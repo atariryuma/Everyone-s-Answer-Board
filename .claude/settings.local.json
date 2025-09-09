@@ -80,7 +80,8 @@
       "Bash(else echo \"❌\")",
       "Bash(clasp open:*)",
       "Bash(clasp:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(then npm run lint)"
     ],
     "deny": [],
     "ask": [],

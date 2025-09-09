@@ -97,6 +97,150 @@ class UnifiedCache {
   }
 }
 
+/**
+ * 🚀 RequestManager - 429エラー解消のための高度なリクエスト制御
+ * 最小限のコードで最大効果を発揮する軽量実装
+ */
+class RequestManager {
+  constructor() {
+    this.queue = [];
+    this.processing = false;
+    this.delay = 500; // 500ms間隔でリクエスト実行
+    this.cache = new Map(); // リクエスト結果キャッシュ
+    this.retryConfig = { maxRetries: 3, baseDelay: 1000 }; // 指数バックオフ
+  }
+
+  /**
+   * ⚡ メインAPI - google.script.run呼び出しを制御
+   * @param {Function} apiCall - google.script.run関数
+   * @param {string} cacheKey - キャッシュキー（省略可）
+   * @param {number} cacheTTL - キャッシュ生存時間（デフォルト5分）
+   */
+  async execute(apiCall, cacheKey = null, cacheTTL = 300000) {
+    // キャッシュチェック（高速化）
+    if (cacheKey && this.cache.has(cacheKey)) {
+      const cached = this.cache.get(cacheKey);
+      if (Date.now() < cached.expiry) {
+        console.log('🚀 RequestManager: キャッシュヒット', cacheKey);
+        return cached.data;
+      }
+      this.cache.delete(cacheKey);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.queue.push({ 
+        apiCall, 
+        resolve, 
+        reject, 
+        cacheKey, 
+        cacheTTL,
+        retries: 0,
+        timestamp: Date.now()
+      });
+      this.processQueue();
+    });
+  }
+
+  /**
+   * 🔄 キュー処理 - 500ms間隔で順次実行
+   */
+  async processQueue() {
+    if (this.processing || this.queue.length === 0) return;
+    
+    this.processing = true;
+
+    try {
+      const request = this.queue.shift();
+      
+      try {
+        const result = await request.apiCall();
+        
+        // 成功時はキャッシュに保存
+        if (request.cacheKey) {
+          this.cache.set(request.cacheKey, {
+            data: result,
+            expiry: Date.now() + request.cacheTTL
+          });
+          console.log('💾 RequestManager: 結果をキャッシュ', request.cacheKey);
+        }
+        
+        request.resolve(result);
+        
+      } catch (error) {
+        // 429エラーまたはリトライ可能エラーの場合
+        if (this.shouldRetry(error, request)) {
+          await this.retryRequest(request);
+        } else {
+          console.error('❌ RequestManager: API呼び出し失敗', error.message);
+          request.reject(error);
+        }
+      }
+
+      // 429エラー対策: 500ms待機
+      await new Promise(resolve => setTimeout(resolve, this.delay));
+      
+    } finally {
+      this.processing = false;
+      
+      // 次のリクエストを処理
+      if (this.queue.length > 0) {
+        this.processQueue();
+      }
+    }
+  }
+
+  /**
+   * 🔁 エラー時のリトライ判定
+   */
+  shouldRetry(error, request) {
+    if (request.retries >= this.retryConfig.maxRetries) return false;
+    
+    // 429, 502, 503エラーはリトライ対象
+    const retryableErrors = ['429', '502', '503', 'timeout', 'network'];
+    return retryableErrors.some(errorType => 
+      error.message?.toLowerCase().includes(errorType)
+    );
+  }
+
+  /**
+   * ⏰ 指数バックオフでリトライ
+   */
+  async retryRequest(request) {
+    request.retries++;
+    const retryDelay = this.retryConfig.baseDelay * Math.pow(2, request.retries - 1);
+    
+    console.log(`🔄 RequestManager: リトライ ${request.retries}/${this.retryConfig.maxRetries} (${retryDelay}ms後)`);
+    
+    setTimeout(() => {
+      this.queue.unshift(request); // 優先処理のため先頭に追加
+      this.processQueue();
+    }, retryDelay);
+  }
+
+  /**
+   * 🧹 キャッシュクリーンアップ
+   */
+  cleanup() {
+    const now = Date.now();
+    for (const [key, cached] of this.cache.entries()) {
+      if (now > cached.expiry) {
+        this.cache.delete(key);
+      }
+    }
+  }
+
+  /**
+   * 📊 統計情報
+   */
+  getStats() {
+    return {
+      queueLength: this.queue.length,
+      cacheSize: this.cache.size,
+      isProcessing: this.processing
+    };
+  }
+}
+
 class StudyQuestApp {
   // アプリケーション定数
   static CONSTANTS = Object.freeze({
@@ -149,6 +293,7 @@ class StudyQuestApp {
 
   constructor() {
     this.cache = new UnifiedCache();
+    this.requestManager = new RequestManager(); // 🚀 429エラー対策
     this.weakCache = new WeakMap(); // For DOM element caching
     this.performanceMetrics = { frameTime: 0, domOperations: 0 };
     this.visibilityObserver = null;
@@ -269,14 +414,17 @@ class StudyQuestApp {
     // Polling settings with dynamic interval adjustment
     this.pollingSettings = {
       enabled: true,
-      baseInterval: 30000, // 基本30秒間隔
-      currentInterval: 30000, // 現在の間隔
-      minInterval: 15000, // 最小15秒 (高アクティビティ時)
-      maxInterval: 120000, // 最大2分 (低アクティビティ時)
-      maxRetries: 3,
+      baseInterval: 60000, // 🚀 基本1分間隔（429エラー対策で延長）
+      currentInterval: 60000, // 現在の間隔
+      minInterval: 30000, // 🚀 最小30秒（429エラー対策で延長）
+      maxInterval: 600000, // 🚀 最大10分（低アクティビティ時の大幅延長）
+      maxRetries: 5, // 🚀 リトライ回数増加
       currentRetries: 0,
       successCount: 0, // 連続成功回数
-      activityScore: 0 // アクティビティスコア
+      activityScore: 0, // アクティビティスコア
+      backoffMultiplier: 2, // 🚀 指数バックオフ倍率
+      last429Error: 0, // 🚀 最後の429エラー発生時刻
+      cooldownPeriod: 300000 // 🚀 429エラー後のクールダウン期間（5分）
     };
     const savedCols = localStorage.getItem('boardColumns');
     if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
@@ -1087,45 +1235,51 @@ class StudyQuestApp {
     this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
   }
   runGas(funcName, ...args) {
-    // Simple request deduplication for identical calls (except for state-changing operations)
+    // 🚀 RequestManager対応 - 429エラー対策の高度な実装
     const cacheKey = funcName + JSON.stringify(args);
     const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
     
+    // 既存のUnifiedCacheも併用（二重キャッシュ効果）
     if (!isStateChanging) {
       const cached = this.cache.get(cacheKey);
       if (cached) {
+        console.log(`🚀 UnifiedCache HIT: ${funcName}`);
         return Promise.resolve(cached);
       }
     }
     
-    // GAS API call processing
-    
-    return new Promise((resolve, reject) => {
-      if (typeof google !== 'undefined' && google.script && google.script.run) {
-        const userId = USER_ID || '';
-        google.script.run
-          .withSuccessHandler((result) => {
+    // RequestManager経由でAPI呼び出し（429エラー対策＋リトライ）
+    return this.requestManager.execute(
+      () => new Promise((resolve, reject) => {
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          const userId = USER_ID || '';
+          google.script.run
+            .withSuccessHandler((result) => {
+              // 二重キャッシュ：UnifiedCache + RequestManagerキャッシュ
+              if (!isStateChanging) {
+                this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
+              }
+              resolve(result);
+            })
+            .withFailureHandler((error) => {
+              console.error('🚨 GAS APIエラー:', { funcName, args, error });
+              reject(error);
+            })
+            .withUserObject({ userId: userId })
+            [funcName](...args);
+        } else {
+          console.warn('Google Apps Script environment not detected.');
+          this.getMockData(funcName, ...args).then((result) => {
             if (!isStateChanging) {
               this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
             }
             resolve(result);
-          })
-          .withFailureHandler((error) => {
-            console.error('GAS APIエラー受信:', { funcName, args, error, success: false });
-            reject(error);
-          })
-          .withUserObject({ userId: userId })
-          [funcName](...args);
-      } else {
-        console.warn('Google Apps Script environment not detected.');
-        this.getMockData(funcName, ...args).then((result) => {
-          if (!isStateChanging) {
-            this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
-          }
-          resolve(result);
-        }).catch(reject);
-      }
-    });
+          }).catch(reject);
+        }
+      }),
+      isStateChanging ? null : `gas-${cacheKey}`, // 状態変更系は RequestManager キャッシュ無効
+      isStateChanging ? 0 : 300000 // 状態変更系は即時実行、その他は5分キャッシュ
+    );
   }
   async verifyAdminAsync() {
     // Use server-provided flag first (fast)
@@ -1755,11 +1909,42 @@ class StudyQuestApp {
         
       } catch (error) {
         this.pollingSettings.currentRetries++;
-        console.warn(`ポーリングエラー (${this.pollingSettings.currentRetries}/${this.pollingSettings.maxRetries}):`, error);
+        console.warn(`🚨 ポーリングエラー (${this.pollingSettings.currentRetries}/${this.pollingSettings.maxRetries}):`, error);
+        
+        // 🚀 429エラー特別処理
+        if (error.message?.includes('429') || error.status === 429) {
+          this.pollingSettings.last429Error = Date.now();
+          const cooldownTime = this.pollingSettings.cooldownPeriod;
+          console.warn(`🚨 429エラー検出 - ${cooldownTime/1000}秒間のクールダウン開始`);
+          
+          // クールダウン期間中はポーリング間隔を大幅延長
+          this.pollingSettings.currentInterval = Math.max(
+            this.pollingSettings.currentInterval * this.pollingSettings.backoffMultiplier,
+            this.pollingSettings.maxInterval
+          );
+        }
+        
+        // 指数バックオフでリトライ間隔を調整
+        const backoffDelay = Math.min(
+          this.pollingSettings.baseInterval * Math.pow(this.pollingSettings.backoffMultiplier, this.pollingSettings.currentRetries - 1),
+          this.pollingSettings.maxInterval
+        );
         
         if (this.pollingSettings.currentRetries >= this.pollingSettings.maxRetries) {
-          console.error('ポーリング最大リトライ数に達したため停止');
+          console.error('🛑 ポーリング最大リトライ数に達したため停止');
           this.stopNewAnswerPolling();
+          
+          // 5分後に自動復旧を試行
+          setTimeout(() => {
+            console.log('🔄 ポーリング自動復旧を試行');
+            this.pollingSettings.currentRetries = 0;
+            this.pollingSettings.currentInterval = this.pollingSettings.baseInterval;
+            this.startNewAnswerPolling();
+          }, 300000);
+        } else {
+          // バックオフ間隔で次のチェックまで待機
+          console.log(`⏰ 次回ポーリングまで ${backoffDelay/1000}秒待機`);
+          this.pollingSettings.currentInterval = backoffDelay;
         }
       }
     }, this.pollingSettings.currentInterval);
@@ -8048,22 +8233,50 @@ const displayDomainInfo = (info) => {
 
 /**
  * フォームリンクを取得して表示する関数
+ * 🚀 RequestManager対応 - 429エラー対策済み
  */
-const loadFormLink = () => {
-  google.script.run
-    .withSuccessHandler(formInfo => {
-      if (formInfo && formInfo.formUrl) {
-        const formLinkBtn = document.getElementById('form-link-btn');
-        if (formLinkBtn) {
-          formLinkBtn.href = formInfo.formUrl;
-          formLinkBtn.classList.remove('hidden');
-        }
+const loadFormLink = async () => {
+  try {
+    // RequestManagerを経由してAPI呼び出し（キャッシュ付き）
+    const requestManager = window.studyQuestApp?.requestManager || new RequestManager();
+    const formInfo = await requestManager.execute(
+      () => new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .getActiveFormInfo(USER_ID);
+      }),
+      `formInfo-${USER_ID}`, // キャッシュキー
+      300000 // 5分キャッシュ
+    );
+
+    if (formInfo && formInfo.formUrl) {
+      const formLinkBtn = document.getElementById('form-link-btn');
+      if (formLinkBtn) {
+        formLinkBtn.href = formInfo.formUrl;
+        formLinkBtn.classList.remove('hidden');
       }
-    })
-    .withFailureHandler(error => {
-      console.warn('フォーム情報の取得に失敗しました:', error);
-    })
-    .getActiveFormInfo(USER_ID);
+    }
+  } catch (error) {
+    console.warn('フォーム情報の取得に失敗しました:', error);
+  }
+}
+
+// システムフロー表示関数の定義
+function showSystemFlow() {
+  try {
+    console.log('🔄 システムフロー初期化開始');
+    // 基本的なシステムフロー初期化
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log('📄 DOM読み込み完了');
+      });
+    } else {
+      console.log('📄 DOM既に読み込み済み');
+    }
+  } catch (error) {
+    console.error('❌ システムフロー初期化中にエラー:', error);
+  }
 }
 
 try {
