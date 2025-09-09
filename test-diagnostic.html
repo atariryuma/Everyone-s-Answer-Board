@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>columnMapping診断ツール</title>
+</head>
+<body>
+    <h1>columnMapping診断ツール</h1>
+    <button onclick="runDiagnosis()">診断実行</button>
+    <button onclick="repairMapping()">自動修復</button>
+    <div id="results"></div>
+
+    <script>
+        function runDiagnosis() {
+            console.log('診断開始...');
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('診断結果:', result);
+                    document.getElementById('results').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                })
+                .withFailureHandler(function(error) {
+                    console.error('診断エラー:', error);
+                    document.getElementById('results').innerHTML = '<div style="color: red;">エラー: ' + error.message + '</div>';
+                })
+                .diagnoseColumnMappingIssue();
+        }
+
+        function repairMapping() {
+            console.log('修復開始...');
+            google.script.run
+                .withSuccessHandler(function(result) {
+                    console.log('修復結果:', result);
+                    document.getElementById('results').innerHTML = '<pre>' + JSON.stringify(result, null, 2) + '</pre>';
+                })
+                .withFailureHandler(function(error) {
+                    console.error('修復エラー:', error);
+                    document.getElementById('results').innerHTML = '<div style="color: red;">エラー: ' + error.message + '</div>';
+                })
+                .repairColumnMapping();
+        }
+    </script>
+</body>
+</html>

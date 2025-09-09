@@ -28,19 +28,57 @@ function connectDataSource(spreadsheetId, sheetName) {
 
     // ヘッダー情報と列マッピング検出
     const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-    const columnMapping = detectColumnMapping(headerRow);
+    
+    // サンプルデータも取得してより精度の高いマッピングを生成
+    const dataRows = Math.min(10, sheet.getLastRow());
+    let allData = [];
+    if (dataRows > 1) {
+      allData = sheet.getRange(1, 1, dataRows, sheet.getLastColumn()).getValues();
+    }
+    
+    let columnMapping = detectColumnMapping(headerRow);
+    
+    // columnMappingが未定義の場合は強制生成
+    if (!columnMapping) {
+      console.warn('⚠️ detectColumnMapping失敗、強制生成を実行');
+      columnMapping = generateColumnMapping(headerRow, allData);
+    }
+    
+    // さらに未定義の場合はレガシーフォールバック
+    if (!columnMapping || !columnMapping.mapping) {
+      console.warn('⚠️ columnMapping生成失敗、レガシーフォールバック実行');
+      columnMapping = generateLegacyColumnMapping(headerRow);
+      
+      // レガシー形式を新形式に変換
+      if (columnMapping && !columnMapping.mapping) {
+        columnMapping = {
+          mapping: columnMapping,
+          confidence: columnMapping.confidence || {}
+        };
+      }
+    }
+    
+    console.log('✅ columnMapping最終確認:', {
+      hasMapping: !!columnMapping,
+      hasMappingField: !!columnMapping?.mapping,
+      mappingKeys: columnMapping?.mapping ? Object.keys(columnMapping.mapping) : [],
+      hasReason: !!columnMapping?.mapping?.reason
+    });
 
     // 列マッピング検証
-    const validationResult = validateAdminPanelMapping(columnMapping);
+    const validationResult = validateAdminPanelMapping(columnMapping.mapping || columnMapping);
     if (!validationResult.isValid) {
       console.warn('列名マッピング検証エラー', validationResult.errors);
     }
 
     // 不足列の追加
-    const missingColumnsResult = addMissingColumns(spreadsheetId, sheetName, columnMapping);
+    const missingColumnsResult = addMissingColumns(spreadsheetId, sheetName, columnMapping.mapping || columnMapping);
     if (missingColumnsResult.success && missingColumnsResult.addedColumns.length > 0) {
       const updatedHeaderRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      columnMapping = detectColumnMapping(updatedHeaderRow);
+      const newMapping = detectColumnMapping(updatedHeaderRow);
+      if (newMapping) {
+        columnMapping = newMapping;
+      }
     }
 
     // 🎯 フォーム連携情報取得（正規実装）
@@ -1448,6 +1486,181 @@ function getActualHeaderName(headerRow, columnIndex) {
     }
   }
   return null;
+}
+
+/**
+ * 🔍 columnMapping診断ツール（フロントエンド用）
+ * 現在のユーザーのconfigJSON状態を詳細診断
+ */
+function diagnoseColumnMappingIssue() {
+  try {
+    console.log('🔍 columnMapping診断開始');
+    
+    const currentUser = UserManager.getCurrentEmail();
+    const userInfo = DB.findUserByEmail(currentUser);
+    
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    const config = JSON.parse(userInfo.configJson || '{}');
+    
+    console.log('📊 現在の設定状態:', {
+      userId: userInfo.userId,
+      hasSpreadsheetId: !!config.spreadsheetId,
+      hasSheetName: !!config.sheetName,
+      hasColumnMapping: !!config.columnMapping,
+      hasReasonHeader: !!config.reasonHeader,
+      setupStatus: config.setupStatus
+    });
+    
+    // スプレッドシート情報確認
+    let spreadsheetInfo = null;
+    if (config.spreadsheetId && config.sheetName) {
+      try {
+        const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+        const sheet = spreadsheet.getSheetByName(config.sheetName);
+        const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+        
+        spreadsheetInfo = {
+          headerCount: headerRow.length,
+          headers: headerRow,
+          dataRowCount: sheet.getLastRow() - 1
+        };
+        
+        console.log('📋 スプレッドシートヘッダー:', headerRow);
+      } catch (sheetError) {
+        console.error('スプレッドシートアクセスエラー:', sheetError.message);
+      }
+    }
+    
+    const diagnosis = {
+      userConfigured: !!userInfo,
+      spreadsheetConfigured: !!(config.spreadsheetId && config.sheetName),
+      columnMappingExists: !!config.columnMapping,
+      reasonMappingExists: !!config.columnMapping?.mapping?.reason,
+      legacyReasonHeaderExists: !!config.reasonHeader,
+      spreadsheetAccessible: !!spreadsheetInfo,
+      headerStructure: spreadsheetInfo
+    };
+    
+    console.log('🎯 診断結果:', diagnosis);
+    
+    return {
+      success: true,
+      diagnosis,
+      config,
+      recommendations: generateRecommendations(diagnosis)
+    };
+    
+  } catch (error) {
+    console.error('❌ columnMapping診断エラー:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * columnMapping自動修復
+ */
+function repairColumnMapping() {
+  try {
+    console.log('🔧 columnMapping自動修復開始');
+    
+    const currentUser = UserManager.getCurrentEmail();
+    const userInfo = DB.findUserByEmail(currentUser);
+    
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+    
+    const currentConfig = JSON.parse(userInfo.configJson || '{}');
+    
+    if (!currentConfig.spreadsheetId || !currentConfig.sheetName) {
+      throw new Error('スプレッドシート情報が不足しています');
+    }
+    
+    // スプレッドシートからヘッダーを取得
+    const spreadsheet = SpreadsheetApp.openById(currentConfig.spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(currentConfig.sheetName);
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // サンプルデータも取得
+    const dataRows = Math.min(10, sheet.getLastRow());
+    const allData = sheet.getRange(1, 1, dataRows, sheet.getLastColumn()).getValues();
+    
+    // 新しいcolumnMappingを生成
+    const newColumnMapping = generateColumnMapping(headerRow, allData);
+    
+    console.log('🎯 新columnMapping生成:', {
+      oldMapping: currentConfig.columnMapping,
+      newMapping: newColumnMapping
+    });
+    
+    // 設定を更新
+    const updatedConfig = {
+      ...currentConfig,
+      columnMapping: newColumnMapping,
+      // レガシーヘッダー情報も更新
+      reasonHeader: getActualHeaderName(headerRow, newColumnMapping.mapping?.reason) || '理由',
+      opinionHeader: getActualHeaderName(headerRow, newColumnMapping.mapping?.answer) || 'お題',
+      classHeader: getActualHeaderName(headerRow, newColumnMapping.mapping?.class) || 'クラス',
+      nameHeader: getActualHeaderName(headerRow, newColumnMapping.mapping?.name) || '名前',
+      lastModified: new Date().toISOString()
+    };
+    
+    // DBに保存
+    DB.updateUser(userInfo.userId, updatedConfig);
+    
+    console.log('✅ columnMapping修復完了');
+    
+    return {
+      success: true,
+      message: 'columnMappingを修復しました',
+      oldMapping: currentConfig.columnMapping,
+      newMapping: newColumnMapping,
+      updatedHeaders: {
+        reasonHeader: updatedConfig.reasonHeader,
+        opinionHeader: updatedConfig.opinionHeader,
+        classHeader: updatedConfig.classHeader,
+        nameHeader: updatedConfig.nameHeader
+      }
+    };
+    
+  } catch (error) {
+    console.error('❌ columnMapping修復エラー:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * 診断結果に基づく推奨事項生成
+ */
+function generateRecommendations(diagnosis) {
+  const recommendations = [];
+  
+  if (!diagnosis.spreadsheetConfigured) {
+    recommendations.push('スプレッドシートの設定が必要です');
+  }
+  
+  if (!diagnosis.columnMappingExists) {
+    recommendations.push('columnMappingを生成する必要があります');
+  }
+  
+  if (!diagnosis.reasonMappingExists && diagnosis.columnMappingExists) {
+    recommendations.push('理由列のマッピングが不足しています');
+  }
+  
+  if (!diagnosis.spreadsheetAccessible && diagnosis.spreadsheetConfigured) {
+    recommendations.push('スプレッドシートにアクセスできません。権限を確認してください');
+  }
+  
+  return recommendations;
 }
 
 /**
