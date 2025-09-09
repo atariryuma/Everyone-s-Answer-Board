@@ -3,6 +3,117 @@
  * 主要な業務ロジック、APIエンドポイント、バルクデータAPI
  */
 
+// ===========================================
+// 🎯 シンプル化：統一データアクセス関数群
+// ===========================================
+
+/**
+ * 統一設定取得関数（シンプル版）
+ * @param {Object} userInfo - ユーザー情報
+ * @returns {Object} 設定オブジェクト
+ */
+function getConfigSimple(userInfo) {
+  if (!userInfo || !userInfo.configJson) {
+    throw new Error('ユーザー情報または設定が見つかりません');
+  }
+  
+  const config = JSON.parse(userInfo.configJson);
+  
+  // 必須フィールドの検証
+  if (!config.spreadsheetId) {
+    throw new Error('スプレッドシートIDが設定されていません');
+  }
+  if (!config.sheetName) {
+    throw new Error('シート名が設定されていません');
+  }
+  if (!config.columnMapping || !config.columnMapping.mapping) {
+    throw new Error('列マッピングが設定されていません');
+  }
+  
+  return config;
+}
+
+/**
+ * 統一エラーレスポンス作成
+ * @param {string} message - エラーメッセージ
+ * @param {Object} details - 詳細情報
+ * @returns {Object} エラーレスポンス
+ */
+function createErrorResponse(message, details = {}) {
+  return {
+    status: 'error',
+    message: message,
+    data: [],
+    count: 0,
+    timestamp: new Date().toISOString(),
+    details: details
+  };
+}
+
+/**
+ * 統一成功レスポンス作成
+ * @param {Array} data - データ配列
+ * @param {Object} metadata - メタデータ
+ * @returns {Object} 成功レスポンス
+ */
+function createSuccessResponse(data, metadata = {}) {
+  return {
+    status: 'success',
+    data: data,
+    count: data.length,
+    timestamp: new Date().toISOString(),
+    ...metadata
+  };
+}
+
+/**
+ * デバッグログ統一出力
+ * @param {string} operation - 操作名
+ * @param {Object} data - ログデータ
+ */
+function logDebug(operation, data) {
+  console.log(`[${operation}] ${JSON.stringify({
+    timestamp: new Date().toISOString(),
+    ...data
+  })}`);
+}
+
+/**
+ * columnMappingを使用したデータ処理（シンプル版）
+ * @param {Array} dataRows - データ行配列
+ * @param {Array} headers - ヘッダー配列
+ * @param {Object} columnMapping - 列マッピング
+ * @returns {Array} 処理済みデータ配列
+ */
+function processDataWithColumnMapping(dataRows, headers, columnMapping) {
+  logDebug('processDataWithColumnMapping', {
+    rowCount: dataRows.length,
+    headerCount: headers.length,
+    mappingKeys: Object.keys(columnMapping)
+  });
+
+  return dataRows.map((row, index) => {
+    const processedRow = {
+      id: index + 1,
+      timestamp: row[columnMapping.timestamp] || row[0] || '',
+      email: row[columnMapping.email] || row[1] || '',
+      class: row[columnMapping.class] || row[2] || '',
+      name: row[columnMapping.name] || row[3] || '',
+      answer: row[columnMapping.answer] || row[4] || '',
+      reason: row[columnMapping.reason] || row[5] || '',
+      reactions: {
+        understand: parseInt(row[columnMapping.understand] || 0),
+        like: parseInt(row[columnMapping.like] || 0),
+        curious: parseInt(row[columnMapping.curious] || 0)
+      },
+      highlight: row[columnMapping.highlight] === 'TRUE' || false,
+      originalData: row
+    };
+
+    return processedRow;
+  });
+}
+
 /**
  * 🚀 バルクデータAPI: 複数の情報を一括取得で高速化
  * 個別API呼び出しを防止し、パフォーマンスを大幅改善
@@ -550,55 +661,35 @@ function getCurrentSheetName(spreadsheetId) {
  */
 function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode) {
   try {
-    const currentUserId = requestUserId; // requestUserId を使用
-    console.log(
-      'getData: userId=%s, classFilter=%s, sortOrder=%s, adminMode=%s',
-      currentUserId,
+    logDebug('executeGetPublishedSheetData', {
+      requestUserId,
       classFilter,
       sortOrder,
       adminMode
-    );
+    });
 
     // CLAUDE.md準拠: requestUserIdを使用してユーザー情報取得
-    const userInfo = DB.findUserById(currentUserId);
+    const userInfo = DB.findUserById(requestUserId);
     if (!userInfo) {
-      throw new Error(`ユーザー情報が見つかりません (userId: ${currentUserId})`);
+      return createErrorResponse(`ユーザー情報が見つかりません (userId: ${requestUserId})`);
     }
 
-    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
-
-    // セットアップ状況を確認
-    const setupStatus = configJson.setupStatus || 'pending';
-
-    // 🚀 CLAUDE.md準拠：統一データソース原則 - configJSONからのみデータ取得
-    const config = JSON.parse(userInfo.configJson || '{}') || configJson || {};
-    const spreadsheetId = config.spreadsheetId;
-    const sheetName = config.sheetName;
-
-    if (!spreadsheetId || !sheetName) {
-      if (setupStatus === 'pending') {
-        // セットアップ未完了の場合は適切なメッセージを返す
-        return {
-          status: 'setup_required',
-          message:
-            'セットアップを完了してください。データ準備、シート・列設定、公開設定の順番で進めてください。',
-          data: [],
-          setupStatus,
-        };
-      }
-      throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
-    }
-
-    // ✅ configJSON中心型: sheetConfig廃止、直接configJSON使用
+    // 🎯 シンプル化: 統一設定取得関数使用
+    const config = getConfigSimple(userInfo);
+    logDebug('config_validated', {
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      hasColumnMapping: !!config.columnMapping.mapping,
+      mappingCount: Object.keys(config.columnMapping.mapping).length
+    });
 
     // Check if current user is the board owner
-    const isOwner = configJson.userId === currentUserId;
-    console.log(
-      'getData: isOwner=%s, userId=%s, currentUserId=%s',
+    const isOwner = userInfo.userId === requestUserId;
+    logDebug('owner_check', {
       isOwner,
-      configJson.userId,
-      currentUserId
-    );
+      userInfoUserId: userInfo.userId,
+      requestUserId
+    });
 
     // データ取得
     const sheetData = getSheetData(
@@ -751,162 +842,89 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
  * @returns {object} 新しいデータのみを含む結果
  */
 function getIncrementalData(requestUserId, classFilter, sortOrder, adminMode, sinceRowCount) {
-  const accessResult = App.getAccess().verifyAccess(
-    requestUserId,
-    'view',
-    UserManager.getCurrentEmail()
-  );
-  if (!accessResult.allowed) {
-    throw new Error(`アクセスが拒否されました: ${accessResult.reason}`);
-  }
   try {
-    const currentUserId = requestUserId; // requestUserId を使用
-
-    const userInfo = getActiveUserInfo();
-    if (!userInfo) {
-      throw new Error('ユーザー情報が見つかりません');
-    }
-
-    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
-    const setupStatus = configJson.setupStatus || 'pending';
-
-    // 🚀 CLAUDE.md準拠：統一データソース原則 - configJSONからのみデータ取得
-    const config = JSON.parse(userInfo.configJson || '{}') || configJson;
-    const spreadsheetId = config.spreadsheetId;
-    const sheetName = config.sheetName;
-
-    if (!spreadsheetId || !sheetName) {
-      if (setupStatus === 'pending') {
-        // セットアップ未完了の場合は適切なメッセージを返す
-        return {
-          status: 'setup_required',
-          message: 'セットアップを完了してください。',
-          incrementalData: [],
-          setupStatus,
-        };
-      }
-      throw new Error('公開対象のスプレッドシートまたはシートが設定されていません。');
-    }
-
-    // スプレッドシートとシートを取得
-    const ss = new ConfigurationManager().getSpreadsheet(spreadsheetId);
-
-    const sheet = ss.getSheetByName(sheetName);
-
-    if (!sheet) {
-      throw new Error(`指定されたシートが見つかりません: ${sheetName}`);
-    }
-
-    const lastRow = sheet.getLastRow(); // スプレッドシートの最終行
-    const headerRow = 1; // ヘッダー行は1行目と仮定
-
-    // 実際に読み込むべき開始行を計算 (sinceRowCountはデータ行数なので、+1してヘッダーを考慮)
-    // sinceRowCountが0の場合、ヘッダーの次の行から読み込む
-    const startRowToRead = sinceRowCount + headerRow + 1;
-
-    // 新しいデータがない場合
-    if (lastRow < startRowToRead) {
-      console.log(
-        '🔍 増分データ分析: 新しいデータなし。lastRow=%s, startRowToRead=%s',
-        lastRow,
-        startRowToRead
-      );
-      return {
-        header: '', // 必要に応じて設定
-        sheetName: sheetName,
-        showCounts: configJson.showCounts === true,
-        displayMode: configJson.displayMode || CONSTANTS.DISPLAY_MODES.ANONYMOUS,
-        data: [],
-        totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
-        newCount: 0,
-        isIncremental: true,
-      };
-    }
-
-    // 読み込む行数
-    const numRowsToRead = lastRow - startRowToRead + 1;
-
-    // 必要なデータのみをスプレッドシートから直接取得
-    // getRange(row, column, numRows, numColumns)
-    // ここでは全列を取得すると仮定 (A列から最終列まで)
-    const lastColumn = sheet.getLastColumn();
-    const rawNewData = sheet.getRange(startRowToRead, 1, numRowsToRead, lastColumn).getValues();
-
-    // 🎯 統一関数で列インデックスを取得（レガシー削除）
-    const columnIndices = getAllColumnIndices(configJson);
-    
-    if (!configJson.columnMapping || !configJson.columnMapping.mapping) {
-      console.warn('⚠️ getSheetData: columnMappingが設定されていません');
-    }
-    
-    // 統一形式でマッピング
-    const mappedIndices = {
-      opinionHeader: columnIndices.answer,
-      reasonHeader: columnIndices.reason,
-      classHeader: columnIndices.class,
-      nameHeader: columnIndices.name
-    };
-
-    // ユーザー情報と管理者モードの取得
-    const isOwner = configJson.userId === currentUserId;
-    const displayMode = configJson.displayMode || CONSTANTS.DISPLAY_MODES.ANONYMOUS;
-
-    // 新しいデータを既存の処理パイプラインと同様に加工
-    const headers = sheet.getRange(headerRow, 1, 1, lastColumn).getValues()[0];
-    const rosterMap = buildRosterMap([]); // roster is not used
-    const processedData = rawNewData.map((row, idx) => {
-      return processRowData(
-        row,
-        headers,
-        headerIndices,
-        rosterMap,
-        displayMode,
-        startRowToRead + idx,
-        isOwner
-      );
+    logDebug('getIncrementalData', {
+      requestUserId,
+      classFilter,
+      sortOrder,
+      adminMode,
+      sinceRowCount
     });
 
-    // 取得した生データをPage.htmlが期待する形式にフォーマット
-    const formattedNewData = formatSheetDataForFrontend(
-      processedData,
-      mappedIndices,
-      headerIndices,
-      adminMode,
-      isOwner,
-      displayMode
+    const accessResult = App.getAccess().verifyAccess(
+      requestUserId,
+      'view',
+      UserManager.getCurrentEmail()
     );
+    if (!accessResult.allowed) {
+      return createErrorResponse(`アクセスが拒否されました: ${accessResult.reason}`);
+    }
 
-    return {
-      header: '', // 必要に応じて設定
-      sheetName: sheetName,
-      showCounts: false, // 必要に応じて設定
-      displayMode,
-      data: formattedNewData,
-      totalCount: lastRow - headerRow, // ヘッダーを除いたデータ総数
-      newCount: formattedNewData.length,
-      isIncremental: true,
-    };
-  } catch (e) {
-    console.error('増分データ取得エラー:', e.message);
-    return {
-      status: 'error',
-      message: `増分データの取得に失敗しました: ${e.message}`,
-    };
+    const userInfo = DB.findUserById(requestUserId);
+    if (!userInfo) {
+      return createErrorResponse('ユーザー情報が見つかりません');
+    }
+
+    // 🎯 シンプル化: 統一設定取得関数使用
+    const config = getConfigSimple(userInfo);
+    
+    // 🔧 シンプルな差分取得ロジック
+    const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(config.sheetName);
+    const lastRow = sheet.getLastRow();
+    
+    logDebug('incremental_check', {
+      lastRow,
+      sinceRowCount,
+      hasNewData: sinceRowCount < lastRow - 1
+    });
+    
+    if (sinceRowCount >= lastRow - 1) {
+      return createSuccessResponse([], {
+        hasNewData: false,
+        totalRows: lastRow - 1
+      });
+    }
+    
+    // 🔧 新しいデータを取得 
+    const allData = sheet.getDataRange().getValues();
+    const headers = allData[0];
+    const newRowsData = allData.slice(sinceRowCount + 1); // sinceRowCount以降の新しい行
+    
+    if (newRowsData.length === 0) {
+      return createSuccessResponse([], {
+        hasNewData: false,
+        totalRows: lastRow - 1
+      });
+    }
+    
+    // 🎯 シンプル化: columnMappingを使用した直接データ処理
+    const processedNewData = processDataWithColumnMapping(
+      newRowsData,
+      headers,
+      config.columnMapping.mapping
+    );
+    
+    return createSuccessResponse(processedNewData, {
+      hasNewData: true,
+      totalRows: lastRow - 1,
+      newDataCount: processedNewData.length,
+      isIncremental: true
+    });
+  } catch (error) {
+    logDebug('getIncrementalData_error', {
+      requestUserId,
+      error: error.message
+    });
+    return createErrorResponse(`差分データ取得に失敗しました: ${error.message}`, {
+      requestUserId
+    });
   }
 }
 
-// getSheetsList: Core.gs 2816行目の完全版に統合済み（重複削除）
-
-/**
- * ボードデータを再読み込み (マルチテナント対応版)
- * AdminPanel.htmlから呼び出される
- * @param {string} requestUserId - リクエスト元のユーザーID
- */
-// refreshBoardData関数はPageBackend.gsに移動済み
-
 /**
  * スプレッドシートの生データをフロントエンドが期待する形式にフォーマットするヘルパー関数
- * @param {Array<Object>} rawData - getSheetDataから返された生データ（originalData, reactionCountsなどを含む）
+ * @param {Array<Object>} rawData - getSheetDataから返された生データ
  * @param {Object} mappedIndices - 設定されたヘッダー名と実際の列インデックスのマッピング
  * @param {Object} headerIndices - 実際のヘッダー名と列インデックスのマッピング
  * @param {boolean} adminMode - 管理者モードかどうか
@@ -2555,122 +2573,60 @@ Object.defineProperty(globalThis, 'sheetConfig', {
  */
 function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
   try {
-    const userInfo = getActiveUserInfo();
+    logDebug('executeGetSheetData_start', {
+      userId,
+      sheetName,
+      classFilter,
+      sortMode
+    });
+
+    const userInfo = DB.findUserById(userId);
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // 🚀 CLAUDE.md準拠：統一データソース原則
-    const config = JSON.parse(userInfo.configJson || '{}') || {};
-    const { spreadsheetId } = config;
-
-    // spreadsheetIDの型と存在をチェック
-    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
-      console.error('executeGetSheetData: 無効なspreadsheetID', {
-        spreadsheetId,
-        type: typeof spreadsheetId,
-        userId,
-        userInfo,
-      });
-      throw new Error(`無効なspreadsheetIDです: 文字列である必要があります`);
-    }
-    const service = getSheetsServiceCached();
-
-    // フォーム回答データのみを取得（名簿機能は使用しない）
-    // 🚀 CLAUDE.md準拠：A:E範囲使用でパフォーマンス最適化
-    const ranges = [`${sheetName}!A:E`];
-
-    const responses = batchGetSheetsData(service, spreadsheetId, ranges);
-    const sheetData = responses.valueRanges[0].values || [];
-
-    // 名簿機能は使用せず、空の配列を設定
-    const rosterData = [];
+    // 🎯 シンプル化: 統一設定取得関数使用
+    const config = getConfigSimple(userInfo);
+    
+    // 🔧 修正: 全列データを取得（A:E制限を削除）
+    const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(config.sheetName);
+    const sheetData = sheet.getDataRange().getValues();
+    
+    logDebug('sheet_data_retrieved', {
+      totalRows: sheetData.length,
+      totalColumns: sheetData[0]?.length || 0,
+      hasColumnMapping: !!config.columnMapping.mapping
+    });
 
     if (sheetData.length === 0) {
-      return {
-        status: 'success',
-        data: [],
-        headers: [],
-        totalCount: 0,
-      };
+      return createSuccessResponse([]);
     }
 
     const headers = sheetData[0];
     const dataRows = sheetData.slice(1);
-
-    // 🔍 スプレッドシート生データの詳細調査ログ（理由列問題対応）
-    console.log('📊 スプレッドシート生データ詳細:', {
-      headers: headers,
-      headerCount: headers.length,
-      reasonRelatedHeaders: headers.map((h, i) => ({ index: i, header: h }))
-        .filter(item => item.header && item.header.toLowerCase().includes('理由'))
-    });
     
-
-    // ヘッダー行から列インデックスを取得
-    const headerIndices = {};
-    headers.forEach((header, index) => {
-      if (header && String(header).trim()) {
-        headerIndices[header] = index;
-      }
-    });
-
-    // 名簿マップを作成（キャッシュ利用）
-    const rosterMap = buildRosterMap(rosterData);
-
-    // 表示モードを取得
-    const configJson = JSON.parse(userInfo.configJson || '{}') || {};
-    const displayMode = configJson.displayMode || CONSTANTS.DISPLAY_MODES.ANONYMOUS;
-
-    // Check if current user is the board owner
-    const isOwner = configJson.userId === userId;
-    console.log(
-      'getSheetData: isOwner=%s, userId=%s, userId=%s',
-      isOwner,
-      configJson.userId,
-      userId
+    // 🎯 シンプル化: columnMappingを使用した直接データ処理
+    const processedData = processDataWithColumnMapping(
+      dataRows, 
+      headers, 
+      config.columnMapping.mapping
     );
-
-    // データを処理
-    const processedData = dataRows.map((row, index) => {
-      return processRowData(
-        row,
-        headers,
-        headerIndices,
-        rosterMap,
-        displayMode,
-        index + 2,
-        isOwner
-      );
+    
+    return createSuccessResponse(processedData, {
+      totalCount: processedData.length,
+      headers: headers
     });
-
-    // フィルタリング
-    let filteredData = processedData;
-    if (classFilter && classFilter !== 'すべて') {
-      const classIndex = headerIndices[CONSTANTS.COLUMNS.CLASS];
-      if (classIndex !== undefined) {
-        filteredData = processedData.filter((row) => row.originalData[classIndex] === classFilter);
-      }
-    }
-
-    // ソート適用
-    const sortedData = applySortMode(filteredData, sortMode || 'newest');
-
-    return {
-      status: 'success',
-      data: sortedData,
-      headers,
-      totalCount: sortedData.length,
-      displayMode,
-    };
-  } catch (e) {
-    console.error('シートデータ取得エラー:', e.message);
-    return {
-      status: 'error',
-      message: `データの取得に失敗しました: ${e.message}`,
-      data: [],
-      headers: [],
-    };
+  } catch (error) {
+    logDebug('executeGetSheetData_error', {
+      userId,
+      sheetName,
+      error: error.message
+    });
+    return createErrorResponse(`データの取得に失敗しました: ${error.message}`, {
+      userId,
+      sheetName
+    });
   }
 }
 
