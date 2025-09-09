@@ -1241,12 +1241,27 @@ function renderAnswerBoard(userInfo, params) {
       // ✅ Step 2: configJsonが「お題」の場合、または未設定の場合は高精度検出実行
       else if (finalSpreadsheetId && finalSheetName) {
         
-        // 2-1: getSpreadsheetColumnIndicesによる高精度検出
-        const headerIndices = getSpreadsheetColumnIndices(finalSpreadsheetId, finalSheetName);
+        // 2-1: ヘッダー行から直接検出
+        try {
+          const spreadsheet = SpreadsheetApp.openById(finalSpreadsheetId);
+          const sheet = spreadsheet.getSheetByName(finalSheetName);
+          const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+          
+          // 質問らしいヘッダーを検索
+          const questionHeader = headerRow.find(header => 
+            header && typeof header === 'string' && 
+            (header.includes('どうして') || header.includes('なぜ') || header.includes('思いますか'))
+          );
+          
+          if (questionHeader && questionHeader !== 'お題') {
+            opinionHeader = questionHeader;
+            opinionHeaderSource = 'header_detection';
+          }
+        } catch (error) {
+          console.warn('ヘッダー検出エラー:', error.message);
+        }
         
-        if (headerIndices?.opinionHeader && headerIndices.opinionHeader !== 'お題') {
-          opinionHeader = headerIndices.opinionHeader;
-          opinionHeaderSource = 'getSpreadsheetColumnIndices';
+        if (opinionHeader && opinionHeader !== 'お題') {
           console.log('✅ renderAnswerBoard: 高精度検出システムによるopinionHeader取得:', {
             value: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
             length: opinionHeader.length,

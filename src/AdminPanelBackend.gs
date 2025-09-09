@@ -1344,8 +1344,18 @@ function getHeaderIndices(spreadsheetId, sheetName) {
       sheetName,
     });
 
-    // 既存のgetSpreadsheetColumnIndices関数を使用
-    const result = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
+    // 統一システム: ヘッダー行から直接インデックスを生成
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // headerIndices オブジェクトを生成
+    const result = {};
+    headerRow.forEach((header, index) => {
+      if (header && String(header).trim()) {
+        result[header] = index;
+      }
+    });
 
     console.log('✅ getHeaderIndices: フロントエンド互換関数完了', {
       hasResult: !!result,

@@ -1434,9 +1434,10 @@ function countSheetRows(spreadsheetId, sheetName, classFilter) {
         return Math.max(0, lastRow - 1);
       }
 
-      const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
-      const classIndex = headerIndices[COLUMN_HEADERS.CLASS];
-      if (classIndex === undefined) {
+      // 簡素化: ヘッダー行から直接クラス列を検索
+      const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const classIndex = headerRow.findIndex(header => header && header.includes('クラス'));
+      if (classIndex === -1) {
         return Math.max(0, lastRow - 1);
       }
 
@@ -1662,10 +1663,15 @@ function createUserFolder(userEmail) {
 function processHighlightToggle(spreadsheetId, sheetName, rowIndex) {
   try {
     const service = getSheetsServiceCached();
-    const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
-    const highlightColumnIndex = headerIndices[COLUMN_HEADERS.HIGHLIGHT];
+    
+    // ヘッダー行からハイライト列を検索
+    const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const highlightColumnIndex = headerRow.findIndex(header => 
+      header && (header.includes('ハイライト') || header.includes('highlight'))
+    );
 
-    if (highlightColumnIndex === undefined) {
+    if (highlightColumnIndex === -1) {
       throw new Error('ハイライト列が見つかりません');
     }
 
@@ -1804,7 +1810,16 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
       lock.waitLock(10000);
 
       const service = getSheetsServiceCached();
-      const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
+      
+      // ヘッダー行から列インデックスを取得
+      const sheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+      const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      const headerIndices = {};
+      headerRow.forEach((header, index) => {
+        if (header && String(header).trim()) {
+          headerIndices[header] = index;
+        }
+      });
 
       // すべてのリアクション列を取得してユーザーの重複リアクションをチェック
       const allReactionRanges = [];
@@ -2796,8 +2811,13 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
     });
     
 
-    // ヘッダーインデックスを取得（キャッシュ利用）
-    const headerIndices = getSpreadsheetColumnIndices(spreadsheetId, sheetName);
+    // ヘッダー行から列インデックスを取得
+    const headerIndices = {};
+    headers.forEach((header, index) => {
+      if (header && String(header).trim()) {
+        headerIndices[header] = index;
+      }
+    });
 
     // 名簿マップを作成（キャッシュ利用）
     const rosterMap = buildRosterMap(rosterData);
