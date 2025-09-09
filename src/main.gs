@@ -1362,6 +1362,30 @@ function renderAnswerBoard(userInfo, params) {
       template.adminPanelUrl = '';
     }
 
+    // 管理者権限チェック
+    try {
+      const currentUserEmail = Session.getActiveUser().getEmail();
+      const boardOwnerEmail = userInfo.userEmail;
+      
+      // 回答ボードの所有者とアクセスユーザーのメール照合
+      const isAdminUser = currentUserEmail && boardOwnerEmail && (currentUserEmail === boardOwnerEmail);
+      
+      // 管理者権限設定をテンプレート変数に追加
+      template.hasAdminCapability = isAdminUser;
+      template.isAdminUser = isAdminUser;
+      
+      console.log('renderAnswerBoard - 管理者権限チェック:', {
+        currentUserEmail: currentUserEmail ? `${currentUserEmail.substring(0, 10)}...` : 'null',
+        boardOwnerEmail: boardOwnerEmail ? `${boardOwnerEmail.substring(0, 10)}...` : 'null',
+        isAdminUser: isAdminUser,
+        hasAdminCapability: isAdminUser
+      });
+    } catch (adminError) {
+      console.error('renderAnswerBoard - 管理者権限チェックエラー:', adminError);
+      template.hasAdminCapability = false;
+      template.isAdminUser = false;
+    }
+
     return template
       .evaluate()
       .setTitle("Everyone's Answer Board")

@@ -1260,6 +1260,9 @@
       }
       const footerHeight = this.elements.footer.offsetHeight;
       this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
+      
+      // レスポンシブデザイン対応：画面サイズ変更時にカード高さキャッシュをクリア
+      this.clearCardHeightCache();
     }
     // ✅ CLAUDE.md準拠: App名前空間パターン使用
     async runGas(funcName, ...args) {
@@ -1857,8 +1860,12 @@
       }
     }
 
-    // 新着回答のポーリング開始
+    // 429エラー対策：新着回答の専用ポーリングを無効化（startPollingに統合）
     startNewAnswerPolling() {
+      console.warn('⚠️ startNewAnswerPolling: 429エラー対策により無効化されています。startPolling()を使用してください。');
+      return; // 無効化
+      
+      /* 以下のコードは429エラー対策のため無効化
       if (this.pollingInterval) {
         clearInterval(this.pollingInterval);
       }
@@ -2025,10 +2032,10 @@
         clearInterval(this.pollingInterval);
       }
 
-      // Adaptive polling: start with normal interval, adjust based on success/failure
+      // 429エラー対策：大幅に緩和されたポーリング間隔
       this.pollSuccessCount = 0;
       this.pollFailureCount = 0;
-      this.currentPollInterval = this.isLowPerformanceMode ? 30000 : 15000;
+      this.currentPollInterval = this.isLowPerformanceMode ? 120000 : 60000; // 2分または1分間隔
 
       const adaptivePoll = async () => {
 
@@ -2038,17 +2045,17 @@
           this.pollFailureCount = 0;
 
           // Reduce interval on consistent success (but not below minimum)
-          if (this.pollSuccessCount > 3 && this.currentPollInterval > 10000) {
-            this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
+          if (this.pollSuccessCount > 5 && this.currentPollInterval > 30000) {
+            this.currentPollInterval = Math.max(30000, this.currentPollInterval * 0.95); // 最小30秒間隔に変更
           }
 
         } catch (error) {
           this.pollFailureCount++;
           this.pollSuccessCount = 0;
 
-          // Increase interval on failures (exponential backoff)
-          if (this.pollFailureCount > 2) {
-            this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
+          // Increase interval on failures (exponential backoff) - より積極的に間隔を増加
+          if (this.pollFailureCount > 1) {
+            this.currentPollInterval = Math.min(300000, this.currentPollInterval * 2); // 最大5分間隔
           }
           console.warn('❌ ポーリング失敗:', error, {
             failureCount: this.pollFailureCount,
@@ -3111,6 +3118,9 @@
      */
 
     async performDataLoad(config, oldAnswers) {
+      // カード高さキャッシュをクリア（新しいデータのロード時）
+      this.clearCardHeightCache();
+      
       // Get current filter and sort settings
       const isInitialLoad = config.isInitialLoad;
       const requestedSheetName = config.requestedSheetName;
@@ -3269,10 +3279,11 @@
               // 理由データ全体の警告チェック（簡素化）
               const emptyReasonCount = result?.data?.filter(item => !item?.reason || item.reason.trim() === '').length || 0;
               if (emptyReasonCount > 0) {
+                const columnMapping = configManager.config?.columnMapping || {};
                 console.warn('⚠️ 理由データが空の項目があります:', {
                   emptyCount: emptyReasonCount,
                   totalCount: result?.data?.length || 0,
-                  columnMapping: configManager.config?.columnMapping?.reason
+                  columnMapping: columnMapping.reason || 'not_configured'
                 });
               }
 
@@ -3885,6 +3896,35 @@
         };
       }
 
+      // カード高さキャッシュもクリア
+      this.clearCardHeightCache();
+      
+      // スクロール位置情報もリセット
+      this._lastScrollTop = 0;
+
+      // 全てのカードを可視状態に復元
+      if (this.elements.answersContainer) {
+        const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
+        cards.forEach((card) => {
+          card.classList.remove('hidden-card');
+          card.classList.add('visible');
+          card.style.display = '';
+          card.style.visibility = '';
+          card.style.opacity = '';
+          card.style.transform = '';
+        });
+      }
+
+      // Observerをクリーンアップ
+      if (this.visibilityObserver) {
+        this.visibilityObserver.disconnect();
+        this.visibilityObserver = null;
+      }
+      if (this.scrollObserver) {
+        this.scrollObserver.disconnect();
+        this.scrollObserver = null;
+      }
+
       // 既存のオブザーバーを切断
       if (this.scrollObserver) {
         this.scrollObserver.disconnect();
@@ -4160,6 +4200,66 @@
       }
     }
 
+    /**
+     * 実際のカードの高さを動的に測定する
+     * @returns {number} カードの平均高さ（px）
+     */
+    getAverageCardHeight() {
+      const container = this.elements.answersContainer;
+      if (!container) {
+        return 150; // デフォルト値
+      }
+
+      // キャッシュされた値があれば使用（パフォーマンス最適化）
+      if (this._cachedCardHeight && this._cardHeightCacheTime && 
+          (Date.now() - this._cardHeightCacheTime < 30000)) { // 30秒キャッシュ
+        return this._cachedCardHeight;
+      }
+
+      const cards = container.querySelectorAll('.answer-card:not(.hidden-card)');
+      if (cards.length === 0) {
+        return 150; // カードがない場合のデフォルト値
+      }
+
+      // 最初の5枚のカードから高さを測定（サンプリング）
+      const sampleSize = Math.min(5, cards.length);
+      let totalHeight = 0;
+      let measuredCount = 0;
+
+      for (let i = 0; i < sampleSize; i++) {
+        const card = cards[i];
+        if (card.offsetHeight > 0) { // 実際に表示されているカードのみ
+          totalHeight += card.offsetHeight;
+          measuredCount++;
+        }
+      }
+
+      const averageHeight = measuredCount > 0 ? Math.ceil(totalHeight / measuredCount) : 150;
+      
+      // キャッシュに保存
+      this._cachedCardHeight = averageHeight;
+      this._cardHeightCacheTime = Date.now();
+
+      // デバッグ情報（開発時のみ）
+      if (window.DEBUG_MODE) {
+        console.log(`📏 カード高さ測定: ${averageHeight}px (${measuredCount}枚のサンプルから)`);
+      }
+
+      return averageHeight;
+    }
+
+    /**
+     * カードの高さキャッシュをクリアする
+     * データが変更された時やレイアウトが変わった時に呼び出す
+     */
+    clearCardHeightCache() {
+      this._cachedCardHeight = null;
+      this._cardHeightCacheTime = null;
+      if (window.DEBUG_MODE) {
+        console.log('📏 カード高さキャッシュをクリアしました');
+      }
+    }
+
     calculateVisibleRange(totalItems) {
       const container = this.elements.answersContainer;
       if (!container) {
@@ -4170,7 +4270,8 @@
 
       const scrollTop = container.scrollTop;
       let containerHeight = container.clientHeight;
-      const cardHeight = 150;
+      // 実際のカードの高さを動的に測定
+      const cardHeight = this.getAverageCardHeight();
 
       // 🚀 Phase1最適化: コンテナ高さ検出の堅牢化
       if (containerHeight <= 0) {
@@ -4187,7 +4288,21 @@
       if (containerHeight > 0 && totalItems > 0) {
         // 仮想スクロールによる表示範囲計算
         const visibleCards = Math.ceil(containerHeight / cardHeight);
-        const bufferSize = Math.max(20, Math.ceil(visibleCards * 0.5)); // 余分なバッファ
+        
+        // スクロール方向検出と動的バッファサイズ調整
+        const lastScrollTop = this._lastScrollTop || 0;
+        const isScrollingDown = scrollTop > lastScrollTop;
+        this._lastScrollTop = scrollTop;
+        
+        // スクロール方向に応じてバッファサイズを動的調整
+        let bufferSize = Math.max(10, Math.ceil(visibleCards * 0.3));
+        if (isScrollingDown) {
+          // 下スクロール時は下側により多くのバッファを確保
+          bufferSize = Math.max(15, Math.ceil(visibleCards * 0.4));
+        } else {
+          // 上スクロール時は上側により多くのバッファを確保
+          bufferSize = Math.max(15, Math.ceil(visibleCards * 0.4));
+        }
 
         startIndex = Math.max(0, Math.floor(scrollTop / cardHeight) - bufferSize);
         endIndex = Math.min(
@@ -4195,9 +4310,15 @@
           Math.ceil((scrollTop + containerHeight) / cardHeight) + bufferSize
         );
 
-        // 初期表示時は十分な数を表示（106件対応のため200に拡張）
-        if (scrollTop === 0 && startIndex === 0) {
-          endIndex = Math.min(totalItems, Math.max(200, visibleCards * 2));
+        // 初期表示時または上端近くでは、十分な数を表示
+        if (scrollTop < cardHeight * 2) {
+          endIndex = Math.min(totalItems, Math.max(100, visibleCards * 3));
+        }
+        
+        // 下端近くでは、残り全てを表示（パフォーマンス考慮で制限）
+        const remainingItems = totalItems - startIndex;
+        if (remainingItems < 50) {
+          endIndex = totalItems;
         }
 
         Logger.perf(
@@ -7100,10 +7221,10 @@
       // Add low-performance class to body for CSS targeting
       document.body.classList.add('low-performance');
 
-      // Reduce polling frequency
+      // 429エラー対策：ポーリング頻度を大幅削減
       if (this.pollingInterval) {
         clearInterval(this.pollingInterval);
-        this.pollingInterval = setInterval(() => this.loadSheetData({ showLoading: false }), 30000); // 30s instead of 15s
+        this.pollingInterval = setInterval(() => this.loadSheetData({ showLoading: false }), 180000); // 3分間隔に変更
       }
     }
 
@@ -7140,13 +7261,15 @@
                 }
               }
             } else {
-              // MODIFIED: Do not hide cards for virtual scrolling - keep them in DOM
-              // This prevents cards from disappearing when scrolling back up
-              // Only mark as not visible for optimization purposes
+              // 改善されたカード非表示処理：完全にDOMから消すのではなく、効率的な非表示処理
               if (entry.intersectionRatio === 0 && card.classList.contains('visible')) {
                 card.classList.remove('visible');
                 card.classList.add('hidden-card');
-                // Do NOT hide or remove from DOM - just mark as not visible
+                // パフォーマンス最適化：visibilityで非表示にし、位置は保持
+                card.style.visibility = 'hidden';
+                card.style.opacity = '0';
+                // transformで微小な移動を避ける
+                card.style.transform = 'translateZ(0)';
               }
             }
           });

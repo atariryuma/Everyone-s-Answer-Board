@@ -804,12 +804,12 @@ function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adm
     const finalDisplayMode =
       adminMode === true
         ? CONSTANTS.DISPLAY_MODES.NAMED
-        : configJson.displayMode || CONSTANTS.DISPLAY_MODES.ANONYMOUS;
+        : config.displayMode || CONSTANTS.DISPLAY_MODES.ANONYMOUS;
 
     const result = {
       header: headerTitle,
-      sheetName: sheetName,
-      showCounts: adminMode === true ? true : configJson.showCounts === true,
+      sheetName: config.sheetName,
+      showCounts: adminMode === true ? true : config.showCounts === true,
       displayMode: finalDisplayMode,
       data: formattedData,
     };
@@ -4375,11 +4375,12 @@ function publishApplication(config) {
       timestamp: new Date().toISOString(),
     });
 
-    // ユーザー情報を取得
+    // 現在のユーザー情報を取得
+    const currentUserEmail = Session.getActiveUser().getEmail();
     const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (!userInfo) {
       console.error('❌ publishApplication: ユーザー情報が見つかりません', {
-        currentUser,
+        currentUserEmail,
         timestamp: new Date().toISOString(),
       });
       throw new Error('ユーザー情報が見つかりません');
@@ -4689,8 +4690,14 @@ function getSpreadsheetList() {
       timestamp: new Date().toISOString(),
     });
 
+    // 現在のユーザーメール取得
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    if (!currentUserEmail) {
+      throw new Error('ユーザー認証が必要です');
+    }
+
     // キャッシュキー生成（ユーザー固有）
-    const cacheKey = `spreadsheet_list_${Utilities.base64Encode(currentUser).replace(/[^a-zA-Z0-9]/g, '')}`;
+    const cacheKey = `spreadsheet_list_${Utilities.base64Encode(currentUserEmail).replace(/[^a-zA-Z0-9]/g, '')}`;
 
     // キャッシュから取得を試行（1時間キャッシュ）
     return cacheManager.get(
@@ -5131,6 +5138,20 @@ function checkFormConnection(spreadsheetId) {
 }
 
 /**
+ * ✅ リアクション文字列を解析（メールアドレスのリストを返す）
+ */
+function parseReactionString(reactionString) {
+  if (!reactionString || typeof reactionString !== 'string') {
+    return [];
+  }
+  
+  return reactionString
+    .split(',')
+    .map(email => email.trim())
+    .filter(email => email.length > 0);
+}
+
+/**
  * 現在のボード情報とURLを取得（CLAUDE.md準拠版）
  * フロントエンドフッター表示用
  * @returns {Object} ボード情報オブジェクト
@@ -5146,8 +5167,9 @@ function getConfig() {
   try {
     console.log('🔧 getConfig: ユーザー設定取得開始');
 
-    // 現在のユーザーの設定を取得
-    if (!currentUser) {
+    // 現在のユーザー情報を取得
+    const currentUserEmail = Session.getActiveUser().getEmail();
+    if (!currentUserEmail) {
       console.error('❌ getConfig: ユーザーメール取得失敗');
       throw new Error('ユーザー認証が必要です');
     }
@@ -5156,7 +5178,7 @@ function getConfig() {
     const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (!userInfo) {
       console.error('❌ getConfig: ユーザー情報が見つかりません', {
-        currentUser,
+        currentUserEmail,
         timestamp: new Date().toISOString(),
       });
       // ✅ 修正：初期設定を返さず、エラーとして扱う
@@ -5167,7 +5189,7 @@ function getConfig() {
     if (!config) {
       console.error('❌ getConfig: 設定データが見つかりません', {
         userId: userInfo.userId,
-        userEmail: currentUser,
+        userEmail: currentUserEmail,
       });
       // ✅ 修正：既存ユーザーには初期設定ではなく最小限の設定を返す
       throw new Error('設定データが破損している可能性があります');
