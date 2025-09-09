@@ -1,0 +1,1615 @@
+{
+  "unused": [
+    {
+      "name": "include",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 1009,
+          "fullMatch": "function include(filename)",
+          "context": "ファイル名（拡張子なし） * @returns {string} HTMLファイルの内容 */ function include(filename) { try { const con"
+        }
+      ],
+      "reason": "どこからも呼び出されていない",
+      "category": "COMPLETELY_UNUSED"
+    }
+  ],
+  "orphaned": [
+    {
+      "name": "executeAppPublish",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 633,
+          "fullMatch": "function executeAppPublish(userId, publishConfig)",
+          "context": "使用するよう調整済み /** * 既存システム互換：executeAppPublish */ function executeAppPublish(userId, publishConfig)"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "executeConfigCleanup",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 658,
+          "fullMatch": "function executeConfigCleanup()",
+          "context": "（管理パネルから呼び出し） * 現在のユーザーのconfigJSONを完全クリーンアップ */ function executeConfigCleanup() { try { cons"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "validateAdminPanelMapping",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 834,
+          "fullMatch": "function validateAdminPanelMapping(columnMapping)",
+          "context": "ping(headerRow); } /** * 列マッピング検証（既存ロジック維持） */ function validateAdminPanelMapping(columnMapping)"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "addMissingColumns",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 856,
+          "fullMatch": "function addMissingColumns(spreadsheetId, sheetName, columnMapping)",
+          "context": "warnings, }; } /** * 不足列の追加（既存ロジック維持） */ function addMissingColumns(spreadsheetId, sheetNam"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "checkFormConnection",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 902,
+          "fullMatch": "function checkFormConnection(spreadsheetId)",
+          "context": "[], }; } } /** * フォーム接続チェック（既存ロジック維持） */ function checkFormConnection(spreadsheetId) { tr"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "migrateUserDataToConfigJson",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 1154,
+          "fullMatch": "function migrateUserDataToConfigJson(userId = null)",
+          "context": "ン、未指定時は全ユーザー） * @returns {Object} マイグレーション結果 */ function migrateUserDataToConfigJson(userId = null"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "diagnoseColumnMappingIssue",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 1449,
+          "fullMatch": "function diagnoseColumnMappingIssue()",
+          "context": "g診断ツール（フロントエンド用） * 現在のユーザーのconfigJSON状態を詳細診断 */ function diagnoseColumnMappingIssue() { try {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "repairColumnMapping",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 1522,
+          "fullMatch": "function repairColumnMapping()",
+          "context": "essage }; } } /** * columnMapping自動修復 */ function repairColumnMapping() { try { conso"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "generateRecommendations",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 1598,
+          "fullMatch": "function generateRecommendations(diagnosis)",
+          "context": "r.message }; } } /** * 診断結果に基づく推奨事項生成 */ function generateRecommendations(diagnosis) { co"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "fixFormInfoForUser",
+      "definitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 1626,
+          "fullMatch": "function fixFormInfoForUser(userId)",
+          "context": "ng} userId - ユーザーID * @returns {object} 修復結果 */ function fixFormInfoForUser(userId) { try {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "testUnifiedSystem",
+      "definitions": [
+        {
+          "file": "Base.gs",
+          "line": 58,
+          "fullMatch": "function testUnifiedSystem()",
+          "context": "= /** * 統合システムテスト関数 * 列マッピングとデータ表示の整合性をテスト */ function testUnifiedSystem() { try { console"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "testSystemStatus",
+      "definitions": [
+        {
+          "file": "Base.gs",
+          "line": 130,
+          "fullMatch": "function testSystemStatus()",
+          "context": "}; } } /** * 簡単なシステム診断関数（clasp run で実行可能） */ function testSystemStatus() { console.log('=== シ"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "analyzeColumnType",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 13,
+          "fullMatch": "function analyzeColumnType(headerName, sampleData = [])",
+          "context": "s {Object} {type: string, confidence: number} */ function analyzeColumnType(headerName, sampleData"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "analyzeHeaderName",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 57,
+          "fullMatch": "function analyzeHeaderName(headerName)",
+          "context": "me - 列ヘッダー名 * @returns {Object} 各列タイプの信頼度スコア */ function analyzeHeaderName(headerName) { const n"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "analyzeColumnContent",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 134,
+          "fullMatch": "function analyzeColumnContent(sampleData)",
+          "context": "- サンプルデータ配列 * @returns {Object} 各列タイプの信頼度スコア */ function analyzeColumnContent(sampleData) { cons"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateFinalConfidence",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 208,
+          "fullMatch": "function calculateFinalConfidence(headerScore, contentScore)",
+          "context": "s {Object} {type: string, confidence: number} */ function calculateFinalConfidence(headerScore, con"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateAdvancedFeatures",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 256,
+          "fullMatch": "function calculateAdvancedFeatures(sampleData)",
+          "context": "- サンプルデータ配列 * @returns {Object} 15次元特徴量ベクトル */ function calculateAdvancedFeatures(sampleData) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateSkewness",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 348,
+          "fullMatch": "function calculateSkewness(values, mean, stdDev)",
+          "context": "PatternScore: 0, }; } /** * 歪度計算（3次モーメント） */ function calculateSkewness(values, mean, stdDev) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateKurtosis",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 358,
+          "fullMatch": "function calculateKurtosis(values, mean, stdDev)",
+          "context": "h; return skewness; } /** * 尖度計算（4次モーメント） */ function calculateKurtosis(values, mean, stdDev) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateShannonEntropy",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 368,
+          "fullMatch": "function calculateShannonEntropy(text)",
+          "context": "return kurtosis; } /** * シャノンエントロピー計算（情報量） */ function calculateShannonEntropy(text) { if (!te"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateConditionalEntropy",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 392,
+          "fullMatch": "function calculateConditionalEntropy(textArray)",
+          "context": "} return entropy; } /** * 条件付きエントロピー計算 */ function calculateConditionalEntropy(textArray) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateMutualInformation",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 429,
+          "fullMatch": "function calculateMutualInformation(textArray)",
+          "context": "return conditionalEntropy; } /** * 相互情報量計算 */ function calculateMutualInformation(textArray) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateNamePatternScore",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 469,
+          "fullMatch": "function calculateNamePatternScore(textArray)",
+          "context": "tches / totalChars : 0; } /** * 名前パターンスコア計算 */ function calculateNamePatternScore(textArray) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateClassPatternScore",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 493,
+          "fullMatch": "function calculateClassPatternScore(textArray)",
+          "context": "textArray.length : 0; } /** * クラスパターンスコア計算 */ function calculateClassPatternScore(textArray) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "classifyByAdvancedFeatures",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 556,
+          "fullMatch": "function classifyByAdvancedFeatures(features)",
+          "context": "return bayesianScores; } /** * 高度特徴量による分類 */ function classifyByAdvancedFeatures(features) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateDynamicWeights",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 594,
+          "fullMatch": "function calculateDynamicWeights(headerScore, contentScore, advancedScore)",
+          "context": "= 85; } return scores; } /** * 動的重み計算 */ function calculateDynamicWeights(headerScore, cont"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateBayesianConfidence",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 615,
+          "fullMatch": "function calculateBayesianConfidence(scores, features)",
+          "context": "ncedMax / total, }; } /** * ベイズ推定による信頼度校正 */ function calculateBayesianConfidence(scores, featu"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "resolveColumnConflicts",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 644,
+          "fullMatch": "function resolveColumnConflicts(headerRow, allData)",
+          "context": "a - 全データ配列 * @returns {Object} 最適化されたマッピング結果 */ function resolveColumnConflicts(headerRow, allData"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "hungarianAlgorithmSimplified",
+      "definitions": [
+        {
+          "file": "ColumnAnalysisSystem.gs",
+          "line": 743,
+          "fullMatch": "function hungarianAlgorithmSimplified(costMatrix, columnTypes)",
+          "context": "* @returns {Array} 割り当て結果（列インデックス→タイプインデックス） */ function hungarianAlgorithmSimplified(costMatrix,"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getBulkData",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 13,
+          "fullMatch": "function getBulkData(userId, options = {})",
+          "context": "ncludeSystemInfo } * @returns {object} 一括データ */ function getBulkData(userId, options = {}) { try"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getAutoStopTime",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 95,
+          "fullMatch": "function getAutoStopTime(publishedAt, minutes)",
+          "context": "nutes - 自動停止までの分数 * @returns {object} 停止時間情報 */ function getAutoStopTime(publishedAt, minutes) {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "validateHeaderIntegrity",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 165,
+          "fullMatch": "function validateHeaderIntegrity(userId)",
+          "context": "ng} userId - ユーザーID * @returns {Object} 検証結果 */ function validateHeaderIntegrity(userId) { try {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getOpinionHeaderSafely",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 254,
+          "fullMatch": "function getOpinionHeaderSafely(userId, sheetName)",
+          "context": "sheetName - シート名 * @returns {string} 意見ヘッダー */ function getOpinionHeaderSafely(userId, sheetName)"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "registerNewUser",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 290,
+          "fullMatch": "function registerNewUser(userEmail)",
+          "context": "ユーザーメールアドレス * @returns {Object} ユーザー情報とURL情報 */ function registerNewUser(userEmail) { const star"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "executeAddReaction",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 454,
+          "fullMatch": "function executeAddReaction(requestUserId, rowIndex, reactionKey, sheetName)",
+          "context": "erId, rowIndex, reactionKey, sheetName); }); } function executeAddReaction(requestUserId, rowInde"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getCurrentSheetName",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 517,
+          "fullMatch": "function getCurrentSheetName(spreadsheetId)",
+          "context": "heetId - スプレッドシートID * @returns {string} シート名 */ function getCurrentSheetName(spreadsheetId) { tr"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "executeGetPublishedSheetData",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 551,
+          "fullMatch": "function executeGetPublishedSheetData(requestUserId, classFilter, sortOrder, adminMode)",
+          "context": "/** * 実際のデータ取得処理（キャッシュ制御から分離） (マルチテナント対応版) */ function executeGetPublishedSheetData(requestUserI"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getIncrementalData",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 753,
+          "fullMatch": "function getIncrementalData(requestUserId, classFilter, sortOrder, adminMode, sinceRowCount)",
+          "context": "数以降のデータを取得 * @returns {object} 新しいデータのみを含む結果 */ function getIncrementalData(requestUserId, classFi"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "switchToSheet",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1035,
+          "fullMatch": "function switchToSheet(userId, spreadsheetId, sheetName, options = {})",
+          "context": "ct} options.sheetsService - 共有SheetsService（最適化用） function switchToSheet(userId, spreadsheetId, shee"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getCurrentUserStatus",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1121,
+          "fullMatch": "function getCurrentUserStatus(requestUserId)",
+          "context": "エスト元のユーザーID * @returns {object} ユーザーのステータス情報 */ function getCurrentUserStatus(requestUserId) { t"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "countSheetRows",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1220,
+          "fullMatch": "function countSheetRows(spreadsheetId, sheetName, classFilter)",
+          "context": "lassFilter クラスフィルタ * @returns {number} データ行数 */ function countSheetRows(spreadsheetId, sheetName,"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "updateFormSettings",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1261,
+          "fullMatch": "function updateFormSettings(requestUserId, title, description)",
+          "context": "しいタイトル * @param {string} description - 新しい説明 */ function updateFormSettings(requestUserId, title,"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "saveSystemConfig",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1313,
+          "fullMatch": "function saveSystemConfig(requestUserId, config)",
+          "context": "設定を保存 (マルチテナント対応版) * AdminPanel.htmlから呼び出される */ function saveSystemConfig(requestUserId, config) {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "executeToggleHighlight",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1373,
+          "fullMatch": "function executeToggleHighlight(requestUserId, rowIndex, sheetName)",
+          "context": "ght(requestUserId, rowIndex, sheetName); }); } function executeToggleHighlight(requestUserId, row"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "createUserFolder",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1429,
+          "fullMatch": "function createUserFolder(userEmail)",
+          "context": "は不要のため削除済み /** * ユーザー専用フォルダを作成 (マルチテナント対応版) */ function createUserFolder(userEmail) { try {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "processHighlightToggle",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1459,
+          "fullMatch": "function processHighlightToggle(spreadsheetId, sheetName, rowIndex)",
+          "context": "に失敗してもnullを返して処理を継続 } } /** * ハイライト切り替え処理 */ function processHighlightToggle(spreadsheetId, she"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSheetColumns",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1523,
+          "fullMatch": "function getSheetColumns(userId, sheetId)",
+          "context": "ved - now using the unified version from url.gs function getSheetColumns(userId, sheetId) { cons"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "processReaction",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1601,
+          "fullMatch": "function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reactingUserEmail)",
+          "context": "============================ /** * リアクション処理 */ function processReaction(spreadsheetId, sheetName,"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "createFormFactory",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1791,
+          "fullMatch": "function createFormFactory(options)",
+          "context": "ption - フォームの説明 * @returns {Object} フォーム作成結果 */ function createFormFactory(options) { try {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "addUnifiedQuestions",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 1849,
+          "fullMatch": "function addUnifiedQuestions(form, questionType, customConfig)",
+          "context": "問タイプ * @param {Object} customConfig - カスタム設定 */ function addUnifiedQuestions(form, questionType, c"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "doGetQuestionConfig",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2028,
+          "fullMatch": "function doGetQuestionConfig()",
+          "context": "turns {ContentService.TextOutput} JSON形式の質問設定 */ function doGetQuestionConfig() { try { // 現在"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "saveClassChoices",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2056,
+          "fullMatch": "function saveClassChoices(userId, classChoices)",
+          "context": "imeType.JSON); } } /** * クラス選択肢をデータベースに保存 */ function saveClassChoices(userId, classChoices) {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSavedClassChoices",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2082,
+          "fullMatch": "function getSavedClassChoices(userId)",
+          "context": "ror.message}` }; } } /** * 保存されたクラス選択肢を取得 */ function getSavedClassChoices(userId) { try {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "createLinkedSpreadsheet",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2190,
+          "fullMatch": "function createLinkedSpreadsheet(userEmail, form, dateTimeString)",
+          "context": "ing - 日付時刻文字列 * @returns {Object} スプレッドシート情報 */ function createLinkedSpreadsheet(userEmail, form,"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "shareAllSpreadsheetsWithServiceAccount",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2257,
+          "fullMatch": "function shareAllSpreadsheetsWithServiceAccount()",
+          "context": "* @param {string} spreadsheetId - スプレッドシートID */ function shareAllSpreadsheetsWithServiceAccount()"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "repairUserSpreadsheetAccess",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2312,
+          "fullMatch": "function repairUserSpreadsheetAccess(userEmail, spreadsheetId)",
+          "context": "ted createUnifiedForm('study', ...) を使用してください */ function repairUserSpreadsheetAccess(userEmail, sp"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "addReactionColumnsToSpreadsheet",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2381,
+          "fullMatch": "function addReactionColumnsToSpreadsheet(spreadsheetId, sheetName)",
+          "context": "heetId - スプレッドシートID * @returns {object} 修復結果 */ function addReactionColumnsToSpreadsheet(spreadshe"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSheetData",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2427,
+          "fullMatch": "function getSheetData(userId, sheetName, classFilter, sortMode, adminMode)",
+          "context": "ject} status ('success' or 'error') と message */ function getSheetData(userId, sheetName, classFilt"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSheetConfig",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2450,
+          "fullMatch": "function getSheetConfig(userId)",
+          "context": "ためのsheetConfig代替関数 * 既存のconfigJSONから必要な設定を生成 */ function getSheetConfig(userId) { try { cons"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSheetConfigSafe",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2532,
+          "fullMatch": "function getSheetConfigSafe()",
+          "context": ": 'pending' }; } } // ✅ レガシー互換性のためのアクセサー関数 function getSheetConfigSafe() { return buildShee"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSheetConfigCached",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2538,
+          "fullMatch": "function getSheetConfigCached()",
+          "context": "ローバル変数代替（必要時に動的生成） let _cachedSheetConfig = null; function getSheetConfigCached() { if (!_cachedSh"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSheetsList",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2680,
+          "fullMatch": "function getSheetsList(userId)",
+          "context": "headers: [], }; } } /** * シート一覧取得 */ function getSheetsList(userId) { try { conso"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateRowScore",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2870,
+          "fullMatch": "function calculateRowScore(rowData)",
+          "context": "} return processedRow; } /** * 行のスコアを計算 */ function calculateRowScore(rowData) { const base"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "applySortMode",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2891,
+          "fullMatch": "function applySortMode(data, sortMode)",
+          "context": "ghtBonus + randomFactor; } /** * データにソートを適用 */ function applySortMode(data, sortMode) { switch"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "shuffleArray",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2915,
+          "fullMatch": "function shuffleArray(array)",
+          "context": "} } /** * 配列をシャッフル（Fisher-Yates shuffle） */ function shuffleArray(array) { for (let i = arra"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getHeaderIndex",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2929,
+          "fullMatch": "function getHeaderIndex(headers, headerName)",
+          "context": "ー配列から指定した名前のインデックスを取得 * CONSTANTSと統一された方式を使用 */ function getHeaderIndex(headers, headerName) { i"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getColumnHeaderName",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2939,
+          "fullMatch": "function getColumnHeaderName(columnKey)",
+          "context": "OPINION', 'CLASS'） * @returns {string} ヘッダー名 */ function getColumnHeaderName(columnKey) { return"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "mapColumnIndices",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 2957,
+          "fullMatch": "function mapColumnIndices(config, headers)",
+          "context": "- ヘッダー配列 * @returns {Object} マッピングされたインデックス */ function mapColumnIndices(config, headers) { //"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "hasSetupPageAccess",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 3062,
+          "fullMatch": "function hasSetupPageAccess()",
+          "context": "クセス権限を確認 * @returns {boolean} アクセス権限があればtrue */ function hasSetupPageAccess() { try { const"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getDriveService",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 3082,
+          "fullMatch": "function getDriveService()",
+          "context": "APIサービスを取得 * @returns {object} Drive APIサービス */ function getDriveService() { try { const acc"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "shouldEnableDebugMode",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 3113,
+          "fullMatch": "function shouldEnableDebugMode()",
+          "context": "定 * @returns {boolean} デバッグモードを有効にすべき場合はtrue */ function shouldEnableDebugMode() { return isSyst"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "deleteCurrentUserAccount",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 3401,
+          "fullMatch": "function deleteCurrentUserAccount(requestUserId)",
+          "context": "** * @deprecated createCustomFormUIを使用してください */ function deleteCurrentUserAccount(requestUserId) {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "activateSheetSimple",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 3435,
+          "fullMatch": "function activateSheetSimple(requestUserId, sheetName)",
+          "context": "ト元のユーザーID * @param {string} sheetName - シート名 */ function activateSheetSimple(requestUserId, sheetN"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getInitialData",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 3556,
+          "fullMatch": "function getInitialData(requestUserId, sheetName)",
+          "context": "得するシート名（省略可能） * @returns {Object} 統合された初期データ */ function getInitialData(requestUserId, sheetName)"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "fixDataConsistencyManual",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 3820,
+          "fullMatch": "function fixDataConsistencyManual(requestUserId)",
+          "context": "rId - リクエスト元のユーザーID * @returns {object} 修正結果 */ function fixDataConsistencyManual(requestUserId) {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "identifyHeadersAdvanced",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 3933,
+          "fullMatch": "function identifyHeadersAdvanced(headers, options = {})",
+          "context": "オプション設定 * @returns {Object} 超高精度で推測された列マッピング */ function identifyHeadersAdvanced(headers, options"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "enhanceWithWebKnowledge",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 3966,
+          "fullMatch": "function enhanceWithWebKnowledge(headers, basicResult)",
+          "context": "n basicResult; } /** * インターネット知識ベースによる列判定強化 */ function enhanceWithWebKnowledge(headers, basicRes"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "analyzeContextualMeaning",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 4026,
+          "fullMatch": "function analyzeContextualMeaning(headers, basicResult)",
+          "context": "return enhancements; } /** * 文脈・意味解析による列判定 */ function analyzeContextualMeaning(headers, basicRe"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "calculateAdvancedConfidence",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 4056,
+          "fullMatch": "function calculateAdvancedConfidence(headers, result)",
+          "context": "eturn contextEnhancements; } /** * 高精度信頼度計算 */ function calculateAdvancedConfidence(headers, resu"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "performAutoRepair",
+      "definitions": [
+        {
+          "file": "Core.gs",
+          "line": 4244,
+          "fullMatch": "function performAutoRepair(userId)",
+          "context": "ng} userId - ユーザーID * @returns {Object} 修復結果 */ function performAutoRepair(userId) { try { c"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "clearActiveSheet",
+      "definitions": [
+        {
+          "file": "PageBackend.gs",
+          "line": 137,
+          "fullMatch": "function clearActiveSheet(userId = null)",
+          "context": "rId - ユーザーID（オプション） * @returns {Object} 処理結果 */ function clearActiveSheet(userId = null) { try {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "addReactions",
+      "definitions": [
+        {
+          "file": "PageBackend.gs",
+          "line": 211,
+          "fullMatch": "function addReactions(requestUserId, batchOperations)",
+          "context": "erations - バッチ操作の配列 * @returns {Object} 処理結果 */ function addReactions(requestUserId, batchOperatio"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "refreshBoardData",
+      "definitions": [
+        {
+          "file": "PageBackend.gs",
+          "line": 347,
+          "fullMatch": "function refreshBoardData(requestUserId)",
+          "context": "rId - リクエスト元のユーザーID * @returns {Object} 処理結果 */ function refreshBoardData(requestUserId) { try {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSetupStatusFromConfig",
+      "definitions": [
+        {
+          "file": "auth.gs",
+          "line": 134,
+          "fullMatch": "function getSetupStatusFromConfig(configJson)",
+          "context": "gJson 設定JSON文字列 * @returns {string} セットアップ状況 */ function getSetupStatusFromConfig(configJson) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "processAdminAccess",
+      "definitions": [
+        {
+          "file": "auth.gs",
+          "line": 149,
+          "fullMatch": "function processAdminAccess(userEmail)",
+          "context": "ールアドレス * @returns {HtmlOutput} 表示するHTMLコンテンツ */ function processAdminAccess(userEmail) { try {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSpreadsheetHeaders",
+      "definitions": [
+        {
+          "file": "cache.gs",
+          "line": 492,
+          "fullMatch": "function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {})",
+          "context": ": boolean } * @returns {object} ヘッダーインデックス情報 */ function getSpreadsheetHeaders(spreadsheetId, shee"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "synchronizeCacheAfterCriticalUpdate",
+      "definitions": [
+        {
+          "file": "cache.gs",
+          "line": 691,
+          "fullMatch": "function synchronizeCacheAfterCriticalUpdate(\n  userId,\n  userEmail,\n  oldSpreadsheetId,\n  newSpreadsheetId\n)",
+          "context": "string|null} newSpreadsheetId - 新しいスプレッドシートID */ function synchronizeCacheAfterCriticalUpdate( us"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "initializeDatabaseSheet",
+      "definitions": [
+        {
+          "file": "database.gs",
+          "line": 1094,
+          "fullMatch": "function initializeDatabaseSheet(spreadsheetId)",
+          "context": "ram {string} spreadsheetId - データベーススプレッドシートID */ function initializeDatabaseSheet(spreadsheetId) {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "cleanupEmptyUsers",
+      "definitions": [
+        {
+          "file": "database.gs",
+          "line": 1138,
+          "fullMatch": "function cleanupEmptyUsers()",
+          "context": "空のユーザーエントリを削除 * @returns {Object} クリーンアップ結果 */ function cleanupEmptyUsers() { try { console"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "debugShowAllUsers",
+      "definitions": [
+        {
+          "file": "database.gs",
+          "line": 1210,
+          "fullMatch": "function debugShowAllUsers()",
+          "context": "- 全ユーザーデータを表示 * @returns {Object} データベースの全内容 */ function debugShowAllUsers() { try { const"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getGoogleClientId",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 440,
+          "fullMatch": "function getGoogleClientId()",
+          "context": "ceAccountCreds; } /** * Google Client IDを取得 */ function getGoogleClientId() { try { const p"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "checkSystem",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 473,
+          "fullMatch": "function checkSystem()",
+          "context": "error ); } } /** * システム設定状況をチェック */ function checkSystem() { try { const propert"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "showAdminPanel",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 555,
+          "fullMatch": "function showAdminPanel()",
+          "context": "tions * 統一されたユーザー管理機能群 */ /** * 管理者パネルの表示 */ function showAdminPanel() { try { console.lo"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "showAnswerBoard",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 604,
+          "fullMatch": "function showAnswerBoard(userId)",
+          "context": "{error.message}</p>`); } } /** * 回答ボードの表示 */ function showAnswerBoard(userId) { try { con"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSuggestedAction",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 652,
+          "fullMatch": "function getSuggestedAction(diagnostics)",
+          "context": "* 🦾 スマート診断システムサポート関数 * ユーザーに適切なアクションを推奨する */ function getSuggestedAction(diagnostics) { try {"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "generateUserId",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 686,
+          "fullMatch": "function generateUserId()",
+          "context": "ザーIDを生成（UUID形式） * @returns {string} 新規ユーザーID */ function generateUserId() { return Utilities.get"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "renderSetupPage",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 890,
+          "fullMatch": "function renderSetupPage(params)",
+          "context": "ndboxMode.NATIVE); } /** * セットアップページのレンダリング */ function renderSetupPage(params) { console.log('"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "parseRequestParams",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 977,
+          "fullMatch": "function parseRequestParams(e)",
+          "context": "et イベントオブジェクト * @returns {Object} 解析されたパラメータ */ function parseRequestParams(e) { if (!e) { c"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "checkCurrentPublicationStatus",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 1387,
+          "fullMatch": "function checkCurrentPublicationStatus(userId)",
+          "context": "ng} userId ユーザーID * @returns {Object} 公開状態情報 */ function checkCurrentPublicationStatus(userId) {"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getTestMockResponse",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 1441,
+          "fullMatch": "function getTestMockResponse()",
+          "context": "ns * 設定管理の機能群 */ /** * テスト用シンプルAPI（テスト専用） */ function getTestMockResponse() { return createRe"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "saveApplicationConfig",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 1450,
+          "fullMatch": "function saveApplicationConfig(config)",
+          "context": "ct} config 設定オブジェクト * @returns {Object} 保存結果 */ function saveApplicationConfig(config) { console"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "handleSystemError",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 1864,
+          "fullMatch": "function handleSystemError(context, error, userId = null, additionalData = {})",
+          "context": "mManager.gsに完全移行しました /** * 🔧 統一エラーハンドリング関数 */ function handleSystemError(context, error, userId"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "validateUserDataState",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 1914,
+          "fullMatch": "function validateUserDataState(userInfo)",
+          "context": "return null; } } /** * 🔧 データ状態一元検証関数 */ function validateUserDataState(userInfo) { const"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "diagnoseSystem",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 1962,
+          "fullMatch": "function diagnoseSystem()",
+          "context": "にGASエディタから直接実行可能 */ /** * システム診断関数（GAS実行用） */ function diagnoseSystem() { try { const"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "emergencyClearCache",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 2005,
+          "fullMatch": "function emergencyClearCache()",
+          "context": "message }; } } /** * 緊急キャッシュクリア関数（GAS実行用） */ function emergencyClearCache() { try { conso"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "repairCurrentUser",
+      "definitions": [
+        {
+          "file": "main.gs",
+          "line": 2020,
+          "fullMatch": "function repairCurrentUser()",
+          "context": ".message }; } } /** * 現在のユーザー修復関数（GAS実行用） */ function repairCurrentUser() { try { console"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "generateNewServiceAccountToken",
+      "definitions": [
+        {
+          "file": "security.gs",
+          "line": 57,
+          "fullMatch": "function generateNewServiceAccountToken()",
+          "context": "* 新しいJWTトークンを生成 * @returns {string} アクセストークン */ function generateNewServiceAccountToken() { try"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "getSheetsService",
+      "definitions": [
+        {
+          "file": "security.gs",
+          "line": 306,
+          "fullMatch": "function getSheetsService()",
+          "context": "さい * @returns {Object|null} Sheetsサービスオブジェクト */ function getSheetsService() { // キャッシュ版に統一 ret"
+        }
+      ],
+      "callCount": 1,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "updateSheetsData",
+      "definitions": [
+        {
+          "file": "security.gs",
+          "line": 319,
+          "fullMatch": "function updateSheetsData(service, spreadsheetId, range, values)",
+          "context": "s - 更新する値の2次元配列 * @returns {Object} APIレスポンス */ function updateSheetsData(service, spreadsheetId,"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    },
+    {
+      "name": "addServiceAccountToSpreadsheet",
+      "definitions": [
+        {
+          "file": "security.gs",
+          "line": 397,
+          "fullMatch": "function addServiceAccountToSpreadsheet(spreadsheetId)",
+          "context": "* @param {string} spreadsheetId - スプレッドシートID */ function addServiceAccountToSpreadsheet(spreadshee"
+        }
+      ],
+      "callCount": 2,
+      "reason": "バックエンドでの使用頻度が低い",
+      "category": "LOW_USAGE"
+    }
+  ],
+  "deadCode": [
+    {
+      "file": "Core.gs",
+      "line": 1,
+      "type": "DEPRECATED_BLOCK",
+      "code": "/**\n * @fileoverview StudyQuest - Core Functions (高速化版)\n * 主要な業務ロジック、APIエンドポイント、バルクデータAPI\n */\n\n/**\n ...",
+      "reason": "コメントで削除対象と明記されている"
+    },
+    {
+      "file": "Core.gs",
+      "line": 2375,
+      "type": "DEPRECATED_BLOCK",
+      "code": "/**\n * 管理パネル専用：権限問題の緊急修復\n * @param {string} userEmail - ユーザーメール\n * @param {string} spreadsheetId - ス...",
+      "reason": "コメントで削除対象と明記されている"
+    },
+    {
+      "file": "Core.gs",
+      "line": 3430,
+      "type": "DEPRECATED_BLOCK",
+      "code": "/**\n * シートを有効化（AdminPanel.html用のシンプル版）\n * @param {string} requestUserId - リクエスト元のユーザーID\n * @param {s...",
+      "reason": "コメントで削除対象と明記されている"
+    },
+    {
+      "file": "database.gs",
+      "line": 1,
+      "type": "DEPRECATED_BLOCK",
+      "code": "/**\n * @fileoverview データベース管理 - CLAUDE.md完全準拠版\n * configJSON中心型5フィールド構造の完全実装\n */\n\n/**\n * ✅ 統一：CONSTA...",
+      "reason": "コメントで削除対象と明記されている"
+    },
+    {
+      "file": "database.gs",
+      "line": 181,
+      "type": "DEPRECATED_BLOCK",
+      "code": "/**\n   * メールでユーザー検索（CLAUDE.md準拠版）\n   * @param {string} email - メールアドレス\n   * @returns {Object|null} ユ...",
+      "reason": "コメントで削除対象と明記されている"
+    },
+    {
+      "file": "database.gs",
+      "line": 372,
+      "type": "DEPRECATED_BLOCK",
+      "code": "/**\n   * ユーザー更新（CLAUDE.md準拠版）\n   * @param {string} userId - ユーザーID\n   * @param {Object} updateData -...",
+      "reason": "コメントで削除対象と明記されている"
+    },
+    {
+      "file": "security.gs",
+      "line": 1,
+      "type": "DEPRECATED_BLOCK",
+      "code": "/**\n * @fileoverview 簡略化されたセキュリティシステム\n * 基本的なアクセス制御機能のみを保持し、複雑なセキュリティクラスを除去\n */\n\n// ================...",
+      "reason": "コメントで削除対象と明記されている"
+    }
+  ],
+  "stats": {
+    "totalFunctions": 200,
+    "usedFunctions": 199,
+    "unusedCount": 1
+  }
+}

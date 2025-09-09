@@ -375,7 +375,7 @@
 
   // 設定データ取得（最適化版 - 重複実行防止）
   function getConfigAsync() {
-    return executionManager.execute('getCurrentConfig', () => {
+    return executionManager.execute('getConfig', () => {
       return new Promise((resolve, reject) => {
         google.script.run
           .withSuccessHandler(resolve)

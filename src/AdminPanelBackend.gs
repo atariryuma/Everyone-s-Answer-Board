@@ -105,8 +105,8 @@ function connectDataSource(spreadsheetId, sheetName) {
 
     // 現在のユーザー取得と設定準備（最適化版）
     const currentUser = UserManager.getCurrentEmail();
-    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
-
+    // ユーザー情報を取得
+    const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (userInfo) {
       // 現在のconfigJSONを直接取得（ConfigManager経由削除）
       const currentConfig = JSON.parse(userInfo.configJson || '{}');
@@ -228,8 +228,8 @@ function publishApplication(config) {
     });
 
     const currentUser = UserManager.getCurrentEmail();
-    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
-
+    // ユーザー情報を取得
+    const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (!userInfo) {
       console.error('❌ publishApplication: ユーザー情報が見つかりません', {
         currentUser,
@@ -390,8 +390,8 @@ function saveDraftConfiguration(config) {
     });
 
     const currentUser = UserManager.getCurrentEmail();
-    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
-
+    // ユーザー情報を取得
+    const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -660,8 +660,8 @@ function executeConfigCleanup() {
     console.log('🧹 configJSONクリーンアップ実行開始');
 
     const currentUser = UserManager.getCurrentEmail();
-    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
-
+    // ユーザー情報を取得
+    const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -678,7 +678,7 @@ function executeConfigCleanup() {
         削減サイズ: `${result.sizeReduction}文字`,
         削減率:
           result.total > 0 && result.sizeReduction > 0
-            ? `${((result.sizeReduction / JSON.stringify(userInfo.parsedConfig || {}).length) * 100).toFixed(1)}%`
+            ? `${((result.sizeReduction / JSON.stringify(JSON.parse(userInfo.configJson || '{}') || {}).length) * 100).toFixed(1)}%`
             : '0%',
         削除フィールド数: result.removedFields.length,
         処理時刻: result.timestamp,
@@ -961,7 +961,8 @@ function getConfig() {
       throw new Error('ユーザー認証が必要です');
     }
 
-    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
+    // ユーザー情報を取得
+    const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (!userInfo) {
       console.error('❌ getConfig: ユーザー情報が見つかりません', {
         currentUser,
@@ -994,7 +995,7 @@ function getConfig() {
     return config;
   } catch (error) {
     const executionTime = Date.now() - startTime;
-    console.error('❌ getCurrentConfig エラー（最適化版）', {
+    console.error('❌ getConfig エラー（最適化版）', {
       error: error.message,
       executionTime: `${executionTime}ms`,
       timestamp: new Date().toISOString(),
@@ -1011,7 +1012,8 @@ function getCurrentBoardInfoAndUrls() {
 
     // 現在のユーザーの設定を取得
     const currentUser = UserManager.getCurrentEmail();
-    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
+    // ユーザー情報を取得
+    const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     const config = userInfo ? ConfigManager.getUserConfig(userInfo.userId) : null;
 
     // フッター表示用の問題文を管理パネルの回答列と一致させる（シンプル版）
@@ -1449,8 +1451,8 @@ function diagnoseColumnMappingIssue() {
     console.log('🔍 columnMapping診断開始');
     
     const currentUser = UserManager.getCurrentEmail();
-    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
-    
+    // ユーザー情報を取得
+    const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }
@@ -1522,8 +1524,8 @@ function repairColumnMapping() {
     console.log('🔧 columnMapping自動修復開始');
     
     const currentUser = UserManager.getCurrentEmail();
-    // userInfoは既にgetCurrentUserInfoSafelyで取得済み
-    
+    // ユーザー情報を取得
+    const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     if (!userInfo) {
       throw new Error('ユーザー情報が見つかりません');
     }

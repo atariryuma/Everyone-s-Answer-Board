@@ -79,7 +79,8 @@
       "Bash(then echo \"✅\")",
       "Bash(else echo \"❌\")",
       "Bash(clasp open:*)",
-      "Bash(clasp:*)"
+      "Bash(clasp:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": [],

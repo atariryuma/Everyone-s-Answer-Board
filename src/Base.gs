@@ -350,7 +350,7 @@ class ConfigurationManager {
   // ✅ 統一された設定取得関数（システム全体で唯一のエントリーポイント）
   getUserConfig(userId) {
     return ConfigManager.getUserConfig(userId);
-  },
+  }
 
   // ✅ 共通ユーティリティ：現在のユーザー情報取得（重複削減）
   getCurrentUserInfo() {
@@ -363,7 +363,7 @@ class ConfigurationManager {
       throw new Error('ユーザー情報が見つかりません');
     }
     return { currentUserEmail, userInfo };
-  },
+  }
 
   // ✅ 安全な現在のユーザー情報取得（nullを返すバージョン）
   getCurrentUserInfoSafely() {
@@ -373,7 +373,7 @@ class ConfigurationManager {
       console.warn('getCurrentUserInfoSafely:', error.message);
       return null;
     }
-  },
+  }
 
   // ✅ 共通ユーティリティ：スプレッドシート取得（重複削減・エラーハンドリング統一）
   getSpreadsheet(spreadsheetId) {

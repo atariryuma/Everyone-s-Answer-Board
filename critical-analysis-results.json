@@ -1,0 +1,136 @@
+{
+  "issues": [
+    {
+      "type": "CLAUDE_MD_VIOLATION",
+      "severity": "WARNING",
+      "file": "main.gs",
+      "line": 329,
+      "pattern": "userInfo.email",
+      "message": "configJSON中心設計違反: userInfo.フィールドは5フィールド構造以外禁止"
+    },
+    {
+      "type": "CLAUDE_MD_VIOLATION",
+      "severity": "WARNING",
+      "file": "main.gs",
+      "line": 330,
+      "pattern": "userInfo.email",
+      "message": "configJSON中心設計違反: userInfo.フィールドは5フィールド構造以外禁止"
+    },
+    {
+      "type": "CLAUDE_MD_VIOLATION",
+      "severity": "WARNING",
+      "file": "main.gs",
+      "line": 331,
+      "pattern": "userInfo.email",
+      "message": "configJSON中心設計違反: userInfo.フィールドは5フィールド構造以外禁止"
+    },
+    {
+      "type": "UNUSED_BACKEND_FUNCTION",
+      "severity": "WARNING",
+      "function": "getConfig",
+      "message": "未使用バックエンド関数: getConfig がバックエンドに定義されていますが、フロントエンドから呼び出されていません",
+      "backendDefinitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 951
+        }
+      ]
+    },
+    {
+      "type": "UNUSED_BACKEND_FUNCTION",
+      "severity": "WARNING",
+      "function": "getData",
+      "message": "未使用バックエンド関数: getData がバックエンドに定義されていますが、フロントエンドから呼び出されていません",
+      "backendDefinitions": [
+        {
+          "file": "main.gs",
+          "line": 1760
+        }
+      ]
+    },
+    {
+      "type": "UNUSED_BACKEND_FUNCTION",
+      "severity": "WARNING",
+      "function": "connectDataSource",
+      "message": "未使用バックエンド関数: connectDataSource がバックエンドに定義されていますが、フロントエンドから呼び出されていません",
+      "backendDefinitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 10
+        }
+      ]
+    },
+    {
+      "type": "UNUSED_BACKEND_FUNCTION",
+      "severity": "WARNING",
+      "function": "publishApplication",
+      "message": "未使用バックエンド関数: publishApplication がバックエンドに定義されていますが、フロントエンドから呼び出されていません",
+      "backendDefinitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 221
+        }
+      ]
+    },
+    {
+      "type": "UNUSED_BACKEND_FUNCTION",
+      "severity": "WARNING",
+      "function": "saveDraftConfiguration",
+      "message": "未使用バックエンド関数: saveDraftConfiguration がバックエンドに定義されていますが、フロントエンドから呼び出されていません",
+      "backendDefinitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 385
+        }
+      ]
+    },
+    {
+      "type": "UNUSED_BACKEND_FUNCTION",
+      "severity": "WARNING",
+      "function": "getCurrentBoardInfoAndUrls",
+      "message": "未使用バックエンド関数: getCurrentBoardInfoAndUrls がバックエンドに定義されていますが、フロントエンドから呼び出されていません",
+      "backendDefinitions": [
+        {
+          "file": "AdminPanelBackend.gs",
+          "line": 1010
+        }
+      ]
+    },
+    {
+      "type": "UNUSED_BACKEND_FUNCTION",
+      "severity": "WARNING",
+      "function": "addReaction",
+      "message": "未使用バックエンド関数: addReaction がバックエンドに定義されていますが、フロントエンドから呼び出されていません",
+      "backendDefinitions": [
+        {
+          "file": "Core.gs",
+          "line": 438
+        }
+      ]
+    },
+    {
+      "type": "UNUSED_BACKEND_FUNCTION",
+      "severity": "WARNING",
+      "function": "toggleHighlight",
+      "message": "未使用バックエンド関数: toggleHighlight がバックエンドに定義されていますが、フロントエンドから呼び出されていません",
+      "backendDefinitions": [
+        {
+          "file": "Core.gs",
+          "line": 1358
+        }
+      ]
+    },
+    {
+      "type": "UNUSED_BACKEND_FUNCTION",
+      "severity": "WARNING",
+      "function": "refreshBoardData",
+      "message": "未使用バックエンド関数: refreshBoardData がバックエンドに定義されていますが、フロントエンドから呼び出されていません",
+      "backendDefinitions": [
+        {
+          "file": "PageBackend.gs",
+          "line": 347
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,413 @@
+{
+  "functions": {},
+  "metrics": {},
+  "inefficiencies": [
+    {
+      "type": "LONG_FUNCTION",
+      "function": "connectDataSource",
+      "file": "AdminPanelBackend.gs",
+      "severity": "WARNING",
+      "value": 206,
+      "message": "関数が長すぎる: 206行 (推奨: 50行以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "publishApplication",
+      "file": "AdminPanelBackend.gs",
+      "severity": "WARNING",
+      "value": 159,
+      "message": "関数が長すぎる: 159行 (推奨: 50行以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "getCurrentBoardInfoAndUrls",
+      "file": "AdminPanelBackend.gs",
+      "severity": "WARNING",
+      "value": 107,
+      "message": "関数が長すぎる: 107行 (推奨: 50行以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "migrateUserDataToConfigJson",
+      "file": "AdminPanelBackend.gs",
+      "severity": "WARNING",
+      "value": 118,
+      "message": "関数が長すぎる: 118行 (推奨: 50行以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "registerNewUser",
+      "file": "Core.gs",
+      "severity": "WARNING",
+      "value": 142,
+      "message": "関数が長すぎる: 142行 (推奨: 50行以下)"
+    },
+    {
+      "type": "HIGH_COMPLEXITY",
+      "function": "executeGetPublishedSheetData",
+      "file": "Core.gs",
+      "severity": "WARNING",
+      "value": 17,
+      "message": "関数の複雑度が高い: 17 (推奨: 10以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "executeGetPublishedSheetData",
+      "file": "Core.gs",
+      "severity": "WARNING",
+      "value": 192,
+      "message": "関数が長すぎる: 192行 (推奨: 50行以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "getIncrementalData",
+      "file": "Core.gs",
+      "severity": "WARNING",
+      "value": 144,
+      "message": "関数が長すぎる: 144行 (推奨: 50行以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "formatSheetDataForFrontend",
+      "file": "Core.gs",
+      "severity": "WARNING",
+      "value": 106,
+      "message": "関数が長すぎる: 106行 (推奨: 50行以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "executeGetSheetData",
+      "file": "Core.gs",
+      "severity": "WARNING",
+      "value": 120,
+      "message": "関数が長すぎる: 120行 (推奨: 50行以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "getSheetsList",
+      "file": "Core.gs",
+      "severity": "WARNING",
+      "value": 112,
+      "message": "関数が長すぎる: 112行 (推奨: 50行以下)"
+    },
+    {
+      "type": "MISSING_ERROR_HANDLING",
+      "function": "getDriveService",
+      "file": "Core.gs",
+      "severity": "ERROR",
+      "message": "API呼び出し1回あるがエラーハンドリングなし"
+    },
+    {
+      "type": "HIGH_COMPLEXITY",
+      "function": "getInitialData",
+      "file": "Core.gs",
+      "severity": "WARNING",
+      "value": 24,
+      "message": "関数の複雑度が高い: 24 (推奨: 10以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "getInitialData",
+      "file": "Core.gs",
+      "severity": "WARNING",
+      "value": 258,
+      "message": "関数が長すぎる: 258行 (推奨: 50行以下)"
+    },
+    {
+      "type": "HIGH_COMPLEXITY",
+      "function": "getSheetsServiceCached",
+      "file": "cache.gs",
+      "severity": "WARNING",
+      "value": 19,
+      "message": "関数の複雑度が高い: 19 (推奨: 10以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "getSheetsServiceCached",
+      "file": "cache.gs",
+      "severity": "WARNING",
+      "value": 380,
+      "message": "関数が長すぎる: 380行 (推奨: 50行以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "getSpreadsheetsData",
+      "file": "database.gs",
+      "severity": "WARNING",
+      "value": 109,
+      "message": "関数が長すぎる: 109行 (推奨: 50行以下)"
+    },
+    {
+      "type": "HIGH_COMPLEXITY",
+      "function": "doGet",
+      "file": "main.gs",
+      "severity": "WARNING",
+      "value": 25,
+      "message": "関数の複雑度が高い: 25 (推奨: 10以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "doGet",
+      "file": "main.gs",
+      "severity": "WARNING",
+      "value": 240,
+      "message": "関数が長すぎる: 240行 (推奨: 50行以下)"
+    },
+    {
+      "type": "HIGH_COMPLEXITY",
+      "function": "renderAnswerBoard",
+      "file": "main.gs",
+      "severity": "WARNING",
+      "value": 16,
+      "message": "関数の複雑度が高い: 16 (推奨: 10以下)"
+    },
+    {
+      "type": "LONG_FUNCTION",
+      "function": "renderAnswerBoard",
+      "file": "main.gs",
+      "severity": "WARNING",
+      "value": 233,
+      "message": "関数が長すぎる: 233行 (推奨: 50行以下)"
+    },
+    {
+      "type": "MISSING_ERROR_HANDLING",
+      "function": "getSecureDatabaseId",
+      "file": "security.gs",
+      "severity": "ERROR",
+      "message": "API呼び出し1回あるがエラーハンドリングなし"
+    },
+    {
+      "type": "HIGH_API_USAGE",
+      "function": "connectDataSource",
+      "file": "AdminPanelBackend.gs",
+      "severity": "WARNING",
+      "value": 6,
+      "message": "API呼び出しが多い: 6回 (バッチ処理を検討)"
+    }
+  ],
+  "optimizations": [
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "connectDataSource",
+      "file": "AdminPanelBackend.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "publishApplication",
+      "file": "AdminPanelBackend.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "saveDraftConfiguration",
+      "file": "AdminPanelBackend.gs",
+      "value": 4,
+      "message": "configJSON中心設計に準拠: 4箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "executeConfigCleanup",
+      "file": "AdminPanelBackend.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getConfig",
+      "file": "AdminPanelBackend.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getCurrentBoardInfoAndUrls",
+      "file": "AdminPanelBackend.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "migrateUserDataToConfigJson",
+      "file": "AdminPanelBackend.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "fixFormInfoForUser",
+      "file": "AdminPanelBackend.gs",
+      "value": 3,
+      "message": "configJSON中心設計に準拠: 3箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getOpinionHeaderSafely",
+      "file": "Core.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "executeGetPublishedSheetData",
+      "file": "Core.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getIncrementalData",
+      "file": "Core.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getResponsesData",
+      "file": "Core.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getActiveFormInfo",
+      "file": "Core.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "saveSystemConfig",
+      "file": "Core.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getSheetColumns",
+      "file": "Core.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getSavedClassChoices",
+      "file": "Core.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getSheetConfig",
+      "file": "Core.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "buildSheetConfigDynamically",
+      "file": "Core.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "executeGetSheetData",
+      "file": "Core.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getSheetsList",
+      "file": "Core.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getInitialData",
+      "file": "Core.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getAvailableSheets",
+      "file": "PageBackend.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "refreshBoardData",
+      "file": "PageBackend.gs",
+      "value": 3,
+      "message": "configJSON中心設計に準拠: 3箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getDataCount",
+      "file": "PageBackend.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "renderAnswerBoard",
+      "file": "main.gs",
+      "value": 7,
+      "message": "configJSON中心設計に準拠: 7箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "getActiveUserInfo",
+      "file": "main.gs",
+      "value": 2,
+      "message": "configJSON中心設計に準拠: 2箇所"
+    },
+    {
+      "type": "CONFIG_JSON_COMPLIANCE",
+      "function": "validateUserDataState",
+      "file": "main.gs",
+      "value": 1,
+      "message": "configJSON中心設計に準拠: 1箇所"
+    },
+    {
+      "type": "CACHE_OPPORTUNITY",
+      "function": "connectDataSource",
+      "file": "AdminPanelBackend.gs",
+      "value": 6,
+      "message": "キャッシュ導入推奨: 6回のAPI呼び出し"
+    },
+    {
+      "type": "CACHE_OPPORTUNITY",
+      "function": "getIncrementalData",
+      "file": "Core.gs",
+      "value": 4,
+      "message": "キャッシュ導入推奨: 4回のAPI呼び出し"
+    },
+    {
+      "type": "CACHE_OPPORTUNITY",
+      "function": "repairUserSpreadsheetAccess",
+      "file": "Core.gs",
+      "value": 5,
+      "message": "キャッシュ導入推奨: 5回のAPI呼び出し"
+    },
+    {
+      "type": "CACHE_OPPORTUNITY",
+      "function": "updateUserFields",
+      "file": "database.gs",
+      "value": 4,
+      "message": "キャッシュ導入推奨: 4回のAPI呼び出し"
+    },
+    {
+      "type": "CATEGORY_COMPLEXITY_OPTIMIZATION",
+      "category": "rendering",
+      "value": "9.0",
+      "message": "renderingカテゴリの平均複雑度が高い: 9.0 (リファクタリング推奨)"
+    }
+  ]
+}

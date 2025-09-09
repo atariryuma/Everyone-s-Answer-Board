@@ -101,10 +101,10 @@ function getAvailableSheets(userId = null) {
 
     // ユーザー情報からスプレッドシートIDを取得（configJSON中心型）
     const userInfo = DB.findUserById(targetUserId);
-    if (!userInfo || !userInfo.parsedConfig) {
+    if (!userInfo || !JSON.parse(userInfo.configJson || '{}')) {
       throw new Error('ユーザー設定が見つかりません');
     }
-    const config = userInfo.parsedConfig;
+    const config = JSON.parse(userInfo.configJson || '{}');
     if (!config.spreadsheetId) {
       throw new Error('ユーザーのスプレッドシート情報が見つかりません');
     }
@@ -391,7 +391,7 @@ function refreshBoardData(requestUserId) {
     try {
       if (typeof invalidateUserCache === 'function') {
         // 🚀 CLAUDE.md準拠：userInfo使用（boardOwnerInfoはuserInfoと同じ）
-        const config = userInfo.parsedConfig || {};
+        const config = JSON.parse(userInfo.configJson || '{}') || {};
         const {spreadsheetId} = config;
         invalidateUserCache(requestUserId, userInfo.userEmail, spreadsheetId, false);
       }
@@ -471,7 +471,7 @@ function getDataCount(requestUserId, classFilter, sortOrder, adminMode) {
     }
 
     // 🔥 設定情報を効率的に取得（parsedConfig優先）
-    const config = userInfo.parsedConfig || {};
+    const config = JSON.parse(userInfo.configJson || '{}') || {};
 
     // スプレッドシート設定確認（configJSON中心型）
     const {spreadsheetId} = config;

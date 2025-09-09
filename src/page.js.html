@@ -37,7 +37,7 @@
       const userId = this._extractUserId();
 
       try {
-        return await this._runGasCall('getCurrentConfig', userId);
+        return await this._runGasCall('getConfig', userId);
       } catch (error) {
         console.error('❌ 設定取得失敗:', error.message);
         throw new Error(`設定取得失敗: ${error.message}`);
@@ -159,7 +159,7 @@
     // 読み取り系API判定
     _isReadOnlyCall(funcName) {
       const readOnlyCalls = [
-        'getCurrentConfig', 'getPublishedSheetData', 'getBulkData',
+        'getConfig', 'getData', 'getBulkData',
         'checkCurrentPublicationStatus', 'getSystemDomainInfo'
       ];
       return readOnlyCalls.includes(funcName);
@@ -280,7 +280,7 @@
     getConfig: () => ({
       getUserConfig: createGasMethod(
         'getUserConfig',
-        'getCurrentConfig',
+        'getConfig',
         'App.getConfig.getUserConfig'
       ),
     }),
@@ -296,7 +296,7 @@
     getData: () => ({
       getPublishedSheetData: createGasMethod(
         'getPublishedSheetData',
-        'getPublishedSheetData',
+        'getData',
         'App.getData.getPublishedSheetData'
       ),
       addReaction: createGasMethod('addReaction', 'addReaction', 'App.getData.addReaction'),
@@ -677,7 +677,7 @@
       this.gas = {
         getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) =>
           this.runGas(
-            'getPublishedSheetData',
+            'getData',
             this.state.userId,
             classFilter,
             sort,
@@ -1336,7 +1336,7 @@
 
               result = await configManager._runGasCall('getBulkData', bulkUserId, ...args.slice(1));
             break;
-          case 'getPublishedSheetData':
+          case 'getData':
             result = await App.getData().getPublishedSheetData(userId, ...args);
             break;
           case 'addReaction':
@@ -2806,7 +2806,7 @@
               );
             }, dynamicTimeout);
 
-              configManager._runGasCall('getPublishedSheetData',
+              configManager._runGasCall('getData',
               fetchParams.userId,
               fetchParams.classFilter,
               fetchParams.sortOrder,
@@ -3221,7 +3221,7 @@
                         // 簡素化されたフォールバック（待機時間短縮）
                         await new Promise((resolve) => setTimeout(resolve, 500));
 
-                                      const retryResult = await configManager._runGasCall('getPublishedSheetData',
+                                      const retryResult = await configManager._runGasCall('getData',
                               this.state.userId,
                               classFilter,
                               this.elements.sortOrder ? this.elements.sortOrder.value : 'newest',

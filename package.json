@@ -28,7 +28,16 @@
     "analyze": "node scripts/dependency-analyzer.js",
     "validate:functions": "node scripts/validate-functions.js",
     "validate:functions:watch": "nodemon scripts/validate-functions.js",
-    "test:functions": "jest tests/functionMappingValidation.test.js"
+    "test:functions": "jest tests/functionMappingValidation.test.js",
+    "analyze:flow": "node scripts/analyze-system-flow.js",
+    "analyze:critical": "node scripts/analyze-critical-functions.js",
+    "analyze:comprehensive": "node scripts/comprehensive-claude-md-audit.js",
+    "analyze:business": "node scripts/business-function-efficiency-audit.js",
+    "fix:claude-md": "node scripts/fix-claude-md-violations.js",
+    "system:health": "npm run analyze:critical && npm run check",
+    "system:full-audit": "npm run analyze:comprehensive && npm run analyze:business && npm run analyze:critical",
+    "system:optimize": "node scripts/generate-optimization-report.js",
+    "system:complete-audit": "npm run system:full-audit && npm run system:optimize"
   },
   "repository": {
     "type": "git",

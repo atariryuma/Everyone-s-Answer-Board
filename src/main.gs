@@ -1147,11 +1147,11 @@ function renderAnswerBoard(userInfo, params) {
     config = ConfigManager.getUserConfig(userInfo.userId);
     if (!config || !config.spreadsheetId) {
       console.warn('⚠️ ConfigManagerからの取得失敗、parsedConfigを使用');
-      config = userInfo.parsedConfig || {};
+      config = JSON.parse(userInfo.configJson || '{}') || {};
     }
   } catch (error) {
     console.error('❌ Config取得エラー:', error);
-    config = userInfo.parsedConfig || {};
+    config = JSON.parse(userInfo.configJson || '{}') || {};
   }
   
   // デバッグ: 実際に取得されたconfigの中身を確認
@@ -1177,8 +1177,8 @@ function renderAnswerBoard(userInfo, params) {
     template.isAdminPanel = false;
 
     // ✅ 設定取得統一化：より確実な設定参照方法
-    const userSpreadsheetId = config.spreadsheetId || userInfo.spreadsheetId || null;
-    const userSheetName = config.sheetName || userInfo.sheetName || null;
+    const userSpreadsheetId = config.spreadsheetId || config.spreadsheetId || null;
+    const userSheetName = config.sheetName || config.sheetName || null;
     
 
     // 📊 ユーザーIDをテンプレートに適切に設定
@@ -1329,7 +1329,7 @@ function renderAnswerBoard(userInfo, params) {
       }
 
       // 現在の設定から表示設定を取得（シンプル版）
-      const currentConfig = userInfo.parsedConfig || {};
+      const currentConfig = JSON.parse(userInfo.configJson || '{}') || {};
       const displaySettings = currentConfig.displaySettings || {};
 
       // 表示設定を適用
@@ -1344,7 +1344,7 @@ function renderAnswerBoard(userInfo, params) {
       template.hasData = false;
 
       // エラー時も表示設定を適用（シンプル版）
-      const currentConfig = userInfo.parsedConfig || {};
+      const currentConfig = JSON.parse(userInfo.configJson || '{}') || {};
       const displaySettings = currentConfig.displaySettings || {};
       template.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
       template.showCounts = displaySettings.showReactions !== false;
@@ -1401,7 +1401,7 @@ function checkCurrentPublicationStatus(userId) {
     }
 
     // 🔥 設定情報を効率的に取得（parsedConfig優先）
-    const config = userInfo.parsedConfig || {};
+    const config = JSON.parse(userInfo.configJson || '{}') || {};
 
     // configJSON中心型：公開状態判定
     const isPublished = config.appPublished === true;
@@ -1898,9 +1898,9 @@ function getActiveUserInfo() {
       email: userInfo.userEmail,
       userId: userInfo.userId,
       userEmail: userInfo.userEmail,
-      spreadsheetId: userInfo.parsedConfig?.spreadsheetId,
+      spreadsheetId: JSON.parse(userInfo.configJson || '{}')?.spreadsheetId,
       configJson: userInfo.configJson,
-      parsedConfig: userInfo.parsedConfig,
+      parsedConfig: JSON.parse(userInfo.configJson || '{}'),
     };
   } catch (error) {
     console.error('getActiveUserInfo グローバル関数エラー:', error.message);
@@ -1932,7 +1932,7 @@ function validateUserDataState(userInfo) {
   }
 
   // 設定データ検証
-  const config = userInfo.parsedConfig || {};
+  const config = JSON.parse(userInfo.configJson || '{}') || {};
   if (config.appPublished && !config.spreadsheetId) {
     issues.push('公開状態だがスプレッドシートIDがありません');
     fixes.push('スプレッドシート接続を確認');
