@@ -292,23 +292,41 @@ const DB = {
    * ユーザー更新（CLAUDE.md準拠版）
    * @param {string} userId - ユーザーID
    * @param {Object} updateData - 更新データ
+   * @param {Object} options - オプション設定
+   * @param {boolean} options.replaceConfig - trueの場合、configを完全置換（デフォルト: false）
    * @returns {Object} 更新結果
    */
-  updateUser(userId, updateData) {
+  updateUser(userId, updateData, options = {}) {
     try {
+      const { replaceConfig = false } = options;
+      
       // 現在のユーザーデータを取得
       const currentUser = this.findUserById(userId);
       if (!currentUser) {
         throw new Error('更新対象のユーザーが見つかりません');
       }
 
-      // シンプルなconfigJsonマージ（現在の設定を保持して更新データを追加）
-      const currentConfig = currentUser.parsedConfig || {};
-      const updatedConfig = {
-        ...currentConfig,
-        ...updateData,  // updateDataで直接上書き
-        lastModified: new Date().toISOString()
-      };
+      let updatedConfig;
+      
+      if (replaceConfig) {
+        // 🔥 完全置換モード：新しいデータのみを使用
+        updatedConfig = {
+          ...updateData,
+          lastModified: new Date().toISOString()
+        };
+        console.log('updateUser: 完全置換モードで更新', {
+          userId,
+          newConfigFields: Object.keys(updatedConfig)
+        });
+      } else {
+        // 既存のマージモード（後方互換性のため維持）
+        const currentConfig = currentUser.parsedConfig || {};
+        updatedConfig = {
+          ...currentConfig,
+          ...updateData,  // updateDataで直接上書き
+          lastModified: new Date().toISOString()
+        };
+      }
 
       // 基本フィールドは別管理なのでconfigJsonから除外
       delete updatedConfig.userEmail;
@@ -338,7 +356,8 @@ const DB = {
       console.log('updateUserConfigJson: 設定更新完了', {
         userId,
         setupStatus: updatedConfig.setupStatus,
-        hasFormUrl: !!updatedConfig.formUrl
+        hasFormUrl: !!updatedConfig.formUrl,
+        replaceConfig
       });
 
       return {

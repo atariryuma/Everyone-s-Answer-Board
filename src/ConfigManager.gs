@@ -176,15 +176,16 @@ const ConfigManager = Object.freeze({
       // タイムスタンプ更新
       validatedConfig.lastModified = new Date().toISOString();
 
-      // 🔧 修正: DB.updateUserInDatabaseを直接使用（updateUserではなく）
-      // updateUserは個別フィールドマージ用、完全なconfigJson置き換えはupdateUserInDatabase
+      // 🔥 修正: DB.updateUserを完全置換モードで使用
+      // configJsonの完全置換により、古いデータの残存を防止
       let success = false;
       try {
-        DB.updateUserInDatabase(userId, {
-          configJson: JSON.stringify(validatedConfig),
-          lastModified: validatedConfig.lastModified,
-        });
+        DB.updateUser(userId, validatedConfig, { replaceConfig: true });
         success = true;
+        console.log('✅ ConfigManager.saveConfig: 完全置換モードで更新成功', {
+          userId,
+          configFields: Object.keys(validatedConfig)
+        });
       } catch (dbError) {
         console.error('❌ ConfigManager.saveConfig: DB更新エラー:', dbError.message);
         success = false;

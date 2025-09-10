@@ -4317,8 +4317,8 @@ function connectDataSource(spreadsheetId, sheetName) {
         configSize: JSON.stringify(updatedConfig).length,
       });
 
-      // 🚀 シンプル化：新しいupdateUserメソッドを使用
-      DB.updateUser(userInfo.userId, updatedConfig);
+      // 🔥 完全置換モードでDB更新（古いデータの残存を防止）
+      DB.updateUser(userInfo.userId, updatedConfig, { replaceConfig: true });
 
       console.log('✅ connectDataSource: DB更新成功', {
         userId: userInfo.userId,
@@ -4447,22 +4447,46 @@ function publishApplication(config) {
 
     if (publishResult.success) {
       // 🔥 最適化：ConfigManager経由を削除し、直接configJSONを更新
+      // 🔥 完全な設定構築（古いデータの残存を防止）
       const updatedConfig = {
-        ...currentConfig,
-        // 公開設定
-        setupStatus: 'completed',
-        appPublished: true,
-        publishedAt: new Date().toISOString(),
-        appUrl: publishResult.appUrl,
-        isDraft: false,
+        // 基本設定の保持
+        createdAt: currentConfig.createdAt || new Date().toISOString(),
+        lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
         
-        // 表示設定を確実に更新
+        // データソース設定（確定済み）
+        spreadsheetId: effectiveSpreadsheetId,
+        sheetName: effectiveSheetName,
+        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${effectiveSpreadsheetId}`,
+        
+        // 表示設定（フロントエンドから）
         displaySettings: {
-          showNames: config.showNames || false,
-          showReactions: config.showReactions || false,
+          showNames: config.showNames !== undefined ? config.showNames : false,
+          showReactions: config.showReactions !== undefined ? config.showReactions : false,
         },
-
-        // メタデータ
+        displayMode: currentConfig.displayMode || 'anonymous',
+        
+        // アプリケーション状態（公開設定）
+        appPublished: true,
+        setupStatus: 'completed',
+        publishedAt: new Date().toISOString(),
+        isDraft: false,
+        appUrl: publishResult.appUrl,
+        
+        // データ接続で設定されたフィールドを保持
+        ...(currentConfig.columnMapping && { columnMapping: currentConfig.columnMapping }),
+        ...(currentConfig.opinionHeader && { opinionHeader: currentConfig.opinionHeader }),
+        ...(currentConfig.reasonHeader && { reasonHeader: currentConfig.reasonHeader }),
+        ...(currentConfig.classHeader && { classHeader: currentConfig.classHeader }),
+        ...(currentConfig.nameHeader && { nameHeader: currentConfig.nameHeader }),
+        ...(currentConfig.formUrl && { formUrl: currentConfig.formUrl }),
+        ...(currentConfig.formTitle && { formTitle: currentConfig.formTitle }),
+        ...(currentConfig.headerIndices && { headerIndices: currentConfig.headerIndices }),
+        ...(currentConfig.reactionMapping && { reactionMapping: currentConfig.reactionMapping }),
+        ...(currentConfig.systemMetadata && { systemMetadata: currentConfig.systemMetadata }),
+        
+        // メタ情報
+        configVersion: '2.0',
+        claudeMdCompliant: true,
         lastModified: new Date().toISOString(),
       };
 
@@ -4476,8 +4500,8 @@ function publishApplication(config) {
         },
       });
 
-      // 🚀 シンプル化：新しいupdateUserメソッドを使用
-      DB.updateUser(userInfo.userId, updatedConfig);
+      // 🔥 完全置換モードでDB更新（古いデータの残存を防止）
+      DB.updateUser(userInfo.userId, updatedConfig, { replaceConfig: true });
 
       console.log('✅ publishApplication: DB直接更新完了', {
         userId: userInfo.userId,
@@ -4531,7 +4555,7 @@ function publishApplication(config) {
  */
 function saveDraftConfiguration(config) {
   try {
-    console.log('💾 saveDraftConfiguration: ConfigManager統一版保存開始', {
+    console.log('💾 saveDraftConfiguration: 完全置換保存開始', {
       configKeys: Object.keys(config),
       timestamp: new Date().toISOString(),
     });
@@ -4542,21 +4566,61 @@ function saveDraftConfiguration(config) {
       throw new Error('ユーザー情報が見つかりません');
     }
 
-    // 🚫 二重構造防止: configJsonフィールドを削除
-    const cleanConfig = { ...config };
-    delete cleanConfig.configJson;
-    delete cleanConfig.configJSON;
+    // 🔥 現在の設定を取得して、必要なフィールドのみを保持
+    const currentConfig = ConfigManager.getUserConfig(userInfo.userId) || {};
+    
+    // 管理パネルから送信されたフィールドで更新
+    const updatedConfig = {
+      // 基本的な設定情報を保持
+      createdAt: currentConfig.createdAt || new Date().toISOString(),
+      lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
+      
+      // データソース設定（管理パネルから更新）
+      spreadsheetId: config.spreadsheetId || currentConfig.spreadsheetId,
+      sheetName: config.sheetName || currentConfig.sheetName,
+      spreadsheetUrl: config.spreadsheetId 
+        ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}`
+        : currentConfig.spreadsheetUrl,
+      
+      // 表示設定（管理パネルから更新）
+      displaySettings: {
+        showNames: config.showNames !== undefined ? config.showNames : (currentConfig.displaySettings?.showNames || false),
+        showReactions: config.showReactions !== undefined ? config.showReactions : (currentConfig.displaySettings?.showReactions || false),
+      },
+      displayMode: currentConfig.displayMode || 'anonymous',
+      
+      // アプリケーション状態
+      setupStatus: currentConfig.setupStatus || 'pending',
+      appPublished: currentConfig.appPublished || false,
+      isDraft: true,
+      
+      // データ接続で設定されたフィールドを保持（connectDataSourceから）
+      ...(currentConfig.columnMapping && { columnMapping: currentConfig.columnMapping }),
+      ...(currentConfig.opinionHeader && { opinionHeader: currentConfig.opinionHeader }),
+      ...(currentConfig.reasonHeader && { reasonHeader: currentConfig.reasonHeader }),
+      ...(currentConfig.classHeader && { classHeader: currentConfig.classHeader }),
+      ...(currentConfig.nameHeader && { nameHeader: currentConfig.nameHeader }),
+      ...(currentConfig.formUrl && { formUrl: currentConfig.formUrl }),
+      ...(currentConfig.formTitle && { formTitle: currentConfig.formTitle }),
+      ...(currentConfig.headerIndices && { headerIndices: currentConfig.headerIndices }),
+      ...(currentConfig.reactionMapping && { reactionMapping: currentConfig.reactionMapping }),
+      ...(currentConfig.systemMetadata && { systemMetadata: currentConfig.systemMetadata }),
+      
+      // メタ情報
+      configVersion: '2.0',
+      claudeMdCompliant: true,
+    };
 
-    // ✅ ConfigManager.updateConfig()による統一更新（簡素化）
-    const success = ConfigManager.updateConfig(userInfo.userId, cleanConfig);
+    // 🔥 ConfigManager.saveConfig()を使用して完全置換
+    const success = ConfigManager.saveConfig(userInfo.userId, updatedConfig);
 
     if (!success) {
       throw new Error('設定の保存に失敗しました');
     }
 
-    console.log('✅ saveDraftConfiguration: ConfigManager統一版保存完了', {
+    console.log('✅ saveDraftConfiguration: 完全置換保存完了', {
       userId: userInfo.userId,
-      configFields: Object.keys(cleanConfig).length,
+      savedFields: Object.keys(updatedConfig),
       claudeMdCompliant: true,
     });
 
@@ -4567,7 +4631,7 @@ function saveDraftConfiguration(config) {
       timestamp: new Date().toISOString(),
     };
   } catch (error) {
-    console.error('❌ saveDraftConfiguration: ConfigManager統一版エラー:', {
+    console.error('❌ saveDraftConfiguration: エラー:', {
       error: error.message,
       timestamp: new Date().toISOString(),
     });
