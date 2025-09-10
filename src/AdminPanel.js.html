@@ -97,7 +97,7 @@
     }
   }
 
-  // シンプルなドロップダウン初期化（初期化時にデータ一括読み込み）
+  // シンプルなドロップダウン初期化（遅延読み込み対応）
   async function initializeDropdowns() {
     const spreadsheetSelect = document.getElementById('spreadsheet-select');
     const sheetSelect = document.getElementById('sheet-select');
@@ -105,12 +105,17 @@
     if (!spreadsheetSelect) return;
 
     try {
-      // スプレッドシート一覧を初期化時に読み込み
-      await loadSpreadsheetListAsync();
+      // スプレッドシート一覧の読み込みはラジオボタン選択時まで遅延
+      spreadsheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
 
       // 現在の設定から既存データを取得・反映
       const config = await getConfigAsync();
       if (config && config.spreadsheetId) {
+        // 既存の設定がある場合は、その項目だけを追加
+        const option = document.createElement('option');
+        option.value = config.spreadsheetId;
+        option.textContent = '現在の設定: ' + (config.spreadsheetName || config.spreadsheetId);
+        spreadsheetSelect.appendChild(option);
         spreadsheetSelect.value = config.spreadsheetId;
 
         // 設定されているスプレッドシートのシート一覧を読み込み
@@ -124,10 +129,30 @@
 
       // シンプルなchangeイベントを設定
       setupSimpleChangeEvents();
+      
+      // データソース選択のラジオボタンイベントを設定
+      setupDataSourceRadioEvents();
     } catch (error) {
       console.error('ドロップダウン初期化エラー:', error);
       spreadsheetSelect.innerHTML = '<option value="">初期化エラー</option>';
     }
+  }
+  
+  // データソース選択ラジオボタンのイベント設定
+  function setupDataSourceRadioEvents() {
+    const radioButtons = document.querySelectorAll('input[name="data-source"]');
+    let spreadsheetListLoaded = false;
+    
+    radioButtons.forEach(radio => {
+      radio.addEventListener('change', async function() {
+        if (this.value === 'list' && !spreadsheetListLoaded) {
+          // 「一覧から選択」が選択された時のみスプレッドシート一覧を読み込み
+          console.log('スプレッドシート一覧を読み込み中...');
+          await loadSpreadsheetListAsync();
+          spreadsheetListLoaded = true;
+        }
+      });
+    });
   }
 
   // 🎯 シンプルなchangeイベント設定
@@ -890,17 +915,23 @@
   function checkSystemAdminAccess() {
     google.script.run
       .withSuccessHandler(function (isAdmin) {
-        if (isAdmin) {
-          console.log('システム管理者として認識されました');
-          document.getElementById('app-setup-btn').style.display = 'block';
-        } else {
-          console.log('一般ユーザーとして認識されました');
-          document.getElementById('app-setup-btn').style.display = 'none';
+        const appSetupBtn = document.getElementById('app-setup-btn');
+        if (appSetupBtn) {
+          if (isAdmin) {
+            console.log('システム管理者として認識されました');
+            appSetupBtn.style.display = 'block';
+          } else {
+            console.log('一般ユーザーとして認識されました');
+            appSetupBtn.style.display = 'none';
+          }
         }
       })
       .withFailureHandler(function (error) {
         console.warn('システム管理者確認エラー:', error);
-        document.getElementById('app-setup-btn').style.display = 'none';
+        const appSetupBtn = document.getElementById('app-setup-btn');
+        if (appSetupBtn) {
+          appSetupBtn.style.display = 'none';
+        }
       })
       .checkIsSystemAdmin();
   }
@@ -2236,4 +2267,28 @@
   }
 
   // アプリケーション名自動生成機能は削除（CLAUDE.md準拠）
+
+  // 回答ボードを開く
+  function openAnswerBoard() {
+    google.script.run
+      .withSuccessHandler(function(result) {
+        if (result && result.appUrl) {
+          window.open(result.appUrl, '_blank');
+        } else {
+          showError('回答ボードのURLが取得できませんでした');
+        }
+      })
+      .withFailureHandler(function(error) {
+        showError('回答ボードを開けませんでした: ' + error.message);
+      })
+      .getCurrentBoardInfoAndUrls();
+  }
+
+  // アプリ設定画面を開く
+  function openAppSetup() {
+    // 現在のURLからベースURLを取得
+    const currentUrl = new URL(window.location.href);
+    const baseUrl = currentUrl.origin + currentUrl.pathname;
+    window.location.href = baseUrl;
+  }
 </script>

@@ -738,34 +738,15 @@ class StudyQuestApp {
    * パブリケーション状態監視システムの初期化 - 最適化版
    */
   initPublicationStatusMonitoring() {
-    // 定期的なパブリケーション状態チェック（5分間隔に延長）
-    this.publicationCheckInterval = setInterval(() => {
-      this.checkPublicationStatus();
-    }, 300000); // 5分 = 300,000ms
-    
-    // 最後のチェック時刻を記録してデバウンス処理
-    this.lastStatusCheck = 0;
-    const CHECK_DEBOUNCE = 30000; // 30秒間隔制限
-    
-    // ページの可視性変更時とフォーカス時の統合処理
-    const debouncedCheck = () => {
-      const now = Date.now();
-      if (now - this.lastStatusCheck > CHECK_DEBOUNCE) {
-        this.lastStatusCheck = now;
-        this.checkPublicationStatus();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) debouncedCheck();
-    });
-    
-    window.addEventListener('focus', debouncedCheck);
+    // ページアクセス時の初回チェックのみ実行
+    // 定期チェックは削除し、新着通知時のみチェックを行う
     
     // 初回チェック（初期化完了後に実行）
     setTimeout(() => {
       this.checkPublicationStatus();
-    }, 5000); // 10秒→5秒に短縮
+    }, 5000); // 5秒後に1回だけ実行
+    
+    // 以降のチェックは新着通知ポーリング時に実行される
   }
 
   /**
@@ -871,7 +852,7 @@ class StudyQuestApp {
     // Reset polling to longer intervals
     if (this.pollingTimeout) {
       clearTimeout(this.pollingTimeout);
-      this.currentPollInterval = 60000; // 1 minute
+      this.currentPollInterval = 90000; // 90 seconds
       this.startPolling();
     }
     
@@ -1430,6 +1411,9 @@ class StudyQuestApp {
       if (!this.validateContentCheckPrerequisites()) {
         return;
       }
+      
+      // 新着通知チェック時に公開状態も確認
+      await this.checkPublicationStatus();
       
       // パラメータの準備
       const { selectedClass, sortOrder } = this.prepareContentCheckParams();
@@ -2198,10 +2182,11 @@ class StudyQuestApp {
       clearInterval(this.pollingInterval);
     }
     
-    // Adaptive polling: start with normal interval, adjust based on success/failure
+    // Adaptive polling: start with 90 seconds interval
     this.pollSuccessCount = 0;
     this.pollFailureCount = 0;
-    this.currentPollInterval = this.isLowPerformanceMode ? 30000 : 15000;
+    // 90秒（通常）または120秒（低パフォーマンス）から開始
+    this.currentPollInterval = this.isLowPerformanceMode ? 120000 : 90000;
     
     const adaptivePoll = async () => {
       console.log('⏰ ポーリング実行:', {
@@ -2216,9 +2201,9 @@ class StudyQuestApp {
         this.pollSuccessCount++;
         this.pollFailureCount = 0;
         
-        // Reduce interval on consistent success (but not below minimum)
-        if (this.pollSuccessCount > 3 && this.currentPollInterval > 10000) {
-          this.currentPollInterval = Math.max(10000, this.currentPollInterval * 0.9);
+        // Reduce interval on consistent success (but not below 60 seconds)
+        if (this.pollSuccessCount > 3 && this.currentPollInterval > 60000) {
+          this.currentPollInterval = Math.max(60000, this.currentPollInterval * 0.9);
         }
         
         console.log('✅ ポーリング成功:', {
@@ -2229,9 +2214,9 @@ class StudyQuestApp {
         this.pollFailureCount++;
         this.pollSuccessCount = 0;
         
-        // Increase interval on failures (exponential backoff)
+        // Increase interval on failures (exponential backoff, max 5 minutes)
         if (this.pollFailureCount > 2) {
-          this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
+          this.currentPollInterval = Math.min(300000, this.currentPollInterval * 1.5);
         }
         console.warn('❌ ポーリング失敗:', error, {
           failureCount: this.pollFailureCount,
