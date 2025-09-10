@@ -252,6 +252,9 @@ class StudyQuestApp {
     INIT_TIMEOUT_MS: 30000
   });
 
+  // 🚀 パフォーマンス設定の静的参照（グローバル定数へのアクセス）
+  static PERFORMANCE_CONFIG = PERFORMANCE_CONFIG;
+
   /**
    * ユーザーIDを検証し、必要に応じてフォールバック値を提供
    * @param {string} userId - 検証するユーザーID
@@ -621,8 +624,8 @@ class StudyQuestApp {
       this.debugMetrics.shift();
     }
     
-    // Alert on significant inconsistencies
-    if (!metrics.domMetrics.isConsistent) {
+    // Alert on significant inconsistencies (初期描画完了後のみ)
+    if (!metrics.domMetrics.isConsistent && this.state.initialDataLoaded) {
       console.warn('⚠️ DOM-Data inconsistency detected:', {
         data: currentDataLength,
         dom: domCardCount,
@@ -4409,7 +4412,11 @@ class StudyQuestApp {
     }
 
     const scrollTop = container.scrollTop;
-    const containerHeight = container.clientHeight;
+    // 🚀 より堅牢なコンテナ高さ取得
+    let containerHeight = container.clientHeight || 
+                         container.getBoundingClientRect().height || 
+                         container.offsetHeight;
+    
     const cardHeight = 150; // 仮のカードの高さ。実際のCSSに基づいて調整が必要。
 
     let startIndex = 0;
@@ -4419,9 +4426,21 @@ class StudyQuestApp {
       startIndex = Math.floor(scrollTop / cardHeight);
       endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
     } else {
-      console.warn('calculateVisibleRange: containerHeight is 0, rendering all items as fallback.');
+      // 🚀 DOM準備完了待ちの処理
+      if (this.state.initialDataLoaded) {
+        console.warn('calculateVisibleRange: containerHeight is 0, retrying after DOM ready.');
+        // DOM準備完了まで少し待機してから再計算
+        requestAnimationFrame(() => {
+          if (this.renderBoard) {
+            this.renderBoard();
+          }
+        });
+      }
+      // デフォルト高さでフォールバック計算
+      containerHeight = 600;
+      startIndex = Math.floor(scrollTop / cardHeight);
+      endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
     }
-
 
     return { startIndex, endIndex };
   }
