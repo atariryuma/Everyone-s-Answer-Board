@@ -1,9 +1,9 @@
 <script>
 // Dynamic performance-based batch sizing
 const PERFORMANCE_CONFIG = Object.freeze({
-  BASE_RENDER_BATCH_SIZE: 50, // Base batch size for normal performance (increased for better DOM consistency)
-  LOW_PERF_BATCH_SIZE: 25, // Reduced batch size for low performance devices
-  HIGH_PERF_BATCH_SIZE: 75, // Increased batch size for high performance devices
+  BASE_RENDER_BATCH_SIZE: 150, // Base batch size for normal performance (optimized for medium datasets)
+  LOW_PERF_BATCH_SIZE: 100, // Reduced batch size for low performance devices  
+  HIGH_PERF_BATCH_SIZE: 200, // Increased batch size for high performance devices
   VIEWPORT_BUFFER: 200, // Viewport buffer for virtual scrolling
   PERFORMANCE_BUDGET: 16, // Maximum ms per frame (60fps)
   CHUNK_SIZE: 5, // DOM operations per chunk
@@ -4346,18 +4346,45 @@ class StudyQuestApp {
     // コンテナをクリア
     container.innerHTML = '';
     
-    // 不要なカードは既にクリアされているので削除処理は不要
+    // データサイズに応じた動的レンダリング戦略
+    const dataSize = newRows.length;
+    const shouldUseVirtualScrolling = this.shouldUseVirtualScrolling(dataSize);
+    
+    console.log(`🎯 レンダリング戦略選択: ${dataSize}件データ -> ${shouldUseVirtualScrolling ? '仮想スクロール' : '直接レンダリング'}`);
     
     // メインレンダリング処理
-    if (newRows.length > RENDER_BATCH_SIZE) {
+    if (shouldUseVirtualScrolling) {
       this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad);
     } else {
       this.renderDirectly(newRows, oldRows, container, existingMap);
     }
   }
   
+  shouldUseVirtualScrolling(dataSize) {
+    // データサイズに応じた動的判定
+    if (dataSize <= 150) {
+      // 小〜中データ: 直接レンダリング（パフォーマンス良好、スクロール不要）
+      return false;
+    } else if (dataSize <= 500) {
+      // 中〜大データ: 仮想スクロール（初期表示75-100件）
+      return true;
+    } else {
+      // 大量データ: 仮想スクロール（初期表示50-75件）
+      return true;
+    }
+  }
+  
   renderDirectly(newRows, oldRows, container, existingMap) {
+    const startTime = performance.now();
+    const totalItems = newRows.length;
+    
+    console.log(`🎯 直接レンダリング開始: ${totalItems}件データ（全件表示）`);
+    
     const fragment = this.getReusableFragment();
+    let newCardsCount = 0;
+    let updatedCardsCount = 0;
+    let reusedCardsCount = 0;
+    let failedCardsCount = 0;
     
     newRows.forEach((row) => {
       const rowId = String(row.rowIndex);
@@ -4370,25 +4397,34 @@ class StudyQuestApp {
         if (card) {
           card.classList.add('new-card');
           fragment.appendChild(card);
+          newCardsCount++;
         } else {
           console.warn('renderBoard: Failed to create card for row:', row.rowIndex);
+          failedCardsCount++;
         }
       } else if (this.shouldUpdateCard(row, oldData)) {
         // 既存カードを更新（リアクション状態を保持）
         this.updateAnswerCard(card, row, oldData);
+        updatedCardsCount++;
+      } else {
+        reusedCardsCount++;
       }
     });
     
     if (fragment.children.length > 0) {
       container.appendChild(fragment);
     }
+    
+    const endTime = performance.now();
+    console.log(`✅ 直接レンダリング完了: ${(endTime - startTime).toFixed(2)}ms | 新規: ${newCardsCount}, 更新: ${updatedCardsCount}, 再利用: ${reusedCardsCount}, 失敗: ${failedCardsCount}`);
   }
   
   calculateVisibleRange(totalItems) {
     const container = this.elements.answersContainer;
     if (!container) {
       console.warn('calculateVisibleRange: answersContainer not found.');
-      return { startIndex: 0, endIndex: Math.min(50, totalItems) }; // 初期は50件表示（DOM不整合防止）
+      const initialDisplay = this.getOptimalInitialDisplay(totalItems);
+      return { startIndex: 0, endIndex: Math.min(initialDisplay, totalItems) };
     }
 
     const scrollTop = container.scrollTop;
@@ -4406,11 +4442,11 @@ class StudyQuestApp {
       startIndex = Math.floor(scrollTop / cardHeight);
       endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight) + 5); // バッファ追加
     } else {
-      // 🚀 DOM準備完了待ちの処理 - 初期表示では多めに表示
+      // 🚀 DOM準備完了待ちの処理 - データサイズに応じた初期表示
       if (this.state.initialDataLoaded) {
         console.warn('calculateVisibleRange: containerHeight is 0, showing initial batch.');
-        // 初期表示では50件表示（DOM不整合防止のため増加）
-        return { startIndex: 0, endIndex: Math.min(50, totalItems) };
+        const initialDisplay = this.getOptimalInitialDisplay(totalItems);
+        return { startIndex: 0, endIndex: Math.min(initialDisplay, totalItems) };
       }
       // デフォルト高さでフォールバック計算
       containerHeight = 600;
@@ -4418,16 +4454,45 @@ class StudyQuestApp {
       endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight) + 5);
     }
 
-    // 最小表示件数を保証（DOM不整合防止のため増加）
-    if (endIndex - startIndex < 25 && totalItems > 25) {
-      endIndex = Math.min(startIndex + 25, totalItems);
+    // データサイズに応じた最小表示件数を保証
+    const minDisplay = this.getOptimalMinDisplay(totalItems);
+    if (endIndex - startIndex < minDisplay && totalItems > minDisplay) {
+      endIndex = Math.min(startIndex + minDisplay, totalItems);
     }
 
     return { startIndex, endIndex };
   }
+  
+  getOptimalInitialDisplay(totalItems) {
+    // データサイズに応じた初期表示件数の動的計算
+    if (totalItems <= 500) {
+      // 中データ: より多く表示（ユーザビリティ重視）
+      return Math.min(100, totalItems);
+    } else if (totalItems <= 1000) {
+      // 大データ: バランス重視
+      return 75;
+    } else {
+      // 超大データ: パフォーマンス重視
+      return 50;
+    }
+  }
+  
+  getOptimalMinDisplay(totalItems) {
+    // データサイズに応じた最小表示件数の動的計算
+    if (totalItems <= 500) {
+      return Math.min(75, totalItems);
+    } else if (totalItems <= 1000) {
+      return 50;
+    } else {
+      return 30;
+    }
+  }
 
   renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad) {
-    debugLog('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
+    const startTime = performance.now();
+    const totalItems = newRows.length;
+    
+    console.log(`🚀 仮想スクロール開始: ${totalItems}件データ (初期ロード: ${isInitialLoad})`);
 
     if (isInitialLoad || this.state.currentAnswers.length === 0) {
       this.clearVirtualScrollingState();
@@ -4435,9 +4500,15 @@ class StudyQuestApp {
 
     // 仮想スクロールでも既存のリアクション状態を保持
     const fragment = this.getReusableFragment();
-    const visibleRange = this.calculateVisibleRange(newRows.length);
+    const visibleRange = this.calculateVisibleRange(totalItems);
     const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
-    debugLog('Virtual scroll rendering:', { visibleRows: visibleRows.length });
+    
+    const optimalDisplay = this.getOptimalInitialDisplay(totalItems);
+    console.log(`📊 仮想スクロール詳細: 範囲 ${visibleRange.startIndex}-${visibleRange.endIndex} (${visibleRows.length}件表示) / 最適初期表示 ${optimalDisplay}件`);
+
+    let newCardsCount = 0;
+    let updatedCardsCount = 0;
+    let reusedCardsCount = 0;
 
     visibleRows.forEach((row) => {
       const rowId = String(row.rowIndex);
@@ -4448,17 +4519,23 @@ class StudyQuestApp {
         card = this.createAnswerCard(row);
         if (card) {
           fragment.appendChild(card);
+          newCardsCount++;
         }
       } else if (this.shouldUpdateCard(row, oldData)) {
         // 既存カードを更新（リアクション状態を保持）
         this.updateAnswerCard(card, row, oldData);
+        updatedCardsCount++;
+      } else {
+        reusedCardsCount++;
       }
     });
 
-    debugLog('Virtual scroll completed:', { renderedCards: fragment.children.length });
     if (fragment.children.length > 0) {
       container.appendChild(fragment);
     }
+    
+    const endTime = performance.now();
+    console.log(`✅ 仮想スクロール完了: ${(endTime - startTime).toFixed(2)}ms | 新規: ${newCardsCount}, 更新: ${updatedCardsCount}, 再利用: ${reusedCardsCount}`);
   }
   
   shouldUpdateCard(newData, oldData) {
