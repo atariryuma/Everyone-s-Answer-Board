@@ -676,11 +676,23 @@
 
   // Helper functions for backward compatibility
   window.debounce = (func, delay, key = 'default') => {
-    window.sharedUtilities.debounce.debounce(func, key, delay);
+    // Check if sharedUtilities exists before using
+    if (window.sharedUtilities && window.sharedUtilities.debounce) {
+      window.sharedUtilities.debounce.debounce(func, key, delay);
+    } else {
+      // Simple fallback
+      setTimeout(func, delay);
+    }
   };
 
   window.throttle = (func, delay, key = 'default') => {
-    window.sharedUtilities.throttle.throttle(func, key, delay);
+    // Check if sharedUtilities exists before using
+    if (window.sharedUtilities && window.sharedUtilities.throttle) {
+      window.sharedUtilities.throttle.throttle(func, key, delay);
+    } else {
+      // Simple fallback
+      func();
+    }
   };
 
   // Global cache instance for backward compatibility

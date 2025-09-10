@@ -7419,7 +7419,15 @@ class StudyQuestApp {
     // Use SharedUtilities with instance-specific keys
     const key = `studyquest-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
     return (...args) => {
-      window.sharedUtilities.debounce.debounce(() => func.apply(this, args), key, delay);
+      // Fix: Correct method call - debounce.debounce() is the right pattern
+      if (window.sharedUtilities && window.sharedUtilities.debounce && window.sharedUtilities.debounce.debounce) {
+        window.sharedUtilities.debounce.debounce(() => func.apply(this, args), key, delay);
+      } else {
+        // Fallback to simple debounce if SharedUtilities not loaded
+        this.debounceTimers = this.debounceTimers || {};
+        clearTimeout(this.debounceTimers[key]);
+        this.debounceTimers[key] = setTimeout(() => func.apply(this, args), delay);
+      }
     };
   }
   
@@ -7427,7 +7435,18 @@ class StudyQuestApp {
     // Use SharedUtilities with instance-specific keys
     const key = `studyquest-throttle-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
     return (...args) => {
-      window.sharedUtilities.throttle.throttle(() => func.apply(this, args), key, delay);
+      // Fix: Correct method call - throttle.throttle() is the right pattern
+      if (window.sharedUtilities && window.sharedUtilities.throttle && window.sharedUtilities.throttle.throttle) {
+        window.sharedUtilities.throttle.throttle(() => func.apply(this, args), key, delay);
+      } else {
+        // Fallback to simple throttle if SharedUtilities not loaded
+        const now = Date.now();
+        this.throttleLastRun = this.throttleLastRun || {};
+        if (now - (this.throttleLastRun[key] || 0) >= delay) {
+          this.throttleLastRun[key] = now;
+          func.apply(this, args);
+        }
+      }
     };
   }
   updateSortOptions() {
@@ -7660,7 +7679,8 @@ class StudyQuestApp {
     if ('ResizeObserver' in window) {
       // Arrow function to preserve 'this' context
       const debouncedResize = (entries) => {
-        if (window.sharedUtilities && window.sharedUtilities.debounce) {
+        if (window.sharedUtilities && window.sharedUtilities.debounce && window.sharedUtilities.debounce.debounce) {
+          // Fix: Call debounce.debounce() method correctly
           window.sharedUtilities.debounce.debounce(() => {
             this.adjustLayout();
           }, 'resize-observer', 100);
