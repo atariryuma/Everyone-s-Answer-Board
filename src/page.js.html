@@ -487,8 +487,8 @@ class StudyQuestApp {
       this.displayInitializationError(`アプリケーションの起動に失敗しました: ${error.message}`);
     });
     
-    // パブリケーション状態監視システムの初期化
-    this.initPublicationStatusMonitoring();
+    // 初回公開状態チェック（5秒後）
+    setTimeout(() => this.checkPublicationStatus(), 5000);
   }
 
   // Reset state for clean initialization (Phase 1.2)
@@ -499,7 +499,6 @@ class StudyQuestApp {
     this.state.currentAnswers = [];
     this.state.hasNewContent = false;
     this.state.newContentCount = 0;
-    this.state.pollingFailureCount = 0;
     
     // Clear DOM to prevent inconsistency
     const container = this.elements.answersContainer;
@@ -563,8 +562,7 @@ class StudyQuestApp {
       this.state.newContentCount = 0;
     }
     
-    // Step 4: Reset polling failure count on successful data update
-    this.state.pollingFailureCount = 0;
+    // Step 4: Data update successful
     
     // Phase 4.1: Enhanced monitoring and logging
     this.logDataConsistencyMetrics(context, dataLength, previousLength);
@@ -606,7 +604,6 @@ class StudyQuestApp {
       stateMetrics: {
         hasNewContent: this.state.hasNewContent,
         newContentCount: this.state.newContentCount,
-        pollingFailureCount: this.state.pollingFailureCount,
         initialDataLoaded: this.initialDataLoaded
       },
       performanceMetrics: {
@@ -669,8 +666,7 @@ class StudyQuestApp {
     // Log detailed error information
     this.logErrorDetails(error, context);
     
-    // Increment failure count
-    this.state.pollingFailureCount = (this.state.pollingFailureCount || 0) + 1;
+    // Error occurred
     
     // Determine recovery strategy based on error type and failure count
     const recoveryStrategy = this.determineRecoveryStrategy(error, context);
@@ -714,7 +710,6 @@ class StudyQuestApp {
       state: {
         currentAnswersLength: this.state.currentAnswers?.length || 0,
         lastSeenCount: this.state.lastSeenCount,
-        pollingFailureCount: this.state.pollingFailureCount,
         isLoading: this.state.isLoading
       },
       environment: {
@@ -735,18 +730,41 @@ class StudyQuestApp {
   }
 
   /**
-   * パブリケーション状態監視システムの初期化 - 最適化版
+   * シンプルなポーリング開始（3分固定間隔）
    */
-  initPublicationStatusMonitoring() {
-    // ページアクセス時の初回チェックのみ実行
-    // 定期チェックは削除し、新着通知時のみチェックを行う
-    
-    // 初回チェック（初期化完了後に実行）
-    setTimeout(() => {
-      this.checkPublicationStatus();
-    }, 5000); // 5秒後に1回だけ実行
-    
-    // 以降のチェックは新着通知ポーリング時に実行される
+  startPolling() {
+    this.stopPolling();
+    this.pollingInterval = setInterval(() => this.checkAll(), 180000); // 3分間隔
+  }
+
+  /**
+   * ポーリング停止
+   */
+  stopPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
+  }
+
+  /**
+   * 統合チェック（公開状態＋新着）
+   */
+  async checkAll() {
+    try {
+      // 公開状態チェック
+      await this.checkPublicationStatus();
+      
+      // 新着チェック（getDataCountのみ使用）
+      const count = await this.gas.getDataCount();
+      const currentCount = this.state.currentAnswers?.length || 0;
+      if (count && count.count > currentCount) {
+        const newItems = count.count - currentCount;
+        this.showNewContentBanner(newItems);
+      }
+    } catch (error) {
+      console.error('Check error:', error);
+    }
   }
 
   /**
@@ -815,10 +833,10 @@ class StudyQuestApp {
   }
 
   determineRecoveryStrategy(error, context) {
-    // Determine best recovery strategy based on error characteristics
-    if (this.state.pollingFailureCount <= 2) {
+    // Simplified recovery strategy
+    if (Math.random() > 0.5) {
       return 'retry';
-    } else if (this.state.pollingFailureCount <= 5) {
+    } else {
       return 'clearAndReload';
     } else {
       return 'fallbackMode';
@@ -852,7 +870,6 @@ class StudyQuestApp {
     // Reset polling to longer intervals
     if (this.pollingTimeout) {
       clearTimeout(this.pollingTimeout);
-      this.currentPollInterval = 90000; // 90 seconds
       this.startPolling();
     }
     
@@ -1515,8 +1532,7 @@ class StudyQuestApp {
       consistencyCheck
     });
     
-    // ポーリング成功のマーク - unified state management (Phase 2.3)
-    this.state.pollingFailureCount = 0;
+    // ポーリング成功のマーク
     
     // 現在のビューキー
     const currentViewKey = `${selectedClass}-${sortOrder}`;
@@ -1537,97 +1553,7 @@ class StudyQuestApp {
     await this.checkForNewItems(newCount);
   }
   
-  async handleInitialContentLoad(currentViewKey, newCount) {
-    this.lastViewKey = currentViewKey;
-    
-    // 初期データロード失敗後の初回成功ポーリング時の特別処理
-    if (this.hadInitialDataLoadFailure && newCount > this.state.lastSeenCount) {
-      console.log('🔄 初期データロード失敗後の新着検出:', {
-        newCount,
-        lastSeenCount: this.state.lastSeenCount,
-        difference: newCount - this.state.lastSeenCount
-      });
-
-      await this.checkForNewItems(newCount);
-      return; // データ取得成功まで基準は更新しない
-    }
-
-    this.updateLastSeenCount(newCount);
-    this.initialDataLoaded = true;
-    
-    console.log('✅ Initial content load completed:', {
-      viewKey: currentViewKey,
-      count: newCount,
-      hadPreviousFailure: this.hadInitialDataLoadFailure
-    });
-  }
-  
-  async handleViewChange(currentViewKey, newCount) {
-    console.log('🔄 View settings changed:', {
-      from: this.lastViewKey,
-      to: currentViewKey,
-      newCount
-    });
-    
-    this.lastViewKey = currentViewKey;
-    this.updateLastSeenCount(newCount);
-    this.dismissNewContentBanner();
-  }
-  
-  async checkForNewItems(newCount) {
-    const currentCount = this.state.currentAnswers?.length || 0;
-    const lastSeen = this.state.lastSeenCount || 0;
-    
-    // Enhanced new item detection with consistency validation (Phase 3.1)
-    const detectionMetrics = {
-      lightCheckCount: newCount,
-      currentDataCount: currentCount,
-      lastSeenCount: lastSeen,
-      expectedNewItems: newCount - lastSeen,
-      hasNewItems: newCount > lastSeen,
-      dataIsStale: currentCount > 0 && newCount > currentCount
-    };
-    
-    console.log('📢 Enhanced new content detection (Phase 3.1):', detectionMetrics);
-    
-    if (detectionMetrics.hasNewItems && detectionMetrics.expectedNewItems > 0) {
-      const newItems = detectionMetrics.expectedNewItems;
-      
-      // 新着通知バナーを表示
-      this.showNewContentBanner(newItems);
-    }
-  }
-  
-  // 自動リフレッシュ機能は無効化 - 新着時は常に通知バナー表示
-  shouldAutoRefresh(newItems) {
-    return false;
-  }
-  
-  async handleContentCheckError(error) {
-    this.state.pollingFailureCount++;
-    
-    console.warn('❌ Content check failed:', {
-      error: error.message,
-      failureCount: this.state.pollingFailureCount
-    });
-    
-    // 連続失敗時の対処
-    if (this.state.pollingFailureCount >= 3) {
-      console.log('⏳ Too many polling failures, extending interval...');
-      await this.handlePollingFailures();
-    }
-  }
-  
-  async handlePollingFailures() {
-    this.stopPolling();
-    
-    // 5秒後にポーリング再開
-    setTimeout(() => {
-      this.startPolling();
-      this.state.pollingFailureCount = 0;
-      console.log('✅ Polling restarted after failure recovery');
-    }, 5000);
-  }
+  // 削除: 複雑なコンテンツチェック関連関数（シンプル化のため削除）
   
   // 新着通知バナーを表示
   showNewContentBanner(newItems) {
@@ -2177,92 +2103,7 @@ class StudyQuestApp {
       }, 300);
     });
   }
-  startPolling() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-    }
-    
-    // Adaptive polling: start with 90 seconds interval
-    this.pollSuccessCount = 0;
-    this.pollFailureCount = 0;
-    // 90秒（通常）または120秒（低パフォーマンス）から開始
-    this.currentPollInterval = this.isLowPerformanceMode ? 120000 : 90000;
-    
-    const adaptivePoll = async () => {
-      console.log('⏰ ポーリング実行:', {
-        currentInterval: this.currentPollInterval,
-        successCount: this.pollSuccessCount,
-        failureCount: this.pollFailureCount,
-        timestamp: new Date().toLocaleTimeString()
-      });
-      
-      try {
-        await this.checkForNewContentLight();
-        this.pollSuccessCount++;
-        this.pollFailureCount = 0;
-        
-        // Reduce interval on consistent success (but not below 60 seconds)
-        if (this.pollSuccessCount > 3 && this.currentPollInterval > 60000) {
-          this.currentPollInterval = Math.max(60000, this.currentPollInterval * 0.9);
-        }
-        
-        console.log('✅ ポーリング成功:', {
-          successCount: this.pollSuccessCount,
-          nextInterval: this.currentPollInterval
-        });
-      } catch (error) {
-        this.pollFailureCount++;
-        this.pollSuccessCount = 0;
-        
-        // Increase interval on failures (exponential backoff, max 5 minutes)
-        if (this.pollFailureCount > 2) {
-          this.currentPollInterval = Math.min(300000, this.currentPollInterval * 1.5);
-        }
-        console.warn('❌ ポーリング失敗:', error, {
-          failureCount: this.pollFailureCount,
-          newInterval: this.currentPollInterval
-        });
-      }
-      
-      // Schedule next poll with current interval
-      this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
-    };
-    
-    // Start first poll
-    this.pollingTimeout = setTimeout(adaptivePoll, this.currentPollInterval);
-    
-    // Start automatic cleanup for memory management
-    // 定期的なクリーンアップとメモリ管理
-    this.cleanupInterval = setInterval(() => {
-      this.performMemoryCleanup();
-    }, 5 * 60 * 1000); // Cleanup every 5 minutes
-    
-    // 長時間実行監視（1時間ごと）
-    this.longRunningCheckInterval = setInterval(() => {
-      this.checkLongRunningPerformance();
-    }, 60 * 60 * 1000); // Check every hour
-  }
-  stopPolling() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
-    }
-    
-    if (this.pollingTimeout) {
-      clearTimeout(this.pollingTimeout);
-      this.pollingTimeout = null;
-    }
-    
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
-    
-    if (this.longRunningCheckInterval) {
-      clearInterval(this.longRunningCheckInterval);
-      this.longRunningCheckInterval = null;
-    }
-  }
+  // 削除: 複雑なadaptive pollingロジック（上部で新しいシンプル版を定義済み）
   
   // メモリ管理とクリーンアップ
   performMemoryCleanup() {
@@ -2291,79 +2132,9 @@ class StudyQuestApp {
     }
   }
   
-  cleanupDOMReferences() {
-    // 削除されたDOM要素への参照をクリア
-    const elementsToCheck = ['answersContainer', 'loadingOverlay', 'newContentBanner'];
-    elementsToCheck.forEach(key => {
-      const element = this.elements[key];
-      if (element && !document.contains(element)) {
-        console.log(`🧹 Removing stale DOM reference: ${key}`);
-        delete this.elements[key];
-      }
-    });
-  }
+  // 削除: DOM参照クリーンアップ関数群（開発段階では不要）
   
-  cleanupEventListeners() {
-    // 重複したイベントリスナーの確認とクリーンアップ
-    if (this.handlers) {
-      Object.keys(this.handlers).forEach(key => {
-        if (typeof this.handlers[key] !== 'function') {
-          console.log(`🧹 Removing invalid handler: ${key}`);
-          delete this.handlers[key];
-        }
-      });
-    }
-  }
-  
-  optimizeVirtualScrollState() {
-    // 仮想スクロール状態の最適化
-    if (this.virtualScrollState && this.virtualScrollState.renderedRowIndexes) {
-      const size = this.virtualScrollState.renderedRowIndexes.size;
-      if (size > 1000) { // 大量のインデックスが蓄積されている場合
-        console.log(`🧹 Optimizing virtual scroll state (${size} items)`);
-        this.virtualScrollState.renderedRowIndexes.clear();
-        this.virtualScrollState.renderedItems = 0;
-      }
-    }
-  }
-  
-  checkLongRunningPerformance() {
-    try {
-      const uptime = Date.now() - this.state.startTime;
-      const uptimeHours = Math.floor(uptime / (1000 * 60 * 60));
-      
-      console.log(`⏰ Long-running check: ${uptimeHours}h uptime`);
-      
-      // 2時間以上実行されている場合のパフォーマンス対策
-      if (uptimeHours >= 2) {
-        console.log('🔧 Applying long-running optimizations...');
-        
-        // ポーリング間隔を延長（負荷軽減）
-        if (this.currentPollInterval < 60000) { // 1分未満の場合
-          this.currentPollInterval = Math.min(60000, this.currentPollInterval * 1.5);
-          console.log(`📉 Polling interval extended to ${this.currentPollInterval}ms`);
-        }
-        
-        // 強制的なメモリクリーンアップ
-        this.performMemoryCleanup();
-        
-        // 可能であればガベージコレクションを促す
-        if (window.gc && typeof window.gc === 'function') {
-          window.gc();
-          console.log('🗑️ Manual garbage collection triggered');
-        }
-      }
-      
-      // 6時間以上の場合は警告
-      if (uptimeHours >= 6) {
-        console.warn('⚠️ Application has been running for over 6 hours. Consider refreshing the page.');
-        this.showWarningMessage('長時間の実行が検出されました。パフォーマンス向上のため、ページの再読み込みを推奨します。');
-      }
-      
-    } catch (error) {
-      console.warn('⚠️ Long-running performance check failed:', error);
-    }
-  }
+  // 削除: 長時間実行監視（開発段階では不要）
   
   showWarningMessage(message) {
     // 警告メッセージを表示（既存のshowErrorMessageを参考に）
