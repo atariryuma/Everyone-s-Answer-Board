@@ -4573,47 +4573,89 @@ function saveDraftConfiguration(config) {
     // 🔥 現在の設定を取得して、必要なフィールドのみを保持
     const currentConfig = ConfigManager.getUserConfig(userInfo.userId) || {};
     
-    // 管理パネルから送信されたフィールドで更新
-    const updatedConfig = {
-      // 基本的な設定情報を保持
-      createdAt: currentConfig.createdAt || new Date().toISOString(),
-      lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
+    // データソースが変更されたかチェック
+    const isDataSourceChanged = config.spreadsheetId && config.sheetName && 
+      (config.spreadsheetId !== currentConfig.spreadsheetId || config.sheetName !== currentConfig.sheetName);
+    
+    let updatedConfig;
+    
+    if (isDataSourceChanged) {
+      // データソースが変更された場合は、古いマッピング情報をクリア
+      console.log('🔄 データソースが変更されました。マッピング情報をリセット', {
+        old: { spreadsheetId: currentConfig.spreadsheetId, sheetName: currentConfig.sheetName },
+        new: { spreadsheetId: config.spreadsheetId, sheetName: config.sheetName }
+      });
       
-      // データソース設定（管理パネルから更新）
-      spreadsheetId: config.spreadsheetId || currentConfig.spreadsheetId,
-      sheetName: config.sheetName || currentConfig.sheetName,
-      spreadsheetUrl: config.spreadsheetId 
-        ? `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}`
-        : currentConfig.spreadsheetUrl,
-      
-      // 表示設定（管理パネルから更新）
-      displaySettings: {
-        showNames: config.showNames !== undefined ? config.showNames : (currentConfig.displaySettings?.showNames || false),
-        showReactions: config.showReactions !== undefined ? config.showReactions : (currentConfig.displaySettings?.showReactions || false),
-      },
-      displayMode: currentConfig.displayMode || 'anonymous',
-      
-      // アプリケーション状態
-      setupStatus: currentConfig.setupStatus || 'pending',
-      appPublished: currentConfig.appPublished || false,
-      isDraft: true,
-      
-      // データ接続で設定されたフィールドを保持（connectDataSourceから）
-      ...(currentConfig.columnMapping && { columnMapping: currentConfig.columnMapping }),
-      ...(currentConfig.opinionHeader && { opinionHeader: currentConfig.opinionHeader }),
-      ...(currentConfig.reasonHeader && { reasonHeader: currentConfig.reasonHeader }),
-      ...(currentConfig.classHeader && { classHeader: currentConfig.classHeader }),
-      ...(currentConfig.nameHeader && { nameHeader: currentConfig.nameHeader }),
-      ...(currentConfig.formUrl && { formUrl: currentConfig.formUrl }),
-      ...(currentConfig.formTitle && { formTitle: currentConfig.formTitle }),
-      ...(currentConfig.headerIndices && { headerIndices: currentConfig.headerIndices }),
-      ...(currentConfig.reactionMapping && { reactionMapping: currentConfig.reactionMapping }),
-      ...(currentConfig.systemMetadata && { systemMetadata: currentConfig.systemMetadata }),
-      
-      // メタ情報
-      configVersion: '2.0',
-      claudeMdCompliant: true,
-    };
+      updatedConfig = {
+        // 基本的な設定情報を保持
+        createdAt: currentConfig.createdAt || new Date().toISOString(),
+        lastAccessedAt: new Date().toISOString(),
+        
+        // 新しいデータソース設定
+        spreadsheetId: config.spreadsheetId,
+        sheetName: config.sheetName,
+        spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}`,
+        
+        // 表示設定（管理パネルから更新）
+        displaySettings: {
+          showNames: config.showNames !== undefined ? config.showNames : false,
+          showReactions: config.showReactions !== undefined ? config.showReactions : false,
+        },
+        displayMode: 'anonymous',
+        
+        // アプリケーション状態をリセット
+        setupStatus: 'data_source_set',
+        appPublished: false,
+        isDraft: true,
+        
+        // 古いマッピング情報は削除（新しいデータソースには適用できないため）
+        // columnMapping, headerIndices等は意図的に含めない
+        
+        // メタ情報
+        configVersion: '2.0',
+        claudeMdCompliant: true,
+      };
+    } else {
+      // データソースが変更されていない場合は、既存のフィールドを保持
+      updatedConfig = {
+        // 基本的な設定情報を保持
+        createdAt: currentConfig.createdAt || new Date().toISOString(),
+        lastAccessedAt: currentConfig.lastAccessedAt || new Date().toISOString(),
+        
+        // データソース設定（変更なし）
+        spreadsheetId: config.spreadsheetId || currentConfig.spreadsheetId,
+        sheetName: config.sheetName || currentConfig.sheetName,
+        spreadsheetUrl: currentConfig.spreadsheetUrl,
+        
+        // 表示設定（管理パネルから更新）
+        displaySettings: {
+          showNames: config.showNames !== undefined ? config.showNames : (currentConfig.displaySettings?.showNames || false),
+          showReactions: config.showReactions !== undefined ? config.showReactions : (currentConfig.displaySettings?.showReactions || false),
+        },
+        displayMode: currentConfig.displayMode || 'anonymous',
+        
+        // アプリケーション状態
+        setupStatus: currentConfig.setupStatus || 'pending',
+        appPublished: currentConfig.appPublished || false,
+        isDraft: true,
+        
+        // 既存のマッピング情報を保持
+        ...(currentConfig.columnMapping && { columnMapping: currentConfig.columnMapping }),
+        ...(currentConfig.opinionHeader && { opinionHeader: currentConfig.opinionHeader }),
+        ...(currentConfig.reasonHeader && { reasonHeader: currentConfig.reasonHeader }),
+        ...(currentConfig.classHeader && { classHeader: currentConfig.classHeader }),
+        ...(currentConfig.nameHeader && { nameHeader: currentConfig.nameHeader }),
+        ...(currentConfig.formUrl && { formUrl: currentConfig.formUrl }),
+        ...(currentConfig.formTitle && { formTitle: currentConfig.formTitle }),
+        ...(currentConfig.headerIndices && { headerIndices: currentConfig.headerIndices }),
+        ...(currentConfig.reactionMapping && { reactionMapping: currentConfig.reactionMapping }),
+        ...(currentConfig.systemMetadata && { systemMetadata: currentConfig.systemMetadata }),
+        
+        // メタ情報
+        configVersion: '2.0',
+        claudeMdCompliant: true,
+      };
+    }
 
     // 🔥 ConfigManager.saveConfig()を使用して完全置換
     const success = ConfigManager.saveConfig(userInfo.userId, updatedConfig);

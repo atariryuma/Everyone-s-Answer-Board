@@ -8,7 +8,7 @@
 # ⚠️ システム破壊防止ルール（これを破ると全システム停止）
 
 ## 🚨 絶対遵守：configJSON中心型データベーススキーマ（5フィールド構造）
-- ✅ **唯一使用**: `database.gs` の `DB_CONFIG`
+- ✅ **唯一使用**: `database.gs` の `DB_CONFIG` および `constants.gs` の `CONSTANTS.DATABASE`
 - ✅ **最適化構造**（5フィールドでconfigJSON中心設計、パフォーマンス大幅向上）: 
 ```javascript
 const DB_CONFIG = Object.freeze({
@@ -59,7 +59,8 @@ const DB_CONFIG = Object.freeze({
 ## 🎯 必須定数（src/constants.gs）
 ### システム全体の統一定数
 ```javascript
-const SYSTEM_CONSTANTS = Object.freeze({
+// メインのシステム定数定義
+const CONSTANTS = Object.freeze({
   // configJSON中心型データベース定数
   DATABASE: Object.freeze({
     SHEET_NAME: 'Users',
@@ -143,14 +144,15 @@ const SYSTEM_CONSTANTS = Object.freeze({
 });
 ```
 
-### 後方互換性エイリアス
+### 簡易アクセス用定数
 ```javascript
-const REACTION_KEYS = SYSTEM_CONSTANTS.REACTIONS.KEYS;
+// よく使用される定数への簡易アクセス
+const REACTION_KEYS = CONSTANTS.REACTIONS.KEYS;
 const COLUMN_HEADERS = {
-  ...SYSTEM_CONSTANTS.COLUMNS,
-  ...SYSTEM_CONSTANTS.REACTIONS.LABELS
+  ...CONSTANTS.COLUMNS,
+  ...CONSTANTS.REACTIONS.LABELS
 };
-const DELETE_LOG_SHEET_CONFIG = SYSTEM_CONSTANTS.DATABASE.DELETE_LOG;
+const DELETE_LOG_SHEET_CONFIG = CONSTANTS.DATABASE.DELETE_LOG;
 ```
 
 ### コアシステム定数
@@ -183,7 +185,7 @@ doGet(mode=login) → handleUserRegistration() → createCompleteUser() → DB.c
 ### 3. 管理パネルフロー（JSON一括処理）
 ```
 doGet(mode=admin) → App.getAccess().verifyAccess() → renderAdminPanel()
-  → getCurrentConfig() → configJson一括読み込み（60%高速化）
+  → getConfig() → configJson一括読み込み（60%高速化）
 ```
 
 ### 4. 回答ボード表示フロー（統一データソース）
@@ -194,7 +196,7 @@ doGet(mode=view) → App.getAccess().verifyAccess() → renderAnswerBoard()
 
 ### 5. データソース接続フロー（単一更新）
 ```
-connectDataSource() → updateConfigJson() → 単一JSON更新（70%効率化）
+connectDataSource() → ConfigManager.saveConfig() → 単一JSON更新（70%効率化）
   → 全データ統合：spreadsheetId, sheetName, columnMapping, formUrl
 ```
 
@@ -450,7 +452,7 @@ const DB = {
 
 ### 🎯 必須遵守項目（configJSON中心型）
 1. **`const`優先、`let`のみ許可、`var`禁止**  
-2. **🚀 5フィールドデータベーススキーマ使用必須**（`DB_CONFIG`準拠）
+2. **🚀 5フィールドデータベーススキーマ使用必須**（`CONSTANTS.DATABASE`準拠）
 3. **⚡ configJSON統合型設計**: 全データをconfigJsonに統合、DB列アクセス禁止
 4. **🔥 統一データソース原則**: `config.spreadsheetId/sheetName`のみ使用（userInfo.列アクセス廃止）
 5. **📊 JSON一括処理**: 個別列更新禁止、configJson更新のみ許可
@@ -608,7 +610,7 @@ npm run deploy
 
 ---
 
-# 📊 システム整合性チェック結果（2025年3月最新版）
+# 📊 システム整合性チェック結果（2025年9月最新版）
 
 ## 🚀 最新の最適化達成状況
 - **データベース構造最適化**: ✅ **5フィールド構造完了**
@@ -637,6 +639,51 @@ npm run deploy
 3. **configJson統合**: ✅ **全設定の中央管理**実装
 4. **動的生成**: ✅ **URL項目の効率化**実装
 5. **テスト機能**: ✅ **testSchemaOptimization()** 追加
+6. **データソース変更検出**: ✅ **saveDraftConfiguration改善**（2025年9月）
+7. **SecurityValidator拡充**: ✅ **包括的な入力検証**実装
+
+---
+
+## 🎯 2025年9月 最新ベストプラクティス
+
+### configJSON管理の重要ポイント
+
+#### データソース変更時の処理
+```javascript
+// saveDraftConfiguration内での実装
+const isDataSourceChanged = config.spreadsheetId && config.sheetName && 
+  (config.spreadsheetId !== currentConfig.spreadsheetId || config.sheetName !== currentConfig.sheetName);
+
+if (isDataSourceChanged) {
+  // 古いマッピング情報をクリア
+  // columnMapping, headerIndices等は新しいデータソースに適用できないため削除
+  updatedConfig = {
+    spreadsheetId: config.spreadsheetId,
+    sheetName: config.sheetName,
+    setupStatus: 'data_source_set',
+    appPublished: false,
+    // 古いマッピング情報は意図的に含めない
+  };
+}
+```
+
+#### セキュリティ検証の徹底
+```javascript
+// すべてのユーザー入力に対して
+const validation = SecurityValidator.validateUserData(userData);
+if (!validation.isValid) {
+  throw new Error(validation.errors.join(', '));
+}
+// 検証済みのsanitizedDataを使用
+const safeData = validation.sanitizedData;
+```
+
+### パフォーマンス最適化のポイント
+
+1. **遅延読み込み**: スプレッドシート一覧は必要時のみ取得
+2. **キャッシュ活用**: 頻繁にアクセスされるデータはCacheServiceで管理
+3. **バッチ処理**: Sheets APIの呼び出しは可能な限りまとめる
+4. **configJSON一括操作**: 個別フィールド更新ではなく、JSON全体を一度に処理
 
 ---
 

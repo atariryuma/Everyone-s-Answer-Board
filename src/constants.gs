@@ -207,6 +207,23 @@ const SecurityValidator = Object.freeze({
         }
       }
     }
+    
+    // Sheet name validation
+    if (userData.sheetName) {
+      sanitizedData.sheetName = SecurityValidator.sanitizeInput(
+        userData.sheetName,
+        100
+      );
+    }
+    
+    // Form URL validation
+    if (userData.formUrl) {
+      if (SECURITY.VALIDATION_PATTERNS.URL.test(userData.formUrl)) {
+        sanitizedData.formUrl = userData.formUrl;
+      } else {
+        errors.push('有効なフォームURLを入力してください。');
+      }
+    }
 
     return {
       isValid: errors.length === 0,
