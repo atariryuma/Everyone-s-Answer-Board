@@ -4336,21 +4336,17 @@ class StudyQuestApp {
   
   performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
     const container = this.elements.answersContainer;
-    container.innerHTML = ''; // ここでコンテナをクリア
     
-    // 既存カードのマップを作成（リアクション状態を保持）
+    // 既存カードのマップを作成（リアクション状態を保持） - クリア前に実行
     const existingMap = new Map();
     container.querySelectorAll('.answer-card').forEach(card => {
       existingMap.set(card.dataset.rowIndex, card);
     });
     
-    // 不要なカードを削除
-    existingMap.forEach((card, id) => {
-      if (!newRows.some(r => String(r.rowIndex) === id)) {
-        card.remove();
-        existingMap.delete(id);
-      }
-    });
+    // コンテナをクリア
+    container.innerHTML = '';
+    
+    // 不要なカードは既にクリアされているので削除処理は不要
     
     // メインレンダリング処理
     if (newRows.length > RENDER_BATCH_SIZE) {
@@ -4392,7 +4388,7 @@ class StudyQuestApp {
     const container = this.elements.answersContainer;
     if (!container) {
       console.warn('calculateVisibleRange: answersContainer not found.');
-      return { startIndex: 0, endIndex: 0 };
+      return { startIndex: 0, endIndex: Math.min(20, totalItems) }; // 初期は20件表示
     }
 
     const scrollTop = container.scrollTop;
@@ -4408,22 +4404,23 @@ class StudyQuestApp {
 
     if (containerHeight > 0) {
       startIndex = Math.floor(scrollTop / cardHeight);
-      endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
+      endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight) + 5); // バッファ追加
     } else {
-      // 🚀 DOM準備完了待ちの処理
+      // 🚀 DOM準備完了待ちの処理 - 初期表示では多めに表示
       if (this.state.initialDataLoaded) {
-        console.warn('calculateVisibleRange: containerHeight is 0, retrying after DOM ready.');
-        // DOM準備完了まで少し待機してから再計算
-        requestAnimationFrame(() => {
-          if (this.renderBoard) {
-            this.renderBoard();
-          }
-        });
+        console.warn('calculateVisibleRange: containerHeight is 0, showing initial batch.');
+        // 初期表示では20件表示
+        return { startIndex: 0, endIndex: Math.min(20, totalItems) };
       }
       // デフォルト高さでフォールバック計算
       containerHeight = 600;
       startIndex = Math.floor(scrollTop / cardHeight);
-      endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
+      endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight) + 5);
+    }
+
+    // 最小表示件数を保証
+    if (endIndex - startIndex < 10 && totalItems > 10) {
+      endIndex = Math.min(startIndex + 10, totalItems);
     }
 
     return { startIndex, endIndex };
