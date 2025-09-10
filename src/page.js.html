@@ -2890,39 +2890,46 @@ class StudyQuestApp {
   }
   
   async validatePostLoadState() {
-    const container = this.elements.answersContainer;
-    if (!container) return;
+    // 再帰呼び出し防止フラグ
+    if (this._isValidating) return;
+    this._isValidating = true;
     
-    const domCards = container.querySelectorAll('.answer-card');
-    const dataLength = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
-    
-    console.log('🔍 validatePostLoadState: DOMカード数:', domCards.length, 'currentAnswers数:', dataLength);
-    
-    // 空データなのにDOMにカードが残っている場合
-    if (dataLength === 0 && domCards.length > 0) {
-      console.warn('⚠️ 状態不整合検出: 空データなのにDOMに', domCards.length, '個のカードが残っています');
+    try {
+      const container = this.elements.answersContainer;
+      if (!container) return;
       
-      // 空データのためのクリーンアップを実行
-      await this.clearAllCardsForEmptyData();
+      const domCards = container.querySelectorAll('.answer-card');
+      const dataLength = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
       
-      // 空状態を表示
-      this.displayEmptyState();
+      console.log('🔍 validatePostLoadState: DOMカード数:', domCards.length, 'currentAnswers数:', dataLength);
       
-      console.log('✅ 状態不整合を修正しました');
-      
-    } else if (dataLength !== domCards.length) { // 数の不一致も不整合とみなす
-      console.warn('⚠️ 状態不整合検出: DOMカード数とデータ数が一致しません。DOM:', domCards.length, 'データ:', dataLength);
+      // 空データなのにDOMにカードが残っている場合
+      if (dataLength === 0 && domCards.length > 0) {
+        console.warn('⚠️ 状態不整合検出: 空データなのにDOMに', domCards.length, '個のカードが残っています');
+        
+        // 空データのためのクリーンアップを実行
+        await this.clearAllCardsForEmptyData();
+        
+        // 空状態を表示
+        this.displayEmptyState();
+        
+        console.log('✅ 状態不整合を修正しました');
+        
+      } else if (dataLength !== domCards.length) { // 数の不一致も不整合とみなす
+        console.warn('⚠️ 状態不整合検出: DOMカード数とデータ数が一致しません。DOM:', domCards.length, 'データ:', dataLength);
 
-      // 不整合がある場合は再レンダリング
-      console.log('再レンダリングを実行します...');
-      this.renderBoard(false, false);
+        // 再レンダリングは行わない（無限ループ防止）
+        console.log('⚠️ 状態不整合を検出しましたが、自動修正は行いません');
+        
+      } else {
+        console.log('✅ 状態検証: DOMとデータの状態が一致しています');
+      }
       
-    } else {
-      console.log('✅ 状態検証: DOMとデータの状態が一致しています');
+      // 追加: 設定と表示内容の一致性を検証
+      this.validateConfigConsistency();
+    } finally {
+      this._isValidating = false;
     }
-    
-    // 追加: 設定と表示内容の一致性を検証
-    this.validateConfigConsistency();
   }
   
   validateConfigConsistency() {
@@ -7577,9 +7584,19 @@ class StudyQuestApp {
 
     // ResizeObserver for responsive adjustments
     if ('ResizeObserver' in window) {
-      this.resizeObserver = new ResizeObserver(this.debounce(() => {
-        this.adjustLayout();
-      }, 100));
+      // Arrow function to preserve 'this' context
+      const debouncedResize = (entries) => {
+        if (window.sharedUtilities && window.sharedUtilities.debounce) {
+          window.sharedUtilities.debounce.debounce(() => {
+            this.adjustLayout();
+          }, 'resize-observer', 100);
+        } else {
+          // Fallback: direct call if debounce is not available
+          this.adjustLayout();
+        }
+      };
+      
+      this.resizeObserver = new ResizeObserver(debouncedResize);
       this.resizeObserver.observe(this.elements.answersContainer);
     }
   }
