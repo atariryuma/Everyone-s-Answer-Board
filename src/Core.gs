@@ -1220,6 +1220,10 @@ function getActiveFormInfo(requestUserId) {
       spreadsheetUrl: configJson.spreadsheetUrl || '',
       answerCount,
       isFormActive: !!(configJson.formUrl && configJson.formCreated),
+      appPublished: configJson.appPublished || false, // 公開ステータスを追加
+      spreadsheetId: configJson.spreadsheetId || '',
+      sheetName: configJson.sheetName || '',
+      displaySettings: configJson.displaySettings || {},
     };
   } catch (e) {
     console.error(`getActiveFormInfo エラー: ${e.message}`);

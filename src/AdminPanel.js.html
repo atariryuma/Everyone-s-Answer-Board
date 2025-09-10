@@ -750,15 +750,28 @@
     }
   }
 
-  // フォーム情報表示
-  function showFormInfo(formData) {
-    const formInfo = document.getElementById('form-info');
-    const formTitle = document.getElementById('form-title');
-    const formUrl = document.getElementById('form-url');
+  // フォーム情報表示（改善版）
+  function showFormInfo(formData, spreadsheetName) {
+    // 両方のフォーム情報エリアを処理（URL入力用と一覧選択用）
+    const formInfos = [
+      {
+        container: document.getElementById('form-info'),
+        title: document.getElementById('form-title'),
+        url: document.getElementById('form-url'),
+        spreadsheet: document.getElementById('spreadsheet-name')
+      },
+      {
+        container: document.getElementById('form-info-url'),
+        title: document.getElementById('form-title-url'),
+        url: document.getElementById('form-url-url'),
+        spreadsheet: document.getElementById('spreadsheet-name-url')
+      }
+    ];
 
     // 詳細デバッグ情報
     console.log('🔍 showFormInfo: 受信データ詳細', {
       formData: formData,
+      spreadsheetName: spreadsheetName,
       hasFormTitle: formData.hasOwnProperty('formTitle'),
       formTitleValue: formData.formTitle,
       formTitleType: typeof formData.formTitle,
@@ -766,31 +779,36 @@
       isEmpty: !formData.formTitle || formData.formTitle.trim() === '',
     });
 
-    if (formInfo && formTitle && formUrl) {
-      // フォームタイトル設定の詳細ログ
-      const titleToSet = formData.formTitle || '（タイトルなし）';
-      console.log('📝 フォームタイトル設定:', {
-        originalTitle: formData.formTitle,
-        settingTitle: titleToSet,
-        element: formTitle,
-      });
+    // 両方のエリアを更新
+    formInfos.forEach(info => {
+      if (info.container && info.title && info.url) {
+        // フォームタイトルが取得できた場合は優先表示、なければスプレッドシート名
+        const displayTitle = formData.formTitle && formData.formTitle.trim() !== '' 
+          ? formData.formTitle 
+          : (spreadsheetName || '（タイトル取得中...）');
+        
+        console.log('📝 フォーム情報設定:', {
+          container: info.container.id,
+          displayTitle: displayTitle,
+          formUrl: formData.formUrl,
+          spreadsheetName: spreadsheetName
+        });
 
-      formTitle.textContent = titleToSet;
-      formUrl.href = formData.formUrl;
-      formUrl.textContent = formData.formUrl;
+        info.title.textContent = displayTitle;
+        info.url.href = formData.formUrl;
+        info.url.textContent = formData.formUrl;
+        
+        // スプレッドシート名も表示（存在する場合）
+        if (info.spreadsheet && spreadsheetName) {
+          info.spreadsheet.textContent = `スプレッドシート: ${spreadsheetName}`;
+          info.spreadsheet.classList.remove('hidden');
+        }
 
-      formInfo.classList.remove('hidden');
-      console.log('✅ フォーム情報表示完了:', {
-        title: formTitle.textContent,
-        url: formData.formUrl,
-      });
-    } else {
-      console.error('❌ DOM要素が見つかりません:', {
-        formInfo: !!formInfo,
-        formTitle: !!formTitle,
-        formUrl: !!formUrl,
-      });
-    }
+        info.container.classList.remove('hidden');
+      }
+    });
+
+    console.log('✅ フォーム情報表示完了');
   }
 
   // フォーム情報非表示
@@ -1991,26 +2009,48 @@
   // 設定サマリー更新
   function updateConfigSummary(config) {
     try {
-      // セットアップステータス更新
-      const setupStatus = config?.setupStatus || 'pending';
-      const badge = document.querySelector('.config-summary .status-badge');
-      if (badge) {
-        const statusText = {
-          completed: '公開準備完了',
-          published: '公開中',
-          pending: '設定中',
-        };
+      // 公開ステータス更新
+      const appPublished = config?.appPublished === true || config?.appPublished === 'true';
+      const publishBadge = document.getElementById('app-publish-status');
+      if (publishBadge) {
+        if (appPublished) {
+          publishBadge.className = 'status-badge published';
+          publishBadge.textContent = '公開中';
+        } else {
+          publishBadge.className = 'status-badge unpublished';
+          publishBadge.textContent = '未公開';
+        }
+      }
 
-        badge.className =
-          'status-badge ' + (setupStatus === 'completed' ? 'published' : 'unpublished');
-        badge.textContent = statusText[setupStatus] || '設定中';
+      // データソース更新
+      const datasourceElement = document.getElementById('current-datasource');
+      if (datasourceElement) {
+        if (config?.spreadsheetId) {
+          // スプレッドシート名を表示（あれば）
+          const name = config.spreadsheetName || 'スプレッドシート';
+          datasourceElement.textContent = name;
+          datasourceElement.className = 'text-sm text-cyan-400';
+        } else {
+          datasourceElement.textContent = '未設定';
+          datasourceElement.className = 'text-sm text-gray-400';
+        }
+      }
+
+      // シート名更新
+      const sheetnameElement = document.getElementById('current-sheetname');
+      if (sheetnameElement) {
+        if (config?.sheetName) {
+          sheetnameElement.textContent = config.sheetName;
+          sheetnameElement.className = 'text-sm text-cyan-400';
+        } else {
+          sheetnameElement.textContent = '未設定';
+          sheetnameElement.className = 'text-sm text-gray-400';
+        }
       }
 
       // 最終更新時刻更新
       const lastUpdated = config?.lastModified || config?.updatedAt;
-      const timeElement = document.querySelector(
-        '.config-summary .config-item:last-child span:last-child'
-      );
+      const timeElement = document.getElementById('last-updated-time');
       if (timeElement && lastUpdated) {
         try {
           const date = new Date(lastUpdated);
@@ -2026,17 +2066,17 @@
         }
       }
 
-      // スプレッドシートリンク更新
-      const openSheetBtn = document.getElementById('open-sheet');
+      // スプレッドシートリンク更新（リソースセクション用）
+      const openSheetBtn = document.getElementById('open-spreadsheet-btn');
       if (openSheetBtn && config?.spreadsheetId) {
-        openSheetBtn.onclick = (e) => {
-          e.preventDefault();
+        openSheetBtn.disabled = false;
+        openSheetBtn.onclick = () => {
           const spreadsheetUrl =
             'https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit';
           window.open(spreadsheetUrl, '_blank');
           showSuccess('📊 スプレッドシートを開きました');
         };
-        openSheetBtn.style.opacity = '1';
+      }
         openSheetBtn.style.pointerEvents = 'auto';
       } else if (openSheetBtn) {
         openSheetBtn.onclick = (e) => {

@@ -501,22 +501,78 @@
                 <input
                   type="radio"
                   name="source-method"
-                  value="dropdown"
+                  value="url"
                   checked
                   class="mr-2"
-                  id="method-dropdown"
+                  id="method-url"
                 />
-                <span class="text-gray-300">📋 一覧から選択</span>
+                <span class="text-gray-300">🔗 URL直接入力</span>
               </label>
               <label class="flex items-center cursor-pointer">
-                <input type="radio" name="source-method" value="url" class="mr-2" id="method-url" />
-                <span class="text-gray-300">🔗 URL直接入力</span>
+                <input type="radio" name="source-method" value="dropdown" class="mr-2" id="method-dropdown" />
+                <span class="text-gray-300">📋 一覧から選択</span>
               </label>
             </div>
           </div>
 
+          <!-- URL直接入力方式 -->
+          <div id="url-method" class="space-y-4">
+            <div class="form-group">
+              <label for="spreadsheet-url" class="block text-sm font-medium text-gray-300 mb-2"
+                >スプレッドシートURL:</label
+              >
+              <input
+                type="text"
+                id="spreadsheet-url"
+                class="modern-select"
+                placeholder="https://docs.google.com/spreadsheets/d/your-spreadsheet-id/edit#gid=0"
+              />
+              <div class="text-xs text-gray-400 mt-1">
+                💡 GoogleスプレッドシートのURLを貼り付けてください
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="sheet-name-input" class="block text-sm font-medium text-gray-300 mb-2"
+                >シート名:</label
+              >
+              <input
+                type="text"
+                id="sheet-name-input"
+                class="modern-select"
+                placeholder="シート名を入力（例：フォームの回答 1）"
+              />
+            </div>
+            <!-- フォーム情報表示 -->
+            <div id="form-info-url" class="form-info hidden">
+              <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mt-4">
+                <div class="flex items-center gap-2 mb-2">
+                  <span class="text-blue-400">📋</span>
+                  <span class="text-sm font-medium text-blue-300">連携フォーム情報</span>
+                </div>
+                <div class="text-sm text-gray-300">
+                  <div class="mb-1">
+                    <span class="font-medium">タイトル:</span>
+                    <span id="form-title-url">-</span>
+                  </div>
+                  <div class="mb-1">
+                    <span class="font-medium">ファイル名:</span>
+                    <span id="spreadsheet-name-url" class="text-gray-400">-</span>
+                  </div>
+                  <div>
+                    <span class="font-medium">URL:</span>
+                    <a id="form-url-url" href="#" target="_blank" class="text-blue-400 hover:underline break-all">-</a>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="action-buttons">
+              <button id="url-validate" class="btn-secondary" type="button">✅ URL検証</button>
+              <button id="connect-url-source" class="btn-primary" type="button">接続</button>
+            </div>
+          </div>
+
           <!-- 一覧選択方式 -->
-          <div id="dropdown-method" class="space-y-4">
+          <div id="dropdown-method" class="space-y-4 hidden">
             <div class="form-group">
               <label for="spreadsheet-select" class="block text-sm font-medium text-gray-300 mb-2"
                 >スプレッドシート:</label
@@ -545,6 +601,10 @@
                     <span class="font-medium">タイトル:</span>
                     <span id="form-title">-</span>
                   </div>
+                  <div class="mb-1">
+                    <span class="font-medium">ファイル名:</span>
+                    <span id="spreadsheet-name" class="text-gray-400">-</span>
+                  </div>
                   <div>
                     <span class="font-medium">URL:</span>
                     <a id="form-url" href="#" target="_blank" class="text-blue-400 hover:underline break-all">-</a>
@@ -555,39 +615,6 @@
             <div class="action-buttons">
               <button id="refresh-data" class="btn-secondary" type="button">🔄 更新</button>
               <button id="connect-source" class="btn-primary" type="button">接続</button>
-            </div>
-          </div>
-
-          <!-- URL直接入力方式 -->
-          <div id="url-method" class="space-y-4 hidden">
-            <div class="form-group">
-              <label for="spreadsheet-url" class="block text-sm font-medium text-gray-300 mb-2"
-                >スプレッドシートURL:</label
-              >
-              <input
-                type="text"
-                id="spreadsheet-url"
-                class="modern-select"
-                placeholder="https://docs.google.com/spreadsheets/d/your-spreadsheet-id/edit#gid=0"
-              />
-              <div class="text-xs text-gray-400 mt-1">
-                💡 GoogleスプレッドシートのURLを貼り付けてください
-              </div>
-            </div>
-            <div class="form-group">
-              <label for="sheet-name-input" class="block text-sm font-medium text-gray-300 mb-2"
-                >シート名:</label
-              >
-              <input
-                type="text"
-                id="sheet-name-input"
-                class="modern-select"
-                placeholder="シート名を入力（例：フォームの回答 1）"
-              />
-            </div>
-            <div class="action-buttons">
-              <button id="url-validate" class="btn-secondary" type="button">✅ URL検証</button>
-              <button id="connect-url-source" class="btn-primary" type="button">接続</button>
             </div>
           </div>
         </section>
@@ -666,18 +693,12 @@
           </div>
         </section>
 
-        <!-- 公開設定カード（表示設定統合） -->
+        <!-- 表示設定カード -->
         <section class="card glass-panel rounded-xl p-6">
-          <h2 class="text-xl font-semibold text-white mb-4">🚀 公開設定</h2>
+          <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
           <div class="space-y-4">
-            <div class="config-item">
-              <span class="label">現在のステータス:</span>
-              <span class="status-badge unpublished">未公開</span>
-            </div>
-            
             <!-- 表示設定（心理的安全性重視でデフォルトOFF） -->
             <div class="mb-4">
-              <h3 class="text-lg font-medium text-gray-300 mb-3">⚙️ 表示設定</h3>
               <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 mb-4">
                 <div class="flex items-center gap-2 mb-1">
                   <span class="text-yellow-400">🔒</span>
@@ -698,11 +719,11 @@
                 </label>
               </div>
             </div>
-            
-            <div class="action-buttons">
-              <button id="save-draft" class="btn-secondary" type="button">下書き保存</button>
-              <button id="publish-now" class="btn-primary" type="button">今すぐ公開</button>
-            </div>
+          </div>
+          
+          <div class="action-buttons">
+            <button id="save-draft" class="btn-secondary" type="button">下書き保存</button>
+            <button id="publish-now" class="btn-primary" type="button">今すぐ公開</button>
           </div>
         </section>
       </div>
@@ -714,16 +735,20 @@
           <h3 class="text-lg font-semibold text-white mb-3">📋 現在の設定</h3>
           <div class="config-summary">
             <div class="config-item">
-              <span class="label">データソース:</span>
-              <a href="#" class="link-btn" id="open-sheet">シートを開く</a>
+              <span class="label">公開状態:</span>
+              <span id="app-publish-status" class="status-badge unpublished">未公開</span>
             </div>
             <div class="config-item">
-              <span class="label">セットアップ:</span>
-              <span class="status-badge unpublished">設定中</span>
+              <span class="label">データソース:</span>
+              <span id="current-datasource" class="text-sm text-gray-400">未設定</span>
+            </div>
+            <div class="config-item">
+              <span class="label">シート名:</span>
+              <span id="current-sheetname" class="text-sm text-gray-400">未設定</span>
             </div>
             <div class="config-item">
               <span class="label">最終更新:</span>
-              <span class="text-sm text-gray-400">--:--</span>
+              <span id="last-updated-time" class="text-sm text-gray-400">--:--</span>
             </div>
           </div>
         </section>
@@ -790,24 +815,35 @@
         <section class="info-card glass-panel rounded-xl p-4">
           <h3 class="text-lg font-semibold text-white mb-3">⚡ クイックアクション</h3>
           <div class="space-y-3">
-            <button class="link-btn w-full text-center" type="button" onclick="exportConfig()">
-              設定をエクスポート
-            </button>
             <button
-              id="create-form-btn"
               class="link-btn w-full text-center"
               type="button"
-              onclick="createFormInterface()"
+              onclick="window.open('https://drive.google.com', '_blank')"
             >
-              📝 フォーム作成
+              📁 Googleドライブを開く
             </button>
             <button
-              id="app-setup-btn"
-              class="link-btn w-full text-center hidden"
+              class="link-btn w-full text-center"
               type="button"
-              onclick="goToAppSetup()"
+              onclick="window.open('https://docs.google.com/forms/', '_blank')"
             >
-              ⚙️ アプリ設定画面
+              📝 Googleフォームを開く
+            </button>
+            <button
+              class="link-btn w-full text-center"
+              type="button"
+              onclick="window.open('https://classroom.google.com', '_blank')"
+            >
+              🎓 Googleクラスルームを開く
+            </button>
+            <button
+              id="open-board-btn"
+              class="link-btn w-full text-center"
+              type="button"
+              onclick="openAnswerBoard()"
+              disabled
+            >
+              📊 回答ボードを開く
             </button>
           </div>
         </section>

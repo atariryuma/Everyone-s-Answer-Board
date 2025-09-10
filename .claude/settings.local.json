@@ -81,7 +81,8 @@
       "Bash(clasp open:*)",
       "Bash(clasp:*)",
       "Bash(npm run:*)",
-      "Bash(then npm run lint)"
+      "Bash(then npm run lint)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": [],

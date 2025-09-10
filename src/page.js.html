@@ -1747,25 +1747,7 @@ class StudyQuestApp {
         this.state.lastSeenCount || 0
       );
       
-      console.log('📊 API整合性ログ - 増分データ取得完了:', {
-        endpoint: 'getIncrementalSheetData',
-        requestParams: {
-          classFilter,
-          sortOrder,
-          adminMode,
-          sinceRowCount: this.state.lastSeenCount || 0
-        },
-        responseStructure: {
-          status: incrementalData.status,
-          newCount: incrementalData.newCount,
-          totalCount: incrementalData.totalCount,
-          hasData: !!incrementalData.data
-        },
-        contextInfo: {
-          purpose: 'refreshContentIncremental',
-          currentAnswersLength: this.state.currentAnswers?.length || 0
-        }
-      });
+      // API整合性 - 増分データ取得完了
       
       if (incrementalData.status === 'error') {
         throw new Error(incrementalData.message);
@@ -3049,26 +3031,11 @@ class StudyQuestApp {
       ? null
       : selectedClass;
     
-    console.log('📤 軽量チェックパラメータ:', { originalSelectedClass: selectedClass, processedClassFilter: classFilter });
+    // 軽量チェックパラメータ
     
     const countData = await this.gas.getDataCount(classFilter, 'newest', this.state.showAdminFeatures);
     
-    console.log('📊 API整合性ログ - 軽量チェック完了:', {
-      endpoint: 'getDataCount',
-      requestParams: {
-        classFilter,
-        sortOrder: 'newest',
-        showAdminFeatures: this.state.showAdminFeatures
-      },
-      responseData: countData,
-      contextInfo: {
-        lastSeenCount: this.state.lastSeenCount,
-        currentAnswersLength: this.state.currentAnswers?.length || 0,
-        purpose: 'performServerDataSync'
-      }
-    });
-    
-    console.log('📊 サーバーカウント確認:', countData);
+    // API整合性 - 軽量チェック完了
     
     if (countData && countData.count > 0) {
       // サーバーにデータがある場合は強制再読み込み
@@ -3151,16 +3118,7 @@ class StudyQuestApp {
       }
       
       // レスポンス構造の詳細ログ
-      console.log('🔍 データ判定: レスポンス構造確認', {
-        hasStatus: 'status' in result,
-        status: result.status,
-        hasData: 'data' in result,
-        dataType: Array.isArray(result.data) ? 'array' : typeof result.data,
-        dataLength: Array.isArray(result.data) ? result.data.length : 'N/A',
-        hasHeader: 'header' in result,
-        hasSheetName: 'sheetName' in result,
-        keys: Object.keys(result)
-      });
+      // データ判定: レスポンス構造確認
       
       // 2つの可能なレスポンス形式に対応
       // 1. 新形式: { status: 'success', data: [...], header: '...', sheetName: '...' }
@@ -3254,7 +3212,7 @@ class StudyQuestApp {
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
-        console.log(`📡 データ取得試行 ${attempt + 1}/${MAX_ATTEMPTS}:`, fetchParams);
+        // データ取得試行
         
         // データ取得を Promise で実行
         const result = await new Promise((resolve, reject) => {
@@ -3281,18 +3239,11 @@ class StudyQuestApp {
         });
         
         // レスポンスの詳細ログ
-        console.log(`🔍 データ取得レスポンス (試行 ${attempt + 1}):`, {
-          hasResult: !!result,
-          resultType: typeof result,
-          resultKeys: result ? Object.keys(result) : [],
-          hasData: result && 'data' in result,
-          dataType: result && result.data ? (Array.isArray(result.data) ? 'array' : typeof result.data) : 'undefined',
-          dataLength: result && Array.isArray(result.data) ? result.data.length : 'N/A'
-        });
+        // データ取得レスポンス確認
         
         // 成功した場合は結果を返す - 改善された判定条件
         if (result && this.isValidDataResult(result)) {
-          console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
+          // データ取得成功
           return result;
         }
         
@@ -3498,7 +3449,7 @@ class StudyQuestApp {
         this.showLoadingOverlay();
       }
       
-      console.log('🔍 loadSheetData started:', config);
+      // loadSheetData started
       const oldAnswers = [...this.state.currentAnswers];
       
       // Clear caches if needed
@@ -3669,12 +3620,7 @@ class StudyQuestApp {
         bypassCache: config.bypassCache || false
       };
       
-      console.log('📤 データ取得パラメータ:', {
-        ...fetchParams,
-        originalSelectedClass: selectedClass,
-        processedClassFilter: classFilter
-      });
-      console.log('📡 Starting data fetch with parameters:', fetchParams);
+      // データ取得パラメータ設定
       
       // エラーハンドリング強化版のデータ取得
       try {
@@ -3717,7 +3663,7 @@ class StudyQuestApp {
             
             if (isValidEmptyData) {
               // 正常な空データの場合は高速復旧戦略をスキップ
-              console.log('📝 正常な空データを受信（まだ回答がありません）');
+              // 空データは正常な状態
             } else {
               console.warn('⚠️ StudyQuestApp: Received empty or invalid data:', result);
               
@@ -3798,7 +3744,7 @@ class StudyQuestApp {
                 !result.header.includes('読み込み') &&
                 result.header.trim() !== '') {
               this.elements.headingLabel.textContent = result.header;
-              console.log('✅ 空データ時でも問題文を表示:', result.header);
+              // 問題文を表示
             }
             
             // 空データ受信時は古いカードを強制的にクリア
@@ -3808,49 +3754,22 @@ class StudyQuestApp {
             this.displayEmptyState();
             if (isInitialLoad) {
               this.state.lastSeenCount = 0;
-              // 初期データロード失敗フラグを設定
-              this.hadInitialDataLoadFailure = true;
-              console.log('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
+              // 空データは正常な状態 - エラーではない
+              this.hadInitialDataLoadFailure = false;
             }
             return;
           }
         }
 
-        console.log('📊 API整合性ログ - データ受信完了:', {
-          endpoint: 'getPublishedSheetData',
-          requestParams: {
-            classFilter: fetchParams.classFilter,
-            sortOrder: fetchParams.sortOrder,
-            showAdminFeatures: fetchParams.showAdminFeatures,
-            bypassCache: fetchParams.bypassCache
-          },
-          responseStructure: {
-            hasData: !!result.data,
-            dataLength: result.data?.length || 0,
-            hasHeader: !!result.header,
-            status: result.status
-          },
-          contextInfo: {
-            isInitialLoad,
-            lastSeenCount: this.state.lastSeenCount,
-            currentAnswersLength: this.state.currentAnswers?.length || 0
-          }
-        });
-        
-        console.log('Received data:', result.data);
+        // API整合性 - データ受信完了
         
         // ===== PHASE 2.1 & 2.3: STRICT PROCESSING ORDER WITH UNIFIED STATE =====
         // Step 1 & 2: Data acquisition and unified state synchronization
         const syncResult = this.synchronizeStateAfterDataUpdate(result.data, 'performDataLoad');
-        console.log('✅ Step 1-2: Data acquisition and state synchronization completed:', syncResult);
+        // Step 1-2: Data acquisition and state synchronization completed
         
         // 理由列デバッグ: 取得されたデータの詳細を確認
-        console.log('🔍 理由列デバッグ - 取得データ詳細:', result.data.map((item, index) => ({
-          index: index,
-          rowIndex: item.rowIndex,
-          opinion: item.opinion?.substring(0, 50) + '...',
-          reason: item.reason,
-          reasonLength: item.reason?.length || 0,
+        // Debug data removed for cleaner logs
           reasonExists: !!item.reason,
           reasonTrimmed: item.reason?.trim(),
           allKeys: Object.keys(item)
@@ -5733,13 +5652,7 @@ class StudyQuestApp {
       // 真の初回判定: すべてが未設定/初期状態の場合
       const isFirstTime = !hasLastSeen && !hasDiffCards && !hasInitialLoad && !hasDOMCards;
       
-      console.log('🔍 初回判定結果:', {
-        hasLastSeen,
-        hasDiffCards,
-        hasInitialLoad,
-        hasDOMCards,
-        isFirstTime
-      });
+      // 初回判定結果確認
       
       return isFirstTime;
     } catch (error) {
