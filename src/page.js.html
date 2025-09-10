@@ -1,9 +1,9 @@
 <script>
 // Dynamic performance-based batch sizing
 const PERFORMANCE_CONFIG = Object.freeze({
-  BASE_RENDER_BATCH_SIZE: 10, // Base batch size for normal performance
-  LOW_PERF_BATCH_SIZE: 5, // Reduced batch size for low performance devices
-  HIGH_PERF_BATCH_SIZE: 15, // Increased batch size for high performance devices
+  BASE_RENDER_BATCH_SIZE: 50, // Base batch size for normal performance (increased for better DOM consistency)
+  LOW_PERF_BATCH_SIZE: 25, // Reduced batch size for low performance devices
+  HIGH_PERF_BATCH_SIZE: 75, // Increased batch size for high performance devices
   VIEWPORT_BUFFER: 200, // Viewport buffer for virtual scrolling
   PERFORMANCE_BUDGET: 16, // Maximum ms per frame (60fps)
   CHUNK_SIZE: 5, // DOM operations per chunk
@@ -4388,7 +4388,7 @@ class StudyQuestApp {
     const container = this.elements.answersContainer;
     if (!container) {
       console.warn('calculateVisibleRange: answersContainer not found.');
-      return { startIndex: 0, endIndex: Math.min(20, totalItems) }; // 初期は20件表示
+      return { startIndex: 0, endIndex: Math.min(50, totalItems) }; // 初期は50件表示（DOM不整合防止）
     }
 
     const scrollTop = container.scrollTop;
@@ -4409,8 +4409,8 @@ class StudyQuestApp {
       // 🚀 DOM準備完了待ちの処理 - 初期表示では多めに表示
       if (this.state.initialDataLoaded) {
         console.warn('calculateVisibleRange: containerHeight is 0, showing initial batch.');
-        // 初期表示では20件表示
-        return { startIndex: 0, endIndex: Math.min(20, totalItems) };
+        // 初期表示では50件表示（DOM不整合防止のため増加）
+        return { startIndex: 0, endIndex: Math.min(50, totalItems) };
       }
       // デフォルト高さでフォールバック計算
       containerHeight = 600;
@@ -4418,9 +4418,9 @@ class StudyQuestApp {
       endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight) + 5);
     }
 
-    // 最小表示件数を保証
-    if (endIndex - startIndex < 10 && totalItems > 10) {
-      endIndex = Math.min(startIndex + 10, totalItems);
+    // 最小表示件数を保証（DOM不整合防止のため増加）
+    if (endIndex - startIndex < 25 && totalItems > 25) {
+      endIndex = Math.min(startIndex + 25, totalItems);
     }
 
     return { startIndex, endIndex };
