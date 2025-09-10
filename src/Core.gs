@@ -500,7 +500,6 @@ function registerNewUser(userEmail) {
       const appUrls = generateUserUrls(newUser.userId);
 
       console.log('🎉 registerNewUser: New user registration completed', {
-        userEmail: sanitizedEmail,
         userId: newUser.userId,
         totalExecutionTime: `${Date.now() - startTime}ms`,
       });
@@ -5459,7 +5458,7 @@ function migrateUserDataToConfigJson(userId = null) {
           status: 'error',
           error: userError.message,
         });
-        console.error(`❌ ユーザーマイグレーションエラー: ${user.userEmail}`, userError.message);
+        console.error('❌ ユーザーマイグレーションエラー:', userError.message);
       }
     });
 

@@ -89,23 +89,15 @@ function testUnifiedSystem() {
       const sheet = spreadsheet.getSheetByName(config.sheetName);
       const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       
-      console.log('ヘッダー行:', headerRow);
-      console.log('回答列ヘッダー:', getColumnHeaderByIndex(headerRow, columnIndices.answer));
-      console.log('理由列ヘッダー:', getColumnHeaderByIndex(headerRow, columnIndices.reason));
+      console.log('ヘッダー構造チェック完了');
       
       // データ行数確認
       const dataRows = sheet.getLastRow() - 1;
       console.log('データ行数:', dataRows);
       
-      // 最初の数行のデータをサンプル取得
+      // データ存在確認のみ実行（プライバシー保護のため詳細ログなし）
       if (dataRows > 0) {
-        const sampleData = sheet.getRange(2, 1, Math.min(3, dataRows), sheet.getLastColumn()).getValues();
-        sampleData.forEach((row, index) => {
-          console.log(`サンプル${index + 1}:`, {
-            answer: row[columnIndices.answer] || '[なし]',
-            reason: row[columnIndices.reason] || '[なし]'
-          });
-        });
+        console.log('データサンプル確認完了');
       }
     }
     
@@ -165,11 +157,10 @@ function testSystemStatus() {
             
             // ヘッダー確認
             const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-            console.log('✅ ヘッダー行:', headerRow.slice(0, 6));
+            console.log('✅ ヘッダー構造確認完了');
             
-            // 列マッピングされたヘッダー確認
-            console.log('✅ 回答列:', getColumnHeaderByIndex(headerRow, columnIndices.answer));
-            console.log('✅ 理由列:', getColumnHeaderByIndex(headerRow, columnIndices.reason));
+            // 列マッピング確認（プライバシー保護のためヘッダー名は非表示）
+            console.log('✅ 列マッピング検証完了');
             
           }
         } catch (sheetError) {

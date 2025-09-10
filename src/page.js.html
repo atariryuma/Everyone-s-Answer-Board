@@ -4763,18 +4763,6 @@ class StudyQuestApp {
         highlight: Boolean(data.highlight)
       };
       
-      // 理由列デバッグ: createAnswerCard での理由データ処理状況
-      console.log('🔍 createAnswerCard 理由列デバッグ:', {
-        rowIndex: safeData.rowIndex,
-        originalReason: data.reason,
-        validatedReason: safeData.reason,
-        opinion: safeData.opinion?.substring(0, 30) + '...',
-        reasonLength: safeData.reason?.length || 0,
-        opinionLength: safeData.opinion?.length || 0,
-        willShowReason: !!(safeData.reason && safeData.reason.trim()),
-        willShowOpinion: !!(safeData.opinion && safeData.opinion.trim()),
-        hasValidContent: !!(safeData.opinion || safeData.reason)
-      });
       
       // Optimized cache key generation (faster than JSON.stringify)
       const cacheKey = `${safeData.rowIndex}-${safeData.opinion.slice(0,50)}-${safeData.reason.slice(0,30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
@@ -4870,25 +4858,12 @@ class StudyQuestApp {
       
       contentDiv.appendChild(opinionTitle);
       
-      // 理由テキストが存在する場合のみ追加（堅牢化）
-      console.log('🔍 理由テキスト追加デバッグ:', {
-        hasReason: !!safeData.reason,
-        reasonTrimmed: safeData.reason?.trim(),
-        willAddReason: !!(safeData.reason && safeData.reason.trim()),
-        reasonTextElement: !!reasonText
-      });
-      
       // 理由テキストが空でない場合のみ追加
       const shouldAddReason = !!(reasonText.textContent && reasonText.textContent.trim());
-      console.log('✅ 理由テキストの追加判定:', shouldAddReason ? '追加' : '未追加（空）');
       try {
         // 理由テキストの有効性を検証
         if (shouldAddReason) {
           contentDiv.appendChild(reasonText);
-          console.log('✅ 理由テキスト追加完了（既存要素使用）');
-        } else {
-          // 何もしない（空の理由は表示しない）
-          console.log('ℹ️ 理由テキストは空のため追加しません');
         }
       } catch (reasonError) {
         // 理由テキスト追加でエラーが発生した場合の回復処理

@@ -361,7 +361,6 @@ const DB = {
   updateUserInDatabase(userId, dbUpdateData) {
     try {
       console.log('updateUserInDatabase: データベース更新開始', {
-        userId,
         hasConfigJson: !!dbUpdateData.configJson,
         configJsonSize: dbUpdateData.configJson?.length || 0,
         timestamp: new Date().toISOString(),
@@ -375,7 +374,6 @@ const DB = {
       if (!service) {
         const serviceError = 'Service Accountサービスが利用できません';
         console.error('❌ updateUserInDatabase: Service Account取得失敗', {
-          userId,
           error: serviceError,
         });
         return {
@@ -453,7 +451,6 @@ const DB = {
       });
 
       console.log('updateUserInDatabase: データベース更新完了', {
-        userId,
         row: rowIndex,
         configJsonSize: dbUpdateData.configJson.length,
         updatedCells: updateResult.updatedCells,
@@ -1254,7 +1251,7 @@ function updateUserFields(userId, fields) {
       const emailColIndex = headers.indexOf('userEmail');
       if (emailColIndex >= 0) {
         sheet.getRange(targetRowIndex, emailColIndex + 1).setValue(fields.userEmail);
-        console.log('✅ userEmail更新完了:', fields.userEmail);
+        console.log('✅ userEmail更新完了');
       }
     }
 

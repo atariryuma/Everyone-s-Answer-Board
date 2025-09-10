@@ -597,6 +597,68 @@
   // =============================================================================
 
   // Initialize global utilities
+  // Privacy-aware logging utilities
+  class PrivacyLogger {
+    // Anonymize sensitive data for logging
+    static anonymize(data) {
+      if (typeof data === 'string') {
+        // Email anonymization
+        if (data.includes('@')) {
+          const parts = data.split('@');
+          return `${parts[0].substring(0, 2)}***@${parts[1]}`;
+        }
+        // Long text anonymization (potential user content)
+        if (data.length > 30) {
+          return `${data.substring(0, 15)}...[${data.length} chars]`;
+        }
+        return data;
+      }
+      
+      if (typeof data === 'object' && data !== null) {
+        const anonymized = {};
+        for (const [key, value] of Object.entries(data)) {
+          // Skip sensitive keys
+          if (['email', 'userEmail', 'reason', 'opinion', 'answer', 'content'].includes(key)) {
+            anonymized[key] = this.anonymize(value);
+          } else if (key.includes('Id') && typeof value === 'string') {
+            // Anonymize IDs partially
+            anonymized[key] = value.length > 8 ? `${value.substring(0, 4)}***` : value;
+          } else {
+            anonymized[key] = value;
+          }
+        }
+        return anonymized;
+      }
+      
+      return data;
+    }
+    
+    // Safe console logging with privacy protection
+    static log(message, data = null) {
+      if (data) {
+        console.log(message, this.anonymize(data));
+      } else {
+        console.log(message);
+      }
+    }
+    
+    static warn(message, data = null) {
+      if (data) {
+        console.warn(message, this.anonymize(data));
+      } else {
+        console.warn(message);
+      }
+    }
+    
+    static error(message, data = null) {
+      if (data) {
+        console.error(message, this.anonymize(data));
+      } else {
+        console.error(message);
+      }
+    }
+  }
+
   window.sharedUtilities = {
     debounce: new DebounceManager(),
     throttle: new ThrottleManager(),
@@ -606,6 +668,7 @@
     loading: new LoadingManager(),
     gas: new GASUtilities(),
     security: new SecurityUtilities(),
+    privacy: PrivacyLogger,
   };
 
   // Setup global error handling
