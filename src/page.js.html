@@ -2932,19 +2932,9 @@ class StudyQuestApp {
     // 現在のデータ数とポーリングで取得したカウントを比較
     const currentDataCount = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
     
-    console.log('🔍 設定一致性検証:', {
-      '表示中の質問文': displayedHeader,
-      '現在のデータ数': currentDataCount,
-      '最新ポーリング結果': this.lastPollingResult || '未実行'
-    });
     
     // ポーリング結果と現在のデータ数の不一致を検出
     if (this.lastPollingResult && this.lastPollingResult.newCount !== currentDataCount) {
-      console.warn('⚠️ データ不整合検出:', {
-        'ポーリングカウント': this.lastPollingResult.newCount,
-        '表示データ数': currentDataCount,
-        '差分': this.lastPollingResult.newCount - currentDataCount
-      });
       
       // 不整合が検出された場合の対応
       this.handleDataInconsistency();
@@ -3859,20 +3849,7 @@ class StudyQuestApp {
           allKeys: Object.keys(item)
         })));
         
-        // サーバーからの質問文と現在表示の一致性をチェック
-        if (result.header) {
-          const currentDisplayed = this.elements.headingLabel ? this.elements.headingLabel.textContent : '';
-          if (currentDisplayed && currentDisplayed !== result.header) {
-            console.warn('⚠️ 質問文不一致検出:', {
-              '現在表示': currentDisplayed,
-              'サーバー設定': result.header,
-              'シート名': result.sheetName
-            });
-            
-            // 質問文を新しいものに更新
-            console.log('🔄 質問文をサーバー設定に合わせます');
-          }
-        }
+        // サーバーからの質問文と現在表示の一致性をチェック（ログなし）
         
         // Apply saved reaction states to restore user's previous reactions
         this.applyReactionState(result.data);
