@@ -140,16 +140,25 @@
   
   // データソース選択ラジオボタンのイベント設定
   function setupDataSourceRadioEvents() {
-    const radioButtons = document.querySelectorAll('input[name="data-source"]');
+    const radioButtons = document.querySelectorAll('input[name="source-method"]');
     let spreadsheetListLoaded = false;
     
     radioButtons.forEach(radio => {
       radio.addEventListener('change', async function() {
-        if (this.value === 'list' && !spreadsheetListLoaded) {
+        if (this.value === 'dropdown' && !spreadsheetListLoaded) {
           // 「一覧から選択」が選択された時のみスプレッドシート一覧を読み込み
           console.log('スプレッドシート一覧を読み込み中...');
-          await loadSpreadsheetListAsync();
-          spreadsheetListLoaded = true;
+          setPartialLoading(true, 'スプレッドシート一覧を取得中...');
+          try {
+            await loadSpreadsheetListAsync();
+            spreadsheetListLoaded = true;
+            showSuccess('スプレッドシート一覧を読み込みました');
+          } catch (error) {
+            console.error('スプレッドシート一覧の読み込みエラー:', error);
+            showError('スプレッドシート一覧の読み込みに失敗しました');
+          } finally {
+            setPartialLoading(false);
+          }
         }
       });
     });
