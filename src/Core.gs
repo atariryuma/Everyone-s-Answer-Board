@@ -870,6 +870,15 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       sinceRowCount
     });
 
+    // 🛡️ パラメータ検証強化
+    if (!requestUserId) {
+      return createErrorResponse('ユーザーIDが指定されていません');
+    }
+
+    if (typeof sinceRowCount !== 'number' || sinceRowCount < 0) {
+      return createErrorResponse('無効なsinceRowCount値です');
+    }
+
     const accessResult = App.getAccess().verifyAccess(
       requestUserId,
       'view',
@@ -884,13 +893,56 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       return createErrorResponse('ユーザー情報が見つかりません');
     }
 
-    // 🎯 シンプル化: 統一設定取得関数使用
-    const config = getConfigSimple(userInfo);
+    // 🛡️ 設定取得の防御的処理
+    let config;
+    try {
+      config = getConfigSimple(userInfo);
+      logDebug('config_loaded', {
+        hasSpreadsheetId: !!config.spreadsheetId,
+        hasSheetName: !!config.sheetName,
+        hasColumnMapping: !!(config.columnMapping && config.columnMapping.mapping)
+      });
+    } catch (configError) {
+      logDebug('getConfigSimple_error', {
+        userId: requestUserId,
+        error: configError.message
+      });
+      return createErrorResponse(`設定の取得に失敗しました: ${configError.message}`, {
+        userId: requestUserId
+      });
+    }
     
-    // 🔧 シンプルな差分取得ロジック
-    const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
-    const sheet = spreadsheet.getSheetByName(config.sheetName);
-    const lastRow = sheet.getLastRow();
+    // 🛡️ スプレッドシートアクセスの防御的処理
+    let spreadsheet, sheet, lastRow;
+    try {
+      spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+      sheet = spreadsheet.getSheetByName(config.sheetName);
+      
+      if (!sheet) {
+        return createErrorResponse(`シート '${config.sheetName}' が見つかりません`, {
+          spreadsheetId: config.spreadsheetId,
+          sheetName: config.sheetName
+        });
+      }
+      
+      lastRow = sheet.getLastRow();
+      logDebug('sheet_access', {
+        spreadsheetId: config.spreadsheetId,
+        sheetName: config.sheetName,
+        lastRow: lastRow
+      });
+    } catch (sheetError) {
+      logDebug('sheet_access_error', {
+        userId: requestUserId,
+        spreadsheetId: config.spreadsheetId,
+        sheetName: config.sheetName,
+        error: sheetError.message
+      });
+      return createErrorResponse(`スプレッドシートのアクセスに失敗しました: ${sheetError.message}`, {
+        spreadsheetId: config.spreadsheetId,
+        sheetName: config.sheetName
+      });
+    }
     
     logDebug('incremental_check', {
       lastRow,
@@ -898,45 +950,134 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       hasNewData: sinceRowCount < lastRow - 1
     });
     
+    // 新着データなしの場合
     if (sinceRowCount >= lastRow - 1) {
       return createSuccessResponse([], {
         hasNewData: false,
-        totalRows: lastRow - 1
+        totalRows: lastRow - 1,
+        newDataCount: 0,
+        isIncremental: true
       });
     }
     
-    // 🔧 新しいデータを取得 
-    const allData = sheet.getDataRange().getValues();
-    const headers = allData[0];
-    const newRowsData = allData.slice(sinceRowCount + 1); // sinceRowCount以降の新しい行
+    // 🛡️ データ取得の防御的処理
+    let allData, headers, newRowsData;
+    try {
+      allData = sheet.getDataRange().getValues();
+      if (!allData || allData.length < 2) {
+        return createSuccessResponse([], {
+          hasNewData: false,
+          totalRows: 0,
+          newDataCount: 0,
+          isIncremental: true,
+          message: 'データが不十分です'
+        });
+      }
+      
+      headers = allData[0];
+      newRowsData = allData.slice(sinceRowCount + 1); // sinceRowCount以降の新しい行
+      
+      logDebug('data_extraction', {
+        totalDataRows: allData.length,
+        headerCount: headers.length,
+        newRowsCount: newRowsData.length,
+        extractedFrom: sinceRowCount + 1
+      });
+    } catch (dataError) {
+      logDebug('data_extraction_error', {
+        userId: requestUserId,
+        error: dataError.message
+      });
+      return createErrorResponse(`データの取得に失敗しました: ${dataError.message}`, {
+        userId: requestUserId
+      });
+    }
     
     if (newRowsData.length === 0) {
       return createSuccessResponse([], {
         hasNewData: false,
-        totalRows: lastRow - 1
+        totalRows: lastRow - 1,
+        newDataCount: 0,
+        isIncremental: true
       });
     }
     
-    // 🎯 シンプル化: columnMappingを使用した直接データ処理
-    const processedNewData = processDataWithColumnMapping(
-      newRowsData,
-      headers,
-      config.columnMapping.mapping
-    );
+    // 🛡️ データ処理の防御的処理
+    let processedNewData;
+    try {
+      if (!config.columnMapping || !config.columnMapping.mapping) {
+        logDebug('columnMapping_missing', {
+          userId: requestUserId,
+          hasColumnMapping: !!config.columnMapping,
+          hasMappingProperty: !!(config.columnMapping && config.columnMapping.mapping)
+        });
+        return createErrorResponse('列マッピング情報が不足しています', {
+          userId: requestUserId
+        });
+      }
+      
+      processedNewData = processDataWithColumnMapping(
+        newRowsData,
+        headers,
+        config.columnMapping.mapping
+      );
+      
+      if (!processedNewData || !Array.isArray(processedNewData)) {
+        return createErrorResponse('データ処理結果が無効です', {
+          userId: requestUserId,
+          processedType: typeof processedNewData
+        });
+      }
+      
+      logDebug('data_processing_success', {
+        inputRowCount: newRowsData.length,
+        outputRowCount: processedNewData.length
+      });
+      
+    } catch (processingError) {
+      logDebug('data_processing_error', {
+        userId: requestUserId,
+        inputRowCount: newRowsData.length,
+        headerCount: headers.length,
+        error: processingError.message,
+        stack: processingError.stack
+      });
+      return createErrorResponse(`データ処理に失敗しました: ${processingError.message}`, {
+        userId: requestUserId,
+        inputRowCount: newRowsData.length
+      });
+    }
     
-    return createSuccessResponse(processedNewData, {
+    // 成功レスポンス
+    const successResult = createSuccessResponse(processedNewData, {
       hasNewData: true,
       totalRows: lastRow - 1,
       newDataCount: processedNewData.length,
       isIncremental: true
     });
-  } catch (error) {
-    logDebug('getIncrementalSheetData_error', {
-      requestUserId,
-      error: error.message
+    
+    logDebug('getIncrementalSheetData_success', {
+      userId: requestUserId,
+      newDataCount: processedNewData.length,
+      hasNewData: true
     });
-    return createErrorResponse(`差分データ取得に失敗しました: ${error.message}`, {
-      requestUserId
+    
+    return successResult;
+    
+  } catch (error) {
+    // 🛡️ 最終的なエラーハンドリング
+    logDebug('getIncrementalSheetData_critical_error', {
+      requestUserId,
+      error: error.message,
+      stack: error.stack,
+      errorType: typeof error
+    });
+    
+    // 構造化されたエラーレスポンスを必ず返す
+    return createErrorResponse(`差分データ取得で予期しないエラーが発生しました: ${error.message}`, {
+      requestUserId,
+      errorType: error.constructor.name,
+      timestamp: new Date().toISOString()
     });
   }
 }

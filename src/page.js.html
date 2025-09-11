@@ -155,13 +155,19 @@ class RequestManager {
       try {
         const result = await request.apiCall();
         
-        // 成功時はキャッシュに保存
-        if (request.cacheKey) {
+        // 🛡️ 有効な結果のみキャッシュに保存
+        if (request.cacheKey && this.shouldCacheResult(result)) {
           this.cache.set(request.cacheKey, {
             data: result,
             expiry: Date.now() + request.cacheTTL
           });
           console.log('💾 RequestManager: 結果をキャッシュ', request.cacheKey);
+        } else if (request.cacheKey) {
+          console.warn('⚠️ RequestManager: 無効な結果のためキャッシュしません', {
+            cacheKey: request.cacheKey,
+            resultType: typeof result,
+            isNull: result === null
+          });
         }
         
         request.resolve(result);
@@ -217,6 +223,45 @@ class RequestManager {
     }, retryDelay);
   }
 
+  /**
+   * 🛡️ 結果がキャッシュする価値があるかを判定
+   * @param {*} result - API呼び出しの結果
+   * @returns {boolean} キャッシュすべきかどうか
+   */
+  shouldCacheResult(result) {
+    // null や undefined はキャッシュしない
+    if (result === null || result === undefined) {
+      return false;
+    }
+    
+    // オブジェクトの場合、statusがerrorならキャッシュしない
+    if (typeof result === 'object' && result.status === 'error') {
+      return false;
+    }
+    
+    // 配列の場合、空配列でも一時的にキャッシュする（頻繁な再取得を防ぐため）
+    if (Array.isArray(result)) {
+      return true;
+    }
+    
+    // 文字列、数値、真偽値はキャッシュ
+    if (['string', 'number', 'boolean'].includes(typeof result)) {
+      return true;
+    }
+    
+    // オブジェクトで有効なstatusを持つ場合はキャッシュ
+    if (typeof result === 'object' && result.status === 'success') {
+      return true;
+    }
+    
+    // その他の有効なオブジェクト（statusフィールドがない場合）
+    if (typeof result === 'object') {
+      return true;
+    }
+    
+    return false;
+  }
+  
   /**
    * 🧹 キャッシュクリーンアップ
    */
@@ -1602,10 +1647,17 @@ class StudyQuestApp {
         this.state.lastSeenCount || 0
       );
       
-      // API整合性 - 増分データ取得完了
+      // 🛡️ null/undefined チェック強化
+      if (!incrementalData || typeof incrementalData !== 'object') {
+        console.error('増分データ取得エラー: 無効なレスポンス', {
+          incrementalData: incrementalData,
+          type: typeof incrementalData
+        });
+        throw new Error('増分データの取得に失敗しました');
+      }
       
       if (incrementalData.status === 'error') {
-        throw new Error(incrementalData.message);
+        throw new Error(incrementalData.message || '増分データ取得でエラーが発生しました');
       }
       
       // Enhanced incremental data analysis (Phase 3.2) - 改善版
@@ -1926,20 +1978,30 @@ class StudyQuestApp {
         this.state.lastSeenCount || 0
       );
       
+      // 🛡️ null/undefined チェック強化
+      if (!incrementalData || typeof incrementalData !== 'object') {
+        console.error('新着確認エラー: 無効なレスポンス', {
+          incrementalData: incrementalData,
+          type: typeof incrementalData
+        });
+        return false; // 新着なしとして処理を継続
+      }
+      
       if (incrementalData.status === 'error') {
-        throw new Error(incrementalData.message);
+        throw new Error(incrementalData.message || '新着データ取得でエラーが発生しました');
       }
       
       // 新着データがある場合
-      if (incrementalData.newCount > 0) {
+      const newCount = incrementalData.newCount || incrementalData.newDataCount || 0;
+      if (newCount > 0) {
         console.log('🆕 新着回答検出:', {
-          newCount: incrementalData.newCount,
-          totalCount: incrementalData.totalCount
+          newCount: newCount,
+          totalCount: incrementalData.totalCount || incrementalData.totalRows || 0
         });
         
         this.state.hasNewContent = true;
-        this.state.newContentCount = incrementalData.newCount;
-        this.showNewContentBanner(incrementalData.newCount);
+        this.state.newContentCount = newCount;
+        this.showNewContentBanner(newCount);
         return true; // 新着コンテンツありを返す
       }
       
