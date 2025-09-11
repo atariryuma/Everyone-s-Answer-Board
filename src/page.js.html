@@ -1173,7 +1173,25 @@
       // Size slider for immediate response with throttling
       const debouncedRender = this.debounce(() => this.renderBoard(true, false), 200);
       this.handlers.onSizeSliderInput = this.throttle((e) => {
-        localStorage.setItem('boardColumns', e.target.value);
+        const value = e.target.value;
+        localStorage.setItem('boardColumns', value);
+        
+        // Update slider value display immediately
+        if (this.elements.sliderValue) {
+          this.elements.sliderValue.textContent = value;
+        }
+        
+        // Update grid columns immediately
+        const container = this.elements.answersContainer;
+        const colsMap = {
+          '2': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2',
+          '3': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+          '4': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+          '5': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
+          '6': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
+        };
+        container.className = colsMap[value] || 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
+        
         debouncedRender();
       }, 100); // Throttle to 100ms
 
@@ -4386,7 +4404,14 @@
       }
       if (this.elements.sizeSlider) {
         const container = this.elements.answersContainer;
-        const newClassName = `grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-${this.elements.sizeSlider.value}`;
+        const colsMap = {
+          '2': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2',
+          '3': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+          '4': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+          '5': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
+          '6': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
+        };
+        const newClassName = colsMap[this.elements.sizeSlider.value] || 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
         if (container.className !== newClassName) {
           updates.push(() => (container.className = newClassName));
         }
