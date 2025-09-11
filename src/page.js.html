@@ -459,7 +459,8 @@ class StudyQuestApp {
       checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
       clearCache: () => this.runGas('refreshBoardData', this.state.userId),
       validateData: () => this.validateBoardDataIntegrity(),
-      getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode)
+      getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode),
+      checkCurrentPublicationStatus: (userId) => this.runGas('checkCurrentPublicationStatus', userId)
     };
     
     // Polling settings with dynamic interval adjustment
@@ -7837,28 +7838,14 @@ class StudyQuestApp {
    */
   validateReasonText(reason) {
     try {
-      console.log('🔍 validateReasonText デバッグ:', {
-        input: reason,
-        inputType: typeof reason,
-        inputIsNull: reason === null,
-        inputIsUndefined: reason === undefined,
-        inputLength: reason?.length
-      });
       
       // null, undefined, 空文字列チェック
       if (!reason && reason !== 0) {
-        console.log('🔍 validateReasonText: 空の理由データ検出 - 空文字列を返します');
         return '';
       }
       
       // 文字列変換と基本検証
       const reasonStr = String(reason).trim();
-      
-      console.log('🔍 validateReasonText 処理結果:', {
-        reasonStr: reasonStr,
-        reasonStrLength: reasonStr.length,
-        willBeEmpty: reasonStr.length === 0
-      });
       
       // 長すぎる理由テキストの制限（10000文字まで）
       if (reasonStr.length > 10000) {
