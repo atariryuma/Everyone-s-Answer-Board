@@ -1,7 +1,13 @@
 <!-- Shared Security Headers -->
+<!-- 
+  Permissions Policy警告について：
+  ブラウザがambient-light-sensor、speaker、vibrate、vr等の機能アクセス警告を表示する場合があります。
+  これは一般的な警告であり、アプリケーションの動作には影響しません。
+  基本的なセキュリティ対策として、不要な機能アクセスを明示的に無効化しています。
+-->
 <meta http-equiv="Cache-Control" content="no-cache" />
 <meta http-equiv="X-Content-Type-Options" content="nosniff" />
 <meta
   http-equiv="Permissions-Policy"
-  content="camera=(), microphone=(), geolocation=()"
+  content="camera=(), microphone=(), geolocation=(), ambient-light-sensor=(), accelerometer=(), gyroscope=(), magnetometer=(), speaker=(), vibrate=(), vr=()"
 />
