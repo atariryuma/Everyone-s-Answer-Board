@@ -958,7 +958,7 @@ class StudyQuestApp {
           // フォームが作成された時のフォームリンク更新
           console.log('📝 新しいフォームが作成されました:', event.data.formUrl);
           try {
-            const formLinkBtn = document.getElementById('form-link-btn');
+            const formLinkBtn = document.getElementById('formAnswerBtn');
             if (formLinkBtn && event.data.formUrl) {
               formLinkBtn.href = event.data.formUrl;
               formLinkBtn.classList.remove('hidden');
@@ -995,7 +995,7 @@ class StudyQuestApp {
             // フォームが作成された時のフォームリンク更新（BroadcastChannel）
             console.log('📝 BroadcastChannelから新しいフォーム作成を受信:', event.data.formUrl);
             try {
-              const formLinkBtn = document.getElementById('form-link-btn');
+              const formLinkBtn = document.getElementById('formAnswerBtn');
               if (formLinkBtn && event.data.formUrl) {
                 formLinkBtn.href = event.data.formUrl;
                 formLinkBtn.classList.remove('hidden');
@@ -8093,7 +8093,7 @@ const loadFormLink = async () => {
     );
 
     if (formInfo && formInfo.formUrl) {
-      const formLinkBtn = document.getElementById('form-link-btn');
+      const formLinkBtn = document.getElementById('formAnswerBtn');
       if (formLinkBtn) {
         formLinkBtn.href = formInfo.formUrl;
         formLinkBtn.classList.remove('hidden');
