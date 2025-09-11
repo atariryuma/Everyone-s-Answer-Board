@@ -4384,7 +4384,7 @@
         }
       }
       if (this.elements.answerCount) {
-        const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
+        const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1 text-blue-400');
         const countHtml = `${userIcon}<span>${newRows.length}件</span>`;
         if (this.elements.answerCount.innerHTML !== countHtml) {
           updates.push(() => (this.elements.answerCount.innerHTML = countHtml));
@@ -6266,7 +6266,7 @@
               // 回答数を更新
               if (this.elements.answerCount) {
                 const count = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
-                const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
+                const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1 text-blue-400');
                 this.elements.answerCount.innerHTML = `${userIcon}<span>${count}件</span>`;
               }
             }, 300);
