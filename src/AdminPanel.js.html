@@ -20,6 +20,33 @@
     config: null,
   };
 
+  // ===== 冪等・重複防止（リクエストガード＆デバウンス） =====
+  const RequestGate = {
+    flags: Object.create(null),
+    enter(key) {
+      if (this.flags[key]) return false;
+      this.flags[key] = true;
+      return true;
+    },
+    exit(key) {
+      this.flags[key] = false;
+    },
+  };
+
+  const Debounce = (() => {
+    const timers = new Map();
+    return {
+      run(key, delay, fn) {
+        if (timers.has(key)) clearTimeout(timers.get(key));
+        const id = setTimeout(() => {
+          timers.delete(key);
+          try { fn(); } catch (e) { console.error('Debounce error', e); }
+        }, delay);
+        timers.set(key, id);
+      },
+    };
+  })();
+
   let initializationStep = 'not started';
 
   // Wrap initialization in safe handler
@@ -1195,7 +1222,7 @@
 
     // 接続ボタン（一覧選択）
     document.getElementById('connect-source').addEventListener('click', function () {
-      connectToSource();
+      Debounce.run('connect-source', 400, () => connectToSource());
     });
 
     // URL検証ボタン
@@ -1210,17 +1237,17 @@
 
     // 設定確認ボタン
     document.getElementById('verify-mapping').addEventListener('click', function () {
-      verifyColumnMapping();
+      Debounce.run('verify-mapping', 500, () => verifyColumnMapping());
     });
 
     // 下書き保存ボタン
     document.getElementById('save-draft').addEventListener('click', function () {
-      saveDraft();
+      Debounce.run('save-draft', 500, () => saveDraft());
     });
 
     // 公開ボタン
     document.getElementById('publish-now').addEventListener('click', function () {
-      publishApp();
+      Debounce.run('publish-now', 800, () => publishApp());
     });
   });
 
@@ -1281,6 +1308,10 @@
 
   // データソース接続
   function connectToSource() {
+    if (!RequestGate.enter('connectToSource')) {
+      showInfo('現在処理中です…少し待ってから再試行してください。');
+      return;
+    }
     const spreadsheetId = document.getElementById('spreadsheet-select').value;
     const sheetName = document.getElementById('sheet-select').value;
 
@@ -1323,11 +1354,13 @@
           handleConnectionError(result.error, { spreadsheetId, sheetName });
         }
         setLoading(false);
+        RequestGate.exit('connectToSource');
       })
       .withFailureHandler(function (error) {
         console.error('connectToSource 接続エラー:', error);
         handleConnectionError(error.message || error, { spreadsheetId, sheetName });
         setLoading(false);
+        RequestGate.exit('connectToSource');
       })
       .connectDataSource(spreadsheetId, sheetName);
   }
@@ -1773,6 +1806,10 @@
 
   // 列マッピング確認
   function verifyColumnMapping() {
+    if (!RequestGate.enter('verifyColumnMapping')) {
+      showInfo('検証処理を実行中です…');
+      return;
+    }
     const spreadsheetId = document.getElementById('spreadsheet-select').value;
     const sheetName = document.getElementById('sheet-select').value;
 
@@ -1805,11 +1842,13 @@
         showSuccess('列マッピングの検証が完了しました');
         updateProgress(3);
         setLoading(false);
+        RequestGate.exit('verifyColumnMapping');
       })
       .withFailureHandler(function (error) {
         console.error('verifyColumnMapping エラー:', error);
         showError('列マッピングの検証に失敗しました: ' + (error.message || 'Unknown error'));
         setLoading(false);
+        RequestGate.exit('verifyColumnMapping');
       })
       .getHeaderIndices(spreadsheetId, sheetName);
   }
@@ -1858,6 +1897,10 @@
 
   // 下書き保存
   function saveDraft() {
+    if (!RequestGate.enter('saveDraft')) {
+      showInfo('保存処理を実行中です…');
+      return;
+    }
     const config = gatherConfiguration();
 
     setLoading(true);
@@ -1870,17 +1913,23 @@
           showError(result.error);
         }
         setLoading(false);
+        RequestGate.exit('saveDraft');
       })
       .withFailureHandler(function (error) {
         console.error('保存エラー:', error);
         showError('下書きの保存に失敗しました');
         setLoading(false);
+        RequestGate.exit('saveDraft');
       })
       .saveDraftConfiguration(config);
   }
 
   // アプリ公開（appName削除版）
   function publishApp() {
+    if (!RequestGate.enter('publishApp')) {
+      showInfo('公開処理を実行中です…');
+      return;
+    }
     setLoading(true);
 
     // 🔧 根本的修正: 現在の完全な設定を取得してからpublishApplicationを呼び出し
@@ -1889,6 +1938,7 @@
         if (!currentConfig || !currentConfig.spreadsheetId) {
           showError('まずデータソースを設定してください。');
           setLoading(false);
+          RequestGate.exit('publishApp');
           return;
         }
 
@@ -1927,6 +1977,7 @@
               showError(result.error);
             }
             setLoading(false);
+            RequestGate.exit('publishApp');
           })
           .withFailureHandler(function (error) {
             console.error('公開エラー:', error);
@@ -1934,12 +1985,14 @@
               'アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。'
             );
             setLoading(false);
+            RequestGate.exit('publishApp');
           })
           .publishApplication(publishConfig);
       })
       .withFailureHandler(function (error) {
         showError('現在の設定の取得に失敗しました: ' + error.message);
         setLoading(false);
+        RequestGate.exit('publishApp');
       })
       .getConfig(); // 現在の完全な設定を先に取得
   }

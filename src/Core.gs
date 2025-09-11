@@ -4370,6 +4370,18 @@ function connectDataSource(spreadsheetId, sheetName) {
  * 複雑な階層を削除し、確実にデータを保存
  */
 function publishApplication(config) {
+  // 単一フライト制御（ユーザー単位）
+  const userLock = LockService.getUserLock();
+  try {
+    userLock.waitLock(30000); // 最大30秒待機
+  } catch (e) {
+    return {
+      success: false,
+      error: '他の操作が進行中です。しばらくしてから再試行してください。',
+      optimized: true,
+      timestamp: new Date().toISOString(),
+    };
+  }
   try {
     console.log('📱 publishApplication: アプリ公開開始（最適化版）', {
       hasSpreadsheetId: !!config.spreadsheetId,
@@ -4450,6 +4462,41 @@ function publishApplication(config) {
     });
 
     if (publishResult.success) {
+      // 最新のフォーム情報をスプレッドシートから取得（常に再検出）
+      let detectedFormUrl = null;
+      let detectedFormTitle = null;
+      try {
+        const spreadsheet = new ConfigurationManager().getSpreadsheet(effectiveSpreadsheetId);
+        detectedFormUrl = spreadsheet.getFormUrl();
+        if (detectedFormUrl) {
+          try {
+            const form = FormApp.openByUrl(detectedFormUrl);
+            detectedFormTitle = form ? form.getTitle() : null;
+          } catch (formErr) {
+            console.warn('publishApplication: フォームタイトル取得失敗', formErr.message);
+          }
+        }
+      } catch (spErr) {
+        console.warn('publishApplication: フォームURL再検出失敗', spErr.message);
+      }
+
+      // ヘッダー配列とハッシュ（存在しなければ保存時に補完）
+      let headers = currentConfig.headers;
+      let headersHash = currentConfig.headersHash;
+      try {
+        if (!headers || !headersHash) {
+          const spreadsheet = new ConfigurationManager().getSpreadsheet(effectiveSpreadsheetId);
+          const sheet = spreadsheet.getSheetByName(effectiveSheetName);
+          if (sheet) {
+            const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+            headers = headerRow;
+            headersHash = computeHeadersHash(headerRow);
+          }
+        }
+      } catch (hhErr) {
+        console.warn('publishApplication: ヘッダー情報の取得失敗', hhErr.message);
+      }
+
       // 🔥 最適化：ConfigManager経由を削除し、直接configJSONを更新
       // 🔥 完全な設定構築（古いデータの残存を防止）
       const updatedConfig = {
@@ -4461,6 +4508,7 @@ function publishApplication(config) {
         spreadsheetId: effectiveSpreadsheetId,
         sheetName: effectiveSheetName,
         spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${effectiveSpreadsheetId}`,
+        sourceKey: buildSourceKey(effectiveSpreadsheetId, effectiveSheetName),
         
         // 表示設定（フロントエンドから）
         displaySettings: {
@@ -4482,16 +4530,21 @@ function publishApplication(config) {
         ...(currentConfig.reasonHeader && { reasonHeader: currentConfig.reasonHeader }),
         ...(currentConfig.classHeader && { classHeader: currentConfig.classHeader }),
         ...(currentConfig.nameHeader && { nameHeader: currentConfig.nameHeader }),
-        ...(currentConfig.formUrl && { formUrl: currentConfig.formUrl }),
-        ...(currentConfig.formTitle && { formTitle: currentConfig.formTitle }),
+        // フォーム情報は最新検出結果を優先
+        ...(detectedFormUrl !== null && { formUrl: detectedFormUrl || null }),
+        ...(detectedFormTitle !== null && { formTitle: detectedFormTitle || null }),
+        // ヘッダー配列とハッシュ（あれば保持、なければ今回の検出）
+        ...(headers && { headers }),
+        ...(headersHash && { headersHash }),
         ...(currentConfig.headerIndices && { headerIndices: currentConfig.headerIndices }),
         ...(currentConfig.reactionMapping && { reactionMapping: currentConfig.reactionMapping }),
         ...(currentConfig.systemMetadata && { systemMetadata: currentConfig.systemMetadata }),
         
         // メタ情報
-        configVersion: '2.0',
+        configVersion: '3.0',
         claudeMdCompliant: true,
         lastModified: new Date().toISOString(),
+        etag: computeEtag(),
       };
 
       console.log('💾 publishApplication: 直接DB更新開始', {
@@ -4551,6 +4604,9 @@ function publishApplication(config) {
       timestamp: new Date().toISOString(),
     };
   }
+  finally {
+    try { userLock.releaseLock(); } catch (_) {}
+  }
 }
 
 /**
@@ -4558,6 +4614,13 @@ function publishApplication(config) {
  * ✅ ConfigManager.updateConfig()に統一簡素化
  */
 function saveDraftConfiguration(config) {
+  // 単一フライト制御（ユーザー単位）
+  const userLock = LockService.getUserLock();
+  try {
+    userLock.waitLock(30000);
+  } catch (e) {
+    return { success: false, error: '他の操作が進行中です。しばらくして再試行してください。' };
+  }
   try {
     console.log('💾 saveDraftConfiguration: 完全置換保存開始', {
       configKeys: Object.keys(config),
@@ -4595,6 +4658,7 @@ function saveDraftConfiguration(config) {
         spreadsheetId: config.spreadsheetId,
         sheetName: config.sheetName,
         spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}`,
+        sourceKey: buildSourceKey(config.spreadsheetId, config.sheetName),
         
         // 表示設定（管理パネルから更新）
         displaySettings: {
@@ -4612,9 +4676,24 @@ function saveDraftConfiguration(config) {
         // columnMapping, headerIndices等は意図的に含めない
         
         // メタ情報
-        configVersion: '2.0',
+        configVersion: '3.0',
         claudeMdCompliant: true,
+        lastModified: new Date().toISOString(),
+        etag: computeEtag(),
       };
+
+      // 新ソースのヘッダーとハッシュを保存
+      try {
+        const spreadsheet = new ConfigurationManager().getSpreadsheet(config.spreadsheetId);
+        const sheet = spreadsheet.getSheetByName(config.sheetName);
+        if (sheet) {
+          const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+          updatedConfig.headers = headerRow;
+          updatedConfig.headersHash = computeHeadersHash(headerRow);
+        }
+      } catch (hhErr) {
+        console.warn('saveDraftConfiguration: ヘッダー取得失敗（ソース変更時）', hhErr.message);
+      }
     } else {
       // データソースが変更されていない場合は、既存のフィールドを保持
       updatedConfig = {
@@ -4626,6 +4705,10 @@ function saveDraftConfiguration(config) {
         spreadsheetId: config.spreadsheetId || currentConfig.spreadsheetId,
         sheetName: config.sheetName || currentConfig.sheetName,
         spreadsheetUrl: currentConfig.spreadsheetUrl,
+        sourceKey: buildSourceKey(
+          config.spreadsheetId || currentConfig.spreadsheetId,
+          config.sheetName || currentConfig.sheetName
+        ),
         
         // 表示設定（管理パネルから更新）
         displaySettings: {
@@ -4648,13 +4731,32 @@ function saveDraftConfiguration(config) {
         ...(currentConfig.formUrl && { formUrl: currentConfig.formUrl }),
         ...(currentConfig.formTitle && { formTitle: currentConfig.formTitle }),
         ...(currentConfig.headerIndices && { headerIndices: currentConfig.headerIndices }),
+        ...(currentConfig.headers && { headers: currentConfig.headers }),
+        ...(currentConfig.headersHash && { headersHash: currentConfig.headersHash }),
         ...(currentConfig.reactionMapping && { reactionMapping: currentConfig.reactionMapping }),
         ...(currentConfig.systemMetadata && { systemMetadata: currentConfig.systemMetadata }),
         
         // メタ情報
-        configVersion: '2.0',
+        configVersion: '3.0',
         claudeMdCompliant: true,
+        lastModified: new Date().toISOString(),
+        etag: computeEtag(),
       };
+
+      // ヘッダー検証: 今回のリクエストにheaderIndicesが付与されている場合は最新ヘッダーを保存
+      try {
+        if (config.headerIndices && updatedConfig.spreadsheetId && updatedConfig.sheetName) {
+          const spreadsheet = new ConfigurationManager().getSpreadsheet(updatedConfig.spreadsheetId);
+          const sheet = spreadsheet.getSheetByName(updatedConfig.sheetName);
+          if (sheet) {
+            const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+            updatedConfig.headers = headerRow;
+            updatedConfig.headersHash = computeHeadersHash(headerRow);
+          }
+        }
+      } catch (hhErr2) {
+        console.warn('saveDraftConfiguration: ヘッダー取得失敗（更新時）', hhErr2.message);
+      }
     }
 
     // 🔥 ConfigManager.saveConfig()を使用して完全置換
@@ -4686,6 +4788,54 @@ function saveDraftConfiguration(config) {
       success: false,
       error: error.message,
     };
+  }
+  finally {
+    try { userLock.releaseLock(); } catch (_) {}
+  }
+}
+
+// =======================
+// Helper utilities (architecture optimizations)
+// =======================
+
+function buildSourceKey(spreadsheetId, sheetName) {
+  if (!spreadsheetId || !sheetName) return null;
+  return `${spreadsheetId}::${sheetName}`;
+}
+
+function computeEtag() {
+  // 乱数ベースのETag（UUID）にタイムスタンプを付与して衝突回避性を高める
+  return `${Utilities.getUuid()}-${new Date().getTime()}`;
+}
+
+function normalizeHeaderValue(h) {
+  try {
+    return String(h)
+      .normalize('NFKC')
+      .replace(/[、。．・\s]+$/g, '')
+      .trim();
+  } catch (_) {
+    return String(h).trim();
+  }
+}
+
+function computeHeadersHash(headers) {
+  try {
+    const normalized = (headers || []).map(normalizeHeaderValue);
+    const bytes = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_256,
+      JSON.stringify(normalized),
+      Utilities.Charset.UTF_8
+    );
+    return bytes
+      .map(function (b) {
+        const v = (b + 256) % 256;
+        return (v < 16 ? '0' : '') + v.toString(16);
+      })
+      .join('');
+  } catch (e) {
+    console.warn('computeHeadersHash失敗', e.message);
+    return null;
   }
 }
 

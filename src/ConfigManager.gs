@@ -371,7 +371,7 @@ const ConfigManager = Object.freeze({
       formTitle: null,
 
       // メタ情報
-      configVersion: '2.0',
+      configVersion: '3.0',
       claudeMdCompliant: true,
     };
   },
@@ -427,7 +427,7 @@ const ConfigManager = Object.freeze({
       isDraft: !baseConfig.appPublished,
 
       // メタ情報
-      configVersion: '2.0',
+      configVersion: '3.0',
       claudeMdCompliant: true,
       lastModified: new Date().toISOString(),
     };
@@ -499,6 +499,21 @@ const ConfigManager = Object.freeze({
       // spreadsheetUrlの動的生成
       if (sanitized.spreadsheetId && !sanitized.spreadsheetUrl) {
         sanitized.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${sanitized.spreadsheetId}`;
+      }
+
+      // version/etag/sourceKey補完
+      if (!sanitized.configVersion) {
+        sanitized.configVersion = '3.0';
+      }
+      if (!sanitized.sourceKey && sanitized.spreadsheetId && sanitized.sheetName) {
+        sanitized.sourceKey = `${sanitized.spreadsheetId}::${sanitized.sheetName}`;
+      }
+      if (!sanitized.etag) {
+        try {
+          sanitized.etag = `${Utilities.getUuid()}-${new Date().getTime()}`;
+        } catch (e) {
+          sanitized.etag = new Date().toISOString();
+        }
       }
 
       return sanitized;
