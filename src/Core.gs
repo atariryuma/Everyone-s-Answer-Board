@@ -8,6 +8,26 @@
 // ===========================================
 
 /**
+ * タイムスタンプを読みやすい形式にフォーマット
+ * @param {string} isoString - ISO形式の日時文字列
+ * @returns {string} フォーマット済み日時（例：9/11 03:25）
+ */
+function formatTimestamp(isoString) {
+  if (!isoString) return '不明';
+  try {
+    return new Date(isoString).toLocaleString('ja-JP', {
+      month: 'numeric',
+      day: 'numeric', 
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.warn('formatTimestamp: フォーマットエラー', error.message);
+    return '不明';
+  }
+}
+
+/**
  * 統一設定取得関数（シンプル版）
  * @param {Object} userInfo - ユーザー情報
  * @returns {Object} 設定オブジェクト
@@ -4567,6 +4587,15 @@ function publishApplication(config) {
         etag: computeEtag(),
       };
 
+      // questionText自動抽出（公開時）
+      if (updatedConfig.columnMapping?.mapping?.answer !== undefined && headers) {
+        const answerIndex = updatedConfig.columnMapping.mapping.answer;
+        if (headers[answerIndex]) {
+          updatedConfig.questionText = headers[answerIndex];
+          console.log('📝 questionText自動抽出（公開時）:', updatedConfig.questionText);
+        }
+      }
+
       console.log('💾 publishApplication: 直接DB更新開始', {
         userId: userInfo.userId,
         updatedFields: {
@@ -4770,6 +4799,15 @@ function saveDraftConfiguration(config) {
       if (config.columnMapping) {
         updatedConfig.columnMapping = config.columnMapping;
       }
+      
+      // questionText自動抽出（データソース変更時）
+      if (updatedConfig.columnMapping?.mapping?.answer !== undefined && updatedConfig.headers) {
+        const answerIndex = updatedConfig.columnMapping.mapping.answer;
+        if (updatedConfig.headers[answerIndex]) {
+          updatedConfig.questionText = updatedConfig.headers[answerIndex];
+          console.log('📝 questionText自動抽出（データソース変更）:', updatedConfig.questionText);
+        }
+      }
     } else {
       // データソースが変更されていない場合は、既存のフィールドを保持
       updatedConfig = {
@@ -4837,6 +4875,15 @@ function saveDraftConfiguration(config) {
       // 要求にcolumnMappingが含まれる場合は採用
       if (config.columnMapping) {
         updatedConfig.columnMapping = config.columnMapping;
+      }
+      
+      // questionText自動抽出（通常更新時）
+      if (updatedConfig.columnMapping?.mapping?.answer !== undefined && updatedConfig.headers) {
+        const answerIndex = updatedConfig.columnMapping.mapping.answer;
+        if (updatedConfig.headers[answerIndex]) {
+          updatedConfig.questionText = updatedConfig.headers[answerIndex];
+          console.log('📝 questionText自動抽出（通常更新）:', updatedConfig.questionText);
+        }
       }
     }
 
@@ -5568,17 +5615,23 @@ function getCurrentBoardInfoAndUrls() {
     const { userInfo } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
     const config = userInfo ? ConfigManager.getUserConfig(userInfo.userId) : null;
 
-    // フッター表示用の問題文を管理パネルの回答列と一致させる（シンプル版）
-    let questionText = config?.opinionHeader;
+    // フッター表示用の問題文：configJSONから直接取得（動的対応）
+    let questionText = config?.questionText;
 
-    // opinionHeaderが設定されていない場合のみフォールバック
+    // questionTextが未設定の場合は間接参照をフォールバック
+    if (!questionText && config?.columnMapping?.mapping?.answer !== undefined && config?.headers) {
+      const answerIndex = config.columnMapping.mapping.answer;
+      questionText = config.headers[answerIndex];
+    }
+    
+    // 最終フォールバック
     if (!questionText) {
       questionText = config?.formTitle || 'システム準備中';
     }
 
-    console.log('getCurrentBoardInfoAndUrls: フッター問題文決定', {
-      opinionHeader: config?.opinionHeader,
-      formTitle: config?.formTitle,
+    console.log('getCurrentBoardInfoAndUrls: フッター問題文決定（動的対応版）', {
+      questionText: config?.questionText,
+      fallbackFromHeaders: !config?.questionText && config?.headers?.[config?.columnMapping?.mapping?.answer],
       finalQuestionText: questionText,
     });
 
@@ -5612,6 +5665,7 @@ function getCurrentBoardInfoAndUrls() {
       appPublished: config?.appPublished || false,
       isPublished: config?.appPublished || false, // フッター互換性
       questionText, // 実際の問題文
+      lastUpdated: formatTimestamp(lastModified || publishedAt), // フッター表示用
       opinionHeader: config?.opinionHeader || '', // 問題文（詳細版）
       appUrl,
       spreadsheetUrl,
