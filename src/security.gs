@@ -15,6 +15,12 @@ const SECURITY_CONFIG = Object.freeze({
   MAX_LOGIN_ATTEMPTS: 3,
 });
 
+// 基本的な入力検証パターン
+const VALIDATION_PATTERNS = Object.freeze({
+  SPREADSHEET_URL: /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]+/,
+  SAFE_STRING: /^[a-zA-Z0-9\s\-_.@]+$/
+});
+
 /**
  * CacheService永続キャッシュでサービスアカウントトークンを取得
  * GAS実行環境で真に永続化されるCacheServiceを活用
@@ -255,6 +261,34 @@ function getSecureDatabaseId() {
     console.error('getSecureDatabaseIdエラー:', error.message);
     throw error;
   }
+}
+
+// =============================================================================
+// SECTION 4: 基本入力検証関数
+// =============================================================================
+
+/**
+ * スプレッドシートURL検証（基本実装）
+ * @param {string} url - 検証するURL
+ * @returns {boolean} 有効性
+ */
+function validateSpreadsheetUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  return VALIDATION_PATTERNS.SPREADSHEET_URL.test(url.trim());
+}
+
+/**
+ * 基本的な文字列サニタイゼーション
+ * @param {string} input - サニタイズする文字列
+ * @returns {string} サニタイズ済み文字列
+ */
+function sanitizeInput(input) {
+  if (!input || typeof input !== 'string') {
+    return '';
+  }
+  return input.replace(/[<>\"'&]/g, '').trim();
 }
 
 // verifyUserAccess function removed - standardized to use App.getAccess().verifyAccess() directly

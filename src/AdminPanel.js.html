@@ -14,10 +14,17 @@
   }
 
   // === SECTION SEPARATOR ===
-  // 簡素化された状態管理
+  // 統一状態管理（一元化）
   let systemState = {
     loading: false,
     config: null,
+    spreadsheetList: null,
+    sheetList: null,
+    initialized: false,
+    currentSpreadsheetId: null,
+    currentSheetName: null,
+    userInfo: null,
+    initializationStep: 'not started'
   };
 
   // ===== 冪等・重複防止（リクエストガード＆デバウンス） =====
@@ -47,7 +54,7 @@
     };
   })();
 
-  let initializationStep = 'not started';
+  // initializationStep は systemState に統合済み
 
   // Wrap initialization in safe handler
   if (document.readyState === 'loading') {
@@ -58,23 +65,24 @@
   }
 
   async function safeInitialize() {
-    initializationStep = 'started';
+    systemState.initializationStep = 'started';
 
     try {
-      initializationStep = 'panel initialization';
+      systemState.initializationStep = 'panel initialization';
       await initializePanel();
 
-      initializationStep = 'admin check';
+      systemState.initializationStep = 'admin check';
       checkSystemAdminAccess();
 
-      initializationStep = 'footer initialization';
+      systemState.initializationStep = 'footer initialization';
       initializeFooter();
 
-      initializationStep = 'completed';
+      systemState.initializationStep = 'completed';
+      systemState.initialized = true;
     } catch (error) {
       // Try to show error even if UI is not fully initialized
       try {
-        showError('初期化エラー: ' + initializationStep + ' - ' + error.message);
+        showError('初期化エラー: ' + systemState.initializationStep + ' - ' + error.message);
       } catch (uiError) {
         alert('管理パネルの初期化に失敗しました。ページを再読み込みしてください。');
       }
@@ -96,27 +104,39 @@
     document.body.classList.add('has-footer');
   }
 
-  // 🚀 パネル初期化 - オンデマンド読み込み対応版（パフォーマンス最適化）
+  // パネル初期化（統一config取得版）
   async function initializePanel() {
     let step = 'starting';
 
     try {
       setLoading(true);
 
-      // 並行処理で基本データを読み込み（ノンブロッキング）
+      // 1. ユーザー情報読み込み
       step = 'loading user info';
-      await loadUserInfoAsync();
+      systemState.userInfo = await loadUserInfoAsync();
 
-      // 設定データを読み込んで完全に自動反映（先に実施して重複getConfigを抑止）
-      step = 'loading and applying config';
-      await loadAndApplyCurrentConfig();
+      // 2. 設定データを1回だけ取得してsystemStateに保存
+      step = 'loading config';
+      systemState.config = await getConfigAsync();
 
-      // ⚡ 最適化：スプレッドシート一覧の自動読み込みを停止
-      // ドロップダウンの初期化（既存configを優先使用）
+      // 3. 基本設定の反映
+      step = 'applying config';
+      if (systemState.config && systemState.config.sheetName) {
+        await autoSelectSheet(systemState.config.sheetName);
+        applyExistingConfig(systemState.config);
+        updateProgressFromConfig(systemState.config);
+      }
+
+      // 4. リソースボタンとサマリー更新
+      step = 'updating UI';
+      updateResourceButtons(systemState.config);
+      updateConfigSummary(systemState.config);
+
+      // 5. ドロップダウンの初期化（systemState.configを使用）
       step = 'initializing dropdowns';
       await initializeDropdowns();
 
-      showSuccess('✅ 管理パネルの初期化が完了しました（最適化済み）');
+      showSuccess('✅ 管理パネルの初期化が完了しました');
     } catch (error) {
       showError('初期化に失敗しました (' + step + '): ' + error.message);
     } finally {
@@ -135,8 +155,8 @@
       // スプレッドシート一覧の読み込みはラジオボタン選択時まで遅延
       spreadsheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
 
-      // 現在の設定から既存データを取得・反映（systemState優先でgetConfigの重複を抑止）
-      const config = (systemState && systemState.config) ? systemState.config : await getConfigAsync();
+      // systemStateから設定データを使用（重複取得を回避）
+      const config = systemState.config;
       if (config && config.spreadsheetId) {
         // 既存の設定がある場合は、その項目だけを追加
         const option = document.createElement('option');
@@ -358,97 +378,35 @@
   }
 
   // 設定データの読み込みと完全自動反映（新実装）
-  async function loadAndApplyCurrentConfig() {
-    try {
-      // 設定データを非同期で取得
-      const config = await getConfigAsync();
+  // この関数はinitializePanel()に統合済み（重複削除）
 
-      // リソースボタンを更新
-      updateResourceButtons(config);
-
-      // 設定サマリーを更新
-      updateConfigSummary(config);
-
-      if (config && config.sheetName) {
-        // 2. シート自動選択
-        await autoSelectSheet(config.sheetName);
-
-        // 3. 列設定の自動初期化
-        await autoInitializeColumnSettings(config);
-
-        // 4. 進捗ステップの更新
-        updateProgressFromConfig(config);
-
-        showSuccess('✅ 既存の設定を完全に反映しました');
-      } else {
-        showInfo('💡 新規セットアップを開始してください');
-      }
-    } catch (error) {
-      showError('設定の自動反映に失敗しました: ' + error.message);
-      // エラー時でもリソースボタンを初期状態で表示
-      updateResourceButtons(null);
-    }
-  }
-
-  // ✅ 重複実行防止管理（パフォーマンス最適化）
-  const executionManager = {
-    pending: new Set(),
-    lastCalls: new Map(),
-    
-    debounce(funcName, delay = 500) {
-      const now = Date.now();
-      const lastCall = this.lastCalls.get(funcName) || 0;
-      
-      if (now - lastCall < delay) {
-        console.log(`🚫 ${funcName}: デバウンス実行（${delay}ms以内の連続呼び出しを防止）`);
-        return false;
-      }
-      
-      this.lastCalls.set(funcName, now);
-      return true;
-    },
-    
-    async execute(funcName, asyncFunction, debounceMs = 500) {
-      // デバウンスチェック
-      if (!this.debounce(funcName, debounceMs)) {
-        throw new Error(`${funcName}が短時間で重複実行されました`);
-      }
-      
-      // 重複実行チェック
-      if (this.pending.has(funcName)) {
-        console.log(`⏳ ${funcName}: 既に実行中のため待機`);
-        throw new Error(`${funcName}が既に実行中です`);
-      }
-      
-      try {
-        this.pending.add(funcName);
-        console.log(`🚀 ${funcName}: 実行開始（最適化版）`);
-        
-        const result = await asyncFunction();
-        
-        console.log(`✅ ${funcName}: 実行完了`);
-        return result;
-      } finally {
-        this.pending.delete(funcName);
-      }
-    }
+  // シンプルなデバウンス機構
+  const simpleDebounce = (fn, delay) => {
+    let timeoutId;
+    return (...args) => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(() => fn.apply(this, args), delay);
+    };
   };
 
-  // 設定データ取得（最適化版 - 重複実行防止）
+  // 設定データ取得（シンプル版）
   function getConfigAsync() {
-    return executionManager.execute('getConfig', () => {
-      return new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(reject)
-          .getConfig();
-      });
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        .getConfig();
     });
   }
 
-  // 旧版との互換性維持
+  // この関数はinitializePanel()に統合済み（重複削除）
   function loadCurrentConfig() {
-    loadAndApplyCurrentConfig().catch((error) => {});
+    // systemState.configを使用（既に読み込み済み）
+    if (systemState.config) {
+      applyExistingConfig(systemState.config);
+      updateResourceButtons(systemState.config);
+      updateConfigSummary(systemState.config);
+    }
   }
 
   // ========== 自動反映機能群 ==========
@@ -501,157 +459,89 @@
     }
   }
 
-  // 列設定の自動初期化（フォールバック処理強化版）
-  async function autoInitializeColumnSettings(config) {
+  // 基本設定の反映（シンプル版）
+  function applyExistingConfig(config) {
+    if (!config) return;
+
     try {
-      // スプレッドシートIDを取得: configから、または現在選択中のものから
-      const spreadsheetSelect = document.getElementById('spreadsheet-select');
-      const spreadsheetId = config.spreadsheetId || spreadsheetSelect?.value;
-      let sheetName = config.sheetName;
-
-      if (!spreadsheetId) {
-        return;
-      }
-
-      // シート名が不足している場合の自動検出・選択
-      if (!sheetName) {
-        try {
-          const sheets = await loadSheetListAsync(spreadsheetId);
-          if (sheets && sheets.length > 0) {
-            // 優先順位でシートを選択
-            sheetName = detectBestSheetName(sheets);
-
-            // UI更新: 自動選択されたシートを反映
-            await autoSelectSheet(sheetName);
-          } else {
-            throw new Error('利用可能なシートが見つかりません');
-          }
-        } catch (sheetError) {
-          sheetName = 'フォームの回答 1'; // フォールバック
-          showInfo('💡 シート情報の自動検出に失敗しました。手動でシートを選択してください。');
-          return;
+      // スプレッドシート選択の反映
+      if (config.spreadsheetId) {
+        const spreadsheetSelect = document.getElementById('spreadsheet-select');
+        if (spreadsheetSelect) {
+          spreadsheetSelect.value = config.spreadsheetId;
         }
       }
 
-      // 既存の列設定データがあるかチェック
-      if (config.columnMapping || config.columnSelections) {
-        // 既存データから列設定を復元
-        await restoreColumnSettingsFromConfig(config, sheetName);
-      } else {
-        // 新規にAI分析実行
-        await analyzeAndSetupColumns(spreadsheetId, sheetName);
-      }
-    } catch (error) {
-      showError('列設定の初期化に失敗しました: ' + error.message);
-    }
-  }
-
-  // 最適なシート名を検出（柔軟パターンマッチング対応）
-  function detectBestSheetName(sheets) {
-    // フォームレスポンス系のパターン（正規表現）
-    const formResponsePatterns = [
-      /^フォームの回答\s*\d*$/, // フォームの回答、フォームの回答 1, フォームの回答 7 など
-      /^Form Responses?\s*\d*$/, // Form Response, Form Responses 1 など
-      /^回答\s*\d*$/, // 回答、回答 1 など
-      /^Responses?\s*\d*$/, // Response, Responses 1 など
-    ];
-
-    // 優先順位リスト（厳密マッチ）
-    const priorities = ['フォームの回答 1', 'フォームの回答', 'Sheet1', 'シート1'];
-
-    // 1. 優先名から厳密検索
-    for (const priority of priorities) {
-      const sheet = sheets.find((s) => s.name === priority);
-      if (sheet && sheet.rowCount > 1) {
-        return priority;
-      }
-    }
-
-    // 2. フォームレスポンスパターンマッチング
-    for (const pattern of formResponsePatterns) {
-      const matchingSheets = sheets
-        .filter((s) => pattern.test(s.name) && s.rowCount > 1)
-        .sort((a, b) => b.rowCount - a.rowCount); // データが多い順
-
-      if (matchingSheets.length > 0) {
-        const selected = matchingSheets[0].name;
-        return selected;
-      }
-    }
-
-    // データが最も多いシートを選択
-    const sheetsWithData = sheets
-      .filter((s) => s.rowCount > 1)
-      .sort((a, b) => b.rowCount - a.rowCount);
-
-    if (sheetsWithData.length > 0) {
-      const selected = sheetsWithData[0].name;
-      return selected;
-    }
-
-    // フォールバック: 最初のシート
-    const fallback = sheets[0].name;
-    return fallback;
-  }
-
-  // 既存の列設定データから復元（引数更新版）
-  async function restoreColumnSettingsFromConfig(config, sheetName) {
-    try {
-      // 有効なシート名を決定
-      const targetSheetName = sheetName || config.sheetName;
-      if (!targetSheetName) {
-        throw new Error('復元に必要なシート名が不足しています');
-      }
-
-      // 既存の列マッピングがあれば使用、なければ簡易フォールバック
-      if (config.columnMapping) {
-        // 既存のマッピングから列設定を復元
-        if (config.columnSelections) {
-          applyPreviousColumnSelections(config.columnSelections);
+      // シート選択の反映
+      if (config.sheetName) {
+        const sheetSelect = document.getElementById('sheet-select');
+        if (sheetSelect) {
+          sheetSelect.value = config.sheetName;
         }
       }
+
+      console.log('✅ 基本設定を反映しました');
     } catch (error) {
-      throw error;
+      console.error('基本設定の反映でエラー:', error.message);
     }
   }
 
-  // 新規AI分析と列設定
-  async function analyzeAndSetupColumns(spreadsheetId, sheetName) {
-    try {
-      const result = await analyzeColumnsAsync(spreadsheetId, sheetName);
+  // ========== 基本セキュリティ関数 ==========
 
-      if (result && result.success) {
-        updateColumnMapping(result);
-      } else {
-        throw new Error(result.error || 'AI分析に失敗しました');
-      }
-    } catch (error) {
-      throw error;
+  // URL入力の基本検証
+  function validateUrlInput(inputElement) {
+    const url = inputElement.value.trim();
+    const messageEl = document.getElementById('url-validation-message');
+    
+    if (!url) {
+      messageEl.textContent = '💡 GoogleスプレッドシートのURLを貼り付けてください';
+      messageEl.className = 'text-xs text-gray-400 mt-1';
+      inputElement.classList.remove('border-red-500', 'border-green-500');
+      return;
+    }
+    
+    // 基本的なURL検証パターン
+    const urlPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]+/;
+    
+    if (urlPattern.test(url)) {
+      messageEl.textContent = '✅ 有効なスプレッドシートURLです';
+      messageEl.className = 'text-xs text-green-400 mt-1';
+      inputElement.classList.remove('border-red-500');
+      inputElement.classList.add('border-green-500');
+    } else {
+      messageEl.textContent = '❌ 無効なURL形式です。Googleスプレッドシートの正しいURLを入力してください';
+      messageEl.className = 'text-xs text-red-400 mt-1';
+      inputElement.classList.remove('border-green-500');
+      inputElement.classList.add('border-red-500');
     }
   }
 
-  // 以前の列選択を復元
-  function applyPreviousColumnSelections(columnSelections) {
-    Object.keys(columnSelections).forEach((columnType) => {
-      if (columnType.startsWith('_')) return; // メタデータはスキップ
+  // 基本的なサニタイゼーション
+  function sanitizeInput(input) {
+    if (!input || typeof input !== 'string') {
+      return '';
+    }
+    return input.replace(/[<>\"'&]/g, '').trim();
+  }
 
-      const selection = columnSelections[columnType];
-      const dropdown = document.getElementById(`${columnType}-column-select`);
-
-      if (dropdown && selection && typeof selection.columnIndex === 'number') {
-        dropdown.value = selection.columnIndex;
-
-        // 選択タイプに応じたクラス設定
-        if (selection.selectionType === 'manual') {
-          dropdown.classList.add('has-manual-selection');
-          showConfidenceBadge(columnType, 100, 'manual');
+  // フォーム送信時のデータサニタイゼーション
+  function sanitizeFormData(data) {
+    const sanitized = {};
+    for (const key in data) {
+      if (data.hasOwnProperty(key)) {
+        if (typeof data[key] === 'string') {
+          sanitized[key] = sanitizeInput(data[key]);
         } else {
-          dropdown.classList.add('has-ai-selection');
-          showConfidenceBadge(columnType, selection.confidence || 0, 'ai');
+          sanitized[key] = data[key];
         }
       }
-    });
+    }
+    return sanitized;
   }
+
+
+
+
 
   // 進捗ステップを設定から更新
   function updateProgressFromConfig(config) {
@@ -1892,9 +1782,8 @@
       .withSuccessHandler(function (result) {
         if (result.success) {
           console.log('列設定を保存しました:', { savedHeaders: headers.length, hasMapping: !!columnMapping });
-          if (typeof loadAndApplyCurrentConfig === 'function') {
-            loadAndApplyCurrentConfig();
-          }
+          // 設定を再読み込み
+          loadCurrentConfig();
         } else {
           if (result.error === 'etag_mismatch') {
             showInfo('設定が他で更新されました。画面を更新しました。もう一度保存してください。');

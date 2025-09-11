@@ -526,8 +526,9 @@
                 id="spreadsheet-url"
                 class="modern-select"
                 placeholder="https://docs.google.com/spreadsheets/d/your-spreadsheet-id/edit#gid=0"
+                oninput="validateUrlInput(this)"
               />
-              <div class="text-xs text-gray-400 mt-1">
+              <div class="text-xs text-gray-400 mt-1" id="url-validation-message">
                 💡 GoogleスプレッドシートのURLを貼り付けてください
               </div>
             </div>
