@@ -775,10 +775,12 @@ class StudyQuestApp {
   // 旧checkPublicationStatusメソッドを削除（checkForNewAnswersに統合済み）
 
   determineRecoveryStrategy(error, context) {
-    // Simplified recovery strategy
-    if (Math.random() > 0.5) {
+    // Simplified recovery strategy based on error type
+    const errorType = error.message || error.toString();
+    
+    if (errorType.includes('network') || errorType.includes('timeout')) {
       return 'retry';
-    } else {
+    } else if (errorType.includes('permission') || errorType.includes('auth')) {
       return 'clearAndReload';
     } else {
       return 'fallbackMode';
@@ -3547,10 +3549,6 @@ class StudyQuestApp {
         
         // 理由列デバッグ: 取得されたデータの詳細を確認
         // Debug data removed for cleaner logs
-          reasonExists: !!item.reason,
-          reasonTrimmed: item.reason?.trim(),
-          allKeys: Object.keys(item)
-        })));
         
         // サーバーからの質問文と現在表示の一致性をチェック（ログなし）
         

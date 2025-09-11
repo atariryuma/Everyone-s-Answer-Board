@@ -359,7 +359,10 @@
         /Unexpected token/i,
         /SyntaxError/i,
         /\}\s*else\s*[^{]/,  // else文の不完全な構文
-        /<script[^>]*>[^<]*else[^<]*<\/script>/i  // script内の不完全なelse
+        /<script[^>]*>[^<]*else[^<]*<\/script>/i,  // script内の不完全なelse
+        /}\s*else\s*{/,  // 正常でない else ブロック
+        /else\s*\{[^}]*$/m,  // 未閉じのelseブロック
+        /\belse\b(?!\s*{|\s*if\b)/  // 不完全なelse文
       ];
       
       for (const pattern of dangerousPatterns) {
