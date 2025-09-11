@@ -113,77 +113,15 @@
         -webkit-backdrop-filter: blur(var(--backdrop-blur));
       }
       
-      /* Header Two-Tier Layout Styles */
-      .header-grid {
-        display: grid;
-        grid-template-rows: auto 1fr;
-        gap: 1rem;
-        align-items: stretch;
-      }
-      
-      /* Top Tier: Compact Button Row */
-      .header-top {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        padding: 0.5rem 0;
-        min-height: 2.5rem;
-      }
-      
-      /* Bottom Tier: Question Display - 元のデザインのまま */
-      .header-bottom {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        padding: 1rem 0;
-      }
-      
-      /* Desktop Layout */
-      @media (min-width: 1024px) {
-        .header-top {
-          flex-wrap: nowrap;
-        }
-      }
-      
-      /* Tablet Layout */
-      @media (max-width: 1023px) and (min-width: 768px) {
-        .header-top {
-          flex-wrap: wrap;
-          justify-content: space-between;
-          gap: 0.5rem;
-        }
-        
-        .header-bottom {
-          padding: 1rem;
-        }
-        
-        /* 元のサイズを維持 */
-      }
-      
-      /* Mobile Layout */
+      /* Header Two-Row Layout Styles */
       @media (max-width: 767px) {
-        .header-top {
-          flex-wrap: wrap;
+        /* Stack buttons on mobile */
+        #main-header .flex-wrap {
           justify-content: center;
           gap: 0.5rem;
-          padding: 0.25rem 0;
         }
         
-        .header-top > div {
-          flex: 0 1 auto;
-        }
-        
-        .header-bottom {
-          padding: 0.75rem;
-        }
-        
-        /* モバイルでも元のサイズを維持 */
-        
-        /* Stack admin controls on mobile */
-        .header-top > div:last-child {
+        #main-header .flex-wrap > div:last-child {
           flex-basis: 100%;
           justify-content: center;
           margin-top: 0.5rem;
@@ -819,29 +757,12 @@
         id="main-header"
         class="glass-panel rounded-xl p-4 mb-4 shadow-lg fade-in"
       >
-        <!-- New Two-Tier Header Layout -->
-        <div class="header-grid">
-          <!-- Top Tier: Compact Button Row -->
-          <div class="header-top">
+        <!-- Two-Row Header Layout -->
+        <div class="space-y-3">
+          <!-- Top Row: Compact Button Row -->
+          <div class="flex items-center justify-between gap-2 flex-wrap">
             <!-- Left Group: Action Buttons -->
             <div class="flex items-center gap-2 flex-wrap">
-              <!-- Statistics Display -->
-              <div id="answerCount" class="text-sm text-gray-300 flex items-center gap-2 bg-gray-800/30 px-3 py-1.5 rounded-md">
-                <svg
-                  class="w-4 h-4 text-blue-400"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM7 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"
-                  ></path>
-                </svg>
-                <span id="answerCountText">0 件の回答</span>
-              </div>
             <!-- Form Answer Button -->
             <button
               type="button"
@@ -859,23 +780,6 @@
               </svg>
               フォームで回答
             </button>
-            <!-- Statistics -->
-            <div id="answerCount" class="text-sm text-gray-300 flex items-center gap-2 bg-gray-800/30 px-3 py-1.5 rounded-md">
-              <svg
-                class="w-4 h-4 text-blue-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17 20h5v-2 a 3 3 0 0 0 -5.356 -1.857 M17 20H7 m10 0v-2c0-.656-.126-1.283-.356-1.857 M7 20H2v-2 a 3 3 0 0 1 5.356 -1.857 M7 20v-2c0-.656.126-1.283.356-1.857 m0 0 a 5.002 5.002 0 0 1 9.288 0 M15 7 a 3 3 0 1 1 -6 0 3 3 0 0 1 6 0 z m6 3 a 2 2 0 1 1 -4 0 2 2 0 0 1 4 0 z M7 10 a 2 2 0 1 1 -4 0 2 2 0 0 1 4 0 z"
-                ></path>
-              </svg>
-              <span id="answerCountText">0 件の回答</span>
-            </div>
 
             <!-- Filters -->
             <div class="flex items-center gap-2">
@@ -996,8 +900,8 @@
             </div>
           </div>
 
-          <!-- Bottom Tier: Question Display -->
-          <div class="header-bottom">
+          <!-- Bottom Row: Question Display -->
+          <div class="flex flex-col items-center justify-center text-center py-2">
             <div
               id="headingLabel"  
               class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem]"
