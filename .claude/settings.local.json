@@ -82,7 +82,9 @@
       "Bash(clasp:*)",
       "Bash(npm run:*)",
       "Bash(then npm run lint)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(cp:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": [],

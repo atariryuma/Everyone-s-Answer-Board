@@ -488,7 +488,7 @@ class StudyQuestApp {
     });
     
     // 初回公開状態チェック（5秒後）
-    setTimeout(() => this.checkPublicationStatus(), 5000);
+    // 初回公開ステータスチェックはポーリングに任せる（簡素化）
   }
 
   // Reset state for clean initialization (Phase 1.2)
@@ -733,18 +733,19 @@ class StudyQuestApp {
    * シンプルなポーリング開始（3分固定間隔）
    */
   startPolling() {
+    // 既存のポーリングを停止
     this.stopPolling();
-    this.pollingInterval = setInterval(() => this.checkAll(), 180000); // 3分間隔
+    
+    // 高度なポーリング機能を使用
+    this.startNewAnswerPolling();
   }
 
   /**
    * ポーリング停止
    */
   stopPolling() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
-    }
+    // 統合されたポーリング停止処理
+    this.stopNewAnswerPolling();
   }
 
   /**
@@ -752,10 +753,10 @@ class StudyQuestApp {
    */
   async checkAll() {
     try {
-      // 公開状態チェック
-      await this.checkPublicationStatus();
+      // 統合チェック（公開ステータス＋新着）
+      const hasNewContent = await this.checkForNewAnswers();
       
-      // 新着チェック（getDataCountのみ使用）
+      // 新着チェック（互換性のため維持）
       const count = await this.gas.getDataCount();
       const currentCount = this.state.currentAnswers?.length || 0;
       if (count && count.count > currentCount) {
@@ -771,66 +772,7 @@ class StudyQuestApp {
    * パブリケーション状態の実際のチェック処理
    * 非公開状態が検出された場合、Unpublished.htmlにリダイレクト
    */
-  async checkPublicationStatus() {
-    try {
-      // サーバーサイドでのリアルタイム状態確認
-      const result = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Publication status check timeout'));
-        }, 10000); // 5秒→10秒に延長（サーバー処理時間を考慮）
-        
-        google.script.run
-          .withSuccessHandler((response) => {
-            clearTimeout(timeout);
-            resolve(response);
-          })
-          .withFailureHandler((error) => {
-            clearTimeout(timeout);
-            reject(error);
-          })
-          .checkCurrentPublicationStatus(this.state.userId);
-      });
-      
-      // 非公開状態が検出された場合の処理
-      if (result && result.isPublished === false) {
-        console.log('⚠️ ボードが非公開状態に変更されました - Unpublished.htmlにリダイレクト');
-        
-        // キャッシュをクリア
-        if (this.cache && typeof this.cache.clear === 'function') {
-          this.cache.clear();
-        }
-        if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-          window.unifiedCache.clear();
-        }
-        
-        // ローカルストレージのキャッシュもクリア
-        try {
-          Object.keys(localStorage).forEach(key => {
-            if (key.includes('studyquest') || key.includes('board') || key.includes('sheet')) {
-              localStorage.removeItem(key);
-            }
-          });
-        } catch (e) {
-          console.warn('localStorage clear warning:', e);
-        }
-        
-        // 非公開ページにリダイレクト（キャッシュバスティング付き）
-        const unpublishedUrl = new URL(window.location.href);
-        unpublishedUrl.searchParams.delete('mode'); // mode=viewを削除
-        unpublishedUrl.searchParams.set('_cb', Date.now()); // キャッシュバスティング
-        
-        window.location.href = unpublishedUrl.toString();
-        return;
-      }
-      
-      // 公開状態の場合は正常継続
-      console.log('✅ ボードは正常に公開中です');
-      
-    } catch (error) {
-      console.warn('⚠️ パブリケーション状態チェックでエラー:', error.message);
-      // エラーの場合は継続（ネットワーク問題などを考慮）
-    }
-  }
+  // 旧checkPublicationStatusメソッドを削除（checkForNewAnswersに統合済み）
 
   determineRecoveryStrategy(error, context) {
     // Simplified recovery strategy
@@ -1430,7 +1372,7 @@ class StudyQuestApp {
       }
       
       // 新着通知チェック時に公開状態も確認
-      await this.checkPublicationStatus();
+      // 統合チェック（公開ステータス＋新着）はポーリングで実行済み
       
       // パラメータの準備
       const { selectedClass, sortOrder } = this.prepareContentCheckParams();
@@ -1826,14 +1768,28 @@ class StudyQuestApp {
     });
   }
 
-  // 新着回答のポーリング開始 (最適化版)
+  // ポーリング開始（安全版）
   startNewAnswerPolling() {
+    // 既存のポーリングを停止
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
     }
 
-    this.pollingInterval = setInterval(async () => {
-      if (!this.pollingSettings.enabled) return;
+    // ポーリングが無効な場合は終了
+    if (!this.pollingSettings.enabled) {
+      console.log('⏹️ ポーリングが無効のため開始しません');
+      return;
+    }
+
+    // ポーリング実行関数
+    const executePolling = async () => {
+      // ポーリングが無効になっている場合は終了
+      if (!this.pollingSettings.enabled) {
+        console.log('⏹️ ポーリングが無効化されたため停止');
+        this.stopNewAnswerPolling();
+        return;
+      }
 
       try {
         const hasNewContent = await this.checkForNewAnswers();
@@ -1841,12 +1797,15 @@ class StudyQuestApp {
         this.pollingSettings.successCount++;
         
         // 動的間隔調整
+        const previousInterval = this.pollingSettings.currentInterval;
         this.adjustPollingInterval(hasNewContent);
         
-        // 間隔が変更された場合はポーリングを再開
-        if (this.pollingSettings.currentInterval !== this.pollingSettings.interval) {
-          this.pollingSettings.interval = this.pollingSettings.currentInterval;
-          this.startNewAnswerPolling(); // 新しい間隔で再開
+        // 間隔が大幅に変更された場合のみポーリングを再起動
+        const intervalDiff = Math.abs(this.pollingSettings.currentInterval - previousInterval);
+        if (intervalDiff > 10000) { // 10秒以上の変更のみ再起動
+          console.log(`⏱️ ポーリング間隔の大幅変更を検出 (${previousInterval/1000}s → ${this.pollingSettings.currentInterval/1000}s)、再起動します`);
+          // 次回のスケジュールで再起動
+          setTimeout(() => this.startNewAnswerPolling(), 1000);
           return;
         }
         
@@ -1854,65 +1813,100 @@ class StudyQuestApp {
         this.pollingSettings.currentRetries++;
         console.warn(`🚨 ポーリングエラー (${this.pollingSettings.currentRetries}/${this.pollingSettings.maxRetries}):`, error);
         
-        // 🚀 429エラー特別処理
+        // 429エラー特別処理
         if (error.message?.includes('429') || error.status === 429) {
           this.pollingSettings.last429Error = Date.now();
-          const cooldownTime = this.pollingSettings.cooldownPeriod;
+          const cooldownTime = this.pollingSettings.cooldownPeriod || 300000; // デフォルト５分
           console.warn(`🚨 429エラー検出 - ${cooldownTime/1000}秒間のクールダウン開始`);
           
-          // クールダウン期間中はポーリング間隔を大幅延長
-          this.pollingSettings.currentInterval = Math.max(
-            this.pollingSettings.currentInterval * this.pollingSettings.backoffMultiplier,
+          // クールダウン期間中はポーリング間隔を大幅延長、修正：Math.minを使用
+          this.pollingSettings.currentInterval = Math.min(
+            this.pollingSettings.currentInterval * (this.pollingSettings.backoffMultiplier || 2),
             this.pollingSettings.maxInterval
           );
+          
+          // 即座にポーリングを再起動（新しい間隔で）
+          setTimeout(() => this.startNewAnswerPolling(), 2000);
+          return;
         }
         
-        // 指数バックオフでリトライ間隔を調整
+        // 通常エラーの指数バックオフ
         const backoffDelay = Math.min(
-          this.pollingSettings.baseInterval * Math.pow(this.pollingSettings.backoffMultiplier, this.pollingSettings.currentRetries - 1),
-          this.pollingSettings.maxInterval
+          (this.pollingSettings.baseInterval || 60000) * Math.pow(this.pollingSettings.backoffMultiplier || 2, this.pollingSettings.currentRetries - 1),
+          this.pollingSettings.maxInterval || 600000
         );
         
-        if (this.pollingSettings.currentRetries >= this.pollingSettings.maxRetries) {
+        if (this.pollingSettings.currentRetries >= (this.pollingSettings.maxRetries || 3)) {
           console.error('🛑 ポーリング最大リトライ数に達したため停止');
           this.stopNewAnswerPolling();
           
           // 5分後に自動復旧を試行
           setTimeout(() => {
-            console.log('🔄 ポーリング自動復旧を試行');
-            this.pollingSettings.currentRetries = 0;
-            this.pollingSettings.currentInterval = this.pollingSettings.baseInterval;
-            this.startNewAnswerPolling();
+            if (this.pollingSettings.enabled) { // 復旧時にまだ有効な場合のみ
+              console.log('🔄 ポーリング自動復旧を試行');
+              this.pollingSettings.currentRetries = 0;
+              this.pollingSettings.currentInterval = this.pollingSettings.baseInterval || 60000;
+              this.startNewAnswerPolling();
+            }
           }, 300000);
+          return;
         } else {
-          // バックオフ間隔で次のチェックまで待機
-          console.log(`⏰ 次回ポーリングまで ${backoffDelay/1000}秒待機`);
+          // バックオフ遅延で次のチェックをスケジュール
+          console.log(`⏰ エラー後のバックオフ: ${backoffDelay/1000}秒待機`);
           this.pollingSettings.currentInterval = backoffDelay;
+          setTimeout(() => this.startNewAnswerPolling(), backoffDelay);
+          return;
         }
       }
-    }, this.pollingSettings.currentInterval);
+    };
 
-    console.log('🔄 新着回答ポーリング開始 (最適化版):', {
-      currentInterval: this.pollingSettings.currentInterval,
-      activityScore: this.pollingSettings.activityScore,
+    // 初回実行をスケジュール
+    const currentInterval = this.pollingSettings.currentInterval || 60000;
+    this.pollingInterval = setInterval(executePolling, currentInterval);
+
+    console.log('🔄 ポーリング開始（安全版）:', {
+      currentInterval: currentInterval / 1000 + '秒',
+      activityScore: this.pollingSettings.activityScore || 0,
       enabled: this.pollingSettings.enabled
     });
   }
 
-  // 新着回答のポーリング停止
+  // シンプルポーリング停止
   stopNewAnswerPolling() {
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
-      console.log('⏹️ 新着回答ポーリング停止');
+      console.log('⏹️ ポーリング停止');
+    }
+  }
+  
+  // ポーリングエラー通知
+  showPollingError() {
+    // ユーザーにエラーを通知し、手動更新を促す
+    if (this.elements.refreshContentBtn) {
+      this.elements.refreshContentBtn.textContent = 'エラー発生 - クリックして更新';
+      this.elements.refreshContentBtn.style.backgroundColor = '#ff6b6b';
+      this.elements.refreshContentBtn.style.color = 'white';
     }
   }
 
-  // 新着回答の確認
+  // 新着回答の確認＋公開ステータスチェック（統合版）
   async checkForNewAnswers() {
-    if (this.state.isLoading) return; // 既にロード中の場合は跳ばす
+    if (this.state.isLoading) return false; // 既にロード中の場合は跳ばす
 
     try {
+      // 1. 公開ステータスを先にチェック（軽量）
+      const publicationStatus = await this.gas.checkCurrentPublicationStatus(this.state.userId);
+      
+      if (publicationStatus && publicationStatus.isPublished === false) {
+        console.log('⚠️ ボードが非公開状態に変更されました');
+        
+        // 非公開状態の場合はリダイレクト
+        this.handleUnpublishedState();
+        return false;
+      }
+      
+      // 2. 公開状態の場合のみ新着チェックを実行
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
       const classFilter = !selectedClass || selectedClass === 'すべて'
         ? null
@@ -1943,12 +1937,39 @@ class StudyQuestApp {
         this.state.hasNewContent = true;
         this.state.newContentCount = incrementalData.newCount;
         this.showNewContentBanner(incrementalData.newCount);
+        return true; // 新着コンテンツありを返す
       }
+      
+      return false; // 新着コンテンツなしを返す
       
     } catch (error) {
       console.error('新着確認エラー:', error);
       throw error;
     }
+  }
+  
+  // 非公開状態処理（シンプル版）
+  handleUnpublishedState() {
+    // ポーリング停止
+    this.stopNewAnswerPolling();
+    
+    // キャッシュクリア
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.includes('studyquest') || key.includes('board') || key.includes('sheet')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {
+      console.warn('localStorage clear warning:', e);
+    }
+    
+    // 非公開ページにリダイレクト
+    const unpublishedUrl = new URL(window.location.href);
+    unpublishedUrl.searchParams.delete('mode');
+    unpublishedUrl.searchParams.set('_cb', Date.now());
+    
+    window.location.href = unpublishedUrl.toString();
   }
   
   // 重複定義のため削除 - 1498行目の定義を使用
