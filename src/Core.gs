@@ -4480,12 +4480,18 @@ function publishApplication(config) {
     });
 
     if (publishResult.success) {
-      // 最新のフォーム情報をスプレッドシートから取得（常に再検出）
+      // 最新のフォーム情報を対象シートから取得（常に再検出・シート優先）
       let detectedFormUrl = null;
       let detectedFormTitle = null;
       try {
         const spreadsheet = new ConfigurationManager().getSpreadsheet(effectiveSpreadsheetId);
-        detectedFormUrl = spreadsheet.getFormUrl();
+        const sheet = spreadsheet.getSheetByName(effectiveSheetName);
+        if (sheet && typeof sheet.getFormUrl === 'function') {
+          detectedFormUrl = sheet.getFormUrl();
+        } else {
+          // フォールバック（スプレッドシートに紐付くフォーム）
+          detectedFormUrl = spreadsheet.getFormUrl();
+        }
         if (detectedFormUrl) {
           try {
             const form = FormApp.openByUrl(detectedFormUrl);
@@ -4554,7 +4560,7 @@ function publishApplication(config) {
         // ヘッダー配列とハッシュ（あれば保持、なければ今回の検出）
         ...(headers && { headers }),
         ...(headersHash && { headersHash }),
-        ...(currentConfig.headerIndices && { headerIndices: currentConfig.headerIndices }),
+        // headerIndices は廃止（headers[] + columnMapping に統一）
         ...(currentConfig.reactionMapping && { reactionMapping: currentConfig.reactionMapping }),
         ...(currentConfig.systemMetadata && { systemMetadata: currentConfig.systemMetadata }),
         
@@ -4771,7 +4777,7 @@ function saveDraftConfiguration(config) {
         ...(currentConfig.nameHeader && { nameHeader: currentConfig.nameHeader }),
         ...(currentConfig.formUrl && { formUrl: currentConfig.formUrl }),
         ...(currentConfig.formTitle && { formTitle: currentConfig.formTitle }),
-        ...(currentConfig.headerIndices && { headerIndices: currentConfig.headerIndices }),
+        // headerIndices は廃止（headers[] + columnMapping に統一）
         ...(currentConfig.headers && { headers: currentConfig.headers }),
         ...(currentConfig.headersHash && { headersHash: currentConfig.headersHash }),
         ...(currentConfig.reactionMapping && { reactionMapping: currentConfig.reactionMapping }),
