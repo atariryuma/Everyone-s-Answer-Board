@@ -810,7 +810,7 @@
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M17 20h5v-2a3 3 0 0 0 -5.356 -1.857 M17 20H7m10 0v-2c0-.656-.126-1.283 -.356 -1.857 M7 20H2v-2a3 3 0 0 1 5.356 -1.857 M7 20v-2c0-.656.126-1.283 .356 -1.857 m0 0a5.002 5.002 0 0 1 9.288 0 M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0 z m6 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0 z M7 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0 z"
+                  d="M17 20h5v-2 a 3 3 0 0 0 -5.356 -1.857 M17 20H7 m10 0v-2c0-.656-.126-1.283-.356-1.857 M7 20H2v-2 a 3 3 0 0 1 5.356 -1.857 M7 20v-2c0-.656.126-1.283.356-1.857 m0 0 a 5.002 5.002 0 0 1 9.288 0 M15 7 a 3 3 0 1 1 -6 0 3 3 0 0 1 6 0 z m6 3 a 2 2 0 1 1 -4 0 2 2 0 0 1 4 0 z M7 10 a 2 2 0 1 1 -4 0 2 2 0 0 1 4 0 z"
                 ></path>
               </svg>
               <span id="answerCountText">0 件の回答</span>
@@ -1107,9 +1107,9 @@
       const __OPINION_HEADER__ =
         '<?= typeof __OPINION_HEADER__ !== "undefined" && __OPINION_HEADER__ ? __OPINION_HEADER__ : "お題" ?>';
 
-      // シンプルな所有者フラグ設定
-      window.isOwner = <?= isOwner ? 'true' : 'false' ?>;
-      console.log('✅ 所有者フラグ設定:', window.isOwner);
+      // シンプルな所有者フラグ設定 - boolean型で設定
+      window.isOwner = <?= isOwner ? true : false ?>;
+      console.log('✅ 所有者フラグ設定:', window.isOwner, typeof window.isOwner);
 
       // DISPLAY_MODES定数をフロントエンドで利用可能にする
       window.DISPLAY_MODES = Object.freeze({
