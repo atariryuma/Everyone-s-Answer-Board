@@ -43,7 +43,10 @@ const ICONS = Object.freeze({
   'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
   'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
   'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
-  'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+  'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  'trash': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c0-1-1-2-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c0 1 1 2 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>',
+  'loading': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 11-6.219-8.56"/></svg>',
+  'alert-triangle': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>'
 });
 
 class UnifiedCache {
@@ -501,6 +504,7 @@ class StudyQuestApp {
       addReactionBatch: (batchOperations) => this.runGas('addReactionBatch', this.state.userId, batchOperations), // 新しいバッチAPI
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction, sheetName),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex, sheetName),
+      deleteAnswer: (rowIndex, sheetName) => this.runGas('deleteAnswer', this.state.userId, rowIndex, sheetName),
       checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
       clearCache: () => this.runGas('refreshBoardData', this.state.userId),
       validateData: () => this.validateBoardDataIntegrity(),
@@ -1247,6 +1251,16 @@ class StudyQuestApp {
             e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
             if (!highlightBtn.disabled) {
                 this.handleHighlight(rowIndex);
+            }
+            return;
+        }
+
+        // 削除ボタンのクリックを処理（管理者のみ）
+        const deleteBtn = e.target.closest('.delete-answer-btn');
+        if (deleteBtn) {
+            e.stopPropagation(); // イベントの伝播を停止
+            if (!deleteBtn.disabled) {
+                this.handleDeleteAnswer(rowIndex);
             }
             return;
         }
@@ -4619,6 +4633,19 @@ class StudyQuestApp {
         const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする';
         highlightBtnHtml = `<button type="button" class="highlight-btn like-btn text-purple-600 ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${safeData.highlight}" data-row-index="${safeData.rowIndex}">${this.getIcon('star', 'w-5 h-5', safeData.highlight)}</button>`;
       }
+      
+      // 🗑️ 削除ボタン（管理者モード時のみ）
+      let deleteBtnHtml = '';
+      if (this.state.showAdminFeatures) {
+        deleteBtnHtml = `
+          <button type="button" 
+            class="delete-answer-btn text-red-500 hover:text-red-400 transition-colors ml-2"
+            aria-label="この回答を削除"
+            data-row-index="${safeData.rowIndex}"
+            title="削除">
+            ${this.getIcon('trash', 'w-5 h-5')}
+          </button>`;
+      }
       const showName = this.state.displayMode === 'named';
       let displayName = '';
       
@@ -4723,7 +4750,7 @@ class StudyQuestApp {
         reactionsDiv.className = 'flex items-center gap-1 flex-shrink-0';
         reactionsDiv.setAttribute('role', 'group');
         reactionsDiv.setAttribute('aria-label', '回答への反応');
-        reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+        reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml + deleteBtnHtml;
         
         footerDiv.appendChild(reactionsDiv);
       } catch (reactionError) {
@@ -5787,6 +5814,185 @@ class StudyQuestApp {
     } catch (error) {
       console.error('ハイライト状態同期確認エラー:', error);
     }
+  }
+
+  // 削除確認ダイアログ付き削除処理（管理者のみ）
+  async handleDeleteAnswer(rowIndex) {
+    const numericRowIndex = parseInt(rowIndex, 10);
+    const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
+    
+    if (!item) {
+      console.warn('削除対象の回答が見つかりません');
+      return;
+    }
+    
+    // 削除確認ダイアログを表示
+    const confirmed = await this.showDeleteConfirmationDialog(item);
+    if (!confirmed) {
+      return; // ユーザーがキャンセルした場合
+    }
+    
+    const deleteKey = `${numericRowIndex}-delete`;
+    
+    // 重複処理防止
+    if (this.pendingReactions && this.pendingReactions.has(deleteKey)) {
+      return;
+    }
+    
+    if (!this.pendingReactions) this.pendingReactions = new Set();
+    this.pendingReactions.add(deleteKey);
+    
+    // 削除ボタンを無効化
+    const deleteBtn = document.querySelector(`.delete-answer-btn[data-row-index="${numericRowIndex}"]`);
+    if (deleteBtn) {
+      deleteBtn.disabled = true;
+      deleteBtn.classList.add('loading');
+      deleteBtn.innerHTML = this.getIcon('loading', 'w-5 h-5');
+    }
+    
+    try {
+      // バックエンドの削除処理を呼び出し
+      const res = await this.gas.deleteAnswer(numericRowIndex, this.state.sheetName);
+      
+      if (res && res.status === 'ok') {
+        // 成功時：UIから該当の回答を削除
+        this.state.currentAnswers = this.state.currentAnswers.filter(answer => answer.rowIndex !== numericRowIndex);
+        
+        // DOMからカードを削除（フェードアウト効果付き）
+        const answerCard = document.querySelector(`.answer-card[data-row-index="${numericRowIndex}"]`);
+        if (answerCard) {
+          answerCard.style.transition = 'opacity 0.3s ease-out, transform 0.3s ease-out';
+          answerCard.style.opacity = '0';
+          answerCard.style.transform = 'scale(0.95)';
+          
+          setTimeout(() => {
+            answerCard.remove();
+            // 回答数を更新
+            if (this.elements.answerCount) {
+              const count = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
+              const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
+              this.elements.answerCount.innerHTML = `${userIcon}<span>${count}件</span>`;
+            }
+          }, 300);
+        }
+        
+        // モーダルが開いていて該当の回答を表示している場合は閉じる
+        if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+          const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
+          if (modalRowIndex == rowIndex) {
+            this.hideAnswerModal();
+          }
+        }
+        
+        console.log(`✅ 回答が削除されました (rowIndex: ${numericRowIndex})`);
+        
+      } else {
+        throw new Error(res?.message || '削除処理に失敗しました');
+      }
+      
+    } catch (error) {
+      console.error('回答削除エラー:', error);
+      
+      // エラーメッセージを表示
+      let errorMsg = '削除に失敗しました';
+      if (error.message && error.message.includes('管理者のみ')) {
+        errorMsg = '権限エラー: 管理者のみ削除可能です';
+      } else if (error.message) {
+        errorMsg = error.message;
+      }
+      
+      this.showErrorMessage(errorMsg, true);
+      
+    } finally {
+      // 削除ボタンの状態を復元
+      if (deleteBtn) {
+        deleteBtn.disabled = false;
+        deleteBtn.classList.remove('loading');
+        deleteBtn.innerHTML = this.getIcon('trash', 'w-5 h-5');
+      }
+      
+      this.pendingReactions.delete(deleteKey);
+    }
+  }
+  
+  // 削除確認ダイアログ
+  async showDeleteConfirmationDialog(item) {
+    return new Promise((resolve) => {
+      // ダイアログのHTML作成
+      const dialogHtml = `
+        <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="delete-confirmation-dialog">
+          <div class="bg-gray-800 rounded-lg p-6 max-w-md mx-4 border border-gray-600">
+            <div class="flex items-center mb-4">
+              <div class="text-red-500 mr-3">
+                ${this.getIcon('alert-triangle', 'w-6 h-6')}
+              </div>
+              <h3 class="text-lg font-semibold text-white">回答の削除確認</h3>
+            </div>
+            
+            <div class="mb-4 p-3 bg-gray-700 rounded border-l-4 border-red-500">
+              <p class="text-gray-300 text-sm mb-2"><strong>削除対象:</strong></p>
+              <p class="text-white text-sm line-clamp-3">${this.escapeHtml(item.answer || '').slice(0, 100)}${item.answer && item.answer.length > 100 ? '...' : ''}</p>
+            </div>
+            
+            <p class="text-gray-300 text-sm mb-6">
+              この回答を削除しますか？<br>
+              <span class="text-red-400 font-semibold">※この操作は取り消せません</span>
+            </p>
+            
+            <div class="flex gap-3 justify-end">
+              <button type="button" id="delete-cancel-btn" class="px-4 py-2 bg-gray-600 hover:bg-gray-500 text-white rounded transition-colors">
+                キャンセル
+              </button>
+              <button type="button" id="delete-confirm-btn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded transition-colors font-semibold">
+                削除する
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      
+      // ダイアログをDOMに追加
+      const dialogDiv = document.createElement('div');
+      dialogDiv.innerHTML = dialogHtml;
+      document.body.appendChild(dialogDiv);
+      
+      const dialog = document.getElementById('delete-confirmation-dialog');
+      const cancelBtn = document.getElementById('delete-cancel-btn');
+      const confirmBtn = document.getElementById('delete-confirm-btn');
+      
+      // イベントリスナー設定
+      const cleanup = () => {
+        dialog.remove();
+      };
+      
+      cancelBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(false);
+      });
+      
+      confirmBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(true);
+      });
+      
+      // 背景クリックで閉じる
+      dialog.addEventListener('click', (e) => {
+        if (e.target === dialog) {
+          cleanup();
+          resolve(false);
+        }
+      });
+      
+      // ESCキーで閉じる
+      const handleEscape = (e) => {
+        if (e.key === 'Escape') {
+          document.removeEventListener('keydown', handleEscape);
+          cleanup();
+          resolve(false);
+        }
+      };
+      document.addEventListener('keydown', handleEscape);
+    });
   }
 
   // 包括的同期状態監視システム

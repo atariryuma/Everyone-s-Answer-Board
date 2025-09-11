@@ -1594,6 +1594,97 @@ function executeToggleHighlight(requestUserId, rowIndex, sheetName) {
 }
 
 /**
+ * 🗑️ 回答を削除する（管理者専用）
+ * @param {string} requestUserId - リクエスト元のユーザーID
+ * @param {number} rowIndex - 削除する行番号（1から始まる）
+ * @param {string} sheetName - シート名
+ * @returns {Object} 削除結果
+ */
+function deleteAnswer(requestUserId, rowIndex, sheetName) {
+  try {
+    // パラメータ検証
+    if (!requestUserId || !rowIndex || rowIndex < 2) {
+      throw new Error('無効なパラメータです');
+    }
+
+    // アクセス権限確認（管理者権限が必要）
+    const accessResult = App.getAccess().verifyAccess(
+      requestUserId,
+      'admin',
+      UserManager.getCurrentEmail()
+    );
+    if (!accessResult.allowed) {
+      throw new Error('削除権限がありません。管理者のみ削除可能です。');
+    }
+
+    // ユーザー情報取得
+    const userInfo = DB.findUserById(requestUserId);
+    if (!userInfo) {
+      throw new Error('ユーザー情報が見つかりません');
+    }
+
+    // 設定取得
+    const config = JSON.parse(userInfo.configJson || '{}');
+    if (!config.spreadsheetId) {
+      throw new Error('スプレッドシートが設定されていません');
+    }
+
+    // スプレッドシートとシートを取得
+    const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName || config.sheetName || 'フォームの回答 1');
+    
+    if (!sheet) {
+      throw new Error('シートが見つかりません');
+    }
+
+    // 行数の範囲チェック
+    const lastRow = sheet.getLastRow();
+    if (rowIndex > lastRow) {
+      throw new Error('指定された行が存在しません');
+    }
+
+    // 削除前のデータを取得（ログ用）
+    const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
+    
+    // ログ記録
+    console.log('回答削除実行:', {
+      userId: requestUserId.substring(0, 8) + '...',
+      rowIndex: rowIndex,
+      sheetName: sheet.getName(),
+      deletedBy: UserManager.getCurrentEmail(),
+      timestamp: new Date().toISOString()
+    });
+
+    // 行を削除
+    sheet.deleteRow(rowIndex);
+
+    // キャッシュクリア
+    const cacheKey = `sheet_data_${config.spreadsheetId}_${sheet.getName()}`;
+    CacheService.getScriptCache().remove(cacheKey);
+
+    return {
+      status: 'success',
+      message: '回答を削除しました',
+      deletedRowIndex: rowIndex,
+      remainingRows: sheet.getLastRow() - 1
+    };
+
+  } catch (error) {
+    console.error('deleteAnswer エラー:', {
+      requestUserId: requestUserId,
+      rowIndex: rowIndex,
+      error: error.message,
+      stack: error.stack
+    });
+    
+    return {
+      status: 'error',
+      message: error.message || '削除に失敗しました'
+    };
+  }
+}
+
+/**
  * 利用可能なシート一覧を取得
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  */
