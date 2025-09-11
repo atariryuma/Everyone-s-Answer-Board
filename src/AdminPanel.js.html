@@ -107,14 +107,14 @@
       step = 'loading user info';
       await loadUserInfoAsync();
 
-      // ⚡ 最適化：スプレッドシート一覧の自動読み込みを停止
-      // ドロップダウンの初期化
-      step = 'initializing dropdowns';
-      await initializeDropdowns();
-
-      // 設定データを読み込んで完全に自動反映
+      // 設定データを読み込んで完全に自動反映（先に実施して重複getConfigを抑止）
       step = 'loading and applying config';
       await loadAndApplyCurrentConfig();
+
+      // ⚡ 最適化：スプレッドシート一覧の自動読み込みを停止
+      // ドロップダウンの初期化（既存configを優先使用）
+      step = 'initializing dropdowns';
+      await initializeDropdowns();
 
       showSuccess('✅ 管理パネルの初期化が完了しました（最適化済み）');
     } catch (error) {
@@ -135,8 +135,8 @@
       // スプレッドシート一覧の読み込みはラジオボタン選択時まで遅延
       spreadsheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
 
-      // 現在の設定から既存データを取得・反映
-      const config = await getConfigAsync();
+      // 現在の設定から既存データを取得・反映（systemState優先でgetConfigの重複を抑止）
+      const config = (systemState && systemState.config) ? systemState.config : await getConfigAsync();
       if (config && config.spreadsheetId) {
         // 既存の設定がある場合は、その項目だけを追加
         const option = document.createElement('option');

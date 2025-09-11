@@ -421,7 +421,6 @@ const ConfigManager = Object.freeze({
 
       // 列マッピング情報（継承）
       ...(baseConfig.columnMapping && { columnMapping: baseConfig.columnMapping }),
-      ...(baseConfig.opinionHeader && { opinionHeader: baseConfig.opinionHeader }),
 
       // ドラフト状態
       isDraft: !baseConfig.appPublished,

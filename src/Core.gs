@@ -4548,12 +4548,8 @@ function publishApplication(config) {
         isDraft: false,
         appUrl: publishResult.appUrl,
         
-        // データ接続で設定されたフィールドを保持
+        // データ接続で設定されたフィールドを保持（レガシー見出しは廃止）
         ...(currentConfig.columnMapping && { columnMapping: currentConfig.columnMapping }),
-        ...(currentConfig.opinionHeader && { opinionHeader: currentConfig.opinionHeader }),
-        ...(currentConfig.reasonHeader && { reasonHeader: currentConfig.reasonHeader }),
-        ...(currentConfig.classHeader && { classHeader: currentConfig.classHeader }),
-        ...(currentConfig.nameHeader && { nameHeader: currentConfig.nameHeader }),
         // フォーム情報は最新検出結果を優先
         ...(detectedFormUrl !== null && { formUrl: detectedFormUrl || null }),
         ...(detectedFormTitle !== null && { formTitle: detectedFormTitle || null }),
@@ -4683,6 +4679,39 @@ function saveDraftConfiguration(config) {
       (config.spreadsheetId !== currentConfig.spreadsheetId || config.sheetName !== currentConfig.sheetName);
     
     let updatedConfig;
+
+    // ===== No-Op 制御: 変更がない場合は保存をスキップ（429抑制） =====
+    try {
+      if (!isDataSourceChanged) {
+        const incomingHeadersHash = (config.headers && Array.isArray(config.headers))
+          ? computeHeadersHash(config.headers)
+          : null;
+        const sameHeaders = incomingHeadersHash && currentConfig.headersHash && incomingHeadersHash === currentConfig.headersHash;
+        const sameMapping = (function () {
+          try {
+            if (!config.columnMapping) return false; // マッピング未指定時はチェックしない
+            const a = JSON.stringify(config.columnMapping);
+            const b = JSON.stringify(currentConfig.columnMapping || {});
+            return a === b;
+          } catch (_) { return false; }
+        })();
+        const sameDisplay = (function () {
+          const cur = currentConfig.displaySettings || {};
+          const nxt = {
+            showNames: config.showNames !== undefined ? config.showNames : cur.showNames,
+            showReactions: config.showReactions !== undefined ? config.showReactions : cur.showReactions,
+          };
+          return cur.showNames === nxt.showNames && cur.showReactions === nxt.showReactions;
+        })();
+
+        if ((sameHeaders || !config.headers) && (sameMapping || !config.columnMapping) && sameDisplay) {
+          console.log('🛑 saveDraftConfiguration: 変更なしのため保存スキップ（no-op）');
+          return { success: true, message: 'no_op', noOp: true };
+        }
+      }
+    } catch (noopErr) {
+      console.warn('saveDraftConfiguration: no-op判定エラー', noopErr.message);
+    }
     
     if (isDataSourceChanged) {
       // データソースが変更された場合は、古いマッピング情報をクリア
@@ -4771,10 +4800,7 @@ function saveDraftConfiguration(config) {
         
         // 既存のマッピング情報を保持
         ...(currentConfig.columnMapping && { columnMapping: currentConfig.columnMapping }),
-        ...(currentConfig.opinionHeader && { opinionHeader: currentConfig.opinionHeader }),
-        ...(currentConfig.reasonHeader && { reasonHeader: currentConfig.reasonHeader }),
-        ...(currentConfig.classHeader && { classHeader: currentConfig.classHeader }),
-        ...(currentConfig.nameHeader && { nameHeader: currentConfig.nameHeader }),
+        // レガシー見出しフィールドは廃止（headers[] + columnMappingに統一）
         ...(currentConfig.formUrl && { formUrl: currentConfig.formUrl }),
         ...(currentConfig.formTitle && { formTitle: currentConfig.formTitle }),
         // headerIndices は廃止（headers[] + columnMapping に統一）
@@ -6077,15 +6103,10 @@ function repairColumnMapping() {
       newMapping: newColumnMapping
     });
     
-    // 設定を更新
+    // 設定を更新（レガシーヘッダー保存は廃止）
     const updatedConfig = {
       ...currentConfig,
       columnMapping: newColumnMapping,
-      // レガシーヘッダー情報も更新
-      reasonHeader: getActualHeaderName(headerRow, newColumnMapping.mapping?.reason) || '理由',
-      opinionHeader: getActualHeaderName(headerRow, newColumnMapping.mapping?.answer) || 'お題',
-      classHeader: getActualHeaderName(headerRow, newColumnMapping.mapping?.class) || 'クラス',
-      nameHeader: getActualHeaderName(headerRow, newColumnMapping.mapping?.name) || '名前',
       lastModified: new Date().toISOString()
     };
     
@@ -6099,12 +6120,7 @@ function repairColumnMapping() {
       message: 'columnMappingを修復しました',
       oldMapping: currentConfig.columnMapping,
       newMapping: newColumnMapping,
-      updatedHeaders: {
-        reasonHeader: updatedConfig.reasonHeader,
-        opinionHeader: updatedConfig.opinionHeader,
-        classHeader: updatedConfig.classHeader,
-        nameHeader: updatedConfig.nameHeader
-      }
+      updatedHeaders: null
     };
     
   } catch (error) {
