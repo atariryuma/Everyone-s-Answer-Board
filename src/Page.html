@@ -1108,8 +1108,20 @@
         '<?= typeof __OPINION_HEADER__ !== "undefined" && __OPINION_HEADER__ ? __OPINION_HEADER__ : "お題" ?>';
 
       // 管理者権限変数をグローバル設定（サーバー側から渡される値を使用）
+      console.log('🔍 テンプレート変数デバッグ:', {
+        hasAdminCapability_raw: typeof hasAdminCapability !== "undefined" ? hasAdminCapability : 'undefined',
+        isAdminUser_raw: typeof isAdminUser !== "undefined" ? isAdminUser : 'undefined',
+        hasAdminCapability_type: typeof hasAdminCapability,
+        isAdminUser_type: typeof isAdminUser
+      });
+      
       window.hasAdminCapability = (typeof hasAdminCapability !== "undefined" && hasAdminCapability === true) ? true : false;
       window.isAdminUser = (typeof isAdminUser !== "undefined" && isAdminUser === true) ? true : false;
+      
+      console.log('✅ 管理者権限変数設定完了:', {
+        'window.hasAdminCapability': window.hasAdminCapability,
+        'window.isAdminUser': window.isAdminUser
+      });
 
       // DISPLAY_MODES定数をフロントエンドで利用可能にする
       window.DISPLAY_MODES = Object.freeze({
