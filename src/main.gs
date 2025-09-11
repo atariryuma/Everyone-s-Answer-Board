@@ -1374,11 +1374,16 @@ function renderAnswerBoard(userInfo, params) {
       template.hasAdminCapability = isAdminUser;
       template.isAdminUser = isAdminUser;
       
-      console.log('renderAnswerBoard - 管理者権限チェック:', {
+      console.log('🔍 renderAnswerBoard - 管理者権限チェック:', {
         currentUserEmail: currentUserEmail ? `${currentUserEmail.substring(0, 10)}...` : 'null',
         boardOwnerEmail: boardOwnerEmail ? `${boardOwnerEmail.substring(0, 10)}...` : 'null',
+        emailMatch: currentUserEmail === boardOwnerEmail,
         isAdminUser: isAdminUser,
-        hasAdminCapability: isAdminUser
+        hasAdminCapability: isAdminUser,
+        templateVars: {
+          hasAdminCapability: template.hasAdminCapability,
+          isAdminUser: template.isAdminUser
+        }
       });
     } catch (adminError) {
       console.error('renderAnswerBoard - 管理者権限チェックエラー:', adminError);

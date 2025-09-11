@@ -945,17 +945,27 @@ class StudyQuestApp {
         this.updateSortOptions();
         this.setupObservers();
         // Initial admin state setup - 管理者権限があっても最初は閲覧モードで起動
+        console.log('🔍 管理者権限チェック:', {
+          hasAdminCapability: window.hasAdminCapability,
+          isAdminUser: window.isAdminUser,
+          adminToggleBtn: !!this.elements.adminToggleBtn
+        });
+        
         if (window.hasAdminCapability && window.isAdminUser) {
           this.state.isAdminUser = true;
           this.state.showAdminFeatures = false; // 初期は閲覧モード
           if (this.elements.adminToggleBtn) {
+            console.log('✅ 管理者モードボタンを表示中');
             this.elements.adminToggleBtn.classList.remove('hidden');
             this.elements.adminToggleBtn.removeAttribute('hidden');
-            this.elements.adminToggleBtn.style.display = ''; // 表示を確実に
+            this.elements.adminToggleBtn.style.display = 'inline-flex'; // 表示を確実に
             this.elements.adminToggleBtn.textContent = '管理モード';
+          } else {
+            console.warn('❌ adminToggleBtn要素が見つかりません');
           }
         } else {
           // 非管理者の場合は管理機能を完全に無効化
+          console.log('ℹ️ 非管理者ユーザー - 管理者モードボタンを非表示');
           this.state.isAdminUser = false;
           this.state.showAdminFeatures = false;
           if (this.elements.adminToggleBtn) {
@@ -1364,11 +1374,19 @@ class StudyQuestApp {
   
   // 管理者UI更新の共通メソッド
   updateAdminButtonUI() {
+    console.log('🔄 updateAdminButtonUI実行中:', {
+      isAdminUser: this.state.isAdminUser,
+      hasAdminCapability: window.hasAdminCapability,
+      adminToggleBtn: !!this.elements.adminToggleBtn
+    });
+    
     // Only show admin toggle button for administrators, never for viewers
     if (this.elements.adminToggleBtn && this.state.isAdminUser) {
       // Show button for admin users only
+      console.log('✅ 管理者ボタンを表示中（updateAdminButtonUI）');
       this.elements.adminToggleBtn.classList.remove('hidden');
       this.elements.adminToggleBtn.removeAttribute('hidden');
+      this.elements.adminToggleBtn.style.display = 'inline-flex';
       
       // Always show "管理モード" text, never show "閲覧モード" to avoid confusion
       this.elements.adminToggleBtn.textContent = '管理モード';
@@ -1385,9 +1403,11 @@ class StudyQuestApp {
       }
     } else {
       // Hide button for non-admin users
+      console.log('ℹ️ 非管理者 - ボタンを非表示（updateAdminButtonUI）');
       if (this.elements.adminToggleBtn) {
         this.elements.adminToggleBtn.classList.add('hidden');
         this.elements.adminToggleBtn.setAttribute('hidden', '');
+        this.elements.adminToggleBtn.style.display = 'none';
       }
     }
   }
