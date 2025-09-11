@@ -51,6 +51,19 @@
       return false;
     };
 
+    // Console.warn suppression for Permissions Policy warnings
+    const originalWarn = console.warn;
+    console.warn = function (...args) {
+      const message = args.join(' ');
+      const shouldSuppress = suppressedErrors.some((pattern) => message.includes(pattern));
+      
+      if (shouldSuppress) {
+        return; // Suppress known warnings
+      }
+      
+      originalWarn.apply(console, args);
+    };
+
     // Enhanced promise rejection handling
     window.addEventListener('unhandledrejection', function (event) {
       const reason = event.reason?.toString() || '';

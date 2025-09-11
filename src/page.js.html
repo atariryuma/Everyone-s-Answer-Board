@@ -8086,7 +8086,7 @@ const loadFormLink = async () => {
         google.script.run
           .withSuccessHandler(resolve)
           .withFailureHandler(reject)
-          .getActiveFormInfo(USER_ID);
+          .getCurrentBoardInfoAndUrls();
       }),
       `formInfo-${USER_ID}`, // キャッシュキー
       300000 // 5分キャッシュ
@@ -8095,8 +8095,16 @@ const loadFormLink = async () => {
     if (formInfo && formInfo.formUrl) {
       const formLinkBtn = document.getElementById('formAnswerBtn');
       if (formLinkBtn) {
-        formLinkBtn.href = formInfo.formUrl;
+        // buttonにformUrlを保存
+        formLinkBtn.dataset.formUrl = formInfo.formUrl;
         formLinkBtn.classList.remove('hidden');
+        
+        // クリックイベントハンドラーを追加
+        formLinkBtn.addEventListener('click', function() {
+          if (this.dataset.formUrl) {
+            window.open(this.dataset.formUrl, '_blank');
+          }
+        });
       }
     }
   } catch (error) {
