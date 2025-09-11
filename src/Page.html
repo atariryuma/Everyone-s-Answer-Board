@@ -113,38 +113,86 @@
         -webkit-backdrop-filter: blur(var(--backdrop-blur));
       }
       
-      /* Header Grid Layout Styles */
+      /* Header Two-Tier Layout Styles */
       .header-grid {
         display: grid;
+        grid-template-rows: auto 1fr;
         gap: 1rem;
+        align-items: stretch;
+      }
+      
+      /* Top Tier: Compact Button Row */
+      .header-top {
+        display: flex;
         align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        padding: 0.5rem 0;
+        min-height: 2.5rem;
+      }
+      
+      /* Bottom Tier: Question Display */
+      .header-bottom {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 1rem 0;
+        background: rgba(236, 72, 153, 0.1);
+        border-radius: 0.75rem;
+        border: 1px solid rgba(236, 72, 153, 0.2);
       }
       
       /* Desktop Layout */
       @media (min-width: 1024px) {
-        .header-grid {
-          grid-template-columns: auto 1fr auto;
-          align-items: start;
+        .header-top {
+          flex-wrap: nowrap;
         }
       }
       
-      /* Tablet and Mobile Layout */
-      @media (max-width: 1023px) {
-        .header-grid {
-          grid-template-columns: 1fr;
-          gap: 0.75rem;
-          text-align: center;
+      /* Tablet Layout */
+      @media (max-width: 1023px) and (min-width: 768px) {
+        .header-top {
+          flex-wrap: wrap;
+          justify-content: space-between;
+          gap: 0.5rem;
         }
         
-        .header-grid > div {
-          justify-content: center !important;
+        .header-bottom {
+          padding: 1rem;
         }
         
-        /* Stack elements vertically on small screens */
-        .header-left,
-        .header-right {
+        .header-bottom .text-2xl {
+          font-size: 1.75rem;
+        }
+      }
+      
+      /* Mobile Layout */
+      @media (max-width: 767px) {
+        .header-top {
           flex-wrap: wrap;
           justify-content: center;
+          gap: 0.5rem;
+          padding: 0.25rem 0;
+        }
+        
+        .header-top > div {
+          flex: 0 1 auto;
+        }
+        
+        .header-bottom {
+          padding: 0.75rem;
+        }
+        
+        .header-bottom .text-2xl {
+          font-size: 1.25rem;
+        }
+        
+        /* Stack admin controls on mobile */
+        .header-top > div:last-child {
+          flex-basis: 100%;
+          justify-content: center;
+          margin-top: 0.5rem;
         }
       }
       
@@ -777,10 +825,29 @@
         id="main-header"
         class="glass-panel rounded-xl p-4 mb-4 shadow-lg fade-in"
       >
-        <!-- New Grid Layout Structure -->
+        <!-- New Two-Tier Header Layout -->
         <div class="header-grid">
-          <!-- Left Section: Form + Statistics & Filters -->
-          <div class="header-left flex items-center gap-3 lg:justify-start justify-center flex-wrap">
+          <!-- Top Tier: Compact Button Row -->
+          <div class="header-top">
+            <!-- Left Group: Action Buttons -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <!-- Statistics Display -->
+              <div id="answerCount" class="text-sm text-gray-300 flex items-center gap-2 bg-gray-800/30 px-3 py-1.5 rounded-md">
+                <svg
+                  class="w-4 h-4 text-blue-400"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M17 20h5v-2 a 3 3 0 0 0 -5.356 -1.857 M17 20H7 m10 0v-2c0-.656-.126-1.283-.356-1.857 M7 20H2v-2 a 3 3 0 0 1 5.356 -1.857 M7 20v-2c0-.656.126-1.283.356-1.857 m0 0 a 5.002 5.002 0 0 1 9.288 0 M15 7 a 3 3 0 1 1 -6 0 3 3 0 0 1 6 0 z m6 3 a 2 2 0 1 1 -4 0 2 2 0 0 1 4 0 z M7 10 a 2 2 0 1 1 -4 0 2 2 0 0 1 4 0 z"
+                  ></path>
+                </svg>
+                <span id="answerCountText">0 件の回答</span>
+              </div>
             <!-- Form Answer Button -->
             <button
               type="button"
@@ -848,33 +915,99 @@
                 ></path>
               </svg>
             </div>
+            </div>
+
+            <!-- Center Group: Site Title -->
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <h1
+                id="siteTitle"
+                class="game-font text-yellow-300 text-sm font-bold flex items-center gap-1.5"
+              >
+                <svg
+                  class="w-4 h-4 text-yellow-300"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                  ></path>
+                </svg>
+                みんなの回答ボード
+              </h1>
+            </div>
+
+            <!-- Right Group: Admin Controls -->
+            <div class="flex items-center gap-2 flex-wrap">
+              <!-- Board Owner Display -->
+              <div
+                id="boardOwnerDisplay"
+                class="text-xs text-gray-500 bg-gray-800/40 backdrop-blur-sm px-2.5 py-1 rounded-md flex items-center gap-1.5"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M16 7a4 4 0 11-8 0 4 4 0 018 0z M12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                  ></path>
+                </svg>
+                <span>ID: <?= userInfo.userId ? userInfo.userId.substring(0,8) + '...' : 'ID_NOT_SET' ?></span>
+              </div>
+
+              <!-- Admin Toggle Button -->
+              <button
+                type="button"
+                id="adminToggleBtn"
+                class="admin-toggle text-gray-400 hover:text-cyan-400 transition-all p-1.5 rounded-md hover:bg-gray-800/50 hidden"
+                aria-label="管理者モード切り替え"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  ></path>
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"
+                  ></path>
+                </svg>
+              </button>
+
+              <!-- End Publication Button -->
+              <button
+                type="button"
+                id="endPublicationBtn"
+                class="admin-toggle text-xs bg-orange-600/80 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md hidden whitespace-nowrap transition-all flex items-center gap-1"
+                hidden
+                aria-label="公開終了"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"
+                  ></path>
+                </svg>
+                公開終了
+              </button>
+            </div>
           </div>
 
-          <!-- Center Section: Title -->
-          <div class="header-center text-center lg:col-span-1 flex flex-col items-center justify-center">
-            <h1
-            id="siteTitle"
-            class="game-font text-yellow-300 text-base md:text-lg lg:text-xl font-bold mb-2 truncate flex items-center justify-center gap-2"
-          >
-            <svg
-              class="w-5 h-5 text-yellow-300"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <!-- Bottom Tier: Question Display -->
+          <div class="header-bottom">
+            <div
+              id="headingLabel"
+              class="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold text-pink-400 leading-tight"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-              ></path>
-            </svg>
-            みんなの回答ボード
-          </h1>
-          <div
-            id="headingLabel"
-            class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem]"
-          >
             <svg
               class="w-5 h-5 md:w-6 md:h-6 animate-spin"
               viewBox="0 0 24 24"
@@ -894,72 +1027,13 @@
                 d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
                 fill="currentColor"
               ></path>
-            </svg>
-          </div>
-
-          <!-- Right Section: Admin Controls + ID -->
-          <div class="header-right flex items-center lg:justify-end justify-center gap-2 flex-wrap">
-            <!-- Board Owner Display -->
-            <div
-              id="boardOwnerDisplay"
-              class="text-xs text-gray-500 bg-gray-800/40 backdrop-blur-sm px-2.5 py-1 rounded-md flex items-center gap-1.5"
-            >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0z M12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
-                ></path>
               </svg>
-              <span>ID: <?= userInfo.userId ? userInfo.userId.substring(0,8) + '...' : 'ID_NOT_SET' ?></span>
-            </div>
-
-            <!-- Admin Controls -->
-            <div class="flex items-center gap-1">
-              <p id="modeLabel" class="text-xs text-gray-400 truncate hidden"></p>
-              <button
-                type="button"
-                id="endPublicationBtn"
-                class="admin-toggle text-xs bg-orange-600/80 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md hidden whitespace-nowrap transition-all flex items-center gap-1"
-                hidden
-                aria-label="公開終了"
-              >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"
-                ></path>
-              </svg>
-              公開終了
-            </button>
-              <button
-                type="button"
-                id="adminToggleBtn"
-                class="admin-toggle text-gray-400 hover:text-cyan-400 transition-all p-1.5 rounded-md hover:bg-gray-800/50 hidden"
-                aria-label="管理者モード切り替え"
-              >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-                ></path>
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"
-                ></path>
-              </svg>
-              </button>
+              <span class="animate-pulse">問題文を読み込み中...</span>
             </div>
           </div>
         </div>
       </header>
+
       <!-- 新着通知バナー -->
       <div
         id="newContentBanner"
