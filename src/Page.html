@@ -810,7 +810,7 @@
                   stroke-linecap="round"
                   stroke-linejoin="round"
                   stroke-width="2"
-                  d="M17 20h5v-2a3 3 0 0 0-5.356-1.857 M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857 M7 20H2v-2a3 3 0 0 1 5.356-1.857 M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0 M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0z m6 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0z M7 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"
+                  d="M17 20h5v-2a3 3 0 0 0 -5.356 -1.857 M17 20H7m10 0v-2c0-.656-.126-1.283 -.356 -1.857 M7 20H2v-2a3 3 0 0 1 5.356 -1.857 M7 20v-2c0-.656.126-1.283 .356 -1.857 m0 0a5.002 5.002 0 0 1 9.288 0 M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0 z m6 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0 z M7 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0 z"
                 ></path>
               </svg>
               <span id="answerCountText">0 件の回答</span>
@@ -1107,21 +1107,9 @@
       const __OPINION_HEADER__ =
         '<?= typeof __OPINION_HEADER__ !== "undefined" && __OPINION_HEADER__ ? __OPINION_HEADER__ : "お題" ?>';
 
-      // 管理者権限変数をグローバル設定（サーバー側から渡される値を使用）
-      console.log('🔍 テンプレート変数デバッグ:', {
-        hasAdminCapability_raw: typeof hasAdminCapability !== "undefined" ? hasAdminCapability : 'undefined',
-        isAdminUser_raw: typeof isAdminUser !== "undefined" ? isAdminUser : 'undefined',
-        hasAdminCapability_type: typeof hasAdminCapability,
-        isAdminUser_type: typeof isAdminUser
-      });
-      
-      window.hasAdminCapability = (typeof hasAdminCapability !== "undefined" && hasAdminCapability === true) ? true : false;
-      window.isAdminUser = (typeof isAdminUser !== "undefined" && isAdminUser === true) ? true : false;
-      
-      console.log('✅ 管理者権限変数設定完了:', {
-        'window.hasAdminCapability': window.hasAdminCapability,
-        'window.isAdminUser': window.isAdminUser
-      });
+      // シンプルな所有者フラグ設定
+      window.isOwner = <?= isOwner ? 'true' : 'false' ?>;
+      console.log('✅ 所有者フラグ設定:', window.isOwner);
 
       // DISPLAY_MODES定数をフロントエンドで利用可能にする
       window.DISPLAY_MODES = Object.freeze({

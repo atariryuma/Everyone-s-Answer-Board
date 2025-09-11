@@ -1366,34 +1366,22 @@ function renderAnswerBoard(userInfo, params) {
       template.adminPanelUrl = '';
     }
 
-    // 管理者権限チェック
+    // シンプルな所有者チェック
     try {
       const currentUserEmail = Session.getActiveUser().getEmail();
       const boardOwnerEmail = userInfo.userEmail;
-
-      // 回答ボードの所有者とアクセスユーザーのメール照合
-      const isAdminUser =
-        currentUserEmail && boardOwnerEmail && currentUserEmail === boardOwnerEmail;
-
-      // 管理者権限設定をテンプレート変数に追加
-      template.hasAdminCapability = isAdminUser;
-      template.isAdminUser = isAdminUser;
-
-      console.log('🔍 renderAnswerBoard - 管理者権限チェック:', {
-        currentUserEmail: currentUserEmail ? `${currentUserEmail.substring(0, 10)}...` : 'null',
+      
+      // 単純な所有者判定
+      template.isOwner = (currentUserEmail === boardOwnerEmail);
+      
+      console.log('🔍 renderAnswerBoard - 所有者チェック:', {
+        currentUserEmail: currentUserEmail ? `${currentUserEmail.substring(0, 10)}...` : 'null', 
         boardOwnerEmail: boardOwnerEmail ? `${boardOwnerEmail.substring(0, 10)}...` : 'null',
-        emailMatch: currentUserEmail === boardOwnerEmail,
-        isAdminUser: isAdminUser,
-        hasAdminCapability: isAdminUser,
-        templateVars: {
-          hasAdminCapability: template.hasAdminCapability,
-          isAdminUser: template.isAdminUser,
-        },
+        isOwner: template.isOwner
       });
-    } catch (adminError) {
-      console.error('renderAnswerBoard - 管理者権限チェックエラー:', adminError);
-      template.hasAdminCapability = false;
-      template.isAdminUser = false;
+    } catch (error) {
+      console.error('renderAnswerBoard - 所有者チェックエラー:', error);
+      template.isOwner = false;
     }
 
     return template

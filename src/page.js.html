@@ -473,10 +473,10 @@
         isLoading: false,
         lastFocusedElement: null,
         isStudentMode: window.isStudentMode,
-        isAdminUser: window.isAdminUser,
+        isAdminUser: window.isOwner,
         showCounts: window.showCounts,
         showAdminFeatures: false, // 初期状態は常に閲覧モード
-        showHighlightToggle: window.isAdminUser, // 管理者なら常に表示
+        showHighlightToggle: window.isOwner, // 所有者なら常に表示
         showScoreSort: window.showScoreSort,
         displayMode: window.displayMode,
         sheetName: SHEET_NAME,
@@ -1010,13 +1010,12 @@
             this.updateSortOptions();
             this.setupObservers();
             // Initial admin state setup - 管理者権限があっても最初は閲覧モードで起動
-            console.log('🔍 管理者権限チェック:', {
-              hasAdminCapability: window.hasAdminCapability,
-              isAdminUser: window.isAdminUser,
+            console.log('🔍 所有者チェック:', {
+              isOwner: window.isOwner,
               adminToggleBtn: !!this.elements.adminToggleBtn,
             });
 
-            if (window.hasAdminCapability && window.isAdminUser) {
+            if (window.isOwner) {
               this.state.isAdminUser = true;
               this.state.showAdminFeatures = false; // 初期は閲覧モード
               if (this.elements.adminToggleBtn) {
@@ -1467,31 +1466,16 @@
         isStateChanging ? 0 : 300000 // 状態変更系は即時実行、その他は5分キャッシュ
       );
     }
-    async verifyAdminAsync() {
-      // Use server-provided flag first (fast)
-      if (window.isAdminUser) {
+    // シンプルな所有者チェック - サーバーから受け取った値をそのまま使用
+    verifyOwner() {
+      if (window.isOwner) {
         this.state.isAdminUser = true;
-        this.state.showHighlightToggle = true; // 管理者なら常に表示
-        // Admin permissions verified
+        this.state.showHighlightToggle = true;
         this.updateAdminButtonUI();
         this.updateEndPublicationButtonUI();
-        return;
-      }
-
-      // Fallback API call (slower)
-      let prevState;
-      try {
-        const isAdmin = await this.gas.checkAdmin();
-        if (isAdmin) {
-          window.isAdminUser = true;
-          this.state.isAdminUser = true;
-          this.state.showHighlightToggle = true; // 管理者なら常に表示
-          // API admin permissions verified
-          this.updateAdminButtonUI();
-          this.updateEndPublicationButtonUI();
-        }
-      } catch (e) {
-        console.error('Admin check failed', e);
+        console.log('✅ 所有者権限確認済み');
+      } else {
+        console.log('ℹ️ 非所有者ユーザー');
       }
     }
 
@@ -1499,7 +1483,7 @@
     updateAdminButtonUI() {
       console.log('🔄 updateAdminButtonUI実行中:', {
         isAdminUser: this.state.isAdminUser,
-        hasAdminCapability: window.hasAdminCapability,
+        isOwner: window.isOwner,
         adminToggleBtn: !!this.elements.adminToggleBtn,
       });
 
@@ -1561,19 +1545,7 @@
       }
     }
 
-    // サーバー管理者権限確認の共通メソッド
-    async checkServerAdminPermission() {
-      try {
-        const isAdmin = await this.gas.checkAdmin();
-        if (!isAdmin) {
-          throw new Error('サーバー側で管理者権限が確認できませんでした');
-        }
-        return true;
-      } catch (error) {
-        console.error('管理者権限確認エラー:', error);
-        throw error;
-      }
-    }
+    // 削除: サーバー管理者権限確認 - window.isOwnerで十分
 
     async checkForNewContentLight(bypassCache = false) {
       // ポーリング実行中の場合は重複実行を防ぐ
@@ -2583,14 +2555,9 @@
           return;
         }
 
-        // 2. Verify admin status to ensure proper initialization
-        console.log('🔍 StudyQuestApp: Verifying admin status...');
-        await this.verifyAdminAsync().catch((error) => {
-          console.warn(
-            '⚠️ StudyQuestApp: Admin verification failed, continuing with default permissions:',
-            error.message
-          );
-        });
+        // 2. シンプルな所有者確認
+        console.log('🔍 StudyQuestApp: 所有者確認中...');
+        this.verifyOwner();
 
         // 3. Start loading immediately without waiting - 最適化版
         console.log('📊 StudyQuestApp: Starting optimized sheet data loading...');
@@ -3490,7 +3457,7 @@
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
           >
             <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582 m15.356 2A8.001 8.001 0 004.582 9 m0 0H9 m11 11v-5h-.581 m0 0a8.003 8.003 0 01-15.357-2 m15.357 2H15" />
             </svg>
             ページを再読み込み
           </button>
@@ -3968,7 +3935,7 @@
         // Post-processing after successful data load
         this.adjustLayout();
 
-        if (!this.state.isAdminUser || !window.hasAdminCapability) {
+        if (!this.state.isAdminUser) {
           this.state.showAdminFeatures = false;
           this.state.showHighlightToggle = false;
           // 管理モードボタンを確実に非表示
@@ -7102,8 +7069,8 @@
 
         // 管理者権限チェック
         if (enable) {
-          if (!this.state.isAdminUser || !window.hasAdminCapability) {
-            console.warn('管理者権限がありません。');
+          if (!this.state.isAdminUser) {
+            console.warn('所有者権限がありません。');
             return;
           }
 
@@ -7113,20 +7080,7 @@
             return; // ユーザーがキャンセルした場合
           }
 
-          // 最初の管理モード切り替え時のみサーバー側で再確認（オプション）
-          if (!this.adminModeVerified) {
-            try {
-              const ok = await this.gas.checkAdmin();
-              if (!ok) {
-                console.warn('サーバー側の権限確認に失敗しました。');
-                // ローカルの権限情報を信頼して継続
-              }
-              this.adminModeVerified = true;
-            } catch (e) {
-              console.warn('権限確認API呼び出しに失敗しました', e);
-              // エラーが発生してもローカルの権限情報を信頼して継続
-            }
-          }
+          // 削除: 複雑な権限再確認ロジック - window.isOwnerで十分
         }
 
         // グローバル設定を更新
@@ -7306,7 +7260,7 @@
         endPublicationBtn.disabled = true;
         endPublicationBtn.innerHTML = `
         <svg class="w-3 h-3 animate-spin inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582 m15.356 2A8.001 8.001 0 004.582 9 m0 0H9 m11 11v-5h-.581 m0 0a8.003 8.003 0 01-15.357-2 m15.357 2H15"></path>
         </svg>
         公開終了中...
       `;
