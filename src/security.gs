@@ -18,7 +18,7 @@ const SECURITY_CONFIG = Object.freeze({
 // 基本的な入力検証パターン
 const VALIDATION_PATTERNS = Object.freeze({
   SPREADSHEET_URL: /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]+/,
-  SAFE_STRING: /^[a-zA-Z0-9\s\-_.@]+$/
+  SAFE_STRING: /^[a-zA-Z0-9\s\-_.@]+$/,
 });
 
 /**
@@ -29,28 +29,28 @@ const VALIDATION_PATTERNS = Object.freeze({
 function getServiceAccountTokenCached() {
   try {
     // Service Accountトークン取得開始
-    
+
     // CacheService直接使用（GAS環境で真に永続化）
     const scriptCache = CacheService.getScriptCache();
     const cachedToken = scriptCache.get(SECURITY_CONFIG.AUTH_CACHE_KEY);
-    
+
     if (cachedToken) {
       // キャッシュヒット
       return cachedToken;
     }
-    
+
     // キャッシュミス - 新規生成
     const newToken = generateNewServiceAccountToken();
-    
+
     // 1時間（3600秒）永続キャッシュ
     scriptCache.put(SECURITY_CONFIG.AUTH_CACHE_KEY, newToken, 3600);
     // キャッシュ保存完了
-    
+
     return newToken;
   } catch (error) {
     console.error('❌ getServiceAccountTokenCached: CacheService永続キャッシュエラー', {
       error: error.message,
-      stack: error.stack
+      stack: error.stack,
     });
     throw error;
   }
@@ -63,66 +63,66 @@ function getServiceAccountTokenCached() {
 function generateNewServiceAccountToken() {
   try {
     // トークン生成開始
-    
+
     // 統一秘密情報管理システムで安全に取得
     const serviceAccountCreds = getSecureServiceAccountCreds();
 
-  const privateKey = serviceAccountCreds.private_key.replace(/\n/g, '\n'); // 改行文字を正規化
-  const clientEmail = serviceAccountCreds.client_email;
-  const tokenUrl = 'https://www.googleapis.com/oauth2/v4/token';
+    const privateKey = serviceAccountCreds.private_key.replace(/\n/g, '\n'); // 改行文字を正規化
+    const clientEmail = serviceAccountCreds.client_email;
+    const tokenUrl = 'https://www.googleapis.com/oauth2/v4/token';
 
-  // JWT準備完了
+    // JWT準備完了
 
-  const now = Math.floor(Date.now() / 1000);
-  const expiresAt = now + 3600; // 1時間後
+    const now = Math.floor(Date.now() / 1000);
+    const expiresAt = now + 3600; // 1時間後
 
-  // JWT生成
-  const jwtHeader = { alg: 'RS256', typ: 'JWT' };
-  const jwtClaimSet = {
-    iss: clientEmail,
-    scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
-    aud: tokenUrl,
-    exp: expiresAt,
-    iat: now,
-  };
+    // JWT生成
+    const jwtHeader = { alg: 'RS256', typ: 'JWT' };
+    const jwtClaimSet = {
+      iss: clientEmail,
+      scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive',
+      aud: tokenUrl,
+      exp: expiresAt,
+      iat: now,
+    };
 
-  const encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(jwtHeader));
-  const encodedClaimSet = Utilities.base64EncodeWebSafe(JSON.stringify(jwtClaimSet));
-  const signatureInput = `${encodedHeader}.${encodedClaimSet}`;
-  const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
-  const encodedSignature = Utilities.base64EncodeWebSafe(signature);
-  const jwt = `${signatureInput}.${encodedSignature}`;
+    const encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(jwtHeader));
+    const encodedClaimSet = Utilities.base64EncodeWebSafe(JSON.stringify(jwtClaimSet));
+    const signatureInput = `${encodedHeader}.${encodedClaimSet}`;
+    const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
+    const encodedSignature = Utilities.base64EncodeWebSafe(signature);
+    const jwt = `${signatureInput}.${encodedSignature}`;
 
-  // トークンリクエスト
-  const response = UrlFetchApp.fetch(tokenUrl, {
-    method: 'post',
-    contentType: 'application/x-www-form-urlencoded',
-    payload: {
-      grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-      assertion: jwt,
-    },
-    muteHttpExceptions: true,
-  });
+    // トークンリクエスト
+    const response = UrlFetchApp.fetch(tokenUrl, {
+      method: 'post',
+      contentType: 'application/x-www-form-urlencoded',
+      payload: {
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: jwt,
+      },
+      muteHttpExceptions: true,
+    });
 
-  const responseCode = response.getResponseCode();
-  if (responseCode !== 200) {
-    const responseText = response.getContentText();
-    console.error('[ERROR]', 'Token request failed. Status: [非表示]');
-    console.error('[ERROR]', 'Response:', responseText);
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      const responseText = response.getContentText();
+      console.error('[ERROR]', 'Token request failed. Status: [非表示]');
+      console.error('[ERROR]', 'Response:', responseText);
 
-    // セキュリティ: エラー詳細を隠蔽、内部ログのみ
-    console.error('Service Account認証エラー:', { responseCode, responseText });
-    throw new Error('認証システムでエラーが発生しました。システム管理者にお問い合わせください。');
-  }
+      // セキュリティ: エラー詳細を隠蔽、内部ログのみ
+      console.error('Service Account認証エラー:', { responseCode, responseText });
+      throw new Error('認証システムでエラーが発生しました。システム管理者にお問い合わせください。');
+    }
 
-  const responseData = JSON.parse(response.getContentText());
-  if (!responseData.access_token) {
-    throw new Error('アクセストークンが見つかりませんでした');
-  }
+    const responseData = JSON.parse(response.getContentText());
+    if (!responseData.access_token) {
+      throw new Error('アクセストークンが見つかりませんでした');
+    }
 
-  // Security: Never log access tokens - removed token logging
-  // トークン生成完了
-  return responseData.access_token;
+    // Security: Never log access tokens - removed token logging
+    // トークン生成完了
+    return responseData.access_token;
   } catch (error) {
     console.error('🔑 Service Accountトークン生成失敗:', error.message);
     throw error;
@@ -164,7 +164,12 @@ function getSecureServiceAccountCreds() {
 function verifyAdminAccess(userId) {
   try {
     // セキュリティ: 厳密な入力検証
-    if (!userId || typeof userId !== 'string' || userId.trim() === '' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) {
+    if (
+      !userId ||
+      typeof userId !== 'string' ||
+      userId.trim() === '' ||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)
+    ) {
       console.warn('verifyAdminAccess: 無効なuserID形式');
       return false;
     }
@@ -213,7 +218,7 @@ function verifyAdminAccess(userId) {
     console.log('verifyAdminAccess: 3重チェック結果:', {
       isEmailMatched,
       isUserIdMatched,
-      isActive
+      isActive,
     });
 
     // 3つの条件すべてが満たされた場合のみ認証成功
@@ -332,7 +337,6 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
   }
 }
 
-
 /**
  * Sheets APIを使用してデータを更新
  * @param {Object} service - Sheets APIサービスオブジェクト
@@ -344,19 +348,24 @@ function shareSpreadsheetWithServiceAccount(spreadsheetId) {
 function updateSheetsData(service, spreadsheetId, range, values) {
   try {
     // Service Account経由でSheets API使用
-    if (service && service.spreadsheets && service.spreadsheets.values && service.spreadsheets.values.update) {
+    if (
+      service &&
+      service.spreadsheets &&
+      service.spreadsheets.values &&
+      service.spreadsheets.values.update
+    ) {
       console.log('updateSheetsData: Service Account経由でSheets API使用', {
-        spreadsheetId: `${spreadsheetId.substring(0, 10)  }...`,
-        range
+        spreadsheetId: `${spreadsheetId.substring(0, 10)}...`,
+        range,
       });
-      
+
       const response = service.spreadsheets.values.update({
         spreadsheetId,
         range,
         valueInputOption: 'RAW',
-        values
+        values,
       });
-      
+
       console.log('✅ updateSheetsData: Service Account成功');
       return response;
     } else {
@@ -378,18 +387,23 @@ function updateSheetsData(service, spreadsheetId, range, values) {
 function batchGetSheetsData(service, spreadsheetId, ranges) {
   try {
     // Service Accountを使用してSheets APIでアクセス
-    if (service && service.spreadsheets && service.spreadsheets.values && service.spreadsheets.values.batchGet) {
+    if (
+      service &&
+      service.spreadsheets &&
+      service.spreadsheets.values &&
+      service.spreadsheets.values.batchGet
+    ) {
       console.log('batchGetSheetsData: Service Account経由でSheets API使用', {
-        spreadsheetId: `${spreadsheetId.substring(0, 10)  }...`,
-        rangeCount: ranges.length
+        spreadsheetId: `${spreadsheetId.substring(0, 10)}...`,
+        rangeCount: ranges.length,
       });
-      
+
       // 正しいメソッド呼び出し: 関数として実行
       const response = service.spreadsheets.values.batchGet({
         spreadsheetId,
         ranges,
       });
-      
+
       console.log('✅ batchGetSheetsData: Service Account成功');
       return response;
     } else {

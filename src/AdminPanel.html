@@ -18,9 +18,7 @@
     <?!= include('SharedUtilities'); ?>
     
     <!-- Safe template variable injection using HTML data attributes -->
-    <div id="app-data" 
-         data-user-id="<?= userInfo && userInfo.userId ? userInfo.userId.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '' ?>" 
-         style="display: none;"></div>
+    <div id="app-data" data-user-id="<?= userInfo && userInfo.userId ? userInfo.userId.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '' ?>" style="display: none;"></div>
     <style>
       /* AdminPanel専用スタイル - commit 421e817 レイアウト構造 + 現在のダークテーマ */
       body {

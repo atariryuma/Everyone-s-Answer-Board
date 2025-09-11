@@ -714,7 +714,7 @@ function resolveColumnConflicts(headerRow, allData) {
     }
   });
 
-  console.log("列割り当て完了", {
+  console.log('列割り当て完了', {
     totalColumns: columnCount,
     assignedColumns: assignmentLog.length,
     assignments: assignmentLog,

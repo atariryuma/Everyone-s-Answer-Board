@@ -35,7 +35,7 @@ function createCompleteUser(userEmail) {
   return {
     userId,
     userEmail,
-    isActive: true,  // 正規Boolean型で統一
+    isActive: true, // 正規Boolean型で統一
     configJson: JSON.stringify(minimalConfig),
     lastModified: timestamp,
   };

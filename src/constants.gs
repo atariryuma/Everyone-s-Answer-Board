@@ -3,7 +3,6 @@
  * 最小限のコア定数のみ定義、Lazy-Loading Pattern対応
  */
 
-
 /**
  * システム全体で使用するコア定数
  * CONSTANT_CASE命名 (Google Style Guide準拠)
@@ -207,15 +206,12 @@ const SecurityValidator = Object.freeze({
         }
       }
     }
-    
+
     // Sheet name validation
     if (userData.sheetName) {
-      sanitizedData.sheetName = SecurityValidator.sanitizeInput(
-        userData.sheetName,
-        100
-      );
+      sanitizedData.sheetName = SecurityValidator.sanitizeInput(userData.sheetName, 100);
     }
-    
+
     // Form URL validation
     if (userData.formUrl) {
       if (SECURITY.VALIDATION_PATTERNS.URL.test(userData.formUrl)) {
@@ -352,7 +348,7 @@ const ErrorHandler = Object.freeze({
     // 内部ログ（詳細付き）
     console.error(`❌ ${context}:`, {
       message: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     });
 
     // 外部向けレスポンス（セキュア）
@@ -360,7 +356,7 @@ const ErrorHandler = Object.freeze({
       success: false,
       message: this.getSafeErrorMessage(error.message),
       timestamp: new Date().toISOString(),
-      errorCode: this.getErrorCode(error.message)
+      errorCode: this.getErrorCode(error.message),
     };
   },
 
@@ -376,33 +372,33 @@ const ErrorHandler = Object.freeze({
 
   getErrorCode(message) {
     const hash = message.split('').reduce((a, b) => {
-      a = ((a << 5) - a) + b.charCodeAt(0);
+      a = (a << 5) - a + b.charCodeAt(0);
       return a & a;
     }, 0);
     return `E${Math.abs(hash).toString(16).substr(0, 6).toUpperCase()}`;
-  }
+  },
 });
 
 // パフォーマンス監視
 const PerformanceMonitor = Object.freeze({
   measure(operationName, operation) {
     const startTime = Date.now();
-    
+
     try {
       const result = operation();
       const duration = Date.now() - startTime;
-      
+
       if (duration > 5000) {
         console.warn(`⚠️ 低速操作: ${operationName} - ${duration}ms`);
       }
-      
+
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`❌ 操作失敗: ${operationName} (${duration}ms)`);
       throw error;
     }
-  }
+  },
 });
 
 // ✅ 簡素化：直接CONSTANTSを使用（エイリアス削除でメモリ効率化）

@@ -134,19 +134,24 @@ const ConfigManager = Object.freeze({
 
     try {
       // 🚨 第1層防御: 二重構造の厳格検出・警告
-      const duplicateFields = Object.keys(config).filter(key => 
-        key.toLowerCase() === 'configjson' || 
-        (typeof config[key] === 'string' && this.isJSONString(config[key]) && key.toLowerCase().includes('config'))
+      const duplicateFields = Object.keys(config).filter(
+        (key) =>
+          key.toLowerCase() === 'configjson' ||
+          (typeof config[key] === 'string' &&
+            this.isJSONString(config[key]) &&
+            key.toLowerCase().includes('config'))
       );
-      
+
       if (duplicateFields.length > 0) {
         console.error('🚨 ConfigManager.saveConfig: 二重構造検出 - 保存を拒否', {
           userId: userId,
           duplicateFields: duplicateFields,
-          source: new Error().stack.split('\n')[2]
+          source: new Error().stack.split('\n')[2],
         });
         // 厳格モード: 二重構造を検出したら保存を拒否
-        throw new Error(`二重構造検出: フィールド [${duplicateFields.join(', ')}] - 保存を拒否しました`);
+        throw new Error(
+          `二重構造検出: フィールド [${duplicateFields.join(', ')}] - 保存を拒否しました`
+        );
       }
 
       // 🚫 二重構造防止（第2層防御）: configJsonフィールドを強制削除
@@ -184,7 +189,7 @@ const ConfigManager = Object.freeze({
         success = true;
         console.log('✅ ConfigManager.saveConfig: 完全置換モードで更新成功', {
           userId,
-          configFields: Object.keys(validatedConfig)
+          configFields: Object.keys(validatedConfig),
         });
       } catch (dbError) {
         console.error('❌ ConfigManager.saveConfig: DB更新エラー:', dbError.message);
@@ -543,14 +548,18 @@ const ConfigManager = Object.freeze({
   isJSONString(value) {
     if (typeof value !== 'string') return false;
     if (value.length < 2) return false; // 最小 "{}" or "[]"
-    
+
     // 明らかにJSONでないパターンを除外
     const trimmed = value.trim();
-    if (!((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
-          (trimmed.startsWith('[') && trimmed.endsWith(']')))) {
+    if (
+      !(
+        (trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']'))
+      )
+    ) {
       return false;
     }
-    
+
     try {
       JSON.parse(value);
       return true;
@@ -620,7 +629,7 @@ const ConfigManager = Object.freeze({
         currentSetupStatus: config.setupStatus,
         currentAppPublished: config.appPublished,
         hasSpreadsheetId: !!config.spreadsheetId,
-        hasSheetName: !!config.sheetName
+        hasSheetName: !!config.sheetName,
       });
 
       let needsFix = false;
@@ -666,8 +675,8 @@ const ConfigManager = Object.freeze({
           updates,
           before: {
             setupStatus: config.setupStatus,
-            appPublished: config.appPublished
-          }
+            appPublished: config.appPublished,
+          },
         });
 
         const success = this.updateConfig(userId, updates);
@@ -676,8 +685,9 @@ const ConfigManager = Object.freeze({
             userId,
             after: {
               setupStatus: updates.setupStatus || config.setupStatus,
-              appPublished: updates.appPublished !== undefined ? updates.appPublished : config.appPublished
-            }
+              appPublished:
+                updates.appPublished !== undefined ? updates.appPublished : config.appPublished,
+            },
           });
         }
         return success;
@@ -687,7 +697,7 @@ const ConfigManager = Object.freeze({
     } catch (error) {
       console.error('❌ ConfigManager.fixSetupConsistency: エラー', {
         userId,
-        error: error.message
+        error: error.message,
       });
       return false;
     }
@@ -702,7 +712,9 @@ const ConfigManager = Object.freeze({
     try {
       const config = this.getUserConfig(userId);
       if (!config || !config.spreadsheetId) {
-        console.error('ConfigManager.restoreFormInfo: スプレッドシートIDが見つかりません', { userId });
+        console.error('ConfigManager.restoreFormInfo: スプレッドシートIDが見つかりません', {
+          userId,
+        });
         return false;
       }
 
@@ -710,7 +722,7 @@ const ConfigManager = Object.freeze({
         userId,
         spreadsheetId: config.spreadsheetId,
         currentFormUrl: config.formUrl,
-        currentFormTitle: config.formTitle
+        currentFormTitle: config.formTitle,
       });
 
       // フォーム情報が既に存在する場合はスキップ
@@ -722,10 +734,10 @@ const ConfigManager = Object.freeze({
         // スプレッドシートからフォーム情報を取得
         const spreadsheet = new ConfigurationManager().getSpreadsheet(config.spreadsheetId);
         const formUrl = spreadsheet.getFormUrl();
-        
+
         if (formUrl) {
           const updates = {
-            formUrl: formUrl
+            formUrl: formUrl,
           };
 
           // フォームタイトルも取得を試みる
@@ -735,7 +747,10 @@ const ConfigManager = Object.freeze({
               updates.formTitle = form.getTitle();
             }
           } catch (formError) {
-            console.warn('ConfigManager.restoreFormInfo: フォームタイトル取得失敗', formError.message);
+            console.warn(
+              'ConfigManager.restoreFormInfo: フォームタイトル取得失敗',
+              formError.message
+            );
             // タイトル取得失敗時はスプレッドシート名をフォールバック
             updates.formTitle = spreadsheet.getName() + ' (フォーム)';
           }
@@ -745,29 +760,32 @@ const ConfigManager = Object.freeze({
             console.log('✅ フォーム情報復元完了', {
               userId,
               formUrl: updates.formUrl,
-              formTitle: updates.formTitle
+              formTitle: updates.formTitle,
             });
           }
           return success;
         } else {
-          console.warn('ConfigManager.restoreFormInfo: スプレッドシートにフォームが関連付けられていません', {
-            userId,
-            spreadsheetId: config.spreadsheetId
-          });
+          console.warn(
+            'ConfigManager.restoreFormInfo: スプレッドシートにフォームが関連付けられていません',
+            {
+              userId,
+              spreadsheetId: config.spreadsheetId,
+            }
+          );
           return false;
         }
       } catch (spreadsheetError) {
         console.error('ConfigManager.restoreFormInfo: スプレッドシートアクセスエラー', {
           userId,
           spreadsheetId: config.spreadsheetId,
-          error: spreadsheetError.message
+          error: spreadsheetError.message,
         });
         return false;
       }
     } catch (error) {
       console.error('❌ ConfigManager.restoreFormInfo: エラー', {
         userId,
-        error: error.message
+        error: error.message,
       });
       return false;
     }
@@ -784,15 +802,14 @@ const ConfigManager = Object.freeze({
         fixedUsers: 0,
         errorUsers: 0,
         skippedUsers: 0,
-        details: []
+        details: [],
       };
 
       // 全ユーザーを取得
       const allUsers = DB.getAllUsers();
       results.totalUsers = allUsers.length;
 
-
-      allUsers.forEach(user => {
+      allUsers.forEach((user) => {
         try {
           if (!user.configJson) {
             results.skippedUsers++;
@@ -800,7 +817,7 @@ const ConfigManager = Object.freeze({
               userId: user.userId,
               email: user.userEmail,
               status: 'skipped',
-              reason: 'configJsonが空'
+              reason: 'configJsonが空',
             });
             return;
           }
@@ -815,7 +832,7 @@ const ConfigManager = Object.freeze({
               userId: user.userId,
               email: user.userEmail,
               status: 'error',
-              reason: `JSON解析エラー: ${parseError.message}`
+              reason: `JSON解析エラー: ${parseError.message}`,
             });
             return;
           }
@@ -828,7 +845,7 @@ const ConfigManager = Object.freeze({
               userId: user.userId,
               email: user.userEmail,
               status: 'skipped',
-              reason: '二重構造なし'
+              reason: '二重構造なし',
             });
             return;
           }
@@ -841,7 +858,7 @@ const ConfigManager = Object.freeze({
               userId: user.userId,
               email: user.userEmail,
               status: 'fixed',
-              reason: '二重構造を自動修復'
+              reason: '二重構造を自動修復',
             });
           } else {
             results.errorUsers++;
@@ -849,7 +866,7 @@ const ConfigManager = Object.freeze({
               userId: user.userId,
               email: user.userEmail,
               status: 'error',
-              reason: '自動修復失敗'
+              reason: '自動修復失敗',
             });
           }
         } catch (userError) {
@@ -858,7 +875,7 @@ const ConfigManager = Object.freeze({
             userId: user.userId || 'unknown',
             email: user.userEmail || 'unknown',
             status: 'error',
-            reason: `処理エラー: ${userError.message}`
+            reason: `処理エラー: ${userError.message}`,
           });
         }
       });
@@ -867,7 +884,7 @@ const ConfigManager = Object.freeze({
         total: results.totalUsers,
         fixed: results.fixedUsers,
         error: results.errorUsers,
-        skipped: results.skippedUsers
+        skipped: results.skippedUsers,
       });
 
       return results;
@@ -947,10 +964,10 @@ const ConfigManager = Object.freeze({
   initPreventionSystem() {
     try {
       console.log('🛡️ ConfigManager.initPreventionSystem: 二重構造予防システム初期化');
-      
+
       // 予防システムのフラグを立てる
       this._preventionSystemActive = true;
-      
+
       console.log('✅ ConfigManager.initPreventionSystem: 予防システム初期化完了');
       return true;
     } catch (error) {
@@ -965,21 +982,20 @@ const ConfigManager = Object.freeze({
    */
   performHealthCheck() {
     try {
-      
       const results = {
         totalUsers: 0,
         healthyUsers: 0,
         doubleStructureUsers: 0,
         errorUsers: 0,
         details: [],
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       // 全ユーザーをチェック
       const allUsers = DB.getAllUsers();
       results.totalUsers = allUsers.length;
 
-      allUsers.forEach(user => {
+      allUsers.forEach((user) => {
         try {
           if (!user.configJson) {
             results.healthyUsers++;
@@ -996,7 +1012,7 @@ const ConfigManager = Object.freeze({
               userId: user.userId,
               email: user.userEmail,
               issue: 'json_parse_error',
-              description: parseError.message
+              description: parseError.message,
             });
             return;
           }
@@ -1009,7 +1025,7 @@ const ConfigManager = Object.freeze({
               userId: user.userId,
               email: user.userEmail,
               issue: 'double_structure',
-              description: '二重構造を検出'
+              description: '二重構造を検出',
             });
           } else {
             results.healthyUsers++;
@@ -1020,19 +1036,19 @@ const ConfigManager = Object.freeze({
             userId: user.userId || 'unknown',
             email: user.userEmail || 'unknown',
             issue: 'processing_error',
-            description: userError.message
+            description: userError.message,
           });
         }
       });
 
       const healthScore = Math.round((results.healthyUsers / results.totalUsers) * 100);
-      
+
       console.log('📊 データベース健康状態診断完了', {
         total: results.totalUsers,
         healthy: results.healthyUsers,
         doubleStructure: results.doubleStructureUsers,
         errors: results.errorUsers,
-        healthScore: `${healthScore}%`
+        healthScore: `${healthScore}%`,
       });
 
       results.healthScore = healthScore;
@@ -1050,12 +1066,12 @@ const ConfigManager = Object.freeze({
   performCompleteRepair() {
     try {
       console.log('🔧 ConfigManager.performCompleteRepair: 総合修復処理開始');
-      
+
       const repairResults = {
         doubleStructureRepair: null,
         consistencyRepair: null,
         formInfoRepair: null,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
       };
 
       // Phase 1: 二重構造修復
@@ -1068,7 +1084,7 @@ const ConfigManager = Object.freeze({
       let consistencyFixed = 0;
       let consistencyErrors = 0;
 
-      allUsers.forEach(user => {
+      allUsers.forEach((user) => {
         try {
           const success = this.fixSetupConsistency(user.userId);
           if (success) {
@@ -1080,7 +1096,7 @@ const ConfigManager = Object.freeze({
           consistencyErrors++;
           console.warn('ConfigManager.performCompleteRepair: 整合性修復エラー', {
             userId: user.userId,
-            error: error.message
+            error: error.message,
           });
         }
       });
@@ -1088,7 +1104,7 @@ const ConfigManager = Object.freeze({
       repairResults.consistencyRepair = {
         totalUsers: allUsers.length,
         fixed: consistencyFixed,
-        errors: consistencyErrors
+        errors: consistencyErrors,
       };
 
       // Phase 3: フォーム情報復元（各ユーザーごと）
@@ -1096,7 +1112,7 @@ const ConfigManager = Object.freeze({
       let formInfoFixed = 0;
       let formInfoErrors = 0;
 
-      allUsers.forEach(user => {
+      allUsers.forEach((user) => {
         try {
           const success = this.restoreFormInfo(user.userId);
           if (success) {
@@ -1108,7 +1124,7 @@ const ConfigManager = Object.freeze({
           formInfoErrors++;
           console.warn('ConfigManager.performCompleteRepair: フォーム情報復元エラー', {
             userId: user.userId,
-            error: error.message
+            error: error.message,
           });
         }
       });
@@ -1116,7 +1132,7 @@ const ConfigManager = Object.freeze({
       repairResults.formInfoRepair = {
         totalUsers: allUsers.length,
         fixed: formInfoFixed,
-        errors: formInfoErrors
+        errors: formInfoErrors,
       };
 
       console.log('✅ ConfigManager.performCompleteRepair: 総合修復処理完了', repairResults);
@@ -1125,7 +1141,7 @@ const ConfigManager = Object.freeze({
       console.error('❌ ConfigManager.performCompleteRepair: エラー', error.message);
       throw error;
     }
-  }
+  },
 });
 
 // ========================================

@@ -3,7 +3,6 @@
  * 基本的なキャッシュ機能のみを保持し、複雑なキャッシュクラスを除去
  */
 
-
 /**
  * シンプルなCacheService永続キャッシュ管理
  * GAS実行環境の特性に合わせてglobalThis依存を排除
@@ -11,53 +10,53 @@
 const SimpleCacheManager = {
   scriptCache: CacheService.getScriptCache(),
   defaultTTL: 21600, // 6時間
-  
+
   /**
    * CacheService永続キャッシュから取得、なければ生成して保存
    * disableCacheService: true の場合は関数オブジェクト保護のためキャッシュをスキップ
    */
   get(key, valueFn, options = {}) {
     const { ttl = this.defaultTTL, disableCacheService = false } = options;
-    
+
     try {
       // シンプル版：disableCacheService=true の場合は関数実行のみ
       if (disableCacheService) {
         return typeof valueFn === 'function' ? valueFn() : null;
       }
-      
+
       // CacheService永続キャッシュから取得
       const cachedValue = this.scriptCache.get(key);
       if (cachedValue !== null) {
         return JSON.parse(cachedValue);
       }
-      
+
       // キャッシュにない場合は関数実行
       if (typeof valueFn === 'function') {
         const newValue = valueFn();
         this.set(key, newValue, { ttl });
         return newValue;
       }
-      
+
       return null;
     } catch (error) {
       console.error('SimpleCacheManager.get エラー:', error.message);
       return null;
     }
   },
-  
+
   /**
    * CacheService永続キャッシュに保存
    */
   set(key, value, options = {}) {
     const { ttl = this.defaultTTL } = options;
-    
+
     try {
       this.scriptCache.put(key, JSON.stringify(value), ttl);
     } catch (error) {
       console.error('SimpleCacheManager.set エラー:', error.message);
     }
   },
-  
+
   /**
    * CacheService永続キャッシュから削除
    */
@@ -76,21 +75,21 @@ const SimpleCacheManager = {
   clearAll() {
     try {
       console.log('🔥 緊急キャッシュクリア: システム復旧開始');
-      
+
       // Service Accountトークンクリア
       this.scriptCache.remove('SA_TOKEN_CACHE');
       this.scriptCache.remove('sheets_service_optimized');
       this.scriptCache.remove('sheets_service');
-      
+
       // その他のキャッシュクリア
       const commonCacheKeys = ['user_config', 'form_info', 'system_status'];
-      commonCacheKeys.forEach(key => this.scriptCache.remove(key));
-      
+      commonCacheKeys.forEach((key) => this.scriptCache.remove(key));
+
       console.log('✅ 緊急キャッシュクリア: 完了');
     } catch (error) {
       console.error('❌ 緊急キャッシュクリア: エラー', error.message);
     }
-  }
+  },
 };
 
 // 後方互換性のためのエイリアス
@@ -103,7 +102,7 @@ console.log('🗄️ シンプルCacheService永続キャッシュが初期化�
  */
 function getSheetsServiceCached() {
   console.log('🔧 getSheetsServiceCached: 安定化版キャッシュ確認開始');
-  
+
   // ✅ 修正: CacheServiceは関数オブジェクトを正しく保存できないため、メモリキャッシュのみ使用
   // ✅ 最適化：先にキャッシュ存在確認とヒット率向上
   const cacheKey = 'sheets_service_optimized';
@@ -114,22 +113,26 @@ function getSheetsServiceCached() {
     const cachedService = cacheManager.get(cacheKey, null, { disableCacheService: false });
     if (cachedService !== null) {
       // 🔍 厳密な関数検証：実際の関数型と構造をチェック
-      const isValidService = cachedService?.spreadsheets?.values?.append && 
-                            typeof cachedService.spreadsheets.values.append === 'function' &&
-                            cachedService?.spreadsheets?.values?.batchGet &&
-                            typeof cachedService.spreadsheets.values.batchGet === 'function' &&
-                            cachedService?.spreadsheets?.values?.update &&
-                            typeof cachedService.spreadsheets.values.update === 'function';
-      
+      const isValidService =
+        cachedService?.spreadsheets?.values?.append &&
+        typeof cachedService.spreadsheets.values.append === 'function' &&
+        cachedService?.spreadsheets?.values?.batchGet &&
+        typeof cachedService.spreadsheets.values.batchGet === 'function' &&
+        cachedService?.spreadsheets?.values?.update &&
+        typeof cachedService.spreadsheets.values.update === 'function';
+
       if (isValidService) {
         console.log('✅ getSheetsServiceCached: メモリキャッシュヒット（完全検証済み）');
         return cachedService;
       } else {
-        console.warn('⚠️ getSheetsServiceCached: キャッシュサービス不完全（関数欠損）- 再生成実行', {
-          hasAppend: typeof cachedService?.spreadsheets?.values?.append,
-          hasBatchGet: typeof cachedService?.spreadsheets?.values?.batchGet,
-          hasUpdate: typeof cachedService?.spreadsheets?.values?.update
-        });
+        console.warn(
+          '⚠️ getSheetsServiceCached: キャッシュサービス不完全（関数欠損）- 再生成実行',
+          {
+            hasAppend: typeof cachedService?.spreadsheets?.values?.append,
+            hasBatchGet: typeof cachedService?.spreadsheets?.values?.batchGet,
+            hasUpdate: typeof cachedService?.spreadsheets?.values?.update,
+          }
+        );
         // 不完全なキャッシュをクリア
         cacheManager.remove(cacheKey);
       }
@@ -143,16 +146,16 @@ function getSheetsServiceCached() {
     cacheKey,
     () => {
       console.log('🔧 getSheetsServiceCached: 新しいサービスオブジェクト作成（キャッシュミス）');
-      
+
       // Service Account認証確認
       let testToken;
       try {
         console.log('🔧 getSheetsServiceCached: Service Accountトークン取得開始');
         testToken = getServiceAccountTokenCached();
-        console.log('🔧 getSheetsServiceCached: Service Accountトークン確認', { 
+        console.log('🔧 getSheetsServiceCached: Service Accountトークン確認', {
           hasToken: !!testToken,
           tokenLength: testToken ? testToken.length : 0,
-          tokenPrefix: testToken ? testToken.substring(0, 20) + '...' : 'null'
+          tokenPrefix: testToken ? testToken.substring(0, 20) + '...' : 'null',
         });
       } catch (tokenError) {
         console.error('🔧 getSheetsServiceCached: Service Accountトークン取得エラー詳細', {
@@ -160,9 +163,9 @@ function getSheetsServiceCached() {
           stack: tokenError.stack,
           context: 'service_object_creation',
           errorName: tokenError.name,
-          errorConstructor: tokenError.constructor.name
+          errorConstructor: tokenError.constructor.name,
         });
-        
+
         // 🚨 重要：トークン取得失敗時は不完全なサービスオブジェクトを返さない
         console.error('🚨 Service Accountトークン取得失敗により、service object構築を中止します');
         throw new Error('Service Account認証が利用できません。システム管理者に連絡してください。');
@@ -170,18 +173,18 @@ function getSheetsServiceCached() {
 
       // Google Sheets APIサービスオブジェクトを返す
       console.log('🔧 getSheetsServiceCached: service object構築開始');
-      
+
       // 🚨 実行コンテキスト情報を記録 - getUser成功/createUser失敗の原因調査
       const executionContext = {
         timestamp: new Date().toISOString(),
         stackTrace: new Error().stack.split('\n').slice(1, 4).join(' -> '),
-        memoryUsage: typeof Utilities !== 'undefined' ? 'available' : 'unavailable'
+        memoryUsage: typeof Utilities !== 'undefined' ? 'available' : 'unavailable',
       };
       console.log('🔧 getSheetsServiceCached: 実行コンテキスト', executionContext);
-      
+
       // Service Objectトークン取得（legacy互換性のため）
       const initialAccessToken = getServiceAccountTokenCached();
-      
+
       const serviceObject = {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
         accessToken: initialAccessToken, // ✅ getSpreadsheetsData互換性修復
@@ -303,12 +306,12 @@ function getSheetsServiceCached() {
               return JSON.parse(response.getContentText());
             },
             append: function (params) {
-              console.log('🔧 cache.gs append function called', { 
+              console.log('🔧 cache.gs append function called', {
                 hasParams: !!params,
                 spreadsheetId: params?.spreadsheetId,
-                range: params?.range
+                range: params?.range,
               });
-              
+
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
@@ -352,13 +355,15 @@ function getSheetsServiceCached() {
           },
         },
       };
-      
+
       // 🔧 service object構築完了確認（構築成功時は簡潔ログ）
-      const isComplete = serviceObject.spreadsheets && serviceObject.spreadsheets.values &&
-                        typeof serviceObject.spreadsheets.values.batchGet === 'function' &&
-                        typeof serviceObject.spreadsheets.values.update === 'function' &&
-                        typeof serviceObject.spreadsheets.values.append === 'function';
-      
+      const isComplete =
+        serviceObject.spreadsheets &&
+        serviceObject.spreadsheets.values &&
+        typeof serviceObject.spreadsheets.values.batchGet === 'function' &&
+        typeof serviceObject.spreadsheets.values.update === 'function' &&
+        typeof serviceObject.spreadsheets.values.append === 'function';
+
       if (isComplete) {
         console.log('✅ getSheetsServiceCached: service object構築完了（全メソッド確認済み）');
       } else {
@@ -366,26 +371,29 @@ function getSheetsServiceCached() {
           hasSpreadsheets: !!serviceObject.spreadsheets,
           hasValues: !!serviceObject.spreadsheets?.values,
           hasBatchGet: typeof serviceObject.spreadsheets?.values?.batchGet === 'function',
-          hasUpdate: typeof serviceObject.spreadsheets?.values?.update === 'function', 
+          hasUpdate: typeof serviceObject.spreadsheets?.values?.update === 'function',
           hasAppend: typeof serviceObject.spreadsheets?.values?.append === 'function',
-          valuesKeys: serviceObject.spreadsheets?.values ? Object.keys(serviceObject.spreadsheets.values) : []
+          valuesKeys: serviceObject.spreadsheets?.values
+            ? Object.keys(serviceObject.spreadsheets.values)
+            : [],
         });
       }
-      
+
       return serviceObject;
     },
-    { 
+    {
       ttl: 900, // 15分間に延長（パフォーマンス重視）
       enableMemoization: true,
-      disableCacheService: true // ✅ CacheService無効化（関数オブジェクト保護）
+      disableCacheService: true, // ✅ CacheService無効化（関数オブジェクト保護）
     }
   );
-  
+
   // 🔧 デバッグ：result の詳細情報を出力（異常時のみ）
-  const hasAllMethods = result?.spreadsheets?.values?.append && 
-                       result?.spreadsheets?.values?.batchGet && 
-                       result?.spreadsheets?.values?.update;
-  
+  const hasAllMethods =
+    result?.spreadsheets?.values?.append &&
+    result?.spreadsheets?.values?.batchGet &&
+    result?.spreadsheets?.values?.update;
+
   if (!hasAllMethods) {
     console.log('🔧 getSheetsServiceCached: キャッシュからの戻り値詳細（異常検出）', {
       resultType: typeof result,
@@ -396,7 +404,7 @@ function getSheetsServiceCached() {
       hasValues: !!result?.spreadsheets?.values,
       valuesType: typeof result?.spreadsheets?.values,
       valuesKeys: result?.spreadsheets?.values ? Object.keys(result.spreadsheets.values) : [],
-      resultKeys: result ? Object.keys(result) : []
+      resultKeys: result ? Object.keys(result) : [],
     });
   }
 
@@ -408,31 +416,32 @@ function getSheetsServiceCached() {
     hasAppend: !!result?.spreadsheets?.values?.append,
     appendIsFunction: typeof result?.spreadsheets?.values?.append === 'function',
     hasBatchGet: !!result?.spreadsheets?.values?.batchGet,
-    hasUpdate: !!result?.spreadsheets?.values?.update
+    hasUpdate: !!result?.spreadsheets?.values?.update,
   };
-  
+
   // 🔍 完全性チェック：全必要メソッドの存在確認
-  const isComplete = validation.hasResult && 
-                    validation.hasSpreadsheets && 
-                    validation.hasValues && 
-                    validation.appendIsFunction && 
-                    validation.hasBatchGet && 
-                    validation.hasUpdate;
-  
+  const isComplete =
+    validation.hasResult &&
+    validation.hasSpreadsheets &&
+    validation.hasValues &&
+    validation.appendIsFunction &&
+    validation.hasBatchGet &&
+    validation.hasUpdate;
+
   // パフォーマンス向上：正常時はログ出力を削減
   if (!isComplete) {
     const missingMethods = [
       !validation.hasAppend && 'append',
-      !validation.hasBatchGet && 'batchGet', 
-      !validation.hasUpdate && 'update'
+      !validation.hasBatchGet && 'batchGet',
+      !validation.hasUpdate && 'update',
     ].filter(Boolean);
-    
+
     console.log('🔧 getSheetsServiceCached: サービス検証失敗', {
       missingMethods: missingMethods,
-      methodCount: missingMethods.length
+      methodCount: missingMethods.length,
     });
   }
-  
+
   // 🚨 破損したservice objectの自動修復
   // ✅ 安定化：必要な全メソッドの存在確認
   // 🔄 無限ループ防止：修復試行回数を制限
@@ -445,40 +454,40 @@ function getSheetsServiceCached() {
       hasBatchGet: validation.hasBatchGet,
       hasUpdate: validation.hasUpdate,
       currentRetryCount: currentRetryCount,
-      maxRetryAttempts: maxRetryAttempts
+      maxRetryAttempts: maxRetryAttempts,
     });
-    
+
     // 🔄 無限ループ防止：リトライ回数が上限を超えた場合はエラー
     if (currentRetryCount >= maxRetryAttempts) {
       console.error('🚨 Service object修復失敗：最大リトライ回数を超過', {
         retryCount: currentRetryCount,
-        maxRetryAttempts: maxRetryAttempts
+        maxRetryAttempts: maxRetryAttempts,
       });
       // リトライカウンターをリセットして次回は再試行できるようにする
       cacheManager.remove(retryKey);
       throw new Error('Service Account認証が利用できません。システム管理者に連絡してください。');
     }
-    
+
     // リトライ回数を増やす
     cacheManager.set(retryKey, (currentRetryCount + 1).toString(), { ttl: 300 }); // 5分でリセット
-    
+
     // ✅ メモリキャッシュのみクリア（CacheService無効のため）
     cacheManager.remove('sheets_service');
     cacheManager.remove('sheets_service_optimized');
     console.log('🔧 破損メモリキャッシュクリア完了', {
-      nextRetryCount: currentRetryCount + 1
+      nextRetryCount: currentRetryCount + 1,
     });
-    
+
     // ✅ 次回呼び出しで正常なオブジェクトが生成される
     throw new Error('Service object corruption detected - please retry operation');
   }
-  
+
   // 🎉 成功時はリトライカウンターをクリア
   if (currentRetryCount > 0) {
     cacheManager.remove(retryKey);
     console.log('✅ Service object正常生成：リトライカウンターをクリア');
   }
-  
+
   return result;
 }
 
@@ -727,4 +736,3 @@ function synchronizeCacheAfterCriticalUpdate(
     // エラーが発生してもシステムを停止させない
   }
 }
-

@@ -43,7 +43,7 @@ function getAllColumnIndices(config) {
     answer: getColumnIndex(config, 'answer'),
     reason: getColumnIndex(config, 'reason'),
     class: getColumnIndex(config, 'class'),
-    name: getColumnIndex(config, 'name')
+    name: getColumnIndex(config, 'name'),
   };
 }
 
@@ -58,58 +58,57 @@ function getAllColumnIndices(config) {
 function testUnifiedSystem() {
   try {
     console.log('=== 統合システムテスト開始 ===');
-    
+
     // 1. システム設定確認
     const isSetup = Services.system.isSystemSetup();
     console.log('システム設定状況:', isSetup);
-    
+
     if (!isSetup) {
       return { success: false, message: 'システムが未設定です' };
     }
-    
+
     // 2. 現在のユーザー設定取得
     const currentUserEmail = Session.getActiveUser().getEmail();
     console.log('現在のユーザー:', currentUserEmail);
-    
+
     const userInfo = DB.findUserByEmail(currentUserEmail);
     if (!userInfo) {
       return { success: false, message: 'ユーザー情報が見つかりません' };
     }
-    
+
     const config = JSON.parse(userInfo.configJson || '{}');
     console.log('設定取得成功');
-    
+
     // 3. 列マッピング確認
     const columnIndices = getAllColumnIndices(config);
     console.log('列インデックス:', columnIndices);
-    
+
     // 4. スプレッドシートデータ取得テスト
     if (config.spreadsheetId && config.sheetName) {
       const spreadsheet = this.getSpreadsheet(config.spreadsheetId);
       const sheet = spreadsheet.getSheetByName(config.sheetName);
       const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-      
+
       console.log('ヘッダー構造チェック完了');
-      
+
       // データ行数確認
       const dataRows = sheet.getLastRow() - 1;
       console.log('データ行数:', dataRows);
-      
+
       // データ存在確認のみ実行（プライバシー保護のため詳細ログなし）
       if (dataRows > 0) {
         console.log('データサンプル確認完了');
       }
     }
-    
+
     return {
       success: true,
       message: 'テスト完了',
       config: {
         columnMapping: config.columnMapping,
-        columnIndices: columnIndices
-      }
+        columnIndices: columnIndices,
+      },
     };
-    
   } catch (error) {
     console.error('テストエラー:', error);
     return { success: false, message: error.message };
@@ -121,57 +120,55 @@ function testUnifiedSystem() {
  */
 function testSystemStatus() {
   console.log('=== システム診断開始 ===');
-  
+
   try {
     // システム設定確認
     const isSetup = Services.system.isSystemSetup();
     console.log('✅ システム設定:', isSetup ? '完了' : '未完了');
-    
+
     // 現在のユーザー取得
     const currentUserEmail = Session.getActiveUser().getEmail();
     console.log('✅ 現在のユーザー:', currentUserEmail);
-    
+
     // データベース接続確認
     const userInfo = DB.findUserByEmail(currentUserEmail);
     console.log('✅ ユーザー情報:', userInfo ? '存在' : '未登録');
-    
+
     if (userInfo) {
       // 設定解析
       const config = JSON.parse(userInfo.configJson || '{}');
       console.log('✅ 設定情報:', !!config);
-      
+
       // 列マッピング確認
       const columnIndices = getAllColumnIndices(config);
       console.log('✅ 列マッピング:', columnIndices);
-      
+
       // スプレッドシートアクセステスト
       if (config.spreadsheetId) {
         try {
           const spreadsheet = this.getSpreadsheet(config.spreadsheetId);
           console.log('✅ スプレッドシート接続: 成功');
-          
+
           if (config.sheetName) {
             const sheet = spreadsheet.getSheetByName(config.sheetName);
             const lastRow = sheet.getLastRow();
             console.log('✅ データ行数:', lastRow - 1);
-            
+
             // ヘッダー確認
             const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
             console.log('✅ ヘッダー構造確認完了');
-            
+
             // 列マッピング確認（プライバシー保護のためヘッダー名は非表示）
             console.log('✅ 列マッピング検証完了');
-            
           }
         } catch (sheetError) {
           console.error('❌ スプレッドシートエラー:', sheetError.message);
         }
       }
     }
-    
+
     console.log('=== 診断完了 ===');
     return 'システム診断完了 - ログを確認してください';
-    
   } catch (error) {
     console.error('❌ 診断エラー:', error.message);
     return `診断エラー: ${error.message}`;
@@ -650,7 +647,7 @@ class AccessController {
     console.warn('❌ 非公開ボードへのアクセスを拒否', {
       appPublished: config.appPublished,
       isPublic: config.isPublic,
-      allowAnonymous: config.allowAnonymous
+      allowAnonymous: config.allowAnonymous,
     });
     return this.createAccessResult(false, 'guest', null, 'このボードは現在非公開です');
   }
@@ -707,7 +704,7 @@ class AccessController {
     try {
       const props = PropertiesService.getScriptProperties();
       const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
-      const userEmail = currentUserEmail || (this.getCurrentUserInfoSafely()?.currentUserEmail);
+      const userEmail = currentUserEmail || this.getCurrentUserInfoSafely()?.currentUserEmail;
       return adminEmail && userEmail && adminEmail === userEmail;
     } catch (e) {
       console.error(`isSystemAdmin エラー: ${e.message}`);

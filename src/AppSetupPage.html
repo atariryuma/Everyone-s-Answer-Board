@@ -15,9 +15,7 @@
     <?!= include('UnifiedStyles'); ?>
     <?!= include('SharedUtilities'); ?>
     <!-- Safe template variable injection using HTML data attributes -->
-    <div id="app-data" 
-         data-user-id="<?= typeof userId !== 'undefined' && userId ? userId.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '' ?>" 
-         style="display: none;"></div>
+    <div id="app-data" data-user-id="<?= typeof userId !== 'undefined' && userId ? userId.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '' ?>" style="display: none;"></div>
     
     <script>
       // Safe template variable extraction from data attributes

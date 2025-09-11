@@ -56,11 +56,11 @@
     console.warn = function (...args) {
       const message = args.join(' ');
       const shouldSuppress = suppressedErrors.some((pattern) => message.includes(pattern));
-      
+
       if (shouldSuppress) {
         return; // Suppress known warnings
       }
-      
+
       originalWarn.apply(console, args);
     };
 
@@ -632,7 +632,7 @@
         }
         return data;
       }
-      
+
       if (typeof data === 'object' && data !== null) {
         const anonymized = {};
         for (const [key, value] of Object.entries(data)) {
@@ -648,10 +648,10 @@
         }
         return anonymized;
       }
-      
+
       return data;
     }
-    
+
     // Safe console logging with privacy protection
     static log(message, data = null) {
       if (data) {
@@ -660,7 +660,7 @@
         console.log(message);
       }
     }
-    
+
     static warn(message, data = null) {
       if (data) {
         console.warn(message, this.anonymize(data));
@@ -668,7 +668,7 @@
         console.warn(message);
       }
     }
-    
+
     static error(message, data = null) {
       if (data) {
         console.error(message, this.anonymize(data));
@@ -1316,7 +1316,7 @@
           'vibrate',
           'vr',
           'geolocation',
-          'microphone', 
+          'microphone',
           'camera',
           'gyroscope',
           'accelerometer',

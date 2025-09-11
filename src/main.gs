@@ -72,7 +72,8 @@ function doGet(e) {
       case 'debug':
         // 🔍 デバッグモード：現在のユーザー情報を表示
         try {
-          const { currentUserEmail, userInfo: userByEmail } = new ConfigurationManager().getCurrentUserInfo();
+          const { currentUserEmail, userInfo: userByEmail } =
+            new ConfigurationManager().getCurrentUserInfo();
           const debugData = {
             current_user_email: currentUserEmail,
             user_exists_in_db: !!userByEmail,
@@ -123,10 +124,14 @@ function doGet(e) {
             <div style="font-family: monospace; background: #f5f5f5; padding: 20px; border-radius: 8px;">
               <h3>テスト結果: ${testResult.success ? '✅ 成功' : '❌ 失敗'}</h3>
               <p><strong>メッセージ:</strong> ${testResult.message}</p>
-              ${testResult.config ? `
+              ${
+                testResult.config
+                  ? `
                 <h3>設定情報:</h3>
                 <pre>${JSON.stringify(testResult.config, null, 2)}</pre>
-              ` : ''}
+              `
+                  : ''
+              }
             </div>
             <hr>
             <p><a href="?mode=debug">デバッグ情報を見る</a></p>
@@ -1067,7 +1072,6 @@ function processLoginAction() {
       };
     }
 
-
     // DB直接検索（キャッシュバイパス）
     let userInfo = DB.findUserByEmail(currentUserEmail);
 
@@ -1153,7 +1157,7 @@ function renderAnswerBoard(userInfo, params) {
     console.error('❌ Config取得エラー:', error);
     config = JSON.parse(userInfo.configJson || '{}') || {};
   }
-  
+
   // デバッグ: 実際に取得されたconfigの中身を確認
   // config取得状況デバッグ（必要時のみ有効化）
   // console.log('config状況:', {
@@ -1179,14 +1183,13 @@ function renderAnswerBoard(userInfo, params) {
     // ✅ 設定取得統一化：より確実な設定参照方法
     const userSpreadsheetId = config.spreadsheetId || config.spreadsheetId || null;
     const userSheetName = config.sheetName || config.sheetName || null;
-    
 
     // 📊 ユーザーIDをテンプレートに適切に設定
     template.USER_ID = userInfo.userId || null;
     template.SHEET_NAME = userSheetName || '';
 
     // ✅ configJSON中心型: sheetConfig廃止、直接config使用
-    
+
     // シンプルな判定: ユーザーがスプレッドシートを設定済みかどうか
     const hasUserConfig = !!(userSpreadsheetId && userSheetName);
     const finalSpreadsheetId = hasUserConfig ? userSpreadsheetId : params.spreadsheetId;
@@ -1222,7 +1225,7 @@ function renderAnswerBoard(userInfo, params) {
     // __OPINION_HEADER__テンプレート変数を設定（高精度・確実取得版）
     let opinionHeader = 'お題'; // デフォルト値
     let opinionHeaderSource = 'default';
-    
+
     try {
       // ✅ Step 1: configJsonからopinionHeaderを優先取得（「お題」以外の場合）
       if (config?.opinionHeader && config.opinionHeader !== 'お題') {
@@ -1231,24 +1234,27 @@ function renderAnswerBoard(userInfo, params) {
         console.log('✅ renderAnswerBoard: configJsonからopinionHeader取得:', {
           value: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
           length: opinionHeader.length,
-          source: 'configJson'
+          source: 'configJson',
         });
-      } 
+      }
       // ✅ Step 2: configJsonが「お題」の場合、または未設定の場合は高精度検出実行
       else if (finalSpreadsheetId && finalSheetName) {
-        
         // 2-1: ヘッダー行から直接検出
         try {
           const spreadsheet = new ConfigurationManager().getSpreadsheet(finalSpreadsheetId);
           const sheet = spreadsheet.getSheetByName(finalSheetName);
           const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
-          
+
           // 質問らしいヘッダーを検索
-          const questionHeader = headerRow.find(header => 
-            header && typeof header === 'string' && 
-            (header.includes('どうして') || header.includes('なぜ') || header.includes('思いますか'))
+          const questionHeader = headerRow.find(
+            (header) =>
+              header &&
+              typeof header === 'string' &&
+              (header.includes('どうして') ||
+                header.includes('なぜ') ||
+                header.includes('思いますか'))
           );
-          
+
           if (questionHeader && questionHeader !== 'お題') {
             opinionHeader = questionHeader;
             opinionHeaderSource = 'header_detection';
@@ -1256,12 +1262,12 @@ function renderAnswerBoard(userInfo, params) {
         } catch (error) {
           console.warn('ヘッダー検出エラー:', error.message);
         }
-        
+
         if (opinionHeader && opinionHeader !== 'お題') {
           console.log('✅ renderAnswerBoard: 高精度検出システムによるopinionHeader取得:', {
             value: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
             length: opinionHeader.length,
-            source: 'Core.gs高精度検出システム'
+            source: 'Core.gs高精度検出システム',
           });
 
           // 3. 取得したopinionHeaderをconfigJsonに保存（永続化・最適化）
@@ -1269,7 +1275,9 @@ function renderAnswerBoard(userInfo, params) {
             try {
               const updatedConfig = { ...config, opinionHeader: headerIndices.opinionHeader };
               ConfigManager.saveConfig(userInfo.userId, updatedConfig);
-              console.log('💾 renderAnswerBoard: opinionHeader永続化完了 - 次回はconfigJsonから直接取得');
+              console.log(
+                '💾 renderAnswerBoard: opinionHeader永続化完了 - 次回はconfigJsonから直接取得'
+              );
             } catch (saveError) {
               console.warn('⚠️ renderAnswerBoard: configJson保存エラー:', saveError.message);
             }
@@ -1277,13 +1285,13 @@ function renderAnswerBoard(userInfo, params) {
         } else {
           console.warn('⚠️ renderAnswerBoard: 高精度検出でもopinionHeaderが「お題」:', {
             headerIndicesOpinionHeader: headerIndices?.opinionHeader,
-            availableHeaders: headerIndices ? Object.keys(headerIndices) : '取得失敗'
+            availableHeaders: headerIndices ? Object.keys(headerIndices) : '取得失敗',
           });
         }
       } else {
         console.warn('⚠️ renderAnswerBoard: スプレッドシート情報不足でopinionHeader検出不可:', {
           finalSpreadsheetId: !!finalSpreadsheetId,
-          finalSheetName: !!finalSheetName
+          finalSheetName: !!finalSheetName,
         });
       }
     } catch (headerError) {
@@ -1291,18 +1299,18 @@ function renderAnswerBoard(userInfo, params) {
         error: headerError.message,
         stack: headerError.stack,
         finalSpreadsheetId: !!finalSpreadsheetId,
-        finalSheetName: !!finalSheetName
+        finalSheetName: !!finalSheetName,
       });
       opinionHeader = 'お題'; // エラー時フォールバック
       opinionHeaderSource = 'error_fallback';
     }
-    
+
     // 最終確認ログ
     console.log('📋 renderAnswerBoard: opinionHeader最終設定完了:', {
       finalValue: opinionHeader.substring(0, 50) + (opinionHeader.length > 50 ? '...' : ''),
       source: opinionHeaderSource,
       isDefault: opinionHeader === 'お題',
-      templateVariableSet: true
+      templateVariableSet: true,
     });
     template.__OPINION_HEADER__ = opinionHeader;
 
@@ -1314,11 +1322,7 @@ function renderAnswerBoard(userInfo, params) {
     try {
       if (finalSpreadsheetId && finalSheetName) {
         // データ取得開始
-        const dataResult = getData(
-          userInfo.userId,
-          finalSpreadsheetId,
-          finalSheetName
-        );
+        const dataResult = getData(userInfo.userId, finalSpreadsheetId, finalSheetName);
         template.data = dataResult.data;
         template.message = dataResult.message;
         template.hasData = !!(dataResult.data && dataResult.data.length > 0);
@@ -1366,14 +1370,15 @@ function renderAnswerBoard(userInfo, params) {
     try {
       const currentUserEmail = Session.getActiveUser().getEmail();
       const boardOwnerEmail = userInfo.userEmail;
-      
+
       // 回答ボードの所有者とアクセスユーザーのメール照合
-      const isAdminUser = currentUserEmail && boardOwnerEmail && (currentUserEmail === boardOwnerEmail);
-      
+      const isAdminUser =
+        currentUserEmail && boardOwnerEmail && currentUserEmail === boardOwnerEmail;
+
       // 管理者権限設定をテンプレート変数に追加
       template.hasAdminCapability = isAdminUser;
       template.isAdminUser = isAdminUser;
-      
+
       console.log('🔍 renderAnswerBoard - 管理者権限チェック:', {
         currentUserEmail: currentUserEmail ? `${currentUserEmail.substring(0, 10)}...` : 'null',
         boardOwnerEmail: boardOwnerEmail ? `${boardOwnerEmail.substring(0, 10)}...` : 'null',
@@ -1382,8 +1387,8 @@ function renderAnswerBoard(userInfo, params) {
         hasAdminCapability: isAdminUser,
         templateVars: {
           hasAdminCapability: template.hasAdminCapability,
-          isAdminUser: template.isAdminUser
-        }
+          isAdminUser: template.isAdminUser,
+        },
       });
     } catch (adminError) {
       console.error('renderAnswerBoard - 管理者権限チェックエラー:', adminError);
@@ -1818,10 +1823,7 @@ function getData(userId, classFilter, sortOrder, adminMode, bypassCache) {
         currentUserEmail = UserManager.getCurrentEmail();
         console.log('getData: UserManager.getCurrentEmail()結果', currentUserEmail);
       } catch (emailError) {
-        console.warn(
-          'getData: UserManager.getCurrentEmail()取得失敗',
-          emailError.message
-        );
+        console.warn('getData: UserManager.getCurrentEmail()取得失敗', emailError.message);
       }
 
       // Step 3: メールアドレスからユーザー検索
@@ -1989,25 +1991,26 @@ function validateUserDataState(userInfo) {
  */
 function diagnoseSystem() {
   try {
-    
     const result = new ConfigurationManager().getCurrentUserInfoSafely();
     const currentUser = result?.currentUserEmail;
     const userInfo = result?.userInfo;
-    
+
     const diagnosis = {
       timestamp: new Date().toISOString(),
       currentUser: currentUser,
       userExists: !!userInfo,
-      userData: userInfo ? {
-        userId: userInfo.userId,
-        isActive: userInfo.isActive,
-        hasConfig: !!userInfo.configJson,
-        setupStatus: JSON.parse(userInfo.configJson || '{}').setupStatus
-      } : null,
+      userData: userInfo
+        ? {
+            userId: userInfo.userId,
+            isActive: userInfo.isActive,
+            hasConfig: !!userInfo.configJson,
+            setupStatus: JSON.parse(userInfo.configJson || '{}').setupStatus,
+          }
+        : null,
       systemSetup: isSystemSetup(),
-      recommendations: []
+      recommendations: [],
     };
-    
+
     if (!currentUser) {
       diagnosis.recommendations.push('ユーザーが認証されていません');
     }
@@ -2017,10 +2020,9 @@ function diagnoseSystem() {
     if (userInfo && !userInfo.isActive) {
       diagnosis.recommendations.push('ユーザーを有効化してください');
     }
-    
+
     console.log('✅ システム診断結果:', diagnosis);
     return diagnosis;
-    
   } catch (error) {
     console.error('❌ システム診断エラー:', error.message);
     return { error: error.message };
@@ -2048,13 +2050,13 @@ function emergencyClearCache() {
 function repairCurrentUser() {
   try {
     console.log('🔧 現在のユーザー修復開始...');
-    
+
     const result = new ConfigurationManager().getCurrentUserInfoSafely();
     const currentUser = result?.currentUserEmail;
     if (!currentUser) {
       throw new Error('認証されたユーザーが見つかりません');
     }
-    
+
     let userInfo = DB.findUserByEmail(currentUser);
     if (!userInfo) {
       // ユーザーが存在しない場合は新規作成
@@ -2063,21 +2065,20 @@ function repairCurrentUser() {
       DB.createUser(newUserData);
       userInfo = DB.findUserByEmail(currentUser);
     }
-    
+
     // データ整合性チェック・修復
     if (userInfo.isActive !== true) {
       console.log('isActiveフラグ修復中...');
       DB.updateUser(userInfo.userId, { isActive: true });
     }
-    
+
     console.log('✅ ユーザー修復完了:', {
       userId: userInfo.userId,
       userEmail: userInfo.userEmail,
-      isActive: userInfo.isActive
+      isActive: userInfo.isActive,
     });
-    
+
     return { success: true, userInfo: userInfo };
-    
   } catch (error) {
     console.error('❌ ユーザー修復エラー:', error.message);
     return { success: false, error: error.message };

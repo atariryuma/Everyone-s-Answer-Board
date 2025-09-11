@@ -24,7 +24,7 @@
     currentSpreadsheetId: null,
     currentSheetName: null,
     userInfo: null,
-    initializationStep: 'not started'
+    initializationStep: 'not started',
   };
 
   // ===== 冪等・重複防止（リクエストガード＆デバウンス） =====
@@ -47,7 +47,11 @@
         if (timers.has(key)) clearTimeout(timers.get(key));
         const id = setTimeout(() => {
           timers.delete(key);
-          try { fn(); } catch (e) { console.error('Debounce error', e); }
+          try {
+            fn();
+          } catch (e) {
+            console.error('Debounce error', e);
+          }
         }, delay);
         timers.set(key, id);
       },
@@ -176,7 +180,7 @@
 
       // シンプルなchangeイベントを設定
       setupSimpleChangeEvents();
-      
+
       // データソース選択のラジオボタンイベントを設定
       setupDataSourceRadioEvents();
     } catch (error) {
@@ -184,14 +188,14 @@
       spreadsheetSelect.innerHTML = '<option value="">初期化エラー</option>';
     }
   }
-  
+
   // データソース選択ラジオボタンのイベント設定
   function setupDataSourceRadioEvents() {
     const radioButtons = document.querySelectorAll('input[name="source-method"]');
     let spreadsheetListLoaded = false;
-    
-    radioButtons.forEach(radio => {
-      radio.addEventListener('change', async function() {
+
+    radioButtons.forEach((radio) => {
+      radio.addEventListener('change', async function () {
         if (this.value === 'dropdown' && !spreadsheetListLoaded) {
           // 「一覧から選択」が選択された時のみスプレッドシート一覧を読み込み
           console.log('スプレッドシート一覧を読み込み中...');
@@ -392,10 +396,7 @@
   // 設定データ取得（シンプル版）
   function getConfigAsync() {
     return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        .getConfig();
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getConfig();
     });
   }
 
@@ -492,24 +493,25 @@
   function validateUrlInput(inputElement) {
     const url = inputElement.value.trim();
     const messageEl = document.getElementById('url-validation-message');
-    
+
     if (!url) {
       messageEl.textContent = '💡 GoogleスプレッドシートのURLを貼り付けてください';
       messageEl.className = 'text-xs text-gray-400 mt-1';
       inputElement.classList.remove('border-red-500', 'border-green-500');
       return;
     }
-    
+
     // 基本的なURL検証パターン
     const urlPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]+/;
-    
+
     if (urlPattern.test(url)) {
       messageEl.textContent = '✅ 有効なスプレッドシートURLです';
       messageEl.className = 'text-xs text-green-400 mt-1';
       inputElement.classList.remove('border-red-500');
       inputElement.classList.add('border-green-500');
     } else {
-      messageEl.textContent = '❌ 無効なURL形式です。Googleスプレッドシートの正しいURLを入力してください';
+      messageEl.textContent =
+        '❌ 無効なURL形式です。Googleスプレッドシートの正しいURLを入力してください';
       messageEl.className = 'text-xs text-red-400 mt-1';
       inputElement.classList.remove('border-green-500');
       inputElement.classList.add('border-red-500');
@@ -538,10 +540,6 @@
     }
     return sanitized;
   }
-
-
-
-
 
   // 進捗ステップを設定から更新
   function updateProgressFromConfig(config) {
@@ -709,14 +707,14 @@
         container: document.getElementById('form-info'),
         title: document.getElementById('form-title'),
         url: document.getElementById('form-url'),
-        spreadsheet: document.getElementById('spreadsheet-name')
+        spreadsheet: document.getElementById('spreadsheet-name'),
       },
       {
         container: document.getElementById('form-info-url'),
         title: document.getElementById('form-title-url'),
         url: document.getElementById('form-url-url'),
-        spreadsheet: document.getElementById('spreadsheet-name-url')
-      }
+        spreadsheet: document.getElementById('spreadsheet-name-url'),
+      },
     ];
 
     // 詳細デバッグ情報
@@ -731,24 +729,25 @@
     });
 
     // 両方のエリアを更新
-    formInfos.forEach(info => {
+    formInfos.forEach((info) => {
       if (info.container && info.title && info.url) {
         // フォームタイトルが取得できた場合は優先表示、なければスプレッドシート名
-        const displayTitle = formData.formTitle && formData.formTitle.trim() !== '' 
-          ? formData.formTitle 
-          : (spreadsheetName || '（タイトル取得中...）');
-        
+        const displayTitle =
+          formData.formTitle && formData.formTitle.trim() !== ''
+            ? formData.formTitle
+            : spreadsheetName || '（タイトル取得中...）';
+
         console.log('📝 フォーム情報設定:', {
           container: info.container.id,
           displayTitle: displayTitle,
           formUrl: formData.formUrl,
-          spreadsheetName: spreadsheetName
+          spreadsheetName: spreadsheetName,
         });
 
         info.title.textContent = displayTitle;
         info.url.href = formData.formUrl;
         info.url.textContent = formData.formUrl;
-        
+
         // スプレッドシート名も表示（存在する場合）
         if (info.spreadsheet && spreadsheetName) {
           info.spreadsheet.textContent = `スプレッドシート: ${spreadsheetName}`;
@@ -1324,7 +1323,9 @@
     // ドロップダウンにヘッダーオプションを設定
     populateColumnDropdowns(headers, mapping);
     // 現在のヘッダーをグローバルに保持（検証/保存で使用）
-    try { window.currentHeaders = headers; } catch (_) {}
+    try {
+      window.currentHeaders = headers;
+    } catch (_) {}
 
     // AI検出情報を表示
     displayAIDetectionInfo(mapping);
@@ -1718,11 +1719,13 @@
     let headers = Array.isArray(window.currentHeaders) ? window.currentHeaders : [];
     if (!headers.length) {
       const options = document.querySelectorAll('#answer-column-select option');
-      headers = Array.from(options).map((opt) => {
-        const txt = opt.textContent || '';
-        const parts = txt.split(': ');
-        return parts.length > 1 ? parts.slice(1).join(': ') : '';
-      }).filter(Boolean);
+      headers = Array.from(options)
+        .map((opt) => {
+          const txt = opt.textContent || '';
+          const parts = txt.split(': ');
+          return parts.length > 1 ? parts.slice(1).join(': ') : '';
+        })
+        .filter(Boolean);
     }
 
     // ドロップダウンからマッピングを収集
@@ -1781,7 +1784,10 @@
     google.script.run
       .withSuccessHandler(function (result) {
         if (result.success) {
-          console.log('列設定を保存しました:', { savedHeaders: headers.length, hasMapping: !!columnMapping });
+          console.log('列設定を保存しました:', {
+            savedHeaders: headers.length,
+            hasMapping: !!columnMapping,
+          });
           // 設定を再読み込み
           loadCurrentConfig();
         } else {
@@ -2248,14 +2254,14 @@
   // 回答ボードを開く
   function openAnswerBoard() {
     google.script.run
-      .withSuccessHandler(function(result) {
+      .withSuccessHandler(function (result) {
         if (result && result.appUrl) {
           window.open(result.appUrl, '_blank');
         } else {
           showError('回答ボードのURLが取得できませんでした');
         }
       })
-      .withFailureHandler(function(error) {
+      .withFailureHandler(function (error) {
         showError('回答ボードを開けませんでした: ' + error.message);
       })
       .getCurrentBoardInfoAndUrls();
