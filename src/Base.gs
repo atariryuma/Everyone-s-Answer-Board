@@ -627,18 +627,32 @@ class AccessController {
       return this.createAccessResult(true, 'owner', config);
     }
 
-    // 公開設定を確認
-    if (config.isPublic) {
+    // 🔧 公開ボードの判定を修正
+    // appPublished が true の場合は閲覧可能（これが主要な公開フラグ）
+    if (config.appPublished === true) {
+      console.log('✅ 公開ボードへのアクセスを許可');
+      return this.createAccessResult(true, 'guest', config);
+    }
+
+    // 旧フラグのサポート（後方互換性）
+    if (config.isPublic === true) {
+      console.log('✅ 公開ボードへのアクセスを許可 (isPublic)');
       return this.createAccessResult(true, 'guest', config);
     }
 
     // 匿名アクセス許可を確認
-    if (config.allowAnonymous) {
+    if (config.allowAnonymous === true) {
+      console.log('✅ 匿名アクセスを許可');
       return this.createAccessResult(true, 'anonymous', config);
     }
 
-    // デフォルトは閲覧不可
-    return this.createAccessResult(false, 'guest', null, '閲覧権限がありません');
+    // 非公開ボードの場合
+    console.warn('❌ 非公開ボードへのアクセスを拒否', {
+      appPublished: config.appPublished,
+      isPublic: config.isPublic,
+      allowAnonymous: config.allowAnonymous
+    });
+    return this.createAccessResult(false, 'guest', null, 'このボードは現在非公開です');
   }
 
   /**
