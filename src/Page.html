@@ -46,8 +46,9 @@
       .glass-panel {
         background: var(--color-surface);
         border: 1px solid var(--color-border);
-        backdrop-filter: blur(var(--backdrop-blur));
         -webkit-backdrop-filter: blur(var(--backdrop-blur));
+        -webkit-backdrop-filter: blur(var(--backdrop-blur));
+        backdrop-filter: blur(var(--backdrop-blur));
         transition: border-color var(--transition-duration) var(--transition-easing);
       }
       .glass-panel:hover {
@@ -228,8 +229,8 @@
       }
       .admin-toggle {
         transition: background-color var(--animation-duration) var(--transition-easing);
-        backdrop-filter: blur(8px);
         -webkit-backdrop-filter: blur(8px);
+        backdrop-filter: blur(8px);
       }
       .admin-toggle:hover {
         background-color: rgba(139, 233, 253, 0.1);
@@ -241,6 +242,7 @@
         right: 0;
         bottom: 0;
         background: rgba(26, 27, 38, 0.8);
+        -webkit-backdrop-filter: blur(4px);
         backdrop-filter: blur(4px);
         display: flex;
         align-items: center;
@@ -328,8 +330,8 @@
         }
 
         .glass-panel {
-          backdrop-filter: none;
           -webkit-backdrop-filter: none;
+          backdrop-filter: none;
           background: var(--color-surface);
         }
 
@@ -434,8 +436,8 @@
       }
 
       .low-performance .glass-panel {
-        backdrop-filter: none;
         -webkit-backdrop-filter: none;
+        backdrop-filter: none;
       }
 
       /* Hidden card styles for virtual scrolling */
@@ -579,6 +581,7 @@
       .answer-preview {
         display: -webkit-box;
         -webkit-line-clamp: 5;
+        line-clamp: 5;
         -webkit-box-orient: vertical;
         overflow: hidden;
         text-overflow: ellipsis;
@@ -1105,8 +1108,8 @@
         '<?= typeof __OPINION_HEADER__ !== "undefined" && __OPINION_HEADER__ ? __OPINION_HEADER__ : "お題" ?>';
 
       // 管理者権限変数をグローバル設定
-      window.hasAdminCapability = <?= typeof hasAdminCapability !== "undefined" && hasAdminCapability === true ? "true" : "false" ?>;
-      window.isAdminUser = <?= typeof isAdminUser !== "undefined" && isAdminUser === true ? "true" : "false" ?>;
+      window.hasAdminCapability = (typeof hasAdminCapability !== "undefined" && hasAdminCapability === true) ? true : false;
+      window.isAdminUser = false; // Set to true if admin user, replace with server-side value if needed
 
       // DISPLAY_MODES定数をフロントエンドで利用可能にする
       window.DISPLAY_MODES = Object.freeze({
