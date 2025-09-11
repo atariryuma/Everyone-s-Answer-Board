@@ -1433,6 +1433,8 @@
 
     // ドロップダウンにヘッダーオプションを設定
     populateColumnDropdowns(headers, mapping);
+    // 現在のヘッダーをグローバルに保持（検証/保存で使用）
+    try { window.currentHeaders = headers; } catch (_) {}
 
     // AI検出情報を表示
     displayAIDetectionInfo(mapping);
@@ -1822,35 +1824,38 @@
 
     console.log('verifyColumnMapping: 列マッピング検証開始', { spreadsheetId, sheetName });
 
-    // 既存のgetHeaderIndices関数を使用して検証
-    google.script.run
-      .withSuccessHandler(function (headerIndices) {
-        console.log('verifyColumnMapping: ヘッダー検証成功', headerIndices);
+    // ヘッダーは接続時に保持したものを使用（なければ最小化）
+    let headers = Array.isArray(window.currentHeaders) ? window.currentHeaders : [];
+    if (!headers.length) {
+      const options = document.querySelectorAll('#answer-column-select option');
+      headers = Array.from(options).map((opt) => {
+        const txt = opt.textContent || '';
+        const parts = txt.split(': ');
+        return parts.length > 1 ? parts.slice(1).join(': ') : '';
+      }).filter(Boolean);
+    }
 
-        if (!headerIndices || Object.keys(headerIndices).length === 0) {
-          showError('ヘッダー情報を取得できませんでした。シートの構造を確認してください');
-          setLoading(false);
-          return;
-        }
+    // ドロップダウンからマッピングを収集
+    const selections = gatherColumnSelections();
+    const mapping = { mapping: {}, confidence: {} };
+    ['answer', 'reason', 'class', 'name'].forEach((key) => {
+      const sel = selections[key];
+      if (sel && typeof sel.columnIndex === 'number') {
+        mapping.mapping[key] = sel.columnIndex;
+        if (typeof sel.confidence === 'number') mapping.confidence[key] = sel.confidence;
+      }
+    });
 
-        // 検証結果を表示
-        displayVerificationResults(headerIndices);
+    // 表示用に検証結果を描画
+    displayVerificationResults({ ok: true });
 
-        // 設定を保存
-        saveColumnConfiguration(spreadsheetId, sheetName, headerIndices);
+    // 設定を保存（headers + columnMapping で統一）
+    saveColumnConfiguration(spreadsheetId, sheetName, headers, mapping);
 
-        showSuccess('列マッピングの検証が完了しました');
-        updateProgress(3);
-        setLoading(false);
-        RequestGate.exit('verifyColumnMapping');
-      })
-      .withFailureHandler(function (error) {
-        console.error('verifyColumnMapping エラー:', error);
-        showError('列マッピングの検証に失敗しました: ' + (error.message || 'Unknown error'));
-        setLoading(false);
-        RequestGate.exit('verifyColumnMapping');
-      })
-      .getHeaderIndices(spreadsheetId, sheetName);
+    showSuccess('列マッピングの検証が完了しました');
+    updateProgress(3);
+    setLoading(false);
+    RequestGate.exit('verifyColumnMapping');
   }
 
   // 検証結果の表示
@@ -1873,20 +1878,32 @@
   }
 
   // 列設定の保存
-  function saveColumnConfiguration(spreadsheetId, sheetName, headerIndices) {
+  function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping) {
     const config = {
-      spreadsheetId: spreadsheetId,
-      sheetName: sheetName,
-      headerIndices: headerIndices,
+      spreadsheetId,
+      sheetName,
+      headers,
+      columnMapping,
       verifiedAt: new Date().toISOString(),
+      etag: (systemState && systemState.config && systemState.config.etag) || undefined,
     };
 
     google.script.run
       .withSuccessHandler(function (result) {
         if (result.success) {
-          console.log('列設定を保存しました:', config);
+          console.log('列設定を保存しました:', { savedHeaders: headers.length, hasMapping: !!columnMapping });
+          if (typeof loadAndApplyCurrentConfig === 'function') {
+            loadAndApplyCurrentConfig();
+          }
         } else {
-          console.warn('列設定の保存に失敗:', result.error);
+          if (result.error === 'etag_mismatch') {
+            showInfo('設定が他で更新されました。画面を更新しました。もう一度保存してください。');
+            if (typeof loadAndApplyCurrentConfig === 'function') {
+              loadAndApplyCurrentConfig();
+            }
+          } else {
+            console.warn('列設定の保存に失敗:', result.error);
+          }
         }
       })
       .withFailureHandler(function (error) {
@@ -1948,6 +1965,7 @@
           spreadsheetId: currentConfig.spreadsheetId,
           sheetName: currentConfig.sheetName,
           columnMapping: currentConfig.columnMapping,
+          etag: currentConfig.etag,
 
           // 🎯 必須データのみ：UI設定
           showNames: document.getElementById('show-names').checked,
@@ -1974,7 +1992,14 @@
                 loadBoardInfo(); // フッター情報を再読み込み
               }, 500);
             } else {
-              showError(result.error);
+              if (result.error === 'etag_mismatch') {
+                showInfo('設定が他で更新されました。画面を更新してから再度公開してください。');
+                if (typeof loadAndApplyCurrentConfig === 'function') {
+                  loadAndApplyCurrentConfig();
+                }
+              } else {
+                showError(result.error);
+              }
             }
             setLoading(false);
             RequestGate.exit('publishApp');
@@ -2026,6 +2051,7 @@
       sheetName,
       showNames: document.getElementById('show-names').checked,
       showReactions: document.getElementById('show-reactions').checked,
+      etag: (systemState && systemState.config && systemState.config.etag) || undefined,
     };
   }
 

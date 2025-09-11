@@ -4404,6 +4404,24 @@ function publishApplication(config) {
     // 現在のconfigJSONを直接取得（パフォーマンス向上）
     const currentConfig = JSON.parse(userInfo.configJson || '{}');
 
+    // 楽観ロック: etag厳格検証（提供されている場合）
+    try {
+      if (config && config.etag && currentConfig && currentConfig.etag && config.etag !== currentConfig.etag) {
+        console.warn('publishApplication: etag不一致により拒否', {
+          provided: config.etag,
+          current: currentConfig.etag,
+        });
+        return {
+          success: false,
+          error: 'etag_mismatch',
+          message: '設定が他で更新されました。画面を更新して再試行してください。',
+          currentConfig: currentConfig,
+        };
+      }
+    } catch (etErr) {
+      console.warn('publishApplication: etag検証エラー', etErr.message);
+    }
+
     console.log('🔍 publishApplication: 設定確認', {
       userId: userInfo.userId,
       currentConfig: {
@@ -4635,6 +4653,24 @@ function saveDraftConfiguration(config) {
 
     // 🔥 現在の設定を取得して、必要なフィールドのみを保持
     const currentConfig = ConfigManager.getUserConfig(userInfo.userId) || {};
+
+    // 楽観ロック: etag厳格検証（提供されている場合）
+    try {
+      if (config && config.etag && currentConfig && currentConfig.etag && config.etag !== currentConfig.etag) {
+        console.warn('saveDraftConfiguration: etag不一致により拒否', {
+          provided: config.etag,
+          current: currentConfig.etag,
+        });
+        return {
+          success: false,
+          error: 'etag_mismatch',
+          message: '設定が他で更新されました。画面を更新してから再保存してください。',
+          currentConfig: currentConfig,
+        };
+      }
+    } catch (etErr) {
+      console.warn('saveDraftConfiguration: etag検証エラー', etErr.message);
+    }
     
     // データソースが変更されたかチェック
     const isDataSourceChanged = config.spreadsheetId && config.sheetName && 
@@ -4694,6 +4730,11 @@ function saveDraftConfiguration(config) {
       } catch (hhErr) {
         console.warn('saveDraftConfiguration: ヘッダー取得失敗（ソース変更時）', hhErr.message);
       }
+
+      // 要求にcolumnMappingが含まれる場合は採用
+      if (config.columnMapping) {
+        updatedConfig.columnMapping = config.columnMapping;
+      }
     } else {
       // データソースが変更されていない場合は、既存のフィールドを保持
       updatedConfig = {
@@ -4743,9 +4784,12 @@ function saveDraftConfiguration(config) {
         etag: computeEtag(),
       };
 
-      // ヘッダー検証: 今回のリクエストにheaderIndicesが付与されている場合は最新ヘッダーを保存
+      // ヘッダー保存: 要求にheadersが含まれる場合は採用。なければ更新時に最新ヘッダーを保存（互換）
       try {
-        if (config.headerIndices && updatedConfig.spreadsheetId && updatedConfig.sheetName) {
+        if (config.headers && Array.isArray(config.headers)) {
+          updatedConfig.headers = config.headers;
+          updatedConfig.headersHash = computeHeadersHash(config.headers);
+        } else if (updatedConfig.spreadsheetId && updatedConfig.sheetName && !updatedConfig.headers) {
           const spreadsheet = new ConfigurationManager().getSpreadsheet(updatedConfig.spreadsheetId);
           const sheet = spreadsheet.getSheetByName(updatedConfig.sheetName);
           if (sheet) {
@@ -4756,6 +4800,11 @@ function saveDraftConfiguration(config) {
         }
       } catch (hhErr2) {
         console.warn('saveDraftConfiguration: ヘッダー取得失敗（更新時）', hhErr2.message);
+      }
+
+      // 要求にcolumnMappingが含まれる場合は採用
+      if (config.columnMapping) {
+        updatedConfig.columnMapping = config.columnMapping;
       }
     }
 
