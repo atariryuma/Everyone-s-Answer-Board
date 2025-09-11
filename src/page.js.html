@@ -2536,18 +2536,18 @@ class StudyQuestApp {
               console.error('❌ getActiveFormInfo エラー:', error);
               reject(error);
             })
-            .getActiveFormInfo(this.state.userId);
+            .getCurrentBoardInfoAndUrls();
         });
       
       console.log('🔍 フォームURL判定:', {
         hasResult: !!result,
-        status: result?.status,
+        isActive: result?.isActive,
         hasFormUrl: !!(result?.formUrl),
         formUrl: result?.formUrl || 'null',
         resultKeys: result ? Object.keys(result) : []
       });
       
-      if (result && result.status === 'success') {
+      if (result && result.isActive) {
         if (result.formUrl) {
           console.log('✅ フォームURL取得成功:', result.formUrl);
           return result.formUrl;
