@@ -347,6 +347,32 @@
       };
     };
 
+    // HTML出力の安全性検証
+    const validateHtmlOutput = (html) => {
+      if (!html || typeof html !== 'string') {
+        console.warn('🔍 HTML validation: 無効な入力');
+        return false;
+      }
+      
+      // 基本的な構文エラーパターンをチェック
+      const dangerousPatterns = [
+        /Unexpected token/i,
+        /SyntaxError/i,
+        /\}\s*else\s*[^{]/,  // else文の不完全な構文
+        /<script[^>]*>[^<]*else[^<]*<\/script>/i  // script内の不完全なelse
+      ];
+      
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(html)) {
+          console.warn('🔍 HTML validation: 危険なパターンを検出', pattern);
+          return false;
+        }
+      }
+      
+      console.log('✅ HTML validation: 安全性確認済み');
+      return true;
+    };
+
     // Set up global error handlers
     const setupGlobalErrorHandlers = () => {
       // Global unhandled error handler
@@ -554,10 +580,25 @@
 
               // サーバーから返されたHTMLを現在のページに設定（自動リダイレクト実行）
               if (htmlOutput && htmlOutput.trim()) {
+                // HTMLの安全性を事前検証
+                if (!validateHtmlOutput(htmlOutput)) {
+                  console.warn('⚠️ HTML validation失敗、フォールバック実行');
+                  fallbackReload();
+                  return;
+                }
+                
                 console.log('✅ Valid HTML received, applying...');
-                document.open();
-                document.write(htmlOutput);
-                document.close();
+                try {
+                  document.open();
+                  document.write(htmlOutput);
+                  document.close();
+                } catch (writeError) {
+                  console.error('❌ document.write failed:', writeError);
+                  console.error('  - Error type:', writeError.name);
+                  console.error('  - Error message:', writeError.message);
+                  console.warn('🔄 フォールバックにリダイレクト');
+                  fallbackReload();
+                }
               } else {
                 console.warn('⚠️ 空のHTMLOutput、フォールバック実行');
                 console.warn('  - htmlOutput:', htmlOutput);
