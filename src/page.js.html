@@ -1348,43 +1348,11 @@
         // Update slider value display immediately using safe DOM operation
         safeDOM.setTextContent(this.elements.sliderValue, value);
         
-        // Apply smooth grid transition with loading state using safe DOM operations
-        const container = this.elements.answersContainer;
-        if (container) {
-          // Set transition state to prevent duplicate updates
-          this.state.isGridTransitioning = true;
-          
-          // Add transition class for smooth animation using safeDOM
-          if (safeDOM.addClass(container, 'transitioning')) {
-            // Map column values to Tailwind classes
-            const colsMap = {
-              '2': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2',
-              '3': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-              '4': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-              '5': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
-              '6': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
-            };
-            
-            const newClassName = colsMap[value] || 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
-            
-            // Only update if className actually changed and use safe DOM operation
-            if (container.className !== newClassName) {
-              safeDOM.setClassName(container, newClassName);
-            }
-            
-            // Remove transition class and reset state after transition
-            setTimeout(() => {
-              safeDOM.removeClass(container, 'transitioning');
-              this.state.isGridTransitioning = false;
-            }, 150);
-          } else {
-            // If addClass failed, still reset the transition state
-            this.state.isGridTransitioning = false;
-          }
-        }
+        // Apply smooth grid transition without losing DOM cards
+        this.applyGridTransitionSafely(value);
         
-        // Delayed render to allow transition to complete
-        debouncedRender();
+        // Skip re-render to avoid DOM card loss - only apply visual changes
+        // debouncedRender() is removed to prevent DOM cards from being lost
       }, 100); // Throttle to 100ms
 
       if (this.elements.sizeSlider) {
@@ -4562,21 +4530,6 @@
           () => (this.elements.sliderValue.textContent = this.elements.sizeSlider.value)
         );
       }
-      // Skip grid updates if transition is already in progress
-      if (this.elements.sizeSlider && !this.state.isGridTransitioning) {
-        const container = this.elements.answersContainer;
-        const colsMap = {
-          '2': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2',
-          '3': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-          '4': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-          '5': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
-          '6': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
-        };
-        const newClassName = colsMap[this.elements.sizeSlider.value] || 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
-        if (container.className !== newClassName) {
-          updates.push(() => (container.className = newClassName));
-        }
-      }
       if (this.elements.answerCount) {
         const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1 text-blue-400');
         const countHtml = `${userIcon}<span>${newRows.length}件</span>`;
@@ -4587,6 +4540,33 @@
 
       // Apply updates using performance-aware batching
       this.batchDOMUpdates(updates);
+    }
+    
+    /**
+     * Safely apply grid transition without losing DOM cards
+     * @param {string} value - Grid column value (2-6)
+     */
+    applyGridTransitionSafely(value) {
+      const container = this.elements.answersContainer;
+      if (!container) return;
+      
+      // Map column values to Tailwind classes
+      const colsMap = {
+        '2': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2',
+        '3': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+        '4': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+        '5': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
+        '6': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
+      };
+      
+      const newClassName = colsMap[value] || 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
+      
+      // Only update if className actually changed
+      if (container.className !== newClassName) {
+        // Use safeDOM to update className - this preserves existing DOM cards
+        safeDOM.setClassName(container, newClassName);
+        console.log(`🎯 Grid layout updated to ${value} columns without re-rendering`);
+      }
     }
 
     performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
