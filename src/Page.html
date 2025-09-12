@@ -28,15 +28,11 @@
       <div class="flex items-center justify-between gap-4 py-2">
         <div class="flex items-center gap-3">
           <div id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0">
-            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
+            <span class="w-4 h-4 text-blue-400">👥</span>
             <span id="answerCountText">0件</span>
           </div>
           <a id="formAnswerBtn" href="#" target="_blank" rel="noopener noreferrer" class="text-xs bg-green-600 hover:bg-green-700 text-white font-medium px-3 py-1.5 rounded-md whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm no-underline" aria-label="フォームで回答" role="button">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
-            </svg>
+            <span class="w-3 h-3">✏️</span>
             フォームで回答
           </a>
           <div class="flex items-center gap-2">
@@ -49,30 +45,21 @@
                 <option value="random">ランダム順</option>
                 <option value="score" id="scoreOption" class="hidden">スコア順</option>
               </select>
-              <svg class="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-              </svg>
+              <span class="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none">▼</span>
             </div>
           </div>
         </div>
         <div class="flex-1 flex justify-center"></div>
         <div class="flex items-center gap-2">
           <div id="boardOwnerDisplay" class="text-xs text-gray-500 bg-gray-800/40 backdrop-blur-sm px-2.5 py-1 rounded-md flex items-center gap-1.5">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
-            </svg>
+            <span class="w-3 h-3">👤</span>
             <span>ID: <?= userInfo.userId ? userInfo.userId.substring(0,8) + '...' : 'ID_NOT_SET' ?></span>
           </div>
           <button type="button" id="adminToggleBtn" class="admin-toggle text-gray-400 hover:text-cyan-400 transition-all p-1.5 rounded-md hover:bg-gray-800/50 hidden" aria-label="管理者モード切り替え">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            </svg>
+            <span class="w-3 h-3">⚙️</span>
           </button>
           <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600/80 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
-            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
-            </svg>
+            <span class="w-3 h-3">🚫</span>
             公開終了
           </button>
         </div>
@@ -80,10 +67,7 @@
       <div class="border-t border-transparent pt-4">
         <div class="flex justify-center">
           <div id="headingLabel" class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem] text-center max-w-4xl line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-            <svg class="w-5 h-5 md:w-6 md:h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
-            </svg>
+            <span class="w-5 h-5 md:w-6 md:h-6 animate-spin">🔄</span>
             <span class="animate-pulse ml-2">問題文を読み込み中...</span>
           </div>
         </div>
@@ -105,9 +89,7 @@
   <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
     <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
       <button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10 absolute -top-3 -right-3" aria-label="閉じる">
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-        </svg>
+        <span class="w-6 h-6 flex items-center justify-center">✕</span>
       </button>
       <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
       <div id="modalFooter" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
@@ -152,11 +134,7 @@
       <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更" />
       <div class="flex items-center gap-1">
         <span id="sliderValue" class="font-bold text-lg">4</span>
-        <svg id="iconGrid" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <rect width="18" height="18" x="3" y="3" rx="2"></rect>
-          <path d="M3 12h18"></path>
-          <path d="M12 3v18"></path>
-        </svg>
+        <span id="iconGrid" class="w-4 h-4 flex items-center justify-center">⊞</span>
       </div>
       <button type="button" id="modeToggleBtn" class="ml-4 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm" title="プレビューモード切り替え">切替</button>
     </div>
@@ -208,20 +186,14 @@
       })
     });
 
-    // 🚀 統合アイコンライブラリ
+    // 🚀 アイコンライブラリ（絵文字使用）
     const ICONS = Object.freeze({
-      'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 3.75a24.456 24.456 0 01-6 0m2.25 2.25a24.456 24.456 0 005.25 0m0 0a24.456 24.456 0 00-5.25-4.5M12 12.75a.75.75 0 00-.75-.75H10.5a.75.75 0 01-.75-.75V9.75a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v2.25a.75.75 0 01.75.75m-1.5 0a.75.75 0 01-.75.75m0-3.75V6a6 6 0 016 6v6h-3V9a3 3 0 00-6 0v9.75a.75.75 0 01-1.5 0V15a6 6 0 016-6V6z"/></svg>',
-      'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0c0 1.58-.75 2.98-1.909 3.87a.75.75 0 01-.341.138v.384c0 .126-.003.253-.01.378a5.25 5.25 0 11-4.78 0c-.007-.125-.01-.252-.01-.378v-.384a.75.75 0 01-.341-.138A4.493 4.493 0 017.5 12zM21 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H20.25A.75.75 0 0121 12zM3.75 12a.75.75 0 01-.75-.75V9a.75.75 0 011.5 0v2.25A.75.75 0 013.75 12z"/></svg>',
-      'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
-      'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M7 22a3 3 0 01-3-3v-8a3 3 0 013-3h2.75L12 2a2 2 0 013.13 1.66L14 7h5.83a3 3 0 012.88 3.84l-2.33 8A3 3 0 0117.5 22H7z"/></svg>',
-      'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
-      'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z" clip-rule="evenodd"/><path d="M10.5 7.5a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5a.75.75 0 01.75-.75z"/></svg>',
-      'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-      'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 15,8.5 22,9.3 17,14 18.2,21 12,17.8 5.8,21 7,14 2,9.3 9,8.5 12,2"/></svg>',
-      'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 15,8.5 22,9.3 17,14 18.2,21 12,17.8 5.8,21 7,14 2,9.3 9,8.5 12,2"/></svg>',
-      'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 15,8.5 22,9.3 17,14 18.2,21 12,17.8 5.8,21 7,14 2,9.3 9,8.5 12,2"/></svg>',
-      'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
-      'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+      'lightbulb': '💡',
+      'hand-thumb-up': '❤️',
+      'magnifying-glass-plus': '🤔',
+      'star': '⭐',
+      'grid-2x2': '⊞',
+      'users': '👥'
     });
 
     // 🚀 高速化ユーティリティ - 1箇所に統合
@@ -273,18 +245,8 @@
       },
 
       getIcon(name, classes = '', solid = false) {
-        let key;
-        if (solid && ICONS[name + '-solid']) {
-          key = name + '-solid';
-        } else if (ICONS[name + '-outline']) {
-          key = name + '-outline';
-        } else if (ICONS[name]) {
-          key = name;
-        } else {
-          console.warn('Icon not found:', name);
-          return '<span class="' + classes + '">⭐</span>';
-        }
-        return '<span class="' + classes + '">' + ICONS[key] + '</span>';
+        const icon = ICONS[name] || '⭐';
+        return '<span class="' + classes + '">' + icon + '</span>';
       },
 
       logDebug(...args) {
