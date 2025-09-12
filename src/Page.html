@@ -1,1088 +1,752 @@
 <!doctype html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <title>StudyQuest - みんなのかいとうボード</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <?!= include('SharedSecurityHeaders'); ?>
-    <link
-      rel="preload"
-      href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
-      as="style"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript
-      ><link
-        href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap"
-        rel="stylesheet"
-    /></noscript>
-    <link rel="dns-prefetch" href="//script.google.com" />
-    <link rel="preconnect" href="https://script.google.com" crossorigin />
-    <?!= include('SharedTailwindConfig'); ?>
-    <style>
-      :root {
-        --color-primary: #8be9fd;
-        --color-background: #1a1b26;
-        --color-surface: rgba(26, 27, 38, 0.95);
-        --color-text: #c0caf5;
-        --color-border: rgba(255, 255, 255, 0.1);
-        --color-accent: #facc15;
-        --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
-        --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
-        --color-success: #10b981;
-        --color-error: #ef4444;
-        --color-warning: #f59e0b;
-        /* Performance variables */
-        --transition-duration: 0.2s;
-        --transition-easing: ease-out;
-        --animation-duration: 0.3s;
-        --backdrop-blur: 12px;
-      }
-      body {
-        color: var(--color-text);
-        background-color: var(--color-background);
-        margin: 0;
-        overflow-x: hidden;
-      }
-      .glass-panel {
-        background: var(--color-surface);
-        border: 1px solid var(--color-border);
-        -webkit-backdrop-filter: blur(var(--backdrop-blur));
-        -webkit-backdrop-filter: blur(var(--backdrop-blur));
-        backdrop-filter: blur(var(--backdrop-blur));
-        transition: border-color var(--transition-duration) var(--transition-easing);
-      }
-      .glass-panel:hover {
-        border-color: rgba(255, 255, 255, 0.2);
-      }
-      .game-font {
-        font-family: 'Press Start 2P', cursive;
-      }
-      .game-btn {
-        transition:
-          transform var(--transition-duration) var(--transition-easing),
-          box-shadow var(--transition-duration) var(--transition-easing),
-          border-bottom-width var(--transition-duration) var(--transition-easing);
-        border-radius: 0.75rem;
-        border-bottom-width: 4px;
-        text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.4);
-        position: relative;
-        overflow: hidden;
-      }
-      .game-btn:not(:disabled):hover {
-        transform: translate3d(0, -2px, 0);
-        box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
-      }
-      .game-btn:active:not(:disabled) {
-        transform: translate3d(0, 2px, 0);
-        border-bottom-width: 2px;
-      }
-      .game-btn:disabled {
-        opacity: 0.6;
-        cursor: not-allowed;
-        transform: none !important;
-      }
-      #classFilter,
-      #sortOrder {
-        background-color: rgba(31, 41, 55, 0.5);
-        border: 1px solid #4b5563;
-        color: #d1d5db;
-        border-radius: 0.375rem;
-        padding: 0.375rem 0.75rem;
-        transition:
-          border-color var(--transition-duration) var(--transition-easing),
-          box-shadow var(--transition-duration) var(--transition-easing);
-      }
-      #classFilter:focus,
-      #sortOrder:focus {
-        border-color: rgba(6, 182, 212, 0.5);
-        box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
-        outline: none;
-      }
-      :focus-visible {
-        outline: 3px solid var(--color-primary);
-        outline-offset: 2px;
-        border-radius: 0.75rem;
-      }
-      header {
-        position: sticky;
-        top: 0;
-        z-index: 50;
-        contain: layout;
-        backdrop-filter: blur(var(--backdrop-blur));
-        -webkit-backdrop-filter: blur(var(--backdrop-blur));
-      }
-      
-      /* Header Two-Row Layout Styles */
-      .line-clamp-2 {
-        display: -webkit-box;
-        -webkit-line-clamp: 2;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-      }
-      
-      
-      @media (min-width: 768px) and (max-width: 1023px) {
-        /* Tablet: ensure proper spacing */
-        #headingLabel {
-          font-size: 1.25rem !important; /* text-xl */
-        }
-      }
-      
-      /* Form button enhancement */
-      #formAnswerBtn {
-        transition: all 0.2s ease-out;
-      }
-      
-      #formAnswerBtn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
-      }
-      
-      /* Statistics display enhancement */
-      #answerCount {
-        transition: background-color 0.2s ease-out;
-      }
-      
-      #answerCount:hover {
-        background-color: rgba(55, 65, 81, 0.5);
-      }
-      .answer-card {
-        transition:
-          transform var(--animation-duration) var(--transition-easing),
-          box-shadow var(--animation-duration) var(--transition-easing);
-        border-radius: 1rem;
-        contain: layout style;
-        position: relative;
-        overflow: hidden;
-      }
-      .answer-card.highlighted {
-        border-image: linear-gradient(45deg, #9333ea, #c084fc, #9333ea) 1 !important;
-        border-width: 4px !important;
-        box-shadow:
-          0 0 25px rgba(147, 51, 234, 0.6),
-          inset 0 0 20px rgba(192, 132, 252, 0.1),
-          0 8px 32px rgba(147, 51, 234, 0.2);
-        transform: scale(1.02);
-        position: relative;
-      }
-      .answer-card:hover {
-        transform: translateY(-4px);
-        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.2);
-      }
-      .answer-card.loading {
-        opacity: 0.7;
-        pointer-events: none;
-      }
-      .reaction-btn {
-        transition:
-          transform var(--transition-duration) var(--transition-easing),
-          background-color var(--transition-duration) var(--transition-easing),
-          box-shadow var(--transition-duration) var(--transition-easing);
-        position: relative;
-        overflow: hidden;
-      }
-      .reaction-btn:hover {
-        transform: scale(1.1);
-      }
-      .reaction-btn:active {
-        transform: scale(0.95);
-      }
-      .reaction-btn.reacted {
-        background-color: var(--color-primary) !important;
-        color: #000 !important;
-        box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
-      }
-      .reaction-btn.liked {
-        background-color: var(--color-primary) !important;
-        color: #000 !important;
-        box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
-      }
-      .reaction-btn.loading {
-        opacity: 0.6;
-        pointer-events: none;
-      }
-      .fade-in {
-        animation: fadeIn 0.5s ease-out;
-      }
-      .slide-in {
-        animation: slideIn 0.3s ease-out;
-      }
-      .pulse {
-        animation: pulse 0.6s ease-out;
-      }
-      .shake {
-        animation: shake 0.5s ease-out;
-      }
-      .admin-toggle {
-        transition: background-color var(--animation-duration) var(--transition-easing);
-        -webkit-backdrop-filter: blur(8px);
-        backdrop-filter: blur(8px);
-      }
-      .admin-toggle:hover {
-        background-color: rgba(139, 233, 253, 0.1);
-      }
-      .loading-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(26, 27, 38, 0.8);
-        -webkit-backdrop-filter: blur(4px);
-        backdrop-filter: blur(4px);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 1000;
-      }
-      .spinner {
-        width: 40px;
-        height: 40px;
-        border: 4px solid rgba(139, 233, 253, 0.3);
-        border-top: 4px solid var(--color-primary);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          will-change: opacity;
-        }
-        to {
-          opacity: 1;
-        }
-      }
-      @keyframes slideIn {
-        from {
-          opacity: 0;
-          will-change: opacity;
-        }
-        to {
-          opacity: 1;
-        }
-      }
-      @keyframes pulse {
-        0% {
-          will-change: transform;
-        }
-        50% {
-          transform: scale3d(1.05, 1.05, 1);
-        }
-        100% {
-          transform: scale3d(1, 1, 1);
-        }
-      }
-      @keyframes shake {
-        0%,
-        100% {
-          will-change: transform;
-        }
-        25% {
-          transform: translate3d(-5px, 0, 0);
-        }
-        75% {
-          transform: translate3d(5px, 0, 0);
-        }
-      }
-      @keyframes spin {
-        100% {
-          transform: rotate(360deg);
-          will-change: transform;
-        }
-      }
-      @keyframes bounce {
-        0%,
-        20%,
-        50%,
-        80%,
-        100% {
-          transform: translate(-50%, 0) translateY(0);
-        }
-        40% {
-          transform: translate(-50%, 0) translateY(-10px);
-        }
-        60% {
-          transform: translate(-50%, 0) translateY(-5px);
-        }
-      }
-
-      /* Performance optimizations */
-
-
-      /* High refresh rate display optimizations */
-      @media (min-resolution: 120dpi) and (min-width: 1200px) {
-        :root {
-          --transition-duration: 0.15s;
-          --animation-duration: 0.2s;
-        }
-      }
-
-
-      /* High contrast mode support */
-      @media (prefers-contrast: high) {
-        :root {
-          --color-border: rgba(255, 255, 255, 0.3);
-          --color-surface: rgba(26, 27, 38, 0.98);
-        }
-      }
-
-      /* Reduced motion support */
-      @media (prefers-reduced-motion: reduce) {
-        :root {
-          --transition-duration: 0.01ms;
-          --animation-duration: 0.01ms;
-          --backdrop-blur: 0px;
-        }
-
-        *,
-        *::before,
-        *::after {
-          animation-duration: 0.01ms !important;
-          animation-iteration-count: 1 !important;
-          transition-duration: 0.01ms !important;
-          transform: none !important;
-        }
-
-        .answer-card:hover,
-        .reaction-btn:hover,
-        .game-btn:hover {
-          transform: none !important;
-        }
-      }
-
-      /* Low performance mode styles */
-      .low-performance .answer-card {
-        contain: layout style paint;
-      }
-
-      .low-performance .answer-card:hover {
-        transform: none;
-        box-shadow: var(--shadow-sm);
-      }
-
-      .low-performance .glass-panel {
-        -webkit-backdrop-filter: none;
-        backdrop-filter: none;
-      }
-
-      /* Hidden card styles for virtual scrolling */
-      .hidden-card {
-        visibility: hidden;
-        pointer-events: none;
-      }
-
-      .visible {
-        visibility: visible;
-        pointer-events: auto;
-      }
-
-      /* Optimize grid layout for performance */
-      @supports (container-type: inline-size) {
-        #answers {
-          container-type: inline-size;
-        }
-      }
-
-      /* Optimize for high DPI displays */
-      @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
-        .answer-card {
-          backface-visibility: hidden;
-          perspective: 1000px;
-        }
-      }
-      .answer-card:hover {
-        transform: translateY(-4px);
-        box-shadow: var(--shadow-md);
-      }
-      .answer-card.new-card {
-        animation: fadeIn 0.3s ease-out;
-      }
-
-      /* Primary action button styles */
-      .primary-action-btn {
-        font-weight: 600;
-        border: none;
-        cursor: pointer;
-        position: relative;
-        overflow: hidden;
-        background-image: linear-gradient(135deg, #ec4899 0%, #8b5cf6 100%);
-        box-shadow: 0 4px 15px rgba(236, 72, 153, 0.25);
-      }
-
-      .primary-action-btn:hover {
-        background-image: linear-gradient(135deg, #db2777 0%, #7c3aed 100%);
-        box-shadow: 0 8px 25px rgba(236, 72, 153, 0.35);
-        transform: translateY(-1px) scale(1.05);
-      }
-
-      .primary-action-btn:active {
-        transform: translateY(0) scale(1.02);
-        box-shadow: 0 2px 10px rgba(236, 72, 153, 0.4);
-      }
-
-      .primary-action-btn:focus {
-        outline: none;
-        box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.5);
-      }
-
-      .primary-action-btn::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-        transition: left 0.5s;
-      }
-
-      .primary-action-btn:hover::before {
-        left: 100%;
-      }
-
-      /* Improved accessibility for reduced motion users */
-      @media (prefers-reduced-motion: reduce) {
-        .primary-action-btn {
-          transition: background-color 0.2s ease;
-        }
-        .primary-action-btn:hover {
-          transform: none;
-        }
-        .primary-action-btn::before {
-          display: none;
-        }
-      }
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(10px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-      .highlight-badge {
-        position: absolute;
-        top: 0.25rem;
-        right: 0.25rem;
-        width: 1.5rem;
-        height: 1.5rem;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: #facc15;
-      }
-      .answer-card.reaction-bg-like {
-        border-color: #ef4444 !important;
-      }
-      .answer-card.reaction-bg-understand {
-        border-color: #fbbf24 !important;
-      }
-      .answer-card.reaction-bg-curious {
-        border-color: #10b981 !important;
-      }
-      .answer-card.reaction-bg-like-understand {
-        border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important;
-      }
-      .answer-card.reaction-bg-like-curious {
-        border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important;
-      }
-      .answer-card.reaction-bg-understand-curious {
-        border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important;
-      }
-      .answer-card.reaction-bg-like-understand-curious {
-        border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important;
-      }
-      .reaction-border-1 {
-        border-width: 2px;
-      }
-      .reaction-border-2 {
-        border-width: 4px;
-      }
-      .reaction-border-3 {
-        border-width: 6px;
-      }
-      .answer-preview {
-        display: -webkit-box;
-        -webkit-line-clamp: 5;
-        line-clamp: 5;
-        -webkit-box-orient: vertical;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        min-height: 120px;
-      }
-      .like-btn svg {
-        transition:
-          fill var(--transition-duration) var(--transition-easing),
-          transform var(--transition-duration) var(--transition-easing);
-        fill: none;
-      }
-      .like-btn.liked svg {
-        stroke: transparent;
-        fill: currentColor;
-        transform: scale(1.1);
-      }
-      .like-btn.loading {
-        opacity: 0.7;
-        position: relative;
-        pointer-events: none;
-      }
-      .like-btn.loading::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border: 2px solid transparent;
-        border-top: 2px solid currentColor;
-        border-radius: 50%;
-        animation: spin 0.8s linear infinite;
-        width: 16px;
-        height: 16px;
-        margin: auto;
-      }
-      @keyframes spin {
-        to {
-          transform: rotate(360deg);
-        }
-      }
-      .highlight-btn {
-        transition:
-          background var(--transition-duration) var(--transition-easing),
-          transform var(--transition-duration) var(--transition-easing);
-        border-radius: 4px;
-        padding: 2px;
-      }
-      .highlight-btn:hover {
-        background: rgba(147, 51, 234, 0.15);
-        transform: scale(1.1);
-      }
-      .highlight-btn.liked {
-        color: #9333ea;
-        text-shadow: 0 0 8px rgba(147, 51, 234, 0.6);
-      }
-      #controlsFooter {
-        pointer-events: none;
-      }
-      #controlsFooter > .glass-panel {
-        pointer-events: auto;
-      }
-      .skeleton {
-        position: relative;
-        overflow: hidden;
-        background-color: rgba(255, 255, 255, 0.05);
-      }
-      .skeleton::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background-image: linear-gradient(
-          90deg,
-          rgba(255, 255, 255, 0),
-          rgba(255, 255, 255, 0.2),
-          rgba(255, 255, 255, 0)
-        );
-        animation: skeleton-loading 1.5s infinite;
-      }
-      @keyframes skeleton-loading {
-        0% {
-          transform: translate3d(-100%, 0, 0);
-          will-change: transform;
-        }
-        100% {
-          transform: translate3d(100%, 0, 0);
-        }
-      }
-      .sr-only {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-      }
-      .modal-close-btn {
-        position: absolute;
-        top: -12px;
-        right: -12px;
-        transform: none;
-        border: 2px solid #fff;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-      }
-      /* モーダルでのリアクション装飾 */
-      #answerModalCard.reaction-border-1 {
-        border-width: 3px !important;
-      }
-      #answerModalCard.reaction-border-2 {
-        border-width: 4px !important;
-      }
-      #answerModalCard.reaction-border-3 {
-        border-width: 5px !important;
-      }
-      /* モーダルでのリアクション背景色 */
-      #answerModalCard.reaction-bg-like {
-        border-color: #ef4444 !important;
-        border-image: none !important;
-      }
-      #answerModalCard.reaction-bg-understand {
-        border-color: #fbbf24 !important;
-        border-image: none !important;
-      }
-      #answerModalCard.reaction-bg-curious {
-        border-color: #10b981 !important;
-        border-image: none !important;
-      }
-      #answerModalCard.reaction-bg-like-understand {
-        border-image: linear-gradient(45deg, #ef4444, #fbbf24) 1 !important;
-        border-color: transparent !important;
-      }
-      #answerModalCard.reaction-bg-like-curious {
-        border-image: linear-gradient(45deg, #ef4444, #10b981) 1 !important;
-        border-color: transparent !important;
-      }
-      #answerModalCard.reaction-bg-understand-curious {
-        border-image: linear-gradient(45deg, #fbbf24, #10b981) 1 !important;
-        border-color: transparent !important;
-      }
-      #answerModalCard.reaction-bg-like-understand-curious {
-        border-image: linear-gradient(45deg, #ef4444, #fbbf24, #10b981) 1 !important;
-        border-color: transparent !important;
-      }
-      /* モーダルでのハイライト装飾（リアクション装飾より後に配置で優先） */
-      #answerModalCard.highlighted {
-        border-image: linear-gradient(45deg, #9333ea, #c084fc, #9333ea) 1 !important;
-        border-width: 4px !important;
-        box-shadow:
-          0 0 25px rgba(147, 51, 234, 0.6),
-          inset 0 0 20px rgba(192, 132, 252, 0.1) !important;
-        position: relative;
-      }
-      .render-optimized {
-        transform: translateZ(0);
-      }
-      .modal-fade {
-        animation: modalFade 0.2s ease-out;
-      }
-      @keyframes modalFade {
-        from {
-          opacity: 0;
-          will-change: opacity;
-        }
-        to {
-          opacity: 1;
-        }
-      }
-      .modal-scale {
-        animation: modalScale 0.2s ease-out;
-      }
-      @keyframes modalScale {
-        from {
-          will-change: transform;
-        }
-        to {
-          transform: scale3d(1, 1, 1);
-        }
-      }
-      
-      /* Grid transition styles for smooth card sizing */
-      .transitioning {
-        transition: grid-template-columns 0.15s ease-out;
-        position: relative;
-      }
-      
-      .transitioning::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: rgba(26, 27, 38, 0.3);
-        z-index: 1;
-        pointer-events: none;
-        border-radius: 0.75rem;
-      }
-    </style>
-  </head>
-  <body class="bg-[#1a1b26] text-gray-200 font-sans">
-    <!-- 🎯 統一アイコン管理システムの読み込み -->
-    <?!= include('IconLibrary.js'); ?>
-    
-    <!-- Loading Overlay -->
-    <div id="loading-overlay" class="loading-overlay hidden">
-      <div class="text-center">
-        <div class="spinner"></div>
-        <p class="mt-4 text-gray-300">読み込み中...</p>
-      </div>
+<head>
+  <meta charset="UTF-8" />
+  <title>GenericBoard - みんなのかいとうボード</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <?!= include('SharedSecurityHeaders'); ?>
+  <link rel="preload" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" /></noscript>
+  <link rel="dns-prefetch" href="//script.google.com" />
+  <link rel="preconnect" href="https://script.google.com" crossorigin />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
+  <?!= include('SharedTailwindConfig'); ?>
+  <style>
+:root{--color-primary:#8be9fd;--color-primary-dark:#6272a4;--color-background:#1a1b26;--color-surface:rgba(26,27,38,0.7);--color-text:#c0caf5;--color-text-secondary:#6272a4;--color-text-muted:rgba(255,255,255,0.6);--color-border:rgba(255,255,255,0.1);--color-accent:#facc15;--color-success:#50fa7b;--color-warning:#ffb86c;--color-error:#ff5555;--duration-fast:0.2s;--duration-normal:0.3s;--duration-slow:0.5s;--ease-out:cubic-bezier(0.25,0.46,0.45,0.94);--ease-in-out:cubic-bezier(0.645,0.045,0.355,1);--border-radius:0.75rem;--border-radius-lg:1rem;--shadow-sm:0 1px 2px rgba(0,0,0,0.05);--shadow-md:0 4px 6px rgba(0,0,0,0.1);--shadow-lg:0 10px 15px rgba(0,0,0,0.1);--shadow-glow:0 0 15px var(--color-primary);--glass-bg:var(--color-surface);--glass-border:1px solid var(--color-border);--glass-blur:blur(12px);--transition-duration:0.2s;--transition-easing:ease-out;--animation-duration:0.3s;--backdrop-blur:12px}body{color:var(--color-text);background-color:var(--color-background);margin:0;overflow-x:hidden}.glass-panel{background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:var(--glass-border);transition:border-color var(--transition-duration) var(--transition-easing)}.glass-panel:hover{border-color:rgba(255,255,255,0.2)}.interactive-element{transition:all var(--duration-fast) var(--ease-out);border-radius:var(--border-radius)}.game-font{font-family:'Press Start 2P',cursive}.game-btn{transition:all var(--duration-fast) var(--ease-out);border-radius:var(--border-radius);border-bottom-width:4px;text-shadow:1px 1px 2px rgba(0,0,0,0.4);position:relative;overflow:hidden}.game-btn:not(:disabled):hover{transform:translateY(-2px) scale(1.02);box-shadow:var(--shadow-glow)}.game-btn:active:not(:disabled){transform:translateY(2px);border-bottom-width:2px;box-shadow:none}.game-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none!important}#classFilter,#sortOrder{background-color:var(--color-primary-dark);border:var(--glass-border);color:var(--color-text);border-radius:var(--border-radius);padding:0.25rem 0.5rem;transition:border-color var(--transition-duration) var(--transition-easing),box-shadow var(--transition-duration) var(--transition-easing)}#classFilter:focus,#sortOrder:focus{border-color:rgba(6,182,212,0.5);box-shadow:0 0 0 2px rgba(6,182,212,0.2);outline:none}:focus-visible{outline:3px solid var(--color-primary);outline-offset:2px;border-radius:var(--border-radius)}header{position:sticky;top:0;z-index:50;contain:layout;backdrop-filter:blur(var(--backdrop-blur));-webkit-backdrop-filter:blur(var(--backdrop-blur))}.line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}@media (min-width:768px) and (max-width:1023px){#headingLabel{font-size:1.25rem!important}}#formAnswerBtn{transition:all 0.2s ease-out}#formAnswerBtn:hover{transform:translateY(-1px);box-shadow:0 4px 8px rgba(0,0,0,0.15)}#answerCount{transition:background-color 0.2s ease-out}#answerCount:hover{background-color:rgba(55,65,81,0.5)}.answer-card{will-change:transform,opacity;transition:all var(--duration-normal) var(--ease-out);border-radius:var(--border-radius-lg);contain:layout style;position:relative;overflow:hidden}.answer-card.highlighted{border:4px solid transparent;border-image:none!important;box-shadow:0 0 15px rgba(250,204,21,0.6);transform:scale(1.02);z-index:2;background:linear-gradient(var(--glass-bg),var(--glass-bg)) padding-box,linear-gradient(90deg,var(--color-accent),var(--color-primary)) border-box;background-clip:padding-box,border-box;position:relative}.answer-card:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 8px 25px rgba(139,233,253,0.3)}.answer-card:focus-visible{transform:translateY(-4px) scale(1.02);box-shadow:0 8px 25px rgba(139,233,253,0.3)}.answer-card.highlighted:hover{transform:translateY(-4px) scale(1.04)}.answer-card.loading{opacity:0.7;pointer-events:none}.reaction-btn{transition:transform var(--transition-duration) var(--transition-easing),background-color var(--transition-duration) var(--transition-easing),box-shadow var(--transition-duration) var(--transition-easing);position:relative;overflow:hidden}.reaction-btn:hover{transform:scale(1.1)}.reaction-btn:active{transform:scale(0.95)}.reaction-btn.reacted{background-color:var(--color-primary)!important;color:#000!important;box-shadow:0 0 10px rgba(139,233,253,0.5)}.reaction-btn.liked{background-color:var(--color-primary)!important;color:#000!important;box-shadow:0 0 10px rgba(139,233,253,0.5)}.reaction-btn.loading{opacity:0.6;pointer-events:none}.fade-in{animation:fadeIn 0.5s ease-out}.slide-in{animation:slideIn 0.3s ease-out}.pulse{animation:pulse 0.6s ease-out}.shake{animation:shake 0.5s ease-out}.admin-toggle{transition:background-color var(--animation-duration) var(--transition-easing);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}.admin-toggle:hover{background-color:rgba(139,233,253,0.1)}.loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(26,27,38,0.8);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000}.spinner{width:40px;height:40px;border:4px solid rgba(139,233,253,0.3);border-top:4px solid var(--color-primary);border-radius:50%;animation:spin 1s linear infinite}@keyframes fadeIn{from{opacity:0;will-change:opacity}to{opacity:1}}@keyframes slideIn{from{opacity:0;will-change:opacity}to{opacity:1}}@keyframes pulse{0%{will-change:transform}50%{transform:scale3d(1.05,1.05,1)}100%{transform:scale3d(1,1,1)}}@keyframes shake{0%,100%{will-change:transform}25%{transform:translate3d(-5px,0,0)}75%{transform:translate3d(5px,0,0)}}@keyframes spin{100%{transform:rotate(360deg);will-change:transform}}@keyframes bounce{0%,20%,50%,80%,100%{transform:translate(-50%,0) translateY(0)}40%{transform:translate(-50%,0) translateY(-10px)}60%{transform:translate(-50%,0) translateY(-5px)}}@media (min-resolution:120dpi) and (min-width:1200px){:root{--transition-duration:0.15s;--animation-duration:0.2s}}@media (prefers-contrast:high){:root{--color-border:rgba(255,255,255,0.3);--color-surface:rgba(26,27,38,0.98)}}@media (prefers-reduced-motion:reduce){:root{--transition-duration:0.01ms;--animation-duration:0.01ms;--backdrop-blur:0px}*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;transform:none!important}.answer-card:hover,.reaction-btn:hover,.game-btn:hover{transform:none!important}}.low-performance .answer-card{contain:layout style paint}.low-performance .answer-card:hover{transform:none;box-shadow:var(--shadow-sm)}.low-performance .glass-panel{-webkit-backdrop-filter:none;backdrop-filter:none}.hidden-card{visibility:hidden;pointer-events:none}.visible{visibility:visible;pointer-events:auto}@supports (container-type:inline-size){#answers{container-type:inline-size}}@media (-webkit-min-device-pixel-ratio:2),(min-resolution:192dpi){.answer-card{backface-visibility:hidden;perspective:1000px}}.answer-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-md)}.answer-card.new-card{animation:fadeIn 0.3s ease-out}.primary-action-btn{font-weight:600;border:none;cursor:pointer;position:relative;overflow:hidden;background-image:linear-gradient(135deg,#ec4899 0%,#8b5cf6 100%);box-shadow:0 4px 15px rgba(236,72,153,0.25)}.primary-action-btn:hover{background-image:linear-gradient(135deg,#db2777 0%,#7c3aed 100%);box-shadow:0 8px 25px rgba(236,72,153,0.35);transform:translateY(-1px) scale(1.05)}.primary-action-btn:active{transform:translateY(0) scale(1.02);box-shadow:0 2px 10px rgba(236,72,153,0.4)}.primary-action-btn:focus{outline:none;box-shadow:0 0 0 3px rgba(236,72,153,0.5)}.primary-action-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);transition:left 0.5s}.primary-action-btn:hover::before{left:100%}@media (prefers-reduced-motion:reduce){.primary-action-btn{transition:background-color 0.2s ease}.primary-action-btn:hover{transform:none}.primary-action-btn::before{display:none}}@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.highlight-badge{position:absolute;top:0.25rem;right:0.25rem;width:1.5rem;height:1.5rem;display:flex;align-items:center;justify-content:center;color:#facc15}.answer-card.reaction-bg-like{border-color:#ef4444!important}.answer-card.reaction-bg-understand{border-color:#fbbf24!important}.answer-card.reaction-bg-curious{border-color:#10b981!important}.answer-card.reaction-bg-like-understand{border-image:linear-gradient(45deg,#ef4444,#fbbf24) 1!important}.answer-card.reaction-bg-like-curious{border-image:linear-gradient(45deg,#ef4444,#10b981) 1!important}.answer-card.reaction-bg-understand-curious{border-image:linear-gradient(45deg,#fbbf24,#10b981) 1!important}.answer-card.reaction-bg-like-understand-curious{border-image:linear-gradient(45deg,#ef4444,#fbbf24,#10b981) 1!important}.reaction-border-1{border-width:2px}.reaction-border-2{border-width:4px}.reaction-border-3{border-width:6px}.answer-preview{display:-webkit-box;-webkit-line-clamp:5;line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;min-height:120px}.like-btn svg{transition:fill var(--transition-duration) var(--transition-easing),transform var(--transition-duration) var(--transition-easing);fill:none}.like-btn.liked svg{stroke:transparent;fill:currentColor;transform:scale(1.1)}.like-btn.loading{opacity:0.7;position:relative;pointer-events:none}.like-btn.loading::after{content:'';position:absolute;inset:0;border:2px solid transparent;border-top:2px solid currentColor;border-radius:50%;animation:spin 0.8s linear infinite;width:16px;height:16px;margin:auto}@keyframes spin{to{transform:rotate(360deg)}}.highlight-btn{transition:background var(--transition-duration) var(--transition-easing),transform var(--transition-duration) var(--transition-easing);border-radius:4px;padding:2px}.highlight-btn:hover{background:rgba(147,51,234,0.15);transform:scale(1.1)}.highlight-btn.liked{color:#9333ea;text-shadow:0 0 8px rgba(147,51,234,0.6)}#controlsFooter{pointer-events:none}#controlsFooter>.glass-panel{pointer-events:auto}.skeleton{position:relative;overflow:hidden;background-color:rgba(255,255,255,0.05)}.skeleton::after{content:'';position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.2),rgba(255,255,255,0));animation:skeleton-loading 1.5s infinite}@keyframes skeleton-loading{0%{transform:translate3d(-100%,0,0);will-change:transform}100%{transform:translate3d(100%,0,0)}}.highlight-badge{position:absolute;top:0.25rem;right:0.25rem;width:1.5rem;height:1.5rem;display:flex;align-items:center;justify-content:center;color:#facc15;filter:drop-shadow(0 0 4px rgba(250,204,21,0.7))}.answer-card.reaction-bg-like{border-color:#ef4444!important;border-image:none}.answer-card.reaction-bg-understand{border-color:#fbbf24!important;border-image:none}.answer-card.reaction-bg-curious{border-color:#10b981!important;border-image:none}.reaction-bg-like-understand,.reaction-bg-like-curious,.reaction-bg-understand-curious,.reaction-bg-all{border-color:transparent;border-style:solid;background:var(--glass-bg);border-image-slice:1;border-image-source:linear-gradient(90deg,#ef4444,#fbbf24)}.reaction-bg-like-curious{border-image-source:linear-gradient(90deg,#ef4444,#10b981)}.reaction-bg-understand-curious{border-image-source:linear-gradient(90deg,#fbbf24,#10b981)}.reaction-bg-all{border-image-source:linear-gradient(90deg,#ef4444,#fbbf24,#10b981)}.reaction-border-1{border-width:2px}.reaction-border-2{border-width:4px}.reaction-border-3{border-width:6px}.answer-preview{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;min-height:120px}.like-btn svg{transition:all 0.2s ease-in-out;fill:none}.like-btn.liked svg{stroke:transparent;fill:currentColor;transform:scale(1.1)}.highlight-btn{transition:all 0.2s ease;border-radius:4px;padding:2px}.highlight-btn:hover{background:rgba(250,204,21,0.1);transform:scale(1.1)}.highlight-btn.liked{color:#facc15;filter:drop-shadow(0 0 4px rgba(250,204,21,0.7))}#controlsFooter{pointer-events:none}#controlsFooter>.glass-panel{pointer-events:auto}.skeleton{position:relative;overflow:hidden;background-color:rgba(255,255,255,0.05);color:transparent}.skeleton::after{content:"";position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.3),rgba(255,255,255,0));animation:skeleton-loading 1.2s infinite}@keyframes skeleton-loading{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.modal-close-btn{position:absolute;top:-12px;right:-12px;transform:none;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)}#answerModalCard.reaction-border-1{border-width:3px!important}#answerModalCard.reaction-border-2{border-width:4px!important}#answerModalCard.reaction-border-3{border-width:5px!important}#answerModalCard.reaction-bg-like{border-color:#ef4444!important;border-image:none!important}#answerModalCard.reaction-bg-understand{border-color:#fbbf24!important;border-image:none!important}#answerModalCard.reaction-bg-curious{border-color:#10b981!important;border-image:none!important}#answerModalCard.reaction-bg-like-understand{border-image:linear-gradient(45deg,#ef4444,#fbbf24) 1!important;border-color:transparent!important}#answerModalCard.reaction-bg-like-curious{border-image:linear-gradient(45deg,#ef4444,#10b981) 1!important;border-color:transparent!important}#answerModalCard.reaction-bg-understand-curious{border-image:linear-gradient(45deg,#fbbf24,#10b981) 1!important;border-color:transparent!important}#answerModalCard.reaction-bg-like-understand-curious{border-image:linear-gradient(45deg,#ef4444,#fbbf24,#10b981) 1!important;border-color:transparent!important}#answerModalCard.highlighted{border-image:linear-gradient(45deg,#9333ea,#c084fc,#9333ea) 1!important;border-width:4px!important;box-shadow:0 0 25px rgba(147,51,234,0.6),inset 0 0 20px rgba(192,132,252,0.1)!important;position:relative}.render-optimized{transform:translateZ(0)}.modal-fade{animation:modalFade 0.2s ease-out}@keyframes modalFade{from{opacity:0;will-change:opacity}to{opacity:1}}.modal-scale{animation:modalScale 0.2s ease-out}@keyframes modalScale{from{will-change:transform}to{transform:scale3d(1,1,1)}}.transitioning{transition:grid-template-columns 0.15s ease-out;position:relative}.transitioning::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(26,27,38,0.3);z-index:1;pointer-events:none;border-radius:0.75rem}
+  </style>
+</head>
+<body class="bg-[#1a1b26] text-gray-200 font-sans">
+  <?!= include('IconLibrary.js'); ?>
+  
+  <div id="loading-overlay" class="loading-overlay hidden">
+    <div class="text-center">
+      <div class="spinner"></div>
+      <p class="mt-4 text-gray-300">読み込み中...</p>
     </div>
+  </div>
 
-    <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
-      <header
-        id="main-header"
-        class="glass-panel rounded-xl p-4 mb-4 shadow-lg fade-in"
-      >
-        <!-- Upper Block: Site Title with Controls -->
-        <div class="flex items-center justify-between gap-4 py-2">
-          <!-- Left Group: Answer Count & Form Button -->
-          <div class="flex items-center gap-3">
-            <!-- Answer Count -->
-            <div id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0">
-              <svg
-                class="w-4 h-4 text-blue-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM7 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"
-                ></path>
-              </svg>
-              <span id="answerCountText">0件</span>
-            </div>
-            
-            <!-- Form Answer Button (changed to anchor for new tab support) -->
-            <a
-              id="formAnswerBtn"
-              href="#"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-xs bg-green-600 hover:bg-green-700 text-white font-medium px-3 py-1.5 rounded-md whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm no-underline"
-              aria-label="フォームで回答"
-              role="button"
-            >
-              <span class="form-edit-icon"></span>
-              フォームで回答
-            </a>
-
-            <!-- Filters -->
-            <div class="flex items-center gap-2">
-              <label for="classFilter" class="sr-only">クラス絞り込み</label>
-              <select
-                id="classFilter"
-                class="hidden text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 rounded-md"
-              ></select>
-
-              <label for="sortOrder" class="sr-only">並び順</label>
-              <div class="relative">
-                <select
-                  id="sortOrder"
-                  class="text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 pr-8 rounded-md appearance-none cursor-pointer focus:ring-2 focus:ring-cyan-400/50"
-                >
+  <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
+    <header id="main-header" class="glass-panel rounded-xl p-4 mb-4 shadow-lg fade-in">
+      <div class="flex items-center justify-between gap-4 py-2">
+        <div class="flex items-center gap-3">
+          <div id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0">
+            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM7 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"></path>
+            </svg>
+            <span id="answerCountText">0件</span>
+          </div>
+          <a id="formAnswerBtn" href="#" target="_blank" rel="noopener noreferrer" class="text-xs bg-green-600 hover:bg-green-700 text-white font-medium px-3 py-1.5 rounded-md whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm no-underline" aria-label="フォームで回答" role="button">
+            <span class="form-edit-icon"></span>
+            フォームで回答
+          </a>
+          <div class="flex items-center gap-2">
+            <label for="classFilter" class="sr-only">クラス絞り込み</label>
+            <select id="classFilter" class="hidden text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 rounded-md"></select>
+            <label for="sortOrder" class="sr-only">並び順</label>
+            <div class="relative">
+              <select id="sortOrder" class="text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 pr-8 rounded-md appearance-none cursor-pointer focus:ring-2 focus:ring-cyan-400/50">
                 <option value="newest" selected>新着順</option>
                 <option value="random">ランダム順</option>
                 <option value="score" id="scoreOption" class="hidden">スコア順</option>
               </select>
-              <svg
-                class="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 9l-7 7-7-7"
-                ></path>
+              <svg class="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
               </svg>
             </div>
-            </div>
-          </div>
-
-          <!-- Center: Site Title -->
-          <div class="flex-1 flex justify-center">
-          </div>
-
-          <!-- Right Group: Admin Controls -->
-          <div class="flex items-center gap-2">
-            <!-- Board Owner Display -->
-            <div
-              id="boardOwnerDisplay"
-              class="text-xs text-gray-500 bg-gray-800/40 backdrop-blur-sm px-2.5 py-1 rounded-md flex items-center gap-1.5"
-            >
-              <span class="user-icon"></span>
-              <span>ID: <?= userInfo.userId ? userInfo.userId.substring(0,8) + '...' : 'ID_NOT_SET' ?></span>
-            </div>
-
-            <!-- Admin Toggle Button -->
-            <button
-              type="button"
-              id="adminToggleBtn"
-              class="admin-toggle text-gray-400 hover:text-cyan-400 transition-all p-1.5 rounded-md hover:bg-gray-800/50 hidden"
-              aria-label="管理者モード切り替え"
-            >
-              <span class="admin-settings-icon"></span>
-            </button>
-
-            <!-- End Publication Button -->
-            <button
-              type="button"
-              id="endPublicationBtn"
-              class="admin-toggle text-xs bg-orange-600/80 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md hidden whitespace-nowrap transition-all flex items-center gap-1"
-              hidden
-              aria-label="公開終了"
-            >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"
-                ></path>
-              </svg>
-              公開終了
-            </button>
           </div>
         </div>
-
-        <!-- Lower Block: Question Display -->
-        <div class="border-t border-transparent pt-4">
-          <!-- Question Display -->
-          <div class="flex justify-center">
-            <div
-              id="headingLabel"  
-              class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem] text-center max-w-4xl line-clamp-2"
-              style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;"
-            >
+        <div class="flex-1 flex justify-center"></div>
+        <div class="flex items-center gap-2">
+          <div id="boardOwnerDisplay" class="text-xs text-gray-500 bg-gray-800/40 backdrop-blur-sm px-2.5 py-1 rounded-md flex items-center gap-1.5">
+            <span class="user-icon"></span>
+            <span>ID: <?= userInfo.userId ? userInfo.userId.substring(0,8) + '...' : 'ID_NOT_SET' ?></span>
+          </div>
+          <button type="button" id="adminToggleBtn" class="admin-toggle text-gray-400 hover:text-cyan-400 transition-all p-1.5 rounded-md hover:bg-gray-800/50 hidden" aria-label="管理者モード切り替え">
+            <span class="admin-settings-icon"></span>
+          </button>
+          <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600/80 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
+            </svg>
+            公開終了
+          </button>
+        </div>
+      </div>
+      <div class="border-t border-transparent pt-4">
+        <div class="flex justify-center">
+          <div id="headingLabel" class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem] text-center max-w-4xl line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
             <span class="heading-loading-icon"></span>
-              <span class="animate-pulse">問題文を読み込み中...</span>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      <!-- 新着通知バナー -->
-      <div
-        id="newContentBanner"
-        class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-lg hidden transition-all duration-300"
-        role="alert"
-        aria-live="polite"
-      >
-        <div class="flex items-center gap-3">
-          <span id="newContentIcon" class="w-5 h-5 animate-pulse" aria-hidden="true">📋</span>
-          <span id="newContentText">新しい意見が投稿されました</span>
-          <button
-            type="button"
-            id="refreshContentBtn"
-            class="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-sm font-medium transition-colors"
-            aria-label="新しいコンテンツを更新して表示"
-          >
-            更新して表示
-          </button>
-          <button
-            type="button"
-            id="dismissBannerBtn"
-            class="text-white/70 hover:text-white w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors"
-            aria-label="通知を閉じる"
-          >
-            ×
-          </button>
-        </div>
-      </div>
-
-      <main
-        id="answers"
-        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-        role="main"
-        aria-live="polite"
-        aria-label="回答一覧"
-      ></main>
-    </div>
-    <div
-      id="answerModalContainer"
-      class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        id="answerModalCard"
-        class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative"
-        role="document"
-        aria-labelledby="modalAnswer"
-      >
-        <button
-          type="button"
-          id="answerModalCloseBtn"
-          class="modal-close-btn bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10"
-          aria-label="閉じる"
-        >
-          <span id="iconClose" class="w-6 h-6"></span>
-        </button>
-        <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
-        <div
-          id="modalFooter"
-          class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center"
-        >
-          <div><span id="modalStudentName" class="font-bold text-2xl text-gray-200"></span></div>
-          <div id="modalReactions" class="flex items-center gap-2"></div>
-        </div>
-      </div>
-    </div>
-    <div
-      id="infoModalContainer"
-      class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden"
-      role="dialog"
-      aria-modal="true"
-    >
-      <div
-        id="infoModalCard"
-        class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-cyan-400/80 w-full max-w-lg relative"
-        role="document"
-      >
-        <div class="space-y-4 text-gray-200 text-lg leading-relaxed">
-          <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
-          <ul class="space-y-2">
-            <li class="flex items-center gap-2">
-              <span id="infoIconLike" class="w-5 h-5 text-red-400"></span
-              >いいね：すてきだと思ったときに押そう
-            </li>
-            <li class="flex items-center gap-2">
-              <span id="infoIconUnderstand" class="w-5 h-5 text-yellow-400"></span
-              >なるほど：参考になったときに押そう
-            </li>
-            <li class="flex items-center gap-2">
-              <span id="infoIconCurious" class="w-5 h-5 text-green-400"></span
-              >きになる：もっと知りたいときに押そう
-            </li>
-          </ul>
-          <p class="flex items-center gap-2">
-            <span id="infoIconHighlight" class="w-5 h-5 text-purple-400"></span
-            >先生が注目してほしい意見につけています
-          </p>
-          <p>責任あるリアクションで、みんなで学びを深めよう！</p>
-          <div class="text-center mt-6">
-            <button
-              id="infoModalConfirmBtn"
-              class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-            >
-              わかった
-            </button>
+            <span class="animate-pulse">問題文を読み込み中...</span>
           </div>
         </div>
       </div>
+    </header>
+
+    <div id="newContentBanner" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-lg hidden transition-all duration-300" role="alert" aria-live="polite">
+      <div class="flex items-center gap-3">
+        <span id="newContentIcon" class="w-5 h-5 animate-pulse" aria-hidden="true">📋</span>
+        <span id="newContentText">新しい意見が投稿されました</span>
+        <button type="button" id="refreshContentBtn" class="bg-white/20 hover:bg-white/30 px-3 py-1 rounded-full text-sm font-medium transition-colors" aria-label="新しいコンテンツを更新して表示">更新して表示</button>
+        <button type="button" id="dismissBannerBtn" class="text-white/70 hover:text-white w-5 h-5 flex items-center justify-center rounded-full hover:bg-white/20 transition-colors" aria-label="通知を閉じる">×</button>
+      </div>
     </div>
-    <footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
-      <div
-        class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3"
-      >
-        <input
-          type="range"
-          id="sizeSlider"
-          min="2"
-          max="6"
-          value="4"
-          class="w-1/2"
-          aria-label="表示列数の変更"
-        />
-        <div class="flex items-center gap-1">
-          <span id="sliderValue" class="font-bold text-lg">4</span>
-          <span id="iconGrid" class="w-4 h-4"></span>
+
+    <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧"></main>
+  </div>
+
+  <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+    <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
+      <button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10" aria-label="閉じる">
+        <span id="iconClose" class="w-6 h-6"></span>
+      </button>
+      <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
+      <div id="modalFooter" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
+        <div><span id="modalStudentName" class="font-bold text-2xl text-gray-200"></span></div>
+        <div id="modalReactions" class="flex items-center gap-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
+    <div id="infoModalCard" class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-cyan-400/80 w-full max-w-lg relative" role="document">
+      <div class="space-y-4 text-gray-200 text-lg leading-relaxed">
+        <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
+        <ul class="space-y-2">
+          <li class="flex items-center gap-2">
+            <span id="infoIconLike" class="w-5 h-5 text-red-400"></span>
+            いいね：すてきだと思ったときに押そう
+          </li>
+          <li class="flex items-center gap-2">
+            <span id="infoIconUnderstand" class="w-5 h-5 text-yellow-400"></span>
+            なるほど：参考になったときに押そう
+          </li>
+          <li class="flex items-center gap-2">
+            <span id="infoIconCurious" class="w-5 h-5 text-green-400"></span>
+            きになる：もっと知りたいときに押そう
+          </li>
+        </ul>
+        <p class="flex items-center gap-2">
+          <span id="infoIconHighlight" class="w-5 h-5 text-purple-400"></span>
+          先生が注目してほしい意見につけています
+        </p>
+        <p>責任あるリアクションで、みんなで学びを深めよう！</p>
+        <div class="text-center mt-6">
+          <button id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
         </div>
       </div>
-    </footer>
-    <script>
-      // テンプレート変数をJavaScriptグローバル変数として設定（エラーハンドリング強化）
-      try {
-        window.USER_ID = '<?= typeof userInfo !== "undefined" && userInfo && userInfo.userId ? userInfo.userId : "" ?>';
-        // UserIDデバッグログ
-        console.log('🔍 Page.html: USER_ID設定確認', {
-          userId: window.USER_ID,
-          userIdLength: window.USER_ID?.length,
-          userIdType: typeof window.USER_ID
-        });
-      } catch (error) {
-        console.error('❌ Page.html: USER_ID設定エラー:', error);
-        window.USER_ID = '';
-      }
-      const SHEET_NAME = '<?= typeof sheetName !== "undefined" && sheetName ? sheetName : "" ?>';
-      const __OPINION_HEADER__ =
-        '<?= typeof __OPINION_HEADER__ !== "undefined" && __OPINION_HEADER__ ? __OPINION_HEADER__ : "お題" ?>';
+    </div>
+  </div>
 
-      // シンプルな所有者フラグ設定 - boolean型で設定
-      window.isOwner = <?= isOwner ? true : false ?>;
-      console.log('✅ 所有者フラグ設定:', window.isOwner, typeof window.isOwner);
+  <footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
+    <div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3">
+      <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更" />
+      <div class="flex items-center gap-1">
+        <span id="sliderValue" class="font-bold text-lg">4</span>
+        <span id="iconGrid" class="w-4 h-4"></span>
+      </div>
+    </div>
+  </footer>
 
-      // DISPLAY_MODES定数をフロントエンドで利用可能にする
-      window.DISPLAY_MODES = Object.freeze({
+  <script>
+    // 🎯 統合最適化設定
+    const CONFIG = Object.freeze({
+      USER_ID: '<?= typeof userInfo !== "undefined" && userInfo && userInfo.userId ? userInfo.userId : "" ?>',
+      SHEET_NAME: '<?= typeof sheetName !== "undefined" && sheetName ? sheetName : "" ?>',
+      OPINION_HEADER: '<?= typeof __OPINION_HEADER__ !== "undefined" && __OPINION_HEADER__ ? __OPINION_HEADER__ : "お題" ?>',
+      IS_OWNER: <?= isOwner ? true : false ?>,
+      DISPLAY_MODES: Object.freeze({
         ANONYMOUS: 'anonymous',
         NAMED: 'named',
-        EMAIL: 'email',
-      });
+        EMAIL: 'email'
+      }),
+      PERFORMANCE: Object.freeze({
+        BUDGET: 16,
+        ANIMATION_DURATION: 300,
+        DEBOUNCE_DELAY: 150
+      }),
+      DEBUG_MODE: false,
+      CACHE: Object.freeze({
+        TTL: 300000,
+        MAX_SIZE: 100
+      }),
+      POLLING: Object.freeze({
+        INTERVAL: 5000,
+        MAX_RETRIES: 3
+      })
+    });
 
-      // PERFORMANCE_BUDGET定数をフロントエンドで利用可能にする
-      window.PERFORMANCE_BUDGET = 16; // 60FPS = 16.67ms/frame の閾値
-
-      // DEBUG_MODE定数をフロントエンドで利用可能にする
-      window.DEBUG_MODE = false; // 本番環境ではfalse、開発時はtrueに設定
-
-      // デバッグログ制御関数
-      window.debugLog = (...args) => {
-        if (window.DEBUG_MODE) {
-          console.log(...args);
-        }
-      };
-      window.debugInfo = (...args) => {
-        if (window.DEBUG_MODE) {
-          console.info(...args);
-        }
-      };
-
-      // デバッグログ（DEBUG_MODE時のみ）
-      debugLog('Template variables:', {
-        USER_ID,
-        SHEET_NAME,
-        __OPINION_HEADER__,
-        DISPLAY_MODES,
-        PERFORMANCE_BUDGET,
-        DEBUG_MODE,
-      });
-
-      // 🎯 統一アイコンシステム - アイコン配置
-      function initializePageIcons() {
-        if (typeof window.IconLibrary !== 'undefined') {
-          // フォーム編集アイコン
-          const formEditIcons = document.querySelectorAll('.form-edit-icon');
-          formEditIcons.forEach(icon => {
-            icon.innerHTML = window.IconLibrary.get('edit', {size: 'w-3 h-3'});
-          });
-
-          // ユーザーアイコン
-          const userIcons = document.querySelectorAll('.user-icon');
-          userIcons.forEach(icon => {
-            icon.innerHTML = window.IconLibrary.get('user', {size: 'w-3 h-3'});
-          });
-
-          // 管理者設定アイコン
-          const adminSettingsIcons = document.querySelectorAll('.admin-settings-icon');
-          adminSettingsIcons.forEach(icon => {
-            icon.innerHTML = window.IconLibrary.get('settings', {size: 'w-3 h-3'});
-          });
-
-          // ヘッダー読み込み中アイコン
-          const headingLoadingIcons = document.querySelectorAll('.heading-loading-icon');
-          headingLoadingIcons.forEach(icon => {
-            icon.innerHTML = window.IconLibrary.get('loading', {size: 'w-5 h-5 md:w-6 md:h-6', className: 'animate-spin'});
-          });
-        }
-      }
-
-      // DOM読み込み完了後とIconLibrary読み込み完了後の両方で初期化
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initializePageIcons);
-      } else {
-        initializePageIcons();
-      }
+    // 🚀 高速化ユーティリティ
+    const Utils = {
+      cache: new Map(),
       
-      // IconLibraryが後から読み込まれる場合に備えて
-      setTimeout(initializePageIcons, 100);
-    </script>
-    <?!= include('page.js.html'); ?>
-  </body>
+      memoize(fn, ttl = CONFIG.CACHE.TTL) {
+        const cache = new Map();
+        return function(...args) {
+          const key = JSON.stringify(args);
+          const cached = cache.get(key);
+          if (cached && Date.now() - cached.timestamp < ttl) {
+            return cached.value;
+          }
+          const result = fn.apply(this, args);
+          cache.set(key, { value: result, timestamp: Date.now() });
+          if (cache.size > CONFIG.CACHE.MAX_SIZE) {
+            const firstKey = cache.keys().next().value;
+            cache.delete(firstKey);
+          }
+          return result;
+        };
+      },
+
+      debounce(fn, delay = CONFIG.PERFORMANCE.DEBOUNCE_DELAY) {
+        let timeoutId;
+        return function(...args) {
+          clearTimeout(timeoutId);
+          timeoutId = setTimeout(() => fn.apply(this, args), delay);
+        };
+      },
+
+      throttle(fn, limit = CONFIG.PERFORMANCE.BUDGET) {
+        let inThrottle;
+        return function(...args) {
+          if (!inThrottle) {
+            fn.apply(this, args);
+            inThrottle = true;
+            setTimeout(() => inThrottle = false, limit);
+          }
+        };
+      },
+
+      async(fn) {
+        return (...args) => setTimeout(() => fn(...args), 0);
+      },
+
+      sanitizeHtml(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+      },
+
+      logDebug(...args) {
+        if (CONFIG.DEBUG_MODE) console.log(...args);
+      },
+
+      logError(error, context = '') {
+        console.error(`❌ ${context}:`, error);
+      }
+    };
+
+    // 🎯 統合アプリケーション
+    class GenericBoardApp {
+      constructor() {
+        this.state = {
+          answers: [],
+          filteredAnswers: [],
+          currentFilter: 'all',
+          currentSort: 'newest',
+          gridColumns: 4,
+          isPolling: false,
+          isLoading: false,
+          cache: new Map()
+        };
+        
+        this.elements = {};
+        this.eventListeners = [];
+        this.gsapTimelines = new Set();
+        this.init();
+      }
+
+      init() {
+        this.cacheElements();
+        this.initializeIcons();
+        this.setupEventListeners();
+        this.loadInitialData();
+        this.startPolling();
+        Utils.logDebug('🚀 GenericBoardApp initialized');
+      }
+
+      cacheElements() {
+        const selectors = [
+          'answers', 'headingLabel', 'answerCount', 'answerCountText', 
+          'formAnswerBtn', 'classFilter', 'sortOrder', 'sizeSlider',
+          'sliderValue', 'adminToggleBtn', 'endPublicationBtn',
+          'answerModalContainer', 'answerModalCard', 'answerModalCloseBtn',
+          'modalAnswer', 'modalStudentName', 'modalReactions',
+          'newContentBanner', 'refreshContentBtn', 'dismissBannerBtn'
+        ];
+        
+        selectors.forEach(id => {
+          this.elements[id] = document.getElementById(id);
+        });
+      }
+
+      initializeIcons() {
+        if (typeof window.IconLibrary !== 'undefined') {
+          const iconMappings = [
+            { selector: '.form-edit-icon', icon: 'edit', options: { size: 'w-3 h-3' }},
+            { selector: '.user-icon', icon: 'user', options: { size: 'w-3 h-3' }},
+            { selector: '.admin-settings-icon', icon: 'settings', options: { size: 'w-3 h-3' }},
+            { selector: '.heading-loading-icon', icon: 'loading', options: { size: 'w-5 h-5 md:w-6 md:h-6', className: 'animate-spin' }}
+          ];
+          
+          iconMappings.forEach(({ selector, icon, options }) => {
+            document.querySelectorAll(selector).forEach(el => {
+              el.innerHTML = window.IconLibrary.get(icon, options);
+            });
+          });
+        }
+      }
+
+      setupEventListeners() {
+        const listeners = [
+          ['click', this.handleClick.bind(this)],
+          ['change', this.handleChange.bind(this)],
+          ['keydown', this.handleKeydown.bind(this)]
+        ];
+
+        listeners.forEach(([event, handler]) => {
+          document.addEventListener(event, handler);
+          this.eventListeners.push({ event, handler });
+        });
+
+        this.elements.sizeSlider?.addEventListener('input', 
+          Utils.throttle(this.updateGridColumns.bind(this))
+        );
+      }
+
+      async loadInitialData() {
+        try {
+          this.showLoading(true);
+          const data = await this.fetchData();
+          this.updateUI(data);
+        } catch (error) {
+          Utils.logError(error, 'Initial data load');
+        } finally {
+          this.showLoading(false);
+        }
+      }
+
+      async fetchData() {
+        return new Promise((resolve) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler((error) => {
+              Utils.logError(error, 'Data fetch');
+              resolve({ answers: [], opinionHeader: CONFIG.OPINION_HEADER });
+            })
+            .getPublishedSheetData(CONFIG.USER_ID, CONFIG.SHEET_NAME);
+        });
+      }
+
+      updateUI(data) {
+        if (data.opinionHeader) {
+          this.updateHeader(data.opinionHeader);
+        }
+        
+        if (data.answers) {
+          this.state.answers = data.answers;
+          this.filterAndSortAnswers();
+          this.renderAnswers();
+          this.updateAnswerCount();
+        }
+
+        if (data.formUrl && this.elements.formAnswerBtn) {
+          this.elements.formAnswerBtn.href = data.formUrl;
+        }
+      }
+
+      updateHeader(text) {
+        if (this.elements.headingLabel) {
+          this.elements.headingLabel.innerHTML = `<span class="text-gradient">${Utils.sanitizeHtml(text)}</span>`;
+        }
+      }
+
+      filterAndSortAnswers() {
+        let filtered = [...this.state.answers];
+        
+        // フィルタリング
+        if (this.state.currentFilter !== 'all') {
+          filtered = filtered.filter(answer => 
+            answer.class === this.state.currentFilter
+          );
+        }
+
+        // ソート
+        switch (this.state.currentSort) {
+          case 'newest':
+            filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            break;
+          case 'random':
+            filtered.sort(() => Math.random() - 0.5);
+            break;
+          case 'score':
+            filtered.sort((a, b) => this.calculateScore(b) - this.calculateScore(a));
+            break;
+        }
+
+        this.state.filteredAnswers = filtered;
+      }
+
+      calculateScore(answer) {
+        const reactions = answer.reactions || {};
+        return Object.values(reactions).reduce((sum, count) => sum + count, 0);
+      }
+
+      renderAnswers() {
+        if (!this.elements.answers) return;
+        
+        const fragment = document.createDocumentFragment();
+        
+        this.state.filteredAnswers.forEach((answer, index) => {
+          const card = this.createAnswerCard(answer, index);
+          fragment.appendChild(card);
+        });
+
+        this.elements.answers.innerHTML = '';
+        this.elements.answers.appendChild(fragment);
+        
+        this.animateCards();
+      }
+
+      createAnswerCard(answer, index) {
+        const card = document.createElement('div');
+        card.className = this.getCardClasses(answer);
+        card.setAttribute('data-index', index);
+        card.setAttribute('role', 'article');
+        card.setAttribute('tabindex', '0');
+        
+        card.innerHTML = `
+          <div class="p-4 relative">
+            ${answer.highlighted ? '<div class="highlight-badge">⭐</div>' : ''}
+            <div class="answer-preview mb-3 text-gray-200 leading-relaxed">
+              ${Utils.sanitizeHtml(answer.opinion || answer.answer || '')}
+            </div>
+            <div class="flex items-center justify-between text-xs text-gray-400">
+              <span class="font-medium">${this.getDisplayName(answer)}</span>
+              <div class="flex items-center gap-1">
+                ${this.createReactionButtons(answer, index)}
+              </div>
+            </div>
+          </div>
+        `;
+
+        return card;
+      }
+
+      getCardClasses(answer) {
+        let classes = 'answer-card glass-panel cursor-pointer interactive-element';
+        
+        if (answer.highlighted) {
+          classes += ' highlighted';
+        }
+
+        const reactions = this.getActiveReactions(answer);
+        if (reactions.length > 0) {
+          classes += ` reaction-bg-${reactions.join('-')}`;
+          const totalReactions = this.calculateScore(answer);
+          if (totalReactions > 10) classes += ' reaction-border-3';
+          else if (totalReactions > 5) classes += ' reaction-border-2';
+          else if (totalReactions > 0) classes += ' reaction-border-1';
+        }
+
+        return classes;
+      }
+
+      getActiveReactions(answer) {
+        const reactions = answer.reactions || {};
+        const active = [];
+        
+        if (reactions.LIKE > 0) active.push('like');
+        if (reactions.UNDERSTAND > 0) active.push('understand');
+        if (reactions.CURIOUS > 0) active.push('curious');
+        
+        return active;
+      }
+
+      createReactionButtons(answer, index) {
+        const reactions = [
+          { key: 'LIKE', icon: '❤️', color: 'text-red-400' },
+          { key: 'UNDERSTAND', icon: '💡', color: 'text-yellow-400' },
+          { key: 'CURIOUS', icon: '🤔', color: 'text-green-400' }
+        ];
+
+        return reactions.map(({ key, icon, color }) => {
+          const count = (answer.reactions && answer.reactions[key]) || 0;
+          const isActive = count > 0;
+          
+          return `
+            <button 
+              type="button"
+              class="reaction-btn p-1 rounded transition-all ${color} ${isActive ? 'reacted' : ''}"
+              data-reaction="${key}"
+              data-index="${index}"
+              aria-label="${key} reaction"
+              ${count > 0 ? `data-count="${count}"` : ''}
+            >
+              ${icon}
+              ${count > 0 ? `<span class="ml-1 text-xs">${count}</span>` : ''}
+            </button>
+          `;
+        }).join('');
+      }
+
+      getDisplayName(answer) {
+        const displayMode = 'anonymous'; // デフォルトで匿名表示
+        
+        switch (displayMode) {
+          case 'named':
+            return answer.name || '匿名';
+          case 'email':
+            return answer.email || '匿名';
+          default:
+            return `ID: ${(answer.email || 'unknown').substring(0, 8)}`;
+        }
+      }
+
+      animateCards() {
+        if (typeof gsap === 'undefined') return;
+        
+        const cards = this.elements.answers.querySelectorAll('.answer-card');
+        const tl = gsap.timeline();
+        
+        tl.fromTo(cards, 
+          { opacity: 0, y: 20 },
+          { 
+            opacity: 1, 
+            y: 0, 
+            duration: 0.3, 
+            stagger: 0.05,
+            ease: 'power2.out'
+          }
+        );
+
+        this.gsapTimelines.add(tl);
+      }
+
+      updateGridColumns() {
+        const columns = parseInt(this.elements.sizeSlider.value);
+        this.state.gridColumns = columns;
+        
+        if (this.elements.sliderValue) {
+          this.elements.sliderValue.textContent = columns;
+        }
+
+        const gridClasses = {
+          2: 'grid-cols-1 sm:grid-cols-2',
+          3: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3',
+          4: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+          5: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+          6: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
+        };
+
+        if (this.elements.answers) {
+          this.elements.answers.className = 
+            'grid gap-4 ' + (gridClasses[columns] || gridClasses[4]);
+        }
+      }
+
+      updateAnswerCount() {
+        if (this.elements.answerCountText) {
+          this.elements.answerCountText.textContent = `${this.state.filteredAnswers.length}件`;
+        }
+      }
+
+      handleClick(event) {
+        const { target } = event;
+        
+        if (target.matches('.answer-card, .answer-card *')) {
+          this.handleCardClick(event);
+        } else if (target.matches('.reaction-btn')) {
+          this.handleReactionClick(event);
+        } else if (target.matches('#refreshContentBtn')) {
+          this.refreshData();
+        } else if (target.matches('#dismissBannerBtn')) {
+          this.hideBanner();
+        } else if (target.matches('#answerModalCloseBtn')) {
+          this.closeModal();
+        }
+      }
+
+      handleChange(event) {
+        const { target } = event;
+        
+        if (target.matches('#classFilter')) {
+          this.state.currentFilter = target.value;
+          this.filterAndSortAnswers();
+          this.renderAnswers();
+        } else if (target.matches('#sortOrder')) {
+          this.state.currentSort = target.value;
+          this.filterAndSortAnswers();
+          this.renderAnswers();
+        }
+      }
+
+      handleKeydown(event) {
+        if (event.key === 'Escape') {
+          this.closeModal();
+        } else if (event.key === 'Enter' || event.key === ' ') {
+          if (event.target.matches('.answer-card')) {
+            event.preventDefault();
+            this.handleCardClick(event);
+          }
+        }
+      }
+
+      handleCardClick(event) {
+        if (event.target.matches('.reaction-btn, .reaction-btn *')) return;
+        
+        const card = event.target.closest('.answer-card');
+        const index = parseInt(card.dataset.index);
+        const answer = this.state.filteredAnswers[index];
+        
+        if (answer) {
+          this.showModal(answer);
+        }
+      }
+
+      async handleReactionClick(event) {
+        event.stopPropagation();
+        
+        const button = event.currentTarget;
+        const reaction = button.dataset.reaction;
+        const index = parseInt(button.dataset.index);
+        const answer = this.state.filteredAnswers[index];
+        
+        if (!answer || button.classList.contains('loading')) return;
+        
+        button.classList.add('loading');
+        
+        try {
+          await this.addReaction(answer, reaction);
+          this.refreshData();
+        } catch (error) {
+          Utils.logError(error, 'Reaction click');
+        } finally {
+          button.classList.remove('loading');
+        }
+      }
+
+      async addReaction(answer, reaction) {
+        return new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .addReaction(CONFIG.USER_ID, answer.rowIndex, reaction);
+        });
+      }
+
+      showModal(answer) {
+        if (!this.elements.answerModalContainer) return;
+        
+        this.elements.modalAnswer.innerHTML = Utils.sanitizeHtml(answer.opinion || answer.answer || '');
+        this.elements.modalStudentName.textContent = this.getDisplayName(answer);
+        
+        this.elements.answerModalCard.className = this.getCardClasses(answer).replace('cursor-pointer', '');
+        
+        this.elements.answerModalContainer.classList.remove('hidden');
+        this.elements.answerModalContainer.classList.add('modal-fade');
+        
+        document.body.style.overflow = 'hidden';
+        this.elements.answerModalCloseBtn.focus();
+      }
+
+      closeModal() {
+        if (!this.elements.answerModalContainer) return;
+        
+        this.elements.answerModalContainer.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+
+      showLoading(show) {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+          overlay.classList.toggle('hidden', !show);
+        }
+      }
+
+      async refreshData() {
+        try {
+          const data = await this.fetchData();
+          this.updateUI(data);
+          this.hideBanner();
+        } catch (error) {
+          Utils.logError(error, 'Data refresh');
+        }
+      }
+
+      hideBanner() {
+        if (this.elements.newContentBanner) {
+          this.elements.newContentBanner.classList.add('hidden');
+        }
+      }
+
+      startPolling() {
+        if (this.state.isPolling) return;
+        
+        this.state.isPolling = true;
+        this.pollingInterval = setInterval(() => {
+          this.checkForUpdates();
+        }, CONFIG.POLLING.INTERVAL);
+      }
+
+      stopPolling() {
+        if (this.pollingInterval) {
+          clearInterval(this.pollingInterval);
+          this.pollingInterval = null;
+          this.state.isPolling = false;
+        }
+      }
+
+      async checkForUpdates() {
+        try {
+          const data = await this.fetchData();
+          if (data.answers && data.answers.length !== this.state.answers.length) {
+            this.showBanner();
+          }
+        } catch (error) {
+          Utils.logError(error, 'Polling check');
+        }
+      }
+
+      showBanner() {
+        if (this.elements.newContentBanner) {
+          this.elements.newContentBanner.classList.remove('hidden');
+        }
+      }
+
+      destroy() {
+        this.stopPolling();
+        
+        this.eventListeners.forEach(({ event, handler }) => {
+          document.removeEventListener(event, handler);
+        });
+
+        this.gsapTimelines.forEach(tl => {
+          if (tl.kill) tl.kill();
+        });
+
+        this.state.cache.clear();
+      }
+    }
+
+    // 🚀 アプリケーション開始
+    let app;
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
+        app = new GenericBoardApp();
+      });
+    } else {
+      app = new GenericBoardApp();
+    }
+
+    // グローバルエラーハンドリング
+    window.addEventListener('error', (event) => {
+      Utils.logError(event.error, 'Global error');
+    });
+
+    window.addEventListener('unhandledrejection', (event) => {
+      Utils.logError(event.reason, 'Unhandled promise rejection');
+    });
+  </script>
+</body>
 </html>
