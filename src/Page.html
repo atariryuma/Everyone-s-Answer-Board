@@ -154,7 +154,9 @@
         this.state = {
           currentAnswers: [],
           isLoading: false,
-          lastFocusedElement: null
+          lastFocusedElement: null,
+          pollingInterval: null,
+          lastDataHash: null
         };
 
         this.handlers = {}; // イベントハンドラ参照用
@@ -167,6 +169,27 @@
         ];
         
         this.init();
+      }
+
+      /**
+       * クリーンアップ処理
+       */
+      destroy() {
+        this.stopPolling();
+        
+        // イベントリスナーを削除
+        if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
+          this.elements.sizeSlider.removeEventListener('input', this.handlers.onSizeSliderInput);
+        }
+        if (this.elements.sortOrder && this.handlers.onSortOrderChange) {
+          this.elements.sortOrder.removeEventListener('change', this.handlers.onSortOrderChange);
+        }
+        if (this.elements.answersContainer && this.handlers.onReactionClick) {
+          this.elements.answersContainer.removeEventListener('click', this.handlers.onReactionClick);
+        }
+        if (this.elements.adminToggleBtn && this.handlers.onAdminToggleClick) {
+          this.elements.adminToggleBtn.removeEventListener('click', this.handlers.onAdminToggleClick);
+        }
       }
 
       /**
@@ -196,6 +219,26 @@
         // モーダルの閉じるボタン
         this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
         this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
+        
+        // リアクションボタンのイベント（イベントデリゲーション）
+        this.handlers.onReactionClick = (event) => {
+          const button = event.target.closest('.reaction-btn');
+          if (!button) return;
+          
+          const rowIndex = parseInt(button.getAttribute('data-row-index'));
+          const reactionKey = button.getAttribute('data-reaction');
+          
+          if (rowIndex && reactionKey) {
+            this.toggleReaction(rowIndex, reactionKey, button);
+          }
+        };
+        this.elements.answersContainer.addEventListener('click', this.handlers.onReactionClick);
+        
+        // 管理モード切替ボタン
+        if (this.elements.adminToggleBtn) {
+          this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
+          this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
+        }
         
         // 保存された列数をローカルストレージからロード
         const savedCols = localStorage.getItem('boardColumns');
@@ -275,6 +318,8 @@
        */
       async loadInitialData() {
         await this.loadSheetData();
+        // 初期データロード完了後、ポーリング開始（5秒後）
+        setTimeout(() => this.startPolling(), 5000);
       }
 
       /**
@@ -489,6 +534,125 @@
       }
 
       /**
+       * リアクション処理
+       */
+      async toggleReaction(rowIndex, reactionKey, buttonElement) {
+        if (buttonElement.classList.contains('loading')) return;
+        
+        try {
+          buttonElement.classList.add('loading');
+          console.log('Toggling reaction:', { rowIndex, reactionKey });
+          
+          // ユーザーIDを取得
+          const userId = '<?= typeof userInfo !== "undefined" && userInfo && userInfo.userId ? userInfo.userId : "" ?>';
+          if (!userId) {
+            throw new Error('ユーザー情報が取得できません');
+          }
+          
+          // リアクションのトグル処理
+          const result = await this.runGas('addReaction', userId, rowIndex, reactionKey);
+          console.log('Reaction toggle result:', result);
+          
+          // UI更新（簡易版）
+          const wasReacted = buttonElement.classList.contains('liked');
+          if (wasReacted) {
+            buttonElement.classList.remove('liked');
+          } else {
+            buttonElement.classList.add('liked');
+          }
+          
+          // 成功アニメーション
+          buttonElement.classList.add('pulse');
+          setTimeout(() => buttonElement.classList.remove('pulse'), 600);
+          
+        } catch (error) {
+          console.error('Reaction error:', error);
+          this.showError('リアクションに失敗しました: ' + error.message);
+          buttonElement.classList.add('shake');
+          setTimeout(() => buttonElement.classList.remove('shake'), 500);
+        } finally {
+          buttonElement.classList.remove('loading');
+        }
+      }
+
+      /**
+       * 管理モード切替
+       */
+      toggleAdminMode() {
+        try {
+          console.log('Toggle admin mode requested');
+          // 管理パネルへ遷移
+          window.location.href = window.location.href.replace('mode=view', 'mode=admin');
+        } catch (error) {
+          console.error('Admin mode toggle error:', error);
+          this.showError('管理モードの切替に失敗しました');
+        }
+      }
+
+      /**
+       * エラー表示
+       */
+      showError(message) {
+        console.warn('Error:', message);
+        // 簡易エラー表示（将来的にはトーストやモーダルに変更可能）
+        if (window.confirm) {
+          setTimeout(() => window.alert(message), 100);
+        }
+      }
+
+      /**
+       * ミニマルポーリングシステム
+       */
+      startPolling() {
+        if (this.state.pollingInterval) return; // 既に開始済み
+        
+        console.log('📡 Starting minimal polling system (3min interval)');
+        this.state.pollingInterval = setInterval(() => {
+          this.checkForUpdates();
+        }, 3 * 60 * 1000); // 3分間隔
+      }
+
+      stopPolling() {
+        if (this.state.pollingInterval) {
+          console.log('⏹️ Stopping polling system');
+          clearInterval(this.state.pollingInterval);
+          this.state.pollingInterval = null;
+        }
+      }
+
+      async checkForUpdates() {
+        try {
+          console.log('🔍 Checking for updates...');
+          
+          const userId = '<?= typeof userInfo !== "undefined" && userInfo && userInfo.userId ? userInfo.userId : "" ?>';
+          if (!userId) return;
+          
+          const selectedClass = 'すべて';
+          const sortOrder = this.elements.sortOrder.value;
+          const data = await this.runGas('getPublishedSheetData', userId, selectedClass, sortOrder);
+          
+          // 差分チェック（簡易版）
+          const dataHash = JSON.stringify(data.data || []).length;
+          
+          if (this.state.lastDataHash && dataHash !== this.state.lastDataHash) {
+            console.log('📊 New data detected, updating...');
+            this.state.currentAnswers = data.data || [];
+            this.renderBoard();
+            
+            // 新着通知（簡易版）
+            if (document.title && !document.title.includes('●')) {
+              document.title = '● ' + document.title;
+            }
+          }
+          
+          this.state.lastDataHash = dataHash;
+          
+        } catch (error) {
+          console.error('Polling error:', error);
+        }
+      }
+
+      /**
        * HTMLエスケープ処理
        */
       escapeHtml(str) {
@@ -508,6 +672,14 @@
         window.genericBoardApp.destroy();
       }
       window.genericBoardApp = new GenericBoardApp();
+      
+      // ページ離脱時のクリーンアップ
+      window.addEventListener('beforeunload', () => {
+        if (window.genericBoardApp) {
+          window.genericBoardApp.destroy();
+        }
+      });
+      
     } catch (error) {
       console.error('Error creating GenericBoardApp instance:', error);
       
