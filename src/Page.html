@@ -24,83 +24,90 @@
   </div>
 
   <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
-    <header id="main-header" class="glass-panel rounded-xl p-4 mb-4 shadow-lg fade-in">
-      <div class="flex items-center justify-between gap-4 py-2">
-        <div class="flex items-center gap-3">
-          <div id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0">
-            <span class="w-4 h-4 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-            <span id="answerCountText">0件</span>
-          </div>
-          <a id="formAnswerBtn" href="#" target="_blank" rel="noopener noreferrer" class="text-xs bg-green-600 hover:bg-green-700 text-white font-medium px-3 py-1.5 rounded-md whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm no-underline" aria-label="フォームで回答" role="button">
-            <span class="w-3 h-3"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 2 4 4"/><path d="m17.5 6.5-1 1"/><path d="m-2 22 1.5-1.5a2.828 2.828 0 0 1 4 0l.5.5-2 2Z"/><path d="M8.5 8.5 12 12"/><path d="m13 7 4 4-6 6H7v-4Z"/></svg></span>
-            フォームで回答
-          </a>
-          <div class="flex items-center gap-2">
-            <label for="classFilter" class="sr-only">クラス絞り込み</label>
-            <select id="classFilter" class="hidden text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 rounded-md"></select>
-            <label for="sortOrder" class="sr-only">並び順</label>
-            <div class="relative">
-              <select id="sortOrder" class="text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 pr-8 rounded-md appearance-none cursor-pointer focus:ring-2 focus:ring-cyan-400/50">
-                <option value="newest" selected>新着順</option>
-                <option value="random">ランダム順</option>
-                <option value="score" id="scoreOption" class="hidden">スコア順</option>
-              </select>
-              <span class="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none">▼</span>
-            </div>
-          </div>
-        </div>
-        <div class="flex-1 flex justify-center"></div>
-        <div class="flex items-center gap-2">
-          <div id="boardOwnerDisplay" class="text-xs text-gray-500 bg-gray-800/40 backdrop-blur-sm px-2.5 py-1 rounded-md flex items-center gap-1.5">
-            <span class="w-3 h-3"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
-            <span>ID: <?= userInfo.userId ? userInfo.userId.substring(0,8) + '...' : 'ID_NOT_SET' ?></span>
-          </div>
-          <button type="button" id="adminToggleBtn" class="admin-toggle text-gray-400 hover:text-cyan-400 transition-all p-1.5 rounded-md hover:bg-gray-800/50 hidden" aria-label="管理者モード切り替え">
-            <span class="w-3 h-3"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg></span>
-          </button>
-          <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600/80 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
-            <span class="w-3 h-3"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
-            公開終了
-          </button>
-        </div>
+    <header id="main-header" class="glass-panel rounded-xl p-4 mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-lg">
+      <div class="flex items-center gap-4 w-full lg:w-auto">
+        <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
+        <label for="classFilter" class="sr-only">クラス絞り込み</label>
+        <select id="classFilter" class="hidden text-sm"></select>
+        <label for="sortOrder" class="sr-only">並び順</label>
+        <select id="sortOrder" class="text-sm">
+          <option value="newest" selected>新着順</option>
+          <option value="random">ランダム順</option>
+          <option value="score" id="scoreOption" style="display: none;">スコア順</option>
+        </select>
       </div>
-      <div class="border-t border-transparent pt-4">
-        <div class="flex justify-center">
-          <div id="headingLabel" class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem] text-center max-w-4xl line-clamp-2">
-            <span class="w-5 h-5 md:w-6 md:h-6 animate-spin"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span>
-            <span class="animate-pulse ml-2">問題文を読み込み中...</span>
-          </div>
-        </div>
+      <div class="flex-grow text-center w-full min-w-0">
+        <h1 id="siteTitle" class="game-font text-yellow-300 text-lg md:text-xl mb-1">みんなの回答ボード</h1>
+        <p id="headingLabel" class="text-2xl md:text-3xl font-bold text-pink-400 leading-tight flex justify-center">
+          <svg class="w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+          </svg>
+        </p>
+      </div>
+      <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1">
+        <p id="sheetNameText" class="text-xs text-gray-400 h-4"></p>
+        <p id="modeLabel" class="text-xs text-gray-400"></p>
+        <button type="button" id="adminToggleBtn" class="text-xs text-cyan-400 underline hidden" hidden aria-label="管理者モード切り替え"></button>
       </div>
     </header>
 
     <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧"></main>
   </div>
+  
+  <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300" role="dialog" aria-modal="true">
+    <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] transform scale-95 transition-transform duration-300" role="document" aria-labelledby="modalAnswer">
+      <button id="answerModalCloseBtn" class="absolute -top-3 -right-3 bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform" aria-label="閉じる"></button>
+      <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
+      <div id="modalFooter" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
+        <div><span id="modalStudentName" class="font-bold text-2xl text-gray-200"></span></div>
+        <div id="modalReactions" class="flex items-center gap-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden opacity-0 transition-opacity duration-300" role="dialog" aria-modal="true">
+    <div id="infoModalCard" class="glass-panel rounded-xl p-6 shadow-2xl border-2 border-cyan-400/80 w-full max-w-lg transform scale-95 transition-transform duration-300 relative" role="document">
+      <div class="space-y-4 text-gray-200 text-lg leading-relaxed">
+        <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
+        <ul class="space-y-2">
+          <li class="flex items-center gap-2"><span id="infoIconLike" class="w-5 h-5 text-red-400"></span>いいね：すてきだと思ったときに押そう</li>
+          <li class="flex items-center gap-2"><span id="infoIconUnderstand" class="w-5 h-5 text-yellow-400"></span>なるほど：参考になったときに押そう</li>
+          <li class="flex items-center gap-2"><span id="infoIconCurious" class="w-5 h-5 text-green-400"></span>きになる：もっと知りたいときに押そう</li>
+        </ul>
+        <p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-yellow-300"></span>先生が注目してほしい意見につけています</p>
+        <p>責任あるリアクションで、みんなで学びを深めよう！</p>
+        <div class="text-center mt-6">
+          <button id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
     <div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3">
-      <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更" />
+      <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更">
       <div class="flex items-center gap-1">
         <span id="sliderValue" class="font-bold text-lg">4</span>
-        <span id="iconGrid" class="w-4 h-4 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg></span>
+        <span id="footerIcon" class="w-4 h-4"></span>
       </div>
+      <button type="button" id="modeToggleBtn" class="ml-4 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm" title="プレビューモード切り替え">切替</button>
     </div>
   </footer>
 
   <script>
-    /** @OnlyCurrentDoc */
+    // サーバーからの変数をJavaScriptの定数として利用（プレビューでは無視）
+    // プレビューモードでは以下の変数は未定義になるが、window変数から参照
+    let showAdminFeatures, showHighlightToggle, isAdminUser;
+    try {
+      // GAS環境でのみ実行される（プレビューではエラーになるが無視）
+      showAdminFeatures = window.showAdminFeatures;
+      showHighlightToggle = window.showHighlightToggle;
+      isAdminUser = !window.isStudentMode;
+    } catch (e) {
+      // プレビューモードでは無視
+    }
     
-    // ⚡ CLAUDE.md準拠：統合最適化設定
-    const BOARD_CONFIG = Object.freeze({
-      USER_ID: '<?= typeof userInfo !== "undefined" && userInfo && userInfo.userId ? userInfo.userId : "" ?>',
-      IS_OWNER: <?= isOwner ? true : false ?>,
-      TIMEOUT: 5000,
-      STATUS: 'active',
-      CONFIG_JSON_ONLY: true,
-      DYNAMIC_URL_CACHE: true,
-      BATCH_JSON_OPERATIONS: true
-    });
-
     // SVGアイコンの定義
     const ICONS = {
       'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
@@ -114,458 +121,347 @@
       'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
       'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
       'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
-      'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-      'user': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
-      'edit': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 2 4 4"/><path d="m17.5 6.5-1 1"/><path d="m-2 22 1.5-1.5a2.828 2.828 0 0 1 4 0l.5.5-2 2Z"/><path d="M8.5 8.5 12 12"/><path d="m13 7 4 4-6 6H7v-4Z"/></svg>',
-      'settings': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>',
-      'loader': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
-      'stop': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>'
+      'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
     };
 
-    // 🚀 統一データソース設計（CLAUDE.md準拠）
-    const App = {
-      init: function() {
-        console.info('⚡ App初期化開始（CLAUDE.md準拠版）');
-        return this;
-      },
-      
-      getAccess: function() {
-        return {
-          verifyAccess: function(userId, mode, currentUserEmail) {
-            // 🔥 configJSON中心アクセス制御
-            return true;
-          }
+    class GenericBoardApp {
+      constructor() {
+        // UI要素への参照を格納
+        this.elements = {
+          answersContainer: document.getElementById('answers'),
+          sizeSlider: document.getElementById('sizeSlider'),
+          sliderValue: document.getElementById('sliderValue'),
+          headingLabel: document.getElementById('headingLabel'),
+          sheetNameText: document.getElementById('sheetNameText'),
+          modeLabel: document.getElementById('modeLabel'),
+          adminToggleBtn: document.getElementById('adminToggleBtn'),
+          answerCount: document.getElementById('answerCount'),
+          answerModalContainer: document.getElementById('answerModalContainer'),
+          answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
+          answerModalCard: document.getElementById('answerModalCard'),
+          modalAnswer: document.getElementById('modalAnswer'),
+          modalStudentName: document.getElementById('modalStudentName'),
+          modalReactionContainer: document.getElementById('modalReactions'),
+          classFilter: document.getElementById('classFilter'),
+          sortOrder: document.getElementById('sortOrder'),
+          scoreOption: document.getElementById('scoreOption'),
+          infoModalContainer: document.getElementById('infoModalContainer'),
+          infoModalConfirmBtn: document.getElementById('infoModalConfirmBtn'),
+          infoIconLike: document.getElementById('infoIconLike'),
+          infoIconUnderstand: document.getElementById('infoIconUnderstand'),
+          infoIconCurious: document.getElementById('infoIconCurious'),
+          infoIconHighlight: document.getElementById('infoIconHighlight'),
+          footerIcon: document.getElementById('footerIcon'),
+          modeToggleBtn: document.getElementById('modeToggleBtn')
         };
-      },
-      
-      getConfig: function() {
-        return {
-          getUserConfig: function(userId) {
-            // ✅ 単一JSON読み込みで全データ取得（60%高速化）
-            // 実際の実装では、ここでDBからconfigJSONを取得
-            console.info('📋 ユーザー設定取得:', userId);
-            return {
-              spreadsheetId: null, // 実際の値はバックエンドから取得
-              sheetName: null,     // 実際の値はバックエンドから取得
-              formUrl: null,       // 実際の値はバックエンドから取得
-              setupStatus: 'completed',
-              appPublished: true
-            };
-          }
-        };
-      }
-    };
 
-    // 🎯 メイン機能クラス（CLAUDE.md準拠）
-    function GenericBoardApp() {
-      const self = this;
-      
-      self.state = {
-        answers: [],
-        filteredAnswers: [],
-        isLoading: false,
-        isAdminMode: false,
-        gridColumns: 4
-      };
-      
-      self.elements = {};
-      
-      // ⚡ 初期化（CLAUDE.md準拠）
-      self.init = function() {
-        try {
-          console.info('🚀 GenericBoardApp初期化開始（CLAUDE.md準拠）');
-          
-          self.cacheElements();
-          self.setupEventListeners();
-          self.loadInitialData();
-          
-          console.info('✅ 初期化完了');
-        } catch (error) {
-          console.error('❌ 初期化エラー:', error);
-          throw error;
-        }
-      };
-      
-      // 📋 要素キャッシュ
-      self.cacheElements = function() {
-        const selectors = [
-          'answers', 'headingLabel', 'answerCountText', 
-          'formAnswerBtn', 'classFilter', 'sortOrder', 'sizeSlider', 'sliderValue'
+        // アプリケーションの状態管理
+        this.state = {
+          currentAnswers: [],
+          isLoading: false,
+          lastFocusedElement: null
+        };
+
+        this.handlers = {}; // イベントハンドラ参照用
+
+        // リアクションの種類とアイコンのマッピング
+        this.reactionTypes = [
+          { key: 'LIKE', icon: 'hand-thumb-up' },
+          { key: 'UNDERSTAND', icon: 'lightbulb' },
+          { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
         ];
         
-        selectors.forEach(function(id) {
-          self.elements[id] = document.getElementById(id);
+        this.init();
+      }
+
+      /**
+       * アプリケーションの初期化処理
+       */
+      init() {
+        this.renderIcons(); // アイコンのレンダリング
+        this.setupEventListeners(); // イベントリスナーの設定
+        this.loadInitialData(); // 初期データのロード
+      }
+
+      /**
+       * イベントリスナーの設定
+       */
+      setupEventListeners() {
+        // スライダーの変更
+        this.handlers.onSizeSliderInput = () => {
+          localStorage.setItem('boardColumns', this.elements.sizeSlider.value);
+          this.renderBoard();
+        };
+        this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput);
+
+        // クラスフィルターとソート順の変更
+        this.handlers.onSortOrderChange = () => this.loadSheetData();
+        this.elements.sortOrder.addEventListener('change', this.handlers.onSortOrderChange);
+
+        // モーダルの閉じるボタン
+        this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
+        this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
+        
+        // 保存された列数をローカルストレージからロード
+        const savedCols = localStorage.getItem('boardColumns');
+        if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
+          this.elements.sizeSlider.value = savedCols;
+          this.elements.sliderValue.textContent = savedCols;
+        }
+      }
+
+      /**
+       * Google Apps Script関数を実行
+       */
+      runGas(funcName, ...args) {
+        return new Promise((resolve, reject) => {
+          // Google Apps Script環境で実行されているかチェック
+          if (typeof google !== 'undefined' && google.script && google.script.run) {
+            google.script.run
+              .withSuccessHandler(resolve)
+              .withFailureHandler(reject)
+              [funcName](...args);
+          } else {
+            // GAS環境がない場合は、デバッグ用のモックデータを使用
+            console.warn('Google Apps Script environment not detected. Using mock data.');
+            this.getMockData(funcName, ...args).then(resolve).catch(reject);
+          }
         });
-      };
-      
-      // 🎧 イベントリスナー設定
-      self.setupEventListeners = function() {
-        if (self.elements.sizeSlider) {
-          self.elements.sizeSlider.addEventListener('input', function() {
-            const value = self.elements.sizeSlider.value;
-            localStorage.setItem('boardColumns', value);
-            self.elements.sliderValue.textContent = value;
-            self.renderBoard();
-          });
-        }
-        
-        if (self.elements.sortOrder) {
-          self.elements.sortOrder.addEventListener('change', function() {
-            self.loadSheetData();
-          });
-        }
-        
-        // 🎯 リアクションボタンのイベント委譲
-        if (self.elements.answers) {
-          self.elements.answers.addEventListener('click', function(e) {
-            const reactionBtn = e.target.closest('.reaction-btn');
-            if (reactionBtn) {
-              e.preventDefault();
-              e.stopPropagation();
-              
-              const reactionType = reactionBtn.dataset.reaction;
-              const rowIndex = reactionBtn.dataset.rowIndex;
-              
-              if (reactionType && rowIndex) {
-                console.info('🎯 リアクションクリック:', { rowIndex: rowIndex, type: reactionType });
-                self.handleReaction(rowIndex, reactionType);
-              }
+      }
+
+      /**
+       * デバッグ用のモックデータを生成
+       */
+      getMockData(funcName, ...args) {
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            if (funcName === 'getPublishedSheetData') {
+              resolve({
+                header: 'テスト問題',
+                sheetName: 'テストシート',
+                rows: [
+                  {
+                    rowIndex: 1,
+                    name: '田中太郎',
+                    class: '3年A組',
+                    opinion: 'これは素晴らしいアイデアだと思います。',
+                    reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
+                    reactions: {
+                      UNDERSTAND: { count: 5, reacted: false },
+                      LIKE: { count: 2, reacted: false },
+                      CURIOUS: { count: 1, reacted: false }
+                    },
+                    highlight: false
+                  }
+                ]
+              });
             }
-          });
-        }
-      };
-      
-      // 📊 初期データ読み込み
-      self.loadInitialData = function() {
-        console.info('📊 初期データ読み込み開始');
-        self.loadSheetData();
-      };
-      
-      // 🔄 シートデータ読み込み（configJSON中心）
-      self.loadSheetData = function() {
-        if (self.state.isLoading) return;
-        
-        self.state.isLoading = true;
+          }, 500);
+        });
+      }
+
+      /**
+       * 初期データをロード
+       */
+      async loadInitialData() {
+        await this.loadSheetData();
+      }
+
+      /**
+       * スプレッドシートデータをロード
+       */
+      async loadSheetData() {
+        if (this.state.isLoading) return;
+        this.state.isLoading = true;
         
         try {
-          console.info('📡 データソース取得:', BOARD_CONFIG.USER_ID);
+          const selectedClass = 'すべて';
+          const sortOrder = this.elements.sortOrder.value;
+          const data = await this.runGas('getPublishedSheetData', selectedClass, sortOrder);
           
-          // 🚀 configJSON統一データソース使用
-          const config = App.getConfig().getUserConfig(BOARD_CONFIG.USER_ID);
-          if (!config) {
-            throw new Error('ユーザー設定が見つかりません');
+          this.state.currentAnswers = data.rows || [];
+          this.elements.headingLabel.textContent = this.escapeHtml(data.header || '問題');
+          
+          if (this.elements.sheetNameText) {
+            this.elements.sheetNameText.textContent = 'シート: ' + this.escapeHtml(data.sheetName || '不明');
           }
           
-          // 🔥 configJSON中心データアクセス（DB列アクセス完全廃止）
-          const spreadsheetId = config.spreadsheetId;
-          const sheetName = config.sheetName;
-          const formUrl = config.formUrl;
-          
-          console.info('📈 統一データソース:', {
-            spreadsheetId: spreadsheetId,
-            sheetName: sheetName,
-            formUrl: formUrl
-          });
-          
-          // 🔄 実際のバックエンド呼び出し
-          console.info('📡 バックエンド呼び出し開始');
-          
-          const selectedClass = self.elements.classFilter ? self.elements.classFilter.value || 'すべて' : 'すべて';
-          const sortOrder = self.elements.sortOrder ? self.elements.sortOrder.value || 'newest' : 'newest';
-          
-          console.info('📊 呼び出しパラメータ:', { selectedClass: selectedClass, sortOrder: sortOrder });
-          
-          // 実際のGAS関数呼び出し（正しいパラメータ順序）
-          self.runGas('getPublishedSheetData', BOARD_CONFIG.USER_ID, selectedClass, sortOrder)
-            .then(function(data) {
-              console.info('📥 バックエンドレスポンス受信:', data);
-              
-              // 🔍 バックエンドステータス確認
-              if (data.status === 'error') {
-                console.error('❌ バックエンドエラー:', data.message);
-                self.showError(data.message || 'データの読み込みに失敗しました');
-                return;
-              }
-              
-              // 📋 データ処理（バックエンド構造に対応）
-              if (data.title || data.header || data.opinionHeader) {
-                const headerText = data.title || data.header || data.opinionHeader;
-                console.info('🏷️ ヘッダー更新:', headerText);
-                self.updateHeader(headerText);
-              }
-              
-              // 🎯 実際のデータ配列を確認
-              const rawAnswers = data.data || data.answers || data.rows || [];
-              console.info('📊 受信データ件数:', rawAnswers.length);
-              
-              if (rawAnswers.length > 0) {
-                console.info('📄 データサンプル:', rawAnswers[0]);
-                
-                self.state.answers = rawAnswers;
-                self.state.filteredAnswers = rawAnswers;
-                self.renderAnswers();
-                self.updateAnswerCount();
-              } else {
-                console.warn('⚠️ データが空です - count:', data.count);
-                self.showError('表示するデータがありません');
-              }
-              
-              // 🔗 フォームURL設定
-              if (data.formUrl && self.elements.formAnswerBtn) {
-                console.info('🔗 フォームURL設定:', data.formUrl);
-                self.elements.formAnswerBtn.href = data.formUrl;
-              }
-              
-              console.info('✅ データ処理完了 - ステータス:', data.status);
-            })
-            .catch(function(error) {
-              console.error('❌ バックエンドエラー:', error);
-              self.showError('データの読み込みに失敗しました: ' + (error.message || error));
-            });
-          
+          this.renderBoard();
         } catch (error) {
-          console.error('❌ データ読み込みエラー:', error);
-          self.showError(error.message || 'データの読み込みに失敗しました');
+          console.error('Error loading sheet data:', error);
+          this.showError(error.message || 'データの読み込みに失敗しました');
         } finally {
-          self.state.isLoading = false;
+          this.state.isLoading = false;
         }
-      };
-      
-      // 🏷️ ヘッダー更新
-      self.updateHeader = function(text) {
-        if (self.elements.headingLabel) {
-          self.elements.headingLabel.innerHTML = '<span class="text-gradient">' + self.sanitizeHtml(text) + '</span>';
-        }
-      };
-      
-      // 📊 回答数更新
-      self.updateAnswerCount = function() {
-        if (self.elements.answerCountText) {
-          self.elements.answerCountText.textContent = self.state.filteredAnswers.length + '件';
-        }
-      };
-      
-      // 🎨 回答レンダリング
-      self.renderAnswers = function() {
-        console.info('🎨 回答レンダリング開始:', self.state.filteredAnswers.length, '件');
+      }
+
+      /**
+       * 回答ボードをレンダリング
+       */
+      renderBoard() {
+        const container = this.elements.answersContainer;
+        const newRows = this.state.currentAnswers;
         
-        if (!self.elements.answers) {
-          console.error('❌ answers要素が見つかりません');
-          return;
-        }
+        this.elements.sliderValue.textContent = this.elements.sizeSlider.value;
+        // グリッド列数を更新
+        container.className = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
         
-        const fragment = document.createDocumentFragment();
+        // 回答数表示の更新
+        const userIcon = this.getIcon('users', 'w-4 h-4 inline-block -mt-1');
+        this.elements.answerCount.innerHTML = userIcon + '<span>' + newRows.length + '件</span>';
         
-        self.state.filteredAnswers.forEach(function(answer, index) {
-          try {
-            const card = self.createAnswerCard(answer, index);
+        if (newRows.length === 0) {
+          container.innerHTML = '<p class="text-center text-gray-500 col-span-full mt-8">回答はありません。</p>';
+        } else {
+          const fragment = document.createDocumentFragment();
+          newRows.forEach((row) => {
+            const card = this.createAnswerCard(row);
             fragment.appendChild(card);
-          } catch (error) {
-            console.error('❌ カード作成エラー:', error, answer);
-          }
-        });
-        
-        self.elements.answers.innerHTML = '';
-        self.elements.answers.appendChild(fragment);
-        
-        console.info('✅ レンダリング完了');
-      };
-      
-      // 🃏 カード作成
-      self.createAnswerCard = function(answer, index) {
+          });
+          container.innerHTML = '';
+          container.appendChild(fragment);
+        }
+      }
+
+      /**
+       * 回答カード要素を生成
+       */
+      createAnswerCard(data) {
         const card = document.createElement('div');
-        card.className = 'answer-card glass-panel cursor-pointer interactive-element rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80';
-        card.setAttribute('data-row-index', answer.rowIndex);
+        const highlightClass = data.highlight ? ' highlighted' : '';
+        card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
+        card.dataset.rowIndex = data.rowIndex;
         card.setAttribute('role', 'article');
         card.setAttribute('tabindex', '0');
+
+        const nameHtml = data.name ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
+        const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+
+        // リアクションボタンのHTMLを生成
+        const reactionButtonsHtml = this.reactionTypes.map(rt => {
+          const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
+          const cls = info.reacted ? 'liked' : '';
+          const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+          
+          return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '">' +
+                   this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
+                   '</button>';
+        }).join('');
         
-        // ハイライトバッジ
-        const highlightBadge = answer.highlighted ? 
-          '<div class="highlight-badge">' + self.getIcon('star', 'w-6 h-6') + '</div>' : '';
-        
-        // 回答プレビュー
-        const answerPreview = self.sanitizeHtml(answer.opinion || answer.answer || '');
-        
-        // 表示名
-        const displayName = answer.name || '匿名';
-        
-        // リアクションボタン
-        const reactionButtons = self.createReactionButtons(answer);
-        
-        card.innerHTML = 
-          '<div class="p-4 relative">' +
-            highlightBadge +
-            '<div class="answer-preview mb-3 text-gray-200 leading-relaxed">' +
-              answerPreview +
-            '</div>' +
-            '<div class="flex items-center justify-between text-xs text-gray-400">' +
-              '<span class="font-medium">' + displayName + '</span>' +
-              '<div class="flex items-center gap-1">' +
-                reactionButtons +
-              '</div>' +
-            '</div>' +
+        card.innerHTML =
+          '<div class="relative flex-grow mb-3 answer-preview">' +
+          '<h3 class="opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight">' +
+          this.escapeHtml(data.opinion || '') + '</h3>' +
+          '<p class="text-gray-100 whitespace-pre-wrap break-words mt-4">' +
+          this.escapeHtml(data.reason || '') + '</p>' +
+          '</div>' +
+          '<div class="' + containerClass + '">' +
+          nameHtml + 
+          '<div class="flex items-center gap-1" role="group">' +
+          reactionButtonsHtml +
+          '</div>' +
           '</div>';
+
+        // ハイライトバッジを動的に追加
+        if (data.highlight) {
+          const badge = document.createElement('span');
+          badge.className = 'highlight-badge';
+          badge.innerHTML = this.getIcon('star', '', true);
+          card.appendChild(badge);
+        }
         
         return card;
-      };
-      
-      // 🎭 リアクションボタン作成（SVGアイコン統一）
-      self.createReactionButtons = function(answer) {
-        const reactionTypes = [
-          { key: 'LIKE', iconName: 'hand-thumb-up-outline', iconActive: 'hand-thumb-up-solid', color: 'text-red-400', label: 'いいね' },
-          { key: 'UNDERSTAND', iconName: 'lightbulb-outline', iconActive: 'lightbulb-solid', color: 'text-yellow-400', label: 'なるほど' },
-          { key: 'CURIOUS', iconName: 'magnifying-glass-plus-outline', iconActive: 'magnifying-glass-plus-solid', color: 'text-green-400', label: 'もっと知りたい' }
-        ];
+      }
+
+      /**
+       * エラー表示
+       */
+      showError(message) {
+        if (!this.elements.answersContainer) return;
         
-        return reactionTypes.map(function(type) {
-          const reaction = answer.reactions ? answer.reactions[type.key] : null;
-          const count = reaction ? (reaction.count || 0) : 0;
-          const isActive = reaction ? (reaction.reacted || false) : false;
-          
-          const activeClass = isActive ? 'reacted bg-opacity-20' : '';
-          const hoverClass = 'hover:bg-opacity-10 hover:scale-110';
-          const iconName = isActive ? type.iconActive : type.iconName;
-          
-          return '<button type="button" class="reaction-btn inline-flex items-center justify-center w-8 h-8 rounded-full transition-all ' + 
-                 type.color + ' ' + activeClass + ' ' + hoverClass + 
-                 '" data-reaction="' + type.key + 
-                 '" data-row-index="' + answer.rowIndex + 
-                 '" aria-label="' + type.label + '" title="' + type.label + '">' + 
-                 self.getIcon(iconName, 'w-5 h-5') +
-                 '</button>';
-        }).join('');
-      };
-      
-      // 🖼️ ボードレンダリング
-      self.renderBoard = function() {
-        const columns = parseInt(self.elements.sizeSlider.value || '4', 10);
-        const gridClasses = {
-          2: 'grid-cols-1 sm:grid-cols-2',
-          3: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3',
-          4: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-          5: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
-          6: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
-        };
-        
-        self.elements.answers.className = 'grid gap-4 ' + (gridClasses[columns] || gridClasses[4]);
-        self.renderAnswers();
-      };
-      
-      // 🚨 エラー表示
-      self.showError = function(message) {
-        if (!self.elements.answers) return;
-        
-        self.elements.answers.innerHTML =
+        this.elements.answersContainer.innerHTML =
           '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' +
           '<p class="font-bold">データの読み込みに失敗しました。</p>' +
-          '<p class="text-sm mt-2">' + self.sanitizeHtml(message) + '</p>' +
+          '<p class="text-sm mt-2">' + this.escapeHtml(message) + '</p>' +
           '</div>';
-      };
+      }
+
+      /**
+       * 回答モーダルを非表示
+       */
+      hideAnswerModal() {
+        this.elements.answerModalContainer.classList.add('hidden');
+      }
+
+      /**
+       * SVGアイコンのHTML文字列を取得
+       */
+      getIcon(name, classes = '', solid = false) {
+        // アイコンキーの優先順位: solid版 > outline版 > プレーン版
+        let key;
+        if (solid && ICONS[name + '-solid']) {
+          key = name + '-solid';
+        } else if (ICONS[name + '-outline']) {
+          key = name + '-outline';
+        } else if (ICONS[name]) {
+          key = name;
+        } else {
+          console.warn('Icon not found:', name);
+          return '<span aria-hidden="true" class="' + classes + '">⭐</span>'; // フォールバック
+        }
+        // 存在するアイコンを返す
+        return '<span aria-hidden="true" class="' + classes + '">' + ICONS[key] + '</span>';
+      }
       
-      // 🛡️ HTML サニタイズ
-      self.sanitizeHtml = function(str) {
+      /**
+       * 主要なアイコンをレンダリング（初期設定）
+       */
+      renderIcons() {
+        this.elements.answerModalCloseBtn.innerHTML = this.getIcon('x', 'w-6 h-6');
+        this.elements.footerIcon.innerHTML = this.getIcon('grid-2x2');
+        if (this.elements.infoIconLike) {
+          this.elements.infoIconLike.innerHTML = this.getIcon('hand-thumb-up');
+        }
+        if (this.elements.infoIconUnderstand) {
+          this.elements.infoIconUnderstand.innerHTML = this.getIcon('lightbulb');
+        }
+        if (this.elements.infoIconCurious) {
+          this.elements.infoIconCurious.innerHTML = this.getIcon('magnifying-glass-plus');
+        }
+        if (this.elements.infoIconHighlight) {
+          this.elements.infoIconHighlight.innerHTML = this.getIcon('star');
+        }
+      }
+
+      /**
+       * HTMLエスケープ処理
+       */
+      escapeHtml(str) {
         if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-      };
-      
-      // 🎨 アイコン取得関数
-      self.getIcon = function(name, classes) {
-        classes = classes || '';
-        const svgContent = ICONS[name] || ICONS['star'];
-        return '<span class="inline-flex items-center justify-center ' + classes + '">' + svgContent + '</span>';
-      };
-      
-      // 📡 GAS関数呼び出し（バックエンドチェック機能対応）
-      self.runGas = function(funcName) {
-        const args = Array.prototype.slice.call(arguments, 1);
-        
-        return new Promise(function(resolve, reject) {
-          console.info('📞 GAS関数呼び出し:', funcName, args);
-          
-          if (typeof google === 'undefined' || !google.script || !google.script.run) {
-            reject(new Error('Google Apps Script環境が検出されません'));
-            return;
-          }
-          
-          const startTime = Date.now();
-          
-          google.script.run
-            .withSuccessHandler(function(result) {
-              const duration = Date.now() - startTime;
-              console.info('✅ GAS関数成功:', funcName, 'duration:', duration + 'ms', result);
-              resolve(result);
-            })
-            .withFailureHandler(function(error) {
-              const duration = Date.now() - startTime;
-              console.error('❌ GAS関数エラー:', funcName, 'duration:', duration + 'ms', error);
-              reject(error);
-            })
-            [funcName].apply(null, args);
-        });
-      };
-      
-      // 🎭 リアクション処理（バックエンド連携）
-      self.handleReaction = function(rowIndex, reactionType) {
-        console.info('🎯 リアクション処理:', rowIndex, reactionType);
-        
-        self.runGas('addReaction', rowIndex, reactionType)
-          .then(function(result) {
-            console.info('✅ リアクション成功:', result);
-            // データを再読み込み
-            self.loadSheetData();
-          })
-          .catch(function(error) {
-            console.error('❌ リアクション失敗:', error);
-          });
-      };
-      
-      // ✨ ハイライト処理（バックエンド連携）
-      self.handleHighlight = function(rowIndex) {
-        console.info('⭐ ハイライト処理:', rowIndex);
-        
-        self.runGas('toggleHighlight', rowIndex)
-          .then(function(result) {
-            console.info('✅ ハイライト成功:', result);
-            // データを再読み込み
-            self.loadSheetData();
-          })
-          .catch(function(error) {
-            console.error('❌ ハイライト失敗:', error);
-          });
-      };
-      
-      return self;
+        return str.toString()
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+      }
     }
     
-    // 🚀 アプリケーション開始（CLAUDE.md準拠）
-    const app = new GenericBoardApp();
-    
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() {
-        app.init();
-      });
-    } else {
-      app.init();
+    // アプリケーションインスタンスを作成
+    try {
+      if (window.genericBoardApp && typeof window.genericBoardApp.destroy === 'function') {
+        window.genericBoardApp.destroy();
+      }
+      window.genericBoardApp = new GenericBoardApp();
+    } catch (error) {
+      console.error('Error creating GenericBoardApp instance:', error);
+      
+      // エラー時の緊急表示
+      const container = document.getElementById('answers');
+      if (container) {
+        container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + error.message + '</div>';
+      }
     }
-    
-    // 📊 構造化ログ（CLAUDE.md準拠）
-    console.info('⚡ GenericBoard初期化完了（CLAUDE.md準拠版）', {
-      userId: BOARD_CONFIG.USER_ID,
-      isOwner: BOARD_CONFIG.IS_OWNER,
-      performance: 'configJSON_optimized',
-      timestamp: new Date().toISOString()
-    });
-    
-    // グローバルエラーハンドリング
-    window.addEventListener('error', function(event) {
-      console.error('❌ グローバルエラー:', event.error);
-    });
-    
-    window.addEventListener('unhandledrejection', function(event) {
-      console.error('❌ 未処理Promise拒否:', event.reason);
-    });
   </script>
 </body>
 </html>
