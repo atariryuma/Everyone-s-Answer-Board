@@ -215,16 +215,31 @@
        */
       runGas(funcName, ...args) {
         return new Promise((resolve, reject) => {
+          console.log('runGas called:', { funcName, args, argsLength: args.length });
+          
           // Google Apps Script環境で実行されているかチェック
           if (typeof google !== 'undefined' && google.script && google.script.run) {
+            console.log('Calling Google Apps Script function:', funcName);
             google.script.run
-              .withSuccessHandler(resolve)
-              .withFailureHandler(reject)
+              .withSuccessHandler((result) => {
+                console.log('GAS function success:', { funcName, result });
+                resolve(result);
+              })
+              .withFailureHandler((error) => {
+                console.error('GAS function error:', { funcName, error });
+                reject(error);
+              })
               [funcName](...args);
           } else {
             // GAS環境がない場合は、デバッグ用のモックデータを使用
             console.warn('Google Apps Script environment not detected. Using mock data.');
-            this.getMockData(funcName, ...args).then(resolve).catch(reject);
+            this.getMockData(funcName, ...args).then((result) => {
+              console.log('Mock data returned:', { funcName, result });
+              resolve(result);
+            }).catch((error) => {
+              console.error('Mock data error:', { funcName, error });
+              reject(error);
+            });
           }
         });
       }
@@ -277,9 +292,44 @@
         try {
           // UserIdを取得（GAS環境から）
           const userId = '<?= typeof userInfo !== "undefined" && userInfo && userInfo.userId ? userInfo.userId : "" ?>';
+          
+          // デバッグ情報をログ出力
+          console.log('loadSheetData called with:', {
+            userId: userId,
+            hasUserId: !!userId,
+            userIdLength: userId.length
+          });
+          
+          // userIdが空の場合の処理
+          if (!userId) {
+            console.warn('userId is empty, trying to use mock data or fallback');
+            // モックデータで一時的に表示
+            const mockData = await this.getMockData('getPublishedSheetData');
+            this.state.currentAnswers = mockData.rows || [];
+            this.elements.headingLabel.textContent = this.escapeHtml(mockData.header || '問題');
+            if (this.elements.sheetNameText) {
+              this.elements.sheetNameText.textContent = 'シート: ' + this.escapeHtml(mockData.sheetName || '不明');
+            }
+            this.renderBoard();
+            this.showError('ユーザー情報が取得できませんでした。管理者に確認してください。');
+            return;
+          }
+          
           const selectedClass = 'すべて';
           const sortOrder = this.elements.sortOrder.value;
+          
+          console.log('Calling getPublishedSheetData with:', {
+            userId, selectedClass, sortOrder
+          });
+          
           const data = await this.runGas('getPublishedSheetData', userId, selectedClass, sortOrder);
+          
+          console.log('getPublishedSheetData response:', {
+            hasData: !!data,
+            rowsCount: data?.rows?.length || 0,
+            header: data?.header,
+            sheetName: data?.sheetName
+          });
           
           this.state.currentAnswers = data.rows || [];
           this.elements.headingLabel.textContent = this.escapeHtml(data.header || '問題');
@@ -291,6 +341,11 @@
           this.renderBoard();
         } catch (error) {
           console.error('Error loading sheet data:', error);
+          console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            name: error.name
+          });
           this.showError(error.message || 'データの読み込みに失敗しました');
         } finally {
           this.state.isLoading = false;
