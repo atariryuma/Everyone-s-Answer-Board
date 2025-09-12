@@ -1,0 +1,537 @@
+  <script>
+    // 🔒 セキュア環境変数取得
+    const getSecureVars = () => ({
+      showAdminFeatures: !!window.showAdminFeatures,
+      isAdminUser: !window.isStudentMode,
+      userId: window.userId || null
+    });
+    
+    // ⚡ 最適化SVGアイコン
+    const ICONS = {
+      lightbulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m8.66-10H20M4 12H2m15.07-7.07L17.66 6.34M6.34 6.34L4.93 4.93m12.14 12.14L15.66 15.66M6.34 17.66L4.93 19.07"/></svg>',
+      thumbup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12l5-3 5 3V10l-5-8-5 8z"/></svg>',
+      search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>',
+      x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+      star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/></svg>',
+      grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M3 12h18"/></svg>',
+      users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+    };
+
+    class StudyQuestApp {
+      constructor() {
+        this.el = id => document.getElementById(id);
+        this.state = { 
+          answers: [], 
+          loading: false, 
+          config: null,
+          polling: null 
+        };
+        this.vars = getSecureVars();
+        this.reactions = [
+          {key: 'LIKE', icon: 'thumbup', color: 'red'},
+          {key: 'UNDERSTAND', icon: 'lightbulb', color: 'yellow'},
+          {key: 'CURIOUS', icon: 'search', color: 'green'}
+        ];
+        this.init();
+      }
+
+      destroy() {
+        if (this.state.polling) {
+          clearInterval(this.state.polling);
+        }
+      }
+
+      async init() {
+        await this.loadConfig();
+        this.setupUI();
+        this.setupEvents();
+        await this.loadData();
+        this.startPolling();
+      }
+
+      async loadConfig() {
+        try {
+          if (!this.vars.userId) {
+            throw new Error('ユーザーIDが取得できません');
+          }
+          this.state.config = await this.runGas('getUserConfig', this.vars.userId) || {};
+        } catch (error) {
+          console.error('設定読み込みエラー:', error);
+          this.state.config = {};
+        }
+      }
+
+      setupUI() {
+        this.renderIcons();
+        this.updateUIState();
+      }
+
+      setupEvents() {
+        const slider = this.el('sizeSlider');
+        const container = this.el('answers');
+        const sortOrder = this.el('sortOrder');
+        
+        if (slider) {
+          slider.addEventListener('input', () => {
+            localStorage.setItem('boardColumns', slider.value);
+            this.el('sliderValue').textContent = slider.value;
+            this.render();
+          });
+          
+          const saved = localStorage.getItem('boardColumns');
+          if (saved) {
+            slider.value = saved;
+            this.el('sliderValue').textContent = saved;
+          }
+        }
+
+        if (sortOrder) {
+          sortOrder.addEventListener('change', () => this.loadData());
+        }
+
+        if (container) {
+          container.addEventListener('click', e => {
+            const btn = e.target.closest('.reaction-btn');
+            const card = e.target.closest('.answer-card');
+            
+            if (btn) {
+              const rowIndex = parseInt(btn.dataset.rowIndex);
+              const reaction = btn.dataset.reaction;
+              if (rowIndex && reaction) {
+                this.toggleReaction(rowIndex, reaction, btn);
+              }
+            } else if (card && !btn) {
+              const rowIndex = parseInt(card.dataset.rowIndex);
+              if (rowIndex) this.showModal(rowIndex);
+            }
+          });
+        }
+
+        document.addEventListener('keydown', e => {
+          if (e.key === 'Escape') this.hideModal();
+        });
+
+        const adminBtn = this.el('adminToggleBtn');
+        if (adminBtn) {
+          adminBtn.addEventListener('click', () => {
+            window.location.href = window.location.href.replace('mode=view', 'mode=admin');
+          });
+        }
+      }
+
+      updateUIState() {
+        const adminBtn = this.el('adminToggleBtn');
+        const modeLabel = this.el('modeLabel');
+        
+        if (adminBtn && this.vars.showAdminFeatures && this.vars.isAdminUser) {
+          adminBtn.classList.remove('hidden');
+          adminBtn.textContent = '管理パネル';
+        }
+        
+        if (modeLabel) {
+          modeLabel.textContent = this.vars.isAdminUser ? '管理者' : '学習者';
+        }
+      }
+
+      runGas(funcName, ...args) {
+        return new Promise((resolve, reject) => {
+          if (typeof google !== 'undefined' && google.script?.run) {
+            google.script.run
+              .withSuccessHandler(resolve)
+              .withFailureHandler(reject)
+              [funcName](...args);
+          } else {
+            // Mock data for testing
+            setTimeout(() => {
+              if (funcName === 'getPublishedSheetData') {
+                resolve({
+                  header: 'テスト問題',
+                  sheetName: 'テストシート', 
+                  data: [{
+                    rowIndex: 1, name: '田中太郎', class: '3年A組',
+                    opinion: 'これは素晴らしいアイデアです。',
+                    reason: '簡潔で実現可能性が高いです。',
+                    reactions: { UNDERSTAND: {count: 5, reacted: false}, LIKE: {count: 2, reacted: false}, CURIOUS: {count: 1, reacted: false} },
+                    highlight: false
+                  }]
+                });
+              }
+              resolve({});
+            }, 300);
+          }
+        });
+      }
+
+      async loadData() {
+        if (this.state.loading) return;
+        this.state.loading = true;
+        
+        try {
+          if (!this.vars.userId) {
+            throw new Error('ユーザー情報が取得できません');
+          }
+          
+          const sortOrder = this.el('sortOrder')?.value || 'newest';
+          const data = await this.runGas('getPublishedSheetData', this.vars.userId, 'すべて', sortOrder);
+          
+          this.state.answers = this.normalizeData(data);
+          
+          const heading = this.el('headingLabel');
+          const sheetName = this.el('sheetNameText');
+          
+          if (heading) heading.textContent = data.header || '問題';
+          if (sheetName) sheetName.textContent = 'シート: ' + (data.sheetName || '不明');
+          
+          this.render();
+        } catch (error) {
+          console.error('データロードエラー:', error);
+          this.showError(error.message || 'データ読み込み失敗');
+        } finally {
+          this.state.loading = false;
+        }
+      }
+
+      normalizeData(rawData) {
+        if (!rawData?.data && !rawData?.rows) return [];
+        const data = rawData.data || rawData.rows || [];
+        
+        return data.filter(item => item?.opinion).map((item, index) => ({
+          rowIndex: item.rowIndex || index + 1,
+          opinion: String(item.opinion || '').trim(),
+          reason: String(item.reason || '').trim(),
+          name: String(item.name || '').trim(),
+          class: String(item.class || '').trim(),
+          email: String(item.email || '').trim(),
+          reactions: this.normalizeReactions(item.reactions),
+          highlight: Boolean(item.highlight)
+        }));
+      }
+
+      normalizeReactions(reactions) {
+        const defaults = { UNDERSTAND: {count: 0, reacted: false}, LIKE: {count: 0, reacted: false}, CURIOUS: {count: 0, reacted: false} };
+        if (!reactions) return defaults;
+        
+        return Object.keys(defaults).reduce((acc, key) => {
+          acc[key] = {
+            count: Math.max(0, parseInt(reactions[key]?.count) || 0),
+            reacted: Boolean(reactions[key]?.reacted)
+          };
+          return acc;
+        }, {});
+      }
+
+      render() {
+        const container = this.el('answers');
+        if (!container) return;
+        
+        const slider = this.el('sizeSlider');
+        const sliderValue = this.el('sliderValue');
+        
+        if (slider && sliderValue) {
+          sliderValue.textContent = slider.value;
+          container.className = `grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-${slider.value}`;
+        }
+        
+        this.updateAnswerCount();
+        
+        if (!this.state.answers.length) {
+          container.innerHTML = '<p class="text-center text-gray-500 col-span-full mt-8">回答はありません</p>';
+          return;
+        }
+        
+        const fragment = document.createDocumentFragment();
+        this.state.answers.forEach(answer => {
+          fragment.appendChild(this.createCard(answer));
+        });
+        
+        container.innerHTML = '';
+        container.appendChild(fragment);
+      }
+
+      createCard(data) {
+        const card = document.createElement('div');
+        card.className = `answer-card glass-panel rounded-xl p-4 flex flex-col shadow-lg border-2 border-cyan-400/80 cursor-pointer${data.highlight ? ' highlighted' : ''}`;
+        card.dataset.rowIndex = data.rowIndex;
+        card.tabIndex = 0;
+        card.setAttribute('role', 'article');
+        card.setAttribute('aria-label', `回答: ${data.opinion.substring(0, 50)}...`);
+        
+        // Content
+        const content = document.createElement('div');
+        content.className = 'flex-grow mb-3';
+        
+        const opinion = document.createElement('h3');
+        opinion.className = 'text-cyan-200 text-xl font-semibold leading-tight mb-2';
+        opinion.textContent = data.opinion;
+        content.appendChild(opinion);
+        
+        if (data.reason) {
+          const reason = document.createElement('p');
+          reason.className = 'text-gray-100 mt-2';
+          reason.textContent = data.reason;
+          content.appendChild(reason);
+        }
+        
+        card.appendChild(content);
+        
+        // Footer
+        const footer = document.createElement('div');
+        footer.className = 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center';
+        
+        // Identity
+        const identity = this.createIdentity(data);
+        if (identity) footer.appendChild(identity);
+        
+        // Reactions
+        const reactions = document.createElement('div');
+        reactions.className = 'flex items-center gap-1';
+        
+        this.reactions.forEach(r => {
+          const btn = this.createReactionBtn(data, r);
+          reactions.appendChild(btn);
+        });
+        
+        footer.appendChild(reactions);
+        card.appendChild(footer);
+        
+        // Highlight badge
+        if (data.highlight) {
+          const badge = document.createElement('span');
+          badge.className = 'absolute top-1 right-1 text-yellow-300';
+          badge.appendChild(this.createIcon('star', 'w-6 h-6'));
+          card.appendChild(badge);
+        }
+        
+        return card;
+      }
+
+      createIdentity(data) {
+        const config = this.state.config?.displaySettings || {};
+        const parts = [];
+        
+        if (config.showName && data.name) parts.push(data.name);
+        if (config.showClass && data.class) parts.push(`(${data.class})`);
+        if (config.showEmail && data.email) parts.push(data.email);
+        
+        if (!parts.length) return null;
+        
+        const div = document.createElement('div');
+        div.className = 'text-sm text-gray-200';
+        div.textContent = parts.join(' ');
+        return div;
+      }
+
+      createReactionBtn(data, reaction) {
+        const info = data.reactions[reaction.key] || {count: 0, reacted: false};
+        const btn = document.createElement('button');
+        
+        btn.type = 'button';
+        btn.dataset.rowIndex = data.rowIndex;
+        btn.dataset.reaction = reaction.key;
+        btn.className = this.getReactionClass(reaction.color, info.reacted);
+        
+        btn.appendChild(this.createIcon(reaction.icon, 'w-4 h-4'));
+        
+        const count = document.createElement('span');
+        count.className = 'ml-1 text-xs';
+        count.textContent = info.count;
+        btn.appendChild(count);
+        
+        return btn;
+      }
+
+      getReactionClass(color, reacted) {
+        const base = 'reaction-btn flex items-center px-2 py-1 rounded border-2 transition-all ';
+        if (reacted) {
+          return base + `bg-${color}-500/20 border-${color}-500 text-${color}-400`;
+        }
+        return base + `bg-transparent border-${color}-500/30 text-${color}-500/60 hover:bg-${color}-500/10`;
+      }
+
+      createIcon(name, classes = '') {
+        const svg = ICONS[name];
+        if (!svg) return document.createElement('span');
+        
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(svg, 'image/svg+xml');
+        const element = doc.documentElement;
+        
+        if (classes) element.className = classes;
+        element.setAttribute('aria-hidden', 'true');
+        
+        return element;
+      }
+
+      renderIcons() {
+        const icons = [
+          ['answerModalCloseBtn', 'x', 'w-6 h-6'],
+          ['footerIcon', 'grid'],
+          ['infoIconLike', 'thumbup'],
+          ['infoIconUnderstand', 'lightbulb'], 
+          ['infoIconCurious', 'search'],
+          ['infoIconHighlight', 'star']
+        ];
+        
+        icons.forEach(([id, icon, classes]) => {
+          const el = this.el(id);
+          if (el) {
+            el.innerHTML = '';
+            el.appendChild(this.createIcon(icon, classes || ''));
+          }
+        });
+      }
+
+      updateAnswerCount() {
+        const el = this.el('answerCount');
+        if (el) {
+          el.innerHTML = '';
+          el.appendChild(this.createIcon('users', 'w-4 h-4 mr-2'));
+          el.appendChild(document.createTextNode(`${this.state.answers.length}件`));
+        }
+      }
+
+      async toggleReaction(rowIndex, reactionKey, btn) {
+        if (btn.classList.contains('loading')) return;
+        
+        try {
+          btn.classList.add('loading');
+          const result = await this.runGas('addReaction', this.vars.userId, rowIndex, reactionKey);
+          
+          // Update button
+          const countEl = btn.querySelector('span');
+          if (countEl) countEl.textContent = result.count || 0;
+          
+          const wasReacted = btn.classList.contains('reacted');
+          btn.className = this.getReactionClass(
+            this.reactions.find(r => r.key === reactionKey)?.color || 'gray',
+            !wasReacted
+          );
+          
+        } catch (error) {
+          console.error('リアクションエラー:', error);
+          this.showError('リアクション失敗: ' + error.message);
+        } finally {
+          btn.classList.remove('loading');
+        }
+      }
+
+      showModal(rowIndex) {
+        const answer = this.state.answers.find(a => a.rowIndex === rowIndex);
+        if (!answer) return;
+        
+        const modal = this.el('answerModalContainer');
+        const content = modal.querySelector('.glass-panel');
+        
+        if (!content) return;
+        
+        // 🔒 XSS対策: DOM操作で安全に構築
+        content.innerHTML = '';
+        
+        const container = document.createElement('div');
+        
+        // Header
+        const header = document.createElement('div');
+        header.className = 'flex justify-between items-start mb-4';
+        
+        const title = document.createElement('h3');
+        title.className = 'text-xl font-bold text-cyan-200';
+        title.textContent = '回答詳細';
+        header.appendChild(title);
+        
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'text-gray-400 hover:text-white';
+        closeBtn.addEventListener('click', () => this.hideModal());
+        closeBtn.appendChild(this.createIcon('x', 'w-6 h-6'));
+        header.appendChild(closeBtn);
+        
+        container.appendChild(header);
+        
+        // Content
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'space-y-4';
+        
+        // Opinion
+        const opinionDiv = document.createElement('div');
+        const opinionTitle = document.createElement('h4');
+        opinionTitle.className = 'text-cyan-400 font-semibold mb-2';
+        opinionTitle.textContent = '回答';
+        const opinionText = document.createElement('p');
+        opinionText.className = 'text-gray-200';
+        opinionText.textContent = answer.opinion;
+        opinionDiv.appendChild(opinionTitle);
+        opinionDiv.appendChild(opinionText);
+        contentDiv.appendChild(opinionDiv);
+        
+        // Reason
+        if (answer.reason) {
+          const reasonDiv = document.createElement('div');
+          const reasonTitle = document.createElement('h4');
+          reasonTitle.className = 'text-cyan-400 font-semibold mb-2';
+          reasonTitle.textContent = '理由';
+          const reasonText = document.createElement('p');
+          reasonText.className = 'text-gray-200';
+          reasonText.textContent = answer.reason;
+          reasonDiv.appendChild(reasonTitle);
+          reasonDiv.appendChild(reasonText);
+          contentDiv.appendChild(reasonDiv);
+        }
+        
+        // Name
+        if (answer.name) {
+          const nameDiv = document.createElement('div');
+          const nameTitle = document.createElement('h4');
+          nameTitle.className = 'text-cyan-400 font-semibold mb-2';
+          nameTitle.textContent = '名前';
+          const nameText = document.createElement('p');
+          nameText.className = 'text-gray-200';
+          nameText.textContent = answer.name;
+          nameDiv.appendChild(nameTitle);
+          nameDiv.appendChild(nameText);
+          contentDiv.appendChild(nameDiv);
+        }
+        
+        container.appendChild(contentDiv);
+        content.appendChild(container);
+        
+        modal.classList.remove('hidden', 'opacity-0');
+      }
+
+      hideModal() {
+        const modal = this.el('answerModalContainer');
+        modal.classList.add('opacity-0');
+        setTimeout(() => modal.classList.add('hidden'), 300);
+      }
+
+      showError(message) {
+        console.error('エラー:', message);
+        setTimeout(() => alert(message), 100);
+      }
+
+      startPolling() {
+        this.state.polling = setInterval(() => this.loadData(), 3 * 60 * 1000);
+      }
+    }
+    
+    // Initialize app
+    try {
+      if (window.studyQuestApp?.destroy) {
+        window.studyQuestApp.destroy();
+      }
+      window.studyQuestApp = new StudyQuestApp();
+      
+      window.addEventListener('beforeunload', () => {
+        window.studyQuestApp?.destroy();
+      });
+      
+    } catch (error) {
+      console.error('App初期化エラー:', error);
+      const container = document.getElementById('answers');
+      if (container) {
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'text-red-400 p-4 text-center';
+        errorDiv.textContent = 'アプリ初期化失敗: ' + error.message;
+        container.appendChild(errorDiv);
+      }
+    }
+  </script>
