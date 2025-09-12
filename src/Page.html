@@ -698,90 +698,39 @@
         id="main-header"
         class="glass-panel rounded-xl p-4 mb-4 shadow-lg fade-in"
       >
-        <!-- Two-Block Header Layout -->
-        <div class="flex flex-col space-y-4">
-          <!-- Top Block: Compact Button Row -->
+        <!-- Upper Block: Site Title -->
+        <div class="flex justify-center py-3">
+          <h1
+            id="siteTitle"
+            class="game-font text-yellow-300 text-lg font-bold flex items-center gap-2"
+          >
+            <svg
+              class="w-5 h-5 text-yellow-300"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              ></path>
+            </svg>
+            みんなの回答ボード
+          </h1>
+        </div>
+
+        <!-- Lower Block: Controls and Question -->
+        <div class="border-t border-gray-600/50 pt-4 space-y-4">
+          <!-- Controls Row -->
           <div class="flex items-center justify-between gap-2">
             <!-- Left Group: Form Answer & Sort Buttons -->
-            <div class="flex items-center gap-2 justify-start">
-            <!-- Answer Count (August Implementation) -->
-            <div id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0">
-              <svg
-                class="w-4 h-4 text-blue-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
-                ></path>
-              </svg>
-              <span id="answerCountText">0件</span>
-            </div>
-            
-            <!-- Form Answer Button -->
-            <button
-              type="button"
-              id="formAnswerBtn"
-              class="text-xs bg-green-600 hover:bg-green-700 text-white font-medium px-3 py-1.5 rounded-md whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm"
-              aria-label="フォームで回答"
-            >
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                ></path>
-              </svg>
-              フォームで回答
-            </button>
-
-            <!-- Filters -->
             <div class="flex items-center gap-2">
-              <label for="classFilter" class="sr-only">クラス絞り込み</label>
-              <select
-                id="classFilter"
-                class="hidden text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 rounded-md"
-              ></select>
-
-              <label for="sortOrder" class="sr-only">並び順</label>
-              <div class="relative">
-                <select
-                  id="sortOrder"
-                  class="text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 pr-8 rounded-md appearance-none cursor-pointer focus:ring-2 focus:ring-cyan-400/50"
-                >
-                <option value="newest" selected>新着順</option>
-                <option value="random">ランダム順</option>
-                <option value="score" id="scoreOption" class="hidden">スコア順</option>
-              </select>
-              <svg
-                class="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M19 9l-7 7-7-7"
-                ></path>
-              </svg>
-            </div>
-            </div>
-
-            <!-- Center Group: Site Title -->
-            <div class="flex items-center justify-center flex-1">
-              <h1
-                id="siteTitle"
-                class="game-font text-yellow-300 text-sm font-bold flex items-center gap-1.5"
-              >
+              <!-- Answer Count -->
+              <div id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0">
                 <svg
-                  class="w-4 h-4 text-yellow-300"
+                  class="w-4 h-4 text-blue-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -790,15 +739,66 @@
                     stroke-linecap="round"
                     stroke-linejoin="round"
                     stroke-width="2"
-                    d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+                    d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"
                   ></path>
                 </svg>
-                みんなの回答ボード
-              </h1>
-            </div>
+                <span id="answerCountText">0件</span>
+              </div>
+              
+              <!-- Form Answer Button -->
+              <button
+                type="button"
+                id="formAnswerBtn"
+                class="text-xs bg-green-600 hover:bg-green-700 text-white font-medium px-3 py-1.5 rounded-md whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm"
+                aria-label="フォームで回答"
+              >
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+                  ></path>
+                </svg>
+                フォームで回答
+              </button>
+
+              <!-- Filters -->
+              <div class="flex items-center gap-2">
+                <label for="classFilter" class="sr-only">クラス絞り込み</label>
+                <select
+                  id="classFilter"
+                  class="hidden text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 rounded-md"
+                ></select>
+
+                <label for="sortOrder" class="sr-only">並び順</label>
+                <div class="relative">
+                  <select
+                    id="sortOrder"
+                    class="text-sm bg-gray-800/50 border border-gray-600 text-gray-300 px-3 py-1.5 pr-8 rounded-md appearance-none cursor-pointer focus:ring-2 focus:ring-cyan-400/50"
+                  >
+                  <option value="newest" selected>新着順</option>
+                  <option value="random">ランダム順</option>
+                  <option value="score" id="scoreOption" class="hidden">スコア順</option>
+                </select>
+                <svg
+                  class="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M19 9l-7 7-7-7"
+                  ></path>
+                </svg>
+              </div>
+              </div>
 
             <!-- Right Group: Admin Controls -->
-            <div class="flex items-center gap-2 justify-end">
+            <div class="flex items-center gap-2">
               <!-- Board Owner Display -->
               <div
                 id="boardOwnerDisplay"
@@ -859,8 +859,8 @@
             </div>
           </div>
 
-          <!-- Bottom Block: Question Display -->
-          <div class="flex flex-col items-center justify-center text-center py-3 border-t border-gray-600/50">
+          <!-- Question Display -->
+          <div class="flex justify-center">
             <div
               id="headingLabel"  
               class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem] text-center max-w-4xl line-clamp-2"
