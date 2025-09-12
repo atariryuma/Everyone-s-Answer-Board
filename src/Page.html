@@ -1956,44 +1956,94 @@
           const modalContent = this.elements.answerModalContainer.querySelector('.glass-panel');
           if (!modalContent) return;
 
-          modalContent.innerHTML = `
-            <div class="space-y-4">
-              <div class="flex justify-between items-start">
-                <h3 class="text-xl font-bold text-cyan-200">回答詳細</h3>
-                <button id="answerModalCloseBtn" class="text-gray-400 hover:text-white">
-                  <span class="w-6 h-6">${this.getIcon('x', 'w-6 h-6')}</span>
-                </button>
-              </div>
-              
-              <div class="space-y-3">
-                <div>
-                  <h4 class="text-cyan-400 font-semibold mb-2">回答</h4>
-                  <p class="text-gray-200 whitespace-pre-wrap">${this.escapeHtml(answer.opinion || '')}</p>
-                </div>
-                
-                ${answer.reason ? `
-                <div>
-                  <h4 class="text-cyan-400 font-semibold mb-2">理由</h4>
-                  <p class="text-gray-200 whitespace-pre-wrap">${this.escapeHtml(answer.reason)}</p>
-                </div>
-                ` : ''}
-                
-                ${answer.class ? `
-                <div>
-                  <h4 class="text-cyan-400 font-semibold mb-2">クラス</h4>
-                  <p class="text-gray-200">${this.escapeHtml(answer.class)}</p>
-                </div>
-                ` : ''}
-                
-                ${answer.name ? `
-                <div>
-                  <h4 class="text-cyan-400 font-semibold mb-2">名前</h4>
-                  <p class="text-gray-200">${this.escapeHtml(answer.name)}</p>
-                </div>
-                ` : ''}
-              </div>
-            </div>
-          `;
+          // 🔒 XSS安全なDOM構築（innerHTML完全排除）
+          while (modalContent.firstChild) {
+            modalContent.removeChild(modalContent.firstChild);
+          }
+
+          const containerDiv = document.createElement('div');
+          containerDiv.className = 'space-y-4';
+
+          // ヘッダー部分
+          const headerDiv = document.createElement('div');
+          headerDiv.className = 'flex justify-between items-start';
+          
+          const titleH3 = document.createElement('h3');
+          titleH3.className = 'text-xl font-bold text-cyan-200';
+          titleH3.textContent = '回答詳細';
+          
+          const closeButton = document.createElement('button');
+          closeButton.id = 'answerModalCloseBtn';
+          closeButton.className = 'text-gray-400 hover:text-white';
+          const closeSpan = document.createElement('span');
+          closeSpan.className = 'w-6 h-6';
+          closeSpan.appendChild(this.createIcon('x', 'w-6 h-6'));
+          closeButton.appendChild(closeSpan);
+          
+          headerDiv.appendChild(titleH3);
+          headerDiv.appendChild(closeButton);
+
+          // コンテンツ部分
+          const contentDiv = document.createElement('div');
+          contentDiv.className = 'space-y-3';
+
+          // 回答セクション
+          const answerDiv = document.createElement('div');
+          const answerTitle = document.createElement('h4');
+          answerTitle.className = 'text-cyan-400 font-semibold mb-2';
+          answerTitle.textContent = '回答';
+          const answerP = document.createElement('p');
+          answerP.className = 'text-gray-200 whitespace-pre-wrap';
+          answerP.textContent = answer.opinion || '';
+          answerDiv.appendChild(answerTitle);
+          answerDiv.appendChild(answerP);
+          contentDiv.appendChild(answerDiv);
+
+          // 理由セクション（条件付き）
+          if (answer.reason) {
+            const reasonDiv = document.createElement('div');
+            const reasonTitle = document.createElement('h4');
+            reasonTitle.className = 'text-cyan-400 font-semibold mb-2';
+            reasonTitle.textContent = '理由';
+            const reasonP = document.createElement('p');
+            reasonP.className = 'text-gray-200 whitespace-pre-wrap';
+            reasonP.textContent = answer.reason;
+            reasonDiv.appendChild(reasonTitle);
+            reasonDiv.appendChild(reasonP);
+            contentDiv.appendChild(reasonDiv);
+          }
+
+          // クラスセクション（条件付き）
+          if (answer.class) {
+            const classDiv = document.createElement('div');
+            const classTitle = document.createElement('h4');
+            classTitle.className = 'text-cyan-400 font-semibold mb-2';
+            classTitle.textContent = 'クラス';
+            const classP = document.createElement('p');
+            classP.className = 'text-gray-200';
+            classP.textContent = answer.class;
+            classDiv.appendChild(classTitle);
+            classDiv.appendChild(classP);
+            contentDiv.appendChild(classDiv);
+          }
+
+          // 名前セクション（条件付き）
+          if (answer.name) {
+            const nameDiv = document.createElement('div');
+            const nameTitle = document.createElement('h4');
+            nameTitle.className = 'text-cyan-400 font-semibold mb-2';
+            nameTitle.textContent = '名前';
+            const nameP = document.createElement('p');
+            nameP.className = 'text-gray-200';
+            nameP.textContent = answer.name;
+            nameDiv.appendChild(nameTitle);
+            nameDiv.appendChild(nameP);
+            contentDiv.appendChild(nameDiv);
+          }
+
+          containerDiv.appendChild(headerDiv);
+          containerDiv.appendChild(contentDiv);
+          modalContent.appendChild(containerDiv);
 
           // モーダル表示
           this.elements.answerModalContainer.classList.remove('hidden');
@@ -2178,7 +2228,14 @@
       // エラー時の緊急表示
       const container = document.getElementById('answers');
       if (container) {
-        container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + error.message + '</div>';
+        // 🔒 XSS安全なエラー表示（innerHTML完全排除）
+        while (container.firstChild) {
+          container.removeChild(container.firstChild);
+        }
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'text-red-400 p-4';
+        errorDiv.textContent = 'アプリケーションの初期化に失敗しました: ' + (error.message || '不明なエラー');
+        container.appendChild(errorDiv);
       }
     }
   </script>
