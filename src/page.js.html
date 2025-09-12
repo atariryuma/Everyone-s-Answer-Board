@@ -1185,27 +1185,43 @@
               adminToggleBtn: !!this.elements.adminToggleBtn,
             });
 
-            if (window.isOwner) {
+            // 厳密な管理者権限チェック
+            console.log('🔍 管理者権限チェック:', {
+              windowIsOwner: window.isOwner,
+              windowIsOwnerType: typeof window.isOwner,
+              windowIsOwnerValue: JSON.stringify(window.isOwner)
+            });
+            
+            if (window.isOwner === true) {
+              // 管理者の場合
+              console.log('✅ 管理者として認識 - ボタンを表示');
               this.state.isAdminUser = true;
               this.state.showAdminFeatures = false; // 初期は閲覧モード
+              this.state.showHighlightToggle = true; // 管理者はハイライト機能使用可能
+              
               if (this.elements.adminToggleBtn) {
-                console.log('✅ 管理者モードボタンを表示中');
+                // 管理者モードボタンを表示
                 this.elements.adminToggleBtn.classList.remove('hidden');
                 this.elements.adminToggleBtn.removeAttribute('hidden');
-                this.elements.adminToggleBtn.style.display = 'inline-flex'; // 表示を確実に
+                this.elements.adminToggleBtn.style.display = 'inline-flex';
                 this.elements.adminToggleBtn.textContent = '管理モード';
+                console.log('✅ 管理者モードボタンを表示完了');
               } else {
                 console.warn('❌ adminToggleBtn要素が見つかりません');
               }
             } else {
               // 非管理者の場合は管理機能を完全に無効化
-              console.log('ℹ️ 非管理者ユーザー - 管理者モードボタンを非表示');
+              console.log('ℹ️ 非管理者として認識 - ボタンを非表示');
               this.state.isAdminUser = false;
               this.state.showAdminFeatures = false;
+              this.state.showHighlightToggle = false; // 非管理者はハイライト機能無効
+              
               if (this.elements.adminToggleBtn) {
+                // 管理者モードボタンを完全に非表示
                 this.elements.adminToggleBtn.classList.add('hidden');
-                this.elements.adminToggleBtn.setAttribute('hidden', '');
-                this.elements.adminToggleBtn.style.display = 'none'; // 確実に非表示
+                this.elements.adminToggleBtn.setAttribute('hidden', 'true');
+                this.elements.adminToggleBtn.style.display = 'none';
+                console.log('✅ 管理者モードボタンを非表示完了');
               }
             }
 
@@ -5530,6 +5546,11 @@
           `[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`
         );
         this.setReactionButtonsLoading(btns, false);
+        console.log('🔄 リアクション処理完了 - ボタン状態をリセット:', {
+          rowIndex,
+          reaction,
+          buttonCount: btns.length
+        });
       }
     }
 
@@ -5776,11 +5797,14 @@
 
     setReactionButtonsLoading(buttons, isLoading) {
       buttons.forEach((btn) => {
+        // Use safeDOM for safe manipulation
         btn.disabled = isLoading;
         if (isLoading) {
-          btn.classList.add('loading');
+          safeDOM.addClass(btn, 'loading');
+          console.log('🔄 リアクションボタンをローディング状態に設定:', btn.dataset.reaction);
         } else {
-          btn.classList.remove('loading');
+          safeDOM.removeClass(btn, 'loading');
+          console.log('✅ リアクションボタンのローディング状態を解除:', btn.dataset.reaction);
         }
       });
     }
