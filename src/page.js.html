@@ -213,13 +213,17 @@
     // IconLibraryが利用可能な場合は統一システムを使用
     if (typeof window !== 'undefined' && window.IconLibrary) {
       const iconMap = {
+        'lightbulb': 'lightbulb',
         'lightbulb-outline': 'lightbulb',
         'lightbulb-solid': 'lightbulb',
+        'hand-thumb-up': 'like',
         'hand-thumb-up-outline': 'like',
         'hand-thumb-up-solid': 'likeFilled',
+        'magnifying-glass-plus': 'searchPlus',
         'magnifying-glass-plus-outline': 'searchPlus',
         'magnifying-glass-plus-solid': 'searchPlus',
         'x': 'close',
+        'star': 'star',
         'star-outline': 'star',
         'star-solid': 'starFilled',
         'grid-2x2': 'grid',
@@ -3652,7 +3656,7 @@
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
           >
             <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m 15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15" />
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357 2m15.357 2H15" />
             </svg>
             ページを再読み込み
           </button>
@@ -7502,7 +7506,7 @@
         endPublicationBtn.disabled = true;
         endPublicationBtn.innerHTML = `
         <svg class="w-3 h-3 animate-spin inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m 15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357-2m15.357 2H15"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0 0 4.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 0 1-15.357 2m15.357 2H15"></path>
         </svg>
         公開終了中...
       `;
