@@ -1,0 +1,324 @@
+<!-- IconLibrary.js.html - 統一アイコン管理システム -->
+<!-- 全システムで使用するSVGアイコンの中央管理ライブラリ -->
+
+<script>
+/**
+ * 🎯 統一アイコン管理システム (IconLibrary)
+ * 
+ * 目的:
+ * - 全システムで使用するSVGアイコンの一元管理
+ * - W3C準拠の高品質SVGによる構文エラーの根絶
+ * - メンテナンス性とパフォーマンスの向上
+ * - 一貫したデザインシステムの実現
+ */
+
+// 🛡️ コアアイコンライブラリ（W3C準拠・Heroicons/Featherベース）
+const ICON_LIBRARY = Object.freeze({
+  // ⚡ システム状態・UI制御アイコン
+  loading: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin">
+      <path d="M21 12a9 9 0 1 1-6.219-8.56"/>
+    </svg>
+  `,
+  
+  close: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 6 6 18"/>
+      <path d="M6 6 12 12"/>
+    </svg>
+  `,
+  
+  refresh: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"/>
+      <path d="M21 3v5h-5"/>
+      <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"/>
+      <path d="M3 21v-5h5"/>
+    </svg>
+  `,
+
+  // 👤 ユーザー・認証関連
+  user: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+      <circle cx="12" cy="7" r="4"/>
+    </svg>
+  `,
+  
+  users: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M22 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+  `,
+
+  // 💬 リアクション・インタラクション
+  like: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 10v12"/>
+      <path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88Z"/>
+    </svg>
+  `,
+
+  likeFilled: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M7 22a3 3 0 0 1-3-3v-8a3 3 0 0 1 3-3h1.88l.37-.66A8 8 0 0 1 16 2a3 3 0 0 1 2.24 5l-1.12 1.12A2 2 0 0 1 15.71 9H12v5a3 3 0 0 1-3 3H7Z"/>
+    </svg>
+  `,
+
+  star: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="12,2 15.09,8.26 22,9 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9 8.91,8.26"/>
+    </svg>
+  `,
+
+  starFilled: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M12 2l3.09 6.26L22 9l-5 4.87 1.18 6.88L12 17.77l-6.18 3.98L7 14.87 2 9l6.91-1.74L12 2Z"/>
+    </svg>
+  `,
+
+  // 💡 学習・知識関連
+  lightbulb: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M9 21h6"/>
+      <path d="M12 3a6 6 0 0 1 6 6c0 3.5-2 5.5-4 7v2a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1v-2c-2-1.5-4-3.5-4-7a6 6 0 0 1 6-6Z"/>
+    </svg>
+  `,
+
+  // 🔍 検索・ナビゲーション
+  search: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <path d="M21 21l-4.35-4.35"/>
+    </svg>
+  `,
+
+  searchPlus: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"/>
+      <path d="M21 21l-4.35-4.35"/>
+      <path d="M11 8v6"/>
+      <path d="M8 11h6"/>
+    </svg>
+  `,
+
+  // ⚙️ システム・管理
+  settings: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/>
+      <circle cx="12" cy="12" r="3"/>
+    </svg>
+  `,
+
+  // ⚠️ 状態・通知アイコン
+  info: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M12 16v-4"/>
+      <path d="M12 8h.01"/>
+    </svg>
+  `,
+
+  success: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+      <path d="M9 11l3 3L22 4"/>
+    </svg>
+  `,
+
+  warning: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/>
+      <path d="M12 9v4"/>
+      <path d="M12 17h.01"/>
+    </svg>
+  `,
+
+  error: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M15 9l-6 6"/>
+      <path d="M9 9l6 6"/>
+    </svg>
+  `,
+
+  // 🗂️ レイアウト・組織
+  grid: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect width="7" height="7" x="3" y="3" rx="1"/>
+      <rect width="7" height="7" x="14" y="3" rx="1"/>
+      <rect width="7" height="7" x="14" y="14" rx="1"/>
+      <rect width="7" height="7" x="3" y="14" rx="1"/>
+    </svg>
+  `,
+
+  // 🗑️ アクション
+  trash: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 6h18"/>
+      <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+      <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+    </svg>
+  `,
+
+  edit: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+      <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4Z"/>
+    </svg>
+  `,
+
+  // 📱 メディア・コミュニケーション
+  share: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+      <polyline points="16,6 12,2 8,6"/>
+      <line x1="12" x2="12" y1="2" y2="15"/>
+    </svg>
+  `,
+
+  // 🔐 セキュリティ・プライバシー
+  lock: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <rect width="18" height="11" x="3" y="11" rx="2" ry="2"/>
+      <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+    </svg>
+  `,
+
+  // デフォルトアイコン（フォールバック）
+  default: `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="10"/>
+      <path d="M8 12h8"/>
+    </svg>
+  `
+});
+
+/**
+ * 🚀 アイコン取得API - メイン関数
+ * 
+ * @param {string} name - アイコン名 (ICON_LIBRARY のキー)
+ * @param {Object} options - カスタマイズオプション
+ * @param {string} options.size - サイズクラス (default: 'w-5 h-5')
+ * @param {string} options.className - 追加CSSクラス
+ * @param {string} options.color - カラークラス (default: 'text-current')
+ * @param {boolean} options.inline - インライン表示 (default: true)
+ * @returns {string} 完全なSVGタグ文字列
+ */
+function getIcon(name, options = {}) {
+  const {
+    size = 'w-5 h-5',
+    className = '',
+    color = 'text-current',
+    inline = true
+  } = options;
+
+  // アイコンの取得（フォールバック付き）
+  const iconSvg = ICON_LIBRARY[name] || ICON_LIBRARY.default;
+  
+  // ベースクラスの組み立て
+  const baseClasses = [size, color, className].filter(Boolean).join(' ');
+  const displayClass = inline ? 'inline-block' : 'block';
+  const finalClasses = `${displayClass} ${baseClasses}`.trim();
+
+  // SVGタグにクラスを適用
+  return iconSvg
+    .replace('<svg', `<svg class="${finalClasses}"`)
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * 🎯 専用ヘルパー関数群
+ */
+
+// リアクションアイコン専用（状態管理付き）
+function getReactionIcon(type, isActive = false, count = 0) {
+  const iconMap = {
+    LIKE: isActive ? 'likeFilled' : 'like',
+    UNDERSTAND: 'lightbulb',
+    CURIOUS: isActive ? 'starFilled' : 'star'
+  };
+  
+  const iconName = iconMap[type] || 'default';
+  const colorClass = isActive ? 'text-blue-500' : 'text-gray-500';
+  
+  return getIcon(iconName, { 
+    size: 'w-4 h-4', 
+    color: colorClass 
+  });
+}
+
+// 状態表示アイコン（色付き）
+function getStatusIcon(status, size = 'w-5 h-5') {
+  const statusMap = {
+    success: { icon: 'success', color: 'text-green-500' },
+    error: { icon: 'error', color: 'text-red-500' },
+    warning: { icon: 'warning', color: 'text-yellow-500' },
+    info: { icon: 'info', color: 'text-blue-500' },
+    loading: { icon: 'loading', color: 'text-gray-500' }
+  };
+  
+  const config = statusMap[status] || statusMap.info;
+  return getIcon(config.icon, { size, color: config.color });
+}
+
+// ローディング表示専用（アニメーション付き）
+function getLoadingIcon(size = 'w-5 h-5', message = '') {
+  const loadingIcon = getIcon('loading', { 
+    size, 
+    color: 'text-blue-500',
+    className: 'animate-spin' 
+  });
+  
+  if (message) {
+    return `${loadingIcon} <span class="ml-2 text-gray-600">${message}</span>`;
+  }
+  
+  return loadingIcon;
+}
+
+/**
+ * 🔧 開発・デバッグ用ユーティリティ
+ */
+
+// 利用可能アイコン一覧の取得
+function getAvailableIcons() {
+  return Object.keys(ICON_LIBRARY).sort();
+}
+
+// アイコン使用状況の検証
+function validateIconUsage(iconName) {
+  if (!ICON_LIBRARY[iconName]) {
+    console.warn(`⚠️ IconLibrary: Unknown icon '${iconName}'. Available icons:`, getAvailableIcons());
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 🌐 グローバル公開 
+ * WindowオブジェクトでSystem全体からアクセス可能にする
+ */
+if (typeof window !== 'undefined') {
+  window.IconLibrary = {
+    get: getIcon,
+    getReaction: getReactionIcon,
+    getStatus: getStatusIcon,
+    getLoading: getLoadingIcon,
+    list: getAvailableIcons,
+    validate: validateIconUsage,
+    version: '1.0.0'
+  };
+}
+
+// 統計・使用状況レポート
+console.log('🎯 IconLibrary v1.0.0 初期化完了:', {
+  totalIcons: Object.keys(ICON_LIBRARY).length,
+  categories: ['system', 'user', 'reaction', 'learning', 'search', 'admin', 'status', 'layout', 'action', 'media', 'security'],
+  loadTime: Date.now()
+});
+</script>

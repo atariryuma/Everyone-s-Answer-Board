@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>統一アイコンシステム - 動作検証</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .test-section {
+      @apply bg-gray-800 rounded-lg p-6 mb-6;
+    }
+    .icon-demo {
+      @apply flex items-center gap-3 p-3 bg-gray-700 rounded mb-2;
+    }
+    .test-passed {
+      @apply text-green-400;
+    }
+    .test-failed {
+      @apply text-red-400;
+    }
+  </style>
+</head>
+<body class="bg-gray-900 text-white p-8">
+  <div class="max-w-4xl mx-auto">
+    <h1 class="text-3xl font-bold mb-8 text-center">🎯 統一アイコンシステム検証</h1>
+    
+    <!-- IconLibrary読み込み -->
+    <script>
+      <?!= include('IconLibrary.js'); ?>
+    </script>
+
+    <!-- 基本機能テスト -->
+    <div class="test-section">
+      <h2 class="text-xl font-bold mb-4">📋 基本機能テスト</h2>
+      <div id="basic-tests"></div>
+    </div>
+
+    <!-- アイコン表示テスト -->
+    <div class="test-section">
+      <h2 class="text-xl font-bold mb-4">🎨 アイコン表示テスト</h2>
+      <div id="icon-display-tests"></div>
+    </div>
+
+    <!-- リアクションアイコンテスト -->
+    <div class="test-section">
+      <h2 class="text-xl font-bold mb-4">💬 リアクションアイコンテスト</h2>
+      <div id="reaction-tests"></div>
+    </div>
+
+    <!-- パフォーマンステスト -->
+    <div class="test-section">
+      <h2 class="text-xl font-bold mb-4">⚡ パフォーマンステスト</h2>
+      <div id="performance-tests"></div>
+    </div>
+
+    <!-- エラーハンドリングテスト -->
+    <div class="test-section">
+      <h2 class="text-xl font-bold mb-4">🛡️ エラーハンドリングテスト</h2>
+      <div id="error-tests"></div>
+    </div>
+
+    <!-- テスト結果サマリー -->
+    <div class="test-section">
+      <h2 class="text-xl font-bold mb-4">📊 テスト結果サマリー</h2>
+      <div id="test-summary"></div>
+    </div>
+  </div>
+
+  <script>
+    // テスト実行管理
+    let testResults = {
+      passed: 0,
+      failed: 0,
+      total: 0
+    };
+
+    function runTest(name, testFunc, container) {
+      testResults.total++;
+      try {
+        const result = testFunc();
+        if (result) {
+          testResults.passed++;
+          container.innerHTML += `<div class="test-passed">✅ ${name}: 成功</div>`;
+          return true;
+        } else {
+          testResults.failed++;
+          container.innerHTML += `<div class="test-failed">❌ ${name}: 失敗</div>`;
+          return false;
+        }
+      } catch (error) {
+        testResults.failed++;
+        container.innerHTML += `<div class="test-failed">❌ ${name}: エラー - ${error.message}</div>`;
+        return false;
+      }
+    }
+
+    // 基本機能テスト
+    function runBasicTests() {
+      const container = document.getElementById('basic-tests');
+      
+      runTest('IconLibraryオブジェクトの存在確認', () => {
+        return typeof window.IconLibrary === 'object' && window.IconLibrary !== null;
+      }, container);
+
+      runTest('get関数の存在確認', () => {
+        return typeof window.IconLibrary.get === 'function';
+      }, container);
+
+      runTest('基本アイコン取得テスト', () => {
+        const icon = window.IconLibrary.get('user');
+        return typeof icon === 'string' && icon.includes('<svg');
+      }, container);
+
+      runTest('利用可能アイコン一覧取得', () => {
+        const icons = window.IconLibrary.list();
+        return Array.isArray(icons) && icons.length > 0;
+      }, container);
+
+      runTest('アイコン検証機能', () => {
+        return window.IconLibrary.validate('user') === true && 
+               window.IconLibrary.validate('nonexistent') === false;
+      }, container);
+    }
+
+    // アイコン表示テスト
+    function runIconDisplayTests() {
+      const container = document.getElementById('icon-display-tests');
+      const testIcons = ['user', 'loading', 'search', 'settings', 'like', 'star'];
+      
+      testIcons.forEach(iconName => {
+        runTest(`${iconName}アイコン表示`, () => {
+          const icon = window.IconLibrary.get(iconName, { size: 'w-8 h-8' });
+          const testDiv = document.createElement('div');
+          testDiv.innerHTML = icon;
+          container.appendChild(testDiv);
+          
+          // 表示テスト用のデモ
+          const demoDiv = document.createElement('div');
+          demoDiv.className = 'icon-demo';
+          demoDiv.innerHTML = `
+            <span>${icon}</span>
+            <span>${iconName}</span>
+            <span class="text-green-400 text-sm">✓</span>
+          `;
+          container.appendChild(demoDiv);
+          
+          return icon.includes('<svg') && icon.includes('w-8 h-8');
+        }, container);
+      });
+    }
+
+    // リアクションアイコンテスト
+    function runReactionTests() {
+      const container = document.getElementById('reaction-tests');
+      const reactions = ['LIKE', 'UNDERSTAND', 'CURIOUS'];
+      
+      reactions.forEach(reaction => {
+        runTest(`${reaction} - 非アクティブ状態`, () => {
+          const icon = window.IconLibrary.getReaction(reaction, false, 0);
+          const demoDiv = document.createElement('div');
+          demoDiv.className = 'icon-demo';
+          demoDiv.innerHTML = `
+            <span>${icon}</span>
+            <span>${reaction} (非アクティブ)</span>
+            <span class="text-green-400 text-sm">✓</span>
+          `;
+          container.appendChild(demoDiv);
+          return icon.includes('<svg');
+        }, container);
+
+        runTest(`${reaction} - アクティブ状態`, () => {
+          const icon = window.IconLibrary.getReaction(reaction, true, 5);
+          const demoDiv = document.createElement('div');
+          demoDiv.className = 'icon-demo';
+          demoDiv.innerHTML = `
+            <span>${icon}</span>
+            <span>${reaction} (アクティブ)</span>
+            <span class="text-green-400 text-sm">✓</span>
+          `;
+          container.appendChild(demoDiv);
+          return icon.includes('<svg');
+        }, container);
+      });
+    }
+
+    // パフォーマンステスト
+    function runPerformanceTests() {
+      const container = document.getElementById('performance-tests');
+      
+      runTest('大量アイコン取得パフォーマンス', () => {
+        const start = performance.now();
+        for (let i = 0; i < 1000; i++) {
+          window.IconLibrary.get('user');
+        }
+        const end = performance.now();
+        const duration = end - start;
+        
+        container.innerHTML += `<div class="text-blue-400">📈 1000個のアイコン取得時間: ${duration.toFixed(2)}ms</div>`;
+        return duration < 100; // 100ms以内であれば合格
+      }, container);
+
+      runTest('メモリリーク検査', () => {
+        const initialMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+        for (let i = 0; i < 100; i++) {
+          window.IconLibrary.get('loading', { size: 'w-4 h-4' });
+        }
+        const finalMemory = performance.memory ? performance.memory.usedJSHeapSize : 0;
+        const memoryIncrease = finalMemory - initialMemory;
+        
+        container.innerHTML += `<div class="text-blue-400">💾 メモリ使用量増加: ${(memoryIncrease / 1024).toFixed(2)}KB</div>`;
+        return memoryIncrease < 100000; // 100KB以内であれば合格
+      }, container);
+    }
+
+    // エラーハンドリングテスト
+    function runErrorTests() {
+      const container = document.getElementById('error-tests');
+      
+      runTest('存在しないアイコンの処理', () => {
+        const icon = window.IconLibrary.get('nonexistent-icon');
+        const demoDiv = document.createElement('div');
+        demoDiv.className = 'icon-demo';
+        demoDiv.innerHTML = `
+          <span>${icon}</span>
+          <span>存在しないアイコン (デフォルト表示)</span>
+          <span class="text-yellow-400 text-sm">⚠️</span>
+        `;
+        container.appendChild(demoDiv);
+        return icon.includes('<svg'); // デフォルトアイコンが返される
+      }, container);
+
+      runTest('不正なオプションの処理', () => {
+        const icon = window.IconLibrary.get('user', { 
+          size: null, 
+          color: undefined, 
+          invalidOption: 'test' 
+        });
+        return icon.includes('<svg');
+      }, container);
+    }
+
+    // テスト結果表示
+    function displayTestSummary() {
+      const container = document.getElementById('test-summary');
+      const passRate = (testResults.passed / testResults.total * 100).toFixed(1);
+      
+      container.innerHTML = `
+        <div class="bg-gray-700 rounded p-4">
+          <h3 class="text-lg font-bold mb-3">総合結果</h3>
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div class="bg-green-600 rounded p-3">
+              <div class="text-2xl font-bold">${testResults.passed}</div>
+              <div class="text-sm">成功</div>
+            </div>
+            <div class="bg-red-600 rounded p-3">
+              <div class="text-2xl font-bold">${testResults.failed}</div>
+              <div class="text-sm">失敗</div>
+            </div>
+            <div class="bg-blue-600 rounded p-3">
+              <div class="text-2xl font-bold">${testResults.total}</div>
+              <div class="text-sm">総数</div>
+            </div>
+            <div class="bg-purple-600 rounded p-3">
+              <div class="text-2xl font-bold">${passRate}%</div>
+              <div class="text-sm">成功率</div>
+            </div>
+          </div>
+          
+          <div class="mt-4 p-3 rounded ${passRate >= 90 ? 'bg-green-700' : passRate >= 70 ? 'bg-yellow-700' : 'bg-red-700'}">
+            <strong>
+              ${passRate >= 90 ? '🎉 優秀！統一アイコンシステムは正常に動作しています。' : 
+                passRate >= 70 ? '⚠️ 注意：いくつかの問題が検出されました。' : 
+                '❌ 重大：多数の問題が検出されました。修正が必要です。'}
+            </strong>
+          </div>
+        </div>
+      `;
+    }
+
+    // ページ読み込み完了後にテスト実行
+    document.addEventListener('DOMContentLoaded', () => {
+      setTimeout(() => {
+        console.log('🧪 統一アイコンシステムのテストを開始します...');
+        
+        runBasicTests();
+        runIconDisplayTests();
+        runReactionTests();
+        runPerformanceTests();
+        runErrorTests();
+        displayTestSummary();
+        
+        console.log('✅ テスト完了:', testResults);
+      }, 100);
+    });
+  </script>
+</body>
+</html>

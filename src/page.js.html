@@ -202,34 +202,52 @@
 
   // Get optimal batch size for current device
   const RENDER_BATCH_SIZE = getDynamicBatchSize();
+  // 🎯 統一アイコンシステム移行（レガシーアイコン定義を段階的に置換）
+  // IconLibrary.js.html から統一管理システムを利用
+  
+  /**
+   * @deprecated レガシーアイコン取得関数 - IconLibrary.get() への移行を推奨
+   * 後方互換性のため一時的に維持、将来のバージョンで削除予定
+   */
+  function getIconLegacy(name) {
+    // IconLibraryが利用可能な場合は統一システムを使用
+    if (typeof window !== 'undefined' && window.IconLibrary) {
+      const iconMap = {
+        'lightbulb-outline': 'lightbulb',
+        'lightbulb-solid': 'lightbulb',
+        'hand-thumb-up-outline': 'like',
+        'hand-thumb-up-solid': 'likeFilled',
+        'magnifying-glass-plus-outline': 'searchPlus',
+        'magnifying-glass-plus-solid': 'searchPlus',
+        'x': 'close',
+        'star-outline': 'star',
+        'star-solid': 'starFilled',
+        'grid-2x2': 'grid',
+        'users': 'users',
+        'trash': 'trash',
+        'loading': 'loading',
+        'alert-triangle': 'warning'
+      };
+      
+      const mappedName = iconMap[name] || name;
+      return window.IconLibrary.get(mappedName, { size: 'w-6 h-6' });
+    }
+    
+    // フォールバック: 従来システム（IconLibrary未読み込み時）
+    const fallbackIcons = {
+      loading: '<svg class="w-6 h-6 animate-spin" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+      warning: '<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'
+    };
+    
+    return fallbackIcons[name] || `<svg class="w-6 h-6"><text x="50%" y="50%" text-anchor="middle" dy="0.3em">?</text></svg>`;
+  }
+
+  // 統一アイコンシステムへの移行用ヘルパー
   const ICONS = Object.freeze({
-    'lightbulb-outline':
-      '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m6.364.636l-.707.707M21 12h-1M18.364 18.364l-.707-.707M12 21v-1m-6.364-.636l.707-.707M3 12h1m2.636-5.636l.707.707"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2.25M10.5 21v-1.5M13.5 21v-1.5"/></svg>',
-    'lightbulb-solid':
-      '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l.117.007a1 1 0 0 1 .876.876L13 3v1l.007.117A1 1 0 0 1 12 5l-.117-.007A1 1 0 0 1 11 4V3l.007-.117A1 1 0 0 1 12 2zM6.343 4.929l.083.076 1.414 1.414a1 1 0 0 1-1.32 1.497l-.094-.083L4.93 6.343a1 1 0 0 1 1.413-1.414zM12 7a5 5 0 0 1 5 5 5.002 5.002 0 0 1-2 4v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-2a5.002 5.002 0 0 1-2-4 5 5 0 0 1 5-5z"/></svg>',
-    'hand-thumb-up-outline':
-      '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
-    'hand-thumb-up-solid':
-      '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z M6.5 10v12h1V10h-1z"/></svg>',
-    'magnifying-glass-plus-outline':
-      '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607z M10.5 7.5v6m3-3h-6"/></svg>',
-    'magnifying-glass-plus-solid':
-      '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 1 0 0-15 7.5 7.5 0 0 0 0 15zM9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z"/><path fill="currentColor" d="m16.5 16.5 4.5 4.5 1.06-1.06-4.5-4.5-1.06 1.06z"/></svg>',
-    x: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
-    'star-outline':
-      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
-    'star-solid':
-      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
-    'grid-2x2':
-      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
-    users:
-      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-    trash:
-      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c0-1-1-2-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c0 1 1 2 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>',
-    loading:
-      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
-    'alert-triangle':
-      '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" x2="12" y1="9" y2="13"/><line x1="12" x2="12.01" y1="17" y2="17"/></svg>',
+    // レガシー互換性維持のためのプロキシオブジェクト
+    get(name) {
+      return getIconLegacy(name);
+    }
   });
 
   class UnifiedCache {
