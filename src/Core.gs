@@ -2021,6 +2021,113 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, reacti
   }
 }
 
+/**
+ * 指定行のリアクション状態を取得（getRowReactions関数の実装）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @param {number} rowIndex - 行番号
+ * @param {string} userEmail - ユーザーのメールアドレス
+ * @returns {Object} リアクション状態オブジェクト
+ */
+function getRowReactions(spreadsheetId, sheetName, rowIndex, userEmail) {
+  try {
+    console.log('getRowReactions: リアクション状態取得開始', {
+      spreadsheetId: `${spreadsheetId.substring(0, 10)}...`,
+      sheetName,
+      rowIndex,
+      userEmail: `${userEmail.substring(0, 5)}...`
+    });
+
+    const service = getSheetsServiceCached();
+    
+    // ヘッダー行から列インデックスを取得
+    const sheet = new ConfigurationManager()
+      .getSpreadsheet(spreadsheetId)
+      .getSheetByName(sheetName);
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const headerIndices = {};
+    headerRow.forEach((header, index) => {
+      if (header && String(header).trim()) {
+        headerIndices[header] = index;
+      }
+    });
+
+    // 全リアクション列の情報を準備
+    const allReactionRanges = [];
+    const reactionColumns = {};
+    
+    CONSTANTS.REACTIONS.KEYS.forEach((key) => {
+      const columnName = CONSTANTS.REACTIONS.LABELS[key];
+      const columnIndex = headerIndices[columnName];
+      if (columnIndex !== undefined) {
+        const range = `'${sheetName}'!${String.fromCharCode(65 + columnIndex)}${rowIndex}`;
+        allReactionRanges.push(range);
+        reactionColumns[key] = { columnIndex, range };
+      }
+    });
+
+    // 全リアクション列の現在の値を一括取得
+    const response = batchGetSheetsData(service, spreadsheetId, allReactionRanges);
+    const reactions = {};
+
+    // 各リアクション列を処理
+    let rangeIndex = 0;
+    CONSTANTS.REACTIONS.KEYS.forEach((key) => {
+      if (!reactionColumns[key]) {
+        reactions[key] = { count: 0, reacted: false };
+        return;
+      }
+
+      let currentReactionString = '';
+      if (
+        response &&
+        response.valueRanges &&
+        response.valueRanges[rangeIndex] &&
+        response.valueRanges[rangeIndex].values &&
+        response.valueRanges[rangeIndex].values[0] &&
+        response.valueRanges[rangeIndex].values[0][0]
+      ) {
+        currentReactionString = response.valueRanges[rangeIndex].values[0][0];
+      }
+
+      // リアクション文字列を解析
+      const currentReactions = parseReactionString(currentReactionString);
+      const userIndex = currentReactions.indexOf(userEmail);
+
+      reactions[key] = {
+        count: currentReactions.length,
+        reacted: userIndex >= 0
+      };
+
+      rangeIndex++;
+    });
+
+    console.log('✅ getRowReactions: リアクション状態取得完了', {
+      rowIndex,
+      reactions,
+      totalReactions: Object.keys(reactions).length
+    });
+
+    return reactions;
+
+  } catch (error) {
+    console.error('❌ getRowReactions エラー:', {
+      spreadsheetId: `${spreadsheetId.substring(0, 10)}...`,
+      sheetName,
+      rowIndex,
+      error: error.message
+    });
+    
+    // エラー時はデフォルト状態を返す
+    const defaultReactions = {};
+    CONSTANTS.REACTIONS.KEYS.forEach((key) => {
+      defaultReactions[key] = { count: 0, reacted: false };
+    });
+    
+    return defaultReactions;
+  }
+}
+
 // =================================================================
 // フォーム作成機能
 // =================================================================

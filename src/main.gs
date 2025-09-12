@@ -1273,7 +1273,7 @@ function renderAnswerBoard(userInfo, params) {
           // 3. 取得したopinionHeaderをconfigJsonに保存（永続化・最適化）
           if (userInfo?.userId) {
             try {
-              const updatedConfig = { ...config, opinionHeader: headerIndices.opinionHeader };
+              const updatedConfig = { ...config, opinionHeader: opinionHeader };
               ConfigManager.saveConfig(userInfo.userId, updatedConfig);
               console.log(
                 '💾 renderAnswerBoard: opinionHeader永続化完了 - 次回はconfigJsonから直接取得'
@@ -1284,8 +1284,9 @@ function renderAnswerBoard(userInfo, params) {
           }
         } else {
           console.warn('⚠️ renderAnswerBoard: 高精度検出でもopinionHeaderが「お題」:', {
-            headerIndicesOpinionHeader: headerIndices?.opinionHeader,
-            availableHeaders: headerIndices ? Object.keys(headerIndices) : '取得失敗',
+            opinionHeaderValue: opinionHeader,
+            opinionHeaderSource: opinionHeaderSource,
+            detectionStatus: '高精度検出実行済み',
           });
         }
       } else {
