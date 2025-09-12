@@ -166,9 +166,9 @@
 
         // リアクションの種類とアイコンのマッピング
         this.reactionTypes = [
-          { key: 'LIKE', icon: 'hand-thumb-up' },
-          { key: 'UNDERSTAND', icon: 'lightbulb' },
-          { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
+          { key: 'LIKE', icon: 'hand-thumb-up-outline' },
+          { key: 'UNDERSTAND', icon: 'lightbulb-outline' },
+          { key: 'CURIOUS', icon: 'magnifying-glass-plus-outline' }
         ];
         
         this.init();
@@ -327,11 +327,14 @@
           console.log('getPublishedSheetData response:', {
             hasData: !!data,
             rowsCount: data?.rows?.length || 0,
+            dataArrayLength: data?.data?.length || 0,
             header: data?.header,
-            sheetName: data?.sheetName
+            sheetName: data?.sheetName,
+            dataStructure: Object.keys(data || {})
           });
           
-          this.state.currentAnswers = data.rows || [];
+          // データ構造の違いに対応: data.rows または data.data を使用
+          this.state.currentAnswers = data.rows || data.data || [];
           this.elements.headingLabel.textContent = this.escapeHtml(data.header || '問題');
           
           if (this.elements.sheetNameText) {
@@ -477,16 +480,16 @@
         this.elements.answerModalCloseBtn.innerHTML = this.getIcon('x', 'w-6 h-6');
         this.elements.footerIcon.innerHTML = this.getIcon('grid-2x2');
         if (this.elements.infoIconLike) {
-          this.elements.infoIconLike.innerHTML = this.getIcon('hand-thumb-up');
+          this.elements.infoIconLike.innerHTML = this.getIcon('hand-thumb-up-outline');
         }
         if (this.elements.infoIconUnderstand) {
-          this.elements.infoIconUnderstand.innerHTML = this.getIcon('lightbulb');
+          this.elements.infoIconUnderstand.innerHTML = this.getIcon('lightbulb-outline');
         }
         if (this.elements.infoIconCurious) {
-          this.elements.infoIconCurious.innerHTML = this.getIcon('magnifying-glass-plus');
+          this.elements.infoIconCurious.innerHTML = this.getIcon('magnifying-glass-plus-outline');
         }
         if (this.elements.infoIconHighlight) {
-          this.elements.infoIconHighlight.innerHTML = this.getIcon('star');
+          this.elements.infoIconHighlight.innerHTML = this.getIcon('star-outline');
         }
       }
 
