@@ -28,14 +28,7 @@
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-md w-full">
       <h3 class="text-xl font-bold text-cyan-400 mb-4">
-        <svg class="w-6 h-6 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-          ></path>
-        </svg>
+        <span class="inline mr-2" id="publish-ready-icon"></span>
         公開準備完了
       </h3>
       <p class="text-gray-300 mb-4">
@@ -46,14 +39,7 @@
       <!-- 自動停止機能の説明 -->
       <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-3 mb-4">
         <h4 class="text-sm font-semibold text-blue-400 mb-2 flex items-center gap-2">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-            ></path>
-          </svg>
+          <span id="auto-stop-clock-icon"></span>
           🔄 自動停止機能について
         </h4>
         <p class="text-xs text-blue-200 leading-relaxed">
@@ -70,14 +56,7 @@
           非公開のまま
         </button>
         <button type="button" id="publish-modal-publish-btn" class="btn btn-primary">
-          <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M15 10l4.553-2.276A1 1 0 0 7 2 1 8.618v6.764a1 1 0 01-1.447.894L15 14 M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-            ></path>
-          </svg>
+          <span class="mr-2" id="publish-broadcast-icon"></span>
           公開する
         </button>
       </div>
@@ -95,14 +74,7 @@
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
       <div class="flex items-center gap-3 mb-4">
-        <svg class="w-8 h-8 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
-          ></path>
-        </svg>
+        <span id="warning-icon" class="text-yellow-400"></span>
         <h3 class="text-xl font-bold text-yellow-400">新しいフォームを作成しますか？</h3>
       </div>
 
@@ -147,14 +119,7 @@
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-lg w-full">
       <div class="flex items-center gap-3 mb-4">
-        <svg class="w-8 h-8 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M12 6v6m0 0v6m0-6h6m-6 0H6"
-          ></path>
-        </svg>
+        <span id="plus-icon" class="text-cyan-400"></span>
         <h3 class="text-xl font-bold text-cyan-400">カスタムフォームの作成方法を選択</h3>
       </div>
 
@@ -216,14 +181,7 @@
   <div class="flex items-center justify-center min-h-full p-4">
     <div class="glass-panel rounded-xl p-6 max-w-md w-full">
       <div class="flex items-center gap-3 mb-4">
-        <svg class="w-8 h-8 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            stroke-width="2"
-            d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-          ></path>
-        </svg>
+        <span id="success-check-icon" class="text-green-400"></span>
         <h3 class="text-xl font-bold text-green-400">📋 公開完了</h3>
       </div>
 
@@ -1928,6 +1886,57 @@
 
   // グローバルインスタンスの作成
   window.sharedModals = new SharedModals();
+
+  // 🎯 統一アイコンシステム - アイコン配置
+  function initializeModalIcons() {
+    if (typeof window.IconLibrary !== 'undefined') {
+      // 公開準備完了アイコン
+      const publishReadyIcon = document.getElementById('publish-ready-icon');
+      if (publishReadyIcon) {
+        publishReadyIcon.innerHTML = window.IconLibrary.get('check-circle', {size: 'w-6 h-6'});
+      }
+
+      // 自動停止機能時計アイコン
+      const autoStopClockIcon = document.getElementById('auto-stop-clock-icon');
+      if (autoStopClockIcon) {
+        autoStopClockIcon.innerHTML = window.IconLibrary.get('clock', {size: 'w-4 h-4'});
+      }
+
+      // 公開ボタンアイコン
+      const publishBroadcastIcon = document.getElementById('publish-broadcast-icon');
+      if (publishBroadcastIcon) {
+        publishBroadcastIcon.innerHTML = window.IconLibrary.get('broadcast', {size: 'w-4 h-4'});
+      }
+
+      // 警告アイコン
+      const warningIcon = document.getElementById('warning-icon');
+      if (warningIcon) {
+        warningIcon.innerHTML = window.IconLibrary.get('alert-triangle', {size: 'w-8 h-8'});
+      }
+
+      // プラスアイコン
+      const plusIcon = document.getElementById('plus-icon');
+      if (plusIcon) {
+        plusIcon.innerHTML = window.IconLibrary.get('plus', {size: 'w-8 h-8'});
+      }
+
+      // 成功チェックアイコン
+      const successCheckIcon = document.getElementById('success-check-icon');
+      if (successCheckIcon) {
+        successCheckIcon.innerHTML = window.IconLibrary.get('check-circle', {size: 'w-8 h-8'});
+      }
+    }
+  }
+
+  // DOM読み込み完了後とIconLibrary読み込み完了後の両方で初期化
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initializeModalIcons);
+  } else {
+    initializeModalIcons();
+  }
+  
+  // IconLibraryが後から読み込まれる場合に備えて
+  setTimeout(initializeModalIcons, 100);
 
   // Direct usage via window.sharedModals is recommended:
   // window.sharedModals.showPrivacy(onContinue)

@@ -92,19 +92,7 @@
           <div
             class="w-20 h-20 mx-auto mb-6 rounded-full bg-gradient-to-r from-cyan-500/20 to-blue-500/20 flex items-center justify-center border-2 border-cyan-400/30"
           >
-            <svg
-              class="w-10 h-10 text-cyan-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 4v16m8-8H4"
-              ></path>
-            </svg>
+            <span id="plus-start-icon" class="text-cyan-400"></span>
           </div>
           <h3 class="text-2xl font-bold mb-3 text-white">ここから始めましょう！</h3>
           <p class="text-gray-400 mb-6">
@@ -285,6 +273,26 @@
           }
       });
       <? } ?>
+
+      // 🎯 統一アイコンシステム - アイコン配置
+      function initializeUnpublishedIcons() {
+        if (typeof window.IconLibrary !== 'undefined') {
+          const plusStartIcon = document.getElementById('plus-start-icon');
+          if (plusStartIcon) {
+            plusStartIcon.innerHTML = window.IconLibrary.get('plus', {size: 'w-10 h-10'});
+          }
+        }
+      }
+
+      // DOM読み込み完了後とIconLibrary読み込み完了後の両方で初期化
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeUnpublishedIcons);
+      } else {
+        initializeUnpublishedIcons();
+      }
+      
+      // IconLibraryが後から読み込まれる場合に備えて
+      setTimeout(initializeUnpublishedIcons, 100);
     </script>
 
     <?!= include('page.js'); ?>
