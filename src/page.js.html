@@ -1,4 +1,174 @@
 <script>
+  // Smart Console Error Management System
+  const CONSOLE_CONFIG = Object.freeze({
+    // Error categories
+    CRITICAL: 'critical',
+    WARNING: 'warning', 
+    INFO: 'info',
+    DEBUG: 'debug',
+    
+    // Error patterns to suppress (non-critical)
+    SUPPRESSED_PATTERNS: [
+      /SVG.*path.*syntax/i,
+      /Permissions-Policy/i,
+      /deprecated.*feature/i,
+      /preflight.*CORS/i,
+      /CSS.*property.*ignored/i
+    ],
+    
+    // Critical error patterns (always show)
+    CRITICAL_PATTERNS: [
+      /script.*error/i,
+      /uncaught.*exception/i,
+      /network.*error/i,
+      /authentication.*failed/i,
+      /permission.*denied/i
+    ]
+  });
+  
+  // Smart console wrapper
+  const smartConsole = {
+    _originalError: console.error,
+    _originalWarn: console.warn,
+    _originalLog: console.log,
+    
+    error: function(...args) {
+      const message = args.join(' ');
+      if (this._shouldSuppress(message, CONSOLE_CONFIG.CRITICAL)) {
+        return; // Suppress non-critical errors
+      }
+      this._originalError.apply(console, args);
+    },
+    
+    warn: function(...args) {
+      const message = args.join(' ');
+      if (this._shouldSuppress(message, CONSOLE_CONFIG.WARNING)) {
+        return; // Suppress non-critical warnings
+      }
+      this._originalWarn.apply(console, args);
+    },
+    
+    log: function(...args) {
+      // Always show logs in debug mode, otherwise filter
+      if (window.DEBUG_MODE || !this._shouldSuppress(args.join(' '), CONSOLE_CONFIG.INFO)) {
+        this._originalLog.apply(console, args);
+      }
+    },
+    
+    _shouldSuppress: function(message, level) {
+      // Never suppress critical errors
+      if (CONSOLE_CONFIG.CRITICAL_PATTERNS.some(pattern => pattern.test(message))) {
+        return false;
+      }
+      
+      // Suppress matched patterns for non-critical errors
+      if (level !== CONSOLE_CONFIG.CRITICAL) {
+        return CONSOLE_CONFIG.SUPPRESSED_PATTERNS.some(pattern => pattern.test(message));
+      }
+      
+      return false;
+    },
+    
+    // Force critical error display (bypass suppression)
+    forceError: function(...args) {
+      this._originalError.apply(console, args);
+    }
+  };
+  
+  // Replace console methods with smart versions only if not in debug mode
+  if (!window.DEBUG_MODE) {
+    console.error = smartConsole.error.bind(smartConsole);
+    console.warn = smartConsole.warn.bind(smartConsole);
+    // Keep console.log as is for now - too many legitimate uses
+  }
+  
+  // DOM Safety Utility - Safe DOM operations with null checks
+  const safeDOM = {
+    /**
+     * Safely set text content with null check
+     * @param {HTMLElement|null} element - DOM element
+     * @param {string} text - Text to set
+     * @returns {boolean} Success status
+     */
+    setTextContent: function(element, text) {
+      if (!element || typeof element.textContent === 'undefined') {
+        if (window.DEBUG_MODE) console.warn('safeDOM: Element not found for setTextContent', element);
+        return false;
+      }
+      element.textContent = text;
+      return true;
+    },
+    
+    /**
+     * Safely set innerHTML with null check
+     * @param {HTMLElement|null} element - DOM element
+     * @param {string} html - HTML to set
+     * @returns {boolean} Success status
+     */
+    setInnerHTML: function(element, html) {
+      if (!element || typeof element.innerHTML === 'undefined') {
+        if (window.DEBUG_MODE) console.warn('safeDOM: Element not found for setInnerHTML', element);
+        return false;
+      }
+      element.innerHTML = html;
+      return true;
+    },
+    
+    /**
+     * Safely set className with null check
+     * @param {HTMLElement|null} element - DOM element
+     * @param {string} className - Class name to set
+     * @returns {boolean} Success status
+     */
+    setClassName: function(element, className) {
+      if (!element || typeof element.className === 'undefined') {
+        if (window.DEBUG_MODE) console.warn('safeDOM: Element not found for setClassName', element);
+        return false;
+      }
+      element.className = className;
+      return true;
+    },
+    
+    /**
+     * Safely add CSS class with null check
+     * @param {HTMLElement|null} element - DOM element
+     * @param {string} className - Class name to add
+     * @returns {boolean} Success status
+     */
+    addClass: function(element, className) {
+      if (!element || !element.classList) {
+        if (window.DEBUG_MODE) console.warn('safeDOM: Element not found for addClass', element);
+        return false;
+      }
+      element.classList.add(className);
+      return true;
+    },
+    
+    /**
+     * Safely remove CSS class with null check
+     * @param {HTMLElement|null} element - DOM element
+     * @param {string} className - Class name to remove
+     * @returns {boolean} Success status
+     */
+    removeClass: function(element, className) {
+      if (!element || !element.classList) {
+        if (window.DEBUG_MODE) console.warn('safeDOM: Element not found for removeClass', element);
+        return false;
+      }
+      element.classList.remove(className);
+      return true;
+    },
+    
+    /**
+     * Safely check if element exists and is visible
+     * @param {HTMLElement|null} element - DOM element
+     * @returns {boolean} Visibility status
+     */
+    isVisible: function(element) {
+      return element && element.offsetParent !== null;
+    }
+  };
+  
   // Dynamic performance-based batch sizing
   const PERFORMANCE_CONFIG = Object.freeze({
     BASE_RENDER_BATCH_SIZE: 150, // Base batch size for normal performance (optimized for medium datasets)
@@ -34,9 +204,9 @@
   const RENDER_BATCH_SIZE = getDynamicBatchSize();
   const ICONS = Object.freeze({
     'lightbulb-outline':
-      '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5 M5.25 6.75L4.2 5.7 M18.75 6.75l1.05-1.05 M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M9 16.5h6v4H9v-4zm0 1h6zm0 1h6z M10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+      '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m6.364.636l-.707.707M21 12h-1M18.364 18.364l-.707-.707M12 21v-1m-6.364-.636l.707-.707M3 12h1m2.636-5.636l.707.707"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 15a3 3 0 100-6 3 3 0 000 6z"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2.25M10.5 21v-1.5M13.5 21v-1.5"/></svg>',
     'lightbulb-solid':
-      '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5 M5.25 6.75L4.2 5.7 M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
+      '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2l.117.007a1 1 0 0 1 .876.876L13 3v1l.007.117A1 1 0 0 1 12 5l-.117-.007A1 1 0 0 1 11 4V3l.007-.117A1 1 0 0 1 12 2zM6.343 4.929l.083.076 1.414 1.414a1 1 0 0 1-1.32 1.497l-.094-.083L4.93 6.343a1 1 0 0 1 1.413-1.414zM12 7a5 5 0 0 1 5 5 5.002 5.002 0 0 1-2 4v2a2 2 0 0 1-2 2h-2a2 2 0 0 1-2-2v-2a5.002 5.002 0 0 1-2-4 5 5 0 0 1 5-5z"/></svg>',
     'hand-thumb-up-outline':
       '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
     'hand-thumb-up-solid':
@@ -44,7 +214,7 @@
     'magnifying-glass-plus-outline':
       '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z M10.5 7.5v6m3-3h-6"/></svg>',
     'magnifying-glass-plus-solid':
-      '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z"/><path fill="currentColor" d="m16.5 16.5 4.5 4.5 1.06-1.06-4.5-4.5-1.06 1.06z"/></svg>',
     x: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
     'star-outline':
       '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
@@ -1169,28 +1339,51 @@
           this.handlers.onAnswerModalCloseClick
         );
       }
-      // Size slider for immediate response with throttling
+      // Size slider for immediate response with improved transition handling
       const debouncedRender = this.debounce(() => this.renderBoard(true, false), 200);
       this.handlers.onSizeSliderInput = this.throttle((e) => {
         const value = e.target.value;
         localStorage.setItem('boardColumns', value);
         
-        // Update slider value display immediately
-        if (this.elements.sliderValue) {
-          this.elements.sliderValue.textContent = value;
+        // Update slider value display immediately using safe DOM operation
+        safeDOM.setTextContent(this.elements.sliderValue, value);
+        
+        // Apply smooth grid transition with loading state using safe DOM operations
+        const container = this.elements.answersContainer;
+        if (container) {
+          // Set transition state to prevent duplicate updates
+          this.state.isGridTransitioning = true;
+          
+          // Add transition class for smooth animation using safeDOM
+          if (safeDOM.addClass(container, 'transitioning')) {
+            // Map column values to Tailwind classes
+            const colsMap = {
+              '2': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2',
+              '3': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+              '4': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+              '5': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
+              '6': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
+            };
+            
+            const newClassName = colsMap[value] || 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
+            
+            // Only update if className actually changed and use safe DOM operation
+            if (container.className !== newClassName) {
+              safeDOM.setClassName(container, newClassName);
+            }
+            
+            // Remove transition class and reset state after transition
+            setTimeout(() => {
+              safeDOM.removeClass(container, 'transitioning');
+              this.state.isGridTransitioning = false;
+            }, 150);
+          } else {
+            // If addClass failed, still reset the transition state
+            this.state.isGridTransitioning = false;
+          }
         }
         
-        // Update grid columns immediately
-        const container = this.elements.answersContainer;
-        const colsMap = {
-          '2': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2',
-          '3': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-          '4': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-          '5': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5',
-          '6': 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
-        };
-        container.className = colsMap[value] || 'grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4';
-        
+        // Delayed render to allow transition to complete
         debouncedRender();
       }, 100); // Throttle to 100ms
 
@@ -4369,7 +4562,8 @@
           () => (this.elements.sliderValue.textContent = this.elements.sizeSlider.value)
         );
       }
-      if (this.elements.sizeSlider) {
+      // Skip grid updates if transition is already in progress
+      if (this.elements.sizeSlider && !this.state.isGridTransitioning) {
         const container = this.elements.answersContainer;
         const colsMap = {
           '2': 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-2',

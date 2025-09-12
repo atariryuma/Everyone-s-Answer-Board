@@ -682,6 +682,25 @@
           transform: scale3d(1, 1, 1);
         }
       }
+      
+      /* Grid transition styles for smooth card sizing */
+      .transitioning {
+        transition: grid-template-columns 0.15s ease-out;
+        position: relative;
+      }
+      
+      .transitioning::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(26, 27, 38, 0.3);
+        z-index: 1;
+        pointer-events: none;
+        border-radius: 0.75rem;
+      }
     </style>
   </head>
   <body class="bg-[#1a1b26] text-gray-200 font-sans">
