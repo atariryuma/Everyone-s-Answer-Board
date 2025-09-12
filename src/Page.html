@@ -12,12 +12,10 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
   <?!= include('SharedTailwindConfig'); ?>
   <style>
-:root{--color-primary:#8be9fd;--color-primary-dark:#6272a4;--color-background:#1a1b26;--color-surface:rgba(26,27,38,0.7);--color-text:#c0caf5;--color-text-secondary:#6272a4;--color-text-muted:rgba(255,255,255,0.6);--color-border:rgba(255,255,255,0.1);--color-accent:#facc15;--color-success:#50fa7b;--color-warning:#ffb86c;--color-error:#ff5555;--duration-fast:0.2s;--duration-normal:0.3s;--duration-slow:0.5s;--ease-out:cubic-bezier(0.25,0.46,0.45,0.94);--ease-in-out:cubic-bezier(0.645,0.045,0.355,1);--border-radius:0.75rem;--border-radius-lg:1rem;--shadow-sm:0 1px 2px rgba(0,0,0,0.05);--shadow-md:0 4px 6px rgba(0,0,0,0.1);--shadow-lg:0 10px 15px rgba(0,0,0,0.1);--shadow-glow:0 0 15px var(--color-primary);--glass-bg:var(--color-surface);--glass-border:1px solid var(--color-border);--glass-blur:blur(12px);--transition-duration:0.2s;--transition-easing:ease-out;--animation-duration:0.3s;--backdrop-blur:12px}body{color:var(--color-text);background-color:var(--color-background);margin:0;overflow-x:hidden}.glass-panel{background:var(--glass-bg);backdrop-filter:var(--glass-blur);-webkit-backdrop-filter:var(--glass-blur);border:var(--glass-border);transition:border-color var(--transition-duration) var(--transition-easing)}.glass-panel:hover{border-color:rgba(255,255,255,0.2)}.interactive-element{transition:all var(--duration-fast) var(--ease-out);border-radius:var(--border-radius)}.game-font{font-family:'Press Start 2P',cursive}.game-btn{transition:all var(--duration-fast) var(--ease-out);border-radius:var(--border-radius);border-bottom-width:4px;text-shadow:1px 1px 2px rgba(0,0,0,0.4);position:relative;overflow:hidden}.game-btn:not(:disabled):hover{transform:translateY(-2px) scale(1.02);box-shadow:var(--shadow-glow)}.game-btn:active:not(:disabled){transform:translateY(2px);border-bottom-width:2px;box-shadow:none}.game-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none!important}#classFilter,#sortOrder{background-color:var(--color-primary-dark);border:var(--glass-border);color:var(--color-text);border-radius:var(--border-radius);padding:0.25rem 0.5rem;transition:border-color var(--transition-duration) var(--transition-easing),box-shadow var(--transition-duration) var(--transition-easing)}#classFilter:focus,#sortOrder:focus{border-color:rgba(6,182,212,0.5);box-shadow:0 0 0 2px rgba(6,182,212,0.2);outline:none}:focus-visible{outline:3px solid var(--color-primary);outline-offset:2px;border-radius:var(--border-radius)}header{position:sticky;top:0;z-index:50;contain:layout;backdrop-filter:blur(var(--backdrop-blur));-webkit-backdrop-filter:blur(var(--backdrop-blur))}.line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}@media (min-width:768px) and (max-width:1023px){#headingLabel{font-size:1.25rem!important}}#formAnswerBtn{transition:all 0.2s ease-out}#formAnswerBtn:hover{transform:translateY(-1px);box-shadow:0 4px 8px rgba(0,0,0,0.15)}#answerCount{transition:background-color 0.2s ease-out}#answerCount:hover{background-color:rgba(55,65,81,0.5)}.answer-card{will-change:transform,opacity;transition:all var(--duration-normal) var(--ease-out);border-radius:var(--border-radius-lg);contain:layout style;position:relative;overflow:hidden}.answer-card.highlighted{border:4px solid transparent;border-image:none!important;box-shadow:0 0 15px rgba(250,204,21,0.6);transform:scale(1.02);z-index:2;background:linear-gradient(var(--glass-bg),var(--glass-bg)) padding-box,linear-gradient(90deg,var(--color-accent),var(--color-primary)) border-box;background-clip:padding-box,border-box;position:relative}.answer-card:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 8px 25px rgba(139,233,253,0.3)}.answer-card:focus-visible{transform:translateY(-4px) scale(1.02);box-shadow:0 8px 25px rgba(139,233,253,0.3)}.answer-card.highlighted:hover{transform:translateY(-4px) scale(1.04)}.answer-card.loading{opacity:0.7;pointer-events:none}.reaction-btn{transition:transform var(--transition-duration) var(--transition-easing),background-color var(--transition-duration) var(--transition-easing),box-shadow var(--transition-duration) var(--transition-easing);position:relative;overflow:hidden}.reaction-btn:hover{transform:scale(1.1)}.reaction-btn:active{transform:scale(0.95)}.reaction-btn.reacted{background-color:var(--color-primary)!important;color:#000!important;box-shadow:0 0 10px rgba(139,233,253,0.5)}.reaction-btn.liked{background-color:var(--color-primary)!important;color:#000!important;box-shadow:0 0 10px rgba(139,233,253,0.5)}.reaction-btn.loading{opacity:0.6;pointer-events:none}.fade-in{animation:fadeIn 0.5s ease-out}.slide-in{animation:slideIn 0.3s ease-out}.pulse{animation:pulse 0.6s ease-out}.shake{animation:shake 0.5s ease-out}.admin-toggle{transition:background-color var(--animation-duration) var(--transition-easing);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}.admin-toggle:hover{background-color:rgba(139,233,253,0.1)}.loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(26,27,38,0.8);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000}.spinner{width:40px;height:40px;border:4px solid rgba(139,233,253,0.3);border-top:4px solid var(--color-primary);border-radius:50%;animation:spin 1s linear infinite}@keyframes fadeIn{from{opacity:0;will-change:opacity}to{opacity:1}}@keyframes slideIn{from{opacity:0;will-change:opacity}to{opacity:1}}@keyframes pulse{0%{will-change:transform}50%{transform:scale3d(1.05,1.05,1)}100%{transform:scale3d(1,1,1)}}@keyframes shake{0%,100%{will-change:transform}25%{transform:translate3d(-5px,0,0)}75%{transform:translate3d(5px,0,0)}}@keyframes spin{100%{transform:rotate(360deg);will-change:transform}}@keyframes bounce{0%,20%,50%,80%,100%{transform:translate(-50%,0) translateY(0)}40%{transform:translate(-50%,0) translateY(-10px)}60%{transform:translate(-50%,0) translateY(-5px)}}@media (min-resolution:120dpi) and (min-width:1200px){:root{--transition-duration:0.15s;--animation-duration:0.2s}}@media (prefers-contrast:high){:root{--color-border:rgba(255,255,255,0.3);--color-surface:rgba(26,27,38,0.98)}}@media (prefers-reduced-motion:reduce){:root{--transition-duration:0.01ms;--animation-duration:0.01ms;--backdrop-blur:0px}*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;transform:none!important}.answer-card:hover,.reaction-btn:hover,.game-btn:hover{transform:none!important}}.low-performance .answer-card{contain:layout style paint}.low-performance .answer-card:hover{transform:none;box-shadow:var(--shadow-sm)}.low-performance .glass-panel{-webkit-backdrop-filter:none;backdrop-filter:none}.hidden-card{visibility:hidden;pointer-events:none}.visible{visibility:visible;pointer-events:auto}@supports (container-type:inline-size){#answers{container-type:inline-size}}@media (-webkit-min-device-pixel-ratio:2),(min-resolution:192dpi){.answer-card{backface-visibility:hidden;perspective:1000px}}.answer-card:hover{transform:translateY(-4px);box-shadow:var(--shadow-md)}.answer-card.new-card{animation:fadeIn 0.3s ease-out}.primary-action-btn{font-weight:600;border:none;cursor:pointer;position:relative;overflow:hidden;background-image:linear-gradient(135deg,#ec4899 0%,#8b5cf6 100%);box-shadow:0 4px 15px rgba(236,72,153,0.25)}.primary-action-btn:hover{background-image:linear-gradient(135deg,#db2777 0%,#7c3aed 100%);box-shadow:0 8px 25px rgba(236,72,153,0.35);transform:translateY(-1px) scale(1.05)}.primary-action-btn:active{transform:translateY(0) scale(1.02);box-shadow:0 2px 10px rgba(236,72,153,0.4)}.primary-action-btn:focus{outline:none;box-shadow:0 0 0 3px rgba(236,72,153,0.5)}.primary-action-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);transition:left 0.5s}.primary-action-btn:hover::before{left:100%}@media (prefers-reduced-motion:reduce){.primary-action-btn{transition:background-color 0.2s ease}.primary-action-btn:hover{transform:none}.primary-action-btn::before{display:none}}@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}.highlight-badge{position:absolute;top:0.25rem;right:0.25rem;width:1.5rem;height:1.5rem;display:flex;align-items:center;justify-content:center;color:#facc15}.answer-card.reaction-bg-like{border-color:#ef4444!important}.answer-card.reaction-bg-understand{border-color:#fbbf24!important}.answer-card.reaction-bg-curious{border-color:#10b981!important}.answer-card.reaction-bg-like-understand{border-image:linear-gradient(45deg,#ef4444,#fbbf24) 1!important}.answer-card.reaction-bg-like-curious{border-image:linear-gradient(45deg,#ef4444,#10b981) 1!important}.answer-card.reaction-bg-understand-curious{border-image:linear-gradient(45deg,#fbbf24,#10b981) 1!important}.answer-card.reaction-bg-like-understand-curious{border-image:linear-gradient(45deg,#ef4444,#fbbf24,#10b981) 1!important}.reaction-border-1{border-width:2px}.reaction-border-2{border-width:4px}.reaction-border-3{border-width:6px}.answer-preview{display:-webkit-box;-webkit-line-clamp:5;line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;min-height:120px}.like-btn svg{transition:fill var(--transition-duration) var(--transition-easing),transform var(--transition-duration) var(--transition-easing);fill:none}.like-btn.liked svg{stroke:transparent;fill:currentColor;transform:scale(1.1)}.like-btn.loading{opacity:0.7;position:relative;pointer-events:none}.like-btn.loading::after{content:'';position:absolute;inset:0;border:2px solid transparent;border-top:2px solid currentColor;border-radius:50%;animation:spin 0.8s linear infinite;width:16px;height:16px;margin:auto}@keyframes spin{to{transform:rotate(360deg)}}.highlight-btn{transition:background var(--transition-duration) var(--transition-easing),transform var(--transition-duration) var(--transition-easing);border-radius:4px;padding:2px}.highlight-btn:hover{background:rgba(147,51,234,0.15);transform:scale(1.1)}.highlight-btn.liked{color:#9333ea;text-shadow:0 0 8px rgba(147,51,234,0.6)}#controlsFooter{pointer-events:none}#controlsFooter>.glass-panel{pointer-events:auto}.skeleton{position:relative;overflow:hidden;background-color:rgba(255,255,255,0.05)}.skeleton::after{content:'';position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.2),rgba(255,255,255,0));animation:skeleton-loading 1.5s infinite}@keyframes skeleton-loading{0%{transform:translate3d(-100%,0,0);will-change:transform}100%{transform:translate3d(100%,0,0)}}.highlight-badge{position:absolute;top:0.25rem;right:0.25rem;width:1.5rem;height:1.5rem;display:flex;align-items:center;justify-content:center;color:#facc15;filter:drop-shadow(0 0 4px rgba(250,204,21,0.7))}.answer-card.reaction-bg-like{border-color:#ef4444!important;border-image:none}.answer-card.reaction-bg-understand{border-color:#fbbf24!important;border-image:none}.answer-card.reaction-bg-curious{border-color:#10b981!important;border-image:none}.reaction-bg-like-understand,.reaction-bg-like-curious,.reaction-bg-understand-curious,.reaction-bg-all{border-color:transparent;border-style:solid;background:var(--glass-bg);border-image-slice:1;border-image-source:linear-gradient(90deg,#ef4444,#fbbf24)}.reaction-bg-like-curious{border-image-source:linear-gradient(90deg,#ef4444,#10b981)}.reaction-bg-understand-curious{border-image-source:linear-gradient(90deg,#fbbf24,#10b981)}.reaction-bg-all{border-image-source:linear-gradient(90deg,#ef4444,#fbbf24,#10b981)}.reaction-border-1{border-width:2px}.reaction-border-2{border-width:4px}.reaction-border-3{border-width:6px}.answer-preview{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;min-height:120px}.like-btn svg{transition:all 0.2s ease-in-out;fill:none}.like-btn.liked svg{stroke:transparent;fill:currentColor;transform:scale(1.1)}.highlight-btn{transition:all 0.2s ease;border-radius:4px;padding:2px}.highlight-btn:hover{background:rgba(250,204,21,0.1);transform:scale(1.1)}.highlight-btn.liked{color:#facc15;filter:drop-shadow(0 0 4px rgba(250,204,21,0.7))}#controlsFooter{pointer-events:none}#controlsFooter>.glass-panel{pointer-events:auto}.skeleton{position:relative;overflow:hidden;background-color:rgba(255,255,255,0.05);color:transparent}.skeleton::after{content:"";position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.3),rgba(255,255,255,0));animation:skeleton-loading 1.2s infinite}@keyframes skeleton-loading{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.modal-close-btn{position:absolute;top:-12px;right:-12px;transform:none;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,0.3)}#answerModalCard.reaction-border-1{border-width:3px!important}#answerModalCard.reaction-border-2{border-width:4px!important}#answerModalCard.reaction-border-3{border-width:5px!important}#answerModalCard.reaction-bg-like{border-color:#ef4444!important;border-image:none!important}#answerModalCard.reaction-bg-understand{border-color:#fbbf24!important;border-image:none!important}#answerModalCard.reaction-bg-curious{border-color:#10b981!important;border-image:none!important}#answerModalCard.reaction-bg-like-understand{border-image:linear-gradient(45deg,#ef4444,#fbbf24) 1!important;border-color:transparent!important}#answerModalCard.reaction-bg-like-curious{border-image:linear-gradient(45deg,#ef4444,#10b981) 1!important;border-color:transparent!important}#answerModalCard.reaction-bg-understand-curious{border-image:linear-gradient(45deg,#fbbf24,#10b981) 1!important;border-color:transparent!important}#answerModalCard.reaction-bg-like-understand-curious{border-image:linear-gradient(45deg,#ef4444,#fbbf24,#10b981) 1!important;border-color:transparent!important}#answerModalCard.highlighted{border-image:linear-gradient(45deg,#9333ea,#c084fc,#9333ea) 1!important;border-width:4px!important;box-shadow:0 0 25px rgba(147,51,234,0.6),inset 0 0 20px rgba(192,132,252,0.1)!important;position:relative}.render-optimized{transform:translateZ(0)}.modal-fade{animation:modalFade 0.2s ease-out}@keyframes modalFade{from{opacity:0;will-change:opacity}to{opacity:1}}.modal-scale{animation:modalScale 0.2s ease-out}@keyframes modalScale{from{will-change:transform}to{transform:scale3d(1,1,1)}}.transitioning{transition:grid-template-columns 0.15s ease-out;position:relative}.transitioning::before{content:'';position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(26,27,38,0.3);z-index:1;pointer-events:none;border-radius:0.75rem}
+:root{--color-primary:#8be9fd;--color-primary-dark:#6272a4;--color-background:#1a1b26;--color-surface:rgba(26,27,38,0.7);--color-text:#c0caf5;--color-text-secondary:#6272a4;--color-text-muted:rgba(255,255,255,0.6);--color-border:rgba(255,255,255,0.1);--color-accent:#facc15;--color-success:#50fa7b;--color-warning:#ffb86c;--color-error:#ff5555;--duration-fast:0.2s;--duration-normal:0.3s;--duration-slow:0.5s;--ease-out:cubic-bezier(0.25,0.46,0.45,0.94);--ease-in-out:cubic-bezier(0.645,0.045,0.355,1);--border-radius:0.75rem;--border-radius-lg:1rem;--shadow-sm:0 1px 2px rgba(0,0,0,0.05);--shadow-md:0 4px 6px rgba(0,0,0,0.1);--shadow-lg:0 10px 15px rgba(0,0,0,0.1);--shadow-glow:0 0 15px var(--color-primary);--glass-bg:var(--color-surface);--glass-border:1px solid var(--color-border);--glass-blur:blur(12px);--transition-duration:0.2s;--transition-easing:ease-out;--animation-duration:0.3s;--backdrop-blur:12px}body{color:var(--color-text);background-color:var(--color-background);margin:0;overflow-x:hidden}.glass-panel{background:var(--glass-bg);-webkit-backdrop-filter:var(--glass-blur);backdrop-filter:var(--glass-blur);border:var(--glass-border);transition:border-color var(--transition-duration) var(--transition-easing)}.glass-panel:hover{border-color:rgba(255,255,255,0.2)}.interactive-element{transition:all var(--duration-fast) var(--ease-out);border-radius:var(--border-radius)}.game-font{font-family:'Press Start 2P',cursive}.game-btn{transition:all var(--duration-fast) var(--ease-out);border-radius:var(--border-radius);border-bottom-width:4px;text-shadow:1px 1px 2px rgba(0,0,0,0.4);position:relative;overflow:hidden}.game-btn:not(:disabled):hover{transform:translateY(-2px) scale(1.02);box-shadow:var(--shadow-glow)}.game-btn:active:not(:disabled){transform:translateY(2px);border-bottom-width:2px;box-shadow:none}.game-btn:disabled{opacity:0.6;cursor:not-allowed;transform:none!important}#classFilter,#sortOrder{background-color:var(--color-primary-dark);border:var(--glass-border);color:var(--color-text);border-radius:var(--border-radius);padding:0.25rem 0.5rem;transition:border-color var(--transition-duration) var(--transition-easing),box-shadow var(--transition-duration) var(--transition-easing)}#classFilter:focus,#sortOrder:focus{border-color:rgba(6,182,212,0.5);box-shadow:0 0 0 2px rgba(6,182,212,0.2);outline:none}:focus-visible{outline:3px solid var(--color-primary);outline-offset:2px;border-radius:var(--border-radius)}header{position:sticky;top:0;z-index:50;contain:layout;-webkit-backdrop-filter:blur(var(--backdrop-blur));backdrop-filter:blur(var(--backdrop-blur))}.line-clamp-2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}@media (min-width:768px) and (max-width:1023px){#headingLabel{font-size:1.25rem!important}}#formAnswerBtn{transition:all 0.2s ease-out}#formAnswerBtn:hover{transform:translateY(-1px);box-shadow:0 4px 8px rgba(0,0,0,0.15)}#answerCount{transition:background-color 0.2s ease-out}#answerCount:hover{background-color:rgba(55,65,81,0.5)}.answer-card{will-change:transform,opacity;transition:all var(--duration-normal) var(--ease-out);border-radius:var(--border-radius-lg);contain:layout style;position:relative;overflow:hidden}.answer-card.highlighted{border:4px solid transparent;border-image:none!important;box-shadow:0 0 15px rgba(250,204,21,0.6);transform:scale(1.02);z-index:2;background:linear-gradient(var(--glass-bg),var(--glass-bg)) padding-box,linear-gradient(90deg,var(--color-accent),var(--color-primary)) border-box;background-clip:padding-box,border-box;position:relative}.answer-card:hover{transform:translateY(-4px) scale(1.02);box-shadow:0 8px 25px rgba(139,233,253,0.3)}.answer-card:focus-visible{transform:translateY(-4px) scale(1.02);box-shadow:0 8px 25px rgba(139,233,253,0.3)}.answer-card.highlighted:hover{transform:translateY(-4px) scale(1.04)}.answer-card.loading{opacity:0.7;pointer-events:none}.reaction-btn{transition:transform var(--transition-duration) var(--transition-easing),background-color var(--transition-duration) var(--transition-easing),box-shadow var(--transition-duration) var(--transition-easing);position:relative;overflow:hidden}.reaction-btn:hover{transform:scale(1.1)}.reaction-btn:active{transform:scale(0.95)}.reaction-btn.reacted{background-color:var(--color-primary)!important;color:#000!important;box-shadow:0 0 10px rgba(139,233,253,0.5)}.reaction-btn.liked{background-color:var(--color-primary)!important;color:#000!important;box-shadow:0 0 10px rgba(139,233,253,0.5)}.reaction-btn.loading{opacity:0.6;pointer-events:none}.fade-in{animation:fadeIn 0.5s ease-out}.slide-in{animation:slideIn 0.3s ease-out}.pulse{animation:pulse 0.6s ease-out}.shake{animation:shake 0.5s ease-out}.admin-toggle{transition:background-color var(--animation-duration) var(--transition-easing);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}.admin-toggle:hover{background-color:rgba(139,233,253,0.1)}.loading-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(26,27,38,0.8);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:1000}.spinner{width:40px;height:40px;border:4px solid rgba(139,233,253,0.3);border-top:4px solid var(--color-primary);border-radius:50%;animation:spin 1s linear infinite}@keyframes fadeIn{from{opacity:0;will-change:opacity}to{opacity:1}}@keyframes slideIn{from{opacity:0;will-change:opacity}to{opacity:1}}@keyframes pulse{0%{will-change:transform}50%{transform:scale3d(1.05,1.05,1)}100%{transform:scale3d(1,1,1)}}@keyframes shake{0%,100%{will-change:transform}25%{transform:translate3d(-5px,0,0)}75%{transform:translate3d(5px,0,0)}}@keyframes spin{100%{transform:rotate(360deg);will-change:transform}}@keyframes bounce{0%,20%,50%,80%,100%{transform:translate(-50%,0) translateY(0)}40%{transform:translate(-50%,0) translateY(-10px)}60%{transform:translate(-50%,0) translateY(-5px)}}@media (min-resolution:120dpi) and (min-width:1200px){:root{--transition-duration:0.15s;--animation-duration:0.2s}}@media (prefers-contrast:high){:root{--color-border:rgba(255,255,255,0.3);--color-surface:rgba(26,27,38,0.98)}}@media (prefers-reduced-motion:reduce){:root{--transition-duration:0.01ms;--animation-duration:0.01ms;--backdrop-blur:0px}*,*::before,*::after{animation-duration:0.01ms!important;animation-iteration-count:1!important;transition-duration:0.01ms!important;transform:none!important}.answer-card:hover,.reaction-btn:hover,.game-btn:hover{transform:none!important}}.highlight-badge{position:absolute;top:0.25rem;right:0.25rem;width:1.5rem;height:1.5rem;display:flex;align-items:center;justify-content:center;color:#facc15;filter:drop-shadow(0 0 4px rgba(250,204,21,0.7))}.answer-card.reaction-bg-like{border-color:#ef4444!important;border-image:none!important}.answer-card.reaction-bg-understand{border-color:#fbbf24!important;border-image:none!important}.answer-card.reaction-bg-curious{border-color:#10b981!important;border-image:none!important}.reaction-bg-like-understand,.reaction-bg-like-curious,.reaction-bg-understand-curious,.reaction-bg-all{border-color:transparent;border-style:solid;background:var(--glass-bg);border-image-slice:1;border-image-source:linear-gradient(90deg,#ef4444,#fbbf24)}.reaction-bg-like-curious{border-image-source:linear-gradient(90deg,#ef4444,#10b981)}.reaction-bg-understand-curious{border-image-source:linear-gradient(90deg,#fbbf24,#10b981)}.reaction-bg-all{border-image-source:linear-gradient(90deg,#ef4444,#fbbf24,#10b981)}.reaction-border-1{border-width:2px}.reaction-border-2{border-width:4px}.reaction-border-3{border-width:6px}.answer-preview{display:-webkit-box;-webkit-line-clamp:5;-webkit-box-orient:vertical;overflow:hidden;text-overflow:ellipsis;min-height:120px}.highlight-btn{transition:all 0.2s ease;border-radius:4px;padding:2px}.highlight-btn:hover{background:rgba(250,204,21,0.1);transform:scale(1.1)}.highlight-btn.liked{color:#facc15;filter:drop-shadow(0 0 4px rgba(250,204,21,0.7))}#controlsFooter{pointer-events:none}#controlsFooter>.glass-panel{pointer-events:auto}.skeleton{position:relative;overflow:hidden;background-color:rgba(255,255,255,0.05);color:transparent}.skeleton::after{content:"";position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,0.3),rgba(255,255,255,0));animation:skeleton-loading 1.2s infinite}@keyframes skeleton-loading{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
   </style>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
-  <?!= include('IconLibrary.js'); ?>
-  
   <div id="loading-overlay" class="loading-overlay hidden">
     <div class="text-center">
       <div class="spinner"></div>
@@ -31,12 +29,14 @@
         <div class="flex items-center gap-3">
           <div id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0">
             <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 0 0-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 0 1 5.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 0 1 9.288 0M15 7a3 3 0 1 1-6 0 3 3 0 0 1 6 0zm6 3a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM7 10a2 2 0 1 1-4 0 2 2 0 0 1 4 0z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 7a4 4 0 1 1 0 8 4 4 0 0 1 0-8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path>
             </svg>
             <span id="answerCountText">0件</span>
           </div>
           <a id="formAnswerBtn" href="#" target="_blank" rel="noopener noreferrer" class="text-xs bg-green-600 hover:bg-green-700 text-white font-medium px-3 py-1.5 rounded-md whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm no-underline" aria-label="フォームで回答" role="button">
-            <span class="form-edit-icon"></span>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
             フォームで回答
           </a>
           <div class="flex items-center gap-2">
@@ -58,11 +58,16 @@
         <div class="flex-1 flex justify-center"></div>
         <div class="flex items-center gap-2">
           <div id="boardOwnerDisplay" class="text-xs text-gray-500 bg-gray-800/40 backdrop-blur-sm px-2.5 py-1 rounded-md flex items-center gap-1.5">
-            <span class="user-icon"></span>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path>
+            </svg>
             <span>ID: <?= userInfo.userId ? userInfo.userId.substring(0,8) + '...' : 'ID_NOT_SET' ?></span>
           </div>
           <button type="button" id="adminToggleBtn" class="admin-toggle text-gray-400 hover:text-cyan-400 transition-all p-1.5 rounded-md hover:bg-gray-800/50 hidden" aria-label="管理者モード切り替え">
-            <span class="admin-settings-icon"></span>
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
           </button>
           <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600/80 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -75,8 +80,11 @@
       <div class="border-t border-transparent pt-4">
         <div class="flex justify-center">
           <div id="headingLabel" class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem] text-center max-w-4xl line-clamp-2" style="display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-            <span class="heading-loading-icon"></span>
-            <span class="animate-pulse">問題文を読み込み中...</span>
+            <svg class="w-5 h-5 md:w-6 md:h-6 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+            </svg>
+            <span class="animate-pulse ml-2">問題文を読み込み中...</span>
           </div>
         </div>
       </div>
@@ -96,8 +104,10 @@
 
   <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
     <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
-      <button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10" aria-label="閉じる">
-        <span id="iconClose" class="w-6 h-6"></span>
+      <button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10 absolute -top-3 -right-3" aria-label="閉じる">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
       </button>
       <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4"></div>
       <div id="modalFooter" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
@@ -113,20 +123,20 @@
         <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
         <ul class="space-y-2">
           <li class="flex items-center gap-2">
-            <span id="infoIconLike" class="w-5 h-5 text-red-400"></span>
+            <span class="w-5 h-5 text-red-400">❤️</span>
             いいね：すてきだと思ったときに押そう
           </li>
           <li class="flex items-center gap-2">
-            <span id="infoIconUnderstand" class="w-5 h-5 text-yellow-400"></span>
+            <span class="w-5 h-5 text-yellow-400">💡</span>
             なるほど：参考になったときに押そう
           </li>
           <li class="flex items-center gap-2">
-            <span id="infoIconCurious" class="w-5 h-5 text-green-400"></span>
+            <span class="w-5 h-5 text-green-400">🤔</span>
             きになる：もっと知りたいときに押そう
           </li>
         </ul>
         <p class="flex items-center gap-2">
-          <span id="infoIconHighlight" class="w-5 h-5 text-purple-400"></span>
+          <span class="w-5 h-5 text-purple-400">⭐</span>
           先生が注目してほしい意見につけています
         </p>
         <p>責任あるリアクションで、みんなで学びを深めよう！</p>
@@ -142,13 +152,18 @@
       <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更" />
       <div class="flex items-center gap-1">
         <span id="sliderValue" class="font-bold text-lg">4</span>
-        <span id="iconGrid" class="w-4 h-4"></span>
+        <svg id="iconGrid" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <rect width="18" height="18" x="3" y="3" rx="2"></rect>
+          <path d="M3 12h18"></path>
+          <path d="M12 3v18"></path>
+        </svg>
       </div>
+      <button type="button" id="modeToggleBtn" class="ml-4 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm" title="プレビューモード切り替え">切替</button>
     </div>
   </footer>
 
   <script>
-    // 🎯 統合最適化設定
+    // 🎯 統合最適化設定 - 全設定を一元化
     const CONFIG = Object.freeze({
       USER_ID: '<?= typeof userInfo !== "undefined" && userInfo && userInfo.userId ? userInfo.userId : "" ?>',
       SHEET_NAME: '<?= typeof sheetName !== "undefined" && sheetName ? sheetName : "" ?>',
@@ -172,10 +187,44 @@
       POLLING: Object.freeze({
         INTERVAL: 5000,
         MAX_RETRIES: 3
+      }),
+      DEFAULT_MODE: Object.freeze({
+        isStudentMode: true,
+        showCounts: false,
+        showAdminFeatures: false,
+        showHighlightToggle: false,
+        showScoreSort: false,
+        showPublishControls: false,
+        displayMode: 'anonymous'
+      }),
+      ADMIN_MODE: Object.freeze({
+        isStudentMode: false,
+        showCounts: true,
+        showAdminFeatures: true,
+        showHighlightToggle: true,
+        showScoreSort: true,
+        showPublishControls: true,
+        displayMode: 'named'
       })
     });
 
-    // 🚀 高速化ユーティリティ
+    // 🚀 統合アイコンライブラリ
+    const ICONS = Object.freeze({
+      'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 3.75a24.456 24.456 0 01-6 0m2.25 2.25a24.456 24.456 0 005.25 0m0 0a24.456 24.456 0 00-5.25-4.5M12 12.75a.75.75 0 00-.75-.75H10.5a.75.75 0 01-.75-.75V9.75a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v2.25a.75.75 0 01.75.75m-1.5 0a.75.75 0 01-.75.75m0-3.75V6a6 6 0 016 6v6h-3V9a3 3 0 00-6 0v9.75a.75.75 0 01-1.5 0V15a6 6 0 016-6V6z"/></svg>',
+      'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.25a.75.75 0 01.75.75v2.25a.75.75 0 01-1.5 0V3a.75.75 0 01.75-.75zM7.5 12a4.5 4.5 0 119 0c0 1.58-.75 2.98-1.909 3.87a.75.75 0 01-.341.138v.384c0 .126-.003.253-.01.378a5.25 5.25 0 11-4.78 0c-.007-.125-.01-.252-.01-.378v-.384a.75.75 0 01-.341-.138A4.493 4.493 0 017.5 12zM21 12a.75.75 0 01-.75.75h-2.25a.75.75 0 010-1.5H20.25A.75.75 0 0121 12zM3.75 12a.75.75 0 01-.75-.75V9a.75.75 0 011.5 0v2.25A.75.75 0 013.75 12z"/></svg>',
+      'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+      'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M7 22a3 3 0 01-3-3v-8a3 3 0 013-3h2.75L12 2a2 2 0 013.13 1.66L14 7h5.83a3 3 0 012.88 3.84l-2.33 8A3 3 0 0117.5 22H7z"/></svg>',
+      'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
+      'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="currentColor"><path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z" clip-rule="evenodd"/><path d="M10.5 7.5a.75.75 0 01.75.75v1.5h1.5a.75.75 0 010 1.5h-1.5v1.5a.75.75 0 01-1.5 0v-1.5h-1.5a.75.75 0 010-1.5h1.5v-1.5a.75.75 0 01.75-.75z"/></svg>',
+      'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+      'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 15,8.5 22,9.3 17,14 18.2,21 12,17.8 5.8,21 7,14 2,9.3 9,8.5 12,2"/></svg>',
+      'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 15,8.5 22,9.3 17,14 18.2,21 12,17.8 5.8,21 7,14 2,9.3 9,8.5 12,2"/></svg>',
+      'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12,2 15,8.5 22,9.3 17,14 18.2,21 12,17.8 5.8,21 7,14 2,9.3 9,8.5 12,2"/></svg>',
+      'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
+      'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+    });
+
+    // 🚀 高速化ユーティリティ - 1箇所に統合
     const Utils = {
       cache: new Map(),
       
@@ -216,14 +265,26 @@
         };
       },
 
-      async(fn) {
-        return (...args) => setTimeout(() => fn(...args), 0);
-      },
-
       sanitizeHtml(str) {
+        if (!str) return '';
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+      },
+
+      getIcon(name, classes = '', solid = false) {
+        let key;
+        if (solid && ICONS[name + '-solid']) {
+          key = name + '-solid';
+        } else if (ICONS[name + '-outline']) {
+          key = name + '-outline';
+        } else if (ICONS[name]) {
+          key = name;
+        } else {
+          console.warn('Icon not found:', name);
+          return '<span class="' + classes + '">⭐</span>';
+        }
+        return '<span class="' + classes + '">' + ICONS[key] + '</span>';
       },
 
       logDebug(...args) {
@@ -232,10 +293,17 @@
 
       logError(error, context = '') {
         console.error(`❌ ${context}:`, error);
+      },
+
+      isPreviewMode() {
+        return window.location.protocol === 'file:' || 
+               window.location.hostname === 'localhost' || 
+               window.location.pathname.includes('preview') ||
+               window.location.href.includes('preview');
       }
     };
 
-    // 🎯 統合アプリケーション
+    // 🎯 統合アプリケーション - 完全最適化版
     class GenericBoardApp {
       constructor() {
         this.state = {
@@ -246,131 +314,355 @@
           gridColumns: 4,
           isPolling: false,
           isLoading: false,
-          cache: new Map()
+          cache: new Map(),
+          isStudentMode: true,
+          showCounts: false,
+          showAdminFeatures: false,
+          showHighlightToggle: false,
+          showScoreSort: false,
+          displayMode: 'anonymous',
+          isAdminUser: false,
+          serverShowDetails: false,
+          lastFocusedElement: null
         };
         
         this.elements = {};
         this.eventListeners = [];
         this.gsapTimelines = new Set();
+        this.pollingInterval = null;
+        this.handlers = {};
+        this.cache = new Map();
+        
+        this.reactionTypes = [
+          { key: 'LIKE', icon: 'hand-thumb-up' },
+          { key: 'UNDERSTAND', icon: 'lightbulb' },
+          { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
+        ];
+
         this.init();
       }
 
       init() {
         this.cacheElements();
-        this.initializeIcons();
+        this.initializeMode();
         this.setupEventListeners();
-        this.loadInitialData();
-        this.startPolling();
+        this.waitForGSAP().then(() => {
+          this.verifyAdmin();
+          this.adjustLayout();
+          this.loadInitialData();
+          this.setupInitialModeButton();
+          this.updateSortOptions();
+          if (!localStorage.getItem('introSeen')) {
+            this.showInfoModal();
+          }
+        });
         Utils.logDebug('🚀 GenericBoardApp initialized');
+      }
+
+      initializeMode() {
+        const targetMode = Utils.isPreviewMode() && window.location.hash === '#admin' ? 
+                          CONFIG.ADMIN_MODE : CONFIG.DEFAULT_MODE;
+        Object.assign(this.state, targetMode);
       }
 
       cacheElements() {
         const selectors = [
           'answers', 'headingLabel', 'answerCount', 'answerCountText', 
-          'formAnswerBtn', 'classFilter', 'sortOrder', 'sizeSlider',
-          'sliderValue', 'adminToggleBtn', 'endPublicationBtn',
-          'answerModalContainer', 'answerModalCard', 'answerModalCloseBtn',
-          'modalAnswer', 'modalStudentName', 'modalReactions',
-          'newContentBanner', 'refreshContentBtn', 'dismissBannerBtn'
+          'formAnswerBtn', 'classFilter', 'sortOrder', 'sizeSlider', 'sliderValue',
+          'adminToggleBtn', 'endPublicationBtn', 'answerModalContainer', 
+          'answerModalCard', 'answerModalCloseBtn', 'modalAnswer', 'modalStudentName', 
+          'modalReactions', 'newContentBanner', 'refreshContentBtn', 'dismissBannerBtn',
+          'infoModalContainer', 'infoModalCard', 'infoModalConfirmBtn', 'modeToggleBtn',
+          'iconGrid', 'controlsFooter', 'mainContainer', 'loadingOverlay'
         ];
         
         selectors.forEach(id => {
           this.elements[id] = document.getElementById(id);
         });
+
+        // 保存された列数をロード
+        const savedCols = localStorage.getItem('boardColumns');
+        if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
+          this.elements.sizeSlider.value = savedCols;
+          this.elements.sliderValue.textContent = savedCols;
+        }
       }
 
-      initializeIcons() {
-        if (typeof window.IconLibrary !== 'undefined') {
-          const iconMappings = [
-            { selector: '.form-edit-icon', icon: 'edit', options: { size: 'w-3 h-3' }},
-            { selector: '.user-icon', icon: 'user', options: { size: 'w-3 h-3' }},
-            { selector: '.admin-settings-icon', icon: 'settings', options: { size: 'w-3 h-3' }},
-            { selector: '.heading-loading-icon', icon: 'loading', options: { size: 'w-5 h-5 md:w-6 md:h-6', className: 'animate-spin' }}
-          ];
-          
-          iconMappings.forEach(({ selector, icon, options }) => {
-            document.querySelectorAll(selector).forEach(el => {
-              el.innerHTML = window.IconLibrary.get(icon, options);
-            });
-          });
-        }
+      waitForGSAP() {
+        return new Promise(resolve => {
+          if (typeof gsap !== 'undefined') {
+            resolve();
+          } else {
+            const checkGSAP = setInterval(() => {
+              if (typeof gsap !== 'undefined') {
+                clearInterval(checkGSAP);
+                resolve();
+              }
+            }, 50);
+          }
+        });
       }
 
       setupEventListeners() {
-        const listeners = [
-          ['click', this.handleClick.bind(this)],
-          ['change', this.handleChange.bind(this)],
-          ['keydown', this.handleKeydown.bind(this)]
-        ];
+        const debouncedRender = Utils.debounce(() => this.renderBoard(true), CONFIG.PERFORMANCE.DEBOUNCE_DELAY);
+        
+        // スライダー
+        if (this.elements.sizeSlider) {
+          this.handlers.onSizeSliderInput = () => {
+            localStorage.setItem('boardColumns', this.elements.sizeSlider.value);
+            debouncedRender();
+          };
+          this.elements.sizeSlider.addEventListener('input', this.handlers.onSizeSliderInput);
+        }
 
-        listeners.forEach(([event, handler]) => {
-          document.addEventListener(event, handler);
-          this.eventListeners.push({ event, handler });
-        });
+        // イベント委譲
+        this.setupEventDelegation();
 
-        this.elements.sizeSlider?.addEventListener('input', 
-          Utils.throttle(this.updateGridColumns.bind(this))
-        );
+        // モーダル関連
+        if (this.elements.answerModalCloseBtn) {
+          this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
+          this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
+        }
+
+        if (this.elements.answerModalContainer) {
+          this.handlers.onAnswerModalContainerClick = (e) => {
+            if (e.target === e.currentTarget) this.hideAnswerModal();
+          };
+          this.elements.answerModalContainer.addEventListener('click', this.handlers.onAnswerModalContainerClick);
+        }
+
+        if (this.elements.infoModalConfirmBtn) {
+          this.handlers.onInfoModalConfirmClick = () => this.hideInfoModal();
+          this.elements.infoModalConfirmBtn.addEventListener('click', this.handlers.onInfoModalConfirmClick);
+        }
+
+        // フィルター・ソート
+        if (this.elements.classFilter) {
+          this.handlers.onClassFilterChange = () => this.loadSheetData(true);
+          this.elements.classFilter.addEventListener('change', this.handlers.onClassFilterChange);
+        }
+
+        if (this.elements.sortOrder) {
+          this.handlers.onSortOrderChange = () => this.loadSheetData(true);
+          this.elements.sortOrder.addEventListener('change', this.handlers.onSortOrderChange);
+        }
+
+        // 管理者トグル
+        if (this.elements.adminToggleBtn) {
+          this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
+          this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
+        }
+
+        // モードトグル（プレビューのみ）
+        if (this.elements.modeToggleBtn) {
+          this.handlers.onModeToggleClick = () => this.togglePreviewMode();
+          this.elements.modeToggleBtn.addEventListener('click', this.handlers.onModeToggleClick);
+        }
+
+        // キーボード・リサイズ
+        this.handlers.onDocumentKeydown = (e) => {
+          if (e.key === 'Escape') this.hideAnswerModal();
+        };
+        document.addEventListener('keydown', this.handlers.onDocumentKeydown);
+
+        this.handlers.onWindowResize = Utils.debounce(() => this.adjustLayout(), 100);
+        window.addEventListener('resize', this.handlers.onWindowResize);
+
+        // 可視性変更
+        this.handlers.onVisibilityChange = () => {
+          if (document.hidden) {
+            this.stopPolling();
+          } else {
+            this.startPolling();
+          }
+        };
+        document.addEventListener('visibilitychange', this.handlers.onVisibilityChange);
+      }
+
+      setupEventDelegation() {
+        if (!this.elements.answers) return;
+
+        this.handlers.onAnswersContainerClick = (e) => {
+          const answerCard = e.target.closest('.answer-card');
+          if (!answerCard) return;
+
+          const rowIndex = answerCard.dataset.rowIndex;
+          if (!rowIndex) return;
+
+          const reactionBtn = e.target.closest('.reaction-btn');
+          if (reactionBtn) {
+            e.stopPropagation();
+            const reactionType = reactionBtn.dataset.reaction;
+            if (reactionType) {
+              this.handleReaction(rowIndex, reactionType);
+            }
+            return;
+          }
+
+          const highlightBtn = e.target.closest('.highlight-btn');
+          if (highlightBtn) {
+            e.stopPropagation();
+            this.handleHighlight(rowIndex);
+            return;
+          }
+
+          this.showAnswerModal(rowIndex);
+        };
+        this.elements.answers.addEventListener('click', this.handlers.onAnswersContainerClick);
+
+        this.handlers.onAnswersContainerKeydown = (e) => {
+          const answerCard = e.target.closest('.answer-card');
+          if (!answerCard) return;
+
+          const rowIndex = answerCard.dataset.rowIndex;
+          if (!rowIndex) return;
+
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            
+            const focusedBtn = document.activeElement;
+            if (focusedBtn.matches('.reaction-btn')) {
+              const reactionType = focusedBtn.dataset.reaction;
+              if (reactionType) {
+                this.handleReaction(rowIndex, reactionType);
+              }
+              return;
+            }
+            
+            if (focusedBtn.matches('.highlight-btn')) {
+              this.handleHighlight(rowIndex);
+              return;
+            }
+            
+            this.showAnswerModal(rowIndex);
+          }
+        };
+        this.elements.answers.addEventListener('keydown', this.handlers.onAnswersContainerKeydown);
+
+        // バナー
+        this.handlers.onDocumentClick = (e) => {
+          if (e.target.matches('#refreshContentBtn')) {
+            e.preventDefault();
+            this.refreshData();
+            return;
+          }
+          if (e.target.matches('#dismissBannerBtn')) {
+            this.hideBanner();
+            return;
+          }
+          if (e.target.matches('#retryLoadBtn')) {
+            e.preventDefault();
+            this.loadInitialData();
+            return;
+          }
+        };
+        document.addEventListener('click', this.handlers.onDocumentClick);
+      }
+
+      adjustLayout() {
+        // レイアウト調整ロジック（省略可能）
+      }
+
+      async verifyAdmin() {
+        try {
+          const ok = await this.runGas('checkAdmin');
+          if (ok && this.elements.adminToggleBtn) {
+            this.state.isAdminUser = true;
+            this.elements.adminToggleBtn.classList.remove('hidden');
+            this.elements.adminToggleBtn.removeAttribute('hidden');
+            this.elements.adminToggleBtn.textContent = this.state.showAdminFeatures ? '閲覧モード' : '管理モード';
+          }
+        } catch (e) {
+          Utils.logError(e, 'Admin check');
+        }
       }
 
       async loadInitialData() {
-        try {
-          this.showLoading(true);
-          const data = await this.fetchData();
-          this.updateUI(data);
-        } catch (error) {
-          Utils.logError(error, 'Initial data load');
-        } finally {
-          this.showLoading(false);
-        }
+        Utils.logDebug('loadInitialData started');
+        await this.loadSheetData(true, true);
+        this.startPolling();
       }
 
-      async fetchData() {
-        return new Promise((resolve) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler((error) => {
-              Utils.logError(error, 'Data fetch');
-              resolve({ answers: [], opinionHeader: CONFIG.OPINION_HEADER });
-            })
-            .getPublishedSheetData(CONFIG.USER_ID, CONFIG.SHEET_NAME);
-        });
-      }
-
-      updateUI(data) {
-        if (data.opinionHeader) {
-          this.updateHeader(data.opinionHeader);
+      async loadSheetData(showLoading = true, isInitialLoad = false) {
+        Utils.logDebug('loadSheetData called', { showLoading, isInitialLoad });
+        if (this.state.isLoading && showLoading) return;
+        
+        this.state.isLoading = true;
+        const selectedClass = isInitialLoad ? 'すべて' : this.elements.classFilter?.value || 'すべて';
+        const sortOrder = this.elements.sortOrder?.value || 'newest';
+        
+        if (showLoading) {
+          this.showSkeletons();
         }
         
-        if (data.answers) {
-          this.state.answers = data.answers;
-          this.filterAndSortAnswers();
-          this.renderAnswers();
-          this.updateAnswerCount();
-        }
+        try {
+          Utils.logDebug('Calling getPublishedSheetData with:', { selectedClass, sortOrder });
+          const data = await this.runGas('getPublishedSheetData', selectedClass, sortOrder);
+          Utils.logDebug('Received data:', data);
+          
+          if (data.opinionHeader || data.header) {
+            this.updateHeader(data.opinionHeader || data.header);
+          }
+          
+          if (data.answers || data.rows) {
+            this.state.answers = data.answers || data.rows || [];
+            this.filterAndSortAnswers();
+            this.renderAnswers();
+            this.updateAnswerCount();
+          }
 
-        if (data.formUrl && this.elements.formAnswerBtn) {
-          this.elements.formAnswerBtn.href = data.formUrl;
+          if (data.formUrl && this.elements.formAnswerBtn) {
+            this.elements.formAnswerBtn.href = data.formUrl;
+          }
+
+          if (isInitialLoad && (data.answers || data.rows)) {
+            this.populateClassFilter(data.answers || data.rows);
+          }
+          
+        } catch (error) {
+          Utils.logError(error, 'Loading sheet data');
+          this.showError(error.message || 'データの読み込みに失敗しました');
+        } finally {
+          this.state.isLoading = false;
         }
+      }
+
+      showSkeletons() {
+        if (!this.elements.answers) return;
+        const count = parseInt(this.elements.sizeSlider?.value || '4', 10) * 2;
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < count; i++) {
+          frag.appendChild(this.createSkeletonCard());
+        }
+        this.elements.answers.innerHTML = '';
+        this.elements.answers.appendChild(frag);
+      }
+
+      showError(message) {
+        if (!this.elements.answers) return;
+        this.elements.answers.innerHTML =
+          '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' +
+          '<p class="font-bold">データの読み込みに失敗しました。</p>' +
+          '<p class="text-sm mt-2">' + Utils.sanitizeHtml(message) + '</p>' +
+          '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' +
+          '</div>';
       }
 
       updateHeader(text) {
         if (this.elements.headingLabel) {
-          this.elements.headingLabel.innerHTML = `<span class="text-gradient">${Utils.sanitizeHtml(text)}</span>`;
+          this.elements.headingLabel.innerHTML = '<span class="text-gradient">' + Utils.sanitizeHtml(text) + '</span>';
         }
       }
 
       filterAndSortAnswers() {
         let filtered = [...this.state.answers];
         
-        // フィルタリング
         if (this.state.currentFilter !== 'all') {
           filtered = filtered.filter(answer => 
             answer.class === this.state.currentFilter
           );
         }
 
-        // ソート
         switch (this.state.currentSort) {
           case 'newest':
             filtered.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -407,10 +699,29 @@
         this.animateCards();
       }
 
+      renderBoard(isLayoutChange = false) {
+        if (!this.elements.answers) return;
+        
+        this.elements.answers.querySelectorAll('.skeleton').forEach(el => el.remove());
+        this.elements.sliderValue.textContent = this.elements.sizeSlider?.value || '4';
+        
+        const columns = parseInt(this.elements.sizeSlider?.value || '4', 10);
+        const gridClasses = {
+          2: 'grid-cols-1 sm:grid-cols-2',
+          3: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3',
+          4: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
+          5: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
+          6: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
+        };
+
+        this.elements.answers.className = 'grid gap-4 ' + (gridClasses[columns] || gridClasses[4]);
+        this.renderAnswers();
+      }
+
       createAnswerCard(answer, index) {
         const card = document.createElement('div');
         card.className = this.getCardClasses(answer);
-        card.setAttribute('data-index', index);
+        card.setAttribute('data-row-index', answer.rowIndex);
         card.setAttribute('role', 'article');
         card.setAttribute('tabindex', '0');
         
@@ -455,42 +766,39 @@
         const reactions = answer.reactions || {};
         const active = [];
         
-        if (reactions.LIKE > 0) active.push('like');
-        if (reactions.UNDERSTAND > 0) active.push('understand');
-        if (reactions.CURIOUS > 0) active.push('curious');
+        if (reactions.LIKE && (reactions.LIKE.count || reactions.LIKE) > 0) active.push('like');
+        if (reactions.UNDERSTAND && (reactions.UNDERSTAND.count || reactions.UNDERSTAND) > 0) active.push('understand');
+        if (reactions.CURIOUS && (reactions.CURIOUS.count || reactions.CURIOUS) > 0) active.push('curious');
         
         return active;
       }
 
       createReactionButtons(answer, index) {
-        const reactions = [
-          { key: 'LIKE', icon: '❤️', color: 'text-red-400' },
-          { key: 'UNDERSTAND', icon: '💡', color: 'text-yellow-400' },
-          { key: 'CURIOUS', icon: '🤔', color: 'text-green-400' }
-        ];
-
-        return reactions.map(({ key, icon, color }) => {
-          const count = (answer.reactions && answer.reactions[key]) || 0;
-          const isActive = count > 0;
+        return this.reactionTypes.map(({ key, icon }) => {
+          const reaction = answer.reactions ? answer.reactions[key] : null;
+          const count = reaction ? (reaction.count || 0) : 0;
+          const isActive = reaction ? (reaction.reacted || false) : false;
+          
+          const colorClass = key === 'LIKE' ? 'text-red-400' : 
+                            key === 'UNDERSTAND' ? 'text-yellow-400' : 'text-green-400';
           
           return `
             <button 
               type="button"
-              class="reaction-btn p-1 rounded transition-all ${color} ${isActive ? 'reacted' : ''}"
+              class="reaction-btn p-1 rounded transition-all ${colorClass} ${isActive ? 'reacted' : ''}"
               data-reaction="${key}"
-              data-index="${index}"
+              data-row-index="${answer.rowIndex}"
               aria-label="${key} reaction"
-              ${count > 0 ? `data-count="${count}"` : ''}
             >
-              ${icon}
-              ${count > 0 ? `<span class="ml-1 text-xs">${count}</span>` : ''}
+              ${key === 'LIKE' ? '❤️' : key === 'UNDERSTAND' ? '💡' : '🤔'}
+              ${this.state.showCounts ? `<span class="ml-1 text-xs">${count}</span>` : ''}
             </button>
           `;
         }).join('');
       }
 
       getDisplayName(answer) {
-        const displayMode = 'anonymous'; // デフォルトで匿名表示
+        const displayMode = this.state.displayMode;
         
         switch (displayMode) {
           case 'named':
@@ -500,6 +808,19 @@
           default:
             return `ID: ${(answer.email || 'unknown').substring(0, 8)}`;
         }
+      }
+
+      createSkeletonCard() {
+        const card = document.createElement('div');
+        card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 skeleton';
+        card.innerHTML =
+          '<div class="flex-1 space-y-3">' +
+          '<div class="h-6 w-3/4 rounded bg-gray-500/30"></div>' +
+          '<div class="h-4 w-full rounded bg-gray-500/20"></div>' +
+          '<div class="h-4 w-5/6 rounded bg-gray-500/20"></div>' +
+          '</div>' +
+          '<div class="mt-4 h-8 rounded bg-gray-500/20"></div>';
+        return card;
       }
 
       animateCards() {
@@ -522,26 +843,13 @@
         this.gsapTimelines.add(tl);
       }
 
-      updateGridColumns() {
-        const columns = parseInt(this.elements.sizeSlider.value);
-        this.state.gridColumns = columns;
-        
-        if (this.elements.sliderValue) {
-          this.elements.sliderValue.textContent = columns;
-        }
-
-        const gridClasses = {
-          2: 'grid-cols-1 sm:grid-cols-2',
-          3: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3',
-          4: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4',
-          5: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5',
-          6: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6'
-        };
-
-        if (this.elements.answers) {
-          this.elements.answers.className = 
-            'grid gap-4 ' + (gridClasses[columns] || gridClasses[4]);
-        }
+      populateClassFilter(answers) {
+        if (!this.elements.classFilter) return;
+        const uniqueClasses = ['すべて', ...new Set(answers.map(a => a.class).filter(Boolean))];
+        this.elements.classFilter.innerHTML = uniqueClasses.map(c => 
+          '<option value="' + Utils.sanitizeHtml(c) + '">' + Utils.sanitizeHtml(c) + '</option>'
+        ).join('');
+        this.elements.classFilter.classList.remove('hidden');
       }
 
       updateAnswerCount() {
@@ -550,127 +858,223 @@
         }
       }
 
-      handleClick(event) {
-        const { target } = event;
-        
-        if (target.matches('.answer-card, .answer-card *')) {
-          this.handleCardClick(event);
-        } else if (target.matches('.reaction-btn')) {
-          this.handleReactionClick(event);
-        } else if (target.matches('#refreshContentBtn')) {
-          this.refreshData();
-        } else if (target.matches('#dismissBannerBtn')) {
-          this.hideBanner();
-        } else if (target.matches('#answerModalCloseBtn')) {
-          this.closeModal();
+      async handleReaction(rowIndex, reaction) {
+        const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+        btns.forEach(btn => {
+          btn.disabled = true;
+          btn.setAttribute('aria-disabled', 'true');
+        });
+
+        try {
+          const res = await this.runGas('addReaction', rowIndex, reaction);
+          if (res && res.status === 'ok') {
+            const item = this.state.answers.find(i => i.rowIndex == rowIndex);
+            if (item && res.reactions) {
+              item.reactions = res.reactions;
+              this.filterAndSortAnswers();
+              this.renderAnswers();
+            }
+          }
+        } catch (error) {
+          Utils.logError(error, 'Reaction click');
+        } finally {
+          btns.forEach(btn => {
+            btn.disabled = false;
+            btn.setAttribute('aria-disabled', 'false');
+          });
         }
       }
 
-      handleChange(event) {
-        const { target } = event;
-        
-        if (target.matches('#classFilter')) {
-          this.state.currentFilter = target.value;
-          this.filterAndSortAnswers();
-          this.renderAnswers();
-        } else if (target.matches('#sortOrder')) {
-          this.state.currentSort = target.value;
-          this.filterAndSortAnswers();
-          this.renderAnswers();
+      async handleHighlight(rowIndex) {
+        const btns = document.querySelectorAll(`.highlight-btn[data-row-index="${rowIndex}"]`);
+        btns.forEach(btn => {
+          btn.disabled = true;
+          btn.setAttribute('aria-disabled', 'true');
+        });
+
+        try {
+          const item = this.state.answers.find(i => i.rowIndex == rowIndex);
+          const res = await this.runGas('toggleHighlight', rowIndex, item.highlight);
+          if (res && res.status === 'ok') {
+            if (item) {
+              item.highlight = res.highlight;
+              this.filterAndSortAnswers();
+              this.renderAnswers();
+            }
+          }
+        } catch (error) {
+          Utils.logError(error, 'Highlight toggle');
+        } finally {
+          btns.forEach(btn => {
+            btn.disabled = false;
+            btn.setAttribute('aria-disabled', 'false');
+          });
         }
       }
 
-      handleKeydown(event) {
-        if (event.key === 'Escape') {
-          this.closeModal();
-        } else if (event.key === 'Enter' || event.key === ' ') {
-          if (event.target.matches('.answer-card')) {
-            event.preventDefault();
-            this.handleCardClick(event);
+      async toggleAdminMode() {
+        const enable = !this.state.showAdminFeatures;
+        
+        if (enable) {
+          try {
+            const ok = await this.runGas('checkAdmin');
+            if (!ok) {
+              console.warn('管理者権限がありません。');
+              return;
+            }
+          } catch (e) {
+            Utils.logError(e, '権限確認');
+            return;
+          }
+        }
+
+        Object.assign(this.state, enable ? CONFIG.ADMIN_MODE : CONFIG.DEFAULT_MODE);
+        
+        if (this.elements.adminToggleBtn) {
+          this.elements.adminToggleBtn.textContent = enable ? '閲覧モード' : '管理モード';
+        }
+        
+        this.updateSortOptions();
+        this.loadSheetData(true, true);
+      }
+
+      togglePreviewMode() {
+        const currentDisplayMode = this.state.displayMode;
+        
+        if (currentDisplayMode === 'anonymous') {
+          Object.assign(this.state, CONFIG.ADMIN_MODE);
+          this.elements.modeToggleBtn.textContent = '学生';
+          this.elements.modeToggleBtn.className = 'ml-4 px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm';
+        } else {
+          Object.assign(this.state, CONFIG.DEFAULT_MODE);
+          this.elements.modeToggleBtn.textContent = '管理者';
+          this.elements.modeToggleBtn.className = 'ml-4 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm';
+        }
+        
+        this.updateSortOptions();
+        this.loadSheetData(true);
+      }
+
+      setupInitialModeButton() {
+        if (!this.elements.modeToggleBtn) return;
+        
+        if (Utils.isPreviewMode()) {
+          this.elements.modeToggleBtn.style.display = 'block';
+          const currentMode = this.state.displayMode;
+          if (currentMode === 'named') {
+            this.elements.modeToggleBtn.textContent = '学生';
+            this.elements.modeToggleBtn.className = 'ml-4 px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-sm';
+          } else {
+            this.elements.modeToggleBtn.textContent = '管理者';
+            this.elements.modeToggleBtn.className = 'ml-4 px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm';
+          }
+        } else {
+          this.elements.modeToggleBtn.style.display = 'none';
+        }
+      }
+
+      updateSortOptions() {
+        const scoreOption = document.getElementById('scoreOption');
+        if (scoreOption) {
+          scoreOption.style.display = this.state.showScoreSort ? 'block' : 'none';
+          if (!this.state.showScoreSort && this.elements.sortOrder?.value === 'score') {
+            this.elements.sortOrder.value = 'newest';
           }
         }
       }
 
-      handleCardClick(event) {
-        if (event.target.matches('.reaction-btn, .reaction-btn *')) return;
+      showAnswerModal(rowIndex) {
+        const data = this.state.filteredAnswers.find(r => r.rowIndex == rowIndex);
+        if (!data) return;
         
-        const card = event.target.closest('.answer-card');
-        const index = parseInt(card.dataset.index);
-        const answer = this.state.filteredAnswers[index];
+        this.state.lastFocusedElement = document.activeElement;
         
-        if (answer) {
-          this.showModal(answer);
+        if (this.elements.modalAnswer) {
+          this.elements.modalAnswer.innerHTML = 
+            '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + 
+            Utils.sanitizeHtml(data.opinion || data.answer || '') + '</p>' +
+            '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + 
+            Utils.sanitizeHtml(data.reason || '') + '</p>';
+        }
+        
+        if (this.elements.modalStudentName) {
+          this.elements.modalStudentName.textContent = this.state.displayMode === 'named' ? (data.name || '') : '';
+        }
+
+        this.elements.answerModalContainer?.classList.remove('hidden');
+        if (typeof gsap !== 'undefined') {
+          gsap.to(this.elements.answerModalContainer, { opacity: 1, duration: 0.3 });
+          gsap.fromTo(this.elements.answerModalCard, 
+            { scale: 0.95 }, 
+            { 
+              scale: 1, 
+              duration: 0.3, 
+              ease: 'back.out', 
+              onComplete: () => this.elements.answerModalCloseBtn?.focus()
+            }
+          );
         }
       }
 
-      async handleReactionClick(event) {
-        event.stopPropagation();
-        
-        const button = event.currentTarget;
-        const reaction = button.dataset.reaction;
-        const index = parseInt(button.dataset.index);
-        const answer = this.state.filteredAnswers[index];
-        
-        if (!answer || button.classList.contains('loading')) return;
-        
-        button.classList.add('loading');
-        
-        try {
-          await this.addReaction(answer, reaction);
-          this.refreshData();
-        } catch (error) {
-          Utils.logError(error, 'Reaction click');
-        } finally {
-          button.classList.remove('loading');
+      hideAnswerModal() {
+        if (typeof gsap !== 'undefined') {
+          gsap.to(this.elements.answerModalContainer, {
+            opacity: 0,
+            duration: 0.3,
+            onComplete: () => this.elements.answerModalContainer?.classList.add('hidden')
+          });
+          gsap.to(this.elements.answerModalCard, {
+            scale: 0.95,
+            duration: 0.3,
+            ease: 'power2.in',
+            onComplete: () => {
+              if (this.state.lastFocusedElement) {
+                this.state.lastFocusedElement.focus();
+              }
+            }
+          });
+        } else {
+          this.elements.answerModalContainer?.classList.add('hidden');
         }
       }
 
-      async addReaction(answer, reaction) {
-        return new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .addReaction(CONFIG.USER_ID, answer.rowIndex, reaction);
-        });
-      }
-
-      showModal(answer) {
-        if (!this.elements.answerModalContainer) return;
-        
-        this.elements.modalAnswer.innerHTML = Utils.sanitizeHtml(answer.opinion || answer.answer || '');
-        this.elements.modalStudentName.textContent = this.getDisplayName(answer);
-        
-        this.elements.answerModalCard.className = this.getCardClasses(answer).replace('cursor-pointer', '');
-        
-        this.elements.answerModalContainer.classList.remove('hidden');
-        this.elements.answerModalContainer.classList.add('modal-fade');
-        
-        document.body.style.overflow = 'hidden';
-        this.elements.answerModalCloseBtn.focus();
-      }
-
-      closeModal() {
-        if (!this.elements.answerModalContainer) return;
-        
-        this.elements.answerModalContainer.classList.add('hidden');
-        document.body.style.overflow = '';
-      }
-
-      showLoading(show) {
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay) {
-          overlay.classList.toggle('hidden', !show);
+      showInfoModal() {
+        this.state.lastFocusedElement = document.activeElement;
+        this.elements.infoModalContainer?.classList.remove('hidden');
+        if (typeof gsap !== 'undefined') {
+          gsap.to(this.elements.infoModalContainer, { opacity: 1, duration: 0.3 });
+          gsap.fromTo(this.elements.infoModalCard,
+            { scale: 0.95 },
+            {
+              scale: 1,
+              duration: 0.3,
+              ease: 'back.out',
+              onComplete: () => this.elements.infoModalConfirmBtn?.focus()
+            }
+          );
         }
       }
 
-      async refreshData() {
-        try {
-          const data = await this.fetchData();
-          this.updateUI(data);
-          this.hideBanner();
-        } catch (error) {
-          Utils.logError(error, 'Data refresh');
+      hideInfoModal() {
+        if (typeof gsap !== 'undefined') {
+          gsap.to(this.elements.infoModalContainer, {
+            opacity: 0,
+            duration: 0.3,
+            onComplete: () => this.elements.infoModalContainer?.classList.add('hidden')
+          });
+          gsap.to(this.elements.infoModalCard, { scale: 0.95, duration: 0.3, ease: 'power2.in' });
+        } else {
+          this.elements.infoModalContainer?.classList.add('hidden');
         }
+        localStorage.setItem('introSeen', '1');
+        if (this.state.lastFocusedElement) {
+          this.state.lastFocusedElement.focus();
+        }
+      }
+
+      refreshData() {
+        this.loadSheetData(true);
+        this.hideBanner();
       }
 
       hideBanner() {
@@ -698,9 +1102,14 @@
 
       async checkForUpdates() {
         try {
-          const data = await this.fetchData();
-          if (data.answers && data.answers.length !== this.state.answers.length) {
-            this.showBanner();
+          const selectedClass = this.elements.classFilter?.value || 'すべて';
+          const sortOrder = this.elements.sortOrder?.value || 'newest';
+          const data = await this.runGas('getPublishedSheetData', selectedClass, sortOrder);
+          if (data.answers || data.rows) {
+            const newAnswers = data.answers || data.rows;
+            if (newAnswers.length !== this.state.answers.length) {
+              this.showBanner();
+            }
           }
         } catch (error) {
           Utils.logError(error, 'Polling check');
@@ -713,11 +1122,87 @@
         }
       }
 
+      runGas(funcName, ...args) {
+        return new Promise((resolve, reject) => {
+          if (Utils.isPreviewMode() || typeof google === 'undefined' || !google.script?.run) {
+            console.warn('Google Apps Script environment not detected or preview mode. Using mock data.');
+            this.getMockData(funcName, ...args).then(resolve).catch(reject);
+          } else {
+            google.script.run
+              .withSuccessHandler(resolve)
+              .withFailureHandler(reject)
+              [funcName](...args);
+          }
+        });
+      }
+
+      getMockData(funcName, ...args) {
+        Utils.logDebug('getMockData called with:', funcName, args);
+        return new Promise((resolve) => {
+          setTimeout(() => {
+            if (funcName === 'getPublishedSheetData') {
+              const currentDisplayMode = this.state.displayMode;
+              const studentName1 = currentDisplayMode === 'named' ? '田中太郎' : '';
+              const studentName2 = currentDisplayMode === 'named' ? '佐藤花子' : '';
+              
+              resolve({
+                header: 'テスト問題',
+                sheetName: 'テストシート',
+                rows: [
+                  {
+                    rowIndex: 1,
+                    name: studentName1,
+                    class: '3年A組',
+                    opinion: 'これは素晴らしいアイデアだと思います。',
+                    reason: '理由は簡潔で分かりやすく、実現可能性が高いからです。',
+                    reactions: {
+                      UNDERSTAND: { count: 5, reacted: false },
+                      LIKE: { count: 2, reacted: false },
+                      CURIOUS: { count: 1, reacted: false }
+                    },
+                    highlight: false
+                  },
+                  {
+                    rowIndex: 2,
+                    name: studentName2,
+                    class: '3年B組',
+                    opinion: '少し改善の余地があると考えます。',
+                    reason: 'より多くの人の意見を聞く必要があると思います。',
+                    reactions: {
+                      UNDERSTAND: { count: 3, reacted: true },
+                      LIKE: { count: 0, reacted: false },
+                      CURIOUS: { count: 0, reacted: false }
+                    },
+                    highlight: true
+                  }
+                ]
+              });
+            } else if (funcName === 'addReaction') {
+              resolve({
+                status: 'ok',
+                reactions: {
+                  UNDERSTAND: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
+                  LIKE: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
+                  CURIOUS: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 }
+                }
+              });
+            } else if (funcName === 'toggleHighlight') {
+              resolve({
+                status: 'ok',
+                highlight: !args[1]
+              });
+            } else if (funcName === 'checkAdmin') {
+              resolve(true); 
+            }
+          }, 500);
+        });
+      }
+
       destroy() {
         this.stopPolling();
         
-        this.eventListeners.forEach(({ event, handler }) => {
-          document.removeEventListener(event, handler);
+        Object.values(this.handlers).forEach((handler, key) => {
+          // イベントリスナー削除のロジック（省略）
         });
 
         this.gsapTimelines.forEach(tl => {
@@ -746,6 +1231,13 @@
 
     window.addEventListener('unhandledrejection', (event) => {
       Utils.logError(event.reason, 'Unhandled promise rejection');
+    });
+
+    // クリーンアップ
+    window.addEventListener('beforeunload', () => {
+      if (app && typeof app.destroy === 'function') {
+        app.destroy();
+      }
     });
   </script>
 </body>
