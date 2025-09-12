@@ -467,4 +467,55 @@ function addServiceAccountToSpreadsheet(spreadsheetId) {
   }
 }
 
+/**
+ * バッチでSheets APIを使用してスプレッドシートデータを更新（複数範囲対応）
+ * @param {Object} service - Sheets API service object
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {Array} updateData - 更新データ配列 [{range, values}, ...]
+ * @returns {Object} API レスポンス
+ */
+function batchUpdateSheetsData(service, spreadsheetId, updateData) {
+  try {
+    if (!updateData || !Array.isArray(updateData) || updateData.length === 0) {
+      throw new Error('更新データが無効です');
+    }
+
+    console.log('batchUpdateSheetsData: バッチ更新開始', {
+      spreadsheetId: `${spreadsheetId.substring(0, 10)}...`,
+      updateCount: updateData.length
+    });
+
+    // 既存のupdateSheetsData関数を使用してバッチ処理
+    const results = [];
+    for (const update of updateData) {
+      if (!update.range || !update.values) {
+        console.warn('batchUpdateSheetsData: 無効な更新データをスキップ', update);
+        continue;
+      }
+      
+      const result = updateSheetsData(service, spreadsheetId, update.range, update.values);
+      results.push(result);
+    }
+
+    console.log('batchUpdateSheetsData: バッチ更新完了', {
+      successCount: results.length,
+      totalRequested: updateData.length
+    });
+
+    return {
+      status: 'success',
+      updateCount: results.length,
+      results: results
+    };
+
+  } catch (error) {
+    console.error('batchUpdateSheetsData: エラー', {
+      spreadsheetId: `${spreadsheetId.substring(0, 10)}...`,
+      error: error.message,
+      updateDataCount: updateData?.length || 0
+    });
+    throw new Error(`バッチ更新エラー: ${error.message}`);
+  }
+}
+
 console.log('🔐 簡略化されたセキュリティシステムが初期化されました');
