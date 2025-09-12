@@ -372,6 +372,35 @@ function updateSheetsData(service, spreadsheetId, range, values) {
       throw new Error('Service Account Sheets APIが利用できません');
     }
   } catch (error) {
+    // 403 Permission Denied エラーの場合、自動でService Account共有を実行
+    if (error.message && error.message.includes('"code": 403') && error.message.includes('permission')) {
+      console.warn('🔧 updateSheetsData: 403権限エラー検出 - Service Account自動共有を実行');
+      
+      try {
+        // Service Accountをスプレッドシートに自動追加
+        shareSpreadsheetWithServiceAccount(spreadsheetId);
+        console.log('✅ Service Account自動共有完了 - API再試行します');
+        
+        // 少し待機してから再試行
+        Utilities.sleep(1000);
+        
+        // API再試行 (1回のみ)
+        const retryResponse = service.spreadsheets.values.update({
+          spreadsheetId,
+          range,
+          valueInputOption: 'RAW',
+          values,
+        });
+        
+        console.log('✅ updateSheetsData: Service Account自動復旧成功');
+        return retryResponse;
+        
+      } catch (recoveryError) {
+        console.error('❌ Service Account自動復旧失敗:', recoveryError.message);
+        // 復旧失敗の場合は元のエラーを投げる
+      }
+    }
+    
     console.error('❌ updateSheetsData Service Account呼び出しエラー:', error.message);
     throw error;
   }
@@ -410,6 +439,33 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
       throw new Error('Service Account Sheets APIが利用できません');
     }
   } catch (error) {
+    // 403 Permission Denied エラーの場合、自動でService Account共有を実行
+    if (error.message && error.message.includes('"code": 403') && error.message.includes('permission')) {
+      console.warn('🔧 batchGetSheetsData: 403権限エラー検出 - Service Account自動共有を実行');
+      
+      try {
+        // Service Accountをスプレッドシートに自動追加
+        shareSpreadsheetWithServiceAccount(spreadsheetId);
+        console.log('✅ Service Account自動共有完了 - API再試行します');
+        
+        // 少し待機してから再試行
+        Utilities.sleep(2000);
+        
+        // API再試行
+        const retryResponse = service.spreadsheets.values.batchGet({
+          spreadsheetId,
+          ranges,
+        });
+        
+        console.log('✅ batchGetSheetsData: Service Account自動復旧成功');
+        return retryResponse;
+        
+      } catch (recoveryError) {
+        console.error('❌ Service Account自動復旧失敗:', recoveryError.message);
+        // 復旧失敗の場合は元のエラーを投げる
+      }
+    }
+    
     console.error('❌ batchGetSheetsData Service Account呼び出しエラー:', error.message);
     throw error;
   }
@@ -509,6 +565,40 @@ function batchUpdateSheetsData(service, spreadsheetId, updateData) {
     };
 
   } catch (error) {
+    // 403 Permission Denied エラーの場合、自動でService Account共有を実行
+    if (error.message && error.message.includes('"code": 403') && error.message.includes('permission')) {
+      console.warn('🔧 batchUpdateSheetsData: 403権限エラー検出 - Service Account自動共有を実行');
+      
+      try {
+        // Service Accountをスプレッドシートに自動追加
+        shareSpreadsheetWithServiceAccount(spreadsheetId);
+        console.log('✅ Service Account自動共有完了 - API再試行します');
+        
+        // 少し待機してから再試行
+        Utilities.sleep(2000);
+        
+        // API再試行 - 既存のupdateSheetsData関数を再実行
+        const retryResults = [];
+        for (const update of updateData) {
+          if (!update.range || !update.values) continue;
+          const result = updateSheetsData(service, spreadsheetId, update.range, update.values);
+          retryResults.push(result);
+        }
+        
+        console.log('✅ batchUpdateSheetsData: Service Account自動復旧成功');
+        return {
+          status: 'success',
+          updateCount: retryResults.length,
+          results: retryResults,
+          recovered: true
+        };
+        
+      } catch (recoveryError) {
+        console.error('❌ Service Account自動復旧失敗:', recoveryError.message);
+        // 復旧失敗の場合は元のエラーを投げる
+      }
+    }
+    
     console.error('batchUpdateSheetsData: エラー', {
       spreadsheetId: `${spreadsheetId.substring(0, 10)}...`,
       error: error.message,
