@@ -28,11 +28,11 @@
       <div class="flex items-center justify-between gap-4 py-2">
         <div class="flex items-center gap-3">
           <div id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0">
-            <span class="w-4 h-4 text-blue-400">👥</span>
+            <span class="w-4 h-4 text-blue-400"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
             <span id="answerCountText">0件</span>
           </div>
           <a id="formAnswerBtn" href="#" target="_blank" rel="noopener noreferrer" class="text-xs bg-green-600 hover:bg-green-700 text-white font-medium px-3 py-1.5 rounded-md whitespace-nowrap transition-all flex items-center gap-1.5 shadow-sm no-underline" aria-label="フォームで回答" role="button">
-            <span class="w-3 h-3">✏️</span>
+            <span class="w-3 h-3"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 2 4 4"/><path d="m17.5 6.5-1 1"/><path d="m-2 22 1.5-1.5a2.828 2.828 0 0 1 4 0l.5.5-2 2Z"/><path d="M8.5 8.5 12 12"/><path d="m13 7 4 4-6 6H7v-4Z"/></svg></span>
             フォームで回答
           </a>
           <div class="flex items-center gap-2">
@@ -52,14 +52,14 @@
         <div class="flex-1 flex justify-center"></div>
         <div class="flex items-center gap-2">
           <div id="boardOwnerDisplay" class="text-xs text-gray-500 bg-gray-800/40 backdrop-blur-sm px-2.5 py-1 rounded-md flex items-center gap-1.5">
-            <span class="w-3 h-3">👤</span>
+            <span class="w-3 h-3"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span>
             <span>ID: <?= userInfo.userId ? userInfo.userId.substring(0,8) + '...' : 'ID_NOT_SET' ?></span>
           </div>
           <button type="button" id="adminToggleBtn" class="admin-toggle text-gray-400 hover:text-cyan-400 transition-all p-1.5 rounded-md hover:bg-gray-800/50 hidden" aria-label="管理者モード切り替え">
-            <span class="w-3 h-3">⚙️</span>
+            <span class="w-3 h-3"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg></span>
           </button>
           <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600/80 hover:bg-orange-600 text-white px-3 py-1.5 rounded-md hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
-            <span class="w-3 h-3">🚫</span>
+            <span class="w-3 h-3"><svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg></span>
             公開終了
           </button>
         </div>
@@ -67,7 +67,7 @@
       <div class="border-t border-transparent pt-4">
         <div class="flex justify-center">
           <div id="headingLabel" class="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold text-pink-400 leading-tight flex justify-center items-center min-h-[2rem] text-center max-w-4xl line-clamp-2">
-            <span class="w-5 h-5 md:w-6 md:h-6 animate-spin">🔄</span>
+            <span class="w-5 h-5 md:w-6 md:h-6 animate-spin"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg></span>
             <span class="animate-pulse ml-2">問題文を読み込み中...</span>
           </div>
         </div>
@@ -82,7 +82,7 @@
       <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更" />
       <div class="flex items-center gap-1">
         <span id="sliderValue" class="font-bold text-lg">4</span>
-        <span id="iconGrid" class="w-4 h-4 flex items-center justify-center">⊞</span>
+        <span id="iconGrid" class="w-4 h-4 flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg></span>
       </div>
     </div>
   </footer>
@@ -100,6 +100,27 @@
       DYNAMIC_URL_CACHE: true,
       BATCH_JSON_OPERATIONS: true
     });
+
+    // SVGアイコンの定義
+    const ICONS = {
+      'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+      'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
+      'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+      'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z M6.5 10v12h1V10h-1z"/></svg>',
+      'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
+      'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+      'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+      'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+      'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+      'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
+      'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+      'user': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>',
+      'edit': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 2 4 4"/><path d="m17.5 6.5-1 1"/><path d="m-2 22 1.5-1.5a2.828 2.828 0 0 1 4 0l.5.5-2 2Z"/><path d="M8.5 8.5 12 12"/><path d="m13 7 4 4-6 6H7v-4Z"/></svg>',
+      'settings': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2Z"/><circle cx="12" cy="12" r="3"/></svg>',
+      'loader': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>',
+      'stop': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>'
+    };
 
     // 🚀 統一データソース設計（CLAUDE.md準拠）
     const App = {
@@ -360,7 +381,7 @@
         
         // ハイライトバッジ
         const highlightBadge = answer.highlighted ? 
-          '<div class="highlight-badge">⭐</div>' : '';
+          '<div class="highlight-badge">' + self.getIcon('star', 'w-6 h-6') + '</div>' : '';
         
         // 回答プレビュー
         const answerPreview = self.sanitizeHtml(answer.opinion || answer.answer || '');
@@ -388,12 +409,12 @@
         return card;
       };
       
-      // 🎭 リアクションボタン作成（CSS/絵文字統一）
+      // 🎭 リアクションボタン作成（SVGアイコン統一）
       self.createReactionButtons = function(answer) {
         const reactionTypes = [
-          { key: 'LIKE', icon: '❤️', color: 'text-red-400', label: 'いいね' },
-          { key: 'UNDERSTAND', icon: '💡', color: 'text-yellow-400', label: 'なるほど' },
-          { key: 'CURIOUS', icon: '🤔', color: 'text-green-400', label: 'もっと知りたい' }
+          { key: 'LIKE', iconName: 'hand-thumb-up-outline', iconActive: 'hand-thumb-up-solid', color: 'text-red-400', label: 'いいね' },
+          { key: 'UNDERSTAND', iconName: 'lightbulb-outline', iconActive: 'lightbulb-solid', color: 'text-yellow-400', label: 'なるほど' },
+          { key: 'CURIOUS', iconName: 'magnifying-glass-plus-outline', iconActive: 'magnifying-glass-plus-solid', color: 'text-green-400', label: 'もっと知りたい' }
         ];
         
         return reactionTypes.map(function(type) {
@@ -403,13 +424,14 @@
           
           const activeClass = isActive ? 'reacted bg-opacity-20' : '';
           const hoverClass = 'hover:bg-opacity-10 hover:scale-110';
+          const iconName = isActive ? type.iconActive : type.iconName;
           
           return '<button type="button" class="reaction-btn inline-flex items-center justify-center w-8 h-8 rounded-full transition-all ' + 
                  type.color + ' ' + activeClass + ' ' + hoverClass + 
                  '" data-reaction="' + type.key + 
                  '" data-row-index="' + answer.rowIndex + 
                  '" aria-label="' + type.label + '" title="' + type.label + '">' + 
-                 '<span class="text-lg" role="img" aria-hidden="true">' + type.icon + '</span>' +
+                 self.getIcon(iconName, 'w-5 h-5') +
                  '</button>';
         }).join('');
       };
@@ -446,6 +468,13 @@
         const div = document.createElement('div');
         div.textContent = str;
         return div.innerHTML;
+      };
+      
+      // 🎨 アイコン取得関数
+      self.getIcon = function(name, classes) {
+        classes = classes || '';
+        const svgContent = ICONS[name] || ICONS['star'];
+        return '<span class="inline-flex items-center justify-center ' + classes + '">' + svgContent + '</span>';
       };
       
       // 📡 GAS関数呼び出し（バックエンドチェック機能対応）
