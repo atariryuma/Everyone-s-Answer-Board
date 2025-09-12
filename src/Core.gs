@@ -593,8 +593,10 @@ function executeAddReaction(requestUserId, rowIndex, reactionKey, sheetName) {
       throw new Error('無効なボードです。');
     }
 
+    // ✅ configJSON中心型アーキテクチャに修正
+    const config = JSON.parse(boardOwnerInfo.configJson);
     const result = processReaction(
-      boardOwnerInfo.spreadsheetId,
+      config.spreadsheetId,
       sheetName,
       rowIndex,
       reactionKey,
@@ -605,7 +607,7 @@ function executeAddReaction(requestUserId, rowIndex, reactionKey, sheetName) {
     if (result && result.status === 'success') {
       // 更新後のリアクション情報を取得
       const updatedReactions = getRowReactions(
-        boardOwnerInfo.spreadsheetId,
+        config.spreadsheetId,
         sheetName,
         rowIndex,
         reactingUserEmail
