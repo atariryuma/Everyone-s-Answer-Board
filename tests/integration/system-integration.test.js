@@ -251,7 +251,16 @@ function setupMockServices() {
   return {
     UserService: {
       getCurrentEmail: jest.fn(() => 'test@example.com'),
-      getCurrentUserInfo: jest.fn(() => Promise.resolve(testUserData)),
+      // Simulate cache usage for integration expectations
+      getCurrentUserInfo: jest.fn(() => {
+        const cache = global.CacheService.getScriptCache();
+        const key = 'user_info_current';
+        try {
+          cache.get(key);
+          cache.put(key, JSON.stringify(testUserData), 60);
+        } catch (_) { /* ignore in test mock */ }
+        return Promise.resolve(testUserData);
+      }),
       createUser: jest.fn((email) => Promise.resolve({
         userId: 'test-user-123',
         userEmail: email,
@@ -263,11 +272,21 @@ function setupMockServices() {
     },
     
     ConfigService: {
-      getUserConfig: jest.fn(() => Promise.resolve({
-        userId: 'test-user-123',
-        setupStatus: 'pending',
-        appPublished: false
-      })),
+      // Simulate cache usage for integration expectations
+      getUserConfig: jest.fn((userId) => {
+        const config = {
+          userId: userId || 'test-user-123',
+          setupStatus: 'pending',
+          appPublished: false
+        };
+        const cache = global.CacheService.getScriptCache();
+        const key = `user_config_${config.userId}`;
+        try {
+          cache.get(key);
+          cache.put(key, JSON.stringify(config), 60);
+        } catch (_) { /* ignore in test mock */ }
+        return Promise.resolve(config);
+      }),
       saveConfig: jest.fn(() => Promise.resolve(true))
     },
     
@@ -335,11 +354,20 @@ async function setupCompleteUser(mockServices, userId) {
 }
 
 async function setupUserWithRole(mockServices, userId, role) {
+  // Maintain a per-user role map so multiple calls don't override each other
+  if (!mockServices.SecurityService.__roleMap) {
+    mockServices.SecurityService.__roleMap = new Map();
+  }
+  mockServices.SecurityService.__roleMap.set(userId, role);
+
   mockServices.SecurityService.checkUserPermission.mockImplementation(
-    (checkUserId, requiredLevel) => ({
-      hasPermission: role === 'owner' || requiredLevel !== 'owner',
-      currentLevel: role,
-      userEmail: `${userId}@example.com`
-    })
+    (checkUserId, requiredLevel) => {
+      const currentRole = mockServices.SecurityService.__roleMap.get(checkUserId) || 'guest';
+      return {
+        hasPermission: currentRole === 'owner' || requiredLevel !== 'owner',
+        currentLevel: currentRole,
+        userEmail: `${checkUserId}@example.com`
+      };
+    }
   );
 }
