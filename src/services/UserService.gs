@@ -13,7 +13,7 @@
  * - auth.gsの一部機能
  */
 
-/* global AppCacheService, DB, PROPS_KEYS, SecurityService, DataFormatter, CONSTANTS, URL */
+/* global CacheService, DB, PROPS_KEYS, SecurityService, DataFormatter, CONSTANTS, URL */
 
 /**
  * UserService - 統一ユーザー管理サービス
@@ -88,7 +88,7 @@ const UserService = Object.freeze({
     
     try {
       // 統一キャッシュサービスから取得試行
-      const cached = AppCacheService.get(cacheKey);
+      const cached = CacheService.get(cacheKey);
       if (cached) {
         return cached;
       }
@@ -110,7 +110,7 @@ const UserService = Object.freeze({
       const completeUserInfo = this.enrichUserInfo(userInfo);
 
       // 統一キャッシュサービスでキャッシュ保存
-      AppCacheService.set(cacheKey, completeUserInfo, AppCacheService.TTL.MEDIUM);
+      CacheService.set(cacheKey, completeUserInfo, 300); // 5分キャッシュ
 
       return completeUserInfo;
     } catch (error) {
@@ -374,8 +374,8 @@ const UserService = Object.freeze({
    * @param {string} userId - ユーザーID（オプション、未指定時は全体）
    */
   clearUserCache(userId = null) {
-    // AppCacheServiceに統一委譲
-    return AppCacheService.invalidateUserCache(userId);
+    // CacheServiceに統一委譲
+    return CacheService.invalidateUserCache(userId);
   },
 
   /**

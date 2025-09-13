@@ -497,7 +497,7 @@
           .withFailureHandler((error) => {
             showMessage(`ステータス取得エラー: ${error.message || error}`, 'error');
           })
-          .SystemController.getApplicationStatusForUI();
+          .getApplicationStatusForUI();
       }
 
       // ステータス表示を更新
@@ -657,7 +657,7 @@
             showMessage(`エラー: ${error.message || error}`, 'error');
             loadingDiv.classList.add('hidden');
           })
-          .SystemController.getAllUsersForAdminForUI(__USER_ID__);
+          .getAllUsersForAdminForUI(__USER_ID__);
       }
 
       // ユーザー一覧をテーブルに表示
@@ -760,7 +760,7 @@
             confirmBtn.disabled = false;
             confirmBtn.textContent = '削除実行';
           })
-          .SystemController.deleteUserAccountByAdminForUI(userToDelete.userId, reason);
+          .deleteUserAccountByAdminForUI(userToDelete.userId, reason);
       }
 
       // 削除ログを表示

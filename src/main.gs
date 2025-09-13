@@ -697,3 +697,97 @@ function createErrorResponse(message, details) {
     return { success: false, error: message };
   }
 }
+
+// ===========================================
+// 🌐 Controller Global Function Exports
+// Required for google.script.run.Controller.method() calls
+// ===========================================
+
+/**
+ * Frontend Controller Global Functions
+ * Required for HTML google.script.run calls
+ */
+function getUser(kind) {
+  return FrontendController.getUser(kind);
+}
+
+function processLoginAction() {
+  return FrontendController.processLoginAction();
+}
+
+/**
+ * System Controller Global Functions
+ */
+function getSystemDomainInfo() {
+  return SystemController.getSystemDomainInfo();
+}
+
+function forceUrlSystemReset() {
+  return SystemController.forceUrlSystemReset();
+}
+
+function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
+  return SystemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
+}
+
+function testSetup() {
+  return SystemController.testSetup();
+}
+
+function getApplicationStatusForUI() {
+  return SystemController.getApplicationStatusForUI();
+}
+
+function getAllUsersForAdminForUI(userId) {
+  return SystemController.getAllUsersForAdminForUI(userId);
+}
+
+function deleteUserAccountByAdminForUI(userId, reason) {
+  return SystemController.deleteUserAccountByAdminForUI(userId, reason);
+}
+
+function getWebAppUrl() {
+  return SystemController.getWebAppUrl();
+}
+
+function reportClientError(errorInfo) {
+  return SystemController.reportClientError(errorInfo);
+}
+
+/**
+ * Admin Controller Global Functions
+ */
+function getConfig() {
+  return AdminController.getConfig();
+}
+
+function getSpreadsheetList() {
+  return AdminController.getSpreadsheetList();
+}
+
+function analyzeColumns(spreadsheetId, sheetName) {
+  return AdminController.analyzeColumns(spreadsheetId, sheetName);
+}
+
+function publishApplication(publishConfig) {
+  return AdminController.publishApplication(publishConfig);
+}
+
+function saveDraftConfiguration(draftConfig) {
+  return AdminController.saveDraftConfiguration(draftConfig);
+}
+
+/**
+ * Data Controller Global Functions
+ */
+function addReaction(userId, rowId, reactionType) {
+  return DataController.addReaction(userId, rowId, reactionType);
+}
+
+function toggleHighlight(userId, rowId) {
+  return DataController.toggleHighlight(userId, rowId);
+}
+
+function refreshBoardData(userId) {
+  return DataController.refreshBoardData(userId);
+}

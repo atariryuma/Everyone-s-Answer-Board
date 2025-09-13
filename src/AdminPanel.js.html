@@ -487,7 +487,7 @@
 
           reject(new Error(detailedMessage));
         })
-        .AdminController.getSpreadsheetList();
+        .getSpreadsheetList();
     });
   }
 
@@ -521,7 +521,7 @@
           document.getElementById('current-user-email').textContent = 'エラー';
           reject(new Error('メールアドレス取得に失敗しました: ' + error.message));
         })
-        .FrontendController.getUser('email');
+        .getUser('email');
     });
   }
 
@@ -551,7 +551,7 @@
   // 設定データ取得（シンプル版）
   function getConfigAsync() {
     return new Promise((resolve, reject) => {
-      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).AdminController.getConfig();
+      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getConfig();
     });
   }
 
@@ -851,7 +851,7 @@
           select.innerHTML = '<option value="">読み込みエラー</option>';
           reject(new Error('シートの読み込みに失敗しました: ' + error.message));
         })
-        .AdminController.getSheetList(spreadsheetId);
+        .getSheetList(spreadsheetId);
     });
   }
 
@@ -860,7 +860,7 @@
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler(reject)
-        .AdminController.analyzeColumns(spreadsheetId, sheetName);
+        .analyzeColumns(spreadsheetId, sheetName);
     });
   }
 
@@ -1069,7 +1069,7 @@
         });
         hideFormInfo();
       })
-      .AdminController.getFormInfo(spreadsheetId, sheetName);
+      .getFormInfo(spreadsheetId, sheetName);
   }
 
   // 設定エクスポート
@@ -1091,7 +1091,7 @@
         console.error('エクスポートエラー:', error);
         showError('設定のエクスポートに失敗しました');
       })
-      .AdminController.getConfig();
+      .getConfig();
   }
 
   // システム管理者アクセス確認
@@ -1116,7 +1116,7 @@
           appSetupBtn.style.display = 'none';
         }
       })
-      .AdminController.checkIsSystemAdmin();
+      .checkIsSystemAdmin();
   }
 
   // フォーム作成インターフェース
@@ -1198,7 +1198,7 @@
         showError('アプリ設定画面への移動に失敗しました');
         setPartialLoading(false);
       })
-      .SystemController.getWebAppUrl();
+      .getWebAppUrl();
   }
 
   // データソース選択方式の切り替え
@@ -1258,7 +1258,7 @@
         console.error('URL検証エラー:', error);
         showError('URL検証に失敗しました: ' + error.message);
       })
-      .AdminController.validateAccess(spreadsheetId);
+      .validateAccess(spreadsheetId);
   }
 
   // シート名候補を更新
@@ -1337,7 +1337,7 @@
         showError('スプレッドシートへの接続に失敗しました: ' + error.message);
         setPartialLoading(false);
       })
-      .AdminController.analyzeColumns(spreadsheetId, sheetName);
+      .analyzeColumns(spreadsheetId, sheetName);
   }
 
   // イベントリスナー設定
@@ -1450,7 +1450,7 @@
         setPartialLoading(false);
         showError(`シート一覧の読み込みに失敗しました: ${error.message || error}`);
       })
-      .AdminController.getSheetList(spreadsheetId);
+      .getSheetList(spreadsheetId);
   }
 
   // データソース接続
@@ -1509,7 +1509,7 @@
         setLoading(false);
         RequestGate.exit('connectToSource');
       })
-      .DataController.connectDataSource(spreadsheetId, sheetName);
+      .connectDataSource(spreadsheetId, sheetName);
   }
 
   // 接続エラーハンドリング
@@ -2068,7 +2068,7 @@
       .withFailureHandler(function (error) {
         console.error('列設定保存エラー:', error);
       })
-      .AdminController.saveDraftConfiguration(config);
+      .saveDraftConfiguration(config);
   }
 
   // 下書き保存
@@ -2097,7 +2097,7 @@
         setLoading(false);
         RequestGate.exit('saveDraft');
       })
-      .AdminController.saveDraftConfiguration(config);
+      .saveDraftConfiguration(config);
   }
 
   // アプリ公開（appName削除版）
@@ -2171,14 +2171,14 @@
             setLoading(false);
             RequestGate.exit('publishApp');
           })
-          .AdminController.publishApplication(publishConfig);
+          .publishApplication(publishConfig);
       })
       .withFailureHandler(function (error) {
         showError('現在の設定の取得に失敗しました: ' + error.message);
         setLoading(false);
         RequestGate.exit('publishApp');
       })
-      .AdminController.getConfig(); // 現在の完全な設定を先に取得
+      .getConfig(); // 現在の完全な設定を先に取得
   }
 
   // 設定収集（ドロップダウン式対応）
@@ -2390,7 +2390,7 @@
           error: error.message,
         });
       })
-      .AdminController.getCurrentBoardInfoAndUrls();
+      .getCurrentBoardInfoAndUrls();
   }
 
   // フッター表示更新
@@ -2528,7 +2528,7 @@
       .withFailureHandler(function (error) {
         showError('回答ボードを開けませんでした: ' + error.message);
       })
-      .AdminController.getCurrentBoardInfoAndUrls();
+      .getCurrentBoardInfoAndUrls();
   }
 
   // アプリ設定画面を開く
