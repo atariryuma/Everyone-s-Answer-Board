@@ -1,55 +1,39 @@
 /**
- * Module-scoped Constants for main.gs
- * Core constants参照による軽量設計
+ * main.gs - Application Entry Points
+ * 新しいサービス層アーキテクチャに基づくエントリーポイント
+ * 
+ * 🎯 責任範囲:
+ * - HTTP requests routing (doGet/doPost)
+ * - User interface rendering
+ * - Service layer coordination
+ * - Error handling & user feedback
  */
-const MODULE_CONFIG = Object.freeze({
-  // キャッシュTTL設定（CORE.TIMEOUTS参照）
-  CACHE_TTL: CORE.TIMEOUTS.LONG,
-  QUICK_CACHE_TTL: CORE.TIMEOUTS.SHORT,
 
-  // ステータス定数（CORE.STATUS参照）
-  STATUS_ACTIVE: CORE.STATUS.ACTIVE,
-  STATUS_INACTIVE: CORE.STATUS.INACTIVE,
-});
-
-// UserManager - UnifiedManagerの後方互換ラッパー（段階的削除予定）
-const UserManager = {
+/**
+ * Application Configuration
+ * サービス層統合後の軽量設定
+ */
+const APP_CONFIG = Object.freeze({
+  // アプリケーション情報
+  APP_NAME: 'Everyone\'s Answer Board',
+  VERSION: '2.0.0',
   
-  getCurrentEmail() {
-    // UnifiedManagerに委譲（後方互換性）
-    return UnifiedManager.user.getCurrentEmail();
-  },
+  // ページモード
+  MODES: Object.freeze({
+    MAIN: 'main',
+    ADMIN: 'admin', 
+    LOGIN: 'login',
+    SETUP: 'setup',
+    DEBUG: 'debug'
+  }),
 
-  clearCache() {
-    // UnifiedManagerに委譲
-    UnifiedManager.clearCache();
-    console.log('UserManager: キャッシュクリア（UnifiedManager経由）');
-  },
-
-  // 統一ユーザー情報取得（UnifiedManager経由）
-  getCurrentUserInfo() {
-    try {
-      // UnifiedManagerを使用
-      const userInfo = UnifiedManager.user.getCurrentInfo();
-      if (!userInfo) return null;
-      
-      // 既存形式に変換（後方互換性）
-      return {
-        currentUserEmail: userInfo.userEmail,
-        userInfo
-      };
-    } catch (error) {
-      console.error('UserManager.getCurrentUserInfo:', error.message);
-      return null;
-    }
-  },
-
-  // 現在のユーザーメールアドレス取得（統一版）
-  getCurrentUserEmail() {
-    // UnifiedManagerに委譲
-    return UnifiedManager.user.getCurrentEmail();
-  },
-};
+  // デフォルト設定
+  DEFAULTS: Object.freeze({
+    CACHE_TTL: 300, // 5分
+    PAGE_SIZE: 50,
+    MAX_RETRIES: 3
+  })
+});
 
 // 廃止予定のUserオブジェクトを削除（UserManager.getCurrentEmail()を使用）
 
@@ -58,50 +42,360 @@ const UserManager = {
  * 新アーキテクチャにおけるエントリーポイント関数群
  */
 
+/**
+ * doGet - HTTP GET request handler
+ * 新しいサービス層アーキテクチャを使用
+ */
 function doGet(e) {
   try {
-    // App名前空間の初期化（必須）
-    App.init();
-
     // リクエストパラメータを解析
     const params = parseRequestParams(e);
-
-    if (!isSystemSetup()) {
+    
+    // セキュリティチェック：認証状態確認
+    const userEmail = UserService.getCurrentEmail();
+    if (!userEmail && params.mode !== APP_CONFIG.MODES.LOGIN && params.mode !== APP_CONFIG.MODES.SETUP) {
+      // 未認証の場合はログインページにリダイレクト
+      return handleLoginMode(params, { reason: 'authentication_required' });
+    }
+    
+    // アクセス権限検証（認証済みユーザーのみ）
+    if (userEmail) {
+      const accessResult = SecurityService.validateWebAppAccess(userEmail, params);
+      if (!accessResult.hasAccess) {
+        return renderErrorPage({
+          success: false,
+          message: 'アクセスが拒否されました',
+          details: accessResult.reason,
+          canRetry: false
+        });
+      }
+    }
+    
+    // システム初期化確認
+    if (!ConfigService.isSystemSetup()) {
       return renderSetupPage(params);
     }
 
     // モードに応じたルーティング
     switch (params.mode) {
-      case 'debug':
-        // 🔍 デバッグモード：現在のユーザー情報を表示
-        try {
-          const { currentUserEmail, userInfo: userByEmail } =
-            UserManager.getCurrentUserInfo();
-          const debugData = {
-            current_user_email: currentUserEmail,
-            user_exists_in_db: !!userByEmail,
-            user_data: userByEmail
-              ? {
-                  userId: userByEmail.userId,
-                  userEmail: userByEmail.userEmail,
-                  isActive: userByEmail.isActive,
-                  hasConfig: !!userByEmail.parsedConfig,
-                }
-              : null,
-            suggestion: !userByEmail
-              ? 'ユーザー登録が必要です。mode=loginでアクセスしてください。'
-              : 'データは正常です',
-          };
+      case APP_CONFIG.MODES.DEBUG:
+        return handleDebugMode(params);
+      
+      case APP_CONFIG.MODES.ADMIN:
+        return handleAdminMode(params);
+      
+      case APP_CONFIG.MODES.LOGIN:
+        return handleLoginMode(params);
+      
+      case APP_CONFIG.MODES.SETUP:
+        return handleSetupMode(params);
+      
+      default:
+        return handleMainMode(params);
+    }
+  } catch (error) {
+    // 統一エラーハンドリング使用
+    const errorResponse = ErrorHandler.handle(error, {
+      service: 'main',
+      method: 'doGet',
+      parameters: e?.parameter
+    });
+    
+    return renderErrorPage(errorResponse);
+  }
+}
 
+/**
+ * デバッグモード処理
+ * @param {Object} params - リクエストパラメータ
+ * @returns {HtmlOutput} デバッグページ
+ */
+function handleDebugMode(params) {
+  try {
+    // 新しいサービス層を使用してユーザー情報取得
+    const userInfo = UserService.getCurrentUserInfo();
+    const sessionStatus = UserService.getSessionStatus();
+    
+    const debugData = {
+      app: {
+        name: APP_CONFIG.APP_NAME,
+        version: APP_CONFIG.VERSION,
+        timestamp: new Date().toISOString()
+      },
+      session: sessionStatus,
+      user: userInfo ? {
+        userId: userInfo.userId,
+        userEmail: userInfo.userEmail,
+        isActive: userInfo.isActive,
+        hasConfig: !!userInfo.config,
+        configCompleteness: userInfo.config?.completionScore || 0
+      } : null,
+      services: {
+        user: UserService.diagnose(),
+        config: ConfigService.diagnose(),
+        data: DataService.diagnose(),
+        security: SecurityService.diagnose()
+      },
+      suggestion: !userInfo 
+        ? 'ユーザー登録が必要です。mode=loginでアクセスしてください。'
+        : 'システムは正常に動作しています'
+    };
+
+    return HtmlService.createHtmlOutput(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Debug - ${APP_CONFIG.APP_NAME}</title>
+        <style>
+          body { font-family: monospace; margin: 20px; background: #f5f5f5; }
+          .container { max-width: 1200px; margin: 0 auto; background: white; padding: 20px; border-radius: 8px; }
+          pre { background: #f8f8f8; padding: 15px; border-radius: 4px; overflow-x: auto; }
+          .status-ok { color: #28a745; }
+          .status-warning { color: #ffc107; }
+          .status-error { color: #dc3545; }
+          .nav { margin-bottom: 20px; }
+          .nav a { margin-right: 15px; text-decoration: none; color: #007bff; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <h2>🔍 ${APP_CONFIG.APP_NAME} - Debug Information</h2>
+          
+          <div class="nav">
+            ${userInfo ? `<a href="?mode=admin&userId=${userInfo.userId}">📊 管理パネル</a>` : ''}
+            <a href="?mode=main">🏠 メインページ</a>
+            <a href="?mode=setup">⚙️ セットアップ</a>
+          </div>
+          
+          <h3>📋 System Status</h3>
+          <pre>${JSON.stringify(debugData, null, 2)}</pre>
+          
+          <h3>💡 Recommendations</h3>
+          <p>${debugData.suggestion}</p>
+          
+          <hr>
+          <small>Generated at: ${new Date().toLocaleString('ja-JP')}</small>
+        </div>
+      </body>
+      </html>
+    `);
+  } catch (error) {
+    const errorResponse = ErrorHandler.handle(error, {
+      service: 'main',
+      method: 'handleDebugMode'
+    });
+    return renderErrorPage(errorResponse);
+  }
+}
+
+/**
+ * 管理モード処理
+ * @param {Object} params - リクエストパラメータ
+ * @returns {HtmlOutput} 管理ページ
+ */
+function handleAdminMode(params) {
+  try {
+    const userId = params.userId;
+    if (!userId) {
+      throw new Error('ユーザーIDが必要です');
+    }
+
+    // 権限確認
+    const permission = SecurityService.checkUserPermission(userId, 'owner');
+    if (!permission.hasPermission) {
+      return renderErrorPage({
+        success: false,
+        message: 'このページにアクセスする権限がありません',
+        canRetry: false
+      });
+    }
+
+    // バルクデータ取得
+    const bulkResult = DataService.getBulkData(userId, {
+      includeUserInfo: true,
+      includeConfig: true,
+      includeSheetData: true,
+      includeSystemInfo: true
+    });
+
+    if (!bulkResult.success) {
+      throw new Error(bulkResult.error);
+    }
+
+    // 既存のAdminPanel.htmlを使用（新しいデータ形式で）
+    const template = HtmlService.createTemplateFromFile('AdminPanel');
+    template.userData = bulkResult.data;
+    
+    return template.evaluate()
+      .setTitle(`管理パネル - ${APP_CONFIG.APP_NAME}`)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+  } catch (error) {
+    const errorResponse = ErrorHandler.handle(error, {
+      service: 'main',
+      method: 'handleAdminMode',
+      userId: params.userId
+    });
+    return renderErrorPage(errorResponse);
+  }
+}
+
+/**
+ * ログインモード処理
+ * @param {Object} params - リクエストパラメータ
+ * @returns {HtmlOutput} ログインページ
+ */
+function handleLoginMode(params) {
+  try {
+    // 現在のセッション状態確認
+    const sessionStatus = UserService.getSessionStatus();
+    
+    if (sessionStatus.isAuthenticated && sessionStatus.hasUserInfo) {
+      // 既にログイン済みの場合は管理パネルにリダイレクト
+      const userInfo = UserService.getCurrentUserInfo();
+      if (userInfo) {
+        return HtmlService.createHtmlOutput(`
+          <script>
+            window.location.href = '?mode=admin&userId=${userInfo.userId}';
+          </script>
+        `);
+      }
+    }
+
+    // 新規ユーザー作成処理
+    if (sessionStatus.isAuthenticated && !sessionStatus.hasUserInfo) {
+      try {
+        const newUser = UserService.createUser(sessionStatus.userEmail);
+        if (newUser) {
+          console.info('main.handleLoginMode: 新規ユーザー作成完了', {
+            userEmail: sessionStatus.userEmail,
+            userId: newUser.userId
+          });
+          
           return HtmlService.createHtmlOutput(`
-            <h2>Debug Info</h2>
-            <pre>${JSON.stringify(debugData, null, 2)}</pre>
-            ${userByEmail ? `<p><a href="?mode=admin&userId=${userByEmail.userId}">管理パネルにアクセス</a></p>` : ''}
-            ${
-              userByEmail && (!userByEmail.userEmail || !userByEmail.isActive)
-                ? `<p><strong>⚠️ データ不整合検出</strong></p>
-               <p><a href="?mode=fix_user&userId=${userByEmail.userId}" style="background:red;color:white;padding:10px;text-decoration:none;">🔧 ユーザーデータを修正</a></p>`
-                : ''
+            <script>
+              window.location.href = '?mode=admin&userId=${newUser.userId}';
+            </script>
+          `);
+        }
+      } catch (createError) {
+        console.error('main.handleLoginMode: ユーザー作成エラー', createError.message);
+      }
+    }
+
+    // LoginPage.htmlを使用
+    const template = HtmlService.createTemplateFromFile('LoginPage');
+    template.sessionStatus = sessionStatus;
+    
+    return template.evaluate()
+      .setTitle(`ログイン - ${APP_CONFIG.APP_NAME}`)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+  } catch (error) {
+    const errorResponse = ErrorHandler.handle(error, {
+      service: 'main',
+      method: 'handleLoginMode'
+    });
+    return renderErrorPage(errorResponse);
+  }
+}
+
+/**
+ * メインモード処理
+ * @param {Object} params - リクエストパラメータ
+ * @returns {HtmlOutput} メインページ
+ */
+function handleMainMode(params) {
+  try {
+    const userId = params.userId;
+    if (!userId) {
+      // ユーザーIDが無い場合はログインに誘導
+      return handleLoginMode(params);
+    }
+
+    // ユーザー設定取得
+    const config = ConfigService.getUserConfig(userId);
+    if (!config) {
+      throw new Error('ユーザー設定が見つかりません');
+    }
+
+    // アプリが公開されていない場合
+    if (!config.appPublished) {
+      return renderErrorPage({
+        success: false,
+        message: 'このアプリケーションは現在公開されていません',
+        canRetry: false
+      });
+    }
+
+    // メインデータ取得
+    const sheetResult = DataService.getSheetData(userId);
+    
+    // Page.htmlテンプレートを使用
+    const template = HtmlService.createTemplateFromFile('Page');
+    template.config = config;
+    template.sheetData = sheetResult.success ? sheetResult.data : [];
+    template.userId = userId;
+    
+    return template.evaluate()
+      .setTitle(config.title || APP_CONFIG.APP_NAME)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+
+  } catch (error) {
+    const errorResponse = ErrorHandler.handle(error, {
+      service: 'main', 
+      method: 'handleMainMode',
+      userId: params.userId
+    });
+    return renderErrorPage(errorResponse);
+  }
+}
+
+/**
+ * エラーページレンダリング
+ * @param {Object} errorResponse - エラーレスポンス
+ * @returns {HtmlOutput} エラーページ
+ */
+function renderErrorPage(errorResponse) {
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>エラー - ${APP_CONFIG.APP_NAME}</title>
+      <style>
+        body { font-family: sans-serif; margin: 40px; background: #f8f9fa; }
+        .error-container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .error-icon { font-size: 48px; text-align: center; margin-bottom: 20px; }
+        .error-message { font-size: 18px; margin-bottom: 20px; color: #dc3545; }
+        .error-details { background: #f8f9fa; padding: 15px; border-radius: 4px; font-family: monospace; font-size: 12px; color: #6c757d; }
+        .actions { margin-top: 20px; text-align: center; }
+        .btn { display: inline-block; padding: 10px 20px; margin: 0 5px; text-decoration: none; border-radius: 4px; }
+        .btn-primary { background: #007bff; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+      </style>
+    </head>
+    <body>
+      <div class="error-container">
+        <div class="error-icon">❌</div>
+        <h2>エラーが発生しました</h2>
+        <div class="error-message">${errorResponse.message}</div>
+        ${errorResponse.canRetry ? '<p>しばらく待ってから再試行してください。</p>' : ''}
+        <div class="error-details">
+          エラーID: ${errorResponse.errorId || 'unknown'}<br>
+          発生時刻: ${errorResponse.timestamp || new Date().toISOString()}
+        </div>
+        <div class="actions">
+          ${errorResponse.canRetry ? '<a href="#" onclick="location.reload()" class="btn btn-primary">再試行</a>' : ''}
+          <a href="?mode=debug" class="btn btn-secondary">システム状態確認</a>
+          <a href="?mode=login" class="btn btn-secondary">ログイン画面</a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+  
+  return HtmlService.createHtmlOutput(html)
+    .setTitle(`エラー - ${APP_CONFIG.APP_NAME}`);
             }
             <hr>
             <h3>🔧 GAS実行用関数</h3>
@@ -2054,4 +2348,297 @@ function repairCurrentUser() {
     console.error('❌ ユーザー修復エラー:', error.message);
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * doPost - HTTP POST request handler
+ * セキュアなPOST処理とAPI操作
+ */
+function doPost(e) {
+  try {
+    // 認証確認（必須）
+    const userEmail = UserService.getCurrentEmail();
+    if (!userEmail) {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: false,
+          message: '認証が必要です',
+          code: 'AUTHENTICATION_REQUIRED'
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // アクセス権限検証
+    const accessResult = SecurityService.validateWebAppAccess(userEmail, {
+      method: 'POST',
+      action: e.parameter?.action || 'unknown'
+    });
+    
+    if (!accessResult.hasAccess) {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: false,
+          message: 'アクセスが拒否されました',
+          reason: accessResult.reason,
+          code: 'ACCESS_DENIED'
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    // リクエストデータ検証とサニタイゼーション
+    const validatedData = SecurityService.validateUserData(e.parameter || {});
+    if (!validatedData.isValid) {
+      return ContentService
+        .createTextOutput(JSON.stringify({
+          success: false,
+          message: '入力データが無効です',
+          errors: validatedData.errors,
+          code: 'VALIDATION_ERROR'
+        }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const params = validatedData.sanitizedData;
+    
+    // アクション別処理
+    switch (params.action) {
+      case 'add_reaction':
+        return handleAddReactionAPI(params, userEmail);
+      
+      case 'toggle_highlight':
+        return handleToggleHighlightAPI(params, userEmail);
+      
+      case 'update_config':
+        return handleUpdateConfigAPI(params, userEmail);
+      
+      case 'refresh_data':
+        return handleRefreshDataAPI(params, userEmail);
+      
+      default:
+        return ContentService
+          .createTextOutput(JSON.stringify({
+            success: false,
+            message: `無効なアクション: ${params.action}`,
+            code: 'INVALID_ACTION'
+          }))
+          .setMimeType(ContentService.MimeType.JSON);
+    }
+
+  } catch (error) {
+    // 統一エラーハンドリング
+    const errorResponse = ErrorHandler.handle(error, {
+      service: 'main',
+      method: 'doPost',
+      parameters: e?.parameter
+    });
+    
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: errorResponse.message,
+        errorId: errorResponse.errorId,
+        code: 'INTERNAL_ERROR'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * リアクション追加API（POST）
+ * @param {Object} params - パラメータ
+ * @param {string} userEmail - ユーザーメール
+ * @returns {ContentService} JSON レスポンス
+ */
+function handleAddReactionAPI(params, userEmail) {
+  const { userId, rowId, reactionType } = params;
+  
+  if (!userId || !rowId || !reactionType) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: '必須パラメータが不足しています',
+        code: 'MISSING_PARAMETERS'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // ConfigServiceからユーザー設定取得
+  const config = ConfigService.getUserConfig(userId);
+  if (!config) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: 'ユーザー設定が見つかりません',
+        code: 'CONFIG_NOT_FOUND'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 行IDから数値に変換 (row_3 → 3)
+  const rowNumber = parseInt(rowId.replace('row_', ''));
+  if (isNaN(rowNumber) || rowNumber < 2) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: '無効な行IDです',
+        code: 'INVALID_ROW_ID'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // DataServiceの新しいprocessReaction関数を使用
+  const result = DataService.processReaction(
+    config.spreadsheetId,
+    config.sheetName,
+    rowNumber,
+    reactionType,
+    userEmail
+  );
+  
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      success: result.status === 'success',
+      message: result.message,
+      newValue: result.newValue
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * ハイライト切り替えAPI（POST）
+ * @param {Object} params - パラメータ
+ * @param {string} userEmail - ユーザーメール
+ * @returns {ContentService} JSON レスポンス
+ */
+function handleToggleHighlightAPI(params, userEmail) {
+  const { userId, rowId } = params;
+  
+  if (!userId || !rowId) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: '必須パラメータが不足しています',
+        code: 'MISSING_PARAMETERS'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // ConfigServiceからユーザー設定取得
+  const config = ConfigService.getUserConfig(userId);
+  if (!config) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: 'ユーザー設定が見つかりません',
+        code: 'CONFIG_NOT_FOUND'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 行IDから数値に変換 (row_3 → 3)
+  const rowNumber = parseInt(rowId.replace('row_', ''));
+  if (isNaN(rowNumber) || rowNumber < 2) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: '無効な行IDです',
+        code: 'INVALID_ROW_ID'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // DataServiceの新しいprocessHighlightToggle関数を使用
+  const result = DataService.processHighlightToggle(
+    config.spreadsheetId,
+    config.sheetName,
+    rowNumber
+  );
+  
+  return ContentService
+    .createTextOutput(JSON.stringify({
+      success: result.status === 'success',
+      message: result.message,
+      highlighted: result.highlighted
+    }))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+/**
+ * 設定更新API（POST）
+ * @param {Object} params - パラメータ
+ * @param {string} userEmail - ユーザーメール
+ * @returns {ContentService} JSON レスポンス
+ */
+function handleUpdateConfigAPI(params, userEmail) {
+  const { userId, configUpdates } = params;
+  
+  if (!userId || !configUpdates) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: '必須パラメータが不足しています',
+        code: 'MISSING_PARAMETERS'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  // 権限確認（設定変更は所有者のみ）
+  const permission = SecurityService.checkUserPermission(userId, 'owner');
+  if (!permission.hasPermission) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: '設定変更権限がありません',
+        code: 'INSUFFICIENT_PERMISSION'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  try {
+    const parsedUpdates = JSON.parse(configUpdates);
+    const result = ConfigService.updateUserConfig(userId, parsedUpdates);
+    
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: true,
+        data: result,
+        message: '設定を更新しました'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: '設定の更新に失敗しました',
+        error: error.message,
+        code: 'UPDATE_ERROR'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * データ更新API（POST）
+ * @param {Object} params - パラメータ
+ * @param {string} userEmail - ユーザーメール
+ * @returns {ContentService} JSON レスポンス
+ */
+function handleRefreshDataAPI(params, userEmail) {
+  const { userId } = params;
+  
+  if (!userId) {
+    return ContentService
+      .createTextOutput(JSON.stringify({
+        success: false,
+        message: 'ユーザーIDが必要です',
+        code: 'MISSING_USER_ID'
+      }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+
+  const result = DataService.refreshBoardData(userId);
+  
+  return ContentService
+    .createTextOutput(JSON.stringify(result))
+    .setMimeType(ContentService.MimeType.JSON);
 }

@@ -111,34 +111,49 @@ npm run deploy            # GASデプロイ
 ### 🎯 理想的なディレクトリ構造
 
 ```
+📁 Everyone-s-Answer-Board/
+├── 🚀 src/                    # GASデプロイ対象（clasp pushされる）
+│   ├── services/              # 🎯 単一責任サービス層（新規作成）
+│   │   ├── UserService.gs     #    ユーザー管理（認証・権限・セッション）
+│   │   ├── ConfigService.gs   #    設定管理（configJSON統一操作）
+│   │   ├── DataService.gs     #    データ操作（CRUD・検索・キャッシュ）
+│   │   └── SecurityService.gs #    セキュリティ（検証・認証・監査）
+│   ├── utils/                 # 🛠️ ユーティリティ（Core.gsから分離）
+│   │   ├── validators.gs      #    入力検証・サニタイズ
+│   │   ├── formatters.gs      #    データ変換・フォーマット
+│   │   └── helpers.gs         #    汎用ヘルパー関数
+│   ├── constants.gs           # 🔧 システム定数・設定（既存・整理済み）
+│   ├── database.gs            # 🗄️ DB抽象化レイヤー（既存・最適化済み）
+│   ├── cache.gs               # ⚡ 統合キャッシュ管理（既存・性能向上済み）
+│   ├── main.gs                # 🚀 アプリケーションエントリー（簡素化予定）
+│   ├── *.html                 # 🎨 UI ファイル（既存）
+│   └── appsscript.json        # ⚙️ GAS設定ファイル
+│
+├── 🧪 tests/                  # 開発環境のみ（GASにデプロイされない）
+│   ├── services/              #    サービス層テスト
+│   ├── integration/           #    統合テスト
+│   └── mocks/                 #    GAS APIモック
+├── 📋 scripts/                # 開発支援ツール（既存）
+├── 📚 docs/                   # ドキュメント（既存）
+├── 🤖 .claude/                # Claude Code設定
+│   ├── commands/              #    カスタムスラッシュコマンド
+│   └── hooks/                 #    ワークフローフック
+├── 📦 package.json            # Node.js依存関係・スクリプト
+├── 📖 README.md               # プロジェクト概要（このファイル）
+├── 🧠 CLAUDE.md               # AI開発者向けガイド
+└── 🔧 その他設定ファイル        # .eslintrc.js, .prettierrc, etc.
+```
+
+### 📋 移行対象ファイル（削除予定）
+
+```
 src/
-├── services/             # 🎯 単一責任サービス層
-│   ├── UserService.gs    #    ユーザー管理（認証・権限）
-│   ├── ConfigService.gs  #    設定管理（configJSON操作）
-│   ├── DataService.gs    #    データ操作（CRUD・検索）
-│   └── SecurityService.gs #   セキュリティ（検証・監査）
-├── core/                 # 🔧 基盤システム
-│   ├── constants.gs      #    システム定数・設定
-│   ├── database.gs       #    DB抽象化レイヤー
-│   ├── cache.gs          #    3層キャッシュ管理
-│   └── errors.gs         #    統一エラーハンドリング
-├── utils/               # 🛠️ ユーティリティ
-│   ├── validators.gs     #    入力検証・サニタイズ
-│   ├── formatters.gs     #    データ変換・フォーマット
-│   └── helpers.gs        #    汎用ヘルパー関数
-├── auth/                # 🔐 認証・認可
-│   ├── oauth.gs          #    Google OAuth2処理
-│   └── permissions.gs    #    アクセス制御ロジック
-├── ui/                  # 🎨 ユーザーインターフェース
-│   ├── AnswerBoard.html  #    メイン表示画面
-│   ├── AdminPanel.html   #    管理者画面
-│   └── Setup.html        #    初期設定ウィザード
-├── .claude/             # 🤖 Claude Code設定
-│   ├── commands/         #    カスタムスラッシュコマンド
-│   └── hooks/           #    ワークフローフック
-├── main.gs              # 🚀 アプリケーションエントリー
-├── CLAUDE.md            # 🧠 AI開発者向けガイド
-└── ROADMAP.md           # 📋 プロジェクト管理
+├── UnifiedManager.gs     # → services層に分散統合
+├── ConfigManager.gs      # → ConfigService.gs
+├── Base.gs              # → utils/ + core/errors.gs
+├── Core.gs              # → services/DataService.gs + utils/
+├── auth.gs              # → SecurityService.gs
+└── security.gs          # → SecurityService.gs
 ```
 
 ### 🎛️ Claude Code専用設定

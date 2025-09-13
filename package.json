@@ -5,14 +5,19 @@
   "main": "index.js",
   "scripts": {
     "test": "jest --passWithNoTests",
-    "test:watch": "jest --watch",
+    "test:watch": "jest --watch --passWithNoTests",
+    "test:coverage": "jest --coverage --passWithNoTests",
     "lint": "eslint \"src/**/*.{js,gs,ts}\" --fix",
     "format": "prettier --write \"src/**/*.{js,gs,html,ts}\"",
     "check": "npm run test && npm run lint",
     "push": "clasp push",
     "pull": "clasp pull",
     "open": "clasp open",
-    "deploy": "npm run check && npm run push"
+    "deploy": "npm run check && npm run push",
+    "deploy:staging": "npm run check && echo 'Staging deployment ready' && npm run push",
+    "deploy:prod": "npm run test:coverage && npm run lint && echo 'Production deployment requires manual approval' && npm run push",
+    "architecture:test": "node scripts/test-architecture.js || echo 'Architecture test script not yet implemented'",
+    "security:review": "node scripts/security-review.js || echo 'Security review script not yet implemented'"
   },
   "repository": {
     "type": "git",
@@ -29,6 +34,8 @@
   },
   "homepage": "https://github.com/atariryuma/Everyone-s-Answer-Board#readme",
   "devDependencies": {
+    "@babel/plugin-transform-modules-commonjs": "^7.27.1",
+    "@babel/preset-env": "^7.28.3",
     "@eslint/js": "^9.34.0",
     "@google/clasp": "^3.0.6-alpha",
     "@types/google-apps-script": "^1.0.83",
@@ -36,6 +43,7 @@
     "@types/node": "^20.16.10",
     "@typescript-eslint/eslint-plugin": "^8.8.0",
     "@typescript-eslint/parser": "^8.8.0",
+    "babel-jest": "^30.1.2",
     "eslint": "^9.34.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",

@@ -177,6 +177,13 @@ const createPropertiesServiceMock = () => {
   const scriptProperties = new Map();
   const userProperties = new Map();
   
+  // Properties Service keys (for testing)
+  const PROPS_KEYS = {
+    DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
+    ADMIN_EMAIL: 'ADMIN_EMAIL',
+    SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS'
+  };
+  
   // デフォルト設定の初期化
   scriptProperties.set(PROPS_KEYS.DATABASE_SPREADSHEET_ID, 'test-database-sheet-id');
   scriptProperties.set(PROPS_KEYS.ADMIN_EMAIL, 'admin@example.com');

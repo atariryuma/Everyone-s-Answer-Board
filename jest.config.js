@@ -7,6 +7,18 @@ module.exports = {
   // テスト環境設定
   testEnvironment: 'node',
   
+  // Transform configuration
+  transform: {
+    '^.+\\.(js|jsx)$': ['babel-jest', {
+      presets: [
+        ['@babel/preset-env', {
+          targets: { node: 'current' },
+          modules: 'commonjs'
+        }]
+      ]
+    }]
+  },
+  
   // テストファイルパターン
   testMatch: [
     '<rootDir>/tests/**/*.test.js',
@@ -15,8 +27,14 @@ module.exports = {
   
   // モジュール解決
   moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1'
+    '^@/(.*)$': '<rootDir>/src/$1',
+    '^../mocks/gas-mocks.js$': '<rootDir>/tests/mocks/gas-mocks.js'
   },
+  
+  // Setup files
+  setupFilesAfterEnv: [
+    '<rootDir>/tests/setup/jest-setup.js'
+  ],
   
   // カバレッジ設定
   collectCoverage: true,
