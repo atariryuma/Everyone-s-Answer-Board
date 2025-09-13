@@ -59,8 +59,24 @@
               return;
             }
 
-            // ログイン成功: 管理パネルURLを表示して自動リダイレクト
-            showAdminPanelRedirect(response.adminUrl, response.message);
+            // ログイン成功: 管理パネルURLを決定して自動リダイレクト
+            const adminUrl =
+              response.adminUrl ||
+              response.redirectUrl ||
+              response.appUrl ||
+              response.url ||
+              '';
+
+            if (typeof adminUrl === 'string' && adminUrl.trim().length > 0) {
+              showAdminPanelRedirect(adminUrl, response.message);
+            } else {
+              console.error('processUnifiedLogin: 管理URLが返されませんでした', response);
+              userEmailDisplay.textContent = 'ログインは成功しましたが、管理URLが見つかりません。管理者に連絡してください。';
+              userEmailDisplay.classList.add('text-yellow-400');
+              // ローディング解除
+              setLoading(false);
+              // resolve to prevent further error flows
+            }
             resolve();
           })
           .withFailureHandler((error) => {
