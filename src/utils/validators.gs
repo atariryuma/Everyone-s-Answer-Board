@@ -13,6 +13,8 @@
  * - 各所に分散している検証処理
  */
 
+/* global CONSTANTS, SECURITY, SecurityValidator, URL */
+
 /**
  * InputValidator - 統一入力検証システム
  * SecurityServiceとの連携でセキュアな検証を実現

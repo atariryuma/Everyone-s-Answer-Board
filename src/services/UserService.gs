@@ -1,22 +1,25 @@
 /**
  * @fileoverview UserService - 統一ユーザー管理サービス
- * 
+ *
  * 🎯 責任範囲:
  * - ユーザー認証・セッション管理
  * - ユーザー情報の取得・更新
  * - 権限・アクセス制御
  * - ユーザーキャッシュ管理
- * 
+ *
  * 🔄 置き換え対象:
  * - UserManager (main.gs内)
  * - UnifiedManager.user
  * - auth.gsの一部機能
  */
 
+/* global AppCacheService, DB, PROPS_KEYS, ConfigService, DataFormatter, CONSTANTS, URL */
+
 /**
  * UserService - 統一ユーザー管理サービス
  * Single Responsibility Pattern準拠
  */
+// eslint-disable-next-line no-unused-vars
 const UserService = Object.freeze({
 
   // ===========================================
@@ -49,10 +52,10 @@ const UserService = Object.freeze({
     const cacheKey = 'current_user_info';
     
     try {
-      // キャッシュから取得試行
-      const cached = CacheService.getScriptCache().get(cacheKey);
+      // 統一キャッシュサービスから取得試行
+      const cached = AppCacheService.get(cacheKey);
       if (cached) {
-        return JSON.parse(cached);
+        return cached;
       }
 
       // セッションからメール取得
@@ -71,12 +74,8 @@ const UserService = Object.freeze({
       // 設定情報を統合
       const completeUserInfo = this.enrichUserInfo(userInfo);
 
-      // キャッシュに保存（5分間）
-      CacheService.getScriptCache().put(
-        cacheKey, 
-        JSON.stringify(completeUserInfo), 
-        300
-      );
+      // 統一キャッシュサービスでキャッシュ保存
+      AppCacheService.set(cacheKey, completeUserInfo, AppCacheService.TTL.MEDIUM);
 
       return completeUserInfo;
     } catch (error) {

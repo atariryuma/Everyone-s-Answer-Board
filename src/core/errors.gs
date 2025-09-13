@@ -17,6 +17,7 @@
  * ErrorHandler - 統一エラーハンドリングシステム
  * システム全体のエラーを一元管理
  */
+// eslint-disable-next-line no-unused-vars
 const ErrorHandler = Object.freeze({
 
   // ===========================================
@@ -99,7 +100,7 @@ const ErrorHandler = Object.freeze({
    * @param {boolean} includeDetails - 詳細を含めるか（未使用・互換用）
    * @returns {Object} セーフなエラーレスポンス
    */
-  createSafeResponse(error, context = 'operation', includeDetails = false) {
+  createSafeResponse(error, context = 'operation', _includeDetails = false) {
     try {
       const message = error && typeof error.message === 'string' ? error.message : String(error);
 
@@ -212,7 +213,7 @@ const ErrorHandler = Object.freeze({
    * @param {Object} context - コンテキスト
    * @returns {string} エラーレベル
    */
-  determineErrorLevel(message, context) {
+  determineErrorLevel(message, _context) {
     if (!message) return this.LEVELS.LOW;
 
     const criticalKeywords = [
@@ -371,7 +372,7 @@ const ErrorHandler = Object.freeze({
    * @param {Object} error - エラー情報
    * @returns {Object} 復旧結果
    */
-  recoverAuthentication(error) {
+  recoverAuthentication(_error) {
     return {
       attempted: true,
       success: false,

@@ -10,8 +10,10 @@
  * 🔄 置き換え対象:
  * - ConfigManager (ConfigManager.gs)
  * - UnifiedManager.config
- * - ConfigurationManager (Base.gs内)
+ * - ConfigurationManager (削除済み)
  */
+
+/* global UserService, DB, PROPS_KEYS, CONSTANTS, SecurityValidator, AppCacheService */
 
 /**
  * ConfigService - 統一設定管理サービス
@@ -184,7 +186,6 @@ const ConfigService = Object.freeze({
         showReactions: false
       },
       createdAt: timestamp,
-      lastModified: timestamp,
       // 既存設定を上書き
       ...config,
       // 強制更新フィールド

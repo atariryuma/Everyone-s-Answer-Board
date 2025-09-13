@@ -1,17 +1,19 @@
 /**
  * @fileoverview Helper Utilities
- * 
+ *
  * 🎯 責任範囲:
  * - 列マッピング・インデックス操作
  * - データフォーマッティング
  * - 汎用ヘルパー関数
  * - 計算・変換ユーティリティ
- * 
+ *
  * 🔄 移行元:
  * - Base.gs の列操作関数
  * - Core.gs の汎用ヘルパー
  * - 各所に分散している共通処理
  */
+
+/* global UserService, ConfigService, DB, PROPS_KEYS, CONSTANTS, DataFormatter, URL */
 
 /**
  * ColumnHelpers - 列操作ヘルパー
@@ -111,8 +113,12 @@ const FormatHelpers = Object.freeze({
    * @returns {string} フォーマット済み日時
    */
   formatTimestamp(timestamp) {
+    // 統一: DataFormatterを使用（要インポート確認）
+    if (typeof DataFormatter !== 'undefined') {
+      return DataFormatter.formatDateTime(timestamp, { style: 'short' });
+    }
+    // フォールバック処理
     if (!timestamp) return '不明';
-    
     try {
       const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
       return date.toLocaleString('ja-JP', {
@@ -122,7 +128,6 @@ const FormatHelpers = Object.freeze({
         minute: '2-digit',
       });
     } catch (error) {
-      console.warn('FormatHelpers.formatTimestamp: フォーマットエラー', error.message);
       return '不明';
     }
   },

@@ -56,7 +56,7 @@ const CORE = Object.freeze({
  * 統一ログ管理システム
  * セキュリティとパフォーマンスを考慮したログ出力制御
  */
-const Logger = Object.freeze({
+const AppLogger = Object.freeze({
   /**
    * 情報ログ（デバッグモード時のみ出力）
    * @param {string} msg - メッセージ
@@ -64,7 +64,7 @@ const Logger = Object.freeze({
    */
   info: (msg, data = {}) => {
     if (CORE.DEBUG_MODE) {
-      console.log(`[INFO] ${msg}`, Logger.sanitizeData(data));
+      console.log(`[INFO] ${msg}`, AppLogger.sanitizeData(data));
     }
   },
 
@@ -74,7 +74,7 @@ const Logger = Object.freeze({
    * @param {Object} data - ログデータ
    */
   error: (msg, data = {}) => {
-    console.error(`[ERROR] ${msg}`, Logger.sanitizeData(data));
+    console.error(`[ERROR] ${msg}`, AppLogger.sanitizeData(data));
   },
 
   /**
@@ -83,7 +83,7 @@ const Logger = Object.freeze({
    * @param {Object} data - ログデータ
    */
   warn: (msg, data = {}) => {
-    console.warn(`[WARN] ${msg}`, Logger.sanitizeData(data));
+    console.warn(`[WARN] ${msg}`, AppLogger.sanitizeData(data));
   },
 
   /**
@@ -93,7 +93,7 @@ const Logger = Object.freeze({
    */
   debug: (msg, data = {}) => {
     if (CORE.DEBUG_MODE) {
-      console.log(`[DEBUG] ${msg}`, Logger.sanitizeData(data));
+      console.log(`[DEBUG] ${msg}`, AppLogger.sanitizeData(data));
     }
   },
 
@@ -130,6 +130,7 @@ const Logger = Object.freeze({
  * PropertiesServiceキー定数
  * セキュリティ重要項目の一元管理
  */
+// eslint-disable-next-line no-unused-vars
 const PROPS_KEYS = Object.freeze({
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
   DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
@@ -147,7 +148,7 @@ const SECURITY = Object.freeze({
     EMAIL: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
     UUID: /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
     SAFE_STRING: /^[a-zA-Z0-9\s\-_.@]+$/,
-    URL: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)$/,
+    URL: /^https?:\/\/(www\.)?[-a-zA-Z0-9@:%._+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_+.~#?&//=]*)$/,
     SHEET_NAME: /^[a-zA-Z0-9\s\-_()]{1,100}$/,
   }),
 
@@ -275,7 +276,7 @@ const SecurityValidator = Object.freeze({
         try {
           JSON.parse(userData.configJson);
           sanitizedData.configJson = userData.configJson;
-        } catch (e) {
+        } catch (_e) {
           errors.push('設定データの形式が正しくありません。');
         }
       }
@@ -307,6 +308,7 @@ const SecurityValidator = Object.freeze({
  * 統合定数オブジェクト（フラット構造）
  * GAS 2025 Best Practices準拠
  */
+// eslint-disable-next-line no-unused-vars
 const CONSTANTS = Object.freeze({
   // 🚀 configJSON中心型超効率化データベース定数
   DATABASE: Object.freeze({
@@ -417,6 +419,7 @@ const CONSTANTS = Object.freeze({
 });
 
 // パフォーマンス監視
+// eslint-disable-next-line no-unused-vars
 const PerformanceMonitor = Object.freeze({
   measure(operationName, operation) {
     const startTime = Date.now();

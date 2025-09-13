@@ -15,31 +15,55 @@
 - **リアルタイム反応機能**: UNDERSTAND/LIKE/CURIOUS による双方向コミュニケーション
 - **Google連携**: Sheets/Forms/Drive/OAuth2の完全統合
 
-### 🏗️ ターゲットアーキテクチャ（リファクタリング完了後）
+### 🏗️ 実装済みアーキテクチャ（2025年版）
 
 ```mermaid
 graph TB
-    A[Google Apps Script V8 Runtime] --> B[認証・セキュリティ層]
-    B --> C[サービス層]
-    C --> D[データ層]
-    C --> E[プレゼンテーション層]
-    
-    B --> B1[Google OAuth2]
-    B --> B2[Service Account API]
-    B --> B3[Email-based Access Control]
-    
-    C --> C1[UserService]
-    C --> C2[ConfigService]
-    C --> C3[DataService]
-    C --> C4[SecurityService]
-    
-    D --> D1[Users Sheet<br/>5-field configJSON]
-    D --> D2[User Spreadsheets<br/>Tenant Data]
-    D --> D3[System Logs<br/>Audit Trail]
-    
-    E --> E1[AnswerBoard UI]
-    E --> E2[AdminPanel UI]
-    E --> E3[Setup Wizard]
+    A[main.gs - エントリーポイント] --> B[Core層]
+    A --> C[Services層]
+    A --> D[Infrastructure層]
+    A --> E[Utils層]
+
+    B --> B1[constants.gs - システム定数]
+    B --> B2[errors.gs - エラーハンドリング]
+    B --> B3[ServiceRegistry.gs - サービス管理]
+
+    C --> C1[UserService.gs - ユーザー管理]
+    C --> C2[ConfigService.gs - 設定管理]
+    C --> C3[DataService.gs - データ操作]
+    C --> C4[SecurityService.gs - セキュリティ]
+
+    D --> D1[DatabaseService.gs - DB抽象化]
+    D --> D2[CacheService.gs - 統一キャッシュ]
+    D --> D3[LegacyCacheHelpers.gs - 互換性]
+
+    E --> E1[formatters.gs - データフォーマット]
+    E --> E2[helpers.gs - 汎用ヘルパー]
+    E --> E3[validators.gs - 入力検証]
+```
+
+### 📁 ディレクトリ構造
+
+```
+src/
+├── main.gs                     # 🚪 HTTP エントリーポイント
+├── core/                       # 🏗️ システム基盤層
+│   ├── constants.gs            # システム全体定数
+│   ├── errors.gs               # 統一エラーハンドリング
+│   └── ServiceRegistry.gs      # サービス管理・DI
+├── services/                   # 🔧 ビジネスロジック層
+│   ├── UserService.gs          # ユーザー認証・管理
+│   ├── ConfigService.gs        # 設定CRUD・検証
+│   ├── DataService.gs          # スプレッドシート操作
+│   └── SecurityService.gs      # セキュリティ・権限
+├── infrastructure/             # 🗄️ インフラストラクチャ層
+│   ├── DatabaseService.gs      # DB抽象化・クエリ
+│   ├── CacheService.gs         # 統一キャッシュ管理
+│   └── LegacyCacheHelpers.gs   # 旧システム互換性
+└── utils/                      # 🛠️ ユーティリティ層
+    ├── formatters.gs           # データ変換・表示
+    ├── helpers.gs              # 汎用ヘルパー関数
+    └── validators.gs           # 入力検証・サニタイズ
 ```
 
 ---

@@ -13,6 +13,8 @@
  * - 各所に分散している表示処理
  */
 
+/* global CONSTANTS, AppLogger */
+
 /**
  * ResponseFormatter - レスポンス形式統一
  * API応答とエラーレスポンスの標準化

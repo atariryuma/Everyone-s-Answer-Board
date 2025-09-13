@@ -86,7 +86,9 @@
       "Bash(cp:*)",
       "Bash(git checkout:*)",
       "Bash(npm install:*)",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(while read file)",
+      "Bash(xargs:*)"
     ],
     "deny": [],
     "ask": [],

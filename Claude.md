@@ -31,19 +31,65 @@ graph TB
     D --> D3[TDD-First開発]
 ```
 
-#### AI開発者への緊急指示
+#### AI開発者への緊急指示（2025年版アップデート）
 
 ```javascript
-// ✅ Claude Code 2025 推奨: 安全なAPI使用
-const user = DB.findUserByEmail(email);              // 安定
-const config = ConfigManager.getUserConfig(userId);  // 推奨メイン
-const data = getPublishedSheetData(userId, options); // 実績あり
+// ✅ Claude Code 2025 推奨: 新アーキテクチャAPI
+const user = UserService.getCurrentUserInfo();         // services/UserService.gs
+const config = ConfigService.getUserConfig(userId);    // services/ConfigService.gs
+const data = DataService.getSheetData(userId, options); // services/DataService.gs
+const cache = CacheService.get(key);                   // infrastructure/CacheService.gs
 
-// ⚠️ 注意: 実験的実装（使用前に動作確認必須）
-const unified = UnifiedManager.user.getCurrentInfo(); // 要テスト
+// ⚠️ 注意: レガシー互換（移行中）
+const dbData = DB.findUserByEmail(email);             // infrastructure/DatabaseService.gs
 
-// ❌ 危険: 削除予定（新規実装では使用禁止）
-const legacy = ConfigurationManager.getUserConfig(userId); // 非推奨
+// ❌ 危険: 削除済み（使用禁止）
+const legacy = ConfigurationManager.getUserConfig(userId); // 削除済み
+const oldCache = SimpleCacheManager.get(key);              // 削除済み
+```
+
+---
+
+## 📋 **CRITICAL: ドキュメント整合性ルール（必須遵守）**
+
+### ⚠️ **アーキテクチャ変更時の必須作業**
+
+```javascript
+// ✅ Claude Code 2025 必須フロー: ファイル構造変更時
+const architectureChangeFlow = {
+  1: "ファイル移動・削除・リネーム実行",
+  2: "README.md のアーキテクチャ図を更新", // 🚨 必須
+  3: "CLAUDE.md の推奨API・パスを更新",   // 🚨 必須
+  4: "package.json の参照パス確認",
+  5: "テスト実行で整合性確認",
+  6: "コミット前の最終ドキュメント検証"
+};
+```
+
+### 📊 **整合性チェックリスト**
+
+#### **README.md 更新必須項目**
+- ✅ mermaidダイアグラムの実際のファイル構造反映
+- ✅ ディレクトリ構造の正確な記載
+- ✅ 各ファイルの責任範囲説明
+- ✅ インポート・使用例の更新
+
+#### **CLAUDE.md 更新必須項目**
+- ✅ 推奨API呼び出しパスの更新
+- ✅ 安全なAPI/危険なAPIリストの保守
+- ✅ ファイル配置ルールの明文化
+- ✅ 新アーキテクチャでのベストプラクティス更新
+
+#### **🚨 違反防止ルール**
+```bash
+# ❌ 禁止: ドキュメント未更新でのファイル移動
+mv src/service.gs src/services/  # README.md更新なしは禁止
+
+# ✅ 推奨: ドキュメント整合性保持
+1. mv src/service.gs src/services/
+2. README.md のアーキテクチャ図更新
+3. CLAUDE.md の推奨パス更新
+4. テスト実行・検証
 ```
 
 ---
