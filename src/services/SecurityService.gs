@@ -635,6 +635,53 @@ const SecurityService = Object.freeze({
   },
 
   /**
+   * スプレッドシートアクセス権限検証
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @returns {Object} 検証結果
+   */
+  validateSpreadsheetAccess(spreadsheetId) {
+    try {
+      if (!spreadsheetId) {
+        return {
+          success: false,
+          message: 'スプレッドシートIDが指定されていません'
+        };
+      }
+
+      // アクセステスト
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const name = spreadsheet.getName();
+      const sheets = spreadsheet.getSheets().map(sheet => ({
+        name: sheet.getName(),
+        index: sheet.getIndex()
+      }));
+
+      return {
+        success: true,
+        name,
+        sheets,
+        message: 'アクセス権限が確認できました'
+      };
+
+    } catch (error) {
+      console.error('SecurityService.validateSpreadsheetAccess エラー:', error.message);
+
+      let userMessage = 'スプレッドシートにアクセスできません。';
+      if (error.message.includes('Permission') || error.message.includes('権限')) {
+        userMessage = 'スプレッドシートへのアクセス権限がありません。編集権限を確認してください。';
+      } else if (error.message.includes('not found') || error.message.includes('見つかりません')) {
+        userMessage = 'スプレッドシートが見つかりません。URLが正しいか確認してください。';
+      }
+
+      return {
+        success: false,
+        message: userMessage,
+        error: error.message
+      };
+    }
+  },
+
+  /**
    * セキュリティ設定推奨事項
    * @returns {Array} 推奨事項リスト
    */

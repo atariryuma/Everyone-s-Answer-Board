@@ -13,7 +13,7 @@
  * - ColumnAnalysisSystem.gs の一部
  */
 
-/* global ConfigManager, DB, AppCacheService, UserService, ConfigService, DataFormatter, CONSTANTS */
+/* global DB, AppCacheService, UserService, ConfigService, DataFormatter, CONSTANTS */
 
 /**
  * DataService - 統一データ操作サービス
@@ -1021,12 +1021,23 @@ const DataService = Object.freeze({
 
       console.log(`🔍 最終結果: ${spreadsheets.length}個のスプレッドシートを発見`);
 
-      return {
+      const response = {
         success: true,
         cached: false,
         executionTime: `${Date.now() - started}ms`,
         spreadsheets
       };
+
+      console.log('🔍 DataService.getSpreadsheetList 戻り値:', response);
+      console.log('🔍 戻り値の詳細:', {
+        hasSuccess: typeof response.success !== 'undefined',
+        successValue: response.success,
+        hasSpreadsheets: typeof response.spreadsheets !== 'undefined',
+        spreadsheetsLength: response.spreadsheets ? response.spreadsheets.length : 'undefined',
+        spreadsheetsType: typeof response.spreadsheets
+      });
+
+      return response;
     } catch (error) {
       console.error('DataService.getSpreadsheetList エラー:', error.message);
       console.error('エラースタック:', error.stack);

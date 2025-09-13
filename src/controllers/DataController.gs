@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, DB, SpreadsheetApp, ScriptApp */
+/* global UserService, ConfigService, DataService, DB */
 
 /**
  * DataController - データ操作用コントローラー

@@ -40,11 +40,11 @@ const AdminController = Object.freeze({
           return { success: false, message: 'ユーザー情報が見つかりません' };
         }
 
-        // DB から直接ユーザー検索を試行
+        // UserService経由でユーザー検索を試行
         try {
-          const dbUser = DB.findUserByEmail(email);
-          if (dbUser && dbUser.userId) {
-            userId = dbUser.userId;
+          const foundUser = UserService.findUserByEmail(email);
+          if (foundUser && foundUser.userId) {
+            userId = foundUser.userId;
             userInfo = userInfo || { userId, userEmail: email };
           }
         } catch (e) {
@@ -105,7 +105,20 @@ const AdminController = Object.freeze({
    * @returns {Object} スプレッドシート一覧
    */
   getSpreadsheetList() {
-    return DataService.getSpreadsheetList();
+    console.log('🔍 AdminController.getSpreadsheetList() 呼び出し開始');
+    try {
+      const result = DataService.getSpreadsheetList();
+      console.log('🔍 AdminController.getSpreadsheetList() 結果:', result);
+      console.log('🔍 結果の詳細:', {
+        type: typeof result,
+        hasSpreadsheets: result && typeof result.spreadsheets !== 'undefined',
+        spreadsheetsLength: result && result.spreadsheets ? result.spreadsheets.length : 'undefined'
+      });
+      return result;
+    } catch (error) {
+      console.error('🔍 AdminController.getSpreadsheetList() エラー:', error);
+      return null;
+    }
   },
 
   /**
@@ -161,45 +174,7 @@ const AdminController = Object.freeze({
    * @returns {Object} 検証結果
    */
   validateAccess(spreadsheetId) {
-    try {
-      if (!spreadsheetId) {
-        return {
-          success: false,
-          message: 'スプレッドシートIDが指定されていません'
-        };
-      }
-
-      // アクセステスト
-      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-      const name = spreadsheet.getName();
-      const sheets = spreadsheet.getSheets().map(sheet => ({
-        name: sheet.getName(),
-        index: sheet.getIndex()
-      }));
-
-      return {
-        success: true,
-        name,
-        sheets,
-        message: 'アクセス権限が確認できました'
-      };
-
-    } catch (error) {
-      console.error('AdminController.validateAccess エラー:', error.message);
-
-      let userMessage = 'スプレッドシートにアクセスできません。';
-      if (error.message.includes('Permission') || error.message.includes('権限')) {
-        userMessage = 'スプレッドシートへのアクセス権限がありません。編集権限を確認してください。';
-      } else if (error.message.includes('not found') || error.message.includes('見つかりません')) {
-        userMessage = 'スプレッドシートが見つかりません。URLが正しいか確認してください。';
-      }
-
-      return {
-        success: false,
-        message: userMessage,
-        error: error.message
-      };
-    }
+    return SecurityService.validateSpreadsheetAccess(spreadsheetId);
   },
 
   /**
@@ -244,11 +219,11 @@ const AdminController = Object.freeze({
           };
         }
 
-        // DB から直接ユーザー検索
+        // UserService経由でユーザー検索
         try {
-          const dbUser = DB.findUserByEmail(email);
-          if (dbUser && dbUser.userId) {
-            userId = dbUser.userId;
+          const foundUser = UserService.findUserByEmail(email);
+          if (foundUser && foundUser.userId) {
+            userId = foundUser.userId;
             userInfo = { userId, userEmail: email };
           } else {
             return {

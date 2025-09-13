@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたフロントエンドAPI関数群
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, DB, ScriptApp */
+/* global UserService */
 
 /**
  * FrontendController - フロントエンド用コントローラー

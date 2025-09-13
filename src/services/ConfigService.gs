@@ -114,7 +114,7 @@ const ConfigService = Object.freeze({
         return this.getDefaultConfig(userId);
       }
 
-      // 🔧 二重構造修復（ConfigManagerの重複問題解決）
+      // 🔧 二重構造修復（レガシー構造の互換性処理）
       if (baseConfig.configJson || baseConfig.configJSON) {
         console.warn('⚠️ ConfigService: 二重構造を検出 - 自動修復開始');
         baseConfig = this.repairNestedConfig(baseConfig, userId);

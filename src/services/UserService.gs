@@ -424,6 +424,23 @@ const UserService = Object.freeze({
   // ===========================================
 
   /**
+   * メールアドレスでユーザー検索
+   * @param {string} email - メールアドレス
+   * @returns {Object|null} ユーザー情報
+   */
+  findUserByEmail(email) {
+    try {
+      if (!email || !this.validateEmail(email)) {
+        return null;
+      }
+      return DB.findUserByEmail(email);
+    } catch (error) {
+      console.error('UserService.findUserByEmail: エラー', error.message);
+      return null;
+    }
+  },
+
+  /**
    * メールアドレス検証
    * @param {string} email - メールアドレス
    * @returns {boolean} 有効かどうか

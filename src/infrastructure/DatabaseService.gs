@@ -1228,7 +1228,7 @@ const DB = {
             // lastModifiedを更新
             cleanedConfig.lastModified = new Date().toISOString();
 
-            // ConfigManager経由でクリーンなデータを保存
+            // ConfigService経由でクリーンなデータを保存
             ConfigService.saveUserConfig(user.userId, cleanedConfig);
 
             cleanupResults.cleaned++;

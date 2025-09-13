@@ -363,10 +363,7 @@ function getAllColumnIndices(config) {
   return ColumnHelpers.getAllColumnIndices(config);
 }
 
-// Core.gsからの移行関数
-function formatTimestamp(timestamp) {
-  return FormatHelpers.formatTimestamp(timestamp);
-}
+// formatTimestamp関数を削除 - formatters.gsで統一
 
 // 診断関数
 function diagnoseHelpers() {
@@ -381,7 +378,7 @@ function diagnoseHelpers() {
     },
     legacyCompatibility: {
       getColumnIndex: typeof getColumnIndex === 'function',
-      formatTimestamp: typeof formatTimestamp === 'function'
+      formatTimestamp: false // 削除済み - formatters.gsを使用
     }
   };
 }
