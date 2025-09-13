@@ -105,40 +105,10 @@ function doGet(e) {
           return renderSetupPageWithTemplate(params);
         }
 
-        // Default flow: authentication check for main app
-        const userEmail = UserService.getCurrentEmail();
-        if (!userEmail) {
-          console.log('doGet: No authentication, redirecting to login');
-          return handleLoginModeWithTemplate(params, { reason: 'authentication_required' });
-        }
-
-        // Access control verification
-        const accessResult = SecurityService.checkUserPermission(null, 'authenticated_user');
-        if (!accessResult.hasPermission) {
-          return renderErrorPage({
-            success: false,
-            message: 'アクセスが拒否されました',
-            details: accessResult.reason,
-            canRetry: false
-          });
-        }
-
-        // System initialization check for authenticated users
-        let systemReady = false;
-        try {
-          systemReady = DataService.isSystemSetup() || ConfigService.isSystemSetup();
-        } catch (setupCheckError) {
-          console.warn('System setup check error:', setupCheckError.message);
-          systemReady = false;
-        }
-
-        if (!systemReady) {
-          console.log('doGet: System not ready, redirecting to admin for setup');
-          return handleAdminModeWithTemplate(params, { reason: 'setup_required' });
-        }
-
-        // Main application view (equivalent to historical mode=view)
-        return handleViewMode(params);
+        // Default flow: Always start with login page for /exec access
+        // This restores the historical behavior where /exec always begins with login
+        console.log('doGet: Default /exec access, starting with login page');
+        return handleLoginModeWithTemplate(params, { reason: 'default_entry_point' });
     }
   } catch (error) {
     // Unified error handling
