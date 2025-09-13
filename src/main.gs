@@ -848,28 +848,25 @@ function getUser(kind = 'email') {
     const userEmail = UserService.getCurrentEmail();
     
     if (!userEmail) {
-      return null;
+      return kind === 'email' ? '' : null;
     }
     
-    // ✅ 修正: 戻り値型を統一（常にオブジェクト）
+    // 後方互換性重視: kind==='email' の場合は純粋な文字列を返す
+    if (kind === 'email') {
+      return String(userEmail);
+    }
+
+    // 統一オブジェクト形式（'full' など）
     const userInfo = UserService.getCurrentUserInfo();
-    const result = {
+    return {
       email: userEmail,
       userId: userInfo?.userId || null,
       isActive: userInfo?.isActive || false,
       hasConfig: !!userInfo?.config
     };
-    
-    // 後方互換性: emailのみ必要な場合は email フィールドに文字列が入っている
-    if (kind === 'email') {
-      // フロントエンドで user.email でアクセス可能
-      result.value = userEmail; // レガシー対応用
-    }
-    
-    return result;
   } catch (error) {
     console.error('getUser エラー:', error.message);
-    return null;
+    return kind === 'email' ? '' : null;
   }
 }
 
