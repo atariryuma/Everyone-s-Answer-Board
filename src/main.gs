@@ -2101,9 +2101,11 @@ function getLoginStatus() {
  */
 function getSystemDomainInfo() {
   try {
-    const webAppUrl = getWebAppUrl();
-    const domain = new URL(webAppUrl).hostname;
-    
+    const webAppUrl = getWebAppUrl() || '';
+    // GAS server runtime may not provide global URL; parse safely
+    const match = webAppUrl.match(/^https?:\/\/([^\/]+)/i);
+    const domain = (match && match[1]) || 'script.google.com';
+
     return {
       success: true,
       webAppUrl,
