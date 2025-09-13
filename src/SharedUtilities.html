@@ -13,6 +13,7 @@
     // Simplified error suppression - safe for GAS template processing
     const suppressedErrors = [
       'cdn.tailwindcss.com should not be used in production',
+      'cdnjs.cloudflare.com',
       'tailwind',
       'TailwindCSS',
       'iframe which has both allow-scripts and allow-same-origin',
@@ -106,6 +107,72 @@
       return element;
     };
   })();
+
+  // =============================================================================
+  // SAFE RESPONSE PROCESSING - Fix response.trim() errors
+  // =============================================================================
+
+  /**
+   * 安全なレスポンス処理 - response.trim()エラーを防ぐ
+   * @param {any} response - サーバーからのレスポンス
+   * @returns {string} 安全な文字列レスポンス
+   */
+  window.safeResponseTrim = function(response) {
+    if (response === null || response === undefined) {
+      return '';
+    }
+
+    // 既に文字列の場合
+    if (typeof response === 'string') {
+      return response.trim();
+    }
+
+    // オブジェクトの場合はJSON文字列化
+    if (typeof response === 'object') {
+      try {
+        return JSON.stringify(response).trim();
+      } catch (error) {
+        console.warn('safeResponseTrim: JSON stringify failed', error);
+        return String(response).trim();
+      }
+    }
+
+    // その他の型は文字列変換
+    return String(response).trim();
+  };
+
+  /**
+   * 安全なGoogle Apps Scriptレスポンス処理
+   * @param {any} response - GASからのレスポンス
+   * @returns {Object} パースされたレスポンスオブジェクト
+   */
+  window.safeParseGASResponse = function(response) {
+    try {
+      // レスポンスが既にオブジェクトの場合
+      if (typeof response === 'object' && response !== null) {
+        return response;
+      }
+
+      // 文字列の場合はJSONパース
+      if (typeof response === 'string') {
+        const trimmed = response.trim();
+        if (trimmed === '') {
+          return { success: false, message: '空のレスポンス' };
+        }
+        return JSON.parse(trimmed);
+      }
+
+      return { success: false, message: '不正なレスポンス形式', raw: response };
+    } catch (error) {
+      console.warn('safeParseGASResponse: Parse failed', error, response);
+      return {
+        success: false,
+        message: 'レスポンス解析エラー',
+        error: error.message,
+        raw: response
+      };
+    }
+  };
 
   // =============================================================================
   // PERFORMANCE UTILITIES

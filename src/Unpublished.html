@@ -25,6 +25,7 @@
         const message = args.join(' ');
         if (
           message.includes('cdn.tailwindcss.com should not be used in production') ||
+          message.includes('cdnjs.cloudflare.com') ||
           message.includes('tailwind') ||
           message.includes('TailwindCSS')
         ) {

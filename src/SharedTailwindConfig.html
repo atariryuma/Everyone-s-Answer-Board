@@ -32,6 +32,7 @@
           message.includes('tailwind') ||
           message.includes('TailwindCSS') ||
           message.includes('cdn.tailwindcss.com') ||
+          message.includes('cdnjs.cloudflare.com') ||
           message.includes('should not be used in production')
         ) {
           return;
@@ -40,7 +41,8 @@
       };
       console.log = function (...args) {
         const message = args.join(' ');
-        if (message.includes('cdn.tailwindcss.com should not be used in production')) {
+        if (message.includes('cdn.tailwindcss.com should not be used in production') ||
+            message.includes('cdnjs.cloudflare.com')) {
           return;
         }
         originalLog.apply(console, args);
@@ -49,7 +51,7 @@
   })();
 </script>
 <script
-  src="https://cdn.tailwindcss.com"
+  src="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/4.1.13/lib.min.js"
   defer
-  onerror="console.warn('TailwindCSS failed to load')"
+  onerror="console.warn('TailwindCSS failed to load from cdnjs')"
 ></script>
