@@ -105,18 +105,15 @@ const AdminController = Object.freeze({
    * @returns {Object} スプレッドシート一覧
    */
   getSpreadsheetList() {
-    console.log('🔍 AdminController.getSpreadsheetList() 呼び出し開始');
     try {
       const result = DataService.getSpreadsheetList();
-      console.log('🔍 AdminController.getSpreadsheetList() 結果:', result);
-      console.log('🔍 結果の詳細:', {
-        type: typeof result,
-        hasSpreadsheets: result && typeof result.spreadsheets !== 'undefined',
-        spreadsheetsLength: result && result.spreadsheets ? result.spreadsheets.length : 'undefined'
+      console.log('🔍 AdminController結果:', {
+        success: result?.success,
+        count: result?.spreadsheets?.length || 0
       });
       return result;
     } catch (error) {
-      console.error('🔍 AdminController.getSpreadsheetList() エラー:', error);
+      console.error('🔍 AdminController エラー:', error.message);
       return null;
     }
   },
@@ -291,7 +288,22 @@ function getConfig() {
 }
 
 function getSpreadsheetList() {
-  return AdminController.getSpreadsheetList();
+  try {
+    const result = AdminController.getSpreadsheetList();
+    console.log('🔍 グローバル関数結果:', {
+      success: result?.success,
+      count: result?.spreadsheets?.length || 0,
+      returningNull: result === null
+    });
+    return result;
+  } catch (error) {
+    console.error('🔍 グローバル関数エラー:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      spreadsheets: []
+    };
+  }
 }
 
 function getSheetList(spreadsheetId) {

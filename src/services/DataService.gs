@@ -1009,7 +1009,10 @@ const DataService = Object.freeze({
 
       while (files.hasNext() && count < maxCount) {
         const file = files.next();
-        console.log(`🔍 ファイル発見 ${count + 1}: ${file.getName()}`);
+        // 最初の3個だけ詳細ログ
+        if (count < 3) {
+          console.log(`🔍 ファイル発見 ${count + 1}: ${file.getName()}`);
+        }
         spreadsheets.push({
           id: file.getId(),
           name: file.getName(),
@@ -1028,13 +1031,10 @@ const DataService = Object.freeze({
         spreadsheets
       };
 
-      console.log('🔍 DataService.getSpreadsheetList 戻り値:', response);
-      console.log('🔍 戻り値の詳細:', {
-        hasSuccess: typeof response.success !== 'undefined',
-        successValue: response.success,
-        hasSpreadsheets: typeof response.spreadsheets !== 'undefined',
-        spreadsheetsLength: response.spreadsheets ? response.spreadsheets.length : 'undefined',
-        spreadsheetsType: typeof response.spreadsheets
+      console.log('🔍 DataService戻り値:', {
+        success: response.success,
+        spreadsheetsCount: response.spreadsheets.length,
+        executionTime: response.executionTime
       });
 
       return response;
