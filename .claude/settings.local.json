@@ -92,7 +92,8 @@
       "Bash(./scripts/safe-deploy.sh:*)",
       "WebFetch(domain:www.anthropic.com)",
       "WebFetch(domain:www.eesel.ai)",
-      "WebFetch(domain:cdnjs.com)"
+      "WebFetch(domain:cdnjs.com)",
+      "Bash(wc:*)"
     ],
     "deny": [],
     "ask": [],

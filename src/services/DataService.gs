@@ -981,6 +981,206 @@ const DataService = Object.freeze({
     }
 
     return results;
+  },
+
+  // ===========================================
+  // 📊 管理パネル用API関数（main.gsから移動）
+  // ===========================================
+
+  /**
+   * スプレッドシート一覧を取得
+   * AdminPanel.js.html, AppSetupPage.html から呼び出される
+   *
+   * @returns {Object} スプレッドシート一覧
+   */
+  getSpreadsheetList() {
+    const started = Date.now();
+    try {
+      const files = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
+      const spreadsheets = [];
+      let count = 0;
+      const maxCount = 50; // 最大50件まで
+
+      while (files.hasNext() && count < maxCount) {
+        const file = files.next();
+        spreadsheets.push({
+          id: file.getId(),
+          name: file.getName(),
+          url: file.getUrl(),
+          lastUpdated: file.getLastUpdated()
+        });
+        count++;
+      }
+
+      return {
+        success: true,
+        cached: false,
+        executionTime: `${Date.now() - started}ms`,
+        spreadsheets
+      };
+    } catch (error) {
+      console.error('DataService.getSpreadsheetList エラー:', error.message);
+      return {
+        success: false,
+        cached: false,
+        executionTime: `${Date.now() - started}ms`,
+        message: error.message,
+        spreadsheets: []
+      };
+    }
+  },
+
+  /**
+   * シート一覧を取得
+   * AdminPanel.js.html, AppSetupPage.html から呼び出される
+   *
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @returns {Object} シート一覧
+   */
+  getSheetList(spreadsheetId) {
+    try {
+      if (!spreadsheetId) {
+        return {
+          success: false,
+          message: 'スプレッドシートIDが指定されていません'
+        };
+      }
+
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const sheets = spreadsheet.getSheets();
+      const sheetList = sheets.map(sheet => ({
+        name: sheet.getName(),
+        index: sheet.getIndex(),
+        rowCount: sheet.getMaxRows(),
+        columnCount: sheet.getMaxColumns()
+      }));
+
+      return {
+        success: true,
+        sheets: sheetList
+      };
+    } catch (error) {
+      console.error('DataService.getSheetList エラー:', error.message);
+      return {
+        success: false,
+        message: error.message,
+        sheets: []
+      };
+    }
+  },
+
+  /**
+   * 列を分析
+   * AdminPanel.js.html, AppSetupPage.html から呼び出される
+   *
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @param {string} sheetName - シート名
+   * @returns {Object} 列分析結果
+   */
+  analyzeColumns(spreadsheetId, sheetName) {
+    try {
+      if (!spreadsheetId || !sheetName) {
+        return {
+          success: false,
+          message: 'スプレッドシートIDとシート名が必要です'
+        };
+      }
+
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const sheet = spreadsheet.getSheetByName(sheetName);
+
+      if (!sheet) {
+        return {
+          success: false,
+          message: 'シートが見つかりません'
+        };
+      }
+
+      // ヘッダー行を取得（1行目）
+      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+
+      // サンプルデータを取得（最大5行）
+      const sampleRowCount = Math.min(5, sheet.getLastRow() - 1);
+      let sampleData = [];
+      if (sampleRowCount > 0) {
+        sampleData = sheet.getRange(2, 1, sampleRowCount, sheet.getLastColumn()).getValues();
+      }
+
+      // 列情報を分析
+      const columns = headers.map((header, index) => {
+        const samples = sampleData.map(row => row[index]).filter(v => v);
+
+        // 列タイプを推測
+        let type = 'text';
+        if (header.toLowerCase().includes('timestamp') || header.toLowerCase().includes('日時')) {
+          type = 'datetime';
+        } else if (header.toLowerCase().includes('email') || header.toLowerCase().includes('メール')) {
+          type = 'email';
+        } else if (header.toLowerCase().includes('class') || header.toLowerCase().includes('クラス')) {
+          type = 'class';
+        } else if (header.toLowerCase().includes('name') || header.toLowerCase().includes('名前')) {
+          type = 'name';
+        } else if (samples.length > 0 && samples.every(s => !isNaN(s))) {
+          type = 'number';
+        }
+
+        return {
+          index,
+          header,
+          type,
+          samples: samples.slice(0, 3) // 最大3つのサンプル
+        };
+      });
+
+      // AI検出シミュレーション（シンプルなパターンマッチング）
+      const mapping = { mapping: {}, confidence: {} };
+
+      headers.forEach((header, index) => {
+        const headerLower = header.toLowerCase();
+
+        // 回答列の検出
+        if (headerLower.includes('回答') || headerLower.includes('answer') || headerLower.includes('意見')) {
+          mapping.mapping.answer = index;
+          mapping.confidence.answer = 85;
+        }
+
+        // 理由列の検出
+        if (headerLower.includes('理由') || headerLower.includes('根拠') || headerLower.includes('reason')) {
+          mapping.mapping.reason = index;
+          mapping.confidence.reason = 80;
+        }
+
+        // クラス列の検出
+        if (headerLower.includes('クラス') || headerLower.includes('class') || headerLower.includes('組')) {
+          mapping.mapping.class = index;
+          mapping.confidence.class = 90;
+        }
+
+        // 名前列の検出
+        if (headerLower.includes('名前') || headerLower.includes('name') || headerLower.includes('氏名')) {
+          mapping.mapping.name = index;
+          mapping.confidence.name = 85;
+        }
+      });
+
+      return {
+        success: true,
+        headers,
+        columns,
+        columnMapping: mapping,
+        sampleData: sampleData.slice(0, 3) // 最大3行のサンプル
+      };
+
+    } catch (error) {
+      console.error('DataService.analyzeColumns エラー:', error.message);
+      return {
+        success: false,
+        message: error.message,
+        headers: [],
+        columns: [],
+        columnMapping: { mapping: {}, confidence: {} }
+      };
+    }
   }
 
 });

@@ -653,4 +653,154 @@ const ConfigService = Object.freeze({
     }
   },
 
+  // ===========================================
+  // 📊 管理パネル用API関数（main.gsから移動）
+  // ===========================================
+
+  /**
+   * 設定の下書き保存
+   * AdminPanel.js.html から呼び出される
+   *
+   * @param {Object} config - 保存する設定
+   * @returns {Object} 保存結果
+   */
+  saveDraftConfiguration(config) {
+    try {
+      if (!config || typeof config !== 'object') {
+        return {
+          success: false,
+          message: '設定データが無効です'
+        };
+      }
+
+      // ユーザー情報の取得
+      let userInfo = UserService.getCurrentUserInfo();
+      let userId = userInfo && userInfo.userId;
+
+      if (!userId) {
+        const email = UserService.getCurrentEmail();
+        if (!email) {
+          return { success: false, message: 'ユーザー情報が見つかりません' };
+        }
+
+        // DB から直接ユーザー検索
+        try {
+          const dbUser = DB.findUserByEmail(email);
+          if (dbUser && dbUser.userId) {
+            userId = dbUser.userId;
+            userInfo = { userId, userEmail: email };
+          } else {
+            // ユーザーを自動作成
+            const created = UserService.createUser(email);
+            userId = created && created.userId;
+            userInfo = created || { userId, userEmail: email };
+          }
+        } catch (e) {
+          return { success: false, message: 'ユーザー情報の処理に失敗しました' };
+        }
+      }
+
+      // 設定を保存
+      const result = this.saveUserConfig(userId, config);
+
+      return {
+        success: result ? true : false,
+        config: result || config,
+        message: result ? '下書きを保存しました' : '保存に失敗しました'
+      };
+
+    } catch (error) {
+      console.error('ConfigService.saveDraftConfiguration エラー:', error.message);
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  },
+
+  /**
+   * アプリケーションの公開
+   * AdminPanel.js.html から呼び出される
+   *
+   * @param {Object} publishConfig - 公開設定
+   * @returns {Object} 公開結果
+   */
+  publishApplication(publishConfig) {
+    try {
+      if (!publishConfig || typeof publishConfig !== 'object') {
+        return {
+          success: false,
+          message: '公開設定が無効です'
+        };
+      }
+
+      // 必須フィールドの確認
+      if (!publishConfig.spreadsheetId || !publishConfig.sheetName) {
+        return {
+          success: false,
+          message: 'スプレッドシートIDとシート名は必須です'
+        };
+      }
+
+      // ユーザー情報の取得
+      let userInfo = UserService.getCurrentUserInfo();
+      let userId = userInfo && userInfo.userId;
+
+      if (!userId) {
+        const email = UserService.getCurrentEmail();
+        if (!email) {
+          return { success: false, message: 'ユーザー情報が見つかりません' };
+        }
+
+        // DB から直接ユーザー検索
+        try {
+          const dbUser = DB.findUserByEmail(email);
+          if (dbUser && dbUser.userId) {
+            userId = dbUser.userId;
+            userInfo = { userId, userEmail: email };
+          } else {
+            return { success: false, message: 'ユーザーが見つかりません' };
+          }
+        } catch (e) {
+          return { success: false, message: 'ユーザー情報の処理に失敗しました' };
+        }
+      }
+
+      // 現在の設定を取得
+      const currentConfig = this.getUserConfig(userId) || {};
+
+      // 公開設定をマージ
+      const updatedConfig = {
+        ...currentConfig,
+        ...publishConfig,
+        appPublished: true,
+        publishedAt: new Date().toISOString(),
+        setupComplete: true
+      };
+
+      // 設定を保存
+      const result = this.saveUserConfig(userId, updatedConfig);
+
+      if (result) {
+        return {
+          success: true,
+          config: result,
+          message: 'アプリケーションを公開しました'
+        };
+      } else {
+        return {
+          success: false,
+          message: '公開設定の保存に失敗しました'
+        };
+      }
+
+    } catch (error) {
+      console.error('ConfigService.publishApplication エラー:', error.message);
+      return {
+        success: false,
+        message: error.message
+      };
+    }
+  }
+
 });

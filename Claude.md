@@ -79,3 +79,154 @@ src/
 2. **Use safe-deploy script** for production changes
 3. **Check GAS logs** after deployment
 4. **Keep backup** of working versions
+
+## Recent Major Refactoring (2025-09-13)
+
+### Architecture Cleanup: main.gs → Controllers Pattern
+
+**Problem Solved**: main.gs had grown to 2,881 lines, violating single responsibility principle
+
+**Solution**: Implemented proper separation of concerns with specialized controllers
+
+### Results:
+- **84% Size Reduction**: main.gs reduced from 2,881 → 400 lines
+- **4 New Controllers**: Organized business logic into focused modules
+- **All Tests Pass**: 113/113 tests continue working after refactoring
+- **Successful Deployment**: 39 files deployed with safe-deploy script
+
+### New Controller Structure:
+
+```
+src/controllers/
+├── AdminController.gs      # Admin panel APIs (getConfig, getSpreadsheetList, etc.)
+├── DataController.gs       # Data operations (handleGetData, reactions, highlights)
+├── FrontendController.gs   # Frontend APIs (getUser, login, authentication)
+└── SystemController.gs     # System management (setup, diagnostics, monitoring)
+```
+
+### main.gs Now Contains Only:
+- HTTP request routing (doGet/doPost)
+- Template inclusion utility (`include` function)
+- Mode-based handler delegation
+- Error handling and response formatting
+
+### Enhanced Services:
+- **DataService**: Added admin panel functions (getSpreadsheetList, analyzeColumns)
+- **ConfigService**: Added configuration management (saveDraftConfiguration, publishApplication)
+
+### Key Benefits:
+1. **Maintainability**: Each controller has single responsibility
+2. **Testability**: Isolated business logic easier to test
+3. **Readability**: main.gs is now pure entry point
+4. **Scalability**: Adding new features won't bloat main.gs
+5. **Debugging**: Errors easier to locate in focused modules
+
+### Backward Compatibility:
+All existing HTML files continue to work through global function exports:
+```javascript
+// Global functions still available for google.script.run calls
+function getUser(kind) { return FrontendController.getUser(kind); }
+function setupApplication(...args) { return SystemController.setupApplication(...args); }
+```
+
+## Function Mapping Guide - Avoid Duplicates
+
+### 📁 File Responsibility Matrix
+
+| **Layer** | **File** | **Primary Purpose** | **Should Contain** | **Should NOT Contain** |
+|-----------|----------|-------------------|-------------------|----------------------|
+| **Entry** | `main.gs` | HTTP routing & templates | `doGet()`, `doPost()`, `include()`, route handlers | Business logic, database ops |
+| **Controllers** | `FrontendController.gs` | Frontend HTML APIs | `getUser()`, `processLoginAction()`, auth functions | Database operations, complex logic |
+| | `AdminController.gs` | Admin panel APIs | `getConfig()`, `validateAccess()`, admin functions | User creation, data processing |
+| | `DataController.gs` | Data operations | `handleGetData()`, reactions, user management | System setup, authentication |
+| | `SystemController.gs` | System management | `setupApplication()`, diagnostics, maintenance | User data, frontend APIs |
+| **Services** | `UserService.gs` | User management | `getCurrentUserInfo()`, `createUser()`, permissions | HTTP handling, templates |
+| | `ConfigService.gs` | Configuration | `getUserConfig()`, `saveConfig()`, validation | User creation, data processing |
+| | `DataService.gs` | Spreadsheet data | `getSheetData()`, `addReaction()`, sheet ops | User authentication, system setup |
+| | `SecurityService.gs` | Security & auth | Token management, input sanitization | Data formatting, UI logic |
+| **Infrastructure** | `DatabaseService.gs` | Database operations | `DB.*` CRUD functions, Service Account API | Business logic, UI concerns |
+| | `CacheService.gs` | Caching strategy | Cache management, TTL, invalidation | Data processing, user logic |
+| **Core** | `constants.gs` | App constants | `CORE`, `CONSTANTS`, `PROPS_KEYS`, enums | Functions, business logic |
+| | `errors.gs` | Error handling | `ErrorHandler`, error categorization | Data operations, user management |
+| **Utils** | `helpers.gs` | Common utilities | `ColumnHelpers`, `FormatHelpers`, calculations | Domain-specific logic |
+| | `formatters.gs` | Data formatting | `ResponseFormatter`, `DataFormatter` | Business operations |
+| | `validators.gs` | Input validation | `InputValidator`, security validation | Data persistence |
+
+### 🔍 Function Placement Decision Tree
+
+```
+New Function Needed?
+         │
+         ▼
+    What does it do?
+         │
+    ┌────┴────────────┬──────────────┐
+    ▼                 ▼              ▼
+HTTP/Routing?    Business Logic?   Utility?
+    │                 │              │
+    ▼                 ▼              ▼
+  main.gs        Which domain?    utils/*.gs
+                      │
+               ┌──────┼──────┬──────────┐
+               ▼      ▼      ▼          ▼
+             User  Config  Data     System
+               │      │      │          │
+               ▼      ▼      ▼          ▼
+          UserService ConfigService DataService SystemController
+```
+
+### ⚠️ Common Duplication Patterns to Avoid
+
+#### 1. **User Information Functions**
+- ✅ **Use:** `UserService.getCurrentUserInfo()`
+- ❌ **Don't create:** `getUser()`, `getCurrentUser()`, `fetchUserData()`
+- **Location:** All user-related functions belong in `UserService.gs`
+
+#### 2. **Configuration Functions**
+- ✅ **Use:** `ConfigService.getUserConfig(userId)`
+- ❌ **Don't create:** `getConfig()`, `loadConfiguration()`, `fetchSettings()`
+- **Location:** All config operations belong in `ConfigService.gs`
+
+#### 3. **Data Retrieval Functions**
+- ✅ **Use:** `DataService.getSheetData(userId, options)`
+- ❌ **Don't create:** `getData()`, `loadSpreadsheetData()`, `fetchSheetInfo()`
+- **Location:** All spreadsheet operations belong in `DataService.gs`
+
+#### 4. **Authentication Functions**
+- ✅ **Use:** `UserService.isSystemAdmin(email)`, `SecurityService.*`
+- ❌ **Don't create:** `checkAuth()`, `validateUser()`, `isAdmin()`
+- **Location:** Auth in `UserService.gs`, security in `SecurityService.gs`
+
+### 📋 Before Adding New Functions Checklist
+
+1. **Search existing code:** Use `Grep` to find similar functionality
+```bash
+# Search for existing functions
+rg "function.*[Gg]et.*[Uu]ser" src/
+rg "function.*[Cc]onfig" src/
+rg "function.*[Dd]ata" src/
+```
+
+2. **Check appropriate service:**
+   - User-related? → `UserService.gs`
+   - Config-related? → `ConfigService.gs`
+   - Data-related? → `DataService.gs`
+   - System-related? → `SystemController.gs`
+
+3. **Verify layer placement:**
+   - HTTP handling? → `main.gs` or `controllers/*.gs`
+   - Business logic? → `services/*.gs`
+   - Data access? → `infrastructure/*.gs`
+   - Utilities? → `utils/*.gs`
+
+4. **Check naming consistency:**
+   - Use domain prefixes: `getUserConfig()`, `saveUserConfig()`
+   - Avoid generic names: `getData()`, `save()`, `load()`
+
+### 🎯 Golden Rules
+
+1. **One function, one location** - Never duplicate functionality
+2. **Search before create** - Always check if it already exists
+3. **Respect boundaries** - Services don't call Controllers
+4. **Use clear names** - Include context in function names
+5. **Follow the layers** - Maintain architectural separation

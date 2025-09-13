@@ -386,12 +386,12 @@
 
           select.innerHTML = '<option value="">スプレッドシートを選択...</option>';
 
-          // デバッグログ追加
+          // デバッグログ追加（null安全）
           console.log('📊 スプレッドシート一覧受信:', {
             resultType: Array.isArray(result) ? 'array' : typeof result,
             count: spreadsheets.length,
-            cached: result.cached || false,
-            executionTime: result.executionTime || 'N/A',
+            cached: (result && result.cached) || false,
+            executionTime: (result && result.executionTime) || 'N/A',
             ownerFiltered: true,
           });
 
