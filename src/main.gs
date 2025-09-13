@@ -11,6 +11,22 @@
 /* global UserService, ConfigService, DataService, SecurityService, ErrorHandler, DB, PROPS_KEYS, URL */
 
 /**
+ * GAS include function - HTML template inclusion utility
+ * GASベストプラクティス準拠のテンプレートインクルード機能
+ *
+ * @param {string} filename - インクルードするファイル名
+ * @returns {string} ファイルの内容
+ */
+function include(filename) {
+  try {
+    return HtmlService.createHtmlOutputFromFile(filename).getContent();
+  } catch (error) {
+    console.error(`include error for file ${filename}:`, error.message);
+    return `<!-- Error loading ${filename}: ${error.message} -->`;
+  }
+}
+
+/**
  * Application Configuration
  */
 const APP_CONFIG = Object.freeze({
