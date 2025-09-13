@@ -45,7 +45,7 @@ const SystemController = Object.freeze({
       // システムプロパティを設定
       const properties = PropertiesService.getScriptProperties();
       properties.setProperties({
-        [PROPS_KEYS.DATABASE_ID]: databaseId,
+        [PROPS_KEYS.DATABASE_SPREADSHEET_ID]: databaseId,
         [PROPS_KEYS.ADMIN_EMAIL]: adminEmail,
         [PROPS_KEYS.SERVICE_ACCOUNT_CREDS]: serviceAccountJson
       });
@@ -89,7 +89,7 @@ const SystemController = Object.freeze({
   testSetup() {
     try {
       const properties = PropertiesService.getScriptProperties();
-      const databaseId = properties.getProperty(PROPS_KEYS.DATABASE_ID);
+      const databaseId = properties.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
       const adminEmail = properties.getProperty(PROPS_KEYS.ADMIN_EMAIL);
 
       if (!databaseId || !adminEmail) {
@@ -234,7 +234,7 @@ const SystemController = Object.freeze({
       // データベース診断
       try {
         const properties = PropertiesService.getScriptProperties();
-        const databaseId = properties.getProperty(PROPS_KEYS.DATABASE_ID);
+        const databaseId = properties.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
 
         if (databaseId) {
           const spreadsheet = SpreadsheetApp.openById(databaseId);
@@ -244,7 +244,7 @@ const SystemController = Object.freeze({
             sheets: spreadsheet.getSheets().length
           };
         } else {
-          diagnostics.database = { accessible: false, reason: 'DATABASE_ID not configured' };
+          diagnostics.database = { accessible: false, reason: 'DATABASE_SPREADSHEET_ID not configured' };
         }
       } catch (dbError) {
         diagnostics.database = { accessible: false, error: dbError.message };
@@ -282,7 +282,7 @@ const SystemController = Object.freeze({
       const status = {
         timestamp: new Date().toISOString(),
         setup: {
-          hasDatabase: !!properties.getProperty(PROPS_KEYS.DATABASE_ID),
+          hasDatabase: !!properties.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID),
           hasAdminEmail: !!properties.getProperty(PROPS_KEYS.ADMIN_EMAIL),
           hasServiceAccount: !!properties.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
         },

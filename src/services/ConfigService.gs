@@ -494,16 +494,7 @@ const ConfigService = Object.freeze({
       // まずコア必須プロパティが揃っていること
       if (!this.hasCoreSystemProps()) return false;
 
-      // スクリプトプロパティの確認
-      const properties = PropertiesService.getScriptProperties();
-      const systemConfig = properties.getProperty('SYSTEM_CONFIG');
-      
-      if (systemConfig) {
-        const config = JSON.parse(systemConfig);
-        return config.initialized === true;
-      }
-      
-      // SYSTEM_CONFIG がなくても、コア必須が揃っているなら最低限セットアップ済みとして扱う
+      // コア必須プロパティが揃っていればセットアップ済みとして扱う
       return true;
     } catch (error) {
       console.warn('ConfigService.isSystemSetup: システム状態確認エラー', error.message);
