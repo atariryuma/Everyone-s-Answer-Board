@@ -9,7 +9,7 @@
  * 📝 main.gsから移動されたAPI関数群
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, DB */
+/* global UserService, ConfigService, DataService, SecurityService, DB, UnifiedLogger */
 
 /**
  * AdminController - 管理パネル用コントローラー
@@ -105,17 +105,8 @@ const AdminController = Object.freeze({
    * @returns {Object} スプレッドシート一覧
    */
   getSpreadsheetList() {
-    try {
-      const result = DataService.getSpreadsheetList();
-      console.log('🔍 AdminController結果:', {
-        success: result?.success,
-        count: result?.spreadsheets?.length || 0
-      });
-      return result;
-    } catch (error) {
-      console.error('🔍 AdminController エラー:', error.message);
-      return null;
-    }
+    // 直接DataServiceに委譲（冗長なログを除去）
+    return DataService.getSpreadsheetList();
   },
 
   /**
@@ -288,22 +279,8 @@ function getConfig() {
 }
 
 function getSpreadsheetList() {
-  try {
-    const result = AdminController.getSpreadsheetList();
-    console.log('🔍 グローバル関数結果:', {
-      success: result?.success,
-      count: result?.spreadsheets?.length || 0,
-      returningNull: result === null
-    });
-    return result;
-  } catch (error) {
-    console.error('🔍 グローバル関数エラー:', error.message);
-    return {
-      success: false,
-      error: error.message,
-      spreadsheets: []
-    };
-  }
+  // グローバル関数は直接Controller呼び出し（エラーハンドリングをDataServiceに委譲）
+  return AdminController.getSpreadsheetList();
 }
 
 function getSheetList(spreadsheetId) {

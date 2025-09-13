@@ -13,7 +13,7 @@
  * - auth.gsの一部機能
  */
 
-/* global AppCacheService, DB, PROPS_KEYS, ConfigService, DataFormatter, CONSTANTS, URL */
+/* global AppCacheService, DB, PROPS_KEYS, SecurityService, DataFormatter, CONSTANTS, URL */
 
 /**
  * UserService - 統一ユーザー管理サービス
@@ -441,14 +441,13 @@ const UserService = Object.freeze({
   },
 
   /**
-   * メールアドレス検証
+   * メールアドレス検証（SecurityServiceに委譲）
    * @param {string} email - メールアドレス
    * @returns {boolean} 有効かどうか
    */
   validateEmail(email) {
-    if (!email || typeof email !== 'string') return false;
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
+    const result = SecurityService.validateEmail(email);
+    return result.isValid;
   },
 
   /**

@@ -656,15 +656,19 @@
         if (spreadsheetSelect) {
           spreadsheetSelect.value = config.spreadsheetId;
           console.log('✅ スプレッドシート選択反映:', config.spreadsheetId);
+        } else {
+          console.warn('⚠️ スプレッドシートセレクト (spreadsheet-select) が見つかりません');
         }
       }
 
       // 2. スプレッドシートURLの反映（URL直接入力フィールド）
       if (config.spreadsheetUrl) {
-        const urlInput = document.getElementById('url-input');
+        const urlInput = document.getElementById('spreadsheet-url');
         if (urlInput) {
           urlInput.value = config.spreadsheetUrl;
           console.log('✅ スプレッドシートURL反映:', config.spreadsheetUrl);
+        } else {
+          console.warn('⚠️ URL入力フィールド (spreadsheet-url) が見つかりません');
         }
       }
 
@@ -674,6 +678,8 @@
         if (sheetSelect) {
           sheetSelect.value = config.sheetName;
           console.log('✅ シート選択反映:', config.sheetName);
+        } else {
+          console.warn('⚠️ シートセレクト (sheet-select) が見つかりません');
         }
       }
 
@@ -686,6 +692,8 @@
         if (showNamesToggle && typeof settings.showNames === 'boolean') {
           showNamesToggle.checked = settings.showNames;
           console.log('✅ 名前表示設定反映:', settings.showNames);
+        } else if (!showNamesToggle) {
+          console.warn('⚠️ 名前表示トグル (show-names) が見つかりません');
         }
 
         // リアクション表示トグル
@@ -693,6 +701,8 @@
         if (showReactionsToggle && typeof settings.showReactions === 'boolean') {
           showReactionsToggle.checked = settings.showReactions;
           console.log('✅ リアクション表示設定反映:', settings.showReactions);
+        } else if (!showReactionsToggle) {
+          console.warn('⚠️ リアクション表示トグル (show-reactions) が見つかりません');
         }
       }
 
@@ -702,24 +712,30 @@
         if (displayModeSelect) {
           displayModeSelect.value = config.displayMode;
           console.log('✅ 表示モード反映:', config.displayMode);
+        } else {
+          console.warn('⚠️ 表示モードセレクト (display-mode) が見つかりません');
         }
       }
 
       // 6. フォーム情報の反映
       if (config.formUrl) {
-        const formUrlDisplay = document.getElementById('form-url-display');
+        const formUrlDisplay = document.getElementById('form-url');
         if (formUrlDisplay) {
           formUrlDisplay.textContent = config.formUrl;
           formUrlDisplay.href = config.formUrl;
           console.log('✅ フォームURL反映:', config.formUrl);
+        } else {
+          console.warn('⚠️ フォームURL表示要素 (form-url) が見つかりません');
         }
       }
 
       if (config.formTitle) {
-        const formTitleDisplay = document.getElementById('form-title-display');
+        const formTitleDisplay = document.getElementById('form-title');
         if (formTitleDisplay) {
           formTitleDisplay.textContent = config.formTitle;
           console.log('✅ フォームタイトル反映:', config.formTitle);
+        } else {
+          console.warn('⚠️ フォームタイトル表示要素 (form-title) が見つかりません');
         }
       }
 

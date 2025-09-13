@@ -13,7 +13,7 @@
  * - 各所に分散している検証処理
  */
 
-/* global CONSTANTS, SECURITY, SecurityValidator, URL */
+/* global CONSTANTS, SECURITY, SecurityValidator, SecurityService, URL */
 
 /**
  * InputValidator - 統一入力検証システム
@@ -26,48 +26,13 @@ const InputValidator = Object.freeze({
   // ===========================================
 
   /**
-   * メールアドレス検証
+   * メールアドレス検証（SecurityServiceに統一）
    * @param {string} email - メールアドレス
    * @returns {Object} 検証結果
    */
   validateEmail(email) {
-    const result = {
-      isValid: false,
-      sanitized: '',
-      errors: []
-    };
-
-    if (!email || typeof email !== 'string') {
-      result.errors.push('メールアドレスが必要です');
-      return result;
-    }
-
-    // 基本形式チェック
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      result.errors.push('無効なメールアドレス形式');
-      return result;
-    }
-
-    // 危険文字除去・正規化
-    const sanitized = email.toLowerCase().trim();
-
-    // 長さ制限（RFC 5321準拠）
-    if (sanitized.length > 254) {
-      result.errors.push('メールアドレスが長すぎます（254文字以下）');
-      return result;
-    }
-
-    // ドメイン部分の追加チェック
-    const [localPart, domain] = sanitized.split('@');
-    if (localPart.length > 64) {
-      result.errors.push('メールアドレスのローカル部分が長すぎます');
-      return result;
-    }
-
-    result.isValid = true;
-    result.sanitized = sanitized;
-    return result;
+    // SecurityServiceに統一 - レガシー互換性維持
+    return SecurityService.validateEmail(email);
   },
 
   /**
@@ -478,7 +443,7 @@ function validateUserData(userData) {
 }
 
 function validateEmail(email) {
-  return InputValidator.validateEmail(email);
+  return SecurityService.validateEmail(email);
 }
 
 function validateUrl(url) {

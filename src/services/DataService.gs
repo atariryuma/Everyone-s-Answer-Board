@@ -13,7 +13,7 @@
  * - ColumnAnalysisSystem.gs の一部
  */
 
-/* global DB, AppCacheService, UserService, ConfigService, DataFormatter, CONSTANTS */
+/* global DB, AppCacheService, UserService, ConfigService, DataFormatter, CONSTANTS, UnifiedLogger */
 
 /**
  * DataService - 統一データ操作サービス
@@ -996,9 +996,11 @@ const DataService = Object.freeze({
   getSpreadsheetList() {
     const started = Date.now();
     try {
-      console.log('🔍 DriveApp.getFilesByType() 実行開始');
+      UnifiedLogger.debug('DataService', { operation: 'DriveApp.getFilesByType', phase: 'start' });
       const files = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
-      console.log('🔍 DriveApp.getFilesByType() 実行完了:', {
+      UnifiedLogger.debug('DataService', {
+        operation: 'DriveApp.getFilesByType',
+        phase: 'complete',
         hasFiles: typeof files !== 'undefined',
         hasNext: files ? files.hasNext() : false
       });
@@ -1011,7 +1013,11 @@ const DataService = Object.freeze({
         const file = files.next();
         // 最初の3個だけ詳細ログ
         if (count < 3) {
-          console.log(`🔍 ファイル発見 ${count + 1}: ${file.getName()}`);
+          UnifiedLogger.debug('DataService', {
+            operation: 'file discovery',
+            index: count + 1,
+            fileName: file.getName()
+          });
         }
         spreadsheets.push({
           id: file.getId(),
@@ -1022,8 +1028,6 @@ const DataService = Object.freeze({
         count++;
       }
 
-      console.log(`🔍 最終結果: ${spreadsheets.length}個のスプレッドシートを発見`);
-
       const response = {
         success: true,
         cached: false,
@@ -1031,16 +1035,21 @@ const DataService = Object.freeze({
         spreadsheets
       };
 
-      console.log('🔍 DataService戻り値:', {
-        success: response.success,
+      UnifiedLogger.success('DataService', {
+        operation: 'getSpreadsheetList',
         spreadsheetsCount: response.spreadsheets.length,
-        executionTime: response.executionTime
+        executionTime: response.executionTime,
+        maxReached: count >= maxCount
       });
 
       return response;
     } catch (error) {
-      console.error('DataService.getSpreadsheetList エラー:', error.message);
-      console.error('エラースタック:', error.stack);
+      UnifiedLogger.error('DataService', {
+        operation: 'getSpreadsheetList',
+        error: error.message,
+        stack: error.stack,
+        executionTime: `${Date.now() - started}ms`
+      });
       return {
         success: false,
         cached: false,

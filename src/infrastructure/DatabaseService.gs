@@ -3,7 +3,7 @@
  * configJSON中心型5フィールド構造の完全実装
  */
 
-/* global PROPS_KEYS, CONSTANTS, SecurityService, AppCacheService, ConfigService, UserService */
+/* global PROPS_KEYS, CONSTANTS, SecurityService, AppCacheService, ConfigService, UserService, DatabaseCore, DatabaseOperations, UnifiedLogger */
 
 /**
  * セキュアなデータベースIDを取得
