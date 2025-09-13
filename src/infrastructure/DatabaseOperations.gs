@@ -120,7 +120,7 @@ const DatabaseOperations = Object.freeze({
     } catch (error) {
       UnifiedLogger.error('DatabaseOperations', {
         operation: 'findUserById',
-        userId: `${userId?.substring(0, 8)  }***`,
+        userId: typeof userId === 'string' && userId ? `${userId.substring(0, 8)}***` : `[${typeof userId}]`,
         error: error.message
       });
       return null;
@@ -235,7 +235,7 @@ const DatabaseOperations = Object.freeze({
     } catch (error) {
       UnifiedLogger.error('DatabaseOperations', {
         operation: 'updateUser',
-        userId: `${userId?.substring(0, 8)  }***`,
+        userId: typeof userId === 'string' && userId ? `${userId.substring(0, 8)}***` : `[${typeof userId}]`,
         error: error.message
       });
       throw error;

@@ -312,9 +312,9 @@ function setupMockServices() {
         userEmail: 'test@example.com'
       })),
       validateUserData: jest.fn((data) => ({
-        isValid: !data.email?.includes('<script>'),
+        isValid: !(typeof data.email === 'string' && data.email.includes('<script>')),
         sanitizedData: data,
-        errors: data.email?.includes('<script>') ? ['Invalid input'] : []
+        errors: (typeof data.email === 'string' && data.email.includes('<script>')) ? ['Invalid input'] : []
       }))
     },
     

@@ -1440,7 +1440,7 @@
       .withFailureHandler(function (error) {
         console.error('❌ loadSheetList: シート読み込みエラー', {
           error: error.message || error,
-          spreadsheetId: `${spreadsheetId?.substring(0, 10)}...`,
+          spreadsheetId: typeof spreadsheetId === 'string' && spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : `[${typeof spreadsheetId}]`,
           timestamp: new Date().toISOString(),
         });
 
