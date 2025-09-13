@@ -621,6 +621,9 @@ const ConfigService = Object.freeze({
       results.overall = '❌';
     }
 
+    return results;
+  },
+
   /**
    * コアシステム必須プロパティの存在確認
    * - ADMIN_EMAIL / DATABASE_SPREADSHEET_ID / SERVICE_ACCOUNT_CREDS
@@ -648,7 +651,5 @@ const ConfigService = Object.freeze({
       return false;
     }
   },
-    return results;
-  }
 
 });

@@ -503,6 +503,58 @@ git commit -m "feat: ..."
 
 ---
 
+## 🧭 回帰リスクと復元計画（重要機能の逸失点）
+
+本プロジェクトの大規模リファクタリングにより、いくつかの重要機能が削除/置換されている可能性があります。将来の開発で安全に復元できるよう、下記に現状と復元方針を明記します。
+
+1) コア初期化ゲート（Script Properties 3点）
+- 期待仕様: `ADMIN_EMAIL`, `DATABASE_SPREADSHEET_ID`, `SERVICE_ACCOUNT_CREDS` が揃っていなければ、ログイン前にセットアップ画面へ遷移。
+- 現状: 復元済み。`ConfigService.hasCoreSystemProps()` で3点を検査し、`src/main.gs:42-72` 付近でゲートしています。
+- 関連箇所: `src/services/ConfigService.gs`（hasCoreSystemProps, isSystemSetup）、`src/main.gs:42-72`
+
+2) Service Account 認証（JWT + SERVICE_ACCOUNT_CREDS）
+- 期待仕様: `SERVICE_ACCOUNT_CREDS` に保存した資格情報を使って JWT を発行し、`UrlFetchApp` で Sheets API を呼び出す。
+- 現状: 旧実装は削除。現行は `ScriptApp.getOAuthToken()` を利用（ユーザー認証依存）。
+- 復元ソース: `backups/legacy-20250913/security.gs` の `getServiceAccountTokenCached`, `generateNewServiceAccountToken`, `getSecureServiceAccountCreds`
+- 復元方針: `SecurityService` に SA トークン発行を再実装し、`cache.gs/getSheetsServiceCached()` で使用するトークンを差し替え。
+
+3) `getSecureDatabaseId()` の欠落
+- 現状: 参照あり（例: `src/database.gs:187` 他）が、定義が現行 `src/` に存在しません。
+- 復元ソース: `backups/legacy-20250913/security.gs`（`getSecureDatabaseId`）
+- 復元方針: `constants.gs` の `PROPS_KEYS.DATABASE_SPREADSHEET_ID` を読み出す関数を `src/database.gs` または `SecurityService` に実装し、参照を統一。
+
+4) `ConfigurationManager` の欠落
+- 現状: 参照あり（`src/cache.gs:344`, `src/database.gs:1287`）だが、クラス定義が現行 `src/` に存在しません。
+- 復元ソース: `backups/legacy-20250913/Base.gs:332` 以降（`ConfigurationManager` クラス）
+- 復元方針: 依存を削減し、直接 `SpreadsheetApp.openById` を利用するか、薄いラッパーとして `ConfigurationManager` を `src/` に再追加。
+
+5) `UserManager.getCurrentEmail()` の参照
+- 現状: `src/database.gs:725` で参照が残存。現行実装では `UserService.getCurrentEmail()` が正。
+- 復元方針: 参照箇所を `UserService.getCurrentEmail()` に置換し、旧 `UserManager` 依存を排除。
+
+6) アクセス検証ロジックの差し替え
+- 変更点: 旧 `validateWebAppAccess` → 新 `SecurityService.checkUserPermission`（役割ベース）
+- 互換性: 期待権限レベルのマッピングを README に明記（owner/system_admin/authenticated_user/guest/none）。
+
+7) セットアップ完了条件の整理
+- ユーザー単位: `UserService.getCurrentUserInfo().config.spreadsheetId` の存在で最小起動を許可。
+- グローバル: `SYSTEM_CONFIG.initialized === true` が true、または 3プロパティ揃いで最小運用可。
+- 参照: `src/services/DataService.gs:817`, `src/services/ConfigService.gs:491`
+
+### 復元チェックリスト（タスク化）
+- [ ] `getSecureDatabaseId()` を `src/database.gs` に実装（PropertiesService読み）
+- [ ] `ConfigurationManager.getSpreadsheet()` 参照を排除 or ラッパー再追加
+- [ ] `UserManager.getCurrentEmail()` 参照を `UserService.getCurrentEmail()` に統一
+- [ ] `SecurityService` に SA トークン（JWT）発行を再実装し、`cache.gs` のトークン取得経路を統一
+- [ ] e2e で SA 経由の Sheets 読み書き確認（DB 初期化/行更新/削除）
+
+### 受け入れ基準（Acceptance Criteria）
+- 3プロパティ未設定時は常にセットアップ画面へ遷移（`mode=setup` 以外）
+- `getSecureDatabaseId()` 経由で DB ID を取得し、全 DB 操作が成功
+- `ConfigurationManager` 参照が 0 件、または `src/` に存在する実装に解消
+- SA 認証で Sheets API 呼び出しが成功（JWT 発行・トークンキャッシュあり）
+- ユーザーのメールアドレスによる識別動作が一貫（`UserService.getCurrentEmail()` のみ利用）
+
 ## 🎊 まとめ
 
 Everyone's Answer Boardは、**Google Apps Script + Claude Code 2025**の最新技術を活用した高品質・高パフォーマンスなマルチテナント型プラットフォームです。
