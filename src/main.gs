@@ -423,49 +423,6 @@ function renderErrorPage(error) {
  * Utility Functions Export - HTML Service Compatible
  */
 
-/**
- * タイムスタンプフォーマット
- * @param {Date|string} date - 日付
- * @returns {string} フォーマット済み日付
- */
-function formatTimestamp(date) {
-  try {
-    return ResponseFormatter.formatTimestamp(date);
-  } catch (error) {
-    console.error('formatTimestamp error:', error);
-    return new Date(date).toISOString();
-  }
-}
-
-/**
- * 成功レスポンス作成
- * @param {*} data - データ
- * @param {Object} metadata - メタデータ
- * @returns {Object} 成功レスポンス
- */
-function createSuccessResponse(data, metadata) {
-  try {
-    return ResponseFormatter.createSuccessResponse(data, metadata);
-  } catch (error) {
-    console.error('createSuccessResponse error:', error);
-    return { success: true, data };
-  }
-}
-
-/**
- * エラーレスポンス作成
- * @param {string} message - エラーメッセージ
- * @param {Object} details - 詳細情報
- * @returns {Object} エラーレスポンス
- */
-function createErrorResponse(message, details) {
-  try {
-    return ResponseFormatter.createErrorResponse(message, details);
-  } catch (error) {
-    console.error('createErrorResponse error:', error);
-    return { success: false, error: message };
-  }
-}
 
 // ===========================================
 // 🌐 Controller Global Function Exports
@@ -557,6 +514,24 @@ function performDataIntegrityCheck() {
   return SystemController.performDataIntegrityCheck();
 }
 
+function testForceLogoutRedirect() {
+  try {
+    return FrontendController.testForceLogoutRedirect();
+  } catch (error) {
+    console.error('testForceLogoutRedirect error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function verifyUserAuthentication() {
+  try {
+    return FrontendController.verifyUserAuthentication();
+  } catch (error) {
+    console.error('verifyUserAuthentication error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 /**
  * Admin Controller Global Functions
  */
@@ -589,9 +564,72 @@ function connectDataSource(spreadsheetId, sheetName) {
   return DataController.connectDataSource(spreadsheetId, sheetName);
 }
 
+function checkIsSystemAdmin() {
+  try {
+    return AdminController.checkIsSystemAdmin();
+  } catch (error) {
+    console.error('checkIsSystemAdmin error:', error);
+    return false;
+  }
+}
+
+function getSheetList(spreadsheetId) {
+  try {
+    return AdminController.getSheetList(spreadsheetId);
+  } catch (error) {
+    console.error('getSheetList error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function validateAccess(spreadsheetId) {
+  try {
+    return AdminController.validateAccess(spreadsheetId);
+  } catch (error) {
+    console.error('validateAccess error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function getCurrentBoardInfoAndUrls() {
+  try {
+    return AdminController.getCurrentBoardInfoAndUrls();
+  } catch (error) {
+    console.error('getCurrentBoardInfoAndUrls error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function getFormInfo(spreadsheetId, sheetName) {
+  try {
+    return AdminController.getFormInfo(spreadsheetId, sheetName);
+  } catch (error) {
+    console.error('getFormInfo error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function checkCurrentPublicationStatus() {
+  try {
+    return AdminController.checkCurrentPublicationStatus();
+  } catch (error) {
+    console.error('checkCurrentPublicationStatus error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 /**
  * Data Controller Global Functions
  */
+function handleGetData(request) {
+  try {
+    return DataController.handleGetData(request);
+  } catch (error) {
+    console.error('handleGetData error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
 function addReaction(userId, rowId, reactionType) {
   return DataController.addReaction(userId, rowId, reactionType);
 }
@@ -602,6 +640,15 @@ function toggleHighlight(userId, rowId) {
 
 function refreshBoardData(userId) {
   return DataController.refreshBoardData(userId);
+}
+
+function addSpreadsheetUrl(url) {
+  try {
+    return DataController.addSpreadsheetUrl(url);
+  } catch (error) {
+    console.error('addSpreadsheetUrl error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function getUserConfig(userId) {

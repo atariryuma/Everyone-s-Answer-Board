@@ -445,16 +445,31 @@ const ConfigFormatter = Object.freeze({
  */
 
 // Core.gsからの移行
-function formatTimestamp(timestamp) {
-  return DataFormatter.formatDateTime(timestamp, { style: 'short' });
+function formatTimestamp(date) {
+  try {
+    return ResponseFormatter.formatTimestamp(date);
+  } catch (error) {
+    console.error('formatTimestamp error:', error);
+    return new Date(date).toISOString();
+  }
 }
 
 function createSuccessResponse(data, metadata) {
-  return ResponseFormatter.createSuccessResponse(data, metadata);
+  try {
+    return ResponseFormatter.createSuccessResponse(data, metadata);
+  } catch (error) {
+    console.error('createSuccessResponse error:', error);
+    return { success: true, data };
+  }
 }
 
 function createErrorResponse(message, details) {
-  return ResponseFormatter.createErrorResponse(message, details);
+  try {
+    return ResponseFormatter.createErrorResponse(message, details);
+  } catch (error) {
+    console.error('createErrorResponse error:', error);
+    return { success: false, error: message };
+  }
 }
 
 // DataServiceからの移行
