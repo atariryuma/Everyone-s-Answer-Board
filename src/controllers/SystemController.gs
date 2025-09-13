@@ -140,11 +140,29 @@ const SystemController = Object.freeze({
     try {
       console.warn('システム強制リセットが実行されました');
 
-      // キャッシュをクリア
+      // キャッシュをクリア（複数の方法を試行）
+      const cacheResults = [];
       try {
-        CacheService.getScriptCache().removeAll();
+        const cache = CacheService.getScriptCache();
+        if (cache && typeof cache.removeAll === 'function') {
+          cache.removeAll();
+          cacheResults.push('ScriptCache クリア成功');
+        }
       } catch (cacheError) {
-        console.warn('キャッシュクリアエラー:', cacheError.message);
+        console.warn('ScriptCache クリアエラー:', cacheError.message);
+        cacheResults.push(`ScriptCache クリア失敗: ${cacheError.message}`);
+      }
+
+      // Document Cache も試行
+      try {
+        const docCache = CacheService.getDocumentCache();
+        if (docCache && typeof docCache.removeAll === 'function') {
+          docCache.removeAll();
+          cacheResults.push('DocumentCache クリア成功');
+        }
+      } catch (docCacheError) {
+        console.warn('DocumentCache クリアエラー:', docCacheError.message);
+        cacheResults.push(`DocumentCache クリア失敗: ${docCacheError.message}`);
       }
 
       // 重要: プロパティはクリアしない（データ損失防止）
@@ -152,7 +170,8 @@ const SystemController = Object.freeze({
       return {
         success: true,
         message: 'システムリセットが完了しました',
-        actions: ['キャッシュクリア完了'],
+        actions: cacheResults,
+        cacheStatus: cacheResults.join(', '),
         timestamp: new Date().toISOString()
       };
 
@@ -363,7 +382,10 @@ const SystemController = Object.freeze({
 
       // キャッシュクリア
       try {
-        CacheService.getScriptCache().removeAll();
+        const cache = CacheService.getScriptCache();
+        if (cache && typeof cache.removeAll === 'function') {
+          cache.removeAll();
+        }
       } catch (cacheError) {
         repairResults.warnings = [`キャッシュクリア失敗: ${  cacheError.message}`];
       }

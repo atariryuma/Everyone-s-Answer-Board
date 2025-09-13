@@ -38,7 +38,7 @@ class DeploymentValidator {
 
     const dependencyMap = {
       'main.gs': ['UserService', 'ConfigService', 'DataService', 'SecurityService', 'ErrorHandler', 'PROPS_KEYS'],
-      'services/UserService.gs': ['AppCacheService', 'DB', 'CONSTANTS', 'ConfigService'],
+      'services/UserService.gs': ['AppCacheService', 'DB', 'CONSTANTS', 'PROPS_KEYS', 'SecurityService'],
       'services/ConfigService.gs': ['DB', 'PROPS_KEYS', 'SecurityService'],
       'services/DataService.gs': ['UserService', 'ConfigService', 'AppCacheService'],
       'services/SecurityService.gs': ['CONSTANTS', 'DB']

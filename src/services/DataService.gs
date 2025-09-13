@@ -13,7 +13,7 @@
  * - ColumnAnalysisSystem.gs の一部
  */
 
-/* global DB, AppCacheService, UserService, ConfigService, DataFormatter, CONSTANTS, UnifiedLogger */
+/* global DB, AppCacheService, UserService, ConfigService, DataFormatter, CONSTANTS, UnifiedLogger, ErrorHandler */
 
 /**
  * DataService - 統一データ操作サービス
@@ -863,27 +863,17 @@ const DataService = Object.freeze({
   },
 
   /**
-   * タイムスタンプフォーマット
+   * タイムスタンプフォーマット（formatters.gsに統一）
    * @param {string} isoString - ISO形式日時文字列
    * @returns {string} フォーマット済み日時
    */
   formatTimestamp(isoString) {
-    // 統一: DataFormatterを使用（要インポート確認）
+    // formatters.gsの統一実装に委譲
     if (typeof DataFormatter !== 'undefined') {
       return DataFormatter.formatDateTime(isoString, { style: 'short' });
     }
-    // フォールバック処理
-    if (!isoString) return '不明';
-    try {
-      return new Date(isoString).toLocaleString('ja-JP', {
-        month: 'numeric',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch (error) {
-      return '不明';
-    }
+    // 緊急フォールバック
+    return isoString ? new Date(isoString).toLocaleString('ja-JP') : '不明';
   },
 
   /**

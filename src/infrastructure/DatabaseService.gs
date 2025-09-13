@@ -13,19 +13,7 @@
  * @throws {Error} データベースIDが設定されていない場合
  */
 function getSecureDatabaseId() {
-  try {
-    const props = PropertiesService.getScriptProperties();
-    const databaseId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    
-    if (!databaseId) {
-      throw new Error('データベースIDが設定されていません。システム管理者に連絡してください。');
-    }
-    
-    return databaseId;
-  } catch (error) {
-    console.error('getSecureDatabaseId エラー:', error.message);
-    throw error;
-  }
+  return DatabaseCore.getSecureDatabaseId();
 }
 
 /**
@@ -52,15 +40,7 @@ const DB_CONFIG = Object.freeze({
  * @returns {Object} バッチ取得結果
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
-  try {
-    return service.spreadsheets.values.batchGet({
-      spreadsheetId,
-      ranges
-    });
-  } catch (error) {
-    console.error('batchGetSheetsData エラー:', error.message);
-    throw error;
-  }
+  return DatabaseCore.batchGetSheetsData(service, spreadsheetId, ranges);
 }
 
 /**
@@ -68,11 +48,8 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
  * @returns {object|null} キャッシュされたサービス情報
  */
 function getSheetsServiceCached() {
-  const cacheKey = 'sheets_service_optimized';
-
-  // メモリキャッシュから確認
-  try {
-    const cachedService = AppCacheService.get(cacheKey, null);
+  return DatabaseCore.getSheetsServiceCached();
+}
     if (cachedService !== null) {
       // 関数検証：必要なAPI関数が存在するかチェック
       const isValidService =
@@ -294,10 +271,20 @@ function getSheetsServiceWithRetry(maxRetries = 2) {
 const DB = {
   /**
    * ユーザー作成（CLAUDE.md準拠版）
+   * DatabaseOperationsに委譲
    * @param {Object} userData - ユーザーデータ
    * @returns {Object} 作成結果
    */
   createUser(userData) {
+    return DatabaseOperations.createUser(userData);
+  },
+
+  /**
+   * 元のcreateUser実装（DatabaseOperations移動用）
+   * @param {Object} userData - ユーザーデータ
+   * @returns {Object} 作成結果
+   */
+  _legacyCreateUser(userData) {
     try {
       // 基本入力検証
       if (!userData.userEmail || !userData.userId) {
@@ -386,6 +373,13 @@ const DB = {
    * @returns {Object|null} ユーザー情報またはnull
    */
   findUserById(userId) {
+    return DatabaseOperations.findUserById(userId);
+  },
+
+  /**
+   * 元のfindUserById実装（DatabaseOperations移動用）
+   */
+  _legacyFindUserById(userId) {
     if (!userId || typeof userId !== 'string') {
       console.warn('findUserById: 無効なユーザーID', userId);
       return null;
@@ -525,6 +519,13 @@ const DB = {
    * @returns {Object} 更新結果
    */
   updateUser(userId, updateData, options = {}) {
+    return DatabaseOperations.updateUser(userId, updateData, options);
+  },
+
+  /**
+   * 元のupdateUser実装（DatabaseOperations移動用）
+   */
+  _legacyUpdateUser(userId, updateData, options = {}) {
     try {
       const { replaceConfig = false } = options;
 
@@ -749,6 +750,13 @@ const DB = {
    * @param {Object} options - オプション {limit: number, offset: number, activeOnly: boolean}
    */
   getAllUsers(options = {}) {
+    return DatabaseOperations.getAllUsers(options);
+  },
+
+  /**
+   * 元のgetAllUsers実装（DatabaseOperations移動用）
+   */
+  _legacyGetAllUsers(options = {}) {
     try {
       const { limit = 500, offset = 0, activeOnly = false } = options;
 
@@ -831,6 +839,13 @@ const DB = {
    * @param {boolean} forceRefresh - キャッシュを強制更新するか
    */
   findUserByEmail(email, forceRefresh = false) {
+    return DatabaseOperations.findUserByEmail(email, forceRefresh);
+  },
+
+  /**
+   * 元のfindUserByEmail実装（DatabaseOperations移動用）
+   */
+  _legacyFindUserByEmail(email, forceRefresh = false) {
     if (!email || typeof email !== 'string') {
       console.warn('findUserByEmail: 無効なメールアドレス', email);
       return null;

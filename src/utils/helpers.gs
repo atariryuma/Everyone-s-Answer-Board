@@ -113,23 +113,12 @@ const FormatHelpers = Object.freeze({
    * @returns {string} フォーマット済み日時
    */
   formatTimestamp(timestamp) {
-    // 統一: DataFormatterを使用（要インポート確認）
-    if (typeof DataFormatter !== 'undefined') {
+    // formatters.gsの統一実装に完全委譲
+    if (typeof DataFormatter !== 'undefined' && DataFormatter.formatDateTime) {
       return DataFormatter.formatDateTime(timestamp, { style: 'short' });
     }
-    // フォールバック処理
-    if (!timestamp) return '不明';
-    try {
-      const date = timestamp instanceof Date ? timestamp : new Date(timestamp);
-      return date.toLocaleString('ja-JP', {
-        month: 'numeric',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch (error) {
-      return '不明';
-    }
+    // 緊急フォールバック
+    return timestamp ? new Date(timestamp).toLocaleString('ja-JP') : '不明';
   },
 
   /**

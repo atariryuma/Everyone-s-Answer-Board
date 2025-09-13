@@ -272,6 +272,59 @@ const DatabaseOperations = Object.freeze({
   },
 
   /**
+   * 全ユーザー取得
+   * @param {Object} options - オプション
+   * @returns {Array} ユーザー一覧
+   */
+  getAllUsers(options = {}) {
+    const { limit = 1000, offset = 0, activeOnly = false } = options;
+
+    try {
+      const timer = UnifiedLogger.startTimer('DatabaseOperations.getAllUsers');
+
+      const service = DatabaseCore.getSheetsServiceCached();
+      const databaseId = DatabaseCore.getSecureDatabaseId();
+
+      const range = 'Users!A:Z';
+      const response = service.spreadsheets.values.get({
+        spreadsheetId: databaseId,
+        range
+      });
+
+      const rows = response.values || [];
+      if (rows.length <= 1) {
+        timer.end();
+        return [];
+      }
+
+      const headers = rows[0];
+      const users = [];
+
+      // ヘッダーをスキップしてユーザーデータを処理
+      for (let i = 1 + offset; i < rows.length && users.length < limit; i++) {
+        const row = rows[i];
+        if (!row || row.length === 0) continue;
+
+        const user = this.rowToUser(row, headers);
+        if (user && (!activeOnly || user.isActive !== 'FALSE')) {
+          users.push(user);
+        }
+      }
+
+      timer.end();
+      return users;
+
+    } catch (error) {
+      UnifiedLogger.error('DatabaseOperations', {
+        operation: 'getAllUsers',
+        options,
+        error: error.message
+      });
+      return [];
+    }
+  },
+
+  /**
    * 診断機能
    * @returns {Object} 診断結果
    */
@@ -283,7 +336,8 @@ const DatabaseOperations = Object.freeze({
         'User CRUD operations',
         'Email-based search',
         'User ID lookup',
-        'Batch operations'
+        'Batch operations',
+        'Get all users with filtering'
       ],
       dependencies: [
         'DatabaseCore',
