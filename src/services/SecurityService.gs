@@ -24,7 +24,7 @@ const SecurityService = Object.freeze({
   // ===========================================
 
   /**
-   * Service Accountトークン取得（キャッシュ最適化）
+   * Service Accountトークン取得（セキュリティ強化版）
    * @returns {string|null} アクセストークン
    */
   getServiceAccountToken() {
@@ -34,29 +34,42 @@ const SecurityService = Object.freeze({
       // キャッシュから取得試行
       const cached = CacheService.getScriptCache().get(cacheKey);
       if (cached) {
-        return cached;
+        // セキュリティ：トークン有効性の簡易検証
+        if (this.validateTokenFormat(cached)) {
+          return cached;
+        } else {
+          // 無効なトークンをクリア
+          CacheService.getScriptCache().remove(cacheKey);
+        }
       }
 
       // 新規トークン生成
       const newToken = this.generateServiceAccountToken();
       if (!newToken) {
-        console.error('SecurityService.getServiceAccountToken: トークン生成失敗');
+        console.error('SecurityService.getServiceAccountToken: トークン生成失敗（詳細はログなし）');
         return null;
       }
 
-      // 1時間キャッシュ
+      // セキュリティ：トークン形式検証
+      if (!this.validateTokenFormat(newToken)) {
+        console.error('SecurityService.getServiceAccountToken: 生成されたトークンが無効な形式');
+        return null;
+      }
+
+      // 1時間キャッシュ（短時間で自動失効）
       CacheService.getScriptCache().put(cacheKey, newToken, 3600);
       
-      console.info('SecurityService.getServiceAccountToken: 新規トークン生成・キャッシュ完了');
+      console.info('SecurityService.getServiceAccountToken: トークン生成・キャッシュ完了（詳細省略）');
       return newToken;
     } catch (error) {
-      console.error('SecurityService.getServiceAccountToken: エラー', error.message);
+      // セキュリティ：エラー詳細をログに出力しない
+      console.error('SecurityService.getServiceAccountToken: トークン取得処理エラー');
       return null;
     }
   },
 
   /**
-   * Service Accountトークン生成
+   * Service Accountトークン生成（セキュリティ強化版）
    * @returns {string|null} 生成されたトークン
    */
   generateServiceAccountToken() {
@@ -67,11 +80,46 @@ const SecurityService = Object.freeze({
         throw new Error('OAuthトークンの取得に失敗');
       }
 
+      // セキュリティ：生成されたトークンの最小検証
+      if (token.length < 20) {
+        throw new Error('生成されたトークンが短すぎます');
+      }
+
       return token;
     } catch (error) {
-      console.error('SecurityService.generateServiceAccountToken: エラー', error.message);
+      // セキュリティ：具体的なエラー内容をログに出力しない
+      console.error('SecurityService.generateServiceAccountToken: トークン生成処理エラー');
       return null;
     }
+  },
+
+  /**
+   * トークン形式検証（セキュリティ強化）
+   * @param {string} token - 検証対象トークン
+   * @returns {boolean} 有効かどうか
+   */
+  validateTokenFormat(token) {
+    if (!token || typeof token !== 'string') {
+      return false;
+    }
+
+    // 基本的な形式チェック
+    if (token.length < 20 || token.length > 4000) {
+      return false;
+    }
+
+    // OAuth 2.0トークンの一般的な形式チェック
+    if (!/^[A-Za-z0-9._-]+$/.test(token)) {
+      return false;
+    }
+
+    // 明らかに無効な値の除外
+    const invalidTokens = ['undefined', 'null', 'error', 'expired'];
+    if (invalidTokens.includes(token.toLowerCase())) {
+      return false;
+    }
+
+    return true;
   },
 
   /**
@@ -301,23 +349,27 @@ const SecurityService = Object.freeze({
         return { isValid: false, error: '無効なURL形式' };
       }
       
-      // Extract hostname for validation
-      let hostname;
+      // Extract protocol and hostname for validation
+      let protocol, hostname;
       try {
-        const urlMatch = url.match(/^https?:\/\/([^\/]+)/);
-        hostname = urlMatch ? urlMatch[1] : '';
+        const urlMatch = url.match(/^(https?):\/\/([^\/]+)/);
+        if (!urlMatch) {
+          return { isValid: false, error: '無効なURL形式' };
+        }
+        protocol = urlMatch[1] + ':'; // 'http:' or 'https:'
+        hostname = urlMatch[2];
       } catch (error) {
         return { isValid: false, error: '無効なURL形式' };
       }
 
       // プロトコルチェック
-      if (!allowedProtocols.includes(urlObj.protocol)) {
+      if (!allowedProtocols.includes(protocol)) {
         return { isValid: false, error: '許可されていないプロトコル' };
       }
 
       // ドメインチェック
       const isAllowedDomain = allowedDomains.some(domain => 
-        urlObj.hostname === domain || urlObj.hostname.endsWith(`.${domain}`)
+        hostname === domain || hostname.endsWith(`.${domain}`)
       );
 
       if (!isAllowedDomain) {
@@ -326,9 +378,9 @@ const SecurityService = Object.freeze({
 
       return {
         isValid: true,
-        sanitized: urlObj.toString(),
-        protocol: urlObj.protocol,
-        hostname: urlObj.hostname
+        sanitized: url.trim(),
+        protocol: protocol,
+        hostname: hostname
       };
     } catch (error) {
       return { isValid: false, error: error.message };

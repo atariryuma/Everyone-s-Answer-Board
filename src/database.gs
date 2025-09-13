@@ -265,9 +265,18 @@ const DB = {
       lastModified: row[4] || '',
     };
 
-    // configJsonをパース（無限再帰回避）
+    // configJsonをパース（重複構造検出・修正付き）
     try {
-      userObj.parsedConfig = JSON.parse(userObj.configJson || '{}');
+      let configJson = userObj.configJson || '{}';
+      userObj.parsedConfig = JSON.parse(configJson);
+      
+      // 🔥 重複構造の検出・自動修正
+      if (userObj.parsedConfig.configJson) {
+        console.warn(`重複configJSON構造を検出 (ユーザー: ${userObj.userId})`);
+        userObj.parsedConfig = this.sanitizeConfigStructure(userObj.parsedConfig);
+        // 修正された設定をconfigJsonに反映
+        userObj.configJson = JSON.stringify(userObj.parsedConfig);
+      }
     } catch (e) {
       console.warn('configJson解析エラー:', {
         userId: userObj.userId,
@@ -932,23 +941,51 @@ const DB = {
           let cleanedConfig = { ...originalConfig };
           let needsCleaning = false;
 
-          // 🔥 重要：ネストしたconfigJsonフィールドを検出・修正
+          // 🔥 重要：ネストしたconfigJsonフィールドを検出・修正（セキュリティ強化）
           if (cleanedConfig.configJson) {
             // configJsonフィールドが存在する場合、それを最上位に展開
             try {
               let nestedConfig;
-              if (typeof cleanedConfig.configJson === 'string') {
-                nestedConfig = JSON.parse(cleanedConfig.configJson);
-              } else {
-                nestedConfig = cleanedConfig.configJson;
+              let depth = 0;
+              const maxDepth = 5; // 無限再帰防止
+              // 再帰的なネスト構造を安全に解決
+              let currentConfig = cleanedConfig.configJson;
+              
+              while (depth < maxDepth && currentConfig) {
+                depth++;
+                
+                if (typeof currentConfig === 'string') {
+                  try {
+                    currentConfig = JSON.parse(currentConfig);
+                  } catch (parseError) {
+                    console.warn(`configJson解析エラー (深度${depth}):`, parseError.message);
+                    break;
+                  }
+                }
+                
+                if (currentConfig && typeof currentConfig === 'object') {
+                  // 安全にマージ（configJsonを除く）
+                  const { configJson: nextNested, ...safeConfig } = currentConfig;
+                  cleanedConfig = { ...safeConfig, ...cleanedConfig };
+                  
+                  if (nextNested) {
+                    currentConfig = nextNested;
+                  } else {
+                    break;
+                  }
+                } else {
+                  break;
+                }
               }
-
-              // ネストされたconfigJsonを最上位にマージ
-              cleanedConfig = { ...nestedConfig, ...cleanedConfig };
 
               // configJsonフィールド自体を削除
               delete cleanedConfig.configJson;
               needsCleaning = true;
+              
+              // 無限再帰の警告
+              if (depth >= maxDepth) {
+                console.warn(`ユーザー ${user.userId}: configJSON再帰が最大深度(${maxDepth})に達しました`);
+              }
             } catch (parseError) {
               console.warn('configJson解析エラー:', parseError.message);
             }

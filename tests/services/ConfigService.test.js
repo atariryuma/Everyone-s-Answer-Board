@@ -285,7 +285,7 @@ describe('ConfigService', () => {
       
       it('should validate correct user IDs', () => {
         ConfigService.validateUserId.mockImplementation((userId) => {
-          return userId && typeof userId === 'string' && userId.length > 0;
+          return !!(userId && typeof userId === 'string' && userId.length > 0);
         });
 
         expect(ConfigService.validateUserId('valid-user-123')).toBe(true);

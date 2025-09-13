@@ -85,7 +85,8 @@
       "Bash(cat:*)",
       "Bash(cp:*)",
       "Bash(git checkout:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": [],

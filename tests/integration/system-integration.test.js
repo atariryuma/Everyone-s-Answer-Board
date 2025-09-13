@@ -251,7 +251,7 @@ function setupMockServices() {
   return {
     UserService: {
       getCurrentEmail: jest.fn(() => 'test@example.com'),
-      getCurrentUserInfo: jest.fn(() => Promise.resolve(testUserData.validUser)),
+      getCurrentUserInfo: jest.fn(() => Promise.resolve(testUserData)),
       createUser: jest.fn((email) => Promise.resolve({
         userId: 'test-user-123',
         userEmail: email,
@@ -316,7 +316,7 @@ async function simulateDoGet(params) {
   return {
     success: true,
     mode: params.mode,
-    data: params.mode === 'admin' ? { userData: testUserData.validUser } : null
+    data: params.mode === 'admin' ? { userData: testUserData } : null
   };
 }
 

@@ -423,7 +423,7 @@ const ConfigService = Object.freeze({
    * @returns {boolean} 有効かどうか
    */
   validateUserId(userId) {
-    return userId && typeof userId === 'string' && userId.length > 0;
+    return !!(userId && typeof userId === 'string' && userId.length > 0);
   },
 
   /**
