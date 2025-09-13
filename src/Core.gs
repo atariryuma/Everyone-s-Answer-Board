@@ -62,11 +62,11 @@ function getConfigSimple(userInfo) {
 function createErrorResponse(message, details = {}) {
   return {
     status: 'error',
-    message: message,
+    message,
     data: [],
     count: 0,
     timestamp: new Date().toISOString(),
-    details: details,
+    details,
   };
 }
 
@@ -79,7 +79,7 @@ function createErrorResponse(message, details = {}) {
 function createSuccessResponse(data, metadata = {}) {
   return {
     status: 'success',
-    data: data,
+    data,
     count: data.length,
     timestamp: new Date().toISOString(),
     ...metadata,
@@ -157,11 +157,11 @@ function getBulkData(userId, options = {}) {
     const config = JSON.parse(userInfo.configJson || '{}');
     const bulkData = {
       timestamp: new Date().toISOString(),
-      userId: userId,
+      userId,
       userInfo: {
         userEmail: userInfo.userEmail,
         isActive: userInfo.isActive,
-        config: config,
+        config,
       },
     };
 
@@ -200,7 +200,7 @@ function getBulkData(userId, options = {}) {
     return {
       success: true,
       data: bulkData,
-      executionTime: executionTime,
+      executionTime,
     };
   } catch (error) {
     console.error('❌ getBulkData: バルクデータ取得エラー', {
@@ -929,7 +929,7 @@ function getIncrementalSheetData(requestUserId, classFilter, sortOrder, adminMod
       logDebug('sheet_access', {
         spreadsheetId: config.spreadsheetId,
         sheetName: config.sheetName,
-        lastRow: lastRow,
+        lastRow,
       });
     } catch (sheetError) {
       logDebug('sheet_access_error', {
@@ -1652,8 +1652,8 @@ function deleteAnswer(requestUserId, rowIndex, sheetName) {
 
     // ログ記録
     console.log('回答削除実行:', {
-      userId: requestUserId.substring(0, 8) + '...',
-      rowIndex: rowIndex,
+      userId: `${requestUserId.substring(0, 8)  }...`,
+      rowIndex,
       sheetName: sheet.getName(),
       deletedBy: UserManager.getCurrentEmail(),
       timestamp: new Date().toISOString(),
@@ -1674,8 +1674,8 @@ function deleteAnswer(requestUserId, rowIndex, sheetName) {
     };
   } catch (error) {
     console.error('deleteAnswer エラー:', {
-      requestUserId: requestUserId,
-      rowIndex: rowIndex,
+      requestUserId,
+      rowIndex,
       error: error.message,
       stack: error.stack,
     });
@@ -2892,7 +2892,7 @@ function buildSheetConfigDynamically(userIdParam) {
 
 // ✅ 直接アクセス用のプロパティ設定
 Object.defineProperty(globalThis, 'sheetConfig', {
-  get: function () {
+  get () {
     return buildSheetConfigDynamically();
   },
   configurable: true,
@@ -2945,7 +2945,7 @@ function executeGetSheetData(userId, sheetName, classFilter, sortMode) {
 
     return createSuccessResponse(processedData, {
       totalCount: processedData.length,
-      headers: headers,
+      headers,
     });
   } catch (error) {
     logDebug('executeGetSheetData_error', {
@@ -3799,7 +3799,7 @@ function getInitialData(requestUserId, sheetName) {
     const sheetName = configJson.sheetName || '';
 
     // ✅ columnMapping形式を使用（legacy形式を完全削除）
-    const columnMapping = configJson.columnMapping;
+    const {columnMapping} = configJson;
 
     if (!columnMapping) {
       console.warn('⚠️ getConfig: columnMappingが設定されていません。');
@@ -4651,12 +4651,12 @@ function connectDataSource(spreadsheetId, sheetName) {
         ...currentConfig,
 
         // 🔸 データソース情報（確実に設定）
-        spreadsheetId: spreadsheetId,
-        sheetName: sheetName,
+        spreadsheetId,
+        sheetName,
         spreadsheetUrl: `https://docs.google.com/spreadsheets/d/${spreadsheetId}`,
 
         // 🔸 列マッピング（統一形式のみ保存、レガシー削除）
-        columnMapping: columnMapping,
+        columnMapping,
 
         // 🔸 フォーム情報（確実な設定）
         formUrl: formInfo?.formUrl || null,
@@ -4789,7 +4789,7 @@ function publishApplication(config) {
           success: false,
           error: 'etag_mismatch',
           message: '設定が他で更新されました。画面を更新して再試行してください。',
-          currentConfig: currentConfig,
+          currentConfig,
         };
       }
     } catch (etErr) {
@@ -4879,8 +4879,8 @@ function publishApplication(config) {
       }
 
       // ヘッダー配列とハッシュ（存在しなければ保存時に補完）
-      let headers = currentConfig.headers;
-      let headersHash = currentConfig.headersHash;
+      let {headers} = currentConfig;
+      let {headersHash} = currentConfig;
       try {
         if (!headers || !headersHash) {
           const spreadsheet = new ConfigurationManager().getSpreadsheet(effectiveSpreadsheetId);
@@ -5057,7 +5057,7 @@ function saveDraftConfiguration(config) {
           success: false,
           error: 'etag_mismatch',
           message: '設定が他で更新されました。画面を更新してから再保存してください。',
-          currentConfig: currentConfig,
+          currentConfig,
         };
       }
     } catch (etErr) {
@@ -5344,7 +5344,7 @@ function computeHeadersHash(headers) {
       Utilities.Charset.UTF_8
     );
     return bytes
-      .map(function (b) {
+      .map((b) => {
         const v = (b + 256) % 256;
         return (v < 16 ? '0' : '') + v.toString(16);
       })
@@ -5362,7 +5362,7 @@ function computeHeadersHash(headers) {
 function getFormInfo(spreadsheetId, sheetName) {
   try {
     console.log('📋 getFormInfo: フォーム情報取得開始（CLAUDE.md準拠）', {
-      spreadsheetId: spreadsheetId?.substring(0, 10) + '...',
+      spreadsheetId: `${spreadsheetId?.substring(0, 10)  }...`,
       sheetName,
       timestamp: new Date().toISOString(),
     });

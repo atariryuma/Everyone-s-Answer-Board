@@ -1,31 +1,38 @@
+/**
+ * Jest設定ファイル - CLAUDE.md準拠版（簡素化）
+ * 🚀 configJSON中心型システムのテスト環境
+ */
+
 module.exports = {
-  preset: 'ts-jest',
+  // テスト環境設定
   testEnvironment: 'node',
-  roots: ['<rootDir>/src'],
   
-  // Test file patterns - support both JS and TS
+  // テストファイルパターン
   testMatch: [
-    '**/__tests__/**/*.(ts|tsx|js|jsx)',
-    '**/?(*.)+(spec|test).(ts|tsx|js|jsx)'
+    '<rootDir>/tests/**/*.test.js',
+    '<rootDir>/tests/**/*.spec.js'
   ],
   
-  // File extensions to recognize
-  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'gs', 'json'],
+  // モジュール解決
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1'
+  },
   
-  // Setup files - no setup files needed currently
-  // setupFilesAfterEnv: [],
-  
-  // Coverage configuration - focused on core functionality
+  // カバレッジ設定
+  collectCoverage: true,
   collectCoverageFrom: [
-    'src/**/*.{js,ts,gs}',
+    'src/**/*.{js,gs}',
     '!src/**/*.html',
-    '!src/appsscript.json',
-    '!src/**/*.d.ts',
-    '!src/utilities/**', // Exclude all utility scripts
-    '!src/scripts/**'   // Exclude conversion scripts
+    '!node_modules/**'
+  ],
+  coverageReporters: [
+    'text',
+    'lcov',
+    'html'
   ],
   coverageDirectory: 'coverage',
-  coverageReporters: ['text', 'lcov'],
+  
+  // カバレッジ閾値（CLAUDE.md品質基準）
   coverageThreshold: {
     global: {
       branches: 70,
@@ -35,47 +42,31 @@ module.exports = {
     }
   },
   
-  // Test configuration
+  // テスト実行設定
   verbose: true,
-  testPathIgnorePatterns: ['/node_modules/', '/.git/', '/dist/'],
+  passWithNoTests: true,
   
-  // Transform configuration for TypeScript and GAS files
-  transform: {
-    '^.+\\.(ts|tsx)$': ['ts-jest', {
-      useESM: false,
-      tsconfig: {
-        target: 'ES2020',
-        module: 'CommonJS',
-        esModuleInterop: true,
-        allowSyntheticDefaultImports: true,
-        skipLibCheck: true
-      }
-    }],
-    '^.+\\.gs$': '<rootDir>/jest.gsTransform.js',
-    '^.+\\.(js|jsx)$': ['ts-jest', {
-      useESM: false
-    }]
-  },
+  // タイムアウト設定
+  testTimeout: 10000,
   
-  // Module name mapping for path aliases
-  moduleNameMapper: {
-    '^@src/(.*)$': '<rootDir>/src/$1',
-    '^@tests/(.*)$': '<rootDir>/tests/$1',
-    '^@mocks/(.*)$': '<rootDir>/tests/mocks/$1'
-  },
+  // エラーハンドリング
+  errorOnDeprecated: false,
   
-  // Legacy globals removed - using modern transform configuration instead
-  
-  // Test timeout - reduced for focused unit tests
-  testTimeout: 15000,
-  
-  // Clear mocks between tests
+  // モック設定
   clearMocks: true,
   restoreMocks: true,
+  resetMocks: true,
   
-  // Collect coverage from TypeScript files
-  extensionsToTreatAsEsm: [],
+  // 無視パターン
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/coverage/',
+    '/dist/'
+  ],
   
-  // Simplified reporters for faster execution
-  reporters: ['default']
+  // モジュール無視パターン
+  modulePathIgnorePatterns: [
+    '/coverage/',
+    '/dist/'
+  ]
 };

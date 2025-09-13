@@ -1273,7 +1273,7 @@ function renderAnswerBoard(userInfo, params) {
           // 3. 取得したopinionHeaderをconfigJsonに保存（永続化・最適化）
           if (userInfo?.userId) {
             try {
-              const updatedConfig = { ...config, opinionHeader: opinionHeader };
+              const updatedConfig = { ...config, opinionHeader };
               ConfigManager.saveConfig(userInfo.userId, updatedConfig);
               console.log(
                 '💾 renderAnswerBoard: opinionHeader永続化完了 - 次回はconfigJsonから直接取得'
@@ -1285,7 +1285,7 @@ function renderAnswerBoard(userInfo, params) {
         } else {
           console.warn('⚠️ renderAnswerBoard: 高精度検出でもopinionHeaderが「お題」:', {
             opinionHeaderValue: opinionHeader,
-            opinionHeaderSource: opinionHeaderSource,
+            opinionHeaderSource,
             detectionStatus: '高精度検出実行済み',
           });
         }
@@ -1986,7 +1986,7 @@ function diagnoseSystem() {
 
     const diagnosis = {
       timestamp: new Date().toISOString(),
-      currentUser: currentUser,
+      currentUser,
       userExists: !!userInfo,
       userData: userInfo
         ? {
@@ -2067,7 +2067,7 @@ function repairCurrentUser() {
       isActive: userInfo.isActive,
     });
 
-    return { success: true, userInfo: userInfo };
+    return { success: true, userInfo };
   } catch (error) {
     console.error('❌ ユーザー修復エラー:', error.message);
     return { success: false, error: error.message };

@@ -106,7 +106,7 @@ function testUnifiedSystem() {
       message: 'テスト完了',
       config: {
         columnMapping: config.columnMapping,
-        columnIndices: columnIndices,
+        columnIndices,
       },
     };
   } catch (error) {

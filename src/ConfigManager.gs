@@ -144,8 +144,8 @@ const ConfigManager = Object.freeze({
 
       if (duplicateFields.length > 0) {
         console.error('🚨 ConfigManager.saveConfig: 二重構造検出 - 保存を拒否', {
-          userId: userId,
-          duplicateFields: duplicateFields,
+          userId,
+          duplicateFields,
           source: new Error().stack.split('\n')[2],
         });
         // 厳格モード: 二重構造を検出したら保存を拒否
@@ -737,7 +737,7 @@ const ConfigManager = Object.freeze({
 
         if (formUrl) {
           const updates = {
-            formUrl: formUrl,
+            formUrl,
           };
 
           // フォームタイトルも取得を試みる
@@ -752,7 +752,7 @@ const ConfigManager = Object.freeze({
               formError.message
             );
             // タイトル取得失敗時はスプレッドシート名をフォールバック
-            updates.formTitle = spreadsheet.getName() + ' (フォーム)';
+            updates.formTitle = `${spreadsheet.getName()  } (フォーム)`;
           }
 
           const success = this.updateConfig(userId, updates);

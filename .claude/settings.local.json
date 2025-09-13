@@ -84,7 +84,8 @@
       "Bash(then npm run lint)",
       "Bash(cat:*)",
       "Bash(cp:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(npm install:*)"
     ],
     "deny": [],
     "ask": [],

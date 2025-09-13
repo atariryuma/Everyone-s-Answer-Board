@@ -155,7 +155,7 @@ function getSheetsServiceCached() {
         console.log('🔧 getSheetsServiceCached: Service Accountトークン確認', {
           hasToken: !!testToken,
           tokenLength: testToken ? testToken.length : 0,
-          tokenPrefix: testToken ? testToken.substring(0, 20) + '...' : 'null',
+          tokenPrefix: testToken ? `${testToken.substring(0, 20)  }...` : 'null',
         });
       } catch (tokenError) {
         console.error('🔧 getSheetsServiceCached: Service Accountトークン取得エラー詳細', {
@@ -189,7 +189,7 @@ function getSheetsServiceCached() {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
         accessToken: initialAccessToken, // ✅ getSpreadsheetsData互換性修復
         spreadsheets: {
-          batchUpdate: function (params) {
+          batchUpdate (params) {
             // 最新のアクセストークンを取得（トークンの期限切れ対応）
             const accessToken = getServiceAccountTokenCached();
             if (!accessToken) {
@@ -229,7 +229,7 @@ function getSheetsServiceCached() {
             return JSON.parse(response.getContentText());
           },
           values: {
-            batchGet: function (params) {
+            batchGet (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
@@ -266,7 +266,7 @@ function getSheetsServiceCached() {
 
               return JSON.parse(response.getContentText());
             },
-            update: function (params) {
+            update (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
               const accessToken = getServiceAccountTokenCached();
               if (!accessToken) {
@@ -305,7 +305,7 @@ function getSheetsServiceCached() {
 
               return JSON.parse(response.getContentText());
             },
-            append: function (params) {
+            append (params) {
               console.log('🔧 cache.gs append function called', {
                 hasParams: !!params,
                 spreadsheetId: params?.spreadsheetId,
@@ -437,7 +437,7 @@ function getSheetsServiceCached() {
     ].filter(Boolean);
 
     console.log('🔧 getSheetsServiceCached: サービス検証失敗', {
-      missingMethods: missingMethods,
+      missingMethods,
       methodCount: missingMethods.length,
     });
   }
@@ -453,15 +453,15 @@ function getSheetsServiceCached() {
       hasAppend: validation.appendIsFunction,
       hasBatchGet: validation.hasBatchGet,
       hasUpdate: validation.hasUpdate,
-      currentRetryCount: currentRetryCount,
-      maxRetryAttempts: maxRetryAttempts,
+      currentRetryCount,
+      maxRetryAttempts,
     });
 
     // 🔄 無限ループ防止：リトライ回数が上限を超えた場合はエラー
     if (currentRetryCount >= maxRetryAttempts) {
       console.error('🚨 Service object修復失敗：最大リトライ回数を超過', {
         retryCount: currentRetryCount,
-        maxRetryAttempts: maxRetryAttempts,
+        maxRetryAttempts,
       });
       // リトライカウンターをリセットして次回は再試行できるようにする
       cacheManager.remove(retryKey);

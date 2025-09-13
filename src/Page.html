@@ -23,16 +23,53 @@
 
   <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
     <header id="main-header" class="glass-panel rounded-xl p-4 mb-4 flex flex-col lg:flex-row justify-between items-center gap-4 shadow-lg">
-      <div class="flex items-center gap-4 w-full lg:w-auto">
-        <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
-        <label for="classFilter" class="sr-only">クラス絞り込み</label>
-        <select id="classFilter" class="hidden text-sm"></select>
-        <label for="sortOrder" class="sr-only">並び順</label>
-        <select id="sortOrder" class="text-sm">
-          <option value="newest" selected>新着順</option>
-          <option value="random">ランダム順</option>
-          <option value="score" id="scoreOption" class="hidden">スコア順</option>
-        </select>
+      <div class="flex flex-col lg:flex-row items-start lg:items-center gap-3 w-full lg:w-auto">
+        <!-- 上部：回答数とフィルタ -->
+        <div class="flex items-center gap-4 w-full lg:w-auto">
+          <p id="answerCount" class="text-sm text-gray-400 flex items-center gap-2 flex-shrink-0"></p>
+          <label for="classFilter" class="sr-only">クラス絞り込み</label>
+          <select id="classFilter" class="filter-select">
+            <option value="">すべてのクラス</option>
+          </select>
+          <label for="reactionFilter" class="sr-only">リアクション数フィルタ</label>
+          <select id="reactionFilter" class="filter-select">
+            <option value="">すべて</option>
+            <option value="popular">人気順(5+)</option>
+            <option value="trending">注目(10+)</option>
+            <option value="viral">バズ(20+)</option>
+          </select>
+          <label for="sortOrder" class="sr-only">並び順</label>
+          <select id="sortOrder" class="filter-select">
+            <option value="newest" selected>新着順</option>
+            <option value="random">ランダム順</option>
+            <option value="reactions">リアクション順</option>
+            <option value="score" id="scoreOption" class="hidden">スコア順</option>
+          </select>
+        </div>
+        
+        <!-- 下部：検索ボックス -->
+        <div class="flex items-center gap-2 w-full lg:w-auto lg:min-w-[200px]">
+          <div class="relative flex-grow">
+            <input 
+              type="text" 
+              id="searchInput" 
+              placeholder="回答を検索..." 
+              class="filter-input w-full pl-8"
+            />
+            <svg class="absolute left-2 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="M21 21l-4.35-4.35"></path>
+            </svg>
+          </div>
+          <button 
+            type="button" 
+            id="clearFiltersBtn" 
+            class="clear-filters-btn"
+            title="フィルタをクリア"
+          >
+            クリア
+          </button>
+        </div>
       </div>
       <div class="flex-grow text-center w-full min-w-0">
         <h1 id="siteTitle" class="game-font text-yellow-300 text-lg md:text-xl mb-1">みんなの回答ボード</h1>

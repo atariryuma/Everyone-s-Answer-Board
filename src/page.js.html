@@ -1,4 +1,6 @@
   <script>
+    'use strict';
+    
     // 🔒 セキュア環境変数取得
     const getSecureVars = () => ({
       showAdminFeatures: !!window.showAdminFeatures,
@@ -6,8 +8,8 @@
       userId: window.userId || null
     });
     
-    // ⚡ 最適化SVGアイコン
-    const ICONS = {
+    // ⚡ SVGアイコン定数
+    const ICONS = Object.freeze({
       lightbulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m8.66-10H20M4 12H2m15.07-7.07L17.66 6.34M6.34 6.34L4.93 4.93m12.14 12.14L15.66 15.66M6.34 17.66L4.93 19.07"/></svg>',
       thumbup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12l5-3 5 3V10l-5-8-5 8z"/></svg>',
       search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>',
@@ -15,287 +17,506 @@
       star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/></svg>',
       grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M3 12h18"/></svg>',
       users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
-    };
-
-    class StudyQuestApp {
-      constructor() {
-        this.el = id => document.getElementById(id);
-        this.state = { 
-          answers: [], 
-          loading: false, 
-          config: null,
-          polling: null 
-        };
-        this.vars = getSecureVars();
-        this.reactions = [
-          {key: 'LIKE', icon: 'thumbup', color: 'red'},
-          {key: 'UNDERSTAND', icon: 'lightbulb', color: 'yellow'},
-          {key: 'CURIOUS', icon: 'search', color: 'green'}
-        ];
-        this.init();
+    });
+    
+    /**
+     * 🏗️ AnswerService - データ取得・キャッシュ・API通信専門クラス
+     */
+    class AnswerService {
+      constructor(userId) {
+        this.userId = userId;
+        this.cache = new Map();
+        this.cacheTimers = new Map();
+        this.isProduction = typeof google !== 'undefined' && google.script?.run;
       }
-
-      destroy() {
-        if (this.state.polling) {
-          clearInterval(this.state.polling);
-        }
-      }
-
-      async init() {
-        await this.loadConfig();
-        this.setupUI();
-        this.setupEvents();
-        await this.loadData();
-        this.startPolling();
-      }
-
+      
+      /**
+       * 📄 設定データ読み込み
+       */
       async loadConfig() {
+        const cacheKey = `config_${this.userId}`;
+        const cached = this.getCache(cacheKey);
+        if (cached) return cached;
+        
         try {
-          if (!this.vars.userId) {
-            throw new Error('ユーザーIDが取得できません');
-          }
-          this.state.config = await this.runGas('getUserConfig', this.vars.userId) || {};
+          const config = await this.callGAS('getUserConfig', this.userId) || {};
+          this.setCache(cacheKey, config, 300000); // 5分キャッシュ
+          return config;
         } catch (error) {
           console.error('設定読み込みエラー:', error);
-          this.state.config = {};
+          return {};
         }
       }
-
-      setupUI() {
-        this.renderIcons();
-        this.updateUIState();
-      }
-
-      setupEvents() {
-        const slider = this.el('sizeSlider');
-        const container = this.el('answers');
-        const sortOrder = this.el('sortOrder');
-        
-        if (slider) {
-          slider.addEventListener('input', () => {
-            localStorage.setItem('boardColumns', slider.value);
-            this.el('sliderValue').textContent = slider.value;
-            this.render();
-          });
+      
+      /**
+       * 📈 回答データ読み込み
+       */
+      async loadAnswers(sortOrder = 'newest') {
+        try {
+          const rawData = await this.callGAS('getPublishedSheetData', this.userId, 'すべて', sortOrder);
           
-          const saved = localStorage.getItem('boardColumns');
-          if (saved) {
-            slider.value = saved;
-            this.el('sliderValue').textContent = saved;
+          if (!rawData?.data && !rawData?.rows) {
+            return {
+              answers: [],
+              header: rawData?.header || '問題',
+              sheetName: rawData?.sheetName || '不明'
+            };
           }
+          
+          const data = rawData.data || rawData.rows || [];
+          const answers = data
+            .filter(item => item?.opinion)
+            .map(item => this.normalizeAnswer(item))
+            .filter(answer => answer.opinion);
+          
+          return {
+            answers,
+            header: rawData.header || '問題',
+            sheetName: rawData.sheetName || '不明'
+          };
+        } catch (error) {
+          console.error('回答データ読み込みエラー:', error);
+          throw error;
         }
-
-        if (sortOrder) {
-          sortOrder.addEventListener('change', () => this.loadData());
-        }
-
-        if (container) {
-          container.addEventListener('click', e => {
-            const btn = e.target.closest('.reaction-btn');
-            const card = e.target.closest('.answer-card');
-            
-            if (btn) {
-              const rowIndex = parseInt(btn.dataset.rowIndex);
-              const reaction = btn.dataset.reaction;
-              if (rowIndex && reaction) {
-                this.toggleReaction(rowIndex, reaction, btn);
-              }
-            } else if (card && !btn) {
-              const rowIndex = parseInt(card.dataset.rowIndex);
-              if (rowIndex) this.showModal(rowIndex);
-            }
-          });
-        }
-
-        document.addEventListener('keydown', e => {
-          if (e.key === 'Escape') this.hideModal();
+      }
+      
+      /**
+       * 📝 リアクション切り替え
+       */
+      async updateReaction(rowIndex, reactionKey) {
+        return await this.callGAS('addReaction', this.userId, rowIndex, reactionKey);
+      }
+      
+      /**
+       * 🔄 回答データ正規化
+       */
+      normalizeAnswer(item) {
+        return {
+          rowIndex: this.sanitizeNumber(item.rowIndex, 1, 1, Number.MAX_SAFE_INTEGER),
+          opinion: this.sanitizeText(item.opinion, true, 5000),
+          reason: this.sanitizeText(item.reason, false, 3000),
+          name: this.sanitizeText(item.name, false, 100),
+          class: this.sanitizeText(item.class, false, 50),
+          email: this.sanitizeEmail(item.email),
+          reactions: this.normalizeReactions(item.reactions),
+          highlight: Boolean(item.highlight),
+          timestamp: item.timestamp || new Date().toISOString()
+        };
+      }
+      
+      /**
+       * 🔄 リアクションデータ正規化
+       */
+      normalizeReactions(reactions) {
+        const defaults = Object.freeze({
+          UNDERSTAND: { count: 0, reacted: false },
+          LIKE: { count: 0, reacted: false },
+          CURIOUS: { count: 0, reacted: false }
         });
-
-        const adminBtn = this.el('adminToggleBtn');
-        if (adminBtn) {
-          adminBtn.addEventListener('click', () => {
-            window.location.href = window.location.href.replace('mode=view', 'mode=admin');
+        
+        if (!reactions) return defaults;
+        
+        const normalized = {};
+        for (const [key, defaultValue] of Object.entries(defaults)) {
+          normalized[key] = Object.freeze({
+            count: Math.max(0, parseInt(reactions[key]?.count) || 0),
+            reacted: Boolean(reactions[key]?.reacted)
           });
         }
-      }
-
-      updateUIState() {
-        const adminBtn = this.el('adminToggleBtn');
-        const modeLabel = this.el('modeLabel');
         
-        if (adminBtn && this.vars.showAdminFeatures && this.vars.isAdminUser) {
-          adminBtn.classList.remove('hidden');
-          adminBtn.textContent = '管理パネル';
-        }
-        
-        if (modeLabel) {
-          modeLabel.textContent = this.vars.isAdminUser ? '管理者' : '学習者';
-        }
+        return Object.freeze(normalized);
       }
-
-      runGas(funcName, ...args) {
+      
+      /**
+       * 📡 GAS関数呼び出し
+       */
+      callGAS(funcName, ...args) {
         return new Promise((resolve, reject) => {
-          if (typeof google !== 'undefined' && google.script?.run) {
+          if (this.isProduction) {
             google.script.run
               .withSuccessHandler(resolve)
               .withFailureHandler(reject)
               [funcName](...args);
           } else {
-            // Mock data for testing
-            setTimeout(() => {
-              if (funcName === 'getPublishedSheetData') {
-                resolve({
-                  header: 'テスト問題',
-                  sheetName: 'テストシート', 
-                  data: [{
-                    rowIndex: 1, name: '田中太郎', class: '3年A組',
-                    opinion: 'これは素晴らしいアイデアです。',
-                    reason: '簡潔で実現可能性が高いです。',
-                    reactions: { UNDERSTAND: {count: 5, reacted: false}, LIKE: {count: 2, reacted: false}, CURIOUS: {count: 1, reacted: false} },
-                    highlight: false
-                  }]
-                });
-              }
-              resolve({});
-            }, 300);
+            this.mockResponse(funcName, resolve);
+          }
+        });
+      }
+      
+      /**
+       * 🧪 モックレスポンス
+       */
+      mockResponse(funcName, resolve) {
+        setTimeout(() => {
+          if (funcName === 'getPublishedSheetData') {
+            resolve({
+              header: 'テスト問題: あなたが思う理想的な学習方法は？',
+              sheetName: 'テスト回答シート',
+              data: [
+                {
+                  rowIndex: 1, name: '田中太郎', class: '3年A組',
+                  opinion: 'グループでの討論を通じて、互いの意見を交換しながら学ぶことが効果的だと思います。',
+                  reason: '一人で勉強するよりも、他の人の考えを聞くことで新しい視点を得られるからです。',
+                  reactions: { UNDERSTAND: {count: 8, reacted: false}, LIKE: {count: 12, reacted: true}, CURIOUS: {count: 3, reacted: false} },
+                  highlight: true
+                },
+                {
+                  rowIndex: 2, name: '佐藤花子', class: '3年B組',
+                  opinion: '実際の体験や実験を通じて、手を動かしながら学ぶことが大切です。',
+                  reason: '本や資料だけでは理解しにくいことも、体験することで記憶に残りやすくなります。',
+                  reactions: { UNDERSTAND: {count: 15, reacted: true}, LIKE: {count: 6, reacted: false}, CURIOUS: {count: 9, reacted: false} },
+                  highlight: false
+                }
+              ]
+            });
+          } else if (funcName === 'addReaction') {
+            resolve({ success: true, count: Math.floor(Math.random() * 20) + 1 });
+          } else {
+            resolve({});
+          }
+        }, 200 + Math.random() * 300);
+      }
+      
+      /**
+       * 💾 キャッシュ設定
+       */
+      setCache(key, value, ttl) {
+        this.cache.set(key, value);
+        
+        if (ttl) {
+          const timer = setTimeout(() => {
+            this.cache.delete(key);
+            this.cacheTimers.delete(key);
+          }, ttl);
+          
+          if (this.cacheTimers.has(key)) {
+            clearTimeout(this.cacheTimers.get(key));
+          }
+          this.cacheTimers.set(key, timer);
+        }
+      }
+      
+      /**
+       * 💿 キャッシュ取得
+       */
+      getCache(key) {
+        return this.cache.get(key);
+      }
+      
+      /**
+       * 🧼 キャッシュクリア
+       */
+      clearCache() {
+        this.cache.clear();
+        this.cacheTimers.forEach(timer => clearTimeout(timer));
+        this.cacheTimers.clear();
+      }
+      
+      // サニタイゼーションメソッド
+      sanitizeText(text, required = false, maxLength = 1000) {
+        if (text === null || text === undefined) {
+          return required ? '' : '';
+        }
+        const str = String(text).trim();
+        if (required && !str) return '';
+        return str.slice(0, maxLength);
+      }
+      
+      sanitizeNumber(value, defaultValue = 0, min = 0, max = Number.MAX_SAFE_INTEGER) {
+        const num = parseInt(value);
+        if (isNaN(num) || num < min || num > max) {
+          return defaultValue;
+        }
+        return num;
+      }
+      
+      sanitizeEmail(email) {
+        if (!email) return '';
+        const str = String(email).trim().toLowerCase();
+        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+        if (!emailRegex.test(str) || str.length > 254) {
+          return '';
+        }
+        return str;
+      }
+    }
+
+    // 🔍 FilterManager - フィルタリング機能
+    class FilterManager {
+      constructor() {
+        this.filters = {
+          classFilter: '',
+          reactionFilter: '',
+          searchQuery: '',
+          sortOrder: 'newest'
+        };
+        this.originalData = [];
+        this.filteredData = [];
+        this.availableClasses = new Set();
+      }
+
+      setData(data) {
+        this.originalData = data || [];
+        this.extractAvailableClasses();
+        this.updateClassFilter();
+        this.applyFilters();
+      }
+
+      extractAvailableClasses() {
+        this.availableClasses.clear();
+        this.originalData.forEach(item => {
+          if (item.class && typeof item.class === 'string' && item.class.trim()) {
+            this.availableClasses.add(item.class.trim());
           }
         });
       }
 
-      async loadData() {
-        if (this.state.loading) return;
-        this.state.loading = true;
-        
-        try {
-          if (!this.vars.userId) {
-            throw new Error('ユーザー情報が取得できません');
-          }
-          
-          const sortOrder = this.el('sortOrder')?.value || 'newest';
-          const data = await this.runGas('getPublishedSheetData', this.vars.userId, 'すべて', sortOrder);
-          
-          this.state.answers = this.normalizeData(data);
-          
-          const heading = this.el('headingLabel');
-          const sheetName = this.el('sheetNameText');
-          
-          if (heading) heading.textContent = data.header || '問題';
-          if (sheetName) sheetName.textContent = 'シート: ' + (data.sheetName || '不明');
-          
-          this.render();
-        } catch (error) {
-          console.error('データロードエラー:', error);
-          this.showError(error.message || 'データ読み込み失敗');
-        } finally {
-          this.state.loading = false;
+      updateClassFilter() {
+        const classFilterEl = document.getElementById('classFilter');
+        if (!classFilterEl) return;
+
+        const currentValue = classFilterEl.value;
+        const firstOption = classFilterEl.querySelector('option[value=""]');
+        classFilterEl.innerHTML = '';
+        if (firstOption) {
+          classFilterEl.appendChild(firstOption);
+        }
+
+        const sortedClasses = Array.from(this.availableClasses).sort();
+        sortedClasses.forEach(className => {
+          const option = document.createElement('option');
+          option.value = className;
+          option.textContent = className;
+          classFilterEl.appendChild(option);
+        });
+
+        classFilterEl.value = currentValue;
+      }
+
+      setFilter(filterType, value) {
+        if (this.filters.hasOwnProperty(filterType)) {
+          this.filters[filterType] = value;
+          this.applyFilters();
         }
       }
 
-      normalizeData(rawData) {
-        if (!rawData?.data && !rawData?.rows) return [];
-        const data = rawData.data || rawData.rows || [];
-        
-        return data.filter(item => item?.opinion).map((item, index) => ({
-          rowIndex: item.rowIndex || index + 1,
-          opinion: String(item.opinion || '').trim(),
-          reason: String(item.reason || '').trim(),
-          name: String(item.name || '').trim(),
-          class: String(item.class || '').trim(),
-          email: String(item.email || '').trim(),
-          reactions: this.normalizeReactions(item.reactions),
-          highlight: Boolean(item.highlight)
-        }));
+      clearFilters() {
+        this.filters = {
+          classFilter: '',
+          reactionFilter: '',
+          searchQuery: '',
+          sortOrder: 'newest'
+        };
+
+        const elements = {
+          classFilter: document.getElementById('classFilter'),
+          reactionFilter: document.getElementById('reactionFilter'),
+          searchInput: document.getElementById('searchInput'),
+          sortOrder: document.getElementById('sortOrder')
+        };
+
+        Object.entries(elements).forEach(([key, element]) => {
+          if (element) {
+            element.value = key === 'sortOrder' ? 'newest' : '';
+          }
+        });
+
+        this.applyFilters();
       }
 
-      normalizeReactions(reactions) {
-        const defaults = { UNDERSTAND: {count: 0, reacted: false}, LIKE: {count: 0, reacted: false}, CURIOUS: {count: 0, reacted: false} };
-        if (!reactions) return defaults;
+      applyFilters() {
+        let filtered = [...this.originalData];
+
+        if (this.filters.classFilter) {
+          filtered = filtered.filter(item => 
+            item.class && item.class.trim() === this.filters.classFilter
+          );
+        }
+
+        if (this.filters.reactionFilter) {
+          const thresholds = { popular: 5, trending: 10, viral: 20 };
+          const threshold = thresholds[this.filters.reactionFilter];
+          if (threshold) {
+            filtered = filtered.filter(item => {
+              const reactionCount = this.getTotalReactions(item);
+              return reactionCount >= threshold;
+            });
+          }
+        }
+
+        if (this.filters.searchQuery) {
+          const query = this.filters.searchQuery.toLowerCase().trim();
+          filtered = filtered.filter(item => {
+            return (
+              (item.opinion && item.opinion.toLowerCase().includes(query)) ||
+              (item.reason && item.reason.toLowerCase().includes(query)) ||
+              (item.name && item.name.toLowerCase().includes(query)) ||
+              (item.class && item.class.toLowerCase().includes(query))
+            );
+          });
+        }
+
+        // ソート
+        switch (this.filters.sortOrder) {
+          case 'newest':
+            filtered.sort((a, b) => (b.rowIndex || 0) - (a.rowIndex || 0));
+            break;
+          case 'random':
+            for (let i = filtered.length - 1; i > 0; i--) {
+              const j = Math.floor(Math.random() * (i + 1));
+              [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+            }
+            break;
+          case 'reactions':
+            filtered.sort((a, b) => {
+              const reactionA = this.getTotalReactions(a);
+              const reactionB = this.getTotalReactions(b);
+              return reactionB - reactionA;
+            });
+            break;
+        }
+
+        this.filteredData = filtered;
+        return filtered;
+      }
+
+      getTotalReactions(item) {
+        if (!item.reactions) return 0;
+        return Object.values(item.reactions).reduce((total, reaction) => {
+          return total + (reaction.count || 0);
+        }, 0);
+      }
+
+      getFilteredData() {
+        return this.filteredData;
+      }
+
+      getFilterStatus() {
+        const hasFilters = Object.values(this.filters).some(value => 
+          value && value !== 'newest'
+        );
         
-        return Object.keys(defaults).reduce((acc, key) => {
-          acc[key] = {
-            count: Math.max(0, parseInt(reactions[key]?.count) || 0),
-            reacted: Boolean(reactions[key]?.reacted)
+        return {
+          hasFilters,
+          totalItems: this.originalData.length,
+          filteredItems: this.filteredData.length,
+          filters: { ...this.filters }
+        };
+      }
+    }
+
+    /**
+     * 🎨 AnswerRenderer - DOM操作・レンダリング専門クラス
+     */
+    class AnswerRenderer {
+      constructor() {
+        this.reactions = [
+          {key: 'LIKE', icon: 'thumbup', color: 'red'},
+          {key: 'UNDERSTAND', icon: 'lightbulb', color: 'yellow'},
+          {key: 'CURIOUS', icon: 'search', color: 'green'}
+        ];
+        this.gsapReady = false;
+        this.initGSAP();
+      }
+      
+      async initGSAP() {
+        try {
+          if (typeof gsap !== 'undefined') {
+            this.gsapReady = true;
+            return;
+          }
+          
+          // GSAP読み込み待機
+          const timeout = setTimeout(() => {
+            this.gsapReady = false;
+          }, 3000);
+          
+          const checkGSAP = () => {
+            if (typeof gsap !== 'undefined') {
+              clearTimeout(timeout);
+              this.gsapReady = true;
+            } else {
+              setTimeout(checkGSAP, 100);
+            }
           };
-          return acc;
-        }, {});
+          checkGSAP();
+        } catch (error) {
+          this.gsapReady = false;
+        }
       }
-
-      render() {
-        const container = this.el('answers');
+      
+      /**
+       * 📈 回答一覧レンダリング
+       */
+      renderAnswers(answers) {
+        const container = document.getElementById('answers');
         if (!container) return;
         
-        const slider = this.el('sizeSlider');
-        const sliderValue = this.el('sliderValue');
-        
-        if (slider && sliderValue) {
-          sliderValue.textContent = slider.value;
-          container.className = `grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-${slider.value}`;
-        }
-        
-        this.updateAnswerCount();
-        
-        if (!this.state.answers.length) {
-          container.innerHTML = '<p class="text-center text-gray-500 col-span-full mt-8">回答はありません</p>';
-          return;
-        }
-        
-        const fragment = document.createDocumentFragment();
-        this.state.answers.forEach(answer => {
-          fragment.appendChild(this.createCard(answer));
-        });
-        
         container.innerHTML = '';
-        container.appendChild(fragment);
-      }
-
-      createCard(data) {
-        const card = document.createElement('div');
-        card.className = `answer-card glass-panel rounded-xl p-4 flex flex-col shadow-lg border-2 border-cyan-400/80 cursor-pointer${data.highlight ? ' highlighted' : ''}`;
-        card.dataset.rowIndex = data.rowIndex;
-        card.tabIndex = 0;
-        card.setAttribute('role', 'article');
-        card.setAttribute('aria-label', `回答: ${data.opinion.substring(0, 50)}...`);
         
-        // Content
+        answers.forEach((answer, index) => {
+          const card = this.createAnswerCard(answer);
+          container.appendChild(card);
+          
+          // アニメーション
+          if (this.gsapReady && typeof gsap !== 'undefined') {
+            gsap.fromTo(card, 
+              { opacity: 0, y: 20 },
+              { opacity: 1, y: 0, duration: 0.3, delay: index * 0.05 }
+            );
+          }
+        });
+      }
+      
+      /**
+       * 📋 回答カード作成
+       */
+      createAnswerCard(answer) {
+        const card = document.createElement('div');
+        card.className = `answer-card glass-panel rounded-xl p-4 flex flex-col shadow-lg border-2 border-cyan-400/80 cursor-pointer${answer.highlight ? ' highlighted' : ''}`;
+        card.dataset.rowIndex = answer.rowIndex;
+        card.tabIndex = 0;
+        
+        // コンテンツ
         const content = document.createElement('div');
         content.className = 'flex-grow mb-3';
         
         const opinion = document.createElement('h3');
         opinion.className = 'text-cyan-200 text-xl font-semibold leading-tight mb-2';
-        opinion.textContent = data.opinion;
+        opinion.textContent = answer.opinion;
         content.appendChild(opinion);
         
-        if (data.reason) {
+        if (answer.reason) {
           const reason = document.createElement('p');
           reason.className = 'text-gray-100 mt-2';
-          reason.textContent = data.reason;
+          reason.textContent = answer.reason;
           content.appendChild(reason);
         }
         
         card.appendChild(content);
         
-        // Footer
+        // フッター
         const footer = document.createElement('div');
         footer.className = 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center';
         
-        // Identity
-        const identity = this.createIdentity(data);
+        // ID情報
+        const identity = this.createIdentity(answer);
         if (identity) footer.appendChild(identity);
         
-        // Reactions
+        // リアクション
         const reactions = document.createElement('div');
         reactions.className = 'flex items-center gap-1';
         
         this.reactions.forEach(r => {
-          const btn = this.createReactionBtn(data, r);
+          const btn = this.createReactionButton(answer, r);
           reactions.appendChild(btn);
         });
         
         footer.appendChild(reactions);
         card.appendChild(footer);
         
-        // Highlight badge
-        if (data.highlight) {
+        // ハイライトバッジ
+        if (answer.highlight) {
           const badge = document.createElement('span');
           badge.className = 'absolute top-1 right-1 text-yellow-300';
           badge.appendChild(this.createIcon('star', 'w-6 h-6'));
@@ -304,14 +525,17 @@
         
         return card;
       }
-
-      createIdentity(data) {
-        const config = this.state.config?.displaySettings || {};
+      
+      /**
+       * 👤 ID情報作成
+       */
+      createIdentity(answer) {
+        const config = window.answerController?.config?.displaySettings || {};
         const parts = [];
         
-        if (config.showName && data.name) parts.push(data.name);
-        if (config.showClass && data.class) parts.push(`(${data.class})`);
-        if (config.showEmail && data.email) parts.push(data.email);
+        if (config.showName && answer.name) parts.push(answer.name);
+        if (config.showClass && answer.class) parts.push(`(${answer.class})`);
+        if (config.showEmail && answer.email) parts.push(answer.email);
         
         if (!parts.length) return null;
         
@@ -320,13 +544,16 @@
         div.textContent = parts.join(' ');
         return div;
       }
-
-      createReactionBtn(data, reaction) {
-        const info = data.reactions[reaction.key] || {count: 0, reacted: false};
+      
+      /**
+       * 👍 リアクションボタン作成
+       */
+      createReactionButton(answer, reaction) {
+        const info = answer.reactions[reaction.key] || {count: 0, reacted: false};
         const btn = document.createElement('button');
         
         btn.type = 'button';
-        btn.dataset.rowIndex = data.rowIndex;
+        btn.dataset.rowIndex = answer.rowIndex;
         btn.dataset.reaction = reaction.key;
         btn.className = this.getReactionClass(reaction.color, info.reacted);
         
@@ -339,7 +566,10 @@
         
         return btn;
       }
-
+      
+      /**
+       * 🎨 リアクションクラス取得
+       */
       getReactionClass(color, reacted) {
         const base = 'reaction-btn flex items-center px-2 py-1 rounded border-2 transition-all ';
         if (reacted) {
@@ -347,7 +577,10 @@
         }
         return base + `bg-transparent border-${color}-500/30 text-${color}-500/60 hover:bg-${color}-500/10`;
       }
-
+      
+      /**
+       * 🖼️ アイコン作成
+       */
       createIcon(name, classes = '') {
         const svg = ICONS[name];
         if (!svg) return document.createElement('span');
@@ -361,167 +594,517 @@
         
         return element;
       }
-
-      renderIcons() {
-        const icons = [
-          ['answerModalCloseBtn', 'x', 'w-6 h-6'],
-          ['footerIcon', 'grid'],
-          ['infoIconLike', 'thumbup'],
-          ['infoIconUnderstand', 'lightbulb'], 
-          ['infoIconCurious', 'search'],
-          ['infoIconHighlight', 'star']
-        ];
+      
+      /**
+       * 📊 グリッド列数更新
+       */
+      updateGridColumns(columnCount) {
+        const container = document.getElementById('answers');
+        const sliderValue = document.getElementById('sliderValue');
         
-        icons.forEach(([id, icon, classes]) => {
-          const el = this.el(id);
-          if (el) {
-            el.innerHTML = '';
-            el.appendChild(this.createIcon(icon, classes || ''));
-          }
-        });
+        if (container && sliderValue) {
+          const validColumns = [1, 2, 3, 4, 5, 6];
+          const columns = validColumns.includes(parseInt(columnCount)) ? parseInt(columnCount) : 4;
+          sliderValue.textContent = columns;
+          container.className = `grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-${columns}`;
+        }
       }
-
-      updateAnswerCount() {
-        const el = this.el('answerCount');
+      
+      /**
+       * 📊 回答数更新
+       */
+      updateAnswerCount(count) {
+        const el = document.getElementById('answerCount');
         if (el) {
           el.innerHTML = '';
           el.appendChild(this.createIcon('users', 'w-4 h-4 mr-2'));
-          el.appendChild(document.createTextNode(`${this.state.answers.length}件`));
+          el.appendChild(document.createTextNode(`${count}件`));
         }
       }
-
-      async toggleReaction(rowIndex, reactionKey, btn) {
+      
+      /**
+       * 📝 ヘッダー更新
+       */
+      updateHeader(header, sheetName) {
+        const headingEl = document.getElementById('headingLabel');
+        const sheetEl = document.getElementById('sheetNameText');
+        
+        if (headingEl) headingEl.textContent = header;
+        if (sheetEl) sheetEl.textContent = 'シート: ' + sheetName;
+      }
+      
+      /**
+       * 🎆 リアクションアニメーション
+       */
+      animateReactionSuccess(button) {
+        if (this.gsapReady && typeof gsap !== 'undefined') {
+          gsap.to(button, {
+            scale: 1.2,
+            duration: 0.2,
+            yoyo: true,
+            repeat: 1
+          });
+        } else {
+          button.style.transform = 'scale(1.2)';
+          setTimeout(() => {
+            button.style.transform = 'scale(1)';
+          }, 200);
+        }
+      }
+      
+      /**
+       * 📺 モーダル表示
+       */
+      showModal(answer) {
+        const modal = document.getElementById('answerModalContainer');
+        const modalContent = document.getElementById('modalAnswer');
+        const modalName = document.getElementById('modalStudentName');
+        const modalReactions = document.getElementById('modalReactions');
+        
+        if (!modal || !modalContent) return;
+        
+        // コンテンツ設定
+        modalContent.innerHTML = `
+          <h2 class="text-2xl font-bold text-cyan-200 mb-4">回答内容</h2>
+          <p class="text-xl leading-relaxed mb-4">${answer.opinion}</p>
+          ${answer.reason ? `
+            <h3 class="text-lg font-semibold text-cyan-400 mb-2">理由・根拠</h3>
+            <p class="text-gray-200 leading-relaxed">${answer.reason}</p>
+          ` : ''}
+        `;
+        
+        if (modalName) {
+          modalName.textContent = answer.name || '匿名';
+        }
+        
+        // リアクションボタン作成
+        if (modalReactions) {
+          modalReactions.innerHTML = '';
+          this.reactions.forEach(r => {
+            const btn = this.createReactionButton(answer, r);
+            modalReactions.appendChild(btn);
+          });
+        }
+        
+        // モーダル表示
+        modal.classList.remove('hidden');
+        requestAnimationFrame(() => {
+          modal.classList.remove('opacity-0');
+        });
+        
+        // クローズイベント
+        this.setupModalCloseEvents(modal);
+      }
+      
+      /**
+       * ✖️ モーダルクローズイベント
+       */
+      setupModalCloseEvents(modal) {
+        const closeModal = () => {
+          modal.classList.add('opacity-0');
+          setTimeout(() => modal.classList.add('hidden'), 300);
+        };
+        
+        // ESCキー
+        const handleEsc = (e) => {
+          if (e.key === 'Escape') {
+            closeModal();
+            document.removeEventListener('keydown', handleEsc);
+          }
+        };
+        document.addEventListener('keydown', handleEsc);
+        
+        // 背景クリック
+        modal.addEventListener('click', (e) => {
+          if (e.target === modal) closeModal();
+        }, { once: true });
+        
+        // クローズボタン
+        const closeBtn = document.getElementById('answerModalCloseBtn');
+        if (closeBtn) {
+          closeBtn.addEventListener('click', closeModal, { once: true });
+        }
+      }
+      
+      /**
+       * 🖼️ アイコン初期化
+       */
+      renderIcons() {
+        const iconConfigs = [
+          ['answerModalCloseBtn', 'x', 'w-6 h-6'],
+          ['footerIcon', 'grid', 'w-4 h-4'],
+          ['infoIconLike', 'thumbup', 'w-5 h-5'],
+          ['infoIconUnderstand', 'lightbulb', 'w-5 h-5'],
+          ['infoIconCurious', 'search', 'w-5 h-5'],
+          ['infoIconHighlight', 'star', 'w-5 h-5']
+        ];
+        
+        iconConfigs.forEach(([elementId, iconName, className]) => {
+          const element = document.getElementById(elementId);
+          if (element) {
+            element.innerHTML = '';
+            const icon = this.createIcon(iconName, className);
+            element.appendChild(icon);
+          }
+        });
+      }
+    }
+    
+    /**
+     * 🎯 AnswerController - アプリケーション制御・調整専門クラス
+     */
+    class AnswerController {
+      constructor() {
+        this.vars = getSecureVars();
+        this.config = null;
+        this.answers = [];
+        this.isLoading = false;
+        this.pollingInterval = null;
+        
+        // 専門クラスのインスタンス化
+        this.answerService = new AnswerService(this.vars.userId);
+        this.answerRenderer = new AnswerRenderer();
+        this.filterManager = new FilterManager();
+        
+        this.init();
+      }
+      
+      async init() {
+        try {
+          // 並列初期化で高速化
+          const [config] = await Promise.all([
+            this.answerService.loadConfig(),
+            this.setupUI(),
+            this.setupEventListeners()
+          ]);
+          
+          this.config = config;
+          await this.loadAnswers();
+          this.startPolling();
+          
+        } catch (error) {
+          this.handleError('初期化エラー', error);
+        }
+      }
+      
+      setupUI() {
+        this.answerRenderer.renderIcons();
+        this.updateUIState();
+        return Promise.resolve();
+      }
+      
+      setupEventListeners() {
+        // スライダーイベント
+        const slider = document.getElementById('sizeSlider');
+        if (slider) {
+          slider.addEventListener('input', () => {
+            localStorage.setItem('boardColumns', slider.value);
+            this.answerRenderer.updateGridColumns(slider.value);
+          });
+          
+          const saved = localStorage.getItem('boardColumns');
+          if (saved) {
+            slider.value = saved;
+            this.answerRenderer.updateGridColumns(saved);
+          }
+        }
+        
+        // フィルターイベント
+        this.setupFilterEvents();
+        
+        // コンテナイベント
+        const container = document.getElementById('answers');
+        if (container) {
+          container.addEventListener('click', (e) => {
+            const btn = e.target.closest('.reaction-btn');
+            const card = e.target.closest('.answer-card');
+            
+            if (btn) {
+              e.stopPropagation();
+              const rowIndex = parseInt(btn.dataset.rowIndex);
+              const reaction = btn.dataset.reaction;
+              if (rowIndex && reaction) {
+                this.handleReaction(rowIndex, reaction, btn);
+              }
+            } else if (card && !btn) {
+              const rowIndex = parseInt(card.dataset.rowIndex);
+              if (rowIndex) this.showModal(rowIndex);
+            }
+          });
+        }
+        
+        // 管理者切り替え
+        const adminBtn = document.getElementById('adminToggleBtn');
+        if (adminBtn) {
+          adminBtn.addEventListener('click', () => {
+            window.location.href = window.location.href.replace('mode=view', 'mode=admin');
+          });
+        }
+        
+        // キーボードイベント
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            const modal = document.getElementById('answerModalContainer');
+            if (modal && !modal.classList.contains('hidden')) {
+              modal.classList.add('opacity-0');
+              setTimeout(() => modal.classList.add('hidden'), 300);
+            }
+          }
+        });
+        
+        return Promise.resolve();
+      }
+      
+      setupFilterEvents() {
+        // クラスフィルタ
+        const classFilter = document.getElementById('classFilter');
+        if (classFilter) {
+          classFilter.addEventListener('change', (e) => {
+            this.filterManager.setFilter('classFilter', e.target.value);
+            this.renderFilteredResults();
+          });
+        }
+        
+        // リアクション数フィルタ
+        const reactionFilter = document.getElementById('reactionFilter');
+        if (reactionFilter) {
+          reactionFilter.addEventListener('change', (e) => {
+            this.filterManager.setFilter('reactionFilter', e.target.value);
+            this.renderFilteredResults();
+          });
+        }
+        
+        // 検索入力（デバウンス付き）
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+          let debounceTimer;
+          searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+              this.filterManager.setFilter('searchQuery', e.target.value);
+              this.renderFilteredResults();
+            }, 300);
+          });
+        }
+        
+        // ソート順変更
+        const sortOrder = document.getElementById('sortOrder');
+        if (sortOrder) {
+          sortOrder.addEventListener('change', (e) => {
+            this.loadAnswers(e.target.value);
+          });
+        }
+        
+        // フィルタクリアボタン
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        if (clearFiltersBtn) {
+          clearFiltersBtn.addEventListener('click', () => {
+            this.filterManager.clearFilters();
+            this.renderFilteredResults();
+          });
+        }
+      }
+      
+      updateUIState() {
+        const adminBtn = document.getElementById('adminToggleBtn');
+        const modeLabel = document.getElementById('modeLabel');
+        
+        if (adminBtn && this.vars.showAdminFeatures && this.vars.isAdminUser) {
+          adminBtn.classList.remove('hidden');
+          adminBtn.textContent = '管理パネル';
+        }
+        
+        if (modeLabel) {
+          modeLabel.textContent = this.vars.isAdminUser ? '管理者' : '学習者';
+        }
+      }
+      
+      async loadAnswers(sortOrder = 'newest') {
+        if (this.isLoading) return;
+        this.isLoading = true;
+        
+        try {
+          const data = await this.answerService.loadAnswers(sortOrder);
+          this.answers = data.answers;
+          
+          // FilterManagerにデータを設定
+          this.filterManager.setData(data.answers);
+          
+          // UIRenderer更新
+          this.answerRenderer.updateHeader(data.header, data.sheetName);
+          this.renderFilteredResults();
+          
+        } catch (error) {
+          this.handleError('データロードエラー', error);
+        } finally {
+          this.isLoading = false;
+        }
+      }
+      
+      renderFilteredResults() {
+        const filteredData = this.filterManager.getFilteredData();
+        const status = this.filterManager.getFilterStatus();
+        
+        // UIに反映
+        this.answerRenderer.renderAnswers(filteredData);
+        this.answerRenderer.updateAnswerCount(status.filteredItems);
+        this.updateFilterStatusDisplay(status);
+      }
+      
+      updateFilterStatusDisplay(status) {
+        const answerCount = document.getElementById('answerCount');
+        if (answerCount) {
+          const filterText = status.hasFilters 
+            ? `${status.filteredItems}/${status.totalItems} 件` 
+            : `${status.totalItems} 件`;
+          
+          answerCount.innerHTML = `
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+            </svg>
+            ${filterText}
+            ${status.hasFilters ? '<span class="text-cyan-400">（フィルタ中）</span>' : ''}
+          `;
+        }
+        
+        // クリアボタンの表示制御
+        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
+        if (clearFiltersBtn) {
+          clearFiltersBtn.style.display = status.hasFilters ? 'block' : 'none';
+        }
+      }
+      
+      async handleReaction(rowIndex, reactionKey, btn) {
         if (btn.classList.contains('loading')) return;
         
         try {
           btn.classList.add('loading');
-          const result = await this.runGas('addReaction', this.vars.userId, rowIndex, reactionKey);
           
-          // Update button
-          const countEl = btn.querySelector('span');
-          if (countEl) countEl.textContent = result.count || 0;
+          const result = await this.answerService.updateReaction(rowIndex, reactionKey);
           
-          const wasReacted = btn.classList.contains('reacted');
-          btn.className = this.getReactionClass(
-            this.reactions.find(r => r.key === reactionKey)?.color || 'gray',
-            !wasReacted
-          );
+          if (result.success) {
+            // カウント更新
+            const countEl = btn.querySelector('span');
+            if (countEl) {
+              countEl.textContent = result.count || 0;
+            }
+            
+            // 状態更新
+            const wasReacted = btn.classList.contains('reacted');
+            btn.classList.toggle('reacted', !wasReacted);
+            btn.classList.toggle('liked', !wasReacted);
+            
+            // アニメーション
+            this.answerRenderer.animateReactionSuccess(btn);
+            
+            // 同じ行の他のボタンも更新
+            const card = btn.closest('.answer-card');
+            if (card) {
+              const allReactionBtns = card.querySelectorAll('.reaction-btn');
+              allReactionBtns.forEach(otherBtn => {
+                if (otherBtn.dataset.reaction === reactionKey && otherBtn !== btn) {
+                  const otherCountEl = otherBtn.querySelector('span');
+                  if (otherCountEl) {
+                    otherCountEl.textContent = result.count || 0;
+                  }
+                  otherBtn.classList.toggle('reacted', !wasReacted);
+                  otherBtn.classList.toggle('liked', !wasReacted);
+                }
+              });
+            }
+            
+          } else {
+            this.showUserError(result.message || 'リアクションに失敗しました');
+          }
           
         } catch (error) {
           console.error('リアクションエラー:', error);
-          this.showError('リアクション失敗: ' + error.message);
+          this.handleError('リアクション処理エラー', error);
         } finally {
           btn.classList.remove('loading');
         }
       }
-
+      
       showModal(rowIndex) {
-        const answer = this.state.answers.find(a => a.rowIndex === rowIndex);
-        if (!answer) return;
-        
-        const modal = this.el('answerModalContainer');
-        const content = modal.querySelector('.glass-panel');
-        
-        if (!content) return;
-        
-        // 🔒 XSS対策: DOM操作で安全に構築
-        content.innerHTML = '';
-        
-        const container = document.createElement('div');
-        
-        // Header
-        const header = document.createElement('div');
-        header.className = 'flex justify-between items-start mb-4';
-        
-        const title = document.createElement('h3');
-        title.className = 'text-xl font-bold text-cyan-200';
-        title.textContent = '回答詳細';
-        header.appendChild(title);
-        
-        const closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.className = 'text-gray-400 hover:text-white';
-        closeBtn.addEventListener('click', () => this.hideModal());
-        closeBtn.appendChild(this.createIcon('x', 'w-6 h-6'));
-        header.appendChild(closeBtn);
-        
-        container.appendChild(header);
-        
-        // Content
-        const contentDiv = document.createElement('div');
-        contentDiv.className = 'space-y-4';
-        
-        // Opinion
-        const opinionDiv = document.createElement('div');
-        const opinionTitle = document.createElement('h4');
-        opinionTitle.className = 'text-cyan-400 font-semibold mb-2';
-        opinionTitle.textContent = '回答';
-        const opinionText = document.createElement('p');
-        opinionText.className = 'text-gray-200';
-        opinionText.textContent = answer.opinion;
-        opinionDiv.appendChild(opinionTitle);
-        opinionDiv.appendChild(opinionText);
-        contentDiv.appendChild(opinionDiv);
-        
-        // Reason
-        if (answer.reason) {
-          const reasonDiv = document.createElement('div');
-          const reasonTitle = document.createElement('h4');
-          reasonTitle.className = 'text-cyan-400 font-semibold mb-2';
-          reasonTitle.textContent = '理由';
-          const reasonText = document.createElement('p');
-          reasonText.className = 'text-gray-200';
-          reasonText.textContent = answer.reason;
-          reasonDiv.appendChild(reasonTitle);
-          reasonDiv.appendChild(reasonText);
-          contentDiv.appendChild(reasonDiv);
+        const answer = this.answers.find(a => a.rowIndex === rowIndex);
+        if (answer) {
+          this.answerRenderer.showModal(answer);
         }
-        
-        // Name
-        if (answer.name) {
-          const nameDiv = document.createElement('div');
-          const nameTitle = document.createElement('h4');
-          nameTitle.className = 'text-cyan-400 font-semibold mb-2';
-          nameTitle.textContent = '名前';
-          const nameText = document.createElement('p');
-          nameText.className = 'text-gray-200';
-          nameText.textContent = answer.name;
-          nameDiv.appendChild(nameTitle);
-          nameDiv.appendChild(nameText);
-          contentDiv.appendChild(nameDiv);
-        }
-        
-        container.appendChild(contentDiv);
-        content.appendChild(container);
-        
-        modal.classList.remove('hidden', 'opacity-0');
       }
-
-      hideModal() {
-        const modal = this.el('answerModalContainer');
-        modal.classList.add('opacity-0');
-        setTimeout(() => modal.classList.add('hidden'), 300);
-      }
-
-      showError(message) {
-        console.error('エラー:', message);
-        setTimeout(() => alert(message), 100);
-      }
-
+      
       startPolling() {
-        this.state.polling = setInterval(() => this.loadData(), 3 * 60 * 1000);
+        // 1分間隔でポーリング
+        this.pollingInterval = setInterval(() => {
+          if (!document.hidden) {
+            this.loadAnswers();
+          }
+        }, 60000);
+        
+        // ページの可視性変化に応じてポーリング制御
+        document.addEventListener('visibilitychange', () => {
+          if (document.hidden) {
+            if (this.pollingInterval) {
+              clearInterval(this.pollingInterval);
+              this.pollingInterval = null;
+            }
+          } else if (!this.pollingInterval) {
+            this.startPolling();
+          }
+        });
+      }
+      
+      handleError(context, error) {
+        const isDevelopment = window.location.hostname === 'localhost';
+        const errorMessage = isDevelopment ? error.message : '処理中にエラーが発生しました';
+        
+        console.error('App Error:', {
+          context,
+          message: error.message,
+          timestamp: new Date().toISOString(),
+          userId: this.vars.userId
+        });
+        
+        this.showUserError(errorMessage);
+      }
+      
+      showUserError(message) {
+        const notification = document.createElement('div');
+        notification.className = 'fixed top-4 right-4 bg-red-600 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm';
+        notification.textContent = message;
+        
+        document.body.appendChild(notification);
+        
+        setTimeout(() => {
+          if (notification.parentNode) {
+            notification.parentNode.removeChild(notification);
+          }
+        }, 3000);
+      }
+      
+      destroy() {
+        // ポーリング停止
+        if (this.pollingInterval) {
+          clearInterval(this.pollingInterval);
+          this.pollingInterval = null;
+        }
+        
+        // キャッシュクリア
+        if (this.answerService?.clearCache) {
+          this.answerService.clearCache();
+        }
       }
     }
     
     // Initialize app
     try {
-      if (window.studyQuestApp?.destroy) {
-        window.studyQuestApp.destroy();
+      if (window.answerController?.destroy) {
+        window.answerController.destroy();
       }
-      window.studyQuestApp = new StudyQuestApp();
+      window.answerController = new AnswerController();
       
       window.addEventListener('beforeunload', () => {
-        window.studyQuestApp?.destroy();
+        window.answerController?.destroy();
       });
       
     } catch (error) {

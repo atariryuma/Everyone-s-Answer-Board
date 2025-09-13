@@ -561,7 +561,7 @@ function batchUpdateSheetsData(service, spreadsheetId, updateData) {
     return {
       status: 'success',
       updateCount: results.length,
-      results: results
+      results
     };
 
   } catch (error) {
