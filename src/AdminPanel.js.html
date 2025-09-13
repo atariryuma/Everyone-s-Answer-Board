@@ -740,56 +740,7 @@
         }
       }
 
-      // 7. 列マッピングの復元
-      if (config.columnMapping && config.columnMapping.mapping) {
-        const mapping = config.columnMapping.mapping;
-
-        // 回答列選択ドロップダウン
-        if (mapping.answer !== undefined) {
-          const answerSelect = document.getElementById('answer-column-select');
-          if (answerSelect) {
-            answerSelect.value = mapping.answer;
-            console.log('✅ 回答列選択反映:', mapping.answer);
-          } else {
-            console.warn('⚠️ 回答列セレクト (answer-column-select) が見つかりません');
-          }
-        }
-
-        // 理由列選択ドロップダウン
-        if (mapping.reason !== undefined) {
-          const reasonSelect = document.getElementById('reason-column-select');
-          if (reasonSelect) {
-            reasonSelect.value = mapping.reason;
-            console.log('✅ 理由列選択反映:', mapping.reason);
-          } else {
-            console.warn('⚠️ 理由列セレクト (reason-column-select) が見つかりません');
-          }
-        }
-
-        // クラス列選択ドロップダウン
-        if (mapping.class !== undefined) {
-          const classSelect = document.getElementById('class-column-select');
-          if (classSelect) {
-            classSelect.value = mapping.class;
-            console.log('✅ クラス列選択反映:', mapping.class);
-          } else {
-            console.warn('⚠️ クラス列セレクト (class-column-select) が見つかりません');
-          }
-        }
-
-        // 名前列選択ドロップダウン
-        if (mapping.name !== undefined) {
-          const nameSelect = document.getElementById('name-column-select');
-          if (nameSelect) {
-            nameSelect.value = mapping.name;
-            console.log('✅ 名前列選択反映:', mapping.name);
-          } else {
-            console.warn('⚠️ 名前列セレクト (name-column-select) が見つかりません');
-          }
-        }
-      }
-
-      // 8. シート名入力フィールドの復元
+      // 7. シート名入力フィールドの復元
       if (config.sheetName) {
         const sheetNameInput = document.getElementById('sheet-name-input');
         if (sheetNameInput) {
@@ -1706,11 +1657,66 @@
       // AI検出結果をドロップダウンの初期選択として設定
       setAIDetectionSelections(mapping, dropdowns);
 
+      // 保存済み設定の復元（オプション追加後に実行）
+      restoreSavedColumnMapping(dropdowns);
+
       // ドロップダウン変更イベントリスナーを設定
       setupDropdownEventListeners(dropdowns);
     } catch (error) {
       console.error('populateColumnDropdowns エラー:', error);
       showError('ドロップダウンの設定に失敗しました: ' + error.message);
+    }
+  }
+
+  // 保存済み設定から列マッピングを復元（オプション追加後に実行）
+  let lastMappingRestore = null;
+  function restoreSavedColumnMapping(dropdowns) {
+    try {
+      const config = systemState.config;
+      if (!config || !config.columnMapping || !config.columnMapping.mapping) {
+        console.log('📋 保存済み列マッピングなし - スキップ');
+        return;
+      }
+
+      const savedMapping = config.columnMapping.mapping;
+
+      // 重複実行防止
+      const mappingHash = JSON.stringify(savedMapping);
+      if (lastMappingRestore === mappingHash) {
+        console.log('📋 列マッピング復元: 重複実行をスキップ');
+        return;
+      }
+      lastMappingRestore = mappingHash;
+
+      console.log('📋 保存済み列マッピング復元開始:', savedMapping);
+
+      // 各列選択ドロップダウンに保存済み値を設定
+      Object.keys(dropdowns).forEach((columnType) => {
+        const dropdown = dropdowns[columnType];
+        if (!dropdown) {
+          console.warn(`⚠️ ${columnType}ドロップダウンが見つかりません`);
+          return;
+        }
+
+        const savedValue = savedMapping[columnType];
+        if (savedValue !== undefined) {
+          // オプションの存在確認
+          const option = dropdown.querySelector(`option[value="${savedValue}"]`);
+          if (option) {
+            dropdown.value = savedValue;
+            console.log(`✅ ${columnType}列選択復元: ${savedValue}`);
+
+            // ドロップダウンに視覚的フィードバックを追加
+            dropdown.classList.add('has-manual-selection');
+          } else {
+            console.warn(`⚠️ ${columnType}列選択: 保存値 ${savedValue} に対応するオプションが見つかりません`);
+          }
+        }
+      });
+
+      console.log('✅ 保存済み列マッピング復元完了');
+    } catch (error) {
+      console.error('❌ 保存済み列マッピング復元エラー:', error.message);
     }
   }
 
@@ -2346,66 +2352,112 @@
     }
   }
 
-  // 設定サマリー更新
+  // 設定サマリー更新（重複実行防止機能付き）
+  let lastConfigUpdate = null;
   function updateConfigSummary(config) {
     try {
+      // 同一の設定データでの重複実行を防ぐ
+      const configHash = config ? JSON.stringify({
+        appPublished: config.appPublished,
+        spreadsheetId: config.spreadsheetId,
+        spreadsheetName: config.spreadsheetName,
+        sheetName: config.sheetName,
+        lastModified: config.lastModified
+      }) : 'null';
+
+      if (lastConfigUpdate === configHash) {
+        console.log('📋 updateConfigSummary: 重複実行をスキップ');
+        return;
+      }
+      lastConfigUpdate = configHash;
+
       console.log('📋 updateConfigSummary 開始:', config);
 
       // 公開ステータス更新
       const appPublished = config?.appPublished === true || config?.appPublished === 'true';
       const publishBadge = document.getElementById('app-publish-status');
+      console.log('🏷️ 公開ステータス更新:', { appPublished, element: !!publishBadge });
       if (publishBadge) {
         if (appPublished) {
           publishBadge.className = 'status-badge published';
           publishBadge.textContent = '公開中';
+          console.log('✅ 公開ステータス: 公開中に更新');
         } else {
           publishBadge.className = 'status-badge unpublished';
           publishBadge.textContent = '未公開';
+          console.log('✅ 公開ステータス: 未公開に更新');
         }
+      } else {
+        console.warn('⚠️ 公開ステータス要素 (app-publish-status) が見つかりません');
       }
 
       // データソース更新
       const datasourceElement = document.getElementById('current-datasource');
+      console.log('📊 データソース更新:', {
+        spreadsheetId: config?.spreadsheetId,
+        spreadsheetName: config?.spreadsheetName,
+        element: !!datasourceElement
+      });
       if (datasourceElement) {
         if (config?.spreadsheetId) {
           // スプレッドシート名を表示（あれば）
           const name = config.spreadsheetName || 'スプレッドシート';
           datasourceElement.textContent = name;
           datasourceElement.className = 'text-sm text-cyan-400';
+          console.log('✅ データソース更新:', name);
         } else {
           datasourceElement.textContent = '未設定';
           datasourceElement.className = 'text-sm text-gray-400';
+          console.log('✅ データソース: 未設定に更新');
         }
+      } else {
+        console.warn('⚠️ データソース要素 (current-datasource) が見つかりません');
       }
 
       // シート名更新
       const sheetnameElement = document.getElementById('current-sheetname');
+      console.log('📋 シート名更新:', { sheetName: config?.sheetName, element: !!sheetnameElement });
       if (sheetnameElement) {
         if (config?.sheetName) {
           sheetnameElement.textContent = config.sheetName;
           sheetnameElement.className = 'text-sm text-cyan-400';
+          console.log('✅ シート名更新:', config.sheetName);
         } else {
           sheetnameElement.textContent = '未設定';
           sheetnameElement.className = 'text-sm text-gray-400';
+          console.log('✅ シート名: 未設定に更新');
         }
+      } else {
+        console.warn('⚠️ シート名要素 (current-sheetname) が見つかりません');
       }
 
       // 最終更新時刻更新
       const lastUpdated = config?.lastModified || config?.updatedAt;
       const timeElement = document.getElementById('last-updated-time');
-      if (timeElement && lastUpdated) {
-        try {
-          const date = new Date(lastUpdated);
-          timeElement.textContent = date.toLocaleString('ja-JP', {
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-          timeElement.className = 'text-sm text-gray-300';
-        } catch (e) {
+      console.log('🕐 最終更新時刻:', { lastUpdated, element: !!timeElement });
+      if (timeElement) {
+        if (lastUpdated) {
+          try {
+            const date = new Date(lastUpdated);
+            const timeString = date.toLocaleString('ja-JP', {
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+            });
+            timeElement.textContent = timeString;
+            timeElement.className = 'text-sm text-gray-300';
+            console.log('✅ 最終更新時刻更新:', timeString);
+          } catch (e) {
+            timeElement.textContent = '--:--';
+            console.warn('⚠️ 日付変換エラー:', e.message);
+          }
+        } else {
           timeElement.textContent = '--:--';
+          console.log('✅ 最終更新時刻: --:-- に更新');
         }
+      } else {
+        console.warn('⚠️ 最終更新時刻要素 (last-updated-time) が見つかりません');
       }
 
       // スプレッドシートリンク更新（リソースセクション用）

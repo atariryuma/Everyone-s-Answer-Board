@@ -8,7 +8,8 @@
       "Bash(clasp open)",
       "Bash(clasp logs:*)",
       "Bash(npx clasp:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": [],
