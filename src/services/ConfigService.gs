@@ -13,7 +13,7 @@
  * - ConfigurationManager (削除済み)
  */
 
-/* global UserService, DB, PROPS_KEYS, CONSTANTS, SecurityValidator, AppCacheService */
+/* global UserService, DB, PROPS_KEYS, CONSTANTS, SecurityValidator, AppCacheService, SecurityService */
 
 /**
  * ConfigService - 統一設定管理サービス

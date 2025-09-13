@@ -1,0 +1,256 @@
+#!/usr/bin/env node
+/**
+ * Pre-deploy validation script
+ * デプロイ前の包括的チェック - デプロイエラーを事前に防ぐ
+ */
+
+const fs = require('fs');
+const path = require('path');
+
+class DeploymentValidator {
+  constructor() {
+    this.errors = [];
+    this.warnings = [];
+    this.srcDir = path.join(__dirname, '..', 'src');
+  }
+
+  /**
+   * 🔍 包括的検証実行
+   */
+  async validate() {
+    console.log('🔍 デプロイ前検証開始...\n');
+
+    await this.checkDependencies();
+    await this.checkTemplateIncludes();
+    await this.checkServiceIntegrity();
+    await this.checkConstantsAvailability();
+    await this.simulateGASExecution();
+
+    this.report();
+    return this.errors.length === 0;
+  }
+
+  /**
+   * 🔗 依存関係チェック
+   */
+  async checkDependencies() {
+    console.log('🔗 依存関係チェック...');
+
+    const dependencyMap = {
+      'main.gs': ['UserService', 'ConfigService', 'DataService', 'SecurityService', 'ErrorHandler', 'PROPS_KEYS'],
+      'services/UserService.gs': ['AppCacheService', 'DB', 'CONSTANTS', 'ConfigService'],
+      'services/ConfigService.gs': ['DB', 'PROPS_KEYS', 'SecurityService'],
+      'services/DataService.gs': ['UserService', 'ConfigService', 'AppCacheService'],
+      'services/SecurityService.gs': ['CONSTANTS', 'DB']
+    };
+
+    for (const [file, dependencies] of Object.entries(dependencyMap)) {
+      const filePath = path.join(this.srcDir, file);
+      if (!fs.existsSync(filePath)) {
+        this.errors.push(`❌ 必須ファイル不足: ${file}`);
+        continue;
+      }
+
+      const content = fs.readFileSync(filePath, 'utf8');
+
+      for (const dep of dependencies) {
+        if (!content.includes(dep)) {
+          this.errors.push(`❌ 依存関係不足: ${file} → ${dep}`);
+        }
+      }
+    }
+  }
+
+  /**
+   * 📄 HTMLテンプレートincludeチェック
+   */
+  async checkTemplateIncludes() {
+    console.log('📄 HTMLテンプレートincludeチェック...');
+
+    const htmlFiles = this.getHtmlFiles();
+    const includePattern = /<\?!=\s*include\(['"`]([^'"`]+)['"`]\)\s*;\s*\?>/g;
+
+    for (const htmlFile of htmlFiles) {
+      const content = fs.readFileSync(htmlFile, 'utf8');
+      let match;
+
+      while ((match = includePattern.exec(content)) !== null) {
+        const includedFile = match[1];
+        const includePath = path.join(this.srcDir, `${includedFile}.html`);
+
+        if (!fs.existsSync(includePath)) {
+          this.errors.push(`❌ includeファイル不足: ${path.basename(htmlFile)} → ${includedFile}.html`);
+        }
+      }
+    }
+
+    // main.gsのinclude関数存在確認
+    const mainPath = path.join(this.srcDir, 'main.gs');
+    if (fs.existsSync(mainPath)) {
+      const content = fs.readFileSync(mainPath, 'utf8');
+      if (!content.includes('function include(')) {
+        this.errors.push('❌ main.gsにinclude関数が定義されていません');
+      }
+    }
+  }
+
+  /**
+   * ⚙️ Services整合性チェック
+   */
+  async checkServiceIntegrity() {
+    console.log('⚙️ Services整合性チェック...');
+
+    const requiredServices = [
+      'services/UserService.gs',
+      'services/ConfigService.gs',
+      'services/DataService.gs',
+      'services/SecurityService.gs'
+    ];
+
+    const requiredMethods = {
+      'UserService': ['getCurrentEmail', 'getCurrentUserInfo', 'isSystemAdmin'],
+      'ConfigService': ['getUserConfig', 'hasCoreSystemProps', 'isSystemSetup'],
+      'DataService': ['getBulkData', 'getSheetData', 'isSystemSetup'],
+      'SecurityService': ['checkUserPermission', 'diagnose']
+    };
+
+    for (const service of requiredServices) {
+      const servicePath = path.join(this.srcDir, service);
+      if (!fs.existsSync(servicePath)) {
+        this.errors.push(`❌ 必須サービス不足: ${service}`);
+        continue;
+      }
+
+      const content = fs.readFileSync(servicePath, 'utf8');
+      const serviceName = path.basename(service, '.gs');
+
+      if (requiredMethods[serviceName]) {
+        for (const method of requiredMethods[serviceName]) {
+          if (!content.includes(`${method}(`)) {
+            this.errors.push(`❌ 必須メソッド不足: ${serviceName}.${method}`);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * 📋 定数可用性チェック
+   */
+  async checkConstantsAvailability() {
+    console.log('📋 定数可用性チェック...');
+
+    const constantsPath = path.join(this.srcDir, 'constants.gs');
+    if (!fs.existsSync(constantsPath)) {
+      this.errors.push('❌ constants.gs が存在しません');
+      return;
+    }
+
+    const content = fs.readFileSync(constantsPath, 'utf8');
+    const requiredConstants = [
+      'CONSTANTS.ACCESS.LEVELS',
+      'PROPS_KEYS.ADMIN_EMAIL',
+      'PROPS_KEYS.DATABASE_SPREADSHEET_ID'
+    ];
+
+    for (const constant of requiredConstants) {
+      if (!content.includes(constant.split('.')[0])) {
+        this.errors.push(`❌ 必須定数不足: ${constant}`);
+      }
+    }
+  }
+
+  /**
+   * 🎯 GAS実行シミュレーション
+   */
+  async simulateGASExecution() {
+    console.log('🎯 GAS実行シミュレーション...');
+
+    // main.gs のdoGet関数存在確認
+    const mainPath = path.join(this.srcDir, 'main.gs');
+    if (fs.existsSync(mainPath)) {
+      const content = fs.readFileSync(mainPath, 'utf8');
+
+      if (!content.includes('function doGet(')) {
+        this.errors.push('❌ main.gsにdoGet関数が定義されていません');
+      }
+
+      // 基本的な構文エラーチェック
+      try {
+        // 簡易的な構文チェック（コメント削除後の括弧バランス）
+        const cleaned = content.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+        const openBraces = (cleaned.match(/\{/g) || []).length;
+        const closeBraces = (cleaned.match(/\}/g) || []).length;
+
+        if (openBraces !== closeBraces) {
+          this.warnings.push('⚠️ main.gsで括弧のバランスが不正の可能性');
+        }
+      } catch (e) {
+        this.warnings.push(`⚠️ main.gs構文チェックエラー: ${e.message}`);
+      }
+    }
+  }
+
+  /**
+   * 📁 HTMLファイル一覧取得
+   */
+  getHtmlFiles() {
+    const htmlFiles = [];
+    const scanDir = (dir) => {
+      const items = fs.readdirSync(dir);
+      for (const item of items) {
+        const fullPath = path.join(dir, item);
+        const stat = fs.statSync(fullPath);
+
+        if (stat.isDirectory()) {
+          scanDir(fullPath);
+        } else if (item.endsWith('.html')) {
+          htmlFiles.push(fullPath);
+        }
+      }
+    };
+
+    scanDir(this.srcDir);
+    return htmlFiles;
+  }
+
+  /**
+   * 📊 検証結果レポート
+   */
+  report() {
+    console.log('\n📊 検証結果レポート');
+    console.log('==================');
+
+    if (this.errors.length === 0 && this.warnings.length === 0) {
+      console.log('✅ すべてのチェックに合格しました！デプロイ可能です。');
+      return;
+    }
+
+    if (this.errors.length > 0) {
+      console.log('\n❌ エラー (デプロイ不可):');
+      this.errors.forEach(error => console.log(`  ${error}`));
+    }
+
+    if (this.warnings.length > 0) {
+      console.log('\n⚠️ 警告:');
+      this.warnings.forEach(warning => console.log(`  ${warning}`));
+    }
+
+    console.log(`\n📈 統計: エラー${this.errors.length}件, 警告${this.warnings.length}件`);
+
+    if (this.errors.length > 0) {
+      console.log('\n🚫 デプロイを中止してください。上記エラーを修正後、再実行してください。');
+      process.exit(1);
+    }
+  }
+}
+
+// 実行
+if (require.main === module) {
+  const validator = new DeploymentValidator();
+  validator.validate().then(success => {
+    process.exit(success ? 0 : 1);
+  });
+}
+
+module.exports = DeploymentValidator;

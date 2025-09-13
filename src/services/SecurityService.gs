@@ -13,7 +13,7 @@
  * - 分散しているバリデーション機能
  */
 
-/* global PROPS_KEYS, AppCacheService, UserService */
+/* global PROPS_KEYS, AppCacheService, UserService, CONSTANTS, DB */
 
 /**
  * SecurityService - 統一セキュリティサービス
