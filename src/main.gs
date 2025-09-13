@@ -588,3 +588,11 @@ function toggleHighlight(userId, rowId) {
 function refreshBoardData(userId) {
   return DataController.refreshBoardData(userId);
 }
+
+function getUserConfig(userId) {
+  return ConfigService.getUserConfig(userId);
+}
+
+function getPublishedSheetData(userId, options) {
+  return DataService.getPublishedSheetData(userId, options);
+}
