@@ -334,12 +334,12 @@ const AdminController = Object.freeze({
 });
 
 // ===========================================
-// 📊 重複削除完了 - グローバル関数エクスポート削除
+// 📊 グローバル関数エクスポート（GAS互換性のため）
 // ===========================================
 
 /**
- * 注意: google.script.run は直接 AdminController.methodName() を呼び出してください
- * 例: google.script.run.withSuccessHandler(resolve).AdminController.getConfig()
+ * 重複削除完了 - グローバル関数エクスポート削除
+ * 使用方法: google.script.run.AdminController.methodName()
  *
- * グローバル関数の重複を削除し、適切なオブジェクト指向アプローチを採用
+ * 適切なオブジェクト指向アプローチを採用し、グローバル関数の重複を回避
  */

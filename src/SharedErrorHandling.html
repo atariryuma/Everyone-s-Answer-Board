@@ -134,7 +134,7 @@ window.ErrorHandler = {
           const userMessage = this.getUserMessage(error, funcName);
           reject(new Error(userMessage));
         })
-        [funcName](...args);
+        .SystemController[funcName](...args);
     });
   },
 

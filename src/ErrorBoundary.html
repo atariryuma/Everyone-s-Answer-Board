@@ -305,7 +305,7 @@
         if (typeof google !== 'undefined' && google.script && google.script.run) {
           google.script.run.withFailureHandler((error) => {
             console.warn('Failed to report error to server:', error);
-          }).reportClientError && google.script.run.reportClientError(errorInfo);
+          }).SystemController.reportClientError && google.script.run.SystemController.reportClientError(errorInfo);
         }
       } catch (e) {
         console.warn('Error reporting failed:', e);

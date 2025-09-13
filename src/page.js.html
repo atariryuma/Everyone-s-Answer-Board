@@ -387,7 +387,27 @@
         
         return normalized;
       }
-      
+
+      /**
+       * 関数名からコントローラーの適切なメソッドを取得
+       * @param {string} funcName - 関数名
+       * @returns {string} - コントローラー.メソッド名
+       */
+      getControllerFunction(funcName) {
+        const functionMap = {
+          // ConfigService系
+          getUserConfig: 'ConfigService.getUserConfig',
+
+          // DataService系
+          getPublishedSheetData: 'DataService.getPublishedSheetData',
+          addReaction: 'DataController.addReaction',
+
+          // その他のマッピングを必要に応じて追加
+        };
+
+        return functionMap[funcName] || funcName; // マッピングがない場合はそのまま返す
+      },
+
       async callGAS(funcName, ...args) {
         return new Promise((resolve, reject) => {
           if (this.isProduction) {
@@ -415,7 +435,7 @@
                   reject(this.normalizeError(error, funcName));
                 }
               })
-              [funcName](...args);
+              [this.getControllerFunction(funcName)](...args);
           } else {
             this.mockResponse(funcName, resolve);
           }

@@ -497,7 +497,7 @@
           .withFailureHandler((error) => {
             showMessage(`ステータス取得エラー: ${error.message || error}`, 'error');
           })
-          .getApplicationStatusForUI();
+          .SystemController.getApplicationStatusForUI();
       }
 
       // ステータス表示を更新
@@ -578,7 +578,7 @@
               console.error('Update error:', error);
               showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
             })
-            .setApplicationStatusForUI(isActive);
+            .SystemController.setApplicationStatusForUI(isActive);
         } catch (error) {
           showMessage(`❌ ${error.message}`, 'error');
         } finally {
@@ -605,7 +605,7 @@
             const currentUrl = window.location.href.split('?')[0];
             const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;             window.open(targetUrl, '_top');
           })
-          .getWebAppUrl();
+          .SystemController.getWebAppUrl();
       }
 
       // ページ読み込み時の処理
@@ -657,7 +657,7 @@
             showMessage(`エラー: ${error.message || error}`, 'error');
             loadingDiv.classList.add('hidden');
           })
-          .getAllUsersForAdminForUI(__USER_ID__);
+          .SystemController.getAllUsersForAdminForUI(__USER_ID__);
       }
 
       // ユーザー一覧をテーブルに表示
@@ -760,7 +760,7 @@
             confirmBtn.disabled = false;
             confirmBtn.textContent = '削除実行';
           })
-          .deleteUserAccountByAdminForUI(userToDelete.userId, reason);
+          .SystemController.deleteUserAccountByAdminForUI(userToDelete.userId, reason);
       }
 
       // 削除ログを表示
@@ -790,7 +790,7 @@
             showMessage(`エラー: ${error.message || error}`, 'error');
             loadingDiv.classList.add('hidden');
           })
-          .getDeletionLogsForUI(__USER_ID__);
+          .SystemController.getDeletionLogsForUI(__USER_ID__);
       }
 
       // 削除ログをテーブルに表示
@@ -927,7 +927,7 @@
             button.disabled = false;
             button.textContent = originalText;
           })
-          [functionName]();
+          SystemController[functionName]();
       }
 
       // System status monitoring function removed - simplified system

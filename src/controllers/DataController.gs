@@ -437,12 +437,8 @@ const DataController = Object.freeze({
 // ===========================================
 
 /**
- * データ操作用API関数を個別にエクスポート
- * HTMLファイルからの google.script.run 呼び出しに対応
- */
-
-
-/**
  * 重複削除完了 - グローバル関数エクスポート削除
  * 使用方法: google.script.run.DataController.methodName()
+ *
+ * 適切なオブジェクト指向アプローチを採用し、グローバル関数の重複を回避
  */

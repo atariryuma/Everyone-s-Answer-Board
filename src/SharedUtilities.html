@@ -569,7 +569,7 @@
             resolve(result);
           })
           .withFailureHandler(reject)
-          [functionName](...args);
+          .SystemController[functionName](...args);
       });
     }
 
@@ -579,7 +579,7 @@
         google.script.run
           .withSuccessHandler(resolve)
           .withFailureHandler(reject)
-          [functionName](...args);
+          .SystemController[functionName](...args);
       });
     }
 
@@ -625,7 +625,7 @@
             window.sharedUtilities.errors.logError(error, `GAS call failed: ${functionName}`);
             reject(error);
           })
-          [functionName](...args);
+          .SystemController[functionName](...args);
       });
 
       // 実行中リクエストとしてキャッシュ

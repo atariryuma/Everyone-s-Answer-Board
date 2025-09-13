@@ -91,7 +91,7 @@
             userEmailDisplay.classList.add('text-red-400');
             reject(error);
           })
-          .processLoginAction();
+          .FrontendController.processLoginAction();
       });
     };
 
@@ -134,7 +134,7 @@
           console.error('User email display failed:', error);
           userEmailDisplay.textContent = 'ユーザー情報取得エラー';
         })
-        .getUser('email');
+        .FrontendController.getUser('email');
     };
 
     // ログインエラーを処理する関数
@@ -172,7 +172,7 @@
             // リセットに失敗してもログイン処理は続行
             processUnifiedLogin().catch(handleLoginError);
           })
-          .forceUrlSystemReset();
+          .SystemController.forceUrlSystemReset();
       } catch (err) {
         console.error('Login function error:', err);
         userEmailDisplay.textContent = 'ログイン処理エラー';
@@ -231,7 +231,7 @@
           // エラー時でもnaha-okinawa.ed.jpを表示
           updateDomainDisplay('match', 'naha-okinawa.ed.jp', 'セキュアアクセス有効');
         })
-        .getSystemDomainInfo();
+        .SystemController.getSystemDomainInfo();
     };
 
     // ドメイン表示を更新するヘルパー関数

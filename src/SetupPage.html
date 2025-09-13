@@ -323,7 +323,7 @@
                 showMessage(displayMessage, 'error');
                 reject(error);
               })
-              .setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
+              .SystemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
           });
         } catch (error) {
           showMessage(`❌ ${error.message}`, 'error');
@@ -353,7 +353,7 @@
             this.disabled = false;
             this.innerHTML = '🔍 システムテスト実行';
           })
-          .testSetup();
+          .SystemController.testSetup();
       });
 
       // 入力フィールドのリアルタイムバリデーション
@@ -411,7 +411,7 @@
               btn.disabled = false;
             }
           })
-          .getWebAppUrl();
+          .SystemController.getWebAppUrl();
       }
 
       // ページ読み込み時に現在のユーザーのメールアドレスを自動取得
@@ -438,7 +438,7 @@
                 'warning'
               );
             })
-            .getUser();
+            .FrontendController.getUser();
         }
       });
     </script>

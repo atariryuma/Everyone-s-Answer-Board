@@ -143,8 +143,11 @@ const SystemController = Object.freeze({
       // キャッシュをクリア（複数の方法を試行）
       const cacheResults = [];
       try {
-        CacheService.getScriptCache().removeAll();
-        cacheResults.push('ScriptCache クリア成功');
+        const cache = CacheService.getScriptCache();
+        if (cache && typeof cache.removeAll === 'function') {
+          cache.removeAll();
+          cacheResults.push('ScriptCache クリア成功');
+        }
       } catch (cacheError) {
         console.warn('ScriptCache クリアエラー:', cacheError.message);
         cacheResults.push(`ScriptCache クリア失敗: ${cacheError.message}`);
@@ -398,7 +401,10 @@ const SystemController = Object.freeze({
 
       // キャッシュクリア
       try {
-        CacheService.getScriptCache().removeAll();
+        const cache = CacheService.getScriptCache();
+        if (cache && typeof cache.removeAll === 'function') {
+          cache.removeAll();
+        }
       } catch (cacheError) {
         repairResults.warnings = [`キャッシュクリア失敗: ${cacheError.message}`];
       }
@@ -426,4 +432,6 @@ const SystemController = Object.freeze({
 /**
  * 重複削除完了 - グローバル関数エクスポート削除
  * 使用方法: google.script.run.SystemController.methodName()
+ *
+ * 適切なオブジェクト指向アプローチを採用し、グローバル関数の重複を回避
  */
