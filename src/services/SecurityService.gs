@@ -296,10 +296,17 @@ const SecurityService = Object.freeze({
         'drive.google.com'
       ];
 
-      let urlObj;
+      // Basic URL validation for GAS environment
+      if (!url.startsWith('http://') && !url.startsWith('https://')) {
+        return { isValid: false, error: '無効なURL形式' };
+      }
+      
+      // Extract hostname for validation
+      let hostname;
       try {
-        urlObj = new URL(url);
-      } catch (urlError) {
+        const urlMatch = url.match(/^https?:\/\/([^\/]+)/);
+        hostname = urlMatch ? urlMatch[1] : '';
+      } catch (error) {
         return { isValid: false, error: '無効なURL形式' };
       }
 

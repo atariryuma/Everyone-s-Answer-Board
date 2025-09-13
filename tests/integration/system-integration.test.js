@@ -3,12 +3,12 @@
  * End-to-end testing for Everyone's Answer Board
  */
 
-const { resetAllMocks, testUserData, testSheetData, createMockSpreadsheet } = require('../mocks/gas-mocks.js');
+const { testUserData, testSheetData, createMockSpreadsheet } = require('../mocks/gas-mocks.js');
 
 describe('System Integration Tests', () => {
 
   beforeEach(() => {
-    resetAllMocks();
+    jest.resetAllMocks();
   });
 
   describe('Complete User Journey', () => {

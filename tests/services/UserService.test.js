@@ -3,7 +3,7 @@
  * Comprehensive testing for user management functionality
  */
 
-const { resetAllMocks, testUserData, createMockSpreadsheet } = require('../mocks/gas-mocks.js');
+const { testUserData, createMockSpreadsheet } = require('../mocks/gas-mocks.js');
 
 // Mock the UserService (simulate GAS environment)
 const UserService = {
@@ -18,7 +18,7 @@ const UserService = {
 describe('UserService', () => {
   
   beforeEach(() => {
-    resetAllMocks();
+    jest.resetAllMocks();
     jest.clearAllMocks();
   });
 

@@ -3,7 +3,7 @@
  * Comprehensive testing for configuration management functionality
  */
 
-const { resetAllMocks, testUserData, testConfigData } = require('../mocks/gas-mocks.js');
+const { testUserData, testConfigData } = require('../mocks/gas-mocks.js');
 
 // Mock ConfigService (simulate GAS environment)
 const ConfigService = {
@@ -26,7 +26,7 @@ const ConfigService = {
 describe('ConfigService', () => {
   
   beforeEach(() => {
-    resetAllMocks();
+    jest.resetAllMocks();
     jest.clearAllMocks();
   });
 

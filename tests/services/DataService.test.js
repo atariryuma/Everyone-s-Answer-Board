@@ -3,7 +3,7 @@
  * Comprehensive testing for data processing and sheet operations
  */
 
-const { resetAllMocks, testUserData, testSheetData, createMockSpreadsheet } = require('../mocks/gas-mocks.js');
+const { testUserData, testSheetData, createMockSpreadsheet } = require('../mocks/gas-mocks.js');
 
 // Mock DataService (simulate GAS environment)
 const DataService = {
@@ -25,7 +25,7 @@ const DataService = {
 describe('DataService', () => {
   
   beforeEach(() => {
-    resetAllMocks();
+    jest.resetAllMocks();
     jest.clearAllMocks();
   });
 

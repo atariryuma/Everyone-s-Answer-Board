@@ -489,5 +489,69 @@ module.exports = {
       waitLock: jest.fn(() => true),
       releaseLock: jest.fn()
     }))
-  }
+  },
+
+  // Test Data
+  testUserData: {
+    userId: 'test-user-123',
+    userEmail: 'test@example.com',
+    isActive: true,
+    configJson: JSON.stringify({
+      spreadsheetId: 'test-sheet-id',
+      sheetName: '回答データ',
+      setupStatus: 'completed',
+      appPublished: true
+    }),
+    lastModified: '2025-01-15T10:00:00Z'
+  },
+
+  testSheetData: [
+    {
+      id: 'row_2',
+      timestamp: '2025-01-15 10:00',
+      email: 'student1@example.com',
+      answer: 'テスト回答1',
+      reason: 'テスト理由1',
+      className: 'A組',
+      name: '学生1',
+      reactions: { understand: 1, like: 2, curious: 0 },
+      isHighlighted: false
+    },
+    {
+      id: 'row_3', 
+      timestamp: '2025-01-15 10:05',
+      email: 'student2@example.com',
+      answer: 'テスト回答2',
+      reason: 'テスト理由2',
+      className: 'B組',
+      name: '学生2',
+      reactions: { understand: 0, like: 1, curious: 1 },
+      isHighlighted: true
+    }
+  ],
+
+  testConfigData: {
+    spreadsheetId: 'test-sheet-id',
+    sheetName: '回答データ',
+    setupStatus: 'completed',
+    appPublished: true,
+    displaySettings: {
+      showNames: false,
+      showReactions: true
+    }
+  },
+
+  createMockSpreadsheet: (id = 'mock-sheet-id') => ({
+    getId: jest.fn(() => id),
+    getName: jest.fn(() => 'テストスプレッドシート'),
+    getSheetByName: jest.fn(() => ({
+      getLastRow: jest.fn(() => 10),
+      getLastColumn: jest.fn(() => 7),
+      getRange: jest.fn(() => ({
+        getValues: jest.fn(() => [['ヘッダー1', 'ヘッダー2']]),
+        getValue: jest.fn(() => 'テスト値'),
+        setValue: jest.fn()
+      }))
+    }))
+  })
 };

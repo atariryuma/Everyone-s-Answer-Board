@@ -3,7 +3,7 @@
  * Comprehensive testing for security and validation functionality
  */
 
-const { resetAllMocks, testUserData } = require('../mocks/gas-mocks.js');
+const { testUserData } = require('../mocks/gas-mocks.js');
 
 // Mock SecurityService (simulate GAS environment)
 const SecurityService = {
@@ -26,7 +26,7 @@ const SecurityService = {
 describe('SecurityService', () => {
   
   beforeEach(() => {
-    resetAllMocks();
+    jest.resetAllMocks();
     jest.clearAllMocks();
   });
 
