@@ -1612,6 +1612,106 @@ function resetAuth() {
 }
 
 /**
+ * ログイン処理を実行し、管理パネルURLを返す
+ * LoginPage.html / login.js から呼び出される
+ */
+function processLoginAction() {
+  try {
+    var auth = verifyUserAuthentication();
+    if (!auth || auth.success === false) {
+      return { success: false, message: (auth && auth.message) || '認証に失敗しました' };
+    }
+
+    var baseUrl = ScriptApp.getService().getUrl();
+    var adminUrl = baseUrl + '?mode=admin' + (auth.userId ? '&userId=' + encodeURIComponent(auth.userId) : '');
+
+    return {
+      success: true,
+      message: 'ログインが完了しました',
+      adminUrl: adminUrl,
+      userId: auth.userId || null,
+      email: auth.email || null
+    };
+  } catch (error) {
+    console.error('processLoginAction エラー:', error.message);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * URL関連の内部状態をリセット
+ * LoginPage.html / login.js から呼び出される
+ */
+function forceUrlSystemReset() {
+  try {
+    // 既知のURLキャッシュキーをベストエフォートで削除
+    var cache = CacheService.getScriptCache();
+    try {
+      cache.removeAll(['dynamic_urls', 'app_url', 'admin_url']);
+    } catch (e) {
+      // ignore cache errors
+    }
+    return { success: true, message: 'URL system reset completed' };
+  } catch (error) {
+    console.warn('forceUrlSystemReset エラー:', error.message);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * システムのドメイン情報を返す（GAS互換・URL未使用）
+ * LoginPage.html / login.js から呼び出される
+ */
+function getSystemDomainInfo() {
+  try {
+    var adminDomain = 'naha-okinawa.ed.jp';
+    var deployDomain = 'script.google.com';
+
+    var email = UserService.getCurrentEmail();
+    var emailDomain = email ? String(email).split('@').pop() : '';
+    var isMatch = emailDomain && String(emailDomain).toLowerCase() === adminDomain.toLowerCase();
+
+    return {
+      success: true,
+      data: {
+        adminDomain: adminDomain,
+        deployDomain: deployDomain,
+        isDomainMatch: !!isMatch
+      }
+    };
+  } catch (error) {
+    console.error('getSystemDomainInfo エラー:', error.message);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * 簡易ユーザー情報取得
+ * LoginPage.html の getUser('email') 互換
+ * @param {string} field
+ */
+function getUser(field) {
+  try {
+    if (field === 'email') {
+      var info = UserService.getCurrentUserInfo();
+      var email = (info && info.userEmail) || UserService.getCurrentEmail() || '';
+      return {
+        success: true,
+        email: email,
+        value: email,
+        userId: info && info.userId,
+        isActive: info ? !!info.isActive : true,
+        hasConfig: !!info
+      };
+    }
+    return { success: false, message: 'Unsupported field: ' + field };
+  } catch (error) {
+    console.error('getUser エラー:', error.message);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
  * ユーザー認証を検証
  * SharedUtilities.html から呼び出される
  * 
