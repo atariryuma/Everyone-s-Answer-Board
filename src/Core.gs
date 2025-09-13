@@ -39,26 +39,25 @@ function formatTimestamp(isoString) {
 }
 
 /**
- * 統一設定取得関数（シンプル版）
+ * 統一設定取得関数（UnifiedManagerラッパー）
  * @param {Object} userInfo - ユーザー情報
  * @returns {Object} 設定オブジェクト
  */
 function getConfigSimple(userInfo) {
-  if (!userInfo || !userInfo.configJson) {
-    throw new Error('ユーザー情報または設定が見つかりません');
+  if (!userInfo || !userInfo.userId) {
+    throw new Error('ユーザー情報が不完全です');
   }
 
-  const config = JSON.parse(userInfo.configJson);
+  // UnifiedManagerを使用（重複削除）
+  const config = UnifiedManager.config.get(userInfo.userId);
+  if (!config) {
+    throw new Error('ユーザー設定が見つかりません');
+  }
 
   // 必須フィールドの検証
-  if (!config.spreadsheetId) {
-    throw new Error('スプレッドシートIDが設定されていません');
-  }
-  if (!config.sheetName) {
-    throw new Error('シート名が設定されていません');
-  }
-  if (!config.columnMapping || !config.columnMapping.mapping) {
-    throw new Error('列マッピングが設定されていません');
+  const validation = UnifiedManager.config.validate(config);
+  if (!validation.isValid) {
+    throw new Error(validation.errors.join(', '));
   }
 
   return config;
@@ -7198,7 +7197,7 @@ const BatchDataRetriever = Object.freeze({
 
     } catch (error) {
       Logger.error('バッチデータ取得エラー', {
-        spreadsheetId: spreadsheetId.substring(0, 10) + '...',
+        spreadsheetId: `${spreadsheetId.substring(0, 10)  }...`,
         rangeCount: ranges.length,
         error: error.message
       });
@@ -7284,7 +7283,7 @@ const BatchDataUpdater = Object.freeze({
 
     } catch (error) {
       Logger.error('バッチ更新エラー', {
-        spreadsheetId: spreadsheetId.substring(0, 10) + '...',
+        spreadsheetId: `${spreadsheetId.substring(0, 10)  }...`,
         updateCount: updates.length,
         error: error.message
       });

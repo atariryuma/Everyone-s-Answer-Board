@@ -12,33 +12,42 @@ const MODULE_CONFIG = Object.freeze({
   STATUS_INACTIVE: CORE.STATUS.INACTIVE,
 });
 
-// UserManager - 統一ユーザー情報管理（キャッシュ付き）
+// UserManager - UnifiedManagerの後方互換ラッパー（段階的削除予定）
 const UserManager = {
-  _cachedEmail: null,
-  _cacheTime: 0,
-  _CACHE_TTL: 300000, // 5分キャッシュ
-
+  
   getCurrentEmail() {
-    const now = Date.now();
-    if (this._cachedEmail && now - this._cacheTime < this._CACHE_TTL) {
-      return this._cachedEmail;
-    }
+    // UnifiedManagerに委譲（後方互換性）
+    return UnifiedManager.user.getCurrentEmail();
+  },
 
+  clearCache() {
+    // UnifiedManagerに委譲
+    UnifiedManager.clearCache();
+    console.log('UserManager: キャッシュクリア（UnifiedManager経由）');
+  },
+
+  // 統一ユーザー情報取得（UnifiedManager経由）
+  getCurrentUserInfo() {
     try {
-      this._cachedEmail = Session.getActiveUser().getEmail();
-      this._cacheTime = now;
-      console.log('UserManager: ユーザー情報更新');
-      return this._cachedEmail;
+      // UnifiedManagerを使用
+      const userInfo = UnifiedManager.user.getCurrentInfo();
+      if (!userInfo) return null;
+      
+      // 既存形式に変換（後方互換性）
+      return {
+        currentUserEmail: userInfo.userEmail,
+        userInfo
+      };
     } catch (error) {
-      console.error('UserManager.getCurrentEmail:', error.message);
+      console.error('UserManager.getCurrentUserInfo:', error.message);
       return null;
     }
   },
 
-  clearCache() {
-    this._cachedEmail = null;
-    this._cacheTime = 0;
-    console.log('UserManager: キャッシュクリア');
+  // 現在のユーザーメールアドレス取得（統一版）
+  getCurrentUserEmail() {
+    // UnifiedManagerに委譲
+    return UnifiedManager.user.getCurrentEmail();
   },
 };
 
@@ -67,7 +76,7 @@ function doGet(e) {
         // 🔍 デバッグモード：現在のユーザー情報を表示
         try {
           const { currentUserEmail, userInfo: userByEmail } =
-            new ConfigurationManager().getCurrentUserInfo();
+            UserManager.getCurrentUserInfo();
           const debugData = {
             current_user_email: currentUserEmail,
             user_exists_in_db: !!userByEmail,
@@ -146,7 +155,7 @@ function doGet(e) {
             return HtmlService.createHtmlOutput('<h2>Error</h2><p>userIdが必要です</p>');
           }
 
-          const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfo();
+          const { currentUserEmail } = UserManager.getCurrentUserInfo();
           const userInfo = DB.findUserById(params.userId);
 
           if (!userInfo) {
@@ -180,7 +189,7 @@ function doGet(e) {
         }
 
         try {
-          const { currentUserEmail, userInfo } = new ConfigurationManager().getCurrentUserInfo();
+          const { currentUserEmail, userInfo } = UserManager.getCurrentUserInfo();
           if (!userInfo || userInfo.userId !== params.userId) {
             // ユーザーが存在しないか、userIdが一致しない場合
             return showErrorPage('アクセス拒否', '管理パネルへのアクセス権限がありません');
@@ -303,35 +312,26 @@ const Services = {
   user: {
     get current() {
       try {
-        const result = new ConfigurationManager().getCurrentUserInfoSafely();
-        if (!result) return null;
-        const { currentUserEmail: email } = result;
+        // UnifiedManagerを使用（重複削除）
+        const userInfo = UnifiedManager.user.getCurrentInfo();
+        if (!userInfo) return null;
 
-        // 簡易的なユーザー情報を返す（将来的にはApp.getConfig()経由）
         return {
-          email,
+          email: userInfo.userEmail,
           isAuthenticated: true,
         };
       } catch (error) {
-        console.error('getActiveUserInfo エラー:', error.message);
+        console.error('Services.user.current エラー:', error.message);
         return null;
       }
     },
 
     getActiveUserInfo() {
       try {
-        // 新アーキテクチャでの単純化実装
-        const userInfo = Services.user.current;
-        if (!userInfo) return null;
-
-        return {
-          email: userInfo.email,
-          userId: userInfo.email.split('@')[0], // 簡易的なユーザーID
-          userEmail: userInfo.email,
-          // spreadsheetId, configJsonは削除され、ConfigurationManagerで管理
-        };
+        // UnifiedManagerを直接使用
+        return UnifiedManager.user.getCurrentInfo();
       } catch (error) {
-        console.error('getActiveUserInfo エラー:', error.message);
+        console.error('Services.user.getActiveUserInfo エラー:', error.message);
         return null;
       }
     },
@@ -362,8 +362,7 @@ const Deploy = {
     try {
       console.log('Deploy.domain() - start');
 
-      const result = new ConfigurationManager().getCurrentUserInfoSafely();
-      const activeUserEmail = result?.currentUserEmail;
+      const activeUserEmail = UserManager.getCurrentUserEmail();
       const currentDomain = getEmailDomain(activeUserEmail);
 
       // WebAppのURLを取得してドメインを判定
@@ -405,7 +404,7 @@ const Deploy = {
     try {
       const props = PropertiesService.getScriptProperties();
       const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
-      const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
+      const currentUserEmail = UserManager.getCurrentUserEmail();
 
       console.log('Deploy.isUser() - 管理者確認:', adminEmail, currentUserEmail);
       return adminEmail === currentUserEmail;
@@ -556,8 +555,7 @@ function showAdminPanel() {
     console.log('showAdminPanel - start');
 
     // Admin権限でのアクセス確認
-    const result = new ConfigurationManager().getCurrentUserInfoSafely();
-    const activeUserEmail = result?.currentUserEmail;
+    const activeUserEmail = UserManager.getCurrentUserEmail();
     if (activeUserEmail) {
       const userProperties = PropertiesService.getUserProperties();
       const lastAdminUserId = userProperties.getProperty('lastAdminUserId');
@@ -1057,7 +1055,7 @@ function processLoginAction() {
   try {
     // キャッシュをクリアして最新情報取得
     UserManager.clearCache();
-    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
+    const currentUserEmail = UserManager.getCurrentUserEmail();
 
     if (!currentUserEmail) {
       return {
@@ -1489,7 +1487,7 @@ function setupApplication(
     console.log('setupApplication - セットアップ開始');
 
     // 現在のユーザーのメールアドレスを取得
-    const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
+    const currentUserEmail = UserManager.getCurrentUserEmail();
     if (!currentUserEmail) {
       throw new Error('認証されたユーザーが必要です');
     }
@@ -1580,30 +1578,22 @@ function setupApplication(
  */
 function getUser(format = 'object') {
   try {
-    const result = new ConfigurationManager().getCurrentUserInfoSafely();
-    const email = result?.currentUserEmail || null;
-    let userId = null;
+    // UnifiedManagerを使用（重複関数統合）
+    const userInfo = UnifiedManager.user.getCurrentInfo();
+    const email = userInfo?.userEmail || null;
+    const userId = userInfo?.userId || null;
 
-    // emailが取得できた場合、userIdも取得してセッション保存
-    if (email) {
-      try {
-        const user = DB.findUserByEmail(email);
-        if (user && user.userId) {
-          userId = user.userId;
-          // セッション情報を保存（1時間有効）
-          const sessionData = {
-            userId,
-            email,
-            timestamp: Date.now(),
-          };
-          PropertiesService.getScriptProperties().setProperty(
-            'LAST_USER_SESSION',
-            JSON.stringify(sessionData)
-          );
-        }
-      } catch (dbError) {
-        console.warn('getUser: DB検索失敗（セッション保存スキップ）', dbError.message);
-      }
+    // セッション情報を保存（1時間有効）
+    if (userId) {
+      const sessionData = {
+        userId,
+        email,
+        timestamp: Date.now(),
+      };
+      PropertiesService.getScriptProperties().setProperty(
+        'LAST_USER_SESSION',
+        JSON.stringify(sessionData)
+      );
     }
 
     // シンプルな文字列形式
@@ -1896,27 +1886,25 @@ function handleSystemError(context, error, userId = null, additionalData = {}) {
 
 /**
  * 🔧 グローバル関数: getActiveUserInfo（Core.gs互換性用）
- * Core.gsから呼び出される際の互換性を保つためのグローバル関数
+ * UnifiedManagerの軽量ラッパー - 完全統合版
  */
 function getActiveUserInfo() {
   try {
-    const result = new ConfigurationManager().getCurrentUserInfoSafely();
-    if (!result) return null;
-    const { currentUserEmail } = result;
-
-    const userInfo = DB.findUserByEmail(currentUserEmail);
+    // UnifiedManagerを直接使用（重複削除）
+    const userInfo = UnifiedManager.user.getCurrentInfo();
     if (!userInfo) return null;
 
+    const config = userInfo.parsedConfig || {};
     return {
       email: userInfo.userEmail,
       userId: userInfo.userId,
       userEmail: userInfo.userEmail,
-      spreadsheetId: JSON.parse(userInfo.configJson || '{}')?.spreadsheetId,
+      spreadsheetId: config.spreadsheetId,
       configJson: userInfo.configJson,
-      parsedConfig: JSON.parse(userInfo.configJson || '{}'),
+      parsedConfig: config,
     };
   } catch (error) {
-    console.error('getActiveUserInfo グローバル関数エラー:', error.message);
+    console.error('getActiveUserInfo エラー:', error.message);
     return null;
   }
 }
