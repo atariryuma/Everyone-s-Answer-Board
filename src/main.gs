@@ -59,8 +59,15 @@ function doGet(e) {
       }
     }
     
-    // System initialization check
-    if (!ConfigService.isSystemSetup()) {
+    // System initialization check (prefer per-user readiness, fallback to global)
+    let systemReady = false;
+    try {
+      systemReady = DataService.isSystemSetup() || ConfigService.isSystemSetup();
+    } catch (setupCheckError) {
+      console.warn('System setup check error:', setupCheckError.message);
+      systemReady = false;
+    }
+    if (!systemReady && params.mode !== APP_CONFIG.MODES.SETUP) {
       return renderSetupPage(params);
     }
 
