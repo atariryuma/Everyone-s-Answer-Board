@@ -490,6 +490,9 @@ const ConfigService = Object.freeze({
    */
   isSystemSetup() {
     try {
+      // まずコア必須プロパティが揃っていること
+      if (!this.hasCoreSystemProps()) return false;
+
       // スクリプトプロパティの確認
       const properties = PropertiesService.getScriptProperties();
       const systemConfig = properties.getProperty('SYSTEM_CONFIG');
@@ -499,7 +502,8 @@ const ConfigService = Object.freeze({
         return config.initialized === true;
       }
       
-      return false;
+      // SYSTEM_CONFIG がなくても、コア必須が揃っているなら最低限セットアップ済みとして扱う
+      return true;
     } catch (error) {
       console.warn('ConfigService.isSystemSetup: システム状態確認エラー', error.message);
       return false;
@@ -617,6 +621,33 @@ const ConfigService = Object.freeze({
       results.overall = '❌';
     }
 
+  /**
+   * コアシステム必須プロパティの存在確認
+   * - ADMIN_EMAIL / DATABASE_SPREADSHEET_ID / SERVICE_ACCOUNT_CREDS
+   * @returns {boolean} 3つすべて存在すれば true
+   */
+  hasCoreSystemProps() {
+    try {
+      const props = PropertiesService.getScriptProperties();
+      const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+      const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      const creds = props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+
+      if (!adminEmail || !dbId || !creds) return false;
+
+      // SERVICE_ACCOUNT_CREDS はJSONであることを軽く検証
+      try {
+        const parsed = JSON.parse(creds);
+        if (!parsed || typeof parsed !== 'object') return false;
+      } catch (_e) {
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.warn('ConfigService.hasCoreSystemProps: エラー', error.message);
+      return false;
+    }
+  },
     return results;
   }
 

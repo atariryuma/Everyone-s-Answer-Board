@@ -39,6 +39,16 @@ function doGet(e) {
     // Parse request parameters
     const params = parseRequestParams(e);
     
+    // Core system properties gating: if not ready, go to setup before auth
+    try {
+      if (!ConfigService.hasCoreSystemProps() && params.mode !== APP_CONFIG.MODES.SETUP) {
+        return renderSetupPage(params);
+      }
+    } catch (propCheckError) {
+      console.warn('Core system props check error:', propCheckError.message);
+      return renderSetupPage(params);
+    }
+
     // Security check: authentication status
     const userEmail = UserService.getCurrentEmail();
     if (!userEmail && params.mode !== APP_CONFIG.MODES.LOGIN && params.mode !== APP_CONFIG.MODES.SETUP) {
