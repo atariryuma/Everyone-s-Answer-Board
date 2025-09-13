@@ -8,7 +8,7 @@
  * - Error handling & user feedback
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, ErrorHandler, DB, PROPS_KEYS, URL */
+/* global UserService, ConfigService, DataService, SecurityService, ErrorHandler, DB, PROPS_KEYS, URL, ORGANIZATION */
 
 /**
  * GAS include function - HTML template inclusion utility
@@ -215,7 +215,7 @@ function handleMainMode(params) {
   try {
     const userInfo = UserService.getCurrentUserInfo();
     if (!userInfo) {
-      return handleLoginMode(params, { reason: 'user_info_required' });
+      return handleLoginModeWithTemplate(params, { reason: 'user_info_required' });
     }
 
     // Get bulk data using new DataService
@@ -681,7 +681,7 @@ function handleFixUserMode(params) {
 
     const fixResults = {
       timestamp: new Date().toISOString(),
-      userEmail: userEmail,
+      userEmail,
       fixes: [],
       successful: 0,
       failed: 0
@@ -697,7 +697,7 @@ function handleFixUserMode(params) {
           fixResults.successful++;
           user = UserService.getCurrentUserInfo();
         } else {
-          fixResults.fixes.push('❌ Failed to create user record: ' + createResult.error);
+          fixResults.fixes.push(`❌ Failed to create user record: ${  createResult.error}`);
           fixResults.failed++;
         }
       } else {
@@ -705,7 +705,7 @@ function handleFixUserMode(params) {
         fixResults.successful++;
       }
     } catch (e) {
-      fixResults.fixes.push('❌ User fix error: ' + e.message);
+      fixResults.fixes.push(`❌ User fix error: ${  e.message}`);
       fixResults.failed++;
     }
 
@@ -730,12 +730,12 @@ function handleFixUserMode(params) {
           fixResults.fixes.push('✅ Config validation and repair completed');
           fixResults.successful++;
         } else {
-          fixResults.fixes.push('❌ Config save failed: ' + saveResult.error);
+          fixResults.fixes.push(`❌ Config save failed: ${  saveResult.error}`);
           fixResults.failed++;
         }
       }
     } catch (e) {
-      fixResults.fixes.push('❌ Config fix error: ' + e.message);
+      fixResults.fixes.push(`❌ Config fix error: ${  e.message}`);
       fixResults.failed++;
     }
 
@@ -744,7 +744,7 @@ function handleFixUserMode(params) {
       <p>User: ${userEmail}</p>
       <p>Status: ${fixResults.failed === 0 ? '✅ All repairs successful' : '⚠️ Some repairs failed'}</p>
       <h3>Repair Results:</h3>
-      <ul>${fixResults.fixes.map(fix => '<li>' + fix + '</li>').join('')}</ul>
+      <ul>${fixResults.fixes.map(fix => `<li>${  fix  }</li>`).join('')}</ul>
       <div style="font-family: monospace; white-space: pre-wrap; background: #f5f5f5; padding: 10px; border: 1px solid #ddd; margin-top: 10px;">${JSON.stringify(fixResults, null, 2)}</div>
       <p><a href="${ScriptApp.getService().getUrl()}">Return to Main</a></p>
       <p><a href="?mode=admin">Admin Panel</a></p>
@@ -778,7 +778,7 @@ function handleClearCacheMode(params) {
       clearResults.operations.push('✅ Script cache cleared');
       clearResults.successful++;
     } catch (e) {
-      clearResults.operations.push('❌ Script cache clear failed: ' + e.message);
+      clearResults.operations.push(`❌ Script cache clear failed: ${  e.message}`);
       clearResults.failed++;
     }
 
@@ -794,7 +794,7 @@ function handleClearCacheMode(params) {
         clearResults.operations.push('ℹ️ No user authenticated, user cache not cleared');
       }
     } catch (e) {
-      clearResults.operations.push('❌ User cache clear failed: ' + e.message);
+      clearResults.operations.push(`❌ User cache clear failed: ${  e.message}`);
       clearResults.failed++;
     }
 
@@ -809,7 +809,7 @@ function handleClearCacheMode(params) {
         clearResults.operations.push('ℹ️ Document cache not available');
       }
     } catch (e) {
-      clearResults.operations.push('❌ Document cache clear failed: ' + e.message);
+      clearResults.operations.push(`❌ Document cache clear failed: ${  e.message}`);
       clearResults.failed++;
     }
 
@@ -818,7 +818,7 @@ function handleClearCacheMode(params) {
       <p>Target: ${params.target || 'all'}</p>
       <p>Status: ${clearResults.failed === 0 ? '✅ All operations successful' : '⚠️ Some operations failed'}</p>
       <h3>Operations:</h3>
-      <ul>${clearResults.operations.map(op => '<li>' + op + '</li>').join('')}</ul>
+      <ul>${clearResults.operations.map(op => `<li>${  op  }</li>`).join('')}</ul>
       <div style="font-family: monospace; white-space: pre-wrap; background: #f5f5f5; padding: 10px; border: 1px solid #ddd; margin-top: 10px;">${JSON.stringify(clearResults, null, 2)}</div>
       <p><a href="${ScriptApp.getService().getUrl()}">Return to Main</a></p>
       <p><a href="?mode=debug">Debug Mode</a></p>
@@ -1615,101 +1615,26 @@ function resetAuth() {
  * ログイン処理を実行し、管理パネルURLを返す
  * LoginPage.html / login.js から呼び出される
  */
-function processLoginAction() {
-  try {
-    var auth = verifyUserAuthentication();
-    if (!auth || auth.success === false) {
-      return { success: false, message: (auth && auth.message) || '認証に失敗しました' };
-    }
-
-    var baseUrl = ScriptApp.getService().getUrl();
-    var adminUrl = baseUrl + '?mode=admin' + (auth.userId ? '&userId=' + encodeURIComponent(auth.userId) : '');
-
-    return {
-      success: true,
-      message: 'ログインが完了しました',
-      adminUrl: adminUrl,
-      userId: auth.userId || null,
-      email: auth.email || null
-    };
-  } catch (error) {
-    console.error('processLoginAction エラー:', error.message);
-    return { success: false, message: error.message };
-  }
-}
+// Removed duplicate processLoginAction; unified implementation is defined earlier
 
 /**
  * URL関連の内部状態をリセット
  * LoginPage.html / login.js から呼び出される
  */
-function forceUrlSystemReset() {
-  try {
-    // 既知のURLキャッシュキーをベストエフォートで削除
-    var cache = CacheService.getScriptCache();
-    try {
-      cache.removeAll(['dynamic_urls', 'app_url', 'admin_url']);
-    } catch (e) {
-      // ignore cache errors
-    }
-    return { success: true, message: 'URL system reset completed' };
-  } catch (error) {
-    console.warn('forceUrlSystemReset エラー:', error.message);
-    return { success: false, message: error.message };
-  }
-}
+// Removed duplicate forceUrlSystemReset; unified implementation is defined earlier
 
 /**
  * システムのドメイン情報を返す（GAS互換・URL未使用）
  * LoginPage.html / login.js から呼び出される
  */
-function getSystemDomainInfo() {
-  try {
-    var adminDomain = 'naha-okinawa.ed.jp';
-    var deployDomain = 'script.google.com';
-
-    var email = UserService.getCurrentEmail();
-    var emailDomain = email ? String(email).split('@').pop() : '';
-    var isMatch = emailDomain && String(emailDomain).toLowerCase() === adminDomain.toLowerCase();
-
-    return {
-      success: true,
-      data: {
-        adminDomain: adminDomain,
-        deployDomain: deployDomain,
-        isDomainMatch: !!isMatch
-      }
-    };
-  } catch (error) {
-    console.error('getSystemDomainInfo エラー:', error.message);
-    return { success: false, message: error.message };
-  }
-}
+// Removed duplicate getSystemDomainInfo; unified implementation is defined later
 
 /**
  * 簡易ユーザー情報取得
  * LoginPage.html の getUser('email') 互換
  * @param {string} field
  */
-function getUser(field) {
-  try {
-    if (field === 'email') {
-      var info = UserService.getCurrentUserInfo();
-      var email = (info && info.userEmail) || UserService.getCurrentEmail() || '';
-      return {
-        success: true,
-        email: email,
-        value: email,
-        userId: info && info.userId,
-        isActive: info ? !!info.isActive : true,
-        hasConfig: !!info
-      };
-    }
-    return { success: false, message: 'Unsupported field: ' + field };
-  } catch (error) {
-    console.error('getUser エラー:', error.message);
-    return { success: false, message: error.message };
-  }
-}
+// Removed duplicate getUser; unified version is defined earlier
 
 /**
  * ユーザー認証を検証
@@ -2102,14 +2027,38 @@ function getLoginStatus() {
 function getSystemDomainInfo() {
   try {
     const webAppUrl = getWebAppUrl() || '';
-    // GAS server runtime may not provide global URL; parse safely
-    const match = webAppUrl.match(/^https?:\/\/([^\/]+)/i);
-    const domain = (match && match[1]) || 'script.google.com';
+    // hostname (deploy domain)
+    const hostMatch = webAppUrl.match(new RegExp('^https?://([^/]+)', 'i'));
+    const deployDomain = (hostMatch && hostMatch[1]) || 'script.google.com';
+
+    // organization domain from '/a/{domain}/' in Apps Script web app URL
+    const orgMatch = webAppUrl.match(new RegExp('/a/([^/]+)', 'i'));
+    let adminDomain = (orgMatch && orgMatch[1]) || '';
+
+    // current user email domain as fallback for adminDomain and matching check
+    const email = (function () {
+      try { return UserService.getCurrentEmail(); } catch (e) { return ''; }
+    })();
+    const emailDomain = email ? String(email).split('@').pop() : '';
+
+    if (!adminDomain && emailDomain) {
+      adminDomain = emailDomain;
+    }
+
+    const isDomainMatch = !!(emailDomain && adminDomain &&
+      String(emailDomain).toLowerCase() === String(adminDomain).toLowerCase());
 
     return {
       success: true,
+      // New shape used by modern UI
+      data: {
+        adminDomain: adminDomain || (typeof ORGANIZATION !== 'undefined' ? ORGANIZATION.ADMIN_DOMAIN : 'naha-okinawa.ed.jp'),
+        deployDomain,
+        isDomainMatch
+      },
+      // Supplemental fields for diagnostics / other callers
       webAppUrl,
-      domain,
+      domain: deployDomain,
       scriptId: ScriptApp.getScriptId()
     };
   } catch (error) {

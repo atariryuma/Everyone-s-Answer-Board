@@ -172,6 +172,13 @@ const SECURITY = Object.freeze({
 });
 
 /**
+ * Organization-specific constants
+ */
+const ORGANIZATION = Object.freeze({
+  ADMIN_DOMAIN: 'naha-okinawa.ed.jp',
+});
+
+/**
  * Input validation utility functions
  * GAS 2025 Security Best Practices
  */

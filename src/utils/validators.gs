@@ -89,11 +89,38 @@ const InputValidator = Object.freeze({
     }
 
     try {
-      const urlObj = new URL(url);
-      
+      let parsed = null;
+      if (typeof URL !== 'undefined') {
+        try {
+          const u = new URL(url);
+          parsed = {
+            protocol: u.protocol,
+            hostname: u.hostname,
+            pathname: u.pathname,
+            search: u.search || '',
+            hash: u.hash || ''
+          };
+        } catch (e1) {
+          // fall through to regex parser
+        }
+      }
+
+      if (!parsed) {
+        // Regex-based parser for GAS backend where URL may be undefined
+        const m = String(url).match(new RegExp('^(https?)://([^/?#]+)([^?#]*)([?][^#]*)?(#.*)?$', 'i'));
+        if (!m) throw new Error('invalid');
+        parsed = {
+          protocol: (`${m[1]  }:`).toLowerCase(),
+          hostname: m[2].toLowerCase(),
+          pathname: m[3] || '/',
+          search: m[4] || '',
+          hash: m[5] || ''
+        };
+      }
+
       // 許可されたプロトコル
       const allowedProtocols = ['https:', 'http:'];
-      if (!allowedProtocols.includes(urlObj.protocol)) {
+      if (!allowedProtocols.includes(parsed.protocol)) {
         result.errors.push('HTTPSまたはHTTPプロトコルが必要です');
         return result;
       }
@@ -108,7 +135,7 @@ const InputValidator = Object.freeze({
       ];
 
       const isAllowedDomain = allowedDomains.some(domain => 
-        urlObj.hostname === domain || urlObj.hostname.endsWith(`.${domain}`)
+        parsed.hostname === domain || parsed.hostname.endsWith(`.${domain}`)
       );
 
       if (!isAllowedDomain) {
@@ -117,11 +144,11 @@ const InputValidator = Object.freeze({
       }
 
       result.isValid = true;
-      result.sanitized = urlObj.toString();
+      result.sanitized = `${parsed.protocol}//${parsed.hostname}${parsed.pathname}${parsed.search}${parsed.hash}`;
       result.metadata = {
-        protocol: urlObj.protocol,
-        hostname: urlObj.hostname,
-        pathname: urlObj.pathname
+        protocol: parsed.protocol,
+        hostname: parsed.hostname,
+        pathname: parsed.pathname
       };
 
     } catch (urlError) {
