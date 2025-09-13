@@ -27,14 +27,14 @@ const FrontendController = Object.freeze({
    * login.js.html, SetupPage.html, AdminPanel.js.html から呼び出される
    *
    * @param {string} [kind='email'] - 取得する情報の種類（'email' or 'full'）
-   * @returns {Object|null} 統一されたユーザー情報オブジェクト
+   * @returns {Object|string|null} 統一されたレスポンス形式
    */
   getUser(kind = 'email') {
     try {
       const userEmail = UserService.getCurrentEmail();
 
       if (!userEmail) {
-        return kind === 'email' ? '' : null;
+        return kind === 'email' ? '' : { success: false, message: 'ユーザー情報が取得できません' };
       }
 
       // 後方互換性重視: kind==='email' の場合は純粋な文字列を返す
@@ -45,6 +45,7 @@ const FrontendController = Object.freeze({
       // 統一オブジェクト形式（'full' など）
       const userInfo = UserService.getCurrentUserInfo();
       return {
+        success: true,
         email: userEmail,
         userId: userInfo?.userId || null,
         isActive: userInfo?.isActive || false,
@@ -52,7 +53,7 @@ const FrontendController = Object.freeze({
       };
     } catch (error) {
       console.error('FrontendController.getUser エラー:', error.message);
-      return kind === 'email' ? '' : null;
+      return kind === 'email' ? '' : { success: false, message: error.message };
     }
   },
 

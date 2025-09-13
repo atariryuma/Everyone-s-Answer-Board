@@ -692,8 +692,13 @@ const ConfigService = Object.freeze({
           } else {
             // ユーザーを自動作成
             const created = UserService.createUser(email);
-            userId = created && created.userId;
-            userInfo = created || { userId, userEmail: email };
+            if (created && created.userId) {
+              userId = created.userId;
+              userInfo = created;
+            } else {
+              console.error('ConfigService.saveDraftConfiguration: ユーザー作成に失敗 - userIdが見つかりません', { created });
+              return { success: false, message: 'ユーザー作成に失敗しました' };
+            }
           }
         } catch (e) {
           return { success: false, message: 'ユーザー情報の処理に失敗しました' };

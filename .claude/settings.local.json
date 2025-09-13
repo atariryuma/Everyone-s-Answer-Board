@@ -93,7 +93,8 @@
       "WebFetch(domain:www.anthropic.com)",
       "WebFetch(domain:www.eesel.ai)",
       "WebFetch(domain:cdnjs.com)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(head:*)"
     ],
     "deny": [],
     "ask": [],

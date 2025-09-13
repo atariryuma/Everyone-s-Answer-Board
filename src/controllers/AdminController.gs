@@ -32,9 +32,10 @@ const AdminController = Object.freeze({
       // ユーザー情報の取得
       let userInfo = UserService.getCurrentUserInfo();
       let userId = userInfo && userInfo.userId;
+      let email = userInfo && userInfo.userEmail;
 
       if (!userId) {
-        const email = UserService.getCurrentEmail();
+        email = email || UserService.getCurrentEmail();
         if (!email) {
           return { success: false, message: 'ユーザー情報が見つかりません' };
         }
@@ -54,12 +55,24 @@ const AdminController = Object.freeze({
         if (!userId) {
           try {
             const created = UserService.createUser(email);
-            userId = created && created.userId;
-            userInfo = created || { userId, userEmail: email };
+            if (created && created.userId) {
+              userId = created.userId;
+              userInfo = created;
+            } else {
+              console.error('AdminController.getConfig: ユーザー作成に失敗 - userIdが見つかりません', { created });
+              return { success: false, message: 'ユーザー作成に失敗しました' };
+            }
           } catch (createErr) {
+            console.error('AdminController.getConfig: ユーザー作成エラー', createErr);
             return { success: false, message: 'ユーザー作成に失敗しました' };
           }
         }
+      }
+
+      // Final validation before calling getUserConfig
+      if (!userId) {
+        console.error('AdminController.getConfig: userId が未定義です', { userInfo, email });
+        return { success: false, message: 'ユーザーIDが取得できませんでした' };
       }
 
       const config = ConfigService.getUserConfig(userId);

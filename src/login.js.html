@@ -29,12 +29,19 @@
     loginBtn.disabled = flag;
 
     if (flag) {
-      loginBtn.innerHTML = `
-        <div class="flex items-center justify-center">
-          <div class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-          ${text || '処理中…'}
-        </div>
-      `;
+      // XSS対策: DOM操作で安全に構築
+      loginBtn.innerHTML = '';
+      const container = document.createElement('div');
+      container.className = 'flex items-center justify-center';
+
+      const spinner = document.createElement('div');
+      spinner.className = 'loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2';
+
+      const textNode = document.createTextNode(text || '処理中…');
+
+      container.appendChild(spinner);
+      container.appendChild(textNode);
+      loginBtn.appendChild(container);
     } else {
       loginBtn.textContent = 'はじめる';
     }

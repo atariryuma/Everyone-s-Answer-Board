@@ -282,8 +282,13 @@ function handleAdminModeWithTemplate(params, context = {}) {
         } else {
           // ユーザーが存在しない場合は作成
           const created = UserService.createUser(userEmail);
-          userId = created && created.userId;
-          userInfo = created || { userId, userEmail };
+          if (created && created.userId) {
+            userId = created.userId;
+            userInfo = created;
+          } else {
+            console.error('main.js handleAdminModeWithTemplate: ユーザー作成に失敗 - userIdが見つかりません', { created });
+            throw new Error('ユーザー作成に失敗しました');
+          }
         }
       } catch (e) {
         console.warn('handleAdminModeWithTemplate: ユーザー作成/取得でエラー:', e.message);

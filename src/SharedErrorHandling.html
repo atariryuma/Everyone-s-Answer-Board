@@ -1,0 +1,172 @@
+<script>
+/**
+ * SharedErrorHandling - フロントエンド統一エラーハンドリング
+ * すべてのHTMLファイルで共通利用
+ */
+
+window.ErrorHandler = {
+
+  // エラータイプ定義（バックエンドと統一）
+  ErrorTypes: Object.freeze({
+    AUTHENTICATION: 'authentication',
+    AUTHORIZATION: 'authorization',
+    VALIDATION: 'validation',
+    NOT_FOUND: 'not_found',
+    NETWORK: 'network',
+    SYSTEM: 'system',
+    USER_INPUT: 'user_input',
+    EXTERNAL_API: 'external_api'
+  }),
+
+  /**
+   * エラーを分類
+   * @param {Error|string} error - エラーオブジェクトまたはメッセージ
+   * @returns {string} エラータイプ
+   */
+  classifyError(error) {
+    const message = typeof error === 'string' ? error : (error?.message || '');
+    const lowerMessage = message.toLowerCase();
+
+    if (lowerMessage.includes('permission') || lowerMessage.includes('権限')) {
+      return this.ErrorTypes.AUTHORIZATION;
+    }
+    if (lowerMessage.includes('not found') || lowerMessage.includes('見つかりません')) {
+      return this.ErrorTypes.NOT_FOUND;
+    }
+    if (lowerMessage.includes('network') || lowerMessage.includes('timeout')) {
+      return this.ErrorTypes.NETWORK;
+    }
+    if (lowerMessage.includes('validation') || lowerMessage.includes('無効')) {
+      return this.ErrorTypes.VALIDATION;
+    }
+    if (lowerMessage.includes('authentication') || lowerMessage.includes('認証')) {
+      return this.ErrorTypes.AUTHENTICATION;
+    }
+
+    return this.ErrorTypes.SYSTEM;
+  },
+
+  /**
+   * ユーザー向けエラーメッセージの生成
+   * @param {Error|string} error - エラーオブジェクトまたはメッセージ
+   * @param {string} [context] - コンテキスト
+   * @returns {string} ユーザー向けメッセージ
+   */
+  getUserMessage(error, context = '') {
+    const errorType = this.classifyError(error);
+
+    const messages = {
+      [this.ErrorTypes.AUTHENTICATION]: 'ログインが必要です。再度ログインしてください。',
+      [this.ErrorTypes.AUTHORIZATION]: 'この操作を実行する権限がありません。',
+      [this.ErrorTypes.VALIDATION]: '入力内容に問題があります。正しい形式で入力してください。',
+      [this.ErrorTypes.NOT_FOUND]: '指定されたリソースが見つかりません。',
+      [this.ErrorTypes.NETWORK]: 'ネットワークエラーが発生しました。時間をおいて再試行してください。',
+      [this.ErrorTypes.EXTERNAL_API]: '外部サービスとの通信に失敗しました。',
+      [this.ErrorTypes.SYSTEM]: 'システムエラーが発生しました。管理者に連絡してください。'
+    };
+
+    let baseMessage = messages[errorType] || messages[this.ErrorTypes.SYSTEM];
+
+    if (context) {
+      baseMessage = `${context}: ${baseMessage}`;
+    }
+
+    return baseMessage;
+  },
+
+  /**
+   * エラーログの出力
+   * @param {Error|string} error - エラーオブジェクトまたはメッセージ
+   * @param {string} [context] - コンテキスト
+   * @param {Object} [additionalData] - 追加データ
+   */
+  logError(error, context = '', additionalData = {}) {
+    const errorInfo = {
+      message: typeof error === 'string' ? error : (error?.message || ''),
+      type: this.classifyError(error),
+      context,
+      timestamp: new Date().toISOString(),
+      url: window.location.href,
+      userAgent: navigator.userAgent.substring(0, 100),
+      ...additionalData
+    };
+
+    console.error(`[Frontend ErrorHandler] ${context}:`, errorInfo);
+  },
+
+  /**
+   * 統一エラー表示
+   * @param {Error|string} error - エラーオブジェクトまたはメッセージ
+   * @param {string} [context] - コンテキスト
+   */
+  showError(error, context = '') {
+    const message = this.getUserMessage(error, context);
+    this.logError(error, context);
+
+    if (typeof showError === 'function') {
+      showError(message);
+    } else if (typeof alert === 'function') {
+      alert(message);
+    }
+  },
+
+  /**
+   * GAS関数呼び出しのエラーハンドリング
+   * @param {string} funcName - 関数名
+   * @param {Array} args - 引数
+   * @returns {Promise} エラーハンドリング付きPromise
+   */
+  async callGAS(funcName, ...args) {
+    return new Promise((resolve, reject) => {
+      if (typeof google === 'undefined' || !google.script?.run) {
+        const error = new Error('Google Apps Script環境が利用できません');
+        this.logError(error, `GAS呼び出し: ${funcName}`);
+        reject(error);
+        return;
+      }
+
+      google.script.run
+        .withSuccessHandler((result) => {
+          resolve(result);
+        })
+        .withFailureHandler((error) => {
+          this.logError(error, `GAS呼び出し: ${funcName}`, { args });
+          const userMessage = this.getUserMessage(error, funcName);
+          reject(new Error(userMessage));
+        })
+        [funcName](...args);
+    });
+  },
+
+  /**
+   * try-catch のヘルパー関数
+   * @param {Function} fn - 実行する関数
+   * @param {string} [context] - コンテキスト
+   * @returns {*} 実行結果またはundefined
+   */
+  async safeExecute(fn, context = '') {
+    try {
+      return await fn();
+    } catch (error) {
+      this.showError(error, context);
+      return undefined;
+    }
+  }
+};
+
+// グローバルエラーハンドリング設定
+window.addEventListener('error', (event) => {
+  window.ErrorHandler.logError(event.error, 'グローバルエラー', {
+    filename: event.filename,
+    lineno: event.lineno,
+    colno: event.colno
+  });
+});
+
+window.addEventListener('unhandledrejection', (event) => {
+  window.ErrorHandler.logError(event.reason, '未処理Promise拒否');
+  event.preventDefault(); // デフォルトのコンソールログを防ぐ
+});
+
+console.info('SharedErrorHandling loaded successfully');
+</script>

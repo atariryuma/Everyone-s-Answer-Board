@@ -38,7 +38,7 @@ const DataService = Object.freeze({
       // 設定取得
       const config = ConfigService.getUserConfig(userId);
       if (!config || !config.spreadsheetId) {
-        return this.createErrorResponse('スプレッドシートが設定されていません');
+        return ErrorHandler.createSafeResponse('スプレッドシートが設定されていません', 'DataService.getSheetData');
       }
 
       // データ取得実行
@@ -57,7 +57,7 @@ const DataService = Object.freeze({
         userId,
         error: error.message
       });
-      return this.createErrorResponse(error.message);
+      return ErrorHandler.createSafeResponse(error, 'DataService.getSheetData');
     }
   },
 
