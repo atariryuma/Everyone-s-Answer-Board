@@ -442,9 +442,7 @@ function validateUserData(userData) {
   return InputValidator.validateConfig(userData);
 }
 
-function validateEmail(email) {
-  return SecurityService.validateEmail(email);
-}
+// validateEmail - SecurityServiceに統一 (グローバル関数削除済み)
 
 function validateUrl(url) {
   return InputValidator.validateUrl(url);

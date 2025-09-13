@@ -40,7 +40,15 @@ const DB_CONFIG = Object.freeze({
  * @returns {Object} バッチ取得結果
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
-  return DatabaseCore.batchGetSheetsData(service, spreadsheetId, ranges);
+  try {
+    return service.spreadsheets.values.batchGet({
+      spreadsheetId,
+      ranges
+    });
+  } catch (error) {
+    console.error('batchGetSheetsData エラー:', error.message);
+    throw error;
+  }
 }
 
 /**
@@ -49,7 +57,10 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
  */
 function getSheetsServiceCached() {
   return DatabaseCore.getSheetsServiceCached();
-}
+
+  // メモリキャッシュから確認
+  try {
+    const cachedService = AppCacheService.get(cacheKey, null);
     if (cachedService !== null) {
       // 関数検証：必要なAPI関数が存在するかチェック
       const isValidService =
@@ -228,12 +239,8 @@ function getSheetsServiceCached() {
  * @returns {object} Sheets API Service Object
  */
 function getSheetsServiceWithRetry(maxRetries = 2) {
-  console.log('🔧 getSheetsServiceWithRetry: Service Object取得開始');
-
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      // getSheetsServiceCachedを呼び出す
-      const service = getSheetsServiceCached();
+  return DatabaseCore.getSheetsServiceWithRetry(maxRetries);
+}
 
       // Service Objectの完全性確認
       if (
@@ -519,13 +526,6 @@ const DB = {
    * @returns {Object} 更新結果
    */
   updateUser(userId, updateData, options = {}) {
-    return DatabaseOperations.updateUser(userId, updateData, options);
-  },
-
-  /**
-   * 元のupdateUser実装（DatabaseOperations移動用）
-   */
-  _legacyUpdateUser(userId, updateData, options = {}) {
     try {
       const { replaceConfig = false } = options;
 
@@ -580,7 +580,7 @@ const DB = {
       this.updateUserInDatabase(userId, dbUpdateData);
 
       // キャッシュクリア
-      this.clearUserCache(userId, currentUser.userEmail);
+      AppCacheService.invalidateUserCache(userId);
 
       console.log('updateUserConfigJson: 設定更新完了', {
         userId,
@@ -734,15 +734,8 @@ const DB = {
    * ユーザーキャッシュクリア
    */
   clearUserCache(userId, userEmail) {
-    try {
-      const cache = CacheService.getScriptCache();
-      cache.remove(`user_id_${userId}`);
-      if (userEmail) {
-        cache.remove(`user_email_${userEmail}`);
-      }
-    } catch (error) {
-      console.warn('キャッシュクリアエラー:', error.message);
-    }
+    // AppCacheServiceに統一委譲
+    return AppCacheService.invalidateUserCache(userId);
   },
 
   /**
@@ -750,13 +743,6 @@ const DB = {
    * @param {Object} options - オプション {limit: number, offset: number, activeOnly: boolean}
    */
   getAllUsers(options = {}) {
-    return DatabaseOperations.getAllUsers(options);
-  },
-
-  /**
-   * 元のgetAllUsers実装（DatabaseOperations移動用）
-   */
-  _legacyGetAllUsers(options = {}) {
     try {
       const { limit = 500, offset = 0, activeOnly = false } = options;
 
@@ -1032,7 +1018,7 @@ const DB = {
       });
 
       // 7. 🔥 重要：キャッシュ完全クリア
-      this.invalidateUserCache(targetUserId, targetUser.userEmail);
+      AppCacheService.invalidateUserCache(targetUserId);
 
       // 8. 削除ログ記録
       this.logAccountDeletion(targetUserId, targetUser.userEmail, reason, currentUserEmail);
@@ -1063,31 +1049,8 @@ const DB = {
    * @param {string} userEmail ユーザーメール
    */
   invalidateUserCache(userId, userEmail) {
-    try {
-      const cache = CacheService.getScriptCache();
-
-      // ユーザー関連の全キャッシュキーをクリア
-      const cacheKeys = [
-        `user_${userId}`,
-        `userinfo_${userId}`,
-        `user_email_${userEmail}`,
-        `config_${userId}`,
-        'all_users', // 全ユーザーリストキャッシュ
-        'user_count', // ユーザー数キャッシュ
-      ];
-
-      cacheKeys.forEach((key) => {
-        cache.remove(key);
-      });
-
-      console.log('clearUserCacheEnhanced: キャッシュクリア完了', {
-        userId,
-        userEmail,
-        clearedKeys: cacheKeys.length,
-      });
-    } catch (error) {
-      console.warn('キャッシュクリアエラー:', error.message);
-    }
+    // AppCacheServiceに統一委譲
+    return AppCacheService.invalidateUserCache(userId);
   },
 
   /**

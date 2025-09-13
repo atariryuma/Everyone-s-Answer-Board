@@ -298,7 +298,7 @@ const UserService = Object.freeze({
    */
   createUser(userEmail, initialConfig = {}) {
     try {
-      if (!userEmail || !this.validateEmail(userEmail)) {
+      if (!userEmail || !SecurityService.validateEmail(userEmail).isValid) {
         throw new Error('無効なメールアドレス');
       }
 
@@ -374,22 +374,8 @@ const UserService = Object.freeze({
    * @param {string} userId - ユーザーID（オプション、未指定時は全体）
    */
   clearUserCache(userId = null) {
-    try {
-      const cache = CacheService.getScriptCache();
-      
-      if (userId) {
-        // 特定ユーザーのキャッシュクリア
-        cache.remove(`user_info_${userId}`);
-        cache.remove(`user_config_${userId}`);
-      } else {
-        // 現在ユーザーのキャッシュクリア
-        cache.remove('current_user_info');
-      }
-
-      console.info('UserService.clearUserCache: キャッシュクリア完了', { userId });
-    } catch (error) {
-      console.error('UserService.clearUserCache: エラー', error.message);
-    }
+    // AppCacheServiceに統一委譲
+    return AppCacheService.invalidateUserCache(userId);
   },
 
   /**
@@ -430,7 +416,7 @@ const UserService = Object.freeze({
    */
   findUserByEmail(email) {
     try {
-      if (!email || !this.validateEmail(email)) {
+      if (!email || !SecurityService.validateEmail(email).isValid) {
         return null;
       }
       return DB.findUserByEmail(email);
@@ -445,10 +431,7 @@ const UserService = Object.freeze({
    * @param {string} email - メールアドレス
    * @returns {boolean} 有効かどうか
    */
-  validateEmail(email) {
-    const result = SecurityService.validateEmail(email);
-    return result.isValid;
-  },
+  // validateEmail - SecurityServiceに統一 (削除済み)
 
   /**
    * フォームURL検証
