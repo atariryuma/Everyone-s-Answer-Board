@@ -1231,9 +1231,7 @@
       window.addEventListener('beforeunload', () => {
         window.answerController?.destroy();
       });
-      
-    }
-    
+
     } catch (error) {
       console.error('[初期化失敗]', {
         message: error.message,

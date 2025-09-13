@@ -121,7 +121,7 @@ const FrontendController = Object.freeze({
         success: true,
         userInfo,
         redirectUrl: baseUrl,
-        adminUrl: adminUrl,
+        adminUrl,
         // 後方互換性のための追加プロパティ
         appUrl: baseUrl,
         url: adminUrl

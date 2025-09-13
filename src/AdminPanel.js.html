@@ -243,6 +243,7 @@
       // 2. 設定データを1回だけ取得してsystemStateに保存
       step = 'loading config';
       systemState.config = await getConfigAsync();
+      console.log('📊 initializePanel: 設定データ取得完了', systemState.config);
 
       // 3. URL パラメータのチェックと適用
       step = 'checking URL params';
@@ -736,6 +737,66 @@
           console.log('✅ フォームタイトル反映:', config.formTitle);
         } else {
           console.warn('⚠️ フォームタイトル表示要素 (form-title) が見つかりません');
+        }
+      }
+
+      // 7. 列マッピングの復元
+      if (config.columnMapping && config.columnMapping.mapping) {
+        const mapping = config.columnMapping.mapping;
+
+        // 回答列選択ドロップダウン
+        if (mapping.answer !== undefined) {
+          const answerSelect = document.getElementById('answer-column-select');
+          if (answerSelect) {
+            answerSelect.value = mapping.answer;
+            console.log('✅ 回答列選択反映:', mapping.answer);
+          } else {
+            console.warn('⚠️ 回答列セレクト (answer-column-select) が見つかりません');
+          }
+        }
+
+        // 理由列選択ドロップダウン
+        if (mapping.reason !== undefined) {
+          const reasonSelect = document.getElementById('reason-column-select');
+          if (reasonSelect) {
+            reasonSelect.value = mapping.reason;
+            console.log('✅ 理由列選択反映:', mapping.reason);
+          } else {
+            console.warn('⚠️ 理由列セレクト (reason-column-select) が見つかりません');
+          }
+        }
+
+        // クラス列選択ドロップダウン
+        if (mapping.class !== undefined) {
+          const classSelect = document.getElementById('class-column-select');
+          if (classSelect) {
+            classSelect.value = mapping.class;
+            console.log('✅ クラス列選択反映:', mapping.class);
+          } else {
+            console.warn('⚠️ クラス列セレクト (class-column-select) が見つかりません');
+          }
+        }
+
+        // 名前列選択ドロップダウン
+        if (mapping.name !== undefined) {
+          const nameSelect = document.getElementById('name-column-select');
+          if (nameSelect) {
+            nameSelect.value = mapping.name;
+            console.log('✅ 名前列選択反映:', mapping.name);
+          } else {
+            console.warn('⚠️ 名前列セレクト (name-column-select) が見つかりません');
+          }
+        }
+      }
+
+      // 8. シート名入力フィールドの復元
+      if (config.sheetName) {
+        const sheetNameInput = document.getElementById('sheet-name-input');
+        if (sheetNameInput) {
+          sheetNameInput.value = config.sheetName;
+          console.log('✅ シート名入力反映:', config.sheetName);
+        } else {
+          console.warn('⚠️ シート名入力フィールド (sheet-name-input) が見つかりません');
         }
       }
 
@@ -2288,6 +2349,8 @@
   // 設定サマリー更新
   function updateConfigSummary(config) {
     try {
+      console.log('📋 updateConfigSummary 開始:', config);
+
       // 公開ステータス更新
       const appPublished = config?.appPublished === true || config?.appPublished === 'true';
       const publishBadge = document.getElementById('app-publish-status');

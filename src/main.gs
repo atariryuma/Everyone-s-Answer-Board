@@ -267,18 +267,18 @@ function handleAdminModeWithTemplate(params, context = {}) {
       return handleLoginModeWithTemplate(params, { reason: 'admin_access_requires_auth' });
     }
 
-    // URLパラメータからuserIdを取得（管理パネル用）
+    // 現在のユーザー情報を取得（セキュリティのためparams.userIdは無視）
     let userInfo = UserService.getCurrentUserInfo();
-    let userId = params.userId || (userInfo && userInfo.userId);
+    let userId = userInfo && userInfo.userId;
 
     // userIdが指定されていない場合、現在のユーザー情報から取得または作成
     if (!userId) {
       try {
-        // DB から直接ユーザー検索を試行
-        const dbUser = DB.findUserByEmail(userEmail);
-        if (dbUser && dbUser.userId) {
-          userId = dbUser.userId;
-          userInfo = { userId, userEmail };
+        // UserService経由でユーザー情報を取得または作成
+        const serviceUserInfo = UserService.getCurrentUserInfo();
+        if (serviceUserInfo && serviceUserInfo.userId) {
+          userId = serviceUserInfo.userId;
+          userInfo = serviceUserInfo;
         } else {
           // ユーザーが存在しない場合は作成
           const created = UserService.createUser(userEmail);
@@ -286,7 +286,7 @@ function handleAdminModeWithTemplate(params, context = {}) {
             userId = created.userId;
             userInfo = created;
           } else {
-            console.error('main.js handleAdminModeWithTemplate: ユーザー作成に失敗 - userIdが見つかりません', { created });
+            console.error('handleAdminModeWithTemplate: ユーザー作成に失敗 - userIdが見つかりません', { created });
             throw new Error('ユーザー作成に失敗しました');
           }
         }
@@ -295,7 +295,7 @@ function handleAdminModeWithTemplate(params, context = {}) {
         userInfo = { userId: '', userEmail };
       }
     } else {
-      // userIdが指定されている場合、そのユーザー情報を使用
+      // userIdが取得済みの場合、現在のユーザー情報を使用
       userInfo = { userId, userEmail };
     }
 
@@ -455,63 +455,138 @@ function processLoginAction() {
  * System Controller Global Functions
  */
 function getSystemDomainInfo() {
-  return SystemController.getSystemDomainInfo();
+  try {
+    return SystemController.getSystemDomainInfo();
+  } catch (error) {
+    console.error('getSystemDomainInfo error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function forceUrlSystemReset() {
-  return SystemController.forceUrlSystemReset();
+  try {
+    return SystemController.forceUrlSystemReset();
+  } catch (error) {
+    console.error('forceUrlSystemReset error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
-  return SystemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
+  try {
+    return SystemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
+  } catch (error) {
+    console.error('setupApplication error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function testSetup() {
-  return SystemController.testSetup();
+  try {
+    return SystemController.testSetup();
+  } catch (error) {
+    console.error('testSetup error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function getApplicationStatusForUI() {
-  return SystemController.getApplicationStatusForUI();
+  try {
+    return SystemController.getApplicationStatusForUI();
+  } catch (error) {
+    console.error('getApplicationStatusForUI error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function getAllUsersForAdminForUI(userId) {
-  return SystemController.getAllUsersForAdminForUI(userId);
+  try {
+    return SystemController.getAllUsersForAdminForUI(userId);
+  } catch (error) {
+    console.error('getAllUsersForAdminForUI error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function deleteUserAccountByAdminForUI(userId, reason) {
-  return SystemController.deleteUserAccountByAdminForUI(userId, reason);
+  try {
+    return SystemController.deleteUserAccountByAdminForUI(userId, reason);
+  } catch (error) {
+    console.error('deleteUserAccountByAdminForUI error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function getWebAppUrl() {
-  return SystemController.getWebAppUrl();
+  try {
+    return SystemController.getWebAppUrl();
+  } catch (error) {
+    console.error('getWebAppUrl error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function reportClientError(errorInfo) {
-  return SystemController.reportClientError(errorInfo);
+  try {
+    return SystemController.reportClientError(errorInfo);
+  } catch (error) {
+    console.error('reportClientError error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function setApplicationStatusForUI(isActive) {
-  return SystemController.setApplicationStatusForUI(isActive);
+  try {
+    return SystemController.setApplicationStatusForUI(isActive);
+  } catch (error) {
+    console.error('setApplicationStatusForUI error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function getDeletionLogsForUI(userId) {
-  return SystemController.getDeletionLogsForUI(userId);
+  try {
+    return SystemController.getDeletionLogsForUI(userId);
+  } catch (error) {
+    console.error('getDeletionLogsForUI error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function testSystemDiagnosis() {
-  return SystemController.testSystemDiagnosis();
+  try {
+    return SystemController.testSystemDiagnosis();
+  } catch (error) {
+    console.error('testSystemDiagnosis error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function performAutoRepair() {
-  return SystemController.performAutoRepair();
+  try {
+    return SystemController.performAutoRepair();
+  } catch (error) {
+    console.error('performAutoRepair error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function performSystemMonitoring() {
-  return SystemController.performSystemMonitoring();
+  try {
+    return SystemController.performSystemMonitoring();
+  } catch (error) {
+    console.error('performSystemMonitoring error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function performDataIntegrityCheck() {
-  return SystemController.performDataIntegrityCheck();
+  try {
+    return SystemController.performDataIntegrityCheck();
+  } catch (error) {
+    console.error('performDataIntegrityCheck error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function testForceLogoutRedirect() {
@@ -545,23 +620,48 @@ function getConfig() {
 }
 
 function getSpreadsheetList() {
-  return AdminController.getSpreadsheetList();
+  try {
+    return AdminController.getSpreadsheetList();
+  } catch (error) {
+    console.error('getSpreadsheetList error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function analyzeColumns(spreadsheetId, sheetName) {
-  return AdminController.analyzeColumns(spreadsheetId, sheetName);
+  try {
+    return AdminController.analyzeColumns(spreadsheetId, sheetName);
+  } catch (error) {
+    console.error('analyzeColumns error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function publishApplication(publishConfig) {
-  return AdminController.publishApplication(publishConfig);
+  try {
+    return AdminController.publishApplication(publishConfig);
+  } catch (error) {
+    console.error('publishApplication error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function saveDraftConfiguration(draftConfig) {
-  return AdminController.saveDraftConfiguration(draftConfig);
+  try {
+    return AdminController.saveDraftConfiguration(draftConfig);
+  } catch (error) {
+    console.error('saveDraftConfiguration error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function connectDataSource(spreadsheetId, sheetName) {
-  return DataController.connectDataSource(spreadsheetId, sheetName);
+  try {
+    return DataController.connectDataSource(spreadsheetId, sheetName);
+  } catch (error) {
+    console.error('connectDataSource error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function checkIsSystemAdmin() {
@@ -631,15 +731,30 @@ function handleGetData(request) {
 }
 
 function addReaction(userId, rowId, reactionType) {
-  return DataController.addReaction(userId, rowId, reactionType);
+  try {
+    return DataController.addReaction(userId, rowId, reactionType);
+  } catch (error) {
+    console.error('addReaction error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function toggleHighlight(userId, rowId) {
-  return DataController.toggleHighlight(userId, rowId);
+  try {
+    return DataController.toggleHighlight(userId, rowId);
+  } catch (error) {
+    console.error('toggleHighlight error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function refreshBoardData(userId) {
-  return DataController.refreshBoardData(userId);
+  try {
+    return DataController.refreshBoardData(userId);
+  } catch (error) {
+    console.error('refreshBoardData error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function addSpreadsheetUrl(url) {
@@ -652,9 +767,19 @@ function addSpreadsheetUrl(url) {
 }
 
 function getUserConfig(userId) {
-  return ConfigService.getUserConfig(userId);
+  try {
+    return ConfigService.getUserConfig(userId);
+  } catch (error) {
+    console.error('getUserConfig error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function getPublishedSheetData(userId, options) {
-  return DataService.getPublishedSheetData(userId, options);
+  try {
+    return DataService.getPublishedSheetData(userId, options);
+  } catch (error) {
+    console.error('getPublishedSheetData error:', error);
+    return { success: false, error: error.message };
+  }
 }
