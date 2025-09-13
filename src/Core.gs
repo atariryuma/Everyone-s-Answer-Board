@@ -1,10 +1,21 @@
 /**
  * @fileoverview StudyQuest - Core Functions (高速化版)
  * 主要な業務ロジック、APIエンドポイント、バルクデータAPI
+ * 
+ * 📋 ファイル構成:
+ * 1. 🔧 基本ユーティリティ関数群
+ * 2. 📊 データ処理・設定管理
+ * 3. 👤 ユーザー管理・認証
+ * 4. 📝 データソース・スプレッドシート操作
+ * 5. 📋 フォーム関連操作
+ * 6. 🎯 リアクション・ハイライト機能
+ * 7. 🔍 分析・診断機能
+ * 8. ⚙️ システム管理・修復機能
+ * 9. 🚀 高度なAPI処理
  */
 
 // ===========================================
-// 🎯 シンプル化：統一データアクセス関数群
+// 🔧 基本ユーティリティ関数群
 // ===========================================
 
 /**
@@ -135,6 +146,10 @@ function processDataWithColumnMapping(dataRows, headers, columnMapping) {
     return processedRow;
   });
 }
+
+// ===========================================
+// 📊 データ処理・設定管理
+// ===========================================
 
 /**
  * 🚀 バルクデータAPI: 複数の情報を一括取得で高速化
@@ -413,6 +428,11 @@ function getOpinionHeaderSafely(userId, sheetName) {
  * 新規ユーザーを登録する（データベース登録のみ）
  * フォーム作成はクイックスタートで実行される
  */
+
+// ===========================================
+// 👤 ユーザー管理・認証
+// ===========================================
+
 /**
  * 新規ユーザー登録・既存ユーザー更新統合関数
  * GAS 2025 Best Practices準拠 - Modern JavaScript & Structured Error Handling
@@ -566,6 +586,11 @@ function registerNewUser(userEmail) {
  * Page.htmlから呼び出される - フロントエンド期待形式に対応
  * @param {string} requestUserId - リクエスト元のユーザーID
  */
+
+// ===========================================
+// 🎯 リアクション・ハイライト機能
+// ===========================================
+
 function addReaction(requestUserId, rowIndex, reactionKey, sheetName) {
   return PerformanceMonitor.measure('addReaction', () => {
     const accessResult = App.getAccess().verifyAccess(
@@ -676,6 +701,10 @@ function getCurrentSheetName(spreadsheetId) {
  * @throws {Error} 認証エラーまたは権限エラー
  */
 // verifyUserAccess function removed - all calls now use App.getAccess().verifyAccess() directly
+
+// ===========================================
+// 📝 データソース・スプレッドシート操作
+// ===========================================
 
 /**
  * 実際のデータ取得処理（キャッシュ制御から分離） (マルチテナント対応版)
@@ -1336,6 +1365,10 @@ function getCurrentUserStatus(requestUserId) {
     return { status: 'error', message: `ステータス取得に失敗しました: ${e.message}` };
   }
 }
+
+// ===========================================
+// 📋 フォーム関連操作
+// ===========================================
 
 /**
  * アクティブなフォーム情報を取得 (マルチテナント対応版)
@@ -3288,6 +3321,10 @@ function getDriveService() {
 function shouldEnableDebugMode() {
   return isSystemAdmin();
 }
+
+// ===========================================
+// ⚙️ システム管理・修復機能
+// ===========================================
 
 /**
  * デプロイユーザーかどうか判定
@@ -6265,6 +6302,10 @@ function migrateUserDataToConfigJson(userId = null) {
   }
 }
 
+// ===========================================
+// 🔍 分析・診断機能
+// ===========================================
+
 /**
  * CLAUDE.md準拠：スプレッドシート列構造を分析
  * 統一データソース原則：configJSON中心型で列マッピングを生成
@@ -6899,26 +6940,384 @@ function clearActiveSheet(userId = null) {
  * @param {Array<Object>} batchOperations - バッチ操作の配列
  * @returns {Object} 処理結果
  */
+
+// ===========================================
+// 🚀 高度なAPI処理
+// ===========================================
+
+/**
+ * 統一バッチ処理マネージャー
+ * 複数の操作を効率的にバッチ処理する汎用システム
+ */
+const BatchProcessor = Object.freeze({
+  /**
+   * デフォルト設定
+   */
+  DEFAULT_CONFIG: Object.freeze({
+    maxBatchSize: 50,
+    maxRetries: 3,
+    retryDelay: 1000,
+    timeoutMs: 30000,
+    enableParallel: true,
+    chunkSize: 10,
+  }),
+
+  /**
+   * バッチ操作を実行
+   * @param {Array} operations - 操作の配列
+   * @param {Function} processor - 各操作を処理する関数
+   * @param {Object} config - 設定オプション
+   * @returns {Object} 処理結果
+   */
+  async execute(operations, processor, config = {}) {
+    const settings = { ...this.DEFAULT_CONFIG, ...config };
+    const startTime = Date.now();
+    
+    try {
+      // 入力検証
+      if (!Array.isArray(operations) || operations.length === 0) {
+        throw new Error('操作配列が無効または空です');
+      }
+      
+      if (typeof processor !== 'function') {
+        throw new Error('プロセッサー関数が無効です');
+      }
+
+      Logger.info('バッチ処理開始', {
+        operationCount: operations.length,
+        maxBatchSize: settings.maxBatchSize,
+        enableParallel: settings.enableParallel
+      });
+
+      // バッチサイズ制限
+      if (operations.length > settings.maxBatchSize) {
+        return this._processInChunks(operations, processor, settings);
+      }
+
+      // 並列処理が有効な場合
+      if (settings.enableParallel && operations.length > settings.chunkSize) {
+        return this._processParallel(operations, processor, settings);
+      }
+
+      // 順次処理
+      return this._processSequential(operations, processor, settings);
+
+    } catch (error) {
+      Logger.error('バッチ処理エラー', {
+        error: error.message,
+        operationCount: operations.length,
+        duration: Date.now() - startTime
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * チャンク単位での処理
+   */
+  _processInChunks(operations, processor, settings) {
+    const chunks = this._createChunks(operations, settings.maxBatchSize);
+    const results = [];
+    let totalSuccess = 0;
+    let totalFailed = 0;
+
+    for (const chunk of chunks) {
+      try {
+        const chunkResult = this._processSequential(chunk, processor, settings);
+        results.push(chunkResult);
+        totalSuccess += chunkResult.successCount;
+        totalFailed += chunkResult.failureCount;
+      } catch (error) {
+        Logger.warn('チャンク処理エラー', { error: error.message, chunkSize: chunk.length });
+        totalFailed += chunk.length;
+        results.push({
+          success: false,
+          error: error.message,
+          successCount: 0,
+          failureCount: chunk.length
+        });
+      }
+    }
+
+    return {
+      success: totalFailed === 0,
+      totalOperations: operations.length,
+      successCount: totalSuccess,
+      failureCount: totalFailed,
+      chunks: results
+    };
+  },
+
+  /**
+   * 並列処理
+   */
+  _processParallel(operations, processor, settings) {
+    // GASでは真の並列処理は制限されるため、疑似並列処理を実装
+    const chunks = this._createChunks(operations, settings.chunkSize);
+    const results = [];
+    let totalSuccess = 0;
+    let totalFailed = 0;
+
+    for (const chunk of chunks) {
+      const chunkResults = [];
+      
+      // チャンク内の各操作を処理
+      for (const operation of chunk) {
+        try {
+          const result = this._processWithRetry(operation, processor, settings);
+          chunkResults.push({ success: true, result });
+          totalSuccess++;
+        } catch (error) {
+          chunkResults.push({ success: false, error: error.message });
+          totalFailed++;
+        }
+      }
+      
+      results.push(...chunkResults);
+    }
+
+    return {
+      success: totalFailed === 0,
+      totalOperations: operations.length,
+      successCount: totalSuccess,
+      failureCount: totalFailed,
+      results
+    };
+  },
+
+  /**
+   * 順次処理
+   */
+  _processSequential(operations, processor, settings) {
+    const results = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const operation of operations) {
+      try {
+        const result = this._processWithRetry(operation, processor, settings);
+        results.push({ success: true, result });
+        successCount++;
+      } catch (error) {
+        results.push({ success: false, error: error.message });
+        failureCount++;
+      }
+    }
+
+    return {
+      success: failureCount === 0,
+      totalOperations: operations.length,
+      successCount,
+      failureCount,
+      results
+    };
+  },
+
+  /**
+   * リトライ機能付きの処理
+   */
+  _processWithRetry(operation, processor, settings) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= settings.maxRetries; attempt++) {
+      try {
+        return processor(operation);
+      } catch (error) {
+        lastError = error;
+        
+        if (attempt < settings.maxRetries) {
+          // 指数バックオフでリトライ
+          const delay = settings.retryDelay * Math.pow(2, attempt - 1);
+          Utilities.sleep(delay);
+          Logger.debug(`リトライ ${attempt}/${settings.maxRetries}`, {
+            delay,
+            error: error.message
+          });
+        }
+      }
+    }
+    
+    throw lastError;
+  },
+
+  /**
+   * 配列をチャンクに分割
+   */
+  _createChunks(array, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += chunkSize) {
+      chunks.push(array.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+});
+
+/**
+ * 拡張バッチデータ取得システム
+ * 複数のスプレッドシートから効率的にデータを取得
+ */
+const BatchDataRetriever = Object.freeze({
+  /**
+   * 複数範囲からのデータ取得
+   * @param {string} spreadsheetId - スプレッドシートID  
+   * @param {Array<string>} ranges - 取得範囲の配列
+   * @param {Object} options - オプション設定
+   * @returns {Object} 取得結果
+   */
+  batchGetRanges(spreadsheetId, ranges, options = {}) {
+    const config = {
+      maxRangesPerBatch: options.maxRangesPerBatch || 100,
+      enableCache: options.enableCache !== false,
+      cacheTimeout: options.cacheTimeout || 300
+    };
+
+    try {
+      const service = getSheetsServiceCached();
+      
+      if (ranges.length <= config.maxRangesPerBatch) {
+        // 単一バッチで処理
+        return service.spreadsheets.values.batchGet({
+          spreadsheetId,
+          ranges
+        });
+      }
+
+      // 大量範囲を分割して処理
+      const chunks = this._createRangeChunks(ranges, config.maxRangesPerBatch);
+      const results = [];
+      
+      for (const chunk of chunks) {
+        const chunkResult = service.spreadsheets.values.batchGet({
+          spreadsheetId,
+          ranges: chunk
+        });
+        results.push(...(chunkResult.valueRanges || []));
+      }
+
+      return { valueRanges: results };
+
+    } catch (error) {
+      Logger.error('バッチデータ取得エラー', {
+        spreadsheetId: spreadsheetId.substring(0, 10) + '...',
+        rangeCount: ranges.length,
+        error: error.message
+      });
+      throw error;
+    }
+  },
+
+  /**
+   * 複数スプレッドシートからの統合データ取得
+   * @param {Array<Object>} sources - {spreadsheetId, ranges} の配列
+   * @param {Object} options - オプション設定
+   * @returns {Object} 統合結果
+   */
+  batchGetFromMultipleSources(sources, options = {}) {
+    const processor = (source) => {
+      return this.batchGetRanges(source.spreadsheetId, source.ranges, options);
+    };
+
+    return BatchProcessor.execute(sources, processor, {
+      maxBatchSize: options.maxSources || 10,
+      enableParallel: options.enableParallel !== false
+    });
+  },
+
+  _createRangeChunks(ranges, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < ranges.length; i += chunkSize) {
+      chunks.push(ranges.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+});
+
+/**
+ * 拡張バッチ更新システム
+ * 複数の更新操作を効率的に実行
+ */
+const BatchDataUpdater = Object.freeze({
+  /**
+   * バッチ更新実行
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @param {Array<Object>} updates - 更新データ配列
+   * @param {Object} options - オプション設定
+   * @returns {Object} 更新結果
+   */
+  batchUpdate(spreadsheetId, updates, options = {}) {
+    const config = {
+      maxUpdatesPerBatch: options.maxUpdatesPerBatch || 200,
+      validateUpdates: options.validateUpdates !== false
+    };
+
+    try {
+      if (config.validateUpdates) {
+        this._validateUpdates(updates);
+      }
+
+      const service = getSheetsServiceCached();
+
+      if (updates.length <= config.maxUpdatesPerBatch) {
+        return service.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requests: updates
+        });
+      }
+
+      // 大量更新を分割処理
+      const chunks = this._createUpdateChunks(updates, config.maxUpdatesPerBatch);
+      const results = [];
+
+      for (const chunk of chunks) {
+        const chunkResult = service.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requests: chunk
+        });
+        results.push(chunkResult);
+      }
+
+      return {
+        replies: results.flatMap(r => r.replies || []),
+        spreadsheetId,
+        updatedCells: results.reduce((sum, r) => sum + (r.updatedCells || 0), 0)
+      };
+
+    } catch (error) {
+      Logger.error('バッチ更新エラー', {
+        spreadsheetId: spreadsheetId.substring(0, 10) + '...',
+        updateCount: updates.length,
+        error: error.message
+      });
+      throw error;
+    }
+  },
+
+  _validateUpdates(updates) {
+    if (!Array.isArray(updates)) {
+      throw new Error('更新データが配列ではありません');
+    }
+
+    for (const update of updates) {
+      if (!update || typeof update !== 'object') {
+        throw new Error('無効な更新データが含まれています');
+      }
+    }
+  },
+
+  _createUpdateChunks(updates, chunkSize) {
+    const chunks = [];
+    for (let i = 0; i < updates.length; i += chunkSize) {
+      chunks.push(updates.slice(i, i + chunkSize));
+    }
+    return chunks;
+  }
+});
+
 function addReactionBatch(requestUserId, batchOperations) {
   try {
     const { currentUserEmail } = new ConfigurationManager().getCurrentUserInfoSafely() || {};
-    console.log('addReactionBatch: バッチリアクション処理開始', {
-      userId: requestUserId ? `${requestUserId.substring(0, 8)}...` : 'null',
-      operationsCount: Array.isArray(batchOperations) ? batchOperations.length : 0,
-    });
-
+    
     // 入力検証
-    if (!Array.isArray(batchOperations) || batchOperations.length === 0) {
-      throw new Error('バッチ操作が無効です');
-    }
-
-    // バッチサイズ制限（安全性のため）
-    const MAX_BATCH_SIZE = 20;
-    if (batchOperations.length > MAX_BATCH_SIZE) {
-      throw new Error(`バッチサイズが制限を超えています (最大${MAX_BATCH_SIZE}件)`);
-    }
-
-    // ユーザーID検証
     if (!SecurityValidator.isValidUUID(requestUserId)) {
       throw new Error('無効なユーザーIDです');
     }
@@ -6939,93 +7338,61 @@ function addReactionBatch(requestUserId, batchOperations) {
       throw new Error('スプレッドシートが設定されていません');
     }
 
-    // バッチ処理結果を格納
-    const batchResults = [];
-    const processedRows = new Set(); // 重複行の追跡
-
     // シート名を取得（統一データソース使用）
     const userConfig = ConfigManager.getUserConfig(requestUserId);
     const sheetName = userConfig?.sheetName || 'フォームの回答 1';
 
-    console.log('addReactionBatch: 処理対象シート', {
+    // バッチ処理用のプロセッサー関数
+    const reactionProcessor = (operation) => {
+      const { rowIndex, reactionKey, action } = operation;
+      
+      // 操作検証
+      if (!rowIndex || !reactionKey || !['add', 'remove'].includes(action)) {
+        throw new Error('無効なリアクション操作です');
+      }
+
+      // リアクション処理を実行
+      const result = executeAddReaction(requestUserId, rowIndex, reactionKey, sheetName);
+      return {
+        rowIndex,
+        reactionKey, 
+        action,
+        result
+      };
+    };
+
+    // BatchProcessorを使用してバッチ処理実行
+    const batchResult = BatchProcessor.execute(batchOperations, reactionProcessor, {
+      maxBatchSize: 50,
+      maxRetries: 2,
+      enableParallel: true,
+      chunkSize: 10
+    });
+
+    Logger.info('バッチリアクション処理完了', {
+      totalOperations: batchResult.totalOperations,
+      successCount: batchResult.successCount,
+      failureCount: batchResult.failureCount,
       spreadsheetId: `${ownerConfig.spreadsheetId.substring(0, 20)}...`,
       sheetName,
     });
 
-    // バッチ操作を順次処理
-    for (let i = 0; i < batchOperations.length; i++) {
-      const operation = batchOperations[i];
+    return {
+      success: batchResult.success,
+      processedCount: batchResult.totalOperations,
+      successCount: batchResult.successCount,
+      failureCount: batchResult.failureCount,
+      results: batchResult.results || batchResult.chunks,
+      timestamp: new Date().toISOString()
+    };
 
-      try {
-        // 入力検証
-        if (!operation.rowIndex || !operation.reaction) {
-          console.warn('addReactionBatch: 無効な操作をスキップ', operation);
-          continue;
-        }
-
-        // 個別のリアクション処理（Core.gsのaddReaction関数を呼び出し）
-        const result = addReaction(
-          requestUserId,
-          operation.rowIndex,
-          operation.reaction,
-          sheetName
-        );
-
-        if (result && result.success) {
-          batchResults.push({
-            rowIndex: operation.rowIndex,
-            reaction: operation.reaction,
-            status: 'success',
-            timestamp: new Date().toISOString(),
-          });
-          processedRows.add(operation.rowIndex);
-        } else {
-          console.warn('addReactionBatch: リアクション処理失敗', operation, result?.message);
-          batchResults.push({
-            rowIndex: operation.rowIndex,
-            reaction: operation.reaction,
-            status: 'error',
-            message: result?.message || 'リアクション処理失敗',
-          });
-        }
-      } catch (operationError) {
-        console.error('addReactionBatch: 個別操作エラー', operation, operationError.message);
-        batchResults.push({
-          rowIndex: operation.rowIndex,
-          reaction: operation.reaction,
-          status: 'error',
-          message: operationError.message,
-        });
-      }
-    }
-
-    const successCount = batchResults.filter((r) => r.status === 'success').length;
-    console.log('addReactionBatch: バッチリアクション処理完了', {
-      total: batchOperations.length,
-      processed: processedRows.size,
-      success: successCount,
-    });
-
-    return createResponse(true, 'バッチリアクション処理完了', {
-      processedCount: batchOperations.length,
-      successCount,
-      details: batchResults,
-    });
   } catch (error) {
-    console.error('addReactionBatch エラー:', {
+    Logger.error('addReactionBatch エラー', {
       error: error.message,
-      stack: error.stack,
       requestUserId,
+      operationCount: Array.isArray(batchOperations) ? batchOperations.length : 0
     });
-
-    return createResponse(
-      false,
-      'バッチリアクション処理エラー',
-      {
-        fallbackToIndividual: true, // クライアント側が個別処理にフォールバック可能
-      },
-      error
-    );
+    throw error;
   }
 }
 

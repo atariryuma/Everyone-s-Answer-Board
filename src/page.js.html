@@ -11,9 +11,10 @@
     });
     
     const getSecureVars = () => ({
-      showAdminFeatures: !!window.showAdminFeatures,
-      isAdminUser: !window.isStudentMode,
-      userId: window.userId || null
+      // セキュリティ: クライアントサイド変数ではなく、サーバーから取得した設定を使用
+      showAdminFeatures: false,  // サーバーサイドで判定
+      isAdminUser: false,        // サーバーサイドで判定  
+      userId: (typeof window !== 'undefined' && window.userId) || null
     });
     
     const ICONS = Object.freeze({
@@ -24,6 +25,71 @@
       star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/></svg>',
       grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M3 12h18"/></svg>',
       users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
+    });
+
+    /**
+     * DOM操作のヘルパー関数群 - 未定義エラーを防止
+     */
+    const DOMHelpers = Object.freeze({
+      /**
+       * 安全なDOM要素取得
+       * @param {string} id - 要素ID
+       * @param {string} context - エラー時のコンテキスト
+       * @returns {Element|null}
+       */
+      safeGetById(id, context = '') {
+        try {
+          const element = document.getElementById(id);
+          if (!element && context) {
+            console.warn(`DOM要素が見つかりません: ${id} (${context})`);
+          }
+          return element;
+        } catch (error) {
+          console.error(`DOM要素取得エラー: ${id}`, error);
+          return null;
+        }
+      },
+
+      /**
+       * 安全なDOM要素値設定
+       * @param {string} id - 要素ID
+       * @param {*} value - 設定する値
+       * @param {string} property - プロパティ名（デフォルト: 'value'）
+       * @returns {boolean} 成功・失敗
+       */
+      safeSetValue(id, value, property = 'value') {
+        const element = this.safeGetById(id, 'value setting');
+        if (element && property in element) {
+          element[property] = value;
+          return true;
+        }
+        return false;
+      },
+
+      /**
+       * 安全なDOM要素値取得
+       * @param {string} id - 要素ID
+       * @param {string} property - プロパティ名（デフォルト: 'value'）
+       * @param {*} fallback - フォールバック値
+       * @returns {*}
+       */
+      safeGetValue(id, property = 'value', fallback = '') {
+        const element = this.safeGetById(id, 'value getting');
+        return (element && property in element) ? element[property] : fallback;
+      },
+
+      /**
+       * 複数要素の安全な取得
+       * @param {Array<string>} ids - 要素IDの配列
+       * @returns {Object} IDをキーとした要素のオブジェクト
+       */
+      safeGetMultiple(ids) {
+        const result = {};
+        ids.forEach(id => {
+          result[id] = this.safeGetById(id);
+        });
+        return result;
+      }
     });
     
     /**
@@ -59,7 +125,7 @@
       }
 
       updateClassFilter() {
-        const classFilterEl = document.getElementById('classFilter');
+        const classFilterEl = DOMHelpers.safeGetById('classFilter', 'class filter update');
         if (!classFilterEl) return;
 
         const currentValue = classFilterEl.value;
@@ -94,11 +160,7 @@
           sortOrder: 'newest'
         };
 
-        const elements = {
-          classFilter: document.getElementById('classFilter'),
-          searchInput: document.getElementById('searchInput'),
-          sortOrder: document.getElementById('sortOrder')
-        };
+        const elements = DOMHelpers.safeGetMultiple(['classFilter', 'searchInput', 'sortOrder']);
 
         Object.entries(elements).forEach(([key, element]) => {
           if (element) {
@@ -186,6 +248,8 @@
         this.cache = new Map();
         this.cacheTimers = new Map();
         this.isProduction = typeof google !== 'undefined' && google.script?.run;
+        this.retryCount = 0;
+        this.maxRetries = 3;
         
         this.answerRenderer = new AnswerRenderer();
         this.filterManager = new FilterManager();
@@ -217,6 +281,13 @@
         
         try {
           const config = await this.callGAS('getUserConfig', this.vars.userId) || {};
+          
+          // セキュリティ: サーバーサイドから権限情報を取得
+          if (config.userPermissions) {
+            this.vars.showAdminFeatures = config.userPermissions.isOwner || config.userPermissions.isSystemAdmin;
+            this.vars.isAdminUser = config.userPermissions.isOwner || config.userPermissions.isSystemAdmin;
+          }
+          
           this.setCache(cacheKey, config, CONFIG.CACHE_DURATION);
           return config;
         } catch (error) {
@@ -317,17 +388,78 @@
         return normalized;
       }
       
-      callGAS(funcName, ...args) {
+      async callGAS(funcName, ...args) {
         return new Promise((resolve, reject) => {
           if (this.isProduction) {
             google.script.run
-              .withSuccessHandler(resolve)
-              .withFailureHandler(reject)
+              .withSuccessHandler((result) => {
+                this.retryCount = 0; // 成功時はリトライカウントをリセット
+                resolve(result);
+              })
+              .withFailureHandler((error) => {
+                console.error(`GAS関数呼び出しエラー: ${funcName}`, error);
+                
+                // リトライ可能なエラーかチェック
+                const isRetryable = this.isRetryableError(error);
+                
+                if (isRetryable && this.retryCount < this.maxRetries) {
+                  this.retryCount++;
+                  console.warn(`リトライ実行: ${this.retryCount}/${this.maxRetries} (${funcName})`);
+                  
+                  // 指数バックオフでリトライ
+                  setTimeout(() => {
+                    this.callGAS(funcName, ...args).then(resolve).catch(reject);
+                  }, Math.pow(2, this.retryCount) * 1000);
+                } else {
+                  this.retryCount = 0;
+                  reject(this.normalizeError(error, funcName));
+                }
+              })
               [funcName](...args);
           } else {
             this.mockResponse(funcName, resolve);
           }
         });
+      }
+
+      /**
+       * リトライ可能なエラーかどうかを判定
+       * @param {*} error - エラーオブジェクト
+       * @returns {boolean}
+       */
+      isRetryableError(error) {
+        const errorString = String(error).toLowerCase();
+        const retryablePatterns = [
+          'timeout',
+          'network',
+          'connection',
+          'temporary',
+          'service unavailable',
+          'internal error'
+        ];
+        
+        return retryablePatterns.some(pattern => errorString.includes(pattern));
+      }
+
+      /**
+       * エラーオブジェクトを正規化
+       * @param {*} error - エラーオブジェクト
+       * @param {string} funcName - 関数名
+       * @returns {Error}
+       */
+      normalizeError(error, funcName) {
+        if (error instanceof Error) {
+          return error;
+        }
+        
+        const message = typeof error === 'string' ? error : 
+                       error?.message || '不明なエラーが発生しました';
+        
+        const normalizedError = new Error(`${funcName}: ${message}`);
+        normalizedError.originalError = error;
+        normalizedError.functionName = funcName;
+        
+        return normalizedError;
       }
       
       mockResponse(funcName, resolve) {
@@ -514,18 +646,28 @@
       updateFilterStatusDisplay(status) {
         const answerCount = document.getElementById('answerCount');
         if (answerCount) {
-          const filterText = status.hasFilters 
-            ? `${status.filteredItems}/${status.totalItems} 件` 
-            : `${status.totalItems} 件`;
+          // XSS防止: HTML直接注入ではなく、DOM操作を使用
+          answerCount.innerHTML = '';
           
-          answerCount.innerHTML = `
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-            </svg>
-            ${filterText}
-            ${status.hasFilters ? '<span class="text-cyan-400">（フィルタ中）</span>' : ''}
-          `;
+          // SVGアイコン
+          const svg = this.answerRenderer.createIcon('users', 'w-4 h-4');
+          answerCount.appendChild(svg);
+          
+          // テキスト（サニタイズ済み）
+          const filterText = status.hasFilters 
+            ? `${parseInt(status.filteredItems)}/${parseInt(status.totalItems)} 件` 
+            : `${parseInt(status.totalItems)} 件`;
+          
+          const textNode = document.createTextNode(` ${filterText}`);
+          answerCount.appendChild(textNode);
+          
+          // フィルタ状態表示
+          if (status.hasFilters) {
+            const filterSpan = document.createElement('span');
+            filterSpan.className = 'text-cyan-400';
+            filterSpan.textContent = '（フィルタ中）';
+            answerCount.appendChild(filterSpan);
+          }
         }
         
         // クリアボタンの表示制御
@@ -597,6 +739,9 @@
       
       // ポーリング開始
       startPolling() {
+        // 既存のポーリングをクリーンアップ
+        this.stopPolling();
+        
         // 90秒間隔でポーリング
         this.pollingInterval = setInterval(() => {
           if (!document.hidden) {
@@ -604,17 +749,24 @@
           }
         }, CONFIG.POLLING_INTERVAL);
         
-        // ページの可視性変化に応じてポーリング制御
-        document.addEventListener('visibilitychange', () => {
+        // ページの可視性変化イベントリスナーを保存（クリーンアップ用）
+        this.visibilityChangeHandler = () => {
           if (document.hidden) {
-            if (this.pollingInterval) {
-              clearInterval(this.pollingInterval);
-              this.pollingInterval = null;
-            }
+            this.stopPolling();
           } else if (!this.pollingInterval) {
             this.startPolling();
           }
-        });
+        };
+        
+        document.addEventListener('visibilitychange', this.visibilityChangeHandler);
+      }
+      
+      // ポーリング停止
+      stopPolling() {
+        if (this.pollingInterval) {
+          clearInterval(this.pollingInterval);
+          this.pollingInterval = null;
+        }
       }
       
       handleError(context, error) {
@@ -635,29 +787,50 @@
         this.showUserError(userMessage);
       }
       
-      // ユーザー向けエラー表示
+      // ユーザー向けエラー表示（XSS防止）
       showUserError(message) {
         const existing = document.querySelector('.error-notification');
         if (existing) existing.remove();
         
         const notification = document.createElement('div');
         notification.className = 'error-notification fixed top-4 right-4 bg-red-600 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm opacity-0 transform translate-x-full transition-all duration-300';
-        notification.innerHTML = `
-          <div class="flex items-center gap-2">
-            <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="15" y1="9" x2="9" y2="15"></line>
-              <line x1="9" y1="9" x2="15" y2="15"></line>
-            </svg>
-            <span class="flex-1">${message}</span>
-            <button class="ml-2 hover:bg-red-700 rounded p-1" onclick="this.parentElement.parentElement.remove()">
-              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="18" y1="6" x2="6" y2="18"></line>
-                <line x1="6" y1="6" x2="18" y2="18"></line>
-              </svg>
-            </button>
-          </div>
-        `;
+        
+        // XSS防止: DOM構築で安全に作成
+        const container = document.createElement('div');
+        container.className = 'flex items-center gap-2';
+        
+        // エラーアイコン
+        const errorIcon = document.createElement('svg');
+        errorIcon.className = 'w-5 h-5';
+        errorIcon.setAttribute('viewBox', '0 0 24 24');
+        errorIcon.setAttribute('fill', 'none');
+        errorIcon.setAttribute('stroke', 'currentColor');
+        errorIcon.setAttribute('stroke-width', '2');
+        errorIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>';
+        
+        // メッセージ（テキストノードで安全に設定）
+        const messageSpan = document.createElement('span');
+        messageSpan.className = 'flex-1';
+        messageSpan.textContent = String(message || 'エラーが発生しました');
+        
+        // 閉じるボタン
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'ml-2 hover:bg-red-700 rounded p-1';
+        closeBtn.addEventListener('click', () => notification.remove());
+        
+        const closeIcon = document.createElement('svg');
+        closeIcon.className = 'w-4 h-4';
+        closeIcon.setAttribute('viewBox', '0 0 24 24');
+        closeIcon.setAttribute('fill', 'none');
+        closeIcon.setAttribute('stroke', 'currentColor');
+        closeIcon.setAttribute('stroke-width', '2');
+        closeIcon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
+        
+        closeBtn.appendChild(closeIcon);
+        container.appendChild(errorIcon);
+        container.appendChild(messageSpan);
+        container.appendChild(closeBtn);
+        notification.appendChild(container);
         
         document.body.appendChild(notification);
         
@@ -675,13 +848,24 @@
       // 破棄処理
       destroy() {
         // ポーリング停止
-        if (this.pollingInterval) {
-          clearInterval(this.pollingInterval);
-          this.pollingInterval = null;
+        this.stopPolling();
+        
+        // イベントリスナークリーンアップ
+        if (this.visibilityChangeHandler) {
+          document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
+          this.visibilityChangeHandler = null;
         }
         
         // キャッシュクリア
         this.clearCache();
+        
+        // DOM参照クリア
+        this.answerRenderer = null;
+        this.filterManager = null;
+        this.config = null;
+        this.answers = [];
+        
+        console.info('[AnswerApp] リソースクリーンアップ完了');
       }
     }
 
@@ -901,15 +1085,33 @@
         
         if (!modal || !modalContent) return;
         
-        // コンテンツ設定
-        modalContent.innerHTML = `
-          <h2 class="text-2xl font-bold text-cyan-200 mb-4">回答内容</h2>
-          <p class="text-xl leading-relaxed mb-4">${answer.opinion}</p>
-          ${answer.reason ? `
-            <h3 class="text-lg font-semibold text-cyan-400 mb-2">理由・根拠</h3>
-            <p class="text-gray-200 leading-relaxed">${answer.reason}</p>
-          ` : ''}
-        `;
+        // XSS対策: DOM操作で安全にコンテンツ設定
+        modalContent.innerHTML = ''; // 既存コンテンツをクリア
+        
+        // タイトル作成
+        const title = document.createElement('h2');
+        title.className = 'text-2xl font-bold text-cyan-200 mb-4';
+        title.textContent = '回答内容';
+        modalContent.appendChild(title);
+        
+        // 回答内容作成
+        const opinionPara = document.createElement('p');
+        opinionPara.className = 'text-xl leading-relaxed mb-4';
+        opinionPara.textContent = answer.opinion || '';
+        modalContent.appendChild(opinionPara);
+        
+        // 理由・根拠がある場合
+        if (answer.reason) {
+          const reasonTitle = document.createElement('h3');
+          reasonTitle.className = 'text-lg font-semibold text-cyan-400 mb-2';
+          reasonTitle.textContent = '理由・根拠';
+          modalContent.appendChild(reasonTitle);
+          
+          const reasonPara = document.createElement('p');
+          reasonPara.className = 'text-gray-200 leading-relaxed';
+          reasonPara.textContent = answer.reason;
+          modalContent.appendChild(reasonPara);
+        }
         
         if (modalName) {
           modalName.textContent = answer.name || '匿名';
@@ -999,298 +1201,8 @@
         window.answerController?.destroy();
       });
       
-      setupUI() {
-        this.answerRenderer.renderIcons();
-        this.updateUIState();
-        return Promise.resolve();
-      }
-      
-      setupEventListeners() {
-        // スライダーイベント
-        const slider = document.getElementById('sizeSlider');
-        if (slider) {
-          slider.addEventListener('input', () => {
-            localStorage.setItem('boardColumns', slider.value);
-            this.answerRenderer.updateGridColumns(slider.value);
-          });
-          
-          const saved = localStorage.getItem('boardColumns');
-          if (saved) {
-            slider.value = saved;
-            this.answerRenderer.updateGridColumns(saved);
-          }
-        }
-        
-        // フィルターイベント
-        this.setupFilterEvents();
-        
-        // コンテナイベント
-        const container = document.getElementById('answers');
-        if (container) {
-          container.addEventListener('click', (e) => {
-            const btn = e.target.closest('.reaction-btn');
-            const card = e.target.closest('.answer-card');
-            
-            if (btn) {
-              e.stopPropagation();
-              const rowIndex = parseInt(btn.dataset.rowIndex);
-              const reaction = btn.dataset.reaction;
-              if (rowIndex && reaction) {
-                this.handleReaction(rowIndex, reaction, btn);
-              }
-            } else if (card && !btn) {
-              const rowIndex = parseInt(card.dataset.rowIndex);
-              if (rowIndex) this.showModal(rowIndex);
-            }
-          });
-        }
-        
-        // 管理者切り替え
-        const adminBtn = document.getElementById('adminToggleBtn');
-        if (adminBtn) {
-          adminBtn.addEventListener('click', () => {
-            window.location.href = window.location.href.replace('mode=view', 'mode=admin');
-          });
-        }
-        
-        // キーボードイベント
-        document.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape') {
-            const modal = document.getElementById('answerModalContainer');
-            if (modal && !modal.classList.contains('hidden')) {
-              modal.classList.add('opacity-0');
-              setTimeout(() => modal.classList.add('hidden'), 300);
-            }
-          }
-        });
-        
-        return Promise.resolve();
-      }
-      
-      setupFilterEvents() {
-        const classFilter = document.getElementById('classFilter');
-        if (classFilter) {
-          classFilter.addEventListener('change', (e) => {
-            this.filterManager.setFilter('classFilter', e.target.value);
-            this.renderFilteredResults();
-          });
-        }
-        
-        // リアクション数フィルタ
-        const reactionFilter = document.getElementById('reactionFilter');
-        if (reactionFilter) {
-          reactionFilter.addEventListener('change', (e) => {
-            this.filterManager.setFilter('reactionFilter', e.target.value);
-            this.renderFilteredResults();
-          });
-        }
-        
-        // 検索入力（デバウンス付き）
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-          let debounceTimer;
-          searchInput.addEventListener('input', (e) => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-              this.filterManager.setFilter('searchQuery', e.target.value);
-              this.renderFilteredResults();
-            }, 300);
-          });
-        }
-        
-        // ソート順変更
-        const sortOrder = document.getElementById('sortOrder');
-        if (sortOrder) {
-          sortOrder.addEventListener('change', (e) => {
-            this.loadAnswers(e.target.value);
-          });
-        }
-        
-        // フィルタクリアボタン
-        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
-        if (clearFiltersBtn) {
-          clearFiltersBtn.addEventListener('click', () => {
-            this.filterManager.clearFilters();
-            this.renderFilteredResults();
-          });
-        }
-      }
-      
-      updateUIState() {
-        const adminBtn = document.getElementById('adminToggleBtn');
-        const modeLabel = document.getElementById('modeLabel');
-        
-        if (adminBtn && this.vars.showAdminFeatures && this.vars.isAdminUser) {
-          adminBtn.classList.remove('hidden');
-          adminBtn.textContent = '管理パネル';
-        }
-        
-        if (modeLabel) {
-          modeLabel.textContent = this.vars.isAdminUser ? '管理者' : '学習者';
-        }
-      }
-      
-      async loadAnswers(sortOrder = 'newest') {
-        if (this.isLoading) return;
-        this.isLoading = true;
-        
-        try {
-          const data = await this.answerService.loadAnswers(sortOrder);
-          this.answers = data.answers;
-          
-          // FilterManagerにデータを設定
-          this.filterManager.setData(data.answers);
-          
-          // UIRenderer更新
-          this.answerRenderer.updateHeader(data.header, data.sheetName);
-          this.renderFilteredResults();
-          
-        } catch (error) {
-          this.handleError('データロードエラー', error);
-        } finally {
-          this.isLoading = false;
-        }
-      }
-      
-      renderFilteredResults() {
-        const filteredData = this.filterManager.getFilteredData();
-        const status = this.filterManager.getFilterStatus();
-        
-        // UIに反映
-        this.answerRenderer.renderAnswers(filteredData);
-        this.answerRenderer.updateAnswerCount(status.filteredItems);
-        this.updateFilterStatusDisplay(status);
-      }
-      
-      updateFilterStatusDisplay(status) {
-        const answerCount = document.getElementById('answerCount');
-        if (answerCount) {
-          const filterText = status.hasFilters 
-            ? `${status.filteredItems}/${status.totalItems} 件` 
-            : `${status.totalItems} 件`;
-          
-          answerCount.innerHTML = `
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
-              <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
-            </svg>
-            ${filterText}
-            ${status.hasFilters ? '<span class="text-cyan-400">（フィルタ中）</span>' : ''}
-          `;
-        }
-        
-        // クリアボタンの表示制御
-        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
-        if (clearFiltersBtn) {
-          clearFiltersBtn.style.display = status.hasFilters ? 'block' : 'none';
-        }
-      }
-      
-      async handleReaction(rowIndex, reactionKey, btn) {
-        if (btn.classList.contains('loading')) return;
-        
-        try {
-          btn.classList.add('loading');
-          
-          const result = await this.answerService.updateReaction(rowIndex, reactionKey);
-          
-          if (result.success) {
-            // カウント更新
-            const countEl = btn.querySelector('span');
-            if (countEl) {
-              countEl.textContent = result.count || 0;
-            }
-            
-            // 状態更新
-            const wasReacted = btn.classList.contains('reacted');
-            btn.classList.toggle('reacted', !wasReacted);
-            btn.classList.toggle('liked', !wasReacted);
-            
-            // アニメーション
-            this.answerRenderer.animateReactionSuccess(btn);
-            
-            // 同じ行の他のボタンも更新
-            const card = btn.closest('.answer-card');
-            if (card) {
-              const allReactionBtns = card.querySelectorAll('.reaction-btn');
-              allReactionBtns.forEach(otherBtn => {
-                if (otherBtn.dataset.reaction === reactionKey && otherBtn !== btn) {
-                  const otherCountEl = otherBtn.querySelector('span');
-                  if (otherCountEl) {
-                    otherCountEl.textContent = result.count || 0;
-                  }
-                  otherBtn.classList.toggle('reacted', !wasReacted);
-                  otherBtn.classList.toggle('liked', !wasReacted);
-                }
-              });
-            }
-            
-          } else {
-            this.showUserError(result.message || 'リアクションに失敗しました');
-          }
-          
-        } catch (error) {
-          console.error('リアクションエラー:', error);
-          this.handleError('リアクション処理エラー', error);
-        } finally {
-          btn.classList.remove('loading');
-        }
-      }
-      
-      showModal(rowIndex) {
-        const answer = this.answers.find(a => a.rowIndex === rowIndex);
-        if (answer) {
-          this.answerRenderer.showModal(answer);
-        }
-      }
-      
-      startPolling() {
-        // 1分間隔でポーリング
-        this.pollingInterval = setInterval(() => {
-          if (!document.hidden) {
-            this.loadAnswers();
-          }
-        }, 60000);
-        
-        // ページの可視性変化に応じてポーリング制御
-        document.addEventListener('visibilitychange', () => {
-          if (document.hidden) {
-            if (this.pollingInterval) {
-              clearInterval(this.pollingInterval);
-              this.pollingInterval = null;
-            }
-          } else if (!this.pollingInterval) {
-            this.startPolling();
-          }
-        });
-      }
-      
-      
-      destroy() {
-        // ポーリング停止
-        if (this.pollingInterval) {
-          clearInterval(this.pollingInterval);
-          this.pollingInterval = null;
-        }
-        
-        // キャッシュクリア
-        if (this.answerService?.clearCache) {
-          this.answerService.clearCache();
-        }
-      }
     }
     
-    // Initialize app
-    try {
-      if (window.answerController?.destroy) {
-        window.answerController.destroy();
-      }
-      window.answerController = new AnswerController();
-      
-      window.addEventListener('beforeunload', () => {
-        window.answerController?.destroy();
-      });
-      
     } catch (error) {
       console.error('[初期化失敗]', {
         message: error.message,

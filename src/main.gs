@@ -42,13 +42,7 @@ const UserManager = {
   },
 };
 
-// 後方互換性のためのUserオブジェクト（廃止予定）
-const User = {
-  email() {
-    console.warn('User.email() は廃止予定です。UserManager.getCurrentEmail()を使用してください');
-    return UserManager.getCurrentEmail();
-  },
-};
+// 廃止予定のUserオブジェクトを削除（UserManager.getCurrentEmail()を使用）
 
 /**
  * Entry Point Functions

@@ -53,6 +53,80 @@ const CORE = Object.freeze({
 });
 
 /**
+ * 統一ログ管理システム
+ * セキュリティとパフォーマンスを考慮したログ出力制御
+ */
+const Logger = Object.freeze({
+  /**
+   * 情報ログ（デバッグモード時のみ出力）
+   * @param {string} msg - メッセージ
+   * @param {Object} data - ログデータ
+   */
+  info: (msg, data = {}) => {
+    if (CORE.DEBUG_MODE) {
+      console.log(`[INFO] ${msg}`, Logger.sanitizeData(data));
+    }
+  },
+
+  /**
+   * エラーログ（常に出力）
+   * @param {string} msg - メッセージ
+   * @param {Object} data - ログデータ
+   */
+  error: (msg, data = {}) => {
+    console.error(`[ERROR] ${msg}`, Logger.sanitizeData(data));
+  },
+
+  /**
+   * 警告ログ（常に出力）
+   * @param {string} msg - メッセージ
+   * @param {Object} data - ログデータ
+   */
+  warn: (msg, data = {}) => {
+    console.warn(`[WARN] ${msg}`, Logger.sanitizeData(data));
+  },
+
+  /**
+   * デバッグログ（デバッグモード時のみ出力）
+   * @param {string} msg - メッセージ
+   * @param {Object} data - ログデータ
+   */
+  debug: (msg, data = {}) => {
+    if (CORE.DEBUG_MODE) {
+      console.log(`[DEBUG] ${msg}`, Logger.sanitizeData(data));
+    }
+  },
+
+  /**
+   * ログデータから機密情報を除去
+   * @param {Object} data - ログデータ
+   * @returns {Object} サニタイズ済みデータ
+   */
+  sanitizeData: (data) => {
+    if (!data || typeof data !== 'object') return data;
+    
+    const sanitized = {};
+    const sensitiveKeys = ['token', 'key', 'password', 'secret', 'creds', 'private_key', 'access_token'];
+    
+    for (const [key, value] of Object.entries(data)) {
+      const keyLower = key.toLowerCase();
+      const isSensitive = sensitiveKeys.some(sensitiveKey => keyLower.includes(sensitiveKey));
+      
+      if (isSensitive) {
+        sanitized[key] = '[REDACTED]';
+      } else if (typeof value === 'string' && value.length > 100) {
+        // 長い文字列は最初の10文字のみ表示
+        sanitized[key] = `${value.substring(0, 10)}...`;
+      } else {
+        sanitized[key] = value;
+      }
+    }
+    
+    return sanitized;
+  }
+});
+
+/**
  * PropertiesServiceキー定数
  * セキュリティ重要項目の一元管理
  */

@@ -14,6 +14,127 @@
   }
 
   // === SECTION SEPARATOR ===
+  
+  /**
+   * DOM操作のヘルパー関数群 - AdminPanel版
+   */
+  const DOMHelpers = Object.freeze({
+    safeGetById(id, context = '') {
+      try {
+        const element = document.getElementById(id);
+        if (!element && context) {
+          console.warn(`DOM要素が見つかりません: ${id} (${context})`);
+        }
+        return element;
+      } catch (error) {
+        console.error(`DOM要素取得エラー: ${id}`, error);
+        return null;
+      }
+    },
+
+    safeSetValue(id, value, property = 'value') {
+      const element = this.safeGetById(id, 'value setting');
+      if (element && property in element) {
+        element[property] = value;
+        return true;
+      }
+      return false;
+    },
+
+    safeGetValue(id, property = 'value', fallback = '') {
+      const element = this.safeGetById(id, 'value getting');
+      return (element && property in element) ? element[property] : fallback;
+    },
+
+    safeSetContent(id, content, method = 'textContent') {
+      const element = this.safeGetById(id, 'content setting');
+      if (element && method in element) {
+        element[method] = content;
+        return true;
+      }
+      return false;
+    },
+
+    safeAddEventListener(id, event, handler, options = {}) {
+      const element = this.safeGetById(id, 'event listener');
+      if (element && typeof handler === 'function') {
+        element.addEventListener(event, handler, options);
+        return true;
+      }
+      return false;
+    }
+  });
+
+  /**
+   * GAS関数呼び出しヘルパー - エラーハンドリングとリトライ機能付き
+   */
+  const GASHelper = Object.freeze({
+    retryCount: 0,
+    maxRetries: 3,
+
+    async callGAS(funcName, ...args) {
+      return new Promise((resolve, reject) => {
+        if (typeof google === 'undefined' || !google.script?.run) {
+          reject(new Error('Google Apps Script環境が利用できません'));
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            this.retryCount = 0;
+            resolve(result);
+          })
+          .withFailureHandler((error) => {
+            console.error(`GAS関数呼び出しエラー: ${funcName}`, error);
+            
+            const isRetryable = this.isRetryableError(error);
+            
+            if (isRetryable && this.retryCount < this.maxRetries) {
+              this.retryCount++;
+              console.warn(`リトライ実行: ${this.retryCount}/${this.maxRetries} (${funcName})`);
+              
+              setTimeout(() => {
+                this.callGAS(funcName, ...args).then(resolve).catch(reject);
+              }, Math.pow(2, this.retryCount) * 1000);
+            } else {
+              this.retryCount = 0;
+              reject(this.normalizeError(error, funcName));
+            }
+          })
+          [funcName](...args);
+      });
+    },
+
+    isRetryableError(error) {
+      const errorString = String(error).toLowerCase();
+      const retryablePatterns = [
+        'timeout',
+        'network',
+        'connection',
+        'temporary',
+        'service unavailable',
+        'internal error'
+      ];
+      
+      return retryablePatterns.some(pattern => errorString.includes(pattern));
+    },
+
+    normalizeError(error, funcName) {
+      if (error instanceof Error) {
+        return error;
+      }
+      
+      const message = typeof error === 'string' ? error : 
+                     error?.message || '不明なエラーが発生しました';
+      
+      const normalizedError = new Error(`${funcName}: ${message}`);
+      normalizedError.originalError = error;
+      normalizedError.functionName = funcName;
+      
+      return normalizedError;
+    }
+  });
+
   // 統一状態管理（一元化）
   let systemState = {
     loading: false,
@@ -218,7 +339,7 @@
   // 🎯 シンプルなchangeイベント設定
   function setupSimpleChangeEvents() {
     // スプレッドシート選択時 → シート読み込み
-    document.getElementById('spreadsheet-select').addEventListener('change', function () {
+    DOMHelpers.safeAddEventListener('spreadsheet-select', 'change', function () {
       const spreadsheetId = this.value;
       if (spreadsheetId) {
         loadSheetList(spreadsheetId);
@@ -230,7 +351,7 @@
 
   // シート選択をリセット
   function resetSheetSelect() {
-    const sheetSelect = document.getElementById('sheet-select');
+    const sheetSelect = DOMHelpers.safeGetById('sheet-select', 'sheet select reset');
     if (sheetSelect) {
       sheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
     }
@@ -239,7 +360,7 @@
   // スプレッドシート一覧読み込み（非同期版）
   function loadSpreadsheetListAsync() {
     return new Promise((resolve, reject) => {
-      const select = document.getElementById('spreadsheet-select');
+      const select = DOMHelpers.safeGetById('spreadsheet-select', 'spreadsheet list loading');
       if (!select) {
         reject(new Error('spreadsheet-select element not found'));
         return;
@@ -1644,7 +1765,13 @@
       }
     });
 
-    detailsDiv.innerHTML = details.map((detail) => `<div>• ${detail}</div>`).join('');
+    // XSS対策: DOM操作で安全に詳細情報を設定
+    detailsDiv.innerHTML = '';
+    details.forEach(detail => {
+      const div = document.createElement('div');
+      div.textContent = `• ${detail}`;
+      detailsDiv.appendChild(div);
+    });
   }
 
   // 選択状況を更新
