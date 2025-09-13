@@ -408,6 +408,17 @@ const SecurityService = Object.freeze({
         };
       }
 
+      // ユーザーIDが不明でも、認証済みであれば authenticated_user 要件は満たす
+      if (!userId && requiredLevel === 'authenticated_user') {
+        return {
+          hasPermission: true,
+          currentLevel: 'authenticated_user',
+          requiredLevel,
+          userEmail: currentEmail,
+          timestamp: new Date().toISOString()
+        };
+      }
+
       // UserServiceから権限レベル取得
       const accessLevel = UserService.getAccessLevel(userId);
       const hasPermission = this.compareAccessLevels(accessLevel, requiredLevel);
