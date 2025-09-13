@@ -111,7 +111,7 @@ const UserService = Object.freeze({
       const completeUserInfo = this.enrichUserInfo(userInfo);
 
       // 統一キャッシュサービスでキャッシュ保存
-      CacheService.set(cacheKey, completeUserInfo, 300); // 5分キャッシュ
+      AppCacheService.set(cacheKey, completeUserInfo, 300); // 5分キャッシュ
 
       return completeUserInfo;
     } catch (error) {
