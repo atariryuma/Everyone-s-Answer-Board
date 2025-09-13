@@ -356,7 +356,7 @@ const SecurityService = Object.freeze({
         if (!urlMatch) {
           return { isValid: false, error: '無効なURL形式' };
         }
-        protocol = urlMatch[1] + ':'; // 'http:' or 'https:'
+        protocol = `${urlMatch[1]  }:`; // 'http:' or 'https:'
         hostname = urlMatch[2];
       } catch (error) {
         return { isValid: false, error: '無効なURL形式' };
@@ -379,8 +379,8 @@ const SecurityService = Object.freeze({
       return {
         isValid: true,
         sanitized: url.trim(),
-        protocol: protocol,
-        hostname: hostname
+        protocol,
+        hostname
       };
     } catch (error) {
       return { isValid: false, error: error.message };

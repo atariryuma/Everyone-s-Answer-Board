@@ -4,6 +4,32 @@
  */
 
 /**
+ * ConfigurationManager - 最小限の互換性ラッパー
+ * 既存コードとの互換性を保つための薄いラッパークラス
+ * 新規実装では直接 SpreadsheetApp.openById() を使用すること
+ */
+class ConfigurationManager {
+  /**
+   * スプレッドシートを取得（互換性用ラッパー）
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @returns {GoogleAppsScript.Spreadsheet.Spreadsheet} スプレッドシートオブジェクト
+   * @throws {Error} アクセスエラー
+   */
+  getSpreadsheet(spreadsheetId) {
+    if (!spreadsheetId) {
+      throw new Error('スプレッドシートIDが指定されていません');
+    }
+    
+    try {
+      return SpreadsheetApp.openById(spreadsheetId);
+    } catch (error) {
+      console.error('ConfigurationManager.getSpreadsheet エラー:', error.message);
+      throw new Error(`スプレッドシートアクセスエラー: ${error.message}`);
+    }
+  }
+}
+
+/**
  * シンプルなCacheService永続キャッシュ管理
  * GAS実行環境の特性に合わせてglobalThis依存を排除
  */
@@ -97,6 +123,25 @@ const cacheManager = SimpleCacheManager;
 Logger.info('シンプルCacheService初期化完了');
 
 /**
+ * バッチでSheetsデータ取得（ヘルパー関数）
+ * @param {Object} service - Sheetsサービスオブジェクト
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {Array} ranges - 取得範囲の配列
+ * @returns {Object} バッチ取得結果
+ */
+function batchGetSheetsData(service, spreadsheetId, ranges) {
+  try {
+    return service.spreadsheets.values.batchGet({
+      spreadsheetId,
+      ranges
+    });
+  } catch (error) {
+    console.error('batchGetSheetsData エラー:', error.message);
+    throw error;
+  }
+}
+
+/**
  * Sheets APIサービス結果のキャッシュ（互換性維持）
  * @returns {object|null} キャッシュされたサービス情報
  */
@@ -134,7 +179,7 @@ function getSheetsServiceCached() {
       // Service Account認証確認
       let testToken;
       try {
-        testToken = getServiceAccountTokenCached();
+        testToken = SecurityService.getServiceAccountToken();
         if (!testToken || testToken.length <= 100) {
           throw new Error('無効なトークンを取得しました');
         }
@@ -147,7 +192,7 @@ function getSheetsServiceCached() {
       }
 
       // Service Objectトークン取得（legacy互換性のため）
-      const initialAccessToken = getServiceAccountTokenCached();
+      const initialAccessToken = SecurityService.getServiceAccountToken();
 
       const serviceObject = {
         baseUrl: 'https://sheets.googleapis.com/v4/spreadsheets',
@@ -155,7 +200,7 @@ function getSheetsServiceCached() {
         spreadsheets: {
           batchUpdate (params) {
             // 最新のアクセストークンを取得（トークンの期限切れ対応）
-            const accessToken = getServiceAccountTokenCached();
+            const accessToken = SecurityService.getServiceAccountToken();
             if (!accessToken) {
               throw new Error('Service Account token is not available');
             }
@@ -186,7 +231,7 @@ function getSheetsServiceCached() {
           values: {
             batchGet (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
-              const accessToken = getServiceAccountTokenCached();
+              const accessToken = SecurityService.getServiceAccountToken();
               if (!accessToken) {
                 throw new Error('Service Account token is not available');
               }
@@ -214,7 +259,7 @@ function getSheetsServiceCached() {
             },
             update (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
-              const accessToken = getServiceAccountTokenCached();
+              const accessToken = SecurityService.getServiceAccountToken();
               if (!accessToken) {
                 throw new Error('Service Account token is not available');
               }
@@ -244,7 +289,7 @@ function getSheetsServiceCached() {
             },
             append (params) {
               // 最新のアクセストークンを取得（トークンの期限切れ対応）
-              const accessToken = getServiceAccountTokenCached();
+              const accessToken = SecurityService.getServiceAccountToken();
               if (!accessToken) {
                 throw new Error('Service Account token is not available');
               }
@@ -388,11 +433,13 @@ function getSpreadsheetHeaders(spreadsheetId, sheetName, options = {}) {
  */
 function validateSpreadsheetHeaders(headerIndices) {
   if (!headerIndices || typeof headerIndices !== 'object') {
-    return createResponse(false, 'ヘッダー検証失敗', {
+    return {
+      success: false, 
+      message: 'ヘッダー検証失敗', 
       missing: ['すべて'],
       hasReasonColumn: false,
       hasOpinionColumn: false,
-    });
+    };
   }
 
   const headerNames = Object.keys(headerIndices);

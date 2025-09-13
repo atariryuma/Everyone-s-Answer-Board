@@ -221,9 +221,35 @@ const UserService = Object.freeze({
    * @returns {boolean} システム管理者かどうか
    */
   isSystemAdmin(email) {
-    // TODO: システム管理者リストの実装
-    // 現在は所有者のみ管理者とする簡素実装
-    return false;
+    try {
+      if (!email) {
+        return false;
+      }
+
+      // CLAUDE.md準拠: ADMIN_EMAIL プロパティで管理者を判定
+      const props = PropertiesService.getScriptProperties();
+      const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+      
+      if (!adminEmail) {
+        console.warn('UserService.isSystemAdmin: ADMIN_EMAILが設定されていません');
+        return false;
+      }
+
+      // 管理者メールと一致チェック
+      const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
+      
+      if (isAdmin) {
+        console.info('UserService.isSystemAdmin: システム管理者を認証', { email });
+      }
+
+      return isAdmin;
+    } catch (error) {
+      console.error('UserService.isSystemAdmin: エラー', {
+        email,
+        error: error.message
+      });
+      return false;
+    }
   },
 
   // ===========================================

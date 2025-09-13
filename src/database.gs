@@ -4,6 +4,29 @@
  */
 
 /**
+ * セキュアなデータベースIDを取得
+ * PropertiesServiceから DATABASE_SPREADSHEET_ID を安全に取得
+ * 
+ * @returns {string} データベースのスプレッドシートID
+ * @throws {Error} データベースIDが設定されていない場合
+ */
+function getSecureDatabaseId() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const databaseId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    
+    if (!databaseId) {
+      throw new Error('データベースIDが設定されていません。システム管理者に連絡してください。');
+    }
+    
+    return databaseId;
+  } catch (error) {
+    console.error('getSecureDatabaseId エラー:', error.message);
+    throw error;
+  }
+}
+
+/**
  * ✅ 統一：CONSTANTS.DATABASE使用（重複削除）
  * CLAUDE.md準拠：configJSON中心型データベーススキーマ（5フィールド構造）
  */
@@ -118,7 +141,7 @@ const DB = {
       ];
 
       // データベースへ書き込み
-      const service = getSheetsServiceWithRetry();
+      const service = getSheetsServiceCached();
       if (!service) {
         throw new Error('Service Accountサービスが利用できません');
       }
@@ -188,7 +211,7 @@ const DB = {
       const sheetName = DB_CONFIG.SHEET_NAME;
 
       // Service Accountでデータ取得
-      const service = getSheetsServiceWithRetry();
+      const service = getSheetsServiceCached();
       if (!service) {
         throw new Error('Service Accountサービスが利用できません');
       }
@@ -267,7 +290,7 @@ const DB = {
 
     // configJsonをパース（重複構造検出・修正付き）
     try {
-      let configJson = userObj.configJson || '{}';
+      const configJson = userObj.configJson || '{}';
       userObj.parsedConfig = JSON.parse(configJson);
       
       // 🔥 重複構造の検出・自動修正
@@ -392,7 +415,7 @@ const DB = {
       const sheetName = DB_CONFIG.SHEET_NAME;
 
       // Service Accountサービス取得（リトライ付き）
-      const service = getSheetsServiceWithRetry();
+      const service = getSheetsServiceCached();
       if (!service) {
         const serviceError = 'Service Accountサービスが利用できません';
         console.error('❌ updateUserInDatabase: Service Account取得失敗', {
@@ -539,7 +562,7 @@ const DB = {
         activeOnly,
       });
 
-      const service = getSheetsServiceWithRetry();
+      const service = getSheetsServiceCached();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
@@ -636,7 +659,7 @@ const DB = {
       : '🔍 findUserByEmail: キャッシュミス';
 
     try {
-      const service = getSheetsServiceWithRetry();
+      const service = getSheetsServiceCached();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
@@ -722,7 +745,7 @@ const DB = {
       }
 
       // 2. 管理者権限確認
-      const currentUserEmail = UserManager.getCurrentEmail();
+      const currentUserEmail = UserService.getCurrentEmail();
       const props = PropertiesService.getScriptProperties();
       const adminEmail = props.getProperty('ADMIN_EMAIL');
 
@@ -749,7 +772,7 @@ const DB = {
       });
 
       // 5. データベースから削除
-      const service = getSheetsServiceWithRetry();
+      const service = getSheetsServiceCached();
       const dbId = getSecureDatabaseId();
       const sheetName = DB_CONFIG.SHEET_NAME;
 
@@ -860,7 +883,7 @@ const DB = {
       const logSheetName = 'DeletionLogs';
 
       // Service Accountでログ記録
-      const service = getSheetsServiceWithRetry();
+      const service = getSheetsServiceCached();
       if (!service) {
         console.warn('Service Accountサービスが利用できないためログ記録をスキップ');
         return;

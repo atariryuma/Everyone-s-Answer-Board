@@ -3,15 +3,15 @@
   "rootDir": "src",
   "filePushOrder": [
     "src/constants.gs",
-    "src/Base.gs",
-    "src/App.gs",
-    "src/cache.gs",
-    "src/monitoring.gs",
-    "src/security.gs",
+    "src/cache.gs", 
     "src/database.gs",
-    "src/auth.gs",
-    "src/Core.gs",
-    "src/AdminPanelBackend.gs",
+    "src/services/SecurityService.gs",
+    "src/services/UserService.gs",
+    "src/services/ConfigService.gs",
+    "src/services/DataService.gs",
+    "src/utils/validators.gs",
+    "src/utils/formatters.gs",
+    "src/utils/helpers.gs",
     "src/main.gs"
   ]
 }
