@@ -140,13 +140,14 @@ class DeploymentValidator {
   async checkConstantsAvailability() {
     console.log('📋 定数可用性チェック...');
 
-    const constantsPath = path.join(this.srcDir, 'constants.gs');
-    if (!fs.existsSync(constantsPath)) {
-      this.errors.push('❌ constants.gs が存在しません');
+    // Check for constants in core/constants.gs (primary location)
+    const coreConstantsPath = path.join(this.srcDir, 'core', 'constants.gs');
+    if (!fs.existsSync(coreConstantsPath)) {
+      this.errors.push('❌ core/constants.gs が存在しません');
       return;
     }
 
-    const content = fs.readFileSync(constantsPath, 'utf8');
+    const content = fs.readFileSync(coreConstantsPath, 'utf8');
     const requiredConstants = [
       'CONSTANTS.ACCESS.LEVELS',
       'PROPS_KEYS.ADMIN_EMAIL',
