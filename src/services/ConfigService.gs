@@ -73,6 +73,8 @@ const ConfigService = Object.freeze({
     }
   },
 
+  
+
   /**
    * デフォルト設定取得
    * @param {string} userId - ユーザーID

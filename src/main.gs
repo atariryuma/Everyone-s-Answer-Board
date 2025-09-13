@@ -46,7 +46,7 @@ function doGet(e) {
       return handleLoginMode(params, { reason: 'authentication_required' });
     }
     
-    // Access control verification (authenticated users only)
+    // Access control verification (only when authenticated)
     if (userEmail) {
       const accessResult = SecurityService.checkUserPermission(null, 'authenticated_user');
       if (!accessResult.hasPermission) {
@@ -100,17 +100,18 @@ function doPost(e) {
   try {
     // Security validation
     const userEmail = UserService.getCurrentEmail();
+    
+    // Parse and validate request
+    const request = parsePostRequest(e);
+    if (!request.action) {
+      throw new Error('Action parameter is required');
+    }
+
     if (!userEmail) {
       return ContentService.createTextOutput(JSON.stringify({
         success: false,
         message: '認証が必要です'
       })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // Parse and validate request
-    const request = parsePostRequest(e);
-    if (!request.action) {
-      throw new Error('Action parameter is required');
     }
 
     // Route to appropriate handler
@@ -230,13 +231,8 @@ function handleGetData(request) {
  */
 function handleAddReaction(request) {
   try {
-    const userInfo = UserService.getCurrentUserInfo();
-    if (!userInfo) {
-      throw new Error('User authentication required');
-    }
-
     const result = DataService.addReaction(
-      userInfo.userId,
+      (UserService.getCurrentUserInfo() || {}).userId,
       request.rowId,
       request.reactionType
     );
