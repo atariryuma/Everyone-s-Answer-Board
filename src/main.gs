@@ -477,11 +477,21 @@ function createErrorResponse(message, details) {
  * Required for HTML google.script.run calls
  */
 function getUser(kind) {
-  return FrontendController.getUser(kind);
+  try {
+    return FrontendController.getUser(kind);
+  } catch (error) {
+    console.error('getUser error:', error);
+    return kind === 'email' ? '' : { success: false, error: error.message };
+  }
 }
 
 function processLoginAction() {
-  return FrontendController.processLoginAction();
+  try {
+    return FrontendController.processLoginAction();
+  } catch (error) {
+    console.error('processLoginAction error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 /**
@@ -551,7 +561,12 @@ function performDataIntegrityCheck() {
  * Admin Controller Global Functions
  */
 function getConfig() {
-  return AdminController.getConfig();
+  try {
+    return AdminController.getConfig();
+  } catch (error) {
+    console.error('getConfig error:', error);
+    return { success: false, error: error.message };
+  }
 }
 
 function getSpreadsheetList() {

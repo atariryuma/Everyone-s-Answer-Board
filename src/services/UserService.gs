@@ -89,7 +89,7 @@ const UserService = Object.freeze({
     
     try {
       // 統一キャッシュサービスから取得試行
-      const cached = CacheService.get(cacheKey);
+      const cached = AppCacheService.get(cacheKey);
       if (cached) {
         return cached;
       }
