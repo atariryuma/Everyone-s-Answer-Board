@@ -591,7 +591,18 @@
         const adminBtn = document.getElementById('adminToggleBtn');
         if (adminBtn) {
           adminBtn.addEventListener('click', () => {
-            window.location.href = window.location.href.replace('mode=view', 'mode=admin');
+            // 現在のURLを解析
+            const currentUrl = new URL(window.location.href);
+
+            // adminモードに変更
+            currentUrl.searchParams.set('mode', 'admin');
+
+            // userIdが不足している場合は追加
+            if (!currentUrl.searchParams.has('userId') && this.vars.userId) {
+              currentUrl.searchParams.set('userId', this.vars.userId);
+            }
+
+            window.location.href = currentUrl.toString();
           });
         }
         

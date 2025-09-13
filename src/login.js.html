@@ -621,21 +621,34 @@
           // ポップアップブロック検出
           if (!newTab || newTab.closed || typeof newTab.closed == 'undefined') {
             console.warn('ポップアップがブロックされました。フォールバック実行');
-            // フォールバック: ユーザーに手動でクリックしてもらう
+
+            // フォールバック1: 同一タブでのリダイレクト
             buttonElement.style.pointerEvents = 'auto';
             buttonElement.style.opacity = '1';
             if (btnSpinner) btnSpinner.style.display = 'none';
             if (btnText) {
               btnText.style.display = 'inline';
-              btnText.textContent = '⚠️ ポップアップがブロックされました。再クリックしてください';
+              btnText.textContent = '🔄 管理パネルにリダイレクト中...';
             }
-            window.isAdminPanelClicking = false;
 
-            // 3秒後に元のテキストに戻す
+            // 1秒後に同一タブでリダイレクト
             setTimeout(() => {
-              if (btnText) btnText.textContent = '🚀 管理パネルを開く（新しいタブ）';
-            }, 3000);
+              console.log('フォールバック: 同一タブでのリダイレクト実行:', adminUrl);
+              window.location.href = adminUrl;
+            }, 1000);
           } else {
+            // フォールバック2: 200ms後にポップアップが生きているかチェック
+            setTimeout(() => {
+              if (newTab && newTab.closed) {
+                console.warn('ポップアップが閉じられました。フォールバック実行');
+                if (btnText) btnText.textContent = '🔄 管理パネルにリダイレクト中...';
+                setTimeout(() => {
+                  window.location.href = adminUrl;
+                }, 1000);
+                return;
+              }
+            }, 200);
+
             // 成功時：ボタンを元に戻す
             setTimeout(() => {
               buttonElement.style.pointerEvents = 'auto';

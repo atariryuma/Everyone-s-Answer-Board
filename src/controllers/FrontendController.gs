@@ -97,12 +97,34 @@ const FrontendController = Object.freeze({
       let userInfo = UserService.getCurrentUserInfo();
       if (!userInfo) {
         userInfo = UserService.createUser(userEmail);
+        // createUserの戻り値構造を正規化
+        if (userInfo && userInfo.value) {
+          userInfo = userInfo.value;
+        }
       }
+
+      // 管理パネル用URLを構築（userId必須）
+      const baseUrl = this.getWebAppUrl();
+      const userId = userInfo?.userId;
+
+      if (!userId) {
+        return {
+          success: false,
+          message: 'ユーザーIDの取得に失敗しました',
+          error: 'USER_ID_MISSING'
+        };
+      }
+
+      const adminUrl = `${baseUrl}?mode=admin&userId=${userId}`;
 
       return {
         success: true,
         userInfo,
-        redirectUrl: this.getWebAppUrl()
+        redirectUrl: baseUrl,
+        adminUrl: adminUrl,
+        // 後方互換性のための追加プロパティ
+        appUrl: baseUrl,
+        url: adminUrl
       };
 
     } catch (error) {
