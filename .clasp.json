@@ -2,7 +2,7 @@
   "scriptId": "1SAAWR_m9TNMPsxCiX9wSm3KBU7yWAe_mN8PafZ00Dqr1hUTgXZhB2g3Z",
   "rootDir": "src",
   "filePushOrder": [
-    "src/constants.gs",
+    "src/core/constants.gs",
     "src/cache.gs", 
     "src/database.gs",
     "src/core/ServiceRegistry.gs",

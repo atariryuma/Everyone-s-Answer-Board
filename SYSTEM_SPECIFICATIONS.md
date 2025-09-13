@@ -258,7 +258,7 @@ const persistentData = {
 
 #### 5. システム管理
 - **SystemManager.gs**: 統合テスト・最適化・診断機能
-- **constants.gs**: システム全体定数・設定値
+- **core/constants.gs**: システム全体定数・設定値
 
 #### 6. ユーティリティ
 - **Base.gs**: 基盤機能・共通ユーティリティ

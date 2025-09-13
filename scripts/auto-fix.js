@@ -49,7 +49,7 @@ class AutoFixer {
     // 定数名の簡素化
     this.replaceGlobal('SYSTEM_CONSTANTS', 'CONSTANTS');
     
-    // 各ファイルでconstants.gsの参照を簡素化
+    // 各ファイルでcore/constants.gsの参照を簡素化
     const files = this.getSourceFiles();
     for (const filePath of files) {
       try {
@@ -158,8 +158,8 @@ class AutoFixer {
 
   // グローバル置換
   replaceGlobal(oldText, newText) {
-    // constants.gsで定数名変更
-    const constantsFile = 'src/constants.gs';
+    // core/constants.gsで定数名変更
+    const constantsFile = 'src/core/constants.gs';
     if (fs.existsSync(constantsFile)) {
       let content = fs.readFileSync(constantsFile, 'utf8');
       content = content.replace(new RegExp(`const\\s+${oldText}`, 'g'), `const ${newText}`);

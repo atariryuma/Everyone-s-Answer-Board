@@ -316,8 +316,8 @@ class SecurityReviewer {
     logTest('Uses PropertiesService', usesPropertiesService, usesPropertiesService ? 'pass' : 'medium',
       usesPropertiesService ? 'PropertiesService used for config' : 'Consider using PropertiesService for sensitive config');
     
-    // Check constants.gs for secure defaults
-    const constantsPath = path.join(this.srcPath, 'constants.gs');
+    // Check core/constants.gs for secure defaults
+    const constantsPath = path.join(this.srcPath, 'core', 'constants.gs');
     if (fs.existsSync(constantsPath)) {
       const constantsContent = fs.readFileSync(constantsPath, 'utf8');
       hasSecureDefaults = !constantsContent.includes('debug: true') && 

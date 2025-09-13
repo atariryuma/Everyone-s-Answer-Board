@@ -1,0 +1,42 @@
+<!-- Shared Security Headers -->
+<!-- 
+  🔒 セキュリティヘッダー強化版（2025年対応）
+  
+  Content Security Policy (CSP):
+  - script-src: 自身のドメイン + Google Apps Script API + CDNJS（GSAP用）
+  - style-src: 自身のドメイン + Google Fonts + インラインスタイル（必要最小限）
+  - img-src: データURL禁止、HTTPSのみ
+  - connect-src: Apps Script API接続のみ
+  - object-src: 完全禁止（Flash等の古い技術防止）
+  - base-uri: 自身のドメインのみ（Base Tag攻撃防止）
+  
+  Permissions Policy設定：
+  現行ブラウザで認識される機能のみに最適化済み（2025年対応）。
+  不要な機能アクセスを明示的に無効化してプライバシー保護強化。
+-->
+
+<!-- 🔒 Content Security Policy - XSS攻撃完全防御 -->
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'self'; 
+           script-src 'self' 'unsafe-inline' https://script.google.com https://cdnjs.cloudflare.com; 
+           style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; 
+           font-src 'self' https://fonts.gstatic.com; 
+           img-src 'self' https: data:; 
+           connect-src 'self' https://script.google.com; 
+           object-src 'none'; 
+           base-uri 'self'; 
+           form-action 'self';"
+/>
+
+<!-- 🛡️ 追加セキュリティヘッダー -->
+<meta http-equiv="Cache-Control" content="no-cache" />
+<meta http-equiv="X-Content-Type-Options" content="nosniff" />
+<!-- Note: X-Frame-Options is controlled by server via HtmlService.setXFrameOptionsMode. -->
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+
+<!-- 🔐 権限ポリシー - プライバシー保護強化 -->
+<meta
+  http-equiv="Permissions-Policy"
+  content="camera=(), microphone=(), geolocation=(), accelerometer=(), gyroscope=(), magnetometer=(), payment=(), usb=()"
+/>

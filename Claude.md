@@ -152,7 +152,7 @@ npm run test:watch              # 継続監視モード開始
 
 ```bash
 src/
-├── 🟢 constants.gs          # 安定・推奨使用
+├── 🟢 core/constants.gs          # 安定・推奨使用
 ├── 🟢 database.gs           # 安定・5フィールド最適化済み
 ├── 🟢 ConfigManager.gs      # メイン・推奨使用
 ├── 🟡 UnifiedManager.gs     # 実験的・要動作確認
@@ -175,7 +175,7 @@ main.gs → Core.gs → {
   ConfigManager.gs,    // 設定管理メイン
   database.gs,         // DB操作
   auth.gs             // 認証
-} → constants.gs       // 共通定数
+} → core/constants.gs       // 共通定数
 
 // 🎯 将来のターゲット構造（リファクタリング後）
 Services層 → {
@@ -464,7 +464,7 @@ const targetStructure = {
     "SecurityService.gs": "セキュリティ"
   },
   "core/": {
-    "constants.gs": "システム定数",
+    "core/constants.gs": "システム定数",
     "database.gs": "DB抽象化",
     "cache.gs": "キャッシュ管理"
   }

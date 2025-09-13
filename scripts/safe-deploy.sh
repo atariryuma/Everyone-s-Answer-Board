@@ -33,7 +33,7 @@ echo "🚀 Step 3: 段階的デプロイ実行..."
 
 # 3-1. 基盤ファイルを最初にデプロイ
 echo "📦 基盤ファイル (constants, utils) をデプロイ..."
-clasp push --force src/constants.gs src/utils/ 2>/dev/null || true
+clasp push --force src/core/constants.gs src/utils/ 2>/dev/null || true
 
 # 3-2. Services層をデプロイ
 echo "⚙️ Services層をデプロイ..."

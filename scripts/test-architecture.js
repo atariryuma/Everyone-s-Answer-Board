@@ -131,10 +131,10 @@ class ArchitectureTester {
   testConstants() {
     logSection('📋 Constants and Configuration');
     
-    const constantsPath = path.join(this.srcPath, 'constants.gs');
+    const constantsPath = path.join(this.srcPath, 'core', 'constants.gs');
     const exists = fs.existsSync(constantsPath);
-    
-    logTest('constants.gs', exists, exists ? 'Constants file found' : 'Missing constants file');
+
+    logTest('core/constants.gs', exists, exists ? 'Constants file found' : 'Missing constants file');
     
     if (exists) {
       const content = fs.readFileSync(constantsPath, 'utf8');

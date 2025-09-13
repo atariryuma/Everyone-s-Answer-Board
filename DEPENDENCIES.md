@@ -75,7 +75,7 @@ graph TB
 - `DataService` (services/DataService.gs)
 - `SecurityService` (services/SecurityService.gs)
 - `ErrorHandler` (utils/CacheManager.gs)
-- `PROPS_KEYS` (constants.gs)
+- `PROPS_KEYS` (core/constants.gs)
 - `include()` 関数 (main.gs内で定義)
 
 **重要な関数:**
@@ -89,7 +89,7 @@ graph TB
 **必須依存:**
 - `AppCacheService` (utils/CacheManager.gs)
 - `DB` (database.gs)
-- `CONSTANTS.ACCESS.LEVELS` (constants.gs)
+- `CONSTANTS.ACCESS.LEVELS` (core/constants.gs)
 - `ConfigService` (間接的)
 
 **提供機能:**
@@ -100,7 +100,7 @@ graph TB
 #### 🔧 ConfigService.gs
 **必須依存:**
 - `DB` (database.gs)
-- `PROPS_KEYS` (constants.gs)
+- `PROPS_KEYS` (core/constants.gs)
 - `SecurityService` (間接的)
 
 **提供機能:**
@@ -121,7 +121,7 @@ graph TB
 
 #### 🛡️ SecurityService.gs
 **必須依存:**
-- `CONSTANTS.ACCESS.LEVELS` (constants.gs)
+- `CONSTANTS.ACCESS.LEVELS` (core/constants.gs)
 - `DB` (database.gs)
 
 **提供機能:**
@@ -154,7 +154,7 @@ graph TB
 
 ### 📋 Constants
 
-#### constants.gs
+#### core/constants.gs
 **依存なし** (基盤レイヤー)
 **提供定数:**
 - `CONSTANTS.ACCESS.LEVELS.*` - アクセスレベル定義
@@ -194,7 +194,7 @@ graph TB
    ```
    UserService → CONSTANTS.ACCESS.LEVELS
    ↓
-   constants.gs が存在しない → ERROR
+   core/constants.gs が存在しない → ERROR
    ```
 
 4. **キャッシュサービス未定義**
@@ -208,7 +208,7 @@ graph TB
 
 ### 🔍 必須ファイル存在確認
 - [ ] `src/main.gs` (include関数含む)
-- [ ] `src/constants.gs`
+- [ ] `src/core/constants.gs`
 - [ ] `src/database.gs`
 - [ ] `src/utils/CacheManager.gs`
 - [ ] `src/services/UserService.gs`
@@ -230,7 +230,7 @@ graph TB
 ## 🔄 推奨デプロイ順序
 
 1. **基盤ファイル**
-   - `constants.gs`
+   - `core/constants.gs`
    - `database.gs`
    - `utils/CacheManager.gs`
 

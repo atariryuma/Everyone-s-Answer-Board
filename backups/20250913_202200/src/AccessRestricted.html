@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <base target="_top" />
+    <title>StudyQuest - アクセス制限中</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <!-- Optimized Permissions Policy - essential permissions only -->
+    <!-- Shared Security Headers -->
+    <?!= include('SharedSecurityHeaders'); ?>
+
+    <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
+    <script>
+      // Complete TailwindCSS warning suppression and early configuration
+      window.__TAILWIND_DISABLE_TOUCH__ = true;
+      window.tailwind = {
+        config: {
+          corePlugins: { preflight: false },
+          important: true,
+        },
+      };
+
+      // Suppress TailwindCSS production warnings immediately
+      const originalWarn = console.warn;
+      console.warn = function (...args) {
+        const message = args.join(' ');
+        if (
+          message.includes('cdn.tailwindcss.com should not be used in production') ||
+          message.includes('tailwind') ||
+          message.includes('TailwindCSS')
+        ) {
+          return; // Completely suppress
+        }
+        originalWarn.apply(console, args);
+      };
+    </script>
+    <!-- Shared TailwindCSS Configuration -->
+    <?!= include('SharedTailwindConfig'); ?>
+
+    <!-- Shared Styles and Utilities -->
+    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
+    <style>
+      .pulse-slow {
+        animation: pulse 2s infinite;
+      }
+      .fade-in {
+        animation: fadeIn 0.8s ease-in-out;
+      }
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+      .restriction-notice {
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.1) 0%, rgba(220, 38, 38, 0.1) 100%);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        backdrop-filter: blur(10px);
+      }
+      .scenario-message {
+        background: linear-gradient(
+          135deg,
+          rgba(59, 130, 246, 0.1) 0%,
+          rgba(37, 99, 235, 0.1) 100%
+        );
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        backdrop-filter: blur(10px);
+      }
+    </style>
+  </head>
+  <body
+    class="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 text-white min-h-screen flex items-center justify-center"
+  >
+    <div class="container mx-auto px-4 py-8 max-w-4xl">
+      <div class="text-center fade-in">
+        <!-- メインステータス -->
+        <div class="glass-panel rounded-2xl p-8 shadow-2xl mb-8">
+          <div class="mb-6">
+            <div
+              class="w-24 h-24 mx-auto mb-4 rounded-full bg-gradient-to-r from-red-500/20 to-orange-500/20 flex items-center justify-center border-2 border-red-400/30 pulse-slow"
+            >
+              <span id="restriction-warning-icon" class="text-red-400"></span>
+            </div>
+            <h1 class="text-3xl font-bold mb-2 text-red-300">アクセスが制限されています</h1>
+            <p class="text-gray-400 text-lg">このアプリケーションは現在利用できません</p>
+          </div>
+
+          <? if (typeof userEmail !== 'undefined' && userEmail) { ?>
+          <div class="mb-6 p-3 bg-gray-700/50 rounded-lg">
+            <p class="text-sm text-gray-300">
+              ユーザー: <span class="text-cyan-400 font-medium"><?= userEmail ?></span>
+            </p>
+          </div>
+          <? } ?>
+
+          <!-- ステータス情報 -->
+          <div class="grid md:grid-cols-2 gap-4 mb-8">
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                <span class="text-sm font-medium">アクセス状態</span>
+              </div>
+              <p class="text-gray-400 text-sm">制限中（一般ユーザーはアクセスできません）</p>
+            </div>
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <div class="flex items-center gap-2 mb-2">
+                <div class="w-3 h-3 rounded-full bg-orange-500"></div>
+                <span class="text-sm font-medium">システム状態</span>
+              </div>
+              <p class="text-gray-400 text-sm">アプリケーション無効化中</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- シナリオ別メッセージ -->
+        <div class="scenario-message rounded-2xl p-6 mb-6">
+          <h2 class="text-xl font-bold mb-4 text-blue-300 flex items-center justify-center gap-2">
+            <span id="info-icon" class="text-blue-300"></span>
+            ご案内
+          </h2>
+
+          <div class="space-y-4 text-left">
+            <!-- 一時的な停止・メンテナンス -->
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-yellow-300 mb-2">🔧 システムメンテナンス</h3>
+              <p class="text-gray-300 text-sm">
+                システムの改善とセキュリティ強化のため、一時的にサービスを停止している場合があります。
+                通常は短時間で復旧いたします。
+              </p>
+            </div>
+
+            <!-- システムアーカイブ -->
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-purple-300 mb-2">📦 システム終了</h3>
+              <p class="text-gray-300 text-sm">
+                このシステムは運用期間が終了し、アーカイブされました。
+                新しいシステムの案内については管理者にお問い合わせください。
+              </p>
+            </div>
+
+            <!-- 違反対応 -->
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-red-300 mb-2">⚠️ 利用規約違反</h3>
+              <p class="text-gray-300 text-sm">
+                利用規約に違反する行為が確認されたため、一時的にアクセスを制限しています。
+                詳細については管理者にお問い合わせください。
+              </p>
+            </div>
+
+            <!-- セットアップ管理 -->
+            <div class="bg-gray-700/30 rounded-lg p-4">
+              <h3 class="text-lg font-semibold text-cyan-300 mb-2">⚙️ システム設定中</h3>
+              <p class="text-gray-300 text-sm">
+                新しい機能の追加やシステム設定の変更作業中のため、一時的に利用を停止しています。
+                設定完了後、自動的に利用可能になります。
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- 管理者向け情報 -->
+        <? if (typeof isSystemAdmin !== 'undefined' && isSystemAdmin) { ?>
+        <div class="restriction-notice rounded-2xl p-6">
+          <h3
+            class="text-lg font-semibold text-orange-300 mb-3 flex items-center justify-center gap-2"
+          >
+            <span id="admin-lock-icon" class="text-orange-300"></span>
+            システム管理者情報
+          </h3>
+          <div class="bg-gray-700/50 rounded-lg p-4">
+            <p class="text-sm text-gray-300 mb-3">
+              あなたはシステム管理者としてログインしているため、アプリケーション管理ページにアクセスできます。
+            </p>
+            <div class="text-center">
+              <a
+                href="?mode=appSetup"
+                class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
+              >
+                <span id="settings-gear-icon"></span>
+                アプリ設定画面へ
+              </a>
+            </div>
+          </div>
+        </div>
+        <? } ?>
+
+        <!-- フッター情報 -->
+        <div class="mt-8 text-center">
+          <p class="text-xs text-gray-500">
+            StudyQuest みんなの回答ボード <? if (typeof timestamp !== 'undefined' && timestamp) { ?>
+            <br />確認時刻: <?= timestamp ?> <? } ?>
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- メッセージエリア -->
+    <div id="message-area" class="fixed top-20 right-4 z-50" aria-live="polite" role="status"></div>
+    
+    <script>
+      // 🎯 統一アイコンシステム - アイコン配置
+      function initializeAccessRestrictedIcons() {
+        if (typeof window.IconLibrary !== 'undefined') {
+          // 制限警告アイコン
+          const restrictionWarningIcon = document.getElementById('restriction-warning-icon');
+          if (restrictionWarningIcon) {
+            restrictionWarningIcon.innerHTML = window.IconLibrary.get('alert-triangle', {size: 'w-12 h-12'});
+          }
+
+          // 情報アイコン
+          const infoIcon = document.getElementById('info-icon');
+          if (infoIcon) {
+            infoIcon.innerHTML = window.IconLibrary.get('info', {size: 'w-6 h-6'});
+          }
+
+          // 管理者ロックアイコン
+          const adminLockIcon = document.getElementById('admin-lock-icon');
+          if (adminLockIcon) {
+            adminLockIcon.innerHTML = window.IconLibrary.get('lock', {size: 'w-5 h-5'});
+          }
+
+          // 設定歯車アイコン
+          const settingsGearIcon = document.getElementById('settings-gear-icon');
+          if (settingsGearIcon) {
+            settingsGearIcon.innerHTML = window.IconLibrary.get('settings', {size: 'w-5 h-5'});
+          }
+        }
+      }
+
+      // DOM読み込み完了後とIconLibrary読み込み完了後の両方で初期化
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initializeAccessRestrictedIcons);
+      } else {
+        initializeAccessRestrictedIcons();
+      }
+      
+      // IconLibraryが後から読み込まれる場合に備えて
+      setTimeout(initializeAccessRestrictedIcons, 100);
+    </script>
+  </body>
+</html>

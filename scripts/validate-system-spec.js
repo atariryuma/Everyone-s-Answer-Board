@@ -365,14 +365,14 @@ function validatePerformanceMetrics(specContent) {
 function validateConstants(specContent) {
   log.section('定数定義の検証');
   
-  // constants.gsを読み込み
-  const constFile = path.join(SRC_DIR, 'constants.gs');
+  // core/constants.gsを読み込み
+  const constFile = path.join(SRC_DIR, 'core', 'constants.gs');
   let constContent = '';
   
   try {
     constContent = fs.readFileSync(constFile, 'utf8');
   } catch (error) {
-    log.error('constants.gsが見つかりません');
+    log.error('core/constants.gsが見つかりません');
     validationResults.errors++;
     return;
   }

@@ -24,7 +24,7 @@ graph TB
     A --> D[Infrastructure層]
     A --> E[Utils層]
 
-    B --> B1[constants.gs - システム定数]
+    B --> B1[core/constants.gs - システム定数]
     B --> B2[errors.gs - エラーハンドリング]
     B --> B3[ServiceRegistry.gs - サービス管理]
 
@@ -146,7 +146,8 @@ npm run deploy            # GASデプロイ
 │   │   ├── validators.gs      #    入力検証・サニタイズ
 │   │   ├── formatters.gs      #    データ変換・フォーマット
 │   │   └── helpers.gs         #    汎用ヘルパー関数
-│   ├── constants.gs           # 🔧 システム定数・設定（既存・整理済み）
+│   ├── core/                   # 🏗️ システム基盤層
+│   │   └── constants.gs        #    システム定数・設定（既存・整理済み）
 │   ├── database.gs            # 🗄️ DB抽象化レイヤー（既存・最適化済み）
 │   ├── cache.gs               # ⚡ 統合キャッシュ管理（既存・性能向上済み）
 │   ├── main.gs                # 🚀 アプリケーションエントリー（簡素化予定）
