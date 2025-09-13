@@ -996,13 +996,20 @@ const DataService = Object.freeze({
   getSpreadsheetList() {
     const started = Date.now();
     try {
+      console.log('🔍 DriveApp.getFilesByType() 実行開始');
       const files = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
+      console.log('🔍 DriveApp.getFilesByType() 実行完了:', {
+        hasFiles: typeof files !== 'undefined',
+        hasNext: files ? files.hasNext() : false
+      });
+
       const spreadsheets = [];
       let count = 0;
       const maxCount = 50; // 最大50件まで
 
       while (files.hasNext() && count < maxCount) {
         const file = files.next();
+        console.log(`🔍 ファイル発見 ${count + 1}: ${file.getName()}`);
         spreadsheets.push({
           id: file.getId(),
           name: file.getName(),
@@ -1012,6 +1019,8 @@ const DataService = Object.freeze({
         count++;
       }
 
+      console.log(`🔍 最終結果: ${spreadsheets.length}個のスプレッドシートを発見`);
+
       return {
         success: true,
         cached: false,
@@ -1020,6 +1029,7 @@ const DataService = Object.freeze({
       };
     } catch (error) {
       console.error('DataService.getSpreadsheetList エラー:', error.message);
+      console.error('エラースタック:', error.stack);
       return {
         success: false,
         cached: false,
