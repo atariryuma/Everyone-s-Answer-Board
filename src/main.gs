@@ -89,7 +89,7 @@ function doGet(e) {
       <p>${errorResponse.message}</p>
       <p>Error Code: ${errorResponse.errorCode}</p>
       <p><a href="${ScriptApp.getService().getUrl()}">Return to Home</a></p>
-    `);
+    `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   }
 }
 
@@ -321,7 +321,9 @@ function renderErrorPage(error) {
     <p>${error.message}</p>
     ${error.details ? `<p>Details: ${error.details}</p>` : ''}
     <p><a href="${ScriptApp.getService().getUrl()}">Return to Home</a></p>
-  `).setTitle(`Error - ${  APP_CONFIG.APP_NAME}`);
+  `)
+    .setTitle(`Error - ${  APP_CONFIG.APP_NAME}`)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function renderSetupPage(params) {
@@ -329,7 +331,9 @@ function renderSetupPage(params) {
     <h2>System Setup Required</h2>
     <p>The system needs to be configured before use.</p>
     <p><a href="?mode=setup">Start Setup</a></p>
-  `).setTitle(`Setup - ${  APP_CONFIG.APP_NAME}`);
+  `)
+    .setTitle(`Setup - ${  APP_CONFIG.APP_NAME}`)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function handleLoginMode(params, context = {}) {
@@ -338,7 +342,9 @@ function handleLoginMode(params, context = {}) {
     <p>Please sign in to access ${APP_CONFIG.APP_NAME}.</p>
     <p>Reason: ${context.reason || 'Authentication required'}</p>
     <p><a href="${ScriptApp.getService().getUrl()}">Try Again</a></p>
-  `).setTitle(`Login - ${  APP_CONFIG.APP_NAME}`);
+  `)
+    .setTitle(`Login - ${  APP_CONFIG.APP_NAME}`)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function handleAdminMode(params) {
@@ -347,7 +353,9 @@ function handleAdminMode(params) {
     <h2>Admin Panel</h2>
     <p>Admin functionality coming soon...</p>
     <p><a href="${ScriptApp.getService().getUrl()}">Return to Main</a></p>
-  `).setTitle(`Admin - ${  APP_CONFIG.APP_NAME}`);
+  `)
+    .setTitle(`Admin - ${  APP_CONFIG.APP_NAME}`)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function handleSetupMode(params) {
@@ -356,7 +364,9 @@ function handleSetupMode(params) {
     <h2>System Setup</h2>
     <p>Setup functionality coming soon...</p>
     <p><a href="${ScriptApp.getService().getUrl()}">Return to Main</a></p>
-  `).setTitle(`Setup - ${  APP_CONFIG.APP_NAME}`);
+  `)
+    .setTitle(`Setup - ${  APP_CONFIG.APP_NAME}`)
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
 function handleDebugMode(params) {
@@ -372,7 +382,9 @@ function handleDebugMode(params) {
       <h2>System Diagnostics</h2>
       <pre>${JSON.stringify(diagnostics, null, 2)}</pre>
       <p><a href="${ScriptApp.getService().getUrl()}">Return to Main</a></p>
-    `).setTitle(`Debug - ${  APP_CONFIG.APP_NAME}`);
+    `)
+      .setTitle(`Debug - ${  APP_CONFIG.APP_NAME}`)
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
   } catch (error) {
     return renderErrorPage({ message: error.message });
   }
