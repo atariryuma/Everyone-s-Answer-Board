@@ -88,7 +88,8 @@
       "Bash(npm install:*)",
       "Bash(git rm:*)",
       "Bash(while read file)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(./scripts/safe-deploy.sh:*)"
     ],
     "deny": [],
     "ask": [],
