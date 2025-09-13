@@ -261,52 +261,85 @@ const AdminController = Object.freeze({
         error: error.message
       };
     }
+  },
+
+  /**
+   * フォーム情報を取得
+   * AdminPanel.js.html から呼び出される
+   *
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @param {string} sheetName - シート名
+   * @returns {Object} フォーム情報
+   */
+  getFormInfo(spreadsheetId, sheetName) {
+    try {
+      return ConfigService.getFormInfo(spreadsheetId, sheetName);
+    } catch (error) {
+      console.error('AdminController.getFormInfo エラー:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  /**
+   * 現在の公開状態を確認
+   * AdminPanel.js.html から呼び出される
+   *
+   * @returns {Object} 公開状態情報
+   */
+  checkCurrentPublicationStatus() {
+    try {
+      // ユーザー情報の取得
+      const userInfo = UserService.getCurrentUserInfo();
+      const userId = userInfo && userInfo.userId;
+
+      if (!userId) {
+        return {
+          success: false,
+          published: false,
+          error: 'ユーザー情報が見つかりません'
+        };
+      }
+
+      // 設定情報を取得
+      const config = ConfigService.getUserConfig(userId);
+      if (!config) {
+        return {
+          success: false,
+          published: false,
+          error: '設定情報が見つかりません'
+        };
+      }
+
+      return {
+        success: true,
+        published: config.appPublished === true,
+        publishedAt: config.publishedAt || null,
+        lastModified: config.lastModified || null,
+        hasDataSource: !!(config.spreadsheetId && config.sheetName)
+      };
+
+    } catch (error) {
+      console.error('AdminController.checkCurrentPublicationStatus エラー:', error.message);
+      return {
+        success: false,
+        published: false,
+        error: error.message
+      };
+    }
   }
 
 });
 
 // ===========================================
-// 📊 グローバル関数エクスポート（GAS互換性のため）
+// 📊 重複削除完了 - グローバル関数エクスポート削除
 // ===========================================
 
 /**
- * 管理パネル用API関数を個別にエクスポート
- * AdminPanel.js.html からの google.script.run 呼び出しに対応
+ * 注意: google.script.run は直接 AdminController.methodName() を呼び出してください
+ * 例: google.script.run.withSuccessHandler(resolve).AdminController.getConfig()
+ *
+ * グローバル関数の重複を削除し、適切なオブジェクト指向アプローチを採用
  */
-
-function getConfig() {
-  return AdminController.getConfig();
-}
-
-function getSpreadsheetList() {
-  // グローバル関数は直接Controller呼び出し（エラーハンドリングをDataServiceに委譲）
-  return AdminController.getSpreadsheetList();
-}
-
-function getSheetList(spreadsheetId) {
-  return AdminController.getSheetList(spreadsheetId);
-}
-
-function analyzeColumns(spreadsheetId, sheetName) {
-  return AdminController.analyzeColumns(spreadsheetId, sheetName);
-}
-
-function saveDraftConfiguration(config) {
-  return AdminController.saveDraftConfiguration(config);
-}
-
-function publishApplication(publishConfig) {
-  return AdminController.publishApplication(publishConfig);
-}
-
-function validateAccess(spreadsheetId) {
-  return AdminController.validateAccess(spreadsheetId);
-}
-
-function checkIsSystemAdmin() {
-  return AdminController.checkIsSystemAdmin();
-}
-
-function getCurrentBoardInfoAndUrls() {
-  return AdminController.getCurrentBoardInfoAndUrls();
-}

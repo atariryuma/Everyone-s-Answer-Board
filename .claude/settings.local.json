@@ -94,7 +94,10 @@
       "WebFetch(domain:www.eesel.ai)",
       "WebFetch(domain:cdnjs.com)",
       "Bash(wc:*)",
-      "Bash(head:*)"
+      "Bash(head:*)",
+      "Bash(tree:*)",
+      "WebFetch(domain:medium.com)",
+      "WebFetch(domain:benenewton.com)"
     ],
     "deny": [],
     "ask": [],

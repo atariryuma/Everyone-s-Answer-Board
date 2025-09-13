@@ -112,14 +112,7 @@ const FormatHelpers = Object.freeze({
    * @param {string|Date} timestamp - タイムスタンプ
    * @returns {string} フォーマット済み日時
    */
-  formatTimestamp(timestamp) {
-    // formatters.gsの統一実装に完全委譲
-    if (typeof DataFormatter !== 'undefined' && DataFormatter.formatDateTime) {
-      return DataFormatter.formatDateTime(timestamp, { style: 'short' });
-    }
-    // 緊急フォールバック
-    return timestamp ? new Date(timestamp).toLocaleString('ja-JP') : '不明';
-  },
+  // formatTimestamp - formatters.jsに統一 (重複削除完了)
 
   /**
    * 完全な日時フォーマット

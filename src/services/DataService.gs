@@ -13,7 +13,7 @@
  * - ColumnAnalysisSystem.gs の一部
  */
 
-/* global DB, AppCacheService, UserService, ConfigService, DataFormatter, CONSTANTS, UnifiedLogger, ErrorHandler */
+/* global DB, UserService, ConfigService, DataFormatter, CONSTANTS, UnifiedLogger, ErrorHandler, ResponseFormatter */
 
 /**
  * DataService - 統一データ操作サービス
@@ -87,7 +87,7 @@ const DataService = Object.freeze({
       const lastCol = sheet.getLastColumn();
 
       if (lastRow <= 1) {
-        return this.createSuccessResponse([], { message: 'データが存在しません' });
+        return ResponseFormatter.createSuccessResponse([], { message: 'データが存在しません' });
       }
 
       // ヘッダー行取得
@@ -148,7 +148,7 @@ const DataService = Object.freeze({
         batchCount: Math.ceil(totalDataRows / MAX_BATCH_SIZE)
       });
 
-      return this.createSuccessResponse(processedData, {
+      return ResponseFormatter.createSuccessResponse(processedData, {
         totalRows: totalDataRows,
         processedRows: processedCount,
         filteredRows: processedData.length,
@@ -194,7 +194,7 @@ const DataService = Object.freeze({
             name: this.extractFieldValue(row, headers, 'name', columnMapping) || '',
 
             // メタデータ
-            formattedTimestamp: this.formatTimestamp(this.extractFieldValue(row, headers, 'timestamp')),
+            formattedTimestamp: ResponseFormatter.formatTimestamp(this.extractFieldValue(row, headers, 'timestamp')),
             isEmpty: this.isEmptyRow(row),
             
             // リアクション（既存の場合）
@@ -250,7 +250,7 @@ const DataService = Object.freeze({
             name: this.extractFieldValue(row, headers, 'name', columnMapping) || '',
 
             // メタデータ
-            formattedTimestamp: this.formatTimestamp(this.extractFieldValue(row, headers, 'timestamp')),
+            formattedTimestamp: ResponseFormatter.formatTimestamp(this.extractFieldValue(row, headers, 'timestamp')),
             isEmpty: this.isEmptyRow(row),
             
             // リアクション（既存の場合）
@@ -867,14 +867,7 @@ const DataService = Object.freeze({
    * @param {string} isoString - ISO形式日時文字列
    * @returns {string} フォーマット済み日時
    */
-  formatTimestamp(isoString) {
-    // formatters.gsの統一実装に委譲
-    if (typeof DataFormatter !== 'undefined') {
-      return DataFormatter.formatDateTime(isoString, { style: 'short' });
-    }
-    // 緊急フォールバック
-    return isoString ? new Date(isoString).toLocaleString('ja-JP') : '不明';
-  },
+  // formatTimestamp - formatters.jsに統一 (重複削除完了)
 
   /**
    * 空行判定
@@ -891,15 +884,7 @@ const DataService = Object.freeze({
    * @param {Object} metadata - メタデータ
    * @returns {Object} 成功レスポンス
    */
-  createSuccessResponse(data, metadata = {}) {
-    return {
-      success: true,
-      data,
-      count: data.length,
-      timestamp: new Date().toISOString(),
-      ...metadata
-    };
-  },
+  // createSuccessResponse - ResponseFormatterに統一 (重複削除完了)
 
   /**
    * エラーレスポンス作成

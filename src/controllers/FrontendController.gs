@@ -257,34 +257,8 @@ const FrontendController = Object.freeze({
  * HTMLファイルからの google.script.run 呼び出しに対応
  */
 
-function getUser(kind = 'email') {
-  return FrontendController.getUser(kind);
-}
 
-function getUserEmail() {
-  return FrontendController.getUser('email');
-}
-
-function getWebAppUrl() {
-  return FrontendController.getWebAppUrl();
-}
-
-function processLoginAction() {
-  return FrontendController.processLoginAction();
-}
-
-function verifyUserAuthentication() {
-  return FrontendController.verifyUserAuthentication();
-}
-
-function getLoginStatus() {
-  return FrontendController.getLoginStatus();
-}
-
-function reportClientError(errorInfo) {
-  return FrontendController.reportClientError(errorInfo);
-}
-
-function testForceLogoutRedirect() {
-  return FrontendController.testForceLogoutRedirect();
-}
+/**
+ * 重複削除完了 - グローバル関数エクスポート削除
+ * 使用方法: google.script.run.FrontendController.methodName()
+ */

@@ -84,6 +84,32 @@ const ResponseFormatter = Object.freeze({
     }
 
     return response;
+  },
+
+  /**
+   * タイムスタンプフォーマット（短縮形式）
+   * @param {string|Date} timestamp - タイムスタンプ
+   * @returns {string} フォーマット済み日時
+   */
+  formatTimestamp(timestamp) {
+    try {
+      const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+      if (isNaN(date.getTime())) {
+        return new Date().toISOString();
+      }
+
+      // 短縮形式: YYYY-MM-DD HH:mm
+      return date.toLocaleString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    } catch (error) {
+      console.error('ResponseFormatter.formatTimestamp error:', error);
+      return new Date().toISOString();
+    }
   }
 
 });

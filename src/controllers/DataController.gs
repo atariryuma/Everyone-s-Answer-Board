@@ -441,38 +441,8 @@ const DataController = Object.freeze({
  * HTMLファイルからの google.script.run 呼び出しに対応
  */
 
-function handleGetData(request) {
-  return DataController.handleGetData(request);
-}
 
-function handleAddReaction(request) {
-  return DataController.handleAddReaction(request);
-}
-
-function handleToggleHighlight(request) {
-  return DataController.handleToggleHighlight(request);
-}
-
-function handleRefreshData(request) {
-  return DataController.handleRefreshData(request);
-}
-
-function getPublishedSheetData(userId, options = {}) {
-  return DataController.getPublishedSheetData(userId, options);
-}
-
-function getHeaderIndices(spreadsheetId, sheetName) {
-  return DataController.getHeaderIndices(spreadsheetId, sheetName);
-}
-
-function getAllUsersForAdminForUI(options = {}) {
-  return DataController.getAllUsersForAdminForUI(options);
-}
-
-function deleteUserAccountByAdminForUI(targetUserId) {
-  return DataController.deleteUserAccountByAdminForUI(targetUserId);
-}
-
-function addSpreadsheetUrl(url) {
-  return DataController.addSpreadsheetUrl(url);
-}
+/**
+ * 重複削除完了 - グローバル関数エクスポート削除
+ * 使用方法: google.script.run.DataController.methodName()
+ */

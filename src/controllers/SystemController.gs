@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたシステム管理関数群
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, DB, PROPS_KEYS, ScriptApp, PropertiesService, SpreadsheetApp, DriveApp */
+/* global UserService, ConfigService, DataService, DB, PROPS_KEYS */
 
 /**
  * SystemController - システム管理用コントローラー
@@ -143,11 +143,8 @@ const SystemController = Object.freeze({
       // キャッシュをクリア（複数の方法を試行）
       const cacheResults = [];
       try {
-        const cache = CacheService.getScriptCache();
-        if (cache && typeof cache.removeAll === 'function') {
-          cache.removeAll();
-          cacheResults.push('ScriptCache クリア成功');
-        }
+        CacheService.getScriptCache().removeAll();
+        cacheResults.push('ScriptCache クリア成功');
       } catch (cacheError) {
         console.warn('ScriptCache クリアエラー:', cacheError.message);
         cacheResults.push(`ScriptCache クリア失敗: ${cacheError.message}`);
@@ -181,6 +178,25 @@ const SystemController = Object.freeze({
         success: false,
         message: error.message
       };
+    }
+  },
+
+  /**
+   * WebアプリのURL取得
+   * 各種HTMLファイルから呼び出される
+   *
+   * @returns {string} WebアプリURL
+   */
+  getWebAppUrl() {
+    try {
+      const url = ScriptApp.getService().getUrl();
+      if (!url) {
+        throw new Error('WebアプリURLの取得に失敗しました');
+      }
+      return url;
+    } catch (error) {
+      console.error('SystemController.getWebAppUrl エラー:', error.message);
+      return '';
     }
   },
 
@@ -382,12 +398,9 @@ const SystemController = Object.freeze({
 
       // キャッシュクリア
       try {
-        const cache = CacheService.getScriptCache();
-        if (cache && typeof cache.removeAll === 'function') {
-          cache.removeAll();
-        }
+        CacheService.getScriptCache().removeAll();
       } catch (cacheError) {
-        repairResults.warnings = [`キャッシュクリア失敗: ${  cacheError.message}`];
+        repairResults.warnings = [`キャッシュクリア失敗: ${cacheError.message}`];
       }
 
       return {
@@ -411,38 +424,6 @@ const SystemController = Object.freeze({
 // ===========================================
 
 /**
- * システム管理用API関数を個別にエクスポート
- * HTMLファイルからの google.script.run 呼び出しに対応
+ * 重複削除完了 - グローバル関数エクスポート削除
+ * 使用方法: google.script.run.SystemController.methodName()
  */
-
-function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
-  return SystemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
-}
-
-function testSetup() {
-  return SystemController.testSetup();
-}
-
-function forceUrlSystemReset() {
-  return SystemController.forceUrlSystemReset();
-}
-
-function testSystemDiagnosis() {
-  return SystemController.testSystemDiagnosis();
-}
-
-function getSystemStatus() {
-  return SystemController.getSystemStatus();
-}
-
-function getSystemDomainInfo() {
-  return SystemController.getSystemDomainInfo();
-}
-
-function performDataIntegrityCheck() {
-  return SystemController.performDataIntegrityCheck();
-}
-
-function performAutoRepair() {
-  return SystemController.performAutoRepair();
-}
