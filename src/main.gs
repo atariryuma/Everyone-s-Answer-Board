@@ -1137,15 +1137,39 @@ function testSetup() {
  */
 function getConfig() {
   try {
-    const userInfo = UserService.getCurrentUserInfo();
-    if (!userInfo) {
-      return {
-        success: false,
-        message: 'ユーザー情報が見つかりません'
-      };
+    // Obtain reliable user context
+    let userInfo = UserService.getCurrentUserInfo();
+    let userId = userInfo && userInfo.userId;
+
+    if (!userId) {
+      const email = UserService.getCurrentEmail();
+      if (!email) {
+        return { success: false, message: 'ユーザー情報が見つかりません' };
+      }
+      // Try DB lookup directly
+      try {
+        const dbUser = DB.findUserByEmail(email);
+        if (dbUser && dbUser.userId) {
+          userId = dbUser.userId;
+          userInfo = userInfo || { userId, userEmail: email };
+        }
+      } catch (e) {
+        // ignore and fallback to auto-create
+      }
+
+      // Auto-create user if still missing
+      if (!userId) {
+        try {
+          const created = UserService.createUser(email);
+          userId = created && created.userId;
+          userInfo = created || { userId, userEmail: email };
+        } catch (createErr) {
+          return { success: false, message: 'ユーザー作成に失敗しました' };
+        }
+      }
     }
-    
-    const config = ConfigService.getUserConfig(userInfo.userId);
+
+    const config = ConfigService.getUserConfig(userId);
     return {
       success: true,
       config: config || {}
@@ -1166,12 +1190,13 @@ function getConfig() {
  * @returns {Object} スプレッドシート一覧
  */
 function getSpreadsheetList() {
+  const started = Date.now();
   try {
     const files = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
     const spreadsheets = [];
     let count = 0;
     const maxCount = 50; // 最大50件まで
-    
+
     while (files.hasNext() && count < maxCount) {
       const file = files.next();
       spreadsheets.push({
@@ -1182,15 +1207,19 @@ function getSpreadsheetList() {
       });
       count++;
     }
-    
+
     return {
       success: true,
+      cached: false,
+      executionTime: `${Date.now() - started}ms`,
       spreadsheets
     };
   } catch (error) {
     console.error('getSpreadsheetList エラー:', error.message);
     return {
       success: false,
+      cached: false,
+      executionTime: `${Date.now() - started}ms`,
       message: error.message,
       spreadsheets: []
     };
@@ -1449,22 +1478,33 @@ function checkIsSystemAdmin() {
  */
 function getCurrentBoardInfoAndUrls() {
   try {
-    const userInfo = UserService.getCurrentUserInfo();
-    if (!userInfo) {
-      return {
-        success: false,
-        message: 'ユーザー情報が見つかりません'
-      };
+    let userInfo = UserService.getCurrentUserInfo();
+    let userId = userInfo && userInfo.userId;
+
+    if (!userId) {
+      const email = UserService.getCurrentEmail();
+      if (!email) {
+        return { success: false, message: 'ユーザー情報が見つかりません' };
+      }
+      try {
+        const dbUser = DB.findUserByEmail(email);
+        if (dbUser && dbUser.userId) {
+          userId = dbUser.userId;
+          userInfo = userInfo || { userId, userEmail: email };
+        }
+      } catch (e) {
+        // ignore
+      }
     }
-    
-    const config = ConfigService.getUserConfig(userInfo.userId);
+
+    const config = userId ? ConfigService.getUserConfig(userId) : null;
     const baseUrl = getWebAppUrl();
-    
-  return {
+
+    return {
       success: true,
       boardInfo: {
-        userId: userInfo.userId,
-        email: userInfo.userEmail || UserService.getCurrentEmail(),
+        userId: userId || null,
+        email: (userInfo && (userInfo.userEmail || userInfo.email)) || UserService.getCurrentEmail(),
         spreadsheetId: config?.spreadsheetId,
         sheetName: config?.sheetName,
         isPublished: config?.appPublished || false,
@@ -1472,7 +1512,7 @@ function getCurrentBoardInfoAndUrls() {
       },
       urls: {
         viewUrl: baseUrl,
-        adminUrl: `${baseUrl}?mode=admin${userInfo.userId ? `&userId=${encodeURIComponent(userInfo.userId)}` : ''}`,
+        adminUrl: `${baseUrl}?mode=admin${userId ? `&userId=${encodeURIComponent(userId)}` : ''}`,
         debugUrl: `${baseUrl}?mode=debug`
       }
     };
