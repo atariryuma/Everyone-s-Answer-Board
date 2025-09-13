@@ -373,6 +373,18 @@
 
       google.script.run
         .withSuccessHandler(function (result) {
+          // 🔍 受信した生データを詳細ログ
+          console.log('📊 受信した生レスポンス:', result);
+          console.log('📊 レスポンスの詳細:', {
+            type: typeof result,
+            isArray: Array.isArray(result),
+            hasSpreadsheets: result && typeof result.spreadsheets !== 'undefined',
+            spreadsheetsType: result && typeof result.spreadsheets,
+            spreadsheetsLength: result && result.spreadsheets ? result.spreadsheets.length : 'undefined',
+            success: result && result.success,
+            keys: result ? Object.keys(result) : []
+          });
+
           // レスポンス構造の確認（オブジェクトか配列か）
           const spreadsheets = Array.isArray(result)
             ? result

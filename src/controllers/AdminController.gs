@@ -55,11 +55,18 @@ const AdminController = Object.freeze({
         if (!userId) {
           try {
             const created = UserService.createUser(email);
-            if (created && created.userId) {
-              userId = created.userId;
-              userInfo = created;
+            // UserService.createUser() の戻り値構造をチェック
+            const actualUser = created && created.value ? created.value : created;
+            if (actualUser && actualUser.userId) {
+              userId = actualUser.userId;
+              userInfo = actualUser;
             } else {
-              console.error('AdminController.getConfig: ユーザー作成に失敗 - userIdが見つかりません', { created });
+              console.error('AdminController.getConfig: ユーザー作成に失敗 - userIdが見つかりません', {
+                created,
+                actualUser,
+                hasValue: created && !!created.value,
+                hasUserId: actualUser && !!actualUser.userId
+              });
               return { success: false, message: 'ユーザー作成に失敗しました' };
             }
           } catch (createErr) {
