@@ -261,6 +261,10 @@ function getUser(kind = 'email') {
   return FrontendController.getUser(kind);
 }
 
+function getUserEmail() {
+  return FrontendController.getUser('email');
+}
+
 function getWebAppUrl() {
   return FrontendController.getWebAppUrl();
 }

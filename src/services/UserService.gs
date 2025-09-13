@@ -32,14 +32,49 @@ const UserService = Object.freeze({
    */
   getCurrentEmail() {
     try {
-      const email = Session.getActiveUser().getEmail();
-      if (!email) {
-        console.warn('UserService.getCurrentEmail: セッションからメールアドレスを取得できません');
-        return null;
+      // 複数の方法でメールアドレス取得を試行
+      let email = null;
+
+      // 方法1: Session.getActiveUser() (従来の方法)
+      try {
+        email = Session.getActiveUser().getEmail();
+        if (email) {
+          console.log('✅ Session.getActiveUser()でメール取得成功:', email);
+          return email;
+        }
+      } catch (sessionError) {
+        console.warn('⚠️ Session.getActiveUser() 失敗:', sessionError.message);
       }
-      return email;
+
+      // 方法2: Session.getEffectiveUser() (OAuth後に有効な場合)
+      try {
+        email = Session.getEffectiveUser().getEmail();
+        if (email) {
+          console.log('✅ Session.getEffectiveUser()でメール取得成功:', email);
+          return email;
+        }
+      } catch (effectiveError) {
+        console.warn('⚠️ Session.getEffectiveUser() 失敗:', effectiveError.message);
+      }
+
+      // 方法3: DriveApp経由でのユーザー情報取得
+      try {
+        const user = DriveApp.getStorageUsed(); // Drive APIアクセスを確認
+        if (user >= 0) { // 正常にアクセスできた場合
+          email = Session.getActiveUser().getEmail(); // 再試行
+          if (email) {
+            console.log('✅ Drive API確認後にメール取得成功:', email);
+            return email;
+          }
+        }
+      } catch (driveError) {
+        console.warn('⚠️ Drive API経由の確認失敗:', driveError.message);
+      }
+
+      console.error('❌ 全ての方法でメールアドレス取得に失敗');
+      return null;
     } catch (error) {
-      console.error('UserService.getCurrentEmail: エラー', error.message);
+      console.error('UserService.getCurrentEmail: 予期しないエラー', error.message);
       return null;
     }
   },
