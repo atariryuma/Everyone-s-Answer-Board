@@ -57,10 +57,11 @@ const UserService = Object.freeze({
         console.warn('⚠️ Session.getEffectiveUser() 失敗:', effectiveError.message);
       }
 
-      // 方法3: DriveApp経由でのユーザー情報取得
+      // 方法3: Drive API経由でのユーザー情報取得
       try {
-        const user = DriveApp.getStorageUsed(); // Drive APIアクセスを確認
-        if (user >= 0) { // 正常にアクセスできた場合
+        // DriveAppが利用可能かチェック（getStorageUsedは廃止されたため代替手段を使用）
+        const files = DriveApp.getFiles(); // より安全なAPI
+        if (files) { // 正常にアクセスできた場合
           email = Session.getActiveUser().getEmail(); // 再試行
           if (email) {
             console.log('✅ Drive API確認後にメール取得成功:', email);

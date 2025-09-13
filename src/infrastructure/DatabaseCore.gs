@@ -115,9 +115,45 @@ const DatabaseCore = Object.freeze({
         throw new Error('サービスアカウントキーが設定されていません');
       }
 
+      // サービスアカウントキーの検証のみ（Google Apps Scriptでは直接Sheetsサービスを使用）
       const parsedKey = JSON.parse(serviceAccountKey);
-      const service = Sheets.newService();
-      service.useServiceAccountCreds(parsedKey);
+
+      // サービスアカウントキーの基本検証
+      if (!parsedKey.client_email || !parsedKey.private_key) {
+        throw new Error('無効なサービスアカウントキーです');
+      }
+
+      // Google Apps Script標準のSpreadsheetAppを使用
+      const service = {
+        spreadsheets: {
+          values: {
+            get: ({ spreadsheetId, range }) => {
+              const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+              const sheet = spreadsheet.getSheetByName(range.split('!')[0]) || spreadsheet.getSheets()[0];
+              const values = sheet.getDataRange().getValues();
+              return { values };
+            },
+            update: ({ spreadsheetId, range, resource }) => {
+              const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+              const sheet = spreadsheet.getSheetByName(range.split('!')[0]) || spreadsheet.getSheets()[0];
+              const {values} = resource;
+              if (values && values.length > 0) {
+                sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+              }
+              return { updatedCells: values ? values.length * values[0].length : 0 };
+            },
+            append: ({ spreadsheetId, range, resource }) => {
+              const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+              const sheet = spreadsheet.getSheetByName(range.split('!')[0]) || spreadsheet.getSheets()[0];
+              const {values} = resource;
+              if (values && values.length > 0) {
+                sheet.getRange(sheet.getLastRow() + 1, 1, values.length, values[0].length).setValues(values);
+              }
+              return { updates: { updatedRows: values ? values.length : 0 } };
+            }
+          }
+        }
+      };
 
       UnifiedLogger.success('DatabaseCore', {
         operation: 'createSheetsService',

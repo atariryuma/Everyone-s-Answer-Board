@@ -971,13 +971,13 @@ const DataService = Object.freeze({
   getSpreadsheetList() {
     const started = Date.now();
     try {
-      UnifiedLogger.debug('DataService', { operation: 'DriveApp.getFilesByType', phase: 'start' });
-      const files = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
+      UnifiedLogger.debug('DataService', { operation: 'DriveApp.searchFiles', phase: 'start' });
+      // 効率的な検索クエリを使用してスプレッドシートのみを取得
+      const files = DriveApp.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
       UnifiedLogger.debug('DataService', {
-        operation: 'DriveApp.getFilesByType',
+        operation: 'DriveApp.searchFiles',
         phase: 'complete',
-        hasFiles: typeof files !== 'undefined',
-        hasNext: files ? files.hasNext() : false
+        hasFiles: typeof files !== 'undefined'
       });
 
       const spreadsheets = [];
