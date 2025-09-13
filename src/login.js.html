@@ -213,6 +213,13 @@
                 'アクセス制限あり'
               );
             }
+          } else if (info && info.domain) {
+            // 新形式のレスポンス対応（currentUser, domain, success）
+            if (info.success && info.domain) {
+              updateDomainDisplay('match', info.domain, 'セキュアアクセス有効');
+            } else {
+              updateDomainDisplay('mismatch', info.domain || 'unknown', 'ドメイン検証失敗');
+            }
           } else if (info && info.adminDomain) {
             // 旧形式のレスポンス対応
             if (info.isDomainMatch) {
