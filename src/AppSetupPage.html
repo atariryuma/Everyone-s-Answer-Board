@@ -578,7 +578,7 @@
               console.error('Update error:', error);
               showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
             })
-            .SystemController.setApplicationStatusForUI(isActive);
+            .setApplicationStatusForUI(isActive);
         } catch (error) {
           showMessage(`❌ ${error.message}`, 'error');
         } finally {
@@ -605,7 +605,7 @@
             const currentUrl = window.location.href.split('?')[0];
             const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;             window.open(targetUrl, '_top');
           })
-          .SystemController.getWebAppUrl();
+          .getWebAppUrl();
       }
 
       // ページ読み込み時の処理
@@ -790,7 +790,7 @@
             showMessage(`エラー: ${error.message || error}`, 'error');
             loadingDiv.classList.add('hidden');
           })
-          .SystemController.getDeletionLogsForUI(__USER_ID__);
+          .getDeletionLogsForUI(__USER_ID__);
       }
 
       // 削除ログをテーブルに表示
@@ -927,7 +927,7 @@
             button.disabled = false;
             button.textContent = originalText;
           })
-          SystemController[functionName]();
+          [functionName]();
       }
 
       // System status monitoring function removed - simplified system
