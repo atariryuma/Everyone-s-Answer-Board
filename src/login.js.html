@@ -1,11 +1,13 @@
 <script>
   // グローバルエラーハンドラー
   window.addEventListener('error', (event) => {
-    console.error('Global error:', event.error);
+    console.error('Global error:', event?.error ?? event);
     const userEmailDisplay = document.getElementById('user-email-display');
-    if (userEmailDisplay && event.error.message) {
-      userEmailDisplay.textContent = 'システムエラーが発生しました';
-    }
+    if (!userEmailDisplay) return;
+    const msg = (event && event.error && event.error.message)
+      ? 'システムエラーが発生しました'
+      : 'エラーが発生しました';
+    userEmailDisplay.textContent = msg;
   });
 
   // Promise rejection ハンドラー
@@ -76,10 +78,26 @@
       google.script.run
         .withSuccessHandler((response) => {
           console.log('getUserEmail応答:', response);
-          if (response && response.trim()) {
-            userEmailDisplay.textContent = response;
-            console.log('ユーザーメール表示完了:', response);
-          } else {
+          try {
+            let emailText = '';
+            if (response && typeof response === 'object') {
+              emailText = response.email || response.value || '';
+            } else if (typeof response === 'string') {
+              emailText = response.trim();
+            } else if (window.safeResponseTrim) {
+              emailText = window.safeResponseTrim(response);
+            }
+
+            if (emailText) {
+              userEmailDisplay.textContent = emailText;
+              console.log('ユーザーメール表示完了:', emailText);
+              return;
+            }
+          } catch (e) {
+            console.warn('ユーザーメール処理中にエラー:', e);
+          }
+
+          {
             userEmailDisplay.textContent = 'ユーザー情報を取得中...';
             console.warn('User email not found in response:', response);
             // 再試行メカニズム
