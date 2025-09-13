@@ -13,6 +13,8 @@
  * - 分散しているバリデーション機能
  */
 
+/* global PROPS_KEYS, AppCacheService, UserService */
+
 /**
  * SecurityService - 統一セキュリティサービス
  * ゼロトラスト原則に基づく多層防御システム
@@ -352,7 +354,7 @@ const SecurityService = Object.freeze({
       // Extract protocol and hostname for validation
       let protocol, hostname;
       try {
-        const urlMatch = url.match(/^(https?):\/\/([^\/]+)/);
+        const urlMatch = url.match(/^(https?):\/\/([^/]+)/);
         if (!urlMatch) {
           return { isValid: false, error: '無効なURL形式' };
         }

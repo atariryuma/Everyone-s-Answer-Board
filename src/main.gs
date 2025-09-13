@@ -1,12 +1,14 @@
 /**
  * main.gs - Clean Application Entry Points
  * New Services Architecture Implementation
- * 
+ *
  * 🎯 Responsibilities:
  * - HTTP request routing (doGet/doPost)
- * - Service layer coordination  
+ * - Service layer coordination
  * - Error handling & user feedback
  */
+
+/* global UserService, ConfigService, DataService, SecurityService, ErrorHandler, DB, PROPS_KEYS, URL */
 
 /**
  * Application Configuration
@@ -100,7 +102,7 @@ function doGet(e) {
     }
   } catch (error) {
     // Unified error handling
-    const errorResponse = ErrorHandler.createSafeResponse(error, 'doGet');
+    const errorResponse = ErrorHandler.handle(error, 'doGet');
     return HtmlService.createHtmlOutput(`
       <h2>Application Error</h2>
       <p>${errorResponse.message}</p>
@@ -149,7 +151,7 @@ function doPost(e) {
         throw new Error(`Unknown action: ${request.action}`);
     }
   } catch (error) {
-    const errorResponse = ErrorHandler.createSafeResponse(error, 'doPost');
+    const errorResponse = ErrorHandler.handle(error, 'doPost');
     return ContentService.createTextOutput(JSON.stringify(errorResponse))
       .setMimeType(ContentService.MimeType.JSON);
   }
@@ -237,7 +239,7 @@ function handleGetData(request) {
       .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
     console.error('handleGetData error:', error.message);
-    const errorResponse = ErrorHandler.createSafeResponse(error, 'getData');
+    const errorResponse = ErrorHandler.handle(error, 'getData');
     return ContentService.createTextOutput(JSON.stringify(errorResponse))
       .setMimeType(ContentService.MimeType.JSON);
   }
@@ -259,7 +261,7 @@ function handleAddReaction(request) {
       message: result ? 'Reaction added successfully' : 'Failed to add reaction'
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    const errorResponse = ErrorHandler.createSafeResponse(error, 'addReaction');
+    const errorResponse = ErrorHandler.handle(error, 'addReaction');
     return ContentService.createTextOutput(JSON.stringify(errorResponse))
       .setMimeType(ContentService.MimeType.JSON);
   }
@@ -282,7 +284,7 @@ function handleToggleHighlight(request) {
       message: result ? 'Highlight toggled successfully' : 'Failed to toggle highlight'
     })).setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    const errorResponse = ErrorHandler.createSafeResponse(error, 'toggleHighlight');
+    const errorResponse = ErrorHandler.handle(error, 'toggleHighlight');
     return ContentService.createTextOutput(JSON.stringify(errorResponse))
       .setMimeType(ContentService.MimeType.JSON);
   }
@@ -311,7 +313,7 @@ function handleRefreshData(request) {
     return ContentService.createTextOutput(JSON.stringify(result))
       .setMimeType(ContentService.MimeType.JSON);
   } catch (error) {
-    const errorResponse = ErrorHandler.createSafeResponse(error, 'refreshData');
+    const errorResponse = ErrorHandler.handle(error, 'refreshData');
     return ContentService.createTextOutput(JSON.stringify(errorResponse))
       .setMimeType(ContentService.MimeType.JSON);
   }
@@ -412,7 +414,7 @@ function handleDebugMode(params) {
  * login.js.html, SetupPage.html, AdminPanel.js.html から呼び出される
  * 
  * @param {string} [kind='email'] - 取得する情報の種類（'email' or 'full'）
- * @returns {string|Object} ユーザー情報
+ * @returns {Object|null} 統一されたユーザー情報オブジェクト
  */
 function getUser(kind = 'email') {
   try {
@@ -422,18 +424,22 @@ function getUser(kind = 'email') {
       return null;
     }
     
-    if (kind === 'email') {
-      return userEmail;
-    }
-    
-    // フル情報を返す場合
+    // ✅ 修正: 戻り値型を統一（常にオブジェクト）
     const userInfo = UserService.getCurrentUserInfo();
-    return {
+    const result = {
       email: userEmail,
-      userId: userInfo?.userId,
-      isActive: userInfo?.isActive,
+      userId: userInfo?.userId || null,
+      isActive: userInfo?.isActive || false,
       hasConfig: !!userInfo?.config
     };
+    
+    // 後方互換性: emailのみ必要な場合は email フィールドに文字列が入っている
+    if (kind === 'email') {
+      // フロントエンドで user.email でアクセス可能
+      result.value = userEmail; // レガシー対応用
+    }
+    
+    return result;
   } catch (error) {
     console.error('getUser エラー:', error.message);
     return null;
@@ -888,23 +894,15 @@ function analyzeColumns(spreadsheetId, sheetName) {
  * @param {string} sheetName - シート名
  * @returns {Object} フォーム情報
  */
-function getFormInfo(spreadsheetId, sheetName) {
-  try {
-    // 現在はフォーム連携機能は未実装
-    return {
-      success: true,
-      hasForm: false,
-      formUrl: null,
-      formTitle: null,
-      message: 'フォーム連携機能は将来のアップデートで提供予定です'
-    };
-  } catch (error) {
-    console.error('getFormInfo エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
+function getFormInfo(_spreadsheetId, _sheetName) {
+  // 現在はフォーム連携機能は未実装
+  return {
+    success: true,
+    hasForm: false,
+    formUrl: null,
+    formTitle: null,
+    message: 'フォーム連携機能は将来のアップデートで提供予定です'
+  };
 }
 
 /**
@@ -1292,9 +1290,25 @@ function getAllUsersForAdminForUI(options = {}) {
   try {
     console.log('getAllUsersForAdminForUI: システム管理者機能実行');
     
-    // システム管理者権限チェック
-    const isAdmin = UserService.isSystemAdmin();
+    // 🔒 二重セキュリティチェック: セッション+権限
+    const currentEmail = UserService.getCurrentEmail();
+    if (!currentEmail) {
+      return {
+        success: false,
+        message: '認証が必要です'
+      };
+    }
+    
+    // システム管理者権限チェック（メールベース）
+    const isAdmin = UserService.isSystemAdmin(currentEmail);
     if (!isAdmin) {
+      // 🚨 権限違反をログ記録
+      SecurityService.persistSecurityLog({
+        event: 'UNAUTHORIZED_ADMIN_ACCESS',
+        severity: 'HIGH',
+        details: { attemptedBy: currentEmail, function: 'getAllUsersForAdminForUI' }
+      });
+      
       return {
         success: false,
         message: 'この機能にはシステム管理者権限が必要です'
@@ -1347,9 +1361,29 @@ function deleteUserAccountByAdminForUI(targetUserId) {
   try {
     console.log('deleteUserAccountByAdminForUI: ユーザー削除実行:', targetUserId);
     
-    // システム管理者権限チェック
-    const isAdmin = UserService.isSystemAdmin();
+    // 🔒 厳格な認証チェック
+    const currentEmail = UserService.getCurrentEmail();
+    if (!currentEmail) {
+      return {
+        success: false,
+        message: '認証が必要です'
+      };
+    }
+    
+    // システム管理者権限チェック（メールベース）
+    const isAdmin = UserService.isSystemAdmin(currentEmail);
     if (!isAdmin) {
+      // 🚨 重大な権限違反をログ記録
+      SecurityService.persistSecurityLog({
+        event: 'UNAUTHORIZED_USER_DELETE_ATTEMPT',
+        severity: 'CRITICAL',
+        details: { 
+          attemptedBy: currentEmail, 
+          targetUserId,
+          timestamp: new Date().toISOString()
+        }
+      });
+      
       return {
         success: false,
         message: 'この機能にはシステム管理者権限が必要です'
@@ -1711,55 +1745,6 @@ function confirmUserRegistration() {
   }
 }
 
-/**
- * 現在のボード情報とURL取得（管理パネル用）
- * @returns {Object} ボード情報
- */
-function getCurrentBoardInfoAndUrls() {
-  try {
-    console.log('getCurrentBoardInfoAndUrls: ボード情報取得');
-    
-    const userInfo = UserService.getCurrentUserInfo();
-    if (!userInfo) {
-      return {
-        success: false,
-        message: 'ユーザー情報が見つかりません'
-      };
-    }
-    
-    const config = ConfigService.getUserConfig(userInfo.userId);
-    if (!config) {
-      return {
-        success: false,
-        message: '設定が見つかりません'
-      };
-    }
-    
-    const baseUrl = getWebAppUrl();
-    
-    return {
-      success: true,
-      boardInfo: {
-        spreadsheetId: config.spreadsheetId,
-        sheetName: config.sheetName,
-        setupStatus: config.setupStatus,
-        appPublished: config.appPublished
-      },
-      urls: {
-        viewUrl: `${baseUrl}?mode=view&user=${userInfo.userId}`,
-        adminUrl: `${baseUrl}?mode=admin&user=${userInfo.userId}`,
-        editUrl: `${baseUrl}?mode=edit&user=${userInfo.userId}`,
-        baseUrl
-      }
-    };
-  } catch (error) {
-    console.error('getCurrentBoardInfoAndUrls エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 /**
  * アプリケーション設定切り替え（有効/無効）

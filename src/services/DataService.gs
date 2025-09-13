@@ -1,17 +1,19 @@
 /**
  * @fileoverview DataService - 統一データ操作サービス
- * 
+ *
  * 🎯 責任範囲:
  * - スプレッドシートデータ取得・操作
  * - リアクション・ハイライト機能
  * - データフィルタリング・検索
  * - バルクデータAPI
- * 
+ *
  * 🔄 置き換え対象:
  * - Core.gs のデータ操作部分
  * - UnifiedManager.data
  * - ColumnAnalysisSystem.gs の一部
  */
+
+/* global ConfigManager, DB, AppCacheService, UserService, ConfigService, DataFormatter, CONSTANTS */
 
 /**
  * DataService - 統一データ操作サービス
@@ -61,11 +63,16 @@ const DataService = Object.freeze({
 
   /**
    * スプレッドシートデータ取得実行
+   * ✅ バッチ処理対応 - GAS制限対応（実行時間・メモリ制限）
    * @param {Object} config - ユーザー設定
    * @param {Object} options - 取得オプション
    * @returns {Object} 取得結果
    */
   fetchSpreadsheetData(config, options = {}) {
+    const startTime = Date.now();
+    const MAX_EXECUTION_TIME = 180000; // 3分制限（安全マージン拡大）
+    const MAX_BATCH_SIZE = 200; // バッチサイズ削減（メモリ制限対応）
+    
     try {
       // スプレッドシート取得
       const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
@@ -86,16 +93,68 @@ const DataService = Object.freeze({
       // ヘッダー行取得
       const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
 
-      // データ行取得（バッチ処理）
-      const dataRows = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
+      // ✅ 大量データ対応: バッチ処理で安全に取得
+      const totalDataRows = lastRow - 1;
+      let processedData = [];
+      let processedCount = 0;
+      
+      // バッチごとに処理（メモリ・実行時間制限対応）
+      for (let startRow = 2; startRow <= lastRow; startRow += MAX_BATCH_SIZE) {
+        // 実行時間チェック
+        if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+          console.warn('DataService.fetchSpreadsheetData: 実行時間制限のため処理を中断', {
+            processedRows: processedCount,
+            totalRows: totalDataRows
+          });
+          break;
+        }
+        
+        const endRow = Math.min(startRow + MAX_BATCH_SIZE - 1, lastRow);
+        const batchSize = endRow - startRow + 1;
+        
+        try {
+          // バッチデータ取得
+          const batchRows = sheet.getRange(startRow, 1, batchSize, lastCol).getValues();
+          
+          // バッチ処理実行
+          const batchProcessed = this.processRawDataBatch(batchRows, headers, config, options, startRow - 2);
+          
+          processedData = processedData.concat(batchProcessed);
+          processedCount += batchSize;
+          
+          console.log(`DataService.fetchSpreadsheetData: バッチ処理完了 ${processedCount}/${totalDataRows}`);
+          
+          // API制限対策: 100行毎に短い休憩
+          if (processedCount % 1000 === 0) {
+            Utilities.sleep(100); // 0.1秒休憩
+          }
+          
+        } catch (batchError) {
+          console.error('DataService.fetchSpreadsheetData: バッチ処理エラー', {
+            startRow,
+            endRow,
+            error: batchError.message
+          });
+          // バッチエラーは継続（他のバッチは処理）
+        }
+      }
 
-      // データ変換・フィルタリング
-      const processedData = this.processRawData(dataRows, headers, config, options);
+      const executionTime = Date.now() - startTime;
+      console.info('DataService.fetchSpreadsheetData: バッチ処理完了', {
+        totalRows: totalDataRows,
+        processedRows: processedCount,
+        filteredRows: processedData.length,
+        executionTime,
+        batchCount: Math.ceil(totalDataRows / MAX_BATCH_SIZE)
+      });
 
       return this.createSuccessResponse(processedData, {
-        totalRows: dataRows.length,
+        totalRows: totalDataRows,
+        processedRows: processedCount,
         filteredRows: processedData.length,
-        headers
+        headers,
+        executionTime,
+        wasTruncated: processedCount < totalDataRows
       });
     } catch (error) {
       console.error('DataService.fetchSpreadsheetData: エラー', error.message);
@@ -104,7 +163,67 @@ const DataService = Object.freeze({
   },
 
   /**
-   * 生データを処理・変換
+   * バッチ処理用データ変換（メモリ効率重視）
+   * @param {Array} batchRows - バッチデータ行
+   * @param {Array} headers - ヘッダー配列
+   * @param {Object} config - 設定
+   * @param {Object} options - 処理オプション
+   * @param {number} startOffset - 開始オフセット（行番号計算用）
+   * @returns {Array} 処理済みバッチデータ
+   */
+  processRawDataBatch(batchRows, headers, config, options = {}, startOffset = 0) {
+    try {
+      const columnMapping = config.columnMapping?.mapping || {};
+      const processedBatch = [];
+
+      batchRows.forEach((row, batchIndex) => {
+        try {
+          // グローバル行インデックス計算
+          const globalIndex = startOffset + batchIndex;
+          
+          // 基本データ構造作成
+          const item = {
+            id: `row_${globalIndex + 2}`, // 実際の行番号（ヘッダー考慮）
+            timestamp: this.extractFieldValue(row, headers, 'timestamp') || '',
+            email: this.extractFieldValue(row, headers, 'email') || '',
+            
+            // メインコンテンツ
+            answer: this.extractFieldValue(row, headers, 'answer', columnMapping) || '',
+            reason: this.extractFieldValue(row, headers, 'reason', columnMapping) || '',
+            className: this.extractFieldValue(row, headers, 'class', columnMapping) || '',
+            name: this.extractFieldValue(row, headers, 'name', columnMapping) || '',
+
+            // メタデータ
+            formattedTimestamp: this.formatTimestamp(this.extractFieldValue(row, headers, 'timestamp')),
+            isEmpty: this.isEmptyRow(row),
+            
+            // リアクション（既存の場合）
+            reactions: this.extractReactions(row, headers),
+            isHighlighted: this.extractHighlight(row, headers)
+          };
+
+          // フィルタリング
+          if (this.shouldIncludeRow(item, options)) {
+            processedBatch.push(item);
+          }
+        } catch (rowError) {
+          console.warn('DataService.processRawDataBatch: 行処理エラー', {
+            batchIndex,
+            globalIndex: startOffset + batchIndex,
+            error: rowError.message
+          });
+        }
+      });
+
+      return processedBatch;
+    } catch (error) {
+      console.error('DataService.processRawDataBatch: エラー', error.message);
+      return [];
+    }
+  },
+
+  /**
+   * 生データを処理・変換（レガシー互換）
    * @param {Array} dataRows - 生データ行
    * @param {Array} headers - ヘッダー配列
    * @param {Object} config - 設定
@@ -384,90 +503,6 @@ const DataService = Object.freeze({
 
       return processedRow;
     });
-  },
-
-  /**
-   * バルクデータ取得API（Core.gsより移行・最適化）
-   * 複数の情報を一括取得で高速化
-   * @param {string} userId - ユーザーID
-   * @param {Object} options - オプション { includeSheetData, includeFormInfo, includeSystemInfo }
-   * @returns {Object} 一括データ
-   */
-  getBulkData(userId, options = {}) {
-    try {
-      const startTime = Date.now();
-
-      // ユーザー情報取得（ConfigServiceから）
-      const userInfo = ConfigService.getUserInfo(userId);
-      if (!userInfo) {
-        throw new Error('ユーザーが見つかりません');
-      }
-
-      const config = ConfigService.getUserConfig(userId);
-      const bulkData = {
-        timestamp: new Date().toISOString(),
-        userId,
-        userInfo: {
-          userEmail: userInfo.userEmail,
-          isActive: userInfo.isActive,
-          config
-        }
-      };
-
-      // シートデータを含む場合
-      if (options.includeSheetData && config?.spreadsheetId && config?.sheetName) {
-        try {
-          bulkData.sheetData = this.getSheetData(userId, {
-            sortOrder: 'asc',
-            includeEmpty: false,
-            useCache: true
-          });
-        } catch (sheetError) {
-          console.warn('DataService.getBulkData: シートデータ取得エラー', sheetError.message);
-          bulkData.sheetDataError = sheetError.message;
-        }
-      }
-
-      // フォーム情報を含む場合
-      if (options.includeFormInfo && config?.formUrl) {
-        try {
-          bulkData.formInfo = this.getFormInfo(userId);
-        } catch (formError) {
-          console.warn('DataService.getBulkData: フォーム情報取得エラー', formError.message);
-          bulkData.formInfoError = formError.message;
-        }
-      }
-
-      // システム情報を含む場合
-      if (options.includeSystemInfo) {
-        bulkData.systemInfo = {
-          setupStep: ConfigService.determineSetupStep(userInfo, config),
-          isSystemSetup: ConfigService.isSystemSetup(),
-          appPublished: config?.appPublished || false
-        };
-      }
-
-      const executionTime = Date.now() - startTime;
-
-      return {
-        success: true,
-        data: bulkData,
-        executionTime
-      };
-    } catch (error) {
-      console.error('❌ DataService.getBulkData: バルクデータ取得エラー', {
-        userId,
-        options,
-        error: error.message,
-        stack: error.stack
-      });
-
-      return {
-        success: false,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
-    }
   },
 
   /**
@@ -833,17 +868,20 @@ const DataService = Object.freeze({
    * @returns {string} フォーマット済み日時
    */
   formatTimestamp(isoString) {
+    // 統一: DataFormatterを使用（要インポート確認）
+    if (typeof DataFormatter !== 'undefined') {
+      return DataFormatter.formatDateTime(isoString, { style: 'short' });
+    }
+    // フォールバック処理
     if (!isoString) return '不明';
-    
     try {
       return new Date(isoString).toLocaleString('ja-JP', {
         month: 'numeric',
-        day: 'numeric', 
+        day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'
       });
     } catch (error) {
-      console.warn('DataService.formatTimestamp: フォーマットエラー', error.message);
       return '不明';
     }
   },
