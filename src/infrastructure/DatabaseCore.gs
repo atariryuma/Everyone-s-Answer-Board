@@ -109,7 +109,7 @@ const DatabaseCore = Object.freeze({
   createSheetsService() {
     try {
       const serviceAccountKey = PropertiesService.getScriptProperties()
-        .getProperty(PROPS_KEYS.SERVICE_ACCOUNT_KEY);
+        .getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
 
       if (!serviceAccountKey) {
         throw new Error('サービスアカウントキーが設定されていません');

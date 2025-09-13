@@ -47,7 +47,7 @@ const SystemController = Object.freeze({
       properties.setProperties({
         [PROPS_KEYS.DATABASE_ID]: databaseId,
         [PROPS_KEYS.ADMIN_EMAIL]: adminEmail,
-        [PROPS_KEYS.SERVICE_ACCOUNT]: serviceAccountJson
+        [PROPS_KEYS.SERVICE_ACCOUNT_CREDS]: serviceAccountJson
       });
 
       if (googleClientId) {
@@ -284,7 +284,7 @@ const SystemController = Object.freeze({
         setup: {
           hasDatabase: !!properties.getProperty(PROPS_KEYS.DATABASE_ID),
           hasAdminEmail: !!properties.getProperty(PROPS_KEYS.ADMIN_EMAIL),
-          hasServiceAccount: !!properties.getProperty(PROPS_KEYS.SERVICE_ACCOUNT)
+          hasServiceAccount: !!properties.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
         },
         services: {
           available: ['UserService', 'ConfigService', 'DataService', 'SecurityService']
