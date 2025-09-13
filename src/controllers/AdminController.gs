@@ -240,7 +240,7 @@ const AdminController = Object.freeze({
 
       // WebAppのベースURL取得
       const baseUrl = ScriptApp.getService().getUrl();
-      const viewUrl = `${baseUrl}?userId=${userId}`;
+      const viewUrl = `${baseUrl}?mode=view&userId=${userId}`;
 
       return {
         isActive: true,

@@ -179,7 +179,8 @@
             </p>
             <div class="text-center">
               <a
-                href="?mode=appSetup"
+                href="#"
+                id="app-setup-link"
                 class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg"
               >
                 <span id="settings-gear-icon"></span>
@@ -239,9 +240,31 @@
       } else {
         initializeAccessRestrictedIcons();
       }
-      
+
       // IconLibraryが後から読み込まれる場合に備えて
       setTimeout(initializeAccessRestrictedIcons, 100);
+
+      // アプリ設定リンクの動的URL生成
+      document.addEventListener('DOMContentLoaded', function() {
+        const appSetupLink = document.getElementById('app-setup-link');
+        if (appSetupLink) {
+          // 現在のユーザー情報を取得してURLを構築
+          google.script.run
+            .withSuccessHandler(function(userInfo) {
+              const baseUrl = window.location.href.split('?')[0];
+              const userId = userInfo?.userId || '';
+              const targetUrl = `${baseUrl}?mode=appSetup${userId ? '&userId=' + userId : ''}`;
+              appSetupLink.href = targetUrl;
+            })
+            .withFailureHandler(function(error) {
+              console.error('ユーザー情報取得失敗:', error);
+              // フォールバック：userIdなしでappSetupに遷移
+              const baseUrl = window.location.href.split('?')[0];
+              appSetupLink.href = `${baseUrl}?mode=appSetup`;
+            })
+            .getUser('full');
+        }
+      });
     </script>
   </body>
 </html>

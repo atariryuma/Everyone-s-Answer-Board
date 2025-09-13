@@ -1190,7 +1190,8 @@
     setPartialLoading(true, '画面遷移中...');
     google.script.run
       .withSuccessHandler(function (webAppUrl) {
-        const setupUrl = webAppUrl + '?mode=appSetup';
+        const userId = getUserId();
+        const setupUrl = webAppUrl + '?mode=appSetup' + (userId ? '&userId=' + userId : '');
         window.open(setupUrl, '_top');
       })
       .withFailureHandler(function (error) {
