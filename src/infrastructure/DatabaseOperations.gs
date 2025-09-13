@@ -66,7 +66,7 @@ const DatabaseOperations = Object.freeze({
     } catch (error) {
       UnifiedLogger.error('DatabaseOperations', {
         operation: 'findUserByEmail',
-        email: `${email?.substring(0, 5)  }***`,
+        email: typeof email === 'string' && email ? `${email.substring(0, 5)}***` : `[${typeof email}]`,
         error: error.message
       });
       return null;
@@ -185,7 +185,7 @@ const DatabaseOperations = Object.freeze({
     } catch (error) {
       UnifiedLogger.error('DatabaseOperations', {
         operation: 'createUser',
-        email: `${email?.substring(0, 5)  }***`,
+        email: typeof email === 'string' && email ? `${email.substring(0, 5)}***` : `[${typeof email}]`,
         error: error.message
       });
       throw error;
