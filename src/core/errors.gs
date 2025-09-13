@@ -93,6 +93,72 @@ const ErrorHandler = Object.freeze({
   },
 
   /**
+   * 既存コード互換用の簡易セーフレスポンス作成
+   * @param {Error|string} error - エラー
+   * @param {string} context - 文脈
+   * @param {boolean} includeDetails - 詳細を含めるか（未使用・互換用）
+   * @returns {Object} セーフなエラーレスポンス
+   */
+  createSafeResponse(error, context = 'operation', includeDetails = false) {
+    try {
+      const message = error && typeof error.message === 'string' ? error.message : String(error);
+
+      // 内部ログ（詳細付き）
+      console.error(`❌ ${context}:`, {
+        message,
+        timestamp: new Date().toISOString(),
+      });
+
+      return {
+        success: false,
+        message: this.getSafeErrorMessage(message),
+        timestamp: new Date().toISOString(),
+        errorCode: this.getErrorCode(message),
+      };
+    } catch (e) {
+      return {
+        success: false,
+        message: '処理中にエラーが発生しました。',
+        timestamp: new Date().toISOString(),
+        errorCode: 'EUNKNOWN',
+      };
+    }
+  },
+
+  /**
+   * エンドユーザー向けに安全なエラーメッセージへ変換
+   */
+  getSafeErrorMessage(originalMessage) {
+    try {
+      const patterns = ['Service Account', 'token', 'database', 'validation'];
+      const lower = (originalMessage || '').toLowerCase();
+      for (const pattern of patterns) {
+        if (lower.includes(pattern.toLowerCase())) {
+          return 'システムエラーが発生しました。管理者にお問い合わせください。';
+        }
+      }
+      return '処理中にエラーが発生しました。';
+    } catch (_e) {
+      return '処理中にエラーが発生しました。';
+    }
+  },
+
+  /**
+   * エラーメッセージから安定したエラーコードを生成
+   */
+  getErrorCode(message) {
+    try {
+      const code = String(message || '').split('').reduce((a, ch) => {
+        a = (a << 5) - a + ch.charCodeAt(0);
+        return a & a;
+      }, 0);
+      return `E${Math.abs(code).toString(16).substr(0, 6).toUpperCase()}`;
+    } catch (_e) {
+      return 'E000000';
+    }
+  },
+
+  /**
    * エラー情報標準化
    * @param {Error|string} error - 元エラー
    * @param {Object} context - コンテキスト
