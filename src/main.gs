@@ -430,6 +430,7 @@ function handleAdminModeWithTemplate(params, context = {}) {
     template.params = params;
     template.context = context;
     template.userEmail = userEmail;
+    template.userInfo = UserService.getCurrentUserInfo() || { userId: '', userEmail };
     template.isSystemAdmin = UserService.isSystemAdmin(userEmail);
 
     return template.evaluate()
@@ -925,12 +926,16 @@ function processLoginAction() {
     const config = ConfigService.getUserConfig(userInfo.userId);
     const needsSetup = !config?.spreadsheetId || config?.setupStatus !== 'completed';
     
+    const baseUrl = getWebAppUrl();
+    const adminUrl = `${baseUrl}?mode=admin${userInfo.userId ? `&userId=${encodeURIComponent(userInfo.userId)}` : ''}`;
+
     return {
       success: true,
       userId: userInfo.userId,
       email: userEmail,
       needsSetup,
-      redirectUrl: needsSetup ? `${getWebAppUrl()}?mode=admin` : getWebAppUrl()
+      adminUrl,
+      redirectUrl: adminUrl
     };
   } catch (error) {
     console.error('processLoginAction エラー:', error.message);
@@ -1458,7 +1463,7 @@ function getCurrentBoardInfoAndUrls() {
     const config = ConfigService.getUserConfig(userInfo.userId);
     const baseUrl = getWebAppUrl();
     
-    return {
+  return {
       success: true,
       boardInfo: {
         userId: userInfo.userId,
@@ -1470,7 +1475,7 @@ function getCurrentBoardInfoAndUrls() {
       },
       urls: {
         viewUrl: baseUrl,
-        adminUrl: `${baseUrl}?mode=admin`,
+        adminUrl: `${baseUrl}?mode=admin${userInfo.userId ? `&userId=${encodeURIComponent(userInfo.userId)}` : ''}`,
         debugUrl: `${baseUrl}?mode=debug`
       }
     };
