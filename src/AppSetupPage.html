@@ -11,9 +11,8 @@
     <!-- Shared TailwindCSS Configuration -->
     <?!= include('SharedTailwindConfig'); ?>
     
-    <!-- Shared Styles and Utilities -->
+    <!-- Shared Styles -->
     <?!= include('UnifiedStyles'); ?>
-    <?!= include('SharedUtilities'); ?>
     <!-- Safe template variable injection using HTML data attributes -->
     <div id="app-data" data-user-id="<?= typeof userId !== 'undefined' && userId ? userId.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '' ?>" style="display: none;"></div>
     
@@ -1141,5 +1140,9 @@
         contentDiv.classList.remove('hidden');
       }
     </script>
+
+    <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
+    <?!= include('SharedUtilities'); ?>
+    <?!= include('SharedErrorHandling'); ?>
   </body>
 </html>

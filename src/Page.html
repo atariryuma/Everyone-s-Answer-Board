@@ -4,15 +4,19 @@
   <meta charset="UTF-8" />
   <title>StudyQuest - みんなの回答ボード</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- GAS推奨: セキュリティヘッダー最優先 -->
   <?!= include('SharedSecurityHeaders'); ?>
-  <?!= include('SharedErrorHandling'); ?>
+
+  <!-- GAS推奨: CSS読み込みはhead内に集約 -->
   <link rel="preload" href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
   <noscript><link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet" /></noscript>
   <link rel="dns-prefetch" href="//script.google.com" />
   <link rel="preconnect" href="https://script.google.com" crossorigin />
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
   <?!= include('SharedTailwindConfig'); ?>
   <?!= include('page.css'); ?>
+
+  <!-- GAS推奨: ライブラリスクリプトの事前読み込み -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js" defer></script>
 </head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
   <div id="loading-overlay" class="loading-overlay hidden">
@@ -144,7 +148,9 @@
     });
   </script>
 
-  <!-- JavaScript分離：page.js.htmlからインクルード -->
+  <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
+  <?!= include('SharedUtilities'); ?>
+  <?!= include('SharedErrorHandling'); ?>
   <?!= include('page.js'); ?>
 
 </body>

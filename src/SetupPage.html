@@ -38,7 +38,7 @@
     <?!= include('SharedTailwindConfig'); ?>
 
     <!-- Shared Styles and Utilities -->
-    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
+    <?!= include('UnifiedStyles'); ?>
   </head>
   <body>
     <div class="max-w-2xl mx-auto">
@@ -294,37 +294,31 @@
             throw new Error('有効なメールアドレスを入力してください');
           }
 
-          showMessage('セットアップを実行中...', 'info');
-
-          // セットアップ実行
-          await new Promise((resolve, reject) => {
-            google.script.run
-              .withSuccessHandler((result) => {
-                showMessage(
-                  `✅ セットアップが正常に完了しました！管理者: ${result.adminEmail}`,
-                  'success'
-                );
+          // 統一エラーハンドリングでセットアップ実行
+          const result = await window.ErrorHandler.handleFormSubmission(
+            () => window.ErrorHandler.callGAS('setupApplication', {
+              showLoading: true,
+              loadingMessage: 'セットアップを実行中...'
+            }, serviceAccountJson, databaseId, adminEmail, googleClientId),
+            'アプリケーションセットアップ',
+            {
+              successMessage: `✅ セットアップが正常に完了しました！管理者: ${adminEmail}`,
+              onSuccess: (result) => {
                 document.getElementById('test-section').classList.remove('hidden');
-                resolve(result);
-              })
-              .withFailureHandler((error) => {
-                console.error('Setup error:', error);
-                let displayMessage = `❌ セットアップに失敗しました: ${error.message || error}`;
-                if (
-                  error.message &&
-                  error.message.includes('スプレッドシートの共有設定が「制限付き」になっていません')
-                ) {
-                  displayMessage = `
-                                    <p class="font-bold">${error.message}</p>
-                                    <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>
-                                    <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>
-                                `;
+              },
+              onError: (error) => {
+                // 特定エラーの詳細メッセージ表示
+                if (error.message?.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
+                  const detailedMessage = `
+                    <p class="font-bold">${error.message}</p>
+                    <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>
+                    <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>
+                  `;
+                  showMessage(detailedMessage, 'error');
                 }
-                showMessage(displayMessage, 'error');
-                reject(error);
-              })
-              .setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
-          });
+              }
+            }
+          );
         } catch (error) {
           showMessage(`❌ ${error.message}`, 'error');
         } finally {
@@ -442,5 +436,9 @@
         }
       });
     </script>
+
+    <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
+    <?!= include('SharedUtilities'); ?>
+    <?!= include('SharedErrorHandling'); ?>
   </body>
 </html>

@@ -73,7 +73,12 @@ function doGet(e) {
 
     // Core system properties gating: if not ready, go to setup before auth
     try {
-      if (!ConfigService.hasCoreSystemProps() && params.mode !== 'setup' && !params.setupParam) {
+      // Safe ConfigService call with fallback - GAS loading order protection
+      const hasSystemProps = (typeof ConfigService !== 'undefined' && ConfigService.hasCoreSystemProps)
+        ? ConfigService.hasCoreSystemProps()
+        : false;
+
+      if (!hasSystemProps && params.mode !== 'setup' && !params.setupParam) {
         console.log('doGet: Core system props missing, redirecting to setup');
         return renderSetupPageWithTemplate(params);
       }

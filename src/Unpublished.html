@@ -38,7 +38,7 @@
     <?!= include('SharedTailwindConfig'); ?>
 
     <!-- Unified Styles and Shared Components -->
-    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
+    <?!= include('UnifiedStyles'); ?>
     <style>
       body {
         margin: 0;
@@ -181,6 +181,10 @@
       </div>
       <? } ?>
     </div>
+
+    <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
+    <?!= include('SharedUtilities'); ?>
+    <?!= include('SharedErrorHandling'); ?>
 
     <script>
       function copyBoardUrl() {

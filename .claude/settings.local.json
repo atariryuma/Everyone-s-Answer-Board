@@ -28,7 +28,10 @@
       "Bash(tree:*)",
       "Bash(git ls-tree:*)",
       "Bash(node:*)",
-      "Bash(npm test)"
+      "Bash(npm test)",
+      "Bash(for file in src/{Page,AdminPanel,LoginPage,SetupPage,AppSetupPage,Unpublished,AccessRestricted}.html)",
+      "Bash(tail:*)",
+      "Bash(done)"
     ],
     "deny": [],
     "ask": [],

@@ -111,31 +111,76 @@ window.ErrorHandler = {
   },
 
   /**
-   * GAS関数呼び出しのエラーハンドリング
+   * GAS関数呼び出しのエラーハンドリング - UnifiedDataLoaderと統合
    * @param {string} funcName - 関数名
+   * @param {Object} options - オプション
    * @param {Array} args - 引数
    * @returns {Promise} エラーハンドリング付きPromise
    */
-  async callGAS(funcName, ...args) {
-    return new Promise((resolve, reject) => {
-      if (typeof google === 'undefined' || !google.script?.run) {
-        const error = new Error('Google Apps Script環境が利用できません');
-        this.logError(error, `GAS呼び出し: ${funcName}`);
-        reject(error);
-        return;
+  async callGAS(funcName, options = {}, ...args) {
+    try {
+      // UnifiedDataLoaderが利用可能な場合はそれを使用
+      if (window.unifiedDataLoader) {
+        return await window.unifiedDataLoader.loadData(funcName, {
+          showLoading: options.showLoading !== false,
+          cache: options.cache !== false,
+          retryOnError: options.retryOnError !== false,
+          ...options
+        }, ...args);
       }
 
-      google.script.run
-        .withSuccessHandler((result) => {
-          resolve(result);
-        })
-        .withFailureHandler((error) => {
-          this.logError(error, `GAS呼び出し: ${funcName}`, { args });
-          const userMessage = this.getUserMessage(error, funcName);
-          reject(new Error(userMessage));
-        })
-        [funcName](...args);
-    });
+      // フォールバック: 従来のGAS呼び出し
+      return new Promise((resolve, reject) => {
+        if (typeof google === 'undefined' || !google.script?.run) {
+          const error = new Error('Google Apps Script環境が利用できません');
+          this.logError(error, `GAS呼び出し: ${funcName}`);
+          reject(error);
+          return;
+        }
+
+        google.script.run
+          .withSuccessHandler((result) => {
+            resolve(result);
+          })
+          .withFailureHandler((error) => {
+            this.logError(error, `GAS呼び出し: ${funcName}`, { args });
+            const userMessage = this.getUserMessage(error, funcName);
+            reject(new Error(userMessage));
+          })
+          [funcName](...args);
+      });
+    } catch (error) {
+      this.logError(error, `callGAS: ${funcName}`);
+      throw error;
+    }
+  },
+
+  /**
+   * バッチGAS呼び出し - 複数の関数を並列実行
+   * @param {Array} requests - [{funcName, options, args}]の配列
+   * @returns {Promise<Array>} 結果配列
+   */
+  async callGASBatch(requests) {
+    try {
+      if (window.unifiedDataLoader) {
+        const formattedRequests = requests.map(req => ({
+          functionName: req.funcName,
+          args: req.args || [],
+          options: req.options || {}
+        }));
+        return await window.unifiedDataLoader.loadBatchData(formattedRequests);
+      }
+
+      // フォールバック: 個別実行
+      const promises = requests.map(req =>
+        this.callGAS(req.funcName, req.options || {}, ...(req.args || []))
+          .catch(error => ({ error: error.message, funcName: req.funcName }))
+      );
+      return Promise.all(promises);
+    } catch (error) {
+      this.logError(error, 'callGASBatch');
+      throw error;
+    }
   },
 
   /**
@@ -150,6 +195,204 @@ window.ErrorHandler = {
     } catch (error) {
       this.showError(error, context);
       return undefined;
+    }
+  },
+
+  /**
+   * フォーム送信のエラーハンドリング
+   * @param {Function} submitFunction - 送信処理関数
+   * @param {string} context - コンテキスト
+   * @param {Object} options - オプション
+   * @returns {Promise} 送信結果
+   */
+  async handleFormSubmission(submitFunction, context = '', options = {}) {
+    const {
+      showLoadingMessage = '送信中...',
+      successMessage = '送信が完了しました',
+      validateForm = null,
+      onSuccess = null,
+      onError = null
+    } = options;
+
+    try {
+      // フォーム検証
+      if (validateForm && typeof validateForm === 'function') {
+        const validationResult = await validateForm();
+        if (!validationResult.isValid) {
+          throw new Error(validationResult.message || '入力内容に問題があります');
+        }
+      }
+
+      // ローディング表示
+      if (window.unifiedLoading && showLoadingMessage) {
+        window.unifiedLoading.show(showLoadingMessage);
+      }
+
+      // 送信実行
+      const result = await submitFunction();
+
+      // 成功処理
+      if (successMessage && typeof showMessage === 'function') {
+        showMessage(successMessage, 'success');
+      }
+      if (onSuccess && typeof onSuccess === 'function') {
+        await onSuccess(result);
+      }
+
+      return result;
+
+    } catch (error) {
+      this.logError(error, context);
+      const userMessage = this.getUserMessage(error, context);
+
+      if (typeof showMessage === 'function') {
+        showMessage(userMessage, 'error');
+      } else {
+        this.showError(error, context);
+      }
+
+      if (onError && typeof onError === 'function') {
+        await onError(error);
+      }
+
+      throw error;
+    } finally {
+      if (window.unifiedLoading) {
+        window.unifiedLoading.hide();
+      }
+    }
+  },
+
+  /**
+   * 非同期データ読み込みのエラーハンドリング
+   * @param {Function} loadFunction - データ読み込み関数
+   * @param {string} context - コンテキスト
+   * @param {Object} options - オプション
+   * @returns {Promise} 読み込み結果
+   */
+  async handleDataLoading(loadFunction, context = '', options = {}) {
+    const {
+      fallbackData = null,
+      showErrors = true,
+      retryCount = 1,
+      retryDelay = 1000
+    } = options;
+
+    let lastError;
+
+    for (let attempt = 1; attempt <= retryCount; attempt++) {
+      try {
+        return await loadFunction();
+      } catch (error) {
+        lastError = error;
+        this.logError(error, `${context} (試行${attempt}/${retryCount})`);
+
+        if (attempt < retryCount) {
+          console.log(`🔄 ${context}: ${retryDelay}ms後にリトライします`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          continue;
+        }
+
+        // 最終試行でも失敗した場合
+        if (showErrors) {
+          const userMessage = this.getUserMessage(error, context);
+          if (typeof showMessage === 'function') {
+            showMessage(userMessage, 'error');
+          }
+        }
+
+        if (fallbackData !== null) {
+          console.log(`📦 ${context}: フォールバックデータを使用`);
+          return fallbackData;
+        }
+
+        throw error;
+      }
+    }
+  },
+
+  /**
+   * リアルタイム検証エラーハンドリング
+   * @param {HTMLElement} field - 入力フィールド
+   * @param {Function} validator - 検証関数
+   * @param {Object} options - オプション
+   */
+  setupFieldValidation(field, validator, options = {}) {
+    const {
+      validClass = 'border-green-500',
+      invalidClass = 'border-red-500',
+      showTooltip = true,
+      debounceDelay = 300
+    } = options;
+
+    if (!field || typeof validator !== 'function') {
+      console.warn('setupFieldValidation: 無効なパラメータ');
+      return;
+    }
+
+    let timeoutId;
+    const validate = async () => {
+      try {
+        const result = await validator(field.value);
+
+        // スタイル更新
+        field.classList.remove(invalidClass);
+        field.classList.add(validClass);
+
+        // ツールチップ削除
+        if (showTooltip) {
+          this.removeTooltip(field);
+        }
+
+        return { isValid: true, result };
+      } catch (error) {
+        // スタイル更新
+        field.classList.remove(validClass);
+        field.classList.add(invalidClass);
+
+        // ツールチップ表示
+        if (showTooltip) {
+          this.showTooltip(field, error.message);
+        }
+
+        return { isValid: false, error: error.message };
+      }
+    };
+
+    // イベントリスナー設定
+    field.addEventListener('input', () => {
+      clearTimeout(timeoutId);
+      timeoutId = setTimeout(validate, debounceDelay);
+    });
+
+    field.addEventListener('blur', validate);
+  },
+
+  /**
+   * ツールチップ表示ヘルパー
+   */
+  showTooltip(element, message) {
+    this.removeTooltip(element);
+
+    const tooltip = document.createElement('div');
+    tooltip.className = 'error-tooltip absolute z-50 bg-red-600 text-white text-xs p-2 rounded shadow-lg';
+    tooltip.textContent = message;
+    tooltip.setAttribute('data-tooltip-for', element.id || 'unknown');
+
+    const rect = element.getBoundingClientRect();
+    tooltip.style.left = rect.left + 'px';
+    tooltip.style.top = (rect.bottom + 5) + 'px';
+
+    document.body.appendChild(tooltip);
+  },
+
+  /**
+   * ツールチップ削除ヘルパー
+   */
+  removeTooltip(element) {
+    const existing = document.querySelector(`[data-tooltip-for="${element.id || 'unknown'}"]`);
+    if (existing) {
+      existing.remove();
     }
   }
 };

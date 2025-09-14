@@ -5,20 +5,12 @@
     <base target="_top" />
     <title>StudyQuest 管理パネル</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- Shared Security Headers -->
+    <!-- GAS推奨: セキュリティヘッダー最優先 -->
     <?!= include('SharedSecurityHeaders'); ?>
 
-    <!-- Shared Error Handling -->
-    <?!= include('SharedErrorHandling'); ?>
-
-    <!-- Shared TailwindCSS Configuration -->
+    <!-- GAS推奨: CSS読み込みはhead内に集約 -->
     <?!= include('SharedTailwindConfig'); ?>
-    
-    <!-- Unified Styles -->
     <?!= include('UnifiedStyles'); ?>
-    
-    <!-- Shared Utilities -->
-    <?!= include('SharedUtilities'); ?>
     
     <!-- Safe template variable injection using HTML data attributes -->
     <div id="app-data" data-user-id="<?= userInfo && userInfo.userId ? userInfo.userId.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '' ?>" style="display: none;"></div>
@@ -916,7 +908,9 @@
       </div>
     </footer>
 
-    <!-- AdminPanel JavaScript -->
+    <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
+    <?!= include('SharedUtilities'); ?>
+    <?!= include('SharedErrorHandling'); ?>
     <?!= include('AdminPanel.js'); ?>
   </body>
 </html>

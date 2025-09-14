@@ -10,11 +10,9 @@
     <!-- Shared Security Headers -->
     <?!= include('SharedSecurityHeaders'); ?>
 
-    <!-- Shared TailwindCSS Configuration -->
+    <!-- GAS推奨: CSS読み込みはhead内に集約 -->
     <?!= include('SharedTailwindConfig'); ?>
-
-    <!-- Unified Styles and Shared Components -->
-    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
+    <?!= include('UnifiedStyles'); ?>
 
     <!-- Global Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay page-specific hidden">
@@ -395,6 +393,9 @@
       </div>
     </div>
 
+    <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
+    <?!= include('SharedUtilities'); ?>
+    <?!= include('SharedErrorHandling'); ?>
     <?!= include('login.js'); ?>
   </body>
 </html>

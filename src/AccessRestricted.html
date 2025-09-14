@@ -40,7 +40,7 @@
     <?!= include('SharedTailwindConfig'); ?>
 
     <!-- Shared Styles and Utilities -->
-    <?!= include('UnifiedStyles'); ?> <?!= include('SharedUtilities'); ?>
+    <?!= include('UnifiedStyles'); ?>
     <style>
       .pulse-slow {
         animation: pulse 2s infinite;
@@ -203,7 +203,11 @@
 
     <!-- メッセージエリア -->
     <div id="message-area" class="fixed top-20 right-4 z-50" aria-live="polite" role="status"></div>
-    
+
+    <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
+    <?!= include('SharedUtilities'); ?>
+    <?!= include('SharedErrorHandling'); ?>
+
     <script>
       // 🎯 統一アイコンシステム - アイコン配置
       function initializeAccessRestrictedIcons() {
