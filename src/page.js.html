@@ -10,52 +10,12 @@
       MIN_DISPLAY_COLUMNS: 1       // 最小表示列数
     });
     
-    const getSecureVars = () => {
-      // URLからuserIdを取得（親ウィンドウも含む）
-      let userId = null;
-      try {
-        // 現在のウィンドウのURLを確認
-        console.log('🔍 [URLDebug] 現在のURL情報', {
-          href: window.location.href,
-          search: window.location.search,
-          pathname: window.location.pathname
-        });
-
-        // 親ウィンドウのURLから取得を試行
-        try {
-          const parentUrl = window.parent.location.href;
-          console.log('🔍 [URLDebug] 親ウィンドウURL:', parentUrl);
-
-          const parentParams = new URLSearchParams(parentUrl.split('?')[1] || '');
-          userId = parentParams.get('userId');
-
-          console.log('🔍 [URLDebug] 親ウィンドウパラメータ解析結果', {
-            userId,
-            allParams: Object.fromEntries(parentParams.entries())
-          });
-        } catch (parentError) {
-          console.warn('親ウィンドウURL取得失敗:', parentError);
-
-          // フォールバック：現在のウィンドウのURLから取得
-          const urlParams = new URLSearchParams(window.location.search);
-          userId = urlParams.get('userId');
-
-          console.log('🔍 [URLDebug] フォールバック - 現在ウィンドウパラメータ解析結果', {
-            userId,
-            allParams: Object.fromEntries(urlParams.entries())
-          });
-        }
-      } catch (error) {
-        console.warn('URLパラメータ解析エラー:', error);
-      }
-
-      return {
-        // セキュリティ: クライアントサイド変数ではなく、サーバーから取得した設定を使用
-        showAdminFeatures: false,  // サーバーサイドで判定
-        isAdminUser: false,        // サーバーサイドで判定
-        userId: userId || (typeof window !== 'undefined' && window.userId) || null
-      };
-    };
+    const getSecureVars = () => ({
+      // セキュリティ: クライアントサイド変数ではなく、サーバーから取得した設定を使用
+      showAdminFeatures: false,  // サーバーサイドで判定
+      isAdminUser: false,        // サーバーサイドで判定
+      userId: (typeof window !== 'undefined' && window.userId) || null
+    });
     
     const ICONS = Object.freeze({
       lightbulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m8.66-10H20M4 12H2m15.07-7.07L17.66 6.34M6.34 6.34L4.93 4.93m12.14 12.14L15.66 15.66M6.34 17.66L4.93 19.07"/></svg>',
@@ -693,6 +653,7 @@
           }
         });
       }
+
 
       /**
        * リトライ可能なエラーかどうかを判定

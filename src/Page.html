@@ -131,6 +131,16 @@
     </div>
   </footer>
 
+  <!-- サーバーデータをクライアントサイドで利用可能にする -->
+  <script>
+    // サーバーから渡されたパラメータをwindowオブジェクトに設定
+    window.userId = <?!= JSON.stringify(data.userId || null) ?>;
+    console.log('🔧 [Page.html] Server data loaded:', {
+      userId: window.userId,
+      hasUserId: !!window.userId
+    });
+  </script>
+
   <!-- JavaScript分離：page.js.htmlからインクルード -->
   <?!= include('page.js'); ?>
 
