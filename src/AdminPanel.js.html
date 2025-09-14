@@ -684,7 +684,10 @@
   // 設定データ取得（シンプル版）
   function getConfigAsync() {
     return new Promise((resolve, reject) => {
-      google.script.run.withSuccessHandler(resolve).withFailureHandler(reject).getConfig();
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(reject)
+        .getConfig();
     });
   }
 
