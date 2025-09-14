@@ -61,6 +61,92 @@ const APP_CONFIG = Object.freeze({
 });
 
 /**
+ * Mode Access Control Rules - 統一アクセス制御マトリクス
+ */
+const MODE_ACCESS_RULES = Object.freeze({
+  // セットアップ不要（常にアクセス可能）
+  'login': { requiresSetup: false, requiresAuth: false, accessLevel: 'public' },
+  'setup': { requiresSetup: false, requiresAuth: false, accessLevel: 'public' },
+
+  // セットアップ必要 + 認証必要 + オープンアクセス
+  'view': { requiresSetup: true, requiresAuth: true, accessLevel: 'open' },
+  'main': { requiresSetup: true, requiresAuth: true, accessLevel: 'open' },
+
+  // セットアップ必要 + 認証必要 + 所有者制限
+  'admin': { requiresSetup: true, requiresAuth: true, accessLevel: 'owner' },
+  'appSetup': { requiresSetup: true, requiresAuth: true, accessLevel: 'owner' },
+
+  // セットアップ必要 + 認証必要 + システム管理者専用
+  'debug': { requiresSetup: true, requiresAuth: true, accessLevel: 'system_admin' },
+  'test': { requiresSetup: true, requiresAuth: true, accessLevel: 'system_admin' },
+  'fix_user': { requiresSetup: true, requiresAuth: true, accessLevel: 'system_admin' },
+  'clear_cache': { requiresSetup: true, requiresAuth: true, accessLevel: 'system_admin' }
+});
+
+/**
+ * 統一モードアクセス検証
+ * @param {string} mode - アクセスするモード
+ * @param {Object} params - リクエストパラメータ
+ * @returns {Object} アクセス結果 { allowed: boolean, redirect?: string, reason?: string }
+ */
+function validateModeAccess(mode, params) {
+  const rules = MODE_ACCESS_RULES[mode];
+  if (!rules) {
+    console.warn('validateModeAccess: 不明なモード', mode);
+    return { allowed: false, redirect: 'login', reason: 'unknown_mode' };
+  }
+
+  // Step 1: セットアップ必要チェック
+  if (rules.requiresSetup) {
+    try {
+      const hasSetup = ConfigService.hasCoreSystemProps();
+      console.log('validateModeAccess: Setup check result', { mode, hasSetup });
+
+      if (!hasSetup) {
+        console.log('validateModeAccess: セットアップ未完了', mode);
+        return { allowed: false, redirect: 'setup', reason: 'setup_required' };
+      }
+    } catch (error) {
+      console.error('validateModeAccess: Setup check error', { mode, error: error.message });
+      return { allowed: false, redirect: 'setup', reason: 'setup_check_error' };
+    }
+  }
+
+  // Step 2: 認証必要チェック
+  if (rules.requiresAuth) {
+    const userEmail = UserService.getCurrentEmail();
+    if (!userEmail) {
+      console.log('validateModeAccess: 認証が必要', mode);
+      return { allowed: false, redirect: 'login', reason: 'auth_required' };
+    }
+
+    // Step 3: アクセスレベルチェック
+    if (rules.accessLevel === 'system_admin' && !UserService.isSystemAdmin(userEmail)) {
+      console.log('validateModeAccess: システム管理者権限が必要', { mode, userEmail });
+      return { allowed: false, redirect: 'login', reason: 'admin_required' };
+    }
+
+    if (rules.accessLevel === 'owner' && params.userId) {
+      const currentUser = UserService.getCurrentUserInfo();
+      const isOwnUser = currentUser && currentUser.userId === params.userId;
+      const isSystemAdmin = UserService.isSystemAdmin(userEmail);
+
+      if (!isOwnUser && !isSystemAdmin) {
+        console.log('validateModeAccess: 所有者権限が必要', {
+          mode,
+          requestedUserId: params.userId,
+          currentUserId: currentUser?.userId
+        });
+        return { allowed: false, redirect: 'login', reason: 'owner_required' };
+      }
+    }
+  }
+
+  console.log('validateModeAccess: アクセス許可', { mode, accessLevel: rules.accessLevel });
+  return { allowed: true };
+}
+
+/**
  * doGet - HTTP GET request handler with complete mode system restoration
  * Integrates historical mode switching with modern Services architecture
  */
@@ -68,26 +154,25 @@ function doGet(e) {
   try {
     // Parse request parameters
     const params = parseRequestParams(e);
-
     console.log('doGet: Processing request with params:', params);
 
-    // Core system properties gating: if not ready, go to setup before auth
-    try {
-      // Safe ConfigService call with fallback - GAS loading order protection
-      const hasSystemProps = (typeof ConfigService !== 'undefined' && ConfigService.hasCoreSystemProps)
-        ? ConfigService.hasCoreSystemProps()
-        : false;
+    // 統一アクセス制御チェック
+    const accessResult = validateModeAccess(params.mode || 'main', params);
 
-      if (!hasSystemProps && params.mode !== 'setup' && !params.setupParam) {
-        console.log('doGet: Core system props missing, redirecting to setup');
-        return renderSetupPageWithTemplate(params);
+    if (!accessResult.allowed) {
+      console.log(`doGet: Access denied, redirecting to ${accessResult.redirect}`, accessResult);
+
+      switch (accessResult.redirect) {
+        case 'setup':
+          return handleSetupModeWithTemplate(params);
+        case 'login':
+          return handleLoginModeWithTemplate(params, { reason: accessResult.reason });
+        default:
+          return handleLoginModeWithTemplate(params, { reason: 'access_error' });
       }
-    } catch (propCheckError) {
-      console.warn('Core system props check error:', propCheckError.message);
-      return renderSetupPageWithTemplate(params);
     }
 
-    // Complete mode-based routing with historical functionality restored
+    // アクセス許可後の既存ルーティング
     switch (params.mode) {
       case APP_CONFIG.MODES.LOGIN:
         return handleLoginModeWithTemplate(params);
@@ -194,10 +279,6 @@ function doPost(e) {
   }
 }
 
-// ===========================================
-// 📊 Request Parsing Utilities
-// ===========================================
-
 /**
  * Parse GET request parameters
  */
@@ -226,10 +307,6 @@ function parsePostRequest(e) {
     throw new Error('Invalid JSON in POST data');
   }
 }
-
-// ===========================================
-// 📊 Mode Handlers (Template Only)
-// ===========================================
 
 /**
  * Handle main mode - delegate to DataController
@@ -272,18 +349,18 @@ function handleAdminModeWithTemplate(params, context = {}) {
       return handleLoginModeWithTemplate(params, { reason: 'admin_access_requires_auth' });
     }
 
-    // 現在のユーザー情報を取得（セキュリティのためparams.userIdは無視）
+    // URLパラメータからuserIdを取得（管理パネル用）- validateModeAccess()で権限チェック済み
     let userInfo = UserService.getCurrentUserInfo();
-    let userId = userInfo && userInfo.userId;
+    let userId = params.userId || (userInfo && userInfo.userId);
 
     // userIdが指定されていない場合、現在のユーザー情報から取得または作成
     if (!userId) {
       try {
-        // UserService経由でユーザー情報を取得または作成
-        const serviceUserInfo = UserService.getCurrentUserInfo();
-        if (serviceUserInfo && serviceUserInfo.userId) {
-          userId = serviceUserInfo.userId;
-          userInfo = serviceUserInfo;
+        // DB から直接ユーザー検索を試行
+        const dbUser = DB.findUserByEmail(userEmail);
+        if (dbUser && dbUser.userId) {
+          userId = dbUser.userId;
+          userInfo = { userId, userEmail };
         } else {
           // ユーザーが存在しない場合は作成
           const created = UserService.createUser(userEmail);
@@ -300,7 +377,7 @@ function handleAdminModeWithTemplate(params, context = {}) {
         userInfo = { userId: '', userEmail };
       }
     } else {
-      // userIdが取得済みの場合、現在のユーザー情報を使用
+      // userIdが指定されている場合、そのユーザー情報を使用
       userInfo = { userId, userEmail };
     }
 
@@ -334,13 +411,6 @@ function handleSetupModeWithTemplate(params) {
   } catch (templateError) {
     return renderErrorPage({ message: 'Setup page template not found' });
   }
-}
-
-/**
- * Other mode handlers - minimal template rendering only
- */
-function renderSetupPageWithTemplate(params) {
-  return handleSetupModeWithTemplate(params);
 }
 
 function handleViewMode(params) {
@@ -396,21 +466,21 @@ function handleDebugMode(params) {
   `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function handleTestMode(params) {
+function handleTestMode() {
   return HtmlService.createHtmlOutput(`
     <h2>Test Mode</h2>
     <p>Test functionality would appear here</p>
   `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function handleFixUserMode(params) {
+function handleFixUserMode() {
   return HtmlService.createHtmlOutput(`
     <h2>Fix User Mode</h2>
     <p>User fix functionality would appear here</p>
   `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-function handleClearCacheMode(params) {
+function handleClearCacheMode() {
   try {
     AppCacheService.clearAll();
     return HtmlService.createHtmlOutput(`
@@ -422,10 +492,6 @@ function handleClearCacheMode(params) {
     return renderErrorPage({ message: `Cache clear failed: ${error.message}` });
   }
 }
-
-// ===========================================
-// 📊 Template Renderers
-// ===========================================
 
 /**
  * Render main page template
@@ -449,42 +515,39 @@ function renderErrorPage(error) {
   `).setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-// ===========================================
-// 📊 API Gateway Functions (Industry Standard)
-// HTML Service Compatible Functions
-// ===========================================
-
-// Note: All global function exports have been moved to the end of this file
-// to avoid duplication
-
-/**
- * Utility Functions Export - HTML Service Compatible
- */
-
-
-// ===========================================
-// 🌐 Controller Global Function Exports
-// Required for google.script.run.Controller.method() calls
-// ===========================================
-
-/**
- * Frontend Controller Global Functions
- * Required for HTML google.script.run calls
- */
-// getUser is implemented in FrontendController.gs
-
-// processLoginAction is implemented in FrontendController.gs
 
 /**
  * System Controller Global Functions
  */
-// getSystemDomainInfo is implemented in SystemController.gs
 
-// forceUrlSystemReset is implemented in SystemController.gs
 
-// setupApplication is implemented in SystemController.gs
+function getUser(kind = 'email') {
+  try {
+    const userEmail = UserService.getCurrentEmail();
 
-// testSetup is implemented in SystemController.gs
+    if (!userEmail) {
+      return kind === 'email' ? '' : { success: false, message: 'ユーザー情報が取得できません' };
+    }
+
+    // 後方互換性重視: kind==='email' の場合は純粋な文字列を返す
+    if (kind === 'email') {
+      return String(userEmail);
+    }
+
+    // 統一オブジェクト形式（'full' など）
+    const userInfo = UserService.getCurrentUserInfo();
+    return {
+      success: true,
+      email: userEmail,
+      userId: userInfo?.userId || null,
+      isActive: userInfo?.isActive || false,
+      hasConfig: !!userInfo?.config
+    };
+  } catch (error) {
+    console.error('getUser エラー:', error.message);
+    return kind === 'email' ? '' : { success: false, message: error.message };
+  }
+}
 
 function getApplicationStatusForUI() {
   try {
@@ -495,13 +558,6 @@ function getApplicationStatusForUI() {
   }
 }
 
-// getAllUsersForAdminForUI is implemented in DataController.gs
-
-// deleteUserAccountByAdminForUI is implemented in DataController.gs
-
-// getWebAppUrl is implemented in SystemController.gs
-
-// reportClientError is implemented in FrontendController.gs
 
 function setApplicationStatusForUI(isActive) {
   try {
@@ -523,24 +579,9 @@ function getDeletionLogsForUI(userId) {
   }
 }
 
-// testSystemDiagnosis is implemented in SystemController.gs
-
-// performAutoRepair is implemented in SystemController.gs
-
-// performSystemMonitoring is implemented in SystemController.gs
-
-// performDataIntegrityCheck is implemented in SystemController.gs
-
-// testForceLogoutRedirect is implemented in FrontendController.gs
-
-// verifyUserAuthentication is implemented in FrontendController.gs
-
-// resetAuth is implemented in FrontendController.gs
-
 /**
  * Admin Controller Global Functions
  */
-// getConfig is implemented in AdminController.gs
 
 function getSpreadsheetList() {
   try {
@@ -554,15 +595,6 @@ function getSpreadsheetList() {
     };
   }
 }
-
-// getLightweightHeaders is implemented in AdminController.gs
-
-// analyzeColumns is implemented in AdminController.gs
-
-// publishApplication is implemented in AdminController.gs
-
-// saveDraftConfiguration is implemented in AdminController.gs
-
 function connectDataSource(spreadsheetId, sheetName) {
   try {
     // ✅ GAS Best Practice: Direct service calls
@@ -572,33 +604,19 @@ function connectDataSource(spreadsheetId, sheetName) {
     return { success: false, error: error.message };
   }
 }
-
-// checkIsSystemAdmin is implemented in AdminController.gs
-
 function getSheetList(spreadsheetId) {
   try {
-    // ✅ GAS Best Practice: Direct service calls
-    return getSheetList(spreadsheetId);
+    return DataService.getSheetList(spreadsheetId);
   } catch (error) {
     console.error('getSheetList error:', error);
     return { success: false, error: error.message };
   }
 }
 
-// validateAccess is implemented in AdminController.gs
-
-// getCurrentBoardInfoAndUrls is implemented in AdminController.gs
-
-// getFormInfo is implemented in AdminController.gs
-
-// checkCurrentPublicationStatus is implemented in AdminController.gs
-
-// createForm is implemented in AdminController.gs
 
 /**
  * Data Controller Global Functions
  */
-// handleGetData is implemented in DataController.gs
 
 function addReaction(userId, rowId, reactionType) {
   try {
@@ -618,9 +636,6 @@ function toggleHighlight(userId, rowId) {
   }
 }
 
-// refreshBoardData is implemented in DataController.gs
-
-// addSpreadsheetUrl is implemented in DataController.gs
 
 function getUserConfig(userId) {
   console.log('getUserConfig: 関数開始', { userId });
@@ -651,7 +666,6 @@ function getUserConfig(userId) {
   }
 }
 
-// getPublishedSheetData is implemented in DataController.gs
 
 function processReactionByEmail(userEmail, rowIndex, reactionKey) {
   try {
@@ -698,10 +712,6 @@ function processReactionByEmail(userEmail, rowIndex, reactionKey) {
   }
 }
 
-// ===========================================
-// 🚀 Phase 2: HTML Service最適化 - Bulk Data Fetching API
-// GAS Best Practice: 複数API呼び出し削減による高速化
-// ===========================================
 
 /**
  * 管理パネル用一括データ取得API（GAS最適化）

@@ -3,7 +3,7 @@
 > **🎯 Project**: Google Apps Script Web Application
 > **🔧 Stack**: GAS, Services Architecture, Spreadsheet Integration
 > **🤖 Claude Code**: 2025 Best Practices Compliant
-> **⚡ Updated**: 2025-09-14
+> **⚡ Updated**: 2025-09-14 (Lazy Initialization Pattern実装)
 
 ## 🧠 Claude Code 2025 Core Principles
 
@@ -59,23 +59,56 @@ clasp logs                     # View execution logs
 ### 🎯 Architecture Principles (2025)
 - **API Gateway Pattern**: main.gs as thin API layer (Google Best Practice)
 - **Services Architecture**: Business logic in `src/services/`
+- **Lazy Initialization Pattern**: Each service uses lazy loading for GAS stability
 - **Single Responsibility**: One concern per file/function
 - **TDD-First**: Tests before implementation (Claude Code favorite)
 - **Error Handling**: Unified try-catch with proper logging
 
 ### 🚀 Claude Code Development Rules
+
+#### ✅ Lazy Initialization Pattern (GAS Best Practice)
 ```javascript
-// ✅ GOOD: Claude Code can easily understand and extend
-const UserService = {
-  getCurrentUser() {
-    try {
-      return this.validateAndReturnUser();
-    } catch (error) {
-      console.error('UserService.getCurrentUser:', error);
-      return null;
+// 遅延初期化状態管理
+let serviceInitialized = false;
+
+/**
+ * Service遅延初期化 - 各公開関数の先頭で呼び出し
+ */
+function initService() {
+  if (serviceInitialized) return;
+
+  try {
+    // 依存関係チェック
+    if (typeof DEPENDENCIES === 'undefined') {
+      console.warn('Dependencies not available, will retry on next call');
+      return;
     }
+
+    serviceInitialized = true;
+    console.log('✅ Service initialized successfully');
+  } catch (error) {
+    console.error('Service initialization failed:', error.message);
   }
-};
+}
+
+// ✅ GOOD: 各公開関数の先頭で遅延初期化
+function getCurrentUser() {
+  initService(); // 遅延初期化
+  try {
+    return this.validateAndReturnUser();
+  } catch (error) {
+    console.error('UserService.getCurrentUser:', error);
+    return null;
+  }
+}
+```
+
+#### ❌ 避けるべきパターン
+```javascript
+// ❌ AVOID: typeof チェック（遅延初期化で不要）
+if (typeof UserService !== 'undefined') {
+  UserService.getCurrentUser();
+}
 
 // ❌ AVOID: Complex nested logic hard for AI to track
 function getUserData(id) {
@@ -138,6 +171,9 @@ src/
 
 ## Common Issues & Solutions
 
+- **Service Loading Order Errors**: Use lazy initialization pattern in all services
+  - `UserService not loaded` → Each public function calls `initUserService()` first
+  - `ConfigService not available` → Each public function calls `initConfigService()` first
 - **Duplicate declarations**: Check for existing const/function before creating
 - **Authentication flow**: Ensure proper user flow from login → setup → main
 - **GAS limitations**: Use service pattern to avoid global scope conflicts
@@ -469,7 +505,8 @@ claude -p "Update all functions to use new ResponseFormatter pattern"
 ### Project Health Indicators
 - ✅ **Tests**: 113/113 passing (100%)
 - ✅ **Errors**: < 5 ESLint errors (Current: 2)
-- ✅ **Architecture**: API Gateway pattern compliance
+- ✅ **Architecture**: API Gateway + Lazy Initialization pattern compliance
+- ✅ **Service Loading**: Zero service loading order errors (遅延初期化で解決)
 - ✅ **Documentation**: Up-to-date CLAUDE.md + ROADMAP.md
 - ✅ **Deployment**: Zero-downtime via safe-deploy
 
@@ -486,6 +523,7 @@ claude -p "Update all functions to use new ResponseFormatter pattern"
 This project exemplifies **Claude Code 2025 best practices**:
 - **Strategic AI Partnership**: Human strategy, AI execution
 - **Quality-First Development**: TDD + automated quality gates
+- **Lazy Initialization Pattern**: GAS service loading order resolved
 - **Context-Aware Sessions**: CLAUDE.md as project brain
 - **Safe, Incremental Progress**: Git workflow + branch safety
 

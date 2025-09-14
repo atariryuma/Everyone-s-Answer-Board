@@ -1,5 +1,5 @@
 /**
- * @fileoverview UserService - 統一ユーザー管理サービス
+ * @fileoverview UserService - 統一ユーザー管理サービス (遅延初期化対応)
  *
  * 🎯 責任範囲:
  * - ユーザー認証・セッション管理
@@ -8,16 +8,38 @@
  * - ユーザーキャッシュ管理
  *
  * 🔄 GAS Best Practices準拠:
- * - フラット関数構造 (Object.freeze削除)
- * - 直接的な関数エクスポート
- * - 単一責任原則の維持
+ * - 遅延初期化パターン (各公開関数先頭でinit)
+ * - ファイル読み込み順序非依存設計
+ * - グローバル副作用排除
  */
 
 /* global DB, PROPS_KEYS, CONSTANTS, URL */
 
-// ===========================================
-// 🔑 認証・セッション管理
-// ===========================================
+// 遅延初期化状態管理
+let userServiceInitialized = false;
+let userServiceCache = new Map();
+
+/**
+ * UserService遅延初期化
+ * 各公開関数の先頭で呼び出し、必要時のみ初期化実行
+ */
+function initUserService() {
+  if (userServiceInitialized) return;
+
+  try {
+    // 必要な依存関係の初期化確認
+    if (typeof DB === 'undefined') {
+      console.warn('initUserService: DB not available, will retry on next call');
+      return;
+    }
+
+    userServiceInitialized = true;
+    console.log('✅ UserService initialized successfully');
+  } catch (error) {
+    console.error('initUserService failed:', error.message);
+    // 初期化失敗時は次回再試行のためfalseのまま
+  }
+}
 
 /**
  * 現在のユーザーメールアドレス取得
@@ -78,6 +100,7 @@ function getCurrentUserEmail() {
  * @returns {string|null} ユーザーメール
  */
 function getCurrentEmail() {
+  initUserService(); // 遅延初期化
   return getCurrentUserEmail();
 }
 
@@ -86,6 +109,7 @@ function getCurrentEmail() {
  * @returns {Object|null} ユーザー情報オブジェクト
  */
 function getCurrentUserInfo() {
+    initUserService(); // 遅延初期化
     const cacheKey = 'current_user_info';
     
     try {
@@ -257,6 +281,7 @@ function verifyUserOwnership(userId) {
  * @returns {boolean} システム管理者かどうか
  */
 function isSystemAdmin(email) {
+    initUserService(); // 遅延初期化
     try {
       if (!email) {
         return false;
@@ -299,6 +324,7 @@ function isSystemAdmin(email) {
  * @returns {Object} 作成されたユーザー情報
  */
 function createUser(userEmail, initialConfig = {}) {
+    initUserService(); // 遅延初期化
     try {
       if (!userEmail || !validateUserEmail(userEmail).isValid) {
         throw new Error('無効なメールアドレス');

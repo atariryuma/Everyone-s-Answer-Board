@@ -1,5 +1,5 @@
 /**
- * @fileoverview ConfigService - 統一設定管理サービス (GAS Flat Functions)
+ * @fileoverview ConfigService - 統一設定管理サービス (遅延初期化対応)
  *
  * 🎯 責任範囲:
  * - configJSON の CRUD操作
@@ -7,14 +7,39 @@
  * - 動的設定生成（URL等）
  * - 設定マイグレーション
  *
- * ✅ GAS Best Practice: Simple Function Architecture
+ * 🔄 GAS Best Practices準拠:
+ * - 遅延初期化パターン (各公開関数先頭でinit)
+ * - ファイル読み込み順序非依存設計
+ * - グローバル副作用排除
  */
 
 /* global DB, PROPS_KEYS, CONSTANTS, SecurityValidator, getCurrentUserEmail, getCurrentUserInfo, URL */
 
-// ===========================================
-// 📖 設定読み込み・取得
-// ===========================================
+// 遅延初期化状態管理
+let configServiceInitialized = false;
+let configServiceCache = new Map();
+
+/**
+ * ConfigService遅延初期化
+ * 各公開関数の先頭で呼び出し、必要時のみ初期化実行
+ */
+function initConfigService() {
+  if (configServiceInitialized) return;
+
+  try {
+    // 必要な依存関係の初期化確認
+    if (typeof DB === 'undefined' || typeof PROPS_KEYS === 'undefined') {
+      console.warn('initConfigService: Dependencies not available, will retry on next call');
+      return;
+    }
+
+    configServiceInitialized = true;
+    console.log('✅ ConfigService initialized successfully');
+  } catch (error) {
+    console.error('initConfigService failed:', error.message);
+    // 初期化失敗時は次回再試行のためfalseのまま
+  }
+}
 
 /**
  * ユーザー設定取得（統合版）
@@ -22,6 +47,7 @@
  * @returns {Object|null} 統合設定オブジェクト
  */
 function getUserConfig(userId) {
+  initConfigService(); // 遅延初期化
   if (!userId || !validateConfigUserId(userId)) {
     console.warn('getUserConfig: 無効なuserID - デフォルト設定を返却:', userId);
     return getDefaultConfig(userId);
@@ -72,6 +98,7 @@ function getUserConfig(userId) {
  * @returns {Object} デフォルト設定
  */
 function getDefaultConfig(userId) {
+  initConfigService(); // 遅延初期化
   return {
     userId,
     setupStatus: 'pending',
@@ -653,19 +680,38 @@ function diagnoseConfigService() {
 }
 
 /**
- * コアシステムプロパティ確認
- * @returns {boolean} コアプロパティが設定済みかどうか
+ * コアシステムプロパティ確認 - 3つの必須項目をすべてチェック
+ * @returns {boolean} 3つすべて存在すれば true
  */
 function hasCoreSystemProps() {
+  initConfigService(); // 遅延初期化
   try {
     const props = PropertiesService.getScriptProperties();
-    const requiredProps = ['ADMIN_EMAIL', 'DATABASE_ID'];
 
-    for (const prop of requiredProps) {
-      if (!props.getProperty(prop)) {
-        console.warn('hasCoreSystemProps: 必須プロパティ未設定', prop);
+    // 3つの必須項目をすべてチェック
+    const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+    const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+    const creds = props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+
+    if (!adminEmail || !dbId || !creds) {
+      console.warn('hasCoreSystemProps: 必須項目不足', {
+        hasAdmin: !!adminEmail,
+        hasDb: !!dbId,
+        hasCreds: !!creds
+      });
+      return false;
+    }
+
+    // SERVICE_ACCOUNT_CREDSのJSON検証
+    try {
+      const parsed = JSON.parse(creds);
+      if (!parsed || typeof parsed !== 'object' || !parsed.client_email) {
+        console.warn('hasCoreSystemProps: SERVICE_ACCOUNT_CREDS JSON不正');
         return false;
       }
+    } catch (jsonError) {
+      console.warn('hasCoreSystemProps: SERVICE_ACCOUNT_CREDS JSON解析失敗', jsonError.message);
+      return false;
     }
 
     return true;

@@ -1,5 +1,5 @@
 /**
- * @fileoverview DataService - 統一データ操作サービス
+ * @fileoverview DataService - 統一データ操作サービス (遅延初期化対応)
  *
  * 🎯 責任範囲:
  * - スプレッドシートデータ取得・操作
@@ -7,17 +7,39 @@
  * - データフィルタリング・検索
  * - バルクデータAPI
  *
- * 🔄 置き換え対象:
- * - Core.gs のデータ操作部分
- * - UnifiedManager.data
- * - ColumnAnalysisSystem.gs の一部
+ * 🔄 GAS Best Practices準拠:
+ * - 遅延初期化パターン (各公開関数先頭でinit)
+ * - ファイル読み込み順序非依存設計
+ * - グローバル副作用排除
  */
 
 /* global DB, DataFormatter, CONSTANTS, ResponseFormatter, PROPS_KEYS, formatTimestampSimple */
 
-// ===========================================
-// 📊 スプレッドシートデータ取得
-// ===========================================
+// 遅延初期化状態管理
+let dataServiceInitialized = false;
+let dataServiceCache = new Map();
+
+/**
+ * DataService遅延初期化
+ * 各公開関数の先頭で呼び出し、必要時のみ初期化実行
+ */
+function initDataService() {
+  if (dataServiceInitialized) return;
+
+  try {
+    // 必要な依存関係の初期化確認
+    if (typeof DB === 'undefined' || typeof CONSTANTS === 'undefined') {
+      console.warn('initDataService: Dependencies not available, will retry on next call');
+      return;
+    }
+
+    dataServiceInitialized = true;
+    console.log('✅ DataService initialized successfully');
+  } catch (error) {
+    console.error('initDataService failed:', error.message);
+    // 初期化失敗時は次回再試行のためfalseのまま
+  }
+}
 
 /**
  * ユーザーのスプレッドシートデータ取得（統合版）
@@ -587,6 +609,7 @@ function getAutoStopTime(publishedAt, minutes) {
  * @returns {Object} 処理結果
  */
 function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEmail) {
+  initDataService(); // 遅延初期化
   try {
     if (!validateReactionParams(spreadsheetId, sheetName, rowIndex, reactionKey)) {
       throw new Error('無効なリアクションパラメータ');
@@ -826,6 +849,7 @@ function applySortAndLimit(data, options = {}) {
  * @returns {Object} スプレッドシート一覧
  */
 function getSpreadsheetList() {
+  initDataService(); // 遅延初期化
   const started = Date.now();
   try {
     console.log('DataService.getSpreadsheetList: 開始 - GAS独立化完了');
@@ -942,6 +966,7 @@ function getSpreadsheetList() {
  * @returns {Object} シート一覧
  */
 function getSheetList(spreadsheetId) {
+  initDataService(); // 遅延初期化
   try {
     if (!spreadsheetId) {
       return {

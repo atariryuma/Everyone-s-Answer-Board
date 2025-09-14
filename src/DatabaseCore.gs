@@ -1,13 +1,44 @@
 /**
- * @fileoverview DatabaseCore - データベースコア機能
+ * @fileoverview DatabaseCore - データベースコア機能 (遅延初期化対応)
  *
  * 🎯 責任範囲:
  * - データベース接続・認証
  * - 基本CRUD操作
  * - サービスアカウント管理
+ *
+ * 🔄 GAS Best Practices準拠:
+ * - 遅延初期化パターン (DB関数呼び出し時にinit)
+ * - ファイル読み込み順序非依存設計
+ * - グローバル副作用排除
  */
 
 /* global PROPS_KEYS, CONSTANTS, SecurityService, AppCacheService, ConfigService, UserService */
+
+// 遅延初期化状態管理
+let databaseCoreInitialized = false;
+let databaseCoreCache = new Map();
+
+/**
+ * DatabaseCore遅延初期化
+ * DB関数呼び出し時に実行、必要時のみ初期化
+ */
+function initDatabaseCore() {
+  if (databaseCoreInitialized) return;
+
+  try {
+    // 必要な依存関係の初期化確認
+    if (typeof PROPS_KEYS === 'undefined' || typeof CONSTANTS === 'undefined') {
+      console.warn('initDatabaseCore: Dependencies not available, will retry on next call');
+      return;
+    }
+
+    databaseCoreInitialized = true;
+    console.log('✅ DatabaseCore initialized successfully');
+  } catch (error) {
+    console.error('initDatabaseCore failed:', error.message);
+    // 初期化失敗時は次回再試行のためfalseのまま
+  }
+}
 
 /**
  * DatabaseCore - データベースコア機能
@@ -649,10 +680,12 @@ const DB = Object.freeze({
   },
 
   findUserById(userId) {
+    initDatabaseCore(); // 遅延初期化
     return DatabaseOperations.findUserById(userId);
   },
 
   findUserByEmail(email, forceRefresh = false) {
+    initDatabaseCore(); // 遅延初期化
     return DatabaseOperations.findUserByEmail(email, forceRefresh);
   },
 
