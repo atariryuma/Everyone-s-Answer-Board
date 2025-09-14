@@ -240,36 +240,88 @@
      */
     class AnswerApp {
       constructor() {
-        this.vars = getSecureVars();
-        this.config = null;
-        this.answers = [];
-        this.isLoading = false;
-        this.pollingInterval = null;
-        this.cache = new Map();
-        this.cacheTimers = new Map();
-        this.isProduction = typeof google !== 'undefined' && google.script?.run;
-        this.retryCount = 0;
-        this.maxRetries = 3;
-        
-        this.answerRenderer = new AnswerRenderer();
-        this.filterManager = new FilterManager();
-        
-        this.init();
+        console.log('🚀 [AnswerApp] 初期化開始', {
+          timestamp: new Date().toISOString(),
+          location: window.location.href,
+          userAgent: navigator.userAgent.substring(0, 100)
+        });
+
+        try {
+          this.vars = getSecureVars();
+          console.log('✅ [AnswerApp] セキュア変数取得完了', {
+            userId: this.vars.userId ? this.vars.userId.substring(0, 8) + '...' : 'なし',
+            isAdminUser: this.vars.isAdminUser
+          });
+
+          this.config = null;
+          this.answers = [];
+          this.isLoading = false;
+          this.pollingInterval = null;
+          this.cache = new Map();
+          this.cacheTimers = new Map();
+          this.isProduction = typeof google !== 'undefined' && google.script?.run;
+          this.retryCount = 0;
+          this.maxRetries = 3;
+
+          console.log('✅ [AnswerApp] 基本プロパティ設定完了', {
+            isProduction: this.isProduction,
+            googleScriptAvailable: typeof google !== 'undefined',
+            googleScriptRun: !!(google && google.script && google.script.run)
+          });
+
+          this.answerRenderer = new AnswerRenderer();
+          console.log('✅ [AnswerApp] AnswerRenderer生成完了');
+
+          this.filterManager = new FilterManager();
+          console.log('✅ [AnswerApp] FilterManager生成完了');
+
+          console.log('🎯 [AnswerApp] init()メソッド呼び出し開始');
+          this.init();
+
+        } catch (error) {
+          console.error('❌ [AnswerApp] コンストラクタエラー', {
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+          });
+          throw error;
+        }
       }
       
       async init() {
+        console.log('🎯 [AnswerApp] init()開始');
+
         try {
+          console.log('🔄 [AnswerApp] 並列初期化処理開始 (loadConfig, setupUI, setupEventListeners)');
+
           const [config] = await Promise.all([
             this.loadConfig(),
             this.setupUI(),
             this.setupEventListeners()
           ]);
-          
+
+          console.log('✅ [AnswerApp] 並列初期化処理完了', {
+            configLoaded: !!config,
+            configKeys: config ? Object.keys(config) : []
+          });
+
           this.config = config;
+
+          console.log('🎯 [AnswerApp] loadAnswers()呼び出し開始');
           await this.loadAnswers();
+          console.log('✅ [AnswerApp] loadAnswers()完了');
+
+          console.log('🎯 [AnswerApp] ポーリング開始');
           this.startPolling();
-          
+
+          console.log('🎉 [AnswerApp] 初期化完全完了');
+
         } catch (error) {
+          console.error('❌ [AnswerApp] init()でエラー発生', {
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+          });
           this.handleError('初期化エラー', error);
         }
       }
@@ -297,18 +349,44 @@
       }
       
       async loadAnswers(sortOrder = 'newest') {
-        if (this.isLoading) return;
+        console.log('📊 [loadAnswers] データ取得開始', {
+          sortOrder,
+          isLoading: this.isLoading,
+          userId: this.vars.userId ? this.vars.userId.substring(0, 8) + '...' : 'なし'
+        });
+
+        if (this.isLoading) {
+          console.warn('⚠️ [loadAnswers] すでに読み込み中のため中止');
+          return;
+        }
         this.isLoading = true;
-        
+
         try {
+          console.log('📡 [loadAnswers] GAS関数呼び出し: getPublishedSheetData');
           const rawData = await this.callGAS('getPublishedSheetData', this.vars.userId, 'すべて', sortOrder);
+
+          console.log('📦 [loadAnswers] バックエンドレスポンス受信', {
+            responseType: typeof rawData,
+            hasData: !!rawData?.data,
+            hasRows: !!rawData?.rows,
+            dataLength: rawData?.data?.length || rawData?.rows?.length || 0,
+            rawDataKeys: rawData ? Object.keys(rawData) : 'なし'
+          });
           
           if (!rawData?.data && !rawData?.rows) {
+            console.warn('⚠️ [loadAnswers] データが空またはnull', {
+              rawData: rawData,
+              hasHeader: !!rawData?.header,
+              hasSheetName: !!rawData?.sheetName
+            });
+
             const emptyResult = {
               answers: [],
               header: rawData?.header || '問題',
               sheetName: rawData?.sheetName || '不明'
             };
+
+            console.log('🔄 [loadAnswers] 空データでUI更新');
             this.updateUI(emptyResult);
             return;
           }
@@ -335,13 +413,29 @@
             header: rawData.header || '問題',
             sheetName: rawData.sheetName || '不明'
           };
-          
+
+          console.log('📋 [loadAnswers] 最終データ構造確認', {
+            answersCount: result.answers.length,
+            header: result.header,
+            sheetName: result.sheetName,
+            firstAnswerKeys: result.answers[0] ? Object.keys(result.answers[0]) : 'なし'
+          });
+
           this.answers = result.answers;
+
+          console.log('🎨 [loadAnswers] updateUI()呼び出し開始');
           this.updateUI(result);
-          
+          console.log('✅ [loadAnswers] updateUI()呼び出し完了');
+
         } catch (error) {
+          console.error('❌ [loadAnswers] エラー発生', {
+            message: error.message,
+            stack: error.stack,
+            timestamp: new Date().toISOString()
+          });
           this.handleError('データロードエラー', error);
         } finally {
+          console.log('🏁 [loadAnswers] 処理終了 - ローディング状態解除');
           this.isLoading = false;
         }
       }
@@ -351,18 +445,54 @@
       }
       
       updateUI(data) {
+        console.log('🎨 [updateUI] UI更新開始', {
+          answersCount: data.answers.length,
+          header: data.header,
+          sheetName: data.sheetName
+        });
+
+        console.log('🔄 [updateUI] FilterManagerにデータセット');
         this.filterManager.setData(data.answers);
+
+        console.log('🔄 [updateUI] AnswerRendererでヘッダー更新');
         this.answerRenderer.updateHeader(data.header, data.sheetName);
+
+        console.log('🔄 [updateUI] フィルタリング結果をレンダリング');
         this.renderFilteredResults();
+
+        console.log('✅ [updateUI] UI更新完了');
       }
-      
+
       renderFilteredResults() {
+        console.log('🔍 [renderFilteredResults] フィルタリング処理開始');
+
         const filteredData = this.filterManager.getFilteredData();
         const status = this.filterManager.getFilterStatus();
-        
+
+        console.log('📊 [renderFilteredResults] フィルタリング結果', {
+          filteredCount: filteredData.length,
+          totalCount: status.totalItems,
+          hasFilters: status.hasFilters
+        });
+
+        // DOM要素の存在確認
+        const answersContainer = document.getElementById('answers');
+        console.log('🎯 [renderFilteredResults] DOM要素確認', {
+          answersContainer: !!answersContainer,
+          containerClass: answersContainer?.className || 'なし',
+          containerChildren: answersContainer?.children.length || 0
+        });
+
+        console.log('🎨 [renderFilteredResults] AnswerRenderer.renderAnswers()呼び出し');
         this.answerRenderer.renderAnswers(filteredData);
+
+        console.log('🎨 [renderFilteredResults] カウント表示更新');
         this.answerRenderer.updateAnswerCount(status.filteredItems);
+
+        console.log('🎨 [renderFilteredResults] フィルタステータス表示更新');
         this.updateFilterStatusDisplay(status);
+
+        console.log('✅ [renderFilteredResults] レンダリング完了');
       }
       
       normalizeAnswer(item) {
@@ -426,33 +556,71 @@
       }
 
       async callGAS(funcName, ...args) {
+        console.log('📡 [GAS] 呼び出し開始', {
+          function: funcName,
+          args: args.length > 0 ? args.map(arg =>
+            typeof arg === 'string' && arg.length > 50 ? arg.substring(0, 50) + '...' : arg
+          ) : 'なし',
+          timestamp: new Date().toISOString(),
+          isProduction: this.isProduction
+        });
+
         return new Promise((resolve, reject) => {
           if (this.isProduction) {
             google.script.run
               .withSuccessHandler((result) => {
+                console.log('✅ [GAS] 呼び出し成功', {
+                  function: funcName,
+                  resultType: typeof result,
+                  hasData: result?.data ? `${result.data.length}件` : 'データなし',
+                  success: result?.success,
+                  executionTime: `${Date.now() - this.callStartTime}ms`
+                });
+
                 this.retryCount = 0; // 成功時はリトライカウントをリセット
                 resolve(result);
               })
               .withFailureHandler((error) => {
-                console.error(`GAS関数呼び出しエラー: ${funcName}`, error);
-                
+                console.error('❌ [GAS] 呼び出し失敗', {
+                  function: funcName,
+                  error: error,
+                  errorString: String(error),
+                  retryCount: this.retryCount,
+                  timestamp: new Date().toISOString()
+                });
+
                 // リトライ可能なエラーかチェック
                 const isRetryable = this.isRetryableError(error);
-                
+
                 if (isRetryable && this.retryCount < this.maxRetries) {
                   this.retryCount++;
-                  console.warn(`リトライ実行: ${this.retryCount}/${this.maxRetries} (${funcName})`);
-                  
+                  console.warn(`🔄 [GAS] リトライ実行: ${this.retryCount}/${this.maxRetries} (${funcName})`);
+
                   // 指数バックオフでリトライ
                   setTimeout(() => {
                     this.callGAS(funcName, ...args).then(resolve).catch(reject);
                   }, Math.pow(2, this.retryCount) * 1000);
                 } else {
                   this.retryCount = 0;
+                  console.error('🚫 [GAS] 最大リトライ回数に達しました', {
+                    function: funcName,
+                    finalError: error
+                  });
                   reject(this.normalizeError(error, funcName));
                 }
-              })
-              [this.getControllerFunction(funcName)](...args);
+              });
+
+            // 実行時間計測開始
+            this.callStartTime = Date.now();
+
+            // GAS関数実行
+            const controllerFunction = this.getControllerFunction(funcName);
+            console.log('🎯 [GAS] 実際の関数実行', {
+              mappedFunction: controllerFunction,
+              originalFunction: funcName
+            });
+
+            google.script.run[controllerFunction](...args);
           } else {
             this.mockResponse(funcName, resolve);
           }

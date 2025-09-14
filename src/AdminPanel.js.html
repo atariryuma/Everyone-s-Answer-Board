@@ -356,15 +356,29 @@
       const analysisResult = await analyzeColumnsAsync(spreadsheetId, sheetName);
 
       if (!analysisResult) {
-        console.error('❌ 列分析でnullが返されました');
-        showError('列分析でエラーが発生しました。スプレッドシートのアクセス権限を確認してください。');
+        console.warn('⚠️ 列分析でnullが返されました - 既存設定から復元を試行');
+        // フォールバック: 既存設定から復元
+        if (existingColumnMapping && existingColumnMapping.mapping) {
+          console.log('📋 既存設定から列設定を復元します');
+          this.restoreFromExistingMapping(existingColumnMapping);
+          showInfo('💡 既存の列設定を復元しました。必要に応じて手動で調整してください。');
+        } else {
+          showError('列分析でエラーが発生しました。スプレッドシートのアクセス権限を確認してください。');
+        }
         return;
       }
 
       if (!analysisResult.success) {
         const errorMsg = analysisResult.error || analysisResult.message || '列分析に失敗しました';
-        console.warn('⚠️ 列分析に失敗:', errorMsg);
-        showError(`列分析エラー: ${errorMsg}`);
+        console.warn('⚠️ 列分析に失敗 - 既存設定から復元を試行:', errorMsg);
+        // フォールバック: 既存設定から復元
+        if (existingColumnMapping && existingColumnMapping.mapping) {
+          console.log('📋 既存設定から列設定を復元します');
+          this.restoreFromExistingMapping(existingColumnMapping);
+          showInfo('💡 既存の列設定を復元しました。列分析は失敗しましたが、保存済み設定を使用します。');
+        } else {
+          showError(`列分析エラー: ${errorMsg}`);
+        }
         return;
       }
 
@@ -377,9 +391,15 @@
       // 2. ドロップダウンにヘッダー選択肢を設定
       populateColumnDropdowns(analysisResult.headers, analysisResult.mapping);
 
-      // 3. 既存の設定がある場合は復元
+      // 3. 既存の設定がある場合は復元（既存関数使用）
       if (existingColumnMapping && existingColumnMapping.mapping) {
-        restoreColumnMappingsToDropdowns(existingColumnMapping.mapping);
+        const dropdowns = {
+          answer: document.getElementById('answer-column-select'),
+          reason: document.getElementById('reason-column-select'),
+          class: document.getElementById('class-column-select'),
+          name: document.getElementById('name-column-select'),
+        };
+        restoreSavedColumnMapping(dropdowns);
       }
 
       console.log('✅ 列設定ドロップダウン初期化完了');
@@ -388,37 +408,6 @@
     }
   }
 
-  // 既存の列マッピングをドロップダウンに復元
-  function restoreColumnMappingsToDropdowns(columnMapping) {
-    try {
-      console.log('🔄 列マッピング復元開始:', columnMapping);
-
-      // 正しいIDとマッピングキーの対応
-      const columnMappings = {
-        answer: 'question',    // answer-column-select → question マッピング
-        reason: 'reason',      // reason-column-select → reason マッピング
-        class: 'class',        // class-column-select → class マッピング
-        name: 'name'           // name-column-select → name マッピング
-      };
-
-      Object.entries(columnMappings).forEach(([dropdownId, mappingKey]) => {
-        const columnValue = columnMapping[mappingKey];
-        if (columnValue) {
-          const dropdown = document.getElementById(`${dropdownId}-column-select`);
-          if (dropdown) {
-            dropdown.value = columnValue;
-            console.log(`✅ ${mappingKey}列を復元: ${columnValue}`);
-          } else {
-            console.warn(`⚠️ ${dropdownId}ドロップダウンが見つかりません`);
-          }
-        }
-      });
-
-      console.log('✅ 列マッピング復元完了');
-    } catch (error) {
-      console.error('❌ 列マッピング復元エラー:', error);
-    }
-  }
 
   // データソース選択ラジオボタンのイベント設定
   function setupDataSourceRadioEvents() {
