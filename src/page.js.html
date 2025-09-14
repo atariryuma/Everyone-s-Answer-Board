@@ -354,8 +354,25 @@
         if (cached) return cached;
         
         try {
-          const config = await this.callGAS('getUserConfig', this.vars.userId) || {};
-          
+          const config = await this.callGAS('getUserConfig', this.vars.userId);
+
+          // レスポンス検証
+          if (!config) {
+            console.error('❌ [loadConfig] 設定取得失敗: nullレスポンス');
+            throw new Error('設定データが取得できませんでした');
+          }
+
+          if (config.success === false) {
+            console.error('❌ [loadConfig] 設定取得失敗:', config.error || '不明なエラー');
+            throw new Error(config.error || '設定取得に失敗しました');
+          }
+
+          console.log('✅ [loadConfig] 設定取得成功', {
+            configType: typeof config,
+            hasUserPermissions: !!config.userPermissions,
+            spreadsheetId: config.spreadsheetId ? 'あり' : 'なし'
+          });
+
           // セキュリティ: サーバーサイドから権限情報を取得
           if (config.userPermissions) {
             this.vars.showAdminFeatures = config.userPermissions.isOwner || config.userPermissions.isSystemAdmin;

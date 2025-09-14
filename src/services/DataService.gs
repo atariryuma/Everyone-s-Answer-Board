@@ -33,11 +33,17 @@ const DataService = Object.freeze({
    */
   getSheetData(userId, options = {}) {
     const startTime = Date.now();
-    
+
     try {
       // 設定取得
       const config = ConfigService.getUserConfig(userId);
-      if (!config || !config.spreadsheetId) {
+      if (!config) {
+        console.error('DataService.getSheetData: ConfigServiceから設定を取得できません', { userId });
+        return ErrorHandler.createSafeResponse('ユーザー設定を取得できませんでした', 'DataService.getSheetData');
+      }
+
+      if (!config.spreadsheetId) {
+        console.warn('DataService.getSheetData: スプレッドシートIDが設定されていません', { userId, config });
         return ErrorHandler.createSafeResponse('スプレッドシートが設定されていません', 'DataService.getSheetData');
       }
 
@@ -1103,17 +1109,46 @@ const DataService = Object.freeze({
     const started = Date.now();
     try {
       UnifiedLogger.debug('DataService', { operation: 'DriveApp.searchFiles', phase: 'start' });
+
+      // まず現在のユーザー情報を確認
+      const currentUser = Session.getActiveUser().getEmail();
+      UnifiedLogger.debug('DataService', { operation: 'getUserInfo', currentUser });
+
       // 効率的な検索クエリを使用してスプレッドシートのみを取得
       const files = DriveApp.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
       UnifiedLogger.debug('DataService', {
         operation: 'DriveApp.searchFiles',
         phase: 'complete',
-        hasFiles: typeof files !== 'undefined'
+        hasFiles: typeof files !== 'undefined',
+        hasNext: files.hasNext()
       });
+
+      // DriveApp権限テスト
+      try {
+        const testFiles = DriveApp.getFiles();
+        const hasAnyFiles = testFiles.hasNext();
+        UnifiedLogger.debug('DataService', {
+          operation: 'DriveApp.getFiles test',
+          hasAnyFiles,
+          message: hasAnyFiles ? 'Drive access working' : 'No files accessible via DriveApp'
+        });
+      } catch (driveError) {
+        UnifiedLogger.error('DataService', {
+          operation: 'DriveApp.getFiles test',
+          error: driveError.message,
+          stack: driveError.stack
+        });
+      }
 
       const spreadsheets = [];
       let count = 0;
       const maxCount = 50; // 最大50件まで
+
+      UnifiedLogger.debug('DataService', {
+        operation: 'spreadsheet enumeration',
+        phase: 'start',
+        hasNext: files.hasNext()
+      });
 
       while (files.hasNext() && count < maxCount) {
         const file = files.next();
@@ -1122,7 +1157,8 @@ const DataService = Object.freeze({
           UnifiedLogger.debug('DataService', {
             operation: 'file discovery',
             index: count + 1,
-            fileName: file.getName()
+            fileName: file.getName(),
+            fileId: `${file.getId().substring(0, 10)  }...`
           });
         }
         spreadsheets.push({
@@ -1133,6 +1169,13 @@ const DataService = Object.freeze({
         });
         count++;
       }
+
+      UnifiedLogger.info('DataService', {
+        operation: 'spreadsheet enumeration',
+        phase: 'complete',
+        totalFound: count,
+        maxReached: count >= maxCount
+      });
 
       const response = {
         success: true,

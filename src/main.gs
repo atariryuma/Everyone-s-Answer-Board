@@ -852,14 +852,21 @@ function getUserConfig(userId) {
         userId = userInfo.userId;
         console.info('getUserConfig: userIdを現在のユーザーから取得:', userId);
       } else {
-        return { success: false, error: 'ユーザーIDの取得に失敗しました' };
+        console.warn('getUserConfig: userIdが取得できない - デフォルト設定を返却');
+        return ConfigService.getDefaultConfig('unknown');
       }
     }
 
-    return ConfigService.getUserConfig(userId);
+    const result = ConfigService.getUserConfig(userId);
+    if (!result) {
+      console.warn('getUserConfig: ConfigServiceからnullが返却された - デフォルト設定を返却');
+      return ConfigService.getDefaultConfig(userId);
+    }
+
+    return result;
   } catch (error) {
     console.error('getUserConfig error:', error);
-    return { success: false, error: error.message };
+    return ConfigService.getDefaultConfig(userId || 'error');
   }
 }
 

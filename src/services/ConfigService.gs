@@ -32,8 +32,8 @@ const ConfigService = Object.freeze({
    */
   getUserConfig(userId) {
     if (!userId || !this.validateUserId(userId)) {
-      console.warn('ConfigService.getUserConfig: 無効なuserID:', userId);
-      return null;
+      console.warn('ConfigService.getUserConfig: 無効なuserID - デフォルト設定を返却:', userId);
+      return this.getDefaultConfig(userId);
     }
 
     const cacheKey = `config_${userId}`;
