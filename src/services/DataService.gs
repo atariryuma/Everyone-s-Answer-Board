@@ -221,7 +221,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',
 
           // メタデータ
-          formattedTimestamp: formatTimestamp(extractFieldValue(row, headers, 'timestamp')),
+          formattedTimestamp: formatTimestampSimple(extractFieldValue(row, headers, 'timestamp')),
           isEmpty: isEmptyRow(row),
 
           // リアクション（既存の場合）
@@ -277,7 +277,7 @@ function processRawData(dataRows, headers, config, options = {}) {
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',
 
           // メタデータ
-          formattedTimestamp: formatTimestamp(extractFieldValue(row, headers, 'timestamp')),
+          formattedTimestamp: formatTimestampSimple(extractFieldValue(row, headers, 'timestamp')),
           isEmpty: isEmptyRow(row),
 
           // リアクション（既存の場合）
@@ -360,7 +360,7 @@ function extractFieldValue(row, headers, fieldType, columnMapping = {}) {
  * @param {string} reactionType - リアクションタイプ
  * @returns {boolean} 成功可否
  */
-function addReaction(userId, rowId, reactionType) {
+function addDataReaction(userId, rowId, reactionType) {
   try {
     if (!validateReactionType(reactionType)) {
       console.error('DataService.addReaction: 無効なリアクションタイプ', reactionType);
@@ -400,7 +400,7 @@ function addReaction(userId, rowId, reactionType) {
  * @param {string} reactionType - リアクションタイプ
  * @returns {boolean} 成功可否
  */
-function removeReaction(userId, rowId, reactionType) {
+function removeDataReaction(userId, rowId, reactionType) {
   try {
     // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
     const user = DB.findUserById(userId);
@@ -430,7 +430,7 @@ function removeReaction(userId, rowId, reactionType) {
  * @param {string} rowId - 行ID
  * @returns {boolean} 成功可否
  */
-function toggleHighlight(userId, rowId) {
+function toggleDataHighlight(userId, rowId) {
   try {
     // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
     const user = DB.findUserById(userId);

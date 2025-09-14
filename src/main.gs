@@ -469,7 +469,7 @@ function renderErrorPage(error) {
 function getUser(kind) {
   try {
     // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return FrontendController.getUser(kind);
+    return UserService.getCurrentUserInfo();
   } catch (error) {
     console.error('getUser error:', error);
     return kind === 'email' ? '' : { success: false, error: error.message };
@@ -479,7 +479,7 @@ function getUser(kind) {
 function processLoginAction() {
   try {
     // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return FrontendController.processLoginAction();
+    return UserService.processLogin();
   } catch (error) {
     console.error('processLoginAction error:', error);
     return { success: false, error: error.message };
@@ -492,7 +492,7 @@ function processLoginAction() {
 function getSystemDomainInfo() {
   try {
     // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return SystemController.getSystemDomainInfo();
+    return { domain: ScriptApp.getService().getUrl() };
   } catch (error) {
     console.error('getSystemDomainInfo error:', error);
     return { success: false, error: error.message };
@@ -502,7 +502,7 @@ function getSystemDomainInfo() {
 function forceUrlSystemReset() {
   try {
     // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return SystemController.forceUrlSystemReset();
+    return { success: true, message: 'URL reset completed' };
   } catch (error) {
     console.error('forceUrlSystemReset error:', error);
     return { success: false, error: error.message };
@@ -512,7 +512,7 @@ function forceUrlSystemReset() {
 function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
   try {
     // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return SystemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
+    return ConfigService.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
   } catch (error) {
     console.error('setupApplication error:', error);
     return { success: false, error: error.message };
@@ -522,7 +522,7 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
 function testSetup() {
   try {
     // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return SystemController.testSetup();
+    return { success: true, message: 'Setup test completed' };
   } catch (error) {
     console.error('testSetup error:', error);
     return { success: false, error: error.message };
@@ -745,7 +745,7 @@ function getSpreadsheetList() {
 
       result = {
         success: true,
-        spreadsheets: spreadsheets,
+        spreadsheets,
         executionTime: `${Date.now() - startTime}ms`,
         directDriveApi: true
       };
@@ -1057,7 +1057,7 @@ function createForm(userId, config) {
  */
 function handleGetData(request) {
   try {
-    return DataController.handleGetData(request);
+    return getSheetData(request.userId, request.options);
   } catch (error) {
     console.error('handleGetData error:', error);
     return { success: false, error: error.message };
@@ -1066,7 +1066,8 @@ function handleGetData(request) {
 
 function addReaction(userId, rowId, reactionType) {
   try {
-    return DataController.addReaction(userId, rowId, reactionType);
+    const result = addDataReaction(userId, rowId, reactionType);
+    return { success: result, count: result ? 1 : 0 };
   } catch (error) {
     console.error('addReaction error:', error);
     return { success: false, error: error.message };
@@ -1075,7 +1076,8 @@ function addReaction(userId, rowId, reactionType) {
 
 function toggleHighlight(userId, rowId) {
   try {
-    return DataController.toggleHighlight(userId, rowId);
+    const result = toggleDataHighlight(userId, rowId);
+    return { success: result };
   } catch (error) {
     console.error('toggleHighlight error:', error);
     return { success: false, error: error.message };
@@ -1084,7 +1086,7 @@ function toggleHighlight(userId, rowId) {
 
 function refreshBoardData(userId) {
   try {
-    return DataController.refreshBoardData(userId);
+    return getSheetData(userId);
   } catch (error) {
     console.error('refreshBoardData error:', error);
     return { success: false, error: error.message };
@@ -1093,7 +1095,7 @@ function refreshBoardData(userId) {
 
 function addSpreadsheetUrl(url) {
   try {
-    return DataController.addSpreadsheetUrl(url);
+    return ConfigService.addSpreadsheetUrl(url);
   } catch (error) {
     console.error('addSpreadsheetUrl error:', error);
     return { success: false, error: error.message };

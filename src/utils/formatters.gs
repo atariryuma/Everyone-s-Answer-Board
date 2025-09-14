@@ -522,3 +522,33 @@ function diagnoseFormatters() {
     overall: results.every(r => r.status === '✅') ? '✅' : '⚠️'
   };
 }
+
+// ===========================================
+// 🎯 GAS Best Practice: Simple Functions
+// ===========================================
+
+/**
+ * Simple timestamp formatting function for GAS flat architecture
+ * @param {string|Date} timestamp - Timestamp to format
+ * @returns {string} Formatted timestamp
+ */
+function formatTimestampSimple(timestamp) {
+  try {
+    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
+    if (isNaN(date.getTime())) {
+      return new Date().toISOString();
+    }
+
+    // Short format: YYYY-MM-DD HH:mm
+    return date.toLocaleString('ja-JP', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    console.error('formatTimestampSimple error:', error);
+    return new Date().toISOString();
+  }
+}

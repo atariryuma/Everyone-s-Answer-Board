@@ -29,7 +29,7 @@ function getSpreadsheetList() {
 
     return {
       success: false,
-      message: 'テスト版エラー: ' + error.message,
+      message: `テスト版エラー: ${  error.message}`,
       spreadsheets: [],
       executionTime: '0ms'
     };
@@ -69,7 +69,7 @@ function getSpreadsheetListBackup() {
 
     const result = {
       success: true,
-      spreadsheets: spreadsheets,
+      spreadsheets,
       executionTime: `${Date.now() - startTime}ms`,
       method: 'drive_api_direct'
     };
