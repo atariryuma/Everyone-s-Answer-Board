@@ -87,9 +87,17 @@ const ConfigService = Object.freeze({
       userId,
       setupStatus: 'pending',
       appPublished: false,
-      displaySettings: { 
-        showNames: false, 
-        showReactions: false 
+      displaySettings: {
+        showNames: false,
+        showReactions: false
+      },
+      userPermissions: {
+        isOwner: false,
+        isSystemAdmin: false,
+        accessLevel: 'viewer',
+        canEdit: false,
+        canView: true,
+        canReact: true
       },
       createdAt: new Date().toISOString(),
       lastModified: new Date().toISOString()

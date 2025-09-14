@@ -339,7 +339,40 @@ function renderSetupPageWithTemplate(params) {
 }
 
 function handleViewMode(params) {
-  return renderMainPage({ mode: 'view', ...params });
+  try {
+    // 現在認証されているユーザーのメールアドレスを取得
+    const userEmail = UserService.getCurrentEmail();
+
+    // userIdからuserEmailを取得（認証情報で補完）
+    let resolvedUserEmail = userEmail;
+
+    // userIdが指定されている場合、そのユーザーの情報を取得
+    if (params.userId) {
+      try {
+        const user = DB.findUserById(params.userId);
+        if (user && user.email) {
+          resolvedUserEmail = user.email;
+        }
+      } catch (error) {
+        console.warn('handleViewMode: userIdからemail取得失敗:', error.message);
+      }
+    }
+
+    console.log('handleViewMode: ユーザー情報設定', {
+      paramsUserId: params.userId,
+      sessionEmail: userEmail,
+      resolvedUserEmail
+    });
+
+    return renderMainPage({
+      mode: 'view',
+      userEmail: resolvedUserEmail,
+      ...params
+    });
+  } catch (error) {
+    console.error('handleViewMode error:', error);
+    return renderMainPage({ mode: 'view', ...params });
+  }
 }
 
 function handleAppSetupMode(params) {
@@ -896,6 +929,19 @@ function getPublishedSheetData(userId, options) {
 
 function processReactionByEmail(userEmail, rowIndex, reactionKey) {
   try {
+    // 引数検証
+    if (!userEmail) {
+      console.error('processReactionByEmail: userEmailが無効です', { userEmail, rowIndex, reactionKey });
+      return { success: false, error: 'ユーザーメールアドレスが必要です' };
+    }
+
+    if (!rowIndex || !reactionKey) {
+      console.error('processReactionByEmail: 必須パラメータが不足', { userEmail, rowIndex, reactionKey });
+      return { success: false, error: '必須パラメータが不足しています' };
+    }
+
+    console.log('processReactionByEmail: 処理開始', { userEmail, rowIndex, reactionKey });
+
     // セッションスコープでスプレッドシート情報を取得
     const currentUserInfo = UserService.getCurrentUserInfo();
     if (!currentUserInfo || !currentUserInfo.config) {

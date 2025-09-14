@@ -135,9 +135,12 @@
   <script>
     // サーバーから渡されたパラメータをwindowオブジェクトに設定
     window.userId = <?!= JSON.stringify(data.userId || null) ?>;
+    window.userEmail = <?!= JSON.stringify(data.userEmail || null) ?>;
     console.log('🔧 [Page.html] Server data loaded:', {
       userId: window.userId,
-      hasUserId: !!window.userId
+      userEmail: window.userEmail,
+      hasUserId: !!window.userId,
+      hasUserEmail: !!window.userEmail
     });
   </script>
 

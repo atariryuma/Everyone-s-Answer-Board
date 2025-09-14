@@ -14,7 +14,8 @@
       // セキュリティ: クライアントサイド変数ではなく、サーバーから取得した設定を使用
       showAdminFeatures: false,  // サーバーサイドで判定
       isAdminUser: false,        // サーバーサイドで判定
-      userId: (typeof window !== 'undefined' && window.userId) || null
+      userId: (typeof window !== 'undefined' && window.userId) || null,
+      userEmail: (typeof window !== 'undefined' && window.userEmail) || null
     });
     
     const ICONS = Object.freeze({
@@ -250,6 +251,7 @@
           this.vars = getSecureVars();
           console.log('✅ [AnswerApp] セキュア変数取得完了', {
             userId: this.vars.userId ? this.vars.userId.substring(0, 8) + '...' : 'なし',
+            userEmail: this.vars.userEmail ? this.vars.userEmail.split('@')[0] + '@...' : 'なし',
             isAdminUser: this.vars.isAdminUser
           });
 
@@ -468,6 +470,18 @@
       }
       
       async updateReaction(rowIndex, reactionKey) {
+        console.log('🎯 [updateReaction] リアクション処理開始', {
+          rowIndex,
+          reactionKey,
+          userEmail: this.vars.userEmail ? this.vars.userEmail.split('@')[0] + '@...' : 'なし',
+          hasUserEmail: !!this.vars.userEmail
+        });
+
+        if (!this.vars.userEmail) {
+          console.error('❌ [updateReaction] userEmailが設定されていません');
+          return { success: false, error: 'ユーザー認証情報が不足しています' };
+        }
+
         return await this.callGAS('processReactionByEmail', this.vars.userEmail, rowIndex, reactionKey);
       }
       
