@@ -608,6 +608,16 @@
 
         return new Promise((resolve, reject) => {
           if (this.isProduction) {
+            // 実行時間計測開始
+            this.callStartTime = Date.now();
+
+            // GAS関数実行
+            const controllerFunction = this.getControllerFunction(funcName);
+            console.log('🎯 [GAS] 実際の関数実行', {
+              mappedFunction: controllerFunction,
+              originalFunction: funcName
+            });
+
             google.script.run
               .withSuccessHandler((result) => {
                 console.log('✅ [GAS] 呼び出し成功', {
@@ -649,19 +659,8 @@
                   });
                   reject(this.normalizeError(error, funcName));
                 }
-              });
-
-            // 実行時間計測開始
-            this.callStartTime = Date.now();
-
-            // GAS関数実行
-            const controllerFunction = this.getControllerFunction(funcName);
-            console.log('🎯 [GAS] 実際の関数実行', {
-              mappedFunction: controllerFunction,
-              originalFunction: funcName
-            });
-
-            google.script.run[controllerFunction](...args);
+              })
+              [controllerFunction](...args);
           } else {
             this.mockResponse(funcName, resolve);
           }
