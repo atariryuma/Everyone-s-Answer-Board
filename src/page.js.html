@@ -826,7 +826,7 @@
         container.className = 'flex items-center gap-2';
         
         // エラーアイコン
-        const errorIcon = document.createElement('svg');
+        const errorIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         errorIcon.className = 'w-5 h-5';
         errorIcon.setAttribute('viewBox', '0 0 24 24');
         errorIcon.setAttribute('fill', 'none');
@@ -844,7 +844,7 @@
         closeBtn.className = 'ml-2 hover:bg-red-700 rounded p-1';
         closeBtn.addEventListener('click', () => notification.remove());
         
-        const closeIcon = document.createElement('svg');
+        const closeIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         closeIcon.className = 'w-4 h-4';
         closeIcon.setAttribute('viewBox', '0 0 24 24');
         closeIcon.setAttribute('fill', 'none');
