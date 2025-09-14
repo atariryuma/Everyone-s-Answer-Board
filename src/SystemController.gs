@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global PROPS_KEYS, DB, UserService, ConfigService, DatabaseOperations */
+/* global ServiceFactory, DB, UserService, ConfigService, DatabaseOperations */
 
 // ===========================================
 // 🔧 DB初期化システム（GAS読み込み順序対応）
@@ -90,16 +90,14 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
         };
       }
 
-      // システムプロパティを設定
-      const properties = PropertiesService.getScriptProperties();
-      properties.setProperties({
-        [PROPS_KEYS.DATABASE_SPREADSHEET_ID]: databaseId,
-        [PROPS_KEYS.ADMIN_EMAIL]: adminEmail,
-        [PROPS_KEYS.SERVICE_ACCOUNT_CREDS]: serviceAccountJson
-      });
+      // システムプロパティを設定（ServiceFactory経由）
+      const props = ServiceFactory.getProperties();
+      props.set('DATABASE_SPREADSHEET_ID', databaseId);
+      props.set('ADMIN_EMAIL', adminEmail);
+      props.set('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
 
       if (googleClientId) {
-        properties.setProperty(PROPS_KEYS.GOOGLE_CLIENT_ID, googleClientId);
+        props.set('GOOGLE_CLIENT_ID', googleClientId);
       }
 
       console.log('システムセットアップ完了:', {
@@ -136,9 +134,9 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
  */
 function testSetup() {
     try {
-      const properties = PropertiesService.getScriptProperties();
-      const databaseId = properties.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-      const adminEmail = properties.getProperty(PROPS_KEYS.ADMIN_EMAIL);
+      const props = ServiceFactory.getProperties();
+      const databaseId = props.getDatabaseSpreadsheetId();
+      const adminEmail = props.getAdminEmail();
 
       if (!databaseId || !adminEmail) {
         return {
@@ -284,8 +282,8 @@ function testSystemDiagnosis() {
 
       // データベース診断
       try {
-        const properties = PropertiesService.getScriptProperties();
-        const databaseId = properties.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+        const props = ServiceFactory.getProperties();
+        const databaseId = props.getDatabaseSpreadsheetId();
 
         if (databaseId) {
           const spreadsheet = SpreadsheetApp.openById(databaseId);
@@ -329,13 +327,13 @@ function testSystemDiagnosis() {
  */
 function getSystemStatus() {
     try {
-      const properties = PropertiesService.getScriptProperties();
+      const props = ServiceFactory.getProperties();
       const status = {
         timestamp: new Date().toISOString(),
         setup: {
-          hasDatabase: !!properties.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID),
-          hasAdminEmail: !!properties.getProperty(PROPS_KEYS.ADMIN_EMAIL),
-          hasServiceAccount: !!properties.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS)
+          hasDatabase: !!props.getDatabaseSpreadsheetId(),
+          hasAdminEmail: !!props.getAdminEmail(),
+          hasServiceAccount: !!props.getServiceAccountCreds()
         },
         services: {
           available: ['UserService', 'ConfigService', 'DataService', 'SecurityService']

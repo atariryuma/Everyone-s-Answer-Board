@@ -15,7 +15,7 @@
  * - src/services/*.gs
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, DB, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, AppCacheService, getAdminSpreadsheetList, addDataReaction, toggleDataHighlight, DatabaseOperations, ServiceFactory */
+/* global UserService, ConfigService, DataService, SecurityService, DB, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, getAdminSpreadsheetList, addDataReaction, toggleDataHighlight, DatabaseOperations, ServiceFactory */
 
 /**
  * 🚀 GAS Service Discovery & Dynamic Loading
@@ -674,7 +674,9 @@ function handleFixUserMode() {
 
 function handleClearCacheMode() {
   try {
-    AppCacheService.clearAll();
+    // ServiceFactory経由でキャッシュクリア
+    const cache = ServiceFactory.getCache();
+    cache.removeAll();
     return HtmlService.createHtmlOutput(`
       <h2>Cache Cleared</h2>
       <p>All caches have been cleared successfully</p>
