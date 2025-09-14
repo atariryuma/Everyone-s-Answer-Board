@@ -39,13 +39,15 @@ const DataService = Object.freeze({
       const user = DB.findUserById(userId);
       if (!user || !user.configJson) {
         console.error('DataService.getSheetData: ユーザー設定が見つかりません', { userId });
-        return this.createErrorResponse('ユーザー設定を取得できませんでした');
+        // ✅ google.script.run 互換: シンプル形式
+        return { data: [], headers: [], sheetName: '', error: 'ユーザー設定を取得できませんでした' };
       }
 
       const config = JSON.parse(user.configJson);
       if (!config.spreadsheetId) {
         console.warn('DataService.getSheetData: スプレッドシートIDが設定されていません', { userId });
-        return this.createErrorResponse('スプレッドシートが設定されていません');
+        // ✅ google.script.run 互換: シンプル形式
+        return { data: [], headers: [], sheetName: '', error: 'スプレッドシートが設定されていません' };
       }
 
       // データ取得実行
@@ -64,7 +66,8 @@ const DataService = Object.freeze({
         userId,
         error: error.message
       });
-      return this.createErrorResponse(error.message || 'データ取得エラー');
+      // ✅ google.script.run 互換: シンプル形式
+      return { data: [], headers: [], sheetName: '', error: error.message || 'データ取得エラー' };
     }
   },
 
@@ -80,7 +83,8 @@ const DataService = Object.freeze({
       return this.getSheetData(userId, options);
     } catch (error) {
       console.error('DataService.getPublishedSheetData error:', error);
-      return this.createErrorResponse(error.message || '公開データ取得エラー');
+      // ✅ google.script.run 互換: シンプル形式
+      return { data: [], headers: [], sheetName: '', error: error.message || '公開データ取得エラー' };
     }
   },
 
@@ -110,7 +114,8 @@ const DataService = Object.freeze({
       const lastCol = sheet.getLastColumn();
 
       if (lastRow <= 1) {
-        return ResponseFormatter.createSuccessResponse([], { message: 'データが存在しません' });
+        // ✅ google.script.run 互換: シンプル形式
+        return { data: [], headers: [], sheetName: config.sheetName || '不明' };
       }
 
       // ヘッダー行取得
@@ -171,14 +176,16 @@ const DataService = Object.freeze({
         batchCount: Math.ceil(totalDataRows / MAX_BATCH_SIZE)
       });
 
-      return ResponseFormatter.createSuccessResponse(processedData, {
+      // ✅ google.script.run 互換: フロントエンド期待形式で直接返却
+      return {
+        data: processedData,
+        headers,
+        sheetName: config.sheetName || '不明',
+        // デバッグ情報（オプショナル）
         totalRows: totalDataRows,
         processedRows: processedCount,
-        filteredRows: processedData.length,
-        headers,
-        executionTime,
-        wasTruncated: processedCount < totalDataRows
-      });
+        executionTime
+      };
     } catch (error) {
       console.error('DataService.fetchSpreadsheetData: エラー', error.message);
       throw error;
@@ -1194,29 +1201,33 @@ const DataService = Object.freeze({
         maxReached: count >= maxCount
       });
 
+      // ✅ google.script.run互換 - シンプル形式に最適化
       const response = {
         success: true,
-        cached: false,
-        executionTime: `${Date.now() - started}ms`,
         spreadsheets,
-        totalCount: count,
-        maxReached: count >= maxCount
+        executionTime: `${Date.now() - started}ms`
       };
 
       // レスポンスサイズ監視（GAS制限対応）
       const responseSize = JSON.stringify(response).length;
       const responseSizeKB = Math.round(responseSize / 1024 * 100) / 100;
 
-      if (responseSizeKB > 50) { // 50KB警告
-        console.warn('DataService.getSpreadsheetList: 大きなレスポンス', {
-          responseSize: `${responseSizeKB  }KB`
-        });
-      }
-
-      console.log('DataService.getSpreadsheetList: 成功', {
-        spreadsheetsCount: response.spreadsheets.length,
-        executionTime: response.executionTime
+      console.log('DataService.getSpreadsheetList: 成功 - google.script.run最適化', {
+        spreadsheetsCount: spreadsheets.length,
+        executionTime: response.executionTime,
+        responseSizeKB,
+        responseValid: response !== null && typeof response === 'object'
       });
+
+      // ✅ google.script.run互換性チェック
+      if (!response || typeof response !== 'object' || !Array.isArray(response.spreadsheets)) {
+        console.error('DataService.getSpreadsheetList: 無効なレスポンス形式', response);
+        return {
+          success: false,
+          spreadsheets: [],
+          message: 'レスポンス形式エラー'
+        };
+      }
 
       return response;
     } catch (error) {

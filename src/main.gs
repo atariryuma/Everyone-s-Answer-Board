@@ -683,36 +683,107 @@ function getConfig() {
 }
 
 function getSpreadsheetList() {
-  try {
-    console.info('getSpreadsheetList: 開始 - GAS Flat Architecture');
+  const startTime = Date.now();
 
-    // ✅ GAS Best Practice: 直接サービス呼び出し（ServiceRegistry除去）
+  try {
+    console.info('getSpreadsheetList: 開始 - GAS Flat Architecture with enhanced debug');
+
+    // ✅ Phase 1: 詳細デバッグログと厳密nullチェック
     const result = DataService.getSpreadsheetList();
 
+    // 詳細なレスポンス検証
     console.info('getSpreadsheetList: DataService直接呼び出し完了', {
       resultType: typeof result,
-      isNull: result === null
+      isNull: result === null,
+      isUndefined: result === undefined,
+      hasSuccess: result && typeof result.success !== 'undefined',
+      hasSpreadsheets: result && Array.isArray(result.spreadsheets),
+      spreadsheetsLength: result && result.spreadsheets ? result.spreadsheets.length : 'N/A',
+      rawResult: result,
+      executionTime: `${Date.now() - startTime}ms`
     });
 
-    // null/undefined ガード
-    if (!result) {
-      console.error('getSpreadsheetList: DataServiceがnullを返しました');
+    // 厳密nullチェック - google.script.run互換性確保
+    if (result === null || result === undefined) {
+      console.error('getSpreadsheetList: DataServiceがnull/undefinedを返しました - google.script.run送信不可');
+      const fallbackResponse = {
+        success: false,
+        message: 'スプレッドシート一覧の取得に失敗しました（null response）',
+        spreadsheets: [],
+        debugInfo: {
+          timestamp: new Date().toISOString(),
+          executionTime: `${Date.now() - startTime}ms`,
+          resultWasNull: result === null,
+          resultWasUndefined: result === undefined
+        }
+      };
+      console.warn('getSpreadsheetList: フォールバック応答を送信', fallbackResponse);
+      return fallbackResponse;
+    }
+
+    // 応答構造の検証
+    if (typeof result !== 'object') {
+      console.error('getSpreadsheetList: DataServiceが非オブジェクトを返しました', {
+        resultType: typeof result,
+        result
+      });
       return {
         success: false,
-        message: 'スプレッドシート一覧の取得に失敗しました',
-        spreadsheets: []
+        message: '無効なレスポンス形式です',
+        spreadsheets: [],
+        debugInfo: {
+          timestamp: new Date().toISOString(),
+          executionTime: `${Date.now() - startTime}ms`,
+          resultType: typeof result
+        }
       };
     }
 
+    // success フィールドの検証
+    if (typeof result.success === 'undefined') {
+      console.warn('getSpreadsheetList: success フィールドが未定義 - 互換性のため設定');
+      result.success = Array.isArray(result.spreadsheets) && result.spreadsheets.length >= 0;
+    }
+
+    // spreadsheets フィールドの検証
+    if (!Array.isArray(result.spreadsheets)) {
+      console.warn('getSpreadsheetList: spreadsheets が配列ではありません - 修正');
+      result.spreadsheets = [];
+      result.success = false;
+      result.message = result.message || 'スプレッドシート配列の取得に失敗';
+    }
+
+    // 最終応答ログ
+    console.info('getSpreadsheetList: 最終応答準備完了', {
+      success: result.success,
+      spreadsheetsCount: result.spreadsheets.length,
+      hasMessage: !!result.message,
+      totalExecutionTime: `${Date.now() - startTime}ms`,
+      responseSize: JSON.stringify(result).length
+    });
+
     return result;
+
   } catch (error) {
-    console.error('getSpreadsheetList error:', error);
+    const executionTime = `${Date.now() - startTime}ms`;
+    console.error('getSpreadsheetList: 例外エラー', {
+      error: error.message,
+      stack: error.stack,
+      name: error.name,
+      executionTime
+    });
 
     return {
       success: false,
       message: error.message || 'スプレッドシート一覧取得エラー',
       spreadsheets: [],
-      error: error.toString()
+      error: error.toString(),
+      debugInfo: {
+        timestamp: new Date().toISOString(),
+        executionTime,
+        errorName: error.name,
+        errorMessage: error.message
+      }
     };
   }
 }
