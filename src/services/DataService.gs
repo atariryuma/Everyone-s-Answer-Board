@@ -930,6 +930,62 @@ const DataService = Object.freeze({
   },
 
   /**
+   * リアクション情報抽出
+   * @param {Array} row - データ行
+   * @param {Array} headers - ヘッダー行
+   * @returns {Object} リアクション情報
+   */
+  extractReactions(row, headers) {
+    try {
+      const reactions = {
+        UNDERSTAND: 0,
+        LIKE: 0,
+        CURIOUS: 0
+      };
+
+      // リアクション列を探して値を抽出
+      headers.forEach((header, index) => {
+        const headerStr = String(header).toLowerCase();
+        if (headerStr.includes('understand') || headerStr.includes('理解')) {
+          reactions.UNDERSTAND = parseInt(row[index]) || 0;
+        } else if (headerStr.includes('like') || headerStr.includes('いいね')) {
+          reactions.LIKE = parseInt(row[index]) || 0;
+        } else if (headerStr.includes('curious') || headerStr.includes('気になる')) {
+          reactions.CURIOUS = parseInt(row[index]) || 0;
+        }
+      });
+
+      return reactions;
+    } catch (error) {
+      console.warn('DataService.extractReactions: エラー', error.message);
+      return { UNDERSTAND: 0, LIKE: 0, CURIOUS: 0 };
+    }
+  },
+
+  /**
+   * ハイライト情報抽出
+   * @param {Array} row - データ行
+   * @param {Array} headers - ヘッダー行
+   * @returns {boolean} ハイライト状態
+   */
+  extractHighlight(row, headers) {
+    try {
+      // ハイライト列を探して値を抽出
+      for (let i = 0; i < headers.length; i++) {
+        const header = String(headers[i]).toLowerCase();
+        if (header.includes('highlight') || header.includes('ハイライト')) {
+          const value = String(row[i]).toUpperCase();
+          return value === 'TRUE' || value === '1' || value === 'YES';
+        }
+      }
+      return false;
+    } catch (error) {
+      console.warn('DataService.extractHighlight: エラー', error.message);
+      return false;
+    }
+  },
+
+  /**
    * サービス状態診断
    * @returns {Object} 診断結果
    */
