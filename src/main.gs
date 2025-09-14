@@ -41,11 +41,90 @@ function getAvailableService(serviceName) {
 function callServiceMethod(serviceName, methodName, ...args) {
   const service = getAvailableService(serviceName);
   if (service && typeof service[methodName] === 'function') {
-    return service[methodName](...args);
+    try {
+      return service[methodName](...args);
+    } catch (error) {
+      console.warn(`callServiceMethod: ${serviceName}.${methodName} execution failed:`, error.message);
+    }
   }
 
-  console.warn(`callServiceMethod: ${serviceName}.${methodName} not available`);
+  console.warn(`callServiceMethod: ${serviceName}.${methodName} not available, trying fallback`);
+
+  // 🚀 Built-in Fallback Functions
+  if (serviceName === 'UserService') {
+    return handleUserServiceFallback(methodName, ...args);
+  }
+
   return null;
+}
+
+/**
+ * UserService fallback using GAS built-in APIs
+ */
+function handleUserServiceFallback(methodName, ...args) {
+  try {
+    switch (methodName) {
+      case 'getCurrentEmail':
+        return getCurrentEmailDirect();
+
+      case 'getCurrentUserInfo': {
+        const email = getCurrentEmailDirect();
+        return email ? { userEmail: email, userId: null, isActive: true } : null;
+      }
+
+      case 'isSystemAdmin': {
+        const userEmail = args[0] || getCurrentEmailDirect();
+        return checkIsSystemAdminDirect(userEmail);
+      }
+
+      default:
+        console.warn(`handleUserServiceFallback: No fallback for ${methodName}`);
+        return null;
+    }
+  } catch (error) {
+    console.error(`handleUserServiceFallback(${methodName}):`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Direct email retrieval using GAS Session API
+ */
+function getCurrentEmailDirect() {
+  try {
+    // Method 1: Session.getActiveUser()
+    let email = Session.getActiveUser().getEmail();
+    if (email) {
+      return email;
+    }
+
+    // Method 2: Session.getEffectiveUser()
+    email = Session.getEffectiveUser().getEmail();
+    if (email) {
+      return email;
+    }
+
+    console.warn('getCurrentEmailDirect: No email available from Session API');
+    return null;
+  } catch (error) {
+    console.error('getCurrentEmailDirect:', error.message);
+    return null;
+  }
+}
+
+/**
+ * Direct system admin check
+ */
+function checkIsSystemAdminDirect(email) {
+  try {
+    if (!email) return false;
+
+    const adminEmail = getSystemPropertyDirect('ADMIN_EMAIL');
+    return adminEmail ? email.toLowerCase() === adminEmail.toLowerCase() : false;
+  } catch (error) {
+    console.error('checkIsSystemAdminDirect:', error.message);
+    return false;
+  }
 }
 
 /**
@@ -204,38 +283,27 @@ function validateModeAccess(mode, params) {
 
   // Step 2: 認証必要チェック
   if (rules.requiresAuth) {
-    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
-      console.warn('validateModeAccess: UserService not available, redirecting to login');
-      return { allowed: false, redirect: 'login', reason: 'user_service_unavailable' };
-    }
-
-    const userEmail = UserService.getCurrentEmail();
+    // 🚀 Dynamic Service Discovery with Fallback
+    const userEmail = callServiceMethod('UserService', 'getCurrentEmail');
     if (!userEmail) {
-      console.log('validateModeAccess: 認証が必要', mode);
+      console.log('validateModeAccess: 認証が必要 (no email from service discovery)', mode);
       return { allowed: false, redirect: 'login', reason: 'auth_required' };
     }
 
     // Step 3: アクセスレベルチェック
     if (rules.accessLevel === 'system_admin') {
-      if (typeof UserService.isSystemAdmin !== 'function') {
-        console.warn('validateModeAccess: UserService.isSystemAdmin not available');
-        return { allowed: false, redirect: 'login', reason: 'admin_check_unavailable' };
-      }
-      if (!UserService.isSystemAdmin(userEmail)) {
+      const isAdmin = callServiceMethod('UserService', 'isSystemAdmin', userEmail);
+      if (!isAdmin) {
         console.log('validateModeAccess: システム管理者権限が必要', { mode, userEmail });
         return { allowed: false, redirect: 'login', reason: 'admin_required' };
       }
     }
 
     if (rules.accessLevel === 'owner' && params.userId) {
-      if (typeof UserService.getCurrentUserInfo !== 'function' || typeof UserService.isSystemAdmin !== 'function') {
-        console.warn('validateModeAccess: UserService methods not available for owner check');
-        return { allowed: false, redirect: 'login', reason: 'owner_check_unavailable' };
-      }
-
-      const currentUser = UserService.getCurrentUserInfo();
+      // 🚀 Dynamic Service Discovery for owner check
+      const currentUser = callServiceMethod('UserService', 'getCurrentUserInfo');
       const isOwnUser = currentUser && currentUser.userId === params.userId;
-      const isSystemAdmin = UserService.isSystemAdmin(userEmail);
+      const isSystemAdmin = callServiceMethod('UserService', 'isSystemAdmin', userEmail);
 
       if (!isOwnUser && !isSystemAdmin) {
         console.log('validateModeAccess: 所有者権限が必要', {
