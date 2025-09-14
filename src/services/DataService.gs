@@ -894,50 +894,6 @@ const DataService = Object.freeze({
     return !row || row.every(cell => !cell || cell.toString().trim() === '');
   },
 
-  /**
-   * メール経由リアクション処理（既存関数のラッパー）
-   * @param {string} userEmail - ユーザーメールアドレス
-   * @param {number} rowIndex - 行インデックス
-   * @param {string} reactionKey - リアクション種類
-   * @returns {Object} 処理結果
-   */
-  processReactionWithEmail(userEmail, rowIndex, reactionKey) {
-    try {
-      if (!userEmail) {
-        return { success: false, message: 'メールアドレスが必要です' };
-      }
-
-      // 現在のリクエストからuserIdパラメータを取得してスプレッドシート情報を取得
-      // URLSearchParamsの代替手法を使用
-      const urlParams = ScriptApp.getService().getUrl().split('?')[1];
-      let userId = null;
-      if (urlParams) {
-        const params = urlParams.split('&');
-        for (const param of params) {
-          const [key, value] = param.split('=');
-          if (key === 'userId' && value) {
-            userId = decodeURIComponent(value);
-            break;
-          }
-        }
-      }
-
-      if (!userId) {
-        return { success: false, message: 'ユーザーIDが見つかりません' };
-      }
-
-      const config = ConfigService.getUserConfig(userId);
-      if (!config || !config.spreadsheetId || !config.sheetName) {
-        return { success: false, message: 'スプレッドシート設定が見つかりません' };
-      }
-
-      // 既存のprocessReaction関数を直接呼び出し
-      return this.processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionKey, userEmail);
-    } catch (error) {
-      console.error('DataService.processReactionWithEmail エラー:', error.message);
-      return { success: false, message: error.message };
-    }
-  },
 
   /**
    * 成功レスポンス作成

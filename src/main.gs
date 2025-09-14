@@ -885,7 +885,30 @@ function getPublishedSheetData(userId, options) {
 
 function processReactionByEmail(userEmail, rowIndex, reactionKey) {
   try {
-    return DataService.processReactionWithEmail(userEmail, rowIndex, reactionKey);
+    // セッションスコープでスプレッドシート情報を取得
+    const currentUserInfo = UserService.getCurrentUserInfo();
+    if (!currentUserInfo || !currentUserInfo.config) {
+      // フォールバック：現在認証されているユーザーの設定を使用
+      const sessionEmail = UserService.getCurrentEmail();
+      if (sessionEmail) {
+        const sessionUser = DB.findUserByEmail(sessionEmail);
+        if (sessionUser) {
+          const config = ConfigService.getUserConfig(sessionUser.userId);
+          if (config && config.spreadsheetId && config.sheetName) {
+            return DataService.processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionKey, userEmail);
+          }
+        }
+      }
+      return { success: false, error: 'スプレッドシート設定が見つかりません' };
+    }
+
+    const {config} = currentUserInfo;
+    if (!config.spreadsheetId || !config.sheetName) {
+      return { success: false, error: '無効なスプレッドシート設定です' };
+    }
+
+    // 既存のprocessReaction関数を直接呼び出し
+    return DataService.processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionKey, userEmail);
   } catch (error) {
     console.error('processReactionByEmail error:', error);
     return { success: false, error: error.message };
