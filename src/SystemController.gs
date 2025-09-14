@@ -873,20 +873,38 @@ function checkCurrentPublicationStatus() {
  * @param {string} [kind='email'] - 取得する情報の種類（'email' or 'full'）
  * @returns {Object|string|null} 統一されたレスポンス形式
  */
-function getUser(kind = 'email') {
+/**
+ * Direct email retrieval using GAS Session API (SystemController version)
+ */
+function getCurrentEmailDirectSC() {
   try {
-    // Safe UserService call with lazy initialization protection
-    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
-      console.warn('getUser: UserService not available, service not initialized yet');
-      return {
-        success: false,
-        error: 'UserService initialization pending'
-      };
+    // Method 1: Session.getActiveUser()
+    let email = Session.getActiveUser().getEmail();
+    if (email) {
+      return email;
     }
 
-    const userEmail = UserService.getCurrentEmail();
+    // Method 2: Session.getEffectiveUser()
+    email = Session.getEffectiveUser().getEmail();
+    if (email) {
+      return email;
+    }
+
+    console.warn('getCurrentEmailDirectSC: No email available from Session API');
+    return null;
+  } catch (error) {
+    console.error('getCurrentEmailDirectSC:', error.message);
+    return null;
+  }
+}
+
+function getUser(kind = 'email') {
+  try {
+    // 🚀 Direct Session API fallback - no service dependencies
+    const userEmail = getCurrentEmailDirectSC();
 
     if (!userEmail) {
+      console.warn('getUser: No email available from Session API');
       return kind === 'email' ? '' : { success: false, message: 'ユーザー情報が取得できません' };
     }
 
@@ -895,8 +913,8 @@ function getUser(kind = 'email') {
       return String(userEmail);
     }
 
-    // 統一オブジェクト形式（'full' など）
-    const userInfo = UserService.getCurrentUserInfo();
+    // 統一オブジェクト形式（'full' など）- フォールバック情報
+    const userInfo = { userEmail, userId: null, isActive: true };
     return {
       success: true,
       email: userEmail,
