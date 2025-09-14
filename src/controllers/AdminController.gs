@@ -105,8 +105,28 @@ const AdminController = Object.freeze({
    * @returns {Object} スプレッドシート一覧
    */
   getSpreadsheetList() {
-    // 直接DataServiceに委譲（冗長なログを除去）
-    return DataService.getSpreadsheetList();
+    try {
+      const result = DataService.getSpreadsheetList();
+
+      // null/undefined ガード
+      if (!result) {
+        console.error('AdminController.getSpreadsheetList: DataServiceがnullを返しました');
+        return {
+          success: false,
+          message: 'スプレッドシート一覧の取得に失敗しました',
+          spreadsheets: []
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('AdminController.getSpreadsheetList エラー:', error.message);
+      return {
+        success: false,
+        message: error.message,
+        spreadsheets: []
+      };
+    }
   },
 
   /**

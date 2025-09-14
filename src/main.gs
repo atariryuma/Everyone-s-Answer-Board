@@ -621,10 +621,26 @@ function getConfig() {
 
 function getSpreadsheetList() {
   try {
-    return AdminController.getSpreadsheetList();
+    const result = AdminController.getSpreadsheetList();
+
+    // null/undefined ガード
+    if (!result) {
+      console.error('getSpreadsheetList: AdminControllerがnullを返しました');
+      return {
+        success: false,
+        message: 'スプレッドシート一覧の取得に失敗しました',
+        spreadsheets: []
+      };
+    }
+
+    return result;
   } catch (error) {
     console.error('getSpreadsheetList error:', error);
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      message: error.message,
+      spreadsheets: []
+    };
   }
 }
 

@@ -360,7 +360,20 @@
         // フォールバック: 既存設定から復元
         if (existingColumnMapping && existingColumnMapping.mapping) {
           console.log('📋 既存設定から列設定を復元します');
-          this.restoreFromExistingMapping(existingColumnMapping);
+
+          // ダミーヘッダーを作成してドロップダウンを初期化
+          const dummyHeaders = ['列1', '列2', '列3', '列4', '列5', '列6', '列7', '列8', '列9', '列10'];
+          populateColumnDropdowns(dummyHeaders, {});
+
+          // 既存マッピングで復元
+          const dropdowns = {
+            answer: document.getElementById('answer-column-select'),
+            reason: document.getElementById('reason-column-select'),
+            class: document.getElementById('class-column-select'),
+            name: document.getElementById('name-column-select'),
+          };
+          restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
+
           showInfo('💡 既存の列設定を復元しました。必要に応じて手動で調整してください。');
         } else {
           showError('列分析でエラーが発生しました。スプレッドシートのアクセス権限を確認してください。');
@@ -374,7 +387,20 @@
         // フォールバック: 既存設定から復元
         if (existingColumnMapping && existingColumnMapping.mapping) {
           console.log('📋 既存設定から列設定を復元します');
-          this.restoreFromExistingMapping(existingColumnMapping);
+
+          // ダミーヘッダーを作成してドロップダウンを初期化
+          const dummyHeaders = ['列1', '列2', '列3', '列4', '列5', '列6', '列7', '列8', '列9', '列10'];
+          populateColumnDropdowns(dummyHeaders, {});
+
+          // 既存マッピングで復元
+          const dropdowns = {
+            answer: document.getElementById('answer-column-select'),
+            reason: document.getElementById('reason-column-select'),
+            class: document.getElementById('class-column-select'),
+            name: document.getElementById('name-column-select'),
+          };
+          restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
+
           showInfo('💡 既存の列設定を復元しました。列分析は失敗しましたが、保存済み設定を使用します。');
         } else {
           showError(`列分析エラー: ${errorMsg}`);
@@ -1683,9 +1709,13 @@
     console.log('populateColumnDropdowns:', { headers, mapping });
 
     try {
-      // 入力データの検証
+      // 入力データの検証とフォールバック
+      let actualHeaders = headers;
       if (!Array.isArray(headers) || headers.length === 0) {
-        throw new Error('ヘッダー情報が不正です');
+        console.warn('⚠️ ヘッダー情報が不正です - ダミーヘッダーを使用');
+        // フォールバック: ダミーヘッダーを提供
+        actualHeaders = ['列1', '列2', '列3', '列4', '列5', '列6', '列7', '列8', '列9', '列10'];
+        showInfo('💡 列分析が失敗したため、列番号で表示しています。適切な列を手動で選択してください。');
       }
 
       // 4つのドロップダウンを取得
@@ -1715,7 +1745,7 @@
           dropdown.innerHTML = '<option value="">選択してください...</option>';
 
           // ヘッダーをオプションとして追加
-          headers.forEach((header, index) => {
+          actualHeaders.forEach((header, index) => {
             if (header && header.trim()) {
               const option = document.createElement('option');
               option.value = index;
@@ -1742,29 +1772,38 @@
     }
   }
 
-  // 保存済み設定から列マッピングを復元（オプション追加後に実行）
+  // 保存済み設定から列マッピングを復元（オプション追加後に実行）- 改良版（フォールバック対応）
   let lastMappingRestore = null;
-  function restoreSavedColumnMapping(dropdowns) {
+  function restoreSavedColumnMapping(dropdowns, fallbackMapping = null) {
     try {
-      const config = systemState.config;
-      if (!config || !config.columnMapping || !config.columnMapping.mapping) {
-        console.log('📋 保存済み列マッピングなし - スキップ');
-        return;
-      }
+      let savedMapping = null;
 
-      const savedMapping = config.columnMapping.mapping;
+      // フォールバックマッピングが提供された場合（列分析失敗時）
+      if (fallbackMapping) {
+        savedMapping = fallbackMapping;
+        console.log('📋 フォールバックマッピング使用:', savedMapping);
+      } else {
+        // 通常のconfig取得
+        const config = systemState.config;
+        if (!config || !config.columnMapping || !config.columnMapping.mapping) {
+          console.log('📋 保存済み列マッピングなし - スキップ');
+          return false;
+        }
+        savedMapping = config.columnMapping.mapping;
+      }
 
       // 重複実行防止
       const mappingHash = JSON.stringify(savedMapping);
       if (lastMappingRestore === mappingHash) {
         console.log('📋 列マッピング復元: 重複実行をスキップ');
-        return;
+        return true;
       }
       lastMappingRestore = mappingHash;
 
       console.log('📋 保存済み列マッピング復元開始:', savedMapping);
 
       // 各列選択ドロップダウンに保存済み値を設定
+      let restoredCount = 0;
       Object.keys(dropdowns).forEach((columnType) => {
         const dropdown = dropdowns[columnType];
         if (!dropdown) {
@@ -1782,15 +1821,18 @@
 
             // ドロップダウンに視覚的フィードバックを追加
             dropdown.classList.add('has-manual-selection');
+            restoredCount++;
           } else {
             console.warn(`⚠️ ${columnType}列選択: 保存値 ${savedValue} に対応するオプションが見つかりません`);
           }
         }
       });
 
-      console.log('✅ 保存済み列マッピング復元完了');
+      console.log(`✅ 保存済み列マッピング復元完了 (${restoredCount}件復元)`);
+      return restoredCount > 0;
     } catch (error) {
       console.error('❌ 保存済み列マッピング復元エラー:', error.message);
+      return false;
     }
   }
 
