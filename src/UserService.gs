@@ -17,7 +17,7 @@
 
 // 遅延初期化状態管理
 let userServiceInitialized = false;
-let userServiceCache = new Map();
+const userServiceCache = new Map();
 
 /**
  * UserService遅延初期化

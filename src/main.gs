@@ -99,7 +99,15 @@ function validateModeAccess(mode, params) {
   // Step 1: セットアップ必要チェック
   if (rules.requiresSetup) {
     try {
-      const hasSetup = ConfigService.hasCoreSystemProps();
+      // ConfigService安全アクセス - 遅延初期化対応
+      let hasSetup = false;
+      if (typeof ConfigService !== 'undefined' && ConfigService.hasCoreSystemProps) {
+        hasSetup = ConfigService.hasCoreSystemProps();
+      } else {
+        console.warn('validateModeAccess: ConfigService not available, assuming setup required');
+        return { allowed: false, redirect: 'setup', reason: 'config_service_unavailable' };
+      }
+
       console.log('validateModeAccess: Setup check result', { mode, hasSetup });
 
       if (!hasSetup) {
@@ -114,6 +122,11 @@ function validateModeAccess(mode, params) {
 
   // Step 2: 認証必要チェック
   if (rules.requiresAuth) {
+    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
+      console.warn('validateModeAccess: UserService not available, redirecting to login');
+      return { allowed: false, redirect: 'login', reason: 'user_service_unavailable' };
+    }
+
     const userEmail = UserService.getCurrentEmail();
     if (!userEmail) {
       console.log('validateModeAccess: 認証が必要', mode);
@@ -121,12 +134,23 @@ function validateModeAccess(mode, params) {
     }
 
     // Step 3: アクセスレベルチェック
-    if (rules.accessLevel === 'system_admin' && !UserService.isSystemAdmin(userEmail)) {
-      console.log('validateModeAccess: システム管理者権限が必要', { mode, userEmail });
-      return { allowed: false, redirect: 'login', reason: 'admin_required' };
+    if (rules.accessLevel === 'system_admin') {
+      if (typeof UserService.isSystemAdmin !== 'function') {
+        console.warn('validateModeAccess: UserService.isSystemAdmin not available');
+        return { allowed: false, redirect: 'login', reason: 'admin_check_unavailable' };
+      }
+      if (!UserService.isSystemAdmin(userEmail)) {
+        console.log('validateModeAccess: システム管理者権限が必要', { mode, userEmail });
+        return { allowed: false, redirect: 'login', reason: 'admin_required' };
+      }
     }
 
     if (rules.accessLevel === 'owner' && params.userId) {
+      if (typeof UserService.getCurrentUserInfo !== 'function' || typeof UserService.isSystemAdmin !== 'function') {
+        console.warn('validateModeAccess: UserService methods not available for owner check');
+        return { allowed: false, redirect: 'login', reason: 'owner_check_unavailable' };
+      }
+
       const currentUser = UserService.getCurrentUserInfo();
       const isOwnUser = currentUser && currentUser.userId === params.userId;
       const isSystemAdmin = UserService.isSystemAdmin(userEmail);
@@ -227,7 +251,15 @@ function doGet(e) {
  */
 function doPost(e) {
   try {
-    // Security validation
+    // Security validation with service availability check
+    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
+      console.error('doPost: UserService not available');
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        error: 'System initialization in progress, please try again'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     const userEmail = UserService.getCurrentEmail();
 
     // Parse and validate request
@@ -325,7 +357,7 @@ function handleLoginModeWithTemplate(params, context = {}) {
     const template = HtmlService.createTemplateFromFile('LoginPage');
     template.params = params;
     template.context = context;
-    template.userEmail = UserService.getCurrentEmail() || '';
+    template.userEmail = (typeof UserService !== 'undefined' && UserService.getCurrentEmail) ? UserService.getCurrentEmail() || '' : '';
 
     return template.evaluate()
       .setTitle(`Login - ${APP_CONFIG.APP_NAME}`)
@@ -343,7 +375,12 @@ function handleAdminModeWithTemplate(params, context = {}) {
   try {
     console.log('handleAdminModeWithTemplate: Rendering admin panel');
 
-    // Security check for admin access
+    // Security check for admin access with service availability check
+    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail || !UserService.getCurrentUserInfo) {
+      console.warn('handleAdminModeWithTemplate: UserService not available');
+      return handleLoginModeWithTemplate(params, { reason: 'service_unavailable' });
+    }
+
     const userEmail = UserService.getCurrentEmail();
     if (!userEmail) {
       return handleLoginModeWithTemplate(params, { reason: 'admin_access_requires_auth' });
@@ -363,7 +400,13 @@ function handleAdminModeWithTemplate(params, context = {}) {
           userInfo = { userId, userEmail };
         } else {
           // ユーザーが存在しない場合は作成
-          const created = UserService.createUser(userEmail);
+          let created;
+          if (typeof UserService.createUser === 'function') {
+            created = UserService.createUser(userEmail);
+          } else {
+            console.error('handleAdminModeWithTemplate: UserService.createUser not available');
+            throw new Error('User creation service unavailable');
+          }
           if (created && created.userId) {
             userId = created.userId;
             userInfo = created;
@@ -386,7 +429,7 @@ function handleAdminModeWithTemplate(params, context = {}) {
     template.context = context;
     template.userEmail = userEmail;
     template.userInfo = userInfo;
-    template.isSystemAdmin = UserService.isSystemAdmin(userEmail);
+    template.isSystemAdmin = (typeof UserService.isSystemAdmin === 'function') ? UserService.isSystemAdmin(userEmail) : false;
 
     return template.evaluate()
       .setTitle(`Admin Panel - ${APP_CONFIG.APP_NAME}`)
@@ -415,7 +458,12 @@ function handleSetupModeWithTemplate(params) {
 
 function handleViewMode(params) {
   try {
-    // 現在認証されているユーザーのメールアドレスを取得
+    // 現在認証されているユーザーのメールアドレスを取得（安全チェック付き）
+    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
+      console.warn('handleMainModeWithTemplate: UserService not available');
+      return renderErrorPage({ message: 'System initialization in progress' });
+    }
+
     const userEmail = UserService.getCurrentEmail();
 
     // userIdからuserEmailを取得（認証情報で補完）
@@ -523,6 +571,12 @@ function renderErrorPage(error) {
 
 function getUser(kind = 'email') {
   try {
+    // UserService安全アクセス確認
+    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
+      console.warn('getUser: UserService not available');
+      return kind === 'email' ? '' : { success: false, message: 'Service initialization in progress' };
+    }
+
     const userEmail = UserService.getCurrentEmail();
 
     if (!userEmail) {
@@ -535,6 +589,11 @@ function getUser(kind = 'email') {
     }
 
     // 統一オブジェクト形式（'full' など）
+    if (typeof UserService.getCurrentUserInfo !== 'function') {
+      console.warn('getUser: UserService.getCurrentUserInfo not available');
+      return { success: false, message: 'Full user info service unavailable' };
+    }
+
     const userInfo = UserService.getCurrentUserInfo();
     return {
       success: true,
@@ -551,7 +610,12 @@ function getUser(kind = 'email') {
 
 function getApplicationStatusForUI() {
   try {
-    return ConfigService.getApplicationStatus();
+    if (typeof ConfigService !== 'undefined' && ConfigService.getApplicationStatus) {
+      return ConfigService.getApplicationStatus();
+    } else {
+      console.warn('getApplicationStatusForUI: ConfigService not available');
+      return { success: false, error: 'ConfigService not available' };
+    }
   } catch (error) {
     console.error('getApplicationStatusForUI error:', error);
     return { success: false, error: error.message };
@@ -561,8 +625,12 @@ function getApplicationStatusForUI() {
 
 function setApplicationStatusForUI(isActive) {
   try {
-    // ✅ GAS Best Practice: Direct service calls
-    return ConfigService.setApplicationStatus(isActive);
+    if (typeof ConfigService !== 'undefined' && ConfigService.setApplicationStatus) {
+      return ConfigService.setApplicationStatus(isActive);
+    } else {
+      console.warn('setApplicationStatusForUI: ConfigService not available');
+      return { success: false, error: 'ConfigService not available' };
+    }
   } catch (error) {
     console.error('setApplicationStatusForUI error:', error);
     return { success: false, error: error.message };
@@ -597,8 +665,12 @@ function getSpreadsheetList() {
 }
 function connectDataSource(spreadsheetId, sheetName) {
   try {
-    // ✅ GAS Best Practice: Direct service calls
-    return ConfigService.connectDataSource(spreadsheetId, sheetName);
+    if (typeof ConfigService !== 'undefined' && ConfigService.connectDataSource) {
+      return ConfigService.connectDataSource(spreadsheetId, sheetName);
+    } else {
+      console.warn('connectDataSource: ConfigService not available');
+      return { success: false, error: 'ConfigService not available' };
+    }
   } catch (error) {
     console.error('connectDataSource error:', error);
     return { success: false, error: error.message };
@@ -648,21 +720,35 @@ function getUserConfig(userId) {
         console.info('getUserConfig: userIdを現在のユーザーから取得:', userId);
       } else {
         console.warn('getUserConfig: userIdが取得できない - デフォルト設定を返却');
-        return ConfigService.getDefaultConfig('unknown');
+        if (typeof ConfigService !== 'undefined' && ConfigService.getDefaultConfig) {
+          return ConfigService.getDefaultConfig('unknown');
+        } else {
+          console.warn('getUserConfig: ConfigService not available, returning fallback config');
+          return { setupStatus: 'pending', appPublished: false };
+        }
       }
     }
 
-    const result = ConfigService.getUserConfig(userId);
-    console.log('getUserConfig: 正常終了', { hasResult: !!result });
-    if (!result) {
-      console.warn('getUserConfig: ConfigServiceからnullが返却された - デフォルト設定を返却');
-      return ConfigService.getDefaultConfig(userId);
+    if (typeof ConfigService !== 'undefined' && ConfigService.getUserConfig) {
+      const result = ConfigService.getUserConfig(userId);
+      console.log('getUserConfig: 正常終了', { hasResult: !!result });
+      if (!result) {
+        console.warn('getUserConfig: ConfigServiceからnullが返却された - デフォルト設定を返却');
+        return ConfigService.getDefaultConfig(userId);
+      }
+      return result;
+    } else {
+      console.warn('getUserConfig: ConfigService not available, returning fallback config');
+      return { setupStatus: 'pending', appPublished: false };
     }
 
-    return result;
   } catch (error) {
     console.error('getUserConfig: エラー', error);
-    return ConfigService.getDefaultConfig(userId || 'error');
+    if (typeof ConfigService !== 'undefined' && ConfigService.getDefaultConfig) {
+      return ConfigService.getDefaultConfig(userId || 'error');
+    } else {
+      return { setupStatus: 'error', appPublished: false };
+    }
   }
 }
 
@@ -689,7 +775,7 @@ function processReactionByEmail(userEmail, rowIndex, reactionKey) {
       const sessionEmail = UserService.getCurrentEmail();
       if (sessionEmail) {
         const sessionUser = DB.findUserByEmail(sessionEmail);
-        if (sessionUser) {
+        if (sessionUser && typeof ConfigService !== 'undefined' && ConfigService.getUserConfig) {
           const config = ConfigService.getUserConfig(sessionUser.userId);
           if (config && config.spreadsheetId && config.sheetName) {
             return DataService.processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionKey, userEmail);

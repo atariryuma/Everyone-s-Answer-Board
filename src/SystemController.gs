@@ -875,12 +875,12 @@ function checkCurrentPublicationStatus() {
  */
 function getUser(kind = 'email') {
   try {
-    // Safe UserService call with GAS loading order protection
+    // Safe UserService call with lazy initialization protection
     if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
-      console.error('FrontendController.getUser: UserService not loaded');
+      console.warn('getUser: UserService not available, service not initialized yet');
       return {
         success: false,
-        error: 'UserService not available - file loading order issue'
+        error: 'UserService initialization pending'
       };
     }
 

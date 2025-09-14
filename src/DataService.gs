@@ -17,7 +17,7 @@
 
 // 遅延初期化状態管理
 let dataServiceInitialized = false;
-let dataServiceCache = new Map();
+const dataServiceCache = new Map();
 
 /**
  * DataService遅延初期化

@@ -17,7 +17,7 @@
 
 // 遅延初期化状態管理
 let configServiceInitialized = false;
-let configServiceCache = new Map();
+const configServiceCache = new Map();
 
 /**
  * ConfigService遅延初期化

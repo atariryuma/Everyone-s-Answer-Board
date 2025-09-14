@@ -16,7 +16,7 @@
 
 // 遅延初期化状態管理
 let databaseCoreInitialized = false;
-let databaseCoreCache = new Map();
+const databaseCoreCache = new Map();
 
 /**
  * DatabaseCore遅延初期化
