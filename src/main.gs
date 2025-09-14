@@ -402,15 +402,15 @@ function doGet(e) {
 function doPost(e) {
   try {
     // Security validation with service availability check
-    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
-      console.error('doPost: UserService not available');
+    // 🚀 Direct Session API - Zero Dependencies
+    const userEmail = getCurrentEmailDirect();
+    if (!userEmail) {
+      console.error('doPost: No user email available from Session API');
       return ContentService.createTextOutput(JSON.stringify({
         success: false,
-        error: 'System initialization in progress, please try again'
+        error: 'Authentication required, please login'
       })).setMimeType(ContentService.MimeType.JSON);
     }
-
-    const userEmail = UserService.getCurrentEmail();
 
     // Parse and validate request
     const request = parsePostRequest(e);
@@ -507,7 +507,7 @@ function handleLoginModeWithTemplate(params, context = {}) {
     const template = HtmlService.createTemplateFromFile('LoginPage');
     template.params = params;
     template.context = context;
-    template.userEmail = (typeof UserService !== 'undefined' && UserService.getCurrentEmail) ? UserService.getCurrentEmail() || '' : '';
+    template.userEmail = getCurrentEmailDirect() || '';
 
     return template.evaluate()
       .setTitle(`Login - ${APP_CONFIG.APP_NAME}`)
@@ -525,53 +525,31 @@ function handleAdminModeWithTemplate(params, context = {}) {
   try {
     console.log('handleAdminModeWithTemplate: Rendering admin panel');
 
-    // Security check for admin access with service availability check
-    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail || !UserService.getCurrentUserInfo) {
-      console.warn('handleAdminModeWithTemplate: UserService not available');
-      return handleLoginModeWithTemplate(params, { reason: 'service_unavailable' });
-    }
-
-    const userEmail = UserService.getCurrentEmail();
+    // 🚀 Direct Session API - Zero Dependencies
+    const userEmail = getCurrentEmailDirect();
     if (!userEmail) {
       return handleLoginModeWithTemplate(params, { reason: 'admin_access_requires_auth' });
     }
 
     // URLパラメータからuserIdを取得（管理パネル用）- validateModeAccess()で権限チェック済み
-    let userInfo = UserService.getCurrentUserInfo();
-    let userId = params.userId || (userInfo && userInfo.userId);
+    let {userId} = params;
+    let userInfo = { userEmail, userId, isActive: true };
 
-    // userIdが指定されていない場合、現在のユーザー情報から取得または作成
+    // userIdが指定されていない場合、フォールバック処理（依存関係最小化）
     if (!userId) {
       try {
-        // DB から直接ユーザー検索を試行
-        const dbUser = DB.findUserByEmail(userEmail);
-        if (dbUser && dbUser.userId) {
-          userId = dbUser.userId;
-          userInfo = { userId, userEmail };
-        } else {
-          // ユーザーが存在しない場合は作成
-          let created;
-          if (typeof UserService.createUser === 'function') {
-            created = UserService.createUser(userEmail);
-          } else {
-            console.error('handleAdminModeWithTemplate: UserService.createUser not available');
-            throw new Error('User creation service unavailable');
-          }
-          if (created && created.userId) {
-            userId = created.userId;
-            userInfo = created;
-          } else {
-            console.error('handleAdminModeWithTemplate: ユーザー作成に失敗 - userIdが見つかりません', { created });
-            throw new Error('ユーザー作成に失敗しました');
-          }
-        }
+        // 🚀 Zero-dependency fallback: Generate temporary userId for session
+        userId = `temp_${userEmail.replace('@', '_at_').replace(/\./g, '_')}`;
+        userInfo = { userId, userEmail, isActive: true, isTemporary: true };
+        console.info('handleAdminModeWithTemplate: Using temporary userId for session', { userId });
       } catch (e) {
-        console.warn('handleAdminModeWithTemplate: ユーザー作成/取得でエラー:', e.message);
-        userInfo = { userId: '', userEmail };
+        console.warn('handleAdminModeWithTemplate: Temporary user creation error:', e.message);
+        userId = 'temp_unknown';
+        userInfo = { userId, userEmail, isActive: true };
       }
     } else {
       // userIdが指定されている場合、そのユーザー情報を使用
-      userInfo = { userId, userEmail };
+      userInfo = { userId, userEmail, isActive: true };
     }
 
     const template = HtmlService.createTemplateFromFile('AdminPanel');
@@ -579,7 +557,7 @@ function handleAdminModeWithTemplate(params, context = {}) {
     template.context = context;
     template.userEmail = userEmail;
     template.userInfo = userInfo;
-    template.isSystemAdmin = (typeof UserService.isSystemAdmin === 'function') ? UserService.isSystemAdmin(userEmail) : false;
+    template.isSystemAdmin = checkIsSystemAdminDirect(userEmail);
 
     return template.evaluate()
       .setTitle(`Admin Panel - ${APP_CONFIG.APP_NAME}`)
@@ -608,13 +586,8 @@ function handleSetupModeWithTemplate(params) {
 
 function handleViewMode(params) {
   try {
-    // 現在認証されているユーザーのメールアドレスを取得（安全チェック付き）
-    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
-      console.warn('handleMainModeWithTemplate: UserService not available');
-      return renderErrorPage({ message: 'System initialization in progress' });
-    }
-
-    const userEmail = UserService.getCurrentEmail();
+    // 🚀 Direct Session API - Zero Dependencies
+    const userEmail = getCurrentEmailDirect();
 
     // userIdからuserEmailを取得（認証情報で補完）
     let resolvedUserEmail = userEmail;

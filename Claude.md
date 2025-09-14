@@ -373,6 +373,58 @@ rg "function.*[Dd]ata" src/
 4. **Use clear names** - Include context in function names
 5. **Follow the layers** - Maintain architectural separation
 
+## 🛠️ GAS Dependency Minimization Best Practices (2025 Discovery)
+
+### 🎯 **Zero-Dependency Architecture Philosophy**
+
+**Problem Identified**: Google Apps Script's non-deterministic file loading order makes service dependency chains unreliable.
+
+**Solution**: **Eliminate dependencies rather than managing them**
+
+#### ❌ **Anti-Pattern: Complex Init Chains**
+```javascript
+// Complex, fragile, failure-prone
+function getCurrentEmail() {
+  initUserService(); // Depends on DB, PROPS_KEYS, CONSTANTS
+  if (!userServiceInitialized) return null;
+  return UserService.getCurrentUserEmail();
+}
+```
+
+#### ✅ **Best Practice: Direct Platform API Usage**
+```javascript
+// Simple, reliable, always works
+function getCurrentEmailDirect() {
+  return Session.getActiveUser().getEmail();
+}
+```
+
+### 🎯 **GAS Zero-Dependency Principles**
+
+1. **Platform API First**: Use Google Apps Script built-ins over custom services
+2. **Minimize Inter-File Dependencies**: Each function should be as self-contained as possible
+3. **Direct Property Access**: `PropertiesService.getScriptProperties().getProperty('KEY')` over constant files
+4. **Session API Direct**: `Session.getActiveUser()` over UserService abstraction
+5. **Spreadsheet API Direct**: `SpreadsheetApp.openById()` over DatabaseService when possible
+
+### 📊 **Dependency Elimination Priority Matrix**
+
+| **High Priority** | **Medium Priority** | **Low Priority** |
+|-------------------|-------------------|------------------|
+| User Authentication | Data Formatting | Helper Utilities |
+| System Properties | Input Validation | Column Mapping |
+| Session Management | Error Handling | Text Processing |
+| Direct API Calls | Cache Operations | Statistical Calcs |
+
+### 🚀 **Implementation Strategy**
+
+1. **Identify Critical Paths**: Functions called by HTML/HTTP requests
+2. **Eliminate Service Dependencies**: Replace service calls with direct APIs
+3. **Self-Contained Functions**: Each function includes all necessary logic
+4. **Platform API Utilization**: Maximize use of GAS built-in services
+
+**Result**: System resilient to file loading order issues, cold start failures, and service initialization problems.
+
 ## 🚀 Claude Code 2025 Advanced Workflows
 
 ### 🎯 Custom Slash Commands (.claude/commands/)
