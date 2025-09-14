@@ -18,6 +18,87 @@
 /* global UserService, ConfigService, DataService, SecurityService, ErrorHandler, DB, PROPS_KEYS, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, AdminController, FrontendController, SystemController, ResponseFormatter, AppCacheService, getAdminSpreadsheetList, addDataReaction, toggleDataHighlight, getConfig, checkIsSystemAdmin, getCurrentBoardInfoAndUrls */
 
 /**
+ * 🚀 GAS Service Discovery & Dynamic Loading
+ * Addresses non-deterministic file loading order in Google Apps Script
+ */
+function getAvailableService(serviceName) {
+  const serviceMap = {
+    'UserService': () => (typeof UserService !== 'undefined') ? UserService : null,
+    'ConfigService': () => (typeof ConfigService !== 'undefined') ? ConfigService : null,
+    'DataService': () => (typeof DataService !== 'undefined') ? DataService : null,
+    'SecurityService': () => (typeof SecurityService !== 'undefined') ? SecurityService : null
+  };
+
+  if (serviceMap[serviceName]) {
+    return serviceMap[serviceName]();
+  }
+  return null;
+}
+
+/**
+ * Safe service method caller with fallback
+ */
+function callServiceMethod(serviceName, methodName, ...args) {
+  const service = getAvailableService(serviceName);
+  if (service && typeof service[methodName] === 'function') {
+    return service[methodName](...args);
+  }
+
+  console.warn(`callServiceMethod: ${serviceName}.${methodName} not available`);
+  return null;
+}
+
+/**
+ * System properties fallback (no dependencies)
+ */
+function getSystemPropertyDirect(propertyName) {
+  try {
+    return PropertiesService.getScriptProperties().getProperty(propertyName);
+  } catch (error) {
+    console.error(`getSystemPropertyDirect(${propertyName}):`, error.message);
+    return null;
+  }
+}
+
+/**
+ * Direct system properties check (no service dependencies)
+ */
+function checkCoreSystemPropsDirectly() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const adminEmail = props.getProperty('ADMIN_EMAIL');
+    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+    const creds = props.getProperty('SERVICE_ACCOUNT_CREDS');
+
+    if (!adminEmail || !dbId || !creds) {
+      console.warn('checkCoreSystemPropsDirectly: Missing required properties', {
+        hasAdmin: !!adminEmail,
+        hasDb: !!dbId,
+        hasCreds: !!creds
+      });
+      return false;
+    }
+
+    // Validate SERVICE_ACCOUNT_CREDS JSON
+    try {
+      const parsed = JSON.parse(creds);
+      if (!parsed || !parsed.client_email) {
+        console.warn('checkCoreSystemPropsDirectly: Invalid SERVICE_ACCOUNT_CREDS format');
+        return false;
+      }
+    } catch (jsonError) {
+      console.warn('checkCoreSystemPropsDirectly: SERVICE_ACCOUNT_CREDS JSON parse failed', jsonError.message);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('checkCoreSystemPropsDirectly: Error', error.message);
+    return false;
+  }
+}
+
+/**
  * GAS include function - HTML template inclusion utility
  * GASベストプラクティス準拠のテンプレートインクルード機能
  *
@@ -99,13 +180,14 @@ function validateModeAccess(mode, params) {
   // Step 1: セットアップ必要チェック
   if (rules.requiresSetup) {
     try {
-      // ConfigService安全アクセス - 遅延初期化対応
-      let hasSetup = false;
-      if (typeof ConfigService !== 'undefined' && ConfigService.hasCoreSystemProps) {
-        hasSetup = ConfigService.hasCoreSystemProps();
-      } else {
-        console.warn('validateModeAccess: ConfigService not available, assuming setup required');
-        return { allowed: false, redirect: 'setup', reason: 'config_service_unavailable' };
+      // 🚀 Dynamic Service Discovery for ConfigService
+      const hasSetup = callServiceMethod('ConfigService', 'hasCoreSystemProps') || checkCoreSystemPropsDirectly();
+      if (hasSetup === null) {
+        console.warn('validateModeAccess: ConfigService unavailable, checking properties directly');
+        const directCheck = checkCoreSystemPropsDirectly();
+        if (!directCheck) {
+          return { allowed: false, redirect: 'setup', reason: 'setup_required_direct_check' };
+        }
       }
 
       console.log('validateModeAccess: Setup check result', { mode, hasSetup });
@@ -571,15 +653,11 @@ function renderErrorPage(error) {
 
 function getUser(kind = 'email') {
   try {
-    // UserService安全アクセス確認
-    if (typeof UserService === 'undefined' || !UserService.getCurrentEmail) {
-      console.warn('getUser: UserService not available');
-      return kind === 'email' ? '' : { success: false, message: 'Service initialization in progress' };
-    }
-
-    const userEmail = UserService.getCurrentEmail();
+    // 🚀 Dynamic Service Discovery for UserService
+    const userEmail = callServiceMethod('UserService', 'getCurrentEmail');
 
     if (!userEmail) {
+      console.warn('getUser: No user email available via service discovery');
       return kind === 'email' ? '' : { success: false, message: 'ユーザー情報が取得できません' };
     }
 
@@ -589,12 +667,12 @@ function getUser(kind = 'email') {
     }
 
     // 統一オブジェクト形式（'full' など）
-    if (typeof UserService.getCurrentUserInfo !== 'function') {
-      console.warn('getUser: UserService.getCurrentUserInfo not available');
+    const userInfo = callServiceMethod('UserService', 'getCurrentUserInfo');
+    if (!userInfo) {
+      console.warn('getUser: UserService.getCurrentUserInfo not available via service discovery');
       return { success: false, message: 'Full user info service unavailable' };
     }
 
-    const userInfo = UserService.getCurrentUserInfo();
     return {
       success: true,
       email: userEmail,
