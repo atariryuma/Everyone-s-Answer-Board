@@ -12,7 +12,7 @@
  * - 各Service ↔ Database層
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, PROPS_KEYS */
+/* global UserService, ConfigService, DataService, SecurityService, PROPS_KEYS, DB */
 
 /**
  * サービス登録レジストリ
@@ -57,53 +57,25 @@ const ServiceRegistry = Object.freeze({
     return this._getObjectWithRetry('SecurityService', () => SecurityService);
   },
 
-  /**
-   * 安全なAdminController参照取得（再試行機能付き）
-   * GASファイル読み込み順序問題の対応
-   * @returns {Object} AdminController オブジェクト
-   */
-  getAdminController() {
-    return this._getObjectWithRetry('AdminController', () => AdminController);
-  },
-
-  /**
-   * 安全なDataController参照取得（再試行機能付き）
-   * @returns {Object} DataController オブジェクト
-   */
-  getDataController() {
-    return this._getObjectWithRetry('DataController', () => DataController);
-  },
-
-  /**
-   * 安全なFrontendController参照取得（再試行機能付き）
-   * @returns {Object} FrontendController オブジェクト
-   */
-  getFrontendController() {
-    return this._getObjectWithRetry('FrontendController', () => FrontendController);
-  },
-
-  /**
-   * 安全なSystemController参照取得（再試行機能付き）
-   * @returns {Object} SystemController オブジェクト
-   */
-  getSystemController() {
-    return this._getObjectWithRetry('SystemController', () => SystemController);
-  },
-
-  /**
-   * 安全なCacheService参照取得（再試行機能付き）
-   * @returns {Object} CacheService オブジェクト（infrastructure/CacheService.gs）
-   */
-  getCacheService() {
-    return this._getObjectWithRetry('CacheService', () => CacheService);
-  },
+  // ✅ NOTE: Controller getters removed - Controllers now use flat functions architecture
+  // ✅ NOTE: Service getters removed - Direct service calls recommended for better performance
 
   /**
    * 安全なDatabaseService参照取得（再試行機能付き）
    * @returns {Object} DatabaseService オブジェクト
+   * @deprecated Use direct DatabaseService calls instead
    */
   getDatabaseService() {
-    return this._getObjectWithRetry('DatabaseService', () => DatabaseService);
+    // For DatabaseService, we still need this as it's an Object.freeze structure
+    try {
+      if (typeof DB !== 'undefined') {
+        return DB;
+      }
+      throw new Error('DatabaseService not available');
+    } catch (error) {
+      console.error('ServiceRegistry.getDatabaseService: Error accessing DatabaseService', error);
+      return null;
+    }
   },
 
   /**

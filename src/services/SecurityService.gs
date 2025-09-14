@@ -1,35 +1,29 @@
 /**
  * @fileoverview SecurityService - 統一セキュリティサービス
- * 
+ *
  * 🎯 責任範囲:
  * - 認証・認可管理
  * - 入力検証・サニタイズ
  * - セキュリティ監査・ログ
  * - Service Account管理
- * 
- * 🔄 置き換え対象:
- * - auth.gs（認証機能）
- * - security.gs（セキュリティ機能）
- * - 分散しているバリデーション機能
+ *
+ * 🔄 GAS Best Practices準拠:
+ * - フラット関数構造 (Object.freeze削除)
+ * - 直接的な関数エクスポート
+ * - 単一責任原則の維持
  */
 
-/* global PROPS_KEYS, AppCacheService, UserService, CONSTANTS, DB */
+/* global PROPS_KEYS, getUserAccessLevel, CONSTANTS, DB */
+
+// ===========================================
+// 🔑 認証・セッション管理
+// ===========================================
 
 /**
- * SecurityService - 統一セキュリティサービス
- * ゼロトラスト原則に基づく多層防御システム
+ * Service Accountトークン取得（セキュリティ強化版）
+ * @returns {string|null} アクセストークン
  */
-const SecurityService = Object.freeze({
-
-  // ===========================================
-  // 🔑 認証・セッション管理
-  // ===========================================
-
-  /**
-   * Service Accountトークン取得（セキュリティ強化版）
-   * @returns {string|null} アクセストークン
-   */
-  getServiceAccountToken() {
+function getServiceAccountToken() {
     const cacheKey = 'SA_TOKEN_CACHE';
     
     try {
@@ -37,7 +31,7 @@ const SecurityService = Object.freeze({
       const cached = CacheService.getScriptCache().get(cacheKey);
       if (cached) {
         // セキュリティ：トークン有効性の簡易検証
-        if (this.validateTokenFormat(cached)) {
+        if (validateSecurityTokenFormat(cached)) {
           return cached;
         } else {
           // 無効なトークンをクリア
@@ -46,14 +40,14 @@ const SecurityService = Object.freeze({
       }
 
       // 新規トークン生成
-      const newToken = this.generateServiceAccountToken();
+      const newToken = generateServiceAccountToken();
       if (!newToken) {
         console.error('SecurityService.getServiceAccountToken: トークン生成失敗（詳細はログなし）');
         return null;
       }
 
       // セキュリティ：トークン形式検証
-      if (!this.validateTokenFormat(newToken)) {
+      if (!validateSecurityTokenFormat(newToken)) {
         console.error('SecurityService.getServiceAccountToken: 生成されたトークンが無効な形式');
         return null;
       }
@@ -68,13 +62,13 @@ const SecurityService = Object.freeze({
       console.error('SecurityService.getServiceAccountToken: トークン取得処理エラー');
       return null;
     }
-  },
+}
 
-  /**
-   * Service Accountトークン生成（セキュリティ強化版）
-   * @returns {string|null} 生成されたトークン
-   */
-  generateServiceAccountToken() {
+/**
+ * Service Accountトークン生成（セキュリティ強化版）
+ * @returns {string|null} 生成されたトークン
+ */
+function generateServiceAccountToken() {
     try {
       // GAS標準のOAuthトークン取得
       const token = ScriptApp.getOAuthToken();
@@ -93,14 +87,14 @@ const SecurityService = Object.freeze({
       console.error('SecurityService.generateServiceAccountToken: トークン生成処理エラー');
       return null;
     }
-  },
+}
 
-  /**
-   * トークン形式検証（セキュリティ強化）
-   * @param {string} token - 検証対象トークン
-   * @returns {boolean} 有効かどうか
-   */
-  validateTokenFormat(token) {
+/**
+ * トークン形式検証（セキュリティ強化）
+ * @param {string} token - 検証対象トークン
+ * @returns {boolean} 有効かどうか
+ */
+function validateSecurityTokenFormat(token) {
     if (!token || typeof token !== 'string') {
       return false;
     }
@@ -122,13 +116,13 @@ const SecurityService = Object.freeze({
     }
 
     return true;
-  },
+}
 
-  /**
-   * セッション状態検証
-   * @returns {Object} セッション検証結果
-   */
-  validateSession() {
+/**
+ * セッション状態検証
+ * @returns {Object} セッション検証結果
+ */
+function validateSecuritySession() {
     try {
       const email = Session.getActiveUser().getEmail();
       const effectiveEmail = Session.getEffectiveUser().getEmail();
@@ -148,18 +142,18 @@ const SecurityService = Object.freeze({
         timestamp: new Date().toISOString()
       };
     }
-  },
+}
 
-  // ===========================================
-  // 🛡️ 入力検証・サニタイズ
-  // ===========================================
+// ===========================================
+// 🛡️ 入力検証・サニタイズ
+// ===========================================
 
-  /**
-   * ユーザーデータ総合検証
-   * @param {Object} userData - ユーザーデータ
-   * @returns {Object} 検証結果
-   */
-  validateUserData(userData) {
+/**
+ * ユーザーデータ総合検証
+ * @param {Object} userData - ユーザーデータ
+ * @returns {Object} 検証結果
+ */
+function validateSecurityUserData(userData) {
     const result = {
       isValid: true,
       errors: [],
@@ -176,7 +170,7 @@ const SecurityService = Object.freeze({
 
       // メールアドレス検証
       if (userData.email) {
-        const emailValidation = this.validateEmail(userData.email);
+        const emailValidation = validateSecurityEmail(userData.email);
         if (!emailValidation.isValid) {
           result.errors.push('無効なメールアドレス');
           result.isValid = false;
@@ -188,7 +182,7 @@ const SecurityService = Object.freeze({
       // テキストフィールド検証・サニタイズ
       ['answer', 'reason', 'name', 'className'].forEach(field => {
         if (userData[field]) {
-          const textValidation = this.validateAndSanitizeText(userData[field]);
+          const textValidation = validateAndSanitizeSecurityText(userData[field]);
           if (!textValidation.isValid) {
             result.errors.push(`${field}: ${textValidation.error}`);
             result.isValid = false;
@@ -203,7 +197,7 @@ const SecurityService = Object.freeze({
 
       // URL検証
       if (userData.url) {
-        const urlValidation = this.validateUrl(userData.url);
+        const urlValidation = validateSecurityUrl(userData.url);
         if (!urlValidation.isValid) {
           result.errors.push('無効なURL');
           result.isValid = false;
@@ -225,14 +219,14 @@ const SecurityService = Object.freeze({
     }
 
     return result;
-  },
+}
 
-  /**
-   * メールアドレス検証・サニタイズ
-   * @param {string} email - メールアドレス
-   * @returns {Object} 検証結果
-   */
-  validateEmail(email) {
+/**
+ * メールアドレス検証・サニタイズ
+ * @param {string} email - メールアドレス
+ * @returns {Object} 検証結果
+ */
+function validateSecurityEmail(email) {
     try {
       if (!email || typeof email !== 'string') {
         return { isValid: false, error: 'メールアドレスが必要です' };
@@ -261,14 +255,14 @@ const SecurityService = Object.freeze({
     } catch (error) {
       return { isValid: false, error: error.message };
     }
-  },
+}
 
-  /**
-   * テキスト検証・サニタイズ
-   * @param {string} text - テキスト
-   * @returns {Object} 検証結果
-   */
-  validateAndSanitizeText(text) {
+/**
+ * テキスト検証・サニタイズ
+ * @param {string} text - テキスト
+ * @returns {Object} 検証結果
+ */
+function validateAndSanitizeSecurityText(text) {
     try {
       if (typeof text !== 'string') {
         return { isValid: false, error: 'テキストが必要です' };
@@ -322,14 +316,14 @@ const SecurityService = Object.freeze({
     } catch (error) {
       return { isValid: false, error: error.message };
     }
-  },
+}
 
-  /**
-   * URL検証・サニタイズ
-   * @param {string} url - URL
-   * @returns {Object} 検証結果
-   */
-  validateUrl(url) {
+/**
+ * URL検証・サニタイズ
+ * @param {string} url - URL
+ * @returns {Object} 検証結果
+ */
+function validateSecurityUrl(url) {
     try {
       if (!url || typeof url !== 'string') {
         return { isValid: false, error: 'URLが必要です' };
@@ -387,19 +381,19 @@ const SecurityService = Object.freeze({
     } catch (error) {
       return { isValid: false, error: error.message };
     }
-  },
+}
 
-  // ===========================================
-  // 🔒 アクセス制御・権限管理
-  // ===========================================
+// ===========================================
+// 🔒 アクセス制御・権限管理
+// ===========================================
 
-  /**
-   * ユーザー権限確認
-   * @param {string} userId - ユーザーID
-   * @param {string} requiredLevel - 必要権限レベル
-   * @returns {Object} 権限確認結果
-   */
-  checkUserPermission(userId, requiredLevel = 'authenticated_user') {
+/**
+ * ユーザー権限確認
+ * @param {string} userId - ユーザーID
+ * @param {string} requiredLevel - 必要権限レベル
+ * @returns {Object} 権限確認結果
+ */
+function checkSecurityUserPermission(userId, requiredLevel = 'authenticated_user') {
     try {
       const currentEmail = Session.getActiveUser().getEmail();
       if (!currentEmail) {
@@ -422,8 +416,8 @@ const SecurityService = Object.freeze({
       }
 
       // UserServiceから権限レベル取得
-      const accessLevel = UserService.getAccessLevel(userId);
-      const hasPermission = this.compareAccessLevels(accessLevel, requiredLevel);
+      const accessLevel = getUserAccessLevel(userId);
+      const hasPermission = compareSecurityAccessLevels(accessLevel, requiredLevel);
 
       return {
         hasPermission,
@@ -440,15 +434,15 @@ const SecurityService = Object.freeze({
         currentLevel: 'none'
       };
     }
-  },
+}
 
-  /**
-   * アクセスレベル比較
-   * @param {string} currentLevel - 現在のレベル
-   * @param {string} requiredLevel - 必要レベル
-   * @returns {boolean} 権限があるかどうか
-   */
-  compareAccessLevels(currentLevel, requiredLevel) {
+/**
+ * アクセスレベル比較
+ * @param {string} currentLevel - 現在のレベル
+ * @param {string} requiredLevel - 必要レベル
+ * @returns {boolean} 権限があるかどうか
+ */
+function compareSecurityAccessLevels(currentLevel, requiredLevel) {
     const levelHierarchy = {
       'none': 0,
       'guest': 1,
@@ -461,17 +455,17 @@ const SecurityService = Object.freeze({
     const requiredScore = levelHierarchy[requiredLevel] || 0;
 
     return currentScore >= requiredScore;
-  },
+}
 
-  // ===========================================
-  // 📊 セキュリティ監査・ログ
-  // ===========================================
+// ===========================================
+// 📊 セキュリティ監査・ログ
+// ===========================================
 
-  /**
-   * セキュリティイベントログ
-   * @param {Object} event - セキュリティイベント
-   */
-  logSecurityEvent(event) {
+/**
+ * セキュリティイベントログ
+ * @param {Object} event - セキュリティイベント
+ */
+function logSecurityEvent(event) {
     try {
       const logEntry = {
         timestamp: new Date().toISOString(),
@@ -500,19 +494,19 @@ const SecurityService = Object.freeze({
 
       // 永続化が必要な場合はPropertiesServiceを使用
       if (event.severity === 'critical' || event.severity === 'high') {
-        this.persistSecurityLog(logEntry);
+        persistSecurityLog(logEntry);
       }
 
     } catch (error) {
       console.error('SecurityService.logSecurityEvent: ログ記録エラー', error.message);
     }
-  },
+}
 
-  /**
-   * セキュリティログ永続化
-   * @param {Object} logEntry - ログエントリ
-   */
-  persistSecurityLog(logEntry) {
+/**
+ * セキュリティログ永続化
+ * @param {Object} logEntry - ログエントリ
+ */
+function persistSecurityLog(logEntry) {
     try {
       const props = PropertiesService.getScriptProperties();
       const logKey = `security_log_${Date.now()}`;
@@ -520,16 +514,16 @@ const SecurityService = Object.freeze({
       props.setProperty(logKey, JSON.stringify(logEntry));
       
       // 古いログの削除（最新100件まで保持）
-      this.cleanupOldSecurityLogs();
+      cleanupOldSecurityLogs();
     } catch (error) {
       console.error('SecurityService.persistSecurityLog: エラー', error.message);
     }
-  },
+}
 
-  /**
-   * 古いセキュリティログ削除
-   */
-  cleanupOldSecurityLogs() {
+/**
+ * 古いセキュリティログ削除
+ */
+function cleanupOldSecurityLogs() {
     try {
       const props = PropertiesService.getScriptProperties();
       const allProps = props.getProperties();
@@ -547,17 +541,17 @@ const SecurityService = Object.freeze({
     } catch (error) {
       console.error('SecurityService.cleanupOldSecurityLogs: エラー', error.message);
     }
-  },
+}
 
-  // ===========================================
-  // 🔧 ユーティリティ・診断
-  // ===========================================
+// ===========================================
+// 🔧 ユーティリティ・診断
+// ===========================================
 
-  /**
-   * セキュリティ状態診断
-   * @returns {Object} 診断結果
-   */
-  diagnose() {
+/**
+ * セキュリティ状態診断
+ * @returns {Object} 診断結果
+ */
+function diagnoseSecurityService() {
     const results = {
       service: 'SecurityService',
       timestamp: new Date().toISOString(),
@@ -567,7 +561,7 @@ const SecurityService = Object.freeze({
 
     try {
       // セッション状態確認
-      const sessionValidation = this.validateSession();
+      const sessionValidation = validateSecuritySession();
       results.checks.push({
         name: 'Session Validation',
         status: sessionValidation.isValid ? '✅' : '❌',
@@ -577,7 +571,7 @@ const SecurityService = Object.freeze({
       });
 
       // Service Accountトークン確認
-      const token = this.getServiceAccountToken();
+      const token = getServiceAccountToken();
       results.checks.push({
         name: 'Service Account Token',
         status: token ? '✅' : '❌',
@@ -632,14 +626,14 @@ const SecurityService = Object.freeze({
     }
 
     return results;
-  },
+}
 
-  /**
-   * スプレッドシートアクセス権限検証
-   * @param {string} spreadsheetId - スプレッドシートID
-   * @returns {Object} 検証結果
-   */
-  validateSpreadsheetAccess(spreadsheetId) {
+/**
+ * スプレッドシートアクセス権限検証
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {Object} 検証結果
+ */
+function validateSpreadsheetAccess(spreadsheetId) {
     const started = Date.now();
     try {
       console.log('SecurityService', {
@@ -771,18 +765,18 @@ const SecurityService = Object.freeze({
       // 絶対にnullを返さない
       return errorResponse;
     }
-  },
+}
 
-  /**
-   * セキュリティ設定推奨事項
-   * @returns {Array} 推奨事項リスト
-   */
-  getSecurityRecommendations() {
+/**
+ * セキュリティ設定推奨事項
+ * @returns {Array} 推奨事項リスト
+ */
+function getSecurityRecommendations() {
     const recommendations = [];
 
     try {
       // 基本的なセキュリティチェック
-      const session = this.validateSession();
+      const session = validateSecuritySession();
       if (!session.isValid) {
         recommendations.push({
           priority: 'high',
@@ -793,7 +787,7 @@ const SecurityService = Object.freeze({
       }
 
       // トークンの有効性確認
-      const token = this.getServiceAccountToken();
+      const token = getServiceAccountToken();
       if (!token) {
         recommendations.push({
           priority: 'medium',
@@ -822,6 +816,4 @@ const SecurityService = Object.freeze({
     }
 
     return recommendations;
-  }
-
-});
+}

@@ -26,7 +26,9 @@
       "Bash(awk:*)",
       "Bash(npx eslint:*)",
       "Bash(tree:*)",
-      "Bash(git ls-tree:*)"
+      "Bash(git ls-tree:*)",
+      "Bash(node:*)",
+      "Bash(npm test)"
     ],
     "deny": [],
     "ask": [],

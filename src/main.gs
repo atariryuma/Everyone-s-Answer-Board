@@ -15,7 +15,7 @@
  * - src/services/*.gs
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, ErrorHandler, DB, PROPS_KEYS, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, AdminController, FrontendController, SystemController, ResponseFormatter */
+/* global UserService, ConfigService, DataService, SecurityService, ErrorHandler, DB, PROPS_KEYS, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, AdminController, FrontendController, SystemController, ResponseFormatter, AppCacheService, getAdminSpreadsheetList, addDataReaction, toggleDataHighlight, getConfig, checkIsSystemAdmin, getCurrentBoardInfoAndUrls */
 
 /**
  * GAS include function - HTML template inclusion utility
@@ -466,68 +466,20 @@ function renderErrorPage(error) {
  * Frontend Controller Global Functions
  * Required for HTML google.script.run calls
  */
-function getUser(kind) {
-  try {
-    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return UserService.getCurrentUserInfo();
-  } catch (error) {
-    console.error('getUser error:', error);
-    return kind === 'email' ? '' : { success: false, error: error.message };
-  }
-}
+// getUser is implemented in FrontendController.gs
 
-function processLoginAction() {
-  try {
-    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return UserService.processLogin();
-  } catch (error) {
-    console.error('processLoginAction error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// processLoginAction is implemented in FrontendController.gs
 
 /**
  * System Controller Global Functions
  */
-function getSystemDomainInfo() {
-  try {
-    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return { domain: ScriptApp.getService().getUrl() };
-  } catch (error) {
-    console.error('getSystemDomainInfo error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// getSystemDomainInfo is implemented in SystemController.gs
 
-function forceUrlSystemReset() {
-  try {
-    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return { success: true, message: 'URL reset completed' };
-  } catch (error) {
-    console.error('forceUrlSystemReset error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// forceUrlSystemReset is implemented in SystemController.gs
 
-function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
-  try {
-    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return ConfigService.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
-  } catch (error) {
-    console.error('setupApplication error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// setupApplication is implemented in SystemController.gs
 
-function testSetup() {
-  try {
-    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
-    return { success: true, message: 'Setup test completed' };
-  } catch (error) {
-    console.error('testSetup error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// testSetup is implemented in SystemController.gs
 
 function getApplicationStatusForUI() {
   try {
@@ -538,44 +490,13 @@ function getApplicationStatusForUI() {
   }
 }
 
-function getAllUsersForAdminForUI(userId) {
-  try {
-    return UserService.getAllUsersForAdmin(userId);
-  } catch (error) {
-    console.error('getAllUsersForAdminForUI error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// getAllUsersForAdminForUI is implemented in DataController.gs
 
-function deleteUserAccountByAdminForUI(userId, reason) {
-  try {
-    return UserService.deleteUserAccount(userId, reason);
-  } catch (error) {
-    console.error('deleteUserAccountByAdminForUI error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// deleteUserAccountByAdminForUI is implemented in DataController.gs
 
-function getWebAppUrl() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return ScriptApp.getService().getUrl();
-  } catch (error) {
-    console.error('getWebAppUrl error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// getWebAppUrl is implemented in SystemController.gs
 
-function reportClientError(errorInfo) {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    console.error('Client Error Report:', errorInfo);
-    return { success: true, message: 'Error reported' };
-  } catch (error) {
-    console.error('reportClientError error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// reportClientError is implemented in FrontendController.gs
 
 function setApplicationStatusForUI(isActive) {
   try {
@@ -597,364 +518,45 @@ function getDeletionLogsForUI(userId) {
   }
 }
 
-function testSystemDiagnosis() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return { success: true, message: 'System diagnosis completed' };
-  } catch (error) {
-    console.error('testSystemDiagnosis error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// testSystemDiagnosis is implemented in SystemController.gs
 
-function performAutoRepair() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return { success: true, message: 'Auto repair completed' };
-  } catch (error) {
-    console.error('performAutoRepair error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// performAutoRepair is implemented in SystemController.gs
 
-function performSystemMonitoring() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return { success: true, message: 'System monitoring completed' };
-  } catch (error) {
-    console.error('performSystemMonitoring error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// performSystemMonitoring is implemented in SystemController.gs
 
-function performDataIntegrityCheck() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return { success: true, message: 'Data integrity check completed' };
-  } catch (error) {
-    console.error('performDataIntegrityCheck error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// performDataIntegrityCheck is implemented in SystemController.gs
 
-function testForceLogoutRedirect() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return { success: true, message: 'Force logout redirect test completed' };
-  } catch (error) {
-    console.error('testForceLogoutRedirect error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// testForceLogoutRedirect is implemented in FrontendController.gs
 
-function verifyUserAuthentication() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return UserService.verifyCurrentUser();
-  } catch (error) {
-    console.error('verifyUserAuthentication error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// verifyUserAuthentication is implemented in FrontendController.gs
 
-function resetAuth() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return UserService.resetAuthentication();
-  } catch (error) {
-    console.error('resetAuth error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// resetAuth is implemented in FrontendController.gs
 
 /**
  * Admin Controller Global Functions
  */
-function getConfig() {
-  try {
-    return ConfigService.getUserConfig(UserService.getCurrentUserId());
-  } catch (error) {
-    console.error('getConfig error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// getConfig is implemented in AdminController.gs
 
 function getSpreadsheetList() {
-  const startTime = Date.now();
-
-  // 🚨 最強フォールバック: 絶対にnullを返さない
-  console.log('=== getSpreadsheetList: 最強フォールバック版 開始 ===');
-
   try {
-    console.info('getSpreadsheetList: 開始 - GAS Flat Architecture with enhanced debug');
-
-    // 🔍 DataService存在チェック
-    console.log('getSpreadsheetList: DataService存在チェック', {
-      DataServiceExists: typeof DataService !== 'undefined',
-      methodExists: typeof DataService?.getSpreadsheetList === 'function'
-    });
-
-    if (typeof DataService === 'undefined') {
-      console.error('getSpreadsheetList: DataService が定義されていません');
-      return {
-        success: false,
-        message: 'DataService が利用できません',
-        spreadsheets: [],
-        debugInfo: { error: 'DataService undefined' }
-      };
-    }
-
-    if (typeof DataService.getSpreadsheetList !== 'function') {
-      console.error('getSpreadsheetList: DataService.getSpreadsheetList が関数ではありません');
-      return {
-        success: false,
-        message: 'getSpreadsheetList メソッドが利用できません',
-        spreadsheets: [],
-        debugInfo: { error: 'getSpreadsheetList not function' }
-      };
-    }
-
-    // ✅ 一時的解決策: DataService依存を回避して直接Drive API呼び出し
-    console.log('getSpreadsheetList: 直接Drive API呼び出し開始（DataService回避）');
-
-    let result;
-    try {
-      const currentUser = Session.getActiveUser().getEmail();
-      console.log('getSpreadsheetList: ユーザー情報', { currentUser });
-
-      const files = DriveApp.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
-      const spreadsheets = [];
-      let count = 0;
-      const maxCount = 25;
-
-      while (files.hasNext() && count < maxCount) {
-        try {
-          const file = files.next();
-          spreadsheets.push({
-            id: file.getId(),
-            name: file.getName(),
-            url: file.getUrl(),
-            lastUpdated: file.getLastUpdated()
-          });
-          count++;
-        } catch (fileError) {
-          console.warn('getSpreadsheetList: ファイル処理スキップ', fileError.message);
-          continue;
-        }
-      }
-
-      result = {
-        success: true,
-        spreadsheets,
-        executionTime: `${Date.now() - startTime}ms`,
-        directDriveApi: true
-      };
-
-      console.log('getSpreadsheetList: 直接Drive API呼び出し成功', {
-        spreadsheetsCount: spreadsheets.length,
-        executionTime: result.executionTime
-      });
-
-    } catch (driveError) {
-      console.error('getSpreadsheetList: Drive API呼び出しエラー', {
-        error: driveError.message,
-        stack: driveError.stack
-      });
-
-      result = {
-        success: false,
-        message: `Drive API エラー: ${driveError.message}`,
-        spreadsheets: [],
-        executionTime: `${Date.now() - startTime}ms`,
-        error: driveError.toString()
-      };
-    }
-
-    // 詳細なレスポンス検証
-    console.info('getSpreadsheetList: DataService直接呼び出し完了', {
-      resultType: typeof result,
-      isNull: result === null,
-      isUndefined: result === undefined,
-      hasSuccess: result && typeof result.success !== 'undefined',
-      hasSpreadsheets: result && Array.isArray(result.spreadsheets),
-      spreadsheetsLength: result && result.spreadsheets ? result.spreadsheets.length : 'N/A',
-      rawResult: result,
-      executionTime: `${Date.now() - startTime}ms`
-    });
-
-    // 厳密nullチェック - google.script.run互換性確保
-    if (result === null || result === undefined) {
-      console.error('getSpreadsheetList: DataServiceがnull/undefinedを返しました - google.script.run送信不可');
-      const fallbackResponse = {
-        success: false,
-        message: 'スプレッドシート一覧の取得に失敗しました（null response）',
-        spreadsheets: [],
-        debugInfo: {
-          timestamp: new Date().toISOString(),
-          executionTime: `${Date.now() - startTime}ms`,
-          resultWasNull: result === null,
-          resultWasUndefined: result === undefined
-        }
-      };
-      console.warn('getSpreadsheetList: フォールバック応答を送信', fallbackResponse);
-      return fallbackResponse;
-    }
-
-    // 応答構造の検証
-    if (typeof result !== 'object') {
-      console.error('getSpreadsheetList: DataServiceが非オブジェクトを返しました', {
-        resultType: typeof result,
-        result
-      });
-      return {
-        success: false,
-        message: '無効なレスポンス形式です',
-        spreadsheets: [],
-        debugInfo: {
-          timestamp: new Date().toISOString(),
-          executionTime: `${Date.now() - startTime}ms`,
-          resultType: typeof result
-        }
-      };
-    }
-
-    // success フィールドの検証
-    if (typeof result.success === 'undefined') {
-      console.warn('getSpreadsheetList: success フィールドが未定義 - 互換性のため設定');
-      result.success = Array.isArray(result.spreadsheets) && result.spreadsheets.length >= 0;
-    }
-
-    // spreadsheets フィールドの検証
-    if (!Array.isArray(result.spreadsheets)) {
-      console.warn('getSpreadsheetList: spreadsheets が配列ではありません - 修正');
-      result.spreadsheets = [];
-      result.success = false;
-      result.message = result.message || 'スプレッドシート配列の取得に失敗';
-    }
-
-    // 最終応答ログ
-    console.info('getSpreadsheetList: 最終応答準備完了', {
-      success: result.success,
-      spreadsheetsCount: result.spreadsheets.length,
-      hasMessage: !!result.message,
-      totalExecutionTime: `${Date.now() - startTime}ms`,
-      responseSize: JSON.stringify(result).length
-    });
-
-    return result;
-
+    return getAdminSpreadsheetList();
   } catch (error) {
-    const executionTime = `${Date.now() - startTime}ms`;
-    console.error('getSpreadsheetList: 例外エラー', {
-      error: error.message,
-      stack: error.stack,
-      name: error.name,
-      executionTime
-    });
-
+    console.error('getSpreadsheetList error:', error);
     return {
       success: false,
       message: error.message || 'スプレッドシート一覧取得エラー',
-      spreadsheets: [],
-      error: error.toString(),
-      debugInfo: {
-        timestamp: new Date().toISOString(),
-        executionTime,
-        errorName: error.name,
-        errorMessage: error.message
-      }
+      spreadsheets: []
     };
   }
 }
 
-function getLightweightHeaders(spreadsheetId, sheetName) {
-  try {
-    console.log('getLightweightHeaders: 関数開始 - GAS Flat Architecture', {
-      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
-      sheetName: sheetName || 'null'
-    });
+// getLightweightHeaders is implemented in AdminController.gs
 
-    // ✅ GAS Best Practice: 直接サービス呼び出し（ServiceRegistry除去）
-    const result = DataService.getLightweightHeaders(spreadsheetId, sheetName);
+// analyzeColumns is implemented in AdminController.gs
 
-    // null/undefined ガード
-    if (!result) {
-      console.error('getLightweightHeaders: DataServiceがnullを返しました');
-      return {
-        success: false,
-        message: 'ヘッダー取得に失敗しました',
-        headers: []
-      };
-    }
+// publishApplication is implemented in AdminController.gs
 
-    return result;
-  } catch (error) {
-    console.error('getLightweightHeaders error:', error);
-    return {
-      success: false,
-      message: error.message || 'ヘッダー取得エラー',
-      headers: []
-    };
-  }
-}
-
-function analyzeColumns(spreadsheetId, sheetName) {
-  try {
-    console.log('analyzeColumns: 関数開始 - GAS Flat Architecture', {
-      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
-      sheetName: sheetName || 'null'
-    });
-
-    // ✅ GAS Best Practice: 直接サービス呼び出し（ServiceRegistry除去）
-    const result = DataService.analyzeColumns(spreadsheetId, sheetName);
-
-    console.info('analyzeColumns: DataService直接呼び出し完了');
-
-    // null/undefined ガード
-    if (!result) {
-      console.error('analyzeColumns: DataServiceがnullを返しました');
-      return {
-        success: false,
-        message: 'システムエラーが発生しました',
-        headers: [],
-        columns: [],
-        columnMapping: { mapping: {}, confidence: {} }
-      };
-    }
-
-    return result;
-  } catch (error) {
-    console.error('analyzeColumns error:', error);
-
-    return {
-      success: false,
-      message: error.message || '列分析エラー',
-      headers: [],
-      columns: [],
-      columnMapping: { mapping: {}, confidence: {} }
-    };
-  }
-}
-
-function publishApplication(publishConfig) {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return ConfigService.publishApplication(publishConfig);
-  } catch (error) {
-    console.error('publishApplication error:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-function saveDraftConfiguration(draftConfig) {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return ConfigService.saveDraftConfiguration(draftConfig);
-  } catch (error) {
-    console.error('saveDraftConfiguration error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// saveDraftConfiguration is implemented in AdminController.gs
 
 function connectDataSource(spreadsheetId, sheetName) {
   try {
@@ -966,15 +568,7 @@ function connectDataSource(spreadsheetId, sheetName) {
   }
 }
 
-function checkIsSystemAdmin() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return UserService.isSystemAdmin(UserService.getCurrentEmail());
-  } catch (error) {
-    console.error('checkIsSystemAdmin error:', error);
-    return false;
-  }
-}
+// checkIsSystemAdmin is implemented in AdminController.gs
 
 function getSheetList(spreadsheetId) {
   try {
@@ -986,88 +580,24 @@ function getSheetList(spreadsheetId) {
   }
 }
 
-function validateAccess(spreadsheetId) {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    const result = ConfigService.validateSpreadsheetAccess(spreadsheetId);
+// validateAccess is implemented in AdminController.gs
 
-    // null/undefined ガード
-    if (!result) {
-      console.error('validateAccess: AdminControllerがnullを返しました');
-      return {
-        success: false,
-        error: 'システムエラーが発生しました',
-        sheets: []
-      };
-    }
+// getCurrentBoardInfoAndUrls is implemented in AdminController.gs
 
-    return result;
-  } catch (error) {
-    console.error('validateAccess error:', error);
-    return {
-      success: false,
-      error: error.message,
-      sheets: []
-    };
-  }
-}
+// getFormInfo is implemented in AdminController.gs
 
-function getCurrentBoardInfoAndUrls() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return ConfigService.getCurrentBoardInfo();
-  } catch (error) {
-    console.error('getCurrentBoardInfoAndUrls error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// checkCurrentPublicationStatus is implemented in AdminController.gs
 
-function getFormInfo(spreadsheetId, sheetName) {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return ConfigService.getFormInfo(spreadsheetId, sheetName);
-  } catch (error) {
-    console.error('getFormInfo error:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-function checkCurrentPublicationStatus() {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return ConfigService.checkPublicationStatus();
-  } catch (error) {
-    console.error('checkCurrentPublicationStatus error:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-function createForm(userId, config) {
-  try {
-    // ✅ GAS Best Practice: Direct service calls
-    return ConfigService.createForm(userId, config);
-  } catch (error) {
-    console.error('createForm error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// createForm is implemented in AdminController.gs
 
 /**
  * Data Controller Global Functions
  */
-function handleGetData(request) {
-  try {
-    return getSheetData(request.userId, request.options);
-  } catch (error) {
-    console.error('handleGetData error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// handleGetData is implemented in DataController.gs
 
 function addReaction(userId, rowId, reactionType) {
   try {
-    const result = addDataReaction(userId, rowId, reactionType);
-    return { success: result, count: result ? 1 : 0 };
+    return addDataReaction(userId, rowId, reactionType);
   } catch (error) {
     console.error('addReaction error:', error);
     return { success: false, error: error.message };
@@ -1076,31 +606,16 @@ function addReaction(userId, rowId, reactionType) {
 
 function toggleHighlight(userId, rowId) {
   try {
-    const result = toggleDataHighlight(userId, rowId);
-    return { success: result };
+    return toggleDataHighlight(userId, rowId);
   } catch (error) {
     console.error('toggleHighlight error:', error);
     return { success: false, error: error.message };
   }
 }
 
-function refreshBoardData(userId) {
-  try {
-    return getSheetData(userId);
-  } catch (error) {
-    console.error('refreshBoardData error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// refreshBoardData is implemented in DataController.gs
 
-function addSpreadsheetUrl(url) {
-  try {
-    return ConfigService.addSpreadsheetUrl(url);
-  } catch (error) {
-    console.error('addSpreadsheetUrl error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// addSpreadsheetUrl is implemented in DataController.gs
 
 function getUserConfig(userId) {
   console.log('getUserConfig: 関数開始', { userId });
@@ -1131,25 +646,7 @@ function getUserConfig(userId) {
   }
 }
 
-function getPublishedSheetData(userId, options) {
-  try {
-    // userIdが無効な場合、現在のユーザーから取得を試行
-    if (!userId) {
-      const userInfo = UserService.getCurrentUserInfo();
-      if (userInfo && userInfo.userId) {
-        userId = userInfo.userId;
-        console.info('getPublishedSheetData: userIdを現在のユーザーから取得:', userId);
-      } else {
-        return { success: false, error: 'ユーザーIDの取得に失敗しました' };
-      }
-    }
-
-    return DataService.getPublishedSheetData(userId, options);
-  } catch (error) {
-    console.error('getPublishedSheetData error:', error);
-    return { success: false, error: error.message };
-  }
-}
+// getPublishedSheetData is implemented in DataController.gs
 
 function processReactionByEmail(userEmail, rowIndex, reactionKey) {
   try {

@@ -10,29 +10,23 @@
  * 📝 main.gsから移動されたシステム管理関数群
  */
 
-/* global UserService, ConfigService, DataService, DB, PROPS_KEYS */
+/* global UserService, ConfigService, DataService, DB, PROPS_KEYS, diagnoseUserService, diagnoseConfigService */
+
+// ===========================================
+// 📊 システムセットアップAPI
+// ===========================================
 
 /**
- * SystemController - システム管理用コントローラー
- * セットアップ、診断、監視機能を集約
+ * アプリケーションの初期セットアップ
+ * AppSetupPage.html から呼び出される
+ *
+ * @param {string} serviceAccountJson - サービスアカウントJSON
+ * @param {string} databaseId - データベースID
+ * @param {string} adminEmail - 管理者メール
+ * @param {string} googleClientId - GoogleクライアントID
+ * @returns {Object} セットアップ結果
  */
-const SystemController = Object.freeze({
-
-  // ===========================================
-  // 📊 システムセットアップAPI
-  // ===========================================
-
-  /**
-   * アプリケーションの初期セットアップ
-   * AppSetupPage.html から呼び出される
-   *
-   * @param {string} serviceAccountJson - サービスアカウントJSON
-   * @param {string} databaseId - データベースID
-   * @param {string} adminEmail - 管理者メール
-   * @param {string} googleClientId - GoogleクライアントID
-   * @returns {Object} セットアップ結果
-   */
-  setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
+function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
     try {
       // バリデーション
       if (!serviceAccountJson || !databaseId || !adminEmail) {
@@ -78,15 +72,15 @@ const SystemController = Object.freeze({
         message: error.message
       };
     }
-  },
+}
 
-  /**
-   * セットアップのテスト実行
-   * AppSetupPage.html から呼び出される
-   *
-   * @returns {Object} テスト結果
-   */
-  testSetup() {
+/**
+ * セットアップのテスト実行
+ * AppSetupPage.html から呼び出される
+ *
+ * @returns {Object} テスト結果
+ */
+function testSetup() {
     try {
       const properties = PropertiesService.getScriptProperties();
       const databaseId = properties.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
@@ -128,15 +122,15 @@ const SystemController = Object.freeze({
         message: `テスト中にエラーが発生しました: ${error.message}`
       };
     }
-  },
+}
 
-  /**
-   * システム状態の強制リセット
-   * AppSetupPage.html から呼び出される（緊急時用）
-   *
-   * @returns {Object} リセット結果
-   */
-  forceUrlSystemReset() {
+/**
+ * システム状態の強制リセット
+ * AppSetupPage.html から呼び出される（緊急時用）
+ *
+ * @returns {Object} リセット結果
+ */
+function forceUrlSystemReset() {
     try {
       console.warn('システム強制リセットが実行されました');
 
@@ -182,15 +176,15 @@ const SystemController = Object.freeze({
         message: error.message
       };
     }
-  },
+}
 
-  /**
-   * WebアプリのURL取得
-   * 各種HTMLファイルから呼び出される
-   *
-   * @returns {string} WebアプリURL
-   */
-  getWebAppUrl() {
+/**
+ * WebアプリのURL取得
+ * 各種HTMLファイルから呼び出される
+ *
+ * @returns {string} WebアプリURL
+ */
+function getWebAppUrl() {
     try {
       const url = ScriptApp.getService().getUrl();
       if (!url) {
@@ -201,19 +195,19 @@ const SystemController = Object.freeze({
       console.error('SystemController.getWebAppUrl エラー:', error.message);
       return '';
     }
-  },
+}
 
-  // ===========================================
-  // 📊 システム診断・監視API
-  // ===========================================
+// ===========================================
+// 📊 システム診断・監視API
+// ===========================================
 
-  /**
-   * システム全体の診断実行
-   * AppSetupPage.html から呼び出される
-   *
-   * @returns {Object} 診断結果
-   */
-  testSystemDiagnosis() {
+/**
+ * システム全体の診断実行
+ * AppSetupPage.html から呼び出される
+ *
+ * @returns {Object} 診断結果
+ */
+function testSystemDiagnosis() {
     try {
       const diagnostics = {
         timestamp: new Date().toISOString(),
@@ -224,9 +218,9 @@ const SystemController = Object.freeze({
 
       // Services診断
       try {
-        diagnostics.services.UserService = UserService.diagnose ? UserService.diagnose() : '❓ 診断機能なし';
-        diagnostics.services.ConfigService = ConfigService.diagnose ? ConfigService.diagnose() : '❓ 診断機能なし';
-        diagnostics.services.DataService = DataService.diagnose ? DataService.diagnose() : '❓ 診断機能なし';
+        diagnostics.services.UserService = typeof diagnoseUserService === 'function' ? diagnoseUserService() : '❓ 診断機能なし';
+        diagnostics.services.ConfigService = typeof diagnoseConfigService === 'function' ? diagnoseConfigService() : '❓ 診断機能なし';
+        diagnostics.services.DataService = '❓ 診断機能なし';
       } catch (servicesError) {
         diagnostics.services.error = servicesError.message;
       }
@@ -268,15 +262,15 @@ const SystemController = Object.freeze({
         message: error.message
       };
     }
-  },
+}
 
-  /**
-   * システム状態の取得
-   * AppSetupPage.html から呼び出される
-   *
-   * @returns {Object} システム状態
-   */
-  getSystemStatus() {
+/**
+ * システム状態の取得
+ * AppSetupPage.html から呼び出される
+ *
+ * @returns {Object} システム状態
+ */
+function getSystemStatus() {
     try {
       const properties = PropertiesService.getScriptProperties();
       const status = {
@@ -307,15 +301,15 @@ const SystemController = Object.freeze({
         message: error.message
       };
     }
-  },
+}
 
-  /**
-   * システムドメイン情報の取得
-   * AppSetupPage.html から呼び出される
-   *
-   * @returns {Object} ドメイン情報
-   */
-  getSystemDomainInfo() {
+/**
+ * システムドメイン情報の取得
+ * AppSetupPage.html から呼び出される
+ *
+ * @returns {Object} ドメイン情報
+ */
+function getSystemDomainInfo() {
     try {
       const currentUser = UserService.getCurrentEmail();
       let domain = 'unknown';
@@ -337,19 +331,19 @@ const SystemController = Object.freeze({
         message: 'ドメイン情報の取得に失敗しました'
       };
     }
-  },
+}
 
-  // ===========================================
-  // 📊 データ整合性・メンテナンスAPI
-  // ===========================================
+// ===========================================
+// 📊 データ整合性・メンテナンスAPI
+// ===========================================
 
-  /**
-   * データ整合性チェック
-   * 管理者用の高度な診断機能
-   *
-   * @returns {Object} チェック結果
-   */
-  performDataIntegrityCheck() {
+/**
+ * データ整合性チェック
+ * 管理者用の高度な診断機能
+ *
+ * @returns {Object} チェック結果
+ */
+function performDataIntegrityCheck() {
     try {
       const results = {
         timestamp: new Date().toISOString(),
@@ -379,15 +373,15 @@ const SystemController = Object.freeze({
         message: error.message
       };
     }
-  },
+}
 
-  /**
-   * 自動修復の実行
-   * 管理者用の自動メンテナンス機能
-   *
-   * @returns {Object} 修復結果
-   */
-  performAutoRepair() {
+/**
+ * 自動修復の実行
+ * 管理者用の自動メンテナンス機能
+ *
+ * @returns {Object} 修復結果
+ */
+function performAutoRepair() {
     try {
       console.log('自動修復機能は現在基本実装のみです');
 
@@ -421,17 +415,4 @@ const SystemController = Object.freeze({
         message: error.message
       };
     }
-  }
-
-});
-
-// ===========================================
-// 📊 グローバル関数エクスポート（GAS互換性のため）
-// ===========================================
-
-/**
- * 重複削除完了 - グローバル関数エクスポート削除
- * 使用方法: google.script.run.SystemController.methodName()
- *
- * 適切なオブジェクト指向アプローチを採用し、グローバル関数の重複を回避
- */
+}

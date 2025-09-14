@@ -13,7 +13,7 @@
  * - ColumnAnalysisSystem.gs の一部
  */
 
-/* global DB, DataFormatter, CONSTANTS, ResponseFormatter, PropertiesService, Session, PROPS_KEYS, SpreadsheetApp, DriveApp, Utilities, CacheService */
+/* global DB, DataFormatter, CONSTANTS, ResponseFormatter, PROPS_KEYS, formatTimestampSimple */
 
 // ===========================================
 // 📊 スプレッドシートデータ取得

@@ -1,46 +1,40 @@
 /**
  * @fileoverview Input Validation & Sanitization
- * 
+ *
  * 🎯 責任範囲:
  * - 入力データの検証・サニタイズ
  * - セキュリティ関連バリデーション
  * - データ整合性チェック
  * - フォーマット検証
- * 
- * 🔄 移行元:
- * - SecurityService の検証機能
- * - ConfigService の設定検証
- * - 各所に分散している検証処理
+ *
+ * 🔄 GAS Best Practices準拠:
+ * - フラット関数構造 (Object.freeze削除)
+ * - 直接的な関数エクスポート
+ * - シンプルなユーティリティ関数群
  */
 
-/* global CONSTANTS, SECURITY, SecurityValidator, SecurityService, URL */
+/* global CONSTANTS, validateSecurityEmail, URL */
+
+// ===========================================
+// 🔒 基本データ型検証関数群
+// ===========================================
 
 /**
- * InputValidator - 統一入力検証システム
- * SecurityServiceとの連携でセキュアな検証を実現
+ * メールアドレス検証 (セキュリティサービスに統一)
+ * @param {string} email - メールアドレス
+ * @returns {Object} 検証結果
  */
-const InputValidator = Object.freeze({
-
-  // ===========================================
-  // 🔒 基本データ型検証
-  // ===========================================
-
-  /**
-   * メールアドレス検証（SecurityServiceに統一）
-   * @param {string} email - メールアドレス
-   * @returns {Object} 検証結果
-   */
-  validateEmail(email) {
+function validateInputEmail(email) {
     // SecurityServiceに統一 - レガシー互換性維持
-    return SecurityService.validateEmail(email);
-  },
+    return validateSecurityEmail(email);
+}
 
-  /**
-   * URL検証（Google関連のみ許可）
-   * @param {string} url - URL
-   * @returns {Object} 検証結果
-   */
-  validateUrl(url) {
+/**
+ * URL検証（Google関連のみ許可）
+ * @param {string} url - URL
+ * @returns {Object} 検証結果
+ */
+function validateInputUrl(url) {
     const result = {
       isValid: false,
       sanitized: '',
@@ -121,15 +115,15 @@ const InputValidator = Object.freeze({
     }
 
     return result;
-  },
+}
 
-  /**
-   * テキスト検証・サニタイズ（XSS対策込み）
-   * @param {string} text - テキスト
-   * @param {Object} options - オプション
-   * @returns {Object} 検証結果
-   */
-  validateText(text, options = {}) {
+/**
+ * テキスト検証・サニタイズ（XSS対策込み）
+ * @param {string} text - テキスト
+ * @param {Object} options - オプション
+ * @returns {Object} 検証結果
+ */
+function validateInputText(text, options = {}) {
     const {
       maxLength = 8192,
       minLength = 0,
@@ -215,18 +209,18 @@ const InputValidator = Object.freeze({
     };
 
     return result;
-  },
+}
 
-  // ===========================================
-  // 📊 設定・構造検証
-  // ===========================================
+// ===========================================
+// 📊 設定・構造検証
+// ===========================================
 
-  /**
-   * スプレッドシートID検証
-   * @param {string} spreadsheetId - スプレッドシートID
-   * @returns {Object} 検証結果
-   */
-  validateSpreadsheetId(spreadsheetId) {
+/**
+ * スプレッドシートID検証
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {Object} 検証結果
+ */
+function validateInputSpreadsheetId(spreadsheetId) {
     const result = {
       isValid: false,
       errors: []
@@ -246,14 +240,14 @@ const InputValidator = Object.freeze({
 
     result.isValid = true;
     return result;
-  },
+}
 
-  /**
-   * 列マッピング検証
-   * @param {Object} columnMapping - 列マッピング
-   * @returns {Object} 検証結果
-   */
-  validateColumnMapping(columnMapping) {
+/**
+ * 列マッピング検証
+ * @param {Object} columnMapping - 列マッピング
+ * @returns {Object} 検証結果
+ */
+function validateInputColumnMapping(columnMapping) {
     const result = {
       isValid: false,
       errors: [],
@@ -309,14 +303,14 @@ const InputValidator = Object.freeze({
 
     result.isValid = result.errors.length === 0;
     return result;
-  },
+}
 
-  /**
-   * 設定オブジェクト総合検証
-   * @param {Object} config - 設定オブジェクト
-   * @returns {Object} 検証結果
-   */
-  validateConfig(config) {
+/**
+ * 設定オブジェクト総合検証
+ * @param {Object} config - 設定オブジェクト
+ * @returns {Object} 検証結果
+ */
+function validateInputConfig(config) {
     const result = {
       isValid: false,
       errors: [],
@@ -331,9 +325,9 @@ const InputValidator = Object.freeze({
 
     // 基本フィールド検証
     const fields = {
-      spreadsheetId: { validator: this.validateSpreadsheetId.bind(this), required: false },
-      formUrl: { validator: this.validateUrl.bind(this), required: false },
-      sheetName: { validator: (v) => this.validateText(v, { maxLength: 100 }), required: false }
+      spreadsheetId: { validator: validateInputSpreadsheetId, required: false },
+      formUrl: { validator: validateInputUrl, required: false },
+      sheetName: { validator: (v) => validateInputText(v, { maxLength: 100 }), required: false }
     };
 
     for (const [field, { validator, required }] of Object.entries(fields)) {
@@ -356,7 +350,7 @@ const InputValidator = Object.freeze({
 
     // 列マッピング検証
     if (config.columnMapping) {
-      const mappingValidation = this.validateColumnMapping(config.columnMapping);
+      const mappingValidation = validateInputColumnMapping(config.columnMapping);
       if (!mappingValidation.isValid) {
         result.errors.push(...mappingValidation.errors);
       }
@@ -384,33 +378,33 @@ const InputValidator = Object.freeze({
 
     result.isValid = result.errors.length === 0;
     return result;
-  },
+}
 
-  // ===========================================
-  // 🔧 ユーティリティ・診断
-  // ===========================================
+// ===========================================
+// 🔧 ユーティリティ・診断
+// ===========================================
 
-  /**
-   * バリデーター診断
-   * @returns {Object} 診断結果
-   */
-  diagnose() {
+/**
+ * バリデーター診断
+ * @returns {Object} 診断結果
+ */
+function diagnoseInputValidator() {
     const tests = [
       {
         name: 'Email Validation',
-        test: () => this.validateEmail('test@example.com').isValid
+        test: () => validateInputEmail('test@example.com').isValid
       },
       {
         name: 'URL Validation',
-        test: () => this.validateUrl('https://docs.google.com/spreadsheets/d/test').isValid
+        test: () => validateInputUrl('https://docs.google.com/spreadsheets/d/test').isValid
       },
       {
         name: 'Text Sanitization',
-        test: () => this.validateText('<script>alert("test")</script>').sanitized.includes('[REMOVED_FOR_SECURITY]')
+        test: () => validateInputText('<script>alert("test")</script>').sanitized.includes('[REMOVED_FOR_SECURITY]')
       },
       {
         name: 'Spreadsheet ID Validation',
-        test: () => this.validateSpreadsheetId('1234567890123456789012345678901234567890abcd').isValid
+        test: () => validateInputSpreadsheetId('1234567890123456789012345678901234567890abcd').isValid
       }
     ];
 
@@ -428,9 +422,7 @@ const InputValidator = Object.freeze({
       tests: results,
       overall: results.every(r => r.status === '✅') ? '✅' : '⚠️'
     };
-  }
-
-});
+}
 
 /**
  * レガシー互換関数
@@ -439,16 +431,16 @@ const InputValidator = Object.freeze({
 
 // SecurityServiceからの移行
 function validateUserData(userData) {
-  return InputValidator.validateConfig(userData);
+  return validateInputConfig(userData);
 }
 
 // validateEmail - SecurityServiceに統一 (グローバル関数削除済み)
 
 function validateUrl(url) {
-  return InputValidator.validateUrl(url);
+  return validateInputUrl(url);
 }
 
-// ConfigServiceからの移行
-function validateAndSanitizeConfig(config) {
-  return InputValidator.validateConfig(config);
+// ConfigServiceからの移行 - Legacy互換関数
+function validateAndSanitizeConfigLegacy(config) {
+  return validateInputConfig(config);
 }

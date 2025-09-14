@@ -7,30 +7,23 @@
  * - 権限・アクセス制御
  * - ユーザーキャッシュ管理
  *
- * 🔄 置き換え対象:
- * - UserManager (main.gs内)
- * - UnifiedManager.user
- * - auth.gsの一部機能
+ * 🔄 GAS Best Practices準拠:
+ * - フラット関数構造 (Object.freeze削除)
+ * - 直接的な関数エクスポート
+ * - 単一責任原則の維持
  */
 
-/* global DB, PROPS_KEYS, SecurityService, DataFormatter, CONSTANTS, URL */
+/* global DB, PROPS_KEYS, CONSTANTS, URL */
+
+// ===========================================
+// 🔑 認証・セッション管理
+// ===========================================
 
 /**
- * UserService - 統一ユーザー管理サービス
- * Single Responsibility Pattern準拠
+ * 現在のユーザーメールアドレス取得
+ * @returns {string|null} ユーザーメールアドレス
  */
-// eslint-disable-next-line no-unused-vars
-const UserService = Object.freeze({
-
-  // ===========================================
-  // 🔑 認証・セッション管理
-  // ===========================================
-
-  /**
-   * 現在のユーザーメールアドレス取得
-   * @returns {string|null} ユーザーメールアドレス
-   */
-  getCurrentEmail() {
+function getCurrentUserEmail() {
     try {
       // 複数の方法でメールアドレス取得を試行
       let email = null;
@@ -78,13 +71,21 @@ const UserService = Object.freeze({
       console.error('UserService.getCurrentEmail: 予期しないエラー', error.message);
       return null;
     }
-  },
+}
 
-  /**
-   * 現在のユーザー情報取得（キャッシュ対応）
-   * @returns {Object|null} ユーザー情報オブジェクト
-   */
-  getCurrentUserInfo() {
+/**
+ * 現在のユーザーメール取得（互換性関数）
+ * @returns {string|null} ユーザーメール
+ */
+function getCurrentEmail() {
+  return getCurrentUserEmail();
+}
+
+/**
+ * 現在のユーザー情報取得（キャッシュ対応）
+ * @returns {Object|null} ユーザー情報オブジェクト
+ */
+function getCurrentUserInfo() {
     const cacheKey = 'current_user_info';
     
     try {
@@ -95,7 +96,7 @@ const UserService = Object.freeze({
       }
 
       // セッションからメール取得
-      const email = this.getCurrentEmail();
+      const email = getCurrentUserEmail();
       if (!email) {
         return null;
       }
@@ -108,7 +109,7 @@ const UserService = Object.freeze({
       }
 
       // 設定情報を統合
-      const completeUserInfo = this.enrichUserInfo(userInfo);
+      const completeUserInfo = enrichUserInfo(userInfo);
 
       // 統一キャッシュサービスでキャッシュ保存
       CacheService.getScriptCache().put(cacheKey, JSON.stringify(completeUserInfo), 300); // 5分キャッシュ
@@ -121,14 +122,14 @@ const UserService = Object.freeze({
       });
       return null;
     }
-  },
+}
 
-  /**
-   * ユーザー情報を設定で拡張
-   * @param {Object} userInfo - 基本ユーザー情報
-   * @returns {Object} 拡張されたユーザー情報
-   */
-  enrichUserInfo(userInfo) {
+/**
+ * ユーザー情報を設定で拡張
+ * @param {Object} userInfo - 基本ユーザー情報
+ * @returns {Object} 拡張されたユーザー情報
+ */
+function enrichUserInfo(userInfo) {
     try {
       if (!userInfo || !userInfo.userId) {
         throw new Error('無効なユーザー情報');
@@ -144,7 +145,7 @@ const UserService = Object.freeze({
       }
 
       // 動的URLを生成・キャッシュ
-      const enrichedConfig = this.generateDynamicUrls(config);
+      const enrichedConfig = generateDynamicUserUrls(config);
 
       return {
         userId: userInfo.userId,
@@ -164,14 +165,14 @@ const UserService = Object.freeze({
       console.error('UserService.enrichUserInfo: エラー', error.message);
       return userInfo; // フォールバック
     }
-  },
+}
 
-  /**
-   * 動的URL生成（spreadsheetUrl, appUrl等）
-   * @param {Object} config - 設定オブジェクト
-   * @returns {Object} URL付き設定オブジェクト
-   */
-  generateDynamicUrls(config) {
+/**
+ * 動的URL生成（spreadsheetUrl, appUrl等）
+ * @param {Object} config - 設定オブジェクト
+ * @returns {Object} URL付き設定オブジェクト
+ */
+function generateDynamicUserUrls(config) {
     try {
       const enhanced = { ...config };
 
@@ -187,7 +188,7 @@ const UserService = Object.freeze({
 
       // フォームURL存在確認
       if (config.formUrl) {
-        enhanced.hasValidForm = this.validateFormUrl(config.formUrl);
+        enhanced.hasValidForm = validateUserFormUrl(config.formUrl);
       }
 
       return enhanced;
@@ -195,24 +196,24 @@ const UserService = Object.freeze({
       console.error('UserService.generateDynamicUrls: エラー', error.message);
       return config; // フォールバック
     }
-  },
+}
 
-  // ===========================================
-  // 🛡️ 権限・アクセス制御
-  // ===========================================
+// ===========================================
+// 🛡️ 権限・アクセス制御
+// ===========================================
 
-  /**
-   * ユーザーアクセスレベル取得
-   * @param {string} userId - ユーザーID
-   * @returns {string} アクセスレベル (owner/system_admin/authenticated_user/guest/none)
-   */
-  getAccessLevel(userId) {
+/**
+ * ユーザーアクセスレベル取得
+ * @param {string} userId - ユーザーID
+ * @returns {string} アクセスレベル (owner/system_admin/authenticated_user/guest/none)
+ */
+function getUserAccessLevel(userId) {
     try {
       if (!userId) {
         return CONSTANTS.ACCESS.LEVELS.GUEST;
       }
 
-      const currentEmail = this.getCurrentEmail();
+      const currentEmail = getCurrentUserEmail();
       if (!currentEmail) {
         return CONSTANTS.ACCESS.LEVELS.NONE;
       }
@@ -228,7 +229,7 @@ const UserService = Object.freeze({
       }
 
       // システム管理者チェック（実装時に条件追加）
-      if (this.isSystemAdmin(currentEmail)) {
+      if (isSystemAdmin(currentEmail)) {
         return CONSTANTS.ACCESS.LEVELS.SYSTEM_ADMIN;
       }
 
@@ -238,24 +239,24 @@ const UserService = Object.freeze({
       console.error('UserService.getAccessLevel: エラー', error.message);
       return CONSTANTS.ACCESS.LEVELS.NONE;
     }
-  },
+}
 
-  /**
-   * 所有者権限確認
-   * @param {string} userId - 確認対象ユーザーID
-   * @returns {boolean} 所有者かどうか
-   */
-  verifyOwnership(userId) {
-    const accessLevel = this.getAccessLevel(userId);
+/**
+ * 所有者権限確認
+ * @param {string} userId - 確認対象ユーザーID
+ * @returns {boolean} 所有者かどうか
+ */
+function verifyUserOwnership(userId) {
+    const accessLevel = getUserAccessLevel(userId);
     return accessLevel === CONSTANTS.ACCESS.LEVELS.OWNER;
-  },
+}
 
-  /**
-   * システム管理者確認
-   * @param {string} email - メールアドレス
-   * @returns {boolean} システム管理者かどうか
-   */
-  isSystemAdmin(email) {
+/**
+ * システム管理者確認
+ * @param {string} email - メールアドレス
+ * @returns {boolean} システム管理者かどうか
+ */
+function isSystemAdmin(email) {
     try {
       if (!email) {
         return false;
@@ -285,21 +286,21 @@ const UserService = Object.freeze({
       });
       return false;
     }
-  },
+}
 
-  // ===========================================
-  // 🔄 ユーザー操作
-  // ===========================================
+// ===========================================
+// 🔄 ユーザー操作
+// ===========================================
 
-  /**
-   * 新規ユーザー作成
-   * @param {string} userEmail - ユーザーメールアドレス
-   * @param {Object} initialConfig - 初期設定（オプション）
-   * @returns {Object} 作成されたユーザー情報
-   */
-  createUser(userEmail, initialConfig = {}) {
+/**
+ * 新規ユーザー作成
+ * @param {string} userEmail - ユーザーメールアドレス
+ * @param {Object} initialConfig - 初期設定（オプション）
+ * @returns {Object} 作成されたユーザー情報
+ */
+function createUser(userEmail, initialConfig = {}) {
     try {
-      if (!userEmail || !SecurityService.validateEmail(userEmail).isValid) {
+      if (!userEmail || !validateUserEmail(userEmail).isValid) {
         throw new Error('無効なメールアドレス');
       }
 
@@ -311,7 +312,7 @@ const UserService = Object.freeze({
       }
 
       // 新規ユーザーデータ作成
-      const userData = this.buildNewUserData(userEmail, initialConfig);
+      const userData = buildNewUserData(userEmail, initialConfig);
 
       // データベースに保存
       const success = DB.createUser(userData);
@@ -332,15 +333,15 @@ const UserService = Object.freeze({
       });
       throw error;
     }
-  },
+}
 
-  /**
-   * 新規ユーザーデータ構築
-   * @param {string} userEmail - ユーザーメールアドレス
-   * @param {Object} initialConfig - 初期設定
-   * @returns {Object} 新規ユーザーデータ
-   */
-  buildNewUserData(userEmail, initialConfig) {
+/**
+ * 新規ユーザーデータ構築
+ * @param {string} userEmail - ユーザーメールアドレス
+ * @param {Object} initialConfig - 初期設定
+ * @returns {Object} 新規ユーザーデータ
+ */
+function buildNewUserData(userEmail, initialConfig) {
     const userId = Utilities.getUuid();
     const timestamp = new Date().toISOString();
 
@@ -364,29 +365,29 @@ const UserService = Object.freeze({
       configJson: JSON.stringify(minimalConfig),
       lastModified: timestamp
     };
-  },
+}
 
-  // ===========================================
-  // 🧹 キャッシュ・セッション管理
-  // ===========================================
+// ===========================================
+// 🧹 キャッシュ・セッション管理
+// ===========================================
 
-  /**
-   * ユーザーキャッシュクリア
-   * @param {string} userId - ユーザーID（オプション、未指定時は全体）
-   */
-  clearUserCache(userId = null) {
+/**
+ * ユーザーキャッシュクリア
+ * @param {string} userId - ユーザーID（オプション、未指定時は全体）
+ */
+function clearUserCache(userId = null) {
     // CacheServiceに統一委譲
     return CacheService.invalidateUserCache(userId);
-  },
+}
 
-  /**
-   * セッション状態確認
-   * @returns {Object} セッション状態情報
-   */
-  getSessionStatus() {
+/**
+ * セッション状態確認
+ * @returns {Object} セッション状態情報
+ */
+function getUserSessionStatus() {
     try {
-      const email = this.getCurrentEmail();
-      const userInfo = email ? this.getCurrentUserInfo() : null;
+      const email = getCurrentUserEmail();
+      const userInfo = email ? getCurrentUserInfo() : null;
 
       return {
         isAuthenticated: !!email,
@@ -404,20 +405,20 @@ const UserService = Object.freeze({
         timestamp: new Date().toISOString()
       };
     }
-  },
+}
 
-  // ===========================================
-  // 🔧 ユーティリティ
-  // ===========================================
+// ===========================================
+// 🔧 ユーティリティ
+// ===========================================
 
-  /**
-   * メールアドレスでユーザー検索
-   * @param {string} email - メールアドレス
-   * @returns {Object|null} ユーザー情報
-   */
-  findUserByEmail(email) {
+/**
+ * メールアドレスでユーザー検索
+ * @param {string} email - メールアドレス
+ * @returns {Object|null} ユーザー情報
+ */
+function findUserByEmail(email) {
     try {
-      if (!email || !SecurityService.validateEmail(email).isValid) {
+      if (!email || !validateUserEmail(email).isValid) {
         return null;
       }
       return DB.findUserByEmail(email);
@@ -425,30 +426,47 @@ const UserService = Object.freeze({
       console.error('UserService.findUserByEmail: エラー', error.message);
       return null;
     }
-  },
+}
 
-  /**
-   * メールアドレス検証（SecurityServiceに委譲）
-   * @param {string} email - メールアドレス
-   * @returns {boolean} 有効かどうか
-   */
-  // validateEmail - SecurityServiceに統一 (削除済み)
+/**
+ * メールアドレス検証（SecurityServiceに委譲）
+ * @param {string} email - メールアドレス
+ * @returns {Object} 検証結果
+ */
+function validateUserEmail(email) {
+  try {
+    if (!email || typeof email !== 'string') {
+      return { isValid: false, reason: 'メールアドレスが空または無効な型です' };
+    }
 
-  /**
-   * フォームURL検証
-   * @param {string} formUrl - フォームURL
-   * @returns {boolean} 有効かどうか
-   */
-  validateFormUrl(formUrl) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const isValid = emailRegex.test(email);
+
+    return {
+      isValid,
+      reason: isValid ? null : '無効なメールアドレス形式です'
+    };
+  } catch (error) {
+    console.error('validateUserEmail エラー:', error.message);
+    return { isValid: false, reason: 'メール検証中にエラーが発生しました' };
+  }
+}
+
+/**
+ * フォームURL検証
+ * @param {string} formUrl - フォームURL
+ * @returns {boolean} 有効かどうか
+ */
+function validateUserFormUrl(formUrl) {
     if (!formUrl || typeof formUrl !== 'string') return false;
     return formUrl.includes('forms.gle') || formUrl.includes('docs.google.com/forms');
-  },
+}
 
-  /**
-   * サービス状態診断
-   * @returns {Object} 診断結果
-   */
-  diagnose() {
+/**
+ * サービス状態診断
+ * @returns {Object} 診断結果
+ */
+function diagnoseUserService() {
     const results = {
       service: 'UserService',
       timestamp: new Date().toISOString(),
@@ -457,7 +475,7 @@ const UserService = Object.freeze({
 
     try {
       // セッション確認
-      const email = this.getCurrentEmail();
+      const email = getCurrentUserEmail();
       results.checks.push({
         name: 'Session Check',
         status: email ? '✅' : '❌',
@@ -491,6 +509,4 @@ const UserService = Object.freeze({
     }
 
     return results;
-  }
-
-});
+}

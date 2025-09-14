@@ -1,33 +1,31 @@
 /**
  * @fileoverview Data Formatting & Transformation
- * 
+ *
  * 🎯 責任範囲:
  * - データの表示用フォーマット
  * - 型変換・データ変換
  * - レスポンス形式の統一
  * - 出力データの正規化
- * 
- * 🔄 移行元:
- * - Core.gs のフォーマット関数
- * - DataService の変換処理
- * - 各所に分散している表示処理
+ *
+ * 🔄 GAS Best Practices準拠:
+ * - フラット関数構造 (Object.freeze削除)
+ * - 直接的な関数エクスポート
+ * - 簡素なユーティリティ関数群
  */
 
-/* global CONSTANTS, AppLogger */
+/* global CONSTANTS */
+
+// ===========================================
+// 📦 レスポンス形式統一関数群
+// ===========================================
 
 /**
- * ResponseFormatter - レスポンス形式統一
- * API応答とエラーレスポンスの標準化
+ * 成功レスポンス作成
+ * @param {*} data - データ
+ * @param {Object} metadata - メタデータ
+ * @returns {Object} 標準成功レスポンス
  */
-const ResponseFormatter = Object.freeze({
-
-  /**
-   * 成功レスポンス作成
-   * @param {*} data - データ
-   * @param {Object} metadata - メタデータ
-   * @returns {Object} 標準成功レスポンス
-   */
-  createSuccessResponse(data, metadata = {}) {
+function createFormatterSuccessResponse(data, metadata = {}) {
     const response = {
       success: true,
       timestamp: new Date().toISOString(),
@@ -41,15 +39,15 @@ const ResponseFormatter = Object.freeze({
 
     // メタデータをマージ
     return { ...response, ...metadata };
-  },
+}
 
-  /**
-   * エラーレスポンス作成
-   * @param {string} message - エラーメッセージ
-   * @param {Object} details - 詳細情報
-   * @returns {Object} 標準エラーレスポンス
-   */
-  createErrorResponse(message, details = {}) {
+/**
+ * エラーレスポンス作成
+ * @param {string} message - エラーメッセージ
+ * @param {Object} details - 詳細情報
+ * @returns {Object} 標準エラーレスポンス
+ */
+function createFormatterErrorResponse(message, details = {}) {
     return {
       success: false,
       message: message || 'エラーが発生しました',
@@ -58,16 +56,16 @@ const ResponseFormatter = Object.freeze({
       count: 0,
       ...details
     };
-  },
+}
 
-  /**
-   * バルクデータレスポンス作成
-   * @param {Object} bulkData - バルクデータ
-   * @param {Object} options - オプション
-   * @returns {Object} バルクレスポンス
-   */
-  createBulkResponse(bulkData, options = {}) {
-    const response = this.createSuccessResponse(bulkData, {
+/**
+ * バルクデータレスポンス作成
+ * @param {Object} bulkData - バルクデータ
+ * @param {Object} options - オプション
+ * @returns {Object} バルクレスポンス
+ */
+function createFormatterBulkResponse(bulkData, options = {}) {
+    const response = createFormatterSuccessResponse(bulkData, {
       type: 'bulk_data',
       executionTime: options.executionTime,
       cached: options.cached || false
@@ -84,14 +82,14 @@ const ResponseFormatter = Object.freeze({
     }
 
     return response;
-  },
+}
 
-  /**
-   * タイムスタンプフォーマット（短縮形式）
-   * @param {string|Date} timestamp - タイムスタンプ
-   * @returns {string} フォーマット済み日時
-   */
-  formatTimestamp(timestamp) {
+/**
+ * タイムスタンプフォーマット（短縮形式）
+ * @param {string|Date} timestamp - タイムスタンプ
+ * @returns {string} フォーマット済み日時
+ */
+function formatFormatterTimestamp(timestamp) {
     try {
       const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp;
       if (isNaN(date.getTime())) {
@@ -107,26 +105,22 @@ const ResponseFormatter = Object.freeze({
         minute: '2-digit'
       });
     } catch (error) {
-      console.error('ResponseFormatter.formatTimestamp error:', error);
+      console.error('formatFormatterTimestamp error:', error);
       return new Date().toISOString();
     }
-  }
+}
 
-});
+// ===========================================
+// 📅 データ表示用フォーマット関数群
+// ===========================================
 
 /**
- * DataFormatter - データ表示用フォーマット
- * ユーザー向け表示データの変換
+ * 日時フォーマット（日本語）
+ * @param {string|Date} timestamp - タイムスタンプ
+ * @param {Object} options - フォーマットオプション
+ * @returns {string} フォーマット済み日時
  */
-const DataFormatter = Object.freeze({
-
-  /**
-   * 日時フォーマット（日本語）
-   * @param {string|Date} timestamp - タイムスタンプ
-   * @param {Object} options - フォーマットオプション
-   * @returns {string} フォーマット済み日時
-   */
-  formatDateTime(timestamp, options = {}) {
+function formatDataDateTime(timestamp, options = {}) {
     const {
       style = 'short', // short, full, date, time
       locale = 'ja-JP'
@@ -176,14 +170,14 @@ const DataFormatter = Object.freeze({
       console.warn('DataFormatter.formatDateTime: フォーマットエラー', error.message);
       return '不明';
     }
-  },
+}
 
-  /**
-   * 相対時間フォーマット（〜前）
-   * @param {string|Date} timestamp - タイムスタンプ
-   * @returns {string} 相対時間表示
-   */
-  formatRelativeTime(timestamp) {
+/**
+ * 相対時間フォーマット（〜前）
+ * @param {string|Date} timestamp - タイムスタンプ
+ * @returns {string} 相対時間表示
+ */
+function formatDataRelativeTime(timestamp) {
     if (!timestamp) return '不明';
 
     try {
@@ -201,20 +195,20 @@ const DataFormatter = Object.freeze({
       if (diffDay < 7) return `${diffDay}日前`;
       
       // 1週間以上は通常フォーマット
-      return this.formatDateTime(date, { style: 'date' });
+      return formatDataDateTime(date, { style: 'date' });
     } catch (error) {
       console.warn('DataFormatter.formatRelativeTime: フォーマットエラー', error.message);
       return '不明';
     }
-  },
+}
 
-  /**
-   * 数値フォーマット（日本語）
-   * @param {number} value - 数値
-   * @param {Object} options - オプション
-   * @returns {string} フォーマット済み数値
-   */
-  formatNumber(value, options = {}) {
+/**
+ * 数値フォーマット（日本語）
+ * @param {number} value - 数値
+ * @param {Object} options - オプション
+ * @returns {string} フォーマット済み数値
+ */
+function formatDataNumber(value, options = {}) {
     const {
       style = 'decimal', // decimal, percent, currency
       minimumFractionDigits = 0,
@@ -232,25 +226,25 @@ const DataFormatter = Object.freeze({
     } catch (error) {
       return value.toString();
     }
-  },
+}
 
-  /**
-   * パーセンテージフォーマット
-   * @param {number} ratio - 比率（0-1）
-   * @param {number} decimals - 小数点以下桁数
-   * @returns {string} パーセント表示
-   */
-  formatPercentage(ratio, decimals = 1) {
+/**
+ * パーセンテージフォーマット
+ * @param {number} ratio - 比率（0-1）
+ * @param {number} decimals - 小数点以下桁数
+ * @returns {string} パーセント表示
+ */
+function formatDataPercentage(ratio, decimals = 1) {
     if (typeof ratio !== 'number' || isNaN(ratio)) return '0%';
     return `${(ratio * 100).toFixed(decimals)}%`;
-  },
+}
 
-  /**
-   * ファイルサイズフォーマット
-   * @param {number} bytes - バイト数
-   * @returns {string} ヒューマンリーダブルサイズ
-   */
-  formatFileSize(bytes) {
+/**
+ * ファイルサイズフォーマット
+ * @param {number} bytes - バイト数
+ * @returns {string} ヒューマンリーダブルサイズ
+ */
+function formatDataFileSize(bytes) {
     if (typeof bytes !== 'number' || bytes < 0) return '0 B';
 
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -264,16 +258,16 @@ const DataFormatter = Object.freeze({
 
     const decimals = unitIndex === 0 ? 0 : 1;
     return `${size.toFixed(decimals)} ${units[unitIndex]}`;
-  },
+}
 
-  /**
-   * テキスト切り詰めフォーマット
-   * @param {string} text - 元テキスト
-   * @param {number} maxLength - 最大長
-   * @param {string} suffix - 切り詰め時の接尾辞
-   * @returns {string} 切り詰められたテキスト
-   */
-  truncateText(text, maxLength = 100, suffix = '...') {
+/**
+ * テキスト切り詰めフォーマット
+ * @param {string} text - 元テキスト
+ * @param {number} maxLength - 最大長
+ * @param {string} suffix - 切り詰め時の接尾辞
+ * @returns {string} 切り詰められたテキスト
+ */
+function formatDataTruncateText(text, maxLength = 100, suffix = '...') {
     if (!text || typeof text !== 'string') return '';
     if (text.length <= maxLength) return text;
 
@@ -292,22 +286,18 @@ const DataFormatter = Object.freeze({
     }
 
     return truncated + suffix;
-  }
+}
 
-});
+// ===========================================
+// 🌐 HTML出力用フォーマット関数群
+// ===========================================
 
 /**
- * HTMLFormatter - HTML出力用フォーマット
- * セキュアなHTML生成とエスケープ処理
+ * HTMLエスケープ
+ * @param {string} text - エスケープ対象テキスト
+ * @returns {string} エスケープ済みテキスト
  */
-const HTMLFormatter = Object.freeze({
-
-  /**
-   * HTMLエスケープ
-   * @param {string} text - エスケープ対象テキスト
-   * @returns {string} エスケープ済みテキスト
-   */
-  escapeHtml(text) {
+function escapeHtml(text) {
     if (!text || typeof text !== 'string') return '';
 
     return text
@@ -317,28 +307,28 @@ const HTMLFormatter = Object.freeze({
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#x27;')
       .replace(/\//g, '&#x2F;');
-  },
+}
 
-  /**
-   * 改行をBRタグに変換
-   * @param {string} text - 元テキスト
-   * @returns {string} BR変換済みテキスト
-   */
-  nl2br(text) {
-    if (!text || typeof text !== 'string') return '';
-    
-    return this.escapeHtml(text).replace(/\n/g, '<br>');
-  },
-
-  /**
-   * マークダウン風の簡易フォーマット
-   * @param {string} text - 元テキスト
-   * @returns {string} フォーマット済みHTML
-   */
-  formatSimpleMarkdown(text) {
+/**
+ * 改行をBRタグに変換
+ * @param {string} text - 元テキスト
+ * @returns {string} BR変換済みテキスト
+ */
+function formatHtmlNl2br(text) {
     if (!text || typeof text !== 'string') return '';
 
-    let formatted = this.escapeHtml(text);
+    return escapeHtml(text).replace(/\n/g, '<br>');
+}
+
+/**
+ * マークダウン風の簡易フォーマット
+ * @param {string} text - 元テキスト
+ * @returns {string} フォーマット済みHTML
+ */
+function formatHtmlSimpleMarkdown(text) {
+    if (!text || typeof text !== 'string') return '';
+
+    let formatted = escapeHtml(text);
 
     // **太字**
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
@@ -354,48 +344,44 @@ const HTMLFormatter = Object.freeze({
     formatted = formatted.replace(urlPattern, '<a href="$1" target="_blank" rel="noopener">$1</a>');
 
     return formatted;
-  },
+}
 
-  /**
-   * CSSクラス名生成
-   * @param {Object} conditions - 条件オブジェクト
-   * @returns {string} CSS クラス名
-   */
-  generateCssClasses(conditions) {
+/**
+ * CSSクラス名生成
+ * @param {Object} conditions - 条件オブジェクト
+ * @returns {string} CSS クラス名
+ */
+function generateHtmlCssClasses(conditions) {
     return Object.entries(conditions)
       .filter(([className, condition]) => condition)
       .map(([className]) => className)
       .join(' ');
-  }
+}
 
-});
+// ===========================================
+// ⚙️ 設定表示用フォーマット関数群
+// ===========================================
 
 /**
- * ConfigFormatter - 設定表示用フォーマット
- * 設定データの人間可読フォーマット
+ * セットアップステップ表示名
+ * @param {number} step - ステップ番号
+ * @returns {string} ステップ表示名
  */
-const ConfigFormatter = Object.freeze({
-
-  /**
-   * セットアップステップ表示名
-   * @param {number} step - ステップ番号
-   * @returns {string} ステップ表示名
-   */
-  formatSetupStep(step) {
+function formatConfigSetupStep(step) {
     const steps = {
       1: '📝 基本設定',
       2: '🔗 データソース連携',
       3: '🚀 アプリケーション公開'
     };
     return steps[step] || `ステップ ${step}`;
-  },
+}
 
-  /**
-   * アクセスレベル表示名
-   * @param {string} level - アクセスレベル
-   * @returns {string} 表示名
-   */
-  formatAccessLevel(level) {
+/**
+ * アクセスレベル表示名
+ * @param {string} level - アクセスレベル
+ * @returns {string} 表示名
+ */
+function formatConfigAccessLevel(level) {
     const levels = {
       'owner': '👑 所有者',
       'system_admin': '🔧 システム管理者',
@@ -404,28 +390,28 @@ const ConfigFormatter = Object.freeze({
       'none': '❌ アクセス不可'
     };
     return levels[level] || level;
-  },
+}
 
-  /**
-   * 設定完了度表示
-   * @param {number} score - 完了度スコア（0-100）
-   * @returns {string} 完了度表示
-   */
-  formatCompletionScore(score) {
+/**
+ * 設定完了度表示
+ * @param {number} score - 完了度スコア（0-100）
+ * @returns {string} 完了度表示
+ */
+function formatConfigCompletionScore(score) {
     if (typeof score !== 'number') return '不明';
 
     const percentage = Math.round(score);
     const emoji = score >= 90 ? '🎉' : score >= 70 ? '✅' : score >= 50 ? '⚠️' : '❌';
     
     return `${emoji} ${percentage}%`;
-  },
+}
 
-  /**
-   * 列マッピング表示
-   * @param {Object} columnMapping - 列マッピング
-   * @returns {string} マッピング表示
-   */
-  formatColumnMapping(columnMapping) {
+/**
+ * 列マッピング表示
+ * @param {Object} columnMapping - 列マッピング
+ * @returns {string} マッピング表示
+ */
+function formatConfigColumnMapping(columnMapping) {
     if (!columnMapping || !columnMapping.mapping) return 'なし';
 
     const {mapping} = columnMapping;
@@ -435,46 +421,63 @@ const ConfigFormatter = Object.freeze({
       .join(', ');
 
     return mappedColumns || 'なし';
-  }
+}
 
-});
+// ===========================================
+// 🔄 レガシー互換関数 (GAS Best Practices準拠)
+// ===========================================
 
 /**
- * レガシー互換関数
- * 既存コードとの互換性維持
+ * タイムスタンプフォーマット (互換性維持)
+ * @param {Date|string} date - 日時
+ * @returns {string} フォーマット済み日時
  */
-
-// Core.gsからの移行
 function formatTimestamp(date) {
   try {
-    return ResponseFormatter.formatTimestamp(date);
+    return formatFormatterTimestamp(date);
   } catch (error) {
     console.error('formatTimestamp error:', error);
     return new Date(date).toISOString();
   }
 }
 
+/**
+ * 成功レスポンス作成 (互換性維持)
+ * @param {*} data - データ
+ * @param {Object} metadata - メタデータ
+ * @returns {Object} レスポンス
+ */
 function createSuccessResponse(data, metadata) {
   try {
-    return ResponseFormatter.createSuccessResponse(data, metadata);
+    return createFormatterSuccessResponse(data, metadata);
   } catch (error) {
     console.error('createSuccessResponse error:', error);
     return { success: true, data };
   }
 }
 
+/**
+ * エラーレスポンス作成 (互換性維持)
+ * @param {string} message - エラーメッセージ
+ * @param {Object} details - 詳細
+ * @returns {Object} レスポンス
+ */
 function createErrorResponse(message, details) {
   try {
-    return ResponseFormatter.createErrorResponse(message, details);
+    return createFormatterErrorResponse(message, details);
   } catch (error) {
     console.error('createErrorResponse error:', error);
     return { success: false, error: message };
   }
 }
 
-// DataServiceからの移行
+/**
+ * フルタイムスタンプフォーマット (互換性維持)
+ * @param {string|Date} timestamp - タイムスタンプ
+ * @returns {string} フォーマット済み日時
+ */
 function formatFullTimestamp(timestamp) {
-  return DataFormatter.formatDateTime(timestamp, { style: 'full' });
+  return formatDataDateTime(timestamp, { style: 'full' });
 }
 
 /**
@@ -485,19 +488,19 @@ function diagnoseFormatters() {
   const tests = [
     {
       name: 'DateTime Formatting',
-      test: () => DataFormatter.formatDateTime(new Date()).length > 0
+      test: () => formatDataDateTime(new Date()).length > 0
     },
     {
       name: 'HTML Escaping',
-      test: () => HTMLFormatter.escapeHtml('<script>') === '&lt;script&gt;'
+      test: () => escapeHtml('<script>') === '&lt;script&gt;'
     },
     {
       name: 'Number Formatting',
-      test: () => DataFormatter.formatNumber(1234.56).includes('1,234')
+      test: () => formatDataNumber(1234.56).includes('1,234')
     },
     {
       name: 'Response Creation',
-      test: () => ResponseFormatter.createSuccessResponse(['test']).count === 1
+      test: () => createFormatterSuccessResponse(['test']).count === 1
     }
   ];
 
@@ -513,12 +516,6 @@ function diagnoseFormatters() {
     service: 'DataFormatters',
     timestamp: new Date().toISOString(),
     tests: results,
-    modules: {
-      responseFormatter: typeof ResponseFormatter !== 'undefined',
-      dataFormatter: typeof DataFormatter !== 'undefined',
-      htmlFormatter: typeof HTMLFormatter !== 'undefined',
-      configFormatter: typeof ConfigFormatter !== 'undefined'
-    },
     overall: results.every(r => r.status === '✅') ? '✅' : '⚠️'
   };
 }
