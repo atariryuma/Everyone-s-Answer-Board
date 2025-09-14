@@ -1473,56 +1473,87 @@
     console.log('URL入力方式で接続開始:', { spreadsheetId, sheetName });
     setPartialLoading(true, 'URL接続中...');
 
-    // 既存のconnectToSource関数と同様の処理を実行
-    google.script.run
-      .withSuccessHandler(function (result) {
-        console.log('URL入力接続成功:', result);
+    // 初期化処理と同じフォールバック機能付きで処理を実行
+    processUrlConnectionWithFallback(spreadsheetId, sheetName);
+  }
 
-        // null/undefined ガード
-        if (!result) {
-          console.error('URL入力接続: サーバーからnullが返されました');
-          showError('🚨 サーバー接続エラー: APIレスポンスがありません。OAuth2スコープが正しく設定されているか確認してください。');
-          setPartialLoading(false);
-          return;
+  // URL入力接続処理（初期化と同じフォールバック機能付き）
+  async function processUrlConnectionWithFallback(spreadsheetId, sheetName) {
+    try {
+      console.log('🔧 URL入力接続処理開始:', { spreadsheetId, sheetName });
+
+      // 1. 列分析を実行
+      const analysisResult = await analyzeColumnsAsync(spreadsheetId, sheetName);
+
+      if (!analysisResult) {
+        console.warn('⚠️ URL入力: 列分析でnullが返されました - 軽量ヘッダー取得を試行');
+        await handleUrlConnectionFallback(spreadsheetId, sheetName);
+        return;
+      }
+
+      if (!analysisResult.success) {
+        const errorMsg = analysisResult.error || analysisResult.message || '列分析に失敗しました';
+        console.warn('⚠️ URL入力: 列分析に失敗 - 軽量ヘッダー取得を試行:', errorMsg);
+        await handleUrlConnectionFallback(spreadsheetId, sheetName);
+        return;
+      }
+
+      if (!analysisResult.headers || !Array.isArray(analysisResult.headers) || analysisResult.headers.length === 0) {
+        console.warn('⚠️ URL入力: ヘッダー情報が無効です:', analysisResult);
+        await handleUrlConnectionFallback(spreadsheetId, sheetName);
+        return;
+      }
+
+      // 2. 成功時の処理
+      console.log('✅ URL入力: 列分析成功');
+      updateColumnMapping(analysisResult);
+      updateProgress(2);
+      showSuccess('✅ URL入力方式でスプレッドシートに接続しました');
+      setPartialLoading(false);
+
+    } catch (error) {
+      console.error('❌ URL入力接続処理エラー:', error);
+      await handleUrlConnectionFallback(spreadsheetId, sheetName);
+    }
+  }
+
+  // URL入力接続のフォールバック処理
+  async function handleUrlConnectionFallback(spreadsheetId, sheetName) {
+    try {
+      console.log('📋 URL入力: 軽量ヘッダー取得を試行');
+      const headerResult = await getLightweightHeadersAsync(spreadsheetId, sheetName);
+
+      if (headerResult && headerResult.success && headerResult.headers.length > 0) {
+        console.log('✅ URL入力: 軽量ヘッダー取得成功 - 実際のヘッダー名を使用');
+
+        // ドロップダウンを初期化
+        populateColumnDropdowns(headerResult.headers, {});
+
+        // 既存の設定があれば復元
+        const config = await getCurrentConfig();
+        if (config && config.columnMapping && config.columnMapping.mapping) {
+          const dropdowns = {
+            answer: document.getElementById('answer-column-select'),
+            reason: document.getElementById('reason-column-select'),
+            class: document.getElementById('class-column-select'),
+            name: document.getElementById('name-column-select'),
+          };
+          restoreSavedColumnMapping(dropdowns, config.columnMapping.mapping);
         }
 
-        if (result.success) {
-          // 新しいドロップダウン式列マッピングを更新
-          updateColumnMapping(result);
-          updateProgress(2);
-          showSuccess('✅ URL入力方式でスプレッドシートに接続しました');
-        } else {
-          // 詳細なエラーメッセージを表示
-          const errorMsg = result.message || result.error || '原因不明';
-          if (errorMsg.includes('権限') || errorMsg.includes('Permission')) {
-            showError('🔐 アクセス権限エラー: スプレッドシートの編集権限を確認してください。\n\n対処法:\n• スプレッドシートの共有設定で編集権限を付与\n• Googleアカウントでスプレッドシートにアクセス可能か確認');
-          } else if (errorMsg.includes('見つかりません') || errorMsg.includes('not found')) {
-            showError('📄 ファイル不存在エラー: スプレッドシートのURLが正しいか確認してください。\n\n対処法:\n• URLをもう一度コピー&ペースト\n• スプレッドシートが削除されていないか確認');
-          } else if (errorMsg.includes('タイムアウト') || errorMsg.includes('timeout')) {
-            showError('⏱️ タイムアウトエラー: ネットワーク接続を確認し、しばらく時間をおいて再試行してください。\n\n対処法:\n• ページを再読み込み\n• 数分後に再試行');
-          } else {
-            showError(`❌ 列分析エラー: ${errorMsg}\n\n詳細なエラー情報はブラウザのデベロッパーコンソールで確認できます。`);
-          }
-        }
+        updateProgress(2);
+        showSuccess('✅ URL入力方式で接続完了（実際のヘッダー名を取得）');
         setPartialLoading(false);
-      })
-      .withFailureHandler(function (error) {
-        console.error('URL入力接続エラー:', error);
-
-        // エラータイプ別のメッセージ
-        let userMessage = 'スプレッドシートへの接続に失敗しました';
-        if (error.message && error.message.includes('ScriptError')) {
-          userMessage = '🚨 スクリプトエラー: サーバー側でエラーが発生しました。\n\n対処法:\n• ページを再読み込み\n• 管理者に連絡してサーバー状態を確認';
-        } else if (error.message && error.message.includes('Permission')) {
-          userMessage = '🔐 権限エラー: Google Sheets APIへのアクセス権限を確認してください。\n\n対処法:\n• Googleアカウントの認証を更新\n• アプリケーションの権限を再承認';
-        } else {
-          userMessage = `🌐 接続エラー: ${error.message || '不明なエラー'}\n\n対処法:\n• インターネット接続を確認\n• しばらく時間をおいて再試行`;
-        }
-
-        showError(userMessage);
+      } else {
+        console.error('❌ URL入力: 軽量ヘッダー取得も失敗');
+        showError('🚨 スプレッドシートへの接続に失敗しました。\n\n対処法:\n• スプレッドシートのアクセス権限を確認\n• URLが正しいことを確認\n• しばらく時間をおいて再試行');
         setPartialLoading(false);
-      })
-      .analyzeColumns(spreadsheetId, sheetName);
+      }
+    } catch (fallbackError) {
+      console.error('❌ URL入力: フォールバック処理エラー:', fallbackError);
+      showError('🚨 接続処理でエラーが発生しました。ページを再読み込みして再試行してください。');
+      setPartialLoading(false);
+    }
   }
 
   // イベントリスナー設定
