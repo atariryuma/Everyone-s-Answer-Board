@@ -12,30 +12,31 @@
  * - グローバル副作用排除
  */
 
-/* global PROPS_KEYS, CONSTANTS, AppCacheService */
+/* global ServiceFactory */
 
 // 遅延初期化状態管理
 let databaseCoreInitialized = false;
 
 /**
- * DatabaseCore遅延初期化
- * DB関数呼び出し時に実行、必要時のみ初期化
+ * DatabaseCore遅延初期化（ServiceFactory版）
+ * ゼロ依存アーキテクチャ準拠
  */
 function initDatabaseCore() {
-  if (databaseCoreInitialized) return;
+  if (databaseCoreInitialized) return true;
 
   try {
-    // 必要な依存関係の初期化確認
-    if (typeof PROPS_KEYS === 'undefined' || typeof CONSTANTS === 'undefined') {
-      console.warn('initDatabaseCore: Dependencies not available, will retry on next call');
-      return;
+    // ServiceFactory利用可能性確認
+    if (typeof ServiceFactory === 'undefined') {
+      console.warn('initDatabaseCore: ServiceFactory not available');
+      return false;
     }
 
     databaseCoreInitialized = true;
-    console.log('✅ DatabaseCore initialized successfully');
+    console.log('✅ DatabaseCore (Zero-Dependency) initialized successfully');
+    return true;
   } catch (error) {
     console.error('initDatabaseCore failed:', error.message);
-    // 初期化失敗時は次回再試行のためfalseのまま
+    return false;
   }
 }
 
@@ -55,7 +56,8 @@ const DatabaseCore = Object.freeze({
    */
   getSecureDatabaseId() {
     try {
-      return PropertiesService.getScriptProperties().getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
+      const props = ServiceFactory.getProperties();
+      return props.getDatabaseSpreadsheetId();
     } catch (error) {
       console.error('DatabaseCore', {
         operation: 'getSecureDatabaseId',
@@ -105,7 +107,9 @@ const DatabaseCore = Object.freeze({
     const cacheKey = 'sheets_service';
 
     try {
-      const cachedService = AppCacheService.get(cacheKey, null);
+      // ServiceFactory経由でキャッシュ取得
+      const cache = ServiceFactory.getCache();
+      const cachedService = cache.get(cacheKey, null);
       if (cachedService) {
         const isValidService =
           cachedService.spreadsheets &&
@@ -119,7 +123,7 @@ const DatabaseCore = Object.freeze({
 
       // 新しいサービス作成
       const service = this.createSheetsService();
-      AppCacheService.set(cacheKey, service, AppCacheService.TTL.MEDIUM);
+      cache.put(cacheKey, service, 300); // 5分間キャッシュ
 
       return service;
     } catch (error) {
@@ -137,8 +141,8 @@ const DatabaseCore = Object.freeze({
    */
   createSheetsService() {
     try {
-      const serviceAccountKey = PropertiesService.getScriptProperties()
-        .getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+      const props = ServiceFactory.getProperties();
+      const serviceAccountKey = props.getServiceAccountCreds();
 
       if (!serviceAccountKey) {
         throw new Error('サービスアカウントキーが設定されていません');
@@ -270,7 +274,8 @@ const DatabaseCore = Object.freeze({
 
       // キャッシュサービス確認
       try {
-        AppCacheService.get('test_key', null);
+        const cache = ServiceFactory.getCache();
+        cache.get('test_key', null);
         results.checks.push({
           name: 'Cache Service',
           status: '✅',
@@ -718,11 +723,18 @@ Object.freeze({
 
   // キャッシュ管理（統一）
   clearUserCache(userId, _userEmail) {
-    return AppCacheService.invalidateUserCache(userId);
+    try {
+      const cache = ServiceFactory.getCache();
+      const userCacheKey = `user_${userId}`;
+      return cache.remove(userCacheKey);
+    } catch (error) {
+      console.error('DatabaseCore.clearUserCache:', error.message);
+      return false;
+    }
   },
 
   invalidateUserCache(userId, _userEmail) {
-    return AppCacheService.invalidateUserCache(userId);
+    return this.clearUserCache(userId, _userEmail);
   },
 
   // ヘルパー関数
