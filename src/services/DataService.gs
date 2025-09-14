@@ -13,7 +13,7 @@
  * - ColumnAnalysisSystem.gs の一部
  */
 
-/* global DB, UserService, ConfigService, DataFormatter, CONSTANTS, ErrorHandler, ResponseFormatter */
+/* global DB, DataFormatter, CONSTANTS, ResponseFormatter, PropertiesService, Session, PROPS_KEYS, SpreadsheetApp, DriveApp, Utilities, CacheService */
 
 /**
  * DataService - 統一データ操作サービス
@@ -35,21 +35,22 @@ const DataService = Object.freeze({
     const startTime = Date.now();
 
     try {
-      // 設定取得
-      const config = ConfigService.getUserConfig(userId);
-      if (!config) {
-        console.error('DataService.getSheetData: ConfigServiceから設定を取得できません', { userId });
-        return ErrorHandler.createSafeResponse('ユーザー設定を取得できませんでした', 'DataService.getSheetData');
+      // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
+      const user = DB.findUserById(userId);
+      if (!user || !user.configJson) {
+        console.error('DataService.getSheetData: ユーザー設定が見つかりません', { userId });
+        return this.createErrorResponse('ユーザー設定を取得できませんでした');
       }
 
+      const config = JSON.parse(user.configJson);
       if (!config.spreadsheetId) {
-        console.warn('DataService.getSheetData: スプレッドシートIDが設定されていません', { userId, config });
-        return ErrorHandler.createSafeResponse('スプレッドシートが設定されていません', 'DataService.getSheetData');
+        console.warn('DataService.getSheetData: スプレッドシートIDが設定されていません', { userId });
+        return this.createErrorResponse('スプレッドシートが設定されていません');
       }
 
       // データ取得実行
       const result = this.fetchSpreadsheetData(config, options);
-      
+
       const executionTime = Date.now() - startTime;
       console.info('DataService.getSheetData: データ取得完了', {
         userId,
@@ -63,7 +64,7 @@ const DataService = Object.freeze({
         userId,
         error: error.message
       });
-      return ErrorHandler.createSafeResponse(error, 'DataService.getSheetData');
+      return this.createErrorResponse(error.message || 'データ取得エラー');
     }
   },
 
@@ -75,11 +76,11 @@ const DataService = Object.freeze({
    */
   getPublishedSheetData(userId, options = {}) {
     try {
-      // getSheetData関数を内部で呼び出す
+      // ✅ GAS Best Practice: 内部関数直接呼び出し
       return this.getSheetData(userId, options);
     } catch (error) {
       console.error('DataService.getPublishedSheetData error:', error);
-      return ErrorHandler.createSafeResponse(error, 'DataService.getPublishedSheetData');
+      return this.createErrorResponse(error.message || '公開データ取得エラー');
     }
   },
 
@@ -362,9 +363,15 @@ const DataService = Object.freeze({
         return false;
       }
 
-      // 設定取得
-      const config = ConfigService.getUserConfig(userId);
-      if (!config || !config.spreadsheetId) {
+      // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
+      const user = DB.findUserById(userId);
+      if (!user || !user.configJson) {
+        console.error('DataService.addReaction: ユーザー設定なし');
+        return false;
+      }
+
+      const config = JSON.parse(user.configJson);
+      if (!config.spreadsheetId) {
         console.error('DataService.addReaction: スプレッドシート設定なし');
         return false;
       }
@@ -391,8 +398,14 @@ const DataService = Object.freeze({
    */
   removeReaction(userId, rowId, reactionType) {
     try {
-      const config = ConfigService.getUserConfig(userId);
-      if (!config || !config.spreadsheetId) {
+      // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
+      const user = DB.findUserById(userId);
+      if (!user || !user.configJson) {
+        return false;
+      }
+
+      const config = JSON.parse(user.configJson);
+      if (!config.spreadsheetId) {
         return false;
       }
 
@@ -415,8 +428,14 @@ const DataService = Object.freeze({
    */
   toggleHighlight(userId, rowId) {
     try {
-      const config = ConfigService.getUserConfig(userId);
-      if (!config || !config.spreadsheetId) {
+      // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
+      const user = DB.findUserById(userId);
+      if (!user || !user.configJson) {
+        return false;
+      }
+
+      const config = JSON.parse(user.configJson);
+      if (!config.spreadsheetId) {
         return false;
       }
 
@@ -665,14 +684,20 @@ const DataService = Object.freeze({
    */
   deleteAnswer(userId, rowIndex, sheetName) {
     try {
-      const config = ConfigService.getUserConfig(userId);
-      if (!config || !config.spreadsheetId) {
+      // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
+      const user = DB.findUserById(userId);
+      if (!user || !user.configJson) {
+        throw new Error('ユーザー設定が見つかりません');
+      }
+
+      const config = JSON.parse(user.configJson);
+      if (!config.spreadsheetId) {
         throw new Error('スプレッドシートが設定されていません');
       }
 
       const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
       const sheet = spreadsheet.getSheetByName(sheetName || config.sheetName);
-      
+
       if (!sheet) {
         throw new Error('シートが見つかりません');
       }
@@ -684,11 +709,11 @@ const DataService = Object.freeze({
       }
 
       // 削除前のデータを取得（ログ用）
-      const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
-      
+      // const rowData = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues()[0];
+
       // 行を削除
       sheet.deleteRow(rowIndex);
-      
+
       // キャッシュクリア
       this.clearCache(config.spreadsheetId, sheet.getName());
 
@@ -1108,59 +1133,60 @@ const DataService = Object.freeze({
   getSpreadsheetList() {
     const started = Date.now();
     try {
-      console.log('DataService.getSpreadsheetList: DriveApp検索開始');
+      console.log('DataService.getSpreadsheetList: 開始 - GAS独立化完了');
 
-      // まず現在のユーザー情報を確認
+      // ✅ GAS Best Practice: 直接API呼び出し（依存除去）
       const currentUser = Session.getActiveUser().getEmail();
       console.log('DataService.getSpreadsheetList: ユーザー情報', { currentUser });
 
-      // 効率的な検索クエリを使用してスプレッドシートのみを取得
+      // DriveApp直接使用（効率重視）
       const files = DriveApp.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
       console.log('DataService.getSpreadsheetList: DriveApp検索完了', {
         hasFiles: typeof files !== 'undefined',
         hasNext: files.hasNext()
       });
 
-      // DriveApp権限テスト
+      // 権限テスト（必要最小限）
+      let driveAccessOk = true;
       try {
         const testFiles = DriveApp.getFiles();
-        const hasAnyFiles = testFiles.hasNext();
-        console.log('DataService.getSpreadsheetList: Driveアクセステスト', {
-          hasAnyFiles,
-          message: hasAnyFiles ? 'Drive access working' : 'No files accessible via DriveApp'
-        });
+        driveAccessOk = testFiles.hasNext();
+        console.log('DataService.getSpreadsheetList: Drive権限OK');
       } catch (driveError) {
-        console.error('DataService.getSpreadsheetList: Driveアクセスエラー', {
-          error: driveError.message,
-          stack: driveError.stack
-        });
+        console.error('DataService.getSpreadsheetList: Drive権限エラー', driveError.message);
+        driveAccessOk = false;
       }
 
+      if (!driveAccessOk) {
+        return {
+          success: false,
+          message: 'Driveアクセス権限がありません',
+          spreadsheets: [],
+          executionTime: `${Date.now() - started}ms`
+        };
+      }
+
+      // スプレッドシート取得（高速処理）
       const spreadsheets = [];
       let count = 0;
-      const maxCount = 20; // 通信制限対応: 最大20件まで
+      const maxCount = 25; // GAS制限対応
 
-      console.log('DataService.getSpreadsheetList: スプレッドシート列挙開始', {
-        hasNext: files.hasNext()
-      });
+      console.log('DataService.getSpreadsheetList: スプレッドシート列挙開始');
 
       while (files.hasNext() && count < maxCount) {
-        const file = files.next();
-        // 最初の3個だけ詳細ログ
-        if (count < 3) {
-          console.log('DataService.getSpreadsheetList: ファイル発見', {
-            index: count + 1,
-            fileName: file.getName(),
-            fileId: `${file.getId().substring(0, 10)}...`
+        try {
+          const file = files.next();
+          spreadsheets.push({
+            id: file.getId(),
+            name: file.getName(),
+            url: file.getUrl(),
+            lastUpdated: file.getLastUpdated()
           });
+          count++;
+        } catch (fileError) {
+          console.warn('DataService.getSpreadsheetList: ファイル処理スキップ', fileError.message);
+          continue; // エラー時はスキップして継続
         }
-        spreadsheets.push({
-          id: file.getId(),
-          name: file.getName(),
-          url: file.getUrl(),
-          lastUpdated: file.getLastUpdated()
-        });
-        count++;
       }
 
       console.log('DataService.getSpreadsheetList: 列挙完了', {
@@ -1172,35 +1198,38 @@ const DataService = Object.freeze({
         success: true,
         cached: false,
         executionTime: `${Date.now() - started}ms`,
-        spreadsheets
+        spreadsheets,
+        totalCount: count,
+        maxReached: count >= maxCount
       };
 
-      // レスポンスサイズ監視
+      // レスポンスサイズ監視（GAS制限対応）
       const responseSize = JSON.stringify(response).length;
-      console.log('DataService.getSpreadsheetList: レスポンスサイズチェック', {
-        responseSize,
-        responseSizeKB: Math.round(responseSize / 1024 * 100) / 100,
-        maxResponseSize: '64KB (Google Apps Script limit)'
-      });
+      const responseSizeKB = Math.round(responseSize / 1024 * 100) / 100;
+
+      if (responseSizeKB > 50) { // 50KB警告
+        console.warn('DataService.getSpreadsheetList: 大きなレスポンス', {
+          responseSize: `${responseSizeKB  }KB`
+        });
+      }
 
       console.log('DataService.getSpreadsheetList: 成功', {
         spreadsheetsCount: response.spreadsheets.length,
-        executionTime: response.executionTime,
-        maxReached: count >= maxCount
+        executionTime: response.executionTime
       });
 
       return response;
     } catch (error) {
       console.error('DataService.getSpreadsheetList: エラー', {
         error: error.message,
-        stack: error.stack,
         executionTime: `${Date.now() - started}ms`
       });
+
       return {
         success: false,
         cached: false,
         executionTime: `${Date.now() - started}ms`,
-        message: error.message,
+        message: error.message || 'スプレッドシート一覧取得エラー',
         spreadsheets: []
       };
     }

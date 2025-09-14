@@ -106,20 +106,9 @@ const AdminController = Object.freeze({
    */
   getSpreadsheetList() {
     try {
-      console.log('AdminController.getSpreadsheetList: 開始', {
-        hasDataService: typeof DataService !== 'undefined',
-        dataServiceType: typeof DataService
-      });
+      console.log('AdminController.getSpreadsheetList: 開始 - GAS Flat Architecture');
 
-      if (typeof DataService === 'undefined') {
-        console.error('AdminController.getSpreadsheetList: DataService is undefined');
-        return {
-          success: false,
-          message: 'DataService オブジェクトが定義されていません',
-          spreadsheets: []
-        };
-      }
-
+      // ✅ GAS Best Practice: 直接DataService呼び出し（ServiceRegistry除去）
       const result = DataService.getSpreadsheetList();
 
       // null/undefined ガード
@@ -135,9 +124,10 @@ const AdminController = Object.freeze({
       return result;
     } catch (error) {
       console.error('AdminController.getSpreadsheetList エラー:', error.message);
+
       return {
         success: false,
-        message: error.message,
+        message: error.message || 'スプレッドシート一覧取得エラー',
         spreadsheets: []
       };
     }
@@ -149,7 +139,17 @@ const AdminController = Object.freeze({
    * @returns {Object} シート一覧
    */
   getSheetList(spreadsheetId) {
-    return DataService.getSheetList(spreadsheetId);
+    try {
+      // ✅ GAS Best Practice: 直接DataService呼び出し（ServiceRegistry除去）
+      return DataService.getSheetList(spreadsheetId);
+    } catch (error) {
+      console.error('AdminController.getSheetList エラー:', error.message);
+      return {
+        success: false,
+        message: error.message || 'シート一覧取得エラー',
+        sheets: []
+      };
+    }
   },
 
   /**
@@ -160,24 +160,12 @@ const AdminController = Object.freeze({
    */
   analyzeColumns(spreadsheetId, sheetName) {
     try {
-      console.log('AdminController.analyzeColumns: 開始', {
+      console.log('AdminController.analyzeColumns: 開始 - GAS Flat Architecture', {
         spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
-        sheetName: sheetName || 'null',
-        hasDataService: typeof DataService !== 'undefined',
-        dataServiceType: typeof DataService
+        sheetName: sheetName || 'null'
       });
 
-      if (typeof DataService === 'undefined') {
-        console.error('AdminController.analyzeColumns: DataService is undefined');
-        return {
-          success: false,
-          message: 'DataService オブジェクトが定義されていません',
-          headers: [],
-          columns: [],
-          columnMapping: { mapping: {}, confidence: {} }
-        };
-      }
-
+      // ✅ GAS Best Practice: 直接DataService呼び出し（ServiceRegistry除去）
       const result = DataService.analyzeColumns(spreadsheetId, sheetName);
 
       // null/undefined ガード
@@ -195,9 +183,10 @@ const AdminController = Object.freeze({
       return result;
     } catch (error) {
       console.error('AdminController.analyzeColumns エラー:', error.message);
+
       return {
         success: false,
-        message: error.message,
+        message: error.message || '列分析エラー',
         headers: [],
         columns: [],
         columnMapping: { mapping: {}, confidence: {} }
@@ -215,6 +204,7 @@ const AdminController = Object.freeze({
    */
   getLightweightHeaders(spreadsheetId, sheetName) {
     try {
+      // ✅ GAS Best Practice: 直接DataService呼び出し（ServiceRegistry除去）
       const result = DataService.getLightweightHeaders(spreadsheetId, sheetName);
 
       // null/undefined ガード
@@ -232,7 +222,7 @@ const AdminController = Object.freeze({
       console.error('AdminController.getLightweightHeaders エラー:', error.message);
       return {
         success: false,
-        message: error.message,
+        message: error.message || 'ヘッダー取得エラー',
         headers: []
       };
     }

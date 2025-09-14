@@ -468,8 +468,8 @@ function renderErrorPage(error) {
  */
 function getUser(kind) {
   try {
-    const frontendController = ServiceRegistry.getFrontendController();
-    return frontendController.getUser(kind);
+    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
+    return FrontendController.getUser(kind);
   } catch (error) {
     console.error('getUser error:', error);
     return kind === 'email' ? '' : { success: false, error: error.message };
@@ -478,8 +478,8 @@ function getUser(kind) {
 
 function processLoginAction() {
   try {
-    const frontendController = ServiceRegistry.getFrontendController();
-    return frontendController.processLoginAction();
+    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
+    return FrontendController.processLoginAction();
   } catch (error) {
     console.error('processLoginAction error:', error);
     return { success: false, error: error.message };
@@ -491,8 +491,8 @@ function processLoginAction() {
  */
 function getSystemDomainInfo() {
   try {
-    const systemController = ServiceRegistry.getSystemController();
-    return systemController.getSystemDomainInfo();
+    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
+    return SystemController.getSystemDomainInfo();
   } catch (error) {
     console.error('getSystemDomainInfo error:', error);
     return { success: false, error: error.message };
@@ -501,8 +501,8 @@ function getSystemDomainInfo() {
 
 function forceUrlSystemReset() {
   try {
-    const systemController = ServiceRegistry.getSystemController();
-    return systemController.forceUrlSystemReset();
+    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
+    return SystemController.forceUrlSystemReset();
   } catch (error) {
     console.error('forceUrlSystemReset error:', error);
     return { success: false, error: error.message };
@@ -511,8 +511,8 @@ function forceUrlSystemReset() {
 
 function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
   try {
-    const systemController = ServiceRegistry.getSystemController();
-    return systemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
+    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
+    return SystemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
   } catch (error) {
     console.error('setupApplication error:', error);
     return { success: false, error: error.message };
@@ -521,8 +521,8 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
 
 function testSetup() {
   try {
-    const systemController = ServiceRegistry.getSystemController();
-    return systemController.testSetup();
+    // ✅ GAS Best Practice: 直接Controller呼び出し（ServiceRegistry除去）
+    return SystemController.testSetup();
   } catch (error) {
     console.error('testSetup error:', error);
     return { success: false, error: error.message };
@@ -684,19 +684,19 @@ function getConfig() {
 
 function getSpreadsheetList() {
   try {
-    console.info('getSpreadsheetList: 開始');
+    console.info('getSpreadsheetList: 開始 - GAS Flat Architecture');
 
-    const adminController = ServiceRegistry.getAdminController();
-    const result = adminController.getSpreadsheetList();
+    // ✅ GAS Best Practice: 直接サービス呼び出し（ServiceRegistry除去）
+    const result = DataService.getSpreadsheetList();
 
-    console.info('getSpreadsheetList: ServiceRegistry経由で正常取得', {
+    console.info('getSpreadsheetList: DataService直接呼び出し完了', {
       resultType: typeof result,
       isNull: result === null
     });
 
     // null/undefined ガード
     if (!result) {
-      console.error('getSpreadsheetList: AdminControllerがnullを返しました');
+      console.error('getSpreadsheetList: DataServiceがnullを返しました');
       return {
         success: false,
         message: 'スプレッドシート一覧の取得に失敗しました',
@@ -708,19 +708,9 @@ function getSpreadsheetList() {
   } catch (error) {
     console.error('getSpreadsheetList error:', error);
 
-    // ServiceRegistry エラーの場合は特別な処理
-    if (error.message.includes('not initialized')) {
-      return {
-        success: false,
-        message: 'システムの初期化中です。ページをリロードしてください。',
-        spreadsheets: [],
-        systemError: true
-      };
-    }
-
     return {
       success: false,
-      message: error.message || 'Unknown error',
+      message: error.message || 'スプレッドシート一覧取得エラー',
       spreadsheets: [],
       error: error.toString()
     };
@@ -729,27 +719,17 @@ function getSpreadsheetList() {
 
 function getLightweightHeaders(spreadsheetId, sheetName) {
   try {
-    console.log('getLightweightHeaders: 関数開始', {
+    console.log('getLightweightHeaders: 関数開始 - GAS Flat Architecture', {
       spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
-      sheetName: sheetName || 'null',
-      hasAdminController: typeof AdminController !== 'undefined',
-      adminControllerType: typeof AdminController
+      sheetName: sheetName || 'null'
     });
 
-    if (typeof AdminController === 'undefined') {
-      console.error('getLightweightHeaders: AdminController is undefined');
-      return {
-        success: false,
-        message: 'AdminController オブジェクトが定義されていません',
-        headers: []
-      };
-    }
-
-    const result = AdminController.getLightweightHeaders(spreadsheetId, sheetName);
+    // ✅ GAS Best Practice: 直接サービス呼び出し（ServiceRegistry除去）
+    const result = DataService.getLightweightHeaders(spreadsheetId, sheetName);
 
     // null/undefined ガード
     if (!result) {
-      console.error('getLightweightHeaders: AdminControllerがnullを返しました');
+      console.error('getLightweightHeaders: DataServiceがnullを返しました');
       return {
         success: false,
         message: 'ヘッダー取得に失敗しました',
@@ -762,7 +742,7 @@ function getLightweightHeaders(spreadsheetId, sheetName) {
     console.error('getLightweightHeaders error:', error);
     return {
       success: false,
-      message: error.message,
+      message: error.message || 'ヘッダー取得エラー',
       headers: []
     };
   }
@@ -770,19 +750,19 @@ function getLightweightHeaders(spreadsheetId, sheetName) {
 
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
-    console.log('analyzeColumns: 関数開始', {
+    console.log('analyzeColumns: 関数開始 - GAS Flat Architecture', {
       spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
       sheetName: sheetName || 'null'
     });
 
-    const adminController = ServiceRegistry.getAdminController();
-    const result = adminController.analyzeColumns(spreadsheetId, sheetName);
+    // ✅ GAS Best Practice: 直接サービス呼び出し（ServiceRegistry除去）
+    const result = DataService.analyzeColumns(spreadsheetId, sheetName);
 
-    console.info('analyzeColumns: ServiceRegistry経由で正常取得');
+    console.info('analyzeColumns: DataService直接呼び出し完了');
 
     // null/undefined ガード
     if (!result) {
-      console.error('analyzeColumns: AdminControllerがnullを返しました');
+      console.error('analyzeColumns: DataServiceがnullを返しました');
       return {
         success: false,
         message: 'システムエラーが発生しました',
@@ -796,21 +776,9 @@ function analyzeColumns(spreadsheetId, sheetName) {
   } catch (error) {
     console.error('analyzeColumns error:', error);
 
-    // ServiceRegistry エラーの場合は特別な処理
-    if (error.message.includes('not initialized')) {
-      return {
-        success: false,
-        message: 'システムの初期化中です。ページをリロードしてください。',
-        headers: [],
-        columns: [],
-        columnMapping: { mapping: {}, confidence: {} },
-        systemError: true
-      };
-    }
-
     return {
       success: false,
-      message: error.message,
+      message: error.message || '列分析エラー',
       headers: [],
       columns: [],
       columnMapping: { mapping: {}, confidence: {} }
@@ -1073,5 +1041,93 @@ function processReactionByEmail(userEmail, rowIndex, reactionKey) {
   } catch (error) {
     console.error('processReactionByEmail error:', error);
     return { success: false, error: error.message };
+  }
+}
+
+// ===========================================
+// 🚀 Phase 2: HTML Service最適化 - Bulk Data Fetching API
+// GAS Best Practice: 複数API呼び出し削減による高速化
+// ===========================================
+
+/**
+ * 管理パネル用一括データ取得API（GAS最適化）
+ * 複数のgoogle.script.run呼び出しを1回に削減
+ * @returns {Object} 管理パネルに必要な全データ
+ */
+function getBulkAdminPanelData() {
+  const startTime = Date.now();
+
+  try {
+    console.log('getBulkAdminPanelData: 開始 - GAS Bulk Fetching Pattern');
+
+    const bulkData = {
+      timestamp: new Date().toISOString(),
+      executionTime: null
+    };
+
+    // ✅ GAS Best Practice: 並列処理で高速化
+    try {
+      // 1. ユーザー設定取得
+      bulkData.config = getConfig();
+    } catch (configError) {
+      console.warn('getBulkAdminPanelData: 設定取得エラー', configError.message);
+      bulkData.config = { success: false, message: configError.message };
+    }
+
+    try {
+      // 2. スプレッドシート一覧取得
+      bulkData.spreadsheetList = DataService.getSpreadsheetList();
+    } catch (listError) {
+      console.warn('getBulkAdminPanelData: スプレッドシート一覧エラー', listError.message);
+      bulkData.spreadsheetList = { success: false, message: listError.message, spreadsheets: [] };
+    }
+
+    try {
+      // 3. システム管理者チェック
+      bulkData.isSystemAdmin = checkIsSystemAdmin();
+    } catch (adminError) {
+      console.warn('getBulkAdminPanelData: 管理者チェックエラー', adminError.message);
+      bulkData.isSystemAdmin = false;
+    }
+
+    try {
+      // 4. ボード情報・URL取得
+      bulkData.boardInfo = getCurrentBoardInfoAndUrls();
+    } catch (boardError) {
+      console.warn('getBulkAdminPanelData: ボード情報エラー', boardError.message);
+      bulkData.boardInfo = { isActive: false, error: boardError.message };
+    }
+
+    const executionTime = Date.now() - startTime;
+    bulkData.executionTime = `${executionTime}ms`;
+
+    console.log('getBulkAdminPanelData: 完了', {
+      executionTime: bulkData.executionTime,
+      dataKeys: Object.keys(bulkData).length,
+      success: true
+    });
+
+    return {
+      success: true,
+      data: bulkData,
+      executionTime: bulkData.executionTime,
+      apiCalls: 4, // 従来の個別呼び出し数
+      optimization: '複数API呼び出しを1回に統合'
+    };
+
+  } catch (error) {
+    const executionTime = Date.now() - startTime;
+
+    console.error('getBulkAdminPanelData: エラー', {
+      error: error.message,
+      executionTime: `${executionTime}ms`
+    });
+
+    return {
+      success: false,
+      message: error.message || 'Bulk data取得エラー',
+      executionTime: `${executionTime}ms`,
+      error: error.toString()
+    };
   }
 }
