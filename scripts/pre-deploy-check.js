@@ -37,11 +37,11 @@ class DeploymentValidator {
     console.log('🔗 依存関係チェック...');
 
     const dependencyMap = {
-      'main.gs': ['UserService', 'ConfigService', 'DataService', 'SecurityService', 'ErrorHandler', 'PROPS_KEYS'],
-      'services/UserService.gs': ['CacheService', 'DB', 'CONSTANTS', 'PROPS_KEYS', 'SecurityService'],
-      'services/ConfigService.gs': ['DB', 'PROPS_KEYS', 'SecurityService'],
-      'services/DataService.gs': ['UserService', 'ConfigService', 'DB', 'CONSTANTS'],
-      'services/SecurityService.gs': ['CONSTANTS', 'DB']
+      'main.gs': ['UserService', 'ConfigService', 'DataService', 'SecurityService'],
+      'UserService.gs': ['ServiceFactory'],
+      'ConfigService.gs': ['ServiceFactory'],
+      'DataService.gs': ['ServiceFactory'],
+      'SecurityService.gs': []
     };
 
     for (const [file, dependencies] of Object.entries(dependencyMap)) {
@@ -101,17 +101,17 @@ class DeploymentValidator {
     console.log('⚙️ Services整合性チェック...');
 
     const requiredServices = [
-      'services/UserService.gs',
-      'services/ConfigService.gs',
-      'services/DataService.gs',
-      'services/SecurityService.gs'
+      'UserService.gs',
+      'ConfigService.gs',
+      'DataService.gs',
+      'SecurityService.gs'
     ];
 
     const requiredMethods = {
       'UserService': ['getCurrentEmail', 'getCurrentUserInfo', 'isSystemAdmin'],
       'ConfigService': ['getUserConfig', 'hasCoreSystemProps', 'isSystemSetup'],
-      'DataService': ['getBulkData', 'getSheetData', 'isSystemSetup'],
-      'SecurityService': ['checkUserPermission', 'diagnose']
+      'DataService': ['getSheetData', 'addDataReaction', 'processRawData'],
+      'SecurityService': ['checkSecurityUserPermission', 'validateSecurityUserData']
     };
 
     for (const service of requiredServices) {
@@ -140,23 +140,24 @@ class DeploymentValidator {
   async checkConstantsAvailability() {
     console.log('📋 定数可用性チェック...');
 
-    // Check for constants in core/constants.gs (primary location)
-    const coreConstantsPath = path.join(this.srcDir, 'core', 'constants.gs');
-    if (!fs.existsSync(coreConstantsPath)) {
-      this.errors.push('❌ core/constants.gs が存在しません');
+    // Check for ServiceFactory (zero-dependency architecture)
+    const serviceFactoryPath = path.join(this.srcDir, 'ServiceFactory.gs');
+    if (!fs.existsSync(serviceFactoryPath)) {
+      this.errors.push('❌ ServiceFactory.gs が存在しません');
       return;
     }
 
-    const content = fs.readFileSync(coreConstantsPath, 'utf8');
-    const requiredConstants = [
-      'CONSTANTS.ACCESS.LEVELS',
-      'PROPS_KEYS.ADMIN_EMAIL',
-      'PROPS_KEYS.DATABASE_SPREADSHEET_ID'
+    const content = fs.readFileSync(serviceFactoryPath, 'utf8');
+    const requiredMethods = [
+      'getDB',
+      'getSession',
+      'getProperties',
+      'getCache'
     ];
 
-    for (const constant of requiredConstants) {
-      if (!content.includes(constant.split('.')[0])) {
-        this.errors.push(`❌ 必須定数不足: ${constant}`);
+    for (const method of requiredMethods) {
+      if (!content.includes(`${method}(`)) {
+        this.errors.push(`❌ ServiceFactory必須メソッド不足: ${method}`);
       }
     }
   }
