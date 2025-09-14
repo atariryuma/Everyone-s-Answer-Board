@@ -242,14 +242,14 @@
 
       // 2. 設定データを1回だけ取得してsystemStateに保存
       step = 'loading config';
-      systemState.config = await getConfigAsync();
-      console.log('📊 initializePanel: 設定データ取得完了', systemState.config);
+      const configResponse = await getConfigAsync();
+      console.log('📊 initializePanel: 設定データ取得完了', configResponse);
+      systemState.config = configResponse?.success ? configResponse.config : null;
 
       // 3. URL パラメータのチェックと適用
       step = 'checking URL params';
       const urlSpreadsheet = getSpreadsheetFromUrl();
       if (urlSpreadsheet) {
-        console.log('🔗 URL からスプレッドシート情報を検出:', urlSpreadsheet);
         // URL の情報を設定に統合
         if (systemState.config) {
           systemState.config.spreadsheetId = urlSpreadsheet.spreadsheetId;
@@ -649,14 +649,12 @@
     if (!config) return;
 
     try {
-      console.log('📋 設定反映開始:', config);
 
       // 1. スプレッドシート選択の反映
       if (config.spreadsheetId) {
         const spreadsheetSelect = document.getElementById('spreadsheet-select');
         if (spreadsheetSelect) {
           spreadsheetSelect.value = config.spreadsheetId;
-          console.log('✅ スプレッドシート選択反映:', config.spreadsheetId);
         } else {
           console.warn('⚠️ スプレッドシートセレクト (spreadsheet-select) が見つかりません');
         }
@@ -667,7 +665,6 @@
         const urlInput = document.getElementById('spreadsheet-url');
         if (urlInput) {
           urlInput.value = config.spreadsheetUrl;
-          console.log('✅ スプレッドシートURL反映:', config.spreadsheetUrl);
         } else {
           console.warn('⚠️ URL入力フィールド (spreadsheet-url) が見つかりません');
         }
@@ -678,7 +675,6 @@
         const sheetSelect = document.getElementById('sheet-select');
         if (sheetSelect) {
           sheetSelect.value = config.sheetName;
-          console.log('✅ シート選択反映:', config.sheetName);
         } else {
           console.warn('⚠️ シートセレクト (sheet-select) が見つかりません');
         }
@@ -692,18 +688,12 @@
         const showNamesToggle = document.getElementById('show-names');
         if (showNamesToggle && typeof settings.showNames === 'boolean') {
           showNamesToggle.checked = settings.showNames;
-          console.log('✅ 名前表示設定反映:', settings.showNames);
-        } else if (!showNamesToggle) {
-          console.warn('⚠️ 名前表示トグル (show-names) が見つかりません');
         }
 
         // リアクション表示トグル
         const showReactionsToggle = document.getElementById('show-reactions');
         if (showReactionsToggle && typeof settings.showReactions === 'boolean') {
           showReactionsToggle.checked = settings.showReactions;
-          console.log('✅ リアクション表示設定反映:', settings.showReactions);
-        } else if (!showReactionsToggle) {
-          console.warn('⚠️ リアクション表示トグル (show-reactions) が見つかりません');
         }
       }
 
@@ -712,9 +702,6 @@
         const displayModeSelect = document.getElementById('display-mode');
         if (displayModeSelect) {
           displayModeSelect.value = config.displayMode;
-          console.log('✅ 表示モード反映:', config.displayMode);
-        } else {
-          console.warn('⚠️ 表示モードセレクト (display-mode) が見つかりません');
         }
       }
 
@@ -724,9 +711,6 @@
         if (formUrlDisplay) {
           formUrlDisplay.textContent = config.formUrl;
           formUrlDisplay.href = config.formUrl;
-          console.log('✅ フォームURL反映:', config.formUrl);
-        } else {
-          console.warn('⚠️ フォームURL表示要素 (form-url) が見つかりません');
         }
       }
 
@@ -734,9 +718,6 @@
         const formTitleDisplay = document.getElementById('form-title');
         if (formTitleDisplay) {
           formTitleDisplay.textContent = config.formTitle;
-          console.log('✅ フォームタイトル反映:', config.formTitle);
-        } else {
-          console.warn('⚠️ フォームタイトル表示要素 (form-title) が見つかりません');
         }
       }
 
@@ -745,13 +726,9 @@
         const sheetNameInput = document.getElementById('sheet-name-input');
         if (sheetNameInput) {
           sheetNameInput.value = config.sheetName;
-          console.log('✅ シート名入力反映:', config.sheetName);
-        } else {
-          console.warn('⚠️ シート名入力フィールド (sheet-name-input) が見つかりません');
         }
       }
 
-      console.log('✅ 設定反映完了');
     } catch (error) {
       console.error('❌ 設定反映エラー:', error.message);
     }
@@ -839,8 +816,9 @@
       select.innerHTML = '<option value="">読み込み中...</option>';
 
       google.script.run
-        .withSuccessHandler(function (sheets) {
+        .withSuccessHandler(function (response) {
           select.innerHTML = '<option value="">シートを選択...</option>';
+          const sheets = response?.success ? response.sheets : [];
           sheets.forEach((sheet) => {
             const option = document.createElement('option');
             option.value = sheet.name;
@@ -1426,8 +1404,11 @@
     setPartialLoading(true, 'シート一覧を読み込み中...');
 
     google.script.run
-      .withSuccessHandler(function (sheets) {
+      .withSuccessHandler(function (response) {
         select.innerHTML = '<option value="">シートを選択...</option>';
+
+        // DataService.getSheetList() returns {success: true, sheets: [...]}
+        const sheets = response?.success ? response.sheets : [];
 
         if (!sheets || sheets.length === 0) {
           const noSheetOption = document.createElement('option');
@@ -2366,75 +2347,51 @@
       }) : 'null';
 
       if (lastConfigUpdate === configHash) {
-        console.log('📋 updateConfigSummary: 重複実行をスキップ');
         return;
       }
       lastConfigUpdate = configHash;
 
-      console.log('📋 updateConfigSummary 開始:', config);
-
       // 公開ステータス更新
       const appPublished = config?.appPublished === true || config?.appPublished === 'true';
       const publishBadge = document.getElementById('app-publish-status');
-      console.log('🏷️ 公開ステータス更新:', { appPublished, element: !!publishBadge });
       if (publishBadge) {
         if (appPublished) {
           publishBadge.className = 'status-badge published';
           publishBadge.textContent = '公開中';
-          console.log('✅ 公開ステータス: 公開中に更新');
         } else {
           publishBadge.className = 'status-badge unpublished';
           publishBadge.textContent = '未公開';
-          console.log('✅ 公開ステータス: 未公開に更新');
         }
-      } else {
-        console.warn('⚠️ 公開ステータス要素 (app-publish-status) が見つかりません');
       }
 
       // データソース更新
       const datasourceElement = document.getElementById('current-datasource');
-      console.log('📊 データソース更新:', {
-        spreadsheetId: config?.spreadsheetId,
-        spreadsheetName: config?.spreadsheetName,
-        element: !!datasourceElement
-      });
       if (datasourceElement) {
         if (config?.spreadsheetId) {
-          // スプレッドシート名を表示（あれば）
           const name = config.spreadsheetName || 'スプレッドシート';
           datasourceElement.textContent = name;
           datasourceElement.className = 'text-sm text-cyan-400';
-          console.log('✅ データソース更新:', name);
         } else {
           datasourceElement.textContent = '未設定';
           datasourceElement.className = 'text-sm text-gray-400';
-          console.log('✅ データソース: 未設定に更新');
         }
-      } else {
-        console.warn('⚠️ データソース要素 (current-datasource) が見つかりません');
       }
 
       // シート名更新
       const sheetnameElement = document.getElementById('current-sheetname');
-      console.log('📋 シート名更新:', { sheetName: config?.sheetName, element: !!sheetnameElement });
       if (sheetnameElement) {
         if (config?.sheetName) {
           sheetnameElement.textContent = config.sheetName;
           sheetnameElement.className = 'text-sm text-cyan-400';
-          console.log('✅ シート名更新:', config.sheetName);
         } else {
           sheetnameElement.textContent = '未設定';
           sheetnameElement.className = 'text-sm text-gray-400';
-          console.log('✅ シート名: 未設定に更新');
         }
-      } else {
-        console.warn('⚠️ シート名要素 (current-sheetname) が見つかりません');
       }
 
       // 最終更新時刻更新
       const lastUpdated = config?.lastModified || config?.updatedAt;
       const timeElement = document.getElementById('last-updated-time');
-      console.log('🕐 最終更新時刻:', { lastUpdated, element: !!timeElement });
       if (timeElement) {
         if (lastUpdated) {
           try {
@@ -2447,17 +2404,12 @@
             });
             timeElement.textContent = timeString;
             timeElement.className = 'text-sm text-gray-300';
-            console.log('✅ 最終更新時刻更新:', timeString);
           } catch (e) {
             timeElement.textContent = '--:--';
-            console.warn('⚠️ 日付変換エラー:', e.message);
           }
         } else {
           timeElement.textContent = '--:--';
-          console.log('✅ 最終更新時刻: --:-- に更新');
         }
-      } else {
-        console.warn('⚠️ 最終更新時刻要素 (last-updated-time) が見つかりません');
       }
 
       // スプレッドシートリンク更新（リソースセクション用）
