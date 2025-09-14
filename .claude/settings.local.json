@@ -25,7 +25,8 @@
       "WebFetch(domain:groups.google.com)",
       "Bash(awk:*)",
       "Bash(npx eslint:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git ls-tree:*)"
     ],
     "deny": [],
     "ask": [],
