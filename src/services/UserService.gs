@@ -13,7 +13,7 @@
  * - auth.gsの一部機能
  */
 
-/* global CacheService, DB, PROPS_KEYS, SecurityService, DataFormatter, CONSTANTS, URL */
+/* global DB, PROPS_KEYS, SecurityService, DataFormatter, CONSTANTS, URL */
 
 /**
  * UserService - 統一ユーザー管理サービス
@@ -89,9 +89,9 @@ const UserService = Object.freeze({
     
     try {
       // 統一キャッシュサービスから取得試行
-      const cached = AppCacheService.get(cacheKey);
+      const cached = CacheService.getScriptCache().get(cacheKey);
       if (cached) {
-        return cached;
+        return JSON.parse(cached);
       }
 
       // セッションからメール取得
@@ -111,7 +111,7 @@ const UserService = Object.freeze({
       const completeUserInfo = this.enrichUserInfo(userInfo);
 
       // 統一キャッシュサービスでキャッシュ保存
-      AppCacheService.set(cacheKey, completeUserInfo, 300); // 5分キャッシュ
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(completeUserInfo), 300); // 5分キャッシュ
 
       return completeUserInfo;
     } catch (error) {

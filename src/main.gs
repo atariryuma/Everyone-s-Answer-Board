@@ -768,6 +768,17 @@ function addSpreadsheetUrl(url) {
 
 function getUserConfig(userId) {
   try {
+    // userIdが無効な場合、現在のユーザーから取得を試行
+    if (!userId) {
+      const userInfo = UserService.getCurrentUserInfo();
+      if (userInfo && userInfo.userId) {
+        userId = userInfo.userId;
+        console.info('getUserConfig: userIdを現在のユーザーから取得:', userId);
+      } else {
+        return { success: false, error: 'ユーザーIDの取得に失敗しました' };
+      }
+    }
+
     return ConfigService.getUserConfig(userId);
   } catch (error) {
     console.error('getUserConfig error:', error);
@@ -777,6 +788,17 @@ function getUserConfig(userId) {
 
 function getPublishedSheetData(userId, options) {
   try {
+    // userIdが無効な場合、現在のユーザーから取得を試行
+    if (!userId) {
+      const userInfo = UserService.getCurrentUserInfo();
+      if (userInfo && userInfo.userId) {
+        userId = userInfo.userId;
+        console.info('getPublishedSheetData: userIdを現在のユーザーから取得:', userId);
+      } else {
+        return { success: false, error: 'ユーザーIDの取得に失敗しました' };
+      }
+    }
+
     return DataService.getPublishedSheetData(userId, options);
   } catch (error) {
     console.error('getPublishedSheetData error:', error);

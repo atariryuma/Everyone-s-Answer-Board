@@ -62,6 +62,22 @@ const DataService = Object.freeze({
   },
 
   /**
+   * 公開されたスプレッドシートデータを取得（API Gateway互換）
+   * @param {string} userId - ユーザーID
+   * @param {Object} options - 取得オプション
+   * @returns {Object} データ取得結果
+   */
+  getPublishedSheetData(userId, options = {}) {
+    try {
+      // getSheetData関数を内部で呼び出す
+      return this.getSheetData(userId, options);
+    } catch (error) {
+      console.error('DataService.getPublishedSheetData error:', error);
+      return ErrorHandler.createSafeResponse(error, 'DataService.getPublishedSheetData');
+    }
+  },
+
+  /**
    * スプレッドシートデータ取得実行
    * ✅ バッチ処理対応 - GAS制限対応（実行時間・メモリ制限）
    * @param {Object} config - ユーザー設定

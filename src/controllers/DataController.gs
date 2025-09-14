@@ -428,6 +428,41 @@ const DataController = Object.freeze({
         message: error.message
       };
     }
+  },
+
+  // ===========================================
+  // 📊 API Gateway互換関数（main.gsから呼び出し用）
+  // ===========================================
+
+  /**
+   * リアクション追加（API Gateway互換）
+   */
+  addReaction(userId, rowId, reactionType) {
+    return this.handleAddReaction({
+      userId,
+      rowId,
+      reactionType
+    });
+  },
+
+  /**
+   * ハイライト切り替え（API Gateway互換）
+   */
+  toggleHighlight(userId, rowId) {
+    return this.handleToggleHighlight({
+      userId,
+      rowId
+    });
+  },
+
+  /**
+   * ボードデータ更新（API Gateway互換）
+   */
+  refreshBoardData(userId, options = {}) {
+    return this.handleRefreshData({
+      userId,
+      options
+    });
   }
 
 });
