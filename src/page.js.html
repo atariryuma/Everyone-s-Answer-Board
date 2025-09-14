@@ -399,9 +399,37 @@
             hasData: !!rawData?.data,
             hasRows: !!rawData?.rows,
             dataLength: rawData?.data?.length || rawData?.rows?.length || 0,
-            rawDataKeys: rawData ? Object.keys(rawData) : 'なし'
+            rawDataKeys: rawData ? Object.keys(rawData) : 'なし',
+            success: rawData?.success,
+            hasError: !!rawData?.error,
+            hasMessage: !!rawData?.message
           });
-          
+
+          // ErrorHandlerからのエラーレスポンス検出
+          if (rawData?.success === false && (rawData?.error || rawData?.message)) {
+            const errorMessage = rawData?.error || rawData?.message || 'データ取得エラーが発生しました';
+            console.error('❌ [loadAnswers] バックエンドエラー受信', {
+              success: rawData.success,
+              error: rawData.error,
+              message: rawData.message,
+              errorCode: rawData.errorCode,
+              timestamp: rawData.timestamp
+            });
+
+            // ErrorHandlerレスポンスの場合は、frontend-compatibleな構造を利用
+            const emptyResult = {
+              answers: [],
+              header: rawData?.headers?.length > 0 ? rawData.headers[0] : '問題',
+              sheetName: rawData?.sheetName || '不明',
+              error: errorMessage
+            };
+
+            console.log('🔄 [loadAnswers] エラーレスポンス処理でUI更新');
+            this.updateUI(emptyResult);
+            this.showUserError(errorMessage);
+            return;
+          }
+
           if (!rawData?.data && !rawData?.rows) {
             console.warn('⚠️ [loadAnswers] データが空またはnull', {
               rawData: rawData,

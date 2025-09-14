@@ -549,8 +549,8 @@ const ConfigService = Object.freeze({
 
       return {
         success: true,
-        formUrl: formUrl,
-        editUrl: editUrl,
+        formUrl,
+        editUrl,
         title: config.title,
         message: 'フォームが正常に作成されました'
       };

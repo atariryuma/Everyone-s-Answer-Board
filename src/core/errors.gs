@@ -127,6 +127,47 @@ const ErrorHandler = Object.freeze({
   },
 
   /**
+   * データサービス用エラーレスポンス生成（フロントエンド期待形式）
+   * page.js.htmlが期待する{data: null, headers: [], sheetName: ""}形式
+   * @param {Error|string} error - エラーオブジェクトまたはメッセージ
+   * @param {string} context - エラーコンテキスト
+   * @returns {Object} フロントエンド互換のエラーレスポンス
+   */
+  createDataResponse(error, context = 'DataService') {
+    try {
+      const message = error && typeof error.message === 'string' ? error.message : String(error);
+
+      // 内部ログ（詳細付き）
+      console.error(`❌ ${context}:`, {
+        message,
+        timestamp: new Date().toISOString(),
+      });
+
+      return {
+        success: false,
+        data: null,
+        headers: [],
+        sheetName: '',
+        error: this.getSafeErrorMessage(message),
+        message: this.getSafeErrorMessage(message),
+        timestamp: new Date().toISOString(),
+        errorCode: this.getErrorCode(message),
+      };
+    } catch (e) {
+      return {
+        success: false,
+        data: null,
+        headers: [],
+        sheetName: '',
+        error: '処理中にエラーが発生しました。',
+        message: '処理中にエラーが発生しました。',
+        timestamp: new Date().toISOString(),
+        errorCode: 'EUNKNOWN',
+      };
+    }
+  },
+
+  /**
    * エンドユーザー向けに安全なエラーメッセージへ変換
    */
   getSafeErrorMessage(originalMessage) {

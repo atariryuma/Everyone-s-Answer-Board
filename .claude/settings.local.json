@@ -23,7 +23,9 @@
       "WebFetch(domain:developers.google.com)",
       "WebFetch(domain:stackoverflow.com)",
       "WebFetch(domain:groups.google.com)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(npx eslint:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": [],
