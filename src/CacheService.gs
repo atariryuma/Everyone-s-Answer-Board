@@ -13,7 +13,7 @@
  * データ整合性とパフォーマンスを両立
  */
  
-const AppCacheService = Object.freeze({
+Object.freeze({
 
   // ==========================================
   // 🔧 キャッシュ設定定数

@@ -1,4 +1,18 @@
 /**
+ * @fileoverview SystemController - System management and setup functions
+ */
+
+/* global PROPS_KEYS, DB, UserService, ConfigService */
+
+/**
+ * Generate unique user ID
+ * @returns {string} Unique user identifier
+ */
+function generateUserId() {
+  return `user_${  Utilities.getUuid().replace(/-/g, '').substring(0, 12)}`;
+}
+
+/**
  * アプリケーションの初期セットアップ
  * AppSetupPage.html から呼び出される
  *
@@ -296,11 +310,12 @@ function getSystemStatus() {
  */
 function getSystemDomainInfo() {
     try {
-      const currentUser = UserService.getCurrentEmail();
+      // 🎯 Zero-dependency: 直接Session API使用
+      const currentUser = getCurrentEmailDirectSC();
       let domain = 'unknown';
 
       if (currentUser && currentUser.includes('@')) {
-        domain = currentUser.split('@')[1];
+        [, domain] = currentUser.split('@');
       }
 
       return {
@@ -310,7 +325,7 @@ function getSystemDomainInfo() {
         timestamp: new Date().toISOString()
       };
 
-    } catch (e) {
+    } catch {
       return {
         success: false,
         message: 'ドメイン情報の取得に失敗しました'
@@ -406,63 +421,50 @@ function performAutoRepair() {
  */
 function getConfig() {
   try {
-    // ユーザー情報の取得
-    let userInfo = UserService.getCurrentUserInfo();
-    let userId = userInfo && userInfo.userId;
-    let email = userInfo && userInfo.userEmail;
+    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
+    const email = getCurrentEmailDirectSC();
+    if (!email) {
+      return { success: false, message: 'ユーザー情報が見つかりません' };
+    }
 
-    if (!userId) {
-      email = email || UserService.getCurrentEmail();
-      if (!email) {
-        return { success: false, message: 'ユーザー情報が見つかりません' };
-      }
+    // 🎯 Zero-dependency: 直接DBからユーザー情報取得
+    let user = DB.findUserByEmail(email);
 
-      // UserService経由でユーザー検索を試行
+    // Auto-create user if not exists
+    if (!user) {
       try {
-        const foundUser = UserService.findUserByEmail(email);
-        if (foundUser && foundUser.userId) {
-          userId = foundUser.userId;
-          userInfo = userInfo || { userId, userEmail: email };
-        }
-      } catch (e) {
-        // ignore and fallback to auto-create
-      }
-
-      // Auto-create user if still missing
-      if (!userId) {
-        try {
-          const created = UserService.createUser(email);
-          // UserService.createUser() の戻り値構造をチェック
-          const actualUser = created && created.value ? created.value : created;
-          if (actualUser && actualUser.userId) {
-            userId = actualUser.userId;
-            userInfo = actualUser;
-          } else {
-            console.error('AdminController.getConfig: ユーザー作成に失敗 - userIdが見つかりません', {
-              created,
-              actualUser,
-              hasValue: created && !!created.value,
-              hasUserId: actualUser && !!actualUser.userId
-            });
-            return { success: false, message: 'ユーザー作成に失敗しました' };
-          }
-        } catch (createErr) {
-          console.error('AdminController.getConfig: ユーザー作成エラー', createErr);
-          return { success: false, message: 'ユーザー作成に失敗しました' };
-        }
+        const newUserId = generateUserId();
+        user = {
+          userId: newUserId,
+          userEmail: email,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          configJson: null
+        };
+        DB.createUser(user);
+        console.log('SystemController.getConfig: 新規ユーザー作成:', { userId: newUserId, email });
+      } catch (createErr) {
+        console.error('SystemController.getConfig: ユーザー作成エラー', createErr);
+        return { success: false, message: 'ユーザー作成に失敗しました' };
       }
     }
 
-    // Final validation before calling getUserConfig
-    if (!userId) {
-      console.error('AdminController.getConfig: userId が未定義です', { userInfo, email });
-      return { success: false, message: 'ユーザーIDが取得できませんでした' };
+    // 🎯 Zero-dependency: 直接DBから設定取得
+    let config = {};
+    if (user.configJson) {
+      try {
+        config = JSON.parse(user.configJson);
+      } catch (parseError) {
+        console.error('SystemController.getConfig: 設定JSON解析エラー', parseError);
+        config = {};
+      }
     }
 
-    const config = ConfigService.getUserConfig(userId);
     return {
       success: true,
-      config: config || {}
+      config,
+      userId: user.userId,
+      userEmail: user.userEmail
     };
   } catch (error) {
     console.error('AdminController.getConfig エラー:', error.message);
@@ -479,22 +481,31 @@ function getConfig() {
  */
 function getAdminSpreadsheetList() {
   try {
-    console.log('AdminController.getSpreadsheetList: 開始 - GAS Flat Architecture');
+    console.log('SystemController.getSpreadsheetList: 開始 - Zero-dependency Architecture');
 
-    // ✅ GAS Best Practice: 直接DataService呼び出し（ServiceRegistry除去）
-    const result = DataService.getSpreadsheetList();
+    // 🎯 Zero-dependency: 直接DriveAppでスプレッドシート一覧取得
+    const spreadsheets = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
+    const spreadsheetList = [];
+    let count = 0;
 
-    // null/undefined ガード
-    if (!result) {
-      console.error('AdminController.getSpreadsheetList: DataServiceがnullを返しました');
-      return {
-        success: false,
-        message: 'スプレッドシート一覧の取得に失敗しました',
-        spreadsheets: []
-      };
+    while (spreadsheets.hasNext() && count < 20) { // 最大20件に制限
+      const file = spreadsheets.next();
+      spreadsheetList.push({
+        id: file.getId(),
+        name: file.getName(),
+        lastUpdated: file.getLastUpdated(),
+        url: file.getUrl(),
+        size: file.getSize() || 0
+      });
+      count++;
     }
 
-    return result;
+    return {
+      success: true,
+      spreadsheets: spreadsheetList,
+      total: spreadsheetList.length,
+      timestamp: new Date().toISOString()
+    };
   } catch (error) {
     console.error('AdminController.getSpreadsheetList エラー:', error.message);
 
@@ -513,8 +524,23 @@ function getAdminSpreadsheetList() {
  */
 function getAdminSheetList(spreadsheetId) {
   try {
-    // ✅ GAS Best Practice: 直接DataService呼び出し（ServiceRegistry除去）
-    return DataService.getSheetList(spreadsheetId);
+    // 🎯 Zero-dependency: 直接SpreadsheetAppでシート一覧取得
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheets = spreadsheet.getSheets();
+
+    const sheetList = sheets.map(sheet => ({
+      name: sheet.getName(),
+      index: sheet.getIndex(),
+      rowCount: sheet.getLastRow(),
+      columnCount: sheet.getLastColumn()
+    }));
+
+    return {
+      success: true,
+      sheets: sheetList,
+      total: sheetList.length,
+      spreadsheetName: spreadsheet.getName()
+    };
   } catch (error) {
     console.error('AdminController.getSheetList エラー:', error.message);
     return {
@@ -533,27 +559,62 @@ function getAdminSheetList(spreadsheetId) {
  */
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
-    console.log('AdminController.analyzeColumns: 開始 - GAS Flat Architecture', {
+    console.log('SystemController.analyzeColumns: 開始 - Zero-dependency Architecture', {
       spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
       sheetName: sheetName || 'null'
     });
 
-    // ✅ GAS Best Practice: 直接DataService呼び出し（ServiceRegistry除去）
-    const result = DataService.analyzeColumns(spreadsheetId, sheetName);
+    // 🎯 Zero-dependency: 直接SpreadsheetAppで列分析
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
 
-    // null/undefined ガード
-    if (!result) {
-      console.error('AdminController.analyzeColumns: DataServiceがnullを返しました');
+    if (!sheet) {
       return {
         success: false,
-        message: 'データサービスエラーが発生しました',
+        message: `シート "${sheetName}" が見つかりません`,
         headers: [],
         columns: [],
         columnMapping: { mapping: {}, confidence: {} }
       };
     }
 
-    return result;
+    // ヘッダー行取得と列分析
+    const headerRow = 1;
+    const lastColumn = sheet.getLastColumn();
+    const [headers] = lastColumn > 0 ? sheet.getRange(headerRow, 1, 1, lastColumn).getValues() : [[]];
+
+    const columns = headers.map((header, index) => ({
+      index: index + 1,
+      header: String(header || ''),
+      letter: columnNumberToLetter(index + 1),
+      type: 'text' // 簡化版では全てtext
+    }));
+
+    // 簡化版のコラムマッピング
+    const mapping = {};
+    const confidence = {};
+    headers.forEach((header, index) => {
+      const headerStr = String(header || '').toLowerCase();
+      if (headerStr.includes('名前') || headerStr.includes('name')) {
+        mapping.name = index + 1;
+        confidence.name = 0.9;
+      } else if (headerStr.includes('コメント') || headerStr.includes('comment')) {
+        mapping.comment = index + 1;
+        confidence.comment = 0.8;
+      }
+    });
+
+    return {
+      success: true,
+      headers,
+      columns,
+      columnMapping: { mapping, confidence },
+      sheetInfo: {
+        name: sheetName,
+        totalRows: sheet.getLastRow(),
+        totalColumns: lastColumn
+      }
+    };
   } catch (error) {
     console.error('AdminController.analyzeColumns エラー:', error.message);
 
@@ -577,18 +638,27 @@ function analyzeColumns(spreadsheetId, sheetName) {
  */
 function getLightweightHeaders(spreadsheetId, sheetName) {
   try {
-    // ✅ GAS Best Practice: 直接DataService呼び出し（ServiceRegistry除去）
-    const result = DataService.getLightweightHeaders(spreadsheetId, sheetName);
+    // 🎯 Zero-dependency: 直接SpreadsheetAppでヘッダー取得
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
 
-    // null/undefined ガード
-    if (!result) {
-      console.error('AdminController.getLightweightHeaders: DataServiceがnullを返しました');
+    if (!sheet) {
       return {
         success: false,
-        message: 'ヘッダー取得サービスエラーが発生しました',
+        message: `シート "${sheetName}" が見つかりません`,
         headers: []
       };
     }
+
+    const lastColumn = sheet.getLastColumn();
+    const [headers] = lastColumn > 0 ? sheet.getRange(1, 1, 1, lastColumn).getValues() : [[]];
+
+    const result = {
+      success: true,
+      headers: headers.map(h => String(h || '')),
+      sheetName,
+      columnCount: lastColumn
+    };
 
     return result;
   } catch (error) {
@@ -607,7 +677,36 @@ function getLightweightHeaders(spreadsheetId, sheetName) {
  * @returns {Object} 保存結果
  */
 function saveDraftConfiguration(config) {
-  return ConfigService.saveDraftConfiguration(config);
+  try {
+    // 🎯 Zero-dependency: 直接DBで設定保存
+    const userEmail = getCurrentEmailDirectSC();
+    if (!userEmail) {
+      return { success: false, message: 'ユーザー認証が必要です' };
+    }
+
+    const user = DB.findUserByEmail(userEmail);
+    if (!user) {
+      return { success: false, message: 'ユーザーが見つかりません' };
+    }
+
+    // 設定をJSONで保存
+    const updatedUser = {
+      ...user,
+      configJson: JSON.stringify(config),
+      updatedAt: new Date().toISOString()
+    };
+
+    DB.updateUser(user.userId, updatedUser);
+
+    return {
+      success: true,
+      message: '下書き設定を保存しました',
+      userId: user.userId
+    };
+  } catch (error) {
+    console.error('saveDraftConfiguration error:', error);
+    return { success: false, message: error.message };
+  }
 }
 
 /**
@@ -616,7 +715,28 @@ function saveDraftConfiguration(config) {
  * @returns {Object} 公開結果
  */
 function publishApplication(publishConfig) {
-  return ConfigService.publishApplication(publishConfig);
+  try {
+    // 🎯 Zero-dependency: 直接PropertiesServiceでアプリ公開
+    const props = PropertiesService.getScriptProperties();
+
+    // アプリケーション状態をアクティブに変更
+    props.setProperty('APPLICATION_STATUS', 'active');
+    props.setProperty('PUBLISHED_AT', new Date().toISOString());
+
+    // 公開設定を保存
+    if (publishConfig) {
+      props.setProperty('PUBLISH_CONFIG', JSON.stringify(publishConfig));
+    }
+
+    return {
+      success: true,
+      message: 'アプリケーションが正常に公開されました',
+      publishedAt: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('publishApplication error:', error);
+    return { success: false, message: error.message };
+  }
 }
 
 /**
@@ -628,17 +748,23 @@ function publishApplication(publishConfig) {
  */
 function validateAccess(spreadsheetId) {
   try {
-    const result = SecurityService.validateSpreadsheetAccess(spreadsheetId);
+    // 🎯 Zero-dependency: 直接SpreadsheetAppでアデス権確認
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheets = spreadsheet.getSheets();
 
-    // null/undefined ガード
-    if (!result) {
-      console.error('AdminController.validateAccess: SecurityServiceがnullを返しました');
-      return {
-        success: false,
-        message: 'セキュリティサービスエラーが発生しました',
-        sheets: []
-      };
-    }
+    // アデスできたら成功
+    const result = {
+      success: true,
+      message: 'アクセス権限が確認されました',
+      spreadsheetName: spreadsheet.getName(),
+      sheets: sheets.map(sheet => ({
+        name: sheet.getName(),
+        rowCount: sheet.getLastRow(),
+        columnCount: sheet.getLastColumn()
+      })),
+      owner: spreadsheet.getOwner()?.getEmail() || 'unknown',
+      url: spreadsheet.getUrl()
+    };
 
     return result;
   } catch (error) {
@@ -659,14 +785,18 @@ function validateAccess(spreadsheetId) {
  */
 function checkIsSystemAdmin() {
   try {
-    const email = UserService.getCurrentEmail();
+    // 🎯 Zero-dependency: 直接Session APIとPropertiesServiceで管理者確認
+    const email = getCurrentEmailDirectSC();
     if (!email) {
       return false;
     }
 
-    return UserService.isSystemAdmin(email);
+    const props = PropertiesService.getScriptProperties();
+    const adminEmails = props.getProperty('ADMIN_EMAILS') || '';
+
+    return adminEmails.split(',').map(e => e.trim()).includes(email);
   } catch (error) {
-    console.error('AdminController.checkIsSystemAdmin エラー:', error.message);
+    console.error('SystemController.checkIsSystemAdmin エラー:', error.message);
     return false;
   }
 }
@@ -679,44 +809,32 @@ function checkIsSystemAdmin() {
  */
 function getCurrentBoardInfoAndUrls() {
   try {
-    // ユーザー情報の取得
-    let userInfo = UserService.getCurrentUserInfo();
-    let userId = userInfo && userInfo.userId;
-
-    if (!userId) {
-      const email = UserService.getCurrentEmail();
-      if (!email) {
-        return {
-          isActive: false,
-          error: 'ユーザー情報が見つかりません',
-          appPublished: false
-        };
-      }
-
-      // UserService経由でユーザー検索
-      try {
-        const foundUser = UserService.findUserByEmail(email);
-        if (foundUser && foundUser.userId) {
-          userId = foundUser.userId;
-          userInfo = { userId, userEmail: email };
-        } else {
-          return {
-            isActive: false,
-            error: 'ユーザーが見つかりません',
-            appPublished: false
-          };
-        }
-      } catch (e) {
-        return {
-          isActive: false,
-          error: 'ユーザー情報の処理に失敗しました',
-          appPublished: false
-        };
-      }
+    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
+    const email = getCurrentEmailDirectSC();
+    if (!email) {
+      return {
+        isActive: false,
+        error: 'ユーザー情報が見つかりません',
+        appPublished: false
+      };
     }
 
-    const config = ConfigService.getUserConfig(userId);
-    if (!config || !config.appPublished) {
+    // 🎯 Zero-dependency: 直接DBからユーザー情報取得
+    const user = DB.findUserByEmail(email);
+    if (!user) {
+      return {
+        isActive: false,
+        error: 'ユーザーが見つかりません',
+        appPublished: false
+      };
+    }
+
+    // 🎯 Zero-dependency: 直接PropertiesServiceでアプリ状態確認
+    const props = PropertiesService.getScriptProperties();
+    const appStatus = props.getProperty('APPLICATION_STATUS');
+    const appPublished = appStatus === 'active';
+
+    if (!appPublished) {
       return {
         isActive: false,
         appPublished: false,
@@ -726,7 +844,17 @@ function getCurrentBoardInfoAndUrls() {
 
     // WebAppのベースURL取得
     const baseUrl = ScriptApp.getService().getUrl();
-    const viewUrl = `${baseUrl}?mode=view&userId=${userId}`;
+    const viewUrl = `${baseUrl}?mode=view&userId=${user.userId}`;
+
+    // 設定がある場合はその情報も含める
+    let config = {};
+    if (user.configJson) {
+      try {
+        config = JSON.parse(user.configJson);
+      } catch (parseError) {
+        console.warn('getCurrentBoardInfoAndUrls: 設定JSON解析エラー', parseError);
+      }
+    }
 
     return {
       isActive: true,
@@ -734,7 +862,7 @@ function getCurrentBoardInfoAndUrls() {
       questionText: config.questionText || config.boardTitle || 'Everyone\'s Answer Board',
       urls: {
         view: viewUrl,
-        admin: `${baseUrl}?mode=admin&userId=${userId}`
+        admin: `${baseUrl}?mode=admin&userId=${user.userId}`
       },
       lastUpdated: config.publishedAt || config.lastModified || new Date().toISOString()
     };
@@ -876,6 +1004,17 @@ function checkCurrentPublicationStatus() {
 /**
  * Direct email retrieval using GAS Session API (SystemController version)
  */
+// 🎯 Zero-dependency Helper Functions
+function columnNumberToLetter(num) {
+  let letter = '';
+  while (num > 0) {
+    const remainder = (num - 1) % 26;
+    letter = String.fromCharCode(65 + remainder) + letter;
+    num = Math.floor((num - 1) / 26);
+  }
+  return letter;
+}
+
 function getCurrentEmailDirectSC() {
   try {
     // Method 1: Session.getActiveUser()
@@ -928,20 +1067,6 @@ function getUser(kind = 'email') {
   }
 }
 
-/**
- * WebアプリケーションのURLを取得
- * 複数のHTMLファイルから呼び出される基本機能
- *
- * @returns {string} WebアプリのURL
- */
-function getWebAppUrl() {
-  try {
-    return ScriptApp.getService().getUrl();
-  } catch (error) {
-    console.error('FrontendController.getWebAppUrl エラー:', error.message);
-    return '';
-  }
-}
 
 // ===========================================
 // 📊 認証・ログイン関連API

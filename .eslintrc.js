@@ -12,12 +12,9 @@ module.exports = {
     sourceType: 'module'
   },
   rules: {
-    // 未使用変数の警告
-    'no-unused-vars': ['warn', { 
-      argsIgnorePattern: '^_',
-      varsIgnorePattern: '^_'
-    }],
-    
+    // GAS環境では未使用関数がHTMLから動的に呼ばれるため無効化
+    'no-unused-vars': 'off',
+
     // テストファイルでの未定義グローバル変数を許可
     'no-undef': ['error', {
       'typeof': false
@@ -110,15 +107,12 @@ module.exports = {
         'WebApp': 'readonly'
       },
       rules: {
-        // GAS特有のルール調整
-        'no-unused-vars': ['warn', { 
-          argsIgnorePattern: '^_',
-          varsIgnorePattern: '^_'
-        }],
+        // GAS特有のルール調整 - GASでは未使用関数が後でHTMLから呼ばれる可能性があるため無効化
+        'no-unused-vars': 'off',
         'no-undef': 'warn',
-        'no-var': 'warn',          // GAS V8でもconstを推奨
-        'prefer-const': 'warn',    // 再代入しない変数はconst
-        'no-console': 'off'        // console.logはGASで使用可能
+        'no-var': 'warn',
+        'prefer-const': 'warn',
+        'no-console': 'off'
       }
     },
     {

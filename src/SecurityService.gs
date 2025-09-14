@@ -13,7 +13,7 @@
  * - 単一責任原則の維持
  */
 
-/* global PROPS_KEYS, getUserAccessLevel, CONSTANTS, DB */
+/* global getUserAccessLevel */
 
 // ===========================================
 // 🔑 認証・セッション管理
@@ -57,7 +57,7 @@ function getServiceAccountToken() {
       
       console.info('SecurityService.getServiceAccountToken: トークン生成・キャッシュ完了（詳細省略）');
       return newToken;
-    } catch (error) {
+    } catch {
       // セキュリティ：エラー詳細をログに出力しない
       console.error('SecurityService.getServiceAccountToken: トークン取得処理エラー');
       return null;
@@ -82,7 +82,7 @@ function generateServiceAccountToken() {
       }
 
       return token;
-    } catch (error) {
+    } catch {
       // セキュリティ：具体的なエラー内容をログに出力しない
       console.error('SecurityService.generateServiceAccountToken: トークン生成処理エラー');
       return null;
@@ -352,9 +352,9 @@ function validateSecurityUrl(url) {
         if (!urlMatch) {
           return { isValid: false, error: '無効なURL形式' };
         }
-        protocol = `${urlMatch[1]  }:`; // 'http:' or 'https:'
-        hostname = urlMatch[2];
-      } catch (error) {
+        [, protocol, hostname] = urlMatch;
+        protocol = `${protocol}:`; // 'http:' or 'https:'
+      } catch {
         return { isValid: false, error: '無効なURL形式' };
       }
 
@@ -547,86 +547,6 @@ function cleanupOldSecurityLogs() {
 // 🔧 ユーティリティ・診断
 // ===========================================
 
-/**
- * セキュリティ状態診断
- * @returns {Object} 診断結果
- */
-function diagnoseSecurityService() {
-    const results = {
-      service: 'SecurityService',
-      timestamp: new Date().toISOString(),
-      checks: [],
-      securityScore: 0
-    };
-
-    try {
-      // セッション状態確認
-      const sessionValidation = validateSecuritySession();
-      results.checks.push({
-        name: 'Session Validation',
-        status: sessionValidation.isValid ? '✅' : '❌',
-        details: sessionValidation.isValid 
-          ? `Active user: ${sessionValidation.userEmail}`
-          : sessionValidation.error
-      });
-
-      // Service Accountトークン確認
-      const token = getServiceAccountToken();
-      results.checks.push({
-        name: 'Service Account Token',
-        status: token ? '✅' : '❌',
-        details: token ? 'Token available' : 'Token generation failed'
-      });
-
-      // プロパティサービス確認
-      try {
-        PropertiesService.getScriptProperties().getProperties();
-        results.checks.push({
-          name: 'Properties Service',
-          status: '✅',
-          details: 'Property access available'
-        });
-      } catch (propError) {
-        results.checks.push({
-          name: 'Properties Service',
-          status: '❌',
-          details: propError.message
-        });
-      }
-
-      // キャッシュサービス確認
-      try {
-        CacheService.getScriptCache().get('test');
-        results.checks.push({
-          name: 'Cache Service',
-          status: '✅',
-          details: 'Cache access available'
-        });
-      } catch (cacheError) {
-        results.checks.push({
-          name: 'Cache Service',
-          status: '❌',
-          details: cacheError.message
-        });
-      }
-
-      // セキュリティスコア計算
-      const passedChecks = results.checks.filter(check => check.status === '✅').length;
-      results.securityScore = Math.round((passedChecks / results.checks.length) * 100);
-      results.overall = results.securityScore >= 80 ? '✅' : '⚠️';
-
-    } catch (error) {
-      results.checks.push({
-        name: 'Service Diagnosis',
-        status: '❌',
-        details: error.message
-      });
-      results.overall = '❌';
-      results.securityScore = 0;
-    }
-
-    return results;
-}
 
 /**
  * スプレッドシートアクセス権限検証

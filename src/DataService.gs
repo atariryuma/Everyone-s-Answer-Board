@@ -13,11 +13,10 @@
  * - グローバル副作用排除
  */
 
-/* global DB, DataFormatter, CONSTANTS, ResponseFormatter, PROPS_KEYS, formatTimestampSimple */
+/* global DB, CONSTANTS, formatTimestampSimple */
 
 // 遅延初期化状態管理
 let dataServiceInitialized = false;
-const dataServiceCache = new Map();
 
 /**
  * DataService遅延初期化
@@ -138,7 +137,7 @@ function fetchSpreadsheetData(config, options = {}) {
     }
 
     // ヘッダー行取得
-    const headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+    const [headers] = sheet.getRange(1, 1, 1, lastCol).getValues();
 
     // ✅ 大量データ対応: バッチ処理で安全に取得
     const totalDataRows = lastRow - 1;
@@ -608,7 +607,7 @@ function getAutoStopTime(publishedAt, minutes) {
  * @param {string} userEmail - ユーザーメール
  * @returns {Object} 処理結果
  */
-function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEmail) {
+function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, _userEmail) {
   initDataService(); // 遅延初期化
   try {
     if (!validateReactionParams(spreadsheetId, sheetName, rowIndex, reactionKey)) {
@@ -1115,7 +1114,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
 
       // ヘッダー行取得
       console.log('DataService.analyzeColumns: ヘッダー取得開始');
-      headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+      [headers] = sheet.getRange(1, 1, 1, lastColumn).getValues();
       console.log('DataService.analyzeColumns: ヘッダー取得成功', {
         headersCount: headers.length
       });
@@ -1252,7 +1251,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
  */
 function getOrCreateReactionColumn(sheet, reactionType) {
   try {
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
     const reactionHeader = reactionType.toUpperCase();
 
     // 既存の列を探す

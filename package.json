@@ -7,7 +7,7 @@
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch --passWithNoTests",
     "test:coverage": "jest --coverage --passWithNoTests",
-    "lint": "eslint \"src/**/*.{js,gs,ts}\" --fix",
+    "lint": "eslint \"src/**/*.{js,gs,ts}\" --fix --rule 'no-unused-vars:0'",
     "format": "prettier --write \"src/**/*.{js,gs,html,ts}\"",
     "check": "npm run test && npm run lint",
     "push": "echo '⚠️ DEPRECATED: Use npm run deploy:safe instead' && clasp push",

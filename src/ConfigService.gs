@@ -13,11 +13,10 @@
  * - グローバル副作用排除
  */
 
-/* global DB, PROPS_KEYS, CONSTANTS, SecurityValidator, getCurrentUserEmail, getCurrentUserInfo, URL */
+/* global DB, PROPS_KEYS, getCurrentUserEmail, getCurrentUserInfo, URL */
 
 // 遅延初期化状態管理
 let configServiceInitialized = false;
-const configServiceCache = new Map();
 
 /**
  * ConfigService遅延初期化
@@ -240,7 +239,7 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
  * @param {string} userId - ユーザーID
  * @returns {Object} 権限オブジェクト
  */
-function generateUserPermissions(userId) {
+function generateUserPermissions(_userId) {
   try {
     const currentEmail = getCurrentUserEmail();
     if (!currentEmail) {
@@ -637,47 +636,6 @@ function clearAllConfigCache() {
  * システム診断
  * @returns {Object} 診断結果
  */
-function diagnoseConfigService() {
-  const results = {
-    service: 'ConfigService',
-    timestamp: new Date().toISOString(),
-    checks: []
-  };
-
-  try {
-    // データベース接続確認
-    results.checks.push({
-      name: 'Database Connection',
-      status: typeof DB !== 'undefined' ? '✅' : '❌',
-      details: 'DB service availability'
-    });
-
-    // キャッシュサービス確認
-    results.checks.push({
-      name: 'Cache Service',
-      status: typeof CacheService !== 'undefined' ? '✅' : '❌',
-      details: 'CacheService availability'
-    });
-
-    // プロパティサービス確認
-    results.checks.push({
-      name: 'Properties Service',
-      status: typeof PropertiesService !== 'undefined' ? '✅' : '❌',
-      details: 'PropertiesService availability'
-    });
-
-    results.overall = results.checks.every(check => check.status === '✅') ? '✅' : '⚠️';
-  } catch (error) {
-    results.checks.push({
-      name: 'Service Diagnosis',
-      status: '❌',
-      details: error.message
-    });
-    results.overall = '❌';
-  }
-
-  return results;
-}
 
 /**
  * コアシステムプロパティ確認 - 3つの必須項目をすべてチェック

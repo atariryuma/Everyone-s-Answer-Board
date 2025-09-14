@@ -13,11 +13,10 @@
  * - グローバル副作用排除
  */
 
-/* global DB, PROPS_KEYS, CONSTANTS, URL */
+/* global DB, CONSTANTS, PROPS_KEYS */
 
 // 遅延初期化状態管理
 let userServiceInitialized = false;
-const userServiceCache = new Map();
 
 /**
  * UserService遅延初期化
@@ -492,47 +491,3 @@ function validateUserFormUrl(formUrl) {
  * サービス状態診断
  * @returns {Object} 診断結果
  */
-function diagnoseUserService() {
-    const results = {
-      service: 'UserService',
-      timestamp: new Date().toISOString(),
-      checks: []
-    };
-
-    try {
-      // セッション確認
-      const email = getCurrentUserEmail();
-      results.checks.push({
-        name: 'Session Check',
-        status: email ? '✅' : '❌',
-        details: email || 'No active session'
-      });
-
-      // データベース接続確認
-      const dbCheck = DB.getSystemStatus ? DB.getSystemStatus() : { status: 'unknown' };
-      results.checks.push({
-        name: 'Database Connection',
-        status: dbCheck.status === 'healthy' ? '✅' : '⚠️',
-        details: dbCheck.message || 'Database status check'
-      });
-
-      // キャッシュ確認
-      const cacheCheck = CacheService.getScriptCache().get('test_key');
-      results.checks.push({
-        name: 'Cache Service',
-        status: '✅',
-        details: 'Cache service accessible'
-      });
-
-      results.overall = results.checks.every(check => check.status === '✅') ? '✅' : '⚠️';
-    } catch (error) {
-      results.checks.push({
-        name: 'Service Diagnosis',
-        status: '❌',
-        details: error.message
-      });
-      results.overall = '❌';
-    }
-
-    return results;
-}

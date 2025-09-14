@@ -23,17 +23,53 @@
  * @param {Object} request - リクエストパラメータ
  * @returns {Object} データ取得結果
  */
+/**
+ * DataController専用：直接Session APIでメール取得
+ */
+function getCurrentEmailDirectDC() {
+  try {
+    // Method 1: Session.getActiveUser()
+    let email = Session.getActiveUser().getEmail();
+    if (email) {
+      return email;
+    }
+
+    // Method 2: Session.getEffectiveUser()
+    email = Session.getEffectiveUser().getEmail();
+    if (email) {
+      return email;
+    }
+
+    console.warn('getCurrentEmailDirectDC: No email available from Session API');
+    return null;
+  } catch (error) {
+    console.error('getCurrentEmailDirectDC:', error.message);
+    return null;
+  }
+}
+
 function handleGetData(request) {
   try {
-    const userInfo = UserService.getCurrentUserInfo();
-    if (!userInfo) {
+    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
+    const email = getCurrentEmailDirectDC();
+    if (!email) {
       return {
         success: false,
         message: 'ユーザー情報が見つかりません'
       };
     }
 
-    const data = DataService.getSheetData(userInfo.userId, request.options || {});
+    // 🎯 Zero-dependency: 直接DBからユーザー情報取得
+    const user = DB.findUserByEmail(email);
+    if (!user) {
+      return {
+        success: false,
+        message: 'ユーザーが登録されていません'
+      };
+    }
+
+    // DataService.getSheetDataは既にzero-dependency実装済み
+    const data = DataService.getSheetData(user.userId, request.options || {});
     return {
       success: true,
       data
@@ -57,16 +93,27 @@ function handleGetData(request) {
  */
 function handleAddReaction(request) {
   try {
-    const userInfo = UserService.getCurrentUserInfo();
-    if (!userInfo) {
+    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
+    const email = getCurrentEmailDirectDC();
+    if (!email) {
       return {
         success: false,
         message: 'ユーザー情報が見つかりません'
       };
     }
 
+    // 🎯 Zero-dependency: 直接DBからユーザー情報取得
+    const user = DB.findUserByEmail(email);
+    if (!user) {
+      return {
+        success: false,
+        message: 'ユーザーが登録されていません'
+      };
+    }
+
+    // DataService.addReactionは既にzero-dependency実装済み
     const result = DataService.addReaction(
-      userInfo.userId,
+      user.userId,
       request.rowId,
       request.reactionType
     );
@@ -217,7 +264,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
       };
     }
 
-    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
     const indices = {};
 
     headers.forEach((header, index) => {
@@ -253,7 +300,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
  * @param {Object} options - 取得オプション
  * @returns {Object} ユーザー一覧
  */
-function getAllUsersForAdminForUI(options = {}) {
+function getAllUsersForAdminForUI(_options = {}) {
   try {
     // 管理者権限チェック
     const currentEmail = UserService.getCurrentEmail();
@@ -392,7 +439,7 @@ function addSpreadsheetUrl(url) {
       };
     }
 
-    const spreadsheetId = match[1];
+    const [, spreadsheetId] = match;
 
     // アクセステスト
     try {

@@ -13,21 +13,12 @@
  * - シンプルなユーティリティ関数群
  */
 
-/* global CONSTANTS, validateSecurityEmail, URL */
+/* global URL */
 
 // ===========================================
 // 🔒 基本データ型検証関数群
 // ===========================================
 
-/**
- * メールアドレス検証 (セキュリティサービスに統一)
- * @param {string} email - メールアドレス
- * @returns {Object} 検証結果
- */
-function validateInputEmail(email) {
-    // SecurityServiceに統一 - レガシー互換性維持
-    return validateSecurityEmail(email);
-}
 
 /**
  * URL検証（Google関連のみ許可）
@@ -59,7 +50,7 @@ function validateInputUrl(url) {
             search: u.search || '',
             hash: u.hash || ''
           };
-        } catch (e1) {
+        } catch {
           // fall through to regex parser
         }
       }
@@ -110,7 +101,7 @@ function validateInputUrl(url) {
         pathname: parsed.pathname
       };
 
-    } catch (urlError) {
+    } catch {
       result.errors.push('無効なURL形式');
     }
 
@@ -388,59 +379,10 @@ function validateInputConfig(config) {
  * バリデーター診断
  * @returns {Object} 診断結果
  */
-function diagnoseInputValidator() {
-    const tests = [
-      {
-        name: 'Email Validation',
-        test: () => validateInputEmail('test@example.com').isValid
-      },
-      {
-        name: 'URL Validation',
-        test: () => validateInputUrl('https://docs.google.com/spreadsheets/d/test').isValid
-      },
-      {
-        name: 'Text Sanitization',
-        test: () => validateInputText('<script>alert("test")</script>').sanitized.includes('[REMOVED_FOR_SECURITY]')
-      },
-      {
-        name: 'Spreadsheet ID Validation',
-        test: () => validateInputSpreadsheetId('1234567890123456789012345678901234567890abcd').isValid
-      }
-    ];
-
-    const results = tests.map(({ name, test }) => {
-      try {
-        return { name, status: test() ? '✅' : '❌', error: null };
-      } catch (error) {
-        return { name, status: '❌', error: error.message };
-      }
-    });
-
-    return {
-      service: 'InputValidator',
-      timestamp: new Date().toISOString(),
-      tests: results,
-      overall: results.every(r => r.status === '✅') ? '✅' : '⚠️'
-    };
-}
 
 /**
  * レガシー互換関数
  * 既存コードとの互換性維持
  */
 
-// SecurityServiceからの移行
-function validateUserData(userData) {
-  return validateInputConfig(userData);
-}
 
-// validateEmail - SecurityServiceに統一 (グローバル関数削除済み)
-
-function validateUrl(url) {
-  return validateInputUrl(url);
-}
-
-// ConfigServiceからの移行 - Legacy互換関数
-function validateAndSanitizeConfigLegacy(config) {
-  return validateInputConfig(config);
-}

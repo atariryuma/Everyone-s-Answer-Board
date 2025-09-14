@@ -17,7 +17,7 @@
  * ErrorHandler - 統一エラーハンドリングシステム
  * システム全体のエラーを一元管理
  */
-// eslint-disable-next-line no-unused-vars
+ 
 const ErrorHandler = Object.freeze({
 
   // ===========================================
@@ -213,9 +213,7 @@ const ErrorHandler = Object.freeze({
     // エラーの基本情報抽出
     let message, stack, name;
     if (error instanceof Error) {
-      message = error.message;
-      stack = error.stack;
-      name = error.name;
+      ({message, stack, name} = error);
     } else if (typeof error === 'string') {
       message = error;
       name = 'StringError';

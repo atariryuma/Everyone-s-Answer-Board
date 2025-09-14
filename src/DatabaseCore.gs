@@ -12,11 +12,10 @@
  * - グローバル副作用排除
  */
 
-/* global PROPS_KEYS, CONSTANTS, SecurityService, AppCacheService, ConfigService, UserService */
+/* global PROPS_KEYS, CONSTANTS, AppCacheService */
 
 // 遅延初期化状態管理
 let databaseCoreInitialized = false;
-const databaseCoreCache = new Map();
 
 /**
  * DatabaseCore遅延初期化
@@ -75,7 +74,7 @@ const DatabaseCore = Object.freeze({
    */
   batchGetSheetsData(service, spreadsheetId, ranges) {
     try {
-      const timer = console.log('DatabaseCore.batchGetSheetsData');
+      console.log('DatabaseCore.batchGetSheetsData');
 
       if (!ranges || ranges.length === 0) {
         return { valueRanges: [] };
@@ -159,13 +158,15 @@ const DatabaseCore = Object.freeze({
           values: {
             get: ({ spreadsheetId, range }) => {
               const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-              const sheet = spreadsheet.getSheetByName(range.split('!')[0]) || spreadsheet.getSheets()[0];
+              const [sheetName] = range.split('!');
+              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
               const values = sheet.getDataRange().getValues();
               return { values };
             },
             update: ({ spreadsheetId, range, resource }) => {
               const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-              const sheet = spreadsheet.getSheetByName(range.split('!')[0]) || spreadsheet.getSheets()[0];
+              const [sheetName] = range.split('!');
+              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
               const {values} = resource;
               if (values && values.length > 0) {
                 sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
@@ -174,7 +175,8 @@ const DatabaseCore = Object.freeze({
             },
             append: ({ spreadsheetId, range, resource }) => {
               const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-              const sheet = spreadsheet.getSheetByName(range.split('!')[0]) || spreadsheet.getSheets()[0];
+              const [sheetName] = range.split('!');
+              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
               const {values} = resource;
               if (values && values.length > 0) {
                 sheet.getRange(sheet.getLastRow() + 1, 1, values.length, values[0].length).setValues(values);
@@ -307,7 +309,6 @@ const DatabaseCore = Object.freeze({
  * - バルクデータ操作
  */
 
-/* global DatabaseCore, CONSTANTS, AppCacheService, ConfigService */
 
 /**
  * DatabaseOperations - データベース操作機能
@@ -344,7 +345,7 @@ const DatabaseOperations = Object.freeze({
         return null; // ヘッダーのみ
       }
 
-      const headers = rows[0];
+      const [headers] = rows;
       const emailIndex = headers.findIndex(h => h.toLowerCase().includes('email'));
 
       if (emailIndex === -1) {
@@ -379,7 +380,7 @@ const DatabaseOperations = Object.freeze({
     if (!userId) return null;
 
     try {
-      const timer = console.log('DatabaseOperations.findUserById');
+      console.log('DatabaseOperations.findUserById');
 
       const service = DatabaseCore.getSheetsServiceCached();
       const databaseId = DatabaseCore.getSecureDatabaseId();
@@ -395,7 +396,7 @@ const DatabaseOperations = Object.freeze({
                 return null;
       }
 
-      const headers = rows[0];
+      const [headers] = rows;
       const userIdIndex = headers.findIndex(h => h.toLowerCase().includes('userid'));
 
       if (userIdIndex === -1) {
@@ -433,7 +434,7 @@ const DatabaseOperations = Object.freeze({
     }
 
     try {
-      const timer = console.log('DatabaseOperations.createUser');
+      console.log('DatabaseOperations.createUser');
 
       // 重複チェック
       const existingUser = this.findUserByEmail(email);
@@ -459,7 +460,7 @@ const DatabaseOperations = Object.freeze({
 
       // データベースに追加
       const range = 'Users!A:A';
-      const appendResult = service.spreadsheets.values.append({
+      service.spreadsheets.values.append({
         spreadsheetId: databaseId,
         range,
         valueInputOption: 'USER_ENTERED',
@@ -497,10 +498,10 @@ const DatabaseOperations = Object.freeze({
     }
 
     try {
-      const timer = console.log('DatabaseOperations.updateUser');
+      console.log('DatabaseOperations.updateUser');
 
-      const service = DatabaseCore.getSheetsServiceCached();
-      const databaseId = DatabaseCore.getSecureDatabaseId();
+      // const service = DatabaseCore.getSheetsServiceCached();
+      // const databaseId = DatabaseCore.getSecureDatabaseId();
 
       // ユーザー検索
       const user = this.findUserById(userId);
@@ -509,10 +510,10 @@ const DatabaseOperations = Object.freeze({
       }
 
       // 更新データにlastModifiedを追加
-      const finalUpdateData = {
-        ...updateData,
-        lastModified: new Date().toISOString()
-      };
+      // const finalUpdateData = {
+      //   ...updateData,
+      //   lastModified: new Date().toISOString()
+      // };
 
       // 実際の更新処理は省略（行特定と更新）
       // 実装時はrowIndexを特定して更新
@@ -572,7 +573,7 @@ const DatabaseOperations = Object.freeze({
     const { limit = 1000, offset = 0, activeOnly = false } = options;
 
     try {
-      const timer = console.log('DatabaseOperations.getAllUsers');
+      console.log('DatabaseOperations.getAllUsers');
 
       const service = DatabaseCore.getSheetsServiceCached();
       const databaseId = DatabaseCore.getSecureDatabaseId();
@@ -588,7 +589,7 @@ const DatabaseOperations = Object.freeze({
                 return [];
       }
 
-      const headers = rows[0];
+      const [headers] = rows;
       const users = [];
 
       // ヘッダーをスキップしてユーザーデータを処理
@@ -647,7 +648,6 @@ const DatabaseOperations = Object.freeze({
  * - シンプルなAPI提供
  */
 
-/* global DatabaseCore, DatabaseOperations, AppCacheService, PROPS_KEYS, CONSTANTS */
 
 /**
  * 統一データベースアクセス関数
@@ -672,7 +672,7 @@ function batchGetSheetsData(service, spreadsheetId, ranges) {
  * 統一データベース操作オブジェクト
  * 全ての操作をDatabaseOperationsに委譲
  */
-const DB = Object.freeze({
+Object.freeze({
 
   // ユーザー操作
   createUser(userData) {
@@ -702,11 +702,11 @@ const DB = Object.freeze({
   },
 
   // キャッシュ管理（統一）
-  clearUserCache(userId, userEmail) {
+  clearUserCache(userId, _userEmail) {
     return AppCacheService.invalidateUserCache(userId);
   },
 
-  invalidateUserCache(userId, userEmail) {
+  invalidateUserCache(userId, _userEmail) {
     return AppCacheService.invalidateUserCache(userId);
   },
 
@@ -734,13 +734,3 @@ const DB = Object.freeze({
 
 });
 
-/**
- * レガシー関数のグローバルエクスポート（互換性維持）
- */
-function initializeDatabaseSheet(spreadsheetId) {
-  return DatabaseCore.initializeSheet(spreadsheetId);
-}
-
-function getSpreadsheetsData(service, spreadsheetId) {
-  return DatabaseCore.getSpreadsheetsData(service, spreadsheetId);
-}

@@ -130,7 +130,7 @@ const AppLogger = Object.freeze({
  * PropertiesServiceキー定数
  * セキュリティ重要項目の一元管理
  */
-// eslint-disable-next-line no-unused-vars
+ 
 const PROPS_KEYS = Object.freeze({
   SERVICE_ACCOUNT_CREDS: 'SERVICE_ACCOUNT_CREDS',
   DATABASE_SPREADSHEET_ID: 'DATABASE_SPREADSHEET_ID',
@@ -174,9 +174,6 @@ const SECURITY = Object.freeze({
 /**
  * Organization-specific constants
  */
-const ORGANIZATION = Object.freeze({
-  ADMIN_DOMAIN: 'naha-okinawa.ed.jp',
-});
 
 /**
  * Input validation utility functions
@@ -283,7 +280,7 @@ const SecurityValidator = Object.freeze({
         try {
           JSON.parse(userData.configJson);
           sanitizedData.configJson = userData.configJson;
-        } catch (_e) {
+        } catch {
           errors.push('設定データの形式が正しくありません。');
         }
       }
@@ -315,7 +312,7 @@ const SecurityValidator = Object.freeze({
  * 統合定数オブジェクト（フラット構造）
  * GAS 2025 Best Practices準拠
  */
-// eslint-disable-next-line no-unused-vars
+ 
 const CONSTANTS = Object.freeze({
   // 🚀 configJSON中心型超効率化データベース定数
   DATABASE: Object.freeze({
@@ -426,7 +423,7 @@ const CONSTANTS = Object.freeze({
 });
 
 // パフォーマンス監視
-// eslint-disable-next-line no-unused-vars
+ 
 const PerformanceMonitor = Object.freeze({
   measure(operationName, operation) {
     const startTime = Date.now();
