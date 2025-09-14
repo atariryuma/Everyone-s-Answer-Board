@@ -630,10 +630,30 @@ function getSpreadsheetList() {
 
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
-    return AdminController.analyzeColumns(spreadsheetId, sheetName);
+    const result = AdminController.analyzeColumns(spreadsheetId, sheetName);
+
+    // null/undefined ガード
+    if (!result) {
+      console.error('analyzeColumns: AdminControllerがnullを返しました');
+      return {
+        success: false,
+        error: 'システムエラーが発生しました',
+        headers: [],
+        columns: [],
+        columnMapping: { mapping: {}, confidence: {} }
+      };
+    }
+
+    return result;
   } catch (error) {
     console.error('analyzeColumns error:', error);
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: error.message,
+      headers: [],
+      columns: [],
+      columnMapping: { mapping: {}, confidence: {} }
+    };
   }
 }
 
@@ -684,10 +704,26 @@ function getSheetList(spreadsheetId) {
 
 function validateAccess(spreadsheetId) {
   try {
-    return AdminController.validateAccess(spreadsheetId);
+    const result = AdminController.validateAccess(spreadsheetId);
+
+    // null/undefined ガード
+    if (!result) {
+      console.error('validateAccess: AdminControllerがnullを返しました');
+      return {
+        success: false,
+        error: 'システムエラーが発生しました',
+        sheets: []
+      };
+    }
+
+    return result;
   } catch (error) {
     console.error('validateAccess error:', error);
-    return { success: false, error: error.message };
+    return {
+      success: false,
+      error: error.message,
+      sheets: []
+    };
   }
 }
 

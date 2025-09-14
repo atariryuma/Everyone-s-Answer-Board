@@ -330,11 +330,20 @@
 
       // 7. 列設定ドロップダウンの初期化
       if (config && config.spreadsheetId && config.sheetName) {
-        await initializeColumnDropdowns(config.spreadsheetId, config.sheetName, config.columnMapping);
+        try {
+          await initializeColumnDropdowns(config.spreadsheetId, config.sheetName, config.columnMapping);
+        } catch (columnError) {
+          console.error('列設定ドロップダウン初期化エラー:', columnError);
+          showInfo('⚠️ 列設定の初期化に失敗しましたが、他の機能は利用できます。');
+          // 列設定初期化に失敗しても他の処理は続行
+        }
       }
     } catch (error) {
       console.error('ドロップダウン初期化エラー:', error);
-      spreadsheetSelect.innerHTML = '<option value="">初期化エラー</option>';
+      if (spreadsheetSelect) {
+        spreadsheetSelect.innerHTML = '<option value="">初期化エラー - 再読み込みしてください</option>';
+      }
+      showError('管理パネルの初期化に失敗しました。ページを再読み込みしてください。');
     }
   }
 
@@ -346,8 +355,22 @@
       // 1. 列分析を実行
       const analysisResult = await analyzeColumnsAsync(spreadsheetId, sheetName);
 
-      if (!analysisResult || !analysisResult.success || !analysisResult.headers) {
-        console.warn('⚠️ 列分析に失敗しました:', analysisResult);
+      if (!analysisResult) {
+        console.error('❌ 列分析でnullが返されました');
+        showError('列分析でエラーが発生しました。スプレッドシートのアクセス権限を確認してください。');
+        return;
+      }
+
+      if (!analysisResult.success) {
+        const errorMsg = analysisResult.error || analysisResult.message || '列分析に失敗しました';
+        console.warn('⚠️ 列分析に失敗:', errorMsg);
+        showError(`列分析エラー: ${errorMsg}`);
+        return;
+      }
+
+      if (!analysisResult.headers || !Array.isArray(analysisResult.headers) || analysisResult.headers.length === 0) {
+        console.warn('⚠️ ヘッダー情報が無効です:', analysisResult);
+        showError('スプレッドシートにヘッダー行が見つかりません。');
         return;
       }
 
@@ -1385,13 +1408,22 @@
     google.script.run
       .withSuccessHandler(function (result) {
         console.log('URL入力接続成功:', result);
-        if (result && result.success) {
+
+        // null/undefined ガード
+        if (!result) {
+          console.error('URL入力接続: サーバーからnullが返されました');
+          showError('サーバーエラーが発生しました。再試行してください。');
+          setPartialLoading(false);
+          return;
+        }
+
+        if (result.success) {
           // 新しいドロップダウン式列マッピングを更新
           updateColumnMapping(result);
           updateProgress(2);
           showSuccess('URL入力方式でスプレッドシートに接続しました');
         } else {
-          showError(result.error || 'スプレッドシートへの接続に失敗しました');
+          showError(result.error || result.message || 'スプレッドシートへの接続に失敗しました');
         }
         setPartialLoading(false);
       })

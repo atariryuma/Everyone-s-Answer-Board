@@ -314,10 +314,21 @@
           }
           
           const data = rawData.data || rawData.rows || [];
+          // デバッグログ: データ構造確認
+          console.log('✅ データ変換開始:', {
+            totalItems: data.length,
+            sampleItem: data[0] ? Object.keys(data[0]) : 'データなし'
+          });
+
           const answers = data
-            .filter(item => item?.opinion)
+            .filter(item => item?.answer || item?.opinion) // answerまたはopinionフィールドがある項目
             .map(item => this.normalizeAnswer(item))
-            .filter(answer => answer.opinion);
+            .filter(answer => answer.opinion); // 正規化後のopinionをチェック
+
+          console.log('✅ データ変換完了:', {
+            filteredCount: answers.length,
+            sampleAnswer: answers[0] ? Object.keys(answers[0]) : 'データなし'
+          });
           
           const result = {
             answers,
@@ -355,9 +366,20 @@
       }
       
       normalizeAnswer(item) {
+        // バックエンドのanswerフィールドをフロントエンドのopinionフィールドにマッピング
+        const opinionText = String(item.answer || item.opinion || '').trim();
+
+        // デバッグログ: フィールドマッピング確認
+        if (item.answer && !item.opinion) {
+          console.log('🔄 フィールド変換: answer → opinion', {
+            originalField: 'answer',
+            value: item.answer?.substring(0, 50) + '...'
+          });
+        }
+
         return {
           rowIndex: parseInt(item.rowIndex) || 1,
-          opinion: String(item.opinion || '').trim(),
+          opinion: opinionText,
           reason: String(item.reason || '').trim(),
           name: String(item.name || '').trim(),
           class: String(item.class || '').trim(),

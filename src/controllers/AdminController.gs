@@ -125,7 +125,32 @@ const AdminController = Object.freeze({
    * @returns {Object} 列分析結果
    */
   analyzeColumns(spreadsheetId, sheetName) {
-    return DataService.analyzeColumns(spreadsheetId, sheetName);
+    try {
+      const result = DataService.analyzeColumns(spreadsheetId, sheetName);
+
+      // null/undefined ガード
+      if (!result) {
+        console.error('AdminController.analyzeColumns: DataServiceがnullを返しました');
+        return {
+          success: false,
+          message: 'データサービスエラーが発生しました',
+          headers: [],
+          columns: [],
+          columnMapping: { mapping: {}, confidence: {} }
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('AdminController.analyzeColumns エラー:', error.message);
+      return {
+        success: false,
+        message: error.message,
+        headers: [],
+        columns: [],
+        columnMapping: { mapping: {}, confidence: {} }
+      };
+    }
   },
 
   // ===========================================
@@ -162,7 +187,28 @@ const AdminController = Object.freeze({
    * @returns {Object} 検証結果
    */
   validateAccess(spreadsheetId) {
-    return SecurityService.validateSpreadsheetAccess(spreadsheetId);
+    try {
+      const result = SecurityService.validateSpreadsheetAccess(spreadsheetId);
+
+      // null/undefined ガード
+      if (!result) {
+        console.error('AdminController.validateAccess: SecurityServiceがnullを返しました');
+        return {
+          success: false,
+          message: 'セキュリティサービスエラーが発生しました',
+          sheets: []
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('AdminController.validateAccess エラー:', error.message);
+      return {
+        success: false,
+        message: error.message,
+        sheets: []
+      };
+    }
   },
 
   /**
