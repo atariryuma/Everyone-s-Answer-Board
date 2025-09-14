@@ -684,14 +684,13 @@ function diagnoseConfigService() {
  * @returns {boolean} 3つすべて存在すれば true
  */
 function hasCoreSystemProps() {
-  initConfigService(); // 遅延初期化
   try {
     const props = PropertiesService.getScriptProperties();
 
-    // 3つの必須項目をすべてチェック
-    const adminEmail = props.getProperty(PROPS_KEYS.ADMIN_EMAIL);
-    const dbId = props.getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
-    const creds = props.getProperty(PROPS_KEYS.SERVICE_ACCOUNT_CREDS);
+    // 3つの必須項目をすべてチェック（依存関係なしで直接指定）
+    const adminEmail = props.getProperty('ADMIN_EMAIL');
+    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+    const creds = props.getProperty('SERVICE_ACCOUNT_CREDS');
 
     if (!adminEmail || !dbId || !creds) {
       console.warn('hasCoreSystemProps: 必須項目不足', {
