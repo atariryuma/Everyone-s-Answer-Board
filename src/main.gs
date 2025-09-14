@@ -1324,12 +1324,25 @@ function checkIsSystemAdminFromSystemController() {
  */
 function testSetup() {
   try {
-    // SystemController.testSetup()への委譲を試行
-    if (typeof SystemController !== 'undefined' && typeof SystemController.testSetup === 'function') {
-      return SystemController.testSetup();
-    }
+    // SystemController.gsのtestSetup()関数への直接委譲
+    // ゼロ依存アーキテクチャ：関数は直接呼び出し可能
+    return testSetupFromSystemController();
+  } catch (error) {
+    console.error('testSetup error:', error.message);
+    return {
+      success: false,
+      status: 'error',
+      message: `テスト実行中にエラーが発生しました: ${error.message}`
+    };
+  }
+}
 
-    // フォールバック：直接テスト
+/**
+ * SystemController.gsのtestSetup実装への直接呼び出し
+ * ゼロ依存アーキテクチャ：ServiceFactory経由でプラットフォームAPI使用
+ */
+function testSetupFromSystemController() {
+  try {
     const props = ServiceFactory.getProperties();
     const databaseId = props.getDatabaseSpreadsheetId();
     const adminEmail = props.getAdminEmail();
@@ -1337,22 +1350,36 @@ function testSetup() {
     if (!databaseId || !adminEmail) {
       return {
         success: false,
-        status: 'error',
-        message: 'システム設定が不完全です。必要な設定項目を確認してください。'
+        message: 'セットアップが不完全です。必要な設定が見つかりません。'
+      };
+    }
+
+    // データベースアクセステスト
+    try {
+      const spreadsheet = SpreadsheetApp.openById(databaseId);
+      const name = spreadsheet.getName();
+      console.log('データベースアクセステスト成功:', name);
+    } catch (dbError) {
+      return {
+        success: false,
+        message: `データベースにアクセスできません: ${dbError.message}`
       };
     }
 
     return {
       success: true,
-      status: 'success',
-      message: 'システムテストが正常に完了しました。'
+      message: 'セットアップテストが成功しました',
+      testResults: {
+        database: '✅ アクセス可能',
+        adminEmail: `✅ ${adminEmail}`,
+        mode: 'ゼロ依存実行'
+      }
     };
   } catch (error) {
-    console.error('testSetup error:', error.message);
+    console.error('testSetupFromSystemController エラー:', error.message);
     return {
       success: false,
-      status: 'error',
-      message: `テスト実行中にエラーが発生しました: ${error.message}`
+      message: `セットアップテストでエラーが発生しました: ${error.message}`
     };
   }
 }
