@@ -911,9 +911,17 @@
 
   function analyzeColumnsAsync(spreadsheetId, sheetName) {
     return new Promise((resolve, reject) => {
+      console.log('🔍 analyzeColumnsAsync called with:', { spreadsheetId, sheetName });
+
       google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
+        .withSuccessHandler(function(result) {
+          console.log('✅ analyzeColumns success:', result);
+          resolve(result);
+        })
+        .withFailureHandler(function(error) {
+          console.error('❌ analyzeColumns error:', error);
+          reject(error);
+        })
         .analyzeColumns(spreadsheetId, sheetName);
     });
   }

@@ -986,6 +986,64 @@ const DataService = Object.freeze({
   },
 
   /**
+   * 行フィルタリング判定
+   * @param {Object} item - データアイテム
+   * @param {Object} options - フィルタリングオプション
+   * @returns {boolean} 含めるかどうか
+   */
+  shouldIncludeRow(item, options = {}) {
+    try {
+      // 空行のフィルタリング
+      if (options.excludeEmpty !== false && item.isEmpty) {
+        return false;
+      }
+
+      // メイン回答が空の行をフィルタリング
+      if (options.requireAnswer !== false && (!item.answer || item.answer.trim() === '')) {
+        return false;
+      }
+
+      // 日付範囲フィルタリング
+      if (options.dateFrom && item.timestamp) {
+        const itemDate = new Date(item.timestamp);
+        const fromDate = new Date(options.dateFrom);
+        if (itemDate < fromDate) {
+          return false;
+        }
+      }
+
+      if (options.dateTo && item.timestamp) {
+        const itemDate = new Date(item.timestamp);
+        const toDate = new Date(options.dateTo);
+        if (itemDate > toDate) {
+          return false;
+        }
+      }
+
+      // クラスフィルタリング
+      if (options.classFilter && options.classFilter.length > 0) {
+        if (!options.classFilter.includes(item.className)) {
+          return false;
+        }
+      }
+
+      // キーワード検索
+      if (options.searchKeyword && options.searchKeyword.trim() !== '') {
+        const keyword = options.searchKeyword.toLowerCase();
+        const searchText = `${item.answer || ''} ${item.reason || ''} ${item.name || ''}`.toLowerCase();
+        if (!searchText.includes(keyword)) {
+          return false;
+        }
+      }
+
+      return true;
+    } catch (error) {
+      console.warn('DataService.shouldIncludeRow: エラー', error.message);
+      return true; // エラー時は含める
+    }
+  },
+
+  /**
    * サービス状態診断
    * @returns {Object} 診断結果
    */
