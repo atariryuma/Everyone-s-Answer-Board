@@ -11,22 +11,40 @@
     });
     
     const getSecureVars = () => {
-      // URLからuserIdを取得
+      // URLからuserIdを取得（親ウィンドウも含む）
       let userId = null;
       try {
-        console.log('🔍 [URLDebug] URL情報', {
+        // 現在のウィンドウのURLを確認
+        console.log('🔍 [URLDebug] 現在のURL情報', {
           href: window.location.href,
           search: window.location.search,
           pathname: window.location.pathname
         });
 
-        const urlParams = new URLSearchParams(window.location.search);
-        userId = urlParams.get('userId');
+        // 親ウィンドウのURLから取得を試行
+        try {
+          const parentUrl = window.parent.location.href;
+          console.log('🔍 [URLDebug] 親ウィンドウURL:', parentUrl);
 
-        console.log('🔍 [URLDebug] パラメータ解析結果', {
-          userId,
-          allParams: Object.fromEntries(urlParams.entries())
-        });
+          const parentParams = new URLSearchParams(parentUrl.split('?')[1] || '');
+          userId = parentParams.get('userId');
+
+          console.log('🔍 [URLDebug] 親ウィンドウパラメータ解析結果', {
+            userId,
+            allParams: Object.fromEntries(parentParams.entries())
+          });
+        } catch (parentError) {
+          console.warn('親ウィンドウURL取得失敗:', parentError);
+
+          // フォールバック：現在のウィンドウのURLから取得
+          const urlParams = new URLSearchParams(window.location.search);
+          userId = urlParams.get('userId');
+
+          console.log('🔍 [URLDebug] フォールバック - 現在ウィンドウパラメータ解析結果', {
+            userId,
+            allParams: Object.fromEntries(urlParams.entries())
+          });
+        }
       } catch (error) {
         console.warn('URLパラメータ解析エラー:', error);
       }

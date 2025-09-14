@@ -1142,7 +1142,7 @@ const DataService = Object.freeze({
 
       const spreadsheets = [];
       let count = 0;
-      const maxCount = 50; // 最大50件まで
+      const maxCount = 20; // 通信制限対応: 最大20件まで
 
       UnifiedLogger.debug('DataService', {
         operation: 'spreadsheet enumeration',
@@ -1183,6 +1183,15 @@ const DataService = Object.freeze({
         executionTime: `${Date.now() - started}ms`,
         spreadsheets
       };
+
+      // レスポンスサイズ監視
+      const responseSize = JSON.stringify(response).length;
+      UnifiedLogger.info('DataService', {
+        operation: 'response size check',
+        responseSize,
+        responseSizeKB: Math.round(responseSize / 1024 * 100) / 100,
+        maxResponseSize: '64KB (Google Apps Script limit)'
+      });
 
       UnifiedLogger.success('DataService', {
         operation: 'getSpreadsheetList',

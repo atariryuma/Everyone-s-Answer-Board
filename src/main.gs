@@ -621,7 +621,9 @@ function getConfig() {
 
 function getSpreadsheetList() {
   try {
+    console.info('getSpreadsheetList: 開始');
     const result = AdminController.getSpreadsheetList();
+    console.info('getSpreadsheetList: AdminController結果', { resultType: typeof result, isNull: result === null });
 
     // null/undefined ガード
     if (!result) {
@@ -633,13 +635,15 @@ function getSpreadsheetList() {
       };
     }
 
+    console.info('getSpreadsheetList: 正常終了');
     return result;
   } catch (error) {
     console.error('getSpreadsheetList error:', error);
     return {
       success: false,
-      message: error.message,
-      spreadsheets: []
+      message: error.message || 'Unknown error',
+      spreadsheets: [],
+      error: error.toString()
     };
   }
 }

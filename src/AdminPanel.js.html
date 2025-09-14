@@ -602,6 +602,13 @@
           select.innerHTML = '<option value="">読み込みエラー</option>';
           setPartialLoading(false);
 
+          console.error('📊 getSpreadsheetList通信エラー:', {
+            error: error,
+            errorMessage: error.message,
+            errorType: typeof error,
+            errorStack: error.stack
+          });
+
           const detailedMessage = 'スプレッドシートの読み込みに失敗しました: ' + error.message;
 
           reject(new Error(detailedMessage));
