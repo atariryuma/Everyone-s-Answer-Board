@@ -639,6 +639,21 @@ const DatabaseOperations = Object.freeze({
 
 });
 
+// ===========================================
+// 🌐 グローバルDB変数設定（GAS読み込み順序対応）
+// ===========================================
+
+/**
+ * グローバルDB変数を確実に設定
+ * GASファイル読み込み順序に関係なく、DatabaseOperationsを利用可能にする
+ */
+if (typeof global !== 'undefined' && typeof DB === 'undefined') {
+  global.DB = DatabaseOperations;
+} else if (typeof DB === 'undefined') {
+  // GAS環境でのフォールバック
+  this.DB = DatabaseOperations;
+}
+
 /**
  * @fileoverview DatabaseService - 統一データベースアクセス層（委譲のみ）
  *

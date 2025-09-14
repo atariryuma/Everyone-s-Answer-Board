@@ -15,7 +15,7 @@
  * - src/services/*.gs
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, DB, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, AppCacheService, getAdminSpreadsheetList, addDataReaction, toggleDataHighlight */
+/* global UserService, ConfigService, DataService, SecurityService, DB, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, AppCacheService, getAdminSpreadsheetList, addDataReaction, toggleDataHighlight, DatabaseOperations */
 
 /**
  * 🚀 GAS Service Discovery & Dynamic Loading
@@ -1093,5 +1093,199 @@ function getBulkAdminPanelData() {
       executionTime: `${executionTime}ms`,
       error: error.toString()
     };
+  }
+}
+
+// ===========================================
+// 🌐 API Gateway Functions（HTML Service用）
+// ===========================================
+
+/**
+ * API Gateway: 設定情報取得
+ * HTMLからgoogle.script.run.getConfig()で呼び出される
+ * @returns {Object} 設定情報
+ */
+function getConfig() {
+  // 直接SystemController.gsの関数を呼び出し（ファイル名基準で解決）
+  return getConfigFromSystemController();
+}
+
+/**
+ * SystemController.gsの関数への直接委譲ラッパー
+ */
+function getConfigFromSystemController() {
+  try {
+    // 直接Session APIでユーザー取得
+    const email = getCurrentEmailDirect();
+    if (!email) {
+      return { success: false, message: 'ユーザー情報が見つかりません' };
+    }
+
+    // DatabaseOperations直接参照
+    if (typeof DatabaseOperations === 'undefined') {
+      return {
+        success: false,
+        message: 'データベースサービスが利用できません'
+      };
+    }
+
+    let user = DatabaseOperations.findUserByEmail(email);
+    if (!user) {
+      try {
+        const newUserId = `user_${Utilities.getUuid().replace(/-/g, '').substring(0, 12)}`;
+        user = {
+          userId: newUserId,
+          userEmail: email,
+          isActive: true,
+          createdAt: new Date().toISOString(),
+          configJson: null
+        };
+        DatabaseOperations.createUser(user);
+        console.log('getConfig: 新規ユーザー作成:', { userId: newUserId, email });
+      } catch (createErr) {
+        console.error('getConfig: ユーザー作成エラー', createErr);
+        return { success: false, message: 'ユーザー作成に失敗しました' };
+      }
+    }
+
+    let config = {};
+    if (user.configJson) {
+      try {
+        config = JSON.parse(user.configJson);
+      } catch (parseError) {
+        console.error('getConfig: 設定JSON解析エラー', parseError);
+        config = {};
+      }
+    }
+
+    return {
+      success: true,
+      config,
+      userId: user.userId,
+      userEmail: user.userEmail
+    };
+  } catch (error) {
+    console.error('getConfigFromSystemController エラー:', error.message);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+}
+
+/**
+ * API Gateway: 現在のボード情報とURL取得
+ * HTMLからgoogle.script.run.getCurrentBoardInfoAndUrls()で呼び出される
+ * @returns {Object} ボード情報
+ */
+function getCurrentBoardInfoAndUrls() {
+  // 直接SystemController.gsの関数を呼び出し
+  return getCurrentBoardInfoAndUrlsFromSystemController();
+}
+
+/**
+ * SystemController.gsの関数への直接委譲ラッパー
+ */
+function getCurrentBoardInfoAndUrlsFromSystemController() {
+  try {
+    // DatabaseOperations直接参照
+    if (typeof DatabaseOperations === 'undefined') {
+      return {
+        isActive: false,
+        error: 'データベースサービスが利用できません',
+        appPublished: false
+      };
+    }
+
+    const email = getCurrentEmailDirect();
+    if (!email) {
+      return {
+        isActive: false,
+        error: 'ユーザー情報が見つかりません',
+        appPublished: false
+      };
+    }
+
+    const user = DatabaseOperations.findUserByEmail(email);
+    if (!user) {
+      return {
+        isActive: false,
+        error: 'ユーザーが見つかりません',
+        appPublished: false
+      };
+    }
+
+    const props = PropertiesService.getScriptProperties();
+    const appStatus = props.getProperty('APPLICATION_STATUS');
+    const appPublished = appStatus === 'active';
+
+    if (!appPublished) {
+      return {
+        isActive: false,
+        appPublished: false,
+        questionText: 'アプリケーションが公開されていません'
+      };
+    }
+
+    const baseUrl = ScriptApp.getService().getUrl();
+    const viewUrl = `${baseUrl}?mode=view&userId=${user.userId}`;
+
+    let config = {};
+    if (user.configJson) {
+      try {
+        config = JSON.parse(user.configJson);
+      } catch (parseError) {
+        console.warn('getCurrentBoardInfoAndUrls: 設定JSON解析エラー', parseError);
+      }
+    }
+
+    return {
+      isActive: true,
+      appPublished: true,
+      questionText: config.questionText || config.boardTitle || 'Everyone\'s Answer Board',
+      urls: {
+        view: viewUrl,
+        admin: `${baseUrl}?mode=admin&userId=${user.userId}`
+      },
+      lastUpdated: config.publishedAt || config.lastModified || new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('getCurrentBoardInfoAndUrlsFromSystemController エラー:', error.message);
+    return {
+      isActive: false,
+      appPublished: false,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * API Gateway: システム管理者チェック
+ * HTMLからgoogle.script.run.checkIsSystemAdmin()で呼び出される
+ * @returns {boolean} 管理者かどうか
+ */
+function checkIsSystemAdmin() {
+  // 直接SystemController.gsの関数を呼び出し
+  return checkIsSystemAdminFromSystemController();
+}
+
+/**
+ * SystemController.gsの関数への直接委譲ラッパー
+ */
+function checkIsSystemAdminFromSystemController() {
+  try {
+    const email = getCurrentEmailDirect();
+    if (!email) {
+      return false;
+    }
+
+    const props = PropertiesService.getScriptProperties();
+    const adminEmails = props.getProperty('ADMIN_EMAILS') || '';
+
+    return adminEmails.split(',').map(e => e.trim()).includes(email);
+  } catch (error) {
+    console.error('checkIsSystemAdminFromSystemController エラー:', error.message);
+    return false;
   }
 }

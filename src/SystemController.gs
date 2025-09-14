@@ -2,7 +2,65 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global PROPS_KEYS, DB, UserService, ConfigService */
+/* global PROPS_KEYS, DB, UserService, ConfigService, DatabaseOperations */
+
+// ===========================================
+// 🔧 DB初期化システム（GAS読み込み順序対応）
+// ===========================================
+
+/**
+ * DB接続の初期化（GAS読み込み順序問題解決）
+ * SystemController内の全関数で使用
+ * @returns {Object|null} DB接続オブジェクト
+ */
+function initDatabaseConnection() {
+  try {
+    // Method 1: グローバルDB変数が利用可能な場合
+    if (typeof DB !== 'undefined' && DB) {
+      return DB;
+    }
+
+    // Method 2: DatabaseOperationsが直接利用可能な場合
+    if (typeof DatabaseOperations !== 'undefined') {
+      // グローバルDB変数を設定
+      if (typeof DB === 'undefined') {
+        global.DB = DatabaseOperations;
+      }
+      return DatabaseOperations;
+    }
+
+    // Method 3: fallback - 基本的なDB機能を直接実装
+    console.warn('initDatabaseConnection: DatabaseOperations not available, using fallback');
+    return null;
+  } catch (error) {
+    console.error('initDatabaseConnection: エラー', error.message);
+    return null;
+  }
+}
+
+/**
+ * SystemController専用：直接Session APIでメール取得
+ * DB依存なしでユーザー情報を取得
+ */
+function getCurrentEmailDirectSC() {
+  try {
+    let email = Session.getActiveUser().getEmail();
+    if (email) {
+      return email;
+    }
+
+    email = Session.getEffectiveUser().getEmail();
+    if (email) {
+      return email;
+    }
+
+    console.warn('getCurrentEmailDirectSC: No email available from Session API');
+    return null;
+  } catch (error) {
+    console.error('getCurrentEmailDirectSC:', error.message);
+    return null;
+  }
+}
 
 /**
  * Generate unique user ID
@@ -421,14 +479,24 @@ function performAutoRepair() {
  */
 function getConfig() {
   try {
+    // 🔧 DB初期化（GAS読み込み順序対応）
+    const db = initDatabaseConnection();
+    if (!db) {
+      console.error('getConfig: DB初期化失敗');
+      return {
+        success: false,
+        message: 'データベース接続エラー'
+      };
+    }
+
     // 🎯 Zero-dependency: 直接Session APIでユーザー取得
     const email = getCurrentEmailDirectSC();
     if (!email) {
       return { success: false, message: 'ユーザー情報が見つかりません' };
     }
 
-    // 🎯 Zero-dependency: 直接DBからユーザー情報取得
-    let user = DB.findUserByEmail(email);
+    // 🎯 DB初期化済みのdb変数を使用
+    let user = db.findUserByEmail(email);
 
     // Auto-create user if not exists
     if (!user) {
@@ -441,7 +509,7 @@ function getConfig() {
           createdAt: new Date().toISOString(),
           configJson: null
         };
-        DB.createUser(user);
+        db.createUser(user);
         console.log('SystemController.getConfig: 新規ユーザー作成:', { userId: newUserId, email });
       } catch (createErr) {
         console.error('SystemController.getConfig: ユーザー作成エラー', createErr);
@@ -809,6 +877,17 @@ function checkIsSystemAdmin() {
  */
 function getCurrentBoardInfoAndUrls() {
   try {
+    // 🔧 DB初期化（GAS読み込み順序対応）
+    const db = initDatabaseConnection();
+    if (!db) {
+      console.error('getCurrentBoardInfoAndUrls: DB初期化失敗');
+      return {
+        isActive: false,
+        error: 'データベース接続エラー',
+        appPublished: false
+      };
+    }
+
     // 🎯 Zero-dependency: 直接Session APIでユーザー取得
     const email = getCurrentEmailDirectSC();
     if (!email) {
@@ -819,8 +898,8 @@ function getCurrentBoardInfoAndUrls() {
       };
     }
 
-    // 🎯 Zero-dependency: 直接DBからユーザー情報取得
-    const user = DB.findUserByEmail(email);
+    // 🎯 DB初期化済みのdb変数を使用
+    const user = db.findUserByEmail(email);
     if (!user) {
       return {
         isActive: false,
@@ -1013,28 +1092,6 @@ function columnNumberToLetter(num) {
     num = Math.floor((num - 1) / 26);
   }
   return letter;
-}
-
-function getCurrentEmailDirectSC() {
-  try {
-    // Method 1: Session.getActiveUser()
-    let email = Session.getActiveUser().getEmail();
-    if (email) {
-      return email;
-    }
-
-    // Method 2: Session.getEffectiveUser()
-    email = Session.getEffectiveUser().getEmail();
-    if (email) {
-      return email;
-    }
-
-    console.warn('getCurrentEmailDirectSC: No email available from Session API');
-    return null;
-  } catch (error) {
-    console.error('getCurrentEmailDirectSC:', error.message);
-    return null;
-  }
 }
 
 function getUser(kind = 'email') {
