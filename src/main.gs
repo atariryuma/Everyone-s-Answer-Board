@@ -468,7 +468,8 @@ function renderErrorPage(error) {
  */
 function getUser(kind) {
   try {
-    return FrontendController.getUser(kind);
+    const frontendController = ServiceRegistry.getFrontendController();
+    return frontendController.getUser(kind);
   } catch (error) {
     console.error('getUser error:', error);
     return kind === 'email' ? '' : { success: false, error: error.message };
@@ -477,7 +478,8 @@ function getUser(kind) {
 
 function processLoginAction() {
   try {
-    return FrontendController.processLoginAction();
+    const frontendController = ServiceRegistry.getFrontendController();
+    return frontendController.processLoginAction();
   } catch (error) {
     console.error('processLoginAction error:', error);
     return { success: false, error: error.message };
@@ -489,7 +491,8 @@ function processLoginAction() {
  */
 function getSystemDomainInfo() {
   try {
-    return SystemController.getSystemDomainInfo();
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.getSystemDomainInfo();
   } catch (error) {
     console.error('getSystemDomainInfo error:', error);
     return { success: false, error: error.message };
@@ -498,7 +501,8 @@ function getSystemDomainInfo() {
 
 function forceUrlSystemReset() {
   try {
-    return SystemController.forceUrlSystemReset();
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.forceUrlSystemReset();
   } catch (error) {
     console.error('forceUrlSystemReset error:', error);
     return { success: false, error: error.message };
@@ -507,7 +511,8 @@ function forceUrlSystemReset() {
 
 function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
   try {
-    return SystemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId);
   } catch (error) {
     console.error('setupApplication error:', error);
     return { success: false, error: error.message };
@@ -516,7 +521,8 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
 
 function testSetup() {
   try {
-    return SystemController.testSetup();
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.testSetup();
   } catch (error) {
     console.error('testSetup error:', error);
     return { success: false, error: error.message };
@@ -525,7 +531,8 @@ function testSetup() {
 
 function getApplicationStatusForUI() {
   try {
-    return SystemController.getApplicationStatusForUI();
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.getApplicationStatusForUI();
   } catch (error) {
     console.error('getApplicationStatusForUI error:', error);
     return { success: false, error: error.message };
@@ -534,7 +541,8 @@ function getApplicationStatusForUI() {
 
 function getAllUsersForAdminForUI(userId) {
   try {
-    return SystemController.getAllUsersForAdminForUI(userId);
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.getAllUsersForAdminForUI(userId);
   } catch (error) {
     console.error('getAllUsersForAdminForUI error:', error);
     return { success: false, error: error.message };
@@ -543,7 +551,8 @@ function getAllUsersForAdminForUI(userId) {
 
 function deleteUserAccountByAdminForUI(userId, reason) {
   try {
-    return SystemController.deleteUserAccountByAdminForUI(userId, reason);
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.deleteUserAccountByAdminForUI(userId, reason);
   } catch (error) {
     console.error('deleteUserAccountByAdminForUI error:', error);
     return { success: false, error: error.message };
@@ -552,7 +561,8 @@ function deleteUserAccountByAdminForUI(userId, reason) {
 
 function getWebAppUrl() {
   try {
-    return SystemController.getWebAppUrl();
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.getWebAppUrl();
   } catch (error) {
     console.error('getWebAppUrl error:', error);
     return { success: false, error: error.message };
@@ -561,7 +571,8 @@ function getWebAppUrl() {
 
 function reportClientError(errorInfo) {
   try {
-    return SystemController.reportClientError(errorInfo);
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.reportClientError(errorInfo);
   } catch (error) {
     console.error('reportClientError error:', error);
     return { success: false, error: error.message };
@@ -570,7 +581,8 @@ function reportClientError(errorInfo) {
 
 function setApplicationStatusForUI(isActive) {
   try {
-    return SystemController.setApplicationStatusForUI(isActive);
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.setApplicationStatusForUI(isActive);
   } catch (error) {
     console.error('setApplicationStatusForUI error:', error);
     return { success: false, error: error.message };
@@ -579,7 +591,8 @@ function setApplicationStatusForUI(isActive) {
 
 function getDeletionLogsForUI(userId) {
   try {
-    return SystemController.getDeletionLogsForUI(userId);
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.getDeletionLogsForUI(userId);
   } catch (error) {
     console.error('getDeletionLogsForUI error:', error);
     return { success: false, error: error.message };
@@ -588,7 +601,8 @@ function getDeletionLogsForUI(userId) {
 
 function testSystemDiagnosis() {
   try {
-    return SystemController.testSystemDiagnosis();
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.testSystemDiagnosis();
   } catch (error) {
     console.error('testSystemDiagnosis error:', error);
     return { success: false, error: error.message };
@@ -597,7 +611,8 @@ function testSystemDiagnosis() {
 
 function performAutoRepair() {
   try {
-    return SystemController.performAutoRepair();
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.performAutoRepair();
   } catch (error) {
     console.error('performAutoRepair error:', error);
     return { success: false, error: error.message };
@@ -606,7 +621,8 @@ function performAutoRepair() {
 
 function performSystemMonitoring() {
   try {
-    return SystemController.performSystemMonitoring();
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.performSystemMonitoring();
   } catch (error) {
     console.error('performSystemMonitoring error:', error);
     return { success: false, error: error.message };
@@ -615,7 +631,8 @@ function performSystemMonitoring() {
 
 function performDataIntegrityCheck() {
   try {
-    return SystemController.performDataIntegrityCheck();
+    const systemController = ServiceRegistry.getSystemController();
+    return systemController.performDataIntegrityCheck();
   } catch (error) {
     console.error('performDataIntegrityCheck error:', error);
     return { success: false, error: error.message };
@@ -624,7 +641,8 @@ function performDataIntegrityCheck() {
 
 function testForceLogoutRedirect() {
   try {
-    return FrontendController.testForceLogoutRedirect();
+    const frontendController = ServiceRegistry.getFrontendController();
+    return frontendController.testForceLogoutRedirect();
   } catch (error) {
     console.error('testForceLogoutRedirect error:', error);
     return { success: false, error: error.message };
@@ -633,9 +651,20 @@ function testForceLogoutRedirect() {
 
 function verifyUserAuthentication() {
   try {
-    return FrontendController.verifyUserAuthentication();
+    const frontendController = ServiceRegistry.getFrontendController();
+    return frontendController.verifyUserAuthentication();
   } catch (error) {
     console.error('verifyUserAuthentication error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function resetAuth() {
+  try {
+    const frontendController = ServiceRegistry.getFrontendController();
+    return frontendController.resetAuth();
+  } catch (error) {
+    console.error('resetAuth error:', error);
     return { success: false, error: error.message };
   }
 }
@@ -645,7 +674,8 @@ function verifyUserAuthentication() {
  */
 function getConfig() {
   try {
-    return AdminController.getConfig();
+    const adminController = ServiceRegistry.getAdminController();
+    return adminController.getConfig();
   } catch (error) {
     console.error('getConfig error:', error);
     return { success: false, error: error.message };
@@ -655,8 +685,14 @@ function getConfig() {
 function getSpreadsheetList() {
   try {
     console.info('getSpreadsheetList: 開始');
-    const result = AdminController.getSpreadsheetList();
-    console.info('getSpreadsheetList: AdminController結果', { resultType: typeof result, isNull: result === null });
+
+    const adminController = ServiceRegistry.getAdminController();
+    const result = adminController.getSpreadsheetList();
+
+    console.info('getSpreadsheetList: ServiceRegistry経由で正常取得', {
+      resultType: typeof result,
+      isNull: result === null
+    });
 
     // null/undefined ガード
     if (!result) {
@@ -668,10 +704,20 @@ function getSpreadsheetList() {
       };
     }
 
-    console.info('getSpreadsheetList: 正常終了');
     return result;
   } catch (error) {
     console.error('getSpreadsheetList error:', error);
+
+    // ServiceRegistry エラーの場合は特別な処理
+    if (error.message.includes('not initialized')) {
+      return {
+        success: false,
+        message: 'システムの初期化中です。ページをリロードしてください。',
+        spreadsheets: [],
+        systemError: true
+      };
+    }
+
     return {
       success: false,
       message: error.message || 'Unknown error',
@@ -683,6 +729,22 @@ function getSpreadsheetList() {
 
 function getLightweightHeaders(spreadsheetId, sheetName) {
   try {
+    console.log('getLightweightHeaders: 関数開始', {
+      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
+      sheetName: sheetName || 'null',
+      hasAdminController: typeof AdminController !== 'undefined',
+      adminControllerType: typeof AdminController
+    });
+
+    if (typeof AdminController === 'undefined') {
+      console.error('getLightweightHeaders: AdminController is undefined');
+      return {
+        success: false,
+        message: 'AdminController オブジェクトが定義されていません',
+        headers: []
+      };
+    }
+
     const result = AdminController.getLightweightHeaders(spreadsheetId, sheetName);
 
     // null/undefined ガード
@@ -708,14 +770,22 @@ function getLightweightHeaders(spreadsheetId, sheetName) {
 
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
-    const result = AdminController.analyzeColumns(spreadsheetId, sheetName);
+    console.log('analyzeColumns: 関数開始', {
+      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
+      sheetName: sheetName || 'null'
+    });
+
+    const adminController = ServiceRegistry.getAdminController();
+    const result = adminController.analyzeColumns(spreadsheetId, sheetName);
+
+    console.info('analyzeColumns: ServiceRegistry経由で正常取得');
 
     // null/undefined ガード
     if (!result) {
       console.error('analyzeColumns: AdminControllerがnullを返しました');
       return {
         success: false,
-        error: 'システムエラーが発生しました',
+        message: 'システムエラーが発生しました',
         headers: [],
         columns: [],
         columnMapping: { mapping: {}, confidence: {} }
@@ -725,9 +795,22 @@ function analyzeColumns(spreadsheetId, sheetName) {
     return result;
   } catch (error) {
     console.error('analyzeColumns error:', error);
+
+    // ServiceRegistry エラーの場合は特別な処理
+    if (error.message.includes('not initialized')) {
+      return {
+        success: false,
+        message: 'システムの初期化中です。ページをリロードしてください。',
+        headers: [],
+        columns: [],
+        columnMapping: { mapping: {}, confidence: {} },
+        systemError: true
+      };
+    }
+
     return {
       success: false,
-      error: error.message,
+      message: error.message,
       headers: [],
       columns: [],
       columnMapping: { mapping: {}, confidence: {} }
@@ -737,7 +820,8 @@ function analyzeColumns(spreadsheetId, sheetName) {
 
 function publishApplication(publishConfig) {
   try {
-    return AdminController.publishApplication(publishConfig);
+    const adminController = ServiceRegistry.getAdminController();
+    return adminController.publishApplication(publishConfig);
   } catch (error) {
     console.error('publishApplication error:', error);
     return { success: false, error: error.message };
@@ -746,7 +830,8 @@ function publishApplication(publishConfig) {
 
 function saveDraftConfiguration(draftConfig) {
   try {
-    return AdminController.saveDraftConfiguration(draftConfig);
+    const adminController = ServiceRegistry.getAdminController();
+    return adminController.saveDraftConfiguration(draftConfig);
   } catch (error) {
     console.error('saveDraftConfiguration error:', error);
     return { success: false, error: error.message };
@@ -755,7 +840,8 @@ function saveDraftConfiguration(draftConfig) {
 
 function connectDataSource(spreadsheetId, sheetName) {
   try {
-    return DataController.connectDataSource(spreadsheetId, sheetName);
+    const dataController = ServiceRegistry.getDataController();
+    return dataController.connectDataSource(spreadsheetId, sheetName);
   } catch (error) {
     console.error('connectDataSource error:', error);
     return { success: false, error: error.message };
@@ -764,7 +850,8 @@ function connectDataSource(spreadsheetId, sheetName) {
 
 function checkIsSystemAdmin() {
   try {
-    return AdminController.checkIsSystemAdmin();
+    const adminController = ServiceRegistry.getAdminController();
+    return adminController.checkIsSystemAdmin();
   } catch (error) {
     console.error('checkIsSystemAdmin error:', error);
     return false;
@@ -773,7 +860,8 @@ function checkIsSystemAdmin() {
 
 function getSheetList(spreadsheetId) {
   try {
-    return AdminController.getSheetList(spreadsheetId);
+    const adminController = ServiceRegistry.getAdminController();
+    return adminController.getSheetList(spreadsheetId);
   } catch (error) {
     console.error('getSheetList error:', error);
     return { success: false, error: error.message };
@@ -782,7 +870,8 @@ function getSheetList(spreadsheetId) {
 
 function validateAccess(spreadsheetId) {
   try {
-    const result = AdminController.validateAccess(spreadsheetId);
+    const adminController = ServiceRegistry.getAdminController();
+    const result = adminController.validateAccess(spreadsheetId);
 
     // null/undefined ガード
     if (!result) {
@@ -807,7 +896,8 @@ function validateAccess(spreadsheetId) {
 
 function getCurrentBoardInfoAndUrls() {
   try {
-    return AdminController.getCurrentBoardInfoAndUrls();
+    const adminController = ServiceRegistry.getAdminController();
+    return adminController.getCurrentBoardInfoAndUrls();
   } catch (error) {
     console.error('getCurrentBoardInfoAndUrls error:', error);
     return { success: false, error: error.message };
@@ -816,7 +906,8 @@ function getCurrentBoardInfoAndUrls() {
 
 function getFormInfo(spreadsheetId, sheetName) {
   try {
-    return AdminController.getFormInfo(spreadsheetId, sheetName);
+    const adminController = ServiceRegistry.getAdminController();
+    return adminController.getFormInfo(spreadsheetId, sheetName);
   } catch (error) {
     console.error('getFormInfo error:', error);
     return { success: false, error: error.message };
@@ -825,9 +916,20 @@ function getFormInfo(spreadsheetId, sheetName) {
 
 function checkCurrentPublicationStatus() {
   try {
-    return AdminController.checkCurrentPublicationStatus();
+    const adminController = ServiceRegistry.getAdminController();
+    return adminController.checkCurrentPublicationStatus();
   } catch (error) {
     console.error('checkCurrentPublicationStatus error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function createForm(userId, config) {
+  try {
+    const adminController = ServiceRegistry.getAdminController();
+    return adminController.createForm(userId, config);
+  } catch (error) {
+    console.error('createForm error:', error);
     return { success: false, error: error.message };
   }
 }

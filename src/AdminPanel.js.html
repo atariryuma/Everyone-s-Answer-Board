@@ -616,7 +616,13 @@
             errorStack: error.stack
           });
 
-          const detailedMessage = 'スプレッドシートの読み込みに失敗しました: ' + error.message;
+          let detailedMessage;
+          if (error.message && error.message.includes('not initialized')) {
+            detailedMessage = 'システムの初期化中です。ページをリロードしてください。';
+            console.warn('🔄 ServiceRegistry初期化エラー検出 - リロード推奨');
+          } else {
+            detailedMessage = 'スプレッドシートの読み込みに失敗しました: ' + error.message;
+          }
 
           reject(new Error(detailedMessage));
         })
@@ -991,7 +997,13 @@
         })
         .withFailureHandler(function(error) {
           console.error('❌ analyzeColumns error:', error);
-          reject(error);
+
+          if (error.message && error.message.includes('not initialized')) {
+            console.warn('🔄 analyzeColumns ServiceRegistry初期化エラー検出');
+            reject(new Error('システムの初期化中です。ページをリロードしてください。'));
+          } else {
+            reject(error);
+          }
         })
         .analyzeColumns(spreadsheetId, sheetName);
     });

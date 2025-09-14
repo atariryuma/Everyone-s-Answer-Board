@@ -18,7 +18,12 @@
       "Bash(npm run test:*)",
       "Bash(./scripts/safe-deploy.sh:*)",
       "Bash(clasp:*)",
-      "Bash(npm run lint:*)"
+      "Bash(npm run lint:*)",
+      "WebSearch",
+      "WebFetch(domain:developers.google.com)",
+      "WebFetch(domain:stackoverflow.com)",
+      "WebFetch(domain:groups.google.com)",
+      "Bash(awk:*)"
     ],
     "deny": [],
     "ask": [],

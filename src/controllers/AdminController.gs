@@ -106,6 +106,20 @@ const AdminController = Object.freeze({
    */
   getSpreadsheetList() {
     try {
+      console.log('AdminController.getSpreadsheetList: 開始', {
+        hasDataService: typeof DataService !== 'undefined',
+        dataServiceType: typeof DataService
+      });
+
+      if (typeof DataService === 'undefined') {
+        console.error('AdminController.getSpreadsheetList: DataService is undefined');
+        return {
+          success: false,
+          message: 'DataService オブジェクトが定義されていません',
+          spreadsheets: []
+        };
+      }
+
       const result = DataService.getSpreadsheetList();
 
       // null/undefined ガード
@@ -146,6 +160,24 @@ const AdminController = Object.freeze({
    */
   analyzeColumns(spreadsheetId, sheetName) {
     try {
+      console.log('AdminController.analyzeColumns: 開始', {
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
+        sheetName: sheetName || 'null',
+        hasDataService: typeof DataService !== 'undefined',
+        dataServiceType: typeof DataService
+      });
+
+      if (typeof DataService === 'undefined') {
+        console.error('AdminController.analyzeColumns: DataService is undefined');
+        return {
+          success: false,
+          message: 'DataService オブジェクトが定義されていません',
+          headers: [],
+          columns: [],
+          columnMapping: { mapping: {}, confidence: {} }
+        };
+      }
+
       const result = DataService.analyzeColumns(spreadsheetId, sheetName);
 
       // null/undefined ガード
@@ -375,6 +407,55 @@ const AdminController = Object.freeze({
       return ConfigService.getFormInfo(spreadsheetId, sheetName);
     } catch (error) {
       console.error('AdminController.getFormInfo エラー:', error.message);
+      return {
+        success: false,
+        error: error.message
+      };
+    }
+  },
+
+  /**
+   * フォーム作成
+   * AdminPanel.js.html から呼び出される
+   *
+   * @param {string} userId - ユーザーID
+   * @param {Object} config - フォーム設定
+   * @returns {Object} 作成結果
+   */
+  createForm(userId, config) {
+    try {
+      console.log('AdminController.createForm: 開始', { userId, configKeys: Object.keys(config || {}) });
+
+      if (!userId) {
+        return {
+          success: false,
+          error: 'ユーザーIDが指定されていません'
+        };
+      }
+
+      if (!config || !config.title) {
+        return {
+          success: false,
+          error: 'フォーム設定が不正です'
+        };
+      }
+
+      // ConfigService経由でフォーム作成
+      const result = ConfigService.createForm(userId, config);
+
+      if (result && result.success) {
+        console.log('AdminController.createForm: 成功', { formUrl: result.formUrl });
+        return result;
+      } else {
+        console.error('AdminController.createForm: ConfigService失敗', result);
+        return {
+          success: false,
+          error: result?.error || 'フォーム作成に失敗しました'
+        };
+      }
+
+    } catch (error) {
+      console.error('AdminController.createForm エラー:', error.message);
       return {
         success: false,
         error: error.message

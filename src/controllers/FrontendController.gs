@@ -170,6 +170,44 @@ const FrontendController = Object.freeze({
   },
 
   /**
+   * 認証情報のリセット
+   * login.js.html から呼び出される
+   *
+   * @returns {Object} リセット結果
+   */
+  resetAuth() {
+    try {
+      console.log('FrontendController.resetAuth: 認証リセット開始');
+
+      // ユーザーキャッシュクリア
+      UserService.clearUserCache();
+
+      // セッション関連の情報をクリア
+      const props = PropertiesService.getScriptProperties();
+
+      // 一時的な認証情報をクリア
+      const authKeys = ['temp_auth_token', 'last_login_attempt', 'auth_retry_count'];
+      authKeys.forEach(key => {
+        props.deleteProperty(key);
+      });
+
+      console.log('FrontendController.resetAuth: 認証リセット完了');
+
+      return {
+        success: true,
+        message: '認証情報がリセットされました'
+      };
+
+    } catch (error) {
+      console.error('FrontendController.resetAuth エラー:', error.message);
+      return {
+        success: false,
+        message: `認証リセットに失敗しました: ${error.message}`
+      };
+    }
+  },
+
+  /**
    * ログイン状態を取得
    * login.js.html から呼び出される
    *

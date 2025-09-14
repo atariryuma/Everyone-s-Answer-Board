@@ -495,6 +495,76 @@ const ConfigService = Object.freeze({
   },
 
   /**
+   * Google Formを作成
+   * @param {string} userId - ユーザーID
+   * @param {Object} config - フォーム設定
+   * @returns {Object} 作成結果
+   */
+  createForm(userId, config) {
+    try {
+      console.log('ConfigService.createForm: 開始', { userId, configTitle: config?.title });
+
+      if (!userId) {
+        return { success: false, error: 'ユーザーIDが必要です' };
+      }
+
+      if (!config || !config.title) {
+        return { success: false, error: 'フォームタイトルが必要です' };
+      }
+
+      // Google Formsを作成
+      const form = FormApp.create(config.title);
+
+      if (config.description) {
+        form.setDescription(config.description);
+      }
+
+      // 基本的な質問を追加（設定可能にする）
+      const questionTitle = config.questionText || 'あなたの回答を入力してください';
+      form.addTextItem()
+        .setTitle(questionTitle)
+        .setRequired(true);
+
+      // 名前フィールド（オプション）
+      if (config.collectName !== false) {
+        form.addTextItem()
+          .setTitle('お名前')
+          .setRequired(true);
+      }
+
+      const formUrl = form.getPublishedUrl();
+      const editUrl = form.getEditUrl();
+
+      console.log('ConfigService.createForm: フォーム作成成功', { formUrl });
+
+      // ユーザー設定にフォーム情報を保存
+      const userConfig = this.getUserConfig(userId) || {};
+      userConfig.formUrl = formUrl;
+      userConfig.formEditUrl = editUrl;
+      userConfig.formTitle = config.title;
+      userConfig.formCreated = true;
+      userConfig.formCreatedAt = new Date().toISOString();
+
+      this.saveUserConfig(userId, userConfig);
+
+      return {
+        success: true,
+        formUrl: formUrl,
+        editUrl: editUrl,
+        title: config.title,
+        message: 'フォームが正常に作成されました'
+      };
+
+    } catch (error) {
+      console.error('ConfigService.createForm エラー:', error.message);
+      return {
+        success: false,
+        error: `フォーム作成に失敗しました: ${error.message}`
+      };
+    }
+  },
+
+  /**
    * セットアップステップ判定（Core.gsより移行）
    * @param {Object} userInfo - ユーザー情報
    * @param {Object} configJson - 設定JSON（オプション）

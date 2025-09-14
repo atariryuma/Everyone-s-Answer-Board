@@ -30,43 +30,111 @@ const ServiceRegistry = Object.freeze({
    * @returns {Object} UserService オブジェクト
    */
   getUserService() {
-    if (typeof UserService === 'undefined') {
-      throw new Error('UserService not initialized');
-    }
-    return UserService;
+    return this._getObjectWithRetry('UserService', () => UserService);
   },
-  
+
   /**
    * 安全なConfigService参照取得
    * @returns {Object} ConfigService オブジェクト
    */
   getConfigService() {
-    if (typeof ConfigService === 'undefined') {
-      throw new Error('ConfigService not initialized');
-    }
-    return ConfigService;
+    return this._getObjectWithRetry('ConfigService', () => ConfigService);
   },
-  
+
   /**
    * 安全なDataService参照取得
    * @returns {Object} DataService オブジェクト
    */
   getDataService() {
-    if (typeof DataService === 'undefined') {
-      throw new Error('DataService not initialized');
-    }
-    return DataService;
+    return this._getObjectWithRetry('DataService', () => DataService);
   },
-  
+
   /**
    * 安全なSecurityService参照取得
    * @returns {Object} SecurityService オブジェクト
    */
   getSecurityService() {
-    if (typeof SecurityService === 'undefined') {
-      throw new Error('SecurityService not initialized');
+    return this._getObjectWithRetry('SecurityService', () => SecurityService);
+  },
+
+  /**
+   * 安全なAdminController参照取得（再試行機能付き）
+   * GASファイル読み込み順序問題の対応
+   * @returns {Object} AdminController オブジェクト
+   */
+  getAdminController() {
+    return this._getObjectWithRetry('AdminController', () => AdminController);
+  },
+
+  /**
+   * 安全なDataController参照取得（再試行機能付き）
+   * @returns {Object} DataController オブジェクト
+   */
+  getDataController() {
+    return this._getObjectWithRetry('DataController', () => DataController);
+  },
+
+  /**
+   * 安全なFrontendController参照取得（再試行機能付き）
+   * @returns {Object} FrontendController オブジェクト
+   */
+  getFrontendController() {
+    return this._getObjectWithRetry('FrontendController', () => FrontendController);
+  },
+
+  /**
+   * 安全なSystemController参照取得（再試行機能付き）
+   * @returns {Object} SystemController オブジェクト
+   */
+  getSystemController() {
+    return this._getObjectWithRetry('SystemController', () => SystemController);
+  },
+
+  /**
+   * 安全なCacheService参照取得（再試行機能付き）
+   * @returns {Object} CacheService オブジェクト（infrastructure/CacheService.gs）
+   */
+  getCacheService() {
+    return this._getObjectWithRetry('CacheService', () => CacheService);
+  },
+
+  /**
+   * 安全なDatabaseService参照取得（再試行機能付き）
+   * @returns {Object} DatabaseService オブジェクト
+   */
+  getDatabaseService() {
+    return this._getObjectWithRetry('DatabaseService', () => DatabaseService);
+  },
+
+  /**
+   * 汎用オブジェクト取得メソッド（再試行機能付き）
+   * @param {string} objectName - オブジェクト名
+   * @param {Function} accessor - オブジェクトアクセサー関数
+   * @returns {Object} オブジェクト
+   * @private
+   */
+  _getObjectWithRetry(objectName, accessor) {
+    // 最大3回まで再試行（指数バックオフ）
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const obj = accessor();
+        if (typeof obj !== 'undefined' && obj !== null) {
+          return obj;
+        }
+      } catch (error) {
+        // ReferenceError の場合は続行、その他は再スロー
+        if (!(error instanceof ReferenceError)) {
+          throw error;
+        }
+      }
+
+      console.warn(`ServiceRegistry._getObjectWithRetry: ${objectName}未定義 - 試行 ${attempt + 1}/3`);
+      if (attempt < 2) { // 最後の試行では待機しない
+        Utilities.sleep(50 * Math.pow(2, attempt)); // 50ms, 100ms, 200ms
+      }
     }
-    return SecurityService;
+
+    throw new Error(`${objectName} not initialized after 3 attempts`);
   },
   
   // ==========================================
@@ -206,19 +274,25 @@ const ServiceRegistry = Object.freeze({
       checks: []
     };
     
-    // サービス可用性チェック
-    const services = ['UserService', 'ConfigService', 'DataService', 'SecurityService'];
-    services.forEach(serviceName => {
+    // サービス・コントローラー・インフラ層可用性チェック
+    const objects = [
+      'UserService', 'ConfigService', 'DataService', 'SecurityService',
+      'AdminController', 'DataController', 'FrontendController', 'SystemController',
+      'CacheService', 'DatabaseService'
+    ];
+    objects.forEach(objectName => {
       try {
-        const service = this[`get${serviceName}`]();
+        const methodName = objectName.includes('Controller') ?
+          `get${objectName}` : `get${objectName}`;
+        const service = this[methodName]();
         results.checks.push({
-          name: `${serviceName} Availability`,
+          name: `${objectName} Availability`,
           status: service ? '✅' : '❌',
-          details: `${serviceName} service accessibility`
+          details: `${objectName} service accessibility`
         });
       } catch (error) {
         results.checks.push({
-          name: `${serviceName} Availability`,
+          name: `${objectName} Availability`,
           status: '❌',
           details: error.message
         });
