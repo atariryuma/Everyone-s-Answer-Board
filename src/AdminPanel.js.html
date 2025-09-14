@@ -454,10 +454,17 @@
   // データソース選択ラジオボタンのイベント設定
   function setupDataSourceRadioEvents() {
     const radioButtons = document.querySelectorAll('input[name="source-method"]');
+    console.log('🔍 [setupDataSourceRadioEvents] Found radio buttons:', radioButtons.length);
     let spreadsheetListLoaded = false;
+
+    if (radioButtons.length === 0) {
+      console.warn('⚠️ [setupDataSourceRadioEvents] source-method radio buttons not found');
+      return;
+    }
 
     radioButtons.forEach((radio) => {
       radio.addEventListener('change', async function () {
+        console.log('🔘 [RadioEvent] Changed to:', this.value, 'listLoaded:', spreadsheetListLoaded);
         if (this.value === 'dropdown' && !spreadsheetListLoaded) {
           // 「一覧から選択」が選択された時のみスプレッドシート一覧を読み込み
           console.log('スプレッドシート一覧を読み込み中...');
