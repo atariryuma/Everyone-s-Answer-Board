@@ -13,7 +13,7 @@
     const getSecureVars = () => ({
       // セキュリティ: クライアントサイド変数ではなく、サーバーから取得した設定を使用
       showAdminFeatures: false,  // サーバーサイドで判定
-      isAdminUser: false,        // サーバーサイドで判定  
+      isAdminUser: false,        // サーバーサイドで判定
       userId: (typeof window !== 'undefined' && window.userId) || null
     });
     
@@ -395,18 +395,13 @@
        */
       getControllerFunction(funcName) {
         const functionMap = {
-          // ConfigService系
           getUserConfig: 'getUserConfig',
-
-          // DataService系
           getPublishedSheetData: 'getPublishedSheetData',
-          addReaction: 'addReaction',
-
-          // その他のマッピングを必要に応じて追加
+          addReaction: 'addReaction'
         };
 
-        return functionMap[funcName] || funcName; // マッピングがない場合はそのまま返す
-      },
+        return functionMap[funcName] || funcName;
+      }
 
       async callGAS(funcName, ...args) {
         return new Promise((resolve, reject) => {
