@@ -173,6 +173,39 @@ const AdminController = Object.freeze({
     }
   },
 
+  /**
+   * 軽量ヘッダー取得 - 列分析に失敗してもヘッダー名だけは取得
+   * AdminPanel.js.html から呼び出される
+   *
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @param {string} sheetName - シート名
+   * @returns {Object} ヘッダー取得結果
+   */
+  getLightweightHeaders(spreadsheetId, sheetName) {
+    try {
+      const result = DataService.getLightweightHeaders(spreadsheetId, sheetName);
+
+      // null/undefined ガード
+      if (!result) {
+        console.error('AdminController.getLightweightHeaders: DataServiceがnullを返しました');
+        return {
+          success: false,
+          message: 'ヘッダー取得サービスエラーが発生しました',
+          headers: []
+        };
+      }
+
+      return result;
+    } catch (error) {
+      console.error('AdminController.getLightweightHeaders エラー:', error.message);
+      return {
+        success: false,
+        message: error.message,
+        headers: []
+      };
+    }
+  },
+
   // ===========================================
   // 📊 設定・公開管理API（ConfigServiceに委譲）
   // ===========================================

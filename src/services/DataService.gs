@@ -1213,32 +1213,158 @@ const DataService = Object.freeze({
    * @returns {Object} 列分析結果
    */
   analyzeColumns(spreadsheetId, sheetName) {
+    const started = Date.now();
     try {
+      UnifiedLogger.debug('DataService', {
+        operation: 'analyzeColumns',
+        phase: 'start',
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null',
+        sheetName: sheetName || 'null'
+      });
+
       if (!spreadsheetId || !sheetName) {
-        return {
+        const errorResponse = {
           success: false,
-          message: 'スプレッドシートIDとシート名が必要です'
+          message: 'スプレッドシートIDとシート名が必要です',
+          headers: [],
+          columns: [],
+          columnMapping: { mapping: {}, confidence: {} }
         };
+        UnifiedLogger.error('DataService', {
+          operation: 'analyzeColumns',
+          error: 'Missing required parameters',
+          spreadsheetId: !!spreadsheetId,
+          sheetName: !!sheetName
+        });
+        return errorResponse;
       }
 
-      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-      const sheet = spreadsheet.getSheetByName(sheetName);
-
-      if (!sheet) {
-        return {
+      // スプレッドシート接続テスト
+      let spreadsheet;
+      try {
+        UnifiedLogger.debug('DataService', { operation: 'SpreadsheetApp.openById', phase: 'start' });
+        spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+        UnifiedLogger.debug('DataService', { operation: 'SpreadsheetApp.openById', phase: 'success' });
+      } catch (openError) {
+        const errorResponse = {
           success: false,
-          message: 'シートが見つかりません'
+          message: `スプレッドシートへのアクセスに失敗しました: ${openError.message}`,
+          headers: [],
+          columns: [],
+          columnMapping: { mapping: {}, confidence: {} }
         };
+        UnifiedLogger.error('DataService', {
+          operation: 'SpreadsheetApp.openById',
+          error: openError.message,
+          spreadsheetId: `${spreadsheetId.substring(0, 10)  }...`
+        });
+        return errorResponse;
       }
 
-      // ヘッダー行を取得（1行目）
-      const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+      // シート取得テスト
+      let sheet;
+      try {
+        sheet = spreadsheet.getSheetByName(sheetName);
+        if (!sheet) {
+          const errorResponse = {
+            success: false,
+            message: `シート "${sheetName}" が見つかりません`,
+            headers: [],
+            columns: [],
+            columnMapping: { mapping: {}, confidence: {} }
+          };
+          UnifiedLogger.error('DataService', {
+            operation: 'getSheetByName',
+            error: 'Sheet not found',
+            sheetName
+          });
+          return errorResponse;
+        }
+        UnifiedLogger.debug('DataService', { operation: 'getSheetByName', phase: 'success' });
+      } catch (sheetError) {
+        const errorResponse = {
+          success: false,
+          message: `シートアクセスエラー: ${sheetError.message}`,
+          headers: [],
+          columns: [],
+          columnMapping: { mapping: {}, confidence: {} }
+        };
+        UnifiedLogger.error('DataService', {
+          operation: 'getSheetByName',
+          error: sheetError.message,
+          sheetName
+        });
+        return errorResponse;
+      }
 
-      // サンプルデータを取得（最大5行）
-      const sampleRowCount = Math.min(5, sheet.getLastRow() - 1);
+      // ヘッダー行を取得（1行目）- 堅牢化
+      let headers = [];
       let sampleData = [];
-      if (sampleRowCount > 0) {
-        sampleData = sheet.getRange(2, 1, sampleRowCount, sheet.getLastColumn()).getValues();
+      let lastColumn = 1;
+      let lastRow = 1;
+
+      try {
+        UnifiedLogger.debug('DataService', { operation: 'sheet.getLastColumn', phase: 'start' });
+        lastColumn = sheet.getLastColumn();
+        lastRow = sheet.getLastRow();
+        UnifiedLogger.debug('DataService', {
+          operation: 'sheet dimensions',
+          lastColumn,
+          lastRow
+        });
+
+        if (lastColumn === 0 || lastRow === 0) {
+          const errorResponse = {
+            success: false,
+            message: 'スプレッドシートが空です',
+            headers: [],
+            columns: [],
+            columnMapping: { mapping: {}, confidence: {} }
+          };
+          UnifiedLogger.error('DataService', {
+            operation: 'sheet dimensions check',
+            error: 'Empty spreadsheet',
+            lastColumn,
+            lastRow
+          });
+          return errorResponse;
+        }
+
+        // ヘッダー行取得
+        UnifiedLogger.debug('DataService', { operation: 'getRange(headers)', phase: 'start' });
+        headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
+        UnifiedLogger.debug('DataService', {
+          operation: 'getRange(headers)',
+          phase: 'success',
+          headersCount: headers.length
+        });
+
+        // サンプルデータを取得（最大5行）
+        const sampleRowCount = Math.min(5, lastRow - 1);
+        if (sampleRowCount > 0) {
+          UnifiedLogger.debug('DataService', { operation: 'getRange(sample)', phase: 'start' });
+          sampleData = sheet.getRange(2, 1, sampleRowCount, lastColumn).getValues();
+          UnifiedLogger.debug('DataService', {
+            operation: 'getRange(sample)',
+            phase: 'success',
+            sampleRowCount: sampleData.length
+          });
+        }
+      } catch (rangeError) {
+        const errorResponse = {
+          success: false,
+          message: `データ取得エラー: ${rangeError.message}`,
+          headers: [],
+          columns: [],
+          columnMapping: { mapping: {}, confidence: {} }
+        };
+        UnifiedLogger.error('DataService', {
+          operation: 'sheet data retrieval',
+          error: rangeError.message,
+          lastColumn,
+          lastRow
+        });
+        return errorResponse;
       }
 
       // 列情報を分析
@@ -1298,23 +1424,131 @@ const DataService = Object.freeze({
         }
       });
 
-      return {
+      const result = {
         success: true,
         headers,
         columns,
         columnMapping: mapping,
-        sampleData: sampleData.slice(0, 3) // 最大3行のサンプル
+        sampleData: sampleData.slice(0, 3), // 最大3行のサンプル
+        executionTime: `${Date.now() - started}ms`
       };
 
+      UnifiedLogger.success('DataService', {
+        operation: 'analyzeColumns',
+        headersCount: headers.length,
+        columnsCount: columns.length,
+        mappingDetected: Object.keys(mapping.mapping).length,
+        executionTime: result.executionTime
+      });
+
+      return result;
+
     } catch (error) {
-      console.error('DataService.analyzeColumns エラー:', error.message);
-      return {
+      const errorResponse = {
         success: false,
-        message: error.message,
+        message: `予期しないエラーが発生しました: ${error.message}`,
         headers: [],
         columns: [],
-        columnMapping: { mapping: {}, confidence: {} }
+        columnMapping: { mapping: {}, confidence: {} },
+        executionTime: `${Date.now() - started}ms`
       };
+
+      UnifiedLogger.error('DataService', {
+        operation: 'analyzeColumns',
+        error: error.message,
+        stack: error.stack,
+        executionTime: errorResponse.executionTime
+      });
+
+      console.error('DataService.analyzeColumns 予期しないエラー:', {
+        error: error.message,
+        stack: error.stack,
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null',
+        sheetName
+      });
+
+      // 絶対にnullを返さない
+      return errorResponse;
+    }
+  },
+
+  /**
+   * 軽量ヘッダー取得 - 列分析に失敗してもヘッダー名だけは取得
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @param {string} sheetName - シート名
+   * @returns {Object} ヘッダー取得結果
+   */
+  getLightweightHeaders(spreadsheetId, sheetName) {
+    const started = Date.now();
+    try {
+      UnifiedLogger.debug('DataService', {
+        operation: 'getLightweightHeaders',
+        phase: 'start',
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null',
+        sheetName: sheetName || 'null'
+      });
+
+      if (!spreadsheetId || !sheetName) {
+        return {
+          success: false,
+          message: 'スプレッドシートIDとシート名が必要です',
+          headers: []
+        };
+      }
+
+      // 最小限のアクセスでヘッダーのみ取得
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const sheet = spreadsheet.getSheetByName(sheetName);
+
+      if (!sheet) {
+        return {
+          success: false,
+          message: `シート "${sheetName}" が見つかりません`,
+          headers: []
+        };
+      }
+
+      const lastColumn = sheet.getLastColumn();
+      if (lastColumn === 0) {
+        return {
+          success: false,
+          message: 'スプレッドシートが空です',
+          headers: []
+        };
+      }
+
+      // ヘッダー行のみ取得（データは取得しない）
+      const headers = sheet.getRange(1, 1, 1, Math.min(lastColumn, 20)).getValues()[0];
+
+      const result = {
+        success: true,
+        headers: headers.map(h => h || ''),
+        executionTime: `${Date.now() - started}ms`
+      };
+
+      UnifiedLogger.success('DataService', {
+        operation: 'getLightweightHeaders',
+        headersCount: result.headers.length,
+        executionTime: result.executionTime
+      });
+
+      return result;
+
+    } catch (error) {
+      const errorResponse = {
+        success: false,
+        message: `ヘッダー取得エラー: ${error.message}`,
+        headers: [],
+        executionTime: `${Date.now() - started}ms`
+      };
+
+      UnifiedLogger.error('DataService', {
+        operation: 'getLightweightHeaders',
+        error: error.message,
+        executionTime: errorResponse.executionTime
+      });
+
+      return errorResponse;
     }
   }
 

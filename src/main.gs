@@ -644,6 +644,31 @@ function getSpreadsheetList() {
   }
 }
 
+function getLightweightHeaders(spreadsheetId, sheetName) {
+  try {
+    const result = AdminController.getLightweightHeaders(spreadsheetId, sheetName);
+
+    // null/undefined ガード
+    if (!result) {
+      console.error('getLightweightHeaders: AdminControllerがnullを返しました');
+      return {
+        success: false,
+        message: 'ヘッダー取得に失敗しました',
+        headers: []
+      };
+    }
+
+    return result;
+  } catch (error) {
+    console.error('getLightweightHeaders error:', error);
+    return {
+      success: false,
+      message: error.message,
+      headers: []
+    };
+  }
+}
+
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
     const result = AdminController.analyzeColumns(spreadsheetId, sheetName);
@@ -854,6 +879,15 @@ function getPublishedSheetData(userId, options) {
     return DataService.getPublishedSheetData(userId, options);
   } catch (error) {
     console.error('getPublishedSheetData error:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+function processReactionByEmail(userEmail, rowIndex, reactionKey) {
+  try {
+    return DataService.processReactionWithEmail(userEmail, rowIndex, reactionKey);
+  } catch (error) {
+    console.error('processReactionByEmail error:', error);
     return { success: false, error: error.message };
   }
 }

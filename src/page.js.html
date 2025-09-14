@@ -441,7 +441,7 @@
       }
       
       async updateReaction(rowIndex, reactionKey) {
-        return await this.callGAS('addReaction', this.vars.userId, rowIndex, reactionKey);
+        return await this.callGAS('processReactionByEmail', this.vars.userEmail, rowIndex, reactionKey);
       }
       
       updateUI(data) {

@@ -356,53 +356,69 @@
       const analysisResult = await analyzeColumnsAsync(spreadsheetId, sheetName);
 
       if (!analysisResult) {
-        console.warn('⚠️ 列分析でnullが返されました - 既存設定から復元を試行');
-        // フォールバック: 既存設定から復元
-        if (existingColumnMapping && existingColumnMapping.mapping) {
-          console.log('📋 既存設定から列設定を復元します');
+        console.warn('⚠️ 列分析でnullが返されました - 軽量ヘッダー取得を試行');
 
-          // ダミーヘッダーを作成してドロップダウンを初期化
-          const dummyHeaders = ['列1', '列2', '列3', '列4', '列5', '列6', '列7', '列8', '列9', '列10'];
-          populateColumnDropdowns(dummyHeaders, {});
+        // フォールバック: 軽量ヘッダー取得を試行
+        try {
+          const headerResult = await getLightweightHeadersAsync(spreadsheetId, sheetName);
+          if (headerResult && headerResult.success && headerResult.headers.length > 0) {
+            console.log('📋 軽量ヘッダー取得成功 - 実際のヘッダー名を使用');
+            populateColumnDropdowns(headerResult.headers, {});
 
-          // 既存マッピングで復元
-          const dropdowns = {
-            answer: document.getElementById('answer-column-select'),
-            reason: document.getElementById('reason-column-select'),
-            class: document.getElementById('class-column-select'),
-            name: document.getElementById('name-column-select'),
-          };
-          restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
+            if (existingColumnMapping && existingColumnMapping.mapping) {
+              const dropdowns = {
+                answer: document.getElementById('answer-column-select'),
+                reason: document.getElementById('reason-column-select'),
+                class: document.getElementById('class-column-select'),
+                name: document.getElementById('name-column-select'),
+              };
+              restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
+            }
 
-          showInfo('💡 既存の列設定を復元しました。必要に応じて手動で調整してください。');
-        } else {
-          showError('列分析でエラーが発生しました。スプレッドシートのアクセス権限を確認してください。');
+            showInfo('💡 実際の列名を取得しました。既存の設定に基づいて列選択を復元しています。');
+          } else {
+            // 軽量ヘッダー取得も失敗した場合
+            console.warn('⚠️ 軽量ヘッダー取得も失敗 - ダミーヘッダーを使用');
+            fallbackToDummyHeaders(existingColumnMapping);
+          }
+        } catch (headerError) {
+          console.warn('⚠️ 軽量ヘッダー取得エラー - ダミーヘッダーを使用:', headerError);
+          fallbackToDummyHeaders(existingColumnMapping);
         }
         return;
       }
 
       if (!analysisResult.success) {
         const errorMsg = analysisResult.error || analysisResult.message || '列分析に失敗しました';
-        console.warn('⚠️ 列分析に失敗 - 既存設定から復元を試行:', errorMsg);
-        // フォールバック: 既存設定から復元
-        if (existingColumnMapping && existingColumnMapping.mapping) {
-          console.log('📋 既存設定から列設定を復元します');
+        console.warn('⚠️ 列分析に失敗 - 軽量ヘッダー取得を試行:', errorMsg);
 
-          // ダミーヘッダーを作成してドロップダウンを初期化
-          const dummyHeaders = ['列1', '列2', '列3', '列4', '列5', '列6', '列7', '列8', '列9', '列10'];
-          populateColumnDropdowns(dummyHeaders, {});
+        // フォールバック: 軽量ヘッダー取得を試行
+        try {
+          const headerResult = await getLightweightHeadersAsync(spreadsheetId, sheetName);
+          if (headerResult && headerResult.success && headerResult.headers.length > 0) {
+            console.log('📋 軽量ヘッダー取得成功 - 実際のヘッダー名を使用');
+            populateColumnDropdowns(headerResult.headers, {});
 
-          // 既存マッピングで復元
-          const dropdowns = {
-            answer: document.getElementById('answer-column-select'),
-            reason: document.getElementById('reason-column-select'),
-            class: document.getElementById('class-column-select'),
-            name: document.getElementById('name-column-select'),
-          };
-          restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
+            if (existingColumnMapping && existingColumnMapping.mapping) {
+              const dropdowns = {
+                answer: document.getElementById('answer-column-select'),
+                reason: document.getElementById('reason-column-select'),
+                class: document.getElementById('class-column-select'),
+                name: document.getElementById('name-column-select'),
+              };
+              restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
+            }
 
-          showInfo('💡 既存の列設定を復元しました。列分析は失敗しましたが、保存済み設定を使用します。');
-        } else {
+            showInfo('💡 列分析は失敗しましたが、実際の列名を取得できました。既存設定を復元しています。');
+          } else {
+            // 軽量ヘッダー取得も失敗した場合
+            console.warn('⚠️ 軽量ヘッダー取得も失敗 - ダミーヘッダーを使用');
+            fallbackToDummyHeaders(existingColumnMapping);
+            showError(`列分析エラー: ${errorMsg}`);
+          }
+        } catch (headerError) {
+          console.warn('⚠️ 軽量ヘッダー取得エラー - ダミーヘッダーを使用:', headerError);
+          fallbackToDummyHeaders(existingColumnMapping);
           showError(`列分析エラー: ${errorMsg}`);
         }
         return;
@@ -964,6 +980,44 @@
     });
   }
 
+  // 軽量ヘッダー取得（非同期）
+  function getLightweightHeadersAsync(spreadsheetId, sheetName) {
+    return new Promise((resolve, reject) => {
+      console.log('🔍 getLightweightHeadersAsync called with:', { spreadsheetId, sheetName });
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          console.log('✅ getLightweightHeaders success:', result);
+          resolve(result);
+        })
+        .withFailureHandler(function(error) {
+          console.error('❌ getLightweightHeaders error:', error);
+          reject(error);
+        })
+        .getLightweightHeaders(spreadsheetId, sheetName);
+    });
+  }
+
+  // ダミーヘッダーへのフォールバック処理
+  function fallbackToDummyHeaders(existingColumnMapping) {
+    console.log('📋 ダミーヘッダーを使用してドロップダウンを初期化');
+    const dummyHeaders = ['列1', '列2', '列3', '列4', '列5', '列6', '列7', '列8', '列9', '列10'];
+    populateColumnDropdowns(dummyHeaders, {});
+
+    if (existingColumnMapping && existingColumnMapping.mapping) {
+      const dropdowns = {
+        answer: document.getElementById('answer-column-select'),
+        reason: document.getElementById('reason-column-select'),
+        class: document.getElementById('class-column-select'),
+        name: document.getElementById('name-column-select'),
+      };
+      restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
+      showInfo('💡 既存の列設定を復元しました。列名が表示されない場合は手動で調整してください。');
+    } else {
+      showError('列分析でエラーが発生しました。スプレッドシートのアクセス権限を確認してください。');
+    }
+  }
+
   // ========== リソースボタン関連関数 ==========
 
   // スプレッドシートを新タブで開く
@@ -1427,7 +1481,7 @@
         // null/undefined ガード
         if (!result) {
           console.error('URL入力接続: サーバーからnullが返されました');
-          showError('サーバーエラーが発生しました。再試行してください。');
+          showError('🚨 サーバー接続エラー: APIレスポンスがありません。OAuth2スコープが正しく設定されているか確認してください。');
           setPartialLoading(false);
           return;
         }
@@ -1436,15 +1490,36 @@
           // 新しいドロップダウン式列マッピングを更新
           updateColumnMapping(result);
           updateProgress(2);
-          showSuccess('URL入力方式でスプレッドシートに接続しました');
+          showSuccess('✅ URL入力方式でスプレッドシートに接続しました');
         } else {
-          showError(result.error || result.message || 'スプレッドシートへの接続に失敗しました');
+          // 詳細なエラーメッセージを表示
+          const errorMsg = result.message || result.error || '原因不明';
+          if (errorMsg.includes('権限') || errorMsg.includes('Permission')) {
+            showError('🔐 アクセス権限エラー: スプレッドシートの編集権限を確認してください。\n\n対処法:\n• スプレッドシートの共有設定で編集権限を付与\n• Googleアカウントでスプレッドシートにアクセス可能か確認');
+          } else if (errorMsg.includes('見つかりません') || errorMsg.includes('not found')) {
+            showError('📄 ファイル不存在エラー: スプレッドシートのURLが正しいか確認してください。\n\n対処法:\n• URLをもう一度コピー&ペースト\n• スプレッドシートが削除されていないか確認');
+          } else if (errorMsg.includes('タイムアウト') || errorMsg.includes('timeout')) {
+            showError('⏱️ タイムアウトエラー: ネットワーク接続を確認し、しばらく時間をおいて再試行してください。\n\n対処法:\n• ページを再読み込み\n• 数分後に再試行');
+          } else {
+            showError(`❌ 列分析エラー: ${errorMsg}\n\n詳細なエラー情報はブラウザのデベロッパーコンソールで確認できます。`);
+          }
         }
         setPartialLoading(false);
       })
       .withFailureHandler(function (error) {
         console.error('URL入力接続エラー:', error);
-        showError('スプレッドシートへの接続に失敗しました: ' + error.message);
+
+        // エラータイプ別のメッセージ
+        let userMessage = 'スプレッドシートへの接続に失敗しました';
+        if (error.message && error.message.includes('ScriptError')) {
+          userMessage = '🚨 スクリプトエラー: サーバー側でエラーが発生しました。\n\n対処法:\n• ページを再読み込み\n• 管理者に連絡してサーバー状態を確認';
+        } else if (error.message && error.message.includes('Permission')) {
+          userMessage = '🔐 権限エラー: Google Sheets APIへのアクセス権限を確認してください。\n\n対処法:\n• Googleアカウントの認証を更新\n• アプリケーションの権限を再承認';
+        } else {
+          userMessage = `🌐 接続エラー: ${error.message || '不明なエラー'}\n\n対処法:\n• インターネット接続を確認\n• しばらく時間をおいて再試行`;
+        }
+
+        showError(userMessage);
         setPartialLoading(false);
       })
       .analyzeColumns(spreadsheetId, sheetName);

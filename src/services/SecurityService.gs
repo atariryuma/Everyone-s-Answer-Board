@@ -13,7 +13,7 @@
  * - 分散しているバリデーション機能
  */
 
-/* global PROPS_KEYS, AppCacheService, UserService, CONSTANTS, DB */
+/* global PROPS_KEYS, AppCacheService, UserService, CONSTANTS, DB, UnifiedLogger */
 
 /**
  * SecurityService - 統一セキュリティサービス
@@ -640,44 +640,136 @@ const SecurityService = Object.freeze({
    * @returns {Object} 検証結果
    */
   validateSpreadsheetAccess(spreadsheetId) {
+    const started = Date.now();
     try {
+      UnifiedLogger.debug('SecurityService', {
+        operation: 'validateSpreadsheetAccess',
+        phase: 'start',
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null'
+      });
+
       if (!spreadsheetId) {
-        return {
+        const errorResponse = {
           success: false,
-          message: 'スプレッドシートIDが指定されていません'
+          message: 'スプレッドシートIDが指定されていません',
+          sheets: [],
+          executionTime: `${Date.now() - started}ms`
         };
+        UnifiedLogger.error('SecurityService', {
+          operation: 'validateSpreadsheetAccess',
+          error: 'Missing spreadsheetId',
+          executionTime: errorResponse.executionTime
+        });
+        return errorResponse;
       }
 
-      // アクセステスト
-      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-      const name = spreadsheet.getName();
-      const sheets = spreadsheet.getSheets().map(sheet => ({
-        name: sheet.getName(),
-        index: sheet.getIndex()
-      }));
+      // アクセステスト - 段階的にチェック
+      let spreadsheet;
+      try {
+        UnifiedLogger.debug('SecurityService', { operation: 'SpreadsheetApp.openById', phase: 'start' });
+        spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+        UnifiedLogger.debug('SecurityService', { operation: 'SpreadsheetApp.openById', phase: 'success' });
+      } catch (openError) {
+        const errorResponse = {
+          success: false,
+          message: `スプレッドシートへのアクセスに失敗: ${openError.message}`,
+          sheets: [],
+          error: openError.message,
+          executionTime: `${Date.now() - started}ms`
+        };
+        UnifiedLogger.error('SecurityService', {
+          operation: 'SpreadsheetApp.openById',
+          error: openError.message,
+          executionTime: errorResponse.executionTime
+        });
+        return errorResponse;
+      }
 
-      return {
+      // 名前とシート情報を取得
+      let name, sheets;
+      try {
+        UnifiedLogger.debug('SecurityService', { operation: 'spreadsheet.getName', phase: 'start' });
+        name = spreadsheet.getName();
+
+        UnifiedLogger.debug('SecurityService', { operation: 'spreadsheet.getSheets', phase: 'start' });
+        sheets = spreadsheet.getSheets().map(sheet => ({
+          name: sheet.getName(),
+          index: sheet.getIndex()
+        }));
+        UnifiedLogger.debug('SecurityService', {
+          operation: 'spreadsheet metadata',
+          phase: 'success',
+          sheetsCount: sheets.length
+        });
+      } catch (metaError) {
+        const errorResponse = {
+          success: false,
+          message: `スプレッドシート情報の取得に失敗: ${metaError.message}`,
+          sheets: [],
+          error: metaError.message,
+          executionTime: `${Date.now() - started}ms`
+        };
+        UnifiedLogger.error('SecurityService', {
+          operation: 'spreadsheet metadata',
+          error: metaError.message,
+          executionTime: errorResponse.executionTime
+        });
+        return errorResponse;
+      }
+
+      const result = {
         success: true,
         name,
         sheets,
-        message: 'アクセス権限が確認できました'
+        message: 'アクセス権限が確認できました',
+        executionTime: `${Date.now() - started}ms`
       };
 
-    } catch (error) {
-      console.error('SecurityService.validateSpreadsheetAccess エラー:', error.message);
+      UnifiedLogger.success('SecurityService', {
+        operation: 'validateSpreadsheetAccess',
+        spreadsheetName: name,
+        sheetsCount: sheets.length,
+        executionTime: result.executionTime
+      });
 
+      return result;
+
+    } catch (error) {
+      const errorResponse = {
+        success: false,
+        message: `予期しないエラー: ${error.message}`,
+        sheets: [],
+        error: error.message,
+        executionTime: `${Date.now() - started}ms`
+      };
+
+      UnifiedLogger.error('SecurityService', {
+        operation: 'validateSpreadsheetAccess',
+        error: error.message,
+        stack: error.stack,
+        executionTime: errorResponse.executionTime
+      });
+
+      console.error('SecurityService.validateSpreadsheetAccess 予期しないエラー:', {
+        error: error.message,
+        stack: error.stack,
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null'
+      });
+
+      // より具体的なエラーメッセージ
       let userMessage = 'スプレッドシートにアクセスできません。';
       if (error.message.includes('Permission') || error.message.includes('権限')) {
         userMessage = 'スプレッドシートへのアクセス権限がありません。編集権限を確認してください。';
       } else if (error.message.includes('not found') || error.message.includes('見つかりません')) {
         userMessage = 'スプレッドシートが見つかりません。URLが正しいか確認してください。';
+      } else if (error.message.includes('timeout') || error.message.includes('タイムアウト')) {
+        userMessage = 'スプレッドシートへのアクセスがタイムアウトしました。しばらく時間をおいて再試行してください。';
       }
 
-      return {
-        success: false,
-        message: userMessage,
-        error: error.message
-      };
+      errorResponse.message = userMessage;
+
+      // 絶対にnullを返さない
+      return errorResponse;
     }
   },
 
