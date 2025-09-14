@@ -226,10 +226,47 @@ const ConfigService = Object.freeze({
       // 設定完了度計算
       enhanced.completionScore = this.calculateCompletionScore(enhanced);
 
+      // 権限情報を追加
+      enhanced.userPermissions = this.generateUserPermissions(userId);
+
       return enhanced;
     } catch (error) {
       console.error('ConfigService.enhanceConfigWithDynamicUrls: エラー', error.message);
       return baseConfig;
+    }
+  },
+
+  /**
+   * ユーザー権限情報生成
+   * @param {string} userId - ユーザーID
+   * @returns {Object} 権限情報
+   */
+  generateUserPermissions(userId) {
+    try {
+      // UserServiceを使って権限レベルを取得
+      const accessLevel = UserService.getAccessLevel(userId);
+      const isOwner = UserService.verifyOwnership(userId);
+      const currentEmail = UserService.getCurrentEmail();
+      const isSystemAdmin = UserService.isSystemAdmin(currentEmail);
+
+      return {
+        isOwner,
+        isSystemAdmin,
+        accessLevel,
+        canEdit: isOwner || isSystemAdmin,
+        canView: true, // 基本的に全員閲覧可能
+        canReact: true // 基本的に全員リアクション可能
+      };
+    } catch (error) {
+      console.error('ConfigService.generateUserPermissions: エラー', error.message);
+      return {
+        isOwner: false,
+        isSystemAdmin: false,
+        accessLevel: 'guest',
+        canEdit: false,
+        canView: true,
+        canReact: true
+      };
     }
   },
 

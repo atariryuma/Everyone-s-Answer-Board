@@ -349,6 +349,16 @@
           if (config.userPermissions) {
             this.vars.showAdminFeatures = config.userPermissions.isOwner || config.userPermissions.isSystemAdmin;
             this.vars.isAdminUser = config.userPermissions.isOwner || config.userPermissions.isSystemAdmin;
+            this.vars.isOwner = config.userPermissions.isOwner;
+            this.vars.isSystemAdmin = config.userPermissions.isSystemAdmin;
+            this.vars.accessLevel = config.userPermissions.accessLevel;
+
+            console.log('🔐 [AnswerApp] 権限情報設定完了', {
+              isOwner: this.vars.isOwner,
+              isSystemAdmin: this.vars.isSystemAdmin,
+              accessLevel: this.vars.accessLevel,
+              showAdminFeatures: this.vars.showAdminFeatures
+            });
           }
           
           this.setCache(cacheKey, config, CONFIG.CACHE_DURATION);
@@ -866,7 +876,22 @@
         }
         
         if (modeLabel) {
-          modeLabel.textContent = this.vars.isAdminUser ? '管理者' : '学習者';
+          let modeText = '学習者';
+          if (this.vars.isOwner) {
+            modeText = '👑 所有者';
+          } else if (this.vars.isSystemAdmin) {
+            modeText = '🔧 システム管理者';
+          } else if (this.vars.isAdminUser) {
+            modeText = '管理者';
+          }
+          modeLabel.textContent = modeText;
+
+          console.log('🎨 [UI] モード表示更新', {
+            modeText,
+            isOwner: this.vars.isOwner,
+            isSystemAdmin: this.vars.isSystemAdmin,
+            isAdminUser: this.vars.isAdminUser
+          });
         }
       }
       
