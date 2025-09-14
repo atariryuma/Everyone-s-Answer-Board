@@ -14,8 +14,19 @@
       // URLからuserIdを取得
       let userId = null;
       try {
+        console.log('🔍 [URLDebug] URL情報', {
+          href: window.location.href,
+          search: window.location.search,
+          pathname: window.location.pathname
+        });
+
         const urlParams = new URLSearchParams(window.location.search);
         userId = urlParams.get('userId');
+
+        console.log('🔍 [URLDebug] パラメータ解析結果', {
+          userId,
+          allParams: Object.fromEntries(urlParams.entries())
+        });
       } catch (error) {
         console.warn('URLパラメータ解析エラー:', error);
       }

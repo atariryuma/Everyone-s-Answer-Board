@@ -1529,9 +1529,10 @@
         // ドロップダウンを初期化
         populateColumnDropdowns(headerResult.headers, {});
 
-        // 既存の設定があれば復元
-        const config = await getCurrentConfig();
+        // 既存の設定があれば復元（グローバル状態から取得）
+        const config = systemState?.config;
         if (config && config.columnMapping && config.columnMapping.mapping) {
+          console.log('📋 URL入力: 既存の列マッピング復元', config.columnMapping.mapping);
           const dropdowns = {
             answer: document.getElementById('answer-column-select'),
             reason: document.getElementById('reason-column-select'),
@@ -1539,6 +1540,8 @@
             name: document.getElementById('name-column-select'),
           };
           restoreSavedColumnMapping(dropdowns, config.columnMapping.mapping);
+        } else {
+          console.log('📋 URL入力: 既存の列マッピングなし - デフォルト状態を維持');
         }
 
         updateProgress(2);
