@@ -9,7 +9,7 @@
  * 📝 main.gsから移動されたAPI関数群
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, DB, UnifiedLogger */
+/* global UserService, ConfigService, DataService, SecurityService, DB */
 
 /**
  * AdminController - 管理パネル用コントローラー

@@ -13,7 +13,7 @@
  * - 分散しているバリデーション機能
  */
 
-/* global PROPS_KEYS, AppCacheService, UserService, CONSTANTS, DB, UnifiedLogger */
+/* global PROPS_KEYS, AppCacheService, UserService, CONSTANTS, DB */
 
 /**
  * SecurityService - 統一セキュリティサービス
@@ -642,7 +642,7 @@ const SecurityService = Object.freeze({
   validateSpreadsheetAccess(spreadsheetId) {
     const started = Date.now();
     try {
-      UnifiedLogger.debug('SecurityService', {
+      console.log('SecurityService', {
         operation: 'validateSpreadsheetAccess',
         phase: 'start',
         spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null'
@@ -655,7 +655,7 @@ const SecurityService = Object.freeze({
           sheets: [],
           executionTime: `${Date.now() - started}ms`
         };
-        UnifiedLogger.error('SecurityService', {
+        console.error('SecurityService', {
           operation: 'validateSpreadsheetAccess',
           error: 'Missing spreadsheetId',
           executionTime: errorResponse.executionTime
@@ -666,9 +666,9 @@ const SecurityService = Object.freeze({
       // アクセステスト - 段階的にチェック
       let spreadsheet;
       try {
-        UnifiedLogger.debug('SecurityService', { operation: 'SpreadsheetApp.openById', phase: 'start' });
+        console.log('SecurityService', { operation: 'SpreadsheetApp.openById', phase: 'start' });
         spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-        UnifiedLogger.debug('SecurityService', { operation: 'SpreadsheetApp.openById', phase: 'success' });
+        console.log('SecurityService', { operation: 'SpreadsheetApp.openById', phase: 'success' });
       } catch (openError) {
         const errorResponse = {
           success: false,
@@ -677,7 +677,7 @@ const SecurityService = Object.freeze({
           error: openError.message,
           executionTime: `${Date.now() - started}ms`
         };
-        UnifiedLogger.error('SecurityService', {
+        console.error('SecurityService', {
           operation: 'SpreadsheetApp.openById',
           error: openError.message,
           executionTime: errorResponse.executionTime
@@ -688,15 +688,15 @@ const SecurityService = Object.freeze({
       // 名前とシート情報を取得
       let name, sheets;
       try {
-        UnifiedLogger.debug('SecurityService', { operation: 'spreadsheet.getName', phase: 'start' });
+        console.log('SecurityService', { operation: 'spreadsheet.getName', phase: 'start' });
         name = spreadsheet.getName();
 
-        UnifiedLogger.debug('SecurityService', { operation: 'spreadsheet.getSheets', phase: 'start' });
+        console.log('SecurityService', { operation: 'spreadsheet.getSheets', phase: 'start' });
         sheets = spreadsheet.getSheets().map(sheet => ({
           name: sheet.getName(),
           index: sheet.getIndex()
         }));
-        UnifiedLogger.debug('SecurityService', {
+        console.log('SecurityService', {
           operation: 'spreadsheet metadata',
           phase: 'success',
           sheetsCount: sheets.length
@@ -709,7 +709,7 @@ const SecurityService = Object.freeze({
           error: metaError.message,
           executionTime: `${Date.now() - started}ms`
         };
-        UnifiedLogger.error('SecurityService', {
+        console.error('SecurityService', {
           operation: 'spreadsheet metadata',
           error: metaError.message,
           executionTime: errorResponse.executionTime
@@ -725,7 +725,7 @@ const SecurityService = Object.freeze({
         executionTime: `${Date.now() - started}ms`
       };
 
-      UnifiedLogger.success('SecurityService', {
+      console.log('SecurityService', {
         operation: 'validateSpreadsheetAccess',
         spreadsheetName: name,
         sheetsCount: sheets.length,
@@ -743,7 +743,7 @@ const SecurityService = Object.freeze({
         executionTime: `${Date.now() - started}ms`
       };
 
-      UnifiedLogger.error('SecurityService', {
+      console.error('SecurityService', {
         operation: 'validateSpreadsheetAccess',
         error: error.message,
         stack: error.stack,

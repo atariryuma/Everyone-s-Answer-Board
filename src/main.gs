@@ -881,6 +881,7 @@ function addSpreadsheetUrl(url) {
 }
 
 function getUserConfig(userId) {
+  console.log('getUserConfig: 関数開始', { userId });
   try {
     // userIdが無効な場合、現在のユーザーから取得を試行
     if (!userId) {
@@ -895,6 +896,7 @@ function getUserConfig(userId) {
     }
 
     const result = ConfigService.getUserConfig(userId);
+    console.log('getUserConfig: 正常終了', { hasResult: !!result });
     if (!result) {
       console.warn('getUserConfig: ConfigServiceからnullが返却された - デフォルト設定を返却');
       return ConfigService.getDefaultConfig(userId);
@@ -902,7 +904,7 @@ function getUserConfig(userId) {
 
     return result;
   } catch (error) {
-    console.error('getUserConfig error:', error);
+    console.error('getUserConfig: エラー', error);
     return ConfigService.getDefaultConfig(userId || 'error');
   }
 }

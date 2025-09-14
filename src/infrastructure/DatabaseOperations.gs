@@ -7,7 +7,7 @@
  * - バルクデータ操作
  */
 
-/* global DatabaseCore, UnifiedLogger, CONSTANTS, AppCacheService, ConfigService */
+/* global DatabaseCore, CONSTANTS, AppCacheService, ConfigService */
 
 /**
  * DatabaseOperations - データベース操作機能
@@ -28,7 +28,7 @@ const DatabaseOperations = Object.freeze({
     if (!email) return null;
 
     try {
-      const timer = UnifiedLogger.startTimer('DatabaseOperations.findUserByEmail');
+      console.log('DatabaseOperations.findUserByEmail: 開始');
 
       const service = DatabaseCore.getSheetsServiceCached();
       const databaseId = DatabaseCore.getSecureDatabaseId();
@@ -41,7 +41,6 @@ const DatabaseOperations = Object.freeze({
 
       const rows = response.values || [];
       if (rows.length <= 1) {
-        timer.end();
         return null; // ヘッダーのみ
       }
 
@@ -56,15 +55,13 @@ const DatabaseOperations = Object.freeze({
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         if (row[emailIndex] && row[emailIndex].toLowerCase() === email.toLowerCase()) {
-          timer.end();
-          return this.rowToUser(row, headers);
+                    return this.rowToUser(row, headers);
         }
       }
 
-      timer.end();
-      return null;
+            return null;
     } catch (error) {
-      UnifiedLogger.error('DatabaseOperations', {
+      console.error('DatabaseOperations', {
         operation: 'findUserByEmail',
         email: typeof email === 'string' && email ? `${email.substring(0, 5)}***` : `[${typeof email}]`,
         error: error.message
@@ -82,7 +79,7 @@ const DatabaseOperations = Object.freeze({
     if (!userId) return null;
 
     try {
-      const timer = UnifiedLogger.startTimer('DatabaseOperations.findUserById');
+      const timer = console.log('DatabaseOperations.findUserById');
 
       const service = DatabaseCore.getSheetsServiceCached();
       const databaseId = DatabaseCore.getSecureDatabaseId();
@@ -95,8 +92,7 @@ const DatabaseOperations = Object.freeze({
 
       const rows = response.values || [];
       if (rows.length <= 1) {
-        timer.end();
-        return null;
+                return null;
       }
 
       const headers = rows[0];
@@ -110,15 +106,13 @@ const DatabaseOperations = Object.freeze({
       for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
         if (row[userIdIndex] === userId) {
-          timer.end();
-          return this.rowToUser(row, headers);
+                    return this.rowToUser(row, headers);
         }
       }
 
-      timer.end();
-      return null;
+            return null;
     } catch (error) {
-      UnifiedLogger.error('DatabaseOperations', {
+      console.error('DatabaseOperations', {
         operation: 'findUserById',
         userId: typeof userId === 'string' && userId ? `${userId.substring(0, 8)}***` : `[${typeof userId}]`,
         error: error.message
@@ -139,7 +133,7 @@ const DatabaseOperations = Object.freeze({
     }
 
     try {
-      const timer = UnifiedLogger.startTimer('DatabaseOperations.createUser');
+      const timer = console.log('DatabaseOperations.createUser');
 
       // 重複チェック
       const existingUser = this.findUserByEmail(email);
@@ -174,8 +168,7 @@ const DatabaseOperations = Object.freeze({
         }
       });
 
-      timer.end();
-      UnifiedLogger.success('DatabaseOperations', {
+            console.log('DatabaseOperations', {
         operation: 'createUser',
         userId: `${userId.substring(0, 8)  }***`,
         email: `${email.substring(0, 5)  }***`
@@ -183,7 +176,7 @@ const DatabaseOperations = Object.freeze({
 
       return userData;
     } catch (error) {
-      UnifiedLogger.error('DatabaseOperations', {
+      console.error('DatabaseOperations', {
         operation: 'createUser',
         email: typeof email === 'string' && email ? `${email.substring(0, 5)}***` : `[${typeof email}]`,
         error: error.message
@@ -204,7 +197,7 @@ const DatabaseOperations = Object.freeze({
     }
 
     try {
-      const timer = UnifiedLogger.startTimer('DatabaseOperations.updateUser');
+      const timer = console.log('DatabaseOperations.updateUser');
 
       const service = DatabaseCore.getSheetsServiceCached();
       const databaseId = DatabaseCore.getSecureDatabaseId();
@@ -224,8 +217,7 @@ const DatabaseOperations = Object.freeze({
       // 実際の更新処理は省略（行特定と更新）
       // 実装時はrowIndexを特定して更新
 
-      timer.end();
-      UnifiedLogger.success('DatabaseOperations', {
+            console.log('DatabaseOperations', {
         operation: 'updateUser',
         userId: `${userId.substring(0, 8)  }***`,
         updatedFields: Object.keys(updateData)
@@ -233,7 +225,7 @@ const DatabaseOperations = Object.freeze({
 
       return true;
     } catch (error) {
-      UnifiedLogger.error('DatabaseOperations', {
+      console.error('DatabaseOperations', {
         operation: 'updateUser',
         userId: typeof userId === 'string' && userId ? `${userId.substring(0, 8)}***` : `[${typeof userId}]`,
         error: error.message
@@ -280,7 +272,7 @@ const DatabaseOperations = Object.freeze({
     const { limit = 1000, offset = 0, activeOnly = false } = options;
 
     try {
-      const timer = UnifiedLogger.startTimer('DatabaseOperations.getAllUsers');
+      const timer = console.log('DatabaseOperations.getAllUsers');
 
       const service = DatabaseCore.getSheetsServiceCached();
       const databaseId = DatabaseCore.getSecureDatabaseId();
@@ -293,8 +285,7 @@ const DatabaseOperations = Object.freeze({
 
       const rows = response.values || [];
       if (rows.length <= 1) {
-        timer.end();
-        return [];
+                return [];
       }
 
       const headers = rows[0];
@@ -311,11 +302,10 @@ const DatabaseOperations = Object.freeze({
         }
       }
 
-      timer.end();
-      return users;
+            return users;
 
     } catch (error) {
-      UnifiedLogger.error('DatabaseOperations', {
+      console.error('DatabaseOperations', {
         operation: 'getAllUsers',
         options,
         error: error.message
@@ -340,8 +330,7 @@ const DatabaseOperations = Object.freeze({
         'Get all users with filtering'
       ],
       dependencies: [
-        'DatabaseCore',
-        'UnifiedLogger'
+        'DatabaseCore'
       ],
       status: '✅ Active'
     };

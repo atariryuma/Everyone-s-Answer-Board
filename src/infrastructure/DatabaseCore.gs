@@ -7,7 +7,7 @@
  * - サービスアカウント管理
  */
 
-/* global PROPS_KEYS, CONSTANTS, SecurityService, AppCacheService, ConfigService, UserService, UnifiedLogger */
+/* global PROPS_KEYS, CONSTANTS, SecurityService, AppCacheService, ConfigService, UserService */
 
 /**
  * DatabaseCore - データベースコア機能
@@ -27,7 +27,7 @@ const DatabaseCore = Object.freeze({
     try {
       return PropertiesService.getScriptProperties().getProperty(PROPS_KEYS.DATABASE_SPREADSHEET_ID);
     } catch (error) {
-      UnifiedLogger.error('DatabaseCore', {
+      console.error('DatabaseCore', {
         operation: 'getSecureDatabaseId',
         error: error.message
       });
@@ -44,7 +44,7 @@ const DatabaseCore = Object.freeze({
    */
   batchGetSheetsData(service, spreadsheetId, ranges) {
     try {
-      const timer = UnifiedLogger.startTimer('DatabaseCore.batchGetSheetsData');
+      const timer = console.log('DatabaseCore.batchGetSheetsData');
 
       if (!ranges || ranges.length === 0) {
         return { valueRanges: [] };
@@ -55,10 +55,9 @@ const DatabaseCore = Object.freeze({
         ranges
       });
 
-      timer.end();
-      return result;
+            return result;
     } catch (error) {
-      UnifiedLogger.error('DatabaseCore', {
+      console.error('DatabaseCore', {
         operation: 'batchGetSheetsData',
         spreadsheetId,
         rangesCount: ranges?.length,
@@ -94,7 +93,7 @@ const DatabaseCore = Object.freeze({
 
       return service;
     } catch (error) {
-      UnifiedLogger.error('DatabaseCore', {
+      console.error('DatabaseCore', {
         operation: 'getSheetsServiceCached',
         error: error.message
       });
@@ -155,14 +154,14 @@ const DatabaseCore = Object.freeze({
         }
       };
 
-      UnifiedLogger.success('DatabaseCore', {
+      console.log('DatabaseCore', {
         operation: 'createSheetsService',
         serviceType: parsedKey.type || 'unknown'
       });
 
       return service;
     } catch (error) {
-      UnifiedLogger.error('DatabaseCore', {
+      console.error('DatabaseCore', {
         operation: 'createSheetsService',
         error: error.message
       });
@@ -180,7 +179,7 @@ const DatabaseCore = Object.freeze({
       try {
         return this.getSheetsServiceCached();
       } catch (error) {
-        UnifiedLogger.warn('DatabaseCore', {
+        console.warn('DatabaseCore', {
           operation: 'getSheetsServiceWithRetry',
           attempt,
           maxRetries,

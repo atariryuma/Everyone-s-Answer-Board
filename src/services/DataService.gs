@@ -13,7 +13,7 @@
  * - ColumnAnalysisSystem.gs の一部
  */
 
-/* global DB, UserService, ConfigService, DataFormatter, CONSTANTS, UnifiedLogger, ErrorHandler, ResponseFormatter */
+/* global DB, UserService, ConfigService, DataFormatter, CONSTANTS, ErrorHandler, ResponseFormatter */
 
 /**
  * DataService - 統一データ操作サービス
@@ -1108,17 +1108,15 @@ const DataService = Object.freeze({
   getSpreadsheetList() {
     const started = Date.now();
     try {
-      UnifiedLogger.debug('DataService', { operation: 'DriveApp.searchFiles', phase: 'start' });
+      console.log('DataService.getSpreadsheetList: DriveApp検索開始');
 
       // まず現在のユーザー情報を確認
       const currentUser = Session.getActiveUser().getEmail();
-      UnifiedLogger.debug('DataService', { operation: 'getUserInfo', currentUser });
+      console.log('DataService.getSpreadsheetList: ユーザー情報', { currentUser });
 
       // 効率的な検索クエリを使用してスプレッドシートのみを取得
       const files = DriveApp.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
-      UnifiedLogger.debug('DataService', {
-        operation: 'DriveApp.searchFiles',
-        phase: 'complete',
+      console.log('DataService.getSpreadsheetList: DriveApp検索完了', {
         hasFiles: typeof files !== 'undefined',
         hasNext: files.hasNext()
       });
@@ -1127,14 +1125,12 @@ const DataService = Object.freeze({
       try {
         const testFiles = DriveApp.getFiles();
         const hasAnyFiles = testFiles.hasNext();
-        UnifiedLogger.debug('DataService', {
-          operation: 'DriveApp.getFiles test',
+        console.log('DataService.getSpreadsheetList: Driveアクセステスト', {
           hasAnyFiles,
           message: hasAnyFiles ? 'Drive access working' : 'No files accessible via DriveApp'
         });
       } catch (driveError) {
-        UnifiedLogger.error('DataService', {
-          operation: 'DriveApp.getFiles test',
+        console.error('DataService.getSpreadsheetList: Driveアクセスエラー', {
           error: driveError.message,
           stack: driveError.stack
         });
@@ -1144,9 +1140,7 @@ const DataService = Object.freeze({
       let count = 0;
       const maxCount = 20; // 通信制限対応: 最大20件まで
 
-      UnifiedLogger.debug('DataService', {
-        operation: 'spreadsheet enumeration',
-        phase: 'start',
+      console.log('DataService.getSpreadsheetList: スプレッドシート列挙開始', {
         hasNext: files.hasNext()
       });
 
@@ -1154,11 +1148,10 @@ const DataService = Object.freeze({
         const file = files.next();
         // 最初の3個だけ詳細ログ
         if (count < 3) {
-          UnifiedLogger.debug('DataService', {
-            operation: 'file discovery',
+          console.log('DataService.getSpreadsheetList: ファイル発見', {
             index: count + 1,
             fileName: file.getName(),
-            fileId: `${file.getId().substring(0, 10)  }...`
+            fileId: `${file.getId().substring(0, 10)}...`
           });
         }
         spreadsheets.push({
@@ -1170,9 +1163,7 @@ const DataService = Object.freeze({
         count++;
       }
 
-      UnifiedLogger.info('DataService', {
-        operation: 'spreadsheet enumeration',
-        phase: 'complete',
+      console.log('DataService.getSpreadsheetList: 列挙完了', {
         totalFound: count,
         maxReached: count >= maxCount
       });
@@ -1186,15 +1177,13 @@ const DataService = Object.freeze({
 
       // レスポンスサイズ監視
       const responseSize = JSON.stringify(response).length;
-      UnifiedLogger.info('DataService', {
-        operation: 'response size check',
+      console.log('DataService.getSpreadsheetList: レスポンスサイズチェック', {
         responseSize,
         responseSizeKB: Math.round(responseSize / 1024 * 100) / 100,
         maxResponseSize: '64KB (Google Apps Script limit)'
       });
 
-      UnifiedLogger.success('DataService', {
-        operation: 'getSpreadsheetList',
+      console.log('DataService.getSpreadsheetList: 成功', {
         spreadsheetsCount: response.spreadsheets.length,
         executionTime: response.executionTime,
         maxReached: count >= maxCount
@@ -1202,8 +1191,7 @@ const DataService = Object.freeze({
 
       return response;
     } catch (error) {
-      UnifiedLogger.error('DataService', {
-        operation: 'getSpreadsheetList',
+      console.error('DataService.getSpreadsheetList: エラー', {
         error: error.message,
         stack: error.stack,
         executionTime: `${Date.now() - started}ms`
@@ -1268,10 +1256,8 @@ const DataService = Object.freeze({
   analyzeColumns(spreadsheetId, sheetName) {
     const started = Date.now();
     try {
-      UnifiedLogger.debug('DataService', {
-        operation: 'analyzeColumns',
-        phase: 'start',
-        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null',
+      console.log('DataService.analyzeColumns: 開始', {
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
         sheetName: sheetName || 'null'
       });
 
@@ -1283,9 +1269,7 @@ const DataService = Object.freeze({
           columns: [],
           columnMapping: { mapping: {}, confidence: {} }
         };
-        UnifiedLogger.error('DataService', {
-          operation: 'analyzeColumns',
-          error: 'Missing required parameters',
+        console.error('DataService.analyzeColumns: 必須パラメータ不足', {
           spreadsheetId: !!spreadsheetId,
           sheetName: !!sheetName
         });
@@ -1295,9 +1279,9 @@ const DataService = Object.freeze({
       // スプレッドシート接続テスト
       let spreadsheet;
       try {
-        UnifiedLogger.debug('DataService', { operation: 'SpreadsheetApp.openById', phase: 'start' });
+        console.log('DataService.analyzeColumns: スプレッドシート接続開始');
         spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-        UnifiedLogger.debug('DataService', { operation: 'SpreadsheetApp.openById', phase: 'success' });
+        console.log('DataService.analyzeColumns: スプレッドシート接続成功');
       } catch (openError) {
         const errorResponse = {
           success: false,
@@ -1306,10 +1290,9 @@ const DataService = Object.freeze({
           columns: [],
           columnMapping: { mapping: {}, confidence: {} }
         };
-        UnifiedLogger.error('DataService', {
-          operation: 'SpreadsheetApp.openById',
+        console.error('DataService.analyzeColumns: スプレッドシート接続失敗', {
           error: openError.message,
-          spreadsheetId: `${spreadsheetId.substring(0, 10)  }...`
+          spreadsheetId: `${spreadsheetId.substring(0, 10)}...`
         });
         return errorResponse;
       }
@@ -1326,14 +1309,12 @@ const DataService = Object.freeze({
             columns: [],
             columnMapping: { mapping: {}, confidence: {} }
           };
-          UnifiedLogger.error('DataService', {
-            operation: 'getSheetByName',
-            error: 'Sheet not found',
+          console.error('DataService.analyzeColumns: シートが見つかりません', {
             sheetName
           });
           return errorResponse;
         }
-        UnifiedLogger.debug('DataService', { operation: 'getSheetByName', phase: 'success' });
+        console.log('DataService.analyzeColumns: シート取得成功');
       } catch (sheetError) {
         const errorResponse = {
           success: false,
@@ -1342,8 +1323,7 @@ const DataService = Object.freeze({
           columns: [],
           columnMapping: { mapping: {}, confidence: {} }
         };
-        UnifiedLogger.error('DataService', {
-          operation: 'getSheetByName',
+        console.error('DataService.analyzeColumns: シートアクセスエラー', {
           error: sheetError.message,
           sheetName
         });
@@ -1357,11 +1337,10 @@ const DataService = Object.freeze({
       let lastRow = 1;
 
       try {
-        UnifiedLogger.debug('DataService', { operation: 'sheet.getLastColumn', phase: 'start' });
+        console.log('DataService.analyzeColumns: シートサイズ取得開始');
         lastColumn = sheet.getLastColumn();
         lastRow = sheet.getLastRow();
-        UnifiedLogger.debug('DataService', {
-          operation: 'sheet dimensions',
+        console.log('DataService.analyzeColumns: シートサイズ', {
           lastColumn,
           lastRow
         });
@@ -1374,9 +1353,7 @@ const DataService = Object.freeze({
             columns: [],
             columnMapping: { mapping: {}, confidence: {} }
           };
-          UnifiedLogger.error('DataService', {
-            operation: 'sheet dimensions check',
-            error: 'Empty spreadsheet',
+          console.error('DataService.analyzeColumns: 空のスプレッドシート', {
             lastColumn,
             lastRow
           });
@@ -1384,22 +1361,18 @@ const DataService = Object.freeze({
         }
 
         // ヘッダー行取得
-        UnifiedLogger.debug('DataService', { operation: 'getRange(headers)', phase: 'start' });
+        console.log('DataService.analyzeColumns: ヘッダー取得開始');
         headers = sheet.getRange(1, 1, 1, lastColumn).getValues()[0];
-        UnifiedLogger.debug('DataService', {
-          operation: 'getRange(headers)',
-          phase: 'success',
+        console.log('DataService.analyzeColumns: ヘッダー取得成功', {
           headersCount: headers.length
         });
 
         // サンプルデータを取得（最大5行）
         const sampleRowCount = Math.min(5, lastRow - 1);
         if (sampleRowCount > 0) {
-          UnifiedLogger.debug('DataService', { operation: 'getRange(sample)', phase: 'start' });
+          console.log('DataService.analyzeColumns: サンプルデータ取得開始');
           sampleData = sheet.getRange(2, 1, sampleRowCount, lastColumn).getValues();
-          UnifiedLogger.debug('DataService', {
-            operation: 'getRange(sample)',
-            phase: 'success',
+          console.log('DataService.analyzeColumns: サンプルデータ取得成功', {
             sampleRowCount: sampleData.length
           });
         }
@@ -1411,8 +1384,7 @@ const DataService = Object.freeze({
           columns: [],
           columnMapping: { mapping: {}, confidence: {} }
         };
-        UnifiedLogger.error('DataService', {
-          operation: 'sheet data retrieval',
+        console.error('DataService.analyzeColumns: データ取得エラー', {
           error: rangeError.message,
           lastColumn,
           lastRow
@@ -1486,8 +1458,7 @@ const DataService = Object.freeze({
         executionTime: `${Date.now() - started}ms`
       };
 
-      UnifiedLogger.success('DataService', {
-        operation: 'analyzeColumns',
+      console.log('DataService.analyzeColumns: 成功', {
         headersCount: headers.length,
         columnsCount: columns.length,
         mappingDetected: Object.keys(mapping.mapping).length,
@@ -1506,8 +1477,7 @@ const DataService = Object.freeze({
         executionTime: `${Date.now() - started}ms`
       };
 
-      UnifiedLogger.error('DataService', {
-        operation: 'analyzeColumns',
+      console.error('DataService.analyzeColumns: 予期しないエラー', {
         error: error.message,
         stack: error.stack,
         executionTime: errorResponse.executionTime
@@ -1534,10 +1504,8 @@ const DataService = Object.freeze({
   getLightweightHeaders(spreadsheetId, sheetName) {
     const started = Date.now();
     try {
-      UnifiedLogger.debug('DataService', {
-        operation: 'getLightweightHeaders',
-        phase: 'start',
-        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null',
+      console.log('DataService.getLightweightHeaders: 開始', {
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
         sheetName: sheetName || 'null'
       });
 
@@ -1579,8 +1547,7 @@ const DataService = Object.freeze({
         executionTime: `${Date.now() - started}ms`
       };
 
-      UnifiedLogger.success('DataService', {
-        operation: 'getLightweightHeaders',
+      console.log('DataService.getLightweightHeaders: 成功', {
         headersCount: result.headers.length,
         executionTime: result.executionTime
       });
@@ -1595,8 +1562,7 @@ const DataService = Object.freeze({
         executionTime: `${Date.now() - started}ms`
       };
 
-      UnifiedLogger.error('DataService', {
-        operation: 'getLightweightHeaders',
+      console.error('DataService.getLightweightHeaders: エラー', {
         error: error.message,
         executionTime: errorResponse.executionTime
       });
