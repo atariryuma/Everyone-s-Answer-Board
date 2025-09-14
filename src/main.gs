@@ -15,7 +15,7 @@
  * - src/services/*.gs
  */
 
-/* global UserService, ConfigService, DataService, SecurityService, DB, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, AppCacheService, getAdminSpreadsheetList, addDataReaction, toggleDataHighlight, DatabaseOperations */
+/* global UserService, ConfigService, DataService, SecurityService, DB, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, AppCacheService, getAdminSpreadsheetList, addDataReaction, toggleDataHighlight, DatabaseOperations, ServiceFactory */
 
 /**
  * 🚀 GAS Service Discovery & Dynamic Loading
@@ -1115,33 +1115,38 @@ function getConfig() {
  */
 function getConfigFromSystemController() {
   try {
-    // 直接Session APIでユーザー取得
-    const email = getCurrentEmailDirect();
-    if (!email) {
+    // 🔧 ServiceFactory経由でセッション取得
+    if (typeof ServiceFactory === 'undefined') {
+      return { success: false, message: 'ServiceFactory not available' };
+    }
+
+    const session = ServiceFactory.getSession();
+    if (!session.isValid || !session.email) {
       return { success: false, message: 'ユーザー情報が見つかりません' };
     }
 
-    // DatabaseOperations直接参照
-    if (typeof DatabaseOperations === 'undefined') {
+    // 🔧 ServiceFactory経由でデータベース取得
+    const db = ServiceFactory.getDB();
+    if (!db) {
       return {
         success: false,
         message: 'データベースサービスが利用できません'
       };
     }
 
-    let user = DatabaseOperations.findUserByEmail(email);
+    let user = db.findUserByEmail(session.email);
     if (!user) {
       try {
-        const newUserId = `user_${Utilities.getUuid().replace(/-/g, '').substring(0, 12)}`;
+        const newUserId = ServiceFactory.getUtils().generateUserId();
         user = {
           userId: newUserId,
-          userEmail: email,
+          userEmail: session.email,
           isActive: true,
-          createdAt: new Date().toISOString(),
+          createdAt: ServiceFactory.getUtils().getCurrentTimestamp(),
           configJson: null
         };
-        DatabaseOperations.createUser(user);
-        console.log('getConfig: 新規ユーザー作成:', { userId: newUserId, email });
+        db.createUser(user);
+        console.log('getConfig: 新規ユーザー作成:', { userId: newUserId, email: session.email });
       } catch (createErr) {
         console.error('getConfig: ユーザー作成エラー', createErr);
         return { success: false, message: 'ユーザー作成に失敗しました' };
@@ -1188,8 +1193,17 @@ function getCurrentBoardInfoAndUrls() {
  */
 function getCurrentBoardInfoAndUrlsFromSystemController() {
   try {
-    // DatabaseOperations直接参照
-    if (typeof DatabaseOperations === 'undefined') {
+    // 🔧 ServiceFactory経由でデータベース取得
+    if (typeof ServiceFactory === 'undefined') {
+      return {
+        isActive: false,
+        error: 'ServiceFactory not available',
+        appPublished: false
+      };
+    }
+
+    const db = ServiceFactory.getDB();
+    if (!db) {
       return {
         isActive: false,
         error: 'データベースサービスが利用できません',
@@ -1197,8 +1211,9 @@ function getCurrentBoardInfoAndUrlsFromSystemController() {
       };
     }
 
-    const email = getCurrentEmailDirect();
-    if (!email) {
+    // 🔧 ServiceFactory経由でセッション取得
+    const session = ServiceFactory.getSession();
+    if (!session.isValid || !session.email) {
       return {
         isActive: false,
         error: 'ユーザー情報が見つかりません',
@@ -1206,7 +1221,7 @@ function getCurrentBoardInfoAndUrlsFromSystemController() {
       };
     }
 
-    const user = DatabaseOperations.findUserByEmail(email);
+    const user = db.findUserByEmail(session.email);
     if (!user) {
       return {
         isActive: false,
@@ -1215,8 +1230,9 @@ function getCurrentBoardInfoAndUrlsFromSystemController() {
       };
     }
 
-    const props = PropertiesService.getScriptProperties();
-    const appStatus = props.getProperty('APPLICATION_STATUS');
+    // 🔧 ServiceFactory経由でプロパティ取得
+    const props = ServiceFactory.getProperties();
+    const appStatus = props.get('APPLICATION_STATUS');
     const appPublished = appStatus === 'active';
 
     if (!appPublished) {
@@ -1275,15 +1291,21 @@ function checkIsSystemAdmin() {
  */
 function checkIsSystemAdminFromSystemController() {
   try {
-    const email = getCurrentEmailDirect();
-    if (!email) {
+    // 🔧 ServiceFactory経由でセッション取得
+    if (typeof ServiceFactory === 'undefined') {
       return false;
     }
 
-    const props = PropertiesService.getScriptProperties();
-    const adminEmails = props.getProperty('ADMIN_EMAILS') || '';
+    const session = ServiceFactory.getSession();
+    if (!session.isValid || !session.email) {
+      return false;
+    }
 
-    return adminEmails.split(',').map(e => e.trim()).includes(email);
+    // 🔧 ServiceFactory経由でプロパティ取得
+    const props = ServiceFactory.getProperties();
+    const adminEmails = props.get('ADMIN_EMAILS') || '';
+
+    return adminEmails.split(',').map(e => e.trim()).includes(session.email);
   } catch (error) {
     console.error('checkIsSystemAdminFromSystemController エラー:', error.message);
     return false;

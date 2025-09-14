@@ -13,30 +13,36 @@
  * - グローバル副作用排除
  */
 
-/* global DB, PROPS_KEYS, getCurrentUserEmail, getCurrentUserInfo, URL */
+/* global ServiceFactory, URL */
 
-// 遅延初期化状態管理
-let configServiceInitialized = false;
+// ===========================================
+// 🔧 Zero-Dependency ConfigService (ServiceFactory版)
+// ===========================================
 
 /**
- * ConfigService遅延初期化
- * 各公開関数の先頭で呼び出し、必要時のみ初期化実行
+ * ConfigService - ゼロ依存アーキテクチャ
+ * ServiceFactoryパターンによる依存関係除去
+ * PROPS_KEYS, DB依存を完全排除
  */
-function initConfigService() {
-  if (configServiceInitialized) return;
 
+/**
+ * ServiceFactory統合初期化
+ * 依存関係チェックなしの即座初期化
+ * @returns {boolean} 初期化成功可否
+ */
+function initConfigServiceZero() {
   try {
-    // 必要な依存関係の初期化確認
-    if (typeof DB === 'undefined' || typeof PROPS_KEYS === 'undefined') {
-      console.warn('initConfigService: Dependencies not available, will retry on next call');
-      return;
+    // ServiceFactory利用可能性確認
+    if (typeof ServiceFactory === 'undefined') {
+      console.warn('initConfigServiceZero: ServiceFactory not available');
+      return false;
     }
 
-    configServiceInitialized = true;
-    console.log('✅ ConfigService initialized successfully');
+    console.log('✅ ConfigService (Zero-Dependency) initialized successfully');
+    return true;
   } catch (error) {
-    console.error('initConfigService failed:', error.message);
-    // 初期化失敗時は次回再試行のためfalseのまま
+    console.error('initConfigServiceZero failed:', error.message);
+    return false;
   }
 }
 
@@ -46,7 +52,12 @@ function initConfigService() {
  * @returns {Object|null} 統合設定オブジェクト
  */
 function getUserConfig(userId) {
-  initConfigService(); // 遅延初期化
+  // 🚀 Zero-dependency initialization
+  if (!initConfigServiceZero()) {
+    console.error('getUserConfig: ServiceFactory not available');
+    return getDefaultConfig(userId);
+  }
+
   if (!userId || !validateConfigUserId(userId)) {
     console.warn('getUserConfig: 無効なuserID - デフォルト設定を返却:', userId);
     return getDefaultConfig(userId);
@@ -55,14 +66,21 @@ function getUserConfig(userId) {
   const cacheKey = `config_${userId}`;
 
   try {
-    // キャッシュから取得試行
-    const cached = CacheService.getScriptCache().get(cacheKey);
+    // 🔧 ServiceFactory経由でキャッシュ取得
+    const cache = ServiceFactory.getCache();
+    const cached = cache.get(cacheKey);
     if (cached) {
-      return JSON.parse(cached);
+      return cached;
     }
 
-    // データベースから取得
-    const user = DB.findUserById(userId);
+    // 🔧 ServiceFactory経由でデータベース取得
+    const db = ServiceFactory.getDB();
+    if (!db) {
+      console.error('getUserConfig: Database not available');
+      return getDefaultConfig(userId);
+    }
+
+    const user = db.findUserById(userId);
     if (!user) {
       console.warn('getUserConfig: ユーザーが見つかりません:', userId);
       return getDefaultConfig(userId);
@@ -74,12 +92,8 @@ function getUserConfig(userId) {
     // 動的URL生成
     const enhancedConfig = enhanceConfigWithDynamicUrls(baseConfig, userId);
 
-    // キャッシュに保存（10分間）
-    CacheService.getScriptCache().put(
-      cacheKey,
-      JSON.stringify(enhancedConfig),
-      600
-    );
+    // 🔧 ServiceFactory経由でキャッシュ保存（10分間）
+    cache.put(cacheKey, enhancedConfig, 600);
 
     return enhancedConfig;
   } catch (error) {
@@ -97,7 +111,7 @@ function getUserConfig(userId) {
  * @returns {Object} デフォルト設定
  */
 function getDefaultConfig(userId) {
-  initConfigService(); // 遅延初期化
+  // 🚀 Zero-dependency: ServiceFactory不要（静的デフォルト値のため）
   return {
     userId,
     setupStatus: 'pending',
@@ -241,7 +255,7 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
  */
 function generateUserPermissions(_userId) {
   try {
-    const currentEmail = getCurrentUserEmail();
+    const currentEmail = ServiceFactory.getSession().email;
     if (!currentEmail) {
       return {
         isOwner: false,
@@ -306,7 +320,7 @@ function saveUserConfig(userId, config) {
     sanitizedConfig.lastModified = new Date().toISOString();
 
     // データベース保存
-    const updateResult = DB.updateUserConfig(userId, JSON.stringify(sanitizedConfig));
+    const updateResult = ServiceFactory.getDB().updateUserConfig(userId, JSON.stringify(sanitizedConfig));
 
     if (!updateResult) {
       throw new Error('データベース更新に失敗しました');
@@ -567,11 +581,15 @@ function determineSetupStep(userInfo, configJson) {
  */
 function isSystemSetup() {
   try {
-    const currentEmail = getCurrentUserEmail();
+    const currentEmail = ServiceFactory.getSession().email;
     if (!currentEmail) return false;
 
-    const userInfo = getCurrentUserInfo();
-    return !!(userInfo && userInfo.config && userInfo.config.spreadsheetId);
+    // 🔧 ServiceFactory経由で直接データベースから取得
+    const db = ServiceFactory.getDB();
+    if (!db) return false;
+
+    const user = db.findUserByEmail(currentEmail);
+    return !!(user && user.configJson);
   } catch (error) {
     console.error('isSystemSetup: エラー', error.message);
     return false;
@@ -693,7 +711,7 @@ function saveDraftConfiguration(config) {
       throw new Error('無効な設定オブジェクト');
     }
 
-    const userId = getCurrentUserEmail();
+    const userId = ServiceFactory.getSession().email;
     if (!userId) {
       throw new Error('ユーザーIDを取得できませんでした');
     }
@@ -725,7 +743,7 @@ function saveDraftConfiguration(config) {
  */
 function publishApplication(publishConfig) {
   try {
-    const userId = getCurrentUserEmail();
+    const userId = ServiceFactory.getSession().email;
     if (!userId) {
       throw new Error('ユーザーIDを取得できませんでした');
     }

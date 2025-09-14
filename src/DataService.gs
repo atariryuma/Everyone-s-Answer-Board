@@ -13,30 +13,36 @@
  * - グローバル副作用排除
  */
 
-/* global DB, CONSTANTS, formatTimestampSimple */
+/* global ServiceFactory, formatTimestampSimple */
 
-// 遅延初期化状態管理
-let dataServiceInitialized = false;
+// ===========================================
+// 🔧 Zero-Dependency DataService (ServiceFactory版)
+// ===========================================
 
 /**
- * DataService遅延初期化
- * 各公開関数の先頭で呼び出し、必要時のみ初期化実行
+ * DataService - ゼロ依存アーキテクチャ
+ * ServiceFactoryパターンによる依存関係除去
+ * DB, CONSTANTS依存を完全排除
  */
-function initDataService() {
-  if (dataServiceInitialized) return;
 
+/**
+ * ServiceFactory統合初期化（DataService版）
+ * 依存関係チェックなしの即座初期化
+ * @returns {boolean} 初期化成功可否
+ */
+function initDataServiceZero() {
   try {
-    // 必要な依存関係の初期化確認
-    if (typeof DB === 'undefined' || typeof CONSTANTS === 'undefined') {
-      console.warn('initDataService: Dependencies not available, will retry on next call');
-      return;
+    // ServiceFactory利用可能性確認
+    if (typeof ServiceFactory === 'undefined') {
+      console.warn('initDataServiceZero: ServiceFactory not available');
+      return false;
     }
 
-    dataServiceInitialized = true;
-    console.log('✅ DataService initialized successfully');
+    console.log('✅ DataService (Zero-Dependency) initialized successfully');
+    return true;
   } catch (error) {
-    console.error('initDataService failed:', error.message);
-    // 初期化失敗時は次回再試行のためfalseのまま
+    console.error('initDataServiceZero failed:', error.message);
+    return false;
   }
 }
 
@@ -51,8 +57,20 @@ function getSheetData(userId, options = {}) {
   const startTime = Date.now();
 
   try {
-    // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
-    const user = DB.findUserById(userId);
+    // 🚀 Zero-dependency initialization
+    if (!initDataServiceZero()) {
+      console.error('getSheetData: ServiceFactory not available');
+      return { data: [], headers: [], sheetName: '', error: 'サービス初期化エラー' };
+    }
+
+    // 🔧 ServiceFactory経由でデータベース取得
+    const db = ServiceFactory.getDB();
+    if (!db) {
+      console.error('DataService.getSheetData: Database not available');
+      return { data: [], headers: [], sheetName: '', error: 'データベース接続エラー' };
+    }
+
+    const user = db.findUserById(userId);
     if (!user || !user.configJson) {
       console.error('DataService.getSheetData: ユーザー設定が見つかりません', { userId });
       // ✅ google.script.run 互換: シンプル形式
@@ -389,7 +407,7 @@ function addDataReaction(userId, rowId, reactionType) {
     }
 
     // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
-    const user = DB.findUserById(userId);
+    const user = ServiceFactory.getDB().findUserById(userId);
     if (!user || !user.configJson) {
       console.error('DataService.addReaction: ユーザー設定なし');
       return false;
@@ -424,7 +442,7 @@ function addDataReaction(userId, rowId, reactionType) {
 function removeDataReaction(userId, rowId, reactionType) {
   try {
     // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
-    const user = DB.findUserById(userId);
+    const user = ServiceFactory.getDB().findUserById(userId);
     if (!user || !user.configJson) {
       return false;
     }
@@ -454,7 +472,7 @@ function removeDataReaction(userId, rowId, reactionType) {
 function toggleDataHighlight(userId, rowId) {
   try {
     // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
-    const user = DB.findUserById(userId);
+    const user = ServiceFactory.getDB().findUserById(userId);
     if (!user || !user.configJson) {
       return false;
     }
@@ -608,7 +626,7 @@ function getAutoStopTime(publishedAt, minutes) {
  * @returns {Object} 処理結果
  */
 function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, _userEmail) {
-  initDataService(); // 遅延初期化
+  // 🚀 Zero-dependency: ServiceFactory経由で初期化
   try {
     if (!validateReactionParams(spreadsheetId, sheetName, rowIndex, reactionKey)) {
       throw new Error('無効なリアクションパラメータ');
@@ -671,7 +689,8 @@ function isEmptyRow(row) {
  * @returns {boolean} 有効かどうか
  */
 function validateReactionType(reactionType) {
-  const validTypes = CONSTANTS.REACTIONS.KEYS || ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+  // 🔧 CONSTANTS依存除去: 直接定義
+  const validTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT'];
   return validTypes.includes(reactionType);
 }
 
@@ -848,7 +867,7 @@ function applySortAndLimit(data, options = {}) {
  * @returns {Object} スプレッドシート一覧
  */
 function getSpreadsheetList() {
-  initDataService(); // 遅延初期化
+  // 🚀 Zero-dependency: ServiceFactory経由で初期化
   const started = Date.now();
   try {
     console.log('DataService.getSpreadsheetList: 開始 - GAS独立化完了');
@@ -965,7 +984,7 @@ function getSpreadsheetList() {
  * @returns {Object} シート一覧
  */
 function getSheetList(spreadsheetId) {
-  initDataService(); // 遅延初期化
+  // 🚀 Zero-dependency: ServiceFactory経由で初期化
   try {
     if (!spreadsheetId) {
       return {
