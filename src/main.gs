@@ -81,15 +81,42 @@ function doGet(e) {
           const db = ServiceFactory.getDB();
           let user = db && db.findUserByEmail ? db.findUserByEmail(email) : null;
 
-          // Auto-create admin user if not exists
+          // Auto-create admin user if not exists - with enhanced error handling
           if (!user && db && typeof db.createUser === 'function') {
             console.log('Creating admin user in database:', email);
             try {
               const userService = ServiceFactory.getUserService();
-              user = userService.createUser(email);
-              console.log('Admin user created successfully:', user?.userId);
+              if (userService && typeof userService.createUser === 'function') {
+                user = userService.createUser(email);
+                console.log('Admin user created successfully:', user?.userId);
+              } else {
+                console.warn('UserService.createUser not available, creating minimal user object');
+                user = {
+                  userId: Utilities.getUuid(),
+                  userEmail: email,
+                  isActive: true,
+                  configJson: JSON.stringify({
+                    setupStatus: 'pending',
+                    appPublished: false,
+                    createdAt: new Date().toISOString()
+                  }),
+                  lastModified: new Date().toISOString()
+                };
+              }
             } catch (createError) {
-              console.warn('Failed to create admin user:', createError.message);
+              console.warn('Failed to create admin user via UserService:', createError.message);
+              // Fallback: create minimal user object without database write
+              user = {
+                userId: Utilities.getUuid(),
+                userEmail: email,
+                isActive: true,
+                configJson: JSON.stringify({
+                  setupStatus: 'pending',
+                  appPublished: false,
+                  createdAt: new Date().toISOString()
+                }),
+                lastModified: new Date().toISOString()
+              };
             }
           }
 
@@ -429,7 +456,7 @@ function getUserConfig(userId) {
     let user = db.findUserById(userId);
 
     if (!user) {
-      // Auto-create user if it's a system admin
+      // Auto-create user if it's a system admin - with enhanced safety
       const userService = ServiceFactory.getUserService();
       if (userService && userService.isSystemAdmin(email)) {
         try {
@@ -437,12 +464,18 @@ function getUserConfig(userId) {
           const userByEmail = db.findUserByEmail(email);
           if (userByEmail && userByEmail.userId === userId) {
             user = userByEmail;
-          } else {
+          } else if (typeof userService.createUser === 'function') {
             user = userService.createUser(email);
+          } else {
+            console.warn('UserService.createUser not available for admin user creation');
           }
           console.log('Admin user auto-created:', user?.userId);
         } catch (createError) {
           console.warn('Failed to auto-create admin user:', createError.message);
+          // For admin users, still provide basic access even if DB write fails
+          if (userService.isSystemAdmin(email)) {
+            console.log('Providing fallback access for system admin');
+          }
         }
       }
 
