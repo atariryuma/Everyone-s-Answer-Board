@@ -1447,3 +1447,170 @@ function saveConfig(userId, config) {
     return createExceptionResponse(error);
   }
 }
+
+// ===========================================
+// 🎯 f0068fa復元機能 - Zero-Dependency Architecture準拠
+// ===========================================
+
+/**
+ * フォームURL取得 - 簡素化実装（configJson直接アクセス）
+ * @param {string} sheetId - 未使用（互換性のため残存）
+ * @returns {Object} フォーム情報
+ */
+function detectFormUrl(sheetId = null) {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return { success: false, message: 'Authentication required', formUrl: null };
+    }
+
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
+    if (!user) {
+      return { success: false, message: 'User not found', formUrl: null };
+    }
+
+    let config = {};
+    try {
+      config = JSON.parse(user.configJson || '{}');
+    } catch (e) {
+      console.warn('detectFormUrl: config parse error', e);
+    }
+
+    if (!config.formUrl) {
+      return { success: false, message: 'Form URL not configured', formUrl: null };
+    }
+
+    return {
+      success: true,
+      formUrl: config.formUrl,
+      source: 'config'
+    };
+  } catch (error) {
+    console.error('detectFormUrl error:', error.message);
+    return { success: false, message: error.message, formUrl: null };
+  }
+}
+
+/**
+ * ドメイン認証チェック - 簡素化実装（既存認証パターン利用）
+ * @param {string} userEmail - ユーザーメール（オプション）
+ * @returns {Object} 認証結果
+ */
+function checkDomainAuth(userEmail = null) {
+  try {
+    const email = userEmail || getCurrentEmail();
+    return {
+      success: true,
+      authenticated: !!email,
+      domainStatus: email ? 'authenticated' : 'not_authenticated',
+      userEmail: email
+    };
+  } catch (error) {
+    console.error('checkDomainAuth error:', error.message);
+    return {
+      success: false,
+      authenticated: false,
+      domainStatus: 'error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * 新着コンテンツ検出機能 - Zero-Dependency直接実装
+ * @param {string|number} lastUpdateTime - 最終更新時刻（ISO文字列またはタイムスタンプ）
+ * @returns {Object} 新着検出結果
+ */
+function detectNewContent(lastUpdateTime) {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return {
+        success: false,
+        hasNewContent: false,
+        message: 'Authentication required'
+      };
+    }
+
+    // 最終更新時刻の正規化
+    let lastUpdate;
+    try {
+      if (typeof lastUpdateTime === 'string') {
+        lastUpdate = new Date(lastUpdateTime);
+      } else if (typeof lastUpdateTime === 'number') {
+        lastUpdate = new Date(lastUpdateTime);
+      } else {
+        lastUpdate = new Date(0); // 初回チェック
+      }
+    } catch (e) {
+      console.warn('detectNewContent: timestamp parse error', e);
+      lastUpdate = new Date(0);
+    }
+
+    // ユーザーデータ取得
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
+    if (!user) {
+      return {
+        success: false,
+        hasNewContent: false,
+        message: 'User not found'
+      };
+    }
+
+    // 現在のシートデータ取得
+    const currentData = getUserSheetData(user.userId, { includeTimestamp: true });
+    if (!currentData?.success || !currentData.data) {
+      return {
+        success: true,
+        hasNewContent: false,
+        message: 'No data available'
+      };
+    }
+
+    // 新着コンテンツチェック
+    let newItemsCount = 0;
+    const newItems = [];
+
+    currentData.data.forEach((item, index) => {
+      // アイテムのタイムスタンプチェック
+      let itemTimestamp = new Date(0);
+      if (item.timestamp) {
+        try {
+          itemTimestamp = new Date(item.timestamp);
+        } catch (e) {
+          // タイムスタンプが無効な場合、行番号ベースで推定
+          itemTimestamp = new Date();
+        }
+      }
+
+      if (itemTimestamp > lastUpdate) {
+        newItemsCount++;
+        newItems.push({
+          rowIndex: item.rowIndex || index + 1,
+          name: item.name || '匿名',
+          preview: `${(item.answer || item.opinion || '').substring(0, 50)  }...`,
+          timestamp: itemTimestamp.toISOString()
+        });
+      }
+    });
+
+    return {
+      success: true,
+      hasNewContent: newItemsCount > 0,
+      newItemsCount,
+      newItems: newItems.slice(0, 5), // 最新5件まで
+      totalItems: currentData.data.length,
+      checkTimestamp: new Date().toISOString(),
+      lastUpdateTime: lastUpdate.toISOString()
+    };
+  } catch (error) {
+    console.error('detectNewContent error:', error.message);
+    return {
+      success: false,
+      hasNewContent: false,
+      message: error.message
+    };
+  }
+}
