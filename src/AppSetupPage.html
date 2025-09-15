@@ -72,85 +72,34 @@
       </div>
 
       <!-- アプリ状態切り替えパネル -->
+      <!-- システム管理ダッシュボード -->
       <div class="glass-panel rounded-xl p-6 mb-6">
-        <h2 class="text-xl font-semibold text-white mb-4">🔧 アプリ状態の管理</h2>
-
-        <div class="space-y-6">
-          <!-- isActive トグル -->
-          <div class="p-4 bg-gray-800 rounded-lg">
-            <div class="flex items-center justify-between mb-3">
-              <div>
-                <h3 class="text-lg font-medium text-white">個別ボード公開制御</h3>
-                <p class="text-sm text-gray-400">
-                  あなたのボードの公開状態を制御します
-                </p>
-              </div>
-              <div class="flex items-center">
-                <label class="relative inline-flex items-center cursor-pointer" for="isActiveToggle">
-                  <input
-                    type="checkbox"
-                    id="isActiveToggle"
-                    class="sr-only peer"
-                    disabled
-                    title="アプリケーション全体の有効/無効を切り替える"
-                  />
-                  <div
-                    class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 dark:peer-focus:ring-blue-800 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-blue-600"
-                  ></div>
-                  <span class="sr-only">アプリケーション全体の有効/無効を切り替える</span>
-                </label>
-              </div>
-            </div>
-
-            <!-- 詳細説明 -->
-            <div class="text-sm text-gray-400 mb-4">
-              <p><strong>公開 (ON):</strong> あなたのボードが一般公開される</p>
-              <p><strong>非公開 (OFF):</strong> あなたのボードは非公開状態</p>
-              <p class="text-xs text-blue-400 mt-2">
-                💡 ヒント: これはあなたのボード個別の公開制御です
-              </p>
-            </div>
-
-            <!-- 変更ボタン -->
-            <button
-              type="button"
-              id="updateStatusBtn"
-              class="w-full btn bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled
-            >
-              <span id="update-text">変更を保存</span>
-              <div
-                id="update-spinner"
-                class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto hidden"
-              ></div>
-            </button>
+        <div class="flex items-center justify-between mb-6">
+          <div>
+            <h2 class="text-2xl font-semibold text-white">📊 システム統計</h2>
+            <p class="text-gray-400">登録ユーザーの概要情報</p>
           </div>
+          <button onclick="loadSystemStats()" class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm">
+            🔄 更新
+          </button>
+        </div>
 
-          <!-- 使用シナリオの説明 -->
-          <div class="p-4 bg-gray-900 rounded-lg">
-            <h4 class="text-md font-medium text-cyan-400 mb-3">
-              🎯 個別ボード公開制御の使用シナリオ
-            </h4>
-            <div class="grid md:grid-cols-2 gap-4 text-sm text-gray-300">
-              <div>
-                <h5 class="font-medium text-white mb-2">授業準備中</h5>
-                <p>ボード設定や問題文の準備中で、まだ生徒に公開したくない場合。</p>
-              </div>
-              <div>
-                <h5 class="font-medium text-white mb-2">授業終了後</h5>
-                <p>授業が終了し、生徒からの回答受付を停止したい場合。</p>
-              </div>
-              <div>
-                <h5 class="font-medium text-white mb-2">内容の修正</h5>
-                <p>ボード内容に誤りがあり、一時的に非公開にして修正作業を行う場合。</p>
-              </div>
-              <div>
-                <h5 class="font-medium text-white mb-2">プライバシー制御</h5>
-                <p>
-                  あなた専用のボード公開制御。他のユーザーのボードには影響しません。
-                </p>
-              </div>
-            </div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="bg-gray-800 rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-blue-400" id="total-users">-</div>
+            <div class="text-sm text-gray-400">総ユーザー数</div>
+          </div>
+          <div class="bg-gray-800 rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-green-400" id="active-users">-</div>
+            <div class="text-sm text-gray-400">アクティブユーザー</div>
+          </div>
+          <div class="bg-gray-800 rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-purple-400" id="published-boards">-</div>
+            <div class="text-sm text-gray-400">公開ボード数</div>
+          </div>
+          <div class="bg-gray-800 rounded-lg p-4 text-center">
+            <div class="text-2xl font-bold text-yellow-400" id="recent-activity">-</div>
+            <div class="text-sm text-gray-400">24時間以内の活動</div>
           </div>
         </div>
       </div>
@@ -240,7 +189,7 @@
 
         <div class="space-y-4">
           <!-- ユーザー一覧表示エリア -->
-          <div id="user-list-container" class="hidden">
+          <div id="user-list-container">
             <div class="flex justify-between items-center mb-4">
               <h3 class="text-lg font-medium text-white">登録ユーザー一覧</h3>
               <div class="flex gap-2">
@@ -286,7 +235,8 @@
                         メールアドレス
                       </th>
                       <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">登録日</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">状態</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">ユーザー状態</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">ボード状態</th>
                       <th class="px-4 py-3 text-left text-sm font-medium text-gray-300">
                         最終アクセス
                       </th>
@@ -299,17 +249,6 @@
             </div>
           </div>
 
-          <!-- ユーザー管理ボタン -->
-          <div class="text-center">
-            <button
-              type="button"
-              id="manage-users-btn"
-              onclick="toggleUserManagement()"
-              class="btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-lg"
-            >
-              👥 ユーザー管理を開く
-            </button>
-          </div>
         </div>
       </div>
 
@@ -611,22 +550,8 @@
       let currentUserList = [];
       let userToDelete = null;
 
-      // ユーザー管理の表示/非表示を切り替え
-      function toggleUserManagement() {
-        const container = document.getElementById('user-list-container');
-        const btn = document.getElementById('manage-users-btn');
-
-        if (userManagementVisible) {
-          container.classList.add('hidden');
-          btn.textContent = '👥 ユーザー管理を開く';
-          userManagementVisible = false;
-        } else {
-          container.classList.remove('hidden');
-          btn.textContent = '👥 ユーザー管理を閉じる';
-          userManagementVisible = true;
-          loadUserList();
-        }
-      }
+      // 不要になった関数（ユーザー管理は常時表示に変更）
+      // function toggleUserManagement() { /* 削除済み */ }
 
       // ユーザー一覧を取得して表示
       function loadUserList() {
@@ -674,6 +599,17 @@
                 ? '<span class="px-2 py-1 bg-green-600 text-green-100 rounded-full text-xs">アクティブ</span>'
                 : '<span class="px-2 py-1 bg-red-600 text-red-100 rounded-full text-xs">非アクティブ</span>';
 
+              // ボード公開状態を判定
+              let boardPublished = false;
+              try {
+                const config = JSON.parse(user.configJson || '{}');
+                boardPublished = config.appPublished === true;
+              } catch (e) {}
+
+              const boardBadge = boardPublished
+                ? '<span class="px-2 py-1 bg-purple-600 text-purple-100 rounded-full text-xs">公開中</span>'
+                : '<span class="px-2 py-1 bg-gray-600 text-gray-100 rounded-full text-xs">非公開</span>';
+
               const lastAccess = user.lastAccessedAt
                 ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP')
                 : '不明';
@@ -687,15 +623,33 @@
                             <td class="px-4 py-3 text-sm text-white">${user.ownerEmail}</td>
                             <td class="px-4 py-3 text-sm text-gray-300">${registrationDate}</td>
                             <td class="px-4 py-3">${statusBadge}</td>
+                            <td class="px-4 py-3">${boardBadge}</td>
                             <td class="px-4 py-3 text-sm text-gray-300">${lastAccess}</td>
                             <td class="px-4 py-3 text-center">
-                                <button 
-                                    data-user-id="${user.userId}"
-                                    data-user-email="${user.ownerEmail}"
-                                    onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
-                                    class="btn bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-xs">
-                                    削除
-                                </button>
+                                <div class="flex gap-1 justify-center">
+                                    <button
+                                        data-user-id="${user.userId}"
+                                        onclick="toggleUserStatus(this.dataset.userId)"
+                                        class="btn ${isActive ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700'} text-white px-2 py-1 rounded text-xs"
+                                        title="${isActive ? 'ユーザーを非アクティブに' : 'ユーザーをアクティブに'}">
+                                        ${isActive ? '無効化' : '有効化'}
+                                    </button>
+                                    <button
+                                        data-user-id="${user.userId}"
+                                        onclick="toggleUserBoard(this.dataset.userId)"
+                                        class="btn ${boardPublished ? 'bg-gray-600 hover:bg-gray-700' : 'bg-purple-600 hover:bg-purple-700'} text-white px-2 py-1 rounded text-xs"
+                                        title="${boardPublished ? 'ボードを非公開に' : 'ボードを公開に'}">
+                                        ${boardPublished ? '非公開' : '公開'}
+                                    </button>
+                                    <button
+                                        data-user-id="${user.userId}"
+                                        data-user-email="${user.ownerEmail}"
+                                        onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
+                                        class="btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs"
+                                        title="ユーザーを削除">
+                                        削除
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     `;
@@ -1132,6 +1086,95 @@
 
         contentDiv.classList.remove('hidden');
       }
+
+      // システム統計を生成・表示
+      function loadSystemStats() {
+        google.script.run
+          .withSuccessHandler(function(users) {
+            if (users && users.success && users.users) {
+              displaySystemStats(users.users);
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error('統計取得エラー:', error);
+          })
+          .getUsers(__USER_ID__);
+      }
+
+      // システム統計を表示
+      function displaySystemStats(users) {
+        const totalUsers = users.length;
+        const activeUsers = users.filter(u => u.isActive === true).length;
+
+        let publishedBoards = 0;
+        let recentActivity = 0;
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+        users.forEach(user => {
+          // ボード公開数を計算
+          try {
+            const config = JSON.parse(user.configJson || '{}');
+            if (config.appPublished === true) publishedBoards++;
+          } catch (e) {}
+
+          // 24時間以内の活動を計算
+          const lastActivity = new Date(user.lastModified || user.createdAt);
+          if (lastActivity > yesterday) recentActivity++;
+        });
+
+        document.getElementById('total-users').textContent = totalUsers;
+        document.getElementById('active-users').textContent = activeUsers;
+        document.getElementById('published-boards').textContent = publishedBoards;
+        document.getElementById('recent-activity').textContent = recentActivity;
+      }
+
+      // ユーザーのアクティブ状態を切り替え
+      function toggleUserStatus(userId) {
+        const confirmMessage = 'ユーザーの状態を切り替えますか？';
+        if (!confirm(confirmMessage)) return;
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              showMessage('✅ ユーザー状態を変更しました', 'success');
+              loadUserList();
+              loadSystemStats();
+            } else {
+              showMessage(`❌ ${result.message || '状態変更に失敗しました'}`, 'error');
+            }
+          })
+          .withFailureHandler(function(error) {
+            showMessage(`❌ エラー: ${error.message}`, 'error');
+          })
+          .toggleUserActiveStatus(userId);
+      }
+
+      // ユーザーのボード公開状態を切り替え
+      function toggleUserBoard(userId) {
+        const confirmMessage = 'このユーザーのボード公開状態を切り替えますか？';
+        if (!confirm(confirmMessage)) return;
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && result.success) {
+              showMessage('✅ ボード状態を変更しました', 'success');
+              loadUserList();
+              loadSystemStats();
+            } else {
+              showMessage(`❌ ${result.message || 'ボード状態変更に失敗しました'}`, 'error');
+            }
+          })
+          .withFailureHandler(function(error) {
+            showMessage(`❌ エラー: ${error.message}`, 'error');
+          })
+          .toggleUserBoardStatus(userId);
+      }
+
+      // ページ読み込み時にユーザー管理を自動表示
+      document.addEventListener('DOMContentLoaded', function() {
+        loadUserList();
+        loadSystemStats();
+      });
     </script>
 
     <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->

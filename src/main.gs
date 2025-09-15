@@ -756,6 +756,102 @@ function deleteUser(userId, reason = '') {
 
 
 /**
+ * Toggle user active status for admin - system admin only
+ */
+function toggleUserActiveStatus(targetUserId) {
+  try {
+    const email = getCurrentEmail();
+    if (!email || !isSystemAdmin(email)) {
+      return createAdminRequiredError();
+    }
+
+    const db = ServiceFactory.getDB();
+    const targetUser = db.findUserById(targetUserId);
+    if (!targetUser) {
+      return createUserNotFoundError();
+    }
+
+    const updatedUser = {
+      ...targetUser,
+      isActive: !targetUser.isActive,
+      lastModified: new Date().toISOString()
+    };
+
+    const result = db.updateUser(targetUserId, updatedUser);
+    if (result.success) {
+      return {
+        success: true,
+        message: `ユーザー状態を${updatedUser.isActive ? 'アクティブ' : '非アクティブ'}に変更しました`,
+        userId: targetUserId,
+        newStatus: updatedUser.isActive,
+        timestamp: new Date().toISOString()
+      };
+    } else {
+      return createErrorResponse('ユーザー状態の更新に失敗しました');
+    }
+  } catch (error) {
+    console.error('toggleUserActiveStatus error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+
+/**
+ * Toggle user board publication status for admin - system admin only
+ */
+function toggleUserBoardStatus(targetUserId) {
+  try {
+    const email = getCurrentEmail();
+    if (!email || !isSystemAdmin(email)) {
+      return createAdminRequiredError();
+    }
+
+    const db = ServiceFactory.getDB();
+    const targetUser = db.findUserById(targetUserId);
+    if (!targetUser) {
+      return createUserNotFoundError();
+    }
+
+    let config = {};
+    try {
+      config = JSON.parse(targetUser.configJson || '{}');
+    } catch (parseError) {
+      console.warn('toggleUserBoardStatus: config parse error', parseError);
+    }
+
+    // ボード公開状態を切り替え
+    config.appPublished = !config.appPublished;
+    if (config.appPublished) {
+      config.publishedAt = config.publishedAt || new Date().toISOString();
+    }
+    config.lastModified = new Date().toISOString();
+
+    const updatedUser = {
+      ...targetUser,
+      configJson: JSON.stringify(config),
+      lastModified: new Date().toISOString()
+    };
+
+    const result = db.updateUser(targetUserId, updatedUser);
+    if (result.success) {
+      return {
+        success: true,
+        message: `ボードを${config.appPublished ? '公開' : '非公開'}に変更しました`,
+        userId: targetUserId,
+        boardPublished: config.appPublished,
+        timestamp: new Date().toISOString()
+      };
+    } else {
+      return createErrorResponse('ボード状態の更新に失敗しました');
+    }
+  } catch (error) {
+    console.error('toggleUserBoardStatus error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+
+/**
  * Check if current user is admin - simplified name
  */
 function isAdmin() {
