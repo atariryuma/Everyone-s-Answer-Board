@@ -541,21 +541,37 @@ function getSystemDomainInfo() {
 }
 
 /**
- * Get application status - simplified name
+ * Get application status - system admin only
  */
 function getAppStatus() {
   try {
+    // Verify system admin access
+    const email = getCurrentEmail();
+    if (!email) {
+      return createErrorResponse('Authentication required');
+    }
+
+    const userService = ServiceFactory.getUserService();
+    if (!userService.isSystemAdmin(email)) {
+      console.warn('getAppStatus access denied:', email);
+      return createErrorResponse('System administrator access required');
+    }
+
+    // Get application status
     const props = ServiceFactory.getProperties();
     const isActive = props.getProperty('APP_STATUS') !== 'inactive';
+
     return {
+      status: 'success',
       success: true,
       isActive,
-      status: isActive ? 'active' : 'inactive',
-      timestamp: new Date().toISOString()
+      appStatus: isActive ? 'active' : 'inactive',
+      timestamp: new Date().toISOString(),
+      adminEmail: email
     };
   } catch (error) {
     console.error('getAppStatus error:', error.message);
-    return createExceptionResponse(error);
+    return createErrorResponse(error.message || 'Failed to get application status');
   }
 }
 
