@@ -558,7 +558,7 @@
             <p class="subtitle">管理パネルにアクセスしてください</p>
             
             <a href="${adminUrl}" target="_blank" rel="noopener noreferrer" class="main-button" id="admin-panel-btn" onclick="handleAdminPanelClick(event, '${adminUrl}', this)">
-              <span id="admin-panel-btn-text">🚀 管理パネルを開く（新しいタブ）</span>
+              <span id="admin-panel-btn-text">🚀 管理パネルを開く</span>
               <div id="admin-panel-btn-spinner" style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
                 <div style="width: 20px; height: 20px; border: 2px solid white; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
               </div>
@@ -575,7 +575,7 @@
             <div class="note">
               <div style="margin-bottom: 4px;">✓ このリンクは安全です</div>
               <div style="margin-bottom: 4px;">✓ Google Apps Script公式のセキュリティガイドラインに準拠</div>
-              <div style="margin-bottom: 4px;">🆕 管理パネルは新しいタブで開きます</div>
+              <div style="margin-bottom: 4px;">🔄 管理パネルに移動します</div>
               <div style="margin-bottom: 4px;">💡 このURLをブックマークすると、次回から直接アクセスできます</div>
               <div style="margin-bottom: 4px;">⚠️ ポップアップがブロックされる場合は、ブラウザの設定をご確認ください</div>
               <div>🔒 セキュリティのため、URLは他人と共有しないでください</div>
@@ -609,7 +609,7 @@
         }
 
         window.isAdminPanelClicking = true;
-        console.log('管理パネルを新しいタブで開いています...');
+        console.log('管理パネルに移動しています...');
 
         // ボタンを無効化してローディング状態にする
         buttonElement.style.pointerEvents = 'none';
@@ -621,59 +621,13 @@
         if (btnText) btnText.style.display = 'none';
         if (btnSpinner) btnSpinner.style.display = 'flex';
 
-        // 新しいタブで開く
+        // 同一ページでリダイレクト
+        if (btnText) btnText.textContent = '🔄 管理パネルにリダイレクト中...';
+
         setTimeout(() => {
-          const newTab = window.open(adminUrl, '_blank', 'noopener,noreferrer');
-
-          // ポップアップブロック検出
-          if (!newTab || newTab.closed || typeof newTab.closed == 'undefined') {
-            console.warn('ポップアップがブロックされました。フォールバック実行');
-
-            // フォールバック1: 同一タブでのリダイレクト
-            buttonElement.style.pointerEvents = 'auto';
-            buttonElement.style.opacity = '1';
-            if (btnSpinner) btnSpinner.style.display = 'none';
-            if (btnText) {
-              btnText.style.display = 'inline';
-              btnText.textContent = '🔄 管理パネルにリダイレクト中...';
-            }
-
-            // 1秒後に同一タブでリダイレクト
-            setTimeout(() => {
-              console.log('フォールバック: 同一タブでのリダイレクト実行:', adminUrl);
-              window.location.href = adminUrl;
-            }, 1000);
-          } else {
-            // フォールバック2: 200ms後にポップアップが生きているかチェック
-            setTimeout(() => {
-              if (newTab && newTab.closed) {
-                console.warn('ポップアップが閉じられました。フォールバック実行');
-                if (btnText) btnText.textContent = '🔄 管理パネルにリダイレクト中...';
-                setTimeout(() => {
-                  window.location.href = adminUrl;
-                }, 1000);
-                return;
-              }
-            }, 200);
-
-            // 成功時：ボタンを元に戻す
-            setTimeout(() => {
-              buttonElement.style.pointerEvents = 'auto';
-              buttonElement.style.opacity = '1';
-              if (btnSpinner) btnSpinner.style.display = 'none';
-              if (btnText) {
-                btnText.style.display = 'inline';
-                btnText.textContent = '✅ 新しいタブで開きました';
-              }
-              window.isAdminPanelClicking = false;
-
-              // 3秒後に元のテキストに戻す
-              setTimeout(() => {
-                if (btnText) btnText.textContent = '🚀 管理パネルを開く（新しいタブ）';
-              }, 3000);
-            }, 500);
-          }
-        }, 100);
+          console.log('管理パネルにリダイレクト:', adminUrl);
+          window.location.href = adminUrl;
+        }, 1000);
 
         return false;
       };
