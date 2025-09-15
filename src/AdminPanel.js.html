@@ -323,7 +323,7 @@
       }
 
       // シンプルなchangeイベントを設定
-      setupSimpleChangeEvents();
+      setupChangeEvents();
 
       // データソース選択のラジオボタンイベントを設定
       setupDataSourceRadioEvents();
@@ -485,7 +485,7 @@
   }
 
   // 🎯 シンプルなchangeイベント設定
-  function setupSimpleChangeEvents() {
+  function setupChangeEvents() {
     // スプレッドシート選択時 → シート読み込み
     DOMHelpers.safeAddEventListener('spreadsheet-select', 'change', function () {
       const spreadsheetId = this.value;
@@ -1185,7 +1185,7 @@
     // UnifiedLoadingSystemを使用
     if (window.unifiedLoading) {
       if (loading) {
-        window.unifiedLoading.showSimple(message);
+        window.unifiedLoading.show(message);
       } else {
         window.unifiedLoading.hide();
       }

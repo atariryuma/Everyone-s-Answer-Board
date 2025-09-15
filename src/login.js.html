@@ -156,7 +156,7 @@
     };
 
     // GAS内蔵認証を使用した簡易ログイン処理
-    const handleSimpleLogin = () => {
+    const handleLogin = () => {
       try {
         setLoading(true, 'ユーザー情報確認中…');
 
@@ -183,7 +183,7 @@
     // 初期化処理 - 組織ポリシー制限を回避するため簡易認証を使用
     const init = () => {
       loginBtn.addEventListener('click', () => {
-        handleSimpleLogin();
+        handleLogin();
       });
 
       displayCurrentUserEmail();

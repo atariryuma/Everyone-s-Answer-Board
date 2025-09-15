@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestampSimple */
+/* global ServiceFactory, formatTimestamp */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -260,7 +260,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',
 
           // メタデータ
-          formattedTimestamp: formatTimestampSimple(extractFieldValue(row, headers, 'timestamp')),
+          formattedTimestamp: formatTimestamp(extractFieldValue(row, headers, 'timestamp')),
           isEmpty: isEmptyRow(row),
 
           // リアクション（既存の場合）
@@ -316,7 +316,7 @@ function processRawData(dataRows, headers, config, options = {}) {
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',
 
           // メタデータ
-          formattedTimestamp: formatTimestampSimple(extractFieldValue(row, headers, 'timestamp')),
+          formattedTimestamp: formatTimestamp(extractFieldValue(row, headers, 'timestamp')),
           isEmpty: isEmptyRow(row),
 
           // リアクション（既存の場合）

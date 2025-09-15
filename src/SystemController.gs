@@ -5,6 +5,28 @@
 /* global ServiceFactory, DB, UserService, ConfigService, DatabaseOperations */
 
 // ===========================================
+// 🔧 Zero-Dependency Utility Functions
+// ===========================================
+
+/**
+ * Service Discovery for Zero-Dependency Architecture
+ */
+function getAvailableService(serviceName) {
+  const serviceMap = {
+    'UserService': () => (typeof UserService !== 'undefined') ? UserService : null,
+    'ConfigService': () => (typeof ConfigService !== 'undefined') ? ConfigService : null,
+    'DataService': () => (typeof DataService !== 'undefined') ? DataService : null,
+    'SecurityService': () => (typeof SecurityService !== 'undefined') ? SecurityService : null
+  };
+
+  if (serviceMap[serviceName]) {
+    return serviceMap[serviceName]();
+  }
+  return null;
+}
+
+
+// ===========================================
 // 🔧 DB初期化システム（GAS読み込み順序対応）
 // ===========================================
 
@@ -1147,23 +1169,40 @@ function getUser(kind = 'email') {
  */
 function processLoginAction() {
   try {
-    const userEmail = UserService.getCurrentEmail();
-    if (!userEmail) {
+    console.log('🔍 SystemController.processLoginAction: 開始 (Zero-Dependency)');
+
+    // 🚀 Zero-dependency: 直接SessionからユーザーEmail取得
+    const session = ServiceFactory.getSession();
+    if (!session.isValid || !session.email) {
+      console.warn('SystemController.processLoginAction: 無効なセッション');
       return {
         success: false,
-        message: 'ユーザー情報が取得できません',
+        message: 'ユーザー認証が必要です',
         needsAuth: true
       };
     }
 
-    // ユーザー情報を取得または作成
-    let userInfo = UserService.getCurrentUserInfo();
+    const userEmail = session.email;
+    console.log('🔍 SystemController.processLoginAction: セッションEmail取得', { userEmail });
+
+    // 🚀 Zero-dependency: ServiceFactory経由でUserService取得
+    const userService = getAvailableService('UserService');
+    let userInfo = null;
+
+    if (userService && typeof userService.getCurrentUserInfo === 'function') {
+      userInfo = userService.getCurrentUserInfo();
+      console.log('🔍 SystemController.processLoginAction: UserService経由でuserInfo取得', { hasUserInfo: !!userInfo });
+    }
+
+    // フォールバック: 簡易的なユーザー情報生成
     if (!userInfo) {
-      userInfo = UserService.createUser(userEmail);
-      // createUserの戻り値構造を正規化
-      if (userInfo && userInfo.value) {
-        userInfo = userInfo.value;
-      }
+      console.log('🔍 SystemController.processLoginAction: フォールバック - 簡易userInfo生成');
+      userInfo = {
+        userId: generateUserId(),
+        email: userEmail,
+        createdAt: new Date().toISOString(),
+        accessLevel: 'authenticated_user'
+      };
     }
 
     // 管理パネル用URLを構築（userId必須）

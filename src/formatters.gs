@@ -48,6 +48,26 @@ function createFormatterSuccessResponse(data, metadata = {}) {
 // 📅 データ表示用フォーマット関数群
 // ===========================================
 
+/**
+ * タイムスタンプをフォーマット
+ * @param {string|Date} timestamp - タイムスタンプ
+ * @returns {string} フォーマット済みタイムスタンプ
+ */
+function formatTimestamp(timestamp) {
+  try {
+    if (!timestamp) return '-';
+
+    const date = new Date(timestamp);
+    if (isNaN(date.getTime())) return '-';
+
+    // YYYY/MM/DD HH:MM形式
+    return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
+  } catch (error) {
+    console.warn('formatTimestamp error:', error.message);
+    return '-';
+  }
+}
+
 
 
 

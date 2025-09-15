@@ -341,8 +341,8 @@
   // CACHE MANAGEMENT
   // =============================================================================
 
-  // Enhanced cache manager with TTL and size limits
-  class EnhancedCache {
+  // Cache manager with TTL and size limits
+  class Cache {
     constructor(maxSize = 100, defaultTTL = 300000) {
       // 5 minutes default
       this.cache = new Map();
@@ -773,7 +773,7 @@
 
   class GASUtilities {
     constructor() {
-      this.callCache = new EnhancedCache(50, 1000); // 1 second cache for API calls
+      this.callCache = new Cache(50, 1000); // 1 second cache for API calls
     }
 
     // Cached GAS function call
@@ -830,7 +830,7 @@
         if (loadingType === 'transparent') {
           window.unifiedLoading.showTransparent(message);
         } else {
-          window.unifiedLoading.showSimple(message);
+          window.unifiedLoading.show(message);
         }
 
         google.script.run
@@ -965,7 +965,7 @@
     debounce: new DebounceManager(),
     throttle: new ThrottleManager(),
     dom: new DOMUtilities(),
-    cache: new EnhancedCache(),
+    cache: new Cache(),
     errors: new ErrorHandler(),
     loading: new LoadingManager(),
     gas: new GASUtilities(),
@@ -999,7 +999,7 @@
 
   // Global cache instance for backward compatibility
   if (!window.UnifiedCache) {
-    window.UnifiedCache = EnhancedCache;
+    window.UnifiedCache = Cache;
   }
 
   // DOM ready utility
@@ -1197,8 +1197,8 @@
   // SIMPLE LOADING MANAGER - Minimal loading overlay management
   // =============================================================================
 
-  // Simple loading manager without complex retry/observer logic
-  window.simpleLoading = {
+  // Basic loading manager
+  window.basicLoading = {
     overlay: null,
 
     init: function () {
@@ -1230,16 +1230,16 @@
 
   // Initialize when DOM is ready and provide backward compatibility
   document.addEventListener('DOMContentLoaded', () => {
-    window.simpleLoading.init();
+    window.basicLoading.init();
   });
 
   // Backward compatibility wrapper for existing code
-  window.unifiedLoading = window.simpleLoading;
+  window.unifiedLoading = window.basicLoading;
   window.setLoading = function (isLoading, message) {
     if (isLoading) {
-      window.simpleLoading.show();
+      window.basicLoading.show();
     } else {
-      window.simpleLoading.hide();
+      window.basicLoading.hide();
     }
   };
 
@@ -1450,7 +1450,7 @@
     }
 
     // Convenience methods for different loading types
-    showSimple(message = '処理中...') {
+    show(message = '処理中...') {
       this.setLoading(true, { message, type: 'overlay' });
     }
 
@@ -1513,7 +1513,7 @@
     } else if (typeof step === 'number' && step > 0) {
       window.unifiedLoading.showAdminProgress(message, step, percentage);
     } else {
-      window.unifiedLoading.showSimple(message || '処理中...');
+      window.unifiedLoading.show(message || '処理中...');
     }
   };
 

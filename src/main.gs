@@ -1510,32 +1510,34 @@ function addSpreadsheetUrl(url) {
 /**
  * ログイン処理（login.js.html用）
  */
-function processLoginAction(action) {
+function processLoginAction(action = 'login') {
   try {
-    // FrontendControllerまたはUserServiceに委譲
-    const userService = getAvailableService('UserService');
-    if (userService && typeof userService.processLoginAction === 'function') {
-      return userService.processLoginAction(action);
-    }
+    console.log('🔍 processLoginAction: 開始', { action });
 
-    // シンプルなフォールバック
-    if (action === 'login') {
-      const session = ServiceFactory.getSession();
-      if (session.isValid && session.email) {
-        return {
-          success: true,
-          message: 'ログイン成功',
-          userEmail: session.email
-        };
-      }
+    // 🚀 Direct session-based login (Zero Dependencies)
+    const session = ServiceFactory.getSession();
+    console.log('🔍 processLoginAction: セッション確認', { isValid: session.isValid, hasEmail: !!session.email });
+
+    if (session.isValid && session.email) {
+      // ログイン成功 - 管理パネルURLを生成
+      const baseUrl = getWebAppUrl();
+      const adminUrl = `${baseUrl}?mode=admin&userId=${session.userId || 'auto-generated'}`;
+
+      return {
+        success: true,
+        message: 'ログイン成功',
+        userEmail: session.email,
+        adminUrl: adminUrl,
+        redirectUrl: adminUrl
+      };
     }
 
     return {
       success: false,
-      message: 'ログイン処理に失敗しました'
+      message: 'ユーザー認証に失敗しました。再度お試しください。'
     };
   } catch (error) {
-    console.error('processLoginAction error:', error.message);
+    console.error('🚨 processLoginAction error:', error);
     return {
       success: false,
       message: `ログイン処理エラー: ${error.message}`
