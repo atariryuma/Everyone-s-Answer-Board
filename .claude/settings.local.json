@@ -13,7 +13,11 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(npm run test:*)",
-      "Bash(clasp push:*)"
+      "Bash(clasp push:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(grep:*)",
+      "Bash(git ls-tree:*)"
     ],
     "deny": [],
     "ask": [],

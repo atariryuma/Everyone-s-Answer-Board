@@ -85,6 +85,73 @@ class AnswerBoardDataLoader {
     this.newContentCount = 0;
   }
 
+  // === f0068fa版復元機能 ===
+
+  // フォームURL検出（新機能）
+  async detectFormUrl(sheetId = null) {
+    try {
+      return await this.callGAS('detectFormUrl', sheetId);
+    } catch (error) {
+      console.warn('Form URL detection failed:', error);
+      return { success: false, formUrl: null };
+    }
+  }
+
+  // ドメイン認証チェック（新機能）
+  async checkDomainAuth(userEmail = null) {
+    try {
+      return await this.callGAS('checkDomainAuth', userEmail);
+    } catch (error) {
+      console.warn('Domain auth check failed:', error);
+      return { success: false, domainStatus: 'unknown' };
+    }
+  }
+
+  // 新着コンテンツ検出（新機能）
+  async detectNewContent(lastUpdateTime) {
+    try {
+      return await this.callGAS('detectNewContent', lastUpdateTime);
+    } catch (error) {
+      console.warn('New content detection failed:', error);
+      return { success: false, hasNewContent: false };
+    }
+  }
+
+  // 差分更新チェック（高度な機能）
+  async checkForUpdates() {
+    const now = new Date().toISOString();
+    const lastCheck = localStorage.getItem('lastUpdateCheck') || new Date(0).toISOString();
+
+    const result = await this.detectNewContent(lastCheck);
+
+    if (result.success && result.hasNewContent) {
+      this.showNewContentBanner(result.newItemsCount, result.newItems);
+    }
+
+    localStorage.setItem('lastUpdateCheck', now);
+    return result;
+  }
+
+  // 新着コンテンツバナー表示
+  showNewContentBanner(count, items) {
+    const banner = document.getElementById('newContentBanner');
+    if (!banner) return;
+
+    const textElement = document.getElementById('newContentText');
+    if (textElement) {
+      textElement.textContent = `${count}件の新しい回答が投稿されました`;
+    }
+
+    banner.classList.add('show');
+
+    // 10秒後に自動非表示
+    setTimeout(() => {
+      if (banner.classList.contains('show')) {
+        banner.classList.remove('show');
+      }
+    }, 10000);
+  }
+
   // 現在のGAS API関数に合わせた呼び出し
   async callGAS(funcName, ...args) {
     const key = `${funcName}_${JSON.stringify(args)}`;
@@ -918,9 +985,121 @@ document.addEventListener('click', async (e) => {
   }
 });
 
+// === f0068fa版 高度な初期化システム ===
+
+// ドメイン認証とフォーム検出
+async function initializeAdvancedFeatures() {
+  try {
+    // ドメイン認証チェック
+    const domainAuthResult = await window.answerApp.loader.checkDomainAuth();
+    updateDomainAuthDisplay(domainAuthResult);
+
+    // フォームURL検出
+    const formResult = await window.answerApp.loader.detectFormUrl();
+    updateFormLinkDisplay(formResult);
+
+    // 新着コンテンツチェック開始
+    startNewContentPolling();
+
+  } catch (error) {
+    console.warn('Advanced features initialization failed:', error);
+  }
+}
+
+// ドメイン認証表示更新
+function updateDomainAuthDisplay(result) {
+  const initialEl = document.getElementById('header-domain-initial');
+  const matchEl = document.getElementById('header-domain-match');
+  const mismatchEl = document.getElementById('header-domain-mismatch');
+
+  if (!result.success) {
+    console.warn('Domain auth check failed');
+    return;
+  }
+
+  // 初期状態を隠す
+  if (initialEl) initialEl.classList.add('hidden');
+
+  if (result.domainStatus === 'school_domain') {
+    if (matchEl) {
+      matchEl.classList.remove('hidden');
+      const textEl = document.getElementById('header-domain-match-text');
+      if (textEl) textEl.textContent = '学校ドメイン';
+    }
+  } else if (result.domainStatus === 'external_access') {
+    if (mismatchEl) {
+      mismatchEl.classList.remove('hidden');
+      const textEl = document.getElementById('header-domain-mismatch-text');
+      if (textEl) textEl.textContent = '外部アクセス';
+    }
+  }
+}
+
+// フォームリンク表示更新
+function updateFormLinkDisplay(result) {
+  const formLinkBtn = document.getElementById('form-link-btn');
+
+  if (result.success && result.formUrl) {
+    if (formLinkBtn) {
+      formLinkBtn.href = result.formUrl;
+      formLinkBtn.classList.remove('hidden');
+
+      // フォームタイトルがある場合は表示を更新
+      if (result.formTitle) {
+        const titleSpan = formLinkBtn.querySelector('span');
+        if (titleSpan) {
+          titleSpan.textContent = `📝 ${result.formTitle}`;
+        }
+      }
+    }
+  }
+}
+
+// 新着コンテンツポーリング開始
+function startNewContentPolling() {
+  // 初回チェック
+  setTimeout(() => {
+    if (window.answerApp && window.answerApp.loader) {
+      window.answerApp.loader.checkForUpdates();
+    }
+  }, 30000); // 30秒後に初回チェック
+
+  // 定期的チェック（3分間隔）
+  setInterval(() => {
+    if (window.answerApp && window.answerApp.loader) {
+      window.answerApp.loader.checkForUpdates();
+    }
+  }, 180000);
+}
+
+// 新着通知バナーのイベントリスナー
+document.addEventListener('click', (e) => {
+  // 更新して表示ボタン
+  if (e.target.id === 'refreshContentBtn') {
+    e.preventDefault();
+    if (window.answerApp) {
+      window.answerApp.loadAnswers(window.answerApp.currentSort);
+    }
+    const banner = document.getElementById('newContentBanner');
+    if (banner) banner.classList.remove('show');
+  }
+
+  // 通知を閉じるボタン
+  if (e.target.id === 'dismissBannerBtn') {
+    e.preventDefault();
+    const banner = document.getElementById('newContentBanner');
+    if (banner) banner.classList.remove('show');
+  }
+});
+
 // アプリケーション起動
 document.addEventListener('DOMContentLoaded', () => {
   window.answerApp = new AnswerApp();
+
+  // 高度な機能を遅延初期化（UIロード後）
+  setTimeout(() => {
+    initializeAdvancedFeatures();
+  }, 2000);
 });
 
 </script>
