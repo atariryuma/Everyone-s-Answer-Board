@@ -363,8 +363,6 @@
     </div>
 
     <script>
-      let currentUserInfo = null;
-      let setupInProgress = false;
 
       // メッセージ表示関数 (通知として右上に表示)
       function showMessage(message, type = 'info', duration = 5000) {
@@ -414,68 +412,7 @@
         }
       }
 
-      // 現在のステータスを取得して表示（無効化 - UI削除済み）
-      function loadCurrentStatus() {
-        // UI要素が削除されたため何もしない
-        console.log('loadCurrentStatus: UI elements removed, skipping');
-      }
 
-      // ステータス表示を更新（無効化 - UI削除済み）
-      function updateStatusDisplay(appInfo) {
-        // UI要素が削除されたため何もしない
-        console.log('updateStatusDisplay: UI elements removed, skipping');
-      }
-
-      // コントロールを有効化（無効化 - UI削除済み）
-      function enableControls() {
-        // UI要素が削除されたため何もしない
-        console.log('enableControls: UI elements removed, skipping');
-      }
-
-      // isActive状態を更新
-      function updateIsActiveStatus(isActive) {
-        if (setupInProgress) return;
-        setupInProgress = true;
-
-        const updateBtn = document.getElementById('updateStatusBtn');
-        const updateText = document.getElementById('update-text');
-        const updateSpinner = document.getElementById('update-spinner');
-
-        try {
-          // ボタン状態を変更
-          updateBtn.disabled = true;
-          updateText.style.display = 'none';
-          updateSpinner.classList.remove('hidden');
-
-          showMessage(isActive ? 'アプリを有効化中...' : 'アプリを無効化中...', 'info');
-
-          google.script.run
-            .withSuccessHandler((result) => {
-              if (result.status === 'success') {
-                showMessage(`✅ ${result.message}`, 'success');
-                // ステータスを再読み込み
-                loadCurrentStatus();
-              } else {
-                showMessage(`❌ ${result.message}`, 'error');
-              }
-            })
-            .withFailureHandler((error) => {
-              console.error('Update error:', error);
-              showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
-            })
-            .setAppStatus(isActive);
-        } catch (error) {
-          showMessage(`❌ ${error.message}`, 'error');
-        } finally {
-          // ボタン状態をリセット
-          setTimeout(() => {
-            updateBtn.disabled = false;
-            updateText.style.display = 'inline';
-            updateSpinner.classList.add('hidden');
-            setupInProgress = false;
-          }, 1000);
-        }
-      }
 
       // 管理パネルに戻る
       function goBackToAdminPanel() {
@@ -493,18 +430,11 @@
           .getWebAppUrl();
       }
 
-      // ページ読み込み時の処理
-      window.addEventListener('load', function () {
-        loadCurrentStatus();
-      });
 
       // ユーザー管理機能のJavaScript関数
-      let userManagementVisible = false;
       let currentUserList = [];
       let userToDelete = null;
 
-      // 不要になった関数（ユーザー管理は常時表示に変更）
-      // function toggleUserManagement() { /* 削除済み */ }
 
       // ユーザー一覧を取得して表示
       function loadUserList() {
