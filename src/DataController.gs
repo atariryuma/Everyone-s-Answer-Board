@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ServiceFactory, ConfigService, DataService, DatabaseOperations, getCurrentEmail, createErrorResponse */
+/* global ServiceFactory, ConfigService, DataService, DatabaseOperations, getCurrentEmail, createErrorResponse, getUserSheetData */
 
 // ===========================================
 // 📊 メインページデータAPI
@@ -51,7 +51,7 @@ function handleGetData(request) {
       console.error('getMainPageData: DataService not available');
       return createErrorResponse('DataServiceが利用できません');
     }
-    const data = dataService.getSheetData(user.userId, request.options || {});
+    const data = getUserSheetData(user.userId, request.options || {});
     return {
       success: true,
       data
@@ -247,7 +247,7 @@ function getRecentSubmissions(userId, limit = 10) {
       console.error('getRecentSubmissions: DataService not available');
       return createErrorResponse('DataServiceが利用できません');
     }
-    const data = dataService.getSheetData(userId, { limit, includeTimestamp: true });
+    const data = getUserSheetData(userId, { limit, includeTimestamp: true });
     return {
       success: true,
       data,

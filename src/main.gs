@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, DatabaseOperations, DataService, SystemController, UserService, ServiceFactory, isSystemAdmin, validateConfig, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps */
+/* global handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, DatabaseOperations, DataService, SystemController, UserService, ServiceFactory, isSystemAdmin, validateConfig, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, processReaction, columnAnalysisImpl */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -230,7 +230,7 @@ function doGet(e) {
           console.log('view mode: serving published board for user:', userId);
           const template = HtmlService.createTemplateFromFile('Page.html');
           template.data = {
-            userId: userId,
+            userId,
             userEmail: user.userEmail || null
           };
           return template.evaluate();
@@ -520,7 +520,7 @@ function addReaction(userEmail, rowIndex, reactionKey) {
     }
 
     // Delegate to DataService unified implementation
-    const res = DataService.processReaction(
+    const res = processReaction(
       config.spreadsheetId,
       config.sheetName,
       rowIndex,
@@ -1106,6 +1106,39 @@ function getBoardInfo() {
 }
 
 /**
+ * Get sheet data - API Gateway function for DataService
+ * @param {string} userId - ユーザーID
+ * @param {Object} options - 取得オプション
+ * @returns {Object} シートデータ取得結果
+ */
+function getSheetData(userId, options = {}) {
+  try {
+    if (!userId) {
+      console.warn('getSheetData: userId not provided');
+      return createErrorResponse('ユーザーIDが必要です', { data: [], headers: [], sheetName: '' });
+    }
+
+    console.log('getSheetData: calling getUserSheetData', { userId, hasOptions: !!options });
+
+    // Delegate to DataService using Zero-Dependency pattern
+    const result = getUserSheetData(userId, options);
+
+    console.log('getSheetData: DataService result', {
+      success: result?.success,
+      hasData: !!result?.data,
+      dataLength: result?.data?.length || 0,
+      hasHeaders: !!result?.headers,
+      sheetName: result?.sheetName || 'undefined'
+    });
+
+    return result;
+  } catch (error) {
+    console.error('getSheetData error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
  * Column analysis - direct call to DataService
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} sheetName - シート名
@@ -1114,7 +1147,8 @@ function getBoardInfo() {
  */
 function columnAnalysis(spreadsheetId, sheetName, options = {}) {
   try {
-    return DataService.columnAnalysis(spreadsheetId, sheetName, options);
+    // Call the actual implementation in DataService.gs
+    return columnAnalysisImpl(spreadsheetId, sheetName, options);
   } catch (error) {
     console.error('columnAnalysis error:', error.message);
     return createExceptionResponse(error);

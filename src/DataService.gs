@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse */
+/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -41,7 +41,7 @@ function initDataServiceZero() {
  * @param {Object} options - 取得オプション
  * @returns {Object} GAS公式推奨レスポンス形式
  */
-function getSheetData(userId, options = {}) {
+function getUserSheetData(userId, options = {}) {
   const startTime = Date.now();
 
   try {
@@ -910,7 +910,7 @@ function getSpreadsheetList() {
  * @param {boolean} options.forceFullAnalysis - フル分析を強制実行（設定復元・基本ヘッダーをスキップ）
  * @returns {Object} 列分析結果
  */
-function columnAnalysis(spreadsheetId, sheetName, options = {}) {
+function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
   const started = Date.now();
   try {
     console.log('DataService.columnAnalysis: 開始', {
