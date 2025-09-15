@@ -1069,6 +1069,11 @@ function validateSheetParams(spreadsheetId, sheetName) {
 function connectToSheetInternal(spreadsheetId, sheetName) {
   try {
     console.log('DataService.connectToSheetInternal: スプレッドシート接続開始');
+    console.log('DataService.connectToSheetInternal: パラメータ確認', {
+      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
+      sheetName: sheetName || 'null'
+    });
+
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
     console.log('DataService.connectToSheetInternal: スプレッドシート接続成功');
 
@@ -1220,7 +1225,20 @@ function restoreColumnConfig(userId, spreadsheetId, sheetName) {
  */
 function getSheetHeaders(spreadsheetId, sheetName, started) {
   try {
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
+    console.log('getSheetHeaders: ServiceFactory.getSpreadsheet()呼び出し開始');
+    const spreadsheetService = ServiceFactory.getSpreadsheet();
+    console.log('getSheetHeaders: spreadsheetService取得結果', { isNull: spreadsheetService === null });
+
+    if (!spreadsheetService) {
+      console.error('getSheetHeaders: ServiceFactory.getSpreadsheet()がnullを返しました');
+      return {
+        success: false,
+        message: 'ServiceFactory.getSpreadsheet()がnullを返しました',
+        headers: []
+      };
+    }
+
+    const spreadsheet = spreadsheetService.openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
