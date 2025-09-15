@@ -353,7 +353,7 @@
       console.log('🔧 setupColumns: 列設定を初期化中:', { spreadsheetId, sheetName, existingColumnMapping });
 
       // 1. まず設定から復元を試行（既存設定がある場合）
-      const userId = getUserId();
+      const userId = __USER_ID__;
       let analysisResult;
 
       if (existingColumnMapping?.mapping &&
@@ -1391,7 +1391,7 @@
     setPartialLoading(true, '画面遷移中...');
     google.script.run
       .withSuccessHandler(function (webAppUrl) {
-        const userId = getUserId();
+        const userId = __USER_ID__;
         const setupUrl = webAppUrl + '?mode=appSetup' + (userId ? '&userId=' + userId : '');
         window.open(setupUrl, '_top');
       })

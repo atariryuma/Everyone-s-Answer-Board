@@ -684,6 +684,23 @@ function deleteUser(userId, reason = '') {
 
 
 /**
+ * Check if current user is admin - simplified name
+ */
+function isAdmin() {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return false;
+    }
+    return isSystemAdmin(email);
+  } catch (error) {
+    console.error('isAdmin error:', error.message);
+    return false;
+  }
+}
+
+
+/**
  * Get logs - simplified name
  */
 function getLogs(options = {}) {
