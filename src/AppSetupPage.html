@@ -13,28 +13,10 @@
     
     <!-- Shared Styles -->
     <?!= include('UnifiedStyles'); ?>
-    <!-- Safe template variable injection using HTML data attributes -->
-    <div id="app-data" data-user-id="<?= typeof userId !== 'undefined' && userId ? userId.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '' ?>" style="display: none;"></div>
-    
     <script>
-      // Safe template variable extraction from data attributes
+      // System admin access - no userId needed
       let __USER_ID__ = '';
-      try {
-        const appData = document.getElementById('app-data');
-        if (appData) {
-          __USER_ID__ = appData.getAttribute('data-user-id') || '';
-          if (__USER_ID__) {
-            console.log('✅ User ID loaded safely from data attribute:', __USER_ID__);
-          } else {
-            console.warn('⚠️ User ID is empty, using fallback');
-          }
-        } else {
-          console.warn('⚠️ App data element not found, using fallback');
-        }
-      } catch (error) {
-        console.error('🚨 Template variable extraction error:', error);
-        __USER_ID__ = '';
-      }
+      console.log('✅ AppSetup page loaded for system administrator');
     </script>
   </head>
   <body>

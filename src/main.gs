@@ -110,7 +110,20 @@ function doGet(e) {
       }
 
       case 'appSetup': {
-        // New setup route targeting AppSetupPage.html
+        // System admin only setup page
+        const email = getCurrentEmail();
+        if (!email) {
+          return HtmlService.createTemplateFromFile('LoginPage.html').evaluate();
+        }
+
+        // Check if user is system admin
+        const userService = ServiceFactory.getUserService();
+        if (!userService.isSystemAdmin(email)) {
+          console.warn('appSetup access denied:', email);
+          return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+        }
+
+        console.log('appSetup access granted for system admin:', email);
         return HtmlService.createTemplateFromFile('AppSetupPage.html').evaluate();
       }
 

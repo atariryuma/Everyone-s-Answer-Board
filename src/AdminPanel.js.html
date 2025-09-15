@@ -1822,6 +1822,20 @@
     // AI検出情報を表示
     displayAIDetectionInfo(mapping);
 
+    // 接続時は保存済み設定を強制復元（重複実行防止をバイパス）
+    if (!mapping) {
+      const currentDropdowns = {
+        answer: DOMHelpers.safeGetById('answer-column'),
+        reason: DOMHelpers.safeGetById('reason-column'),
+        class: DOMHelpers.safeGetById('class-column'),
+        name: DOMHelpers.safeGetById('name-column')
+      };
+
+      // 重複実行防止をリセットして強制復元
+      lastMappingRestore = null;
+      restoreColumnSelection(currentDropdowns);
+    }
+
     showSuccess('✅ 列設定を更新しました');
   }
 
