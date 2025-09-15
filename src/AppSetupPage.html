@@ -80,9 +80,9 @@
           <div class="p-4 bg-gray-800 rounded-lg">
             <div class="flex items-center justify-between mb-3">
               <div>
-                <h3 class="text-lg font-medium text-white">アプリケーション全体制御</h3>
+                <h3 class="text-lg font-medium text-white">個別ボード公開制御</h3>
                 <p class="text-sm text-gray-400">
-                  システム全体の利用可能状態を制御します（システム管理者以外のアクセス制限）
+                  あなたのボードの公開状態を制御します
                 </p>
               </div>
               <div class="flex items-center">
@@ -104,10 +104,10 @@
 
             <!-- 詳細説明 -->
             <div class="text-sm text-gray-400 mb-4">
-              <p><strong>有効 (ON):</strong> 全ユーザーがアプリにアクセス可能</p>
-              <p><strong>無効 (OFF):</strong> システム管理者以外のアクセスを制限</p>
-              <p class="text-xs text-yellow-400 mt-2">
-                ⚠️ 注意: これはシステム全体の制御で、個別ユーザーのisActiveとは別の機能です
+              <p><strong>公開 (ON):</strong> あなたのボードが一般公開される</p>
+              <p><strong>非公開 (OFF):</strong> あなたのボードは非公開状態</p>
+              <p class="text-xs text-blue-400 mt-2">
+                💡 ヒント: これはあなたのボード個別の公開制御です
               </p>
             </div>
 
@@ -129,25 +129,25 @@
           <!-- 使用シナリオの説明 -->
           <div class="p-4 bg-gray-900 rounded-lg">
             <h4 class="text-md font-medium text-cyan-400 mb-3">
-              🎯 アプリケーション全体制御の使用シナリオ
+              🎯 個別ボード公開制御の使用シナリオ
             </h4>
             <div class="grid md:grid-cols-2 gap-4 text-sm text-gray-300">
               <div>
-                <h5 class="font-medium text-white mb-2">緊急メンテナンス</h5>
-                <p>システム全体の緊急停止が必要な場合。管理者のみアクセス可能になります。</p>
+                <h5 class="font-medium text-white mb-2">授業準備中</h5>
+                <p>ボード設定や問題文の準備中で、まだ生徒に公開したくない場合。</p>
               </div>
               <div>
-                <h5 class="font-medium text-white mb-2">大規模アップデート</h5>
-                <p>データベース構造変更など、全ユーザーアクセスを停止する必要がある場合。</p>
+                <h5 class="font-medium text-white mb-2">授業終了後</h5>
+                <p>授業が終了し、生徒からの回答受付を停止したい場合。</p>
               </div>
               <div>
-                <h5 class="font-medium text-white mb-2">セキュリティ問題対応</h5>
-                <p>セキュリティ脆弱性発見時の緊急アクセス制限。調査・修正期間中の保護。</p>
+                <h5 class="font-medium text-white mb-2">内容の修正</h5>
+                <p>ボード内容に誤りがあり、一時的に非公開にして修正作業を行う場合。</p>
               </div>
               <div>
-                <h5 class="font-medium text-white mb-2">個別ユーザー制御との違い</h5>
+                <h5 class="font-medium text-white mb-2">プライバシー制御</h5>
                 <p>
-                  これはシステム全体制御。個別ユーザーのisActive管理は別途ユーザー管理セクションで行います。
+                  あなた専用のボード公開制御。他のユーザーのボードには影響しません。
                 </p>
               </div>
             </div>

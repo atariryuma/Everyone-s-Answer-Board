@@ -545,21 +545,29 @@ function getSystemDomainInfo() {
  */
 function getAppStatus() {
   try {
-    // Verify system admin access
     const email = getCurrentEmail();
     if (!email) {
       return createErrorResponse('Authentication required');
     }
 
-    const userService = ServiceFactory.getUserService();
-    if (!userService.isSystemAdmin(email)) {
-      console.warn('getAppStatus access denied:', email);
-      return createErrorResponse('System administrator access required');
+    // ユーザー情報とconfigJsonを取得
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
+    if (!user) {
+      return createErrorResponse('User not found');
     }
 
-    // Get application status
-    const props = ServiceFactory.getProperties();
-    const isActive = props.getProperty('APP_STATUS') !== 'inactive';
+    let config = {};
+    if (user.configJson) {
+      try {
+        config = JSON.parse(user.configJson);
+      } catch (parseError) {
+        console.warn('getAppStatus: config parse error', parseError);
+      }
+    }
+
+    // ユーザーのボード公開状態を取得
+    const isActive = Boolean(config.appPublished);
 
     return {
       status: 'success',
@@ -567,7 +575,8 @@ function getAppStatus() {
       isActive,
       appStatus: isActive ? 'active' : 'inactive',
       timestamp: new Date().toISOString(),
-      adminEmail: email
+      adminEmail: email,
+      userId: user.userId
     };
   } catch (error) {
     console.error('getAppStatus error:', error.message);
@@ -582,18 +591,52 @@ function getAppStatus() {
 function setAppStatus(isActive) {
   try {
     const email = getCurrentEmail();
-    if (!email || !isSystemAdmin(email)) {
-      return createAdminRequiredError();
+    if (!email) {
+      return createAuthError();
     }
 
-    const props = ServiceFactory.getProperties();
-    props.setProperty('APP_STATUS', isActive ? 'active' : 'inactive');
+    // ユーザー情報を取得
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
+    if (!user) {
+      return createUserNotFoundError();
+    }
+
+    // 現在の設定を取得
+    let config = {};
+    if (user.configJson) {
+      try {
+        config = JSON.parse(user.configJson);
+      } catch (parseError) {
+        console.warn('setAppStatus: config parse error', parseError);
+      }
+    }
+
+    // ボード公開状態を更新
+    config.appPublished = Boolean(isActive);
+    if (isActive) {
+      config.publishedAt = config.publishedAt || new Date().toISOString();
+    }
+    config.lastModified = new Date().toISOString();
+
+    // データベースに保存
+    const updatedUser = {
+      ...user,
+      configJson: JSON.stringify(config),
+      lastModified: new Date().toISOString()
+    };
+
+    const result = db.updateUser(user.userId, updatedUser);
+    if (!result.success) {
+      return createErrorResponse('Failed to update user configuration');
+    }
 
     return {
       success: true,
-      isActive,
+      isActive: Boolean(isActive),
       status: isActive ? 'active' : 'inactive',
       updatedBy: email,
+      userId: user.userId,
       timestamp: new Date().toISOString()
     };
   } catch (error) {
@@ -801,10 +844,6 @@ function getBoardInfo() {
       return { success: false, message: 'User not found' };
     }
 
-    const props = ServiceFactory.getProperties();
-    const appStatus = props.getProperty('APP_STATUS');
-    const appPublished = appStatus === 'active';
-
     const baseUrl = ScriptApp.getService().getUrl();
     let config = {};
     if (user.configJson) {
@@ -814,6 +853,9 @@ function getBoardInfo() {
         console.warn('getBoardInfo: config parse error', parseError);
       }
     }
+
+    // ユーザーのconfigJsonからボード公開状態を取得
+    const appPublished = Boolean(config.appPublished);
 
     return {
       success: true,
