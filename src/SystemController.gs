@@ -31,9 +31,10 @@ function initDatabaseConnection() {
 
     // Method 2: DatabaseOperationsが直接利用可能な場合
     if (typeof DatabaseOperations !== 'undefined') {
-      // グローバルDB変数を設定
+      // グローバルDB変数を設定（環境互換: globalThis/this）
       if (typeof DB === 'undefined') {
-        global.DB = DatabaseOperations;
+        const __rootDB = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
+        __rootDB.DB = DatabaseOperations;
       }
       return DatabaseOperations;
     }

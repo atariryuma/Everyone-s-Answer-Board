@@ -307,7 +307,8 @@ function diagnose() {
  * ServiceFactory統一インターフェース
  * Zero-Dependency Architecture統合層
  */
-global.ServiceFactory = {
+const __rootSF = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
+__rootSF.ServiceFactory = {
   getSession,
   getProperties,
   getCache,
