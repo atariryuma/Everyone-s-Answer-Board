@@ -2031,6 +2031,12 @@
   function setAIDetectionSelections(mapping, dropdowns) {
     console.log('setAIDetectionSelections:', mapping);
 
+    // 防御的チェック: mappingがundefined/nullの場合は早期リターン
+    if (!mapping || typeof mapping !== 'object') {
+      console.log('💡 AI検出結果がありません - 手動選択をお使いください');
+      return;
+    }
+
     // グローバル変数として現在のAI検出結果を保存
     window.currentAIMapping = mapping;
 
@@ -2259,6 +2265,13 @@
   function displayAIDetectionInfo(mapping) {
     const detailsDiv = document.getElementById('ai-detection-details');
     if (!detailsDiv) return;
+
+    // 防御的チェック: mappingがundefined/nullの場合は早期リターン
+    if (!mapping || typeof mapping !== 'object') {
+      console.log('💡 AI検出結果がありません - displayAIDetectionInfo');
+      detailsDiv.innerHTML = '<div class="text-gray-400 text-sm">AI検出結果がありません</div>';
+      return;
+    }
 
     const details = [];
     const columnNames = {
