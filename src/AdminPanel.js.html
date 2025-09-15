@@ -1530,8 +1530,11 @@
       console.log('📋 connectToSheet: シート接続を開始:', { spreadsheetId, sheetName });
       showInfo('📋 シートに接続しています...');
 
-      // 1. フル列分析を実行（AI検出と設定復元込み）
-      let analysisResult = await analyzeColumns(spreadsheetId, sheetName);
+      // 1. フル列分析を実行（AI検出込み - 設定復元なし）
+      showInfo('🔍 AI列判定を実行中...');
+      let analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
+        forceFullAnalysis: true
+      });
 
       // 2. 列分析が失敗した場合は基本ヘッダーのみ取得を試行
       if (!analysisResult || !analysisResult.success) {
@@ -1822,19 +1825,8 @@
     // AI検出情報を表示
     displayAIDetectionInfo(mapping);
 
-    // 接続時は保存済み設定を強制復元（重複実行防止をバイパス）
-    if (!mapping) {
-      const currentDropdowns = {
-        answer: DOMHelpers.safeGetById('answer-column'),
-        reason: DOMHelpers.safeGetById('reason-column'),
-        class: DOMHelpers.safeGetById('class-column'),
-        name: DOMHelpers.safeGetById('name-column')
-      };
-
-      // 重複実行防止をリセットして強制復元
-      lastMappingRestore = null;
-      restoreColumnSelection(currentDropdowns);
-    }
+    // 接続時はAI検出結果を優先し、保存済み設定復元は行わない
+    // AI検出が無い場合のみヘッダー情報を表示
 
     showSuccess('✅ 列設定を更新しました');
   }

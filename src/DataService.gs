@@ -907,6 +907,7 @@ function getSpreadsheetList() {
  * @param {boolean} options.basicOnly - 基本ヘッダー情報のみ取得
  * @param {boolean} options.useConfigJson - configJsonからマッピング復元
  * @param {string} options.userId - ユーザーID（設定復元用）
+ * @param {boolean} options.forceFullAnalysis - フル分析を強制実行（設定復元・基本ヘッダーをスキップ）
  * @returns {Object} 列分析結果
  */
 function columnAnalysis(spreadsheetId, sheetName, options = {}) {
@@ -924,18 +925,23 @@ function columnAnalysis(spreadsheetId, sheetName, options = {}) {
       return paramValidation.errorResponse;
     }
 
-    // 🎯 configJsonからの設定復元（優先実行）
-    if (options.useConfigJson && options.userId) {
-      const configResult = restoreColumnConfig(options.userId, spreadsheetId, sheetName);
-      if (configResult.success) {
-        console.log('DataService.columnAnalysis: configJson復元成功');
-        return configResult;
+    // 🎯 フル分析強制実行の場合は設定復元・基本ヘッダーをスキップ
+    if (!options.forceFullAnalysis) {
+      // 🎯 configJsonからの設定復元（優先実行）
+      if (options.useConfigJson && options.userId) {
+        const configResult = restoreColumnConfig(options.userId, spreadsheetId, sheetName);
+        if (configResult.success) {
+          console.log('DataService.columnAnalysis: configJson復元成功');
+          return configResult;
+        }
       }
-    }
 
-    // 🎯 基本ヘッダー情報のみ取得
-    if (options.basicOnly) {
-      return getSheetHeaders(spreadsheetId, sheetName, started);
+      // 🎯 基本ヘッダー情報のみ取得
+      if (options.basicOnly) {
+        return getSheetHeaders(spreadsheetId, sheetName, started);
+      }
+    } else {
+      console.log('DataService.columnAnalysis: フル分析を強制実行');
     }
 
     // 🎯 GAS Best Practice: スプレッドシート接続を別関数に分離
