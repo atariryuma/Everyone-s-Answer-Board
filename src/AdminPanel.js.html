@@ -2880,13 +2880,33 @@
     try {
       setPartialLoading(true, 'アプリ設定画面に移動中...');
 
-      // 現在のURLからベースURLを取得してappSetupモードで遷移
-      const currentUrl = new URL(window.location.href);
-      const baseUrl = currentUrl.origin + currentUrl.pathname;
-      const setupUrl = baseUrl + '?mode=appSetup';
+      // Google Apps Script WebApp URL取得してappSetupモードで遷移
+      google.script.run
+        .withSuccessHandler(function (webAppUrl) {
+          const setupUrl = webAppUrl + '?mode=appSetup';
+          console.log('アプリ設定画面への遷移:', setupUrl);
 
-      console.log('アプリ設定画面への遷移:', setupUrl);
-      window.location.href = setupUrl;
+          // Google Apps Script環境では window.open(_top) を使用
+          window.open(setupUrl, '_top');
+        })
+        .withFailureHandler(function (error) {
+          console.error('WebApp URL取得エラー:', error);
+          setPartialLoading(false);
+          showError('アプリ設定画面への移動に失敗しました');
+
+          // フォールバック: 現在のURLベースで遷移
+          try {
+            const currentUrl = new URL(window.location.href);
+            const baseUrl = currentUrl.origin + currentUrl.pathname;
+            const setupUrl = baseUrl + '?mode=appSetup';
+            console.log('フォールバック遷移:', setupUrl);
+            window.open(setupUrl, '_top');
+          } catch (fallbackError) {
+            console.error('フォールバック遷移も失敗:', fallbackError);
+          }
+        })
+        .getWebAppUrl();
+
     } catch (error) {
       console.error('openAppSetup error:', error);
       showError('アプリ設定画面への移動に失敗しました');
