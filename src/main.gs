@@ -87,8 +87,33 @@ function doGet(e) {
         return adminTmpl.evaluate();
       }
 
-      case 'setup':
-        return HtmlService.createTemplateFromFile('SetupPage.html').evaluate();
+      case 'setup': {
+        // Only allow initial setup when core properties are NOT configured (no DB, no SA creds, no admin email)
+        let showSetup = false;
+        try {
+          if (typeof hasCoreSystemProps === 'function') {
+            showSetup = !hasCoreSystemProps();
+          } else {
+            const props = ServiceFactory.getProperties();
+            const hasAdmin = !!props.getProperty('ADMIN_EMAIL');
+            const hasDb = !!props.getProperty('DATABASE_SPREADSHEET_ID');
+            const hasCreds = !!props.getProperty('SERVICE_ACCOUNT_CREDS');
+            showSetup = !(hasAdmin && hasDb && hasCreds);
+          }
+        } catch (e) {
+          // Conservative: if check fails, assume setup allowed
+          showSetup = true;
+        }
+
+        return showSetup
+          ? HtmlService.createTemplateFromFile('SetupPage.html').evaluate()
+          : HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+      }
+
+      case 'appSetup': {
+        // New setup route targeting AppSetupPage.html
+        return HtmlService.createTemplateFromFile('AppSetupPage.html').evaluate();
+      }
 
       case 'main':
       default: {
@@ -440,13 +465,18 @@ function processLoginAction() {
     }
 
     const baseUrl = ScriptApp.getService().getUrl();
+    const redirectUrl = `${baseUrl}?mode=admin&userId=${user.userId}`;
+    // Return redirect URL at top-level for client compatibility
     return {
       success: true,
       message: 'Login successful',
+      redirectUrl,
+      adminUrl: redirectUrl,
+      url: redirectUrl,
       data: {
         userId: user.userId,
         email,
-        redirectUrl: `${baseUrl}?mode=admin&userId=${user.userId}`
+        redirectUrl
       }
     };
   } catch (error) {

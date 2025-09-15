@@ -250,26 +250,34 @@
       // IconLibraryが後から読み込まれる場合に備えて
       setTimeout(initializeAccessRestrictedIcons, 100);
 
-      // アプリ設定リンクの動的URL生成
+      // アプリ設定リンクの動的URL生成（本番URLを取得して生成）
       document.addEventListener('DOMContentLoaded', function() {
         const appSetupLink = document.getElementById('app-setup-link');
-        if (appSetupLink) {
-          // 現在のユーザー情報を取得してURLを構築
-          google.script.run
-            .withSuccessHandler(function(userInfo) {
-              const baseUrl = window.location.href.split('?')[0];
-              const userId = userInfo?.userId || '';
-              const targetUrl = `${baseUrl}?mode=appSetup${userId ? '&userId=' + userId : ''}`;
-              appSetupLink.href = targetUrl;
-            })
-            .withFailureHandler(function(error) {
-              console.error('ユーザー情報取得失敗:', error);
-              // フォールバック：userIdなしでappSetupに遷移
-              const baseUrl = window.location.href.split('?')[0];
-              appSetupLink.href = `${baseUrl}?mode=appSetup`;
-            })
-            .getUser('full');
-        }
+        if (!appSetupLink) return;
+
+        // Web アプリの本番URLを取得（window.location 由来の開発URLを回避）
+        google.script.run
+          .withSuccessHandler(function(webAppUrl) {
+            // 現在のユーザー情報を取得してURLを構築
+            google.script.run
+              .withSuccessHandler(function(userInfo) {
+                const userId = (userInfo && userInfo.userId) ? userInfo.userId : '';
+                const targetUrl = `${webAppUrl}?mode=appSetup${userId ? '&userId=' + userId : ''}`;
+                appSetupLink.href = targetUrl;
+              })
+              .withFailureHandler(function(error) {
+                console.error('ユーザー情報取得失敗:', error);
+                appSetupLink.href = `${webAppUrl}?mode=appSetup`;
+              })
+              .getUser('full');
+          })
+          .withFailureHandler(function(error) {
+            console.error('WebApp URL取得失敗:', error);
+            // フォールバック: 現在URLからクエリ除去して生成
+            const baseUrl = window.location.href.split('?')[0];
+            appSetupLink.href = `${baseUrl}?mode=appSetup`;
+          })
+          .getWebAppUrl();
       });
     </script>
   </body>

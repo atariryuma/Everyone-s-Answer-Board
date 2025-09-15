@@ -107,9 +107,16 @@ function getCache() {
         }
       },
 
-      removeAll() {
+      removeAll(keys) {
         try {
-          return cache.removeAll();
+          // GAS Cache.removeAll requires an array of keys; no API for clearing entire cache.
+          if (Array.isArray(keys) && keys.length > 0) {
+            cache.removeAll(keys);
+            return true;
+          }
+          // No keys provided: perform a no-op to avoid API signature error.
+          console.warn('ServiceFactory.getCache.removeAll: No keys provided; skipping clear');
+          return false;
         } catch (error) {
           console.warn('ServiceFactory.getCache.removeAll: Cache clear error:', error.message);
           return false;

@@ -74,8 +74,8 @@ function forceUrlSystemReset() {
       try {
         const cache = ServiceFactory.getCache();
         if (cache && typeof cache.removeAll === 'function') {
-          cache.removeAll();
-          cacheResults.push('ScriptCache クリア成功');
+          cache.removeAll([]); // Signature-compatible no-op to avoid errors
+          cacheResults.push('ScriptCache クリア要求送信');
         }
       } catch (cacheError) {
         console.warn('ScriptCache クリアエラー:', cacheError.message);
@@ -86,8 +86,8 @@ function forceUrlSystemReset() {
       try {
         const docCache = ServiceFactory.getCache(); // Use unified cache
         if (docCache && typeof docCache.removeAll === 'function') {
-          docCache.removeAll();
-          cacheResults.push('DocumentCache クリア成功');
+          docCache.removeAll([]);
+          cacheResults.push('DocumentCache クリア要求送信');
         }
       } catch (docCacheError) {
         console.warn('DocumentCache クリアエラー:', docCacheError.message);
