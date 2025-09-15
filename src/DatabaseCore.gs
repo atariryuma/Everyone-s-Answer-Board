@@ -108,13 +108,22 @@ function getSheetsService() {
       throw new Error('Invalid service structure created');
     }
 
-    // 必要なメソッドの存在確認
+    // 必要なメソッドの存在確認（正確な階層構造）
     const requiredMethods = ['get', 'update', 'append'];
     for (const method of requiredMethods) {
       if (typeof service.spreadsheets.values[method] !== 'function') {
-        throw new Error(`Required method '${method}' is not available in service`);
+        console.error(`Method check failed: service.spreadsheets.values.${method}`, {
+          type: typeof service.spreadsheets.values[method],
+          available: Object.keys(service.spreadsheets.values)
+        });
+        throw new Error(`Required method '${method}' is not available in service.spreadsheets.values`);
       }
     }
+
+    console.log('DatabaseCore: All required methods validated', {
+      methods: requiredMethods,
+      structure: 'service.spreadsheets.values'
+    });
 
     return service;
   } catch (error) {
@@ -169,18 +178,33 @@ return { data: { values } };
 console.error('Service.get error:', error.message);
 throw error;
 }
-}
-
 },
+
 update: ({ spreadsheetId, range, resource }) => {
+try {
 const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
 const [sheetName] = range.split('!');
 const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+
+if (!sheet) {
+throw new Error(`Sheet "${sheetName}" not found in spreadsheet`);
+}
+
 const {values} = resource;
 if (values && values.length > 0) {
 sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
 }
+
+console.log('DatabaseCore.update: Data updated successfully', {
+sheetName,
+rowsUpdated: values ? values.length : 0
+});
+
 return { updatedCells: values ? values.length * values[0].length : 0 };
+} catch (error) {
+console.error('Service.update error:', error.message);
+throw error;
+}
 },
 append: ({ spreadsheetId, range, resource, valueInputOption }) => {
 try {
@@ -216,10 +240,10 @@ range
 } catch (error) {
 console.error('Service.append error:', error.message);
 throw error;
-}
-}
-}
-};
+        }
+      }
+    }
+  };
 
 console.log('DatabaseCore', {
 operation: 'createSheetsService',
