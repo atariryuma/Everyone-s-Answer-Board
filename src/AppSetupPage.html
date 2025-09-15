@@ -508,7 +508,7 @@
           .withFailureHandler((error) => {
             showMessage(`ステータス取得エラー: ${error.message || error}`, 'error');
           })
-          .getApplicationStatusForUI();
+          .getAppStatus();
       }
 
       // ステータス表示を更新
@@ -589,7 +589,7 @@
               console.error('Update error:', error);
               showMessage(`❌ 更新に失敗しました: ${error.message || error}`, 'error');
             })
-            .setApplicationStatusForUI(isActive);
+            .setAppStatus(isActive);
         } catch (error) {
           showMessage(`❌ ${error.message}`, 'error');
         } finally {
@@ -668,7 +668,7 @@
             showMessage(`エラー: ${error.message || error}`, 'error');
             loadingDiv.classList.add('hidden');
           })
-          .getAllUsersForAdminForUI(__USER_ID__);
+          .getUsers(__USER_ID__);
       }
 
       // ユーザー一覧をテーブルに表示
@@ -771,7 +771,7 @@
             confirmBtn.disabled = false;
             confirmBtn.textContent = '削除実行';
           })
-          .deleteUserAccountByAdminForUI(userToDelete.userId, reason);
+          .deleteUser(userToDelete.userId, reason);
       }
 
       // 削除ログを表示
@@ -801,7 +801,7 @@
             showMessage(`エラー: ${error.message || error}`, 'error');
             loadingDiv.classList.add('hidden');
           })
-          .getDeletionLogsForUI(__USER_ID__);
+          .getLogs(__USER_ID__);
       }
 
       // 削除ログをテーブルに表示

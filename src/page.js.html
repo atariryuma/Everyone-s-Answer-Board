@@ -334,19 +334,20 @@
         if (cached) return cached;
         
         try {
-          const config = await this.callGAS('getUserConfig', this.vars.userId);
+          const response = await this.callGAS('getUserConfig', this.vars.userId);
 
           // レスポンス検証
-          if (!config) {
+          if (!response) {
             console.error('❌ [loadConfig] 設定取得失敗: nullレスポンス');
             throw new Error('設定データが取得できませんでした');
           }
 
-          if (config.success === false) {
-            console.error('❌ [loadConfig] 設定取得失敗:', config.error || '不明なエラー');
-            throw new Error(config.error || '設定取得に失敗しました');
+          if (response.success === false) {
+            console.error('❌ [loadConfig] 設定取得失敗:', response.message || '不明なエラー');
+            throw new Error(response.message || '設定取得に失敗しました');
           }
 
+          const config = response.config;
           console.log('✅ [loadConfig] 設定取得成功', {
             configType: typeof config,
             hasUserPermissions: !!config.userPermissions,
@@ -391,8 +392,11 @@
         this.isLoading = true;
 
         try {
-          console.log('📡 [loadAnswers] GAS関数呼び出し: getPublishedSheetData');
-          const rawData = await this.callGAS('getPublishedSheetData', this.vars.userId, 'すべて', sortOrder);
+          console.log('📡 [loadAnswers] GAS関数呼び出し: getData');
+          const rawData = await this.callGAS('getSheetData', this.vars.userId, {
+            filter: 'すべて',
+            sortOrder: sortOrder
+          });
 
           console.log('📦 [loadAnswers] バックエンドレスポンス受信 - google.script.run最適化版', {
             responseType: typeof rawData,
@@ -514,7 +518,7 @@
           return { success: false, error: 'ユーザー認証情報が不足しています' };
         }
 
-        return await this.callGAS('processReactionByEmail', this.vars.userEmail, rowIndex, reactionKey);
+        return await this.callGAS('addReaction', this.vars.userEmail, rowIndex, reactionKey);
       }
       
       updateUI(data) {
@@ -621,7 +625,7 @@
       getControllerFunction(funcName) {
         const functionMap = {
           getUserConfig: 'getUserConfig',
-          getPublishedSheetData: 'getPublishedSheetData',
+          getSheetData: 'getSheetData',
           addReaction: 'addReaction'
         };
 
@@ -742,7 +746,7 @@
       
       mockResponse(funcName, resolve) {
         setTimeout(() => {
-          if (funcName === 'getPublishedSheetData') {
+          if (funcName === 'getData') {
             resolve({
               header: 'テスト問題: あなたが思う理想的な学習方法は？',
               sheetName: 'テスト回答シート',

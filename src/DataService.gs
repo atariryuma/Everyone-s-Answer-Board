@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp */
+/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -31,19 +31,7 @@
  * @returns {boolean} 初期化成功可否
  */
 function initDataServiceZero() {
-  try {
-    // ServiceFactory利用可能性確認
-    if (typeof ServiceFactory === 'undefined') {
-      console.warn('initDataServiceZero: ServiceFactory not available');
-      return false;
-    }
-
-    console.log('✅ DataService (Zero-Dependency) initialized successfully');
-    return true;
-  } catch (error) {
-    console.error('initDataServiceZero failed:', error.message);
-    return false;
-  }
+  return ServiceFactory.getUtils().initService('DataService');
 }
 
 /**
@@ -60,28 +48,28 @@ function getSheetData(userId, options = {}) {
     // 🚀 Zero-dependency initialization
     if (!initDataServiceZero()) {
       console.error('getSheetData: ServiceFactory not available');
-      return { data: [], headers: [], sheetName: '', error: 'サービス初期化エラー' };
+      return createErrorResponse('サービス初期化エラー', { data: [], headers: [], sheetName: '' });
     }
 
     // 🔧 ServiceFactory経由でデータベース取得
     const db = ServiceFactory.getDB();
     if (!db) {
       console.error('DataService.getSheetData: Database not available');
-      return { data: [], headers: [], sheetName: '', error: 'データベース接続エラー' };
+      return createErrorResponse('データベース接続エラー', { data: [], headers: [], sheetName: '' });
     }
 
     const user = db.findUserById(userId);
     if (!user || !user.configJson) {
       console.error('DataService.getSheetData: ユーザー設定が見つかりません', { userId });
       // ✅ google.script.run 互換: シンプル形式
-      return { data: [], headers: [], sheetName: '', error: 'ユーザー設定を取得できませんでした' };
+      return { success: false, message: 'ユーザー設定を取得できませんでした', data: [], headers: [], sheetName: '' };
     }
 
     const config = JSON.parse(user.configJson);
     if (!config.spreadsheetId) {
       console.warn('DataService.getSheetData: スプレッドシートIDが設定されていません', { userId });
       // ✅ google.script.run 互換: シンプル形式
-      return { data: [], headers: [], sheetName: '', error: 'スプレッドシートが設定されていません' };
+      return { success: false, message: 'スプレッドシートが設定されていません', data: [], headers: [], sheetName: '' };
     }
 
     // データ取得実行
@@ -101,27 +89,11 @@ function getSheetData(userId, options = {}) {
       error: error.message
     });
     // ✅ google.script.run 互換: シンプル形式
-    return { data: [], headers: [], sheetName: '', error: error.message || 'データ取得エラー' };
+    return createErrorResponse(error.message || 'データ取得エラー', { data: [], headers: [], sheetName: '' });
   }
 }
 
-/**
- * 公開されたスプレッドシートデータを取得（API Gateway互換）
- * GAS公式ベストプラクティス：シンプルな関数形式
- * @param {string} userId - ユーザーID
- * @param {Object} options - 取得オプション
- * @returns {Object} GAS公式推奨レスポンス形式
- */
-function getPublishedSheetData(userId, options = {}) {
-  try {
-    // ✅ GAS Best Practice: 直接関数呼び出し
-    return getSheetData(userId, options);
-  } catch (error) {
-    console.error('getPublishedSheetData error:', error);
-    // ✅ GAS公式推奨: シンプルエラーレスポンス
-    return { data: [], headers: [], sheetName: '', error: error.message || '公開データ取得エラー' };
-  }
-}
+// getPublishedSheetData removed - use getSheetData directly for better performance
 
 /**
  * スプレッドシートデータ取得実行
@@ -151,7 +123,7 @@ function fetchSpreadsheetData(config, options = {}) {
 
     if (lastRow <= 1) {
       // ✅ google.script.run 互換: シンプル形式
-      return { data: [], headers: [], sheetName: config.sheetName || '不明' };
+      return { success: true, data: [], headers: [], sheetName: config.sheetName || '不明' };
     }
 
     // ヘッダー行取得
@@ -214,6 +186,7 @@ function fetchSpreadsheetData(config, options = {}) {
 
     // ✅ google.script.run 互換: フロントエンド期待形式で直接返却
     return {
+      success: true,
       data: processedData,
       headers,
       sheetName: config.sheetName || '不明',
@@ -399,99 +372,11 @@ function extractFieldValue(row, headers, fieldType, columnMapping = {}) {
  * @param {string} reactionType - リアクションタイプ
  * @returns {boolean} 成功可否
  */
-function addDataReaction(userId, rowId, reactionType) {
-  try {
-    if (!validateReactionType(reactionType)) {
-      console.error('DataService.addReaction: 無効なリアクションタイプ', reactionType);
-      return false;
-    }
+// addDataReaction removed - use main.gs addReactionById instead
 
-    // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
-    const user = ServiceFactory.getDB().findUserById(userId);
-    if (!user || !user.configJson) {
-      console.error('DataService.addReaction: ユーザー設定なし');
-      return false;
-    }
+// removeDataReaction removed - use main.gs removeReaction instead
 
-    const config = JSON.parse(user.configJson);
-    if (!config.spreadsheetId) {
-      console.error('DataService.addReaction: スプレッドシート設定なし');
-      return false;
-    }
-
-    // リアクション更新実行
-    return updateReactionInSheet(config, rowId, reactionType, 'add');
-  } catch (error) {
-    console.error('DataService.addReaction: エラー', {
-      userId,
-      rowId,
-      reactionType,
-      error: error.message
-    });
-    return false;
-  }
-}
-
-/**
- * リアクション削除
- * @param {string} userId - ユーザーID
- * @param {string} rowId - 行ID
- * @param {string} reactionType - リアクションタイプ
- * @returns {boolean} 成功可否
- */
-function removeDataReaction(userId, rowId, reactionType) {
-  try {
-    // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
-    const user = ServiceFactory.getDB().findUserById(userId);
-    if (!user || !user.configJson) {
-      return false;
-    }
-
-    const config = JSON.parse(user.configJson);
-    if (!config.spreadsheetId) {
-      return false;
-    }
-
-    return updateReactionInSheet(config, rowId, reactionType, 'remove');
-  } catch (error) {
-    console.error('DataService.removeReaction: エラー', {
-      userId,
-      rowId,
-      error: error.message
-    });
-    return false;
-  }
-}
-
-/**
- * ハイライト切り替え
- * @param {string} userId - ユーザーID
- * @param {string} rowId - 行ID
- * @returns {boolean} 成功可否
- */
-function toggleDataHighlight(userId, rowId) {
-  try {
-    // ✅ GAS Best Practice: 直接DB呼び出し（ConfigService依存除去）
-    const user = ServiceFactory.getDB().findUserById(userId);
-    if (!user || !user.configJson) {
-      return false;
-    }
-
-    const config = JSON.parse(user.configJson);
-    if (!config.spreadsheetId) {
-      return false;
-    }
-
-    return updateHighlightInSheet(config, rowId);
-  } catch (error) {
-    console.error('DataService.toggleHighlight: エラー', {
-      userId,
-      rowId,
-      error: error.message
-    });
-    return false;
-  }
-}
+// toggleDataHighlight removed - use main.gs toggleHighlight instead
 
 /**
  * スプレッドシート内リアクション更新
@@ -628,7 +513,7 @@ function getAutoStopTime(publishedAt, minutes) {
 function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, _userEmail) {
   // 🚀 Zero-dependency: ServiceFactory経由で初期化
   try {
-    if (!validateReactionParams(spreadsheetId, sheetName, rowIndex, reactionKey)) {
+    if (!validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey)) {
       throw new Error('無効なリアクションパラメータ');
     }
 
@@ -1023,25 +908,25 @@ function analyzeColumns(spreadsheetId, sheetName) {
     });
 
     // 🎯 GAS Best Practice: パラメータ検証を別関数に分離
-    const paramValidation = validateAnalyzeColumnsParams(spreadsheetId, sheetName);
+    const paramValidation = validateParams(spreadsheetId, sheetName);
     if (!paramValidation.isValid) {
       return paramValidation.errorResponse;
     }
 
     // 🎯 GAS Best Practice: スプレッドシート接続を別関数に分離
-    const connectionResult = connectToSpreadsheet(spreadsheetId, sheetName);
+    const connectionResult = openSpreadsheet(spreadsheetId, sheetName);
     if (!connectionResult.success) {
       return connectionResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: データ取得を別関数に分離
-    const dataResult = extractSheetData(connectionResult.sheet);
+    const dataResult = getSheetData(connectionResult.sheet);
     if (!dataResult.success) {
       return dataResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: 列分析を別関数に分離
-    const analysisResult = performColumnAnalysis(dataResult.headers, dataResult.sampleData);
+    const analysisResult = analyzeColumns(dataResult.headers, dataResult.sampleData);
 
     return {
       success: true,
@@ -1075,7 +960,7 @@ function analyzeColumns(spreadsheetId, sheetName) {
  * @param {string} sheetName - シート名
  * @returns {Object} 検証結果
  */
-function validateAnalyzeColumnsParams(spreadsheetId, sheetName) {
+function validateParams(spreadsheetId, sheetName) {
   if (!spreadsheetId || !sheetName) {
     const errorResponse = {
       success: false,
@@ -1100,7 +985,7 @@ function validateAnalyzeColumnsParams(spreadsheetId, sheetName) {
  * @param {string} sheetName - シート名
  * @returns {Object} 接続結果
  */
-function connectToSpreadsheet(spreadsheetId, sheetName) {
+function openSpreadsheet(spreadsheetId, sheetName) {
   try {
     console.log('DataService.analyzeColumns: スプレッドシート接続開始');
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
@@ -1367,7 +1252,7 @@ function updateHighlightInSheet(config, rowId) {
  * @param {string} reactionKey - リアクション種類
  * @returns {boolean} 検証結果
  */
-function validateReactionParams(spreadsheetId, sheetName, rowIndex, reactionKey) {
+function validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey) {
   if (!spreadsheetId || !sheetName || !rowIndex || !reactionKey) {
     return false;
   }

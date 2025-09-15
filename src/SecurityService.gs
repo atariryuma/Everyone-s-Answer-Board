@@ -13,7 +13,7 @@
  * - 単一責任原則の維持
  */
 
-/* global ServiceFactory, getUserAccessLevel */
+/* global ServiceFactory, validateEmail, validateUrl, getUserAccessLevel */
 
 /**
  * ServiceFactory統合初期化
@@ -21,17 +21,7 @@
  * @returns {boolean} 初期化成功可否
  */
 function initSecurityServiceZero() {
-  try {
-    if (typeof ServiceFactory === 'undefined') {
-      console.warn('initSecurityServiceZero: ServiceFactory not available');
-      return false;
-    }
-    console.log('✅ SecurityService (Zero-Dependency) initialized successfully');
-    return true;
-  } catch (error) {
-    console.error('initSecurityServiceZero failed:', error.message);
-    return false;
-  }
+  return ServiceFactory.getUtils().initService('SecurityService');
 }
 
 // ===========================================
@@ -55,7 +45,7 @@ function getServiceAccountToken() {
       const cached = cache.get(cacheKey);
       if (cached) {
         // セキュリティ：トークン有効性の簡易検証
-        if (validateSecurityTokenFormat(cached)) {
+        if (validateTokenFormat(cached)) {
           return cached;
         } else {
           // 無効なトークンをクリア
@@ -71,7 +61,7 @@ function getServiceAccountToken() {
       }
 
       // セキュリティ：トークン形式検証
-      if (!validateSecurityTokenFormat(newToken)) {
+      if (!validateTokenFormat(newToken)) {
         console.error('SecurityService.getServiceAccountToken: 生成されたトークンが無効な形式');
         return null;
       }
@@ -118,7 +108,7 @@ function generateServiceAccountToken() {
  * @param {string} token - 検証対象トークン
  * @returns {boolean} 有効かどうか
  */
-function validateSecurityTokenFormat(token) {
+function validateTokenFormat(token) {
     if (!token || typeof token !== 'string') {
       return false;
     }
@@ -146,7 +136,7 @@ function validateSecurityTokenFormat(token) {
  * セッション状態検証
  * @returns {Object} セッション検証結果
  */
-function validateSecuritySession() {
+function validateSession() {
     try {
       const email = Session.getActiveUser().getEmail();
       const effectiveEmail = Session.getEffectiveUser().getEmail();
@@ -177,7 +167,7 @@ function validateSecuritySession() {
  * @param {Object} userData - ユーザーデータ
  * @returns {Object} 検証結果
  */
-function validateSecurityUserData(userData) {
+function validateUserData(userData) {
     const result = {
       isValid: true,
       errors: [],
@@ -194,7 +184,7 @@ function validateSecurityUserData(userData) {
 
       // メールアドレス検証
       if (userData.email) {
-        const emailValidation = validateSecurityEmail(userData.email);
+        const emailValidation = validateEmail(userData.email);
         if (!emailValidation.isValid) {
           result.errors.push('無効なメールアドレス');
           result.isValid = false;
@@ -206,7 +196,7 @@ function validateSecurityUserData(userData) {
       // テキストフィールド検証・サニタイズ
       ['answer', 'reason', 'name', 'className'].forEach(field => {
         if (userData[field]) {
-          const textValidation = validateAndSanitizeSecurityText(userData[field]);
+          const textValidation = validateSecureText(userData[field]);
           if (!textValidation.isValid) {
             result.errors.push(`${field}: ${textValidation.error}`);
             result.isValid = false;
@@ -221,7 +211,7 @@ function validateSecurityUserData(userData) {
 
       // URL検証
       if (userData.url) {
-        const urlValidation = validateSecurityUrl(userData.url);
+        const urlValidation = validateUrl(userData.url);
         if (!urlValidation.isValid) {
           result.errors.push('無効なURL');
           result.isValid = false;
@@ -250,43 +240,13 @@ function validateSecurityUserData(userData) {
  * @param {string} email - メールアドレス
  * @returns {Object} 検証結果
  */
-function validateSecurityEmail(email) {
-    try {
-      if (!email || typeof email !== 'string') {
-        return { isValid: false, error: 'メールアドレスが必要です' };
-      }
-
-      // 基本形式チェック
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(email)) {
-        return { isValid: false, error: '無効なメールアドレス形式' };
-      }
-
-      // 危険文字除去
-      const sanitized = email.toLowerCase().trim();
-
-      // 長さ制限
-      if (sanitized.length > 254) {
-        return { isValid: false, error: 'メールアドレスが長すぎます' };
-      }
-
-      return {
-        isValid: true,
-        sanitized,
-        originalLength: email.length,
-        sanitizedLength: sanitized.length
-      };
-    } catch (error) {
-      return { isValid: false, error: error.message };
-    }
-}
 
 /**
  * テキスト検証・サニタイズ
  * @param {string} text - テキスト
  * @returns {Object} 検証結果
  */
-function validateAndSanitizeSecurityText(text) {
+function validateSecureText(text) {
     try {
       if (typeof text !== 'string') {
         return { isValid: false, error: 'テキストが必要です' };
@@ -347,65 +307,6 @@ function validateAndSanitizeSecurityText(text) {
  * @param {string} url - URL
  * @returns {Object} 検証結果
  */
-function validateSecurityUrl(url) {
-    try {
-      if (!url || typeof url !== 'string') {
-        return { isValid: false, error: 'URLが必要です' };
-      }
-
-      // 許可されたプロトコル
-      const allowedProtocols = ['https:', 'http:'];
-      
-      // 許可されたドメイン（Google関連のみ）
-      const allowedDomains = [
-        'docs.google.com',
-        'forms.gle',
-        'script.google.com',
-        'drive.google.com'
-      ];
-
-      // Basic URL validation for GAS environment
-      if (!url.startsWith('http://') && !url.startsWith('https://')) {
-        return { isValid: false, error: '無効なURL形式' };
-      }
-      
-      // Extract protocol and hostname for validation
-      let protocol, hostname;
-      try {
-        const urlMatch = url.match(/^(https?):\/\/([^/]+)/);
-        if (!urlMatch) {
-          return { isValid: false, error: '無効なURL形式' };
-        }
-        [, protocol, hostname] = urlMatch;
-        protocol = `${protocol}:`; // 'http:' or 'https:'
-      } catch {
-        return { isValid: false, error: '無効なURL形式' };
-      }
-
-      // プロトコルチェック
-      if (!allowedProtocols.includes(protocol)) {
-        return { isValid: false, error: '許可されていないプロトコル' };
-      }
-
-      // ドメインチェック
-      const isAllowedDomain = allowedDomains.some(domain => 
-        hostname === domain || hostname.endsWith(`.${domain}`)
-      );
-
-      if (!isAllowedDomain) {
-        return { isValid: false, error: '許可されていないドメイン' };
-      }
-
-      return {
-        isValid: true,
-        sanitized: url.trim(),
-        protocol,
-        hostname
-      };
-    } catch (error) {
-      return { isValid: false, error: error.message };
-    }
-}
 
 // ===========================================
 // 🔒 アクセス制御・権限管理
@@ -728,8 +629,8 @@ function getSecurityRecommendations() {
 
     try {
       // 基本的なセキュリティチェック
-      const session = validateSecuritySession();
-      if (!session.isValid) {
+      const session = validateSession();
+      if (!session) {
         recommendations.push({
           priority: 'high',
           category: 'authentication',

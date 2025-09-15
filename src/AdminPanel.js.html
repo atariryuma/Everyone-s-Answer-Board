@@ -541,7 +541,7 @@
             console.error('📊 null/undefinedレスポンスを受信 - google.script.run送信問題');
             select.innerHTML = '<option value="">通信エラー（null response）</option>';
             setPartialLoading(false);
-            reject(new Error('サーバーからnullレスポンスが返されました。main.gs:getSpreadsheetList()の実行を確認してください。'));
+            reject(new Error('サーバーからnullレスポンスが返されました。main.gs:getSheets()の実行を確認してください。'));
             return;
           }
 
@@ -662,7 +662,7 @@
           select.innerHTML = '<option value="">読み込みエラー</option>';
           setPartialLoading(false);
 
-          console.error('📊 getSpreadsheetList通信エラー:', {
+          console.error('📊 getSheets通信エラー:', {
             error: error,
             errorMessage: error.message,
             errorType: typeof error,
@@ -679,7 +679,7 @@
 
           reject(new Error(detailedMessage));
         })
-        .getSpreadsheetList();
+        .getSheets();
     });
   }
 
@@ -1352,7 +1352,7 @@
           appSetupBtn.style.display = 'none';
         }
       })
-      .checkIsSystemAdmin();
+      .isAdmin();
   }
 
   // フォーム作成インターフェース
@@ -2797,7 +2797,7 @@
           error: error.message,
         });
       })
-      .getCurrentBoardInfoAndUrls();
+      .getBoardInfo();
   }
 
   // フッター表示更新
@@ -2935,7 +2935,7 @@
       .withFailureHandler(function (error) {
         showError('回答ボードを開けませんでした: ' + error.message);
       })
-      .getCurrentBoardInfoAndUrls();
+      .getBoardInfo();
   }
 
   // アプリ設定画面を開く

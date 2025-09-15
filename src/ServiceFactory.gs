@@ -2,385 +2,317 @@
  * @fileoverview ServiceFactory - 統一サービスアクセス層
  *
  * 🎯 責任範囲:
- * - GAS Platform APIへの統一アクセス
- * - 依存関係の除去とゼロ依存アーキテクチャ
- * - サービス読み込み順序問題の解決
- * - パフォーマンス最適化
+ * - GAS Platform APIs統一アクセス
+ * - Zero-Dependency Architecture実装
+ * - Service Layer抽象化
+ * - Cross-Service統合
  *
  * 🔄 GAS Best Practices準拠:
- * - 直接Platform API利用
- * - 依存関係なしの自己完結型
- * - エラー処理とフォールバック機能
+ * - 直接的な関数エクスポート
+ * - フラット関数構造
+ * - プラットフォームAPI統合
  */
 
-/* global DB, DatabaseOperations */
+/* global DatabaseOperations */
 
-/**
- * ServiceFactory - ゼロ依存サービスアクセス層
- * GASファイル読み込み順序に依存しない堅牢なアーキテクチャ
- */
-const ServiceFactory = Object.freeze({
+// ===========================================
+// 🔧 Session Management
+// ===========================================
 
-  // ===========================================
-  // 🔧 Database Operations
-  // ===========================================
+function getSession() {
+  try {
+    const email = Session.getActiveUser().getEmail();
+    return {
+      isValid: Boolean(email),
+      email: email || null
+    };
+  } catch (error) {
+    console.warn('ServiceFactory.getSession: Session access error:', error.message);
+    return {
+      isValid: false,
+      email: null
+    };
+  }
+}
 
-  /**
-   * データベース操作オブジェクト取得
-   * @returns {Object|null} DatabaseOperations or fallback
-   */
-  getDB() {
-    try {
-      // Method 1: グローバルDB変数
-      if (typeof DB !== 'undefined' && DB) {
-        return DB;
+// ===========================================
+// 📊 Properties Management
+// ===========================================
+
+function getProperties() {
+  try {
+    const scriptProps = PropertiesService.getScriptProperties();
+
+    return {
+      getDatabaseSpreadsheetId() {
+        return scriptProps.getProperty('DATABASE_SPREADSHEET_ID');
+      },
+
+      getAdminEmail() {
+        return scriptProps.getProperty('ADMIN_EMAIL');
+      },
+
+      getProperty(key) {
+        return scriptProps.getProperty(key);
+      },
+
+      setProperty(key, value) {
+        return scriptProps.setProperty(key, value);
+      },
+
+      setProperties(properties) {
+        return scriptProps.setProperties(properties);
       }
+    };
+  } catch (error) {
+    console.error('ServiceFactory.getProperties: Properties access error:', error.message);
+    return null;
+  }
+}
 
-      // Method 2: DatabaseOperations直接参照
-      if (typeof DatabaseOperations !== 'undefined') {
-        return DatabaseOperations;
+// ===========================================
+// 💾 Cache Management
+// ===========================================
+
+function getCache() {
+  try {
+    const cache = CacheService.getScriptCache();
+
+    return {
+      get(key) {
+        try {
+          const value = cache.get(key);
+          return value ? JSON.parse(value) : null;
+        } catch (parseError) {
+          console.warn('ServiceFactory.getCache.get: Parse error for key:', key);
+          return null;
+        }
+      },
+
+      put(key, value, expirationInSeconds = 3600) {
+        try {
+          return cache.put(key, JSON.stringify(value), expirationInSeconds);
+        } catch (error) {
+          console.warn('ServiceFactory.getCache.put: Cache put error:', error.message);
+          return false;
+        }
+      },
+
+      remove(key) {
+        try {
+          return cache.remove(key);
+        } catch (error) {
+          console.warn('ServiceFactory.getCache.remove: Cache remove error:', error.message);
+          return false;
+        }
+      },
+
+      removeAll() {
+        try {
+          return cache.removeAll();
+        } catch (error) {
+          console.warn('ServiceFactory.getCache.removeAll: Cache clear error:', error.message);
+          return false;
+        }
       }
+    };
+  } catch (error) {
+    console.error('ServiceFactory.getCache: Cache service error:', error.message);
+    return null;
+  }
+}
 
-      // Method 3: Fallback - null return
-      console.warn('ServiceFactory.getDB: Database service not available');
-      return null;
-    } catch (error) {
-      console.error('ServiceFactory.getDB error:', error.message);
-      return null;
+// ===========================================
+// 🗄️ Database Access
+// ===========================================
+
+function getDB() {
+  try {
+    // DatabaseOperations should be available globally
+    if (typeof DatabaseOperations !== 'undefined') {
+      return DatabaseOperations;
     }
-  },
 
-  // ===========================================
-  // 🔐 Session Management
-  // ===========================================
+    console.warn('ServiceFactory.getDB: DatabaseOperations not available');
+    return null;
+  } catch (error) {
+    console.error('ServiceFactory.getDB: Database access error:', error.message);
+    return null;
+  }
+}
 
-  /**
-   * 現在のユーザーセッション情報取得
-   * @returns {Object} Session information
-   */
-  getSession() {
-    try {
-      const session = {
-        email: null,
-        effectiveEmail: null,
-        isValid: false
-      };
+// ===========================================
+// 📋 Spreadsheet Operations
+// ===========================================
 
-      // Primary method: Session.getActiveUser()
+function getSpreadsheet() {
+  return {
+    openById(id) {
       try {
-        session.email = Session.getActiveUser().getEmail();
-        if (session.email) {
-          session.isValid = true;
-        }
-      } catch (activeError) {
-        console.warn('ServiceFactory.getSession: getActiveUser failed:', activeError.message);
+        return SpreadsheetApp.openById(id);
+      } catch (error) {
+        console.error('ServiceFactory.getSpreadsheet.openById: Error opening spreadsheet:', error.message);
+        return null;
       }
+    },
 
-      // Fallback method: Session.getEffectiveUser()
-      if (!session.email) {
-        try {
-          session.effectiveEmail = Session.getEffectiveUser().getEmail();
-          if (session.effectiveEmail) {
-            session.email = session.effectiveEmail;
-            session.isValid = true;
-          }
-        } catch (effectiveError) {
-          console.warn('ServiceFactory.getSession: getEffectiveUser failed:', effectiveError.message);
-        }
+    create(name) {
+      try {
+        return SpreadsheetApp.create(name);
+      } catch (error) {
+        console.error('ServiceFactory.getSpreadsheet.create: Error creating spreadsheet:', error.message);
+        return null;
       }
-
-      return session;
-    } catch (error) {
-      console.error('ServiceFactory.getSession error:', error.message);
-      return { email: null, effectiveEmail: null, isValid: false };
     }
-  },
+  };
+}
 
-  // ===========================================
-  // ⚙️ Properties Management
-  // ===========================================
+// ===========================================
+// 🔧 Utility Functions
+// ===========================================
 
-  /**
-   * システムプロパティ管理オブジェクト取得
-   * @returns {Object} Properties service wrapper
-   */
-  getProperties() {
-    try {
-      const props = PropertiesService.getScriptProperties();
+function getUtils() {
+  return {
+    generateId() {
+      return Utilities.getUuid();
+    },
 
-      return {
-        get: (key) => {
-          try {
-            return props.getProperty(key);
-          } catch (error) {
-            console.error(`ServiceFactory.getProperties.get(${key}):`, error.message);
-            return null;
-          }
-        },
-
-        set: (key, value) => {
-          try {
-            props.setProperty(key, value);
-            return true;
-          } catch (error) {
-            console.error(`ServiceFactory.getProperties.set(${key}):`, error.message);
-            return false;
-          }
-        },
-
-        getAll: () => {
-          try {
-            return props.getProperties();
-          } catch (error) {
-            console.error('ServiceFactory.getProperties.getAll:', error.message);
-            return {};
-          }
-        },
-
-        // 直接値取得（定数インライン化）
-        getServiceAccountCreds: () => props.getProperty('SERVICE_ACCOUNT_CREDS'),
-        getDatabaseSpreadsheetId: () => props.getProperty('DATABASE_SPREADSHEET_ID'),
-        getAdminEmail: () => props.getProperty('ADMIN_EMAIL'),
-        getGoogleClientId: () => props.getProperty('GOOGLE_CLIENT_ID')
-      };
-    } catch (error) {
-      console.error('ServiceFactory.getProperties error:', error.message);
-      return {
-        get: () => null,
-        set: () => false,
-        getAll: () => ({}),
-        getServiceAccountCreds: () => null,
-        getDatabaseSpreadsheetId: () => null,
-        getAdminEmail: () => null,
-        getGoogleClientId: () => null
-      };
-    }
-  },
-
-  // ===========================================
-  // 🗄️ Cache Management
-  // ===========================================
-
-  /**
-   * キャッシュサービス管理オブジェクト取得
-   * @returns {Object} Cache service wrapper
-   */
-  getCache() {
-    try {
-      const cache = CacheService.getScriptCache();
-
-      return {
-        get: (key, defaultValue = null) => {
-          try {
-            const cached = cache.get(key);
-            return cached ? JSON.parse(cached) : defaultValue;
-          } catch (error) {
-            console.warn(`ServiceFactory.getCache.get(${key}):`, error.message);
-            return defaultValue;
-          }
-        },
-
-        put: (key, value, ttlSeconds = 300) => {
-          try {
-            cache.put(key, JSON.stringify(value), ttlSeconds);
-            return true;
-          } catch (error) {
-            console.error(`ServiceFactory.getCache.put(${key}):`, error.message);
-            return false;
-          }
-        },
-
-        remove: (key) => {
-          try {
-            cache.remove(key);
-            return true;
-          } catch (error) {
-            console.error(`ServiceFactory.getCache.remove(${key}):`, error.message);
-            return false;
-          }
-        },
-
-        removeAll: () => {
-          try {
-            cache.removeAll();
-            return true;
-          } catch (error) {
-            console.error('ServiceFactory.getCache.removeAll:', error.message);
-            return false;
-          }
+    initService(serviceName) {
+      try {
+        if (typeof ServiceFactory === 'undefined') {
+          console.warn(`init${serviceName}: ServiceFactory not available`);
+          return false;
         }
-      };
-    } catch (error) {
-      console.error('ServiceFactory.getCache error:', error.message);
-      return {
-        get: () => null,
-        put: () => false,
-        remove: () => false,
-        removeAll: () => false
-      };
-    }
-  },
-
-  // ===========================================
-  // 📊 Spreadsheet Operations
-  // ===========================================
-
-  /**
-   * スプレッドシート操作ヘルパー
-   * @returns {Object} Spreadsheet operations wrapper
-   */
-  getSpreadsheet() {
-    return {
-      openById: (spreadsheetId) => {
-        try {
-          return SpreadsheetApp.openById(spreadsheetId);
-        } catch (error) {
-          console.error(`ServiceFactory.getSpreadsheet.openById(${spreadsheetId}):`, error.message);
-          return null;
-        }
-      },
-
-      getActiveSpreadsheet: () => {
-        try {
-          return SpreadsheetApp.getActiveSpreadsheet();
-        } catch (error) {
-          console.warn('ServiceFactory.getSpreadsheet.getActiveSpreadsheet:', error.message);
-          return null;
-        }
+        console.log(`✅ ${serviceName} (Zero-Dependency) initialized successfully`);
+        return true;
+      } catch (error) {
+        console.error(`init${serviceName} failed:`, error.message);
+        return false;
       }
-    };
-  },
+    },
 
-  // ===========================================
-  // 🔧 Utility Functions
-  // ===========================================
-
-  /**
-   * ユーティリティ関数群
-   * @returns {Object} Utility functions
-   */
-  getUtils() {
-    return {
-      generateUserId: () => {
-        return Utilities.getUuid();
-      },
-
-      getCurrentTimestamp: () => {
-        return new Date().toISOString();
-      },
-
-      validateEmail: (email) => {
-        const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
-        return emailRegex.test(email);
-      },
-
-      sanitizeInput: (input) => {
-        if (typeof input !== 'string') return '';
-        return input.replace(/[<>&"']/g, '');
+    formatDate(date, format = 'yyyy-MM-dd HH:mm:ss') {
+      try {
+        return Utilities.formatDate(date, Session.getScriptTimeZone(), format);
+      } catch (error) {
+        console.warn('ServiceFactory.getUtils.formatDate: Format error:', error.message);
+        return date.toISOString();
       }
-    };
-  },
+    },
 
-  // ===========================================
-  // 🏥 Health Check & Diagnostics
-  // ===========================================
+    getTimeZone() {
+      try {
+        return Session.getScriptTimeZone();
+      } catch (error) {
+        console.warn('ServiceFactory.getUtils.getTimeZone: Timezone error:', error.message);
+        return 'UTC';
+      }
+    },
 
-  /**
-   * サービス診断情報
-   * @returns {Object} Diagnostic information
-   */
-  diagnose() {
-    const startTime = Date.now();
-
-    const diagnostics = {
-      timestamp: new Date().toISOString(),
-      factory: 'ServiceFactory',
-      version: '1.0.0',
-      services: {},
-      platform: {},
-      executionTime: 0
-    };
-
-    try {
-      // Database service check
-      diagnostics.services.database = {
-        available: this.getDB() !== null,
-        type: typeof DB !== 'undefined' ? 'Global' :
-              typeof DatabaseOperations !== 'undefined' ? 'Direct' : 'None'
-      };
-
-      // Session service check
-      const session = this.getSession();
-      diagnostics.services.session = {
-        available: session.isValid,
-        email: session.email ? 'Available' : 'None'
-      };
-
-      // Properties service check
-      const props = this.getProperties();
-      diagnostics.services.properties = {
-        available: props.getAdminEmail() !== null
-      };
-
-      // Cache service check
-      const cache = this.getCache();
-      const testKey = `test_key_${  Date.now()}`;
-      cache.put(testKey, 'test', 10);
-      const testResult = cache.get(testKey);
-      cache.remove(testKey);
-      diagnostics.services.cache = {
-        available: testResult === 'test'
-      };
-
-      // Platform APIs check
-      diagnostics.platform = {
-        session: typeof Session !== 'undefined',
-        properties: typeof PropertiesService !== 'undefined',
-        cache: typeof CacheService !== 'undefined',
-        spreadsheet: typeof SpreadsheetApp !== 'undefined',
-        utilities: typeof Utilities !== 'undefined'
-      };
-
-    } catch (error) {
-      diagnostics.error = error.message;
+    getWebAppUrl() {
+      try {
+        return ScriptApp.getService().getUrl();
+      } catch (error) {
+        console.warn('ServiceFactory.getUtils.getWebAppUrl: WebApp URL error:', error.message);
+        return '';
+      }
     }
+  };
+}
 
-    diagnostics.executionTime = `${Date.now() - startTime}ms`;
-    return diagnostics;
+// ===========================================
+// 🔍 Diagnostics
+// ===========================================
+
+function diagnose() {
+  const results = {
+    service: 'ServiceFactory',
+    timestamp: new Date().toISOString(),
+    checks: []
+  };
+
+  // Session check
+  try {
+    const session = getSession();
+    results.checks.push({
+      name: 'Session Service',
+      status: session.isValid ? '✅' : '⚠️',
+      details: session.isValid ? `User: ${session.email}` : 'No active session'
+    });
+  } catch (error) {
+    results.checks.push({
+      name: 'Session Service',
+      status: '❌',
+      details: error.message
+    });
   }
 
-});
+  // Properties check
+  try {
+    const props = getProperties();
+    results.checks.push({
+      name: 'Properties Service',
+      status: props ? '✅' : '❌',
+      details: props ? 'Properties service accessible' : 'Properties service failed'
+    });
+  } catch (error) {
+    results.checks.push({
+      name: 'Properties Service',
+      status: '❌',
+      details: error.message
+    });
+  }
+
+  // Cache check
+  try {
+    const cache = getCache();
+    results.checks.push({
+      name: 'Cache Service',
+      status: cache ? '✅' : '❌',
+      details: cache ? 'Cache service accessible' : 'Cache service failed'
+    });
+  } catch (error) {
+    results.checks.push({
+      name: 'Cache Service',
+      status: '❌',
+      details: error.message
+    });
+  }
+
+  // Database check
+  try {
+    const db = getDB();
+    results.checks.push({
+      name: 'Database Service',
+      status: db ? '✅' : '⚠️',
+      details: db ? 'Database operations available' : 'DatabaseOperations not found'
+    });
+  } catch (error) {
+    results.checks.push({
+      name: 'Database Service',
+      status: '❌',
+      details: error.message
+    });
+  }
+
+  results.overall = results.checks.every(check => check.status === '✅') ? '✅' : '⚠️';
+  return results;
+}
 
 // ===========================================
-// 🌐 グローバル Export
+// 🌍 Global ServiceFactory Object
 // ===========================================
 
 /**
- * レガシー互換性のためのグローバル関数
- * 既存コードの段階的移行を支援
+ * ServiceFactory統一インターフェース
+ * Zero-Dependency Architecture統合層
  */
-
-/**
- * 現在のユーザーメール取得（ServiceFactory版）
- * @returns {string|null} User email
- */
-function getCurrentEmailFromFactory() {
-  return ServiceFactory.getSession().email;
-}
-
-/**
- * システムプロパティ取得（ServiceFactory版）
- * @param {string} key - Property key
- * @returns {string|null} Property value
- */
-function getSystemPropertyFromFactory(key) {
-  return ServiceFactory.getProperties().get(key);
-}
-
-/**
- * データベース操作取得（ServiceFactory版）
- * @returns {Object|null} Database operations
- */
-function getDatabaseFromFactory() {
-  return ServiceFactory.getDB();
-}
+global.ServiceFactory = {
+  getSession,
+  getProperties,
+  getCache,
+  getDB,
+  getSpreadsheet,
+  getUtils,
+  diagnose
+};

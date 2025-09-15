@@ -59,11 +59,63 @@ function getHelperColumnIndex(config, columnType) {
 
 
 // ===========================================
-// 🔄 レガシー互換関数 (GAS Best Practices準拠)
+// 📋 Response Standardization (Zero-Dependency)
 // ===========================================
 
+/**
+ * 標準化エラーレスポンス生成
+ * @param {string} message - エラーメッセージ
+ * @param {*} data - 追加データ
+ * @returns {Object} 標準エラーレスポンス
+ */
+function createErrorResponse(message, data = null) {
+  return { success: false, message, ...(data && { data }) };
+}
 
+/**
+ * 標準化成功レスポンス生成
+ * @param {string} message - 成功メッセージ
+ * @param {*} data - レスポンスデータ
+ * @returns {Object} 標準成功レスポンス
+ */
+function createSuccessResponse(message, data = null) {
+  return { success: true, message, ...(data && { data }) };
+}
 
+/**
+ * 認証エラーレスポンス
+ * @returns {Object} 認証エラー
+ */
+function createAuthError() {
+  return createErrorResponse('Not authenticated');
+}
 
-// formatTimestamp関数を削除 - formatters.gsで統一
+/**
+ * ユーザー未発見エラーレスポンス
+ * @returns {Object} ユーザー未発見エラー
+ */
+function createUserNotFoundError() {
+  return createErrorResponse('User not found');
+}
+
+/**
+ * 管理者権限エラーレスポンス
+ * @returns {Object} 管理者権限エラー
+ */
+function createAdminRequiredError() {
+  return createErrorResponse('Admin access required');
+}
+
+/**
+ * 例外エラーレスポンス生成
+ * @param {Error} error - エラーオブジェクト
+ * @returns {Object} 例外エラーレスポンス
+ */
+function createExceptionResponse(error) {
+  return createErrorResponse(error.message || 'Unknown error');
+}
+
+// ===========================================
+// 🔄 レガシー互換関数 (GAS Best Practices準拠)
+// ===========================================
 

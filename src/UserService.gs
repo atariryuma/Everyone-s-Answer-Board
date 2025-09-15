@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory */
+/* global ServiceFactory, DatabaseOperations, validateUrl, validateEmail, getCurrentEmail */
 
 // ===========================================
 // 🔧 Zero-Dependency UserService (ServiceFactory版)
@@ -25,109 +25,43 @@
  * DB, CONSTANTS, PROPS_KEYS依存を排除
  */
 
-/**
- * ServiceFactory統合初期化（UserService版）
- * 依存関係チェックなしの即座初期化
- * @returns {boolean} 初期化成功可否
- */
-function initUserServiceZero() {
-  try {
-    // ServiceFactory利用可能性確認
-    if (typeof ServiceFactory === 'undefined') {
-      console.warn('initUserServiceZero: ServiceFactory not available');
-      return false;
-    }
 
-    console.log('✅ UserService (Zero-Dependency) initialized successfully');
-    return true;
-  } catch (error) {
-    console.error('initUserServiceZero failed:', error.message);
-    return false;
-  }
-}
-
-/**
- * 現在のユーザーメールアドレス取得
- * @returns {string|null} ユーザーメールアドレス
- */
-function getCurrentUserEmail() {
-  try {
-    // 🚀 ServiceFactory経由でセッション情報取得
-    if (!initUserServiceZero()) {
-      console.error('getCurrentUserEmail: ServiceFactory not available');
-      return null;
-    }
-
-    const session = ServiceFactory.getSession();
-    if (session.isValid && session.email) {
-      console.log('✅ ServiceFactory.getSession()でメール取得成功:', session.email);
-      return session.email;
-    }
-
-    console.warn('⚠️ ServiceFactory.getSession(): 有効なセッションなし');
-    return null;
-
-  } catch (error) {
-    console.error('UserService.getCurrentUserEmail: エラー', error.message);
-    return null;
-  }
-}
-
-/**
- * 現在のユーザーメール取得（互換性関数）
- * @returns {string|null} ユーザーメール
- */
-function getCurrentEmail() {
-  // 🚀 Zero-dependency: getCurrentUserEmailが既にServiceFactory利用
-  return getCurrentUserEmail();
-}
 
 /**
  * 現在のユーザー情報取得（キャッシュ対応）
  * @returns {Object|null} ユーザー情報オブジェクト
  */
 function getCurrentUserInfo() {
-  // 🚀 Zero-dependency initialization
-  if (!initUserServiceZero()) {
-    console.error('getCurrentUserInfo: ServiceFactory not available');
-    return null;
-  }
-
   const cacheKey = 'current_user_info';
 
   try {
-    // 🔧 ServiceFactory経由でキャッシュ取得
+    // キャッシュ確認
     const cache = ServiceFactory.getCache();
     const cached = cache.get(cacheKey);
     if (cached) {
-      return cached;
+      return JSON.parse(cached);
     }
 
-    // 🔧 ServiceFactory経由でセッション取得
+    // セッション取得
     const session = ServiceFactory.getSession();
-    if (!session.isValid || !session.email) {
+    const {email} = session;
+    if (!email) {
       console.warn('getCurrentUserInfo: 有効なセッションなし');
       return null;
     }
 
-    // 🔧 ServiceFactory経由でデータベース検索
-    const db = ServiceFactory.getDB();
-    if (!db) {
-      console.error('getCurrentUserInfo: Database not available');
-      return null;
-    }
-
-    const userInfo = db.findUserByEmail(session.email);
+    // データベース検索
+    const userInfo = DatabaseOperations.findUserByEmail(email);
     if (!userInfo) {
-      console.info('UserService.getCurrentUserInfo: 新規ユーザーの可能性', { email: session.email });
+      console.info('UserService.getCurrentUserInfo: 新規ユーザーの可能性', { email });
       return null;
     }
 
     // 設定情報を統合
     const completeUserInfo = enrichUserInfo(userInfo);
 
-    // 🔧 ServiceFactory経由でキャッシュ保存（5分間）
-    cache.put(cacheKey, completeUserInfo, 300);
+    // キャッシュ保存（5分間）
+    cache.put(cacheKey, JSON.stringify(completeUserInfo), 300);
 
     return completeUserInfo;
   } catch (error) {
@@ -198,12 +132,12 @@ function generateDynamicUserUrls(config) {
 
       // アプリURL生成（公開済みの場合）
       if (config.appPublished && !config.appUrl) {
-        enhanced.appUrl = ScriptApp.getService().getUrl();
+        enhanced.appUrl = ServiceFactory.getUtils().getWebAppUrl();
       }
 
       // フォームURL存在確認
       if (config.formUrl) {
-        enhanced.hasValidForm = validateUserFormUrl(config.formUrl);
+        enhanced.hasValidForm = validateUrl(config.formUrl)?.isValid || false;
       }
 
       return enhanced;
@@ -224,7 +158,6 @@ function generateDynamicUserUrls(config) {
  */
 function getUserAccessLevel(userId) {
   try {
-    // 🔧 CONSTANTS依存除去: アクセスレベル直接定義
     const ACCESS_LEVELS = {
       NONE: 'none',
       GUEST: 'guest',
@@ -237,18 +170,12 @@ function getUserAccessLevel(userId) {
       return ACCESS_LEVELS.GUEST;
     }
 
-    const currentEmail = getCurrentUserEmail();
+    const currentEmail = getCurrentEmail();
     if (!currentEmail) {
       return ACCESS_LEVELS.NONE;
     }
 
-    // 🔧 ServiceFactory経由でデータベース取得
-    const db = ServiceFactory.getDB();
-    if (!db) {
-      return ACCESS_LEVELS.NONE;
-    }
-
-    const userInfo = db.findUserById(userId);
+    const userInfo = DatabaseOperations.findUserById(userId);
     if (!userInfo) {
       return ACCESS_LEVELS.NONE;
     }
@@ -267,7 +194,6 @@ function getUserAccessLevel(userId) {
     return ACCESS_LEVELS.AUTHENTICATED_USER;
   } catch (error) {
     console.error('UserService.getAccessLevel: エラー', error.message);
-    // 🔧 CONSTANTS依存除去: 直接値返却
     return 'none';
   }
 }
@@ -294,31 +220,28 @@ function isSystemAdmin(email) {
       return false;
     }
 
-    // 🔧 ServiceFactory経由でプロパティ取得
-    const props = ServiceFactory.getProperties();
-    // 🔧 PROPS_KEYS依存除去: 直接プロパティ名指定
-    const adminEmail = props.get('ADMIN_EMAIL');
-      
-      if (!adminEmail) {
-        console.warn('UserService.isSystemAdmin: ADMIN_EMAILが設定されていません');
-        return false;
-      }
+    const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
 
-      // 管理者メールと一致チェック
-      const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
-      
-      if (isAdmin) {
-        console.info('UserService.isSystemAdmin: システム管理者を認証', { email });
-      }
-
-      return isAdmin;
-    } catch (error) {
-      console.error('UserService.isSystemAdmin: エラー', {
-        email,
-        error: error.message
-      });
+    if (!adminEmail) {
+      console.warn('UserService.isSystemAdmin: ADMIN_EMAILが設定されていません');
       return false;
     }
+
+    // 管理者メールと一致チェック
+    const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
+
+    if (isAdmin) {
+      console.info('UserService.isSystemAdmin: システム管理者を認証', { email });
+    }
+
+    return isAdmin;
+  } catch (error) {
+    console.error('UserService.isSystemAdmin: エラー', {
+      email,
+      error: error.message
+    });
+    return false;
+  }
 }
 
 // ===========================================
@@ -332,47 +255,40 @@ function isSystemAdmin(email) {
  * @returns {Object} 作成されたユーザー情報
  */
 function createUser(userEmail, initialConfig = {}) {
-    // 🚀 Zero-dependency: getCurrentUserEmailが既にServiceFactory利用
-    try {
-      if (!userEmail || !validateUserEmail(userEmail).isValid) {
-        throw new Error('無効なメールアドレス');
-      }
-
-      // 🔧 ServiceFactory経由でデータベース取得
-      const db = ServiceFactory.getDB();
-      if (!db) {
-        throw new Error('データベースサービスが利用できません');
-      }
-
-      // 既存ユーザーチェック
-      const existingUser = db.findUserByEmail(userEmail);
-      if (existingUser) {
-        console.info('UserService.createUser: 既存ユーザーを返却', { userEmail });
-        return existingUser;
-      }
-
-      // 新規ユーザーデータ作成
-      const userData = buildNewUserData(userEmail, initialConfig);
-
-      // データベースに保存
-      const success = db.createUser(userData);
-      if (!success) {
-        throw new Error('ユーザー作成に失敗');
-      }
-
-      console.info('UserService.createUser: 新規ユーザー作成完了', { 
-        userEmail, 
-        userId: userData.userId 
-      });
-
-      return userData;
-    } catch (error) {
-      console.error('UserService.createUser: エラー', {
-        userEmail,
-        error: error.message
-      });
-      throw error;
+  try {
+    if (!userEmail || !validateEmail(userEmail).isValid) {
+      throw new Error('無効なメールアドレス');
     }
+
+    // 既存ユーザーチェック
+    const existingUser = DatabaseOperations.findUserByEmail(userEmail);
+    if (existingUser) {
+      console.info('UserService.createUser: 既存ユーザーを返却', { userEmail });
+      return existingUser;
+    }
+
+    // 新規ユーザーデータ作成
+    const userData = buildNewUserData(userEmail, initialConfig);
+
+    // データベースに保存
+    const success = DatabaseOperations.createUser(userData);
+    if (!success) {
+      throw new Error('ユーザー作成に失敗');
+    }
+
+    console.info('UserService.createUser: 新規ユーザー作成完了', {
+      userEmail,
+      userId: userData.userId
+    });
+
+    return userData;
+  } catch (error) {
+    console.error('UserService.createUser: エラー', {
+      userEmail,
+      error: error.message
+    });
+    throw error;
+  }
 }
 
 /**
@@ -418,7 +334,9 @@ function buildNewUserData(userEmail, initialConfig) {
  */
 function clearUserCache(userId = null) {
     // CacheServiceに統一委譲
-    return CacheService.invalidateUserCache(userId);
+    const cache = ServiceFactory.getCache();
+    const cacheKey = userId ? `user_info_${userId}` : 'current_user_info';
+    return cache.remove(cacheKey);
 }
 
 /**
@@ -427,7 +345,7 @@ function clearUserCache(userId = null) {
  */
 function getUserSessionStatus() {
     try {
-      const email = getCurrentUserEmail();
+      const email = getCurrentEmail();
       const userInfo = email ? getCurrentUserInfo() : null;
 
       return {
@@ -459,18 +377,11 @@ function getUserSessionStatus() {
  */
 function findUserByEmail(email) {
   try {
-    if (!email || !validateUserEmail(email).isValid) {
+    if (!email || !validateEmail(email).isValid) {
       return null;
     }
 
-    // 🔧 ServiceFactory経由でデータベース取得
-    const db = ServiceFactory.getDB();
-    if (!db) {
-      console.error('findUserByEmail: Database not available');
-      return null;
-    }
-
-    return db.findUserByEmail(email);
+    return DatabaseOperations.findUserByEmail(email);
   } catch (error) {
     console.error('UserService.findUserByEmail: エラー', error.message);
     return null;
@@ -482,34 +393,13 @@ function findUserByEmail(email) {
  * @param {string} email - メールアドレス
  * @returns {Object} 検証結果
  */
-function validateUserEmail(email) {
-  try {
-    if (!email || typeof email !== 'string') {
-      return { isValid: false, reason: 'メールアドレスが空または無効な型です' };
-    }
-
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const isValid = emailRegex.test(email);
-
-    return {
-      isValid,
-      reason: isValid ? null : '無効なメールアドレス形式です'
-    };
-  } catch (error) {
-    console.error('validateUserEmail エラー:', error.message);
-    return { isValid: false, reason: 'メール検証中にエラーが発生しました' };
-  }
-}
 
 /**
  * フォームURL検証
  * @param {string} formUrl - フォームURL
  * @returns {boolean} 有効かどうか
  */
-function validateUserFormUrl(formUrl) {
-    if (!formUrl || typeof formUrl !== 'string') return false;
-    return formUrl.includes('forms.gle') || formUrl.includes('docs.google.com/forms');
-}
+// validateUserFormUrl function removed - use validateUrl from validators.gs instead
 
 /**
  * サービス状態診断

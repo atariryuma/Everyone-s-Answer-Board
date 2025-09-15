@@ -19,13 +19,46 @@
 // 🔒 基本データ型検証関数群
 // ===========================================
 
+/**
+ * メールアドレス検証
+ * @param {string} email - メールアドレス
+ * @returns {Object} 検証結果
+ */
+function validateEmail(email) {
+  const result = {
+    isValid: false,
+    sanitized: null,
+    errors: []
+  };
+
+  try {
+    if (!email || typeof email !== 'string') {
+      result.errors.push('メールアドレスが必要です');
+      return result;
+    }
+
+    // 基本的なメールアドレス形式チェック
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      result.errors.push('無効なメールアドレス形式です');
+      return result;
+    }
+
+    result.isValid = true;
+    result.sanitized = email.trim().toLowerCase();
+    return result;
+  } catch (error) {
+    result.errors.push('メール検証エラー');
+    return result;
+  }
+}
 
 /**
  * URL検証（Google関連のみ許可）
  * @param {string} url - URL
  * @returns {Object} 検証結果
  */
-function validateInputUrl(url) {
+function validateUrl(url) {
     const result = {
       isValid: false,
       sanitized: '',
@@ -114,7 +147,7 @@ function validateInputUrl(url) {
  * @param {Object} options - オプション
  * @returns {Object} 検証結果
  */
-function validateInputText(text, options = {}) {
+function validateText(text, options = {}) {
     const {
       maxLength = 8192,
       minLength = 0,
@@ -211,7 +244,7 @@ function validateInputText(text, options = {}) {
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {Object} 検証結果
  */
-function validateInputSpreadsheetId(spreadsheetId) {
+function validateSpreadsheetId(spreadsheetId) {
     const result = {
       isValid: false,
       errors: []
@@ -238,7 +271,7 @@ function validateInputSpreadsheetId(spreadsheetId) {
  * @param {Object} columnMapping - 列マッピング
  * @returns {Object} 検証結果
  */
-function validateInputColumnMapping(columnMapping) {
+function validateColumnMapping(columnMapping) {
     const result = {
       isValid: false,
       errors: [],
@@ -301,7 +334,7 @@ function validateInputColumnMapping(columnMapping) {
  * @param {Object} config - 設定オブジェクト
  * @returns {Object} 検証結果
  */
-function validateInputConfig(config) {
+function validateConfig(config) {
     const result = {
       isValid: false,
       errors: [],
@@ -316,9 +349,9 @@ function validateInputConfig(config) {
 
     // 基本フィールド検証
     const fields = {
-      spreadsheetId: { validator: validateInputSpreadsheetId, required: false },
-      formUrl: { validator: validateInputUrl, required: false },
-      sheetName: { validator: (v) => validateInputText(v, { maxLength: 100 }), required: false }
+      spreadsheetId: { validator: validateSpreadsheetId, required: false },
+      formUrl: { validator: validateUrl, required: false },
+      sheetName: { validator: (v) => validateText(v, { maxLength: 100 }), required: false }
     };
 
     for (const [field, { validator, required }] of Object.entries(fields)) {
@@ -341,7 +374,7 @@ function validateInputConfig(config) {
 
     // 列マッピング検証
     if (config.columnMapping) {
-      const mappingValidation = validateInputColumnMapping(config.columnMapping);
+      const mappingValidation = validateColumnMapping(config.columnMapping);
       if (!mappingValidation.isValid) {
         result.errors.push(...mappingValidation.errors);
       }

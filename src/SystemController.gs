@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global ServiceFactory, DB, UserService, ConfigService, DatabaseOperations */
+/* global ServiceFactory, DB, UserService, ConfigService, DatabaseOperations, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse */
 
 // ===========================================
 // 🔧 Zero-Dependency Utility Functions
@@ -47,87 +47,9 @@ function initDatabaseConnection() {
   }
 }
 
-/**
- * SystemController専用：直接Session APIでメール取得
- * DB依存なしでユーザー情報を取得
- */
-function getCurrentEmailDirectSC() {
-  try {
-    let email = Session.getActiveUser().getEmail();
-    if (email) {
-      return email;
-    }
-
-    email = Session.getEffectiveUser().getEmail();
-    if (email) {
-      return email;
-    }
-
-    console.warn('getCurrentEmailDirectSC: No email available from Session API');
-    return null;
-  } catch (error) {
-    console.error('getCurrentEmailDirectSC:', error.message);
-    return null;
-  }
-}
 
 // generateUserId は main.gs に統一移動済み
 
-/**
- * アプリケーションの初期セットアップ
- * AppSetupPage.html から呼び出される
- *
- * @param {string} serviceAccountJson - サービスアカウントJSON
- * @param {string} databaseId - データベースID
- * @param {string} adminEmail - 管理者メール
- * @param {string} googleClientId - GoogleクライアントID
- * @returns {Object} セットアップ結果
- */
-function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
-    try {
-      // バリデーション
-      if (!serviceAccountJson || !databaseId || !adminEmail) {
-        return {
-          success: false,
-          message: '必須パラメータが不足しています'
-        };
-      }
-
-      // システムプロパティを設定（ServiceFactory経由）
-      const props = ServiceFactory.getProperties();
-      props.set('DATABASE_SPREADSHEET_ID', databaseId);
-      props.set('ADMIN_EMAIL', adminEmail);
-      props.set('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
-
-      if (googleClientId) {
-        props.set('GOOGLE_CLIENT_ID', googleClientId);
-      }
-
-      console.log('システムセットアップ完了:', {
-        databaseId,
-        adminEmail,
-        hasServiceAccount: !!serviceAccountJson,
-        hasClientId: !!googleClientId
-      });
-
-      return {
-        success: true,
-        message: 'システムセットアップが完了しました',
-        setupData: {
-          databaseId,
-          adminEmail,
-          timestamp: new Date().toISOString()
-        }
-      };
-
-    } catch (error) {
-      console.error('SystemController.setupApplication エラー:', error.message);
-      return {
-        success: false,
-        message: error.message
-      };
-    }
-}
 
 /**
  * セットアップのテスト実行
@@ -149,7 +71,7 @@ function forceUrlSystemReset() {
       // キャッシュをクリア（複数の方法を試行）
       const cacheResults = [];
       try {
-        const cache = CacheService.getScriptCache();
+        const cache = ServiceFactory.getCache();
         if (cache && typeof cache.removeAll === 'function') {
           cache.removeAll();
           cacheResults.push('ScriptCache クリア成功');
@@ -161,7 +83,7 @@ function forceUrlSystemReset() {
 
       // Document Cache も試行
       try {
-        const docCache = CacheService.getDocumentCache();
+        const docCache = ServiceFactory.getCache(); // Use unified cache
         if (docCache && typeof docCache.removeAll === 'function') {
           docCache.removeAll();
           cacheResults.push('DocumentCache クリア成功');
@@ -234,7 +156,7 @@ function testSystemDiagnosis() {
         const databaseId = props.getDatabaseSpreadsheetId();
 
         if (databaseId) {
-          const spreadsheet = SpreadsheetApp.openById(databaseId);
+          const spreadsheet = ServiceFactory.getSpreadsheet().openById(databaseId);
           diagnostics.database = {
             accessible: true,
             name: spreadsheet.getName(),
@@ -306,36 +228,6 @@ function getSystemStatus() {
     }
 }
 
-/**
- * システムドメイン情報の取得
- * AppSetupPage.html から呼び出される
- *
- * @returns {Object} ドメイン情報
- */
-function getSystemDomainInfo() {
-    try {
-      // 🎯 Zero-dependency: 直接Session API使用
-      const currentUser = getCurrentEmailDirectSC();
-      let domain = 'unknown';
-
-      if (currentUser && currentUser.includes('@')) {
-        [, domain] = currentUser.split('@');
-      }
-
-      return {
-        success: true,
-        domain,
-        currentUser,
-        timestamp: new Date().toISOString()
-      };
-
-    } catch {
-      return {
-        success: false,
-        message: 'ドメイン情報の取得に失敗しました'
-      };
-    }
-}
 
 /**
  * データ整合性チェック
@@ -395,7 +287,7 @@ function performAutoRepair() {
 
       // キャッシュクリア
       try {
-        const cache = CacheService.getScriptCache();
+        const cache = ServiceFactory.getCache();
         if (cache && typeof cache.removeAll === 'function') {
           cache.removeAll();
         }
@@ -481,7 +373,7 @@ function getAdminSpreadsheetList() {
 function getAdminSheetList(spreadsheetId) {
   try {
     // 🎯 Zero-dependency: 直接SpreadsheetAppでシート一覧取得
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
 
     const sheetList = sheets.map(sheet => ({
@@ -525,7 +417,7 @@ function getAdminSheetList(spreadsheetId) {
 function getLightweightHeaders(spreadsheetId, sheetName) {
   try {
     // 🎯 Zero-dependency: 直接SpreadsheetAppでヘッダー取得
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -565,14 +457,14 @@ function getLightweightHeaders(spreadsheetId, sheetName) {
 function saveDraftConfiguration(config) {
   try {
     // 🎯 Zero-dependency: 直接DBで設定保存
-    const userEmail = getCurrentEmailDirectSC();
+    const userEmail = getCurrentEmail();
     if (!userEmail) {
-      return { success: false, message: 'ユーザー認証が必要です' };
+      return createErrorResponse('ユーザー認証が必要です');
     }
 
     const user = DB.findUserByEmail(userEmail);
     if (!user) {
-      return { success: false, message: 'ユーザーが見つかりません' };
+      return createUserNotFoundError();
     }
 
     // 設定をJSONで保存
@@ -591,7 +483,7 @@ function saveDraftConfiguration(config) {
     };
   } catch (error) {
     console.error('saveDraftConfiguration error:', error);
-    return { success: false, message: error.message };
+    return createExceptionResponse(error);
   }
 }
 
@@ -603,7 +495,7 @@ function saveDraftConfiguration(config) {
 function publishApplication(publishConfig) {
   try {
     // 🎯 Zero-dependency: 直接PropertiesServiceでアプリ公開
-    const props = PropertiesService.getScriptProperties();
+    const props = ServiceFactory.getProperties();
 
     // アプリケーション状態をアクティブに変更
     props.setProperty('APPLICATION_STATUS', 'active');
@@ -621,7 +513,7 @@ function publishApplication(publishConfig) {
     };
   } catch (error) {
     console.error('publishApplication error:', error);
-    return { success: false, message: error.message };
+    return createExceptionResponse(error);
   }
 }
 
@@ -635,7 +527,7 @@ function publishApplication(publishConfig) {
 function validateAccess(spreadsheetId) {
   try {
     // 🎯 Zero-dependency: 直接SpreadsheetAppでアデス権確認
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
 
     // アデスできたら成功
@@ -678,7 +570,7 @@ function validateAccess(spreadsheetId) {
 function getFormInfo(spreadsheetId, sheetName) {
   try {
     // 🚀 Zero-dependency: ServiceFactory経由でConfigService利用
-    const configService = ServiceFactory.getService('ConfigService');
+    const configService = ConfigService;
     if (!configService) {
       throw new Error('ConfigService not available');
     }
@@ -719,7 +611,7 @@ function createForm(userId, config) {
     }
 
     // ServiceFactory経由でConfigServiceアクセス
-    const configService = ServiceFactory.getService('ConfigService');
+    const configService = ConfigService;
     if (!configService) {
       console.error('AdminController.createForm: ConfigService not available');
       return { success: false, message: 'ConfigServiceが利用できません' };
@@ -755,8 +647,8 @@ function createForm(userId, config) {
 function checkCurrentPublicationStatus() {
   try {
     // ServiceFactory経由でユーザー情報取得
-    const session = ServiceFactory.getSession();
-    const userId = session.isValid ? session.userId : null;
+    const {email} = ServiceFactory.getSession();
+    const userId = email ? userId : null;
 
     if (!userId) {
       return {
@@ -767,7 +659,7 @@ function checkCurrentPublicationStatus() {
     }
 
     // ServiceFactory経由で設定情報を取得
-    const configService = ServiceFactory.getService('ConfigService');
+    const configService = ConfigService;
     const config = configService ? configService.getUserConfig(userId) : null;
     if (!config) {
       return {
@@ -833,8 +725,8 @@ function columnNumberToLetter(num) {
  */
 function verifyUserAuthentication() {
   try {
-    const session = ServiceFactory.getSession();
-    const userEmail = session.isValid ? session.email : null;
+    const {email} = ServiceFactory.getSession();
+    const userEmail = email ? email : null;
     if (!userEmail) {
       return {
         isAuthenticated: false,
@@ -842,7 +734,7 @@ function verifyUserAuthentication() {
       };
     }
 
-    const userInfo = session.isValid ? { userId: session.userId, email: session.email } : null;
+    const userInfo = email ? { email } : null;
     return {
       isAuthenticated: true,
       userEmail,
@@ -869,8 +761,8 @@ function verifyUserAuthentication() {
  */
 function getLoginStatus() {
   try {
-    const session = ServiceFactory.getSession();
-    const userEmail = session.isValid ? session.email : null;
+    const {email} = ServiceFactory.getSession();
+    const userEmail = email ? email : null;
     if (!userEmail) {
       return {
         isLoggedIn: false,
@@ -878,7 +770,7 @@ function getLoginStatus() {
       };
     }
 
-    const userInfo = session.isValid ? { userId: session.userId, email: session.email } : null;
+    const userInfo = email ? { email } : null;
     return {
       isLoggedIn: true,
       user: {
@@ -910,13 +802,13 @@ function reportClientError(errorInfo) {
     console.error('クライアントエラー報告:', errorInfo);
 
     // ServiceFactory経由でセッション情報取得
-    const session = ServiceFactory.getSession();
+    const {email} = ServiceFactory.getSession();
 
     // エラーログを記録（将来的にはSecurityServiceや専用のログサービスに委譲）
     const logEntry = {
       timestamp: new Date().toISOString(),
       type: 'client_error',
-      userEmail: session.isValid ? session.email : 'unknown',
+      userEmail: email ? email : 'unknown',
       errorInfo
     };
 

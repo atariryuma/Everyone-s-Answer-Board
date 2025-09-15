@@ -1,638 +1,383 @@
-<div align="center">
+# 📚 StudyQuest - Everyone's Answer Board
 
-# 🎯 Everyone's Answer Board
-
-### *Zero-Dependency Google Apps Script Multi-Tenant Platform*
+### *みんなの回答ボード - リアルタイム協調学習プラットフォーム*
 
 [![GAS Platform](https://img.shields.io/badge/Platform-Google%20Apps%20Script-blue?logo=googleappsscript&logoColor=white)](https://script.google.com)
-[![Architecture](https://img.shields.io/badge/Architecture-Zero%20Dependency-green?logo=serverless&logoColor=white)](CLAUDE.md)
-[![Claude Code](https://img.shields.io/badge/AI%20Dev-Claude%20Code%202025-purple?logo=anthropic&logoColor=white)](CLAUDE.md)
-[![Tests](https://img.shields.io/badge/Tests-113%20Tests%20Passing-brightgreen?logo=jest&logoColor=white)](tests/)
-[![License](https://img.shields.io/badge/License-MIT-orange?logo=opensourceinitiative&logoColor=white)](LICENSE)
+[![Zero Dependency](https://img.shields.io/badge/Architecture-Zero%20Dependency-green?logo=serverless&logoColor=white)](#architecture)
+[![Real-time](https://img.shields.io/badge/Real--time-Collaboration-purple?logo=googledrive&logoColor=white)](#features)
 
-**🚀 Real-time collaborative answer sharing with Google Sheets integration**
-**⚡ Built with zero-dependency architecture for maximum reliability**
+**🎯 教育現場のための Google Sheets 連携リアルタイム協調学習システム**
+**⚡ 学生同士の回答共有とリアルタイム反応機能による学習促進**
 
 ---
 
-[🎯 Features](#features) • [🚀 Quick Start](#quick-start) • [📖 API Documentation](#api-documentation) • [🏗️ Architecture](#architecture) • [🤝 Contributing](#contributing)
+## 🎯 アプリケーション概要
 
-</div>
+**StudyQuest みんなの回答ボード**は、教育現場での学習効果を最大化するために設計されたリアルタイム協調学習プラットフォームです。**サイロ型マルチテナント方式**により、各教育機関・クラス・プロジェクトが完全に独立したデータ環境を持ち、Google Sheets と連携して学生が回答を共有し、互いの学習内容に対してリアルタイムで反応・評価できる環境を提供します。
 
----
-
-## 🎯 Features
-
-<table>
-<tr>
-<td width="50%">
-
-### 🏢 Zero-Dependency Multi-Tenant Architecture
-- **ServiceFactory Pattern**: Unified platform API access layer
-- **No Service Dependencies**: Eliminates file loading order issues
-- **Google OAuth Integration**: Direct Session API authentication
-- **Dynamic Configuration**: Per-tenant JSON-based settings
-- **Unlimited Scalability**: Zero external dependencies
-
-</td>
-<td width="50%">
-
-### ⚡ Real-Time Collaboration
-- **Live Reactions**: UNDERSTAND/LIKE/CURIOUS system
-- **Instant Updates**: Real-time data synchronization
-- **Response Highlighting**: Interactive answer engagement
-- **Auto-Refresh**: Background data updates
-
-</td>
-</tr>
-<tr>
-<td>
-
-### 🔒 Zero-Dependency Security
-- **Platform API Security**: Direct Google Apps Script security model
-- **No External Dependencies**: Eliminates supply chain vulnerabilities
-- **Tenant Isolation**: Complete data separation guarantee
-- **Built-in Protection**: GAS platform-level security
-
-</td>
-<td>
-
-### 🎨 Modern User Experience
-- **Responsive Design**: Mobile-first UI approach
-- **Progressive Enhancement**: Works without JavaScript
-- **Accessibility**: WCAG 2.1 compliant interface
-- **Dark Mode**: User preference support
-
-</td>
-</tr>
-</table>
+### 🌟 教育効果
+- **📖 学習の可視化**: 全員の回答を一覧表示し、多様な視点を共有
+- **🤝 相互学習**: 他の学生の回答から新しい発見と学びを促進
+- **⚡ リアルタイム反応**: 即座のフィードバックで学習意欲を向上
+- **📊 学習状況把握**: 教師が学生の理解度をリアルタイムで確認
 
 ---
 
-## 🚀 Quick Start
+## 🏢 アーキテクチャ概要
 
-### Prerequisites
+### サイロ型マルチテナント方式
+各教育機関・クラスのデータが完全に独立したテナント環境で動作します。
 
-```bash
-# Required software
-node >= 18.0.0
-npm >= 8.0.0
-```
+**データ分離**
+- テナント別Google Sheets: 各回答ボードが独自のスプレッドシートを使用
+- 管理台帳データベース: configJsonを含むシステム設定を一元管理
+- クロステナント防御: テナント間の不正アクセスを完全遮断
 
-### Installation
-
-```bash
-# 1. Clone and setup
-git clone https://github.com/your-username/Everyone-s-Answer-Board.git
-cd Everyone-s-Answer-Board
-
-# 2. Install development dependencies
-npm install
-
-# 3. Configure Google Apps Script
-npx clasp login
-npx clasp pull
-
-# 4. Run quality checks
-npm run check
-```
-
-### First Deployment
-
-```bash
-# Deploy to Google Apps Script (production-safe)
-./scripts/safe-deploy.sh
-
-# Or manual deployment
-clasp push
-
-# Open GAS editor (optional)
-clasp open
-
-# View execution logs
-clasp logs
-```
-
-### 🎯 Usage Example
-
-```javascript
-// Access your deployed web app
-const webAppUrl = "https://script.google.com/macros/s/YOUR_ID/exec";
-
-// Users navigate through the flow:
-// 1. Login page (OAuth authentication)
-// 2. Setup page (spreadsheet configuration)
-// 3. Main board (real-time collaboration)
-```
+**認証・権限制御**
+- Google Apps Script サービスアカウント: 全データアクセスの基盤
+- OAuth 2.0認証: Google Workspaceとの安全な連携
+- 多層アクセス制御: データベース・スプレッドシート・アプリケーション層
 
 ---
 
-## 🏗️ Architecture
+## 🚀 主要機能
 
-### 📋 Zero-Dependency Architecture Overview
+### メインボード（回答閲覧・反応）
+Google Sheetsのデータをリアルタイムで表示し、学習者同士の相互作用を促進します。
 
-```mermaid
-graph TB
-    A[🌐 Web Interface] --> B[🚪 main.gs API Gateway]
-    B --> C[🏭 ServiceFactory]
-    C --> D[🔧 Services Layer]
-    C --> E[📀 Direct GAS Platform APIs]
+**検索・フィルタ機能**
+- キーワード検索: 回答内容・学生名での検索
+- クラス別絞り込み: 複数クラス対応
+- リアクション数フィルタ: 人気順・注目・バズ
+- ソート: 新着順・ランダム順・リアクション順・スコア順
 
-    B --> B1[HTML Template Routing]
-    B --> B2[API Function Routing]
-    B --> B3[Error Handling]
+**リアクションシステム**
+- UNDERSTAND（理解）: 分かりやすい回答への反応
+- LIKE（いいね）: 素晴らしい回答への支持
+- CURIOUS（興味深い）: 新しい視点への興味
+- ハイライト機能: 重要回答のマーク
+- リアルタイム反応数表示
 
-    C --> C1[getSession()]
-    C --> C2[getProperties()]
-    C --> C3[getSpreadsheet()]
-    C --> C4[getCache()]
-    C --> C5[getDB()]
+**ユーザビリティ**
+- レスポンシブデザイン: 全デバイス対応
+- WCAG 2.1準拠: アクセシビリティ確保
+- 高速レンダリング: 大量データ処理
 
-    D --> D1[UserService]
-    D --> D2[ConfigService]
-    D --> D3[DataService]
-    D --> D4[SecurityService]
+### 認証システム
+Google Apps Script の組み込み OAuth 2.0 による安全な認証とユーザー管理を提供します。
 
-    E --> E1[Session API]
-    E --> E2[PropertiesService]
-    E --> E3[SpreadsheetApp]
-    E --> E4[CacheService]
-    E --> E5[UrlFetchApp]
+**認証フロー**
+1. **Google アカウント認証**: Session.getActiveUser().getEmail() による自動認証
+2. **データベース検索**: findUserByEmail() で既存ユーザー確認
+3. **自動アカウント作成**: 新規ユーザーは自動的にデータベースに登録
+4. **権限判定**: システム管理者・回答ボード所有者・一般ユーザーの自動識別
+5. **適切なページへリダイレクト**: ユーザー状態に応じた画面表示
 
-    style A fill:#e1f5fe
-    style B fill:#f3e5f5
-    style C fill:#fff9c4
-    style D fill:#e8f5e8
-    style E fill:#fce4ec
-```
+**主要API関数**
+- `getCurrentEmail()`: 現在のユーザーメール取得
+- `processLoginAction()`: ログイン処理とユーザー作成
+- `isSystemAdmin()`: 管理者権限確認
+- `getUser(infoType)`: ユーザー情報取得
 
-### 📁 Zero-Dependency Architecture Structure
+**ユーザーデータ構造**
+- userId: UUID形式の一意識別子
+- userEmail: Google アカウントメールアドレス
+- configJson: ユーザー設定（JSON形式）
+  - setupStatus: 'pending'（初期）→ 'completed'（設定済み）
+  - appPublished: 回答ボード公開状態
+  - spreadsheetId: 連携するGoogle Sheetsの ID
 
-```
-src/
-├── 🚪 main.gs                    # API Gateway - HTTP routing only
-├── 🏭 ServiceFactory.gs          # Zero-dependency platform API access
-├── 🔧 UserService.gs             # User auth & management (zero-dep)
-├── 🔧 ConfigService.gs           # Configuration management (zero-dep)
-├── 🔧 DataService.gs             # Spreadsheet operations (zero-dep)
-├── 🔧 SecurityService.gs         # Security & permissions (zero-dep)
-├── 📀 DatabaseCore.gs            # Direct Spreadsheet API usage
-├── 📀 SystemController.gs        # System management (zero-dep)
-├── 📀 DataController.gs          # Data operations (zero-dep)
-├── 📀 AdminpanelService.gs       # Admin panel operations (zero-dep)
-├── 📀 CacheService.gs            # Caching layer (zero-dep)
-├── 🏗️ errors.gs                 # Error handling utilities
-├── 🏗️ constants.gs              # System constants
-├── 🛠️ formatters.gs             # Data formatting (no dependencies)
-├── 🛠️ helpers.gs                # Common helpers (no dependencies)
-├── 🛠️ validators.gs             # Input validation (no dependencies)
-└── 🎨 *.html                     # UI templates
-```
+### 初回セットアップ
+教師が回答ボードを作成するための設定ウィザードです。
 
-### 🔄 Zero-Dependency Request Flow
+- Google Sheets選択と接続
+- データ列の自動識別とマッピング（回答・クラス・名前列）
+- 表示設定とプレビュー機能
+- 設定の検証と保存
 
-```mermaid
-sequenceDiagram
-    participant User
-    participant main.gs
-    participant ServiceFactory
-    participant Service
-    participant GAS_API
+### 管理者パネル
+システム全体の管理とユーザー制御機能を提供します。
 
-    User->>main.gs: HTTP Request (doGet/doPost)
-    main.gs->>Service: Direct service function call
-    Service->>ServiceFactory: Platform API request
-    ServiceFactory->>GAS_API: Direct Google API call
-    GAS_API-->>ServiceFactory: Platform response
-    ServiceFactory-->>Service: Unified response
-    Service-->>main.gs: Business logic result
-    main.gs-->>User: HTML/JSON response
-```
+**ユーザー管理**
+- 全ユーザー一覧とアクセス権限設定
+- アカウント削除とログ管理
+
+**システム監視**
+- リアルタイム利用状況監視
+- パフォーマンス指標とデータ同期状況
+- システム設定とメンテナンスモード制御
 
 ---
 
-## 📊 System Specifications
+## 🎯 利用フロー
 
-### 🗄️ Data Model
+### 🔐 システム全体のアクセスフロー
 
-#### Users Collection
-```typescript
-interface UserRecord {
-  userId: string;        // UUID primary key
-  userEmail: string;     // Authentication email
-  isActive: boolean;     // Active status flag
-  configJson: string;    // All settings (JSON)
-  lastModified: string;  // Audit timestamp
-}
+**Webアプリエントリーポイント**: `/exec` アクセス → 必ずログインページから開始
+
+```
+/exec → LoginPage.html → [認証処理] → 適切なページへリダイレクト
 ```
 
-#### Configuration Schema (Zero-Dependency)
-```typescript
-interface ConfigJson {
-  // Data source settings
-  spreadsheetId: string;
-  sheetName: string;
-  formUrl: string;
+### 👨‍🏫 教師による回答ボード作成フロー
+1. **初回ログイン**: LoginPage.html で Google アカウント認証
+2. **自動ユーザー作成**: processLoginAction() で新規ユーザーを自動登録
+3. **セットアップ画面**: SetupPage.html で Google Sheets 選択と列マッピング設定
+4. **設定保存**: configJson に spreadsheetId、列設定、表示設定を保存
+5. **回答ボード公開**: 共有URL（mode=view&userId）生成
+6. **管理画面アクセス**: AdminPanel.html で継続的な管理
 
-  // Display settings
-  displayMode: "anonymous" | "named" | "email";
-  showReactions: boolean;
+### 👨‍🎓 学生・閲覧者の利用フロー
+1. **直接アクセス**: 共有URL（?mode=view&userId=xxx）から Page.html へ直接アクセス
+2. **匿名利用**: データベース登録不要（ゲストとして利用可能）
+3. **回答カード閲覧**: リアルタイムでGoogle Sheetsデータを表示
+4. **検索・フィルタリング**: キーワード検索、クラス別絞り込み、ソート機能
+5. **リアクション送信**: UNDERSTAND/LIKE/CURIOUS による評価
+6. **ハイライト機能**: 重要回答のマーク（セッション単位）
+7. **リアルタイム更新**: 他ユーザーの反応を即座に反映
 
-  // Application state
-  setupStatus: "pending" | "completed";
-  appPublished: boolean;
-  publishedAt: string;
+### 👑 管理者によるシステム管理フロー
 
-  // ServiceFactory integration
-  platformApiAccess: {
-    sessionValid: boolean;
-    propertiesAccessible: boolean;
-    spreadsheetAccessible: boolean;
-  };
-
-  // Dynamic per-sheet settings
-  [`sheet_${sheetName}`]: {
-    columnMapping: Record<string, string>;
-    headers: Record<string, string>;
-    lastModified: string;
-  };
-}
-```
-
-### ⚡ Performance Metrics
-
-| Metric | Zero-Dependency | Previous | Improvement |
-|--------|-----------------|----------|-------------|
-| Service Loading | 100% reliable | 60% reliable | 67% better |
-| File Dependencies | 0 dependencies | 15+ dependencies | 100% eliminated |
-| Cold Start Time | <500ms | >2000ms | 75% faster |
-| Platform API Calls | Direct access | Abstracted layers | 40% fewer |
-| Test Coverage | 113/113 passing | Variable | 100% stable |
+1. **管理者認証**: ADMIN_EMAIL設定による管理者権限確認
+2. **AdminPanel.html アクセス**: 管理者専用インターフェース
+3. **ユーザー管理**: getBulkAdminPanelData() で全ユーザー情報取得
+4. **システム監視**: リアルタイムパフォーマンス確認
+5. **データ整合性確認**: データベースとスプレッドシートの同期状況確認
 
 ---
 
-## 📖 API Documentation
+## 📊 ページ構成と機能詳細
 
-### 🔐 Zero-Dependency Authentication APIs
+### 🔐 LoginPage.html
+**機能**: Google OAuth 2.0 認証とユーザー作成・ログイン処理
+- Google アカウント情報表示（getUser('email')）
+- ドメイン制限確認（getSystemDomainInfo()）
+- ログインボタン（processLoginAction() 実行）
+- 認証成功時の自動リダイレクト
 
-<details>
-<summary><strong>Direct Platform Authentication</strong></summary>
+### 📋 Page.html（メインボード）
+**機能**: 回答ボード表示とリアクション機能
+- Google Sheets データリアルタイム表示
+- 検索・フィルタ・ソート機能
+- リアクションシステム（addReaction()）
+- ハイライト機能（toggleHighlight()）
+- レスポンシブデザイン
 
-```javascript
-// Get current user (direct Session API)
-getUser(kind = 'email')
-→ Returns: string | {email, permissions}
-→ Uses: ServiceFactory.getSession() → Session.getActiveUser()
+### ⚙️ SetupPage.html
+**機能**: 初回セットアップウィザード
+- スプレッドシート選択と接続
+- 列マッピング設定（回答・クラス・名前列の自動識別）
+- プレビュー機能とバリデーション
+- configJson設定保存
 
-// Process login action (zero dependencies)
-processLoginAction()
-→ Returns: {success: boolean, redirect?: string, error?: string}
-→ Uses: Direct PropertiesService access
+### 👑 AdminPanel.html
+**機能**: システム管理者専用パネル
+- 全ユーザー管理（getBulkAdminPanelData()）
+- アクセス権限設定
+- システム監視とパフォーマンス確認
+- データ整合性確認
 
-// System reset (platform API direct)
-forceUrlSystemReset()
-→ Returns: {success: boolean}
-→ Uses: ServiceFactory.getProperties().deleteAll()
-```
-
-</details>
-
-### ⚙️ Zero-Dependency Configuration APIs
-
-<details>
-<summary><strong>ServiceFactory-Based Configuration</strong></summary>
-
-```javascript
-// Get user configuration (zero dependencies)
-getConfig()
-→ Returns: ConfigJson
-→ Uses: ServiceFactory.getDB() → Direct Spreadsheet API
-
-// Save configuration (platform API direct)
-saveDraftConfiguration(config: ConfigJson)
-→ Returns: {success: boolean, validationErrors?: string[]}
-→ Uses: ServiceFactory.getProperties() → PropertiesService
-
-// Publish application (zero dependencies)
-publishApplication(config: ConfigJson)
-→ Returns: {success: boolean, webAppUrl: string}
-→ Uses: ServiceFactory.getSpreadsheet() → SpreadsheetApp
-
-// Application status (self-contained)
-getApplicationStatusForUI()
-→ Returns: {isOwner: boolean, isActive: boolean, lastModified: string}
-→ Uses: ServiceFactory.getSession() → Session API
-```
-
-</details>
-
-### 📊 Data Operations APIs
-
-<details>
-<summary><strong>Zero-Dependency Spreadsheet Operations</strong></summary>
-
-```javascript
-// Get spreadsheet list (ServiceFactory direct)
-getSpreadsheetList()
-→ Returns: Array<{id: string, name: string, url: string}>
-→ Uses: ServiceFactory.getSpreadsheet() → DriveApp
-
-// Get sheet list from spreadsheet
-getSheetList(spreadsheetId: string)
-→ Returns: Array<{name: string, rowCount: number}>
-→ Uses: ServiceFactory.getSpreadsheet() → SpreadsheetApp.openById()
-
-// Analyze sheet columns (zero dependencies)
-analyzeColumns(spreadsheetId: string, sheetName: string)
-→ Returns: {
-  headers: string[],
-  suggestions: {answer: number, class: number, name: number},
-  confidence: number
-}
-
-// Get published sheet data (ServiceFactory)
-getPublishedSheetData(request: DataRequest)
-→ Returns: {
-  data: Array<Record<string, any>>,
-  totalCount: number,
-  hasMore: boolean
-}
-```
-
-</details>
-
-### 🛠️ Administrative APIs
-
-<details>
-<summary><strong>Zero-Dependency System Administration</strong></summary>
-
-```javascript
-// Check system admin status (Session API direct)
-checkIsSystemAdmin()
-→ Returns: {isAdmin: boolean, email: string}
-→ Uses: ServiceFactory.getSession() → Session.getActiveUser()
-
-// Get all users (admin only, ServiceFactory)
-getAllUsersForAdminForUI()
-→ Returns: Array<{userId, email, isActive, lastModified}>
-→ Uses: ServiceFactory.getDB() → Direct Spreadsheet API
-
-// Delete user account (admin only, zero dependencies)
-deleteUserAccountByAdminForUI(userId: string)
-→ Returns: {success: boolean, deletionId: string}
-→ Uses: ServiceFactory.getProperties() → PropertiesService
-
-// Get deletion logs (admin only, platform API)
-getDeletionLogsForUI()
-→ Returns: Array<{deletionId, userId, email, deletedAt, reason}>
-→ Uses: ServiceFactory.getCache() → CacheService
-```
-
-</details>
+### 🚀 AppSetupPage.html
+**機能**: アプリケーション初期設定
+- システム全体の基本設定
+- データベース接続設定
+- 初期管理者設定
 
 ---
 
-## 🧪 Testing & Quality
+## 🔒 データアクセス制御
 
-### Test Structure
+### データベース（管理台帳）
+- システム管理者: フルアクセス権限
+- サービスアカウント: 読み書き権限
+- その他のユーザー: アクセス不可
 
-```bash
-npm run test              # Run all tests
-npm run test:watch        # Watch mode for TDD
-npm run test:coverage     # Coverage report
-npm run lint              # Code linting
-npm run format            # Code formatting
-npm run check             # Full quality gate
+### 回答ボード用スプレッドシート
+- 回答ボード所有者（教師）: フルアクセス権限
+- サービスアカウント: 読み書き権限
+- 同一ドメインユーザー: 閲覧・編集権限
+- 外部ユーザー: 直接アクセス不可
+
+### ゲストユーザーアクセス
+- 回答カード閲覧: 制限なし
+- リアクション送信: 匿名で可能
+- ハイライト機能: セッション単位
+- スプレッドシート・データベース直接アクセス: 完全遮断
+
+---
+
+## 教育現場での活用
+
+### 🌟 **ユーザーエクスペリエンス**
+- **⚡ 高速レスポンス**: 最適化されたパフォーマンス
+- **🎯 直感的操作**: 学習に集中できるシンプルなUI
+- **📱 マルチデバイス**: デスクトップ・タブレット・スマートフォン対応
+- **🎮 ゲーミフィケーション**: 学習意欲を向上させる要素
+
+### 🎨 **ビジュアルデザイン**
+- **🌙 ダークテーマ**: 目に優しい配色
+- **🎨 Glassmorphism**: モダンなガラス風UI
+- **⚡ アニメーション**: スムーズなトランジション
+- **🌈 カラーコード**: 機能別の色分け
+
+### ♿ **アクセシビリティ**
+- **🔊 スクリーンリーダー**: 視覚障害者対応
+- **⌨️ キーボード操作**: マウス無しでの完全操作
+- **🎨 高コントラスト**: 読みやすい文字表示
+- **📏 WCAG 2.1 準拠**: 国際アクセシビリティ基準
+
+---
+
+## 🔧 管理者向け機能詳細
+
+### 📊 **システム監視**
+- **👥 ユーザー活動**: リアルタイムユーザー数、アクセスパターン
+- **⚡ パフォーマンス**: レスポンス時間、メモリ使用量
+- **🔄 データ同期**: Google Sheets との同期状況
+- **❌ エラー監視**: システムエラーの検出と通知
+
+### 🛠️ **メンテナンス機能**
+- **🔧 設定変更**: システム設定のリアルタイム変更
+- **🗑️ データクリーンアップ**: 不要データの自動削除
+- **📋 ログ管理**: 詳細ログの保存と分析
+- **🔄 バックアップ**: 自動バックアップシステム
+
+### 🔒 **セキュリティ管理**
+- **👤 アクセス制御**: ユーザー別権限設定
+- **🛡️ 不正アクセス検出**: 異常なアクセスパターンの監視
+- **📊 監査ログ**: 全操作の記録と追跡
+- **⚠️ セキュリティ通知**: セキュリティイベントの即座な通知
+
+## 🛡️ **サービスアカウント・データアクセス制御**
+
+### **📊 データベース（管理台帳）アクセス制御**
 ```
+🔐 管理台帳データベース
+├── ✅ システム管理者: フルアクセス権限
+├── ✅ サービスアカウント: 読み書き権限
+└── ❌ その他のユーザー: アクセス不可
+```
+- **⚙️ configJson 管理**: 全回答ボードの設定情報を安全に保存
+- **👥 ユーザー管理**: テナント別ユーザー情報の一元管理
+- **📊 システム設定**: グローバル設定とテナント別設定の管理
 
-### Zero-Dependency Quality Standards
+### **📋 回答ボード・スプレッドシートアクセス制御**
+```
+📊 回答ボード用スプレッドシート
+├── ✅ 回答ボード所有者（教師）: フルアクセス権限
+├── ✅ サービスアカウント: 読み書き権限
+├── ✅ 同じドメインユーザー: 閲覧・編集権限
+└── ❌ 外部ユーザー: 直接アクセス不可
+```
+- **🔐 サービスアカウント経由**: 全てのデータアクセスはサービスアカウント経由
+- **🏫 ドメイン制限**: 教育機関ドメイン内でのセキュアな共有
+- **📱 アプリケーション層制御**: 直接スプレッドシートアクセスを防止
 
-- **Test Coverage**: 113/113 tests passing (100% reliability)
-- **ESLint**: Zero errors achieved (down from 25)
-- **Service Loading**: 100% reliable (zero file order dependencies)
-- **Platform API**: Direct access patterns only
-- **Performance**: <500ms cold start (75% improvement)
+### **👥 ゲストユーザー・アクセスモデル**
+```
+🌐 回答ボードURL共有
+├── 📋 回答カード閲覧: ✅ 制限なし
+├── 💡 リアクション送信: ✅ 匿名で可能
+├── ⭐ ハイライト機能: ✅ セッション単位
+├── 📊 スプレッドシート直接アクセス: ❌ 完全遮断
+└── 🗃️ データベース直接アクセス: ❌ 完全遮断
+```
+- **🔗 URL ベースアクセス**: mode=view&userId形式のURLによる安全な共有
+- **👤 登録不要**: データベース未登録でも回答ボード利用可能
+- **🛡️ 間接アクセス**: サービスアカウント経由でのみデータ取得
 
-### Zero-Dependency Deployment Pipeline
+---
 
-```bash
-# Quality gates (must pass)
-npm run check            # 113 tests + zero ESLint errors
+## 🚀 教育現場での活用例
 
-# Zero-dependency validation
-./scripts/pre-deploy-check.js  # Validates zero-dependency patterns
+### 📚 **授業での活用**
+- **💭 ブレインストーミング**: 創造的思考の共有
+- **🤔 問題解決**: 多様な解決方法の発見
+- **📖 読解活動**: 文章理解の共有と議論
+- **🔬 実験結果**: 科学実験結果の比較検討
 
-# Safe deployment
-./scripts/safe-deploy.sh     # Production-safe GAS deployment
+### 🎯 **学習効果の向上**
+- **👀 多様性の認識**: 他者の視点からの学び
+- **💪 学習意欲向上**: リアクション機能による動機付け
+- **🤝 協調学習**: 互いに学び合う環境の構築
+- **📊 理解度確認**: 教師による学習状況の把握
 
-# Post-deployment verification
-clasp logs                   # Monitor for service loading errors
+### 🏫 **運用パターン**
+- **🕐 リアルタイム授業**: 授業中の即座な回答共有
+- **📝 宿題・課題**: 授業外での学習成果共有
+- **📋 復習活動**: 学習内容の振り返りと定着
+- **🎪 イベント活動**: 学校行事での意見収集
+
+---
+
+## ⚠️ 開発者向け機能保護ガイドライン
+
+### 🛡️ **重要機能の保護**
+
+#### **📱 メインボード（Page.html）の必須機能**
+- **🔍 検索・フィルタ機能**: 学習効果に直結する重要機能
+- **💡 リアクションシステム**: 学習動機の核となる機能
+- **⭐ ハイライト機能**: 重要回答の識別機能
+- **🔄 リアルタイム更新**: 協調学習の基盤機能
+- **📱 レスポンシブデザイン**: 多様なデバイス対応
+
+#### **⚙️ セットアップ（SetupPage.html）の必須機能**
+- **📊 スプレッドシート連携**: データソースとの接続
+- **🏷️ 列マッピング**: データ構造の柔軟性
+- **👀 プレビュー機能**: 設定確認の安全性
+- **✅ バリデーション**: データ整合性の保証
+
+#### **👑 管理者パネル（AdminPanel.html）の必須機能**
+- **👥 ユーザー管理**: システム運用の制御
+- **📊 監視機能**: システム健全性の確認
+- **🔒 セキュリティ管理**: データ保護の実現
+- **⚙️ 設定管理**: システム最適化の実現
+
+### 🔧 **機能追加時の注意事項**
+
+#### **✅ 推奨される追加**
+- **📊 分析機能**: 学習効果測定の向上
+- **🎨 カスタマイズ**: 教育現場に合わせた調整
+- **🔄 同期機能**: 他システムとの連携
+- **♿ アクセシビリティ**: より多くの学習者への対応
+
+#### **⚠️ 避けるべき変更**
+- **🔍 検索機能の削除**: 学習効果の大幅な低下
+- **💡 リアクション機能の変更**: 学習動機システムの破綻
+- **📱 モバイル対応の除去**: アクセシビリティの大幅な低下
+- **🔒 セキュリティ機能の削除**: データ保護の破綻
+- **🏢 マルチテナント分離の変更**: テナント間データ漏洩リスク
+- **👤 サービスアカウント認証の変更**: システム全体のセキュリティ破綻
+
+### 📋 **機能変更チェックリスト**
+
+```markdown
+機能変更前のチェック項目：
+□ 学習効果への影響を評価したか？
+□ ユーザビリティが維持されるか？
+□ 既存の教育現場での使用に支障がないか？
+□ アクセシビリティが確保されるか？
+□ セキュリティが維持されるか？
+□ 既存データとの互換性があるか？
+□ 教師・学生双方のワークフローが保たれるか？
+□ マルチテナント分離が維持されるか？
+□ サービスアカウント認証が影響を受けないか？
+□ テナント間のデータ漏洩リスクがないか？
+□ クロステナント機能が正常に動作するか？
 ```
 
 ---
 
-## 🛠️ Development
+## 🎊 まとめ
 
-### Local Development
+**StudyQuest みんなの回答ボード**は、教育現場での協調学習を最大化するための包括的なプラットフォームです。リアルタイムな反応機能と直感的なインターフェースにより、学生の学習意欲向上と教師の効果的な指導を支援します。
 
-```bash
-# Start development environment
-npm run dev
+### 🌟 **コア価値**
+- **📚 学習効果の最大化**: 多様な視点の共有による深い学び
+- **🤝 協調学習の促進**: リアルタイム反応による相互作用
+- **⚡ 直感的な操作性**: 学習に集中できるシンプルなUI
+- **🔒 安全なデータ管理**: Google Workspace 統合による信頼性
+- **🏢 エンタープライズ級セキュリティ**: サイロ型マルチテナント完全分離
+- **👤 信頼できる認証**: サービスアカウントベースの堅牢な認証システム
 
-# Watch for changes
-npm run watch
-
-# Hot reload for GAS
-npx clasp push --watch
-```
-
-### Creating Zero-Dependency Features
-
-```bash
-# 1. Create feature branch
-git checkout -b feature/new-capability
-
-# 2. Write zero-dependency tests first
-npm run test:watch
-
-# 3. Implement with ServiceFactory pattern
-# - Use ServiceFactory.get*() APIs only
-# - No inter-service dependencies
-# - Self-contained initialization
-
-# 4. Validate zero-dependency compliance
-npm run check
-./scripts/pre-deploy-check.js
-
-# 5. Deploy and test
-./scripts/safe-deploy.sh
-```
-
-### Zero-Dependency Code Style Guide
-
-```javascript
-// ✅ Correct: Zero-dependency pattern
-function getCurrentUser() {
-  if (!initUserServiceZero()) return null;
-  const session = ServiceFactory.getSession();
-  return session.isValid ? session.email : null;
-}
-
-// ✅ Correct: ServiceFactory usage
-function saveUserConfig(userId, config) {
-  try {
-    const db = ServiceFactory.getDB();
-    if (!db.isValid) return { success: false };
-    return db.updateUser(userId, { configJson: JSON.stringify(config) });
-  } catch (error) {
-    console.error('Config save failed:', error);
-    return { success: false, error: error.message };
-  }
-}
-
-// ❌ Incorrect: Service dependencies
-const userData = UserService.getCurrentUserInfo(); // May fail loading
-
-// ❌ Incorrect: External constants
-const key = PROPS_KEYS.USER_CONFIG; // Dependency on constants file
-```
-
----
-
-## 🔧 Configuration
-
-### Environment Setup
-
-```javascript
-// appsscript.json
-{
-  "timeZone": "Asia/Tokyo",
-  "dependencies": {
-    "libraries": []  // Zero external dependencies
-  },
-  "exceptionLogging": "STACKDRIVER",
-  "executionApi": {
-    "access": "ANYONE"
-  }
-}
-```
-
-### ServiceFactory Configuration
-
-```javascript
-// ServiceFactory.gs - Zero-dependency platform access
-const ServiceFactory = {
-  getSession: () => ({
-    isValid: true,
-    email: Session.getActiveUser().getEmail(),
-    user: Session.getActiveUser()
-  }),
-
-  getProperties: () => PropertiesService.getScriptProperties(),
-
-  getSpreadsheet: () => SpreadsheetApp,
-
-  getCache: () => CacheService.getScriptCache(),
-
-  getDB: () => /* Direct Spreadsheet API wrapper */
-};
-```
-
----
-
-## 🤝 Contributing
-
-### Getting Started
-
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally
-3. **Create a feature branch** from `main`
-4. **Follow zero-dependency patterns** in implementation
-5. **Test thoroughly** with `npm run check`
-6. **Submit a pull request** with detailed description
-
-### Contribution Guidelines
-
-- 📋 **Zero Dependencies**: No inter-service dependencies allowed
-- 🏭 **ServiceFactory**: Use ServiceFactory for all platform API access
-- 🧪 **Testing**: Write tests first (TDD approach)
-- 📝 **Documentation**: Update docs with code changes
-- 🔍 **Code Review**: All changes require review
-- ✅ **Quality Gate**: All 113 tests must pass
-
-### Development Standards
-
-```bash
-# Required before any commit
-npm run check               # Must pass 100%
-./scripts/pre-deploy-check.js  # Zero-dependency validation
-
-# Recommended development flow
-npm run test:watch          # TDD development
-npm run lint:fix            # Auto-fix style issues
-npm run format              # Consistent formatting
-```
-
----
-
-## 📞 Support
-
-### 🐛 Bug Reports
-
-Please include:
-- **Reproduction steps**: Clear step-by-step instructions
-- **Expected behavior**: What should happen
-- **Actual behavior**: What actually happens
-- **ServiceFactory logs**: Platform API access logs
-- **Error logs**: Complete stack traces
-
-### 💡 Feature Requests
-
-Please provide:
-- **Zero-dependency approach**: How to implement without dependencies
-- **ServiceFactory integration**: Platform API usage plan
-- **Use case**: Why is this feature needed?
-- **Impact**: Who would benefit from this?
-
-### 📚 Resources
-
-- [📖 Developer Guide](CLAUDE.md) - Zero-dependency architecture patterns
-- [🏭 ServiceFactory Guide](src/ServiceFactory.gs) - Platform API access layer
-- [🧪 Test Suite](tests/) - 113 comprehensive tests
-- [🚀 Deployment Scripts](scripts/) - Production-safe deployment tools
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🎊 Acknowledgments
-
-### Zero-Dependency Technology Stack
-- **[Google Apps Script](https://developers.google.com/apps-script)** - Platform APIs only
-- **[ServiceFactory Pattern](src/ServiceFactory.gs)** - Unified platform access
-- **[Claude Code](https://claude.ai/code)** - AI-powered zero-dependency development
-- **[Jest](https://jestjs.io)** - 113 comprehensive tests
-- **[ESLint](https://eslint.org)** - Zero errors achieved
-
-### Zero-Dependency Development Approach
-- **Platform API First** - Direct Google Apps Script API usage
-- **Dependency Elimination** - Zero inter-service dependencies
-- **ServiceFactory Pattern** - Unified platform API access layer
-- **100% Reliability** - Eliminates file loading order issues
-- **AI-Guided Architecture** - Claude Code 2025 best practices
-
----
-
-<div align="center">
-
-### 🌟 Star this project if you find it helpful!
-
-**Built with ❤️ using zero-dependency architecture practices**
-
-[⬆️ Back to Top](#-everyones-answer-board)
-
-</div>
+教育現場での実際のニーズに基づいて設計された各機能は、学習者中心の体験を提供し、21世紀型の協調学習環境を実現します。

@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ServiceFactory, ConfigService, DataService */
+/* global ServiceFactory, ConfigService, DataService, DatabaseOperations, getCurrentEmail, createErrorResponse */
 
 // ===========================================
 // 📊 メインページデータAPI
@@ -23,35 +23,11 @@
  * @param {Object} request - リクエストパラメータ
  * @returns {Object} データ取得結果
  */
-/**
- * DataController専用：直接Session APIでメール取得
- */
-function getCurrentEmailDirectDC() {
-  try {
-    // Method 1: Session.getActiveUser()
-    let email = Session.getActiveUser().getEmail();
-    if (email) {
-      return email;
-    }
-
-    // Method 2: Session.getEffectiveUser()
-    email = Session.getEffectiveUser().getEmail();
-    if (email) {
-      return email;
-    }
-
-    console.warn('getCurrentEmailDirectDC: No email available from Session API');
-    return null;
-  } catch (error) {
-    console.error('getCurrentEmailDirectDC:', error.message);
-    return null;
-  }
-}
 
 function handleGetData(request) {
   try {
     // 🎯 Zero-dependency: 直接Session APIでユーザー取得
-    const email = getCurrentEmailDirectDC();
+    const email = getCurrentEmail();
     if (!email) {
       return {
         success: false,
@@ -70,10 +46,10 @@ function handleGetData(request) {
     }
 
     // ServiceFactory経由でDataServiceアクセス
-    const dataService = ServiceFactory.getService('DataService');
+    const dataService = DataService;
     if (!dataService) {
       console.error('getMainPageData: DataService not available');
-      return { success: false, message: 'DataServiceが利用できません' };
+      return createErrorResponse('DataServiceが利用できません');
     }
     const data = dataService.getSheetData(user.userId, request.options || {});
     return {
@@ -100,7 +76,7 @@ function handleGetData(request) {
 function handleAddReaction(request) {
   try {
     // 🎯 Zero-dependency: 直接Session APIでユーザー取得
-    const email = getCurrentEmailDirectDC();
+    const email = getCurrentEmail();
     if (!email) {
       return {
         success: false,
@@ -119,10 +95,10 @@ function handleAddReaction(request) {
     }
 
     // ServiceFactory経由でDataServiceアクセス
-    const dataService = ServiceFactory.getService('DataService');
+    const dataService = DataService;
     if (!dataService) {
       console.error('processAddReaction: DataService not available');
-      return { success: false, message: 'DataServiceが利用できません' };
+      return createErrorResponse('DataServiceが利用できません');
     }
     const result = dataService.addReaction(
       user.userId,
@@ -150,23 +126,32 @@ function handleAddReaction(request) {
  */
 function handleToggleHighlight(request) {
   try {
-    // 🚀 Zero-dependency: ServiceFactory経由でユーザー情報取得
-    const session = ServiceFactory.getSession();
-    if (!session.isValid || !session.userId) {
+    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
+    const email = getCurrentEmail();
+    if (!email) {
       return {
         success: false,
         message: 'ユーザー情報が見つかりません'
       };
     }
-    const userInfo = { userId: session.userId, email: session.email };
 
-    const dataService = ServiceFactory.getService('DataService');
+    // 🎯 Zero-dependency: ServiceFactory経由でDBアクセス
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
+    if (!user) {
+      return {
+        success: false,
+        message: 'ユーザーが登録されていません'
+      };
+    }
+
+    const dataService = DataService;
     if (!dataService) {
       console.error('processToggleHighlight: DataService not available');
-      return { success: false, message: 'DataServiceが利用できません' };
+      return createErrorResponse('DataServiceが利用できません');
     }
     const result = dataService.toggleHighlight(
-      userInfo.userId,
+      user.userId,
       request.rowId
     );
 
@@ -190,22 +175,31 @@ function handleToggleHighlight(request) {
  */
 function handleRefreshData(request) {
   try {
-    // 🚀 Zero-dependency: ServiceFactory経由でユーザー情報取得
-    const session = ServiceFactory.getSession();
-    if (!session.isValid || !session.userId) {
+    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
+    const email = getCurrentEmail();
+    if (!email) {
       return {
         success: false,
         message: 'ユーザー情報が見つかりません'
       };
     }
-    const userInfo = { userId: session.userId, email: session.email };
 
-    const dataService = ServiceFactory.getService('DataService');
+    // 🎯 Zero-dependency: ServiceFactory経由でDBアクセス
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
+    if (!user) {
+      return {
+        success: false,
+        message: 'ユーザーが登録されていません'
+      };
+    }
+
+    const dataService = DataService;
     if (!dataService) {
       console.error('processRefreshData: DataService not available');
-      return { success: false, message: 'DataServiceが利用できません' };
+      return createErrorResponse('DataServiceが利用できません');
     }
-    const result = dataService.refreshBoardData(userInfo.userId, request.options || {});
+    const result = dataService.refreshBoardData(user.userId, request.options || {});
     return result;
 
   } catch (error) {
@@ -231,15 +225,15 @@ function getRecentSubmissions(userId, limit = 10) {
     }
 
     // ServiceFactory経由で設定取得（Zero-Dependency Pattern）
-    const session = ServiceFactory.getSession();
-    if (!session.isValid) {
+    const {email} = ServiceFactory.getSession();
+    if (!email) {
       return {
         success: false,
         message: 'セッションが無効です'
       };
     }
 
-    const configService = ServiceFactory.getService('ConfigService');
+    const configService = ConfigService;
     const config = configService ? configService.getUserConfig(userId) : null;
     if (!config || !config.appPublished) {
       return {
@@ -248,10 +242,10 @@ function getRecentSubmissions(userId, limit = 10) {
       };
     }
 
-    const dataService = ServiceFactory.getService('DataService');
+    const dataService = DataService;
     if (!dataService) {
       console.error('getRecentSubmissions: DataService not available');
-      return { success: false, message: 'DataServiceが利用できません' };
+      return createErrorResponse('DataServiceが利用できません');
     }
     const data = dataService.getSheetData(userId, { limit, includeTimestamp: true });
     return {
@@ -286,7 +280,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
       };
     }
 
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -332,11 +326,11 @@ function getHeaderIndices(spreadsheetId, sheetName) {
  * @param {Object} options - 取得オプション
  * @returns {Object} ユーザー一覧
  */
-function getAllUsersForAdminForUI(_options = {}) {
+function getAllUsers(_options = {}) {
   try {
     // 🚀 Zero-dependency: ServiceFactory経由で管理者権限チェック
-    const session = ServiceFactory.getSession();
-    if (!session.isValid || !session.email) {
+    const {email} = ServiceFactory.getSession();
+    if (!email) {
       return {
         success: false,
         message: 'ユーザー認証が必要です'
@@ -345,7 +339,7 @@ function getAllUsersForAdminForUI(_options = {}) {
 
     const props = ServiceFactory.getProperties();
     const adminEmails = props.getAdminEmailList();
-    if (!adminEmails.includes(session.email)) {
+    if (!adminEmails.includes(email)) {
       return {
         success: false,
         message: '管理者権限が必要です'
@@ -379,84 +373,7 @@ function getAllUsersForAdminForUI(_options = {}) {
   }
 }
 
-/**
- * ユーザーアカウント削除（管理者向け）
- * AdminPanel.js.html から呼び出される
- *
- * @param {string} targetUserId - 削除対象のユーザーID
- * @returns {Object} 削除結果
- */
-function deleteUserAccountByAdminForUI(targetUserId) {
-  try {
-    // 🚀 Zero-dependency: ServiceFactory経由で管理者権限チェック
-    const session = ServiceFactory.getSession();
-    if (!session.isValid || !session.email) {
-      return {
-        success: false,
-        message: 'ユーザー認証が必要です'
-      };
-    }
-
-    const props = ServiceFactory.getProperties();
-    const adminEmails = props.getAdminEmailList();
-    if (!adminEmails.includes(session.email)) {
-      return {
-        success: false,
-        message: '管理者権限が必要です'
-      };
-    }
-
-    if (!targetUserId) {
-      return {
-        success: false,
-        message: 'ユーザーIDが指定されていません'
-      };
-    }
-
-    // 対象ユーザーの存在確認
-    const db = ServiceFactory.getDB();
-    const targetUser = db.findUserById(targetUserId);
-    if (!targetUser) {
-      return {
-        success: false,
-        message: 'ユーザーが見つかりません'
-      };
-    }
-
-    // 削除実行
-    const result = db.deleteUser(targetUserId);
-
-    if (result.success) {
-      console.log('管理者によるユーザー削除:', {
-        admin: session.email,
-        deletedUser: targetUser.userEmail,
-        deletedUserId: targetUserId,
-        timestamp: new Date().toISOString()
-      });
-
-      return {
-        success: true,
-        message: 'ユーザーアカウントを削除しました',
-        deletedUser: {
-          userId: targetUserId,
-          email: targetUser.userEmail
-        }
-      };
-    } else {
-      return {
-        success: false,
-        message: result.message || '削除に失敗しました'
-      };
-    }
-
-  } catch (error) {
-    console.error('DataController.deleteUserAccountByAdminForUI エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
+// deleteUserAccountByAdminForUI removed - use deleteUser from main.gs instead
 
 /**
  * スプレッドシートURL追加
@@ -495,7 +412,7 @@ function addSpreadsheetUrl(url) {
 
     // アクセステスト
     try {
-      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
       const name = spreadsheet.getName();
 
       return {

@@ -21,17 +21,7 @@
  * @returns {boolean} 初期化成功可否
  */
 function initCacheServiceZero() {
-  try {
-    if (typeof ServiceFactory === 'undefined') {
-      console.warn('initCacheServiceZero: ServiceFactory not available');
-      return false;
-    }
-    console.log('✅ CacheService (Zero-Dependency) initialized successfully');
-    return true;
-  } catch (error) {
-    console.error('initCacheServiceZero failed:', error.message);
-    return false;
-  }
+  return ServiceFactory.getUtils().initService('CacheService');
 }
 
 // ==========================================
@@ -84,7 +74,7 @@ function setCacheValue(key, value, ttl = getCacheTTL().MEDIUM) {
       return false;
     }
 
-    const cache = ServiceFactory.getCache();
+    const cache = CacheService.getScriptCache();
     const serializedValue = JSON.stringify({
       data: value,
       timestamp: Date.now(),
@@ -112,7 +102,7 @@ function getCacheValue(key) {
       return null;
     }
 
-    const cache = ServiceFactory.getCache();
+    const cache = CacheService.getScriptCache();
     const cached = cache.get(key);
 
     if (!cached) {
@@ -141,7 +131,7 @@ function clearCacheValue(key) {
       return false;
     }
 
-    const cache = ServiceFactory.getCache();
+    const cache = CacheService.getScriptCache();
     cache.remove(key);
     console.log(`Cache CLEAR: ${key}`);
     return true;
@@ -237,7 +227,7 @@ function clearAllCache() {
       return false;
     }
 
-    const cache = ServiceFactory.getCache();
+    const cache = CacheService.getScriptCache();
     // GASのCacheServiceは全削除機能がないため、個別削除
     const keys = getCacheKeys();
     Object.values(keys).forEach(keyPrefix => {

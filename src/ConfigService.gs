@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, URL */
+/* global ServiceFactory, URL, DatabaseOperations, validateUrl, createErrorResponse */
 
 // ===========================================
 // 🔧 Zero-Dependency ConfigService (ServiceFactory版)
@@ -31,19 +31,7 @@
  * @returns {boolean} 初期化成功可否
  */
 function initConfigServiceZero() {
-  try {
-    // ServiceFactory利用可能性確認
-    if (typeof ServiceFactory === 'undefined') {
-      console.warn('initConfigServiceZero: ServiceFactory not available');
-      return false;
-    }
-
-    console.log('✅ ConfigService (Zero-Dependency) initialized successfully');
-    return true;
-  } catch (error) {
-    console.error('initConfigServiceZero failed:', error.message);
-    return false;
-  }
+  return ServiceFactory.getUtils().initService('ConfigService');
 }
 
 
@@ -166,7 +154,7 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
   const enhanced = { ...baseConfig };
 
   try {
-    const webAppUrl = ScriptApp.getService().getUrl();
+    const webAppUrl = ServiceFactory.getUtils().getWebAppUrl();
 
     enhanced.dynamicUrls = {
       webAppUrl,
@@ -198,7 +186,8 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
  */
 function generateUserPermissions(_userId) {
   try {
-    const currentEmail = ServiceFactory.getSession().email;
+    const session = ServiceFactory.getSession();
+    const currentEmail = session.email;
     if (!currentEmail) {
       return {
         isOwner: false,
@@ -263,7 +252,7 @@ function saveUserConfig(userId, config) {
     sanitizedConfig.lastModified = new Date().toISOString();
 
     // データベース保存
-    const updateResult = ServiceFactory.getDB().updateUserConfig(userId, JSON.stringify(sanitizedConfig));
+    const updateResult = DatabaseOperations.updateUserConfig(userId, JSON.stringify(sanitizedConfig));
 
     if (!updateResult) {
       throw new Error('データベース更新に失敗しました');
@@ -297,52 +286,6 @@ function saveUserConfig(userId, config) {
   }
 }
 
-/**
- * 部分設定更新
- * @param {string} userId - ユーザーID
- * @param {Object} partialConfig - 部分設定
- * @returns {Object} 更新結果
- */
-function updatePartialConfig(userId, partialConfig) {
-  try {
-    // 現在の設定取得（Zero-Dependency Pattern）
-    const session = ServiceFactory.getSession();
-    if (!session.isValid || session.userId !== userId) {
-      throw new Error('セッション情報が無効です');
-    }
-
-    // データベースから現在の設定を取得
-    const db = ServiceFactory.getDB();
-    const user = db.getUserById(userId);
-    const currentConfig = user && user.configJson ?
-      parseAndRepairConfig(user.configJson, userId) :
-      getDefaultConfig(userId);
-    if (!currentConfig) {
-      throw new Error('現在の設定を取得できませんでした');
-    }
-
-    // マージ
-    const mergedConfig = {
-      ...currentConfig,
-      ...partialConfig,
-      lastModified: new Date().toISOString()
-    };
-
-    // 保存
-    return saveUserConfig(userId, mergedConfig);
-
-  } catch (error) {
-    console.error('updatePartialConfig: エラー', {
-      userId,
-      error: error.message
-    });
-    return {
-      success: false,
-      message: '部分更新に失敗しました',
-      error: error.message
-    };
-  }
-}
 
 // ===========================================
 // ✅ 設定検証・サニタイズ
@@ -361,7 +304,7 @@ function validateAndSanitizeConfig(config, userId) {
     // 基本構造検証
     if (!config || typeof config !== 'object') {
       errors.push('設定は有効なオブジェクトである必要があります');
-      return { success: false, message: '無効な設定形式', errors };
+      return createErrorResponse('無効な設定形式', { errors });
     }
 
     const sanitized = { ...config };
@@ -379,7 +322,7 @@ function validateAndSanitizeConfig(config, userId) {
     }
 
     // formUrl検証
-    if (sanitized.formUrl && !validateFormUrl(sanitized.formUrl)) {
+    if (sanitized.formUrl && !validateUrl(sanitized.formUrl)?.isValid) {
       errors.push('無効なフォームURL形式');
       sanitized.formUrl = '';
     }
@@ -486,14 +429,7 @@ function validateSpreadsheetId(spreadsheetId) {
  * @param {string} formUrl - フォームURL
  * @returns {boolean} 有効性
  */
-function validateFormUrl(formUrl) {
-  try {
-    const url = new URL(formUrl);
-    return url.hostname === 'docs.google.com' && url.pathname.includes('/forms/');
-  } catch {
-    return false;
-  }
-}
+// validateFormUrl function removed - use validateUrl from validators.gs instead
 
 // ===========================================
 // 📊 システム状態・診断
@@ -534,7 +470,8 @@ function determineSetupStep(userInfo, configJson) {
  */
 function isSystemSetup() {
   try {
-    const currentEmail = ServiceFactory.getSession().email;
+    const session = ServiceFactory.getSession();
+    const currentEmail = session.email;
     if (!currentEmail) return false;
 
     // 🔧 ServiceFactory経由で直接データベースから取得
@@ -583,7 +520,7 @@ function calculateCompletionScore(config) {
 function clearConfigCache(userId) {
   try {
     const cacheKey = `config_${userId}`;
-    CacheService.getScriptCache().remove(cacheKey);
+    ServiceFactory.getCache().remove(cacheKey);
     console.info('clearConfigCache: キャッシュクリア完了', { userId });
   } catch (error) {
     console.warn('clearConfigCache: キャッシュクリアエラー', error.message);
@@ -614,7 +551,7 @@ function clearAllConfigCache() {
  */
 function hasCoreSystemProps() {
   try {
-    const props = PropertiesService.getScriptProperties();
+    const props = ServiceFactory.getProperties();
 
     // 3つの必須項目をすべてチェック（依存関係なしで直接指定）
     const adminEmail = props.getProperty('ADMIN_EMAIL');
@@ -669,7 +606,7 @@ function hasCoreSystemProps() {
  */
 function checkIfSystemAdmin(email) {
   try {
-    const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+    const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
     return adminEmail && adminEmail === email;
   } catch (error) {
     console.error('checkIfSystemAdmin: エラー', error.message);
