@@ -68,7 +68,23 @@ function doGet(e) {
         if (!UserService.isSystemAdmin(email)) {
           return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
         }
-        return HtmlService.createTemplateFromFile('AdminPanel.html').evaluate();
+        // Inject minimal userInfo for template usage
+        let userInfo = null;
+        try {
+          const db = ServiceFactory.getDB();
+          const user = db && db.findUserByEmail ? db.findUserByEmail(email) : null;
+          if (user) {
+            userInfo = {
+              userId: user.userId || null,
+              userEmail: user.userEmail || email
+            };
+          }
+        } catch (e) {
+          console.warn('doGet(admin): user lookup failed', e && e.message);
+        }
+        const adminTmpl = HtmlService.createTemplateFromFile('AdminPanel.html');
+        adminTmpl.userInfo = userInfo;
+        return adminTmpl.evaluate();
       }
 
       case 'setup':
@@ -76,16 +92,9 @@ function doGet(e) {
 
       case 'main':
       default: {
-        const userEmail = getCurrentEmail();
-        if (!userEmail) {
-          // Redirect to login
-          const loginUrl = `${ScriptApp.getService().getUrl()  }?mode=login`;
-          return HtmlService.createHtmlOutput(`
-            <script>window.top.location.href = '${loginUrl}';</script>
-          `);
-        }
-
-        return HtmlService.createTemplateFromFile('Page.html').evaluate();
+        // Minimal routing policy: do not auto-redirect to login.
+        // For unspecified or unknown modes, show AccessRestricted to avoid unintended login attempts.
+        return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
       }
     }
   } catch (error) {
