@@ -127,6 +127,50 @@ function doGet(e) {
         return HtmlService.createTemplateFromFile('AppSetupPage.html').evaluate();
       }
 
+      case 'view': {
+        // Public view page - requires userId parameter
+        const {userId} = params;
+        if (!userId) {
+          console.warn('view mode accessed without userId parameter');
+          return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+        }
+
+        // Verify user exists
+        try {
+          const db = ServiceFactory.getDB();
+          const user = db.findUserById(userId);
+          if (!user) {
+            console.warn('view mode: user not found:', userId);
+            return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+          }
+
+          // Check if user's board is published
+          let config = {};
+          if (user.configJson) {
+            try {
+              config = JSON.parse(user.configJson);
+            } catch (parseError) {
+              console.warn('view mode: config parse error', parseError);
+            }
+          }
+
+          if (!config.appPublished) {
+            console.warn('view mode: board not published for user:', userId);
+            return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+          }
+
+          // Board is published - serve view page
+          console.log('view mode: serving published board for user:', userId);
+          const template = HtmlService.createTemplateFromFile('Page.html');
+          template.userId = userId;
+          return template.evaluate();
+
+        } catch (error) {
+          console.error('view mode error:', error.message);
+          return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+        }
+      }
+
       case 'main':
       default: {
         // Minimal routing policy: do not auto-redirect to login.

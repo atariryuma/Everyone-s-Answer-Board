@@ -446,7 +446,7 @@
 
         google.script.run
           .withSuccessHandler((result) => {
-            if (result.status === 'success') {
+            if (result.success === true) {
               currentUserList = result.users;
               displayUserList(result.users);
             } else {
