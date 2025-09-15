@@ -170,7 +170,7 @@ function createSheetsService() {
           get(params) {
             try {
               const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
-              const sheetName = params.range.split('!')[0];
+              const [sheetName] = params.range.split('!');
               const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
               const values = sheet.getDataRange().getValues();
               return { data: { values } };
@@ -183,7 +183,7 @@ function createSheetsService() {
           update(params) {
             try {
               const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
-              const sheetName = params.range.split('!')[0];
+              const [sheetName] = params.range.split('!');
               const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
 
               if (!sheet) {
@@ -210,7 +210,7 @@ function createSheetsService() {
           append(params) {
             try {
               const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
-              const sheetName = params.range.split('!')[0];
+              const [sheetName] = params.range.split('!');
               const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
 
               if (!sheet) {
@@ -404,7 +404,7 @@ function findUserByEmail(email) {
       return null; // ヘッダーのみ
     }
 
-    const headers = rows[0];
+    const [headers] = rows;
     const emailIndex = headers.findIndex((h) => {
       return h.toLowerCase().includes('email');
     });
@@ -457,7 +457,7 @@ function findUserById(userId) {
       return null;
     }
 
-    const headers = rows[0];
+    const [headers] = rows;
     const userIdIndex = headers.findIndex((h) => {
       return h.toLowerCase().includes('userid');
     });
@@ -654,7 +654,7 @@ function getAllUsers(options) {
       return [];
     }
 
-    const headers = rows[0];
+    const [headers] = rows;
     const users = [];
 
     // ヘッダーをスキップしてユーザーデータを処理
