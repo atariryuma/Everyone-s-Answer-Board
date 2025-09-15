@@ -557,11 +557,8 @@
             <h1 class="title">${message || 'ログインが完了しました'}</h1>
             <p class="subtitle">管理パネルにアクセスしてください</p>
             
-            <a href="${adminUrl}" target="_blank" rel="noopener noreferrer" class="main-button" id="admin-panel-btn" onclick="handleAdminPanelClick(event, '${adminUrl}', this)">
+            <a href="${adminUrl}" class="main-button" id="admin-panel-btn">
               <span id="admin-panel-btn-text">🚀 管理パネルを開く</span>
-              <div id="admin-panel-btn-spinner" style="display: none; position: absolute; inset: 0; align-items: center; justify-content: center; background: rgba(0,0,0,0.8);">
-                <div style="width: 20px; height: 20px; border: 2px solid white; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
-              </div>
             </a>
             
             <div class="url-info">
@@ -575,9 +572,8 @@
             <div class="note">
               <div style="margin-bottom: 4px;">✓ このリンクは安全です</div>
               <div style="margin-bottom: 4px;">✓ Google Apps Script公式のセキュリティガイドラインに準拠</div>
-              <div style="margin-bottom: 4px;">🔄 管理パネルに移動します</div>
+              <div style="margin-bottom: 4px;">🖱️ ボタンをクリックして管理パネルに移動してください</div>
               <div style="margin-bottom: 4px;">💡 このURLをブックマークすると、次回から直接アクセスできます</div>
-              <div style="margin-bottom: 4px;">⚠️ ポップアップがブロックされる場合は、ブラウザの設定をご確認ください</div>
               <div>🔒 セキュリティのため、URLは他人と共有しないでください</div>
             </div>
           </div>
@@ -588,71 +584,15 @@
       // 現在のコンテンツを成功画面に完全置換
       document.body.innerHTML = successHtml;
 
-      // JavaScript関数を再定義（HTMLに埋め込まれたスクリプトが実行されるため）
-      window.isAdminPanelClicking = false;
-
-      // 🚀 2秒後に自動的に管理パネルを開く（以前の動作を再現）
-      setTimeout(() => {
-        console.log('⏰ 2秒後の自動リダイレクト実行');
-        const adminBtn = document.getElementById('admin-panel-btn');
-        if (adminBtn) {
-          adminBtn.click();
-        }
-      }, 2000);
-
-      window.handleAdminPanelClick = function (event, adminUrl, buttonElement) {
-        event.preventDefault();
-
-        if (window.isAdminPanelClicking) {
-          console.log('管理パネルボタンクリック処理中、二重クリックをブロック');
-          return false;
-        }
-
-        window.isAdminPanelClicking = true;
-        console.log('管理パネルに移動しています...');
-
-        // ボタンを無効化してローディング状態にする
-        buttonElement.style.pointerEvents = 'none';
-        buttonElement.style.opacity = '0.8';
-
-        const btnText = document.getElementById('admin-panel-btn-text');
-        const btnSpinner = document.getElementById('admin-panel-btn-spinner');
-
-        if (btnText) btnText.style.display = 'none';
-        if (btnSpinner) btnSpinner.style.display = 'flex';
-
-        // iframe環境検出とリダイレクト
-        if (btnText) btnText.textContent = '🔄 管理パネルにリダイレクト中...';
-
-        setTimeout(() => {
-          console.log('管理パネルにリダイレクト:', adminUrl);
-
-          // iframe内かどうか検出
-          if (window.self !== window.top) {
-            // iframe内の場合：親ウィンドウでリダイレクト（X-Frame-Options回避）
-            console.log('iframe環境を検出：親ウィンドウでリダイレクト実行');
-            try {
-              window.parent.location.href = adminUrl;
-            } catch (error) {
-              console.warn('親ウィンドウアクセス失敗、top.location使用:', error.message);
-              window.top.location.href = adminUrl;
-            }
-          } else {
-            // 通常の場合：同一ページでリダイレクト
-            console.log('通常環境：同一ページでリダイレクト実行');
-            window.location.href = adminUrl;
-          }
-        }, 1000);
-
-        return false;
-      };
+      // シンプルなリンク方式 - JavaScript処理廃止
+      console.log('✅ シンプルリンク方式 - 管理パネルボタンが表示されました');
 
       // 背景遷移を開始
       setTimeout(function () {
         document.body.classList.add('success-transition');
       }, 300);
 
-      console.log('✅ ユーザーアクション待ち画面を表示しました');
+      console.log('✅ シンプルリンク画面を表示しました');
     } catch (error) {
       console.error('成功画面表示エラー:', error);
       // フォールバック: シンプルなconfirm
