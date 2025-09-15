@@ -148,118 +148,118 @@ function getSheetsService() {
  * @returns {Object} 新しいSheetsサービス
  */
 function createSheetsService() {
-try {
-const serviceAccountKey = ServiceFactory.getProperties().getProperty('SERVICE_ACCOUNT_CREDS');
+  try {
+    const serviceAccountKey = ServiceFactory.getProperties().getProperty('SERVICE_ACCOUNT_CREDS');
 
-if (!serviceAccountKey) {
-throw new Error('サービスアカウントキーが設定されていません');
-}
+    if (!serviceAccountKey) {
+      throw new Error('サービスアカウントキーが設定されていません');
+    }
 
-// サービスアカウントキーの検証のみ（Google Apps Scriptでは直接Sheetsサービスを使用）
-const parsedKey = JSON.parse(serviceAccountKey);
+    // サービスアカウントキーの検証のみ（Google Apps Scriptでは直接Sheetsサービスを使用）
+    const parsedKey = JSON.parse(serviceAccountKey);
 
-// サービスアカウントキーの基本検証
-if (!parsedKey.client_email || !parsedKey.private_key) {
-throw new Error('無効なサービスアカウントキーです');
-}
+    // サービスアカウントキーの基本検証
+    if (!parsedKey.client_email || !parsedKey.private_key) {
+      throw new Error('無効なサービスアカウントキーです');
+    }
 
-// Google Apps Script標準のSpreadsheetAppを使用
-const service = {
-  spreadsheets: {
-    values: {
-      get: ({ spreadsheetId, range }) => {
-        try {
-          const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-          const [sheetName] = range.split('!');
-          const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
-          const values = sheet.getDataRange().getValues();
-          return { data: { values } };
-        } catch (error) {
-          console.error('Service.get error:', error.message);
-          throw error;
-        }
-      },
-
-      update: ({ spreadsheetId, range, resource }) => {
-        try {
-          const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-          const [sheetName] = range.split('!');
-          const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
-
-          if (!sheet) {
-            throw new Error(`Sheet "${sheetName}" not found in spreadsheet`);
-          }
-
-          const {values} = resource;
-          if (values && values.length > 0) {
-            sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
-          }
-
-          console.log('DatabaseCore.update: Data updated successfully', {
-            sheetName,
-            rowsUpdated: values ? values.length : 0
-          });
-
-          return { updatedCells: values ? values.length * values[0].length : 0 };
-        } catch (error) {
-          console.error('Service.update error:', error.message);
-          throw error;
-        }
-      },
-
-      append: ({ spreadsheetId, range, resource, valueInputOption }) => {
-        try {
-          const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-          const [sheetName] = range.split('!');
-          const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
-
-          if (!sheet) {
-            throw new Error(`Sheet "${sheetName}" not found in spreadsheet`);
-          }
-
-          const {values} = resource;
-          if (values && values.length > 0) {
-            const lastRow = sheet.getLastRow();
-            const targetRow = lastRow + 1;
-            const targetRange = sheet.getRange(targetRow, 1, values.length, values[0].length);
-            targetRange.setValues(values);
-
-            console.log('DatabaseCore.append: Data written successfully', {
-              sheetName,
-              targetRow,
-              rowsWritten: values.length
-            });
-          }
-
-          return {
-            updates: {
-              updatedRows: values ? values.length : 0,
-              spreadsheetId,
-              range
+    // Google Apps Script標準のSpreadsheetAppを使用
+    const service = {
+      spreadsheets: {
+        values: {
+          get(params) {
+            try {
+              const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
+              const sheetName = params.range.split('!')[0];
+              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+              const values = sheet.getDataRange().getValues();
+              return { data: { values } };
+            } catch (error) {
+              console.error('Service.get error:', error.message);
+              throw error;
             }
-          };
-        } catch (error) {
-          console.error('Service.append error:', error.message);
-          throw error;
+          },
+
+          update(params) {
+            try {
+              const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
+              const sheetName = params.range.split('!')[0];
+              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+
+              if (!sheet) {
+                throw new Error(`Sheet "${  sheetName  }" not found in spreadsheet`);
+              }
+
+              const {values} = params.resource;
+              if (values && values.length > 0) {
+                sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
+              }
+
+              console.log('DatabaseCore.update: Data updated successfully', {
+                sheetName,
+                rowsUpdated: values ? values.length : 0
+              });
+
+              return { updatedCells: values ? values.length * values[0].length : 0 };
+            } catch (error) {
+              console.error('Service.update error:', error.message);
+              throw error;
+            }
+          },
+
+          append(params) {
+            try {
+              const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
+              const sheetName = params.range.split('!')[0];
+              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+
+              if (!sheet) {
+                throw new Error(`Sheet "${  sheetName  }" not found in spreadsheet`);
+              }
+
+              const {values} = params.resource;
+              if (values && values.length > 0) {
+                const lastRow = sheet.getLastRow();
+                const targetRow = lastRow + 1;
+                const targetRange = sheet.getRange(targetRow, 1, values.length, values[0].length);
+                targetRange.setValues(values);
+
+                console.log('DatabaseCore.append: Data written successfully', {
+                  sheetName,
+                  targetRow,
+                  rowsWritten: values.length
+                });
+              }
+
+              return {
+                updates: {
+                  updatedRows: values ? values.length : 0,
+                  spreadsheetId: params.spreadsheetId,
+                  range: params.range
+                }
+              };
+            } catch (error) {
+              console.error('Service.append error:', error.message);
+              throw error;
+            }
+          }
         }
       }
-    }
+    };
+
+    console.log('DatabaseCore', {
+      operation: 'createSheetsService',
+      serviceType: parsedKey.type || 'unknown'
+    });
+
+    return service;
+  } catch (error) {
+    console.error('DatabaseCore', {
+      operation: 'createSheetsService',
+      error: error.message
+    });
+    throw error;
   }
-};
-
-console.log('DatabaseCore', {
-operation: 'createSheetsService',
-serviceType: parsedKey.type || 'unknown'
-});
-
-return service;
-} catch (error) {
-console.error('DatabaseCore', {
-operation: 'createSheetsService',
-error: error.message
-});
-throw error;
-}
 }
 
 /**
