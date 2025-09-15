@@ -16,35 +16,6 @@
 /* global */
 
 // ===========================================
-// 📦 レスポンス形式統一関数群
-// ===========================================
-
-/**
- * 成功レスポンス作成
- * @param {*} data - データ
- * @param {Object} metadata - メタデータ
- * @returns {Object} 標準成功レスポンス
- */
-function createFormatterSuccessResponse(data, metadata = {}) {
-    const response = {
-      success: true,
-      timestamp: new Date().toISOString(),
-      data: data || null
-    };
-
-    // データが配列の場合はカウント追加
-    if (Array.isArray(data)) {
-      response.count = data.length;
-    }
-
-    // メタデータをマージ
-    return { ...response, ...metadata };
-}
-
-
-
-
-// ===========================================
 // 📅 データ表示用フォーマット関数群
 // ===========================================
 
@@ -106,4 +77,3 @@ function formatTimestamp(timestamp) {
 // ===========================================
 // 🎯 GAS Best Practice: Simple Functions
 // ===========================================
-

@@ -326,52 +326,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
  * @param {Object} options - 取得オプション
  * @returns {Object} ユーザー一覧
  */
-function getAllUsers(_options = {}) {
-  try {
-    // 🚀 Zero-dependency: ServiceFactory経由で管理者権限チェック
-    const {email} = ServiceFactory.getSession();
-    if (!email) {
-      return {
-        success: false,
-        message: 'ユーザー認証が必要です'
-      };
-    }
-
-    const props = ServiceFactory.getProperties();
-    const adminEmails = props.getAdminEmailList();
-    if (!adminEmails.includes(email)) {
-      return {
-        success: false,
-        message: '管理者権限が必要です'
-      };
-    }
-
-    // ServiceFactory経由で全ユーザーを取得
-    const db = ServiceFactory.getDB();
-    const users = db.getAllUsers();
-    const processedUsers = users.map(user => ({
-      userId: user.userId,
-      userEmail: user.userEmail,
-      createdAt: user.createdAt,
-      lastLogin: user.lastLogin,
-      hasConfig: !!user.configJSON
-    }));
-
-    return {
-      success: true,
-      users: processedUsers,
-      total: processedUsers.length,
-      timestamp: new Date().toISOString()
-    };
-
-  } catch (e) {
-    console.error('DataController.getAllUsersForAdminForUI エラー:', e.message);
-    return {
-      success: false,
-      message: e.message
-    };
-  }
-}
+// getAllUsers (admin UI) is not used and duplicates DB function name (removed)
 
 // deleteUserAccountByAdminForUI removed - use deleteUser from main.gs instead
 

@@ -222,23 +222,24 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
 
         // 基本データ構造作成
         const item = {
-          id: `row_${globalIndex + 2}`, // 実際の行番号（ヘッダー考慮）
+          id: `row_${globalIndex + 2}`,
+          rowIndex: globalIndex + 2, // 1-based row number including header
           timestamp: extractFieldValue(row, headers, 'timestamp') || '',
           email: extractFieldValue(row, headers, 'email') || '',
 
-          // メインコンテンツ
+          // メインコンテンツ（フロントエンドと統一）
           answer: extractFieldValue(row, headers, 'answer', columnMapping) || '',
           reason: extractFieldValue(row, headers, 'reason', columnMapping) || '',
-          className: extractFieldValue(row, headers, 'class', columnMapping) || '',
+          class: extractFieldValue(row, headers, 'class', columnMapping) || '',
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',
 
           // メタデータ
           formattedTimestamp: formatTimestamp(extractFieldValue(row, headers, 'timestamp')),
           isEmpty: isEmptyRow(row),
 
-          // リアクション（既存の場合）
+          // リアクション（{count, reacted} 形式に統一）
           reactions: extractReactions(row, headers),
-          isHighlighted: extractHighlight(row, headers)
+          highlight: extractHighlight(row, headers)
         };
 
         // フィルタリング
@@ -278,23 +279,24 @@ function processRawData(dataRows, headers, config, options = {}) {
       try {
         // 基本データ構造作成
         const item = {
-          id: `row_${index + 2}`, // 実際の行番号（ヘッダー考慮）
+          id: `row_${index + 2}`,
+          rowIndex: index + 2,
           timestamp: extractFieldValue(row, headers, 'timestamp') || '',
           email: extractFieldValue(row, headers, 'email') || '',
 
           // メインコンテンツ
           answer: extractFieldValue(row, headers, 'answer', columnMapping) || '',
           reason: extractFieldValue(row, headers, 'reason', columnMapping) || '',
-          className: extractFieldValue(row, headers, 'class', columnMapping) || '',
+          class: extractFieldValue(row, headers, 'class', columnMapping) || '',
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',
 
           // メタデータ
           formattedTimestamp: formatTimestamp(extractFieldValue(row, headers, 'timestamp')),
           isEmpty: isEmptyRow(row),
 
-          // リアクション（既存の場合）
+          // リアクション（{count, reacted} 形式）
           reactions: extractReactions(row, headers),
-          isHighlighted: extractHighlight(row, headers)
+          highlight: extractHighlight(row, headers)
         };
 
         // フィルタリング
@@ -372,11 +374,11 @@ function extractFieldValue(row, headers, fieldType, columnMapping = {}) {
  * @param {string} reactionType - リアクションタイプ
  * @returns {boolean} 成功可否
  */
-// addDataReaction removed - use main.gs addReactionById instead
+// addDataReaction removed - use DataService.addReaction(userId, rowId, reactionType)
 
-// removeDataReaction removed - use main.gs removeReaction instead
+// removeDataReaction removed - use updateReactionInSheet(config, rowId, reactionType, 'remove')
 
-// toggleDataHighlight removed - use main.gs toggleHighlight instead
+// toggleDataHighlight removed - use DataService.toggleHighlight(userId, rowId)
 
 /**
  * スプレッドシート内リアクション更新
@@ -587,7 +589,7 @@ function validateReactionType(reactionType) {
  */
 function extractReactions(row, headers) {
   try {
-    const reactions = {
+    const counts = {
       UNDERSTAND: 0,
       LIKE: 0,
       CURIOUS: 0
@@ -597,18 +599,26 @@ function extractReactions(row, headers) {
     headers.forEach((header, index) => {
       const headerStr = String(header).toLowerCase();
       if (headerStr.includes('understand') || headerStr.includes('理解')) {
-        reactions.UNDERSTAND = parseInt(row[index]) || 0;
+        counts.UNDERSTAND = parseInt(row[index]) || 0;
       } else if (headerStr.includes('like') || headerStr.includes('いいね')) {
-        reactions.LIKE = parseInt(row[index]) || 0;
+        counts.LIKE = parseInt(row[index]) || 0;
       } else if (headerStr.includes('curious') || headerStr.includes('気になる')) {
-        reactions.CURIOUS = parseInt(row[index]) || 0;
+        counts.CURIOUS = parseInt(row[index]) || 0;
       }
     });
 
-    return reactions;
+    return {
+      UNDERSTAND: { count: counts.UNDERSTAND, reacted: false },
+      LIKE: { count: counts.LIKE, reacted: false },
+      CURIOUS: { count: counts.CURIOUS, reacted: false }
+    };
   } catch (error) {
     console.warn('DataService.extractReactions: エラー', error.message);
-    return { UNDERSTAND: 0, LIKE: 0, CURIOUS: 0 };
+    return {
+      UNDERSTAND: { count: 0, reacted: false },
+      LIKE: { count: 0, reacted: false },
+      CURIOUS: { count: 0, reacted: false }
+    };
   }
 }
 
@@ -672,7 +682,7 @@ function shouldIncludeRow(item, options = {}) {
 
     // クラスフィルタリング
     if (options.classFilter && options.classFilter.length > 0) {
-      if (!options.classFilter.includes(item.className)) {
+      if (!options.classFilter.includes(item.class)) {
         return false;
       }
     }
@@ -920,13 +930,13 @@ function analyzeColumns(spreadsheetId, sheetName) {
     }
 
     // 🎯 GAS Best Practice: データ取得を別関数に分離
-    const dataResult = getSheetData(connectionResult.sheet);
+    const dataResult = extractSheetData(connectionResult.sheet);
     if (!dataResult.success) {
       return dataResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: 列分析を別関数に分離
-    const analysisResult = analyzeColumns(dataResult.headers, dataResult.sampleData);
+    const analysisResult = performColumnAnalysis(dataResult.headers, dataResult.sampleData);
 
     return {
       success: true,
@@ -1265,3 +1275,94 @@ function validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey) {
   return validReactions.includes(reactionKey);
 }
 
+// ===========================================
+// 🌍 Public DataService Namespace
+// ===========================================
+
+/**
+ * addReaction (user context)
+ * @param {string} userId
+ * @param {number|string} rowId - number or 'row_#'
+ * @param {string} reactionType
+ * @returns {Object}
+ */
+function dsAddReaction(userId, rowId, reactionType) {
+  try {
+    const db = ServiceFactory.getDB();
+    const user = db && db.findUserById ? db.findUserById(userId) : null;
+    if (!user || !user.configJson) {
+      return createErrorResponse('User configuration not found');
+    }
+
+    const config = JSON.parse(user.configJson);
+    if (!config.spreadsheetId || !config.sheetName) {
+      return createErrorResponse('Spreadsheet configuration incomplete');
+    }
+
+    const rowIndex = typeof rowId === 'string' ? parseInt(String(rowId).replace('row_', ''), 10) : parseInt(rowId, 10);
+    if (!rowIndex || rowIndex < 2) {
+      return createErrorResponse('Invalid row ID');
+    }
+
+    const res = processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionType, null);
+    return res && res.status === 'success'
+      ? { success: true, message: res.message || 'Reaction added', data: { newValue: res.newValue } }
+      : { success: false, message: res?.message || 'Failed to add reaction' };
+  } catch (error) {
+    console.error('DataService.dsAddReaction: エラー', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * toggleHighlight (user context)
+ * @param {string} userId
+ * @param {number|string} rowId - number or 'row_#'
+ * @returns {Object}
+ */
+function dsToggleHighlight(userId, rowId) {
+  try {
+    const db = ServiceFactory.getDB();
+    const user = db && db.findUserById ? db.findUserById(userId) : null;
+    if (!user || !user.configJson) {
+      return createErrorResponse('User configuration not found');
+    }
+
+    const config = JSON.parse(user.configJson);
+    if (!config.spreadsheetId || !config.sheetName) {
+      return createErrorResponse('Spreadsheet configuration incomplete');
+    }
+
+    // updateHighlightInSheet expects 'row_#'
+    const rowNumber = typeof rowId === 'string' && rowId.startsWith('row_')
+      ? rowId
+      : `row_${parseInt(rowId, 10)}`;
+
+    const ok = updateHighlightInSheet(config, rowNumber);
+    return ok
+      ? { success: true, message: 'Highlight toggled successfully' }
+      : { success: false, message: 'Failed to toggle highlight' };
+  } catch (error) {
+    console.error('DataService.dsToggleHighlight: エラー', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+// Expose a stable namespace for non-global access patterns
+if (typeof global !== 'undefined') {
+  global.DataService = {
+    getSheetData,
+    analyzeColumns,
+    processReaction,
+    addReaction: dsAddReaction,
+    toggleHighlight: dsToggleHighlight
+  };
+} else {
+  this.DataService = {
+    getSheetData,
+    analyzeColumns,
+    processReaction,
+    addReaction: dsAddReaction,
+    toggleHighlight: dsToggleHighlight
+  };
+}

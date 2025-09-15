@@ -370,23 +370,7 @@ function getUserSessionStatus() {
 // 🔧 ユーティリティ
 // ===========================================
 
-/**
- * メールアドレスでユーザー検索
- * @param {string} email - メールアドレス
- * @returns {Object|null} ユーザー情報
- */
-function findUserByEmail(email) {
-  try {
-    if (!email || !validateEmail(email).isValid) {
-      return null;
-    }
-
-    return DatabaseOperations.findUserByEmail(email);
-  } catch (error) {
-    console.error('UserService.findUserByEmail: エラー', error.message);
-    return null;
-  }
-}
+// findUserByEmail is provided by DatabaseOperations (duplicate removed)
 
 /**
  * メールアドレス検証（SecurityServiceに委譲）

@@ -58,24 +58,21 @@ function doGet(e) {
     switch (mode) {
       case 'login':
         return HtmlService.createTemplateFromFile('LoginPage.html')
-          .evaluate()
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+          .evaluate();
 
       case 'admin': {
         const email = getCurrentEmail();
         if (!email) {
           return HtmlService.createHtmlOutput('<h1>Login Required</h1>');
         }
-
-        return HtmlService.createTemplateFromFile('AdminPanel.html')
-          .evaluate()
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+        if (!UserService.isSystemAdmin(email)) {
+          return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+        }
+        return HtmlService.createTemplateFromFile('AdminPanel.html').evaluate();
       }
 
       case 'setup':
-        return HtmlService.createTemplateFromFile('SetupPage.html')
-          .evaluate()
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+        return HtmlService.createTemplateFromFile('SetupPage.html').evaluate();
 
       case 'main':
       default: {
@@ -88,9 +85,7 @@ function doGet(e) {
           `);
         }
 
-        return HtmlService.createTemplateFromFile('Page.html')
-          .evaluate()
-          .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+        return HtmlService.createTemplateFromFile('Page.html').evaluate();
       }
     }
   } catch (error) {
@@ -306,17 +301,7 @@ function getUserConfig(userId) {
   }
 }
 
-/**
- * Get sheet data - direct name without intermediate wrapper
- */
-function getSheetData(userId, options = {}) {
-  try {
-    return DataService.getSheetData(userId, options);
-  } catch (error) {
-    console.error('getSheetData error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
+// getSheetData is provided by DataService (duplicate removed)
 
 /**
  * Legacy alias for backwards compatibility
@@ -345,38 +330,19 @@ function addReaction(userEmail, rowIndex, reactionKey) {
       return createErrorResponse('Invalid reaction parameters');
     }
 
-    // Process reaction directly
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(config.spreadsheetId);
-    const sheet = spreadsheet.getSheetByName(config.sheetName);
+    // Delegate to DataService unified implementation
+    const res = DataService.processReaction(
+      config.spreadsheetId,
+      config.sheetName,
+      rowIndex,
+      reactionKey,
+      userEmail
+    );
 
-    if (!sheet) {
-      return createErrorResponse('Sheet not found');
-    }
-
-    // Find or create reaction column
-    const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
-    let reactionColumn = headers.indexOf(reactionKey) + 1;
-
-    if (reactionColumn === 0) {
-      // Create new reaction column
-      reactionColumn = sheet.getLastColumn() + 1;
-      sheet.getRange(1, reactionColumn).setValue(reactionKey);
-    }
-
-    // Update reaction count
-    const currentValue = sheet.getRange(rowIndex, reactionColumn).getValue() || 0;
-    const newValue = Math.max(0, currentValue + 1);
-    sheet.getRange(rowIndex, reactionColumn).setValue(newValue);
-
-    console.info('processReactionByEmail: Reaction processed', {
-      userEmail, rowIndex, reactionKey, oldValue: currentValue, newValue
-    });
-
-    return {
-      success: true,
-      message: 'Reaction added successfully',
-      data: { oldValue: currentValue, newValue }
-    };
+    const ok = res && res.status === 'success';
+    return ok
+      ? { success: true, message: res.message || 'Reaction added successfully', data: { newValue: res.newValue } }
+      : { success: false, message: res?.message || 'Failed to add reaction' };
 
   } catch (error) {
     console.error('processReactionByEmail error:', error.message);
@@ -574,30 +540,7 @@ function setAppStatus(isActive) {
 /**
  * Add reaction by user ID - converts userId to email for addReaction
  */
-function addReactionById(userId, rowId, reactionType) {
-  try {
-    // Get user email from userId
-    const db = ServiceFactory.getDB();
-    const user = db.findUserById(userId);
-
-    if (!user || !user.userEmail) {
-      return createUserNotFoundError();
-    }
-
-    // Convert rowId to rowIndex (assuming 1-based indexing)
-    const rowIndex = parseInt(rowId, 10);
-    if (isNaN(rowIndex) || rowIndex < 1) {
-      return createErrorResponse('Invalid row ID');
-    }
-
-    // Use the unified addReaction function
-    return addReaction(user.userEmail, rowIndex, reactionType);
-
-  } catch (error) {
-    console.error('addReactionById error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
+// addReactionById removed - call DataService.addReaction(userId, rowId, reactionType)
 
 /**
  * Check if user is system admin - simplified name
@@ -610,7 +553,7 @@ function addReactionById(userId, rowId, reactionType) {
 /**
  * Get users - simplified name for admin panel
  */
-function getUsers(options = {}) {
+function getAdminUsers(options = {}) {
   try {
     const email = getCurrentEmail();
     if (!email || !UserService.isSystemAdmin(email)) {
@@ -625,10 +568,13 @@ function getUsers(options = {}) {
       users: users || []
     };
   } catch (error) {
-    console.error('getUsers error:', error.message);
+    console.error('getAdminUsers error:', error.message);
     return createExceptionResponse(error);
   }
 }
+
+// Backward-compatible alias (to be removed after clients migrate)
+function getUsers(options = {}) { return getAdminUsers(options); }
 
 
 /**
@@ -839,116 +785,12 @@ function getBoardInfo() {
 /**
  * Toggle highlight - simplified name for highlight operations
  */
-function toggleHighlight(userId, rowId) {
-  try {
-    const email = getCurrentEmail();
-    if (!email || !UserService.isSystemAdmin(email)) {
-      return createAdminRequiredError();
-    }
-
-    // Direct implementation
-    const db = ServiceFactory.getDB();
-    const user = db.findUserById(userId);
-    if (!user || !user.configJson) {
-      return createErrorResponse('User configuration not found');
-    }
-
-    const config = JSON.parse(user.configJson);
-    if (!config.spreadsheetId || !config.sheetName) {
-      return createErrorResponse('Spreadsheet configuration incomplete');
-    }
-
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(config.spreadsheetId);
-    const sheet = spreadsheet.getSheetByName(config.sheetName);
-
-    if (!sheet) {
-      return createErrorResponse('Sheet not found');
-    }
-
-    // Find or create highlight column
-    const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
-    let highlightColumn = headers.indexOf('highlight') + 1;
-
-    if (highlightColumn === 0) {
-      highlightColumn = sheet.getLastColumn() + 1;
-      sheet.getRange(1, highlightColumn).setValue('highlight');
-    }
-
-    // Toggle highlight value
-    const currentValue = sheet.getRange(rowId, highlightColumn).getValue();
-    const newValue = currentValue ? '' : 'highlighted';
-    sheet.getRange(rowId, highlightColumn).setValue(newValue);
-
-    return {
-      success: true,
-      message: 'Highlight toggled successfully',
-      highlighted: !!newValue
-    };
-
-  } catch (error) {
-    console.error('toggleHighlight error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
+// toggleHighlight removed - call DataService.toggleHighlight(userId, rowId)
 
 /**
  * Remove reaction - simplified name
  */
-function removeReaction(userId, rowId, reactionType) {
-  try {
-    const db = ServiceFactory.getDB();
-    const user = db.findUserById(userId);
-    if (!user || !user.userEmail) {
-      return { success: false, message: 'User not found' };
-    }
-
-    const rowIndex = parseInt(rowId, 10);
-    if (isNaN(rowIndex) || rowIndex < 1) {
-      return createErrorResponse('Invalid row ID');
-    }
-
-    // Get user config
-    if (!user.configJson) {
-      return createErrorResponse('User configuration not found');
-    }
-
-    const config = JSON.parse(user.configJson);
-    if (!config.spreadsheetId || !config.sheetName) {
-      return createErrorResponse('Spreadsheet configuration incomplete');
-    }
-
-    // Process reaction removal
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(config.spreadsheetId);
-    const sheet = spreadsheet.getSheetByName(config.sheetName);
-
-    if (!sheet) {
-      return createErrorResponse('Sheet not found');
-    }
-
-    // Find reaction column
-    const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
-    const reactionColumn = headers.indexOf(reactionType) + 1;
-
-    if (reactionColumn === 0) {
-      return { success: false, message: 'Reaction type not found' };
-    }
-
-    // Decrease reaction count
-    const currentValue = sheet.getRange(rowIndex, reactionColumn).getValue() || 0;
-    const newValue = Math.max(0, currentValue - 1);
-    sheet.getRange(rowIndex, reactionColumn).setValue(newValue);
-
-    return {
-      success: true,
-      message: 'Reaction removed successfully',
-      data: { oldValue: currentValue, newValue }
-    };
-
-  } catch (error) {
-    console.error('removeReaction error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
+// removeReaction removed - use DataService.updateReactionInSheet(..., 'remove') if needed
 
 // Legacy aliases removed - use direct function names
 
@@ -985,116 +827,11 @@ function getSheetList(spreadsheetId) {
   }
 }
 
-/**
- * Analyze columns - simplified name
- */
-function analyzeColumns(spreadsheetId, sheetName) {
-  try {
-    if (!spreadsheetId || !sheetName) {
-      return createErrorResponse('Spreadsheet ID and sheet name required');
-    }
+// analyzeColumns is provided by DataService (duplicate removed)
 
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
-    const sheet = spreadsheet.getSheetByName(sheetName);
+// getFormInfo is provided by SystemController (duplicate removed)
 
-    if (!sheet) {
-      return createErrorResponse('Sheet not found');
-    }
-
-    // Get headers (first row)
-    const lastColumn = sheet.getLastColumn();
-    if (lastColumn === 0) {
-      return { success: false, message: 'No data found' };
-    }
-
-    const [headers] = sheet.getRange(1, 1, 1, lastColumn).getValues();
-
-    // Analyze data types in first few rows
-    const sampleSize = Math.min(10, sheet.getLastRow() - 1);
-    const sampleData = sampleSize > 0 ?
-      sheet.getRange(2, 1, sampleSize, lastColumn).getValues() : [];
-
-    const analysis = headers.map((header, index) => {
-      const columnData = sampleData.map(row => row[index]);
-
-      return {
-        name: header,
-        index: index + 1,
-        sampleValues: columnData.slice(0, 3),
-        hasData: columnData.some(value => value !== null && value !== ''),
-        dataType: detectDataType(columnData)
-      };
-    });
-
-    return {
-      success: true,
-      columns: analysis,
-      totalRows: sheet.getLastRow(),
-      totalColumns: lastColumn
-    };
-  } catch (error) {
-    console.error('analyzeColumns error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
-
-/**
- * Helper function to detect data type
- */
-function detectDataType(values) {
-  const nonEmptyValues = values.filter(v => v !== null && v !== '');
-  if (nonEmptyValues.length === 0) return 'empty';
-
-  const [firstValue] = nonEmptyValues;
-  if (typeof firstValue === 'number') return 'number';
-  if (firstValue instanceof Date) return 'date';
-  if (typeof firstValue === 'boolean') return 'boolean';
-  return 'text';
-}
-
-/**
- * Get form info - simplified name
- */
-function getFormInfo(spreadsheetId, sheetName) {
-  try {
-    if (!spreadsheetId || !sheetName) {
-      return createErrorResponse('Spreadsheet ID and sheet name required');
-    }
-
-    // For now, return basic info (can be enhanced later)
-    return {
-      success: true,
-      formInfo: {
-        hasForm: false,
-        message: 'Form detection not implemented yet'
-      }
-    };
-  } catch (error) {
-    console.error('getFormInfo error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
-
-/**
- * Create form - simplified name
- */
-function createForm(userId, config) {
-  try {
-    if (!userId || !config) {
-      return { success: false, message: 'User ID and config required' };
-    }
-
-    // For now, return success (can be enhanced later)
-    return {
-      success: true,
-      message: 'Form creation not implemented yet',
-      formUrl: null
-    };
-  } catch (error) {
-    console.error('createForm error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
+// createForm is provided by SystemController (duplicate removed)
 
 /**
  * Save user config - simplified name

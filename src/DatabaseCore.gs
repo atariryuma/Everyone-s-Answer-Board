@@ -428,7 +428,7 @@ return null;
  * @param {Object} additionalData - 追加データ
  * @returns {Object} 作成されたユーザー情報
  */
-function createUser(email, additionalData = {}) {
+function dbCreateUser(email, additionalData = {}) {
 if (!email) {
 throw new Error('メールアドレスが必要です');
 }
@@ -649,7 +649,7 @@ status: '✅ Active'
 const DatabaseOperations = {
   findUserByEmail,
   findUserById,
-  createUser,
+  createUser: dbCreateUser,
   updateUser,
   deleteUserAccountByAdmin: updateUser, // Alias
   diagnose: diagnoseDatabaseOperations
@@ -670,7 +670,6 @@ if (typeof global !== 'undefined') {
  * - レガシー実装完全削除
  * - シンプルなAPI提供
  */
-
 
 
 

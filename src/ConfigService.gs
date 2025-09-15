@@ -418,11 +418,7 @@ function validateConfigUserId(userId) {
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {boolean} 有効性
  */
-function validateSpreadsheetId(spreadsheetId) {
-  return typeof spreadsheetId === 'string' &&
-         spreadsheetId.length > 20 &&
-         /^[a-zA-Z0-9_-]+$/.test(spreadsheetId);
-}
+// validateSpreadsheetId is unified in src/validators.gs (duplicate removed)
 
 /**
  * フォームURL検証
