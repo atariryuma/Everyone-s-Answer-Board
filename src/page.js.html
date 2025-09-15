@@ -421,6 +421,9 @@ class AnswerApp {
       this.isOwner = false;
       this.isSystemAdmin = false;
     }
+
+    // 管理モード初期化（デフォルトはOFF）
+    this.adminMode = false;
   }
 
   // UI初期化
@@ -485,6 +488,32 @@ class AnswerApp {
     }
   }
 
+  // 管理モード切り替え
+  toggleAdminMode() {
+    this.adminMode = !this.adminMode;
+    console.log('Admin mode toggled:', this.adminMode);
+
+    // 管理モード表示更新
+    this.updateModeDisplay();
+
+    // 回答リストを再読み込みして管理機能の表示/非表示を切り替え
+    this.loadAnswers(this.currentSort);
+
+    // ボタンの見た目を更新
+    const adminToggleBtn = DOMHelpers.safeGetById('adminToggleBtn');
+    if (adminToggleBtn) {
+      if (this.adminMode) {
+        adminToggleBtn.classList.add('bg-cyan-600', 'text-white');
+        adminToggleBtn.classList.remove('text-gray-500');
+        adminToggleBtn.title = '管理モードON (クリックでOFF)';
+      } else {
+        adminToggleBtn.classList.remove('bg-cyan-600', 'text-white');
+        adminToggleBtn.classList.add('text-gray-500');
+        adminToggleBtn.title = '管理モードOFF (クリックでON)';
+      }
+    }
+  }
+
   // イベントリスナー設定
   setupEventListeners() {
     // ソート順変更
@@ -512,6 +541,14 @@ class AnswerApp {
         const size = e.target.value;
         sliderValue.textContent = size;
         this.updateGridSize(size);
+      });
+    }
+
+    // 管理モード切り替えボタン
+    const adminToggleBtn = DOMHelpers.safeGetById('adminToggleBtn');
+    if (adminToggleBtn) {
+      adminToggleBtn.addEventListener('click', () => {
+        this.toggleAdminMode();
       });
     }
 
@@ -668,8 +705,8 @@ class AnswerApp {
     }
 
     let highlightBtnHtml = '';
-    // ハイライトトグル機能が有効な場合のみボタンを生成
-    if (this.appConfig.showHighlightToggle) {
+    // ハイライトトグル機能が有効かつ管理モードONの場合のみボタンを生成
+    if (this.appConfig.showHighlightToggle && this.adminMode && this.showAdminFeatures) {
       const cls = data.highlight ? 'liked' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
       highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' +
@@ -677,8 +714,8 @@ class AnswerApp {
                          '</button>';
     }
 
-    // 名前表示設定に基づき学生名を表示
-    const showName = this.appConfig.displayMode === 'named';
+    // 名前表示 - 管理モードONかつ管理権限がある場合、または設定でnamedの場合
+    const showName = (this.adminMode && this.showAdminFeatures) || this.appConfig.displayMode === 'named';
     const nameHtml = showName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
     const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
 
