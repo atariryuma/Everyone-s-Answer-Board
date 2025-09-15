@@ -1070,6 +1070,10 @@ function getLogs(options = {}) {
  */
 function getSheets() {
   try {
+    const email = getCurrentEmail();
+    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
+      return createAdminRequiredError();
+    }
     // Direct implementation for spreadsheet access
     const drive = DriveApp;
     const spreadsheets = drive.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
@@ -1443,4 +1447,3 @@ function saveConfig(userId, config) {
     return createExceptionResponse(error);
   }
 }
-

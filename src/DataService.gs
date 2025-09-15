@@ -1542,16 +1542,14 @@ function dsToggleHighlight(userId, rowId) {
 // Expose a stable namespace for non-global access patterns
 if (typeof global !== 'undefined') {
   global.DataService = {
-    getSheetData,
-    columnAnalysis,
+    getUserSheetData,
     processReaction,
     addReaction: dsAddReaction,
     toggleHighlight: dsToggleHighlight
   };
 } else {
   this.DataService = {
-    getSheetData,
-    columnAnalysis,
+    getUserSheetData,
     processReaction,
     addReaction: dsAddReaction,
     toggleHighlight: dsToggleHighlight

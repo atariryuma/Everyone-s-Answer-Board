@@ -721,9 +721,12 @@ const DatabaseOperations = {
   diagnose: diagnoseDatabaseOperations
 };
 
-// グローバル変数に代入
-if (typeof global !== 'undefined') {
-  global.DB = DatabaseOperations;
-} else {
-  DB = DatabaseOperations;
-}
+// グローバル変数に代入（環境互換: globalThis / global / this）
+(function () {
+  const root = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
+  try {
+    root.DB = DatabaseOperations;
+  } catch (e) {
+    // Fallback (should not happen in V8), avoid leaking bare global symbol
+  }
+})();

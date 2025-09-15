@@ -67,7 +67,7 @@ const DOMHelpers = Object.freeze({
 });
 
 // === GAS API呼び出し統合クラス ===
-class UnifiedDataLoader {
+class AnswerBoardDataLoader {
   constructor() {
     this.cache = new Map();
     this.loadingStates = new Map();
@@ -240,7 +240,7 @@ class UnifiedDataLoader {
 // === メインアプリケーションクラス ===
 class AnswerApp {
   constructor() {
-    this.loader = new UnifiedDataLoader();
+    this.loader = new AnswerBoardDataLoader();
     this.appConfig = {};
     this.answers = [];
     this.isLoading = false;

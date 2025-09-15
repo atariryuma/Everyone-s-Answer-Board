@@ -45,12 +45,7 @@ function handleGetData(request) {
       };
     }
 
-    // ServiceFactory経由でDataServiceアクセス
-    const dataService = DataService;
-    if (!dataService) {
-      console.error('getMainPageData: DataService not available');
-      return createErrorResponse('DataServiceが利用できません');
-    }
+    // 直接DataServiceに依存せず、安定APIで取得
     const data = getUserSheetData(user.userId, request.options || {});
     return {
       success: true,
@@ -95,7 +90,7 @@ function handleAddReaction(request) {
     }
 
     // ServiceFactory経由でDataServiceアクセス
-    const dataService = DataService;
+    const dataService = ServiceFactory.getDataService();
     if (!dataService) {
       console.error('processAddReaction: DataService not available');
       return createErrorResponse('DataServiceが利用できません');
@@ -145,7 +140,7 @@ function handleToggleHighlight(request) {
       };
     }
 
-    const dataService = DataService;
+    const dataService = ServiceFactory.getDataService();
     if (!dataService) {
       console.error('processToggleHighlight: DataService not available');
       return createErrorResponse('DataServiceが利用できません');
@@ -194,13 +189,9 @@ function handleRefreshData(request) {
       };
     }
 
-    const dataService = DataService;
-    if (!dataService) {
-      console.error('processRefreshData: DataService not available');
-      return createErrorResponse('DataServiceが利用できません');
-    }
-    const result = dataService.refreshBoardData(user.userId, request.options || {});
-    return result;
+    // DataServiceに依存せず、直に最新データを再取得して返却
+    const data = getUserSheetData(user.userId, request.options || {});
+    return { success: true, data };
 
   } catch (error) {
     console.error('DataController.handleRefreshData エラー:', error.message);
@@ -242,11 +233,6 @@ function getRecentSubmissions(userId, limit = 10) {
       };
     }
 
-    const dataService = DataService;
-    if (!dataService) {
-      console.error('getRecentSubmissions: DataService not available');
-      return createErrorResponse('DataServiceが利用できません');
-    }
     const data = getUserSheetData(userId, { limit, includeTimestamp: true });
     return {
       success: true,
@@ -405,10 +391,15 @@ function addSpreadsheetUrl(url) {
  * ボードデータ更新（API Gateway互換）
  */
 function refreshBoardData(userId, options = {}) {
-  return handleRefreshData({
-    userId,
-    options
-  });
+  try {
+    if (!userId) {
+      return { success: false, message: 'ユーザーIDが必要です' };
+    }
+    const data = getUserSheetData(userId, options || {});
+    return { success: true, data };
+  } catch (err) {
+    return { success: false, message: err.message || '更新エラー' };
+  }
 }
 
 // ===========================================

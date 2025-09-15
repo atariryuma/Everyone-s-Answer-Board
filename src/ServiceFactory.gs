@@ -135,8 +135,15 @@ function getCache() {
 
 function getDB() {
   try {
-    // DatabaseOperations should be available globally
+    const root = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
+    // Prefer globally exposed DB instance
+    if (root && root.DB) {
+      return root.DB;
+    }
+    // Fallback to DatabaseOperations symbol if present
     if (typeof DatabaseOperations !== 'undefined') {
+      // Cache to global root for subsequent calls
+      try { root.DB = DatabaseOperations; } catch (_) {}
       return DatabaseOperations;
     }
 
@@ -252,6 +259,35 @@ function getUserService() {
 }
 
 // ===========================================
+// 📊 Data Service Accessor
+// ===========================================
+
+function getDataService() {
+  try {
+    const root = (typeof globalThis !== 'undefined') ? globalThis : this;
+    if (root.DataService) return root.DataService;
+
+    // Build a minimal shim from available globals (best-effort)
+    const shim = {};
+    if (typeof getUserSheetData === 'function') {
+      shim.getUserSheetData = getUserSheetData;
+    }
+    if (typeof dsAddReaction === 'function') {
+      shim.addReaction = dsAddReaction;
+    }
+    if (typeof dsToggleHighlight === 'function') {
+      shim.toggleHighlight = dsToggleHighlight;
+    }
+    if (Object.keys(shim).length > 0) return shim;
+
+    console.warn('ServiceFactory.getDataService: DataService not available');
+    return null;
+  } catch (error) {
+    console.error('ServiceFactory.getDataService: Access error:', error.message);
+    return null;
+  }
+}
+// ===========================================
 // 🔍 Diagnostics
 // ===========================================
 
@@ -347,5 +383,6 @@ __rootSF.ServiceFactory = {
   getSpreadsheet,
   getUtils,
   getUserService,
+  getDataService,
   diagnose
 };
