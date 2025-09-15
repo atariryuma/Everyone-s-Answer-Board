@@ -340,7 +340,7 @@ spreadsheetId: databaseId,
 range
 });
 
-const rows = response.values || [];
+const rows = response.data?.values || [];
 if (rows.length <= 1) {
 return null; // ヘッダーのみ
 }
@@ -391,7 +391,7 @@ spreadsheetId: databaseId,
 range
 });
 
-const rows = response.values || [];
+const rows = response.data?.values || [];
 if (rows.length <= 1) {
 return null;
 }
@@ -584,7 +584,7 @@ spreadsheetId: databaseId,
 range
 });
 
-const rows = response.values || [];
+const rows = response.data?.values || [];
 if (rows.length <= 1) {
 return [];
 }
