@@ -1,0 +1,270 @@
+{
+  "timestamp": "2025-09-15T01:02:00.845Z",
+  "config": {
+    "sourceDir": "/Users/ryuma/Everyone-s-Answer-Board/src",
+    "extensions": [
+      ".gs"
+    ],
+    "ignorePatterns": [
+      {},
+      {},
+      {}
+    ],
+    "minFunctionBodyLines": 3
+  },
+  "results": {
+    "exactDuplicates": [],
+    "similarFunctions": [],
+    "nameConflicts": [
+      {
+        "name": "addSpreadsheetUrl",
+        "functions": [
+          {
+            "name": "addSpreadsheetUrl",
+            "signature": "function addSpreadsheetUrl(url)",
+            "body": "try {\n    if (!url) {\n      return {\n        success: false,\n        message: 'URLが指定されていません'\n      };\n    }\n\n    // URL形式の簡易検証\n    if (!url.includes('docs.google.com/spreadsheets')) {\n      return {\n        success: false,\n        message: 'Googleスプレッドシートの有効なURLではありません'\n      };\n    }\n\n    // スプレッドシートIDを抽出\n    const match = url.match(/\\/spreadsheets\\/d\\/([a-zA-Z0-9-_]+)/);\n    if (!match) {\n      return {\n        success: false,\n        message: 'スプレッドシートIDが取得できません'\n      };\n    }\n\n    const [, spreadsheetId] = match;\n\n    // アクセステスト\n    try {\n      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);\n      const name = spreadsheet.getName();\n\n      return {\n        success: true,\n        message: 'スプレッドシートを確認しました',\n        spreadsheet: {\n          id: spreadsheetId,\n          name,\n          url\n        }\n      };\n    } catch (accessError) {\n      return {\n        success: false,\n        message: `スプレッドシートにアクセスできません: ${accessError.message}`\n      };\n    }\n\n  } catch (error) {\n    console.error('DataController.addSpreadsheetUrl エラー:', error.message);\n    return {\n      success: false,\n      message: error.message\n    };\n  }\n}",
+            "file": "DataController.gs",
+            "lineNumber": 430,
+            "endLineNumber": 486,
+            "hash": "1084312892",
+            "normalizedBody": "try{if (!url){return{success: false,message: 'URLが指定されていません'};}// URL形式の簡易検証 if (!url.includes('docs.google.com/spreadsheets')){return{success: false,message: 'Googleスプレッドシートの有効なURLではありません'};}// スプレッドシートIDを抽出 const match = url.match(/\\/spreadsheets\\/d\\/([a-zA-Z0-9-_]+)/);if (!match){return{success: false,message: 'スプレッドシートIDが取得できません'};}const [,spreadsheetId] = match;// アクセステスト try{const spreadsheet = SpreadsheetApp.openById(spreadsheetId);const name = spreadsheet.getName();return{success: true,message: 'スプレッドシートを確認しました',spreadsheet:{id: spreadsheetId,name,url}};}catch (accessError){return{success: false,message: `スプレッドシートにアクセスできません: ${accessError.message}`};}}catch (error){console.error('DataController.addSpreadsheetUrl エラー:',error.message);return{success: false,message: error.message};}}"
+          },
+          {
+            "name": "addSpreadsheetUrl",
+            "signature": "function addSpreadsheetUrl(url)",
+            "body": "try {\n    // DataControllerに委譲\n    const service = getAvailableService('DataService');\n    if (service && typeof service.addSpreadsheetUrl === 'function') {\n      return service.addSpreadsheetUrl(url);\n    }\n\n    // フォールバック実装\n    return {\n      success: false,\n      message: 'スプレッドシート追加機能は現在利用できません'\n    };\n  } catch (error) {\n    console.error('addSpreadsheetUrl error:', error.message);\n    return {\n      success: false,\n      message: `スプレッドシート追加エラー: ${error.message}`\n    };\n  }\n}",
+            "file": "main.gs",
+            "lineNumber": 1488,
+            "endLineNumber": 1508,
+            "hash": "957524206",
+            "normalizedBody": "try{// DataControllerに委譲 const service = getAvailableService('DataService');if (service && typeof service.addSpreadsheetUrl === 'function'){return service.addSpreadsheetUrl(url);}// フォールバック実装 return{success: false,message: 'スプレッドシート追加機能は現在利用できません'};}catch (error){console.error('addSpreadsheetUrl error:',error.message);return{success: false,message: `スプレッドシート追加エラー: ${error.message}`};}}"
+          }
+        ],
+        "type": "name_conflict"
+      },
+      {
+        "name": "diagnose",
+        "functions": [
+          {
+            "name": "diagnose",
+            "signature": "function diagnose()",
+            "body": "const results = {\n      service: 'DatabaseCore',\n      timestamp: new Date().toISOString(),\n      checks: []\n    };\n\n    try {\n      // データベースID確認\n      const databaseId = this.getSecureDatabaseId();\n      results.checks.push({\n        name: 'Database ID',\n        status: databaseId ? '✅' : '❌',\n        details: databaseId ? 'Database ID configured' : 'Database ID missing'\n      });\n\n      // サービスアカウント確認\n      try {\n        const service = this.createSheetsService();\n        results.checks.push({\n          name: 'Service Account',\n          status: service ? '✅' : '❌',\n          details: 'Service account authentication working'\n        });\n      } catch (serviceError) {\n        results.checks.push({\n          name: 'Service Account',\n          status: '❌',\n          details: serviceError.message\n        });\n      }\n\n      // キャッシュサービス確認\n      try {\n        const cache = ServiceFactory.getCache();\n        cache.get('test_key', null);\n        results.checks.push({\n          name: 'Cache Service',\n          status: '✅',\n          details: 'Cache service accessible'\n        });\n      } catch (cacheError) {\n        results.checks.push({\n          name: 'Cache Service',\n          status: '⚠️',\n          details: cacheError.message\n        });\n      }\n\n      results.overall = results.checks.every(check => check.status === '✅') ? '✅' : '⚠️';\n    } catch (error) {\n      results.checks.push({\n        name: 'Core Diagnosis',\n        status: '❌',\n        details: error.message\n      });\n      results.overall = '❌';\n    }\n\n    return results;\n  }",
+            "file": "DatabaseCore.gs",
+            "lineNumber": 243,
+            "endLineNumber": 303,
+            "hash": "1341483001",
+            "normalizedBody": "const results ={service: 'DatabaseCore',timestamp: new Date().toISOString(),checks: []};try{// データベースID確認 const databaseId = this.getSecureDatabaseId();results.checks.push({name: 'Database ID',status: databaseId ? '✅' : '❌',details: databaseId ? 'Database ID configured' : 'Database ID missing'});// サービスアカウント確認 try{const service = this.createSheetsService();results.checks.push({name: 'Service Account',status: service ? '✅' : '❌',details: 'Service account authentication working'});}catch (serviceError){results.checks.push({name: 'Service Account',status: '❌',details: serviceError.message});}// キャッシュサービス確認 try{const cache = ServiceFactory.getCache();cache.get('test_key',null);results.checks.push({name: 'Cache Service',status: '✅',details: 'Cache service accessible'});}catch (cacheError){results.checks.push({name: 'Cache Service',status: '⚠️',details: cacheError.message});}results.overall = results.checks.every(check => check.status === '✅') ? '✅' : '⚠️';}catch (error){results.checks.push({name: 'Core Diagnosis',status: '❌',details: error.message});results.overall = '❌';}return results;}"
+          },
+          {
+            "name": "diagnose",
+            "signature": "function diagnose()",
+            "body": "return {\n      service: 'DatabaseOperations',\n      timestamp: new Date().toISOString(),\n      features: [\n        'User CRUD operations',\n        'Email-based search',\n        'User ID lookup',\n        'Batch operations',\n        'Get all users with filtering'\n      ],\n      dependencies: [\n        'DatabaseCore'\n      ],\n      status: '✅ Active'\n    };\n  }",
+            "file": "DatabaseCore.gs",
+            "lineNumber": 627,
+            "endLineNumber": 643,
+            "hash": "-557336544",
+            "normalizedBody": "return{service: 'DatabaseOperations',timestamp: new Date().toISOString(),features: [ 'User CRUD operations','Email-based search','User ID lookup','Batch operations','Get all users with filtering' ],dependencies: [ 'DatabaseCore' ],status: '✅ Active'};}"
+          },
+          {
+            "name": "diagnose",
+            "signature": "function diagnose()",
+            "body": "return {\n      service: 'DatabaseService',\n      timestamp: new Date().toISOString(),\n      architecture: '統一委譲パターン',\n      dependencies: [\n        'DatabaseCore - コアデータベース機能',\n        'DatabaseOperations - CRUD操作',\n        'AppCacheService - 統一キャッシュ管理'\n      ],\n      legacyImplementations: '完全削除済み',\n      codeSize: '大幅削減 (1669行 → 80行)',\n      status: '✅ 完全クリーンアップ完了'\n    };\n  }",
+            "file": "DatabaseCore.gs",
+            "lineNumber": 746,
+            "endLineNumber": 760,
+            "hash": "488550251",
+            "normalizedBody": "return{service: 'DatabaseService',timestamp: new Date().toISOString(),architecture: '統一委譲パターン',dependencies: [ 'DatabaseCore - コアデータベース機能','DatabaseOperations - CRUD操作','AppCacheService - 統一キャッシュ管理' ],legacyImplementations: '完全削除済み',codeSize: '大幅削減 (1669行 → 80行)',status: '✅ 完全クリーンアップ完了'};}"
+          },
+          {
+            "name": "diagnose",
+            "signature": "function diagnose()",
+            "body": "const startTime = Date.now();\n\n    const diagnostics = {\n      timestamp: new Date().toISOString(),\n      factory: 'ServiceFactory',\n      version: '1.0.0',\n      services: {},\n      platform: {},\n      executionTime: 0\n    };\n\n    try {\n      // Database service check\n      diagnostics.services.database = {\n        available: this.getDB() !== null,\n        type: typeof DB !== 'undefined' ? 'Global' :\n              typeof DatabaseOperations !== 'undefined' ? 'Direct' : 'None'\n      };\n\n      // Session service check\n      const session = this.getSession();\n      diagnostics.services.session = {\n        available: session.isValid,\n        email: session.email ? 'Available' : 'None'\n      };\n\n      // Properties service check\n      const props = this.getProperties();\n      diagnostics.services.properties = {\n        available: props.getAdminEmail() !== null\n      };\n\n      // Cache service check\n      const cache = this.getCache();\n      const testKey = `test_key_${  Date.now()}`;\n      cache.put(testKey, 'test', 10);\n      const testResult = cache.get(testKey);\n      cache.remove(testKey);\n      diagnostics.services.cache = {\n        available: testResult === 'test'\n      };\n\n      // Platform APIs check\n      diagnostics.platform = {\n        session: typeof Session !== 'undefined',\n        properties: typeof PropertiesService !== 'undefined',\n        cache: typeof CacheService !== 'undefined',\n        spreadsheet: typeof SpreadsheetApp !== 'undefined',\n        utilities: typeof Utilities !== 'undefined'\n      };\n\n    } catch (error) {\n      diagnostics.error = error.message;\n    }\n\n    diagnostics.executionTime = `${Date.now() - startTime}ms`;\n    return diagnostics;\n  }",
+            "file": "ServiceFactory.gs",
+            "lineNumber": 292,
+            "endLineNumber": 350,
+            "hash": "-39605908",
+            "normalizedBody": "const startTime = Date.now();const diagnostics ={timestamp: new Date().toISOString(),factory: 'ServiceFactory',version: '1.0.0',services:{},platform:{},executionTime: 0};try{// Database service check diagnostics.services.database ={available: this.getDB() !== null,type: typeof DB !== 'undefined' ? 'Global' : typeof DatabaseOperations !== 'undefined' ? 'Direct' : 'None'};// Session service check const session = this.getSession();diagnostics.services.session ={available: session.isValid,email: session.email ? 'Available' : 'None'};// Properties service check const props = this.getProperties();diagnostics.services.properties ={available: props.getAdminEmail() !== null};// Cache service check const cache = this.getCache();const testKey = `test_key_${Date.now()}`;cache.put(testKey,'test',10);const testResult = cache.get(testKey);cache.remove(testKey);diagnostics.services.cache ={available: testResult === 'test'};// Platform APIs check diagnostics.platform ={session: typeof Session !== 'undefined',properties: typeof PropertiesService !== 'undefined',cache: typeof CacheService !== 'undefined',spreadsheet: typeof SpreadsheetApp !== 'undefined',utilities: typeof Utilities !== 'undefined'};}catch (error){diagnostics.error = error.message;}diagnostics.executionTime = `${Date.now() - startTime}ms`;return diagnostics;}"
+          }
+        ],
+        "type": "name_conflict"
+      },
+      {
+        "name": "findUserByEmail",
+        "functions": [
+          {
+            "name": "findUserByEmail",
+            "signature": "function findUserByEmail(email)",
+            "body": "if (!email) return null;\n\n    try {\n      console.log('DatabaseOperations.findUserByEmail: 開始');\n\n      const service = DatabaseCore.getSheetsServiceCached();\n      const databaseId = DatabaseCore.getSecureDatabaseId();\n\n      const range = 'Users!A:Z';\n      const response = service.spreadsheets.values.get({\n        spreadsheetId: databaseId,\n        range\n      });\n\n      const rows = response.values || [];\n      if (rows.length <= 1) {\n        return null; // ヘッダーのみ\n      }\n\n      const [headers] = rows;\n      const emailIndex = headers.findIndex(h => h.toLowerCase().includes('email'));\n\n      if (emailIndex === -1) {\n        throw new Error('メール列が見つかりません');\n      }\n\n      // メールアドレスで検索\n      for (let i = 1; i < rows.length; i++) {\n        const row = rows[i];\n        if (row[emailIndex] && row[emailIndex].toLowerCase() === email.toLowerCase()) {\n                    return this.rowToUser(row, headers);\n        }\n      }\n\n            return null;\n    } catch (error) {\n      console.error('DatabaseOperations', {\n        operation: 'findUserByEmail',\n        email: typeof email === 'string' && email ? `${email.substring(0, 5)}***` : `[${typeof email}]`,\n        error: error.message\n      });\n      return null;\n    }\n  },",
+            "file": "DatabaseCore.gs",
+            "lineNumber": 333,
+            "endLineNumber": 377,
+            "hash": "-1675782224",
+            "normalizedBody": "if (!email) return null;try{console.log('DatabaseOperations.findUserByEmail: 開始');const service = DatabaseCore.getSheetsServiceCached();const databaseId = DatabaseCore.getSecureDatabaseId();const range = 'Users!A:Z';const response = service.spreadsheets.values.get({spreadsheetId: databaseId,range});const rows = response.values || [];if (rows.length <= 1){return null;// ヘッダーのみ}const [headers] = rows;const emailIndex = headers.findIndex(h => h.toLowerCase().includes('email'));if (emailIndex === -1){throw new Error('メール列が見つかりません');}// メールアドレスで検索 for (let i = 1;i < rows.length;i++){const row = rows[i];if (row[emailIndex] && row[emailIndex].toLowerCase() === email.toLowerCase()){return this.rowToUser(row,headers);}}return null;}catch (error){console.error('DatabaseOperations',{operation: 'findUserByEmail',email: typeof email === 'string' && email ? `${email.substring(0,5)}***` : `[${typeof email}]`,error: error.message});return null;}},"
+          },
+          {
+            "name": "findUserByEmail",
+            "signature": "function findUserByEmail(email, forceRefresh = false)",
+            "body": "initDatabaseCore(); // 遅延初期化\n    return DatabaseOperations.findUserByEmail(email, forceRefresh);\n  },",
+            "file": "DatabaseCore.gs",
+            "lineNumber": 707,
+            "endLineNumber": 710,
+            "hash": "2129143948",
+            "normalizedBody": "initDatabaseCore();// 遅延初期化 return DatabaseOperations.findUserByEmail(email,forceRefresh);},"
+          },
+          {
+            "name": "findUserByEmail",
+            "signature": "function findUserByEmail(email)",
+            "body": "try {\n    if (!email || !validateUserEmail(email).isValid) {\n      return null;\n    }\n\n    // 🔧 ServiceFactory経由でデータベース取得\n    const db = ServiceFactory.getDB();\n    if (!db) {\n      console.error('findUserByEmail: Database not available');\n      return null;\n    }\n\n    return db.findUserByEmail(email);\n  } catch (error) {\n    console.error('UserService.findUserByEmail: エラー', error.message);\n    return null;\n  }\n}",
+            "file": "UserService.gs",
+            "lineNumber": 459,
+            "endLineNumber": 477,
+            "hash": "-583433770",
+            "normalizedBody": "try{if (!email || !validateUserEmail(email).isValid){return null;}// 🔧 ServiceFactory経由でデータベース取得 const db = ServiceFactory.getDB();if (!db){console.error('findUserByEmail: Database not available');return null;}return db.findUserByEmail(email);}catch (error){console.error('UserService.findUserByEmail: エラー',error.message);return null;}}"
+          }
+        ],
+        "type": "name_conflict"
+      },
+      {
+        "name": "findUserById",
+        "functions": [
+          {
+            "name": "findUserById",
+            "signature": "function findUserById(userId)",
+            "body": "if (!userId) return null;\n\n    try {\n      console.log('DatabaseOperations.findUserById');\n\n      const service = DatabaseCore.getSheetsServiceCached();\n      const databaseId = DatabaseCore.getSecureDatabaseId();\n\n      const range = 'Users!A:Z';\n      const response = service.spreadsheets.values.get({\n        spreadsheetId: databaseId,\n        range\n      });\n\n      const rows = response.values || [];\n      if (rows.length <= 1) {\n                return null;\n      }\n\n      const [headers] = rows;\n      const userIdIndex = headers.findIndex(h => h.toLowerCase().includes('userid'));\n\n      if (userIdIndex === -1) {\n        throw new Error('ユーザーID列が見つかりません');\n      }\n\n      // ユーザーIDで検索\n      for (let i = 1; i < rows.length; i++) {\n        const row = rows[i];\n        if (row[userIdIndex] === userId) {\n                    return this.rowToUser(row, headers);\n        }\n      }\n\n            return null;\n    } catch (error) {\n      console.error('DatabaseOperations', {\n        operation: 'findUserById',\n        userId: typeof userId === 'string' && userId ? `${userId.substring(0, 8)}***` : `[${typeof userId}]`,\n        error: error.message\n      });\n      return null;\n    }\n  },",
+            "file": "DatabaseCore.gs",
+            "lineNumber": 384,
+            "endLineNumber": 428,
+            "hash": "-151782197",
+            "normalizedBody": "if (!userId) return null;try{console.log('DatabaseOperations.findUserById');const service = DatabaseCore.getSheetsServiceCached();const databaseId = DatabaseCore.getSecureDatabaseId();const range = 'Users!A:Z';const response = service.spreadsheets.values.get({spreadsheetId: databaseId,range});const rows = response.values || [];if (rows.length <= 1){return null;}const [headers] = rows;const userIdIndex = headers.findIndex(h => h.toLowerCase().includes('userid'));if (userIdIndex === -1){throw new Error('ユーザーID列が見つかりません');}// ユーザーIDで検索 for (let i = 1;i < rows.length;i++){const row = rows[i];if (row[userIdIndex] === userId){return this.rowToUser(row,headers);}}return null;}catch (error){console.error('DatabaseOperations',{operation: 'findUserById',userId: typeof userId === 'string' && userId ? `${userId.substring(0,8)}***` : `[${typeof userId}]`,error: error.message});return null;}},"
+          },
+          {
+            "name": "findUserById",
+            "signature": "function findUserById(userId)",
+            "body": "initDatabaseCore(); // 遅延初期化\n    return DatabaseOperations.findUserById(userId);\n  },",
+            "file": "DatabaseCore.gs",
+            "lineNumber": 702,
+            "endLineNumber": 705,
+            "hash": "-2117640363",
+            "normalizedBody": "initDatabaseCore();// 遅延初期化 return DatabaseOperations.findUserById(userId);},"
+          }
+        ],
+        "type": "name_conflict"
+      },
+      {
+        "name": "createUser",
+        "functions": [
+          {
+            "name": "createUser",
+            "signature": "function createUser(email, additionalData = {})",
+            "body": "if (!email) {\n      throw new Error('メールアドレスが必要です');\n    }\n\n    try {\n      console.log('DatabaseOperations.createUser');\n\n      // 重複チェック\n      const existingUser = this.findUserByEmail(email);\n      if (existingUser) {\n        throw new Error('既に登録済みのメールアドレスです');\n      }\n\n      const service = DatabaseCore.getSheetsServiceCached();\n      const databaseId = DatabaseCore.getSecureDatabaseId();\n\n      // 新しいユーザーデータ作成\n      const userId = Utilities.getUuid();\n      const now = new Date().toISOString();\n\n      const userData = {\n        userId,\n        userEmail: email,\n        createdAt: now,\n        lastModified: now,\n        configJson: JSON.stringify({}),\n        ...additionalData\n      };\n\n      // データベースに追加\n      const range = 'Users!A:A';\n      service.spreadsheets.values.append({\n        spreadsheetId: databaseId,\n        range,\n        valueInputOption: 'USER_ENTERED',\n        resource: {\n          values: [Object.values(userData)]\n        }\n      });\n\n            console.log('DatabaseOperations', {\n        operation: 'createUser',\n        userId: `${userId.substring(0, 8)  }***`,\n        email: `${email.substring(0, 5)  }***`\n      });\n\n      return userData;\n    } catch (error) {\n      console.error('DatabaseOperations', {\n        operation: 'createUser',\n        email: typeof email === 'string' && email ? `${email.substring(0, 5)}***` : `[${typeof email}]`,\n        error: error.message\n      });\n      throw error;\n    }\n  },",
+            "file": "DatabaseCore.gs",
+            "lineNumber": 436,
+            "endLineNumber": 492,
+            "hash": "-1910945487",
+            "normalizedBody": "if (!email){throw new Error('メールアドレスが必要です');}try{console.log('DatabaseOperations.createUser');// 重複チェック const existingUser = this.findUserByEmail(email);if (existingUser){throw new Error('既に登録済みのメールアドレスです');}const service = DatabaseCore.getSheetsServiceCached();const databaseId = DatabaseCore.getSecureDatabaseId();// 新しいユーザーデータ作成 const userId = Utilities.getUuid();const now = new Date().toISOString();const userData ={userId,userEmail: email,createdAt: now,lastModified: now,configJson: JSON.stringify({}),...additionalData};// データベースに追加 const range = 'Users!A:A';service.spreadsheets.values.append({spreadsheetId: databaseId,range,valueInputOption: 'USER_ENTERED',resource:{values: [Object.values(userData)]}});console.log('DatabaseOperations',{operation: 'createUser',userId: `${userId.substring(0,8)}***`,email: `${email.substring(0,5)}***`});return userData;}catch (error){console.error('DatabaseOperations',{operation: 'createUser',email: typeof email === 'string' && email ? `${email.substring(0,5)}***` : `[${typeof email}]`,error: error.message});throw error;}},"
+          },
+          {
+            "name": "createUser",
+            "signature": "function createUser(userEmail, initialConfig = {})",
+            "body": "// 🚀 Zero-dependency: getCurrentUserEmailが既にServiceFactory利用\n    try {\n      if (!userEmail || !validateUserEmail(userEmail).isValid) {\n        throw new Error('無効なメールアドレス');\n      }\n\n      // 🔧 ServiceFactory経由でデータベース取得\n      const db = ServiceFactory.getDB();\n      if (!db) {\n        throw new Error('データベースサービスが利用できません');\n      }\n\n      // 既存ユーザーチェック\n      const existingUser = db.findUserByEmail(userEmail);\n      if (existingUser) {\n        console.info('UserService.createUser: 既存ユーザーを返却', { userEmail });\n        return existingUser;\n      }\n\n      // 新規ユーザーデータ作成\n      const userData = buildNewUserData(userEmail, initialConfig);\n\n      // データベースに保存\n      const success = db.createUser(userData);\n      if (!success) {\n        throw new Error('ユーザー作成に失敗');\n      }\n\n      console.info('UserService.createUser: 新規ユーザー作成完了', { \n        userEmail, \n        userId: userData.userId \n      });\n\n      return userData;\n    } catch (error) {\n      console.error('UserService.createUser: エラー', {\n        userEmail,\n        error: error.message\n      });\n      throw error;\n    }\n}",
+            "file": "UserService.gs",
+            "lineNumber": 334,
+            "endLineNumber": 376,
+            "hash": "-1627343155",
+            "normalizedBody": "// 🚀 Zero-dependency: getCurrentUserEmailが既にServiceFactory利用 try{if (!userEmail || !validateUserEmail(userEmail).isValid){throw new Error('無効なメールアドレス');}// 🔧 ServiceFactory経由でデータベース取得 const db = ServiceFactory.getDB();if (!db){throw new Error('データベースサービスが利用できません');}// 既存ユーザーチェック const existingUser = db.findUserByEmail(userEmail);if (existingUser){console.info('UserService.createUser: 既存ユーザーを返却',{userEmail});return existingUser;}// 新規ユーザーデータ作成 const userData = buildNewUserData(userEmail,initialConfig);// データベースに保存 const success = db.createUser(userData);if (!success){throw new Error('ユーザー作成に失敗');}console.info('UserService.createUser: 新規ユーザー作成完了',{userEmail,userId: userData.userId});return userData;}catch (error){console.error('UserService.createUser: エラー',{userEmail,error: error.message});throw error;}}"
+          }
+        ],
+        "type": "name_conflict"
+      },
+      {
+        "name": "clearUserCache",
+        "functions": [
+          {
+            "name": "clearUserCache",
+            "signature": "function clearUserCache(userId, _userEmail)",
+            "body": "try {\n      const cache = ServiceFactory.getCache();\n      const userCacheKey = `user_${userId}`;\n      return cache.remove(userCacheKey);\n    } catch (error) {\n      console.error('DatabaseCore.clearUserCache:', error.message);\n      return false;\n    }\n  },",
+            "file": "DatabaseCore.gs",
+            "lineNumber": 725,
+            "endLineNumber": 734,
+            "hash": "-636035652",
+            "normalizedBody": "try{const cache = ServiceFactory.getCache();const userCacheKey = `user_${userId}`;return cache.remove(userCacheKey);}catch (error){console.error('DatabaseCore.clearUserCache:',error.message);return false;}},"
+          },
+          {
+            "name": "clearUserCache",
+            "signature": "function clearUserCache(userId = null)",
+            "body": "// CacheServiceに統一委譲\n    return CacheService.invalidateUserCache(userId);\n}",
+            "file": "UserService.gs",
+            "lineNumber": 418,
+            "endLineNumber": 421,
+            "hash": "415492947",
+            "normalizedBody": "// CacheServiceに統一委譲 return CacheService.invalidateUserCache(userId);}"
+          }
+        ],
+        "type": "name_conflict"
+      },
+      {
+        "name": "forceUrlSystemReset",
+        "functions": [
+          {
+            "name": "forceUrlSystemReset",
+            "signature": "function forceUrlSystemReset()",
+            "body": "try {\n      console.warn('システム強制リセットが実行されました');\n\n      // キャッシュをクリア（複数の方法を試行）\n      const cacheResults = [];\n      try {\n        const cache = CacheService.getScriptCache();\n        if (cache && typeof cache.removeAll === 'function') {\n          cache.removeAll();\n          cacheResults.push('ScriptCache クリア成功');\n        }\n      } catch (cacheError) {\n        console.warn('ScriptCache クリアエラー:', cacheError.message);\n        cacheResults.push(`ScriptCache クリア失敗: ${cacheError.message}`);\n      }\n\n      // Document Cache も試行\n      try {\n        const docCache = CacheService.getDocumentCache();\n        if (docCache && typeof docCache.removeAll === 'function') {\n          docCache.removeAll();\n          cacheResults.push('DocumentCache クリア成功');\n        }\n      } catch (docCacheError) {\n        console.warn('DocumentCache クリアエラー:', docCacheError.message);\n        cacheResults.push(`DocumentCache クリア失敗: ${docCacheError.message}`);\n      }\n\n      // 重要: プロパティはクリアしない（データ損失防止）\n\n      return {\n        success: true,\n        message: 'システムリセットが完了しました',\n        actions: cacheResults,\n        cacheStatus: cacheResults.join(', '),\n        timestamp: new Date().toISOString()\n      };\n\n    } catch (error) {\n      console.error('SystemController.forceUrlSystemReset エラー:', error.message);\n      return {\n        success: false,\n        message: error.message\n      };\n    }\n}",
+            "file": "SystemController.gs",
+            "lineNumber": 151,
+            "endLineNumber": 197,
+            "hash": "935831494",
+            "normalizedBody": "try{console.warn('システム強制リセットが実行されました');// キャッシュをクリア（複数の方法を試行） const cacheResults = [];try{const cache = CacheService.getScriptCache();if (cache && typeof cache.removeAll === 'function'){cache.removeAll();cacheResults.push('ScriptCache クリア成功');}}catch (cacheError){console.warn('ScriptCache クリアエラー:',cacheError.message);cacheResults.push(`ScriptCache クリア失敗: ${cacheError.message}`);}// Document Cache も試行 try{const docCache = CacheService.getDocumentCache();if (docCache && typeof docCache.removeAll === 'function'){docCache.removeAll();cacheResults.push('DocumentCache クリア成功');}}catch (docCacheError){console.warn('DocumentCache クリアエラー:',docCacheError.message);cacheResults.push(`DocumentCache クリア失敗: ${docCacheError.message}`);}// 重要: プロパティはクリアしない（データ損失防止） return{success: true,message: 'システムリセットが完了しました',actions: cacheResults,cacheStatus: cacheResults.join(','),timestamp: new Date().toISOString()};}catch (error){console.error('SystemController.forceUrlSystemReset エラー:',error.message);return{success: false,message: error.message};}}"
+          },
+          {
+            "name": "forceUrlSystemReset",
+            "signature": "function forceUrlSystemReset()",
+            "body": "try {\n    // SystemControllerに委譲\n    console.log('URL system reset requested');\n    return {\n      success: true,\n      message: 'URL system reset completed'\n    };\n  } catch (error) {\n    console.error('forceUrlSystemReset error:', error.message);\n    return {\n      success: false,\n      message: `URL reset エラー: ${error.message}`\n    };\n  }\n}",
+            "file": "main.gs",
+            "lineNumber": 1551,
+            "endLineNumber": 1566,
+            "hash": "-1720493249",
+            "normalizedBody": "try{// SystemControllerに委譲 console.log('URL system reset requested');return{success: true,message: 'URL system reset completed'};}catch (error){console.error('forceUrlSystemReset error:',error.message);return{success: false,message: `URL reset エラー: ${error.message}`};}}"
+          }
+        ],
+        "type": "name_conflict"
+      },
+      {
+        "name": "getSystemDomainInfo",
+        "functions": [
+          {
+            "name": "getSystemDomainInfo",
+            "signature": "function getSystemDomainInfo()",
+            "body": "try {\n      // 🎯 Zero-dependency: 直接Session API使用\n      const currentUser = getCurrentEmailDirectSC();\n      let domain = 'unknown';\n\n      if (currentUser && currentUser.includes('@')) {\n        [, domain] = currentUser.split('@');\n      }\n\n      return {\n        success: true,\n        domain,\n        currentUser,\n        timestamp: new Date().toISOString()\n      };\n\n    } catch {\n      return {\n        success: false,\n        message: 'ドメイン情報の取得に失敗しました'\n      };\n    }\n}",
+            "file": "SystemController.gs",
+            "lineNumber": 321,
+            "endLineNumber": 344,
+            "hash": "-769368979",
+            "normalizedBody": "try{// 🎯 Zero-dependency: 直接Session API使用 const currentUser = getCurrentEmailDirectSC();let domain = 'unknown';if (currentUser && currentUser.includes('@')){[,domain] = currentUser.split('@');}return{success: true,domain,currentUser,timestamp: new Date().toISOString()};}catch{return{success: false,message: 'ドメイン情報の取得に失敗しました'};}}"
+          },
+          {
+            "name": "getSystemDomainInfo",
+            "signature": "function getSystemDomainInfo()",
+            "body": "try {\n    const session = ServiceFactory.getSession();\n    if (!session.isValid || !session.email) {\n      return {\n        success: false,\n        message: 'セッション情報を取得できません'\n      };\n    }\n\n    const props = ServiceFactory.getProperties();\n    const adminEmail = props.getAdminEmail();\n\n    const userDomain = session.email.split('@')[1];\n    const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;\n\n    return {\n      success: true,\n      userDomain,\n      adminDomain,\n      isValidDomain: adminDomain ? userDomain === adminDomain : true,\n      userEmail: session.email\n    };\n  } catch (error) {\n    console.error('getSystemDomainInfo error:', error.message);\n    return {\n      success: false,\n      message: `ドメイン情報取得エラー: ${error.message}`\n    };\n  }\n}",
+            "file": "main.gs",
+            "lineNumber": 1397,
+            "endLineNumber": 1427,
+            "hash": "909261950",
+            "normalizedBody": "try{const session = ServiceFactory.getSession();if (!session.isValid || !session.email){return{success: false,message: 'セッション情報を取得できません'};}const props = ServiceFactory.getProperties();const adminEmail = props.getAdminEmail();const userDomain = session.email.split('@')[1];const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;return{success: true,userDomain,adminDomain,isValidDomain: adminDomain ? userDomain === adminDomain : true,userEmail: session.email};}catch (error){console.error('getSystemDomainInfo error:',error.message);return{success: false,message: `ドメイン情報取得エラー: ${error.message}`};}}"
+          }
+        ],
+        "type": "name_conflict"
+      }
+    ],
+    "stats": {
+      "totalFunctions": 227,
+      "uniqueNames": 216,
+      "duplicateGroups": 0
+    }
+  },
+  "summary": {
+    "totalFunctions": 227,
+    "exactDuplicates": 0,
+    "nameConflicts": 8,
+    "similarFunctions": 0
+  }
+}

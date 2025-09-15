@@ -46,64 +46,7 @@ function initConfigServiceZero() {
   }
 }
 
-/**
- * ユーザー設定取得（統合版）
- * @param {string} userId - ユーザーID
- * @returns {Object|null} 統合設定オブジェクト
- */
-function getUserConfig(userId) {
-  // 🚀 Zero-dependency initialization
-  if (!initConfigServiceZero()) {
-    console.error('getUserConfig: ServiceFactory not available');
-    return getDefaultConfig(userId);
-  }
 
-  if (!userId || !validateConfigUserId(userId)) {
-    console.warn('getUserConfig: 無効なuserID - デフォルト設定を返却:', userId);
-    return getDefaultConfig(userId);
-  }
-
-  const cacheKey = `config_${userId}`;
-
-  try {
-    // 🔧 ServiceFactory経由でキャッシュ取得
-    const cache = ServiceFactory.getCache();
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      return cached;
-    }
-
-    // 🔧 ServiceFactory経由でデータベース取得
-    const db = ServiceFactory.getDB();
-    if (!db) {
-      console.error('getUserConfig: Database not available');
-      return getDefaultConfig(userId);
-    }
-
-    const user = db.findUserById(userId);
-    if (!user) {
-      console.warn('getUserConfig: ユーザーが見つかりません:', userId);
-      return getDefaultConfig(userId);
-    }
-
-    // configJsonパース・修復
-    const baseConfig = parseAndRepairConfig(user.configJson, userId);
-
-    // 動的URL生成
-    const enhancedConfig = enhanceConfigWithDynamicUrls(baseConfig, userId);
-
-    // 🔧 ServiceFactory経由でキャッシュ保存（10分間）
-    cache.put(cacheKey, enhancedConfig, 600);
-
-    return enhancedConfig;
-  } catch (error) {
-    console.error('getUserConfig: エラー', {
-      userId,
-      error: error.message
-    });
-    return getDefaultConfig(userId);
-  }
-}
 
 /**
  * デフォルト設定取得
@@ -362,8 +305,18 @@ function saveUserConfig(userId, config) {
  */
 function updatePartialConfig(userId, partialConfig) {
   try {
-    // 現在の設定取得
-    const currentConfig = getUserConfig(userId);
+    // 現在の設定取得（Zero-Dependency Pattern）
+    const session = ServiceFactory.getSession();
+    if (!session.isValid || session.userId !== userId) {
+      throw new Error('セッション情報が無効です');
+    }
+
+    // データベースから現在の設定を取得
+    const db = ServiceFactory.getDB();
+    const user = db.getUserById(userId);
+    const currentConfig = user && user.configJson ?
+      parseAndRepairConfig(user.configJson, userId) :
+      getDefaultConfig(userId);
     if (!currentConfig) {
       throw new Error('現在の設定を取得できませんでした');
     }
@@ -700,104 +653,9 @@ function hasCoreSystemProps() {
 // 📱 アプリケーション管理
 // ===========================================
 
-/**
- * ドラフト設定保存
- * @param {Object} config - ドラフト設定
- * @returns {Object} 保存結果
- */
-function saveDraftConfiguration(config) {
-  try {
-    if (!config || typeof config !== 'object') {
-      throw new Error('無効な設定オブジェクト');
-    }
 
-    const userId = ServiceFactory.getSession().email;
-    if (!userId) {
-      throw new Error('ユーザーIDを取得できませんでした');
-    }
 
-    // ドラフトとしてマーク
-    const draftConfig = {
-      ...config,
-      isDraft: true,
-      draftSavedAt: new Date().toISOString(),
-      setupStatus: 'draft'
-    };
 
-    return saveUserConfig(userId, draftConfig);
-
-  } catch (error) {
-    console.error('saveDraftConfiguration: エラー', error.message);
-    return {
-      success: false,
-      message: 'ドラフト保存に失敗しました',
-      error: error.message
-    };
-  }
-}
-
-/**
- * アプリケーション公開
- * @param {Object} publishConfig - 公開設定
- * @returns {Object} 公開結果
- */
-function publishApplication(publishConfig) {
-  try {
-    const userId = ServiceFactory.getSession().email;
-    if (!userId) {
-      throw new Error('ユーザーIDを取得できませんでした');
-    }
-
-    // 現在の設定取得
-    const currentConfig = getUserConfig(userId);
-    if (!currentConfig) {
-      throw new Error('現在の設定を取得できませんでした');
-    }
-
-    // 公開用設定作成
-    const finalConfig = {
-      ...currentConfig,
-      ...publishConfig,
-      appPublished: true,
-      publishedAt: new Date().toISOString(),
-      setupStatus: 'completed',
-      isDraft: false
-    };
-
-    // 最終検証
-    const validation = validateAndSanitizeConfig(finalConfig, userId);
-    if (!validation.success) {
-      throw new Error(`設定検証エラー: ${validation.errors.join(', ')}`);
-    }
-
-    // 公開実行
-    const result = saveUserConfig(userId, validation.data);
-
-    if (result.success) {
-      console.info('publishApplication: アプリケーション公開完了', {
-        userId,
-        publishedAt: finalConfig.publishedAt
-      });
-
-      return {
-        success: true,
-        message: 'アプリケーションを公開しました',
-        data: result.data,
-        publishedAt: finalConfig.publishedAt
-      };
-    } else {
-      throw new Error(result.message);
-    }
-
-  } catch (error) {
-    console.error('publishApplication: エラー', error.message);
-    return {
-      success: false,
-      message: 'アプリケーション公開に失敗しました',
-      error: error.message
-    };
-  }
-}
 
 // ===========================================
 // 🔧 ヘルパー関数（依存関数）

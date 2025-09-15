@@ -13,7 +13,26 @@
  * - 単一責任原則の維持
  */
 
-/* global getUserAccessLevel */
+/* global ServiceFactory, getUserAccessLevel */
+
+/**
+ * ServiceFactory統合初期化
+ * SecurityService用Zero-Dependency実装
+ * @returns {boolean} 初期化成功可否
+ */
+function initSecurityServiceZero() {
+  try {
+    if (typeof ServiceFactory === 'undefined') {
+      console.warn('initSecurityServiceZero: ServiceFactory not available');
+      return false;
+    }
+    console.log('✅ SecurityService (Zero-Dependency) initialized successfully');
+    return true;
+  } catch (error) {
+    console.error('initSecurityServiceZero failed:', error.message);
+    return false;
+  }
+}
 
 // ===========================================
 // 🔑 認証・セッション管理
@@ -27,15 +46,20 @@ function getServiceAccountToken() {
     const cacheKey = 'SA_TOKEN_CACHE';
     
     try {
-      // キャッシュから取得試行
-      const cached = CacheService.getScriptCache().get(cacheKey);
+      // ServiceFactory経由でキャッシュアクセス
+      if (!initSecurityServiceZero()) {
+        console.error('getServiceAccountToken: ServiceFactory not available');
+        return null;
+      }
+      const cache = ServiceFactory.getCache();
+      const cached = cache.get(cacheKey);
       if (cached) {
         // セキュリティ：トークン有効性の簡易検証
         if (validateSecurityTokenFormat(cached)) {
           return cached;
         } else {
           // 無効なトークンをクリア
-          CacheService.getScriptCache().remove(cacheKey);
+          cache.remove(cacheKey);
         }
       }
 
@@ -53,7 +77,7 @@ function getServiceAccountToken() {
       }
 
       // 1時間キャッシュ（短時間で自動失効）
-      CacheService.getScriptCache().put(cacheKey, newToken, 3600);
+      cache.put(cacheKey, newToken, 3600);
       
       console.info('SecurityService.getServiceAccountToken: トークン生成・キャッシュ完了（詳細省略）');
       return newToken;
@@ -508,7 +532,11 @@ function logSecurityEvent(event) {
  */
 function persistSecurityLog(logEntry) {
     try {
-      const props = PropertiesService.getScriptProperties();
+      if (!initSecurityServiceZero()) {
+        console.error('validateEmailAccess: ServiceFactory not available');
+        return false;
+      }
+      const props = ServiceFactory.getProperties();
       const logKey = `security_log_${Date.now()}`;
       
       props.setProperty(logKey, JSON.stringify(logEntry));
@@ -525,7 +553,11 @@ function persistSecurityLog(logEntry) {
  */
 function cleanupOldSecurityLogs() {
     try {
-      const props = PropertiesService.getScriptProperties();
+      if (!initSecurityServiceZero()) {
+        console.error('validateEmailAccess: ServiceFactory not available');
+        return false;
+      }
+      const props = ServiceFactory.getProperties();
       const allProps = props.getProperties();
       
       const securityLogs = Object.keys(allProps)

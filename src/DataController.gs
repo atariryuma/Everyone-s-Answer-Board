@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global UserService, ConfigService, DataService, DB */
+/* global ServiceFactory, ConfigService, DataService */
 
 // ===========================================
 // 📊 メインページデータAPI
@@ -59,8 +59,9 @@ function handleGetData(request) {
       };
     }
 
-    // 🎯 Zero-dependency: 直接DBからユーザー情報取得
-    const user = DB.findUserByEmail(email);
+    // 🎯 Zero-dependency: ServiceFactory経由でDBアクセス
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -68,8 +69,13 @@ function handleGetData(request) {
       };
     }
 
-    // DataService.getSheetDataは既にzero-dependency実装済み
-    const data = DataService.getSheetData(user.userId, request.options || {});
+    // ServiceFactory経由でDataServiceアクセス
+    const dataService = ServiceFactory.getService('DataService');
+    if (!dataService) {
+      console.error('getMainPageData: DataService not available');
+      return { success: false, message: 'DataServiceが利用できません' };
+    }
+    const data = dataService.getSheetData(user.userId, request.options || {});
     return {
       success: true,
       data
@@ -102,8 +108,9 @@ function handleAddReaction(request) {
       };
     }
 
-    // 🎯 Zero-dependency: 直接DBからユーザー情報取得
-    const user = DB.findUserByEmail(email);
+    // 🎯 Zero-dependency: ServiceFactory経由でDBアクセス
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -111,8 +118,13 @@ function handleAddReaction(request) {
       };
     }
 
-    // DataService.addReactionは既にzero-dependency実装済み
-    const result = DataService.addReaction(
+    // ServiceFactory経由でDataServiceアクセス
+    const dataService = ServiceFactory.getService('DataService');
+    if (!dataService) {
+      console.error('processAddReaction: DataService not available');
+      return { success: false, message: 'DataServiceが利用できません' };
+    }
+    const result = dataService.addReaction(
       user.userId,
       request.rowId,
       request.reactionType
@@ -138,15 +150,22 @@ function handleAddReaction(request) {
  */
 function handleToggleHighlight(request) {
   try {
-    const userInfo = UserService.getCurrentUserInfo();
-    if (!userInfo) {
+    // 🚀 Zero-dependency: ServiceFactory経由でユーザー情報取得
+    const session = ServiceFactory.getSession();
+    if (!session.isValid || !session.userId) {
       return {
         success: false,
         message: 'ユーザー情報が見つかりません'
       };
     }
+    const userInfo = { userId: session.userId, email: session.email };
 
-    const result = DataService.toggleHighlight(
+    const dataService = ServiceFactory.getService('DataService');
+    if (!dataService) {
+      console.error('processToggleHighlight: DataService not available');
+      return { success: false, message: 'DataServiceが利用できません' };
+    }
+    const result = dataService.toggleHighlight(
       userInfo.userId,
       request.rowId
     );
@@ -171,15 +190,22 @@ function handleToggleHighlight(request) {
  */
 function handleRefreshData(request) {
   try {
-    const userInfo = UserService.getCurrentUserInfo();
-    if (!userInfo) {
+    // 🚀 Zero-dependency: ServiceFactory経由でユーザー情報取得
+    const session = ServiceFactory.getSession();
+    if (!session.isValid || !session.userId) {
       return {
         success: false,
         message: 'ユーザー情報が見つかりません'
       };
     }
+    const userInfo = { userId: session.userId, email: session.email };
 
-    const result = DataService.refreshBoardData(userInfo.userId, request.options || {});
+    const dataService = ServiceFactory.getService('DataService');
+    if (!dataService) {
+      console.error('processRefreshData: DataService not available');
+      return { success: false, message: 'DataServiceが利用できません' };
+    }
+    const result = dataService.refreshBoardData(userInfo.userId, request.options || {});
     return result;
 
   } catch (error) {
@@ -195,15 +221,7 @@ function handleRefreshData(request) {
 // 📊 データ公開・取得API
 // ===========================================
 
-/**
- * 公開されたシートデータの取得
- * 外部からのアクセス用
- *
- * @param {string} userId - ユーザーID
- * @param {Object} options - 取得オプション
- * @returns {Object} 公開データ
- */
-function getPublishedSheetData(userId, options = {}) {
+function getRecentSubmissions(userId, limit = 10) {
   try {
     if (!userId) {
       return {
@@ -212,8 +230,17 @@ function getPublishedSheetData(userId, options = {}) {
       };
     }
 
-    // セキュリティチェック: 公開されているかの確認
-    const config = ConfigService.getUserConfig(userId);
+    // ServiceFactory経由で設定取得（Zero-Dependency Pattern）
+    const session = ServiceFactory.getSession();
+    if (!session.isValid) {
+      return {
+        success: false,
+        message: 'セッションが無効です'
+      };
+    }
+
+    const configService = ServiceFactory.getService('ConfigService');
+    const config = configService ? configService.getUserConfig(userId) : null;
     if (!config || !config.appPublished) {
       return {
         success: false,
@@ -221,7 +248,12 @@ function getPublishedSheetData(userId, options = {}) {
       };
     }
 
-    const data = DataService.getSheetData(userId, options);
+    const dataService = ServiceFactory.getService('DataService');
+    if (!dataService) {
+      console.error('getRecentSubmissions: DataService not available');
+      return { success: false, message: 'DataServiceが利用できません' };
+    }
+    const data = dataService.getSheetData(userId, { limit, includeTimestamp: true });
     return {
       success: true,
       data,
@@ -302,17 +334,27 @@ function getHeaderIndices(spreadsheetId, sheetName) {
  */
 function getAllUsersForAdminForUI(_options = {}) {
   try {
-    // 管理者権限チェック
-    const currentEmail = UserService.getCurrentEmail();
-    if (!UserService.isSystemAdmin(currentEmail)) {
+    // 🚀 Zero-dependency: ServiceFactory経由で管理者権限チェック
+    const session = ServiceFactory.getSession();
+    if (!session.isValid || !session.email) {
+      return {
+        success: false,
+        message: 'ユーザー認証が必要です'
+      };
+    }
+
+    const props = ServiceFactory.getProperties();
+    const adminEmails = props.getAdminEmailList();
+    if (!adminEmails.includes(session.email)) {
       return {
         success: false,
         message: '管理者権限が必要です'
       };
     }
 
-    // データベースから全ユーザーを取得
-    const users = DB.getAllUsers();
+    // ServiceFactory経由で全ユーザーを取得
+    const db = ServiceFactory.getDB();
+    const users = db.getAllUsers();
     const processedUsers = users.map(user => ({
       userId: user.userId,
       userEmail: user.userEmail,
@@ -346,9 +388,18 @@ function getAllUsersForAdminForUI(_options = {}) {
  */
 function deleteUserAccountByAdminForUI(targetUserId) {
   try {
-    // 管理者権限チェック
-    const currentEmail = UserService.getCurrentEmail();
-    if (!UserService.isSystemAdmin(currentEmail)) {
+    // 🚀 Zero-dependency: ServiceFactory経由で管理者権限チェック
+    const session = ServiceFactory.getSession();
+    if (!session.isValid || !session.email) {
+      return {
+        success: false,
+        message: 'ユーザー認証が必要です'
+      };
+    }
+
+    const props = ServiceFactory.getProperties();
+    const adminEmails = props.getAdminEmailList();
+    if (!adminEmails.includes(session.email)) {
       return {
         success: false,
         message: '管理者権限が必要です'
@@ -363,7 +414,8 @@ function deleteUserAccountByAdminForUI(targetUserId) {
     }
 
     // 対象ユーザーの存在確認
-    const targetUser = DB.findUserById(targetUserId);
+    const db = ServiceFactory.getDB();
+    const targetUser = db.findUserById(targetUserId);
     if (!targetUser) {
       return {
         success: false,
@@ -372,11 +424,11 @@ function deleteUserAccountByAdminForUI(targetUserId) {
     }
 
     // 削除実行
-    const result = DB.deleteUser(targetUserId);
+    const result = db.deleteUser(targetUserId);
 
     if (result.success) {
       console.log('管理者によるユーザー削除:', {
-        admin: currentEmail,
+        admin: session.email,
         deletedUser: targetUser.userEmail,
         deletedUserId: targetUserId,
         timestamp: new Date().toISOString()
@@ -475,26 +527,9 @@ function addSpreadsheetUrl(url) {
 // 📊 API Gateway互換関数（main.gsから呼び出し用）
 // ===========================================
 
-/**
- * リアクション追加（API Gateway互換）
- */
-function addDataReaction(userId, rowId, reactionType) {
-  return handleAddReaction({
-    userId,
-    rowId,
-    reactionType
-  });
-}
 
-/**
- * ハイライト切り替え（API Gateway互換）
- */
-function toggleDataHighlight(userId, rowId) {
-  return handleToggleHighlight({
-    userId,
-    rowId
-  });
-}
+
+
 
 /**
  * ボードデータ更新（API Gateway互換）

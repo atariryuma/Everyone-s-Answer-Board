@@ -971,8 +971,13 @@ function processReactionByEmail(userEmail, rowIndex, reactionKey) {
       return { success: false, error: 'スプレッドシート設定が不完全です' };
     }
 
-    // 🎯 Zero-dependency: DataService.processReactionは既にzero-dependency実装済み
-    return DataService.processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionKey, userEmail);
+    // 🎯 Zero-dependency: ServiceFactory経由でDataServiceアクセス
+    const dataService = ServiceFactory.getService('DataService');
+    if (!dataService) {
+      console.error('processReactionByEmail: DataService not available');
+      return { success: false, error: 'DataServiceが利用できません' };
+    }
+    return dataService.processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionKey, userEmail);
   } catch (error) {
     console.error('processReactionByEmail error:', error.message);
     return { success: false, error: error.message };
@@ -994,70 +999,11 @@ function getBulkAdminPanelData() {
       executionTime: null
     };
 
-    // 🎯 Zero-dependency Bulk Data Fetching
-    try {
-      // 1. 🎯 Zero-dependency: 直接PropertiesServiceから設定取得
-      const props = PropertiesService.getScriptProperties();
-      const userEmail = getCurrentEmailDirect();
-      const user = userEmail ? DB.findUserByEmail(userEmail) : null;
-      const config = user && user.configJson ? JSON.parse(user.configJson) : null;
-
-      bulkData.config = {
-        success: !!config,
-        spreadsheetId: config?.spreadsheetId || null,
-        sheetName: config?.sheetName || null,
-        appStatus: props.getProperty('APPLICATION_STATUS') || 'active'
-      };
-    } catch (configError) {
-      console.warn('getBulkAdminPanelData: 設定取得エラー', configError.message);
-      bulkData.config = { success: false, message: configError.message };
-    }
-
-    try {
-      // 2. 🎯 Zero-dependency: 直接DriveAPIでスプレッドシート一覧取得
-      const spreadsheets = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
-      const spreadsheetList = [];
-      let count = 0;
-      while (spreadsheets.hasNext() && count < 10) { // 最大10件に制限
-        const file = spreadsheets.next();
-        spreadsheetList.push({
-          id: file.getId(),
-          name: file.getName(),
-          lastUpdated: file.getLastUpdated(),
-          url: file.getUrl()
-        });
-        count++;
-      }
-      bulkData.spreadsheetList = { success: true, spreadsheets: spreadsheetList };
-    } catch (listError) {
-      console.warn('getBulkAdminPanelData: スプレッドシート一覧エラー', listError.message);
-      bulkData.spreadsheetList = { success: false, message: listError.message, spreadsheets: [] };
-    }
-
-    try {
-      // 3. 🎯 Zero-dependency: 直接PropertiesServiceから管理者チェック
-      const userEmail = getCurrentEmailDirect();
-      const props = PropertiesService.getScriptProperties();
-      const adminEmails = props.getProperty('ADMIN_EMAILS') || '';
-      bulkData.isSystemAdmin = adminEmails.split(',').map(e => e.trim()).includes(userEmail);
-    } catch (adminError) {
-      console.warn('getBulkAdminPanelData: 管理者チェックエラー', adminError.message);
-      bulkData.isSystemAdmin = false;
-    }
-
-    try {
-      // 4. 🎯 Zero-dependency: 直接プロパティからボード情報取得
-      const props = PropertiesService.getScriptProperties();
-      const webAppUrl = ScriptApp.getService().getUrl();
-      bulkData.boardInfo = {
-        isActive: (props.getProperty('APPLICATION_STATUS') || 'active') === 'active',
-        webAppUrl,
-        timestamp: new Date().toISOString()
-      };
-    } catch (boardError) {
-      console.warn('getBulkAdminPanelData: ボード情報エラー', boardError.message);
-      bulkData.boardInfo = { isActive: false, error: boardError.message };
-    }
+    // 🎯 Zero-dependency Bulk Data Fetching - 各セクション別に取得
+    bulkData.config = getBulkAdminConfigData();
+    bulkData.spreadsheetList = getBulkAdminSpreadsheetList();
+    bulkData.isSystemAdmin = getBulkAdminSystemAdminStatus();
+    bulkData.boardInfo = getBulkAdminBoardInfo();
 
     const executionTime = Date.now() - startTime;
     bulkData.executionTime = `${executionTime}ms`;
@@ -1090,6 +1036,96 @@ function getBulkAdminPanelData() {
       executionTime: `${executionTime}ms`,
       error: error.toString()
     };
+  }
+}
+
+/**
+ * 管理パネル用設定データ取得 (Zero-dependency)
+ * @returns {Object} 設定データ
+ */
+function getBulkAdminConfigData() {
+  try {
+    // ServiceFactory経由でプロパティとDBアクセス
+    const props = ServiceFactory.getProperties();
+    const session = ServiceFactory.getSession();
+    const userEmail = session.isValid ? session.email : null;
+    const db = ServiceFactory.getDB();
+    const user = userEmail ? db.findUserByEmail(userEmail) : null;
+    const config = user && user.configJson ? JSON.parse(user.configJson) : null;
+
+    return {
+      success: !!config,
+      spreadsheetId: config?.spreadsheetId || null,
+      sheetName: config?.sheetName || null,
+      appStatus: props.getProperty('APPLICATION_STATUS') || 'active'
+    };
+  } catch (configError) {
+    console.warn('getBulkAdminConfigData: 設定取得エラー', configError.message);
+    return { success: false, message: configError.message };
+  }
+}
+
+/**
+ * 管理パネル用スプレッドシート一覧取得 (Zero-dependency)
+ * @returns {Object} スプレッドシート一覧データ
+ */
+function getBulkAdminSpreadsheetList() {
+  try {
+    // 直接DriveAPIでスプレッドシート一覧取得
+    const spreadsheets = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
+    const spreadsheetList = [];
+    let count = 0;
+    while (spreadsheets.hasNext() && count < 10) { // 最大10件に制限
+      const file = spreadsheets.next();
+      spreadsheetList.push({
+        id: file.getId(),
+        name: file.getName(),
+        lastUpdated: file.getLastUpdated(),
+        url: file.getUrl()
+      });
+      count++;
+    }
+    return { success: true, spreadsheets: spreadsheetList };
+  } catch (listError) {
+    console.warn('getBulkAdminSpreadsheetList: スプレッドシート一覧エラー', listError.message);
+    return { success: false, message: listError.message, spreadsheets: [] };
+  }
+}
+
+/**
+ * 管理パネル用システム管理者ステータス取得 (Zero-dependency)
+ * @returns {boolean} システム管理者かどうか
+ */
+function getBulkAdminSystemAdminStatus() {
+  try {
+    // 直接PropertiesServiceから管理者チェック
+    const userEmail = getCurrentEmailDirect();
+    const props = PropertiesService.getScriptProperties();
+    const adminEmails = props.getProperty('ADMIN_EMAILS') || '';
+    return adminEmails.split(',').map(e => e.trim()).includes(userEmail);
+  } catch (adminError) {
+    console.warn('getBulkAdminSystemAdminStatus: 管理者チェックエラー', adminError.message);
+    return false;
+  }
+}
+
+/**
+ * 管理パネル用ボード情報取得 (Zero-dependency)
+ * @returns {Object} ボード情報
+ */
+function getBulkAdminBoardInfo() {
+  try {
+    // 直接プロパティからボード情報取得
+    const props = PropertiesService.getScriptProperties();
+    const webAppUrl = ScriptApp.getService().getUrl();
+    return {
+      isActive: (props.getProperty('APPLICATION_STATUS') || 'active') === 'active',
+      webAppUrl,
+      timestamp: new Date().toISOString()
+    };
+  } catch (boardError) {
+    console.warn('getBulkAdminBoardInfo: ボード情報エラー', boardError.message);
+    return { isActive: false, error: boardError.message };
   }
 }
 
@@ -1407,7 +1443,7 @@ function getSystemDomainInfo() {
     const props = ServiceFactory.getProperties();
     const adminEmail = props.getAdminEmail();
 
-    const userDomain = session.email.split('@')[1];
+    const [, userDomain] = session.email.split('@');
     const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
 
     return {
@@ -1527,7 +1563,7 @@ function processLoginAction(action = 'login') {
         success: true,
         message: 'ログイン成功',
         userEmail: session.email,
-        adminUrl: adminUrl,
+        adminUrl,
         redirectUrl: adminUrl
       };
     }

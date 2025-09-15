@@ -11,19 +11,6 @@
 /**
  * Service Discovery for Zero-Dependency Architecture
  */
-function getAvailableService(serviceName) {
-  const serviceMap = {
-    'UserService': () => (typeof UserService !== 'undefined') ? UserService : null,
-    'ConfigService': () => (typeof ConfigService !== 'undefined') ? ConfigService : null,
-    'DataService': () => (typeof DataService !== 'undefined') ? DataService : null,
-    'SecurityService': () => (typeof SecurityService !== 'undefined') ? SecurityService : null
-  };
-
-  if (serviceMap[serviceName]) {
-    return serviceMap[serviceName]();
-  }
-  return null;
-}
 
 
 // ===========================================
@@ -154,49 +141,6 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
  *
  * @returns {Object} テスト結果
  */
-function testSetup() {
-    try {
-      const props = ServiceFactory.getProperties();
-      const databaseId = props.getDatabaseSpreadsheetId();
-      const adminEmail = props.getAdminEmail();
-
-      if (!databaseId || !adminEmail) {
-        return {
-          success: false,
-          message: 'セットアップが不完全です。必要な設定が見つかりません。'
-        };
-      }
-
-      // データベースアクセステスト
-      try {
-        const spreadsheet = SpreadsheetApp.openById(databaseId);
-        const name = spreadsheet.getName();
-        console.log('データベースアクセステスト成功:', name);
-      } catch (dbError) {
-        return {
-          success: false,
-          message: `データベースにアクセスできません: ${dbError.message}`
-        };
-      }
-
-      return {
-        success: true,
-        message: 'セットアップテストが成功しました',
-        testResults: {
-          database: '✅ アクセス可能',
-          adminEmail: '✅ 設定済み',
-          timestamp: new Date().toISOString()
-        }
-      };
-
-    } catch (error) {
-      console.error('SystemController.testSetup エラー:', error.message);
-      return {
-        success: false,
-        message: `テスト中にエラーが発生しました: ${error.message}`
-      };
-    }
-}
 
 /**
  * システム状態の強制リセット
@@ -258,18 +202,6 @@ function forceUrlSystemReset() {
  *
  * @returns {string} WebアプリURL
  */
-function getWebAppUrl() {
-    try {
-      const url = ScriptApp.getService().getUrl();
-      if (!url) {
-        throw new Error('WebアプリURLの取得に失敗しました');
-      }
-      return url;
-    } catch (error) {
-      console.error('SystemController.getWebAppUrl エラー:', error.message);
-      return '';
-    }
-}
 
 /**
  * システム全体の診断実行
@@ -491,77 +423,7 @@ function performAutoRepair() {
     }
 }
 
-/**
- * 現在の設定を取得
- * AdminPanel.js.html から呼び出される
- *
- * @returns {Object} 設定情報
- */
-function getConfig() {
-  try {
-    // 🔧 DB初期化（GAS読み込み順序対応）
-    const db = initDatabaseConnection();
-    if (!db) {
-      console.error('getConfig: DB初期化失敗');
-      return {
-        success: false,
-        message: 'データベース接続エラー'
-      };
-    }
 
-    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
-    const email = getCurrentEmailDirectSC();
-    if (!email) {
-      return { success: false, message: 'ユーザー情報が見つかりません' };
-    }
-
-    // 🎯 DB初期化済みのdb変数を使用
-    let user = db.findUserByEmail(email);
-
-    // Auto-create user if not exists
-    if (!user) {
-      try {
-        const newUserId = generateUserId();
-        user = {
-          userId: newUserId,
-          userEmail: email,
-          isActive: true,
-          createdAt: new Date().toISOString(),
-          configJson: null
-        };
-        db.createUser(user);
-        console.log('SystemController.getConfig: 新規ユーザー作成:', { userId: newUserId, email });
-      } catch (createErr) {
-        console.error('SystemController.getConfig: ユーザー作成エラー', createErr);
-        return { success: false, message: 'ユーザー作成に失敗しました' };
-      }
-    }
-
-    // 🎯 Zero-dependency: 直接DBから設定取得
-    let config = {};
-    if (user.configJson) {
-      try {
-        config = JSON.parse(user.configJson);
-      } catch (parseError) {
-        console.error('SystemController.getConfig: 設定JSON解析エラー', parseError);
-        config = {};
-      }
-    }
-
-    return {
-      success: true,
-      config,
-      userId: user.userId,
-      userEmail: user.userEmail
-    };
-  } catch (error) {
-    console.error('AdminController.getConfig エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 /**
  * スプレッドシート一覧を取得
@@ -657,76 +519,6 @@ function getAdminSheetList(spreadsheetId) {
  * @param {string} sheetName - シート名
  * @returns {Object} 列分析結果
  */
-function analyzeColumns(spreadsheetId, sheetName) {
-  try {
-    console.log('SystemController.analyzeColumns: 開始 - Zero-dependency Architecture', {
-      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
-      sheetName: sheetName || 'null'
-    });
-
-    // 🎯 Zero-dependency: 直接SpreadsheetAppで列分析
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    const sheet = spreadsheet.getSheetByName(sheetName);
-
-    if (!sheet) {
-      return {
-        success: false,
-        message: `シート "${sheetName}" が見つかりません`,
-        headers: [],
-        columns: [],
-        columnMapping: { mapping: {}, confidence: {} }
-      };
-    }
-
-    // ヘッダー行取得と列分析
-    const headerRow = 1;
-    const lastColumn = sheet.getLastColumn();
-    const [headers] = lastColumn > 0 ? sheet.getRange(headerRow, 1, 1, lastColumn).getValues() : [[]];
-
-    const columns = headers.map((header, index) => ({
-      index: index + 1,
-      header: String(header || ''),
-      letter: columnNumberToLetter(index + 1),
-      type: 'text' // 簡化版では全てtext
-    }));
-
-    // 簡化版のコラムマッピング
-    const mapping = {};
-    const confidence = {};
-    headers.forEach((header, index) => {
-      const headerStr = String(header || '').toLowerCase();
-      if (headerStr.includes('名前') || headerStr.includes('name')) {
-        mapping.name = index + 1;
-        confidence.name = 0.9;
-      } else if (headerStr.includes('コメント') || headerStr.includes('comment')) {
-        mapping.comment = index + 1;
-        confidence.comment = 0.8;
-      }
-    });
-
-    return {
-      success: true,
-      headers,
-      columns,
-      columnMapping: { mapping, confidence },
-      sheetInfo: {
-        name: sheetName,
-        totalRows: sheet.getLastRow(),
-        totalColumns: lastColumn
-      }
-    };
-  } catch (error) {
-    console.error('AdminController.analyzeColumns エラー:', error.message);
-
-    return {
-      success: false,
-      message: error.message || '列分析エラー',
-      headers: [],
-      columns: [],
-      columnMapping: { mapping: {}, confidence: {} }
-    };
-  }
-}
 
 /**
  * 軽量ヘッダー取得 - 列分析に失敗してもヘッダー名だけは取得
@@ -877,116 +669,9 @@ function validateAccess(spreadsheetId) {
   }
 }
 
-/**
- * システム管理者権限の確認
- * AdminPanel.js.html から呼び出される
- *
- * @returns {boolean} 管理者権限の有無
- */
-function checkIsSystemAdmin() {
-  try {
-    // 🎯 Zero-dependency: 直接Session APIとPropertiesServiceで管理者確認
-    const email = getCurrentEmailDirectSC();
-    if (!email) {
-      return false;
-    }
 
-    const props = PropertiesService.getScriptProperties();
-    const adminEmails = props.getProperty('ADMIN_EMAILS') || '';
 
-    return adminEmails.split(',').map(e => e.trim()).includes(email);
-  } catch (error) {
-    console.error('SystemController.checkIsSystemAdmin エラー:', error.message);
-    return false;
-  }
-}
 
-/**
- * 現在のボード情報とURLを取得
- * AdminPanel.js.html から呼び出される
- *
- * @returns {Object} ボード情報
- */
-function getCurrentBoardInfoAndUrls() {
-  try {
-    // 🔧 DB初期化（GAS読み込み順序対応）
-    const db = initDatabaseConnection();
-    if (!db) {
-      console.error('getCurrentBoardInfoAndUrls: DB初期化失敗');
-      return {
-        isActive: false,
-        error: 'データベース接続エラー',
-        appPublished: false
-      };
-    }
-
-    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
-    const email = getCurrentEmailDirectSC();
-    if (!email) {
-      return {
-        isActive: false,
-        error: 'ユーザー情報が見つかりません',
-        appPublished: false
-      };
-    }
-
-    // 🎯 DB初期化済みのdb変数を使用
-    const user = db.findUserByEmail(email);
-    if (!user) {
-      return {
-        isActive: false,
-        error: 'ユーザーが見つかりません',
-        appPublished: false
-      };
-    }
-
-    // 🎯 Zero-dependency: 直接PropertiesServiceでアプリ状態確認
-    const props = PropertiesService.getScriptProperties();
-    const appStatus = props.getProperty('APPLICATION_STATUS');
-    const appPublished = appStatus === 'active';
-
-    if (!appPublished) {
-      return {
-        isActive: false,
-        appPublished: false,
-        questionText: 'アプリケーションが公開されていません'
-      };
-    }
-
-    // WebAppのベースURL取得
-    const baseUrl = ScriptApp.getService().getUrl();
-    const viewUrl = `${baseUrl}?mode=view&userId=${user.userId}`;
-
-    // 設定がある場合はその情報も含める
-    let config = {};
-    if (user.configJson) {
-      try {
-        config = JSON.parse(user.configJson);
-      } catch (parseError) {
-        console.warn('getCurrentBoardInfoAndUrls: 設定JSON解析エラー', parseError);
-      }
-    }
-
-    return {
-      isActive: true,
-      appPublished: true,
-      questionText: config.questionText || config.boardTitle || 'Everyone\'s Answer Board',
-      urls: {
-        view: viewUrl,
-        admin: `${baseUrl}?mode=admin&userId=${user.userId}`
-      },
-      lastUpdated: config.publishedAt || config.lastModified || new Date().toISOString()
-    };
-
-  } catch (error) {
-    console.error('AdminController.getCurrentBoardInfoAndUrls エラー:', error.message);
-    return {
-      isActive: false,
-      appPublished: false,
-      error: error.message
-    };
-  }
-}
 
 /**
  * フォーム情報を取得
@@ -998,7 +683,12 @@ function getCurrentBoardInfoAndUrls() {
  */
 function getFormInfo(spreadsheetId, sheetName) {
   try {
-    return ConfigService.getFormInfo(spreadsheetId, sheetName);
+    // 🚀 Zero-dependency: ServiceFactory経由でConfigService利用
+    const configService = ServiceFactory.getService('ConfigService');
+    if (!configService) {
+      throw new Error('ConfigService not available');
+    }
+    return configService.getFormInfo(spreadsheetId, sheetName);
   } catch (error) {
     console.error('AdminController.getFormInfo エラー:', error.message);
     return {
@@ -1034,8 +724,13 @@ function createForm(userId, config) {
       };
     }
 
-    // ConfigService経由でフォーム作成
-    const result = ConfigService.createForm(userId, config);
+    // ServiceFactory経由でConfigServiceアクセス
+    const configService = ServiceFactory.getService('ConfigService');
+    if (!configService) {
+      console.error('AdminController.createForm: ConfigService not available');
+      return { success: false, message: 'ConfigServiceが利用できません' };
+    }
+    const result = configService.createForm(userId, config);
 
     if (result && result.success) {
       console.log('AdminController.createForm: 成功', { formUrl: result.formUrl });
@@ -1065,9 +760,9 @@ function createForm(userId, config) {
  */
 function checkCurrentPublicationStatus() {
   try {
-    // ユーザー情報の取得
-    const userInfo = UserService.getCurrentUserInfo();
-    const userId = userInfo && userInfo.userId;
+    // ServiceFactory経由でユーザー情報取得
+    const session = ServiceFactory.getSession();
+    const userId = session.isValid ? session.userId : null;
 
     if (!userId) {
       return {
@@ -1077,8 +772,9 @@ function checkCurrentPublicationStatus() {
       };
     }
 
-    // 設定情報を取得
-    const config = ConfigService.getUserConfig(userId);
+    // ServiceFactory経由で設定情報を取得
+    const configService = ServiceFactory.getService('ConfigService');
+    const config = configService ? configService.getUserConfig(userId) : null;
     if (!config) {
       return {
         success: false,
@@ -1126,117 +822,14 @@ function columnNumberToLetter(num) {
   return letter;
 }
 
-function getUser(kind = 'email') {
-  try {
-    // 🚀 Direct Session API fallback - no service dependencies
-    const userEmail = getCurrentEmailDirectSC();
 
-    if (!userEmail) {
-      console.warn('getUser: No email available from Session API');
-      return kind === 'email' ? '' : { success: false, message: 'ユーザー情報が取得できません' };
-    }
-
-    // 後方互換性重視: kind==='email' の場合は純粋な文字列を返す
-    if (kind === 'email') {
-      return String(userEmail);
-    }
-
-    // 統一オブジェクト形式（'full' など）- フォールバック情報
-    const userInfo = { userEmail, userId: null, isActive: true };
-    return {
-      success: true,
-      email: userEmail,
-      userId: userInfo?.userId || null,
-      isActive: userInfo?.isActive || false,
-      hasConfig: !!userInfo?.config
-    };
-  } catch (error) {
-    console.error('FrontendController.getUser エラー:', error.message);
-    return kind === 'email' ? '' : { success: false, message: error.message };
-  }
-}
 
 
 // ===========================================
 // 📊 認証・ログイン関連API
 // ===========================================
 
-/**
- * ログインアクションを処理
- * login.js.html から呼び出される
- *
- * @returns {Object} ログイン処理結果
- */
-function processLoginAction() {
-  try {
-    console.log('🔍 SystemController.processLoginAction: 開始 (Zero-Dependency)');
 
-    // 🚀 Zero-dependency: 直接SessionからユーザーEmail取得
-    const session = ServiceFactory.getSession();
-    if (!session.isValid || !session.email) {
-      console.warn('SystemController.processLoginAction: 無効なセッション');
-      return {
-        success: false,
-        message: 'ユーザー認証が必要です',
-        needsAuth: true
-      };
-    }
-
-    const userEmail = session.email;
-    console.log('🔍 SystemController.processLoginAction: セッションEmail取得', { userEmail });
-
-    // 🚀 Zero-dependency: ServiceFactory経由でUserService取得
-    const userService = getAvailableService('UserService');
-    let userInfo = null;
-
-    if (userService && typeof userService.getCurrentUserInfo === 'function') {
-      userInfo = userService.getCurrentUserInfo();
-      console.log('🔍 SystemController.processLoginAction: UserService経由でuserInfo取得', { hasUserInfo: !!userInfo });
-    }
-
-    // フォールバック: 簡易的なユーザー情報生成
-    if (!userInfo) {
-      console.log('🔍 SystemController.processLoginAction: フォールバック - 簡易userInfo生成');
-      userInfo = {
-        userId: generateUserId(),
-        email: userEmail,
-        createdAt: new Date().toISOString(),
-        accessLevel: 'authenticated_user'
-      };
-    }
-
-    // 管理パネル用URLを構築（userId必須）
-    const baseUrl = getWebAppUrl();
-    const userId = userInfo?.userId;
-
-    if (!userId) {
-      return {
-        success: false,
-        message: 'ユーザーIDの取得に失敗しました',
-        error: 'USER_ID_MISSING'
-      };
-    }
-
-    const adminUrl = `${baseUrl}?mode=admin&userId=${userId}`;
-
-    return {
-      success: true,
-      userInfo,
-      redirectUrl: baseUrl,
-      adminUrl,
-      // 後方互換性のための追加プロパティ
-      appUrl: baseUrl,
-      url: adminUrl
-    };
-
-  } catch (error) {
-    console.error('FrontendController.processLoginAction エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 /**
  * 認証状態を確認
@@ -1246,7 +839,8 @@ function processLoginAction() {
  */
 function verifyUserAuthentication() {
   try {
-    const userEmail = UserService.getCurrentEmail();
+    const session = ServiceFactory.getSession();
+    const userEmail = session.isValid ? session.email : null;
     if (!userEmail) {
       return {
         isAuthenticated: false,
@@ -1254,7 +848,7 @@ function verifyUserAuthentication() {
       };
     }
 
-    const userInfo = UserService.getCurrentUserInfo();
+    const userInfo = session.isValid ? { userId: session.userId, email: session.email } : null;
     return {
       isAuthenticated: true,
       userEmail,
@@ -1271,43 +865,7 @@ function verifyUserAuthentication() {
   }
 }
 
-/**
- * 認証情報のリセット
- * login.js.html から呼び出される
- *
- * @returns {Object} リセット結果
- */
-function resetAuth() {
-  try {
-    console.log('FrontendController.resetAuth: 認証リセット開始');
 
-    // ユーザーキャッシュクリア
-    UserService.clearUserCache();
-
-    // セッション関連の情報をクリア
-    const props = PropertiesService.getScriptProperties();
-
-    // 一時的な認証情報をクリア
-    const authKeys = ['temp_auth_token', 'last_login_attempt', 'auth_retry_count'];
-    authKeys.forEach(key => {
-      props.deleteProperty(key);
-    });
-
-    console.log('FrontendController.resetAuth: 認証リセット完了');
-
-    return {
-      success: true,
-      message: '認証情報がリセットされました'
-    };
-
-  } catch (error) {
-    console.error('FrontendController.resetAuth エラー:', error.message);
-    return {
-      success: false,
-      message: `認証リセットに失敗しました: ${error.message}`
-    };
-  }
-}
 
 /**
  * ログイン状態を取得
@@ -1317,7 +875,8 @@ function resetAuth() {
  */
 function getLoginStatus() {
   try {
-    const userEmail = UserService.getCurrentEmail();
+    const session = ServiceFactory.getSession();
+    const userEmail = session.isValid ? session.email : null;
     if (!userEmail) {
       return {
         isLoggedIn: false,
@@ -1325,7 +884,7 @@ function getLoginStatus() {
       };
     }
 
-    const userInfo = UserService.getCurrentUserInfo();
+    const userInfo = session.isValid ? { userId: session.userId, email: session.email } : null;
     return {
       isLoggedIn: true,
       user: {
@@ -1356,11 +915,14 @@ function reportClientError(errorInfo) {
   try {
     console.error('クライアントエラー報告:', errorInfo);
 
+    // ServiceFactory経由でセッション情報取得
+    const session = ServiceFactory.getSession();
+
     // エラーログを記録（将来的にはSecurityServiceや専用のログサービスに委譲）
     const logEntry = {
       timestamp: new Date().toISOString(),
       type: 'client_error',
-      userEmail: UserService.getCurrentEmail() || 'unknown',
+      userEmail: session.isValid ? session.email : 'unknown',
       errorInfo
     };
 
@@ -1393,7 +955,7 @@ function testForceLogoutRedirect() {
     return {
       success: true,
       message: 'ログアウトテスト完了',
-      redirectUrl: `${getWebAppUrl()}?mode=login`
+      redirectUrl: `${ScriptApp.getService().getUrl()}?mode=login`
     };
   } catch (error) {
     console.error('FrontendController.testForceLogoutRedirect エラー:', error.message);
