@@ -1509,6 +1509,7 @@ function detectFormUrl(sheetId = null) {
     return {
       success: true,
       formUrl: config.formUrl,
+      formTitle: config.formTitle || 'フォーム',
       source: 'config'
     };
   } catch (error) {
