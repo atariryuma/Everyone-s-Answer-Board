@@ -557,7 +557,7 @@
             <h1 class="title">${message || 'ログインが完了しました'}</h1>
             <p class="subtitle">管理パネルにアクセスしてください</p>
             
-            <a href="${adminUrl}" class="main-button" id="admin-panel-btn">
+            <a href="${adminUrl}" class="main-button" id="admin-panel-btn" onclick="handleSingleClick(this)">
               <span id="admin-panel-btn-text">🚀 管理パネルを開く</span>
             </a>
             
@@ -584,8 +584,30 @@
       // 現在のコンテンツを成功画面に完全置換
       document.body.innerHTML = successHtml;
 
-      // シンプルなリンク方式 - JavaScript処理廃止
+      // シンプルなリンク方式 + 二重クリック防止
       console.log('✅ シンプルリンク方式 - 管理パネルボタンが表示されました');
+
+      // 二重クリック防止処理
+      window.handleSingleClick = function(buttonElement) {
+        if (buttonElement.dataset.clicked === 'true') {
+          console.log('二重クリック防止: 既にクリック済みです');
+          return false;
+        }
+
+        // クリック状態を記録
+        buttonElement.dataset.clicked = 'true';
+
+        // ボタンの状態を変更
+        const btnText = buttonElement.querySelector('#admin-panel-btn-text');
+        if (btnText) {
+          btnText.textContent = '🔄 管理パネルに移動中...';
+        }
+        buttonElement.style.opacity = '0.7';
+        buttonElement.style.pointerEvents = 'none';
+
+        console.log('管理パネルに移動します');
+        return true; // リンクの通常動作を継続
+      };
 
       // 背景遷移を開始
       setTimeout(function () {
