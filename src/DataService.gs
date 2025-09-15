@@ -82,6 +82,15 @@ function getUserSheetData(userId, options = {}) {
       executionTime
     });
 
+    // フロントエンド互換形式に拡張
+    if (result.success) {
+      return {
+        ...result,
+        header: config.header || config.title || result.sheetName || '回答一覧',
+        showDetails: config.showDetails !== false // デフォルトはtrue
+      };
+    }
+
     return result;
   } catch (error) {
     console.error('DataService.getUserSheetData: エラー', {
@@ -175,6 +184,19 @@ function fetchSpreadsheetData(config, options = {}) {
     }
 
     const executionTime = Date.now() - startTime;
+    // クラスフィルタリングとソートを適用
+    if (options.classFilter) {
+      processedData = processedData.filter(item => item.class === options.classFilter);
+    }
+
+    // ソート処理
+    if (options.sortBy) {
+      processedData = applySortAndLimit(processedData, {
+        sortBy: options.sortBy,
+        limit: options.limit
+      });
+    }
+
     console.info('DataService.fetchSpreadsheetData: バッチ処理完了', {
       totalRows: totalDataRows,
       processedRows: processedCount,
@@ -192,6 +214,7 @@ function fetchSpreadsheetData(config, options = {}) {
       // デバッグ情報（オプショナル）
       totalRows: totalDataRows,
       processedRows: processedCount,
+      filteredRows: processedData.length,
       executionTime
     };
   } catch (error) {
@@ -228,6 +251,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
 
           // メインコンテンツ（フロントエンドと統一）
           answer: extractFieldValue(row, headers, 'answer', columnMapping) || '',
+          opinion: extractFieldValue(row, headers, 'answer', columnMapping) || '', // フロントエンド互換
           reason: extractFieldValue(row, headers, 'reason', columnMapping) || '',
           class: extractFieldValue(row, headers, 'class', columnMapping) || '',
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',
@@ -285,6 +309,7 @@ function processRawData(dataRows, headers, config, options = {}) {
 
           // メインコンテンツ
           answer: extractFieldValue(row, headers, 'answer', columnMapping) || '',
+          opinion: extractFieldValue(row, headers, 'answer', columnMapping) || '', // フロントエンド互換
           reason: extractFieldValue(row, headers, 'reason', columnMapping) || '',
           class: extractFieldValue(row, headers, 'class', columnMapping) || '',
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',

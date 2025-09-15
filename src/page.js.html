@@ -1,1539 +1,903 @@
-  <script>
-    'use strict';
-    
-    const CONFIG = Object.freeze({
-      CACHE_DURATION: 120000,      // 2分キャッシュ
-      POLLING_INTERVAL: 90000,     // 90秒ポーリング
-      SEARCH_DEBOUNCE: 400,        // 400ms検索デバウンス
-      ANIMATION_DURATION: 300,     // 300msアニメーション
-      MAX_DISPLAY_COLUMNS: 6,      // 最大表示列数
-      MIN_DISPLAY_COLUMNS: 1       // 最小表示列数
-    });
-    
-    const getSecureVars = () => ({
-      // セキュリティ: クライアントサイド変数ではなく、サーバーから取得した設定を使用
-      showAdminFeatures: false,  // サーバーサイドで判定
-      isAdminUser: false,        // サーバーサイドで判定
-      userId: (typeof window !== 'undefined' && window.userId) || null,
-      userEmail: (typeof window !== 'undefined' && window.userEmail) || null
-    });
-    
-    const ICONS = Object.freeze({
-      lightbulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m8.66-10H20M4 12H2m15.07-7.07L17.66 6.34M6.34 6.34L4.93 4.93m12.14 12.14L15.66 15.66M6.34 17.66L4.93 19.07"/></svg>',
-      thumbup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12l5-3 5 3V10l-5-8-5 8z"/></svg>',
-      search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>',
-      x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg>',
-      star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/></svg>',
-      grid: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18"/><path d="M12 3v18M3 12h18"/></svg>',
-      users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
-    });
+<script>
+'use strict';
 
-    /**
-     * DOM操作のヘルパー関数群 - 未定義エラーを防止
-     */
-    const DOMHelpers = Object.freeze({
-      /**
-       * 安全なDOM要素取得
-       * @param {string} id - 要素ID
-       * @param {string} context - エラー時のコンテキスト
-       * @returns {Element|null}
-       */
-      safeGetById(id, context = '') {
-        try {
-          const element = document.getElementById(id);
-          if (!element && context) {
-            console.warn(`DOM要素が見つかりません: ${id} (${context})`);
-          }
-          return element;
-        } catch (error) {
-          console.error(`DOM要素取得エラー: ${id}`, error);
-          return null;
-        }
-      },
+// 🎯 Everyone's Answer Board - 完全復元版 (e121b12ベース)
+// 現在のGASシステム (2025) に完全適応したリファクタリング版
 
-      /**
-       * 安全なDOM要素値設定
-       * @param {string} id - 要素ID
-       * @param {*} value - 設定する値
-       * @param {string} property - プロパティ名（デフォルト: 'value'）
-       * @returns {boolean} 成功・失敗
-       */
-      safeSetValue(id, value, property = 'value') {
-        const element = this.safeGetById(id, 'value setting');
-        if (element && property in element) {
-          element[property] = value;
-          return true;
-        }
-        return false;
-      },
+// === 基本設定とユーティリティ ===
+const CONFIG = Object.freeze({
+  CACHE_DURATION: 120000,      // 2分キャッシュ
+  POLLING_INTERVAL: 90000,     // 90秒ポーリング
+  ANIMATION_DURATION: 300,     // 300msアニメーション
+  MAX_DISPLAY_COLUMNS: 6,      // 最大表示列数
+  MIN_DISPLAY_COLUMNS: 1,      // 最小表示列数
+  RENDER_BATCH_SIZE: 10,       // レンダリングバッチサイズ
+  CHUNK_SIZE: 5,               // DOM操作チャンクサイズ
+  ERROR_RETRY_ATTEMPTS: 3,     // エラーリトライ回数
+  ERROR_RETRY_DELAY: 1000      // リトライ遅延(ms)
+});
 
-      /**
-       * 安全なDOM要素値取得
-       * @param {string} id - 要素ID
-       * @param {string} property - プロパティ名（デフォルト: 'value'）
-       * @param {*} fallback - フォールバック値
-       * @returns {*}
-       */
-      safeGetValue(id, property = 'value', fallback = '') {
-        const element = this.safeGetById(id, 'value getting');
-        return (element && property in element) ? element[property] : fallback;
-      },
+// アイコン定義
+const ICONS = Object.freeze({
+  lightbulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m8.66-10H20M4 12H2m15.07-7.07L17.66 6.34M6.34 6.34L4.93 4.93m12.14 12.14L15.66 15.66M6.34 17.66L4.93 19.07"/></svg>',
+  thumbup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12l5-3 5 3V10l-5-8-5 8z"/></svg>',
+  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/></svg>',
+  users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  x: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
+});
 
-      /**
-       * 複数要素の安全な取得
-       * @param {Array<string>} ids - 要素IDの配列
-       * @returns {Object} IDをキーとした要素のオブジェクト
-       */
-      safeGetMultiple(ids) {
-        const result = {};
-        ids.forEach(id => {
-          result[id] = this.safeGetById(id);
-        });
-        return result;
-      }
-    });
-    
-    /**
-     * FilterManager - フィルタリング機能専門クラス
-     * 教育現場での重要な機能（クラス絞り込み、検索、ソート）を管理
-     */
-    class FilterManager {
-      constructor() {
-        this.filters = {
-          classFilter: '',
-          searchQuery: '',
-          sortOrder: 'newest'
-        };
-        this.originalData = [];
-        this.filteredData = [];
-        this.availableClasses = new Set();
-      }
+// システム定数
+const SYSTEM_CONSTANTS = Object.freeze({
+  REACTIONS: Object.freeze({
+    KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
+    LABELS: Object.freeze({
+      UNDERSTAND: 'なるほど！',
+      LIKE: 'いいね！',
+      CURIOUS: 'もっと知りたい！',
+      HIGHLIGHT: 'ハイライト'
+    })
+  }),
+  DISPLAY_MODES: Object.freeze({
+    ANONYMOUS: 'anonymous',
+    SHOW_NAME: 'show_name',
+    SHOW_COUNTS: 'show_counts'
+  })
+});
 
-      setData(data) {
-        this.originalData = data || [];
-        this.extractAvailableClasses();
-        this.updateClassFilter();
-        this.applyFilters();
-      }
+// DOM操作ヘルパー
+const DOMHelpers = Object.freeze({
+  safeGetById(id) {
+    return document.getElementById(id);
+  },
 
-      extractAvailableClasses() {
-        this.availableClasses.clear();
-        this.originalData.forEach(item => {
-          if (item.class && typeof item.class === 'string' && item.class.trim()) {
-            this.availableClasses.add(item.class.trim());
-          }
-        });
-      }
+  safeGetMultiple(ids) {
+    return ids.reduce((acc, id) => {
+      acc[id] = this.safeGetById(id);
+      return acc;
+    }, {});
+  },
 
-      updateClassFilter() {
-        const classFilterEl = DOMHelpers.safeGetById('classFilter', 'class filter update');
-        if (!classFilterEl) return;
+  createElement(tag, className = '', innerHTML = '') {
+    const element = document.createElement(tag);
+    if (className) element.className = className;
+    if (innerHTML) element.innerHTML = innerHTML;
+    return element;
+  }
+});
 
-        const currentValue = classFilterEl.value;
-        const firstOption = classFilterEl.querySelector('option[value=""]');
-        classFilterEl.innerHTML = '';
-        if (firstOption) {
-          classFilterEl.appendChild(firstOption);
-        }
+// === GAS API呼び出し統合クラス ===
+class UnifiedDataLoader {
+  constructor() {
+    this.cache = new Map();
+    this.loadingStates = new Map();
+    this.lastDataHash = null;
+    this.newContentCount = 0;
+  }
 
-        const sortedClasses = Array.from(this.availableClasses).sort();
-        sortedClasses.forEach(className => {
-          const option = document.createElement('option');
-          option.value = className;
-          option.textContent = className;
-          classFilterEl.appendChild(option);
-        });
+  // 現在のGAS API関数に合わせた呼び出し
+  async callGAS(funcName, ...args) {
+    const key = `${funcName}_${JSON.stringify(args)}`;
 
-        classFilterEl.value = currentValue;
-      }
-
-      setFilter(filterType, value) {
-        if (this.filters.hasOwnProperty(filterType)) {
-          this.filters[filterType] = value;
-          this.applyFilters();
-        }
-      }
-
-      clearFilters() {
-        this.filters = {
-          classFilter: '',
-          searchQuery: '',
-          sortOrder: 'newest'
-        };
-
-        const elements = DOMHelpers.safeGetMultiple(['classFilter', 'searchInput', 'sortOrder']);
-
-        Object.entries(elements).forEach(([key, element]) => {
-          if (element) {
-            element.value = key === 'sortOrder' ? 'newest' : '';
-          }
-        });
-
-        this.applyFilters();
-      }
-
-      applyFilters() {
-        let filtered = [...this.originalData];
-
-        if (this.filters.classFilter) {
-          filtered = filtered.filter(item => 
-            item.class && item.class.trim() === this.filters.classFilter
-          );
-        }
-
-        if (this.filters.searchQuery) {
-          const query = this.filters.searchQuery.toLowerCase().trim();
-          filtered = filtered.filter(item => {
-            return (
-              (item.opinion && item.opinion.toLowerCase().includes(query)) ||
-              (item.reason && item.reason.toLowerCase().includes(query)) ||
-              (item.name && item.name.toLowerCase().includes(query)) ||
-              (item.class && item.class.toLowerCase().includes(query))
-            );
-          });
-        }
-
-        switch (this.filters.sortOrder) {
-          case 'newest':
-            filtered.sort((a, b) => (b.rowIndex || 0) - (a.rowIndex || 0));
-            break;
-          case 'reactions':
-            filtered.sort((a, b) => {
-              const reactionA = this.getTotalReactions(a);
-              const reactionB = this.getTotalReactions(b);
-              return reactionB - reactionA;
-            });
-            break;
-        }
-
-        this.filteredData = filtered;
-        return filtered;
-      }
-
-      getTotalReactions(item) {
-        if (!item.reactions) return 0;
-        return Object.values(item.reactions).reduce((total, reaction) => {
-          return total + (reaction.count || 0);
-        }, 0);
-      }
-
-      getFilteredData() {
-        return this.filteredData;
-      }
-
-      getFilterStatus() {
-        const hasFilters = Object.values(this.filters).some(value => 
-          value && value !== 'newest'
-        );
-        
-        return {
-          hasFilters,
-          totalItems: this.originalData.length,
-          filteredItems: this.filteredData.length,
-          filters: { ...this.filters }
-        };
-      }
+    if (this.loadingStates.get(key)) {
+      return this.loadingStates.get(key);
     }
 
-    /**
-     * AnswerApp - メインアプリケーション制御クラス
-     * データ管理、状態管理、API通信を統合
-     */
-    class AnswerApp {
-      constructor() {
-        console.log('🚀 [AnswerApp] 初期化開始', {
-          timestamp: new Date().toISOString(),
-          location: window.location.href,
-          userAgent: navigator.userAgent.substring(0, 100)
-        });
+    const promise = this.executeWithRetry(() => {
+      return new Promise((resolve, reject) => {
+        if (typeof google !== 'undefined' && google.script && google.script.run) {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            [funcName](...args);
+        } else {
+          resolve(this.getMockData(funcName, args));
+        }
+      });
+    });
 
-        try {
-          this.vars = getSecureVars();
-          console.log('✅ [AnswerApp] セキュア変数取得完了', {
-            userId: this.vars.userId ? this.vars.userId.substring(0, 8) + '...' : 'なし',
-            userEmail: this.vars.userEmail ? this.vars.userEmail.split('@')[0] + '@...' : 'なし',
-            isAdminUser: this.vars.isAdminUser
-          });
+    this.loadingStates.set(key, promise);
 
-          this.config = null;
-          this.answers = [];
-          this.isLoading = false;
-          this.pollingInterval = null;
-          this.cache = new Map();
-          this.cacheTimers = new Map();
-          this.isProduction = typeof google !== 'undefined' && google.script?.run;
-          this.retryCount = 0;
-          this.maxRetries = 3;
+    try {
+      const result = await promise;
+      this.loadingStates.delete(key);
+      return result;
+    } catch (error) {
+      this.loadingStates.delete(key);
+      console.error(`GAS呼び出しエラー [${funcName}]:`, error);
+      throw error;
+    }
+  }
 
-          console.log('✅ [AnswerApp] 基本プロパティ設定完了', {
-            isProduction: this.isProduction,
-            googleScriptAvailable: typeof google !== 'undefined',
-            googleScriptRun: !!(google && google.script && google.script.run)
-          });
-
-          this.answerRenderer = new AnswerRenderer();
-          console.log('✅ [AnswerApp] AnswerRenderer生成完了');
-
-          this.filterManager = new FilterManager();
-          console.log('✅ [AnswerApp] FilterManager生成完了');
-
-          console.log('🎯 [AnswerApp] init()メソッド呼び出し開始');
-          this.init();
-
-        } catch (error) {
-          console.error('❌ [AnswerApp] コンストラクタエラー', {
-            message: error.message,
-            stack: error.stack,
-            timestamp: new Date().toISOString()
-          });
+  // 指数バックオフリトライメカニズム
+  async executeWithRetry(operation, maxRetries = CONFIG.ERROR_RETRY_ATTEMPTS) {
+    let retryCount = 0;
+    while (retryCount < maxRetries) {
+      try {
+        return await operation();
+      } catch (error) {
+        retryCount++;
+        if (retryCount >= maxRetries) {
           throw error;
         }
-      }
-      
-      async init() {
-        console.log('🎯 [AnswerApp] init()開始');
-
-        try {
-          console.log('🔄 [AnswerApp] 並列初期化処理開始 (loadConfig, setupUI, setupEventListeners)');
-
-          const [config] = await Promise.all([
-            this.loadConfig(),
-            this.setupUI(),
-            this.setupEventListeners()
-          ]);
-
-          console.log('✅ [AnswerApp] 並列初期化処理完了', {
-            configLoaded: !!config,
-            configKeys: config ? Object.keys(config) : []
-          });
-
-          this.config = config;
-
-          console.log('🎯 [AnswerApp] loadAnswers()呼び出し開始');
-          await this.loadAnswers();
-          console.log('✅ [AnswerApp] loadAnswers()完了');
-
-          console.log('🎯 [AnswerApp] ポーリング開始');
-          this.startPolling();
-
-          console.log('🎉 [AnswerApp] 初期化完全完了');
-
-        } catch (error) {
-          console.error('❌ [AnswerApp] init()でエラー発生', {
-            message: error.message,
-            stack: error.stack,
-            timestamp: new Date().toISOString()
-          });
-          this.handleError('初期化エラー', error);
-        }
-      }
-      
-      async loadConfig() {
-        const cacheKey = `config_${this.vars.userId}`;
-        const cached = this.getCache(cacheKey);
-        if (cached) return cached;
-        
-        try {
-          const response = await this.callGAS('getUserConfig', this.vars.userId);
-
-          // レスポンス検証
-          if (!response) {
-            console.error('❌ [loadConfig] 設定取得失敗: nullレスポンス');
-            throw new Error('設定データが取得できませんでした');
-          }
-
-          if (response.success === false) {
-            console.error('❌ [loadConfig] 設定取得失敗:', response.message || '不明なエラー');
-            throw new Error(response.message || '設定取得に失敗しました');
-          }
-
-          const config = response.config;
-          console.log('✅ [loadConfig] 設定取得成功', {
-            configType: typeof config,
-            hasUserPermissions: !!config.userPermissions,
-            spreadsheetId: config.spreadsheetId ? 'あり' : 'なし'
-          });
-
-          // セキュリティ: サーバーサイドから権限情報を取得
-          if (config.userPermissions) {
-            this.vars.showAdminFeatures = config.userPermissions.isOwner || config.userPermissions.isSystemAdmin;
-            this.vars.isAdminUser = config.userPermissions.isOwner || config.userPermissions.isSystemAdmin;
-            this.vars.isOwner = config.userPermissions.isOwner;
-            this.vars.isSystemAdmin = config.userPermissions.isSystemAdmin;
-            this.vars.accessLevel = config.userPermissions.accessLevel;
-
-            console.log('🔐 [AnswerApp] 権限情報設定完了', {
-              isOwner: this.vars.isOwner,
-              isSystemAdmin: this.vars.isSystemAdmin,
-              accessLevel: this.vars.accessLevel,
-              showAdminFeatures: this.vars.showAdminFeatures
-            });
-          }
-          
-          this.setCache(cacheKey, config, CONFIG.CACHE_DURATION);
-          return config;
-        } catch (error) {
-          console.error('設定読み込みエラー:', error);
-          return {};
-        }
-      }
-      
-      async loadAnswers(sortOrder = 'newest') {
-        console.log('📊 [loadAnswers] データ取得開始', {
-          sortOrder,
-          isLoading: this.isLoading,
-          userId: this.vars.userId ? this.vars.userId.substring(0, 8) + '...' : 'なし'
-        });
-
-        if (this.isLoading) {
-          console.warn('⚠️ [loadAnswers] すでに読み込み中のため中止');
-          return;
-        }
-        this.isLoading = true;
-
-        try {
-          console.log('📡 [loadAnswers] GAS関数呼び出し: getData');
-          const rawData = await this.callGAS('getSheetData', this.vars.userId, {
-            filter: 'すべて',
-            sortOrder: sortOrder
-          });
-
-          console.log('📦 [loadAnswers] バックエンドレスポンス受信 - google.script.run最適化版', {
-            responseType: typeof rawData,
-            hasData: !!rawData?.data,
-            dataLength: rawData?.data?.length || 0,
-            hasHeaders: !!rawData?.headers,
-            headersLength: rawData?.headers?.length || 0,
-            sheetName: rawData?.sheetName || 'なし',
-            hasError: !!rawData?.error,
-            totalRows: rawData?.totalRows,
-            executionTime: rawData?.executionTime
-          });
-
-          // ✅ google.script.run 互換: シンプルエラー検出
-          if (rawData?.error) {
-            console.error('❌ [loadAnswers] バックエンドエラー受信', {
-              error: rawData.error,
-              sheetName: rawData.sheetName,
-              hasHeaders: !!rawData.headers
-            });
-
-            const emptyResult = {
-              answers: [],
-              header: rawData?.headers?.length > 0 ? rawData.headers[0] : '問題',
-              sheetName: rawData?.sheetName || '不明',
-              error: rawData.error
-            };
-
-            console.log('🔄 [loadAnswers] エラーレスポンス処理でUI更新');
-            this.updateUI(emptyResult);
-            this.showUserError(rawData.error);
-            return;
-          }
-
-          // ✅ google.script.run 互換: シンプルデータ存在チェック
-          if (!rawData?.data || !Array.isArray(rawData.data)) {
-            console.warn('⚠️ [loadAnswers] データが空またはnull', {
-              hasRawData: !!rawData,
-              hasData: !!rawData?.data,
-              dataType: typeof rawData?.data,
-              isDataArray: Array.isArray(rawData?.data),
-              sheetName: rawData?.sheetName
-            });
-
-            const emptyResult = {
-              answers: [],
-              header: rawData?.headers?.length > 0 ? rawData.headers[0] : '問題',
-              sheetName: rawData?.sheetName || '不明'
-            };
-
-            console.log('🔄 [loadAnswers] 空データでUI更新');
-            this.updateUI(emptyResult);
-            return;
-          }
-          
-          // ✅ google.script.run 互換: 直接データアクセス
-          const data = rawData.data;
-          console.log('✅ データ変換開始 - google.script.run最適化版:', {
-            totalItems: data.length,
-            sampleItem: data[0] ? Object.keys(data[0]) : 'データなし',
-            backendExecutionTime: rawData.executionTime,
-            totalRows: rawData.totalRows,
-            processedRows: rawData.processedRows
-          });
-
-          const answers = data
-            .filter(item => item?.answer || item?.opinion) // answerまたはopinionフィールドがある項目
-            .map(item => this.normalizeAnswer(item))
-            .filter(answer => answer.opinion); // 正規化後のopinionをチェック
-
-          console.log('✅ データ変換完了:', {
-            filteredCount: answers.length,
-            sampleAnswer: answers[0] ? Object.keys(answers[0]) : 'データなし'
-          });
-          
-          // ✅ google.script.run 互換: 直接headers配列から取得
-          const result = {
-            answers,
-            header: rawData.headers?.length > 0 ? rawData.headers[0] : '問題',
-            sheetName: rawData.sheetName || '不明'
-          };
-
-          console.log('📋 [loadAnswers] 最終データ構造確認', {
-            answersCount: result.answers.length,
-            header: result.header,
-            sheetName: result.sheetName,
-            firstAnswerKeys: result.answers[0] ? Object.keys(result.answers[0]) : 'なし'
-          });
-
-          this.answers = result.answers;
-
-          console.log('🎨 [loadAnswers] updateUI()呼び出し開始');
-          this.updateUI(result);
-          console.log('✅ [loadAnswers] updateUI()呼び出し完了');
-
-        } catch (error) {
-          console.error('❌ [loadAnswers] エラー発生', {
-            message: error.message,
-            stack: error.stack,
-            timestamp: new Date().toISOString()
-          });
-          this.handleError('データロードエラー', error);
-        } finally {
-          console.log('🏁 [loadAnswers] 処理終了 - ローディング状態解除');
-          this.isLoading = false;
-        }
-      }
-      
-      async updateReaction(rowIndex, reactionKey) {
-        console.log('🎯 [updateReaction] リアクション処理開始', {
-          rowIndex,
-          reactionKey,
-          userEmail: this.vars.userEmail ? this.vars.userEmail.split('@')[0] + '@...' : 'なし',
-          hasUserEmail: !!this.vars.userEmail
-        });
-
-        if (!this.vars.userEmail) {
-          console.error('❌ [updateReaction] userEmailが設定されていません');
-          return { success: false, error: 'ユーザー認証情報が不足しています' };
-        }
-
-        return await this.callGAS('addReaction', this.vars.userEmail, rowIndex, reactionKey);
-      }
-      
-      updateUI(data) {
-        console.log('🎨 [updateUI] UI更新開始', {
-          answersCount: data.answers.length,
-          header: data.header,
-          sheetName: data.sheetName
-        });
-
-        console.log('🔄 [updateUI] FilterManagerにデータセット');
-        this.filterManager.setData(data.answers);
-
-        console.log('🔄 [updateUI] AnswerRendererでヘッダー更新');
-        this.answerRenderer.updateHeader(data.header, data.sheetName);
-
-        console.log('🔄 [updateUI] フィルタリング結果をレンダリング');
-        this.renderFilteredResults();
-
-        console.log('✅ [updateUI] UI更新完了');
-      }
-
-      renderFilteredResults() {
-        console.log('🔍 [renderFilteredResults] フィルタリング処理開始');
-
-        const filteredData = this.filterManager.getFilteredData();
-        const status = this.filterManager.getFilterStatus();
-
-        console.log('📊 [renderFilteredResults] フィルタリング結果', {
-          filteredCount: filteredData.length,
-          totalCount: status.totalItems,
-          hasFilters: status.hasFilters
-        });
-
-        // DOM要素の存在確認
-        const answersContainer = document.getElementById('answers');
-        console.log('🎯 [renderFilteredResults] DOM要素確認', {
-          answersContainer: !!answersContainer,
-          containerClass: answersContainer?.className || 'なし',
-          containerChildren: answersContainer?.children.length || 0
-        });
-
-        console.log('🎨 [renderFilteredResults] AnswerRenderer.renderAnswers()呼び出し');
-        this.answerRenderer.renderAnswers(filteredData);
-
-        console.log('🎨 [renderFilteredResults] カウント表示更新');
-        this.answerRenderer.updateAnswerCount(status.filteredItems);
-
-        console.log('🎨 [renderFilteredResults] フィルタステータス表示更新');
-        this.updateFilterStatusDisplay(status);
-
-        console.log('✅ [renderFilteredResults] レンダリング完了');
-      }
-      
-      normalizeAnswer(item) {
-        // バックエンドのanswerフィールドをフロントエンドのopinionフィールドにマッピング
-        const opinionText = String(item.answer || item.opinion || '').trim();
-
-        // デバッグログ: フィールドマッピング確認
-        if (item.answer && !item.opinion) {
-          console.log('🔄 フィールド変換: answer → opinion', {
-            originalField: 'answer',
-            value: item.answer?.substring(0, 50) + '...'
-          });
-        }
-
-        return {
-          rowIndex: parseInt(item.rowIndex) || 1,
-          opinion: opinionText,
-          reason: String(item.reason || '').trim(),
-          name: String(item.name || '').trim(),
-          class: String(item.class || '').trim(),
-          email: String(item.email || '').trim(),
-          reactions: this.normalizeReactions(item.reactions),
-          highlight: Boolean(item.highlight),
-          timestamp: item.timestamp || new Date().toISOString()
-        };
-      }
-      
-      normalizeReactions(reactions) {
-        const defaults = {
-          UNDERSTAND: { count: 0, reacted: false },
-          LIKE: { count: 0, reacted: false },
-          CURIOUS: { count: 0, reacted: false }
-        };
-        
-        if (!reactions) return defaults;
-        
-        const normalized = {};
-        for (const [key, defaultValue] of Object.entries(defaults)) {
-          normalized[key] = {
-            count: Math.max(0, parseInt(reactions[key]?.count) || 0),
-            reacted: Boolean(reactions[key]?.reacted)
-          };
-        }
-        
-        return normalized;
-      }
-
-      /**
-       * 関数名からコントローラーの適切なメソッドを取得
-       * @param {string} funcName - 関数名
-       * @returns {string} - コントローラー.メソッド名
-       */
-      getControllerFunction(funcName) {
-        const functionMap = {
-          getUserConfig: 'getUserConfig',
-          getSheetData: 'getSheetData',
-          addReaction: 'addReaction'
-        };
-
-        return functionMap[funcName] || funcName;
-      }
-
-      async callGAS(funcName, ...args) {
-        console.log('📡 [GAS] 呼び出し開始', {
-          function: funcName,
-          args: args.length > 0 ? args.map(arg =>
-            typeof arg === 'string' && arg.length > 50 ? arg.substring(0, 50) + '...' : arg
-          ) : 'なし',
-          timestamp: new Date().toISOString(),
-          isProduction: this.isProduction
-        });
-
-        return new Promise((resolve, reject) => {
-          if (this.isProduction) {
-            // 実行時間計測開始
-            this.callStartTime = Date.now();
-
-            // GAS関数実行
-            const controllerFunction = this.getControllerFunction(funcName);
-            console.log('🎯 [GAS] 実際の関数実行', {
-              mappedFunction: controllerFunction,
-              originalFunction: funcName
-            });
-
-            google.script.run
-              .withSuccessHandler((result) => {
-                console.log('✅ [GAS] 呼び出し成功', {
-                  function: funcName,
-                  resultType: typeof result,
-                  hasData: result?.data ? `${result.data.length}件` : 'データなし',
-                  success: result?.success,
-                  executionTime: `${Date.now() - this.callStartTime}ms`
-                });
-
-                this.retryCount = 0; // 成功時はリトライカウントをリセット
-                resolve(result);
-              })
-              .withFailureHandler((error) => {
-                console.error('❌ [GAS] 呼び出し失敗', {
-                  function: funcName,
-                  error: error,
-                  errorString: String(error),
-                  retryCount: this.retryCount,
-                  timestamp: new Date().toISOString()
-                });
-
-                // リトライ可能なエラーかチェック
-                const isRetryable = this.isRetryableError(error);
-
-                if (isRetryable && this.retryCount < this.maxRetries) {
-                  this.retryCount++;
-                  console.warn(`🔄 [GAS] リトライ実行: ${this.retryCount}/${this.maxRetries} (${funcName})`);
-
-                  // 指数バックオフでリトライ
-                  setTimeout(() => {
-                    this.callGAS(funcName, ...args).then(resolve).catch(reject);
-                  }, Math.pow(2, this.retryCount) * 1000);
-                } else {
-                  this.retryCount = 0;
-                  console.error('🚫 [GAS] 最大リトライ回数に達しました', {
-                    function: funcName,
-                    finalError: error
-                  });
-                  reject(this.normalizeError(error, funcName));
-                }
-              })
-              [controllerFunction](...args);
-          } else {
-            this.mockResponse(funcName, resolve);
-          }
-        });
-      }
-
-
-      /**
-       * リトライ可能なエラーかどうかを判定
-       * @param {*} error - エラーオブジェクト
-       * @returns {boolean}
-       */
-      isRetryableError(error) {
-        const errorString = String(error).toLowerCase();
-        const retryablePatterns = [
-          'timeout',
-          'network',
-          'connection',
-          'temporary',
-          'service unavailable',
-          'internal error'
-        ];
-        
-        return retryablePatterns.some(pattern => errorString.includes(pattern));
-      }
-
-      /**
-       * エラーオブジェクトを正規化
-       * @param {*} error - エラーオブジェクト
-       * @param {string} funcName - 関数名
-       * @returns {Error}
-       */
-      normalizeError(error, funcName) {
-        if (error instanceof Error) {
-          return error;
-        }
-        
-        const message = typeof error === 'string' ? error : 
-                       error?.message || '不明なエラーが発生しました';
-        
-        const normalizedError = new Error(`${funcName}: ${message}`);
-        normalizedError.originalError = error;
-        normalizedError.functionName = funcName;
-        
-        return normalizedError;
-      }
-      
-      mockResponse(funcName, resolve) {
-        setTimeout(() => {
-          if (funcName === 'getData') {
-            resolve({
-              header: 'テスト問題: あなたが思う理想的な学習方法は？',
-              sheetName: 'テスト回答シート',
-              data: [
-                {
-                  rowIndex: 1, name: '田中太郎', class: '3年A組',
-                  opinion: 'グループでの討論を通じて、互いの意見を交換しながら学ぶことが効果的だと思います。',
-                  reason: '一人で勉強するよりも、他の人の考えを聞くことで新しい視点を得られるからです。',
-                  reactions: { UNDERSTAND: {count: 8, reacted: false}, LIKE: {count: 12, reacted: true}, CURIOUS: {count: 3, reacted: false} },
-                  highlight: true
-                },
-                {
-                  rowIndex: 2, name: '佐藤花子', class: '3年B組',
-                  opinion: '実際の体験や実験を通じて、手を動かしながら学ぶことが大切です。',
-                  reason: '本や資料だけでは理解しにくいことも、体験することで記憶に残りやすくなります。',
-                  reactions: { UNDERSTAND: {count: 15, reacted: true}, LIKE: {count: 6, reacted: false}, CURIOUS: {count: 9, reacted: false} },
-                  highlight: false
-                }
-              ]
-            });
-          } else if (funcName === 'addReaction') {
-            resolve({ success: true, count: Math.floor(Math.random() * 20) + 1 });
-          } else if (funcName === 'getUserConfig') {
-            resolve({ displaySettings: { showName: true, showClass: true, showEmail: false } });
-          } else {
-            resolve({});
-          }
-        }, 200 + Math.random() * 300);
-      }
-      
-      setCache(key, value, ttl) {
-        this.cache.set(key, value);
-        
-        if (ttl) {
-          const timer = setTimeout(() => {
-            this.cache.delete(key);
-            this.cacheTimers.delete(key);
-          }, ttl);
-          
-          if (this.cacheTimers.has(key)) {
-            clearTimeout(this.cacheTimers.get(key));
-          }
-          this.cacheTimers.set(key, timer);
-        }
-      }
-      
-      getCache(key) {
-        return this.cache.get(key);
-      }
-      
-      clearCache() {
-        this.cache.clear();
-        this.cacheTimers.forEach(timer => clearTimeout(timer));
-        this.cacheTimers.clear();
-      }
-      
-      setupUI() {
-        this.answerRenderer.renderIcons();
-        this.updateUIState();
-        return Promise.resolve();
-      }
-      
-      setupEventListeners() {
-        // スライダーイベント
-        const slider = document.getElementById('sizeSlider');
-        if (slider) {
-          slider.addEventListener('input', () => {
-            localStorage.setItem('boardColumns', slider.value);
-            this.answerRenderer.updateGridColumns(slider.value);
-          });
-          
-          const saved = localStorage.getItem('boardColumns');
-          if (saved) {
-            slider.value = saved;
-            this.answerRenderer.updateGridColumns(saved);
-          }
-        }
-        
-        // フィルターイベント
-        this.setupFilterEvents();
-        
-        // コンテナイベント
-        const container = document.getElementById('answers');
-        if (container) {
-          container.addEventListener('click', (e) => {
-            const btn = e.target.closest('.reaction-btn');
-            const card = e.target.closest('.answer-card');
-            
-            if (btn) {
-              e.stopPropagation();
-              const rowIndex = parseInt(btn.dataset.rowIndex);
-              const reaction = btn.dataset.reaction;
-              if (rowIndex && reaction) {
-                this.handleReaction(rowIndex, reaction, btn);
-              }
-            } else if (card && !btn) {
-              const rowIndex = parseInt(card.dataset.rowIndex);
-              if (rowIndex) this.showModal(rowIndex);
-            }
-          });
-        }
-        
-        // 管理者切り替え
-        const adminBtn = document.getElementById('adminToggleBtn');
-        if (adminBtn) {
-          adminBtn.addEventListener('click', () => {
-            // 現在のURLを解析
-            const currentUrl = new URL(window.location.href);
-
-            // adminモードに変更
-            currentUrl.searchParams.set('mode', 'admin');
-
-            // userIdが不足している場合は追加
-            if (!currentUrl.searchParams.has('userId') && this.vars.userId) {
-              currentUrl.searchParams.set('userId', this.vars.userId);
-            }
-
-            window.location.href = currentUrl.toString();
-          });
-        }
-        
-        // キーボードイベント
-        document.addEventListener('keydown', (e) => {
-          if (e.key === 'Escape') {
-            const modal = document.getElementById('answerModalContainer');
-            if (modal && !modal.classList.contains('hidden')) {
-              modal.classList.add('opacity-0');
-              setTimeout(() => modal.classList.add('hidden'), CONFIG.ANIMATION_DURATION);
-            }
-          }
-        });
-        
-        return Promise.resolve();
-      }
-      
-      setupFilterEvents() {
-        const classFilter = document.getElementById('classFilter');
-        if (classFilter) {
-          classFilter.addEventListener('change', (e) => {
-            this.filterManager.setFilter('classFilter', e.target.value);
-            this.renderFilteredResults();
-          });
-        }
-        
-        // 検索入力（デバウンス付き）
-        const searchInput = document.getElementById('searchInput');
-        if (searchInput) {
-          let debounceTimer;
-          searchInput.addEventListener('input', (e) => {
-            clearTimeout(debounceTimer);
-            debounceTimer = setTimeout(() => {
-              this.filterManager.setFilter('searchQuery', e.target.value);
-              this.renderFilteredResults();
-            }, CONFIG.SEARCH_DEBOUNCE);
-          });
-        }
-        
-        // ソート順変更
-        const sortOrder = document.getElementById('sortOrder');
-        if (sortOrder) {
-          sortOrder.addEventListener('change', (e) => {
-            this.loadAnswers(e.target.value);
-          });
-        }
-        
-        // フィルタクリアボタン
-        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
-        if (clearFiltersBtn) {
-          clearFiltersBtn.addEventListener('click', () => {
-            this.filterManager.clearFilters();
-            this.renderFilteredResults();
-          });
-        }
-      }
-      
-      updateUIState() {
-        const adminBtn = document.getElementById('adminToggleBtn');
-        const modeLabel = document.getElementById('modeLabel');
-        
-        if (adminBtn && this.vars.showAdminFeatures && this.vars.isAdminUser) {
-          adminBtn.classList.remove('hidden');
-          adminBtn.textContent = '管理パネル';
-        }
-        
-        if (modeLabel) {
-          let modeText = '学習者';
-          if (this.vars.isOwner) {
-            modeText = '👑 所有者';
-          } else if (this.vars.isSystemAdmin) {
-            modeText = '🔧 システム管理者';
-          } else if (this.vars.isAdminUser) {
-            modeText = '管理者';
-          }
-          modeLabel.textContent = modeText;
-
-          console.log('🎨 [UI] モード表示更新', {
-            modeText,
-            isOwner: this.vars.isOwner,
-            isSystemAdmin: this.vars.isSystemAdmin,
-            isAdminUser: this.vars.isAdminUser
-          });
-        }
-      }
-      
-      updateFilterStatusDisplay(status) {
-        const answerCount = document.getElementById('answerCount');
-        if (answerCount) {
-          // XSS防止: HTML直接注入ではなく、DOM操作を使用
-          answerCount.innerHTML = '';
-          
-          // SVGアイコン
-          const svg = this.answerRenderer.createIcon('users', 'w-4 h-4');
-          answerCount.appendChild(svg);
-          
-          // テキスト（サニタイズ済み）
-          const filterText = status.hasFilters 
-            ? `${parseInt(status.filteredItems)}/${parseInt(status.totalItems)} 件` 
-            : `${parseInt(status.totalItems)} 件`;
-          
-          const textNode = document.createTextNode(` ${filterText}`);
-          answerCount.appendChild(textNode);
-          
-          // フィルタ状態表示
-          if (status.hasFilters) {
-            const filterSpan = document.createElement('span');
-            filterSpan.className = 'text-cyan-400';
-            filterSpan.textContent = '（フィルタ中）';
-            answerCount.appendChild(filterSpan);
-          }
-        }
-        
-        // クリアボタンの表示制御
-        const clearFiltersBtn = document.getElementById('clearFiltersBtn');
-        if (clearFiltersBtn) {
-          clearFiltersBtn.style.display = status.hasFilters ? 'block' : 'none';
-        }
-      }
-      
-      // リアクション処理
-      async handleReaction(rowIndex, reactionKey, btn) {
-        if (btn.classList.contains('loading')) return;
-        
-        try {
-          btn.classList.add('loading');
-          
-          const result = await this.updateReaction(rowIndex, reactionKey);
-          
-          if (result.success) {
-            // カウント更新
-            const countEl = btn.querySelector('span');
-            if (countEl) {
-              countEl.textContent = result.count || 0;
-            }
-            
-            // 状態更新
-            const wasReacted = btn.classList.contains('reacted');
-            btn.classList.toggle('reacted', !wasReacted);
-            btn.classList.toggle('liked', !wasReacted);
-            
-            // アニメーション
-            this.answerRenderer.animateReactionSuccess(btn);
-            
-            // 同じ行の他のボタンも更新
-            const card = btn.closest('.answer-card');
-            if (card) {
-              const allReactionBtns = card.querySelectorAll('.reaction-btn');
-              allReactionBtns.forEach(otherBtn => {
-                if (otherBtn.dataset.reaction === reactionKey && otherBtn !== btn) {
-                  const otherCountEl = otherBtn.querySelector('span');
-                  if (otherCountEl) {
-                    otherCountEl.textContent = result.count || 0;
-                  }
-                  otherBtn.classList.toggle('reacted', !wasReacted);
-                  otherBtn.classList.toggle('liked', !wasReacted);
-                }
-              });
-            }
-            
-          } else {
-            this.showUserError(result.message || 'リアクションに失敗しました');
-          }
-          
-        } catch (error) {
-          console.error('リアクションエラー:', error);
-          this.handleError('リアクション処理エラー', error);
-        } finally {
-          btn.classList.remove('loading');
-        }
-      }
-      
-      // モーダル表示
-      showModal(rowIndex) {
-        const answer = this.answers.find(a => a.rowIndex === rowIndex);
-        if (answer) {
-          this.answerRenderer.showModal(answer);
-        }
-      }
-      
-      // ポーリング開始
-      startPolling() {
-        // 既存のポーリングをクリーンアップ
-        this.stopPolling();
-        
-        // 90秒間隔でポーリング
-        this.pollingInterval = setInterval(() => {
-          if (!document.hidden) {
-            this.loadAnswers();
-          }
-        }, CONFIG.POLLING_INTERVAL);
-        
-        // ページの可視性変化イベントリスナーを保存（クリーンアップ用）
-        this.visibilityChangeHandler = () => {
-          if (document.hidden) {
-            this.stopPolling();
-          } else if (!this.pollingInterval) {
-            this.startPolling();
-          }
-        };
-        
-        document.addEventListener('visibilitychange', this.visibilityChangeHandler);
-      }
-      
-      // ポーリング停止
-      stopPolling() {
-        if (this.pollingInterval) {
-          clearInterval(this.pollingInterval);
-          this.pollingInterval = null;
-        }
-      }
-      
-      handleError(context, error) {
-        const isDevelopment = window.location.hostname === 'localhost' || window.location.hostname.includes('script.google.com');
-        
-        console.error(`[エラー] ${context}:`, {
-          message: error.message,
-          stack: isDevelopment ? error.stack : undefined,
-          timestamp: new Date().toISOString(),
-          userId: this.vars.userId,
-          userAgent: navigator.userAgent.substring(0, 100)
-        });
-        
-        const userMessage = isDevelopment 
-          ? `${context}: ${error.message}` 
-          : 'システムエラーが発生しました。時間をおいて再度お試しください。';
-          
-        this.showUserError(userMessage);
-      }
-      
-      // ユーザー向けエラー表示（XSS防止）
-      showUserError(message) {
-        const existing = document.querySelector('.error-notification');
-        if (existing) existing.remove();
-        
-        const notification = document.createElement('div');
-        notification.className = 'error-notification fixed top-4 right-4 bg-red-600 text-white p-4 rounded-lg shadow-lg z-50 max-w-sm opacity-0 transform translate-x-full transition-all duration-300';
-        
-        // XSS防止: DOM構築で安全に作成
-        const container = document.createElement('div');
-        container.className = 'flex items-center gap-2';
-        
-        // エラーアイコン
-        const errorIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        errorIcon.className = 'w-5 h-5';
-        errorIcon.setAttribute('viewBox', '0 0 24 24');
-        errorIcon.setAttribute('fill', 'none');
-        errorIcon.setAttribute('stroke', 'currentColor');
-        errorIcon.setAttribute('stroke-width', '2');
-        errorIcon.innerHTML = '<circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line>';
-        
-        // メッセージ（テキストノードで安全に設定）
-        const messageSpan = document.createElement('span');
-        messageSpan.className = 'flex-1';
-        messageSpan.textContent = String(message || 'エラーが発生しました');
-        
-        // 閉じるボタン
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'ml-2 hover:bg-red-700 rounded p-1';
-        closeBtn.addEventListener('click', () => notification.remove());
-        
-        const closeIcon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        closeIcon.className = 'w-4 h-4';
-        closeIcon.setAttribute('viewBox', '0 0 24 24');
-        closeIcon.setAttribute('fill', 'none');
-        closeIcon.setAttribute('stroke', 'currentColor');
-        closeIcon.setAttribute('stroke-width', '2');
-        closeIcon.innerHTML = '<line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line>';
-        
-        closeBtn.appendChild(closeIcon);
-        container.appendChild(errorIcon);
-        container.appendChild(messageSpan);
-        container.appendChild(closeBtn);
-        notification.appendChild(container);
-        
-        document.body.appendChild(notification);
-        
-        requestAnimationFrame(() => {
-          notification.classList.remove('opacity-0', 'translate-x-full');
-        });
-        setTimeout(() => {
-          if (notification.parentNode) {
-            notification.classList.add('opacity-0', 'translate-x-full');
-            setTimeout(() => notification.remove(), 300);
-          }
-        }, 8000);
-      }
-      
-      // 破棄処理
-      destroy() {
-        // ポーリング停止
-        this.stopPolling();
-        
-        // イベントリスナークリーンアップ
-        if (this.visibilityChangeHandler) {
-          document.removeEventListener('visibilitychange', this.visibilityChangeHandler);
-          this.visibilityChangeHandler = null;
-        }
-        
-        // キャッシュクリア
-        this.clearCache();
-        
-        // DOM参照クリア
-        this.answerRenderer = null;
-        this.filterManager = null;
-        this.config = null;
-        this.answers = [];
-        
-        console.info('[AnswerApp] リソースクリーンアップ完了');
+        const delay = Math.pow(2, retryCount) * CONFIG.ERROR_RETRY_DELAY;
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
+  }
 
-
-    /**
-     * AnswerRenderer - DOM操作・レンダリング専門クラス
-     */
-    class AnswerRenderer {
-      constructor() {
-        this.reactions = [
-          {key: 'LIKE', icon: 'thumbup', color: 'red'},
-          {key: 'UNDERSTAND', icon: 'lightbulb', color: 'yellow'},
-          {key: 'CURIOUS', icon: 'search', color: 'green'}
-        ];
-      }
-      
-      // 回答一覧レンダリング
-      renderAnswers(answers) {
-        const container = document.getElementById('answers');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        answers.forEach((answer, index) => {
-          const card = this.createAnswerCard(answer);
-          container.appendChild(card);
-          
-          // ネイティブCSS アニメーション
-          card.style.opacity = '0';
-          card.style.transform = 'translateY(20px)';
-          
-          setTimeout(() => {
-            card.style.transition = `opacity ${CONFIG.ANIMATION_DURATION}ms ease-out, transform ${CONFIG.ANIMATION_DURATION}ms ease-out`;
-            card.style.opacity = '1';
-            card.style.transform = 'translateY(0)';
-          }, index * 50);
-        });
-      }
-      
-      // 回答カード作成
-      createAnswerCard(answer) {
-        const card = document.createElement('div');
-        card.className = `answer-card glass-panel rounded-xl p-4 flex flex-col shadow-lg border-2 border-cyan-400/80 cursor-pointer${answer.highlight ? ' highlighted' : ''}`;
-        card.dataset.rowIndex = answer.rowIndex;
-        card.tabIndex = 0;
-        
-        // コンテンツ
-        const content = document.createElement('div');
-        content.className = 'flex-grow mb-3';
-        
-        const opinion = document.createElement('h3');
-        opinion.className = 'text-cyan-200 text-xl font-semibold leading-tight mb-2';
-        opinion.textContent = answer.opinion;
-        content.appendChild(opinion);
-        
-        if (answer.reason) {
-          const reason = document.createElement('p');
-          reason.className = 'text-gray-100 mt-2';
-          reason.textContent = answer.reason;
-          content.appendChild(reason);
-        }
-        
-        card.appendChild(content);
-        
-        // フッター
-        const footer = document.createElement('div');
-        footer.className = 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center';
-        
-        // ID情報
-        const identity = this.createIdentity(answer);
-        if (identity) footer.appendChild(identity);
-        
-        // リアクション
-        const reactions = document.createElement('div');
-        reactions.className = 'flex items-center gap-1';
-        
-        this.reactions.forEach(r => {
-          const btn = this.createReactionButton(answer, r);
-          reactions.appendChild(btn);
-        });
-        
-        footer.appendChild(reactions);
-        card.appendChild(footer);
-        
-        // ハイライトバッジ
-        if (answer.highlight) {
-          const badge = document.createElement('span');
-          badge.className = 'absolute top-1 right-1 text-yellow-300';
-          badge.appendChild(this.createIcon('star', 'w-6 h-6'));
-          card.appendChild(badge);
-        }
-        
-        return card;
-      }
-      
-      // ID情報作成
-      createIdentity(answer) {
-        const config = window.answerController?.config?.displaySettings || {};
-        const parts = [];
-        
-        if (config.showName && answer.name) parts.push(answer.name);
-        if (config.showClass && answer.class) parts.push(`(${answer.class})`);
-        if (config.showEmail && answer.email) parts.push(answer.email);
-        
-        if (!parts.length) return null;
-        
-        const div = document.createElement('div');
-        div.className = 'text-sm text-gray-200';
-        div.textContent = parts.join(' ');
-        return div;
-      }
-      
-      // リアクションボタン作成
-      createReactionButton(answer, reaction) {
-        const info = answer.reactions[reaction.key] || {count: 0, reacted: false};
-        const btn = document.createElement('button');
-        
-        btn.type = 'button';
-        btn.dataset.rowIndex = answer.rowIndex;
-        btn.dataset.reaction = reaction.key;
-        btn.className = this.getReactionClass(reaction.color, info.reacted);
-        
-        btn.appendChild(this.createIcon(reaction.icon, 'w-4 h-4'));
-        
-        const count = document.createElement('span');
-        count.className = 'ml-1 text-xs';
-        count.textContent = info.count;
-        btn.appendChild(count);
-        
-        return btn;
-      }
-      
-      // リアクションクラス取得
-      getReactionClass(color, reacted) {
-        const base = 'reaction-btn flex items-center px-2 py-1 rounded border-2 transition-all ';
-        if (reacted) {
-          return base + `bg-${color}-500/20 border-${color}-500 text-${color}-400`;
-        }
-        return base + `bg-transparent border-${color}-500/30 text-${color}-500/60 hover:bg-${color}-500/10`;
-      }
-      
-      /**
-       * 🖼️ アイコン作成
-       */
-      createIcon(name, classes = '') {
-        const svg = ICONS[name];
-        if (!svg) return document.createElement('span');
-        
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(svg, 'image/svg+xml');
-        const element = doc.documentElement;
-        
-        if (classes) element.className = classes;
-        element.setAttribute('aria-hidden', 'true');
-        
-        return element;
-      }
-      
-      /**
-       * 📊 グリッド列数更新
-       */
-      updateGridColumns(columnCount) {
-        const container = document.getElementById('answers');
-        const sliderValue = document.getElementById('sliderValue');
-        
-        if (container && sliderValue) {
-          const validColumns = [1, 2, 3, 4, 5, 6];
-          const columns = validColumns.includes(parseInt(columnCount)) ? parseInt(columnCount) : 4;
-          sliderValue.textContent = columns;
-          container.className = `grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-${columns}`;
-        }
-      }
-      
-      /**
-       * 📊 回答数更新
-       */
-      updateAnswerCount(count) {
-        const el = document.getElementById('answerCount');
-        if (el) {
-          el.innerHTML = '';
-          el.appendChild(this.createIcon('users', 'w-4 h-4 mr-2'));
-          el.appendChild(document.createTextNode(`${count}件`));
-        }
-      }
-      
-      /**
-       * 📝 ヘッダー更新
-       */
-      updateHeader(header, sheetName) {
-        const headingEl = document.getElementById('headingLabel');
-        const sheetEl = document.getElementById('sheetNameText');
-        
-        if (headingEl) headingEl.textContent = header;
-        if (sheetEl) sheetEl.textContent = 'シート: ' + sheetName;
-      }
-      
-      // リアクションアニメーション
-      animateReactionSuccess(button) {
-        button.style.transition = 'transform 0.2s ease-out';
-        button.style.transform = 'scale(1.2)';
-        
-        setTimeout(() => {
-          button.style.transform = 'scale(1)';
-        }, 200);
-        
-        setTimeout(() => {
-          button.style.transition = '';
-        }, 400);
-      }
-      
-      // モーダル表示
-      showModal(answer) {
-        const modal = document.getElementById('answerModalContainer');
-        const modalContent = document.getElementById('modalAnswer');
-        const modalName = document.getElementById('modalStudentName');
-        const modalReactions = document.getElementById('modalReactions');
-        
-        if (!modal || !modalContent) return;
-        
-        // XSS対策: DOM操作で安全にコンテンツ設定
-        modalContent.innerHTML = ''; // 既存コンテンツをクリア
-        
-        // タイトル作成
-        const title = document.createElement('h2');
-        title.className = 'text-2xl font-bold text-cyan-200 mb-4';
-        title.textContent = '回答内容';
-        modalContent.appendChild(title);
-        
-        // 回答内容作成
-        const opinionPara = document.createElement('p');
-        opinionPara.className = 'text-xl leading-relaxed mb-4';
-        opinionPara.textContent = answer.opinion || '';
-        modalContent.appendChild(opinionPara);
-        
-        // 理由・根拠がある場合
-        if (answer.reason) {
-          const reasonTitle = document.createElement('h3');
-          reasonTitle.className = 'text-lg font-semibold text-cyan-400 mb-2';
-          reasonTitle.textContent = '理由・根拠';
-          modalContent.appendChild(reasonTitle);
-          
-          const reasonPara = document.createElement('p');
-          reasonPara.className = 'text-gray-200 leading-relaxed';
-          reasonPara.textContent = answer.reason;
-          modalContent.appendChild(reasonPara);
-        }
-        
-        if (modalName) {
-          modalName.textContent = answer.name || '匿名';
-        }
-        
-        // リアクションボタン作成
-        if (modalReactions) {
-          modalReactions.innerHTML = '';
-          this.reactions.forEach(r => {
-            const btn = this.createReactionButton(answer, r);
-            modalReactions.appendChild(btn);
-          });
-        }
-        
-        // モーダル表示
-        modal.classList.remove('hidden');
-        requestAnimationFrame(() => {
-          modal.classList.remove('opacity-0');
-        });
-        
-        // クローズイベント
-        this.setupModalCloseEvents(modal);
-      }
-      
-      /**
-       * ✖️ モーダルクローズイベント
-       */
-      setupModalCloseEvents(modal) {
-        const closeModal = () => {
-          modal.classList.add('opacity-0');
-          setTimeout(() => modal.classList.add('hidden'), 300);
-        };
-        
-        // ESCキー
-        const handleEsc = (e) => {
-          if (e.key === 'Escape') {
-            closeModal();
-            document.removeEventListener('keydown', handleEsc);
-          }
-        };
-        document.addEventListener('keydown', handleEsc);
-        
-        // 背景クリック
-        modal.addEventListener('click', (e) => {
-          if (e.target === modal) closeModal();
-        }, { once: true });
-        
-        // クローズボタン
-        const closeBtn = document.getElementById('answerModalCloseBtn');
-        if (closeBtn) {
-          closeBtn.addEventListener('click', closeModal, { once: true });
-        }
-      }
-      
-      /**
-       * 🖼️ アイコン初期化
-       */
-      renderIcons() {
-        const iconConfigs = [
-          ['answerModalCloseBtn', 'x', 'w-6 h-6'],
-          ['footerIcon', 'grid', 'w-4 h-4'],
-          ['infoIconLike', 'thumbup', 'w-5 h-5'],
-          ['infoIconUnderstand', 'lightbulb', 'w-5 h-5'],
-          ['infoIconCurious', 'search', 'w-5 h-5'],
-          ['infoIconHighlight', 'star', 'w-5 h-5']
-        ];
-        
-        iconConfigs.forEach(([elementId, iconName, className]) => {
-          const element = document.getElementById(elementId);
-          if (element) {
-            element.innerHTML = '';
-            const icon = this.createIcon(iconName, className);
-            element.appendChild(icon);
-          }
-        });
-      }
+  // キャッシュ管理
+  getFromCache(key) {
+    const cached = this.cache.get(key);
+    if (cached && Date.now() - cached.timestamp < CONFIG.CACHE_DURATION) {
+      return cached.data;
     }
-    
-    // アプリケーション初期化
+    return null;
+  }
+
+  setCache(key, data) {
+    this.cache.set(key, {
+      data,
+      timestamp: Date.now()
+    });
+  }
+
+  // モックデータ（開発用）
+  getMockData(funcName, args) {
+    if (funcName === 'getUserConfig') {
+      return {
+        success: true,
+        config: {
+          spreadsheetId: 'mock-spreadsheet-id',
+          sheetName: 'テストシート',
+          title: 'テスト問題',
+          showDetails: true,
+          userPermissions: {
+            isOwner: false,
+            isSystemAdmin: false,
+            accessLevel: 'viewer'
+          }
+        }
+      };
+    }
+
+    if (funcName === 'getPublishedSheetData') {
+      return {
+        success: true,
+        header: 'テスト問題',
+        sheetName: 'テストシート',
+        rows: [
+          {
+            rowIndex: 1,
+            name: 'テストユーザー',
+            class: '3年A組',
+            opinion: 'これはテスト回答です。',
+            reason: 'テスト用の理由です。',
+            reactions: {
+              UNDERSTAND: { count: 2, reacted: false },
+              LIKE: { count: 1, reacted: false },
+              CURIOUS: { count: 0, reacted: false }
+            },
+            highlight: false
+          }
+        ]
+      };
+    }
+
+    return { success: false, error: 'Mock data not available' };
+  }
+
+  // 新着通知システム
+  async checkForNewContent(currentData) {
     try {
-      if (window.answerController?.destroy) {
-        window.answerController.destroy();
+      const currentHash = this.generateDataHash(currentData);
+
+      if (this.lastDataHash && this.lastDataHash !== currentHash) {
+        const newCount = this.calculateNewContent(currentData);
+        if (newCount > 0) {
+          this.showNewContentNotification(newCount);
+          return true;
+        }
       }
-      window.answerController = new AnswerApp();
-      
-      window.addEventListener('beforeunload', () => {
-        window.answerController?.destroy();
+
+      this.lastDataHash = currentHash;
+      return false;
+    } catch (error) {
+      console.error('新着コンテンツ確認エラー:', error);
+      return false;
+    }
+  }
+
+  generateDataHash(data) {
+    if (!data || !data.rows) return '';
+    return data.rows.map(row => `${row.rowIndex}-${row.opinion}-${JSON.stringify(row.reactions)}`).join('|');
+  }
+
+  calculateNewContent(data) {
+    // 簡易実装：データの長さで判定
+    const currentCount = data.rows ? data.rows.length : 0;
+    const previousCount = this.newContentCount;
+    this.newContentCount = currentCount;
+    return Math.max(0, currentCount - previousCount);
+  }
+
+  showNewContentNotification(count) {
+    const banner = DOMHelpers.safeGetById('newContentBanner');
+    const text = DOMHelpers.safeGetById('newContentText');
+
+    if (banner && text) {
+      text.textContent = `${count}件の新しい回答が追加されました`;
+      banner.classList.remove('hidden');
+
+      // 通知システムを使用
+      if (window.notifications) {
+        window.notifications.info(`新しい回答が${count}件追加されました`);
+      }
+    }
+  }
+}
+
+// === メインアプリケーションクラス ===
+class AnswerApp {
+  constructor() {
+    this.loader = new UnifiedDataLoader();
+    this.appConfig = {};
+    this.answers = [];
+    this.isLoading = false;
+    this.pollingInterval = null;
+    this.currentSort = 'newest';
+
+    this.init();
+  }
+
+  // アプリケーション初期化
+  async init() {
+    try {
+      // Step 1: セキュアな変数取得
+      await this.initializeSecureContext();
+
+      // Step 2: 設定読み込み（current GAS functions使用）
+      await this.loadConfiguration();
+
+      // Step 3: UI初期化
+      this.initializeUI();
+
+      // Step 4: データ読み込み
+      await this.loadAnswers();
+
+      // Step 5: ポーリング開始
+      this.startPolling();
+
+      console.log('✅ AnswerApp initialization complete');
+    } catch (error) {
+      console.error('❌ AnswerApp initialization error:', error);
+      this.showError('アプリケーションの初期化に失敗しました');
+    }
+  }
+
+  // セキュアコンテキストの初期化
+  async initializeSecureContext() {
+    // window変数から取得
+    this.userId = window.userId || null;
+    this.userEmail = window.userEmail || null;
+
+    // URLパラメータからフォールバック取得
+    if (!this.userId) {
+      const urlParams = new URLSearchParams(window.location.search);
+      this.userId = urlParams.get('userId');
+    }
+
+    // 基本検証
+    if (this.userId && typeof this.userId !== 'string') {
+      console.error('ユーザーIDフィールド形式不正:', this.userId);
+    }
+    if (this.userEmail && typeof this.userEmail !== 'string') {
+      console.error('ユーザーメールフィールド形式不正:', this.userEmail);
+    }
+  }
+
+  // 設定読み込み（現在のGAS関数使用）
+  async loadConfiguration() {
+    const cacheKey = `config_${this.userId}`;
+    let config = this.loader.getFromCache(cacheKey);
+
+    if (!config) {
+      try {
+        // 現在のGAS関数を使用
+        const response = await this.loader.callGAS('getUserConfig', this.userId);
+        config = response.success ? response.config : {};
+        this.loader.setCache(cacheKey, config);
+      } catch (error) {
+        console.error('設定読み込みエラー:', error);
+        // フォールバック設定
+        config = {
+          title: '問題',
+          sheetName: '未設定',
+          showDetails: true,
+          userPermissions: {
+            isOwner: false,
+            isSystemAdmin: false,
+            accessLevel: 'viewer'
+          }
+        };
+      }
+    }
+
+    this.appConfig = config;
+
+    // 権限情報設定
+    if (config.userPermissions) {
+      this.showAdminFeatures = Boolean(config.userPermissions.isOwner || config.userPermissions.isSystemAdmin);
+      this.isAdminUser = Boolean(config.userPermissions.isOwner || config.userPermissions.isSystemAdmin);
+      this.isOwner = Boolean(config.userPermissions.isOwner);
+      this.isSystemAdmin = Boolean(config.userPermissions.isSystemAdmin);
+    } else {
+      this.showAdminFeatures = false;
+      this.isAdminUser = false;
+      this.isOwner = false;
+      this.isSystemAdmin = false;
+    }
+  }
+
+  // UI初期化
+  initializeUI() {
+    // ヘッダー設定
+    const headingLabel = DOMHelpers.safeGetById('headingLabel');
+    if (headingLabel) {
+      headingLabel.innerHTML = this.escapeHtml(this.appConfig.title || this.appConfig.header || '問題');
+    }
+
+    // シート名設定
+    const sheetNameText = DOMHelpers.safeGetById('sheetNameText');
+    if (sheetNameText) {
+      sheetNameText.innerHTML = `<svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> ${this.escapeHtml(this.appConfig.sheetName || '不明')}`;
+    }
+
+    // モード表示更新
+    this.updateModeDisplay();
+
+    // 管理者機能表示
+    this.setupAdminFeatures();
+
+    // イベントリスナー設定
+    this.setupEventListeners();
+
+    // アイコン設定
+    this.setupIcons();
+  }
+
+  // モード表示更新
+  updateModeDisplay() {
+    const modeLabel = DOMHelpers.safeGetById('modeLabel');
+    if (modeLabel) {
+      let modeText = '学習者';
+      if (this.isSystemAdmin) {
+        modeText = 'システム管理者';
+      } else if (this.isOwner) {
+        modeText = '作成者';
+      } else if (this.showAdminFeatures) {
+        modeText = '管理者';
+      }
+      modeLabel.textContent = modeText;
+    }
+  }
+
+  // 管理者機能セットアップ
+  setupAdminFeatures() {
+    if (this.showAdminFeatures) {
+      // 管理者ボタン表示
+      const adminToggleBtn = DOMHelpers.safeGetById('adminToggleBtn');
+      if (adminToggleBtn) {
+        adminToggleBtn.classList.remove('hidden');
+        adminToggleBtn.removeAttribute('hidden');
+      }
+
+      // スコア順オプション表示
+      const scoreOption = DOMHelpers.safeGetById('scoreOption');
+      if (scoreOption) {
+        scoreOption.classList.remove('hidden');
+        scoreOption.style.display = '';
+      }
+    }
+  }
+
+  // イベントリスナー設定
+  setupEventListeners() {
+    // ソート順変更
+    const sortOrder = DOMHelpers.safeGetById('sortOrder');
+    if (sortOrder) {
+      sortOrder.addEventListener('change', (e) => {
+        this.currentSort = e.target.value;
+        this.loadAnswers(this.currentSort);
       });
+    }
+
+    // クラスフィルター変更
+    const classFilter = DOMHelpers.safeGetById('classFilter');
+    if (classFilter) {
+      classFilter.addEventListener('change', () => {
+        this.loadAnswers(this.currentSort);
+      });
+    }
+
+    // グリッドサイズ変更
+    const sizeSlider = DOMHelpers.safeGetById('sizeSlider');
+    const sliderValue = DOMHelpers.safeGetById('sliderValue');
+    if (sizeSlider && sliderValue) {
+      sizeSlider.addEventListener('input', (e) => {
+        const size = e.target.value;
+        sliderValue.textContent = size;
+        this.updateGridSize(size);
+      });
+    }
+
+    // 新着通知バナーのイベント
+    this.setupNewContentBanner();
+
+    // モーダルイベント
+    this.setupModalEvents();
+  }
+
+  // 新着通知バナーのセットアップ
+  setupNewContentBanner() {
+    const refreshBtn = DOMHelpers.safeGetById('refreshContentBtn');
+    const dismissBtn = DOMHelpers.safeGetById('dismissBannerBtn');
+    const banner = DOMHelpers.safeGetById('newContentBanner');
+
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', () => {
+        this.loadAnswers(this.currentSort);
+        if (banner) banner.classList.add('hidden');
+      });
+    }
+
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => {
+        if (banner) banner.classList.add('hidden');
+      });
+    }
+  }
+
+  // モーダルイベントセットアップ
+  setupModalEvents() {
+    const modalCloseBtn = DOMHelpers.safeGetById('answerModalCloseBtn');
+    const modalContainer = DOMHelpers.safeGetById('answerModalContainer');
+
+    if (modalCloseBtn) {
+      modalCloseBtn.addEventListener('click', () => {
+        this.closeModal();
+      });
+    }
+
+    if (modalContainer) {
+      modalContainer.addEventListener('click', (e) => {
+        if (e.target === modalContainer) {
+          this.closeModal();
+        }
+      });
+    }
+  }
+
+  // アイコンセットアップ
+  setupIcons() {
+    const iconElements = {
+      iconClose: 'x',
+      infoIconLike: 'thumbup',
+      infoIconUnderstand: 'lightbulb',
+      infoIconCurious: 'search',
+      infoIconHighlight: 'star',
+      footerIcon: 'users'
+    };
+
+    Object.entries(iconElements).forEach(([elementId, iconKey]) => {
+      const element = DOMHelpers.safeGetById(elementId);
+      if (element && ICONS[iconKey]) {
+        element.innerHTML = ICONS[iconKey];
+      }
+    });
+  }
+
+  // 回答データ読み込み（現在のGAS関数使用）
+  async loadAnswers(sortOrder = 'newest') {
+    if (this.isLoading) return;
+
+    this.isLoading = true;
+    this.showLoading(true);
+
+    try {
+      const classFilter = DOMHelpers.safeGetById('classFilter');
+      const filterValue = classFilter ? classFilter.value || 'すべて' : 'すべて';
+
+      // 現在のGAS関数を使用
+      const data = await this.loader.callGAS('getPublishedSheetData', filterValue, sortOrder);
+
+      if (!data.success && data.error) {
+        throw new Error(data.error);
+      }
+
+      this.answers = data.rows || [];
+
+      // 新着通知チェック
+      await this.loader.checkForNewContent(data);
+
+      this.populateClassFilter(this.answers);
+      this.renderAnswers();
 
     } catch (error) {
-      console.error('[初期化失敗]', {
-        message: error.message,
-        stack: error.stack,
-        timestamp: new Date().toISOString(),
-        url: window.location.href
-      });
-      
-      const container = document.getElementById('answers') || document.body;
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'fixed inset-0 bg-gray-900 text-white p-8 flex items-center justify-center z-50';
-      errorDiv.innerHTML = `
-        <div class="text-center max-w-md">
-          <svg class="w-16 h-16 text-red-400 mx-auto mb-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"></circle>
-            <line x1="15" y1="9" x2="9" y2="15"></line>
-            <line x1="9" y1="9" x2="15" y2="15"></line>
-          </svg>
-          <h2 class="text-xl font-bold mb-2">システムエラー</h2>
-          <p class="text-gray-300 mb-4">アプリケーションの初期化に失敗しました。</p>
-          <button type="button" onclick="window.location.reload()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white">
-            再読み込み
-          </button>
-        </div>
-      `;
-      container.appendChild(errorDiv);
+      console.error('データ読み込みエラー:', error);
+      this.showError('データの読み込みに失敗しました');
+    } finally {
+      this.isLoading = false;
+      this.showLoading(false);
     }
-  </script>
+  }
+
+  // 回答レンダリング
+  renderAnswers() {
+    const container = DOMHelpers.safeGetById('answers');
+    if (!container) return;
+
+    // 回答数表示更新
+    this.updateAnswerCount(this.answers.length);
+
+    if (this.answers.length === 0) {
+      container.innerHTML = '<div class="col-span-full text-center text-gray-400 py-8">回答がありません</div>';
+      return;
+    }
+
+    // 回答カード生成
+    const fragment = document.createDocumentFragment();
+    this.answers.forEach(answer => {
+      const card = this.createAnswerCard(answer);
+      fragment.appendChild(card);
+    });
+
+    container.innerHTML = '';
+    container.appendChild(fragment);
+  }
+
+  // 回答カード作成
+  createAnswerCard(answer) {
+    const card = DOMHelpers.createElement('div', 'answer-card glass-panel rounded-xl p-4 cursor-pointer transition-all duration-300 hover:scale-105');
+
+    // ハイライト装飾
+    if (answer.highlight) {
+      card.classList.add('highlighted');
+    }
+
+    // リアクション装飾
+    this.addReactionDecorations(card, answer.reactions);
+
+    const showName = this.appConfig.showDetails !== false;
+    const nameHtml = showName ? `<div class="font-bold text-sm mb-2">${this.escapeHtml(answer.name || '')}</div>` : '';
+
+    card.innerHTML = `
+      <div class="mb-3">
+        ${nameHtml}
+        <h3 class="text-cyan-200 font-semibold mb-2">${this.escapeHtml(answer.opinion || '')}</h3>
+        <p class="text-gray-300 text-sm answer-preview">${this.escapeHtml(answer.reason || '')}</p>
+      </div>
+      ${this.createReactionButtons(answer)}
+      ${answer.highlight ? '<div class="highlight-badge"><span class="text-yellow-300">' + ICONS.star + '</span></div>' : ''}
+    `;
+
+    // カードクリックでモーダル表示
+    card.addEventListener('click', (e) => {
+      if (!e.target.closest('.reaction-btn')) {
+        this.showModal(answer);
+      }
+    });
+
+    return card;
+  }
+
+  // リアクション装飾追加
+  addReactionDecorations(card, reactions) {
+    if (!reactions) return;
+
+    const reactionTypes = Object.keys(reactions).filter(key => reactions[key].count > 0);
+
+    if (reactionTypes.length > 0) {
+      // 複数リアクションの場合はグラデーション
+      if (reactionTypes.length > 1) {
+        const colors = {
+          LIKE: '#ef4444',
+          UNDERSTAND: '#fbbf24',
+          CURIOUS: '#10b981'
+        };
+        const gradientColors = reactionTypes.map(type => colors[type]).filter(Boolean);
+        if (gradientColors.length > 1) {
+          card.style.borderImage = `linear-gradient(45deg, ${gradientColors.join(', ')}) 1`;
+          card.style.borderWidth = '2px';
+        }
+      } else {
+        // 単一リアクションの場合
+        const type = reactionTypes[0];
+        const colorClass = {
+          LIKE: 'reaction-bg-like',
+          UNDERSTAND: 'reaction-bg-understand',
+          CURIOUS: 'reaction-bg-curious'
+        }[type];
+        if (colorClass) {
+          card.classList.add(colorClass);
+        }
+      }
+
+      // リアクション数に応じてボーダーの太さを調整
+      const totalReactions = reactionTypes.reduce((sum, type) => sum + reactions[type].count, 0);
+      if (totalReactions >= 5) {
+        card.classList.add('reaction-border-3');
+      } else if (totalReactions >= 3) {
+        card.classList.add('reaction-border-2');
+      } else {
+        card.classList.add('reaction-border-1');
+      }
+    }
+  }
+
+  // リアクションボタン作成
+  createReactionButtons(answer) {
+    if (!this.showAdminFeatures && !this.appConfig.showDetails) return '';
+
+    const reactions = answer.reactions || {};
+    const reactionButtons = Object.entries(reactions).map(([type, data]) => {
+      const isReacted = data.reacted || false;
+      const count = data.count || 0;
+      const icon = {
+        LIKE: ICONS.thumbup,
+        UNDERSTAND: ICONS.lightbulb,
+        CURIOUS: ICONS.search
+      }[type] || ICONS.thumbup;
+
+      return `
+        <button class="reaction-btn flex items-center gap-1 text-xs px-2 py-1 rounded transition-all ${isReacted ? 'reacted' : 'bg-gray-800 hover:bg-gray-700'}"
+                data-type="${type}" data-row="${answer.rowIndex}">
+          ${icon}
+          <span>${count}</span>
+        </button>
+      `;
+    }).join('');
+
+    // ハイライトボタン（管理者のみ）
+    let highlightButton = '';
+    if (this.showAdminFeatures) {
+      highlightButton = `
+        <button class="highlight-btn ml-2 p-1 rounded transition-all ${answer.highlight ? 'liked' : 'hover:bg-gray-700'}"
+                data-action="highlight" data-row="${answer.rowIndex}">
+          ${ICONS.star}
+        </button>
+      `;
+    }
+
+    return `
+      <div class="flex items-center gap-2 pt-2 border-t border-gray-700">
+        ${reactionButtons}
+        ${highlightButton}
+      </div>
+    `;
+  }
+
+  // モーダル表示
+  showModal(answer) {
+    const modalContainer = DOMHelpers.safeGetById('answerModalContainer');
+    const modalCard = DOMHelpers.safeGetById('answerModalCard');
+    const modalAnswer = DOMHelpers.safeGetById('modalAnswer');
+    const modalStudentName = DOMHelpers.safeGetById('modalStudentName');
+    const modalReactions = DOMHelpers.safeGetById('modalReactions');
+
+    if (!modalContainer || !modalCard || !modalAnswer) return;
+
+    // モーダル内容設定
+    const showName = this.appConfig.showDetails !== false;
+    modalAnswer.innerHTML = `
+      <div class="space-y-4">
+        <div>
+          <h2 class="text-2xl font-bold text-cyan-200 mb-4">${this.escapeHtml(answer.opinion || '')}</h2>
+          <div class="text-gray-200 text-lg leading-relaxed whitespace-pre-wrap">${this.escapeHtml(answer.reason || '')}</div>
+        </div>
+      </div>
+    `;
+
+    if (modalStudentName) {
+      modalStudentName.textContent = showName ? (answer.name || '') : '';
+    }
+
+    if (modalReactions) {
+      modalReactions.innerHTML = this.createReactionButtons(answer);
+    }
+
+    // ハイライト装飾をモーダルにも適用
+    if (answer.highlight) {
+      modalCard.classList.add('highlighted');
+    } else {
+      modalCard.classList.remove('highlighted');
+    }
+
+    this.addReactionDecorations(modalCard, answer.reactions);
+
+    // モーダル表示
+    modalContainer.classList.remove('hidden');
+    modalContainer.classList.add('modal-fade');
+    modalCard.classList.add('modal-scale');
+
+    setTimeout(() => {
+      modalContainer.style.opacity = '1';
+      modalCard.style.transform = 'scale(1)';
+    }, 10);
+  }
+
+  // モーダル閉じる
+  closeModal() {
+    const modalContainer = DOMHelpers.safeGetById('answerModalContainer');
+    const modalCard = DOMHelpers.safeGetById('answerModalCard');
+
+    if (modalContainer && modalCard) {
+      modalContainer.style.opacity = '0';
+      modalCard.style.transform = 'scale(0.95)';
+
+      setTimeout(() => {
+        modalContainer.classList.add('hidden');
+        modalCard.classList.remove('highlighted', 'reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious', 'reaction-border-1', 'reaction-border-2', 'reaction-border-3');
+        modalCard.style.borderImage = '';
+        modalCard.style.borderWidth = '';
+      }, 300);
+    }
+  }
+
+  // クラスフィルター生成
+  populateClassFilter(answers) {
+    const classFilter = DOMHelpers.safeGetById('classFilter');
+    if (!classFilter) return;
+
+    const classes = [...new Set(answers.map(a => a.class).filter(Boolean))];
+
+    if (classes.length > 0) {
+      classFilter.innerHTML = '<option value="">すべてのクラス</option>' +
+        classes.map(cls => `<option value="${this.escapeHtml(cls)}">${this.escapeHtml(cls)}</option>`).join('');
+      classFilter.classList.remove('hidden');
+    }
+  }
+
+  // ポーリング開始
+  startPolling() {
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+    }
+    this.pollingInterval = setInterval(() => {
+      if (!this.isLoading) {
+        this.loadAnswers(this.currentSort);
+      }
+    }, CONFIG.POLLING_INTERVAL);
+  }
+
+  // ユーティリティメソッド
+  updateAnswerCount(count) {
+    const answerCount = DOMHelpers.safeGetById('answerCount');
+    const answerCountText = DOMHelpers.safeGetById('answerCountText');
+
+    if (answerCountText) {
+      answerCountText.textContent = `${count} 件の回答`;
+    }
+  }
+
+  updateGridSize(size) {
+    const container = DOMHelpers.safeGetById('answers');
+    if (container) {
+      container.className = `grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-${Math.min(size, CONFIG.MAX_DISPLAY_COLUMNS)}`;
+    }
+  }
+
+  showLoading(show) {
+    const headingLabel = DOMHelpers.safeGetById('headingLabel');
+    if (headingLabel) {
+      if (show) {
+        headingLabel.innerHTML = `
+          <svg class="w-5 h-5 md:w-6 md:h-6 animate-spin" viewBox="0 0 24 24" fill="none">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
+          </svg>
+        `;
+      }
+    }
+  }
+
+  showError(message) {
+    const container = DOMHelpers.safeGetById('answers');
+    if (container) {
+      container.innerHTML = `<div class="col-span-full text-center text-red-400 py-8">${this.escapeHtml(message)}</div>`;
+    }
+
+    // 通知システムでもエラー表示
+    if (window.notifications) {
+      window.notifications.error(message);
+    }
+  }
+
+  escapeHtml(str) {
+    if (!str) return '';
+    return str.toString()
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+}
+
+// リアクション・ハイライト処理
+document.addEventListener('click', async (e) => {
+  // リアクションボタンクリック
+  if (e.target.closest('.reaction-btn')) {
+    e.preventDefault();
+    const btn = e.target.closest('.reaction-btn');
+    const type = btn.dataset.type;
+    const rowIndex = btn.dataset.row;
+
+    if (!window.answerApp || !window.answerApp.userEmail) {
+      if (window.notifications) {
+        window.notifications.error('認証が必要です');
+      }
+      return;
+    }
+
+    try {
+      btn.classList.add('loading');
+
+      // 現在のGAS関数を使用
+      await window.answerApp.loader.callGAS('addReaction', window.answerApp.userEmail, parseInt(rowIndex), type);
+
+      // データ再読み込み
+      await window.answerApp.loadAnswers(window.answerApp.currentSort);
+
+      if (window.notifications) {
+        window.notifications.success('リアクションを追加しました');
+      }
+    } catch (error) {
+      console.error('リアクション追加エラー:', error);
+      if (window.notifications) {
+        window.notifications.error('リアクションの追加に失敗しました');
+      }
+    } finally {
+      btn.classList.remove('loading');
+    }
+  }
+
+  // ハイライトボタンクリック
+  if (e.target.closest('.highlight-btn')) {
+    e.preventDefault();
+    const btn = e.target.closest('.highlight-btn');
+    const rowIndex = btn.dataset.row;
+
+    if (!window.answerApp || !window.answerApp.showAdminFeatures) {
+      return;
+    }
+
+    try {
+      btn.classList.add('loading');
+
+      // 現在のGAS関数を使用（toggleHighlight関数を確認）
+      await window.answerApp.loader.callGAS('toggleHighlight', window.answerApp.userEmail, parseInt(rowIndex));
+
+      // データ再読み込み
+      await window.answerApp.loadAnswers(window.answerApp.currentSort);
+
+      if (window.notifications) {
+        window.notifications.success('ハイライトを変更しました');
+      }
+    } catch (error) {
+      console.error('ハイライト変更エラー:', error);
+      if (window.notifications) {
+        window.notifications.error('ハイライトの変更に失敗しました');
+      }
+    } finally {
+      btn.classList.remove('loading');
+    }
+  }
+});
+
+// アプリケーション起動
+document.addEventListener('DOMContentLoaded', () => {
+  window.answerApp = new AnswerApp();
+});
+
+</script>

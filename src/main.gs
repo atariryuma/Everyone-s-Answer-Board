@@ -1,3 +1,4 @@
+/* global DB */
 /**
  * main.gs - Simplified Application Entry Points
  *
@@ -535,6 +536,41 @@ function addReaction(userEmail, rowIndex, reactionKey) {
 
   } catch (error) {
     console.error('processReactionByEmail error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * Toggle highlight - unified implementation for direct GAS calls
+ * @param {string} userEmail - User email
+ * @param {number} rowIndex - Row index to toggle highlight
+ * @returns {Object} Toggle result
+ */
+function toggleHighlight(userEmail, rowIndex) {
+  try {
+    // Get user and validate
+    const user = typeof DatabaseOperations !== 'undefined' ?
+      ServiceFactory.getDB().findUserByEmail(userEmail) : null;
+
+    if (!user || !user.configJson) {
+      return createErrorResponse('User configuration not found');
+    }
+
+    // Validate parameters
+    if (typeof rowIndex !== 'number' || rowIndex < 1) {
+      return createErrorResponse('Invalid row index');
+    }
+
+    // Create request object that matches handleToggleHighlight expectations
+    const request = {
+      rowId: rowIndex
+    };
+
+    // Delegate to existing handleToggleHighlight implementation
+    return handleToggleHighlight(request);
+
+  } catch (error) {
+    console.error('toggleHighlight error:', error.message);
     return createExceptionResponse(error);
   }
 }
@@ -1138,6 +1174,137 @@ function getSheetData(userId, options = {}) {
     console.error('getSheetData error:', error.message);
     // Direct return format like admin panel getSheetList
     return { success: false, message: error.message || 'データ取得エラー', data: [], headers: [], sheetName: '' };
+  }
+}
+
+/**
+ * フロントエンド回答ボード用のデータ取得関数
+ * Page.htmlから呼び出される
+ * @param {string} classFilter - クラスフィルター (例: 'すべて', '3年A組')
+ * @param {string} sortOrder - ソート順 (例: 'newest', 'oldest', 'random', 'score')
+ * @returns {Object} フロントエンド期待形式のデータ
+ */
+function getPublishedSheetData(classFilter, sortOrder) {
+  try {
+    console.log('getPublishedSheetData: 開始', { classFilter, sortOrder });
+
+    // ユーザー認証とID取得
+    const email = getCurrentEmail();
+    if (!email) {
+      console.warn('getPublishedSheetData: 認証が必要です');
+      return {
+        error: 'Authentication required',
+        rows: [],
+        sheetName: '',
+        header: '認証エラー'
+      };
+    }
+
+    // Zero-dependency: 直接DB操作でユーザー取得
+    let db = null;
+    try {
+      // Method 1: グローバルDB変数が利用可能な場合
+      if (typeof DB !== 'undefined' && DB) {
+        db = DB;
+      }
+      // Method 2: DatabaseOperationsが直接利用可能な場合
+      else if (typeof DatabaseOperations !== 'undefined') {
+        db = DatabaseOperations;
+      }
+    } catch (dbError) {
+      console.error('getPublishedSheetData: DB初期化エラー', dbError.message);
+    }
+
+    if (!db) {
+      console.error('getPublishedSheetData: Database接続エラー');
+      return {
+        error: 'Database connection failed',
+        rows: [],
+        sheetName: '',
+        header: 'データベースエラー'
+      };
+    }
+
+    const user = db.findUserByEmail(email);
+    if (!user) {
+      console.warn('getPublishedSheetData: ユーザーが見つかりません');
+      return {
+        error: 'User not found',
+        rows: [],
+        sheetName: '',
+        header: 'ユーザーエラー'
+      };
+    }
+
+    // getUserSheetDataを呼び出し、フィルターオプションを渡す
+    const options = {
+      classFilter: classFilter !== 'すべて' ? classFilter : undefined,
+      sortBy: sortOrder || 'newest',
+      includeTimestamp: true
+    };
+
+    console.log('getPublishedSheetData: getUserSheetData呼び出し', {
+      userId: user.userId,
+      options
+    });
+
+    const result = getUserSheetData(user.userId, options);
+
+    console.log('getPublishedSheetData: getUserSheetData結果', {
+      success: result?.success,
+      hasData: !!result?.data,
+      dataLength: result?.data?.length || 0,
+      sheetName: result?.sheetName
+    });
+
+    // フロントエンド期待形式に変換
+    if (result && result.success && result.data) {
+      const transformedData = {
+        header: result.header || result.sheetName || '回答一覧',
+        sheetName: result.sheetName || '不明',
+        rows: result.data.map(item => ({
+          rowIndex: item.rowIndex || item.id,
+          name: item.name || '',
+          class: item.class || '',
+          opinion: item.answer || item.opinion || '',
+          reason: item.reason || '',
+          reactions: item.reactions || {
+            UNDERSTAND: { count: 0, reacted: false },
+            LIKE: { count: 0, reacted: false },
+            CURIOUS: { count: 0, reacted: false }
+          },
+          highlight: item.highlight || false
+        })),
+        showDetails: result.showDetails !== false
+      };
+
+      console.log('getPublishedSheetData: 変換完了', {
+        header: transformedData.header,
+        sheetName: transformedData.sheetName,
+        rowsCount: transformedData.rows.length
+      });
+
+      // Add explicit success property for frontend compatibility
+      transformedData.success = true;
+      return transformedData;
+    } else {
+      console.warn('getPublishedSheetData: データ取得失敗または空', result);
+      return {
+        error: result?.message || 'データ取得エラー',
+        rows: [],
+        sheetName: result?.sheetName || '',
+        header: result?.header || '問題'
+      };
+    }
+
+  } catch (error) {
+    console.error('getPublishedSheetData: 予期しないエラー', error.message);
+    return {
+      error: error.message || 'データ取得エラー',
+      rows: [],
+      sheetName: '',
+      header: '問題'
+    };
   }
 }
 
