@@ -9,7 +9,9 @@
       "Bash(npx eslint:*)",
       "Bash(sed:*)",
       "Bash(npm test)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": [],

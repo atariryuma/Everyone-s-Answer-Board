@@ -405,48 +405,6 @@ function getAdminSheetList(spreadsheetId) {
  * @returns {Object} 列分析結果
  */
 
-/**
- * 軽量ヘッダー取得 - 列分析に失敗してもヘッダー名だけは取得
- * AdminPanel.js.html から呼び出される
- *
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} sheetName - シート名
- * @returns {Object} ヘッダー取得結果
- */
-function getLightweightHeaders(spreadsheetId, sheetName) {
-  try {
-    // 🎯 Zero-dependency: 直接SpreadsheetAppでヘッダー取得
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
-    const sheet = spreadsheet.getSheetByName(sheetName);
-
-    if (!sheet) {
-      return {
-        success: false,
-        message: `シート "${sheetName}" が見つかりません`,
-        headers: []
-      };
-    }
-
-    const lastColumn = sheet.getLastColumn();
-    const [headers] = lastColumn > 0 ? sheet.getRange(1, 1, 1, lastColumn).getValues() : [[]];
-
-    const result = {
-      success: true,
-      headers: headers.map(h => String(h || '')),
-      sheetName,
-      columnCount: lastColumn
-    };
-
-    return result;
-  } catch (error) {
-    console.error('AdminController.getLightweightHeaders エラー:', error.message);
-    return {
-      success: false,
-      message: error.message || 'ヘッダー取得エラー',
-      headers: []
-    };
-  }
-}
 
 /**
  * 設定の下書き保存

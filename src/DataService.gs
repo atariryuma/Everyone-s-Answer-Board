@@ -900,23 +900,42 @@ function getSpreadsheetList() {
 // ===========================================
 
 /**
- * 列分析のメイン関数（リファクタリング版）
+ * 列分析のメイン関数（コンテキスト対応版）
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} sheetName - シート名
+ * @param {Object} options - 分析オプション
+ * @param {boolean} options.basicOnly - 基本ヘッダー情報のみ取得
+ * @param {boolean} options.useConfigJson - configJsonからマッピング復元
+ * @param {string} options.userId - ユーザーID（設定復元用）
  * @returns {Object} 列分析結果
  */
-function analyzeColumns(spreadsheetId, sheetName) {
+function analyzeColumns(spreadsheetId, sheetName, options = {}) {
   const started = Date.now();
   try {
     console.log('DataService.analyzeColumns: 開始', {
       spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
-      sheetName: sheetName || 'null'
+      sheetName: sheetName || 'null',
+      options
     });
 
     // 🎯 GAS Best Practice: パラメータ検証を別関数に分離
     const paramValidation = validateParams(spreadsheetId, sheetName);
     if (!paramValidation.isValid) {
       return paramValidation.errorResponse;
+    }
+
+    // 🎯 configJsonからの設定復元（優先実行）
+    if (options.useConfigJson && options.userId) {
+      const configResult = getConfigBasedMapping(options.userId, spreadsheetId, sheetName);
+      if (configResult.success) {
+        console.log('DataService.analyzeColumns: configJson復元成功');
+        return configResult;
+      }
+    }
+
+    // 🎯 基本ヘッダー情報のみ取得
+    if (options.basicOnly) {
+      return getBasicHeaders(spreadsheetId, sheetName, started);
     }
 
     // 🎯 GAS Best Practice: スプレッドシート接続を別関数に分離
@@ -1091,6 +1110,89 @@ function extractSheetData(sheet) {
         columns: [],
         columnMapping: { mapping: {}, confidence: {} }
       }
+    };
+  }
+}
+
+/**
+ * configJsonベースの列マッピング取得
+ * @param {string} userId - ユーザーID
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} 設定ベースの結果
+ */
+function getConfigBasedMapping(userId, spreadsheetId, sheetName) {
+  try {
+    const user = DatabaseOperations.findUserByEmail(Session.getActiveUser().getEmail());
+    if (!user || !user.configJson) {
+      return { success: false, message: 'User config not found' };
+    }
+
+    const config = JSON.parse(user.configJson);
+    if (config.spreadsheetId !== spreadsheetId || config.sheetName !== sheetName) {
+      return { success: false, message: 'Config mismatch' };
+    }
+
+    // 基本ヘッダー情報を取得
+    const basicHeaders = getBasicHeaders(spreadsheetId, sheetName, Date.now());
+    if (!basicHeaders.success) {
+      return basicHeaders;
+    }
+
+    return {
+      success: true,
+      headers: basicHeaders.headers,
+      columnMapping: {
+        mapping: config.columnMapping || {},
+        confidence: config.confidence || {}
+      },
+      source: 'configJson',
+      executionTime: basicHeaders.executionTime
+    };
+  } catch (error) {
+    console.error('getConfigBasedMapping error:', error.message);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * 基本ヘッダー情報のみ取得（軽量版の代替）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @param {number} started - 開始時刻
+ * @returns {Object} ヘッダー情報
+ */
+function getBasicHeaders(spreadsheetId, sheetName, started) {
+  try {
+    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+
+    if (!sheet) {
+      return {
+        success: false,
+        message: `シート "${sheetName}" が見つかりません`,
+        headers: []
+      };
+    }
+
+    const lastColumn = sheet.getLastColumn();
+    const headers = lastColumn > 0 ?
+      sheet.getRange(1, 1, 1, lastColumn).getValues()[0] : [];
+
+    return {
+      success: true,
+      headers: headers.map(h => String(h || '')),
+      sheetName,
+      columnCount: lastColumn,
+      source: 'basic',
+      executionTime: `${Date.now() - started}ms`
+    };
+  } catch (error) {
+    console.error('getBasicHeaders error:', error.message);
+    return {
+      success: false,
+      message: error.message || 'ヘッダー取得エラー',
+      headers: []
     };
   }
 }

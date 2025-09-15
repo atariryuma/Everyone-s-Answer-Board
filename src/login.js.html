@@ -621,12 +621,27 @@
         if (btnText) btnText.style.display = 'none';
         if (btnSpinner) btnSpinner.style.display = 'flex';
 
-        // 同一ページでリダイレクト
+        // iframe環境検出とリダイレクト
         if (btnText) btnText.textContent = '🔄 管理パネルにリダイレクト中...';
 
         setTimeout(() => {
           console.log('管理パネルにリダイレクト:', adminUrl);
-          window.location.href = adminUrl;
+
+          // iframe内かどうか検出
+          if (window.self !== window.top) {
+            // iframe内の場合：親ウィンドウでリダイレクト（X-Frame-Options回避）
+            console.log('iframe環境を検出：親ウィンドウでリダイレクト実行');
+            try {
+              window.parent.location.href = adminUrl;
+            } catch (error) {
+              console.warn('親ウィンドウアクセス失敗、top.location使用:', error.message);
+              window.top.location.href = adminUrl;
+            }
+          } else {
+            // 通常の場合：同一ページでリダイレクト
+            console.log('通常環境：同一ページでリダイレクト実行');
+            window.location.href = adminUrl;
+          }
         }, 1000);
 
         return false;
