@@ -922,6 +922,7 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
     // 🎯 GAS Best Practice: パラメータ検証を別関数に分離
     const paramValidation = validateSheetParams(spreadsheetId, sheetName);
     if (!paramValidation.isValid) {
+      console.error('DataService.columnAnalysis: パラメータ検証失敗');
       return paramValidation.errorResponse;
     }
 
@@ -947,19 +948,21 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
     // 🎯 GAS Best Practice: スプレッドシート接続を別関数に分離
     const connectionResult = connectToSheet(spreadsheetId, sheetName);
     if (!connectionResult.success) {
+      console.error('DataService.columnAnalysis: スプレッドシート接続失敗');
       return connectionResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: データ取得を別関数に分離
     const dataResult = extractSheetHeaders(connectionResult.sheet);
     if (!dataResult.success) {
+      console.error('DataService.columnAnalysis: データ取得失敗');
       return dataResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: 列分析を別関数に分離
     const analysisResult = detectColumnTypes(dataResult.headers, dataResult.sampleData);
 
-    return {
+    const finalResult = {
       success: true,
       headers: dataResult.headers,
       columns: analysisResult.columns,
@@ -968,9 +971,18 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
       executionTime: `${Date.now() - started}ms`
     };
 
+    console.log('DataService.columnAnalysis: 正常終了', {
+      headersCount: dataResult.headers.length,
+      mappingKeys: Object.keys(analysisResult.mapping?.mapping || {}),
+      success: true
+    });
+
+    return finalResult;
+
   } catch (error) {
     console.error('DataService.columnAnalysis: 予期しないエラー', {
       error: error.message,
+      stack: error.stack,
       executionTime: `${Date.now() - started}ms`
     });
 
@@ -1210,70 +1222,120 @@ function getSheetHeaders(spreadsheetId, sheetName, started) {
  * @returns {Object} 分析結果
  */
 function detectColumnTypes(headers, sampleData) {
-  // 列情報を分析
-  const columns = headers.map((header, index) => {
-    const samples = sampleData.map(row => row[index]).filter(v => v);
+  try {
+    console.log('DataService.detectColumnTypes: 開始', {
+      headersCount: headers.length,
+      sampleDataCount: sampleData.length
+    });
 
-    // 列タイプを推測
-    let type = 'text';
-    if (header.toLowerCase().includes('timestamp') || header.toLowerCase().includes('日時')) {
-      type = 'datetime';
-    } else if (header.toLowerCase().includes('email') || header.toLowerCase().includes('メール')) {
-      type = 'email';
-    } else if (header.toLowerCase().includes('class') || header.toLowerCase().includes('クラス')) {
-      type = 'class';
-    } else if (header.toLowerCase().includes('name') || header.toLowerCase().includes('名前')) {
-      type = 'name';
-    } else if (samples.length > 0 && samples.every(s => !isNaN(s))) {
-      type = 'number';
+    // 防御的プログラミング: 入力値検証
+    if (!Array.isArray(headers) || headers.length === 0) {
+      console.warn('DataService.detectColumnTypes: 無効なheaders', headers);
+      return { columns: [], mapping: { mapping: {}, confidence: {} } };
     }
 
+    if (!Array.isArray(sampleData)) {
+      console.warn('DataService.detectColumnTypes: 無効なsampleData', sampleData);
+      sampleData = [];
+    }
+
+    // 列情報を分析
+    const columns = headers.map((header, index) => {
+      const samples = sampleData.map(row => row && row[index]).filter(v => v != null && v !== '');
+
+      // 列タイプを推測
+      let type = 'text';
+      const headerLower = String(header || '').toLowerCase();
+
+      if (headerLower.includes('timestamp') || headerLower.includes('日時') || headerLower.includes('タイムスタンプ')) {
+        type = 'datetime';
+      } else if (headerLower.includes('email') || headerLower.includes('メール')) {
+        type = 'email';
+      } else if (headerLower.includes('class') || headerLower.includes('クラス')) {
+        type = 'class';
+      } else if (headerLower.includes('name') || headerLower.includes('名前')) {
+        type = 'name';
+      } else if (samples.length > 0 && samples.every(s => !isNaN(s))) {
+        type = 'number';
+      }
+
+      return {
+        index,
+        header: String(header || ''),
+        type,
+        samples: samples.slice(0, 3) // 最大3つのサンプル
+      };
+    });
+
+    // AI検出シミュレーション（高精度パターンマッチング）
+    const mapping = { mapping: {}, confidence: {} };
+
+    headers.forEach((header, index) => {
+      if (!header) return;
+
+      const headerLower = String(header).toLowerCase();
+
+      // 回答列の検出（より詳細なパターン）
+      if (headerLower.includes('回答') || headerLower.includes('answer') ||
+          headerLower.includes('意見') || headerLower.includes('予想') ||
+          headerLower.includes('考え') || headerLower.includes('思う')) {
+        mapping.mapping.answer = index;
+        mapping.confidence.answer = 90;
+        console.log(`DataService.detectColumnTypes: 回答列検出 - "${header}" at index ${index}`);
+      }
+
+      // 理由列の検出
+      if (headerLower.includes('理由') || headerLower.includes('根拠') ||
+          headerLower.includes('reason') || headerLower.includes('なぜ') ||
+          headerLower.includes('わけ') || headerLower.includes('因為')) {
+        mapping.mapping.reason = index;
+        mapping.confidence.reason = 85;
+        console.log(`DataService.detectColumnTypes: 理由列検出 - "${header}" at index ${index}`);
+      }
+
+      // クラス列の検出
+      if (headerLower.includes('クラス') || headerLower.includes('class') ||
+          headerLower.includes('組') || headerLower.includes('年組') ||
+          headerLower.includes('学級')) {
+        mapping.mapping.class = index;
+        mapping.confidence.class = 95;
+        console.log(`DataService.detectColumnTypes: クラス列検出 - "${header}" at index ${index}`);
+      }
+
+      // 名前列の検出
+      if (headerLower.includes('名前') || headerLower.includes('name') ||
+          headerLower.includes('氏名') || headerLower.includes('お名前') ||
+          headerLower.includes('ネーム')) {
+        mapping.mapping.name = index;
+        mapping.confidence.name = 90;
+        console.log(`DataService.detectColumnTypes: 名前列検出 - "${header}" at index ${index}`);
+      }
+    });
+
+    const result = { columns, mapping };
+
+    console.log('DataService.detectColumnTypes: 分析完了', {
+      headersCount: headers.length,
+      columnsCount: columns.length,
+      mappingDetected: Object.keys(mapping.mapping).length,
+      mappingDetails: mapping.mapping,
+      confidenceDetails: mapping.confidence
+    });
+
+    return result;
+
+  } catch (error) {
+    console.error('DataService.detectColumnTypes: エラー', {
+      error: error.message,
+      stack: error.stack
+    });
+
+    // エラー時のフォールバック
     return {
-      index,
-      header,
-      type,
-      samples: samples.slice(0, 3) // 最大3つのサンプル
+      columns: [],
+      mapping: { mapping: {}, confidence: {} }
     };
-  });
-
-  // AI検出シミュレーション（シンプルなパターンマッチング）
-  const mapping = { mapping: {}, confidence: {} };
-
-  headers.forEach((header, index) => {
-    const headerLower = header.toLowerCase();
-
-    // 回答列の検出
-    if (headerLower.includes('回答') || headerLower.includes('answer') || headerLower.includes('意見')) {
-      mapping.mapping.answer = index;
-      mapping.confidence.answer = 85;
-    }
-
-    // 理由列の検出
-    if (headerLower.includes('理由') || headerLower.includes('根拠') || headerLower.includes('reason')) {
-      mapping.mapping.reason = index;
-      mapping.confidence.reason = 80;
-    }
-
-    // クラス列の検出
-    if (headerLower.includes('クラス') || headerLower.includes('class') || headerLower.includes('組')) {
-      mapping.mapping.class = index;
-      mapping.confidence.class = 90;
-    }
-
-    // 名前列の検出
-    if (headerLower.includes('名前') || headerLower.includes('name') || headerLower.includes('氏名')) {
-      mapping.mapping.name = index;
-      mapping.confidence.name = 85;
-    }
-  });
-
-  console.log('DataService.analyzeColumns: 分析完了', {
-    headersCount: headers.length,
-    columnsCount: columns.length,
-    mappingDetected: Object.keys(mapping.mapping).length
-  });
-
-  return { columns, mapping };
+  }
 }
 
 // ===========================================
