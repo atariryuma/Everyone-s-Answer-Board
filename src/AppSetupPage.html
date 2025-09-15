@@ -493,17 +493,17 @@
                 ? '<span class="px-2 py-1 bg-purple-600 text-purple-100 rounded-full text-xs">公開中</span>'
                 : '<span class="px-2 py-1 bg-gray-600 text-gray-100 rounded-full text-xs">非公開</span>';
 
-              const lastAccess = user.lastAccessedAt
-                ? new Date(user.lastAccessedAt).toLocaleDateString('ja-JP')
+              const lastAccess = user.lastModified
+                ? new Date(user.lastModified).toLocaleDateString('ja-JP')
                 : '不明';
 
-              const registrationDate = user.registrationDate
-                ? new Date(user.registrationDate).toLocaleDateString('ja-JP')
+              const registrationDate = user.lastModified
+                ? new Date(user.lastModified).toLocaleDateString('ja-JP')
                 : '不明';
 
               return `
                         <tr class="hover:bg-gray-700/50">
-                            <td class="px-4 py-3 text-sm text-white">${user.ownerEmail}</td>
+                            <td class="px-4 py-3 text-sm text-white">${user.userEmail || 'N/A'}</td>
                             <td class="px-4 py-3 text-sm text-gray-300">${registrationDate}</td>
                             <td class="px-4 py-3">${statusBadge}</td>
                             <td class="px-4 py-3">${boardBadge}</td>

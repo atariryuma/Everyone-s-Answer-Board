@@ -62,7 +62,10 @@ function doGet(e) {
       case 'admin': {
         const email = getCurrentEmail();
         if (!email) {
-          return HtmlService.createHtmlOutput('<h1>Login Required</h1>');
+          const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
+          errorTemplate.title = 'ログインが必要です';
+          errorTemplate.message = '管理画面にアクセスするにはログインが必要です。';
+          return errorTemplate.evaluate();
         }
         if (!ServiceFactory.getUserService().isSystemAdmin(email)) {
           return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
@@ -180,10 +183,11 @@ function doGet(e) {
     }
   } catch (error) {
     console.error('doGet error:', error.message);
-    return HtmlService.createHtmlOutput(`
-      <h1>Error</h1>
-      <p>${error.message}</p>
-    `);
+    const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
+    errorTemplate.title = 'システムエラー';
+    errorTemplate.message = 'システムで予期しないエラーが発生しました。管理者にお問い合わせください。';
+    errorTemplate.debugInfo = `Error: ${error.message}\nStack: ${error.stack || 'N/A'}`;
+    return errorTemplate.evaluate();
   }
 }
 
