@@ -1321,11 +1321,25 @@ function getPublishedSheetData(classFilter, sortOrder) {
  */
 function columnAnalysis(spreadsheetId, sheetName, options = {}) {
   try {
+    console.log('main.columnAnalysis: columnAnalysisImpl呼び出し開始');
     // Call the actual implementation in DataService.gs
-    return columnAnalysisImpl(spreadsheetId, sheetName, options);
+    const result = columnAnalysisImpl(spreadsheetId, sheetName, options);
+    console.log('main.columnAnalysis: columnAnalysisImpl結果', {
+      resultType: typeof result,
+      success: result?.success,
+      isNull: result === null,
+      isUndefined: result === undefined
+    });
+    return result;
   } catch (error) {
     console.error('columnAnalysis error:', error.message);
-    return createExceptionResponse(error);
+    console.error('columnAnalysis stack:', error.stack);
+    const exceptionResult = createExceptionResponse(error);
+    console.log('main.columnAnalysis: 例外レスポンス作成', {
+      exceptionType: typeof exceptionResult,
+      exceptionSuccess: exceptionResult?.success
+    });
+    return exceptionResult;
   }
 }
 
@@ -1333,7 +1347,18 @@ function columnAnalysis(spreadsheetId, sheetName, options = {}) {
  * Legacy alias for backwards compatibility - analyzeColumns
  */
 function analyzeColumns(spreadsheetId, sheetName, options = {}) {
-  return columnAnalysis(spreadsheetId, sheetName, options);
+  console.log('main.analyzeColumns: 呼び出し開始', {
+    spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
+    sheetName,
+    options
+  });
+  const result = columnAnalysis(spreadsheetId, sheetName, options);
+  console.log('main.analyzeColumns: 結果取得', {
+    resultType: typeof result,
+    success: result?.success,
+    isNull: result === null
+  });
+  return result;
 }
 
 

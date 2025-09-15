@@ -971,22 +971,32 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
     }
 
     // 🎯 GAS Best Practice: スプレッドシート接続を別関数に分離
+    console.log('DataService.columnAnalysis: スプレッドシート接続開始');
     const connectionResult = connectToSheetInternal(spreadsheetId, sheetName);
+    console.log('DataService.columnAnalysis: 接続結果', { success: connectionResult?.success });
     if (!connectionResult.success) {
       console.error('DataService.columnAnalysis: スプレッドシート接続失敗');
       return connectionResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: データ取得を別関数に分離
+    console.log('DataService.columnAnalysis: データ取得開始');
     const dataResult = extractSheetHeaders(connectionResult.sheet);
+    console.log('DataService.columnAnalysis: データ取得結果', { success: dataResult?.success, headerCount: dataResult?.headers?.length });
     if (!dataResult.success) {
       console.error('DataService.columnAnalysis: データ取得失敗');
       return dataResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: 列分析を別関数に分離
+    console.log('DataService.columnAnalysis: 列分析開始');
     const analysisResult = detectColumnTypes(dataResult.headers, dataResult.sampleData);
+    console.log('DataService.columnAnalysis: 列分析結果', {
+      mappingKeys: Object.keys(analysisResult?.mapping?.mapping || {}),
+      confidenceKeys: Object.keys(analysisResult?.mapping?.confidence || {})
+    });
 
+    console.log('DataService.columnAnalysis: 最終結果構築開始');
     const finalResult = {
       success: true,
       headers: dataResult.headers,
@@ -999,9 +1009,12 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
     console.log('DataService.columnAnalysis: 正常終了', {
       headersCount: dataResult.headers.length,
       mappingKeys: Object.keys(analysisResult.mapping?.mapping || {}),
-      success: true
+      success: true,
+      finalResultType: typeof finalResult,
+      finalResultKeys: Object.keys(finalResult)
     });
 
+    console.log('DataService.columnAnalysis: 戻り値準備完了', finalResult);
     return finalResult;
 
   } catch (error) {
