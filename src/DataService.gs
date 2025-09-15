@@ -998,17 +998,16 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
 
     console.log('DataService.columnAnalysis: 最終結果構築開始');
 
-    // google.script.run互換性: DateオブジェクトをISO文字列に変換
-    const serializedSampleData = dataResult.sampleData.slice(0, 3).map(row =>
-      row.map(cell => cell instanceof Date ? cell.toISOString() : cell)
-    );
+    // google.script.run互換性: フロントエンド期待フォーマットに変換
+    const frontendMapping = {
+      ...analysisResult.mapping.mapping,        // answer: 4, reason: 5, etc
+      confidence: analysisResult.mapping.confidence  // confidence: { answer: 90, ... }
+    };
 
     const finalResult = {
       success: true,
       headers: dataResult.headers,
-      columns: analysisResult.columns,
-      columnMapping: analysisResult.mapping,
-      sampleData: serializedSampleData,
+      columnMapping: frontendMapping,
       executionTime: `${Date.now() - started}ms`
     };
 
