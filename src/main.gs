@@ -304,8 +304,8 @@ function validateModeAccess(mode, params) {
 
   // Step 2: 認証必要チェック
   if (rules.requiresAuth) {
-    // 🚀 Dynamic Service Discovery with Fallback
-    const userEmail = callServiceMethod('UserService', 'getCurrentEmail');
+    // 🚀 Direct email acquisition with fallback
+    const userEmail = getCurrentEmailDirect();
     if (!userEmail) {
       console.log('validateModeAccess: 認証が必要 (no email from service discovery)', mode);
       return { allowed: false, redirect: 'login', reason: 'auth_required' };
@@ -321,10 +321,15 @@ function validateModeAccess(mode, params) {
     }
 
     if (rules.accessLevel === 'owner' && params.userId) {
-      // 🚀 Dynamic Service Discovery for owner check
-      const currentUser = callServiceMethod('UserService', 'getCurrentUserInfo');
+      // 🚀 Direct user info acquisition with fallback
+      const service = getAvailableService('UserService');
+      const currentUser = service && typeof service.getCurrentUserInfo === 'function'
+        ? service.getCurrentUserInfo()
+        : null;
       const isOwnUser = currentUser && currentUser.userId === params.userId;
-      const isSystemAdmin = callServiceMethod('UserService', 'isSystemAdmin', userEmail);
+      const isSystemAdmin = service && typeof service.isSystemAdmin === 'function'
+        ? service.isSystemAdmin(userEmail)
+        : false;
 
       if (!isOwnUser && !isSystemAdmin) {
         console.log('validateModeAccess: 所有者権限が必要', {
@@ -776,18 +781,8 @@ function getDeletionLogsForUI(userId) {
  * Admin Controller Global Functions
  */
 
-function getSpreadsheetList() {
-  try {
-    return getAdminSpreadsheetList();
-  } catch (error) {
-    console.error('getSpreadsheetList error:', error);
-    return {
-      success: false,
-      message: error.message || 'スプレッドシート一覧取得エラー',
-      spreadsheets: []
-    };
-  }
-}
+// getSpreadsheetList関数はAdminpanelService.gsで定義済み
+// main.gsからは削除（重複回避）
 function connectDataSource(spreadsheetId, sheetName) {
   try {
     // 🚀 Direct PropertiesService - Zero Dependencies

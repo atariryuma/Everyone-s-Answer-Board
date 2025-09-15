@@ -546,40 +546,52 @@ function getConfig() {
  * @returns {Object} スプレッドシート一覧
  */
 function getAdminSpreadsheetList() {
+  console.log('🔍 getAdminSpreadsheetList: 関数開始 - Zero-dependency Architecture');
   try {
-    console.log('SystemController.getSpreadsheetList: 開始 - Zero-dependency Architecture');
+    console.log('🔍 DriveApp.getFilesByType呼び出し開始');
 
     // 🎯 Zero-dependency: 直接DriveAppでスプレッドシート一覧取得
     const spreadsheets = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
+    console.log('🔍 DriveApp.getFilesByType完了', spreadsheets);
+
     const spreadsheetList = [];
     let count = 0;
 
+    console.log('🔍 ファイル列挙開始');
     while (spreadsheets.hasNext() && count < 20) { // 最大20件に制限
       const file = spreadsheets.next();
-      spreadsheetList.push({
+      const fileData = {
         id: file.getId(),
         name: file.getName(),
         lastUpdated: file.getLastUpdated(),
         url: file.getUrl(),
         size: file.getSize() || 0
-      });
+      };
+      console.log(`🔍 ファイル${count + 1}:`, fileData.name, fileData.id);
+      spreadsheetList.push(fileData);
       count++;
     }
 
-    return {
+    const result = {
       success: true,
       spreadsheets: spreadsheetList,
       total: spreadsheetList.length,
       timestamp: new Date().toISOString()
     };
-  } catch (error) {
-    console.error('AdminController.getSpreadsheetList エラー:', error.message);
 
-    return {
+    console.log('🔍 getAdminSpreadsheetList: 結果準備完了', result);
+    return result;
+  } catch (error) {
+    console.error('🚨 AdminController.getSpreadsheetList エラー:', error);
+
+    const errorResult = {
       success: false,
       message: error.message || 'スプレッドシート一覧取得エラー',
       spreadsheets: []
     };
+
+    console.log('🔍 getAdminSpreadsheetList: エラー結果', errorResult);
+    return errorResult;
   }
 }
 
