@@ -71,13 +71,7 @@ function getCurrentEmailDirectSC() {
   }
 }
 
-/**
- * Generate unique user ID
- * @returns {string} Unique user identifier
- */
-function generateUserId() {
-  return `user_${  Utilities.getUuid().replace(/-/g, '').substring(0, 12)}`;
-}
+// generateUserId は main.gs に統一移動済み
 
 /**
  * アプリケーションの初期セットアップ

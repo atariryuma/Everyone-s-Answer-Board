@@ -69,7 +69,21 @@ function handleUserServiceFallback(methodName, ...args) {
 
       case 'getCurrentUserInfo': {
         const email = getCurrentEmailDirect();
-        return email ? { userEmail: email, userId: null, isActive: true } : null;
+        if (!email) return null;
+
+        // UserService最優先、fallbackは最小限
+        const userService = ServiceFactory.getService('UserService');
+        if (userService && typeof userService.getCurrentUserInfo === 'function') {
+          try {
+            return userService.getCurrentUserInfo();
+          } catch (error) {
+            console.error('handleUserServiceFallback: UserService execution error:', error.message);
+          }
+        }
+
+        // 最小限のfallback（UserServiceが完全に利用不可な場合）
+        console.warn('handleUserServiceFallback: Using minimal fallback');
+        return { userEmail: email, userId: generateUserId(), isActive: true };
       }
 
       case 'isSystemAdmin': {
@@ -85,6 +99,14 @@ function handleUserServiceFallback(methodName, ...args) {
     console.error(`handleUserServiceFallback(${methodName}):`, error.message);
     return null;
   }
+}
+
+/**
+ * 統一ユーザーID生成（SystemControllerから移植）
+ * @returns {string} 生成されたユーザーID
+ */
+function generateUserId() {
+  return `user_${Utilities.getUuid().replace(/-/g, '').substring(0, 12)}`;
 }
 
 /**
@@ -1550,28 +1572,55 @@ function processLoginAction(action = 'login') {
   try {
     console.log('🔍 processLoginAction: 開始', { action });
 
-    // 🚀 Direct session-based login (Zero Dependencies)
-    const session = ServiceFactory.getSession();
-    console.log('🔍 processLoginAction: セッション確認', { isValid: session.isValid, hasEmail: !!session.email });
-
-    if (session.isValid && session.email) {
-      // ログイン成功 - 管理パネルURLを生成
-      const baseUrl = getWebAppUrl();
-      const adminUrl = `${baseUrl}?mode=admin&userId=${session.userId || 'auto-generated'}`;
-
+    // 1. メール取得
+    const email = getCurrentEmailDirect();
+    if (!email) {
       return {
-        success: true,
-        message: 'ログイン成功',
-        userEmail: session.email,
-        adminUrl,
-        redirectUrl: adminUrl
+        success: false,
+        message: 'ユーザー認証に失敗しました。再度お試しください。'
       };
     }
 
+    console.log('🔍 processLoginAction: メール取得成功', { email });
+
+    // 2. UserService経由で確実にユーザー作成・取得
+    try {
+      const userService = ServiceFactory.getService('UserService');
+      if (userService && typeof userService.createUser === 'function') {
+        const user = userService.createUser(email); // 既存なら返却、新規なら作成
+        console.log('🔍 processLoginAction: ユーザー作成・取得成功', { userId: user.userId });
+
+        const baseUrl = getWebAppUrl();
+        const adminUrl = `${baseUrl}?mode=admin&userId=${user.userId}`;
+
+        return {
+          success: true,
+          message: 'ログイン成功',
+          userEmail: email,
+          userId: user.userId,
+          adminUrl,
+          redirectUrl: adminUrl
+        };
+      }
+    } catch (userServiceError) {
+      console.error('🔍 processLoginAction: UserService error:', userServiceError.message);
+    }
+
+    // 3. UserServiceが失敗した場合のfallback
+    console.warn('🔍 processLoginAction: UserService利用不可、fallback実行');
+    const fallbackUserId = generateUserId();
+    const baseUrl = getWebAppUrl();
+    const adminUrl = `${baseUrl}?mode=admin&userId=${fallbackUserId}`;
+
     return {
-      success: false,
-      message: 'ユーザー認証に失敗しました。再度お試しください。'
+      success: true,
+      message: 'ログイン成功（簡易モード）',
+      userEmail: email,
+      userId: fallbackUserId,
+      adminUrl,
+      redirectUrl: adminUrl
     };
+
   } catch (error) {
     console.error('🚨 processLoginAction error:', error);
     return {
