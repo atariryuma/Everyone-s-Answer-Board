@@ -414,69 +414,22 @@
         }
       }
 
-      // 現在のステータスを取得して表示
+      // 現在のステータスを取得して表示（無効化 - UI削除済み）
       function loadCurrentStatus() {
-        google.script.run
-          .withSuccessHandler((result) => {
-            if (result.status === 'success') {
-              currentUserInfo = result;
-              updateStatusDisplay(result);
-              enableControls();
-            } else {
-              showMessage(`ステータス取得に失敗しました: ${result.message}`, 'error');
-            }
-          })
-          .withFailureHandler((error) => {
-            showMessage(`ステータス取得エラー: ${error.message || error}`, 'error');
-          })
-          .getAppStatus();
+        // UI要素が削除されたため何もしない
+        console.log('loadCurrentStatus: UI elements removed, skipping');
       }
 
-      // ステータス表示を更新
+      // ステータス表示を更新（無効化 - UI削除済み）
       function updateStatusDisplay(appInfo) {
-        const isActive =
-          appInfo.isEnabled === true || String(appInfo.isEnabled).toLowerCase() === 'true';
-        const statusElement = document.getElementById('current-status');
-        const adminElement = document.getElementById('current-admin');
-        const lastUpdatedElement = document.getElementById('last-updated');
-        const toggleElement = document.getElementById('isActiveToggle');
-
-        // 現在の状態を表示
-        statusElement.innerHTML = isActive
-          ? '<span class="bg-green-600 text-green-100 px-3 py-1 rounded-full">🟢 アクティブ</span>'
-          : '<span class="bg-red-600 text-red-100 px-3 py-1 rounded-full">🔴 非アクティブ</span>';
-
-        adminElement.textContent = appInfo.ownerEmail || '不明';
-        lastUpdatedElement.textContent = appInfo.lastUpdated
-          ? new Date(appInfo.lastUpdated).toLocaleString('ja-JP')
-          : '不明';
-
-        // トグルの状態を設定
-        toggleElement.checked = isActive;
+        // UI要素が削除されたため何もしない
+        console.log('updateStatusDisplay: UI elements removed, skipping');
       }
 
-      // コントロールを有効化
+      // コントロールを有効化（無効化 - UI削除済み）
       function enableControls() {
-        const toggleElement = document.getElementById('isActiveToggle');
-        const updateBtn = document.getElementById('updateStatusBtn');
-
-        toggleElement.disabled = false;
-        updateBtn.disabled = false;
-
-        // トグル変更時のイベント
-        toggleElement.addEventListener('change', function () {
-          const newStatus = this.checked;
-          const confirmMessage = newStatus
-            ? 'アプリを有効化しますか？ユーザーがアクセスできるようになります。'
-            : 'アプリを無効化しますか？ユーザーのアクセスが制限されます。';
-
-          if (confirm(confirmMessage)) {
-            updateIsActiveStatus(newStatus);
-          } else {
-            // キャンセル時は元に戻す
-            this.checked = !newStatus;
-          }
-        });
+        // UI要素が削除されたため何もしない
+        console.log('enableControls: UI elements removed, skipping');
       }
 
       // isActive状態を更新
