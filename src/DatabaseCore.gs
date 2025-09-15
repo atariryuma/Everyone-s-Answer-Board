@@ -725,8 +725,7 @@ Object.freeze({
   clearUserCache(userId, _userEmail) {
     try {
       const cache = ServiceFactory.getCache();
-      const cacheKeys = cache.getCacheKeys();
-      const userCacheKey = `${cacheKeys.USER_INFO}${userId}`;
+      const userCacheKey = `user_${userId}`;
       return cache.remove(userCacheKey);
     } catch (error) {
       console.error('DatabaseCore.clearUserCache:', error.message);

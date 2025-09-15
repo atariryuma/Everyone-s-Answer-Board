@@ -14,19 +14,19 @@
  */
 
 /**
- * 統一エラーID生成関数
- * @returns {string} UUID形式のエラーID
+ * エラーID生成
+ * @returns {string} エラーID
  */
 function generateErrorId() {
-  return `error_${Utilities.getUuid()}`;
+  return `error_${Date.now()}`;
 }
 
 /**
- * 統一セッションID生成関数
- * @returns {string} UUID形式のセッションID
+ * セッションID生成
+ * @returns {string} セッションID
  */
 function generateSessionId() {
-  return `session_${Utilities.getUuid()}`;
+  return `session_${Date.now()}`;
 }
 
 /**

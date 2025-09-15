@@ -93,9 +93,7 @@ function getCurrentUserInfo() {
     return null;
   }
 
-  // 🔧 ServiceFactory経由で構造化キャッシュキー取得
-  const cacheKeys = ServiceFactory.getCache().getCacheKeys();
-  const cacheKey = `${cacheKeys.USER_INFO}current`;
+  const cacheKey = 'current_user_info';
 
   try {
     // 🔧 ServiceFactory経由でキャッシュ取得
