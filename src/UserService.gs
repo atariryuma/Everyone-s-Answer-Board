@@ -383,7 +383,7 @@ function createUser(userEmail, initialConfig = {}) {
  */
 function buildNewUserData(userEmail, initialConfig) {
     // 統一ID生成関数を使用（main.gsのgenerateUserIdと同一）
-    const userId = `user_${Utilities.getUuid().replace(/-/g, '').substring(0, 12)}`;
+    const userId = Utilities.getUuid();
     const timestamp = new Date().toISOString();
 
     // CLAUDE.md準拠: 最小限configJSON

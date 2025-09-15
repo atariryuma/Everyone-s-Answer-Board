@@ -262,7 +262,7 @@ const ServiceFactory = Object.freeze({
   getUtils() {
     return {
       generateUserId: () => {
-        return `user_${Utilities.getUuid().replace(/-/g, '').substring(0, 12)}`;
+        return Utilities.getUuid();
       },
 
       getCurrentTimestamp: () => {

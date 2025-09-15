@@ -106,7 +106,7 @@ function handleUserServiceFallback(methodName, ...args) {
  * @returns {string} 生成されたユーザーID
  */
 function generateUserId() {
-  return `user_${Utilities.getUuid().replace(/-/g, '').substring(0, 12)}`;
+  return Utilities.getUuid();
 }
 
 /**
