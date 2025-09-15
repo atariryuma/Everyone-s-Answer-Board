@@ -909,49 +909,49 @@ function getSpreadsheetList() {
  * @param {string} options.userId - ユーザーID（設定復元用）
  * @returns {Object} 列分析結果
  */
-function analyzeColumns(spreadsheetId, sheetName, options = {}) {
+function columnAnalysis(spreadsheetId, sheetName, options = {}) {
   const started = Date.now();
   try {
-    console.log('DataService.analyzeColumns: 開始', {
+    console.log('DataService.columnAnalysis: 開始', {
       spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
       sheetName: sheetName || 'null',
       options
     });
 
     // 🎯 GAS Best Practice: パラメータ検証を別関数に分離
-    const paramValidation = validateParams(spreadsheetId, sheetName);
+    const paramValidation = validateSheetParams(spreadsheetId, sheetName);
     if (!paramValidation.isValid) {
       return paramValidation.errorResponse;
     }
 
     // 🎯 configJsonからの設定復元（優先実行）
     if (options.useConfigJson && options.userId) {
-      const configResult = getConfigBasedMapping(options.userId, spreadsheetId, sheetName);
+      const configResult = restoreColumnConfig(options.userId, spreadsheetId, sheetName);
       if (configResult.success) {
-        console.log('DataService.analyzeColumns: configJson復元成功');
+        console.log('DataService.columnAnalysis: configJson復元成功');
         return configResult;
       }
     }
 
     // 🎯 基本ヘッダー情報のみ取得
     if (options.basicOnly) {
-      return getBasicHeaders(spreadsheetId, sheetName, started);
+      return getSheetHeaders(spreadsheetId, sheetName, started);
     }
 
     // 🎯 GAS Best Practice: スプレッドシート接続を別関数に分離
-    const connectionResult = openSpreadsheet(spreadsheetId, sheetName);
+    const connectionResult = connectToSheet(spreadsheetId, sheetName);
     if (!connectionResult.success) {
       return connectionResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: データ取得を別関数に分離
-    const dataResult = extractSheetData(connectionResult.sheet);
+    const dataResult = extractSheetHeaders(connectionResult.sheet);
     if (!dataResult.success) {
       return dataResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: 列分析を別関数に分離
-    const analysisResult = performColumnAnalysis(dataResult.headers, dataResult.sampleData);
+    const analysisResult = detectColumnTypes(dataResult.headers, dataResult.sampleData);
 
     return {
       success: true,
@@ -963,7 +963,7 @@ function analyzeColumns(spreadsheetId, sheetName, options = {}) {
     };
 
   } catch (error) {
-    console.error('DataService.analyzeColumns: 予期しないエラー', {
+    console.error('DataService.columnAnalysis: 予期しないエラー', {
       error: error.message,
       executionTime: `${Date.now() - started}ms`
     });
@@ -985,7 +985,7 @@ function analyzeColumns(spreadsheetId, sheetName, options = {}) {
  * @param {string} sheetName - シート名
  * @returns {Object} 検証結果
  */
-function validateParams(spreadsheetId, sheetName) {
+function validateSheetParams(spreadsheetId, sheetName) {
   if (!spreadsheetId || !sheetName) {
     const errorResponse = {
       success: false,
@@ -1010,11 +1010,11 @@ function validateParams(spreadsheetId, sheetName) {
  * @param {string} sheetName - シート名
  * @returns {Object} 接続結果
  */
-function openSpreadsheet(spreadsheetId, sheetName) {
+function connectToSheet(spreadsheetId, sheetName) {
   try {
-    console.log('DataService.analyzeColumns: スプレッドシート接続開始');
+    console.log('DataService.connectToSheet: スプレッドシート接続開始');
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    console.log('DataService.analyzeColumns: スプレッドシート接続成功');
+    console.log('DataService.connectToSheet: スプレッドシート接続成功');
 
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
@@ -1030,11 +1030,11 @@ function openSpreadsheet(spreadsheetId, sheetName) {
       };
     }
 
-    console.log('DataService.analyzeColumns: シート取得成功');
+    console.log('DataService.connectToSheet: シート取得成功');
     return { success: true, sheet };
 
   } catch (error) {
-    console.error('DataService.analyzeColumns: 接続エラー', {
+    console.error('DataService.connectToSheet: 接続エラー', {
       error: error.message,
       spreadsheetId: `${spreadsheetId.substring(0, 10)}...`
     });
@@ -1057,13 +1057,13 @@ function openSpreadsheet(spreadsheetId, sheetName) {
  * @param {Sheet} sheet - シートオブジェクト
  * @returns {Object} データ抽出結果
  */
-function extractSheetData(sheet) {
+function extractSheetHeaders(sheet) {
   try {
-    console.log('DataService.analyzeColumns: シートサイズ取得開始');
+    console.log('DataService.extractSheetHeaders: シートサイズ取得開始');
     const lastColumn = sheet.getLastColumn();
     const lastRow = sheet.getLastRow();
 
-    console.log('DataService.analyzeColumns: シートサイズ', { lastColumn, lastRow });
+    console.log('DataService.extractSheetHeaders: シートサイズ', { lastColumn, lastRow });
 
     if (lastColumn === 0 || lastRow === 0) {
       return {
@@ -1087,9 +1087,9 @@ function extractSheetData(sheet) {
     let sampleData = [];
     const sampleRowCount = Math.min(5, lastRow - 1);
     if (sampleRowCount > 0) {
-      console.log('DataService.analyzeColumns: サンプルデータ取得開始');
+      console.log('DataService.extractSheetHeaders: サンプルデータ取得開始');
       sampleData = sheet.getRange(2, 1, sampleRowCount, lastColumn).getValues();
-      console.log('DataService.analyzeColumns: サンプルデータ取得成功', {
+      console.log('DataService.extractSheetHeaders: サンプルデータ取得成功', {
         sampleRowCount: sampleData.length
       });
     }
@@ -1097,7 +1097,7 @@ function extractSheetData(sheet) {
     return { success: true, headers, sampleData };
 
   } catch (error) {
-    console.error('DataService.analyzeColumns: データ取得エラー', {
+    console.error('DataService.extractSheetHeaders: データ取得エラー', {
       error: error.message
     });
 
@@ -1121,7 +1121,7 @@ function extractSheetData(sheet) {
  * @param {string} sheetName - シート名
  * @returns {Object} 設定ベースの結果
  */
-function getConfigBasedMapping(userId, spreadsheetId, sheetName) {
+function restoreColumnConfig(userId, spreadsheetId, sheetName) {
   try {
     const user = DatabaseOperations.findUserByEmail(Session.getActiveUser().getEmail());
     if (!user || !user.configJson) {
@@ -1134,7 +1134,7 @@ function getConfigBasedMapping(userId, spreadsheetId, sheetName) {
     }
 
     // 基本ヘッダー情報を取得
-    const basicHeaders = getBasicHeaders(spreadsheetId, sheetName, Date.now());
+    const basicHeaders = getSheetHeaders(spreadsheetId, sheetName, Date.now());
     if (!basicHeaders.success) {
       return basicHeaders;
     }
@@ -1150,7 +1150,7 @@ function getConfigBasedMapping(userId, spreadsheetId, sheetName) {
       executionTime: basicHeaders.executionTime
     };
   } catch (error) {
-    console.error('getConfigBasedMapping error:', error.message);
+    console.error('restoreColumnConfig error:', error.message);
     return { success: false, message: error.message };
   }
 }
@@ -1162,7 +1162,7 @@ function getConfigBasedMapping(userId, spreadsheetId, sheetName) {
  * @param {number} started - 開始時刻
  * @returns {Object} ヘッダー情報
  */
-function getBasicHeaders(spreadsheetId, sheetName, started) {
+function getSheetHeaders(spreadsheetId, sheetName, started) {
   try {
     const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
@@ -1188,7 +1188,7 @@ function getBasicHeaders(spreadsheetId, sheetName, started) {
       executionTime: `${Date.now() - started}ms`
     };
   } catch (error) {
-    console.error('getBasicHeaders error:', error.message);
+    console.error('getSheetHeaders error:', error.message);
     return {
       success: false,
       message: error.message || 'ヘッダー取得エラー',
@@ -1203,7 +1203,7 @@ function getBasicHeaders(spreadsheetId, sheetName, started) {
  * @param {Array} sampleData - サンプルデータ配列
  * @returns {Object} 分析結果
  */
-function performColumnAnalysis(headers, sampleData) {
+function detectColumnTypes(headers, sampleData) {
   // 列情報を分析
   const columns = headers.map((header, index) => {
     const samples = sampleData.map(row => row[index]).filter(v => v);
@@ -1450,7 +1450,7 @@ function dsToggleHighlight(userId, rowId) {
 if (typeof global !== 'undefined') {
   global.DataService = {
     getSheetData,
-    analyzeColumns,
+    columnAnalysis,
     processReaction,
     addReaction: dsAddReaction,
     toggleHighlight: dsToggleHighlight
@@ -1458,7 +1458,7 @@ if (typeof global !== 'undefined') {
 } else {
   this.DataService = {
     getSheetData,
-    analyzeColumns,
+    columnAnalysis,
     processReaction,
     addReaction: dsAddReaction,
     toggleHighlight: dsToggleHighlight

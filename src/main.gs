@@ -787,6 +787,29 @@ function getBoardInfo() {
 }
 
 /**
+ * Column analysis - direct call to DataService
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @param {Object} options - 分析オプション
+ * @returns {Object} 列分析結果
+ */
+function columnAnalysis(spreadsheetId, sheetName, options = {}) {
+  try {
+    return DataService.columnAnalysis(spreadsheetId, sheetName, options);
+  } catch (error) {
+    console.error('columnAnalysis error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * Legacy alias for backwards compatibility - analyzeColumns
+ */
+function analyzeColumns(spreadsheetId, sheetName, options = {}) {
+  return columnAnalysis(spreadsheetId, sheetName, options);
+}
+
+/**
  * Legacy alias for backwards compatibility
  */
 

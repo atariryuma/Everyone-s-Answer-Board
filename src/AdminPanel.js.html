@@ -331,7 +331,7 @@
       // 7. 列設定ドロップダウンの初期化
       if (config && config.spreadsheetId && config.sheetName) {
         try {
-          await initializeColumnDropdowns(config.spreadsheetId, config.sheetName, config.columnMapping);
+          await setupColumns(config.spreadsheetId, config.sheetName, config.columnMapping);
         } catch (columnError) {
           console.error('列設定ドロップダウン初期化エラー:', columnError);
           showInfo('⚠️ 列設定の初期化に失敗しましたが、他の機能は利用できます。');
@@ -348,79 +348,44 @@
   }
 
   // 列設定ドロップダウン初期化関数
-  async function initializeColumnDropdowns(spreadsheetId, sheetName, existingColumnMapping) {
+  async function setupColumns(spreadsheetId, sheetName, existingColumnMapping) {
     try {
-      console.log('🔧 列設定ドロップダウン初期化開始:', { spreadsheetId, sheetName, existingColumnMapping });
+      console.log('🔧 setupColumns: 列設定を初期化中:', { spreadsheetId, sheetName, existingColumnMapping });
 
-      // 1. 列分析を実行
-      const analysisResult = await analyzeColumnsAsync(spreadsheetId, sheetName);
+      // 1. まず設定から復元を試行（既存設定がある場合）
+      const userId = getUserId();
+      let analysisResult;
 
-      if (!analysisResult) {
-        console.warn('⚠️ 列分析でnullが返されました - 軽量ヘッダー取得を試行');
-
-        // フォールバック: 軽量ヘッダー取得を試行
-        try {
-          const headerResult = await getLightweightHeadersAsync(spreadsheetId, sheetName);
-          if (headerResult && headerResult.success && headerResult.headers.length > 0) {
-            console.log('📋 軽量ヘッダー取得成功 - 実際のヘッダー名を使用');
-            populateColumnDropdowns(headerResult.headers, {});
-
-            if (existingColumnMapping && existingColumnMapping.mapping) {
-              const dropdowns = {
-                answer: document.getElementById('answer-column-select'),
-                reason: document.getElementById('reason-column-select'),
-                class: document.getElementById('class-column-select'),
-                name: document.getElementById('name-column-select'),
-              };
-              restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
-            }
-
-            showInfo('💡 実際の列名を取得しました。既存の設定に基づいて列選択を復元しています。');
-          } else {
-            // 軽量ヘッダー取得も失敗した場合
-            console.warn('⚠️ 軽量ヘッダー取得も失敗 - ダミーヘッダーを使用');
-            fallbackToDummyHeaders(existingColumnMapping);
-          }
-        } catch (headerError) {
-          console.warn('⚠️ 軽量ヘッダー取得エラー - ダミーヘッダーを使用:', headerError);
-          fallbackToDummyHeaders(existingColumnMapping);
-        }
-        return;
+      if (existingColumnMapping?.mapping &&
+          existingColumnMapping?.spreadsheetId === spreadsheetId &&
+          Object.keys(existingColumnMapping.mapping).length > 0) {
+        console.log('🔧 同一スプレッドシート設定検出 - 設定復元実行');
+        showInfo('💾 保存済み設定を復元しています...');
+        analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
+          useConfigJson: true,
+          userId: userId
+        });
       }
 
-      if (!analysisResult.success) {
-        const errorMsg = analysisResult.error || analysisResult.message || '列分析に失敗しました';
-        console.warn('⚠️ 列分析に失敗 - 軽量ヘッダー取得を試行:', errorMsg);
+      // 2. 設定復元に失敗した場合は基本ヘッダー取得
+      if (!analysisResult || !analysisResult.success) {
+        console.log('🔧 基本ヘッダー取得を実行');
+        showInfo('📋 列情報を取得しています...');
+        analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
+          basicOnly: true
+        });
+      }
 
-        // フォールバック: 軽量ヘッダー取得を試行
-        try {
-          const headerResult = await getLightweightHeadersAsync(spreadsheetId, sheetName);
-          if (headerResult && headerResult.success && headerResult.headers.length > 0) {
-            console.log('📋 軽量ヘッダー取得成功 - 実際のヘッダー名を使用');
-            populateColumnDropdowns(headerResult.headers, {});
+      // 3. 基本ヘッダー取得も失敗した場合はフル分析
+      if (!analysisResult || !analysisResult.success) {
+        console.log('🔧 フル列分析を実行');
+        showInfo('🔍 スプレッドシートを詳細分析中...');
+        analysisResult = await analyzeColumns(spreadsheetId, sheetName);
+      }
 
-            if (existingColumnMapping && existingColumnMapping.mapping) {
-              const dropdowns = {
-                answer: document.getElementById('answer-column-select'),
-                reason: document.getElementById('reason-column-select'),
-                class: document.getElementById('class-column-select'),
-                name: document.getElementById('name-column-select'),
-              };
-              restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
-            }
-
-            showInfo('💡 列分析は失敗しましたが、実際の列名を取得できました。既存設定を復元しています。');
-          } else {
-            // 軽量ヘッダー取得も失敗した場合
-            console.warn('⚠️ 軽量ヘッダー取得も失敗 - ダミーヘッダーを使用');
-            fallbackToDummyHeaders(existingColumnMapping);
-            showError(`列分析エラー: ${errorMsg}`);
-          }
-        } catch (headerError) {
-          console.warn('⚠️ 軽量ヘッダー取得エラー - ダミーヘッダーを使用:', headerError);
-          fallbackToDummyHeaders(existingColumnMapping);
-          showError(`列分析エラー: ${errorMsg}`);
-        }
+      if (!analysisResult || !analysisResult.success) {
+        console.warn('⚠️ すべての列分析方法が失敗 - ダミーヘッダーを使用');
+        useDummyColumns(existingColumnMapping);
         return;
       }
 
@@ -431,7 +396,7 @@
       }
 
       // 2. ドロップダウンにヘッダー選択肢を設定
-      populateColumnDropdowns(analysisResult.headers, analysisResult.mapping);
+      fillColumnDropdowns(analysisResult.headers, analysisResult.mapping);
 
       // 3. 既存の設定がある場合は復元（既存関数使用）
       if (existingColumnMapping && existingColumnMapping.mapping) {
@@ -441,7 +406,7 @@
           class: document.getElementById('class-column-select'),
           name: document.getElementById('name-column-select'),
         };
-        restoreSavedColumnMapping(dropdowns);
+        restoreColumnSelection(dropdowns);
       }
 
       console.log('✅ 列設定ドロップダウン初期化完了');
@@ -470,7 +435,7 @@
           console.log('スプレッドシート一覧を読み込み中...');
           setPartialLoading(true, 'スプレッドシート一覧を取得中...');
           try {
-            await loadSpreadsheetListAsync();
+            await loadSpreadsheets();
             spreadsheetListLoaded = true;
             showSuccess('スプレッドシート一覧を読み込みました');
           } catch (error) {
@@ -506,7 +471,7 @@
   }
 
   // スプレッドシート一覧読み込み（非同期版）
-  function loadSpreadsheetListAsync() {
+  function loadSpreadsheets() {
     return new Promise((resolve, reject) => {
       const select = DOMHelpers.safeGetById('spreadsheet-select', 'spreadsheet list loading');
       if (!select) {
@@ -688,7 +653,7 @@
 
   // 旧版との互換性維持
   function loadSpreadsheetList() {
-    loadSpreadsheetListAsync();
+    loadSpreadsheets();
   }
 
   // ユーザー情報読み込み（非同期版）
@@ -821,7 +786,7 @@
         select.value = spreadsheetId;
 
         // シート一覧も自動読み込み
-        await loadSheetListAsync(spreadsheetId);
+        await loadSheets(spreadsheetId);
         return true;
       } else {
         // 直接URLで接続を試行
@@ -1021,7 +986,7 @@
   }
 
   // 非同期版の補助関数群
-  function loadSheetListAsync(spreadsheetId) {
+  function loadSheets(spreadsheetId) {
     return new Promise((resolve, reject) => {
       const select = document.getElementById('sheet-select');
       select.innerHTML = '<option value="">読み込み中...</option>';
@@ -1056,9 +1021,9 @@
     });
   }
 
-  function analyzeColumnsAsync(spreadsheetId, sheetName) {
+  function analyzeColumns(spreadsheetId, sheetName, options = {}) {
     return new Promise((resolve, reject) => {
-      console.log('🔍 analyzeColumnsAsync called with:', { spreadsheetId, sheetName });
+      console.log('🔍 analyzeColumns called with:', { spreadsheetId, sheetName, options });
 
       google.script.run
         .withSuccessHandler(function(result) {
@@ -1075,33 +1040,16 @@
             reject(error);
           }
         })
-        .analyzeColumns(spreadsheetId, sheetName);
+        .analyzeColumns(spreadsheetId, sheetName, options);
     });
   }
 
-  // 軽量ヘッダー取得（非同期）
-  function getLightweightHeadersAsync(spreadsheetId, sheetName) {
-    return new Promise((resolve, reject) => {
-      console.log('🔍 getLightweightHeadersAsync called with:', { spreadsheetId, sheetName });
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          console.log('✅ getLightweightHeaders success:', result);
-          resolve(result);
-        })
-        .withFailureHandler(function(error) {
-          console.error('❌ getLightweightHeaders error:', error);
-          reject(error);
-        })
-        .getLightweightHeaders(spreadsheetId, sheetName);
-    });
-  }
 
   // ダミーヘッダーへのフォールバック処理
-  function fallbackToDummyHeaders(existingColumnMapping) {
+  function useDummyColumns(existingColumnMapping) {
     console.log('📋 ダミーヘッダーを使用してドロップダウンを初期化');
     const dummyHeaders = ['列1', '列2', '列3', '列4', '列5', '列6', '列7', '列8', '列9', '列10'];
-    populateColumnDropdowns(dummyHeaders, {});
+    fillColumnDropdowns(dummyHeaders, {});
 
     if (existingColumnMapping && existingColumnMapping.mapping) {
       const dropdowns = {
@@ -1110,7 +1058,7 @@
         class: document.getElementById('class-column-select'),
         name: document.getElementById('name-column-select'),
       };
-      restoreSavedColumnMapping(dropdowns, existingColumnMapping.mapping);
+      restoreColumnSelection(dropdowns, existingColumnMapping.mapping);
       showInfo('💡 既存の列設定を復元しました。列名が表示されない場合は手動で調整してください。');
     } else {
       showError('列分析でエラーが発生しました。スプレッドシートのアクセス権限を確認してください。');
@@ -1573,90 +1521,55 @@
     setPartialLoading(true, 'URL接続中...');
 
     // 初期化処理と同じフォールバック機能付きで処理を実行
-    processUrlConnectionWithFallback(spreadsheetId, sheetName);
+    connectToSheet(spreadsheetId, sheetName);
   }
 
-  // URL入力接続処理（初期化と同じフォールバック機能付き）
-  async function processUrlConnectionWithFallback(spreadsheetId, sheetName) {
+  // URL入力接続処理（簡素化版）
+  async function connectToSheet(spreadsheetId, sheetName) {
     try {
-      console.log('🔧 URL入力接続処理開始:', { spreadsheetId, sheetName });
+      console.log('📋 connectToSheet: シート接続を開始:', { spreadsheetId, sheetName });
+      showInfo('📋 シートに接続しています...');
 
-      // 1. 列分析を実行
-      const analysisResult = await analyzeColumnsAsync(spreadsheetId, sheetName);
+      // 1. 基本ヘッダー取得を実行
+      let analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
+        basicOnly: true
+      });
 
-      if (!analysisResult) {
-        console.warn('⚠️ URL入力: 列分析でnullが返されました - 軽量ヘッダー取得を試行');
-        await handleUrlConnectionFallback(spreadsheetId, sheetName);
-        return;
+      // 2. 基本ヘッダー取得も失敗した場合はフル分析
+      if (!analysisResult || !analysisResult.success) {
+        console.log('🔧 connectToSheet: フル列分析を実行');
+        showInfo('🔍 詳細分析を実行中...');
+        analysisResult = await analyzeColumns(spreadsheetId, sheetName);
       }
 
-      if (!analysisResult.success) {
-        const errorMsg = analysisResult.error || analysisResult.message || '列分析に失敗しました';
-        console.warn('⚠️ URL入力: 列分析に失敗 - 軽量ヘッダー取得を試行:', errorMsg);
-        await handleUrlConnectionFallback(spreadsheetId, sheetName);
+      if (!analysisResult || !analysisResult.success) {
+        console.warn('⚠️ connectToSheet: すべての列分析方法が失敗');
+        showError('スプレッドシートへの接続に失敗しました');
+        setPartialLoading(false);
         return;
       }
 
       if (!analysisResult.headers || !Array.isArray(analysisResult.headers) || analysisResult.headers.length === 0) {
-        console.warn('⚠️ URL入力: ヘッダー情報が無効です:', analysisResult);
-        await handleUrlConnectionFallback(spreadsheetId, sheetName);
+        console.warn('⚠️ connectToSheet: ヘッダー情報が無効です:', analysisResult);
+        showError('スプレッドシートにヘッダー行が見つかりません');
+        setPartialLoading(false);
         return;
       }
 
-      // 2. 成功時の処理
-      console.log('✅ URL入力: 列分析成功');
+      // 3. 成功時の処理
+      console.log('✅ connectToSheet: シート接続成功');
       updateColumnMapping(analysisResult);
       updateProgress(2);
-      showSuccess('✅ URL入力方式でスプレッドシートに接続しました');
+      showSuccess('✅ シートに接続しました');
       setPartialLoading(false);
 
     } catch (error) {
-      console.error('❌ URL入力接続処理エラー:', error);
-      await handleUrlConnectionFallback(spreadsheetId, sheetName);
-    }
-  }
-
-  // URL入力接続のフォールバック処理
-  async function handleUrlConnectionFallback(spreadsheetId, sheetName) {
-    try {
-      console.log('📋 URL入力: 軽量ヘッダー取得を試行');
-      const headerResult = await getLightweightHeadersAsync(spreadsheetId, sheetName);
-
-      if (headerResult && headerResult.success && headerResult.headers.length > 0) {
-        console.log('✅ URL入力: 軽量ヘッダー取得成功 - 実際のヘッダー名を使用');
-
-        // ドロップダウンを初期化
-        populateColumnDropdowns(headerResult.headers, {});
-
-        // 既存の設定があれば復元（グローバル状態から取得）
-        const config = systemState?.config;
-        if (config && config.columnMapping && config.columnMapping.mapping) {
-          console.log('📋 URL入力: 既存の列マッピング復元', config.columnMapping.mapping);
-          const dropdowns = {
-            answer: document.getElementById('answer-column-select'),
-            reason: document.getElementById('reason-column-select'),
-            class: document.getElementById('class-column-select'),
-            name: document.getElementById('name-column-select'),
-          };
-          restoreSavedColumnMapping(dropdowns, config.columnMapping.mapping);
-        } else {
-          console.log('📋 URL入力: 既存の列マッピングなし - デフォルト状態を維持');
-        }
-
-        updateProgress(2);
-        showSuccess('✅ URL入力方式で接続完了（実際のヘッダー名を取得）');
-        setPartialLoading(false);
-      } else {
-        console.error('❌ URL入力: 軽量ヘッダー取得も失敗');
-        showError('🚨 スプレッドシートへの接続に失敗しました。\n\n対処法:\n• スプレッドシートのアクセス権限を確認\n• URLが正しいことを確認\n• しばらく時間をおいて再試行');
-        setPartialLoading(false);
-      }
-    } catch (fallbackError) {
-      console.error('❌ URL入力: フォールバック処理エラー:', fallbackError);
-      showError('🚨 接続処理でエラーが発生しました。ページを再読み込みして再試行してください。');
+      console.error('❌ connectToSheet: 接続処理エラー:', error);
+      showError('接続処理中にエラーが発生しました: ' + error.message);
       setPartialLoading(false);
     }
   }
+
 
   // イベントリスナー設定
   document.addEventListener('DOMContentLoaded', function () {
@@ -1682,7 +1595,7 @@
 
     // データ更新ボタン
     document.getElementById('refresh-data').addEventListener('click', function () {
-      loadSpreadsheetList();
+      loadSpreadsheets();
     });
 
     // 接続ボタン（一覧選択）
@@ -1900,7 +1813,7 @@
     console.log('Headers:', headers, 'Mapping:', mapping);
 
     // ドロップダウンにヘッダーオプションを設定
-    populateColumnDropdowns(headers, mapping);
+    fillColumnDropdowns(headers, mapping);
     // 現在のヘッダーをグローバルに保持（検証/保存で使用）
     try {
       window.currentHeaders = headers;
@@ -1913,8 +1826,8 @@
   }
 
   // ドロップダウンにヘッダーオプションを設定 - エラーハンドリング強化版
-  function populateColumnDropdowns(headers, mapping) {
-    console.log('populateColumnDropdowns:', { headers, mapping });
+  function fillColumnDropdowns(headers, mapping) {
+    console.log('fillColumnDropdowns:', { headers, mapping });
 
     try {
       // 入力データの検証とフォールバック
@@ -1970,19 +1883,19 @@
       setAIDetectionSelections(mapping, dropdowns);
 
       // 保存済み設定の復元（オプション追加後に実行）
-      restoreSavedColumnMapping(dropdowns);
+      restoreColumnSelection(dropdowns);
 
       // ドロップダウン変更イベントリスナーを設定
       setupDropdownEventListeners(dropdowns);
     } catch (error) {
-      console.error('populateColumnDropdowns エラー:', error);
+      console.error('fillColumnDropdowns エラー:', error);
       showError('ドロップダウンの設定に失敗しました: ' + error.message);
     }
   }
 
   // 保存済み設定から列マッピングを復元（オプション追加後に実行）- 改良版（フォールバック対応）
   let lastMappingRestore = null;
-  function restoreSavedColumnMapping(dropdowns, fallbackMapping = null) {
+  function restoreColumnSelection(dropdowns, fallbackMapping = null) {
     try {
       let savedMapping = null;
 
