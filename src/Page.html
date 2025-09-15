@@ -138,7 +138,9 @@
   <!-- サーバーデータをクライアントサイドで利用可能にする -->
   <script>
     // サーバーから渡されたパラメータをwindowオブジェクトに設定
+    // GAS Template: userId injection
     window.userId = <?!= JSON.stringify(data.userId || null) ?>;
+    // GAS Template: userEmail injection
     window.userEmail = <?!= JSON.stringify(data.userEmail || null) ?>;
     console.log('🔧 [Page.html] Server data loaded:', {
       userId: window.userId,

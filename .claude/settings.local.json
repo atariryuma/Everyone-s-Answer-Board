@@ -36,7 +36,8 @@
       "Bash(do)",
       "Bash(echo \"File: $file\")",
       "Bash(do echo \"=== $file ===\")",
-      "Bash(do echo \"=== Checking $func ===\")"
+      "Bash(do echo \"=== Checking $func ===\")",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": [],

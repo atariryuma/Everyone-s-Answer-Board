@@ -398,8 +398,8 @@
         /* フッター専用のガラス調スタイル */
         background: rgba(55, 65, 81, 0.95);
         border: 1px solid rgba(75, 85, 99, 0.6);
-        backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
+        backdrop-filter: blur(12px);
       }
 
       #boardInfoFooter .glass-panel:hover {
@@ -442,6 +442,7 @@
       #boardInfoFooter .btn-primary,
       #boardInfoFooter .btn-secondary {
         white-space: nowrap;
+        min-width: -webkit-fill-available;
         min-width: fit-content;
       }
 

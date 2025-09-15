@@ -298,6 +298,7 @@
 
           <div class="text-center space-y-3">
             <button
+              type="button"
               id="switch-account-btn"
               onclick="switchAccount()"
               class="text-sm text-cyan-400 hover:text-cyan-300 underline"
@@ -306,6 +307,7 @@
             </button>
             <br />
             <button
+              type="button"
               onclick="showSecurityModal()"
               class="text-xs text-gray-500 hover:text-gray-400 underline transition-colors duration-200"
             >
@@ -328,7 +330,7 @@
       >
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-xl font-semibold text-white">🔒 セキュリティ仕様</h3>
-          <button onclick="closeSecurityModal()" class="text-gray-400 hover:text-white text-2xl">
+          <button type="button" onclick="closeSecurityModal()" class="text-gray-400 hover:text-white text-2xl">
             ✕
           </button>
         </div>

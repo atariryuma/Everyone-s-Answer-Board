@@ -1,8 +1,8 @@
 <!doctype html>
-<html>
+<html lang="ja">
   <head>
-    <base target="_top" />
     <meta charset="UTF-8" />
+    <base target="_top" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Shared Security Headers -->
     <?!= include('SharedSecurityHeaders'); ?>
@@ -153,6 +153,7 @@
           セットアップが正常に完了しました。システムの動作確認を行えます。
         </p>
         <button
+          type="button"
           id="test-btn"
           class="btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg"
         >
@@ -224,7 +225,7 @@
                             ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
                         </div>
                         <div class="flex-1">${message}</div>
-                        <button onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
+                        <button type="button" onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
                     </div>
                 </div>
             `;

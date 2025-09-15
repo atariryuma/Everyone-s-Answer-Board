@@ -1,8 +1,8 @@
 <!doctype html>
 <html lang="ja">
   <head>
-    <base target="_top" />
     <meta charset="UTF-8" />
+    <base target="_top" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Shared Security Headers -->
     <?!= include('SharedSecurityHeaders'); ?>
@@ -131,6 +131,7 @@
 
             <!-- 変更ボタン -->
             <button
+              type="button"
               id="updateStatusBtn"
               class="w-full btn bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold py-3 px-6 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed"
               disabled
@@ -185,6 +186,7 @@
                 データベース接続、権限、データ整合性をチェックします
               </p>
               <button
+                type="button"
                 id="run-diagnosis-btn"
                 onclick="runSystemDiagnosis()"
                 class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full"
@@ -197,6 +199,7 @@
               <h3 class="text-lg font-medium text-white mb-3">🔧 自動修復</h3>
               <p class="text-sm text-gray-400 mb-4">検出された問題を自動的に修復します</p>
               <button
+                type="button"
                 id="run-repair-btn"
                 onclick="runAutoRepair()"
                 class="btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg w-full"
@@ -212,6 +215,7 @@
               <h3 class="text-lg font-medium text-white mb-3">📈 システム監視</h3>
               <p class="text-sm text-gray-400 mb-4">システム全体の健全性をチェックします</p>
               <button
+                type="button"
                 id="run-monitoring-btn"
                 onclick="runSystemMonitoring()"
                 class="btn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg w-full"
@@ -228,6 +232,7 @@
               <h3 class="text-lg font-medium text-white mb-3">✅ データ整合性</h3>
               <p class="text-sm text-gray-400 mb-4">データベースの整合性をチェックします</p>
               <button
+                type="button"
                 id="run-integrity-btn"
                 onclick="runIntegrityCheck()"
                 class="btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg w-full"
@@ -258,6 +263,7 @@
               <h3 class="text-lg font-medium text-white">登録ユーザー一覧</h3>
               <div class="flex gap-2">
                 <button
+                  type="button"
                   id="refresh-users-btn"
                   onclick="loadUserList()"
                   class="btn bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm"
@@ -265,6 +271,7 @@
                   🔄 更新
                 </button>
                 <button
+                  type="button"
                   id="view-logs-btn"
                   onclick="viewDeletionLogs()"
                   class="btn bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs"
@@ -272,6 +279,7 @@
                   📋 削除ログ
                 </button>
                 <button
+                  type="button"
                   id="view-diagnostic-logs-btn"
                   onclick="viewDiagnosticHistory()"
                   class="btn bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-lg text-xs"
@@ -312,6 +320,7 @@
           <!-- ユーザー管理ボタン -->
           <div class="text-center">
             <button
+              type="button"
               id="manage-users-btn"
               onclick="toggleUserManagement()"
               class="btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-3 px-6 rounded-lg"
@@ -325,6 +334,7 @@
       <!-- 戻るボタン -->
       <div class="text-center">
         <button
+          type="button"
           onclick="goBackToAdminPanel()"
           class="btn bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white font-bold py-2 px-6 rounded-lg"
         >
@@ -371,12 +381,14 @@
 
         <div class="flex gap-3">
           <button
+            type="button"
             onclick="cancelDeletion()"
             class="flex-1 btn bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg"
           >
             キャンセル
           </button>
           <button
+            type="button"
             id="confirm-delete-btn"
             onclick="confirmDeletion()"
             class="flex-1 btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg"
@@ -395,7 +407,7 @@
       <div class="glass-panel rounded-xl p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-xl font-semibold text-white">📋 削除ログ</h3>
-          <button onclick="closeDeletionLogs()" class="text-gray-400 hover:text-white text-2xl">
+          <button type="button" onclick="closeDeletionLogs()" class="text-gray-400 hover:text-white text-2xl">
             ✕
           </button>
         </div>
@@ -460,7 +472,7 @@
         notification.innerHTML = `
                 <div class="mr-3 text-2xl">${icon[type]}</div>
                 <div class="flex-1 text-sm">${message}</div>
-                <button class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest('.notification').remove()">✕</button>
+                <button type="button" class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest('.notification').remove()">✕</button>
             `;
 
         notificationContainer.appendChild(notification);

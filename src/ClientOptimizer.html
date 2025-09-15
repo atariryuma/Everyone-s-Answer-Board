@@ -225,7 +225,7 @@
           ${this.getIcon(type)}
         </div>
         <div class="flex-1 text-sm font-medium">${message}</div>
-        <button onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
+        <button type="button" onclick="this.parentElement.parentElement.remove()" class="text-white hover:text-gray-200">
           ${typeof window.IconLibrary !== 'undefined' ? window.IconLibrary.get('x', {size: 'w-4 h-4'}) : '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/></svg>'}
         </button>
       </div>
