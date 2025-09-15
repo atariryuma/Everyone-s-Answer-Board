@@ -14,6 +14,22 @@
  */
 
 /**
+ * 統一エラーID生成関数
+ * @returns {string} UUID形式のエラーID
+ */
+function generateErrorId() {
+  return `error_${Utilities.getUuid()}`;
+}
+
+/**
+ * 統一セッションID生成関数
+ * @returns {string} UUID形式のセッションID
+ */
+function generateSessionId() {
+  return `session_${Utilities.getUuid()}`;
+}
+
+/**
  * ErrorHandler - 統一エラーハンドリングシステム
  * システム全体のエラーを一元管理
  */
@@ -86,7 +102,7 @@ const ErrorHandler = Object.freeze({
       return {
         success: false,
         message: 'システムエラーが発生しました。管理者に連絡してください。',
-        errorId: `handler_error_${Date.now()}`,
+        errorId: generateErrorId(),
         canRetry: false,
         timestamp: new Date().toISOString()
       };
@@ -207,7 +223,7 @@ const ErrorHandler = Object.freeze({
    * @returns {Object} 標準化エラー
    */
   standardizeError(error, context) {
-    const errorId = `error_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const errorId = generateErrorId();
     const timestamp = new Date().toISOString();
 
     // エラーの基本情報抽出
@@ -550,7 +566,7 @@ const ErrorHandler = Object.freeze({
   persistCriticalError(error) {
     try {
       const props = PropertiesService.getScriptProperties();
-      const logKey = `error_log_${Date.now()}`;
+      const logKey = generateErrorId();
       
       props.setProperty(logKey, JSON.stringify(error));
       
@@ -601,8 +617,8 @@ const ErrorHandler = Object.freeze({
    */
   getSessionId() {
     try {
-      // GASではセッションIDが直接取得できないため、一時的なIDを生成
-      return `session_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      // GASではセッションIDが直接取得できないため、統一形式のIDを生成
+      return generateSessionId();
     } catch (error) {
       return 'unknown_session';
     }

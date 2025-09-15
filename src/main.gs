@@ -586,13 +586,15 @@ function handleAdminModeWithTemplate(params, context = {}) {
     // userIdが指定されていない場合、フォールバック処理（依存関係最小化）
     if (!userId) {
       try {
-        // 🚀 Zero-dependency fallback: Generate temporary userId for session
-        userId = `temp_${userEmail.replace('@', '_at_').replace(/\./g, '_')}`;
+        // 🚀 Zero-dependency fallback: Generate unique temporary userId
+        const tempId = Utilities.getUuid().substring(0, 8);
+        userId = `temp_${tempId}_${userEmail.replace('@', '_at_').replace(/\./g, '_')}`;
         userInfo = { userId, userEmail, isActive: true, isTemporary: true };
-        console.info('handleAdminModeWithTemplate: Using temporary userId for session', { userId });
+        console.info('handleAdminModeWithTemplate: Using unique temporary userId for session', { userId });
       } catch (e) {
         console.warn('handleAdminModeWithTemplate: Temporary user creation error:', e.message);
-        userId = 'temp_unknown';
+        // 完全にユニークなフォールバック
+        userId = `temp_unknown_${Utilities.getUuid().substring(0, 8)}`;
         userInfo = { userId, userEmail, isActive: true };
       }
     } else {
