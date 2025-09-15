@@ -1530,16 +1530,16 @@
       console.log('📋 connectToSheet: シート接続を開始:', { spreadsheetId, sheetName });
       showInfo('📋 シートに接続しています...');
 
-      // 1. 基本ヘッダー取得を実行
-      let analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
-        basicOnly: true
-      });
+      // 1. フル列分析を実行（AI検出と設定復元込み）
+      let analysisResult = await analyzeColumns(spreadsheetId, sheetName);
 
-      // 2. 基本ヘッダー取得も失敗した場合はフル分析
+      // 2. 列分析が失敗した場合は基本ヘッダーのみ取得を試行
       if (!analysisResult || !analysisResult.success) {
-        console.log('🔧 connectToSheet: フル列分析を実行');
-        showInfo('🔍 詳細分析を実行中...');
-        analysisResult = await analyzeColumns(spreadsheetId, sheetName);
+        console.log('🔧 connectToSheet: 基本ヘッダー取得を実行');
+        showInfo('🔍 基本ヘッダー取得中...');
+        analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
+          basicOnly: true
+        });
       }
 
       if (!analysisResult || !analysisResult.success) {
