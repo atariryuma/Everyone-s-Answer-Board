@@ -240,10 +240,9 @@ range
 } catch (error) {
 console.error('Service.append error:', error.message);
 throw error;
-        }
-      }
     }
-  };
+  }
+};
 
 console.log('DatabaseCore', {
 operation: 'createSheetsService',
