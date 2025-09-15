@@ -2877,9 +2877,20 @@
 
   // アプリ設定画面を開く
   function openAppSetup() {
-    // 現在のURLからベースURLを取得
-    const currentUrl = new URL(window.location.href);
-    const baseUrl = currentUrl.origin + currentUrl.pathname;
-    window.location.href = baseUrl;
+    try {
+      setPartialLoading(true, 'アプリ設定画面に移動中...');
+
+      // 現在のURLからベースURLを取得してappSetupモードで遷移
+      const currentUrl = new URL(window.location.href);
+      const baseUrl = currentUrl.origin + currentUrl.pathname;
+      const setupUrl = baseUrl + '?mode=appSetup';
+
+      console.log('アプリ設定画面への遷移:', setupUrl);
+      window.location.href = setupUrl;
+    } catch (error) {
+      console.error('openAppSetup error:', error);
+      showError('アプリ設定画面への移動に失敗しました');
+      setPartialLoading(false);
+    }
   }
 </script>
