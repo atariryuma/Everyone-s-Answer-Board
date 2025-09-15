@@ -1115,7 +1115,8 @@ function getSheetData(userId, options = {}) {
   try {
     if (!userId) {
       console.warn('getSheetData: userId not provided');
-      return createErrorResponse('ユーザーIDが必要です', { data: [], headers: [], sheetName: '' });
+      // Direct return format like admin panel getSheetList
+      return { success: false, message: 'ユーザーIDが必要です', data: [], headers: [], sheetName: '' };
     }
 
     console.log('getSheetData: calling getUserSheetData', { userId, hasOptions: !!options });
@@ -1131,10 +1132,12 @@ function getSheetData(userId, options = {}) {
       sheetName: result?.sheetName || 'undefined'
     });
 
+    // Return directly without wrapping - same pattern as admin panel getSheetList
     return result;
   } catch (error) {
     console.error('getSheetData error:', error.message);
-    return createExceptionResponse(error);
+    // Direct return format like admin panel getSheetList
+    return { success: false, message: error.message || 'データ取得エラー', data: [], headers: [], sheetName: '' };
   }
 }
 

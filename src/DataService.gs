@@ -54,21 +54,21 @@ function getUserSheetData(userId, options = {}) {
     // 🔧 ServiceFactory経由でデータベース取得
     const db = ServiceFactory.getDB();
     if (!db) {
-      console.error('DataService.getSheetData: Database not available');
-      return createErrorResponse('データベース接続エラー', { data: [], headers: [], sheetName: '' });
+      console.error('DataService.getUserSheetData: Database not available');
+      return { success: false, message: 'データベース接続エラー', data: [], headers: [], sheetName: '' };
     }
 
     const user = db.findUserById(userId);
     if (!user || !user.configJson) {
-      console.error('DataService.getSheetData: ユーザー設定が見つかりません', { userId });
-      // ✅ google.script.run 互換: シンプル形式
+      console.error('DataService.getUserSheetData: ユーザー設定が見つかりません', { userId });
+      // Direct return format like admin panel getSheetList
       return { success: false, message: 'ユーザー設定を取得できませんでした', data: [], headers: [], sheetName: '' };
     }
 
     const config = JSON.parse(user.configJson);
     if (!config.spreadsheetId) {
-      console.warn('DataService.getSheetData: スプレッドシートIDが設定されていません', { userId });
-      // ✅ google.script.run 互換: シンプル形式
+      console.warn('DataService.getUserSheetData: スプレッドシートIDが設定されていません', { userId });
+      // Direct return format like admin panel getSheetList
       return { success: false, message: 'スプレッドシートが設定されていません', data: [], headers: [], sheetName: '' };
     }
 
@@ -84,12 +84,12 @@ function getUserSheetData(userId, options = {}) {
 
     return result;
   } catch (error) {
-    console.error('DataService.getSheetData: エラー', {
+    console.error('DataService.getUserSheetData: エラー', {
       userId,
       error: error.message
     });
-    // ✅ google.script.run 互換: シンプル形式
-    return createErrorResponse(error.message || 'データ取得エラー', { data: [], headers: [], sheetName: '' });
+    // Direct return format like admin panel getSheetList
+    return { success: false, message: error.message || 'データ取得エラー', data: [], headers: [], sheetName: '' };
   }
 }
 
