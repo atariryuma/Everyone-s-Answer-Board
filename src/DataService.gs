@@ -971,7 +971,7 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
     }
 
     // 🎯 GAS Best Practice: スプレッドシート接続を別関数に分離
-    const connectionResult = connectToSheet(spreadsheetId, sheetName);
+    const connectionResult = connectToSheetInternal(spreadsheetId, sheetName);
     if (!connectionResult.success) {
       console.error('DataService.columnAnalysis: スプレッドシート接続失敗');
       return connectionResult.errorResponse;
@@ -1053,11 +1053,11 @@ function validateSheetParams(spreadsheetId, sheetName) {
  * @param {string} sheetName - シート名
  * @returns {Object} 接続結果
  */
-function connectToSheet(spreadsheetId, sheetName) {
+function connectToSheetInternal(spreadsheetId, sheetName) {
   try {
-    console.log('DataService.connectToSheet: スプレッドシート接続開始');
+    console.log('DataService.connectToSheetInternal: スプレッドシート接続開始');
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    console.log('DataService.connectToSheet: スプレッドシート接続成功');
+    console.log('DataService.connectToSheetInternal: スプレッドシート接続成功');
 
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
@@ -1073,11 +1073,11 @@ function connectToSheet(spreadsheetId, sheetName) {
       };
     }
 
-    console.log('DataService.connectToSheet: シート取得成功');
+    console.log('DataService.connectToSheetInternal: シート取得成功');
     return { success: true, sheet };
 
   } catch (error) {
-    console.error('DataService.connectToSheet: 接続エラー', {
+    console.error('DataService.connectToSheetInternal: 接続エラー', {
       error: error.message,
       spreadsheetId: `${spreadsheetId.substring(0, 10)}...`
     });
