@@ -229,7 +229,10 @@ function doGet(e) {
           // Board is published - serve view page
           console.log('view mode: serving published board for user:', userId);
           const template = HtmlService.createTemplateFromFile('Page.html');
-          template.userId = userId;
+          template.data = {
+            userId: userId,
+            userEmail: user.userEmail || null
+          };
           return template.evaluate();
 
         } catch (error) {
