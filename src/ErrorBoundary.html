@@ -169,9 +169,11 @@
         <button type="button" class="btn btn-primary" onclick="location.reload()">
           🔄 再読み込み
         </button>
+        <? if (!hideLoginButton) { ?>
         <button type="button" class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
           🏠 ログイン画面に戻る
         </button>
+        <? } ?>
       </div>
 
       <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>

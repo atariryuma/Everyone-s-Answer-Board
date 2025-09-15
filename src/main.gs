@@ -144,7 +144,11 @@ function doGet(e) {
           const user = db.findUserById(userId);
           if (!user) {
             console.warn('view mode: user not found:', userId);
-            return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+            const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
+            errorTemplate.title = 'ユーザーが見つかりません';
+            errorTemplate.message = '指定されたユーザーの回答ボードは存在しません。URLをご確認ください。';
+            errorTemplate.hideLoginButton = true;
+            return errorTemplate.evaluate();
           }
 
           // Check if user's board is published
@@ -159,7 +163,11 @@ function doGet(e) {
 
           if (!config.appPublished) {
             console.warn('view mode: board not published for user:', userId);
-            return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+            const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
+            errorTemplate.title = 'ボードは非公開です';
+            errorTemplate.message = 'このユーザーの回答ボードは現在非公開設定になっています。';
+            errorTemplate.hideLoginButton = true;
+            return errorTemplate.evaluate();
           }
 
           // Board is published - serve view page
@@ -170,7 +178,11 @@ function doGet(e) {
 
         } catch (error) {
           console.error('view mode error:', error.message);
-          return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+          const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
+          errorTemplate.title = 'アクセスエラー';
+          errorTemplate.message = '回答ボードへのアクセス中にエラーが発生しました。';
+          errorTemplate.hideLoginButton = true;
+          return errorTemplate.evaluate();
         }
       }
 
