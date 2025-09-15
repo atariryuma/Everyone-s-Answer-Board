@@ -245,6 +245,21 @@ function isSystemAdmin(email) {
 }
 
 // ===========================================
+// 🌍 Compatibility Export (minimal shim)
+// ===========================================
+
+(function () {
+  const root = (typeof globalThis !== 'undefined') ? globalThis : this;
+  // Ensure UserService namespace exists for callers using UserService.isSystemAdmin
+  if (!root.UserService) {
+    root.UserService = {};
+  }
+  if (typeof root.UserService.isSystemAdmin !== 'function') {
+    root.UserService.isSystemAdmin = isSystemAdmin;
+  }
+})();
+
+// ===========================================
 // 🔄 ユーザー操作
 // ===========================================
 

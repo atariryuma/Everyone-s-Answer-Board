@@ -65,7 +65,7 @@ function doGet(e) {
         if (!email) {
           return HtmlService.createHtmlOutput('<h1>Login Required</h1>');
         }
-        if (!UserService.isSystemAdmin(email)) {
+        if (!ServiceFactory.getUserService().isSystemAdmin(email)) {
           return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
         }
         // Inject minimal userInfo for template usage
@@ -595,7 +595,7 @@ function setAppStatus(isActive) {
 function getAdminUsers(options = {}) {
   try {
     const email = getCurrentEmail();
-    if (!email || !UserService.isSystemAdmin(email)) {
+    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
       return createAdminRequiredError();
     }
 
@@ -693,7 +693,7 @@ function deleteUser(userId, reason = '') {
 function getLogs(options = {}) {
   try {
     const email = getCurrentEmail();
-    if (!email || !UserService.isSystemAdmin(email)) {
+    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
       return createAdminRequiredError();
     }
 

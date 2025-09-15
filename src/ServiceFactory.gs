@@ -228,6 +228,30 @@ function getUtils() {
 }
 
 // ===========================================
+// 👤 User Service Accessor
+// ===========================================
+
+function getUserService() {
+  try {
+    const root = (typeof globalThis !== 'undefined') ? globalThis : this;
+    if (root.UserService && typeof root.UserService.isSystemAdmin === 'function') {
+      return root.UserService;
+    }
+    // Fallback: wrap global isSystemAdmin function if available
+    if (typeof isSystemAdmin === 'function') {
+      return { isSystemAdmin };
+    }
+    // Safe default stub
+    return {
+      isSystemAdmin: () => false
+    };
+  } catch (error) {
+    console.warn('ServiceFactory.getUserService: Access error:', error.message);
+    return { isSystemAdmin: () => false };
+  }
+}
+
+// ===========================================
 // 🔍 Diagnostics
 // ===========================================
 
@@ -322,5 +346,6 @@ __rootSF.ServiceFactory = {
   getDB,
   getSpreadsheet,
   getUtils,
+  getUserService,
   diagnose
 };
