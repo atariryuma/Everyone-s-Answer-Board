@@ -79,15 +79,39 @@ function doGet(e) {
         let userInfo = null;
         try {
           const db = ServiceFactory.getDB();
-          const user = db && db.findUserByEmail ? db.findUserByEmail(email) : null;
+          let user = db && db.findUserByEmail ? db.findUserByEmail(email) : null;
+
+          // Auto-create admin user if not exists
+          if (!user && db && typeof db.createUser === 'function') {
+            console.log('Creating admin user in database:', email);
+            try {
+              const userService = ServiceFactory.getUserService();
+              user = userService.createUser(email);
+              console.log('Admin user created successfully:', user?.userId);
+            } catch (createError) {
+              console.warn('Failed to create admin user:', createError.message);
+            }
+          }
+
           if (user) {
             userInfo = {
               userId: user.userId || null,
               userEmail: user.userEmail || email
             };
+          } else {
+            // Fallback userInfo for admin even without DB user
+            userInfo = {
+              userId: null,
+              userEmail: email
+            };
           }
         } catch (e) {
           console.warn('doGet(admin): user lookup failed', e && e.message);
+          // Fallback userInfo for admin
+          userInfo = {
+            userId: null,
+            userEmail: email
+          };
         }
         const adminTmpl = HtmlService.createTemplateFromFile('AdminPanel.html');
         adminTmpl.userInfo = userInfo;
@@ -402,10 +426,30 @@ function getUserConfig(userId) {
     }
 
     const db = ServiceFactory.getDB();
-    const user = db.findUserById(userId);
+    let user = db.findUserById(userId);
 
     if (!user) {
-      return createUserNotFoundError();
+      // Auto-create user if it's a system admin
+      const userService = ServiceFactory.getUserService();
+      if (userService && userService.isSystemAdmin(email)) {
+        try {
+          console.log('Auto-creating admin user for getUserConfig:', userId);
+          const userByEmail = db.findUserByEmail(email);
+          if (userByEmail && userByEmail.userId === userId) {
+            user = userByEmail;
+          } else {
+            user = userService.createUser(email);
+          }
+          console.log('Admin user auto-created:', user?.userId);
+        } catch (createError) {
+          console.warn('Failed to auto-create admin user:', createError.message);
+        }
+      }
+
+      // Still no user found
+      if (!user) {
+        return createUserNotFoundError();
+      }
     }
 
     const config = user.configJson ? JSON.parse(user.configJson) : {};

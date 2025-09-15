@@ -1100,6 +1100,7 @@
   function updateResourceButtons(config) {
     const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
     const formBtn = document.getElementById('open-form-btn');
+    const boardBtn = document.getElementById('open-board-btn');
     const statusDiv = document.getElementById('resource-status');
 
     // 設定が無い場合の初期状態
@@ -1107,7 +1108,7 @@
       spreadsheetBtn.disabled = true;
       spreadsheetBtn.dataset.spreadsheetId = '';
       formBtn.classList.add('hidden');
-      boardBtn.classList.add('hidden');
+      if (boardBtn) boardBtn.classList.add('hidden');
       statusDiv.textContent = '設定が見つかりません';
       return;
     }
