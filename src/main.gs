@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, DatabaseOperations, DataService, SystemController, UserService, ServiceFactory, isSystemAdmin, validateConfig, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse */
+/* global handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, DatabaseOperations, DataService, SystemController, UserService, ServiceFactory, isSystemAdmin, validateConfig, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -31,7 +31,6 @@ function getCurrentEmail() {
   }
 }
 
-// isAdmin removed - use UserService.isSystemAdmin() instead
 
 /**
  * Include HTML template
@@ -335,7 +334,6 @@ function getUserConfig(userId) {
   }
 }
 
-// getSheetData is provided by DataService (duplicate removed)
 
 /**
  * Legacy alias for backwards compatibility
@@ -579,7 +577,6 @@ function setAppStatus(isActive) {
 /**
  * Add reaction by user ID - converts userId to email for addReaction
  */
-// addReactionById removed - call DataService.addReaction(userId, rowId, reactionType)
 
 /**
  * Check if user is system admin - simplified name
@@ -612,7 +609,6 @@ function getAdminUsers(options = {}) {
   }
 }
 
-// Backward-compatible alias (to be removed after clients migrate)
 function getUsers(options = {}) { return getAdminUsers(options); }
 
 
@@ -801,21 +797,16 @@ function getBoardInfo() {
 /**
  * Validate URL - unified function replacing multiple duplicates
  */
-// validateUrl removed - use validators.gs validateUrl instead
 
 /**
  * Validate email - unified function
  */
-// validateEmail removed - use validators.gs validateEmail instead
 
 /**
  * Validate spreadsheet ID - unified function
  */
-// validateSpreadsheetId removed - use validators.gs validateSpreadsheetId instead
 
-// validateConfig removed - use validateConfig from validators.gs instead
 
-// Removed legacy aliases - use direct functions instead
 
 // ===========================================
 // 🔧 Unified Data Operations
@@ -824,14 +815,11 @@ function getBoardInfo() {
 /**
  * Toggle highlight - simplified name for highlight operations
  */
-// toggleHighlight removed - call DataService.toggleHighlight(userId, rowId)
 
 /**
  * Remove reaction - simplified name
  */
-// removeReaction removed - use DataService.updateReactionInSheet(..., 'remove') if needed
 
-// Legacy aliases removed - use direct function names
 
 // ===========================================
 // 🔧 Additional HTML-Called Functions
@@ -866,11 +854,8 @@ function getSheetList(spreadsheetId) {
   }
 }
 
-// analyzeColumns is provided by DataService (duplicate removed)
 
-// getFormInfo is provided by SystemController (duplicate removed)
 
-// createForm is provided by SystemController (duplicate removed)
 
 /**
  * Save user config - simplified name
@@ -916,4 +901,3 @@ function saveConfig(userId, config) {
   }
 }
 
-// Removed legacy aliases - use saveConfig directly

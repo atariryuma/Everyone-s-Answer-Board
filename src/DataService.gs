@@ -93,7 +93,6 @@ function getSheetData(userId, options = {}) {
   }
 }
 
-// getPublishedSheetData removed - use getSheetData directly for better performance
 
 /**
  * スプレッドシートデータ取得実行
@@ -374,11 +373,8 @@ function extractFieldValue(row, headers, fieldType, columnMapping = {}) {
  * @param {string} reactionType - リアクションタイプ
  * @returns {boolean} 成功可否
  */
-// addDataReaction removed - use DataService.addReaction(userId, rowId, reactionType)
 
-// removeDataReaction removed - use updateReactionInSheet(config, rowId, reactionType, 'remove')
 
-// toggleDataHighlight removed - use DataService.toggleHighlight(userId, rowId)
 
 /**
  * スプレッドシート内リアクション更新

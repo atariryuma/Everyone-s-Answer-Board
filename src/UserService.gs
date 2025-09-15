@@ -385,7 +385,6 @@ function getUserSessionStatus() {
 // 🔧 ユーティリティ
 // ===========================================
 
-// findUserByEmail is provided by DatabaseOperations (duplicate removed)
 
 /**
  * メールアドレス検証（SecurityServiceに委譲）
@@ -398,7 +397,6 @@ function getUserSessionStatus() {
  * @param {string} formUrl - フォームURL
  * @returns {boolean} 有効かどうか
  */
-// validateUserFormUrl function removed - use validateUrl from validators.gs instead
 
 /**
  * サービス状態診断

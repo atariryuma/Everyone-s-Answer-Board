@@ -49,7 +49,6 @@ function initDatabaseConnection() {
 }
 
 
-// generateUserId は main.gs に統一移動済み
 
 
 /**
@@ -137,7 +136,6 @@ function testSystemDiagnosis() {
 
       // Services診断 - Safe service access with GAS loading protection
       try {
-        // Safe Service availability check - removed function calls to prevent undefined errors
         diagnostics.services.UserService = typeof UserService !== 'undefined'
           ? '✅ Loaded and available'
           : '❌ Not loaded or unavailable';

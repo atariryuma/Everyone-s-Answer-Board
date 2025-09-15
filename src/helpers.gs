@@ -37,7 +37,6 @@ function getHelperColumnIndex(config, columnType) {
 // 📏 フォーマッティングヘルパー関数群
 // ===========================================
 
-// formatTimestamp - formatters.jsに統一 (重複削除完了)
 
 
 

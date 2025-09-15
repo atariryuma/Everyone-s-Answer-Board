@@ -238,8 +238,8 @@ function getUserService() {
       return root.UserService;
     }
     // Fallback: wrap global isSystemAdmin function if available
-    if (typeof isSystemAdmin === 'function') {
-      return { isSystemAdmin };
+    if (typeof global.isSystemAdmin === 'function') {
+      return { isSystemAdmin: global.isSystemAdmin };
     }
     // Safe default stub
     return {

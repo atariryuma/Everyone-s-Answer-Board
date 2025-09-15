@@ -326,9 +326,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
  * @param {Object} options - 取得オプション
  * @returns {Object} ユーザー一覧
  */
-// getAllUsers (admin UI) is not used and duplicates DB function name (removed)
 
-// deleteUserAccountByAdminForUI removed - use deleteUser from main.gs instead
 
 /**
  * スプレッドシートURL追加

@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, URL, DatabaseOperations, validateUrl, createErrorResponse */
+/* global ServiceFactory, URL, DatabaseOperations, validateUrl, createErrorResponse, validateSpreadsheetId */
 
 // ===========================================
 // 🔧 Zero-Dependency ConfigService (ServiceFactory版)
@@ -418,14 +418,12 @@ function validateConfigUserId(userId) {
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {boolean} 有効性
  */
-// validateSpreadsheetId is unified in src/validators.gs (duplicate removed)
 
 /**
  * フォームURL検証
  * @param {string} formUrl - フォームURL
  * @returns {boolean} 有効性
  */
-// validateFormUrl function removed - use validateUrl from validators.gs instead
 
 // ===========================================
 // 📊 システム状態・診断
