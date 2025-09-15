@@ -649,6 +649,7 @@ status: '✅ Active'
 const DatabaseOperations = {
   findUserByEmail,
   findUserById,
+  getAllUsers,
   createUser: dbCreateUser,
   updateUser,
   deleteUserAccountByAdmin: updateUser, // Alias
