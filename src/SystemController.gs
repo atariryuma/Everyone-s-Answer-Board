@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global ServiceFactory, DB, UserService, ConfigService, DatabaseOperations, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse */
+/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse */
 
 // ===========================================
 // 🔧 Zero-Dependency Utility Functions
@@ -13,40 +13,7 @@
  */
 
 
-// ===========================================
-// 🔧 DB初期化システム（GAS読み込み順序対応）
-// ===========================================
-
-/**
- * DB接続の初期化（GAS読み込み順序問題解決）
- * SystemController内の全関数で使用
- * @returns {Object|null} DB接続オブジェクト
- */
-function initDatabaseConnection() {
-  try {
-    // Method 1: グローバルDB変数が利用可能な場合
-    if (typeof DB !== 'undefined' && DB) {
-      return DB;
-    }
-
-    // Method 2: DatabaseOperationsが直接利用可能な場合
-    if (typeof DatabaseOperations !== 'undefined') {
-      // グローバルDB変数を設定（環境互換: globalThis/this）
-      if (typeof DB === 'undefined') {
-        const __rootDB = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
-        __rootDB.DB = DatabaseOperations;
-      }
-      return DatabaseOperations;
-    }
-
-    // Method 3: fallback - 基本的なDB機能を直接実装
-    console.warn('initDatabaseConnection: DatabaseOperations not available, using fallback');
-    return null;
-  } catch (error) {
-    console.error('initDatabaseConnection: エラー', error.message);
-    return null;
-  }
-}
+// DB 初期化関数は廃止。必ず ServiceFactory.getDB() を使用すること。
 
 
 
@@ -419,7 +386,11 @@ function saveDraftConfiguration(config) {
       return createErrorResponse('ユーザー認証が必要です');
     }
 
-    const user = DB.findUserByEmail(userEmail);
+    const db = ServiceFactory.getDB();
+    if (!db) {
+      return createErrorResponse('データベース接続エラー');
+    }
+    const user = db.findUserByEmail(userEmail);
     if (!user) {
       return createUserNotFoundError();
     }
@@ -431,7 +402,7 @@ function saveDraftConfiguration(config) {
       updatedAt: new Date().toISOString()
     };
 
-    DB.updateUser(user.userId, updatedUser);
+    db.updateUser(user.userId, updatedUser);
 
     return {
       success: true,
@@ -527,7 +498,7 @@ function validateAccess(spreadsheetId) {
 function getFormInfo(spreadsheetId, sheetName) {
   try {
     // 🚀 Zero-dependency: ServiceFactory経由でConfigService利用
-    const configService = ConfigService;
+    const configService = ServiceFactory.getConfigService();
     if (!configService) {
       throw new Error('ConfigService not available');
     }
@@ -568,7 +539,7 @@ function createForm(userId, config) {
     }
 
     // ServiceFactory経由でConfigServiceアクセス
-    const configService = ConfigService;
+    const configService = ServiceFactory.getConfigService();
     if (!configService) {
       console.error('AdminController.createForm: ConfigService not available');
       return { success: false, message: 'ConfigServiceが利用できません' };
@@ -616,7 +587,7 @@ function checkCurrentPublicationStatus() {
     }
 
     // ServiceFactory経由で設定情報を取得
-    const configService = ConfigService;
+    const configService = ServiceFactory.getConfigService();
     const config = configService ? configService.getUserConfig(userId) : null;
     if (!config) {
       return {

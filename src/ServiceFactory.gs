@@ -13,7 +13,7 @@
  * - プラットフォームAPI統合
  */
 
-/* global DatabaseOperations */
+/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, getServiceAccountToken */
 
 // ===========================================
 // 🔧 Session Management
@@ -143,7 +143,7 @@ function getDB() {
     // Fallback to DatabaseOperations symbol if present
     if (typeof DatabaseOperations !== 'undefined') {
       // Cache to global root for subsequent calls
-      try { root.DB = DatabaseOperations; } catch (_) {}
+      try { root.DB = DatabaseOperations; } catch (_) { void 0; }
       return DatabaseOperations;
     }
 
@@ -287,6 +287,29 @@ function getDataService() {
     return null;
   }
 }
+
+// ===========================================
+// ⚙️ Config Service Accessor
+// ===========================================
+
+function getConfigService() {
+  try {
+    const root = (typeof globalThis !== 'undefined') ? globalThis : this;
+    if (root.ConfigService) return root.ConfigService;
+
+    // Build minimal shim from available globals
+    const shim = {};
+    if (typeof getUserConfig === 'function') shim.getUserConfig = getUserConfig;
+    if (typeof saveUserConfig === 'function') shim.saveUserConfig = saveUserConfig;
+    if (Object.keys(shim).length > 0) return shim;
+
+    console.warn('ServiceFactory.getConfigService: ConfigService not available');
+    return null;
+  } catch (error) {
+    console.error('ServiceFactory.getConfigService: Access error:', error.message);
+    return null;
+  }
+}
 // ===========================================
 // 🔍 Diagnostics
 // ===========================================
@@ -384,5 +407,25 @@ __rootSF.ServiceFactory = {
   getUtils,
   getUserService,
   getDataService,
+  getConfigService,
+  // Lazy accessor for SecurityService (optional usage sites)
+  getSecurityService: (function () {
+    return function getSecurityService() {
+      try {
+        const root = (typeof globalThis !== 'undefined') ? globalThis : this;
+        if (root.SecurityService) return root.SecurityService;
+        const shim = {};
+        if (typeof validateUserData === 'function') shim.validateUserData = validateUserData;
+        if (typeof validateSession === 'function') shim.validateSession = validateSession;
+        if (typeof getServiceAccountToken === 'function') shim.getServiceAccountToken = getServiceAccountToken;
+        if (Object.keys(shim).length > 0) return shim;
+        console.warn('ServiceFactory.getSecurityService: SecurityService not available');
+        return null;
+      } catch (e) {
+        console.error('ServiceFactory.getSecurityService: Access error:', e.message);
+        return null;
+      }
+    };
+  })(),
   diagnose
 };

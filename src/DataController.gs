@@ -224,7 +224,7 @@ function getRecentSubmissions(userId, limit = 10) {
       };
     }
 
-    const configService = ConfigService;
+    const configService = ServiceFactory.getConfigService();
     const config = configService ? configService.getUserConfig(userId) : null;
     if (!config || !config.appPublished) {
       return {

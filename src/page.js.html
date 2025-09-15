@@ -17,14 +17,24 @@ const CONFIG = Object.freeze({
   ERROR_RETRY_DELAY: 1000      // リトライ遅延(ms)
 });
 
-// アイコン定義
+// SVGアイコンの定義（見本ファイルと完全互換）
 const ICONS = Object.freeze({
-  lightbulb: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2m8.66-10H20M4 12H2m15.07-7.07L17.66 6.34M6.34 6.34L4.93 4.93m12.14 12.14L15.66 15.66M6.34 17.66L4.93 19.07"/></svg>',
-  thumbup: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 10v12l5-3 5 3V10l-5-8-5 8z"/></svg>',
-  search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>',
-  star: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26 12,2"/></svg>',
-  users: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
-  x: '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>'
+  'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+  'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
+  'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+  'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z M6.5 10v12h1V10h-1z"/></svg>',
+  'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
+  'magnifying-glass-plus-solid': '<svg viewBox="0 0 24 24" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15z M9.75 7.5v2.25H7.5v1.5h2.25V13.5h1.5v-2.25H13.5v-1.5h-2.25V7.5h-1.5z" fill="currentColor"/><path d="M10.5 18a7.5 7.5 0 100-15 7.5 7.5 0 000 15zM16.5 16.5l4.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  'x': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>',
+  'star-outline': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+  'star-solid': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+  'star': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15 8.5 22 9.3 17 14 18.2 21 12 17.8 5.8 21 7 14 2 9.3 9 8.5 12 2"/></svg>',
+  'grid-2x2': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 12h18"/><path d="M12 3v18"/></svg>',
+  'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  // 後方互換性のため既存のキー名も保持
+  lightbulb: '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+  thumbup: '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+  search: '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>'
 });
 
 // システム定数
@@ -246,6 +256,13 @@ class AnswerApp {
     this.isLoading = false;
     this.pollingInterval = null;
     this.currentSort = 'newest';
+
+    // リアクションの種類とアイコンのマッピング（見本ファイルと互換）
+    this.reactionTypes = [
+      { key: 'LIKE', icon: 'hand-thumb-up' },
+      { key: 'UNDERSTAND', icon: 'lightbulb' },
+      { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
+    ];
 
     this.init();
   }
@@ -556,126 +573,114 @@ class AnswerApp {
     container.appendChild(fragment);
   }
 
-  // 回答カード作成
-  createAnswerCard(answer) {
-    const card = DOMHelpers.createElement('div', 'answer-card glass-panel rounded-xl p-4 cursor-pointer transition-all duration-300 hover:scale-105');
+  // 回答カード作成（見本ファイル仕様）
+  createAnswerCard(data) {
+    const card = document.createElement('div');
+    card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer';
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('role', 'button');
 
-    // ハイライト装飾
-    if (answer.highlight) {
+    const instructionId = 'instruction-' + data.rowIndex;
+    card.setAttribute('aria-describedby', instructionId);
+
+    // ハイライト状態の適用
+    if (data.highlight) {
       card.classList.add('highlighted');
     }
 
-    // リアクション装飾
-    this.addReactionDecorations(card, answer.reactions);
+    // リアクション総数に基づくボーダー設定
+    const totalReactions = this.reactionTypes.reduce((sum, rt) =>
+      sum + ((data.reactions && data.reactions[rt.key]) ? data.reactions[rt.key].count : 0), 0);
 
-    const showName = this.appConfig.showDetails !== false;
-    const nameHtml = showName ? `<div class="font-bold text-sm mb-2">${this.escapeHtml(answer.name || '')}</div>` : '';
+    if (totalReactions >= 10) {
+      card.classList.add('reaction-border-3');
+    } else if (totalReactions >= 5) {
+      card.classList.add('reaction-border-2');
+    } else if (totalReactions > 0) {
+      card.classList.add('reaction-border-1');
+    }
 
-    card.innerHTML = `
-      <div class="mb-3">
-        ${nameHtml}
-        <h3 class="text-cyan-200 font-semibold mb-2">${this.escapeHtml(answer.opinion || '')}</h3>
-        <p class="text-gray-300 text-sm answer-preview">${this.escapeHtml(answer.reason || '')}</p>
-      </div>
-      ${this.createReactionButtons(answer)}
-      ${answer.highlight ? '<div class="highlight-badge"><span class="text-yellow-300">' + ICONS.star + '</span></div>' : ''}
-    `;
+    let highlightBtnHtml = '';
+    // ハイライトトグル機能が有効な場合のみボタンを生成
+    if (this.appConfig.showHighlightToggle) {
+      const cls = data.highlight ? 'liked' : '';
+      const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+      highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-yellow-400 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' +
+                         this.getIcon('star', 'w-5 h-5', true) +
+                         '</button>';
+    }
 
-    // カードクリックでモーダル表示
-    card.addEventListener('click', (e) => {
-      if (!e.target.closest('.reaction-btn')) {
-        this.showModal(answer);
-      }
-    });
+    // 名前表示設定に基づき学生名を表示
+    const showName = this.appConfig.displayMode === 'named';
+    const nameHtml = showName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
+    const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+
+    // リアクションボタンのHTMLを生成（アクセシビリティ強化）
+    const reactionButtonsHtml = this.reactionTypes.map(rt => {
+      const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
+      const cls = info.reacted ? 'liked' : '';
+      const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+
+      // showCountsがtrueの場合のみカウントを表示
+      const countSpan = this.appConfig.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
+
+      // アクセシビリティ向上のためのaria-label
+      const reactionNames = {
+        'LIKE': 'いいね',
+        'UNDERSTAND': 'なるほど',
+        'CURIOUS': '気になる'
+      };
+      const reactionName = reactionNames[rt.key] || rt.key;
+      const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.appConfig.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
+
+      return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' +
+               this.getIcon(rt.icon, 'w-5 h-5', info.reacted) +
+               countSpan +
+               '</button>';
+    }).join('');
+
+    // ハイライト状態を隠れた要素で通知（スクリーンリーダー用）
+    const highlightStatusHtml = data.highlight ?
+      '<div id="highlight-status-' + data.rowIndex + '" class="sr-only">この回答はハイライトされています</div>' : '';
+    // 詳細表示のヒントを隠れた要素で提供
+    const instructionHtml = '<div id="' + instructionId + '" class="sr-only">Enter または Space で詳細表示</div>';
+
+    card.innerHTML =
+      '<div class="relative flex-grow mb-3 answer-preview">' +
+      '<h3 class="opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight">' +
+      this.escapeHtml(data.opinion || '') + '</h3>' +
+      '<p class="text-gray-100 whitespace-pre-wrap break-words mt-4">' +
+      this.escapeHtml(data.reason || '') + '</p>' +
+      '</div>' +
+      '<div class="' + containerClass + '">' +
+      nameHtml + // 学生名（管理者モードのみ）
+      '<div class="flex items-center gap-1" role="group" aria-label="回答への反応">' +
+      reactionButtonsHtml + // リアクションボタン群
+      highlightBtnHtml + // ハイライトボタン（管理者モードのみ）
+      '</div>' +
+      '</div>' +
+      highlightStatusHtml + // ハイライト状態通知
+      instructionHtml; // 詳細表示ヒント
+
+    // ハイライトバッジを動的に追加
+    if (data.highlight) {
+      const badge = document.createElement('span');
+      badge.className = 'highlight-badge';
+      badge.innerHTML = this.getIcon('star', '', true);
+      card.appendChild(badge);
+    }
+
+    // カードクリックイベントリスナーは setupEventDelegation() で一括処理されるため不要
+    // 個別のイベントリスナー追加を削除してパフォーマンスを向上
+
+    // 以下のコードは setupEventDelegation() に移行済み:
+    // - リアクションボタンのクリック処理
+    // - ハイライトボタンのクリック処理
+    // - カード本体のクリック処理（モーダル表示）
 
     return card;
   }
 
-  // リアクション装飾追加
-  addReactionDecorations(card, reactions) {
-    if (!reactions) return;
-
-    const reactionTypes = Object.keys(reactions).filter(key => reactions[key].count > 0);
-
-    if (reactionTypes.length > 0) {
-      // 複数リアクションの場合はグラデーション
-      if (reactionTypes.length > 1) {
-        const colors = {
-          LIKE: '#ef4444',
-          UNDERSTAND: '#fbbf24',
-          CURIOUS: '#10b981'
-        };
-        const gradientColors = reactionTypes.map(type => colors[type]).filter(Boolean);
-        if (gradientColors.length > 1) {
-          card.style.borderImage = `linear-gradient(45deg, ${gradientColors.join(', ')}) 1`;
-          card.style.borderWidth = '2px';
-        }
-      } else {
-        // 単一リアクションの場合
-        const type = reactionTypes[0];
-        const colorClass = {
-          LIKE: 'reaction-bg-like',
-          UNDERSTAND: 'reaction-bg-understand',
-          CURIOUS: 'reaction-bg-curious'
-        }[type];
-        if (colorClass) {
-          card.classList.add(colorClass);
-        }
-      }
-
-      // リアクション数に応じてボーダーの太さを調整
-      const totalReactions = reactionTypes.reduce((sum, type) => sum + reactions[type].count, 0);
-      if (totalReactions >= 5) {
-        card.classList.add('reaction-border-3');
-      } else if (totalReactions >= 3) {
-        card.classList.add('reaction-border-2');
-      } else {
-        card.classList.add('reaction-border-1');
-      }
-    }
-  }
-
-  // リアクションボタン作成
-  createReactionButtons(answer) {
-    if (!this.showAdminFeatures && !this.appConfig.showDetails) return '';
-
-    const reactions = answer.reactions || {};
-    const reactionButtons = Object.entries(reactions).map(([type, data]) => {
-      const isReacted = data.reacted || false;
-      const count = data.count || 0;
-      const icon = {
-        LIKE: ICONS.thumbup,
-        UNDERSTAND: ICONS.lightbulb,
-        CURIOUS: ICONS.search
-      }[type] || ICONS.thumbup;
-
-      return `
-        <button class="reaction-btn flex items-center gap-1 text-xs px-2 py-1 rounded transition-all ${isReacted ? 'reacted' : 'bg-gray-800 hover:bg-gray-700'}"
-                data-type="${type}" data-row="${answer.rowIndex}">
-          ${icon}
-          <span>${count}</span>
-        </button>
-      `;
-    }).join('');
-
-    // ハイライトボタン（管理者のみ）
-    let highlightButton = '';
-    if (this.showAdminFeatures) {
-      highlightButton = `
-        <button class="highlight-btn ml-2 p-1 rounded transition-all ${answer.highlight ? 'liked' : 'hover:bg-gray-700'}"
-                data-action="highlight" data-row="${answer.rowIndex}">
-          ${ICONS.star}
-        </button>
-      `;
-    }
-
-    return `
-      <div class="flex items-center gap-2 pt-2 border-t border-gray-700">
-        ${reactionButtons}
-        ${highlightButton}
-      </div>
-    `;
-  }
 
   // モーダル表示
   showModal(answer) {
@@ -821,6 +826,24 @@ class AnswerApp {
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
+  }
+
+  // アイコン取得メソッド（見本ファイルと完全互換）
+  getIcon(name, classes = '', solid = false) {
+    // アイコンキーの優先順位: solid版 > outline版 > プレーン版
+    let key;
+    if (solid && ICONS[name + '-solid']) {
+      key = name + '-solid';
+    } else if (ICONS[name + '-outline']) {
+      key = name + '-outline';
+    } else if (ICONS[name]) {
+      key = name;
+    } else {
+      console.warn('Icon not found:', name);
+      return '<span aria-hidden="true" class="' + classes + '">⭐</span>'; // フォールバック
+    }
+    // 存在するアイコンを返す
+    return '<span aria-hidden="true" class="' + classes + '">' + ICONS[key] + '</span>';
   }
 }
 
