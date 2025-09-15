@@ -458,7 +458,7 @@
             showMessage(`エラー: ${error.message || error}`, 'error');
             loadingDiv.classList.add('hidden');
           })
-          .getUsers(__USER_ID__);
+          .getAdminUsers(__USER_ID__);
       }
 
       // ユーザー一覧をテーブルに表示
@@ -981,7 +981,7 @@
           .withFailureHandler(function(error) {
             console.error('統計取得エラー:', error);
           })
-          .getUsers(__USER_ID__);
+          .getAdminUsers(__USER_ID__);
       }
 
       // システム統計を表示

@@ -20,6 +20,7 @@
 
 /**
  * Get current user email - simple and direct
+ * @returns {string|null} User email or null if not authenticated
  */
 function getCurrentEmail() {
   try {
@@ -34,6 +35,8 @@ function getCurrentEmail() {
 
 /**
  * Include HTML template
+ * @param {string} filename - Template filename to include
+ * @returns {string} HTML content of the template
  */
 function include(filename) {
   return HtmlService.createTemplateFromFile(filename).evaluate().getContent();
@@ -45,6 +48,8 @@ function include(filename) {
 
 /**
  * Handle GET requests
+ * @param {Object} e - Event object containing request parameters
+ * @returns {HtmlOutput} HTML response for the requested page
  */
 function doGet(e) {
   try {
@@ -205,6 +210,8 @@ function doGet(e) {
 
 /**
  * Handle POST requests
+ * @param {Object} e - Event object containing POST data
+ * @returns {TextOutput} JSON response with operation result
  */
 function doPost(e) {
   try {
@@ -337,6 +344,7 @@ function getConfig() {
 
 /**
  * Get web app URL
+ * @returns {string} The URL of the deployed web app
  */
 function getWebAppUrl() {
   try {
@@ -349,6 +357,7 @@ function getWebAppUrl() {
 
 /**
  * Test system setup
+ * @returns {Object} Setup status with success flag and message
  */
 function testSetup() {
   try {
@@ -406,11 +415,6 @@ function getUserConfig(userId) {
     return createExceptionResponse(error);
   }
 }
-
-
-/**
- * Legacy alias for backwards compatibility
- */
 
 /**
  * Add reaction - simplified name, direct email implementation
@@ -714,9 +718,6 @@ function setAppStatus(isActive) {
  * Check if user is system admin - simplified name
  */
 
-/**
- * Legacy alias for backwards compatibility
- */
 
 /**
  * Get users - simplified name for admin panel
@@ -740,9 +741,6 @@ function getAdminUsers(options = {}) {
     return createExceptionResponse(error);
   }
 }
-
-function getUsers(options = {}) { return getAdminUsers(options); }
-
 
 /**
  * Delete user - simplified name
@@ -980,9 +978,6 @@ function getSheets() {
   }
 }
 
-/**
- * Legacy alias for backwards compatibility
- */
 
 /**
  * Get board info - simplified name
@@ -1053,9 +1048,6 @@ function analyzeColumns(spreadsheetId, sheetName, options = {}) {
   return columnAnalysis(spreadsheetId, sheetName, options);
 }
 
-/**
- * Legacy alias for backwards compatibility
- */
 
 // ===========================================
 // 🔧 Unified Validation Functions
