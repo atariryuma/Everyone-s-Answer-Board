@@ -568,11 +568,14 @@
             ? result
             : result && Array.isArray(result.spreadsheets)
               ? result.spreadsheets
-              : [];
+              : result && Array.isArray(result.sheets)
+                ? result.sheets
+                : [];
 
           console.log('📊 スプレッドシート配列抽出完了:', {
             isDirectArray: Array.isArray(result),
             hasSpreadsheetsProp: result && Array.isArray(result.spreadsheets),
+            hasSheetsProperty: result && Array.isArray(result.sheets),
             extractedLength: spreadsheets.length
           });
 
