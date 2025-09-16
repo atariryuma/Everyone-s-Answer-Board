@@ -572,29 +572,34 @@ function createForm(userId, config) {
  *
  * @returns {Object} 公開状態情報
  */
-function checkCurrentPublicationStatus() {
+function checkCurrentPublicationStatus(targetUserId) {
   try {
-    // ServiceFactory経由でユーザー情報取得
-    const {email} = ServiceFactory.getSession();
-    const userId = email ? userId : null;
+    const session = ServiceFactory.getSession();
+    const db = ServiceFactory.getDB();
 
-    if (!userId) {
-      return {
-        success: false,
-        published: false,
-        error: 'ユーザー情報が見つかりません'
-      };
+    if (!db) {
+      return createErrorResponse('データベース接続エラー');
     }
 
-    // ServiceFactory経由で設定情報を取得
-    const configService = ServiceFactory.getConfigService();
-    const config = configService ? configService.getUserConfig(userId) : null;
-    if (!config) {
-      return {
-        success: false,
-        published: false,
-        error: '設定情報が見つかりません'
-      };
+    let user = null;
+    if (targetUserId) {
+      user = db.findUserById(targetUserId);
+    }
+
+    if (!user && session && session.email) {
+      user = db.findUserByEmail(session.email);
+    }
+
+    if (!user) {
+      return createUserNotFoundError();
+    }
+
+    let config = {};
+    try {
+      config = JSON.parse(user.configJson || '{}');
+    } catch (parseError) {
+      console.warn('checkCurrentPublicationStatus: config parse error', parseError.message);
+      config = {};
     }
 
     return {
@@ -602,16 +607,12 @@ function checkCurrentPublicationStatus() {
       published: config.appPublished === true,
       publishedAt: config.publishedAt || null,
       lastModified: config.lastModified || null,
-      hasDataSource: !!(config.spreadsheetId && config.sheetName)
+      hasDataSource: Boolean(config.spreadsheetId && config.sheetName),
+      userId: user.userId
     };
-
   } catch (error) {
     console.error('AdminController.checkCurrentPublicationStatus エラー:', error.message);
-    return {
-      success: false,
-      published: false,
-      error: error.message
-    };
+    return createExceptionResponse(error);
   }
 }
 

@@ -565,6 +565,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, _userE
     });
 
     return {
+      success: true,
       status: 'success',
       message: 'リアクションを追加しました',
       newValue
@@ -572,6 +573,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, _userE
   } catch (error) {
     console.error('DataService.processReaction: エラー', error.message);
     return {
+      success: false,
       status: 'error',
       message: error.message
     };
@@ -1875,17 +1877,25 @@ function updateHighlightInSheet(config, rowId) {
 
     sheet.getRange(rowNumber, highlightColumn).setValue(newValue);
 
+    const highlighted = newValue === 'TRUE';
+
     console.info('DataService.updateHighlightInSheet: ハイライト切り替え完了', {
       rowId,
       oldValue: currentValue,
       newValue,
-      highlighted: !isCurrentlyHighlighted
+      highlighted
     });
 
-    return true;
+    return {
+      success: true,
+      highlighted
+    };
   } catch (error) {
     console.error('DataService.updateHighlightInSheet: エラー', error.message);
-    return false;
+    return {
+      success: false,
+      error: error.message
+    };
   }
 }
 
@@ -1940,9 +1950,18 @@ function dsAddReaction(userId, rowId, reactionType) {
     }
 
     const res = processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionType, null);
-    return res && res.status === 'success'
-      ? { success: true, message: res.message || 'Reaction added', data: { newValue: res.newValue } }
-      : { success: false, message: res?.message || 'Failed to add reaction' };
+    if (res && (res.success || res.status === 'success')) {
+      return {
+        success: true,
+        message: res.message || 'Reaction added',
+        newValue: res.newValue
+      };
+    }
+
+    return {
+      success: false,
+      message: res?.message || 'Failed to add reaction'
+    };
   } catch (error) {
     console.error('DataService.dsAddReaction: エラー', error.message);
     return createExceptionResponse(error);
@@ -1973,10 +1992,19 @@ function dsToggleHighlight(userId, rowId) {
       ? rowId
       : `row_${parseInt(rowId, 10)}`;
 
-    const ok = updateHighlightInSheet(config, rowNumber);
-    return ok
-      ? { success: true, message: 'Highlight toggled successfully' }
-      : { success: false, message: 'Failed to toggle highlight' };
+    const result = updateHighlightInSheet(config, rowNumber);
+    if (result?.success) {
+      return {
+        success: true,
+        message: 'Highlight toggled successfully',
+        highlighted: Boolean(result.highlighted)
+      };
+    }
+
+    return {
+      success: false,
+      message: result?.error || 'Failed to toggle highlight'
+    };
   } catch (error) {
     console.error('DataService.dsToggleHighlight: エラー', error.message);
     return createExceptionResponse(error);

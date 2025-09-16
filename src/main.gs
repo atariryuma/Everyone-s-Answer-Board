@@ -248,8 +248,8 @@ function doGet(e) {
 
       case 'main':
       default: {
-        // Minimal routing policy: do not auto-redirect to login.
-        // For unspecified or unknown modes, show AccessRestricted to avoid unintended login attempts.
+        // Default landing is AccessRestricted to prevent unintended login/account creation.
+        // Viewers must specify ?mode=view&userId=... and admins explicitly use ?mode=login.
         return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
       }
     }
@@ -493,82 +493,6 @@ function getUserConfig(userId) {
     return { success: true, config, userId: user.userId };
   } catch (error) {
     console.error('getUserConfig error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
-
-/**
- * Add reaction - simplified name, direct email implementation
- */
-function addReaction(userEmail, rowIndex, reactionKey) {
-  try {
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(userEmail);
-
-    if (!user || !user.configJson) {
-      return createErrorResponse('User configuration not found');
-    }
-
-    const config = JSON.parse(user.configJson);
-    if (!config.spreadsheetId || !config.sheetName) {
-      return createErrorResponse('Spreadsheet configuration incomplete');
-    }
-
-    if (!reactionKey || typeof rowIndex !== 'number' || rowIndex < 1) {
-      return createErrorResponse('Invalid reaction parameters');
-    }
-
-    // Direct DataService call
-    const dataService = ServiceFactory.getDataService();
-    return dataService.addReaction(
-      config.spreadsheetId,
-      config.sheetName,
-      rowIndex,
-      reactionKey,
-      userEmail
-    );
-
-  } catch (error) {
-    console.error('addReaction error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
-
-/**
- * Toggle highlight - unified implementation for direct GAS calls
- * @param {string} userEmail - User email
- * @param {number} rowIndex - Row index to toggle highlight
- * @returns {Object} Toggle result
- */
-function toggleHighlight(userEmail, rowIndex) {
-  try {
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(userEmail);
-
-    if (!user || !user.configJson) {
-      return createErrorResponse('User configuration not found');
-    }
-
-    const config = JSON.parse(user.configJson);
-    if (!config.spreadsheetId || !config.sheetName) {
-      return createErrorResponse('Spreadsheet configuration incomplete');
-    }
-
-    if (typeof rowIndex !== 'number' || rowIndex < 1) {
-      return createErrorResponse('Invalid row index');
-    }
-
-    // Direct DataService call
-    const dataService = ServiceFactory.getDataService();
-    return dataService.toggleHighlight(
-      config.spreadsheetId,
-      config.sheetName,
-      rowIndex,
-      userEmail
-    );
-
-  } catch (error) {
-    console.error('toggleHighlight error:', error.message);
     return createExceptionResponse(error);
   }
 }
@@ -823,11 +747,6 @@ function setAppStatus(isActive) {
   }
 }
 
-
-/**
- * Add reaction by user ID - converts userId to email for addReaction
- */
-
 /**
  * Check if user is system admin - simplified name
  */
@@ -1024,6 +943,69 @@ function toggleUserBoardStatus(targetUserId) {
 
 
 /**
+ * Clear active sheet publication (set board to unpublished)
+ * @param {string} targetUserId - 対象ユーザーID（省略時は現在の管理者）
+ * @returns {Object} 実行結果
+ */
+function clearActiveSheet(targetUserId) {
+  try {
+    const email = getCurrentEmail();
+    if (!email || !isSystemAdmin(email)) {
+      return createAdminRequiredError();
+    }
+
+    const db = ServiceFactory.getDB();
+    if (!db) {
+      return createErrorResponse('データベース接続エラー');
+    }
+
+    let targetUser = targetUserId ? db.findUserById(targetUserId) : null;
+    if (!targetUser) {
+      targetUser = db.findUserByEmail(email);
+    }
+
+    if (!targetUser) {
+      return createUserNotFoundError();
+    }
+
+    let config = {};
+    try {
+      config = JSON.parse(targetUser.configJson || '{}');
+    } catch (parseError) {
+      console.warn('clearActiveSheet: config parse error', parseError.message);
+      config = {};
+    }
+
+    const wasPublished = config.appPublished === true;
+    config.appPublished = false;
+    config.publishedAt = null;
+    config.lastModified = new Date().toISOString();
+
+    const updatedUser = {
+      ...targetUser,
+      configJson: JSON.stringify(config),
+      lastModified: new Date().toISOString()
+    };
+
+    const result = db.updateUser(targetUser.userId, updatedUser);
+    if (!result?.success) {
+      return createErrorResponse('ボード状態の更新に失敗しました');
+    }
+
+    return {
+      success: true,
+      message: wasPublished ? 'ボードを非公開にしました' : 'ボードは既に非公開です',
+      boardPublished: false,
+      userId: targetUser.userId
+    };
+  } catch (error) {
+    console.error('clearActiveSheet error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+
+/**
  * Check if current user is admin - simplified name
  */
 function isAdmin() {
@@ -1092,6 +1074,72 @@ function getSheets() {
     };
   } catch (error) {
     console.error('getSheets error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+
+/**
+ * Validate header integrity for user's active sheet
+ * @param {string} targetUserId - 対象ユーザーID（省略可能）
+ * @returns {Object} 検証結果
+ */
+function validateHeaderIntegrity(targetUserId) {
+  try {
+    const session = ServiceFactory.getSession();
+    const db = ServiceFactory.getDB();
+
+    if (!db) {
+      return createErrorResponse('データベース接続エラー');
+    }
+
+    let targetUser = targetUserId ? db.findUserById(targetUserId) : null;
+    if (!targetUser && session?.email) {
+      targetUser = db.findUserByEmail(session.email);
+    }
+
+    if (!targetUser) {
+      return createUserNotFoundError();
+    }
+
+    let config = {};
+    try {
+      config = JSON.parse(targetUser.configJson || '{}');
+    } catch (parseError) {
+      console.warn('validateHeaderIntegrity: config parse error', parseError.message);
+      config = {};
+    }
+
+    if (!config.spreadsheetId || !config.sheetName) {
+      return {
+        success: false,
+        error: 'Spreadsheet configuration incomplete'
+      };
+    }
+
+    const sheet = SpreadsheetApp.openById(config.spreadsheetId).getSheetByName(config.sheetName);
+    if (!sheet) {
+      return {
+        success: false,
+        error: 'Sheet not found'
+      };
+    }
+
+    const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+    const normalizedHeaders = headers.map(header => String(header || '').trim());
+    const emptyHeaderCount = normalizedHeaders.filter(header => header.length === 0).length;
+    const valid = normalizedHeaders.length > 0 && emptyHeaderCount < normalizedHeaders.length;
+
+    return {
+      success: valid,
+      valid,
+      headerCount: normalizedHeaders.length,
+      emptyHeaderCount,
+      headers: normalizedHeaders,
+      error: valid ? null : 'ヘッダー情報が不完全です'
+    };
+  } catch (error) {
+    console.error('validateHeaderIntegrity error:', error.message);
     return createExceptionResponse(error);
   }
 }

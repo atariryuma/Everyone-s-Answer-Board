@@ -254,16 +254,23 @@ class StudyQuestApp {
     // リアクション状態保存用のキー
     this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
     this.gas = {
-      getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) => this.runGas('getPublishedSheetData', this.state.userId, classFilter, sort, adminMode, bypassCache),
-      getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) => this.runGas('getIncrementalSheetData', this.state.userId, classFilter, sort, adminMode, sinceRowCount),
-      getAvailableSheets: () => this.runGas('getAvailableSheets', this.state.userId),
-      addReactionBatch: (batchOperations) => this.runGas('addReactionBatch', this.state.userId, batchOperations), // 新しいバッチAPI
-      addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction),
-      toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex),
-      checkAdmin: () => this.runGas('checkAdmin', this.state.userId),
+      // サーバ実装に合わせた直接呼び出し（中間関数なし）
+      getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) =>
+        this.runGas('getPublishedSheetData', classFilter, sort, adminMode, bypassCache),
+      getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) =>
+        this.runGas('getIncrementalSheetData', this.state.sheetName, { classFilter, sortOrder: sort, lastSeenCount: sinceRowCount }),
+      getAvailableSheets: () => this.runGas('getSheets'),
+      addReaction: (rowIndex, reaction, sheetName) => this.runGas('dsAddReaction', this.state.userId, rowIndex, reaction),
+      toggleHighlight: (rowIndex, sheetName) => this.runGas('dsToggleHighlight', this.state.userId, rowIndex),
+      checkAdmin: () => this.runGas('isAdmin'),
       clearCache: () => this.runGas('refreshBoardData', this.state.userId),
       validateData: () => this.validData(),
-      getDataCount: (classFilter, sortOrder, adminMode) => this.runGas('getDataCount', this.state.userId, classFilter, sortOrder, adminMode)
+      // 件数は公開取得から導出（不要な中間APIを使わない）
+      getDataCount: async (classFilter, sortOrder, adminMode) => {
+        const resp = await this.gas.getPublishedSheetData(classFilter, sortOrder, adminMode);
+        const rows = resp?.rows || resp?.data || [];
+        return { success: true, count: rows.length };
+      }
     };
     
     // Polling settings with dynamic interval adjustment
@@ -1069,12 +1076,12 @@ class StudyQuestApp {
     this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
   }
   runGas(funcName, ...args) {
-    // データマッピング層 - バックエンドが期待する形式に変換
-    const mappedArgs = this.mapApiParameters(funcName, args);
+    // 直接呼び出し（マッピング層なし）
+    const mappedArgs = args;
 
     // Simple request deduplication for identical calls (except for state-changing operations)
     const cacheKey = funcName + JSON.stringify(mappedArgs);
-    const isStateChanging = ['toggleHighlight', 'addReaction', 'endPublication'].includes(funcName);
+    const isStateChanging = ['dsToggleHighlight', 'dsAddReaction'].includes(funcName);
 
     if (!isStateChanging) {
       const cached = this.cache.get(cacheKey);
@@ -1089,17 +1096,7 @@ class StudyQuestApp {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         // API関数存在チェック
         if (!google.script.run[funcName] || typeof google.script.run[funcName] !== 'function') {
-          warnLog(`⚠️ API function '${funcName}' not available, attempting fallback`);
-
-          // 既知の関数に対するフォールバック処理
-          const fallbackResult = this.handleMissingApiFunction(funcName, mappedArgs);
-          if (fallbackResult) {
-            resolve(fallbackResult);
-            return;
-          }
-
-          // フォールバック不可の場合はエラー
-          reject(new Error(`API function '${funcName}' not available and no fallback exists`));
+          reject(new Error(`API function '${funcName}' not available`));
           return;
         }
 
@@ -1143,82 +1140,6 @@ class StudyQuestApp {
   }
 
   /**
-   * 不足しているAPI関数のフォールバック処理
-   * @param {string} funcName - 関数名
-   * @param {Array} args - 引数
-   * @returns {Object|null} フォールバック結果またはnull
-   */
-  handleMissingApiFunction(funcName, args) {
-    switch (funcName) {
-      case 'getIncrementalSheetData':
-        debugLog('📋 Using fallback for getIncrementalSheetData');
-        return {
-          success: false,
-          message: 'Incremental data not available',
-          data: [],
-          hasNewData: false,
-          fallback: true
-        };
-
-      case 'getDeployUserDomainInfo':
-        debugLog('🌐 Using fallback for getDeployUserDomainInfo');
-        return {
-          success: true,
-          domain: 'unknown',
-          userEmail: 'anonymous',
-          isValidDomain: true,
-          fallback: true
-        };
-
-      case 'getActiveFormInfo':
-        debugLog('📝 Using fallback for getActiveFormInfo');
-        return {
-          success: false,
-          message: 'Form info not available',
-          formUrl: null,
-          formTitle: null,
-          fallback: true
-        };
-
-      default:
-        warnLog(`⚠️ No fallback available for function: ${funcName}`);
-        return null;
-    }
-  }
-
-  /**
-   * APIパラメータをバックエンドが期待する形式にマッピング
-   * @param {string} funcName - 関数名
-   * @param {Array} args - 元の引数
-   * @returns {Array} マッピングされた引数
-   */
-  mapApiParameters(funcName, args) {
-    switch (funcName) {
-      case 'addReaction':
-        // フロントエンド: (userId, rowIndex, reaction)
-        // バックエンド: (userEmail, rowIndex, reactionKey)
-        if (args.length >= 3) {
-          return [args[0], args[1], args[2]]; // userIdがuserEmailとして使用される
-        }
-        break;
-
-      case 'toggleHighlight':
-        // フロントエンド: (userId, rowIndex)
-        // バックエンド: (userEmail, rowIndex)
-        if (args.length >= 2) {
-          return [args[0], args[1]]; // userIdがuserEmailとして使用される
-        }
-        break;
-
-      default:
-        // その他の関数はそのまま
-        return args;
-    }
-
-    return args;
-  }
-
-  /**
    * エラー情報を強化してユーザーフレンドリーなメッセージを提供
    * @param {Error} error - 元のエラー
    * @param {string} funcName - 関数名
@@ -1233,10 +1154,10 @@ class StudyQuestApp {
 
     // 関数固有のエラーメッセージ
     switch (funcName) {
-      case 'addReaction':
+      case 'dsAddReaction':
         enhancedError.userMessage = 'リアクションの送信に失敗しました。しばらく待ってから再度お試しください。';
         break;
-      case 'toggleHighlight':
+      case 'dsToggleHighlight':
         enhancedError.userMessage = 'ハイライトの切り替えに失敗しました。しばらく待ってから再度お試しください。';
         break;
       default:
@@ -2072,7 +1993,7 @@ class StudyQuestApp {
               }
             ]
           });
-        } else if (funcName === 'addReaction') {
+        } else if (funcName === 'addReaction' || funcName === 'dsAddReaction') {
           resolve({
             status: 'ok',
             reactions: {
@@ -2081,13 +2002,13 @@ class StudyQuestApp {
               CURIOUS: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 }
             }
           });
-        } else if (funcName === 'toggleHighlight') {
+        } else if (funcName === 'toggleHighlight' || funcName === 'dsToggleHighlight') {
           const currentHighlight = args[2] === undefined ? false : !args[2];
           resolve({
             status: 'ok',
             highlight: currentHighlight
           });
-        } else if (funcName === 'checkAdmin') {
+        } else if (funcName === 'checkAdmin' || funcName === 'isAdmin') {
           resolve(true);
         }
       }, 300);
@@ -3011,7 +2932,7 @@ class StudyQuestApp {
     
     // サーバーキャッシュをクリア
     try {
-      await this.runGas('clearCache');
+      await this.gas.clearCache();
       debugLog('✅ サーバーキャッシュをクリア');
     } catch (error) {
       warnLog('⚠️ サーバーキャッシュクリアでエラー:', error);
@@ -5158,23 +5079,30 @@ class StudyQuestApp {
         return false;
       }
 
-      const result = await this.gas.addReactionBatch(batchOperations);
-
-      if (result && result.success) {
-        debugLog('✅ バッチ処理成功:', batchOperations.length + '件');
-
-        this.processBatchReactionResponse(result.data, batchOperations);
-
-        batchOperations.forEach(op => {
+      // サーバ側のバッチAPIは使用せず、直接逐次送信
+      const responseData = [];
+      for (const op of batchOperations) {
+        try {
+          const r = await this.gas.addReaction(op.rowIndex, op.reaction, this.state.sheetName);
+          const ok = r && (r.success === true || r.status === 'success');
+          if (ok) {
+            responseData.push({ rowIndex: op.rowIndex, reactions: r.reactions || null, reaction: op.reaction });
+          }
           const reactionKey = `${op.rowIndex}-${op.reaction}`;
-          this.notifyReactionComplete(reactionKey, { success: true, batch: true });
-        });
-
-        return true;
-      } else {
-        warnLog('バッチ処理失敗、個別処理にフォールバック');
-        return false;
+          this.notifyReactionComplete(reactionKey, { success: ok, batch: true });
+        } catch (e) {
+          const reactionKey = `${op.rowIndex}-${op.reaction}`;
+          this.notifyReactionComplete(reactionKey, { success: false, error: e?.message || String(e), batch: true });
+        }
       }
+
+      if (responseData.length > 0) {
+        debugLog('✅ バッチ処理成功(ローカル逐次):', batchOperations.length + '件');
+        this.processBatchReactionResponse(responseData, batchOperations);
+        return true;
+      }
+      warnLog('バッチ処理失敗、個別処理にフォールバック');
+      return false;
     } catch (error) {
       warnLog('バッチ処理エラー、個別処理にフォールバック:', error);
       return false;
@@ -5193,7 +5121,7 @@ class StudyQuestApp {
       responseData.forEach(rowData => {
         const item = this.state.currentAnswers.find(i => i.rowIndex == rowData.rowIndex);
         if (item) {
-          this.processResponse(rowData, item);
+          this.processResponse(item, rowData, rowData.reaction);
         }
       });
       
@@ -5222,7 +5150,8 @@ class StudyQuestApp {
           throw new Error('サーバーからの応答がありません');
       }
 
-      if (response.status !== 'ok') {
+      const success = response.success === true || response.status === 'success';
+      if (!success) {
           throw new Error(response.message || 'リアクション送信に失敗しました');
       }
 
@@ -5242,97 +5171,20 @@ class StudyQuestApp {
   }
 
   async processResponse(item, response, reaction) {
-    debugLog('🔄 サーバー応答処理開始:', { rowIndex: item.rowIndex, reaction, response });
-    
     // サーバー状態を絶対的に適用（楽観的更新なし）
     if (response.reactions && typeof response.reactions === 'object') {
         // サーバー状態で完全に上書き
         const serverState = response.reactions;
         item.reactions = JSON.parse(JSON.stringify(serverState));
-        
-        debugLog('✅ サーバー状態適用完了:', {
-          rowIndex: item.rowIndex,
-          reaction,
-          serverState: item.reactions
-        });
-        
     } else {
         warnLog('⚠️ 期待されたリアクション形式ではありません:', response);
         // フォールバック処理（サーバー応答が不正な場合のみ）
         this.applyFallbackReactionUpdate(item, reaction);
-        debugLog('🔄 フォールバック処理実行:', item.reactions);
     }
     
     // ローカルストレージに保存（サーバー状態を保存）
     this.saveReactionState(item.rowIndex, item.reactions);
-    
-    debugLog('🎯 サーバー応答処理完了:', { rowIndex: item.rowIndex, finalState: item.reactions });
 }
-
-  // リアクション状態整合性検証
-  validateReactionConsistency(rowIndex, optimisticState, serverState) {
-    const inconsistencies = [];
-    
-    // 各リアクションタイプをチェック
-    this.reactionTypes.forEach(rt => {
-      const reaction = rt.key;
-      const optimistic = optimisticState[reaction] || { count: 0, reacted: false };
-      const server = serverState[reaction] || { count: 0, reacted: false };
-      
-      if (optimistic.reacted !== server.reacted) {
-        inconsistencies.push({
-          reaction,
-          type: 'reacted_mismatch',
-          optimistic: optimistic.reacted,
-          server: server.reacted
-        });
-      }
-      
-      if (Math.abs(optimistic.count - server.count) > 1) {
-        inconsistencies.push({
-          reaction,
-          type: 'count_significant_diff',
-          optimistic: optimistic.count,
-          server: server.count,
-          diff: server.count - optimistic.count
-        });
-      }
-    });
-    
-    if (inconsistencies.length > 0) {
-      warnLog('⚠️ リアクション状態不整合検出:', {
-        rowIndex,
-        inconsistencies,
-        optimisticState,
-        serverState
-      });
-      
-      // 不整合を記録（デバッグ用）
-      this.recordReactionInconsistency(rowIndex, inconsistencies);
-    } else {
-      debugLog('✅ リアクション状態整合性確認:', { rowIndex });
-    }
-    
-    return inconsistencies;
-  }
-
-  // 不整合記録（デバッグ用）
-  recordReactionInconsistency(rowIndex, inconsistencies) {
-    if (!this.reactionInconsistencies) {
-      this.reactionInconsistencies = [];
-    }
-    
-    this.reactionInconsistencies.push({
-      timestamp: new Date().toISOString(),
-      rowIndex,
-      inconsistencies
-    });
-    
-    // 最新10件のみ保持
-    if (this.reactionInconsistencies.length > 10) {
-      this.reactionInconsistencies.shift();
-    }
-  }
 
   applyFallbackReactionUpdate(item, reaction) {
     if (!item.reactions) {
@@ -5730,7 +5582,8 @@ class StudyQuestApp {
 
             const response = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
 
-            if (response && response.status === 'ok') {
+            const ok = response && (response.success === true || response.status === 'success');
+            if (ok) {
                 return response;
             } else {
                 throw new Error(response?.message || 'ハイライトの処理に失敗しました');
@@ -5753,7 +5606,8 @@ class StudyQuestApp {
         });
 
         // Apply highlight result with async DOM updates
-        item.highlight = res.highlight;
+        const highlighted = typeof res.highlighted === 'boolean' ? res.highlighted : !item.highlight;
+        item.highlight = highlighted;
 
         // Use batch DOM updates for better performance
         this.batchDOMUpdates([
@@ -6681,7 +6535,7 @@ class StudyQuestApp {
       debugLog('🔄 公開終了処理を開始します...');
       
       // サーバーに公開終了リクエストを送信
-      const result = await this.runGas('clearActiveSheet');
+      const result = await this.runGas('clearActiveSheet', this.state.userId);
       
       debugLog('✅ 公開終了処理が完了しました:', result);
       

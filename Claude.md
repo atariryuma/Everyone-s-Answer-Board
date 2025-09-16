@@ -312,9 +312,11 @@ npm run deploy:safe           # Comprehensive deployment validation
 
 ### **Web App Entry Flow**
 ```
-/exec access → Login Page → Setup (if needed) → Main Board
+/exec access → AccessRestricted (safe landing)
+            → (explicit) ?mode=login → Setup (if needed) → Admin Panel
+            → (viewer)  ?mode=view&userId=... → Public Board View
 ```
-**Critical**: `/exec` always starts with login page, never direct main board access.
+**Policy**: `/exec` のデフォルトはログインページではなく、安全な着地点（AccessRestricted）を表示します。これは、閲覧ユーザーが不用意にログインしてアカウントを生成してしまうことを防ぐための安全策です。ログインは明示的に `?mode=login` で行います。公開閲覧は `?mode=view&userId=...` で行います。
 
 ### **Anti-Patterns to Avoid**
 ```javascript
@@ -323,6 +325,18 @@ npm run deploy:safe           # Comprehensive deployment validation
 // ❌ AVOID: Synchronous UI blocking operations
 // ❌ AVOID: Direct constants/service dependencies at file level
 ```
+
+## 🔧 API Naming and Compatibility Guidance
+
+- フロントエンドは既存の安定API名に合わせる（例: `checkAdmin` ではなく `isAdmin`、`getAvailableSheets` ではなく `getSheets`）。
+- リアクション系は DataService の公開関数を直接利用（`dsAddReaction(userId, rowId, type)`, `dsToggleHighlight(userId, rowId)`）。
+- 新たな中間API（Gatewayラッパ）は原則追加しない。既存APIに合わせてフロント引数をマッピングする。
+
+## 🔒 OAuth Scopes Policy
+
+- 必要最小限のスコープのみ採用。
+- 既定: `spreadsheets`, `drive`, `script.external_request`, `userinfo.email`。
+- 未使用の Advanced Services は無効化。
 
 ---
 
