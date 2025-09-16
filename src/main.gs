@@ -230,10 +230,8 @@ function doGet(e) {
           // Board is published - serve view page
           console.log('view mode: serving published board for user:', userId);
           const template = HtmlService.createTemplateFromFile('Page.html');
-          template.data = {
-            userId,
-            userEmail: user.userEmail || null
-          };
+          template.userId = userId;
+          template.userEmail = user.userEmail || null;
           return template.evaluate();
 
         } catch (error) {
@@ -1312,6 +1310,19 @@ function getPublishedSheetData(classFilter, sortOrder) {
       const transformedData = {
         header: result.header || result.sheetName || '回答一覧',
         sheetName: result.sheetName || '不明',
+        data: result.data.map(item => ({
+          rowIndex: item.rowIndex || item.id,
+          name: item.name || '',
+          class: item.class || '',
+          opinion: item.answer || item.opinion || '',
+          reason: item.reason || '',
+          reactions: item.reactions || {
+            UNDERSTAND: { count: 0, reacted: false },
+            LIKE: { count: 0, reacted: false },
+            CURIOUS: { count: 0, reacted: false }
+          },
+          highlight: item.highlight || false
+        })),
         rows: result.data.map(item => ({
           rowIndex: item.rowIndex || item.id,
           name: item.name || '',
@@ -1331,6 +1342,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
       console.log('getPublishedSheetData: 変換完了', {
         header: transformedData.header,
         sheetName: transformedData.sheetName,
+        dataCount: transformedData.data.length,
         rowsCount: transformedData.rows.length
       });
 

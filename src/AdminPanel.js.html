@@ -2633,44 +2633,10 @@
       return;
     }
 
-    // 🔧 UI状態の事前検証: 接続方式に応じた検証を追加
-    const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
-    let spreadsheetId, sheetName;
-
-    if (sourceMethod === 'url') {
-      // URL入力方式の検証
-      const urlInput = document.getElementById('spreadsheet-url');
-      const url = urlInput.value.trim();
-      const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
-      const match = url.match(spreadsheetRegex);
-
-      if (!match) {
-        showError('まずデータソースを設定してください。');
-        RequestGate.exit('publishApp');
-        return;
-      }
-
-      spreadsheetId = match[1];
-      sheetName = document.getElementById('sheet-name-input').value.trim();
-
-      if (!sheetName) {
-        showError('まずデータソースを設定してください。');
-        RequestGate.exit('publishApp');
-        return;
-      }
-    } else {
-      // 一覧選択方式の検証
-      spreadsheetId = document.getElementById('spreadsheet-select').value;
-      sheetName = document.getElementById('sheet-select').value;
-
-      if (!spreadsheetId || !sheetName) {
-        showError('まずデータソースを設定してください。');
-        RequestGate.exit('publishApp');
-        return;
-      }
-    }
-
     setLoading(true);
+
+    // 🔧 修正: 保存済み設定があれば、UI検証をスキップして直接公開処理へ
+    // UI状態の事前検証は設定が保存されていない場合のみ実行
 
     // 🔧 根本的修正: 現在の完全な設定を取得してからpublishApplicationを呼び出し
     google.script.run

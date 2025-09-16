@@ -110,8 +110,8 @@ class DeploymentValidator {
     const requiredMethods = {
       'UserService': ['getCurrentEmail', 'getCurrentUserInfo', 'isSystemAdmin'],
       'ConfigService': ['getUserConfig', 'hasCoreSystemProps', 'isSystemSetup'],
-      'DataService': ['getSheetData', 'addDataReaction', 'processRawData'],
-      'SecurityService': ['checkSecurityUserPermission', 'validateSecurityUserData']
+      'DataService': ['getUserSheetData', 'processReaction', 'processRawData'],
+      'SecurityService': ['checkSecurityUserPermission', 'validateUserData']
     };
 
     for (const service of requiredServices) {

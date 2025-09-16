@@ -19,7 +19,17 @@
       "Bash(grep:*)",
       "Bash(git ls-tree:*)",
       "Bash(clasp logs:*)",
-      "Bash(npm run deploy:safe:*)"
+      "Bash(npm run deploy:safe:*)",
+      "Bash(clasp open)",
+      "Bash(clasp:*)",
+      "WebFetch(domain:developers.google.com)",
+      "Bash(sort:*)",
+      "Bash(awk:*)",
+      "Bash(for func in validateBatchSystem validateReasonText checkLongRunningPerformance detectLowPerformanceDevice optimizeForLowPerformance)",
+      "Bash(done)",
+      "Bash(for func in diagnoseReactionSystemHealth endAdminMode getActiveFormInfo getAvailableSheets)",
+      "Bash(do echo \"=== $func ===\")",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": [],
