@@ -2055,6 +2055,9 @@
       name: ['name'], // バックエンドのCONSTANTS.COLUMNS.NAME → name
     };
 
+    let detectedCount = 0;
+    let totalConfidenceInfo = [];
+
     Object.keys(dropdowns).forEach((columnType) => {
       const dropdown = dropdowns[columnType];
       if (!dropdown) return;
@@ -2066,9 +2069,16 @@
       mappingKeys[columnType].forEach((key) => {
         if (mapping[key] !== null && mapping[key] !== undefined) {
           selectedIndex = mapping[key];
-          confidence = mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
+        }
+        if (mapping.confidence && mapping.confidence[key] !== undefined) {
+          confidence = mapping.confidence[key];
         }
       });
+
+      // 信頼度情報を記録（検出されなくても）
+      if (confidence > 0) {
+        totalConfidenceInfo.push(`${columnType}: ${confidence}%`);
+      }
 
       if (selectedIndex !== null) {
         // ドロップダウンの選択を設定
@@ -2078,9 +2088,23 @@
         // 信頼度バッジを表示
         showConfidenceBadge(columnType, confidence, 'ai');
 
-        console.log(`AI検出: ${columnType} → ${selectedIndex}列 (信頼度: ${confidence}%)`);
+        console.log(`✅ AI検出成功: ${columnType} → ${selectedIndex}列 (信頼度: ${confidence}%)`);
+        detectedCount++;
+      } else if (confidence > 0) {
+        // 信頼度はあるが閾値未満の場合
+        console.log(`⚠️ AI検出: ${columnType}列は信頼度${confidence}%で閾値未満`);
+        showConfidenceBadge(columnType, confidence, 'low-confidence');
       }
     });
+
+    // 改善されたフィードバックメッセージ
+    if (detectedCount > 0) {
+      console.log(`🎯 AI検出: ${detectedCount}/4列を自動設定しました (${totalConfidenceInfo.join(', ')})`);
+    } else if (totalConfidenceInfo.length > 0) {
+      console.log(`📊 AI分析完了: 信頼度不足のため手動選択が必要です (${totalConfidenceInfo.join(', ')})`);
+    } else {
+      console.log('💡 AI検出結果がありません - 手動選択をお使いください');
+    }
 
     // AI検出情報パネルを表示
     const aiInfo = document.getElementById('ai-detection-info');

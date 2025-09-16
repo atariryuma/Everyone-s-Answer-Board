@@ -1638,3 +1638,55 @@ function detectNewContent(lastUpdateTime) {
     };
   }
 }
+
+/**
+ * Connect to data source - API Gateway function for DataService
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} 接続結果
+ */
+function connectDataSource(spreadsheetId, sheetName) {
+  try {
+    const email = getCurrentEmail();
+    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
+      return createAdminRequiredError();
+    }
+
+    // Direct DataService call using ServiceFactory pattern
+    const dataService = ServiceFactory.getDataService();
+    return dataService.connectToSheetInternal(spreadsheetId, sheetName);
+
+  } catch (error) {
+    console.error('connectDataSource error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * Get form info - API Gateway function for SystemController
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} フォーム情報
+ */
+function getFormInfo(spreadsheetId, sheetName) {
+  try {
+    const email = getCurrentEmail();
+    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
+      return createAdminRequiredError();
+    }
+
+    // Direct ConfigService call using ServiceFactory pattern
+    const configService = ServiceFactory.getConfigService();
+    if (!configService) {
+      throw new Error('ConfigService not available');
+    }
+    return configService.getFormInfo(spreadsheetId, sheetName);
+
+  } catch (error) {
+    console.error('getFormInfo error:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}

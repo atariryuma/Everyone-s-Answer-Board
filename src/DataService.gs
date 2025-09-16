@@ -1332,12 +1332,21 @@ function detectColumnTypes(headers, sampleData) {
     const mapping = { mapping: {}, confidence: {} };
     const analysisResults = performHighPrecisionAnalysis(headers, sampleData);
 
-    // 結果をマッピングに反映
+    // 結果をマッピングに反映 - 設定可能な信頼度閾値
+    const confidenceThreshold = 50; // Zero-dependency: 日本語ヘッダー対応で50%に調整
+    console.log(`DataService.detectColumnTypes: 信頼度閾値=${confidenceThreshold}% で検出開始`);
+
     Object.entries(analysisResults).forEach(([columnType, result]) => {
-      if (result.confidence >= 70) { // 70%以上の確信度で採用
+      console.log(`DataService.detectColumnTypes: ${columnType}列分析結果 - index=${result.index}, confidence=${result.confidence}%, header="${headers[result.index] || 'undefined'}"`);
+
+      if (result.confidence >= confidenceThreshold) {
         mapping.mapping[columnType] = result.index;
         mapping.confidence[columnType] = Math.round(result.confidence);
-        console.log(`DataService.detectColumnTypes: 高精度検出 - ${columnType}列 "${headers[result.index]}" at index ${result.index} (confidence: ${result.confidence}%)`);
+        console.log(`✅ DataService.detectColumnTypes: 検出採用 - ${columnType}列 "${headers[result.index]}" at index ${result.index} (confidence: ${result.confidence}%)`);
+      } else {
+        // 閾値未満でも信頼度情報は記録（フロントエンド用）
+        mapping.confidence[columnType] = Math.round(result.confidence);
+        console.log(`⚠️ DataService.detectColumnTypes: 信頼度不足 - ${columnType}列 "${headers[result.index] || 'undefined'}" (${result.confidence}% < ${confidenceThreshold}%)`);
       }
     });
 
@@ -1431,42 +1440,73 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
   let totalConfidence = 0;
   const factors = {};
 
-  // 1️⃣ ヘッダーパターン分析（重み: 30%）
+  // 1️⃣ ヘッダーパターン分析
   const headerScore = analyzeHeaderPattern(headerLower, targetType);
   factors.headerPattern = headerScore;
-  totalConfidence += headerScore * 0.3;
 
-  // 2️⃣ コンテンツ統計分析（重み: 25%）
+  // 🎯 日本語完全一致対応: 高精度パターンマッチの重み配分を動的調整
+  let headerWeight, contentWeight, linguisticWeight, contextWeight, semanticWeight;
+
+  if (headerScore >= 90) {
+    // 日本語完全一致 (95%等) - ヘッダーパターンを最重要視
+    headerWeight = 0.6;      // 30% → 60% (倍増)
+    contentWeight = 0.15;    // 25% → 15%
+    linguisticWeight = 0.1;  // 20% → 10%
+    contextWeight = 0.1;     // 15% → 10%
+    semanticWeight = 0.05;   // 10% → 5%
+  } else if (headerScore >= 70) {
+    // 強パターンマッチ - ヘッダー重視
+    headerWeight = 0.45;
+    contentWeight = 0.2;
+    linguisticWeight = 0.15;
+    contextWeight = 0.125;
+    semanticWeight = 0.075;
+  } else {
+    // 標準分析 - バランス型
+    headerWeight = 0.3;
+    contentWeight = 0.25;
+    linguisticWeight = 0.2;
+    contextWeight = 0.15;
+    semanticWeight = 0.1;
+  }
+
+  totalConfidence += headerScore * headerWeight;
+
+  // 2️⃣ コンテンツ統計分析
   const contentScore = analyzeContentStatistics(samples, targetType);
   factors.contentStatistics = contentScore;
-  totalConfidence += contentScore * 0.25;
+  totalConfidence += contentScore * contentWeight;
 
-  // 3️⃣ 言語パターン分析（重み: 20%）
+  // 3️⃣ 言語パターン分析
   const linguisticScore = analyzeLinguisticPatterns(samples, targetType);
   factors.linguisticPatterns = linguisticScore;
-  totalConfidence += linguisticScore * 0.2;
+  totalConfidence += linguisticScore * linguisticWeight;
 
-  // 4️⃣ コンテキスト推論（重み: 15%）
+  // 4️⃣ コンテキスト推論
   const contextScore = analyzeContextualClues(header, index, allHeaders, targetType);
   factors.contextualClues = contextScore;
-  totalConfidence += contextScore * 0.15;
+  totalConfidence += contextScore * contextWeight;
 
-  // 5️⃣ セマンティック分析（重み: 10%）
+  // 5️⃣ セマンティック分析
   const semanticScore = analyzeSemanticCharacteristics(samples, targetType);
   factors.semanticCharacteristics = semanticScore;
-  totalConfidence += semanticScore * 0.1;
+  totalConfidence += semanticScore * semanticWeight;
 
   const finalConfidence = Math.min(Math.max(totalConfidence, 0), 100);
 
-  // 詳細デバッグログ（特定のヘッダーに対してのみ）
+  // 詳細デバッグログ（動的重み対応版）
   if (headerScore > 0 || finalConfidence > 10) {
-    console.log(`🔬 詳細分析[${index}] "${header}" → ${targetType}:`, {
+    const weightProfile = headerScore >= 90 ? 'Japanese-Optimized' :
+                         headerScore >= 70 ? 'Pattern-Focused' : 'Balanced';
+
+    console.log(`🔬 詳細分析[${index}] "${header}" → ${targetType} [${weightProfile}]:`, {
       headerLower,
-      headerScore: `${headerScore} (${(headerScore * 0.3).toFixed(1)})`,
-      contentScore: `${contentScore} (${(contentScore * 0.25).toFixed(1)})`,
-      linguisticScore: `${linguisticScore} (${(linguisticScore * 0.2).toFixed(1)})`,
-      contextScore: `${contextScore} (${(contextScore * 0.15).toFixed(1)})`,
-      semanticScore: `${semanticScore} (${(semanticScore * 0.1).toFixed(1)})`,
+      headerScore: `${headerScore} (${(headerScore * headerWeight).toFixed(1)})`,
+      contentScore: `${contentScore} (${(contentScore * contentWeight).toFixed(1)})`,
+      linguisticScore: `${linguisticScore} (${(linguisticScore * linguisticWeight).toFixed(1)})`,
+      contextScore: `${contextScore} (${(contextScore * contextWeight).toFixed(1)})`,
+      semanticScore: `${semanticScore} (${(semanticScore * semanticWeight).toFixed(1)})`,
+      weights: `H:${(headerWeight*100).toFixed(0)}% C:${(contentWeight*100).toFixed(0)}% L:${(linguisticWeight*100).toFixed(0)}%`,
       totalConfidence: totalConfidence.toFixed(1),
       finalConfidence: finalConfidence.toFixed(1),
       samplesCount: samples.length
