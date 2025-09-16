@@ -1375,6 +1375,12 @@ function detectColumnTypes(headers, sampleData) {
  * @returns {Object} 分析結果
  */
 function performHighPrecisionAnalysis(headers, sampleData) {
+  console.log('🔍 performHighPrecisionAnalysis: 開始', {
+    headersCount: headers.length,
+    sampleDataCount: sampleData.length,
+    headers: headers
+  });
+
   const results = {
     answer: { index: -1, confidence: 0, factors: {} },
     reason: { index: -1, confidence: 0, factors: {} },
@@ -1385,15 +1391,27 @@ function performHighPrecisionAnalysis(headers, sampleData) {
   headers.forEach((header, index) => {
     if (!header) return;
 
+    console.log(`🔍 分析中: ヘッダー[${index}] = "${header}"`);
+
     const samples = sampleData.map(row => row && row[index]).filter(v => v != null && v !== '');
 
     // 各列タイプに対する分析を実行
     Object.keys(results).forEach(columnType => {
       const analysis = analyzeColumnForType(header, samples, index, headers, columnType);
+      console.log(`📊 ${columnType}分析結果[${index}]: 信頼度=${analysis.confidence}%, factors=`, analysis.factors);
+
       if (analysis.confidence > results[columnType].confidence) {
         results[columnType] = analysis;
+        console.log(`✅ ${columnType}の最優秀候補更新: ヘッダー[${index}]="${header}" (信頼度: ${analysis.confidence}%)`);
       }
     });
+  });
+
+  console.log('🎯 performHighPrecisionAnalysis: 最終結果', {
+    answer: `index=${results.answer.index}, confidence=${results.answer.confidence}%`,
+    reason: `index=${results.reason.index}, confidence=${results.reason.confidence}%`,
+    class: `index=${results.class.index}, confidence=${results.class.confidence}%`,
+    name: `index=${results.name.index}, confidence=${results.name.confidence}%`
   });
 
   return results;
@@ -1438,9 +1456,26 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
   factors.semanticCharacteristics = semanticScore;
   totalConfidence += semanticScore * 0.1;
 
+  const finalConfidence = Math.min(Math.max(totalConfidence, 0), 100);
+
+  // 詳細デバッグログ（特定のヘッダーに対してのみ）
+  if (headerScore > 0 || finalConfidence > 10) {
+    console.log(`🔬 詳細分析[${index}] "${header}" → ${targetType}:`, {
+      headerLower,
+      headerScore: `${headerScore} (${(headerScore * 0.3).toFixed(1)})`,
+      contentScore: `${contentScore} (${(contentScore * 0.25).toFixed(1)})`,
+      linguisticScore: `${linguisticScore} (${(linguisticScore * 0.2).toFixed(1)})`,
+      contextScore: `${contextScore} (${(contextScore * 0.15).toFixed(1)})`,
+      semanticScore: `${semanticScore} (${(semanticScore * 0.1).toFixed(1)})`,
+      totalConfidence: totalConfidence.toFixed(1),
+      finalConfidence: finalConfidence.toFixed(1),
+      samplesCount: samples.length
+    });
+  }
+
   return {
     index,
-    confidence: Math.min(Math.max(totalConfidence, 0), 100),
+    confidence: finalConfidence,
     factors
   };
 }
@@ -1478,24 +1513,60 @@ function analyzeHeaderPattern(headerLower, targetType) {
 
   const typePatterns = patterns[targetType] || {};
 
+  // デバッグ用の一時変数
+  let matchedPattern = null;
+  let matchedLevel = null;
+  let score = 0;
+
   // 段階的マッチング
   for (const pattern of typePatterns.primary || []) {
-    if (pattern.test(headerLower)) return 95;
+    if (pattern.test(headerLower)) {
+      matchedPattern = pattern.toString();
+      matchedLevel = 'primary';
+      score = 95;
+      break;
+    }
   }
 
-  for (const pattern of typePatterns.strong || []) {
-    if (pattern.test(headerLower)) return 85;
+  if (score === 0) {
+    for (const pattern of typePatterns.strong || []) {
+      if (pattern.test(headerLower)) {
+        matchedPattern = pattern.toString();
+        matchedLevel = 'strong';
+        score = 85;
+        break;
+      }
+    }
   }
 
-  for (const pattern of typePatterns.medium || []) {
-    if (pattern.test(headerLower)) return 60;
+  if (score === 0) {
+    for (const pattern of typePatterns.medium || []) {
+      if (pattern.test(headerLower)) {
+        matchedPattern = pattern.toString();
+        matchedLevel = 'medium';
+        score = 60;
+        break;
+      }
+    }
   }
 
-  for (const pattern of typePatterns.weak || []) {
-    if (pattern.test(headerLower)) return 35;
+  if (score === 0) {
+    for (const pattern of typePatterns.weak || []) {
+      if (pattern.test(headerLower)) {
+        matchedPattern = pattern.toString();
+        matchedLevel = 'weak';
+        score = 35;
+        break;
+      }
+    }
   }
 
-  return 0;
+  // マッチした場合のデバッグログ
+  if (score > 0) {
+    console.log(`🎯 ヘッダーパターンマッチ: "${headerLower}" → ${targetType} (${matchedLevel}: ${matchedPattern}) = ${score}%`);
+  }
+
+  return score;
 }
 
 /**

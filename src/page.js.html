@@ -169,17 +169,46 @@ class AnswerBoardDataLoader {
     const key = `${funcName}_${JSON.stringify(args)}`;
 
     if (this.loadingStates.get(key)) {
+      console.log(`🔄 GAS Cache Hit: ${funcName}`, { args });
       return this.loadingStates.get(key);
     }
+
+    console.log(`📡 GAS Call Start: ${funcName}`, {
+      args,
+      timestamp: new Date().toISOString(),
+      hasGoogleAPI: typeof google !== 'undefined' && !!google.script?.run
+    });
 
     const promise = this.executeWithRetry(() => {
       return new Promise((resolve, reject) => {
         if (typeof google !== 'undefined' && google.script && google.script.run) {
+          const startTime = performance.now();
+
           google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
+            .withSuccessHandler((result) => {
+              const endTime = performance.now();
+              console.log(`✅ GAS Success: ${funcName}`, {
+                args,
+                result: result?.success ? 'success' : 'failed',
+                executionTime: `${(endTime - startTime).toFixed(2)}ms`,
+                dataSize: JSON.stringify(result).length,
+                timestamp: new Date().toISOString()
+              });
+              resolve(result);
+            })
+            .withFailureHandler((error) => {
+              const endTime = performance.now();
+              console.error(`❌ GAS Error: ${funcName}`, {
+                args,
+                error: error.message || error,
+                executionTime: `${(endTime - startTime).toFixed(2)}ms`,
+                timestamp: new Date().toISOString()
+              });
+              reject(error);
+            })
             [funcName](...args);
         } else {
+          console.warn(`🔧 GAS Mock Mode: ${funcName}`, { args });
           resolve(this.getMockData(funcName, args));
         }
       });
@@ -190,10 +219,19 @@ class AnswerBoardDataLoader {
     try {
       const result = await promise;
       this.loadingStates.delete(key);
+      console.log(`🎯 GAS Complete: ${funcName}`, {
+        success: result?.success !== false,
+        hasData: !!result?.rows || !!result?.config,
+        timestamp: new Date().toISOString()
+      });
       return result;
     } catch (error) {
       this.loadingStates.delete(key);
-      console.error(`GAS call error [${funcName}]:`, error);
+      console.error(`💥 GAS Exception: ${funcName}`, {
+        args,
+        error: error.message || error,
+        timestamp: new Date().toISOString()
+      });
       throw error;
     }
   }
@@ -410,14 +448,32 @@ class AnswerApp {
     const cacheKey = `config_${this.userId}`;
     let config = this.loader.getFromCache(cacheKey);
 
+    console.log('⚙️ LoadConfiguration Start', {
+      userId: this.userId,
+      hasCachedConfig: !!config,
+      timestamp: new Date().toISOString()
+    });
+
     if (!config) {
       try {
         // 現在のGAS関数を使用
+        console.log('📡 LoadConfiguration: Calling getUserConfig API');
         const response = await this.loader.callGAS('getUserConfig', this.userId);
+
+        console.log('📊 LoadConfiguration: API response', {
+          success: response.success,
+          hasConfig: !!response.config,
+          configKeys: response.config ? Object.keys(response.config) : []
+        });
+
         config = response.success ? response.config : {};
         this.loader.setCache(cacheKey, config);
       } catch (error) {
-        console.error('Configuration loading error:', error);
+        console.error('❌ Configuration loading error', {
+          error: error.message || error,
+          userId: this.userId,
+          timestamp: new Date().toISOString()
+        });
         // フォールバック設定
         config = {
           title: '問題',
@@ -429,10 +485,20 @@ class AnswerApp {
             accessLevel: 'viewer'
           }
         };
+        console.log('🔄 LoadConfiguration: Using fallback config', config);
       }
+    } else {
+      console.log('🔄 LoadConfiguration: Using cached config');
     }
 
     this.appConfig = config;
+    console.log('✅ LoadConfiguration Complete', {
+      title: config.title,
+      sheetName: config.sheetName,
+      showDetails: config.showDetails,
+      hasPermissions: !!config.userPermissions,
+      timestamp: new Date().toISOString()
+    });
 
     // 権限情報設定
     if (config.userPermissions) {
@@ -669,7 +735,16 @@ class AnswerApp {
 
   // Answer data loading (using current GAS functions)
   async loadAnswers(sortOrder = 'newest') {
-    if (this.isLoading) return;
+    if (this.isLoading) {
+      console.log('⏳ LoadAnswers: Already loading, skipping');
+      return;
+    }
+
+    console.log('🔄 LoadAnswers Start', {
+      sortOrder,
+      userId: this.userId,
+      timestamp: new Date().toISOString()
+    });
 
     this.isLoading = true;
     this.showLoading(true);
@@ -678,8 +753,23 @@ class AnswerApp {
       const classFilter = DOMHelpers.safeGetById('classFilter');
       const filterValue = classFilter ? classFilter.value || 'すべて' : 'すべて';
 
+      console.log('📋 LoadAnswers: Filter parameters', {
+        classFilter: filterValue,
+        sortOrder,
+        userId: this.userId
+      });
+
       // 現在のGAS関数を使用
       const data = await this.loader.callGAS('getPublishedSheetData', filterValue, sortOrder);
+
+      console.log('📊 LoadAnswers: Data received', {
+        success: data.success,
+        rowCount: data.rows?.length || 0,
+        hasHeader: !!data.header,
+        hasError: !!data.error,
+        sheetName: data.sheetName,
+        timestamp: new Date().toISOString()
+      });
 
       if (!data.success && data.error) {
         throw new Error(data.error);
@@ -693,6 +783,7 @@ class AnswerApp {
         if (headingLabel) {
           headingLabel.innerHTML = this.escapeHtml(data.header);
         }
+        console.log('🏷️ LoadAnswers: Header updated', { header: data.header });
       }
 
       // 新着通知チェック
@@ -701,12 +792,24 @@ class AnswerApp {
       this.populateClassFilter(this.answers);
       this.renderAnswers();
 
+      console.log('✅ LoadAnswers Complete', {
+        answersCount: this.answers.length,
+        classFiltersPopulated: !!classFilter?.options?.length,
+        timestamp: new Date().toISOString()
+      });
+
     } catch (error) {
-      console.error('Data loading error:', error);
+      console.error('❌ LoadAnswers Error', {
+        error: error.message || error,
+        sortOrder,
+        userId: this.userId,
+        timestamp: new Date().toISOString()
+      });
       this.showError('データの読み込みに失敗しました');
     } finally {
       this.isLoading = false;
       this.showLoading(false);
+      console.log('🏁 LoadAnswers: Finished loading process');
     }
   }
 
@@ -1014,10 +1117,22 @@ document.addEventListener('click', async (e) => {
   if (e.target.closest('.reaction-btn')) {
     e.preventDefault();
     const btn = e.target.closest('.reaction-btn');
-    const type = btn.dataset.type;
-    const rowIndex = btn.dataset.row;
+    const type = btn.dataset.reaction;
+    const rowIndex = btn.dataset.rowIndex;
+
+    console.log('👆 Reaction Click', {
+      type,
+      rowIndex,
+      userEmail: window.answerApp?.userEmail,
+      hasAuth: !!window.answerApp?.userEmail,
+      timestamp: new Date().toISOString()
+    });
 
     if (!window.answerApp || !window.answerApp.userEmail) {
+      console.warn('❌ Reaction: No authentication', {
+        hasApp: !!window.answerApp,
+        hasEmail: !!window.answerApp?.userEmail
+      });
       if (window.notifications) {
         window.notifications.error('認証が必要です');
       }
@@ -1026,9 +1141,21 @@ document.addEventListener('click', async (e) => {
 
     try {
       btn.classList.add('loading');
+      console.log('⏳ Reaction: Starting API call', {
+        type,
+        rowIndex: parseInt(rowIndex),
+        userEmail: window.answerApp.userEmail
+      });
 
       // 現在のGAS関数を使用
-      await window.answerApp.loader.callGAS('addReaction', window.answerApp.userEmail, parseInt(rowIndex), type);
+      const result = await window.answerApp.loader.callGAS('addReaction', window.answerApp.userEmail, parseInt(rowIndex), type);
+
+      console.log('🎯 Reaction: API result', {
+        success: result?.success,
+        type,
+        rowIndex,
+        result
+      });
 
       // Data reload
       await window.answerApp.loadAnswers(window.answerApp.currentSort);
@@ -1036,13 +1163,21 @@ document.addEventListener('click', async (e) => {
       if (window.notifications) {
         window.notifications.success('リアクションを追加しました');
       }
+      console.log('✅ Reaction: Complete', { type, rowIndex });
     } catch (error) {
-      console.error('Reaction addition error:', error);
+      console.error('❌ Reaction Error', {
+        error: error.message || error,
+        type,
+        rowIndex,
+        userEmail: window.answerApp.userEmail,
+        timestamp: new Date().toISOString()
+      });
       if (window.notifications) {
         window.notifications.error('リアクションの追加に失敗しました');
       }
     } finally {
       btn.classList.remove('loading');
+      console.log('🏁 Reaction: Cleanup complete', { type, rowIndex });
     }
   }
 
@@ -1050,17 +1185,38 @@ document.addEventListener('click', async (e) => {
   if (e.target.closest('.highlight-btn')) {
     e.preventDefault();
     const btn = e.target.closest('.highlight-btn');
-    const rowIndex = btn.dataset.row;
+    const rowIndex = btn.dataset.rowIndex;
+
+    console.log('🌟 Highlight Click', {
+      rowIndex,
+      hasAdminFeatures: !!window.answerApp?.showAdminFeatures,
+      adminMode: window.answerApp?.adminMode,
+      timestamp: new Date().toISOString()
+    });
 
     if (!window.answerApp || !window.answerApp.showAdminFeatures) {
+      console.warn('❌ Highlight: No admin privileges', {
+        hasApp: !!window.answerApp,
+        hasAdminFeatures: !!window.answerApp?.showAdminFeatures
+      });
       return;
     }
 
     try {
       btn.classList.add('loading');
+      console.log('⏳ Highlight: Starting API call', {
+        rowIndex: parseInt(rowIndex),
+        userEmail: window.answerApp.userEmail
+      });
 
       // 現在のGAS関数を使用（toggleHighlight関数を確認）
-      await window.answerApp.loader.callGAS('toggleHighlight', window.answerApp.userEmail, parseInt(rowIndex));
+      const result = await window.answerApp.loader.callGAS('toggleHighlight', window.answerApp.userEmail, parseInt(rowIndex));
+
+      console.log('🎯 Highlight: API result', {
+        success: result?.success,
+        rowIndex,
+        result
+      });
 
       // Data reload
       await window.answerApp.loadAnswers(window.answerApp.currentSort);
@@ -1068,13 +1224,20 @@ document.addEventListener('click', async (e) => {
       if (window.notifications) {
         window.notifications.success('ハイライトを変更しました');
       }
+      console.log('✅ Highlight: Complete', { rowIndex });
     } catch (error) {
-      console.error('Highlight change error:', error);
+      console.error('❌ Highlight Error', {
+        error: error.message || error,
+        rowIndex,
+        userEmail: window.answerApp.userEmail,
+        timestamp: new Date().toISOString()
+      });
       if (window.notifications) {
         window.notifications.error('ハイライトの変更に失敗しました');
       }
     } finally {
       btn.classList.remove('loading');
+      console.log('🏁 Highlight: Cleanup complete', { rowIndex });
     }
   }
 });
@@ -1083,20 +1246,35 @@ document.addEventListener('click', async (e) => {
 
 // ドメイン認証とフォーム検出
 async function initializeAdvancedFeatures() {
+  console.log('🚀 InitializeAdvancedFeatures Start', {
+    hasApp: !!window.answerApp,
+    hasLoader: !!window.answerApp?.loader,
+    timestamp: new Date().toISOString()
+  });
+
   try {
     // ドメイン認証チェック
+    console.log('🔐 Starting domain auth check');
     const domainAuthResult = await window.answerApp.loader.checkDomainAuth();
+    console.log('🔐 Domain auth result', domainAuthResult);
     updateDomainAuthDisplay(domainAuthResult);
 
     // フォームURL検出
+    console.log('📝 Starting form URL detection');
     const formResult = await window.answerApp.loader.detectFormUrl();
+    console.log('📝 Form detection result', formResult);
     updateFormLinkDisplay(formResult);
 
     // 新着コンテンツチェック開始
+    console.log('🔄 Starting new content polling');
     startNewContentPolling();
 
+    console.log('✅ InitializeAdvancedFeatures Complete');
   } catch (error) {
-    console.warn('Advanced features initialization failed:', error);
+    console.error('❌ Advanced features initialization failed', {
+      error: error.message || error,
+      timestamp: new Date().toISOString()
+    });
   }
 }
 
