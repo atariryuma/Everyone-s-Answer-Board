@@ -1387,7 +1387,7 @@ function performHighPrecisionAnalysis(headers, sampleData) {
   console.log('🔍 performHighPrecisionAnalysis: 開始', {
     headersCount: headers.length,
     sampleDataCount: sampleData.length,
-    headers: headers
+    headers
   });
 
   const results = {

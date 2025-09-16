@@ -1,14 +1,12 @@
 <!DOCTYPE html>
-<html lang="ja" prefix="og: http://ogp.me/ns#">
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <title>StudyQuest -みんなの回答ボード- </title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="StudyQuest みんなの回答ボード - インタラクティブな学習プラットフォーム">
-  <meta name="author" content="StudyQuest">
   <!-- Shared Security Headers -->
   <?!= include('SharedSecurityHeaders'); ?>
-
+  
   <!-- Preload Google Fonts for better performance -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,45 +36,49 @@
     });
 
   </script>
-
+  
   <!-- Shared TailwindCSS Configuration -->
   <?!= include('SharedTailwindConfig'); ?>
   <script>
     const DEBUG_MODE = '<?= typeof DEBUG_MODE !== "undefined" ? DEBUG_MODE : "false" ?>' === 'true';
-    function log() {
+    function debugLog() {
       if (DEBUG_MODE && console && console.log) {
         try {
+          // 引数を安全に処理
           const args = Array.from(arguments).map(arg => {
             if (typeof arg === 'object' && arg !== null) {
-              return stringify(arg);
+              return safeDebugStringify(arg);
             }
             return arg;
           });
           console.log.apply(console, args);
         } catch (error) {
-          console.warn('Log error:', error.message);
+          console.warn('debugLog error:', error.message);
         }
       }
     }
 
-    function stringify(obj, maxDepth = 2, currentDepth = 0) {
-      if (currentDepth > maxDepth) return '[Max Depth]';
-
+    function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
+      if (currentDepth > maxDepth) return '[Max Depth Reached]';
+      
       try {
         if (obj === null || obj === undefined) return obj;
         if (typeof obj !== 'object') return obj;
-
+        
+        // DOM要素の安全な表示
         if (obj instanceof HTMLElement) {
           return `[${obj.tagName}${obj.id ? '#' + obj.id : ''}${obj.className ? '.' + obj.className.split(' ').slice(0, 2).join('.') : ''}]`;
         }
-
+        
+        // 配列の安全な表示
         if (Array.isArray(obj)) {
           if (obj.length > 5) {
-            return `[Array(${obj.length}): ${obj.length - 3} more items]`;
+            return `[Array(${obj.length}): first 3 items + ${obj.length - 3} more]`;
           }
-          return obj.map(item => stringify(item, maxDepth, currentDepth + 1));
+          return obj.map(item => safeDebugStringify(item, maxDepth, currentDepth + 1));
         }
-
+        
+        // オブジェクトの安全な表示
         const result = {};
         let count = 0;
         for (const key in obj) {
@@ -84,7 +86,7 @@
             result['...'] = `[${Object.keys(obj).length - 8} more properties]`;
             break;
           }
-          result[key] = stringify(obj[key], maxDepth, currentDepth + 1);
+          result[key] = safeDebugStringify(obj[key], maxDepth, currentDepth + 1);
           count++;
         }
         return result;
@@ -93,42 +95,84 @@
       }
     }
 
-    // Development flow display removed for production
+    // システム全体フロー表示機能
+    function showSystemFlow() {
+      // Development flow display removed for production
+    }
+
+    const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : "false" ?>';
+    const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
+    const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
+    const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
+    const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+    const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
+    const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
+    const __OPINION_HEADER__ = '<?= typeof opinionHeader !== "undefined" ? opinionHeader : "お題" ?>';
+    const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : "false" ?>';
+    const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : "false" ?>';
+    const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : "false" ?>';
+    const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : "true" ?>';
+    const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : "false" ?>';
+    window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
+    window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
+    // Store server-provided admin capability but always start in view mode
+    window.hasAdminCapability = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';
+    window.showAdminFeatures = false; // Always start in view mode
+    window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : __SHOW_HIGHLIGHT_TOGGLE__ === 'true';
+    window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
+    window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
+    window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
+
+    // Server configuration processing completed
+    const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
+    const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
+    const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
+    let MAPPING;
+    try {
+      if (typeof __MAPPING__ === 'string' && !__MAPPING__.startsWith('<')) {
+        MAPPING = JSON.parse(__MAPPING__);
+      } else {
+        MAPPING = {};
+      }
+    } catch (e) {
+      console.warn('Failed to parse MAPPING:', e);
+      MAPPING = {};
+    }
   </script>
-
-  <!-- Shared Styles and CSS -->
+  
+  <?!= include('SharedUtilities'); ?>
   <?!= include('page.css'); ?>
-</head>
 
+</head>
 <body class="bg-[#1a1b26] text-gray-200 font-sans">
-  <!-- Loading Overlay -->
-  <div id="loading-overlay" class="loading-overlay hidden"></div>
+  <!-- Unified Loading Overlay - Content managed by UnifiedLoadingManager -->
+  <div id="loading-overlay" class="loading-overlay page-specific hidden"></div>
 
   <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
-    <!-- Header -->
+    <!-- コンパクトヘッダー -->
     <header id="main-header" class="glass-panel rounded-xl p-3 mb-4 shadow-lg fade-in">
-      <!-- Form Link and Domain Info -->
+      <!-- 上部: フォームリンク + ドメイン情報（横並び） -->
       <div class="flex items-center justify-between mb-3 text-xs">
-        <!-- Form Link -->
+        <!-- フォームリンク（左側） -->
         <a id="form-link-btn" href="#" target="_blank" class="bg-cyan-500/10 border border-cyan-400/30 rounded px-3 py-1 flex items-center gap-2 hover:bg-cyan-500/20 transition-all text-cyan-400 hover:text-cyan-300 hidden">
           <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
           </svg>
           <span class="font-medium">📝 回答フォーム</span>
         </a>
-
-        <!-- Admin Controls and Domain Info -->
+        
+        <!-- 管理モードボタンとドメイン情報（右側） -->
         <div class="flex-shrink-0 flex items-center gap-2">
-          <!-- Admin Toggle -->
-          <button type="button" id="adminToggleBtn" class="admin-toggle text-xs text-gray-500 hover:text-cyan-400 transition-all opacity-60 hover:opacity-100 hidden whitespace-nowrap flex items-center gap-1 px-2 py-1 rounded" aria-label="Admin mode toggle">
+          <!-- 管理モードボタン -->
+          <button type="button" id="adminToggleBtn" class="admin-toggle text-xs text-gray-500 hover:text-cyan-400 transition-all opacity-60 hover:opacity-100 hidden whitespace-nowrap flex items-center gap-1 px-2 py-1 rounded" hidden aria-label="管理者モード切り替え">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
             </svg>
           </button>
-
-          <!-- Domain Status -->
+          
           <div>
+            <!-- ドメイン一致表示 -->
             <div id="header-domain-match" class="bg-green-500/10 border border-green-400/30 rounded px-2 py-1 hidden">
               <div class="flex items-center gap-1">
                 <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -137,7 +181,8 @@
                 <span class="text-green-400 font-medium" id="header-domain-match-text">学校ドメイン</span>
               </div>
             </div>
-
+            
+            <!-- ドメイン不一致表示 -->
             <div id="header-domain-mismatch" class="bg-yellow-500/10 border border-yellow-400/30 rounded px-2 py-1 hidden">
               <div class="flex items-center gap-1">
                 <svg class="w-3 h-3 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -146,7 +191,8 @@
                 <span class="text-yellow-400 font-medium" id="header-domain-mismatch-text">外部アクセス</span>
               </div>
             </div>
-
+            
+            <!-- 初期状態表示 -->
             <div id="header-domain-initial" class="bg-blue-500/10 border border-blue-400/30 rounded px-2 py-1">
               <div class="flex items-center gap-1">
                 <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
@@ -156,10 +202,10 @@
           </div>
         </div>
       </div>
-
-      <!-- Main Title and Controls -->
+      
+      <!-- メイン部分: 問題タイトル + コントロール -->
       <div class="flex flex-col lg:flex-row items-center gap-3">
-        <!-- Controls -->
+        <!-- 左: コントロール -->
         <div class="flex items-center gap-3 text-xs">
           <div id="answerCount" class="text-gray-400 flex items-center gap-1">
             <svg class="w-3 h-3 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -167,11 +213,11 @@
             </svg>
             <span id="answerCountText">0件</span>
           </div>
-
-          <select id="classFilter" class="hidden text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1" aria-label="Class filter"></select>
-
+          
+          <select id="classFilter" class="hidden text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1" title="クラスフィルター" aria-label="クラスフィルター"></select>
+          
           <div class="relative">
-            <select id="sortOrder" class="text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1 pr-6 appearance-none" aria-label="Sort order">
+            <select id="sortOrder" class="text-xs bg-gray-700 border border-gray-600 rounded px-2 py-1 pr-6 appearance-none" title="並び順" aria-label="並び順">
               <option value="newest" selected>新着順</option>
               <option value="random">ランダム順</option>
               <option value="score" id="scoreOption" class="hidden">スコア順</option>
@@ -182,37 +228,32 @@
           </div>
         </div>
 
-        <!-- Question Title -->
+        <!-- 中央: 問題タイトル（最大） -->
         <div class="flex-grow text-center min-w-0">
-          <h1 id="headingLabel" class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-pink-400 leading-tight">
+          <div id="headingLabel" class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-pink-400 leading-tight">
             <svg class="w-5 h-5 md:w-6 md:h-6 animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
               <path class="opacity-75" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" fill="currentColor"></path>
             </svg>
-          </h1>
+          </div>
         </div>
 
-        <!-- Right Section: Info & Admin Controls -->
-        <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1 px-2">
-          <p id="modeLabel" class="text-xs text-cyan-400 font-medium h-4 truncate flex items-center justify-end gap-1">
-            学習者
-          </p>
-          <p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate flex items-center justify-end gap-1">
-          </p>
-          <div class="flex justify-end gap-1 flex-wrap">
-            <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded hidden whitespace-nowrap transition-all flex items-center gap-1" aria-label="End publication">
-              <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
-              </svg>
-              公開終了
-            </button>
-          </div>
+      <!-- Right Section: Info & Admin Controls -->
+      <div class="w-full lg:w-auto lg:min-w-[150px] text-right space-y-1 px-2">
+        <p id="sheetNameText" class="text-xs text-gray-400 h-4 truncate flex items-center justify-end gap-1">
+        </p>
+        <div class="flex justify-end gap-1 flex-wrap">
+          <button type="button" id="endPublicationBtn" class="admin-toggle text-xs bg-orange-600 hover:bg-orange-700 text-white px-3 py-1 rounded hidden whitespace-nowrap transition-all flex items-center gap-1" hidden aria-label="公開終了">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
+            </svg>
+            公開終了
+          </button>
         </div>
       </div>
     </header>
-
-    <!-- New Content Banner -->
-    <aside id="newContentBanner" class="new-content-banner" role="alert" aria-live="polite">
+    <!-- 新着通知バナー -->
+    <div id="newContentBanner" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-lg hidden transition-all duration-300" role="alert" aria-live="polite">
       <div class="flex items-center gap-3">
         <span id="newContentIcon" class="w-5 h-5 animate-pulse" aria-hidden="true">📋</span>
         <span id="newContentText">新しい意見が投稿されました</span>
@@ -223,12 +264,10 @@
           ×
         </button>
       </div>
-    </aside>
+    </div>
 
-    <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧" itemscope itemtype="https://schema.org/Collection"></main>
+    <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="main" aria-live="polite" aria-label="回答一覧"></main>
   </div>
-
-  <!-- Answer Modal -->
   <div id="answerModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
     <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative" role="document" aria-labelledby="modalAnswer">
       <button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 rounded-full p-2 text-white hover:scale-110 transition-transform z-10" aria-label="閉じる">
@@ -241,8 +280,6 @@
       </div>
     </div>
   </div>
-
-  <!-- Info Modal -->
   <div id="infoModalContainer" class="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4 hidden" role="dialog" aria-modal="true">
     <div id="infoModalCard" class="glass-panel rounded-xl p-8 shadow-2xl border-2 border-cyan-400/80 w-full max-w-2xl relative" role="document">
       <div class="space-y-5 text-gray-200 text-lg leading-relaxed">
@@ -250,11 +287,9 @@
         <div class="bg-gradient-to-r from-green-800/40 to-emerald-800/40 border border-green-400/50 rounded-lg p-4 mb-4">
           <div class="flex items-start gap-3">
             <div class="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-              </svg>
+              <span class="text-lg">📚</span>
             </div>
-            <div class="flex-1">
+            <div>
               <p class="text-base font-bold text-green-200 mb-3">デジタル・シティズンシップって何だろう？</p>
               <p class="text-sm text-green-100 leading-relaxed mb-2">
                 <span class="text-green-200 font-semibold">デジタル・シティズンシップ</span>とは、コンピューターやタブレットを使うときに、<span class="text-green-200 font-semibold">やさしい心で相手のことを考える</span>ことです。
@@ -278,42 +313,22 @@
         <p class="flex items-center gap-2"><span id="infoIconHighlight" class="w-5 h-5 text-purple-400"></span>先生が注目してほしい意見につけています</p>
         <p>責任あるリアクションで、みんなで学びを深めよう！</p>
 
+
         <div class="text-center mt-6">
           <button type="button" id="infoModalConfirmBtn" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">わかった</button>
         </div>
       </div>
     </div>
   </div>
-
-  <!-- Footer Controls -->
-  <footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4 pointer-events-none">
-    <div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3 pointer-events-auto">
-      <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="Display column count">
+  <footer id="controlsFooter" class="fixed bottom-0 left-0 right-0 z-40 p-4">
+    <div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3">
+      <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2" aria-label="表示列数の変更">
       <div class="flex items-center gap-1">
         <span id="sliderValue" class="font-bold text-lg">4</span>
-        <span id="footerIcon" class="w-4 h-4"></span>
+        <span id="iconGrid" class="w-4 h-4"></span>
       </div>
     </div>
   </footer>
-
-  <!-- Make server data available on client side -->
-  <script>
-    // Set parameters passed from server to window object
-    // GAS Template: userId injection
-    window.userId = <?!= JSON.stringify(data.userId || null) ?>;
-    // GAS Template: userEmail injection
-    window.userEmail = <?!= JSON.stringify(data.userEmail || null) ?>;
-
-    // DISPLAY_MODES定数を追加（フロントエンドエラー修正）
-    window.DISPLAY_MODES = {
-      ANONYMOUS: 'anonymous',
-      SHOW_NAME: 'show_name',
-      SHOW_COUNTS: 'show_counts'
-    };
-  </script>
-
-  <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
-  <?!= include('SharedUtilities'); ?>
   <?!= include('page.js'); ?>
 </body>
 </html>
