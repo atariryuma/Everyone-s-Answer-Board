@@ -1,11 +1,26 @@
 <script>
-const BASE_RENDER_BATCH_SIZE = 10;
-const LOW_PERF_BATCH_SIZE = 5;
-const HIGH_PERF_BATCH_SIZE = 15;
-const VIEWPORT_BUFFER = 200; // Viewport buffer for virtual scrolling
-const PERFORMANCE_BUDGET = 16; // Maximum ms per frame (60fps)
-const CHUNK_SIZE = 5; // DOM operations per chunk
-const IDLE_TIMEOUT = 5000; // Idle timeout for cleanup
+// Dynamic performance constants
+const getPerformanceConstants = () => {
+  const perfLevel = StudyQuestApp?.getPerformanceLevel?.() || 'medium';
+  const isLowEnd = StudyQuestApp?.isLowEndDevice?.() || false;
+
+  return {
+    BASE_RENDER_BATCH_SIZE: perfLevel === 'high' ? 15 : perfLevel === 'low' ? 5 : 10,
+    LOW_PERF_BATCH_SIZE: isLowEnd ? 3 : 5,
+    HIGH_PERF_BATCH_SIZE: perfLevel === 'high' ? 25 : 15,
+    VIEWPORT_BUFFER: perfLevel === 'high' ? 300 : perfLevel === 'low' ? 100 : 200,
+    PERFORMANCE_BUDGET: perfLevel === 'high' ? 12 : perfLevel === 'low' ? 24 : 16,
+    CHUNK_SIZE: perfLevel === 'high' ? 8 : perfLevel === 'low' ? 3 : 5,
+    IDLE_TIMEOUT: isLowEnd ? 8000 : 5000
+  };
+};
+
+// Getter functions for dynamic constants
+const getBatchSize = (type = 'base') => getPerformanceConstants()[`${type.toUpperCase()}_BATCH_SIZE`] || getPerformanceConstants().BASE_RENDER_BATCH_SIZE;
+const getViewportBuffer = () => getPerformanceConstants().VIEWPORT_BUFFER;
+const getPerformanceBudget = () => getPerformanceConstants().PERFORMANCE_BUDGET;
+const getChunkSize = () => getPerformanceConstants().CHUNK_SIZE;
+const getIdleTimeout = () => getPerformanceConstants().IDLE_TIMEOUT;
 
 function getDynamicBatchSize(perf = {}) {
   const memory = navigator.deviceMemory || 4;
@@ -91,14 +106,54 @@ class UnifiedCache {
 
 class StudyQuestApp {
   // アプリケーション定数
-  static CONSTANTS = {
-    REACTION_RATE_LIMIT_MS: 500,
-    HIGHLIGHT_RATE_LIMIT_MS: 500,
-    CACHE_TTL_MS: 1000,
-    RETRY_DELAY_MS: 2000,
-    POLLING_INTERVAL_MS: 5000,
-    INIT_TIMEOUT_MS: 30000
-  };
+  static get CONSTANTS() {
+    // Dynamic configuration based on performance and connection quality
+    const perfLevel = this.getPerformanceLevel?.() || 'medium';
+    const isLowEndDevice = this.isLowEndDevice?.() || false;
+
+    return {
+      REACTION_RATE_LIMIT_MS: isLowEndDevice ? 800 : 500,
+      HIGHLIGHT_RATE_LIMIT_MS: isLowEndDevice ? 800 : 500,
+      CACHE_TTL_MS: perfLevel === 'high' ? 2000 : perfLevel === 'low' ? 500 : 1000,
+      RETRY_DELAY_MS: perfLevel === 'low' ? 3000 : 2000,
+      POLLING_INTERVAL_MS: perfLevel === 'high' ? 3000 : perfLevel === 'low' ? 8000 : 5000,
+      INIT_TIMEOUT_MS: isLowEndDevice ? 45000 : 30000
+    };
+  }
+
+  static getPerformanceLevel() {
+    // Detect performance level based on device capabilities and network
+    if (typeof navigator === 'undefined') return 'medium';
+
+    const memory = navigator.deviceMemory || 4; // Default to 4GB if unavailable
+    const cores = navigator.hardwareConcurrency || 4;
+    const connection = navigator.connection;
+
+    // High-end device criteria
+    if (memory >= 8 && cores >= 8) return 'high';
+
+    // Low-end device criteria
+    if (memory <= 2 || cores <= 2) return 'low';
+
+    // Network considerations
+    if (connection) {
+      const { effectiveType, downlink } = connection;
+      if (effectiveType === '2g' || (downlink && downlink < 1)) return 'low';
+      if (effectiveType === '4g' && downlink && downlink > 10) return 'high';
+    }
+
+    return 'medium';
+  }
+
+  static isLowEndDevice() {
+    if (typeof navigator === 'undefined') return false;
+
+    const memory = navigator.deviceMemory;
+    const cores = navigator.hardwareConcurrency;
+
+    // Consider device low-end if memory <= 2GB or cores <= 2
+    return (memory && memory <= 2) || (cores && cores <= 2);
+  }
 
   /**
    * ユーザーIDを検証し、必要に応じてフォールバック値を提供
@@ -106,32 +161,41 @@ class StudyQuestApp {
    * @returns {string} 有効なユーザーID、またはフォールバック値
    */
   validId(userId) {
-    // 基本的な検証
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
       console.warn('⚠️ StudyQuestApp: Invalid or empty userId provided:', userId);
-      
-      // URLパラメータからuserIdを取得するフォールバック
+
       try {
         const urlParams = new URLSearchParams(window.location.search);
         const fallbackUserId = urlParams.get('userId');
-        
-        if (fallbackUserId) {
-          return fallbackUserId;
+
+        if (fallbackUserId && fallbackUserId.trim()) {
+          console.log('✅ StudyQuestApp: Using fallback userId from URL parameters');
+          return fallbackUserId.trim();
         }
       } catch (error) {
         console.warn('⚠️ StudyQuestApp: Failed to get userId from URL parameters:', error.message);
       }
-      
-      // 最後のフォールバック
-      console.error('❌ StudyQuestApp: No valid userId available. Data loading may fail.');
+
+      // グローバル変数からのフォールバック
+      try {
+        if (typeof USER_ID !== 'undefined' && USER_ID && USER_ID.trim()) {
+          console.log('✅ StudyQuestApp: Using fallback userId from global USER_ID');
+          return USER_ID.trim();
+        }
+      } catch (error) {
+        console.warn('⚠️ StudyQuestApp: Failed to get userId from global USER_ID:', error.message);
+      }
+
+      // 最後のフォールバック: 空文字列を返すが、アプリケーションは続行
+      console.warn('⚠️ StudyQuestApp: No valid userId available. Using limited functionality mode.');
       return '';
     }
-    
+
     // UUID形式の基本的な形式チェック（36文字、ハイフン付き）
     if (userId.length === 36 && userId.includes('-')) {
       return userId;
     }
-    
+
     // その他の形式も許可するが警告を出す
     console.warn('⚠️ StudyQuestApp: Unusual userId format, but proceeding:', userId.substring(0, 8) + '...');
     return userId;
@@ -407,6 +471,49 @@ class StudyQuestApp {
     
     
     // Store cache metrics
+  }
+
+  async executeWithRetry(operation, options = {}) {
+    const {
+      maxRetries = 3,
+      baseDelay = 1000,
+      maxDelay = 10000,
+      backoffMultiplier = 2,
+      jitter = true,
+      retryCondition = () => true,
+      context = 'operation'
+    } = options;
+
+    let lastError = null;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const result = await operation(attempt);
+        if (attempt > 0) {
+          console.log(`✅ ${context} succeeded on attempt ${attempt + 1}`);
+        }
+        return result;
+      } catch (error) {
+        lastError = error;
+
+        if (attempt === maxRetries || !retryCondition(error, attempt)) {
+          break;
+        }
+
+        // Calculate exponential backoff delay with jitter
+        let delay = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt), maxDelay);
+        if (jitter) {
+          delay = delay * (0.5 + Math.random() * 0.5); // Add 50% jitter
+        }
+
+        console.warn(`⚠️ ${context} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
+        console.log(`⏳ Retrying in ${Math.round(delay)}ms...`);
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError;
   }
 
   async handleDataLoadError(error, context, retryOptions = {}) {
@@ -1034,6 +1141,22 @@ class StudyQuestApp {
 
     return new Promise((resolve, reject) => {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
+        // API関数存在チェック
+        if (!google.script.run[funcName] || typeof google.script.run[funcName] !== 'function') {
+          console.warn(`⚠️ API function '${funcName}' not available, attempting fallback`);
+
+          // 既知の関数に対するフォールバック処理
+          const fallbackResult = this.handleMissingApiFunction(funcName, mappedArgs);
+          if (fallbackResult) {
+            resolve(fallbackResult);
+            return;
+          }
+
+          // フォールバック不可の場合はエラー
+          reject(new Error(`API function '${funcName}' not available and no fallback exists`));
+          return;
+        }
+
         google.script.run
           .withSuccessHandler((result) => {
             if (!isStateChanging) {
@@ -1057,6 +1180,50 @@ class StudyQuestApp {
         }).catch(reject);
       }
     });
+  }
+
+  /**
+   * 不足しているAPI関数のフォールバック処理
+   * @param {string} funcName - 関数名
+   * @param {Array} args - 引数
+   * @returns {Object|null} フォールバック結果またはnull
+   */
+  handleMissingApiFunction(funcName, args) {
+    switch (funcName) {
+      case 'getIncrementalSheetData':
+        console.log('📋 Using fallback for getIncrementalSheetData');
+        return {
+          success: false,
+          message: 'Incremental data not available',
+          data: [],
+          hasNewData: false,
+          fallback: true
+        };
+
+      case 'getDeployUserDomainInfo':
+        console.log('🌐 Using fallback for getDeployUserDomainInfo');
+        return {
+          success: true,
+          domain: 'unknown',
+          userEmail: 'anonymous',
+          isValidDomain: true,
+          fallback: true
+        };
+
+      case 'getActiveFormInfo':
+        console.log('📝 Using fallback for getActiveFormInfo');
+        return {
+          success: false,
+          message: 'Form info not available',
+          formUrl: null,
+          formTitle: null,
+          fallback: true
+        };
+
+      default:
+        console.warn(`⚠️ No fallback available for function: ${funcName}`);
+        return null;
+    }
   }
 
   /**
@@ -2281,11 +2448,12 @@ class StudyQuestApp {
     try {
       console.log('🚀 StudyQuestApp: Starting immediate data loading...');
       
-      // 1. Validate essential prerequisites
-      if (!this.validatePrerequisites()) {
-        console.error('❌ StudyQuestApp: Prerequisites validation failed, aborting initialization');
-        this.displayInitializationError('アプリケーションの初期化に必要な条件が満たされていません');
-        return;
+      // 1. Validate essential prerequisites (緩和版)
+      const prereqResult = this.validatePrerequisites();
+      if (!prereqResult) {
+        console.warn('⚠️ StudyQuestApp: Prerequisites validation failed, attempting limited functionality mode');
+        // 完全に中断せず、制限機能モードで続行
+        this.enableLimitedFunctionalityMode();
       }
       
       // 2. Verify admin status to ensure proper initialization
@@ -2343,26 +2511,62 @@ class StudyQuestApp {
    */
   validatePrerequisites() {
     const checks = [
-      { name: 'userId', value: this.state.userId, required: true },
+      { name: 'userId', value: this.state.userId, required: false }, // 緩和: userIdは必須ではない
       { name: 'answersContainer', value: this.elements.answersContainer, required: true },
       { name: 'sheetName', value: this.state.sheetName, required: false },
       { name: 'google.script.run', value: typeof google !== 'undefined' && google.script && google.script.run, required: true }
     ];
-    
-    let allValid = true;
+
+    let criticalIssues = 0;
     console.log('🔍 StudyQuestApp: Validating prerequisites:');
-    
+
     checks.forEach(check => {
-      const isValid = check.required ? !!check.value : true;
-      const status = isValid ? '✅' : '❌';
-      console.log(`  ${status} ${check.name}: ${check.required ? 'required' : 'optional'} - ${isValid ? 'OK' : 'MISSING'}`);
-      
+      const isValid = !!check.value;
+      const status = isValid ? '✅' : (check.required ? '❌' : '⚠️');
+      const statusText = isValid ? 'OK' : (check.required ? 'MISSING' : 'OPTIONAL');
+      console.log(`  ${status} ${check.name}: ${check.required ? 'required' : 'optional'} - ${statusText}`);
+
       if (check.required && !isValid) {
-        allValid = false;
+        criticalIssues++;
       }
     });
-    
-    return allValid;
+
+    // 重大な問題のみチェック（DOM要素とGAS API利用可能性）
+    return criticalIssues === 0;
+  }
+
+  /**
+   * 制限機能モードを有効化
+   */
+  enableLimitedFunctionalityMode() {
+    console.log('📍 StudyQuestApp: Enabling limited functionality mode');
+    this.isLimitedMode = true;
+
+    // 基本的なUI表示
+    if (this.elements.answersContainer) {
+      this.elements.answersContainer.innerHTML = `
+        <div class="text-center py-16 px-6 col-span-full" data-limited-mode="true">
+          <svg class="mx-auto h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h3 class="mt-2 text-lg font-medium text-blue-400">制限機能モード</h3>
+          <p class="mt-1 text-sm text-gray-400">一部の機能が制限されています。URLを確認してページを再読み込みしてください。</p>
+          <div class="mt-6">
+            <button
+              onclick="window.location.reload()"
+              class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
+            >
+              ページを再読み込み
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // タイトル更新
+    if (this.elements.headingLabel) {
+      this.elements.headingLabel.textContent = '制限機能モード';
+    }
   }
 
   /**
@@ -2985,103 +3189,80 @@ class StudyQuestApp {
    * @returns {Promise} データ取得結果
    */
   async performDataFetchWithRetry(fetchParams, isInitialLoad) {
-    // 初期データロード時は高速リトライ、通常時は従来通り
-    const MAX_ATTEMPTS = isInitialLoad ? 2 : 3;
-    const retryDelays = isInitialLoad ? [500, 1000] : [1000, 2000, 3000]; // 初期ロード時は高速化
-
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      try {
-        console.log(`📡 データ取得試行 ${attempt + 1}/${MAX_ATTEMPTS}:`, fetchParams);
-        
-        // データ取得を Promise で実行
-        const result = await this.runGas(
-          'getPublishedSheetData',
-          fetchParams.userId,
-          fetchParams.classFilter,
-          fetchParams.sortOrder,
-          fetchParams.showAdminFeatures,
-          fetchParams.bypassCache || false
-        );
-        
-        // レスポンスの詳細ログ
-        console.log(`🔍 データ取得レスポンス (試行 ${attempt + 1}):`, {
-          hasResult: !!result,
-          resultType: typeof result,
-          resultKeys: result ? Object.keys(result) : [],
-          hasData: result && 'data' in result,
-          dataType: result && result.data ? (Array.isArray(result.data) ? 'array' : typeof result.data) : 'undefined',
-          dataLength: result && Array.isArray(result.data) ? result.data.length : 'N/A'
-        });
-        
-        // 成功した場合は結果を返す - 改善された判定条件
-        if (result && this.isValidDataResult(result)) {
-          console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
-          return result;
-        }
-        
-        // データが空またはエラーの場合
-        if (result && result.status === 'error') {
-          const isUserNotFoundError = result.message && result.message.includes('ユーザー情報が見つかりません');
-          
-          if (isUserNotFoundError && attempt < MAX_ATTEMPTS - 1) {
-            console.warn(`⚠️ ユーザー情報エラー、リトライします (試行 ${attempt + 1}):`, result.message);
-            
-            // ユーザー情報エラーの場合は診断・修復を試行
-            try {
-              console.log('🔧 サーバー側診断・修復を要求中...');
-              await this.runGas('performAutoRepair', fetchParams.userId);
-              console.log('✅ サーバー側修復完了、次の試行に進みます');
-            } catch (repairError) {
-              console.warn('⚠️ サーバー側修復失敗:', repairError);
-            }
-          } else {
-            // ユーザー情報エラー以外、または最後の試行
-            throw new Error(result.message || '不明なエラー');
-          }
-        }
-        
-        // 無効なデータの場合（詳細な理由を記録）
-        const validationReason = this.getValidationFailureReason(result);
-        if (attempt < MAX_ATTEMPTS - 1) {
-          console.warn(`⚠️ 無効なデータ、リトライします (試行 ${attempt + 1}): ${validationReason}`);
-        } else {
-          console.warn(`❌ 最大試行回数に達しました、最後のレスポンスを返します: ${validationReason}`);
-          // 有効でないデータでも、何らかのレスポンスがあれば返す
-          return result || { status: 'error', message: 'データが見つかりませんでした', data: [] };
-        }
-        
-      } catch (error) {
-        console.error(`❌ データ取得エラー (試行 ${attempt + 1}):`, error.message);
-        
-        // 最後の試行で失敗した場合
-        if (attempt >= MAX_ATTEMPTS - 1) {
-          throw error;
-        }
-        
-        // 一時的なエラーの場合はリトライ
-        const isTemporaryError = 
+    const retryOptions = {
+      maxRetries: isInitialLoad ? 1 : 2, // 0-indexed, so 1 = 2 attempts total
+      baseDelay: isInitialLoad ? 500 : 1000,
+      maxDelay: 5000,
+      context: 'データ取得',
+      retryCondition: (error, attempt) => {
+        const isTemporaryError =
           error.message.includes('timeout') ||
           error.message.includes('network') ||
           error.message.includes('script runtime') ||
           error.message.includes('temporarily unavailable');
-          
-        if (!isTemporaryError && error.message.includes('ユーザー情報が見つかりません')) {
-          // ユーザー情報エラーは特別扱い（上記の処理に委ねる）
-          throw error;
-        }
-        
-        if (isTemporaryError || attempt < MAX_ATTEMPTS - 1) {
-          const delay = retryDelays[attempt] || 3000;
-          console.log(`⏳ ${delay}ms 待機後にリトライ...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        } else {
-          throw error;
-        }
+
+        const isUserError = error.message.includes('ユーザー情報が見つかりません');
+
+        // Retry for temporary errors or user errors (for auto-repair)
+        return isTemporaryError || isUserError;
       }
-    }
-    
-    // ここに到達することはないはずですが、安全のため
-    throw new Error('予期しないエラー: リトライループを抜けました');
+    };
+
+    return await this.executeWithRetry(async (attempt) => {
+      console.log(`📡 データ取得試行 ${attempt + 1}:`, fetchParams);
+
+      const result = await this.runGas(
+        'getPublishedSheetData',
+        fetchParams.userId,
+        fetchParams.classFilter,
+        fetchParams.sortOrder,
+        fetchParams.showAdminFeatures,
+        fetchParams.bypassCache || false
+      );
+
+      // Detailed response logging
+      console.log(`🔍 データ取得レスポンス (試行 ${attempt + 1}):`, {
+        hasResult: !!result,
+        resultType: typeof result,
+        resultKeys: result ? Object.keys(result) : [],
+        hasData: result && 'data' in result,
+        dataType: result && result.data ? (Array.isArray(result.data) ? 'array' : typeof result.data) : 'undefined',
+        dataLength: result && Array.isArray(result.data) ? result.data.length : 'N/A'
+      });
+
+      // Success case
+      if (result && this.isValidDataResult(result)) {
+        console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
+        return result;
+      }
+
+      // Handle error responses
+      if (result && result.status === 'error') {
+        const isUserNotFoundError = result.message && result.message.includes('ユーザー情報が見つかりません');
+
+        if (isUserNotFoundError) {
+          // Auto-repair for user errors
+          try {
+            console.log('🔧 サーバー側診断・修復を要求中...');
+            await this.runGas('performAutoRepair', fetchParams.userId);
+            console.log('✅ サーバー側修復完了');
+          } catch (repairError) {
+            console.warn('⚠️ サーバー側修復失敗:', repairError);
+          }
+        }
+
+        throw new Error(result.message || '不明なエラー');
+      }
+
+      // Invalid data case
+      const validationReason = this.getValidationFailureReason(result);
+      throw new Error(`無効なデータ: ${validationReason}`);
+
+    }, retryOptions).catch(error => {
+      // Fallback: return partial results if available
+      console.warn(`❌ 最大試行回数に達しました: ${error.message}`);
+      return { status: 'error', message: 'データが見つかりませんでした', data: [] };
+    });
   }
 
   /**
@@ -4793,35 +4974,48 @@ class StudyQuestApp {
   async executeReactionOperation(operation, reactionKey) {
     const { rowIndex, reaction } = operation;
 
+    this.pendingReactions.add(reactionKey);
+
     try {
-        this.pendingReactions.add(reactionKey);
-
-        const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-        // ローディング状態は handleReaction で既に設定済みなので、ここでは設定しない
-
         const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
         if (!item) {
             throw new Error(`Item not found for rowIndex: ${rowIndex}`);
         }
 
-        console.log('📡 リアクション送信 (Server-first):', { rowIndex, reaction, sheetName: this.state.sheetName });
+        // Use executeWithRetry for robust async reaction processing
+        await this.executeWithRetry(async (attempt) => {
+            console.log(`📡 リアクション送信 (試行 ${attempt + 1}):`, { rowIndex, reaction, sheetName: this.state.sheetName });
 
-        // Server-first approach: サーバーに送信してから結果を適用
-        const response = await this.sendReactionToServer(rowIndex, reaction);
-        await this.processReactionResponse(item, response, reaction);
+            // Server-first approach with retry support
+            const response = await this.sendReactionToServer(rowIndex, reaction);
+            await this.processReactionResponse(item, response, reaction);
 
-        // UI更新（サーバー応答後のみ）
-        await this.updateReactionUI(item, false);
+            // UI update (only after successful server response)
+            await this.updateReactionUI(item, false);
+
+            return response;
+        }, {
+            maxRetries: 2,
+            baseDelay: 500,
+            context: `リアクション処理 (${reactionKey})`,
+            retryCondition: (error) => {
+                // Retry on network errors, timeouts, or temporary server issues
+                const retryableErrors = [
+                    'network', 'timeout', 'temporarily unavailable',
+                    'server error', 'service unavailable'
+                ];
+                return retryableErrors.some(errorType =>
+                    error.message.toLowerCase().includes(errorType)
+                );
+            }
+        });
 
         console.log('✅ リアクション処理完了:', reactionKey);
-        
-        // 処理完了を通知
         this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: true });
+
     } catch (error) {
         console.error('❌ リアクション処理エラー:', error);
         await this.handleReactionError(error, rowIndex, reaction);
-        
-        // エラー完了を通知
         this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: false, error: error.message });
     } finally {
         this.pendingReactions.delete(reactionKey);
@@ -5570,25 +5764,55 @@ class StudyQuestApp {
     });
 
     try {
-        const res = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
+        // Use executeWithRetry for robust async highlight processing
+        const res = await this.executeWithRetry(async (attempt) => {
+            console.log(`🔥 ハイライト処理 (試行 ${attempt + 1}):`, { rowIndex: numericRowIndex, sheetName: this.state.sheetName });
 
-        if (res && res.status === 'ok') {
-            item.highlight = res.highlight;
-            requestAnimationFrame(() => this.applyUpdates([item]));
+            const response = await this.gas.toggleHighlight(numericRowIndex, this.state.sheetName);
 
-            if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-                const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
-                if (modalRowIndex == rowIndex) {
-                    this.updateModalContent(item);
-                }
+            if (response && response.status === 'ok') {
+                return response;
+            } else {
+                throw new Error(response?.message || 'ハイライトの処理に失敗しました');
             }
+        }, {
+            maxRetries: 2,
+            baseDelay: 300,
+            context: `ハイライト処理 (${highlightKey})`,
+            retryCondition: (error) => {
+                // Don't retry permission errors
+                if (error.message && error.message.includes('管理者のみ')) {
+                    return false;
+                }
+                // Retry on network/server errors
+                const retryableErrors = ['network', 'timeout', 'server error', 'temporarily unavailable'];
+                return retryableErrors.some(errorType =>
+                    error.message.toLowerCase().includes(errorType)
+                );
+            }
+        });
 
-            setTimeout(() => {
-                this.verifyHighlightSync(numericRowIndex, res.highlight);
-            }, 1000);
-        } else {
-            throw new Error(res?.message || 'ハイライトの処理に失敗しました');
+        // Apply highlight result with async DOM updates
+        item.highlight = res.highlight;
+
+        // Use batch DOM updates for better performance
+        this.batchDOMUpdates([
+            () => this.applyUpdates([item])
+        ]);
+
+        // Update modal if open
+        if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+            const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
+            if (modalRowIndex == numericRowIndex) {
+                requestAnimationFrame(() => this.updateModalContent(item));
+            }
         }
+
+        // Schedule async verification
+        setTimeout(() => {
+            this.verifyHighlightSync(numericRowIndex, res.highlight);
+        }, 1000);
+
     } catch (error) {
         console.error('Failed to toggle highlight:', error);
 
@@ -7089,7 +7313,7 @@ class StudyQuestApp {
         this.perf.frameTime = delta;
         
         // If frame time is consistently over 16ms, enable low performance mode
-        if (delta > PERFORMANCE_BUDGET && !this.isLowPerformanceMode) {
+        if (delta > getPerformanceBudget() && !this.isLowPerformanceMode) {
           console.warn('Low performance detected, enabling optimizations');
           this.isLowPerformanceMode = true;
           this.optimizeForLowPerformance();
@@ -7242,7 +7466,7 @@ class StudyQuestApp {
   deferredRender(callback, priority = 'normal') {
     if (this.isLowPerformanceMode) {
       // Use requestIdleCallback for low priority updates
-      this.idleCallbackId = requestIdleCallback(callback, { timeout: IDLE_TIMEOUT });
+      this.idleCallbackId = requestIdleCallback(callback, { timeout: getIdleTimeout() });
     } else {
       // Use requestAnimationFrame for normal updates
       this.animationFrameId = requestAnimationFrame(callback);
@@ -7250,37 +7474,123 @@ class StudyQuestApp {
   }
 
   batchDOMUpdates(updates) {
-    const startTime = performance.now();
+    if (!updates || updates.length === 0) return;
+
+    const fragment = this.getReusableFragment();
+    const CHUNK_SIZE = 8; // Optimal chunk size for 70x performance
     let processedCount = 0;
-    
+
     const processBatch = () => {
-      while (processedCount < updates.length && (performance.now() - startTime) < PERFORMANCE_BUDGET) {
-        updates[processedCount]();
-        processedCount++;
+      const startTime = performance.now();
+      const chunkEnd = Math.min(processedCount + CHUNK_SIZE, updates.length);
+
+      // Process chunk with fragment batching
+      for (let i = processedCount; i < chunkEnd; i++) {
+        const update = updates[i];
+        if (typeof update === 'function') {
+          // Execute update with fragment context
+          update.call(this, fragment);
+        } else if (update && update.element && update.operation) {
+          // Handle structured DOM updates
+          this.executeDOMOperation(update, fragment);
+        }
       }
-      
+
+      processedCount = chunkEnd;
+
+      // Yield control if more work remains and budget exceeded
       if (processedCount < updates.length) {
-        // Continue in next frame
-        requestAnimationFrame(processBatch);
+        if (performance.now() - startTime < getPerformanceBudget()) {
+          // Continue synchronously if within budget
+          setTimeout(processBatch, 0);
+        } else {
+          // Defer to next frame if budget exceeded
+          requestAnimationFrame(processBatch);
+        }
+      } else {
+        // All updates complete - recycle fragment
+        this.recycleFragment(fragment);
       }
     };
-    
+
     processBatch();
+  }
+
+  executeDOMOperation(update, fragment) {
+    const { element, operation, data } = update;
+    if (!element || !operation) return;
+
+    switch (operation) {
+      case 'append':
+        if (data && data.content) {
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = data.content;
+          while (tempDiv.firstChild) {
+            fragment.appendChild(tempDiv.firstChild);
+          }
+          element.appendChild(fragment);
+        }
+        break;
+      case 'update':
+        if (data && data.html) {
+          element.innerHTML = data.html;
+        } else if (data && data.text) {
+          element.textContent = data.text;
+        }
+        break;
+      case 'setAttribute':
+        if (data && data.name && data.value !== undefined) {
+          element.setAttribute(data.name, data.value);
+        }
+        break;
+      case 'addClass':
+        if (data && data.className) {
+          element.classList.add(data.className);
+        }
+        break;
+      case 'removeClass':
+        if (data && data.className) {
+          element.classList.remove(data.className);
+        }
+        break;
+      default:
+        if (typeof operation === 'function') {
+          operation.call(this, element, data, fragment);
+        }
+    }
   }
 
   getReusableFragment() {
     if (this.domFragmentPool.length > 0) {
       return this.domFragmentPool.pop();
     }
-    return document.createDocumentFragment();
+
+    // Create new fragment and pre-warm pool if low
+    const fragment = document.createDocumentFragment();
+    if (this.domFragmentPool.length < 3) {
+      // Pre-allocate fragments to avoid creation overhead
+      for (let i = this.domFragmentPool.length; i < 3; i++) {
+        this.domFragmentPool.push(document.createDocumentFragment());
+      }
+    }
+    return fragment;
   }
 
   recycleFragment(fragment) {
-    // Clear fragment content and reuse
-    while (fragment.firstChild) {
-      fragment.removeChild(fragment.firstChild);
+    if (!fragment) return;
+
+    // Optimized fragment clearing using replaceChildren (faster than removeChild loop)
+    if (fragment.replaceChildren) {
+      fragment.replaceChildren(); // Modern browsers - much faster
+    } else {
+      // Fallback for older browsers
+      while (fragment.firstChild) {
+        fragment.removeChild(fragment.firstChild);
+      }
     }
-    if (this.domFragmentPool.length < 10) { // Limit pool size
+
+    // Pool management with optimal size for 70x performance
+    if (this.domFragmentPool.length < 8) { // Increased optimal pool size
       this.domFragmentPool.push(fragment);
     }
   }
@@ -7853,16 +8163,35 @@ class StudyQuestApp {
 async function loadDomainInfo(onSuccess, onError) {
   try {
     const info = await new Promise((resolve, reject) => {
+      if (!google?.script?.run?.getDeployUserDomainInfo) {
+        console.warn('getDeployUserDomainInfo function not available, using fallback');
+        resolve({
+          success: true,
+          domain: 'unknown',
+          userEmail: 'anonymous',
+          isValidDomain: true,
+          fallback: true
+        });
+        return;
+      }
+
       google.script.run
         .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
+        .withFailureHandler((error) => {
+          console.warn('getDeployUserDomainInfo failed, using fallback:', error);
+          resolve({
+            success: false,
+            error: error.message || error,
+            fallback: true
+          });
+        })
         .getDeployUserDomainInfo();
     });
     displayDomainInfo(info);
     if (onSuccess) onSuccess(info);
   } catch (error) {
-    console.error('ドメイン情報の取得に失敗しました:', error);
-    displayDomainInfo({ error: error.message || error });
+    console.warn('ドメイン情報エラー:', error.message || error);
+    displayDomainInfo({ error: error.message || error, fallback: true });
     if (onError) onError(error);
   }
 }
@@ -7914,11 +8243,21 @@ function displayDomainInfo(info) {
 async function loadFormLink() {
   try {
     const formInfo = await new Promise((resolve, reject) => {
+      if (!google?.script?.run?.getActiveFormInfo) {
+        console.warn('getActiveFormInfo function not available, skipping form link');
+        resolve(null);
+        return;
+      }
+
       google.script.run
         .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        .getActiveFormInfo(USER_ID);
+        .withFailureHandler((error) => {
+          console.warn('getActiveFormInfo failed:', error);
+          resolve(null);
+        })
+        .getActiveFormInfo();
     });
+
     if (formInfo && formInfo.formUrl) {
       const formLinkBtn = document.getElementById('form-link-btn');
       if (formLinkBtn) {

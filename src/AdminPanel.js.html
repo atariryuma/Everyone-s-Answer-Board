@@ -2386,8 +2386,27 @@
       showInfo('検証処理を実行中です…');
       return;
     }
-    const spreadsheetId = document.getElementById('spreadsheet-select').value;
-    const sheetName = document.getElementById('sheet-select').value;
+
+    // 接続方式に応じて適切な方法でスプレッドシート情報を取得
+    const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
+    let spreadsheetId, sheetName;
+
+    if (sourceMethod === 'url') {
+      // URL入力方式
+      const urlInput = document.getElementById('spreadsheet-url');
+      const url = urlInput.value.trim();
+      const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+      const match = url.match(spreadsheetRegex);
+
+      if (match) {
+        spreadsheetId = match[1];
+      }
+      sheetName = document.getElementById('sheet-name-input').value.trim();
+    } else {
+      // 一覧選択方式
+      spreadsheetId = document.getElementById('spreadsheet-select').value;
+      sheetName = document.getElementById('sheet-select').value;
+    }
 
     if (!spreadsheetId || !sheetName) {
       showError('検証するにはまず、スプレッドシートとシートを接続してください');
@@ -2613,6 +2632,44 @@
       showInfo('公開処理を実行中です…');
       return;
     }
+
+    // 🔧 UI状態の事前検証: 接続方式に応じた検証を追加
+    const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
+    let spreadsheetId, sheetName;
+
+    if (sourceMethod === 'url') {
+      // URL入力方式の検証
+      const urlInput = document.getElementById('spreadsheet-url');
+      const url = urlInput.value.trim();
+      const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
+      const match = url.match(spreadsheetRegex);
+
+      if (!match) {
+        showError('まずデータソースを設定してください。');
+        RequestGate.exit('publishApp');
+        return;
+      }
+
+      spreadsheetId = match[1];
+      sheetName = document.getElementById('sheet-name-input').value.trim();
+
+      if (!sheetName) {
+        showError('まずデータソースを設定してください。');
+        RequestGate.exit('publishApp');
+        return;
+      }
+    } else {
+      // 一覧選択方式の検証
+      spreadsheetId = document.getElementById('spreadsheet-select').value;
+      sheetName = document.getElementById('sheet-select').value;
+
+      if (!spreadsheetId || !sheetName) {
+        showError('まずデータソースを設定してください。');
+        RequestGate.exit('publishApp');
+        return;
+      }
+    }
+
     setLoading(true);
 
     // 🔧 根本的修正: 現在の完全な設定を取得してからpublishApplicationを呼び出し

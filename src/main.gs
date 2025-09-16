@@ -1690,3 +1690,186 @@ function getFormInfo(spreadsheetId, sheetName) {
     };
   }
 }
+
+// ===========================================
+// 🔧 Missing API Functions for Frontend Error Fix
+// ===========================================
+
+/**
+ * Get deploy user domain info - フロントエンドエラー修正用
+ * @returns {Object} ドメイン情報
+ */
+function getDeployUserDomainInfo() {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return {
+        success: false,
+        message: 'Authentication required',
+        domain: null,
+        isValidDomain: false
+      };
+    }
+
+    const domain = email.includes('@') ? email.split('@')[1] : 'unknown';
+    const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
+    const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
+
+    return {
+      success: true,
+      domain,
+      userEmail: email,
+      userDomain: domain,
+      adminDomain,
+      isValidDomain: adminDomain ? domain === adminDomain : true,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('getDeployUserDomainInfo error:', error.message);
+    return {
+      success: false,
+      message: error.message,
+      domain: null,
+      isValidDomain: false
+    };
+  }
+}
+
+/**
+ * Get active form info - フロントエンドエラー修正用
+ * @returns {Object} フォーム情報
+ */
+function getActiveFormInfo() {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return {
+        success: false,
+        message: 'Authentication required',
+        formUrl: null,
+        formTitle: null
+      };
+    }
+
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
+    if (!user) {
+      return {
+        success: false,
+        message: 'User not found',
+        formUrl: null,
+        formTitle: null
+      };
+    }
+
+    let config = {};
+    try {
+      config = JSON.parse(user.configJson || '{}');
+    } catch (parseError) {
+      console.warn('getActiveFormInfo: config parse error', parseError);
+    }
+
+    if (!config.formUrl) {
+      return {
+        success: false,
+        message: 'Form URL not configured',
+        formUrl: null,
+        formTitle: null
+      };
+    }
+
+    return {
+      success: true,
+      formUrl: config.formUrl,
+      formTitle: config.formTitle || 'フォーム',
+      isActive: true,
+      source: 'user_config'
+    };
+  } catch (error) {
+    console.error('getActiveFormInfo error:', error.message);
+    return {
+      success: false,
+      message: error.message,
+      formUrl: null,
+      formTitle: null
+    };
+  }
+}
+
+/**
+ * Get incremental sheet data - フロントエンドエラー修正用
+ * @param {string} sheetName - シート名
+ * @param {Object} options - 取得オプション
+ * @returns {Object} 増分データ
+ */
+function getIncrementalSheetData(sheetName, options = {}) {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return {
+        success: false,
+        message: 'Authentication required',
+        data: [],
+        hasNewData: false
+      };
+    }
+
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
+    if (!user) {
+      return {
+        success: false,
+        message: 'User not found',
+        data: [],
+        hasNewData: false
+      };
+    }
+
+    // getUserSheetDataを使用してデータ取得
+    const result = getUserSheetData(user.userId, {
+      includeTimestamp: true,
+      classFilter: options.classFilter,
+      sortBy: options.sortOrder || 'newest'
+    });
+
+    if (!result?.success) {
+      return {
+        success: false,
+        message: result?.message || 'Data retrieval failed',
+        data: [],
+        hasNewData: false
+      };
+    }
+
+    // 増分データチェック（lastSeenCountベース）
+    const lastSeenCount = options.lastSeenCount || 0;
+    const currentCount = result.data ? result.data.length : 0;
+    const hasNewData = currentCount > lastSeenCount;
+
+    // 新着データのみ抽出（必要に応じて）
+    let incrementalData = result.data || [];
+    if (hasNewData && lastSeenCount > 0) {
+      incrementalData = incrementalData.slice(0, currentCount - lastSeenCount);
+    }
+
+    return {
+      success: true,
+      data: incrementalData,
+      hasNewData,
+      totalCount: currentCount,
+      lastSeenCount,
+      newItemsCount: hasNewData ? currentCount - lastSeenCount : 0,
+      sheetName: result.sheetName || sheetName,
+      header: result.header,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('getIncrementalSheetData error:', error.message);
+    return {
+      success: false,
+      message: error.message,
+      data: [],
+      hasNewData: false
+    };
+  }
+}
