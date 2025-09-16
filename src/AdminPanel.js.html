@@ -179,7 +179,6 @@
     };
   })();
 
-  // initializationStep は systemState に統合済み
 
   // Wrap initialization in safe handler
   if (document.readyState === 'loading') {
@@ -651,7 +650,6 @@
     });
   }
 
-  // 旧版との互換性維持
   function loadSpreadsheetList() {
     loadSpreadsheets();
   }
@@ -699,7 +697,6 @@
     });
   }
 
-  // 旧版との互換性維持（再試行機能付き）
   function loadUserInfo() {
     loadUserInfoAsync().catch((error) => {
       setTimeout(() => {
@@ -711,7 +708,6 @@
   }
 
   // 設定データの読み込みと完全自動反映（新実装）
-  // この関数はinitializePanel()に統合済み（重複削除）
 
   // シンプルなデバウンス機構
   const simpleDebounce = (fn, delay) => {
@@ -732,7 +728,6 @@
     });
   }
 
-  // この関数はinitializePanel()に統合済み（重複削除）
   function loadCurrentConfig() {
     // systemState.configを使用（既に読み込み済み）
     if (systemState.config) {
@@ -856,21 +851,21 @@
         }
       }
 
-      // 4. 表示設定の反映
-      if (config.displaySettings) {
-        const settings = config.displaySettings;
+      // 4. 表示設定の反映（新形式・旧形式対応）
+      const displaySettings = config.displaySettings || {};
+      const showNames = displaySettings.showNames !== undefined ? displaySettings.showNames : config.showNames;
+      const showReactions = displaySettings.showReactions !== undefined ? displaySettings.showReactions : config.showReactions;
 
-        // 名前表示トグル
-        const showNamesToggle = document.getElementById('show-names');
-        if (showNamesToggle && typeof settings.showNames === 'boolean') {
-          showNamesToggle.checked = settings.showNames;
-        }
+      // 名前表示トグル
+      const showNamesToggle = document.getElementById('show-names');
+      if (showNamesToggle && typeof showNames === 'boolean') {
+        showNamesToggle.checked = showNames;
+      }
 
-        // リアクション表示トグル
-        const showReactionsToggle = document.getElementById('show-reactions');
-        if (showReactionsToggle && typeof settings.showReactions === 'boolean') {
-          showReactionsToggle.checked = settings.showReactions;
-        }
+      // リアクション表示トグル
+      const showReactionsToggle = document.getElementById('show-reactions');
+      if (showReactionsToggle && typeof showReactions === 'boolean') {
+        showReactionsToggle.checked = showReactions;
       }
 
       // 5. 表示モードの反映
@@ -969,20 +964,23 @@
     try {
       let currentStep = 1;
 
-      if (config.sheetName) {
+      if (config.sheetName && config.spreadsheetId) {
         currentStep = 2; // データソース接続完了
       }
 
-      if (config.columnMapping || config.columnSelections) {
-        currentStep = 2; // 列設定完了
+      if (config.columnMapping && config.columnMapping.mapping && Object.keys(config.columnMapping.mapping).length > 0) {
+        currentStep = 3; // 列設定完了
       }
 
-      if (config.setupComplete) {
-        currentStep = 3; // セットアップ完了
+      if (config.setupComplete === true) {
+        currentStep = 3; // セットアップ完了確定
       }
 
+      console.log('📈 Progress update:', { currentStep, hasSheet: !!(config.sheetName), hasMapping: !!(config.columnMapping), setupComplete: config.setupComplete });
       updateProgress(currentStep);
-    } catch (error) {}
+    } catch (error) {
+      console.warn('updateProgressFromConfig error:', error);
+    }
   }
 
   // 非同期版の補助関数群
@@ -1103,6 +1101,10 @@
     const boardBtn = document.getElementById('open-board-btn');
     const statusDiv = document.getElementById('resource-status');
 
+    // 🎯 下書き保存・公開ボタンの状態管理
+    const saveDraftBtn = document.getElementById('save-draft');
+    const publishNowBtn = document.getElementById('publish-now');
+
     // 設定が無い場合の初期状態
     if (!config) {
       spreadsheetBtn.disabled = true;
@@ -1110,7 +1112,59 @@
       formBtn.classList.add('hidden');
       if (boardBtn) boardBtn.classList.add('hidden');
       statusDiv.textContent = '設定が見つかりません';
+
+      // 下書き保存・公開ボタンを無効化
+      if (saveDraftBtn) {
+        saveDraftBtn.disabled = true;
+        saveDraftBtn.textContent = '下書き保存（設定未完了）';
+      }
+      if (publishNowBtn) {
+        publishNowBtn.disabled = true;
+        publishNowBtn.textContent = '今すぐ公開（設定未完了）';
+      }
       return;
+    }
+
+    // 🚀 列マッピング完了状態の判定
+    const hasColumnMapping = !!(config.columnMapping && config.columnMapping.mapping);
+    const hasSpreadsheetConfig = !!(config.spreadsheetId && config.sheetName);
+    const isSetupComplete = config.setupComplete === true;
+
+    console.log('📋 ボタン状態更新:', {
+      hasColumnMapping,
+      hasSpreadsheetConfig,
+      isSetupComplete,
+      mappingKeys: hasColumnMapping ? Object.keys(config.columnMapping.mapping) : []
+    });
+
+    // 下書き保存ボタンの状態管理
+    if (saveDraftBtn) {
+      if (hasSpreadsheetConfig) {
+        saveDraftBtn.disabled = false;
+        saveDraftBtn.textContent = hasColumnMapping ? '下書き保存' : '下書き保存（列設定推奨）';
+        saveDraftBtn.className = 'btn-secondary';
+      } else {
+        saveDraftBtn.disabled = true;
+        saveDraftBtn.textContent = '下書き保存（データソース未接続）';
+        saveDraftBtn.className = 'btn-secondary opacity-50';
+      }
+    }
+
+    // 公開ボタンの状態管理
+    if (publishNowBtn) {
+      if (hasSpreadsheetConfig && hasColumnMapping) {
+        publishNowBtn.disabled = false;
+        publishNowBtn.textContent = '今すぐ公開';
+        publishNowBtn.className = 'btn-primary';
+      } else {
+        publishNowBtn.disabled = true;
+        if (!hasSpreadsheetConfig) {
+          publishNowBtn.textContent = '今すぐ公開（データソース未接続）';
+        } else {
+          publishNowBtn.textContent = '今すぐ公開（列設定が必要）';
+        }
+        publishNowBtn.className = 'btn-primary opacity-50';
+      }
     }
 
     // スプレッドシート情報はConfigurationManagerで管理されるため、API経由で取得
@@ -1138,6 +1192,22 @@
     } else {
       statusDiv.textContent = '💡 リソースの設定を開始してください';
       statusDiv.className = 'text-xs text-yellow-400 mt-2 text-center';
+    }
+
+    // 🎯 設定完了状態のフィードバック
+    if (isSetupComplete && hasColumnMapping && hasSpreadsheetConfig) {
+      // 設定完了時の特別フィードバック
+      const setupStatusDiv = document.getElementById('setup-status-feedback');
+      if (setupStatusDiv) {
+        setupStatusDiv.innerHTML = `
+          <div class="flex items-center gap-2 p-3 bg-green-900/20 border border-green-500/30 rounded-lg text-green-400 text-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+            </svg>
+            <span>設定が完了しました！下書き保存または公開を実行できます</span>
+          </div>
+        `;
+      }
     }
 
     // 設定サマリーも更新
@@ -2342,43 +2412,130 @@
 
   // 検証結果の表示
   function displayVerificationResults(headerIndices) {
-    const columnsContainer = document.querySelector('.auto-detected-columns');
-    if (!columnsContainer) return;
+    console.log('検証結果の表示を開始:', headerIndices);
 
-    // 既存の列表示に検証済みマークを追加
-    const columnMatches = columnsContainer.querySelectorAll('.column-match');
-    columnMatches.forEach((match) => {
-      const verifiedBadge = document.createElement('span');
-      verifiedBadge.className = 'status-badge published';
-      verifiedBadge.textContent = '✓ 検証済み';
-      verifiedBadge.style.fontSize = '0.75rem';
-      verifiedBadge.style.marginLeft = '0.5rem';
-      match.appendChild(verifiedBadge);
+    // 🎯 実際のUIドロップダウン要素に検証済みバッジを追加
+    const columnTypes = ['answer', 'reason', 'class', 'name'];
+    let badgesAdded = 0;
+
+    columnTypes.forEach(columnType => {
+      const dropdown = document.getElementById(`${columnType}-column-select`);
+      const confidenceDiv = document.getElementById(`${columnType}-confidence`);
+
+      if (dropdown && dropdown.value !== '') {
+        // 既存の検証済みバッジを削除（重複防止）
+        const existingBadge = dropdown.parentElement.querySelector('.verification-badge');
+        if (existingBadge) {
+          existingBadge.remove();
+        }
+
+        // 新しい検証済みバッジを作成
+        const verifiedBadge = document.createElement('span');
+        verifiedBadge.className = 'verification-badge status-badge published';
+        verifiedBadge.textContent = '✓ 検証済み';
+        verifiedBadge.style.fontSize = '0.75rem';
+        verifiedBadge.style.marginLeft = '0.5rem';
+        verifiedBadge.style.display = 'inline-flex';
+        verifiedBadge.style.alignItems = 'center';
+
+        // ドロップダウンの親要素に追加
+        if (confidenceDiv) {
+          confidenceDiv.appendChild(verifiedBadge);
+        } else {
+          dropdown.parentElement.appendChild(verifiedBadge);
+        }
+
+        badgesAdded++;
+        console.log(`✅ 検証済みバッジを追加: ${columnType}列`);
+      }
     });
 
-    console.log('検証結果を表示しました:', headerIndices);
+    // 🎯 列マッピングセクション全体に検証完了マークを追加
+    const sectionHeaders = document.querySelectorAll('section h2');
+    let mappingSection = null;
+
+    sectionHeaders.forEach(header => {
+      const headerText = header.textContent || '';
+      if (headerText.includes('AI列マッピング') || headerText.includes('列マッピング')) {
+        mappingSection = header.closest('section');
+      }
+    });
+
+    if (mappingSection) {
+      // 既存の検証完了マークを削除
+      const existingMark = mappingSection.querySelector('.section-verified-mark');
+      if (existingMark) {
+        existingMark.remove();
+      }
+
+      // セクション検証完了マークを追加
+      const sectionMark = document.createElement('div');
+      sectionMark.className = 'section-verified-mark';
+      sectionMark.innerHTML = `
+        <div class="flex items-center gap-2 mt-4 p-3 bg-green-900/20 border border-green-500/30 rounded-lg">
+          <svg class="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+          </svg>
+          <span class="text-green-400 font-medium">列マッピング設定が完了しました</span>
+        </div>
+      `;
+
+      const actionButtons = mappingSection.querySelector('.action-buttons');
+      if (actionButtons) {
+        actionButtons.parentElement.insertBefore(sectionMark, actionButtons);
+      } else {
+        mappingSection.appendChild(sectionMark);
+      }
+    }
+
+    console.log(`✅ 検証結果を表示しました: ${badgesAdded}個のバッジを追加`);
   }
 
   // 列設定の保存
   function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping) {
-    const config = {
+    // 🎯 重複データ削除：columnMappingに統一し、headersの重複保存を削除
+    const optimizedConfig = {
       spreadsheetId,
       sheetName,
-      headers,
-      columnMapping,
+      columnMapping: {
+        ...columnMapping,
+        headers: headers, // columnMapping内にheadersを統合
+        verifiedAt: new Date().toISOString()
+      },
+      setupComplete: true, // 🚀 設定完了フラグ追加
       verifiedAt: new Date().toISOString(),
       etag: (systemState && systemState.config && systemState.config.etag) || undefined,
     };
 
+    if (systemState && systemState.config) {
+      Object.assign(optimizedConfig, systemState.config, optimizedConfig);
+    }
+
+    console.log('📋 optimized config for save:', {
+      hasSpreadsheetId: !!optimizedConfig.spreadsheetId,
+      hasSheetName: !!optimizedConfig.sheetName,
+      hasColumnMapping: !!optimizedConfig.columnMapping,
+      setupComplete: optimizedConfig.setupComplete,
+      configSize: JSON.stringify(optimizedConfig).length
+    });
+
     google.script.run
       .withSuccessHandler(function (result) {
         if (result.success) {
-          console.log('列設定を保存しました:', {
+          console.log('✅ 列設定を保存しました:', {
             savedHeaders: headers.length,
             hasMapping: !!columnMapping,
+            setupComplete: true
           });
-          // 設定を再読み込み
-          loadCurrentConfig();
+
+          // systemStateを更新
+          if (systemState) {
+            systemState.config = { ...systemState.config, ...optimizedConfig };
+          }
+
+          // UI状態を更新
+          updateResourceButtons(optimizedConfig);
+          showSuccess('✅ 列マッピング設定が完了しました');
         } else {
           if (result.error === 'etag_mismatch') {
             showInfo('設定が他で更新されました。画面を更新しました。もう一度保存してください。');
@@ -2392,8 +2549,9 @@
       })
       .withFailureHandler(function (error) {
         console.error('列設定保存エラー:', error);
+        showError('列設定の保存に失敗しました');
       })
-      .saveDraftConfiguration(config);
+      .saveDraftConfiguration(optimizedConfig);
   }
 
   // 下書き保存
@@ -2451,9 +2609,11 @@
           columnMapping: currentConfig.columnMapping,
           etag: currentConfig.etag,
 
-          // 🎯 必須データのみ：UI設定
-          showNames: document.getElementById('show-names').checked,
-          showReactions: document.getElementById('show-reactions').checked,
+          // 🎯 必須データのみ：UI設定（統一displaySettings形式）
+          displaySettings: {
+            showNames: document.getElementById('show-names').checked,
+            showReactions: document.getElementById('show-reactions').checked
+          },
         };
 
         console.log('📋 publishApp: 完全な設定でpublishApplication呼び出し', {
@@ -2533,8 +2693,10 @@
     return {
       spreadsheetId,
       sheetName,
-      showNames: document.getElementById('show-names').checked,
-      showReactions: document.getElementById('show-reactions').checked,
+      displaySettings: {
+        showNames: document.getElementById('show-names').checked,
+        showReactions: document.getElementById('show-reactions').checked
+      },
       etag: (systemState && systemState.config && systemState.config.etag) || undefined,
     };
   }

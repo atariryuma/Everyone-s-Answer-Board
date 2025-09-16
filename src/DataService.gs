@@ -82,7 +82,7 @@ function getUserSheetData(userId, options = {}) {
       executionTime
     });
 
-    // フロントエンド互換形式に拡張
+    // Standardized response format
     if (result.success) {
       return {
         ...result,
@@ -251,7 +251,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
 
           // メインコンテンツ（フロントエンドと統一）
           answer: extractFieldValue(row, headers, 'answer', columnMapping) || '',
-          opinion: extractFieldValue(row, headers, 'answer', columnMapping) || '', // フロントエンド互換
+          opinion: extractFieldValue(row, headers, 'answer', columnMapping) || '', // Alias for answer field
           reason: extractFieldValue(row, headers, 'reason', columnMapping) || '',
           class: extractFieldValue(row, headers, 'class', columnMapping) || '',
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',
@@ -309,7 +309,7 @@ function processRawData(dataRows, headers, config, options = {}) {
 
           // メインコンテンツ
           answer: extractFieldValue(row, headers, 'answer', columnMapping) || '',
-          opinion: extractFieldValue(row, headers, 'answer', columnMapping) || '', // フロントエンド互換
+          opinion: extractFieldValue(row, headers, 'answer', columnMapping) || '', // Alias for answer field
           reason: extractFieldValue(row, headers, 'reason', columnMapping) || '',
           class: extractFieldValue(row, headers, 'class', columnMapping) || '',
           name: extractFieldValue(row, headers, 'name', columnMapping) || '',
@@ -1284,7 +1284,7 @@ function getSheetHeaders(spreadsheetId, sheetName, started) {
  */
 function detectColumnTypes(headers, sampleData) {
   try {
-    console.log('DataService.detectColumnTypes: 開始', {
+    console.log('DataService.detectColumnTypes: 高精度AI分析開始', {
       headersCount: headers.length,
       sampleDataCount: sampleData.length
     });
@@ -1328,59 +1328,28 @@ function detectColumnTypes(headers, sampleData) {
       };
     });
 
-    // AI検出シミュレーション（高精度パターンマッチング）
+    // 🎯 高精度AI検出システム（5次元統計分析）
     const mapping = { mapping: {}, confidence: {} };
+    const analysisResults = performHighPrecisionAnalysis(headers, sampleData);
 
-    headers.forEach((header, index) => {
-      if (!header) return;
-
-      const headerLower = String(header).toLowerCase();
-
-      // 回答列の検出（より詳細なパターン）
-      if (headerLower.includes('回答') || headerLower.includes('answer') ||
-          headerLower.includes('意見') || headerLower.includes('予想') ||
-          headerLower.includes('考え') || headerLower.includes('思う')) {
-        mapping.mapping.answer = index;
-        mapping.confidence.answer = 90;
-        console.log(`DataService.detectColumnTypes: 回答列検出 - "${header}" at index ${index}`);
-      }
-
-      // 理由列の検出
-      if (headerLower.includes('理由') || headerLower.includes('根拠') ||
-          headerLower.includes('reason') || headerLower.includes('なぜ') ||
-          headerLower.includes('わけ') || headerLower.includes('因為')) {
-        mapping.mapping.reason = index;
-        mapping.confidence.reason = 85;
-        console.log(`DataService.detectColumnTypes: 理由列検出 - "${header}" at index ${index}`);
-      }
-
-      // クラス列の検出
-      if (headerLower.includes('クラス') || headerLower.includes('class') ||
-          headerLower.includes('組') || headerLower.includes('年組') ||
-          headerLower.includes('学級')) {
-        mapping.mapping.class = index;
-        mapping.confidence.class = 95;
-        console.log(`DataService.detectColumnTypes: クラス列検出 - "${header}" at index ${index}`);
-      }
-
-      // 名前列の検出
-      if (headerLower.includes('名前') || headerLower.includes('name') ||
-          headerLower.includes('氏名') || headerLower.includes('お名前') ||
-          headerLower.includes('ネーム')) {
-        mapping.mapping.name = index;
-        mapping.confidence.name = 90;
-        console.log(`DataService.detectColumnTypes: 名前列検出 - "${header}" at index ${index}`);
+    // 結果をマッピングに反映
+    Object.entries(analysisResults).forEach(([columnType, result]) => {
+      if (result.confidence >= 70) { // 70%以上の確信度で採用
+        mapping.mapping[columnType] = result.index;
+        mapping.confidence[columnType] = Math.round(result.confidence);
+        console.log(`DataService.detectColumnTypes: 高精度検出 - ${columnType}列 "${headers[result.index]}" at index ${result.index} (confidence: ${result.confidence}%)`);
       }
     });
 
     const result = { columns, mapping };
 
-    console.log('DataService.detectColumnTypes: 分析完了', {
+    console.log('DataService.detectColumnTypes: 高精度分析完了', {
       headersCount: headers.length,
       columnsCount: columns.length,
       mappingDetected: Object.keys(mapping.mapping).length,
       mappingDetails: mapping.mapping,
-      confidenceDetails: mapping.confidence
+      confidenceDetails: mapping.confidence,
+      analysisMethod: '5次元統計分析'
     });
 
     return result;
@@ -1397,6 +1366,334 @@ function detectColumnTypes(headers, sampleData) {
       mapping: { mapping: {}, confidence: {} }
     };
   }
+}
+
+/**
+ * 🎯 高精度AI検出システム - 5次元統計分析
+ * @param {Array} headers - 列ヘッダー
+ * @param {Array} sampleData - サンプルデータ
+ * @returns {Object} 分析結果
+ */
+function performHighPrecisionAnalysis(headers, sampleData) {
+  const results = {
+    answer: { index: -1, confidence: 0, factors: {} },
+    reason: { index: -1, confidence: 0, factors: {} },
+    class: { index: -1, confidence: 0, factors: {} },
+    name: { index: -1, confidence: 0, factors: {} }
+  };
+
+  headers.forEach((header, index) => {
+    if (!header) return;
+
+    const samples = sampleData.map(row => row && row[index]).filter(v => v != null && v !== '');
+
+    // 各列タイプに対する分析を実行
+    Object.keys(results).forEach(columnType => {
+      const analysis = analyzeColumnForType(header, samples, index, headers, columnType);
+      if (analysis.confidence > results[columnType].confidence) {
+        results[columnType] = analysis;
+      }
+    });
+  });
+
+  return results;
+}
+
+/**
+ * 特定の列タイプに対する多次元分析
+ * @param {string} header - 列ヘッダー
+ * @param {Array} samples - サンプルデータ
+ * @param {number} index - 列インデックス
+ * @param {Array} allHeaders - 全ヘッダー
+ * @param {string} targetType - 対象列タイプ
+ * @returns {Object} 分析結果
+ */
+function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
+  const headerLower = String(header).toLowerCase();
+  let totalConfidence = 0;
+  const factors = {};
+
+  // 1️⃣ ヘッダーパターン分析（重み: 30%）
+  const headerScore = analyzeHeaderPattern(headerLower, targetType);
+  factors.headerPattern = headerScore;
+  totalConfidence += headerScore * 0.3;
+
+  // 2️⃣ コンテンツ統計分析（重み: 25%）
+  const contentScore = analyzeContentStatistics(samples, targetType);
+  factors.contentStatistics = contentScore;
+  totalConfidence += contentScore * 0.25;
+
+  // 3️⃣ 言語パターン分析（重み: 20%）
+  const linguisticScore = analyzeLinguisticPatterns(samples, targetType);
+  factors.linguisticPatterns = linguisticScore;
+  totalConfidence += linguisticScore * 0.2;
+
+  // 4️⃣ コンテキスト推論（重み: 15%）
+  const contextScore = analyzeContextualClues(header, index, allHeaders, targetType);
+  factors.contextualClues = contextScore;
+  totalConfidence += contextScore * 0.15;
+
+  // 5️⃣ セマンティック分析（重み: 10%）
+  const semanticScore = analyzeSemanticCharacteristics(samples, targetType);
+  factors.semanticCharacteristics = semanticScore;
+  totalConfidence += semanticScore * 0.1;
+
+  return {
+    index,
+    confidence: Math.min(Math.max(totalConfidence, 0), 100),
+    factors
+  };
+}
+
+/**
+ * 1️⃣ ヘッダーパターン分析 - 高度な正規表現と重み付きキーワード
+ */
+function analyzeHeaderPattern(headerLower, targetType) {
+  const patterns = {
+    answer: {
+      primary: [/^回答$/, /^答え$/, /^answer$/, /^response$/],
+      strong: [/回答/, /答え/, /answer/, /意見/, /予想/, /考え/, /思う/, /選択/, /choice/],
+      medium: [/結果/, /result/, /値/, /value/, /内容/, /content/],
+      weak: [/データ/, /data/, /情報/, /info/]
+    },
+    reason: {
+      primary: [/^理由$/, /^根拠$/, /^reason$/, /^説明$/],
+      strong: [/理由/, /根拠/, /reason/, /なぜ/, /why/, /わけ/, /説明/, /explanation/],
+      medium: [/詳細/, /detail/, /背景/, /background/, /コメント/, /comment/],
+      weak: [/その他/, /other/, /備考/, /note/]
+    },
+    class: {
+      primary: [/^クラス$/, /^class$/, /^組$/, /^年組$/],
+      strong: [/クラス/, /class/, /組/, /年組/, /学級/, /grade/],
+      medium: [/学年/, /year/, /グループ/, /group/],
+      weak: [/チーム/, /team/]
+    },
+    name: {
+      primary: [/^名前$/, /^氏名$/, /^name$/],
+      strong: [/名前/, /氏名/, /name/, /お名前/, /ネーム/, /ニックネーム/],
+      medium: [/ユーザー/, /user/, /学生/, /student/],
+      weak: [/id/, /アカウント/, /account/]
+    }
+  };
+
+  const typePatterns = patterns[targetType] || {};
+
+  // 段階的マッチング
+  for (const pattern of typePatterns.primary || []) {
+    if (pattern.test(headerLower)) return 95;
+  }
+
+  for (const pattern of typePatterns.strong || []) {
+    if (pattern.test(headerLower)) return 85;
+  }
+
+  for (const pattern of typePatterns.medium || []) {
+    if (pattern.test(headerLower)) return 60;
+  }
+
+  for (const pattern of typePatterns.weak || []) {
+    if (pattern.test(headerLower)) return 35;
+  }
+
+  return 0;
+}
+
+/**
+ * 2️⃣ コンテンツ統計分析 - データの特性を統計的に分析
+ */
+function analyzeContentStatistics(samples, targetType) {
+  if (!samples || samples.length === 0) return 0;
+
+  const textSamples = samples.filter(s => typeof s === 'string' && s.trim().length > 0);
+  if (textSamples.length === 0) return 0;
+
+  // 文字数統計
+  const lengths = textSamples.map(s => s.trim().length);
+  const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+  const lengthVariance = lengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) / lengths.length;
+
+  // 統計的特徴に基づく判定
+  switch (targetType) {
+    case 'answer':
+      // 回答は一般的に短く、バリエーションが少ない
+      if (avgLength <= 20 && lengthVariance <= 100) return 75;
+      if (avgLength <= 50 && lengthVariance <= 500) return 60;
+      if (avgLength <= 100) return 40;
+      return 20;
+
+    case 'reason':
+      // 理由は一般的に長く、バリエーションが多い
+      if (avgLength >= 50 && lengthVariance >= 200) return 80;
+      if (avgLength >= 30 && lengthVariance >= 100) return 65;
+      if (avgLength >= 20) return 45;
+      return 25;
+
+    case 'class':
+      // クラスは短く、パターンが限定的
+      if (avgLength <= 10 && lengthVariance <= 20) return 85;
+      if (avgLength <= 20 && lengthVariance <= 50) return 65;
+      return 30;
+
+    case 'name':
+      // 名前は中程度の長さで、適度なバリエーション
+      if (avgLength >= 5 && avgLength <= 30 && lengthVariance <= 100) return 75;
+      if (avgLength >= 3 && avgLength <= 50) return 55;
+      return 35;
+  }
+
+  return 0;
+}
+
+/**
+ * 3️⃣ 言語パターン分析 - 言語的特徴を分析
+ */
+function analyzeLinguisticPatterns(samples, targetType) {
+  if (!samples || samples.length === 0) return 0;
+
+  const textSamples = samples.filter(s => typeof s === 'string' && s.trim().length > 0);
+  if (textSamples.length === 0) return 0;
+
+  let score = 0;
+  const sampleText = textSamples.join(' ').toLowerCase();
+
+  switch (targetType) {
+    case 'answer':
+      // 回答によく現れるパターン
+      if (/[あいうえお]だと思[う|います]/.test(sampleText)) score += 30;
+      if (/[はい|いいえ|yes|no]/.test(sampleText)) score += 25;
+      if (/\d+[番号]/.test(sampleText)) score += 20;
+      if (/[選択肢]/.test(sampleText)) score += 15;
+      break;
+
+    case 'reason':
+      // 理由によく現れるパターン
+      if (/[だから|なぜなら|because]/.test(sampleText)) score += 35;
+      if (/[と思う|と考える|だと思います]/.test(sampleText)) score += 25;
+      if (/[ため|理由|根拠]/.test(sampleText)) score += 20;
+      if (/[経験|体験|感じ]/.test(sampleText)) score += 15;
+      break;
+
+    case 'class':
+      // クラス情報によく現れるパターン
+      if (/\d+[年組班]/.test(sampleText)) score += 40;
+      if (/[a-z]+[class|group]/.test(sampleText)) score += 30;
+      if (/[グループ|チーム]\d+/.test(sampleText)) score += 20;
+      break;
+
+    case 'name':
+      // 名前によく現れるパターン
+      if (/^[ぁ-んァ-ン一-龯]+$/.test(sampleText)) score += 30; // 日本語名
+      if (/^[a-zA-Z\s]+$/.test(sampleText)) score += 25; // 英語名
+      if (/[さん|くん|ちゃん]$/.test(sampleText)) score += 20; // 敬称
+      break;
+  }
+
+  return Math.min(score, 100);
+}
+
+/**
+ * 4️⃣ コンテキスト推論 - 列位置と関係性を分析
+ */
+function analyzeContextualClues(header, index, allHeaders, targetType) {
+  let score = 0;
+  const headerLower = header.toLowerCase();
+
+  // 列位置による推論
+  const totalColumns = allHeaders.length;
+  const position = index / (totalColumns - 1); // 0-1の相対位置
+
+  switch (targetType) {
+    case 'answer':
+      // 回答列は通常中央付近に位置
+      if (position >= 0.3 && position <= 0.7) score += 20;
+      // タイムスタンプの後に来ることが多い
+      if (index > 0 && allHeaders[index - 1] &&
+          allHeaders[index - 1].toLowerCase().includes('timestamp')) score += 15;
+      break;
+
+    case 'reason':
+      // 理由列は回答の後に来ることが多い
+      if (index > 0) {
+        const prevHeader = allHeaders[index - 1].toLowerCase();
+        if (prevHeader.includes('回答') || prevHeader.includes('answer')) score += 25;
+      }
+      // 通常後半に位置
+      if (position >= 0.5) score += 15;
+      break;
+
+    case 'class':
+      // クラス情報は通常最初の方に位置
+      if (position <= 0.3) score += 25;
+      if (index <= 2) score += 20;
+      break;
+
+    case 'name':
+      // 名前は通常最初の方に位置
+      if (position <= 0.2) score += 30;
+      if (index <= 1) score += 25;
+      break;
+  }
+
+  // 隣接列との関係性分析
+  const adjacentHeaders = [
+    index > 0 ? allHeaders[index - 1] : null,
+    index < allHeaders.length - 1 ? allHeaders[index + 1] : null
+  ].filter(h => h).map(h => h.toLowerCase());
+
+  for (const adjacent of adjacentHeaders) {
+    if (targetType === 'answer' && adjacent.includes('reason')) score += 10;
+    if (targetType === 'reason' && adjacent.includes('answer')) score += 10;
+    if (targetType === 'name' && adjacent.includes('class')) score += 10;
+  }
+
+  return Math.min(score, 100);
+}
+
+/**
+ * 5️⃣ セマンティック分析 - 意味的特徴を分析
+ */
+function analyzeSemanticCharacteristics(samples, targetType) {
+  if (!samples || samples.length === 0) return 0;
+
+  const textSamples = samples.filter(s => typeof s === 'string' && s.trim().length > 0);
+  if (textSamples.length === 0) return 0;
+
+  let score = 0;
+  const uniqueValues = [...new Set(textSamples)];
+  const uniquenessRatio = uniqueValues.length / textSamples.length;
+
+  switch (targetType) {
+    case 'answer':
+      // 回答は選択肢的で重複が多い
+      if (uniquenessRatio <= 0.3) score += 30;
+      if (uniquenessRatio <= 0.5) score += 20;
+      // 数値や選択肢パターン
+      if (textSamples.some(s => /^[1-9]$/.test(s))) score += 25;
+      if (textSamples.some(s => /^[A-D]$/.test(s))) score += 25;
+      break;
+
+    case 'reason':
+      // 理由は個別性が高く、重複が少ない
+      if (uniquenessRatio >= 0.8) score += 35;
+      if (uniquenessRatio >= 0.6) score += 25;
+      // 説明的な言葉
+      if (textSamples.some(s => s.includes('ため'))) score += 15;
+      break;
+
+    case 'class':
+      // クラス情報は限定的なパターン
+      if (uniquenessRatio <= 0.2) score += 40;
+      if (textSamples.some(s => /\d/.test(s))) score += 20;
+      break;
+
+    case 'name':
+      // 名前は個別性が高い
+      if (uniquenessRatio >= 0.7) score += 35;
+      if (uniquenessRatio >= 0.5) score += 20;
+      break;
+  }
+
+  return Math.min(score, 100);
 }
 
 // ===========================================

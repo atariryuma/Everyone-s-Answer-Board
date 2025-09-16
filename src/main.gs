@@ -13,7 +13,7 @@
  * - Simple, readable code
  */
 
-/* global handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, DatabaseOperations, DataService, SystemController, UserService, ServiceFactory, isSystemAdmin, validateConfig, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, processReaction, columnAnalysisImpl */
+/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, isSystemAdmin, getUserSheetData, DatabaseOperations, columnAnalysisImpl, validateConfig */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -502,9 +502,8 @@ function getUserConfig(userId) {
  */
 function addReaction(userEmail, rowIndex, reactionKey) {
   try {
-    // Get user and validate
-    const user = typeof DatabaseOperations !== 'undefined' ?
-      ServiceFactory.getDB().findUserByEmail(userEmail) : null;
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(userEmail);
 
     if (!user || !user.configJson) {
       return createErrorResponse('User configuration not found');
@@ -515,13 +514,13 @@ function addReaction(userEmail, rowIndex, reactionKey) {
       return createErrorResponse('Spreadsheet configuration incomplete');
     }
 
-    // Validate reaction parameters
     if (!reactionKey || typeof rowIndex !== 'number' || rowIndex < 1) {
       return createErrorResponse('Invalid reaction parameters');
     }
 
-    // Delegate to DataService unified implementation
-    const res = processReaction(
+    // Direct DataService call
+    const dataService = ServiceFactory.getDataService();
+    return dataService.addReaction(
       config.spreadsheetId,
       config.sheetName,
       rowIndex,
@@ -529,13 +528,8 @@ function addReaction(userEmail, rowIndex, reactionKey) {
       userEmail
     );
 
-    const ok = res && res.status === 'success';
-    return ok
-      ? { success: true, message: res.message || 'Reaction added successfully', data: { newValue: res.newValue } }
-      : { success: false, message: res?.message || 'Failed to add reaction' };
-
   } catch (error) {
-    console.error('processReactionByEmail error:', error.message);
+    console.error('addReaction error:', error.message);
     return createExceptionResponse(error);
   }
 }
@@ -548,26 +542,30 @@ function addReaction(userEmail, rowIndex, reactionKey) {
  */
 function toggleHighlight(userEmail, rowIndex) {
   try {
-    // Get user and validate
-    const user = typeof DatabaseOperations !== 'undefined' ?
-      ServiceFactory.getDB().findUserByEmail(userEmail) : null;
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(userEmail);
 
     if (!user || !user.configJson) {
       return createErrorResponse('User configuration not found');
     }
 
-    // Validate parameters
+    const config = JSON.parse(user.configJson);
+    if (!config.spreadsheetId || !config.sheetName) {
+      return createErrorResponse('Spreadsheet configuration incomplete');
+    }
+
     if (typeof rowIndex !== 'number' || rowIndex < 1) {
       return createErrorResponse('Invalid row index');
     }
 
-    // Create request object that matches handleToggleHighlight expectations
-    const request = {
-      rowId: rowIndex
-    };
-
-    // Delegate to existing handleToggleHighlight implementation
-    return handleToggleHighlight(request);
+    // Direct DataService call
+    const dataService = ServiceFactory.getDataService();
+    return dataService.toggleHighlight(
+      config.spreadsheetId,
+      config.sheetName,
+      rowIndex,
+      userEmail
+    );
 
   } catch (error) {
     console.error('toggleHighlight error:', error.message);
@@ -1288,7 +1286,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
         rowsCount: transformedData.rows.length
       });
 
-      // Add explicit success property for frontend compatibility
+      // Ensure success property is set
       transformedData.success = true;
       return transformedData;
     } else {

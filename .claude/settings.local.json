@@ -18,7 +18,8 @@
       "Bash(git show:*)",
       "Bash(grep:*)",
       "Bash(git ls-tree:*)",
-      "Bash(clasp logs:*)"
+      "Bash(clasp logs:*)",
+      "Bash(npm run deploy:safe:*)"
     ],
     "deny": [],
     "ask": [],
