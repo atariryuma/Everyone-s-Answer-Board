@@ -869,7 +869,7 @@ class StudyQuestApp {
       // 問題文を常に表示（読み込み中は表示しない）
       const opinionHeader = __OPINION_HEADER__.startsWith('<') || __OPINION_HEADER__.includes('読み込み')
         ? 'お題'  // デフォルトテキスト
-        : this.escapeHtml(__OPINION_HEADER__);
+        : window.sharedUtilities.security.escapeHtml(__OPINION_HEADER__);
       this.elements.headingLabel.textContent = opinionHeader;
     }
 
@@ -2289,7 +2289,7 @@ class StudyQuestApp {
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13 4c-.77-.833-1.964-.833-2.732 0L3 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
         </svg>
-        <span class="text-sm">${this.escapeHtml(message)}</span>
+        <span class="text-sm">${window.sharedUtilities.security.escapeHtml(message)}</span>
         <button onclick="this.parentElement.parentElement.remove()" class="ml-4 hover:bg-yellow-700 rounded p-1">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
@@ -2543,7 +2543,7 @@ class StudyQuestApp {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <h3 class="mt-2 text-lg font-medium text-red-400">初期化エラー</h3>
-        <p class="mt-1 text-sm text-gray-400">${this.escapeHtml(message)}</p>
+        <p class="mt-1 text-sm text-gray-400">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6">
           <button 
             onclick="window.location.reload()" 
@@ -2570,7 +2570,7 @@ class StudyQuestApp {
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
         <h3 class="mt-2 text-lg font-medium text-yellow-400">データ読み込みエラー</h3>
-        <p class="mt-1 text-sm text-gray-400">${this.escapeHtml(message)}</p>
+        <p class="mt-1 text-sm text-gray-400">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6 space-x-3">
           <button 
             onclick="window.location.reload()" 
@@ -2598,7 +2598,7 @@ class StudyQuestApp {
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
-        <span class="text-sm">${this.escapeHtml(message)}</span>
+        <span class="text-sm">${window.sharedUtilities.security.escapeHtml(message)}</span>
       </div>
     `;
     
@@ -2634,7 +2634,7 @@ class StudyQuestApp {
     this.getFormUrlForEmptyState().then(formUrl => {
       const formLinkHtml = formUrl ? 
         `<div class="mt-6">
-          <a href="${this.escapeHtml(formUrl)}" target="_blank" 
+          <a href="${window.sharedUtilities.security.escapeHtml(formUrl)}" target="_blank" 
              class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors duration-200">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -3272,7 +3272,7 @@ class StudyQuestApp {
           <h4 class="text-sm font-medium text-yellow-400 mb-2">🛠️ 自動修復：</h4>
           <p class="text-xs text-gray-400">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
         </div>` : ''}
-        <p class="mt-2 text-xs text-gray-500">エラー詳細: ${this.escapeHtml(errorMessage)}</p>
+        <p class="mt-2 text-xs text-gray-500">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
         <div class="mt-6 space-x-3">
           <button 
             onclick="window.location.reload()" 
@@ -3806,7 +3806,7 @@ class StudyQuestApp {
         }
       } catch (error) {
         errorLog('Error loading sheet data:', error);
-        const errorMessage = this.escapeHtml(error.message || 'Unknown error');
+        const errorMessage = window.sharedUtilities.security.escapeHtml(error.message || 'Unknown error');
         this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
         this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
         // 同期エラーの場合にもローディング状態を解除
@@ -3848,7 +3848,7 @@ class StudyQuestApp {
     const options = sheets.map(sheet => {
       const selected = sheet.name === this.state.sheetName ? 'selected' : ''; // Use sheet.name for comparison
       const activeLabel = sheet.name === this.state.sheetName ? ' (現在のアクティブシート)' : '';
-      return `<option value="${this.escapeHtml(sheet.name)}" ${selected}>${this.escapeHtml(sheet.name)}${activeLabel}</option>`;
+      return `<option value="${window.sharedUtilities.security.escapeHtml(sheet.name)}" ${selected}>${window.sharedUtilities.security.escapeHtml(sheet.name)}${activeLabel}</option>`;
     }).join('');
     
     selector.innerHTML = options;
@@ -4011,7 +4011,7 @@ class StudyQuestApp {
   updateSheetDisplayName(sheetName) {
     if (this.elements.sheetNameText && sheetName) {
       const sheetIcon = this.getIcon('users', 'w-3 h-3 inline-block mr-1');
-      this.elements.sheetNameText.innerHTML = sheetIcon + this.escapeHtml(sheetName);
+      this.elements.sheetNameText.innerHTML = sheetIcon + window.sharedUtilities.security.escapeHtml(sheetName);
     }
   }
   
@@ -4065,7 +4065,7 @@ class StudyQuestApp {
     const classFilter = this.elements.classFilter;
     // Ensure rows is an array before mapping
     const uniqueClasses = ['すべて', ...new Set(Array.isArray(rows) ? rows.map(r => r.class).filter(Boolean) : [])];
-    classFilter.innerHTML = uniqueClasses.map(c => '<option value="' + this.escapeHtml(c) + '">' + this.escapeHtml(c) + '</option>').join('');
+    classFilter.innerHTML = uniqueClasses.map(c => '<option value="' + window.sharedUtilities.security.escapeHtml(c) + '">' + window.sharedUtilities.security.escapeHtml(c) + '</option>').join('');
     classFilter.value = 'すべて';
     classFilter.classList.remove('hidden');
   }
@@ -4645,7 +4645,7 @@ class StudyQuestApp {
         }
       }
       
-      const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + this.escapeHtml(displayName) + '</span></div>' : '';
+      const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + window.sharedUtilities.security.escapeHtml(displayName) + '</span></div>' : '';
       const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
     
       // Name display configuration complete
@@ -7014,7 +7014,7 @@ class StudyQuestApp {
       reason: data.reason?.substring(0, 50) + '...'
     });
     this.state.lastFocusedElement = document.activeElement;
-    this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + this.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + this.escapeHtml(data.reason || '') + '</p>';
+    this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason || '') + '</p>';
     const showName = this.state.displayMode === 'named';
     let modalDisplayName = '';
     
@@ -7240,10 +7240,6 @@ class StudyQuestApp {
       finalDisplayMode: this.state.displayMode,
       windowDisplayMode: window.displayMode
     });
-  }
-  escapeHtml(str) {
-    if (!str) return '';
-    return str.toString().replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
   }
 
   // Performance optimization methods
@@ -9074,7 +9070,7 @@ try {
   errorLog('Error creating StudyQuestApp instance:', error);
   const container = document.getElementById('answers');
   if (container) {
-    const msg = StudyQuestApp.prototype.escapeHtml(error.message || '');
+    const msg = window.sharedUtilities.security.escapeHtml(error.message || '');
     container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
   }
 }
