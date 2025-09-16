@@ -58,6 +58,38 @@
       }
     }
 
+    function warnLog() {
+      if (console && console.warn) {
+        try {
+          const args = Array.from(arguments).map(arg => {
+            if (typeof arg === 'object' && arg !== null) {
+              return safeDebugStringify(arg);
+            }
+            return arg;
+          });
+          console.warn.apply(console, args);
+        } catch (error) {
+          console.warn('warnLog error:', error.message);
+        }
+      }
+    }
+
+    function errorLog() {
+      if (console && console.error) {
+        try {
+          const args = Array.from(arguments).map(arg => {
+            if (typeof arg === 'object' && arg !== null) {
+              return safeDebugStringify(arg);
+            }
+            return arg;
+          });
+          console.error.apply(console, args);
+        } catch (error) {
+          console.error('errorLog error:', error.message);
+        }
+      }
+    }
+
     function safeDebugStringify(obj, maxDepth = 2, currentDepth = 0) {
       if (currentDepth > maxDepth) return '[Max Depth Reached]';
       

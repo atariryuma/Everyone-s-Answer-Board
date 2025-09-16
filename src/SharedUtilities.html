@@ -1885,11 +1885,86 @@
     document.head.appendChild(style);
   }
 
+  // =============================================================================
+  // DYNAMIC PERFORMANCE CONSTANTS - Shared across all HTML files
+  // =============================================================================
+
+  // Performance level detection
+  window.getPerformanceLevel = function() {
+    if (typeof navigator === 'undefined') return 'medium';
+
+    const memory = navigator.deviceMemory || 4;
+    const cores = navigator.hardwareConcurrency || 4;
+    const connection = navigator.connection;
+
+    // High-end device criteria
+    if (memory >= 8 && cores >= 8) return 'high';
+
+    // Low-end device criteria
+    if (memory <= 2 || cores <= 2) return 'low';
+
+    // Network considerations
+    if (connection) {
+      const { effectiveType, downlink } = connection;
+      if (effectiveType === '2g' || (downlink && downlink < 1)) return 'low';
+      if (effectiveType === '4g' && downlink && downlink > 10) return 'high';
+    }
+
+    return 'medium';
+  };
+
+  window.isLowEndDevice = function() {
+    if (typeof navigator === 'undefined') return false;
+
+    const memory = navigator.deviceMemory;
+    const cores = navigator.hardwareConcurrency;
+
+    return (memory && memory <= 2) || (cores && cores <= 2);
+  };
+
+  // Dynamic performance constants
+  window.getPerformanceConstants = function() {
+    const perfLevel = window.getPerformanceLevel();
+    const isLowEnd = window.isLowEndDevice();
+
+    return {
+      BASE_RENDER_BATCH_SIZE: perfLevel === 'high' ? 15 : perfLevel === 'low' ? 5 : 10,
+      LOW_PERF_BATCH_SIZE: isLowEnd ? 3 : 5,
+      HIGH_PERF_BATCH_SIZE: perfLevel === 'high' ? 25 : 15,
+      VIEWPORT_BUFFER: perfLevel === 'high' ? 300 : perfLevel === 'low' ? 100 : 200,
+      PERFORMANCE_BUDGET: perfLevel === 'high' ? 12 : perfLevel === 'low' ? 24 : 16,
+      CHUNK_SIZE: perfLevel === 'high' ? 8 : perfLevel === 'low' ? 3 : 5,
+      IDLE_TIMEOUT: isLowEnd ? 8000 : 5000
+    };
+  };
+
+  // Getter functions for dynamic constants
+  window.getBatchSize = function(type = 'base') {
+    const constants = window.getPerformanceConstants();
+    return constants[`${type.toUpperCase()}_BATCH_SIZE`] || constants.BASE_RENDER_BATCH_SIZE;
+  };
+
+  window.getViewportBuffer = function() {
+    return window.getPerformanceConstants().VIEWPORT_BUFFER;
+  };
+
+  window.getPerformanceBudget = function() {
+    return window.getPerformanceConstants().PERFORMANCE_BUDGET;
+  };
+
+  window.getChunkSize = function() {
+    return window.getPerformanceConstants().CHUNK_SIZE;
+  };
+
+  window.getIdleTimeout = function() {
+    return window.getPerformanceConstants().IDLE_TIMEOUT;
+  };
+
   // Prevent duplicate loading messages
   if (!window.sharedUtilitiesLoaded) {
     window.sharedUtilitiesLoaded = true;
     console.log(
-      '✅ SharedUtilities loaded successfully - Version 1.3.0 (with Notification System)'
+      '✅ SharedUtilities loaded successfully - Version 1.4.0 (with Performance Constants)'
     );
   }
 </script>
