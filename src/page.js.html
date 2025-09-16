@@ -1,43 +1,55 @@
 <script>
 'use strict';
 
-// 🎯 Everyone's Answer Board - 完全復元版 (e121b12ベース)
-// 現在のGASシステム (2025) に完全適応したリファクタリング版
+// Everyone's Answer Board - Complete Restoration Version (e121b12 base)
+// Fully adapted refactoring for current GAS system (2025)
 
-// === 基本設定とユーティリティ ===
+// Basic Configuration and Utilities
 const CONFIG = Object.freeze({
-  CACHE_DURATION: 120000,      // 2分キャッシュ
-  POLLING_INTERVAL: 90000,     // 90秒ポーリング
-  ANIMATION_DURATION: 300,     // 300msアニメーション
-  MAX_DISPLAY_COLUMNS: 6,      // 最大表示列数
-  MIN_DISPLAY_COLUMNS: 1,      // 最小表示列数
-  RENDER_BATCH_SIZE: 10,       // レンダリングバッチサイズ
-  CHUNK_SIZE: 5,               // DOM操作チャンクサイズ
-  ERROR_RETRY_ATTEMPTS: 3,     // エラーリトライ回数
-  ERROR_RETRY_DELAY: 1000      // リトライ遅延(ms)
+  CACHE_DURATION: 120000,      // 2-minute cache
+  POLLING_INTERVAL: 90000,     // 90-second polling
+  ANIMATION_DURATION: 300,     // 300ms animation
+  MAX_DISPLAY_COLUMNS: 6,      // Maximum display columns
+  MIN_DISPLAY_COLUMNS: 1,      // Minimum display columns
+  RENDER_BATCH_SIZE: 10,       // Rendering batch size
+  CHUNK_SIZE: 5,               // DOM operation chunk size
+  ERROR_RETRY_ATTEMPTS: 3,     // Error retry attempts
+  ERROR_RETRY_DELAY: 1000,     // Retry delay (ms)
+  // Modal animation values
+  MODAL_OPACITY_VISIBLE: 1,    // Modal visible opacity
+  MODAL_OPACITY_HIDDEN: 0,     // Modal hidden opacity
+  MODAL_SCALE_NORMAL: 1,       // Modal normal scale
+  MODAL_SCALE_SMALL: 0.95      // Modal small scale
 });
 
-// SVGアイコンの定義（シンプルで有効なSVGパス）
+// Complete SVG icon library (cloned from docs/page.f0068fa)
 const ICONS = Object.freeze({
-  'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.071 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>',
-  'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.071 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>',
-  'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>',
-  'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M7 22h4v-7H7v7zM14.5 12.5c0 .281-.219.5-.5.5s-.5-.219-.5-.5.219-.5.5-.5.5.219.5.5zm3.5 6.5v-7c0-.552-.448-1-1-1h-3c-.552 0-1-.448-1-1v-2c0-1.654-1.346-3-3-3s-3 1.346-3 3v2H5c-.552 0-1 .448-1 1v7c0 .552.448 1 1 1h12c.552 0 1-.448 1-1z"/></svg>',
+  'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+  'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
+  'hand-thumb-up-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+  'hand-thumb-up-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.33 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z M6.5 10v12h1V10h-1z"/></svg>',
   'magnifying-glass-plus-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
-  'magnifying-glass-plus-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM9.75 10.5a.75.75 0 001.5 0V9.75H12a.75.75 0 000-1.5h-.75V7.5a.75.75 0 00-1.5 0v.75H9a.75.75 0 000 1.5h.75v.75z" clip-rule="evenodd"/><path fill-rule="evenodd" d="M13.28 15.47a2.25 2.25 0 01-3.18 0l-1.06 1.06a.75.75 0 101.06 1.06l1.06-1.06z" clip-rule="evenodd"/></svg>',
+  'magnifying-glass-plus-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1116.5 0 8.25 8.25 0 01-16.5 0zM10.5 7.125a3.375 3.375 0 100 6.75 3.375 3.375 0 000-6.75zM6.75 10.5a3.75 3.75 0 117.5 0 3.75 3.75 0 01-7.5 0z" clip-rule="evenodd"/></svg>',
   'x': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>',
   'star-outline': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>',
   'star-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z"/></svg>',
-  'star': '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z"/></svg>',
   'grid-2x2': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>',
   'users': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m0 0a4 4 0 017.5 1.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>',
+  'check-circle': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>',
+  'exclamation-triangle': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>',
+  'information-circle': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>',
+  'chevron-down': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>',
+  'cog': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>',
+  'clipboard': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>',
+  'x-circle': '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"/></svg>',
   // 後方互換性のため既存のキー名も保持
-  lightbulb: '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.071 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>',
-  thumbup: '<svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>',
-  search: '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>'
+  lightbulb: '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
+  thumbup: '<svg fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.338 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2h0a3.13 3.13 0 0 1 3 3.88Z"/></svg>',
+  search: '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6"/></svg>',
+  star: '<svg fill="currentColor" viewBox="0 0 24 24"><path d="M10.788 3.21c.448-1.077 1.976-1.077 2.424 0l2.082 5.007 5.404.433c1.164.093 1.636 1.545.749 2.305l-4.117 3.527 1.257 5.273c.271 1.136-.964 2.033-1.96 1.425L12 18.354 7.373 21.18c-.996.608-2.231-.29-1.96-1.425l1.257-5.273-4.117-3.527c-.887-.76-.415-2.212.749-2.305l5.404-.433 2.082-5.006z"/></svg>'
 });
 
-// システム定数
+// System constants
 const SYSTEM_CONSTANTS = Object.freeze({
   REACTIONS: Object.freeze({
     KEYS: ['UNDERSTAND', 'LIKE', 'CURIOUS'],
@@ -55,7 +67,7 @@ const SYSTEM_CONSTANTS = Object.freeze({
   })
 });
 
-// DOM操作ヘルパー
+// DOM operation helpers
 const DOMHelpers = Object.freeze({
   safeGetById(id) {
     return document.getElementById(id);
@@ -117,7 +129,7 @@ class AnswerBoardDataLoader {
     }
   }
 
-  // 差分更新チェック（高度な機能）
+  // Diff update check (advanced feature)
   async checkForUpdates() {
     const now = new Date().toISOString();
     const lastCheck = localStorage.getItem('lastUpdateCheck') || new Date(0).toISOString();
@@ -132,7 +144,7 @@ class AnswerBoardDataLoader {
     return result;
   }
 
-  // 新着コンテンツバナー表示
+  // New content banner display
   showNewContentBanner(count, items) {
     const banner = document.getElementById('newContentBanner');
     if (!banner) return;
@@ -181,12 +193,12 @@ class AnswerBoardDataLoader {
       return result;
     } catch (error) {
       this.loadingStates.delete(key);
-      console.error(`GAS呼び出しエラー [${funcName}]:`, error);
+      console.error(`GAS call error [${funcName}]:`, error);
       throw error;
     }
   }
 
-  // 指数バックオフリトライメカニズム
+  // Exponential backoff retry mechanism
   async executeWithRetry(operation, maxRetries = CONFIG.ERROR_RETRY_ATTEMPTS) {
     let retryCount = 0;
     while (retryCount < maxRetries) {
@@ -219,7 +231,7 @@ class AnswerBoardDataLoader {
     });
   }
 
-  // モックデータ（開発用）
+  // Mock data (development)
   getMockData(funcName, args) {
     if (funcName === 'getUserConfig') {
       return {
@@ -280,7 +292,7 @@ class AnswerBoardDataLoader {
       this.lastDataHash = currentHash;
       return false;
     } catch (error) {
-      console.error('新着コンテンツ確認エラー:', error);
+      console.error('New content check error:', error);
       return false;
     }
   }
@@ -291,7 +303,7 @@ class AnswerBoardDataLoader {
   }
 
   calculateNewContent(data) {
-    // 簡易実装：データの長さで判定
+    // Simple implementation: judge by data length
     const currentCount = data.rows ? data.rows.length : 0;
     const previousCount = this.newContentCount;
     this.newContentCount = currentCount;
@@ -337,7 +349,20 @@ class AnswerApp {
   // アプリケーション初期化
   async init() {
     try {
-      // Step 1: セキュアな変数取得
+      // Display digital citizenship modal on first access (concurrent with loading)
+      const hasSeenDigitalCitizenship = localStorage.getItem('hasSeenDigitalCitizenship');
+      const shouldShowModal = !hasSeenDigitalCitizenship ||
+        (hasSeenDigitalCitizenship && Date.now() > parseInt(hasSeenDigitalCitizenship));
+
+      if (shouldShowModal && window.sharedModals) {
+        console.log('🌐 First access/expired: Show digital citizenship modal');
+        window.sharedModals.showDigitalCitizenship();
+        // 表示済みフラグを設定（24時間有効）
+        const expiry = Date.now() + (24 * 60 * 60 * 1000);
+        localStorage.setItem('hasSeenDigitalCitizenship', expiry.toString());
+      }
+
+      // Step 1: Secure variable acquisition
       await this.initializeSecureContext();
 
       // Step 2: 設定読み込み（current GAS functions使用）
@@ -346,7 +371,7 @@ class AnswerApp {
       // Step 3: UI初期化
       this.initializeUI();
 
-      // Step 4: データ読み込み
+      // Step 4: Data loading
       await this.loadAnswers();
 
       // Step 5: ポーリング開始
@@ -361,11 +386,11 @@ class AnswerApp {
 
   // セキュアコンテキストの初期化
   async initializeSecureContext() {
-    // window変数から取得
+    // Get from window variables
     this.userId = window.userId || null;
     this.userEmail = window.userEmail || null;
 
-    // URLパラメータからフォールバック取得
+    // Fallback from URL parameters
     if (!this.userId) {
       const urlParams = new URLSearchParams(window.location.search);
       this.userId = urlParams.get('userId');
@@ -373,10 +398,10 @@ class AnswerApp {
 
     // 基本検証
     if (this.userId && typeof this.userId !== 'string') {
-      console.error('ユーザーIDフィールド形式不正:', this.userId);
+      console.error('Invalid userId field format:', this.userId);
     }
     if (this.userEmail && typeof this.userEmail !== 'string') {
-      console.error('ユーザーメールフィールド形式不正:', this.userEmail);
+      console.error('Invalid userEmail field format:', this.userEmail);
     }
   }
 
@@ -392,7 +417,7 @@ class AnswerApp {
         config = response.success ? response.config : {};
         this.loader.setCache(cacheKey, config);
       } catch (error) {
-        console.error('設定読み込みエラー:', error);
+        console.error('Configuration loading error:', error);
         // フォールバック設定
         config = {
           title: '問題',
@@ -428,10 +453,10 @@ class AnswerApp {
 
   // UI初期化
   initializeUI() {
-    // ヘッダー設定
+    // ヘッダー設定（デフォルト値のみ、実際の問題文はloadAnswers()で設定）
     const headingLabel = DOMHelpers.safeGetById('headingLabel');
     if (headingLabel) {
-      headingLabel.innerHTML = this.escapeHtml(this.appConfig.title || this.appConfig.header || '問題');
+      headingLabel.innerHTML = this.escapeHtml('みんなの回答ボード');
     }
 
     // シート名設定
@@ -446,7 +471,7 @@ class AnswerApp {
     // 管理者機能表示
     this.setupAdminFeatures();
 
-    // イベントリスナー設定
+    // Event listener setup
     this.setupEventListeners();
 
     // アイコン設定
@@ -472,11 +497,18 @@ class AnswerApp {
   // 管理者機能セットアップ
   setupAdminFeatures() {
     if (this.showAdminFeatures) {
-      // 管理者ボタン表示
+      // Admin button display
       const adminToggleBtn = DOMHelpers.safeGetById('adminToggleBtn');
       if (adminToggleBtn) {
         adminToggleBtn.classList.remove('hidden');
         adminToggleBtn.removeAttribute('hidden');
+      }
+
+      // End publication button display
+      const endPublicationBtn = DOMHelpers.safeGetById('endPublicationBtn');
+      if (endPublicationBtn) {
+        endPublicationBtn.classList.remove('hidden');
+        endPublicationBtn.removeAttribute('hidden');
       }
 
       // スコア順オプション表示
@@ -499,7 +531,7 @@ class AnswerApp {
     // 回答リストを再読み込みして管理機能の表示/非表示を切り替え
     this.loadAnswers(this.currentSort);
 
-    // ボタンの見た目を更新
+    // Update button appearance
     const adminToggleBtn = DOMHelpers.safeGetById('adminToggleBtn');
     if (adminToggleBtn) {
       if (this.adminMode) {
@@ -514,7 +546,7 @@ class AnswerApp {
     }
   }
 
-  // イベントリスナー設定
+  // Event listener setup
   setupEventListeners() {
     // ソート順変更
     const sortOrder = DOMHelpers.safeGetById('sortOrder');
@@ -525,7 +557,7 @@ class AnswerApp {
       });
     }
 
-    // クラスフィルター変更
+    // Class filter change
     const classFilter = DOMHelpers.safeGetById('classFilter');
     if (classFilter) {
       classFilter.addEventListener('change', () => {
@@ -544,7 +576,7 @@ class AnswerApp {
       });
     }
 
-    // 管理モード切り替えボタン
+    // Admin mode toggle button
     const adminToggleBtn = DOMHelpers.safeGetById('adminToggleBtn');
     if (adminToggleBtn) {
       adminToggleBtn.addEventListener('click', () => {
@@ -552,14 +584,31 @@ class AnswerApp {
       });
     }
 
-    // 新着通知バナーのイベント
+    // End publication button
+    const endPublicationBtn = DOMHelpers.safeGetById('endPublicationBtn');
+    if (endPublicationBtn) {
+      endPublicationBtn.addEventListener('click', async () => {
+        if (confirm('回答ボードの公開を終了しますか？\n終了後は回答の追加ができなくなります。')) {
+          try {
+            console.log('Executing publication end process');
+            // 実装予定: 公開終了のAPI呼び出し
+            alert('公開終了機能は実装予定です');
+          } catch (error) {
+            console.error('Publication end error:', error);
+            alert('公開終了に失敗しました');
+          }
+        }
+      });
+    }
+
+    // New content banner events
     this.setupNewContentBanner();
 
     // モーダルイベント
     this.setupModalEvents();
   }
 
-  // 新着通知バナーのセットアップ
+  // New content banner setup
   setupNewContentBanner() {
     const refreshBtn = DOMHelpers.safeGetById('refreshContentBtn');
     const dismissBtn = DOMHelpers.safeGetById('dismissBannerBtn');
@@ -618,7 +667,7 @@ class AnswerApp {
     });
   }
 
-  // 回答データ読み込み（現在のGAS関数使用）
+  // Answer data loading (using current GAS functions)
   async loadAnswers(sortOrder = 'newest') {
     if (this.isLoading) return;
 
@@ -638,6 +687,14 @@ class AnswerApp {
 
       this.answers = data.rows || [];
 
+      // 問題文を動的更新（getPublishedSheetDataのheaderを使用）
+      if (data.header) {
+        const headingLabel = DOMHelpers.safeGetById('headingLabel');
+        if (headingLabel) {
+          headingLabel.innerHTML = this.escapeHtml(data.header);
+        }
+      }
+
       // 新着通知チェック
       await this.loader.checkForNewContent(data);
 
@@ -645,7 +702,7 @@ class AnswerApp {
       this.renderAnswers();
 
     } catch (error) {
-      console.error('データ読み込みエラー:', error);
+      console.error('Data loading error:', error);
       this.showError('データの読み込みに失敗しました');
     } finally {
       this.isLoading = false;
@@ -666,7 +723,7 @@ class AnswerApp {
       return;
     }
 
-    // 回答カード生成
+    // Answer card generation
     const fragment = document.createDocumentFragment();
     this.answers.forEach(answer => {
       const card = this.createAnswerCard(answer);
@@ -677,7 +734,7 @@ class AnswerApp {
     container.appendChild(fragment);
   }
 
-  // 回答カード作成（見本ファイル仕様）
+  // Answer card creation (sample file specification)
   createAnswerCard(data) {
     const card = document.createElement('div');
     card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer';
@@ -705,7 +762,7 @@ class AnswerApp {
     }
 
     let highlightBtnHtml = '';
-    // ハイライトトグル機能が有効かつ管理モードONの場合のみボタンを生成
+    // Generate button only when highlight toggle is enabled and admin mode is ON
     if (this.appConfig.showHighlightToggle && this.adminMode && this.showAdminFeatures) {
       const cls = data.highlight ? 'liked' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
@@ -714,18 +771,18 @@ class AnswerApp {
                          '</button>';
     }
 
-    // 名前表示 - 管理モードONかつ管理権限がある場合、または設定でnamedの場合
+    // Name display - when admin mode ON with admin privileges, or when named in settings
     const showName = (this.adminMode && this.showAdminFeatures) || this.appConfig.displayMode === 'named';
     const nameHtml = showName ? '<div><span class="font-bold text-sm text-gray-200">' + this.escapeHtml(data.name) + '</span></div>' : '';
     const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-between items-center' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
 
-    // リアクションボタンのHTMLを生成（アクセシビリティ強化）
+    // Generate reaction button HTML (accessibility enhanced)
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions ? data.reactions[rt.key] : { count: 0, reacted: false };
       const cls = info.reacted ? 'liked' : '';
       const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
 
-      // showCountsがtrueの場合のみカウントを表示
+      // Display count only when showCounts is true
       const countSpan = this.appConfig.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
 
       // アクセシビリティ向上のためのaria-label
@@ -759,8 +816,8 @@ class AnswerApp {
       '<div class="' + containerClass + '">' +
       nameHtml + // 学生名（管理者モードのみ）
       '<div class="flex items-center gap-1" role="group" aria-label="回答への反応">' +
-      reactionButtonsHtml + // リアクションボタン群
-      highlightBtnHtml + // ハイライトボタン（管理者モードのみ）
+      reactionButtonsHtml + // Reaction button group
+      highlightBtnHtml + // Highlight button (admin mode only)
       '</div>' +
       '</div>' +
       highlightStatusHtml + // ハイライト状態通知
@@ -774,13 +831,13 @@ class AnswerApp {
       card.appendChild(badge);
     }
 
-    // カードクリックイベントリスナーは setupEventDelegation() で一括処理されるため不要
-    // 個別のイベントリスナー追加を削除してパフォーマンスを向上
+    // Card click event listeners are handled in setupEventDelegation() so not needed here
+    // Remove individual event listener additions to improve performance
 
     // 以下のコードは setupEventDelegation() に移行済み:
-    // - リアクションボタンのクリック処理
-    // - ハイライトボタンのクリック処理
-    // - カード本体のクリック処理（モーダル表示）
+    // - Reaction button click handling
+    // - Highlight button click handling
+    // - Card body click handling (modal display)
 
     return card;
   }
@@ -830,8 +887,8 @@ class AnswerApp {
     modalCard.classList.add('modal-scale');
 
     setTimeout(() => {
-      modalContainer.style.opacity = '1';
-      modalCard.style.transform = 'scale(1)';
+      modalContainer.style.opacity = CONFIG.MODAL_OPACITY_VISIBLE;
+      modalCard.style.transform = `scale(${CONFIG.MODAL_SCALE_NORMAL})`;
     }, 10);
   }
 
@@ -841,8 +898,8 @@ class AnswerApp {
     const modalCard = DOMHelpers.safeGetById('answerModalCard');
 
     if (modalContainer && modalCard) {
-      modalContainer.style.opacity = '0';
-      modalCard.style.transform = 'scale(0.95)';
+      modalContainer.style.opacity = CONFIG.MODAL_OPACITY_HIDDEN;
+      modalCard.style.transform = `scale(${CONFIG.MODAL_SCALE_SMALL})`;
 
       setTimeout(() => {
         modalContainer.classList.add('hidden');
@@ -853,7 +910,7 @@ class AnswerApp {
     }
   }
 
-  // クラスフィルター生成
+  // Class filter generation
   populateClassFilter(answers) {
     const classFilter = DOMHelpers.safeGetById('classFilter');
     if (!classFilter) return;
@@ -953,7 +1010,7 @@ class AnswerApp {
 
 // リアクション・ハイライト処理
 document.addEventListener('click', async (e) => {
-  // リアクションボタンクリック
+  // Reaction button click
   if (e.target.closest('.reaction-btn')) {
     e.preventDefault();
     const btn = e.target.closest('.reaction-btn');
@@ -973,14 +1030,14 @@ document.addEventListener('click', async (e) => {
       // 現在のGAS関数を使用
       await window.answerApp.loader.callGAS('addReaction', window.answerApp.userEmail, parseInt(rowIndex), type);
 
-      // データ再読み込み
+      // Data reload
       await window.answerApp.loadAnswers(window.answerApp.currentSort);
 
       if (window.notifications) {
         window.notifications.success('リアクションを追加しました');
       }
     } catch (error) {
-      console.error('リアクション追加エラー:', error);
+      console.error('Reaction addition error:', error);
       if (window.notifications) {
         window.notifications.error('リアクションの追加に失敗しました');
       }
@@ -989,7 +1046,7 @@ document.addEventListener('click', async (e) => {
     }
   }
 
-  // ハイライトボタンクリック
+  // Highlight button click
   if (e.target.closest('.highlight-btn')) {
     e.preventDefault();
     const btn = e.target.closest('.highlight-btn');
@@ -1005,14 +1062,14 @@ document.addEventListener('click', async (e) => {
       // 現在のGAS関数を使用（toggleHighlight関数を確認）
       await window.answerApp.loader.callGAS('toggleHighlight', window.answerApp.userEmail, parseInt(rowIndex));
 
-      // データ再読み込み
+      // Data reload
       await window.answerApp.loadAnswers(window.answerApp.currentSort);
 
       if (window.notifications) {
         window.notifications.success('ハイライトを変更しました');
       }
     } catch (error) {
-      console.error('ハイライト変更エラー:', error);
+      console.error('Highlight change error:', error);
       if (window.notifications) {
         window.notifications.error('ハイライトの変更に失敗しました');
       }
@@ -1022,7 +1079,7 @@ document.addEventListener('click', async (e) => {
   }
 });
 
-// === f0068fa版 高度な初期化システム ===
+// === f0068fa Advanced Initialization System ===
 
 // ドメイン認証とフォーム検出
 async function initializeAdvancedFeatures() {
@@ -1067,7 +1124,7 @@ function updateDomainAuthDisplay(result) {
     // 非認証アクセスの表示は不要（認証済みの場合のみ表示）
     if (mismatchEl) mismatchEl.classList.add('hidden');
   } else {
-    // 非認証の場合は何も表示しない
+    // Display nothing for unauthenticated users
     if (matchEl) matchEl.classList.add('hidden');
     if (mismatchEl) mismatchEl.classList.add('hidden');
   }
@@ -1082,7 +1139,7 @@ function updateFormLinkDisplay(result) {
       formLinkBtn.href = result.formUrl;
       formLinkBtn.classList.remove('hidden');
 
-      // フォームタイトルがある場合は表示を更新
+      // Update display if form title exists
       if (result.formTitle) {
         const titleSpan = formLinkBtn.querySelector('span');
         if (titleSpan) {
@@ -1110,9 +1167,9 @@ function startNewContentPolling() {
   }, 180000);
 }
 
-// 新着通知バナーのイベントリスナー
+// New content banner event listeners
 document.addEventListener('click', (e) => {
-  // 更新して表示ボタン
+  // Update and display button
   if (e.target.id === 'refreshContentBtn') {
     e.preventDefault();
     if (window.answerApp) {
@@ -1122,7 +1179,7 @@ document.addEventListener('click', (e) => {
     if (banner) banner.classList.remove('show');
   }
 
-  // 通知を閉じるボタン
+  // Close notification button
   if (e.target.id === 'dismissBannerBtn') {
     e.preventDefault();
     const banner = document.getElementById('newContentBanner');
@@ -1134,7 +1191,7 @@ document.addEventListener('click', (e) => {
 document.addEventListener('DOMContentLoaded', () => {
   window.answerApp = new AnswerApp();
 
-  // 高度な機能を遅延初期化（UIロード後）
+  // Initialize advanced features with lazy loading (after UI load)
   setTimeout(() => {
     initializeAdvancedFeatures();
   }, 2000);

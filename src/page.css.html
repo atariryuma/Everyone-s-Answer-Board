@@ -6,16 +6,45 @@
   --color-text: #c0caf5;
   --color-border: rgba(255, 255, 255, 0.1);
   --color-accent: #facc15;
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
-  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
   --color-success: #10b981;
   --color-error: #ef4444;
   --color-warning: #f59e0b;
-  /* Performance variables */
+  --color-like: #ef4444;
+  --color-understand: #fbbf24;
+  --color-curious: #10b981;
+  /* Additional color variables for DRY compliance */
+  --color-border-hover: rgba(255, 255, 255, 0.2);
+  --color-primary-glow: rgba(139, 233, 253, 0.4);
+  --color-background-alt: rgba(26, 27, 38, 0.95);
+  --color-accent-bg: rgba(250, 204, 21, 0.1);
+  --color-skeleton: rgba(255, 255, 255, 0.05);
+  --color-skeleton-shimmer: rgba(255, 255, 255, 0.3);
+  --color-success-shadow: rgba(16, 185, 129, 0.4);
+  --color-success-shadow-hover: rgba(16, 185, 129, 0.6);
+  --color-success-dark: #059669;
+  --color-form-bg: #374151;
+  /* Additional DRY variables for complete compliance */
+  --shadow-text: 1px 1px 2px rgba(0,0,0,0.4);
+  --border-spinner: 4px solid rgba(139, 233, 253, 0.2);
+  --filter-accent-glow: drop-shadow(0 0 4px rgba(250, 204, 21, 0.7));
+  --gradient-skeleton: linear-gradient(90deg, rgba(255,255,255,0), var(--color-skeleton-shimmer), rgba(255,255,255,0));
+  /* Unified transition system */
   --transition-duration: 0.2s;
   --transition-easing: ease-out;
+  --transition-all: all var(--transition-duration) var(--transition-easing);
+  --transition-transform: transform var(--transition-duration) var(--transition-easing);
   --animation-duration: 0.3s;
+  /* Shadow system */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 8px 25px rgba(139, 233, 253, 0.3);
+  --shadow-highlight: 0 0 15px rgba(250, 204, 21, 0.6);
   --backdrop-blur: 12px;
+  /* Border radius system */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
 }
 body {
   color: var(--color-text);
@@ -31,24 +60,22 @@ body {
   transition: border-color var(--transition-duration) var(--transition-easing);
 }
 .glass-panel:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--color-border-hover);
 }
 .game-font {
   font-family: 'Press Start 2P', cursive;
 }
 .game-btn {
-  transition: transform var(--transition-duration) var(--transition-easing),
-              box-shadow var(--transition-duration) var(--transition-easing),
-              border-bottom-width var(--transition-duration) var(--transition-easing);
-  border-radius: 0.75rem;
+  transition: var(--transition-transform), box-shadow var(--transition-duration) var(--transition-easing), border-bottom-width var(--transition-duration) var(--transition-easing);
+  border-radius: var(--radius-md);
   border-bottom-width: 4px;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
+  text-shadow: var(--shadow-text);
   position: relative;
   overflow: hidden;
 }
 .game-btn:not(:disabled):hover {
   transform: translate3d(0, -2px, 0);
-  box-shadow: 0 0 20px rgba(139, 233, 253, 0.4);
+  box-shadow: 0 0 20px var(--color-primary-glow);
   border-bottom-width: 6px;
 }
 .game-btn:active:not(:disabled) {
@@ -64,7 +91,7 @@ body {
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(26, 27, 38, 0.95);
+  background: var(--color-background-alt);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -78,8 +105,8 @@ body {
 .spinner {
   width: 40px;
   height: 40px;
-  border: 4px solid rgba(139, 233, 253, 0.2);
-  border-left-color: #8be9fd;
+  border: var(--border-spinner);
+  border-left-color: var(--color-primary);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
@@ -90,15 +117,15 @@ body {
 /* Answer cards */
 .answer-card {
   will-change: transform, opacity;
-  transition: all var(--animation-duration) var(--transition-easing);
-  border-radius: 1rem;
+  transition: var(--transition-all);
+  border-radius: var(--radius-lg);
   transform-style: preserve-3d;
   backface-visibility: hidden;
 }
 .answer-card.highlighted {
   border: 4px solid transparent;
   border-image: none !important;
-  box-shadow: 0 0 15px rgba(250,204,21,0.6);
+  box-shadow: var(--shadow-highlight);
   transform: scale(1.02);
   z-index: 2;
   background:
@@ -106,13 +133,10 @@ body {
     linear-gradient(90deg, var(--color-accent), var(--color-primary)) border-box;
   background-clip: padding-box, border-box;
 }
-.answer-card:hover {
-  transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 25px rgba(139,233,253,0.3);
-}
+.answer-card:hover,
 .answer-card:focus-visible {
   transform: translateY(-4px) scale(1.02);
-  box-shadow: 0 8px 25px rgba(139,233,253,0.3);
+  box-shadow: var(--shadow-lg);
 }
 .answer-card.highlighted:hover {
   transform: translateY(-4px) scale(1.04);
@@ -128,14 +152,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #facc15;
-  filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.7));
+  color: var(--color-accent);
+  filter: var(--filter-accent-glow);
 }
 
 /* Reaction backgrounds and border colors */
-.answer-card.reaction-bg-like { border-color:#ef4444 !important; border-image:none; }
-.answer-card.reaction-bg-understand { border-color:#fbbf24 !important; border-image:none; }
-.answer-card.reaction-bg-curious { border-color:#10b981 !important; border-image:none; }
+.answer-card.reaction-bg-like { border-color: var(--color-like) !important; border-image: none; }
+.answer-card.reaction-bg-understand { border-color: var(--color-understand) !important; border-image: none; }
+.answer-card.reaction-bg-curious { border-color: var(--color-curious) !important; border-image: none; }
 .reaction-bg-like-understand,
 .reaction-bg-like-curious,
 .reaction-bg-understand-curious,
@@ -144,16 +168,18 @@ body {
   border-style: solid;
   background: var(--color-surface);
   border-image-slice: 1;
-  border-image-source: linear-gradient(90deg,#ef4444,#fbbf24);
+}
+.reaction-bg-like-understand {
+  border-image-source: linear-gradient(90deg, var(--color-like), var(--color-understand));
 }
 .reaction-bg-like-curious {
-  border-image-source: linear-gradient(90deg,#ef4444,#10b981);
+  border-image-source: linear-gradient(90deg, var(--color-like), var(--color-curious));
 }
 .reaction-bg-understand-curious {
-  border-image-source: linear-gradient(90deg,#fbbf24,#10b981);
+  border-image-source: linear-gradient(90deg, var(--color-understand), var(--color-curious));
 }
 .reaction-bg-all {
-  border-image-source: linear-gradient(90deg,#ef4444,#fbbf24,#10b981);
+  border-image-source: linear-gradient(90deg, var(--color-like), var(--color-understand), var(--color-curious));
 }
 
 /* Reaction border thickness based on total count */
@@ -171,9 +197,9 @@ body {
   min-height: 120px;
 }
 
-/* Like button SVG transition */
+/* Button interaction styles */
 .like-btn svg {
-  transition: all 0.2s ease-in-out;
+  transition: var(--transition-all);
   fill: none;
 }
 .like-btn.liked svg {
@@ -182,19 +208,18 @@ body {
   transform: scale(1.1);
 }
 
-/* Highlight button styles */
 .highlight-btn {
-  transition: all 0.2s ease;
-  border-radius: 4px;
+  transition: var(--transition-all);
+  border-radius: var(--radius-sm);
   padding: 2px;
 }
 .highlight-btn:hover {
-  background: rgba(250, 204, 21, 0.1);
+  background: var(--color-accent-bg);
   transform: scale(1.1);
 }
 .highlight-btn.liked {
-  color: #facc15;
-  filter: drop-shadow(0 0 4px rgba(250, 204, 21, 0.7));
+  color: var(--color-accent);
+  filter: var(--filter-accent-glow);
 }
 
 /* Footer controls pointer events */
@@ -205,14 +230,14 @@ body {
 .skeleton {
   position: relative;
   overflow: hidden;
-  background-color: rgba(255,255,255,0.05);
+  background-color: var(--color-skeleton);
   color: transparent;
 }
 .skeleton::after {
   content: "";
   position: absolute;
   inset: 0;
-  background-image: linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,0.3), rgba(255,255,255,0));
+  background-image: var(--gradient-skeleton);
   animation: skeleton-loading 1.2s infinite;
 }
 @keyframes skeleton-loading {
@@ -228,13 +253,13 @@ body {
   transform: translateX(-50%);
   z-index: 1000;
   padding: 0.75rem 1.5rem;
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, var(--color-success), var(--color-success-dark));
   color: white;
-  border-radius: 0.5rem;
-  box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 25px var(--color-success-shadow);
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: var(--transition-all);
   opacity: 0;
   visibility: hidden;
 }
@@ -247,7 +272,7 @@ body {
 
 .new-content-banner:hover {
   transform: translateX(-50%) translateY(-2px);
-  box-shadow: 0 15px 35px rgba(16, 185, 129, 0.6);
+  box-shadow: 0 15px 35px var(--color-success-shadow-hover);
 }
 
 /* Animation definitions */
@@ -293,10 +318,10 @@ body {
 
 /* Form elements styling */
 #classFilter, #sortOrder {
-  background-color: #374151;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background-color: var(--color-form-bg);
+  border: 1px solid var(--color-border);
   color: var(--color-text);
-  border-radius: 0.375rem;
+  border-radius: var(--radius-sm);
   padding: 0.25rem 0.5rem;
 }
 
@@ -304,7 +329,7 @@ body {
 :focus-visible {
   outline: 3px solid var(--color-primary);
   outline-offset: 2px;
-  border-radius: 0.375rem;
+  border-radius: var(--radius-sm);
 }
 
 /* Header sticky positioning */
@@ -316,7 +341,7 @@ header {
 
 /* Interactive element base styles */
 .interactive-element {
-  transition: all var(--transition-duration) var(--transition-easing);
-  border-radius: 0.75rem;
+  transition: var(--transition-all);
+  border-radius: var(--radius-md);
 }
 </style>
