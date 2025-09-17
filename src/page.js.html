@@ -463,37 +463,13 @@ class StudyQuestApp {
   }
 
   /**
-   * パブリケーション状態監視システムの初期化 - 最適化版
+   * パブリケーション状態監視システムの初期化 - 最小限版
    */
   initPublicationStatusMonitoring() {
-    // 定期的なパブリケーション状態チェック（5分間隔に延長）
-    this.publicationCheckInterval = setInterval(() => {
-      this.checkPublicationStatus();
-    }, 300000); // 5分 = 300,000ms
-    
-    // 最後のチェック時刻を記録してデバウンス処理
-    this.lastStatusCheck = 0;
-    const CHECK_DEBOUNCE = 30000; // 30秒間隔制限
-    
-    // ページの可視性変更時とフォーカス時の統合処理
-    const debouncedCheck = () => {
-      const now = Date.now();
-      if (now - this.lastStatusCheck > CHECK_DEBOUNCE) {
-        this.lastStatusCheck = now;
-        this.checkPublicationStatus();
-      }
-    };
-    
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) debouncedCheck();
-    });
-    
-    window.addEventListener('focus', debouncedCheck);
-    
-    // 初回チェック（初期化完了後に実行）
+    // ページアクセス時のみチェック（初回のみ）
     setTimeout(() => {
       this.checkPublicationStatus();
-    }, 5000); // 10秒→5秒に短縮
+    }, 2000); // 初期化完了後に1回のみ実行
   }
 
   /**
