@@ -1226,72 +1226,118 @@
   }
 
   // フォーム情報表示（改善版）
-  function showFormInfo(formData, spreadsheetName) {
-    // 両方のフォーム情報エリアを処理（URL入力用と一覧選択用）
+  function showFormInfo(formData, options = {}) {
+    const safeData = formData || {};
+    const status = options.status || (safeData.formUrl ? 'linked' : 'missing');
+    const message = options.message || '';
+    const reason = options.reason || '';
+    const diagnostics = options.diagnostics || null;
+    const suggestions = Array.isArray(options.suggestions) ? options.suggestions : [];
+    const spreadsheetName = options.spreadsheetName || safeData.spreadsheetName || '';
+    const sheetName = safeData.sheetName || options.sheetName || '';
+
     const formInfos = [
       {
         container: document.getElementById('form-info'),
         title: document.getElementById('form-title'),
         url: document.getElementById('form-url'),
-        spreadsheet: document.getElementById('spreadsheet-name'),
+        spreadsheet: document.getElementById('spreadsheet-name')
       },
       {
         container: document.getElementById('form-info-url'),
         title: document.getElementById('form-title-url'),
         url: document.getElementById('form-url-url'),
-        spreadsheet: document.getElementById('spreadsheet-name-url'),
-      },
+        spreadsheet: document.getElementById('spreadsheet-name-url')
+      }
     ];
 
-    // 詳細デバッグ情報
-    console.log('🔍 showFormInfo: 受信データ詳細', {
-      formData: formData,
-      spreadsheetName: spreadsheetName,
-      hasFormTitle: formData.hasOwnProperty('formTitle'),
-      formTitleValue: formData.formTitle,
-      formTitleType: typeof formData.formTitle,
-      formTitleLength: formData.formTitle ? formData.formTitle.length : 0,
-      isEmpty: !formData.formTitle || formData.formTitle.trim() === '',
+    const displayTitle = (safeData.formTitle && safeData.formTitle.trim())
+      ? safeData.formTitle.trim()
+      : (spreadsheetName || sheetName || 'フォーム未連携');
+    const hasLink = status === 'linked' && !!safeData.formUrl;
+    const linkText = hasLink ? safeData.formUrl : (message || 'フォームが連携されていません');
+    const linkHref = hasLink ? safeData.formUrl : null;
+
+    console.log('🔍 showFormInfo: 表示状態', {
+      status,
+      reason,
+      hasLink,
+      formData: safeData,
+      diagnostics
     });
 
-    // 両方のエリアを更新
     formInfos.forEach((info) => {
-      if (info.container && info.title && info.url) {
-        // フォームタイトルが取得できた場合は優先表示、なければスプレッドシート名
-        const displayTitle =
-          formData.formTitle && formData.formTitle.trim() !== ''
-            ? formData.formTitle
-            : spreadsheetName || '（タイトル取得中...）';
+      if (!info.container || !info.title || !info.url) {
+        return;
+      }
 
-        console.log('📝 フォーム情報設定:', {
-          container: info.container.id,
-          displayTitle: displayTitle,
-          formUrl: formData.formUrl,
-          spreadsheetName: spreadsheetName,
-        });
+      info.title.textContent = displayTitle;
 
-        info.title.textContent = displayTitle;
-        info.url.href = formData.formUrl;
-        info.url.textContent = formData.formUrl;
+      if (linkHref) {
+        info.url.href = linkHref;
+        info.url.setAttribute('target', '_blank');
+        info.url.textContent = linkText;
+        info.url.classList.remove('text-yellow-400', 'cursor-not-allowed');
+        info.url.classList.add('text-blue-400');
+      } else {
+        info.url.textContent = linkText;
+        info.url.removeAttribute('href');
+        info.url.removeAttribute('target');
+        info.url.classList.remove('text-blue-400');
+        info.url.classList.add('text-yellow-400', 'cursor-not-allowed');
+      }
 
-        // スプレッドシート名も表示（存在する場合）
-        if (info.spreadsheet && spreadsheetName) {
-          info.spreadsheet.textContent = `スプレッドシート: ${spreadsheetName}`;
-          info.spreadsheet.classList.remove('hidden');
+      if (info.spreadsheet && spreadsheetName) {
+        info.spreadsheet.textContent = `スプレッドシート: ${spreadsheetName}`;
+        info.spreadsheet.classList.remove('hidden');
+      }
+
+      info.container.classList.remove('hidden');
+      info.container.dataset.formStatus = status;
+      info.container.dataset.formReason = reason;
+      info.container.dataset.formSheet = sheetName;
+
+      if (diagnostics) {
+        try {
+          info.container.dataset.formDiagnostics = JSON.stringify(diagnostics);
+        } catch (jsonError) {
+          console.warn('formDiagnostics serialization failed:', jsonError);
         }
-
-        info.container.classList.remove('hidden');
+      } else {
+        info.container.removeAttribute('data-form-diagnostics');
       }
     });
 
-    console.log('✅ フォーム情報表示完了');
+    window.__formIntegrationStatus = {
+      status,
+      reason,
+      message,
+      suggestions,
+      diagnostics,
+      formData: {
+        ...safeData,
+        spreadsheetName,
+        sheetName
+      }
+    };
+    console.log('📊 フォーム連携ステータス更新:', window.__formIntegrationStatus);
   }
 
   // フォーム情報非表示
   function hideFormInfo() {
     const formInfo = document.getElementById('form-info');
+    const formInfoUrl = document.getElementById('form-info-url');
     if (formInfo) {
       formInfo.classList.add('hidden');
+      formInfo.removeAttribute('data-form-status');
+      formInfo.removeAttribute('data-form-reason');
+      formInfo.removeAttribute('data-form-diagnostics');
+    }
+    if (formInfoUrl) {
+      formInfoUrl.classList.add('hidden');
+      formInfoUrl.removeAttribute('data-form-status');
+      formInfoUrl.removeAttribute('data-form-reason');
+      formInfoUrl.removeAttribute('data-form-diagnostics');
     }
   }
 
@@ -1307,25 +1353,79 @@
     google.script.run
       .withSuccessHandler((result) => {
         setPartialLoading(false);
+        const normalizedResult = result && typeof result === 'object' ? result : null;
+        const rawFormData = normalizedResult && typeof normalizedResult.formData === 'object' ? normalizedResult.formData : null;
+        const derivedSpreadsheetName = rawFormData?.spreadsheetName || normalizedResult?.diagnostics?.spreadsheetName || '';
+        const derivedSheetName = rawFormData?.sheetName || normalizedResult?.requestContext?.sheetName || sheetName;
+
+        window.__formIntegrationLatestResponse = normalizedResult;
+
         console.log('🔍 getFormInfo APIレスポンス詳細:', {
-          result: result,
-          hasResult: !!result,
-          isSuccess: result && result.success,
-          hasFormData: result && result.formData,
-          formData: result ? result.formData : null,
-          spreadsheetId: spreadsheetId,
-          sheetName: sheetName,
+          result: normalizedResult,
+          hasResult: !!normalizedResult,
+          isSuccess: normalizedResult && normalizedResult.success,
+          hasFormData: rawFormData,
+          formData: rawFormData,
+          spreadsheetId,
+          sheetName: derivedSheetName
         });
 
-        if (result && result.success && result.formData) {
-          showFormInfo(result.formData);
-        } else {
-          console.warn('⚠️ フォーム連携情報が見つからない:', {
-            reason: result ? result.reason : '不明',
-            suggestions: result ? result.suggestions : [],
-          });
-          hideFormInfo();
+        if (normalizedResult && normalizedResult.success && rawFormData && rawFormData.formUrl) {
+          showFormInfo(
+            {
+              ...rawFormData,
+              spreadsheetName: derivedSpreadsheetName,
+              sheetName: derivedSheetName
+            },
+            {
+              status: 'linked',
+              message: normalizedResult.message || 'フォーム連携を確認しました。',
+              reason: normalizedResult.reason || '',
+              diagnostics: normalizedResult.diagnostics || null,
+              suggestions: Array.isArray(normalizedResult.suggestions) ? normalizedResult.suggestions : [],
+              spreadsheetName: derivedSpreadsheetName,
+              sheetName: derivedSheetName
+            }
+          );
+          return;
         }
+
+        const fallbackMessage = normalizedResult && normalizedResult.message
+          ? normalizedResult.message
+          : 'フォーム連携情報が見つかりませんでした。';
+        const fallbackSuggestions = normalizedResult && Array.isArray(normalizedResult.suggestions)
+          ? normalizedResult.suggestions
+          : [];
+
+        console.warn('⚠️ フォーム連携情報が見つからない:', {
+          reason: normalizedResult ? normalizedResult.reason : '不明',
+          suggestions: fallbackSuggestions
+        });
+
+        if (fallbackSuggestions.length > 0) {
+          const formattedSuggestions = fallbackSuggestions.map((s) => `• ${s}`).join('\n');
+          showWarning(`${fallbackMessage}\n\n推奨対処法:\n${formattedSuggestions}`);
+        } else {
+          showWarning(fallbackMessage);
+        }
+
+        const fallbackFormData = {
+          ...(rawFormData || {}),
+          formUrl: rawFormData ? rawFormData.formUrl : null,
+          formTitle: (rawFormData && rawFormData.formTitle) || derivedSpreadsheetName || derivedSheetName || 'フォーム未連携',
+          spreadsheetName: derivedSpreadsheetName,
+          sheetName: derivedSheetName
+        };
+
+        showFormInfo(fallbackFormData, {
+          status: 'missing',
+          message: fallbackMessage,
+          reason: normalizedResult ? normalizedResult.reason || 'FORM_INFO_UNAVAILABLE' : 'FORM_INFO_UNAVAILABLE',
+          diagnostics: normalizedResult ? normalizedResult.diagnostics || null : null,
+          suggestions: fallbackSuggestions,
+          spreadsheetName: derivedSpreadsheetName,
+          sheetName: derivedSheetName
+        });
       })
       .withFailureHandler((error) => {
         setPartialLoading(false);
@@ -1335,6 +1435,9 @@
           spreadsheetId: spreadsheetId,
           sheetName: sheetName,
         });
+        const failureMessage = 'フォーム連携情報の取得中にエラーが発生しました。';
+        showError(`${failureMessage}\n${error.message || ''}`);
+        window.__formIntegrationLatestResponse = null;
         hideFormInfo();
       })
       .getFormInfo(spreadsheetId, sheetName);

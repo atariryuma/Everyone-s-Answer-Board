@@ -626,76 +626,254 @@ function getQuestionText(config) {
  * @returns {Object} フォーム情報
  */
 function getFormInfo(spreadsheetId, sheetName) {
+  const failureCatalog = {
+    SERVICE_INIT_FAILED: {
+      message: '設定サービスの初期化に失敗しました。',
+      suggestions: [
+        'ページを再読み込みしてから再試行してください',
+        '問題が続く場合は管理者へお問い合わせください'
+      ]
+    },
+    INVALID_ARGUMENTS: {
+      message: 'スプレッドシートIDとシート名を指定してください。',
+      suggestions: [
+        '対象のスプレッドシートとシートを選択し直してください'
+      ]
+    },
+    SPREADSHEET_NOT_FOUND: {
+      message: 'スプレッドシートにアクセスできませんでした。',
+      suggestions: [
+        'スプレッドシートの共有設定とアクセス権限を確認してください',
+        '必要に応じて管理者から再度アクセス権を付与してください'
+      ]
+    },
+    SHEET_NOT_FOUND: {
+      message: '指定したシートが見つかりません。',
+      suggestions: [
+        'シート名が変更されていないか確認してください',
+        '正しいシートを選択し直してください'
+      ]
+    },
+    FORM_NOT_LINKED: {
+      message: '指定したシートにはフォーム連携が確認できませんでした。',
+      suggestions: [
+        'Googleフォームの「回答の行き先」を開き、対象のシートにリンクしてください',
+        'フォーム作成者に連携状況を確認してください'
+      ]
+    },
+    FORM_URL_ACCESS_ERROR: {
+      message: 'フォーム情報の取得中に権限エラーが発生しました。',
+      suggestions: [
+        'フォームへのアクセス権限が付与されているか確認してください',
+        'しばらく時間をおいてから再試行してください'
+      ]
+    },
+    UNKNOWN_ERROR: {
+      message: 'フォーム情報の取得に失敗しました。',
+      suggestions: [
+        'ページを再読み込みしてから再試行してください'
+      ]
+    }
+  };
+
+  function buildFailure(reason, overrides) {
+    const catalogEntry = failureCatalog[reason] || failureCatalog.UNKNOWN_ERROR;
+    const message = overrides && typeof overrides.message === 'string'
+      ? overrides.message
+      : catalogEntry.message;
+    const suggestions = overrides && Array.isArray(overrides.suggestions)
+      ? overrides.suggestions
+      : catalogEntry.suggestions;
+
+    const response = {
+      success: false,
+      status: overrides && overrides.status ? overrides.status : 'FORM_INFO_UNAVAILABLE',
+      reason,
+      message,
+      suggestions: suggestions || [],
+      formData: overrides && Object.prototype.hasOwnProperty.call(overrides, 'formData')
+        ? overrides.formData
+        : null,
+      diagnostics: overrides && overrides.diagnostics ? overrides.diagnostics : null,
+      timestamp: new Date().toISOString(),
+      requestContext: {
+        spreadsheetId,
+        sheetName
+      }
+    };
+
+    if (overrides && overrides.error) {
+      response.error = overrides.error;
+    }
+
+    return response;
+  }
+
   try {
     if (!initConfigServiceZero()) {
-      return { success: false, message: 'Service initialization failed' };
+      return buildFailure('SERVICE_INIT_FAILED');
     }
 
-    // Direct GAS API usage (CLAUDE.md準拠)
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    let formUrl = null;
-    let formTitle = null; // フォームタイトル（取得できない場合はnull）
+    if (!spreadsheetId || !sheetName) {
+      return buildFailure('INVALID_ARGUMENTS');
+    }
 
+    let spreadsheet;
     try {
-      // シート固有のフォームURL取得を試行
-      const sheet = spreadsheet.getSheetByName(sheetName);
-      if (sheet && typeof sheet.getFormUrl === 'function') {
+      spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    } catch (accessError) {
+      return buildFailure('SPREADSHEET_NOT_FOUND', {
+        diagnostics: {
+          spreadsheetId,
+          sheetName,
+          accessError: accessError.message
+        },
+        error: accessError.message
+      });
+    }
+
+    if (!spreadsheet) {
+      return buildFailure('SPREADSHEET_NOT_FOUND', {
+        diagnostics: {
+          spreadsheetId,
+          sheetName
+        }
+      });
+    }
+
+    const spreadsheetName = spreadsheet.getName();
+    const diagnostics = {
+      spreadsheetId,
+      spreadsheetName,
+      sheetName,
+      evaluatedAt: new Date().toISOString(),
+      sheetFound: false,
+      sheetFormUrlFunctionAvailable: false,
+      spreadsheetFormUrlFunctionAvailable: typeof spreadsheet.getFormUrl === 'function',
+      sheetFormUrlAvailable: false,
+      spreadsheetFormUrlAvailable: false,
+      formUrlSource: null
+    };
+
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      diagnostics.sheetFound = false;
+      return buildFailure('SHEET_NOT_FOUND', {
+        message: `シート「${sheetName}」が見つかりません。`,
+        diagnostics,
+        formData: {
+          formUrl: null,
+          formTitle: null,
+          spreadsheetName,
+          sheetName
+        }
+      });
+    }
+
+    diagnostics.sheetFound = true;
+    diagnostics.sheetFormUrlFunctionAvailable = typeof sheet.getFormUrl === 'function';
+
+    let formUrl = null;
+    if (diagnostics.sheetFormUrlFunctionAvailable) {
+      try {
         formUrl = sheet.getFormUrl();
+        diagnostics.sheetFormUrlAvailable = !!formUrl;
+        if (formUrl) {
+          diagnostics.formUrlSource = 'sheet';
+        }
+      } catch (sheetUrlError) {
+        diagnostics.sheetFormUrlError = sheetUrlError.message;
       }
+    }
 
-      // スプレッドシートレベルのフォームURL取得を試行
-      if (!formUrl && typeof spreadsheet.getFormUrl === 'function') {
-        formUrl = spreadsheet.getFormUrl();
+    if (!formUrl && diagnostics.spreadsheetFormUrlFunctionAvailable) {
+      try {
+        const spreadsheetLevelFormUrl = spreadsheet.getFormUrl();
+        diagnostics.spreadsheetFormUrlAvailable = !!spreadsheetLevelFormUrl;
+        if (spreadsheetLevelFormUrl) {
+          formUrl = spreadsheetLevelFormUrl;
+          diagnostics.formUrlSource = 'spreadsheet';
+        }
+      } catch (spreadsheetUrlError) {
+        diagnostics.spreadsheetFormUrlError = spreadsheetUrlError.message;
       }
+    }
 
-      // FormApp usage with multiple strategies for V8 runtime stability
-      if (formUrl && formUrl.includes('docs.google.com/forms/')) {
+    let formTitle = null;
+    if (formUrl && formUrl.indexOf('docs.google.com/forms/') !== -1) {
+      try {
+        Utilities.sleep(50);
+        const form = FormApp.openByUrl(formUrl);
+        if (form && typeof form.getTitle === 'function') {
+          formTitle = form.getTitle() || null;
+        }
+      } catch (directError) {
+        diagnostics.formOpenError = directError.message;
         try {
-          // Strategy 1: Direct URL access with delay to prevent stack overflow
-          Utilities.sleep(50);
-          const form = FormApp.openByUrl(formUrl);
-          if (form && typeof form.getTitle === 'function') {
-            formTitle = form.getTitle() || null;
-          }
-        } catch (directError) {
-          try {
-            // Strategy 2: ID extraction fallback
-            const formId = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/)?.[1];
-            if (formId) {
-              Utilities.sleep(50);
-              const form = FormApp.openById(formId);
-              if (form && typeof form.getTitle === 'function') {
-                formTitle = form.getTitle() || null;
-              }
+          const match = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+          const formId = match ? match[1] : null;
+          if (formId) {
+            Utilities.sleep(50);
+            const form = FormApp.openById(formId);
+            if (form && typeof form.getTitle === 'function') {
+              formTitle = form.getTitle() || null;
             }
-          } catch (idError) {
-            console.warn('FormApp access failed:', directError.message, idError.message);
-            formTitle = null;
           }
+        } catch (idError) {
+          diagnostics.formOpenFallbackError = idError.message;
         }
       }
-
-    } catch (accessError) {
-      // Robust Error Handling - ログ出力を削除（エラー原因対策）
     }
 
-    return {
-      success: !!formUrl,
-      formData: {
-        formUrl,
-        formTitle, // 実際のフォームタイトル（取得できない場合はnull）
-        spreadsheetName: spreadsheet.getName()
-      },
-      message: formUrl ? 'Form info retrieved successfully' : 'No form URL found'
+    if (!formTitle) {
+      formTitle = sheetName || spreadsheetName;
+    }
+
+    const formData = {
+      formUrl: formUrl || null,
+      formTitle,
+      spreadsheetName,
+      sheetName
     };
 
+    if (formUrl) {
+      diagnostics.formLinked = true;
+      return {
+        success: true,
+        status: 'FORM_LINK_FOUND',
+        message: 'フォーム連携を確認しました。',
+        suggestions: [],
+        formData,
+        diagnostics,
+        timestamp: new Date().toISOString(),
+        requestContext: {
+          spreadsheetId,
+          sheetName
+        }
+      };
+    }
+
+    diagnostics.formLinked = false;
+    const hasAccessErrors = diagnostics.sheetFormUrlError || diagnostics.spreadsheetFormUrlError;
+    const failureReason = hasAccessErrors ? 'FORM_URL_ACCESS_ERROR' : 'FORM_NOT_LINKED';
+
+    return buildFailure(failureReason, {
+      message: hasAccessErrors
+        ? 'フォーム情報の取得中に権限エラーが発生しました。'
+        : '指定したシートにはフォーム連携が確認できませんでした。',
+      diagnostics,
+      formData
+    });
+
   } catch (error) {
-    // Robust Error Handling (CLAUDE.md準拠)
-    return {
-      success: false,
-      formData: null,
-      message: 'Form info retrieval failed'
-    };
+    return buildFailure('UNKNOWN_ERROR', {
+      diagnostics: {
+        spreadsheetId,
+        sheetName,
+        error: error.message
+      },
+      error: error.message
+    });
   }
 }
 

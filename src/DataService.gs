@@ -1007,6 +1007,7 @@ function getSpreadsheetList() {
  * @returns {Object} 列分析結果
  */
 function columnAnalysisImpl(spreadsheetId, sheetName) {
+  const started = Date.now();
   try {
     const paramValidation = validateSheetParams(spreadsheetId, sheetName);
     if (!paramValidation.isValid) {
@@ -1021,7 +1022,8 @@ function columnAnalysisImpl(spreadsheetId, sheetName) {
     return {
       success: true,
       headers: connectionResult.headers,
-      columnMapping: connectionResult.columnMapping
+      columnMapping: connectionResult.columnMapping,
+      executionTime: `${Date.now() - started}ms`
     };
 
   } catch (error) {

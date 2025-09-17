@@ -534,7 +534,26 @@ function getFormInfo(spreadsheetId, sheetName) {
     if (!configService) {
       throw new Error('ConfigService not available');
     }
-    return configService.getFormInfo(spreadsheetId, sheetName);
+    const serviceResponse = configService.getFormInfo(spreadsheetId, sheetName);
+    if (serviceResponse && typeof serviceResponse === 'object') {
+      const enrichedFormData = serviceResponse.formData && typeof serviceResponse.formData === 'object'
+        ? {
+            ...serviceResponse.formData,
+            sheetName: serviceResponse.formData.sheetName || sheetName
+          }
+        : serviceResponse.formData;
+
+      return {
+        ...serviceResponse,
+        formData: enrichedFormData,
+        requestContext: serviceResponse.requestContext || {
+          spreadsheetId,
+          sheetName
+        }
+      };
+    }
+
+    return serviceResponse;
   } catch (error) {
     console.error('AdminController.getFormInfo エラー:', error.message);
     return {
