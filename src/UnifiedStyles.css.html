@@ -713,6 +713,15 @@
     -webkit-backdrop-filter: var(--glass-backdrop);
   }
 
+  /* Page-specific loading content should also be transparent */
+  .loading-overlay.page-specific .loading-content {
+    background: rgba(0, 0, 0, 0) !important; /* Transparent background */
+    border: none !important; /* Remove border */
+    box-shadow: none !important; /* Remove shadow */
+    backdrop-filter: none !important; /* Remove blur */
+    -webkit-backdrop-filter: none !important;
+  }
+
   /* Variant: QuickStart, lightweight and non-blocking */
   .loading-overlay.quickstart {
     background-color: rgba(0, 0, 0, 0.1) !important;
