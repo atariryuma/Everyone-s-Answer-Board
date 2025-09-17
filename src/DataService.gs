@@ -1022,7 +1022,8 @@ function columnAnalysisImpl(spreadsheetId, sheetName) {
     return {
       success: true,
       headers: connectionResult.headers,
-      columnMapping: connectionResult.columnMapping,
+      mapping: connectionResult.mapping,        // フロントエンド期待形式
+      confidence: connectionResult.confidence,  // 分離
       executionTime: `${Date.now() - started}ms`
     };
 
@@ -1038,7 +1039,8 @@ function columnAnalysisImpl(spreadsheetId, sheetName) {
       message: `予期しないエラーが発生しました: ${error.message}`,
       headers: [],
       columns: [],
-      columnMapping: { mapping: {}, confidence: {} },
+      mapping: {},           // フロントエンド期待形式
+      confidence: {},        // 分離
       executionTime: `${Date.now() - started}ms`
     };
   }
@@ -1057,7 +1059,8 @@ function validateSheetParams(spreadsheetId, sheetName) {
       message: 'スプレッドシートIDとシート名が必要です',
       headers: [],
       columns: [],
-      columnMapping: { mapping: {}, confidence: {} }
+      mapping: {},
+      confidence: {}
     };
     console.error('DataService.analyzeColumns: 必須パラメータ不足', {
       spreadsheetId: !!spreadsheetId,
@@ -1088,7 +1091,8 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
           message: `シート "${sheetName}" が見つかりません`,
           headers: [],
           columns: [],
-          columnMapping: { mapping: {}, confidence: {} }
+          mapping: {},
+      confidence: {}
         }
       };
     }
@@ -1105,7 +1109,7 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
       const sampleData = allData.slice(1, Math.min(11, allData.length)); // 最大10行のサンプル
 
       const analysisResult = detectColumnTypes(headers, sampleData);
-      columnMapping = analysisResult.mapping || { mapping: {}, confidence: {} };
+      columnMapping = analysisResult || { mapping: {}, confidence: {} };
 
       console.log('DataService.connectToSheetInternal: AI分析完了', {
         headers: headers.length,
@@ -1122,7 +1126,8 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
       success: true,
       sheet,
       headers, // UI必須データ追加
-      columnMapping // AI分析結果を含む
+      mapping: columnMapping.mapping,      // フロントエンド期待形式
+      confidence: columnMapping.confidence // 分離
     };
 
   } catch (error) {
@@ -1138,7 +1143,8 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
         message: `スプレッドシートアクセスエラー: ${error.message}`,
         headers: [],
         columns: [],
-        columnMapping: { mapping: {}, confidence: {} }
+        mapping: {},
+      confidence: {}
       }
     };
   }
@@ -1162,7 +1168,8 @@ function extractSheetHeaders(sheet) {
           message: 'スプレッドシートが空です',
           headers: [],
           columns: [],
-          columnMapping: { mapping: {}, confidence: {} }
+          mapping: {},
+      confidence: {}
         }
       };
     }
@@ -1191,7 +1198,8 @@ function extractSheetHeaders(sheet) {
         message: `データ取得エラー: ${error.message}`,
         headers: [],
         columns: [],
-        columnMapping: { mapping: {}, confidence: {} }
+        mapping: {},
+      confidence: {}
       }
     };
   }
@@ -1303,7 +1311,7 @@ function detectColumnTypes(headers, sampleData) {
     // 防御的プログラミング: 入力値検証
     if (!Array.isArray(headers) || headers.length === 0) {
       console.warn('DataService.detectColumnTypes: 無効なheaders', headers);
-      return { columns: [], mapping: { mapping: {}, confidence: {} } };
+      return { columns: [], mapping: {}, confidence: {} };
     }
 
     if (!Array.isArray(sampleData)) {
@@ -1364,9 +1372,11 @@ function detectColumnTypes(headers, sampleData) {
       }
     });
 
-    const result = { columns, mapping };
-
-    return result;
+    return {
+      columns,
+      mapping: mapping.mapping,        // フロントエンド期待形式
+      confidence: mapping.confidence   // 分離
+    };
 
   } catch (error) {
     console.error('DataService.detectColumnTypes: エラー', {
@@ -1377,7 +1387,8 @@ function detectColumnTypes(headers, sampleData) {
     // エラー時のフォールバック
     return {
       columns: [],
-      mapping: { mapping: {}, confidence: {} }
+      mapping: {},
+      confidence: {}
     };
   }
 }
