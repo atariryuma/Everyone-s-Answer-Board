@@ -240,11 +240,16 @@
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">
     <div
       id="loading-overlay"
-      class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
+      class="fixed inset-0 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
+      style="background-color: var(--brand-background-overlay, rgba(16, 17, 28, 0.9));"
     >
-      <div
-        class="loading-spinner w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"
-      ></div>
+      <div class="flex flex-col items-center gap-4">
+        <div
+          class="loading-spinner w-16 h-16 border-4 rounded-full animate-spin"
+          style="border-color: rgba(139, 233, 253, 0.3); border-top-color: var(--brand-primary);"
+        ></div>
+        <div class="loading-message text-center" style="color: var(--brand-text);">処理中...</div>
+      </div>
     </div>
 
     <!-- Notification Container -->
@@ -609,15 +614,6 @@
               onclick="window.open('https://classroom.google.com', '_blank')"
             >
               🎓 Googleクラスルームを開く
-            </button>
-            <button
-              id="open-board-btn"
-              class="link-btn w-full text-center"
-              type="button"
-              onclick="openAnswerBoard()"
-              disabled
-            >
-              📊 回答ボードを開く
             </button>
             <!-- システム管理者用ボタン -->
             <button

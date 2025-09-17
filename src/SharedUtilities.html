@@ -1415,8 +1415,10 @@
       let messageElement = this.overlay.querySelector('.loading-message');
       if (!messageElement) {
         this.overlay.innerHTML = `
-          <div class="loading-spinner"></div>
-          <div class="loading-message">${config.message}</div>
+          <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-message">${config.message}</div>
+          </div>
         `;
         messageElement = this.overlay.querySelector('.loading-message');
       } else {

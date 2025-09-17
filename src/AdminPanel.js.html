@@ -802,7 +802,14 @@
         select.value = option.value;
         return true;
       } else {
-        showInfo('💡 シート「' + sheetName + '」が見つかりません。手動で選択してください');
+        // 現在のモードを確認
+        const dropdownMethod = document.getElementById('dropdown-method');
+        const isDropdownMode = dropdownMethod && !dropdownMethod.classList.contains('hidden');
+
+        // 一覧選択モードでかつ実際にドロップダウンが読み込まれている場合のみ通知
+        if (isDropdownMode && select.options.length > 1) {
+          showInfo('💡 シート「' + sheetName + '」が見つかりません。手動で選択してください');
+        }
         return false;
       }
     } catch (error) {
@@ -1165,8 +1172,8 @@
     spreadsheetBtn.disabled = true;
     statusDiv.textContent = 'スプレッドシート機能はConfigurationManager統合中';
 
-    // フォームボタン（フォーム作成済みの場合のみ表示）
-    if (config.formCreated && config.formUrl) {
+    // フォームボタン（フォームURLが設定されている場合に表示）
+    if (config.formUrl) {
       formBtn.classList.remove('hidden');
       formBtn.disabled = false;
       formBtn.dataset.formUrl = config.formUrl;
@@ -1177,7 +1184,7 @@
     // ステータス更新
     let statusParts = [];
     // スプレッドシートステータスはConfigurationManager経由で取得
-    if (config.formCreated) statusParts.push('📝 フォーム');
+    if (config.formUrl) statusParts.push('📝 フォーム');
     if (config.appPublished) statusParts.push('🎯 ボード');
 
     if (statusParts.length > 0) {
