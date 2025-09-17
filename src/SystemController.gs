@@ -13,7 +13,6 @@
  */
 
 
-// DB 初期化関数は廃止。必ず ServiceFactory.getDB() を使用すること。
 
 
 
@@ -241,7 +240,6 @@ function performDataIntegrityCheck() {
  */
 function performAutoRepair() {
     try {
-      console.log('自動修復機能は現在基本実装のみです');
 
       const repairResults = {
         timestamp: new Date().toISOString(),
@@ -282,18 +280,13 @@ function performAutoRepair() {
  * @returns {Object} スプレッドシート一覧
  */
 function getAdminSpreadsheetList() {
-  console.log('🔍 getAdminSpreadsheetList: 関数開始 - Zero-dependency Architecture');
   try {
-    console.log('🔍 DriveApp.getFilesByType呼び出し開始');
-
     // 🎯 Zero-dependency: 直接DriveAppでスプレッドシート一覧取得
     const spreadsheets = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
-    console.log('🔍 DriveApp.getFilesByType完了', spreadsheets);
 
     const spreadsheetList = [];
     let count = 0;
 
-    console.log('🔍 ファイル列挙開始');
     while (spreadsheets.hasNext() && count < 20) { // 最大20件に制限
       const file = spreadsheets.next();
       const fileData = {
@@ -303,7 +296,6 @@ function getAdminSpreadsheetList() {
         url: file.getUrl(),
         size: file.getSize() || 0
       };
-      console.log(`🔍 ファイル${count + 1}:`, fileData.name, fileData.id);
       spreadsheetList.push(fileData);
       count++;
     }
@@ -315,7 +307,6 @@ function getAdminSpreadsheetList() {
       timestamp: new Date().toISOString()
     };
 
-    console.log('🔍 getAdminSpreadsheetList: 結果準備完了', result);
     return result;
   } catch (error) {
     console.error('🚨 AdminController.getSpreadsheetList エラー:', error);
@@ -326,7 +317,6 @@ function getAdminSpreadsheetList() {
       spreadsheets: []
     };
 
-    console.log('🔍 getAdminSpreadsheetList: エラー結果', errorResult);
     return errorResult;
   }
 }
@@ -473,8 +463,6 @@ function publishApplication(publishConfig) {
       if (!updateResult || !updateResult.success) {
         console.error('Failed to update user config:', updateResult?.message || 'Unknown error');
         // エラーでも処理は継続
-      } else {
-        console.log('✅ User config updated successfully:', updateResult.updatedFields);
       }
     }
 
@@ -566,7 +554,6 @@ function getFormInfo(spreadsheetId, sheetName) {
  */
 function createForm(userId, config) {
   try {
-    console.log('AdminController.createForm: 開始', { userId, configKeys: Object.keys(config || {}) });
 
     if (!userId) {
       return {
@@ -591,7 +578,6 @@ function createForm(userId, config) {
     const result = configService.createForm(userId, config);
 
     if (result && result.success) {
-      console.log('AdminController.createForm: 成功', { formUrl: result.formUrl });
       return result;
     } else {
       console.error('AdminController.createForm: ConfigService失敗', result);
@@ -785,8 +771,7 @@ function reportClientError(errorInfo) {
       errorInfo
     };
 
-    // コンソールにログ出力（将来的には永続化）
-    console.log('Error Log Entry:', JSON.stringify(logEntry));
+    // エラーログを記録（将来的には永続化）
 
     return {
       success: true,
@@ -809,7 +794,6 @@ function reportClientError(errorInfo) {
  */
 function testForceLogoutRedirect() {
   try {
-    console.log('強制ログアウトテストが実行されました');
 
     return {
       success: true,

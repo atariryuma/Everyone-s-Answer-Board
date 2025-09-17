@@ -26,7 +26,6 @@ if (databaseCoreInitialized) return true;
 
 try {
 databaseCoreInitialized = true;
-console.log('✅ DatabaseCore initialized successfully');
 return true;
 } catch (error) {
 console.error('initDatabaseCore failed:', error.message);
@@ -71,7 +70,6 @@ throw new Error('データベース設定の取得に失敗しました');
  */
 function batchGetSheetsData(service, spreadsheetId, ranges) {
 try {
-console.log('DatabaseCore.batchGetSheetsData');
 
 if (!ranges || ranges.length === 0) {
 return { valueRanges: [] };
@@ -120,10 +118,6 @@ function getSheetsService() {
       }
     }
 
-    console.log('DatabaseCore: All required methods validated', {
-      methods: requiredMethods,
-      structure: 'service.spreadsheets.values'
-    });
 
     return service;
   } catch (error) {
@@ -195,10 +189,6 @@ function createSheetsService() {
                 sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
               }
 
-              console.log('DatabaseCore.update: Data updated successfully', {
-                sheetName,
-                rowsUpdated: values ? values.length : 0
-              });
 
               return { updatedCells: values ? values.length * values[0].length : 0 };
             } catch (error) {
@@ -224,11 +214,6 @@ function createSheetsService() {
                 const targetRange = sheet.getRange(targetRow, 1, values.length, values[0].length);
                 targetRange.setValues(values);
 
-                console.log('DatabaseCore.append: Data written successfully', {
-                  sheetName,
-                  targetRow,
-                  rowsWritten: values.length
-                });
               }
 
               return {
@@ -247,10 +232,6 @@ function createSheetsService() {
       }
     };
 
-    console.log('DatabaseCore', {
-      operation: 'createSheetsService',
-      serviceType: parsedKey.type || 'unknown'
-    });
 
     return service;
   } catch (error) {
@@ -388,7 +369,6 @@ function findUserByEmail(email) {
   if (!email) return null;
 
   try {
-    console.log('DatabaseOperations.findUserByEmail: 開始');
 
     const service = getSheetsService();
     const databaseId = getSecureDatabaseId();
@@ -443,7 +423,6 @@ function findUserById(userId) {
   if (!userId) return null;
 
   try {
-    console.log('DatabaseOperations.findUserById');
 
     const service = getSheetsService();
     const databaseId = getSecureDatabaseId();
@@ -503,7 +482,6 @@ function dbCreateUser(email, additionalData) {
   }
 
   try {
-    console.log('DatabaseOperations.createUser');
 
     // 重複チェック
     const existingUser = findUserByEmail(email);
@@ -544,11 +522,6 @@ function dbCreateUser(email, additionalData) {
       }
     });
 
-    console.log('DatabaseOperations', {
-      operation: 'createUser',
-      userId: `${userId.substring(0, 8)  }***`,
-      email: `${email.substring(0, 5)  }***`
-    });
 
     return userData;
   } catch (error) {
@@ -573,38 +546,29 @@ function updateUser(userId, updateData) {
   }
 
   try {
-    console.log('DatabaseOperations.updateUser', {
-      userId: `${userId.substring(0, 8)}***`,
-      updateDataKeys: Object.keys(updateData)
-    });
-
     // ユーザー検索
     const user = findUserById(userId);
     if (!user) {
       throw new Error('ユーザーが見つかりません');
     }
-    console.log('✅ User found:', `${userId.substring(0, 8)}***`, 'at row', user.rowIndex);
 
     // データベースID取得
     const dbSpreadsheetId = ServiceFactory.getProperties().getDatabaseSpreadsheetId();
     if (!dbSpreadsheetId) {
       throw new Error('DATABASE_SPREADSHEET_ID が設定されていません');
     }
-    console.log('✅ Database ID retrieved:', `${dbSpreadsheetId.substring(0, 10)  }***`);
 
     // スプレッドシート接続
     const dbSpreadsheet = ServiceFactory.getSpreadsheet().openById(dbSpreadsheetId);
     if (!dbSpreadsheet) {
       throw new Error('データベーススプレッドシートを開けません');
     }
-    console.log('✅ Database spreadsheet opened:', dbSpreadsheet.getName());
 
     // ユーザーシート取得
     const userSheet = dbSpreadsheet.getSheetByName('Users');
     if (!userSheet) {
       throw new Error('Usersシートが見つかりません');
     }
-    console.log('✅ Users sheet accessed');
 
     // ユーザー行を特定（findUserByIdから取得した行インデックス）
     const userRow = user.rowIndex;
@@ -630,7 +594,6 @@ function updateUser(userId, updateData) {
           try {
             userSheet.getRange(userRow, columnIndex).setValue(updateData[field]);
             updates.push(field);
-            console.log(`✅ Updated ${field} in column ${columnIndex}`);
           } catch (cellError) {
             console.error(`❌ Failed to update ${field}:`, cellError.message);
             throw new Error(`フィールド ${field} の更新に失敗: ${cellError.message}`);
@@ -643,11 +606,6 @@ function updateUser(userId, updateData) {
       }
     });
 
-    console.log('DatabaseOperations', {
-      operation: 'updateUser',
-      userId: `${userId.substring(0, 8)  }***`,
-      updatedFields: updates
-    });
 
     return { success: true, updatedFields: updates };
   } catch (error) {
@@ -701,7 +659,6 @@ function getAllUsers(options) {
   const activeOnly = options.activeOnly || false;
 
   try {
-    console.log('DatabaseOperations.getAllUsers');
 
     const service = getSheetsService();
     const databaseId = getSecureDatabaseId();

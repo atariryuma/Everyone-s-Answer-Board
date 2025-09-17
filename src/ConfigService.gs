@@ -42,7 +42,7 @@ function initConfigServiceZero() {
  * @returns {Object} デフォルト設定
  */
 function getDefaultConfig(userId) {
-  // 🚀 Zero-dependency: ServiceFactory不要（静的デフォルト値のため）
+  // 🚀 Zero-dependency: 静的デフォルト値を提供
   return {
     userId,
     setupStatus: 'pending',

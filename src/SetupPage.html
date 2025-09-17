@@ -38,7 +38,7 @@
     <?!= include('SharedTailwindConfig'); ?>
 
     <!-- Shared Styles and Utilities -->
-    <?!= include('UnifiedStyles'); ?>
+    <?!= include('UnifiedStyles.css'); ?>
   </head>
   <body>
     <div class="max-w-2xl mx-auto">
@@ -321,7 +321,7 @@
             }
           );
         } catch (error) {
-          showMessage(`❌ ${error.message}`, 'error');
+          showMessage('セットアップに失敗しました', 'error');
         } finally {
           // ボタン状態をリセット
           setupBtn.disabled = false;
@@ -344,7 +344,7 @@
             this.innerHTML = '🔍 システムテスト実行';
           })
           .withFailureHandler((error) => {
-            showMessage(`テスト実行に失敗しました: ${error.message || error}`, 'error');
+            showMessage('テストの実行に失敗しました', 'error');
             this.disabled = false;
             this.innerHTML = '🔍 システムテスト実行';
           })
@@ -418,7 +418,6 @@
               if (result.success && result.email) {
                 adminEmailField.value = result.email;
                 adminEmailField.style.borderColor = '#10b981'; // 緑色の境界線
-                showMessage(`📧 管理者メールアドレスを自動取得しました: ${result.email}`, 'info');
               } else {
                 showMessage(
                   '⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。',

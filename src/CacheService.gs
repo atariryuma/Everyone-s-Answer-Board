@@ -82,7 +82,6 @@ function setCacheValue(key, value, ttl = getCacheTTL().MEDIUM) {
     });
 
     cache.put(key, serializedValue, ttl);
-    console.log(`Cache SET: ${key} (TTL: ${ttl}s)`);
     return true;
   } catch (error) {
     console.error('setCacheValue error:', { key, error: error.message });
@@ -106,12 +105,10 @@ function getCacheValue(key) {
     const cached = cache.get(key);
 
     if (!cached) {
-      console.log(`Cache MISS: ${key}`);
       return null;
     }
 
     const parsed = JSON.parse(cached);
-    console.log(`Cache HIT: ${key}`);
     return parsed.data;
   } catch (error) {
     console.error('getCacheValue error:', { key, error: error.message });
@@ -133,7 +130,6 @@ function clearCacheValue(key) {
 
     const cache = CacheService.getScriptCache();
     cache.remove(key);
-    console.log(`Cache CLEAR: ${key}`);
     return true;
   } catch (error) {
     console.error('clearCacheValue error:', { key, error: error.message });
@@ -208,7 +204,6 @@ function invalidateUserCache(userId) {
       }
     });
 
-    console.log(`Cache INVALIDATE USER: ${userId} (${success ? 'SUCCESS' : 'PARTIAL'})`);
     return success;
   } catch (error) {
     console.error('invalidateUserCache error:', { userId, error: error.message });
@@ -228,14 +223,7 @@ function clearAllCache() {
     }
 
     const cache = CacheService.getScriptCache();
-    // GASのCacheServiceは全削除機能がないため、個別削除
-    const keys = getCacheKeys();
-    Object.values(keys).forEach(keyPrefix => {
-      // プレフィックスベースの削除は制限があるため、ログのみ
-      console.log(`Cache CLEAR PREFIX: ${keyPrefix}`);
-    });
-
-    console.log('Cache CLEAR ALL: Completed');
+    // GASのCacheServiceは全削除機能がないため、個別削除は制限あり
     return true;
   } catch (error) {
     console.error('clearAllCache error:', error.message);

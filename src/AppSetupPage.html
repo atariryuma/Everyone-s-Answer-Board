@@ -12,7 +12,7 @@
     <?!= include('SharedTailwindConfig'); ?>
     
     <!-- Shared Styles -->
-    <?!= include('UnifiedStyles'); ?>
+    <?!= include('UnifiedStyles.css'); ?>
     <script>
       // System admin access - no userId needed
       let __USER_ID__ = '';
@@ -155,7 +155,6 @@
               </button>
             </div>
 
-            <!-- System status monitoring removed - simplified system -->
           </div>
 
           <div class="grid md:grid-cols-1 gap-4">
@@ -450,12 +449,12 @@
               currentUserList = result.users;
               displayUserList(result.users);
             } else {
-              showMessage(`ユーザー一覧の取得に失敗しました: ${result.message}`, 'error');
+              showMessage('ユーザー情報を取得できません', 'error');
             }
             loadingDiv.classList.add('hidden');
           })
           .withFailureHandler((error) => {
-            showMessage(`エラー: ${error.message || error}`, 'error');
+            showMessage('ユーザー情報の取得に失敗しました', 'error');
             loadingDiv.classList.add('hidden');
           })
           .getAdminUsers(__USER_ID__);
@@ -576,17 +575,16 @@
         google.script.run
           .withSuccessHandler((result) => {
             if (result.status === 'success') {
-              showMessage(`✅ ${result.message}`, 'success');
               cancelDeletion();
               loadUserList(); // ユーザー一覧を再読み込み
             } else {
-              showMessage(`❌ ${result.message}`, 'error');
+              showMessage('削除に失敗しました', 'error');
             }
             confirmBtn.disabled = false;
             confirmBtn.textContent = '削除実行';
           })
           .withFailureHandler((error) => {
-            showMessage(`❌ 削除に失敗しました: ${error.message || error}`, 'error');
+            showMessage('削除に失敗しました', 'error');
             confirmBtn.disabled = false;
             confirmBtn.textContent = '削除実行';
           })
@@ -612,12 +610,12 @@
             if (result.status === 'success') {
               displayDeletionLogs(result.logs);
             } else {
-              showMessage(`ログの取得に失敗しました: ${result.message}`, 'error');
+              showMessage('ログを取得できません', 'error');
             }
             loadingDiv.classList.add('hidden');
           })
           .withFailureHandler((error) => {
-            showMessage(`エラー: ${error.message || error}`, 'error');
+            showMessage('ユーザー情報の取得に失敗しました', 'error');
             loadingDiv.classList.add('hidden');
           })
           .getLogs(__USER_ID__);
@@ -739,7 +737,6 @@
               saveDiagnosticToHistory(functionName, result, summary);
             } else {
               outputElement.textContent = `結果: ${result}`;
-              showMessage(`✅ ${functionName} が完了しました`, 'success');
             }
 
             // ボタンを復元
@@ -1019,15 +1016,14 @@
         google.script.run
           .withSuccessHandler(function(result) {
             if (result && result.success) {
-              showMessage('✅ ユーザー状態を変更しました', 'success');
               loadUserList();
               loadSystemStats();
             } else {
-              showMessage(`❌ ${result.message || '状態変更に失敗しました'}`, 'error');
+              showMessage('状態変更に失敗しました', 'error');
             }
           })
           .withFailureHandler(function(error) {
-            showMessage(`❌ エラー: ${error.message}`, 'error');
+            showMessage('状態変更に失敗しました', 'error');
           })
           .toggleUserActiveStatus(userId);
       }
@@ -1040,15 +1036,14 @@
         google.script.run
           .withSuccessHandler(function(result) {
             if (result && result.success) {
-              showMessage('✅ ボード状態を変更しました', 'success');
               loadUserList();
               loadSystemStats();
             } else {
-              showMessage(`❌ ${result.message || 'ボード状態変更に失敗しました'}`, 'error');
+              showMessage('ボード状態変更に失敗しました', 'error');
             }
           })
           .withFailureHandler(function(error) {
-            showMessage(`❌ エラー: ${error.message}`, 'error');
+            showMessage('状態変更に失敗しました', 'error');
           })
           .toggleUserBoardStatus(userId);
       }

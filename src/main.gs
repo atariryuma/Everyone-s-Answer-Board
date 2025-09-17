@@ -57,7 +57,6 @@ function doGet(e) {
     const params = e ? e.parameter : {};
     const mode = params.mode || 'main';
 
-    console.log('doGet: mode =', mode);
 
     // Simple routing
     switch (mode) {
@@ -84,12 +83,10 @@ function doGet(e) {
 
           // Auto-create admin user if not exists - with enhanced error handling
           if (!user && db && typeof db.createUser === 'function') {
-            console.log('Creating admin user in database:', email);
             try {
               const userService = ServiceFactory.getUserService();
               if (userService && typeof userService.createUser === 'function') {
                 user = userService.createUser(email);
-                console.log('Admin user created successfully:', user?.userId);
               } else {
                 console.warn('UserService.createUser not available, creating minimal user object');
                 user = {
@@ -183,7 +180,6 @@ function doGet(e) {
           return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
         }
 
-        console.log('appSetup access granted for system admin:', email);
         return HtmlService.createTemplateFromFile('AppSetupPage.html').evaluate();
       }
 
@@ -191,7 +187,6 @@ function doGet(e) {
         // Public view page - requires userId parameter
         const {userId} = params;
         if (!userId) {
-          console.warn('view mode accessed without userId parameter');
           return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
         }
 
@@ -200,7 +195,6 @@ function doGet(e) {
           const db = ServiceFactory.getDB();
           const user = db.findUserById(userId);
           if (!user) {
-            console.warn('view mode: user not found:', userId);
             const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
             errorTemplate.title = 'ユーザーが見つかりません';
             errorTemplate.message = '指定されたユーザーの回答ボードは存在しません。URLをご確認ください。';
@@ -214,12 +208,10 @@ function doGet(e) {
             try {
               config = JSON.parse(user.configJson);
             } catch (parseError) {
-              console.warn('view mode: config parse error', parseError);
             }
           }
 
           if (!config.appPublished) {
-            console.warn('view mode: board not published for user:', userId);
             const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
             errorTemplate.title = 'ボードは非公開です';
             errorTemplate.message = 'このユーザーの回答ボードは現在非公開設定になっています。';
@@ -228,7 +220,6 @@ function doGet(e) {
           }
 
           // Board is published - serve view page
-          console.log('view mode: serving published board for user:', userId);
           const template = HtmlService.createTemplateFromFile('Page.html');
           template.userId = userId;
           template.userEmail = user.userEmail || null;
@@ -286,7 +277,6 @@ function doPost(e) {
     const request = JSON.parse(postData);
     const {action} = request;
 
-    console.log('doPost: action =', action);
 
     // Verify authentication
     const email = getCurrentEmail();
@@ -475,7 +465,6 @@ function getUserConfig(userId) {
       const userService = ServiceFactory.getUserService();
       if (userService && userService.isSystemAdmin(email)) {
         try {
-          console.log('Auto-creating admin user for getUserConfig:', userId);
           const userByEmail = db.findUserByEmail(email);
           if (userByEmail && userByEmail.userId === userId) {
             user = userByEmail;
@@ -484,13 +473,8 @@ function getUserConfig(userId) {
           } else {
             console.warn('UserService.createUser not available for admin user creation');
           }
-          console.log('Admin user auto-created:', user?.userId);
         } catch (createError) {
           console.warn('Failed to auto-create admin user:', createError.message);
-          // For admin users, still provide basic access even if DB write fails
-          if (userService.isSystemAdmin(email)) {
-            console.log('Providing fallback access for system admin');
-          }
         }
       }
 
@@ -534,7 +518,6 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
     // Initialize database if needed
     try {
       const testAccess = ServiceFactory.getSpreadsheet().openById(databaseId);
-      console.log('Database access confirmed:', testAccess.getName());
     } catch (dbError) {
       console.warn('Database access test failed:', dbError.message);
     }
@@ -833,13 +816,6 @@ function deleteUser(userId, reason = '') {
     const result = db.deleteUser(userId);
 
     if (result.success) {
-      console.log('管理者によるユーザー削除:', {
-        admin: email,
-        deletedUser: targetUser.userEmail,
-        deletedUserId: userId,
-        reason: reason || 'No reason provided',
-        timestamp: new Date().toISOString()
-      });
 
       return {
         success: true,
@@ -1231,18 +1207,8 @@ function getSheetData(userId, options = {}) {
       return { success: false, message: 'ユーザーIDが必要です', data: [], headers: [], sheetName: '' };
     }
 
-    console.log('getSheetData: calling getUserSheetData', { userId, hasOptions: !!options });
-
     // Delegate to DataService using Zero-Dependency pattern
     const result = getUserSheetData(userId, options);
-
-    console.log('getSheetData: DataService result', {
-      success: result?.success,
-      hasData: !!result?.data,
-      dataLength: result?.data?.length || 0,
-      hasHeaders: !!result?.headers,
-      sheetName: result?.sheetName || 'undefined'
-    });
 
     // Return directly without wrapping - same pattern as admin panel getSheetList
     return result;
@@ -1262,7 +1228,6 @@ function getSheetData(userId, options = {}) {
  */
 function getPublishedSheetData(classFilter, sortOrder) {
   try {
-    console.log('getPublishedSheetData: 開始', { classFilter, sortOrder });
 
     // ユーザー認証とID取得
     const email = getCurrentEmail();
@@ -1319,19 +1284,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
       includeTimestamp: true
     };
 
-    console.log('getPublishedSheetData: getUserSheetData呼び出し', {
-      userId: user.userId,
-      options
-    });
-
     const result = getUserSheetData(user.userId, options);
-
-    console.log('getPublishedSheetData: getUserSheetData結果', {
-      success: result?.success,
-      hasData: !!result?.data,
-      dataLength: result?.data?.length || 0,
-      sheetName: result?.sheetName
-    });
 
     // フロントエンド期待形式に変換
     if (result && result.success && result.data) {
@@ -1367,12 +1320,6 @@ function getPublishedSheetData(classFilter, sortOrder) {
         showDetails: result.showDetails !== false
       };
 
-      console.log('getPublishedSheetData: 変換完了', {
-        header: transformedData.header,
-        sheetName: transformedData.sheetName,
-        dataCount: transformedData.data.length,
-        rowsCount: transformedData.rows.length
-      });
 
       // Ensure success property is set
       transformedData.success = true;
@@ -1407,24 +1354,13 @@ function getPublishedSheetData(classFilter, sortOrder) {
  */
 function columnAnalysis(spreadsheetId, sheetName, options = {}) {
   try {
-    console.log('main.columnAnalysis: columnAnalysisImpl呼び出し開始');
     // Call the actual implementation in DataService.gs
     const result = columnAnalysisImpl(spreadsheetId, sheetName, options);
-    console.log('main.columnAnalysis: columnAnalysisImpl結果', {
-      resultType: typeof result,
-      success: result?.success,
-      isNull: result === null,
-      isUndefined: result === undefined
-    });
     return result;
   } catch (error) {
     console.error('columnAnalysis error:', error.message);
     console.error('columnAnalysis stack:', error.stack);
     const exceptionResult = createExceptionResponse(error);
-    console.log('main.columnAnalysis: 例外レスポンス作成', {
-      exceptionType: typeof exceptionResult,
-      exceptionSuccess: exceptionResult?.success
-    });
     return exceptionResult;
   }
 }
@@ -1433,17 +1369,7 @@ function columnAnalysis(spreadsheetId, sheetName, options = {}) {
  * Legacy alias for backwards compatibility - analyzeColumns
  */
 function analyzeColumns(spreadsheetId, sheetName, options = {}) {
-  console.log('main.analyzeColumns: 呼び出し開始', {
-    spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
-    sheetName,
-    options
-  });
   const result = columnAnalysis(spreadsheetId, sheetName, options);
-  console.log('main.analyzeColumns: 結果取得', {
-    resultType: typeof result,
-    success: result?.success,
-    isNull: result === null
-  });
   return result;
 }
 

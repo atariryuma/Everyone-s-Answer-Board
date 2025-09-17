@@ -408,7 +408,6 @@ function refreshBoardData(userId, options = {}) {
 
 /**
  * Converted from Object.freeze format to flat functions following GAS best practices
- * - Removed Object.freeze wrapper
  * - Converted methods to function declarations
  * - Fixed internal this.handleXxx() references to direct function calls
  * - Maintained all existing functionality and comments

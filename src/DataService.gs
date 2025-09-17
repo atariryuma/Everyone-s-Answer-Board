@@ -166,7 +166,6 @@ function fetchSpreadsheetData(config, options = {}) {
         processedData = processedData.concat(batchProcessed);
         processedCount += batchSize;
 
-        console.log(`DataService.fetchSpreadsheetData: バッチ処理完了 ${processedCount}/${totalDataRows}`);
 
         // API制限対策: 100行毎に短い休憩
         if (processedCount % 1000 === 0) {
@@ -883,25 +882,17 @@ function getSpreadsheetList() {
   // 🚀 Zero-dependency: ServiceFactory経由で初期化
   const started = Date.now();
   try {
-    console.log('DataService.getSpreadsheetList: 開始 - GAS独立化完了');
-
     // ✅ GAS Best Practice: 直接API呼び出し（依存除去）
     const currentUser = Session.getActiveUser().getEmail();
-    console.log('DataService.getSpreadsheetList: ユーザー情報', { currentUser });
 
     // DriveApp直接使用（効率重視）
     const files = DriveApp.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
-    console.log('DataService.getSpreadsheetList: DriveApp検索完了', {
-      hasFiles: typeof files !== 'undefined',
-      hasNext: files.hasNext()
-    });
 
     // 権限テスト（必要最小限）
     let driveAccessOk = true;
     try {
       const testFiles = DriveApp.getFiles();
       driveAccessOk = testFiles.hasNext();
-      console.log('DataService.getSpreadsheetList: Drive権限OK');
     } catch (driveError) {
       console.error('DataService.getSpreadsheetList: Drive権限エラー', driveError.message);
       driveAccessOk = false;
@@ -921,8 +912,6 @@ function getSpreadsheetList() {
     let count = 0;
     const maxCount = 25; // GAS制限対応
 
-    console.log('DataService.getSpreadsheetList: スプレッドシート列挙開始');
-
     while (files.hasNext() && count < maxCount) {
       try {
         const file = files.next();
@@ -939,10 +928,6 @@ function getSpreadsheetList() {
       }
     }
 
-    console.log('DataService.getSpreadsheetList: 列挙完了', {
-      totalFound: count,
-      maxReached: count >= maxCount
-    });
 
     // ✅ google.script.run互換 - シンプル形式に最適化
     const response = {
@@ -955,12 +940,6 @@ function getSpreadsheetList() {
     const responseSize = JSON.stringify(response).length;
     const responseSizeKB = Math.round(responseSize / 1024 * 100) / 100;
 
-    console.log('DataService.getSpreadsheetList: 成功 - google.script.run最適化', {
-      spreadsheetsCount: spreadsheets.length,
-      executionTime: response.executionTime,
-      responseSizeKB,
-      responseValid: response !== null && typeof response === 'object'
-    });
 
     // ✅ google.script.run互換性チェック
     if (!response || typeof response !== 'object' || !Array.isArray(response.spreadsheets)) {
@@ -1035,11 +1014,6 @@ function getSpreadsheetList() {
 function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
   const started = Date.now();
   try {
-    console.log('DataService.columnAnalysis: 開始', {
-      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
-      sheetName: sheetName || 'null',
-      options
-    });
 
     // 🎯 GAS Best Practice: パラメータ検証を別関数に分離
     const paramValidation = validateSheetParams(spreadsheetId, sheetName);
@@ -1054,7 +1028,6 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
       if (options.useConfigJson && options.userId) {
         const configResult = restoreColumnConfig(options.userId, spreadsheetId, sheetName);
         if (configResult.success) {
-          console.log('DataService.columnAnalysis: configJson復元成功');
           return configResult;
         }
       }
@@ -1063,37 +1036,24 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
       if (options.basicOnly) {
         return getSheetHeaders(spreadsheetId, sheetName, started);
       }
-    } else {
-      console.log('DataService.columnAnalysis: フル分析を強制実行');
     }
 
     // 🎯 GAS Best Practice: スプレッドシート接続を別関数に分離
-    console.log('DataService.columnAnalysis: スプレッドシート接続開始');
     const connectionResult = connectToSheetInternal(spreadsheetId, sheetName);
-    console.log('DataService.columnAnalysis: 接続結果', { success: connectionResult?.success });
     if (!connectionResult.success) {
       console.error('DataService.columnAnalysis: スプレッドシート接続失敗');
       return connectionResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: データ取得を別関数に分離
-    console.log('DataService.columnAnalysis: データ取得開始');
     const dataResult = extractSheetHeaders(connectionResult.sheet);
-    console.log('DataService.columnAnalysis: データ取得結果', { success: dataResult?.success, headerCount: dataResult?.headers?.length });
     if (!dataResult.success) {
       console.error('DataService.columnAnalysis: データ取得失敗');
       return dataResult.errorResponse;
     }
 
     // 🎯 GAS Best Practice: 列分析を別関数に分離
-    console.log('DataService.columnAnalysis: 列分析開始');
     const analysisResult = detectColumnTypes(dataResult.headers, dataResult.sampleData);
-    console.log('DataService.columnAnalysis: 列分析結果', {
-      mappingKeys: Object.keys(analysisResult?.mapping?.mapping || {}),
-      confidenceKeys: Object.keys(analysisResult?.mapping?.confidence || {})
-    });
-
-    console.log('DataService.columnAnalysis: 最終結果構築開始');
 
     // google.script.run互換性: フロントエンド期待フォーマットに変換
     const frontendMapping = {
@@ -1108,15 +1068,6 @@ function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
       executionTime: `${Date.now() - started}ms`
     };
 
-    console.log('DataService.columnAnalysis: 正常終了', {
-      headersCount: dataResult.headers.length,
-      mappingKeys: Object.keys(analysisResult.mapping?.mapping || {}),
-      success: true,
-      finalResultType: typeof finalResult,
-      finalResultKeys: Object.keys(finalResult)
-    });
-
-    console.log('DataService.columnAnalysis: 戻り値準備完了', finalResult);
     return finalResult;
 
   } catch (error) {
@@ -1170,14 +1121,7 @@ function validateSheetParams(spreadsheetId, sheetName) {
  */
 function connectToSheetInternal(spreadsheetId, sheetName) {
   try {
-    console.log('DataService.connectToSheetInternal: スプレッドシート接続開始');
-    console.log('DataService.connectToSheetInternal: パラメータ確認', {
-      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null',
-      sheetName: sheetName || 'null'
-    });
-
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-    console.log('DataService.connectToSheetInternal: スプレッドシート接続成功');
 
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
@@ -1193,7 +1137,6 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
       };
     }
 
-    console.log('DataService.connectToSheetInternal: シート取得成功');
     return { success: true, sheet };
 
   } catch (error) {
@@ -1222,11 +1165,8 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
  */
 function extractSheetHeaders(sheet) {
   try {
-    console.log('DataService.extractSheetHeaders: シートサイズ取得開始');
     const lastColumn = sheet.getLastColumn();
     const lastRow = sheet.getLastRow();
-
-    console.log('DataService.extractSheetHeaders: シートサイズ', { lastColumn, lastRow });
 
     if (lastColumn === 0 || lastRow === 0) {
       return {
@@ -1242,19 +1182,13 @@ function extractSheetHeaders(sheet) {
     }
 
     // 🎯 GAS Best Practice: バッチでデータ取得
-    console.log('DataService.analyzeColumns: ヘッダー取得開始');
     const [headers] = sheet.getRange(1, 1, 1, lastColumn).getValues();
-    console.log('DataService.analyzeColumns: ヘッダー取得成功', { headersCount: headers.length });
 
     // サンプルデータを取得（最大5行）
     let sampleData = [];
     const sampleRowCount = Math.min(5, lastRow - 1);
     if (sampleRowCount > 0) {
-      console.log('DataService.extractSheetHeaders: サンプルデータ取得開始');
       sampleData = sheet.getRange(2, 1, sampleRowCount, lastColumn).getValues();
-      console.log('DataService.extractSheetHeaders: サンプルデータ取得成功', {
-        sampleRowCount: sampleData.length
-      });
     }
 
     return { success: true, headers, sampleData };
@@ -1327,9 +1261,7 @@ function restoreColumnConfig(userId, spreadsheetId, sheetName) {
  */
 function getSheetHeaders(spreadsheetId, sheetName, started) {
   try {
-    console.log('getSheetHeaders: ServiceFactory.getSpreadsheet()呼び出し開始');
     const spreadsheetService = ServiceFactory.getSpreadsheet();
-    console.log('getSheetHeaders: spreadsheetService取得結果', { isNull: spreadsheetService === null });
 
     if (!spreadsheetService) {
       console.error('getSheetHeaders: ServiceFactory.getSpreadsheet()がnullを返しました');
@@ -1381,10 +1313,6 @@ function getSheetHeaders(spreadsheetId, sheetName, started) {
  */
 function detectColumnTypes(headers, sampleData) {
   try {
-    console.log('DataService.detectColumnTypes: 高精度AI分析開始', {
-      headersCount: headers.length,
-      sampleDataCount: sampleData.length
-    });
 
     // 防御的プログラミング: 入力値検証
     if (!Array.isArray(headers) || headers.length === 0) {
@@ -1431,32 +1359,18 @@ function detectColumnTypes(headers, sampleData) {
 
     // 結果をマッピングに反映 - 設定可能な信頼度閾値
     const confidenceThreshold = 50; // Zero-dependency: 日本語ヘッダー対応で50%に調整
-    console.log(`DataService.detectColumnTypes: 信頼度閾値=${confidenceThreshold}% で検出開始`);
 
     Object.entries(analysisResults).forEach(([columnType, result]) => {
-      console.log(`DataService.detectColumnTypes: ${columnType}列分析結果 - index=${result.index}, confidence=${result.confidence}%, header="${headers[result.index] || 'undefined'}"`);
-
       if (result.confidence >= confidenceThreshold) {
         mapping.mapping[columnType] = result.index;
         mapping.confidence[columnType] = Math.round(result.confidence);
-        console.log(`✅ DataService.detectColumnTypes: 検出採用 - ${columnType}列 "${headers[result.index]}" at index ${result.index} (confidence: ${result.confidence}%)`);
       } else {
         // 閾値未満でも信頼度情報は記録（フロントエンド用）
         mapping.confidence[columnType] = Math.round(result.confidence);
-        console.log(`⚠️ DataService.detectColumnTypes: 信頼度不足 - ${columnType}列 "${headers[result.index] || 'undefined'}" (${result.confidence}% < ${confidenceThreshold}%)`);
       }
     });
 
     const result = { columns, mapping };
-
-    console.log('DataService.detectColumnTypes: 高精度分析完了', {
-      headersCount: headers.length,
-      columnsCount: columns.length,
-      mappingDetected: Object.keys(mapping.mapping).length,
-      mappingDetails: mapping.mapping,
-      confidenceDetails: mapping.confidence,
-      analysisMethod: '5次元統計分析'
-    });
 
     return result;
 
@@ -1481,11 +1395,6 @@ function detectColumnTypes(headers, sampleData) {
  * @returns {Object} 分析結果
  */
 function performHighPrecisionAnalysis(headers, sampleData) {
-  console.log('🔍 performHighPrecisionAnalysis: 開始', {
-    headersCount: headers.length,
-    sampleDataCount: sampleData.length,
-    headers
-  });
 
   const results = {
     answer: { index: -1, confidence: 0, factors: {} },
@@ -1497,28 +1406,18 @@ function performHighPrecisionAnalysis(headers, sampleData) {
   headers.forEach((header, index) => {
     if (!header) return;
 
-    console.log(`🔍 分析中: ヘッダー[${index}] = "${header}"`);
-
     const samples = sampleData.map(row => row && row[index]).filter(v => v != null && v !== '');
 
     // 各列タイプに対する分析を実行
     Object.keys(results).forEach(columnType => {
       const analysis = analyzeColumnForType(header, samples, index, headers, columnType);
-      console.log(`📊 ${columnType}分析結果[${index}]: 信頼度=${analysis.confidence}%, factors=`, analysis.factors);
 
       if (analysis.confidence > results[columnType].confidence) {
         results[columnType] = analysis;
-        console.log(`✅ ${columnType}の最優秀候補更新: ヘッダー[${index}]="${header}" (信頼度: ${analysis.confidence}%)`);
       }
     });
   });
 
-  console.log('🎯 performHighPrecisionAnalysis: 最終結果', {
-    answer: `index=${results.answer.index}, confidence=${results.answer.confidence}%`,
-    reason: `index=${results.reason.index}, confidence=${results.reason.confidence}%`,
-    class: `index=${results.class.index}, confidence=${results.class.confidence}%`,
-    name: `index=${results.name.index}, confidence=${results.name.confidence}%`
-  });
 
   return results;
 }
@@ -1591,24 +1490,6 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
 
   const finalConfidence = Math.min(Math.max(totalConfidence, 0), 100);
 
-  // 詳細デバッグログ（動的重み対応版）
-  if (headerScore > 0 || finalConfidence > 10) {
-    const weightProfile = headerScore >= 90 ? 'Japanese-Optimized' :
-                         headerScore >= 70 ? 'Pattern-Focused' : 'Balanced';
-
-    console.log(`🔬 詳細分析[${index}] "${header}" → ${targetType} [${weightProfile}]:`, {
-      headerLower,
-      headerScore: `${headerScore} (${(headerScore * headerWeight).toFixed(1)})`,
-      contentScore: `${contentScore} (${(contentScore * contentWeight).toFixed(1)})`,
-      linguisticScore: `${linguisticScore} (${(linguisticScore * linguisticWeight).toFixed(1)})`,
-      contextScore: `${contextScore} (${(contextScore * contextWeight).toFixed(1)})`,
-      semanticScore: `${semanticScore} (${(semanticScore * semanticWeight).toFixed(1)})`,
-      weights: `H:${(headerWeight*100).toFixed(0)}% C:${(contentWeight*100).toFixed(0)}% L:${(linguisticWeight*100).toFixed(0)}%`,
-      totalConfidence: totalConfidence.toFixed(1),
-      finalConfidence: finalConfidence.toFixed(1),
-      samplesCount: samples.length
-    });
-  }
 
   return {
     index,
@@ -1698,10 +1579,6 @@ function analyzeHeaderPattern(headerLower, targetType) {
     }
   }
 
-  // マッチした場合のデバッグログ
-  if (score > 0) {
-    console.log(`🎯 ヘッダーパターンマッチ: "${headerLower}" → ${targetType} (${matchedLevel}: ${matchedPattern}) = ${score}%`);
-  }
 
   return score;
 }

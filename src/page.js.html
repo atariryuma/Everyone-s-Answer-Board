@@ -184,7 +184,7 @@ class StudyQuestApp {
       checkAdmin: () => this.runGas('isAdmin'),
       clearCache: () => this.runGas('refreshBoardData', this.state.userId),
       validateData: () => this.validData(),
-      // 件数は公開取得から導出（不要な中間APIを使わない）
+      // 件数は公開取得から導出
       getDataCount: async (classFilter, sortOrder, adminMode) => {
         const resp = await this.gas.getPublishedSheetData(classFilter, sortOrder, adminMode);
         const rows = resp?.rows || resp?.data || [];
@@ -665,7 +665,7 @@ class StudyQuestApp {
         // Start polling for new answers
         this.startNewAnswerPolling();
         
-        // Sync monitoring removed - caused excessive warnings
+        // Start polling for new answers
       }, { timeout: 50 });
 
       // AdminPanelからのメッセージをリッスン  
@@ -959,7 +959,7 @@ class StudyQuestApp {
     }
   }
   
-  // Debug helper functions removed for production
+  // Layout adjustment functionality
   adjustLayout() {
     if (this.baseBodyPadding === undefined) {
       this.baseBodyPadding = parseFloat(getComputedStyle(this.elements.body).paddingBottom) || 0;
@@ -3887,8 +3887,16 @@ class StudyQuestApp {
               if (svgEl && rt) {
                 // Force icon update to ensure reacted state is visible
                 const newIcon = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
-                if (svgEl.outerHTML !== newIcon) {
-                  svgEl.outerHTML = newIcon;
+                // Always update to ensure consistency
+                svgEl.outerHTML = newIcon;
+
+                // Add visual feedback for state change
+                btn.style.transition = 'all 0.2s ease-out';
+                if (update.reacted) {
+                  btn.style.transform = 'scale(1.1)';
+                  setTimeout(() => {
+                    btn.style.transform = '';
+                  }, 200);
                 }
               }
 
@@ -3896,7 +3904,7 @@ class StudyQuestApp {
                                update.reaction === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
               btn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
               btn.classList.add(colorClass);
-              btn.classList.toggle('liked', update.reacted);
+              btn.classList.toggle('reacted', update.reacted);
               btn.setAttribute('aria-pressed', update.reacted.toString());
 
               btn.style.display = update.shouldDisplay ? 'flex' : 'none';
@@ -4016,7 +4024,7 @@ class StudyQuestApp {
       let highlightBtnHtml = '';
       // Highlight button condition check
       if (this.state.showHighlightToggle) {
-        const cls = safeData.highlight ? 'liked' : '';
+        const cls = safeData.highlight ? 'reacted' : '';
         const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする';
         highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + safeData.highlight + '" data-row-index="' + safeData.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', safeData.highlight) + '</button>';
       }
@@ -4044,7 +4052,7 @@ class StudyQuestApp {
       const reactionButtonsHtml = this.reactionTypes.map(rt => {
         try {
           const info = safeData.reactions && safeData.reactions[rt.key] ? safeData.reactions[rt.key] : { count: 0, reacted: false };
-          const cls = info.reacted ? 'liked' : '';
+          const cls = info.reacted ? 'reacted' : '';
           const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
           const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
           const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
@@ -5112,7 +5120,7 @@ class StudyQuestApp {
     }
   }
 
-  // Excessive sync monitoring system removed to prevent false warnings
+  // Data integrity management
 
   // 不整合の自動修復
   async fixSyncIssues(healthCheckResult) {
@@ -5163,7 +5171,7 @@ class StudyQuestApp {
     return { fixed, skipped };
   }
 
-  // Sync monitoring functions removed - caused excessive warnings
+  // State hash calculation utilities
 
   // アイテム状態のハッシュを計算（変更検出用）
   calculateStateHash(item) {
@@ -5635,17 +5643,26 @@ class StudyQuestApp {
           countEl.textContent = info.count;
         }
         
-        // アイコン更新
+        // アイコン更新（強制的に更新）
         const svgEl = modalBtn.querySelector('svg');
         if (svgEl) {
           svgEl.outerHTML = this.getIcon(rt.icon, 'w-5 h-5', info.reacted);
+
+          // モーダル内でも視覚フィードバック
+          modalBtn.style.transition = 'all 0.2s ease-out';
+          if (info.reacted) {
+            modalBtn.style.transform = 'scale(1.05)';
+            setTimeout(() => {
+              modalBtn.style.transform = '';
+            }, 200);
+          }
         }
         
         // スタイル更新
         const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
         modalBtn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
         modalBtn.classList.add(colorClass);
-        modalBtn.classList.toggle('liked', info.reacted);
+        modalBtn.classList.toggle('reacted', info.reacted);
         modalBtn.setAttribute('aria-pressed', info.reacted.toString());
         
         // aria-label更新
@@ -5701,13 +5718,22 @@ class StudyQuestApp {
         this.applyReactionStyles(card, item);
         const highlightBtn = card.querySelector('.highlight-btn');
         if (highlightBtn) {
-          highlightBtn.classList.toggle('liked', item.highlight);
+          highlightBtn.classList.toggle('reacted', item.highlight);
           highlightBtn.setAttribute('aria-pressed', String(item.highlight));
           const label = item.highlight ? 'ハイライトを解除する' : 'ハイライトする';
           highlightBtn.setAttribute('aria-label', label);
           const svgEl = highlightBtn.querySelector('svg');
           if (svgEl) {
             svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', item.highlight);
+
+            // ハイライトボタンにも視覚フィードバック
+            highlightBtn.style.transition = 'all 0.2s ease-out';
+            if (item.highlight) {
+              highlightBtn.style.transform = 'scale(1.05)';
+              setTimeout(() => {
+                highlightBtn.style.transform = '';
+              }, 200);
+            }
           }
         }
         let badge = card.querySelector('.highlight-badge');
@@ -5804,7 +5830,7 @@ class StudyQuestApp {
     // ハイライトボタンを追加
     let highlightBtnHtml = '';
     if (this.state.showHighlightToggle) {
-      const cls = data.highlight ? 'liked' : '';
+      const cls = data.highlight ? 'reacted' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
       highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
     }
@@ -5844,7 +5870,7 @@ class StudyQuestApp {
     // ハイライトボタンを更新
     let highlightBtnHtml = '';
     if (this.state.showHighlightToggle) {
-      const cls = data.highlight ? 'liked' : '';
+      const cls = data.highlight ? 'reacted' : '';
       const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
       highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
     }
@@ -5886,7 +5912,7 @@ class StudyQuestApp {
     this.elements.infoModalContainer.classList.remove('modal-fade');
     this.elements.infoModalCard.classList.remove('modal-scale');
     
-    // Note: localStorage 'introSeen' flag removed to allow modal to show on every board update
+    // Modal always shows on board updates for important information
     if (this.state.lastFocusedElement) {
       this.state.lastFocusedElement.focus();
     }
