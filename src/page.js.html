@@ -2792,18 +2792,10 @@ class StudyQuestApp {
     
   }
 
-  // Add these two methods
+  // Page.html uses independent skeleton loading - no overlay needed
   showLoadingOverlay(message = '') {
-    if (window.unifiedLoading) {
-      window.unifiedLoading.setLoading(true, { 
-        message: '', // No message for transparent overlay
-        type: 'transparent',
-        disableInteraction: true 
-      });
-    }
-    
     // Add loading-active class to body and container to disable render optimizations
-    // This prevents stacking context issues with the loading overlay
+    // This prevents stacking context issues during loading
     document.body.classList.add('loading-active');
     if (this.elements.answersContainer) {
       this.elements.answersContainer.classList.add('loading-active');
@@ -2815,10 +2807,6 @@ class StudyQuestApp {
   }
 
   hideLoadingOverlay() {
-    if (window.unifiedLoading) {
-      window.unifiedLoading.setLoading(false);
-    }
-    
     // Remove loading-active classes to restore render optimizations
     document.body.classList.remove('loading-active');
     if (this.elements.answersContainer) {
