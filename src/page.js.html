@@ -4473,6 +4473,9 @@ class StudyQuestApp {
       }
     }
 
+    // Current reaction state capture for rollback support
+    const currentState = item.reactions?.[reaction] || { count: 0, reacted: false };
+
     // Register this request in pending reactions with full tracking
     this.pendingReactions.set(reactionKey, {
       requestId,
