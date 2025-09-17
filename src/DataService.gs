@@ -1351,17 +1351,20 @@ function detectColumnTypes(headers, sampleData) {
     const mapping = { mapping: {}, confidence: {} };
     const analysisResults = performHighPrecisionAnalysis(headers, sampleData);
 
-    // 結果をマッピングに反映 - 設定可能な信頼度閾値
-    // 🎯 適応的閾値システム - 列種別最適化
-    const adaptiveThresholds = {
-      name: 65,    // 明確な列種別：「名前」「氏名」等
-      class: 65,   // 明確な列種別：「クラス」「組」等
-      answer: 55,  // 文脈依存列：質問文等
-      reason: 55   // 文脈依存列：理由説明等
+    // 結果をマッピングに反映 - 統一化された信頼度閾値
+    // 🎯 統一閾値システム - 予測可能性と一貫性向上
+    const UNIFIED_CONFIDENCE_THRESHOLD = 60; // 全列種別で統一
+
+    // 特殊ケース用の例外閾値（必要に応じて適用）
+    const specialCaseThresholds = {
+      // 高精度が特に重要な列種別（将来の拡張用）
+      // name: 65,    // 名前列は特に高精度が必要な場合
+      // class: 65    // クラス列は特に高精度が必要な場合
     };
 
     Object.entries(analysisResults).forEach(([columnType, result]) => {
-      const threshold = adaptiveThresholds[columnType] || 60; // デフォルト閾値
+      // 特殊ケース閾値がある場合はそれを使用、なければ統一閾値
+      const threshold = specialCaseThresholds[columnType] || UNIFIED_CONFIDENCE_THRESHOLD;
 
       if (result.confidence >= threshold) {
         mapping.mapping[columnType] = result.index;
@@ -1423,6 +1426,19 @@ function performHighPrecisionAnalysis(headers, sampleData) {
     });
   });
 
+  // 🎯 分析結果サマリー出力
+  console.info('🔍 AI列判定分析サマリー', {
+    '分析対象列数': headers.length,
+    'サンプル行数': sampleData.length,
+    '検出結果': Object.entries(results).map(([type, result]) => ({
+      列種別: type,
+      検出列: result.index >= 0 ? `インデックス ${result.index} ("${headers[result.index]}")` : '未検出',
+      信頼度: `${Math.round(result.confidence)}%`,
+      閾値達成: result.confidence >= 60 ? '✅' : '❌'
+    })),
+    '統一閾値': '60%',
+    '最高信頼度': `${Math.max(...Object.values(results).map(r => Math.round(r.confidence)))}%`
+  });
 
   return results;
 }
@@ -1445,30 +1461,30 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
   const headerScore = analyzeHeaderPattern(headerLower, targetType);
   factors.headerPattern = headerScore;
 
-  // 🎯 日本語完全一致対応: 高精度パターンマッチの重み配分を動的調整
+  // 🎯 最適化された重み配分システム - バランスと精度の両立
   let headerWeight, contentWeight, linguisticWeight, contextWeight, semanticWeight;
 
   if (headerScore >= 90) {
-    // 日本語完全一致 (95%等) - ヘッダーパターンを最重要視
-    headerWeight = 0.6;      // 30% → 60% (倍増)
-    contentWeight = 0.15;    // 25% → 15%
-    linguisticWeight = 0.1;  // 20% → 10%
-    contextWeight = 0.1;     // 15% → 10%
-    semanticWeight = 0.05;   // 10% → 5%
+    // 日本語完全一致 (95%等) - ヘッダー重視だがバランス維持
+    headerWeight = 0.5;      // 60% → 50% (過度の偏重を防止)
+    contentWeight = 0.2;     // 15% → 20% (コンテンツ分析も重視)
+    linguisticWeight = 0.15; // 10% → 15% (言語特徴を適度に活用)
+    contextWeight = 0.1;     // 10% → 10% (維持)
+    semanticWeight = 0.05;   // 5% → 5% (維持)
   } else if (headerScore >= 70) {
-    // 強パターンマッチ - ヘッダー重視
-    headerWeight = 0.45;
-    contentWeight = 0.2;
-    linguisticWeight = 0.15;
-    contextWeight = 0.125;
-    semanticWeight = 0.075;
+    // 強パターンマッチ - ヘッダー重視だが他要素も考慮
+    headerWeight = 0.4;      // 45% → 40% (バランス改善)
+    contentWeight = 0.25;    // 20% → 25% (コンテンツ分析強化)
+    linguisticWeight = 0.2;  // 15% → 20% (言語分析強化)
+    contextWeight = 0.1;     // 12.5% → 10% (簡素化)
+    semanticWeight = 0.05;   // 7.5% → 5% (簡素化)
   } else {
-    // 標準分析 - バランス型
-    headerWeight = 0.3;
-    contentWeight = 0.25;
-    linguisticWeight = 0.2;
-    contextWeight = 0.15;
-    semanticWeight = 0.1;
+    // 標準分析 - バランス型（微調整）
+    headerWeight = 0.3;      // 維持
+    contentWeight = 0.3;     // 25% → 30% (コンテンツ重視強化)
+    linguisticWeight = 0.25; // 20% → 25% (言語分析重視)
+    contextWeight = 0.1;     // 15% → 10% (簡素化)
+    semanticWeight = 0.05;   // 10% → 5% (簡素化)
   }
 
   totalConfidence += headerScore * headerWeight;
@@ -1495,6 +1511,31 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
 
   const finalConfidence = Math.min(Math.max(totalConfidence, 0), 100);
 
+  // 🎯 強化されたデバッグ出力 - 分析プロセスの可視化
+  console.info(`🤖 AI列分析詳細 [${targetType}] インデックス:${index} ヘッダー:"${header}"`, {
+    最終信頼度: Math.round(finalConfidence * 100) / 100,
+    '重み配分': {
+      'ヘッダー': `${(headerWeight * 100).toFixed(1)}%`,
+      'コンテンツ': `${(contentWeight * 100).toFixed(1)}%`,
+      '言語': `${(linguisticWeight * 100).toFixed(1)}%`,
+      'コンテキスト': `${(contextWeight * 100).toFixed(1)}%`,
+      'セマンティック': `${(semanticWeight * 100).toFixed(1)}%`
+    },
+    '各要素スコア': {
+      'ヘッダーパターン': Math.round(factors.headerPattern * 100) / 100,
+      'コンテンツ統計': Math.round(factors.contentStatistics * 100) / 100,
+      '言語パターン': Math.round(factors.linguisticPatterns * 100) / 100,
+      'コンテキスト': Math.round(factors.contextualClues * 100) / 100,
+      'セマンティック': Math.round(factors.semanticCharacteristics * 100) / 100
+    },
+    '加重後スコア': {
+      'ヘッダー貢献': Math.round(factors.headerPattern * headerWeight * 100) / 100,
+      'コンテンツ貢献': Math.round(factors.contentStatistics * contentWeight * 100) / 100,
+      '言語貢献': Math.round(factors.linguisticPatterns * linguisticWeight * 100) / 100,
+      'コンテキスト貢献': Math.round(factors.contextualClues * contextWeight * 100) / 100,
+      'セマンティック貢献': Math.round(factors.semanticCharacteristics * semanticWeight * 100) / 100
+    }
+  });
 
   return {
     index,
@@ -1608,24 +1649,34 @@ function analyzeHeaderPattern(headerLower, targetType) {
     }
   }
 
-  // 🎯 否定的パターンフィルタ - リアクション列誤判定防止
+  // 🎯 改善された否定的パターンフィルタ - 精密な誤判定防止
   const negativePatterns = [
-    // リアクション系
-    /^like$/i, /^いいね/, /^good$/i, /^great$/i,
-    /^understand$/i, /^なるほど/, /^わかった$/i, /^got it$/i,
-    /^curious$/i, /^もっと知りたい/, /^want to know/i, /^interested/i,
-    /^highlight$/i, /^ハイライト/, /^mark$/i, /^important$/i,
-    // 感情表現
-    /！$/, /!$/, /^すごい/, /^amazing/i, /^wow/i,
+    // リアクション系（完全一致重視）
+    { pattern: /^like$/i, penalty: 40 },
+    { pattern: /^いいね$/i, penalty: 40 },
+    { pattern: /^good$/i, penalty: 35 },
+    { pattern: /^understand$/i, penalty: 40 },
+    { pattern: /^なるほど$/i, penalty: 35 },
+    { pattern: /^curious$/i, penalty: 40 },
+    { pattern: /^highlight$/i, penalty: 30 },
+    { pattern: /^ハイライト$/i, penalty: 30 },
+    // 感情表現（部分一致）
+    { pattern: /！$/, penalty: 25 },
+    { pattern: /!$/, penalty: 25 },
+    { pattern: /^すごい/, penalty: 20 },
+    { pattern: /^amazing/i, penalty: 20 },
     // 単発アクション
-    /^yes$/i, /^no$/i, /^はい$/, /^いいえ$/
+    { pattern: /^yes$/i, penalty: 30 },
+    { pattern: /^no$/i, penalty: 30 },
+    { pattern: /^はい$/, penalty: 30 },
+    { pattern: /^いいえ$/, penalty: 30 }
   ];
 
-  // 否定的パターンにマッチした場合は大幅減点
-  for (const negPattern of negativePatterns) {
-    if (negPattern.test(headerLower)) {
-      score = Math.max(0, score - 50); // 50点減点（最低0点）
-      break;
+  // 否定的パターンにマッチした場合は適度な減点（段階的）
+  for (const negItem of negativePatterns) {
+    if (negItem.pattern.test(headerLower)) {
+      score = Math.max(0, score - negItem.penalty); // 段階的減点（最低0点）
+      break; // 最初にマッチしたパターンのみ適用
     }
   }
 
@@ -1784,7 +1835,7 @@ function analyzeContextualClues(header, index, allHeaders, targetType) {
 }
 
 /**
- * 5️⃣ セマンティック分析 - 意味的特徴を分析
+ * 5️⃣ 強化されたセマンティック分析 - 多次元意味的特徴分析
  */
 function analyzeSemanticCharacteristics(samples, targetType) {
   if (!samples || samples.length === 0) return 0;
@@ -1796,38 +1847,97 @@ function analyzeSemanticCharacteristics(samples, targetType) {
   const uniqueValues = [...new Set(textSamples)];
   const uniquenessRatio = uniqueValues.length / textSamples.length;
 
+  // 🎯 新機能: 文字列長分布分析
+  const lengths = textSamples.map(s => s.trim().length);
+  const avgLength = lengths.reduce((a, b) => a + b, 0) / lengths.length;
+  const lengthVariance = lengths.reduce((sum, len) => sum + Math.pow(len - avgLength, 2), 0) / lengths.length;
+  const lengthStdDev = Math.sqrt(lengthVariance);
+
+  // 🎯 新機能: キーワード密度分析
+  const keywordDensity = analyzeKeywordDensity(textSamples, targetType);
+
   switch (targetType) {
     case 'answer':
-      // 回答は選択肢的で重複が多い
+      // 回答は選択肢的で重複が多い + 長さが均一
       if (uniquenessRatio <= 0.3) score += 30;
       if (uniquenessRatio <= 0.5) score += 20;
+      // 文字列長の均一性（回答は短く均一な傾向）
+      if (avgLength <= 20 && lengthStdDev <= 10) score += 25;
       // 数値や選択肢パターン
       if (textSamples.some(s => /^[1-9]$/.test(s))) score += 25;
       if (textSamples.some(s => /^[A-D]$/.test(s))) score += 25;
+      // キーワード密度
+      score += keywordDensity;
       break;
 
     case 'reason':
-      // 理由は個別性が高く、重複が少ない
+      // 理由は個別性が高く、重複が少ない + 長さにバリエーション
       if (uniquenessRatio >= 0.8) score += 35;
       if (uniquenessRatio >= 0.6) score += 25;
+      // 文字列長のバリエーション（理由は長さが多様）
+      if (avgLength >= 30 && lengthStdDev >= 15) score += 20;
       // 説明的な言葉
       if (textSamples.some(s => s.includes('ため'))) score += 15;
+      if (textSamples.some(s => s.includes('から'))) score += 10;
+      // キーワード密度
+      score += keywordDensity;
       break;
 
     case 'class':
-      // クラス情報は限定的なパターン
+      // クラス情報は限定的なパターン + 短い
       if (uniquenessRatio <= 0.2) score += 40;
+      if (uniquenessRatio <= 0.4) score += 25;
+      // 短い文字列（クラス名は通常短い）
+      if (avgLength <= 15 && lengthStdDev <= 5) score += 30;
       if (textSamples.some(s => /\d/.test(s))) score += 20;
+      // キーワード密度
+      score += keywordDensity;
       break;
 
     case 'name':
-      // 名前は個別性が高い
+      // 名前は個別性が高い + 適度な長さで均一
       if (uniquenessRatio >= 0.7) score += 35;
       if (uniquenessRatio >= 0.5) score += 20;
+      // 名前の典型的な長さ（5-20文字程度）
+      if (avgLength >= 5 && avgLength <= 20 && lengthStdDev <= 8) score += 25;
+      // キーワード密度
+      score += keywordDensity;
       break;
   }
 
   return Math.min(score, 100);
+}
+
+/**
+ * キーワード密度分析（新機能）
+ * @param {Array} samples - サンプルデータ
+ * @param {string} targetType - 対象列タイプ
+ * @returns {number} キーワード密度スコア
+ */
+function analyzeKeywordDensity(samples, targetType) {
+  const sampleText = samples.join(' ').toLowerCase();
+  let densityScore = 0;
+
+  const keywords = {
+    answer: ['はい', 'いいえ', 'yes', 'no', '選択', '番', '思う', 'だと思', '考える'],
+    reason: ['だから', 'なぜなら', 'because', 'ため', '理由', '根拠', '経験', '感じ'],
+    class: ['年', '組', '班', 'class', 'group', 'チーム', 'クラス'],
+    name: ['さん', 'くん', 'ちゃん', '先生', '氏']
+  };
+
+  const typeKeywords = keywords[targetType] || [];
+  let matchCount = 0;
+
+  typeKeywords.forEach(keyword => {
+    if (sampleText.includes(keyword.toLowerCase())) {
+      matchCount++;
+    }
+  });
+
+  // キーワードマッチ率に基づくスコア（最大15点）
+  densityScore = Math.min(15, matchCount * 3);
+
+  return densityScore;
 }
 
 // ===========================================

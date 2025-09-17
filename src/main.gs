@@ -380,21 +380,90 @@ function getUser(infoType = 'email') {
  * Get user configuration - unified function for current user
  */
 function getConfig() {
-  try {
-    const email = getCurrentEmail();
-    if (!email) return createAuthError();
+  const startTime = new Date().toISOString();
+  console.log('=== getConfig START ===', { timestamp: startTime });
 
-    // Get user from database by email
+  try {
+    // 🎯 User authentication logging
+    const email = getCurrentEmail();
+    console.log('getConfig: User authentication', {
+      emailFound: !!email,
+      emailLength: email ? email.length : 0
+    });
+
+    if (!email) {
+      console.error('getConfig: Authentication failed');
+      return createAuthError();
+    }
+
+    // 🎯 Database access logging
     const db = ServiceFactory.getDB();
+    console.log('getConfig: Database access', {
+      dbAvailable: !!db,
+      dbType: typeof db,
+      findUserByEmailAvailable: !!(db && db.findUserByEmail)
+    });
+
+    if (!db) {
+      console.error('getConfig: Database not available');
+      return createErrorResponse('データベースアクセスエラー');
+    }
+
+    // 🎯 User lookup logging
+    console.log('getConfig: Starting user lookup', { email: email.substring(0, 5) + '***' });
     const user = db.findUserByEmail(email);
+    console.log('getConfig: User lookup result', {
+      userFound: !!user,
+      userId: user ? user.userId : null,
+      configJsonLength: user ? (user.configJson ? user.configJson.length : 0) : null,
+      userKeys: user ? Object.keys(user) : null
+    });
+
     if (!user) {
+      console.error('getConfig: User not found', { email: email.substring(0, 5) + '***' });
       return createUserNotFoundError();
     }
 
-    const config = user.configJson ? JSON.parse(user.configJson) : {};
+    // 🎯 Config parsing logging
+    let config = {};
+    try {
+      config = user.configJson ? JSON.parse(user.configJson) : {};
+      console.log('getConfig: Config parsed successfully', {
+        configKeys: Object.keys(config),
+        configSize: JSON.stringify(config).length
+      });
+    } catch (parseError) {
+      console.error('getConfig: Config parse error', {
+        parseError: parseError.message,
+        configJsonLength: user.configJson ? user.configJson.length : 0
+      });
+      config = {};
+    }
+
+    const endTime = new Date().toISOString();
+    const processingTime = new Date(endTime) - new Date(startTime);
+
+    console.log('=== getConfig SUCCESS ===', {
+      startTime,
+      endTime,
+      processingTimeMs: processingTime,
+      userId: user.userId,
+      configKeys: Object.keys(config)
+    });
+
     return { success: true, config, userId: user.userId };
   } catch (error) {
-    console.error('getConfig error:', error.message);
+    const endTime = new Date().toISOString();
+    const processingTime = new Date(endTime) - new Date(startTime);
+
+    console.error('=== getConfig ERROR ===', {
+      startTime,
+      endTime,
+      processingTimeMs: processingTime,
+      errorMessage: error.message,
+      errorStack: error.stack
+    });
+
     return createExceptionResponse(error);
   }
 }
