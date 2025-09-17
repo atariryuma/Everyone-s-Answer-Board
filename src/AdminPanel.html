@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <base target="_top" />
-    <title>StudyQuest 管理パネル</title>
+    <title>みんなの回答ボード 設定</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!-- GAS推奨: セキュリティヘッダー最優先 -->
     <?!= include('SharedSecurityHeaders'); ?>
@@ -255,7 +255,7 @@
       <div class="main-editor">
         <!-- ステータスヘッダー -->
         <header class="status-header glass-panel rounded-xl">
-          <h1 class="text-cyan-400 font-bold">StudyQuest 管理パネル</h1>
+          <h1 class="text-cyan-400 font-bold">みんなの回答ボード 設定</h1>
         </header>
 
         <!-- セットアップ進捗 -->
@@ -340,8 +340,8 @@
               </div>
             </div>
             <div class="action-buttons">
-              <button id="url-validate" class="btn-secondary" type="button">✅ URL検証</button>
-              <button id="connect-url-source" class="btn-primary" type="button">接続</button>
+              <button id="url-validate" class="btn btn-secondary" type="button">✅ URL検証</button>
+              <button id="connect-url-source" class="btn btn-primary" type="button">接続</button>
             </div>
           </div>
 
@@ -387,8 +387,8 @@
               </div>
             </div>
             <div class="action-buttons">
-              <button id="refresh-data" class="btn-secondary" type="button">🔄 更新</button>
-              <button id="connect-source" class="btn-primary" type="button">接続</button>
+              <button id="refresh-data" class="btn btn-secondary" type="button">🔄 更新</button>
+              <button id="connect-source" class="btn btn-primary" type="button">接続</button>
             </div>
           </div>
         </section>
@@ -463,7 +463,7 @@
           </div>
 
           <div class="action-buttons">
-            <button id="verify-mapping" class="btn-primary" type="button">設定を確認</button>
+            <button id="verify-mapping" class="btn btn-primary" type="button">設定を確認</button>
           </div>
         </section>
 
@@ -496,8 +496,8 @@
           </div>
           
           <div class="action-buttons">
-            <button id="save-draft" class="btn-secondary" type="button">下書き保存</button>
-            <button id="publish-now" class="btn-primary" type="button">今すぐ公開</button>
+            <button id="save-draft" class="btn btn-secondary" type="button">下書き保存</button>
+            <button id="publish-now" class="btn btn-primary" type="button">今すぐ公開</button>
           </div>
         </section>
       </div>
@@ -657,7 +657,7 @@
           <div class="flex items-center gap-2 flex-shrink-0">
             <button
               id="copyViewUrlBtn"
-              class="btn-secondary text-sm px-3 py-2"
+              class="btn btn-secondary text-sm px-3 py-2"
               title="閲覧用URLをコピー（共有用）"
               type="button"
             >
@@ -665,7 +665,7 @@
             </button>
             <button
               id="openBoardBtn"
-              class="btn-primary text-sm px-3 py-2"
+              class="btn btn-primary text-sm px-3 py-2"
               title="回答ボードを開く"
               type="button"
             >
@@ -673,7 +673,7 @@
             </button>
             <button
               id="refreshBoardInfo"
-              class="btn-secondary text-sm px-2 py-2"
+              class="btn btn-secondary text-sm px-2 py-2"
               title="情報を更新"
               type="button"
             >
