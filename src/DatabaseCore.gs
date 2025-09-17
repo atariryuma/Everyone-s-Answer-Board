@@ -417,7 +417,9 @@ function findUserByEmail(email) {
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (row[emailIndex] && row[emailIndex].toLowerCase() === email.toLowerCase()) {
-        return rowToUser(row, headers);
+        const user = rowToUser(row, headers);
+        user.rowIndex = i + 1; // スプレッドシートの行番号（1ベース）
+        return user;
       }
     }
 
@@ -470,7 +472,9 @@ function findUserById(userId) {
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
       if (row[userIdIndex] === userId) {
-        return rowToUser(row, headers);
+        const user = rowToUser(row, headers);
+        user.rowIndex = i + 1; // スプレッドシートの行番号（1ベース）
+        return user;
       }
     }
 
@@ -569,31 +573,90 @@ function updateUser(userId, updateData) {
   }
 
   try {
-    console.log('DatabaseOperations.updateUser');
+    console.log('DatabaseOperations.updateUser', {
+      userId: `${userId.substring(0, 8)}***`,
+      updateDataKeys: Object.keys(updateData)
+    });
 
     // ユーザー検索
     const user = findUserById(userId);
     if (!user) {
       throw new Error('ユーザーが見つかりません');
     }
+    console.log('✅ User found:', `${userId.substring(0, 8)}***`, 'at row', user.rowIndex);
 
-    // 実際の更新処理は省略（行特定と更新）
-    // 実装時はrowIndexを特定して更新
+    // データベースID取得
+    const dbSpreadsheetId = ServiceFactory.getProperties().getDatabaseSpreadsheetId();
+    if (!dbSpreadsheetId) {
+      throw new Error('DATABASE_SPREADSHEET_ID が設定されていません');
+    }
+    console.log('✅ Database ID retrieved:', `${dbSpreadsheetId.substring(0, 10)  }***`);
+
+    // スプレッドシート接続
+    const dbSpreadsheet = ServiceFactory.getSpreadsheet().openById(dbSpreadsheetId);
+    if (!dbSpreadsheet) {
+      throw new Error('データベーススプレッドシートを開けません');
+    }
+    console.log('✅ Database spreadsheet opened:', dbSpreadsheet.getName());
+
+    // ユーザーシート取得
+    const userSheet = dbSpreadsheet.getSheetByName('Users');
+    if (!userSheet) {
+      throw new Error('Usersシートが見つかりません');
+    }
+    console.log('✅ Users sheet accessed');
+
+    // ユーザー行を特定（findUserByIdから取得した行インデックス）
+    const userRow = user.rowIndex;
+
+    // 列のマッピング（Users シートの構造に基づく）
+    const columnMapping = {
+      'userId': 1,       // A列
+      'userEmail': 2,    // B列
+      'isActive': 3,     // C列
+      'configJson': 4,   // D列
+      'lastModified': 5  // E列
+    };
+
+    // 許可されたフィールドのみ更新
+    const allowedFields = ['userEmail', 'isActive', 'configJson', 'lastModified', 'updatedAt'];
+    const updates = [];
+
+    // 各フィールドを対応する列に更新
+    Object.keys(updateData).forEach(field => {
+      if (allowedFields.includes(field)) {
+        const columnIndex = columnMapping[field];
+        if (columnIndex) {
+          try {
+            userSheet.getRange(userRow, columnIndex).setValue(updateData[field]);
+            updates.push(field);
+            console.log(`✅ Updated ${field} in column ${columnIndex}`);
+          } catch (cellError) {
+            console.error(`❌ Failed to update ${field}:`, cellError.message);
+            throw new Error(`フィールド ${field} の更新に失敗: ${cellError.message}`);
+          }
+        } else {
+          console.warn(`⚠️ Column mapping not found for field: ${field}`);
+        }
+      } else {
+        console.warn(`⚠️ Field not allowed: ${field}`);
+      }
+    });
 
     console.log('DatabaseOperations', {
       operation: 'updateUser',
       userId: `${userId.substring(0, 8)  }***`,
-      updatedFields: Object.keys(updateData)
+      updatedFields: updates
     });
 
-    return true;
+    return { success: true, updatedFields: updates };
   } catch (error) {
     console.error('DatabaseOperations', {
       operation: 'updateUser',
       userId: typeof userId === 'string' && userId ? `${userId.substring(0, 8)  }***` : `[${  typeof userId  }]`,
-      error: error.message
+      error: error.message || 'Unknown error'
     });
-    throw error;
+    return { success: false, message: error.message || 'Unknown error' };
   }
 }
 

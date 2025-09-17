@@ -592,6 +592,32 @@ function hasCoreSystemProps() {
 // 🔧 ヘルパー関数（依存関数）
 // ===========================================
 
+/**
+ * 動的questionText取得（configJson最適化対応）
+ * headers配列とcolumnMappingから実際の問題文を動的取得
+ * @param {Object} config - ユーザー設定オブジェクト
+ * @returns {string} 問題文テキスト
+ */
+function getQuestionText(config) {
+  try {
+    const answerIndex = config?.columnMapping?.mapping?.answer;
+    if (typeof answerIndex === 'number' && config?.headers?.[answerIndex]) {
+      const questionText = config.headers[answerIndex];
+      if (questionText && typeof questionText === 'string' && questionText.trim()) {
+        return questionText.trim();
+      }
+    }
+
+    if (config?.formTitle && typeof config.formTitle === 'string' && config.formTitle.trim()) {
+      return config.formTitle.trim();
+    }
+
+    return 'Everyone\'s Answer Board';
+  } catch (error) {
+    console.error('getQuestionText error:', error.message);
+    return 'Everyone\'s Answer Board';
+  }
+}
 
 /**
  * システム管理者確認

@@ -37,7 +37,7 @@ class DeploymentValidator {
     console.log('🔗 依存関係チェック...');
 
     const dependencyMap = {
-      'main.gs': ['UserService', 'ConfigService', 'DataService', 'SecurityService'],
+      'main.gs': ['UserService', 'ConfigService', 'DataService'],
       'UserService.gs': ['ServiceFactory'],
       'ConfigService.gs': ['ServiceFactory'],
       'DataService.gs': ['ServiceFactory'],
@@ -103,15 +103,13 @@ class DeploymentValidator {
     const requiredServices = [
       'UserService.gs',
       'ConfigService.gs',
-      'DataService.gs',
-      'SecurityService.gs'
+      'DataService.gs'
     ];
 
     const requiredMethods = {
       'UserService': ['getCurrentEmail', 'getCurrentUserInfo', 'isSystemAdmin'],
-      'ConfigService': ['getUserConfig', 'hasCoreSystemProps', 'isSystemSetup'],
-      'DataService': ['getUserSheetData', 'processReaction', 'processRawData'],
-      'SecurityService': ['checkSecurityUserPermission', 'validateUserData']
+      'ConfigService': ['hasCoreSystemProps', 'isSystemSetup'],
+      'DataService': ['getUserSheetData', 'processReaction', 'processRawData']
     };
 
     for (const service of requiredServices) {

@@ -395,14 +395,23 @@ function saveDraftConfiguration(config) {
       return createUserNotFoundError();
     }
 
-    // 設定をJSONで保存
+    // 設定をJSONで保存（重複フィールド削除）
+    delete config.setupComplete;
+    delete config.isDraft;
+    delete config.questionText;
+    config.lastAccessedAt = new Date().toISOString();
+    config.lastModified = new Date().toISOString();
+
     const updatedUser = {
       ...user,
       configJson: JSON.stringify(config),
       updatedAt: new Date().toISOString()
     };
 
-    db.updateUser(user.userId, updatedUser);
+    const updateResult = db.updateUser(user.userId, updatedUser);
+    if (!updateResult.success) {
+      return createErrorResponse(updateResult.message || 'データベース更新に失敗しました');
+    }
 
     return {
       success: true,
@@ -422,22 +431,57 @@ function saveDraftConfiguration(config) {
  */
 function publishApplication(publishConfig) {
   try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return { success: false, message: 'ユーザー認証が必要です' };
+    }
+
+    const publishedAt = new Date().toISOString();
+
     // 🎯 Zero-dependency: 直接PropertiesServiceでアプリ公開
     const props = ServiceFactory.getProperties();
-
-    // アプリケーション状態をアクティブに変更
     props.setProperty('APPLICATION_STATUS', 'active');
-    props.setProperty('PUBLISHED_AT', new Date().toISOString());
+    props.setProperty('PUBLISHED_AT', publishedAt);
 
     // 公開設定を保存
     if (publishConfig) {
       props.setProperty('PUBLISH_CONFIG', JSON.stringify(publishConfig));
     }
 
+    // ユーザーの設定も更新
+    const db = ServiceFactory.getDB();
+    const user = db.findUserByEmail(email);
+    if (user) {
+      const currentConfig = user.configJson ? JSON.parse(user.configJson) : {};
+      const updatedConfig = {
+        ...currentConfig,
+        ...publishConfig,
+        appPublished: true,
+        publishedAt,
+        setupStatus: 'completed',
+        isDraft: false,
+        lastModified: publishedAt
+      };
+
+      // データベースを更新
+      const updateResult = db.updateUser(user.userId, {
+        configJson: JSON.stringify(updatedConfig),
+        lastModified: publishedAt,
+        updatedAt: publishedAt
+      });
+
+      if (!updateResult || !updateResult.success) {
+        console.error('Failed to update user config:', updateResult?.message || 'Unknown error');
+        // エラーでも処理は継続
+      } else {
+        console.log('✅ User config updated successfully:', updateResult.updatedFields);
+      }
+    }
+
     return {
       success: true,
       message: 'アプリケーションが正常に公開されました',
-      publishedAt: new Date().toISOString()
+      publishedAt
     };
   } catch (error) {
     console.error('publishApplication error:', error);

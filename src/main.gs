@@ -1,4 +1,4 @@
-/* global DB */
+/* global DB, getQuestionText */
 /**
  * main.gs - Simplified Application Entry Points
  *
@@ -719,7 +719,12 @@ function setAppStatus(isActive) {
     }
     config.lastModified = new Date().toISOString();
 
-    // データベースに保存
+    // データベースに保存（重複フィールド削除）
+    delete config.setupComplete;
+    delete config.isDraft;
+    delete config.questionText;
+    config.lastAccessedAt = new Date().toISOString();
+
     const updatedUser = {
       ...user,
       configJson: JSON.stringify(config),
@@ -915,6 +920,11 @@ function toggleUserBoardStatus(targetUserId) {
     }
     config.lastModified = new Date().toISOString();
 
+    delete config.setupComplete;
+    delete config.isDraft;
+    delete config.questionText;
+    config.lastAccessedAt = new Date().toISOString();
+
     const updatedUser = {
       ...targetUser,
       configJson: JSON.stringify(config),
@@ -978,6 +988,11 @@ function clearActiveSheet(targetUserId) {
     config.appPublished = false;
     config.publishedAt = null;
     config.lastModified = new Date().toISOString();
+
+    delete config.setupComplete;
+    delete config.isDraft;
+    delete config.questionText;
+    config.lastAccessedAt = new Date().toISOString();
 
     const updatedUser = {
       ...targetUser,
@@ -1176,7 +1191,7 @@ function getBoardInfo() {
       success: true,
       isActive: appPublished,
       appPublished,
-      questionText: config.questionText || config.boardTitle || 'Everyone\'s Answer Board',
+      questionText: getQuestionText(config),
       urls: {
         view: `${baseUrl}?mode=view&userId=${user.userId}`,
         admin: `${baseUrl}?mode=admin&userId=${user.userId}`
@@ -1512,6 +1527,12 @@ function saveConfig(userId, config) {
     if (!user) {
       return { success: false, message: 'User not found' };
     }
+
+    delete config.setupComplete;
+    delete config.isDraft;
+    delete config.questionText;
+    config.lastAccessedAt = new Date().toISOString();
+    config.lastModified = new Date().toISOString();
 
     const updatedUser = {
       ...user,

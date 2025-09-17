@@ -68,7 +68,7 @@ function getHelperColumnIndex(config, columnType) {
  * @returns {Object} 標準エラーレスポンス
  */
 function createErrorResponse(message, data = null) {
-  return { success: false, message, ...(data && { data }) };
+  return { success: false, message, error: message, ...(data && { data }) };
 }
 
 /**

@@ -972,11 +972,11 @@
         currentStep = 3; // 列設定完了
       }
 
-      if (config.setupComplete === true) {
+      if (config.setupStatus === 'completed') {
         currentStep = 3; // セットアップ完了確定
       }
 
-      console.log('📈 Progress update:', { currentStep, hasSheet: !!(config.sheetName), hasMapping: !!(config.columnMapping), setupComplete: config.setupComplete });
+      console.log('📈 Progress update:', { currentStep, hasSheet: !!(config.sheetName), hasMapping: !!(config.columnMapping), setupComplete: config.setupStatus === 'completed' });
       updateProgress(currentStep);
     } catch (error) {
       console.warn('updateProgressFromConfig error:', error);
@@ -1128,7 +1128,9 @@
     // 🚀 列マッピング完了状態の判定
     const hasColumnMapping = !!(config.columnMapping && config.columnMapping.mapping);
     const hasSpreadsheetConfig = !!(config.spreadsheetId && config.sheetName);
-    const isSetupComplete = config.setupComplete === true;
+    // setupStatusまたは、実際にマッピング要件が満たされている場合も完了とみなす
+    const isSetupComplete = config.setupStatus === 'completed' ||
+                          (hasSpreadsheetConfig && hasColumnMapping && config.setupStatus === 'completed');
 
     console.log('📋 ボタン状態更新:', {
       hasColumnMapping,
@@ -2640,13 +2642,26 @@
 
     // 🔧 根本的修正: 現在の完全な設定を取得してからpublishApplicationを呼び出し
     google.script.run
-      .withSuccessHandler(function (currentConfig) {
-        if (!currentConfig || !currentConfig.spreadsheetId) {
+      .withSuccessHandler(function (response) {
+        console.log('📋 publishApp: getConfig結果:', response);
+
+        // getConfigは { success: true, config: {...}, userId: "..." } の形式で返す
+        if (!response || !response.success || !response.config || !response.config.spreadsheetId) {
+          console.error('❌ publishApp: 設定データが不完全:', {
+            hasResponse: !!response,
+            success: response?.success,
+            hasConfig: !!(response?.config),
+            hasSpreadsheetId: !!(response?.config?.spreadsheetId),
+            configKeys: response?.config ? Object.keys(response.config) : null
+          });
           showError('まずデータソースを設定してください。');
           setLoading(false);
           RequestGate.exit('publishApp');
           return;
         }
+
+        // 実際の設定データを取得
+        const currentConfig = response.config;
 
         // 🚀 最小限公開設定（送信データ最適化）
         const publishConfig = {
@@ -2676,7 +2691,39 @@
             if (result.success) {
               showSuccess('アプリを公開しました！');
               updatePublishStatus('published');
-              updateResourceButtons(result.config);
+
+              // 公開後に最新の設定を取得してボタン状態を更新
+              console.log('📋 公開成功 - 最新設定を取得してボタン状態を更新');
+
+              // 公開が成功したので、最新の設定を取得し直してボタン状態を更新
+              google.script.run
+                .withSuccessHandler(function(latestConfigResponse) {
+                  console.log('📋 最新設定取得結果:', latestConfigResponse);
+                  if (latestConfigResponse && latestConfigResponse.success && latestConfigResponse.config) {
+                    updateResourceButtons(latestConfigResponse.config);
+                  } else {
+                    // フォールバック: 手動で設定を構築
+                    const updatedConfig = {
+                      ...currentConfig,
+                      appPublished: true,
+                      publishedAt: result.publishedAt || new Date().toISOString(),
+                      setupComplete: true
+                    };
+                    updateResourceButtons(updatedConfig);
+                  }
+                })
+                .withFailureHandler(function(error) {
+                  console.warn('最新設定取得に失敗:', error);
+                  // フォールバック: 手動で設定を構築
+                  const updatedConfig = {
+                    ...currentConfig,
+                    appPublished: true,
+                    publishedAt: result.publishedAt || new Date().toISOString(),
+                    setupComplete: true
+                  };
+                  updateResourceButtons(updatedConfig);
+                })
+                .getConfig();
 
               // ✅ 公開成功後：即座にフッターを更新（UX向上）
               setTimeout(() => {
