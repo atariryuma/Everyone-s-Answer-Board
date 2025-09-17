@@ -112,11 +112,29 @@ function createSheetsService() {
 
     // サービスアカウント経由でSpreadsheetApp使用（GAS環境での実装）
     const sheetsServiceObject = {
+      openById(spreadsheetId) {
+        try {
+          const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+          // 自動的にサービスアカウントをエディターとして追加
+          const serviceAccountEmail = getServiceAccountEmail();
+          if (serviceAccountEmail) {
+            try {
+              spreadsheet.addEditor(serviceAccountEmail);
+            } catch (permError) {
+              console.warn('Service account editor registration failed:', permError.message);
+            }
+          }
+          return spreadsheet;
+        } catch (error) {
+          console.error('getSheetsService.openById error:', error.message);
+          throw error;
+        }
+      },
       spreadsheets: {
         values: {
           get(params) {
             try {
-              const spreadsheet = getSheetsService().openById(params.spreadsheetId);
+              const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
               const [sheetName] = params.range.split('!');
               const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
               const values = sheet.getDataRange().getValues();
@@ -129,7 +147,7 @@ function createSheetsService() {
 
           update(params) {
             try {
-              const spreadsheet = getSheetsService().openById(params.spreadsheetId);
+              const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
               const [sheetName] = params.range.split('!');
               const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
 
@@ -149,7 +167,7 @@ function createSheetsService() {
 
           append(params) {
             try {
-              const spreadsheet = getSheetsService().openById(params.spreadsheetId);
+              const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
               const [sheetName] = params.range.split('!');
               const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
 
@@ -237,7 +255,7 @@ details: globalDatabaseId ? 'Database ID configured' : 'Database ID missing'
 
 // スプレッドシートアクセス確認
 try {
-const spreadsheet = getSheetsService().openById(globalDatabaseId);
+const spreadsheet = SpreadsheetApp.openById(globalDatabaseId);
 const sheet = spreadsheet.getSheetByName('Users');
 results.checks.push({
 name: 'Database Access',

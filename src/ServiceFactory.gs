@@ -163,7 +163,7 @@ function getSpreadsheet() {
   return {
     openById(id) {
       try {
-        return getSheetsService().openById(id);
+        return SpreadsheetApp.openById(id);
       } catch (error) {
         console.error('ServiceFactory.getSpreadsheet.openById: Error opening spreadsheet:', error.message);
         return null;
