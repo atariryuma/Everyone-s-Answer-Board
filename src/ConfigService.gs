@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, URL, DatabaseOperations, validateUrl, createErrorResponse, validateSpreadsheetId */
+/* global ServiceFactory, URL, DatabaseOperations, validateUrl, createErrorResponse, validateSpreadsheetId, getSheetsService */
 
 // ===========================================
 // 🔧 Zero-Dependency ConfigService (ServiceFactory版)
@@ -882,7 +882,7 @@ function getFormInfo(spreadsheetId, sheetName) {
 
     let spreadsheet;
     try {
-      spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      spreadsheet = getSheetsService().openById(spreadsheetId);
     } catch (accessError) {
       return buildFailure('SPREADSHEET_NOT_FOUND', {
         diagnostics: {

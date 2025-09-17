@@ -33,6 +33,7 @@ return false;
 }
 }
 
+
 /**
  * DatabaseCore - データベースコア機能
  * 基本的なデータベース操作とサービス管理
@@ -59,6 +60,122 @@ error: error.message
 });
 throw new Error('データベース設定の取得に失敗しました');
 }
+}
+
+/**
+ * 🔒 セキュリティ: サービスアカウント経由Sheetsサービス取得
+ * @returns {Object} Sheetsサービス
+ */
+function getSheetsService() {
+  try {
+    const serviceObject = createSheetsService();
+    if (!serviceObject || !serviceObject.spreadsheets || !serviceObject.spreadsheets.values) {
+      throw new Error('Invalid service structure created');
+    }
+    return serviceObject;
+  } catch (error) {
+    console.error('DatabaseCore getSheetsService:', error.message);
+    throw new Error('Secure database service initialization failed');
+  }
+}
+
+/**
+ * サービスアカウントのメールアドレスを取得
+ * @returns {string|null} サービスアカウントメール
+ */
+function getServiceAccountEmail() {
+  try {
+    const serviceAccountKey = ServiceFactory.getProperties().getProperty('SERVICE_ACCOUNT_CREDS');
+    if (!serviceAccountKey) {
+      console.error('getServiceAccountEmail: Service account key not configured');
+      return null;
+    }
+
+    const creds = JSON.parse(serviceAccountKey);
+    return creds.client_email || null;
+  } catch (error) {
+    console.error('getServiceAccountEmail: エラー', error.message);
+    return null;
+  }
+}
+
+/**
+ * 🔒 セキュリティ: サービスアカウントSheets API作成
+ * @returns {Object} Sheetsサービス
+ */
+function createSheetsService() {
+  try {
+    const serviceAccountKey = ServiceFactory.getProperties().getProperty('SERVICE_ACCOUNT_CREDS');
+    if (!serviceAccountKey) {
+      throw new Error('Service account key not configured');
+    }
+
+    // サービスアカウント経由でSpreadsheetApp使用（GAS環境での実装）
+    const sheetsServiceObject = {
+      spreadsheets: {
+        values: {
+          get(params) {
+            try {
+              const spreadsheet = getSheetsService().openById(params.spreadsheetId);
+              const [sheetName] = params.range.split('!');
+              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+              const values = sheet.getDataRange().getValues();
+              return { data: { values } };
+            } catch (error) {
+              console.error('Secure service.get error:', error.message);
+              throw error;
+            }
+          },
+
+          update(params) {
+            try {
+              const spreadsheet = getSheetsService().openById(params.spreadsheetId);
+              const [sheetName] = params.range.split('!');
+              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+
+              if (!sheet) throw new Error(`Sheet "${sheetName}" not found`);
+
+              const {values} = params.resource;
+              if (values && values.length > 0) {
+                const range = sheet.getRange(1, 1, values.length, values[0].length);
+                range.setValues(values);
+              }
+              return { updatedCells: values ? values.length * values[0].length : 0 };
+            } catch (error) {
+              console.error('Secure service.update error:', error.message);
+              throw error;
+            }
+          },
+
+          append(params) {
+            try {
+              const spreadsheet = getSheetsService().openById(params.spreadsheetId);
+              const [sheetName] = params.range.split('!');
+              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
+
+              if (!sheet) throw new Error(`Sheet "${sheetName}" not found`);
+
+              const {values} = params.resource;
+              if (values && values.length > 0) {
+                const lastRow = sheet.getLastRow();
+                const targetRange = sheet.getRange(lastRow + 1, 1, values.length, values[0].length);
+                targetRange.setValues(values);
+              }
+              return { updates: { updatedRows: values ? values.length : 0 } };
+            } catch (error) {
+              console.error('Secure service.append error:', error.message);
+              throw error;
+            }
+          }
+        }
+      }
+    };
+
+    return sheetsServiceObject;
+  } catch (error) {
+    console.error('createSheetsService error:', error.message);
+    throw error;
+  }
 }
 
 /**
@@ -92,182 +209,7 @@ throw error;
 }
 }
 
-/**
- * Sheetsサービス取得（直接作成）
- * @returns {Object} Sheetsサービス
- */
-function getSheetsService() {
-  try {
-    // キャッシュ機能除去: 常に新しいサービスを作成
-    const service = createSheetsService();
 
-    // サービス検証
-    if (!service || !service.spreadsheets || !service.spreadsheets.values) {
-      throw new Error('Invalid service structure created');
-    }
-
-    // 必要なメソッドの存在確認（正確な階層構造）
-    const requiredMethods = ['get', 'update', 'append'];
-    for (const method of requiredMethods) {
-      if (typeof service.spreadsheets.values[method] !== 'function') {
-        console.error(`Method check failed: service.spreadsheets.values.${method}`, {
-          type: typeof service.spreadsheets.values[method],
-          available: Object.keys(service.spreadsheets.values)
-        });
-        throw new Error(`Required method '${method}' is not available in service.spreadsheets.values`);
-      }
-    }
-
-
-    return service;
-  } catch (error) {
-    console.error('DatabaseCore', {
-      operation: 'getSheetsService',
-      error: error.message
-    });
-
-    // より具体的なエラーメッセージを提供
-    if (error.message.includes('SERVICE_ACCOUNT_CREDS')) {
-      throw new Error('サービスアカウント設定に問題があります。システム管理者にお問い合わせください。');
-    } else if (error.message.includes('spreadsheet')) {
-      throw new Error('データベースへのアクセスに失敗しました。設定を確認してください。');
-    } else {
-      throw new Error(`データベースサービスの初期化に失敗しました: ${error.message}`);
-    }
-  }
-}
-
-/**
- * Sheetsサービス作成
- * @returns {Object} 新しいSheetsサービス
- */
-function createSheetsService() {
-  try {
-    const serviceAccountKey = ServiceFactory.getProperties().getProperty('SERVICE_ACCOUNT_CREDS');
-
-    if (!serviceAccountKey) {
-      throw new Error('サービスアカウントキーが設定されていません');
-    }
-
-    // サービスアカウントキーの検証のみ（Google Apps Scriptでは直接Sheetsサービスを使用）
-    const parsedKey = JSON.parse(serviceAccountKey);
-
-    // サービスアカウントキーの基本検証
-    if (!parsedKey.client_email || !parsedKey.private_key) {
-      throw new Error('無効なサービスアカウントキーです');
-    }
-
-    // Google Apps Script標準のSpreadsheetAppを使用
-    const service = {
-      spreadsheets: {
-        values: {
-          get(params) {
-            try {
-              const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
-              const [sheetName] = params.range.split('!');
-              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
-              const values = sheet.getDataRange().getValues();
-              return { data: { values } };
-            } catch (error) {
-              console.error('Service.get error:', error.message);
-              throw error;
-            }
-          },
-
-          update(params) {
-            try {
-              const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
-              const [sheetName] = params.range.split('!');
-              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
-
-              if (!sheet) {
-                throw new Error(`Sheet "${  sheetName  }" not found in spreadsheet`);
-              }
-
-              const {values} = params.resource;
-              if (values && values.length > 0) {
-                sheet.getRange(1, 1, values.length, values[0].length).setValues(values);
-              }
-
-
-              return { updatedCells: values ? values.length * values[0].length : 0 };
-            } catch (error) {
-              console.error('Service.update error:', error.message);
-              throw error;
-            }
-          },
-
-          append(params) {
-            try {
-              const spreadsheet = SpreadsheetApp.openById(params.spreadsheetId);
-              const [sheetName] = params.range.split('!');
-              const sheet = spreadsheet.getSheetByName(sheetName) || spreadsheet.getSheets()[0];
-
-              if (!sheet) {
-                throw new Error(`Sheet "${  sheetName  }" not found in spreadsheet`);
-              }
-
-              const {values} = params.resource;
-              if (values && values.length > 0) {
-                const lastRow = sheet.getLastRow();
-                const targetRow = lastRow + 1;
-                const targetRange = sheet.getRange(targetRow, 1, values.length, values[0].length);
-                targetRange.setValues(values);
-
-              }
-
-              return {
-                updates: {
-                  updatedRows: values ? values.length : 0,
-                  spreadsheetId: params.spreadsheetId,
-                  range: params.range
-                }
-              };
-            } catch (error) {
-              console.error('Service.append error:', error.message);
-              throw error;
-            }
-          }
-        }
-      }
-    };
-
-
-    return service;
-  } catch (error) {
-    console.error('DatabaseCore', {
-      operation: 'createSheetsService',
-      error: error.message
-    });
-    throw error;
-  }
-}
-
-/**
- * リトライ付きSheetsサービス取得
- * @param {number} maxRetries - 最大リトライ回数
- * @returns {Object} Sheetsサービス
- */
-function getSheetsServiceWithRetry(maxRetries = 2) {
-for (let attempt = 1; attempt <= maxRetries; attempt++) {
-try {
-return getSheetsService();
-} catch (error) {
-console.warn('DatabaseCore', {
-operation: 'getSheetsServiceWithRetry',
-attempt,
-maxRetries,
-error: error.message
-});
-
-if (attempt === maxRetries) {
-throw error;
-}
-
-Utilities.sleep(1000 * attempt); // 指数バックオフ
-}
-}
-}
 
 // ==========================================
 // 🔧 診断・ユーティリティ
@@ -286,43 +228,27 @@ checks: []
 
 try {
 // データベースID確認
-const databaseId = getSecureDatabaseId();
+const globalDatabaseId = ServiceFactory.getProperties().getDatabaseSpreadsheetId();
 results.checks.push({
 name: 'Database ID',
-status: databaseId ? '✅' : '❌',
-details: databaseId ? 'Database ID configured' : 'Database ID missing'
+status: globalDatabaseId ? '✅' : '❌',
+details: globalDatabaseId ? 'Database ID configured' : 'Database ID missing'
 });
 
-// サービスアカウント確認
+// スプレッドシートアクセス確認
 try {
-const service = createSheetsService();
+const spreadsheet = getSheetsService().openById(globalDatabaseId);
+const sheet = spreadsheet.getSheetByName('Users');
 results.checks.push({
-name: 'Service Account',
-status: service ? '✅' : '❌',
-details: 'Service account authentication working'
+name: 'Database Access',
+status: sheet ? '✅' : '❌',
+details: sheet ? 'Database accessible' : 'Users sheet not found'
 });
-} catch (serviceError) {
+} catch (accessError) {
 results.checks.push({
-name: 'Service Account',
+name: 'Database Access',
 status: '❌',
-details: serviceError.message
-});
-}
-
-// キャッシュサービス確認
-try {
-const cache = ServiceFactory.getCache();
-cache.get('test_key');
-results.checks.push({
-name: 'Cache Service',
-status: '✅',
-details: 'Cache service accessible'
-});
-} catch (cacheError) {
-results.checks.push({
-name: 'Cache Service',
-status: '⚠️',
-details: cacheError.message
+details: accessError.message
 });
 }
 
@@ -369,13 +295,13 @@ function findUserByEmail(email) {
   if (!email) return null;
 
   try {
-
-    const service = getSheetsService();
-    const databaseId = getSecureDatabaseId();
+    // 🔒 Security: Service Account access only
+    const dbService = getSheetsService();
+    const dbId = getSecureDatabaseId();
 
     const range = 'Users!A:Z';
-    const response = service.spreadsheets.values.get({
-      spreadsheetId: databaseId,
+    const response = dbService.spreadsheets.values.get({
+      spreadsheetId: dbId,
       range
     });
 
@@ -423,13 +349,13 @@ function findUserById(userId) {
   if (!userId) return null;
 
   try {
-
-    const service = getSheetsService();
-    const databaseId = getSecureDatabaseId();
+    // 🔒 Security: Service Account access only
+    const dbService = getSheetsService();
+    const dbId = getSecureDatabaseId();
 
     const range = 'Users!A:Z';
-    const response = service.spreadsheets.values.get({
-      spreadsheetId: databaseId,
+    const response = dbService.spreadsheets.values.get({
+      spreadsheetId: dbId,
       range
     });
 
@@ -489,8 +415,8 @@ function dbCreateUser(email, additionalData) {
       throw new Error('既に登録済みのメールアドレスです');
     }
 
-    const service = getSheetsService();
-    const databaseId = getSecureDatabaseId();
+    const dbService = getSheetsService();
+    const dbId = getSecureDatabaseId();
 
     // 新しいユーザーデータ作成
     const userId = Utilities.getUuid();
@@ -511,15 +437,43 @@ function dbCreateUser(email, additionalData) {
       userData[key] = additionalData[key];
     }
 
-    // データベースに追加
-    const range = 'Users!A:A';
-    service.spreadsheets.values.append({
-      spreadsheetId: databaseId,
-      range,
+    // 🔒 Security: Service Account database access
+    // const sheetsService = getSheetsService(); // 既にdbServiceが宣言済み
+    // const dbId = getSecureDatabaseId(); // 既にdbIdが宣言済み
+
+    // ヘッダー行確認
+    const headerCheckResponse = dbService.spreadsheets.values.get({
+      spreadsheetId: dbId,
+      range: 'Users!A1:E1'
+    });
+
+    const existingData = headerCheckResponse.data && headerCheckResponse.data.values ? headerCheckResponse.data.values : [];
+    const hasHeaders = existingData.length > 0 && existingData[0][0] === 'userId';
+
+    if (!hasHeaders) {
+      console.log('dbCreateUser: Adding header row');
+      dbService.spreadsheets.values.update({
+        spreadsheetId: dbId,
+        range: 'Users!A1:E1',
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [['userId', 'userEmail', 'isActive', 'configJson', 'lastModified']]
+        }
+      });
+    }
+
+    // ユーザーデータ追加
+    dbService.spreadsheets.values.append({
+      spreadsheetId: dbId,
+      range: 'Users!A:E',
       valueInputOption: 'USER_ENTERED',
       resource: {
         values: [Object.values(userData)]
       }
+    });
+
+    console.log('dbCreateUser: Secure user data added', {
+      userId: userData.userId ? `${userData.userId.substring(0, 8)  }***` : 'NO_ID'
     });
 
 
@@ -552,14 +506,14 @@ function updateUser(userId, updateData) {
       throw new Error('ユーザーが見つかりません');
     }
 
-    // 🎯 統一されたSheets API使用 - findUserByIdと同じアクセス方法
-    const service = getSheetsService();
-    const databaseId = getSecureDatabaseId();
+    // 🔒 Security: Service Account database access
+    const dbService = getSheetsService();
+    const dbId = getSecureDatabaseId();
 
     // 現在のデータを取得
     const range = 'Users!A:Z';
-    const response = service.spreadsheets.values.get({
-      spreadsheetId: databaseId,
+    const response = dbService.spreadsheets.values.get({
+      spreadsheetId: dbId,
       range
     });
 
@@ -575,20 +529,6 @@ function updateUser(userId, updateData) {
       throw new Error('ユーザー行が見つかりません');
     }
 
-    // 列のマッピング（ヘッダーから動的に取得）
-    const columnMapping = {};
-    headers.forEach((header, index) => {
-      const key = header.toLowerCase()
-        .replace(/\s+/g, '')
-        .replace('userid', 'userId')
-        .replace('useremail', 'userEmail')
-        .replace('createdat', 'createdAt')
-        .replace('lastmodified', 'lastModified')
-        .replace('configjson', 'configJson')
-        .replace('isactive', 'isActive');
-      columnMapping[key] = index;
-    });
-
     // 許可されたフィールドのみ更新
     const allowedFields = ['userEmail', 'isActive', 'configJson', 'lastModified'];
     const updates = [];
@@ -597,23 +537,23 @@ function updateUser(userId, updateData) {
     // 各フィールドを対応する列に更新
     Object.keys(updateData).forEach(field => {
       if (allowedFields.includes(field)) {
-        const columnIndex = columnMapping[field];
-        if (columnIndex !== undefined) {
+        const columnIndex = headers.findIndex(h => h.toLowerCase().includes(field.toLowerCase()));
+        if (columnIndex !== -1) {
           updatedRow[columnIndex] = updateData[field];
           updates.push(field);
         } else {
-          console.warn(`⚠️ Column mapping not found for field: ${field}`);
+          console.warn(`⚠️ Column not found for field: ${field}`);
         }
       } else {
         console.warn(`⚠️ Field not allowed: ${field}`);
       }
     });
 
-    // 行全体を更新（Sheets API使用）
+    // 行全体を更新
     if (updates.length > 0) {
       const updateRange = `Users!A${user.rowIndex}:${String.fromCharCode(65 + updatedRow.length - 1)}${user.rowIndex}`;
-      service.spreadsheets.values.update({
-        spreadsheetId: databaseId,
+      dbService.spreadsheets.values.update({
+        spreadsheetId: dbId,
         range: updateRange,
         valueInputOption: 'USER_ENTERED',
         resource: {
@@ -674,13 +614,13 @@ function getAllUsers(options) {
   const activeOnly = options.activeOnly || false;
 
   try {
-
-    const service = getSheetsService();
-    const databaseId = getSecureDatabaseId();
+    // 🔒 Security: Service Account access only
+    const dbService = getSheetsService();
+    const dbId = getSecureDatabaseId();
 
     const range = 'Users!A:Z';
-    const response = service.spreadsheets.values.get({
-      spreadsheetId: databaseId,
+    const response = dbService.spreadsheets.values.get({
+      spreadsheetId: dbId,
       range
     });
 

@@ -13,7 +13,7 @@
  * - 単一責任原則の維持
  */
 
-/* global ServiceFactory, validateEmail, validateUrl, getUserAccessLevel */
+/* global ServiceFactory, validateEmail, validateUrl, getUserAccessLevel, getSheetsService */
 
 /**
  * ServiceFactory統合初期化
@@ -513,9 +513,9 @@ function validateSpreadsheetAccess(spreadsheetId) {
       // アクセステスト - 段階的にチェック
       let spreadsheet;
       try {
-        console.log('SecurityService', { operation: 'SpreadsheetApp.openById', phase: 'start' });
-        spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-        console.log('SecurityService', { operation: 'SpreadsheetApp.openById', phase: 'success' });
+        console.log('SecurityService', { operation: 'getSheetsService.openById', phase: 'start' });
+        spreadsheet = getSheetsService().openById(spreadsheetId);
+        console.log('SecurityService', { operation: 'getSheetsService.openById', phase: 'success' });
       } catch (openError) {
         const errorResponse = {
           success: false,

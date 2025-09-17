@@ -152,13 +152,7 @@ class StudyQuestApp {
     this.reactionEventListeners = new Map(); // 処理完了通知用
     this.isProcessingReactionQueue = false; // キュー処理中フラグ
     
-    // バッチ処理システム（既存機能に影響しない追加機能）
-    this.enableBatchProcessing = true; // バッチ処理有効フラグ（簡単に無効化可能）
-    this.reactionBatchQueue = new Map(); // rowIndex -> reactions[] のバッチキュー
-    this.batchTimer = null; // バッチ処理タイマー
-    this.BATCH_TIMEOUT = 500; // 500ms以内の操作をバッチ化
-    this.BATCH_SIZE_LIMIT = 5; // 最大バッチサイズ（控えめに設定）
-    this.batchProcessingActive = false; // バッチ処理中フラグ
+    // 🎯 CLAUDE.md準拠: 単純な直接送信システム（バッチ処理削除）
     
     // イベントリスナー重複登録防止フラグ
     this.eventDelegationSetup = false;
@@ -1043,16 +1037,16 @@ class StudyQuestApp {
     enhancedError.functionName = funcName;
     enhancedError.arguments = args;
 
-    // 関数固有のエラーメッセージ
+    // 🎯 CLAUDE.md準拠: 統一されたエラーメッセージ
     switch (funcName) {
       case 'dsAddReaction':
-        enhancedError.userMessage = 'リアクションの送信に失敗しました。しばらく待ってから再度お試しください。';
+        enhancedError.userMessage = 'リアクション処理エラー';
         break;
       case 'dsToggleHighlight':
-        enhancedError.userMessage = 'ハイライトの切り替えに失敗しました。しばらく待ってから再度お試しください。';
+        enhancedError.userMessage = 'ハイライト処理エラー';
         break;
       default:
-        enhancedError.userMessage = 'サーバーとの通信に失敗しました。しばらく待ってから再度お試しください。';
+        enhancedError.userMessage = '通信エラー';
     }
 
     return enhancedError;
@@ -3834,6 +3828,7 @@ class StudyQuestApp {
     }
   }
   
+
   updateCardReactions(card, data) {
     const reactionContainer = card.querySelector('.reaction-container');
     if (!reactionContainer) return;
@@ -3880,10 +3875,19 @@ class StudyQuestApp {
               const rt = this.reactionTypes.find(r => r.key === update.reaction);
               const svgEl = btn.querySelector('svg') || btn.querySelector('span[aria-hidden="true"]');
               if (svgEl && rt) {
-                // Force icon update to ensure reacted state is visible
-                const newIcon = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
-                // Always update to ensure consistency
-                svgEl.outerHTML = newIcon;
+                // Enhanced icon update with animation sync
+                requestAnimationFrame(() => {
+                  const newIcon = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
+                  svgEl.outerHTML = newIcon;
+
+                  // Force CSS recalculation for proper fill state
+                  const newSvg = btn.querySelector('svg');
+                  if (newSvg && update.reacted) {
+                    // Ensure reacted styling is properly applied
+                    newSvg.style.fill = 'currentColor';
+                    newSvg.style.stroke = 'transparent';
+                  }
+                });
 
                 // Add visual feedback for state change
                 btn.style.transition = 'all 0.2s ease-out';
@@ -4196,21 +4200,252 @@ class StudyQuestApp {
   }
 
   /**
-   * リアクション処理（既存キューイングシステム＋オプショナルバッチ処理）
+   * Generate unique request ID for operation tracking
+   * @returns {string} UUID-like unique identifier
+   */
+  generateRequestId() {
+    return 'req_' + Date.now().toString(36) + '_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  /**
+   * Staged error recovery strategy with escalating levels
+   * @param {number} rowIndex - Row index of the failed operation
+   * @param {string} reaction - Reaction type that failed
+   * @param {Error} error - Original error
+   * @returns {Promise<Object>} Recovery result
+   */
+  async performStagedRecovery(rowIndex, reaction, error) {
+    const reactionKey = `${rowIndex}-${reaction}`;
+
+    // Get pending request info for recovery context
+    const pendingRequest = this.pendingReactions.get(reactionKey);
+    if (pendingRequest) {
+      pendingRequest.retryCount = (pendingRequest.retryCount || 0) + 1;
+    }
+
+    debugLog(`🔄 Starting staged recovery for ${reactionKey}, attempt: ${pendingRequest?.retryCount || 1}`);
+
+    // Level 1: Specific item data refresh
+    try {
+      debugLog('🔄 Level 1: Attempting specific item refresh');
+      const refreshResult = await this.refreshSpecificItem(rowIndex);
+      if (refreshResult.success) {
+        debugLog('✅ Level 1 recovery successful');
+        return { success: true, level: 1, method: 'specific_refresh' };
+      }
+    } catch (level1Error) {
+      warnLog('⚠️ Level 1 recovery failed:', level1Error.message);
+    }
+
+    // Level 2: Cache clear and force reload
+    try {
+      debugLog('🔄 Level 2: Cache clear and force reload');
+      this.clearReactionCache();
+      await this.loadSheetData({ bypassCache: true, silent: true });
+      debugLog('✅ Level 2 recovery successful');
+      return { success: true, level: 2, method: 'cache_clear_reload' };
+    } catch (level2Error) {
+      warnLog('⚠️ Level 2 recovery failed:', level2Error.message);
+    }
+
+    // Level 3: Local state restoration (final fallback)
+    try {
+      debugLog('🔄 Level 3: Local state restoration fallback');
+      const localRestoreResult = this.restoreLocalReactionState(rowIndex, reaction, pendingRequest);
+      if (localRestoreResult.success) {
+        debugLog('✅ Level 3 recovery successful');
+        return { success: true, level: 3, method: 'local_restore' };
+      }
+    } catch (level3Error) {
+      errorLog('❌ Level 3 recovery failed:', level3Error.message);
+    }
+
+    return {
+      success: false,
+      message: `All recovery levels failed for ${reactionKey}`,
+      originalError: error.message
+    };
+  }
+
+  /**
+   * Refresh specific item data from server
+   * @param {number} rowIndex - Row index to refresh
+   * @returns {Promise<Object>} Refresh result
+   */
+  async refreshSpecificItem(rowIndex) {
+    // This is a placeholder for specific item refresh
+    // In a real implementation, this would make a targeted API call
+    throw new Error('Specific item refresh not implemented - fallback to level 2');
+  }
+
+  /**
+   * Clear reaction-related caches
+   */
+  clearReactionCache() {
+    if (this.reactionCache) {
+      this.reactionCache.clear();
+    }
+
+    // Clear localStorage reaction states
+    try {
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('reaction_state_')) {
+          localStorage.removeItem(key);
+        }
+      });
+    } catch (e) {
+      warnLog('⚠️ Failed to clear localStorage reaction cache:', e.message);
+    }
+  }
+
+  /**
+   * Restore local reaction state as final fallback
+   * @param {number} rowIndex - Row index
+   * @param {string} reaction - Reaction type
+   * @param {Object} pendingRequest - Pending request context
+   * @returns {Object} Restoration result
+   */
+  async restoreLocalReactionState(rowIndex, reaction, pendingRequest) {
+    const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+    if (!item || !item.reactions || !item.reactions[reaction]) {
+      return { success: false, message: 'No local state to restore' };
+    }
+
+    const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
+
+    // Stop any ongoing animations before state restoration
+    if (card) {
+      await this.stopOngoingAnimations(card, reaction);
+    }
+
+    // Revert to original state before the failed operation
+    if (pendingRequest && typeof pendingRequest.originalState === 'boolean') {
+      item.reactions[reaction].reacted = pendingRequest.originalState;
+      if (pendingRequest.originalState) {
+        item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
+      } else {
+        item.reactions[reaction].count = Math.max(0, (item.reactions[reaction].count || 1) - 1);
+      }
+    } else {
+      // Simple revert: toggle current state
+      const wasReacted = item.reactions[reaction].reacted;
+      item.reactions[reaction].reacted = !wasReacted;
+      if (wasReacted) {
+        item.reactions[reaction].count = Math.max(0, (item.reactions[reaction].count || 1) - 1);
+      } else {
+        item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
+      }
+    }
+
+    // Update UI
+    if (card) {
+      this.updateCardReactions(card, item);
+    }
+
+    return { success: true, message: 'Local state restored with animation sync' };
+  }
+
+  /**
+   * Stop ongoing animations on specific reaction buttons
+   * @param {HTMLElement} card - Card element
+   * @param {string} reaction - Reaction type
+   * @returns {Promise} Promise that resolves when animations are stopped
+   */
+  async stopOngoingAnimations(card, reaction) {
+    const reactionBtn = card.querySelector(`[data-reaction="${reaction}"]`);
+    if (!reactionBtn) return;
+
+    // Force completion of any ongoing transitions
+    const transitioningElements = [reactionBtn, ...reactionBtn.querySelectorAll('*')];
+
+    transitioningElements.forEach(el => {
+      const style = getComputedStyle(el);
+      if (style.transition && style.transition !== 'none') {
+        // Temporarily disable transitions
+        el.style.transition = 'none';
+
+        // Force reflow to apply the change
+        el.offsetHeight;
+
+        // Re-enable transitions after a frame
+        requestAnimationFrame(() => {
+          el.style.transition = '';
+        });
+      }
+    });
+
+    // Small delay to ensure transition interruption is complete
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+
+  /**
+   * Simulate server-side exclusive reaction logic for optimistic updates
+   * @param {Object} item - The answer item
+   * @param {string} reaction - The reaction type being clicked
+   * @returns {Object} Predicted server response
+   */
+  simulateServerExclusiveReaction(item, reaction) {
+    if (!item.reactions) item.reactions = {};
+
+    // Create deep copy of current reactions to simulate server logic
+    const predictedReactions = JSON.parse(JSON.stringify(item.reactions));
+
+    // Initialize reaction types if they don't exist
+    this.reactionTypes.forEach(rt => {
+      if (!predictedReactions[rt.key]) {
+        predictedReactions[rt.key] = { count: 0, reacted: false };
+      }
+    });
+
+    // Find current user reaction (simulate server finding user in email lists)
+    let userCurrentReaction = null;
+    Object.keys(predictedReactions).forEach(key => {
+      if (predictedReactions[key].reacted) {
+        userCurrentReaction = key;
+      }
+    });
+
+    let changed = false;
+
+    if (userCurrentReaction === reaction) {
+      // User clicking same reaction -> remove (toggle)
+      predictedReactions[reaction].reacted = false;
+      predictedReactions[reaction].count = Math.max(0, predictedReactions[reaction].count - 1);
+      changed = true;
+    } else {
+      // User clicking different reaction -> remove old (if any), add new
+      if (userCurrentReaction) {
+        predictedReactions[userCurrentReaction].reacted = false;
+        predictedReactions[userCurrentReaction].count = Math.max(0, predictedReactions[userCurrentReaction].count - 1);
+      }
+      predictedReactions[reaction].reacted = true;
+      predictedReactions[reaction].count = (predictedReactions[reaction].count || 0) + 1;
+      changed = true;
+    }
+
+    return {
+      changed,
+      reactions: predictedReactions,
+      action: userCurrentReaction === reaction ? 'removed' :
+              userCurrentReaction ? 'changed' : 'added',
+      userReaction: userCurrentReaction === reaction ? null : reaction
+    };
+  }
+
+  /**
+   * リアクション処理（UUID ベースの重複防止システム）
    */
   async handleReaction(rowIndex, reaction) {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
-    const now = Date.now();
-    const lastOperation = this.lastReactionTimes?.get(reactionKey);
-    if (lastOperation && (now - lastOperation) < 1000) {
-      debugLog(`⚡ 重複操作スキップ: ${reactionKey}`);
-      return;
-    }
+    // Generate unique request ID for this operation
+    const requestId = this.generateRequestId();
 
+    // Enhanced duplicate prevention: check if any request for this reaction is pending
     if (this.pendingReactions.has(reactionKey)) {
-      debugLog(`⏳ 処理中のためスキップ: ${reactionKey}`);
+      const pendingRequest = this.pendingReactions.get(reactionKey);
+      debugLog(`⏳ 処理中のためスキップ: ${reactionKey}, requestId: ${pendingRequest.requestId}`);
       return;
     }
 
@@ -4221,33 +4456,42 @@ class StudyQuestApp {
     }
 
     const buttons = document.querySelectorAll(`[data-row-index="${numericRowIndex}"][data-reaction="${reaction}"]`);
-    this.setReactionButtonsLoading(buttons, true);
 
-    const currentState = item.reactions?.[reaction]?.reacted || false;
-    if (item.reactions && item.reactions[reaction]) {
-      item.reactions[reaction].reacted = !currentState;
-      item.reactions[reaction].count = currentState
-        ? Math.max(0, (item.reactions[reaction].count || 1) - 1)
-        : (item.reactions[reaction].count || 0) + 1;
+    // Set loading state
+    this.setReactionButtonsLoading(buttons, true, requestId);
 
-      // Update card reactions using the efficient batch approach
+    // Enhanced optimistic update - simulate server-side exclusive logic
+    const optimisticUpdate = this.simulateServerExclusiveReaction(item, reaction);
+    if (optimisticUpdate.changed) {
+      // Apply the predicted server response to local state
+      item.reactions = optimisticUpdate.reactions;
+
+      // Update card reactions
       const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
-      if (card) this.updateCardReactions(card, item);
+      if (card) {
+        this.updateCardReactions(card, item);
+      }
     }
 
-    this.reactionQueue.set(reactionKey, {
+    // Register this request in pending reactions with full tracking
+    this.pendingReactions.set(reactionKey, {
+      requestId,
       rowIndex: numericRowIndex,
       reaction,
-      timestamp: now,
+      timestamp: Date.now(),
+      originalState: currentState,
+      retryCount: 0
+    });
+
+    this.reactionQueue.set(reactionKey, {
+      requestId,
+      rowIndex: numericRowIndex,
+      reaction,
+      timestamp: Date.now(),
       originalState: currentState
     });
 
-    if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
-    this.lastReactionTimes.set(reactionKey, now);
-
-    if (this.enableBatchProcessing && !this.batchProcessingActive) {
-      this.addToBatchQueue(numericRowIndex, reaction);
-    }
+    // 🎯 CLAUDE.md準拠: バッチ処理システム削除
 
     this.processReactionQueue();
   }
@@ -4262,19 +4506,7 @@ class StudyQuestApp {
 
     try {
       
-      // バッチ処理が有効で、キューに複数アイテムがある場合はバッチ処理を試行
-      if (this.enableBatchProcessing && this.reactionQueue.size > 1 && !this.batchProcessingActive) {
-        const canBatch = await this.tryBatchProcessing();
-        if (canBatch) {
-          // バッチ処理成功時は個別キューをクリア
-          processedCount = this.reactionQueue.size;
-          this.reactionQueue.clear();
-          return;
-        }
-        // バッチ処理失敗時は既存の個別処理にフォールバック
-      }
-
-      // 既存の個別処理システム（完全に保持）
+      // 🎯 CLAUDE.md準拠: 直接送信システム（バッチ処理削除）
       const queueEntries = Array.from(this.reactionQueue.entries());
       
       for (const [reactionKey, operation] of queueEntries) {
@@ -4358,21 +4590,11 @@ class StudyQuestApp {
         await this.handleReactionError(error, rowIndex, reaction);
         this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: false, error: error.message });
     } finally {
-        this.pendingReactions.delete(reactionKey);
-
-        // Ensure loading state is cleared for all matching buttons
+        // Simple cleanup
         const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
         this.setReactionButtonsLoading(btns, false);
 
-        // Additional safety: clear any remaining loading states for this row
-        setTimeout(() => {
-          const allBtns = document.querySelectorAll(`[data-row-index="${rowIndex}"].loading`);
-          allBtns.forEach(btn => {
-            btn.classList.remove('loading');
-            btn.disabled = false;
-            btn.setAttribute('aria-busy', 'false');
-          });
-        }, 100);
+        this.pendingReactions.delete(reactionKey);
     }
   }
 
@@ -4597,18 +4819,25 @@ class StudyQuestApp {
     }
   }
 
-  setReactionButtonsLoading(buttons, isLoading) {
+  setReactionButtonsLoading(buttons, isLoading, requestId = null) {
     buttons.forEach(btn => {
         btn.disabled = isLoading;
         if (isLoading) {
             btn.classList.add('loading');
             btn.setAttribute('aria-busy', 'true');
+            if (requestId) {
+                btn.setAttribute('data-request-id', requestId);
+            }
         } else {
             btn.classList.remove('loading');
             btn.setAttribute('aria-busy', 'false');
+            if (requestId) {
+                btn.removeAttribute('data-request-id');
+            }
         }
     });
   }
+
 
   async sendReactionToServer(rowIndex, reaction) {
     try {
@@ -4639,100 +4868,28 @@ class StudyQuestApp {
   }
 
   async processResponse(item, response, reaction) {
-    // Handle new user-based backend format: {success, reactions, userReaction, newValue}
+    // Modern backend format only: {success, reactions, userReaction, action}
     if (response.success && response.reactions && typeof response.reactions === 'object') {
-        // New user-based backend format: complete server state with user context
-        const serverState = response.reactions;
-        item.reactions = JSON.parse(JSON.stringify(serverState));
+        // Apply complete server state
+        item.reactions = JSON.parse(JSON.stringify(response.reactions));
 
-        // Log user reaction state for debugging
-        debugLog('✅ Processed user-based backend format:', {
+        debugLog('✅ Processed server response:', {
             reaction,
+            action: response.action,
             userReaction: response.userReaction,
-            allReactions: response.reactions,
-            item: item.reactions
+            reactions: response.reactions
         });
-    } else if (response.reactions && typeof response.reactions === 'object') {
-        // Legacy format: complete server state (without success flag)
-        const serverState = response.reactions;
-        item.reactions = JSON.parse(JSON.stringify(serverState));
-        debugLog('✅ Processed legacy backend format:', { reaction, item: item.reactions });
-    } else if (response.success && typeof response.newValue === 'number') {
-        // Old simple backend format: update specific reaction only
-        if (!item.reactions) item.reactions = {};
-        if (!item.reactions[reaction]) {
-            item.reactions[reaction] = { count: 0, reacted: false };
-        }
-        item.reactions[reaction].count = response.newValue;
-        item.reactions[reaction].reacted = response.newValue > 0; // Assume user reacted if count > 0
-        debugLog('✅ Processed simple backend format:', { reaction, newValue: response.newValue, item: item.reactions });
-    } else {
-        warnLog('⚠️ 期待されたリアクション形式ではありません:', response);
-        // フォールバック処理（サーバー応答が不正な場合のみ）
-        this.applyFallbackReactionUpdate(item, reaction);
-    }
 
-    // ローカルストレージに保存（サーバー状態を保存）
-    this.saveReactionState(item.rowIndex, item.reactions);
+        // Save to localStorage
+        this.saveReactionState(item.rowIndex, item.reactions);
+    } else {
+        // Handle error cases
+        errorLog('❌ Invalid server response format:', response);
+        throw new Error('Server returned invalid response format');
+    }
 }
 
-  applyFallbackReactionUpdate(item, reaction) {
-    if (!item.reactions) {
-        item.reactions = {};
-    }
-    
-    // 他のリアクションをまず解除
-    this.reactionTypes.forEach(rt => {
-      if (rt.key !== reaction && item.reactions[rt.key]?.reacted) {
-        item.reactions[rt.key].count = Math.max(0, item.reactions[rt.key].count - 1);
-        item.reactions[rt.key].reacted = false;
-      }
-    });
-    
-    if (!item.reactions[reaction]) {
-        item.reactions[reaction] = { count: 0, reacted: false };
-    }
-    
-    // Toggle reaction state
-    if (item.reactions[reaction].reacted) {
-        item.reactions[reaction].count = Math.max(0, item.reactions[reaction].count - 1);
-        item.reactions[reaction].reacted = false;
-    } else {
-        item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
-        item.reactions[reaction].reacted = true;
-    }
-  }
 
-  // 即座UI更新（requestAnimationFrameを使わない同期更新）
-  async immediateUIUpdate(rowIndex, reaction) {
-    const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
-    if (!item || !item.reactions || !item.reactions[reaction]) {
-      warnLog('⚠️ immediateUIUpdate: アイテムまたはリアクション状態が見つかりません');
-      return;
-    }
-
-    try {
-      // カードのUI更新（同期実行）
-      const card = document.querySelector(`[data-row-index="${rowIndex}"]`);
-      if (card && card instanceof HTMLElement) {
-        this.updateCardReactions(card, item);
-        this.applyReactionStyles(card, item);
-      }
-
-      // モーダルが開いている場合はそちらも更新
-      if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-        const modalRowIndex = this.elements.modalReactionContainer
-          .querySelector('[data-row-index]')?.dataset.rowIndex;
-        if (modalRowIndex == rowIndex) {
-          this.updateModalReactionButtons(item);
-        }
-      }
-
-      debugLog('⚡ 即座UI更新完了:', { rowIndex, reaction });
-    } catch (error) {
-      errorLog('❌ 即座UI更新エラー:', error);
-    }
-  }
 
   async updateReactionUI(item, immediate = false) {
       const lastUpdateKey = `ui_update_${item.rowIndex}`;
@@ -4939,36 +5096,44 @@ class StudyQuestApp {
         reaction,
         timestamp: new Date().toISOString()
     });
-    
-    // エラー復旧処理を追加
-    try {
-      // UI状態を元に戻す（楽観的更新の取り消し）
-      const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
-      if (item && item.reactions && item.reactions[reaction]) {
-        const wasReacted = item.reactions[reaction].reacted;
-        item.reactions[reaction].reacted = !wasReacted;
-        if (wasReacted) {
-          item.reactions[reaction].count = Math.max(0, (item.reactions[reaction].count || 1) - 1);
-        } else {
-          item.reactions[reaction].count = (item.reactions[reaction].count || 0) + 1;
-        }
 
-        // Update card reactions using the efficient batch approach
-      const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
-      if (card) this.updateCardReactions(card, item);
-      }
-    } catch (recoveryError) {
-      warnLog('⚠️ リアクションエラー復旧処理に失敗:', recoveryError);
+    // Staged error recovery strategy
+    const recoveryResult = await this.performStagedRecovery(rowIndex, reaction, error);
+
+    if (!recoveryResult.success) {
+      errorLog('❌ All recovery attempts failed:', recoveryResult.message);
     }
     
-    // ユーザーにエラーを表示（オプション）
-    if (window.messageManager) {
-        window.messageManager.show(
-            'リアクションの処理に失敗しました。再度お試しください。',
-            'error',
-            3000
-        );
+    // Enhanced user feedback with actionable error messages
+    let userMessage = 'リアクション更新エラーが発生しました';
+    if (error.message.includes('timeout') || error.message.includes('タイムアウト')) {
+      userMessage = 'ネットワークが遅いため、リアクションの更新に時間がかかっています';
+    } else if (error.message.includes('network') || error.message.includes('ネットワーク')) {
+      userMessage = 'ネットワーク接続を確認してください';
+    } else if (error.message.includes('permission') || error.message.includes('権限')) {
+      userMessage = 'リアクション機能への権限がありません';
     }
+
+    // Show error to user
+    if (window.messageManager) {
+        window.messageManager.show(userMessage, 'error', 4000);
+    } else if (this.showErrorToast) {
+        this.showErrorToast(userMessage);
+    } else {
+        console.warn('⚠️ No error display method available:', userMessage);
+    }
+
+    // Enhanced logging for debugging
+    console.group('🔍 Reaction Error Analysis');
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      rowIndex,
+      reaction,
+      timestamp: new Date().toISOString(),
+      currentReactionState: this.state.currentAnswers?.find(i => i.rowIndex == rowIndex)?.reactions?.[reaction]
+    });
+    console.groupEnd();
   }
 
   

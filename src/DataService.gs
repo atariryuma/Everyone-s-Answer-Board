@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText */
+/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, getSheetsService, getServiceAccountEmail */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -118,7 +118,7 @@ function fetchSpreadsheetData(config, options = {}) {
 
   try {
     // スプレッドシート取得
-    const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+    const spreadsheet = getSheetsService().openById(config.spreadsheetId);
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
     if (!sheet) {
@@ -410,7 +410,7 @@ function extractFieldValue(row, headers, fieldType, columnMapping = {}) {
  */
 function updateReactionInSheet(config, rowId, reactionType, action) {
   try {
-    const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+    const spreadsheet = getSheetsService().openById(config.spreadsheetId);
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
     if (!sheet) {
@@ -524,13 +524,21 @@ function getAutoStopTime(publishedAt, minutes) {
 }
 
 /**
- * レガシーCore.gsから移行: リアクション処理実行
+ * 🎯 排他的リアクション処理システム - CLAUDE.md準拠Zero-Dependency実装
+ *
+ * 仕様:
+ * - 排他的リアクション: ユーザーは1つのリアクションのみ選択可能
+ * - 同じリアクションをクリック: トグル（削除）
+ * - 異なるリアクションをクリック: 古いリアクションを削除し、新しいリアクションを追加
+ * - ユーザーベース管理: メールアドレスで重複防止
+ * - カウントベース表示: フロントエンド向けに適切に変換
+ *
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} sheetName - シート名
  * @param {number} rowIndex - 行インデックス
- * @param {string} reactionKey - リアクション種類
+ * @param {string} reactionKey - リアクション種類 (LIKE, UNDERSTAND, CURIOUS)
  * @param {string} userEmail - ユーザーメール
- * @returns {Object} 処理結果
+ * @returns {Object} 処理結果 {success, status, message, action, reactions, userReaction, newValue}
  */
 function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEmail) {
   // 🚀 Zero-dependency: ServiceFactory経由で初期化
@@ -543,7 +551,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEm
       throw new Error('ユーザー情報が必要です');
     }
 
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = getSheetsService().openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -577,7 +585,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEm
       }
     });
 
-    // Apply reaction rules
+    // Apply reaction rules with simplified logic
     let action = 'added';
     let newUserReaction = null;
 
@@ -585,14 +593,15 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEm
       // User clicking same reaction -> remove (toggle)
       currentReactions[reactionKey] = currentReactions[reactionKey].filter(u => u !== userEmail);
       action = 'removed';
+      newUserReaction = null;
     } else {
-      // User clicking different reaction -> remove old, add new
+      // User clicking different reaction -> remove old (if any), add new
       if (userCurrentReaction) {
         currentReactions[userCurrentReaction] = currentReactions[userCurrentReaction].filter(u => u !== userEmail);
+        action = 'changed';
       }
       currentReactions[reactionKey].push(userEmail);
       newUserReaction = reactionKey;
-      action = 'changed';
     }
 
     // Update all reaction columns
@@ -609,22 +618,24 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEm
       };
     });
 
-    console.info('DataService.processReaction: ユーザーベースリアクション処理完了', {
-      spreadsheetId,
+    console.info('🎯 排他的リアクション処理完了 - CLAUDE.md準拠', {
+      spreadsheetId: `${spreadsheetId.substring(0, 10)}***`,
       sheetName,
       rowIndex,
       reactionKey,
       userEmail: `${userEmail.substring(0, 5)  }***`,
       action,
-      userCurrentReaction: newUserReaction,
-      oldValue: userCurrentReaction ? allReactionsData[userCurrentReaction]?.count || 0 : 0,
-      newValue: allReactionsData[reactionKey]?.count || 0
+      exclusive: true,  // 排他的リアクションであることを明示
+      previousReaction: userCurrentReaction,
+      newReaction: newUserReaction,
+      reactionCounts: Object.keys(allReactionsData).map(key => `${key}:${allReactionsData[key].count}`).join(', ')
     });
 
     return {
       success: true,
       status: 'success',
       message: `リアクションを${action === 'removed' ? '削除' : action === 'changed' ? '変更' : '追加'}しました`,
+      action,
       reactions: allReactionsData,
       userReaction: newUserReaction,
       newValue: allReactionsData[reactionKey]?.count || 0  // For backwards compatibility
@@ -878,12 +889,20 @@ function applySortAndLimit(data, options = {}) {
  *
  * @returns {Object} スプレッドシート一覧
  */
-function getSpreadsheetList() {
+function getSpreadsheetList(options = {}) {
   // 🚀 Zero-dependency: ServiceFactory経由で初期化
   const started = Date.now();
   try {
     // ✅ GAS Best Practice: 直接API呼び出し（依存除去）
     const currentUser = Session.getActiveUser().getEmail();
+
+    // オプション設定
+    const {
+      adminMode = false,
+      maxCount = adminMode ? 20 : 25,
+      includeSize = adminMode,
+      includeTimestamp = true
+    } = options;
 
     // DriveApp直接使用（効率重視）
     const files = DriveApp.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
@@ -910,17 +929,23 @@ function getSpreadsheetList() {
     // スプレッドシート取得（高速処理）
     const spreadsheets = [];
     let count = 0;
-    const maxCount = 25; // GAS制限対応
 
     while (files.hasNext() && count < maxCount) {
       try {
         const file = files.next();
-        spreadsheets.push({
+        const fileData = {
           id: file.getId(),
           name: file.getName(),
           url: file.getUrl(),
           lastUpdated: file.getLastUpdated()
-        });
+        };
+
+        // 管理者モード時は追加情報を含める
+        if (includeSize) {
+          fileData.size = file.getSize() || 0;
+        }
+
+        spreadsheets.push(fileData);
         count++;
       } catch (fileError) {
         console.warn('DataService.getSpreadsheetList: ファイル処理スキップ', fileError.message);
@@ -1080,7 +1105,18 @@ function validateSheetParams(spreadsheetId, sheetName) {
  */
 function connectToSheetInternal(spreadsheetId, sheetName) {
   try {
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const spreadsheet = getSheetsService().openById(spreadsheetId);
+
+    // サービスアカウントを編集者として自動登録
+    try {
+      const serviceAccountEmail = getServiceAccountEmail();
+      if (serviceAccountEmail) {
+        spreadsheet.addEditor(serviceAccountEmail);
+        console.log('connectToSheetInternal: サービスアカウントを編集者として登録:', serviceAccountEmail);
+      }
+    } catch (editorError) {
+      console.warn('connectToSheetInternal: 編集者登録をスキップ:', editorError.message);
+    }
 
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
@@ -1982,7 +2018,7 @@ function getOrCreateReactionColumn(sheet, reactionType) {
  */
 function updateHighlightInSheet(config, rowId) {
   try {
-    const spreadsheet = SpreadsheetApp.openById(config.spreadsheetId);
+    const spreadsheet = getSheetsService().openById(config.spreadsheetId);
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
     if (!sheet) {
@@ -2064,8 +2100,8 @@ function validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey) {
  */
 function dsAddReaction(userId, rowId, reactionType) {
   try {
-    const db = ServiceFactory.getDB();
-    const user = db && db.findUserById ? db.findUserById(userId) : null;
+    // 🎯 Zero-Dependency: Direct DatabaseOperations call
+    const user = DatabaseOperations.findUserById(userId);
     if (!user || !user.configJson) {
       return createErrorResponse('User configuration not found');
     }
@@ -2107,8 +2143,8 @@ function dsAddReaction(userId, rowId, reactionType) {
  */
 function dsToggleHighlight(userId, rowId) {
   try {
-    const db = ServiceFactory.getDB();
-    const user = db && db.findUserById ? db.findUserById(userId) : null;
+    // 🎯 Zero-Dependency: Direct DatabaseOperations call
+    const user = DatabaseOperations.findUserById(userId);
     if (!user || !user.configJson) {
       return createErrorResponse('User configuration not found');
     }

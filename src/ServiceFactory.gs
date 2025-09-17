@@ -13,7 +13,7 @@
  * - プラットフォームAPI統合
  */
 
-/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, getServiceAccountToken, connectToSheetInternal, getFormInfo */
+/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, getServiceAccountToken, connectToSheetInternal, getFormInfo, getSheetsService */
 
 // ===========================================
 // 🔧 Session Management
@@ -163,7 +163,7 @@ function getSpreadsheet() {
   return {
     openById(id) {
       try {
-        return SpreadsheetApp.openById(id);
+        return getSheetsService().openById(id);
       } catch (error) {
         console.error('ServiceFactory.getSpreadsheet.openById: Error opening spreadsheet:', error.message);
         return null;

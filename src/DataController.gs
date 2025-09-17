@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ServiceFactory, ConfigService, DataService, DatabaseOperations, getCurrentEmail, createErrorResponse, getUserSheetData */
+/* global ServiceFactory, ConfigService, DataService, DatabaseOperations, getCurrentEmail, createErrorResponse, getUserSheetData, getSheetsService */
 
 // ===========================================
 // 📊 メインページデータAPI
@@ -62,104 +62,14 @@ function handleGetData(request) {
 }
 
 /**
- * リアクションの追加
- * Page.html から呼び出される
- *
- * @param {Object} request - リアクション情報
- * @returns {Object} 追加結果
+ * @deprecated This function has been removed in favor of direct DataService calls from main.gs
+ * See main.gs doPost() method for the new Zero-Dependency Architecture implementation
  */
-function handleAddReaction(request) {
-  try {
-    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
-    const email = getCurrentEmail();
-    if (!email) {
-      return {
-        success: false,
-        message: 'ユーザー情報が見つかりません'
-      };
-    }
-
-    // 🎯 Zero-dependency: ServiceFactory経由でDBアクセス
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
-    if (!user) {
-      return {
-        success: false,
-        message: 'ユーザーが登録されていません'
-      };
-    }
-
-    // ServiceFactory経由でDataServiceアクセス
-    const dataService = ServiceFactory.getDataService();
-    if (!dataService) {
-      console.error('processAddReaction: DataService not available');
-      return createErrorResponse('DataServiceが利用できません');
-    }
-    const result = dataService.addReaction(
-      user.userId,
-      request.rowId,
-      request.reactionType
-    );
-
-    return result;
-
-  } catch (error) {
-    console.error('DataController.handleAddReaction エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 /**
- * ハイライトの切り替え
- * Page.html から呼び出される
- *
- * @param {Object} request - ハイライト情報
- * @returns {Object} 切り替え結果
+ * @deprecated This function has been removed in favor of direct DataService calls from main.gs
+ * See main.gs doPost() method for the new Zero-Dependency Architecture implementation
  */
-function handleToggleHighlight(request) {
-  try {
-    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
-    const email = getCurrentEmail();
-    if (!email) {
-      return {
-        success: false,
-        message: 'ユーザー情報が見つかりません'
-      };
-    }
-
-    // 🎯 Zero-dependency: ServiceFactory経由でDBアクセス
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
-    if (!user) {
-      return {
-        success: false,
-        message: 'ユーザーが登録されていません'
-      };
-    }
-
-    const dataService = ServiceFactory.getDataService();
-    if (!dataService) {
-      console.error('processToggleHighlight: DataService not available');
-      return createErrorResponse('DataServiceが利用できません');
-    }
-    const result = dataService.toggleHighlight(
-      user.userId,
-      request.rowId
-    );
-
-    return result;
-
-  } catch (error) {
-    console.error('DataController.handleToggleHighlight エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 /**
  * データの更新
@@ -266,7 +176,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
       };
     }
 
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
+    const spreadsheet = getSheetsService().openById(spreadsheetId);
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -351,7 +261,7 @@ function addSpreadsheetUrl(url) {
 
     // アクセステスト
     try {
-      const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
+      const spreadsheet = getSheetsService().openById(spreadsheetId);
       const name = spreadsheet.getName();
 
       return {

@@ -13,7 +13,7 @@
  * - Simple, readable code
  */
 
-/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, handleGetData, handleAddReaction, handleToggleHighlight, handleRefreshData, isSystemAdmin, getUserSheetData, DatabaseOperations, columnAnalysisImpl, validateConfig */
+/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, DatabaseOperations, columnAnalysisImpl, validateConfig, getSheetsService, getSecureDatabaseId, dsAddReaction, dsToggleHighlight */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -288,20 +288,42 @@ function doPost(e) {
       })).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // Route to handlers (these functions are defined in DataController.gs)
+    // 🎯 Zero-Dependency Architecture: Direct DataService calls
     let result;
     switch (action) {
       case 'getData':
-        result = handleGetData(request);
+        // 🎯 Zero-Dependency: Direct DatabaseOperations call
+        try {
+          const user = DatabaseOperations.findUserByEmail(email);
+          if (!user) {
+            result = { success: false, message: 'ユーザーが登録されていません' };
+          } else {
+            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
+          }
+        } catch (error) {
+          result = { success: false, message: error.message };
+        }
         break;
       case 'addReaction':
-        result = handleAddReaction(request);
+        // Direct DataService call for reactions
+        result = dsAddReaction(request.userId || email, request.rowId, request.reactionType);
         break;
       case 'toggleHighlight':
-        result = handleToggleHighlight(request);
+        // Direct DataService call for highlights
+        result = dsToggleHighlight(request.userId || email, request.rowId);
         break;
       case 'refreshData':
-        result = handleRefreshData(request);
+        // 🎯 Zero-Dependency: Direct DatabaseOperations call
+        try {
+          const user = DatabaseOperations.findUserByEmail(email);
+          if (!user) {
+            result = { success: false, message: 'ユーザーが登録されていません' };
+          } else {
+            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
+          }
+        } catch (error) {
+          result = { success: false, message: error.message };
+        }
         break;
       default:
         result = { success: false, message: `Unknown action: ${  action}` };
@@ -410,7 +432,7 @@ function getConfig() {
     }
 
     // 🎯 User lookup logging
-    console.log('getConfig: Starting user lookup', { email: email.substring(0, 5) + '***' });
+    console.log('getConfig: Starting user lookup', { email: `${email.substring(0, 5)  }***` });
     const user = db.findUserByEmail(email);
     console.log('getConfig: User lookup result', {
       userFound: !!user,
@@ -427,7 +449,7 @@ function getConfig() {
         const allUsers = db.getAllUsers ? db.getAllUsers({ limit: 10 }) : [];
         console.log('getConfig: Database users diagnostic', {
           totalUsers: allUsers.length,
-          userEmails: allUsers.map(u => u.userEmail ? u.userEmail.substring(0, 5) + '***' : 'NO_EMAIL'),
+          userEmails: allUsers.map(u => u.userEmail ? `${u.userEmail.substring(0, 5)  }***` : 'NO_EMAIL'),
           hasCurrentEmail: allUsers.some(u => u.userEmail === email)
         });
 
@@ -441,11 +463,12 @@ function getConfig() {
           });
           const rows = response.data && response.data.values ? response.data.values : [];
           console.log('getConfig: Raw database content', {
-            databaseId: databaseId.substring(0, 10) + '***',
+            databaseId: `${databaseId.substring(0, 10)  }***`,
             rowCount: rows.length,
             headers: rows.length > 0 ? rows[0] : [],
-            sampleEmails: rows.slice(1, 4).map(row => row[1] ? row[1].substring(0, 5) + '***' : 'NO_EMAIL')
+            sampleEmails: rows.slice(1, 4).map(row => row[1] ? `${row[1].substring(0, 5)  }***` : 'NO_EMAIL')
           });
+
         }
       } catch (diagnosticError) {
         console.error('getConfig: Database diagnostic failed', {
@@ -455,7 +478,7 @@ function getConfig() {
     }
 
     if (!user) {
-      console.error('getConfig: User not found', { email: email.substring(0, 5) + '***' });
+      console.error('getConfig: User not found', { email: `${email.substring(0, 5)  }***` });
       return createUserNotFoundError();
     }
 
@@ -622,7 +645,7 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
 
     // Initialize database if needed
     try {
-      const testAccess = ServiceFactory.getSpreadsheet().openById(databaseId);
+      const testAccess = getSheetsService().openById(databaseId);
     } catch (dbError) {
       console.warn('Database access test failed:', dbError.message);
     }
@@ -1224,7 +1247,7 @@ function validateHeaderIntegrity(targetUserId) {
       };
     }
 
-    const sheet = SpreadsheetApp.openById(config.spreadsheetId).getSheetByName(config.sheetName);
+    const sheet = getSheetsService().openById(config.spreadsheetId).getSheetByName(config.sheetName);
     if (!sheet) {
       return {
         success: false,
@@ -1513,7 +1536,7 @@ function getSheetList(spreadsheetId) {
       return createErrorResponse('Spreadsheet ID required');
     }
 
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
+    const spreadsheet = getSheetsService().openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
 
     const sheetList = sheets.map(sheet => ({

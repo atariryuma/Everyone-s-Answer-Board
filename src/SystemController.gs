@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse */
+/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, getSheetsService, getServiceAccountEmail, getSpreadsheetList */
 
 // ===========================================
 // 🔧 Zero-Dependency Utility Functions
@@ -121,7 +121,7 @@ function testSystemDiagnosis() {
         const databaseId = props.getDatabaseSpreadsheetId();
 
         if (databaseId) {
-          const spreadsheet = ServiceFactory.getSpreadsheet().openById(databaseId);
+          const spreadsheet = getSheetsService().openById(databaseId);
           diagnostics.database = {
             accessible: true,
             name: spreadsheet.getName(),
@@ -276,49 +276,12 @@ function performAutoRepair() {
 
 
 /**
- * スプレッドシート一覧を取得
+ * スプレッドシート一覧を取得（管理者向け）
+ * DataService.getSpreadsheetList()の管理者モードラッパー
  * @returns {Object} スプレッドシート一覧
  */
 function getAdminSpreadsheetList() {
-  try {
-    // 🎯 Zero-dependency: 直接DriveAppでスプレッドシート一覧取得
-    const spreadsheets = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
-
-    const spreadsheetList = [];
-    let count = 0;
-
-    while (spreadsheets.hasNext() && count < 20) { // 最大20件に制限
-      const file = spreadsheets.next();
-      const fileData = {
-        id: file.getId(),
-        name: file.getName(),
-        lastUpdated: file.getLastUpdated(),
-        url: file.getUrl(),
-        size: file.getSize() || 0
-      };
-      spreadsheetList.push(fileData);
-      count++;
-    }
-
-    const result = {
-      success: true,
-      spreadsheets: spreadsheetList,
-      total: spreadsheetList.length,
-      timestamp: new Date().toISOString()
-    };
-
-    return result;
-  } catch (error) {
-    console.error('🚨 AdminController.getSpreadsheetList エラー:', error);
-
-    const errorResult = {
-      success: false,
-      message: error.message || 'スプレッドシート一覧取得エラー',
-      spreadsheets: []
-    };
-
-    return errorResult;
-  }
+  return getSpreadsheetList({ adminMode: true });
 }
 
 /**
@@ -328,8 +291,8 @@ function getAdminSpreadsheetList() {
  */
 function getAdminSheetList(spreadsheetId) {
   try {
-    // 🎯 Zero-dependency: 直接SpreadsheetAppでシート一覧取得
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
+    // 🎯 Zero-dependency: サービスアカウント経由でシート一覧取得
+    const spreadsheet = getSheetsService().openById(spreadsheetId);
     const sheets = spreadsheet.getSheets();
 
     const sheetList = sheets.map(sheet => ({
@@ -748,13 +711,27 @@ function publishApplication(publishConfig) {
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {Object} 検証結果
  */
-function validateAccess(spreadsheetId) {
+function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
-    // 🎯 Zero-dependency: 直接SpreadsheetAppでアデス権確認
-    const spreadsheet = ServiceFactory.getSpreadsheet().openById(spreadsheetId);
+    // 🎯 Zero-dependency: サービスアカウント経由でアクセス権確認
+    const spreadsheet = getSheetsService().openById(spreadsheetId);
+
+    // サービスアカウントを編集者として自動登録
+    if (autoAddEditor) {
+      try {
+        const serviceAccountEmail = getServiceAccountEmail();
+        if (serviceAccountEmail) {
+          spreadsheet.addEditor(serviceAccountEmail);
+          console.log('validateAccess: サービスアカウントを編集者として登録:', serviceAccountEmail);
+        }
+      } catch (editorError) {
+        console.warn('validateAccess: 編集者登録をスキップ:', editorError.message);
+      }
+    }
+
     const sheets = spreadsheet.getSheets();
 
-    // アデスできたら成功
+    // アクセスできたら成功
     const result = {
       success: true,
       message: 'アクセス権限が確認されました',
@@ -811,7 +788,7 @@ function getFormInfo(spreadsheetId, sheetName) {
     // スプレッドシート取得
     let spreadsheet;
     try {
-      spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      spreadsheet = getSheetsService().openById(spreadsheetId);
     } catch (accessError) {
       return {
         success: false,
