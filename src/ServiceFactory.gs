@@ -13,7 +13,7 @@
  * - プラットフォームAPI統合
  */
 
-/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, getServiceAccountToken */
+/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, getServiceAccountToken, connectToSheetInternal */
 
 // ===========================================
 // 🔧 Session Management
@@ -277,6 +277,9 @@ function getDataService() {
     }
     if (typeof dsToggleHighlight === 'function') {
       shim.toggleHighlight = dsToggleHighlight;
+    }
+    if (typeof connectToSheetInternal === 'function') {
+      shim.connectToSheetInternal = connectToSheetInternal;
     }
     if (Object.keys(shim).length > 0) return shim;
 

@@ -1989,13 +1989,15 @@ if (typeof global !== 'undefined') {
     getUserSheetData,
     processReaction,
     addReaction: dsAddReaction,
-    toggleHighlight: dsToggleHighlight
+    toggleHighlight: dsToggleHighlight,
+    connectToSheetInternal
   };
 } else {
   this.DataService = {
     getUserSheetData,
     processReaction,
     addReaction: dsAddReaction,
-    toggleHighlight: dsToggleHighlight
+    toggleHighlight: dsToggleHighlight,
+    connectToSheetInternal
   };
 }

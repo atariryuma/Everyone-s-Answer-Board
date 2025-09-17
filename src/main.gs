@@ -208,6 +208,7 @@ function doGet(e) {
             try {
               config = JSON.parse(user.configJson);
             } catch (parseError) {
+              // Parse error ignored - use default empty config
             }
           }
 
