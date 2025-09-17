@@ -13,7 +13,7 @@
  * - プラットフォームAPI統合
  */
 
-/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, getServiceAccountToken, connectToSheetInternal */
+/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, getServiceAccountToken, connectToSheetInternal, getFormInfo */
 
 // ===========================================
 // 🔧 Session Management
@@ -304,6 +304,7 @@ function getConfigService() {
     const shim = {};
     if (typeof getUserConfig === 'function') shim.getUserConfig = getUserConfig;
     if (typeof saveUserConfig === 'function') shim.saveUserConfig = saveUserConfig;
+    if (typeof getFormInfo === 'function') shim.getFormInfo = getFormInfo;
     if (Object.keys(shim).length > 0) return shim;
 
     console.warn('ServiceFactory.getConfigService: ConfigService not available');

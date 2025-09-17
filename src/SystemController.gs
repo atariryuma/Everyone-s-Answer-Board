@@ -575,7 +575,8 @@ function createForm(userId, config) {
       console.error('AdminController.createForm: ConfigService not available');
       return { success: false, message: 'ConfigServiceが利用できません' };
     }
-    const result = configService.createForm(userId, config);
+    // createForm機能は現在サポートされていません
+    const result = { success: false, message: 'フォーム作成機能は現在利用できません' };
 
     if (result && result.success) {
       return result;

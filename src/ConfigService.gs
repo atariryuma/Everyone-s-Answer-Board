@@ -620,6 +620,73 @@ function getQuestionText(config) {
 }
 
 /**
+ * フォーム情報取得
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} フォーム情報
+ */
+function getFormInfo(spreadsheetId, sheetName) {
+  try {
+    if (!initConfigServiceZero()) {
+      return { success: false, message: 'Service initialization failed' };
+    }
+
+    // Direct GAS API usage (CLAUDE.md準拠)
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    let formUrl = null;
+    let formTitle = null; // フォームタイトル（取得できない場合はnull）
+
+    try {
+      // シート固有のフォームURL取得を試行
+      const sheet = spreadsheet.getSheetByName(sheetName);
+      if (sheet && typeof sheet.getFormUrl === 'function') {
+        formUrl = sheet.getFormUrl();
+      }
+
+      // スプレッドシートレベルのフォームURL取得を試行
+      if (!formUrl && typeof spreadsheet.getFormUrl === 'function') {
+        formUrl = spreadsheet.getFormUrl();
+      }
+
+      // 安全なFormApp使用（ログ出力なしでスタックオーバーフロー対策）
+      if (formUrl) {
+        try {
+          // FormApp.openByUrl()をログ出力なしで使用
+          const form = FormApp.openByUrl(formUrl);
+          if (form && typeof form.getTitle === 'function') {
+            const title = form.getTitle();
+            formTitle = title || null; // 空文字の場合もnullに
+          }
+        } catch (formError) {
+          // エラー時は静寂に処理（ログ出力なし）
+          formTitle = null;
+        }
+      }
+
+    } catch (accessError) {
+      // Robust Error Handling - ログ出力を削除（エラー原因対策）
+    }
+
+    return {
+      success: !!formUrl,
+      formUrl,
+      formTitle, // 実際のフォームタイトル（取得できない場合はnull）
+      spreadsheetName: spreadsheet.getName(),
+      message: formUrl ? 'Form info retrieved successfully' : 'No form URL found'
+    };
+
+  } catch (error) {
+    // Robust Error Handling (CLAUDE.md準拠)
+    return {
+      success: false,
+      message: 'Form info retrieval failed',
+      formUrl: null,
+      formTitle: null
+    };
+  }
+}
+
+/**
  * システム管理者確認
  * @param {string} email - メールアドレス
  * @returns {boolean} システム管理者かどうか

@@ -1137,7 +1137,15 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
       };
     }
 
-    return { success: true, sheet };
+    // Batch operations for performance (CLAUDE.md準拠)
+    const headers = sheet.getDataRange().getValues()[0] || [];
+
+    return {
+      success: true,
+      sheet,
+      headers, // UI必須データ追加
+      columnMapping: { mapping: {}, confidence: {} } // UI必須データ追加
+    };
 
   } catch (error) {
     console.error('DataService.connectToSheetInternal: 接続エラー', {
