@@ -1342,10 +1342,18 @@ function detectColumnTypes(headers, sampleData) {
     const analysisResults = performHighPrecisionAnalysis(headers, sampleData);
 
     // 結果をマッピングに反映 - 設定可能な信頼度閾値
-    const confidenceThreshold = 50; // Zero-dependency: 日本語ヘッダー対応で50%に調整
+    // 🎯 適応的閾値システム - 列種別最適化
+    const adaptiveThresholds = {
+      name: 65,    // 明確な列種別：「名前」「氏名」等
+      class: 65,   // 明確な列種別：「クラス」「組」等
+      answer: 55,  // 文脈依存列：質問文等
+      reason: 55   // 文脈依存列：理由説明等
+    };
 
     Object.entries(analysisResults).forEach(([columnType, result]) => {
-      if (result.confidence >= confidenceThreshold) {
+      const threshold = adaptiveThresholds[columnType] || 60; // デフォルト閾値
+
+      if (result.confidence >= threshold) {
         mapping.mapping[columnType] = result.index;
         mapping.confidence[columnType] = Math.round(result.confidence);
       } else {
@@ -1489,14 +1497,32 @@ function analyzeHeaderPattern(headerLower, targetType) {
   const patterns = {
     answer: {
       primary: [/^回答$/, /^答え$/, /^answer$/, /^response$/],
-      strong: [/回答/, /答え/, /answer/, /意見/, /予想/, /考え/, /思う/, /選択/, /choice/],
-      medium: [/結果/, /result/, /値/, /value/, /内容/, /content/],
+      strong: [
+        /回答/, /答え/, /answer/, /意見/, /予想/, /考え/, /思う/, /選択/, /choice/,
+        // 🎯 教育現場パターン強化
+        /予想.*しよう/, /考え.*書/, /思い.*記入/, /どのように/, /何が/, /どんな/,
+        /観察.*気づいた/, /気づいた.*こと/, /わかった.*こと/, /感じた.*こと/
+      ],
+      medium: [
+        /結果/, /result/, /値/, /value/, /内容/, /content/,
+        // 🎯 教育質問文パターン
+        /しよう$/, /ましょう$/, /てください$/, /について/, /に関して/
+      ],
       weak: [/データ/, /data/, /情報/, /info/]
     },
     reason: {
       primary: [/^理由$/, /^根拠$/, /^reason$/, /^説明$/],
-      strong: [/理由/, /根拠/, /reason/, /なぜ/, /why/, /わけ/, /説明/, /explanation/],
-      medium: [/詳細/, /detail/, /背景/, /background/, /コメント/, /comment/],
+      strong: [
+        /理由/, /根拠/, /reason/, /なぜ/, /why/, /わけ/, /説明/, /explanation/,
+        // 🎯 教育現場理由パターン強化
+        /理由.*書/, /根拠.*教/, /なぜ.*思/, /どうして.*考/, /そう.*理由/,
+        /体験.*あれば/, /経験.*あれば/, /背景.*あれば/
+      ],
+      medium: [
+        /詳細/, /detail/, /背景/, /background/, /コメント/, /comment/,
+        // 🎯 教育理由説明パターン
+        /考える/, /思う/, /感じる/, /体験/, /経験/, /きっかけ/
+      ],
       weak: [/その他/, /other/, /備考/, /note/]
     },
     class: {
@@ -1520,12 +1546,18 @@ function analyzeHeaderPattern(headerLower, targetType) {
   let matchedLevel = null;
   let score = 0;
 
-  // 段階的マッチング
+  // 段階的マッチング - 明確キーワードボーナス対応
   for (const pattern of typePatterns.primary || []) {
     if (pattern.test(headerLower)) {
       matchedPattern = pattern.toString();
       matchedLevel = 'primary';
-      score = 95;
+      score = 98; // 明確キーワードの基本スコア向上 95% → 98%
+
+      // 🎯 超明確キーワードボーナス (+2%)
+      const ultraClearKeywords = ['クラス', '名前', '氏名', 'class', 'name'];
+      if (ultraClearKeywords.some(keyword => headerLower.includes(keyword.toLowerCase()))) {
+        score = Math.min(100, score + 2); // 最大100%まで
+      }
       break;
     }
   }
@@ -1563,6 +1595,26 @@ function analyzeHeaderPattern(headerLower, targetType) {
     }
   }
 
+  // 🎯 否定的パターンフィルタ - リアクション列誤判定防止
+  const negativePatterns = [
+    // リアクション系
+    /^like$/i, /^いいね/, /^good$/i, /^great$/i,
+    /^understand$/i, /^なるほど/, /^わかった$/i, /^got it$/i,
+    /^curious$/i, /^もっと知りたい/, /^want to know/i, /^interested/i,
+    /^highlight$/i, /^ハイライト/, /^mark$/i, /^important$/i,
+    // 感情表現
+    /！$/, /!$/, /^すごい/, /^amazing/i, /^wow/i,
+    // 単発アクション
+    /^yes$/i, /^no$/i, /^はい$/, /^いいえ$/
+  ];
+
+  // 否定的パターンにマッチした場合は大幅減点
+  for (const negPattern of negativePatterns) {
+    if (negPattern.test(headerLower)) {
+      score = Math.max(0, score - 50); // 50点減点（最低0点）
+      break;
+    }
+  }
 
   return score;
 }

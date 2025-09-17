@@ -2097,8 +2097,17 @@
         console.log(`✅ AI検出成功: ${columnType} → ${selectedIndex}列 (信頼度: ${confidence}%)`);
         detectedCount++;
       } else if (confidence > 0) {
-        // 信頼度はあるが閾値未満の場合
-        console.log(`⚠️ AI検出: ${columnType}列は信頼度${confidence}%で閾値未満`);
+        // 適応的閾値チェック
+        const adaptiveThresholds = {
+          name: 65, class: 65, answer: 55, reason: 55
+        };
+        const threshold = adaptiveThresholds[columnType] || 60;
+
+        if (confidence >= threshold) {
+          console.log(`⚠️ AI検出: ${columnType}列は信頼度${confidence}%で適応閾値(${threshold}%)以上だが、マッピングエラー`);
+        } else {
+          console.log(`⚠️ AI検出: ${columnType}列は信頼度${confidence}%で適応閾値(${threshold}%)未満`);
+        }
         showConfidenceBadge(columnType, confidence, 'low-confidence');
       }
     });
@@ -2139,7 +2148,14 @@
     let autoAppliedCount = 0;
     let highConfidenceCount = 0;
 
-    // 高信頼度(80%以上)の検出結果を自動適用（UI列のみ）
+    // 適応的閾値による自動適用（列種別最適化）
+    const adaptiveThresholds = {
+      name: 65,    // 明確な列種別
+      class: 65,   // 明確な列種別
+      answer: 55,  // 文脈依存列
+      reason: 55   // 文脈依存列
+    };
+
     Object.keys(mapping).forEach((columnType) => {
       // リアクション列はスキップ（UIドロップダウンが存在しない）
       if (['highlight', 'curious', 'like', 'understand'].includes(columnType)) {
@@ -2148,10 +2164,11 @@
 
       const columnIndex = mapping[columnType];
       const confidenceValue = confidence?.[columnType] || 0;
+      const threshold = adaptiveThresholds[columnType] || 60; // デフォルト閾値
 
-      console.log(`🔍 ${columnType}: columnIndex=${columnIndex}, confidence=${confidenceValue}`);
+      console.log(`🔍 ${columnType}: columnIndex=${columnIndex}, confidence=${confidenceValue}, threshold=${threshold}`);
 
-      if (confidenceValue >= 80 && columnIndex !== undefined && columnIndex !== null) {
+      if (confidenceValue >= threshold && columnIndex !== undefined && columnIndex !== null) {
         highConfidenceCount++;
         const dropdown = document.getElementById(`${columnType}-column-select`);
 
