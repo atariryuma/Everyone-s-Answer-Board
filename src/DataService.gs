@@ -86,7 +86,7 @@ function getUserSheetData(userId, options = {}) {
     if (result.success) {
       return {
         ...result,
-        header: config.header || config.title || result.sheetName || '回答一覧',
+        header: getQuestionText(config) || result.sheetName || '回答一覧',
         showDetails: config.showDetails !== false // デフォルトはtrue
       };
     }
@@ -533,11 +533,15 @@ function getAutoStopTime(publishedAt, minutes) {
  * @param {string} userEmail - ユーザーメール
  * @returns {Object} 処理結果
  */
-function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, _userEmail) {
+function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEmail) {
   // 🚀 Zero-dependency: ServiceFactory経由で初期化
   try {
     if (!validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey)) {
       throw new Error('無効なリアクションパラメータ');
+    }
+
+    if (!userEmail) {
+      throw new Error('ユーザー情報が必要です');
     }
 
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
@@ -547,28 +551,84 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, _userE
       throw new Error('シートが見つかりません');
     }
 
-    // リアクション列を取得または作成
-    const reactionColumn = getOrCreateReactionColumn(sheet, reactionKey);
+    // Get all reaction columns for this row to implement exclusive reactions
+    const reactionColumns = {
+      'LIKE': getOrCreateReactionColumn(sheet, 'LIKE'),
+      'UNDERSTAND': getOrCreateReactionColumn(sheet, 'UNDERSTAND'),
+      'CURIOUS': getOrCreateReactionColumn(sheet, 'CURIOUS')
+    };
 
-    // 現在の値を取得して更新
-    const currentValue = sheet.getRange(rowIndex, reactionColumn).getValue() || 0;
-    const newValue = Math.max(0, currentValue + 1);
-    sheet.getRange(rowIndex, reactionColumn).setValue(newValue);
+    // Get current reaction states for all reaction types
+    const currentReactions = {};
+    const allReactionsData = {};
+    let userCurrentReaction = null;
 
-    console.info('DataService.processReaction: リアクション処理完了', {
+    Object.keys(reactionColumns).forEach(key => {
+      const col = reactionColumns[key];
+      const cellValue = sheet.getRange(rowIndex, col).getValue() || '';
+      const reactionUsers = parseReactionUsers(cellValue);
+      currentReactions[key] = reactionUsers;
+      allReactionsData[key] = {
+        count: reactionUsers.length,
+        reacted: reactionUsers.includes(userEmail)
+      };
+
+      if (reactionUsers.includes(userEmail)) {
+        userCurrentReaction = key;
+      }
+    });
+
+    // Apply reaction rules
+    let action = 'added';
+    let newUserReaction = null;
+
+    if (userCurrentReaction === reactionKey) {
+      // User clicking same reaction -> remove (toggle)
+      currentReactions[reactionKey] = currentReactions[reactionKey].filter(u => u !== userEmail);
+      action = 'removed';
+    } else {
+      // User clicking different reaction -> remove old, add new
+      if (userCurrentReaction) {
+        currentReactions[userCurrentReaction] = currentReactions[userCurrentReaction].filter(u => u !== userEmail);
+      }
+      currentReactions[reactionKey].push(userEmail);
+      newUserReaction = reactionKey;
+      action = 'changed';
+    }
+
+    // Update all reaction columns
+    Object.keys(reactionColumns).forEach(key => {
+      const col = reactionColumns[key];
+      const users = currentReactions[key];
+      const cellValue = serializeReactionUsers(users);
+      sheet.getRange(rowIndex, col).setValue(cellValue);
+
+      // Update response data
+      allReactionsData[key] = {
+        count: users.length,
+        reacted: users.includes(userEmail)
+      };
+    });
+
+    console.info('DataService.processReaction: ユーザーベースリアクション処理完了', {
       spreadsheetId,
       sheetName,
       rowIndex,
       reactionKey,
-      oldValue: currentValue,
-      newValue
+      userEmail: userEmail.substring(0, 5) + '***',
+      action,
+      userCurrentReaction: newUserReaction,
+      oldValue: userCurrentReaction ? allReactionsData[userCurrentReaction]?.count || 0 : 0,
+      newValue: allReactionsData[reactionKey]?.count || 0
     });
 
     return {
       success: true,
       status: 'success',
-      message: 'リアクションを追加しました',
-      newValue
+      message: `リアクションを${action === 'removed' ? '削除' : action === 'changed' ? '変更' : '追加'}しました`,
+      reactions: allReactionsData,
+      userReaction: newUserReaction,
+      newValue: allReactionsData[reactionKey]?.count || 0  // For backwards compatibility
     };
   } catch (error) {
     console.error('DataService.processReaction: エラー', error.message);
@@ -579,6 +639,41 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, _userE
     };
   }
 }
+
+/**
+ * リアクションユーザー配列をパース
+ * @param {string} cellValue - セル値
+ * @returns {Array<string>} ユーザーメール配列
+ */
+function parseReactionUsers(cellValue) {
+  if (!cellValue || typeof cellValue !== 'string') {
+    return [];
+  }
+
+  const trimmed = cellValue.trim();
+  if (!trimmed) {
+    return [];
+  }
+
+  // Split by delimiter and filter out empty strings
+  return trimmed.split('|').filter(email => email.trim().length > 0);
+}
+
+/**
+ * ユーザー配列をセル用文字列にシリアライズ
+ * @param {Array<string>} users - ユーザーメール配列
+ * @returns {string} セル格納用文字列
+ */
+function serializeReactionUsers(users) {
+  if (!Array.isArray(users) || users.length === 0) {
+    return '';
+  }
+
+  // Filter out empty emails and join with delimiter
+  const validEmails = users.filter(email => email && email.trim().length > 0);
+  return validEmails.join('|');
+}
+
 
 // ===========================================
 // 🔧 ユーティリティ・ヘルパー
@@ -1949,7 +2044,7 @@ function dsAddReaction(userId, rowId, reactionType) {
       return createErrorResponse('Invalid row ID');
     }
 
-    const res = processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionType, null);
+    const res = processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionType, user.userEmail);
     if (res && (res.success || res.status === 'success')) {
       return {
         success: true,

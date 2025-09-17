@@ -1948,9 +1948,14 @@ function getIncrementalSheetData(sheetName, options = {}) {
     console.error('getIncrementalSheetData error:', error.message);
     return {
       success: false,
-      message: error.message,
+      status: 'error',
+      message: error.message || 'データ取得エラー',
+      error: error.message || 'Unknown error',
       data: [],
-      hasNewData: false
+      hasNewData: false,
+      newCount: 0,
+      totalCount: 0,
+      timestamp: new Date().toISOString()
     };
   }
 }
