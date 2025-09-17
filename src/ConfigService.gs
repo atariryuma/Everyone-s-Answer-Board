@@ -648,18 +648,30 @@ function getFormInfo(spreadsheetId, sheetName) {
         formUrl = spreadsheet.getFormUrl();
       }
 
-      // 安全なFormApp使用（ログ出力なしでスタックオーバーフロー対策）
-      if (formUrl) {
+      // FormApp usage with multiple strategies for V8 runtime stability
+      if (formUrl && formUrl.includes('docs.google.com/forms/')) {
         try {
-          // FormApp.openByUrl()をログ出力なしで使用
+          // Strategy 1: Direct URL access with delay to prevent stack overflow
+          Utilities.sleep(50);
           const form = FormApp.openByUrl(formUrl);
           if (form && typeof form.getTitle === 'function') {
-            const title = form.getTitle();
-            formTitle = title || null; // 空文字の場合もnullに
+            formTitle = form.getTitle() || null;
           }
-        } catch (formError) {
-          // エラー時は静寂に処理（ログ出力なし）
-          formTitle = null;
+        } catch (directError) {
+          try {
+            // Strategy 2: ID extraction fallback
+            const formId = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+            if (formId) {
+              Utilities.sleep(50);
+              const form = FormApp.openById(formId);
+              if (form && typeof form.getTitle === 'function') {
+                formTitle = form.getTitle() || null;
+              }
+            }
+          } catch (idError) {
+            console.warn('FormApp access failed:', directError.message, idError.message);
+            formTitle = null;
+          }
         }
       }
 
@@ -669,9 +681,11 @@ function getFormInfo(spreadsheetId, sheetName) {
 
     return {
       success: !!formUrl,
-      formUrl,
-      formTitle, // 実際のフォームタイトル（取得できない場合はnull）
-      spreadsheetName: spreadsheet.getName(),
+      formData: {
+        formUrl,
+        formTitle, // 実際のフォームタイトル（取得できない場合はnull）
+        spreadsheetName: spreadsheet.getName()
+      },
       message: formUrl ? 'Form info retrieved successfully' : 'No form URL found'
     };
 
@@ -679,9 +693,8 @@ function getFormInfo(spreadsheetId, sheetName) {
     // Robust Error Handling (CLAUDE.md準拠)
     return {
       success: false,
-      message: 'Form info retrieval failed',
-      formUrl: null,
-      formTitle: null
+      formData: null,
+      message: 'Form info retrieval failed'
     };
   }
 }
