@@ -358,18 +358,13 @@
           existingColumnMapping?.spreadsheetId === spreadsheetId &&
           Object.keys(existingColumnMapping.mapping).length > 0) {
         console.log('🔧 同一スプレッドシート設定検出 - 設定復元実行');
-        analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
-          useConfigJson: true,
-          userId: userId
-        });
+        analysisResult = await analyzeColumns(spreadsheetId, sheetName);
       }
 
       // 2. 設定復元に失敗した場合は基本ヘッダー取得
       if (!analysisResult || !analysisResult.success) {
         console.log('🔧 基本ヘッダー取得を実行');
-        analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
-          basicOnly: true
-        });
+        analysisResult = await analyzeColumns(spreadsheetId, sheetName);
       }
 
       // 3. 基本ヘッダー取得も失敗した場合はフル分析
@@ -1021,9 +1016,9 @@
     });
   }
 
-  function analyzeColumns(spreadsheetId, sheetName, options = {}) {
+  function analyzeColumns(spreadsheetId, sheetName) {
     return new Promise((resolve, reject) => {
-      console.log('🔍 analyzeColumns called with:', { spreadsheetId, sheetName, options });
+      console.log('🔍 analyzeColumns called with:', { spreadsheetId, sheetName });
 
       google.script.run
         .withSuccessHandler(function(result) {
@@ -1040,7 +1035,7 @@
             reject(error);
           }
         })
-        .analyzeColumns(spreadsheetId, sheetName, options);
+        .analyzeColumns(spreadsheetId, sheetName);
     });
   }
 
@@ -1143,11 +1138,11 @@
       if (hasSpreadsheetConfig) {
         saveDraftBtn.disabled = false;
         saveDraftBtn.textContent = hasColumnMapping ? '下書き保存' : '下書き保存（列設定推奨）';
-        saveDraftBtn.className = 'btn-secondary';
+        saveDraftBtn.classList.remove('opacity-50');
       } else {
         saveDraftBtn.disabled = true;
         saveDraftBtn.textContent = '下書き保存（データソース未接続）';
-        saveDraftBtn.className = 'btn-secondary opacity-50';
+        saveDraftBtn.classList.add('opacity-50');
       }
     }
 
@@ -1156,7 +1151,7 @@
       if (hasSpreadsheetConfig && hasColumnMapping) {
         publishNowBtn.disabled = false;
         publishNowBtn.textContent = '今すぐ公開';
-        publishNowBtn.className = 'btn-primary';
+        publishNowBtn.classList.remove('opacity-50');
       } else {
         publishNowBtn.disabled = true;
         if (!hasSpreadsheetConfig) {
@@ -1164,7 +1159,7 @@
         } else {
           publishNowBtn.textContent = '今すぐ公開（列設定が必要）';
         }
-        publishNowBtn.className = 'btn-primary opacity-50';
+        publishNowBtn.classList.add('opacity-50');
       }
     }
 
@@ -1602,16 +1597,12 @@
       console.log('📋 connectToSheet: シート接続を開始:', { spreadsheetId, sheetName });
 
       // 1. フル列分析を実行（AI検出込み - 設定復元なし）
-      let analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
-        forceFullAnalysis: true
-      });
+      let analysisResult = await analyzeColumns(spreadsheetId, sheetName);
 
       // 2. 列分析が失敗した場合は基本ヘッダーのみ取得を試行
       if (!analysisResult || !analysisResult.success) {
         console.log('🔧 connectToSheet: 基本ヘッダー取得を実行');
-        analysisResult = await analyzeColumns(spreadsheetId, sheetName, {
-          basicOnly: true
-        });
+        analysisResult = await analyzeColumns(spreadsheetId, sheetName);
       }
 
       if (!analysisResult || !analysisResult.success) {
@@ -2036,6 +2027,26 @@
     // 防御的チェック: mappingがundefined/nullの場合は早期リターン
     if (!mapping || typeof mapping !== 'object') {
       console.log('💡 AI検出結果がありません - 手動選択をお使いください');
+      return;
+    }
+
+    // 詳細チェック: mapping構造の検証
+    const mappingDetails = {
+      hasMapping: mapping.hasOwnProperty('mapping'),
+      hasConfidence: mapping.hasOwnProperty('confidence'),
+      mappingKeys: mapping.mapping ? Object.keys(mapping.mapping) : [],
+      confidenceKeys: mapping.confidence ? Object.keys(mapping.confidence) : [],
+      mappingContent: mapping.mapping,
+      confidenceContent: mapping.confidence
+    };
+    console.log('🔍 setAIDetectionSelections: mapping詳細分析', mappingDetails);
+
+    // mappingが空の場合の詳細ログ
+    if (!mapping.mapping || Object.keys(mapping.mapping).length === 0) {
+      console.log('💡 AI検出結果がありません - 手動選択をお使いください');
+      if (mapping.confidence && Object.keys(mapping.confidence).length > 0) {
+        console.log('🔍 信頼度情報はあります:', mapping.confidence);
+      }
       return;
     }
 

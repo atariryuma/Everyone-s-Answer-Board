@@ -1347,31 +1347,21 @@ function getPublishedSheetData(classFilter, sortOrder) {
 }
 
 /**
- * Column analysis - direct call to DataService
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} sheetName - シート名
- * @param {Object} options - 分析オプション
+ * 🎯 API Gateway: 列分析（AI自動判定）
+ * @param {string} spreadsheetId スプレッドシートID
+ * @param {string} sheetName シート名
  * @returns {Object} 列分析結果
  */
-function columnAnalysis(spreadsheetId, sheetName, options = {}) {
+function analyzeColumns(spreadsheetId, sheetName) {
   try {
-    // Call the actual implementation in DataService.gs
-    const result = columnAnalysisImpl(spreadsheetId, sheetName, options);
+    const result = columnAnalysisImpl(spreadsheetId, sheetName);
     return result;
   } catch (error) {
-    console.error('columnAnalysis error:', error.message);
-    console.error('columnAnalysis stack:', error.stack);
+    console.error('analyzeColumns error:', error.message);
+    console.error('analyzeColumns stack:', error.stack);
     const exceptionResult = createExceptionResponse(error);
     return exceptionResult;
   }
-}
-
-/**
- * Legacy alias for backwards compatibility - analyzeColumns
- */
-function analyzeColumns(spreadsheetId, sheetName, options = {}) {
-  const result = columnAnalysis(spreadsheetId, sheetName, options);
-  return result;
 }
 
 

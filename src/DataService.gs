@@ -130,7 +130,7 @@ function fetchSpreadsheetData(config, options = {}) {
     const lastCol = sheet.getLastColumn();
 
     if (lastRow <= 1) {
-      // ✅ google.script.run 互換: シンプル形式
+      // ✅ シンプル形式で返却
       return { success: true, data: [], headers: [], sheetName: config.sheetName || '不明' };
     }
 
@@ -204,7 +204,7 @@ function fetchSpreadsheetData(config, options = {}) {
       batchCount: Math.ceil(totalDataRows / MAX_BATCH_SIZE)
     });
 
-    // ✅ google.script.run 互換: フロントエンド期待形式で直接返却
+    // ✅ フロントエンド期待形式で直接返却
     return {
       success: true,
       data: processedData,
@@ -285,7 +285,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
 }
 
 /**
- * 生データを処理・変換（レガシー互換）
+ * 生データを処理・変換
  * @param {Array} dataRows - 生データ行
  * @param {Array} headers - ヘッダー配列
  * @param {Object} config - 設定
@@ -929,7 +929,7 @@ function getSpreadsheetList() {
     }
 
 
-    // ✅ google.script.run互換 - シンプル形式に最適化
+    // ✅ シンプル形式に最適化
     const response = {
       success: true,
       spreadsheets,
@@ -941,7 +941,7 @@ function getSpreadsheetList() {
     const responseSizeKB = Math.round(responseSize / 1024 * 100) / 100;
 
 
-    // ✅ google.script.run互換性チェック
+    // ✅ 構造チェック
     if (!response || typeof response !== 'object' || !Array.isArray(response.spreadsheets)) {
       console.error('DataService.getSpreadsheetList: 無効なレスポンス形式', response);
       return {
@@ -1001,74 +1001,28 @@ function getSpreadsheetList() {
 // ===========================================
 
 /**
- * 列分析のメイン関数（コンテキスト対応版）
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} sheetName - シート名
- * @param {Object} options - 分析オプション
- * @param {boolean} options.basicOnly - 基本ヘッダー情報のみ取得
- * @param {boolean} options.useConfigJson - configJsonからマッピング復元
- * @param {string} options.userId - ユーザーID（設定復元用）
- * @param {boolean} options.forceFullAnalysis - フル分析を強制実行（設定復元・基本ヘッダーをスキップ）
+ * 🎯 AI列分析実装 - connectToSheetInternalに統合
+ * @param {string} spreadsheetId スプレッドシートID
+ * @param {string} sheetName シート名
  * @returns {Object} 列分析結果
  */
-function columnAnalysisImpl(spreadsheetId, sheetName, options = {}) {
-  const started = Date.now();
+function columnAnalysisImpl(spreadsheetId, sheetName) {
   try {
-
-    // 🎯 GAS Best Practice: パラメータ検証を別関数に分離
     const paramValidation = validateSheetParams(spreadsheetId, sheetName);
     if (!paramValidation.isValid) {
-      console.error('DataService.columnAnalysis: パラメータ検証失敗');
       return paramValidation.errorResponse;
     }
 
-    // 🎯 フル分析強制実行の場合は設定復元・基本ヘッダーをスキップ
-    if (!options.forceFullAnalysis) {
-      // 🎯 configJsonからの設定復元（優先実行）
-      if (options.useConfigJson && options.userId) {
-        const configResult = restoreColumnConfig(options.userId, spreadsheetId, sheetName);
-        if (configResult.success) {
-          return configResult;
-        }
-      }
-
-      // 🎯 基本ヘッダー情報のみ取得
-      if (options.basicOnly) {
-        return getSheetHeaders(spreadsheetId, sheetName, started);
-      }
-    }
-
-    // 🎯 GAS Best Practice: スプレッドシート接続を別関数に分離
     const connectionResult = connectToSheetInternal(spreadsheetId, sheetName);
     if (!connectionResult.success) {
-      console.error('DataService.columnAnalysis: スプレッドシート接続失敗');
       return connectionResult.errorResponse;
     }
 
-    // 🎯 GAS Best Practice: データ取得を別関数に分離
-    const dataResult = extractSheetHeaders(connectionResult.sheet);
-    if (!dataResult.success) {
-      console.error('DataService.columnAnalysis: データ取得失敗');
-      return dataResult.errorResponse;
-    }
-
-    // 🎯 GAS Best Practice: 列分析を別関数に分離
-    const analysisResult = detectColumnTypes(dataResult.headers, dataResult.sampleData);
-
-    // google.script.run互換性: フロントエンド期待フォーマットに変換
-    const frontendMapping = {
-      ...analysisResult.mapping.mapping,        // answer: 4, reason: 5, etc
-      confidence: analysisResult.mapping.confidence  // confidence: { answer: 90, ... }
-    };
-
-    const finalResult = {
+    return {
       success: true,
-      headers: dataResult.headers,
-      columnMapping: frontendMapping,
-      executionTime: `${Date.now() - started}ms`
+      headers: connectionResult.headers,
+      columnMapping: connectionResult.columnMapping
     };
-
-    return finalResult;
 
   } catch (error) {
     console.error('DataService.columnAnalysis: 予期しないエラー', {
@@ -1140,11 +1094,33 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
     // Batch operations for performance (CLAUDE.md準拠)
     const headers = sheet.getDataRange().getValues()[0] || [];
 
+    // AI列判定を統合実行（Zero-Dependency Architecture）
+    let columnMapping = { mapping: {}, confidence: {} };
+    try {
+      // サンプルデータを取得してAI分析実行
+      const dataRange = sheet.getDataRange();
+      const allData = dataRange.getValues();
+      const sampleData = allData.slice(1, Math.min(11, allData.length)); // 最大10行のサンプル
+
+      const analysisResult = detectColumnTypes(headers, sampleData);
+      columnMapping = analysisResult.mapping || { mapping: {}, confidence: {} };
+
+      console.log('DataService.connectToSheetInternal: AI分析完了', {
+        headers: headers.length,
+        sampleData: sampleData.length,
+        mapping: columnMapping.mapping,
+        confidence: columnMapping.confidence
+      });
+    } catch (aiError) {
+      console.warn('DataService.connectToSheetInternal: AI分析エラー', aiError.message);
+      // エラー時はデフォルト値を使用
+    }
+
     return {
       success: true,
       sheet,
       headers, // UI必須データ追加
-      columnMapping: { mapping: {}, confidence: {} } // UI必須データ追加
+      columnMapping // AI分析結果を含む
     };
 
   } catch (error) {
