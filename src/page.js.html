@@ -3191,7 +3191,9 @@ class StudyQuestApp {
           await this.renderBoard(false, isInitialLoad);
           
           // Step 4: Consistency validation after DOM update (Phase 2.1)
-          await this.validatePostLoadState();
+          setTimeout(() => {
+            this.validatePostLoadState();
+          }, 100);
         });
 
         // Post-processing after successful data load
@@ -3555,7 +3557,11 @@ class StudyQuestApp {
       
       // レンダリング後の状態更新
       this.finalizeRenderingState();
-      this.validatePostLoadState();
+
+      // DOM要素の生成が完了してから検証を実行
+      setTimeout(() => {
+        this.validatePostLoadState();
+      }, 100);
       
     } catch (error) {
       errorLog('❌ renderBoard: レンダリングエラー:', error);
@@ -3845,7 +3851,7 @@ class StudyQuestApp {
         reaction: reactionType.key,
         count: newCount,
         reacted,
-        shouldDisplay: newCount > 0
+        shouldDisplay: newCount > 0 || reacted
       });
     });
 
@@ -3872,7 +3878,7 @@ class StudyQuestApp {
               }
 
               const rt = this.reactionTypes.find(r => r.key === update.reaction);
-              const svgEl = btn.querySelector('svg');
+              const svgEl = btn.querySelector('svg') || btn.querySelector('span[aria-hidden="true"]');
               if (svgEl && rt) {
                 // Force icon update to ensure reacted state is visible
                 const newIcon = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
@@ -5066,9 +5072,10 @@ class StudyQuestApp {
             }
         }
 
-        // Schedule async verification
+        // Schedule async verification with proper highlight value
         setTimeout(() => {
-            this.verifyHighlightSync(numericRowIndex, res.highlight);
+            const highlightValue = typeof res.highlighted === 'boolean' ? res.highlighted : (typeof res.highlight === 'boolean' ? res.highlight : highlighted);
+            this.verifyHighlightSync(numericRowIndex, highlightValue);
         }, 1000);
 
     } catch (error) {
@@ -5093,6 +5100,12 @@ class StudyQuestApp {
     try {
       const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
       if (!item) return;
+
+      // Skip verification if expectedHighlight is undefined
+      if (typeof expectedHighlight === 'undefined') {
+        debugLog('✅ ハイライト状態同期確認: スキップ (expectedHighlight is undefined)');
+        return;
+      }
 
       if (item.highlight !== expectedHighlight) {
         warnLog(`⚠️ ハイライト状態不整合検出: rowIndex=${rowIndex}, UI=${item.highlight}, Expected=${expectedHighlight}`);
@@ -5697,7 +5710,7 @@ class StudyQuestApp {
             reaction: rt.key,
             count: item.reactions[rt.key].count,
             reacted: item.reactions[rt.key].reacted,
-            shouldDisplay: item.reactions[rt.key].count > 0
+            shouldDisplay: item.reactions[rt.key].count > 0 || item.reactions[rt.key].reacted
           });
         }
       });
@@ -5711,7 +5724,7 @@ class StudyQuestApp {
           highlightBtn.setAttribute('aria-pressed', String(item.highlight));
           const label = item.highlight ? 'ハイライトを解除する' : 'ハイライトする';
           highlightBtn.setAttribute('aria-label', label);
-          const svgEl = highlightBtn.querySelector('svg');
+          const svgEl = highlightBtn.querySelector('svg') || highlightBtn.querySelector('span[aria-hidden="true"]');
           if (svgEl) {
             svgEl.outerHTML = this.getIcon('star', 'w-5 h-5', item.highlight);
 
@@ -5810,7 +5823,7 @@ class StudyQuestApp {
     this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
-      const cls = info.reacted ? 'liked' : '';
+      const cls = info.reacted ? 'reacted' : '';
       const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
       const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
       return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
@@ -5850,7 +5863,7 @@ class StudyQuestApp {
     // リアクションボタンを更新
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
-      const cls = info.reacted ? 'liked' : '';
+      const cls = info.reacted ? 'reacted' : '';
       const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
       const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
       return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';

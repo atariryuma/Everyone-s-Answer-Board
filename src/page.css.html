@@ -337,6 +337,40 @@ header {
 .tailwind-fallback .flex-col { flex-direction: column; }
 .tailwind-fallback .items-center { align-items: center; }
 .tailwind-fallback .justify-center { justify-content: center; }
+
+/* Range Slider Styles */
+.slider-thumb::-webkit-slider-thumb {
+  appearance: none;
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  cursor: pointer;
+  border: 2px solid var(--brand-background);
+  box-shadow: 0 0 10px rgba(139, 233, 253, 0.4);
+  transition: all 0.3s ease;
+}
+
+.slider-thumb::-webkit-slider-thumb:hover {
+  background: #06b6d4;
+  box-shadow: 0 0 15px rgba(139, 233, 253, 0.6);
+}
+
+.slider-thumb::-moz-range-thumb {
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: var(--brand-primary);
+  cursor: pointer;
+  border: 2px solid var(--brand-background);
+  box-shadow: 0 0 10px rgba(139, 233, 253, 0.4);
+  transition: all 0.3s ease;
+}
+
+.slider-thumb::-moz-range-thumb:hover {
+  background: #06b6d4;
+  box-shadow: 0 0 15px rgba(139, 233, 253, 0.6);
+}
 .tailwind-fallback .grid { display: grid; }
 .tailwind-fallback .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
 .tailwind-fallback .w-full { width: 100%; }

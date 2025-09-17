@@ -369,47 +369,154 @@ function getAdminSheetList(spreadsheetId) {
  * @returns {Object} 保存結果
  */
 function saveDraftConfiguration(config) {
+  const startTime = new Date().toISOString();
+  console.log('=== saveDraftConfiguration START ===', {
+    timestamp: startTime,
+    configKeys: config ? Object.keys(config) : null,
+    configSize: config ? JSON.stringify(config).length : 0
+  });
+
   try {
-    // 🎯 Zero-dependency: 直接DBで設定保存
+    // 🎯 Input validation logging
+    if (!config || typeof config !== 'object') {
+      console.error('saveDraftConfiguration: Invalid config input', { config });
+      return createErrorResponse('設定データが不正です');
+    }
+
+    // 🎯 User authentication logging
     const userEmail = getCurrentEmail();
+    console.log('saveDraftConfiguration: User authentication', {
+      userEmail: userEmail ? 'FOUND' : 'NOT_FOUND',
+      emailLength: userEmail ? userEmail.length : 0
+    });
+
     if (!userEmail) {
+      console.error('saveDraftConfiguration: Authentication failed');
       return createErrorResponse('ユーザー認証が必要です');
     }
 
+    // 🎯 Database connection logging
     const db = ServiceFactory.getDB();
+    console.log('saveDraftConfiguration: Database connection', {
+      dbAvailable: !!db,
+      dbType: db ? typeof db : 'undefined'
+    });
+
     if (!db) {
+      console.error('saveDraftConfiguration: Database connection failed');
       return createErrorResponse('データベース接続エラー');
     }
+
+    // 🎯 User lookup logging
     const user = db.findUserByEmail(userEmail);
+    console.log('saveDraftConfiguration: User lookup', {
+      userFound: !!user,
+      userId: user ? user.userId : null,
+      currentConfigJson: user ? (user.configJson ? user.configJson.length : 0) : null
+    });
+
     if (!user) {
+      console.error('saveDraftConfiguration: User not found', { userEmail });
       return createUserNotFoundError();
     }
 
-    // 設定をJSONで保存（重複フィールド削除）
-    delete config.setupComplete;
-    delete config.isDraft;
-    delete config.questionText;
-    config.lastAccessedAt = new Date().toISOString();
-    config.lastModified = new Date().toISOString();
+    // 🎯 Configuration processing logging
+    const originalConfigKeys = Object.keys(config);
+    console.log('saveDraftConfiguration: Configuration processing START', {
+      originalKeys: originalConfigKeys,
+      originalSize: JSON.stringify(config).length
+    });
 
+    // 設定をJSONで保存（重複フィールド削除）
+    const removedFields = [];
+    if ('setupComplete' in config) { delete config.setupComplete; removedFields.push('setupComplete'); }
+    if ('isDraft' in config) { delete config.isDraft; removedFields.push('isDraft'); }
+    if ('questionText' in config) { delete config.questionText; removedFields.push('questionText'); }
+
+    const timestamp = new Date().toISOString();
+    config.lastAccessedAt = timestamp;
+    config.lastModified = timestamp;
+
+    console.log('saveDraftConfiguration: Configuration processing COMPLETE', {
+      removedFields,
+      addedFields: ['lastAccessedAt', 'lastModified'],
+      finalKeys: Object.keys(config),
+      finalSize: JSON.stringify(config).length,
+      timestamp
+    });
+
+    // 🎯 User update object creation logging
+    const configJsonString = JSON.stringify(config);
     const updatedUser = {
       ...user,
-      configJson: JSON.stringify(config),
-      updatedAt: new Date().toISOString()
+      configJson: configJsonString,
+      updatedAt: timestamp
     };
 
+    console.log('saveDraftConfiguration: User update object created', {
+      userId: user.userId,
+      configJsonLength: configJsonString.length,
+      updatedUserKeys: Object.keys(updatedUser),
+      configJsonPreview: `${configJsonString.substring(0, 100)  }...`
+    });
+
+    // 🎯 Database update operation logging
+    console.log('saveDraftConfiguration: Starting database update', {
+      userId: user.userId,
+      updateTimestamp: timestamp
+    });
+
     const updateResult = db.updateUser(user.userId, updatedUser);
-    if (!updateResult.success) {
-      return createErrorResponse(updateResult.message || 'データベース更新に失敗しました');
+
+    console.log('saveDraftConfiguration: Database update result', {
+      success: updateResult ? updateResult.success : false,
+      message: updateResult ? updateResult.message : 'NO_RESULT',
+      resultKeys: updateResult ? Object.keys(updateResult) : null,
+      userId: user.userId
+    });
+
+    if (!updateResult || !updateResult.success) {
+      console.error('saveDraftConfiguration: Database update failed', {
+        updateResult,
+        userId: user.userId,
+        configSize: configJsonString.length
+      });
+      return createErrorResponse(updateResult?.message || 'データベース更新に失敗しました');
     }
+
+    // 🎯 Success validation logging
+    const endTime = new Date().toISOString();
+    const processingTime = new Date(endTime) - new Date(startTime);
+
+    console.log('=== saveDraftConfiguration SUCCESS ===', {
+      startTime,
+      endTime,
+      processingTimeMs: processingTime,
+      userId: user.userId,
+      configJsonLength: configJsonString.length,
+      finalMessage: '下書き設定を保存しました'
+    });
 
     return {
       success: true,
       message: '下書き設定を保存しました',
       userId: user.userId
     };
+
   } catch (error) {
-    console.error('saveDraftConfiguration error:', error);
+    const endTime = new Date().toISOString();
+    const processingTime = new Date(endTime) - new Date(startTime);
+
+    console.error('=== saveDraftConfiguration ERROR ===', {
+      startTime,
+      endTime,
+      processingTimeMs: processingTime,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      configProvided: !!config,
+      configKeys: config ? Object.keys(config) : null
+    });
+
     return createExceptionResponse(error);
   }
 }
@@ -420,29 +527,118 @@ function saveDraftConfiguration(config) {
  * @returns {Object} 公開結果
  */
 function publishApplication(publishConfig) {
+  const startTime = new Date().toISOString();
+  console.log('=== publishApplication START ===', {
+    timestamp: startTime,
+    publishConfigProvided: !!publishConfig,
+    publishConfigKeys: publishConfig ? Object.keys(publishConfig) : null,
+    publishConfigSize: publishConfig ? JSON.stringify(publishConfig).length : 0
+  });
+
   try {
+    // 🎯 Input validation logging
+    console.log('publishApplication: Input validation', {
+      publishConfigType: typeof publishConfig,
+      publishConfigNull: publishConfig === null,
+      publishConfigUndefined: publishConfig === undefined,
+      publishConfigEmpty: publishConfig && Object.keys(publishConfig).length === 0
+    });
+
+    // 🎯 User authentication logging
     const email = getCurrentEmail();
+    console.log('publishApplication: User authentication', {
+      emailFound: !!email,
+      emailLength: email ? email.length : 0
+    });
+
     if (!email) {
+      console.error('publishApplication: Authentication failed');
       return { success: false, message: 'ユーザー認証が必要です' };
     }
 
     const publishedAt = new Date().toISOString();
+    console.log('publishApplication: Timestamp generated', { publishedAt });
 
-    // 🎯 Zero-dependency: 直接PropertiesServiceでアプリ公開
+    // 🎯 PropertiesService operations logging
+    console.log('publishApplication: Starting PropertiesService operations');
     const props = ServiceFactory.getProperties();
-    props.setProperty('APPLICATION_STATUS', 'active');
-    props.setProperty('PUBLISHED_AT', publishedAt);
+    console.log('publishApplication: PropertiesService connection', {
+      propsAvailable: !!props,
+      propsType: typeof props
+    });
+
+    // Set APPLICATION_STATUS
+    try {
+      props.setProperty('APPLICATION_STATUS', 'active');
+      console.log('publishApplication: APPLICATION_STATUS set to active');
+    } catch (statusError) {
+      console.error('publishApplication: Failed to set APPLICATION_STATUS', {
+        error: statusError.message
+      });
+    }
+
+    // Set PUBLISHED_AT
+    try {
+      props.setProperty('PUBLISHED_AT', publishedAt);
+      console.log('publishApplication: PUBLISHED_AT set', { publishedAt });
+    } catch (publishedAtError) {
+      console.error('publishApplication: Failed to set PUBLISHED_AT', {
+        error: publishedAtError.message,
+        publishedAt
+      });
+    }
 
     // 公開設定を保存
     if (publishConfig) {
-      props.setProperty('PUBLISH_CONFIG', JSON.stringify(publishConfig));
+      try {
+        const publishConfigString = JSON.stringify(publishConfig);
+        props.setProperty('PUBLISH_CONFIG', publishConfigString);
+        console.log('publishApplication: PUBLISH_CONFIG saved', {
+          configLength: publishConfigString.length,
+          configKeys: Object.keys(publishConfig)
+        });
+      } catch (publishConfigError) {
+        console.error('publishApplication: Failed to set PUBLISH_CONFIG', {
+          error: publishConfigError.message,
+          publishConfigKeys: Object.keys(publishConfig)
+        });
+      }
+    } else {
+      console.log('publishApplication: No publishConfig provided, skipping PUBLISH_CONFIG');
     }
 
-    // ユーザーの設定も更新
+    // 🎯 Database operations logging
+    console.log('publishApplication: Starting database operations');
     const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    console.log('publishApplication: Database connection', {
+      dbAvailable: !!db,
+      dbType: typeof db
+    });
+
+    const user = db ? db.findUserByEmail(email) : null;
+    console.log('publishApplication: User lookup', {
+      userFound: !!user,
+      userId: user ? user.userId : null,
+      currentConfigJsonLength: user ? (user.configJson ? user.configJson.length : 0) : null
+    });
+
     if (user) {
-      const currentConfig = user.configJson ? JSON.parse(user.configJson) : {};
+      // 🎯 Configuration merge logging
+      let currentConfig = {};
+      try {
+        currentConfig = user.configJson ? JSON.parse(user.configJson) : {};
+        console.log('publishApplication: Current config parsed', {
+          currentConfigKeys: Object.keys(currentConfig),
+          currentConfigSize: JSON.stringify(currentConfig).length
+        });
+      } catch (parseError) {
+        console.error('publishApplication: Failed to parse current config', {
+          error: parseError.message,
+          configJsonLength: user.configJson ? user.configJson.length : 0
+        });
+        currentConfig = {};
+      }
+
       const updatedConfig = {
         ...currentConfig,
         ...publishConfig,
@@ -453,26 +649,96 @@ function publishApplication(publishConfig) {
         lastModified: publishedAt
       };
 
-      // データベースを更新
-      const updateResult = db.updateUser(user.userId, {
+      console.log('publishApplication: Config merge completed', {
+        originalKeys: Object.keys(currentConfig),
+        publishConfigKeys: publishConfig ? Object.keys(publishConfig) : [],
+        mergedKeys: Object.keys(updatedConfig),
+        finalConfigSize: JSON.stringify(updatedConfig).length,
+        addedFields: ['appPublished', 'publishedAt', 'setupStatus', 'isDraft', 'lastModified']
+      });
+
+      // 🎯 Database update operation logging
+      const updatePayload = {
         configJson: JSON.stringify(updatedConfig),
         lastModified: publishedAt,
         updatedAt: publishedAt
+      };
+
+      console.log('publishApplication: Starting database update', {
+        userId: user.userId,
+        updatePayloadKeys: Object.keys(updatePayload),
+        configJsonLength: updatePayload.configJson.length,
+        updateTimestamp: publishedAt
+      });
+
+      const updateResult = db.updateUser(user.userId, updatePayload);
+
+      console.log('publishApplication: Database update result', {
+        success: updateResult ? updateResult.success : false,
+        message: updateResult ? updateResult.message : 'NO_RESULT',
+        resultKeys: updateResult ? Object.keys(updateResult) : null,
+        userId: user.userId,
+        configJsonLength: updatePayload.configJson.length
       });
 
       if (!updateResult || !updateResult.success) {
-        console.error('Failed to update user config:', updateResult?.message || 'Unknown error');
+        console.error('publishApplication: Database update failed', {
+          updateResult,
+          userId: user.userId,
+          updatePayload: {
+            ...updatePayload,
+            configJson: `[${updatePayload.configJson.length} chars]`
+          }
+        });
         // エラーでも処理は継続
+      } else {
+        console.log('publishApplication: Database update successful', {
+          userId: user.userId,
+          configJsonLength: updatePayload.configJson.length
+        });
       }
+    } else {
+      console.error('publishApplication: User not found, skipping database update', { email });
     }
+
+    // 🎯 Success validation logging
+    const endTime = new Date().toISOString();
+    const processingTime = new Date(endTime) - new Date(startTime);
+
+    console.log('=== publishApplication SUCCESS ===', {
+      startTime,
+      endTime,
+      processingTimeMs: processingTime,
+      publishedAt,
+      userEmail: email,
+      userFound: !!user,
+      userId: user ? user.userId : null,
+      propertiesUpdated: true,
+      databaseUpdated: !!user,
+      finalMessage: 'アプリケーションが正常に公開されました'
+    });
 
     return {
       success: true,
       message: 'アプリケーションが正常に公開されました',
       publishedAt
     };
+
   } catch (error) {
-    console.error('publishApplication error:', error);
+    const endTime = new Date().toISOString();
+    const processingTime = new Date(endTime) - new Date(startTime);
+
+    console.error('=== publishApplication ERROR ===', {
+      startTime,
+      endTime,
+      processingTimeMs: processingTime,
+      errorMessage: error.message,
+      errorStack: error.stack,
+      publishConfigProvided: !!publishConfig,
+      publishConfigKeys: publishConfig ? Object.keys(publishConfig) : null,
+      userEmail: getCurrentEmail()
+    });
+
     return createExceptionResponse(error);
   }
 }
@@ -529,36 +795,130 @@ function validateAccess(spreadsheetId) {
  */
 function getFormInfo(spreadsheetId, sheetName) {
   try {
-    // 🚀 Zero-dependency: ServiceFactory経由でConfigService利用
-    const configService = ServiceFactory.getConfigService();
-    if (!configService) {
-      throw new Error('ConfigService not available');
-    }
-    const serviceResponse = configService.getFormInfo(spreadsheetId, sheetName);
-    if (serviceResponse && typeof serviceResponse === 'object') {
-      const enrichedFormData = serviceResponse.formData && typeof serviceResponse.formData === 'object'
-        ? {
-            ...serviceResponse.formData,
-            sheetName: serviceResponse.formData.sheetName || sheetName
-          }
-        : serviceResponse.formData;
-
+    // 引数検証
+    if (!spreadsheetId || !sheetName) {
       return {
-        ...serviceResponse,
-        formData: enrichedFormData,
-        requestContext: serviceResponse.requestContext || {
-          spreadsheetId,
+        success: false,
+        status: 'INVALID_ARGUMENTS',
+        message: 'スプレッドシートIDとシート名を指定してください。',
+        formData: {
+          formUrl: null,
+          formTitle: sheetName || 'フォーム',
+          spreadsheetName: '',
           sheetName
         }
       };
     }
 
-    return serviceResponse;
+    // スプレッドシート取得
+    let spreadsheet;
+    try {
+      spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    } catch (accessError) {
+      return {
+        success: false,
+        status: 'SPREADSHEET_NOT_FOUND',
+        message: 'スプレッドシートにアクセスできませんでした。',
+        formData: {
+          formUrl: null,
+          formTitle: sheetName || 'フォーム',
+          spreadsheetName: '',
+          sheetName
+        },
+        error: accessError.message
+      };
+    }
+
+    const spreadsheetName = spreadsheet.getName();
+
+    // シート取得
+    const sheet = spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      return {
+        success: false,
+        status: 'SHEET_NOT_FOUND',
+        message: `シート「${sheetName}」が見つかりません。`,
+        formData: {
+          formUrl: null,
+          formTitle: sheetName,
+          spreadsheetName,
+          sheetName
+        }
+      };
+    }
+
+    // フォームURL取得（スタックオーバーフロー完全対策）
+    let formUrl = null;
+    let formTitle = sheetName || spreadsheetName || 'フォーム';
+
+    // 安全なフォームURL取得 - FormApp.openByUrlは完全に回避
+    try {
+      // まずシートレベルでフォームURLを取得
+      if (typeof sheet.getFormUrl === 'function') {
+        formUrl = sheet.getFormUrl();
+      }
+
+      // シートレベルで取得できない場合はスプレッドシートレベルで試行
+      if (!formUrl && typeof spreadsheet.getFormUrl === 'function') {
+        formUrl = spreadsheet.getFormUrl();
+      }
+    } catch (urlError) {
+      console.warn('SystemController.getFormInfo: FormURL取得エラー（安全に処理）:', urlError.message);
+      // エラーが発生してもformUrlはnullのままで続行
+    }
+
+    // フォームタイトル設定（FormApp.openByUrlを使用せず安全に処理）
+    if (formUrl && formUrl.includes('docs.google.com/forms/')) {
+      // FormApp呼び出しは完全に回避し、シート名ベースのタイトルを使用
+      formTitle = `${sheetName} (フォーム連携)`;
+    }
+
+    const formData = {
+      formUrl: formUrl || null,
+      formTitle,
+      spreadsheetName,
+      sheetName
+    };
+
+    // 成功レスポンス
+    if (formUrl) {
+      return {
+        success: true,
+        status: 'FORM_LINK_FOUND',
+        message: 'フォーム連携を確認しました。',
+        formData,
+        timestamp: new Date().toISOString(),
+        requestContext: {
+          spreadsheetId,
+          sheetName
+        }
+      };
+    } else {
+      return {
+        success: false,
+        status: 'FORM_NOT_LINKED',
+        message: '指定したシートにはフォーム連携が確認できませんでした。',
+        formData,
+        suggestions: [
+          'Googleフォームの「回答の行き先」を開き、対象のシートにリンクしてください',
+          'フォーム作成者に連携状況を確認してください'
+        ]
+      };
+    }
+
   } catch (error) {
-    console.error('AdminController.getFormInfo エラー:', error.message);
+    console.error('SystemController.getFormInfo エラー:', error.message);
     return {
       success: false,
-      error: error.message
+      status: 'UNKNOWN_ERROR',
+      message: 'フォーム情報の取得に失敗しました。',
+      error: error.message,
+      formData: {
+        formUrl: null,
+        formTitle: sheetName || 'フォーム',
+        spreadsheetName: '',
+        sheetName
+      }
     };
   }
 }
