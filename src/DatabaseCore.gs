@@ -552,52 +552,55 @@ function updateUser(userId, updateData) {
       throw new Error('ユーザーが見つかりません');
     }
 
-    // データベースID取得
-    const dbSpreadsheetId = ServiceFactory.getProperties().getDatabaseSpreadsheetId();
-    if (!dbSpreadsheetId) {
-      throw new Error('DATABASE_SPREADSHEET_ID が設定されていません');
+    // 🎯 統一されたSheets API使用 - findUserByIdと同じアクセス方法
+    const service = getSheetsService();
+    const databaseId = getSecureDatabaseId();
+
+    // 現在のデータを取得
+    const range = 'Users!A:Z';
+    const response = service.spreadsheets.values.get({
+      spreadsheetId: databaseId,
+      range
+    });
+
+    const rows = response.data && response.data.values ? response.data.values : [];
+    if (rows.length <= 1) {
+      throw new Error('ユーザーデータが見つかりません');
     }
 
-    // スプレッドシート接続
-    const dbSpreadsheet = ServiceFactory.getSpreadsheet().openById(dbSpreadsheetId);
-    if (!dbSpreadsheet) {
-      throw new Error('データベーススプレッドシートを開けません');
+    const [headers] = rows;
+    const userRowIndex = user.rowIndex - 1; // 0ベースに変換
+
+    if (userRowIndex >= rows.length) {
+      throw new Error('ユーザー行が見つかりません');
     }
 
-    // ユーザーシート取得
-    const userSheet = dbSpreadsheet.getSheetByName('Users');
-    if (!userSheet) {
-      throw new Error('Usersシートが見つかりません');
-    }
-
-    // ユーザー行を特定（findUserByIdから取得した行インデックス）
-    const userRow = user.rowIndex;
-
-    // 列のマッピング（Users シートの構造に基づく）
-    const columnMapping = {
-      'userId': 1,       // A列
-      'userEmail': 2,    // B列
-      'isActive': 3,     // C列
-      'configJson': 4,   // D列
-      'lastModified': 5  // E列
-    };
+    // 列のマッピング（ヘッダーから動的に取得）
+    const columnMapping = {};
+    headers.forEach((header, index) => {
+      const key = header.toLowerCase()
+        .replace(/\s+/g, '')
+        .replace('userid', 'userId')
+        .replace('useremail', 'userEmail')
+        .replace('createdat', 'createdAt')
+        .replace('lastmodified', 'lastModified')
+        .replace('configjson', 'configJson')
+        .replace('isactive', 'isActive');
+      columnMapping[key] = index;
+    });
 
     // 許可されたフィールドのみ更新
-    const allowedFields = ['userEmail', 'isActive', 'configJson', 'lastModified', 'updatedAt'];
+    const allowedFields = ['userEmail', 'isActive', 'configJson', 'lastModified'];
     const updates = [];
+    const updatedRow = [...rows[userRowIndex]]; // 現在の行をコピー
 
     // 各フィールドを対応する列に更新
     Object.keys(updateData).forEach(field => {
       if (allowedFields.includes(field)) {
         const columnIndex = columnMapping[field];
-        if (columnIndex) {
-          try {
-            userSheet.getRange(userRow, columnIndex).setValue(updateData[field]);
-            updates.push(field);
-          } catch (cellError) {
-            console.error(`❌ Failed to update ${field}:`, cellError.message);
-            throw new Error(`フィールド ${field} の更新に失敗: ${cellError.message}`);
-          }
+        if (columnIndex !== undefined) {
+          updatedRow[columnIndex] = updateData[field];
+          updates.push(field);
         } else {
           console.warn(`⚠️ Column mapping not found for field: ${field}`);
         }
@@ -606,6 +609,18 @@ function updateUser(userId, updateData) {
       }
     });
 
+    // 行全体を更新（Sheets API使用）
+    if (updates.length > 0) {
+      const updateRange = `Users!A${user.rowIndex}:${String.fromCharCode(65 + updatedRow.length - 1)}${user.rowIndex}`;
+      service.spreadsheets.values.update({
+        spreadsheetId: databaseId,
+        range: updateRange,
+        valueInputOption: 'USER_ENTERED',
+        resource: {
+          values: [updatedRow]
+        }
+      });
+    }
 
     return { success: true, updatedFields: updates };
   } catch (error) {
