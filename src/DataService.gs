@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis */
+/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -615,7 +615,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEm
       sheetName,
       rowIndex,
       reactionKey,
-      userEmail: userEmail.substring(0, 5) + '***',
+      userEmail: `${userEmail.substring(0, 5)  }***`,
       action,
       userCurrentReaction: newUserReaction,
       oldValue: userCurrentReaction ? allReactionsData[userCurrentReaction]?.count || 0 : 0,

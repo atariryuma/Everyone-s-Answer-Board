@@ -232,6 +232,19 @@ function doGet(e) {
           const template = HtmlService.createTemplateFromFile('Page.html');
           template.userId = userId;
           template.userEmail = user.userEmail || null;
+
+          // Admin privilege detection using existing ServiceFactory pattern
+          const currentEmail = Session.getActiveUser().getEmail();
+          const userService = ServiceFactory.getUserService();
+          const isSystemAdmin = userService.isSystemAdmin(currentEmail);
+          const isOwnBoard = currentEmail === user.userEmail;
+
+          // Set admin privileges for template
+          const hasAdminPrivileges = isSystemAdmin || isOwnBoard;
+          template.showAdminFeatures = hasAdminPrivileges;
+          template.isAdminUser = hasAdminPrivileges;
+          template.showHighlightToggle = hasAdminPrivileges;
+
           return template.evaluate();
 
         } catch (error) {
