@@ -322,13 +322,18 @@ class StudyQuestApp {
     
     // Alert on significant inconsistencies (ignore initial loading and minor differences)
     const isInitialLoad = context === 'performDataLoad' && domCardCount <= 3;
-    const significantDifference = Math.abs(currentDataLength - domCardCount) > 5;
-    if (!metrics.domMetrics.isConsistent && significantDifference && !isInitialLoad) {
+    const difference = Math.abs(currentDataLength - domCardCount);
+    // More lenient threshold: 20% of data count or minimum 10 items
+    const significantThreshold = Math.max(Math.floor(currentDataLength * 0.2), 10);
+    const significantDifference = difference > significantThreshold;
+
+    if (!metrics.domMetrics.isConsistent && significantDifference && !isInitialLoad && currentDataLength > 5) {
       warnLog('⚠️ Significant DOM-Data inconsistency detected:', {
         data: currentDataLength,
         dom: domCardCount,
         context,
-        difference: Math.abs(currentDataLength - domCardCount)
+        difference: difference,
+        threshold: significantThreshold
       });
     }
     
@@ -1614,30 +1619,22 @@ class StudyQuestApp {
     this.pollingInterval = setInterval(async () => {
       if (!this.pollingSettings.enabled) return;
 
-      try {
-        const hasNewContent = await this.checkForNewAnswers();
-        this.pollingSettings.currentRetries = 0;
-        this.pollingSettings.successCount++;
-        
-        // 動的間隔調整
-        this.adjustPollingInterval(hasNewContent);
-        
-        // 間隔が変更された場合はポーリングを再開
-        if (this.pollingSettings.currentInterval !== this.pollingSettings.interval) {
-          this.pollingSettings.interval = this.pollingSettings.currentInterval;
-          this.startNewAnswerPolling(); // 新しい間隔で再開
-          return;
-        }
-        
-      } catch (error) {
-        this.pollingSettings.currentRetries++;
-        warnLog(`ポーリングエラー (${this.pollingSettings.currentRetries}/${this.pollingSettings.maxRetries}):`, error);
-        
-        if (this.pollingSettings.currentRetries >= this.pollingSettings.maxRetries) {
-          errorLog('ポーリング最大リトライ数に達したため停止');
-          this.stopNewAnswerPolling();
-        }
+      const hasNewContent = await this.checkForNewAnswers();
+
+      // checkForNewAnswers now handles all errors gracefully, no need for try-catch
+      this.pollingSettings.currentRetries = 0;
+      this.pollingSettings.successCount++;
+
+      // 動的間隔調整
+      this.adjustPollingInterval(hasNewContent);
+
+      // 間隔が変更された場合はポーリングを再開
+      if (this.pollingSettings.currentInterval !== this.pollingSettings.interval) {
+        this.pollingSettings.interval = this.pollingSettings.currentInterval;
+        this.startNewAnswerPolling(); // 新しい間隔で再開
+        return;
       }
+
     }, this.pollingSettings.currentInterval);
   }
 
@@ -1666,7 +1663,7 @@ class StudyQuestApp {
 
   // 新着回答の確認
   async checkForNewAnswers() {
-    if (this.state.isLoading) return; // 既にロード中の場合は跳ばす
+    if (this.state.isLoading) return false; // 既にロード中の場合は跳ばす
 
     try {
       const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
@@ -1675,8 +1672,8 @@ class StudyQuestApp {
         : selectedClass;
       const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
       const adminMode = this.state.showAdminFeatures;
-      
-      
+
+
       const incrementalData = await this.gas.getIncrementalSheetData(
         classFilter,
         sortOrder,
@@ -1686,40 +1683,44 @@ class StudyQuestApp {
 
       debugLog('📡 getIncrementalSheetData response:', incrementalData);
 
-      // Handle empty response or malformed data
+      // Handle empty response or malformed data gracefully
       if (!incrementalData || typeof incrementalData !== 'object') {
-        throw new Error('Invalid response from server: empty or malformed data');
+        debugLog('📡 Polling: Invalid response, skipping this cycle');
+        return false;
       }
 
-      // Handle empty object specifically
+      // Handle empty object - this might be normal for no new data
       if (Object.keys(incrementalData).length === 0) {
-        throw new Error('Server returned empty object - API call may have failed');
+        debugLog('📡 Polling: Empty response, no new data');
+        return false;
       }
 
+      // Check for explicit error responses
       if (incrementalData.status === 'error' || incrementalData.success === false) {
-        throw new Error(incrementalData.message || incrementalData.error || 'Unknown polling error');
+        const errorMsg = incrementalData.message || incrementalData.error || 'Server error';
+        debugLog('📡 Polling: Server error:', errorMsg);
+        return false;
       }
-      
+
       // 新着データがある場合
       if (incrementalData.newCount > 0) {
         debugLog('🆕 新着回答検出:', {
           newCount: incrementalData.newCount,
           totalCount: incrementalData.totalCount
         });
-        
+
         this.state.hasNewContent = true;
         this.state.newContentCount = incrementalData.newCount;
         this.showNewContentBanner(incrementalData.newCount);
+        return true;
       }
-      
+
+      return false;
+
     } catch (error) {
-      // Reduce noise for network errors during polling
-      if (error.message.includes('empty object') || error.message.includes('NetworkError')) {
-        debugLog('📡 ポーリングエラー (一時的):', error.message);
-      } else {
-        errorLog('新着確認エラー:', error);
-      }
-      throw error;
+      // Log but don't throw - polling should be resilient
+      debugLog('📡 Polling error (non-critical):', error.message);
+      return false;
     }
   }
   
@@ -2205,8 +2206,8 @@ class StudyQuestApp {
   }
   
   showMinimalSkeleton() {
-    // Show only 3 skeletons for immediate visual feedback
-    const count = 3;
+    // Show only 2 minimal skeletons for immediate visual feedback
+    const count = 2;
     const frag = document.createDocumentFragment();
     for (let i = 0; i < count; i++) {
       frag.appendChild(this.createSkeletonCard());
@@ -2991,9 +2992,9 @@ class StudyQuestApp {
                          (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
     
-    // Show skeleton cards during loading
+    // Show minimal skeleton cards during loading
     if (config.showLoading && !config.isInitialLoad) {
-      const count = Math.min(parseInt(this.elements.sizeSlider.value, 10) * 2, 8); // Cap at 8
+      const count = Math.min(parseInt(this.elements.sizeSlider.value, 10), 4); // Reduced cap to 4
       const frag = document.createDocumentFragment();
       for (let i = 0; i < count; i++) {
         frag.appendChild(this.createSkeletonCard());
@@ -4194,9 +4195,9 @@ class StudyQuestApp {
   
   createSkeletonCard() {
     const card = document.createElement('div');
-    card.className = 'answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 skeleton';
-    // Simplified skeleton for faster rendering
-    card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/30 mb-4"></div><div class="h-6 w-full rounded bg-gray-500/20"></div>';
+    card.className = 'answer-card glass-panel rounded-xl p-4 opacity-50 skeleton';
+    // Ultra-simple skeleton without animation for better performance and UX
+    card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/20 mb-4"></div><div class="h-4 w-3/4 rounded bg-gray-500/15"></div>';
     return card;
   }
 

@@ -1885,11 +1885,11 @@ function getIncrementalSheetData(sheetName, options = {}) {
     };
   } catch (error) {
     console.error('getIncrementalSheetData error:', error.message);
+    // Return consistent response format that polling can handle gracefully
     return {
       success: false,
       status: 'error',
       message: error.message || 'データ取得エラー',
-      error: error.message || 'Unknown error',
       data: [],
       hasNewData: false,
       newCount: 0,
