@@ -1965,25 +1965,21 @@
       return;
     }
 
-    const mapping = result.columnMapping;
+    const mapping = result.columnMapping || result.mapping || {};
+    const confidence = result.confidence || {};
     const headers = result.headers || [];
 
-    // confidenceをmappingに追加（バックエンド統一形式対応）
-    if (result.confidence) {
-      mapping.confidence = result.confidence;
-    }
-
-    console.log('Headers:', headers, 'Mapping:', mapping);
+    console.log('Headers:', headers, 'Mapping:', mapping, 'Confidence:', confidence);
 
     // ドロップダウンにヘッダーオプションを設定
-    fillColumnDropdowns(headers, mapping);
+    fillColumnDropdowns(headers, mapping, confidence);
     // 現在のヘッダーをグローバルに保持（検証/保存で使用）
     try {
       window.currentHeaders = headers;
     } catch (_) {}
 
     // AI検出情報を表示
-    displayAIDetectionInfo(mapping);
+    displayAIDetectionInfo(mapping, confidence);
 
     // 接続時はAI検出結果を優先し、保存済み設定復元は行わない
     // AI検出が無い場合のみヘッダー情報を表示
@@ -1992,8 +1988,8 @@
   }
 
   // ドロップダウンにヘッダーオプションを設定 - エラーハンドリング強化版
-  function fillColumnDropdowns(headers, mapping) {
-    console.log('fillColumnDropdowns:', { headers, mapping });
+  function fillColumnDropdowns(headers, mapping, confidence = {}) {
+    console.log('fillColumnDropdowns:', { headers, mapping, confidence });
 
     try {
       // 入力データの検証とフォールバック
@@ -2046,7 +2042,7 @@
       });
 
       // AI検出結果をドロップダウンの初期選択として設定
-      setAIDetectionSelections(mapping, dropdowns);
+      setAIDetectionSelections(mapping, dropdowns, confidence);
 
       // 保存済み設定の復元（オプション追加後に実行）
       restoreColumnSelection(dropdowns);
@@ -2124,8 +2120,8 @@
   }
 
   // AI検出結果をドロップダウンの初期選択として設定
-  function setAIDetectionSelections(mapping, dropdowns) {
-    console.log('setAIDetectionSelections:', mapping);
+  function setAIDetectionSelections(mapping, dropdowns, confidence = {}) {
+    console.log('setAIDetectionSelections:', mapping, 'confidence:', confidence);
 
     // 防御的チェック: mappingがundefined/nullの場合は早期リターン
     if (!mapping || typeof mapping !== 'object') {
@@ -2135,20 +2131,21 @@
 
     // 詳細チェック: mapping構造の検証
     const mappingDetails = {
-      hasMapping: mapping.hasOwnProperty('mapping'),
-      hasConfidence: mapping.hasOwnProperty('confidence'),
-      mappingKeys: mapping.mapping ? Object.keys(mapping.mapping) : [],
-      confidenceKeys: mapping.confidence ? Object.keys(mapping.confidence) : [],
-      mappingContent: mapping.mapping,
-      confidenceContent: mapping.confidence
+      hasMapping: mapping.hasOwnProperty('mapping') || Object.keys(mapping).length > 0,
+      hasConfidence: Object.keys(confidence).length > 0,
+      mappingKeys: mapping.mapping ? Object.keys(mapping.mapping) : Object.keys(mapping),
+      confidenceKeys: Object.keys(confidence),
+      mappingContent: mapping.mapping || mapping,
+      confidenceContent: confidence
     };
     console.log('🔍 setAIDetectionSelections: mapping詳細分析', mappingDetails);
 
     // mappingが空の場合の詳細ログ
-    if (!mapping.mapping || Object.keys(mapping.mapping).length === 0) {
+    const actualMapping = mapping.mapping || mapping;
+    if (!actualMapping || Object.keys(actualMapping).length === 0) {
       console.log('💡 AI検出結果がありません - 手動選択をお使いください');
-      if (mapping.confidence && Object.keys(mapping.confidence).length > 0) {
-        console.log('🔍 信頼度情報はあります:', mapping.confidence);
+      if (confidence && Object.keys(confidence).length > 0) {
+        console.log('🔍 信頼度情報はあります:', confidence);
       }
       return;
     }
@@ -2173,20 +2170,20 @@
 
       // 対応するマッピングキーを探す
       let selectedIndex = null;
-      let confidence = 0;
+      let columnConfidence = 0;
 
       mappingKeys[columnType].forEach((key) => {
-        if (mapping[key] !== null && mapping[key] !== undefined) {
-          selectedIndex = mapping[key];
+        if (actualMapping[key] !== null && actualMapping[key] !== undefined) {
+          selectedIndex = actualMapping[key];
         }
-        if (mapping.confidence && mapping.confidence[key] !== undefined) {
-          confidence = mapping.confidence[key];
+        if (confidence && confidence[key] !== undefined) {
+          columnConfidence = confidence[key];
         }
       });
 
       // 信頼度情報を記録（検出されなくても）
-      if (confidence > 0) {
-        totalConfidenceInfo.push(`${columnType}: ${confidence}%`);
+      if (columnConfidence > 0) {
+        totalConfidenceInfo.push(`${columnType}: ${columnConfidence}%`);
       }
 
       if (selectedIndex !== null) {
@@ -2195,23 +2192,23 @@
         dropdown.classList.add('has-ai-selection');
 
         // 信頼度バッジを表示
-        showConfidenceBadge(columnType, confidence, 'ai');
+        showConfidenceBadge(columnType, columnConfidence, 'ai');
 
-        console.log(`✅ AI検出成功: ${columnType} → ${selectedIndex}列 (信頼度: ${confidence}%)`);
+        console.log(`✅ AI検出成功: ${columnType} → ${selectedIndex}列 (信頼度: ${columnConfidence}%)`);
         detectedCount++;
-      } else if (confidence > 0) {
+      } else if (columnConfidence > 0) {
         // 適応的閾値チェック
         const adaptiveThresholds = {
           name: 65, class: 65, answer: 55, reason: 55
         };
         const threshold = adaptiveThresholds[columnType] || 60;
 
-        if (confidence >= threshold) {
-          console.log(`⚠️ AI検出: ${columnType}列は信頼度${confidence}%で適応閾値(${threshold}%)以上だが、マッピングエラー`);
+        if (columnConfidence >= threshold) {
+          console.log(`⚠️ AI検出: ${columnType}列は信頼度${columnConfidence}%で適応閾値(${threshold}%)以上だが、マッピングエラー`);
         } else {
-          console.log(`⚠️ AI検出: ${columnType}列は信頼度${confidence}%で適応閾値(${threshold}%)未満`);
+          console.log(`⚠️ AI検出: ${columnType}列は信頼度${columnConfidence}%で適応閾値(${threshold}%)未満`);
         }
-        showConfidenceBadge(columnType, confidence, 'low-confidence');
+        showConfidenceBadge(columnType, columnConfidence, 'low-confidence');
       }
     });
 
@@ -2419,7 +2416,7 @@
   }
 
   // AI検出情報を表示
-  function displayAIDetectionInfo(mapping) {
+  function displayAIDetectionInfo(mapping, confidence = {}) {
     const detailsDiv = document.getElementById('ai-detection-details');
     if (!detailsDiv) return;
 
@@ -2438,12 +2435,12 @@
       name: '名前列',
     };
 
+    const actualMapping = mapping.mapping || mapping;
     Object.keys(columnNames).forEach((key) => {
-      if (mapping[key] !== null && mapping[key] !== undefined) {
-        const columnLabel = String.fromCharCode(65 + mapping[key]) + '列';
-        const confidence =
-          mapping.confidence && mapping.confidence[key] ? mapping.confidence[key] : 0;
-        details.push(`${columnNames[key]}: ${columnLabel} (信頼度: ${Math.round(confidence)}%)`);
+      if (actualMapping[key] !== null && actualMapping[key] !== undefined) {
+        const columnLabel = String.fromCharCode(65 + actualMapping[key]) + '列';
+        const columnConfidence = confidence[key] || 0;
+        details.push(`${columnNames[key]}: ${columnLabel} (信頼度: ${Math.round(columnConfidence)}%)`);
       }
     });
 
