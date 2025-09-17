@@ -448,9 +448,8 @@ function saveDraftConfiguration(config) {
     // 🎯 User update object creation logging
     const configJsonString = JSON.stringify(config);
     const updatedUser = {
-      ...user,
       configJson: configJsonString,
-      updatedAt: timestamp
+      lastModified: timestamp
     };
 
     console.log('saveDraftConfiguration: User update object created', {
@@ -660,8 +659,7 @@ function publishApplication(publishConfig) {
       // 🎯 Database update operation logging
       const updatePayload = {
         configJson: JSON.stringify(updatedConfig),
-        lastModified: publishedAt,
-        updatedAt: publishedAt
+        lastModified: publishedAt
       };
 
       console.log('publishApplication: Starting database update', {
