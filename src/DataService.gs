@@ -1744,32 +1744,32 @@ function analyzeLinguisticPatterns(samples, targetType) {
   switch (targetType) {
     case 'answer':
       // 回答によく現れるパターン
-      if (/[あいうえお]だと思[う|います]/.test(sampleText)) score += 30;
-      if (/[はい|いいえ|yes|no]/.test(sampleText)) score += 25;
-      if (/\d+[番号]/.test(sampleText)) score += 20;
-      if (/[選択肢]/.test(sampleText)) score += 15;
+      if (/[あいうえお]だと思(う|います)/.test(sampleText)) score += 30;
+      if (/(はい|いいえ|yes|no)/.test(sampleText)) score += 25;
+      if (/\d+(番|号)/.test(sampleText)) score += 20;
+      if (/(選択|肢)/.test(sampleText)) score += 15;
       break;
 
     case 'reason':
       // 理由によく現れるパターン
-      if (/[だから|なぜなら|because]/.test(sampleText)) score += 35;
-      if (/[と思う|と考える|だと思います]/.test(sampleText)) score += 25;
-      if (/[ため|理由|根拠]/.test(sampleText)) score += 20;
-      if (/[経験|体験|感じ]/.test(sampleText)) score += 15;
+      if (/(だから|なぜなら|because)/.test(sampleText)) score += 35;
+      if (/(と思う|と考える|だと思います)/.test(sampleText)) score += 25;
+      if (/(ため|理由|根拠)/.test(sampleText)) score += 20;
+      if (/(経験|体験|感じ)/.test(sampleText)) score += 15;
       break;
 
     case 'class':
       // クラス情報によく現れるパターン
-      if (/\d+[年組班]/.test(sampleText)) score += 40;
-      if (/[a-z]+[class|group]/.test(sampleText)) score += 30;
-      if (/[グループ|チーム]\d+/.test(sampleText)) score += 20;
+      if (/\d+(年|組|班)/.test(sampleText)) score += 40;
+      if (/[a-z]+(class|group)/.test(sampleText)) score += 30;
+      if (/(グループ|チーム)\d+/.test(sampleText)) score += 20;
       break;
 
     case 'name':
       // 名前によく現れるパターン
       if (/^[ぁ-んァ-ン一-龯]+$/.test(sampleText)) score += 30; // 日本語名
       if (/^[a-zA-Z\s]+$/.test(sampleText)) score += 25; // 英語名
-      if (/[さん|くん|ちゃん]$/.test(sampleText)) score += 20; // 敬称
+      if (/(さん|くん|ちゃん)$/.test(sampleText)) score += 20; // 敬称
       break;
   }
 

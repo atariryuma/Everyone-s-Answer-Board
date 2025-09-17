@@ -419,6 +419,41 @@ function getConfig() {
       userKeys: user ? Object.keys(user) : null
     });
 
+    // 🎯 Database diagnostic logging if user not found
+    if (!user) {
+      console.log('getConfig: Running database diagnostics');
+      try {
+        // Check all users in database
+        const allUsers = db.getAllUsers ? db.getAllUsers({ limit: 10 }) : [];
+        console.log('getConfig: Database users diagnostic', {
+          totalUsers: allUsers.length,
+          userEmails: allUsers.map(u => u.userEmail ? u.userEmail.substring(0, 5) + '***' : 'NO_EMAIL'),
+          hasCurrentEmail: allUsers.some(u => u.userEmail === email)
+        });
+
+        // Check database structure
+        if (typeof getSheetsService === 'function' && typeof getSecureDatabaseId === 'function') {
+          const service = getSheetsService();
+          const databaseId = getSecureDatabaseId();
+          const response = service.spreadsheets.values.get({
+            spreadsheetId: databaseId,
+            range: 'Users!A1:E10'
+          });
+          const rows = response.data && response.data.values ? response.data.values : [];
+          console.log('getConfig: Raw database content', {
+            databaseId: databaseId.substring(0, 10) + '***',
+            rowCount: rows.length,
+            headers: rows.length > 0 ? rows[0] : [],
+            sampleEmails: rows.slice(1, 4).map(row => row[1] ? row[1].substring(0, 5) + '***' : 'NO_EMAIL')
+          });
+        }
+      } catch (diagnosticError) {
+        console.error('getConfig: Database diagnostic failed', {
+          error: diagnosticError.message
+        });
+      }
+    }
+
     if (!user) {
       console.error('getConfig: User not found', { email: email.substring(0, 5) + '***' });
       return createUserNotFoundError();
