@@ -705,22 +705,7 @@
     z-index: var(--z-notification) !important;
   }
 
-  /* Variant: Page-specific styling with backdrop blur */
-  .loading-overlay.page-specific {
-    /* background-color: var(--brand-background); */ /* Remove this to use the default dark background */
-    background-color: rgba(0, 0, 0, 0) !important; /* Make it transparent */
-    backdrop-filter: var(--glass-backdrop); /* Keep the blur effect */
-    -webkit-backdrop-filter: var(--glass-backdrop);
-  }
-
-  /* Page-specific loading content should also be transparent */
-  .loading-overlay.page-specific .loading-content {
-    background: rgba(0, 0, 0, 0) !important; /* Transparent background */
-    border: none !important; /* Remove border */
-    box-shadow: none !important; /* Remove shadow */
-    backdrop-filter: none !important; /* Remove blur */
-    -webkit-backdrop-filter: none !important;
-  }
+  /* Variant: Page-specific removed - Page.html uses independent skeleton loading */
 
   /* Variant: QuickStart, lightweight and non-blocking */
   .loading-overlay.quickstart {
