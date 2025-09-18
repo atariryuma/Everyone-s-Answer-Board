@@ -656,10 +656,11 @@ function getFormInfoImpl(spreadsheetId, sheetName) {
     }
 
     // スプレッドシート取得
-    let spreadsheet;
+    let spreadsheet, auth;
     try {
-      const { spreadsheet: spreadsheetFromData } = Data.open(spreadsheetId);
-      spreadsheet = spreadsheetFromData;
+      const dataAccess = Data.open(spreadsheetId);
+      spreadsheet = dataAccess.spreadsheet;
+      auth = dataAccess.auth;
     } catch (accessError) {
       return {
         success: false,
@@ -675,7 +676,9 @@ function getFormInfoImpl(spreadsheetId, sheetName) {
       };
     }
 
-    const spreadsheetName = spreadsheet.getName();
+    // スプレッドシート情報を取得（Sheets API経由）
+    const spreadsheetInfo = getSpreadsheetInfo(spreadsheetId, auth.token);
+    const spreadsheetName = spreadsheetInfo.name || `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
 
     // シート取得
     const sheet = spreadsheet.getSheetByName(sheetName);
@@ -705,8 +708,15 @@ function getFormInfoImpl(spreadsheetId, sheetName) {
       }
 
       // シートレベルで取得できない場合はスプレッドシートレベルで試行
-      if (!formUrl && typeof spreadsheet.getFormUrl === 'function') {
-        formUrl = spreadsheet.getFormUrl();
+      // 注意: カスタムラッパーにはgetFormUrlメソッドが存在しない可能性があるため、
+      // 直接SpreadsheetApp経由でアクセスする（サービスアカウント権限で）
+      if (!formUrl) {
+        try {
+          // フォームURL取得は現在サポートされていないため、nullとして処理
+          console.log('getFormInfoImpl: スプレッドシートレベルのFormURL取得はカスタムラッパーではサポートされていません');
+        } catch (spreadsheetFormError) {
+          console.warn('getFormInfoImpl: スプレッドシートレベルFormURL取得エラー:', spreadsheetFormError.message);
+        }
       }
     } catch (urlError) {
       console.warn('SystemController.getFormInfo: FormURL取得エラー（安全に処理）:', urlError.message);
