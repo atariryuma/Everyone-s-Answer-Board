@@ -1255,7 +1255,10 @@
       ? safeData.formTitle.trim()
       : (spreadsheetName || sheetName || 'フォーム未連携');
     const hasLink = status === 'linked' && !!safeData.formUrl;
-    const linkText = hasLink ? safeData.formUrl : (message || 'フォームが連携されていません');
+    const isDetected = ['detected', 'possible'].includes(status);
+    const linkText = hasLink ? safeData.formUrl :
+                    isDetected ? (message || 'フォーム連携が検出されています') :
+                    (message || 'フォームが連携されていません');
     const linkHref = hasLink ? safeData.formUrl : null;
 
     console.log('🔍 showFormInfo: 表示状態', {
@@ -1277,14 +1280,22 @@
         info.url.href = linkHref;
         info.url.setAttribute('target', '_blank');
         info.url.textContent = linkText;
-        info.url.classList.remove('text-yellow-400', 'cursor-not-allowed');
+        info.url.classList.remove('text-yellow-400', 'text-green-400', 'cursor-not-allowed');
         info.url.classList.add('text-blue-400');
       } else {
         info.url.textContent = linkText;
         info.url.removeAttribute('href');
         info.url.removeAttribute('target');
         info.url.classList.remove('text-blue-400');
-        info.url.classList.add('text-yellow-400', 'cursor-not-allowed');
+
+        // ステータスに応じたスタイリング
+        if (isDetected) {
+          info.url.classList.remove('text-yellow-400');
+          info.url.classList.add('text-green-400', 'cursor-not-allowed');
+        } else {
+          info.url.classList.remove('text-green-400');
+          info.url.classList.add('text-yellow-400', 'cursor-not-allowed');
+        }
       }
 
       if (info.spreadsheet && spreadsheetName) {
@@ -1633,16 +1644,32 @@
               google.script.run
                 .withSuccessHandler(function(formResult) {
                   console.log('validateAccessAPI後のフォーム情報取得成功:', formResult);
-                  if (formResult && formResult.success && formResult.formData) {
-                    showFormInfo(formResult.formData, {
-                      status: 'linked',
-                      message: 'フォーム連携が確認されました'
-                    });
+                  if (formResult && formResult.formData) {
+                    // フォーム検出レベルに応じた処理
+                    if (formResult.success) {
+                      // URLありまたは高信頼度検出
+                      const statusInfo = formResult.formData.formUrl ?
+                        { status: 'linked', message: 'フォーム連携が確認されました' } :
+                        { status: 'detected', message: 'フォーム連携が検出されました（URL取得不可）' };
+                      showFormInfo(formResult.formData, statusInfo);
+                    } else if (formResult.formData.detectionDetails && formResult.formData.detectionDetails.confidence >= 40) {
+                      // 中程度信頼度での検出
+                      showFormInfo(formResult.formData, {
+                        status: 'possible',
+                        message: 'フォーム連携の可能性があります'
+                      });
+                    } else {
+                      // 検出なし
+                      showFormInfo(formResult.formData, {
+                        status: 'missing',
+                        message: 'フォーム連携が確認できませんでした'
+                      });
+                    }
                   } else {
                     console.warn('フォーム情報取得失敗:', formResult);
                     showFormInfo({}, {
-                      status: 'missing',
-                      message: 'フォーム連携情報が見つかりませんでした'
+                      status: 'error',
+                      message: 'フォーム情報の取得に失敗しました'
                     });
                   }
                 })

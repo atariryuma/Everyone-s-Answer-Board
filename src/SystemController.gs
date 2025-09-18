@@ -621,6 +621,7 @@ function getSpreadsheetAdaptive(spreadsheetId) {
 function detectFormConnection(spreadsheet, sheet, sheetName, accessMethod) {
   const results = {
     formUrl: null,
+    formTitle: null,
     confidence: 0,
     detectionMethod: 'none',
     details: []
@@ -679,6 +680,11 @@ function detectFormConnection(spreadsheet, sheet, sheetName, accessMethod) {
     results.confidence = Math.max(results.confidence, sheetNameAnalysis.confidence);
     results.detectionMethod = results.detectionMethod === 'none' ? 'sheet_name' : results.detectionMethod;
     results.details.push(`シート名解析: ${sheetNameAnalysis.reason}`);
+  }
+
+  // フォーム検出時のタイトル生成
+  if (results.confidence >= 40) {
+    results.formTitle = `${sheetName} (フォーム検出済み)`;
   }
 
   return results;
@@ -973,11 +979,12 @@ function getFormInfoImpl(spreadsheetId, sheetName) {
       };
     } else {
       // フォーム未検出時も詳細情報を提供
+      const isHighConfidence = formDetectionResult.confidence >= 70;
       return {
-        success: false,
-        status: formDetectionResult.confidence === 'high' ? 'FORM_DETECTION_FAILED' : 'FORM_NOT_LINKED',
-        message: formDetectionResult.confidence === 'high' ?
-          'フォーム連携の可能性はありますが、アクセス権限により検出できませんでした。' :
+        success: isHighConfidence,
+        status: isHighConfidence ? 'FORM_DETECTED_NO_URL' : 'FORM_NOT_LINKED',
+        message: isHighConfidence ?
+          'フォーム連携が検出されました（URLは取得できませんが、フォーム接続されている可能性が高いです）' :
           '指定したシートにはフォーム連携が確認できませんでした。',
         formData,
         suggestions: formDetectionResult.suggestions || [
