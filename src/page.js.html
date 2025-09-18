@@ -147,13 +147,17 @@ class StudyQuestApp {
     this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
     this.reactionDebounce = new Map();
     this.highlightDebounce = new Map(); // ハイライトのデバウンス処理用
-    this.pendingReactions = new Set();
+    this.pendingReactions = new Map();
     this.reactionQueue = new Map();
     this.reactionEventListeners = new Map(); // 処理完了通知用
     this.isProcessingReactionQueue = false; // キュー処理中フラグ
-    
+
+    // V8 Runtime Error Handling - CLAUDE.md準拠
+    this.maxRetries = 3;
+    this.retryDelayBase = 1000; // 1秒
+
     // 🎯 CLAUDE.md準拠: 単純な直接送信システム（バッチ処理削除）
-    
+
     // イベントリスナー重複登録防止フラグ
     this.eventDelegationSetup = false;
     this.nonCriticalListenersSetup = false;
@@ -163,9 +167,10 @@ class StudyQuestApp {
       { key: 'UNDERSTAND', icon: 'lightbulb' },
       { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
     ];
-    
+
     // リアクション状態保存用のキー
     this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
+
     this.gas = {
       // サーバ実装に合わせた直接呼び出し（中間関数なし）
       getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) =>
@@ -185,7 +190,14 @@ class StudyQuestApp {
         return { success: true, count: rows.length };
       }
     };
-    
+
+    // Initialize remaining properties
+    this.initializePollingSettings();
+  }
+
+
+  // Constructor continuation - should be called in constructor
+  initializePollingSettings() {
     // Polling settings with dynamic interval adjustment
     this.pollingSettings = {
       enabled: true,
@@ -207,7 +219,7 @@ class StudyQuestApp {
       errorLog('❌ StudyQuestApp: Fatal initialization error:', error);
       this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
     });
-    
+
     // パブリケーション状態監視システムの初期化
     this.initPublicationStatusMonitoring();
   }
@@ -4550,7 +4562,7 @@ class StudyQuestApp {
   async processReaction(operation, reactionKey) {
     const { rowIndex, reaction } = operation;
 
-    this.pendingReactions.add(reactionKey);
+    this.pendingReactions.set(reactionKey, { rowIndex, reaction, timestamp: Date.now() });
 
     try {
         const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
@@ -5176,7 +5188,7 @@ class StudyQuestApp {
       return;
     }
 
-    this.pendingReactions.add(highlightKey);
+    this.pendingReactions.set(highlightKey, { type: 'highlight', rowIndex: numericRowIndex, timestamp: Date.now() });
     if (!this.lastReactionTimes) this.lastReactionTimes = new Map();
     this.lastReactionTimes.set(highlightKey, now);
 

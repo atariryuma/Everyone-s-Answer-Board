@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config */
+/* global ServiceFactory, formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -1255,7 +1255,7 @@ function extractSheetHeaders(sheet) {
  */
 function restoreColumnConfig(userId, spreadsheetId, sheetName) {
   try {
-    const user = DatabaseOperations.findUserByEmail(Session.getActiveUser().getEmail());
+    const user = Data.findUserByEmail(Session.getActiveUser().getEmail());
     if (!user || !user.configJson) {
       return { success: false, message: 'User config not found' };
     }
@@ -1392,26 +1392,16 @@ function detectColumnTypes(headers, sampleData) {
     const mapping = { mapping: {}, confidence: {} };
     const analysisResults = performHighPrecisionAnalysis(headers, sampleData);
 
-    // 結果をマッピングに反映 - 統一化された信頼度閾値
-    // 🎯 統一閾値システム - 予測可能性と一貫性向上
-    const UNIFIED_CONFIDENCE_THRESHOLD = 60; // 全列種別で統一
+    // 🎯 相対評価システム実装 - 接続された列の中での最適マッチ判定
+    const relativeMatchingResult = performRelativeMatching(analysisResults, headers);
 
-    // 特殊ケース用の例外閾値（必要に応じて適用）
-    const specialCaseThresholds = {
-      // 高精度が特に重要な列種別（将来の拡張用）
-      // name: 65,    // 名前列は特に高精度が必要な場合
-      // class: 65    // クラス列は特に高精度が必要な場合
-    };
-
-    Object.entries(analysisResults).forEach(([columnType, result]) => {
-      // 特殊ケース閾値がある場合はそれを使用、なければ統一閾値
-      const threshold = specialCaseThresholds[columnType] || UNIFIED_CONFIDENCE_THRESHOLD;
-
-      if (result.confidence >= threshold) {
+    // 相対評価結果をマッピングに反映
+    Object.entries(relativeMatchingResult.mapping).forEach(([columnType, result]) => {
+      if (result.shouldMap) {
         mapping.mapping[columnType] = result.index;
         mapping.confidence[columnType] = Math.round(result.confidence);
       } else {
-        // 閾値未満でも信頼度情報は記録（フロントエンド用）
+        // マッピング対象外でも信頼度情報は記録（フロントエンド用）
         mapping.confidence[columnType] = Math.round(result.confidence);
       }
     });
@@ -1435,6 +1425,113 @@ function detectColumnTypes(headers, sampleData) {
       confidence: {}
     };
   }
+}
+
+/**
+ * 🎯 相対評価システム - 接続された列の中での最適マッチ判定
+ * @param {Object} analysisResults - AI分析結果
+ * @param {Array} headers - 列ヘッダー
+ * @returns {Object} 相対評価結果
+ */
+function performRelativeMatching(analysisResults, headers) {
+  const targetTypes = ['answer', 'reason', 'class', 'name'];
+  const mapping = {};
+  const usedIndices = new Set();
+  const mappingStats = [];
+
+  // 1️⃣ 各ターゲットタイプについて最高スコアを収集
+  targetTypes.forEach(targetType => {
+    const result = analysisResults[targetType];
+    mappingStats.push({
+      targetType,
+      index: result.index,
+      confidence: result.confidence,
+      headerName: headers[result.index] || '不明'
+    });
+  });
+
+  // 2️⃣ 信頼度でソートして優先順位決定
+  const sortedStats = mappingStats
+    .filter(stat => stat.confidence > 0)
+    .sort((a, b) => b.confidence - a.confidence);
+
+  console.log('🔍 相対評価システム - 信頼度ランキング:', sortedStats.map(stat => ({
+    ターゲット: stat.targetType,
+    列名: stat.headerName,
+    信頼度: `${Math.round(stat.confidence)}%`,
+    順位: sortedStats.indexOf(stat) + 1
+  })));
+
+  // 3️⃣ 相対的な品質評価とマッピング決定
+  sortedStats.forEach((stat, rank) => {
+    const { targetType, index, confidence } = stat;
+
+    // 相対的な判定ロジック
+    let shouldMap = false;
+    let adjustedConfidence = confidence;
+
+    if (rank === 0 && confidence > 25) {
+      // 最高スコア: 25%以上で採用
+      shouldMap = true;
+      adjustedConfidence = Math.min(confidence + 15, 100); // ボーナス
+    } else if (rank === 1 && confidence > 20 && !usedIndices.has(index)) {
+      // 2位: 20%以上で採用（重複除く）
+      shouldMap = true;
+      adjustedConfidence = Math.min(confidence + 10, 100); // 小ボーナス
+    } else if (rank === 2 && confidence > 15 && !usedIndices.has(index)) {
+      // 3位: 15%以上で採用（重複除く）
+      shouldMap = true;
+      adjustedConfidence = Math.min(confidence + 5, 100); // 最小ボーナス
+    } else if (confidence > 30 && !usedIndices.has(index)) {
+      // 高信頼度: 順位に関わらず30%以上で採用
+      shouldMap = true;
+    }
+
+    // 重複チェック
+    if (shouldMap && usedIndices.has(index)) {
+      console.warn(`⚠️ 列インデックス${index}の重複を検出 - ${targetType}をスキップ`);
+      shouldMap = false;
+    }
+
+    if (shouldMap) {
+      usedIndices.add(index);
+    }
+
+    mapping[targetType] = {
+      index,
+      confidence: adjustedConfidence,
+      shouldMap,
+      rank: rank + 1,
+      originalConfidence: confidence
+    };
+  });
+
+  // 4️⃣ 未割り当てのターゲットタイプを処理
+  targetTypes.forEach(targetType => {
+    if (!mapping[targetType]) {
+      const result = analysisResults[targetType];
+      mapping[targetType] = {
+        index: result.index,
+        confidence: result.confidence,
+        shouldMap: false,
+        rank: null,
+        originalConfidence: result.confidence
+      };
+    }
+  });
+
+  // 5️⃣ 結果サマリー
+  const mappedCount = Object.values(mapping).filter(m => m.shouldMap).length;
+  console.log('✅ 相対評価システム完了:', {
+    '対象列数': headers.length,
+    'マッピング成功数': mappedCount,
+    '成功率': `${Math.round(mappedCount / targetTypes.length * 100)}%`,
+    'マッピング詳細': Object.entries(mapping)
+      .filter(([_, m]) => m.shouldMap)
+      .map(([type, m]) => `${type}→列${m.index}(${Math.round(m.confidence)}%)`)
+  });
+
+  return { mapping, stats: mappingStats };
 }
 
 /**
@@ -2106,8 +2203,8 @@ function validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey) {
  */
 function dsAddReaction(userId, rowId, reactionType) {
   try {
-    // 🎯 Zero-Dependency: Direct DatabaseOperations call
-    const user = DatabaseOperations.findUserById(userId);
+    // 🎯 Zero-Dependency: Direct Data call
+    const user = Data.findUserById(userId);
     if (!user || !user.configJson) {
       return createErrorResponse('User configuration not found');
     }
@@ -2124,10 +2221,13 @@ function dsAddReaction(userId, rowId, reactionType) {
 
     const res = processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionType, user.userEmail);
     if (res && (res.success || res.status === 'success')) {
+      // フロントエンド期待形式に合わせたレスポンス
       return {
         success: true,
-        message: res.message || 'Reaction added',
-        newValue: res.newValue
+        reactions: res.reactions || {},
+        userReaction: res.userReaction || reactionType,
+        action: res.action || 'added',
+        message: res.message || 'リアクションを追加しました'
       };
     }
 
@@ -2149,8 +2249,8 @@ function dsAddReaction(userId, rowId, reactionType) {
  */
 function dsToggleHighlight(userId, rowId) {
   try {
-    // 🎯 Zero-Dependency: Direct DatabaseOperations call
-    const user = DatabaseOperations.findUserById(userId);
+    // 🎯 Zero-Dependency: Direct Data call
+    const user = Data.findUserById(userId);
     if (!user || !user.configJson) {
       return createErrorResponse('User configuration not found');
     }

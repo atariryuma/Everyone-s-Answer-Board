@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, DatabaseOperations, validateUrl, validateEmail, getCurrentEmail */
+/* global ServiceFactory, validateUrl, validateEmail, getCurrentEmail, Data */
 
 // ===========================================
 // 🔧 Zero-Dependency UserService (ServiceFactory版)
@@ -51,7 +51,7 @@ function getCurrentUserInfo() {
     }
 
     // データベース検索
-    const userInfo = DatabaseOperations.findUserByEmail(email);
+    const userInfo = Data.findUserByEmail(email);
     if (!userInfo) {
       console.info('UserService.getCurrentUserInfo: 新規ユーザーの可能性', { email });
       return null;
@@ -175,7 +175,7 @@ function getUserAccessLevel(userId) {
       return ACCESS_LEVELS.NONE;
     }
 
-    const userInfo = DatabaseOperations.findUserById(userId);
+    const userInfo = Data.findUserById(userId);
     if (!userInfo) {
       return ACCESS_LEVELS.NONE;
     }
@@ -276,7 +276,7 @@ function createUser(userEmail, initialConfig = {}) {
     }
 
     // 既存ユーザーチェック
-    const existingUser = DatabaseOperations.findUserByEmail(userEmail);
+    const existingUser = Data.findUserByEmail(userEmail);
     if (existingUser) {
       console.info('UserService.createUser: 既存ユーザーを返却', { userEmail });
       return existingUser;
@@ -286,7 +286,7 @@ function createUser(userEmail, initialConfig = {}) {
     const userData = buildNewUserData(userEmail, initialConfig);
 
     // データベースに保存
-    const success = DatabaseOperations.createUser(userData);
+    const success = Data.createUser(userEmail);
     if (!success) {
       throw new Error('ユーザー作成に失敗');
     }

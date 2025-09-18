@@ -13,7 +13,7 @@
  * - プラットフォームAPI統合
  */
 
-/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, connectToSheetInternal, getFormInfo */
+/* global getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, connectToSheetInternal, getFormInfo */
 
 // ===========================================
 // 🔧 Session Management
@@ -136,18 +136,24 @@ function getCache() {
 function getDB() {
   try {
     const root = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
-    // Prefer globally exposed DB instance
-    if (root && root.DB) {
-      return root.DB;
-    }
-    // Fallback to DatabaseOperations symbol if present
-    if (typeof DatabaseOperations !== 'undefined') {
-      // Cache to global root for subsequent calls
-      try { root.DB = DatabaseOperations; } catch (_) { void 0; }
-      return DatabaseOperations;
+
+    // Use Data.gs Zero-Dependency implementation
+    if (root && root.Data) {
+      return root.Data;
     }
 
-    console.warn('ServiceFactory.getDB: DatabaseOperations not available');
+    // Direct access fallback
+    if (typeof globalThis !== 'undefined' && globalThis.Data) {
+      try { root.Data = globalThis.Data; } catch (_) { void 0; }
+      return globalThis.Data;
+    }
+
+    if (typeof global !== 'undefined' && global.Data) {
+      try { root.Data = global.Data; } catch (_) { void 0; }
+      return global.Data;
+    }
+
+    console.warn('ServiceFactory.getDB: Data class not available');
     return null;
   } catch (error) {
     console.error('ServiceFactory.getDB: Database access error:', error.message);
@@ -379,7 +385,7 @@ function diagnose() {
     results.checks.push({
       name: 'Database Service',
       status: db ? '✅' : '⚠️',
-      details: db ? 'Database operations available' : 'DatabaseOperations not found'
+      details: db ? 'Database operations available' : 'Data class not found'
     });
   } catch (error) {
     results.checks.push({
@@ -421,7 +427,6 @@ __rootSF.ServiceFactory = {
         const shim = {};
         if (typeof validateUserData === 'function') shim.validateUserData = validateUserData;
         if (typeof validateSession === 'function') shim.validateSession = validateSession;
-        // Service account token function removed - was impersonation
         if (Object.keys(shim).length > 0) return shim;
         console.warn('ServiceFactory.getSecurityService: SecurityService not available');
         return null;

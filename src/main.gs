@@ -13,7 +13,7 @@
  * - Simple, readable code
  */
 
-/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, DatabaseOperations, columnAnalysisImpl, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config */
+/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, columnAnalysisImpl, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -79,14 +79,14 @@ function doGet(e) {
         let userInfo = null;
         try {
           const db = ServiceFactory.getDB();
-          let user = db && db.findUserByEmail ? db.findUserByEmail(email) : null;
+          let user = Data.findUserByEmail(email);
 
           // Auto-create admin user if not exists - with enhanced error handling
-          if (!user && db && typeof db.createUser === 'function') {
+          if (!user) {
             try {
               const userService = ServiceFactory.getUserService();
               if (userService && typeof userService.createUser === 'function') {
-                user = userService.createUser(email);
+                user = Data.createUser(email);
               } else {
                 console.warn('UserService.createUser not available, creating minimal user object');
                 user = {
@@ -193,7 +193,7 @@ function doGet(e) {
         // Verify user exists
         try {
           const db = ServiceFactory.getDB();
-          const user = db.findUserById(userId);
+          const user = Data.findUserById(userId);
           if (!user) {
             const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
             errorTemplate.title = 'ユーザーが見つかりません';
@@ -292,9 +292,9 @@ function doPost(e) {
     let result;
     switch (action) {
       case 'getData':
-        // 🎯 Zero-Dependency: Direct DatabaseOperations call
+        // 🎯 Zero-Dependency: Direct Data class call
         try {
-          const user = DatabaseOperations.findUserByEmail(email);
+          const user = Data.findUserByEmail(email);
           if (!user) {
             result = { success: false, message: 'ユーザーが登録されていません' };
           } else {
@@ -313,9 +313,9 @@ function doPost(e) {
         result = dsToggleHighlight(request.userId || email, request.rowId);
         break;
       case 'refreshData':
-        // 🎯 Zero-Dependency: Direct DatabaseOperations call
+        // 🎯 Zero-Dependency: Direct Data class call
         try {
-          const user = DatabaseOperations.findUserByEmail(email);
+          const user = Data.findUserByEmail(email);
           if (!user) {
             result = { success: false, message: 'ユーザーが登録されていません' };
           } else {
@@ -423,7 +423,7 @@ function getConfig() {
     console.log('getConfig: Database access', {
       dbAvailable: !!db,
       dbType: typeof db,
-      findUserByEmailAvailable: !!(db && db.findUserByEmail)
+      findUserByEmailAvailable: !!(db && typeof db.findUserByEmail === 'function')
     });
 
     if (!db) {
@@ -694,7 +694,7 @@ function processLoginAction() {
         lastModified: new Date().toISOString()
       };
 
-      db.createUser(userData);
+      Data.createUser(userData.userEmail);
       user = userData;
     }
 
@@ -1376,9 +1376,9 @@ function getPublishedSheetData(classFilter, sortOrder) {
       if (typeof DB !== 'undefined' && DB) {
         db = DB;
       }
-      // Method 2: DatabaseOperationsが直接利用可能な場合
-      else if (typeof DatabaseOperations !== 'undefined') {
-        db = DatabaseOperations;
+      // Method 2: Data class が直接利用可能な場合
+      else if (typeof Data !== 'undefined') {
+        db = Data;
       }
     } catch (dbError) {
       console.error('getPublishedSheetData: DB初期化エラー', dbError.message);
@@ -1496,31 +1496,9 @@ function analyzeColumns(spreadsheetId, sheetName) {
 // 🔧 Unified Validation Functions
 // ===========================================
 
-/**
- * Validate URL - unified function replacing multiple duplicates
- */
-
-/**
- * Validate email - unified function
- */
-
-/**
- * Validate spreadsheet ID - unified function
- */
-
-
-
 // ===========================================
 // 🔧 Unified Data Operations
 // ===========================================
-
-/**
- * Toggle highlight - simplified name for highlight operations
- */
-
-/**
- * Remove reaction - simplified name
- */
 
 
 // ===========================================
@@ -1581,7 +1559,7 @@ function saveConfig(userId, config) {
 
     // Save to database
     const db = ServiceFactory.getDB();
-    const user = db.findUserById(userId);
+    const user = Data.findUserById(userId);
     if (!user) {
       return { success: false, message: 'User not found' };
     }
@@ -1802,7 +1780,7 @@ function connectDataSource(spreadsheetId, sheetName) {
 }
 
 /**
- * Get form info - API Gateway function for SystemController
+ * Get form info - API Gateway function delegating to SystemController
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} sheetName - シート名
  * @returns {Object} フォーム情報
@@ -1814,32 +1792,9 @@ function getFormInfo(spreadsheetId, sheetName) {
       return createAdminRequiredError();
     }
 
-    // Direct ConfigService call using ServiceFactory pattern
-    const configService = ServiceFactory.getConfigService();
-    if (!configService) {
-      throw new Error('ConfigService not available');
-    }
-
-    const serviceResponse = configService.getFormInfo(spreadsheetId, sheetName);
-    if (serviceResponse && typeof serviceResponse === 'object') {
-      const enrichedFormData = serviceResponse.formData && typeof serviceResponse.formData === 'object'
-        ? {
-            ...serviceResponse.formData,
-            sheetName: serviceResponse.formData.sheetName || sheetName
-          }
-        : serviceResponse.formData;
-
-      return {
-        ...serviceResponse,
-        formData: enrichedFormData,
-        requestContext: serviceResponse.requestContext || {
-          spreadsheetId,
-          sheetName
-        }
-      };
-    }
-
-    return serviceResponse;
+    // Delegate to SystemController implementation - Zero-Dependency Architecture
+    // SystemController contains the actual implementation logic
+    return getFormInfoImpl(spreadsheetId, sheetName);
 
   } catch (error) {
     console.error('getFormInfo error:', error.message);

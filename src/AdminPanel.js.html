@@ -2140,14 +2140,18 @@
     };
     console.log('🔍 setAIDetectionSelections: mapping詳細分析', mappingDetails);
 
-    // mappingが空の場合の詳細ログ
+    // 相対評価システム対応: mappingが空でも信頼度があれば処理継続
     const actualMapping = mapping.mapping || mapping;
-    if (!actualMapping || Object.keys(actualMapping).length === 0) {
+    const hasValidMapping = actualMapping && Object.keys(actualMapping).length > 0;
+    const hasConfidenceData = confidence && Object.keys(confidence).length > 0;
+
+    if (!hasValidMapping && !hasConfidenceData) {
       console.log('💡 AI検出結果がありません - 手動選択をお使いください');
-      if (confidence && Object.keys(confidence).length > 0) {
-        console.log('🔍 信頼度情報はあります:', confidence);
-      }
       return;
+    }
+
+    if (!hasValidMapping && hasConfidenceData) {
+      console.log('🔍 相対評価システム: マッピングなし、信頼度データで処理継続', confidence);
     }
 
     // グローバル変数として現在のAI検出結果を保存
@@ -2197,26 +2201,39 @@
         console.log(`✅ AI検出成功: ${columnType} → ${selectedIndex}列 (信頼度: ${columnConfidence}%)`);
         detectedCount++;
       } else if (columnConfidence > 0) {
-        // 適応的閾値チェック
-        const adaptiveThresholds = {
-          name: 65, class: 65, answer: 55, reason: 55
-        };
-        const threshold = adaptiveThresholds[columnType] || 60;
+        // 相対評価システム: 動的閾値による判定
+        const allConfidences = Object.values(confidence).filter(c => c > 0);
+        const maxConfidence = Math.max(...allConfidences);
+        const relativeThreshold = Math.max(maxConfidence * 0.7, 25); // 最高値の70%または25%
 
-        if (columnConfidence >= threshold) {
-          console.log(`⚠️ AI検出: ${columnType}列は信頼度${columnConfidence}%で適応閾値(${threshold}%)以上だが、マッピングエラー`);
+        let badgeType = 'low-confidence';
+        let statusMessage = '';
+
+        if (columnConfidence >= relativeThreshold) {
+          badgeType = 'relative-candidate';
+          statusMessage = `候補 (相対閾値${Math.round(relativeThreshold)}%達成)`;
+        } else if (columnConfidence >= 20) {
+          badgeType = 'low-confidence';
+          statusMessage = `検討中 (${Math.round(columnConfidence)}%)`;
         } else {
-          console.log(`⚠️ AI検出: ${columnType}列は信頼度${columnConfidence}%で適応閾値(${threshold}%)未満`);
+          statusMessage = `信頼度不足 (${Math.round(columnConfidence)}%)`;
         }
-        showConfidenceBadge(columnType, columnConfidence, 'low-confidence');
+
+        console.log(`🔍 相対評価: ${columnType}列 - ${statusMessage} (最高値: ${Math.round(maxConfidence)}%)`);
+        showConfidenceBadge(columnType, columnConfidence, badgeType);
       }
     });
 
-    // 改善されたフィードバックメッセージ
+    // 相対評価システム対応の改善されたフィードバックメッセージ
     if (detectedCount > 0) {
-      console.log(`🎯 AI検出: ${detectedCount}/4列を自動設定しました (${totalConfidenceInfo.join(', ')})`);
+      const maxConfidence = Math.max(...Object.values(confidence));
+      console.log(`🎯 相対評価AI検出: ${detectedCount}/4列を自動設定 (最高信頼度: ${Math.round(maxConfidence)}%)`);
+      console.log(`📊 詳細: ${totalConfidenceInfo.join(', ')}`);
     } else if (totalConfidenceInfo.length > 0) {
-      console.log(`📊 AI分析完了: 信頼度不足のため手動選択が必要です (${totalConfidenceInfo.join(', ')})`);
+      const maxConfidence = Math.max(...Object.values(confidence));
+      const avgConfidence = Object.values(confidence).reduce((a, b) => a + b, 0) / Object.values(confidence).length;
+      console.log(`📊 相対評価分析完了: 自動設定なし (最高: ${Math.round(maxConfidence)}%, 平均: ${Math.round(avgConfidence)}%)`);
+      console.log(`🔍 各列信頼度: ${totalConfidenceInfo.join(', ')} - 手動選択をご利用ください`);
     } else {
       console.log('💡 AI検出結果がありません - 手動選択をお使いください');
     }
@@ -2388,8 +2405,20 @@
     if (type === 'manual') {
       badgeClass = 'manual';
       badgeText = '✋ 手動設定';
+    } else if (type === 'ai') {
+      // 相対評価システムで自動設定された場合
+      badgeClass = 'high';
+      badgeText = `🎯 相対評価 ${Math.round(confidence)}%`;
+    } else if (type === 'relative-candidate') {
+      // 相対評価で候補として検出された場合
+      badgeClass = 'candidate';
+      badgeText = `🔍 候補 ${Math.round(confidence)}%`;
+    } else if (type === 'low-confidence') {
+      // 信頼度が低い場合
+      badgeClass = 'low';
+      badgeText = `📊 検討中 ${Math.round(confidence)}%`;
     } else {
-      // AI検出の場合の信頼度による色分け
+      // 従来のAI検出（フォールバック）
       if (confidence >= 80) {
         badgeClass = 'high';
         badgeText = `🤖 AI検出 ${Math.round(confidence)}%`;

@@ -214,5 +214,10 @@ class Auth {
 }
 
 // Export for global access
-const __globalRoot = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
-__globalRoot.Auth = Auth;
+if (typeof globalThis !== 'undefined') {
+  globalThis.Auth = Auth;
+} else if (typeof global !== 'undefined') {
+  global.Auth = Auth;
+} else {
+  this.Auth = Auth;
+}

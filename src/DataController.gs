@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ServiceFactory, ConfigService, DataService, DatabaseOperations, getCurrentEmail, createErrorResponse, getUserSheetData, Data */
+/* global ServiceFactory, ConfigService, DataService, getCurrentEmail, createErrorResponse, getUserSheetData, Data */
 
 // ===========================================
 // 📊 メインページデータAPI

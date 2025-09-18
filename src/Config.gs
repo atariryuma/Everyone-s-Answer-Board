@@ -317,5 +317,10 @@ class Config {
 }
 
 // Export for global access
-const __globalRoot = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
-__globalRoot.Config = Config;
+if (typeof globalThis !== 'undefined') {
+  globalThis.Config = Config;
+} else if (typeof global !== 'undefined') {
+  global.Config = Config;
+} else {
+  this.Config = Config;
+}

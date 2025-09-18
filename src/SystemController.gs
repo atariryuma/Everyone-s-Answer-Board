@@ -587,18 +587,25 @@ function publishApplication(publishConfig) {
     });
 
     if (user) {
+      // 🎯 Ensure we have the latest user data before merging
+      console.log('publishApplication: Re-fetching user for latest config');
+      const latestUser = db.findUserByEmail(email);
+      const userToUse = latestUser || user;
+
       // 🎯 Configuration merge logging
       let currentConfig = {};
       try {
-        currentConfig = user.configJson ? JSON.parse(user.configJson) : {};
+        currentConfig = userToUse.configJson ? JSON.parse(userToUse.configJson) : {};
         console.log('publishApplication: Current config parsed', {
           currentConfigKeys: Object.keys(currentConfig),
-          currentConfigSize: JSON.stringify(currentConfig).length
+          currentConfigSize: JSON.stringify(currentConfig).length,
+          usingLatestUser: !!latestUser,
+          configJsonLength: userToUse.configJson ? userToUse.configJson.length : 0
         });
       } catch (parseError) {
         console.error('publishApplication: Failed to parse current config', {
           error: parseError.message,
-          configJsonLength: user.configJson ? user.configJson.length : 0
+          configJsonLength: userToUse.configJson ? userToUse.configJson.length : 0
         });
         currentConfig = {};
       }
@@ -765,14 +772,14 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
 
 
 /**
- * フォーム情報を取得
- * AdminPanel.js.html から呼び出される
+ * フォーム情報を取得（実装関数）
+ * main.gs API Gateway から呼び出される
  *
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} sheetName - シート名
  * @returns {Object} フォーム情報
  */
-function getFormInfo(spreadsheetId, sheetName) {
+function getFormInfoImpl(spreadsheetId, sheetName) {
   try {
     // 引数検証
     if (!spreadsheetId || !sheetName) {

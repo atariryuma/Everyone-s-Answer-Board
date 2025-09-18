@@ -28,16 +28,6 @@ function initSecurityServiceZero() {
 // 🔑 認証・セッション管理
 // ===========================================
 
-/**
- * Service Accountトークン取得（セキュリティ強化版）
- * @returns {string|null} アクセストークン
- */
-// Service account token function removed - impersonation detected
-
-/**
- * Service Accountトークン生成（セキュリティ強化版）
- * @returns {string|null} 生成されたトークン
- */
 // Service account token generation function removed - was using user OAuth token impersonation
 
 /**
