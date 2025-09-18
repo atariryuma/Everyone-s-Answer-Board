@@ -3092,7 +3092,7 @@
   function updatePublishStatus(status) {
     const badge = document.querySelector('.status-badge.unpublished') || document.querySelector('.status-badge.published');
     if (badge) {
-      badge.className = `status-badge ${status}`;
+      badge.className = 'status-badge ' + status;
       badge.textContent = status === 'published' ? '公開中' : '未公開';
     }
   }
