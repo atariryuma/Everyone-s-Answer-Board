@@ -1620,6 +1620,41 @@
           // シート一覧を取得してプルダウンを更新
           if (result.sheets && result.sheets.length > 0) {
             updateSheetNameSuggestions(result.sheets);
+
+            // シート名が自動設定された場合、フォーム情報も取得
+            const sheetNameInput = document.getElementById('sheet-name-input');
+            if (sheetNameInput.value && sheetNameInput.value.trim() !== '') {
+              console.log('validateAccessAPI成功後、フォーム情報を取得:', {
+                spreadsheetId: spreadsheetId,
+                sheetName: sheetNameInput.value
+              });
+
+              // フォーム情報を非同期で取得
+              google.script.run
+                .withSuccessHandler(function(formResult) {
+                  console.log('validateAccessAPI後のフォーム情報取得成功:', formResult);
+                  if (formResult && formResult.success && formResult.formData) {
+                    showFormInfo(formResult.formData, {
+                      status: 'linked',
+                      message: 'フォーム連携が確認されました'
+                    });
+                  } else {
+                    console.warn('フォーム情報取得失敗:', formResult);
+                    showFormInfo({}, {
+                      status: 'missing',
+                      message: 'フォーム連携情報が見つかりませんでした'
+                    });
+                  }
+                })
+                .withFailureHandler(function(formError) {
+                  console.warn('validateAccessAPI後のフォーム情報取得エラー:', formError);
+                  showFormInfo({}, {
+                    status: 'error',
+                    message: 'フォーム情報の取得中にエラーが発生しました'
+                  });
+                })
+                .getFormInfo(spreadsheetId, sheetNameInput.value);
+            }
           }
         } else {
           showError('スプレッドシートが開けません');
