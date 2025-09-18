@@ -807,6 +807,22 @@ function getAppStatus() {
   }
 }
 
+/**
+ * Validate spreadsheet access with service account
+ * Frontend API for SystemController.validateAccess
+ */
+function validateAccess(spreadsheetId, autoAddEditor = true) {
+  try {
+    return SystemController.validateAccess(spreadsheetId, autoAddEditor);
+  } catch (error) {
+    console.error('validateAccess API error:', error.message);
+    return {
+      success: false,
+      message: error.message,
+      sheets: []
+    };
+  }
+}
 
 /**
  * Set application status - simplified name

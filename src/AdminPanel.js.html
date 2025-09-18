@@ -2688,31 +2688,32 @@
 
   // 列設定の保存
   function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping) {
-    // 🎯 ConfigJson完全同期: 全フィールド適切更新
+    // 🎯 ConfigJson最適化: 重複防止の単一責任設計
+    const timestamp = new Date().toISOString();
+
     const optimizedConfig = {
       spreadsheetId,
       sheetName,
-      headers: headers, // トップレベルheaders
+      headers: headers, // トップレベルheaders（UI表示用）
       columnMapping: {
         ...columnMapping,
-        headers: headers, // columnMapping内にもheadersを保持
-        verifiedAt: new Date().toISOString()
+        headers: headers, // columnMapping内headers（システム利用）
+        verifiedAt: timestamp // 検証時刻は論理的にmapping内のみ
       },
-      setupComplete: true, // 🚀 設定完了フラグ追加
-      verifiedAt: new Date().toISOString(),
+      setupComplete: true,
       etag: (systemState && systemState.config && systemState.config.etag) || undefined,
     };
 
     if (systemState && systemState.config) {
       Object.assign(optimizedConfig, systemState.config);
-      // 最新のUI状態を最終的に適用（上書き防止）
+      // 最新のUI状態を最終的に適用（重複なし単一責任設計）
       optimizedConfig.spreadsheetId = spreadsheetId;
       optimizedConfig.sheetName = sheetName;
       optimizedConfig.headers = headers;
       optimizedConfig.columnMapping = {
         ...columnMapping,
         headers: headers,
-        verifiedAt: new Date().toISOString()
+        verifiedAt: timestamp // 統一されたタイムスタンプ
       };
 
       // 🎯 ConfigJson完全同期: Derived Fields自動更新
@@ -2738,6 +2739,11 @@
           spreadsheetUrl: optimizedConfig.spreadsheetUrl,
           formCleared: 'フォーム情報クリア済み'
         });
+      }
+
+      // 🎯 Object.assign残存分クリーンアップ（最小限）
+      if (optimizedConfig.verifiedAt) {
+        delete optimizedConfig.verifiedAt; // columnMapping.verifiedAtのみ使用
       }
 
       // 🔗 フォーム自動連携: 既存フォーム検出・統合（安全版）

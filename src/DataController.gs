@@ -61,15 +61,6 @@ function handleGetData(request) {
   }
 }
 
-/**
- * @deprecated This function has been removed in favor of direct DataService calls from main.gs
- * See main.gs doPost() method for the new Zero-Dependency Architecture implementation
- */
-
-/**
- * @deprecated This function has been removed in favor of direct DataService calls from main.gs
- * See main.gs doPost() method for the new Zero-Dependency Architecture implementation
- */
 
 /**
  * データの更新

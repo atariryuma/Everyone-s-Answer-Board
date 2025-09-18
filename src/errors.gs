@@ -116,7 +116,7 @@ function validateRequired(params, required) {
   return { isValid: true };
 }
 
-// Legacy compatibility functions for gradual migration
+// Error handling utilities for Zero-Dependency Architecture
 const ErrorHandler = Object.freeze({
   logError,
   logWarning,

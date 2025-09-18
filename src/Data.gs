@@ -248,8 +248,8 @@ class Data {
   }
 
   /**
-   * DatabaseOperations互換 - Zero-Dependency実装
-   * CLAUDE.md準拠の直接SpreadsheetApp使用
+   * User Database Operations - Zero-Dependency実装
+   * CLAUDE.md準拠のサービスアカウント統一アクセス
    */
 
   /**
@@ -987,14 +987,11 @@ class Data {
   }
 }
 
-// Export for global access with DatabaseOperations compatibility
+// Export for global access (Zero-Dependency Architecture)
 if (typeof globalThis !== 'undefined') {
   globalThis.Data = Data;
-  globalThis.DatabaseOperations = Data; // DatabaseOperations互換
 } else if (typeof global !== 'undefined') {
   global.Data = Data;
-  global.DatabaseOperations = Data; // DatabaseOperations互換
 } else {
   this.Data = Data;
-  this.DatabaseOperations = Data; // DatabaseOperations互換
 }
