@@ -2722,10 +2722,10 @@
         });
 
         // sourceKey自動生成 (UserService.gsロジック準拠)
-        optimizedConfig.sourceKey = `sheet_${optimizedConfig.spreadsheetId}_${Date.now()}`;
+        optimizedConfig.sourceKey = 'sheet_' + optimizedConfig.spreadsheetId + '_' + Date.now();
 
         // spreadsheetUrl自動生成
-        optimizedConfig.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${optimizedConfig.spreadsheetId}/edit`;
+        optimizedConfig.spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + optimizedConfig.spreadsheetId + '/edit';
 
         console.log('✅ Derived Fields更新完了:', {
           sourceKey: optimizedConfig.sourceKey,
