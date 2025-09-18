@@ -822,13 +822,14 @@ function getAppStatus() {
 
 /**
  * Validate spreadsheet access with service account
- * Frontend API for SystemController.validateAccess
+ * Frontend API for validateAccess function in SystemController.gs
  */
-function validateAccess(spreadsheetId, autoAddEditor = true) {
+function validateAccessAPI(spreadsheetId, autoAddEditor = true) {
   try {
-    return SystemController.validateAccess(spreadsheetId, autoAddEditor);
+    // Zero-dependency: Direct function call instead of object reference
+    return validateAccess(spreadsheetId, autoAddEditor);
   } catch (error) {
-    console.error('validateAccess API error:', error.message);
+    console.error('validateAccessAPI error:', error.message);
     return {
       success: false,
       message: error.message,

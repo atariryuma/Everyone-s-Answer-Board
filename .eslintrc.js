@@ -82,6 +82,7 @@ module.exports = {
         'invalidateUserCache': 'writable',
         'createResponse': 'writable',
         'validateAccess': 'writable',
+        'validateAccessAPI': 'writable',
         'verifyAccess': 'writable',
         'buildUserAdminUrl': 'writable',
         'logError': 'writable',
