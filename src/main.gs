@@ -1,4 +1,4 @@
-/* global DB, getQuestionText, validateAccess */
+/* global DB, getQuestionText, validateAccess, URL */
 /**
  * main.gs - Simplified Application Entry Points
  *
@@ -1940,37 +1940,62 @@ function getActiveFormInfo() {
       console.error('❌ Config parse error:', parseError.message);
     }
 
-    if (!config.formUrl) {
-      console.warn('⚠️ Form URL not configured');
-      return {
-        success: false,
-        message: 'Form URL not configured',
-        formUrl: null,
-        formTitle: null
-      };
-    }
+    // シンプルな統一ルール: URLが存在して有効な場合のみ表示
+    const isValidUrl = !!(config.formUrl && isValidFormUrl(config.formUrl));
 
     console.log('✅ getActiveFormInfo SUCCESS:', {
       userId: user.userId,
       hasFormUrl: !!config.formUrl,
+      isValidUrl,
       formTitle: config.formTitle || 'フォーム'
     });
 
     return {
-      success: true,
-      formUrl: config.formUrl,
+      success: isValidUrl,
+      shouldShow: isValidUrl,
+      formUrl: isValidUrl ? config.formUrl : null,
       formTitle: config.formTitle || 'フォーム',
-      isActive: true,
-      source: 'user_config'
+      message: isValidUrl ? 'Valid form found' : 'No valid form URL configured'
     };
   } catch (error) {
     console.error('❌ getActiveFormInfo ERROR:', error.message);
     return {
       success: false,
+      shouldShow: false,
       message: error.message,
       formUrl: null,
       formTitle: null
     };
+  }
+}
+
+/**
+ * Check if URL is valid Google Forms URL
+ * @param {string} url - URL to validate
+ * @returns {boolean} True if valid Google Forms URL
+ */
+function isValidFormUrl(url) {
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+
+  try {
+    const urlObj = new URL(url.trim());
+
+    if (urlObj.protocol !== 'https:') {
+      return false;
+    }
+
+    const validHosts = ['docs.google.com', 'forms.gle'];
+    const isValidHost = validHosts.includes(urlObj.hostname);
+
+    if (urlObj.hostname === 'docs.google.com') {
+      return urlObj.pathname.includes('/forms/');
+    }
+
+    return isValidHost;
+  } catch {
+    return false;
   }
 }
 

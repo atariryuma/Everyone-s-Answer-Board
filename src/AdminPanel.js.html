@@ -179,6 +179,21 @@
     };
   })();
 
+  // URL検証関数
+  function isValidFormUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    try {
+      const urlObj = new URL(url.trim());
+      if (urlObj.protocol !== 'https:') return false;
+      const validHosts = ['docs.google.com', 'forms.gle'];
+      if (urlObj.hostname === 'docs.google.com') {
+        return urlObj.pathname.includes('/forms/');
+      }
+      return validHosts.includes(urlObj.hostname);
+    } catch {
+      return false;
+    }
+  }
 
   // Wrap initialization in safe handler
   if (document.readyState === 'loading') {
@@ -1167,8 +1182,9 @@
     spreadsheetBtn.disabled = true;
     statusDiv.textContent = 'スプレッドシート機能はConfigurationManager統合中';
 
-    // フォームボタン（フォームURLが設定されている場合に表示）
-    if (config.formUrl) {
+    // フォームボタン（有効なフォームURLが設定されている場合に表示）
+    const shouldShowForm = config.formUrl && isValidFormUrl(config.formUrl);
+    if (shouldShowForm) {
       formBtn.classList.remove('hidden');
       formBtn.disabled = false;
       formBtn.dataset.formUrl = config.formUrl;
