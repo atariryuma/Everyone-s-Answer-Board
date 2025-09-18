@@ -1236,18 +1236,11 @@
     const spreadsheetName = options.spreadsheetName || safeData.spreadsheetName || '';
     const sheetName = safeData.sheetName || options.sheetName || '';
 
-    const formInfos = [
-      {
-        container: document.getElementById('form-info'),
-        title: document.getElementById('form-title'),
-        url: document.getElementById('form-url')
-      },
-      {
-        container: document.getElementById('form-info-url'),
-        title: document.getElementById('form-title-url'),
-        url: document.getElementById('form-url-url')
-      }
-    ];
+    const formInfo = {
+      container: document.getElementById('form-info'),
+      title: document.getElementById('form-title'),
+      url: document.getElementById('form-url')
+    };
 
     const displayTitle = (safeData.formTitle && safeData.formTitle.trim())
       ? safeData.formTitle.trim()
@@ -1267,51 +1260,54 @@
       diagnostics
     });
 
-    formInfos.forEach((info) => {
-      if (!info.container || !info.title || !info.url) {
-        return;
-      }
+    // 要素の存在確認
+    if (!formInfo.container || !formInfo.title || !formInfo.url) {
+      console.warn('showFormInfo: Required form elements not found');
+      return;
+    }
 
-      info.title.textContent = displayTitle;
+    // タイトル設定
+    formInfo.title.textContent = displayTitle;
 
-      if (linkHref) {
-        info.url.href = linkHref;
-        info.url.setAttribute('target', '_blank');
-        info.url.textContent = linkText;
-        info.url.classList.remove('text-yellow-400', 'text-green-400', 'cursor-not-allowed');
-        info.url.classList.add('text-blue-400');
+    // URL設定とスタイリング
+    if (linkHref) {
+      formInfo.url.href = linkHref;
+      formInfo.url.setAttribute('target', '_blank');
+      formInfo.url.textContent = linkText;
+      formInfo.url.classList.remove('text-yellow-400', 'text-green-400', 'cursor-not-allowed');
+      formInfo.url.classList.add('text-blue-400');
+    } else {
+      formInfo.url.textContent = linkText;
+      formInfo.url.removeAttribute('href');
+      formInfo.url.removeAttribute('target');
+      formInfo.url.classList.remove('text-blue-400');
+
+      // ステータスに応じたスタイリング
+      if (isDetected) {
+        formInfo.url.classList.remove('text-yellow-400');
+        formInfo.url.classList.add('text-green-400', 'cursor-not-allowed');
       } else {
-        info.url.textContent = linkText;
-        info.url.removeAttribute('href');
-        info.url.removeAttribute('target');
-        info.url.classList.remove('text-blue-400');
-
-        // ステータスに応じたスタイリング
-        if (isDetected) {
-          info.url.classList.remove('text-yellow-400');
-          info.url.classList.add('text-green-400', 'cursor-not-allowed');
-        } else {
-          info.url.classList.remove('text-green-400');
-          info.url.classList.add('text-yellow-400', 'cursor-not-allowed');
-        }
+        formInfo.url.classList.remove('text-green-400');
+        formInfo.url.classList.add('text-yellow-400', 'cursor-not-allowed');
       }
+    }
 
+    // コンテナ表示とデータ属性設定
+    formInfo.container.classList.remove('hidden');
+    formInfo.container.dataset.formStatus = status;
+    formInfo.container.dataset.formReason = reason;
+    formInfo.container.dataset.formSheet = sheetName;
 
-      info.container.classList.remove('hidden');
-      info.container.dataset.formStatus = status;
-      info.container.dataset.formReason = reason;
-      info.container.dataset.formSheet = sheetName;
-
-      if (diagnostics) {
-        try {
-          info.container.dataset.formDiagnostics = JSON.stringify(diagnostics);
-        } catch (jsonError) {
-          console.warn('formDiagnostics serialization failed:', jsonError);
-        }
-      } else {
-        info.container.removeAttribute('data-form-diagnostics');
+    // 診断情報設定
+    if (diagnostics) {
+      try {
+        formInfo.container.dataset.formDiagnostics = JSON.stringify(diagnostics);
+      } catch (jsonError) {
+        console.warn('formDiagnostics serialization failed:', jsonError);
       }
-    });
+    } else {
+      formInfo.container.removeAttribute('data-form-diagnostics');
+    }
 
     window.__formIntegrationStatus = {
       status,
@@ -1331,18 +1327,11 @@
   // フォーム情報非表示
   function hideFormInfo() {
     const formInfo = document.getElementById('form-info');
-    const formInfoUrl = document.getElementById('form-info-url');
     if (formInfo) {
       formInfo.classList.add('hidden');
       formInfo.removeAttribute('data-form-status');
       formInfo.removeAttribute('data-form-reason');
       formInfo.removeAttribute('data-form-diagnostics');
-    }
-    if (formInfoUrl) {
-      formInfoUrl.classList.add('hidden');
-      formInfoUrl.removeAttribute('data-form-status');
-      formInfoUrl.removeAttribute('data-form-reason');
-      formInfoUrl.removeAttribute('data-form-diagnostics');
     }
   }
 
