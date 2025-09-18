@@ -2703,12 +2703,83 @@
     };
 
     if (systemState && systemState.config) {
-      Object.assign(optimizedConfig, systemState.config, optimizedConfig);
+      Object.assign(optimizedConfig, systemState.config);
+      // 最新のUI状態を最終的に適用（上書き防止）
+      optimizedConfig.spreadsheetId = spreadsheetId;
+      optimizedConfig.sheetName = sheetName;
+      optimizedConfig.columnMapping = {
+        ...columnMapping,
+        headers: headers,
+        verifiedAt: new Date().toISOString()
+      };
+
+      // 🎯 ConfigJson完全同期: Derived Fields自動更新
+      const isSpreadsheetChanged = optimizedConfig.spreadsheetId !== systemState.config.spreadsheetId;
+      if (isSpreadsheetChanged) {
+        console.log('🔄 SpreadsheetId変更検出 - Derived Fields更新開始:', {
+          oldId: systemState.config.spreadsheetId,
+          newId: optimizedConfig.spreadsheetId
+        });
+
+        // sourceKey自動生成 (UserService.gsロジック準拠)
+        optimizedConfig.sourceKey = `sheet_${optimizedConfig.spreadsheetId}_${Date.now()}`;
+
+        // spreadsheetUrl自動生成
+        optimizedConfig.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${optimizedConfig.spreadsheetId}/edit`;
+
+        console.log('✅ Derived Fields更新完了:', {
+          sourceKey: optimizedConfig.sourceKey,
+          spreadsheetUrl: optimizedConfig.spreadsheetUrl
+        });
+      }
+
+      // 🔗 フォーム自動連携: 既存フォーム検出・統合
+      if (!optimizedConfig.formUrl) {
+        console.log('🔍 フォーム連携なし - 自動検出開始');
+
+        // getFormInfo API呼び出し準備（非同期処理対応）
+        const formIntegrationPromise = new Promise((resolve) => {
+          google.script.run
+            .withSuccessHandler(function(formResult) {
+              if (formResult.success && formResult.formData && formResult.formData.formUrl) {
+                optimizedConfig.formUrl = formResult.formData.formUrl;
+                optimizedConfig.formTitle = formResult.formData.formTitle;
+                console.log('✅ フォーム自動連携完了:', {
+                  formUrl: optimizedConfig.formUrl,
+                  formTitle: optimizedConfig.formTitle
+                });
+              } else {
+                console.log('ℹ️ フォーム連携なし（通常状態）');
+              }
+              resolve();
+            })
+            .withFailureHandler(function(error) {
+              console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
+              resolve();
+            })
+            .getFormInfo(spreadsheetId, sheetName);
+        });
+
+        // フォーム検出完了後に保存実行
+        formIntegrationPromise.then(() => {
+          executeConfigSave();
+        });
+        return; // 非同期処理のため、ここで一旦return
+      }
     }
 
-    console.log('📋 optimized config for save:', {
-      hasSpreadsheetId: !!optimizedConfig.spreadsheetId,
-      hasSheetName: !!optimizedConfig.sheetName,
+    // 通常の保存処理実行
+    executeConfigSave();
+
+    function executeConfigSave() {
+
+    console.log('📋 完全同期Config保存準備:', {
+      spreadsheetId: optimizedConfig.spreadsheetId,
+      sheetName: optimizedConfig.sheetName,
+      sourceKey: optimizedConfig.sourceKey,
+      spreadsheetUrl: optimizedConfig.spreadsheetUrl,
+      formUrl: optimizedConfig.formUrl || 'なし',
+      formTitle: optimizedConfig.formTitle || 'なし',
       hasColumnMapping: !!optimizedConfig.columnMapping,
       setupComplete: optimizedConfig.setupComplete,
       configSize: JSON.stringify(optimizedConfig).length
@@ -2717,10 +2788,15 @@
     google.script.run
       .withSuccessHandler(function (result) {
         if (result.success) {
-          console.log('✅ 列設定を保存しました:', {
+          console.log('✅ ConfigJson完全同期保存成功:', {
+            spreadsheetId: optimizedConfig.spreadsheetId,
+            sourceKey: optimizedConfig.sourceKey,
+            spreadsheetUrl: optimizedConfig.spreadsheetUrl,
+            formUrl: optimizedConfig.formUrl || 'なし',
             savedHeaders: headers.length,
             hasMapping: !!columnMapping,
-            setupComplete: true
+            setupComplete: true,
+            completeSyncStatus: '全フィールド更新完了'
           });
 
           // systemStateを更新
@@ -2930,6 +3006,14 @@
       spreadsheetId = document.getElementById('spreadsheet-select').value;
       sheetName = document.getElementById('sheet-select').value;
     }
+
+    console.log('📋 gatherConfiguration result:', {
+      sourceMethod,
+      spreadsheetId,
+      sheetName,
+      spreadsheetUrlValue: sourceMethod === 'url' ? document.getElementById('spreadsheet-url').value : 'N/A',
+      spreadsheetSelectValue: sourceMethod === 'list' ? document.getElementById('spreadsheet-select').value : 'N/A'
+    });
 
     // 🎯 必須データのみ送信（送信データ大幅削減）
     return {
