@@ -32,7 +32,8 @@
       "Bash(node:*)",
       "Bash(git rm:*)",
       "Bash(cat:*)",
-      "Bash(xxd:*)"
+      "Bash(xxd:*)",
+      "Bash(uniq:*)"
     ],
     "deny": [],
     "ask": [],

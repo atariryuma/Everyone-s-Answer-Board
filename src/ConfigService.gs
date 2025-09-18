@@ -791,3 +791,191 @@ function checkIfSystemAdmin(email) {
     return false;
   }
 }
+
+// ===========================================
+// 🔧 統一configJson操作API (CLAUDE.md準拠)
+// ===========================================
+
+/**
+ * 統一設定読み込みAPI - V8最適化、変数チェック強化
+ * main.gs内の直接JSON.parse()操作を置換する統一関数
+ * @param {string} userId - ユーザーID
+ * @returns {Object} {success: boolean, config: Object, message?: string, userId?: string}
+ */
+function getConfigSafe(userId) {
+  // V8最適化: 事前変数チェック（CLAUDE.md 151-169行準拠）
+  if (!userId || typeof userId !== 'string' || !userId.trim()) {
+    return {
+      success: false,
+      config: getDefaultConfig(null),
+      message: 'Invalid userId provided'
+    };
+  }
+
+  try {
+    // Zero-Dependency: 直接Data.findUserById呼び出し
+    const user = Data.findUserById(userId);
+    if (!user) {
+      return {
+        success: false,
+        config: getDefaultConfig(userId),
+        message: 'User not found',
+        userId
+      };
+    }
+
+    // V8最適化: configJson存在チェック + 構造化パース
+    if (!user.configJson || typeof user.configJson !== 'string') {
+      return {
+        success: true,
+        config: getDefaultConfig(userId),
+        message: 'No config found, using defaults',
+        userId
+      };
+    }
+
+    // 構造化パース（修復機能付き）- 既存parseAndRepairConfig利用
+    const config = parseAndRepairConfig(user.configJson, userId);
+
+    return {
+      success: true,
+      config,
+      userId,
+      message: 'Config loaded successfully'
+    };
+
+  } catch (error) {
+    console.error('getConfigSafe error:', {
+      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
+      error: error.message
+    });
+
+    return {
+      success: false,
+      config: getDefaultConfig(userId),
+      message: `Config load error: ${error.message}`,
+      userId
+    };
+  }
+}
+
+/**
+ * 統一設定保存API - 検証+サニタイズ必須
+ * main.gs内の直接JSON.stringify()操作を置換する統一関数
+ * @param {string} userId - ユーザーID
+ * @param {Object} config - 保存する設定オブジェクト
+ * @param {Object} options - 保存オプション
+ * @returns {Object} {success: boolean, message: string, data?: Object}
+ */
+function saveConfigSafe(userId, config, options = {}) {
+  // V8最適化: 入力検証（事前チェック）
+  if (!userId || typeof userId !== 'string' || !userId.trim()) {
+    return {
+      success: false,
+      message: 'Invalid userId provided'
+    };
+  }
+
+  if (!config || typeof config !== 'object') {
+    return {
+      success: false,
+      message: 'Invalid config object provided'
+    };
+  }
+
+  try {
+    // 1. 統合検証・サニタイズ（既存validateAndSanitizeConfig利用）
+    const validation = validateAndSanitizeConfig(config, userId);
+    if (!validation.success) {
+      return {
+        success: false,
+        message: validation.message,
+        errors: validation.errors
+      };
+    }
+
+    // 2. 共通フィールドクリーンアップ
+    const cleanedConfig = cleanConfigFields(validation.data, options);
+
+    // 3. タイムスタンプ更新
+    cleanedConfig.lastModified = new Date().toISOString();
+    if (!cleanedConfig.lastAccessedAt) {
+      cleanedConfig.lastAccessedAt = cleanedConfig.lastModified;
+    }
+
+    // 4. Zero-Dependency: 直接Data.updateUser呼び出し
+    const updateResult = Data.updateUser(userId, {
+      configJson: JSON.stringify(cleanedConfig),
+      lastModified: cleanedConfig.lastModified
+    });
+
+    if (!updateResult || !updateResult.success) {
+      return {
+        success: false,
+        message: updateResult?.message || 'Database update failed'
+      };
+    }
+
+    // 5. キャッシュクリア
+    clearConfigCache(userId);
+
+    return {
+      success: true,
+      message: 'Config saved successfully',
+      data: cleanedConfig,
+      userId
+    };
+
+  } catch (error) {
+    console.error('saveConfigSafe error:', {
+      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
+      error: error.message
+    });
+
+    return {
+      success: false,
+      message: `Config save error: ${error.message}`
+    };
+  }
+}
+
+/**
+ * 共通フィールドクリーンアップ - main.gs内の個別delete操作を統一
+ * @param {Object} config - 設定オブジェクト
+ * @param {Object} options - クリーンアップオプション
+ * @returns {Object} クリーンアップ済み設定
+ */
+function cleanConfigFields(config, options = {}) {
+  if (!config || typeof config !== 'object') {
+    return config;
+  }
+
+  // V8最適化: const/destructuring使用
+  const cleanedConfig = { ...config };
+
+  // 標準的なクリーンアップフィールド（main.gsパターンから抽出）
+  const fieldsToRemove = [
+    'setupComplete',  // レガシーフィールド
+    'isDraft',        // レガシーフィールド
+    'questionText'    // 動的生成されるフィールド
+  ];
+
+  // オプション指定による追加クリーンアップ
+  if (options.cleanLegacyFields) {
+    fieldsToRemove.push('setupStatus_old', 'configVersion_old');
+  }
+
+  // フィールド削除実行
+  fieldsToRemove.forEach(field => {
+    if (field in cleanedConfig) {
+      delete cleanedConfig[field];
+    }
+  });
+
+  // lastAccessedAt自動更新（オプション）
+  if (options.updateAccessTime !== false) {
+    cleanedConfig.lastAccessedAt = new Date().toISOString();
+  }
+
+  return cleanedConfig;
+}

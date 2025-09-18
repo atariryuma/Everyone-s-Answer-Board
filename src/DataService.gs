@@ -1047,7 +1047,7 @@ function getSpreadsheetList(options = {}) {
  * @param {string} sheetName シート名
  * @returns {Object} 列分析結果
  */
-function columnAnalysisImpl(spreadsheetId, sheetName) {
+function analyzeColumnStructure(spreadsheetId, sheetName) {
   const started = Date.now();
   try {
     const paramValidation = validateSheetParams(spreadsheetId, sheetName);

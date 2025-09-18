@@ -28,7 +28,6 @@ function initSecurityServiceZero() {
 // 🔑 認証・セッション管理
 // ===========================================
 
-// Service account token generation function removed - was using user OAuth token impersonation
 
 /**
  * トークン形式検証（セキュリティ強化）
@@ -568,14 +567,23 @@ function getSecurityRecommendations() {
       }
 
       // トークンの有効性確認
-      // Service account token access removed - impersonation detected
-      const token = null; // Placeholder for removed impersonation function
-      if (!token) {
+      // Service account authentication handled by ServiceFactory
+      try {
+        const authTest = ServiceFactory.getSession();
+        if (!authTest.email) {
+          recommendations.push({
+            priority: 'medium',
+            category: 'authorization',
+            message: 'Service Accountトークンの更新が必要です',
+            action: 'トークンを再生成してください'
+          });
+        }
+      } catch (authError) {
         recommendations.push({
-          priority: 'medium',
+          priority: 'high',
           category: 'authorization',
-          message: 'Service Accountトークンの更新が必要です',
-          action: 'トークンを再生成してください'
+          message: 'Service Account認証エラー',
+          action: '認証設定を確認してください'
         });
       }
 

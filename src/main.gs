@@ -13,7 +13,7 @@
  * - Simple, readable code
  */
 
-/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, columnAnalysisImpl, validateConfig, dsAddReaction, dsToggleHighlight, getFormInfoImpl, Auth, Data, Config */
+/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config, getConfigSafe, saveConfigSafe, cleanConfigFields */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -202,15 +202,9 @@ function doGet(e) {
             return errorTemplate.evaluate();
           }
 
-          // Check if user's board is published
-          let config = {};
-          if (user.configJson) {
-            try {
-              config = JSON.parse(user.configJson);
-            } catch (parseError) {
-              // Parse error ignored - use default empty config
-            }
-          }
+          // Check if user's board is published - 統一API使用
+          const configResult = getConfigSafe(userId);
+          const config = configResult.success ? configResult.config : {};
 
           if (!config.appPublished) {
             const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
@@ -494,21 +488,16 @@ function getConfig() {
       return createUserNotFoundError();
     }
 
-    // 🎯 Config parsing logging
-    let config = {};
-    try {
-      config = user.configJson ? JSON.parse(user.configJson) : {};
-      console.log('getConfig: Config parsed successfully', {
-        configKeys: Object.keys(config),
-        configSize: JSON.stringify(config).length
-      });
-    } catch (parseError) {
-      console.error('getConfig: Config parse error', {
-        parseError: parseError.message,
-        configJsonLength: user.configJson ? user.configJson.length : 0
-      });
-      config = {};
-    }
+    // 🎯 Config parsing - 統一API使用
+    const configResult = getConfigSafe(user.userId);
+    const config = configResult.success ? configResult.config : {};
+
+    console.log('getConfig: Config loaded via unified API', {
+      success: configResult.success,
+      configKeys: Object.keys(config),
+      configSize: JSON.stringify(config).length,
+      message: configResult.message
+    });
 
     const endTime = new Date().toISOString();
     const processingTime = new Date(endTime) - new Date(startTime);
@@ -624,8 +613,14 @@ function getUserConfig(userId) {
       }
     }
 
-    const config = user.configJson ? JSON.parse(user.configJson) : {};
-    return { success: true, config, userId: user.userId };
+    // 統一API使用
+    const configResult = getConfigSafe(user.userId);
+    return {
+      success: configResult.success,
+      config: configResult.config,
+      userId: user.userId,
+      message: configResult.message
+    };
   } catch (error) {
     console.error('getUserConfig error:', error.message);
     return createExceptionResponse(error);
@@ -1524,7 +1519,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
  */
 function analyzeColumns(spreadsheetId, sheetName) {
   try {
-    const result = columnAnalysisImpl(spreadsheetId, sheetName);
+    const result = analyzeColumnStructure(spreadsheetId, sheetName);
     return result;
   } catch (error) {
     console.error('analyzeColumns error:', error.message);
@@ -1822,31 +1817,6 @@ function connectDataSource(spreadsheetId, sheetName) {
   }
 }
 
-/**
- * Get form info - API Gateway function delegating to SystemController
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} sheetName - シート名
- * @returns {Object} フォーム情報
- */
-function getFormInfo(spreadsheetId, sheetName) {
-  try {
-    const email = getCurrentEmail();
-    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
-      return createAdminRequiredError();
-    }
-
-    // Delegate to SystemController implementation - Zero-Dependency Architecture
-    // SystemController contains the actual implementation logic
-    return getFormInfoImpl(spreadsheetId, sheetName);
-
-  } catch (error) {
-    console.error('getFormInfo error:', error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
 
 // ===========================================
 // 🔧 Missing API Functions for Frontend Error Fix

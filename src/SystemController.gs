@@ -1014,9 +1014,9 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
  * @param {string} sheetName - シート名
  * @returns {Object} フォーム情報
  */
-function getFormInfoImpl(spreadsheetId, sheetName) {
+function getFormInfo(spreadsheetId, sheetName) {
   const startTime = new Date().toISOString();
-  console.log('=== getFormInfoImpl START ===', {
+  console.log('=== getFormInfo START ===', {
     spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 12)  }***` : 'N/A',
     sheetName: sheetName || 'N/A',
     timestamp: startTime
