@@ -630,32 +630,73 @@ function detectFormConnection(spreadsheet, sheet, sheetName, accessMethod) {
   // Method 1: 標準API - オーナー権限の場合のみ
   if (accessMethod === 'owner') {
     try {
-      // スプレッドシートレベルでフォームURL取得
-      if (typeof spreadsheet.getFormUrl === 'function') {
-        const formUrl = spreadsheet.getFormUrl();
-        if (formUrl) {
-          results.formUrl = formUrl;
-          results.confidence = 95;
-          results.detectionMethod = 'spreadsheet_api';
-          results.details.push('SpreadsheetApp.getFormUrl()で検出');
-          return results;
-        }
-      }
-
-      // シートレベルでフォームURL取得
+      // シートレベルでフォームURL取得（最優先）
       if (typeof sheet.getFormUrl === 'function') {
         const formUrl = sheet.getFormUrl();
         if (formUrl) {
           results.formUrl = formUrl;
-          results.confidence = 90;
+          results.confidence = 95;
           results.detectionMethod = 'sheet_api';
           results.details.push('Sheet.getFormUrl()で検出');
+
+          // FormApp.openByUrlでタイトル取得
+          try {
+            const form = FormApp.openByUrl(formUrl);
+            results.formTitle = form.getTitle();
+            results.details.push('FormApp.openByUrl()でタイトル取得');
+          } catch (titleError) {
+            console.warn('FormApp.openByUrl failed:', titleError.message);
+            results.formTitle = generateFormTitle(sheetName, spreadsheet.getName());
+            results.details.push('FormApp権限エラー - フォールバックタイトル使用');
+          }
+          return results;
+        }
+      }
+
+      // スプレッドシートレベルでフォームURL取得（フォールバック）
+      if (typeof spreadsheet.getFormUrl === 'function') {
+        const formUrl = spreadsheet.getFormUrl();
+        if (formUrl) {
+          results.formUrl = formUrl;
+          results.confidence = 85;
+          results.detectionMethod = 'spreadsheet_api';
+          results.details.push('SpreadsheetApp.getFormUrl()で検出');
+
+          // FormApp.openByUrlでタイトル取得
+          try {
+            const form = FormApp.openByUrl(formUrl);
+            results.formTitle = form.getTitle();
+            results.details.push('FormApp.openByUrl()でタイトル取得');
+          } catch (titleError) {
+            console.warn('FormApp.openByUrl failed:', titleError.message);
+            results.formTitle = generateFormTitle(sheetName, spreadsheet.getName());
+            results.details.push('FormApp権限エラー - フォールバックタイトル使用');
+          }
           return results;
         }
       }
     } catch (apiError) {
       console.warn('detectFormConnection: API検出失敗:', apiError.message);
       results.details.push(`API検出失敗: ${apiError.message}`);
+    }
+  }
+
+  // Method 1.5: Drive APIフォーム検索（API検出失敗時のフォールバック）
+  if (accessMethod === 'owner') {
+    try {
+      const spreadsheetId = spreadsheet.getId();
+      const driveFormResult = searchFormsByDrive(spreadsheetId, sheetName);
+      if (driveFormResult.formUrl) {
+        results.formUrl = driveFormResult.formUrl;
+        results.formTitle = driveFormResult.formTitle;
+        results.confidence = 80;
+        results.detectionMethod = 'drive_search';
+        results.details.push('Drive API検索で検出');
+        return results;
+      }
+    } catch (driveError) {
+      console.warn('detectFormConnection: Drive API検索失敗:', driveError.message);
+      results.details.push(`Drive API検索失敗: ${driveError.message}`);
     }
   }
 
@@ -765,6 +806,118 @@ function analyzeSheetName(sheetName) {
     confidence: 0,
     reason: `一般的なフォームシート名パターンなし: "${sheetName}"`
   };
+}
+
+/**
+ * フォールバックタイトル生成
+ * @param {string} sheetName - シート名
+ * @param {string} spreadsheetName - スプレッドシート名
+ * @returns {string} 生成されたタイトル
+ */
+function generateFormTitle(sheetName, spreadsheetName) {
+  try {
+    // シート名がフォーム関連の場合
+    if (sheetName && typeof sheetName === 'string') {
+      const formPatterns = [
+        /フォームの回答|form.*responses?/i,
+        /フォーム.*結果|form.*results?/i,
+        /回答.*\d+|responses?.*\d+/i,
+        /アンケート|survey|questionnaire/i
+      ];
+
+      for (const pattern of formPatterns) {
+        if (pattern.test(sheetName)) {
+          // フォーム関連のシート名の場合、「の回答」を除去してフォームタイトルとする
+          const formTitle = sheetName
+            .replace(/の回答.*$/i, '')
+            .replace(/.*responses?.*$/i, '')
+            .replace(/.*結果.*$/i, '')
+            .trim();
+
+          if (formTitle.length > 0) {
+            return `${formTitle  } (フォーム)`;
+          }
+        }
+      }
+    }
+
+    // スプレッドシート名ベースのタイトル生成
+    if (spreadsheetName && typeof spreadsheetName === 'string') {
+      return `${spreadsheetName  } - ${  sheetName  } (フォーム)`;
+    }
+
+    // 最終フォールバック
+    return `${sheetName || 'データ'  } (フォーム)`;
+
+  } catch (error) {
+    console.warn('generateFormTitle error:', error.message);
+    return `${sheetName || 'フォーム'  } (タイトル生成エラー)`;
+  }
+}
+
+/**
+ * Drive APIによるフォーム検索
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} {formUrl, formTitle}
+ */
+function searchFormsByDrive(spreadsheetId, sheetName) {
+  try {
+    console.log('searchFormsByDrive: 検索開始', { spreadsheetId: `${spreadsheetId.substring(0, 12)  }***`, sheetName });
+
+    // Drive APIでフォーム一覧を取得
+    const forms = DriveApp.getFilesByType('application/vnd.google-apps.form');
+
+    while (forms.hasNext()) {
+      const formFile = forms.next();
+      try {
+        const form = FormApp.openById(formFile.getId());
+        const destId = form.getDestinationId();
+
+        if (destId === spreadsheetId) {
+          console.log('searchFormsByDrive: 対象スプレッドシートへのフォーム発見', {
+            formId: formFile.getId(),
+            formTitle: form.getTitle()
+          });
+
+          // 対象シートへの接続確認
+          const destSpreadsheet = SpreadsheetApp.openById(destId);
+          const targetSheet = destSpreadsheet.getSheetByName(sheetName);
+
+          if (targetSheet) {
+            const sheetFormUrl = targetSheet.getFormUrl();
+            const formPublishedUrl = form.getPublishedUrl();
+
+            // URL照合またはform ID照合
+            if (sheetFormUrl && (sheetFormUrl === formPublishedUrl ||
+                sheetFormUrl.includes(formFile.getId()) ||
+                formPublishedUrl.includes(formFile.getId()))) {
+
+              console.log('searchFormsByDrive: フォーム接続確認成功', {
+                sheetName,
+                formTitle: form.getTitle()
+              });
+
+              return {
+                formUrl: formPublishedUrl,
+                formTitle: form.getTitle()
+              };
+            }
+          }
+        }
+      } catch (formError) {
+        // 個別フォームアクセスエラーは無視して継続
+        console.warn('searchFormsByDrive: フォームアクセスエラー（継続）:', formError.message);
+      }
+    }
+
+    console.log('searchFormsByDrive: 対象フォームが見つかりませんでした');
+    return { formUrl: null, formTitle: null };
+
+  } catch (error) {
+    console.error('searchFormsByDrive: Drive API検索エラー:', error.message);
+    throw error;
+  }
 }
 
 /**
@@ -941,7 +1094,7 @@ function getFormInfoImpl(spreadsheetId, sheetName) {
     }
 
     // 多層フォーム検出システム実行
-    const formDetectionResult = detectFormConnection(spreadsheet, sheet, spreadsheetId, sheetName, accessMethod);
+    const formDetectionResult = detectFormConnection(spreadsheet, sheet, sheetName, accessMethod);
 
     console.log('getFormInfoImpl: フォーム検出結果', {
       hasFormUrl: !!formDetectionResult.formUrl,
