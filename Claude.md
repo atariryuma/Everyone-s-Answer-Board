@@ -324,6 +324,32 @@ npm run deploy:safe           # Comprehensive deployment validation
 // ❌ AVOID: Library dependencies in production
 // ❌ AVOID: Synchronous UI blocking operations
 // ❌ AVOID: Direct constants/service dependencies at file level
+
+// ❌ AVOID: Template literals in GAS environment (browser compatibility issues)
+const url = `https://example.com/${id}`;  // 問題あり - 構文エラーの原因
+const url = 'https://example.com/' + id;  // ✅ 推奨 - 安全な文字列連結
+
+// ❌ AVOID: User permissions for data access
+SpreadsheetApp.openById(id);              // 問題あり - ユーザー権限依存
+Data.open(id);                           // ✅ 推奨 - サービスアカウント使用
+```
+
+### **JavaScript互換性とサービスアカウント利用**
+
+#### **必須ガイドライン**:
+- **テンプレートリテラル禁止**: Google Apps Script環境では「Unexpected end of input」エラーの原因となるため、すべて文字列連結(`+`)を使用
+- **サービスアカウント必須**: スプレッドシート・データベースアクセスは必ずサービスアカウント経由で実行
+- **ユーザー権限回避**: `SpreadsheetApp`直接使用ではなく、`Data.open()`経由でアクセス
+
+#### **構文エラー対策**:
+```javascript
+// ❌ 危険: テンプレートリテラルは構文エラーを引き起こす
+optimizedConfig.sourceKey = `sheet_${spreadsheetId}_${Date.now()}`;
+optimizedConfig.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+
+// ✅ 安全: 文字列連結で確実な動作を保証
+optimizedConfig.sourceKey = 'sheet_' + spreadsheetId + '_' + Date.now();
+optimizedConfig.spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit';
 ```
 
 ## 🔧 API Naming and Compatibility Guidance
