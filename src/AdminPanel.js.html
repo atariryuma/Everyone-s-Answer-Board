@@ -3072,7 +3072,8 @@
 
   // Get column confidence level
   function getColumnConfidence(columnType) {
-    const confidenceDiv = document.getElementById(`${columnType}-confidence`);
+    const elementId = columnType + '-confidence';
+    const confidenceDiv = document.getElementById(elementId);
     if (!confidenceDiv || confidenceDiv.classList.contains('hidden')) {
       return 0;
     }
