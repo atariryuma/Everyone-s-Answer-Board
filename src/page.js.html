@@ -715,9 +715,14 @@ class StudyQuestApp {
           // フォームが作成された時のフォームリンク更新
           try {
             const formLinkBtn = document.getElementById('form-link-btn');
-            if (formLinkBtn && event.data.formUrl) {
-              formLinkBtn.href = event.data.formUrl;
-              formLinkBtn.classList.remove('hidden');
+            if (formLinkBtn) {
+              if (event.data.formUrl) {
+                formLinkBtn.href = event.data.formUrl;
+                formLinkBtn.classList.remove('hidden');
+              } else {
+                // フォームURLがない場合は非表示にする
+                formLinkBtn.classList.add('hidden');
+              }
             }
           } catch (error) {
             warnLog('フォームリンク更新でエラー:', error);
@@ -749,9 +754,14 @@ class StudyQuestApp {
             // フォームが作成された時のフォームリンク更新（BroadcastChannel）
             try {
               const formLinkBtn = document.getElementById('form-link-btn');
-              if (formLinkBtn && event.data.formUrl) {
-                formLinkBtn.href = event.data.formUrl;
-                formLinkBtn.classList.remove('hidden');
+              if (formLinkBtn) {
+                if (event.data.formUrl) {
+                  formLinkBtn.href = event.data.formUrl;
+                  formLinkBtn.classList.remove('hidden');
+                } else {
+                  // フォームURLがない場合は非表示にする
+                  formLinkBtn.classList.add('hidden');
+                }
               }
             } catch (error) {
               warnLog('BroadcastChannel フォームリンク更新でエラー:', error);
@@ -7198,11 +7208,13 @@ async function loadFormLink() {
         .getActiveFormInfo();
     });
 
-    if (formInfo && formInfo.formUrl) {
-      const formLinkBtn = document.getElementById('form-link-btn');
-      if (formLinkBtn) {
+    const formLinkBtn = document.getElementById('form-link-btn');
+    if (formLinkBtn) {
+      if (formInfo && formInfo.formUrl) {
+        // フォームURLがある場合は通常のリンクとして表示
         formLinkBtn.href = formInfo.formUrl;
         formLinkBtn.classList.remove('hidden');
+        formLinkBtn.classList.remove('disabled-link');
 
         // フォームタイトルを動的に設定
         if (formInfo.formTitle) {
@@ -7211,10 +7223,22 @@ async function loadFormLink() {
             formTitleSpan.textContent = `📝 ${formInfo.formTitle}`;
           }
         }
+      } else if (formInfo && formInfo.formTitle && !formInfo.formUrl) {
+        // フォームタイトルはあるがURLがない場合は非表示にする
+        warnLog('フォームタイトルはありますが、フォームURLが設定されていません:', formInfo.formTitle);
+        formLinkBtn.classList.add('hidden');
+      } else {
+        // フォーム情報が完全にない場合も非表示
+        formLinkBtn.classList.add('hidden');
       }
     }
   } catch (error) {
     warnLog('フォーム情報の取得に失敗しました:', error);
+    // エラー時はフォームボタンを非表示にする
+    const formLinkBtn = document.getElementById('form-link-btn');
+    if (formLinkBtn) {
+      formLinkBtn.classList.add('hidden');
+    }
   }
 }
 

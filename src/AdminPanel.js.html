@@ -1240,14 +1240,12 @@
       {
         container: document.getElementById('form-info'),
         title: document.getElementById('form-title'),
-        url: document.getElementById('form-url'),
-        spreadsheet: document.getElementById('spreadsheet-name')
+        url: document.getElementById('form-url')
       },
       {
         container: document.getElementById('form-info-url'),
         title: document.getElementById('form-title-url'),
-        url: document.getElementById('form-url-url'),
-        spreadsheet: document.getElementById('spreadsheet-name-url')
+        url: document.getElementById('form-url-url')
       }
     ];
 
@@ -1298,10 +1296,6 @@
         }
       }
 
-      if (info.spreadsheet && spreadsheetName) {
-        info.spreadsheet.textContent = `スプレッドシート: ${spreadsheetName}`;
-        info.spreadsheet.classList.remove('hidden');
-      }
 
       info.container.classList.remove('hidden');
       info.container.dataset.formStatus = status;
