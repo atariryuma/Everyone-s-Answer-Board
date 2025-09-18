@@ -2688,13 +2688,14 @@
 
   // 列設定の保存
   function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping) {
-    // 🎯 重複データ削除：columnMappingに統一し、headersの重複保存を削除
+    // 🎯 ConfigJson完全同期: 全フィールド適切更新
     const optimizedConfig = {
       spreadsheetId,
       sheetName,
+      headers: headers, // トップレベルheaders
       columnMapping: {
         ...columnMapping,
-        headers: headers, // columnMapping内にheadersを統合
+        headers: headers, // columnMapping内にもheadersを保持
         verifiedAt: new Date().toISOString()
       },
       setupComplete: true, // 🚀 設定完了フラグ追加
@@ -2707,6 +2708,7 @@
       // 最新のUI状態を最終的に適用（上書き防止）
       optimizedConfig.spreadsheetId = spreadsheetId;
       optimizedConfig.sheetName = sheetName;
+      optimizedConfig.headers = headers;
       optimizedConfig.columnMapping = {
         ...columnMapping,
         headers: headers,
@@ -2727,9 +2729,14 @@
         // spreadsheetUrl自動生成
         optimizedConfig.spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + optimizedConfig.spreadsheetId + '/edit';
 
+        // 古いフォーム情報をクリア（新しいスプレッドシートでは異なる可能性）
+        optimizedConfig.formUrl = null;
+        optimizedConfig.formTitle = null;
+
         console.log('✅ Derived Fields更新完了:', {
           sourceKey: optimizedConfig.sourceKey,
-          spreadsheetUrl: optimizedConfig.spreadsheetUrl
+          spreadsheetUrl: optimizedConfig.spreadsheetUrl,
+          formCleared: 'フォーム情報クリア済み'
         });
       }
 
