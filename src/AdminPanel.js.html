@@ -2762,7 +2762,19 @@
 
         // フォーム検出完了後に保存実行
         formIntegrationPromise.then(() => {
-          executeConfigSave();
+          try {
+            executeConfigSave();
+          } catch (error) {
+            console.error('executeConfigSave error:', error);
+            showError('設定保存でエラーが発生しました');
+          }
+        }).catch((error) => {
+          console.error('formIntegrationPromise error:', error);
+          try {
+            executeConfigSave();
+          } catch (fallbackError) {
+            console.error('fallback executeConfigSave error:', fallbackError);
+          }
         });
         return; // 非同期処理のため、ここで一旦return
       }
@@ -3400,4 +3412,7 @@
       setPartialLoading(false);
     }
   }
+
+  // Debug: File end marker
+  console.log('AdminPanel.js.html loaded successfully - No syntax errors');
 </script>
