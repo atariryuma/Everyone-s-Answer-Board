@@ -1,3 +1,4 @@
+/* global Auth, Data */
 /**
  * @fileoverview ServiceFactory - 統一サービスアクセス層
  *
@@ -170,13 +171,13 @@ function getSpreadsheet() {
     openById(id) {
       try {
         // Service account authentication - 真の実装
-        const auth = Auth.serviceAccount();
-        if (!auth.isValid) {
-          console.warn('ServiceFactory.getSpreadsheet.openById: Fallback to user session due to service account failure:', auth.error);
+        const auth = typeof Auth !== 'undefined' ? Auth.serviceAccount() : null;
+        if (!auth || !auth.isValid) {
+          console.warn('ServiceFactory.getSpreadsheet.openById: Fallback to user session due to service account failure:', auth?.error);
           return SpreadsheetApp.openById(id);
         }
 
-        return Data.openSpreadsheetWithServiceAccount(id, auth.token);
+        return typeof Data !== 'undefined' ? Data.openSpreadsheetWithServiceAccount(id, auth.token) : SpreadsheetApp.openById(id);
       } catch (error) {
         console.error('ServiceFactory.getSpreadsheet.openById: Error opening spreadsheet:', error.message);
         return null;

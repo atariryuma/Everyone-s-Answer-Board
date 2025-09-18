@@ -97,10 +97,20 @@ header {
   transform: scale(0.95);
 }
 .reaction-btn.reacted {
-  background-color: var(--color-primary) !important;
-  color: #000 !important;
-  box-shadow: 0 0 10px rgba(139, 233, 253, 0.5);
   transform: scale(1.05);
+}
+
+/* Specific reacted styles for each reaction type - icon fill only */
+.reaction-btn.reacted.text-red-500 {
+  color: #ef4444 !important;
+}
+
+.reaction-btn.reacted.text-yellow-500 {
+  color: #fbbf24 !important;
+}
+
+.reaction-btn.reacted.text-green-500 {
+  color: #10b981 !important;
 }
 
 .reaction-btn svg,

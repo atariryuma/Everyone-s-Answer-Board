@@ -334,6 +334,7 @@ function getAdminSheetList(spreadsheetId) {
  * @returns {Object} 保存結果
  */
 function saveDraftConfiguration(config) {
+  const startTime = new Date().toISOString();
   console.log('=== saveDraftConfiguration START ===', {
     spreadsheetId: config?.spreadsheetId || 'N/A',
     sheetName: config?.sheetName || 'N/A',
@@ -800,11 +801,16 @@ function createForm(userId, config) {
  * @returns {Object} 公開状態情報
  */
 function checkCurrentPublicationStatus(targetUserId) {
+  console.log('📊 checkCurrentPublicationStatus START:', {
+    targetUserId: targetUserId || 'current_user'
+  });
+
   try {
     const session = ServiceFactory.getSession();
     const db = ServiceFactory.getDB();
 
     if (!db) {
+      console.error('❌ Database connection failed');
       return createErrorResponse('データベース接続エラー');
     }
 
@@ -818,6 +824,7 @@ function checkCurrentPublicationStatus(targetUserId) {
     }
 
     if (!user) {
+      console.error('❌ User not found');
       return createUserNotFoundError();
     }
 
@@ -825,11 +832,11 @@ function checkCurrentPublicationStatus(targetUserId) {
     try {
       config = JSON.parse(user.configJson || '{}');
     } catch (parseError) {
-      console.warn('checkCurrentPublicationStatus: config parse error', parseError.message);
+      console.error('❌ Config parse error:', parseError.message);
       config = {};
     }
 
-    return {
+    const result = {
       success: true,
       published: config.appPublished === true,
       publishedAt: config.publishedAt || null,
@@ -837,8 +844,16 @@ function checkCurrentPublicationStatus(targetUserId) {
       hasDataSource: Boolean(config.spreadsheetId && config.sheetName),
       userId: user.userId
     };
+
+    console.log('✅ checkCurrentPublicationStatus SUCCESS:', {
+      userId: user.userId,
+      published: result.published,
+      hasDataSource: result.hasDataSource
+    });
+
+    return result;
   } catch (error) {
-    console.error('AdminController.checkCurrentPublicationStatus エラー:', error.message);
+    console.error('❌ checkCurrentPublicationStatus ERROR:', error.message);
     return createExceptionResponse(error);
   }
 }

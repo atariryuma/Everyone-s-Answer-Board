@@ -1279,30 +1279,39 @@ function validateHeaderIntegrity(targetUserId) {
  * Get board info - simplified name
  */
 function getBoardInfo() {
+  console.log('🔍 getBoardInfo START');
+
   try {
     const email = getCurrentEmail();
     if (!email) {
+      console.error('❌ Authentication failed');
       return createAuthError();
     }
 
     const db = ServiceFactory.getDB();
     const user = db.findUserByEmail(email);
     if (!user) {
+      console.error('❌ User not found:', email);
       return { success: false, message: 'User not found' };
     }
 
-    const baseUrl = ScriptApp.getService().getUrl();
     let config = {};
     if (user.configJson) {
       try {
         config = JSON.parse(user.configJson);
       } catch (parseError) {
-        console.warn('getBoardInfo: config parse error', parseError);
+        console.error('❌ Config parse error:', parseError.message);
       }
     }
 
-    // ユーザーのconfigJsonからボード公開状態を取得
     const appPublished = Boolean(config.appPublished);
+    const baseUrl = ScriptApp.getService().getUrl();
+
+    console.log('✅ getBoardInfo SUCCESS:', {
+      userId: user.userId,
+      appPublished,
+      hasConfig: !!user.configJson
+    });
 
     return {
       success: true,
@@ -1316,7 +1325,7 @@ function getBoardInfo() {
       lastUpdated: config.publishedAt || config.lastModified || new Date().toISOString()
     };
   } catch (error) {
-    console.error('getBoardInfo error:', error.message);
+    console.error('❌ getBoardInfo ERROR:', error.message);
     return createExceptionResponse(error);
   }
 }
@@ -1355,12 +1364,15 @@ function getSheetData(userId, options = {}) {
  * @returns {Object} フロントエンド期待形式のデータ
  */
 function getPublishedSheetData(classFilter, sortOrder) {
-  try {
+  console.log('📊 getPublishedSheetData START:', {
+    classFilter: classFilter || 'すべて',
+    sortOrder: sortOrder || 'newest'
+  });
 
-    // ユーザー認証とID取得
+  try {
     const email = getCurrentEmail();
     if (!email) {
-      console.warn('getPublishedSheetData: 認証が必要です');
+      console.error('❌ Authentication failed');
       return {
         error: 'Authentication required',
         rows: [],
@@ -1372,20 +1384,17 @@ function getPublishedSheetData(classFilter, sortOrder) {
     // Zero-dependency: 直接DB操作でユーザー取得
     let db = null;
     try {
-      // Method 1: グローバルDB変数が利用可能な場合
       if (typeof DB !== 'undefined' && DB) {
         db = DB;
-      }
-      // Method 2: Data class が直接利用可能な場合
-      else if (typeof Data !== 'undefined') {
+      } else if (typeof Data !== 'undefined') {
         db = Data;
       }
     } catch (dbError) {
-      console.error('getPublishedSheetData: DB初期化エラー', dbError.message);
+      console.error('❌ DB initialization error:', dbError.message);
     }
 
     if (!db) {
-      console.error('getPublishedSheetData: Database接続エラー');
+      console.error('❌ Database connection failed');
       return {
         error: 'Database connection failed',
         rows: [],
@@ -1396,7 +1405,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
 
     const user = db.findUserByEmail(email);
     if (!user) {
-      console.warn('getPublishedSheetData: ユーザーが見つかりません');
+      console.error('❌ User not found:', email);
       return {
         error: 'User not found',
         rows: [],
@@ -1445,15 +1454,19 @@ function getPublishedSheetData(classFilter, sortOrder) {
           },
           highlight: item.highlight || false
         })),
-        showDetails: result.showDetails !== false
+        showDetails: result.showDetails !== false,
+        success: true
       };
 
+      console.log('✅ getPublishedSheetData SUCCESS:', {
+        userId: user.userId,
+        dataCount: result.data.length,
+        sheetName: result.sheetName
+      });
 
-      // Ensure success property is set
-      transformedData.success = true;
       return transformedData;
     } else {
-      console.warn('getPublishedSheetData: データ取得失敗または空', result);
+      console.error('❌ Data retrieval failed:', result?.message);
       return {
         error: result?.message || 'データ取得エラー',
         rows: [],
@@ -1463,7 +1476,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
     }
 
   } catch (error) {
-    console.error('getPublishedSheetData: 予期しないエラー', error.message);
+    console.error('❌ getPublishedSheetData ERROR:', error.message);
     return {
       error: error.message || 'データ取得エラー',
       rows: [],
@@ -1814,9 +1827,12 @@ function getFormInfo(spreadsheetId, sheetName) {
  * @returns {Object} ドメイン情報
  */
 function getDeployUserDomainInfo() {
+  console.log('🏢 getDeployUserDomainInfo START');
+
   try {
     const email = getCurrentEmail();
     if (!email) {
+      console.error('❌ Authentication failed');
       return {
         success: false,
         message: 'Authentication required',
@@ -1828,6 +1844,13 @@ function getDeployUserDomainInfo() {
     const domain = email.includes('@') ? email.split('@')[1] : 'unknown';
     const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
     const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
+    const isValidDomain = adminDomain ? domain === adminDomain : true;
+
+    console.log('✅ getDeployUserDomainInfo SUCCESS:', {
+      userDomain: domain,
+      adminDomain: adminDomain || 'N/A',
+      isValidDomain
+    });
 
     return {
       success: true,
@@ -1835,11 +1858,11 @@ function getDeployUserDomainInfo() {
       userEmail: email,
       userDomain: domain,
       adminDomain,
-      isValidDomain: adminDomain ? domain === adminDomain : true,
+      isValidDomain,
       timestamp: new Date().toISOString()
     };
   } catch (error) {
-    console.error('getDeployUserDomainInfo error:', error.message);
+    console.error('❌ getDeployUserDomainInfo ERROR:', error.message);
     return {
       success: false,
       message: error.message,
@@ -1854,9 +1877,12 @@ function getDeployUserDomainInfo() {
  * @returns {Object} フォーム情報
  */
 function getActiveFormInfo() {
+  console.log('📝 getActiveFormInfo START');
+
   try {
     const email = getCurrentEmail();
     if (!email) {
+      console.error('❌ Authentication failed');
       return {
         success: false,
         message: 'Authentication required',
@@ -1868,6 +1894,7 @@ function getActiveFormInfo() {
     const db = ServiceFactory.getDB();
     const user = db.findUserByEmail(email);
     if (!user) {
+      console.error('❌ User not found:', email);
       return {
         success: false,
         message: 'User not found',
@@ -1880,10 +1907,11 @@ function getActiveFormInfo() {
     try {
       config = JSON.parse(user.configJson || '{}');
     } catch (parseError) {
-      console.warn('getActiveFormInfo: config parse error', parseError);
+      console.error('❌ Config parse error:', parseError.message);
     }
 
     if (!config.formUrl) {
+      console.warn('⚠️ Form URL not configured');
       return {
         success: false,
         message: 'Form URL not configured',
@@ -1891,6 +1919,12 @@ function getActiveFormInfo() {
         formTitle: null
       };
     }
+
+    console.log('✅ getActiveFormInfo SUCCESS:', {
+      userId: user.userId,
+      hasFormUrl: !!config.formUrl,
+      formTitle: config.formTitle || 'フォーム'
+    });
 
     return {
       success: true,
@@ -1900,7 +1934,7 @@ function getActiveFormInfo() {
       source: 'user_config'
     };
   } catch (error) {
-    console.error('getActiveFormInfo error:', error.message);
+    console.error('❌ getActiveFormInfo ERROR:', error.message);
     return {
       success: false,
       message: error.message,

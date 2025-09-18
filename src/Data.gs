@@ -845,7 +845,7 @@ class Data {
                     'Content-Type': 'application/json'
                   },
                   payload: JSON.stringify({
-                    values: values
+                    values
                   }),
                   muteHttpExceptions: true
                 }
