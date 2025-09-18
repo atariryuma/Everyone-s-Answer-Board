@@ -334,62 +334,40 @@ function getAdminSheetList(spreadsheetId) {
  * @returns {Object} 保存結果
  */
 function saveDraftConfiguration(config) {
-  const startTime = new Date().toISOString();
   console.log('=== saveDraftConfiguration START ===', {
-    timestamp: startTime,
-    configKeys: config ? Object.keys(config) : null,
+    spreadsheetId: config?.spreadsheetId || 'N/A',
+    sheetName: config?.sheetName || 'N/A',
     configSize: config ? JSON.stringify(config).length : 0
   });
 
   try {
-    // 🎯 Input validation logging
     if (!config || typeof config !== 'object') {
-      console.error('saveDraftConfiguration: Invalid config input', { config });
+      console.error('❌ Invalid config input');
       return createErrorResponse('設定データが不正です');
     }
 
-    // 🎯 User authentication logging
     const userEmail = getCurrentEmail();
-    console.log('saveDraftConfiguration: User authentication', {
-      userEmail: userEmail ? 'FOUND' : 'NOT_FOUND',
-      emailLength: userEmail ? userEmail.length : 0
-    });
-
     if (!userEmail) {
-      console.error('saveDraftConfiguration: Authentication failed');
+      console.error('❌ User authentication failed');
       return createErrorResponse('ユーザー認証が必要です');
     }
 
-    // 🎯 Database connection logging
     const db = ServiceFactory.getDB();
-    console.log('saveDraftConfiguration: Database connection', {
-      dbAvailable: !!db,
-      dbType: db ? typeof db : 'undefined'
-    });
-
     if (!db) {
-      console.error('saveDraftConfiguration: Database connection failed');
+      console.error('❌ Database connection failed');
       return createErrorResponse('データベース接続エラー');
     }
 
-    // 🎯 User lookup logging
     const user = db.findUserByEmail(userEmail);
-    console.log('saveDraftConfiguration: User lookup', {
-      userFound: !!user,
-      userId: user ? user.userId : null,
-      currentConfigJson: user ? (user.configJson ? user.configJson.length : 0) : null
-    });
-
     if (!user) {
-      console.error('saveDraftConfiguration: User not found', { userEmail });
+      console.error('❌ User not found:', userEmail);
       return createUserNotFoundError();
     }
 
-    // 🎯 Configuration processing logging
-    const originalConfigKeys = Object.keys(config);
-    console.log('saveDraftConfiguration: Configuration processing START', {
-      originalKeys: originalConfigKeys,
-      originalSize: JSON.stringify(config).length
+    console.log('📋 Config processing:', {
+      userId: user.userId,
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName
     });
 
     // 設定をJSONで保存（重複フィールド削除）
@@ -402,63 +380,24 @@ function saveDraftConfiguration(config) {
     config.lastAccessedAt = timestamp;
     config.lastModified = timestamp;
 
-    console.log('saveDraftConfiguration: Configuration processing COMPLETE', {
-      removedFields,
-      addedFields: ['lastAccessedAt', 'lastModified'],
-      finalKeys: Object.keys(config),
-      finalSize: JSON.stringify(config).length,
-      timestamp
-    });
-
-    // 🎯 User update object creation logging
     const configJsonString = JSON.stringify(config);
     const updatedUser = {
       configJson: configJsonString,
       lastModified: timestamp
     };
 
-    console.log('saveDraftConfiguration: User update object created', {
-      userId: user.userId,
-      configJsonLength: configJsonString.length,
-      updatedUserKeys: Object.keys(updatedUser),
-      configJsonPreview: `${configJsonString.substring(0, 100)  }...`
-    });
-
-    // 🎯 Database update operation logging
-    console.log('saveDraftConfiguration: Starting database update', {
-      userId: user.userId,
-      updateTimestamp: timestamp
-    });
-
     const updateResult = db.updateUser(user.userId, updatedUser);
 
-    console.log('saveDraftConfiguration: Database update result', {
-      success: updateResult ? updateResult.success : false,
-      message: updateResult ? updateResult.message : 'NO_RESULT',
-      resultKeys: updateResult ? Object.keys(updateResult) : null,
-      userId: user.userId
-    });
-
     if (!updateResult || !updateResult.success) {
-      console.error('saveDraftConfiguration: Database update failed', {
-        updateResult,
-        userId: user.userId,
-        configSize: configJsonString.length
-      });
+      console.error('❌ Database update failed:', updateResult?.message);
       return createErrorResponse(updateResult?.message || 'データベース更新に失敗しました');
     }
 
-    // 🎯 Success validation logging
-    const endTime = new Date().toISOString();
-    const processingTime = new Date(endTime) - new Date(startTime);
-
-    console.log('=== saveDraftConfiguration SUCCESS ===', {
-      startTime,
-      endTime,
-      processingTimeMs: processingTime,
+    console.log('✅ saveDraftConfiguration SUCCESS:', {
       userId: user.userId,
-      configJsonLength: configJsonString.length,
-      finalMessage: '下書き設定を保存しました'
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      configSize: configJsonString.length
     });
 
     return {
@@ -493,122 +432,61 @@ function saveDraftConfiguration(config) {
 function publishApplication(publishConfig) {
   const startTime = new Date().toISOString();
   console.log('=== publishApplication START ===', {
-    timestamp: startTime,
-    publishConfigProvided: !!publishConfig,
-    publishConfigKeys: publishConfig ? Object.keys(publishConfig) : null,
-    publishConfigSize: publishConfig ? JSON.stringify(publishConfig).length : 0
+    spreadsheetId: publishConfig?.spreadsheetId || 'N/A',
+    sheetName: publishConfig?.sheetName || 'N/A',
+    configSize: publishConfig ? JSON.stringify(publishConfig).length : 0
   });
 
   try {
-    // 🎯 Input validation logging
-    console.log('publishApplication: Input validation', {
-      publishConfigType: typeof publishConfig,
-      publishConfigNull: publishConfig === null,
-      publishConfigUndefined: publishConfig === undefined,
-      publishConfigEmpty: publishConfig && Object.keys(publishConfig).length === 0
-    });
-
-    // 🎯 User authentication logging
     const email = getCurrentEmail();
-    console.log('publishApplication: User authentication', {
-      emailFound: !!email,
-      emailLength: email ? email.length : 0
-    });
 
     if (!email) {
-      console.error('publishApplication: Authentication failed');
+      console.error('❌ User authentication failed');
       return { success: false, message: 'ユーザー認証が必要です' };
     }
 
     const publishedAt = new Date().toISOString();
-    console.log('publishApplication: Timestamp generated', { publishedAt });
-
-    // 🎯 PropertiesService operations logging
-    console.log('publishApplication: Starting PropertiesService operations');
     const props = ServiceFactory.getProperties();
-    console.log('publishApplication: PropertiesService connection', {
-      propsAvailable: !!props,
-      propsType: typeof props
-    });
 
-    // Set APPLICATION_STATUS
+    // Set properties
     try {
       props.setProperty('APPLICATION_STATUS', 'active');
-      console.log('publishApplication: APPLICATION_STATUS set to active');
-    } catch (statusError) {
-      console.error('publishApplication: Failed to set APPLICATION_STATUS', {
-        error: statusError.message
-      });
-    }
-
-    // Set PUBLISHED_AT
-    try {
       props.setProperty('PUBLISHED_AT', publishedAt);
-      console.log('publishApplication: PUBLISHED_AT set', { publishedAt });
-    } catch (publishedAtError) {
-      console.error('publishApplication: Failed to set PUBLISHED_AT', {
-        error: publishedAtError.message,
-        publishedAt
-      });
+    } catch (propsError) {
+      console.error('❌ Properties update failed:', propsError.message);
     }
 
-    // 公開設定を保存
     if (publishConfig) {
       try {
-        const publishConfigString = JSON.stringify(publishConfig);
-        props.setProperty('PUBLISH_CONFIG', publishConfigString);
-        console.log('publishApplication: PUBLISH_CONFIG saved', {
-          configLength: publishConfigString.length,
-          configKeys: Object.keys(publishConfig)
-        });
+        props.setProperty('PUBLISH_CONFIG', JSON.stringify(publishConfig));
       } catch (publishConfigError) {
-        console.error('publishApplication: Failed to set PUBLISH_CONFIG', {
-          error: publishConfigError.message,
-          publishConfigKeys: Object.keys(publishConfig)
-        });
+        console.error('❌ PUBLISH_CONFIG save failed:', publishConfigError.message);
       }
-    } else {
-      console.log('publishApplication: No publishConfig provided, skipping PUBLISH_CONFIG');
     }
 
-    // 🎯 Database operations logging
-    console.log('publishApplication: Starting database operations');
     const db = ServiceFactory.getDB();
-    console.log('publishApplication: Database connection', {
-      dbAvailable: !!db,
-      dbType: typeof db
-    });
-
     const user = db ? db.findUserByEmail(email) : null;
-    console.log('publishApplication: User lookup', {
-      userFound: !!user,
-      userId: user ? user.userId : null,
-      currentConfigJsonLength: user ? (user.configJson ? user.configJson.length : 0) : null
-    });
 
     if (user) {
-      // 🎯 Ensure we have the latest user data before merging
-      console.log('publishApplication: Re-fetching user for latest config');
+      // Re-fetch latest user data to avoid conflicts
       const latestUser = db.findUserByEmail(email);
       const userToUse = latestUser || user;
 
-      // 🎯 Configuration merge logging
       let currentConfig = {};
       try {
         currentConfig = userToUse.configJson ? JSON.parse(userToUse.configJson) : {};
-        console.log('publishApplication: Current config parsed', {
-          currentConfigKeys: Object.keys(currentConfig),
-          currentConfigSize: JSON.stringify(currentConfig).length,
-          usingLatestUser: !!latestUser,
-          configJsonLength: userToUse.configJson ? userToUse.configJson.length : 0
-        });
       } catch (parseError) {
-        console.error('publishApplication: Failed to parse current config', {
-          error: parseError.message,
-          configJsonLength: userToUse.configJson ? userToUse.configJson.length : 0
-        });
+        console.error('❌ Config parse error:', parseError.message);
         currentConfig = {};
       }
+
+      console.log('📋 Config merge:', {
+        userId: user.userId,
+        currentSpreadsheetId: currentConfig.spreadsheetId,
+        newSpreadsheetId: publishConfig?.spreadsheetId,
+        currentSheetName: currentConfig.sheetName,
+        newSheetName: publishConfig?.sheetName
+      });
 
       const updatedConfig = {
         ...currentConfig,
@@ -620,96 +498,48 @@ function publishApplication(publishConfig) {
         lastModified: publishedAt
       };
 
-      console.log('publishApplication: Config merge completed', {
-        originalKeys: Object.keys(currentConfig),
-        publishConfigKeys: publishConfig ? Object.keys(publishConfig) : [],
-        mergedKeys: Object.keys(updatedConfig),
-        finalConfigSize: JSON.stringify(updatedConfig).length,
-        addedFields: ['appPublished', 'publishedAt', 'setupStatus', 'isDraft', 'lastModified']
-      });
-
-      // 🎯 Database update operation logging
       const updatePayload = {
         configJson: JSON.stringify(updatedConfig),
         lastModified: publishedAt
       };
 
-      console.log('publishApplication: Starting database update', {
-        userId: user.userId,
-        updatePayloadKeys: Object.keys(updatePayload),
-        configJsonLength: updatePayload.configJson.length,
-        updateTimestamp: publishedAt
-      });
-
       const updateResult = db.updateUser(user.userId, updatePayload);
 
-      console.log('publishApplication: Database update result', {
-        success: updateResult ? updateResult.success : false,
-        message: updateResult ? updateResult.message : 'NO_RESULT',
-        resultKeys: updateResult ? Object.keys(updateResult) : null,
-        userId: user.userId,
-        configJsonLength: updatePayload.configJson.length
-      });
-
       if (!updateResult || !updateResult.success) {
-        console.error('publishApplication: Database update failed', {
-          updateResult,
-          userId: user.userId,
-          updatePayload: {
-            ...updatePayload,
-            configJson: `[${updatePayload.configJson.length} chars]`
-          }
-        });
-        // エラーでも処理は継続
-      } else {
-        console.log('publishApplication: Database update successful', {
-          userId: user.userId,
-          configJsonLength: updatePayload.configJson.length
-        });
+        console.error('❌ Database update failed:', updateResult?.message);
+        // Continue processing even on database errors
       }
     } else {
-      console.error('publishApplication: User not found, skipping database update', { email });
+      console.error('❌ User not found:', email);
     }
 
-    // 🎯 Success validation logging
-    const endTime = new Date().toISOString();
-    const processingTime = new Date(endTime) - new Date(startTime);
-
-    console.log('=== publishApplication SUCCESS ===', {
-      startTime,
-      endTime,
-      processingTimeMs: processingTime,
-      publishedAt,
-      userEmail: email,
-      userFound: !!user,
-      userId: user ? user.userId : null,
-      propertiesUpdated: true,
-      databaseUpdated: !!user,
-      finalMessage: 'アプリケーションが正常に公開されました'
+    console.log('✅ publishApplication SUCCESS:', {
+      userId: user?.userId || 'N/A',
+      spreadsheetId: publishConfig?.spreadsheetId,
+      sheetName: publishConfig?.sheetName,
+      userFound: !!user
     });
 
     return {
       success: true,
       message: 'アプリケーションが正常に公開されました',
-      publishedAt
+      publishedAt,
+      userId: user ? user.userId : null
     };
 
   } catch (error) {
-    const endTime = new Date().toISOString();
-    const processingTime = new Date(endTime) - new Date(startTime);
-
-    console.error('=== publishApplication ERROR ===', {
-      startTime,
-      endTime,
-      processingTimeMs: processingTime,
-      errorMessage: error.message,
-      errorStack: error.stack,
-      publishConfigProvided: !!publishConfig,
-      publishConfigKeys: publishConfig ? Object.keys(publishConfig) : null,
+    console.error('❌ publishApplication ERROR:', {
+      error: error.message,
+      spreadsheetId: publishConfig?.spreadsheetId,
+      sheetName: publishConfig?.sheetName,
       userEmail: getCurrentEmail()
     });
 
-    return createExceptionResponse(error);
+    return {
+      success: false,
+      message: error.message,
+      error: error.message
+    };
   }
 }
 
@@ -799,8 +629,8 @@ function getFormInfoImpl(spreadsheetId, sheetName) {
     // スプレッドシート取得
     let spreadsheet;
     try {
-      const dataAccess = Data.open(spreadsheetId);
-      spreadsheet = dataAccess.spreadsheet;
+      const { spreadsheet: spreadsheetFromData } = Data.open(spreadsheetId);
+      spreadsheet = spreadsheetFromData;
     } catch (accessError) {
       return {
         success: false,

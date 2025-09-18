@@ -214,6 +214,7 @@ class StudyQuestApp {
     if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
       this.elements.sizeSlider.value = savedCols;
       this.elements.sliderValue.textContent = savedCols;
+      this.updateSliderBackground(this.elements.sizeSlider);
     }
     this.init().catch(error => {
       errorLog('❌ StudyQuestApp: Fatal initialization error:', error);
@@ -793,6 +794,7 @@ class StudyQuestApp {
     const debouncedRender = this.debounce(() => this.renderBoard(true, false), 200);
     this.handlers.onSizeSliderInput = this.throttle((e) => {
       localStorage.setItem('boardColumns', e.target.value);
+      this.updateSliderBackground(e.target);
       debouncedRender();
     }, 100); // Throttle to 100ms
     
@@ -3895,9 +3897,9 @@ class StudyQuestApp {
                   // Force CSS recalculation for proper fill state
                   const newSvg = btn.querySelector('svg');
                   if (newSvg && update.reacted) {
-                    // Ensure reacted styling is properly applied
-                    newSvg.style.fill = 'currentColor';
-                    newSvg.style.stroke = 'transparent';
+                    // CSS classes handle styling - remove forced inline styles
+                    newSvg.style.fill = '';
+                    newSvg.style.stroke = '';
                   }
                 });
 
@@ -5884,15 +5886,14 @@ class StudyQuestApp {
     
     itemsToUpdate.forEach(item => {
       this.reactionTypes.forEach(rt => {
-        if (item.reactions && item.reactions[rt.key]) {
-          reactionUpdates.push({
-            rowIndex: item.rowIndex,
-            reaction: rt.key,
-            count: item.reactions[rt.key].count,
-            reacted: item.reactions[rt.key].reacted,
-            shouldDisplay: item.reactions[rt.key].count > 0 || item.reactions[rt.key].reacted
-          });
-        }
+        const reaction = item.reactions && item.reactions[rt.key] ? item.reactions[rt.key] : { count: 0, reacted: false };
+        reactionUpdates.push({
+          rowIndex: item.rowIndex,
+          reaction: rt.key,
+          count: reaction.count,
+          reacted: reaction.reacted,
+          shouldDisplay: reaction.count > 0 || reaction.reacted
+        });
       });
       const card = document.querySelector('.answer-card[data-row-index="' + item.rowIndex + '"]');
       if (card) {
@@ -6157,6 +6158,29 @@ class StudyQuestApp {
       window.sharedUtilities.throttle.throttle(() => func.apply(this, args), key, delay);
     };
   }
+
+  /**
+   * スライダーの背景塗りつぶし更新
+   * @param {HTMLInputElement} slider - スライダー要素
+   */
+  updateSliderBackground(slider) {
+    if (!slider) return;
+
+    const min = parseFloat(slider.min) || 2;
+    const max = parseFloat(slider.max) || 6;
+    const value = parseFloat(slider.value) || 4;
+
+    // パーセンテージ計算: (現在値 - 最小値) / (最大値 - 最小値) * 100
+    const percentage = ((value - min) / (max - min)) * 100;
+
+    // 背景グラデーションを動的に設定
+    slider.style.backgroundImage = `linear-gradient(var(--brand-primary), var(--brand-primary))`;
+    slider.style.backgroundSize = `${percentage}% 100%`;
+    slider.style.backgroundRepeat = 'no-repeat';
+
+    debugLog('スライダー背景更新:', { value, percentage: `${percentage}%` });
+  }
+
   updateSortOptions() {
     if (this.elements.scoreOption) {
       if (this.state.showScoreSort) {

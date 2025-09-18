@@ -23,13 +23,23 @@ class Data {
    */
   static open(id) {
     try {
-      // Service account authentication
+      // Service account authentication - 真の実装
       const auth = Auth.serviceAccount();
       if (!auth.isValid) {
         throw new Error('Service account authentication required');
       }
 
-      const spreadsheet = SpreadsheetApp.openById(id);
+      // サービスアカウントでのスプレッドシート権限確保
+      try {
+        // DriveAppでサービスアカウントをエディターとして追加（実際の権限付与）
+        DriveApp.getFileById(id).addEditor(auth.email);
+        console.log('Data.open: Service account editor access granted:', auth.email);
+      } catch (driveError) {
+        console.warn('Data.open: Service account editor access already granted or failed:', driveError.message);
+      }
+
+      // サービスアカウント権限でGoogle Sheets APIを直接使用
+      const spreadsheet = this.openSpreadsheetWithServiceAccount(id, auth.token);
 
       return {
         spreadsheet,
@@ -82,6 +92,12 @@ class Data {
    */
   static batch(requests) {
     try {
+      // Service account authentication - 真の実装
+      const auth = Auth.serviceAccount();
+      if (!auth.isValid) {
+        throw new Error('Service account authentication required for batch operations');
+      }
+
       const results = [];
 
       // Group requests by type for optimization
@@ -91,7 +107,7 @@ class Data {
       // Process read requests in batch
       if (readRequests.length > 0) {
         for (const request of readRequests) {
-          const spreadsheet = SpreadsheetApp.openById(request.spreadsheetId);
+          const spreadsheet = this.openSpreadsheetWithServiceAccount(request.spreadsheetId, auth.token);
           const batchResults = [];
 
           for (const range of request.ranges) {
@@ -206,7 +222,13 @@ class Data {
    */
   static executeWriteRequest(request) {
     try {
-      const spreadsheet = SpreadsheetApp.openById(request.spreadsheetId);
+      // Service account authentication - 真の実装
+      const auth = Auth.serviceAccount();
+      if (!auth.isValid) {
+        throw new Error('Service account authentication required for write operations');
+      }
+
+      const spreadsheet = this.openSpreadsheetWithServiceAccount(request.spreadsheetId, auth.token);
       const sheet = spreadsheet.getSheetByName(request.sheetName) || spreadsheet.getSheets()[0];
 
       if (request.operation === 'update') {
@@ -239,6 +261,13 @@ class Data {
     try {
       if (!email) return null;
 
+      // Service account authentication for database access
+      const auth = Auth.serviceAccount();
+      if (!auth.isValid) {
+        console.warn('Data.findUserByEmail: Service account authentication required');
+        return null;
+      }
+
       // Direct SpreadsheetApp access (Zero-Dependency)
       const props = PropertiesService.getScriptProperties();
       const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
@@ -248,11 +277,18 @@ class Data {
         return null;
       }
 
-      const spreadsheet = SpreadsheetApp.openById(dbId);
+      // サービスアカウント権限でのデータベースアクセス
+      try {
+        DriveApp.getFileById(dbId).addEditor(auth.email);
+      } catch (driveError) {
+        console.warn('Data.findUserByEmail: Service account access:', driveError.message);
+      }
+
+      const spreadsheet = this.openSpreadsheetWithServiceAccount(dbId, auth.token);
       const usersSheet = spreadsheet.getSheetByName('users') || spreadsheet.getSheets()[0];
 
       const data = usersSheet.getDataRange().getValues();
-      const headers = data[0];
+      const [headers] = data;
 
       // Find email column index
       const emailColIndex = headers.findIndex(h => h === 'userEmail' || h === 'email');
@@ -288,6 +324,13 @@ class Data {
     try {
       if (!userId) return null;
 
+      // Service account authentication for database access
+      const auth = Auth.serviceAccount();
+      if (!auth.isValid) {
+        console.warn('Data.findUserById: Service account authentication required');
+        return null;
+      }
+
       // Direct SpreadsheetApp access (Zero-Dependency)
       const props = PropertiesService.getScriptProperties();
       const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
@@ -297,11 +340,18 @@ class Data {
         return null;
       }
 
-      const spreadsheet = SpreadsheetApp.openById(dbId);
+      // サービスアカウント権限でのデータベースアクセス
+      try {
+        DriveApp.getFileById(dbId).addEditor(auth.email);
+      } catch (driveError) {
+        console.warn('Data.findUserById: Service account access:', driveError.message);
+      }
+
+      const spreadsheet = this.openSpreadsheetWithServiceAccount(dbId, auth.token);
       const usersSheet = spreadsheet.getSheetByName('users') || spreadsheet.getSheets()[0];
 
       const data = usersSheet.getDataRange().getValues();
-      const headers = data[0];
+      const [headers] = data;
 
       // Find userId column index
       const userIdColIndex = headers.findIndex(h => h === 'userId' || h === 'id');
@@ -337,6 +387,13 @@ class Data {
     try {
       if (!email) return null;
 
+      // Service account authentication for database access
+      const auth = Auth.serviceAccount();
+      if (!auth.isValid) {
+        console.warn('Data.createUser: Service account authentication required');
+        return null;
+      }
+
       // Check if user already exists
       const existingUser = this.findUserByEmail(email);
       if (existingUser) {
@@ -352,7 +409,15 @@ class Data {
         return null;
       }
 
-      const spreadsheet = SpreadsheetApp.openById(dbId);
+      // サービスアカウント権限でのデータベースアクセス
+      try {
+        DriveApp.getFileById(dbId).addEditor(auth.email);
+        console.log('Data.createUser: Service account editor access granted:', auth.email);
+      } catch (driveError) {
+        console.warn('Data.createUser: Service account access:', driveError.message);
+      }
+
+      const spreadsheet = this.openSpreadsheetWithServiceAccount(dbId, auth.token);
       const usersSheet = spreadsheet.getSheetByName('users') || spreadsheet.getSheets()[0];
 
       const userId = Utilities.getUuid();
@@ -371,8 +436,10 @@ class Data {
         updatedAt: timestamp
       };
 
-      // Append user using header-safe method
-      const headers = usersSheet.getRange(1, 1, 1, usersSheet.getLastColumn()).getValues()[0];
+      // Append user using header-safe method - Sheets API対応
+      const lastColumn = usersSheet.getLastColumn();
+      const headerRange = `A1:${Data.columnToLetter(lastColumn)}1`;
+      const [headers] = usersSheet.getRange(headerRange).getValues();
       const newRow = headers.map(header => newUser[header] || '');
 
       usersSheet.appendRow(newRow);
@@ -399,6 +466,16 @@ class Data {
         };
       }
 
+      // Service account authentication for database access
+      const auth = Auth.serviceAccount();
+      if (!auth.isValid) {
+        console.warn('Data.updateUser: Service account authentication required');
+        return {
+          success: false,
+          error: 'Service account authentication required'
+        };
+      }
+
       // Direct SpreadsheetApp access (Zero-Dependency)
       const props = PropertiesService.getScriptProperties();
       const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
@@ -411,11 +488,19 @@ class Data {
         };
       }
 
-      const spreadsheet = SpreadsheetApp.openById(dbId);
+      // サービスアカウント権限でのデータベースアクセス
+      try {
+        DriveApp.getFileById(dbId).addEditor(auth.email);
+        console.log('Data.updateUser: Service account editor access granted:', auth.email);
+      } catch (driveError) {
+        console.warn('Data.updateUser: Service account access:', driveError.message);
+      }
+
+      const spreadsheet = this.openSpreadsheetWithServiceAccount(dbId, auth.token);
       const usersSheet = spreadsheet.getSheetByName('users') || spreadsheet.getSheets()[0];
 
       const data = usersSheet.getDataRange().getValues();
-      const headers = data[0];
+      const [headers] = data;
 
       // Find userId column index
       const userIdColIndex = headers.findIndex(h => h === 'userId' || h === 'id');
@@ -462,8 +547,11 @@ class Data {
         };
       }
 
-      // Write updated row back to sheet
-      const range = usersSheet.getRange(userRowIndex + 1, 1, 1, updatedRow.length);
+      // Write updated row back to sheet - Sheets API対応
+      const rowNumber = userRowIndex + 1;
+      const endColumn = Data.columnToLetter(updatedRow.length);
+      const rangeNotation = `A${rowNumber}:${endColumn}${rowNumber}`;
+      const range = usersSheet.getRange(rangeNotation);
       range.setValues([updatedRow]);
 
       return {
@@ -542,6 +630,360 @@ class Data {
 
     results.overall = results.checks.every(check => check.status === '✅') ? '✅' : '⚠️';
     return results;
+  }
+
+  /**
+   * サービスアカウントトークンでスプレッドシートを開く
+   * @param {string} spreadsheetId - Spreadsheet ID
+   * @param {string} accessToken - Service account access token
+   * @returns {Object} Spreadsheet wrapper object
+   */
+  static openSpreadsheetWithServiceAccount(spreadsheetId, accessToken) {
+    const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
+
+    return {
+      getId: () => spreadsheetId,
+
+      getSheetByName(name) {
+        return Data.createSheetWrapper(spreadsheetId, name, accessToken);
+      },
+
+      getSheets() {
+        try {
+          const response = UrlFetchApp.fetch(sheetsApiBase, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            muteHttpExceptions: true
+          });
+
+          const data = JSON.parse(response.getContentText());
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+          }
+
+          return data.sheets.map(sheet =>
+            Data.createSheetWrapper(spreadsheetId, sheet.properties.title, accessToken)
+          );
+        } catch (error) {
+          console.error('openSpreadsheetWithServiceAccount.getSheets error:', error.message);
+          throw error;
+        }
+      },
+
+      createSheetWrapper: (spreadsheetId, sheetName, accessToken) => {
+        return Data.createSheetWrapper(spreadsheetId, sheetName, accessToken);
+      }
+    };
+  }
+
+  /**
+   * サービスアカウント用シートラッパー作成
+   * @param {string} spreadsheetId - Spreadsheet ID
+   * @param {string} sheetName - Sheet name
+   * @param {string} accessToken - Service account access token
+   * @returns {Object} Sheet wrapper object
+   */
+  static createSheetWrapper(spreadsheetId, sheetName, accessToken) {
+    const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
+
+    return {
+      getName: () => sheetName,
+
+      getSheetId() {
+        try {
+          const response = UrlFetchApp.fetch(sheetsApiBase, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            muteHttpExceptions: true
+          });
+
+          const data = JSON.parse(response.getContentText());
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+          }
+
+          const sheet = data.sheets.find(s => s.properties.title === sheetName);
+          return sheet ? sheet.properties.sheetId : 0;
+        } catch (error) {
+          console.error('getSheetId error:', error.message);
+          return 0;
+        }
+      },
+
+      getDataRange() {
+        return {
+          getValues() {
+            try {
+              const response = UrlFetchApp.fetch(
+                `${sheetsApiBase}/values/${sheetName}!A:Z?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`,
+                {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  muteHttpExceptions: true
+                }
+              );
+
+              const data = JSON.parse(response.getContentText());
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+              }
+
+              return data.values || [];
+            } catch (error) {
+              console.error('getDataRange.getValues error:', error.message);
+              throw error;
+            }
+          }
+        };
+      },
+
+      getLastRow() {
+        try {
+          const response = UrlFetchApp.fetch(
+            `${sheetsApiBase}/values/${sheetName}!A:A?valueRenderOption=UNFORMATTED_VALUE`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              muteHttpExceptions: true
+            }
+          );
+
+          const data = JSON.parse(response.getContentText());
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+          }
+
+          return data.values ? data.values.length : 0;
+        } catch (error) {
+          console.error('getLastRow error:', error.message);
+          return 0;
+        }
+      },
+
+      getLastColumn() {
+        try {
+          const response = UrlFetchApp.fetch(
+            `${sheetsApiBase}/values/${sheetName}!1:1?valueRenderOption=UNFORMATTED_VALUE`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              muteHttpExceptions: true
+            }
+          );
+
+          const data = JSON.parse(response.getContentText());
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+          }
+
+          return data.values && data.values[0] ? data.values[0].length : 0;
+        } catch (error) {
+          console.error('getLastColumn error:', error.message);
+          return 0;
+        }
+      },
+
+      getRange(range, col, numRows, numCols) {
+        let rangeNotation;
+
+        if (typeof range === 'string') {
+          rangeNotation = range;
+        } else {
+          // Convert numeric parameters to A1 notation
+          rangeNotation = Data.convertToA1Notation(range, col, numRows, numCols);
+        }
+        return {
+          getValues() {
+            try {
+              const response = UrlFetchApp.fetch(
+                `${sheetsApiBase}/values/${sheetName}!${rangeNotation}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`,
+                {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  muteHttpExceptions: true
+                }
+              );
+
+              const data = JSON.parse(response.getContentText());
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+              }
+
+              return data.values || [];
+            } catch (error) {
+              console.error('getRange.getValues error:', error.message);
+              throw error;
+            }
+          },
+
+          setValues(values) {
+            try {
+              const response = UrlFetchApp.fetch(
+                `${sheetsApiBase}/values/${sheetName}!${rangeNotation}?valueInputOption=RAW`,
+                {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  payload: JSON.stringify({
+                    values: values
+                  }),
+                  muteHttpExceptions: true
+                }
+              );
+
+              const data = JSON.parse(response.getContentText());
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+              }
+
+              return data;
+            } catch (error) {
+              console.error('getRange.setValues error:', error.message);
+              throw error;
+            }
+          },
+
+          getValue() {
+            try {
+              const response = UrlFetchApp.fetch(
+                `${sheetsApiBase}/values/${sheetName}!${rangeNotation}?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`,
+                {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  muteHttpExceptions: true
+                }
+              );
+
+              const data = JSON.parse(response.getContentText());
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+              }
+
+              return data.values && data.values[0] && data.values[0][0] ? data.values[0][0] : null;
+            } catch (error) {
+              console.error('getValue error:', error.message);
+              return null;
+            }
+          },
+
+          setValue(value) {
+            try {
+              const response = UrlFetchApp.fetch(
+                `${sheetsApiBase}/values/${sheetName}!${rangeNotation}?valueInputOption=RAW`,
+                {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  payload: JSON.stringify({
+                    values: [[value]]
+                  }),
+                  muteHttpExceptions: true
+                }
+              );
+
+              const data = JSON.parse(response.getContentText());
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+              }
+
+              return data;
+            } catch (error) {
+              console.error('setValue error:', error.message);
+              throw error;
+            }
+          }
+        };
+      },
+
+      appendRow(values) {
+        try {
+          const response = UrlFetchApp.fetch(
+            `${sheetsApiBase}/values/${sheetName}!A:A:append?valueInputOption=RAW`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              payload: JSON.stringify({
+                values: [values]
+              }),
+              muteHttpExceptions: true
+            }
+          );
+
+          const data = JSON.parse(response.getContentText());
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+          }
+
+          return data;
+        } catch (error) {
+          console.error('appendRow error:', error.message);
+          throw error;
+        }
+      }
+    };
+  }
+
+  /**
+   * Convert column number to letter
+   * @param {number} column - Column number (1-based)
+   * @returns {string} Column letter
+   */
+  static columnToLetter(column) {
+    let result = '';
+    while (column > 0) {
+      column--;
+      result = String.fromCharCode(65 + (column % 26)) + result;
+      column = Math.floor(column / 26);
+    }
+    return result;
+  }
+
+  /**
+   * Convert numeric parameters to A1 notation
+   * @param {number} row - Starting row (1-based)
+   * @param {number} col - Starting column (1-based)
+   * @param {number} numRows - Number of rows
+   * @param {number} numCols - Number of columns
+   * @returns {string} A1 notation range
+   */
+  static convertToA1Notation(row, col, numRows, numCols) {
+    const startCol = Data.columnToLetter(col);
+    const endCol = numCols ? Data.columnToLetter(col + numCols - 1) : startCol;
+    const endRow = numRows ? row + numRows - 1 : row;
+
+    if (numRows === 1 && numCols === 1) {
+      return `${startCol}${row}`;
+    } else {
+      return `${startCol}${row}:${endCol}${endRow}`;
+    }
   }
 }
 

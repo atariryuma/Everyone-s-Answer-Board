@@ -13,7 +13,7 @@
  * - Simple, readable code
  */
 
-/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, columnAnalysisImpl, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config */
+/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, columnAnalysisImpl, validateConfig, dsAddReaction, dsToggleHighlight, getFormInfoImpl, Auth, Data, Config */
 
 // ===========================================
 // 🔧 Core Utility Functions

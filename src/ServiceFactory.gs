@@ -169,7 +169,14 @@ function getSpreadsheet() {
   return {
     openById(id) {
       try {
-        return SpreadsheetApp.openById(id);
+        // Service account authentication - 真の実装
+        const auth = Auth.serviceAccount();
+        if (!auth.isValid) {
+          console.warn('ServiceFactory.getSpreadsheet.openById: Fallback to user session due to service account failure:', auth.error);
+          return SpreadsheetApp.openById(id);
+        }
+
+        return Data.openSpreadsheetWithServiceAccount(id, auth.token);
       } catch (error) {
         console.error('ServiceFactory.getSpreadsheet.openById: Error opening spreadsheet:', error.message);
         return null;

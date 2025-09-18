@@ -2140,7 +2140,7 @@
     };
     console.log('🔍 setAIDetectionSelections: mapping詳細分析', mappingDetails);
 
-    // 相対評価システム対応: mappingが空でも信頼度があれば処理継続
+    // AI判定システム対応: mappingが空でも信頼度があれば処理継続
     const actualMapping = mapping.mapping || mapping;
     const hasValidMapping = actualMapping && Object.keys(actualMapping).length > 0;
     const hasConfidenceData = confidence && Object.keys(confidence).length > 0;
@@ -2151,7 +2151,7 @@
     }
 
     if (!hasValidMapping && hasConfidenceData) {
-      console.log('🔍 相対評価システム: マッピングなし、信頼度データで処理継続', confidence);
+      console.log('🔍 AI判定システム: マッピングなし、信頼度データで処理継続', confidence);
     }
 
     // グローバル変数として現在のAI検出結果を保存
@@ -2201,7 +2201,7 @@
         console.log(`✅ AI検出成功: ${columnType} → ${selectedIndex}列 (信頼度: ${columnConfidence}%)`);
         detectedCount++;
       } else if (columnConfidence > 0) {
-        // 相対評価システム: 動的閾値による判定
+        // AI判定システム: 動的閾値による判定
         const allConfidences = Object.values(confidence).filter(c => c > 0);
         const maxConfidence = Math.max(...allConfidences);
         const relativeThreshold = Math.max(maxConfidence * 0.7, 25); // 最高値の70%または25%
@@ -2219,20 +2219,20 @@
           statusMessage = `信頼度不足 (${Math.round(columnConfidence)}%)`;
         }
 
-        console.log(`🔍 相対評価: ${columnType}列 - ${statusMessage} (最高値: ${Math.round(maxConfidence)}%)`);
+        console.log(`🔍 AI判定: ${columnType}列 - ${statusMessage} (最高値: ${Math.round(maxConfidence)}%)`);
         showConfidenceBadge(columnType, columnConfidence, badgeType);
       }
     });
 
-    // 相対評価システム対応の改善されたフィードバックメッセージ
+    // AI判定システム対応の改善されたフィードバックメッセージ
     if (detectedCount > 0) {
       const maxConfidence = Math.max(...Object.values(confidence));
-      console.log(`🎯 相対評価AI検出: ${detectedCount}/4列を自動設定 (最高信頼度: ${Math.round(maxConfidence)}%)`);
+      console.log(`🎯 AI判定検出: ${detectedCount}/4列を自動設定 (最高信頼度: ${Math.round(maxConfidence)}%)`);
       console.log(`📊 詳細: ${totalConfidenceInfo.join(', ')}`);
     } else if (totalConfidenceInfo.length > 0) {
       const maxConfidence = Math.max(...Object.values(confidence));
       const avgConfidence = Object.values(confidence).reduce((a, b) => a + b, 0) / Object.values(confidence).length;
-      console.log(`📊 相対評価分析完了: 自動設定なし (最高: ${Math.round(maxConfidence)}%, 平均: ${Math.round(avgConfidence)}%)`);
+      console.log(`📊 AI判定分析完了: 自動設定なし (最高: ${Math.round(maxConfidence)}%, 平均: ${Math.round(avgConfidence)}%)`);
       console.log(`🔍 各列信頼度: ${totalConfidenceInfo.join(', ')} - 手動選択をご利用ください`);
     } else {
       console.log('💡 AI検出結果がありません - 手動選択をお使いください');
@@ -2406,11 +2406,11 @@
       badgeClass = 'manual';
       badgeText = '✋ 手動設定';
     } else if (type === 'ai') {
-      // 相対評価システムで自動設定された場合
+      // AI判定システムで自動設定された場合
       badgeClass = 'high';
-      badgeText = `🎯 相対評価 ${Math.round(confidence)}%`;
+      badgeText = `🎯 AI判定 ${Math.round(confidence)}%`;
     } else if (type === 'relative-candidate') {
-      // 相対評価で候補として検出された場合
+      // AI判定で候補として検出された場合
       badgeClass = 'candidate';
       badgeText = `🔍 候補 ${Math.round(confidence)}%`;
     } else if (type === 'low-confidence') {
@@ -2778,7 +2778,7 @@
       .saveDraftConfiguration(config);
   }
 
-  // アプリ公開（appName削除版）
+  // アプリ公開（getConfig依存を削除して重複保存防止版）
   function publishApp() {
     if (!RequestGate.enter('publishApp')) {
       showInfo('公開処理を実行中です…');
@@ -2787,127 +2787,125 @@
 
     setLoading(true);
 
-    // 🔧 修正: 保存済み設定があれば、UI検証をスキップして直接公開処理へ
-    // UI状態の事前検証は設定が保存されていない場合のみ実行
+    try {
+      // 🔧 根本的修正: UI状態を直接使用（getConfig依存を削除して上書き競合回避）
+      const config = gatherConfiguration();
 
-    // 🔧 根本的修正: 現在の完全な設定を取得してからpublishApplicationを呼び出し
-    google.script.run
-      .withSuccessHandler(function (response) {
-        console.log('📋 publishApp: getConfig結果:', response);
+      console.log('📋 publishApp: UI状態から設定収集:', {
+        hasSpreadsheetId: !!config.spreadsheetId,
+        hasSheetName: !!config.sheetName,
+        configKeys: Object.keys(config)
+      });
 
-        // getConfigは { success: true, config: {...}, userId: "..." } の形式で返す
-        if (!response || !response.success || !response.config || !response.config.spreadsheetId) {
-          console.error('❌ publishApp: 設定データが不完全:', {
-            hasResponse: !!response,
-            success: response?.success,
-            hasConfig: !!(response?.config),
-            hasSpreadsheetId: !!(response?.config?.spreadsheetId),
-            configKeys: response?.config ? Object.keys(response.config) : null
-          });
-          showError('まずデータソースを設定してください。');
-          setLoading(false);
-          RequestGate.exit('publishApp');
-          return;
-        }
-
-        // 実際の設定データを取得
-        const currentConfig = response.config;
-
-        // 🚀 最小限公開設定（送信データ最適化）
-        const publishConfig = {
-          // 🎯 必須データのみ：既存設定から最小限抽出
-          spreadsheetId: currentConfig.spreadsheetId,
-          sheetName: currentConfig.sheetName,
-          columnMapping: currentConfig.columnMapping,
-          etag: currentConfig.etag,
-
-          // 🎯 必須データのみ：UI設定（統一displaySettings形式）
-          displaySettings: {
-            showNames: document.getElementById('show-names').checked,
-            showReactions: document.getElementById('show-reactions').checked
-          },
-        };
-
-        console.log('📋 publishApp: 完全な設定でpublishApplication呼び出し', {
-          hasFormUrl: !!publishConfig.formUrl,
-          hasColumnMapping: !!publishConfig.columnMapping,
-          hasSpreadsheetId: !!publishConfig.spreadsheetId,
-          hasSheetName: !!publishConfig.sheetName,
+      if (!config || !config.spreadsheetId) {
+        console.error('❌ publishApp: UI設定データが不完全:', {
+          hasConfig: !!config,
+          hasSpreadsheetId: !!(config?.spreadsheetId),
         });
+        showError('まずデータソースを設定してください。');
+        setLoading(false);
+        RequestGate.exit('publishApp');
+        return;
+      }
 
-        // 完全な設定でpublishApplicationを呼び出し
-        google.script.run
-          .withSuccessHandler(function (result) {
-            if (result.success) {
-              showSuccess('アプリを公開しました！');
-              updatePublishStatus('published');
+      // 🚀 UI状態に基づく公開設定作成
+      const sourceMethod = document.querySelector('input[name="source-method"]:checked')?.value || 'list';
 
-              // 公開後に最新の設定を取得してボタン状態を更新
-              console.log('📋 公開成功 - 最新設定を取得してボタン状態を更新');
+      // 列マッピングを現在のsystemStateから取得（UI保存済みのもの）
+      const columnMapping = (systemState && systemState.config && systemState.config.columnMapping) || {};
 
-              // 公開が成功したので、最新の設定を取得し直してボタン状態を更新
-              google.script.run
-                .withSuccessHandler(function(latestConfigResponse) {
-                  console.log('📋 最新設定取得結果:', latestConfigResponse);
-                  if (latestConfigResponse && latestConfigResponse.success && latestConfigResponse.config) {
-                    updateResourceButtons(latestConfigResponse.config);
-                  } else {
-                    // フォールバック: 手動で設定を構築
-                    const updatedConfig = {
-                      ...currentConfig,
-                      appPublished: true,
-                      publishedAt: result.publishedAt || new Date().toISOString(),
-                      setupComplete: true
-                    };
-                    updateResourceButtons(updatedConfig);
-                  }
-                })
-                .withFailureHandler(function(error) {
-                  console.warn('最新設定取得に失敗:', error);
+      const publishConfig = {
+        // 🎯 UIの現在状態を反映
+        spreadsheetId: config.spreadsheetId,
+        sheetName: config.sheetName,
+        columnMapping: columnMapping,
+        etag: config.etag,
+
+        // 🎯 UI設定（統一displaySettings形式）
+        displaySettings: config.displaySettings,
+      };
+
+      console.log('📋 publishApp: UI状態反映publishConfig作成', {
+        sourceMethod,
+        spreadsheetId: config.spreadsheetId,
+        sheetName: config.sheetName,
+        hasColumnMapping: !!columnMapping,
+        publishConfigKeys: Object.keys(publishConfig)
+      });
+
+      // 完全な設定でpublishApplicationを呼び出し
+      google.script.run
+        .withSuccessHandler(function (result) {
+          if (result.success) {
+            showSuccess('アプリを公開しました！');
+            updatePublishStatus('published');
+
+            // 公開後に最新の設定を取得してボタン状態を更新
+            console.log('📋 公開成功 - 最新設定を取得してボタン状態を更新');
+
+            // 公開が成功したので、最新の設定を取得し直してボタン状態を更新
+            google.script.run
+              .withSuccessHandler(function(latestConfigResponse) {
+                console.log('📋 最新設定取得結果:', latestConfigResponse);
+                if (latestConfigResponse && latestConfigResponse.success && latestConfigResponse.config) {
+                  updateResourceButtons(latestConfigResponse.config);
+                } else {
                   // フォールバック: 手動で設定を構築
                   const updatedConfig = {
-                    ...currentConfig,
+                    ...publishConfig,
                     appPublished: true,
                     publishedAt: result.publishedAt || new Date().toISOString(),
                     setupComplete: true
                   };
                   updateResourceButtons(updatedConfig);
-                })
-                .getConfig();
-
-              // ✅ 公開成功後：即座にフッターを更新（UX向上）
-              setTimeout(() => {
-                loadBoardInfo(); // フッター情報を再読み込み
-              }, 500);
-            } else {
-              if (result.error === 'etag_mismatch') {
-                showInfo('設定が他で更新されました。画面を更新してから再度公開してください。');
-                if (typeof loadAndApplyCurrentConfig === 'function') {
-                  loadAndApplyCurrentConfig();
                 }
-              } else {
-                showError(result.error);
+              })
+              .withFailureHandler(function(error) {
+                console.warn('最新設定取得に失敗:', error);
+                // フォールバック: 手動で設定を構築
+                const updatedConfig = {
+                  ...publishConfig,
+                  appPublished: true,
+                  publishedAt: result.publishedAt || new Date().toISOString(),
+                  setupComplete: true
+                };
+                updateResourceButtons(updatedConfig);
+              })
+              .getConfig();
+
+            // ✅ 公開成功後：即座にフッターを更新（UX向上）
+            setTimeout(() => {
+              loadBoardInfo(); // フッター情報を再読み込み
+            }, 500);
+          } else {
+            if (result.error === 'etag_mismatch') {
+              showInfo('設定が他で更新されました。画面を更新してから再度公開してください。');
+              if (typeof loadAndApplyCurrentConfig === 'function') {
+                loadAndApplyCurrentConfig();
               }
+            } else {
+              showError(result.error);
             }
-            setLoading(false);
-            RequestGate.exit('publishApp');
-          })
-          .withFailureHandler(function (error) {
-            console.error('公開エラー:', error);
-            showError(
-              'アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。'
-            );
-            setLoading(false);
-            RequestGate.exit('publishApp');
-          })
-          .publishApplication(publishConfig);
-      })
-      .withFailureHandler(function (error) {
-        showError('現在の設定の取得に失敗しました: ' + error.message);
-        setLoading(false);
-        RequestGate.exit('publishApp');
-      })
-      .getConfig(); // 現在の完全な設定を先に取得
+          }
+          setLoading(false);
+          RequestGate.exit('publishApp');
+        })
+        .withFailureHandler(function (error) {
+          console.error('公開エラー:', error);
+          showError(
+            'アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。'
+          );
+          setLoading(false);
+          RequestGate.exit('publishApp');
+        })
+        .publishApplication(publishConfig);
+
+    } catch (error) {
+      console.error('❌ publishApp: UI設定収集エラー:', error);
+      showError('設定の収集に失敗しました: ' + error.message);
+      setLoading(false);
+      RequestGate.exit('publishApp');
+    }
   }
 
   // 設定収集（ドロップダウン式対応）

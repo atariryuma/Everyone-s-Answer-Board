@@ -73,7 +73,7 @@ function getUserSheetData(userId, options = {}) {
     }
 
     // データ取得実行
-    const result = fetchSpreadsheetData(config, options);
+    const result = fetchSpreadsheetData(config, options, user);
 
     const executionTime = Date.now() - startTime;
     console.info('getSheetData: データ取得完了', {
@@ -111,7 +111,7 @@ function getUserSheetData(userId, options = {}) {
  * @param {Object} options - 取得オプション
  * @returns {Object} GAS公式推奨レスポンス形式
  */
-function fetchSpreadsheetData(config, options = {}) {
+function fetchSpreadsheetData(config, options = {}, user = null) {
   const startTime = Date.now();
   const MAX_EXECUTION_TIME = 180000; // 3分制限（安全マージン拡大）
   const MAX_BATCH_SIZE = 200; // バッチサイズ削減（メモリ制限対応）
@@ -162,7 +162,7 @@ function fetchSpreadsheetData(config, options = {}) {
         const batchRows = sheet.getRange(startRow, 1, batchSize, lastCol).getValues();
 
         // バッチ処理実行
-        const batchProcessed = processRawDataBatch(batchRows, headers, config, options, startRow - 2);
+        const batchProcessed = processRawDataBatch(batchRows, headers, config, options, startRow - 2, user);
 
         processedData = processedData.concat(batchProcessed);
         processedCount += batchSize;
@@ -232,7 +232,7 @@ function fetchSpreadsheetData(config, options = {}) {
  * @param {number} startOffset - 開始オフセット（行番号計算用）
  * @returns {Array} 処理済みバッチデータ
  */
-function processRawDataBatch(batchRows, headers, config, options = {}, startOffset = 0) {
+function processRawDataBatch(batchRows, headers, config, options = {}, startOffset = 0, user = null) {
   try {
     const columnMapping = config.columnMapping?.mapping || {};
     const processedBatch = [];
@@ -261,7 +261,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
           isEmpty: isEmptyRow(row),
 
           // リアクション（{count, reacted} 形式に統一）
-          reactions: extractReactions(row, headers),
+          reactions: extractReactions(row, headers, user.userEmail),
           highlight: extractHighlight(row, headers)
         };
 
@@ -293,7 +293,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
  * @param {Object} options - 処理オプション
  * @returns {Array} 処理済みデータ
  */
-function processRawData(dataRows, headers, config, options = {}) {
+function processRawData(dataRows, headers, config, options = {}, user = null) {
   try {
     const columnMapping = config.columnMapping?.mapping || {};
     const processedData = [];
@@ -319,7 +319,7 @@ function processRawData(dataRows, headers, config, options = {}) {
           isEmpty: isEmptyRow(row),
 
           // リアクション（{count, reacted} 形式）
-          reactions: extractReactions(row, headers),
+          reactions: extractReactions(row, headers, user.userEmail),
           highlight: extractHighlight(row, headers)
         };
 
@@ -718,31 +718,39 @@ function validateReactionType(reactionType) {
  * @param {Array} headers - ヘッダー行
  * @returns {Object} リアクション情報
  */
-function extractReactions(row, headers) {
+function extractReactions(row, headers, userEmail = null) {
   try {
-    const counts = {
-      UNDERSTAND: 0,
-      LIKE: 0,
-      CURIOUS: 0
+    const reactions = {
+      UNDERSTAND: { count: 0, reacted: false },
+      LIKE: { count: 0, reacted: false },
+      CURIOUS: { count: 0, reacted: false }
     };
 
-    // リアクション列を探して値を抽出
+    // リアクション列を探してメール配列を抽出
     headers.forEach((header, index) => {
-      const headerStr = String(header).toLowerCase();
-      if (headerStr.includes('understand') || headerStr.includes('理解')) {
-        counts.UNDERSTAND = parseInt(row[index]) || 0;
-      } else if (headerStr.includes('like') || headerStr.includes('いいね')) {
-        counts.LIKE = parseInt(row[index]) || 0;
-      } else if (headerStr.includes('curious') || headerStr.includes('気になる')) {
-        counts.CURIOUS = parseInt(row[index]) || 0;
+      const headerStr = String(header).toUpperCase();
+      let reactionType = null;
+
+      // ヘッダー名からリアクションタイプを特定
+      if (headerStr.includes('UNDERSTAND') || headerStr.includes('理解')) {
+        reactionType = 'UNDERSTAND';
+      } else if (headerStr.includes('LIKE') || headerStr.includes('いいね')) {
+        reactionType = 'LIKE';
+      } else if (headerStr.includes('CURIOUS') || headerStr.includes('気になる')) {
+        reactionType = 'CURIOUS';
+      }
+
+      if (reactionType) {
+        const cellValue = row[index] || '';
+        const reactionUsers = parseReactionUsers(cellValue);
+        reactions[reactionType] = {
+          count: reactionUsers.length,
+          reacted: userEmail ? reactionUsers.includes(userEmail) : false
+        };
       }
     });
 
-    return {
-      UNDERSTAND: { count: counts.UNDERSTAND, reacted: false },
-      LIKE: { count: counts.LIKE, reacted: false },
-      CURIOUS: { count: counts.CURIOUS, reacted: false }
-    };
+    return reactions;
   } catch (error) {
     console.warn('DataService.extractReactions: エラー', error.message);
     return {
@@ -1296,18 +1304,9 @@ function restoreColumnConfig(userId, spreadsheetId, sheetName) {
  */
 function getSheetHeaders(spreadsheetId, sheetName, started) {
   try {
-    const spreadsheetService = ServiceFactory.getSpreadsheet();
-
-    if (!spreadsheetService) {
-      console.error('getSheetHeaders: ServiceFactory.getSpreadsheet()がnullを返しました');
-      return {
-        success: false,
-        message: 'ServiceFactory.getSpreadsheet()がnullを返しました',
-        headers: []
-      };
-    }
-
-    const spreadsheet = spreadsheetService.openById(spreadsheetId);
+    // 🎯 サービスアカウント認証でData.open()を使用（ServiceFactoryのフォールバック回避）
+    const dataAccess = Data.open(spreadsheetId);
+    const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -1392,10 +1391,10 @@ function detectColumnTypes(headers, sampleData) {
     const mapping = { mapping: {}, confidence: {} };
     const analysisResults = performHighPrecisionAnalysis(headers, sampleData);
 
-    // 🎯 相対評価システム実装 - 接続された列の中での最適マッチ判定
+    // 🎯 AI判定システム実装 - 接続された列の中での最適マッチ判定
     const relativeMatchingResult = performRelativeMatching(analysisResults, headers);
 
-    // 相対評価結果をマッピングに反映
+    // AI判定結果をマッピングに反映
     Object.entries(relativeMatchingResult.mapping).forEach(([columnType, result]) => {
       if (result.shouldMap) {
         mapping.mapping[columnType] = result.index;
@@ -1428,10 +1427,10 @@ function detectColumnTypes(headers, sampleData) {
 }
 
 /**
- * 🎯 相対評価システム - 接続された列の中での最適マッチ判定
+ * 🎯 AI判定システム - 接続された列の中での最適マッチ判定
  * @param {Object} analysisResults - AI分析結果
  * @param {Array} headers - 列ヘッダー
- * @returns {Object} 相対評価結果
+ * @returns {Object} AI判定結果
  */
 function performRelativeMatching(analysisResults, headers) {
   const targetTypes = ['answer', 'reason', 'class', 'name'];
@@ -1455,7 +1454,7 @@ function performRelativeMatching(analysisResults, headers) {
     .filter(stat => stat.confidence > 0)
     .sort((a, b) => b.confidence - a.confidence);
 
-  console.log('🔍 相対評価システム - 信頼度ランキング:', sortedStats.map(stat => ({
+  console.log('🔍 AI判定システム - 信頼度ランキング:', sortedStats.map(stat => ({
     ターゲット: stat.targetType,
     列名: stat.headerName,
     信頼度: `${Math.round(stat.confidence)}%`,
@@ -1522,7 +1521,7 @@ function performRelativeMatching(analysisResults, headers) {
 
   // 5️⃣ 結果サマリー
   const mappedCount = Object.values(mapping).filter(m => m.shouldMap).length;
-  console.log('✅ 相対評価システム完了:', {
+  console.log('✅ AI判定システム完了:', {
     '対象列数': headers.length,
     'マッピング成功数': mappedCount,
     '成功率': `${Math.round(mappedCount / targetTypes.length * 100)}%`,
@@ -1599,30 +1598,33 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
   const headerScore = analyzeHeaderPattern(headerLower, targetType);
   factors.headerPattern = headerScore;
 
-  // 🎯 最適化された重み配分システム - バランスと精度の両立
+  // 🎯 ヘッダー特化AI判定システム - サンプルデータなし設計
   let headerWeight, contentWeight, linguisticWeight, contextWeight, semanticWeight;
 
+  // サンプルデータ有無による最適化
+  const hasSampleData = samples && samples.length > 0;
+
   if (headerScore >= 90) {
-    // 日本語完全一致 (95%等) - ヘッダー重視だがバランス維持
-    headerWeight = 0.5;      // 60% → 50% (過度の偏重を防止)
-    contentWeight = 0.2;     // 15% → 20% (コンテンツ分析も重視)
-    linguisticWeight = 0.15; // 10% → 15% (言語特徴を適度に活用)
-    contextWeight = 0.1;     // 10% → 10% (維持)
-    semanticWeight = 0.05;   // 5% → 5% (維持)
+    // 日本語完全一致 - ヘッダー特化重視
+    headerWeight = hasSampleData ? 0.5 : 0.7;    // サンプルなし時は70%
+    contentWeight = hasSampleData ? 0.2 : 0.0;   // サンプルなし時は無効
+    linguisticWeight = hasSampleData ? 0.15 : 0.2; // 言語パターン強化
+    contextWeight = hasSampleData ? 0.1 : 0.1;   // コンテキスト維持
+    semanticWeight = hasSampleData ? 0.05 : 0.0; // サンプルなし時は無効
   } else if (headerScore >= 70) {
-    // 強パターンマッチ - ヘッダー重視だが他要素も考慮
-    headerWeight = 0.4;      // 45% → 40% (バランス改善)
-    contentWeight = 0.25;    // 20% → 25% (コンテンツ分析強化)
-    linguisticWeight = 0.2;  // 15% → 20% (言語分析強化)
-    contextWeight = 0.1;     // 12.5% → 10% (簡素化)
-    semanticWeight = 0.05;   // 7.5% → 5% (簡素化)
+    // 強パターンマッチ - ヘッダー・コンテキスト重視
+    headerWeight = hasSampleData ? 0.4 : 0.6;    // サンプルなし時は60%
+    contentWeight = hasSampleData ? 0.25 : 0.0;  // サンプルなし時は無効
+    linguisticWeight = hasSampleData ? 0.2 : 0.25; // 言語分析強化
+    contextWeight = hasSampleData ? 0.1 : 0.15;  // コンテキスト強化
+    semanticWeight = hasSampleData ? 0.05 : 0.0; // サンプルなし時は無効
   } else {
-    // 標準分析 - バランス型（微調整）
-    headerWeight = 0.3;      // 維持
-    contentWeight = 0.3;     // 25% → 30% (コンテンツ重視強化)
-    linguisticWeight = 0.25; // 20% → 25% (言語分析重視)
-    contextWeight = 0.1;     // 15% → 10% (簡素化)
-    semanticWeight = 0.05;   // 10% → 5% (簡素化)
+    // 標準分析 - ヘッダー・言語・コンテキスト重視
+    headerWeight = hasSampleData ? 0.3 : 0.5;    // サンプルなし時は50%
+    contentWeight = hasSampleData ? 0.3 : 0.0;   // サンプルなし時は無効
+    linguisticWeight = hasSampleData ? 0.25 : 0.35; // 言語分析大幅強化
+    contextWeight = hasSampleData ? 0.1 : 0.15;  // コンテキスト強化
+    semanticWeight = hasSampleData ? 0.05 : 0.0; // サンプルなし時は無効
   }
 
   totalConfidence += headerScore * headerWeight;

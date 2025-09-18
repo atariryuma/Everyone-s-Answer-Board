@@ -441,8 +441,8 @@ function validateSpreadsheetAccess(spreadsheetId) {
       let spreadsheet;
       try {
         console.log('SecurityService', { operation: 'Data.open', phase: 'start' });
-        const dataAccess = Data.open(spreadsheetId);
-        spreadsheet = dataAccess.spreadsheet;
+        const { spreadsheet: spreadsheetFromData } = Data.open(spreadsheetId);
+        spreadsheet = spreadsheetFromData;
         console.log('SecurityService', { operation: 'Data.open', phase: 'success' });
       } catch (openError) {
         const errorResponse = {
