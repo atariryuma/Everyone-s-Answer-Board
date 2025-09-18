@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, getSheetsService, getServiceAccountEmail, getSpreadsheetList */
+/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, Data, Config, getSpreadsheetList */
 
 // ===========================================
 // 🔧 Zero-Dependency Utility Functions
@@ -121,7 +121,8 @@ function testSystemDiagnosis() {
         const databaseId = props.getDatabaseSpreadsheetId();
 
         if (databaseId) {
-          const spreadsheet = getSheetsService().openById(databaseId);
+          const dataAccess = Data.open(databaseId);
+          const {spreadsheet} = dataAccess;
           diagnostics.database = {
             accessible: true,
             name: spreadsheet.getName(),
@@ -168,7 +169,7 @@ function getSystemStatus() {
         setup: {
           hasDatabase: !!props.getDatabaseSpreadsheetId(),
           hasAdminEmail: !!props.getAdminEmail(),
-          hasServiceAccount: !!props.getServiceAccountCreds()
+          hasServiceAccount: !!Config.serviceAccount()
         },
         services: {
           available: ['UserService', 'ConfigService', 'DataService', 'SecurityService']
@@ -292,7 +293,8 @@ function getAdminSpreadsheetList() {
 function getAdminSheetList(spreadsheetId) {
   try {
     // 🎯 Zero-dependency: サービスアカウント経由でシート一覧取得
-    const spreadsheet = getSheetsService().openById(spreadsheetId);
+    const dataAccess = Data.open(spreadsheetId);
+    const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
 
     const sheetList = sheets.map(sheet => ({
@@ -714,12 +716,14 @@ function publishApplication(publishConfig) {
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
     // 🎯 Zero-dependency: サービスアカウント経由でアクセス権確認
-    const spreadsheet = getSheetsService().openById(spreadsheetId);
+    const dataAccess = Data.open(spreadsheetId);
+    const {spreadsheet} = dataAccess;
 
     // サービスアカウントを編集者として自動登録
     if (autoAddEditor) {
       try {
-        const serviceAccountEmail = getServiceAccountEmail();
+        const serviceAccount = Config.serviceAccount();
+        const serviceAccountEmail = serviceAccount ? serviceAccount.client_email : null;
         if (serviceAccountEmail) {
           spreadsheet.addEditor(serviceAccountEmail);
           console.log('validateAccess: サービスアカウントを編集者として登録:', serviceAccountEmail);
@@ -788,7 +792,8 @@ function getFormInfo(spreadsheetId, sheetName) {
     // スプレッドシート取得
     let spreadsheet;
     try {
-      spreadsheet = getSheetsService().openById(spreadsheetId);
+      const dataAccess = Data.open(spreadsheetId);
+      spreadsheet = dataAccess.spreadsheet;
     } catch (accessError) {
       return {
         success: false,

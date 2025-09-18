@@ -13,7 +13,7 @@
  * - Simple, readable code
  */
 
-/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, DatabaseOperations, columnAnalysisImpl, validateConfig, getSheetsService, getSecureDatabaseId, dsAddReaction, dsToggleHighlight */
+/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, DatabaseOperations, columnAnalysisImpl, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -454,21 +454,20 @@ function getConfig() {
         });
 
         // Check database structure
-        if (typeof getSheetsService === 'function' && typeof getSecureDatabaseId === 'function') {
-          const service = getSheetsService();
-          const databaseId = getSecureDatabaseId();
-          const response = service.spreadsheets.values.get({
-            spreadsheetId: databaseId,
-            range: 'Users!A1:E10'
-          });
-          const rows = response.data && response.data.values ? response.data.values : [];
+        const dbConfig = Config.database();
+        if (dbConfig && dbConfig.isValid) {
+          const dataAccess = Data.open(dbConfig.spreadsheetId);
+          if (dataAccess.spreadsheet) {
+            const batchResults = dataAccess.batchRead(['Users!A1:E10']);
+            const rows = batchResults.length > 0 && batchResults[0].results.length > 0 ?
+              batchResults[0].results[0].values : [];
           console.log('getConfig: Raw database content', {
-            databaseId: `${databaseId.substring(0, 10)  }***`,
+            databaseId: `${dbConfig.spreadsheetId.substring(0, 10)}***`,
             rowCount: rows.length,
             headers: rows.length > 0 ? rows[0] : [],
             sampleEmails: rows.slice(1, 4).map(row => row[1] ? `${row[1].substring(0, 5)  }***` : 'NO_EMAIL')
           });
-
+          }
         }
       } catch (diagnosticError) {
         console.error('getConfig: Database diagnostic failed', {
@@ -645,7 +644,7 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
 
     // Initialize database if needed
     try {
-      const testAccess = getSheetsService().openById(databaseId);
+      const testAccess = Data.open(databaseId).spreadsheet;
     } catch (dbError) {
       console.warn('Database access test failed:', dbError.message);
     }
@@ -1247,7 +1246,8 @@ function validateHeaderIntegrity(targetUserId) {
       };
     }
 
-    const sheet = getSheetsService().openById(config.spreadsheetId).getSheetByName(config.sheetName);
+    const dataAccess = Data.open(config.spreadsheetId);
+    const sheet = dataAccess.getSheet(config.sheetName);
     if (!sheet) {
       return {
         success: false,
@@ -1536,7 +1536,8 @@ function getSheetList(spreadsheetId) {
       return createErrorResponse('Spreadsheet ID required');
     }
 
-    const spreadsheet = getSheetsService().openById(spreadsheetId);
+    const dataAccess = Data.open(spreadsheetId);
+    const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
 
     const sheetList = sheets.map(sheet => ({

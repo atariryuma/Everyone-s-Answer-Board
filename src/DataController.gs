@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ServiceFactory, ConfigService, DataService, DatabaseOperations, getCurrentEmail, createErrorResponse, getUserSheetData, getSheetsService */
+/* global ServiceFactory, ConfigService, DataService, DatabaseOperations, getCurrentEmail, createErrorResponse, getUserSheetData, Data */
 
 // ===========================================
 // 📊 メインページデータAPI
@@ -176,7 +176,8 @@ function getHeaderIndices(spreadsheetId, sheetName) {
       };
     }
 
-    const spreadsheet = getSheetsService().openById(spreadsheetId);
+    const dataAccess = Data.open(spreadsheetId);
+    const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -261,7 +262,8 @@ function addSpreadsheetUrl(url) {
 
     // アクセステスト
     try {
-      const spreadsheet = getSheetsService().openById(spreadsheetId);
+      const dataAccess = Data.open(spreadsheetId);
+    const {spreadsheet} = dataAccess;
       const name = spreadsheet.getName();
 
       return {

@@ -13,7 +13,7 @@
  * - 単一責任原則の維持
  */
 
-/* global ServiceFactory, validateEmail, validateUrl, getUserAccessLevel, getSheetsService */
+/* global ServiceFactory, validateEmail, validateUrl, getUserAccessLevel, Data */
 
 /**
  * ServiceFactory統合初期化
@@ -32,76 +32,13 @@ function initSecurityServiceZero() {
  * Service Accountトークン取得（セキュリティ強化版）
  * @returns {string|null} アクセストークン
  */
-function getServiceAccountToken() {
-    const cacheKey = 'SA_TOKEN_CACHE';
-    
-    try {
-      // ServiceFactory経由でキャッシュアクセス
-      if (!initSecurityServiceZero()) {
-        console.error('getServiceAccountToken: ServiceFactory not available');
-        return null;
-      }
-      const cache = ServiceFactory.getCache();
-      const cached = cache.get(cacheKey);
-      if (cached) {
-        // セキュリティ：トークン有効性の簡易検証
-        if (validateTokenFormat(cached)) {
-          return cached;
-        } else {
-          // 無効なトークンをクリア
-          cache.remove(cacheKey);
-        }
-      }
-
-      // 新規トークン生成
-      const newToken = generateServiceAccountToken();
-      if (!newToken) {
-        console.error('SecurityService.getServiceAccountToken: トークン生成失敗（詳細はログなし）');
-        return null;
-      }
-
-      // セキュリティ：トークン形式検証
-      if (!validateTokenFormat(newToken)) {
-        console.error('SecurityService.getServiceAccountToken: 生成されたトークンが無効な形式');
-        return null;
-      }
-
-      // 1時間キャッシュ（短時間で自動失効）
-      cache.put(cacheKey, newToken, 3600);
-      
-      console.info('SecurityService.getServiceAccountToken: トークン生成・キャッシュ完了（詳細省略）');
-      return newToken;
-    } catch {
-      // セキュリティ：エラー詳細をログに出力しない
-      console.error('SecurityService.getServiceAccountToken: トークン取得処理エラー');
-      return null;
-    }
-}
+// Service account token function removed - impersonation detected
 
 /**
  * Service Accountトークン生成（セキュリティ強化版）
  * @returns {string|null} 生成されたトークン
  */
-function generateServiceAccountToken() {
-    try {
-      // GAS標準のOAuthトークン取得
-      const token = ScriptApp.getOAuthToken();
-      if (!token) {
-        throw new Error('OAuthトークンの取得に失敗');
-      }
-
-      // セキュリティ：生成されたトークンの最小検証
-      if (token.length < 20) {
-        throw new Error('生成されたトークンが短すぎます');
-      }
-
-      return token;
-    } catch {
-      // セキュリティ：具体的なエラー内容をログに出力しない
-      console.error('SecurityService.generateServiceAccountToken: トークン生成処理エラー');
-      return null;
-    }
-}
+// Service account token generation function removed - was using user OAuth token impersonation
 
 /**
  * トークン形式検証（セキュリティ強化）
@@ -513,9 +450,10 @@ function validateSpreadsheetAccess(spreadsheetId) {
       // アクセステスト - 段階的にチェック
       let spreadsheet;
       try {
-        console.log('SecurityService', { operation: 'getSheetsService.openById', phase: 'start' });
-        spreadsheet = getSheetsService().openById(spreadsheetId);
-        console.log('SecurityService', { operation: 'getSheetsService.openById', phase: 'success' });
+        console.log('SecurityService', { operation: 'Data.open', phase: 'start' });
+        const dataAccess = Data.open(spreadsheetId);
+        spreadsheet = dataAccess.spreadsheet;
+        console.log('SecurityService', { operation: 'Data.open', phase: 'success' });
       } catch (openError) {
         const errorResponse = {
           success: false,
@@ -640,7 +578,8 @@ function getSecurityRecommendations() {
       }
 
       // トークンの有効性確認
-      const token = getServiceAccountToken();
+      // Service account token access removed - impersonation detected
+      const token = null; // Placeholder for removed impersonation function
       if (!token) {
         recommendations.push({
           priority: 'medium',

@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, getSheetsService, getServiceAccountEmail */
+/* global ServiceFactory, formatTimestamp, DatabaseOperations, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -118,7 +118,8 @@ function fetchSpreadsheetData(config, options = {}) {
 
   try {
     // スプレッドシート取得
-    const spreadsheet = getSheetsService().openById(config.spreadsheetId);
+    const dataAccess = Data.open(config.spreadsheetId);
+    const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
     if (!sheet) {
@@ -410,7 +411,8 @@ function extractFieldValue(row, headers, fieldType, columnMapping = {}) {
  */
 function updateReactionInSheet(config, rowId, reactionType, action) {
   try {
-    const spreadsheet = getSheetsService().openById(config.spreadsheetId);
+    const dataAccess = Data.open(config.spreadsheetId);
+    const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
     if (!sheet) {
@@ -551,7 +553,8 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEm
       throw new Error('ユーザー情報が必要です');
     }
 
-    const spreadsheet = getSheetsService().openById(spreadsheetId);
+    const dataAccess = Data.open(spreadsheetId);
+    const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -1105,11 +1108,13 @@ function validateSheetParams(spreadsheetId, sheetName) {
  */
 function connectToSheetInternal(spreadsheetId, sheetName) {
   try {
-    const spreadsheet = getSheetsService().openById(spreadsheetId);
+    const dataAccess = Data.open(spreadsheetId);
+    const {spreadsheet} = dataAccess;
 
     // サービスアカウントを編集者として自動登録
     try {
-      const serviceAccountEmail = getServiceAccountEmail();
+      const serviceAccount = Config.serviceAccount();
+      const serviceAccountEmail = serviceAccount ? serviceAccount.client_email : null;
       if (serviceAccountEmail) {
         spreadsheet.addEditor(serviceAccountEmail);
         console.log('connectToSheetInternal: サービスアカウントを編集者として登録:', serviceAccountEmail);
@@ -2018,7 +2023,8 @@ function getOrCreateReactionColumn(sheet, reactionType) {
  */
 function updateHighlightInSheet(config, rowId) {
   try {
-    const spreadsheet = getSheetsService().openById(config.spreadsheetId);
+    const dataAccess = Data.open(config.spreadsheetId);
+    const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
     if (!sheet) {

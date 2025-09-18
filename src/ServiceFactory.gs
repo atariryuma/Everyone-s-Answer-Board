@@ -13,7 +13,7 @@
  * - プラットフォームAPI統合
  */
 
-/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, getServiceAccountToken, connectToSheetInternal, getFormInfo, getSheetsService */
+/* global DatabaseOperations, getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, connectToSheetInternal, getFormInfo */
 
 // ===========================================
 // 🔧 Session Management
@@ -421,7 +421,7 @@ __rootSF.ServiceFactory = {
         const shim = {};
         if (typeof validateUserData === 'function') shim.validateUserData = validateUserData;
         if (typeof validateSession === 'function') shim.validateSession = validateSession;
-        if (typeof getServiceAccountToken === 'function') shim.getServiceAccountToken = getServiceAccountToken;
+        // Service account token function removed - was impersonation
         if (Object.keys(shim).length > 0) return shim;
         console.warn('ServiceFactory.getSecurityService: SecurityService not available');
         return null;
