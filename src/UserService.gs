@@ -193,10 +193,11 @@ function getUserAccessLevel(userId) {
     // 認証済みユーザー
     return ACCESS_LEVELS.AUTHENTICATED_USER;
   } catch (error) {
+    const currentEmailForLog = getCurrentEmail();
     console.error('UserService.getAccessLevel: エラー', {
       operation: 'getAccessLevel',
-      userId: userId?.substring(0, 8) + '***',
-      currentEmail: currentEmail?.split('@')[0] + '@***',
+      userId: `${userId?.substring(0, 8)  }***`,
+      currentEmail: currentEmailForLog ? `${currentEmailForLog.split('@')[0]  }@***` : 'N/A',
       error: error.message,
       stack: error.stack
     });

@@ -545,6 +545,223 @@ function publishApplication(publishConfig) {
 }
 
 /**
+ * ユーザーがスプレッドシートのオーナーかチェック
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {boolean} オーナーかどうか
+ */
+function isUserSpreadsheetOwner(spreadsheetId) {
+  try {
+    const currentEmail = getCurrentEmail();
+    if (!currentEmail) return false;
+
+    // DriveAppで所有者確認を試行
+    const file = DriveApp.getFileById(spreadsheetId);
+    const owner = file.getOwner();
+
+    if (owner && owner.getEmail() === currentEmail) {
+      console.log('isUserSpreadsheetOwner: ユーザーはオーナーです:', currentEmail);
+      return true;
+    }
+
+    console.log('isUserSpreadsheetOwner: ユーザーはオーナーではありません:', {
+      currentEmail,
+      ownerEmail: owner ? owner.getEmail() : 'unknown'
+    });
+    return false;
+  } catch (error) {
+    console.warn('isUserSpreadsheetOwner: 権限チェック失敗:', error.message);
+    return false;
+  }
+}
+
+/**
+ * 適応的スプレッドシートアクセス（オーナー優先、サービスアカウントfallback）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @returns {Object} {spreadsheet, accessMethod, auth?}
+ */
+function getSpreadsheetAdaptive(spreadsheetId) {
+  // まずオーナー権限でのアクセスを試行
+  if (isUserSpreadsheetOwner(spreadsheetId)) {
+    try {
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      console.log('getSpreadsheetAdaptive: オーナー権限でアクセス成功');
+      return {
+        spreadsheet,
+        accessMethod: 'owner',
+        auth: null
+      };
+    } catch (ownerError) {
+      console.warn('getSpreadsheetAdaptive: オーナー権限アクセス失敗:', ownerError.message);
+    }
+  }
+
+  // オーナー権限失敗時はサービスアカウントfallback
+  try {
+    const dataAccess = Data.open(spreadsheetId);
+    console.log('getSpreadsheetAdaptive: サービスアカウントでアクセス成功');
+    return {
+      spreadsheet: dataAccess.spreadsheet,
+      accessMethod: 'service_account',
+      auth: dataAccess.auth
+    };
+  } catch (serviceError) {
+    console.error('getSpreadsheetAdaptive: 全てのアクセス方法が失敗:', serviceError.message);
+    throw new Error(`スプレッドシートアクセス失敗: ${serviceError.message}`);
+  }
+}
+
+/**
+ * 多層フォーム検出システム
+ * @param {Object} spreadsheet - スプレッドシートオブジェクト
+ * @param {Object} sheet - シートオブジェクト
+ * @param {string} sheetName - シート名
+ * @param {string} accessMethod - アクセス方法 ('owner' or 'service_account')
+ * @returns {Object} {formUrl, confidence, detectionMethod}
+ */
+function detectFormConnection(spreadsheet, sheet, sheetName, accessMethod) {
+  const results = {
+    formUrl: null,
+    confidence: 0,
+    detectionMethod: 'none',
+    details: []
+  };
+
+  // Method 1: 標準API - オーナー権限の場合のみ
+  if (accessMethod === 'owner') {
+    try {
+      // スプレッドシートレベルでフォームURL取得
+      if (typeof spreadsheet.getFormUrl === 'function') {
+        const formUrl = spreadsheet.getFormUrl();
+        if (formUrl) {
+          results.formUrl = formUrl;
+          results.confidence = 95;
+          results.detectionMethod = 'spreadsheet_api';
+          results.details.push('SpreadsheetApp.getFormUrl()で検出');
+          return results;
+        }
+      }
+
+      // シートレベルでフォームURL取得
+      if (typeof sheet.getFormUrl === 'function') {
+        const formUrl = sheet.getFormUrl();
+        if (formUrl) {
+          results.formUrl = formUrl;
+          results.confidence = 90;
+          results.detectionMethod = 'sheet_api';
+          results.details.push('Sheet.getFormUrl()で検出');
+          return results;
+        }
+      }
+    } catch (apiError) {
+      console.warn('detectFormConnection: API検出失敗:', apiError.message);
+      results.details.push(`API検出失敗: ${apiError.message}`);
+    }
+  }
+
+  // Method 2: ヘッダーパターン解析
+  try {
+    const [headers] = sheet.getRange(1, 1, 1, Math.min(sheet.getLastColumn(), 10)).getValues();
+    const headerAnalysis = analyzeFormHeaders(headers);
+
+    if (headerAnalysis.isFormLike) {
+      results.confidence = Math.max(results.confidence, headerAnalysis.confidence);
+      results.detectionMethod = results.detectionMethod === 'none' ? 'header_analysis' : results.detectionMethod;
+      results.details.push(`ヘッダー解析: ${headerAnalysis.reason}`);
+    }
+  } catch (headerError) {
+    console.warn('detectFormConnection: ヘッダー解析失敗:', headerError.message);
+    results.details.push(`ヘッダー解析失敗: ${headerError.message}`);
+  }
+
+  // Method 3: シート名パターン解析
+  const sheetNameAnalysis = analyzeSheetName(sheetName);
+  if (sheetNameAnalysis.isFormLike) {
+    results.confidence = Math.max(results.confidence, sheetNameAnalysis.confidence);
+    results.detectionMethod = results.detectionMethod === 'none' ? 'sheet_name' : results.detectionMethod;
+    results.details.push(`シート名解析: ${sheetNameAnalysis.reason}`);
+  }
+
+  return results;
+}
+
+/**
+ * フォームヘッダーパターン解析
+ * @param {Array} headers - ヘッダー配列
+ * @returns {Object} {isFormLike, confidence, reason}
+ */
+function analyzeFormHeaders(headers) {
+  if (!headers || headers.length === 0) {
+    return { isFormLike: false, confidence: 0, reason: 'ヘッダーなし' };
+  }
+
+  const formIndicators = [
+    { pattern: /タイムスタンプ|timestamp/i, weight: 30, description: 'タイムスタンプ列' },
+    { pattern: /メールアドレス|email.*address|メール/i, weight: 25, description: 'メールアドレス列' },
+    { pattern: /回答|answer|意見|response/i, weight: 20, description: '回答列' },
+    { pattern: /名前|name|氏名/i, weight: 15, description: '名前列' },
+    { pattern: /クラス|class|組/i, weight: 10, description: 'クラス列' }
+  ];
+
+  let totalScore = 0;
+  const matches = [];
+
+  headers.forEach((header, index) => {
+    if (typeof header === 'string') {
+      formIndicators.forEach(indicator => {
+        if (indicator.pattern.test(header)) {
+          totalScore += indicator.weight;
+          matches.push(`${indicator.description}(${header})`);
+        }
+      });
+    }
+  });
+
+  const confidence = Math.min(totalScore, 85); // 最大85%
+  const isFormLike = confidence >= 40; // 40%以上でフォームと判定
+
+  return {
+    isFormLike,
+    confidence,
+    reason: isFormLike ? `フォームパターン検出: ${matches.join(', ')}` : '一般的なフォームパターンが不足'
+  };
+}
+
+/**
+ * シート名パターン解析
+ * @param {string} sheetName - シート名
+ * @returns {Object} {isFormLike, confidence, reason}
+ */
+function analyzeSheetName(sheetName) {
+  if (!sheetName || typeof sheetName !== 'string') {
+    return { isFormLike: false, confidence: 0, reason: 'シート名なし' };
+  }
+
+  const patterns = [
+    { regex: /フォームの回答|form.*responses?/i, confidence: 80, description: 'フォーム回答シート' },
+    { regex: /フォーム.*結果|form.*results?/i, confidence: 75, description: 'フォーム結果シート' },
+    { regex: /回答.*\d+|responses?.*\d+/i, confidence: 70, description: 'ナンバリング回答シート' },
+    { regex: /アンケート|survey|questionnaire/i, confidence: 60, description: 'アンケートシート' },
+    { regex: /回答|responses?|答え|answer/i, confidence: 50, description: '回答関連シート' }
+  ];
+
+  for (const pattern of patterns) {
+    if (pattern.regex.test(sheetName)) {
+      return {
+        isFormLike: true,
+        confidence: pattern.confidence,
+        reason: `${pattern.description}パターン検出: "${sheetName}"`
+      };
+    }
+  }
+
+  return {
+    isFormLike: false,
+    confidence: 0,
+    reason: `一般的なフォームシート名パターンなし: "${sheetName}"`
+  };
+}
+
+/**
  * Sheets APIでスプレッドシート情報を取得
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} accessToken - アクセストークン
@@ -631,7 +848,7 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
 
 
 /**
- * フォーム情報を取得（実装関数）
+ * フォーム情報を取得（実装関数）- 適応的アクセス対応版
  * main.gs API Gateway から呼び出される
  *
  * @param {string} spreadsheetId - スプレッドシートID
@@ -639,6 +856,13 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
  * @returns {Object} フォーム情報
  */
 function getFormInfoImpl(spreadsheetId, sheetName) {
+  const startTime = new Date().toISOString();
+  console.log('=== getFormInfoImpl START ===', {
+    spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 12)  }***` : 'N/A',
+    sheetName: sheetName || 'N/A',
+    timestamp: startTime
+  });
+
   try {
     // 引数検証
     if (!spreadsheetId || !sheetName) {
@@ -655,13 +879,9 @@ function getFormInfoImpl(spreadsheetId, sheetName) {
       };
     }
 
-    // スプレッドシート取得
-    let spreadsheet, auth;
-    try {
-      const dataAccess = Data.open(spreadsheetId);
-      spreadsheet = dataAccess.spreadsheet;
-      auth = dataAccess.auth;
-    } catch (accessError) {
+    // 適応的スプレッドシートアクセス（ユーザー所有 vs サービスアカウント）
+    const accessResult = getSpreadsheetAdaptive(spreadsheetId);
+    if (!accessResult.spreadsheet) {
       return {
         success: false,
         status: 'SPREADSHEET_NOT_FOUND',
@@ -672,13 +892,30 @@ function getFormInfoImpl(spreadsheetId, sheetName) {
           spreadsheetName: '',
           sheetName
         },
-        error: accessError.message
+        accessMethod: accessResult.accessMethod,
+        error: accessResult.error
       };
     }
 
-    // スプレッドシート情報を取得（Sheets API経由）
-    const spreadsheetInfo = getSpreadsheetInfo(spreadsheetId, auth.token);
-    const spreadsheetName = spreadsheetInfo.name || `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
+    const { spreadsheet, accessMethod, auth } = accessResult;
+
+    // スプレッドシート名取得（アクセス方法により異なる）
+    let spreadsheetName;
+    try {
+      if (accessMethod === 'owner') {
+        // ユーザー所有の場合はgetNameメソッド使用可能
+        spreadsheetName = spreadsheet.getName();
+      } else {
+        // サービスアカウントの場合はSheets API使用
+        const spreadsheetInfo = getSpreadsheetInfo(spreadsheetId, auth.token);
+        spreadsheetName = spreadsheetInfo.name;
+      }
+    } catch (nameError) {
+      console.warn('getFormInfoImpl: スプレッドシート名取得エラー:', nameError.message);
+      if (spreadsheetId && spreadsheetId.trim()) {
+        spreadsheetName = `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
+      }
+    }
 
     // シート取得
     const sheet = spreadsheet.getSheetByName(sheetName);
@@ -692,78 +929,77 @@ function getFormInfoImpl(spreadsheetId, sheetName) {
           formTitle: sheetName,
           spreadsheetName,
           sheetName
-        }
+        },
+        accessMethod
       };
     }
 
-    // フォームURL取得（スタックオーバーフロー完全対策）
-    let formUrl = null;
-    let formTitle = sheetName || spreadsheetName || 'フォーム';
+    // 多層フォーム検出システム実行
+    const formDetectionResult = detectFormConnection(spreadsheet, sheet, spreadsheetId, sheetName, accessMethod);
 
-    // 安全なフォームURL取得 - FormApp.openByUrlは完全に回避
-    try {
-      // まずシートレベルでフォームURLを取得
-      if (typeof sheet.getFormUrl === 'function') {
-        formUrl = sheet.getFormUrl();
-      }
-
-      // シートレベルで取得できない場合はスプレッドシートレベルで試行
-      // 注意: カスタムラッパーにはgetFormUrlメソッドが存在しない可能性があるため、
-      // 直接SpreadsheetApp経由でアクセスする（サービスアカウント権限で）
-      if (!formUrl) {
-        try {
-          // フォームURL取得は現在サポートされていないため、nullとして処理
-          console.log('getFormInfoImpl: スプレッドシートレベルのFormURL取得はカスタムラッパーではサポートされていません');
-        } catch (spreadsheetFormError) {
-          console.warn('getFormInfoImpl: スプレッドシートレベルFormURL取得エラー:', spreadsheetFormError.message);
-        }
-      }
-    } catch (urlError) {
-      console.warn('SystemController.getFormInfo: FormURL取得エラー（安全に処理）:', urlError.message);
-      // エラーが発生してもformUrlはnullのままで続行
-    }
-
-    // フォームタイトル設定（FormApp.openByUrlを使用せず安全に処理）
-    if (formUrl && formUrl.includes('docs.google.com/forms/')) {
-      // FormApp呼び出しは完全に回避し、シート名ベースのタイトルを使用
-      formTitle = `${sheetName} (フォーム連携)`;
-    }
+    console.log('getFormInfoImpl: フォーム検出結果', {
+      hasFormUrl: !!formDetectionResult.formUrl,
+      detectionMethod: formDetectionResult.detectionMethod,
+      confidence: formDetectionResult.confidence,
+      accessMethod
+    });
 
     const formData = {
-      formUrl: formUrl || null,
-      formTitle,
+      formUrl: formDetectionResult.formUrl || null,
+      formTitle: formDetectionResult.formTitle || sheetName,
       spreadsheetName,
-      sheetName
+      sheetName,
+      detectionDetails: {
+        method: formDetectionResult.detectionMethod,
+        confidence: formDetectionResult.confidence,
+        accessMethod,
+        timestamp: new Date().toISOString()
+      }
     };
 
-    // 成功レスポンス
-    if (formUrl) {
+    // レスポンス生成
+    if (formDetectionResult.formUrl) {
       return {
         success: true,
         status: 'FORM_LINK_FOUND',
-        message: 'フォーム連携を確認しました。',
+        message: `フォーム連携を確認しました (${formDetectionResult.detectionMethod})`,
         formData,
         timestamp: new Date().toISOString(),
         requestContext: {
           spreadsheetId,
-          sheetName
+          sheetName,
+          accessMethod
         }
       };
     } else {
+      // フォーム未検出時も詳細情報を提供
       return {
         success: false,
-        status: 'FORM_NOT_LINKED',
-        message: '指定したシートにはフォーム連携が確認できませんでした。',
+        status: formDetectionResult.confidence === 'high' ? 'FORM_DETECTION_FAILED' : 'FORM_NOT_LINKED',
+        message: formDetectionResult.confidence === 'high' ?
+          'フォーム連携の可能性はありますが、アクセス権限により検出できませんでした。' :
+          '指定したシートにはフォーム連携が確認できませんでした。',
         formData,
-        suggestions: [
+        suggestions: formDetectionResult.suggestions || [
           'Googleフォームの「回答の行き先」を開き、対象のシートにリンクしてください',
-          'フォーム作成者に連携状況を確認してください'
-        ]
+          'フォーム作成者に連携状況を確認してください',
+          'シート名に「回答」「フォーム」等の文字列が含まれている場合、フォーム連携の可能性があります'
+        ],
+        analysisResults: formDetectionResult.analysisResults
       };
     }
 
   } catch (error) {
-    console.error('SystemController.getFormInfo エラー:', error.message);
+    const endTime = new Date().toISOString();
+    console.error('=== getFormInfoImpl ERROR ===', {
+      startTime,
+      endTime,
+      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 12)  }***` : 'N/A',
+      sheetName,
+      error: error.message,
+      stack: error.stack
+    });
+
     return {
       success: false,
       status: 'UNKNOWN_ERROR',

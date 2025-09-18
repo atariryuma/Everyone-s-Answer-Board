@@ -179,7 +179,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
           batchIndex: Math.floor(startRow / options.batchSize),
           startRow,
           endRow,
-          totalRows: totalRows,
+          totalRows: totalDataRows,
           sheetName: sheet?.getName() || 'unknown',
           error: batchError.message,
           stack: batchError.stack

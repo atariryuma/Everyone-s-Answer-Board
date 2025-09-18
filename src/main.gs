@@ -1,4 +1,4 @@
-/* global DB, getQuestionText */
+/* global DB, getQuestionText, validateAccess */
 /**
  * main.gs - Simplified Application Entry Points
  *
@@ -261,7 +261,7 @@ function doGet(e) {
       message: error.message,
       stack: error.stack,
       mode: e.parameter?.mode,
-      userId: e.parameter?.userId?.substring(0, 8) + '***'
+      userId: `${e.parameter?.userId?.substring(0, 8)  }***`
     });
 
     const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
@@ -826,7 +826,7 @@ function getAppStatus() {
  */
 function validateAccessAPI(spreadsheetId, autoAddEditor = true) {
   try {
-    // Zero-dependency: Direct function call instead of object reference
+    // Zero-dependency: Direct function call from SystemController
     return validateAccess(spreadsheetId, autoAddEditor);
   } catch (error) {
     console.error('validateAccessAPI error:', error.message);
