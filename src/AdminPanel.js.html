@@ -2733,51 +2733,9 @@
         });
       }
 
-      // 🔗 フォーム自動連携: 既存フォーム検出・統合
-      if (!optimizedConfig.formUrl) {
-        console.log('🔍 フォーム連携なし - 自動検出開始');
-
-        // getFormInfo API呼び出し準備（非同期処理対応）
-        const formIntegrationPromise = new Promise((resolve) => {
-          google.script.run
-            .withSuccessHandler(function(formResult) {
-              if (formResult.success && formResult.formData && formResult.formData.formUrl) {
-                optimizedConfig.formUrl = formResult.formData.formUrl;
-                optimizedConfig.formTitle = formResult.formData.formTitle;
-                console.log('✅ フォーム自動連携完了:', {
-                  formUrl: optimizedConfig.formUrl,
-                  formTitle: optimizedConfig.formTitle
-                });
-              } else {
-                console.log('ℹ️ フォーム連携なし（通常状態）');
-              }
-              resolve();
-            })
-            .withFailureHandler(function(error) {
-              console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
-              resolve();
-            })
-            .getFormInfo(spreadsheetId, sheetName);
-        });
-
-        // フォーム検出完了後に保存実行
-        formIntegrationPromise.then(() => {
-          try {
-            executeConfigSave();
-          } catch (error) {
-            console.error('executeConfigSave error:', error);
-            showError('設定保存でエラーが発生しました');
-          }
-        }).catch((error) => {
-          console.error('formIntegrationPromise error:', error);
-          try {
-            executeConfigSave();
-          } catch (fallbackError) {
-            console.error('fallback executeConfigSave error:', fallbackError);
-          }
-        });
-        return; // 非同期処理のため、ここで一旦return
-      }
+      // 🔗 フォーム自動連携: 一時的に無効化（デバッグ用）
+      // TODO: フォーム自動連携機能を再有効化
+      console.log('🔍 フォーム自動連携機能を一時的に無効化中（構文エラー対策）');
     }
 
     // 通常の保存処理実行
