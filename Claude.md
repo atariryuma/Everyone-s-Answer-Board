@@ -3,7 +3,7 @@
 > **🎯 Project**: Google Apps Script Web Application
 > **🔧 Stack**: Zero-Dependency Architecture, Direct GAS API Calls
 > **🤖 Claude Code**: 2025 Best Practices Compliant
-> **⚡ Updated**: 2025-09-15
+> **⚡ Updated**: 2025-09-19
 
 ## 🧠 Claude Code Core Principles
 
@@ -14,18 +14,9 @@
 3. **Code**: Implement incrementally with TDD-first approach
 4. **Commit**: Structured git workflow with proper documentation
 
-### 🎯 Project Management Philosophy
+## 🏗️ Zero-Dependency Architecture
 
-**"Claude Code as Project Manager"** - Dynamic task-driven development:
-- Living documentation with real-time task tracking
-- Context preservation across sessions
-- Flexible task switching with maintained state
-- AI-assisted progress orchestration
-
-## 🏗️ Architecture Overview
-
-### **Zero-Dependency Architecture**
-This project eliminates Google Apps Script file loading order issues through direct GAS API calls:
+**Core Pattern**: Direct GAS API calls eliminate file loading order issues
 
 ```
 🌟 Architecture
@@ -35,22 +26,12 @@ This project eliminates Google Apps Script file loading order issues through dir
 └── *.html                     # Frontend (Unified API calls)
 ```
 
-### **Current Pattern: Direct GAS API Calls**
+### **Implementation Pattern**
 ```javascript
-// ✅ Current Best Practice: Direct GAS API usage
-function getCurrentEmailDirect() {
-  try {
-    return Session.getActiveUser().getEmail();
-  } catch (error) {
-    console.error('getCurrentEmailDirect error:', error.message);
-    return null;
-  }
-}
-
-// ✅ Service delegation with fallbacks
+// ✅ Direct GAS API usage with fallbacks
 function getConfig() {
   try {
-    const email = getCurrentEmailDirect();
+    const email = Session.getActiveUser().getEmail();
     if (!email) return { success: false, message: 'Not authenticated' };
 
     const user = typeof DatabaseOperations !== 'undefined' ?
@@ -68,23 +49,19 @@ function getConfig() {
 
 ## 🛠️ Development Commands
 
-### **Essential Development Workflow**
+### **Essential Commands**
 ```bash
-# Every Development Session:
-npm run check                   # Quality gate (MUST pass before commit)
-npm run deploy:safe             # Production deployment with validation
-npm run test:coverage           # Run tests with coverage
-npm run lint                    # ESLint with auto-fix
+# Quality Gate (MUST pass before commit)
+npm run check                   # Combined linting, testing, validation
 
 # GAS Development Cycle
 clasp push                      # Deploy to Google Apps Script
-clasp open                      # Open GAS editor
 clasp logs                      # View execution logs
+npm run deploy:safe             # Production deployment with validation
 ```
 
-### **Claude Code Best Practice Workflow**
+### **Claude Code Workflow**
 ```markdown
-## Every Development Session:
 1. Ask Claude to read CLAUDE.md - Context loading
 2. **Explore**: "Read [files] and analyze [problem] - DO NOT CODE YET"
 3. **Plan**: "Create detailed implementation plan with TodoWrite"
@@ -93,25 +70,26 @@ clasp logs                      # View execution logs
 6. **Deploy**: `npm run deploy:safe`
 ```
 
-## 📝 Google Apps Script Best Practices
+## 📝 Google Apps Script V8 Best Practices
 
-### 🎯 Performance Optimization
+### 🚨 **Critical Migration (2025)**
+- **Rhino Deprecated**: Feb 20, 2025
+- **Rhino Shutdown**: Jan 31, 2026 (scripts will stop working)
+- **Action Required**: Migrate all scripts to V8 runtime
 
-#### **Batch Operations (70x Performance Improvement)**
+### 🎯 **Performance Optimization (70x Improvement)**
+
+#### **Batch Operations**
 ```javascript
-// ✅ BEST: Batch operations (1 second execution)
+// ✅ BEST: Batch operations (1 second vs 70 seconds)
 function efficientDataProcessing() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const data = sheet.getDataRange().getValues();
-
-  const processedData = data.map(row =>
-    row.map(cell => processTransformation(cell))
-  );
-
+  const processedData = data.map(row => row.map(cell => processTransformation(cell)));
   sheet.getDataRange().setValues(processedData);
 }
 
-// ❌ AVOID: Individual operations (70+ seconds)
+// ❌ AVOID: Individual operations
 function inefficientDataProcessing() {
   const sheet = SpreadsheetApp.getActiveSheet();
   for (let i = 1; i <= sheet.getLastRow(); i++) {
@@ -121,83 +99,92 @@ function inefficientDataProcessing() {
 }
 ```
 
-#### **Modern JavaScript with V8 Runtime**
+#### **Modern JavaScript (V8 Runtime)**
 ```javascript
-// ✅ V8 Runtime Features
-async function modernGASFunction() {
-  const data = await fetchDataWithRetry();
-  const message = `Processing ${data.length} records`;
-  const { users, configs } = data;
+// ✅ V8 Features: const/let, destructuring, template literals
+const { users, configs } = data;
+const message = `Processing ${data.length} records`;
 
-  const processedUsers = users.map(user => ({
-    ...user,
-    processed: true,
-    timestamp: new Date().toISOString()
-  }));
-
-  return processedUsers;
-}
-```
-
-#### **Robust Error Handling**
-```javascript
+// ✅ Error Handling with Exponential Backoff
 function executeWithRetry(operation, maxRetries = 3) {
   let retryCount = 0;
-
   while (retryCount < maxRetries) {
     try {
       return operation();
     } catch (error) {
       retryCount++;
       console.warn(`Attempt ${retryCount} failed:`, error.message);
-
-      if (retryCount >= maxRetries) {
-        throw error;
-      }
-
-      const delay = Math.pow(2, retryCount) * 1000;
-      Utilities.sleep(delay);
+      if (retryCount >= maxRetries) throw error;
+      Utilities.sleep(Math.pow(2, retryCount) * 1000);
     }
   }
 }
 ```
 
-### 🛡️ Security Best Practices
+### 🛡️ **V8 Runtime Critical Differences**
 
-#### **OAuth Scope Management**
+#### **Variable Declaration**
 ```javascript
-// appsscript.json
-{
-  "timeZone": "America/New_York",
-  "runtimeVersion": "V8",
-  "oauthScopes": [
-    "https://www.googleapis.com/auth/spreadsheets.currentonly",
-    "https://www.googleapis.com/auth/script.external_request"
-  ]
+// ✅ RECOMMENDED: Use const/let, avoid var
+const CONFIG_VALUES = { timeout: 5000, retries: 3 };
+let processedValue = null;
+
+// ❌ AVOID: var causes scope/hoisting issues
+var globalVar = 'avoid this';
+```
+
+#### **Undefined Parameter Handling**
+```javascript
+// ✅ V8-safe undefined checks
+function safeFunction(param) {
+  if (typeof param !== 'undefined' && param !== null) {
+    return param.toString();
+  }
+  return 'default value';
+}
+
+// ✅ Safe object access
+const safeValue = (myObject || {}).propertyName;
+const safeArrayValue = (myArray || [])[index];
+```
+
+#### **Template Literals with Validation**
+問題はテンプレートリテラルではなく、**変数の値が実行時に存在しない可能性**です。`+`連結に書き換えても根本解決になりません。正しい修正は**変数の存在チェック**です。
+
+```javascript
+// ❌ 誤った修正（対症療法）
+const errorInfo = 'Error: ' + error.message; // errorがnullなら同じエラー
+
+// ✅ 正しい修正（根本治療）
+if (error && error.message) {
+  const errorInfo = `Error: ${error.message}\nStack: ${error.stack || 'N/A'}`;
+} else {
+  const errorInfo = 'An unknown error occurred.';
+}
+
+// ✅ 推奨パターン：事前チェック後のテンプレートリテラル使用
+if (spreadsheetId && spreadsheetId.trim()) {
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 }
 ```
 
-#### **HTTP Error Handling**
+#### **Async/Sync Limitations**
 ```javascript
-function robustApiCall(url) {
-  const options = {
-    'muteHttpExceptions': true,
-    'method': 'GET',
-    'headers': { 'Authorization': 'Bearer ' + getAccessToken() }
-  };
+// ❌ NOT AVAILABLE: setTimeout/setInterval
+// setTimeout(() => {}, 1000); // ReferenceError
 
-  try {
-    const response = UrlFetchApp.fetch(url, options);
+// ✅ ALTERNATIVE: Utilities.sleep (synchronous, blocks execution)
+Utilities.sleep(1000);
 
-    if (response.getResponseCode() === 200) {
-      return JSON.parse(response.getContentText());
-    } else {
-      throw new Error(`API call failed: ${response.getResponseCode()}`);
-    }
-  } catch (error) {
-    console.error('API call exception:', error.message);
-    throw error;
+// ✅ RECOMMENDED: Batch processing for efficiency
+function efficientProcessing(data) {
+  const batchSize = 100;
+  const results = [];
+  for (let i = 0; i < data.length; i += batchSize) {
+    const batch = data.slice(i, i + batchSize);
+    results.push(...processBatch(batch));
   }
+  return results;
 }
 ```
 
@@ -213,24 +200,16 @@ src/
 ├── DatabaseCore.gs            # Database operations
 ├── SystemController.gs        # System management
 ├── DataController.gs          # Data operations
-├── CacheService.gs            # Caching strategy
-├── errors.gs                  # Error handling
 └── *.html                     # UI templates
 ```
 
-## 🎯 API Functions
+## 🎯 Main API Functions
 
-### **Main API Gateway (main.gs)**
 ```javascript
 // User Management
 getCurrentEmail()              // Get current user email
 getUser(infoType)             // Get user information
 processLoginAction(action)     // Handle login
-
-// System Management
-testSetup()                   // System testing
-getWebAppUrl()               // WebApp URL
-resetAuth()                  // Authentication reset
 
 // Data Operations
 addReaction(userId, rowId, type)     // Add reaction
@@ -244,128 +223,68 @@ getUserConfig(userId)         // Get user config
 
 ## 🧪 Testing & Quality
 
-### **Current Test Suite**
+### **Current Status**
 - **113/113 tests passing** (100% success rate)
+- **Zero ESLint errors**
 - **Complete coverage** of critical paths
-- **Quality gates**: All tests must pass before deployment
 
-### **Quality Commands**
+### **Quality Gate**
 ```bash
-npm run test                  # Run all tests
-npm run test:coverage         # Test with coverage report
-npm run lint                  # ESLint with auto-fix
-npm run check                 # Combined quality gate
+npm run check                 # MUST pass before any commit
 npm run deploy:safe           # Safe deployment with validation
 ```
 
-## 🚀 Production Deployment
+## 🛡️ Security & Anti-Patterns
 
-### **Safe Deployment Process**
-```bash
-npm run deploy:safe           # Comprehensive deployment validation
-```
-
-**Features**:
-- Pre-deployment validation
-- Automatic backup creation
-- Quality gate enforcement
-- Post-deployment verification
-- Rollback capability
-
-### **Deployment Checklist**
-- ✅ All tests passing (npm run test)
-- ✅ Zero ESLint errors (npm run lint)
-- ✅ Security validation
-- ✅ Performance benchmarks
-- ✅ Zero-dependency compliance
-
-## 🏆 Architecture Benefits
-
-### **Performance Achievements**
-- **70x Performance Improvement**: Batch operations (1s vs 70s)
-- **Modern JavaScript**: V8 runtime with async/await, destructuring
-- **Robust Error Handling**: Exponential backoff retry mechanisms
-- **Multi-layer Caching**: Optimized data access patterns
-
-### **Architecture Excellence**
-- **Zero Dependencies**: Direct GAS API calls for maximum reliability
-- **Loading Order Independence**: No file dependency chains
-- **Graceful Degradation**: Service delegation with fallbacks
-- **Production Stability**: Enterprise-grade error handling
-
-### **Quality Delivered**
-- **100% Test Coverage**: 113/113 tests passing
-- **Zero ESLint Errors**: Clean, maintainable code
-- **Automated Deployment**: Safe, validated releases
-- **Comprehensive Documentation**: Living project guide
-
-## 🛡️ Security & Compliance
-
+### **Security Best Practices**
 - **Input Validation**: All user inputs validated
-- **SQL Injection Prevention**: Parameterized queries
-- **XSS Protection**: HTML sanitization
-- **CSRF Protection**: Token-based validation
+- **XSS/CSRF Protection**: HTML sanitization, token-based validation
 - **Access Control**: Role-based permissions
-- **Session Management**: Secure session handling
-
-## Important Notes
-
-### **Web App Entry Flow**
-```
-/exec access → AccessRestricted (safe landing)
-            → (explicit) ?mode=login → Setup (if needed) → Admin Panel
-            → (viewer)  ?mode=view&userId=... → Public Board View
-```
-**Policy**: `/exec` のデフォルトはログインページではなく、安全な着地点（AccessRestricted）を表示します。これは、閲覧ユーザーが不用意にログインしてアカウントを生成してしまうことを防ぐための安全策です。ログインは明示的に `?mode=login` で行います。公開閲覧は `?mode=view&userId=...` で行います。
+- **Service Account**: Use `Data.open()` instead of `SpreadsheetApp.openById()`
 
 ### **Anti-Patterns to Avoid**
 ```javascript
 // ❌ AVOID: Individual API calls in loops
 // ❌ AVOID: Library dependencies in production
+// ❌ AVOID: User permission-dependent data access
+SpreadsheetApp.openById(id);              // ❌ User permission dependent
+Data.open(id);                           // ✅ Service account
+
+// ❌ AVOID: Direct service dependencies at file level
 // ❌ AVOID: Synchronous UI blocking operations
-// ❌ AVOID: Direct constants/service dependencies at file level
-
-// ❌ AVOID: Template literals in GAS environment (browser compatibility issues)
-const url = `https://example.com/${id}`;  // 問題あり - 構文エラーの原因
-const url = 'https://example.com/' + id;  // ✅ 推奨 - 安全な文字列連結
-
-// ❌ AVOID: User permissions for data access
-SpreadsheetApp.openById(id);              // 問題あり - ユーザー権限依存
-Data.open(id);                           // ✅ 推奨 - サービスアカウント使用
 ```
 
-### **JavaScript互換性とサービスアカウント利用**
+## 📋 Important Application Notes
 
-#### **必須ガイドライン**:
-- **テンプレートリテラル禁止**: Google Apps Script環境では「Unexpected end of input」エラーの原因となるため、すべて文字列連結(`+`)を使用
-- **サービスアカウント必須**: スプレッドシート・データベースアクセスは必ずサービスアカウント経由で実行
-- **ユーザー権限回避**: `SpreadsheetApp`直接使用ではなく、`Data.open()`経由でアクセス
-
-#### **構文エラー対策**:
-```javascript
-// ❌ 危険: テンプレートリテラルは構文エラーを引き起こす
-optimizedConfig.sourceKey = `sheet_${spreadsheetId}_${Date.now()}`;
-optimizedConfig.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
-
-// ✅ 安全: 文字列連結で確実な動作を保証
-optimizedConfig.sourceKey = 'sheet_' + spreadsheetId + '_' + Date.now();
-optimizedConfig.spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit';
+### **Web App Entry Flow**
+```
+/exec access → AccessRestricted (safe landing)
+            → (explicit) ?mode=login → Setup → Admin Panel
+            → (viewer)  ?mode=view&userId=... → Public Board View
 ```
 
-## 🔧 API Naming and Compatibility Guidance
+**Policy**: `/exec`のデフォルトはログインページではなく、安全な着地点（AccessRestricted）を表示。これは閲覧ユーザーが不用意にアカウント生成することを防ぐ安全策。
 
-- フロントエンドは既存の安定API名に合わせる（例: `checkAdmin` ではなく `isAdmin`、`getAvailableSheets` ではなく `getSheets`）。
-- リアクション系は DataService の公開関数を直接利用（`dsAddReaction(userId, rowId, type)`, `dsToggleHighlight(userId, rowId)`）。
-- 新たな中間API（Gatewayラッパ）は原則追加しない。既存APIに合わせてフロント引数をマッピングする。
+### **API Compatibility Guidance**
+- フロントエンドは既存API名に合わせる（例: `isAdmin`、`getSheets`）
+- リアクション系はDataServiceの公開関数を直接利用（`dsAddReaction`, `dsToggleHighlight`）
+- 新たな中間API（Gatewayラッパ）は原則追加しない
 
-## 🔒 OAuth Scopes Policy
+### **OAuth Scopes Policy**
+- 必要最小限のスコープのみ採用
+- 既定: `spreadsheets`, `drive`, `script.external_request`, `userinfo.email`
+- 未使用のAdvanced Servicesは無効化
 
-- 必要最小限のスコープのみ採用。
-- 既定: `spreadsheets`, `drive`, `script.external_request`, `userinfo.email`。
-- 未使用の Advanced Services は無効化。
+## 🏆 Architecture Benefits
+
+- **70x Performance Improvement**: Batch operations (1s vs 70s)
+- **Zero Dependencies**: Direct GAS API calls for maximum reliability
+- **Loading Order Independence**: No file dependency chains
+- **100% Test Coverage**: 113/113 tests passing
+- **Production Stability**: Enterprise-grade error handling
 
 ---
 
-*🤖 This CLAUDE.md follows Anthropic's Official Claude Code 2025 Best Practices*
+*🤖 Claude Code 2025 Best Practices Compliant*
 *📈 Optimized for Google Apps Script Performance and Reliability*
-*⚡ Integrated with Zero-Dependency Architecture Pattern*
+*⚡ Zero-Dependency Architecture Pattern*

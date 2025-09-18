@@ -127,13 +127,23 @@ class Auth {
     const headerB64 = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=+$/, '');
     const payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=+$/, '');
 
-    const signatureInput = `${headerB64  }.${  payloadB64}`;
+    // Validate base64 encoding results before template literal usage
+    if (!headerB64 || !payloadB64) {
+      throw new Error('Failed to encode JWT components - invalid base64 result');
+    }
+
+    const signatureInput = `${headerB64}.${payloadB64}`;
 
     // Use Utilities.computeRsaSha256Signature for real RSA-SHA256 signing
     const signature = Utilities.computeRsaSha256Signature(signatureInput, config.private_key);
     const signatureB64 = Utilities.base64EncodeWebSafe(signature).replace(/=+$/, '');
 
-    return `${signatureInput  }.${  signatureB64}`;
+    // Validate signature encoding before final JWT assembly
+    if (!signatureB64) {
+      throw new Error('Failed to encode JWT signature - invalid signature result');
+    }
+
+    return `${signatureInput}.${signatureB64}`;
   }
 
   /**
@@ -148,7 +158,7 @@ class Auth {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded'
         },
-        payload: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${  jwt}`,
+        payload: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
         muteHttpExceptions: true
       });
 
@@ -157,7 +167,7 @@ class Auth {
       if (response.getResponseCode() === 200 && responseData.access_token) {
         return responseData.access_token;
       } else {
-        throw new Error(`Token exchange failed: ${  JSON.stringify(responseData)}`);
+        throw new Error(`Token exchange failed: ${JSON.stringify(responseData)}`);
       }
     } catch (error) {
       console.error('Auth.exchangeJWTForToken error:', error.message);

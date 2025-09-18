@@ -175,9 +175,14 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
 
       } catch (batchError) {
         console.error('DataService.fetchSpreadsheetData: バッチ処理エラー', {
+          operation: 'fetchSpreadsheetData',
+          batchIndex: Math.floor(startRow / options.batchSize),
           startRow,
           endRow,
-          error: batchError.message
+          totalRows: totalRows,
+          sheetName: sheet?.getName() || 'unknown',
+          error: batchError.message,
+          stack: batchError.stack
         });
         // バッチエラーは継続（他のバッチは処理）
       }

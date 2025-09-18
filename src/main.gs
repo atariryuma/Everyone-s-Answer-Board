@@ -257,11 +257,24 @@ function doGet(e) {
       }
     }
   } catch (error) {
-    console.error('doGet error:', error.message);
+    console.error('doGet error:', {
+      message: error.message,
+      stack: error.stack,
+      mode: e.parameter?.mode,
+      userId: e.parameter?.userId?.substring(0, 8) + '***'
+    });
+
     const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     errorTemplate.title = 'システムエラー';
     errorTemplate.message = 'システムで予期しないエラーが発生しました。管理者にお問い合わせください。';
-    errorTemplate.debugInfo = `Error: ${error.message}\nStack: ${error.stack || 'N/A'}`;
+
+    // Validate error object before template literal usage
+    if (error && error.message) {
+      errorTemplate.debugInfo = `Error: ${error.message}\nStack: ${error.stack || 'N/A'}`;
+    } else {
+      errorTemplate.debugInfo = 'An unknown error occurred during request processing.';
+    }
+
     return errorTemplate.evaluate();
   }
 }

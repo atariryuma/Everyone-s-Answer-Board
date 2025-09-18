@@ -639,6 +639,14 @@ class Data {
    * @returns {Object} Spreadsheet wrapper object
    */
   static openSpreadsheetWithServiceAccount(spreadsheetId, accessToken) {
+    // Validate parameters before API URL construction
+    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+      throw new Error('Invalid spreadsheet ID: must be a non-empty string');
+    }
+    if (!accessToken || typeof accessToken !== 'string') {
+      throw new Error('Invalid access token: must be a non-empty string');
+    }
+
     const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
 
     return {

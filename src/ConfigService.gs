@@ -235,8 +235,11 @@ function parseAndRepairConfig(configJson, userId) {
     return ensureRequiredFields(repairedConfig, userId);
   } catch (parseError) {
     console.warn('parseAndRepairConfig: JSON解析失敗 - デフォルト設定を使用', {
-      userId,
-      error: parseError.message
+      operation: 'parseAndRepairConfig',
+      userId: userId?.substring(0, 8) + '***',
+      configLength: configJson?.length || 0,
+      error: parseError.message,
+      stack: parseError.stack
     });
     return getDefaultConfig(userId);
   }
