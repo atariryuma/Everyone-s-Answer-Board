@@ -1633,12 +1633,17 @@
       .validateAccessAPI(spreadsheetId);
   }
 
-  // シート名候補を更新
+  // シート名候補を更新し、空欄時は自動入力
   function updateSheetNameSuggestions(sheets) {
     const sheetNameInput = document.getElementById('sheet-name-input');
     if (sheets && sheets.length > 0) {
-      // デフォルトで最初のシートを設定
-      sheetNameInput.value = sheets[0].name;
+      // シート名が空欄の場合のみ自動入力
+      if (!sheetNameInput.value || sheetNameInput.value.trim() === '') {
+        // 優先順位でシート名を選択
+        const preferredSheetName = selectBestSheetName(sheets);
+        sheetNameInput.value = preferredSheetName;
+        console.log('シート名を自動設定:', preferredSheetName);
+      }
 
       // datalistで候補を表示（より良いUX）
       let datalist = document.getElementById('sheet-suggestions');
@@ -1653,9 +1658,32 @@
       sheets.forEach((sheet) => {
         const option = document.createElement('option');
         option.value = sheet.name;
+        option.text = `${sheet.name} (${sheet.rowCount}行)`;
         datalist.appendChild(option);
       });
     }
+  }
+
+  // 最適なシート名を選択する関数
+  function selectBestSheetName(sheets) {
+    // 1. 「回答」「answer」を含むシートを優先
+    const answerSheets = sheets.filter(sheet =>
+      /回答|answer|データ|data/i.test(sheet.name)
+    );
+    if (answerSheets.length > 0) {
+      return answerSheets[0].name;
+    }
+
+    // 2. 行数が最も多いシート（データが入っていそう）
+    const maxRowSheet = sheets.reduce((max, sheet) =>
+      sheet.rowCount > max.rowCount ? sheet : max
+    );
+    if (maxRowSheet.rowCount > 1) {
+      return maxRowSheet.name;
+    }
+
+    // 3. デフォルトで最初のシート
+    return sheets[0].name;
   }
 
   // URL入力方式でのデータソース接続

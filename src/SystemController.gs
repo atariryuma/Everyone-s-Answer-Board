@@ -545,6 +545,39 @@ function publishApplication(publishConfig) {
 }
 
 /**
+ * Sheets APIでスプレッドシート情報を取得
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} accessToken - アクセストークン
+ * @returns {Object} スプレッドシート情報
+ */
+function getSpreadsheetInfo(spreadsheetId, accessToken) {
+  try {
+    const response = UrlFetchApp.fetch(`https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      muteHttpExceptions: true
+    });
+
+    if (response.getResponseCode() === 200) {
+      const data = JSON.parse(response.getContentText());
+      return {
+        name: data.properties?.title || 'Unknown',
+        owner: 'Service Account Access'  // Sheets APIでは所有者情報は取得できない
+      };
+    } else {
+      console.warn('getSpreadsheetInfo: Sheets API error:', response.getContentText());
+      return { name: 'Unknown', owner: 'Unknown' };
+    }
+  } catch (error) {
+    console.error('getSpreadsheetInfo error:', error.message);
+    return { name: 'Unknown', owner: 'Unknown' };
+  }
+}
+
+/**
  * スプレッドシートへのアクセス権限を検証
  * AdminPanel.js.html から呼び出される
  *
@@ -555,36 +588,31 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
     // 🎯 Zero-dependency: サービスアカウント経由でアクセス権確認
     const dataAccess = Data.open(spreadsheetId);
-    const {spreadsheet} = dataAccess;
+    const {spreadsheet, auth} = dataAccess;
 
-    // サービスアカウントを編集者として自動登録
+    // サービスアカウントを編集者として自動登録（Data.openで既に実行済み）
     if (autoAddEditor) {
-      try {
-        const serviceAccount = Config.serviceAccount();
-        const serviceAccountEmail = serviceAccount ? serviceAccount.client_email : null;
-        if (serviceAccountEmail) {
-          spreadsheet.addEditor(serviceAccountEmail);
-          console.log('validateAccess: サービスアカウントを編集者として登録:', serviceAccountEmail);
-        }
-      } catch (editorError) {
-        console.warn('validateAccess: 編集者登録をスキップ:', editorError.message);
-      }
+      console.log('validateAccess: サービスアカウント編集者権限は Data.open で既に処理済み');
     }
 
+    // カスタムラッパーのgetSheets()メソッドを使用
     const sheets = spreadsheet.getSheets();
+
+    // スプレッドシート情報を取得（Sheets API経由）
+    const spreadsheetInfo = getSpreadsheetInfo(spreadsheetId, auth.token);
 
     // アクセスできたら成功
     const result = {
       success: true,
       message: 'アクセス権限が確認されました',
-      spreadsheetName: spreadsheet.getName(),
+      spreadsheetName: spreadsheetInfo.name || `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`,
       sheets: sheets.map(sheet => ({
         name: sheet.getName(),
         rowCount: sheet.getLastRow(),
         columnCount: sheet.getLastColumn()
       })),
-      owner: spreadsheet.getOwner()?.getEmail() || 'unknown',
-      url: spreadsheet.getUrl()
+      owner: spreadsheetInfo.owner || 'unknown',
+      url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
     };
 
     return result;
