@@ -42,7 +42,7 @@
   /**
    * DOM操作のヘルパー関数群 - AdminPanel版
    */
-  const DOMHelpers = Object.freeze({
+  const DOMHelpers = {
     safeGetById(id, context = '') {
       try {
         const element = document.getElementById(id);
@@ -87,12 +87,12 @@
       }
       return false;
     }
-  });
+  };
 
   /**
    * GAS関数呼び出しヘルパー - エラーハンドリングとリトライ機能付き
    */
-  const GASHelper = Object.freeze({
+  const GASHelper = {
     retryCount: 0,
     maxRetries: 3,
 

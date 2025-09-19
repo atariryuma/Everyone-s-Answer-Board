@@ -58,7 +58,8 @@ class Auth {
    */
   static session() {
     try {
-      const email = Session.getActiveUser().getEmail();
+      const session = ServiceFactory.getSession();
+      const {email} = session;
       return {
         email,
         isValid: !!email,

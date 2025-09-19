@@ -117,10 +117,4 @@ function validateRequired(params, required) {
 }
 
 // Error handling utilities for Zero-Dependency Architecture
-const ErrorHandler = Object.freeze({
-  logError,
-  logWarning,
-  logInfo,
-  safeExecute,
-  validateRequired
-});
+// Individual functions exported directly for V8 optimization

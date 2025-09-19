@@ -64,7 +64,8 @@ function validateTokenFormat(token) {
  */
 function validateSession() {
     try {
-      const email = Session.getActiveUser().getEmail();
+      const session = ServiceFactory.getSession();
+      const {email} = session;
       const effectiveEmail = Session.getEffectiveUser().getEmail();
 
       return {
@@ -246,7 +247,8 @@ function validateSecureText(text) {
  */
 function checkSecurityUserPermission(userId, requiredLevel = 'authenticated_user') {
     try {
-      const currentEmail = Session.getActiveUser().getEmail();
+      const session = ServiceFactory.getSession();
+      const currentEmail = session.email;
       if (!currentEmail) {
         return {
           hasPermission: false,
@@ -320,7 +322,7 @@ function logSecurityEvent(event) {
     try {
       const logEntry = {
         timestamp: new Date().toISOString(),
-        sessionEmail: Session.getActiveUser().getEmail(),
+        sessionEmail: ServiceFactory.getSession().email,
         effectiveEmail: Session.getEffectiveUser().getEmail(),
         eventType: event.type || 'unknown',
         severity: event.severity || 'info',

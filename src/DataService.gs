@@ -911,7 +911,8 @@ function getSpreadsheetList(options = {}) {
   const started = Date.now();
   try {
     // ✅ GAS Best Practice: 直接API呼び出し（依存除去）
-    const currentUser = Session.getActiveUser().getEmail();
+    const session = ServiceFactory.getSession();
+    const currentUser = session.email;
 
     // オプション設定
     const {
@@ -1269,7 +1270,8 @@ function extractSheetHeaders(sheet) {
  */
 function restoreColumnConfig(userId, spreadsheetId, sheetName) {
   try {
-    const user = Data.findUserByEmail(Session.getActiveUser().getEmail());
+    const session = ServiceFactory.getSession();
+    const user = Data.findUserByEmail(session.email);
     if (!user) {
       return { success: false, message: 'User not found' };
     }

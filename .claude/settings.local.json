@@ -36,7 +36,9 @@
       "Bash(uniq:*)",
       "WebFetch(domain:script.google.com)",
       "Bash(npm run lint:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(for:*)",
+      "Bash(do echo \"=== $file ===\")"
     ],
     "deny": [],
     "ask": [],

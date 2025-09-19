@@ -8,7 +8,7 @@
  * - ヘッダー保護機能
  */
 
-/* global Auth */
+/* global Auth, ServiceFactory */
 
 /**
  * 統一データアクセスクラス
@@ -268,9 +268,9 @@ class Data {
         return null;
       }
 
-      // Direct SpreadsheetApp access (Zero-Dependency)
-      const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+      // ServiceFactory unified access (Zero-Dependency)
+      const props = ServiceFactory.getProperties();
+      const dbId = props.getDatabaseSpreadsheetId();
 
       if (!dbId) {
         console.warn('Data.findUserByEmail: DATABASE_SPREADSHEET_ID not configured');
@@ -331,9 +331,9 @@ class Data {
         return null;
       }
 
-      // Direct SpreadsheetApp access (Zero-Dependency)
-      const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+      // ServiceFactory unified access (Zero-Dependency)
+      const props = ServiceFactory.getProperties();
+      const dbId = props.getDatabaseSpreadsheetId();
 
       if (!dbId) {
         console.warn('Data.findUserById: DATABASE_SPREADSHEET_ID not configured');
@@ -400,9 +400,9 @@ class Data {
         return existingUser;
       }
 
-      // Direct SpreadsheetApp access (Zero-Dependency)
-      const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+      // ServiceFactory unified access (Zero-Dependency)
+      const props = ServiceFactory.getProperties();
+      const dbId = props.getDatabaseSpreadsheetId();
 
       if (!dbId) {
         console.warn('Data.createUser: DATABASE_SPREADSHEET_ID not configured');
@@ -476,9 +476,9 @@ class Data {
         };
       }
 
-      // Direct SpreadsheetApp access (Zero-Dependency)
-      const props = PropertiesService.getScriptProperties();
-      const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
+      // ServiceFactory unified access (Zero-Dependency)
+      const props = ServiceFactory.getProperties();
+      const dbId = props.getDatabaseSpreadsheetId();
 
       if (!dbId) {
         console.warn('Data.updateUser: DATABASE_SPREADSHEET_ID not configured');

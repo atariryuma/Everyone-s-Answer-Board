@@ -182,24 +182,27 @@ function getSpreadsheet() {
       }
 
       try {
-        // 🔧 CLAUDE.md準拠: 認証状態の統一管理 - 権限混在防止
+        // 🔧 CLAUDE.md準拠: サービスアカウント専用アクセス - セキュリティ強化
         const auth = typeof Auth !== 'undefined' ? Auth.serviceAccount() : null;
 
-        // 認証状態を明確に判定し、混在を防止
-        if (auth && auth.isValid && auth.token) {
-          console.log('ServiceFactory.getSpreadsheet.openById: Using service account authentication');
-          return typeof Data !== 'undefined' ?
-            Data.openSpreadsheetWithServiceAccount(id, auth.token) :
-            SpreadsheetApp.openById(id);
-        } else {
-          console.warn('ServiceFactory.getSpreadsheet.openById: Service account unavailable, using user session:', {
-            authExists: !!auth,
-            isValid: auth?.isValid,
-            hasToken: !!auth?.token,
-            error: auth?.error
-          });
-          return SpreadsheetApp.openById(id);
+        // 🛡️ サービスアカウント認証の厳格な検証
+        if (!auth) {
+          throw new Error('ServiceFactory.getSpreadsheet: Auth service unavailable');
         }
+
+        if (!auth.isValid || !auth.token) {
+          throw new Error(`ServiceFactory.getSpreadsheet: Service account authentication failed - ${auth.error || 'Unknown error'}`);
+        }
+
+        // ✅ セキュアなサービスアカウント専用アクセス
+        console.log('ServiceFactory.getSpreadsheet.openById: Using secure service account authentication');
+
+        if (typeof Data !== 'undefined' && typeof Data.openSpreadsheetWithServiceAccount === 'function') {
+          return Data.openSpreadsheetWithServiceAccount(id, auth.token);
+        } else {
+          throw new Error('ServiceFactory.getSpreadsheet: Data.openSpreadsheetWithServiceAccount not available');
+        }
+
       } catch (error) {
         console.error('ServiceFactory.getSpreadsheet.openById: Error opening spreadsheet:', error.message);
         return null;

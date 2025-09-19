@@ -19,8 +19,15 @@
 // ===========================================
 
 /**
- * Get current user email - simple and direct
- * @returns {string|null} User email or null if not authenticated
+ * 現在のユーザーのメールアドレスを取得
+ * ServiceFactory経由でセッション情報を安全に取得
+ * @description Zero-Dependency Architecture準拠の統一アクセス方法
+ * @returns {string|null} ユーザーのメールアドレス、または認証されていない場合はnull
+ * @example
+ * const email = getCurrentEmail();
+ * if (email) {
+ *   console.log('Current user:', email);
+ * }
  */
 function getCurrentEmail() {
   try {
@@ -259,8 +266,9 @@ function doGet(e) {
           template.questionText = questionText || '回答ボード';
           template.boardTitle = questionText || user.userEmail || '回答ボード';
 
-          // Admin privilege detection using existing ServiceFactory pattern
-          const currentEmail = Session.getActiveUser().getEmail();
+          // Admin privilege detection using unified ServiceFactory pattern
+          const session = ServiceFactory.getSession();
+          const currentEmail = session.email;
           const userService = ServiceFactory.getUserService();
           const isSystemAdmin = userService.isSystemAdmin(currentEmail);
           const isOwnBoard = currentEmail === user.userEmail;
@@ -329,10 +337,9 @@ function doPost(e) {
     // Verify authentication
     const email = getCurrentEmail();
     if (!email) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        message: 'Authentication required'
-      })).setMimeType(ContentService.MimeType.JSON);
+      return ContentService.createTextOutput(JSON.stringify(
+        createAuthError()
+      )).setMimeType(ContentService.MimeType.JSON);
     }
 
     // 🎯 Zero-Dependency Architecture: Direct DataService calls
@@ -343,12 +350,12 @@ function doPost(e) {
         try {
           const user = Data.findUserByEmail(email);
           if (!user) {
-            result = { success: false, message: 'ユーザーが登録されていません' };
+            result = createUserNotFoundError();
           } else {
             result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
           }
         } catch (error) {
-          result = { success: false, message: error.message };
+          result = createExceptionResponse(error);
         }
         break;
       case 'addReaction':
@@ -364,16 +371,16 @@ function doPost(e) {
         try {
           const user = Data.findUserByEmail(email);
           if (!user) {
-            result = { success: false, message: 'ユーザーが登録されていません' };
+            result = createUserNotFoundError();
           } else {
             result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
           }
         } catch (error) {
-          result = { success: false, message: error.message };
+          result = createExceptionResponse(error);
         }
         break;
       default:
-        result = { success: false, message: `Unknown action: ${  action}` };
+        result = createErrorResponse(`Unknown action: ${action}`);
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -852,15 +859,13 @@ function getAppStatus() {
     // ユーザーのボード公開状態を取得
     const isActive = Boolean(config.appPublished);
 
-    return {
-      status: 'success',
-      success: true,
+    return createSuccessResponse('Application status retrieved', {
       isActive,
       appStatus: isActive ? 'active' : 'inactive',
       timestamp: new Date().toISOString(),
       adminEmail: email,
       userId: user.userId
-    };
+    });
   } catch (error) {
     console.error('getAppStatus error:', error.message);
     return createErrorResponse(error.message || 'Failed to get application status');
@@ -976,7 +981,7 @@ function deleteUser(userId, reason = '') {
     }
 
     // System admin check with ServiceFactory
-    if (!isSystemAdmin(email)) {
+    if (!ServiceFactory.getUserService().isSystemAdmin(email)) {
       return {
         success: false,
         message: '管理者権限が必要です'
@@ -1184,7 +1189,7 @@ function isAdmin() {
     if (!email) {
       return false;
     }
-    return isSystemAdmin(email);
+    return ServiceFactory.getUserService().isSystemAdmin(email);
   } catch (error) {
     console.error('isAdmin error:', error.message);
     return false;

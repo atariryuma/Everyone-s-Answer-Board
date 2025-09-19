@@ -658,38 +658,30 @@ function isUserSpreadsheetOwner(spreadsheetId) {
 }
 
 /**
- * 適応的スプレッドシートアクセス（オーナー優先、サービスアカウントfallback）
+ * 🔧 CLAUDE.md準拠: セキュアなサービスアカウント専用スプレッドシートアクセス
+ * オーナー判定は残すが、アクセスは全てサービスアカウント経由で統一
  * @param {string} spreadsheetId - スプレッドシートID
- * @returns {Object} {spreadsheet, accessMethod, auth?}
+ * @returns {Object} {spreadsheet, accessMethod, auth, isOwner}
  */
 function getSpreadsheetAdaptive(spreadsheetId) {
-  // まずオーナー権限でのアクセスを試行
-  if (isUserSpreadsheetOwner(spreadsheetId)) {
-    try {
-      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-      console.log('getSpreadsheetAdaptive: オーナー権限でアクセス成功');
-      return {
-        spreadsheet,
-        accessMethod: 'owner',
-        auth: null
-      };
-    } catch (ownerError) {
-      console.warn('getSpreadsheetAdaptive: オーナー権限アクセス失敗:', ownerError.message);
-    }
-  }
+  // オーナー判定（表示・ログ目的のみ）
+  const isOwner = isUserSpreadsheetOwner(spreadsheetId);
 
-  // オーナー権限失敗時はサービスアカウントfallback
+  console.log(`getSpreadsheetAdaptive: ${isOwner ? 'Owner' : 'Non-owner'} accessing via service account`);
+
+  // 🛡️ セキュアなサービスアカウント専用アクセス
   try {
     const dataAccess = Data.open(spreadsheetId);
     console.log('getSpreadsheetAdaptive: サービスアカウントでアクセス成功');
     return {
       spreadsheet: dataAccess.spreadsheet,
       accessMethod: 'service_account',
-      auth: dataAccess.auth
+      auth: dataAccess.auth,
+      isOwner
     };
   } catch (serviceError) {
-    console.error('getSpreadsheetAdaptive: 全てのアクセス方法が失敗:', serviceError.message);
-    throw new Error(`スプレッドシートアクセス失敗: ${serviceError.message}`);
+    console.error('getSpreadsheetAdaptive: サービスアカウントアクセス失敗:', serviceError.message);
+    throw new Error(`セキュアスプレッドシートアクセス失敗: ${serviceError.message}`);
   }
 }
 
@@ -698,10 +690,10 @@ function getSpreadsheetAdaptive(spreadsheetId) {
  * @param {Object} spreadsheet - スプレッドシートオブジェクト
  * @param {Object} sheet - シートオブジェクト
  * @param {string} sheetName - シート名
- * @param {string} accessMethod - アクセス方法 ('owner' or 'service_account')
+ * @param {boolean} isOwner - オーナー権限フラグ
  * @returns {Object} {formUrl, confidence, detectionMethod}
  */
-function detectFormConnection(spreadsheet, sheet, sheetName, accessMethod) {
+function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
   const results = {
     formUrl: null,
     formTitle: null,
@@ -711,7 +703,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, accessMethod) {
   };
 
   // Method 1: 標準API - オーナー権限の場合のみ
-  if (accessMethod === 'owner') {
+  if (isOwner) {
     try {
       // シートレベルでフォームURL取得（最優先）
       if (typeof sheet.getFormUrl === 'function') {
@@ -765,7 +757,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, accessMethod) {
   }
 
   // Method 1.5: Drive APIフォーム検索（API検出失敗時のフォールバック）
-  if (accessMethod === 'owner') {
+  if (isOwner) {
     try {
       const spreadsheetId = spreadsheet.getId();
       const driveFormResult = searchFormsByDrive(spreadsheetId, sheetName);
@@ -964,7 +956,7 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
           });
 
           // 対象シートへの接続確認
-          const destSpreadsheet = SpreadsheetApp.openById(destId);
+          const destSpreadsheet = ServiceFactory.getSpreadsheet().openById(destId);
           const targetSheet = destSpreadsheet.getSheetByName(sheetName);
 
           if (targetSheet) {
@@ -1139,12 +1131,12 @@ function getFormInfo(spreadsheetId, sheetName) {
       };
     }
 
-    const { spreadsheet, accessMethod, auth } = accessResult;
+    const { spreadsheet, accessMethod, auth, isOwner } = accessResult;
 
     // スプレッドシート名取得（アクセス方法により異なる）
     let spreadsheetName;
     try {
-      if (accessMethod === 'owner') {
+      if (isOwner) {
         // ユーザー所有の場合はgetNameメソッド使用可能
         spreadsheetName = spreadsheet.getName();
       } else {
@@ -1177,7 +1169,7 @@ function getFormInfo(spreadsheetId, sheetName) {
     }
 
     // 多層フォーム検出システム実行
-    const formDetectionResult = detectFormConnection(spreadsheet, sheet, sheetName, accessMethod);
+    const formDetectionResult = detectFormConnection(spreadsheet, sheet, sheetName, isOwner);
 
     console.log('getFormInfoImpl: フォーム検出結果', {
       hasFormUrl: !!formDetectionResult.formUrl,
