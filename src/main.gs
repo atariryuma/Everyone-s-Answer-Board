@@ -1845,11 +1845,18 @@ function processBatchDataSourceOperations(spreadsheetId, sheetName, operations) 
         case 'connectDataSource': {
           const connectionResult = ServiceFactory.getDataService().connectToSheetInternal(spreadsheetId, sheetName);
           if (connectionResult.success) {
-            results.columnMapping = connectionResult.columnMapping;
+            // Zero-Dependency Architecture: 直接データ転送（中間変換なし）
+            results.mapping = connectionResult.mapping;
+            results.confidence = connectionResult.confidence;
             results.headers = connectionResult.headers;
+            console.log('connectDataSource: AI分析結果を直接送信', {
+              mappingKeys: Object.keys(connectionResult.mapping || {}),
+              confidenceKeys: Object.keys(connectionResult.confidence || {}),
+              headers: connectionResult.headers?.length || 0
+            });
           } else {
             results.success = false;
-            results.error = connectionResult.message;
+            results.error = connectionResult.errorResponse?.message || connectionResult.message;
           }
           break;
         }

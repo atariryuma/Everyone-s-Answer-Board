@@ -1140,6 +1140,7 @@
       return new Promise((resolve, reject) => {
         console.log('🔍 performColumnAnalysis:', { spreadsheetId, sheetName, retryCount });
 
+        // AI分析はconnectDataSource内部で自動実行されるため、単純にヘッダー取得のみ実行
         google.script.run
           .withSuccessHandler(function(result) {
             console.log('✅ performColumnAnalysis success:', result);
@@ -1175,7 +1176,7 @@
               reject(error);
             }
           })
-          .analyzeColumns(spreadsheetId, sheetName);  // バックエンドAPI呼び出し（performColumnAnalysisの内部で使用）
+          .getSheets(spreadsheetId);  // ヘッダー取得のみ（AI分析はconnectDataSource内部で実行）
       });
     } catch (error) {
       RequestGate.exit(gateKey);
@@ -2149,7 +2150,7 @@
           });
         }
 
-        if (result.columnMapping) {
+        if (result.mapping) {
           successDetails.push('🤖 AI列判定完了');
           autoApplyAIDetection(result);
           showNextStepGuidance(result);
@@ -2285,7 +2286,7 @@
       return;
     }
 
-    const mapping = result.columnMapping || result.mapping || {};
+    const mapping = result.mapping || {};
     const confidence = result.confidence || {};
     const headers = result.headers || [];
 
@@ -2567,17 +2568,16 @@
 
   // 🚀 UX向上：AI判定の自動適用機能（データ構造修正版）
   function autoApplyAIDetection(result) {
-    if (!result?.success || !result?.columnMapping?.mapping) {
+    if (!result?.success || !result?.mapping) {
       console.log('🔍 autoApplyAIDetection: データ不足のためスキップ');
       return;
     }
 
-    // 正しいデータ構造へのアクセス
-    const mapping = result.columnMapping.mapping; // ✅ 正しいパス
-    const confidence = result.columnMapping.confidence; // ✅ 正しいパス
+    // Zero-Dependency Architecture: 直接データアクセス
+    const mapping = result.mapping;
+    const confidence = result.confidence || {};
 
-    console.log('🔍 autoApplyAIDetection: データ構造確認', {
-      columnMapping: result.columnMapping,
+    console.log('🔍 autoApplyAIDetection: 直接データアクセス確認', {
       mapping: mapping,
       confidence: confidence,
     });
@@ -2644,10 +2644,10 @@
   function showNextStepGuidance(result) {
     if (!result || !result.success) return;
 
-    const mapping = result.columnMapping || {};
-    const hasAutoApplied = Object.values(mapping).some((detection) => {
-      const confidence = typeof detection?.confidence === 'number' ? detection.confidence : 0;
-      return confidence >= 80;
+    const mapping = result.mapping || {};
+    const confidence = result.confidence || {};
+    const hasAutoApplied = Object.values(confidence).some((confidenceValue) => {
+      return confidenceValue >= 80;
     });
 
     // ✅ CLAUDE.md準拠: Promise-based UI feedback delay
