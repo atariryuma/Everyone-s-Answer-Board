@@ -8,7 +8,7 @@
  * - ヘッダー保護機能
  */
 
-/* global Auth, ServiceFactory */
+/* global Auth, ServiceFactory, RequestGate */
 
 /**
  * 統一データアクセスクラス
@@ -508,7 +508,6 @@ class Data {
       // 🔧 CLAUDE.md準拠: 原子的トランザクション - 競合状態防止
       const transactionKey = `update_user_${userId}`;
 
-      // eslint-disable-next-line no-undef
       if (typeof RequestGate !== 'undefined' && !RequestGate.enter(transactionKey)) {
         console.warn('Data.updateUser: Transaction in progress for user:', userId);
         return {
@@ -558,7 +557,6 @@ class Data {
       }
 
         if (userRowIndex === -1) {
-          // eslint-disable-next-line no-undef
           if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
           return {
             success: false,
@@ -579,7 +577,6 @@ class Data {
       });
 
         if (updateCount === 0) {
-          // eslint-disable-next-line no-undef
           if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
           return {
             success: false,
@@ -606,13 +603,11 @@ class Data {
           error: error.message
         };
       } finally {
-        // eslint-disable-next-line no-undef
         if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
       }
     } catch (outerError) {
       console.error('Data.updateUser outer error:', outerError.message);
       const transactionKey = `update_user_${userId}`;
-      // eslint-disable-next-line no-undef
       if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
       return {
         success: false,

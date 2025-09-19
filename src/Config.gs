@@ -8,7 +8,7 @@
  * - 設定値検証・暗号化
  */
 
-/* global ServiceFactory */
+/* global ServiceFactory, validateEmail, validateSpreadsheetId */
 
 /**
  * 統一設定管理クラス
@@ -191,13 +191,8 @@ class Config {
    * @returns {boolean} Validation result
    */
   static validateSpreadsheetId(id) {
-    if (!id || typeof id !== 'string') {
-      return false;
-    }
-
-    // Google Sheets ID format validation
-    const pattern = /^[a-zA-Z0-9-_]{44}$/;
-    return pattern.test(id);
+    const result = validateSpreadsheetId(id);
+    return result.isValid;
   }
 
   /**
@@ -206,12 +201,8 @@ class Config {
    * @returns {boolean} Validation result
    */
   static validateEmail(email) {
-    if (!email || typeof email !== 'string') {
-      return false;
-    }
-
-    const pattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return pattern.test(email);
+    const result = validateEmail(email);
+    return result.isValid;
   }
 
   /**

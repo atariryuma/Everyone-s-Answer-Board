@@ -37,7 +37,7 @@ class DeploymentValidator {
     console.log('🔗 依存関係チェック...');
 
     const dependencyMap = {
-      'main.gs': ['UserService', 'ConfigService', 'DataService'],
+      'main.gs': ['ServiceFactory'], // main.gs uses ServiceFactory directly, not individual services
       'UserService.gs': ['ServiceFactory'],
       'ConfigService.gs': ['ServiceFactory'],
       'DataService.gs': ['ServiceFactory'],

@@ -1,4 +1,4 @@
-/* global Auth, Data */
+/* global Auth, Data, RequestGate */
 /**
  * @fileoverview ServiceFactory - 統一サービスアクセス層
  *
@@ -172,12 +172,10 @@ function getSpreadsheet() {
       const authKey = `spreadsheet_auth_${id}`;
 
       // 🛡️ RequestGate safe access (optional dependency)
-      // eslint-disable-next-line no-undef
       if (typeof RequestGate !== 'undefined' && !RequestGate.enter(authKey)) {
         console.warn('ServiceFactory.getSpreadsheet.openById: Authentication in progress, waiting...');
         Utilities.sleep(200);
       } else if (typeof RequestGate !== 'undefined') {
-        // eslint-disable-next-line no-undef
         RequestGate.exit(authKey);
       }
 

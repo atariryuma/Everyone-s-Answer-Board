@@ -2110,19 +2110,6 @@ class StudyQuestApp {
         return false;
       }
 
-      // 🚀 データ処理続行...
-      // TODO: 既存のデータ処理ロジックをここに続ける
-      return incrementalData.hasNewData || false;
-
-    } catch (error) {
-      console.error('❌ checkForNewAnswers error:', error.message);
-      this.handlePollingError(error);
-      return false;
-    } finally {
-      // 🛡️ シングルトンセマフォ解放（必須）
-      this.stateManager.updateState({ checkAnswersSemaphore: false });
-    }
-
       // Handle empty object - this might be normal for no new data
       if (Object.keys(incrementalData).length === 0) {
         debugLog('📡 Polling: Empty response, no new data');
@@ -2135,6 +2122,18 @@ class StudyQuestApp {
         debugLog('📡 Polling: Server error:', errorMsg);
         return false;
       }
+
+      // 🚀 新着データ処理続行
+      return incrementalData.hasNewData || false;
+
+    } catch (error) {
+      console.error('❌ checkForNewAnswers error:', error.message);
+      this.handlePollingError(error);
+      return false;
+    } finally {
+      // 🛡️ シングルトンセマフォ解放（必須）
+      this.stateManager.updateState({ checkAnswersSemaphore: false });
+    }
 
       // 新着データがある場合
       if (incrementalData.newCount > 0) {

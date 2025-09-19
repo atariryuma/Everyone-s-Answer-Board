@@ -13,7 +13,7 @@
  * - シンプルなユーティリティ関数群
  */
 
-/* global URL */
+/* global URL, connectToSheetInternal, getFormInfo */
 
 // ===========================================
 // 🔒 基本データ型検証関数群
@@ -412,6 +412,104 @@ function validateConfig(config) {
  * バリデーター診断
  * @returns {Object} 診断結果
  */
+
+/**
+ * フォーム-スプレッドシート整合性検証
+ * @param {string} formUrl - Google Forms URL
+ * @param {string} spreadsheetId - Spreadsheet ID
+ * @returns {Object} 検証結果
+ */
+function validateFormLink(formUrl, spreadsheetId) {
+  const result = {
+    isValid: false,
+    consistent: false,
+    errors: [],
+    details: {}
+  };
+
+  try {
+    // 基本URL検証
+    const formValidation = validateUrl(formUrl);
+    const sheetValidation = validateSpreadsheetId(spreadsheetId);
+
+    if (!formValidation.isValid) {
+      result.errors.push('Invalid form URL format');
+      return result;
+    }
+
+    if (!sheetValidation.isValid) {
+      result.errors.push('Invalid spreadsheet ID format');
+      return result;
+    }
+
+    // Google Forms URL pattern check
+    const formsPattern = /^https:\/\/docs\.google\.com\/forms\/d\/([a-zA-Z0-9-_]+)/;
+    const formMatch = formUrl.match(formsPattern);
+
+    if (!formMatch) {
+      result.errors.push('URL is not a valid Google Forms URL');
+      return result;
+    }
+
+    const [, formId] = formMatch;
+    result.details.formId = formId;
+    result.details.spreadsheetId = spreadsheetId;
+
+    // Basic validation passed
+    result.isValid = true;
+
+    // Consistency check (if both IDs are different, it might be intentional)
+    // This is a warning rather than an error for flexibility
+    if (formId !== spreadsheetId) {
+      result.details.warning = 'Form ID and Spreadsheet ID are different - ensure this is intentional';
+      result.consistent = false;
+    } else {
+      result.consistent = true;
+    }
+
+    // 実際の接続テスト（より確実な検証）
+    try {
+      // 1. スプレッドシート接続確認
+      if (typeof connectToSheetInternal === 'function') {
+        const connectionTest = connectToSheetInternal(spreadsheetId, 'フォームの回答 1');
+        if (connectionTest && connectionTest.success) {
+          result.details.connectionVerified = true;
+          result.details.sheetAccessible = true;
+        } else {
+          result.details.connectionVerified = false;
+          result.details.connectionError = connectionTest?.errorResponse?.message || 'Connection failed';
+        }
+      }
+
+      // 2. フォーム情報取得・検証
+      if (typeof getFormInfo === 'function') {
+        const formInfoTest = getFormInfo(spreadsheetId, 'フォームの回答 1');
+        if (formInfoTest && formInfoTest.success) {
+          result.details.formInfoVerified = true;
+          result.details.formData = formInfoTest.formData;
+
+          // フォームURLが取得できた場合、URLの一致確認
+          if (formInfoTest.formData && formInfoTest.formData.formUrl) {
+            const detectedFormUrl = formInfoTest.formData.formUrl;
+            result.details.detectedFormUrl = detectedFormUrl;
+            result.details.formUrlMatches = (detectedFormUrl === formUrl);
+          }
+        } else {
+          result.details.formInfoVerified = false;
+          result.details.formInfoError = formInfoTest?.message || 'Form info retrieval failed';
+        }
+      }
+    } catch (connectionError) {
+      result.details.connectionVerified = false;
+      result.details.connectionError = connectionError.message;
+    }
+
+    return result;
+  } catch (error) {
+    result.errors.push(`Validation error: ${error.message}`);
+    return result;
+  }
+}
 
 /**
  * レガシー互換関数

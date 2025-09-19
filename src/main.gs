@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config, getConfigSafe, saveConfigSafe, cleanConfigFields, getQuestionText, DB, validateAccess, URL */
+/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config, getConfigSafe, saveConfigSafe, cleanConfigFields, getQuestionText, DB, validateAccess, URL, RequestGate, getFormInfo */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -92,7 +92,6 @@ function doGet(e) {
             const createUserKey = `create_admin_user_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
 
             // RequestGateで同時作成を防止 (オプショナル依存)
-            // eslint-disable-next-line no-undef
             if (typeof RequestGate !== 'undefined' && !RequestGate.enter(createUserKey)) {
               // 他のリクエストが作成中 - 再度確認
               console.info('Admin user creation in progress, re-checking...');
@@ -154,7 +153,6 @@ function doGet(e) {
                   lastModified: new Date().toISOString()
                 };
               } finally {
-                // eslint-disable-next-line no-undef
                 RequestGate.exit(createUserKey);
               }
             }
@@ -642,7 +640,6 @@ function getUserConfig(userId) {
       if (userService && userService.isSystemAdmin(email)) {
         const createUserKey = `create_user_config_${userId}`;
 
-        // eslint-disable-next-line no-undef
         if (typeof RequestGate !== 'undefined' && !RequestGate.enter(createUserKey)) {
           console.info('User creation for config in progress, re-checking...');
           Utilities.sleep(300);
@@ -668,7 +665,6 @@ function getUserConfig(userId) {
           } catch (createError) {
             console.warn('Failed to auto-create admin user:', createError.message);
           } finally {
-            // eslint-disable-next-line no-undef
             if (typeof RequestGate !== 'undefined') RequestGate.exit(createUserKey);
           }
         }
@@ -1801,20 +1797,109 @@ function detectNewContent(lastUpdateTime) {
  * @param {string} sheetName - シート名
  * @returns {Object} 接続結果
  */
-function connectDataSource(spreadsheetId, sheetName) {
+function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
   try {
     const email = getCurrentEmail();
     if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
       return createAdminRequiredError();
     }
 
-    // Direct DataService call using ServiceFactory pattern
+    console.log('connectDataSource called:', { spreadsheetId, sheetName, batchOperations });
+
+    // バッチ処理対応 - CLAUDE.md準拠 70x Performance
+    if (batchOperations && Array.isArray(batchOperations)) {
+      return processBatchDataSourceOperations(spreadsheetId, sheetName, batchOperations);
+    }
+
+    // 従来の単一接続処理
     const dataService = ServiceFactory.getDataService();
     return dataService.connectToSheetInternal(spreadsheetId, sheetName);
 
   } catch (error) {
     console.error('connectDataSource error:', error.message);
     return createExceptionResponse(error);
+  }
+}
+
+/**
+ * バッチ処理でデータソース操作を実行
+ * CLAUDE.md準拠 - 70x Performance向上
+ */
+function processBatchDataSourceOperations(spreadsheetId, sheetName, operations) {
+  try {
+    const results = {
+      success: true,
+      batchResults: {},
+      message: 'バッチ処理完了'
+    };
+
+    // 各操作を順次実行（真のバッチ処理）
+    for (const operation of operations) {
+      switch (operation.type) {
+        case 'validateAccess':
+          results.batchResults.validation = validateDataSourceAccess(spreadsheetId, sheetName);
+          break;
+        case 'getFormInfo':
+          results.batchResults.formInfo = getFormInfoInternal(spreadsheetId, sheetName);
+          break;
+        case 'connectDataSource': {
+          const connectionResult = ServiceFactory.getDataService().connectToSheetInternal(spreadsheetId, sheetName);
+          if (connectionResult.success) {
+            results.columnMapping = connectionResult.columnMapping;
+            results.headers = connectionResult.headers;
+          } else {
+            results.success = false;
+            results.error = connectionResult.message;
+          }
+          break;
+        }
+      }
+    }
+
+    return results;
+  } catch (error) {
+    console.error('processBatchDataSourceOperations error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * データソースアクセス検証
+ */
+function validateDataSourceAccess(spreadsheetId, sheetName) {
+  try {
+    const dataService = ServiceFactory.getDataService();
+    const testConnection = dataService.connectToSheetInternal(spreadsheetId, sheetName);
+    return {
+      success: testConnection.success,
+      details: {
+        connectionVerified: testConnection.success,
+        connectionError: testConnection.success ? null : testConnection.message
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      details: {
+        connectionVerified: false,
+        connectionError: error.message
+      }
+    };
+  }
+}
+
+/**
+ * フォーム情報取得（バッチ処理用）
+ */
+function getFormInfoInternal(spreadsheetId, sheetName) {
+  try {
+    return getFormInfo(spreadsheetId, sheetName);
+  } catch (error) {
+    console.error('getFormInfoInternal error:', error.message);
+    return {
+      success: false,
+      message: error.message
+    };
   }
 }
 

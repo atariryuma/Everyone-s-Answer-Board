@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config, getConfigSafe */
+/* global ServiceFactory, formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config, getConfigSafe, RequestGate */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -1467,24 +1467,34 @@ function performRelativeMatching(analysisResults, headers) {
   sortedStats.forEach((stat, rank) => {
     const { targetType, index, confidence } = stat;
 
-    // 相対的な判定ロジック
+    // 🎯 Adaptive threshold system - column-type specific thresholds
+    const adaptiveThresholds = {
+      answer: { rank0: 20, rank1: 18, rank2: 15, high: 25 },  // More lenient for answer
+      reason: { rank0: 20, rank1: 18, rank2: 15, high: 25 },  // More lenient for reason
+      name: { rank0: 25, rank1: 20, rank2: 15, high: 30 },    // Standard for name
+      class: { rank0: 25, rank1: 20, rank2: 15, high: 30 }    // Standard for class
+    };
+
+    const thresholds = adaptiveThresholds[targetType] || adaptiveThresholds.name;
+
+    // 相対的な判定ロジック（適応的閾値）
     let shouldMap = false;
     let adjustedConfidence = confidence;
 
-    if (rank === 0 && confidence > 25) {
-      // 最高スコア: 25%以上で採用
+    if (rank === 0 && confidence > thresholds.rank0) {
+      // 最高スコア: 適応的閾値で採用
       shouldMap = true;
       adjustedConfidence = Math.min(confidence + 15, 100); // ボーナス
-    } else if (rank === 1 && confidence > 20 && !usedIndices.has(index)) {
-      // 2位: 20%以上で採用（重複除く）
+    } else if (rank === 1 && confidence > thresholds.rank1 && !usedIndices.has(index)) {
+      // 2位: 適応的閾値で採用（重複除く）
       shouldMap = true;
       adjustedConfidence = Math.min(confidence + 10, 100); // 小ボーナス
-    } else if (rank === 2 && confidence > 15 && !usedIndices.has(index)) {
-      // 3位: 15%以上で採用（重複除く）
+    } else if (rank === 2 && confidence > thresholds.rank2 && !usedIndices.has(index)) {
+      // 3位: 適応的閾値で採用（重複除く）
       shouldMap = true;
       adjustedConfidence = Math.min(confidence + 5, 100); // 最小ボーナス
-    } else if (confidence > 30 && !usedIndices.has(index)) {
-      // 高信頼度: 順位に関わらず30%以上で採用
+    } else if (confidence > thresholds.high && !usedIndices.has(index)) {
+      // 高信頼度: 順位に関わらず適応的閾値で採用
       shouldMap = true;
     }
 
@@ -1573,9 +1583,9 @@ function performHighPrecisionAnalysis(headers, sampleData) {
       列種別: type,
       検出列: result.index >= 0 ? `インデックス ${result.index} ("${headers[result.index]}")` : '未検出',
       信頼度: `${Math.round(result.confidence)}%`,
-      閾値達成: result.confidence >= 60 ? '✅' : '❌'
+      閾値達成: result.confidence >= (type === 'answer' || type === 'reason' ? 55 : 60) ? '✅' : '❌'
     })),
-    '統一閾値': '60%',
+    '適応的閾値': 'answer/reason: 55%, name/class: 60%',
     '最高信頼度': `${Math.max(...Object.values(results).map(r => Math.round(r.confidence)))}%`
   });
 
@@ -1615,38 +1625,41 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
     console.log(`🎯 競合ケース検出 [${targetType}]: "${headerLower}" - コンテキスト重み強化`);
   }
 
+  // 🎯 Enhanced weight distribution for better answer/reason detection
+  const isAnswerReasonType = (targetType === 'answer' || targetType === 'reason');
+
   if (headerScore >= 90) {
-    // 日本語完全一致 - ヘッダー特化重視
-    headerWeight = hasSampleData ? 0.5 : 0.7;    // サンプルなし時は70%
-    contentWeight = hasSampleData ? 0.2 : 0.0;   // サンプルなし時は無効
-    linguisticWeight = hasSampleData ? 0.15 : 0.2; // 言語パターン強化
-    contextWeight = hasSampleData ? 0.1 : 0.1;   // コンテキスト維持
-    semanticWeight = hasSampleData ? 0.05 : 0.0; // サンプルなし時は無効
+    // 日本語完全一致 - ヘッダー特化重視（最適化済み）
+    headerWeight = hasSampleData ? (isAnswerReasonType ? 0.35 : 0.45) : 0.6;
+    contentWeight = hasSampleData ? 0.2 : 0.0;
+    linguisticWeight = hasSampleData ? 0.15 : 0.2;
+    contextWeight = hasSampleData ? (isAnswerReasonType ? 0.2 : 0.15) : 0.15;
+    semanticWeight = hasSampleData ? (isAnswerReasonType ? 0.1 : 0.05) : 0.05;
   } else if (headerScore >= 70) {
-    // 強パターンマッチ - ヘッダー・コンテキスト重視
-    headerWeight = hasSampleData ? 0.4 : 0.6;    // サンプルなし時は60%
-    contentWeight = hasSampleData ? 0.25 : 0.0;  // サンプルなし時は無効
-    linguisticWeight = hasSampleData ? 0.2 : 0.25; // 言語分析強化
-    contextWeight = hasSampleData ? 0.1 : 0.15;  // コンテキスト強化
-    semanticWeight = hasSampleData ? 0.05 : 0.0; // サンプルなし時は無効
+    // 強パターンマッチ - 最適化重み配分
+    headerWeight = hasSampleData ? (isAnswerReasonType ? 0.3 : 0.4) : 0.5;
+    contentWeight = hasSampleData ? 0.25 : 0.0;
+    linguisticWeight = hasSampleData ? 0.2 : 0.25;
+    contextWeight = hasSampleData ? (isAnswerReasonType ? 0.15 : 0.1) : 0.2;
+    semanticWeight = hasSampleData ? (isAnswerReasonType ? 0.1 : 0.05) : 0.05;
   } else {
-    // 標準分析 - ヘッダー・言語・コンテキスト重視
-    headerWeight = hasSampleData ? 0.3 : 0.5;    // サンプルなし時は50%
-    contentWeight = hasSampleData ? 0.3 : 0.0;   // サンプルなし時は無効
-    linguisticWeight = hasSampleData ? 0.25 : 0.35; // 言語分析大幅強化
-    contextWeight = hasSampleData ? 0.1 : 0.15;  // コンテキスト強化
-    semanticWeight = hasSampleData ? 0.05 : 0.0; // サンプルなし時は無効
+    // 標準分析 - answer/reason型で大幅最適化
+    headerWeight = hasSampleData ? (isAnswerReasonType ? 0.25 : 0.3) : 0.45;
+    contentWeight = hasSampleData ? 0.3 : 0.0;
+    linguisticWeight = hasSampleData ? 0.25 : 0.35;
+    contextWeight = hasSampleData ? (isAnswerReasonType ? 0.15 : 0.1) : 0.15;
+    semanticWeight = hasSampleData ? (isAnswerReasonType ? 0.05 : 0.05) : 0.05;
   }
 
   // 🎯 競合時の制約付き重み最適化
   if (isConflictCase) {
     const originalWeights = { headerWeight, contentWeight, linguisticWeight, contextWeight, semanticWeight };
 
-    // 制約付き重み最適化の実行
+    // 制約付き重み最適化の実行（answer/reason強化）
     const optimizedWeights = optimizeWeightsWithConstraints(originalWeights, {
-      contextBoost: 2.0,
-      semanticBoost: hasSampleData ? 2.0 : 1.5,
-      headerReduction: 0.8
+      contextBoost: isAnswerReasonType ? 2.5 : 2.0,
+      semanticBoost: hasSampleData ? (isAnswerReasonType ? 2.5 : 2.0) : 1.5,
+      headerReduction: isAnswerReasonType ? 0.7 : 0.8
     });
 
     // 最適化された重みを適用
@@ -1728,13 +1741,20 @@ function analyzeHeaderPattern(headerLower, targetType) {
       // 🎯 Composite Patterns - 複合パターンで具体的マッチング
       composite: [
         /答え.*書/, /回答.*記入/, /考え.*書/, /意見.*述べ/, /予想.*記入/,
-        /選択.*理由.*含/, /答え.*説明.*含/, /回答.*詳細/ // 複合的なanswer列
+        /選択.*理由.*含/, /答え.*説明.*含/, /回答.*詳細/, // 複合的なanswer列
+        // 🎯 Enhanced emotional/opinion patterns
+        /あなた.*答え/, /あなたの.*意見/, /どう.*思い.*書/, /感想.*記入/,
+        /自分.*考え/, /君.*答え/, /皆.*予想/, /みんな.*意見/
       ],
       strong: [
         /回答/, /意見/, /予想/, /選択/, /choice/,
         // 🎯 教育現場パターン強化
         /予想.*しよう/, /思い.*記入/, /どのように/, /何が/, /どんな/,
-        /観察.*気づいた/, /気づいた.*こと/, /わかった.*こと/, /感じた.*こと/
+        /観察.*気づいた/, /気づいた.*こと/, /わかった.*こと/, /感じた.*こと/,
+        // 🎯 Enhanced emotional response patterns
+        /感想/, /どう思/, /どんな.*気持/, /印象/, /感じ/, /思い/, /考え/,
+        // 🎯 Enhanced prediction patterns
+        /推測/, /予測/, /見込/, /予定/, /期待/, /希望/
       ],
       medium: [
         /結果/, /result/, /値/, /value/, /内容/, /content/,
@@ -1756,10 +1776,17 @@ function analyzeHeaderPattern(headerLower, targetType) {
       composite: [
         /答えた.*理由/, /選んだ.*理由/, /考えた.*理由/, /そう.*思.*理由/,
         /理由.*書/, /根拠.*教/, /なぜ.*思/, /どうして.*考/,
-        /背景.*あれば/, /体験.*あれば/, /経験.*あれば/
+        /背景.*あれば/, /体験.*あれば/, /経験.*あれば/,
+        // 🎯 Enhanced justification patterns
+        /判断.*理由/, /決定.*理由/, /選択.*根拠/, /決めた.*わけ/,
+        /なぜ.*選/, /どうして.*決/, /理由.*教/, /根拠.*説明/
       ],
       strong: [
-        /理由/, /根拠/, /reason/, /なぜ/, /why/, /わけ/, /説明/, /explanation/
+        /理由/, /根拠/, /reason/, /なぜ/, /why/, /わけ/, /説明/, /explanation/,
+        // 🎯 Enhanced justification patterns
+        /判断/, /決定/, /選択理由/, /動機/, /motive/, /justification/,
+        // 🎯 Enhanced story patterns
+        /きっかけ/, /経緯/, /過程/, /いきさつ/, /背景事情/
       ],
       medium: [
         /詳細/, /detail/, /背景/, /background/, /コメント/, /comment/,
@@ -1784,10 +1811,15 @@ function analyzeHeaderPattern(headerLower, targetType) {
       // 🎯 Composite Patterns - 複合パターンで名前系を強化
       composite: [
         /名前.*書/, /名前.*入力/, /氏名.*記入/, /お名前.*教/,
-        /name.*enter/, /name.*write/, /名前.*ましょう/, /氏名.*ましょう/
+        /name.*enter/, /name.*write/, /名前.*ましょう/, /氏名.*ましょう/,
+        // 🎯 Enhanced instruction patterns
+        /名前.*入れ/, /お名前.*どうぞ/, /名前.*記載/, /氏名.*入力/,
+        /呼び名.*教/, /ニックネーム.*書/, /あだ名.*入力/
       ],
       strong: [
-        /名前/, /氏名/, /name/, /お名前/, /ネーム/, /ニックネーム/
+        /名前/, /氏名/, /name/, /お名前/, /ネーム/, /ニックネーム/,
+        // 🎯 Enhanced informal patterns
+        /呼び名/, /あだ名/, /nickname/, /ハンドルネーム/, /ペンネーム/
       ],
       medium: [
         /ユーザー/, /user/, /学生/, /student/, /生徒/, /児童/,
@@ -2205,53 +2237,87 @@ function analyzeLinguisticPatterns(samples, targetType) {
 function analyzeContextualClues(header, index, allHeaders, targetType) {
   let score = 0;
 
-  // 列位置による推論
+  // 🎯 Enhanced column position analysis
   const totalColumns = allHeaders.length;
-  const position = index / (totalColumns - 1); // 0-1の相対位置
+  const position = index / Math.max(totalColumns - 1, 1); // 0-1の相対位置
 
   switch (targetType) {
     case 'answer':
-      // 回答列は通常中央付近に位置
-      if (position >= 0.3 && position <= 0.7) score += 20;
+      // 回答列は通常中央からやや後半に位置（強化）
+      if (position >= 0.2 && position <= 0.8) score += 25;
+      if (position >= 0.4 && position <= 0.6) score += 10; // 中央ボーナス
       // タイムスタンプの後に来ることが多い
       if (index > 0 && allHeaders[index - 1] &&
-          allHeaders[index - 1].toLowerCase().includes('timestamp')) score += 15;
+          allHeaders[index - 1].toLowerCase().includes('timestamp')) score += 20;
+      // 🎯 Enhancement: 基本情報の後に来る傾向
+      if (index >= 2) score += 15; // 3列目以降にボーナス
       break;
 
     case 'reason':
-      // 理由列は回答の後に来ることが多い
+      // 理由列は回答の後に来ることが多い（強化）
       if (index > 0) {
         const prevHeader = allHeaders[index - 1].toLowerCase();
-        if (prevHeader.includes('回答') || prevHeader.includes('answer')) score += 25;
+        if (prevHeader.includes('回答') || prevHeader.includes('answer') ||
+            prevHeader.includes('意見') || prevHeader.includes('予想')) score += 35;
       }
-      // 通常後半に位置
-      if (position >= 0.5) score += 15;
+      // 通常後半に位置（強化）
+      if (position >= 0.4) score += 20;
+      if (position >= 0.6) score += 10; // 後半ボーナス
       break;
 
     case 'class':
-      // クラス情報は通常最初の方に位置
-      if (position <= 0.3) score += 25;
-      if (index <= 2) score += 20;
+      // クラス情報は通常最初の方に位置（強化）
+      if (position <= 0.4) score += 30;
+      if (index <= 3) score += 25;
+      if (index <= 1) score += 15; // 最初期ボーナス
       break;
 
     case 'name':
-      // 名前は通常最初の方に位置
-      if (position <= 0.2) score += 30;
-      if (index <= 1) score += 25;
+      // 名前は通常最初の方に位置（強化）
+      if (position <= 0.3) score += 35;
+      if (index <= 2) score += 30;
+      if (index === 0) score += 20; // 第一列ボーナス
       break;
   }
 
-  // 隣接列との関係性分析
+  // 🎯 Enhanced adjacent relationship analysis
   const adjacentHeaders = [
     index > 0 ? allHeaders[index - 1] : null,
     index < allHeaders.length - 1 ? allHeaders[index + 1] : null
   ].filter(h => h).map(h => h.toLowerCase());
 
+  // 🎯 Enhanced pattern matching for relationships
   for (const adjacent of adjacentHeaders) {
-    if (targetType === 'answer' && adjacent.includes('reason')) score += 10;
-    if (targetType === 'reason' && adjacent.includes('answer')) score += 10;
-    if (targetType === 'name' && adjacent.includes('class')) score += 10;
+    if (targetType === 'answer') {
+      if (adjacent.includes('reason') || adjacent.includes('理由') || adjacent.includes('根拠')) score += 15;
+      if (adjacent.includes('name') || adjacent.includes('名前') || adjacent.includes('氏名')) score += 10;
+    }
+    if (targetType === 'reason') {
+      if (adjacent.includes('answer') || adjacent.includes('回答') || adjacent.includes('意見')) score += 15;
+      if (adjacent.includes('背景') || adjacent.includes('体験') || adjacent.includes('経験')) score += 12;
+    }
+    if (targetType === 'name') {
+      if (adjacent.includes('class') || adjacent.includes('クラス') || adjacent.includes('組')) score += 15;
+      if (adjacent.includes('id') || adjacent.includes('番号')) score += 10;
+    }
+    if (targetType === 'class') {
+      if (adjacent.includes('name') || adjacent.includes('名前') || adjacent.includes('氏名')) score += 15;
+      if (adjacent.includes('学年') || adjacent.includes('year')) score += 12;
+    }
   }
+
+  // 🎯 Multi-column pattern detection (boost for pattern combinations)
+  const allHeadersLower = allHeaders.map(h => h.toLowerCase());
+  const hasNameColumn = allHeadersLower.some(h => h.includes('名前') || h.includes('name') || h.includes('氏名'));
+  const hasClassColumn = allHeadersLower.some(h => h.includes('クラス') || h.includes('class') || h.includes('組'));
+  const hasAnswerColumn = allHeadersLower.some(h => h.includes('回答') || h.includes('answer') || h.includes('意見'));
+  const hasReasonColumn = allHeadersLower.some(h => h.includes('理由') || h.includes('reason') || h.includes('根拠'));
+
+  // Cross-column relationship bonuses
+  if (targetType === 'answer' && hasReasonColumn) score += 8;
+  if (targetType === 'reason' && hasAnswerColumn) score += 8;
+  if (targetType === 'name' && hasClassColumn) score += 8;
+  if (targetType === 'class' && hasNameColumn) score += 8;
 
   return Math.min(score, 100);
 }
@@ -2508,7 +2574,6 @@ function dsAddReaction(userId, rowId, reactionType) {
     // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時リアクション競合防止
     const reactionKey = `reaction_${config.spreadsheetId}_${config.sheetName}_${rowIndex}`;
 
-    // eslint-disable-next-line no-undef
     if (typeof RequestGate !== 'undefined' && !RequestGate.enter(reactionKey)) {
       return {
         success: false,
@@ -2539,14 +2604,12 @@ function dsAddReaction(userId, rowId, reactionType) {
       console.error('DataService.dsAddReaction: エラー', error.message);
       return createExceptionResponse(error);
     } finally {
-      // eslint-disable-next-line no-undef
       if (typeof RequestGate !== 'undefined') RequestGate.exit(reactionKey);
     }
   } catch (outerError) {
     console.error('DataService.dsAddReaction outer error:', outerError.message);
     if (typeof RequestGate !== 'undefined') {
       const reactionKey = `reaction_${userId}_${rowId}`;
-      // eslint-disable-next-line no-undef
       RequestGate.exit(reactionKey);
     }
     return createExceptionResponse(outerError);
@@ -2582,7 +2645,6 @@ function dsToggleHighlight(userId, rowId) {
     // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時ハイライト競合防止
     const highlightKey = `highlight_${config.spreadsheetId}_${config.sheetName}_${rowNumber}`;
 
-    // eslint-disable-next-line no-undef
     if (typeof RequestGate !== 'undefined' && !RequestGate.enter(highlightKey)) {
       return {
         success: false,
@@ -2610,14 +2672,12 @@ function dsToggleHighlight(userId, rowId) {
       console.error('DataService.dsToggleHighlight: エラー', error.message);
       return createExceptionResponse(error);
     } finally {
-      // eslint-disable-next-line no-undef
       if (typeof RequestGate !== 'undefined') RequestGate.exit(highlightKey);
     }
   } catch (outerError) {
     console.error('DataService.dsToggleHighlight outer error:', outerError.message);
     if (typeof RequestGate !== 'undefined') {
       const highlightKey = `highlight_${userId}_${rowId}`;
-      // eslint-disable-next-line no-undef
       RequestGate.exit(highlightKey);
     }
     return createExceptionResponse(outerError);
