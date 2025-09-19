@@ -3130,7 +3130,7 @@
           showError('列設定の保存に失敗しました');
           RequestGate.exit('saveColumnConfiguration');
         })
-        .saveConfiguration(optimizedConfig);
+        .saveConfig(optimizedConfig);
     }
   }
 
@@ -3164,7 +3164,7 @@
         setLoading(false);
         RequestGate.exit('saveDraft');
       })
-      .saveDraftConfiguration(config);
+      .saveConfig(config, { isDraft: true });
   }
 
   // アプリ公開（getConfig依存を削除して重複保存防止版）

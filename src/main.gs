@@ -118,12 +118,12 @@ function doGet(e) {
                 // 二重チェック: RequestGate内で再度確認
                 user = Data.findUserByEmail(email);
                 if (!user) {
-                  const userService = ServiceFactory.getUserService();
-                  if (userService && typeof userService.createUser === 'function') {
-                    user = Data.createUser(email);
-                    console.log('✅ Admin user created successfully via UserService');
+                  // 🔧 CLAUDE.md準拠: Data.createUser()統一実装
+                  user = Data.createUser(email);
+                  if (user) {
+                    console.log('✅ Admin user created successfully via Data.createUser');
                   } else {
-                    console.warn('UserService.createUser not available, creating minimal user object');
+                    console.warn('Data.createUser failed, creating minimal user object');
                     user = {
                       userId: Utilities.getUuid(),
                       userEmail: email,
@@ -655,11 +655,14 @@ function getUserConfig(userId) {
               const userByEmail = db.findUserByEmail(email);
               if (userByEmail && userByEmail.userId === userId) {
                 user = userByEmail;
-              } else if (typeof userService.createUser === 'function') {
-                user = userService.createUser(email);
-                console.log('✅ User created successfully for getUserConfig');
               } else {
-                console.warn('UserService.createUser not available for admin user creation');
+                // 🔧 CLAUDE.md準拠: Data.createUser()統一実装
+                user = Data.createUser(email);
+                if (user) {
+                  console.log('✅ User created successfully for getUserConfig via Data.createUser');
+                } else {
+                  console.warn('Data.createUser failed for admin user creation');
+                }
               }
             }
           } catch (createError) {
@@ -753,21 +756,22 @@ function processLoginAction() {
     const db = ServiceFactory.getDB();
     let user = db.findUserByEmail(email);
     if (!user) {
-      // Create new user
-      const userData = {
-        userId: Utilities.getUuid(),
-        userEmail: email,
-        isActive: true,
-        configJson: JSON.stringify({
-          setupStatus: 'pending',
-          appPublished: false,
-          createdAt: new Date().toISOString()
-        }),
-        lastModified: new Date().toISOString()
-      };
-
-      Data.createUser(userData.userEmail);
-      user = userData;
+      // 🔧 CLAUDE.md準拠: Data.createUser()統一実装
+      user = Data.createUser(email);
+      if (!user) {
+        console.warn('Data.createUser failed, creating fallback user object');
+        user = {
+          userId: Utilities.getUuid(),
+          userEmail: email,
+          isActive: true,
+          configJson: JSON.stringify({
+            setupStatus: 'pending',
+            appPublished: false,
+            createdAt: new Date().toISOString()
+          }),
+          lastModified: new Date().toISOString()
+        };
+      }
     }
 
     const baseUrl = ScriptApp.getService().getUrl();
@@ -1589,33 +1593,40 @@ function getSheetList(spreadsheetId) {
 
 
 /**
- * Save user config - simplified name
+ * 🎯 Zero-Dependency統一設定保存API
+ * CLAUDE.md準拠: 直接的でシンプルな実装
+ * @param {Object} config - 設定オブジェクト
+ * @param {Object} options - 保存オプション { isDraft: boolean }
  */
-function saveConfig(userId, config) {
+function saveConfig(config, options = {}) {
   try {
-    if (!userId || !config) {
-      return { success: false, message: 'User ID and config required' };
+    const userEmail = getCurrentEmail();
+    if (!userEmail) {
+      return { success: false, message: 'ユーザー認証が必要です' };
     }
 
-    // 統一API使用: 検証・サニタイズ・保存を一元化
-    const saveResult = saveConfigSafe(userId, config);
-    if (!saveResult.success) {
-      return {
-        success: false,
-        message: saveResult.message || 'Failed to save config',
-        errors: saveResult.errors || []
-      };
+    const db = ServiceFactory.getDB();
+    if (!db) {
+      return { success: false, message: 'データベース接続エラー' };
     }
 
-    const result = saveResult; // 統一APIレスポンスをそのまま利用
+    const user = db.findUserByEmail(userEmail);
+    if (!user) {
+      return { success: false, message: 'ユーザーが見つかりません' };
+    }
 
-    return {
-      success: !!result,
-      message: result ? 'Config saved successfully' : 'Failed to save config'
-    };
+    // 保存タイプをオプションで制御（Zero-Dependency準拠）
+    const saveOptions = options.isDraft ?
+      { isDraft: true } :
+      { isMainConfig: true };
+
+    // 統一API使用: saveConfigSafeで安全保存
+    return saveConfigSafe(user.userId, config, saveOptions);
+
   } catch (error) {
-    console.error('saveConfig error:', error.message);
-    return createExceptionResponse(error);
+    const operation = options.isDraft ? 'saveDraft' : 'saveConfig';
+    console.error(`${operation} error:`, error.message);
+    return { success: false, message: error.message };
   }
 }
 

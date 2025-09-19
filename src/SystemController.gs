@@ -328,136 +328,6 @@ function getAdminSheetList(spreadsheetId) {
  */
 
 
-/**
- * 設定の下書き保存
- * @param {Object} config - 保存する設定
- * @returns {Object} 保存結果
- */
-function saveDraftConfiguration(config) {
-  const startTime = new Date().toISOString();
-  console.log('=== saveDraftConfiguration START ===', {
-    spreadsheetId: config?.spreadsheetId || 'N/A',
-    sheetName: config?.sheetName || 'N/A',
-    configSize: config ? JSON.stringify(config).length : 0
-  });
-
-  try {
-    if (!config || typeof config !== 'object') {
-      console.error('❌ Invalid config input');
-      return createErrorResponse('設定データが不正です');
-    }
-
-    const userEmail = getCurrentEmail();
-    if (!userEmail) {
-      console.error('❌ User authentication failed');
-      return createErrorResponse('ユーザー認証が必要です');
-    }
-
-    const db = ServiceFactory.getDB();
-    if (!db) {
-      console.error('❌ Database connection failed');
-      return createErrorResponse('データベース接続エラー');
-    }
-
-    const user = db.findUserByEmail(userEmail);
-    if (!user) {
-      console.error('❌ User not found:', userEmail);
-      return createUserNotFoundError();
-    }
-
-    console.log('📋 Config processing:', {
-      userId: user.userId,
-      spreadsheetId: config.spreadsheetId,
-      sheetName: config.sheetName
-    });
-
-    // 🔧 FIX: Transform columnMapping from frontend format to backend format
-    if (config.columnMapping && typeof config.columnMapping === 'object') {
-      console.log('🔍 BACKEND TRANSFORMATION START:', {
-        originalColumnMapping: config.columnMapping,
-        hasMapping: !!config.columnMapping.mapping
-      });
-
-      // If columnMapping doesn't have the correct structure, transform it
-      if (!config.columnMapping.mapping) {
-        const transformedMapping = {};
-        const transformedConfidence = {};
-
-        // Transform each column type from { columnIndex: N } to mapping[type] = N
-        Object.keys(config.columnMapping).forEach(key => {
-          if (key.startsWith('_') || key === 'headers' || key === 'verifiedAt') return;
-
-          const columnData = config.columnMapping[key];
-          if (columnData && typeof columnData.columnIndex === 'number') {
-            transformedMapping[key] = columnData.columnIndex;
-            transformedConfidence[key] = columnData.confidence || 0;
-            console.log(`✅ Transformed ${key}: ${columnData.columnIndex}`);
-          }
-        });
-
-        // Rebuild columnMapping with correct structure
-        config.columnMapping = {
-          mapping: transformedMapping,
-          confidence: transformedConfidence,
-          headers: config.columnMapping.headers || [],
-          verifiedAt: config.columnMapping.verifiedAt || new Date().toISOString()
-        };
-
-        console.log('✅ BACKEND TRANSFORMATION COMPLETE:', {
-          transformedMapping,
-          finalColumnMapping: config.columnMapping
-        });
-      } else {
-        console.log('🔍 ColumnMapping already has correct structure');
-      }
-    }
-
-    // 🔧 CLAUDE.md準拠: 統一API使用 - saveConfigSafeを使用してETag対応の安全な更新
-    const removedFields = [];
-    if ('setupComplete' in config) { delete config.setupComplete; removedFields.push('setupComplete'); }
-    if ('isDraft' in config) { delete config.isDraft; removedFields.push('isDraft'); }
-    if ('questionText' in config) { delete config.questionText; removedFields.push('questionText'); }
-
-    // saveConfigSafeを使用して統一された更新パターンを適用
-    const saveResult = saveConfigSafe(user.userId, config, { isDraft: true });
-
-    if (!saveResult.success) {
-      console.error('❌ saveConfigSafe failed:', saveResult.message);
-      return createErrorResponse(saveResult.message || 'データベース更新に失敗しました');
-    }
-
-    console.log('✅ saveDraftConfiguration SUCCESS (via saveConfigSafe):', {
-      userId: user.userId,
-      spreadsheetId: config.spreadsheetId,
-      sheetName: config.sheetName,
-      etag: saveResult.etag
-    });
-
-    return {
-      success: true,
-      message: '下書き設定を保存しました',
-      userId: user.userId,
-      etag: saveResult.etag,
-      config: saveResult.config
-    };
-
-  } catch (error) {
-    const endTime = new Date().toISOString();
-    const processingTime = new Date(endTime) - new Date(startTime);
-
-    console.error('=== saveDraftConfiguration ERROR ===', {
-      startTime,
-      endTime,
-      processingTimeMs: processingTime,
-      errorMessage: error.message,
-      errorStack: error.stack,
-      configProvided: !!config,
-      configKeys: config ? Object.keys(config) : null
-    });
-
-    return createExceptionResponse(error);
-  }
-}
 
 /**
  * アプリケーションの公開
@@ -946,39 +816,41 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
     while (forms.hasNext()) {
       const formFile = forms.next();
       try {
-        const form = FormApp.openById(formFile.getId());
-        const destId = form.getDestinationId();
+        // FormAppアクセスを制限的に実行
+        let form = null;
+        let destId = null;
+        let formTitle = null;
+        let formPublishedUrl = null;
+
+        try {
+          form = FormApp.openById(formFile.getId());
+          destId = form.getDestinationId();
+          formTitle = form.getTitle();
+          formPublishedUrl = form.getPublishedUrl();
+        } catch (formAccessError) {
+          // FormApp権限エラーの場合はファイル名から推測
+          console.warn('searchFormsByDrive: FormApp権限制限、ファイル名から推測:', formAccessError.message);
+          formTitle = formFile.getName();
+          // 権限のないフォームはスキップ
+          continue;
+        }
 
         if (destId === spreadsheetId) {
           console.log('searchFormsByDrive: 対象スプレッドシートへのフォーム発見', {
             formId: formFile.getId(),
-            formTitle: form.getTitle()
+            formTitle
           });
 
-          // 対象シートへの接続確認
-          const destSpreadsheet = ServiceFactory.getSpreadsheet().openById(destId);
-          const targetSheet = destSpreadsheet.getSheetByName(sheetName);
+          // Form IDとspreadsheet IDが一致していれば接続確認済み
+          console.log('searchFormsByDrive: フォーム接続確認成功', {
+            sheetName,
+            formTitle
+          });
 
-          if (targetSheet) {
-            const sheetFormUrl = targetSheet.getFormUrl();
-            const formPublishedUrl = form.getPublishedUrl();
-
-            // URL照合またはform ID照合
-            if (sheetFormUrl && (sheetFormUrl === formPublishedUrl ||
-                sheetFormUrl.includes(formFile.getId()) ||
-                formPublishedUrl.includes(formFile.getId()))) {
-
-              console.log('searchFormsByDrive: フォーム接続確認成功', {
-                sheetName,
-                formTitle: form.getTitle()
-              });
-
-              return {
-                formUrl: formPublishedUrl,
-                formTitle: form.getTitle()
-              };
-            }
-          }
+          return {
+            formUrl: formPublishedUrl,
+            formTitle
+          };
         }
       } catch (formError) {
         // 個別フォームアクセスエラーは無視して継続

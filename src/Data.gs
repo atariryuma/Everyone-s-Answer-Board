@@ -379,11 +379,12 @@ class Data {
   }
 
   /**
-   * ユーザー作成
+   * ユーザー作成（統一実装 - Zero-Dependency Architecture準拠）
    * @param {string} email - ユーザーメールアドレス
+   * @param {Object} initialConfig - 初期設定（オプション）
    * @returns {Object|null} 作成されたユーザーオブジェクト
    */
-  static createUser(email) {
+  static createUser(email, initialConfig = {}) {
     try {
       if (!email) return null;
 
@@ -397,6 +398,7 @@ class Data {
       // Check if user already exists
       const existingUser = this.findUserByEmail(email);
       if (existingUser) {
+        console.info('Data.createUser: 既存ユーザーを返却', { email: `${email.substring(0, 5)}***` });
         return existingUser;
       }
 
@@ -420,20 +422,30 @@ class Data {
       const spreadsheet = this.openSpreadsheetWithServiceAccount(dbId, auth.token);
       const usersSheet = spreadsheet.getSheetByName('users') || spreadsheet.getSheets()[0];
 
+      // 統一ユーザーデータ構築（UserService.buildNewUserDataロジック統合）
       const userId = Utilities.getUuid();
       const timestamp = new Date().toISOString();
+
+      // CLAUDE.md準拠: 最小限かつ完全なconfigJSON
+      const minimalConfig = {
+        setupStatus: 'pending',
+        appPublished: false,
+        displaySettings: {
+          showNames: false,
+          showReactions: false
+        },
+        createdAt: timestamp,
+        lastModified: timestamp,
+        ...initialConfig
+      };
 
       const newUser = {
         userId,
         userEmail: email,
         isActive: true,
-        configJson: JSON.stringify({
-          setupStatus: 'pending',
-          appPublished: false,
-          createdAt: timestamp
-        }),
+        configJson: JSON.stringify(minimalConfig),
         createdAt: timestamp,
-        updatedAt: timestamp
+        lastModified: timestamp
       };
 
       // Append user using header-safe method - Sheets API対応
@@ -443,6 +455,11 @@ class Data {
       const newRow = headers.map(header => newUser[header] || '');
 
       usersSheet.appendRow(newRow);
+
+      console.info('Data.createUser: 新規ユーザー作成完了', {
+        email: `${email.substring(0, 5)}***`,
+        userId: `${userId.substring(0, 8)}***`
+      });
 
       return newUser;
     } catch (error) {
@@ -688,6 +705,29 @@ class Data {
     return {
       getId: () => spreadsheetId,
 
+      getName() {
+        try {
+          const response = UrlFetchApp.fetch(sheetsApiBase, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            muteHttpExceptions: true
+          });
+
+          const data = JSON.parse(response.getContentText());
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+          }
+
+          return data.properties?.title || 'Unknown Spreadsheet';
+        } catch (error) {
+          console.error('getName error:', error.message);
+          return `Spreadsheet (ID: ${spreadsheetId.substring(0, 8)}...)`;
+        }
+      },
+
       getSheetByName(name) {
         return Data.createSheetWrapper(spreadsheetId, name, accessToken);
       },
@@ -735,6 +775,37 @@ class Data {
 
     return {
       getName: () => sheetName,
+
+      getFormUrl() {
+        // Form URL detection is not available through Sheets API
+        // This method exists for compatibility but always returns null
+        // Note: Form detection is handled by Drive API in searchFormsByDrive()
+        return null;
+      },
+
+      getIndex() {
+        try {
+          const response = UrlFetchApp.fetch(`${sheetsApiBase}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            muteHttpExceptions: true
+          });
+
+          const data = JSON.parse(response.getContentText());
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+          }
+
+          const sheetIndex = data.sheets.findIndex(s => s.properties.title === sheetName);
+          return sheetIndex >= 0 ? sheetIndex : 0;
+        } catch (error) {
+          console.error('getIndex error:', error.message);
+          return 0;
+        }
+      },
 
       getSheetId() {
         try {

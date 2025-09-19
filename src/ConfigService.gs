@@ -388,58 +388,6 @@ function generateUserPermissions(_userId) {
 // 💾 設定保存・更新
 // ===========================================
 
-/**
- * 設定保存（統合版）
- * @param {string} userId - ユーザーID
- * @param {Object} config - 保存する設定
- * @returns {Object} 保存結果
- */
-function saveUserConfig(userId, config) {
-  try {
-    // 検証・サニタイズ
-    const validatedConfig = validateAndSanitizeConfig(config, userId);
-
-    if (!validatedConfig.success) {
-      return {
-        success: false,
-        message: validatedConfig.message,
-        errors: validatedConfig.errors
-      };
-    }
-
-    const sanitizedConfig = validatedConfig.data;
-    sanitizedConfig.lastModified = new Date().toISOString();
-
-    // 統一API使用: 保存処理をsaveConfigSafeに委謗
-    const saveResult = saveConfigSafe(userId, sanitizedConfig);
-    if (!saveResult.success) {
-      throw new Error(`データベース更新に失敗しました: ${saveResult.message}`);
-    }
-
-    console.info('saveUserConfig: 設定保存完了', {
-      userId,
-      setupStatus: sanitizedConfig.setupStatus,
-      completionScore: sanitizedConfig.completionScore
-    });
-
-    return {
-      success: true,
-      message: '設定を保存しました',
-      data: sanitizedConfig
-    };
-
-  } catch (error) {
-    console.error('saveUserConfig: エラー', {
-      userId,
-      error: error.message
-    });
-    return {
-      success: false,
-      message: '設定の保存に失敗しました',
-      error: error.message
-    };
-  }
-}
 
 
 // ===========================================

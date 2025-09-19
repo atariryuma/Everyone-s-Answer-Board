@@ -14,7 +14,7 @@
  * - プラットフォームAPI統合
  */
 
-/* global getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, saveUserConfig, validateUserData, validateSession, connectToSheetInternal, getFormInfo */
+/* global getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, validateUserData, validateSession, connectToSheetInternal, getFormInfo */
 
 // ===========================================
 // 🔧 Session Management
@@ -342,7 +342,6 @@ function getConfigService() {
     // Build minimal shim from available globals
     const shim = {};
     if (typeof getUserConfig === 'function') shim.getUserConfig = getUserConfig;
-    if (typeof saveUserConfig === 'function') shim.saveUserConfig = saveUserConfig;
     if (typeof getFormInfo === 'function') shim.getFormInfo = getFormInfo;
     if (Object.keys(shim).length > 0) return shim;
 

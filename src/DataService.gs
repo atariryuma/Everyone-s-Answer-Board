@@ -1126,17 +1126,9 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
     const dataAccess = Data.open(spreadsheetId);
     const {spreadsheet} = dataAccess;
 
-    // サービスアカウントを編集者として自動登録
-    try {
-      const serviceAccount = Config.serviceAccount();
-      const serviceAccountEmail = serviceAccount ? serviceAccount.client_email : null;
-      if (serviceAccountEmail) {
-        spreadsheet.addEditor(serviceAccountEmail);
-        console.log('connectToSheetInternal: サービスアカウントを編集者として登録:', serviceAccountEmail);
-      }
-    } catch (editorError) {
-      console.warn('connectToSheetInternal: 編集者登録をスキップ:', editorError.message);
-    }
+    // サービスアカウントを編集者として自動登録 (Data.openで既に処理済み)
+    // Note: Data.open()内でDriveApp.getFileById(id).addEditor()が既に実行されている
+    console.log('connectToSheetInternal: サービスアカウント編集者権限はData.openで処理済み');
 
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
@@ -1614,6 +1606,15 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
   // サンプルデータ有無による最適化
   const hasSampleData = samples && samples.length > 0;
 
+  // 🎯 競合検出による動的重み調整
+  const hasReasonKeywords = /理由|根拠|なぜ|why|わけ|説明/.test(headerLower);
+  const hasAnswerKeywords = /答え|回答|answer|意見|予想|考え/.test(headerLower);
+  const isConflictCase = hasReasonKeywords && hasAnswerKeywords && (targetType === 'answer' || targetType === 'reason');
+
+  if (isConflictCase) {
+    console.debug(`🎯 競合ケース検出 [${targetType}]: "${headerLower}" - コンテキスト重み強化`);
+  }
+
   if (headerScore >= 90) {
     // 日本語完全一致 - ヘッダー特化重視
     headerWeight = hasSampleData ? 0.5 : 0.7;    // サンプルなし時は70%
@@ -1635,6 +1636,29 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
     linguisticWeight = hasSampleData ? 0.25 : 0.35; // 言語分析大幅強化
     contextWeight = hasSampleData ? 0.1 : 0.15;  // コンテキスト強化
     semanticWeight = hasSampleData ? 0.05 : 0.0; // サンプルなし時は無効
+  }
+
+  // 🎯 競合時の制約付き重み最適化
+  if (isConflictCase) {
+    const originalWeights = { headerWeight, contentWeight, linguisticWeight, contextWeight, semanticWeight };
+
+    // 制約付き重み最適化の実行
+    const optimizedWeights = optimizeWeightsWithConstraints(originalWeights, {
+      contextBoost: 2.0,
+      semanticBoost: hasSampleData ? 2.0 : 1.5,
+      headerReduction: 0.8
+    });
+
+    // 最適化された重みを適用
+    ({
+      headerWeight,
+      contentWeight,
+      linguisticWeight,
+      contextWeight,
+      semanticWeight
+    } = optimizedWeights);
+
+    console.debug(`🎯 制約付き重み最適化完了 [${targetType}]: context=${(contextWeight*100).toFixed(1)}%, semantic=${(semanticWeight*100).toFixed(1)}%`);
   }
 
   totalConfidence += headerScore * headerWeight;
@@ -1701,10 +1725,15 @@ function analyzeHeaderPattern(headerLower, targetType) {
   const patterns = {
     answer: {
       primary: [/^回答$/, /^答え$/, /^answer$/, /^response$/],
+      // 🎯 Composite Patterns - 複合パターンで具体的マッチング
+      composite: [
+        /答え.*書/, /回答.*記入/, /考え.*書/, /意見.*述べ/, /予想.*記入/,
+        /選択.*理由.*含/, /答え.*説明.*含/, /回答.*詳細/ // 複合的なanswer列
+      ],
       strong: [
-        /回答/, /答え/, /answer/, /意見/, /予想/, /考え/, /思う/, /選択/, /choice/,
+        /回答/, /意見/, /予想/, /選択/, /choice/,
         // 🎯 教育現場パターン強化
-        /予想.*しよう/, /考え.*書/, /思い.*記入/, /どのように/, /何が/, /どんな/,
+        /予想.*しよう/, /思い.*記入/, /どのように/, /何が/, /どんな/,
         /観察.*気づいた/, /気づいた.*こと/, /わかった.*こと/, /感じた.*こと/
       ],
       medium: [
@@ -1712,22 +1741,37 @@ function analyzeHeaderPattern(headerLower, targetType) {
         // 🎯 教育質問文パターン
         /しよう$/, /ましょう$/, /てください$/, /について/, /に関して/
       ],
-      weak: [/データ/, /data/, /情報/, /info/]
+      weak: [/データ/, /data/, /情報/, /info/],
+      // 🎯 Smart Conflict Patterns - 段階的減点（30%減点）
+      conflict: [
+        { pattern: /理由.*だけ/, penalty: 0.2 },     // 「理由だけ」→ 80%減点
+        { pattern: /なぜ.*のみ/, penalty: 0.2 },     // 「なぜのみ」→ 80%減点
+        { pattern: /根拠.*記載/, penalty: 0.3 },     // 「根拠記載」→ 70%減点
+        { pattern: /説明.*のみ/, penalty: 0.3 }      // 「説明のみ」→ 70%減点
+      ]
     },
     reason: {
-      primary: [/^理由$/, /^根拠$/, /^reason$/, /^説明$/],
+      primary: [/^理由$/, /^根拠$/, /^reason$/, /^説明$/, /^答えた理由$/],
+      // 🎯 Composite Patterns - 複合パターンで理由系を強化
+      composite: [
+        /答えた.*理由/, /選んだ.*理由/, /考えた.*理由/, /そう.*思.*理由/,
+        /理由.*書/, /根拠.*教/, /なぜ.*思/, /どうして.*考/,
+        /背景.*あれば/, /体験.*あれば/, /経験.*あれば/
+      ],
       strong: [
-        /理由/, /根拠/, /reason/, /なぜ/, /why/, /わけ/, /説明/, /explanation/,
-        // 🎯 教育現場理由パターン強化
-        /理由.*書/, /根拠.*教/, /なぜ.*思/, /どうして.*考/, /そう.*理由/,
-        /体験.*あれば/, /経験.*あれば/, /背景.*あれば/
+        /理由/, /根拠/, /reason/, /なぜ/, /why/, /わけ/, /説明/, /explanation/
       ],
       medium: [
         /詳細/, /detail/, /背景/, /background/, /コメント/, /comment/,
-        // 🎯 教育理由説明パターン
-        /考える/, /思う/, /感じる/, /体験/, /経験/, /きっかけ/
+        // 🎯 感情・経験パターン（answer列との競合回避）
+        /体験/, /経験/, /きっかけ/
       ],
-      weak: [/その他/, /other/, /備考/, /note/]
+      weak: [/その他/, /other/, /備考/, /note/],
+      // 🎯 Smart Conflict Patterns - answer列との競合時の減点
+      conflict: [
+        { pattern: /答え.*中心/, penalty: 0.3 },      // 「答え中心」→ 70%減点
+        { pattern: /回答.*メイン/, penalty: 0.3 }     // 「回答メイン」→ 70%減点
+      ]
     },
     class: {
       primary: [/^クラス$/, /^class$/, /^組$/, /^年組$/],
@@ -1736,66 +1780,96 @@ function analyzeHeaderPattern(headerLower, targetType) {
       weak: [/チーム/, /team/]
     },
     name: {
-      primary: [/^名前$/, /^氏名$/, /^name$/],
-      strong: [/名前/, /氏名/, /name/, /お名前/, /ネーム/, /ニックネーム/],
-      medium: [/ユーザー/, /user/, /学生/, /student/],
+      primary: [/^名前$/, /^氏名$/, /^name$/, /^お名前$/],
+      // 🎯 Composite Patterns - 複合パターンで名前系を強化
+      composite: [
+        /名前.*書/, /名前.*入力/, /氏名.*記入/, /お名前.*教/,
+        /name.*enter/, /name.*write/, /名前.*ましょう/, /氏名.*ましょう/
+      ],
+      strong: [
+        /名前/, /氏名/, /name/, /お名前/, /ネーム/, /ニックネーム/
+      ],
+      medium: [
+        /ユーザー/, /user/, /学生/, /student/, /生徒/, /児童/,
+        // 🎯 一般的入力パターン（複合と重複しない単体のみ）
+        /記入/, /入力/
+      ],
       weak: [/id/, /アカウント/, /account/]
     }
   };
 
   const typePatterns = patterns[targetType] || {};
-
-  // デバッグ用の一時変数
-  let matchedPattern = null;
-  let matchedLevel = null;
   let score = 0;
 
-  // 段階的マッチング - 明確キーワードボーナス対応
-  for (const pattern of typePatterns.primary || []) {
-    if (pattern.test(headerLower)) {
-      matchedPattern = pattern.toString();
-      matchedLevel = 'primary';
-      score = 98; // 明確キーワードの基本スコア向上 95% → 98%
-
-      // 🎯 超明確キーワードボーナス (+2%)
-      const ultraClearKeywords = ['クラス', '名前', '氏名', 'class', 'name'];
-      if (ultraClearKeywords.some(keyword => headerLower.includes(keyword.toLowerCase()))) {
-        score = Math.min(100, score + 2); // 最大100%まで
-      }
-      break;
+  // 🎯 Smart Penalty System - 段階的減点による論理的判定
+  let penaltyMultiplier = 1.0;
+  const conflictPatterns = typePatterns.conflict || [];
+  for (const conflictPattern of conflictPatterns) {
+    if (conflictPattern.pattern.test(headerLower)) {
+      penaltyMultiplier *= conflictPattern.penalty; // 段階的減点
+      console.debug(`🎯 競合パターン検出 [${targetType}]: "${headerLower}" → 減点率${conflictPattern.penalty}`);
+      break; // 最初の競合パターンのみ適用
     }
   }
 
-  if (score === 0) {
-    for (const pattern of typePatterns.strong || []) {
+  // 🎯 Smart Pattern Evaluation Matrix - 全パターン評価による最適判定
+  const patternEvaluations = [];
+
+  // パターンレベル定義（重み付き評価）
+  const patternLevels = {
+    primary: { weight: 1.1, baseScore: 85 },
+    composite: { weight: 1.2, baseScore: 80 },
+    strong: { weight: 1.0, baseScore: 75 },
+    medium: { weight: 0.9, baseScore: 60 },
+    weak: { weight: 0.8, baseScore: 35 }
+  };
+
+  // 🎯 全パターンレベルを包括的に評価
+  for (const [levelName, levelConfig] of Object.entries(patternLevels)) {
+    const patterns = typePatterns[levelName] || [];
+
+    for (const pattern of patterns) {
       if (pattern.test(headerLower)) {
-        matchedPattern = pattern.toString();
-        matchedLevel = 'strong';
-        score = 85;
-        break;
+        let levelScore = levelConfig.baseScore * levelConfig.weight;
+
+        // 🎯 Primary特別ボーナス処理
+        if (levelName === 'primary') {
+          const ultraClearKeywords = ['クラス', '名前', '氏名', 'class', 'name'];
+          if (ultraClearKeywords.some(keyword => headerLower.includes(keyword.toLowerCase()))) {
+            levelScore += 5; // 超明確キーワードボーナス
+          }
+        }
+
+        patternEvaluations.push({
+          level: levelName,
+          pattern: pattern.toString(),
+          score: Math.round(levelScore),
+          weight: levelConfig.weight
+        });
+
+        console.debug(`🎯 パターン評価 [${targetType}]: ${levelName} "${pattern}" → ${Math.round(levelScore)}点`);
       }
     }
   }
 
-  if (score === 0) {
-    for (const pattern of typePatterns.medium || []) {
-      if (pattern.test(headerLower)) {
-        matchedPattern = pattern.toString();
-        matchedLevel = 'medium';
-        score = 60;
-        break;
-      }
-    }
-  }
+  // 🎯 Multi-Criteria Decision Matrix (MCDM) による競合解決
+  if (patternEvaluations.length > 0) {
+    const maxScore = Math.max(...patternEvaluations.map(e => e.score));
+    const topEvaluations = patternEvaluations.filter(e => e.score === maxScore);
 
-  if (score === 0) {
-    for (const pattern of typePatterns.weak || []) {
-      if (pattern.test(headerLower)) {
-        matchedPattern = pattern.toString();
-        matchedLevel = 'weak';
-        score = 35;
-        break;
-      }
+    if (topEvaluations.length === 1) {
+      // 単一最高点 - 明確な選択
+      const [{ score: bestScore, level: bestLevel }] = topEvaluations;
+      score = bestScore;
+      console.debug(`🎯 単一最適パターン [${targetType}]: ${bestLevel} → ${score}点`);
+    } else {
+      // 同点競合 - MCDM適用
+      console.debug(`🎯 同点競合検出 [${targetType}]: ${topEvaluations.length}個のパターン → MCDM適用`);
+
+      const mcdmResult = resolveConflictWithMCDM(topEvaluations, headerLower, targetType);
+      score = mcdmResult.finalScore;
+
+      console.debug(`🎯 MCDM競合解決 [${targetType}]: ${mcdmResult.selectedPattern} → ${score}点`);
     }
   }
 
@@ -1830,7 +1904,206 @@ function analyzeHeaderPattern(headerLower, targetType) {
     }
   }
 
-  return score;
+  // 🎯 Smart Penalty適用 - 最終スコアに段階的減点を適用
+  const finalScore = Math.round(score * penaltyMultiplier);
+
+  if (penaltyMultiplier < 1.0) {
+    console.debug(`🎯 最終スコア調整 [${targetType}]: ${score} × ${penaltyMultiplier} = ${finalScore}`);
+  }
+
+  return finalScore;
+}
+
+/**
+ * 🎯 Multi-Criteria Decision Matrix (MCDM) による競合解決
+ * @param {Array} conflictingEvaluations 競合するパターン評価
+ * @param {string} headerLower 小文字ヘッダー
+ * @param {string} targetType 対象列タイプ
+ * @returns {Object} MCDM解決結果
+ */
+function resolveConflictWithMCDM(conflictingEvaluations, headerLower, targetType) {
+  // MCDM基準の重み設定
+  const mcdmCriteria = {
+    headerSpecificity: 0.4,   // ヘッダー特異性（具体性）
+    contextualFit: 0.3,       // 文脈適合度
+    semanticDistance: 0.2,    // セマンティック距離
+    patternComplexity: 0.1    // パターン複雑度
+  };
+
+  const evaluationResults = conflictingEvaluations.map(evaluation => {
+    // 1. ヘッダー特異性スコア
+    const specificityScore = calculateHeaderSpecificity(evaluation.pattern, headerLower);
+
+    // 2. 文脈適合度スコア
+    const contextualScore = calculateContextualFit(evaluation.level, targetType, headerLower);
+
+    // 3. セマンティック距離スコア
+    const semanticScore = calculateSemanticDistance(evaluation.pattern, targetType);
+
+    // 4. パターン複雑度スコア
+    const complexityScore = calculatePatternComplexity(evaluation.pattern);
+
+    // MCDM重み付き総合スコア計算
+    const mcdmScore =
+      specificityScore * mcdmCriteria.headerSpecificity +
+      contextualScore * mcdmCriteria.contextualFit +
+      semanticScore * mcdmCriteria.semanticDistance +
+      complexityScore * mcdmCriteria.patternComplexity;
+
+    return {
+      ...evaluation,
+      mcdmScore: Math.round(mcdmScore * 100) / 100,
+      criteria: { specificityScore, contextualScore, semanticScore, complexityScore }
+    };
+  });
+
+  // 最高MCDMスコアの選択
+  const bestMcdmEvaluation = evaluationResults.reduce((best, current) =>
+    current.mcdmScore > best.mcdmScore ? current : best
+  );
+
+  // 元スコア + MCDM調整による最終スコア
+  const finalScore = Math.round(bestMcdmEvaluation.score * (1 + bestMcdmEvaluation.mcdmScore * 0.1));
+
+  return {
+    selectedPattern: bestMcdmEvaluation.level,
+    finalScore: Math.min(finalScore, 100), // 最大100点
+    mcdmDetails: bestMcdmEvaluation.criteria
+  };
+}
+
+/**
+ * ヘッダー特異性計算
+ */
+function calculateHeaderSpecificity(pattern, headerLower) {
+  // パターンの具体性を評価（より具体的なパターンほど高スコア）
+  const patternStr = pattern.replace(/^\/|\/$/g, ''); // 正規表現マーカー除去
+  const specificityFactors = {
+    exactMatch: /^\^.*\$$/.test(pattern) ? 1.0 : 0.0,        // 完全一致
+    wordBoundary: /\\b/.test(pattern) ? 0.3 : 0.0,           // 単語境界
+    complexPattern: /\.\*/.test(pattern) ? 0.2 : 0.0,        // 複合パターン
+    lengthFactor: Math.min(patternStr.length / 20, 0.5)      // 長さ係数
+  };
+
+  return Object.values(specificityFactors).reduce((sum, factor) => sum + factor, 0);
+}
+
+/**
+ * 文脈適合度計算
+ */
+function calculateContextualFit(patternLevel, targetType, headerLower) {
+  // パターンレベルと対象タイプの適合度
+  const levelTypeFit = {
+    primary: { answer: 0.9, reason: 0.9, name: 1.0, class: 1.0 },
+    composite: { answer: 1.0, reason: 1.0, name: 0.8, class: 0.7 },
+    strong: { answer: 0.8, reason: 0.8, name: 0.7, class: 0.8 },
+    medium: { answer: 0.6, reason: 0.6, name: 0.6, class: 0.6 },
+    weak: { answer: 0.4, reason: 0.4, name: 0.4, class: 0.4 }
+  };
+
+  return (levelTypeFit[patternLevel] || {})[targetType] || 0.5;
+}
+
+/**
+ * セマンティック距離計算
+ */
+function calculateSemanticDistance(pattern, targetType) {
+  // パターンと対象タイプ間のセマンティック親和性
+  const semanticAffinities = {
+    answer: [/答え/, /回答/, /answer/, /意見/, /予想/],
+    reason: [/理由/, /根拠/, /reason/, /なぜ/, /説明/],
+    name: [/名前/, /氏名/, /name/, /お名前/],
+    class: [/クラス/, /class/, /組/, /学級/]
+  };
+
+  const targetAffinities = semanticAffinities[targetType] || [];
+  const patternStr = pattern.replace(/^\/|\/$/g, '');
+
+  // パターンが対象タイプの親和性キーワードを含むかチェック
+  const affinityScore = targetAffinities.some(affinity =>
+    affinity.test(patternStr)
+  ) ? 1.0 : 0.3;
+
+  return affinityScore;
+}
+
+/**
+ * パターン複雑度計算
+ */
+function calculatePatternComplexity(pattern) {
+  // 複雑なパターンほど高い特異性を持つ
+  const complexityFactors = {
+    quantifiers: (/[+*?{]/.test(pattern) ? 0.3 : 0.0),      // 量詞
+    characterClasses: (/\[.*\]/.test(pattern) ? 0.2 : 0.0), // 文字クラス
+    alternation: (/\|/.test(pattern) ? 0.2 : 0.0),          // 選択
+    lookahead: (/\(\?=/.test(pattern) ? 0.3 : 0.0)         // 先読み
+  };
+
+  return Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 0);
+}
+
+/**
+ * 🎯 制約付き重み最適化（Constrained Weight Optimization）
+ * @param {Object} originalWeights 元の重み設定
+ * @param {Object} adjustments 調整パラメータ
+ * @returns {Object} 最適化された重み
+ */
+function optimizeWeightsWithConstraints(originalWeights, adjustments) {
+  // 制約条件: Σweight = 1.0, 0.01 ≤ weight ≤ 0.7
+  const MIN_WEIGHT = 0.01;
+  const MAX_WEIGHT = 0.7;
+  const TARGET_SUM = 1.0;
+
+  // 初期調整の適用
+  const adjustedWeights = {
+    headerWeight: originalWeights.headerWeight * adjustments.headerReduction,
+    contentWeight: originalWeights.contentWeight,
+    linguisticWeight: originalWeights.linguisticWeight,
+    contextWeight: originalWeights.contextWeight * adjustments.contextBoost,
+    semanticWeight: originalWeights.semanticWeight * adjustments.semanticBoost
+  };
+
+  // 制約違反のチェックと修正
+  const weightKeys = Object.keys(adjustedWeights);
+
+  // 1. 個別制約の適用（最小・最大値）
+  for (const key of weightKeys) {
+    adjustedWeights[key] = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, adjustedWeights[key]));
+  }
+
+  // 2. 合計制約の適用（Lagrange乗数法の簡易版）
+  const currentSum = Object.values(adjustedWeights).reduce((sum, weight) => sum + weight, 0);
+
+  if (Math.abs(currentSum - TARGET_SUM) > 0.001) {
+    // 重み正規化が必要
+    const scaleFactor = TARGET_SUM / currentSum;
+
+    // 優先順位付き調整（重要度の低い重みから調整）
+    const priorityOrder = ['linguisticWeight', 'contentWeight', 'headerWeight', 'semanticWeight', 'contextWeight'];
+
+    for (const key of priorityOrder) {
+      adjustedWeights[key] *= scaleFactor;
+
+      // 制約範囲内に収める
+      adjustedWeights[key] = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, adjustedWeights[key]));
+    }
+
+    // 最終正規化（微調整）
+    const finalSum = Object.values(adjustedWeights).reduce((sum, weight) => sum + weight, 0);
+    if (Math.abs(finalSum - TARGET_SUM) > 0.01) {
+      const microAdjustment = (TARGET_SUM - finalSum) / weightKeys.length;
+      for (const key of weightKeys) {
+        adjustedWeights[key] += microAdjustment;
+        adjustedWeights[key] = Math.max(MIN_WEIGHT, Math.min(MAX_WEIGHT, adjustedWeights[key]));
+      }
+    }
+  }
+
+  // 3. 最終検証
+  const optimizedSum = Object.values(adjustedWeights).reduce((sum, weight) => sum + weight, 0);
+  console.debug(`🎯 重み最適化検証: 合計=${optimizedSum.toFixed(3)}, 目標=1.000`);
+
+  return adjustedWeights;
 }
 
 /**
@@ -1931,7 +2204,6 @@ function analyzeLinguisticPatterns(samples, targetType) {
  */
 function analyzeContextualClues(header, index, allHeaders, targetType) {
   let score = 0;
-  const headerLower = header.toLowerCase();
 
   // 列位置による推論
   const totalColumns = allHeaders.length;
