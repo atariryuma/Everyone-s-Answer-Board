@@ -246,8 +246,8 @@
         initializeAccessRestrictedIcons();
       }
 
-      // IconLibraryが後から読み込まれる場合に備えて
-      setTimeout(initializeAccessRestrictedIcons, 100);
+      // CLAUDE.md V8 compliant: requestIdleCallback for icon initialization
+      requestIdleCallback(initializeAccessRestrictedIcons, { timeout: 100 });
 
       // アプリ設定リンクの動的URL生成（本番URLを取得して生成）
       document.addEventListener('DOMContentLoaded', function() {

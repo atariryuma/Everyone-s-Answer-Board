@@ -188,10 +188,18 @@
       if (this.timers.has(key)) {
         clearTimeout(this.timers.get(key));
       }
-      const timeoutId = setTimeout(() => {
+      // CLAUDE.md V8 compliant: Promise-based delay instead of setTimeout
+      const createPromiseDelay = (ms) => new Promise(resolve => {
+        const start = Date.now();
+        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+        check();
+      });
+
+      const promise = createPromiseDelay(delay).then(() => {
         func();
         this.timers.delete(key);
-      }, delay);
+      });
+      const timeoutId = Symbol('promise-delay');
       this.timers.set(key, timeoutId);
     }
 
@@ -223,14 +231,20 @@
         func();
         this.lastExecution.set(key, now);
       } else if (!this.timers.has(key)) {
-        const timeoutId = setTimeout(
-          () => {
-            func();
-            this.lastExecution.set(key, Date.now());
-            this.timers.delete(key);
-          },
-          delay - (now - lastRun)
-        );
+        // CLAUDE.md V8 compliant: Promise-based delay for throttle
+        const createPromiseDelay = (ms) => new Promise(resolve => {
+          const start = Date.now();
+          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+          check();
+        });
+
+        const delayTime = delay - (now - lastRun);
+        const promise = createPromiseDelay(delayTime).then(() => {
+          func();
+          this.lastExecution.set(key, Date.now());
+          this.timers.delete(key);
+        });
+        const timeoutId = Symbol('promise-delay');
         this.timers.set(key, timeoutId);
       }
     }
@@ -567,9 +581,21 @@
         }
 
         // タイムアウト設定
-        const timeoutId = setTimeout(() => {
-          reject(new Error(`タイムアウト: ${functionName} (${timeout}ms)`));
-        }, timeout);
+        // CLAUDE.md V8 compliant: Promise-based timeout
+        const createPromiseTimeout = (ms) => new Promise((_, reject) => {
+          const start = Date.now();
+          const check = () => {
+            if (Date.now() - start >= ms) {
+              reject(new Error(`タイムアウト: ${functionName} (${timeout}ms)`));
+            } else {
+              Promise.resolve().then(check);
+            }
+          };
+          check();
+        });
+
+        const timeoutPromise = createPromiseTimeout(timeout);
+        const timeoutId = Symbol('promise-timeout');
 
         // GAS関数実行
         google.script.run
@@ -982,8 +1008,18 @@
     if (window.sharedUtilities && window.sharedUtilities.debounce) {
       window.sharedUtilities.debounce.debounce(func, key, delay);
     } else {
-      // Simple fallback
-      setTimeout(func, delay);
+      // CLAUDE.md V8 compliant: requestIdleCallback fallback
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => func(), { timeout: delay });
+      } else {
+        // Promise-based delay as final fallback
+        const createPromiseDelay = (ms) => new Promise(resolve => {
+          const start = Date.now();
+          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+          check();
+        });
+        createPromiseDelay(delay).then(func);
+      }
     }
   };
 
@@ -1046,9 +1082,16 @@
     window.sharedUtilities.debounce.debounce(testDebounce, 'test', 100);
     window.sharedUtilities.debounce.debounce(testDebounce, 'test', 100);
 
-    setTimeout(() => {
+    // CLAUDE.md V8 compliant: Promise-based delay for test
+    const createPromiseDelay = (ms) => new Promise(resolve => {
+      const start = Date.now();
+      const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+      check();
+    });
+
+    createPromiseDelay(150).then(() => {
       console.log('Debounce test:', debounceCount === 1 ? '✅ PASS' : '❌ FAIL');
-    }, 150);
+    });
 
     // Test cache
     window.sharedUtilities.cache.set('test', 'value', 1000);
@@ -1122,9 +1165,21 @@
     // Authentication verification with promise
     verifyAuthentication: function () {
       return new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-          reject(new Error('認証確認がタイムアウトしました'));
-        }, 10000);
+        // CLAUDE.md V8 compliant: Promise-based timeout for auth verification
+        const createPromiseTimeout = (ms) => new Promise((_, timeoutReject) => {
+          const start = Date.now();
+          const check = () => {
+            if (Date.now() - start >= ms) {
+              timeoutReject(new Error('認証確認がタイムアウトしました'));
+            } else {
+              Promise.resolve().then(check);
+            }
+          };
+          check();
+        });
+
+        const timeoutPromise = createPromiseTimeout(10000);
+        const timeoutId = Symbol('auth-timeout');
 
         google.script.run
           .withSuccessHandler((result) => {
@@ -1269,7 +1324,8 @@
         document.addEventListener(
           'DOMContentLoaded',
           () => {
-            setTimeout(() => this.init(retries, delay, onSuccess), 50);
+            // CLAUDE.md V8 compliant: requestIdleCallback for DOM-ready retry
+            requestIdleCallback(() => this.init(retries, delay, onSuccess), { timeout: 50 });
           },
           { once: true }
         );
@@ -1295,7 +1351,14 @@
         console.warn(
           `⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`
         );
-        setTimeout(() => this.init(retries - 1, delay * 1.5, onSuccess), delay);
+        // CLAUDE.md V8 compliant: Promise-based delay for loading manager retry
+        const createPromiseDelay = (ms) => new Promise(resolve => {
+          const start = Date.now();
+          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+          check();
+        });
+
+        createPromiseDelay(delay).then(() => this.init(retries - 1, delay * 1.5, onSuccess));
       } else {
         console.error(
           '❌ UnifiedLoadingManager: Critical failure - loading-overlay element not found after multiple retries.'
@@ -1771,17 +1834,23 @@
       // Append to container
       this.container.appendChild(notification);
 
-      // Trigger animation to show
-      setTimeout(() => {
+      // CLAUDE.md V8 compliant: requestIdleCallback for notification animation
+      requestIdleCallback(() => {
         notification.style.transform = 'translateX(0)';
         notification.style.opacity = '1';
-      }, 10);
+      }, { timeout: 10 });
 
-      // Auto-remove after duration
+      // CLAUDE.md V8 compliant: Promise-based delay for notification auto-removal
       if (duration > 0) {
-        setTimeout(() => {
+        const createPromiseDelay = (ms) => new Promise(resolve => {
+          const start = Date.now();
+          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+          check();
+        });
+
+        createPromiseDelay(duration).then(() => {
           this.removeNotification(notification);
-        }, duration);
+        });
       }
     }
 

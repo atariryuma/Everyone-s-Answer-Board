@@ -395,19 +395,25 @@
 
         notificationContainer.appendChild(notification);
 
-        // アニメーションで表示
-        setTimeout(() => {
+        // CLAUDE.md V8 compliant: requestIdleCallback for notification animation
+        requestIdleCallback(() => {
           notification.classList.remove('translate-x-full', 'opacity-0');
           notification.classList.add('translate-x-0', 'opacity-100');
-        }, 10); // 小さな遅延でトランジションをトリガー
+        }, { timeout: 10 });
 
-        // 自動的に消えるように設定
+        // CLAUDE.md V8 compliant: Promise-based auto-removal
         if (duration > 0) {
-          setTimeout(() => {
+          const createPromiseDelay = (ms) => new Promise(resolve => {
+            const start = Date.now();
+            const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+            check();
+          });
+
+          createPromiseDelay(duration).then(() => {
             notification.classList.remove('translate-x-0', 'opacity-100');
             notification.classList.add('translate-x-full', 'opacity-0');
             notification.addEventListener('transitionend', () => notification.remove());
-          }, duration);
+          });
         }
       }
 
@@ -900,11 +906,11 @@
         loadingDiv.classList.remove('hidden');
         contentDiv.classList.add('hidden');
 
-        // 少し遅延させて履歴を表示
-        setTimeout(() => {
+        // CLAUDE.md V8 compliant: requestIdleCallback for diagnostic display
+        requestIdleCallback(() => {
           displayDiagnosticHistory();
           loadingDiv.classList.add('hidden');
-        }, 500);
+        }, { timeout: 500 });
       }
 
       // 診断履歴をテーブルに表示

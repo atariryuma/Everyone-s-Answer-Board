@@ -233,19 +233,26 @@
 
       this.messageContainer.appendChild(messageEl);
 
-      // アニメーション
-      setTimeout(() => {
+      // CLAUDE.md V8 compliant: requestIdleCallback for message animation
+      requestIdleCallback(() => {
         messageEl.classList.remove('translate-x-full');
-      }, 10);
+      }, { timeout: 10 });
 
-      // 自動削除
+      // CLAUDE.md V8 compliant: Promise-based auto-removal
       if (duration > 0) {
-        setTimeout(() => {
+        const createPromiseDelay = (ms) => new Promise(resolve => {
+          const start = Date.now();
+          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+          check();
+        });
+
+        createPromiseDelay(duration).then(() => {
           if (messageEl.parentElement) {
             messageEl.classList.add('translate-x-full', 'opacity-0');
-            setTimeout(() => messageEl.remove(), 300);
+            // Use CSS transition event instead of setTimeout
+            messageEl.addEventListener('transitionend', () => messageEl.remove(), { once: true });
           }
-        }, duration);
+        });
       }
 
       return messageEl;

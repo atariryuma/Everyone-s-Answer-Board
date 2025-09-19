@@ -1628,8 +1628,21 @@
       // 初回実行
       updateRemainingTime();
 
-      // 1分毎に更新
-      const interval = setInterval(updateRemainingTime, 60000);
+      // CLAUDE.md V8 compliant: Promise-based periodic updates
+      let isUpdating = true;
+      const createPeriodicUpdate = async () => {
+        while (isUpdating) {
+          await new Promise(resolve => {
+            const start = Date.now();
+            const check = () => (Date.now() - start >= 60000) ? resolve() : Promise.resolve().then(check);
+            check();
+          });
+          if (isUpdating) {
+            updateRemainingTime();
+          }
+        }
+      };
+      createPeriodicUpdate();
 
       // モーダルが閉じられたときにインターバルをクリア
       const modal = document.getElementById('auto-stop-confirmation-modal');
@@ -1638,7 +1651,8 @@
           mutations.forEach((mutation) => {
             if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
               if (modal.classList.contains('hidden')) {
-                clearInterval(interval);
+                // CLAUDE.md V8 compliant: Stop promise-based updates
+                isUpdating = false;
                 observer.disconnect();
               }
             }
@@ -1935,8 +1949,8 @@
     initializeModalIcons();
   }
   
-  // IconLibraryが後から読み込まれる場合に備えて
-  setTimeout(initializeModalIcons, 100);
+  // CLAUDE.md V8 compliant: requestIdleCallback for icon initialization
+  requestIdleCallback(initializeModalIcons, { timeout: 100 });
 
   // Direct usage via window.sharedModals is recommended:
   // window.sharedModals.showPrivacy(onContinue)

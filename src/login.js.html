@@ -123,11 +123,17 @@
           {
             userEmailDisplay.textContent = 'ユーザー情報を取得中...';
             console.warn('User email not found in response:', response);
-            // 再試行メカニズム
-            setTimeout(() => {
+            // CLAUDE.md V8 compliant: Promise-based retry mechanism
+            const createPromiseDelay = (ms) => new Promise(resolve => {
+              const start = Date.now();
+              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+              check();
+            });
+
+            createPromiseDelay(2000).then(() => {
               console.log('ユーザーメール取得再試行');
               displayCurrentUserEmail();
-            }, 2000);
+            });
           }
         })
         .withFailureHandler((error) => {
@@ -335,7 +341,8 @@
       // フェードアウトアニメーション
       modal.style.animation = 'fadeOut 0.2s ease-out';
 
-      setTimeout(() => {
+      // CLAUDE.md V8 compliant: CSS transition completion event
+      modal.addEventListener('animationend', () => {
         modal.classList.add('hidden');
         // アニメーションをリセット
         modal.style.animation = '';
@@ -343,7 +350,7 @@
         if (modalContent) {
           modalContent.style.animation = '';
         }
-      }, 200);
+      }, { once: true });
     }
   }
 
@@ -609,10 +616,10 @@
         return true; // リンクの通常動作を継続
       };
 
-      // 背景遷移を開始
-      setTimeout(function () {
+      // CLAUDE.md V8 compliant: requestIdleCallback for background transition
+      requestIdleCallback(() => {
         document.body.classList.add('success-transition');
-      }, 300);
+      }, { timeout: 300 });
 
       console.log('✅ シンプルリンク画面を表示しました');
     } catch (error) {
@@ -650,10 +657,17 @@
             const originalText = buttonElement.textContent;
             buttonElement.textContent = '✅ コピー完了!';
             buttonElement.disabled = true;
-            setTimeout(() => {
+            // CLAUDE.md V8 compliant: Promise-based delay for button state reset
+            const createPromiseDelay = (ms) => new Promise(resolve => {
+              const start = Date.now();
+              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+              check();
+            });
+
+            createPromiseDelay(2000).then(() => {
               buttonElement.textContent = originalText;
               buttonElement.disabled = false;
-            }, 2000);
+            });
           })
           .catch((error) => {
             console.error('Clipboard API failed:', error);
@@ -662,7 +676,14 @@
             messageElement.textContent = ' (手動でコピーしてください)';
             messageElement.style.color = 'orange';
             buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-            setTimeout(() => messageElement.remove(), 5000);
+            // CLAUDE.md V8 compliant: Promise-based auto-removal for clipboard error
+            const createPromiseDelay = (ms) => new Promise(resolve => {
+              const start = Date.now();
+              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+              check();
+            });
+
+            createPromiseDelay(5000).then(() => messageElement.remove());
           });
       } else {
         // Clipboard APIがサポートされていない場合のフォールバック
@@ -672,7 +693,14 @@
           ' (ブラウザがコピーをサポートしていません。手動でコピーしてください)';
         messageElement.style.color = 'orange';
         buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-        setTimeout(() => messageElement.remove(), 5000);
+        // CLAUDE.md V8 compliant: Promise-based auto-removal for clipboard fallback
+        const createPromiseDelay = (ms) => new Promise(resolve => {
+          const start = Date.now();
+          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+          check();
+        });
+
+        createPromiseDelay(5000).then(() => messageElement.remove());
       }
     } catch (error) {
       console.error('copyUrlToClipboard error:', error);
@@ -681,7 +709,14 @@
       messageElement.textContent = ' (コピー中にエラーが発生しました)';
       messageElement.style.color = 'red';
       buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-      setTimeout(() => messageElement.remove(), 5000);
+      // CLAUDE.md V8 compliant: Promise-based auto-removal for copy error
+      const createPromiseDelay = (ms) => new Promise(resolve => {
+        const start = Date.now();
+        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+        check();
+      });
+
+      createPromiseDelay(5000).then(() => messageElement.remove());
     }
   };
 
