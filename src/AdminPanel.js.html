@@ -3164,6 +3164,51 @@
     }
   }
 
+  // フォーム情報の安全な収集（Zero-Dependency Architecture準拠）
+  function getCurrentFormInfoSafe() {
+    try {
+      const isUrlMethod = !document.getElementById('url-method')?.classList?.contains('hidden');
+
+      const titleElement = isUrlMethod ?
+        document.getElementById('url-form-title') :
+        document.getElementById('form-title');
+      const urlElement = isUrlMethod ?
+        document.getElementById('url-form-url') :
+        document.getElementById('form-url');
+
+      return {
+        formUrl: (urlElement?.href !== '#' && urlElement?.href) || null,
+        formTitle: (titleElement?.textContent !== '-' && titleElement?.textContent) || null
+      };
+    } catch (error) {
+      console.warn('getCurrentFormInfoSafe error:', error.message);
+      return { formUrl: null, formTitle: null };
+    }
+  }
+
+  // 列マッピング情報の安全な収集（V8 Runtime最適化準拠）
+  function gatherColumnSelectionsSafe() {
+    try {
+      // ✅ 既存関数の拡張（破壊的変更回避）
+      const existing = gatherColumnSelections();
+
+      // ✅ ヘッダー情報の安全な収集
+      const answerSelect = document.getElementById('answer-column-select');
+      const headers = answerSelect ?
+        Array.from(answerSelect.options).slice(1).map(opt => opt.textContent) :
+        [];
+
+      return {
+        ...existing,
+        headers,
+        verifiedAt: new Date().toISOString()
+      };
+    } catch (error) {
+      console.warn('gatherColumnSelectionsSafe error:', error.message);
+      return { mapping: {}, confidence: {}, headers: [] };
+    }
+  }
+
   // 設定収集（ドロップダウン式対応）
   function gatherConfiguration() {
     const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
@@ -3195,15 +3240,23 @@
       spreadsheetSelectValue: sourceMethod === 'list' ? document.getElementById('spreadsheet-select').value : 'N/A'
     });
 
-    // 🎯 必須データのみ送信（送信データ大幅削減）
+    // ✅ 完全なデータ収集（既存統一API活用）
+    const formInfo = getCurrentFormInfoSafe();
+    const columnMapping = gatherColumnSelectionsSafe();
+
     return {
       spreadsheetId,
       sheetName,
       displaySettings: {
-        showNames: document.getElementById('show-names').checked,
-        showReactions: document.getElementById('show-reactions').checked
+        showNames: document.getElementById('show-names')?.checked || false,
+        showReactions: document.getElementById('show-reactions')?.checked || false
       },
-      etag: (systemState && systemState.config && systemState.config.etag) || undefined,
+      // 🔧 NEW: フォーム情報追加（安全な収集）
+      formUrl: formInfo.formUrl,
+      formTitle: formInfo.formTitle,
+      // 🔧 NEW: 列マッピング追加（既存関数活用）
+      columnMapping,
+      etag: (systemState?.config?.etag) || undefined,
     };
   }
 
