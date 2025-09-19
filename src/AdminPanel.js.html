@@ -2973,7 +2973,7 @@
     // 🎯 ConfigJson最適化: 重複防止の単一責任設計
     const timestamp = new Date().toISOString();
 
-    const optimizedConfig = {
+    const baseConfig = {
       spreadsheetId,
       sheetName,
       headers: headers, // トップレベルheaders（UI表示用）
@@ -2986,29 +2986,26 @@
       etag: (systemState && systemState.config && systemState.config.etag) || undefined,
     };
 
-    if (systemState && systemState.config) {
-      // 🔧 CLAUDE.md準拠: 競合回避のため明示的フィールドマージ
-      // Object.assignの全体コピーを避け、必要なフィールドのみ選択的にマージ
-      const safeConfig = {
-        ...optimizedConfig, // 新しい設定を基本とする
-        // 既存設定から保持すべきフィールドのみ明示的に取得
-        userId: systemState.config.userId,
-        setupStatus: systemState.config.setupStatus,
-        appPublished: systemState.config.appPublished,
-        publishedAt: systemState.config.publishedAt,
-        userPermissions: systemState.config.userPermissions,
-        displaySettings: systemState.config.displaySettings,
-        // 新しい設定で明示的に上書き
-        spreadsheetId,
-        sheetName,
-        headers,
-        columnMapping: {
-          ...columnMapping,
-          headers: headers,
-          verifiedAt: timestamp // 統一されたタイムスタンプ
-        }
-      };
-      optimizedConfig = safeConfig;
+    // 🔧 CLAUDE.md準拠: const再代入エラー回避 - 条件分岐で安全な構築
+    const optimizedConfig = systemState && systemState.config ? {
+      ...baseConfig, // 新しい設定を基本とする
+      // 既存設定から保持すべきフィールドのみ明示的に取得
+      userId: systemState.config.userId,
+      setupStatus: systemState.config.setupStatus,
+      appPublished: systemState.config.appPublished,
+      publishedAt: systemState.config.publishedAt,
+      userPermissions: systemState.config.userPermissions,
+      displaySettings: systemState.config.displaySettings,
+      // 新しい設定で明示的に上書き（baseConfigで既に設定済みだが明示的に保証）
+      spreadsheetId,
+      sheetName,
+      headers,
+      columnMapping: {
+        ...columnMapping,
+        headers: headers,
+        verifiedAt: timestamp // 統一されたタイムスタンプ
+      }
+    } : baseConfig;
 
       // 🎯 ConfigJson完全同期: Derived Fields自動更新
       const isSpreadsheetChanged = optimizedConfig.spreadsheetId !== systemState.config.spreadsheetId;
