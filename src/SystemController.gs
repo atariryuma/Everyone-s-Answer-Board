@@ -481,13 +481,21 @@ function publishApplication(publishConfig) {
         userId: user.userId,
         currentSpreadsheetId: currentConfig.spreadsheetId,
         newSpreadsheetId: publishConfig?.spreadsheetId,
+        currentFormUrl: currentConfig.formUrl,
+        newFormUrl: publishConfig?.formUrl,
         currentSheetName: currentConfig.sheetName,
         newSheetName: publishConfig?.sheetName
       });
 
+      // 🔧 重要フィールドの明示的上書き（新しい値を優先）
       const updatedConfig = {
         ...currentConfig,
         ...publishConfig,
+        // 🎯 critical fields: 必ず新しい値を使用
+        formUrl: publishConfig?.formUrl || currentConfig.formUrl,
+        formTitle: publishConfig?.formTitle || currentConfig.formTitle,
+        columnMapping: publishConfig?.columnMapping || currentConfig.columnMapping,
+        // 🔧 system fields
         appPublished: true,
         publishedAt,
         setupStatus: 'completed',

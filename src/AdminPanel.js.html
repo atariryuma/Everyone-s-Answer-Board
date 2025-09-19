@@ -3044,12 +3044,15 @@
     setLoading(true);
 
     try {
-      // 🔧 根本的修正: UI状態を直接使用（getConfig依存を削除して上書き競合回避）
+      // 🔧 UI状態から完全な設定データを収集
       const config = gatherConfiguration();
 
-      console.log('📋 publishApp: UI状態から設定収集:', {
+      console.log('📋 publishApp: 完全設定データ収集:', {
         hasSpreadsheetId: !!config.spreadsheetId,
         hasSheetName: !!config.sheetName,
+        hasFormUrl: !!config.formUrl,
+        hasFormTitle: !!config.formTitle,
+        hasColumnMapping: !!config.columnMapping,
         configKeys: Object.keys(config)
       });
 
@@ -3064,29 +3067,16 @@
         return;
       }
 
-      // 🚀 UI状態に基づく公開設定作成
-      const sourceMethod = document.querySelector('input[name="source-method"]:checked')?.value || 'list';
+      // 🚀 完全な設定データを使用（gatherConfiguration()の結果を完全信頼）
+      const publishConfig = config;
 
-      // 列マッピングを現在のsystemStateから取得（UI保存済みのもの）
-      const columnMapping = (systemState && systemState.config && systemState.config.columnMapping) || {};
-
-      const publishConfig = {
-        // 🎯 UIの現在状態を反映
-        spreadsheetId: config.spreadsheetId,
-        sheetName: config.sheetName,
-        columnMapping: columnMapping,
-        etag: config.etag,
-
-        // 🎯 UI設定（統一displaySettings形式）
-        displaySettings: config.displaySettings,
-      };
-
-      console.log('📋 publishApp: UI状態反映publishConfig作成', {
-        sourceMethod,
-        spreadsheetId: config.spreadsheetId,
-        sheetName: config.sheetName,
-        hasColumnMapping: !!columnMapping,
-        publishConfigKeys: Object.keys(publishConfig)
+      console.log('📋 publishApp: 公開設定データ確認:', {
+        spreadsheetId: publishConfig.spreadsheetId,
+        sheetName: publishConfig.sheetName,
+        formUrl: publishConfig.formUrl,
+        formTitle: publishConfig.formTitle,
+        hasColumnMapping: !!publishConfig.columnMapping,
+        configSize: JSON.stringify(publishConfig).length
       });
 
       // 完全な設定でpublishApplicationを呼び出し
