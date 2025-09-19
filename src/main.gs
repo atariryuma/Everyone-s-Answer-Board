@@ -1839,22 +1839,27 @@ function getActiveFormInfo() {
     const configResult = getConfigSafe(user.userId);
     const config = configResult.success ? configResult.config : {};
 
-    // シンプルな統一ルール: URLが存在して有効な場合のみ表示
-    const isValidUrl = !!(config.formUrl && isValidFormUrl(config.formUrl));
+    // フォーム表示判定: URL存在性を優先、検証は補助的に利用
+    const hasFormUrl = !!(config.formUrl && config.formUrl.trim());
+    const isValidUrl = hasFormUrl && isValidFormUrl(config.formUrl);
 
     console.log('✅ getActiveFormInfo SUCCESS:', {
       userId: user.userId,
-      hasFormUrl: !!config.formUrl,
+      hasFormUrl,
       isValidUrl,
+      formUrl: config.formUrl || null,
       formTitle: config.formTitle || 'フォーム'
     });
 
     return {
-      success: isValidUrl,
-      shouldShow: isValidUrl,
-      formUrl: isValidUrl ? config.formUrl : null,
+      success: hasFormUrl,
+      shouldShow: hasFormUrl,  // URL存在性ベースで表示判定
+      formUrl: hasFormUrl ? config.formUrl : null,
       formTitle: config.formTitle || 'フォーム',
-      message: isValidUrl ? 'Valid form found' : 'No valid form URL configured'
+      isValidUrl,  // 検証結果も提供（デバッグ用）
+      message: hasFormUrl ?
+        (isValidUrl ? 'Valid form found' : 'Form URL found but validation failed') :
+        'No form URL configured'
     };
   } catch (error) {
     console.error('❌ getActiveFormInfo ERROR:', error.message);
@@ -1889,7 +1894,8 @@ function isValidFormUrl(url) {
     const isValidHost = validHosts.includes(urlObj.hostname);
 
     if (urlObj.hostname === 'docs.google.com') {
-      return urlObj.pathname.includes('/forms/');
+      // Google Forms URLの包括的サポート: /forms/ と /viewform を許可
+      return urlObj.pathname.includes('/forms/') || urlObj.pathname.includes('/viewform');
     }
 
     return isValidHost;

@@ -3120,12 +3120,6 @@ class StudyQuestApp {
                 !result.header.includes('読み込み') &&
                 result.header.trim() !== '') {
               this.elements.headingLabel.textContent = result.header;
-              // フッター問題文も同時更新
-              const footerElement = document.getElementById('footerQuestionText');
-              if (footerElement) {
-                footerElement.textContent = result.header;
-                footerElement.style.display = result.header ? 'block' : 'none';
-              }
               debugLog('✅ 空データ時でも問題文を表示:', result.header);
             }
             
@@ -3160,12 +3154,6 @@ class StudyQuestApp {
             // 質問文を新しいものに更新
             if (this.elements.headingLabel) {
               this.elements.headingLabel.textContent = result.header;
-              // フッター問題文も同時更新
-              const footerElement = document.getElementById('footerQuestionText');
-              if (footerElement) {
-                footerElement.textContent = result.header;
-                footerElement.style.display = result.header ? 'block' : 'none';
-              }
             }
           }
         }
@@ -3201,12 +3189,6 @@ class StudyQuestApp {
             !result.header.includes('読み込み') &&
             result.header.trim() !== '') {
           this.elements.headingLabel.textContent = result.header;
-          // フッター問題文も同時更新
-          const footerElement = document.getElementById('footerQuestionText');
-          if (footerElement) {
-            footerElement.textContent = result.header;
-            footerElement.style.display = result.header ? 'block' : 'none';
-          }
         }
 
         // Step 3: DOM update with proper sequencing (Phase 2.1)

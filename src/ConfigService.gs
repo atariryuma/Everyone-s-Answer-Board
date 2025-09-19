@@ -745,21 +745,31 @@ function hasCoreSystemProps() {
  */
 function getQuestionText(config) {
   try {
+    console.log('📝 getQuestionText START:', {
+      hasColumnMapping: !!config?.columnMapping,
+      hasHeaders: !!config?.columnMapping?.headers,
+      answerIndex: config?.columnMapping?.mapping?.answer,
+      headersLength: config?.columnMapping?.headers?.length || 0
+    });
+
     const answerIndex = config?.columnMapping?.mapping?.answer;
-    if (typeof answerIndex === 'number' && config?.headers?.[answerIndex]) {
-      const questionText = config.headers[answerIndex];
+    if (typeof answerIndex === 'number' && config?.columnMapping?.headers?.[answerIndex]) {
+      const questionText = config.columnMapping.headers[answerIndex];
       if (questionText && typeof questionText === 'string' && questionText.trim()) {
+        console.log('✅ getQuestionText SUCCESS (from headers):', questionText.trim());
         return questionText.trim();
       }
     }
 
     if (config?.formTitle && typeof config.formTitle === 'string' && config.formTitle.trim()) {
+      console.log('✅ getQuestionText SUCCESS (from formTitle):', config.formTitle.trim());
       return config.formTitle.trim();
     }
 
+    console.log('🔄 getQuestionText FALLBACK: Using default title');
     return 'Everyone\'s Answer Board';
   } catch (error) {
-    console.error('getQuestionText error:', error.message);
+    console.error('❌ getQuestionText ERROR:', error.message);
     return 'Everyone\'s Answer Board';
   }
 }
