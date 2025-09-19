@@ -38,7 +38,8 @@
       "Bash(npm run lint:*)",
       "Bash(npm run:*)",
       "Bash(for:*)",
-      "Bash(do echo \"=== $file ===\")"
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(claude --version)"
     ],
     "deny": [],
     "ask": [],
