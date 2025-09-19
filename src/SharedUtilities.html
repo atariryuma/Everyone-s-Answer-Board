@@ -1838,20 +1838,42 @@
       requestIdleCallback(() => {
         notification.style.transform = 'translateX(0)';
         notification.style.opacity = '1';
-      }, { timeout: 10 });
 
-      // CLAUDE.md V8 compliant: Promise-based delay for notification auto-removal
-      if (duration > 0) {
-        const createPromiseDelay = (ms) => new Promise(resolve => {
-          const start = Date.now();
-          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-          check();
-        });
+        // アニメーション完了後に削除タイマーを開始
+        if (duration > 0) {
+          // 表示アニメーション完了後（300ms）+ 安全マージン（100ms）
+          const animationDelay = 400;
+          this.scheduleNotificationRemoval(notification, duration + animationDelay);
+        }
+      }, { timeout: 100 });  // 10ms → 100ms: より確実な表示開始
+    }
 
-        createPromiseDelay(duration).then(() => {
-          this.removeNotification(notification);
-        });
-      }
+    // 最適化されたPromise-based遅延実装（CPU負荷削減）
+    scheduleNotificationRemoval(notification, delay) {
+      // CLAUDE.md V8準拠: 効率的な遅延実装
+      const createOptimizedDelay = (ms) => new Promise(resolve => {
+        // 100ms間隔でのチェック（CPU負荷を大幅削減）
+        const checkInterval = Math.min(100, ms / 10);
+        const start = Date.now();
+
+        const optimizedCheck = () => {
+          const elapsed = Date.now() - start;
+          if (elapsed >= ms) {
+            resolve();
+          } else {
+            // requestIdleCallbackで低優先度実行
+            requestIdleCallback(() => {
+              Promise.resolve().then(optimizedCheck);
+            }, { timeout: checkInterval });
+          }
+        };
+
+        optimizedCheck();
+      });
+
+      createOptimizedDelay(delay).then(() => {
+        this.removeNotification(notification);
+      });
     }
 
     // Remove notification with animation

@@ -1649,13 +1649,13 @@
             }
           }
         } else {
-          showError('フォーム作成に失敗しました');
+          showError(`フォーム作成に失敗しました: ${result.message || '不明なエラー'}`);
         }
         setPartialLoading(false);
       })
       .withFailureHandler(function (error) {
         console.error('フォーム作成エラー:', error);
-        showError('フォーム作成に失敗しました');
+        showError(`フォーム作成中にシステムエラーが発生しました: ${error.message || 'ネットワークエラー'}`);
         setPartialLoading(false);
       })
       .createForm(__USER_ID__, config);
@@ -2137,19 +2137,28 @@
       ]);
 
       if (result.success) {
-        showSuccess('データソースに接続しました');
-        // バッチ結果の活用
+        // 詳細な成功通知で明確なフィードバック
+        const successDetails = [];
+        successDetails.push('✅ データソース接続完了');
+
         if (result.batchResults && result.batchResults.formInfo) {
+          successDetails.push('📋 フォーム連携確認済み');
           displayFormInfo(result.batchResults.formInfo.formData, {
             status: 'linked',
             spreadsheetName: result.batchResults.formInfo.spreadsheetName
           });
         }
-        // AI検出の自動適用
+
         if (result.columnMapping) {
+          successDetails.push('🤖 AI列判定完了');
           autoApplyAIDetection(result);
           showNextStepGuidance(result);
         }
+
+        showSuccess(successDetails.join(' | '));
+
+        // 進捗状況をユーザーに明示
+        showInfo('次のステップ: 列マッピングを確認して設定を保存してください', 8000);
       } else {
         handleConnectionError(result.error, { spreadsheetId, sheetName, method: isUrlMethod ? 'URL' : 'dropdown' });
       }
