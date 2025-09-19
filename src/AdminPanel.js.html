@@ -369,11 +369,44 @@
     if (!spreadsheetSelect) return;
 
     try {
-      // スプレッドシート一覧の読み込みはラジオボタン選択時まで遅延
-      spreadsheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
-
       // systemStateから設定データを使用（重複取得を回避）
       const config = systemState.config;
+
+      // 🚀 最適化: 設定済みユーザーは軽量復元モード
+      if (config?.spreadsheetId && config?.sheetName && config?.columnMapping?.mapping) {
+        console.log('📋 設定済みユーザー: 軽量復元モード実行');
+
+        // 既存設定の直接復元（重いAPI呼び出しなし）
+        spreadsheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
+        const option = document.createElement('option');
+        option.value = config.spreadsheetId;
+        option.textContent = '現在の設定: ' + (config.spreadsheetName || config.spreadsheetId);
+        spreadsheetSelect.appendChild(option);
+        spreadsheetSelect.value = config.spreadsheetId;
+
+        // シート選択復元（loadSheetListスキップ）
+        if (sheetSelect) {
+          sheetSelect.innerHTML = '<option value="">シートを選択してください</option>';
+          const sheetOption = document.createElement('option');
+          sheetOption.value = config.sheetName;
+          sheetOption.textContent = config.sheetName;
+          sheetSelect.appendChild(sheetOption);
+          sheetSelect.value = config.sheetName;
+        }
+
+        // イベント設定
+        setupChangeEvents();
+        setupDataSourceRadioEvents();
+
+        // 列設定の軽量復元（setupColumnsで最適化実行）
+        await setupColumns(config.spreadsheetId, config.sheetName, config.columnMapping);
+        return; // 重い処理をスキップして終了
+      }
+
+      // 未設定ユーザー: 従来のフル初期化
+      console.log('🔄 未設定ユーザー: フル初期化実行');
+      spreadsheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
+
       if (config && config.spreadsheetId) {
         // 既存の設定がある場合は、その項目だけを追加
         const option = document.createElement('option');
@@ -421,7 +454,39 @@
     try {
       console.log('🔧 setupColumns: 列設定を初期化中:', { spreadsheetId, sheetName, existingColumnMapping });
 
-      // 1. まず設定から復元を試行（既存設定がある場合）
+      // 🚀 最適化: 既存マッピング優先ロジック
+      if (existingColumnMapping?.mapping && Object.keys(existingColumnMapping.mapping).length > 0) {
+        console.log('🚀 高速復元: 既存マッピング優先実行');
+
+        // API呼び出しなしで直接復元
+        const headers = existingColumnMapping.headers || [];
+        if (headers.length > 0) {
+          fillColumnDropdowns(headers, existingColumnMapping);
+
+          // 列選択の復元
+          const dropdowns = {
+            answer: document.getElementById('answer-column-select'),
+            reason: document.getElementById('reason-column-select'),
+            class: document.getElementById('class-column-select'),
+            name: document.getElementById('name-column-select'),
+          };
+
+          Object.keys(existingColumnMapping.mapping).forEach(columnType => {
+            const dropdown = dropdowns[columnType];
+            const columnIndex = existingColumnMapping.mapping[columnType];
+            if (dropdown && columnIndex !== undefined) {
+              dropdown.value = columnIndex;
+              console.log(`📋 復元: ${columnType} → ${columnIndex}列`);
+            }
+          });
+
+          console.log('✅ 設定済みマッピング復元完了');
+          return; // 重いAPI処理をスキップ
+        }
+      }
+
+      // 従来の処理: 未設定時またはheadersがない場合のみAPI呼び出し
+      console.log('🔧 API呼び出しによる列分析実行');
       const userId = __USER_ID__;
       let analysisResult;
 
@@ -1120,6 +1185,19 @@
     const maxRetries = 2;
     const gateKey = `performColumnAnalysis_${spreadsheetId}_${sheetName}`;
 
+    // 🚀 最適化: 既存マッピングキャッシュチェック
+    const existingMapping = systemState.config?.columnMapping;
+    if (existingMapping?.mapping && Object.keys(existingMapping.mapping).length > 0) {
+      console.log('📋 既存マッピング使用: performColumnAnalysis スキップ');
+      return {
+        success: true,
+        headers: existingMapping.headers || [],
+        mapping: existingMapping.mapping,
+        confidence: existingMapping.confidence || {},
+        fromCache: true
+      };
+    }
+
     if (!RequestGate.enter(gateKey)) {
       console.warn('performColumnAnalysis: 既に実行中です');
       await createPromiseDelay(1000); // 1秒待機
@@ -1138,7 +1216,7 @@
 
     try {
       return new Promise((resolve, reject) => {
-        console.log('🔍 performColumnAnalysis:', { spreadsheetId, sheetName, retryCount });
+        console.log('🔍 performColumnAnalysis: API呼び出し実行', { spreadsheetId, sheetName, retryCount });
 
         // AI分析はconnectDataSource内部で自動実行されるため、単純にヘッダー取得のみ実行
         google.script.run
