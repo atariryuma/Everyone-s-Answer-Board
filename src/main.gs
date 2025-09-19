@@ -1,4 +1,3 @@
-/* global DB, getQuestionText, validateAccess, URL */
 /**
  * main.gs - Simplified Application Entry Points
  *
@@ -13,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config, getConfigSafe, saveConfigSafe, cleanConfigFields */
+/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config, getConfigSafe, saveConfigSafe, cleanConfigFields, getQuestionText, DB, validateAccess, URL */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -218,6 +217,11 @@ function doGet(e) {
           const template = HtmlService.createTemplateFromFile('Page.html');
           template.userId = userId;
           template.userEmail = user.userEmail || null;
+
+          // 問題文設定: getQuestionTextで取得してテンプレートに渡す
+          const questionText = getQuestionText(config);
+          template.questionText = questionText || '回答ボード';
+          template.boardTitle = questionText || user.userEmail || '回答ボード';
 
           // Admin privilege detection using existing ServiceFactory pattern
           const currentEmail = Session.getActiveUser().getEmail();
