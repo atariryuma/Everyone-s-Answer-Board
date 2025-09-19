@@ -3062,76 +3062,75 @@
           .getFormInfo(spreadsheetId, sheetName);
         return;
       }
-    }
 
     // 通常の保存処理実行
     executeConfigSave();
 
     function executeConfigSave() {
-    console.log('📋 完全同期Config保存準備:', {
-      spreadsheetId: optimizedConfig.spreadsheetId,
-      sheetName: optimizedConfig.sheetName,
-      sourceKey: optimizedConfig.sourceKey,
-      spreadsheetUrl: optimizedConfig.spreadsheetUrl,
-      formUrl: optimizedConfig.formUrl || 'なし',
-      formTitle: optimizedConfig.formTitle || 'なし',
-      hasColumnMapping: !!optimizedConfig.columnMapping,
-      setupComplete: optimizedConfig.setupComplete,
-      configSize: JSON.stringify(optimizedConfig).length
-    });
+      console.log('📋 完全同期Config保存準備:', {
+        spreadsheetId: optimizedConfig.spreadsheetId,
+        sheetName: optimizedConfig.sheetName,
+        sourceKey: optimizedConfig.sourceKey,
+        spreadsheetUrl: optimizedConfig.spreadsheetUrl,
+        formUrl: optimizedConfig.formUrl || 'なし',
+        formTitle: optimizedConfig.formTitle || 'なし',
+        hasColumnMapping: !!optimizedConfig.columnMapping,
+        setupComplete: optimizedConfig.setupComplete,
+        configSize: JSON.stringify(optimizedConfig).length
+      });
 
-    google.script.run
-      .withSuccessHandler(function (result) {
-        if (result.success) {
-          console.log('✅ ConfigJson完全同期保存成功:', {
-            spreadsheetId: optimizedConfig.spreadsheetId,
-            sourceKey: optimizedConfig.sourceKey,
-            spreadsheetUrl: optimizedConfig.spreadsheetUrl,
-            formUrl: optimizedConfig.formUrl || 'なし',
-            savedHeaders: headers.length,
-            hasMapping: !!columnMapping,
-            setupComplete: true,
-            completeSyncStatus: '全フィールド更新完了'
-          });
-
-          // 🔧 CLAUDE.md準拠: systemState安全更新（競合回避）
-          if (systemState && systemState.config) {
-            // 明示的フィールドマージで意図しない上書きを防止
-            systemState.config = {
-              ...systemState.config,
-              // 列設定関連のフィールドのみ更新
+      google.script.run
+        .withSuccessHandler(function (result) {
+          if (result.success) {
+            console.log('✅ ConfigJson完全同期保存成功:', {
               spreadsheetId: optimizedConfig.spreadsheetId,
-              sheetName: optimizedConfig.sheetName,
-              headers: optimizedConfig.headers,
-              columnMapping: optimizedConfig.columnMapping,
-              setupComplete: optimizedConfig.setupComplete,
-              lastModified: optimizedConfig.lastModified || systemState.config.lastModified,
-              // 🔧 楽観的ロック: 新しいETagを更新
-              etag: result.etag || result.config?.etag || systemState.config.etag
-            };
-          }
+              sourceKey: optimizedConfig.sourceKey,
+              spreadsheetUrl: optimizedConfig.spreadsheetUrl,
+              formUrl: optimizedConfig.formUrl || 'なし',
+              savedHeaders: headers.length,
+              hasMapping: !!columnMapping,
+              setupComplete: true,
+              completeSyncStatus: '全フィールド更新完了'
+            });
 
-          // UI状態を更新
-          updateResourceButtons(optimizedConfig);
-          showSuccess('✅ 列マッピング設定が完了しました');
-        } else {
-          if (result.error === 'etag_mismatch') {
-            showInfo('設定が他で更新されました。画面を更新しました。もう一度保存してください。');
-            if (typeof loadAndApplyCurrentConfig === 'function') {
-              loadAndApplyCurrentConfig();
+            // 🔧 CLAUDE.md準拠: systemState安全更新（競合回避）
+            if (systemState && systemState.config) {
+              // 明示的フィールドマージで意図しない上書きを防止
+              systemState.config = {
+                ...systemState.config,
+                // 列設定関連のフィールドのみ更新
+                spreadsheetId: optimizedConfig.spreadsheetId,
+                sheetName: optimizedConfig.sheetName,
+                headers: optimizedConfig.headers,
+                columnMapping: optimizedConfig.columnMapping,
+                setupComplete: optimizedConfig.setupComplete,
+                lastModified: optimizedConfig.lastModified || systemState.config.lastModified,
+                // 🔧 楽観的ロック: 新しいETagを更新
+                etag: result.etag || result.config?.etag || systemState.config.etag
+              };
             }
+
+            // UI状態を更新
+            updateResourceButtons(optimizedConfig);
+            showSuccess('✅ 列マッピング設定が完了しました');
           } else {
-            console.warn('列設定の保存に失敗:', result.error);
+            if (result.error === 'etag_mismatch') {
+              showInfo('設定が他で更新されました。画面を更新しました。もう一度保存してください。');
+              if (typeof loadAndApplyCurrentConfig === 'function') {
+                loadAndApplyCurrentConfig();
+              }
+            } else {
+              console.warn('列設定の保存に失敗:', result.error);
+            }
           }
-        }
-        RequestGate.exit('saveColumnConfiguration');
-      })
-      .withFailureHandler(function (error) {
-        console.error('列設定保存エラー:', error);
-        showError('列設定の保存に失敗しました');
-        RequestGate.exit('saveColumnConfiguration');
-      })
-      .saveDraftConfiguration(optimizedConfig);
+          RequestGate.exit('saveColumnConfiguration');
+        })
+        .withFailureHandler(function (error) {
+          console.error('列設定保存エラー:', error);
+          showError('列設定の保存に失敗しました');
+          RequestGate.exit('saveColumnConfiguration');
+        })
+        .saveConfiguration(optimizedConfig);
     }
   }
 
