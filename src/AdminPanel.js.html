@@ -1254,7 +1254,7 @@
               reject(error);
             }
           })
-          .getSheets(spreadsheetId);  // ヘッダー取得のみ（AI分析はconnectDataSource内部で実行）
+          .connectDataSource(spreadsheetId, sheetName);  // AI分析結果付きでデータ取得
       });
     } catch (error) {
       RequestGate.exit(gateKey);

@@ -1879,7 +1879,6 @@ function analyzeHeaderPattern(headerLower, targetType) {
           weight: levelConfig.weight
         });
 
-        console.log(`🎯 パターン評価 [${targetType}]: ${levelName} "${pattern}" → ${Math.round(levelScore)}点`);
       }
     }
   }
@@ -1893,7 +1892,6 @@ function analyzeHeaderPattern(headerLower, targetType) {
       // 単一最高点 - 明確な選択
       const [{ score: bestScore, level: bestLevel }] = topEvaluations;
       score = bestScore;
-      console.log(`🎯 単一最適パターン [${targetType}]: ${bestLevel} → ${score}点`);
     } else {
       // 同点競合 - MCDM適用
       console.log(`🎯 同点競合検出 [${targetType}]: ${topEvaluations.length}個のパターン → MCDM適用`);
@@ -1901,7 +1899,6 @@ function analyzeHeaderPattern(headerLower, targetType) {
       const mcdmResult = resolveConflictWithMCDM(topEvaluations, headerLower, targetType);
       score = mcdmResult.finalScore;
 
-      console.log(`🎯 MCDM競合解決 [${targetType}]: ${mcdmResult.selectedPattern} → ${score}点`);
     }
   }
 
@@ -1940,7 +1937,6 @@ function analyzeHeaderPattern(headerLower, targetType) {
   const finalScore = Math.round(score * penaltyMultiplier);
 
   if (penaltyMultiplier < 1.0) {
-    console.log(`🎯 最終スコア調整 [${targetType}]: ${score} × ${penaltyMultiplier} = ${finalScore}`);
   }
 
   return finalScore;
