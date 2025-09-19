@@ -15,7 +15,7 @@
 
 /* global validateConfig */
 
-/* global ServiceFactory, URL, validateUrl, createErrorResponse, validateSpreadsheetId, Data */
+/* global ServiceFactory, URL, validateUrl, createErrorResponse, validateSpreadsheetId, Data, Auth */
 
 // ===========================================
 // 🔧 Zero-Dependency ConfigService (ServiceFactory版)
@@ -726,8 +726,9 @@ function hasCoreSystemProps() {
 // ===========================================
 
 /**
- * 動的questionText取得（configJson最適化対応）
+ * 動的questionText取得（configJson最適化対応 + 動的headers取得）
  * headers配列とcolumnMappingから実際の問題文を動的取得
+ * headersがない場合はスプレッドシートから動的取得
  * @param {Object} config - ユーザー設定オブジェクト
  * @returns {string} 問題文テキスト
  */
@@ -737,23 +738,56 @@ function getQuestionText(config) {
       hasColumnMapping: !!config?.columnMapping,
       hasHeaders: !!config?.columnMapping?.headers,
       answerIndex: config?.columnMapping?.mapping?.answer,
-      headersLength: config?.columnMapping?.headers?.length || 0
+      headersLength: config?.columnMapping?.headers?.length || 0,
+      hasSpreadsheetId: !!config?.spreadsheetId,
+      hasSheetName: !!config?.sheetName
     });
 
     const answerIndex = config?.columnMapping?.mapping?.answer;
+
+    // 1. 既存のheadersから取得を試行
     if (typeof answerIndex === 'number' && config?.columnMapping?.headers?.[answerIndex]) {
       const questionText = config.columnMapping.headers[answerIndex];
       if (questionText && typeof questionText === 'string' && questionText.trim()) {
-        console.log('✅ getQuestionText SUCCESS (from headers):', questionText.trim());
+        console.log('✅ getQuestionText SUCCESS (from stored headers):', questionText.trim());
         return questionText.trim();
       }
     }
 
+    // 2. headersがない場合、スプレッドシートから動的取得
+    if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
+      try {
+        console.log('🔄 getQuestionText: Fetching headers from spreadsheet');
+        const db = ServiceFactory.getDB();
+        if (db && db.openSpreadsheetWithServiceAccount) {
+          const auth = typeof Auth !== 'undefined' ? Auth.serviceAccount() : null;
+          if (auth && auth.isValid) {
+            const spreadsheet = db.openSpreadsheetWithServiceAccount(config.spreadsheetId, auth.token);
+            const sheet = spreadsheet.getSheetByName(config.sheetName);
+            if (sheet && sheet.getLastColumn() > 0) {
+              const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
+              if (headers && headers[answerIndex]) {
+                const questionText = headers[answerIndex];
+                if (questionText && typeof questionText === 'string' && questionText.trim()) {
+                  console.log('✅ getQuestionText SUCCESS (from dynamic headers):', questionText.trim());
+                  return questionText.trim();
+                }
+              }
+            }
+          }
+        }
+      } catch (dynamicError) {
+        console.warn('⚠️ getQuestionText: Dynamic headers fetch failed:', dynamicError.message);
+      }
+    }
+
+    // 3. formTitleからの取得
     if (config?.formTitle && typeof config.formTitle === 'string' && config.formTitle.trim()) {
       console.log('✅ getQuestionText SUCCESS (from formTitle):', config.formTitle.trim());
       return config.formTitle.trim();
     }
 
+    // 4. デフォルトフォールバック
     console.log('🔄 getQuestionText FALLBACK: Using default title');
     return 'Everyone\'s Answer Board';
   } catch (error) {
