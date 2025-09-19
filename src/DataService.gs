@@ -1612,7 +1612,7 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
   const isConflictCase = hasReasonKeywords && hasAnswerKeywords && (targetType === 'answer' || targetType === 'reason');
 
   if (isConflictCase) {
-    console.debug(`🎯 競合ケース検出 [${targetType}]: "${headerLower}" - コンテキスト重み強化`);
+    console.log(`🎯 競合ケース検出 [${targetType}]: "${headerLower}" - コンテキスト重み強化`);
   }
 
   if (headerScore >= 90) {
@@ -1658,7 +1658,7 @@ function analyzeColumnForType(header, samples, index, allHeaders, targetType) {
       semanticWeight
     } = optimizedWeights);
 
-    console.debug(`🎯 制約付き重み最適化完了 [${targetType}]: context=${(contextWeight*100).toFixed(1)}%, semantic=${(semanticWeight*100).toFixed(1)}%`);
+    console.log(`🎯 制約付き重み最適化完了 [${targetType}]: context=${(contextWeight*100).toFixed(1)}%, semantic=${(semanticWeight*100).toFixed(1)}%`);
   }
 
   totalConfidence += headerScore * headerWeight;
@@ -1807,7 +1807,7 @@ function analyzeHeaderPattern(headerLower, targetType) {
   for (const conflictPattern of conflictPatterns) {
     if (conflictPattern.pattern.test(headerLower)) {
       penaltyMultiplier *= conflictPattern.penalty; // 段階的減点
-      console.debug(`🎯 競合パターン検出 [${targetType}]: "${headerLower}" → 減点率${conflictPattern.penalty}`);
+      console.log(`🎯 競合パターン検出 [${targetType}]: "${headerLower}" → 減点率${conflictPattern.penalty}`);
       break; // 最初の競合パターンのみ適用
     }
   }
@@ -1847,7 +1847,7 @@ function analyzeHeaderPattern(headerLower, targetType) {
           weight: levelConfig.weight
         });
 
-        console.debug(`🎯 パターン評価 [${targetType}]: ${levelName} "${pattern}" → ${Math.round(levelScore)}点`);
+        console.log(`🎯 パターン評価 [${targetType}]: ${levelName} "${pattern}" → ${Math.round(levelScore)}点`);
       }
     }
   }
@@ -1861,15 +1861,15 @@ function analyzeHeaderPattern(headerLower, targetType) {
       // 単一最高点 - 明確な選択
       const [{ score: bestScore, level: bestLevel }] = topEvaluations;
       score = bestScore;
-      console.debug(`🎯 単一最適パターン [${targetType}]: ${bestLevel} → ${score}点`);
+      console.log(`🎯 単一最適パターン [${targetType}]: ${bestLevel} → ${score}点`);
     } else {
       // 同点競合 - MCDM適用
-      console.debug(`🎯 同点競合検出 [${targetType}]: ${topEvaluations.length}個のパターン → MCDM適用`);
+      console.log(`🎯 同点競合検出 [${targetType}]: ${topEvaluations.length}個のパターン → MCDM適用`);
 
       const mcdmResult = resolveConflictWithMCDM(topEvaluations, headerLower, targetType);
       score = mcdmResult.finalScore;
 
-      console.debug(`🎯 MCDM競合解決 [${targetType}]: ${mcdmResult.selectedPattern} → ${score}点`);
+      console.log(`🎯 MCDM競合解決 [${targetType}]: ${mcdmResult.selectedPattern} → ${score}点`);
     }
   }
 
@@ -1908,7 +1908,7 @@ function analyzeHeaderPattern(headerLower, targetType) {
   const finalScore = Math.round(score * penaltyMultiplier);
 
   if (penaltyMultiplier < 1.0) {
-    console.debug(`🎯 最終スコア調整 [${targetType}]: ${score} × ${penaltyMultiplier} = ${finalScore}`);
+    console.log(`🎯 最終スコア調整 [${targetType}]: ${score} × ${penaltyMultiplier} = ${finalScore}`);
   }
 
   return finalScore;
@@ -2101,7 +2101,7 @@ function optimizeWeightsWithConstraints(originalWeights, adjustments) {
 
   // 3. 最終検証
   const optimizedSum = Object.values(adjustedWeights).reduce((sum, weight) => sum + weight, 0);
-  console.debug(`🎯 重み最適化検証: 合計=${optimizedSum.toFixed(3)}, 目標=1.000`);
+  console.log(`🎯 重み最適化検証: 合計=${optimizedSum.toFixed(3)}, 目標=1.000`);
 
   return adjustedWeights;
 }
