@@ -33,7 +33,10 @@
       "Bash(git rm:*)",
       "Bash(cat:*)",
       "Bash(xxd:*)",
-      "Bash(uniq:*)"
+      "Bash(uniq:*)",
+      "WebFetch(domain:script.google.com)",
+      "Bash(npm run lint:*)",
+      "Bash(npm run:*)"
     ],
     "deny": [],
     "ask": [],

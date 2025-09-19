@@ -2231,25 +2231,51 @@ function dsAddReaction(userId, rowId, reactionType) {
       return createErrorResponse('Invalid row ID');
     }
 
-    const res = processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionType, user.userEmail);
-    if (res && (res.success || res.status === 'success')) {
-      // フロントエンド期待形式に合わせたレスポンス
+    // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時リアクション競合防止
+    const reactionKey = `reaction_${config.spreadsheetId}_${config.sheetName}_${rowIndex}`;
+
+    // eslint-disable-next-line no-undef
+    if (typeof RequestGate !== 'undefined' && !RequestGate.enter(reactionKey)) {
       return {
-        success: true,
-        reactions: res.reactions || {},
-        userReaction: res.userReaction || reactionType,
-        action: res.action || 'added',
-        message: res.message || 'リアクションを追加しました'
+        success: false,
+        message: '同じ行に対するリアクション処理が実行中です。しばらくお待ちください。'
       };
+    } else if (typeof RequestGate === 'undefined') {
+      console.warn('dsAddReaction: RequestGate not available, proceeding without row lock');
     }
 
-    return {
-      success: false,
-      message: res?.message || 'Failed to add reaction'
-    };
-  } catch (error) {
-    console.error('DataService.dsAddReaction: エラー', error.message);
-    return createExceptionResponse(error);
+    try {
+      const res = processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionType, user.userEmail);
+      if (res && (res.success || res.status === 'success')) {
+        // フロントエンド期待形式に合わせたレスポンス
+        return {
+          success: true,
+          reactions: res.reactions || {},
+          userReaction: res.userReaction || reactionType,
+          action: res.action || 'added',
+          message: res.message || 'リアクションを追加しました'
+        };
+      }
+
+      return {
+        success: false,
+        message: res?.message || 'Failed to add reaction'
+      };
+    } catch (error) {
+      console.error('DataService.dsAddReaction: エラー', error.message);
+      return createExceptionResponse(error);
+    } finally {
+      // eslint-disable-next-line no-undef
+      if (typeof RequestGate !== 'undefined') RequestGate.exit(reactionKey);
+    }
+  } catch (outerError) {
+    console.error('DataService.dsAddReaction outer error:', outerError.message);
+    if (typeof RequestGate !== 'undefined') {
+      const reactionKey = `reaction_${userId}_${rowId}`;
+      // eslint-disable-next-line no-undef
+      RequestGate.exit(reactionKey);
+    }
+    return createExceptionResponse(outerError);
   }
 }
 
@@ -2279,22 +2305,48 @@ function dsToggleHighlight(userId, rowId) {
       ? rowId
       : `row_${parseInt(rowId, 10)}`;
 
-    const result = updateHighlightInSheet(config, rowNumber);
-    if (result?.success) {
+    // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時ハイライト競合防止
+    const highlightKey = `highlight_${config.spreadsheetId}_${config.sheetName}_${rowNumber}`;
+
+    // eslint-disable-next-line no-undef
+    if (typeof RequestGate !== 'undefined' && !RequestGate.enter(highlightKey)) {
       return {
-        success: true,
-        message: 'Highlight toggled successfully',
-        highlighted: Boolean(result.highlighted)
+        success: false,
+        message: '同じ行のハイライト処理が実行中です。しばらくお待ちください。'
       };
+    } else if (typeof RequestGate === 'undefined') {
+      console.warn('dsToggleHighlight: RequestGate not available, proceeding without row lock');
     }
 
-    return {
-      success: false,
-      message: result?.error || 'Failed to toggle highlight'
-    };
-  } catch (error) {
-    console.error('DataService.dsToggleHighlight: エラー', error.message);
-    return createExceptionResponse(error);
+    try {
+      const result = updateHighlightInSheet(config, rowNumber);
+      if (result?.success) {
+        return {
+          success: true,
+          message: 'Highlight toggled successfully',
+          highlighted: Boolean(result.highlighted)
+        };
+      }
+
+      return {
+        success: false,
+        message: result?.error || 'Failed to toggle highlight'
+      };
+    } catch (error) {
+      console.error('DataService.dsToggleHighlight: エラー', error.message);
+      return createExceptionResponse(error);
+    } finally {
+      // eslint-disable-next-line no-undef
+      if (typeof RequestGate !== 'undefined') RequestGate.exit(highlightKey);
+    }
+  } catch (outerError) {
+    console.error('DataService.dsToggleHighlight outer error:', outerError.message);
+    if (typeof RequestGate !== 'undefined') {
+      const highlightKey = `highlight_${userId}_${rowId}`;
+      // eslint-disable-next-line no-undef
+      RequestGate.exit(highlightKey);
+    }
+    return createExceptionResponse(outerError);
   }
 }
 

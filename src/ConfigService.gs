@@ -658,22 +658,62 @@ function calculateCompletionScore(config) {
  */
 function clearConfigCache(userId) {
   try {
-    const cacheKey = `config_${userId}`;
-    ServiceFactory.getCache().remove(cacheKey);
-    console.info('clearConfigCache: キャッシュクリア完了', { userId });
+    const cache = ServiceFactory.getCache();
+
+    // 🔧 CLAUDE.md準拠: 依存関係キャッシュの完全無効化
+    const keysToRemove = [
+      `config_${userId}`,           // 設定キャッシュ
+      `user_${userId}`,             // ユーザーキャッシュ
+      `board_data_${userId}`,       // ボードデータキャッシュ
+      `admin_panel_${userId}`,      // 管理パネルデータ
+      `question_text_${userId}`     // 質問テキストキャッシュ
+    ];
+
+    // 一括削除でパフォーマンス向上
+    if (keysToRemove.length > 0) {
+      cache.removeAll(keysToRemove);
+    }
+
+    console.info('clearConfigCache: 依存関係キャッシュクリア完了', {
+      userId: `${userId.substring(0, 8)}***`,
+      keysCleared: keysToRemove.length
+    });
   } catch (error) {
     console.warn('clearConfigCache: キャッシュクリアエラー', error.message);
   }
 }
 
 /**
- * 全設定キャッシュクリア
+ * 全設定キャッシュクリア（特定ユーザー群用）
  */
-function clearAllConfigCache() {
+function clearAllConfigCache(userIds = []) {
   try {
-    // 個別キャッシュクリアは困難なため、プリフィックスパターンでクリア
-    console.info('clearAllConfigCache: 全設定キャッシュクリア実行');
-    // Note: GASにはワイルドカードクリア機能がないため、必要に応じて個別にクリア
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      console.warn('clearAllConfigCache: ユーザーID配列が空または無効');
+      return;
+    }
+
+    // 特定ユーザー群のキャッシュを一括クリア
+    const allKeysToRemove = [];
+    userIds.forEach(userId => {
+      if (typeof userId === 'string' && userId.trim()) {
+        allKeysToRemove.push(
+          `config_${userId}`,
+          `user_${userId}`,
+          `board_data_${userId}`,
+          `admin_panel_${userId}`,
+          `question_text_${userId}`
+        );
+      }
+    });
+
+    if (allKeysToRemove.length > 0) {
+      ServiceFactory.getCache().removeAll(allKeysToRemove);
+      console.info('clearAllConfigCache: ユーザー群キャッシュクリア完了', {
+        userCount: userIds.length,
+        keysCleared: allKeysToRemove.length
+      });
+    }
   } catch (error) {
     console.warn('clearAllConfigCache: エラー', error.message);
   }
@@ -882,6 +922,35 @@ function saveConfigSafe(userId, config, options = {}) {
   }
 
   try {
+    // 🔧 CLAUDE.md準拠: 楽観的ロック（ETag）検証の実装
+    if (config.etag) {
+      const user = Data.getUser(userId);
+      if (user && user.configJson) {
+        try {
+          const currentConfig = JSON.parse(user.configJson);
+          const currentETag = currentConfig.etag || currentConfig.lastModified;
+
+          if (currentETag && config.etag !== currentETag) {
+            console.warn('saveConfigSafe: ETag mismatch detected', {
+              userId: `${userId.substring(0, 8)}***`,
+              requestETag: config.etag,
+              currentETag
+            });
+
+            return {
+              success: false,
+              error: 'etag_mismatch',
+              message: 'Configuration has been modified by another user',
+              currentConfig
+            };
+          }
+        } catch (parseError) {
+          console.warn('saveConfigSafe: Current config parse error for ETag validation:', parseError.message);
+          // パースエラーの場合は競合チェックをスキップして続行
+        }
+      }
+    }
+
     // 1. 統合検証・サニタイズ（既存validateAndSanitizeConfig利用）
     const validation = validateAndSanitizeConfig(config, userId);
     if (!validation.success) {
@@ -895,13 +964,20 @@ function saveConfigSafe(userId, config, options = {}) {
     // 2. 共通フィールドクリーンアップ
     const cleanedConfig = cleanConfigFields(validation.data, options);
 
-    // 3. タイムスタンプ更新
+    // 3. タイムスタンプ更新とETag生成
     cleanedConfig.lastModified = new Date().toISOString();
     if (!cleanedConfig.lastAccessedAt) {
       cleanedConfig.lastAccessedAt = cleanedConfig.lastModified;
     }
 
-    // 4. Zero-Dependency: 直接Data.updateUser呼び出し
+    // 🔧 CLAUDE.md準拠: 楽観的ロック用ETag生成
+    cleanedConfig.etag = `${cleanedConfig.lastModified  }_${  Math.random().toString(36).substring(2, 15)}`;
+
+    // 4. 🔧 CLAUDE.md準拠: 書き込み前キャッシュ無効化 - 同期ギャップ防止
+    clearConfigCache(userId);
+    console.log('saveConfigSafe: 書き込み前キャッシュクリア完了');
+
+    // 5. Zero-Dependency: 直接Data.updateUser呼び出し
     const updateResult = Data.updateUser(userId, {
       configJson: JSON.stringify(cleanedConfig),
       lastModified: cleanedConfig.lastModified
@@ -914,13 +990,19 @@ function saveConfigSafe(userId, config, options = {}) {
       };
     }
 
-    // 5. キャッシュクリア
+    // 6. 🔧 CLAUDE.md準拠: 書き込み後的確キャッシュ無効化 - 最終一貫性保証
     clearConfigCache(userId);
+    console.log('saveConfigSafe: 書き込み後的確キャッシュクリア完了', {
+      userId: `${userId.substring(0, 8)}***`,
+      newETag: cleanedConfig.etag
+    });
 
     return {
       success: true,
       message: 'Config saved successfully',
       data: cleanedConfig,
+      config: cleanedConfig, // フロントエンド互換性のため
+      etag: cleanedConfig.etag, // 楽観的ロック用
       userId
     };
 

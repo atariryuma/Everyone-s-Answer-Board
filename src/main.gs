@@ -80,14 +80,61 @@ function doGet(e) {
           const db = ServiceFactory.getDB();
           let user = Data.findUserByEmail(email);
 
-          // Auto-create admin user if not exists - with enhanced error handling
+          // 🔧 CLAUDE.md準拠: 競合状態防止 - 管理者ユーザー作成のRequestGate保護
           if (!user) {
-            try {
-              const userService = ServiceFactory.getUserService();
-              if (userService && typeof userService.createUser === 'function') {
-                user = Data.createUser(email);
-              } else {
-                console.warn('UserService.createUser not available, creating minimal user object');
+            const createUserKey = `create_admin_user_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+            // RequestGateで同時作成を防止 (オプショナル依存)
+            // eslint-disable-next-line no-undef
+            if (typeof RequestGate !== 'undefined' && !RequestGate.enter(createUserKey)) {
+              // 他のリクエストが作成中 - 再度確認
+              console.info('Admin user creation in progress, re-checking...');
+              Utilities.sleep(500); // 短時間待機
+              user = Data.findUserByEmail(email);
+
+              if (!user) {
+                console.warn('Admin user creation conflict detected');
+                user = {
+                  userId: null,
+                  userEmail: email,
+                  isActive: true,
+                  configJson: JSON.stringify({
+                    setupStatus: 'pending',
+                    appPublished: false,
+                    createdAt: new Date().toISOString()
+                  }),
+                  lastModified: new Date().toISOString()
+                };
+              }
+            } else {
+              try {
+                // 二重チェック: RequestGate内で再度確認
+                user = Data.findUserByEmail(email);
+                if (!user) {
+                  const userService = ServiceFactory.getUserService();
+                  if (userService && typeof userService.createUser === 'function') {
+                    user = Data.createUser(email);
+                    console.log('✅ Admin user created successfully via UserService');
+                  } else {
+                    console.warn('UserService.createUser not available, creating minimal user object');
+                    user = {
+                      userId: Utilities.getUuid(),
+                      userEmail: email,
+                      isActive: true,
+                      configJson: JSON.stringify({
+                        setupStatus: 'pending',
+                        appPublished: false,
+                        createdAt: new Date().toISOString()
+                      }),
+                      lastModified: new Date().toISOString()
+                    };
+                  }
+                } else {
+                  console.log('✅ Admin user found during RequestGate (created by concurrent request)');
+                }
+              } catch (createError) {
+                console.warn('Failed to create admin user via UserService:', createError.message);
+                // Fallback: create minimal user object without database write
                 user = {
                   userId: Utilities.getUuid(),
                   userEmail: email,
@@ -99,21 +146,10 @@ function doGet(e) {
                   }),
                   lastModified: new Date().toISOString()
                 };
+              } finally {
+                // eslint-disable-next-line no-undef
+                RequestGate.exit(createUserKey);
               }
-            } catch (createError) {
-              console.warn('Failed to create admin user via UserService:', createError.message);
-              // Fallback: create minimal user object without database write
-              user = {
-                userId: Utilities.getUuid(),
-                userEmail: email,
-                isActive: true,
-                configJson: JSON.stringify({
-                  setupStatus: 'pending',
-                  appPublished: false,
-                  createdAt: new Date().toISOString()
-                }),
-                lastModified: new Date().toISOString()
-              };
             }
           }
 
@@ -594,20 +630,37 @@ function getUserConfig(userId) {
     let user = db.findUserById(userId);
 
     if (!user) {
-      // Auto-create user if it's a system admin - with enhanced safety
+      // 🔧 CLAUDE.md準拠: 競合状態防止 - getUserConfigでのユーザー作成保護
       const userService = ServiceFactory.getUserService();
       if (userService && userService.isSystemAdmin(email)) {
-        try {
-          const userByEmail = db.findUserByEmail(email);
-          if (userByEmail && userByEmail.userId === userId) {
-            user = userByEmail;
-          } else if (typeof userService.createUser === 'function') {
-            user = userService.createUser(email);
-          } else {
-            console.warn('UserService.createUser not available for admin user creation');
+        const createUserKey = `create_user_config_${userId}`;
+
+        // eslint-disable-next-line no-undef
+        if (typeof RequestGate !== 'undefined' && !RequestGate.enter(createUserKey)) {
+          console.info('User creation for config in progress, re-checking...');
+          Utilities.sleep(300);
+          user = db.findUserById(userId);
+        } else if (typeof RequestGate !== 'undefined') {
+          try {
+            // 二重チェック: RequestGate内で再度確認
+            user = db.findUserById(userId);
+            if (!user) {
+              const userByEmail = db.findUserByEmail(email);
+              if (userByEmail && userByEmail.userId === userId) {
+                user = userByEmail;
+              } else if (typeof userService.createUser === 'function') {
+                user = userService.createUser(email);
+                console.log('✅ User created successfully for getUserConfig');
+              } else {
+                console.warn('UserService.createUser not available for admin user creation');
+              }
+            }
+          } catch (createError) {
+            console.warn('Failed to auto-create admin user:', createError.message);
+          } finally {
+            // eslint-disable-next-line no-undef
+            if (typeof RequestGate !== 'undefined') RequestGate.exit(createUserKey);
           }
-        } catch (createError) {
-          console.warn('Failed to auto-create admin user:', createError.message);
         }
       }
 
@@ -1984,5 +2037,69 @@ function getIncrementalSheetData(sheetName, options = {}) {
       totalCount: 0,
       timestamp: new Date().toISOString()
     };
+  }
+}
+
+// ===========================================
+// 🔄 CLAUDE.md準拠: GAS-side Trigger-Based Polling System
+// ===========================================
+
+/**
+ * GAS Server-side trigger-based polling endpoint
+ * Replaces client-side setInterval with server-initiated updates
+ * @param {Object} options - Polling options
+ * @returns {Object} Polling response with trigger status
+ */
+function triggerPollingUpdate(options = {}) {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
+    }
+
+    // デフォルト設定（CLAUDE.md準拠: 性能最適化）
+    const pollOptions = {
+      maxBatchSize: options.maxBatchSize || 100,
+      timeoutMs: options.timeoutMs || 5000,
+      includeMetadata: options.includeMetadata !== false,
+      ...options
+    };
+
+    // サーバーサイド統合チェック
+    const newContentResult = detectNewContent(options.lastUpdateTime);
+
+    // 新しいコンテンツがある場合のみデータ取得
+    if (newContentResult.success && newContentResult.hasNewContent) {
+      const db = ServiceFactory.getDB();
+      const user = db.findUserByEmail(email);
+
+      if (user && user.activeSheetName) {
+        const sheetResult = getIncrementalSheetData(user.activeSheetName, pollOptions);
+
+        return {
+          success: true,
+          triggerType: 'server-side',
+          hasUpdates: true,
+          contentUpdate: newContentResult,
+          sheetData: sheetResult,
+          serverTimestamp: new Date().toISOString(),
+          pollOptions
+        };
+      }
+    }
+
+    // 更新なしの場合
+    return {
+      success: true,
+      triggerType: 'server-side',
+      hasUpdates: false,
+      contentUpdate: newContentResult,
+      serverTimestamp: new Date().toISOString(),
+      pollOptions
+    };
+
+  } catch (error) {
+    console.error('triggerPollingUpdate error:', error.message);
+    return createExceptionResponse(error, 'Polling trigger failed');
   }
 }

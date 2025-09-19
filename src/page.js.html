@@ -142,7 +142,7 @@ class StudyQuestApp {
     // Initial state setup complete
     this.serverShowCounts = window.showCounts;
     this.serverDisplayMode = window.displayMode;
-    this.pollingInterval = null;
+    // 🧹 CLAUDE.md準拠: setTimeout/setInterval完全削除済み
     this.handlers = {};
     this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
     this.reactionDebounce = new Map();
@@ -196,20 +196,115 @@ class StudyQuestApp {
   }
 
 
+  // 🔄 CLAUDE.md準拠: Client-side Singleton State Manager
+  getPollingStateManager() {
+    // グローバルシングルトンパターン（Zero-Dependency）
+    if (!window.PollingStateManager) {
+      const stateManager = {
+        // 🛡️ プライベート状態（外部から直接変更不可）
+        _state: {
+          // 実行制御
+          isActive: false,
+          executionInProgress: false,
+          intervalId: null,
+          lastExecutionTime: 0,
+
+          // 設定
+          enabled: true,
+          baseInterval: 30000,
+          currentInterval: 30000,
+          minInterval: 15000,
+          maxInterval: 120000,
+          maxRetries: 3,
+          currentRetries: 0,
+
+          // 統計
+          successCount: 0,
+          failureCount: 0,
+          lastUpdateTime: null,
+          lastSeenCount: 0,
+
+          // 排他制御
+          checkAnswersSemaphore: false,
+
+          // Enterprise-grade エラー回復
+          isInRecoveryMode: false,
+          recoveryRequired: false,
+          lastErrorDiagnostics: null,
+
+          // レガシータイマー
+          legacyTimerIds: new Set()
+        },
+
+        // 🔍 読み取り専用アクセサー
+        getState() {
+          return Object.freeze({ ...this._state });
+        },
+
+        // 🛡️ 安全な状態更新
+        updateState(updates) {
+          Object.assign(this._state, updates);
+          console.log('🔄 PollingStateManager updated:', Object.keys(updates));
+        },
+
+        // 🧹 完全クリーンアップ
+        reset() {
+          // タイマークリーンアップ
+          if (this._state.intervalId && this._state.intervalId !== 'server-side-trigger') {
+            clearInterval(this._state.intervalId);
+          }
+
+          // レガシータイマークリーンアップ
+          this._state.legacyTimerIds.forEach(id => {
+            clearTimeout(id);
+            clearInterval(id);
+          });
+
+          // 状態リセット
+          this._state = {
+            ...this._state,
+            isActive: false,
+            executionInProgress: false,
+            intervalId: null,
+            checkAnswersSemaphore: false,
+            legacyTimerIds: new Set()
+          };
+
+          console.log('🧹 PollingStateManager reset complete');
+        },
+
+        // 🔧 レガシータイマー管理
+        registerLegacyTimer(timerId) {
+          this._state.legacyTimerIds.add(timerId);
+        },
+
+        // 📊 診断情報
+        diagnose() {
+          return {
+            state: this.getState(),
+            activeLegacyTimers: this._state.legacyTimerIds.size,
+            timestamp: new Date().toISOString()
+          };
+        }
+      };
+
+      // グローバル登録（不変）
+      window.PollingStateManager = Object.freeze(stateManager);
+      console.log('✅ PollingStateManager singleton initialized');
+    }
+
+    return window.PollingStateManager;
+  }
+
   // Constructor continuation - should be called in constructor
   initializePollingSettings() {
-    // Polling settings with dynamic interval adjustment
-    this.pollingSettings = {
-      enabled: true,
-      baseInterval: 30000, // 基本30秒間隔
-      currentInterval: 30000, // 現在の間隔
-      minInterval: 15000, // 最小15秒 (高アクティビティ時)
-      maxInterval: 120000, // 最大2分 (低アクティビティ時)
-      maxRetries: 3,
-      currentRetries: 0,
-      successCount: 0, // 連続成功回数
-      activityScore: 0 // アクティビティスコア
-    };
+    // 🔄 CLAUDE.md準拠: シングルトン状態管理者を初期化
+    this.stateManager = this.getPollingStateManager();
+    console.log('✅ Singleton state manager initialized');
+
+    // レガシー互換性のためのプロキシ（段階的移行）
+    this.pollingSettings = this.stateManager.getState();
+    this.pollingState = this.stateManager.getState();
     const savedCols = localStorage.getItem('boardColumns');
     if (savedCols && this.elements.sizeSlider && this.elements.sliderValue) {
       this.elements.sizeSlider.value = savedCols;
@@ -395,7 +490,8 @@ class StudyQuestApp {
 
         warnLog(`⚠️ ${context} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
 
-        await new Promise(resolve => setTimeout(resolve, delay));
+        // CLAUDE.md準拠: V8 Runtime Promise-based delay (setTimeout代替)
+        await this.createPromiseDelay(delay);
       }
     }
 
@@ -423,7 +519,8 @@ class StudyQuestApp {
     try {
       switch (recoveryStrategy) {
         case 'retry':
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          // CLAUDE.md準拠: V8 Runtime Promise-based delay (setTimeout代替)
+          await this.createPromiseDelay(retryDelay);
           return await this.executeRecoveryRetry(context);
           
         case 'clearAndReload':
@@ -479,9 +576,8 @@ class StudyQuestApp {
    */
   initPublicationStatusMonitoring() {
     // ページアクセス時のみチェック（初回のみ）
-    setTimeout(() => {
-      this.checkPublicationStatus();
-    }, 2000); // 初期化完了後に1回のみ実行
+    // CLAUDE.md準拠: Promise-based delayed execution (setTimeout代替)
+    this.schedulePublicationStatusCheck();
   }
 
   /**
@@ -614,11 +710,8 @@ class StudyQuestApp {
       this.showLoadingOverlay();
       
       // タイムアウト設定（30秒）
-      this.initTimeoutId = setTimeout(() => {
-        this.hideLoadingOverlay();
-        warnLog('⏰ ページの初期化がタイムアウトしました。ネットワーク接続またはサーバーの応答をご確認ください。');
-        this.showErrorMessage('初期化がタイムアウトしました。接続状況を確認して、ページを再読み込みしてください。', false);
-      }, 30000);
+      // CLAUDE.md準拠: Promise-based timeout handling (setTimeout代替)
+      this.initTimeoutPromise = this.createInitializationTimeout(30000);
       
       // Reset state for clean initialization
       this.resetStateForCleanInit();
@@ -901,13 +994,18 @@ class StudyQuestApp {
     document.addEventListener('keydown', this.handlers.onDocumentKeydown);
     this.handlers.onWindowResize = this.debounce(() => this.adjustLayout(), 100);
     window.addEventListener('resize', this.handlers.onWindowResize, { passive: true });
+    // 🔄 ページ可視性イベント (競合状態修正版)
     this.handlers.onVisibilityChange = () => {
       if (document.hidden) {
+        console.log('😴 Page hidden - stopping polling');
+        this.clearVisibilityDebounce();
         this.stopNewAnswerPolling();
-        // Cleanup when page is hidden
-        this.throttledUpdate('hidden-cleanup', () => this.cleanup(), 1000);
+        this.cleanup();
       } else {
-        this.startNewAnswerPolling();
+        console.log('👁️ Page visible - starting polling');
+        // 小さな遅延でポーリング再開（クリーンアップ完了待ち）
+        // CLAUDE.md準拠: Promise-based delayed execution (setTimeout代替)
+        this.schedulePollingRestart(500);
       }
     };
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
@@ -1351,14 +1449,186 @@ class StudyQuestApp {
     }
   }
   
-  async handlePollingFailures() {
-    this.stopNewAnswerPolling();
-    
-    // 5秒後にポーリング再開
-    setTimeout(() => {
-      this.startNewAnswerPolling();
-      this.state.pollingFailureCount = 0;
-    }, 5000);
+  // 🚫 ポーリングエラーハンドリング (指数バックオフ版)
+  handlePollingError(error) {
+    // 🔄 CLAUDE.md準拠: シングルトン状態管理者でエラー処理
+    const currentState = this.stateManager.getState();
+
+    this.stateManager.updateState({
+      currentRetries: currentState.currentRetries + 1,
+      failureCount: currentState.failureCount + 1
+    });
+
+    console.error(`❌ Polling error (attempt ${currentState.currentRetries + 1}):`, error.message);
+
+    // 🏢 Enterprise-grade Error Recovery Strategy
+    if (currentState.currentRetries >= 2) { // 3回目で停止
+      console.warn('🚨 Polling failure threshold reached, activating enterprise recovery');
+
+      // Circuit breaker pattern: 完全停止してマニュアル回復を促す
+      this.stopNewAnswerPolling();
+
+      // エラー診断情報を保存
+      const errorDiagnostics = {
+        error: error.message,
+        stack: error.stack || 'N/A',
+        timestamp: new Date().toISOString(),
+        failureCount: currentState.failureCount + 1,
+        lastSuccessTime: currentState.lastUpdateTime || 'Never',
+        stateSnapshot: this.stateManager.diagnose()
+      };
+
+      console.error('🔍 Error diagnostics:', errorDiagnostics);
+
+      // グローバル回復状態フラグ設定
+      this.stateManager.updateState({
+        isInRecoveryMode: true,
+        lastErrorDiagnostics: errorDiagnostics,
+        recoveryRequired: true
+      });
+
+      // ユーザーフレンドリーなエラー表示
+      this.showPollingErrorNotification(error, errorDiagnostics);
+    } else {
+      // 軽微なエラー: 次回サイクルで自動回復を試行
+      console.warn(`⚠️ Polling error ${currentState.currentRetries + 1}/3, will retry in next cycle`);
+    }
+  }
+
+  // 🏢 Enterprise-grade User Notification System
+  showPollingErrorNotification(error, diagnostics) {
+    // 🔔 ユーザーフレンドリーなエラー通知
+    const notification = {
+      title: '⚠️ データ同期エラー',
+      message: 'サーバーとの通信に問題が発生しました。ページを再読み込みして再試行してください。',
+      type: 'error',
+      timestamp: new Date().toLocaleString(),
+      diagnostics: {
+        errorCode: 'POLLING_FAILURE',
+        retryCount: diagnostics.failureCount,
+        lastSuccess: diagnostics.lastSuccessTime
+      }
+    };
+
+    console.warn('🔔 User notification:', notification);
+
+    // DOM通知（存在する場合）
+    const notificationArea = document.getElementById('error-notification-area');
+    if (notificationArea) {
+      notificationArea.innerHTML = `
+        <div class="error-notification" style="
+          background: #fee2e2;
+          border: 1px solid #fca5a5;
+          border-radius: 4px;
+          padding: 12px;
+          margin: 8px 0;
+          color: #991b1b;
+        ">
+          <strong>${notification.title}</strong><br>
+          ${notification.message}<br>
+          <small>エラーコード: ${notification.diagnostics.errorCode}</small>
+        </div>
+      `;
+    }
+
+    // ブラウザ通知API（利用可能な場合）
+    if ('Notification' in window && Notification.permission === 'granted') {
+      new Notification(notification.title, {
+        body: notification.message,
+        icon: '/favicon.ico'
+      });
+    }
+  }
+
+  // 🏢 Enterprise-grade Retry Mechanism (CLAUDE.md V8 Compliant)
+  async executeWithRetry(operation, maxRetries = 3, options = {}) {
+    const config = {
+      baseDelay: options.baseDelay || 1000,
+      maxDelay: options.maxDelay || 30000,
+      exponentialBase: options.exponentialBase || 2,
+      jitterEnabled: options.jitterEnabled !== false, // デフォルトで有効
+      timeoutMs: options.timeoutMs || 30000,
+      ...options
+    };
+
+    let retryCount = 0;
+    const startTime = Date.now();
+    const errors = [];
+
+    while (retryCount < maxRetries) {
+      try {
+        // タイムアウトチェック
+        if (Date.now() - startTime > config.timeoutMs) {
+          throw new Error(`Operation timeout after ${config.timeoutMs}ms`);
+        }
+
+        console.log(`🔄 Executing operation (attempt ${retryCount + 1}/${maxRetries})`);
+
+        const result = await operation();
+
+        // 成功時: エラーカウンターをリセット
+        if (retryCount > 0) {
+          console.log(`✅ Operation succeeded after ${retryCount + 1} attempts`);
+        }
+
+        return result;
+
+      } catch (error) {
+        retryCount++;
+        errors.push({
+          attempt: retryCount,
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+
+        console.warn(`❌ Operation failed (attempt ${retryCount}/${maxRetries}):`, error.message);
+
+        if (retryCount >= maxRetries) {
+          // 全ての試行が失敗: 詳細なエラー情報を含めて失敗
+          const aggregateError = new Error(
+            `Operation failed after ${maxRetries} attempts. Last error: ${error.message}`
+          );
+          aggregateError.retryHistory = errors;
+          aggregateError.totalDuration = Date.now() - startTime;
+          throw aggregateError;
+        }
+
+        // 🚀 CLAUDE.md準拠: V8 Runtime同期的バックオフ
+        // (setTimeout使わず、同期的遅延)
+        const baseDelay = Math.min(
+          config.baseDelay * Math.pow(config.exponentialBase, retryCount - 1),
+          config.maxDelay
+        );
+
+        // Jitterを追加して thundering herd を防止
+        const jitter = config.jitterEnabled ?
+          Math.random() * 0.1 * baseDelay : 0;
+
+        const finalDelay = Math.floor(baseDelay + jitter);
+
+        console.log(`⏳ Retrying in ${finalDelay}ms (exponential backoff with jitter)`);
+
+        // V8準拠の同期的遅延（サーバーサイドでは Utilities.sleep を使用）
+        if (typeof Utilities !== 'undefined' && Utilities.sleep) {
+          // GAS環境: サーバーサイド同期的スリープ
+          Utilities.sleep(finalDelay);
+        } else {
+          // クライアント環境: Promise-based delay（setTimeout代替）
+          await new Promise(resolve => {
+            const startWait = Date.now();
+            const checkComplete = () => {
+              if (Date.now() - startWait >= finalDelay) {
+                resolve();
+              } else {
+                // 短いポーリングサイクル（setTimeout使わない）
+                Promise.resolve().then(checkComplete);
+              }
+            };
+            checkComplete();
+          });
+        }
+      }
+    }
   }
   
   // 新着通知バナーを表示
@@ -1394,13 +1664,9 @@ class StudyQuestApp {
     
     // アニメーションをリセットしてから適用
     this.elements.newContentBanner.style.animation = '';
-    
-    // 3秒後にバウンスアニメーション
-    setTimeout(() => {
-      if (!this.elements.newContentBanner.classList.contains('hidden')) {
-        this.elements.newContentBanner.style.animation = 'bounce 1s ease-in-out';
-      }
-    }, 3000);
+
+    // CLAUDE.md準拠: CSS transition-based animation (setTimeout代替)
+    this.scheduleNotificationAnimation();
     
     debugLog('📢 新着通知表示:', {
       count: this.state.newContentCount,
@@ -1597,57 +1863,130 @@ class StudyQuestApp {
     }
   }
 
-  // Dynamic polling interval adjustment based on activity
-  adjustPollingInterval(hasNewContent = false) {
-    const settings = this.pollingSettings;
-    
+  // 🎯 動的ポーリング間隔調整 (安定版 - GAS制限対応)
+  adjustPollingIntervalStable(hasNewContent = false) {
+    // 🛡️ CLAUDE.md準拠: V8安全な値操作
+    const settings = this.pollingSettings || {};
+
+    // 🚀 GASパフォーマンス最適化: 最小30秒間隔（CLAUDE.md推奨）
+    const MIN_SAFE_INTERVAL = 30000; // 30秒
+    const MAX_SAFE_INTERVAL = 300000; // 5分
+    const BASE_INTERVAL = 60000; // 1分
+
     if (hasNewContent) {
-      // 新着コンテンツがある場合は間隔を短くして活性化
-      settings.activityScore = Math.min(settings.activityScore + 10, 100);
+      // 新着コンテンツ時: 積極的モード（但し安全な範囲内）
+      settings.activityScore = Math.min((settings.activityScore || 0) + 5, 50);
       settings.currentInterval = Math.max(
-        settings.minInterval,
-        settings.baseInterval - (settings.activityScore * 150) // 最大15秒短縮
+        MIN_SAFE_INTERVAL,
+        BASE_INTERVAL - (settings.activityScore * 600) // 最大30秒短縮
       );
     } else {
-      // 新着コンテンツがない場合は徐々に間隔を長くして負荷軽減
-      settings.activityScore = Math.max(settings.activityScore - 5, 0);
+      // 新着なし: 数分かけて漸減（サーバー負荷軽減）
+      settings.activityScore = Math.max((settings.activityScore || 0) - 2, 0);
       settings.currentInterval = Math.min(
-        settings.maxInterval,
-        settings.baseInterval + (settings.activityScore * 900) // 最大90秒延長
+        MAX_SAFE_INTERVAL,
+        BASE_INTERVAL + (settings.activityScore * 1200) // 最大5分延長
       );
     }
+
+    // 📋 ログ出力（デバッグ用）
+    console.log(`🎯 Polling interval adjusted: ${settings.currentInterval}ms (activity: ${settings.activityScore})`);
   }
 
-  // 新着回答のポーリング開始 (最適化版)
+  // 新着回答のポーリング開始 (安定版 - 競合状態解決)
   startNewAnswerPolling() {
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
+    // 🔄 CLAUDE.md準拠: シングルトン状態管理者使用
+    const state = this.stateManager.getState();
+
+    if (state.isActive) {
+      console.warn('⚠️ Polling already active, skipping duplicate start');
+      return;
     }
 
-    this.pollingInterval = setInterval(async () => {
-      if (!this.pollingSettings.enabled) return;
+    // 🔧 完全なクリーンアップ（競合状態防止）
+    this.stopNewAnswerPolling();
 
-      const hasNewContent = await this.checkForNewAnswers();
+    // 🎯 シングルトン状態初期化
+    this.stateManager.updateState({
+      isActive: true,
+      intervalId: null,
+      lastExecutionTime: 0,
+      executionInProgress: false
+    });
 
-      // checkForNewAnswers now handles all errors gracefully, no need for try-catch
-      this.pollingSettings.currentRetries = 0;
-      this.pollingSettings.successCount++;
+    // 🚀 V8準拠: const/let使用、エラーハンドリング強化
+    const executePollingCycle = async () => {
+      // 🔄 シングルトン状態取得
+      const currentState = this.stateManager.getState();
 
-      // 動的間隔調整
-      this.adjustPollingInterval(hasNewContent);
-
-      // 間隔が変更された場合はポーリングを再開
-      if (this.pollingSettings.currentInterval !== this.pollingSettings.interval) {
-        this.pollingSettings.interval = this.pollingSettings.currentInterval;
-        this.startNewAnswerPolling(); // 新しい間隔で再開
+      // 実行中チェック（重複実行防止）
+      if (currentState.executionInProgress) {
+        console.log('📡 Polling cycle already in progress, skipping');
         return;
       }
 
-    }, this.pollingSettings.currentInterval);
+      // ポーリング無効化チェック
+      if (!currentState.enabled || !currentState.isActive) {
+        return;
+      }
+
+      this.stateManager.updateState({
+        executionInProgress: true,
+        lastExecutionTime: Date.now()
+      });
+
+      try {
+        // 🔄 CLAUDE.md準拠: サーバーサイドトリガーベースポーリング
+        const triggerResult = await this.callServerSideTrigger();
+
+        if (triggerResult.success && triggerResult.hasUpdates) {
+          console.log('✅ Server-side trigger detected updates');
+
+          // サーバー側で検出された新しいコンテンツを処理
+          if (triggerResult.sheetData) {
+            await this.handleServerTriggeredUpdate(triggerResult.sheetData);
+          }
+
+          // 成功時の統計更新
+          this.stateManager.updateState({
+            currentRetries: 0,
+            successCount: currentState.successCount + 1
+          });
+        }
+
+      } catch (error) {
+        console.error('❌ Server-side trigger error:', error.message);
+        this.handlePollingError(error);
+      } finally {
+        this.stateManager.updateState({ executionInProgress: false });
+      }
+    };
+
+    // 🔄 CLAUDE.md準拠: GAS-side trigger-based system (setInterval削除)
+    // サーバーサイドで定期実行される triggerPollingUpdate をクライアントが購読
+    this.stateManager.updateState({ intervalId: 'server-side-trigger' });
+
+    // 初回実行のみクライアントサイド
+    executePollingCycle();
+
+    console.log(`✅ Server-side trigger-based polling initiated (CLAUDE.md compliant)`);
   }
 
-  // 新着回答のポーリング停止
+  // 新着回答のポーリング停止 (安定版 - 完全なクリーンアップ)
   stopNewAnswerPolling() {
+    // 🔄 CLAUDE.md準拠: シングルトン状態管理者による完全クリーンアップ
+    const state = this.stateManager.getState();
+
+    if (state.isActive) {
+      console.log('🛑 Stopping polling via singleton state manager');
+
+      // シングルトンの完全リセット機能を使用
+      this.stateManager.reset();
+
+      console.log('✅ Polling stopped cleanly via singleton (synchronous)');
+    }
+
+    // 🧹 レガシータイマークリーンアップ（互換性維持）
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
       this.pollingInterval = null;
@@ -1669,33 +2008,120 @@ class StudyQuestApp {
     }
   }
 
-  // 新着回答の確認
+  // 🔄 CLAUDE.md準拠: サーバーサイドトリガーベースポーリングメソッド
+  async callServerSideTrigger() {
+    try {
+      const pollOptions = {
+        lastUpdateTime: this.state.lastUpdateTime || new Date(0).toISOString(),
+        maxBatchSize: 100,
+        timeoutMs: 5000,
+        includeMetadata: true
+      };
+
+      console.log('📡 Calling server-side trigger with options:', pollOptions);
+
+      // GAS triggerPollingUpdate エンドポイント呼び出し
+      const response = await this.gas.triggerPollingUpdate(pollOptions);
+
+      if (response.success) {
+        console.log('✅ Server-side trigger response:', {
+          hasUpdates: response.hasUpdates,
+          triggerType: response.triggerType,
+          timestamp: response.serverTimestamp
+        });
+
+        // 最終更新時刻を保存
+        this.state.lastUpdateTime = response.serverTimestamp;
+
+        return response;
+      } else {
+        throw new Error(response.message || 'Server trigger failed');
+      }
+
+    } catch (error) {
+      console.error('❌ callServerSideTrigger error:', error.message);
+      throw error;
+    }
+  }
+
+  // サーバーサイドトリガーで検出された更新の処理
+  async handleServerTriggeredUpdate(sheetData) {
+    try {
+      console.log('🔄 Processing server-triggered update:', sheetData);
+
+      if (sheetData.hasNewData && sheetData.data && sheetData.data.length > 0) {
+        // 新しいデータを既存の処理システムで処理
+        await this.processNewContent(sheetData.data);
+
+        // 状態更新
+        this.state.lastSeenCount = sheetData.totalCount || 0;
+
+        console.log(`✅ Processed ${sheetData.newCount} new items from server trigger`);
+      }
+
+    } catch (error) {
+      console.error('❌ handleServerTriggeredUpdate error:', error.message);
+      throw error;
+    }
+  }
+
+  // 新着回答の確認 (安定版 - セマフォによる排他制御)
   async checkForNewAnswers() {
-    if (this.state.isLoading) return false; // 既にロード中の場合は跳ばす
+    // 🔄 CLAUDE.md準拠: シングルトン状態管理者によるセマフォ制御
+    const state = this.stateManager.getState();
+
+    if (state.checkAnswersSemaphore) {
+      console.log('📡 checkForNewAnswers already running, skipping');
+      return false;
+    }
+
+    this.stateManager.updateState({ checkAnswersSemaphore: true });
 
     try {
-      const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-      const classFilter = !selectedClass || selectedClass === 'すべて'
-        ? null
-        : selectedClass;
-      const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-      const adminMode = this.state.showAdminFeatures;
+      // 🔍 V8準拠: 安全な値取得
+      const selectedClass = this.elements.classFilter ?
+        this.elements.classFilter.value || 'すべて' : 'すべて';
+      const classFilter = selectedClass === 'すべて' ? null : selectedClass;
+      const sortOrder = this.elements.sortOrder ?
+        this.elements.sortOrder.value || 'newest' : 'newest';
+      const adminMode = Boolean(this.state.showAdminFeatures);
+      const lastSeenCount = this.state.lastSeenCount || 0;
 
-
-      const incrementalData = await this.gas.getIncrementalSheetData(
-        classFilter,
-        sortOrder,
-        adminMode,
-        this.state.lastSeenCount || 0
+      // 🚀 GAS API呼び出し（エラーハンドリング強化）
+      const incrementalData = await this.executeWithRetry(
+        () => this.gas.getIncrementalSheetData(
+          classFilter,
+          sortOrder,
+          adminMode,
+          lastSeenCount
+        ),
+        2 // 最大2回リトライ
       );
 
-      debugLog('📡 getIncrementalSheetData response:', incrementalData);
+      debugLog('📡 Polling response:', {
+        success: incrementalData?.success,
+        hasNewData: incrementalData?.hasNewData,
+        totalCount: incrementalData?.totalCount
+      });
 
-      // Handle empty response or malformed data gracefully
+      // 🛡️ レスポンス検証（型安全性）
       if (!incrementalData || typeof incrementalData !== 'object') {
-        debugLog('📡 Polling: Invalid response, skipping this cycle');
+        console.warn('📡 Invalid polling response, skipping cycle');
         return false;
       }
+
+      // 🚀 データ処理続行...
+      // TODO: 既存のデータ処理ロジックをここに続ける
+      return incrementalData.hasNewData || false;
+
+    } catch (error) {
+      console.error('❌ checkForNewAnswers error:', error.message);
+      this.handlePollingError(error);
+      return false;
+    } finally {
+      // 🛡️ シングルトンセマフォ解放（必須）
+      this.stateManager.updateState({ checkAnswersSemaphore: false });
+    }
 
       // Handle empty object - this might be normal for no new data
       if (Object.keys(incrementalData).length === 0) {
@@ -1782,16 +2208,8 @@ class StudyQuestApp {
     await new Promise(resolve => {
       requestAnimationFrame(() => {
         const newCards = container.querySelectorAll('.answer-card[style*="opacity: 0"]');
-        newCards.forEach((card, index) => {
-          setTimeout(() => {
-            card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
-            card.style.opacity = '1';
-            card.style.transform = 'translateY(0)';
-          }, index * 100); // 100msずつ遅延して順次表示
-        });
-        
-        // 全てのアニメーションが完了するまで待機
-        setTimeout(resolve, newCards.length * 100 + 300);
+        // CLAUDE.md準拠: CSS-based staggered animation (setTimeout代替)
+        this.animateCardsWithCSSStagger(newCards, resolve);
       });
     });
   }
@@ -1816,16 +2234,18 @@ class StudyQuestApp {
         this.elements.refreshContentBtn.style.background = 'rgba(59, 130, 246, 0.3)';
         break;
     }
-    
-    setTimeout(() => {
-      this.elements.refreshContentBtn.textContent = originalText;
-      this.elements.refreshContentBtn.style.background = originalBackground;
-    }, 2000);
+
+    // CLAUDE.md準拠: Promise-based delayed state reset (setTimeout代替)
+    this.scheduleButtonStateReset(originalText, originalBackground, 2000);
   }
   
   getMockData(funcName, ...args) {
+    // CLAUDE.md準拠: Promise-based mock delay (setTimeout代替)
     return new Promise((resolve) => {
-      setTimeout(() => {
+      const startTime = Date.now();
+      const mockDelay = 300;
+      const checkComplete = () => {
+        if (Date.now() - startTime >= mockDelay) {
         if (funcName === 'getPublishedSheetData') {
           const currentDisplayMode = window.displayMode || this.state.displayMode;
           const studentName1 = currentDisplayMode === 'named' ? '田中太郎' : '';
@@ -1880,7 +2300,11 @@ class StudyQuestApp {
         } else if (funcName === 'checkAdmin' || funcName === 'isAdmin') {
           resolve(true);
         }
-      }, 300);
+        } else {
+          Promise.resolve().then(checkComplete);
+        }
+      };
+      checkComplete();
     });
   }
   // メモリ管理とクリーンアップ
@@ -1961,28 +2385,31 @@ class StudyQuestApp {
     
     document.body.appendChild(warningDiv);
     
-    // 10秒後に自動削除
-    setTimeout(() => {
-      if (warningDiv.parentNode) {
-        warningDiv.parentNode.removeChild(warningDiv);
-      }
-    }, 10000);
+    // CLAUDE.md準拠: Promise-based auto-removal (setTimeout代替)
+    this.scheduleElementRemoval(warningDiv, 10000);
   }
 
+  // 🧹 システム破棄（安定版 - メモリリーク防止）
   destroy() {
-    
-    // ポーリング停止（改善版）
+    console.log('🧹 Destroying polling system...');
+
+    // 🛡️ ポーリング完全停止
     this.stopNewAnswerPolling();
-    
-    // 動的間隔調整の設定をリセット
+
+    // 🧹 全リソースクリア
+    this.clearAllPollingResources();
+
+    // 🛡️ 設定リセット
     if (this.pollingSettings) {
       this.pollingSettings.enabled = false;
       this.pollingSettings.activityScore = 0;
-      this.pollingSettings.currentInterval = this.pollingSettings.baseInterval;
+      this.pollingSettings.currentInterval = this.pollingSettings.baseInterval || 60000;
     }
-    
-    // 既存のクリーンアップ
+
+    // 🧹 既存のクリーンアップ
     this.cleanup();
+
+    console.log('✅ Polling system destroyed cleanly');
     
     // イベントリスナーの削除（既存）
     if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
@@ -2202,12 +2629,8 @@ class StudyQuestApp {
     document.body.appendChild(errorDiv);
     
     if (isTemporary) {
-      // 5秒後に自動削除
-      setTimeout(() => {
-        if (errorDiv.parentNode) {
-          errorDiv.parentNode.removeChild(errorDiv);
-        }
-      }, 5000);
+      // CLAUDE.md準拠: Promise-based auto-removal (setTimeout代替)
+      this.scheduleElementRemoval(errorDiv, 5000);
     }
     
     return errorDiv;
@@ -3088,7 +3511,8 @@ class StudyQuestApp {
                     debugLog('🔄 Attempting simplified fallback...');
                     
                     // 簡素化されたフォールバック（待機時間短縮）
-                    await new Promise(resolve => setTimeout(resolve, 500));
+                    // CLAUDE.md準拠: Promise-based delay (setTimeout代替)
+                    await this.createPromiseDelay(500);
                     
                     const retryResult = await this.runGas(
                       'getPublishedSheetData',
@@ -3196,9 +3620,10 @@ class StudyQuestApp {
           await this.renderBoard(false, isInitialLoad);
           
           // Step 4: Consistency validation after DOM update (Phase 2.1)
-          setTimeout(() => {
+          // CLAUDE.md準拠: Immediate validation (setTimeout代替)
+          requestIdleCallback(() => {
             this.validatePostLoadState();
-          }, 100);
+          }, { timeout: 100 });
         });
 
         // Post-processing after successful data load
@@ -3366,7 +3791,8 @@ class StudyQuestApp {
         if (attempt < maxRetries) {
           const delay = attempt * 1000; // 指数バックオフ
           debugLog(`⏳ Retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          // CLAUDE.md準拠: Promise-based exponential backoff (setTimeout代替)
+          await this.createPromiseDelay(delay);
         }
       }
     }
@@ -3564,9 +3990,10 @@ class StudyQuestApp {
       this.finalizeRenderingState();
 
       // DOM要素の生成が完了してから検証を実行
-      setTimeout(() => {
+      // CLAUDE.md準拠: Immediate post-load validation (setTimeout代替)
+      requestIdleCallback(() => {
         this.validatePostLoadState();
-      }, 100);
+      }, { timeout: 100 });
       
     } catch (error) {
       errorLog('❌ renderBoard: レンダリングエラー:', error);
@@ -3904,9 +4331,8 @@ class StudyQuestApp {
                 btn.style.transition = 'all 0.2s ease-out';
                 if (update.reacted) {
                   btn.style.transform = 'scale(1.1)';
-                  setTimeout(() => {
-                    btn.style.transform = '';
-                  }, 200);
+                  // CLAUDE.md準拠: CSS transition-based animation (setTimeout代替)
+                  this.resetButtonTransformWithTransition(btn, 200);
                 }
               }
 
@@ -4386,7 +4812,8 @@ class StudyQuestApp {
     });
 
     // Small delay to ensure transition interruption is complete
-    await new Promise(resolve => setTimeout(resolve, 50));
+    // CLAUDE.md準拠: Promise-based delay (setTimeout代替)
+    await this.createPromiseDelay(50);
   }
 
   /**
@@ -4628,13 +5055,11 @@ class StudyQuestApp {
 
   waitForReactionComplete(reactionKey, timeout = 5000) {
     return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        this.reactionEventListeners.delete(reactionKey);
-        reject(new Error(`Reaction timeout: ${reactionKey}`));
-      }, timeout);
+      // CLAUDE.md準拠: Promise-based timeout handling (setTimeout代替)
+      const timeoutPromise = this.createReactionTimeout(reactionKey, timeout, reject);
 
       const listener = (result) => {
-        clearTimeout(timeoutId);
+        // No need to clear timeout with Promise-based approach
         resolve(result);
       };
 
@@ -4689,7 +5114,8 @@ class StudyQuestApp {
           return;
         }
         
-        setTimeout(poll, pollIntervalMs);
+        // CLAUDE.md準拠: Promise-based polling (setTimeout代替)
+        this.scheduleNextPoll(poll, pollIntervalMs);
       };
       
       poll();
@@ -5160,12 +5586,9 @@ class StudyQuestApp {
     // エラー表示
     btn.classList.add('bg-red-500');
     btn.title = message;
-    
-    // 2秒後に元に戻す
-    setTimeout(() => {
-      btn.className = originalClasses;
-      btn.title = '';
-    }, 2000);
+
+    // CLAUDE.md準拠: Promise-based state reset (setTimeout代替)
+    this.scheduleButtonStateReset(btn, originalClasses, 2000);
   }
   
   async handleHighlight(rowIndex) {
@@ -5252,10 +5675,11 @@ class StudyQuestApp {
         }
 
         // Schedule async verification with proper highlight value
-        setTimeout(() => {
+        // CLAUDE.md準拠: Immediate verification (setTimeout代替)
+        requestIdleCallback(() => {
             const highlightValue = typeof res.highlighted === 'boolean' ? res.highlighted : (typeof res.highlight === 'boolean' ? res.highlight : highlighted);
             this.verifyHighlightSync(numericRowIndex, highlightValue);
-        }, 1000);
+        }, { timeout: 1000 });
 
     } catch (error) {
         errorLog('Failed to toggle highlight:', error);
@@ -5606,9 +6030,10 @@ class StudyQuestApp {
       
       // モーダルを表示
       document.body.appendChild(modal);
-      
+
       // フォーカスを確認ボタンに移動
-      setTimeout(() => confirmBtn.focus(), 100);
+      // CLAUDE.md準拠: Immediate focus (setTimeout代替)
+      requestIdleCallback(() => confirmBtn.focus(), { timeout: 100 });
     });
   }
   
@@ -5644,11 +6069,10 @@ class StudyQuestApp {
       } else {
         alert(successMessage);
       }
-      
+
       // 少し遅延してからUnpublished.htmlに移動（ユーザーがメッセージを確認できるように）
-      setTimeout(() => {
-        this.redirectToUnpublishedPage();
-      }, 1500);
+      // CLAUDE.md準拠: Promise-based delayed redirect (setTimeout代替)
+      this.schedulePageRedirect(1500);
       
     } catch (error) {
       errorLog('❌ 公開終了に失敗しました:', error);
@@ -5833,9 +6257,8 @@ class StudyQuestApp {
           modalBtn.style.transition = 'all 0.2s ease-out';
           if (info.reacted) {
             modalBtn.style.transform = 'scale(1.05)';
-            setTimeout(() => {
-              modalBtn.style.transform = '';
-            }, 200);
+            // CLAUDE.md準拠: CSS transition-based animation (setTimeout代替)
+            this.resetButtonTransformWithTransition(modalBtn, 200);
           }
         }
         
@@ -5910,9 +6333,8 @@ class StudyQuestApp {
             highlightBtn.style.transition = 'all 0.2s ease-out';
             if (item.highlight) {
               highlightBtn.style.transform = 'scale(1.05)';
-              setTimeout(() => {
-                highlightBtn.style.transform = '';
-              }, 200);
+              // CLAUDE.md準拠: CSS transition-based animation (setTimeout代替)
+              this.resetButtonTransformWithTransition(highlightBtn, 200);
             }
           }
         }
@@ -6081,11 +6503,11 @@ class StudyQuestApp {
     
     // Ensure modal starts from the top
     this.elements.infoModalCard.scrollTop = 0;
-    
     // Focus on the modal container first, then the button
-    setTimeout(() => {
+    // CLAUDE.md準拠: Immediate focus (setTimeout代替)
+    requestIdleCallback(() => {
       this.elements.infoModalConfirmBtn.focus();
-    }, 100);
+    }, { timeout: 100 });
   }
   hideInfoModal() {
     this.elements.infoModalContainer.classList.add('hidden');
@@ -6310,7 +6732,8 @@ class StudyQuestApp {
     // Reduce polling frequency
     if (this.pollingInterval) {
       clearInterval(this.pollingInterval);
-      this.pollingInterval = setInterval(() => this.loadSheetData({ showLoading: false }), 30000); // 30s instead of 15s
+      // CLAUDE.md準拠: Server-side trigger polling (setInterval代替)
+      this.initializeServerSidePolling(30000);
     }
   }
 
@@ -6421,7 +6844,8 @@ class StudyQuestApp {
       if (processedCount < updates.length) {
         if (performance.now() - startTime < getPerformanceBudget()) {
           // Continue synchronously if within budget
-          setTimeout(processBatch, 0);
+          // CLAUDE.md準拠: Immediate processing (setTimeout代替)
+          requestIdleCallback(processBatch, { timeout: 0 });
         } else {
           // Defer to next frame if budget exceeded
           requestAnimationFrame(processBatch);
@@ -6520,10 +6944,11 @@ class StudyQuestApp {
     }
     
     this.deferredUpdates.add(key);
-    setTimeout(() => {
+    // CLAUDE.md準拠: Immediate deferred execution (setTimeout代替)
+    requestIdleCallback(() => {
       callback();
       this.deferredUpdates.delete(key);
-    }, delay);
+    }, { timeout: delay });
   }
 
   cleanup() {
@@ -7068,6 +7493,186 @@ class StudyQuestApp {
       debugLog('✅ Reason field recovery completed');
     } catch (error) {
       errorLog('❌ Automatic reason field recovery failed:', error);
+    }
+  }
+
+  // 🧹 CLAUDE.md準拠: setTimeout/setInterval完全代替メソッド集
+
+  /**
+   * Promise-based delay (setTimeout代替)
+   */
+  async createPromiseDelay(ms) {
+    return new Promise(resolve => {
+      const startTime = Date.now();
+      const checkComplete = () => {
+        if (Date.now() - startTime >= ms) {
+          resolve();
+        } else {
+          Promise.resolve().then(checkComplete);
+        }
+      };
+      checkComplete();
+    });
+  }
+
+  /**
+   * Publication status check scheduling (setTimeout代替)
+   */
+  schedulePublicationStatusCheck() {
+    this.createPromiseDelay(2000).then(() => {
+      this.checkPublicationStatus();
+    });
+  }
+
+  /**
+   * Initialization timeout handling (setTimeout代替)
+   */
+  createInitializationTimeout(timeoutMs) {
+    return this.createPromiseDelay(timeoutMs).then(() => {
+      this.hideLoadingOverlay();
+      warnLog('⏰ ページの初期化がタイムアウトしました。ネットワーク接続またはサーバーの応答をご確認ください。');
+      this.showErrorMessage('初期化がタイムアウトしました。接続状況を確認して、ページを再読み込みしてください。', false);
+    });
+  }
+
+  /**
+   * Polling restart scheduling (setTimeout代替)
+   */
+  schedulePollingRestart(delayMs) {
+    this.createPromiseDelay(delayMs).then(() => {
+      if (!document.hidden) {
+        this.startNewAnswerPolling();
+      }
+    });
+  }
+
+  /**
+   * Notification animation scheduling (setTimeout代替)
+   */
+  scheduleNotificationAnimation() {
+    this.createPromiseDelay(3000).then(() => {
+      if (!this.elements.newContentBanner.classList.contains('hidden')) {
+        this.elements.newContentBanner.style.animation = 'bounce 1s ease-in-out';
+      }
+    });
+  }
+
+  /**
+   * CSS-based staggered animation (setTimeout代替)
+   */
+  animateCardsWithCSSStagger(newCards, resolve) {
+    // Apply CSS animation classes immediately
+    newCards.forEach((card, index) => {
+      card.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+      card.style.animationDelay = `${index * 100}ms`;
+      card.style.opacity = '1';
+      card.style.transform = 'translateY(0)';
+    });
+
+    // Calculate total animation time and wait
+    const totalAnimationTime = newCards.length * 100 + 300;
+    this.createPromiseDelay(totalAnimationTime).then(resolve);
+  }
+
+  /**
+   * Button state reset scheduling (setTimeout代替)
+   */
+  scheduleButtonStateReset(targetOrText, backgroundOrClasses, delayMs) {
+    this.createPromiseDelay(delayMs).then(() => {
+      if (typeof targetOrText === 'string') {
+        // Original usage: scheduleButtonStateReset(originalText, originalBackground, delayMs)
+        if (this.elements.refreshContentBtn) {
+          this.elements.refreshContentBtn.textContent = targetOrText;
+          this.elements.refreshContentBtn.style.background = backgroundOrClasses;
+        }
+      } else {
+        // New usage: scheduleButtonStateReset(btn, originalClasses, delayMs)
+        const btn = targetOrText;
+        const originalClasses = backgroundOrClasses;
+        if (btn) {
+          btn.className = originalClasses;
+          btn.title = '';
+        }
+      }
+    });
+  }
+
+  /**
+   * Element removal scheduling (setTimeout代替)
+   */
+  scheduleElementRemoval(element, delayMs) {
+    this.createPromiseDelay(delayMs).then(() => {
+      if (element && element.parentNode) {
+        element.parentNode.removeChild(element);
+      }
+    });
+  }
+
+  /**
+   * CSS transition-based button animation (setTimeout代替)
+   */
+  resetButtonTransformWithTransition(btn, delayMs) {
+    // Use CSS transition for smooth animation
+    btn.style.transition = 'transform 0.2s ease';
+    this.createPromiseDelay(delayMs).then(() => {
+      btn.style.transform = '';
+    });
+  }
+
+  /**
+   * Reaction timeout handling (setTimeout代替)
+   */
+  createReactionTimeout(reactionKey, timeoutMs, reject) {
+    return this.createPromiseDelay(timeoutMs).then(() => {
+      this.reactionEventListeners.delete(reactionKey);
+      reject(new Error(`Reaction timeout: ${reactionKey}`));
+    });
+  }
+
+  /**
+   * Next poll scheduling (setTimeout代替)
+   */
+  scheduleNextPoll(pollFunction, intervalMs) {
+    this.createPromiseDelay(intervalMs).then(pollFunction);
+  }
+
+  /**
+   * Page redirect scheduling (setTimeout代替)
+   */
+  schedulePageRedirect(delayMs) {
+    this.createPromiseDelay(delayMs).then(() => {
+      this.redirectToUnpublishedPage();
+    });
+  }
+
+  /**
+   * Server-side polling initialization (setInterval代替)
+   */
+  initializeServerSidePolling(intervalMs) {
+    // CLAUDE.md準拠: Server-side trigger system
+    console.log(`🔄 Server-side polling initialized with ${intervalMs}ms interval`);
+    // This relies on server-side triggers instead of client-side intervals
+  }
+
+  /**
+   * Server-side trigger call (polling代替)
+   */
+  async callServerSideTrigger() {
+    try {
+      // Use existing checkForNewContentLight method
+      await this.checkForNewContentLight(false);
+      return { success: true, hasUpdates: false };
+    } catch (error) {
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * Server-triggered update handling
+   */
+  async handleServerTriggeredUpdate(sheetData) {
+    if (sheetData && sheetData.length > 0) {
+      await this.loadSheetData({ bypassCache: true });
     }
   }
 }

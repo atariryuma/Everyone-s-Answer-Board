@@ -105,7 +105,8 @@ module.exports = {
         'updateLoginStatus': 'writable',
         'clearTimeout': 'writable',
         'LockService': 'readonly',
-        'WebApp': 'readonly'
+        'WebApp': 'readonly',
+        'RequestGate': 'writable'
       },
       rules: {
         // GAS特有のルール調整 - GASでは未使用関数が後でHTMLから呼ばれる可能性があるため無効化

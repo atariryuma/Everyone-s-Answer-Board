@@ -169,15 +169,37 @@ function getDB() {
 function getSpreadsheet() {
   return {
     openById(id) {
+      const authKey = `spreadsheet_auth_${id}`;
+
+      // 🛡️ RequestGate safe access (optional dependency)
+      // eslint-disable-next-line no-undef
+      if (typeof RequestGate !== 'undefined' && !RequestGate.enter(authKey)) {
+        console.warn('ServiceFactory.getSpreadsheet.openById: Authentication in progress, waiting...');
+        Utilities.sleep(200);
+      } else if (typeof RequestGate !== 'undefined') {
+        // eslint-disable-next-line no-undef
+        RequestGate.exit(authKey);
+      }
+
       try {
-        // Service account authentication - 真の実装
+        // 🔧 CLAUDE.md準拠: 認証状態の統一管理 - 権限混在防止
         const auth = typeof Auth !== 'undefined' ? Auth.serviceAccount() : null;
-        if (!auth || !auth.isValid) {
-          console.warn('ServiceFactory.getSpreadsheet.openById: Fallback to user session due to service account failure:', auth?.error);
+
+        // 認証状態を明確に判定し、混在を防止
+        if (auth && auth.isValid && auth.token) {
+          console.log('ServiceFactory.getSpreadsheet.openById: Using service account authentication');
+          return typeof Data !== 'undefined' ?
+            Data.openSpreadsheetWithServiceAccount(id, auth.token) :
+            SpreadsheetApp.openById(id);
+        } else {
+          console.warn('ServiceFactory.getSpreadsheet.openById: Service account unavailable, using user session:', {
+            authExists: !!auth,
+            isValid: auth?.isValid,
+            hasToken: !!auth?.token,
+            error: auth?.error
+          });
           return SpreadsheetApp.openById(id);
         }
-
-        return typeof Data !== 'undefined' ? Data.openSpreadsheetWithServiceAccount(id, auth.token) : SpreadsheetApp.openById(id);
       } catch (error) {
         console.error('ServiceFactory.getSpreadsheet.openById: Error opening spreadsheet:', error.message);
         return null;

@@ -81,7 +81,8 @@ class Auth {
    */
   static getServiceAccountConfig() {
     try {
-      const props = ServiceFactory.getProperties();
+      // 🔧 CLAUDE.md準拠: 循環参照解決 - 直接PropertiesService使用
+      const props = PropertiesService.getScriptProperties();
       const credsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
 
       if (!credsJson) {

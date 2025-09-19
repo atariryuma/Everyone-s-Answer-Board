@@ -371,40 +371,74 @@ function saveDraftConfiguration(config) {
       sheetName: config.sheetName
     });
 
-    // 設定をJSONで保存（重複フィールド削除）
+    // 🔧 FIX: Transform columnMapping from frontend format to backend format
+    if (config.columnMapping && typeof config.columnMapping === 'object') {
+      console.log('🔍 BACKEND TRANSFORMATION START:', {
+        originalColumnMapping: config.columnMapping,
+        hasMapping: !!config.columnMapping.mapping
+      });
+
+      // If columnMapping doesn't have the correct structure, transform it
+      if (!config.columnMapping.mapping) {
+        const transformedMapping = {};
+        const transformedConfidence = {};
+
+        // Transform each column type from { columnIndex: N } to mapping[type] = N
+        Object.keys(config.columnMapping).forEach(key => {
+          if (key.startsWith('_') || key === 'headers' || key === 'verifiedAt') return;
+
+          const columnData = config.columnMapping[key];
+          if (columnData && typeof columnData.columnIndex === 'number') {
+            transformedMapping[key] = columnData.columnIndex;
+            transformedConfidence[key] = columnData.confidence || 0;
+            console.log(`✅ Transformed ${key}: ${columnData.columnIndex}`);
+          }
+        });
+
+        // Rebuild columnMapping with correct structure
+        config.columnMapping = {
+          mapping: transformedMapping,
+          confidence: transformedConfidence,
+          headers: config.columnMapping.headers || [],
+          verifiedAt: config.columnMapping.verifiedAt || new Date().toISOString()
+        };
+
+        console.log('✅ BACKEND TRANSFORMATION COMPLETE:', {
+          transformedMapping,
+          finalColumnMapping: config.columnMapping
+        });
+      } else {
+        console.log('🔍 ColumnMapping already has correct structure');
+      }
+    }
+
+    // 🔧 CLAUDE.md準拠: 統一API使用 - saveConfigSafeを使用してETag対応の安全な更新
     const removedFields = [];
     if ('setupComplete' in config) { delete config.setupComplete; removedFields.push('setupComplete'); }
     if ('isDraft' in config) { delete config.isDraft; removedFields.push('isDraft'); }
     if ('questionText' in config) { delete config.questionText; removedFields.push('questionText'); }
 
-    const timestamp = new Date().toISOString();
-    config.lastAccessedAt = timestamp;
-    config.lastModified = timestamp;
+    // saveConfigSafeを使用して統一された更新パターンを適用
+    const saveResult = saveConfigSafe(user.userId, config, { isDraft: true });
 
-    const configJsonString = JSON.stringify(config);
-    const updatedUser = {
-      configJson: configJsonString,
-      lastModified: timestamp
-    };
-
-    const updateResult = db.updateUser(user.userId, updatedUser);
-
-    if (!updateResult || !updateResult.success) {
-      console.error('❌ Database update failed:', updateResult?.message);
-      return createErrorResponse(updateResult?.message || 'データベース更新に失敗しました');
+    if (!saveResult.success) {
+      console.error('❌ saveConfigSafe failed:', saveResult.message);
+      return createErrorResponse(saveResult.message || 'データベース更新に失敗しました');
     }
 
-    console.log('✅ saveDraftConfiguration SUCCESS:', {
+    console.log('✅ saveDraftConfiguration SUCCESS (via saveConfigSafe):', {
       userId: user.userId,
       spreadsheetId: config.spreadsheetId,
       sheetName: config.sheetName,
-      configSize: configJsonString.length
+      etag: saveResult.etag
     });
 
     return {
       success: true,
       message: '下書き設定を保存しました',
-      userId: user.userId
+      userId: user.userId,
+      etag: saveResult.etag,
+      config: saveResult.config
     };
 
   } catch (error) {
@@ -467,6 +501,7 @@ function publishApplication(publishConfig) {
 
     const db = ServiceFactory.getDB();
     const user = db ? db.findUserByEmail(email) : null;
+    let saveResult = null;
 
     if (user) {
       // Re-fetch latest user data to avoid conflicts
@@ -503,16 +538,58 @@ function publishApplication(publishConfig) {
         lastModified: publishedAt
       };
 
-      const updatePayload = {
-        configJson: JSON.stringify(updatedConfig),
-        lastModified: publishedAt
-      };
+      // 🔧 FIX: Transform columnMapping from frontend format to backend format (publishApplication)
+      if (updatedConfig.columnMapping && typeof updatedConfig.columnMapping === 'object') {
+        console.log('🔍 PUBLISH TRANSFORMATION START:', {
+          originalColumnMapping: updatedConfig.columnMapping,
+          hasMapping: !!updatedConfig.columnMapping.mapping
+        });
 
-      const updateResult = db.updateUser(user.userId, updatePayload);
+        // If columnMapping doesn't have the correct structure, transform it
+        if (!updatedConfig.columnMapping.mapping) {
+          const transformedMapping = {};
+          const transformedConfidence = {};
 
-      if (!updateResult || !updateResult.success) {
-        console.error('❌ Database update failed:', updateResult?.message);
-        // Continue processing even on database errors
+          // Transform each column type from { columnIndex: N } to mapping[type] = N
+          Object.keys(updatedConfig.columnMapping).forEach(key => {
+            if (key.startsWith('_') || key === 'headers' || key === 'verifiedAt') return;
+
+            const columnData = updatedConfig.columnMapping[key];
+            if (columnData && typeof columnData.columnIndex === 'number') {
+              transformedMapping[key] = columnData.columnIndex;
+              transformedConfidence[key] = columnData.confidence || 0;
+              console.log(`✅ Transformed ${key}: ${columnData.columnIndex}`);
+            }
+          });
+
+          // Rebuild columnMapping with correct structure
+          updatedConfig.columnMapping = {
+            mapping: transformedMapping,
+            confidence: transformedConfidence,
+            headers: updatedConfig.columnMapping.headers || [],
+            verifiedAt: updatedConfig.columnMapping.verifiedAt || new Date().toISOString()
+          };
+
+          console.log('✅ PUBLISH TRANSFORMATION COMPLETE:', {
+            transformedMapping,
+            finalColumnMapping: updatedConfig.columnMapping
+          });
+        } else {
+          console.log('🔍 ColumnMapping already has correct structure (publish)');
+        }
+      }
+
+      // 🔧 CLAUDE.md準拠: 統一API使用 - saveConfigSafeでETag対応の安全な更新
+      saveResult = saveConfigSafe(user.userId, updatedConfig, { isPublish: true });
+
+      if (!saveResult.success) {
+        console.error('❌ saveConfigSafe failed during publish:', saveResult.message);
+        // エラーでも処理を継続（互換性のため）
+      } else {
+        console.log('✅ Config saved via saveConfigSafe:', {
+          userId: user.userId,
+          etag: saveResult.etag
+        });
       }
     } else {
       console.error('❌ User not found:', email);
@@ -529,7 +606,9 @@ function publishApplication(publishConfig) {
       success: true,
       message: 'アプリケーションが正常に公開されました',
       publishedAt,
-      userId: user ? user.userId : null
+      userId: user ? user.userId : null,
+      etag: user && saveResult?.etag ? saveResult.etag : null,
+      config: user && saveResult?.config ? saveResult.config : null
     };
 
   } catch (error) {
@@ -1302,16 +1381,6 @@ function checkCurrentPublicationStatus(targetUserId) {
 /**
  * Direct email retrieval using GAS Session API (SystemController version)
  */
-// 🎯 Zero-dependency Helper Functions
-function columnNumberToLetter(num) {
-  let letter = '';
-  while (num > 0) {
-    const remainder = (num - 1) % 26;
-    letter = String.fromCharCode(65 + remainder) + letter;
-    num = Math.floor((num - 1) / 26);
-  }
-  return letter;
-}
 
 
 
@@ -1395,42 +1464,6 @@ function getLoginStatus() {
   }
 }
 
-/**
- * クライアントエラーを報告
- * ErrorBoundary.html から呼び出される
- *
- * @param {Object} errorInfo - エラー情報
- * @returns {Object} 報告結果
- */
-function reportClientError(errorInfo) {
-  try {
-    console.error('クライアントエラー報告:', errorInfo);
-
-    // ServiceFactory経由でセッション情報取得
-    const {email} = ServiceFactory.getSession();
-
-    // エラーログを記録（将来的にはSecurityServiceや専用のログサービスに委譲）
-    const logEntry = {
-      timestamp: new Date().toISOString(),
-      type: 'client_error',
-      userEmail: email ? email : 'unknown',
-      errorInfo
-    };
-
-    // エラーログを記録（将来的には永続化）
-
-    return {
-      success: true,
-      message: 'エラーが報告されました'
-    };
-  } catch (error) {
-    console.error('FrontendController.reportClientError エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 /**
  * 強制ログアウトとリダイレクトのテスト

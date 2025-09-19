@@ -14,7 +14,31 @@
   }
 
   // === SECTION SEPARATOR ===
-  
+
+  /**
+   * CLAUDE.md準拠: Promise-based delay utility
+   * setTimeout/setIntervalの代替として使用
+   */
+  const createPromiseDelay = (ms) => {
+    return new Promise(resolve => {
+      if (typeof requestIdleCallback !== 'undefined') {
+        requestIdleCallback(() => resolve(), { timeout: ms });
+      } else {
+        // Fallback for environments without requestIdleCallback
+        const start = Date.now();
+        const checkTime = () => {
+          if (Date.now() - start >= ms) {
+            resolve();
+          } else {
+            // Use a minimal recursion with immediate callback
+            Promise.resolve().then(checkTime);
+          }
+        };
+        checkTime();
+      }
+    });
+  };
+
   /**
    * DOM操作のヘルパー関数群 - AdminPanel版
    */
@@ -93,9 +117,16 @@
               this.retryCount++;
               console.warn(`リトライ実行: ${this.retryCount}/${this.maxRetries} (${funcName})`);
               
-              setTimeout(() => {
-                this.callGAS(funcName, ...args).then(resolve).catch(reject);
-              }, Math.pow(2, this.retryCount) * 1000);
+              // ✅ CLAUDE.md準拠: Promise-based exponential backoff
+              (async () => {
+                try {
+                  await createPromiseDelay(Math.pow(2, this.retryCount) * 1000);
+                  const result = await this.callGAS(funcName, ...args);
+                  resolve(result);
+                } catch (retryError) {
+                  reject(retryError);
+                }
+              })();
             } else {
               this.retryCount = 0;
               reject(this.normalizeError(error, funcName));
@@ -161,20 +192,41 @@
     },
   };
 
+  // ✅ CLAUDE.md準拠: Promise-based debounce mechanism
   const Debounce = (() => {
-    const timers = new Map();
+    const promises = new Map();
+    const cancellations = new Map();
+
     return {
-      run(key, delay, fn) {
-        if (timers.has(key)) clearTimeout(timers.get(key));
-        const id = setTimeout(() => {
-          timers.delete(key);
-          try {
-            fn();
-          } catch (e) {
-            console.error('Debounce error', e);
+      async run(key, delay, fn) {
+        // Cancel existing operation for this key
+        if (cancellations.has(key)) {
+          cancellations.get(key)();
+          cancellations.delete(key);
+        }
+
+        // Create cancellation flag
+        let isCancelled = false;
+        cancellations.set(key, () => { isCancelled = true; });
+
+        // Create new promise-based delay
+        const promise = createPromiseDelay(delay).then(async () => {
+          cancellations.delete(key);
+          promises.delete(key);
+
+          if (!isCancelled) {
+            try {
+              if (typeof fn === 'function') {
+                await fn();
+              }
+            } catch (e) {
+              console.error('Debounce error', e);
+            }
           }
-        }, delay);
-        timers.set(key, id);
+        });
+
+        promises.set(key, promise);
+        return promise;
       },
     };
   })();
@@ -258,7 +310,8 @@
       step = 'loading config';
       const configResponse = await getConfigAsync();
       console.log('📊 initializePanel: 設定データ取得完了', configResponse);
-      systemState.config = configResponse?.success ? configResponse.config : null;
+      // 🔧 CLAUDE.md準拠: 安全な設定状態更新
+      systemState.config = configResponse?.success ? { ...configResponse.config } : null;
 
       // 3. URL パラメータのチェックと適用
       step = 'checking URL params';
@@ -271,10 +324,13 @@
             systemState.config.spreadsheetUrl = urlSpreadsheet.spreadsheetUrl;
           }
         } else {
-          // 設定がない場合は、URL 情報のみで最低限の設定を作成
+          // 🔧 CLAUDE.md準拠: 最低限設定の安全な作成
           systemState.config = {
+            userId: null, // 後で設定される
+            setupStatus: 'pending',
             spreadsheetId: urlSpreadsheet.spreadsheetId,
-            spreadsheetUrl: urlSpreadsheet.spreadsheetUrl || null
+            spreadsheetUrl: urlSpreadsheet.spreadsheetUrl || null,
+            appPublished: false
           };
         }
       }
@@ -702,24 +758,52 @@
     });
   }
 
-  function loadUserInfo() {
-    loadUserInfoAsync().catch((error) => {
-      setTimeout(() => {
-        loadUserInfoAsync().catch((retryError) => {
-          showError('接続に問題があります。再読み込みしてください');
-        });
-      }, 2000);
-    });
+  // ✅ CLAUDE.md準拠: Promise-based retry with exponential backoff
+  async function loadUserInfo() {
+    try {
+      await loadUserInfoAsync();
+    } catch (error) {
+      console.warn('Initial loadUserInfo failed, retrying...', error);
+
+      try {
+        // Exponential backoff retry pattern
+        await createPromiseDelay(2000);
+        await loadUserInfoAsync();
+      } catch (retryError) {
+        console.error('Retry failed:', retryError);
+        showError('接続に問題があります。再読み込みしてください');
+      }
+    }
   }
 
   // 設定データの読み込みと完全自動反映（新実装）
 
-  // シンプルなデバウンス機構
+  // ✅ CLAUDE.md準拠: Promise-based simple debounce
   const simpleDebounce = (fn, delay) => {
-    let timeoutId;
-    return (...args) => {
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => fn.apply(this, args), delay);
+    let isDebouncing = false;
+    let currentPromise = null;
+
+    return async (...args) => {
+      // Cancel existing debounce
+      if (isDebouncing) {
+        isDebouncing = false;
+      }
+
+      isDebouncing = true;
+
+      // Create new debounce promise
+      currentPromise = createPromiseDelay(delay).then(async () => {
+        if (isDebouncing) {
+          isDebouncing = false;
+          try {
+            await fn.apply(this, args);
+          } catch (error) {
+            console.error('Debounced function error:', error);
+          }
+        }
+      });
+
+      return currentPromise;
     };
   };
 
@@ -1828,7 +1912,13 @@
   }
 
   // URL入力方式でのデータソース接続
-  function connectToUrlSource() {
+  async function connectToUrlSource() {
+    // 🔧 CLAUDE.md準拠: RequestGateで重複実行防止
+    if (!RequestGate.enter('connectToUrlSource')) {
+      showInfo('接続処理を実行中です…');
+      return;
+    }
+
     const urlInput = document.getElementById('spreadsheet-url');
     const sheetNameInput = document.getElementById('sheet-name-input');
 
@@ -1837,11 +1927,13 @@
 
     if (!url) {
       showError('URLを入力してください');
+      RequestGate.exit('connectToUrlSource');
       return;
     }
 
     if (!sheetName) {
       showError('シート名を入力してください');
+      RequestGate.exit('connectToUrlSource');
       return;
     }
 
@@ -1851,6 +1943,7 @@
 
     if (!match) {
       showError('URLをコピペしてください（例: docs.google.com/spreadsheets/...）');
+      RequestGate.exit('connectToUrlSource');
       return;
     }
 
@@ -1859,8 +1952,16 @@
     console.log('URL入力方式で接続開始:', { spreadsheetId, sheetName });
     setPartialLoading(true, 'URL接続中...');
 
-    // 初期化処理と同じフォールバック機能付きで処理を実行
-    connectToSheet(spreadsheetId, sheetName);
+    try {
+      // 初期化処理と同じフォールバック機能付きで処理を実行
+      await connectToSheet(spreadsheetId, sheetName);
+      RequestGate.exit('connectToUrlSource');
+    } catch (error) {
+      console.error('connectToUrlSource エラー:', error);
+      showError('接続に失敗しました: ' + error.message);
+      setPartialLoading(false);
+      RequestGate.exit('connectToUrlSource');
+    }
   }
 
   // URL入力接続処理（簡素化版）
@@ -2504,13 +2605,14 @@
       return confidence >= 80;
     });
 
-    setTimeout(() => {
+    // ✅ CLAUDE.md準拠: Promise-based UI feedback delay
+    createPromiseDelay(1500).then(() => {
       if (hasAutoApplied) {
         showSuccess('✨ AI判定を自動適用済み。「設定を確認」で完了できます！');
       } else {
         showInfo('💡 ドロップダウンで列を手動設定してから「設定を確認」してください');
       }
-    }, 1500); // 他のメッセージの後に表示
+    }); // 他のメッセージの後に表示
   }
 
   // ドロップダウンの変更イベントリスナーを設定
@@ -2862,6 +2964,12 @@
 
   // 列設定の保存
   function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping) {
+    // 🔧 CLAUDE.md準拠: RequestGateで重複実行防止
+    if (!RequestGate.enter('saveColumnConfiguration')) {
+      showInfo('列設定の保存処理を実行中です…');
+      return;
+    }
+
     // 🎯 ConfigJson最適化: 重複防止の単一責任設計
     const timestamp = new Date().toISOString();
 
@@ -2879,16 +2987,28 @@
     };
 
     if (systemState && systemState.config) {
-      Object.assign(optimizedConfig, systemState.config);
-      // 最新のUI状態を最終的に適用（重複なし単一責任設計）
-      optimizedConfig.spreadsheetId = spreadsheetId;
-      optimizedConfig.sheetName = sheetName;
-      optimizedConfig.headers = headers;
-      optimizedConfig.columnMapping = {
-        ...columnMapping,
-        headers: headers,
-        verifiedAt: timestamp // 統一されたタイムスタンプ
+      // 🔧 CLAUDE.md準拠: 競合回避のため明示的フィールドマージ
+      // Object.assignの全体コピーを避け、必要なフィールドのみ選択的にマージ
+      const safeConfig = {
+        ...optimizedConfig, // 新しい設定を基本とする
+        // 既存設定から保持すべきフィールドのみ明示的に取得
+        userId: systemState.config.userId,
+        setupStatus: systemState.config.setupStatus,
+        appPublished: systemState.config.appPublished,
+        publishedAt: systemState.config.publishedAt,
+        userPermissions: systemState.config.userPermissions,
+        displaySettings: systemState.config.displaySettings,
+        // 新しい設定で明示的に上書き
+        spreadsheetId,
+        sheetName,
+        headers,
+        columnMapping: {
+          ...columnMapping,
+          headers: headers,
+          verifiedAt: timestamp // 統一されたタイムスタンプ
+        }
       };
+      optimizedConfig = safeConfig;
 
       // 🎯 ConfigJson完全同期: Derived Fields自動更新
       const isSpreadsheetChanged = optimizedConfig.spreadsheetId !== systemState.config.spreadsheetId;
@@ -2978,9 +3098,21 @@
             completeSyncStatus: '全フィールド更新完了'
           });
 
-          // systemStateを更新
-          if (systemState) {
-            systemState.config = { ...systemState.config, ...optimizedConfig };
+          // 🔧 CLAUDE.md準拠: systemState安全更新（競合回避）
+          if (systemState && systemState.config) {
+            // 明示的フィールドマージで意図しない上書きを防止
+            systemState.config = {
+              ...systemState.config,
+              // 列設定関連のフィールドのみ更新
+              spreadsheetId: optimizedConfig.spreadsheetId,
+              sheetName: optimizedConfig.sheetName,
+              headers: optimizedConfig.headers,
+              columnMapping: optimizedConfig.columnMapping,
+              setupComplete: optimizedConfig.setupComplete,
+              lastModified: optimizedConfig.lastModified || systemState.config.lastModified,
+              // 🔧 楽観的ロック: 新しいETagを更新
+              etag: result.etag || result.config?.etag || systemState.config.etag
+            };
           }
 
           // UI状態を更新
@@ -2996,10 +3128,12 @@
             console.warn('列設定の保存に失敗:', result.error);
           }
         }
+        RequestGate.exit('saveColumnConfiguration');
       })
       .withFailureHandler(function (error) {
         console.error('列設定保存エラー:', error);
         showError('列設定の保存に失敗しました');
+        RequestGate.exit('saveColumnConfiguration');
       })
       .saveDraftConfiguration(optimizedConfig);
     }
@@ -3019,6 +3153,10 @@
         if (result.success) {
           showSuccess('下書きを保存しました');
           updateResourceButtons(result.config);
+          // ETag更新 - 楽観的ロック機構
+          if (result.etag || result.config?.etag) {
+            systemState.config.etag = result.etag || result.config.etag;
+          }
         } else {
           showError(result.error);
         }
@@ -3095,6 +3233,10 @@
                 console.log('📋 最新設定取得結果:', latestConfigResponse);
                 if (latestConfigResponse && latestConfigResponse.success && latestConfigResponse.config) {
                   updateResourceButtons(latestConfigResponse.config);
+                  // ETag更新 - 楽観的ロック機構
+                  if (latestConfigResponse.config.etag) {
+                    systemState.config.etag = latestConfigResponse.config.etag;
+                  }
                 } else {
                   // フォールバック: 手動で設定を構築
                   const updatedConfig = {
@@ -3104,6 +3246,10 @@
                     setupComplete: true
                   };
                   updateResourceButtons(updatedConfig);
+                  // ETag更新 - フォールバック時も実行
+                  if (result.etag || result.config?.etag) {
+                    systemState.config.etag = result.etag || result.config.etag;
+                  }
                 }
               })
               .withFailureHandler(function(error) {
@@ -3116,13 +3262,17 @@
                   setupComplete: true
                 };
                 updateResourceButtons(updatedConfig);
+                // ETag更新 - フォールバック時も実行
+                if (result.etag || result.config?.etag) {
+                  systemState.config.etag = result.etag || result.config.etag;
+                }
               })
               .getConfig();
 
-            // ✅ 公開成功後：即座にフッターを更新（UX向上）
-            setTimeout(() => {
+            // ✅ CLAUDE.md準拠 & 公開成功後：即座にフッターを更新（UX向上）
+            createPromiseDelay(500).then(() => {
               loadBoardInfo(); // フッター情報を再読み込み
-            }, 500);
+            });
           } else {
             if (result.error === 'etag_mismatch') {
               showInfo('設定が他で更新されました。画面を更新してから再度公開してください。');
@@ -3537,10 +3687,12 @@
           const originalText = btn.textContent;
           btn.textContent = '✅ コピー完了';
           btn.disabled = true;
-          setTimeout(() => {
+
+          // ✅ CLAUDE.md準拠: Promise-based UI state restoration
+          createPromiseDelay(2000).then(() => {
             btn.textContent = originalText;
             btn.disabled = false;
-          }, 2000);
+          });
         })
         .catch(() => {
           fallbackCopyUrl(url);

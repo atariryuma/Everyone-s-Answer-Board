@@ -488,15 +488,34 @@ class Data {
         };
       }
 
-      // サービスアカウント権限でのデータベースアクセス
-      try {
-        DriveApp.getFileById(dbId).addEditor(auth.email);
-        console.log('Data.updateUser: Service account editor access granted:', auth.email);
-      } catch (driveError) {
-        console.warn('Data.updateUser: Service account access:', driveError.message);
+      // 🔧 CLAUDE.md準拠: 原子的トランザクション - 競合状態防止
+      const transactionKey = `update_user_${userId}`;
+
+      // eslint-disable-next-line no-undef
+      if (typeof RequestGate !== 'undefined' && !RequestGate.enter(transactionKey)) {
+        console.warn('Data.updateUser: Transaction in progress for user:', userId);
+        return {
+          success: false,
+          error: 'User update transaction in progress'
+        };
+      } else if (typeof RequestGate === 'undefined') {
+        console.warn('Data.updateUser: RequestGate not available, proceeding without transaction lock');
       }
 
-      const spreadsheet = this.openSpreadsheetWithServiceAccount(dbId, auth.token);
+      let spreadsheet = null;
+      try {
+        // サービスアカウント権限でのデータベースアクセス
+        try {
+          DriveApp.getFileById(dbId).addEditor(auth.email);
+          console.log('Data.updateUser: Service account editor access granted:', auth.email);
+        } catch (driveError) {
+          console.warn('Data.updateUser: Service account access:', driveError.message);
+        }
+
+        spreadsheet = this.openSpreadsheetWithServiceAccount(dbId, auth.token);
+        if (!spreadsheet) {
+          throw new Error('Failed to open spreadsheet with service account');
+        }
       const usersSheet = spreadsheet.getSheetByName('users') || spreadsheet.getSheets()[0];
 
       const data = usersSheet.getDataRange().getValues();
@@ -521,12 +540,14 @@ class Data {
         }
       }
 
-      if (userRowIndex === -1) {
-        return {
-          success: false,
-          error: 'User not found'
-        };
-      }
+        if (userRowIndex === -1) {
+          // eslint-disable-next-line no-undef
+          if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
+          return {
+            success: false,
+            error: 'User not found'
+          };
+        }
 
       // Update user data
       const updatedRow = [...data[userRowIndex]];
@@ -540,12 +561,14 @@ class Data {
         }
       });
 
-      if (updateCount === 0) {
-        return {
-          success: false,
-          error: 'No matching columns found to update'
-        };
-      }
+        if (updateCount === 0) {
+          // eslint-disable-next-line no-undef
+          if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
+          return {
+            success: false,
+            error: 'No matching columns found to update'
+          };
+        }
 
       // Write updated row back to sheet - Sheets API対応
       const rowNumber = userRowIndex + 1;
@@ -554,16 +577,29 @@ class Data {
       const range = usersSheet.getRange(rangeNotation);
       range.setValues([updatedRow]);
 
-      return {
-        success: true,
-        updatedFields: updateCount,
-        userId
-      };
-    } catch (error) {
-      console.error('Data.updateUser error:', error.message);
+        return {
+          success: true,
+          updatedFields: updateCount,
+          userId
+        };
+      } catch (error) {
+        console.error('Data.updateUser error:', error.message);
+        return {
+          success: false,
+          error: error.message
+        };
+      } finally {
+        // eslint-disable-next-line no-undef
+        if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
+      }
+    } catch (outerError) {
+      console.error('Data.updateUser outer error:', outerError.message);
+      const transactionKey = `update_user_${userId}`;
+      // eslint-disable-next-line no-undef
+      if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
       return {
         success: false,
-        error: error.message
+        error: outerError.message
       };
     }
   }

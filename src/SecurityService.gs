@@ -375,32 +375,6 @@ function persistSecurityLog(logEntry) {
     }
 }
 
-/**
- * 古いセキュリティログ削除
- */
-function cleanupOldSecurityLogs() {
-    try {
-      if (!initSecurityServiceZero()) {
-        console.error('validateEmailAccess: ServiceFactory not available');
-        return false;
-      }
-      const props = ServiceFactory.getProperties();
-      const allProps = props.getProperties();
-      
-      const securityLogs = Object.keys(allProps)
-        .filter(key => key.startsWith('security_log_'))
-        .sort()
-        .reverse();
-
-      // 100件を超える古いログを削除
-      if (securityLogs.length > 100) {
-        const logsToDelete = securityLogs.slice(100);
-        logsToDelete.forEach(key => props.deleteProperty(key));
-      }
-    } catch (error) {
-      console.error('SecurityService.cleanupOldSecurityLogs: エラー', error.message);
-    }
-}
 
 // ===========================================
 // 🔧 ユーティリティ・診断
@@ -548,62 +522,25 @@ function validateSpreadsheetAccess(spreadsheetId) {
 }
 
 /**
- * セキュリティ設定推奨事項
- * @returns {Array} 推奨事項リスト
+ * 古いセキュリティログのクリーンアップ
+ * 最新100件まで保持し、古いログを削除する
  */
-function getSecurityRecommendations() {
-    const recommendations = [];
+function cleanupOldSecurityLogs() {
+  try {
+    const cache = CacheService.getScriptCache();
+    const logs = cache.get('security_logs');
 
-    try {
-      // 基本的なセキュリティチェック
-      const session = validateSession();
-      if (!session) {
-        recommendations.push({
-          priority: 'high',
-          category: 'authentication',
-          message: 'セッションの再認証が必要です',
-          action: 'ログインを確認してください'
-        });
+    if (logs) {
+      const logArray = JSON.parse(logs);
+      if (logArray.length > 100) {
+        // 最新100件のみ保持
+        const trimmedLogs = logArray.slice(-100);
+        cache.put('security_logs', JSON.stringify(trimmedLogs), 21600); // 6時間保持
+        console.log(`SecurityService: Cleaned up old logs. Kept ${trimmedLogs.length} recent entries.`);
       }
-
-      // トークンの有効性確認
-      // Service account authentication handled by ServiceFactory
-      try {
-        const authTest = ServiceFactory.getSession();
-        if (!authTest.email) {
-          recommendations.push({
-            priority: 'medium',
-            category: 'authorization',
-            message: 'Service Accountトークンの更新が必要です',
-            action: 'トークンを再生成してください'
-          });
-        }
-      } catch (authError) {
-        recommendations.push({
-          priority: 'high',
-          category: 'authorization',
-          message: 'Service Account認証エラー',
-          action: '認証設定を確認してください'
-        });
-      }
-
-      // デフォルト推奨事項
-      recommendations.push({
-        priority: 'low',
-        category: 'general',
-        message: '定期的なセキュリティ監査を実施してください',
-        action: '月次でのセキュリティレビューを設定'
-      });
-
-    } catch (error) {
-      console.error('SecurityService.getSecurityRecommendations: エラー', error.message);
-      recommendations.push({
-        priority: 'high',
-        category: 'error',
-        message: 'セキュリティ診断でエラーが発生しました',
-        action: 'システム管理者に連絡してください'
-      });
     }
-
-    return recommendations;
+  } catch (error) {
+    console.warn('SecurityService.cleanupOldSecurityLogs: Cleanup failed:', error.message);
+  }
 }
+
