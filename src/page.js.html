@@ -232,8 +232,6 @@ class StudyQuestApp {
           recoveryRequired: false,
           lastErrorDiagnostics: null,
 
-          // レガシータイマー
-          legacyTimerIds: new Set()
         },
 
         // 🔍 読み取り専用アクセサー
@@ -243,7 +241,7 @@ class StudyQuestApp {
 
         // 🛡️ 安全な状態更新
         updateState(updates) {
-          Object.assign(this._state, updates);
+          this._state = { ...this._state, ...updates };
           console.log('🔄 PollingStateManager updated:', Object.keys(updates));
         },
 
@@ -254,11 +252,6 @@ class StudyQuestApp {
             clearInterval(this._state.intervalId);
           }
 
-          // レガシータイマークリーンアップ
-          this._state.legacyTimerIds.forEach(id => {
-            clearTimeout(id);
-            clearInterval(id);
-          });
 
           // 状態リセット
           this._state = {
@@ -267,22 +260,16 @@ class StudyQuestApp {
             executionInProgress: false,
             intervalId: null,
             checkAnswersSemaphore: false,
-            legacyTimerIds: new Set()
           };
 
           console.log('🧹 PollingStateManager reset complete');
         },
 
-        // 🔧 レガシータイマー管理
-        registerLegacyTimer(timerId) {
-          this._state.legacyTimerIds.add(timerId);
-        },
 
         // 📊 診断情報
         diagnose() {
           return {
             state: this.getState(),
-            activeLegacyTimers: this._state.legacyTimerIds.size,
             timestamp: new Date().toISOString()
           };
         }

@@ -97,8 +97,6 @@ function enrichUserInfo(userInfo) {
         isActive: userInfo.isActive,
         lastModified: userInfo.lastModified,
         config: enrichedConfig,
-        // レガシー互換性のためのフィールド
-        currentUserEmail: userInfo.userEmail,
         userInfo: {
           userId: userInfo.userId,
           userEmail: userInfo.userEmail,
