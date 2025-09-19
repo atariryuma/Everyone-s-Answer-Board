@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, Data, Config, getSpreadsheetList */
+/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, Data, Config, getSpreadsheetList, getConfigSafe, saveConfigSafe */
 
 // ===========================================
 // 🔧 Zero-Dependency Utility Functions
@@ -473,13 +473,9 @@ function publishApplication(publishConfig) {
       const latestUser = db.findUserByEmail(email);
       const userToUse = latestUser || user;
 
-      let currentConfig = {};
-      try {
-        currentConfig = userToUse.configJson ? JSON.parse(userToUse.configJson) : {};
-      } catch (parseError) {
-        console.error('❌ Config parse error:', parseError.message);
-        currentConfig = {};
-      }
+      // 統一API使用: 構造化パース
+      const configResult = getConfigSafe(userToUse.userId);
+      const currentConfig = configResult.success ? configResult.config : {};
 
       console.log('📋 Config merge:', {
         userId: user.userId,
@@ -1262,13 +1258,9 @@ function checkCurrentPublicationStatus(targetUserId) {
       return createUserNotFoundError();
     }
 
-    let config = {};
-    try {
-      config = JSON.parse(user.configJson || '{}');
-    } catch (parseError) {
-      console.error('❌ Config parse error:', parseError.message);
-      config = {};
-    }
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(user.userId);
+    const config = configResult.success ? configResult.config : {};
 
     const result = {
       success: true,

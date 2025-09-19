@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config */
+/* global ServiceFactory, formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config, getConfigSafe */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -59,13 +59,14 @@ function getUserSheetData(userId, options = {}) {
     }
 
     const user = db.findUserById(userId);
-    if (!user || !user.configJson) {
-      console.error('DataService.getUserSheetData: ユーザー設定が見つかりません', { userId });
-      // Direct return format like admin panel getSheetList
-      return { success: false, message: 'ユーザー設定を取得できませんでした', data: [], headers: [], sheetName: '' };
+    if (!user) {
+      console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
+      return { success: false, message: 'ユーザーが見つかりません', data: [], headers: [], sheetName: '' };
     }
 
-    const config = JSON.parse(user.configJson);
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(userId);
+    const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId) {
       console.warn('DataService.getUserSheetData: スプレッドシートIDが設定されていません', { userId });
       // Direct return format like admin panel getSheetList
@@ -1269,11 +1270,13 @@ function extractSheetHeaders(sheet) {
 function restoreColumnConfig(userId, spreadsheetId, sheetName) {
   try {
     const user = Data.findUserByEmail(Session.getActiveUser().getEmail());
-    if (!user || !user.configJson) {
-      return { success: false, message: 'User config not found' };
+    if (!user) {
+      return { success: false, message: 'User not found' };
     }
 
-    const config = JSON.parse(user.configJson);
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(userId);
+    const config = configResult.success ? configResult.config : {};
     if (config.spreadsheetId !== spreadsheetId || config.sheetName !== sheetName) {
       return { success: false, message: 'Config mismatch' };
     }
@@ -2212,11 +2215,13 @@ function dsAddReaction(userId, rowId, reactionType) {
   try {
     // 🎯 Zero-Dependency: Direct Data call
     const user = Data.findUserById(userId);
-    if (!user || !user.configJson) {
-      return createErrorResponse('User configuration not found');
+    if (!user) {
+      return createErrorResponse('User not found');
     }
 
-    const config = JSON.parse(user.configJson);
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(userId);
+    const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Spreadsheet configuration incomplete');
     }
@@ -2258,11 +2263,13 @@ function dsToggleHighlight(userId, rowId) {
   try {
     // 🎯 Zero-Dependency: Direct Data call
     const user = Data.findUserById(userId);
-    if (!user || !user.configJson) {
-      return createErrorResponse('User configuration not found');
+    if (!user) {
+      return createErrorResponse('User not found');
     }
 
-    const config = JSON.parse(user.configJson);
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(userId);
+    const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Spreadsheet configuration incomplete');
     }

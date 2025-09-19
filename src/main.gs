@@ -788,14 +788,9 @@ function getAppStatus() {
       return createErrorResponse('User not found');
     }
 
-    let config = {};
-    if (user.configJson) {
-      try {
-        config = JSON.parse(user.configJson);
-      } catch (parseError) {
-        console.warn('getAppStatus: config parse error', parseError);
-      }
-    }
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(user.userId);
+    const config = configResult.success ? configResult.config : {};
 
     // ユーザーのボード公開状態を取得
     const isActive = Boolean(config.appPublished);
@@ -850,15 +845,9 @@ function setAppStatus(isActive) {
       return createUserNotFoundError();
     }
 
-    // 現在の設定を取得
-    let config = {};
-    if (user.configJson) {
-      try {
-        config = JSON.parse(user.configJson);
-      } catch (parseError) {
-        console.warn('setAppStatus: config parse error', parseError);
-      }
-    }
+    // 統一API使用: 設定取得・更新・保存
+    const configResult = getConfigSafe(user.userId);
+    const config = configResult.success ? configResult.config : {};
 
     // ボード公開状態を更新
     config.appPublished = Boolean(isActive);
@@ -866,22 +855,12 @@ function setAppStatus(isActive) {
       config.publishedAt = config.publishedAt || new Date().toISOString();
     }
     config.lastModified = new Date().toISOString();
-
-    // データベースに保存（重複フィールド削除）
-    delete config.setupComplete;
-    delete config.isDraft;
-    delete config.questionText;
     config.lastAccessedAt = new Date().toISOString();
 
-    const updatedUser = {
-      ...user,
-      configJson: JSON.stringify(config),
-      lastModified: new Date().toISOString()
-    };
-
-    const result = db.updateUser(user.userId, updatedUser);
-    if (!result.success) {
-      return createErrorResponse('Failed to update user configuration');
+    // 統一API使用: 検証・サニタイズ・保存
+    const saveResult = saveConfigSafe(user.userId, config);
+    if (!saveResult.success) {
+      return createErrorResponse(`Failed to update user configuration: ${saveResult.message}`);
     }
 
     return {
@@ -1047,12 +1026,9 @@ function toggleUserBoardStatus(targetUserId) {
       return createUserNotFoundError();
     }
 
-    let config = {};
-    try {
-      config = JSON.parse(targetUser.configJson || '{}');
-    } catch (parseError) {
-      console.warn('toggleUserBoardStatus: config parse error', parseError);
-    }
+    // 統一API使用: 設定取得・更新・保存
+    const configResult = getConfigSafe(targetUserId);
+    const config = configResult.success ? configResult.config : {};
 
     // ボード公開状態を切り替え
     config.appPublished = !config.appPublished;
@@ -1060,19 +1036,15 @@ function toggleUserBoardStatus(targetUserId) {
       config.publishedAt = config.publishedAt || new Date().toISOString();
     }
     config.lastModified = new Date().toISOString();
-
-    delete config.setupComplete;
-    delete config.isDraft;
-    delete config.questionText;
     config.lastAccessedAt = new Date().toISOString();
 
-    const updatedUser = {
-      ...targetUser,
-      configJson: JSON.stringify(config),
-      lastModified: new Date().toISOString()
-    };
+    // 統一API使用: 検証・サニタイズ・保存
+    const saveResult = saveConfigSafe(targetUserId, config);
+    if (!saveResult.success) {
+      return createErrorResponse(`Failed to toggle board status: ${saveResult.message}`);
+    }
 
-    const result = db.updateUser(targetUserId, updatedUser);
+    const result = saveResult; // 統一APIレスポンスをそのまま利用
     if (result.success) {
       return {
         success: true,
@@ -1117,33 +1089,20 @@ function clearActiveSheet(targetUserId) {
       return createUserNotFoundError();
     }
 
-    let config = {};
-    try {
-      config = JSON.parse(targetUser.configJson || '{}');
-    } catch (parseError) {
-      console.warn('clearActiveSheet: config parse error', parseError.message);
-      config = {};
-    }
+    // 統一API使用: 設定取得・更新・保存
+    const configResult = getConfigSafe(targetUser.userId);
+    const config = configResult.success ? configResult.config : {};
 
     const wasPublished = config.appPublished === true;
     config.appPublished = false;
     config.publishedAt = null;
     config.lastModified = new Date().toISOString();
-
-    delete config.setupComplete;
-    delete config.isDraft;
-    delete config.questionText;
     config.lastAccessedAt = new Date().toISOString();
 
-    const updatedUser = {
-      ...targetUser,
-      configJson: JSON.stringify(config),
-      lastModified: new Date().toISOString()
-    };
-
-    const result = db.updateUser(targetUser.userId, updatedUser);
-    if (!result?.success) {
-      return createErrorResponse('ボード状態の更新に失敗しました');
+    // 統一API使用: 検証・サニタイズ・保存
+    const saveResult = saveConfigSafe(targetUser.userId, config);
+    if (!saveResult.success) {
+      return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message}`);
     }
 
     return {
@@ -1256,13 +1215,9 @@ function validateHeaderIntegrity(targetUserId) {
       return createUserNotFoundError();
     }
 
-    let config = {};
-    try {
-      config = JSON.parse(targetUser.configJson || '{}');
-    } catch (parseError) {
-      console.warn('validateHeaderIntegrity: config parse error', parseError.message);
-      config = {};
-    }
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(targetUser.userId);
+    const config = configResult.success ? configResult.config : {};
 
     if (!config.spreadsheetId || !config.sheetName) {
       return {
@@ -1320,14 +1275,9 @@ function getBoardInfo() {
       return { success: false, message: 'User not found' };
     }
 
-    let config = {};
-    if (user.configJson) {
-      try {
-        config = JSON.parse(user.configJson);
-      } catch (parseError) {
-        console.error('❌ Config parse error:', parseError.message);
-      }
-    }
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(user.userId);
+    const config = configResult.success ? configResult.config : {};
 
     const appPublished = Boolean(config.appPublished);
     const baseUrl = ScriptApp.getService().getUrl();
@@ -1585,36 +1535,17 @@ function saveConfig(userId, config) {
       return { success: false, message: 'User ID and config required' };
     }
 
-    // Validate config first
-    const validation = validateConfig(config);
-    if (!validation.isValid) {
+    // 統一API使用: 検証・サニタイズ・保存を一元化
+    const saveResult = saveConfigSafe(userId, config);
+    if (!saveResult.success) {
       return {
         success: false,
-        message: 'Invalid config',
-        errors: validation.errors
+        message: saveResult.message || 'Failed to save config',
+        errors: saveResult.errors || []
       };
     }
 
-    // Save to database
-    const db = ServiceFactory.getDB();
-    const user = Data.findUserById(userId);
-    if (!user) {
-      return { success: false, message: 'User not found' };
-    }
-
-    delete config.setupComplete;
-    delete config.isDraft;
-    delete config.questionText;
-    config.lastAccessedAt = new Date().toISOString();
-    config.lastModified = new Date().toISOString();
-
-    const updatedUser = {
-      ...user,
-      configJson: JSON.stringify(config),
-      lastModified: new Date().toISOString()
-    };
-
-    const result = db.updateUser(userId, updatedUser);
+    const result = saveResult; // 統一APIレスポンスをそのまま利用
 
     return {
       success: !!result,
@@ -1648,12 +1579,9 @@ function detectFormUrl(sheetId = null) {
       return { success: false, message: 'User not found', formUrl: null };
     }
 
-    let config = {};
-    try {
-      config = JSON.parse(user.configJson || '{}');
-    } catch (e) {
-      console.warn('detectFormUrl: config parse error', e);
-    }
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(user.userId);
+    const config = configResult.success ? configResult.config : {};
 
     if (!config.formUrl) {
       return { success: false, message: 'Form URL not configured', formUrl: null };
@@ -1903,12 +1831,9 @@ function getActiveFormInfo() {
       };
     }
 
-    let config = {};
-    try {
-      config = JSON.parse(user.configJson || '{}');
-    } catch (parseError) {
-      console.error('❌ Config parse error:', parseError.message);
-    }
+    // 統一API使用: 構造化パース
+    const configResult = getConfigSafe(user.userId);
+    const config = configResult.success ? configResult.config : {};
 
     // シンプルな統一ルール: URLが存在して有効な場合のみ表示
     const isValidUrl = !!(config.formUrl && isValidFormUrl(config.formUrl));

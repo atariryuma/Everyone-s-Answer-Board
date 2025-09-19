@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, validateUrl, validateEmail, getCurrentEmail, Data */
+/* global ServiceFactory, validateUrl, validateEmail, getCurrentEmail, Data, getConfigSafe */
 
 // ===========================================
 // 🔧 Zero-Dependency UserService (ServiceFactory版)
@@ -84,14 +84,9 @@ function enrichUserInfo(userInfo) {
         throw new Error('無効なユーザー情報');
       }
 
-      // configJsonを解析
-      let config = {};
-      try {
-        config = JSON.parse(userInfo.configJson || '{}');
-      } catch (parseError) {
-        console.warn('UserService.enrichUserInfo: configJson解析エラー', parseError.message);
-        config = {};
-      }
+      // 統一API使用: 構造化パース
+      const configResult = getConfigSafe(userInfo.userId);
+      const config = configResult.success ? configResult.config : {};
 
       // 動的URLを生成・キャッシュ
       const enrichedConfig = generateDynamicUserUrls(config);

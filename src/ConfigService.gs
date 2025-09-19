@@ -13,6 +13,8 @@
  * - グローバル副作用排除
  */
 
+/* global validateConfig */
+
 /* global ServiceFactory, URL, validateUrl, createErrorResponse, validateSpreadsheetId, Data */
 
 // ===========================================
@@ -408,15 +410,11 @@ function saveUserConfig(userId, config) {
     const sanitizedConfig = validatedConfig.data;
     sanitizedConfig.lastModified = new Date().toISOString();
 
-    // データベース保存
-    const updateResult = Data.updateUser(userId, { configJson: JSON.stringify(sanitizedConfig) });
-
-    if (!updateResult) {
-      throw new Error('データベース更新に失敗しました');
+    // 統一API使用: 保存処理をsaveConfigSafeに委謗
+    const saveResult = saveConfigSafe(userId, sanitizedConfig);
+    if (!saveResult.success) {
+      throw new Error(`データベース更新に失敗しました: ${saveResult.message}`);
     }
-
-    // キャッシュクリア
-    clearConfigCache(userId);
 
     console.info('saveUserConfig: 設定保存完了', {
       userId,
@@ -455,46 +453,35 @@ function saveUserConfig(userId, config) {
  * @returns {Object} 検証結果
  */
 function validateAndSanitizeConfig(config, userId) {
-  const errors = [];
-
   try {
-    // 基本構造検証
-    if (!config || typeof config !== 'object') {
-      errors.push('設定は有効なオブジェクトである必要があります');
-      return createErrorResponse('無効な設定形式', { errors });
+    // 統一検証: validators.gsのvalidateConfigを活用
+    const validationResult = validateConfig(config);
+    if (!validationResult.isValid) {
+      return {
+        success: false,
+        message: '設定検証エラーがあります',
+        errors: validationResult.errors,
+        data: validationResult.sanitized || config
+      };
     }
 
-    const sanitized = { ...config };
-
-    // userId検証
+    // ユーザーIDの追加検証
+    const errors = [];
     if (!validateConfigUserId(userId)) {
       errors.push('無効なユーザーID形式');
     }
+
+    // ConfigService固有の追加サニタイズ
+    const sanitized = { ...validationResult.sanitized };
     sanitized.userId = userId;
 
-    // spreadsheetId検証
-    if (sanitized.spreadsheetId && !validateSpreadsheetId(sanitized.spreadsheetId)) {
-      errors.push('無効なスプレッドシートID形式');
-      sanitized.spreadsheetId = '';
-    }
-
-    // formUrl検証
-    if (sanitized.formUrl && !validateUrl(sanitized.formUrl)?.isValid) {
-      errors.push('無効なフォームURL形式');
-      sanitized.formUrl = '';
-    }
-
-    // displaySettings サニタイズ
     if (sanitized.displaySettings) {
       sanitized.displaySettings = sanitizeDisplaySettings(sanitized.displaySettings);
     }
-
-    // columnMapping サニタイズ
     if (sanitized.columnMapping) {
       sanitized.columnMapping = sanitizeColumnMapping(sanitized.columnMapping);
     }
 
-    // エラーがある場合は失敗を返す
     if (errors.length > 0) {
       return {
         success: false,
@@ -594,7 +581,8 @@ function validateConfigUserId(userId) {
  */
 function determineSetupStep(userInfo, configJson) {
   try {
-    const config = JSON.parse(configJson || '{}');
+    // configJsonは文字列またはオブジェクトの可能性あり
+    const config = typeof configJson === 'string' ? JSON.parse(configJson || '{}') : (configJson || {});
 
     if (!config.spreadsheetId) {
       return 1; // データソース未設定
