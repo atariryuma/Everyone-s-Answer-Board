@@ -79,7 +79,7 @@ function findUserByEmail(email) {
     const data = sheet.getDataRange().getValues();
     if (data.length === 0) return null;
 
-    const headers = data[0];
+    const [headers] = data;
     const emailColumnIndex = headers.indexOf('userEmail');
 
     if (emailColumnIndex === -1) {
@@ -127,7 +127,7 @@ function findUserById(userId) {
     const data = sheet.getDataRange().getValues();
     if (data.length === 0) return null;
 
-    const headers = data[0];
+    const [headers] = data;
     const userIdColumnIndex = headers.indexOf('userId');
 
     if (userIdColumnIndex === -1) {
@@ -244,7 +244,7 @@ function getAllUsers(options = {}) {
     const data = sheet.getDataRange().getValues();
     if (data.length <= 1) return []; // No data or header only
 
-    const headers = data[0];
+    const [headers] = data;
     const users = [];
 
     for (let i = 1; i < data.length; i++) {
@@ -331,7 +331,7 @@ function updateUser(userId, updates) {
     }
 
     const data = sheet.getDataRange().getValues();
-    const headers = data[0];
+    const [headers] = data;
     const userIdColumnIndex = headers.indexOf('userId');
 
     if (userIdColumnIndex === -1) {
@@ -388,7 +388,7 @@ function deleteUser(userId, reason = '') {
     }
 
     const data = sheet.getDataRange().getValues();
-    const headers = data[0];
+    const [headers] = data;
     const userIdColumnIndex = headers.indexOf('userId');
 
     if (userIdColumnIndex === -1) {

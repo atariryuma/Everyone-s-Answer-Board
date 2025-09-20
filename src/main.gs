@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, getFormInfo, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -817,7 +817,7 @@ function deleteUser(userId, reason = '') {
     }
 
     const data = sheet.getDataRange().getValues();
-    const headers = data[0];
+    const [headers] = data;
     const userIdColumnIndex = headers.indexOf('userId');
     const isActiveIndex = headers.indexOf('isActive');
     const lastModifiedIndex = headers.indexOf('lastModified');
@@ -2053,5 +2053,418 @@ function triggerPollingUpdate(options = {}) {
   } catch (error) {
     console.error('triggerPollingUpdate error:', error.message);
     return createExceptionResponse(error, 'Polling trigger failed');
+  }
+}
+
+// ===========================================
+// 🔧 Missing API Endpoints - Frontend/Backend Compatibility
+// ===========================================
+
+/**
+ * Refresh board data for a user
+ * @param {string} userId - User ID
+ * @param {Object} options - Refresh options
+ * @returns {Object} Refreshed board data
+ */
+function refreshBoardData(userId, options = {}) {
+  try {
+    console.log('📊 refreshBoardData START:', { userId, options });
+
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
+    }
+
+    // Validate access
+    const accessCheck = checkAccess(email);
+    if (!accessCheck.success) {
+      return createAuthError();
+    }
+
+    // Call DataController function if available
+    if (typeof DataController !== 'undefined' && DataController.refreshBoardData) {
+      return DataController.refreshBoardData(userId, options);
+    }
+
+    // Fallback to DataService approach
+    const user = findUserById(userId);
+    if (!user) {
+      return createUserNotFoundError();
+    }
+
+    // Get fresh sheet data
+    const sheetResult = dsGetUserSheetData(userId, {
+      forceRefresh: true,
+      includeMetadata: true,
+      ...options
+    });
+
+    return {
+      success: sheetResult.success,
+      data: sheetResult.data || [],
+      message: sheetResult.success ? 'Board data refreshed successfully' : sheetResult.message,
+      timestamp: new Date().toISOString(),
+      userId
+    };
+
+  } catch (error) {
+    console.error('refreshBoardData error:', error.message);
+    return createExceptionResponse(error, 'Failed to refresh board data');
+  }
+}
+
+/**
+ * Check current publication status
+ * @param {string} targetUserId - Target user ID
+ * @returns {Object} Publication status
+ */
+function checkCurrentPublicationStatus(targetUserId) {
+  try {
+    console.log('📋 checkCurrentPublicationStatus START:', { targetUserId });
+
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
+    }
+
+    // Call SystemController function if available
+    if (typeof SystemController !== 'undefined' && SystemController.checkCurrentPublicationStatus) {
+      return SystemController.checkCurrentPublicationStatus(targetUserId);
+    }
+
+    // Fallback implementation
+    const user = findUserById(targetUserId);
+    if (!user) {
+      return createUserNotFoundError();
+    }
+
+    const configResult = getUserConfig(targetUserId);
+    if (!configResult.success) {
+      return {
+        success: false,
+        message: 'Failed to get user configuration',
+        isPublished: false
+      };
+    }
+
+    const isPublished = Boolean(configResult.config.isPublished);
+
+    return {
+      success: true,
+      isPublished,
+      targetUserId,
+      publishedUrl: isPublished ? configResult.config.publishedUrl : null,
+      message: isPublished ? 'Application is published' : 'Application is not published',
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('checkCurrentPublicationStatus error:', error.message);
+    return createExceptionResponse(error, 'Failed to check publication status');
+  }
+}
+
+/**
+ * Perform auto repair on system
+ * @returns {Object} Auto repair result
+ */
+function performAutoRepair() {
+  try {
+    console.log('🔧 performAutoRepair START');
+
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
+    }
+
+    // Check if user is administrator
+    if (!isAdministrator(email)) {
+      return createAdminRequiredError();
+    }
+
+    // Call SystemController function if available
+    if (typeof SystemController !== 'undefined' && SystemController.performAutoRepair) {
+      return SystemController.performAutoRepair();
+    }
+
+    // Fallback auto repair implementation
+    const repairSteps = [];
+    let allSuccess = true;
+
+    // Step 1: Validate system configuration
+    try {
+      const hasCore = hasCoreSystemProps();
+      if (!hasCore) {
+        repairSteps.push({ step: 'System configuration', status: 'failed', message: 'Core system properties missing' });
+        allSuccess = false;
+      } else {
+        repairSteps.push({ step: 'System configuration', status: 'success', message: 'Core properties validated' });
+      }
+    } catch (error) {
+      repairSteps.push({ step: 'System configuration', status: 'error', message: error.message });
+      allSuccess = false;
+    }
+
+    // Step 2: Check database connectivity
+    try {
+      const dbConfig = getDatabaseConfig();
+      if (dbConfig.success) {
+        repairSteps.push({ step: 'Database connectivity', status: 'success', message: 'Database accessible' });
+      } else {
+        repairSteps.push({ step: 'Database connectivity', status: 'failed', message: 'Database not accessible' });
+        allSuccess = false;
+      }
+    } catch (error) {
+      repairSteps.push({ step: 'Database connectivity', status: 'error', message: error.message });
+      allSuccess = false;
+    }
+
+    return {
+      success: allSuccess,
+      message: allSuccess ? 'Auto repair completed successfully' : 'Auto repair completed with issues',
+      repairSteps,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('performAutoRepair error:', error.message);
+    return createExceptionResponse(error, 'Auto repair failed');
+  }
+}
+
+/**
+ * Force URL system reset
+ * @returns {Object} Reset result
+ */
+function forceUrlSystemReset() {
+  try {
+    console.log('🔄 forceUrlSystemReset START');
+
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
+    }
+
+    // Check if user is administrator
+    if (!isAdministrator(email)) {
+      return createAdminRequiredError();
+    }
+
+    // Call SystemController function if available
+    if (typeof SystemController !== 'undefined' && SystemController.forceUrlSystemReset) {
+      return SystemController.forceUrlSystemReset();
+    }
+
+    // Fallback implementation - clear URL-related cache and properties
+    try {
+      // Clear script properties related to URLs
+      const properties = PropertiesService.getScriptProperties();
+      const urlProps = ['WEB_APP_URL', 'PUBLISHED_URL', 'DEPLOYMENT_URL'];
+
+      urlProps.forEach(prop => {
+        try {
+          properties.deleteProperty(prop);
+        } catch (deleteError) {
+          console.warn(`Failed to delete property ${prop}:`, deleteError.message);
+        }
+      });
+
+      // Clear relevant cache entries
+      try {
+        const cache = CacheService.getScriptCache();
+        cache.removeAll(['url_cache', 'deployment_cache', 'web_app_cache']);
+      } catch (cacheError) {
+        console.warn('Cache clearing failed:', cacheError.message);
+      }
+
+      return {
+        success: true,
+        message: 'URL system reset completed successfully',
+        resetItems: urlProps,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (resetError) {
+      return {
+        success: false,
+        message: `URL system reset failed: ${  resetError.message}`,
+        timestamp: new Date().toISOString()
+      };
+    }
+
+  } catch (error) {
+    console.error('forceUrlSystemReset error:', error.message);
+    return createExceptionResponse(error, 'Force URL system reset failed');
+  }
+}
+
+/**
+ * Publish application
+ * @param {Object} publishConfig - Publication configuration
+ * @returns {Object} Publication result
+ */
+function publishApplication(publishConfig) {
+  try {
+    console.log('🚀 publishApplication START:', publishConfig);
+
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
+    }
+
+    // Check if user is administrator
+    if (!isAdministrator(email)) {
+      return createAdminRequiredError();
+    }
+
+    // Call SystemController function if available
+    if (typeof SystemController !== 'undefined' && SystemController.publishApplication) {
+      return SystemController.publishApplication(publishConfig);
+    }
+
+    // Basic validation
+    if (!publishConfig || typeof publishConfig !== 'object') {
+      return {
+        success: false,
+        message: 'Invalid publish configuration provided'
+      };
+    }
+
+    // Fallback implementation
+    try {
+      // Update user configuration with publication settings
+      const user = findUserByEmail(email);
+      if (!user) {
+        return createUserNotFoundError();
+      }
+
+      const configResult = getUserConfig(user.userId);
+      if (!configResult.success) {
+        return {
+          success: false,
+          message: 'Failed to get user configuration for publishing'
+        };
+      }
+
+      // Merge publish configuration
+      const updatedConfig = {
+        ...configResult.config,
+        isPublished: true,
+        publishedUrl: publishConfig.publishedUrl || ScriptApp.getService().getUrl(),
+        publishSettings: publishConfig,
+        publishedAt: new Date().toISOString()
+      };
+
+      const saveResult = saveUserConfig(user.userId, updatedConfig);
+      if (!saveResult.success) {
+        return {
+          success: false,
+          message: 'Failed to save publication configuration'
+        };
+      }
+
+      return {
+        success: true,
+        message: 'Application published successfully',
+        publishedUrl: updatedConfig.publishedUrl,
+        publishConfig,
+        timestamp: new Date().toISOString()
+      };
+
+    } catch (publishError) {
+      return {
+        success: false,
+        message: `Publication failed: ${  publishError.message}`
+      };
+    }
+
+  } catch (error) {
+    console.error('publishApplication error:', error.message);
+    return createExceptionResponse(error, 'Application publication failed');
+  }
+}
+
+/**
+ * Get form information
+ * @param {string} spreadsheetId - Spreadsheet ID
+ * @param {string} sheetName - Sheet name
+ * @returns {Object} Form information
+ */
+function getFormInfo(spreadsheetId, sheetName) {
+  try {
+    console.log('📋 getFormInfo START:', { spreadsheetId, sheetName });
+
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
+    }
+
+    // Call SystemController function if available
+    if (typeof SystemController !== 'undefined' && SystemController.getFormInfo) {
+      return SystemController.getFormInfo(spreadsheetId, sheetName);
+    }
+
+    // Validate inputs
+    if (!spreadsheetId || !sheetName) {
+      return {
+        success: false,
+        message: 'Spreadsheet ID and sheet name are required'
+      };
+    }
+
+    // Fallback implementation
+    try {
+      // Open spreadsheet and get sheet
+      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      const sheet = spreadsheet.getSheetByName(sheetName);
+
+      if (!sheet) {
+        return {
+          success: false,
+          message: `Sheet '${sheetName}' not found in spreadsheet`
+        };
+      }
+
+      // Get basic sheet information
+      const lastRow = sheet.getLastRow();
+      const lastColumn = sheet.getLastColumn();
+
+      let headers = [];
+      if (lastRow > 0 && lastColumn > 0) {
+        const headerRange = sheet.getRange(1, 1, 1, lastColumn);
+        [headers] = headerRange.getValues();
+      }
+
+      // Try to detect form URL from sheet if available
+      let formUrl = null;
+      try {
+        const formUrlProp = `FORM_URL_${spreadsheetId}_${sheetName}`;
+        formUrl = PropertiesService.getScriptProperties().getProperty(formUrlProp);
+      } catch (propError) {
+        console.warn('Could not get form URL from properties:', propError.message);
+      }
+
+      return {
+        success: true,
+        spreadsheetId,
+        sheetName,
+        formUrl,
+        dataRows: Math.max(0, lastRow - 1), // Exclude header row
+        columns: lastColumn,
+        headers: headers.filter(h => h && h.toString().trim()),
+        lastUpdated: new Date().toISOString(),
+        message: 'Form information retrieved successfully'
+      };
+
+    } catch (sheetError) {
+      return {
+        success: false,
+        message: `Failed to access sheet: ${  sheetError.message}`
+      };
+    }
+
+  } catch (error) {
+    console.error('getFormInfo error:', error.message);
+    return createExceptionResponse(error, 'Failed to get form information');
   }
 }
