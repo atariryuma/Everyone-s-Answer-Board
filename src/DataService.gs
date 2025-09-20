@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config, getUserConfig, helpers, CACHE_DURATION, SLEEP_MS */
+/* global formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config, getUserConfig, helpers, CACHE_DURATION, SLEEP_MS */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -893,7 +893,7 @@ function getSpreadsheetList(options = {}) {
   const started = Date.now();
   try {
     // ✅ GAS Best Practice: 直接API呼び出し（依存除去）
-    const session = ServiceFactory.getSession();
+    const session = { email: Session.getActiveUser().getEmail() };
     const currentUser = session.email;
 
     // オプション設定
@@ -1238,7 +1238,7 @@ function extractSheetHeaders(sheet) {
  */
 function restoreColumnConfig(userId, spreadsheetId, sheetName) {
   try {
-    const session = ServiceFactory.getSession();
+    const session = { email: Session.getActiveUser().getEmail() };
     const user = Data.findUserByEmail(session.email);
     if (!user) {
       return { success: false, message: 'User not found' };
@@ -2378,11 +2378,11 @@ function validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey) {
 /**
  * addReaction (user context)
  * @param {string} userId
- * @param {number|string} rowId - number or 'row_#'
- * @param {string} reactionType
+ * @param {number|string} rowIndex - number or 'row_#'
+ * @param {string} reaction
  * @returns {Object}
  */
-function dsAddReaction(userId, rowId, reactionType) {
+function dsAddReaction(userId, rowIndex, reaction) {
   try {
     // 🎯 Zero-Dependency: Direct Data call
     const user = Data.findUserById(userId);
@@ -2397,14 +2397,14 @@ function dsAddReaction(userId, rowId, reactionType) {
       return createErrorResponse('Spreadsheet configuration incomplete');
     }
 
-    const rowIndex = typeof rowId === 'string' ? parseInt(String(rowId).replace('row_', ''), 10) : parseInt(rowId, 10);
-    if (!rowIndex || rowIndex < 2) {
+    const parsedRowIndex = typeof rowIndex === 'string' ? parseInt(String(rowIndex).replace('row_', ''), 10) : parseInt(rowIndex, 10);
+    if (!parsedRowIndex || parsedRowIndex < 2) {
       return createErrorResponse('Invalid row ID');
     }
 
     // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時リアクション競合防止（CacheService-based mutex）
-    const reactionKey = `reaction_${config.spreadsheetId}_${config.sheetName}_${rowIndex}`;
-    const cache = ServiceFactory.getCache();
+    const reactionKey = `reaction_${config.spreadsheetId}_${config.sheetName}_${parsedRowIndex}`;
+    const cache = CacheService.getScriptCache();
 
     // 排他制御（Cache-based mutex）
     if (cache.get(reactionKey)) {
@@ -2417,13 +2417,13 @@ function dsAddReaction(userId, rowId, reactionType) {
     try {
       cache.put(reactionKey, true, CACHE_DURATION.MEDIUM); // 30秒ロック
 
-      const res = processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionType, user.userEmail);
+      const res = processReaction(config.spreadsheetId, config.sheetName, parsedRowIndex, reaction, user.userEmail);
       if (res && (res.success || res.status === 'success')) {
         // フロントエンド期待形式に合わせたレスポンス
         return {
           success: true,
           reactions: res.reactions || {},
-          userReaction: res.userReaction || reactionType,
+          userReaction: res.userReaction || reaction,
           action: res.action || 'added',
           message: res.message || 'リアクションを追加しました'
         };
@@ -2443,9 +2443,14 @@ function dsAddReaction(userId, rowId, reactionType) {
     console.error('DataService.dsAddReaction outer error:', outerError.message);
     // 🔧 統一ミューテックス: 緊急時のキャッシュクリア
     try {
-      const cache = ServiceFactory.getCache();
-      const reactionKey = `reaction_${userId}_${rowId}`;
-      cache.remove(reactionKey);
+      const cache = CacheService.getScriptCache();
+      const configForCleanup = getUserConfig(userId);
+      const cleanupConfig = configForCleanup.success ? configForCleanup.config : {};
+      if (cleanupConfig.spreadsheetId && cleanupConfig.sheetName) {
+        const cleanupRowIndex = typeof rowIndex === 'string' ? parseInt(String(rowIndex).replace('row_', ''), 10) : parseInt(rowIndex, 10);
+        const reactionKey = `reaction_${cleanupConfig.spreadsheetId}_${cleanupConfig.sheetName}_${cleanupRowIndex}`;
+        cache.remove(reactionKey);
+      }
     } catch (cacheError) {
       console.warn('Failed to clear reaction cache in error handler:', cacheError.message);
     }
@@ -2456,10 +2461,10 @@ function dsAddReaction(userId, rowId, reactionType) {
 /**
  * toggleHighlight (user context)
  * @param {string} userId
- * @param {number|string} rowId - number or 'row_#'
+ * @param {number|string} rowIndex - number or 'row_#'
  * @returns {Object}
  */
-function dsToggleHighlight(userId, rowId) {
+function dsToggleHighlight(userId, rowIndex) {
   try {
     // 🎯 Zero-Dependency: Direct Data call
     const user = Data.findUserById(userId);
@@ -2475,13 +2480,13 @@ function dsToggleHighlight(userId, rowId) {
     }
 
     // updateHighlightInSheet expects 'row_#'
-    const rowNumber = typeof rowId === 'string' && rowId.startsWith('row_')
-      ? rowId
-      : `row_${parseInt(rowId, 10)}`;
+    const rowNumber = typeof rowIndex === 'string' && rowIndex.startsWith('row_')
+      ? rowIndex
+      : `row_${parseInt(rowIndex, 10)}`;
 
     // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時ハイライト競合防止（CacheService-based mutex）
     const highlightKey = `highlight_${config.spreadsheetId}_${config.sheetName}_${rowNumber}`;
-    const cache = ServiceFactory.getCache();
+    const cache = CacheService.getScriptCache();
 
     // 排他制御（Cache-based mutex）
     if (cache.get(highlightKey)) {
@@ -2517,8 +2522,8 @@ function dsToggleHighlight(userId, rowId) {
     console.error('DataService.dsToggleHighlight outer error:', outerError.message);
     // 🔧 統一ミューテックス: 緊急時のキャッシュクリア
     try {
-      const cache = ServiceFactory.getCache();
-      const highlightKey = `highlight_${userId}_${rowId}`;
+      const cache = CacheService.getScriptCache();
+      const highlightKey = `highlight_${userId}_${rowIndex}`;
       cache.remove(highlightKey);
     } catch (cacheError) {
       console.warn('Failed to clear highlight cache in error handler:', cacheError.message);

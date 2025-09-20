@@ -15,15 +15,15 @@
 
 /* global validateConfig */
 
-/* global ServiceFactory, URL, validateUrl, createErrorResponse, validateSpreadsheetId, Data, Auth, UserService, authIsAdministrator, SLEEP_MS */
+/* global URL, validateUrl, createErrorResponse, validateSpreadsheetId, Data, Auth, UserService, isAdministrator, SLEEP_MS */
 
 // ===========================================
-// 🔧 Zero-Dependency ConfigService (ServiceFactory版)
+// 🔧 GAS-Native ConfigService (直接API版)
 // ===========================================
 
 /**
  * ConfigService - ゼロ依存アーキテクチャ
- * ServiceFactoryパターンによる依存関係除去
+ * GAS-Nativeパターンによる直接APIアクセス
  * PROPS_KEYS, DB依存を完全排除
  */
 
@@ -305,7 +305,7 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
   const enhanced = { ...baseConfig };
 
   try {
-    const webAppUrl = ServiceFactory.getUtils().getWebAppUrl();
+    const webAppUrl = ScriptApp.getService().getUrl();
 
     enhanced.dynamicUrls = {
       webAppUrl,
@@ -337,7 +337,8 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
  */
 function generateUserPermissions(_userId) {
   try {
-    const session = ServiceFactory.getSession();
+    const email = Session.getActiveUser().getEmail();
+    const session = { email };
     const currentEmail = session.email;
     if (!currentEmail) {
       return {
@@ -350,7 +351,7 @@ function generateUserPermissions(_userId) {
       };
     }
 
-    const isAdministrator = authIsAdministrator(currentEmail);
+    const isAdministrator = isAdministrator(currentEmail);
 
     return {
       isEditor: true, // 現在のユーザーは自分の設定の編集者
@@ -548,7 +549,8 @@ function determineSetupStep(configJson) {
  */
 function isSystemSetup() {
   try {
-    const session = ServiceFactory.getSession();
+    const email = Session.getActiveUser().getEmail();
+    const session = { email };
     const currentEmail = session.email;
     if (!currentEmail) return false;
 
@@ -594,7 +596,7 @@ function calculateCompletionScore(config) {
  */
 function clearConfigCache(userId) {
   try {
-    const cache = ServiceFactory.getCache();
+    const cache = CacheService.getScriptCache();
 
     // 🔧 CLAUDE.md準拠: 依存関係キャッシュの完全無効化
     const keysToRemove = [
@@ -644,7 +646,7 @@ function clearAllConfigCache(userIds = []) {
     });
 
     if (allKeysToRemove.length > 0) {
-      ServiceFactory.getCache().removeAll(allKeysToRemove);
+      CacheService.getScriptCache().removeAll(allKeysToRemove);
       console.info('clearAllConfigCache: ユーザー群キャッシュクリア完了', {
         userCount: userIds.length,
         keysCleared: allKeysToRemove.length
@@ -666,7 +668,7 @@ function clearAllConfigCache(userIds = []) {
  */
 function hasCoreSystemProps() {
   try {
-    const props = ServiceFactory.getProperties();
+    const props = PropertiesService.getScriptProperties();
 
     // 3つの必須項目をすべてチェック（依存関係なしで直接指定）
     const adminEmail = props.getProperty('ADMIN_EMAIL');

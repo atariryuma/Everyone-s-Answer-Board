@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ServiceFactory, ConfigService, DataService, getCurrentEmail, createErrorResponse, dsGetUserSheetData, Data, getUserConfig */
+/* global ConfigService, DataService, getCurrentEmail, createErrorResponse, dsGetUserSheetData, Data, getUserConfig */
 
 // ===========================================
 // 📊 メインページデータAPI
@@ -115,7 +115,7 @@ function getRecentSubmissions(userId, limit = 10) {
     }
 
     // ServiceFactory経由で設定取得（Zero-Dependency Pattern）
-    const {email} = ServiceFactory.getSession();
+    const email = Session.getActiveUser().getEmail();
     if (!email) {
       return {
         success: false,

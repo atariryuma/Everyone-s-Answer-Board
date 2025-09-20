@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, getFormInfo, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, getFormInfo, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -20,8 +20,8 @@
 
 /**
  * 現在のユーザーのメールアドレスを取得
- * ServiceFactory経由でセッション情報を安全に取得
- * @description Zero-Dependency Architecture準拠の統一アクセス方法
+ * GAS-Native直接APIでセッション情報を安全に取得
+ * @description GAS-Native Architecture準拠の統一アクセス方法
  * @returns {string|null} ユーザーのメールアドレス、または認証されていない場合はnull
  * @example
  * const email = getCurrentEmail();
@@ -29,10 +29,9 @@
  *   console.log('Current user:', email);
  * }
  */
-function authGetCurrentEmail() {
+function getCurrentEmail() {
   try {
-    const session = ServiceFactory.getSession();
-    return session.email;
+    return Session.getActiveUser().getEmail();
   } catch (error) {
     console.error('getCurrentEmail error:', error.message);
     return null;
@@ -72,7 +71,7 @@ function doGet(e) {
 
       case 'admin': {
         // 🔐 統一認証システム使用
-        const authResult = Auth.checkAccess('admin', params);
+        const authResult = checkAccess('admin', params);
         if (!authResult.allowed) {
           return this.createRedirectTemplate(authResult.redirect, authResult.error);
         }
@@ -93,7 +92,7 @@ function doGet(e) {
           if (typeof hasCoreSystemProps === 'function') {
             showSetup = !hasCoreSystemProps();
           } else {
-            const props = ServiceFactory.getProperties();
+            const props = PropertiesService.getScriptProperties();
             const hasAdmin = !!props.getProperty('ADMIN_EMAIL');
             const hasDb = !!props.getProperty('DATABASE_SPREADSHEET_ID');
             const hasCreds = !!props.getProperty('SERVICE_ACCOUNT_CREDS');
@@ -110,7 +109,7 @@ function doGet(e) {
           // 🔧 統一認証システム: isSystemAdmin変数をAccessRestricted.htmlに渡す
           const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
           const email = getCurrentEmail();
-          template.isAdministrator = email ? authIsAdministrator(email) : false;
+          template.isAdministrator = email ? isAdministrator(email) : false;
           template.userEmail = email || '';
           template.timestamp = new Date().toISOString();
           return template.evaluate();
@@ -119,7 +118,7 @@ function doGet(e) {
 
       case 'appSetup': {
         // 🔐 統一認証システム使用 - Administrator専用
-        const authResult = Auth.checkAccess('appSetup', params);
+        const authResult = checkAccess('appSetup', params);
         if (!authResult.allowed) {
           return this.createRedirectTemplate(authResult.redirect, authResult.error);
         }
@@ -130,7 +129,7 @@ function doGet(e) {
 
       case 'view': {
         // 🔐 統一認証システム使用 - Viewer権限確認
-        const authResult = Auth.checkAccess('view', params);
+        const authResult = checkAccess('view', params);
         if (!authResult.allowed) {
           return this.createRedirectTemplate(authResult.redirect, authResult.error);
         }
@@ -146,12 +145,11 @@ function doGet(e) {
         template.boardTitle = questionText || authResult.user?.userEmail || '回答ボード';
 
         // 編集権限検出（Administrator または 自分のボード）
-        const session = ServiceFactory.getSession();
-        const currentEmail = session.email;
-        const isAdministrator = authIsAdministrator(currentEmail);
+        const currentEmail = getCurrentEmail();
+        const isAdministrator = isAdministrator(currentEmail);
         const isOwnBoard = currentEmail === authResult.user?.userEmail;
 
-        // 🔧 統一用語: Editor権限設定（Zero-Dependency Architecture）
+        // 🔧 統一用語: Editor権限設定（GAS-Native Architecture）
         const isEditor = isAdministrator || isOwnBoard;
         template.isEditor = isEditor;
 
@@ -165,7 +163,7 @@ function doGet(e) {
         // 🔧 統一認証システム: isSystemAdmin変数をAccessRestricted.htmlに渡す
         const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
         const email = getCurrentEmail();
-        template.isAdministrator = email ? authIsAdministrator(email) : false;
+        template.isAdministrator = email ? isAdministrator(email) : false;
         template.userEmail = email || '';
         template.timestamp = new Date().toISOString();
         return template.evaluate();
@@ -211,7 +209,7 @@ function createRedirectTemplate(redirectPage, error) {
     // 🔧 統一認証システム: AccessRestricted.htmlの場合は必要な変数を設定
     if (redirectPage === 'AccessRestricted.html') {
       const email = getCurrentEmail();
-      template.isAdministrator = email ? authIsAdministrator(email) : false;
+      template.isAdministrator = email ? isAdministrator(email) : false;
       template.userEmail = email || '';
       template.timestamp = new Date().toISOString();
       if (error) {
@@ -255,13 +253,13 @@ function doPost(e) {
       )).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 🎯 Zero-Dependency Architecture: Direct DataService calls
+    // 🎯 GAS-Native Architecture: Direct DataService calls
     let result;
     switch (action) {
       case 'getData':
-        // 🎯 Zero-Dependency: Direct Data class call
+        // 🎯 GAS-Native: Direct Data class call
         try {
-          const user = Data.findUserByEmail(email);
+          const user = findUserByEmail(email);
           if (!user) {
             result = createUserNotFoundError();
           } else {
@@ -280,9 +278,9 @@ function doPost(e) {
         result = dsToggleHighlight(request.userId || email, request.rowId);
         break;
       case 'refreshData':
-        // 🎯 Zero-Dependency: Direct Data class call
+        // 🎯 GAS-Native: Direct Data class call
         try {
-          const user = Data.findUserByEmail(email);
+          const user = findUserByEmail(email);
           if (!user) {
             result = createUserNotFoundError();
           } else {
@@ -341,8 +339,8 @@ function getUser(infoType = 'email') {
 
     if (infoType === 'full') {
       // Get user from database if available
-      // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-      const user = Data.findUserByEmail(email);
+      // 🔧 GAS-Native統一: 直接findUserByEmail使用
+      const user = findUserByEmail(email);
 
       return {
         success: true,
@@ -375,8 +373,8 @@ function getConfig() {
       return createAuthError();
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       return createUserNotFoundError();
     }
@@ -415,28 +413,28 @@ function getWebAppUrl() {
  * @param {string} email - メールアドレス
  * @returns {boolean} 管理者権限があるか
  */
-function authIsAdministrator(email) {
+function isAdministrator(email) {
   if (!email || typeof email !== 'string') {
     return false;
   }
 
   try {
-    const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
+    const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
     if (!adminEmail) {
-      console.warn('authIsAdministrator: ADMIN_EMAIL設定が見つかりません');
+      console.warn('isAdministrator: ADMIN_EMAIL設定が見つかりません');
       return false;
     }
 
     const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
     if (isAdmin) {
-      console.info('authIsAdministrator: Administrator認証成功', {
+      console.info('isAdministrator: Administrator認証成功', {
         email: email && typeof email === 'string' ? `${email.split('@')[0]}@***` : 'N/A'
       });
     }
 
     return isAdmin;
   } catch (error) {
-    console.error('authIsAdministrator: エラー', {
+    console.error('isAdministrator: エラー', {
       error: error.message,
       email: email && typeof email === 'string' ? `${email.split('@')[0]}@***` : 'null'
     });
@@ -455,7 +453,7 @@ function isAdmin() {
     if (!email) {
       return false;
     }
-    return authIsAdministrator(email);
+    return isAdministrator(email);
   } catch (error) {
     console.error('isAdmin error:', error.message);
     return false;
@@ -468,7 +466,7 @@ function isAdmin() {
  */
 function testSetup() {
   try {
-    const props = ServiceFactory.getProperties();
+    const props = PropertiesService.getScriptProperties();
     const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
     const adminEmail = props.getProperty('ADMIN_EMAIL');
 
@@ -487,7 +485,9 @@ function testSetup() {
  */
 function resetAuth() {
   try {
-    ServiceFactory.getCache().removeAll();
+    const cache = CacheService.getScriptCache();
+    // Clear authentication-related cache entries
+    cache.remove('current_user_info');
     return { success: true, message: 'Authentication reset' };
   } catch (error) {
     console.error('resetAuth error:', error.message);
@@ -513,7 +513,7 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
     }
 
     // System properties setup
-    const props = ServiceFactory.getProperties();
+    const props = PropertiesService.getScriptProperties();
     props.setProperty('DATABASE_SPREADSHEET_ID', databaseId);
     props.setProperty('ADMIN_EMAIL', adminEmail);
     props.setProperty('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
@@ -524,7 +524,7 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
 
     // Initialize database if needed
     try {
-      const testAccess = Data.open(databaseId).spreadsheet;
+      const testAccess = openSpreadsheet(databaseId).spreadsheet;
     } catch (dbError) {
       console.warn('Database access test failed:', dbError.message);
     }
@@ -558,13 +558,13 @@ function processLoginAction() {
     }
 
     // Create or get user
-    // 🔧 Zero-Dependency統一: 直接Data使用
-    let user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接Data使用
+    let user = findUserByEmail(email);
     if (!user) {
-      // 🔧 CLAUDE.md準拠: Data.createUser()統一実装
-      user = Data.createUser(email);
+      // 🔧 CLAUDE.md準拠: createUser()統一実装
+      user = createUser(email);
       if (!user) {
-        console.warn('Data.createUser failed, creating fallback user object');
+        console.warn('createUser failed, creating fallback user object');
         user = {
           userId: Utilities.getUuid(),
           userEmail: email,
@@ -621,7 +621,7 @@ function getSystemDomainInfo() {
       [, domain] = currentUser.split('@');
     }
 
-    const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
+    const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
     const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
 
     return {
@@ -655,8 +655,8 @@ function getAppStatus() {
     }
 
     // ユーザー情報とconfigJsonを取得
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       return createErrorResponse('User not found');
     }
@@ -710,8 +710,8 @@ function setAppStatus(isActive) {
     }
 
     // ユーザー情報を取得
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       return createUserNotFoundError();
     }
@@ -759,12 +759,12 @@ function setAppStatus(isActive) {
 function getAdminUsers(options = {}) {
   try {
     const email = getCurrentEmail();
-    if (!email || !authIsAdministrator(email)) {
+    if (!email || !isAdministrator(email)) {
       return createAdminRequiredError();
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.getAllUsers使用
-    const users = Data.getAllUsers();
+    // 🔧 GAS-Native統一: 直接getAllUsers使用
+    const users = getAllUsers();
     return {
       success: true,
       users: users || []
@@ -776,64 +776,84 @@ function getAdminUsers(options = {}) {
 }
 
 /**
- * Delete user - simplified name
+ * Delete user - API endpoint for frontend
+ * GAS-Native直接実装（DatabaseCore.gsとは独立）
+ * @param {string} userId - ユーザーID
+ * @param {string} reason - 削除理由
+ * @returns {Object} 削除結果
  */
 function deleteUser(userId, reason = '') {
   try {
     const email = getCurrentEmail();
     if (!email) {
-      return {
-        success: false,
-        message: 'ユーザー認証が必要です'
-      };
+      return createErrorResponse('ユーザー認証が必要です');
     }
 
-    // System admin check with ServiceFactory
-    if (!authIsAdministrator(email)) {
-      return {
-        success: false,
-        message: '管理者権限が必要です'
-      };
+    // 管理者権限チェック
+    if (!isAdministrator(email)) {
+      return createAdminRequiredError();
     }
 
     if (!userId) {
-      return {
-        success: false,
-        message: 'ユーザーIDが指定されていません'
-      };
+      return createErrorResponse('ユーザーIDが指定されていません');
     }
 
-    // Get user info before deletion
-    // 🔧 Zero-Dependency統一: 直接Data.findUserById使用
-    const targetUser = Data.findUserById(userId);
+    // 対象ユーザー存在確認
+    const targetUser = findUserById(userId);
     if (!targetUser) {
-      return {
-        success: false,
-        message: 'ユーザーが見つかりません'
-      };
+      return createErrorResponse('対象ユーザーが見つかりません', { userId });
     }
 
-    // Execute deletion
-    const result = Data.deleteUser(userId);
+    // GAS-Native: 直接データベース操作
+    const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+    if (!dbId) {
+      return createErrorResponse('データベース設定が見つかりません');
+    }
 
-    if (result.success) {
+    const spreadsheet = SpreadsheetApp.openById(dbId);
+    const sheet = spreadsheet.getSheetByName('users');
+    if (!sheet) {
+      return createErrorResponse('ユーザーシートが見つかりません');
+    }
 
-      return {
-        success: true,
-        message: 'ユーザーアカウントを削除しました',
-        deletedUser: {
-          userId,
-          email: targetUser.userEmail
+    const data = sheet.getDataRange().getValues();
+    const headers = data[0];
+    const userIdColumnIndex = headers.indexOf('userId');
+    const isActiveIndex = headers.indexOf('isActive');
+    const lastModifiedIndex = headers.indexOf('lastModified');
+
+    if (userIdColumnIndex === -1) {
+      return createErrorResponse('ユーザーIDカラムが見つかりません');
+    }
+
+    // ユーザーを検索してソフト削除
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][userIdColumnIndex] === userId) {
+        // ソフト削除：isActiveをfalseに設定
+        if (isActiveIndex !== -1) {
+          sheet.getRange(i + 1, isActiveIndex + 1).setValue(false);
         }
-      };
-    } else {
-      return {
-        success: false,
-        message: result.message || '削除に失敗しました'
-      };
+
+        // 最終更新日時を更新
+        if (lastModifiedIndex !== -1) {
+          sheet.getRange(i + 1, lastModifiedIndex + 1).setValue(new Date().toISOString());
+        }
+
+        console.log('✅ User soft deleted successfully:', `${userId.substring(0, 8)}***`, reason ? `Reason: ${reason}` : '');
+
+        return createSuccessResponse('ユーザーを削除しました', {
+          userId,
+          userEmail: targetUser.userEmail,
+          reason: reason || '管理者による削除',
+          deleted: true
+        });
+      }
     }
+
+    return createErrorResponse('ユーザーが見つかりませんでした', { userId });
+
   } catch (error) {
-    console.error('deleteUser error:', error.message);
+    console.error('deleteUser API error:', error.message);
     return createExceptionResponse(error);
   }
 }
@@ -845,12 +865,12 @@ function deleteUser(userId, reason = '') {
 function toggleUserActiveStatus(targetUserId) {
   try {
     const email = getCurrentEmail();
-    if (!email || !authIsAdministrator(email)) {
+    if (!email || !isAdministrator(email)) {
       return createAdminRequiredError();
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserById使用
-    const targetUser = Data.findUserById(targetUserId);
+    // 🔧 GAS-Native統一: 直接findUserById使用
+    const targetUser = findUserById(targetUserId);
     if (!targetUser) {
       return createUserNotFoundError();
     }
@@ -861,7 +881,7 @@ function toggleUserActiveStatus(targetUserId) {
       lastModified: new Date().toISOString()
     };
 
-    const result = Data.updateUser(targetUserId, updatedUser);
+    const result = updateUser(targetUserId, updatedUser);
     if (result.success) {
       return {
         success: true,
@@ -886,12 +906,12 @@ function toggleUserActiveStatus(targetUserId) {
 function toggleUserBoardStatus(targetUserId) {
   try {
     const email = getCurrentEmail();
-    if (!email || !authIsAdministrator(email)) {
+    if (!email || !isAdministrator(email)) {
       return createAdminRequiredError();
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserById使用
-    const targetUser = Data.findUserById(targetUserId);
+    // 🔧 GAS-Native統一: 直接findUserById使用
+    const targetUser = findUserById(targetUserId);
     if (!targetUser) {
       return createUserNotFoundError();
     }
@@ -941,14 +961,14 @@ function toggleUserBoardStatus(targetUserId) {
 function clearActiveSheet(targetUserId) {
   try {
     const email = getCurrentEmail();
-    if (!email || !authIsAdministrator(email)) {
+    if (!email || !isAdministrator(email)) {
       return createAdminRequiredError();
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data使用
-    let targetUser = targetUserId ? Data.findUserById(targetUserId) : null;
+    // 🔧 GAS-Native統一: 直接Data使用
+    let targetUser = targetUserId ? findUserById(targetUserId) : null;
     if (!targetUser) {
-      targetUser = Data.findUserByEmail(email);
+      targetUser = findUserByEmail(email);
     }
 
     if (!targetUser) {
@@ -995,7 +1015,7 @@ function clearActiveSheet(targetUserId) {
 function getLogs(options = {}) {
   try {
     const email = getCurrentEmail();
-    if (!email || !authIsAdministrator(email)) {
+    if (!email || !isAdministrator(email)) {
       return createAdminRequiredError();
     }
 
@@ -1018,7 +1038,7 @@ function getLogs(options = {}) {
 function getSheets() {
   try {
     const email = getCurrentEmail();
-    if (!email || !authIsAdministrator(email)) {
+    if (!email || !isAdministrator(email)) {
       return createAdminRequiredError();
     }
     // Direct implementation for spreadsheet access
@@ -1053,11 +1073,11 @@ function getSheets() {
  */
 function validateHeaderIntegrity(targetUserId) {
   try {
-    const session = ServiceFactory.getSession();
-    // 🔧 Zero-Dependency統一: 直接Data使用
-    let targetUser = targetUserId ? Data.findUserById(targetUserId) : null;
-    if (!targetUser && session?.email) {
-      targetUser = Data.findUserByEmail(session.email);
+    const currentEmail = getCurrentEmail();
+    // 🔧 GAS-Native: 直接Data使用
+    let targetUser = targetUserId ? findUserById(targetUserId) : null;
+    if (!targetUser && currentEmail) {
+      targetUser = findUserByEmail(currentEmail);
     }
 
     if (!targetUser) {
@@ -1075,7 +1095,7 @@ function validateHeaderIntegrity(targetUserId) {
       };
     }
 
-    const dataAccess = Data.open(config.spreadsheetId);
+    const dataAccess = openSpreadsheet(config.spreadsheetId);
     const sheet = dataAccess.getSheet(config.sheetName);
     if (!sheet) {
       return {
@@ -1117,8 +1137,8 @@ function getBoardInfo() {
       return createAuthError();
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       console.error('❌ User not found:', email);
       return { success: false, message: 'User not found' };
@@ -1133,14 +1153,14 @@ function getBoardInfo() {
 
     console.log('✅ getBoardInfo SUCCESS:', {
       userId: user.userId,
-      isPublished: isPublished,
+      isPublished,
       hasConfig: !!user.configJson
     });
 
     return {
       success: true,
       isActive: isPublished,
-      isPublished: isPublished,
+      isPublished,
       questionText: getQuestionText(config),
       urls: {
         view: baseUrl && user && user.userId ? `${baseUrl}?mode=view&userId=${user.userId}` : '',
@@ -1168,7 +1188,7 @@ function getSheetData(userId, options = {}) {
       return { success: false, message: 'ユーザーIDが必要です', data: [], headers: [], sheetName: '' };
     }
 
-    // Delegate to DataService using Zero-Dependency pattern
+    // Delegate to DataService using GAS-Native pattern
     const result = dsGetUserSheetData(userId, options);
 
     // Return directly without wrapping - same pattern as admin panel getSheetList
@@ -1210,8 +1230,8 @@ function getPublishedSheetData(classFilter, sortOrder) {
     try {
       if (typeof DB !== 'undefined' && DB) {
         db = DB;
-      } else if (typeof Data !== 'undefined') {
-        db = Data;
+      } else {
+        console.warn('Database service not available');
       }
     } catch (dbError) {
       console.error('❌ DB initialization error:', dbError.message);
@@ -1227,7 +1247,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
       };
     }
 
-    const user = Data.findUserByEmail(email);
+    const user = findUserByEmail(email);
     if (!user) {
       console.error('❌ User not found:', email);
       return {
@@ -1351,7 +1371,7 @@ function getSheetList(spreadsheetId) {
       return createErrorResponse('Spreadsheet ID required');
     }
 
-    const dataAccess = Data.open(spreadsheetId);
+    const dataAccess = openSpreadsheet(spreadsheetId);
     const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
 
@@ -1389,8 +1409,8 @@ function getDataCount(classFilter, sortOrder, adminMode = false) {
       return { error: 'Authentication required', count: 0 };
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       return { error: 'User not found', count: 0 };
     }
@@ -1418,7 +1438,7 @@ function getDataCount(classFilter, sortOrder, adminMode = false) {
 }
 
 /**
- * 🎯 Zero-Dependency統一設定保存API
+ * 🎯 GAS-Native統一設定保存API
  * CLAUDE.md準拠: 直接的でシンプルな実装
  * @param {Object} config - 設定オブジェクト
  * @param {Object} options - 保存オプション { isDraft: boolean }
@@ -1430,13 +1450,13 @@ function saveConfig(config, options = {}) {
       return { success: false, message: 'ユーザー認証が必要です' };
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(userEmail);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(userEmail);
     if (!user) {
       return { success: false, message: 'ユーザーが見つかりません' };
     }
 
-    // 保存タイプをオプションで制御（Zero-Dependency準拠）
+    // 保存タイプをオプションで制御（GAS-Native準拠）
     const saveOptions = options.isDraft ?
       { isDraft: true } :
       { isMainConfig: true };
@@ -1452,7 +1472,7 @@ function saveConfig(config, options = {}) {
 }
 
 // ===========================================
-// 🎯 f0068fa復元機能 - Zero-Dependency Architecture準拠
+// 🎯 f0068fa復元機能 - GAS-Native Architecture準拠
 // ===========================================
 
 /**
@@ -1467,8 +1487,8 @@ function detectFormUrl(sheetId = null) {
       return { success: false, message: 'Authentication required', formUrl: null };
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       return { success: false, message: 'User not found', formUrl: null };
     }
@@ -1519,7 +1539,7 @@ function checkDomainAuth(userEmail = null) {
 }
 
 /**
- * 新着コンテンツ検出機能 - Zero-Dependency直接実装
+ * 新着コンテンツ検出機能 - GAS-Native直接実装
  * @param {string|number} lastUpdateTime - 最終更新時刻（ISO文字列またはタイムスタンプ）
  * @returns {Object} 新着検出結果
  */
@@ -1550,8 +1570,8 @@ function detectNewContent(lastUpdateTime) {
     }
 
     // ユーザーデータ取得
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -1625,7 +1645,7 @@ function detectNewContent(lastUpdateTime) {
 function dsConnectDataSource(spreadsheetId, sheetName, batchOperations = null) {
   try {
     const email = getCurrentEmail();
-    if (!email || !authIsAdministrator(email)) {
+    if (!email || !isAdministrator(email)) {
       return createAdminRequiredError();
     }
 
@@ -1636,9 +1656,8 @@ function dsConnectDataSource(spreadsheetId, sheetName, batchOperations = null) {
       return processBatchDataSourceOperations(spreadsheetId, sheetName, batchOperations);
     }
 
-    // 従来の単一接続処理
-    const dataService = ServiceFactory.getDataService();
-    return dataService.connectToSheetInternal(spreadsheetId, sheetName);
+    // 従来の単一接続処理（GAS-Native直接呼び出し）
+    return connectToSheetInternal(spreadsheetId, sheetName);
 
   } catch (error) {
     console.error('connectDataSource error:', error.message);
@@ -1668,9 +1687,9 @@ function processBatchDataSourceOperations(spreadsheetId, sheetName, operations) 
           results.batchResults.formInfo = getFormInfoInternal(spreadsheetId, sheetName);
           break;
         case 'connectDataSource': {
-          const connectionResult = ServiceFactory.getDataService().connectToSheetInternal(spreadsheetId, sheetName);
+          const connectionResult = connectToSheetInternal(spreadsheetId, sheetName);
           if (connectionResult.success) {
-            // Zero-Dependency Architecture: 直接データ転送（中間変換なし）
+            // GAS-Native Architecture: 直接データ転送（中間変換なし）
             results.mapping = connectionResult.mapping;
             results.confidence = connectionResult.confidence;
             results.headers = connectionResult.headers;
@@ -1700,8 +1719,8 @@ function processBatchDataSourceOperations(spreadsheetId, sheetName, operations) 
  */
 function validateDataSourceAccess(spreadsheetId, sheetName) {
   try {
-    const dataService = ServiceFactory.getDataService();
-    const testConnection = dataService.connectToSheetInternal(spreadsheetId, sheetName);
+    // GAS-Native: Direct function call instead of ServiceFactory
+    const testConnection = connectToSheetInternal(spreadsheetId, sheetName);
     return {
       success: testConnection.success,
       details: {
@@ -1760,7 +1779,7 @@ function getDeployUserDomainInfo() {
     }
 
     const domain = email.includes('@') ? email.split('@')[1] : 'unknown';
-    const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
+    const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
     const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
     const isValidDomain = adminDomain ? domain === adminDomain : true;
 
@@ -1809,8 +1828,8 @@ function getActiveFormInfo() {
       };
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       console.error('❌ User not found:', email);
       return {
@@ -1908,8 +1927,8 @@ function getIncrementalSheetData(sheetName, options = {}) {
       };
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -2003,8 +2022,8 @@ function triggerPollingUpdate(options = {}) {
 
     // 新しいコンテンツがある場合のみデータ取得
     if (newContentResult.success && newContentResult.hasNewContent) {
-      // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-      const user = Data.findUserByEmail(email);
+      // 🔧 GAS-Native統一: 直接findUserByEmail使用
+      const user = findUserByEmail(email);
 
       if (user && user.activeSheetName) {
         const sheetResult = getIncrementalSheetData(user.activeSheetName, pollOptions);

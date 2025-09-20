@@ -4,280 +4,222 @@
  * 責任範囲:
  * - 設定の単一エントリーポイント (Single Source of Truth)
  * - サービスアカウント設定一元化
- * - Zero-Dependency Architecture準拠
+ * - Zero-Dependency Architecture準拠（直接関数実装）
  * - 設定値検証・暗号化
  */
 
-/* global ServiceFactory, validateEmail, validateSpreadsheetId, Auth */
+/* global validateEmail, validateSpreadsheetId, getServiceAccount */
+
+// ===========================================
+// ⚙️ 統一設定管理
+// ===========================================
 
 /**
- * 統一設定管理クラス
- * CLAUDE.md準拠のZero-Dependency実装
+ * データベース設定取得
+ * @returns {Object|null} Database configuration
  */
-class Config {
+function getDatabaseConfig() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const databaseId = props.getProperty('DATABASE_SPREADSHEET_ID');
 
-  /**
-   * データベース設定取得
-   * @returns {Object|null} Database configuration
-   */
-  static database() {
-    try {
-      const props = ServiceFactory.getProperties();
-      const databaseId = props.getProperty('DATABASE_SPREADSHEET_ID');
-
-      if (!databaseId) {
-        return null;
-      }
-
-      return {
-        spreadsheetId: databaseId,
-        isValid: this.validateSpreadsheetId(databaseId)
-      };
-    } catch (error) {
-      console.error('Config.database error:', error.message);
+    if (!databaseId) {
       return null;
     }
-  }
 
-  /**
-   * 管理者設定取得
-   * @returns {Object|null} Admin configuration
-   */
-  static admin() {
-    try {
-      const props = ServiceFactory.getProperties();
-      const adminEmail = props.getProperty('ADMIN_EMAIL');
-
-      if (!adminEmail) {
-        return null;
-      }
-
-      return {
-        email: adminEmail,
-        isValid: this.validateEmail(adminEmail)
-      };
-    } catch (error) {
-      console.error('Config.admin error:', error.message);
-      return null;
-    }
-  }
-
-  /**
-   * システム設定取得
-   * @returns {Object} System configuration
-   */
-  static system() {
-    try {
-      const serviceAccountAuth = Auth.serviceAccount();
-      const serviceAccount = serviceAccountAuth?.isValid ? serviceAccountAuth : null;
-      const database = this.database();
-      const admin = this.admin();
-
-      return {
-        serviceAccount,
-        database,
-        admin,
-        isComplete: !!(serviceAccount && database && admin),
-        version: '3.0.0-flat'
-      };
-    } catch (error) {
-      console.error('Config.system error:', error.message);
-      return {
-        serviceAccount: null,
-        database: null,
-        admin: null,
-        isComplete: false,
-        error: error.message
-      };
-    }
-  }
-
-  /**
-   * 設定値設定
-   * @param {string} key - Configuration key
-   * @param {string} value - Configuration value
-   * @returns {boolean} Success status
-   */
-  static set(key, value) {
-    try {
-      const props = ServiceFactory.getProperties();
-
-      // Validation based on key type
-      if (key === 'SERVICE_ACCOUNT_CREDS') {
-        const config = JSON.parse(value);
-        if (!this.validateServiceAccountConfig(config)) {
-          throw new Error('Invalid service account configuration');
-        }
-      } else if (key === 'DATABASE_SPREADSHEET_ID') {
-        if (!this.validateSpreadsheetId(value)) {
-          throw new Error('Invalid spreadsheet ID format');
-        }
-      } else if (key === 'ADMIN_EMAIL') {
-        if (!this.validateEmail(value)) {
-          throw new Error('Invalid email format');
-        }
-      }
-
-      props.setProperty(key, value);
-      return true;
-    } catch (error) {
-      console.error('Config.set error:', error.message);
-      return false;
-    }
-  }
-
-  /**
-   * バッチ設定
-   * @param {Object} configs - Configuration object
-   * @returns {boolean} Success status
-   */
-  static setBatch(configs) {
-    try {
-      const props = ServiceFactory.getProperties();
-
-      // Validate all configs first
-      for (const [key, value] of Object.entries(configs)) {
-        if (!this.validateConfigValue(key, value)) {
-          throw new Error(key ? `Invalid configuration for key: ${key}` : 'Invalid configuration for key: 不明');
-        }
-      }
-
-      // Set all configs if validation passes
-      props.setProperties(configs);
-      return true;
-    } catch (error) {
-      console.error('Config.setBatch error:', error.message);
-      return false;
-    }
-  }
-
-  /**
-   * スプレッドシートID検証
-   * @param {string} id - Spreadsheet ID
-   * @returns {boolean} Validation result
-   */
-  static validateSpreadsheetId(id) {
-    const result = validateSpreadsheetId(id);
-    return result.isValid;
-  }
-
-  /**
-   * メールアドレス検証
-   * @param {string} email - Email address
-   * @returns {boolean} Validation result
-   */
-  static validateEmail(email) {
-    const result = validateEmail(email);
-    return result.isValid;
-  }
-
-  /**
-   * サービスアカウント設定検証
-   * @param {Object} config - Service account configuration
-   * @returns {boolean} Validation result
-   */
-  static validateServiceAccountConfig(config) {
-    if (!config || typeof config !== 'object') {
-      return false;
-    }
-
-    const requiredFields = ['type', 'project_id', 'private_key_id', 'private_key', 'client_email', 'client_id'];
-    return requiredFields.every(field => config[field]) && config.type === 'service_account';
-  }
-
-  /**
-   * 設定値検証
-   * @param {string} key - Configuration key
-   * @param {string} value - Configuration value
-   * @returns {boolean} Validation result
-   */
-  static validateConfigValue(key, value) {
-    switch (key) {
-      case 'SERVICE_ACCOUNT_CREDS':
-        try {
-          const config = JSON.parse(value);
-          return this.validateServiceAccountConfig(config);
-        } catch {
-          return false;
-        }
-      case 'DATABASE_SPREADSHEET_ID':
-        return this.validateSpreadsheetId(value);
-      case 'ADMIN_EMAIL':
-        return this.validateEmail(value);
-      default:
-        return typeof value === 'string' && value.length > 0;
-    }
-  }
-
-  /**
-   * 設定診断
-   * @returns {Object} Diagnostic information
-   */
-  static diagnose() {
-    const results = {
-      service: 'Config',
-      timestamp: new Date().toISOString(),
-      checks: []
+    return {
+      spreadsheetId: databaseId,
+      isValid: validateSpreadsheetId(databaseId).isValid
     };
-
-    // Service account check
-    try {
-      const sa = Auth.serviceAccount();
-      results.checks.push({
-        name: 'Service Account Configuration',
-        status: sa?.isValid ? '✅' : '❌',
-        details: sa?.isValid ? 'Service account configuration valid' : 'Service account configuration missing or invalid'
-      });
-    } catch (error) {
-      results.checks.push({
-        name: 'Service Account Configuration',
-        status: '❌',
-        details: error.message
-      });
-    }
-
-    // Database check
-    try {
-      const db = this.database();
-      results.checks.push({
-        name: 'Database Configuration',
-        status: db && db.isValid ? '✅' : '❌',
-        details: db && db.isValid ? 'Database configuration valid' : 'Database configuration missing or invalid'
-      });
-    } catch (error) {
-      results.checks.push({
-        name: 'Database Configuration',
-        status: '❌',
-        details: error.message
-      });
-    }
-
-    // Admin check
-    try {
-      const admin = this.admin();
-      results.checks.push({
-        name: 'Admin Configuration',
-        status: admin && admin.isValid ? '✅' : '❌',
-        details: admin && admin.isValid ? 'Admin configuration valid' : 'Admin configuration missing or invalid'
-      });
-    } catch (error) {
-      results.checks.push({
-        name: 'Admin Configuration',
-        status: '❌',
-        details: error.message
-      });
-    }
-
-    results.overall = results.checks.every(check => check.status === '✅') ? '✅' : '⚠️';
-    return results;
+  } catch (error) {
+    console.error('getDatabaseConfig error:', error.message);
+    return null;
   }
 }
 
-// Export for global access
-if (typeof globalThis !== 'undefined') {
-  globalThis.Config = Config;
-} else if (typeof global !== 'undefined') {
-  global.Config = Config;
-} else {
-  this.Config = Config;
+/**
+ * 管理者設定取得
+ * @returns {Object|null} Admin configuration
+ */
+function getAdminConfig() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const adminEmail = props.getProperty('ADMIN_EMAIL');
+
+    if (!adminEmail) {
+      return null;
+    }
+
+    return {
+      email: adminEmail,
+      isValid: validateEmail(adminEmail).isValid
+    };
+  } catch (error) {
+    console.error('getAdminConfig error:', error.message);
+    return null;
+  }
+}
+
+/**
+ * サービスアカウント設定存在確認
+ * @returns {boolean} Service account configuration exists
+ */
+function hasServiceAccountConfig() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const credsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
+    return !!credsJson;
+  } catch (error) {
+    console.error('hasServiceAccountConfig error:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Google OAuth クライアント設定取得
+ * @returns {Object|null} OAuth client configuration
+ */
+function getOAuthConfig() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const clientId = props.getProperty('GOOGLE_CLIENT_ID');
+
+    if (!clientId) {
+      return null;
+    }
+
+    return {
+      clientId,
+      isValid: !!clientId && clientId.length > 20
+    };
+  } catch (error) {
+    console.error('getOAuthConfig error:', error.message);
+    return null;
+  }
+}
+
+/**
+ * システム設定の完全性確認
+ * @returns {Object} System configuration status
+ */
+function getSystemConfigStatus() {
+  const database = getDatabaseConfig();
+  const admin = getAdminConfig();
+  const serviceAccount = hasServiceAccountConfig();
+  const oauth = getOAuthConfig();
+
+  return {
+    database: {
+      configured: !!database,
+      valid: database ? database.isValid : false
+    },
+    admin: {
+      configured: !!admin,
+      valid: admin ? admin.isValid : false
+    },
+    serviceAccount: {
+      configured: serviceAccount,
+      valid: serviceAccount
+    },
+    oauth: {
+      configured: !!oauth,
+      valid: oauth ? oauth.isValid : false
+    },
+    overall: !!(database && admin && serviceAccount && oauth) &&
+             database.isValid && admin.isValid && oauth.isValid
+  };
+}
+
+/**
+ * 設定診断
+ * @returns {Object} Configuration diagnostic information
+ */
+function diagnoseConfig() {
+  const results = {
+    service: 'Config',
+    timestamp: new Date().toISOString(),
+    checks: []
+  };
+
+  const status = getSystemConfigStatus();
+
+  // Database configuration check
+  results.checks.push({
+    name: 'Database Configuration',
+    status: status.database.valid ? '✅' : '❌',
+    details: status.database.valid ? 'Database configuration valid' : 'Database not configured or invalid'
+  });
+
+  // Admin configuration check
+  results.checks.push({
+    name: 'Admin Configuration',
+    status: status.admin.valid ? '✅' : '❌',
+    details: status.admin.valid ? 'Admin configuration valid' : 'Admin not configured or invalid'
+  });
+
+  // Service account check
+  results.checks.push({
+    name: 'Service Account Configuration',
+    status: status.serviceAccount.valid ? '✅' : '❌',
+    details: status.serviceAccount.valid ? 'Service account configured' : 'Service account not configured'
+  });
+
+  // OAuth configuration check
+  results.checks.push({
+    name: 'OAuth Configuration',
+    status: status.oauth.valid ? '✅' : '❌',
+    details: status.oauth.valid ? 'OAuth configuration valid' : 'OAuth not configured or invalid'
+  });
+
+  results.overall = status.overall ? '✅' : '⚠️';
+  return results;
+}
+
+// ===========================================
+// 🔧 設定ヘルパー関数
+// ===========================================
+
+/**
+ * 基本設定値を取得
+ * @param {string} key - Property key
+ * @returns {string|null} Property value
+ */
+function getProperty(key) {
+  try {
+    return PropertiesService.getScriptProperties().getProperty(key);
+  } catch (error) {
+    console.error('getProperty error:', error.message);
+    return null;
+  }
+}
+
+/**
+ * 基本設定値を設定
+ * @param {string} key - Property key
+ * @param {string} value - Property value
+ * @returns {boolean} Success status
+ */
+function setProperty(key, value) {
+  try {
+    PropertiesService.getScriptProperties().setProperty(key, value);
+    return true;
+  } catch (error) {
+    console.error('setProperty error:', error.message);
+    return false;
+  }
+}
+
+/**
+ * 複数の設定値を一括設定
+ * @param {Object} properties - Properties object
+ * @returns {boolean} Success status
+ */
+function setProperties(properties) {
+  try {
+    PropertiesService.getScriptProperties().setProperties(properties);
+    return true;
+  } catch (error) {
+    console.error('setProperties error:', error.message);
+    return false;
+  }
 }

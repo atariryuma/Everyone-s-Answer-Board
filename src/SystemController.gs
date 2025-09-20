@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, Data, Config, getSpreadsheetList, getUserConfig, saveUserConfig, Auth */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, Data, Config, getSpreadsheetList, getUserConfig, saveUserConfig, Auth */
 
 // ===========================================
 // 📊 システム定数 - Zero-Dependency Architecture
@@ -126,7 +126,7 @@ function testSystemSetup() {
 
     // 基本コンポーネントテスト
     try {
-      const session = ServiceFactory.getSession();
+      const session = { email: Session.getActiveUser().getEmail() };
       diagnostics.tests.push({
         name: 'Session Service',
         status: session.isValid ? '✅' : '❌',
@@ -142,7 +142,7 @@ function testSystemSetup() {
 
     // データベース接続テスト
     try {
-      const props = ServiceFactory.getProperties();
+      const props = PropertiesService.getScriptProperties();
       const databaseId = props.getDatabaseSpreadsheetId();
       if (databaseId) {
         const dataAccess = Data.open(databaseId);
@@ -195,7 +195,7 @@ function forceUrlSystemReset() {
       // キャッシュをクリア（複数の方法を試行）
       const cacheResults = [];
       try {
-        const cache = ServiceFactory.getCache();
+        const cache = CacheService.getScriptCache();
         if (cache && typeof cache.removeAll === 'function') {
           cache.removeAll([]); // Signature-compatible no-op to avoid errors
           cacheResults.push('ScriptCache クリア要求送信');
@@ -207,7 +207,7 @@ function forceUrlSystemReset() {
 
       // Document Cache も試行
       try {
-        const docCache = ServiceFactory.getCache(); // Use unified cache
+        const docCache = CacheService.getScriptCache(); // Use unified cache
         if (docCache && typeof docCache.removeAll === 'function') {
           docCache.removeAll([]);
           cacheResults.push('DocumentCache クリア要求送信');
@@ -244,7 +244,7 @@ function forceUrlSystemReset() {
  */
 function getWebAppUrl() {
   try {
-    return ServiceFactory.getUtils().getWebAppUrl();
+    return ScriptApp.getService().getUrl();
   } catch (error) {
     console.error('SystemController.getWebAppUrl: エラー', error.message);
     return '';
@@ -283,7 +283,7 @@ function testSystemDiagnosis() {
 
       // データベース診断
       try {
-        const props = ServiceFactory.getProperties();
+        const props = PropertiesService.getScriptProperties();
         const databaseId = props.getDatabaseSpreadsheetId();
 
         if (databaseId) {
@@ -329,7 +329,7 @@ function testSystemDiagnosis() {
  */
 function getSystemStatus() {
     try {
-      const props = ServiceFactory.getProperties();
+      const props = PropertiesService.getScriptProperties();
       const status = {
         timestamp: new Date().toISOString(),
         setup: {
@@ -418,7 +418,7 @@ function performAutoRepair() {
 
       // キャッシュクリア
       try {
-        const cache = ServiceFactory.getCache();
+        const cache = CacheService.getScriptCache();
         if (cache && typeof cache.removeAll === 'function') {
           cache.removeAll();
         }
@@ -517,7 +517,7 @@ function publishApplication(publishConfig) {
     }
 
     const publishedAt = new Date().toISOString();
-    const props = ServiceFactory.getProperties();
+    const props = PropertiesService.getScriptProperties();
 
     // Set properties
     try {
@@ -594,7 +594,7 @@ function publishApplication(publishConfig) {
             if (columnData && typeof columnData.columnIndex === 'number') {
               transformedMapping[key] = columnData.columnIndex;
               transformedConfidence[key] = columnData.confidence || 0;
-              console.log(key && columnData && typeof columnData.columnIndex !== 'undefined' ? `✅ Transformed ${key}: ${columnData.columnIndex}` : '✅ Transformed: 結果不明');
+              console.log(key && columnData && columnData.columnIndex !== undefined ? `✅ Transformed ${key}: ${columnData.columnIndex}` : '✅ Transformed: 結果不明');
             }
           });
 
@@ -1315,7 +1315,7 @@ function createForm(userId, config) {
     }
 
     // ServiceFactory経由でConfigServiceアクセス
-    const configService = ServiceFactory.getConfigService();
+    const configService = null /* ConfigService direct call */;
     if (!configService) {
       console.error('AdminController.createForm: ConfigService not available');
       return { success: false, message: 'ConfigServiceが利用できません' };
@@ -1354,7 +1354,7 @@ function checkCurrentPublicationStatus(targetUserId) {
   });
 
   try {
-    const session = ServiceFactory.getSession();
+    const session = { email: Session.getActiveUser().getEmail() };
     // 🔧 Zero-Dependency統一: 直接Dataクラス使用
     let user = null;
     if (targetUserId) {
@@ -1424,7 +1424,7 @@ function checkCurrentPublicationStatus(targetUserId) {
  */
 function checkUserAuthentication() {
   try {
-    const {email} = ServiceFactory.getSession();
+    const {email} = { email: Session.getActiveUser().getEmail() };
     const userEmail = email ? email : null;
     if (!userEmail) {
       return {
@@ -1460,7 +1460,7 @@ function checkUserAuthentication() {
  */
 function getLoginStatus() {
   try {
-    const {email} = ServiceFactory.getSession();
+    const {email} = { email: Session.getActiveUser().getEmail() };
     const userEmail = email ? email : null;
     if (!userEmail) {
       return {

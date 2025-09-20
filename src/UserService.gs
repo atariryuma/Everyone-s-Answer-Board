@@ -13,15 +13,15 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, validateUrl, validateEmail, getCurrentEmail, Data, getUserConfig, authIsAdministrator, CACHE_DURATION */
+/* global validateUrl, validateEmail, getCurrentEmail, Data, getUserConfig, isAdministrator, CACHE_DURATION */
 
 // ===========================================
-// 🔧 Zero-Dependency UserService (ServiceFactory版)
+// 🔧 GAS-Native UserService (直接API版)
 // ===========================================
 
 /**
  * UserService - ゼロ依存アーキテクチャ
- * ServiceFactoryパターンによる依存関係完全除去
+ * GAS-Nativeパターンによる直接APIアクセス
  * DB, CONSTANTS, PROPS_KEYS依存を排除
  */
 
@@ -31,20 +31,19 @@
  * 現在のユーザー情報取得（キャッシュ対応）
  * @returns {Object|null} ユーザー情報オブジェクト
  */
-function authGetCurrentUserInfo() {
+function getCurrentUserInfo() {
   const cacheKey = 'current_user_info';
 
   try {
     // キャッシュ確認
-    const cache = ServiceFactory.getCache();
+    const cache = CacheService.getScriptCache();
     const cached = cache.get(cacheKey);
     if (cached) {
       return JSON.parse(cached);
     }
 
     // セッション取得
-    const session = ServiceFactory.getSession();
-    const {email} = session;
+    const email = Session.getActiveUser().getEmail();
     if (!email) {
       console.warn('getCurrentUserInfo: 有効なセッションなし');
       return null;
@@ -58,7 +57,7 @@ function authGetCurrentUserInfo() {
     }
 
     // 設定情報を統合
-    const completeUserInfo = configEnrichUserInfo(userInfo);
+    const completeUserInfo = enrichUserInfo(userInfo);
 
     // キャッシュ保存（5分間）
     cache.put(cacheKey, JSON.stringify(completeUserInfo), CACHE_DURATION.LONG);
@@ -78,7 +77,7 @@ function authGetCurrentUserInfo() {
  * @param {Object} userInfo - 基本ユーザー情報
  * @returns {Object} 拡張されたユーザー情報
  */
-function configEnrichUserInfo(userInfo) {
+function enrichUserInfo(userInfo) {
     try {
       if (!userInfo || !userInfo.userId) {
         throw new Error('無効なユーザー情報');
@@ -127,7 +126,7 @@ function generateDynamicUserUrls(config) {
 
       // アプリURL生成（公開済みの場合）
       if (config.isPublished && !config.appUrl) {
-        enhanced.appUrl = ServiceFactory.getUtils().getWebAppUrl();
+        enhanced.appUrl = ScriptApp.getService().getUrl();
       }
 
       // フォームURL存在確認
@@ -152,7 +151,7 @@ function generateDynamicUserUrls(config) {
  * @returns {string} アクセスレベル (editor/administrator/authenticated_user/guest/none)
  * @deprecated Use getUnifiedAccessLevel() instead for email-based access control
  */
-function authGetUserAccessLevel(userId) {
+function getUserAccessLevel(userId) {
   try {
     const ACCESS_LEVELS = {
       NONE: 'none',
@@ -182,7 +181,7 @@ function authGetUserAccessLevel(userId) {
     }
 
     // 管理者チェック（Administrator）
-    if (authIsAdministrator(currentEmail)) {
+    if (isAdministrator(currentEmail)) {
       return ACCESS_LEVELS.ADMINISTRATOR;
     }
 
@@ -207,7 +206,7 @@ function authGetUserAccessLevel(userId) {
  * @returns {boolean} 編集者かどうか
  */
 function checkUserEditorAccess(userId) {
-  const accessLevel = authGetUserAccessLevel(userId);
+  const accessLevel = getUserAccessLevel(userId);
   // 🔧 用語統一: owner → editor
   return accessLevel === 'editor';
 }
@@ -245,7 +244,7 @@ function isEditor(email, targetUserId) {
  * @returns {string} アクセスレベル
  */
 function getUnifiedAccessLevel(email, targetUserId) {
-  if (authIsAdministrator(email)) return 'administrator';
+  if (isAdministrator(email)) return 'administrator';
   if (targetUserId && isEditor(email, targetUserId)) return 'editor';
   return email ? 'authenticated_user' : 'guest';
 }

@@ -13,7 +13,7 @@
  * - 単一責任原則の維持
  */
 
-/* global ServiceFactory, validateEmail, validateUrl, authGetUserAccessLevel, Data, URL */
+/* global validateEmail, validateText, validateUrl, getUserAccessLevel, Data, URL */
 
 
 // ===========================================
@@ -56,7 +56,7 @@ function validateTokenFormat(token) {
  */
 function validateSession() {
     try {
-      const session = ServiceFactory.getSession();
+      const session = { email: Session.getActiveUser().getEmail() };
       const {email} = session;
       const effectiveEmail = Session.getEffectiveUser().getEmail();
 
@@ -115,7 +115,7 @@ function validateUserData(userData) {
       // テキストフィールド検証・サニタイズ
       ['answer', 'reason', 'name', 'className'].forEach(field => {
         if (userData[field]) {
-          const textValidation = validateSecureText(userData[field]);
+          const textValidation = validateText(userData[field]);
           if (!textValidation.isValid) {
             result.errors.push(field && textValidation && textValidation.error ? `${field}: ${textValidation.error}` : 'Validation error: 詳細不明');
             result.isValid = false;
@@ -154,165 +154,11 @@ function validateUserData(userData) {
     return result;
 }
 
-/**
- * メールアドレス検証・サニタイズ
- * @param {string} email - メールアドレス
- * @returns {Object} 検証結果
- */
-function validateSecurityEmail(email) {
-  try {
-    if (!email || typeof email !== 'string') {
-      return { isValid: false, error: 'メールアドレスが必要です' };
-    }
+// validateEmail function moved to validators.gs for CLAUDE.md compliance
 
-    // 基本的なメール形式チェック
-    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+// validateText function moved to validators.gs for CLAUDE.md compliance
 
-    if (!emailRegex.test(email)) {
-      return { isValid: false, error: '無効なメールアドレス形式' };
-    }
-
-    // セキュリティチェック
-    const sanitized = email.toLowerCase().trim();
-
-    // 危険なパターンチェック
-    const dangerousPatterns = [
-      /<script/i,
-      /javascript:/i,
-      /<iframe/i
-    ];
-
-    const hasSecurityRisk = dangerousPatterns.some(pattern => pattern.test(sanitized));
-
-    if (hasSecurityRisk) {
-      return { isValid: false, error: 'セキュリティリスクを含むメールアドレス' };
-    }
-
-    return {
-      isValid: true,
-      sanitized,
-      originalLength: email.length,
-      sanitizedLength: sanitized.length
-    };
-  } catch (error) {
-    return { isValid: false, error: error.message };
-  }
-}
-
-/**
- * テキスト検証・サニタイズ
- * @param {string} text - テキスト
- * @returns {Object} 検証結果
- */
-function validateSecureText(text) {
-    try {
-      if (typeof text !== 'string') {
-        return { isValid: false, error: 'テキストが必要です' };
-      }
-
-      const originalLength = text.length;
-      let sanitized = text;
-      let hasSecurityRisk = false;
-
-      // 危険なパターンチェック
-      const dangerousPatterns = [
-        /<script/i,
-        /javascript:/i,
-        /on\w+\s*=/i,
-        /<iframe/i,
-        /<object/i,
-        /<embed/i
-      ];
-
-      dangerousPatterns.forEach(pattern => {
-        if (pattern.test(sanitized)) {
-          hasSecurityRisk = true;
-          sanitized = sanitized.replace(pattern, '[REMOVED]');
-        }
-      });
-
-      // HTMLエンティティエスケープ
-      sanitized = sanitized
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#x27;');
-
-      // 長さ制限（8KB）
-      if (sanitized.length > 8192) {
-        sanitized = `${sanitized.substring(0, 8192)  }...`;
-      }
-
-      // 改行正規化
-      sanitized = sanitized.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-
-      return {
-        isValid: true,
-        sanitized,
-        hasSecurityRisk,
-        originalLength,
-        sanitizedLength: sanitized.length,
-        wasTruncated: sanitized.endsWith('...')
-      };
-    } catch (error) {
-      return { isValid: false, error: error.message };
-    }
-}
-
-/**
- * URL検証・サニタイズ
- * @param {string} url - URL
- * @returns {Object} 検証結果
- */
-function validateSecurityUrl(url) {
-  try {
-    if (!url || typeof url !== 'string') {
-      return { isValid: false, error: 'URLが必要です' };
-    }
-
-    // 基本的なURL形式チェック
-    let sanitized = url.trim();
-
-    // プロトコルチェック（HTTPSを推奨）
-    if (!sanitized.startsWith('http://') && !sanitized.startsWith('https://')) {
-      return { isValid: false, error: '有効なHTTP/HTTPSプロトコルが必要です' };
-    }
-
-    // セキュリティリスクチェック
-    const dangerousPatterns = [
-      /javascript:/i,
-      /data:/i,
-      /vbscript:/i,
-      /<script/i,
-      /on\w+\s*=/i
-    ];
-
-    const hasSecurityRisk = dangerousPatterns.some(pattern => pattern.test(sanitized));
-
-    if (hasSecurityRisk) {
-      return { isValid: false, error: 'セキュリティリスクを含むURL' };
-    }
-
-    // URL形式の詳細検証
-    try {
-      const urlObj = new URL(sanitized);
-      sanitized = urlObj.toString(); // 正規化
-    } catch (urlError) {
-      return { isValid: false, error: '無効なURL形式' };
-    }
-
-    return {
-      isValid: true,
-      sanitized,
-      originalLength: url.length,
-      sanitizedLength: sanitized.length,
-      protocol: new URL(sanitized).protocol
-    };
-  } catch (error) {
-    return { isValid: false, error: error.message };
-  }
-}
+// validateUrl function moved to validators.gs for CLAUDE.md compliance
 
 // ===========================================
 // 🔒 アクセス制御・権限管理
@@ -326,7 +172,7 @@ function validateSecurityUrl(url) {
  */
 function checkSecurityUserPermission(userId, requiredLevel = 'authenticated_user') {
     try {
-      const session = ServiceFactory.getSession();
+      const session = { email: Session.getActiveUser().getEmail() };
       const currentEmail = session.email;
       if (!currentEmail) {
         return {
@@ -348,7 +194,7 @@ function checkSecurityUserPermission(userId, requiredLevel = 'authenticated_user
       }
 
       // UserServiceから権限レベル取得
-      const accessLevel = authGetUserAccessLevel(userId);
+      const accessLevel = getUserAccessLevel(userId);
       const hasPermission = compareSecurityAccessLevels(accessLevel, requiredLevel);
 
       return {
@@ -401,7 +247,7 @@ function logSecurityEvent(event) {
     try {
       const logEntry = {
         timestamp: new Date().toISOString(),
-        sessionEmail: ServiceFactory.getSession().email,
+        sessionEmail: { email: Session.getActiveUser().getEmail() }.email,
         effectiveEmail: Session.getEffectiveUser().getEmail(),
         eventType: event.type || 'unknown',
         severity: event.severity || 'info',
@@ -441,7 +287,7 @@ function logSecurityEvent(event) {
 function persistSecurityLog(logEntry) {
     try {
       // 🚀 Zero-dependency security logging
-      const props = ServiceFactory.getProperties();
+      const props = PropertiesService.getScriptProperties();
       const logKey = `security_log_${Date.now()}`;
       
       props.setProperty(logKey, JSON.stringify(logEntry));
@@ -605,7 +451,7 @@ function validateSpreadsheetAccess(spreadsheetId) {
  */
 function cleanupOldSecurityLogs() {
   try {
-    const props = ServiceFactory.getProperties();
+    const props = PropertiesService.getScriptProperties();
     const allProps = props.getProperties();
 
     // セキュリティログのキーを抽出

@@ -1,17 +1,16 @@
 /* global Auth, Data, CACHE_DURATION, SLEEP_MS */
 /**
- * @fileoverview ServiceFactory - 統一サービスアクセス層
+ * @fileoverview ServiceFactory - 統一サービスアクセス層 (Gradually Simplifying)
  *
- * 🎯 責任範囲:
- * - GAS Platform APIs統一アクセス
- * - Zero-Dependency Architecture実装
- * - Service Layer抽象化
- * - Cross-Service統合
+ * 🔄 段階的簡素化中:
+ * - 直接GAS API呼び出しへの移行進行中
+ * - 多くのラッパー関数が非推奨となりました
+ * - クロスユーザーアクセス用の機能のみ保持
  *
- * 🔄 GAS Best Practices準拠:
- * - 直接的な関数エクスポート
- * - フラット関数構造
- * - プラットフォームAPI統合
+ * 🎯 現在の責任範囲 (縮小中):
+ * - クロスユーザーアクセス用スプレッドシート操作
+ * - ユーティリティ関数
+ * - サービスアクセサ
  */
 
 /* global dsGetUserSheetData, dsAddReaction, dsToggleHighlight, validateUserData, validateSession, connectToSheetInternal, getFormInfo */
@@ -20,7 +19,11 @@
 // 🔧 Session Management
 // ===========================================
 
+/**
+ * @deprecated 直接 Session.getActiveUser().getEmail() を使用してください
+ */
 function getSession() {
+  console.warn('ServiceFactory.getSession is deprecated. Use Session.getActiveUser().getEmail() directly.');
   try {
     const email = Session.getActiveUser().getEmail();
     return {
@@ -40,7 +43,11 @@ function getSession() {
 // 📊 Properties Management
 // ===========================================
 
+/**
+ * @deprecated 直接 PropertiesService.getScriptProperties() を使用してください
+ */
 function getProperties() {
+  console.warn('ServiceFactory.getProperties is deprecated. Use PropertiesService.getScriptProperties() directly.');
   try {
     const scriptProps = PropertiesService.getScriptProperties();
 
@@ -75,7 +82,11 @@ function getProperties() {
 // 💾 Cache Management
 // ===========================================
 
+/**
+ * @deprecated 直接 CacheService.getScriptCache() を使用してください
+ */
 function getCache() {
+  console.warn('ServiceFactory.getCache is deprecated. Use CacheService.getScriptCache() directly.');
   try {
     const cache = CacheService.getScriptCache();
 
@@ -138,7 +149,7 @@ function getDB() {
   try {
     const root = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
 
-    // Use Data.gs Zero-Dependency implementation
+    // Use Data.gs GAS-Native implementation
     if (root && root.Data) {
       return root.Data;
     }
@@ -212,19 +223,11 @@ function getSpreadsheet() {
 
     create(name) {
       try {
-        // 🔧 データアクセス統一性: サービスアカウント経由でスプレッドシートを作成
+        // 🔧 CLAUDE.md準拠: ユーザー自身のスプレッドシート作成はサービスアカウント不要
         const spreadsheet = SpreadsheetApp.create(name);
 
-        // サービスアカウント権限自動付与（Data.openパターンに統一）
-        const auth = Auth.serviceAccount();
-        if (auth.isValid) {
-          try {
-            DriveApp.getFileById(spreadsheet.getId()).addEditor(auth.email);
-            console.log('ServiceFactory.getSpreadsheet.create: Service account editor access granted:', auth.email);
-          } catch (driveError) {
-            console.warn('ServiceFactory.getSpreadsheet.create: Service account access:', driveError.message);
-          }
-        }
+        // 🔧 CLAUDE.md準拠: ユーザー自身のスプレッドシートはサービスアカウント不要
+        // Service account should only be used for cross-user viewer access
 
         return spreadsheet;
       } catch (error) {
@@ -251,7 +254,7 @@ function getUtils() {
           console.warn(`init${serviceName}: ServiceFactory not available`);
           return false;
         }
-        console.log(`✅ ${serviceName} (Zero-Dependency) initialized successfully`);
+        console.log(`✅ ${serviceName} (GAS-Native) initialized successfully`);
         return true;
       } catch (error) {
         console.error(`init${serviceName} failed:`, error.message);
@@ -428,7 +431,7 @@ function diagnose() {
 
 /**
  * ServiceFactory統一インターフェース
- * Zero-Dependency Architecture統合層
+ * GAS-Native Architecture統合層
  */
 const __rootSF = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
 __rootSF.ServiceFactory = {

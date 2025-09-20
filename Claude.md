@@ -14,35 +14,50 @@
 3. **Code**: Implement incrementally with TDD-first approach
 4. **Commit**: Structured git workflow with proper documentation
 
-## 🏗️ Zero-Dependency Architecture
+## 🏗️ GAS-Optimized Architecture
 
-**Core Pattern**: Direct GAS API calls eliminate file loading order issues
+**Core Pattern**: Direct GAS API calls with natural global scope utilization
 
 ```
-🌟 Architecture
-├── main.gs                    # API Gateway (Zero-Dependency)
-├── *Service.gs                # Services Layer (Direct GAS APIs)
-├── *Controller.gs             # Business Logic Controllers
-└── *.html                     # Frontend (Unified API calls)
+🌟 GAS-Native Architecture
+├── main.gs                    # Entry Point (doGet/doPost only)
+├── auth.gs                    # Authentication (unified logic)
+├── database.gs                # Database Operations (direct SpreadsheetApp)
+├── permissions.gs             # Permission Management (simple role-based)
+├── reactions.gs               # Reaction System (specialized feature)
+├── utils.gs                   # Utility Functions (shared operations)
+└── *.html                     # Frontend Templates
 ```
 
-### **Implementation Pattern**
+### **GAS-Native Implementation Pattern**
 ```javascript
-// ✅ Direct GAS API usage with fallbacks
-function getConfig() {
-  try {
-    const email = Session.getActiveUser().getEmail();
-    if (!email) return { success: false, message: 'Not authenticated' };
+// ✅ Direct GAS API usage - natural global scope
+function getCurrentEmail() {
+  return Session.getActiveUser().getEmail();
+}
 
-    const user = typeof DatabaseOperations !== 'undefined' ?
-      DatabaseOperations.findUserByEmail(email) : null;
+function isAdministrator(email) {
+  const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+  return email?.toLowerCase() === adminEmail?.toLowerCase();
+}
 
-    return user ?
-      { success: true, config: JSON.parse(user.configJson || '{}') } :
-      { success: false, message: 'User not found' };
-  } catch (error) {
-    console.error('getConfig error:', error.message);
-    return { success: false, message: error.message };
+function getUserData(email) {
+  // Direct SpreadsheetApp usage for owner data
+  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+  const spreadsheet = SpreadsheetApp.openById(dbId);
+  const sheet = spreadsheet.getSheetByName('users');
+  // ... direct data operations
+}
+
+// ✅ Service Account usage - ONLY for cross-user access
+function getViewerBoardData(targetUserId, viewerEmail) {
+  const targetUser = findUserById(targetUserId);
+  if (targetUser.userEmail === viewerEmail) {
+    // Own data: use normal permissions
+    return getUserSpreadsheetData(targetUser);
+  } else {
+    // Other's data: use service account for viewer access
+    return getDataWithServiceAccount(targetUser);
   }
 }
 ```
@@ -240,42 +255,67 @@ npm run deploy:safe           # Safe deployment with validation
 - **Input Validation**: All user inputs validated
 - **XSS/CSRF Protection**: HTML sanitization, token-based validation
 - **Access Control**: Role-based permissions
-- **Service Account**: Use `Data.open()` instead of `SpreadsheetApp.openById()`
+- **Service Account**: **CROSS-USER ACCESS ONLY** - Security-critical restrictions
+  - ✅ **Viewer→Editor**: Accessing published board data and reactions
+  - ✅ **Editor→Admin**: Accessing shared user database (DATABASE_SPREADSHEET_ID)
+  - ✅ **Cross-tenant operations**: Any access across user boundaries
+  - ❌ **Self-access**: User accessing own spreadsheets (use direct GAS APIs)
+  - ❌ **Same-tenant**: Operations within user's own permissions scope
 
 ### **Anti-Patterns to Avoid**
 ```javascript
-// ❌ AVOID: Individual API calls in loops
-// ❌ AVOID: Library dependencies in production
-// ❌ AVOID: User permission-dependent data access
-SpreadsheetApp.openById(id);              // ❌ User permission dependent
-Data.open(id);                           // ✅ Service account
+// ❌ AVOID: Individual API calls in loops (use batch operations)
+// ❌ AVOID: Unnecessary service account usage
+function getUserOwnData(email) {
+  const auth = Auth.serviceAccount();        // ❌ Unnecessary privilege escalation
+  return Data.findUserByEmail(email, auth); // ❌ User accessing own data
+}
 
-// ❌ AVOID: Direct service dependencies at file level
+// ✅ CORRECT: Appropriate permission usage
+function getUserOwnData(email) {
+  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+  const spreadsheet = SpreadsheetApp.openById(dbId); // ✅ Normal user permissions
+  return findUserInSheet(spreadsheet, email);
+}
+
+function getViewerCrossUserData(targetUserId, viewerEmail) {
+  const targetUser = findUserById(targetUserId);
+  if (targetUser.userEmail === viewerEmail) {
+    return getUserOwnData(viewerEmail);        // ✅ Own data: normal permissions
+  } else {
+    return getDataWithServiceAccount(targetUser); // ✅ Cross-user: service account
+  }
+}
+
 // ❌ AVOID: Synchronous UI blocking operations
+// ❌ AVOID: typeof undefined checks (unnecessary in GAS)
 ```
 
 ## 📝 Naming Conventions & Code Standards
 
-### **🎯 Unified Naming System**
+### **🎯 Pragmatic Naming System**
 
-**Core Principle**: 一貫性のある命名規則により、Zero-Dependency Architectureの可読性と保守性を最大化
+**Core Principle**: 自然で読みやすい関数名を優先し、GAS-Native Architectureの可読性と実用性を最大化
 
-#### **Function Naming - Prefix System**
+#### **Function Naming - Natural English Pattern**
 ```javascript
-// ✅ サービス別プレフィックスパターン
-ds*()                    // DataService operations (スプレッドシート・データ処理)
-auth*()                  // Authentication & authorization (認証・権限)
-config*()                // Configuration management (設定管理)
-sys*()                   // System management (システム管理)
+// ✅ 推奨: 自然な英語表現パターン
+getCurrentEmail()        // 直感的で分かりやすい
+getUser()               // シンプルで明確
+validateEmail()         // 目的が明確
+createErrorResponse()   // 自然な動詞+名詞構造
+isAdmin()              // 簡潔な状態確認
+checkUserAccess()      // 分かりやすいアクション
 
-// ✅ 実装例
-dsGetUserSheetData()     // DataService: ユーザーシートデータ取得
-dsAddReaction()          // DataService: リアクション追加
-dsConnectDataSource()    // DataService: データソース接続
+// ✅ 特殊機能のみプレフィックス使用
+dsGetUserSheetData()   // DataService特有の複雑なデータ処理
+dsAddReaction()        // DataService特有の機能
+sysLog()              // システムレベルの統一ログ機能
 
-authIsAdministrator()    // Auth: 管理者権限確認
-configGetUserConfig()    // Config: ユーザー設定取得
-sysTestSystemSetup()     // System: システムセットアップテスト
+// ❌ 避けるべき: 不要なプレフィックス強制
+authGetCurrentEmail()  // → getCurrentEmail() の方が自然
+configGetUserConfig()  // → getUserConfig() の方が読みやすい
+authIsAdministrator()  // → isAdministrator() の方がシンプル
 ```
 
 #### **Variable & Property Naming**
@@ -324,6 +364,35 @@ cache.put(cacheKey, data, 300);     // ❌ 意味が不明
 Utilities.sleep(100);               // ❌ なぜ100ms？
 ```
 
+#### **Function Categories & Naming Patterns**
+```javascript
+// ✅ カテゴリ別命名パターン
+
+// 1. データ取得・操作
+getCurrentEmail()       // get + 対象名
+getUser()              // シンプルで明確
+getUserConfig()        // 対象を明確に
+saveUserConfig()       // 動作を明確に
+
+// 2. 検証・確認
+validateEmail()        // validate + 対象
+isAdmin()             // 状態確認（boolean返却）
+checkUserAccess()     // check + 確認内容
+
+// 3. 作成・生成
+createErrorResponse()  // create + 作成対象
+generateDynamicUrls()  // generate + 生成内容
+
+// 4. 処理・変換
+processLoginAction()   // process + 処理対象
+handleGetData()       // handle + ハンドル対象
+formatTimestamp()     // format + 変換対象
+
+// 5. 特殊プレフィックス（必要時のみ）
+dsGetUserSheetData()  // 複雑なデータ処理
+sysLog()             // システムレベル機能
+```
+
 #### **Parameter Naming Standards**
 ```javascript
 // ✅ 統一されたパラメータ名
@@ -335,9 +404,9 @@ function processUserData(userId, spreadsheetId, sheetName, options = {}) {
 }
 
 // ✅ 一貫性のあるAPI設計
-dsGetUserSheetData(userId, options);        // Data layer
-getUserConfig(userId);                      // Config layer
-authIsAdministrator(email);                 // Auth layer
+getCurrentEmail()                           // Auth layer
+getUserConfig(userId)                       // Config layer
+dsGetUserSheetData(userId, options)        // Data layer (特殊処理)
 
 // ❌ 非一貫的なパラメータ（非推奨）
 function badFunction(user_id, spreadsheet-id, sheet_name) { } // ❌ 命名規則混在
@@ -346,41 +415,69 @@ function anotherBad(userID, spreadSheetId, SheetName) { }     // ❌ 大文字�
 
 ### **🔧 Implementation Guidelines**
 
-#### **Zero-Dependency Pattern Compliance**
+#### **GAS-Native Pattern Compliance**
 ```javascript
-// ✅ 推奨: 直接的で明確な関数名
-function dsGetUserSheetData(userId, options = {}) {
-  // Direct GAS API calls
-  // No external dependencies
-  // Clear responsibility boundary
+// ✅ GAS-Native: Direct API calls with natural global scope
+function getCurrentEmail() {
+  return Session.getActiveUser().getEmail();
 }
 
-// ✅ グローバル定数の適切な設定
-const __rootSys = (typeof globalThis !== 'undefined') ? globalThis : this;
-__rootSys.CACHE_DURATION = CACHE_DURATION;
-__rootSys.TIMEOUT_MS = TIMEOUT_MS;
+function getUserConfig(userId) {
+  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+  const spreadsheet = SpreadsheetApp.openById(dbId);
+  // Direct SpreadsheetApp usage - no abstraction layers
+}
+
+// ✅ Specialized functions with clear prefixes
+function dsGetUserSheetData(userId, options = {}) {
+  // Complex data operations warrant specific naming
+  // Clear functional responsibility
+}
+
+// ✅ GAS-Native constants (no typeof checks needed)
+const CACHE_DURATION = {
+  SHORT: 10,
+  MEDIUM: 30,
+  LONG: 300
+};
+
+const TIMEOUT_MS = {
+  QUICK: 100,
+  DEFAULT: 5000,
+  EXTENDED: 30000
+};
 ```
 
-#### **Legacy Code Migration**
+#### **Naming Philosophy & Migration**
 ```javascript
-// ✅ CLAUDE.md準拠移行パターン
-// 旧: isAdmin() → 新: authIsAdministrator()
-// 旧: DB.* → 新: Data.*
-// 旧: getUserSheetData() → 新: dsGetUserSheetData()
-// 旧: appPublished → 新: isPublished
-// 旧: isAdminUser/showAdminFeatures → 新: isEditor
+// ✅ CLAUDE.md準拠：実用性重視のシンプル命名
+// 自然な英語 > 強制的なプレフィックス
+// 読みやすさ > 厳格な分類
 
-// ❌ 後方互換性ラッパー（非推奨）
-// function isAdmin() { return authIsAdministrator(); } // ✗ 削除済み
+// ✅ 保持すべき関数名パターン
+getCurrentEmail()         // 直感的
+getUserConfig()          // 明確
+validateEmail()          // 目的が分かりやすい
+createErrorResponse()    // 自然な動詞+名詞
+isAdmin()               // シンプルな状態確認
+
+// ✅ 必要なプレフィックス（機能的理由）
+dsGetUserSheetData()    // DataService特有の複雑処理
+dsAddReaction()         // DataService特有の機能
+sysLog()               // システムレベル統一機能
+
+// ❌ 不要なプレフィックス強制は避ける
+// 読みやすさを損なうプレフィックスは使用しない
 ```
 
-### **📊 Benefits of Unified Naming**
+### **📊 Benefits of Pragmatic Naming**
 
-- **🔍 Instant Recognition**: プレフィックスで関数の役割を即座に識別
-- **🚫 Conflict Prevention**: モジュール間の命名競合を完全排除
-- **📖 Self-Documenting Code**: 名前から機能と責任範囲が明確
-- **🛠️ Maintenance Efficiency**: 統一された規則で保守性向上
-- **⚡ Zero-Dependency Compliance**: ファイル読み込み順序に依存しない設計
+- **🎯 Natural Readability**: 自然な英語表現で直感的に理解可能
+- **⚡ Development Speed**: シンプルな関数名で開発効率向上
+- **📖 Self-Documenting Code**: 機能が名前から即座に理解できる
+- **🛠️ Maintenance Efficiency**: 読みやすい関数名で保守性向上
+- **🔄 Zero-Dependency Compliance**: ファイル読み込み順序に依存しない設計
+- **🎨 Code Aesthetics**: 美しく読みやすいコードベース実現
 
 ## 📋 Important Application Notes
 
