@@ -3858,6 +3858,12 @@
         })
         .saveConfig(optimizedConfig);
     }
+
+    } catch (error) {
+      console.error('列設定保存処理エラー:', error);
+      showError('列設定の保存処理に失敗しました: ' + error.message);
+      ClientMutex.release('saveColumnConfiguration');
+    }
   }
 
   // 下書き保存
