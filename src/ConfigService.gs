@@ -15,7 +15,7 @@
 
 /* global validateConfig */
 
-/* global URL, validateUrl, createErrorResponse, validateSpreadsheetId, Data, Auth, UserService, isAdministrator, SLEEP_MS */
+/* global URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, Auth, UserService, isAdministrator, SLEEP_MS */
 
 // ===========================================
 // 🔧 GAS-Native ConfigService (直接API版)
@@ -554,8 +554,8 @@ function isSystemSetup() {
     const currentEmail = session.email;
     if (!currentEmail) return false;
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(currentEmail);
+    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用
+    const user = findUserByEmail(currentEmail);
     return !!(user && user.configJson);
   } catch (error) {
     console.error('isSystemSetup: エラー', error.message);
@@ -748,9 +748,9 @@ function getQuestionText(config) {
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
         console.log('🔄 getQuestionText: Fetching headers from spreadsheet');
-        // 🔧 Zero-Dependency統一: 直接Data.open使用（ConfigService内部処理）
+        // 🔧 Zero-Dependency統一: 直接openSpreadsheet使用（ConfigService内部処理）
         try {
-          const dataAccess = Data.open(config.spreadsheetId);
+          const dataAccess = openSpreadsheet(config.spreadsheetId);
           const { spreadsheet } = dataAccess;
           const sheet = spreadsheet.getSheetByName(config.sheetName);
           if (sheet && sheet.getLastColumn() > 0) {
@@ -764,7 +764,7 @@ function getQuestionText(config) {
             }
           }
         } catch (dataAccessError) {
-          console.warn('⚠️ getQuestionText: Data.open access failed:', dataAccessError.message);
+          console.warn('⚠️ getQuestionText: openSpreadsheet access failed:', dataAccessError.message);
         }
       } catch (dynamicError) {
         console.warn('⚠️ getQuestionText: Dynamic headers fetch failed:', dynamicError.message);
@@ -814,8 +814,8 @@ function getUserConfig(userId) {
   }
 
   try {
-    // Zero-Dependency: 直接Data.findUserById呼び出し
-    const user = Data.findUserById(userId);
+    // Zero-Dependency: 直接findUserById呼び出し
+    const user = findUserById(userId);
     if (!user) {
       return {
         success: false,
@@ -887,7 +887,7 @@ function saveUserConfig(userId, config, options = {}) {
   try {
     // 🔧 CLAUDE.md準拠: 楽観的ロック（ETag）検証の実装
     if (config.etag) {
-      const user = Data.getUser(userId);
+      const user = getUserSpreadsheetData(userId);
       if (user && user.configJson) {
         try {
           const currentConfig = JSON.parse(user.configJson);
@@ -940,8 +940,8 @@ function saveUserConfig(userId, config, options = {}) {
     clearConfigCache(userId);
     console.log('saveUserConfig: 書き込み前キャッシュクリア完了');
 
-    // 5. Zero-Dependency: 直接Data.updateUser呼び出し
-    const updateResult = Data.updateUser(userId, {
+    // 5. Zero-Dependency: 直接updateUser呼び出し
+    const updateResult = updateUser(userId, {
       configJson: JSON.stringify(cleanedConfig),
       lastModified: cleanedConfig.lastModified
     });

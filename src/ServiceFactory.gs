@@ -1,4 +1,4 @@
-/* global Auth, Data, CACHE_DURATION, SLEEP_MS */
+/* global getServiceAccount, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, openSpreadsheetWithServiceAccount, CACHE_DURATION, SLEEP_MS */
 /**
  * @fileoverview ServiceFactory - 統一サービスアクセス層 (Gradually Simplifying)
  *
@@ -192,7 +192,7 @@ function getSpreadsheet() {
       try {
         cache.put(authKey, true, CACHE_DURATION.SHORT); // 10秒間の認証ロック
         // 🔧 CLAUDE.md準拠: サービスアカウント専用アクセス - セキュリティ強化
-        const auth = typeof Auth !== 'undefined' ? Auth.serviceAccount() : null;
+        const auth = getServiceAccount();
 
         // 🛡️ サービスアカウント認証の厳格な検証
         if (!auth) {
@@ -206,10 +206,10 @@ function getSpreadsheet() {
         // ✅ セキュアなサービスアカウント専用アクセス
         console.log('ServiceFactory.getSpreadsheet.openById: Using secure service account authentication');
 
-        if (typeof Data !== 'undefined' && typeof Data.openSpreadsheetWithServiceAccount === 'function') {
-          return Data.openSpreadsheetWithServiceAccount(id, auth.token);
+        if (typeof Data !== 'undefined' && typeof openSpreadsheetWithServiceAccount === 'function') {
+          return openSpreadsheetWithServiceAccount(id, auth.token);
         } else {
-          throw new Error('ServiceFactory.getSpreadsheet: Data.openSpreadsheetWithServiceAccount not available');
+          throw new Error('ServiceFactory.getSpreadsheet: openSpreadsheetWithServiceAccount not available');
         }
 
       } catch (error) {

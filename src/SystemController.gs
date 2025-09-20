@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, Data, Config, getSpreadsheetList, getUserConfig, saveUserConfig, Auth */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, Config, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount */
 
 // ===========================================
 // 📊 システム定数 - Zero-Dependency Architecture
@@ -145,7 +145,7 @@ function testSystemSetup() {
       const props = PropertiesService.getScriptProperties();
       const databaseId = props.getDatabaseSpreadsheetId();
       if (databaseId) {
-        const dataAccess = Data.open(databaseId);
+        const dataAccess = openSpreadsheet(databaseId);
         diagnostics.tests.push({
           name: 'Database Connection',
           status: '✅',
@@ -287,7 +287,7 @@ function testSystemDiagnosis() {
         const databaseId = props.getDatabaseSpreadsheetId();
 
         if (databaseId) {
-          const dataAccess = Data.open(databaseId);
+          const dataAccess = openSpreadsheet(databaseId);
           const {spreadsheet} = dataAccess;
           diagnostics.database = {
             accessible: true,
@@ -335,7 +335,7 @@ function getSystemStatus() {
         setup: {
           hasDatabase: !!props.getDatabaseSpreadsheetId(),
           hasAdminEmail: !!props.getAdminEmail(),
-          hasServiceAccount: !!Auth.serviceAccount()?.isValid
+          hasServiceAccount: !!getServiceAccount()?.isValid
         },
         services: {
           available: ['UserService', 'ConfigService', 'DataService', 'SecurityService']
@@ -459,7 +459,7 @@ function getAdminSpreadsheetList() {
 function getAdminSheetList(spreadsheetId) {
   try {
     // 🎯 Zero-dependency: サービスアカウント経由でシート一覧取得
-    const dataAccess = Data.open(spreadsheetId);
+    const dataAccess = openSpreadsheet(spreadsheetId);
     const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
 
@@ -535,13 +535,13 @@ function publishApplication(publishConfig) {
       }
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     let saveResult = null;
 
     if (user) {
       // Re-fetch latest user data to avoid conflicts
-      const latestUser = Data.findUserByEmail(email);
+      const latestUser = findUserByEmail(email);
       const userToUse = latestUser || user;
 
       // 統一API使用: 構造化パース
@@ -707,7 +707,7 @@ function getSpreadsheetAdaptive(spreadsheetId) {
 
   // 🛡️ セキュアなサービスアカウント専用アクセス
   try {
-    const dataAccess = Data.open(spreadsheetId);
+    const dataAccess = openSpreadsheet(spreadsheetId);
     console.log('getSpreadsheetAdaptive: サービスアカウントでアクセス成功');
     return {
       spreadsheet: dataAccess.spreadsheet,
@@ -1077,12 +1077,12 @@ function getSpreadsheetInfo(spreadsheetId, accessToken) {
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
     // 🎯 Zero-dependency: サービスアカウント経由でアクセス権確認
-    const dataAccess = Data.open(spreadsheetId);
+    const dataAccess = openSpreadsheet(spreadsheetId);
     const {spreadsheet, auth} = dataAccess;
 
-    // サービスアカウントを編集者として自動登録（Data.openで既に実行済み）
+    // サービスアカウントを編集者として自動登録（openSpreadsheetで既に実行済み）
     if (autoAddEditor) {
-      console.log('validateAccess: サービスアカウント編集者権限は Data.open で既に処理済み');
+      console.log('validateAccess: サービスアカウント編集者権限は openSpreadsheet で既に処理済み');
     }
 
     // カスタムラッパーのgetSheets()メソッドを使用
@@ -1358,11 +1358,11 @@ function checkCurrentPublicationStatus(targetUserId) {
     // 🔧 Zero-Dependency統一: 直接Dataクラス使用
     let user = null;
     if (targetUserId) {
-      user = Data.findUserById(targetUserId);
+      user = findUserById(targetUserId);
     }
 
     if (!user && session && session.email) {
-      user = Data.findUserByEmail(session.email);
+      user = findUserByEmail(session.email);
     }
 
     if (!user) {

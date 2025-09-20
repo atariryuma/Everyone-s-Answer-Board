@@ -13,7 +13,7 @@
  * - 単一責任原則の維持
  */
 
-/* global validateEmail, validateText, validateUrl, getUserAccessLevel, Data, URL */
+/* global validateEmail, validateText, validateUrl, getUserAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, URL */
 
 
 // ===========================================
@@ -337,10 +337,10 @@ function validateSpreadsheetAccess(spreadsheetId) {
       // アクセステスト - 段階的にチェック
       let spreadsheet;
       try {
-        console.log('SecurityService', { operation: 'Data.open', phase: 'start' });
-        const { spreadsheet: spreadsheetFromData } = Data.open(spreadsheetId);
+        console.log('SecurityService', { operation: 'openSpreadsheet', phase: 'start' });
+        const { spreadsheet: spreadsheetFromData } = openSpreadsheet(spreadsheetId);
         spreadsheet = spreadsheetFromData;
-        console.log('SecurityService', { operation: 'Data.open', phase: 'success' });
+        console.log('SecurityService', { operation: 'openSpreadsheet', phase: 'success' });
       } catch (openError) {
         const errorResponse = {
           success: false,

@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config, getUserConfig, helpers, CACHE_DURATION, SLEEP_MS */
+/* global formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, Config, getUserConfig, helpers, CACHE_DURATION, SLEEP_MS */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -39,8 +39,8 @@ function dsGetUserSheetData(userId, options = {}) {
   try {
     // 🚀 Zero-dependency data processing
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserById使用
-    const user = Data.findUserById(userId);
+    // 🔧 Zero-Dependency統一: 直接findUserById使用
+    const user = findUserById(userId);
     if (!user) {
       console.error('DataService.dsGetUserSheetData: ユーザーが見つかりません', { userId });
       return helpers.createDataServiceErrorResponse('ユーザーが見つかりません');
@@ -100,7 +100,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
 
   try {
     // スプレッドシート取得
-    const dataAccess = Data.open(config.spreadsheetId);
+    const dataAccess = openSpreadsheet(config.spreadsheetId);
     const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
@@ -399,7 +399,7 @@ function extractFieldValue(row, headers, fieldType, columnMapping = {}) {
  */
 function updateReactionInSheet(config, rowId, reactionType, action) {
   try {
-    const dataAccess = Data.open(config.spreadsheetId);
+    const dataAccess = openSpreadsheet(config.spreadsheetId);
     const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
@@ -541,7 +541,7 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEm
       throw new Error('ユーザー情報が必要です');
     }
 
-    const dataAccess = Data.open(spreadsheetId);
+    const dataAccess = openSpreadsheet(spreadsheetId);
     const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(sheetName);
 
@@ -1103,12 +1103,12 @@ function validateSheetParams(spreadsheetId, sheetName) {
  */
 function connectToSheetInternal(spreadsheetId, sheetName) {
   try {
-    const dataAccess = Data.open(spreadsheetId);
+    const dataAccess = openSpreadsheet(spreadsheetId);
     const {spreadsheet} = dataAccess;
 
-    // サービスアカウントを編集者として自動登録 (Data.openで既に処理済み)
-    // Note: Data.open()内でDriveApp.getFileById(id).addEditor()が既に実行されている
-    console.log('connectToSheetInternal: サービスアカウント編集者権限はData.openで処理済み');
+    // サービスアカウントを編集者として自動登録 (openSpreadsheetで既に処理済み)
+    // Note: openSpreadsheet()内でDriveApp.getFileById(id).addEditor()が既に実行されている
+    console.log('connectToSheetInternal: サービスアカウント編集者権限はopenSpreadsheetで処理済み');
 
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
@@ -1239,7 +1239,7 @@ function extractSheetHeaders(sheet) {
 function restoreColumnConfig(userId, spreadsheetId, sheetName) {
   try {
     const session = { email: Session.getActiveUser().getEmail() };
-    const user = Data.findUserByEmail(session.email);
+    const user = findUserByEmail(session.email);
     if (!user) {
       return { success: false, message: 'User not found' };
     }
@@ -1282,8 +1282,8 @@ function restoreColumnConfig(userId, spreadsheetId, sheetName) {
  */
 function getSheetHeaders(spreadsheetId, sheetName, started) {
   try {
-    // 🎯 サービスアカウント認証でData.open()を使用（ServiceFactoryのフォールバック回避）
-    const dataAccess = Data.open(spreadsheetId);
+    // 🎯 サービスアカウント認証でopenSpreadsheet()を使用（ServiceFactoryのフォールバック回避）
+    const dataAccess = openSpreadsheet(spreadsheetId);
     const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(sheetName);
 
@@ -2301,7 +2301,7 @@ function getOrCreateReactionColumn(sheet, reactionType) {
  */
 function updateHighlightInSheet(config, rowId) {
   try {
-    const dataAccess = Data.open(config.spreadsheetId);
+    const dataAccess = openSpreadsheet(config.spreadsheetId);
     const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
@@ -2385,7 +2385,7 @@ function validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey) {
 function dsAddReaction(userId, rowIndex, reaction) {
   try {
     // 🎯 Zero-Dependency: Direct Data call
-    const user = Data.findUserById(userId);
+    const user = findUserById(userId);
     if (!user) {
       return createErrorResponse('User not found');
     }
@@ -2467,7 +2467,7 @@ function dsAddReaction(userId, rowIndex, reaction) {
 function dsToggleHighlight(userId, rowIndex) {
   try {
     // 🎯 Zero-Dependency: Direct Data call
-    const user = Data.findUserById(userId);
+    const user = findUserById(userId);
     if (!user) {
       return createErrorResponse('User not found');
     }

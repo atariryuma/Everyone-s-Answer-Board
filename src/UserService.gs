@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global validateUrl, validateEmail, getCurrentEmail, Data, getUserConfig, isAdministrator, CACHE_DURATION */
+/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, getUserConfig, isAdministrator, CACHE_DURATION */
 
 // ===========================================
 // 🔧 GAS-Native UserService (直接API版)
@@ -50,7 +50,7 @@ function getCurrentUserInfo() {
     }
 
     // データベース検索
-    const userInfo = Data.findUserByEmail(email);
+    const userInfo = findUserByEmail(email);
     if (!userInfo) {
       console.info('UserService.getCurrentUserInfo: 新規ユーザーの可能性', { email });
       return null;
@@ -170,7 +170,7 @@ function getUserAccessLevel(userId) {
       return ACCESS_LEVELS.NONE;
     }
 
-    const userInfo = Data.findUserById(userId);
+    const userInfo = findUserById(userId);
     if (!userInfo) {
       return ACCESS_LEVELS.NONE;
     }
@@ -229,7 +229,7 @@ function isEditor(email, targetUserId) {
   }
 
   try {
-    const user = Data.findUserByEmail(email);
+    const user = findUserByEmail(email);
     return user && user.userId === targetUserId;
   } catch (error) {
     console.error('UserService.isEditor: エラー', error.message);

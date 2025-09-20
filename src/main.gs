@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getDataWithServiceAccount */
 
 // ===========================================
 // 🔧 Core Utility Functions

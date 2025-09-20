@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ConfigService, DataService, getCurrentEmail, createErrorResponse, dsGetUserSheetData, Data, getUserConfig */
+/* global ConfigService, DataService, getCurrentEmail, createErrorResponse, dsGetUserSheetData, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, getUserConfig */
 
 // ===========================================
 // 📊 メインページデータAPI
@@ -35,8 +35,8 @@ function handleGetData(request) {
       };
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -79,8 +79,8 @@ function handleRefreshData(request) {
       };
     }
 
-    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
-    const user = Data.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -166,7 +166,7 @@ function getHeaderIndices(spreadsheetId, sheetName) {
       };
     }
 
-    const dataAccess = Data.open(spreadsheetId);
+    const dataAccess = openSpreadsheet(spreadsheetId);
     const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(sheetName);
 
@@ -252,7 +252,7 @@ function addSpreadsheetUrl(url) {
 
     // アクセステスト
     try {
-      const dataAccess = Data.open(spreadsheetId);
+      const dataAccess = openSpreadsheet(spreadsheetId);
     const {spreadsheet} = dataAccess;
       const name = spreadsheet.getName();
 
