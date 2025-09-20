@@ -1462,8 +1462,11 @@
       return { status: 'linked', message: 'フォーム連携を確認しました' };
     }
 
-    // successフラグまたは高信頼度パターン検出
-    if (formResult.success || confidence >= 70) {
+    // ✅ 修正: 実際のフォーム検出結果に基づく判定
+    const isFormDetected = formResult.status === 'FORM_LINK_FOUND' ||
+                          (formResult.success && confidence >= 70);
+
+    if (isFormDetected) {
       console.log('✅ 高信頼度パターン検出');
       return { status: 'detected', message: 'フォーム連携パターンを検出（URL取得不可）' };
     }

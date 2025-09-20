@@ -2380,8 +2380,12 @@ function getFormInfo(spreadsheetId, sheetName) {
         }
       };
 
+      // ✅ 修正: フォーム検出の実際の結果に基づくsuccess判定
+      const confidence = formUrl ? 80 : 20;
+      const hasFormDetection = formUrl || confidence >= 70;
+
       return {
-        success: true,
+        success: hasFormDetection,
         status: formUrl ? 'FORM_LINK_FOUND' : 'FORM_NOT_LINKED',
         message: formUrl ? 'Form information retrieved successfully' : 'Form information retrieved (no URL found)',
         formData, // フロントエンド互換性
