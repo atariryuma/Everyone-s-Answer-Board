@@ -259,7 +259,8 @@
       if (urlObj.protocol !== 'https:') return false;
       const validHosts = ['docs.google.com', 'forms.gle'];
       if (urlObj.hostname === 'docs.google.com') {
-        return urlObj.pathname.includes('/forms/');
+        // Match backend logic: support both /forms/ and /viewform for comprehensive Google Forms URL support
+        return urlObj.pathname.includes('/forms/') || urlObj.pathname.includes('/viewform');
       }
       return validHosts.includes(urlObj.hostname);
     } catch {
@@ -478,7 +479,7 @@
       console.log('🔧 setupColumns: 列設定を初期化中:', { spreadsheetId, sheetName });
 
       // シンプルフロー: データソース接続 → 列情報取得 → UI反映
-      const analysisResult = await performColumnAnalysis(spreadsheetId, sheetName);
+      const analysisResult = await getColumnAnalysis(spreadsheetId, sheetName);
 
       if (!analysisResult || !analysisResult.success) {
         console.warn('⚠️ 列分析に失敗 - 空白状態を維持');
@@ -1151,31 +1152,36 @@
     });
   }
 
-  // シンプル列分析関数
-  async function performColumnAnalysis(spreadsheetId, sheetName) {
-    const gateKey = `performColumnAnalysis_${spreadsheetId}_${sheetName}`;
+  // 🎯 CLAUDE.md準拠: バックエンドと一致した自然な関数名
+  async function getColumnAnalysis(spreadsheetId, sheetName) {
+    const gateKey = `getColumnAnalysis_${spreadsheetId}_${sheetName}`;
 
     if (!ClientMutex.acquire(gateKey)) {
-      console.warn('performColumnAnalysis: 既に実行中です');
+      console.warn('getColumnAnalysis: 既に実行中です');
       return { success: false, error: 'Analysis already in progress' };
     }
 
     try {
       return new Promise((resolve, reject) => {
-        console.log('🔍 performColumnAnalysis: API呼び出し実行', { spreadsheetId, sheetName });
+        console.log('🔍 getColumnAnalysis: バッチAPI呼び出し実行', { spreadsheetId, sheetName });
+
+        // 🎯 最適化: ワンパス統合処理で重複アクセスを完全回避
+        const operations = [
+          { type: 'integratedAnalysis' }    // 接続+AI分析を1回で実行
+        ];
 
         google.script.run
           .withSuccessHandler(function(result) {
-            console.log('✅ performColumnAnalysis success:', result);
+            console.log('✅ getColumnAnalysis batch success:', result);
             ClientMutex.release(gateKey);
             resolve(result);
           })
           .withFailureHandler(function(error) {
-            console.error('❌ performColumnAnalysis error:', error);
+            console.error('❌ getColumnAnalysis batch error:', error);
             ClientMutex.release(gateKey);
             reject(error);
           })
-          .dsConnectDataSource(spreadsheetId, sheetName);
+          .dsConnectDataSource(spreadsheetId, sheetName, operations);
       });
     } catch (error) {
       ClientMutex.release(gateKey);
@@ -1430,22 +1436,47 @@
 
   // フォーム検出結果を処理し、適切なステータス情報を返す
   function processFormDetectionResult(formResult) {
-    if (!formResult || !formResult.formData) {
+    console.log('🔍 processFormDetectionResult 実行:', formResult);
+
+    // 🛡️ CLAUDE.md準拠: V8ランタイム対応の柔軟なデータ構造判定
+    if (!formResult || !formResult.success) {
+      console.log('❌ formResult が不正または失敗:', { formResult, success: !!formResult?.success });
       return null;
     }
 
-    if (formResult.success) {
-      // URLありまたは高信頼度検出
-      return formResult.formData.formUrl ?
-        { status: 'linked', message: 'フォーム連携を確認しました' } :
-        { status: 'detected', message: 'フォーム連携パターンを検出（URL取得不可）' };
-    } else if (formResult.formData.detectionDetails && formResult.formData.detectionDetails.confidence >= 40) {
-      // 中程度信頼度での検出
-      return { status: 'possible', message: 'フォーム連携パターンを検出しました' };
-    } else {
-      // 検出なし
-      return { status: 'missing', message: 'フォーム連携が確認できませんでした' };
+    // データ構造の正規化（後方互換性維持）
+    const normalizedData = formResult.formData || formResult;
+    const confidence = normalizedData.detectionDetails?.confidence || 0;
+    const hasFormUrl = !!normalizedData.formUrl;
+
+    console.log('🔍 検出パラメータ:', {
+      success: formResult.success,
+      confidence,
+      hasFormUrl,
+      status: formResult.status
+    });
+
+    // フォームURLがある場合は完全な連携
+    if (hasFormUrl) {
+      console.log('✅ フォームURL検出成功');
+      return { status: 'linked', message: 'フォーム連携を確認しました' };
     }
+
+    // successフラグまたは高信頼度パターン検出
+    if (formResult.success || confidence >= 70) {
+      console.log('✅ 高信頼度パターン検出');
+      return { status: 'detected', message: 'フォーム連携パターンを検出（URL取得不可）' };
+    }
+
+    // 中程度信頼度での検出
+    if (confidence >= 40) {
+      console.log('⚠️ 中程度信頼度パターン検出');
+      return { status: 'possible', message: 'フォーム連携パターンを検出しました' };
+    }
+
+    // 検出なし
+    console.log('❌ フォーム連携パターンなし');
+    return { status: 'missing', message: 'フォーム連携が確認できませんでした' };
   }
 
   // シート別フォーム連携情報をチェック・表示
@@ -2351,10 +2382,224 @@
     }
   }
 
+  // ===========================================
+  // 🔧 AI検出と手動設定の競合解決システム
+  // ===========================================
 
-  // AI検出結果をドロップダウンの初期選択として設定
+  /**
+   * 列選択の競合状態分析
+   * @param {Object} mapping - AI検出マッピング
+   * @param {Object} dropdowns - ドロップダウン要素
+   * @param {Object} confidence - AI信頼度データ
+   * @returns {Object} 競合分析結果
+   */
+  function analyzeColumnSelectionConflicts(mapping, dropdowns, confidence = {}) {
+    const analysis = {
+      hasConflicts: false,
+      conflicts: [],
+      recommendations: [],
+      summary: {
+        aiSelections: 0,
+        manualSelections: 0,
+        conflictingFields: []
+      }
+    };
+
+    try {
+      const actualMapping = mapping?.mapping || mapping || {};
+
+      Object.keys(dropdowns).forEach(fieldType => {
+        const dropdown = dropdowns[fieldType];
+        if (!dropdown) return;
+
+        const hasAISelection = actualMapping[fieldType] !== undefined && actualMapping[fieldType] !== null;
+        const hasManualSelection = dropdown.value && dropdown.value !== '';
+        const aiConfidence = confidence[fieldType] || 0;
+
+        if (hasAISelection) analysis.summary.aiSelections++;
+        if (hasManualSelection) analysis.summary.manualSelections++;
+
+        // 競合検出: AI検出と手動選択が異なる場合
+        if (hasAISelection && hasManualSelection) {
+          const aiIndex = actualMapping[fieldType];
+          const manualIndex = parseInt(dropdown.value);
+
+          if (aiIndex !== manualIndex) {
+            analysis.hasConflicts = true;
+            analysis.conflicts.push({
+              field: fieldType,
+              aiSelection: { index: aiIndex, confidence: aiConfidence },
+              manualSelection: { index: manualIndex },
+              severity: aiConfidence > 70 ? 'high' : 'medium'
+            });
+            analysis.summary.conflictingFields.push(fieldType);
+          }
+        }
+      });
+
+      // 推奨事項の生成
+      if (analysis.hasConflicts) {
+        analysis.recommendations = generateConflictResolutionRecommendations(analysis);
+      }
+
+      console.log('🔍 analyzeColumnSelectionConflicts結果:', analysis);
+      return analysis;
+
+    } catch (error) {
+      console.error('analyzeColumnSelectionConflicts エラー:', error);
+      return { hasConflicts: false, conflicts: [], error: error.message };
+    }
+  }
+
+  /**
+   * 競合解決の推奨事項生成
+   * @param {Object} analysis - 競合分析結果
+   * @returns {Array} 推奨事項リスト
+   */
+  function generateConflictResolutionRecommendations(analysis) {
+    const recommendations = [];
+
+    analysis.conflicts.forEach(conflict => {
+      if (conflict.severity === 'high') {
+        recommendations.push({
+          type: 'trust_ai',
+          field: conflict.field,
+          message: `${conflict.field}: AI検出の信頼度が高いため(${conflict.aiSelection.confidence}%)、AI選択を推奨`,
+          action: 'use_ai_selection'
+        });
+      } else {
+        recommendations.push({
+          type: 'user_choice',
+          field: conflict.field,
+          message: `${conflict.field}: AI信頼度が中程度のため、手動選択を維持または確認してください`,
+          action: 'confirm_manual_selection'
+        });
+      }
+    });
+
+    return recommendations;
+  }
+
+  /**
+   * 競合状況の処理と解決
+   * @param {Object} conflictStatus - 競合状態分析結果
+   * @param {Object} mapping - AI検出マッピング
+   * @param {Object} dropdowns - ドロップダウン要素
+   * @param {Object} confidence - AI信頼度データ
+   */
+  function handleColumnSelectionConflicts(conflictStatus, mapping, dropdowns, confidence) {
+    try {
+      console.log('🔧 handleColumnSelectionConflicts: 競合解決処理開始');
+
+      // 🎯 競合解決戦略: 信頼度ベース自動解決 + ユーザー確認
+      conflictStatus.conflicts.forEach(conflict => {
+        const dropdown = dropdowns[conflict.field];
+        if (!dropdown) return;
+
+        if (conflict.severity === 'high') {
+          // 高信頼度のAI検出: 自動でAI選択を採用
+          dropdown.value = conflict.aiSelection.index;
+          dropdown.classList.add('auto-resolved-ai');
+
+          console.log(`✅ 自動解決: ${conflict.field} → AI選択 (信頼度: ${conflict.aiSelection.confidence}%)`);
+
+          // 信頼度バッジを更新
+          showConfidenceBadge(conflict.field, conflict.aiSelection.confidence, 'ai-auto');
+
+        } else {
+          // 中程度の信頼度: 手動選択を維持し、確認を促す
+          dropdown.classList.add('needs-user-confirmation');
+
+          console.log(`⚠️ 確認要求: ${conflict.field} → 手動選択維持、確認推奨`);
+
+          // 確認バッジを表示
+          showConfidenceBadge(conflict.field, 100, 'manual-confirm');
+        }
+      });
+
+      // 🎯 競合解決結果の通知
+      displayConflictResolutionResults(conflictStatus);
+
+      // グローバル状態の更新
+      window.currentAIMapping = mapping;
+      window.conflictResolutionStatus = conflictStatus;
+
+    } catch (error) {
+      console.error('handleColumnSelectionConflicts エラー:', error);
+      showError('列設定の競合解決中にエラーが発生しました');
+    }
+  }
+
+  /**
+   * 競合解決結果の表示
+   * @param {Object} conflictStatus - 競合状態分析結果
+   */
+  function displayConflictResolutionResults(conflictStatus) {
+    try {
+      const autoResolved = conflictStatus.conflicts.filter(c => c.severity === 'high').length;
+      const needsConfirmation = conflictStatus.conflicts.filter(c => c.severity === 'medium').length;
+
+      let message = '🔧 列設定の競合を解決しました:\n';
+
+      if (autoResolved > 0) {
+        message += `• ${autoResolved}件を自動解決（高信頼度AI検出採用）\n`;
+      }
+
+      if (needsConfirmation > 0) {
+        message += `• ${needsConfirmation}件の確認が必要（手動選択維持）`;
+      }
+
+      showInfo(message, 8000);
+
+      // 詳細情報パネルの更新
+      updateConflictInfoPanel(conflictStatus);
+
+    } catch (error) {
+      console.error('displayConflictResolutionResults エラー:', error);
+    }
+  }
+
+  /**
+   * 競合情報パネルの更新
+   * @param {Object} conflictStatus - 競合状態分析結果
+   */
+  function updateConflictInfoPanel(conflictStatus) {
+    try {
+      const infoPanel = document.getElementById('column-conflict-info');
+      if (!infoPanel) return;
+
+      if (conflictStatus.hasConflicts) {
+        infoPanel.classList.remove('hidden');
+        infoPanel.innerHTML = `
+          <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 mt-4">
+            <h4 class="text-yellow-400 font-medium mb-2">🔧 列設定競合解決状況</h4>
+            <div class="text-sm text-yellow-200 space-y-1">
+              ${conflictStatus.recommendations.map(rec =>
+                `<div>• ${rec.message}</div>`
+              ).join('')}
+            </div>
+          </div>
+        `;
+      } else {
+        infoPanel.classList.add('hidden');
+      }
+
+    } catch (error) {
+      console.error('updateConflictInfoPanel エラー:', error);
+    }
+  }
+
+
+  // 🎯 AI検出結果をドロップダウンの初期選択として設定（競合解決強化版）
   function setAIDetectionSelections(mapping, dropdowns, confidence = {}) {
-    console.log('setAIDetectionSelections:', mapping, 'confidence:', confidence);
+    console.log('🔍 setAIDetectionSelections: AI検出と手動設定の競合解決開始', { mapping, confidence });
+
+    // 🛡️ 競合状態の事前チェック
+    const conflictStatus = analyzeColumnSelectionConflicts(mapping, dropdowns, confidence);
+    if (conflictStatus.hasConflicts) {
+      console.warn('⚠️ AI検出と手動設定の競合検出:', conflictStatus.conflicts);
+      return handleColumnSelectionConflicts(conflictStatus, mapping, dropdowns, confidence);
+    }
 
     // 防御的チェック: mappingがundefined/nullの場合は早期リターン
     if (!mapping || typeof mapping !== 'object') {
@@ -2390,12 +2635,25 @@
     // グローバル変数として現在のAI検出結果を保存
     window.currentAIMapping = mapping;
 
-    // マッピングの対応関係（バックエンドのconvertIndicesToMappingと統一）
+    // 🎯 統一マッピングキー（バックエンドのgetHeaderPatterns()と完全統一）
     const mappingKeys = {
-      answer: ['answer'], // バックエンドのCONSTANTS.COLUMNS.OPINION → answer
-      reason: ['reason'], // バックエンドのCONSTANTS.COLUMNS.REASON → reason
-      class: ['class'], // バックエンドのCONSTANTS.COLUMNS.CLASS → class
-      name: ['name'], // バックエンドのCONSTANTS.COLUMNS.NAME → name
+      // 基本フィールド（管理パネル対応）
+      answer: ['answer'], // バックエンド: answer フィールド
+      reason: ['reason'], // バックエンド: reason フィールド
+      class: ['class'], // バックエンド: class フィールド
+      name: ['name'], // バックエンド: name フィールド
+
+      // 拡張フィールド（将来対応・デバッグ用）
+      timestamp: ['timestamp'], // バックエンド: timestamp フィールド
+      email: ['email'], // バックエンド: email フィールド
+
+      // リアクション列（システム内部用）
+      understand: ['understand'], // バックエンド: understand フィールド
+      like: ['like'], // バックエンド: like フィールド
+      curious: ['curious'], // バックエンド: curious フィールド
+
+      // ハイライト列（システム内部用）
+      highlight: ['highlight'] // バックエンド: highlight フィールド
     };
 
     let detectedCount = 0;
@@ -2454,7 +2712,7 @@
           statusMessage = `信頼度不足 (${Math.round(columnConfidence)}%)`;
         }
 
-        console.log(`🔍 AI判定: ${columnType}列 - ${statusMessage} (最高値: ${Math.round(maxConfidence)}%)`);
+        console.log(`🔍 AI判定: ${columnType}列 - ${statusMessage} (信頼度: ${Math.round(columnConfidence)}%)`);
         showConfidenceBadge(columnType, columnConfidence, badgeType);
       }
     });
@@ -2477,6 +2735,334 @@
     const aiInfo = document.getElementById('ai-detection-info');
     if (aiInfo) {
       aiInfo.classList.remove('hidden');
+    }
+  }
+
+  // ===========================================
+  // 🔗 統合テスト・最終検証システム
+  // ===========================================
+
+  /**
+   * システム全体の列判定統合テスト実行
+   */
+  function runIntegratedColumnTest() {
+    if (!ClientMutex.acquire('runIntegratedColumnTest')) {
+      showInfo('統合テストを実行中です…');
+      return;
+    }
+
+    try {
+      console.log('🔍 runIntegratedColumnTest: 統合テスト開始');
+
+      // 現在の設定を収集
+      const currentConfig = gatherConfiguration();
+      const headers = window.currentHeaders || [];
+      const columnMapping = currentConfig.columnMapping || {};
+
+      if (!headers.length) {
+        showError('統合テストには先にデータソース接続が必要です');
+        ClientMutex.release('runIntegratedColumnTest');
+        return;
+      }
+
+      // サンプルデータの生成
+      const sampleData = generateTestSampleData(headers);
+
+      // バックエンド統合診断API呼び出し
+      google.script.run
+        .withSuccessHandler(function(diagnosticsResult) {
+          console.log('✅ 統合診断結果:', diagnosticsResult);
+          displayIntegratedTestResults(diagnosticsResult);
+          ClientMutex.release('runIntegratedColumnTest');
+        })
+        .withFailureHandler(function(error) {
+          console.error('❌ 統合診断エラー:', error);
+          showError('統合診断中にエラーが発生しました');
+          ClientMutex.release('runIntegratedColumnTest');
+        })
+        .performIntegratedColumnDiagnostics(headers, columnMapping, sampleData);
+
+      showInfo('列判定システムの統合診断を実行中…', 3000);
+
+    } catch (error) {
+      console.error('runIntegratedColumnTest エラー:', error);
+      showError('統合テストの開始に失敗しました');
+      ClientMutex.release('runIntegratedColumnTest');
+    }
+  }
+
+  /**
+   * テスト用サンプルデータ生成
+   * @param {Array} headers - ヘッダー配列
+   * @returns {Array} サンプルデータ
+   */
+  function generateTestSampleData(headers) {
+    const sampleData = [];
+
+    try {
+      // サンプルデータ行を生成
+      const testRow = Array(headers.length).fill(null);
+
+      headers.forEach((header, index) => {
+        const headerLower = String(header).toLowerCase();
+
+        if (headerLower.includes('timestamp') || headerLower.includes('日時')) {
+          testRow[index] = '2025/09/20 10:30:00';
+        } else if (headerLower.includes('email') || headerLower.includes('メール')) {
+          testRow[index] = 'test@example.com';
+        } else if (headerLower.includes('answer') || headerLower.includes('回答')) {
+          testRow[index] = 'テスト回答データ';
+        } else if (headerLower.includes('reason') || headerLower.includes('理由')) {
+          testRow[index] = 'テスト理由データ';
+        } else if (headerLower.includes('class') || headerLower.includes('クラス')) {
+          testRow[index] = '1年A組';
+        } else if (headerLower.includes('name') || headerLower.includes('名前')) {
+          testRow[index] = 'テスト太郎';
+        } else {
+          testRow[index] = `テストデータ${index + 1}`;
+        }
+      });
+
+      sampleData.push(testRow);
+      console.log('📊 generateTestSampleData: サンプルデータ生成完了', sampleData);
+
+      return sampleData;
+
+    } catch (error) {
+      console.error('generateTestSampleData エラー:', error);
+      return [[]];
+    }
+  }
+
+  /**
+   * 統合テスト結果の表示
+   * @param {Object} diagnostics - 診断結果
+   */
+  function displayIntegratedTestResults(diagnostics) {
+    try {
+      console.log('📊 displayIntegratedTestResults: 結果表示開始');
+
+      // 結果パネルを取得または作成
+      let resultsPanel = document.getElementById('integrated-test-results');
+      if (!resultsPanel) {
+        resultsPanel = createIntegratedTestResultsPanel();
+      }
+
+      // 結果コンテンツの生成
+      const resultsHTML = generateTestResultsHTML(diagnostics);
+      resultsPanel.innerHTML = resultsHTML;
+
+      // パネル表示
+      resultsPanel.classList.remove('hidden');
+
+      // 結果に応じた通知
+      if (diagnostics.summary.overallScore >= 90) {
+        showSuccess(`✅ 列判定システム検証完了！総合スコア: ${diagnostics.summary.overallScore}%`);
+      } else if (diagnostics.summary.overallScore >= 70) {
+        showInfo(`⚠️ 列判定システムに改善余地あり。総合スコア: ${diagnostics.summary.overallScore}%`);
+      } else {
+        showError(`❌ 列判定システムに問題があります。総合スコア: ${diagnostics.summary.overallScore}%`);
+      }
+
+      // 推奨事項の表示
+      if (diagnostics.recommendations.length > 0) {
+        const criticalRecs = diagnostics.recommendations.filter(r => r.priority === 'critical');
+        if (criticalRecs.length > 0) {
+          showError(`重要: ${criticalRecs[0].message}`);
+        }
+      }
+
+    } catch (error) {
+      console.error('displayIntegratedTestResults エラー:', error);
+      showError('テスト結果の表示に失敗しました');
+    }
+  }
+
+  /**
+   * 統合テスト結果パネルの作成
+   * @returns {HTMLElement} 結果パネル要素
+   */
+  function createIntegratedTestResultsPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'integrated-test-results';
+    panel.className = 'hidden mt-6 p-4 bg-gray-900/50 border border-gray-600 rounded-lg';
+
+    // 適切な挿入位置を見つける
+    const insertAfter = document.getElementById('ai-detection-info') ||
+                       document.querySelector('section[data-section="column-mapping"]') ||
+                       document.querySelector('.column-mapping-section');
+
+    if (insertAfter && insertAfter.parentNode) {
+      insertAfter.parentNode.insertBefore(panel, insertAfter.nextSibling);
+    } else {
+      document.body.appendChild(panel);
+    }
+
+    return panel;
+  }
+
+  /**
+   * テスト結果HTML生成
+   * @param {Object} diagnostics - 診断結果
+   * @returns {string} 生成されたHTML
+   */
+  function generateTestResultsHTML(diagnostics) {
+    const overallScore = diagnostics.summary.overallScore;
+    const scoreColor = overallScore >= 90 ? 'green' : overallScore >= 70 ? 'yellow' : 'red';
+
+    let html = `
+      <div class="mb-4">
+        <h3 class="text-lg font-semibold text-white mb-2">🔍 列判定システム統合診断結果</h3>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div class="bg-gray-800 p-3 rounded">
+            <div class="text-sm text-gray-400">総合スコア</div>
+            <div class="text-xl font-bold text-${scoreColor}-400">${overallScore}%</div>
+          </div>
+          <div class="bg-gray-800 p-3 rounded">
+            <div class="text-sm text-gray-400">重大な問題</div>
+            <div class="text-xl font-bold text-red-400">${diagnostics.summary.criticalIssues || 0}件</div>
+          </div>
+          <div class="bg-gray-800 p-3 rounded">
+            <div class="text-sm text-gray-400">警告</div>
+            <div class="text-xl font-bold text-yellow-400">${diagnostics.summary.warnings || 0}件</div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // システム健全性
+    if (diagnostics.systemHealth) {
+      html += generateSystemHealthHTML(diagnostics.systemHealth);
+    }
+
+    // フィールドテスト結果
+    if (diagnostics.columnTests) {
+      html += generateFieldTestsHTML(diagnostics.columnTests);
+    }
+
+    // 推奨事項
+    if (diagnostics.recommendations && diagnostics.recommendations.length > 0) {
+      html += generateRecommendationsHTML(diagnostics.recommendations);
+    }
+
+    html += `
+      <div class="text-xs text-gray-500 mt-4">
+        診断実行時刻: ${new Date(diagnostics.timestamp).toLocaleString()}
+      </div>
+    `;
+
+    return html;
+  }
+
+  /**
+   * システム健全性HTML生成
+   * @param {Object} systemHealth - システム健全性データ
+   * @returns {string} HTML
+   */
+  function generateSystemHealthHTML(systemHealth) {
+    return `
+      <div class="mb-4">
+        <h4 class="font-medium text-white mb-2">システム健全性</h4>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+          <div class="flex justify-between p-2 bg-gray-800 rounded">
+            <span>バックエンド:</span>
+            <span class="text-${getStatusColor(systemHealth.backend.status)}-400">
+              ${systemHealth.backend.score}% (${systemHealth.backend.status})
+            </span>
+          </div>
+          <div class="flex justify-between p-2 bg-gray-800 rounded">
+            <span>フロントエンド:</span>
+            <span class="text-${getStatusColor(systemHealth.frontend.status)}-400">
+              ${systemHealth.frontend.score}% (${systemHealth.frontend.status})
+            </span>
+          </div>
+          <div class="flex justify-between p-2 bg-gray-800 rounded">
+            <span>統合:</span>
+            <span class="text-${getStatusColor(systemHealth.integration.status)}-400">
+              ${systemHealth.integration.score}% (${systemHealth.integration.status})
+            </span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * フィールドテストHTML生成
+   * @param {Object} columnTests - フィールドテスト結果
+   * @returns {string} HTML
+   */
+  function generateFieldTestsHTML(columnTests) {
+    let html = `
+      <div class="mb-4">
+        <h4 class="font-medium text-white mb-2">フィールド別テスト結果</h4>
+        <div class="space-y-1 text-sm">
+    `;
+
+    Object.entries(columnTests).forEach(([field, test]) => {
+      const statusIcon = test.resolved ? '✅' : '❌';
+      const severityColor = test.severity === 'critical' ? 'red' : test.severity === 'warning' ? 'yellow' : 'green';
+
+      html += `
+        <div class="flex justify-between items-center p-2 bg-gray-800 rounded">
+          <span>${statusIcon} ${field}</span>
+          <span class="text-${severityColor}-400">
+            ${test.resolved ? `${test.confidence}% (${test.method})` : 'Not Resolved'}
+          </span>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    return html;
+  }
+
+  /**
+   * 推奨事項HTML生成
+   * @param {Array} recommendations - 推奨事項
+   * @returns {string} HTML
+   */
+  function generateRecommendationsHTML(recommendations) {
+    let html = `
+      <div class="mb-4">
+        <h4 class="font-medium text-white mb-2">推奨事項</h4>
+        <div class="space-y-2 text-sm">
+    `;
+
+    recommendations.forEach(rec => {
+      const priorityColor = rec.priority === 'critical' ? 'red' : rec.priority === 'high' ? 'orange' : 'yellow';
+      html += `
+        <div class="p-2 bg-gray-800 rounded">
+          <div class="text-${priorityColor}-400 font-medium">${rec.priority.toUpperCase()}</div>
+          <div class="text-gray-300">${rec.message}</div>
+        </div>
+      `;
+    });
+
+    html += `
+        </div>
+      </div>
+    `;
+
+    return html;
+  }
+
+  /**
+   * ステータスに対応する色を取得
+   * @param {string} status - ステータス
+   * @returns {string} 色名
+   */
+  function getStatusColor(status) {
+    switch (status) {
+      case 'healthy': return 'green';
+      case 'warning': return 'yellow';
+      case 'critical': return 'red';
+      case 'error': return 'red';
+      default: return 'gray';
     }
   }
 
@@ -2864,7 +3450,236 @@
     console.log(`✅ 検証結果を表示しました: ${badgesAdded}個のバッジを追加`);
   }
 
-  // 列設定の保存
+  // ===========================================
+  // 🛡️ 列設定保存の検証・堅牢化システム
+  // ===========================================
+
+  /**
+   * 列設定データの包括的検証
+   * @param {string} spreadsheetId - スプレッドシートID
+   * @param {string} sheetName - シート名
+   * @param {Array} headers - ヘッダー配列
+   * @param {Object} columnMapping - 列マッピング
+   * @returns {Object} 検証結果
+   */
+  function validateColumnConfigurationData(spreadsheetId, sheetName, headers, columnMapping) {
+    const validation = {
+      isValid: true,
+      errors: [],
+      warnings: [],
+      recommendations: []
+    };
+
+    try {
+      // 🔍 基本パラメータ検証
+      if (!spreadsheetId || typeof spreadsheetId !== 'string' || spreadsheetId.trim() === '') {
+        validation.errors.push('スプレッドシートIDが無効です');
+        validation.isValid = false;
+      }
+
+      if (!sheetName || typeof sheetName !== 'string' || sheetName.trim() === '') {
+        validation.errors.push('シート名が無効です');
+        validation.isValid = false;
+      }
+
+      // 🔍 ヘッダー配列検証
+      if (!Array.isArray(headers) || headers.length === 0) {
+        validation.errors.push('ヘッダー配列が無効または空です');
+        validation.isValid = false;
+      } else {
+        const emptyHeaders = headers.filter((h, i) => !h || String(h).trim() === '');
+        if (emptyHeaders.length > 0) {
+          validation.warnings.push(`${emptyHeaders.length}個の空ヘッダーがあります`);
+        }
+      }
+
+      // 🔍 列マッピング検証
+      if (!columnMapping || typeof columnMapping !== 'object') {
+        validation.errors.push('列マッピングが無効です');
+        validation.isValid = false;
+      } else {
+        const mappingData = columnMapping.mapping || columnMapping;
+        const confidenceData = columnMapping.confidence || {};
+
+        // 必須フィールドの確認
+        const requiredFields = ['answer'];
+        const missingRequired = requiredFields.filter(field =>
+          mappingData[field] === undefined || mappingData[field] === null || mappingData[field] < 0
+        );
+
+        if (missingRequired.length > 0) {
+          validation.errors.push(`必須フィールドが不足: ${missingRequired.join(', ')}`);
+          validation.isValid = false;
+        }
+
+        // 列インデックスの妥当性確認
+        Object.keys(mappingData).forEach(field => {
+          const index = mappingData[field];
+          if (typeof index === 'number') {
+            if (index < 0) {
+              validation.errors.push(`${field}フィールドの列インデックスが負の値です`);
+              validation.isValid = false;
+            } else if (headers && index >= headers.length) {
+              validation.errors.push(`${field}フィールドの列インデックス(${index})がヘッダー範囲外です`);
+              validation.isValid = false;
+            }
+          }
+        });
+
+        // 信頼度データの確認
+        const lowConfidenceFields = Object.keys(confidenceData).filter(field =>
+          confidenceData[field] < 30
+        );
+        if (lowConfidenceFields.length > 0) {
+          validation.warnings.push(`低信頼度フィールド: ${lowConfidenceFields.join(', ')}`);
+          validation.recommendations.push('管理パネルで手動調整を検討してください');
+        }
+
+        // 重複列検出
+        const usedIndices = Object.values(mappingData).filter(v => typeof v === 'number' && v >= 0);
+        const duplicateIndices = usedIndices.filter((index, i, arr) => arr.indexOf(index) !== i);
+        if (duplicateIndices.length > 0) {
+          validation.warnings.push(`重複列インデックス: ${duplicateIndices.join(', ')}`);
+          validation.recommendations.push('異なるフィールドが同じ列を指しています');
+        }
+      }
+
+      // 🎯 設定品質スコア算出
+      if (validation.isValid) {
+        validation.qualityScore = calculateConfigurationQualityScore(headers, columnMapping);
+        if (validation.qualityScore < 70) {
+          validation.warnings.push(`設定品質スコア: ${validation.qualityScore}% - 改善余地あり`);
+        }
+      }
+
+      console.log('🛡️ validateColumnConfigurationData結果:', validation);
+      return validation;
+
+    } catch (error) {
+      console.error('validateColumnConfigurationData エラー:', error);
+      return {
+        isValid: false,
+        errors: ['検証処理中にエラーが発生しました'],
+        error: error.message
+      };
+    }
+  }
+
+  /**
+   * 設定品質スコア算出
+   * @param {Array} headers - ヘッダー配列
+   * @param {Object} columnMapping - 列マッピング
+   * @returns {number} 品質スコア (0-100)
+   */
+  function calculateConfigurationQualityScore(headers, columnMapping) {
+    let score = 0;
+    const maxScore = 100;
+
+    try {
+      const mappingData = columnMapping.mapping || columnMapping;
+      const confidenceData = columnMapping.confidence || {};
+
+      // 基本フィールド存在 (40点)
+      const basicFields = ['answer', 'reason', 'class', 'name'];
+      const definedFields = basicFields.filter(field =>
+        mappingData[field] !== undefined && mappingData[field] !== null && mappingData[field] >= 0
+      );
+      score += (definedFields.length / basicFields.length) * 40;
+
+      // 信頼度の高さ (30点)
+      const avgConfidence = Object.values(confidenceData).length > 0
+        ? Object.values(confidenceData).reduce((sum, conf) => sum + conf, 0) / Object.values(confidenceData).length
+        : 50;
+      score += (avgConfidence / 100) * 30;
+
+      // ヘッダー品質 (20点)
+      const headerQuality = headers ?
+        headers.filter(h => h && String(h).trim() !== '').length / headers.length * 100 : 0;
+      score += (headerQuality / 100) * 20;
+
+      // マッピング一意性 (10点)
+      const usedIndices = Object.values(mappingData).filter(v => typeof v === 'number' && v >= 0);
+      const uniqueness = usedIndices.length > 0 ?
+        new Set(usedIndices).size / usedIndices.length * 100 : 100;
+      score += (uniqueness / 100) * 10;
+
+      return Math.round(Math.max(0, Math.min(maxScore, score)));
+
+    } catch (error) {
+      console.error('calculateConfigurationQualityScore エラー:', error);
+      return 50; // デフォルトスコア
+    }
+  }
+
+  /**
+   * 設定保存のリトライ機構
+   * @param {Object} config - 保存する設定
+   * @param {number} maxRetries - 最大リトライ回数
+   * @returns {Promise} 保存結果
+   */
+  function saveConfigurationWithRetry(config, maxRetries = 3) {
+    return new Promise((resolve, reject) => {
+      let attempt = 0;
+
+      function attemptSave() {
+        attempt++;
+        console.log(`🔄 設定保存試行 ${attempt}/${maxRetries}`);
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result.success) {
+              console.log(`✅ 設定保存成功 (試行 ${attempt})`);
+              resolve(result);
+            } else {
+              console.warn(`⚠️ 設定保存失敗 (試行 ${attempt}):`, result.error);
+              if (attempt < maxRetries) {
+                // CLAUDE.md準拠: Promise-based指数バックオフ (setTimeout代替)
+                const delay = Math.pow(2, attempt) * 1000;
+                new Promise(resolve => {
+                  const startTime = Date.now();
+                  const checkTime = () => {
+                    if (Date.now() - startTime >= delay) {
+                      resolve();
+                    } else {
+                      requestAnimationFrame(checkTime);
+                    }
+                  };
+                  checkTime();
+                }).then(attemptSave);
+              } else {
+                reject(new Error(result.error || '設定保存に失敗しました'));
+              }
+            }
+          })
+          .withFailureHandler(function(error) {
+            console.error(`❌ 設定保存エラー (試行 ${attempt}):`, error);
+            if (attempt < maxRetries) {
+              // CLAUDE.md準拠: Promise-based指数バックオフ (setTimeout代替)
+              const delay = Math.pow(2, attempt) * 1000;
+              new Promise(resolve => {
+                const startTime = Date.now();
+                const checkTime = () => {
+                  if (Date.now() - startTime >= delay) {
+                    resolve();
+                  } else {
+                    requestAnimationFrame(checkTime);
+                  }
+                };
+                checkTime();
+              }).then(attemptSave);
+            } else {
+              reject(error);
+            }
+          })
+          .saveConfig(config);
+      }
+
+      attemptSave();
+    });
+  }
+
+
+  // 🔒 列設定の保存（堅牢化版）
   function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping) {
     // 🔧 CLAUDE.md準拠: ClientMutexで重複実行防止
     if (!ClientMutex.acquire('saveColumnConfiguration')) {
@@ -2872,8 +3687,17 @@
       return;
     }
 
-    // 🎯 ConfigJson最適化: 重複防止の単一責任設計
-    const timestamp = new Date().toISOString();
+    try {
+      // 🛡️ 入力データの検証
+      const validationResult = validateColumnConfigurationData(spreadsheetId, sheetName, headers, columnMapping);
+      if (!validationResult.isValid) {
+        showError(`列設定の検証に失敗: ${validationResult.errors.join(', ')}`);
+        ClientMutex.release('saveColumnConfiguration');
+        return;
+      }
+
+      // 🎯 ConfigJson最適化: 重複防止の単一責任設計
+      const timestamp = new Date().toISOString();
 
     const baseConfig = {
       spreadsheetId,

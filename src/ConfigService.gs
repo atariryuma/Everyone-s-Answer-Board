@@ -351,17 +351,17 @@ function generateUserPermissions(_userId) {
       };
     }
 
-    const isAdministrator = isAdministrator(currentEmail);
+    const isAdmin = isAdministrator(currentEmail);
 
     return {
       isEditor: true, // 現在のユーザーは自分の設定の編集者
-      isAdministrator,
-      accessLevel: isAdministrator ? 'administrator' : 'editor',
+      isAdministrator: isAdmin,
+      accessLevel: isAdmin ? 'administrator' : 'editor',
       canEdit: true,
       canView: true,
       canReact: true,
-      canDelete: isAdministrator,
-      canManageUsers: isAdministrator
+      canDelete: isAdmin,
+      canManageUsers: isAdmin
     };
 
   } catch (error) {

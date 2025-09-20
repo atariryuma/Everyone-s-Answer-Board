@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getDataWithServiceAccount */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, getColumnAnalysis, validateConfig, dsAddReaction, dsToggleHighlight, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getDataWithServiceAccount */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -1228,11 +1228,9 @@ function getPublishedSheetData(classFilter, sortOrder) {
     // Zero-dependency: 直接DB操作でユーザー取得
     let db = null;
     try {
-      if (typeof DB !== 'undefined' && DB) {
-        db = DB;
-      } else {
-        console.warn('Database service not available');
-      }
+      // GAS-Native: Direct database access (Zero-Dependency Architecture)
+      // eslint-disable-next-line no-undef
+      db = openDatabase();
     } catch (dbError) {
       console.error('❌ DB initialization error:', dbError.message);
     }
@@ -1330,23 +1328,6 @@ function getPublishedSheetData(classFilter, sortOrder) {
   }
 }
 
-/**
- * 🎯 API Gateway: 列分析（AI自動判定）
- * @param {string} spreadsheetId スプレッドシートID
- * @param {string} sheetName シート名
- * @returns {Object} 列分析結果
- */
-function analyzeColumns(spreadsheetId, sheetName) {
-  try {
-    const result = analyzeColumnStructure(spreadsheetId, sheetName);
-    return result;
-  } catch (error) {
-    console.error('analyzeColumns error:', error.message);
-    console.error('analyzeColumns stack:', error.stack);
-    const exceptionResult = createExceptionResponse(error);
-    return exceptionResult;
-  }
-}
 
 
 // ===========================================
@@ -1466,8 +1447,8 @@ function saveConfig(config, options = {}) {
 
   } catch (error) {
     const operation = options.isDraft ? 'saveDraft' : 'saveConfig';
-    console.error(`${operation} error:`, error.message);
-    return { success: false, message: error.message };
+    console.error(`${operation} error:`, error && error.message ? error.message : 'エラー詳細不明');
+    return { success: false, message: error && error.message ? error.message : 'エラーが発生しました' };
   }
 }
 
@@ -1701,6 +1682,37 @@ function processBatchDataSourceOperations(spreadsheetId, sheetName, operations) 
           } else {
             results.success = false;
             results.error = connectionResult.errorResponse?.message || connectionResult.message;
+          }
+          break;
+        }
+        case 'integratedAnalysis': {
+          // 🎯 新機能: 最適化された統合分析（接続+AI分析を1回で実行）
+          const integratedResult = getColumnAnalysis(spreadsheetId, sheetName);
+          if (integratedResult.success) {
+            // 接続とAI分析の両方の結果を統合
+            results.batchResults.connection = {
+              success: true,
+              sheet: integratedResult.sheet,
+              headers: integratedResult.headers,
+              data: integratedResult.data
+            };
+            results.batchResults.analysis = {
+              success: true,
+              mapping: integratedResult.mapping,
+              confidence: integratedResult.confidence
+            };
+            // バッチ結果のルートレベルにも配置（互換性維持）
+            results.mapping = integratedResult.mapping;
+            results.confidence = integratedResult.confidence;
+            results.headers = integratedResult.headers;
+            console.log('integratedAnalysis: 統合分析完了', {
+              mappingKeys: Object.keys(integratedResult.mapping || {}),
+              confidenceKeys: Object.keys(integratedResult.confidence || {}),
+              headers: integratedResult.headers?.length || 0
+            });
+          } else {
+            results.success = false;
+            results.error = integratedResult.message;
           }
           break;
         }
@@ -2081,88 +2093,15 @@ function refreshBoardData(userId, options = {}) {
       return createAuthError();
     }
 
-    // Call DataController function if available
-    if (typeof DataController !== 'undefined' && DataController.refreshBoardData) {
-      return DataController.refreshBoardData(userId, options);
-    }
-
-    // Fallback to DataService approach
-    const user = findUserById(userId);
-    if (!user) {
-      return createUserNotFoundError();
-    }
-
-    // Get fresh sheet data
-    const sheetResult = dsGetUserSheetData(userId, {
-      forceRefresh: true,
-      includeMetadata: true,
-      ...options
-    });
-
-    return {
-      success: sheetResult.success,
-      data: sheetResult.data || [],
-      message: sheetResult.success ? 'Board data refreshed successfully' : sheetResult.message,
-      timestamp: new Date().toISOString(),
-      userId
-    };
+    // GAS-Native: Direct function call (Zero-Dependency Architecture)
+    return refreshBoardData(userId, options);
 
   } catch (error) {
-    console.error('refreshBoardData error:', error.message);
+    console.error('refreshBoardData error:', error && error.message ? error.message : 'エラー詳細不明');
     return createExceptionResponse(error, 'Failed to refresh board data');
   }
 }
 
-/**
- * Check current publication status
- * @param {string} targetUserId - Target user ID
- * @returns {Object} Publication status
- */
-function checkCurrentPublicationStatus(targetUserId) {
-  try {
-    console.log('📋 checkCurrentPublicationStatus START:', { targetUserId });
-
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
-
-    // Call SystemController function if available
-    if (typeof SystemController !== 'undefined' && SystemController.checkCurrentPublicationStatus) {
-      return SystemController.checkCurrentPublicationStatus(targetUserId);
-    }
-
-    // Fallback implementation
-    const user = findUserById(targetUserId);
-    if (!user) {
-      return createUserNotFoundError();
-    }
-
-    const configResult = getUserConfig(targetUserId);
-    if (!configResult.success) {
-      return {
-        success: false,
-        message: 'Failed to get user configuration',
-        isPublished: false
-      };
-    }
-
-    const isPublished = Boolean(configResult.config.isPublished);
-
-    return {
-      success: true,
-      isPublished,
-      targetUserId,
-      publishedUrl: isPublished ? configResult.config.publishedUrl : null,
-      message: isPublished ? 'Application is published' : 'Application is not published',
-      timestamp: new Date().toISOString()
-    };
-
-  } catch (error) {
-    console.error('checkCurrentPublicationStatus error:', error.message);
-    return createExceptionResponse(error, 'Failed to check publication status');
-  }
-}
 
 /**
  * Perform auto repair on system
@@ -2182,12 +2121,7 @@ function performAutoRepair() {
       return createAdminRequiredError();
     }
 
-    // Call SystemController function if available
-    if (typeof SystemController !== 'undefined' && SystemController.performAutoRepair) {
-      return SystemController.performAutoRepair();
-    }
-
-    // Fallback auto repair implementation
+    // GAS-Native: Direct auto repair implementation
     const repairSteps = [];
     let allSuccess = true;
 
@@ -2250,12 +2184,7 @@ function forceUrlSystemReset() {
       return createAdminRequiredError();
     }
 
-    // Call SystemController function if available
-    if (typeof SystemController !== 'undefined' && SystemController.forceUrlSystemReset) {
-      return SystemController.forceUrlSystemReset();
-    }
-
-    // Fallback implementation - clear URL-related cache and properties
+    // GAS-Native: Direct implementation - clear URL-related cache and properties
     try {
       // Clear script properties related to URLs
       const properties = PropertiesService.getScriptProperties();
@@ -2317,11 +2246,7 @@ function publishApplication(publishConfig) {
       return createAdminRequiredError();
     }
 
-    // Call SystemController function if available
-    if (typeof SystemController !== 'undefined' && SystemController.publishApplication) {
-      return SystemController.publishApplication(publishConfig);
-    }
-
+    // GAS-Native: Direct implementation
     // Basic validation
     if (!publishConfig || typeof publishConfig !== 'object') {
       return {
@@ -2390,6 +2315,7 @@ function publishApplication(publishConfig) {
  * @param {string} sheetName - Sheet name
  * @returns {Object} Form information
  */
+
 function getFormInfo(spreadsheetId, sheetName) {
   try {
     console.log('📋 getFormInfo START:', { spreadsheetId, sheetName });
@@ -2399,11 +2325,7 @@ function getFormInfo(spreadsheetId, sheetName) {
       return createAuthError();
     }
 
-    // Call SystemController function if available
-    if (typeof SystemController !== 'undefined' && SystemController.getFormInfo) {
-      return SystemController.getFormInfo(spreadsheetId, sheetName);
-    }
-
+    // GAS-Native: Direct implementation
     // Validate inputs
     if (!spreadsheetId || !sheetName) {
       return {
@@ -2444,16 +2366,33 @@ function getFormInfo(spreadsheetId, sheetName) {
         console.warn('Could not get form URL from properties:', propError.message);
       }
 
+      // 🛡️ CLAUDE.md準拠: フロントエンド互換性のためのformData構造
+      const formData = {
+        formUrl,
+        formTitle: sheetName,
+        spreadsheetName: spreadsheet.getName(),
+        sheetName,
+        detectionDetails: {
+          method: 'fallback',
+          confidence: formUrl ? 80 : 20,
+          accessMethod: 'user',
+          timestamp: new Date().toISOString()
+        }
+      };
+
       return {
         success: true,
+        status: formUrl ? 'FORM_LINK_FOUND' : 'FORM_NOT_LINKED',
+        message: formUrl ? 'Form information retrieved successfully' : 'Form information retrieved (no URL found)',
+        formData, // フロントエンド互換性
+        // 追加の互換性フィールド
         spreadsheetId,
         sheetName,
         formUrl,
-        dataRows: Math.max(0, lastRow - 1), // Exclude header row
+        dataRows: Math.max(0, lastRow - 1),
         columns: lastColumn,
         headers: headers.filter(h => h && h.toString().trim()),
-        lastUpdated: new Date().toISOString(),
-        message: 'Form information retrieved successfully'
+        lastUpdated: new Date().toISOString()
       };
 
     } catch (sheetError) {

@@ -154,12 +154,6 @@ function validateUserData(userData) {
     return result;
 }
 
-// validateEmail function moved to validators.gs for CLAUDE.md compliance
-
-// validateText function moved to validators.gs for CLAUDE.md compliance
-
-// validateUrl function moved to validators.gs for CLAUDE.md compliance
-
 // ===========================================
 // 🔒 アクセス制御・権限管理
 // ===========================================

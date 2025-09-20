@@ -119,6 +119,7 @@ class StudyQuestApp {
       isLoading: false,
       lastFocusedElement: null,
       isEditor: window.isEditor,
+      isAdminUser: false, // Initialize as false, will be set by checkAdmin() call
       showCounts: window.showCounts,
       displayMode: window.displayMode,
       sheetName: SHEET_NAME,
@@ -724,6 +725,16 @@ class StudyQuestApp {
       
       // Apply default low performance tweaks
       this.optimizeForLowPerformance();
+
+      // Initialize admin user status early in the initialization process
+      try {
+        const isAdmin = await this.gas.checkAdmin();
+        this.state.isAdminUser = Boolean(isAdmin);
+        debugLog('🔑 Admin user status initialized:', { isAdminUser: this.state.isAdminUser });
+      } catch (error) {
+        warnLog('⚠️ Failed to initialize admin status, defaulting to false:', error.message);
+        this.state.isAdminUser = false;
+      }
 
       // Show info modal while loading sheet data in the background
       this.showInfoModal();
@@ -5906,24 +5917,20 @@ class StudyQuestApp {
         });
       }
       
-      // 管理モード有効時は強制的にローカル状態も更新
+      // Update local state from global variables first
+      this.updateConfigFromGlobals();
+
+      // Then apply admin mode overrides if needed (single authoritative application)
       if (enable) {
+        // Admin mode: force show names and counts regardless of server settings
         this.state.displayMode = 'named';
         this.state.showCounts = true;
         this.state.isStudentMode = false;
       } else {
+        // Viewer mode: restore server settings
         this.state.displayMode = this.serverDisplayMode;
         this.state.showCounts = this.serverShowCounts;
         this.state.isStudentMode = true;
-      }
-      
-      // Update local state from global variables (but preserve displayMode if in admin mode)
-      this.updateConfigFromGlobals();
-      
-      // Re-enforce admin mode settings after updateConfigFromGlobals
-      if (enable) {
-        this.state.displayMode = 'named';
-        this.state.showCounts = true;
       }
       
       // 管理モード切り替え後の状態を確認

@@ -3,7 +3,7 @@
 > **🎯 Project**: Google Apps Script Web Application
 > **🔧 Stack**: Zero-Dependency Architecture, Direct GAS API Calls
 > **🤖 Claude Code**: 2025 Best Practices Compliant
-> **⚡ Updated**: 2025-09-15
+> **⚡ Updated**: 2025-09-20 (Unified Naming Conventions Implemented)
 
 ## 🧠 Claude Code Core Principles
 
@@ -14,77 +14,69 @@
 3. **Code**: Implement incrementally with TDD-first approach
 4. **Commit**: Structured git workflow with proper documentation
 
-### 🎯 Project Management Philosophy
+## 🏗️ GAS-Optimized Architecture
 
-**"Claude Code as Project Manager"** - Dynamic task-driven development:
-- Living documentation with real-time task tracking
-- Context preservation across sessions
-- Flexible task switching with maintained state
-- AI-assisted progress orchestration
-
-## 🏗️ Architecture Overview
-
-### **Zero-Dependency Architecture**
-This project eliminates Google Apps Script file loading order issues through direct GAS API calls:
+**Core Pattern**: Direct GAS API calls with natural global scope utilization
 
 ```
-🌟 Architecture
-├── main.gs                    # API Gateway (Zero-Dependency)
-├── *Service.gs                # Services Layer (Direct GAS APIs)
-├── *Controller.gs             # Business Logic Controllers
-└── *.html                     # Frontend (Unified API calls)
+🌟 GAS-Native Architecture
+├── main.gs                    # Entry Point (doGet/doPost only)
+├── auth.gs                    # Authentication (unified logic)
+├── database.gs                # Database Operations (direct SpreadsheetApp)
+├── permissions.gs             # Permission Management (simple role-based)
+├── reactions.gs               # Reaction System (specialized feature)
+├── utils.gs                   # Utility Functions (shared operations)
+└── *.html                     # Frontend Templates
 ```
 
-### **Current Pattern: Direct GAS API Calls**
+### **GAS-Native Implementation Pattern**
 ```javascript
-// ✅ Current Best Practice: Direct GAS API usage
-function getCurrentEmailDirect() {
-  try {
-    return Session.getActiveUser().getEmail();
-  } catch (error) {
-    console.error('getCurrentEmailDirect error:', error.message);
-    return null;
-  }
+// ✅ Direct GAS API usage - natural global scope
+function getCurrentEmail() {
+  return Session.getActiveUser().getEmail();
 }
 
-// ✅ Service delegation with fallbacks
-function getConfig() {
-  try {
-    const email = getCurrentEmailDirect();
-    if (!email) return { success: false, message: 'Not authenticated' };
+function isAdministrator(email) {
+  const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+  return email?.toLowerCase() === adminEmail?.toLowerCase();
+}
 
-    const user = typeof DatabaseOperations !== 'undefined' ?
-      DatabaseOperations.findUserByEmail(email) : null;
+function getUserData(email) {
+  // Direct SpreadsheetApp usage for owner data
+  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+  const spreadsheet = SpreadsheetApp.openById(dbId);
+  const sheet = spreadsheet.getSheetByName('users');
+  // ... direct data operations
+}
 
-    return user ?
-      { success: true, config: JSON.parse(user.configJson || '{}') } :
-      { success: false, message: 'User not found' };
-  } catch (error) {
-    console.error('getConfig error:', error.message);
-    return { success: false, message: error.message };
+// ✅ Service Account usage - ONLY for cross-user access
+function getViewerBoardData(targetUserId, viewerEmail) {
+  const targetUser = findUserById(targetUserId);
+  if (targetUser.userEmail === viewerEmail) {
+    // Own data: use normal permissions
+    return getUserSpreadsheetData(targetUser);
+  } else {
+    // Other's data: use service account for viewer access
+    return getDataWithServiceAccount(targetUser);
   }
 }
 ```
 
 ## 🛠️ Development Commands
 
-### **Essential Development Workflow**
+### **Essential Commands**
 ```bash
-# Every Development Session:
-npm run check                   # Quality gate (MUST pass before commit)
-npm run deploy:safe             # Production deployment with validation
-npm run test:coverage           # Run tests with coverage
-npm run lint                    # ESLint with auto-fix
+# Quality Gate (MUST pass before commit)
+npm run check                   # Combined linting, testing, validation
 
 # GAS Development Cycle
 clasp push                      # Deploy to Google Apps Script
-clasp open                      # Open GAS editor
 clasp logs                      # View execution logs
+npm run deploy:safe             # Production deployment with validation
 ```
 
-### **Claude Code Best Practice Workflow**
+### **Claude Code Workflow**
 ```markdown
-## Every Development Session:
 1. Ask Claude to read CLAUDE.md - Context loading
 2. **Explore**: "Read [files] and analyze [problem] - DO NOT CODE YET"
 3. **Plan**: "Create detailed implementation plan with TodoWrite"
@@ -93,25 +85,26 @@ clasp logs                      # View execution logs
 6. **Deploy**: `npm run deploy:safe`
 ```
 
-## 📝 Google Apps Script Best Practices
+## 📝 Google Apps Script V8 Best Practices
 
-### 🎯 Performance Optimization
+### 🚨 **Critical Migration (2025)**
+- **Rhino Deprecated**: Feb 20, 2025
+- **Rhino Shutdown**: Jan 31, 2026 (scripts will stop working)
+- **Action Required**: Migrate all scripts to V8 runtime
 
-#### **Batch Operations (70x Performance Improvement)**
+### 🎯 **Performance Optimization (70x Improvement)**
+
+#### **Batch Operations**
 ```javascript
-// ✅ BEST: Batch operations (1 second execution)
+// ✅ BEST: Batch operations (1 second vs 70 seconds)
 function efficientDataProcessing() {
   const sheet = SpreadsheetApp.getActiveSheet();
   const data = sheet.getDataRange().getValues();
-
-  const processedData = data.map(row =>
-    row.map(cell => processTransformation(cell))
-  );
-
+  const processedData = data.map(row => row.map(cell => processTransformation(cell)));
   sheet.getDataRange().setValues(processedData);
 }
 
-// ❌ AVOID: Individual operations (70+ seconds)
+// ❌ AVOID: Individual operations
 function inefficientDataProcessing() {
   const sheet = SpreadsheetApp.getActiveSheet();
   for (let i = 1; i <= sheet.getLastRow(); i++) {
@@ -121,83 +114,92 @@ function inefficientDataProcessing() {
 }
 ```
 
-#### **Modern JavaScript with V8 Runtime**
+#### **Modern JavaScript (V8 Runtime)**
 ```javascript
-// ✅ V8 Runtime Features
-async function modernGASFunction() {
-  const data = await fetchDataWithRetry();
-  const message = `Processing ${data.length} records`;
-  const { users, configs } = data;
+// ✅ V8 Features: const/let, destructuring, template literals
+const { users, configs } = data;
+const message = `Processing ${data.length} records`;
 
-  const processedUsers = users.map(user => ({
-    ...user,
-    processed: true,
-    timestamp: new Date().toISOString()
-  }));
-
-  return processedUsers;
-}
-```
-
-#### **Robust Error Handling**
-```javascript
+// ✅ Error Handling with Exponential Backoff
 function executeWithRetry(operation, maxRetries = 3) {
   let retryCount = 0;
-
   while (retryCount < maxRetries) {
     try {
       return operation();
     } catch (error) {
       retryCount++;
       console.warn(`Attempt ${retryCount} failed:`, error.message);
-
-      if (retryCount >= maxRetries) {
-        throw error;
-      }
-
-      const delay = Math.pow(2, retryCount) * 1000;
-      Utilities.sleep(delay);
+      if (retryCount >= maxRetries) throw error;
+      Utilities.sleep(Math.pow(2, retryCount) * 1000);
     }
   }
 }
 ```
 
-### 🛡️ Security Best Practices
+### 🛡️ **V8 Runtime Critical Differences**
 
-#### **OAuth Scope Management**
+#### **Variable Declaration**
 ```javascript
-// appsscript.json
-{
-  "timeZone": "America/New_York",
-  "runtimeVersion": "V8",
-  "oauthScopes": [
-    "https://www.googleapis.com/auth/spreadsheets.currentonly",
-    "https://www.googleapis.com/auth/script.external_request"
-  ]
+// ✅ RECOMMENDED: Use const/let, avoid var
+const CONFIG_VALUES = { timeout: 5000, retries: 3 };
+let processedValue = null;
+
+// ❌ AVOID: var causes scope/hoisting issues
+var globalVar = 'avoid this';
+```
+
+#### **Undefined Parameter Handling**
+```javascript
+// ✅ V8-safe undefined checks
+function safeFunction(param) {
+  if (typeof param !== 'undefined' && param !== null) {
+    return param.toString();
+  }
+  return 'default value';
+}
+
+// ✅ Safe object access
+const safeValue = (myObject || {}).propertyName;
+const safeArrayValue = (myArray || [])[index];
+```
+
+#### **Template Literals with Validation**
+問題はテンプレートリテラルではなく、**変数の値が実行時に存在しない可能性**です。`+`連結に書き換えても根本解決になりません。正しい修正は**変数の存在チェック**です。
+
+```javascript
+// ❌ 誤った修正（対症療法）
+const errorInfo = 'Error: ' + error.message; // errorがnullなら同じエラー
+
+// ✅ 正しい修正（根本治療）
+if (error && error.message) {
+  const errorInfo = `Error: ${error.message}\nStack: ${error.stack || 'N/A'}`;
+} else {
+  const errorInfo = 'An unknown error occurred.';
+}
+
+// ✅ 推奨パターン：事前チェック後のテンプレートリテラル使用
+if (spreadsheetId && spreadsheetId.trim()) {
+  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
 }
 ```
 
-#### **HTTP Error Handling**
+#### **Async/Sync Limitations**
 ```javascript
-function robustApiCall(url) {
-  const options = {
-    'muteHttpExceptions': true,
-    'method': 'GET',
-    'headers': { 'Authorization': 'Bearer ' + getAccessToken() }
-  };
+// ❌ NOT AVAILABLE: setTimeout/setInterval
+// setTimeout(() => {}, 1000); // ReferenceError
 
-  try {
-    const response = UrlFetchApp.fetch(url, options);
+// ✅ ALTERNATIVE: Utilities.sleep (synchronous, blocks execution)
+Utilities.sleep(1000);
 
-    if (response.getResponseCode() === 200) {
-      return JSON.parse(response.getContentText());
-    } else {
-      throw new Error(`API call failed: ${response.getResponseCode()}`);
-    }
-  } catch (error) {
-    console.error('API call exception:', error.message);
-    throw error;
+// ✅ RECOMMENDED: Batch processing for efficiency
+function efficientProcessing(data) {
+  const batchSize = 100;
+  const results = [];
+  for (let i = 0; i < data.length; i += batchSize) {
+    const batch = data.slice(i, i + batchSize);
+    results.push(...processBatch(batch));
   }
+  return results;
 }
 ```
 
@@ -213,24 +215,16 @@ src/
 ├── DatabaseCore.gs            # Database operations
 ├── SystemController.gs        # System management
 ├── DataController.gs          # Data operations
-├── CacheService.gs            # Caching strategy
-├── errors.gs                  # Error handling
 └── *.html                     # UI templates
 ```
 
-## 🎯 API Functions
+## 🎯 Main API Functions
 
-### **Main API Gateway (main.gs)**
 ```javascript
 // User Management
 getCurrentEmail()              // Get current user email
 getUser(infoType)             // Get user information
 processLoginAction(action)     // Handle login
-
-// System Management
-testSetup()                   // System testing
-getWebAppUrl()               // WebApp URL
-resetAuth()                  // Authentication reset
 
 // Data Operations
 addReaction(userId, rowId, type)     // Add reaction
@@ -244,88 +238,278 @@ getUserConfig(userId)         // Get user config
 
 ## 🧪 Testing & Quality
 
-### **Current Test Suite**
+### **Current Status**
 - **113/113 tests passing** (100% success rate)
+- **Zero ESLint errors**
 - **Complete coverage** of critical paths
-- **Quality gates**: All tests must pass before deployment
 
-### **Quality Commands**
+### **Quality Gate**
 ```bash
-npm run test                  # Run all tests
-npm run test:coverage         # Test with coverage report
-npm run lint                  # ESLint with auto-fix
-npm run check                 # Combined quality gate
+npm run check                 # MUST pass before any commit
 npm run deploy:safe           # Safe deployment with validation
 ```
 
-## 🚀 Production Deployment
+## 🛡️ Security & Anti-Patterns
 
-### **Safe Deployment Process**
-```bash
-npm run deploy:safe           # Comprehensive deployment validation
-```
-
-**Features**:
-- Pre-deployment validation
-- Automatic backup creation
-- Quality gate enforcement
-- Post-deployment verification
-- Rollback capability
-
-### **Deployment Checklist**
-- ✅ All tests passing (npm run test)
-- ✅ Zero ESLint errors (npm run lint)
-- ✅ Security validation
-- ✅ Performance benchmarks
-- ✅ Zero-dependency compliance
-
-## 🏆 Architecture Benefits
-
-### **Performance Achievements**
-- **70x Performance Improvement**: Batch operations (1s vs 70s)
-- **Modern JavaScript**: V8 runtime with async/await, destructuring
-- **Robust Error Handling**: Exponential backoff retry mechanisms
-- **Multi-layer Caching**: Optimized data access patterns
-
-### **Architecture Excellence**
-- **Zero Dependencies**: Direct GAS API calls for maximum reliability
-- **Loading Order Independence**: No file dependency chains
-- **Graceful Degradation**: Service delegation with fallbacks
-- **Production Stability**: Enterprise-grade error handling
-
-### **Quality Delivered**
-- **100% Test Coverage**: 113/113 tests passing
-- **Zero ESLint Errors**: Clean, maintainable code
-- **Automated Deployment**: Safe, validated releases
-- **Comprehensive Documentation**: Living project guide
-
-## 🛡️ Security & Compliance
-
+### **Security Best Practices**
 - **Input Validation**: All user inputs validated
-- **SQL Injection Prevention**: Parameterized queries
-- **XSS Protection**: HTML sanitization
-- **CSRF Protection**: Token-based validation
+- **XSS/CSRF Protection**: HTML sanitization, token-based validation
 - **Access Control**: Role-based permissions
-- **Session Management**: Secure session handling
-
-## Important Notes
-
-### **Web App Entry Flow**
-```
-/exec access → Login Page → Setup (if needed) → Main Board
-```
-**Critical**: `/exec` always starts with login page, never direct main board access.
+- **Service Account**: **CROSS-USER ACCESS ONLY** - Security-critical restrictions
+  - ✅ **Viewer→Editor**: Accessing published board data and reactions
+  - ✅ **Editor→Admin**: Accessing shared user database (DATABASE_SPREADSHEET_ID)
+  - ✅ **Cross-tenant operations**: Any access across user boundaries
+  - ❌ **Self-access**: User accessing own spreadsheets (use direct GAS APIs)
+  - ❌ **Same-tenant**: Operations within user's own permissions scope
 
 ### **Anti-Patterns to Avoid**
 ```javascript
-// ❌ AVOID: Individual API calls in loops
-// ❌ AVOID: Library dependencies in production
+// ❌ AVOID: Individual API calls in loops (use batch operations)
+// ❌ AVOID: Unnecessary service account usage
+function getUserOwnData(email) {
+  const auth = Auth.serviceAccount();        // ❌ Unnecessary privilege escalation
+  return Data.findUserByEmail(email, auth); // ❌ User accessing own data
+}
+
+// ✅ CORRECT: Appropriate permission usage
+function getUserOwnData(email) {
+  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+  const spreadsheet = SpreadsheetApp.openById(dbId); // ✅ Normal user permissions
+  return findUserInSheet(spreadsheet, email);
+}
+
+function getViewerCrossUserData(targetUserId, viewerEmail) {
+  const targetUser = findUserById(targetUserId);
+  if (targetUser.userEmail === viewerEmail) {
+    return getUserOwnData(viewerEmail);        // ✅ Own data: normal permissions
+  } else {
+    return getDataWithServiceAccount(targetUser); // ✅ Cross-user: service account
+  }
+}
+
 // ❌ AVOID: Synchronous UI blocking operations
-// ❌ AVOID: Direct constants/service dependencies at file level
+// ❌ AVOID: typeof undefined checks (unnecessary in GAS)
 ```
+
+## 📝 Naming Conventions & Code Standards
+
+### **🎯 Pragmatic Naming System**
+
+**Core Principle**: 自然で読みやすい関数名を優先し、GAS-Native Architectureの可読性と実用性を最大化
+
+#### **Function Naming - Natural English Pattern**
+```javascript
+// ✅ 推奨: 自然な英語表現パターン
+getCurrentEmail()        // 直感的で分かりやすい
+getUser()               // シンプルで明確
+validateEmail()         // 目的が明確
+createErrorResponse()   // 自然な動詞+名詞構造
+isAdmin()              // 簡潔な状態確認
+checkUserAccess()      // 分かりやすいアクション
+
+// ✅ 特殊機能のみプレフィックス使用
+dsGetUserSheetData()   // DataService特有の複雑なデータ処理
+dsAddReaction()        // DataService特有の機能
+sysLog()              // システムレベルの統一ログ機能
+
+// ❌ 避けるべき: 不要なプレフィックス強制
+authGetCurrentEmail()  // → getCurrentEmail() の方が自然
+configGetUserConfig()  // → getUserConfig() の方が読みやすい
+authIsAdministrator()  // → isAdministrator() の方がシンプル
+```
+
+#### **Variable & Property Naming**
+```javascript
+// ✅ camelCase + 意味的プレフィックス
+const isPublished = Boolean(config.isPublished);    // ✅ boolean値: is/has/can
+const isEditor = isAdministrator || isOwnBoard;     // ✅ 統一された権限表現
+const hasValidForm = validateUrl(formUrl).isValid; // ✅ 存在確認: has
+
+// ✅ オブジェクトプロパティの統一
+{
+  isPublished: true,        // ✅ appPublished → isPublished
+  isEditor: false,          // ✅ showAdminFeatures → isEditor
+  spreadsheetId: 'abc123',  // ✅ camelCase統一
+  sheetName: 'Sheet1'       // ✅ 標準化されたパラメータ名
+}
+
+// ❌ 非推奨パターン
+const appPublished = true;           // ❌ 曖昧な名前
+const isAdminUser = false;          // ❌ 重複する概念
+const showAdminFeatures = true;     // ❌ 表示ロジックと権限の混在
+```
+
+#### **Constants - System Standards**
+```javascript
+// ✅ UPPER_SNAKE_CASE + カテゴリ別構造
+const CACHE_DURATION = {
+  SHORT: 10,           // 認証ロック
+  MEDIUM: 30,          // リアクション・ハイライト
+  LONG: 300,           // ユーザー情報キャッシュ
+  EXTRA_LONG: 3600     // 設定キャッシュ
+};
+
+const TIMEOUT_MS = {
+  QUICK: 100,          // UI応答性
+  DEFAULT: 5000,       // デフォルトタイムアウト
+  EXTENDED: 30000      // 拡張タイムアウト
+};
+
+// ✅ 使用例
+cache.put(cacheKey, data, CACHE_DURATION.LONG);
+Utilities.sleep(SLEEP_MS.SHORT);
+
+// ❌ マジックナンバー（非推奨）
+cache.put(cacheKey, data, 300);     // ❌ 意味が不明
+Utilities.sleep(100);               // ❌ なぜ100ms？
+```
+
+#### **Function Categories & Naming Patterns**
+```javascript
+// ✅ カテゴリ別命名パターン
+
+// 1. データ取得・操作
+getCurrentEmail()       // get + 対象名
+getUser()              // シンプルで明確
+getUserConfig()        // 対象を明確に
+saveUserConfig()       // 動作を明確に
+
+// 2. 検証・確認
+validateEmail()        // validate + 対象
+isAdmin()             // 状態確認（boolean返却）
+checkUserAccess()     // check + 確認内容
+
+// 3. 作成・生成
+createErrorResponse()  // create + 作成対象
+generateDynamicUrls()  // generate + 生成内容
+
+// 4. 処理・変換
+processLoginAction()   // process + 処理対象
+handleGetData()       // handle + ハンドル対象
+formatTimestamp()     // format + 変換対象
+
+// 5. 特殊プレフィックス（必要時のみ）
+dsGetUserSheetData()  // 複雑なデータ処理
+sysLog()             // システムレベル機能
+```
+
+#### **Parameter Naming Standards**
+```javascript
+// ✅ 統一されたパラメータ名
+function processUserData(userId, spreadsheetId, sheetName, options = {}) {
+  // userId: 常にcamelCase、一意識別子
+  // spreadsheetId: Google Sheets ID（統一形式）
+  // sheetName: シート名（camelCase）
+  // options: オプション引数は常にオブジェクト
+}
+
+// ✅ 一貫性のあるAPI設計
+getCurrentEmail()                           // Auth layer
+getUserConfig(userId)                       // Config layer
+dsGetUserSheetData(userId, options)        // Data layer (特殊処理)
+
+// ❌ 非一貫的なパラメータ（非推奨）
+function badFunction(user_id, spreadsheet-id, sheet_name) { } // ❌ 命名規則混在
+function anotherBad(userID, spreadSheetId, SheetName) { }     // ❌ 大文字小文字不統一
+```
+
+### **🔧 Implementation Guidelines**
+
+#### **GAS-Native Pattern Compliance**
+```javascript
+// ✅ GAS-Native: Direct API calls with natural global scope
+function getCurrentEmail() {
+  return Session.getActiveUser().getEmail();
+}
+
+function getUserConfig(userId) {
+  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+  const spreadsheet = SpreadsheetApp.openById(dbId);
+  // Direct SpreadsheetApp usage - no abstraction layers
+}
+
+// ✅ Specialized functions with clear prefixes
+function dsGetUserSheetData(userId, options = {}) {
+  // Complex data operations warrant specific naming
+  // Clear functional responsibility
+}
+
+// ✅ GAS-Native constants (no typeof checks needed)
+const CACHE_DURATION = {
+  SHORT: 10,
+  MEDIUM: 30,
+  LONG: 300
+};
+
+const TIMEOUT_MS = {
+  QUICK: 100,
+  DEFAULT: 5000,
+  EXTENDED: 30000
+};
+```
+
+#### **Naming Philosophy & Migration**
+```javascript
+// ✅ CLAUDE.md準拠：実用性重視のシンプル命名
+// 自然な英語 > 強制的なプレフィックス
+// 読みやすさ > 厳格な分類
+
+// ✅ 保持すべき関数名パターン
+getCurrentEmail()         // 直感的
+getUserConfig()          // 明確
+validateEmail()          // 目的が分かりやすい
+createErrorResponse()    // 自然な動詞+名詞
+isAdmin()               // シンプルな状態確認
+
+// ✅ 必要なプレフィックス（機能的理由）
+dsGetUserSheetData()    // DataService特有の複雑処理
+dsAddReaction()         // DataService特有の機能
+sysLog()               // システムレベル統一機能
+
+// ❌ 不要なプレフィックス強制は避ける
+// 読みやすさを損なうプレフィックスは使用しない
+```
+
+### **📊 Benefits of Pragmatic Naming**
+
+- **🎯 Natural Readability**: 自然な英語表現で直感的に理解可能
+- **⚡ Development Speed**: シンプルな関数名で開発効率向上
+- **📖 Self-Documenting Code**: 機能が名前から即座に理解できる
+- **🛠️ Maintenance Efficiency**: 読みやすい関数名で保守性向上
+- **🔄 Zero-Dependency Compliance**: ファイル読み込み順序に依存しない設計
+- **🎨 Code Aesthetics**: 美しく読みやすいコードベース実現
+
+## 📋 Important Application Notes
+
+### **Web App Entry Flow**
+```
+/exec access → AccessRestricted (safe landing)
+            → (explicit) ?mode=login → Setup → Admin Panel
+            → (viewer)  ?mode=view&userId=... → Public Board View
+```
+
+**Policy**: `/exec`のデフォルトはログインページではなく、安全な着地点（AccessRestricted）を表示。これは閲覧ユーザーが不用意にアカウント生成することを防ぐ安全策。
+
+### **API Compatibility Guidance**
+- フロントエンドは既存API名に合わせる（例: `isAdmin`、`getSheets`）
+- リアクション系はDataServiceの公開関数を直接利用（`dsAddReaction`, `dsToggleHighlight`）
+- 新たな中間API（Gatewayラッパ）は原則追加しない
+
+### **OAuth Scopes Policy**
+- 必要最小限のスコープのみ採用
+- 既定: `spreadsheets`, `drive`, `script.external_request`, `userinfo.email`
+- 未使用のAdvanced Servicesは無効化
+
+## 🏆 Architecture Benefits
+
+- **70x Performance Improvement**: Batch operations (1s vs 70s)
+- **Zero Dependencies**: Direct GAS API calls for maximum reliability
+- **Loading Order Independence**: No file dependency chains
+- **100% Test Coverage**: 113/113 tests passing
+- **Production Stability**: Enterprise-grade error handling
 
 ---
 
-*🤖 This CLAUDE.md follows Anthropic's Official Claude Code 2025 Best Practices*
+*🤖 Claude Code 2025 Best Practices Compliant*
 *📈 Optimized for Google Apps Script Performance and Reliability*
-*⚡ Integrated with Zero-Dependency Architecture Pattern*
+*⚡ Zero-Dependency Architecture Pattern*

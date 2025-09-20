@@ -741,10 +741,13 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
 
   // Method 1: 標準API - オーナー権限の場合のみ
   if (isOwner) {
+    console.log('🔍 detectFormConnection: オーナー権限でAPI検出開始');
     try {
       // シートレベルでフォームURL取得（最優先）
+      console.log('🔍 sheet.getFormUrl() 実行中...');
       if (typeof sheet.getFormUrl === 'function') {
         const formUrl = sheet.getFormUrl();
+        console.log('🔍 sheet.getFormUrl() 結果:', { formUrl: formUrl || 'null' });
         if (formUrl) {
           results.formUrl = formUrl;
           results.confidence = 95;
@@ -761,13 +764,18 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
             results.formTitle = generateFormTitle(sheetName, spreadsheet.getName());
             results.details.push('FormApp権限エラー - フォールバックタイトル使用');
           }
+          console.log('✅ シートレベルでフォーム検出成功:', results);
           return results;
         }
+      } else {
+        console.log('⚠️ sheet.getFormUrl メソッドが使用できません');
       }
 
       // スプレッドシートレベルでフォームURL取得（フォールバック）
+      console.log('🔍 spreadsheet.getFormUrl() 実行中...');
       if (typeof spreadsheet.getFormUrl === 'function') {
         const formUrl = spreadsheet.getFormUrl();
+        console.log('🔍 spreadsheet.getFormUrl() 結果:', { formUrl: formUrl || 'null' });
         if (formUrl) {
           results.formUrl = formUrl;
           results.confidence = 85;
@@ -784,27 +792,42 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
             results.formTitle = generateFormTitle(sheetName, spreadsheet.getName());
             results.details.push('FormApp権限エラー - フォールバックタイトル使用');
           }
+          console.log('✅ スプレッドシートレベルでフォーム検出成功:', results);
           return results;
         }
+      } else {
+        console.log('⚠️ spreadsheet.getFormUrl メソッドが使用できません');
       }
+      console.log('❌ API検出: フォームURLが取得できませんでした');
     } catch (apiError) {
       console.warn('detectFormConnection: API検出失敗:', apiError.message);
       results.details.push(apiError && apiError.message ? `API検出失敗: ${apiError.message}` : 'API検出失敗: 詳細不明');
     }
+  } else {
+    console.log('⚠️ オーナー権限なし - API検出をスキップ');
   }
 
   // Method 1.5: Drive APIフォーム検索（API検出失敗時のフォールバック）
   if (isOwner) {
+    console.log('🔍 Drive API検索開始...');
     try {
       const spreadsheetId = spreadsheet.getId();
+      console.log('🔍 Drive API検索 - spreadsheetId:', `${spreadsheetId.substring(0, 12)}***`);
       const driveFormResult = searchFormsByDrive(spreadsheetId, sheetName);
+      console.log('🔍 Drive API検索結果:', {
+        hasFormUrl: !!driveFormResult.formUrl,
+        formTitle: driveFormResult.formTitle || 'null'
+      });
       if (driveFormResult.formUrl) {
         results.formUrl = driveFormResult.formUrl;
         results.formTitle = driveFormResult.formTitle;
         results.confidence = 80;
         results.detectionMethod = 'drive_search';
         results.details.push('Drive API検索で検出');
+        console.log('✅ Drive API検索でフォーム検出成功:', results);
         return results;
+      } else {
+        console.log('❌ Drive API検索: フォームが見つかりませんでした');
       }
     } catch (driveError) {
       console.warn('detectFormConnection: Drive API検索失敗:', driveError.message);
@@ -813,14 +836,20 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
   }
 
   // Method 2: ヘッダーパターン解析
+  console.log('🔍 ヘッダーパターン解析開始...');
   try {
     const [headers] = sheet.getRange(1, 1, 1, Math.min(sheet.getLastColumn(), 10)).getValues();
+    console.log('🔍 取得したヘッダー:', headers);
     const headerAnalysis = analyzeFormHeaders(headers);
+    console.log('🔍 ヘッダー解析結果:', headerAnalysis);
 
     if (headerAnalysis.isFormLike) {
       results.confidence = Math.max(results.confidence, headerAnalysis.confidence);
       results.detectionMethod = results.detectionMethod === 'none' ? 'header_analysis' : results.detectionMethod;
       results.details.push(headerAnalysis && headerAnalysis.reason ? `ヘッダー解析: ${headerAnalysis.reason}` : 'ヘッダー解析: 結果不明');
+      console.log('✅ ヘッダー分析でフォームパターン検出');
+    } else {
+      console.log('❌ ヘッダー分析: フォームパターンなし');
     }
   } catch (headerError) {
     console.warn('detectFormConnection: ヘッダー解析失敗:', headerError.message);
@@ -828,17 +857,30 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
   }
 
   // Method 3: シート名パターン解析
+  console.log('🔍 シート名パターン解析開始...');
   const sheetNameAnalysis = analyzeSheetName(sheetName);
+  console.log('🔍 シート名解析結果:', sheetNameAnalysis);
   if (sheetNameAnalysis.isFormLike) {
     results.confidence = Math.max(results.confidence, sheetNameAnalysis.confidence);
     results.detectionMethod = results.detectionMethod === 'none' ? 'sheet_name' : results.detectionMethod;
     results.details.push(sheetNameAnalysis && sheetNameAnalysis.reason ? `シート名解析: ${sheetNameAnalysis.reason}` : 'シート名解析: 結果不明');
+    console.log('✅ シート名分析でフォームパターン検出');
+  } else {
+    console.log('❌ シート名分析: フォームパターンなし');
   }
 
   // フォーム検出時のタイトル生成
   if (results.confidence >= 40) {
     results.formTitle = `${sheetName} (フォーム検出済み)`;
   }
+
+  console.log('🔍 detectFormConnection 最終結果:', {
+    formUrl: results.formUrl || 'null',
+    confidence: results.confidence,
+    detectionMethod: results.detectionMethod,
+    formTitle: results.formTitle || 'null',
+    detailsCount: results.details.length
+  });
 
   return results;
 }
@@ -1512,3 +1554,21 @@ function testForceLogoutRedirect() {
     };
   }
 }
+
+// ===========================================
+// 🌍 Global SystemController Object Export
+// ===========================================
+
+/**
+ * SystemController統一インターフェース
+ * main.gsからアクセス可能にするためのグローバルエクスポート
+ */
+const __rootSC = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
+__rootSC.SystemController = {
+  getFormInfo,
+  checkCurrentPublicationStatus,
+  performAutoRepair,
+  forceUrlSystemReset,
+  publishApplication,
+  testForceLogoutRedirect
+};

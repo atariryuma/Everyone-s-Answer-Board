@@ -568,10 +568,3 @@ function validateFormLink(formUrl, spreadsheetId) {
     return result;
   }
 }
-
-/**
- * レガシー互換関数
- * 既存コードとの互換性維持
- */
-
-

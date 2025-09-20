@@ -114,7 +114,7 @@ function getRecentSubmissions(userId, limit = 10) {
       };
     }
 
-    // ServiceFactory経由で設定取得（Zero-Dependency Pattern）
+    // GAS-Native: 直接Session APIでユーザー取得
     const email = Session.getActiveUser().getEmail();
     if (!email) {
       return {
