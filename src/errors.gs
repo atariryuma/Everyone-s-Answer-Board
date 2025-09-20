@@ -13,20 +13,13 @@
  */
 
 /**
- * Generate simple error ID
- */
-function generateErrorId() {
-  return `error_${Date.now()}`;
-}
-
-/**
  * Simple error logger
  * @param {string} message - Error message
  * @param {Object} context - Additional context
  * @returns {string} Error ID
  */
 function logError(message, context = {}) {
-  const errorId = generateErrorId();
+  const errorId = `error_${Date.now()}`;
   const timestamp = new Date().toISOString();
 
   const logEntry = {
@@ -40,39 +33,7 @@ function logError(message, context = {}) {
   return errorId;
 }
 
-/**
- * Log warning
- * @param {string} message - Warning message
- * @param {Object} context - Additional context
- */
-function logWarning(message, context = {}) {
-  const timestamp = new Date().toISOString();
 
-  const logEntry = {
-    timestamp,
-    message,
-    ...context
-  };
-
-  console.warn('Warning:', JSON.stringify(logEntry));
-}
-
-/**
- * Log info
- * @param {string} message - Info message
- * @param {Object} context - Additional context
- */
-function logInfo(message, context = {}) {
-  const timestamp = new Date().toISOString();
-
-  const logEntry = {
-    timestamp,
-    message,
-    ...context
-  };
-
-  console.log('Info:', JSON.stringify(logEntry));
-}
 
 /**
  * Safe function executor with error handling
@@ -97,24 +58,6 @@ function safeExecute(fn, context = {}) {
   }
 }
 
-/**
- * Validate required parameters
- * @param {Object} params - Parameters to validate
- * @param {Array} required - Required parameter names
- * @returns {Object} Validation result
- */
-function validateRequired(params, required) {
-  const missing = required.filter(key => !params[key]);
-
-  if (missing.length > 0) {
-    return {
-      isValid: false,
-      message: `Missing required parameters: ${missing.join(', ')}`
-    };
-  }
-
-  return { isValid: true };
-}
 
 // Error handling utilities for Zero-Dependency Architecture
 // Individual functions exported directly for V8 optimization

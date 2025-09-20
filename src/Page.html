@@ -137,27 +137,18 @@
     const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
     const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
     const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
-    const __OWNER_NAME__ = '<?= typeof ownerName !== "undefined" ? ownerName : "" ?>';
+    const __EDITOR_NAME__ = '<?= typeof editorName !== "undefined" ? editorName : "" ?>';
     const __OPINION_HEADER__ = '<?= typeof opinionHeader !== "undefined" ? opinionHeader : "質問" ?>';
-    const __SHOW_ADMIN_FEATURES__ = '<?= typeof showAdminFeatures !== "undefined" ? showAdminFeatures : "false" ?>';
-    const __SHOW_HIGHLIGHT_TOGGLE__ = '<?= typeof showHighlightToggle !== "undefined" ? showHighlightToggle : "false" ?>';
-    const __SHOW_SCORE_SORT__ = '<?= typeof showScoreSort !== "undefined" ? showScoreSort : "false" ?>';
-    const __IS_STUDENT_MODE__ = '<?= typeof isStudentMode !== "undefined" ? isStudentMode : "true" ?>';
-    const __IS_ADMIN_USER__ = '<?= typeof isAdminUser !== "undefined" ? isAdminUser : "false" ?>';
+    const __IS_EDITOR__ = '<?= typeof isEditor !== "undefined" ? isEditor : "false" ?>';
     window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
     window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
-    // Store server-provided admin capability but always start in view mode
-    window.hasAdminCapability = __SHOW_ADMIN_FEATURES__.startsWith('<') ? false : __SHOW_ADMIN_FEATURES__ === 'true';
-    window.showAdminFeatures = false; // Always start in view mode
-    window.showHighlightToggle = __SHOW_HIGHLIGHT_TOGGLE__.startsWith('<') ? false : __SHOW_HIGHLIGHT_TOGGLE__ === 'true';
-    window.showScoreSort = __SHOW_SCORE_SORT__.startsWith('<') ? false : __SHOW_SCORE_SORT__ === 'true';
-    window.isStudentMode = __IS_STUDENT_MODE__.startsWith('<') ? true : __IS_STUDENT_MODE__ === 'true';
-    window.isAdminUser = __IS_ADMIN_USER__.startsWith('<') ? false : __IS_ADMIN_USER__ === 'true';
+    // Unified editor capability - Zero-Dependency Architecture
+    window.isEditor = __IS_EDITOR__.startsWith('<') ? false : __IS_EDITOR__ === 'true';
 
     // Server configuration processing completed
     const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
     const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
-    const OWNER_NAME = __OWNER_NAME__.startsWith('<') ? '' : __OWNER_NAME__;
+    const EDITOR_NAME = __EDITOR_NAME__.startsWith('<') ? '' : __EDITOR_NAME__;
     let MAPPING;
     try {
       if (typeof __MAPPING__ === 'string' && !__MAPPING__.startsWith('<')) {

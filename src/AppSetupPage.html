@@ -14,9 +14,9 @@
     <!-- Shared Styles -->
     <?!= include('UnifiedStyles.css'); ?>
     <script>
-      // System admin access - no userId needed
+      // Administrator access - no userId needed
       let __USER_ID__ = '';
-      console.log('✅ AppSetup page loaded for system administrator');
+      console.log('✅ AppSetup page loaded for administrator');
     </script>
   </head>
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">
@@ -491,7 +491,7 @@
               let boardPublished = false;
               try {
                 const config = JSON.parse(user.configJson || '{}');
-                boardPublished = config.appPublished === true;
+                boardPublished = config.isPublished === true;
               } catch (e) {}
 
               const boardBadge = boardPublished
@@ -531,7 +531,7 @@
                                     </button>
                                     <button
                                         data-user-id="${user.userId}"
-                                        data-user-email="${user.ownerEmail}"
+                                        data-user-email="${user.editorEmail}"
                                         onclick="showDeleteConfirmation(this.dataset.userId, this.dataset.userEmail)"
                                         class="btn bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs"
                                         title="ユーザーを削除">
@@ -1000,7 +1000,7 @@
           // ボード公開数を計算
           try {
             const config = JSON.parse(user.configJson || '{}');
-            if (config.appPublished === true) publishedBoards++;
+            if (config.isPublished === true) publishedBoards++;
           } catch (e) {}
 
           // 24時間以内の活動を計算

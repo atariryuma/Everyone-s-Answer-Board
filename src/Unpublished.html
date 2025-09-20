@@ -53,14 +53,14 @@
   </head>
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans flex items-center justify-center h-screen">
     <div class="text-center p-4 max-w-lg">
-      <? if (typeof isOwner !== 'undefined' && isOwner) { ?>
+      <? if (typeof isEditor !== 'undefined' && isEditor) { ?>
       <!-- 管理者用画面：統合された管理パネル -->
       <div class="glass-panel rounded-xl p-8 shadow-2xl">
         <h1 class="text-3xl font-bold mb-4 text-yellow-300">StudyQuest 管理画面</h1>
         <p class="text-gray-400 mb-6">スプレッドシートを追加して回答ボードを開始しましょう</p>
 
-        <? if (typeof ownerName !== 'undefined' && ownerName) { ?>
-        <p class="text-xs text-gray-500 mb-4">管理者: <?= ownerName ?></p>
+        <? if (typeof editorName !== 'undefined' && editorName) { ?>
+        <p class="text-xs text-gray-500 mb-4">管理者: <?= editorName ?></p>
         <? } ?>
 
         <!-- 生徒用URL表示 -->
@@ -165,8 +165,8 @@
         <h1 class="text-4xl font-bold mb-4 text-yellow-300">現在は準備中です</h1>
         <p class="text-gray-400 mb-4">先生がスプレッドシートを設定したら、回答が表示されます。</p>
 
-        <? if (typeof ownerName !== 'undefined' && ownerName) { ?>
-        <p class="text-xs text-gray-500">管理者: <?= ownerName ?></p>
+        <? if (typeof editorName !== 'undefined' && editorName) { ?>
+        <p class="text-xs text-gray-500">管理者: <?= editorName ?></p>
         <? } ?>
 
         <div class="mt-6">
@@ -243,7 +243,7 @@
       }
 
       // 管理者用機能
-      <? if (typeof isOwner !== 'undefined' && isOwner) { ?>
+      <? if (typeof isEditor !== 'undefined' && isEditor) { ?>
       document.getElementById('add-spreadsheet-btn').addEventListener('click', function() {
           const urlInput = document.getElementById('spreadsheet-url-input');
           const url = urlInput.value.trim();

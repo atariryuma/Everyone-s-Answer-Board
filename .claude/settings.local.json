@@ -39,7 +39,12 @@
       "Bash(npm run:*)",
       "Bash(for:*)",
       "Bash(do echo \"=== $file ===\")",
-      "Bash(claude --version)"
+      "Bash(claude --version)",
+      "Bash(rg:*)",
+      "Bash(do echo \"=== $func calls ===\")",
+      "Bash(do echo \"=== $func usage ===\")",
+      "Bash(cut:*)",
+      "mcp__ide__getDiagnostics"
     ],
     "deny": [],
     "ask": [],

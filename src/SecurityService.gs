@@ -13,16 +13,8 @@
  * - 単一責任原則の維持
  */
 
-/* global ServiceFactory, validateEmail, validateUrl, getUserAccessLevel, Data */
+/* global ServiceFactory, validateEmail, validateUrl, authGetUserAccessLevel, Data, URL */
 
-/**
- * ServiceFactory統合初期化
- * SecurityService用Zero-Dependency実装
- * @returns {boolean} 初期化成功可否
- */
-function initSecurityServiceZero() {
-  return ServiceFactory.getUtils().initService('SecurityService');
-}
 
 // ===========================================
 // 🔑 認証・セッション管理
@@ -125,7 +117,7 @@ function validateUserData(userData) {
         if (userData[field]) {
           const textValidation = validateSecureText(userData[field]);
           if (!textValidation.isValid) {
-            result.errors.push(`${field}: ${textValidation.error}`);
+            result.errors.push(field && textValidation && textValidation.error ? `${field}: ${textValidation.error}` : 'Validation error: 詳細不明');
             result.isValid = false;
           } else {
             result.sanitizedData[field] = textValidation.sanitized;
@@ -155,7 +147,7 @@ function validateUserData(userData) {
       }
 
     } catch (error) {
-      result.errors.push(`検証エラー: ${error.message}`);
+      result.errors.push(error && error.message ? `検証エラー: ${error.message}` : '検証エラー: 詳細不明');
       result.isValid = false;
     }
 
@@ -167,6 +159,45 @@ function validateUserData(userData) {
  * @param {string} email - メールアドレス
  * @returns {Object} 検証結果
  */
+function validateSecurityEmail(email) {
+  try {
+    if (!email || typeof email !== 'string') {
+      return { isValid: false, error: 'メールアドレスが必要です' };
+    }
+
+    // 基本的なメール形式チェック
+    const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+
+    if (!emailRegex.test(email)) {
+      return { isValid: false, error: '無効なメールアドレス形式' };
+    }
+
+    // セキュリティチェック
+    const sanitized = email.toLowerCase().trim();
+
+    // 危険なパターンチェック
+    const dangerousPatterns = [
+      /<script/i,
+      /javascript:/i,
+      /<iframe/i
+    ];
+
+    const hasSecurityRisk = dangerousPatterns.some(pattern => pattern.test(sanitized));
+
+    if (hasSecurityRisk) {
+      return { isValid: false, error: 'セキュリティリスクを含むメールアドレス' };
+    }
+
+    return {
+      isValid: true,
+      sanitized,
+      originalLength: email.length,
+      sanitizedLength: sanitized.length
+    };
+  } catch (error) {
+    return { isValid: false, error: error.message };
+  }
+}
 
 /**
  * テキスト検証・サニタイズ
@@ -234,6 +265,54 @@ function validateSecureText(text) {
  * @param {string} url - URL
  * @returns {Object} 検証結果
  */
+function validateSecurityUrl(url) {
+  try {
+    if (!url || typeof url !== 'string') {
+      return { isValid: false, error: 'URLが必要です' };
+    }
+
+    // 基本的なURL形式チェック
+    let sanitized = url.trim();
+
+    // プロトコルチェック（HTTPSを推奨）
+    if (!sanitized.startsWith('http://') && !sanitized.startsWith('https://')) {
+      return { isValid: false, error: '有効なHTTP/HTTPSプロトコルが必要です' };
+    }
+
+    // セキュリティリスクチェック
+    const dangerousPatterns = [
+      /javascript:/i,
+      /data:/i,
+      /vbscript:/i,
+      /<script/i,
+      /on\w+\s*=/i
+    ];
+
+    const hasSecurityRisk = dangerousPatterns.some(pattern => pattern.test(sanitized));
+
+    if (hasSecurityRisk) {
+      return { isValid: false, error: 'セキュリティリスクを含むURL' };
+    }
+
+    // URL形式の詳細検証
+    try {
+      const urlObj = new URL(sanitized);
+      sanitized = urlObj.toString(); // 正規化
+    } catch (urlError) {
+      return { isValid: false, error: '無効なURL形式' };
+    }
+
+    return {
+      isValid: true,
+      sanitized,
+      originalLength: url.length,
+      sanitizedLength: sanitized.length,
+      protocol: new URL(sanitized).protocol
+    };
+  } catch (error) {
+    return { isValid: false, error: error.message };
+  }
+}
 
 // ===========================================
 // 🔒 アクセス制御・権限管理
@@ -269,7 +348,7 @@ function checkSecurityUserPermission(userId, requiredLevel = 'authenticated_user
       }
 
       // UserServiceから権限レベル取得
-      const accessLevel = getUserAccessLevel(userId);
+      const accessLevel = authGetUserAccessLevel(userId);
       const hasPermission = compareSecurityAccessLevels(accessLevel, requiredLevel);
 
       return {
@@ -300,8 +379,8 @@ function compareSecurityAccessLevels(currentLevel, requiredLevel) {
       'none': 0,
       'guest': 1,
       'authenticated_user': 2,
-      'system_admin': 3,
-      'owner': 4
+      'editor': 3,           // 🔧 用語統一: owner → editor
+      'administrator': 4,    // 🔧 用語統一: system_admin → administrator
     };
 
     const currentScore = levelHierarchy[currentLevel] || 0;
@@ -345,7 +424,7 @@ function logSecurityEvent(event) {
           console.info('ℹ️ SecurityEvent:', logEntry);
       }
 
-      // 永続化が必要な場合はPropertiesServiceを使用
+      // 重要なログのみ永続化（PropertiesServiceで統一）
       if (event.severity === 'critical' || event.severity === 'high') {
         persistSecurityLog(logEntry);
       }
@@ -361,10 +440,7 @@ function logSecurityEvent(event) {
  */
 function persistSecurityLog(logEntry) {
     try {
-      if (!initSecurityServiceZero()) {
-        console.error('validateEmailAccess: ServiceFactory not available');
-        return false;
-      }
+      // 🚀 Zero-dependency security logging
       const props = ServiceFactory.getProperties();
       const logKey = `security_log_${Date.now()}`;
       
@@ -422,7 +498,7 @@ function validateSpreadsheetAccess(spreadsheetId) {
       } catch (openError) {
         const errorResponse = {
           success: false,
-          message: `スプレッドシートへのアクセスに失敗: ${openError.message}`,
+          message: openError && openError.message ? `スプレッドシートへのアクセスに失敗: ${openError.message}` : 'スプレッドシートへのアクセスに失敗: 詳細不明',
           sheets: [],
           error: openError.message,
           executionTime: `${Date.now() - started}ms`
@@ -454,7 +530,7 @@ function validateSpreadsheetAccess(spreadsheetId) {
       } catch (metaError) {
         const errorResponse = {
           success: false,
-          message: `スプレッドシート情報の取得に失敗: ${metaError.message}`,
+          message: metaError && metaError.message ? `スプレッドシート情報の取得に失敗: ${metaError.message}` : 'スプレッドシート情報の取得に失敗: 詳細不明',
           sheets: [],
           error: metaError.message,
           executionTime: `${Date.now() - started}ms`
@@ -487,7 +563,7 @@ function validateSpreadsheetAccess(spreadsheetId) {
     } catch (error) {
       const errorResponse = {
         success: false,
-        message: `予期しないエラー: ${error.message}`,
+        message: error && error.message ? `予期しないエラー: ${error.message}` : '予期しないエラー: 詳細不明',
         sheets: [],
         error: error.message,
         executionTime: `${Date.now() - started}ms`
@@ -525,21 +601,35 @@ function validateSpreadsheetAccess(spreadsheetId) {
 
 /**
  * 古いセキュリティログのクリーンアップ
- * 最新100件まで保持し、古いログを削除する
+ * PropertiesServiceで統一管理（最新100件まで保持）
  */
 function cleanupOldSecurityLogs() {
   try {
-    const cache = CacheService.getScriptCache();
-    const logs = cache.get('security_logs');
+    const props = ServiceFactory.getProperties();
+    const allProps = props.getProperties();
 
-    if (logs) {
-      const logArray = JSON.parse(logs);
-      if (logArray.length > 100) {
-        // 最新100件のみ保持
-        const trimmedLogs = logArray.slice(-100);
-        cache.put('security_logs', JSON.stringify(trimmedLogs), 21600); // 6時間保持
-        console.log(`SecurityService: Cleaned up old logs. Kept ${trimmedLogs.length} recent entries.`);
-      }
+    // セキュリティログのキーを抽出
+    const logKeys = Object.keys(allProps).filter(key => key.startsWith('security_log_'));
+
+    if (logKeys.length > 100) {
+      // タイムスタンプでソートして古いものから削除
+      const sortedKeys = logKeys.sort((a, b) => {
+        const timestampA = parseInt(a.split('_')[2], 10);
+        const timestampB = parseInt(b.split('_')[2], 10);
+        return timestampA - timestampB;
+      });
+
+      // 古いログを削除（最新100件を残す）
+      const keysToDelete = sortedKeys.slice(0, -100);
+      keysToDelete.forEach(key => {
+        try {
+          props.deleteProperty(key);
+        } catch (deleteError) {
+          console.warn(`SecurityService: Failed to delete log ${key}:`, deleteError.message);
+        }
+      });
+
+      console.log(`SecurityService: Cleaned up ${keysToDelete.length} old logs. Kept ${sortedKeys.length - keysToDelete.length} recent entries.`);
     }
   } catch (error) {
     console.warn('SecurityService.cleanupOldSecurityLogs: Cleanup failed:', error.message);

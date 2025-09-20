@@ -8,48 +8,13 @@
  * - 設定値検証・暗号化
  */
 
-/* global ServiceFactory, validateEmail, validateSpreadsheetId */
+/* global ServiceFactory, validateEmail, validateSpreadsheetId, Auth */
 
 /**
  * 統一設定管理クラス
  * CLAUDE.md準拠のZero-Dependency実装
  */
 class Config {
-  /**
-   * サービスアカウント設定取得
-   * 全設定の単一エントリーポイント
-   * @returns {Object|null} Service account configuration
-   */
-  static serviceAccount() {
-    try {
-      const props = ServiceFactory.getProperties();
-      const credsJson = props.getProperty('SERVICE_ACCOUNT_CREDS');
-
-      if (!credsJson) {
-        return null;
-      }
-
-      const config = JSON.parse(credsJson);
-
-      // 必須フィールド検証
-      const requiredFields = ['client_email', 'private_key', 'project_id', 'type'];
-      for (const field of requiredFields) {
-        if (!config[field]) {
-          throw new Error(`Missing required field: ${field}`);
-        }
-      }
-
-      // Service account type validation
-      if (config.type !== 'service_account') {
-        throw new Error('Invalid service account type');
-      }
-
-      return config;
-    } catch (error) {
-      console.error('Config.serviceAccount error:', error.message);
-      return null;
-    }
-  }
 
   /**
    * データベース設定取得
@@ -103,7 +68,8 @@ class Config {
    */
   static system() {
     try {
-      const serviceAccount = this.serviceAccount();
+      const serviceAccountAuth = Auth.serviceAccount();
+      const serviceAccount = serviceAccountAuth?.isValid ? serviceAccountAuth : null;
       const database = this.database();
       const admin = this.admin();
 
@@ -112,7 +78,7 @@ class Config {
         database,
         admin,
         isComplete: !!(serviceAccount && database && admin),
-        version: '2.0.0'
+        version: '3.0.0-flat'
       };
     } catch (error) {
       console.error('Config.system error:', error.message);
@@ -172,7 +138,7 @@ class Config {
       // Validate all configs first
       for (const [key, value] of Object.entries(configs)) {
         if (!this.validateConfigValue(key, value)) {
-          throw new Error(`Invalid configuration for key: ${key}`);
+          throw new Error(key ? `Invalid configuration for key: ${key}` : 'Invalid configuration for key: 不明');
         }
       }
 
@@ -256,11 +222,11 @@ class Config {
 
     // Service account check
     try {
-      const sa = this.serviceAccount();
+      const sa = Auth.serviceAccount();
       results.checks.push({
         name: 'Service Account Configuration',
-        status: sa ? '✅' : '❌',
-        details: sa ? 'Service account configuration valid' : 'Service account configuration missing or invalid'
+        status: sa?.isValid ? '✅' : '❌',
+        details: sa?.isValid ? 'Service account configuration valid' : 'Service account configuration missing or invalid'
       });
     } catch (error) {
       results.checks.push({

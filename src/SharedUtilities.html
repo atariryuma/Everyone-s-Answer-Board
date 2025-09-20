@@ -494,15 +494,17 @@
         timeout = this.defaultTimeout
       } = options;
 
-      const finalCacheKey = cacheKey || `${functionName}_${JSON.stringify(args).substring(0, 50)}`;
-      const requestId = `${functionName}_${Date.now()}`;
+      // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
+      const funcName = functionName || 'unknown';
+      const finalCacheKey = cacheKey || `${funcName}_${JSON.stringify(args || []).substring(0, 50)}`;
+      const requestId = `${funcName}_${Date.now()}`;
 
       try {
         // キャッシュチェック
         if (cache && this.cache.has(finalCacheKey)) {
           const cached = this.cache.get(finalCacheKey);
           if (Date.now() - cached.timestamp < cacheTTL) {
-            console.log(`📦 [UnifiedDataLoader] キャッシュから取得: ${functionName}`);
+            console.log(`📦 [UnifiedDataLoader] キャッシュから取得: ${funcName}`);
             return cached.data;
           }
           this.cache.delete(finalCacheKey);
@@ -527,10 +529,10 @@
         return result;
 
       } catch (error) {
-        console.error(`❌ [UnifiedDataLoader] ${functionName} エラー:`, error);
+        console.error(`❌ [UnifiedDataLoader] ${funcName} エラー:`, error);
 
         if (retryOnError && this.shouldRetry(requestId)) {
-          console.log(`🔄 [UnifiedDataLoader] ${functionName} リトライ実行`);
+          console.log(`🔄 [UnifiedDataLoader] ${funcName} リトライ実行`);
           return this.loadData(functionName, { ...options, retryOnError: false }, ...args);
         }
 
@@ -549,7 +551,7 @@
      * @returns {Promise<Array>} 各リクエストの結果配列
      */
     async loadBatchData(requests) {
-      console.log(`📦 [UnifiedDataLoader] バッチ読み込み開始: ${requests.length}件`);
+      console.log(`📦 [UnifiedDataLoader] バッチ読み込み開始: ${(requests && requests.length) || 0}件`);
 
       const promises = requests.map((request, index) => {
         const { functionName, args = [], options = {} } = request;
@@ -557,7 +559,7 @@
           ...options,
           showLoading: false, // バッチでは個別ローディングを無効化
         }, ...args).catch(error => {
-          console.error(`❌ [UnifiedDataLoader] バッチ${index}: ${functionName} エラー:`, error);
+          console.error(`❌ [UnifiedDataLoader] バッチ${index || 0}: ${functionName || 'unknown'} エラー:`, error);
           return { error: error.message, functionName };
         });
       });
@@ -586,7 +588,7 @@
           const start = Date.now();
           const check = () => {
             if (Date.now() - start >= ms) {
-              reject(new Error(`タイムアウト: ${functionName} (${timeout}ms)`));
+              reject(new Error(`タイムアウト: ${functionName || 'unknown'} (${timeout || 0}ms)`));
             } else {
               Promise.resolve().then(check);
             }
@@ -601,12 +603,12 @@
         google.script.run
           .withSuccessHandler((result) => {
             clearTimeout(timeoutId);
-            console.log(`✅ [UnifiedDataLoader] ${functionName} 成功`);
+            console.log(`✅ [UnifiedDataLoader] ${functionName || 'unknown'} 成功`);
             resolve(result);
           })
           .withFailureHandler((error) => {
             clearTimeout(timeoutId);
-            console.error(`❌ [UnifiedDataLoader] ${functionName} GAS実行エラー:`, error);
+            console.error(`❌ [UnifiedDataLoader] ${functionName || 'unknown'} GAS実行エラー:`, error);
             reject(new Error(error.message || error.toString()));
           })
           [functionName](...args);
@@ -840,9 +842,10 @@
       }
 
       // 重複リクエスト防止: 同じ関数が実行中の場合は既存のPromiseを返す
-      const requestKey = `${functionName}_${JSON.stringify(args)}`;
+      const funcName = functionName || 'unknown';
+      const requestKey = `${funcName}_${JSON.stringify(args || [])}`;
       if (this.pendingRequests && this.pendingRequests.has(requestKey)) {
-        console.log(`🚫 Duplicate request prevented: ${functionName}`);
+        console.log(`🚫 Duplicate request prevented: ${funcName}`);
         return this.pendingRequests.get(requestKey);
       }
 
@@ -869,7 +872,7 @@
             window.unifiedLoading.hide(); // Hide loading overlay on failure
             this.pendingRequests.delete(requestKey); // エラー時にもキャッシュから削除
             // Log the error using the shared error handler
-            window.sharedUtilities.errors.logError(error, `GAS call failed: ${functionName}`);
+            window.sharedUtilities.errors.logError(error, `GAS call failed: ${funcName}`);
             reject(error);
           })
           [functionName](...args);
@@ -933,11 +936,15 @@
         // Email anonymization
         if (data.includes('@')) {
           const parts = data.split('@');
-          return `${parts[0].substring(0, 2)}***@${parts[1]}`;
+          const safePart0 = (parts[0] && parts[0].substring) ? parts[0].substring(0, 2) : 'xx';
+          const safePart1 = parts[1] || 'unknown';
+          return `${safePart0}***@${safePart1}`;
         }
         // Long text anonymization (potential user content)
         if (data.length > 30) {
-          return `${data.substring(0, 15)}...[${data.length} chars]`;
+          const safeDataPrefix = (data && data.substring) ? data.substring(0, 15) : 'unknown';
+          const safeDataLength = (data && data.length) || 0;
+          return `${safeDataPrefix}...[${safeDataLength} chars]`;
         }
         return data;
       }
@@ -950,7 +957,11 @@
             anonymized[key] = this.anonymize(value);
           } else if (key.includes('Id') && typeof value === 'string') {
             // Anonymize IDs partially
-            anonymized[key] = value.length > 8 ? `${value.substring(0, 4)}***` : value;
+            if (value && value.length && value.substring) {
+              anonymized[key] = value.length > 8 ? `${value.substring(0, 4)}***` : value;
+            } else {
+              anonymized[key] = value;
+            }
           } else {
             anonymized[key] = value;
           }
@@ -1194,7 +1205,7 @@
             clearTimeout(timeoutId);
             reject(error);
           })
-          .verifyUserAuthentication();
+          .checkUserAuthentication();
       });
     },
 
@@ -1349,7 +1360,12 @@
       // Enhanced retry logic
       if (retries > 0) {
         console.warn(
-          `⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${document.readyState}. Retrying in ${delay}ms (${retries} retries left)...`
+          (() => {
+            const safeReadyState = (document && document.readyState) || 'unknown';
+            const safeDelay = delay || 0;
+            const safeRetries = retries || 0;
+            return `⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${safeReadyState}. Retrying in ${safeDelay}ms (${safeRetries} retries left)...`;
+          })()
         );
         // CLAUDE.md V8 compliant: Promise-based delay for loading manager retry
         const createPromiseDelay = (ms) => new Promise(resolve => {
@@ -1446,7 +1462,11 @@
       }
 
       console.log(
-        `UnifiedLoadingManager: Overlay shown with type '${config.type}' and message '${config.message}'`
+        (() => {
+          const safeConfigType = (config && config.type) || 'unknown';
+          const safeConfigMessage = (config && config.message) || 'No message';
+          return `UnifiedLoadingManager: Overlay shown with type '${safeConfigType}' and message '${safeConfigMessage}'`;
+        })()
       );
     }
 
@@ -1477,10 +1497,11 @@
       // Use existing content or create default structure
       let messageElement = this.overlay.querySelector('.loading-message');
       if (!messageElement) {
+        const safeOverlayMessage = (config && config.message) || 'Loading...';
         this.overlay.innerHTML = `
           <div class="loading-content">
             <div class="loading-spinner"></div>
-            <div class="loading-message">${config.message}</div>
+            <div class="loading-message">${safeOverlayMessage}</div>
           </div>
         `;
         messageElement = this.overlay.querySelector('.loading-message');
@@ -1496,7 +1517,8 @@
           progressElement.className = 'loading-progress';
           this.overlay.appendChild(progressElement);
         }
-        progressElement.textContent = `${config.progress}%`;
+        const safeProgress = (config && typeof config.progress === 'number') ? config.progress : 0;
+        progressElement.textContent = `${safeProgress}%`;
       }
 
       // Handle step display if configured
@@ -1509,7 +1531,11 @@
         }
 
         stepsElement.innerHTML = config.steps
-          .map((step) => `<div class="loading-step ${step.status}">${step.text}</div>`)
+          .map((step) => {
+            const safeStatus = (step && step.status) || 'pending';
+            const safeText = (step && step.text) || 'Step';
+            return `<div class="loading-step ${safeStatus}">${safeText}</div>`;
+          })
           .join('');
       }
     }
@@ -1586,7 +1612,8 @@
   window.setPartialLoading = function (loading, message) {
     if (loading) {
       // 部分ローディング: 通知 + インラインスピナー、画面操作可能
-      window.showInfo(`🔄 ${message || '処理中...'}`);
+      const safeInfoMessage = message || '処理中...';
+      window.showInfo(`🔄 ${safeInfoMessage}`);
 
       // インライン要素にスピナークラスを追加（あれば）
       const activeElements = document.querySelectorAll('.partial-loading-target');
@@ -1799,7 +1826,8 @@
 
       // Create notification element
       const notification = document.createElement('div');
-      notification.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${colors[type]}`;
+      const safeTypeColor = colors[type] || colors.info;
+      notification.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${safeTypeColor}`;
 
       // Add inline styles for better compatibility
       notification.style.cssText = `
@@ -1821,9 +1849,11 @@
         line-height: 1.4;
       `;
 
+      const safeIcon = icons[type] || icons.info;
+      const safeHtmlMessage = this.escapeHtml(message || 'No message');
       notification.innerHTML = `
-        <div class="mr-3 text-lg flex-shrink-0 leading-none">${icons[type]}</div>
-        <div class="flex-1 text-sm leading-normal">${this.escapeHtml(message)}</div>
+        <div class="mr-3 text-lg flex-shrink-0 leading-none">${safeIcon}</div>
+        <div class="flex-1 text-sm leading-normal">${safeHtmlMessage}</div>
         <button type="button" class="ml-4 text-gray-400 hover:text-white text-lg leading-none flex-shrink-0" style="background: none; border: none; cursor: pointer; line-height: 1;">✕</button>
       `;
 
@@ -2033,7 +2063,8 @@
   // Getter functions for dynamic constants
   window.getBatchSize = function(type = 'base') {
     const constants = window.getPerformanceConstants();
-    return constants[`${type.toUpperCase()}_BATCH_SIZE`] || constants.BASE_RENDER_BATCH_SIZE;
+    const safeType = (type && type.toUpperCase) ? type.toUpperCase() : 'DEFAULT';
+    return constants[`${safeType}_BATCH_SIZE`] || constants.BASE_RENDER_BATCH_SIZE;
   };
 
   window.getViewportBuffer = function() {
@@ -2056,7 +2087,7 @@
   if (!window.sharedUtilitiesLoaded) {
     window.sharedUtilitiesLoaded = true;
     console.log(
-      '✅ SharedUtilities loaded successfully - Version 1.4.0 (with Performance Constants)'
+      '✅ SharedUtilities loaded successfully - Version 3.0.0-flat (Zero-Dependency Architecture)'
     );
   }
 </script>

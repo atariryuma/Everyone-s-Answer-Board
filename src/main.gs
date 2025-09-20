@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, isSystemAdmin, getUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config, getConfigSafe, saveConfigSafe, cleanConfigFields, getQuestionText, DB, validateAccess, URL, RequestGate, getFormInfo */
+/* global ServiceFactory, createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, analyzeColumnStructure, validateConfig, dsAddReaction, dsToggleHighlight, Auth, Data, Config, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, getFormInfo, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -29,7 +29,7 @@
  *   console.log('Current user:', email);
  * }
  */
-function getCurrentEmail() {
+function authGetCurrentEmail() {
   try {
     const session = ServiceFactory.getSession();
     return session.email;
@@ -71,116 +71,19 @@ function doGet(e) {
           .evaluate();
 
       case 'admin': {
-        const email = getCurrentEmail();
-        if (!email) {
-          const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
-          errorTemplate.title = 'ログインが必要です';
-          errorTemplate.message = '管理画面にアクセスするにはログインが必要です。';
-          return errorTemplate.evaluate();
+        // 🔐 統一認証システム使用
+        const authResult = Auth.checkAccess('admin', params);
+        if (!authResult.allowed) {
+          return this.createRedirectTemplate(authResult.redirect, authResult.error);
         }
-        if (!ServiceFactory.getUserService().isSystemAdmin(email)) {
-          return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
-        }
-        // Inject minimal userInfo for template usage
-        let userInfo = null;
-        try {
-          const db = ServiceFactory.getDB();
-          let user = Data.findUserByEmail(email);
 
-          // 🔧 CLAUDE.md準拠: 競合状態防止 - 管理者ユーザー作成のRequestGate保護
-          if (!user) {
-            const createUserKey = `create_admin_user_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
-
-            // RequestGateで同時作成を防止 (オプショナル依存)
-            if (typeof RequestGate !== 'undefined' && !RequestGate.enter(createUserKey)) {
-              // 他のリクエストが作成中 - 再度確認
-              console.info('Admin user creation in progress, re-checking...');
-              Utilities.sleep(500); // 短時間待機
-              user = Data.findUserByEmail(email);
-
-              if (!user) {
-                console.warn('Admin user creation conflict detected');
-                user = {
-                  userId: null,
-                  userEmail: email,
-                  isActive: true,
-                  configJson: JSON.stringify({
-                    setupStatus: 'pending',
-                    appPublished: false,
-                    createdAt: new Date().toISOString()
-                  }),
-                  lastModified: new Date().toISOString()
-                };
-              }
-            } else {
-              try {
-                // 二重チェック: RequestGate内で再度確認
-                user = Data.findUserByEmail(email);
-                if (!user) {
-                  // 🔧 CLAUDE.md準拠: Data.createUser()統一実装
-                  user = Data.createUser(email);
-                  if (user) {
-                    console.log('✅ Admin user created successfully via Data.createUser');
-                  } else {
-                    console.warn('Data.createUser failed, creating minimal user object');
-                    user = {
-                      userId: Utilities.getUuid(),
-                      userEmail: email,
-                      isActive: true,
-                      configJson: JSON.stringify({
-                        setupStatus: 'pending',
-                        appPublished: false,
-                        createdAt: new Date().toISOString()
-                      }),
-                      lastModified: new Date().toISOString()
-                    };
-                  }
-                } else {
-                  console.log('✅ Admin user found during RequestGate (created by concurrent request)');
-                }
-              } catch (createError) {
-                console.warn('Failed to create admin user via UserService:', createError.message);
-                // Fallback: create minimal user object without database write
-                user = {
-                  userId: Utilities.getUuid(),
-                  userEmail: email,
-                  isActive: true,
-                  configJson: JSON.stringify({
-                    setupStatus: 'pending',
-                    appPublished: false,
-                    createdAt: new Date().toISOString()
-                  }),
-                  lastModified: new Date().toISOString()
-                };
-              } finally {
-                RequestGate.exit(createUserKey);
-              }
-            }
-          }
-
-          if (user) {
-            userInfo = {
-              userId: user.userId || null,
-              userEmail: user.userEmail || email
-            };
-          } else {
-            // Fallback userInfo for admin even without DB user
-            userInfo = {
-              userId: null,
-              userEmail: email
-            };
-          }
-        } catch (e) {
-          console.warn('doGet(admin): user lookup failed', e && e.message);
-          // Fallback userInfo for admin
-          userInfo = {
-            userId: null,
-            userEmail: email
-          };
-        }
-        const adminTmpl = HtmlService.createTemplateFromFile('AdminPanel.html');
-        adminTmpl.userInfo = userInfo;
-        return adminTmpl.evaluate();
+        // 認証済み - Editor権限でAdminPanel表示
+        const template = HtmlService.createTemplateFromFile('AdminPanel.html');
+        template.userEmail = authResult.email;
+        template.userId = authResult.user?.userId;
+        template.accessLevel = authResult.accessLevel;
+        template.userInfo = authResult.user;
+        return template.evaluate();
       }
 
       case 'setup': {
@@ -201,99 +104,71 @@ function doGet(e) {
           showSetup = true;
         }
 
-        return showSetup
-          ? HtmlService.createTemplateFromFile('SetupPage.html').evaluate()
-          : HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+        if (showSetup) {
+          return HtmlService.createTemplateFromFile('SetupPage.html').evaluate();
+        } else {
+          // 🔧 統一認証システム: isSystemAdmin変数をAccessRestricted.htmlに渡す
+          const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
+          const email = getCurrentEmail();
+          template.isAdministrator = email ? authIsAdministrator(email) : false;
+          template.userEmail = email || '';
+          template.timestamp = new Date().toISOString();
+          return template.evaluate();
+        }
       }
 
       case 'appSetup': {
-        // System admin only setup page
-        const email = getCurrentEmail();
-        if (!email) {
-          return HtmlService.createTemplateFromFile('LoginPage.html').evaluate();
+        // 🔐 統一認証システム使用 - Administrator専用
+        const authResult = Auth.checkAccess('appSetup', params);
+        if (!authResult.allowed) {
+          return this.createRedirectTemplate(authResult.redirect, authResult.error);
         }
 
-        // Check if user is system admin
-        const userService = ServiceFactory.getUserService();
-        if (!userService.isSystemAdmin(email)) {
-          console.warn('appSetup access denied:', email);
-          return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
-        }
-
+        // 認証済み - Administrator権限でAppSetup表示
         return HtmlService.createTemplateFromFile('AppSetupPage.html').evaluate();
       }
 
       case 'view': {
-        // Public view page - requires userId parameter
-        const {userId} = params;
-        if (!userId) {
-          return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+        // 🔐 統一認証システム使用 - Viewer権限確認
+        const authResult = Auth.checkAccess('view', params);
+        if (!authResult.allowed) {
+          return this.createRedirectTemplate(authResult.redirect, authResult.error);
         }
 
-        // Verify user exists
-        try {
-          const db = ServiceFactory.getDB();
-          const user = Data.findUserById(userId);
-          if (!user) {
-            const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
-            errorTemplate.title = 'ユーザーが見つかりません';
-            errorTemplate.message = '指定されたユーザーの回答ボードは存在しません。URLをご確認ください。';
-            errorTemplate.hideLoginButton = true;
-            return errorTemplate.evaluate();
-          }
+        // 認証済み - 公開ボード表示
+        const template = HtmlService.createTemplateFromFile('Page.html');
+        template.userId = params.userId;
+        template.userEmail = authResult.user?.userEmail || null;
 
-          // Check if user's board is published - 統一API使用
-          const configResult = getConfigSafe(userId);
-          const config = configResult.success ? configResult.config : {};
+        // 問題文設定
+        const questionText = getQuestionText(authResult.config);
+        template.questionText = questionText || '回答ボード';
+        template.boardTitle = questionText || authResult.user?.userEmail || '回答ボード';
 
-          if (!config.appPublished) {
-            const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
-            errorTemplate.title = 'ボードは非公開です';
-            errorTemplate.message = 'このユーザーの回答ボードは現在非公開設定になっています。';
-            errorTemplate.hideLoginButton = true;
-            return errorTemplate.evaluate();
-          }
+        // 編集権限検出（Administrator または 自分のボード）
+        const session = ServiceFactory.getSession();
+        const currentEmail = session.email;
+        const isAdministrator = authIsAdministrator(currentEmail);
+        const isOwnBoard = currentEmail === authResult.user?.userEmail;
 
-          // Board is published - serve view page
-          const template = HtmlService.createTemplateFromFile('Page.html');
-          template.userId = userId;
-          template.userEmail = user.userEmail || null;
+        // 🔧 統一用語: Editor権限設定（Zero-Dependency Architecture）
+        const isEditor = isAdministrator || isOwnBoard;
+        template.isEditor = isEditor;
 
-          // 問題文設定: getQuestionTextで取得してテンプレートに渡す
-          const questionText = getQuestionText(config);
-          template.questionText = questionText || '回答ボード';
-          template.boardTitle = questionText || user.userEmail || '回答ボード';
-
-          // Admin privilege detection using unified ServiceFactory pattern
-          const session = ServiceFactory.getSession();
-          const currentEmail = session.email;
-          const userService = ServiceFactory.getUserService();
-          const isSystemAdmin = userService.isSystemAdmin(currentEmail);
-          const isOwnBoard = currentEmail === user.userEmail;
-
-          // Set admin privileges for template
-          const hasAdminPrivileges = isSystemAdmin || isOwnBoard;
-          template.showAdminFeatures = hasAdminPrivileges;
-          template.isAdminUser = hasAdminPrivileges;
-          template.showHighlightToggle = hasAdminPrivileges;
-
-          return template.evaluate();
-
-        } catch (error) {
-          console.error('view mode error:', error.message);
-          const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
-          errorTemplate.title = 'アクセスエラー';
-          errorTemplate.message = '回答ボードへのアクセス中にエラーが発生しました。';
-          errorTemplate.hideLoginButton = true;
-          return errorTemplate.evaluate();
-        }
+        return template.evaluate();
       }
 
       case 'main':
       default: {
         // Default landing is AccessRestricted to prevent unintended login/account creation.
         // Viewers must specify ?mode=view&userId=... and admins explicitly use ?mode=login.
-        return HtmlService.createTemplateFromFile('AccessRestricted.html').evaluate();
+        // 🔧 統一認証システム: isSystemAdmin変数をAccessRestricted.htmlに渡す
+        const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
+        const email = getCurrentEmail();
+        template.isAdministrator = email ? authIsAdministrator(email) : false;
+        template.userEmail = email || '';
+        template.timestamp = new Date().toISOString();
+        return template.evaluate();
       }
     }
   } catch (error) {
@@ -301,7 +176,7 @@ function doGet(e) {
       message: error.message,
       stack: error.stack,
       mode: e.parameter?.mode,
-      userId: `${e.parameter?.userId?.substring(0, 8)  }***`
+      userId: e.parameter?.userId && typeof e.parameter.userId === 'string' ? `${e.parameter.userId.substring(0, 8)}***` : 'N/A'
     });
 
     const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
@@ -316,6 +191,46 @@ function doGet(e) {
     }
 
     return errorTemplate.evaluate();
+  }
+}
+
+/**
+ * 🔐 統一認証システム用ヘルパー関数
+ */
+
+/**
+ * リダイレクト用テンプレート作成
+ * @param {string} redirectPage - リダイレクト先ページ
+ * @param {string} error - エラーメッセージ（オプショナル）
+ * @returns {HtmlOutput} リダイレクト用HTMLテンプレート
+ */
+function createRedirectTemplate(redirectPage, error) {
+  try {
+    const template = HtmlService.createTemplateFromFile(redirectPage);
+
+    // 🔧 統一認証システム: AccessRestricted.htmlの場合は必要な変数を設定
+    if (redirectPage === 'AccessRestricted.html') {
+      const email = getCurrentEmail();
+      template.isAdministrator = email ? authIsAdministrator(email) : false;
+      template.userEmail = email || '';
+      template.timestamp = new Date().toISOString();
+      if (error) {
+        template.message = error;
+      }
+    } else if (error && redirectPage === 'ErrorBoundary.html') {
+      template.title = 'アクセスエラー';
+      template.message = error;
+      template.hideLoginButton = true;
+    }
+
+    return template.evaluate();
+  } catch (templateError) {
+    console.error('createRedirectTemplate error:', templateError.message);
+    // フォールバック: 基本的なエラーページ
+    const fallbackTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
+    fallbackTemplate.title = 'システムエラー';
+    fallbackTemplate.message = 'ページの表示中にエラーが発生しました。';
+    return fallbackTemplate.evaluate();
   }
 }
 
@@ -350,7 +265,7 @@ function doPost(e) {
           if (!user) {
             result = createUserNotFoundError();
           } else {
-            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
+            result = { success: true, data: dsGetUserSheetData(user.userId, request.options || {}) };
           }
         } catch (error) {
           result = createExceptionResponse(error);
@@ -371,14 +286,14 @@ function doPost(e) {
           if (!user) {
             result = createUserNotFoundError();
           } else {
-            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
+            result = { success: true, data: dsGetUserSheetData(user.userId, request.options || {}) };
           }
         } catch (error) {
           result = createExceptionResponse(error);
         }
         break;
       default:
-        result = createErrorResponse(`Unknown action: ${action}`);
+        result = createErrorResponse(action ? `Unknown action: ${action}` : 'Unknown action: 不明');
     }
 
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -426,8 +341,8 @@ function getUser(infoType = 'email') {
 
     if (infoType === 'full') {
       // Get user from database if available
-      const db = ServiceFactory.getDB();
-      const user = db.findUserByEmail(email);
+      // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+      const user = Data.findUserByEmail(email);
 
       return {
         success: true,
@@ -439,7 +354,7 @@ function getUser(infoType = 'email') {
 
     return {
       success: false,
-      message: `Unknown info type: ${infoType}`
+      message: infoType ? `Unknown info type: ${infoType}` : 'Unknown info type: 不明'
     };
   } catch (error) {
     console.error('getUser error:', error.message);
@@ -454,120 +369,25 @@ function getUser(infoType = 'email') {
  * Get user configuration - unified function for current user
  */
 function getConfig() {
-  const startTime = new Date().toISOString();
-  console.log('=== getConfig START ===', { timestamp: startTime });
-
   try {
-    // 🎯 User authentication logging
     const email = getCurrentEmail();
-    console.log('getConfig: User authentication', {
-      emailFound: !!email,
-      emailLength: email ? email.length : 0
-    });
-
     if (!email) {
-      console.error('getConfig: Authentication failed');
       return createAuthError();
     }
 
-    // 🎯 Database access logging
-    const db = ServiceFactory.getDB();
-    console.log('getConfig: Database access', {
-      dbAvailable: !!db,
-      dbType: typeof db,
-      findUserByEmailAvailable: !!(db && typeof db.findUserByEmail === 'function')
-    });
-
-    if (!db) {
-      console.error('getConfig: Database not available');
-      return createErrorResponse('データベースアクセスエラー');
-    }
-
-    // 🎯 User lookup logging
-    console.log('getConfig: Starting user lookup', { email: `${email.substring(0, 5)  }***` });
-    const user = db.findUserByEmail(email);
-    console.log('getConfig: User lookup result', {
-      userFound: !!user,
-      userId: user ? user.userId : null,
-      configJsonLength: user ? (user.configJson ? user.configJson.length : 0) : null,
-      userKeys: user ? Object.keys(user) : null
-    });
-
-    // 🎯 Database diagnostic logging if user not found
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
-      console.log('getConfig: Running database diagnostics');
-      try {
-        // Check all users in database
-        const allUsers = db.getAllUsers ? db.getAllUsers({ limit: 10 }) : [];
-        console.log('getConfig: Database users diagnostic', {
-          totalUsers: allUsers.length,
-          userEmails: allUsers.map(u => u.userEmail ? `${u.userEmail.substring(0, 5)  }***` : 'NO_EMAIL'),
-          hasCurrentEmail: allUsers.some(u => u.userEmail === email)
-        });
-
-        // Check database structure
-        const dbConfig = Config.database();
-        if (dbConfig && dbConfig.isValid) {
-          const dataAccess = Data.open(dbConfig.spreadsheetId);
-          if (dataAccess.spreadsheet) {
-            const batchResults = dataAccess.batchRead(['Users!A1:E10']);
-            const rows = batchResults.length > 0 && batchResults[0].results.length > 0 ?
-              batchResults[0].results[0].values : [];
-          console.log('getConfig: Raw database content', {
-            databaseId: `${dbConfig.spreadsheetId.substring(0, 10)}***`,
-            rowCount: rows.length,
-            headers: rows.length > 0 ? rows[0] : [],
-            sampleEmails: rows.slice(1, 4).map(row => row[1] ? `${row[1].substring(0, 5)  }***` : 'NO_EMAIL')
-          });
-          }
-        }
-      } catch (diagnosticError) {
-        console.error('getConfig: Database diagnostic failed', {
-          error: diagnosticError.message
-        });
-      }
-    }
-
-    if (!user) {
-      console.error('getConfig: User not found', { email: `${email.substring(0, 5)  }***` });
       return createUserNotFoundError();
     }
 
-    // 🎯 Config parsing - 統一API使用
-    const configResult = getConfigSafe(user.userId);
+    // 🔧 統一API使用: getUserConfigで設定取得
+    const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
-
-    console.log('getConfig: Config loaded via unified API', {
-      success: configResult.success,
-      configKeys: Object.keys(config),
-      configSize: JSON.stringify(config).length,
-      message: configResult.message
-    });
-
-    const endTime = new Date().toISOString();
-    const processingTime = new Date(endTime) - new Date(startTime);
-
-    console.log('=== getConfig SUCCESS ===', {
-      startTime,
-      endTime,
-      processingTimeMs: processingTime,
-      userId: user.userId,
-      configKeys: Object.keys(config)
-    });
 
     return { success: true, config, userId: user.userId };
   } catch (error) {
-    const endTime = new Date().toISOString();
-    const processingTime = new Date(endTime) - new Date(startTime);
-
-    console.error('=== getConfig ERROR ===', {
-      startTime,
-      endTime,
-      processingTimeMs: processingTime,
-      errorMessage: error.message,
-      errorStack: error.stack
-    });
-
+    console.error('getConfig error:', error.message);
     return createExceptionResponse(error);
   }
 }
@@ -582,6 +402,63 @@ function getWebAppUrl() {
   } catch (error) {
     console.error('getWebAppUrl error:', error.message);
     return '';
+  }
+}
+
+// ===========================================
+// 🔧 フロントエンド互換性API - 統一認証システム対応
+// ===========================================
+
+/**
+ * 統一管理者認証関数（メイン実装）
+ * 全システム共通の管理者権限チェック
+ * @param {string} email - メールアドレス
+ * @returns {boolean} 管理者権限があるか
+ */
+function authIsAdministrator(email) {
+  if (!email || typeof email !== 'string') {
+    return false;
+  }
+
+  try {
+    const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
+    if (!adminEmail) {
+      console.warn('authIsAdministrator: ADMIN_EMAIL設定が見つかりません');
+      return false;
+    }
+
+    const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
+    if (isAdmin) {
+      console.info('authIsAdministrator: Administrator認証成功', {
+        email: email && typeof email === 'string' ? `${email.split('@')[0]}@***` : 'N/A'
+      });
+    }
+
+    return isAdmin;
+  } catch (error) {
+    console.error('authIsAdministrator: エラー', {
+      error: error.message,
+      email: email && typeof email === 'string' ? `${email.split('@')[0]}@***` : 'null'
+    });
+    return false;
+  }
+}
+
+/**
+ * 管理者権限確認（フロントエンド互換性）
+ * 統一認証システムのAdministrator権限をチェック
+ * @returns {boolean} 管理者権限があるか
+ */
+function isAdmin() {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return false;
+    }
+    return authIsAdministrator(email);
+  } catch (error) {
+    console.error('isAdmin error:', error.message);
+    return false;
   }
 }
 
@@ -621,74 +498,6 @@ function resetAuth() {
 /**
  * Get user configuration by userId - for compatibility with existing HTML calls
  */
-function getUserConfig(userId) {
-  try {
-    const email = getCurrentEmail();
-    if (!email) return createAuthError();
-
-    // If no userId provided, get current user's config
-    if (!userId) {
-      return getConfig();
-    }
-
-    const db = ServiceFactory.getDB();
-    let user = db.findUserById(userId);
-
-    if (!user) {
-      // 🔧 CLAUDE.md準拠: 競合状態防止 - getUserConfigでのユーザー作成保護
-      const userService = ServiceFactory.getUserService();
-      if (userService && userService.isSystemAdmin(email)) {
-        const createUserKey = `create_user_config_${userId}`;
-
-        if (typeof RequestGate !== 'undefined' && !RequestGate.enter(createUserKey)) {
-          console.info('User creation for config in progress, re-checking...');
-          Utilities.sleep(300);
-          user = db.findUserById(userId);
-        } else if (typeof RequestGate !== 'undefined') {
-          try {
-            // 二重チェック: RequestGate内で再度確認
-            user = db.findUserById(userId);
-            if (!user) {
-              const userByEmail = db.findUserByEmail(email);
-              if (userByEmail && userByEmail.userId === userId) {
-                user = userByEmail;
-              } else {
-                // 🔧 CLAUDE.md準拠: Data.createUser()統一実装
-                user = Data.createUser(email);
-                if (user) {
-                  console.log('✅ User created successfully for getUserConfig via Data.createUser');
-                } else {
-                  console.warn('Data.createUser failed for admin user creation');
-                }
-              }
-            }
-          } catch (createError) {
-            console.warn('Failed to auto-create admin user:', createError.message);
-          } finally {
-            if (typeof RequestGate !== 'undefined') RequestGate.exit(createUserKey);
-          }
-        }
-      }
-
-      // Still no user found
-      if (!user) {
-        return createUserNotFoundError();
-      }
-    }
-
-    // 統一API使用
-    const configResult = getConfigSafe(user.userId);
-    return {
-      success: configResult.success,
-      config: configResult.config,
-      userId: user.userId,
-      message: configResult.message
-    };
-  } catch (error) {
-    console.error('getUserConfig error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
 
 /**
  * Setup application - unified implementation from SystemController
@@ -749,8 +558,8 @@ function processLoginAction() {
     }
 
     // Create or get user
-    const db = ServiceFactory.getDB();
-    let user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data使用
+    let user = Data.findUserByEmail(email);
     if (!user) {
       // 🔧 CLAUDE.md準拠: Data.createUser()統一実装
       user = Data.createUser(email);
@@ -762,7 +571,7 @@ function processLoginAction() {
           isActive: true,
           configJson: JSON.stringify({
             setupStatus: 'pending',
-            appPublished: false,
+            isPublished: false,
             createdAt: new Date().toISOString()
           }),
           lastModified: new Date().toISOString()
@@ -771,7 +580,7 @@ function processLoginAction() {
     }
 
     const baseUrl = ScriptApp.getService().getUrl();
-    const redirectUrl = `${baseUrl}?mode=admin&userId=${user.userId}`;
+    const redirectUrl = baseUrl && user && user.userId ? `${baseUrl}?mode=admin&userId=${user.userId}` : baseUrl || '';
     // Return redirect URL at top-level for client compatibility
     return {
       success: true,
@@ -789,7 +598,7 @@ function processLoginAction() {
     console.error('processLoginAction error:', error.message);
     return {
       success: false,
-      message: `Login failed: ${error.message}`
+      message: error && error.message ? `Login failed: ${error.message}` : 'Login failed: 詳細不明'
     };
   }
 }
@@ -830,7 +639,7 @@ function getSystemDomainInfo() {
     console.error('getSystemDomainInfo error:', error.message);
     return {
       success: false,
-      message: `Domain information error: ${error.message}`
+      message: error && error.message ? `Domain information error: ${error.message}` : 'Domain information error: 詳細不明'
     };
   }
 }
@@ -846,18 +655,18 @@ function getAppStatus() {
     }
 
     // ユーザー情報とconfigJsonを取得
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
       return createErrorResponse('User not found');
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(user.userId);
+    const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
     // ユーザーのボード公開状態を取得
-    const isActive = Boolean(config.appPublished);
+    const isActive = Boolean(config.isPublished);
 
     return createSuccessResponse('Application status retrieved', {
       isActive,
@@ -901,18 +710,18 @@ function setAppStatus(isActive) {
     }
 
     // ユーザー情報を取得
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
       return createUserNotFoundError();
     }
 
     // 統一API使用: 設定取得・更新・保存
-    const configResult = getConfigSafe(user.userId);
+    const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
     // ボード公開状態を更新
-    config.appPublished = Boolean(isActive);
+    config.isPublished = Boolean(isActive);
     if (isActive) {
       config.publishedAt = config.publishedAt || new Date().toISOString();
     }
@@ -920,9 +729,9 @@ function setAppStatus(isActive) {
     config.lastAccessedAt = new Date().toISOString();
 
     // 統一API使用: 検証・サニタイズ・保存
-    const saveResult = saveConfigSafe(user.userId, config);
+    const saveResult = saveUserConfig(user.userId, config);
     if (!saveResult.success) {
-      return createErrorResponse(`Failed to update user configuration: ${saveResult.message}`);
+      return createErrorResponse(saveResult && saveResult.message ? `Failed to update user configuration: ${saveResult.message}` : 'Failed to update user configuration: 詳細不明');
     }
 
     return {
@@ -950,13 +759,12 @@ function setAppStatus(isActive) {
 function getAdminUsers(options = {}) {
   try {
     const email = getCurrentEmail();
-    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
+    if (!email || !authIsAdministrator(email)) {
       return createAdminRequiredError();
     }
 
-    // Get all users from database
-    const db = ServiceFactory.getDB();
-    const users = db.getAllUsers();
+    // 🔧 Zero-Dependency統一: 直接Data.getAllUsers使用
+    const users = Data.getAllUsers();
     return {
       success: true,
       users: users || []
@@ -981,7 +789,7 @@ function deleteUser(userId, reason = '') {
     }
 
     // System admin check with ServiceFactory
-    if (!ServiceFactory.getUserService().isSystemAdmin(email)) {
+    if (!authIsAdministrator(email)) {
       return {
         success: false,
         message: '管理者権限が必要です'
@@ -996,8 +804,8 @@ function deleteUser(userId, reason = '') {
     }
 
     // Get user info before deletion
-    const db = ServiceFactory.getDB();
-    const targetUser = db.findUserById(userId);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserById使用
+    const targetUser = Data.findUserById(userId);
     if (!targetUser) {
       return {
         success: false,
@@ -1006,7 +814,7 @@ function deleteUser(userId, reason = '') {
     }
 
     // Execute deletion
-    const result = db.deleteUser(userId);
+    const result = Data.deleteUser(userId);
 
     if (result.success) {
 
@@ -1037,12 +845,12 @@ function deleteUser(userId, reason = '') {
 function toggleUserActiveStatus(targetUserId) {
   try {
     const email = getCurrentEmail();
-    if (!email || !isSystemAdmin(email)) {
+    if (!email || !authIsAdministrator(email)) {
       return createAdminRequiredError();
     }
 
-    const db = ServiceFactory.getDB();
-    const targetUser = db.findUserById(targetUserId);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserById使用
+    const targetUser = Data.findUserById(targetUserId);
     if (!targetUser) {
       return createUserNotFoundError();
     }
@@ -1053,11 +861,11 @@ function toggleUserActiveStatus(targetUserId) {
       lastModified: new Date().toISOString()
     };
 
-    const result = db.updateUser(targetUserId, updatedUser);
+    const result = Data.updateUser(targetUserId, updatedUser);
     if (result.success) {
       return {
         success: true,
-        message: `ユーザー状態を${updatedUser.isActive ? 'アクティブ' : '非アクティブ'}に変更しました`,
+        message: updatedUser && typeof updatedUser.isActive === 'boolean' ? `ユーザー状態を${updatedUser.isActive ? 'アクティブ' : '非アクティブ'}に変更しました` : 'ユーザー状態を変更しました',
         userId: targetUserId,
         newStatus: updatedUser.isActive,
         timestamp: new Date().toISOString()
@@ -1078,41 +886,41 @@ function toggleUserActiveStatus(targetUserId) {
 function toggleUserBoardStatus(targetUserId) {
   try {
     const email = getCurrentEmail();
-    if (!email || !isSystemAdmin(email)) {
+    if (!email || !authIsAdministrator(email)) {
       return createAdminRequiredError();
     }
 
-    const db = ServiceFactory.getDB();
-    const targetUser = db.findUserById(targetUserId);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserById使用
+    const targetUser = Data.findUserById(targetUserId);
     if (!targetUser) {
       return createUserNotFoundError();
     }
 
     // 統一API使用: 設定取得・更新・保存
-    const configResult = getConfigSafe(targetUserId);
+    const configResult = getUserConfig(targetUserId);
     const config = configResult.success ? configResult.config : {};
 
     // ボード公開状態を切り替え
-    config.appPublished = !config.appPublished;
-    if (config.appPublished) {
+    config.isPublished = !config.isPublished;
+    if (config.isPublished) {
       config.publishedAt = config.publishedAt || new Date().toISOString();
     }
     config.lastModified = new Date().toISOString();
     config.lastAccessedAt = new Date().toISOString();
 
     // 統一API使用: 検証・サニタイズ・保存
-    const saveResult = saveConfigSafe(targetUserId, config);
+    const saveResult = saveUserConfig(targetUserId, config);
     if (!saveResult.success) {
-      return createErrorResponse(`Failed to toggle board status: ${saveResult.message}`);
+      return createErrorResponse(saveResult && saveResult.message ? `Failed to toggle board status: ${saveResult.message}` : 'Failed to toggle board status: 詳細不明');
     }
 
     const result = saveResult; // 統一APIレスポンスをそのまま利用
     if (result.success) {
       return {
         success: true,
-        message: `ボードを${config.appPublished ? '公開' : '非公開'}に変更しました`,
+        message: config && typeof config.isPublished === 'boolean' ? `ボードを${config.isPublished ? '公開' : '非公開'}に変更しました` : 'ボード状態を変更しました',
         userId: targetUserId,
-        boardPublished: config.appPublished,
+        boardPublished: config.isPublished,
         timestamp: new Date().toISOString()
       };
     } else {
@@ -1133,18 +941,14 @@ function toggleUserBoardStatus(targetUserId) {
 function clearActiveSheet(targetUserId) {
   try {
     const email = getCurrentEmail();
-    if (!email || !isSystemAdmin(email)) {
+    if (!email || !authIsAdministrator(email)) {
       return createAdminRequiredError();
     }
 
-    const db = ServiceFactory.getDB();
-    if (!db) {
-      return createErrorResponse('データベース接続エラー');
-    }
-
-    let targetUser = targetUserId ? db.findUserById(targetUserId) : null;
+    // 🔧 Zero-Dependency統一: 直接Data使用
+    let targetUser = targetUserId ? Data.findUserById(targetUserId) : null;
     if (!targetUser) {
-      targetUser = db.findUserByEmail(email);
+      targetUser = Data.findUserByEmail(email);
     }
 
     if (!targetUser) {
@@ -1152,19 +956,19 @@ function clearActiveSheet(targetUserId) {
     }
 
     // 統一API使用: 設定取得・更新・保存
-    const configResult = getConfigSafe(targetUser.userId);
+    const configResult = getUserConfig(targetUser.userId);
     const config = configResult.success ? configResult.config : {};
 
-    const wasPublished = config.appPublished === true;
-    config.appPublished = false;
+    const wasPublished = config.isPublished === true;
+    config.isPublished = false;
     config.publishedAt = null;
     config.lastModified = new Date().toISOString();
     config.lastAccessedAt = new Date().toISOString();
 
     // 統一API使用: 検証・サニタイズ・保存
-    const saveResult = saveConfigSafe(targetUser.userId, config);
+    const saveResult = saveUserConfig(targetUser.userId, config);
     if (!saveResult.success) {
-      return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message}`);
+      return createErrorResponse(saveResult && saveResult.message ? `ボード状態の更新に失敗しました: ${saveResult.message}` : 'ボード状態の更新に失敗しました: 詳細不明');
     }
 
     return {
@@ -1183,18 +987,6 @@ function clearActiveSheet(targetUserId) {
 /**
  * Check if current user is admin - simplified name
  */
-function isAdmin() {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return false;
-    }
-    return ServiceFactory.getUserService().isSystemAdmin(email);
-  } catch (error) {
-    console.error('isAdmin error:', error.message);
-    return false;
-  }
-}
 
 
 /**
@@ -1203,7 +995,7 @@ function isAdmin() {
 function getLogs(options = {}) {
   try {
     const email = getCurrentEmail();
-    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
+    if (!email || !authIsAdministrator(email)) {
       return createAdminRequiredError();
     }
 
@@ -1226,7 +1018,7 @@ function getLogs(options = {}) {
 function getSheets() {
   try {
     const email = getCurrentEmail();
-    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
+    if (!email || !authIsAdministrator(email)) {
       return createAdminRequiredError();
     }
     // Direct implementation for spreadsheet access
@@ -1262,15 +1054,10 @@ function getSheets() {
 function validateHeaderIntegrity(targetUserId) {
   try {
     const session = ServiceFactory.getSession();
-    const db = ServiceFactory.getDB();
-
-    if (!db) {
-      return createErrorResponse('データベース接続エラー');
-    }
-
-    let targetUser = targetUserId ? db.findUserById(targetUserId) : null;
+    // 🔧 Zero-Dependency統一: 直接Data使用
+    let targetUser = targetUserId ? Data.findUserById(targetUserId) : null;
     if (!targetUser && session?.email) {
-      targetUser = db.findUserByEmail(session.email);
+      targetUser = Data.findUserByEmail(session.email);
     }
 
     if (!targetUser) {
@@ -1278,7 +1065,7 @@ function validateHeaderIntegrity(targetUserId) {
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(targetUser.userId);
+    const configResult = getUserConfig(targetUser.userId);
     const config = configResult.success ? configResult.config : {};
 
     if (!config.spreadsheetId || !config.sheetName) {
@@ -1330,34 +1117,34 @@ function getBoardInfo() {
       return createAuthError();
     }
 
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
       console.error('❌ User not found:', email);
       return { success: false, message: 'User not found' };
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(user.userId);
+    const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
-    const appPublished = Boolean(config.appPublished);
+    const isPublished = Boolean(config.isPublished);
     const baseUrl = ScriptApp.getService().getUrl();
 
     console.log('✅ getBoardInfo SUCCESS:', {
       userId: user.userId,
-      appPublished,
+      isPublished: isPublished,
       hasConfig: !!user.configJson
     });
 
     return {
       success: true,
-      isActive: appPublished,
-      appPublished,
+      isActive: isPublished,
+      isPublished: isPublished,
       questionText: getQuestionText(config),
       urls: {
-        view: `${baseUrl}?mode=view&userId=${user.userId}`,
-        admin: `${baseUrl}?mode=admin&userId=${user.userId}`
+        view: baseUrl && user && user.userId ? `${baseUrl}?mode=view&userId=${user.userId}` : '',
+        admin: baseUrl && user && user.userId ? `${baseUrl}?mode=admin&userId=${user.userId}` : ''
       },
       lastUpdated: config.publishedAt || config.lastModified || new Date().toISOString()
     };
@@ -1382,7 +1169,7 @@ function getSheetData(userId, options = {}) {
     }
 
     // Delegate to DataService using Zero-Dependency pattern
-    const result = getUserSheetData(userId, options);
+    const result = dsGetUserSheetData(userId, options);
 
     // Return directly without wrapping - same pattern as admin panel getSheetList
     return result;
@@ -1440,7 +1227,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
       };
     }
 
-    const user = db.findUserByEmail(email);
+    const user = Data.findUserByEmail(email);
     if (!user) {
       console.error('❌ User not found:', email);
       return {
@@ -1451,14 +1238,14 @@ function getPublishedSheetData(classFilter, sortOrder) {
       };
     }
 
-    // getUserSheetDataを呼び出し、フィルターオプションを渡す
+    // dsGetUserSheetDataを呼び出し、フィルターオプションを渡す
     const options = {
       classFilter: classFilter !== 'すべて' ? classFilter : undefined,
       sortBy: sortOrder || 'newest',
       includeTimestamp: true
     };
 
-    const result = getUserSheetData(user.userId, options);
+    const result = dsGetUserSheetData(user.userId, options);
 
     // フロントエンド期待形式に変換
     if (result && result.success && result.data) {
@@ -1589,6 +1376,48 @@ function getSheetList(spreadsheetId) {
 
 
 /**
+ * データカウント取得（フロントエンド整合性のため追加）
+ * @param {string} classFilter - クラスフィルター
+ * @param {string} sortOrder - ソート順
+ * @param {boolean} adminMode - 管理者モード
+ * @returns {Object} カウント情報
+ */
+function getDataCount(classFilter, sortOrder, adminMode = false) {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return { error: 'Authentication required', count: 0 };
+    }
+
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
+    if (!user) {
+      return { error: 'User not found', count: 0 };
+    }
+
+    // dsGetUserSheetDataを使用してデータを取得し、カウントのみ返却
+    const result = dsGetUserSheetData(user.userId, {
+      classFilter,
+      sortOrder,
+      adminMode
+    });
+
+    if (result.success && result.data) {
+      return {
+        success: true,
+        count: result.data.length,
+        sheetName: result.sheetName
+      };
+    }
+
+    return { error: result.message || 'Failed to get count', count: 0 };
+  } catch (error) {
+    console.error('getDataCount error:', error.message);
+    return { error: error.message, count: 0 };
+  }
+}
+
+/**
  * 🎯 Zero-Dependency統一設定保存API
  * CLAUDE.md準拠: 直接的でシンプルな実装
  * @param {Object} config - 設定オブジェクト
@@ -1601,12 +1430,8 @@ function saveConfig(config, options = {}) {
       return { success: false, message: 'ユーザー認証が必要です' };
     }
 
-    const db = ServiceFactory.getDB();
-    if (!db) {
-      return { success: false, message: 'データベース接続エラー' };
-    }
-
-    const user = db.findUserByEmail(userEmail);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(userEmail);
     if (!user) {
       return { success: false, message: 'ユーザーが見つかりません' };
     }
@@ -1616,8 +1441,8 @@ function saveConfig(config, options = {}) {
       { isDraft: true } :
       { isMainConfig: true };
 
-    // 統一API使用: saveConfigSafeで安全保存
-    return saveConfigSafe(user.userId, config, saveOptions);
+    // 統一API使用: saveUserConfigで安全保存
+    return saveUserConfig(user.userId, config, saveOptions);
 
   } catch (error) {
     const operation = options.isDraft ? 'saveDraft' : 'saveConfig';
@@ -1642,14 +1467,14 @@ function detectFormUrl(sheetId = null) {
       return { success: false, message: 'Authentication required', formUrl: null };
     }
 
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
       return { success: false, message: 'User not found', formUrl: null };
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(user.userId);
+    const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
     if (!config.formUrl) {
@@ -1725,8 +1550,8 @@ function detectNewContent(lastUpdateTime) {
     }
 
     // ユーザーデータ取得
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -1736,7 +1561,7 @@ function detectNewContent(lastUpdateTime) {
     }
 
     // 現在のシートデータ取得
-    const currentData = getUserSheetData(user.userId, { includeTimestamp: true });
+    const currentData = dsGetUserSheetData(user.userId, { includeTimestamp: true });
     if (!currentData?.success || !currentData.data) {
       return {
         success: true,
@@ -1766,7 +1591,7 @@ function detectNewContent(lastUpdateTime) {
         newItems.push({
           rowIndex: item.rowIndex || index + 1,
           name: item.name || '匿名',
-          preview: `${(item.answer || item.opinion || '').substring(0, 50)  }...`,
+          preview: item && (item.answer || item.opinion) ? `${(item.answer || item.opinion).substring(0, 50)}...` : 'プレビュー不可',
           timestamp: itemTimestamp.toISOString()
         });
       }
@@ -1797,10 +1622,10 @@ function detectNewContent(lastUpdateTime) {
  * @param {string} sheetName - シート名
  * @returns {Object} 接続結果
  */
-function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
+function dsConnectDataSource(spreadsheetId, sheetName, batchOperations = null) {
   try {
     const email = getCurrentEmail();
-    if (!email || !ServiceFactory.getUserService().isSystemAdmin(email)) {
+    if (!email || !authIsAdministrator(email)) {
       return createAdminRequiredError();
     }
 
@@ -1984,8 +1809,8 @@ function getActiveFormInfo() {
       };
     }
 
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
       console.error('❌ User not found:', email);
       return {
@@ -1997,7 +1822,7 @@ function getActiveFormInfo() {
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(user.userId);
+    const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
     // フォーム表示判定: URL存在性を優先、検証は補助的に利用
@@ -2083,8 +1908,8 @@ function getIncrementalSheetData(sheetName, options = {}) {
       };
     }
 
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -2094,8 +1919,8 @@ function getIncrementalSheetData(sheetName, options = {}) {
       };
     }
 
-    // getUserSheetDataを使用してデータ取得
-    const result = getUserSheetData(user.userId, {
+    // dsGetUserSheetDataを使用してデータ取得
+    const result = dsGetUserSheetData(user.userId, {
       includeTimestamp: true,
       classFilter: options.classFilter,
       sortBy: options.sortOrder || 'newest'
@@ -2178,8 +2003,8 @@ function triggerPollingUpdate(options = {}) {
 
     // 新しいコンテンツがある場合のみデータ取得
     if (newContentResult.success && newContentResult.hasNewContent) {
-      const db = ServiceFactory.getDB();
-      const user = db.findUserByEmail(email);
+      // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+      const user = Data.findUserByEmail(email);
 
       if (user && user.activeSheetName) {
         const sheetResult = getIncrementalSheetData(user.activeSheetName, pollOptions);

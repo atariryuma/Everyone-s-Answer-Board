@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ServiceFactory, ConfigService, DataService, getCurrentEmail, createErrorResponse, getUserSheetData, Data */
+/* global ServiceFactory, ConfigService, DataService, getCurrentEmail, createErrorResponse, dsGetUserSheetData, Data, getUserConfig */
 
 // ===========================================
 // 📊 メインページデータAPI
@@ -35,9 +35,8 @@ function handleGetData(request) {
       };
     }
 
-    // 🎯 Zero-dependency: ServiceFactory経由でDBアクセス
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -46,7 +45,7 @@ function handleGetData(request) {
     }
 
     // 直接DataServiceに依存せず、安定APIで取得
-    const data = getUserSheetData(user.userId, request.options || {});
+    const data = dsGetUserSheetData(user.userId, request.options || {});
     return {
       success: true,
       data
@@ -80,9 +79,8 @@ function handleRefreshData(request) {
       };
     }
 
-    // 🎯 Zero-dependency: ServiceFactory経由でDBアクセス
-    const db = ServiceFactory.getDB();
-    const user = db.findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     if (!user) {
       return {
         success: false,
@@ -91,7 +89,7 @@ function handleRefreshData(request) {
     }
 
     // DataServiceに依存せず、直に最新データを再取得して返却
-    const data = getUserSheetData(user.userId, request.options || {});
+    const data = dsGetUserSheetData(user.userId, request.options || {});
     return { success: true, data };
 
   } catch (error) {
@@ -125,16 +123,17 @@ function getRecentSubmissions(userId, limit = 10) {
       };
     }
 
-    const configService = ServiceFactory.getConfigService();
-    const config = configService ? configService.getUserConfig(userId) : null;
-    if (!config || !config.appPublished) {
+    // 🔧 統一API使用: 直接getUserConfigを使用してConfigService依存を除去
+    const configResult = getUserConfig(userId);
+    const config = configResult.success ? configResult.config : null;
+    if (!config || !config.isPublished) {
       return {
         success: false,
         message: 'このデータは公開されていません'
       };
     }
 
-    const data = getUserSheetData(userId, { limit, includeTimestamp: true });
+    const data = dsGetUserSheetData(userId, { limit, includeTimestamp: true });
     return {
       success: true,
       data,
@@ -269,7 +268,7 @@ function addSpreadsheetUrl(url) {
     } catch (accessError) {
       return {
         success: false,
-        message: `スプレッドシートにアクセスできません: ${accessError.message}`
+        message: accessError && accessError.message ? `スプレッドシートにアクセスできません: ${accessError.message}` : 'スプレッドシートにアクセスできません: 詳細不明'
       };
     }
 
@@ -298,7 +297,7 @@ function refreshBoardData(userId, options = {}) {
     if (!userId) {
       return { success: false, message: 'ユーザーIDが必要です' };
     }
-    const data = getUserSheetData(userId, options || {});
+    const data = dsGetUserSheetData(userId, options || {});
     return { success: true, data };
   } catch (err) {
     return { success: false, message: err.message || '更新エラー' };

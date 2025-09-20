@@ -13,7 +13,7 @@
  * - 簡素なユーティリティ関数群
  */
 
-/* global */
+/* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS */
 
 
 
@@ -24,23 +24,58 @@
 // ===========================================
 
 /**
- * 標準化エラーレスポンス生成
+ * 標準化エラーレスポンス生成（拡張版）
  * @param {string} message - エラーメッセージ
  * @param {*} data - 追加データ
+ * @param {Object} extraFields - 追加フィールド
  * @returns {Object} 標準エラーレスポンス
  */
-function createErrorResponse(message, data = null) {
-  return { success: false, message, error: message, ...(data && { data }) };
+function createErrorResponse(message, data = null, extraFields = {}) {
+  return {
+    success: false,
+    message,
+    error: message,
+    ...(data && { data }),
+    ...extraFields
+  };
 }
 
 /**
- * 標準化成功レスポンス生成
+ * 標準化成功レスポンス生成（拡張版）
  * @param {string} message - 成功メッセージ
  * @param {*} data - レスポンスデータ
+ * @param {Object} extraFields - 追加フィールド
  * @returns {Object} 標準成功レスポンス
  */
-function createSuccessResponse(message, data = null) {
-  return { success: true, message, ...(data && { data }) };
+function createSuccessResponse(message, data = null, extraFields = {}) {
+  return {
+    success: true,
+    message,
+    ...(data && { data }),
+    ...extraFields
+  };
+}
+
+/**
+ * データサービス用エラーレスポンス
+ * @param {string} message - エラーメッセージ
+ * @param {string} sheetName - シート名
+ * @returns {Object} データサービス用エラーレスポンス
+ */
+function createDataServiceErrorResponse(message, sheetName = '') {
+  return createErrorResponse(message, [], { headers: [], sheetName });
+}
+
+/**
+ * データサービス用成功レスポンス
+ * @param {Array} data - データ配列
+ * @param {Array} headers - ヘッダー配列
+ * @param {string} sheetName - シート名
+ * @param {string} message - 成功メッセージ
+ * @returns {Object} データサービス用成功レスポンス
+ */
+function createDataServiceSuccessResponse(data, headers, sheetName, message = 'データ取得成功') {
+  return createSuccessResponse(message, data, { headers, sheetName });
 }
 
 /**
@@ -48,7 +83,7 @@ function createSuccessResponse(message, data = null) {
  * @returns {Object} 認証エラー
  */
 function createAuthError() {
-  return createErrorResponse('Not authenticated');
+  return createErrorResponse('ユーザー認証が必要です');
 }
 
 /**
@@ -56,7 +91,7 @@ function createAuthError() {
  * @returns {Object} ユーザー未発見エラー
  */
 function createUserNotFoundError() {
-  return createErrorResponse('User not found');
+  return createErrorResponse('ユーザーが見つかりません');
 }
 
 /**
@@ -64,7 +99,7 @@ function createUserNotFoundError() {
  * @returns {Object} 管理者権限エラー
  */
 function createAdminRequiredError() {
-  return createErrorResponse('Admin access required');
+  return createErrorResponse('管理者権限が必要です');
 }
 
 /**

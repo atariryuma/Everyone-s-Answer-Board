@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config, getConfigSafe, RequestGate */
+/* global ServiceFactory, formatTimestamp, createErrorResponse, createExceptionResponse, getSheetData, columnAnalysis, getQuestionText, Data, Config, getUserConfig, helpers, CACHE_DURATION, SLEEP_MS */
 
 // ===========================================
 // 🔧 Zero-Dependency DataService (ServiceFactory版)
@@ -25,14 +25,6 @@
  * DB, CONSTANTS依存を完全排除
  */
 
-/**
- * ServiceFactory統合初期化（DataService版）
- * 依存関係チェックなしの即座初期化
- * @returns {boolean} 初期化成功可否
- */
-function initDataServiceZero() {
-  return ServiceFactory.getUtils().initService('DataService');
-}
 
 /**
  * ユーザーのスプレッドシートデータ取得（統合版）
@@ -41,36 +33,25 @@ function initDataServiceZero() {
  * @param {Object} options - 取得オプション
  * @returns {Object} GAS公式推奨レスポンス形式
  */
-function getUserSheetData(userId, options = {}) {
+function dsGetUserSheetData(userId, options = {}) {
   const startTime = Date.now();
 
   try {
-    // 🚀 Zero-dependency initialization
-    if (!initDataServiceZero()) {
-      console.error('getSheetData: ServiceFactory not available');
-      return createErrorResponse('サービス初期化エラー', { data: [], headers: [], sheetName: '' });
-    }
+    // 🚀 Zero-dependency data processing
 
-    // 🔧 ServiceFactory経由でデータベース取得
-    const db = ServiceFactory.getDB();
-    if (!db) {
-      console.error('DataService.getUserSheetData: Database not available');
-      return { success: false, message: 'データベース接続エラー', data: [], headers: [], sheetName: '' };
-    }
-
-    const user = db.findUserById(userId);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserById使用
+    const user = Data.findUserById(userId);
     if (!user) {
-      console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
-      return { success: false, message: 'ユーザーが見つかりません', data: [], headers: [], sheetName: '' };
+      console.error('DataService.dsGetUserSheetData: ユーザーが見つかりません', { userId });
+      return helpers.createDataServiceErrorResponse('ユーザーが見つかりません');
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(userId);
+    const configResult = getUserConfig(userId);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId) {
-      console.warn('DataService.getUserSheetData: スプレッドシートIDが設定されていません', { userId });
-      // Direct return format like admin panel getSheetList
-      return { success: false, message: 'スプレッドシートが設定されていません', data: [], headers: [], sheetName: '' };
+      console.warn('DataService.dsGetUserSheetData: スプレッドシートIDが設定されていません', { userId });
+      return helpers.createDataServiceErrorResponse('スプレッドシートが設定されていません');
     }
 
     // データ取得実行
@@ -94,12 +75,12 @@ function getUserSheetData(userId, options = {}) {
 
     return result;
   } catch (error) {
-    console.error('DataService.getUserSheetData: エラー', {
+    console.error('DataService.dsGetUserSheetData: エラー', {
       userId,
       error: error.message
     });
     // Direct return format like admin panel getSheetList
-    return { success: false, message: error.message || 'データ取得エラー', data: [], headers: [], sheetName: '' };
+    return helpers.createDataServiceErrorResponse(error.message || 'データ取得エラー');
   }
 }
 
@@ -124,7 +105,8 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
     const sheet = spreadsheet.getSheetByName(config.sheetName);
 
     if (!sheet) {
-      throw new Error(`シート '${config.sheetName}' が見つかりません`);
+      const sheetName = config && config.sheetName ? config.sheetName : '不明';
+      throw new Error(`シート '${sheetName}' が見つかりません`);
     }
 
     // データ範囲取得
@@ -133,7 +115,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
 
     if (lastRow <= 1) {
       // ✅ シンプル形式で返却
-      return { success: true, data: [], headers: [], sheetName: config.sheetName || '不明' };
+      return helpers.createDataServiceSuccessResponse([], [], config.sheetName || '不明');
     }
 
     // ヘッダー行取得
@@ -171,7 +153,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
 
         // API制限対策: 100行毎に短い休憩
         if (processedCount % 1000 === 0) {
-          Utilities.sleep(100); // 0.1秒休憩
+          Utilities.sleep(SLEEP_MS.SHORT); // 0.1秒休憩
         }
 
       } catch (batchError) {
@@ -628,11 +610,11 @@ function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEm
     });
 
     console.info('🎯 排他的リアクション処理完了 - CLAUDE.md準拠', {
-      spreadsheetId: `${spreadsheetId.substring(0, 10)}***`,
+      spreadsheetId: spreadsheetId && typeof spreadsheetId === 'string' ? `${spreadsheetId.substring(0, 10)}***` : 'N/A',
       sheetName,
       rowIndex,
       reactionKey,
-      userEmail: `${userEmail.substring(0, 5)  }***`,
+      userEmail: userEmail && typeof userEmail === 'string' ? `${userEmail.substring(0, 5)}***` : 'N/A',
       action,
       exclusive: true,  // 排他的リアクションであることを明示
       previousReaction: userCurrentReaction,
@@ -1079,9 +1061,8 @@ function analyzeColumnStructure(spreadsheetId, sheetName) {
 
     return {
       success: false,
-      message: `予期しないエラーが発生しました: ${error.message}`,
+      message: error && error.message ? `予期しないエラーが発生しました: ${error.message}` : '予期しないエラーが発生しました: 詳細不明',
       headers: [],
-      columns: [],
       mapping: {},           // フロントエンド期待形式
       confidence: {},        // 分離
       executionTime: `${Date.now() - started}ms`
@@ -1101,7 +1082,6 @@ function validateSheetParams(spreadsheetId, sheetName) {
       success: false,
       message: 'スプレッドシートIDとシート名が必要です',
       headers: [],
-      columns: [],
       mapping: {},
       confidence: {}
     };
@@ -1138,8 +1118,7 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
           success: false,
           message: `シート "${sheetName}" が見つかりません`,
           headers: [],
-          columns: [],
-          mapping: {},
+              mapping: {},
       confidence: {}
         }
       };
@@ -1174,24 +1153,23 @@ function connectToSheetInternal(spreadsheetId, sheetName) {
       success: true,
       sheet,
       headers, // UI必須データ追加
-      mapping: columnMapping.mapping,      // フロントエンド期待形式
-      confidence: columnMapping.confidence // 分離
+      mapping: columnMapping.mapping || {},      // フロントエンド期待形式
+      confidence: columnMapping.confidence || {} // 分離
     };
 
   } catch (error) {
     console.error('DataService.connectToSheetInternal: 接続エラー', {
       error: error.message,
-      spreadsheetId: `${spreadsheetId.substring(0, 10)}...`
+      spreadsheetId: spreadsheetId && typeof spreadsheetId === 'string' ? `${spreadsheetId.substring(0, 10)}...` : 'N/A'
     });
 
     return {
       success: false,
       errorResponse: {
         success: false,
-        message: `スプレッドシートアクセスエラー: ${error.message}`,
+        message: error && error.message ? `スプレッドシートアクセスエラー: ${error.message}` : 'スプレッドシートアクセスエラー: 詳細不明',
         headers: [],
-        columns: [],
-        mapping: {},
+          mapping: {},
       confidence: {}
       }
     };
@@ -1215,8 +1193,7 @@ function extractSheetHeaders(sheet) {
           success: false,
           message: 'スプレッドシートが空です',
           headers: [],
-          columns: [],
-          mapping: {},
+              mapping: {},
       confidence: {}
         }
       };
@@ -1243,10 +1220,9 @@ function extractSheetHeaders(sheet) {
       success: false,
       errorResponse: {
         success: false,
-        message: `データ取得エラー: ${error.message}`,
+        message: error && error.message ? `データ取得エラー: ${error.message}` : 'データ取得エラー: 詳細不明',
         headers: [],
-        columns: [],
-        mapping: {},
+          mapping: {},
       confidence: {}
       }
     };
@@ -1269,7 +1245,7 @@ function restoreColumnConfig(userId, spreadsheetId, sheetName) {
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(userId);
+    const configResult = getUserConfig(userId);
     const config = configResult.success ? configResult.config : {};
     if (config.spreadsheetId !== spreadsheetId || config.sheetName !== sheetName) {
       return { success: false, message: 'Config mismatch' };
@@ -1353,7 +1329,7 @@ function detectColumnTypes(headers, sampleData) {
     // 防御的プログラミング: 入力値検証
     if (!Array.isArray(headers) || headers.length === 0) {
       console.warn('DataService.detectColumnTypes: 無効なheaders', headers);
-      return { columns: [], mapping: {}, confidence: {} };
+      return { mapping: {}, confidence: {} };
     }
 
     if (!Array.isArray(sampleData)) {
@@ -1361,54 +1337,28 @@ function detectColumnTypes(headers, sampleData) {
       sampleData = [];
     }
 
-    // 列情報を分析
-    const columns = headers.map((header, index) => {
-      const samples = sampleData.map(row => row && row[index]).filter(v => v != null && v !== '');
-
-      // 列タイプを推測
-      let type = 'text';
-      const headerLower = String(header || '').toLowerCase();
-
-      if (headerLower.includes('timestamp') || headerLower.includes('日時') || headerLower.includes('タイムスタンプ')) {
-        type = 'datetime';
-      } else if (headerLower.includes('email') || headerLower.includes('メール')) {
-        type = 'email';
-      } else if (headerLower.includes('class') || headerLower.includes('クラス')) {
-        type = 'class';
-      } else if (headerLower.includes('name') || headerLower.includes('名前')) {
-        type = 'name';
-      } else if (samples.length > 0 && samples.every(s => !isNaN(s))) {
-        type = 'number';
-      }
-
-      return {
-        index,
-        header: String(header || ''),
-        type,
-        samples: samples.slice(0, 3) // 最大3つのサンプル
-      };
-    });
-
     // 🎯 高精度AI検出システム（5次元統計分析）
     const mapping = { mapping: {}, confidence: {} };
     const analysisResults = performHighPrecisionAnalysis(headers, sampleData);
 
-    // 🎯 AI判定システム実装 - 接続された列の中での最適マッチ判定
-    const relativeMatchingResult = performRelativeMatching(analysisResults, headers);
+    // 🎯 シンプル絶対閾値判定システム
+    const thresholds = {
+      answer: 55,  reason: 55,  // 文脈依存列
+      name: 65,    class: 65    // 明確な列種別
+    };
 
-    // AI判定結果をマッピングに反映
-    Object.entries(relativeMatchingResult.mapping).forEach(([columnType, result]) => {
-      if (result.shouldMap) {
+    // AI判定結果を絶対閾値で判定
+    Object.keys(analysisResults).forEach(columnType => {
+      const result = analysisResults[columnType];
+      const threshold = thresholds[columnType] || 60;
+
+      if (result.confidence >= threshold && result.index >= 0) {
         mapping.mapping[columnType] = result.index;
-        mapping.confidence[columnType] = Math.round(result.confidence);
-      } else {
-        // マッピング対象外でも信頼度情報は記録（フロントエンド用）
-        mapping.confidence[columnType] = Math.round(result.confidence);
       }
+      mapping.confidence[columnType] = Math.round(result.confidence);
     });
 
     return {
-      columns,
       mapping: mapping.mapping,        // フロントエンド期待形式
       confidence: mapping.confidence   // 分離
     };
@@ -1421,129 +1371,13 @@ function detectColumnTypes(headers, sampleData) {
 
     // エラー時のフォールバック
     return {
-      columns: [],
       mapping: {},
       confidence: {}
     };
   }
 }
 
-/**
- * 🎯 AI判定システム - 接続された列の中での最適マッチ判定
- * @param {Object} analysisResults - AI分析結果
- * @param {Array} headers - 列ヘッダー
- * @returns {Object} AI判定結果
- */
-function performRelativeMatching(analysisResults, headers) {
-  const targetTypes = ['answer', 'reason', 'class', 'name'];
-  const mapping = {};
-  const usedIndices = new Set();
-  const mappingStats = [];
 
-  // 1️⃣ 各ターゲットタイプについて最高スコアを収集
-  targetTypes.forEach(targetType => {
-    const result = analysisResults[targetType];
-    mappingStats.push({
-      targetType,
-      index: result.index,
-      confidence: result.confidence,
-      headerName: headers[result.index] || '不明'
-    });
-  });
-
-  // 2️⃣ 信頼度でソートして優先順位決定
-  const sortedStats = mappingStats
-    .filter(stat => stat.confidence > 0)
-    .sort((a, b) => b.confidence - a.confidence);
-
-  console.log('🔍 AI判定システム - 信頼度ランキング:', sortedStats.map(stat => ({
-    ターゲット: stat.targetType,
-    列名: stat.headerName,
-    信頼度: `${Math.round(stat.confidence)}%`,
-    順位: sortedStats.indexOf(stat) + 1
-  })));
-
-  // 3️⃣ 相対的な品質評価とマッピング決定
-  sortedStats.forEach((stat, rank) => {
-    const { targetType, index, confidence } = stat;
-
-    // 🎯 Adaptive threshold system - column-type specific thresholds
-    const adaptiveThresholds = {
-      answer: { rank0: 20, rank1: 18, rank2: 15, high: 25 },  // More lenient for answer
-      reason: { rank0: 20, rank1: 18, rank2: 15, high: 25 },  // More lenient for reason
-      name: { rank0: 25, rank1: 20, rank2: 15, high: 30 },    // Standard for name
-      class: { rank0: 25, rank1: 20, rank2: 15, high: 30 }    // Standard for class
-    };
-
-    const thresholds = adaptiveThresholds[targetType] || adaptiveThresholds.name;
-
-    // 相対的な判定ロジック（適応的閾値）
-    let shouldMap = false;
-    let adjustedConfidence = confidence;
-
-    if (rank === 0 && confidence > thresholds.rank0) {
-      // 最高スコア: 適応的閾値で採用
-      shouldMap = true;
-      adjustedConfidence = Math.min(confidence + 15, 100); // ボーナス
-    } else if (rank === 1 && confidence > thresholds.rank1 && !usedIndices.has(index)) {
-      // 2位: 適応的閾値で採用（重複除く）
-      shouldMap = true;
-      adjustedConfidence = Math.min(confidence + 10, 100); // 小ボーナス
-    } else if (rank === 2 && confidence > thresholds.rank2 && !usedIndices.has(index)) {
-      // 3位: 適応的閾値で採用（重複除く）
-      shouldMap = true;
-      adjustedConfidence = Math.min(confidence + 5, 100); // 最小ボーナス
-    } else if (confidence > thresholds.high && !usedIndices.has(index)) {
-      // 高信頼度: 順位に関わらず適応的閾値で採用
-      shouldMap = true;
-    }
-
-    // 重複チェック
-    if (shouldMap && usedIndices.has(index)) {
-      console.warn(`⚠️ 列インデックス${index}の重複を検出 - ${targetType}をスキップ`);
-      shouldMap = false;
-    }
-
-    if (shouldMap) {
-      usedIndices.add(index);
-    }
-
-    mapping[targetType] = {
-      index,
-      confidence: adjustedConfidence,
-      shouldMap,
-      rank: rank + 1,
-      originalConfidence: confidence
-    };
-  });
-
-  // 4️⃣ 未割り当てのターゲットタイプを処理
-  targetTypes.forEach(targetType => {
-    if (!mapping[targetType]) {
-      const result = analysisResults[targetType];
-      mapping[targetType] = {
-        index: result.index,
-        confidence: result.confidence,
-        shouldMap: false,
-        rank: null,
-        originalConfidence: result.confidence
-      };
-    }
-  });
-
-  // 5️⃣ 結果サマリー
-  const mappedCount = Object.values(mapping).filter(m => m.shouldMap).length;
-  console.log('✅ AI判定システム完了:', {
-    '対象列数': headers.length,
-    'マッピング成功数': mappedCount,
-    '成功率': `${Math.round(mappedCount / targetTypes.length * 100)}%`,
-    'マッピング詳細': Object.entries(mapping)
-      .filter(([_, m]) => m.shouldMap)
-      .map(([type, m]) => `${type}→列${m.index}(${Math.round(m.confidence)}%)`)
-  });
-
-  return { mapping, stats: mappingStats };
-}
 
 /**
  * 🎯 高精度AI検出システム - 5次元統計分析
@@ -1583,9 +1417,9 @@ function performHighPrecisionAnalysis(headers, sampleData) {
       列種別: type,
       検出列: result.index >= 0 ? `インデックス ${result.index} ("${headers[result.index]}")` : '未検出',
       信頼度: `${Math.round(result.confidence)}%`,
-      閾値達成: result.confidence >= (type === 'answer' || type === 'reason' ? 55 : 60) ? '✅' : '❌'
+      閾値達成: result.confidence >= (type === 'answer' || type === 'reason' ? 55 : 65) ? '✅' : '❌'
     })),
-    '適応的閾値': 'answer/reason: 55%, name/class: 60%',
+    '適応的閾値': 'answer/reason: 55%, name/class: 65%',
     '最高信頼度': `${Math.max(...Object.values(results).map(r => Math.round(r.confidence)))}%`
   });
 
@@ -1937,6 +1771,7 @@ function analyzeHeaderPattern(headerLower, targetType) {
   const finalScore = Math.round(score * penaltyMultiplier);
 
   if (penaltyMultiplier < 1.0) {
+    console.log(`Smart Penalty適用: ${penaltyMultiplier}x`);
   }
 
   return finalScore;
@@ -2556,7 +2391,7 @@ function dsAddReaction(userId, rowId, reactionType) {
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(userId);
+    const configResult = getUserConfig(userId);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Spreadsheet configuration incomplete');
@@ -2567,19 +2402,21 @@ function dsAddReaction(userId, rowId, reactionType) {
       return createErrorResponse('Invalid row ID');
     }
 
-    // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時リアクション競合防止
+    // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時リアクション競合防止（CacheService-based mutex）
     const reactionKey = `reaction_${config.spreadsheetId}_${config.sheetName}_${rowIndex}`;
+    const cache = ServiceFactory.getCache();
 
-    if (typeof RequestGate !== 'undefined' && !RequestGate.enter(reactionKey)) {
+    // 排他制御（Cache-based mutex）
+    if (cache.get(reactionKey)) {
       return {
         success: false,
         message: '同じ行に対するリアクション処理が実行中です。しばらくお待ちください。'
       };
-    } else if (typeof RequestGate === 'undefined') {
-      console.warn('dsAddReaction: RequestGate not available, proceeding without row lock');
     }
 
     try {
+      cache.put(reactionKey, true, CACHE_DURATION.MEDIUM); // 30秒ロック
+
       const res = processReaction(config.spreadsheetId, config.sheetName, rowIndex, reactionType, user.userEmail);
       if (res && (res.success || res.status === 'success')) {
         // フロントエンド期待形式に合わせたレスポンス
@@ -2600,13 +2437,17 @@ function dsAddReaction(userId, rowId, reactionType) {
       console.error('DataService.dsAddReaction: エラー', error.message);
       return createExceptionResponse(error);
     } finally {
-      if (typeof RequestGate !== 'undefined') RequestGate.exit(reactionKey);
+      cache.remove(reactionKey);
     }
   } catch (outerError) {
     console.error('DataService.dsAddReaction outer error:', outerError.message);
-    if (typeof RequestGate !== 'undefined') {
+    // 🔧 統一ミューテックス: 緊急時のキャッシュクリア
+    try {
+      const cache = ServiceFactory.getCache();
       const reactionKey = `reaction_${userId}_${rowId}`;
-      RequestGate.exit(reactionKey);
+      cache.remove(reactionKey);
+    } catch (cacheError) {
+      console.warn('Failed to clear reaction cache in error handler:', cacheError.message);
     }
     return createExceptionResponse(outerError);
   }
@@ -2627,7 +2468,7 @@ function dsToggleHighlight(userId, rowId) {
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(userId);
+    const configResult = getUserConfig(userId);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Spreadsheet configuration incomplete');
@@ -2638,19 +2479,21 @@ function dsToggleHighlight(userId, rowId) {
       ? rowId
       : `row_${parseInt(rowId, 10)}`;
 
-    // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時ハイライト競合防止
+    // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時ハイライト競合防止（CacheService-based mutex）
     const highlightKey = `highlight_${config.spreadsheetId}_${config.sheetName}_${rowNumber}`;
+    const cache = ServiceFactory.getCache();
 
-    if (typeof RequestGate !== 'undefined' && !RequestGate.enter(highlightKey)) {
+    // 排他制御（Cache-based mutex）
+    if (cache.get(highlightKey)) {
       return {
         success: false,
         message: '同じ行のハイライト処理が実行中です。しばらくお待ちください。'
       };
-    } else if (typeof RequestGate === 'undefined') {
-      console.warn('dsToggleHighlight: RequestGate not available, proceeding without row lock');
     }
 
     try {
+      cache.put(highlightKey, true, CACHE_DURATION.MEDIUM); // 30秒ロック
+
       const result = updateHighlightInSheet(config, rowNumber);
       if (result?.success) {
         return {
@@ -2668,13 +2511,17 @@ function dsToggleHighlight(userId, rowId) {
       console.error('DataService.dsToggleHighlight: エラー', error.message);
       return createExceptionResponse(error);
     } finally {
-      if (typeof RequestGate !== 'undefined') RequestGate.exit(highlightKey);
+      cache.remove(highlightKey);
     }
   } catch (outerError) {
     console.error('DataService.dsToggleHighlight outer error:', outerError.message);
-    if (typeof RequestGate !== 'undefined') {
+    // 🔧 統一ミューテックス: 緊急時のキャッシュクリア
+    try {
+      const cache = ServiceFactory.getCache();
       const highlightKey = `highlight_${userId}_${rowId}`;
-      RequestGate.exit(highlightKey);
+      cache.remove(highlightKey);
+    } catch (cacheError) {
+      console.warn('Failed to clear highlight cache in error handler:', cacheError.message);
     }
     return createExceptionResponse(outerError);
   }
@@ -2683,7 +2530,7 @@ function dsToggleHighlight(userId, rowId) {
 // Expose a stable namespace for non-global access patterns
 if (typeof global !== 'undefined') {
   global.DataService = {
-    getUserSheetData,
+    dsGetUserSheetData,
     processReaction,
     addReaction: dsAddReaction,
     toggleHighlight: dsToggleHighlight,
@@ -2691,7 +2538,7 @@ if (typeof global !== 'undefined') {
   };
 } else {
   this.DataService = {
-    getUserSheetData,
+    dsGetUserSheetData,
     processReaction,
     addReaction: dsAddReaction,
     toggleHighlight: dsToggleHighlight,

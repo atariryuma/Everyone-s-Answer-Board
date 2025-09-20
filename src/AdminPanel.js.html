@@ -40,6 +40,26 @@
   };
 
   /**
+   * 設定値標準化ヘルパー - 型整合性保証
+   */
+  const ConfigHelpers = {
+    /**
+     * 設定ブール値の統一チェック
+     * 文字列・数値・ブールの混在に対応
+     */
+    isConfigTrue(value) {
+      return Boolean(value === true || value === 'true' || value === '1' || value === 1);
+    },
+
+    /**
+     * 設定ブール値の統一チェック（公開状態専用）
+     */
+    isPublished(config) {
+      return this.isConfigTrue(config?.isPublished) || this.isConfigTrue(config?.isActive);
+    }
+  };
+
+  /**
    * DOM操作のヘルパー関数群 - AdminPanel版
    */
   const DOMHelpers = {
@@ -179,16 +199,16 @@
     initializationStep: 'not started',
   };
 
-  // ===== 冪等・重複防止（リクエストガード＆デバウンス） =====
-  const RequestGate = {
-    flags: Object.create(null),
-    enter(key) {
-      if (this.flags[key]) return false;
-      this.flags[key] = true;
+  // ===== 冪等・重複防止（モダンなクライアント側ミューテックス） =====
+  const ClientMutex = {
+    locks: Object.create(null),
+    acquire(key) {
+      if (this.locks[key]) return false;
+      this.locks[key] = true;
       return true;
     },
-    exit(key) {
-      this.flags[key] = false;
+    release(key) {
+      this.locks[key] = false;
     },
   };
 
@@ -263,7 +283,7 @@
       await initializePanel();
 
       systemState.initializationStep = 'admin check';
-      checkSystemAdminAccess();
+      checkAdministratorAccess();
 
       systemState.initializationStep = 'footer initialization';
       initializeFooter();
@@ -330,7 +350,7 @@
             setupStatus: 'pending',
             spreadsheetId: urlSpreadsheet.spreadsheetId,
             spreadsheetUrl: urlSpreadsheet.spreadsheetUrl || null,
-            appPublished: false
+            isPublished: false
           };
         }
       }
@@ -377,20 +397,20 @@
         console.log('📋 設定済みユーザー: 軽量復元モード実行');
 
         // 既存設定の直接復元（重いAPI呼び出しなし）
-        spreadsheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
-        const option = document.createElement('option');
-        option.value = config.spreadsheetId;
-        option.textContent = '現在の設定: ' + (config.spreadsheetName || config.spreadsheetId);
-        spreadsheetSelect.appendChild(option);
+        // 🔧 パフォーマンス最適化: 単一innerHTML操作でDOM reflow削減
+        const spreadsheetName = config.spreadsheetName || config.spreadsheetId;
+        spreadsheetSelect.innerHTML = `
+          <option value="">スプレッドシートを選択してください</option>
+          <option value="${config.spreadsheetId}" selected>現在の設定: ${spreadsheetName}</option>
+        `;
         spreadsheetSelect.value = config.spreadsheetId;
 
-        // シート選択復元（loadSheetListスキップ）
+        // 🔧 パフォーマンス最適化: シート選択も単一innerHTML操作で最適化
         if (sheetSelect) {
-          sheetSelect.innerHTML = '<option value="">シートを選択してください</option>';
-          const sheetOption = document.createElement('option');
-          sheetOption.value = config.sheetName;
-          sheetOption.textContent = config.sheetName;
-          sheetSelect.appendChild(sheetOption);
+          sheetSelect.innerHTML = `
+            <option value="">シートを選択してください</option>
+            <option value="${config.sheetName}" selected>${config.sheetName}</option>
+          `;
           sheetSelect.value = config.sheetName;
         }
 
@@ -398,8 +418,8 @@
         setupChangeEvents();
         setupDataSourceRadioEvents();
 
-        // 列設定の軽量復元（setupColumnsで最適化実行）
-        await setupColumns(config.spreadsheetId, config.sheetName, config.columnMapping);
+        // データソース接続による列設定初期化
+        await setupColumns(config.spreadsheetId, config.sheetName);
         return; // 重い処理をスキップして終了
       }
 
@@ -433,7 +453,7 @@
       // 7. 列設定ドロップダウンの初期化
       if (config && config.spreadsheetId && config.sheetName) {
         try {
-          await setupColumns(config.spreadsheetId, config.sheetName, config.columnMapping);
+          await setupColumns(config.spreadsheetId, config.sheetName);
         } catch (columnError) {
           console.error('列設定ドロップダウン初期化エラー:', columnError);
           showInfo('⚠️ 列設定の初期化に失敗しましたが、他の機能は利用できます。');
@@ -449,91 +469,29 @@
     }
   }
 
-  // 列設定ドロップダウン初期化関数
-  async function setupColumns(spreadsheetId, sheetName, existingColumnMapping) {
+  // 列設定ドロップダウン初期化関数 - シンプル版
+  async function setupColumns(spreadsheetId, sheetName) {
+    // 事前に確実にクリア
+    clearColumnDropdowns();
+
     try {
-      console.log('🔧 setupColumns: 列設定を初期化中:', { spreadsheetId, sheetName, existingColumnMapping });
+      console.log('🔧 setupColumns: 列設定を初期化中:', { spreadsheetId, sheetName });
 
-      // 🚀 最適化: 既存マッピング優先ロジック
-      if (existingColumnMapping?.mapping && Object.keys(existingColumnMapping.mapping).length > 0) {
-        console.log('🚀 高速復元: 既存マッピング優先実行');
-
-        // API呼び出しなしで直接復元
-        const headers = existingColumnMapping.headers || [];
-        if (headers.length > 0) {
-          fillColumnDropdowns(headers, existingColumnMapping);
-
-          // 列選択の復元
-          const dropdowns = {
-            answer: document.getElementById('answer-column-select'),
-            reason: document.getElementById('reason-column-select'),
-            class: document.getElementById('class-column-select'),
-            name: document.getElementById('name-column-select'),
-          };
-
-          Object.keys(existingColumnMapping.mapping).forEach(columnType => {
-            const dropdown = dropdowns[columnType];
-            const columnIndex = existingColumnMapping.mapping[columnType];
-            if (dropdown && columnIndex !== undefined) {
-              dropdown.value = columnIndex;
-              console.log(`📋 復元: ${columnType} → ${columnIndex}列`);
-            }
-          });
-
-          console.log('✅ 設定済みマッピング復元完了');
-          return; // 重いAPI処理をスキップ
-        }
-      }
-
-      // 従来の処理: 未設定時またはheadersがない場合のみAPI呼び出し
-      console.log('🔧 API呼び出しによる列分析実行');
-      const userId = __USER_ID__;
-      let analysisResult;
-
-      if (existingColumnMapping?.mapping &&
-          existingColumnMapping?.spreadsheetId === spreadsheetId &&
-          Object.keys(existingColumnMapping.mapping).length > 0) {
-        console.log('🔧 同一スプレッドシート設定検出 - 設定復元実行');
-        analysisResult = await performColumnAnalysis(spreadsheetId, sheetName);
-      }
-
-      // 2. 設定復元に失敗した場合は基本ヘッダー取得
-      if (!analysisResult || !analysisResult.success) {
-        console.log('🔧 基本ヘッダー取得を実行');
-        analysisResult = await performColumnAnalysis(spreadsheetId, sheetName);
-      }
-
-      // 3. 基本ヘッダー取得も失敗した場合はフル分析
-      if (!analysisResult || !analysisResult.success) {
-        console.log('🔧 フル列分析を実行');
-        analysisResult = await performColumnAnalysis(spreadsheetId, sheetName);
-      }
+      // シンプルフロー: データソース接続 → 列情報取得 → UI反映
+      const analysisResult = await performColumnAnalysis(spreadsheetId, sheetName);
 
       if (!analysisResult || !analysisResult.success) {
-        console.warn('⚠️ すべての列分析方法が失敗 - ダミーヘッダーを使用');
-        useDummyColumns(existingColumnMapping);
+        console.warn('⚠️ 列分析に失敗 - 空白状態を維持');
         return;
       }
 
       if (!analysisResult.headers || !Array.isArray(analysisResult.headers) || analysisResult.headers.length === 0) {
-        console.warn('⚠️ ヘッダー情報が無効です:', analysisResult);
-        showError('ヘッダー行がありません');
+        console.warn('⚠️ ヘッダー情報が無効 - 空白状態を維持');
         return;
       }
 
-      // 2. ドロップダウンにヘッダー選択肢を設定
-      fillColumnDropdowns(analysisResult.headers, analysisResult.columnMapping);
-
-      // 3. 既存の設定がある場合は復元（既存関数使用）
-      if (existingColumnMapping && existingColumnMapping.mapping) {
-        const dropdowns = {
-          answer: document.getElementById('answer-column-select'),
-          reason: document.getElementById('reason-column-select'),
-          class: document.getElementById('class-column-select'),
-          name: document.getElementById('name-column-select'),
-        };
-        restoreColumnSelection(dropdowns);
-      }
+      // ドロップダウンにヘッダー選択肢を設定
+      fillColumnDropdowns(analysisResult.headers, analysisResult.mapping, analysisResult.confidence);
 
       console.log('✅ 列設定ドロップダウン初期化完了');
     } catch (error) {
@@ -541,6 +499,19 @@
     }
   }
 
+  // 列ドロップダウンを空白状態にクリア
+  function clearColumnDropdowns() {
+    const dropdownIds = ['answer-column-select', 'reason-column-select', 'class-column-select', 'name-column-select'];
+
+    dropdownIds.forEach(id => {
+      const dropdown = document.getElementById(id);
+      if (dropdown) {
+        dropdown.innerHTML = '<option value="">選択してください...</option>';
+      }
+    });
+
+    console.log('📋 列ドロップダウンを空白状態にクリア');
+  }
 
   // データソース選択ラジオボタンのイベント設定
   function setupDataSourceRadioEvents() {
@@ -681,7 +652,7 @@
             count: spreadsheets.length,
             cached: (result && result.cached) || false,
             executionTime: (result && result.executionTime) || 'N/A',
-            ownerFiltered: true,
+            editorFiltered: true,
           });
 
           if (spreadsheets && Array.isArray(spreadsheets) && spreadsheets.length > 0) {
@@ -1180,107 +1151,39 @@
     });
   }
 
-  // ✅ 適切なエラーハンドリング付き列分析関数
-  async function performColumnAnalysis(spreadsheetId, sheetName, retryCount = 0) {
-    const maxRetries = 2;
+  // シンプル列分析関数
+  async function performColumnAnalysis(spreadsheetId, sheetName) {
     const gateKey = `performColumnAnalysis_${spreadsheetId}_${sheetName}`;
 
-    // 🚀 最適化: 既存マッピングキャッシュチェック
-    const existingMapping = systemState.config?.columnMapping;
-    if (existingMapping?.mapping && Object.keys(existingMapping.mapping).length > 0) {
-      console.log('📋 既存マッピング使用: performColumnAnalysis スキップ');
-      return {
-        success: true,
-        headers: existingMapping.headers || [],
-        mapping: existingMapping.mapping,
-        confidence: existingMapping.confidence || {},
-        fromCache: true
-      };
-    }
-
-    if (!RequestGate.enter(gateKey)) {
+    if (!ClientMutex.acquire(gateKey)) {
       console.warn('performColumnAnalysis: 既に実行中です');
-      await createPromiseDelay(1000); // 1秒待機
-      // 再帰呼び出しを避け、適切に処理を停止
-      if (RequestGate.enter(gateKey)) {
-        // ゲートが取得できた場合のみ処理継続
-      } else {
-        return {
-          success: false,
-          error: 'Column analysis is already in progress',
-          fallbackMode: true,
-          headers: ['列1', '列2', '列3', '列4', '列5']
-        };
-      }
+      return { success: false, error: 'Analysis already in progress' };
     }
 
     try {
       return new Promise((resolve, reject) => {
-        console.log('🔍 performColumnAnalysis: API呼び出し実行', { spreadsheetId, sheetName, retryCount });
+        console.log('🔍 performColumnAnalysis: API呼び出し実行', { spreadsheetId, sheetName });
 
-        // AI分析はconnectDataSource内部で自動実行されるため、単純にヘッダー取得のみ実行
         google.script.run
           .withSuccessHandler(function(result) {
             console.log('✅ performColumnAnalysis success:', result);
-            RequestGate.exit(gateKey);
+            ClientMutex.release(gateKey);
             resolve(result);
           })
           .withFailureHandler(function(error) {
             console.error('❌ performColumnAnalysis error:', error);
-            RequestGate.exit(gateKey);
-
-            // 真のリトライロジック - 異なる戦略で再試行
-            if (retryCount < maxRetries) {
-              console.warn(`🔄 performColumnAnalysis リトライ ${retryCount + 1}/${maxRetries}`);
-
-              // 段階的フォールバック戦略
-              if (retryCount === 0) {
-                // 1回目: 基本ヘッダーのみ取得を試行
-                setTimeout(() => {
-                  performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1)
-                    .then(resolve)
-                    .catch(reject);
-                }, 1000 * Math.pow(2, retryCount)); // 指数バックオフ
-              } else {
-                // 2回目: ダミーカラムでフォールバック
-                resolve({
-                  success: false,
-                  error: error.message,
-                  fallbackMode: true,
-                  headers: ['列1', '列2', '列3', '列4', '列5']
-                });
-              }
-            } else {
-              reject(error);
-            }
+            ClientMutex.release(gateKey);
+            reject(error);
           })
-          .connectDataSource(spreadsheetId, sheetName);  // AI分析結果付きでデータ取得
+          .dsConnectDataSource(spreadsheetId, sheetName);
       });
     } catch (error) {
-      RequestGate.exit(gateKey);
+      ClientMutex.release(gateKey);
       throw error;
     }
   }
 
 
-  // ダミーヘッダーへのフォールバック処理
-  function useDummyColumns(existingColumnMapping) {
-    console.log('📋 ダミーヘッダーを使用してドロップダウンを初期化');
-    const dummyHeaders = ['列1', '列2', '列3', '列4', '列5', '列6', '列7', '列8', '列9', '列10'];
-    fillColumnDropdowns(dummyHeaders, {});
-
-    if (existingColumnMapping && existingColumnMapping.mapping) {
-      const dropdowns = {
-        answer: document.getElementById('answer-column-select'),
-        reason: document.getElementById('reason-column-select'),
-        class: document.getElementById('class-column-select'),
-        name: document.getElementById('name-column-select'),
-      };
-      restoreColumnSelection(dropdowns, existingColumnMapping.mapping);
-    } else {
-      showError('スプレッドシートが開けません');
-    }
-  }
 
   // ========== リソースボタン関連関数 ==========
 
@@ -1404,7 +1307,7 @@
     let statusParts = [];
     // スプレッドシートステータスはConfigurationManager経由で取得
     if (config.formUrl) statusParts.push('📝 フォーム');
-    if (config.appPublished) statusParts.push('🎯 ボード');
+    if (config.isPublished) statusParts.push('🎯 ボード');
 
     if (statusParts.length > 0) {
       statusDiv.textContent = '✅ 利用可能: ' + statusParts.join(', ');
@@ -1525,6 +1428,26 @@
     }
   }
 
+  // フォーム検出結果を処理し、適切なステータス情報を返す
+  function processFormDetectionResult(formResult) {
+    if (!formResult || !formResult.formData) {
+      return null;
+    }
+
+    if (formResult.success) {
+      // URLありまたは高信頼度検出
+      return formResult.formData.formUrl ?
+        { status: 'linked', message: 'フォーム連携を確認しました' } :
+        { status: 'detected', message: 'フォーム連携パターンを検出（URL取得不可）' };
+    } else if (formResult.formData.detectionDetails && formResult.formData.detectionDetails.confidence >= 40) {
+      // 中程度信頼度での検出
+      return { status: 'possible', message: 'フォーム連携パターンを検出しました' };
+    } else {
+      // 検出なし
+      return { status: 'missing', message: 'フォーム連携が確認できませんでした' };
+    }
+  }
+
   // シート別フォーム連携情報をチェック・表示
   function checkSheetFormConnection(spreadsheetId, sheetName) {
     if (!spreadsheetId || !sheetName) {
@@ -1563,7 +1486,7 @@
             },
             {
               status: 'linked',
-              message: normalizedResult.message || 'フォーム連携を確認しました。',
+              message: normalizedResult.message || 'フォーム連携を確認しました',
               reason: normalizedResult.reason || '',
               diagnostics: normalizedResult.diagnostics || null,
               suggestions: Array.isArray(normalizedResult.suggestions) ? normalizedResult.suggestions : [],
@@ -1576,7 +1499,7 @@
 
         const fallbackMessage = normalizedResult && normalizedResult.message
           ? normalizedResult.message
-          : 'フォーム連携情報が見つかりませんでした。';
+          : 'フォーム連携情報が見つかりませんでした';
         const fallbackSuggestions = normalizedResult && Array.isArray(normalizedResult.suggestions)
           ? normalizedResult.suggestions
           : [];
@@ -1619,7 +1542,7 @@
           spreadsheetId: spreadsheetId,
           sheetName: sheetName,
         });
-        const failureMessage = 'フォーム連携情報の取得中にエラーが発生しました。';
+        const failureMessage = 'フォーム連携情報の取得中にエラーが発生しました';
         showError(`${failureMessage}\n${error.message || ''}`);
         window.__formIntegrationLatestResponse = null;
         hideFormInfo();
@@ -1650,7 +1573,7 @@
   }
 
   // システム管理者アクセス確認
-  function checkSystemAdminAccess() {
+  function checkAdministratorAccess() {
     google.script.run
       .withSuccessHandler(function (isAdmin) {
         const appSetupBtn = document.getElementById('app-setup-btn');
@@ -1851,27 +1774,9 @@
               google.script.run
                 .withSuccessHandler(function(formResult) {
                   console.log('validateAccessAPI後のフォーム情報取得成功:', formResult);
-                  if (formResult && formResult.formData) {
-                    // フォーム検出レベルに応じた処理
-                    if (formResult.success) {
-                      // URLありまたは高信頼度検出
-                      const statusInfo = formResult.formData.formUrl ?
-                        { status: 'linked', message: 'フォーム連携が確認されました' } :
-                        { status: 'detected', message: 'フォーム連携が検出されました（URL取得不可）' };
-                      displayFormInfo(formResult.formData, statusInfo);
-                    } else if (formResult.formData.detectionDetails && formResult.formData.detectionDetails.confidence >= 40) {
-                      // 中程度信頼度での検出
-                      displayFormInfo(formResult.formData, {
-                        status: 'possible',
-                        message: 'フォーム連携の可能性があります'
-                      });
-                    } else {
-                      // 検出なし
-                      displayFormInfo(formResult.formData, {
-                        status: 'missing',
-                        message: 'フォーム連携が確認できませんでした'
-                      });
-                    }
+                  const statusInfo = processFormDetectionResult(formResult);
+                  if (statusInfo) {
+                    displayFormInfo(formResult.formData, statusInfo);
                   } else {
                     console.warn('フォーム情報取得失敗:', formResult);
                     displayFormInfo({}, {
@@ -1884,7 +1789,7 @@
                   console.warn('validateAccessAPI後のフォーム情報取得エラー:', formError);
                   displayFormInfo({}, {
                     status: 'error',
-                    message: 'フォーム情報の取得中にエラーが発生しました'
+                    message: 'フォーム情報の取得に失敗しました'
                   });
                 })
                 .getFormInfo(spreadsheetId, sheetNameInput.value);
@@ -1937,24 +1842,15 @@
 
         console.log('✅ フォーム情報手動更新成功:', formResult);
 
-        if (formResult && formResult.formData) {
-          if (formResult.success) {
-            const statusInfo = formResult.formData.formUrl ?
-              { status: 'linked', message: 'フォーム連携が確認されました' } :
-              { status: 'detected', message: 'フォーム連携が検出されました（URL取得不可）' };
-            displayFormInfo(formResult.formData, statusInfo);
+        const statusInfo = processFormDetectionResult(formResult);
+        if (statusInfo) {
+          displayFormInfo(formResult.formData, statusInfo);
+          // ステータスに応じた成功メッセージ
+          if (statusInfo.status === 'linked' || statusInfo.status === 'detected') {
             showSuccess('フォーム情報を更新しました');
-          } else if (formResult.formData.detectionDetails && formResult.formData.detectionDetails.confidence >= 40) {
-            displayFormInfo(formResult.formData, {
-              status: 'possible',
-              message: 'フォーム連携の可能性があります'
-            });
+          } else if (statusInfo.status === 'possible') {
             showSuccess('フォーム情報を更新しました（可能性検出）');
           } else {
-            displayFormInfo(formResult.formData, {
-              status: 'missing',
-              message: 'フォーム連携が確認できませんでした'
-            });
             showSuccess('フォーム情報を更新しました（連携なし）');
           }
         } else {
@@ -2156,7 +2052,7 @@
   // ✅ 統一された接続処理関数 - ドロップダウン・URL両方式対応
   async function connectToDataSource() {
     const gateKey = 'connectToDataSource';
-    if (!RequestGate.enter(gateKey)) {
+    if (!ClientMutex.acquire(gateKey)) {
       showInfo('現在処理中です…少し待ってから再試行してください。');
       return;
     }
@@ -2230,7 +2126,6 @@
 
         if (result.mapping) {
           successDetails.push('🤖 AI列判定完了');
-          autoApplyAIDetection(result);
           showNextStepGuidance(result);
         }
 
@@ -2246,7 +2141,7 @@
       handleConnectionError(error.message || error, { spreadsheetId, sheetName, method: isUrlMethod ? 'URL' : 'dropdown' });
     } finally {
       setLoading(false);
-      RequestGate.exit(gateKey);
+      ClientMutex.release(gateKey);
     }
   }
 
@@ -2271,7 +2166,7 @@
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler(reject)
-        .connectDataSource(firstOp.spreadsheetId, firstOp.sheetName, operations);
+        .dsConnectDataSource(firstOp.spreadsheetId, firstOp.sheetName, operations);
     });
   }
 
@@ -2391,13 +2286,18 @@
     console.log('fillColumnDropdowns:', { headers, mapping, confidence });
 
     try {
-      // 入力データの検証とフォールバック
-      let actualHeaders = headers;
+      // 入力データの検証
       if (!Array.isArray(headers) || headers.length === 0) {
-        console.warn('⚠️ ヘッダー情報が不正です - ダミーヘッダーを使用');
-        // フォールバック: ダミーヘッダーを提供
-        actualHeaders = ['列1', '列2', '列3', '列4', '列5', '列6', '列7', '列8', '列9', '列10'];
-        showInfo('💡 列分析が失敗したため、列番号で表示しています。適切な列を手動で選択してください。');
+        console.warn('⚠️ ヘッダー情報が不正です');
+        return;
+      }
+
+      // mapping/confidence検証（既存パターン）
+      if (!mapping || typeof mapping !== 'object') {
+        mapping = {};
+      }
+      if (!confidence || typeof confidence !== 'object') {
+        confidence = {};
       }
 
       // 4つのドロップダウンを取得
@@ -2427,7 +2327,7 @@
           dropdown.innerHTML = '<option value="">選択してください...</option>';
 
           // ヘッダーをオプションとして追加
-          actualHeaders.forEach((header, index) => {
+          headers.forEach((header, index) => {
             if (header && header.trim()) {
               const option = document.createElement('option');
               option.value = index;
@@ -2440,11 +2340,8 @@
         }
       });
 
-      // AI検出結果をドロップダウンの初期選択として設定
+      // AI検出結果をドロップダウンの初期選択として設定（統合処理）
       setAIDetectionSelections(mapping, dropdowns, confidence);
-
-      // 保存済み設定の復元（オプション追加後に実行）
-      restoreColumnSelection(dropdowns);
 
       // ドロップダウン変更イベントリスナーを設定
       setupDropdownEventListeners(dropdowns);
@@ -2454,69 +2351,6 @@
     }
   }
 
-  // 保存済み設定から列マッピングを復元（オプション追加後に実行）- 改良版（フォールバック対応）
-  let lastMappingRestore = null;
-  function restoreColumnSelection(dropdowns, fallbackMapping = null) {
-    try {
-      let savedMapping = null;
-
-      // フォールバックマッピングが提供された場合（列分析失敗時）
-      if (fallbackMapping) {
-        savedMapping = fallbackMapping;
-        console.log('📋 フォールバックマッピング使用:', savedMapping);
-      } else {
-        // 通常のconfig取得
-        const config = systemState.config;
-        if (!config || !config.columnMapping || !config.columnMapping.mapping) {
-          console.log('📋 保存済み列マッピングなし - スキップ');
-          return false;
-        }
-        savedMapping = config.columnMapping.mapping;
-      }
-
-      // 重複実行防止
-      const mappingHash = JSON.stringify(savedMapping);
-      if (lastMappingRestore === mappingHash) {
-        console.log('📋 列マッピング復元: 重複実行をスキップ');
-        return true;
-      }
-      lastMappingRestore = mappingHash;
-
-      console.log('📋 保存済み列マッピング復元開始:', savedMapping);
-
-      // 各列選択ドロップダウンに保存済み値を設定
-      let restoredCount = 0;
-      Object.keys(dropdowns).forEach((columnType) => {
-        const dropdown = dropdowns[columnType];
-        if (!dropdown) {
-          console.warn(`⚠️ ${columnType}ドロップダウンが見つかりません`);
-          return;
-        }
-
-        const savedValue = savedMapping[columnType];
-        if (savedValue !== undefined) {
-          // オプションの存在確認
-          const option = dropdown.querySelector(`option[value="${savedValue}"]`);
-          if (option) {
-            dropdown.value = savedValue;
-            console.log(`✅ ${columnType}列選択復元: ${savedValue}`);
-
-            // ドロップダウンに視覚的フィードバックを追加
-            dropdown.classList.add('has-manual-selection');
-            restoredCount++;
-          } else {
-            console.warn(`⚠️ ${columnType}列選択: 保存値 ${savedValue} に対応するオプションが見つかりません`);
-          }
-        }
-      });
-
-      console.log(`✅ 保存済み列マッピング復元完了 (${restoredCount}件復元)`);
-      return restoredCount > 0;
-    } catch (error) {
-      console.error('❌ 保存済み列マッピング復元エラー:', error.message);
-      return false;
-    }
-  }
 
   // AI検出結果をドロップダウンの初期選択として設定
   function setAIDetectionSelections(mapping, dropdowns, confidence = {}) {
@@ -2600,17 +2434,19 @@
         console.log(`✅ AI検出成功: ${columnType} → ${selectedIndex}列 (信頼度: ${columnConfidence}%)`);
         detectedCount++;
       } else if (columnConfidence > 0) {
-        // AI判定システム: 動的閾値による判定
-        const allConfidences = Object.values(confidence).filter(c => c > 0);
-        const maxConfidence = Math.max(...allConfidences);
-        const relativeThreshold = Math.max(maxConfidence * 0.7, 25); // 最高値の70%または25%
+        // AI判定システム: 統一絶対閾値による判定
+        const THRESHOLDS = {
+          answer: 55, reason: 55,  // 文脈依存列
+          name: 65, class: 65      // 明確な列種別
+        };
+        const threshold = THRESHOLDS[columnType] || 55;
 
         let badgeType = 'low-confidence';
         let statusMessage = '';
 
-        if (columnConfidence >= relativeThreshold) {
-          badgeType = 'relative-candidate';
-          statusMessage = `候補 (相対閾値${Math.round(relativeThreshold)}%達成)`;
+        if (columnConfidence >= threshold) {
+          badgeType = 'candidate';
+          statusMessage = `候補 (閾値${threshold}%達成)`;
         } else if (columnConfidence >= 20) {
           badgeType = 'low-confidence';
           statusMessage = `検討中 (${Math.round(columnConfidence)}%)`;
@@ -2644,79 +2480,7 @@
     }
   }
 
-  // 🚀 UX向上：AI判定の自動適用機能（データ構造修正版）
-  function autoApplyAIDetection(result) {
-    if (!result?.success || !result?.mapping) {
-      console.log('🔍 autoApplyAIDetection: データ不足のためスキップ');
-      return;
-    }
 
-    // Zero-Dependency Architecture: 直接データアクセス
-    const mapping = result.mapping;
-    const confidence = result.confidence || {};
-
-    console.log('🔍 autoApplyAIDetection: 直接データアクセス確認', {
-      mapping: mapping,
-      confidence: confidence,
-    });
-
-    let autoAppliedCount = 0;
-    let highConfidenceCount = 0;
-
-    // 適応的閾値による自動適用（列種別最適化）
-    const adaptiveThresholds = {
-      name: 65,    // 明確な列種別
-      class: 65,   // 明確な列種別
-      answer: 55,  // 文脈依存列
-      reason: 55   // 文脈依存列
-    };
-
-    Object.keys(mapping).forEach((columnType) => {
-      // リアクション列はスキップ（UIドロップダウンが存在しない）
-      if (['highlight', 'curious', 'like', 'understand'].includes(columnType)) {
-        return;
-      }
-
-      const columnIndex = mapping[columnType];
-      const confidenceValue = confidence?.[columnType] || 0;
-      const threshold = adaptiveThresholds[columnType] || 60; // デフォルト閾値
-
-      console.log(`🔍 ${columnType}: columnIndex=${columnIndex}, confidence=${confidenceValue}, threshold=${threshold}`);
-
-      if (confidenceValue >= threshold && columnIndex !== undefined && columnIndex !== null) {
-        highConfidenceCount++;
-        const dropdown = document.getElementById(`${columnType}-column-select`);
-
-        if (dropdown) {
-          dropdown.value = columnIndex;
-          dropdown.classList.add('has-auto-applied');
-          dropdown.classList.remove('has-manual-selection');
-
-          // 信頼度バッジを更新（関数が存在する場合のみ）
-          if (typeof showConfidenceBadge === 'function') {
-            showConfidenceBadge(columnType, confidenceValue, 'auto-applied');
-          }
-
-          autoAppliedCount++;
-          console.log(
-            `🤖 AI自動適用成功: ${columnType} → ${columnIndex}列 (信頼度: ${confidenceValue}%)`
-          );
-        } else {
-          console.warn(`❌ ドロップダウンが見つかりません: ${columnType}-column-select`);
-        }
-      }
-    });
-
-    // ユーザーフィードバック
-    if (autoAppliedCount > 0) {
-      showSuccess(`🤖 高精度AI判定を${autoAppliedCount}項目自動適用しました！`);
-      updateProgress(3); // 列設定完了まで進める
-    } else if (highConfidenceCount === 0) {
-      showInfo('💡 AI判定の信頼度が低めです。ドロップダウンで手動設定してください。');
-    } else {
-      console.log('🔍 高信頼度の項目はあるが、ドロップダウン設定に失敗');
-    }
-  }
 
   // 🎯 UX向上：次ステップ案内機能
   function showNextStepGuidance(result) {
@@ -2724,8 +2488,17 @@
 
     const mapping = result.mapping || {};
     const confidence = result.confidence || {};
-    const hasAutoApplied = Object.values(confidence).some((confidenceValue) => {
-      return confidenceValue >= 80;
+
+    // バックエンドと統一した闾値システム
+    const THRESHOLDS = {
+      answer: 55, reason: 55,  // 文脈依存列
+      name: 65, class: 65      // 明確な列種別
+    };
+
+    const hasAutoApplied = Object.keys(mapping).some((columnType) => {
+      const columnConfidence = confidence[columnType] || 0;
+      const threshold = THRESHOLDS[columnType] || 55;
+      return columnConfidence >= threshold;
     });
 
     // ✅ CLAUDE.md準拠: Promise-based UI feedback delay
@@ -2808,7 +2581,7 @@
       // AI判定システムで自動設定された場合
       badgeClass = 'high';
       badgeText = `🎯 AI判定 ${Math.round(confidence)}%`;
-    } else if (type === 'relative-candidate') {
+    } else if (type === 'candidate') {
       // AI判定で候補として検出された場合
       badgeClass = 'candidate';
       badgeText = `🔍 候補 ${Math.round(confidence)}%`;
@@ -2817,11 +2590,17 @@
       badgeClass = 'low';
       badgeText = `📊 検討中 ${Math.round(confidence)}%`;
     } else {
-      // 従来のAI検出（フォールバック）
-      if (confidence >= 80) {
+      // 統一闾値システムでのAI検出判定
+      const THRESHOLDS = {
+        answer: 55, reason: 55,  // 文脈依存列
+        name: 65, class: 65      // 明確な列種別
+      };
+      const threshold = THRESHOLDS[columnType] || 55;
+
+      if (confidence >= threshold) {
         badgeClass = 'high';
         badgeText = `🤖 AI検出 ${Math.round(confidence)}%`;
-      } else if (confidence >= 50) {
+      } else if (confidence >= Math.max(threshold * 0.7, 20)) {
         badgeClass = 'medium';
         badgeText = `🤖 AI検出 ${Math.round(confidence)}%`;
       } else {
@@ -2933,7 +2712,7 @@
 
   // 列マッピング確認
   function verifyColumnMapping() {
-    if (!RequestGate.enter('verifyColumnMapping')) {
+    if (!ClientMutex.acquire('verifyColumnMapping')) {
       showInfo('検証処理を実行中です…');
       return;
     }
@@ -3001,7 +2780,7 @@
     showSuccess('列マッピングの検証が完了しました');
     updateProgress(3);
     setLoading(false);
-    RequestGate.exit('verifyColumnMapping');
+    ClientMutex.release('verifyColumnMapping');
   }
 
   // 検証結果の表示
@@ -3087,8 +2866,8 @@
 
   // 列設定の保存
   function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping) {
-    // 🔧 CLAUDE.md準拠: RequestGateで重複実行防止
-    if (!RequestGate.enter('saveColumnConfiguration')) {
+    // 🔧 CLAUDE.md準拠: ClientMutexで重複実行防止
+    if (!ClientMutex.acquire('saveColumnConfiguration')) {
       showInfo('列設定の保存処理を実行中です…');
       return;
     }
@@ -3115,7 +2894,7 @@
       // 既存設定から保持すべきフィールドのみ明示的に取得
       userId: systemState.config.userId,
       setupStatus: systemState.config.setupStatus,
-      appPublished: systemState.config.appPublished,
+      isPublished: systemState.config.isPublished,
       publishedAt: systemState.config.publishedAt,
       userPermissions: systemState.config.userPermissions,
       displaySettings: systemState.config.displaySettings,
@@ -3246,12 +3025,12 @@
               console.warn('列設定の保存に失敗:', result.error);
             }
           }
-          RequestGate.exit('saveColumnConfiguration');
+          ClientMutex.release('saveColumnConfiguration');
         })
         .withFailureHandler(function (error) {
           console.error('列設定保存エラー:', error);
           showError('列設定の保存に失敗しました');
-          RequestGate.exit('saveColumnConfiguration');
+          ClientMutex.release('saveColumnConfiguration');
         })
         .saveConfig(optimizedConfig);
     }
@@ -3259,7 +3038,7 @@
 
   // 下書き保存
   function saveDraft() {
-    if (!RequestGate.enter('saveDraft')) {
+    if (!ClientMutex.acquire('saveDraft')) {
       showInfo('保存処理を実行中です…');
       return;
     }
@@ -3279,20 +3058,20 @@
           showError(result.error);
         }
         setLoading(false);
-        RequestGate.exit('saveDraft');
+        ClientMutex.release('saveDraft');
       })
       .withFailureHandler(function (error) {
         console.error('保存エラー:', error);
         showError('下書きの保存に失敗しました');
         setLoading(false);
-        RequestGate.exit('saveDraft');
+        ClientMutex.release('saveDraft');
       })
       .saveConfig(config, { isDraft: true });
   }
 
   // アプリ公開（getConfig依存を削除して重複保存防止版）
   function publishApp() {
-    if (!RequestGate.enter('publishApp')) {
+    if (!ClientMutex.acquire('publishApp')) {
       showInfo('公開処理を実行中です…');
       return;
     }
@@ -3319,7 +3098,7 @@
         });
         showError('まずデータソースを設定してください。');
         setLoading(false);
-        RequestGate.exit('publishApp');
+        ClientMutex.release('publishApp');
         return;
       }
 
@@ -3359,7 +3138,7 @@
                   // フォールバック: 手動で設定を構築
                   const updatedConfig = {
                     ...publishConfig,
-                    appPublished: true,
+                    isPublished: true,
                     publishedAt: result.publishedAt || new Date().toISOString(),
                     setupComplete: true
                   };
@@ -3375,7 +3154,7 @@
                 // フォールバック: 手動で設定を構築
                 const updatedConfig = {
                   ...publishConfig,
-                  appPublished: true,
+                  isPublished: true,
                   publishedAt: result.publishedAt || new Date().toISOString(),
                   setupComplete: true
                 };
@@ -3402,7 +3181,7 @@
             }
           }
           setLoading(false);
-          RequestGate.exit('publishApp');
+          ClientMutex.release('publishApp');
         })
         .withFailureHandler(function (error) {
           console.error('公開エラー:', error);
@@ -3410,7 +3189,7 @@
             'アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。'
           );
           setLoading(false);
-          RequestGate.exit('publishApp');
+          ClientMutex.release('publishApp');
         })
         .publishApplication(publishConfig);
 
@@ -3418,7 +3197,7 @@
       console.error('❌ publishApp: UI設定収集エラー:', error);
       showError('設定の収集に失敗しました: ' + error.message);
       setLoading(false);
-      RequestGate.exit('publishApp');
+      ClientMutex.release('publishApp');
     }
   }
 
@@ -3592,7 +3371,7 @@
     try {
       // 同一の設定データでの重複実行を防ぐ
       const configHash = config ? JSON.stringify({
-        appPublished: config.appPublished,
+        isPublished: config.isPublished,
         spreadsheetId: config.spreadsheetId,
         spreadsheetName: config.spreadsheetName,
         sheetName: config.sheetName,
@@ -3604,11 +3383,11 @@
       }
       lastConfigUpdate = configHash;
 
-      // 公開ステータス更新
-      const appPublished = config?.appPublished === true || config?.appPublished === 'true';
+      // 🔧 統一設定チェック: ConfigHelpers使用で型整合性保証
+      const isPublished = ConfigHelpers.isPublished(config);
       const publishBadge = document.getElementById('app-publish-status');
       if (publishBadge) {
-        if (appPublished) {
+        if (isPublished) {
           publishBadge.className = 'status-badge published';
           publishBadge.textContent = '公開中';
         } else {
@@ -3721,18 +3500,13 @@
     const copyBtn = document.getElementById('copyViewUrlBtn');
     const statusText = document.getElementById('boardStatus');
 
-    // ✅ configJSON中心型：統一データソースからの公開状態チェック
-    const isPublished = Boolean(
-      boardInfo.appPublished === true ||
-        boardInfo.appPublished === 'true' ||
-        boardInfo.appPublished === '1' ||
-        boardInfo.isActive === true
-    );
+    // 🔧 統一設定チェック: ConfigHelpers使用で型整合性保証
+    const isPublished = ConfigHelpers.isPublished(boardInfo);
 
     console.log('🔍 フッター表示判定:', {
-      appPublished: boardInfo.appPublished,
+      isPublished: boardInfo.isPublished,
       isActive: boardInfo.isActive,
-      isPublished: isPublished,
+      finalIsPublished: isPublished,
       timestamp: new Date().toISOString(),
     });
 

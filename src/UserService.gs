@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global ServiceFactory, validateUrl, validateEmail, getCurrentEmail, Data, getConfigSafe */
+/* global ServiceFactory, validateUrl, validateEmail, getCurrentEmail, Data, getUserConfig, authIsAdministrator, CACHE_DURATION */
 
 // ===========================================
 // 🔧 Zero-Dependency UserService (ServiceFactory版)
@@ -31,7 +31,7 @@
  * 現在のユーザー情報取得（キャッシュ対応）
  * @returns {Object|null} ユーザー情報オブジェクト
  */
-function getCurrentUserInfo() {
+function authGetCurrentUserInfo() {
   const cacheKey = 'current_user_info';
 
   try {
@@ -58,10 +58,10 @@ function getCurrentUserInfo() {
     }
 
     // 設定情報を統合
-    const completeUserInfo = enrichUserInfo(userInfo);
+    const completeUserInfo = configEnrichUserInfo(userInfo);
 
     // キャッシュ保存（5分間）
-    cache.put(cacheKey, JSON.stringify(completeUserInfo), 300);
+    cache.put(cacheKey, JSON.stringify(completeUserInfo), CACHE_DURATION.LONG);
 
     return completeUserInfo;
   } catch (error) {
@@ -78,14 +78,14 @@ function getCurrentUserInfo() {
  * @param {Object} userInfo - 基本ユーザー情報
  * @returns {Object} 拡張されたユーザー情報
  */
-function enrichUserInfo(userInfo) {
+function configEnrichUserInfo(userInfo) {
     try {
       if (!userInfo || !userInfo.userId) {
         throw new Error('無効なユーザー情報');
       }
 
       // 統一API使用: 構造化パース
-      const configResult = getConfigSafe(userInfo.userId);
+      const configResult = getUserConfig(userInfo.userId);
       const config = configResult.success ? configResult.config : {};
 
       // 動的URLを生成・キャッシュ
@@ -120,11 +120,13 @@ function generateDynamicUserUrls(config) {
 
       // スプレッドシートURL生成
       if (config.spreadsheetId && !config.spreadsheetUrl) {
-        enhanced.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`;
+        if (config.spreadsheetId && typeof config.spreadsheetId === 'string') {
+          enhanced.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`;
+        }
       }
 
       // アプリURL生成（公開済みの場合）
-      if (config.appPublished && !config.appUrl) {
+      if (config.isPublished && !config.appUrl) {
         enhanced.appUrl = ServiceFactory.getUtils().getWebAppUrl();
       }
 
@@ -147,16 +149,17 @@ function generateDynamicUserUrls(config) {
 /**
  * ユーザーアクセスレベル取得
  * @param {string} userId - ユーザーID
- * @returns {string} アクセスレベル (owner/system_admin/authenticated_user/guest/none)
+ * @returns {string} アクセスレベル (editor/administrator/authenticated_user/guest/none)
+ * @deprecated Use getUnifiedAccessLevel() instead for email-based access control
  */
-function getUserAccessLevel(userId) {
+function authGetUserAccessLevel(userId) {
   try {
     const ACCESS_LEVELS = {
       NONE: 'none',
       GUEST: 'guest',
       AUTHENTICATED_USER: 'authenticated',
-      OWNER: 'owner',
-      SYSTEM_ADMIN: 'system_admin'
+      EDITOR: 'editor', // 旧: OWNER
+      ADMINISTRATOR: 'administrator' // 旧: SYSTEM_ADMIN
     };
 
     if (!userId) {
@@ -173,14 +176,14 @@ function getUserAccessLevel(userId) {
       return ACCESS_LEVELS.NONE;
     }
 
-    // 所有者チェック
+    // 編集者チェック（旧: 所有者）
     if (userInfo.userEmail === currentEmail) {
-      return ACCESS_LEVELS.OWNER;
+      return ACCESS_LEVELS.EDITOR;
     }
 
-    // システム管理者チェック
-    if (isSystemAdmin(currentEmail)) {
-      return ACCESS_LEVELS.SYSTEM_ADMIN;
+    // 管理者チェック（Administrator）
+    if (authIsAdministrator(currentEmail)) {
+      return ACCESS_LEVELS.ADMINISTRATOR;
     }
 
     // 認証済みユーザー
@@ -189,8 +192,8 @@ function getUserAccessLevel(userId) {
     const currentEmailForLog = getCurrentEmail();
     console.error('UserService.getAccessLevel: エラー', {
       operation: 'getAccessLevel',
-      userId: `${userId?.substring(0, 8)  }***`,
-      currentEmail: currentEmailForLog ? `${currentEmailForLog.split('@')[0]  }@***` : 'N/A',
+      userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
+      currentEmail: currentEmailForLog && typeof currentEmailForLog === 'string' ? `${currentEmailForLog.split('@')[0]}@***` : 'N/A',
       error: error.message,
       stack: error.stack
     });
@@ -199,65 +202,56 @@ function getUserAccessLevel(userId) {
 }
 
 /**
- * 所有者権限確認
+ * 編集者権限確認（旧: 所有者権限確認）
  * @param {string} userId - 確認対象ユーザーID
- * @returns {boolean} 所有者かどうか
+ * @returns {boolean} 編集者かどうか
  */
-function verifyUserOwnership(userId) {
-  const accessLevel = getUserAccessLevel(userId);
-  // 🔧 CONSTANTS依存除去: 直接値比較
-  return accessLevel === 'owner';
+function checkUserEditorAccess(userId) {
+  const accessLevel = authGetUserAccessLevel(userId);
+  // 🔧 用語統一: owner → editor
+  return accessLevel === 'editor';
 }
 
+
+// ===========================================
+// 🔐 統一認証システム（Administrator/Editor/Viewer）
+// ===========================================
+
+
 /**
- * システム管理者確認
+ * 編集者権限判定（Editor）
  * @param {string} email - メールアドレス
- * @returns {boolean} システム管理者かどうか
+ * @param {string} targetUserId - 対象ユーザーID
+ * @returns {boolean} 編集権限があるか
  */
-function isSystemAdmin(email) {
+function isEditor(email, targetUserId) {
+  if (!email || !targetUserId) {
+    return false;
+  }
+
   try {
-    if (!email) {
-      return false;
-    }
-
-    const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
-
-    if (!adminEmail) {
-      console.warn('UserService.isSystemAdmin: ADMIN_EMAILが設定されていません');
-      return false;
-    }
-
-    // 管理者メールと一致チェック
-    const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
-
-    if (isAdmin) {
-      console.info('UserService.isSystemAdmin: システム管理者を認証', { email });
-    }
-
-    return isAdmin;
+    const user = Data.findUserByEmail(email);
+    return user && user.userId === targetUserId;
   } catch (error) {
-    console.error('UserService.isSystemAdmin: エラー', {
-      email,
-      error: error.message
-    });
+    console.error('UserService.isEditor: エラー', error.message);
     return false;
   }
 }
 
-// ===========================================
-// 🌍 Compatibility Export (minimal shim)
-// ===========================================
+/**
+ * 統一アクセスレベル取得（Email-based）
+ * @param {string} email - メールアドレス
+ * @param {string} targetUserId - 対象ユーザーID（オプショナル）
+ * @returns {string} アクセスレベル
+ */
+function getUnifiedAccessLevel(email, targetUserId) {
+  if (authIsAdministrator(email)) return 'administrator';
+  if (targetUserId && isEditor(email, targetUserId)) return 'editor';
+  return email ? 'authenticated_user' : 'guest';
+}
 
-(function () {
-  const root = (typeof globalThis !== 'undefined') ? globalThis : this;
-  // Ensure UserService namespace exists for callers using UserService.isSystemAdmin
-  if (!root.UserService) {
-    root.UserService = {};
-  }
-  if (typeof root.UserService.isSystemAdmin !== 'function') {
-    root.UserService.isSystemAdmin = isSystemAdmin;
-  }
-})();
+
+
 
 // ===========================================
 // 🔄 ユーザー操作
@@ -272,39 +266,7 @@ function isSystemAdmin(email) {
  * ユーザーキャッシュクリア
  * @param {string} userId - ユーザーID（オプション、未指定時は全体）
  */
-function clearUserCache(userId = null) {
-    // CacheServiceに統一委譲
-    const cache = ServiceFactory.getCache();
-    const cacheKey = userId ? `user_info_${userId}` : 'current_user_info';
-    return cache.remove(cacheKey);
-}
 
-/**
- * セッション状態確認
- * @returns {Object} セッション状態情報
- */
-function getUserSessionStatus() {
-    try {
-      const email = getCurrentEmail();
-      const userInfo = email ? getCurrentUserInfo() : null;
-
-      return {
-        isAuthenticated: !!email,
-        userEmail: email,
-        hasUserInfo: !!userInfo,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('UserService.getSessionStatus: エラー', error.message);
-      return {
-        isAuthenticated: false,
-        userEmail: null,
-        hasUserInfo: false,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
-    }
-}
 
 // ===========================================
 // 🔧 ユーティリティ

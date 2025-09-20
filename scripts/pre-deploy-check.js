@@ -107,7 +107,7 @@ class DeploymentValidator {
     ];
 
     const requiredMethods = {
-      'UserService': ['getCurrentEmail', 'getCurrentUserInfo', 'isSystemAdmin'],
+      'UserService': ['getCurrentEmail', 'getCurrentUserInfo', 'isAdministrator'],
       'ConfigService': ['hasCoreSystemProps', 'isSystemSetup'],
       'DataService': ['getUserSheetData', 'processReaction', 'processRawData']
     };

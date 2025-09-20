@@ -127,7 +127,7 @@ function validateUrl(url) {
       }
 
       result.isValid = true;
-      result.sanitized = `${parsed.protocol}//${parsed.hostname}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      result.sanitized = `${parsed.protocol  }//${  parsed.hostname  }${parsed.pathname  }${parsed.search  }${parsed.hash}`;
       result.metadata = {
         protocol: parsed.protocol,
         hostname: parsed.hostname,
@@ -173,12 +173,12 @@ function validateText(text, options = {}) {
 
     // 長さチェック
     if (sanitized.length < minLength) {
-      result.errors.push(`${minLength}文字以上である必要があります`);
+      result.errors.push(`${minLength  }文字以上である必要があります`);
       return result;
     }
 
     if (sanitized.length > maxLength) {
-      result.errors.push(`${maxLength}文字以下である必要があります`);
+      result.errors.push(`${maxLength  }文字以下である必要があります`);
       return result;
     }
 
@@ -297,7 +297,7 @@ function validateColumnMapping(columnMapping) {
     for (const col of requiredColumns) {
       const index = mapping[col];
       if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
-        result.errors.push(`必須列 '${col}' が正しくマッピングされていません`);
+        result.errors.push(`必須列 '${  col  }' が正しくマッピングされていません`);
       }
     }
 
@@ -306,7 +306,7 @@ function validateColumnMapping(columnMapping) {
       const index = mapping[col];
       if (index !== undefined) {
         if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
-          result.warnings.push(`オプション列 '${col}' のマッピングが無効です`);
+          result.warnings.push(`オプション列 '${  col  }' のマッピングが無効です`);
         }
       }
     }
@@ -321,7 +321,7 @@ function validateColumnMapping(columnMapping) {
     // 未知の列チェック
     for (const col of Object.keys(mapping)) {
       if (!allColumns.includes(col)) {
-        result.warnings.push(`未知の列タイプ '${col}' が含まれています`);
+        result.warnings.push(`未知の列タイプ '${  col  }' が含まれています`);
       }
     }
 
@@ -358,14 +358,14 @@ function validateConfig(config) {
       const value = config[field];
       
       if (required && !value) {
-        result.errors.push(`必須フィールド '${field}' が不足しています`);
+        result.errors.push(`必須フィールド '${  field  }' が不足しています`);
         continue;
       }
 
       if (value) {
         const validation = validator(value);
         if (!validation.isValid) {
-          result.errors.push(`${field}: ${validation.errors.join(', ')}`);
+          result.errors.push(`${field  }: ${  validation.errors.join(', ')}`);
         } else {
           result.sanitized[field] = validation.sanitized || value;
         }
@@ -387,7 +387,7 @@ function validateConfig(config) {
     }
 
     // ブール値フィールド
-    const booleanFields = ['appPublished', 'showNames', 'showReactions'];
+    const booleanFields = ['isPublished', 'showNames', 'showReactions'];
     booleanFields.forEach(field => {
       if (config[field] !== undefined) {
         result.sanitized[field] = Boolean(config[field]);
@@ -412,6 +412,64 @@ function validateConfig(config) {
  * バリデーター診断
  * @returns {Object} 診断結果
  */
+function diagnoseValidators() {
+  const result = {
+    service: 'Validators',
+    timestamp: new Date().toISOString(),
+    checks: []
+  };
+
+  // 基本バリデーター関数のテスト
+  try {
+    const emailTest = validateEmail('test@example.com');
+    result.checks.push({
+      name: 'Email Validator',
+      status: emailTest.isValid ? '✅' : '❌',
+      details: emailTest.isValid ? 'Email validation working' : 'Email validation failed'
+    });
+  } catch (error) {
+    result.checks.push({
+      name: 'Email Validator',
+      status: '❌',
+      details: error.message
+    });
+  }
+
+  // URL バリデーターのテスト
+  try {
+    const urlTest = validateUrl('https://docs.google.com/spreadsheets/d/test');
+    result.checks.push({
+      name: 'URL Validator',
+      status: urlTest.isValid ? '✅' : '❌',
+      details: urlTest.isValid ? 'URL validation working' : 'URL validation failed'
+    });
+  } catch (error) {
+    result.checks.push({
+      name: 'URL Validator',
+      status: '❌',
+      details: error.message
+    });
+  }
+
+  // テキストバリデーターのテスト
+  try {
+    const textTest = validateText('テストテキスト');
+    result.checks.push({
+      name: 'Text Validator',
+      status: textTest.isValid ? '✅' : '❌',
+      details: textTest.isValid ? 'Text validation working' : 'Text validation failed'
+    });
+  } catch (error) {
+    result.checks.push({
+      name: 'Text Validator',
+      status: '❌',
+      details: error.message
+    });
+  }
+
+  result.overall = result.checks.every(check => check.status === '✅') ? '✅' : '⚠️';
+  return result;
+}
 
 /**
  * フォーム-スプレッドシート整合性検証
@@ -506,7 +564,7 @@ function validateFormLink(formUrl, spreadsheetId) {
 
     return result;
   } catch (error) {
-    result.errors.push(`Validation error: ${error.message}`);
+    result.errors.push(error && error.message ? `Validation error: ${error.message}` : 'Validation error: 詳細不明');
     return result;
   }
 }

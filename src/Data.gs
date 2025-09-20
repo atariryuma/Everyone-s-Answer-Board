@@ -8,7 +8,7 @@
  * - ヘッダー保護機能
  */
 
-/* global Auth, ServiceFactory, RequestGate */
+/* global Auth, ServiceFactory, CACHE_DURATION */
 
 /**
  * 統一データアクセスクラス
@@ -62,13 +62,13 @@ class Data {
         // Header-safe update operation
         update(sheetName, values, options = {}) {
           const sheet = this.getSheet(sheetName);
-          return Data.safeUpdate(sheet, values, options);
+          return Data.update(sheet, values, options);
         },
 
         // Header-safe append operation
         append(sheetName, values) {
           const sheet = this.getSheet(sheetName);
-          return Data.safeAppend(sheet, values);
+          return Data.append(sheet, values);
         }
       };
     } catch (error) {
@@ -147,7 +147,7 @@ class Data {
    * @param {Object} options - Update options
    * @returns {Object} Update result
    */
-  static safeUpdate(sheet, values, options = {}) {
+  static update(sheet, values, options = {}) {
     try {
       if (!values || values.length === 0) {
         return { success: true, updatedRows: 0 };
@@ -161,7 +161,7 @@ class Data {
         const firstCell = sheet.getRange(1, 1).getValue();
         if (firstCell === 'userId' || (typeof firstCell === 'string' && firstCell.includes('userId'))) {
           startRow = 2;
-          console.log('Data.safeUpdate: Header row detected, preserving and starting from row 2');
+          console.log('Data.update: Header row detected, preserving and starting from row 2');
         }
       }
 
@@ -175,7 +175,7 @@ class Data {
         startRow
       };
     } catch (error) {
-      console.error('Data.safeUpdate error:', error.message);
+      console.error('Data.update error:', error.message);
       return {
         success: false,
         error: error.message,
@@ -190,7 +190,7 @@ class Data {
    * @param {Array} values - Values to append
    * @returns {Object} Append result
    */
-  static safeAppend(sheet, values) {
+  static append(sheet, values) {
     try {
       if (!values || values.length === 0) {
         return { success: true, appendedRows: 0 };
@@ -206,7 +206,7 @@ class Data {
         startRow: lastRow + 1
       };
     } catch (error) {
-      console.error('Data.safeAppend error:', error.message);
+      console.error('Data.append error:', error.message);
       return {
         success: false,
         error: error.message,
@@ -232,9 +232,9 @@ class Data {
       const sheet = spreadsheet.getSheetByName(request.sheetName) || spreadsheet.getSheets()[0];
 
       if (request.operation === 'update') {
-        return this.safeUpdate(sheet, request.values, request.options);
+        return this.update(sheet, request.values, request.options);
       } else if (request.operation === 'append') {
-        return this.safeAppend(sheet, request.values);
+        return this.append(sheet, request.values);
       } else {
         throw new Error(`Unsupported write operation: ${  request.operation}`);
       }
@@ -398,7 +398,7 @@ class Data {
       // Check if user already exists
       const existingUser = this.findUserByEmail(email);
       if (existingUser) {
-        console.info('Data.createUser: 既存ユーザーを返却', { email: `${email.substring(0, 5)}***` });
+        console.info('Data.createUser: 既存ユーザーを返却', { email: `${email.substring(0, 5)  }***` });
         return existingUser;
       }
 
@@ -429,7 +429,7 @@ class Data {
       // CLAUDE.md準拠: 最小限かつ完全なconfigJSON
       const minimalConfig = {
         setupStatus: 'pending',
-        appPublished: false,
+        isPublished: false,
         displaySettings: {
           showNames: false,
           showReactions: false
@@ -450,15 +450,15 @@ class Data {
 
       // Append user using header-safe method - Sheets API対応
       const lastColumn = usersSheet.getLastColumn();
-      const headerRange = `A1:${Data.columnToLetter(lastColumn)}1`;
+      const headerRange = `A1:${  Data.columnToLetter(lastColumn)  }1`;
       const [headers] = usersSheet.getRange(headerRange).getValues();
       const newRow = headers.map(header => newUser[header] || '');
 
       usersSheet.appendRow(newRow);
 
       console.info('Data.createUser: 新規ユーザー作成完了', {
-        email: `${email.substring(0, 5)}***`,
-        userId: `${userId.substring(0, 8)}***`
+        email: `${email.substring(0, 5)  }***`,
+        userId: `${userId.substring(0, 8)  }***`
       });
 
       return newUser;
@@ -505,18 +505,21 @@ class Data {
         };
       }
 
-      // 🔧 CLAUDE.md準拠: 原子的トランザクション - 競合状態防止
-      const transactionKey = `update_user_${userId}`;
+      // 🔧 統一ミューテックス: CacheService-based トランザクション
+      const transactionKey = `update_user_${  userId}`;
+      const cache = ServiceFactory.getCache();
 
-      if (typeof RequestGate !== 'undefined' && !RequestGate.enter(transactionKey)) {
+      // トランザクション排他制御
+      if (cache.get(transactionKey)) {
         console.warn('Data.updateUser: Transaction in progress for user:', userId);
         return {
           success: false,
           error: 'User update transaction in progress'
         };
-      } else if (typeof RequestGate === 'undefined') {
-        console.warn('Data.updateUser: RequestGate not available, proceeding without transaction lock');
       }
+
+      try {
+        cache.put(transactionKey, true, CACHE_DURATION.MEDIUM); // 30秒ロック
 
       let spreadsheet = null;
       try {
@@ -532,7 +535,8 @@ class Data {
         if (!spreadsheet) {
           throw new Error('Failed to open spreadsheet with service account');
         }
-      const usersSheet = spreadsheet.getSheetByName('users') || spreadsheet.getSheets()[0];
+
+        const usersSheet = spreadsheet.getSheetByName('users') || spreadsheet.getSheets()[0];
 
       const data = usersSheet.getDataRange().getValues();
       const [headers] = data;
@@ -557,7 +561,7 @@ class Data {
       }
 
         if (userRowIndex === -1) {
-          if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
+          cache.remove(transactionKey);
           return {
             success: false,
             error: 'User not found'
@@ -577,7 +581,7 @@ class Data {
       });
 
         if (updateCount === 0) {
-          if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
+          cache.remove(transactionKey);
           return {
             success: false,
             error: 'No matching columns found to update'
@@ -587,28 +591,36 @@ class Data {
       // Write updated row back to sheet - Sheets API対応
       const rowNumber = userRowIndex + 1;
       const endColumn = Data.columnToLetter(updatedRow.length);
-      const rangeNotation = `A${rowNumber}:${endColumn}${rowNumber}`;
+      const rangeNotation = `A${  rowNumber  }:${  endColumn  }${rowNumber}`;
       const range = usersSheet.getRange(rangeNotation);
       range.setValues([updatedRow]);
 
+      return {
+        success: true,
+        updatedFields: updateCount,
+        userId
+      };
+      } catch (spreadsheetError) {
+        console.error('Data.updateUser spreadsheet error:', spreadsheetError.message);
         return {
-          success: true,
-          updatedFields: updateCount,
-          userId
+          success: false,
+          error: `Spreadsheet access error: ${  spreadsheetError.message}`
         };
-      } catch (error) {
+      }
+    } catch (error) {
         console.error('Data.updateUser error:', error.message);
         return {
           success: false,
           error: error.message
         };
       } finally {
-        if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
+        cache.remove(transactionKey);
       }
     } catch (outerError) {
       console.error('Data.updateUser outer error:', outerError.message);
-      const transactionKey = `update_user_${userId}`;
-      if (typeof RequestGate !== 'undefined') RequestGate.exit(transactionKey);
+      const transactionKey = `update_user_${  userId}`;
+      const cache = ServiceFactory.getCache();
+      cache.remove(transactionKey);
       return {
         success: false,
         error: outerError.message
@@ -695,7 +707,7 @@ class Data {
       throw new Error('Invalid access token: must be a non-empty string');
     }
 
-    const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
+    const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${  spreadsheetId}`;
 
     return {
       getId: () => spreadsheetId,
@@ -705,7 +717,7 @@ class Data {
           const response = UrlFetchApp.fetch(sheetsApiBase, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
+              'Authorization': `Bearer ${  accessToken}`,
               'Content-Type': 'application/json'
             },
             muteHttpExceptions: true
@@ -713,13 +725,13 @@ class Data {
 
           const data = JSON.parse(response.getContentText());
           if (response.getResponseCode() !== 200) {
-            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+            throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
           }
 
           return data.properties?.title || 'Unknown Spreadsheet';
         } catch (error) {
           console.error('getName error:', error.message);
-          return `Spreadsheet (ID: ${spreadsheetId.substring(0, 8)}...)`;
+          return `Spreadsheet (ID: ${  spreadsheetId.substring(0, 8)  }...)`;
         }
       },
 
@@ -732,7 +744,7 @@ class Data {
           const response = UrlFetchApp.fetch(sheetsApiBase, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
+              'Authorization': `Bearer ${  accessToken}`,
               'Content-Type': 'application/json'
             },
             muteHttpExceptions: true
@@ -740,7 +752,7 @@ class Data {
 
           const data = JSON.parse(response.getContentText());
           if (response.getResponseCode() !== 200) {
-            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+            throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
           }
 
           return data.sheets.map(sheet =>
@@ -766,7 +778,7 @@ class Data {
    * @returns {Object} Sheet wrapper object
    */
   static createSheetWrapper(spreadsheetId, sheetName, accessToken) {
-    const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}`;
+    const sheetsApiBase = `https://sheets.googleapis.com/v4/spreadsheets/${  spreadsheetId}`;
 
     return {
       getName: () => sheetName,
@@ -780,10 +792,10 @@ class Data {
 
       getIndex() {
         try {
-          const response = UrlFetchApp.fetch(`${sheetsApiBase}`, {
+          const response = UrlFetchApp.fetch(sheetsApiBase, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
+              'Authorization': `Bearer ${  accessToken}`,
               'Content-Type': 'application/json'
             },
             muteHttpExceptions: true
@@ -791,7 +803,7 @@ class Data {
 
           const data = JSON.parse(response.getContentText());
           if (response.getResponseCode() !== 200) {
-            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+            throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
           }
 
           const sheetIndex = data.sheets.findIndex(s => s.properties.title === sheetName);
@@ -807,7 +819,7 @@ class Data {
           const response = UrlFetchApp.fetch(sheetsApiBase, {
             method: 'GET',
             headers: {
-              'Authorization': `Bearer ${accessToken}`,
+              'Authorization': `Bearer ${  accessToken}`,
               'Content-Type': 'application/json'
             },
             muteHttpExceptions: true
@@ -815,7 +827,7 @@ class Data {
 
           const data = JSON.parse(response.getContentText());
           if (response.getResponseCode() !== 200) {
-            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+            throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
           }
 
           const sheet = data.sheets.find(s => s.properties.title === sheetName);
@@ -831,11 +843,11 @@ class Data {
           getValues() {
             try {
               const response = UrlFetchApp.fetch(
-                `${sheetsApiBase}/values/${sheetName}!A:Z?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`,
+                `${sheetsApiBase  }/values/${  sheetName  }!A:Z?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING`,
                 {
                   method: 'GET',
                   headers: {
-                    'Authorization': `Bearer ${accessToken}`,
+                    'Authorization': `Bearer ${  accessToken}`,
                     'Content-Type': 'application/json'
                   },
                   muteHttpExceptions: true
@@ -844,7 +856,7 @@ class Data {
 
               const data = JSON.parse(response.getContentText());
               if (response.getResponseCode() !== 200) {
-                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+                throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
               }
 
               return data.values || [];
@@ -863,7 +875,7 @@ class Data {
             {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': `Bearer ${  accessToken}`,
                 'Content-Type': 'application/json'
               },
               muteHttpExceptions: true
@@ -872,7 +884,7 @@ class Data {
 
           const data = JSON.parse(response.getContentText());
           if (response.getResponseCode() !== 200) {
-            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+            throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
           }
 
           return data.values ? data.values.length : 0;
@@ -889,7 +901,7 @@ class Data {
             {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': `Bearer ${  accessToken}`,
                 'Content-Type': 'application/json'
               },
               muteHttpExceptions: true
@@ -898,7 +910,7 @@ class Data {
 
           const data = JSON.parse(response.getContentText());
           if (response.getResponseCode() !== 200) {
-            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+            throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
           }
 
           return data.values && data.values[0] ? data.values[0].length : 0;
@@ -925,7 +937,7 @@ class Data {
                 {
                   method: 'GET',
                   headers: {
-                    'Authorization': `Bearer ${accessToken}`,
+                    'Authorization': `Bearer ${  accessToken}`,
                     'Content-Type': 'application/json'
                   },
                   muteHttpExceptions: true
@@ -934,7 +946,7 @@ class Data {
 
               const data = JSON.parse(response.getContentText());
               if (response.getResponseCode() !== 200) {
-                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+                throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
               }
 
               return data.values || [];
@@ -951,7 +963,7 @@ class Data {
                 {
                   method: 'PUT',
                   headers: {
-                    'Authorization': `Bearer ${accessToken}`,
+                    'Authorization': `Bearer ${  accessToken}`,
                     'Content-Type': 'application/json'
                   },
                   payload: JSON.stringify({
@@ -963,7 +975,7 @@ class Data {
 
               const data = JSON.parse(response.getContentText());
               if (response.getResponseCode() !== 200) {
-                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+                throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
               }
 
               return data;
@@ -980,7 +992,7 @@ class Data {
                 {
                   method: 'GET',
                   headers: {
-                    'Authorization': `Bearer ${accessToken}`,
+                    'Authorization': `Bearer ${  accessToken}`,
                     'Content-Type': 'application/json'
                   },
                   muteHttpExceptions: true
@@ -989,7 +1001,7 @@ class Data {
 
               const data = JSON.parse(response.getContentText());
               if (response.getResponseCode() !== 200) {
-                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+                throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
               }
 
               return data.values && data.values[0] && data.values[0][0] ? data.values[0][0] : null;
@@ -1006,7 +1018,7 @@ class Data {
                 {
                   method: 'PUT',
                   headers: {
-                    'Authorization': `Bearer ${accessToken}`,
+                    'Authorization': `Bearer ${  accessToken}`,
                     'Content-Type': 'application/json'
                   },
                   payload: JSON.stringify({
@@ -1018,7 +1030,7 @@ class Data {
 
               const data = JSON.parse(response.getContentText());
               if (response.getResponseCode() !== 200) {
-                throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+                throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
               }
 
               return data;
@@ -1037,7 +1049,7 @@ class Data {
             {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${accessToken}`,
+                'Authorization': `Bearer ${  accessToken}`,
                 'Content-Type': 'application/json'
               },
               payload: JSON.stringify({
@@ -1049,7 +1061,7 @@ class Data {
 
           const data = JSON.parse(response.getContentText());
           if (response.getResponseCode() !== 200) {
-            throw new Error(`Sheets API error: ${data.error?.message || response.getResponseCode()}`);
+            throw new Error(`Sheets API error: ${  data.error?.message || response.getResponseCode()}`);
           }
 
           return data;

@@ -1,4 +1,4 @@
-/* global Auth, Data, RequestGate */
+/* global Auth, Data, CACHE_DURATION, SLEEP_MS */
 /**
  * @fileoverview ServiceFactory - 統一サービスアクセス層
  *
@@ -14,7 +14,7 @@
  * - プラットフォームAPI統合
  */
 
-/* global getUserSheetData, dsAddReaction, dsToggleHighlight, getUserConfig, validateUserData, validateSession, connectToSheetInternal, getFormInfo */
+/* global dsGetUserSheetData, dsAddReaction, dsToggleHighlight, validateUserData, validateSession, connectToSheetInternal, getFormInfo */
 
 // ===========================================
 // 🔧 Session Management
@@ -171,15 +171,15 @@ function getSpreadsheet() {
     openById(id) {
       const authKey = `spreadsheet_auth_${id}`;
 
-      // 🛡️ RequestGate safe access (optional dependency)
-      if (typeof RequestGate !== 'undefined' && !RequestGate.enter(authKey)) {
+      // 🛡️ Cache-based safe access - 認証重複防止
+      const cache = CacheService.getScriptCache();
+      if (cache.get(authKey)) {
         console.warn('ServiceFactory.getSpreadsheet.openById: Authentication in progress, waiting...');
-        Utilities.sleep(200);
-      } else if (typeof RequestGate !== 'undefined') {
-        RequestGate.exit(authKey);
+        Utilities.sleep(SLEEP_MS.MEDIUM);
       }
 
       try {
+        cache.put(authKey, true, CACHE_DURATION.SHORT); // 10秒間の認証ロック
         // 🔧 CLAUDE.md準拠: サービスアカウント専用アクセス - セキュリティ強化
         const auth = typeof Auth !== 'undefined' ? Auth.serviceAccount() : null;
 
@@ -204,12 +204,29 @@ function getSpreadsheet() {
       } catch (error) {
         console.error('ServiceFactory.getSpreadsheet.openById: Error opening spreadsheet:', error.message);
         return null;
+      } finally {
+        // 🔧 認証ロックキャッシュのクリア
+        cache.remove(authKey);
       }
     },
 
     create(name) {
       try {
-        return SpreadsheetApp.create(name);
+        // 🔧 データアクセス統一性: サービスアカウント経由でスプレッドシートを作成
+        const spreadsheet = SpreadsheetApp.create(name);
+
+        // サービスアカウント権限自動付与（Data.openパターンに統一）
+        const auth = Auth.serviceAccount();
+        if (auth.isValid) {
+          try {
+            DriveApp.getFileById(spreadsheet.getId()).addEditor(auth.email);
+            console.log('ServiceFactory.getSpreadsheet.create: Service account editor access granted:', auth.email);
+          } catch (driveError) {
+            console.warn('ServiceFactory.getSpreadsheet.create: Service account access:', driveError.message);
+          }
+        }
+
+        return spreadsheet;
       } catch (error) {
         console.error('ServiceFactory.getSpreadsheet.create: Error creating spreadsheet:', error.message);
         return null;
@@ -271,29 +288,6 @@ function getUtils() {
   };
 }
 
-// ===========================================
-// 👤 User Service Accessor
-// ===========================================
-
-function getUserService() {
-  try {
-    const root = (typeof globalThis !== 'undefined') ? globalThis : this;
-    if (root.UserService && typeof root.UserService.isSystemAdmin === 'function') {
-      return root.UserService;
-    }
-    // Fallback: wrap global isSystemAdmin function if available
-    if (typeof global.isSystemAdmin === 'function') {
-      return { isSystemAdmin: global.isSystemAdmin };
-    }
-    // Safe default stub
-    return {
-      isSystemAdmin: () => false
-    };
-  } catch (error) {
-    console.warn('ServiceFactory.getUserService: Access error:', error.message);
-    return { isSystemAdmin: () => false };
-  }
-}
 
 // ===========================================
 // 📊 Data Service Accessor
@@ -306,8 +300,8 @@ function getDataService() {
 
     // Build a minimal shim from available globals (best-effort)
     const shim = {};
-    if (typeof getUserSheetData === 'function') {
-      shim.getUserSheetData = getUserSheetData;
+    if (typeof dsGetUserSheetData === 'function') {
+      shim.dsGetUserSheetData = dsGetUserSheetData;
     }
     if (typeof dsAddReaction === 'function') {
       shim.addReaction = dsAddReaction;
@@ -339,7 +333,6 @@ function getConfigService() {
 
     // Build minimal shim from available globals
     const shim = {};
-    if (typeof getUserConfig === 'function') shim.getUserConfig = getUserConfig;
     if (typeof getFormInfo === 'function') shim.getFormInfo = getFormInfo;
     if (Object.keys(shim).length > 0) return shim;
 
@@ -445,7 +438,6 @@ __rootSF.ServiceFactory = {
   getDB,
   getSpreadsheet,
   getUtils,
-  getUserService,
   getDataService,
   getConfigService,
   // Lazy accessor for SecurityService (optional usage sites)

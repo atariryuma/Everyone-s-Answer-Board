@@ -15,7 +15,7 @@
 
 /* global validateConfig */
 
-/* global ServiceFactory, URL, validateUrl, createErrorResponse, validateSpreadsheetId, Data, Auth */
+/* global ServiceFactory, URL, validateUrl, createErrorResponse, validateSpreadsheetId, Data, Auth, UserService, authIsAdministrator, SLEEP_MS */
 
 // ===========================================
 // 🔧 Zero-Dependency ConfigService (ServiceFactory版)
@@ -27,14 +27,6 @@
  * PROPS_KEYS, DB依存を完全排除
  */
 
-/**
- * ServiceFactory統合初期化
- * 依存関係チェックなしの即座初期化
- * @returns {boolean} 初期化成功可否
- */
-function initConfigServiceZero() {
-  return ServiceFactory.getUtils().initService('ConfigService');
-}
 
 /**
  * FormApp権限の安全チェック - GAS 2025ベストプラクティス準拠
@@ -72,7 +64,7 @@ function validateFormAppAccess() {
     return {
       hasAccess: false,
       reason: 'PERMISSION_ERROR',
-      message: `FormApp権限エラー: ${error.message}`,
+      message: error && error.message ? `FormApp権限エラー: ${error.message}` : 'FormApp権限エラー: 詳細不明',
       error: error.message
     };
   }
@@ -85,7 +77,7 @@ function validateFormAppAccess() {
  * @param {Object} options - オプション設定
  * @returns {Object} 実行結果
  */
-function safeFormAppOpenByUrl(formUrl, options = {}) {
+function openFormWithRetry(formUrl, options = {}) {
   const maxTries = options.maxTries || 3;
   const initialDelay = options.initialDelay || 500;
 
@@ -128,7 +120,7 @@ function safeFormAppOpenByUrl(formUrl, options = {}) {
       // V8ランタイム対応: 短時間の遅延でスタック状態をリセット
       if (tries > 1) {
         const delay = initialDelay * Math.pow(2, tries - 1);
-        Utilities.sleep(Math.min(delay, 5000)); // 最大5秒まで
+        Utilities.sleep(Math.min(delay, SLEEP_MS.MAX)); // 最大5秒まで
       }
 
       // FormApp.openByUrl実行
@@ -202,14 +194,14 @@ function getDefaultConfig(userId) {
   return {
     userId,
     setupStatus: 'pending',
-    appPublished: false,
+    isPublished: false,
     displaySettings: {
       showNames: false,
       showReactions: false
     },
     userPermissions: {
-      isOwner: false,
-      isSystemAdmin: false,
+      isEditor: false,
+      isAdministrator: false,
       accessLevel: 'viewer',
       canEdit: false,
       canView: true,
@@ -238,7 +230,7 @@ function parseAndRepairConfig(configJson, userId) {
   } catch (parseError) {
     console.warn('parseAndRepairConfig: JSON解析失敗 - デフォルト設定を使用', {
       operation: 'parseAndRepairConfig',
-      userId: `${userId?.substring(0, 8)  }***`,
+      userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
       configLength: configJson?.length || 0,
       error: parseError.message,
       stack: parseError.stack
@@ -287,7 +279,7 @@ function ensureRequiredFields(config, userId) {
   return {
     userId,
     setupStatus: config.setupStatus || 'pending',
-    appPublished: Boolean(config.appPublished),
+    isPublished: Boolean(config.isPublished),
     spreadsheetId: config.spreadsheetId || '',
     sheetName: config.sheetName || '',
     formUrl: config.formUrl || '',
@@ -297,7 +289,7 @@ function ensureRequiredFields(config, userId) {
     },
     columnMapping: config.columnMapping || { mapping: {} },
     userPermissions: config.userPermissions || generateUserPermissions(userId),
-    setupStep: config.setupStep || determineSetupStep(null, JSON.stringify(config)),
+    setupStep: config.setupStep || determineSetupStep(JSON.stringify(config)),
     completionScore: calculateCompletionScore(config),
     lastModified: new Date().toISOString()
   };
@@ -349,8 +341,8 @@ function generateUserPermissions(_userId) {
     const currentEmail = session.email;
     if (!currentEmail) {
       return {
-        isOwner: false,
-        isSystemAdmin: false,
+        isEditor: false,
+        isAdministrator: false,
         accessLevel: 'viewer',
         canEdit: false,
         canView: true,
@@ -358,24 +350,24 @@ function generateUserPermissions(_userId) {
       };
     }
 
-    const isSystemAdmin = checkIfSystemAdmin(currentEmail);
+    const isAdministrator = authIsAdministrator(currentEmail);
 
     return {
-      isOwner: true, // 現在のユーザーは自分の設定のオーナー
-      isSystemAdmin,
-      accessLevel: isSystemAdmin ? 'admin' : 'owner',
+      isEditor: true, // 現在のユーザーは自分の設定の編集者
+      isAdministrator,
+      accessLevel: isAdministrator ? 'administrator' : 'editor',
       canEdit: true,
       canView: true,
       canReact: true,
-      canDelete: isSystemAdmin,
-      canManageUsers: isSystemAdmin
+      canDelete: isAdministrator,
+      canManageUsers: isAdministrator
     };
 
   } catch (error) {
     console.error('generateUserPermissions: エラー', error.message);
     return {
-      isOwner: false,
-      isSystemAdmin: false,
+      isEditor: false,
+      isAdministrator: false,
       accessLevel: 'viewer',
       canEdit: false,
       canView: true,
@@ -523,11 +515,10 @@ function validateConfigUserId(userId) {
 
 /**
  * セットアップステップ判定
- * @param {Object} userInfo - ユーザー情報
  * @param {string} configJson - 設定JSON
  * @returns {number} セットアップステップ (1-3)
  */
-function determineSetupStep(userInfo, configJson) {
+function determineSetupStep(configJson) {
   try {
     // configJsonは文字列またはオブジェクトの可能性あり
     const config = typeof configJson === 'string' ? JSON.parse(configJson || '{}') : (configJson || {});
@@ -540,7 +531,7 @@ function determineSetupStep(userInfo, configJson) {
       return 2; // 設定未完了
     }
 
-    if (config.appPublished) {
+    if (config.isPublished) {
       return 3; // 完了・公開済み
     }
 
@@ -561,11 +552,8 @@ function isSystemSetup() {
     const currentEmail = session.email;
     if (!currentEmail) return false;
 
-    // 🔧 ServiceFactory経由で直接データベースから取得
-    const db = ServiceFactory.getDB();
-    if (!db) return false;
-
-    const user = db.findUserByEmail(currentEmail);
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(currentEmail);
     return !!(user && user.configJson);
   } catch (error) {
     console.error('isSystemSetup: エラー', error.message);
@@ -623,7 +611,7 @@ function clearConfigCache(userId) {
     }
 
     console.info('clearConfigCache: 依存関係キャッシュクリア完了', {
-      userId: `${userId.substring(0, 8)}***`,
+      userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
       keysCleared: keysToRemove.length
     });
   } catch (error) {
@@ -758,23 +746,23 @@ function getQuestionText(config) {
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
         console.log('🔄 getQuestionText: Fetching headers from spreadsheet');
-        const db = ServiceFactory.getDB();
-        if (db && db.openSpreadsheetWithServiceAccount) {
-          const auth = typeof Auth !== 'undefined' ? Auth.serviceAccount() : null;
-          if (auth && auth.isValid) {
-            const spreadsheet = db.openSpreadsheetWithServiceAccount(config.spreadsheetId, auth.token);
-            const sheet = spreadsheet.getSheetByName(config.sheetName);
-            if (sheet && sheet.getLastColumn() > 0) {
-              const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
-              if (headers && headers[answerIndex]) {
-                const questionText = headers[answerIndex];
-                if (questionText && typeof questionText === 'string' && questionText.trim()) {
-                  console.log('✅ getQuestionText SUCCESS (from dynamic headers):', questionText.trim());
-                  return questionText.trim();
-                }
+        // 🔧 Zero-Dependency統一: 直接Data.open使用（ConfigService内部処理）
+        try {
+          const dataAccess = Data.open(config.spreadsheetId);
+          const { spreadsheet } = dataAccess;
+          const sheet = spreadsheet.getSheetByName(config.sheetName);
+          if (sheet && sheet.getLastColumn() > 0) {
+            const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
+            if (headers && headers[answerIndex]) {
+              const questionText = headers[answerIndex];
+              if (questionText && typeof questionText === 'string' && questionText.trim()) {
+                console.log('✅ getQuestionText SUCCESS (from dynamic headers):', questionText.trim());
+                return questionText.trim();
               }
             }
           }
+        } catch (dataAccessError) {
+          console.warn('⚠️ getQuestionText: Data.open access failed:', dataAccessError.message);
         }
       } catch (dynamicError) {
         console.warn('⚠️ getQuestionText: Dynamic headers fetch failed:', dynamicError.message);
@@ -802,15 +790,6 @@ function getQuestionText(config) {
  * @param {string} email - メールアドレス
  * @returns {boolean} システム管理者かどうか
  */
-function checkIfSystemAdmin(email) {
-  try {
-    const adminEmail = ServiceFactory.getProperties().getProperty('ADMIN_EMAIL');
-    return adminEmail && adminEmail === email;
-  } catch (error) {
-    console.error('checkIfSystemAdmin: エラー', error.message);
-    return false;
-  }
-}
 
 // ===========================================
 // 🔧 統一configJson操作API (CLAUDE.md準拠)
@@ -822,7 +801,7 @@ function checkIfSystemAdmin(email) {
  * @param {string} userId - ユーザーID
  * @returns {Object} {success: boolean, config: Object, message?: string, userId?: string}
  */
-function getConfigSafe(userId) {
+function getUserConfig(userId) {
   // V8最適化: 事前変数チェック（CLAUDE.md 151-169行準拠）
   if (!userId || typeof userId !== 'string' || !userId.trim()) {
     return {
@@ -865,7 +844,7 @@ function getConfigSafe(userId) {
     };
 
   } catch (error) {
-    console.error('getConfigSafe error:', {
+    console.error('getUserConfig error:', {
       userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
       error: error.message
     });
@@ -873,7 +852,7 @@ function getConfigSafe(userId) {
     return {
       success: false,
       config: getDefaultConfig(userId),
-      message: `Config load error: ${error.message}`,
+      message: error && error.message ? `Config load error: ${error.message}` : 'Config load error: 詳細不明',
       userId
     };
   }
@@ -887,7 +866,7 @@ function getConfigSafe(userId) {
  * @param {Object} options - 保存オプション
  * @returns {Object} {success: boolean, message: string, data?: Object}
  */
-function saveConfigSafe(userId, config, options = {}) {
+function saveUserConfig(userId, config, options = {}) {
   // V8最適化: 入力検証（事前チェック）
   if (!userId || typeof userId !== 'string' || !userId.trim()) {
     return {
@@ -913,8 +892,8 @@ function saveConfigSafe(userId, config, options = {}) {
           const currentETag = currentConfig.etag || currentConfig.lastModified;
 
           if (currentETag && config.etag !== currentETag) {
-            console.warn('saveConfigSafe: ETag mismatch detected', {
-              userId: `${userId.substring(0, 8)}***`,
+            console.warn('saveUserConfig: ETag mismatch detected', {
+              userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
               requestETag: config.etag,
               currentETag
             });
@@ -927,7 +906,7 @@ function saveConfigSafe(userId, config, options = {}) {
             };
           }
         } catch (parseError) {
-          console.warn('saveConfigSafe: Current config parse error for ETag validation:', parseError.message);
+          console.warn('saveUserConfig: Current config parse error for ETag validation:', parseError.message);
           // パースエラーの場合は競合チェックをスキップして続行
         }
       }
@@ -957,7 +936,7 @@ function saveConfigSafe(userId, config, options = {}) {
 
     // 4. 🔧 CLAUDE.md準拠: 書き込み前キャッシュ無効化 - 同期ギャップ防止
     clearConfigCache(userId);
-    console.log('saveConfigSafe: 書き込み前キャッシュクリア完了');
+    console.log('saveUserConfig: 書き込み前キャッシュクリア完了');
 
     // 5. Zero-Dependency: 直接Data.updateUser呼び出し
     const updateResult = Data.updateUser(userId, {
@@ -974,8 +953,8 @@ function saveConfigSafe(userId, config, options = {}) {
 
     // 6. 🔧 CLAUDE.md準拠: 書き込み後的確キャッシュ無効化 - 最終一貫性保証
     clearConfigCache(userId);
-    console.log('saveConfigSafe: 書き込み後的確キャッシュクリア完了', {
-      userId: `${userId.substring(0, 8)}***`,
+    console.log('saveUserConfig: 書き込み後的確キャッシュクリア完了', {
+      userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
       newETag: cleanedConfig.etag
     });
 
@@ -989,14 +968,14 @@ function saveConfigSafe(userId, config, options = {}) {
     };
 
   } catch (error) {
-    console.error('saveConfigSafe error:', {
+    console.error('saveUserConfig error:', {
       userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
       error: error.message
     });
 
     return {
       success: false,
-      message: `Config save error: ${error.message}`
+      message: error && error.message ? `Config save error: ${error.message}` : 'Config save error: 詳細不明'
     };
   }
 }

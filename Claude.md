@@ -3,7 +3,7 @@
 > **🎯 Project**: Google Apps Script Web Application
 > **🔧 Stack**: Zero-Dependency Architecture, Direct GAS API Calls
 > **🤖 Claude Code**: 2025 Best Practices Compliant
-> **⚡ Updated**: 2025-09-19
+> **⚡ Updated**: 2025-09-20 (Unified Naming Conventions Implemented)
 
 ## 🧠 Claude Code Core Principles
 
@@ -253,6 +253,134 @@ Data.open(id);                           // ✅ Service account
 // ❌ AVOID: Direct service dependencies at file level
 // ❌ AVOID: Synchronous UI blocking operations
 ```
+
+## 📝 Naming Conventions & Code Standards
+
+### **🎯 Unified Naming System**
+
+**Core Principle**: 一貫性のある命名規則により、Zero-Dependency Architectureの可読性と保守性を最大化
+
+#### **Function Naming - Prefix System**
+```javascript
+// ✅ サービス別プレフィックスパターン
+ds*()                    // DataService operations (スプレッドシート・データ処理)
+auth*()                  // Authentication & authorization (認証・権限)
+config*()                // Configuration management (設定管理)
+sys*()                   // System management (システム管理)
+
+// ✅ 実装例
+dsGetUserSheetData()     // DataService: ユーザーシートデータ取得
+dsAddReaction()          // DataService: リアクション追加
+dsConnectDataSource()    // DataService: データソース接続
+
+authIsAdministrator()    // Auth: 管理者権限確認
+configGetUserConfig()    // Config: ユーザー設定取得
+sysTestSystemSetup()     // System: システムセットアップテスト
+```
+
+#### **Variable & Property Naming**
+```javascript
+// ✅ camelCase + 意味的プレフィックス
+const isPublished = Boolean(config.isPublished);    // ✅ boolean値: is/has/can
+const isEditor = isAdministrator || isOwnBoard;     // ✅ 統一された権限表現
+const hasValidForm = validateUrl(formUrl).isValid; // ✅ 存在確認: has
+
+// ✅ オブジェクトプロパティの統一
+{
+  isPublished: true,        // ✅ appPublished → isPublished
+  isEditor: false,          // ✅ showAdminFeatures → isEditor
+  spreadsheetId: 'abc123',  // ✅ camelCase統一
+  sheetName: 'Sheet1'       // ✅ 標準化されたパラメータ名
+}
+
+// ❌ 非推奨パターン
+const appPublished = true;           // ❌ 曖昧な名前
+const isAdminUser = false;          // ❌ 重複する概念
+const showAdminFeatures = true;     // ❌ 表示ロジックと権限の混在
+```
+
+#### **Constants - System Standards**
+```javascript
+// ✅ UPPER_SNAKE_CASE + カテゴリ別構造
+const CACHE_DURATION = {
+  SHORT: 10,           // 認証ロック
+  MEDIUM: 30,          // リアクション・ハイライト
+  LONG: 300,           // ユーザー情報キャッシュ
+  EXTRA_LONG: 3600     // 設定キャッシュ
+};
+
+const TIMEOUT_MS = {
+  QUICK: 100,          // UI応答性
+  DEFAULT: 5000,       // デフォルトタイムアウト
+  EXTENDED: 30000      // 拡張タイムアウト
+};
+
+// ✅ 使用例
+cache.put(cacheKey, data, CACHE_DURATION.LONG);
+Utilities.sleep(SLEEP_MS.SHORT);
+
+// ❌ マジックナンバー（非推奨）
+cache.put(cacheKey, data, 300);     // ❌ 意味が不明
+Utilities.sleep(100);               // ❌ なぜ100ms？
+```
+
+#### **Parameter Naming Standards**
+```javascript
+// ✅ 統一されたパラメータ名
+function processUserData(userId, spreadsheetId, sheetName, options = {}) {
+  // userId: 常にcamelCase、一意識別子
+  // spreadsheetId: Google Sheets ID（統一形式）
+  // sheetName: シート名（camelCase）
+  // options: オプション引数は常にオブジェクト
+}
+
+// ✅ 一貫性のあるAPI設計
+dsGetUserSheetData(userId, options);        // Data layer
+getUserConfig(userId);                      // Config layer
+authIsAdministrator(email);                 // Auth layer
+
+// ❌ 非一貫的なパラメータ（非推奨）
+function badFunction(user_id, spreadsheet-id, sheet_name) { } // ❌ 命名規則混在
+function anotherBad(userID, spreadSheetId, SheetName) { }     // ❌ 大文字小文字不統一
+```
+
+### **🔧 Implementation Guidelines**
+
+#### **Zero-Dependency Pattern Compliance**
+```javascript
+// ✅ 推奨: 直接的で明確な関数名
+function dsGetUserSheetData(userId, options = {}) {
+  // Direct GAS API calls
+  // No external dependencies
+  // Clear responsibility boundary
+}
+
+// ✅ グローバル定数の適切な設定
+const __rootSys = (typeof globalThis !== 'undefined') ? globalThis : this;
+__rootSys.CACHE_DURATION = CACHE_DURATION;
+__rootSys.TIMEOUT_MS = TIMEOUT_MS;
+```
+
+#### **Legacy Code Migration**
+```javascript
+// ✅ CLAUDE.md準拠移行パターン
+// 旧: isAdmin() → 新: authIsAdministrator()
+// 旧: DB.* → 新: Data.*
+// 旧: getUserSheetData() → 新: dsGetUserSheetData()
+// 旧: appPublished → 新: isPublished
+// 旧: isAdminUser/showAdminFeatures → 新: isEditor
+
+// ❌ 後方互換性ラッパー（非推奨）
+// function isAdmin() { return authIsAdministrator(); } // ✗ 削除済み
+```
+
+### **📊 Benefits of Unified Naming**
+
+- **🔍 Instant Recognition**: プレフィックスで関数の役割を即座に識別
+- **🚫 Conflict Prevention**: モジュール間の命名競合を完全排除
+- **📖 Self-Documenting Code**: 名前から機能と責任範囲が明確
+- **🛠️ Maintenance Efficiency**: 統一された規則で保守性向上
+- **⚡ Zero-Dependency Compliance**: ファイル読み込み順序に依存しない設計
 
 ## 📋 Important Application Notes
 

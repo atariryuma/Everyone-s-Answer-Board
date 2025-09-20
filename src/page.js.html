@@ -118,12 +118,8 @@ class StudyQuestApp {
       currentAnswers: [],
       isLoading: false,
       lastFocusedElement: null,
-      isStudentMode: window.isStudentMode,
-      isAdminUser: window.isAdminUser,
+      isEditor: window.isEditor,
       showCounts: window.showCounts,
-      showAdminFeatures: false, // 初期状態は常に閲覧モード
-      showHighlightToggle: window.isAdminUser, // 管理者なら常に表示
-      showScoreSort: window.showScoreSort,
       displayMode: window.displayMode,
       sheetName: SHEET_NAME,
       userId: this.validId(USER_ID),
@@ -168,8 +164,11 @@ class StudyQuestApp {
       { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
     ];
 
-    // リアクション状態保存用のキー
-    this.reactionStorageKey = `reactions_${USER_ID}_${SHEET_NAME}`;
+    // リアクション状態保存用のキー - CLAUDE.md準拠: 安全な変数アクセス
+    const safeUserId = this.validId(USER_ID);
+    const safeSheetName = (typeof SHEET_NAME !== 'undefined' && SHEET_NAME) ?
+      SHEET_NAME.trim() : 'default';
+    this.reactionStorageKey = 'reactions_' + safeUserId + '_' + safeSheetName;
 
     this.gas = {
       // サーバ実装に合わせた直接呼び出し（中間関数なし）
@@ -475,7 +474,13 @@ class StudyQuestApp {
           delay = delay * (0.5 + Math.random() * 0.5); // Add 50% jitter
         }
 
-        warnLog(`⚠️ ${context} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
+        // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
+        const safeContext = context || 'Operation';
+        if (error && error.message) {
+          warnLog(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
+        } else {
+          warnLog(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): Unknown error`);
+        }
 
         // CLAUDE.md準拠: V8 Runtime Promise-based delay (setTimeout代替)
         await this.createPromiseDelay(delay);
@@ -636,7 +641,12 @@ class StudyQuestApp {
       await this.clearDataCaches(true);
       return await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
     } catch (retryError) {
-      throw new Error(`Retry failed: ${retryError.message}`);
+      // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
+      if (retryError && retryError.message) {
+        throw new Error(`Retry failed: ${retryError.message}`);
+      } else {
+        throw new Error('Retry failed: Unknown retry error');
+      }
     }
   }
 
@@ -646,7 +656,12 @@ class StudyQuestApp {
       this.resetStateForCleanInit();
       return await this.loadSheetData({ bypassCache: true, isInitialLoad: true });
     } catch (reloadError) {
-      throw new Error(`Reload failed: ${reloadError.message}`);
+      // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
+      if (reloadError && reloadError.message) {
+        throw new Error(`Reload failed: ${reloadError.message}`);
+      } else {
+        throw new Error('Reload failed: Unknown reload error');
+      }
     }
   }
 
@@ -733,24 +748,22 @@ class StudyQuestApp {
         this.adjustLayout();
         this.updateSortOptions();
         this.setupObservers();
-        // Initial admin state setup - 管理者権限があっても最初は閲覧モードで起動
-        if (window.hasAdminCapability && window.isAdminUser) {
-          this.state.isAdminUser = true;
-          this.state.showAdminFeatures = false; // 初期は閲覧モード
+        // Initial editor state setup - 編集権限があっても最初は閲覧モードで起動
+        if (window.isEditor) {
+          this.state.isEditor = true;
           if (this.elements.adminToggleBtn) {
             this.elements.adminToggleBtn.classList.remove('hidden');
             this.elements.adminToggleBtn.removeAttribute('hidden');
-            this.elements.adminToggleBtn.style.display = ''; // 表示を確実に
+            this.elements.adminToggleBtn.style.display = '';
             this.elements.adminToggleBtn.textContent = '管理モード';
           }
         } else {
-          // 非管理者の場合は管理機能を完全に無効化
-          this.state.isAdminUser = false;
-          this.state.showAdminFeatures = false;
+          // 非編集者の場合は管理機能を完全に無効化
+          this.state.isEditor = false;
           if (this.elements.adminToggleBtn) {
             this.elements.adminToggleBtn.classList.add('hidden');
             this.elements.adminToggleBtn.setAttribute('hidden', '');
-            this.elements.adminToggleBtn.style.display = 'none'; // 確実に非表示
+            this.elements.adminToggleBtn.style.display = 'none';
           }
         }
         
@@ -1086,7 +1099,9 @@ class StudyQuestApp {
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         // API関数存在チェック
         if (!google.script.run[funcName] || typeof google.script.run[funcName] !== 'function') {
-          reject(new Error(`API function '${funcName}' not available`));
+          // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
+          const safeFuncName = funcName || 'unknown';
+          reject(new Error(`API function '${safeFuncName}' not available`));
           return;
         }
 
@@ -1116,7 +1131,7 @@ class StudyQuestApp {
     }, {
       maxRetries: isStateChanging ? 1 : 2, // State-changing operations get fewer retries
       baseDelay: 500,
-      context: `GAS API (${funcName})`,
+      context: `GAS API (${funcName || 'unknown'})`,
       retryCondition: (error) => {
         const retryableErrors = [
           'network', 'timeout', 'temporarily unavailable',
@@ -1150,26 +1165,24 @@ class StudyQuestApp {
 
     return enhancedError;
   }
-  async verifyAdminAsync() {
+  async verifyEditorAsync() {
     // Use server-provided flag first (fast)
-    if (window.isAdminUser) {
-      this.state.isAdminUser = true;
-      this.state.showHighlightToggle = true; // 管理者なら常に表示
-      // Admin permissions verified
+    if (window.isEditor) {
+      this.state.isEditor = true;
+      // Editor permissions verified
       this.updateAdminButtonUI();
       this.updateEndPublicationButtonUI();
       return;
     }
-    
+
     // Fallback API call (slower)
     let prevState;
     try {
       const isAdmin = await this.gas.checkAdmin();
       if (isAdmin) {
-        window.isAdminUser = true;
-        this.state.isAdminUser = true;
-        this.state.showHighlightToggle = true; // 管理者なら常に表示
-        // API admin permissions verified
+        window.isEditor = true;
+        this.state.isEditor = true;
+        // API editor permissions verified
         this.updateAdminButtonUI();
         this.updateEndPublicationButtonUI();
       }

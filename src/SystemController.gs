@@ -2,7 +2,100 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, Data, Config, getSpreadsheetList, getConfigSafe, saveConfigSafe */
+/* global ServiceFactory, UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, Data, Config, getSpreadsheetList, getUserConfig, saveUserConfig, Auth */
+
+// ===========================================
+// 📊 システム定数 - Zero-Dependency Architecture
+// ===========================================
+
+/**
+ * キャッシュ期間 (秒)
+ */
+const CACHE_DURATION = {
+  SHORT: 10,           // 10秒 - 認証ロック
+  MEDIUM: 30,          // 30秒 - リアクション・ハイライトロック
+  LONG: 300,           // 5分 - ユーザー情報キャッシュ
+  EXTRA_LONG: 3600     // 1時間 - 設定キャッシュ
+};
+
+/**
+ * タイムアウト期間 (ミリ秒)
+ */
+const TIMEOUT_MS = {
+  QUICK: 100,          // UI応答性
+  SHORT: 500,          // 軽量処理
+  MEDIUM: 1000,        // 一般的処理
+  LONG: 3000,          // 重い処理
+  DEFAULT: 5000,       // デフォルトタイムアウト
+  EXTENDED: 30000      // 拡張タイムアウト
+};
+
+/**
+ * スリープ期間 (ミリ秒)
+ */
+const SLEEP_MS = {
+  MICRO: 50,           // マイクロ待機
+  SHORT: 100,          // 短時間休憩
+  MEDIUM: 200,         // 中間休憩
+  LONG: 500,           // 長時間休憩
+  MAX: 5000            // 最大待機時間
+};
+
+/**
+ * ログレベル制御
+ */
+const LOG_LEVEL = {
+  DEBUG: 0,        // 開発時詳細ログ
+  INFO: 1,         // 一般情報
+  WARN: 2,         // 警告
+  ERROR: 3,        // エラーのみ
+  NONE: 4          // プロダクション（ログ無効）
+};
+
+/**
+ * 現在のログレベル (プロダクション環境では ERROR または NONE を推奨)
+ */
+const CURRENT_LOG_LEVEL = LOG_LEVEL.INFO; // 開発時設定
+
+/**
+ * 統一ログ関数 - Zero-Dependency Architecture
+ */
+function sysLog(level, message, ...args) {
+  if (level < CURRENT_LOG_LEVEL) return;
+
+  const timestamp = new Date().toISOString();
+  const prefix = `[${timestamp}]`;
+
+  switch (level) {
+    case LOG_LEVEL.DEBUG:
+      console.log(`${prefix} [DEBUG]`, message, ...args);
+      break;
+    case LOG_LEVEL.INFO:
+      console.log(`${prefix} [INFO]`, message, ...args);
+      break;
+    case LOG_LEVEL.WARN:
+      console.warn(`${prefix} [WARN]`, message, ...args);
+      break;
+    case LOG_LEVEL.ERROR:
+      console.error(`${prefix} [ERROR]`, message, ...args);
+      break;
+  }
+}
+
+// ===========================================
+// 🌍 グローバル定数設定 - Zero-Dependency Architecture
+// ===========================================
+
+/**
+ * グローバルスコープにシステム定数を設定
+ * Zero-Dependency Architecture準拠
+ */
+const __rootSys = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
+__rootSys.CACHE_DURATION = CACHE_DURATION;
+__rootSys.TIMEOUT_MS = TIMEOUT_MS;
+__rootSys.SLEEP_MS = SLEEP_MS;
+__rootSys.LOG_LEVEL = LOG_LEVEL;
+__rootSys.sysLog = sysLog;
 
 // ===========================================
 // 🔧 Zero-Dependency Utility Functions
@@ -23,6 +116,71 @@
  *
  * @returns {Object} テスト結果
  */
+function testSystemSetup() {
+  try {
+    const diagnostics = {
+      timestamp: new Date().toISOString(),
+      tests: [],
+      overall: 'unknown'
+    };
+
+    // 基本コンポーネントテスト
+    try {
+      const session = ServiceFactory.getSession();
+      diagnostics.tests.push({
+        name: 'Session Service',
+        status: session.isValid ? '✅' : '❌',
+        details: session.isValid ? `User: ${  session.email}` : 'No active session'
+      });
+    } catch (sessionError) {
+      diagnostics.tests.push({
+        name: 'Session Service',
+        status: '❌',
+        details: sessionError.message
+      });
+    }
+
+    // データベース接続テスト
+    try {
+      const props = ServiceFactory.getProperties();
+      const databaseId = props.getDatabaseSpreadsheetId();
+      if (databaseId) {
+        const dataAccess = Data.open(databaseId);
+        diagnostics.tests.push({
+          name: 'Database Connection',
+          status: '✅',
+          details: 'Database accessible'
+        });
+      } else {
+        diagnostics.tests.push({
+          name: 'Database Connection',
+          status: '❌',
+          details: 'Database not configured'
+        });
+      }
+    } catch (dbError) {
+      diagnostics.tests.push({
+        name: 'Database Connection',
+        status: '❌',
+        details: dbError.message
+      });
+    }
+
+    // 総合評価
+    const hasErrors = diagnostics.tests.some(test => test.status === '❌');
+    diagnostics.overall = hasErrors ? '⚠️ 問題あり' : '✅ 正常';
+
+    return {
+      success: !hasErrors,
+      diagnostics
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+}
 
 /**
  * システム状態の強制リセット
@@ -44,7 +202,7 @@ function forceUrlSystemReset() {
         }
       } catch (cacheError) {
         console.warn('ScriptCache クリアエラー:', cacheError.message);
-        cacheResults.push(`ScriptCache クリア失敗: ${cacheError.message}`);
+        cacheResults.push(cacheError && cacheError.message ? `ScriptCache クリア失敗: ${cacheError.message}` : 'ScriptCache クリア失敗: 詳細不明');
       }
 
       // Document Cache も試行
@@ -56,7 +214,7 @@ function forceUrlSystemReset() {
         }
       } catch (docCacheError) {
         console.warn('DocumentCache クリアエラー:', docCacheError.message);
-        cacheResults.push(`DocumentCache クリア失敗: ${docCacheError.message}`);
+        cacheResults.push(docCacheError && docCacheError.message ? `DocumentCache クリア失敗: ${docCacheError.message}` : 'DocumentCache クリア失敗: 詳細不明');
       }
 
       // 重要: プロパティはクリアしない（データ損失防止）
@@ -70,10 +228,10 @@ function forceUrlSystemReset() {
       };
 
     } catch (error) {
-      console.error('SystemController.forceUrlSystemReset エラー:', error.message);
+      console.error('SystemController.forceUrlSystemReset エラー:', error && error.message ? error.message : '詳細不明');
       return {
         success: false,
-        message: error.message
+        message: error && error.message ? error.message : '詳細不明'
       };
     }
 }
@@ -84,6 +242,14 @@ function forceUrlSystemReset() {
  *
  * @returns {string} WebアプリURL
  */
+function getWebAppUrl() {
+  try {
+    return ServiceFactory.getUtils().getWebAppUrl();
+  } catch (error) {
+    console.error('SystemController.getWebAppUrl: エラー', error.message);
+    return '';
+  }
+}
 
 /**
  * システム全体の診断実行
@@ -169,7 +335,7 @@ function getSystemStatus() {
         setup: {
           hasDatabase: !!props.getDatabaseSpreadsheetId(),
           hasAdminEmail: !!props.getAdminEmail(),
-          hasServiceAccount: !!Config.serviceAccount()
+          hasServiceAccount: !!Auth.serviceAccount()?.isValid
         },
         services: {
           available: ['UserService', 'ConfigService', 'DataService', 'SecurityService']
@@ -257,7 +423,7 @@ function performAutoRepair() {
           cache.removeAll();
         }
       } catch (cacheError) {
-        repairResults.warnings = [`キャッシュクリア失敗: ${cacheError.message}`];
+        repairResults.warnings = [cacheError && cacheError.message ? `キャッシュクリア失敗: ${cacheError.message}` : 'キャッシュクリア失敗: 詳細不明'];
       }
 
       return {
@@ -369,17 +535,17 @@ function publishApplication(publishConfig) {
       }
     }
 
-    const db = ServiceFactory.getDB();
-    const user = db ? db.findUserByEmail(email) : null;
+    // 🔧 Zero-Dependency統一: 直接Data.findUserByEmail使用
+    const user = Data.findUserByEmail(email);
     let saveResult = null;
 
     if (user) {
       // Re-fetch latest user data to avoid conflicts
-      const latestUser = db.findUserByEmail(email);
+      const latestUser = Data.findUserByEmail(email);
       const userToUse = latestUser || user;
 
       // 統一API使用: 構造化パース
-      const configResult = getConfigSafe(userToUse.userId);
+      const configResult = getUserConfig(userToUse.userId);
       const currentConfig = configResult.success ? configResult.config : {};
 
       console.log('📋 Config merge:', {
@@ -401,7 +567,7 @@ function publishApplication(publishConfig) {
         formTitle: publishConfig?.formTitle || currentConfig.formTitle,
         columnMapping: publishConfig?.columnMapping || currentConfig.columnMapping,
         // 🔧 system fields
-        appPublished: true,
+        isPublished: true,
         publishedAt,
         setupStatus: 'completed',
         isDraft: false,
@@ -428,7 +594,7 @@ function publishApplication(publishConfig) {
             if (columnData && typeof columnData.columnIndex === 'number') {
               transformedMapping[key] = columnData.columnIndex;
               transformedConfidence[key] = columnData.confidence || 0;
-              console.log(`✅ Transformed ${key}: ${columnData.columnIndex}`);
+              console.log(key && columnData && typeof columnData.columnIndex !== 'undefined' ? `✅ Transformed ${key}: ${columnData.columnIndex}` : '✅ Transformed: 結果不明');
             }
           });
 
@@ -449,14 +615,14 @@ function publishApplication(publishConfig) {
         }
       }
 
-      // 🔧 CLAUDE.md準拠: 統一API使用 - saveConfigSafeでETag対応の安全な更新
-      saveResult = saveConfigSafe(user.userId, updatedConfig, { isPublish: true });
+      // 🔧 CLAUDE.md準拠: 統一API使用 - saveUserConfigでETag対応の安全な更新
+      saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
 
       if (!saveResult.success) {
-        console.error('❌ saveConfigSafe failed during publish:', saveResult.message);
+        console.error('❌ saveUserConfig failed during publish:', saveResult.message);
         // エラーでも処理を継続（互換性のため）
       } else {
-        console.log('✅ Config saved via saveConfigSafe:', {
+        console.log('✅ Config saved via saveUserConfig:', {
           userId: user.userId,
           etag: saveResult.etag
         });
@@ -551,7 +717,8 @@ function getSpreadsheetAdaptive(spreadsheetId) {
     };
   } catch (serviceError) {
     console.error('getSpreadsheetAdaptive: サービスアカウントアクセス失敗:', serviceError.message);
-    throw new Error(`セキュアスプレッドシートアクセス失敗: ${serviceError.message}`);
+    const errorMessage = serviceError && serviceError.message ? serviceError.message : '詳細不明';
+    throw new Error(`セキュアスプレッドシートアクセス失敗: ${errorMessage}`);
   }
 }
 
@@ -622,7 +789,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
       }
     } catch (apiError) {
       console.warn('detectFormConnection: API検出失敗:', apiError.message);
-      results.details.push(`API検出失敗: ${apiError.message}`);
+      results.details.push(apiError && apiError.message ? `API検出失敗: ${apiError.message}` : 'API検出失敗: 詳細不明');
     }
   }
 
@@ -641,7 +808,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
       }
     } catch (driveError) {
       console.warn('detectFormConnection: Drive API検索失敗:', driveError.message);
-      results.details.push(`Drive API検索失敗: ${driveError.message}`);
+      results.details.push(driveError && driveError.message ? `Drive API検索失敗: ${driveError.message}` : 'Drive API検索失敗: 詳細不明');
     }
   }
 
@@ -653,11 +820,11 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
     if (headerAnalysis.isFormLike) {
       results.confidence = Math.max(results.confidence, headerAnalysis.confidence);
       results.detectionMethod = results.detectionMethod === 'none' ? 'header_analysis' : results.detectionMethod;
-      results.details.push(`ヘッダー解析: ${headerAnalysis.reason}`);
+      results.details.push(headerAnalysis && headerAnalysis.reason ? `ヘッダー解析: ${headerAnalysis.reason}` : 'ヘッダー解析: 結果不明');
     }
   } catch (headerError) {
     console.warn('detectFormConnection: ヘッダー解析失敗:', headerError.message);
-    results.details.push(`ヘッダー解析失敗: ${headerError.message}`);
+    results.details.push(headerError && headerError.message ? `ヘッダー解析失敗: ${headerError.message}` : 'ヘッダー解析失敗: 詳細不明');
   }
 
   // Method 3: シート名パターン解析
@@ -665,7 +832,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
   if (sheetNameAnalysis.isFormLike) {
     results.confidence = Math.max(results.confidence, sheetNameAnalysis.confidence);
     results.detectionMethod = results.detectionMethod === 'none' ? 'sheet_name' : results.detectionMethod;
-    results.details.push(`シート名解析: ${sheetNameAnalysis.reason}`);
+    results.details.push(sheetNameAnalysis && sheetNameAnalysis.reason ? `シート名解析: ${sheetNameAnalysis.reason}` : 'シート名解析: 結果不明');
   }
 
   // フォーム検出時のタイトル生成
@@ -1019,7 +1186,7 @@ function getFormInfo(spreadsheetId, sheetName) {
     } catch (nameError) {
       console.warn('getFormInfoImpl: スプレッドシート名取得エラー:', nameError.message);
       if (spreadsheetId && spreadsheetId.trim()) {
-        spreadsheetName = `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
+        spreadsheetName = `スプレッドシート (ID: ${  spreadsheetId.substring(0, 8)  }...)`;
       }
     }
 
@@ -1084,13 +1251,13 @@ function getFormInfo(spreadsheetId, sheetName) {
         success: isHighConfidence,
         status: isHighConfidence ? 'FORM_DETECTED_NO_URL' : 'FORM_NOT_LINKED',
         message: isHighConfidence ?
-          'フォーム連携が検出されました（URLは取得できませんが、フォーム接続されている可能性が高いです）' :
-          '指定したシートにはフォーム連携が確認できませんでした。',
+          'フォーム連携パターンを検出（URL取得不可）' :
+          'フォーム連携が確認できませんでした',
         formData,
         suggestions: formDetectionResult.suggestions || [
           'Googleフォームの「回答の行き先」を開き、対象のシートにリンクしてください',
           'フォーム作成者に連携状況を確認してください',
-          'シート名に「回答」「フォーム」等の文字列が含まれている場合、フォーム連携の可能性があります'
+          'シート名に「回答」「フォーム」等の文字列が含まれている場合、フォーム連携パターンとして評価されます'
         ],
         analysisResults: formDetectionResult.analysisResults
       };
@@ -1188,20 +1355,14 @@ function checkCurrentPublicationStatus(targetUserId) {
 
   try {
     const session = ServiceFactory.getSession();
-    const db = ServiceFactory.getDB();
-
-    if (!db) {
-      console.error('❌ Database connection failed');
-      return createErrorResponse('データベース接続エラー');
-    }
-
+    // 🔧 Zero-Dependency統一: 直接Dataクラス使用
     let user = null;
     if (targetUserId) {
-      user = db.findUserById(targetUserId);
+      user = Data.findUserById(targetUserId);
     }
 
     if (!user && session && session.email) {
-      user = db.findUserByEmail(session.email);
+      user = Data.findUserByEmail(session.email);
     }
 
     if (!user) {
@@ -1210,12 +1371,12 @@ function checkCurrentPublicationStatus(targetUserId) {
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getConfigSafe(user.userId);
+    const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
     const result = {
       success: true,
-      published: config.appPublished === true,
+      published: config.isPublished === true,
       publishedAt: config.publishedAt || null,
       lastModified: config.lastModified || null,
       hasDataSource: Boolean(config.spreadsheetId && config.sheetName),
@@ -1261,7 +1422,7 @@ function checkCurrentPublicationStatus(targetUserId) {
  *
  * @returns {Object} 認証状態
  */
-function verifyUserAuthentication() {
+function checkUserAuthentication() {
   try {
     const {email} = ServiceFactory.getSession();
     const userEmail = email ? email : null;
@@ -1281,7 +1442,7 @@ function verifyUserAuthentication() {
     };
 
   } catch (error) {
-    console.error('FrontendController.verifyUserAuthentication エラー:', error.message);
+    console.error('FrontendController.checkUserAuthentication エラー:', error.message);
     return {
       isAuthenticated: false,
       message: error.message
