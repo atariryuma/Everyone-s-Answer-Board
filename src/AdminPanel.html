@@ -309,17 +309,10 @@
               <div class="text-xs text-gray-400 mt-1" id="url-validation-message">
                 💡 GoogleスプレッドシートのURL（シート指定含む）を貼り付けてください
               </div>
-            </div>
 
-            <!-- 🆕 自動検出情報表示 -->
-            <div id="auto-detection-info" class="hidden mt-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="text-blue-400">🔍</span>
-                <span class="text-sm font-medium text-blue-300">自動検出情報</span>
-              </div>
-              <div class="text-sm text-blue-300">
-                📊 検出シート: <span id="detected-sheet-name">-</span><br>
-                🆔 GID: <span id="detected-gid">-</span>
+              <!-- 自動検出情報表示（コンパクト版） -->
+              <div id="auto-detection-info" class="hidden mt-2 text-xs text-blue-300">
+                📊 検出シート: <span id="detected-sheet-name">-</span> | 🆔 GID: <span id="detected-gid">-</span>
               </div>
             </div>
             <!-- フォーム情報表示（URL直接入力用） -->
@@ -342,7 +335,7 @@
               </div>
             </div>
             <div class="action-buttons">
-              <button id="url-validate" class="btn btn-primary" type="button">🔍 統合検証</button>
+              <button id="url-validate" class="btn btn-primary" type="button">🔍 URL検証</button>
               <button id="connect-url-source" class="btn btn-success" type="button" disabled>
                 接続（検証完了後に有効化）
               </button>

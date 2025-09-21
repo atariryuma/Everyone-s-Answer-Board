@@ -1896,7 +1896,7 @@
 
     // UI状態更新
     validateBtn.disabled = true;
-    validateBtn.textContent = '🔍 統合検証中...';
+    validateBtn.textContent = '🔍 URL検証中...';
     connectBtn.disabled = true;
     connectBtn.textContent = '検証完了後に有効化';
 
@@ -1904,11 +1904,11 @@
       url: `${fullUrl.substring(0, 50)}...`
     });
 
-    // ✅ 新しい統合検証API呼び出し
+    // ✅ 統合URL検証API呼び出し（フォーム連携検出含む）
     google.script.run
       .withSuccessHandler(function(result) {
         validateBtn.disabled = false;
-        validateBtn.textContent = '🔍 統合検証';
+        validateBtn.textContent = '🔍 URL検証';
 
         console.log('✅ validateCompleteSpreadsheetUrl result:', result);
 
