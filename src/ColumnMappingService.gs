@@ -136,10 +136,10 @@ function getHeaderPatterns() {
 /**
  * 位置ベースフォールバック（Google Formsの典型的な列順序）
  * @param {string} fieldType - フィールドタイプ
- * @param {number} columnCount - 列数
- * @returns {number} 推測される列インデックス
+ * @param {number|Array} columnCountOrRow - 列数またはデータ行
+ * @returns {number|*} インデックスまたはフォールバック値
  */
-function getPositionalFallback(fieldType, columnCount) {
+function getPositionalFallback(fieldType, columnCountOrRow) {
   // Google Formsの典型的な列順序: タイムスタンプ, 質問1, 質問2, ...
   const typicalPositions = {
     timestamp: 0,
@@ -151,6 +151,19 @@ function getPositionalFallback(fieldType, columnCount) {
   };
 
   const position = typicalPositions[fieldType];
+
+  // データ行が渡された場合（getPhysicalPositionFallback相当）
+  if (Array.isArray(columnCountOrRow)) {
+    const row = columnCountOrRow;
+    if (!row || row.length === 0) return '';
+
+    // 実際の行長に合わせて調整
+    const adjustedPosition = position !== undefined ? Math.min(position, row.length - 1) : -1;
+    return adjustedPosition !== -1 ? (row[adjustedPosition] || '') : '';
+  }
+
+  // 列数が渡された場合（従来のgetPositionalFallback）
+  const columnCount = columnCountOrRow;
   return (position !== undefined && position < columnCount) ? position : -1;
 }
 
@@ -211,7 +224,9 @@ function extractFieldValueUnified(row, headers, fieldType, columnMapping = {}, o
     return cleanedValue || (options.defaultValue || '');
 
   } catch (error) {
-    return handleExtractionError(fieldType, error, options);
+    const errorMessage = error && error.message ? error.message : 'Unknown extraction error';
+    console.error(`[ERROR] ColumnMappingService.extractFieldValueUnified (${fieldType}):`, errorMessage);
+    return options.defaultValue || '';
   }
 }
 
@@ -240,7 +255,7 @@ function handleColumnNotFound(fieldType, row, headers, options = {}) {
     case 'answer':
     case 'opinion':
       // 回答フィールドが見つからない場合は物理位置フォールバック
-      return getPhysicalPositionFallback('answer', row) || options.defaultValue || '';
+      return getPositionalFallback('answer', row) || options.defaultValue || '';
 
     case 'email': {
       // メールアドレスパターンを検索
@@ -256,45 +271,7 @@ function handleColumnNotFound(fieldType, row, headers, options = {}) {
   }
 }
 
-/**
- * 抽出エラー処理
- * @param {string} fieldType - フィールドタイプ
- * @param {Error} error - エラーオブジェクト
- * @param {Object} options - オプション設定
- * @returns {*} エラー時のフォールバック値
- */
-function handleExtractionError(fieldType, error, options = {}) {
-  const errorMessage = error && error.message ? error.message : 'Unknown extraction error';
-  console.error(`[ERROR] ColumnMappingService.extractFieldValueUnified (${fieldType}):`, errorMessage);
 
-  // エラー発生時のフォールバック値
-  return options.defaultValue || '';
-}
-
-/**
- * 物理位置フォールバック
- * @param {string} fieldType - フィールドタイプ
- * @param {Array} row - データ行
- * @returns {*} フォールバック値
- */
-function getPhysicalPositionFallback(fieldType, row) {
-  if (!Array.isArray(row) || row.length === 0) {
-    return '';
-  }
-
-  // フィールドタイプ別の物理位置推測
-  const positions = {
-    timestamp: 0,
-    answer: Math.min(1, row.length - 1),
-    reason: Math.min(2, row.length - 1),
-    class: Math.min(3, row.length - 1),
-    name: Math.min(4, row.length - 1),
-    email: Math.min(5, row.length - 1)
-  };
-
-  const position = positions[fieldType];
-  return position !== undefined ? (row[position] || '') : '';
-}
 
 // ===========================================
 // 🔍 列診断・レポート生成システム
@@ -463,86 +440,79 @@ function generateColumnRecommendations(report) {
   }
 }
 
-/**
- * 列解決監視機能（パフォーマンス監視用）
- * @param {Array} headers - ヘッダー配列
- * @param {Object} columnMapping - 列マッピング
- * @param {Object} options - 監視オプション
- * @returns {Object} 監視結果
- */
-function monitorColumnResolution(headers, columnMapping = {}, options = {}) {
-  const startTime = Date.now();
-  const monitoringResult = {
-    timestamp: new Date().toISOString(),
-    performance: {},
-    resolutionStats: {},
-    systemHealth: 'unknown'
-  };
-
-  try {
-    const fieldsToTest = options.fields || ['answer', 'reason', 'class', 'name', 'timestamp', 'email'];
-    const resolutionResults = [];
-
-    // フィールド別解決テスト
-    fieldsToTest.forEach(fieldType => {
-      const fieldStartTime = Date.now();
-      const result = resolveColumnIndex(headers, fieldType, columnMapping);
-      const fieldEndTime = Date.now();
-
-      resolutionResults.push({
-        fieldType,
-        resolved: result.index !== -1,
-        confidence: result.confidence,
-        method: result.method,
-        executionTime: fieldEndTime - fieldStartTime
-      });
-    });
-
-    // パフォーマンス統計
-    const totalExecutionTime = Date.now() - startTime;
-    monitoringResult.performance = {
-      totalExecutionTime,
-      averageFieldTime: totalExecutionTime / fieldsToTest.length,
-      fieldResults: resolutionResults
-    };
-
-    // 解決統計
-    const resolvedCount = resolutionResults.filter(r => r.resolved).length;
-    const highConfidenceCount = resolutionResults.filter(r => r.confidence >= 80).length;
-
-    monitoringResult.resolutionStats = {
-      totalFields: fieldsToTest.length,
-      resolvedFields: resolvedCount,
-      unresolvedFields: fieldsToTest.length - resolvedCount,
-      highConfidenceFields: highConfidenceCount,
-      resolutionRate: (resolvedCount / fieldsToTest.length) * 100,
-      averageConfidence: resolutionResults.reduce((sum, r) => sum + r.confidence, 0) / fieldsToTest.length
-    };
-
-    // システム健全性評価
-    if (monitoringResult.resolutionStats.resolutionRate >= 90 && monitoringResult.resolutionStats.averageConfidence >= 80) {
-      monitoringResult.systemHealth = 'excellent';
-    } else if (monitoringResult.resolutionStats.resolutionRate >= 70) {
-      monitoringResult.systemHealth = 'good';
-    } else if (monitoringResult.resolutionStats.resolutionRate >= 50) {
-      monitoringResult.systemHealth = 'fair';
-    } else {
-      monitoringResult.systemHealth = 'poor';
-    }
-
-    return monitoringResult;
-
-  } catch (error) {
-    console.error('monitorColumnResolution エラー:', error);
-    monitoringResult.systemHealth = 'error';
-    monitoringResult.error = error.message;
-    return monitoringResult;
-  }
-}
 
 // ===========================================
 // 🔬 統合診断システム（高度）
 // ===========================================
+
+/**
+ * AI列分析：ヘッダーから推奨マッピングと信頼度を自動生成
+ * @param {Array} headers - ヘッダー配列
+ * @param {Object} options - 分析オプション
+ * @returns {Object} { recommendedMapping, confidence, analysis }
+ */
+function generateRecommendedMapping(headers, options = {}) {
+  const analysis = {
+    timestamp: new Date().toISOString(),
+    headers: headers || [],
+    fieldResults: {},
+    overallScore: 0
+  };
+
+  try {
+    const targetFields = options.fields || ['answer', 'reason', 'class', 'name', 'timestamp', 'email'];
+    const recommendedMapping = {};
+    const confidence = {};
+    let totalConfidence = 0;
+    let resolvedFields = 0;
+
+    // 各フィールドのAI分析実行
+    targetFields.forEach(fieldType => {
+      const result = resolveColumnIndex(headers, fieldType, {}, { allowPositionalFallback: true });
+
+      analysis.fieldResults[fieldType] = {
+        resolved: result.index !== -1,
+        index: result.index,
+        confidence: result.confidence,
+        method: result.method,
+        header: result.index !== -1 ? headers[result.index] : null
+      };
+
+      // 推奨マッピング生成（解決済みフィールドのみ）
+      if (result.index !== -1) {
+        recommendedMapping[fieldType] = result.index;
+        confidence[fieldType] = result.confidence;
+        totalConfidence += result.confidence;
+        resolvedFields++;
+      }
+    });
+
+    // 全体スコア計算
+    analysis.overallScore = resolvedFields > 0 ? Math.round(totalConfidence / resolvedFields) : 0;
+
+    console.log('✅ AI列分析完了:', {
+      resolvedFields: `${resolvedFields}/${targetFields.length}`,
+      overallScore: analysis.overallScore,
+      mappingKeys: Object.keys(recommendedMapping)
+    });
+
+    return {
+      recommendedMapping,
+      confidence,
+      analysis,
+      success: true
+    };
+
+  } catch (error) {
+    console.error('generateRecommendedMapping エラー:', error.message);
+    return {
+      recommendedMapping: {},
+      confidence: {},
+      analysis: { ...analysis, error: error.message },
+      success: false
+    };
+  }
+}
 
 /**
  * 統合列診断（サンプルデータ付き高精度版）
@@ -562,7 +532,7 @@ function performIntegratedColumnDiagnostics(headers, columnMapping = {}, sampleD
 
     // システム健全性
     systemHealth: {
-      backend: diagnoseBackendColumnSystem(headers, columnMapping),
+      backend: diagnoseBackendColumnSystem(headers),
       frontend: diagnoseFrontendColumnSystem(columnMapping),
       integration: null // 後で設定
     },
@@ -580,6 +550,12 @@ function performIntegratedColumnDiagnostics(headers, columnMapping = {}, sampleD
   };
 
   try {
+    // ✅ AI列分析実行：推奨マッピングと信頼度を自動生成
+    const aiAnalysis = generateRecommendedMapping(headers);
+    diagnostics.recommendedMapping = aiAnalysis.recommendedMapping;
+    diagnostics.confidence = aiAnalysis.confidence;
+    diagnostics.aiAnalysis = aiAnalysis.analysis;
+
     // 統合テスト実行
     if (sampleData.length > 0) {
       diagnostics.integrationTests = performIntegrationTests(headers, columnMapping, sampleData);
@@ -619,80 +595,40 @@ function performIntegratedColumnDiagnostics(headers, columnMapping = {}, sampleD
 }
 
 /**
- * バックエンド列システム診断
+ * バックエンド列システム診断（簡素化版）
  * @param {Array} headers - ヘッダー配列
- * @param {Object} columnMapping - 列マッピング
  * @returns {Object} バックエンド診断結果
  */
-function diagnoseBackendColumnSystem(headers, columnMapping) {
+function diagnoseBackendColumnSystem(headers) {
   const diagnosis = {
     system: 'backend',
     score: 0,
     issues: [],
     strengths: [],
-    details: {}
+    details: { totalHeaders: headers.length }
   };
 
   try {
-    // ヘッダーパターン解析
-    const patterns = getHeaderPatterns();
-    const recognizedHeaders = [];
+    // 必須フィールドの存在チェック
+    const essentialFields = ['answer', 'timestamp'];
+    let foundEssential = 0;
 
-    headers.forEach((header, index) => {
-      if (header && typeof header === 'string') {
-        const lowerHeader = header.toLowerCase();
-
-        // パターンマッチング
-        Object.entries(patterns).forEach(([fieldType, fieldPatterns]) => {
-          const isMatch = fieldPatterns.some(pattern =>
-            lowerHeader.includes(pattern.toLowerCase())
-          );
-          if (isMatch) {
-            recognizedHeaders.push({ header, index, fieldType, matchedPattern: fieldPatterns[0] });
-          }
-        });
-      }
+    essentialFields.forEach(fieldType => {
+      const result = resolveColumnIndex(headers, fieldType);
+      if (result.index !== -1) foundEssential++;
     });
 
-    diagnosis.details.recognizedHeaders = recognizedHeaders;
-    diagnosis.details.totalHeaders = headers.length;
-    diagnosis.details.recognitionRate = headers.length > 0 ? (recognizedHeaders.length / headers.length) * 100 : 0;
+    // スコア計算（シンプル化）
+    diagnosis.score = Math.round((foundEssential / essentialFields.length) * 100);
 
-    // スコア計算
-    let score = 0;
-
-    // ヘッダー認識率
-    score += diagnosis.details.recognitionRate * 0.4;
-
-    // 必須フィールドの存在
-    const essentialFields = ['answer', 'timestamp'];
-    const foundEssential = essentialFields.filter(field =>
-      recognizedHeaders.some(h => h.fieldType === field)
-    );
-    score += (foundEssential.length / essentialFields.length) * 40;
-
-    // オプションフィールドの存在
-    const optionalFields = ['reason', 'class', 'name', 'email'];
-    const foundOptional = optionalFields.filter(field =>
-      recognizedHeaders.some(h => h.fieldType === field)
-    );
-    score += (foundOptional.length / optionalFields.length) * 20;
-
-    diagnosis.score = Math.round(score);
-
-    // 強み・問題の特定
-    if (diagnosis.details.recognitionRate >= 80) {
-      diagnosis.strengths.push('ヘッダーパターン認識率が高い');
-    } else if (diagnosis.details.recognitionRate < 50) {
-      diagnosis.issues.push('ヘッダーパターン認識率が低い');
-    }
-
-    if (foundEssential.length === essentialFields.length) {
+    // 問題・強みの判定
+    if (foundEssential === essentialFields.length) {
       diagnosis.strengths.push('必須フィールドがすべて認識されている');
     } else {
-      diagnosis.issues.push(`必須フィールドが不足 (${foundEssential.length}/${essentialFields.length})`);
+      diagnosis.issues.push(`必須フィールドが不足 (${foundEssential}/${essentialFields.length})`);
     }
 
+    diagnosis.details.foundEssential = foundEssential;
     return diagnosis;
 
   } catch (error) {
@@ -703,7 +639,7 @@ function diagnoseBackendColumnSystem(headers, columnMapping) {
 }
 
 /**
- * フロントエンド列システム診断
+ * フロントエンド列システム診断（簡素化版）
  * @param {Object} columnMapping - 列マッピング
  * @returns {Object} フロントエンド診断結果
  */
@@ -717,72 +653,29 @@ function diagnoseFrontendColumnSystem(columnMapping) {
   };
 
   try {
-    // 列マッピングの分析
-    const mappingAnalysis = {
-      hasMappings: columnMapping && Object.keys(columnMapping).length > 0,
-      mappingCount: columnMapping ? Object.keys(columnMapping).length : 0,
-      validMappings: 0,
-      invalidMappings: 0,
-      mappingDetails: []
-    };
+    const hasMappings = columnMapping && Object.keys(columnMapping).length > 0;
+    const mappingCount = hasMappings ? Object.keys(columnMapping).length : 0;
 
-    if (mappingAnalysis.hasMappings) {
-      Object.entries(columnMapping).forEach(([fieldType, columnIndex]) => {
-        const mappingDetail = {
-          fieldType,
-          columnIndex,
-          isValid: typeof columnIndex === 'number' && columnIndex >= 0
-        };
+    if (hasMappings) {
+      // 有効マッピング数をカウント
+      const validMappings = Object.values(columnMapping)
+        .filter(value => typeof value === 'number' && value >= 0).length;
 
-        if (mappingDetail.isValid) {
-          mappingAnalysis.validMappings++;
-        } else {
-          mappingAnalysis.invalidMappings++;
-        }
+      // スコア計算（シンプル化）
+      diagnosis.score = Math.round((validMappings / mappingCount) * 100);
 
-        mappingAnalysis.mappingDetails.push(mappingDetail);
-      });
-    }
-
-    diagnosis.details = mappingAnalysis;
-
-    // スコア計算
-    let score = 0;
-
-    if (mappingAnalysis.hasMappings) {
-      // マッピング存在ボーナス
-      score += 30;
-
-      // 有効マッピング率
-      const validRate = mappingAnalysis.validMappings / mappingAnalysis.mappingCount;
-      score += validRate * 50;
-
-      // 必須フィールドマッピング
-      const essentialFields = ['answer'];
-      const hasEssentialMappings = essentialFields.every(field =>
-        columnMapping[field] !== undefined && typeof columnMapping[field] === 'number'
-      );
-      if (hasEssentialMappings) {
-        score += 20;
-      }
-    } else {
-      // マッピングなしの場合は低スコア
-      diagnosis.issues.push('列マッピングが設定されていません');
-    }
-
-    diagnosis.score = Math.round(score);
-
-    // 強み・問題の特定
-    if (mappingAnalysis.hasMappings) {
-      if (mappingAnalysis.invalidMappings === 0) {
+      // 問題・強みの判定
+      if (validMappings === mappingCount) {
         diagnosis.strengths.push('すべての列マッピングが有効');
       } else {
-        diagnosis.issues.push(`無効な列マッピングがあります (${mappingAnalysis.invalidMappings}件)`);
+        diagnosis.issues.push(`無効な列マッピングがあります`);
       }
 
-      if (mappingAnalysis.mappingCount >= 4) {
-        diagnosis.strengths.push('十分な数の列マッピングが設定されている');
-      }
+      diagnosis.details = { mappingCount, validMappings };
+    } else {
+      diagnosis.score = 0;
+      diagnosis.issues.push('列マッピングが設定されていません');
+      diagnosis.details = { mappingCount: 0, validMappings: 0 };
     }
 
     return diagnosis;

@@ -13,7 +13,7 @@
  * - シンプルなユーティリティ関数群
  */
 
-/* global URL, connectToSheetInternal, getFormInfo */
+/* global URL, getColumnAnalysis, getFormInfo */
 
 // ===========================================
 // 🔒 基本データ型検証関数群
@@ -535,8 +535,8 @@ function validateFormLink(formUrl, spreadsheetId) {
     // 実際の接続テスト（より確実な検証）
     try {
       // 1. スプレッドシート接続確認
-      if (typeof connectToSheetInternal === 'function') {
-        const connectionTest = connectToSheetInternal(spreadsheetId, 'フォームの回答 1');
+      if (typeof getColumnAnalysis === 'function') {
+        const connectionTest = getColumnAnalysis(spreadsheetId, 'フォームの回答 1');
         if (connectionTest && connectionTest.success) {
           result.details.connectionVerified = true;
           result.details.sheetAccessible = true;

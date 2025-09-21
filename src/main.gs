@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, getColumnAnalysis, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -1500,7 +1500,7 @@ function detectNewContent(lastUpdateTime) {
  * @param {string} sheetName - シート名
  * @returns {Object} 接続結果
  */
-function dsConnectDataSource(spreadsheetId, sheetName, batchOperations = null) {
+function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
   try {
     const email = getCurrentEmail();
     if (!email || !isAdministrator(email)) {
@@ -1511,11 +1511,11 @@ function dsConnectDataSource(spreadsheetId, sheetName, batchOperations = null) {
 
     // バッチ処理対応 - CLAUDE.md準拠 70x Performance
     if (batchOperations && Array.isArray(batchOperations)) {
-      return processBatchDataSourceOperations(spreadsheetId, sheetName, batchOperations);
+      return processDataSourceOperations(spreadsheetId, sheetName, batchOperations);
     }
 
     // 従来の単一接続処理（GAS-Native直接呼び出し）
-    return connectToSheetInternal(spreadsheetId, sheetName);
+    return getColumnAnalysis(spreadsheetId, sheetName);
 
   } catch (error) {
     console.error('connectDataSource error:', error.message);
@@ -1527,69 +1527,57 @@ function dsConnectDataSource(spreadsheetId, sheetName, batchOperations = null) {
  * バッチ処理でデータソース操作を実行
  * CLAUDE.md準拠 - 70x Performance向上
  */
-function processBatchDataSourceOperations(spreadsheetId, sheetName, operations) {
+function processDataSourceOperations(spreadsheetId, sheetName, operations) {
   try {
     const results = {
       success: true,
       batchResults: {},
-      message: 'バッチ処理完了'
+      message: '統合処理完了'
     };
 
-    // 各操作を順次実行（真のバッチ処理）
+    // 🎯 最適化: getColumnAnalysisの結果をキャッシュして再利用
+    let columnAnalysisResult = null;
+
+    // 各操作を効率的に実行（重複API呼び出し回避）
     for (const operation of operations) {
       switch (operation.type) {
         case 'validateAccess':
-          results.batchResults.validation = validateDataSourceAccess(spreadsheetId, sheetName);
+          // 初回のみgetColumnAnalysisを実行、以降は結果を再利用
+          if (!columnAnalysisResult) {
+            columnAnalysisResult = getColumnAnalysis(spreadsheetId, sheetName);
+          }
+          results.batchResults.validation = {
+            success: columnAnalysisResult.success,
+            details: {
+              connectionVerified: columnAnalysisResult.success,
+              connectionError: columnAnalysisResult.success ? null : columnAnalysisResult.message
+            }
+          };
           break;
         case 'getFormInfo':
           results.batchResults.formInfo = getFormInfoInternal(spreadsheetId, sheetName);
           break;
         case 'connectDataSource': {
-          const connectionResult = connectToSheetInternal(spreadsheetId, sheetName);
-          if (connectionResult.success) {
-            // GAS-Native Architecture: 直接データ転送（中間変換なし）
-            results.mapping = connectionResult.mapping;
-            results.confidence = connectionResult.confidence;
-            results.headers = connectionResult.headers;
-            console.log('connectDataSource: AI分析結果を直接送信', {
-              mappingKeys: Object.keys(connectionResult.mapping || {}),
-              confidenceKeys: Object.keys(connectionResult.confidence || {}),
-              headers: connectionResult.headers?.length || 0
-            });
-          } else {
-            results.success = false;
-            results.error = connectionResult.errorResponse?.message || connectionResult.message;
+          // ✅ キャッシュされた結果を使用（重複API呼び出しなし）
+          if (!columnAnalysisResult) {
+            columnAnalysisResult = getColumnAnalysis(spreadsheetId, sheetName);
           }
-          break;
-        }
-        case 'integratedAnalysis': {
-          // 🎯 新機能: 最適化された統合分析（接続+AI分析を1回で実行）
-          const integratedResult = getColumnAnalysis(spreadsheetId, sheetName);
-          if (integratedResult.success) {
-            // 接続とAI分析の両方の結果を統合
-            results.batchResults.connection = {
-              success: true,
-              sheet: integratedResult.sheet,
-              headers: integratedResult.headers,
-              data: integratedResult.data
-            };
-            results.batchResults.analysis = {
-              success: true,
-              mapping: integratedResult.mapping,
-              confidence: integratedResult.confidence
-            };
-            // バッチ結果のルートレベルにも配置（互換性維持）
-            results.mapping = integratedResult.mapping;
-            results.confidence = integratedResult.confidence;
-            results.headers = integratedResult.headers;
-            console.log('integratedAnalysis: 統合分析完了', {
-              mappingKeys: Object.keys(integratedResult.mapping || {}),
-              confidenceKeys: Object.keys(integratedResult.confidence || {}),
-              headers: integratedResult.headers?.length || 0
+
+          if (columnAnalysisResult.success) {
+            // GAS-Native Architecture: 直接データ転送（中間変換なし）
+            results.mapping = columnAnalysisResult.mapping;
+            results.confidence = columnAnalysisResult.confidence;
+            results.headers = columnAnalysisResult.headers;
+            results.data = columnAnalysisResult.data;
+            results.sheet = columnAnalysisResult.sheet;
+            console.log('connectDataSource: AI分析結果を直接送信（キャッシュ利用）', {
+              mappingKeys: Object.keys(columnAnalysisResult.mapping || {}),
+              confidenceKeys: Object.keys(columnAnalysisResult.confidence || {}),
+              headers: columnAnalysisResult.headers?.length || 0
             });
           } else {
             results.success = false;
-            results.error = integratedResult.message;
+            results.error = columnAnalysisResult.errorResponse?.message || columnAnalysisResult.message;
           }
           break;
         }
@@ -1598,7 +1586,49 @@ function processBatchDataSourceOperations(spreadsheetId, sheetName, operations) 
 
     return results;
   } catch (error) {
-    console.error('processBatchDataSourceOperations error:', error.message);
+    console.error('processDataSourceOperations error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * 列分析 - API Gateway実装（既存サービス活用）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @returns {Object} 列分析結果
+ */
+function getColumnAnalysis(spreadsheetId, sheetName) {
+  try {
+    const email = getCurrentEmail();
+    if (!email || !isAdministrator(email)) {
+      return createAdminRequiredError();
+    }
+
+    // 🔧 CLAUDE.md準拠: openSpreadsheet + 既存サービス活用
+    const dataAccess = openSpreadsheet(spreadsheetId);
+    const sheet = dataAccess.getSheet(sheetName);
+
+    if (!sheet) {
+      return { success: false, error: 'Sheet not found' };
+    }
+
+    // 🔧 既存DataService.getSheetHeaders活用
+    const lastCol = sheet.getLastColumn();
+    const headers = lastCol > 0 ? getSheetHeaders(sheet, lastCol) : [];
+
+    // 🔧 既存ColumnMappingService活用
+    const diagnostics = performIntegratedColumnDiagnostics(headers);
+
+    return {
+      success: true,
+      sheet,
+      headers,
+      data: [], // 軽量化: 接続時は不要
+      mapping: diagnostics.recommendedMapping || {},
+      confidence: diagnostics.confidence || {}
+    };
+  } catch (error) {
+    console.error('getColumnAnalysis error:', error.message);
     return createExceptionResponse(error);
   }
 }
@@ -1609,7 +1639,7 @@ function processBatchDataSourceOperations(spreadsheetId, sheetName, operations) 
 function validateDataSourceAccess(spreadsheetId, sheetName) {
   try {
     // GAS-Native: Direct function call instead of ServiceFactory
-    const testConnection = connectToSheetInternal(spreadsheetId, sheetName);
+    const testConnection = getColumnAnalysis(spreadsheetId, sheetName);
     return {
       success: testConnection.success,
       details: {

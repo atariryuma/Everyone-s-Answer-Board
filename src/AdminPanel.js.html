@@ -262,6 +262,20 @@
     }
   }
 
+  // Google Forms URL検証関数（backend関数と同じ）
+  function isValidFormUrl(url) {
+    if (!url || typeof url !== 'string') {
+      return false;
+    }
+    try {
+      const urlObj = new URL(url);
+      return urlObj.hostname === 'docs.google.com' &&
+             urlObj.pathname.includes('/forms/');
+    } catch {
+      return false;
+    }
+  }
+
   // Wrap initialization in safe handler
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', safeInitialize);
@@ -324,7 +338,6 @@
       // 2. 設定データを1回だけ取得してsystemStateに保存
       step = 'loading config';
       const configResponse = await getConfigAsync();
-      console.log('📊 initializePanel: 設定データ取得完了', configResponse);
       // 🔧 CLAUDE.md準拠: 安全な設定状態更新
       systemState.config = configResponse?.success ? { ...configResponse.data.config } : null;
 
@@ -356,21 +369,17 @@
         if (systemState.config.sheetName) {
           await autoSelectSheet(systemState.config.sheetName);
         }
-        applyExistingConfig(systemState.config);
+        updatePanelState(systemState.config);
         updateProgressFromConfig(systemState.config);
       }
-
-      // 5. リソースボタンとサマリー更新
-      step = 'updating UI';
-      updateResourceButtons(systemState.config);
-      updateConfigSummary(systemState.config);
 
       // 6. ドロップダウンの初期化（systemState.configを使用）
       step = 'initializing dropdowns';
       await initializeDropdowns();
 
     } catch (error) {
-      showError('画面の準備に失敗しました');
+      console.error('🚨 initializePanel error at step:', step, error);
+      showError(`画面の準備に失敗しました (${step}): ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -389,7 +398,6 @@
 
       // 🚀 最適化: 設定済みユーザーは軽量復元モード
       if (config?.spreadsheetId && config?.sheetName && config?.columnMapping?.mapping) {
-        console.log('📋 設定済みユーザー: 軽量復元モード実行');
 
         // 既存設定の直接復元（重いAPI呼び出しなし）
         // 🔧 パフォーマンス最適化: 単一innerHTML操作でDOM reflow削減
@@ -413,9 +421,8 @@
         setupChangeEvents();
         setupDataSourceRadioEvents();
 
-        // データソース接続による列設定初期化
-        await setupColumns(config.spreadsheetId, config.sheetName);
-        return; // 重い処理をスキップして終了
+        // 初回読み込み軽量化: 重い列分析処理を除去（接続ボタン経由で実行）
+        return; // 軽量初期化完了
       }
 
       // 未設定ユーザー: 従来のフル初期化
@@ -445,16 +452,7 @@
       // データソース選択のラジオボタンイベントを設定
       setupDataSourceRadioEvents();
 
-      // 7. 列設定ドロップダウンの初期化
-      if (config && config.spreadsheetId && config.sheetName) {
-        try {
-          await setupColumns(config.spreadsheetId, config.sheetName);
-        } catch (columnError) {
-          console.error('列設定ドロップダウン初期化エラー:', columnError);
-          showInfo('⚠️ 列設定の初期化に失敗しましたが、他の機能は利用できます。');
-          // 列設定初期化に失敗しても他の処理は続行
-        }
-      }
+      // 7. 列設定は軽量化: 手動接続時のみ実行（初回読み込み高速化）
     } catch (error) {
       console.error('ドロップダウン初期化エラー:', error);
       if (spreadsheetSelect) {
@@ -505,13 +503,11 @@
       }
     });
 
-    console.log('📋 列ドロップダウンを空白状態にクリア');
   }
 
   // データソース選択ラジオボタンのイベント設定
   function setupDataSourceRadioEvents() {
     const radioButtons = document.querySelectorAll('input[name="source-method"]');
-    console.log('🔍 [setupDataSourceRadioEvents] Found radio buttons:', radioButtons.length);
     let spreadsheetListLoaded = false;
 
     if (radioButtons.length === 0) {
@@ -851,9 +847,7 @@
   function loadCurrentConfig() {
     // systemState.configを使用（既に読み込み済み）
     if (systemState.config) {
-      applyExistingConfig(systemState.config);
-      updateResourceButtons(systemState.config);
-      updateConfigSummary(systemState.config);
+      updatePanelState(systemState.config);
     }
   }
 
@@ -943,6 +937,14 @@
   }
 
   // 設定の完全反映（拡張版）
+  // パネル状態の統一更新
+  function updatePanelState(config) {
+    if (!config) return;
+    applyExistingConfig(config);
+    updateResourceButtons(config);
+    updateConfigSummary(config);
+  }
+
   function applyExistingConfig(config) {
     if (!config) return;
 
@@ -1149,25 +1151,21 @@
 
     try {
       return new Promise((resolve, reject) => {
-        console.log('🔍 getColumnAnalysis: バッチAPI呼び出し実行', { spreadsheetId, sheetName });
+        console.log('🔍 getColumnAnalysis: 直接API呼び出し実行', { spreadsheetId, sheetName });
 
-        // 🎯 最適化: ワンパス統合処理で重複アクセスを完全回避
-        const operations = [
-          { type: 'integratedAnalysis' }    // 接続+AI分析を1回で実行
-        ];
-
+        // 🎯 論理的破綻修正: 直接getColumnAnalysis呼び出しで重複処理除去
         google.script.run
           .withSuccessHandler(function(result) {
-            console.log('✅ getColumnAnalysis batch success:', result);
+            console.log('✅ getColumnAnalysis direct success:', result);
             ClientMutex.release(gateKey);
             resolve(result);
           })
           .withFailureHandler(function(error) {
-            console.error('❌ getColumnAnalysis batch error:', error);
+            console.error('❌ getColumnAnalysis direct error:', error);
             ClientMutex.release(gateKey);
             reject(error);
           })
-          .dsConnectDataSource(spreadsheetId, sheetName, operations);
+          .getColumnAnalysis(spreadsheetId, sheetName);
       });
     } catch (error) {
       ClientMutex.release(gateKey);
@@ -1242,7 +1240,7 @@
     const hasSpreadsheetConfig = !!(config.spreadsheetId && config.sheetName);
     // setupStatusまたは、実際にマッピング要件が満たされている場合も完了とみなす
     const isSetupComplete = config.setupStatus === 'completed' ||
-                          (hasSpreadsheetConfig && hasColumnMapping && config.setupStatus === 'completed');
+                          (hasSpreadsheetConfig && hasColumnMapping);
 
     console.log('📋 ボタン状態更新:', {
       hasColumnMapping,
@@ -1307,6 +1305,20 @@
     } else {
       statusDiv.textContent = '💡 リソースの設定を開始してください';
       statusDiv.className = 'text-xs text-yellow-400 mt-2 text-center';
+    }
+
+    // 🤖 AI列判定ボタンの状態管理
+    const aiAnalyzeBtn = document.getElementById('ai-analyze-btn');
+    if (aiAnalyzeBtn) {
+      if (hasSpreadsheetConfig) {
+        aiAnalyzeBtn.disabled = false;
+        aiAnalyzeBtn.textContent = '🤖 AI列判定';
+        aiAnalyzeBtn.classList.remove('opacity-50');
+      } else {
+        aiAnalyzeBtn.disabled = true;
+        aiAnalyzeBtn.textContent = '🤖 AI列判定（データソース接続が必要）';
+        aiAnalyzeBtn.classList.add('opacity-50');
+      }
     }
 
     // 🎯 設定完了状態のフィードバック
@@ -2267,14 +2279,22 @@
 
         showSuccess(successDetails.join(' | '));
 
-        // 🆕 自動AI列判定の実行
-        showInfo('🤖 AI列判定実行中...', 3000);
-        try {
-          await performColumnAnalysis(spreadsheetId, sheetName);
-          showSuccess('🎯 AI列判定完了！設定を確認してください');
-        } catch (analysisError) {
-          console.warn('AI列判定エラー:', analysisError);
-          showWarning('⚠️ AI列判定に失敗しました。手動で設定するか「🤖 AI列判定」ボタンで再実行してください');
+        // ✅ 最適化: 既に分析データがある場合は再実行しない
+        if (result.headers && result.mapping) {
+          console.log('🎯 統合処理で分析完了済み、UI更新のみ実行');
+          fillColumnDropdowns(result.headers, result.mapping, result.confidence);
+          showSuccess('🎯 接続とAI列判定が完了しました！');
+        } else {
+          // フォールバック: 分析データがない場合のみ追加実行
+          console.log('⚠️ 分析データなし、追加のAI列判定実行');
+          showInfo('🤖 AI列判定実行中...', 3000);
+          try {
+            await performColumnAnalysis(spreadsheetId, sheetName);
+            showSuccess('🎯 AI列判定完了！設定を確認してください');
+          } catch (analysisError) {
+            console.warn('AI列判定エラー:', analysisError);
+            showWarning('⚠️ AI列判定に失敗しました。手動で設定するか「🤖 AI列判定」ボタンで再実行してください');
+          }
         }
       } else {
         handleConnectionError(result.message || result.error || 'データソース接続に失敗しました', { spreadsheetId, sheetName, method: isUrlMethod ? 'URL' : 'dropdown' });
@@ -2309,7 +2329,7 @@
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler(reject)
-        .dsConnectDataSource(firstOp.spreadsheetId, firstOp.sheetName, operations);
+        .connectDataSource(firstOp.spreadsheetId, firstOp.sheetName, operations);
     });
   }
 
@@ -2426,7 +2446,6 @@
 
   // ドロップダウンにヘッダーオプションを設定 - エラーハンドリング強化版
   function fillColumnDropdowns(headers, mapping, confidence = {}) {
-    console.log('fillColumnDropdowns:', { headers, mapping, confidence });
 
     try {
       // 入力データの検証
@@ -2704,7 +2723,6 @@
 
   // 🎯 AI検出結果をドロップダウンの初期選択として設定（競合解決強化版）
   function setAIDetectionSelections(mapping, dropdowns, confidence = {}) {
-    console.log('🔍 setAIDetectionSelections: AI検出と手動設定の競合解決開始', { mapping, confidence });
 
     // 🛡️ 競合状態の事前チェック
     const conflictStatus = analyzeColumnSelectionConflicts(mapping, dropdowns, confidence);
@@ -2719,19 +2737,19 @@
       return;
     }
 
+    // バックエンド構造統一: CLAUDE.md準拠
+    const actualMapping = mapping || {};
+
     // 詳細チェック: mapping構造の検証
     const mappingDetails = {
-      hasMapping: mapping.hasOwnProperty('mapping') || Object.keys(mapping).length > 0,
+      hasMapping: Object.keys(actualMapping).length > 0,
       hasConfidence: Object.keys(confidence).length > 0,
-      mappingKeys: mapping.mapping ? Object.keys(mapping.mapping) : Object.keys(mapping),
+      mappingKeys: Object.keys(actualMapping),
       confidenceKeys: Object.keys(confidence),
-      mappingContent: mapping.mapping || mapping,
+      mappingContent: actualMapping,
       confidenceContent: confidence
     };
-    console.log('🔍 setAIDetectionSelections: mapping詳細分析', mappingDetails);
 
-    // バックエンド構造統一: mapping.mapping を直接使用
-    const actualMapping = mapping.mapping || {};
     const hasValidMapping = actualMapping && Object.keys(actualMapping).length > 0;
     const hasConfidenceData = confidence && Object.keys(confidence).length > 0;
 
@@ -3799,6 +3817,7 @@
         verifiedAt: timestamp // 検証時刻は論理的にmapping内のみ
       },
       setupComplete: true,
+      setupStatus: 'completed',
       etag: (systemState && systemState.config && systemState.config.etag) || undefined,
     };
 
