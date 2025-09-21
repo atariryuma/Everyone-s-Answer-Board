@@ -8,11 +8,33 @@
  * - サービスアカウント使用時の安全な権限管理
  */
 
-/* global getServiceAccount, validateEmail, CACHE_DURATION, TIMEOUT_MS */
+/* global validateEmail, CACHE_DURATION, TIMEOUT_MS */
 
 // ===========================================
 // 🗄️ データベース基盤操作
 // ===========================================
+
+/**
+ * サービスアカウント認証情報を取得
+ * @returns {Object} Service account info with isValid flag
+ */
+function getServiceAccount() {
+  try {
+    const creds = PropertiesService.getScriptProperties().getProperty('SERVICE_ACCOUNT_CREDS');
+    if (!creds) {
+      return { isValid: false };
+    }
+
+    const serviceAccount = JSON.parse(creds);
+    return {
+      isValid: !!(serviceAccount.client_email && serviceAccount.private_key),
+      email: serviceAccount.client_email
+    };
+  } catch (error) {
+    console.warn('getServiceAccount: Invalid credentials format');
+    return { isValid: false };
+  }
+}
 
 /**
  * データベーススプレッドシートを開く
