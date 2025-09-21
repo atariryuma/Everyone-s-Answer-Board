@@ -178,8 +178,8 @@ class StudyQuestApp {
       getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) =>
         this.runGas('getIncrementalSheetData', this.state.sheetName, { classFilter, sortOrder: sort, lastSeenCount: sinceRowCount }),
       getAvailableSheets: () => this.runGas('getSheets'),
-      addReaction: (rowIndex, reaction, sheetName) => this.runGas('dsAddReaction', this.state.userId, rowIndex, reaction),
-      toggleHighlight: (rowIndex, sheetName) => this.runGas('dsToggleHighlight', this.state.userId, rowIndex),
+      addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction),
+      toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex),
       checkAdmin: () => this.runGas('isAdmin'),
       clearCache: () => this.runGas('refreshBoardData', this.state.userId),
       validateData: () => this.validData(),
@@ -1095,7 +1095,7 @@ class StudyQuestApp {
 
     // Simple request deduplication for identical calls (except for state-changing operations)
     const cacheKey = funcName + JSON.stringify(mappedArgs);
-    const isStateChanging = ['dsToggleHighlight', 'dsAddReaction'].includes(funcName);
+    const isStateChanging = ['toggleHighlight', 'addReaction'].includes(funcName);
 
     if (!isStateChanging) {
       const cached = this.cache.get(cacheKey);
@@ -1164,10 +1164,10 @@ class StudyQuestApp {
 
     // 🎯 CLAUDE.md準拠: 統一されたエラーメッセージ
     switch (funcName) {
-      case 'dsAddReaction':
+      case 'addReaction':
         enhancedError.userMessage = 'リアクション処理エラー';
         break;
-      case 'dsToggleHighlight':
+      case 'toggleHighlight':
         enhancedError.userMessage = 'ハイライト処理エラー';
         break;
       default:
@@ -2292,7 +2292,7 @@ class StudyQuestApp {
               }
             ]
           });
-        } else if (funcName === 'addReaction' || funcName === 'dsAddReaction') {
+        } else if (funcName === 'addReaction') {
           resolve({
             status: 'ok',
             reactions: {
@@ -2301,7 +2301,7 @@ class StudyQuestApp {
               CURIOUS: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 }
             }
           });
-        } else if (funcName === 'toggleHighlight' || funcName === 'dsToggleHighlight') {
+        } else if (funcName === 'toggleHighlight') {
           const currentHighlight = args[2] === undefined ? false : !args[2];
           resolve({
             status: 'ok',
@@ -3100,7 +3100,7 @@ class StudyQuestApp {
    * @param {boolean} isInitialLoad - 初期ロードかどうか
    * @returns {Promise} データ取得結果
    */
-  async fetchUserData(fetchParams, isInitialLoad) {
+  async getUserData(fetchParams, isInitialLoad) {
     const retryOptions = {
       maxRetries: isInitialLoad ? 1 : 2, // 0-indexed, so 1 = 2 attempts total
       baseDelay: isInitialLoad ? 500 : 1000,
@@ -3449,7 +3449,7 @@ class StudyQuestApp {
       
       // エラーハンドリング強化版のデータ取得
       try {
-        const result = await this.fetchUserData(
+        const result = await this.getUserData(
           fetchParams,
           isInitialLoad
         );
@@ -7854,5 +7854,5 @@ try {
     const msg = window.sharedUtilities.security.escapeHtml(error.message || '');
     container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
   }
-}
+
 </script>

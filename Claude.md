@@ -308,8 +308,8 @@ isAdmin()              // 簡潔な状態確認
 checkUserAccess()      // 分かりやすいアクション
 
 // ✅ 特殊機能のみプレフィックス使用
-dsGetUserSheetData()   // DataService特有の複雑なデータ処理
-dsAddReaction()        // DataService特有の機能
+getUserSheetData()   // DataService特有の複雑なデータ処理
+addReaction()        // DataService特有の機能
 sysLog()              // システムレベルの統一ログ機能
 
 // ❌ 避けるべき: 不要なプレフィックス強制
@@ -389,7 +389,7 @@ handleGetData()       // handle + ハンドル対象
 formatTimestamp()     // format + 変換対象
 
 // 5. 特殊プレフィックス（必要時のみ）
-dsGetUserSheetData()  // 複雑なデータ処理
+getUserSheetData()  // 複雑なデータ処理
 sysLog()             // システムレベル機能
 ```
 
@@ -406,7 +406,7 @@ function processUserData(userId, spreadsheetId, sheetName, options = {}) {
 // ✅ 一貫性のあるAPI設計
 getCurrentEmail()                           // Auth layer
 getUserConfig(userId)                       // Config layer
-dsGetUserSheetData(userId, options)        // Data layer (特殊処理)
+getUserSheetData(userId, options)        // Data layer (特殊処理)
 
 // ❌ 非一貫的なパラメータ（非推奨）
 function badFunction(user_id, spreadsheet-id, sheet_name) { } // ❌ 命名規則混在
@@ -429,7 +429,7 @@ function getUserConfig(userId) {
 }
 
 // ✅ Specialized functions with clear prefixes
-function dsGetUserSheetData(userId, options = {}) {
+function getUserSheetData(userId, options = {}) {
   // Complex data operations warrant specific naming
   // Clear functional responsibility
 }
@@ -462,8 +462,8 @@ createErrorResponse()    // 自然な動詞+名詞
 isAdmin()               // シンプルな状態確認
 
 // ✅ 必要なプレフィックス（機能的理由）
-dsGetUserSheetData()    // DataService特有の複雑処理
-dsAddReaction()         // DataService特有の機能
+getUserSheetData()    // DataService特有の複雑処理
+addReaction()         // DataService特有の機能
 sysLog()               // システムレベル統一機能
 
 // ❌ 不要なプレフィックス強制は避ける
@@ -492,7 +492,7 @@ sysLog()               // システムレベル統一機能
 
 ### **API Compatibility Guidance**
 - フロントエンドは既存API名に合わせる（例: `isAdmin`、`getSheets`）
-- リアクション系はDataServiceの公開関数を直接利用（`dsAddReaction`, `dsToggleHighlight`）
+- リアクション系はDataServiceの公開関数を直接利用（`addReaction`, `toggleHighlight`）
 - 新たな中間API（Gatewayラッパ）は原則追加しない
 
 ### **OAuth Scopes Policy**

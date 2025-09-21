@@ -207,7 +207,6 @@ function getDefaultConfig(userId) {
       canView: true,
       canReact: true
     },
-    setupStep: 1,
     completionScore: 0
   };
 }
@@ -283,13 +282,9 @@ function ensureRequiredFields(config, userId) {
     spreadsheetId: config.spreadsheetId || '',
     sheetName: config.sheetName || '',
     formUrl: config.formUrl || '',
-    displaySettings: config.displaySettings || {
-      showNames: false,
-      showReactions: false
-    },
-    columnMapping: config.columnMapping || { mapping: {} },
-    userPermissions: config.userPermissions || generateUserPermissions(userId),
-    setupStep: config.setupStep || determineSetupStep(JSON.stringify(config)),
+    displaySettings: config.displaySettings,
+    columnMapping: config.columnMapping,
+    userPermissions: config.userPermissions,
     completionScore: calculateCompletionScore(config),
     lastModified: new Date().toISOString()
   };
@@ -514,34 +509,6 @@ function validateConfigUserId(userId) {
 // 📊 システム状態・診断
 // ===========================================
 
-/**
- * セットアップステップ判定
- * @param {string} configJson - 設定JSON
- * @returns {number} セットアップステップ (1-3)
- */
-function determineSetupStep(configJson) {
-  try {
-    // configJsonは文字列またはオブジェクトの可能性あり
-    const config = typeof configJson === 'string' ? JSON.parse(configJson || '{}') : (configJson || {});
-
-    if (!config.spreadsheetId) {
-      return 1; // データソース未設定
-    }
-
-    if (!config.formUrl || config.setupStatus !== 'completed') {
-      return 2; // 設定未完了
-    }
-
-    if (config.isPublished) {
-      return 3; // 完了・公開済み
-    }
-
-    return 2; // 設定完了だが未公開
-  } catch (error) {
-    console.error('determineSetupStep: エラー', error.message);
-    return 1;
-  }
-}
 
 /**
  * システムセットアップ状態確認

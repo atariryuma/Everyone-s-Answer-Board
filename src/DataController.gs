@@ -10,96 +10,12 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ConfigService, DataService, getCurrentEmail, createErrorResponse, dsGetUserSheetData, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, getUserConfig */
+/* global ConfigService, DataService, getCurrentEmail, createErrorResponse, getUserSheetData, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, getUserConfig */
 
 // ===========================================
 // 📊 メインページデータAPI
 // ===========================================
 
-/**
- * メインページ用データの取得
- * Page.html から呼び出される
- *
- * @param {Object} request - リクエストパラメータ
- * @returns {Object} データ取得結果
- */
-
-function handleGetData(request) {
-  try {
-    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
-    const email = getCurrentEmail();
-    if (!email) {
-      return {
-        success: false,
-        message: 'ユーザー情報が見つかりません'
-      };
-    }
-
-    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
-    if (!user) {
-      return {
-        success: false,
-        message: 'ユーザーが登録されていません'
-      };
-    }
-
-    // 直接DataServiceに依存せず、安定APIで取得
-    const data = dsGetUserSheetData(user.userId, request.options || {});
-    return {
-      success: true,
-      data
-    };
-
-  } catch (error) {
-    console.error('DataController.handleGetData エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
-
-
-/**
- * データの更新
- * Page.html から呼び出される
- *
- * @param {Object} request - 更新リクエスト
- * @returns {Object} 更新結果
- */
-function handleRefreshData(request) {
-  try {
-    // 🎯 Zero-dependency: 直接Session APIでユーザー取得
-    const email = getCurrentEmail();
-    if (!email) {
-      return {
-        success: false,
-        message: 'ユーザー情報が見つかりません'
-      };
-    }
-
-    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
-    if (!user) {
-      return {
-        success: false,
-        message: 'ユーザーが登録されていません'
-      };
-    }
-
-    // DataServiceに依存せず、直に最新データを再取得して返却
-    const data = dsGetUserSheetData(user.userId, request.options || {});
-    return { success: true, data };
-
-  } catch (error) {
-    console.error('DataController.handleRefreshData エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 // ===========================================
 // 📊 データ公開・取得API
@@ -133,7 +49,7 @@ function getRecentSubmissions(userId, limit = 10) {
       };
     }
 
-    const data = dsGetUserSheetData(userId, { limit, includeTimestamp: true });
+    const data = getUserSheetData(userId, { limit, includeTimestamp: true });
     return {
       success: true,
       data,
@@ -289,20 +205,6 @@ function addSpreadsheetUrl(url) {
 
 
 
-/**
- * ボードデータ更新（API Gateway互換）
- */
-function refreshBoardData(userId, options = {}) {
-  try {
-    if (!userId) {
-      return { success: false, message: 'ユーザーIDが必要です' };
-    }
-    const data = dsGetUserSheetData(userId, options || {});
-    return { success: true, data };
-  } catch (err) {
-    return { success: false, message: err.message || '更新エラー' };
-  }
-}
 
 // ===========================================
 // 📊 GAS Best Practices - Flat Function Structure

@@ -252,16 +252,7 @@
   })();
 
   // URL検証関数
-  function isValidFormUrl(url) {
-    if (!url || typeof url !== 'string') return false;
-    try {
-      const urlObj = new URL(url.trim());
-      if (urlObj.protocol !== 'https:') return false;
-      const validHosts = ['docs.google.com', 'forms.gle'];
-      if (urlObj.hostname === 'docs.google.com') {
-        // Match backend logic: support both /forms/ and /viewform for comprehensive Google Forms URL support
-        return urlObj.pathname.includes('/forms/') || urlObj.pathname.includes('/viewform');
-      }
+  
       return validHosts.includes(urlObj.hostname);
     } catch {
       return false;
@@ -332,7 +323,7 @@
       const configResponse = await getConfigAsync();
       console.log('📊 initializePanel: 設定データ取得完了', configResponse);
       // 🔧 CLAUDE.md準拠: 安全な設定状態更新
-      systemState.config = configResponse?.success ? { ...configResponse.config } : null;
+      systemState.config = configResponse?.success ? { ...configResponse.data.config } : null;
 
       // 3. URL パラメータのチェックと適用
       step = 'checking URL params';
@@ -399,7 +390,7 @@
 
         // 既存設定の直接復元（重いAPI呼び出しなし）
         // 🔧 パフォーマンス最適化: 単一innerHTML操作でDOM reflow削減
-        const spreadsheetName = config.spreadsheetName || config.spreadsheetId;
+        const spreadsheetName = config.spreadsheetName;
         spreadsheetSelect.innerHTML = `
           <option value="">スプレッドシートを選択してください</option>
           <option value="${config.spreadsheetId}" selected>現在の設定: ${spreadsheetName}</option>
@@ -432,7 +423,7 @@
         // 既存の設定がある場合は、その項目だけを追加
         const option = document.createElement('option');
         option.value = config.spreadsheetId;
-        option.textContent = '現在の設定: ' + (config.spreadsheetName || config.spreadsheetId);
+        option.textContent = '現在の設定: ' + config.spreadsheetName;
         spreadsheetSelect.appendChild(option);
         spreadsheetSelect.value = config.spreadsheetId;
 
@@ -984,10 +975,10 @@
         }
       }
 
-      // 4. 表示設定の反映（新形式・旧形式対応）
-      const displaySettings = config.displaySettings || {};
-      const showNames = displaySettings.showNames !== undefined ? displaySettings.showNames : config.showNames;
-      const showReactions = displaySettings.showReactions !== undefined ? displaySettings.showReactions : config.showReactions;
+      // 4. 表示設定の反映（統一構造）
+      const displaySettings = config.displaySettings;
+      const showNames = displaySettings.showNames;
+      const showReactions = displaySettings.showReactions;
 
       // 名前表示トグル
       const showNamesToggle = document.getElementById('show-names');
@@ -1064,10 +1055,7 @@
   }
 
   // 基本的なサニタイゼーション
-  function sanitizeInput(input) {
-    if (!input || typeof input !== 'string') {
-      return '';
-    }
+  
     return input.replace(/[<>\"'&]/g, '').trim();
   }
 
@@ -1584,7 +1572,8 @@
   // 設定エクスポート
   function exportConfig() {
     google.script.run
-      .withSuccessHandler(function (config) {
+      .withSuccessHandler(function (response) {
+        const config = response.data.config;
         const dataStr = JSON.stringify(config, null, 2);
         const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
         const exportFileDefaultName = 'studyquest-config.json';
@@ -1726,14 +1715,7 @@
   }
 
   // スプレッドシートURL検証
-  function validateSpreadsheetUrl() {
-    const urlInput = document.getElementById('spreadsheet-url');
-    const url = urlInput.value.trim();
-
-    if (!url) {
-      showError('URLを入力してください');
-      return;
-    }
+  
 
     // GoogleスプレッドシートURLの基本的な検証
     const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
@@ -2743,8 +2725,8 @@
     };
     console.log('🔍 setAIDetectionSelections: mapping詳細分析', mappingDetails);
 
-    // AI判定システム対応: mappingが空でも信頼度があれば処理継続
-    const actualMapping = mapping.mapping || mapping;
+    // バックエンド構造統一: mapping.mapping を直接使用
+    const actualMapping = mapping.mapping || {};
     const hasValidMapping = actualMapping && Object.keys(actualMapping).length > 0;
     const hasConfidenceData = confidence && Object.keys(confidence).length > 0;
 
@@ -3331,7 +3313,7 @@
       name: '名前列',
     };
 
-    const actualMapping = mapping.mapping || mapping;
+    const actualMapping = mapping.mapping || {};
     Object.keys(columnNames).forEach((key) => {
       if (actualMapping[key] !== null && actualMapping[key] !== undefined) {
         const columnLabel = String.fromCharCode(65 + actualMapping[key]) + '列';
@@ -3601,7 +3583,7 @@
         validation.errors.push('列マッピングが無効です');
         validation.isValid = false;
       } else {
-        const mappingData = columnMapping.mapping || columnMapping;
+        const mappingData = columnMapping.mapping || {};
         const confidenceData = columnMapping.confidence || {};
 
         // 必須フィールドの確認
@@ -3679,7 +3661,7 @@
     const maxScore = 100;
 
     try {
-      const mappingData = columnMapping.mapping || columnMapping;
+      const mappingData = columnMapping.mapping || {};
       const confidenceData = columnMapping.confidence || {};
 
       // 基本フィールド存在 (40点)
@@ -4063,11 +4045,11 @@
             google.script.run
               .withSuccessHandler(function(latestConfigResponse) {
                 console.log('📋 最新設定取得結果:', latestConfigResponse);
-                if (latestConfigResponse && latestConfigResponse.success && latestConfigResponse.config) {
-                  updateResourceButtons(latestConfigResponse.config);
+                if (latestConfigResponse && latestConfigResponse.success && latestConfigResponse.data.config) {
+                  updateResourceButtons(latestConfigResponse.data.config);
                   // ETag更新 - 楽観的ロック機構
-                  if (latestConfigResponse.config.etag) {
-                    systemState.config.etag = latestConfigResponse.config.etag;
+                  if (latestConfigResponse.data.config.etag) {
+                    systemState.config.etag = latestConfigResponse.data.config.etag;
                   }
                 } else {
                   // フォールバック: 手動で設定を構築
@@ -4591,14 +4573,14 @@
           } catch (fallbackError) {
             console.error('フォールバック遷移も失敗:', fallbackError);
           }
-        })
+        )
         .getWebAppUrl();
 
-    } catch (error) {
+     catch (error) {
       console.error('openAppSetup error:', error);
       showError('アプリ設定画面への移動に失敗しました');
       setPartialLoading(false);
-    }
-  }
+    
+  
 
 </script>

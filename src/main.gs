@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, dsGetUserSheetData, getColumnAnalysis, validateConfig, dsAddReaction, dsToggleHighlight, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getDataWithServiceAccount */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, getColumnAnalysis, validateConfig, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getDataWithServiceAccount */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -182,7 +182,7 @@ function doGet(e) {
     errorTemplate.message = 'システムで予期しないエラーが発生しました。管理者にお問い合わせください。';
 
     // Validate error object before template literal usage
-    if (error && error.message) {
+    if (error.message) {
       errorTemplate.debugInfo = `Error: ${error.message}\nStack: ${error.stack || 'N/A'}`;
     } else {
       errorTemplate.debugInfo = 'An unknown error occurred during request processing.';
@@ -263,7 +263,7 @@ function doPost(e) {
           if (!user) {
             result = createUserNotFoundError();
           } else {
-            result = { success: true, data: dsGetUserSheetData(user.userId, request.options || {}) };
+            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
           }
         } catch (error) {
           result = createExceptionResponse(error);
@@ -271,11 +271,11 @@ function doPost(e) {
         break;
       case 'addReaction':
         // Direct DataService call for reactions
-        result = dsAddReaction(request.userId || email, request.rowId, request.reactionType);
+        result = addReaction(request.userId || email, request.rowId, request.reactionType);
         break;
       case 'toggleHighlight':
         // Direct DataService call for highlights
-        result = dsToggleHighlight(request.userId || email, request.rowId);
+        result = toggleHighlight(request.userId || email, request.rowId);
         break;
       case 'refreshData':
         // 🎯 GAS-Native: Direct Data class call
@@ -284,7 +284,7 @@ function doPost(e) {
           if (!user) {
             result = createUserNotFoundError();
           } else {
-            result = { success: true, data: dsGetUserSheetData(user.userId, request.options || {}) };
+            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
           }
         } catch (error) {
           result = createExceptionResponse(error);
@@ -383,7 +383,7 @@ function getConfig() {
     const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
-    return { success: true, config, userId: user.userId };
+    return { success: true, data: { config, userId: user.userId } };
   } catch (error) {
     console.error('getConfig error:', error.message);
     return createExceptionResponse(error);
@@ -434,7 +434,7 @@ function isAdministrator(email) {
 
     return isAdmin;
   } catch (error) {
-    console.error('isAdministrator: エラー', {
+    console.error('[ERROR] main.isAdministrator:', {
       error: error.message,
       email: email && typeof email === 'string' ? `${email.split('@')[0]}@***` : 'null'
     });
@@ -580,7 +580,19 @@ function processLoginAction() {
     }
 
     const baseUrl = ScriptApp.getService().getUrl();
-    const redirectUrl = baseUrl && user && user.userId ? `${baseUrl}?mode=admin&userId=${user.userId}` : baseUrl || '';
+    if (!baseUrl) {
+      return {
+        success: false,
+        message: 'Web app URL not available'
+      };
+    }
+    if (!user || !user.userId) {
+      return {
+        success: false,
+        message: 'Invalid user data'
+      };
+    }
+    const redirectUrl = `${baseUrl}?mode=admin&userId=${user.userId}`;
     // Return redirect URL at top-level for client compatibility
     return {
       success: true,
@@ -598,7 +610,7 @@ function processLoginAction() {
     console.error('processLoginAction error:', error.message);
     return {
       success: false,
-      message: error && error.message ? `Login failed: ${error.message}` : 'Login failed: 詳細不明'
+      message: `Login failed: ${error.message || '詳細不明'}`
     };
   }
 }
@@ -639,7 +651,7 @@ function getSystemDomainInfo() {
     console.error('getSystemDomainInfo error:', error.message);
     return {
       success: false,
-      message: error && error.message ? `Domain information error: ${error.message}` : 'Domain information error: 詳細不明'
+      message: `Domain information error: ${error.message || '詳細不明'}`
     };
   }
 }
@@ -723,7 +735,9 @@ function setAppStatus(isActive) {
     // ボード公開状態を更新
     config.isPublished = Boolean(isActive);
     if (isActive) {
-      config.publishedAt = config.publishedAt || new Date().toISOString();
+      if (!config.publishedAt) {
+        config.publishedAt = new Date().toISOString();
+      }
     }
     config.lastModified = new Date().toISOString();
     config.lastAccessedAt = new Date().toISOString();
@@ -731,7 +745,7 @@ function setAppStatus(isActive) {
     // 統一API使用: 検証・サニタイズ・保存
     const saveResult = saveUserConfig(user.userId, config);
     if (!saveResult.success) {
-      return createErrorResponse(saveResult && saveResult.message ? `Failed to update user configuration: ${saveResult.message}` : 'Failed to update user configuration: 詳細不明');
+      return createErrorResponse(`Failed to update user configuration: ${saveResult.message || '詳細不明'}`);
     }
 
     return {
@@ -885,7 +899,7 @@ function toggleUserActiveStatus(targetUserId) {
     if (result.success) {
       return {
         success: true,
-        message: updatedUser && typeof updatedUser.isActive === 'boolean' ? `ユーザー状態を${updatedUser.isActive ? 'アクティブ' : '非アクティブ'}に変更しました` : 'ユーザー状態を変更しました',
+        message: `ユーザー状態を${updatedUser.isActive ? 'アクティブ' : '非アクティブ'}に変更しました`,
         userId: targetUserId,
         newStatus: updatedUser.isActive,
         timestamp: new Date().toISOString()
@@ -923,7 +937,9 @@ function toggleUserBoardStatus(targetUserId) {
     // ボード公開状態を切り替え
     config.isPublished = !config.isPublished;
     if (config.isPublished) {
-      config.publishedAt = config.publishedAt || new Date().toISOString();
+      if (!config.publishedAt) {
+        config.publishedAt = new Date().toISOString();
+      }
     }
     config.lastModified = new Date().toISOString();
     config.lastAccessedAt = new Date().toISOString();
@@ -931,14 +947,14 @@ function toggleUserBoardStatus(targetUserId) {
     // 統一API使用: 検証・サニタイズ・保存
     const saveResult = saveUserConfig(targetUserId, config);
     if (!saveResult.success) {
-      return createErrorResponse(saveResult && saveResult.message ? `Failed to toggle board status: ${saveResult.message}` : 'Failed to toggle board status: 詳細不明');
+      return createErrorResponse(`Failed to toggle board status: ${saveResult.message || '詳細不明'}`);
     }
 
     const result = saveResult; // 統一APIレスポンスをそのまま利用
     if (result.success) {
       return {
         success: true,
-        message: config && typeof config.isPublished === 'boolean' ? `ボードを${config.isPublished ? '公開' : '非公開'}に変更しました` : 'ボード状態を変更しました',
+        message: `ボードを${config.isPublished ? '公開' : '非公開'}に変更しました`,
         userId: targetUserId,
         boardPublished: config.isPublished,
         timestamp: new Date().toISOString()
@@ -988,7 +1004,7 @@ function clearActiveSheet(targetUserId) {
     // 統一API使用: 検証・サニタイズ・保存
     const saveResult = saveUserConfig(targetUser.userId, config);
     if (!saveResult.success) {
-      return createErrorResponse(saveResult && saveResult.message ? `ボード状態の更新に失敗しました: ${saveResult.message}` : 'ボード状態の更新に失敗しました: 詳細不明');
+      return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
     }
 
     return {
@@ -1163,8 +1179,8 @@ function getBoardInfo() {
       isPublished,
       questionText: getQuestionText(config),
       urls: {
-        view: baseUrl && user && user.userId ? `${baseUrl}?mode=view&userId=${user.userId}` : '',
-        admin: baseUrl && user && user.userId ? `${baseUrl}?mode=admin&userId=${user.userId}` : ''
+        view: `${baseUrl}?mode=view&userId=${user.userId}`,
+        admin: `${baseUrl}?mode=admin&userId=${user.userId}`
       },
       lastUpdated: config.publishedAt || config.lastModified || new Date().toISOString()
     };
@@ -1185,18 +1201,18 @@ function getSheetData(userId, options = {}) {
     if (!userId) {
       console.warn('getSheetData: userId not provided');
       // Direct return format like admin panel getSheetList
-      return { success: false, message: 'ユーザーIDが必要です', data: [], headers: [], sheetName: '' };
+      return { success: false, message: 'ユーザーIDが必要です' };
     }
 
     // Delegate to DataService using GAS-Native pattern
-    const result = dsGetUserSheetData(userId, options);
+    const result = getUserSheetData(userId, options);
 
     // Return directly without wrapping - same pattern as admin panel getSheetList
     return result;
   } catch (error) {
     console.error('getSheetData error:', error.message);
     // Direct return format like admin panel getSheetList
-    return { success: false, message: error.message || 'データ取得エラー', data: [], headers: [], sheetName: '' };
+    return { success: false, message: error.message || 'データ取得エラー' };
   }
 }
 
@@ -1256,14 +1272,14 @@ function getPublishedSheetData(classFilter, sortOrder) {
       };
     }
 
-    // dsGetUserSheetDataを呼び出し、フィルターオプションを渡す
+    // getUserSheetDataを呼び出し、フィルターオプションを渡す
     const options = {
       classFilter: classFilter !== 'すべて' ? classFilter : undefined,
       sortBy: sortOrder || 'newest',
       includeTimestamp: true
     };
 
-    const result = dsGetUserSheetData(user.userId, options);
+    const result = getUserSheetData(user.userId, options);
 
     // フロントエンド期待形式に変換
     if (result && result.success && result.data) {
@@ -1396,8 +1412,8 @@ function getDataCount(classFilter, sortOrder, adminMode = false) {
       return { error: 'User not found', count: 0 };
     }
 
-    // dsGetUserSheetDataを使用してデータを取得し、カウントのみ返却
-    const result = dsGetUserSheetData(user.userId, {
+    // getUserSheetDataを使用してデータを取得し、カウントのみ返却
+    const result = getUserSheetData(user.userId, {
       classFilter,
       sortOrder,
       adminMode
@@ -1447,8 +1463,8 @@ function saveConfig(config, options = {}) {
 
   } catch (error) {
     const operation = options.isDraft ? 'saveDraft' : 'saveConfig';
-    console.error(`${operation} error:`, error && error.message ? error.message : 'エラー詳細不明');
-    return { success: false, message: error && error.message ? error.message : 'エラーが発生しました' };
+    console.error(`[ERROR] main.${operation}:`, error.message || 'Operation error');
+    return { success: false, message: error.message || 'エラーが発生しました' };
   }
 }
 
@@ -1456,68 +1472,6 @@ function saveConfig(config, options = {}) {
 // 🎯 f0068fa復元機能 - GAS-Native Architecture準拠
 // ===========================================
 
-/**
- * フォームURL取得 - 簡素化実装（configJson直接アクセス）
- * @param {string} sheetId - 未使用（互換性のため残存）
- * @returns {Object} フォーム情報
- */
-function detectFormUrl(sheetId = null) {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return { success: false, message: 'Authentication required', formUrl: null };
-    }
-
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
-    if (!user) {
-      return { success: false, message: 'User not found', formUrl: null };
-    }
-
-    // 統一API使用: 構造化パース
-    const configResult = getUserConfig(user.userId);
-    const config = configResult.success ? configResult.config : {};
-
-    if (!config.formUrl) {
-      return { success: false, message: 'Form URL not configured', formUrl: null };
-    }
-
-    return {
-      success: true,
-      formUrl: config.formUrl,
-      formTitle: config.formTitle || 'フォーム',
-      source: 'config'
-    };
-  } catch (error) {
-    console.error('detectFormUrl error:', error.message);
-    return { success: false, message: error.message, formUrl: null };
-  }
-}
-
-/**
- * ドメイン認証チェック - 簡素化実装（既存認証パターン利用）
- * @param {string} userEmail - ユーザーメール（オプション）
- * @returns {Object} 認証結果
- */
-function checkDomainAuth(userEmail = null) {
-  try {
-    const email = userEmail || getCurrentEmail();
-    return {
-      success: true,
-      authenticated: !!email,
-      domainStatus: email ? 'authenticated' : 'not_authenticated',
-      userEmail: email
-    };
-  } catch (error) {
-    console.error('checkDomainAuth error:', error.message);
-    return {
-      success: false,
-      authenticated: false,
-      domainStatus: 'error',
-      message: error.message
-    };
-  }
-}
 
 /**
  * 新着コンテンツ検出機能 - GAS-Native直接実装
@@ -1562,7 +1516,7 @@ function detectNewContent(lastUpdateTime) {
     }
 
     // 現在のシートデータ取得
-    const currentData = dsGetUserSheetData(user.userId, { includeTimestamp: true });
+    const currentData = getUserSheetData(user.userId, { includeTimestamp: true });
     if (!currentData?.success || !currentData.data) {
       return {
         success: true,
@@ -1592,7 +1546,7 @@ function detectNewContent(lastUpdateTime) {
         newItems.push({
           rowIndex: item.rowIndex || index + 1,
           name: item.name || '匿名',
-          preview: item && (item.answer || item.opinion) ? `${(item.answer || item.opinion).substring(0, 50)}...` : 'プレビュー不可',
+          preview: (item.answer || item.opinion) ? `${(item.answer || item.opinion).substring(0, 50)}...` : 'プレビュー不可',
           timestamp: itemTimestamp.toISOString()
         });
       }
@@ -1950,8 +1904,8 @@ function getIncrementalSheetData(sheetName, options = {}) {
       };
     }
 
-    // dsGetUserSheetDataを使用してデータ取得
-    const result = dsGetUserSheetData(user.userId, {
+    // getUserSheetDataを使用してデータ取得
+    const result = getUserSheetData(user.userId, {
       includeTimestamp: true,
       classFilter: options.classFilter,
       sortBy: options.sortOrder || 'newest'
@@ -2072,35 +2026,6 @@ function triggerPollingUpdate(options = {}) {
 // 🔧 Missing API Endpoints - Frontend/Backend Compatibility
 // ===========================================
 
-/**
- * Refresh board data for a user
- * @param {string} userId - User ID
- * @param {Object} options - Refresh options
- * @returns {Object} Refreshed board data
- */
-function refreshBoardData(userId, options = {}) {
-  try {
-    console.log('📊 refreshBoardData START:', { userId, options });
-
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
-
-    // Validate access
-    const accessCheck = checkAccess(email);
-    if (!accessCheck.success) {
-      return createAuthError();
-    }
-
-    // GAS-Native: Direct function call (Zero-Dependency Architecture)
-    return refreshBoardData(userId, options);
-
-  } catch (error) {
-    console.error('refreshBoardData error:', error && error.message ? error.message : 'エラー詳細不明');
-    return createExceptionResponse(error, 'Failed to refresh board data');
-  }
-}
 
 
 /**
@@ -2216,7 +2141,7 @@ function forceUrlSystemReset() {
     } catch (resetError) {
       return {
         success: false,
-        message: `URL system reset failed: ${  resetError.message}`,
+        message: `URL system reset failed: ${resetError.message}`,
         timestamp: new Date().toISOString()
       };
     }
@@ -2299,7 +2224,7 @@ function publishApplication(publishConfig) {
     } catch (publishError) {
       return {
         success: false,
-        message: `Publication failed: ${  publishError.message}`
+        message: `Publication failed: ${publishError.message}`
       };
     }
 
@@ -2381,7 +2306,7 @@ function getFormInfo(spreadsheetId, sheetName) {
           console.log('ℹ️ フォーム連携なし - 通常のスプレッドシート');
         }
       } catch (error) {
-        console.warn('フォームURL取得エラー:', error.message);
+        console.warn('[WARN] main.validateFormUrl: Form URL retrieval error:', error.message || 'Form URL error');
       }
 
       // 🛡️ CLAUDE.md準拠: 改良されたformData構造（GASベストプラクティス準拠）
@@ -2424,7 +2349,7 @@ function getFormInfo(spreadsheetId, sheetName) {
     } catch (sheetError) {
       return {
         success: false,
-        message: `Failed to access sheet: ${  sheetError.message}`
+        message: `Failed to access sheet: ${sheetError.message}`
       };
     }
 

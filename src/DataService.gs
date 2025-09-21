@@ -108,7 +108,7 @@ function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}
     return { index: -1, confidence: 0, method: 'not_found', debug: debugInfo };
 
   } catch (error) {
-    console.error('DataService.resolveColumnIndex: エラー', error.message);
+    console.error('[ERROR] DataService.resolveColumnIndex:', error.message || 'Unknown error');
     debugInfo.error = error.message;
     return { index: -1, confidence: 0, method: 'error', debug: debugInfo };
   }
@@ -172,7 +172,7 @@ function extractFieldValueUnified(row, headers, fieldType, columnMapping = {}, o
     // 🛡️ 入力検証強化
     if (!Array.isArray(row)) {
       if (options.enableDebug) {
-        console.warn(`DataService.extractFieldValueUnified: 無効な行データ (${fieldType})`);
+        console.warn(`[WARN] DataService.extractFieldValueUnified (${fieldType}): Invalid row data`);
       }
       return options.defaultValue || '';
     }
@@ -181,7 +181,7 @@ function extractFieldValueUnified(row, headers, fieldType, columnMapping = {}, o
 
     // 🔍 詳細なデバッグ情報
     if (options.enableDebug) {
-      console.log(`DataService.extractFieldValueUnified: ${fieldType}`, {
+      console.log(`[DEBUG] DataService.extractFieldValueUnified (${fieldType}):`, {
         ...columnResult.debug,
         rowLength: row.length,
         hasValue: columnResult.index !== -1 && row[columnResult.index] !== undefined
@@ -196,7 +196,7 @@ function extractFieldValueUnified(row, headers, fieldType, columnMapping = {}, o
     // 🔒 範囲外アクセス防止
     if (columnResult.index >= row.length) {
       if (options.enableDebug) {
-        console.warn(`DataService.extractFieldValueUnified: 列インデックス範囲外 (${fieldType})`, {
+        console.warn(`[WARN] DataService.extractFieldValueUnified (${fieldType}): Column index out of bounds`, {
           index: columnResult.index,
           rowLength: row.length
         });
@@ -208,7 +208,7 @@ function extractFieldValueUnified(row, headers, fieldType, columnMapping = {}, o
     return value !== undefined && value !== null ? value : (options.defaultValue || '');
 
   } catch (error) {
-    console.error(`DataService.extractFieldValueUnified: 予期しないエラー (${fieldType})`, error && error.message ? error.message : 'エラー詳細不明');
+    console.error(`[ERROR] DataService.extractFieldValueUnified (${fieldType}):`, error.message || 'Unexpected error');
     return handleExtractionError(fieldType, error, options);
   }
 }
@@ -238,7 +238,7 @@ function handleColumnNotFound(fieldType, row, headers, options = {}) {
       const physicalFallback = getPhysicalPositionFallback(fieldType, row);
       if (physicalFallback !== null) {
         if (options.enableDebug) {
-          console.info(`DataService.handleColumnNotFound: 物理位置フォールバック使用 (${fieldType})`);
+          console.info(`[INFO] DataService.handleColumnNotFound (${fieldType}): Using physical position fallback`);
         }
         return physicalFallback;
       }
@@ -249,13 +249,13 @@ function handleColumnNotFound(fieldType, row, headers, options = {}) {
       : emergencyDefaults[fieldType] || '';
 
     if (options.enableDebug) {
-      console.info(`DataService.handleColumnNotFound: デフォルト値使用 (${fieldType})`, defaultValue);
+      console.info(`[INFO] DataService.handleColumnNotFound (${fieldType}): Using default value`, defaultValue);
     }
 
     return defaultValue;
 
   } catch (fallbackError) {
-    console.error(`DataService.handleColumnNotFound: フォールバック処理エラー (${fieldType})`, fallbackError && fallbackError.message ? fallbackError.message : 'エラー詳細不明');
+    console.error(`[ERROR] DataService.handleColumnNotFound fallback (${fieldType}):`, fallbackError.message || 'Fallback processing error');
     return options.defaultValue || '';
   }
 }
@@ -268,10 +268,10 @@ function handleColumnNotFound(fieldType, row, headers, options = {}) {
  * @returns {*} エラー時のデフォルト値
  */
 function handleExtractionError(fieldType, error, options = {}) {
-  const errorMessage = `列値抽出エラー: ${fieldType} - ${error && error.message ? error.message : 'エラー詳細不明'}`;
+  const errorMessage = `Column value extraction error: ${fieldType} - ${error.message || 'Unknown error'}`;
 
   // 🚨 重要なエラーログ
-  console.error('DataService.handleExtractionError:', {
+  console.error('[ERROR] DataService.handleExtractionError:', {
     fieldType,
     error: error.message,
     stack: error.stack,
@@ -305,7 +305,7 @@ function getPhysicalPositionFallback(fieldType, row) {
 
     return null;
   } catch (error) {
-    console.warn(`DataService.getPhysicalPositionFallback: エラー (${fieldType})`, error && error.message ? error.message : 'エラー詳細不明');
+    console.warn(`[WARN] DataService.getPhysicalPositionFallback (${fieldType}):`, error.message || 'Position fallback error');
     return null;
   }
 }
@@ -366,7 +366,7 @@ function generateColumnDiagnosticReport(headers, columnMapping = {}, requiredFie
     // 推奨事項の生成
     report.recommendations = generateColumnRecommendations(report);
 
-    console.log('📊 DataService.generateColumnDiagnosticReport:', {
+    console.log('[DEBUG] DataService.generateColumnDiagnosticReport:', {
       resolved: report.summary.resolved,
       missing: report.summary.missing,
       avgConfidence: report.summary.confidence
@@ -375,7 +375,7 @@ function generateColumnDiagnosticReport(headers, columnMapping = {}, requiredFie
     return report;
 
   } catch (error) {
-    console.error('DataService.generateColumnDiagnosticReport: エラー', error.message);
+    console.error('[ERROR] DataService.generateColumnDiagnosticReport:', error.message || 'Diagnostic report error');
     report.error = error.message;
     return report;
   }
@@ -435,7 +435,7 @@ function generateColumnRecommendations(report) {
     return recommendations;
 
   } catch (error) {
-    console.error('DataService.generateColumnRecommendations: エラー', error.message);
+    console.error('[ERROR] DataService.generateColumnRecommendations:', error.message || 'Recommendations generation error');
     return [];
   }
 }
@@ -475,14 +475,14 @@ function monitorColumnResolution(headers, columnMapping = {}, options = {}) {
       ? Math.round((resolvedCount / criticalFields.length) * 100)
       : 0;
 
-    console.log('🔍 DataService.monitorColumnResolution:', {
+    console.log('[DEBUG] DataService.monitorColumnResolution:', {
       ...monitoringData,
       successRate: `${successRate}%`
     });
 
     // アラート条件
     if (successRate < 70) {
-      console.warn('⚠️ DataService.monitorColumnResolution: 列解決率が低下', {
+      console.warn('[WARN] DataService.monitorColumnResolution: Column resolution rate declined', {
         successRate,
         requiredAction: '列設定の確認が必要'
       });
@@ -491,7 +491,7 @@ function monitorColumnResolution(headers, columnMapping = {}, options = {}) {
     return monitoringData;
 
   } catch (error) {
-    console.error('DataService.monitorColumnResolution: エラー', error.message);
+    console.error('[ERROR] DataService.monitorColumnResolution:', error.message || 'Column monitoring error');
     return null;
   }
 }
@@ -568,7 +568,7 @@ function performIntegratedColumnDiagnostics(headers, columnMapping = {}, sampleD
     return diagnostics;
 
   } catch (error) {
-    console.error('performIntegratedColumnDiagnostics エラー:', error.message);
+    console.error('[ERROR] DataService.performIntegratedColumnDiagnostics:', error.message || 'Integrated diagnostics error');
     diagnostics.error = error.message;
     return diagnostics;
   }
@@ -631,7 +631,7 @@ function diagnoseBackendColumnSystem(headers, columnMapping) {
     return diagnosis;
 
   } catch (error) {
-    console.error('diagnoseBackendColumnSystem エラー:', error);
+    console.error('[ERROR] DataService.diagnoseBackendColumnSystem:', error.message || 'Backend column system error');
     return {
       status: 'error',
       score: 0,
@@ -661,7 +661,7 @@ function diagnoseFrontendColumnSystem(columnMapping) {
   try {
     // マッピングキーの一貫性確認
     const expectedKeys = ['answer', 'reason', 'class', 'name'];
-    const mappingData = columnMapping.mapping || columnMapping;
+    const mappingData = columnMapping.mapping || {};
 
     expectedKeys.forEach(key => {
       if (mappingData[key] === undefined) {
@@ -910,7 +910,7 @@ function generateSystemRecommendations(diagnostics) {
  * @param {Object} options - 取得オプション
  * @returns {Object} GAS公式推奨レスポンス形式
  */
-function dsGetUserSheetData(userId, options = {}) {
+function getUserSheetData(userId, options = {}) {
   const startTime = Date.now();
 
   try {
@@ -919,7 +919,7 @@ function dsGetUserSheetData(userId, options = {}) {
     // 🔧 Zero-Dependency統一: 直接findUserById使用
     const user = findUserById(userId);
     if (!user) {
-      console.error('DataService.dsGetUserSheetData: ユーザーが見つかりません', { userId });
+      console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
       return helpers.createDataServiceErrorResponse('ユーザーが見つかりません');
     }
 
@@ -927,7 +927,7 @@ function dsGetUserSheetData(userId, options = {}) {
     const configResult = getUserConfig(userId);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId) {
-      console.warn('DataService.dsGetUserSheetData: スプレッドシートIDが設定されていません', { userId });
+      console.warn('[WARN] DataService.getUserSheetData: Spreadsheet ID not configured', { userId });
       return helpers.createDataServiceErrorResponse('スプレッドシートが設定されていません');
     }
 
@@ -952,7 +952,7 @@ function dsGetUserSheetData(userId, options = {}) {
 
     return result;
   } catch (error) {
-    console.error('DataService.dsGetUserSheetData: エラー', {
+    console.error('DataService.getUserSheetData: エラー', {
       userId,
       error: error.message
     });
@@ -2111,8 +2111,8 @@ function restoreColumnConfig(userId, spreadsheetId, sheetName) {
       success: true,
       headers: basicHeaders.headers,
       columnMapping: {
-        mapping: config.columnMapping || {},
-        confidence: config.confidence || {}
+        mapping: config.columnMapping?.mapping || {},
+        confidence: config.columnMapping?.confidence || {}
       },
       source: 'configJson',
       executionTime: basicHeaders.executionTime
@@ -3333,7 +3333,7 @@ function validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey) {
  * @param {string} reaction
  * @returns {Object}
  */
-function dsAddReaction(userId, rowIndex, reaction) {
+function addReaction(userId, rowIndex, reaction) {
   try {
     // 🎯 Zero-Dependency: Direct Data call
     const user = findUserById(userId);
@@ -3385,13 +3385,13 @@ function dsAddReaction(userId, rowIndex, reaction) {
         message: res?.message || 'Failed to add reaction'
       };
     } catch (error) {
-      console.error('DataService.dsAddReaction: エラー', error.message);
+      console.error('DataService.addReaction: エラー', error.message);
       return createExceptionResponse(error);
     } finally {
       cache.remove(reactionKey);
     }
   } catch (outerError) {
-    console.error('DataService.dsAddReaction outer error:', outerError.message);
+    console.error('DataService.addReaction outer error:', outerError.message);
     // 🔧 統一ミューテックス: 緊急時のキャッシュクリア
     try {
       const cache = CacheService.getScriptCache();
@@ -3415,7 +3415,7 @@ function dsAddReaction(userId, rowIndex, reaction) {
  * @param {number|string} rowIndex - number or 'row_#'
  * @returns {Object}
  */
-function dsToggleHighlight(userId, rowIndex) {
+function toggleHighlight(userId, rowIndex) {
   try {
     // 🎯 Zero-Dependency: Direct Data call
     const user = findUserById(userId);
@@ -3464,13 +3464,13 @@ function dsToggleHighlight(userId, rowIndex) {
         message: result?.error || 'Failed to toggle highlight'
       };
     } catch (error) {
-      console.error('DataService.dsToggleHighlight: エラー', error.message);
+      console.error('DataService.toggleHighlight: エラー', error.message);
       return createExceptionResponse(error);
     } finally {
       cache.remove(highlightKey);
     }
   } catch (outerError) {
-    console.error('DataService.dsToggleHighlight outer error:', outerError.message);
+    console.error('DataService.toggleHighlight outer error:', outerError.message);
     // 🔧 統一ミューテックス: 緊急時のキャッシュクリア
     try {
       const cache = CacheService.getScriptCache();
@@ -3483,23 +3483,32 @@ function dsToggleHighlight(userId, rowIndex) {
   }
 }
 
+// ===========================================
+// 🔄 CLAUDE.md準拠: 自然な英語表現への統一化
+// ===========================================
+
+
 // Expose a stable namespace for non-global access patterns
 if (typeof global !== 'undefined') {
   global.DataService = {
-    dsGetUserSheetData,
+    // 🔄 GAS-Native Architecture: Direct ds-prefixed functions (CLAUDE.md compliant)
+    getUserSheetData,
+    addReaction,
+    toggleHighlight,
+    // Other functions
     processReaction,
-    addReaction: dsAddReaction,
-    toggleHighlight: dsToggleHighlight,
     connectToSheetInternal,
     analyzeColumns,
     getColumnAnalysis
   };
 } else {
   this.DataService = {
-    dsGetUserSheetData,
+    // 🔄 GAS-Native Architecture: Direct ds-prefixed functions (CLAUDE.md compliant)
+    getUserSheetData,
+    addReaction,
+    toggleHighlight,
+    // Other functions
     processReaction,
-    addReaction: dsAddReaction,
-    toggleHighlight: dsToggleHighlight,
     connectToSheetInternal,
     analyzeColumns,
     getColumnAnalysis

@@ -72,7 +72,7 @@ describe('System Integration Tests', () => {
       // Act & Assert
       
       // 1. Fetch sheet data
-      const sheetResult = await mockServices.DataService.getSheetData(userId);
+      const sheetResult = await mockServices.DataService.getUserSheetData(userId);
       expect(sheetResult.success).toBe(true);
       expect(Array.isArray(sheetResult.data)).toBe(true);
       
@@ -191,7 +191,7 @@ describe('System Integration Tests', () => {
       const startTime = Date.now();
       
       const promises = Array(10).fill().map(() => 
-        mockServices.DataService.getSheetData(userId)
+        mockServices.DataService.getUserSheetData(userId)
       );
       
       const results = await Promise.all(promises);
@@ -291,7 +291,7 @@ function setupMockServices() {
     },
     
     DataService: {
-      getSheetData: jest.fn(() => Promise.resolve({
+      getUserSheetData: jest.fn(() => Promise.resolve({
         success: true,
         data: testSheetData.slice(1), // Exclude header
         count: testSheetData.length - 1

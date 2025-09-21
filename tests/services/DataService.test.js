@@ -7,7 +7,7 @@ const { testUserData, testSheetData, createMockSpreadsheet } = require('../mocks
 
 // Mock DataService (simulate GAS environment)
 const DataService = {
-  getSheetData: jest.fn(),
+  getUserSheetData: jest.fn(),
   addReaction: jest.fn(),
   toggleHighlight: jest.fn(),
   refreshBoardData: jest.fn(),
@@ -59,7 +59,7 @@ describe('DataService', () => {
         }
       ];
 
-      DataService.getSheetData.mockReturnValue({
+      DataService.getUserSheetData.mockReturnValue({
         success: true,
         data: mockData,
         count: 2,
@@ -67,7 +67,7 @@ describe('DataService', () => {
       });
 
       // Act
-      const result = DataService.getSheetData(userId);
+      const result = DataService.getUserSheetData(userId);
 
       // Assert
       expect(result.success).toBe(true);
@@ -78,7 +78,7 @@ describe('DataService', () => {
 
     it('should handle empty sheet data', () => {
       // Arrange
-      DataService.getSheetData.mockReturnValue({
+      DataService.getUserSheetData.mockReturnValue({
         success: true,
         data: [],
         count: 0,
@@ -86,7 +86,7 @@ describe('DataService', () => {
       });
 
       // Act
-      const result = DataService.getSheetData('test-user');
+      const result = DataService.getUserSheetData('test-user');
 
       // Assert
       expect(result.success).toBe(true);
@@ -96,14 +96,14 @@ describe('DataService', () => {
 
     it('should handle sheet access errors', () => {
       // Arrange
-      DataService.getSheetData.mockReturnValue({
+      DataService.getUserSheetData.mockReturnValue({
         success: false,
         error: 'スプレッドシートにアクセスできません',
         timestamp: '2025-01-15T10:00:00Z'
       });
 
       // Act
-      const result = DataService.getSheetData('invalid-user');
+      const result = DataService.getUserSheetData('invalid-user');
 
       // Assert
       expect(result.success).toBe(false);
@@ -510,12 +510,12 @@ describe('DataService', () => {
 
     it('should handle spreadsheet API errors', () => {
       // Arrange
-      DataService.getSheetData.mockImplementation(() => {
+      DataService.getUserSheetData.mockImplementation(() => {
         throw new Error('Spreadsheet API error');
       });
 
       // Act & Assert
-      expect(() => DataService.getSheetData('test-user')).toThrow('Spreadsheet API error');
+      expect(() => DataService.getUserSheetData('test-user')).toThrow('Spreadsheet API error');
     });
 
     it('should handle network timeouts', () => {
@@ -535,14 +535,14 @@ describe('DataService', () => {
     it('should complete sheet operations within time limits', async () => {
       // Arrange
       const startTime = Date.now();
-      DataService.getSheetData.mockReturnValue({
+      DataService.getUserSheetData.mockReturnValue({
         success: true,
         data: testSheetData,
         count: testSheetData.length
       });
 
       // Act
-      DataService.getSheetData('test-user');
+      DataService.getUserSheetData('test-user');
       const endTime = Date.now();
 
       // Assert (should complete within 100ms for mock)
@@ -557,14 +557,14 @@ describe('DataService', () => {
         reactions: { understand: 0, like: 0, curious: 0 }
       }));
 
-      DataService.getSheetData.mockReturnValue({
+      DataService.getUserSheetData.mockReturnValue({
         success: true,
         data: largeDataset,
         count: 1000
       });
 
       // Act
-      const result = DataService.getSheetData('test-user');
+      const result = DataService.getUserSheetData('test-user');
 
       // Assert
       expect(result.count).toBe(1000);
@@ -611,7 +611,7 @@ describe('DataService Integration Tests', () => {
     const userId = 'integration-test-user';
     
     // Mock the full workflow
-    DataService.getSheetData.mockResolvedValue({
+    DataService.getUserSheetData.mockResolvedValue({
       success: true,
       data: testSheetData,
       count: testSheetData.length
@@ -633,7 +633,7 @@ describe('DataService Integration Tests', () => {
     });
 
     // Act
-    const sheetData = await DataService.getSheetData(userId);
+    const sheetData = await DataService.getUserSheetData(userId);
     const reactionResult = await DataService.addReaction(userId, 'row_2', 'LIKE');
     const highlightResult = await DataService.toggleHighlight(userId, 'row_2');
     const statistics = await DataService.getDataStatistics(userId);

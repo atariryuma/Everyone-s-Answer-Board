@@ -283,45 +283,52 @@ function validateColumnMapping(columnMapping) {
       return result;
     }
 
+    // バックエンド構造：columnMapping.mapping（CLAUDE.md準拠）
     if (!columnMapping.mapping || typeof columnMapping.mapping !== 'object') {
-      result.errors.push('列マッピングの mapping プロパティが必要です');
+      result.errors.push('列マッピング内のmappingプロパティが必要です');
       return result;
     }
-
     const {mapping} = columnMapping;
+
+    // メタプロパティをフィルタリング（V8最適化）
+    const metaProperties = ['_aiMapping', 'headers', 'verifiedAt', '_hasSelections'];
+    const actualColumns = Object.keys(mapping)
+      .filter(key => !metaProperties.includes(key));
     const requiredColumns = ['answer'];
     const optionalColumns = ['reason', 'class', 'name'];
     const allColumns = [...requiredColumns, ...optionalColumns];
 
-    // 必須列チェック
+    // 必須列チェック（バックエンド構造対応）
     for (const col of requiredColumns) {
       const index = mapping[col];
       if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
-        result.errors.push(`必須列 '${  col  }' が正しくマッピングされていません`);
+        result.errors.push(`必須列 '${col}' のインデックスが無効です（値: ${index}）`);
       }
     }
 
-    // オプション列チェック
+    // オプション列チェック（バックエンド構造対応）
     for (const col of optionalColumns) {
       const index = mapping[col];
       if (index !== undefined) {
         if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
-          result.warnings.push(`オプション列 '${  col  }' のマッピングが無効です`);
+          result.warnings.push(`オプション列 '${col}' のインデックスが無効です（値: ${index}）`);
         }
       }
     }
 
-    // 重複チェック
-    const usedIndices = Object.values(mapping).filter(index => typeof index === 'number');
+    // 重複チェック（V8最適化パターン、バックエンド構造対応）
+    const usedIndices = actualColumns
+      .map(col => mapping[col])
+      .filter(index => typeof index === 'number');
     const uniqueIndices = [...new Set(usedIndices)];
     if (usedIndices.length !== uniqueIndices.length) {
       result.errors.push('列インデックスに重複があります');
     }
 
-    // 未知の列チェック
-    for (const col of Object.keys(mapping)) {
+    // 未知の列チェック（メタプロパティ除外）
+    for (const col of actualColumns) {
       if (!allColumns.includes(col)) {
-        result.warnings.push(`未知の列タイプ '${  col  }' が含まれています`);
+        result.warnings.push(`未知の列タイプ '${col}' が含まれています`);
       }
     }
 

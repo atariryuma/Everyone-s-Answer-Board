@@ -201,7 +201,7 @@ function forceUrlSystemReset() {
           cacheResults.push('ScriptCache クリア要求送信');
         }
       } catch (cacheError) {
-        console.warn('ScriptCache クリアエラー:', cacheError.message);
+        console.warn('[WARN] SystemController.forceUrlSystemReset: ScriptCache clear error:', cacheError.message || 'Cache clear failed');
         cacheResults.push(cacheError && cacheError.message ? `ScriptCache クリア失敗: ${cacheError.message}` : 'ScriptCache クリア失敗: 詳細不明');
       }
 
@@ -213,7 +213,7 @@ function forceUrlSystemReset() {
           cacheResults.push('DocumentCache クリア要求送信');
         }
       } catch (docCacheError) {
-        console.warn('DocumentCache クリアエラー:', docCacheError.message);
+        console.warn('[WARN] SystemController.forceUrlSystemReset: DocumentCache clear error:', docCacheError.message || 'Document cache clear failed');
         cacheResults.push(docCacheError && docCacheError.message ? `DocumentCache クリア失敗: ${docCacheError.message}` : 'DocumentCache クリア失敗: 詳細不明');
       }
 
@@ -228,7 +228,7 @@ function forceUrlSystemReset() {
       };
 
     } catch (error) {
-      console.error('SystemController.forceUrlSystemReset エラー:', error && error.message ? error.message : '詳細不明');
+      console.error('[ERROR] SystemController.forceUrlSystemReset:', error.message || 'System reset error');
       return {
         success: false,
         message: error && error.message ? error.message : '詳細不明'
@@ -246,7 +246,7 @@ function getWebAppUrl() {
   try {
     return ScriptApp.getService().getUrl();
   } catch (error) {
-    console.error('SystemController.getWebAppUrl: エラー', error.message);
+    console.error('[ERROR] SystemController.getWebAppUrl:', error.message || 'Web app URL error');
     return '';
   }
 }
@@ -313,7 +313,7 @@ function testSystemDiagnosis() {
       };
 
     } catch (error) {
-      console.error('SystemController.testSystemDiagnosis エラー:', error.message);
+      console.error('[ERROR] SystemController.testSystemDiagnosis:', error.message || 'System diagnosis error');
       return {
         success: false,
         message: error.message
@@ -352,7 +352,7 @@ function getSystemStatus() {
       };
 
     } catch (error) {
-      console.error('SystemController.getSystemStatus エラー:', error.message);
+      console.error('[ERROR] SystemController.getSystemStatus:', error.message || 'System status error');
       return {
         success: false,
         message: error.message
@@ -391,7 +391,7 @@ function performDataIntegrityCheck() {
       };
 
     } catch (error) {
-      console.error('SystemController.performDataIntegrityCheck エラー:', error.message);
+      console.error('[ERROR] SystemController.performDataIntegrityCheck:', error.message || 'Data integrity check error');
       return {
         success: false,
         message: error.message
@@ -432,7 +432,7 @@ function performAutoRepair() {
       };
 
     } catch (error) {
-      console.error('SystemController.performAutoRepair エラー:', error.message);
+      console.error('[ERROR] SystemController.performAutoRepair:', error.message || 'Auto repair error');
       return {
         success: false,
         message: error.message
@@ -477,7 +477,7 @@ function getAdminSheetList(spreadsheetId) {
       spreadsheetName: spreadsheet.getName()
     };
   } catch (error) {
-    console.error('AdminController.getSheetList エラー:', error.message);
+    console.error('[ERROR] SystemController.getSheetList:', error.message || 'Sheet list error');
     return {
       success: false,
       message: error.message || 'シート一覧取得エラー',
@@ -524,7 +524,7 @@ function publishApplication(publishConfig) {
       props.setProperty('APPLICATION_STATUS', 'active');
       props.setProperty('PUBLISHED_AT', publishedAt);
     } catch (propsError) {
-      console.error('❌ Properties update failed:', propsError.message);
+      console.error('[ERROR] SystemController.publishApplication: Properties update failed:', propsError.message || 'Properties update error');
     }
 
     if (publishConfig) {
@@ -570,50 +570,11 @@ function publishApplication(publishConfig) {
         isPublished: true,
         publishedAt,
         setupStatus: 'completed',
-        isDraft: false,
         lastModified: publishedAt
       };
 
-      // 🔧 FIX: Transform columnMapping from frontend format to backend format (publishApplication)
-      if (updatedConfig.columnMapping && typeof updatedConfig.columnMapping === 'object') {
-        console.log('🔍 PUBLISH TRANSFORMATION START:', {
-          originalColumnMapping: updatedConfig.columnMapping,
-          hasMapping: !!updatedConfig.columnMapping.mapping
-        });
-
-        // If columnMapping doesn't have the correct structure, transform it
-        if (!updatedConfig.columnMapping.mapping) {
-          const transformedMapping = {};
-          const transformedConfidence = {};
-
-          // Transform each column type from { columnIndex: N } to mapping[type] = N
-          Object.keys(updatedConfig.columnMapping).forEach(key => {
-            if (key.startsWith('_') || key === 'headers' || key === 'verifiedAt') return;
-
-            const columnData = updatedConfig.columnMapping[key];
-            if (columnData && typeof columnData.columnIndex === 'number') {
-              transformedMapping[key] = columnData.columnIndex;
-              transformedConfidence[key] = columnData.confidence || 0;
-              console.log(key && columnData && columnData.columnIndex !== undefined ? `✅ Transformed ${key}: ${columnData.columnIndex}` : '✅ Transformed: 結果不明');
-            }
-          });
-
-          // Rebuild columnMapping with correct structure
-          updatedConfig.columnMapping = {
-            mapping: transformedMapping,
-            confidence: transformedConfidence,
-            headers: updatedConfig.columnMapping.headers || [],
-            verifiedAt: updatedConfig.columnMapping.verifiedAt || new Date().toISOString()
-          };
-
-          console.log('✅ PUBLISH TRANSFORMATION COMPLETE:', {
-            transformedMapping,
-            finalColumnMapping: updatedConfig.columnMapping
-          });
-        } else {
-          console.log('🔍 ColumnMapping already has correct structure (publish)');
-        }
-      }
+      // ✅ バックエンド構造統一完了：フロントエンドは既に正しい構造を送信
+      console.log('✅ ColumnMapping backend structure unified - no transformation needed');
 
       // 🔧 CLAUDE.md準拠: 統一API使用 - saveUserConfigでETag対応の安全な更新
       saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
