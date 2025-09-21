@@ -388,7 +388,12 @@
 
         <!-- 列マッピングカード -->
         <section class="card glass-panel rounded-xl p-6">
-          <h2 class="text-xl font-semibold text-white mb-4">📋 列設定</h2>
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="text-xl font-semibold text-white">📋 列設定</h2>
+            <button id="ai-analyze-btn" class="btn btn-secondary btn-sm" type="button">
+              🤖 AI列判定
+            </button>
+          </div>
 
           <div class="column-dropdowns space-y-4 mb-4">
             <!-- 回答列選択 -->
@@ -453,6 +458,11 @@
               </div>
             </div>
 
+          </div>
+
+          <!-- 設定完了状況表示 -->
+          <div class="text-sm text-gray-400 mb-4">
+            <span id="completion-status">⚪ 設定状況: 0/4列完了</span>
           </div>
 
           <div class="action-buttons">

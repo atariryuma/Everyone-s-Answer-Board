@@ -2038,11 +2038,111 @@
       Debounce.run('save-draft', 500, () => saveDraft());
     });
 
+    // AI列判定ボタン
+    document.getElementById('ai-analyze-btn').addEventListener('click', function () {
+      Debounce.run('ai-analyze', 500, () => manualColumnAnalysis());
+    });
+
     // 公開ボタン
     document.getElementById('publish-now').addEventListener('click', function () {
       Debounce.run('publish-now', 800, () => publishApp());
     });
   });
+
+  // 🆕 手動AI列判定関数
+  async function manualColumnAnalysis() {
+    const spreadsheetId = getCurrentSpreadsheetId();
+    const sheetName = getCurrentSheetName();
+
+    if (!spreadsheetId || !sheetName) {
+      showError('スプレッドシートとシートを選択してください');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      showInfo('🤖 AI列判定実行中...', 3000);
+
+      await performColumnAnalysis(spreadsheetId, sheetName);
+      showSuccess('🎯 AI列判定完了！設定を確認してください');
+    } catch (error) {
+      console.error('手動AI列判定エラー:', error);
+      showError('⚠️ AI列判定に失敗しました。接続を確認して再試行してください');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // 🆕 列分析実行関数
+  async function performColumnAnalysis(spreadsheetId, sheetName) {
+    const analysisResult = await getColumnAnalysis(spreadsheetId, sheetName);
+
+    if (!analysisResult || !analysisResult.success) {
+      throw new Error('列分析に失敗しました');
+    }
+
+    if (!analysisResult.headers || !Array.isArray(analysisResult.headers) || analysisResult.headers.length === 0) {
+      throw new Error('ヘッダー情報が取得できませんでした');
+    }
+
+    // ドロップダウンにヘッダー選択肢を設定
+    fillColumnDropdowns(analysisResult.headers, analysisResult.mapping, analysisResult.confidence);
+
+    // 設定完了状況を更新
+    updateCompletionStatus();
+
+    console.log('✅ AI列判定処理完了');
+  }
+
+  // 🆕 現在のスプレッドシートID取得
+  function getCurrentSpreadsheetId() {
+    const urlMethod = document.getElementById('method-url').checked;
+    if (urlMethod) {
+      const urlInput = document.getElementById('spreadsheet-url').value;
+      if (urlInput) {
+        const match = urlInput.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+        return match ? match[1] : null;
+      }
+    } else {
+      return document.getElementById('spreadsheet-select').value;
+    }
+    return null;
+  }
+
+  // 🆕 現在のシート名取得
+  function getCurrentSheetName() {
+    const urlMethod = document.getElementById('method-url').checked;
+    if (urlMethod) {
+      return document.getElementById('detected-sheet-name').textContent || null;
+    } else {
+      return document.getElementById('sheet-select').value;
+    }
+  }
+
+  // 🆕 設定完了状況更新
+  function updateCompletionStatus() {
+    const columnTypes = ['answer', 'reason', 'class', 'name'];
+    let completedCount = 0;
+
+    columnTypes.forEach(type => {
+      const select = document.getElementById(`${type}-column-select`);
+      if (select && select.value) {
+        completedCount++;
+      }
+    });
+
+    const statusElement = document.getElementById('completion-status');
+    if (statusElement) {
+      const statusIcon = completedCount === 4 ? '🟢' : completedCount > 0 ? '🟡' : '⚪';
+      statusElement.textContent = `${statusIcon} 設定状況: ${completedCount}/4列完了`;
+    }
+
+    // 設定確認ボタンの状態更新
+    const verifyButton = document.getElementById('verify-mapping');
+    if (verifyButton) {
+      verifyButton.disabled = completedCount < 4;
+    }
+  }
 
   // シート一覧読み込み
   function loadSheetList(spreadsheetId) {
@@ -2178,15 +2278,17 @@
           });
         }
 
-        if (result.mapping) {
-          successDetails.push('🤖 AI列判定完了');
-          showNextStepGuidance(result);
-        }
-
         showSuccess(successDetails.join(' | '));
 
-        // 進捗状況をユーザーに明示
-        showInfo('次のステップ: 列マッピングを確認して設定を保存してください', 8000);
+        // 🆕 自動AI列判定の実行
+        showInfo('🤖 AI列判定実行中...', 3000);
+        try {
+          await performColumnAnalysis(spreadsheetId, sheetName);
+          showSuccess('🎯 AI列判定完了！設定を確認してください');
+        } catch (analysisError) {
+          console.warn('AI列判定エラー:', analysisError);
+          showWarning('⚠️ AI列判定に失敗しました。手動で設定するか「🤖 AI列判定」ボタンで再実行してください');
+        }
       } else {
         handleConnectionError(result.error, { spreadsheetId, sheetName, method: isUrlMethod ? 'URL' : 'dropdown' });
       }
@@ -2759,6 +2861,9 @@
     if (aiInfo) {
       aiInfo.classList.remove('hidden');
     }
+
+    // 🆕 設定完了状況を更新
+    updateCompletionStatus();
   }
 
   // ===========================================
@@ -3171,6 +3276,9 @@
 
     // 選択状況を更新
     updateSelectionStatus();
+
+    // 🆕 設定完了状況を更新
+    updateCompletionStatus();
   }
 
   // 信頼度バッジを表示
