@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, getColumnAnalysis, validateConfig, checkAccess, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getDataWithServiceAccount */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, getColumnAnalysis, validateConfig, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getDataWithServiceAccount */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -70,18 +70,24 @@ function doGet(e) {
           .evaluate();
 
       case 'admin': {
-        // 🔐 統一認証システム使用
-        const authResult = checkAccess('admin', params);
-        if (!authResult.allowed) {
-          return this.createRedirectTemplate(authResult.redirect, authResult.error);
+        // 🔐 GAS-Native: 直接認証チェック
+        const email = getCurrentEmail();
+        if (!email || !isAdministrator(email)) {
+          return createRedirectTemplate('ErrorBoundary.html', '管理者権限が必要です');
         }
 
-        // 認証済み - Editor権限でAdminPanel表示
+        // ユーザー情報取得
+        const user = findUserByEmail(email);
+        if (!user) {
+          return createRedirectTemplate('ErrorBoundary.html', 'ユーザー情報が見つかりません');
+        }
+
+        // 認証済み - Administrator権限でAdminPanel表示
         const template = HtmlService.createTemplateFromFile('AdminPanel.html');
-        template.userEmail = authResult.email;
-        template.userId = authResult.user?.userId;
-        template.accessLevel = authResult.accessLevel;
-        template.userInfo = authResult.user;
+        template.userEmail = email;
+        template.userId = user.userId;
+        template.accessLevel = 'administrator';
+        template.userInfo = user;
         return template.evaluate();
       }
 
@@ -117,10 +123,10 @@ function doGet(e) {
       }
 
       case 'appSetup': {
-        // 🔐 統一認証システム使用 - Administrator専用
-        const authResult = checkAccess('appSetup', params);
-        if (!authResult.allowed) {
-          return this.createRedirectTemplate(authResult.redirect, authResult.error);
+        // 🔐 GAS-Native: 直接認証チェック - Administrator専用
+        const email = getCurrentEmail();
+        if (!email || !isAdministrator(email)) {
+          return createRedirectTemplate('ErrorBoundary.html', '管理者権限が必要です');
         }
 
         // 認証済み - Administrator権限でAppSetup表示
@@ -128,29 +134,48 @@ function doGet(e) {
       }
 
       case 'view': {
-        // 🔐 統一認証システム使用 - Viewer権限確認
-        const authResult = checkAccess('view', params);
-        if (!authResult.allowed) {
-          return this.createRedirectTemplate(authResult.redirect, authResult.error);
+        // 🔐 GAS-Native: 直接認証チェック - Viewer権限確認
+        const currentEmail = getCurrentEmail();
+        if (!currentEmail) {
+          return createRedirectTemplate('ErrorBoundary.html', 'ユーザー認証が必要です');
+        }
+
+        // 対象ユーザー確認
+        const targetUserId = params.userId;
+        if (!targetUserId) {
+          return createRedirectTemplate('ErrorBoundary.html', 'ユーザーIDが指定されていません');
+        }
+
+        const targetUser = findUserById(targetUserId);
+        if (!targetUser) {
+          return createRedirectTemplate('ErrorBoundary.html', '対象ユーザーが見つかりません');
+        }
+
+        // ユーザー設定取得
+        const configResult = getUserConfig(targetUserId);
+        const config = configResult.success ? configResult.config : {};
+
+        // 公開設定チェック（管理者は常にアクセス可能）
+        const isAdminUser = isAdministrator(currentEmail);
+        const isOwnBoard = currentEmail === targetUser.userEmail;
+        const isPublished = Boolean(config.isPublished);
+
+        if (!isAdminUser && !isOwnBoard && !isPublished) {
+          return createRedirectTemplate('ErrorBoundary.html', 'このボードは非公開に設定されています');
         }
 
         // 認証済み - 公開ボード表示
         const template = HtmlService.createTemplateFromFile('Page.html');
-        template.userId = params.userId;
-        template.userEmail = authResult.user?.userEmail || null;
+        template.userId = targetUserId;
+        template.userEmail = targetUser.userEmail;
 
         // 問題文設定
-        const questionText = getQuestionText(authResult.config);
+        const questionText = getQuestionText(config);
         template.questionText = questionText || '回答ボード';
-        template.boardTitle = questionText || authResult.user?.userEmail || '回答ボード';
-
-        // 編集権限検出（Administrator または 自分のボード）
-        const currentEmail = getCurrentEmail();
-        const isAdministrator = isAdministrator(currentEmail);
-        const isOwnBoard = currentEmail === authResult.user?.userEmail;
+        template.boardTitle = questionText || targetUser.userEmail || '回答ボード';
 
         // 🔧 統一用語: Editor権限設定（GAS-Native Architecture）
-        const isEditor = isAdministrator || isOwnBoard;
+        const isEditor = isAdminUser || isOwnBoard;
         template.isEditor = isEditor;
 
         return template.evaluate();
