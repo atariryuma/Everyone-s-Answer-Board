@@ -1841,6 +1841,171 @@
       .validateAccessAPI(spreadsheetId);
   }
 
+  // ===========================================
+  // 🆕 CLAUDE.md準拠: V8ランタイム対応 完全自動化URL解析・検証
+  // ===========================================
+
+  /**
+   * URL自動解析（リアルタイム）- V8ランタイム対応
+   * @param {string} fullUrl - 入力された完全URL
+   */
+  function autoAnalyzeUrl(fullUrl) {
+    if (!fullUrl || fullUrl.trim() === '') {
+      hideAutoDetectionInfo();
+      return;
+    }
+
+    // ✅ V8ランタイム対応: const使用
+    const urlInfo = parseUrlClientSide(fullUrl);
+
+    if (urlInfo.isValid) {
+      showAutoDetectionInfo(urlInfo);
+    } else {
+      hideAutoDetectionInfo();
+    }
+  }
+
+  /**
+   * クライアントサイドURL解析 - V8ランタイム最適化
+   * @param {string} url - 解析対象URL
+   * @returns {Object} 解析結果
+   */
+  function parseUrlClientSide(url) {
+    try {
+      // ✅ V8ランタイム対応: const + 正規表現最適化
+      const spreadsheetMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+      const gidMatch = url.match(/[#&]gid=(\d+)/);
+
+      if (!spreadsheetMatch) {
+        return { isValid: false };
+      }
+
+      return {
+        isValid: true,
+        spreadsheetId: spreadsheetMatch[1],
+        gid: gidMatch ? gidMatch[1] : '0',
+        displayGid: gidMatch ? gidMatch[1] : 'デフォルト'
+      };
+    } catch (error) {
+      console.warn('parseUrlClientSide error:', error.message);
+      return { isValid: false };
+    }
+  }
+
+  /**
+   * 自動検出情報表示
+   * @param {Object} urlInfo - URL解析結果
+   */
+  function showAutoDetectionInfo(urlInfo) {
+    const container = document.getElementById('auto-detection-info');
+    const sheetNameSpan = document.getElementById('detected-sheet-name');
+    const gidSpan = document.getElementById('detected-gid');
+
+    if (container && sheetNameSpan && gidSpan) {
+      sheetNameSpan.textContent = '解析中...';
+      gidSpan.textContent = urlInfo.displayGid;
+      container.classList.remove('hidden');
+    }
+  }
+
+  /**
+   * 自動検出情報非表示
+   */
+  function hideAutoDetectionInfo() {
+    const container = document.getElementById('auto-detection-info');
+    if (container) {
+      container.classList.add('hidden');
+    }
+  }
+
+  /**
+   * 完全URL統合検証 - 既存API活用版
+   */
+  function validateCompleteUrl() {
+    const urlInput = document.getElementById('spreadsheet-url');
+    const validateBtn = document.getElementById('url-validate');
+    const connectBtn = document.getElementById('connect-url-source');
+
+    const fullUrl = urlInput.value.trim();
+
+    if (!fullUrl) {
+      showError('URLを入力してください');
+      return;
+    }
+
+    // UI状態更新
+    validateBtn.disabled = true;
+    validateBtn.textContent = '🔍 統合検証中...';
+    connectBtn.disabled = true;
+    connectBtn.textContent = '検証完了後に有効化';
+
+    console.log('🚀 Complete URL validation started:', {
+      url: `${fullUrl.substring(0, 50)}...`
+    });
+
+    // ✅ 新しい統合検証API呼び出し
+    google.script.run
+      .withSuccessHandler(function(result) {
+        validateBtn.disabled = false;
+        validateBtn.textContent = '🔍 統合検証';
+
+        console.log('✅ validateCompleteSpreadsheetUrl result:', result);
+
+        if (result.success) {
+          // 自動検出情報更新
+          updateDetectedInfo(result);
+
+          // フォーム情報表示
+          if (result.formInfo && result.formInfo.formData) {
+            const statusInfo = processFormDetectionResult(result.formInfo);
+            if (statusInfo) {
+              displayFormInfo(result.formInfo.formData, statusInfo);
+            }
+          }
+
+          // 接続ボタン有効化
+          if (result.readyToConnect) {
+            connectBtn.disabled = false;
+            connectBtn.textContent = '✅ 接続';
+
+            // ✅ V8ランタイム対応: Template literals
+            showSuccess(`✅ 検証完了 - シート「${result.sheetName}」に接続できます (${result.executionTime})`);
+          } else {
+            showWarning('⚠️ アクセス権限に問題があります');
+          }
+
+          // スプレッドシートIDを保存（既存機能との互換性）
+          urlInput.dataset.spreadsheetId = result.spreadsheetId;
+
+        } else {
+          showError(`検証失敗: ${result.message}`);
+        }
+      })
+      .withFailureHandler(function(error) {
+        validateBtn.disabled = false;
+        validateBtn.textContent = '🔍 統合検証';
+        console.error('❌ validateCompleteSpreadsheetUrl error:', error);
+        showError(`統合検証エラー: ${error.message}`);
+      })
+      .validateCompleteSpreadsheetUrl(fullUrl);
+  }
+
+  /**
+   * 検出情報UI更新
+   * @param {Object} result - 検証結果
+   */
+  function updateDetectedInfo(result) {
+    const sheetNameSpan = document.getElementById('detected-sheet-name');
+    const gidSpan = document.getElementById('detected-gid');
+
+    if (sheetNameSpan) {
+      sheetNameSpan.textContent = result.sheetName || '-';
+    }
+    if (gidSpan) {
+      gidSpan.textContent = result.gid || '0';
+    }
+  }
+
   // URL入力方式でフォーム情報を手動更新
   function refreshUrlFormInfo() {
     const urlInput = document.getElementById('spreadsheet-url');
@@ -1993,9 +2158,9 @@
       Debounce.run('connect-source', 400, () => connectToDataSource());
     });
 
-    // URL検証ボタン
+    // 🆕 統合検証ボタン
     document.getElementById('url-validate').addEventListener('click', function () {
-      validateSpreadsheetUrl();
+      validateCompleteUrl();
     });
 
     // フォーム情報更新ボタン（URL入力用）
