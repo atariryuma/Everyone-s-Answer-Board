@@ -314,20 +314,20 @@ function createUserObjectFromRow(row, headers) {
  * ユーザー情報を更新
  * @param {string} userId - ユーザーID
  * @param {Object} updates - 更新データ
- * @returns {boolean} Success status
+ * @returns {Object} {success: boolean, message?: string} Operation result
  */
 function updateUser(userId, updates) {
   try {
     const spreadsheet = openDatabase(true); // Service account required
     if (!spreadsheet) {
       console.warn('updateUser: Database access failed');
-      return false;
+      return { success: false, message: 'Database access failed' };
     }
 
     const sheet = spreadsheet.getSheetByName('users');
     if (!sheet) {
       console.warn('updateUser: Users sheet not found');
-      return false;
+      return { success: false, message: 'Users sheet not found' };
     }
 
     const data = sheet.getDataRange().getValues();
@@ -336,7 +336,7 @@ function updateUser(userId, updates) {
 
     if (userIdColumnIndex === -1) {
       console.warn('updateUser: UserId column not found');
-      return false;
+      return { success: false, message: 'UserId column not found' };
     }
 
     for (let i = 1; i < data.length; i++) {
@@ -355,15 +355,15 @@ function updateUser(userId, updates) {
           sheet.getRange(i + 1, lastModifiedIndex + 1).setValue(new Date().toISOString());
         }
 
-        return true;
+        return { success: true };
       }
     }
 
     console.warn('updateUser: User not found:', userId);
-    return false;
+    return { success: false, message: 'User not found' };
   } catch (error) {
     console.error('updateUser error:', error.message);
-    return false;
+    return { success: false, message: error.message || 'Unknown error occurred' };
   }
 }
 
