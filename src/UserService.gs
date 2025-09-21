@@ -206,7 +206,11 @@ function getUserAccessLevel(userId) {
  * @returns {boolean} 編集者かどうか
  */
 function checkUserEditorAccess(userId) {
-  const accessLevel = getUserAccessLevel(userId);
+  // userIdからemailを取得してgetUnifiedAccessLevelを使用
+  const user = findUserById(userId);
+  if (!user) return false;
+
+  const accessLevel = getUnifiedAccessLevel(user.userEmail, userId);
   // 🔧 用語統一: owner → editor
   return accessLevel === 'editor';
 }

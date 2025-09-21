@@ -13,7 +13,7 @@
  * - 単一責任原則の維持
  */
 
-/* global validateEmail, validateText, validateUrl, getUserAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, URL */
+/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, URL */
 
 
 // ===========================================
@@ -117,7 +117,11 @@ function validateUserData(userData) {
         if (userData[field]) {
           const textValidation = validateText(userData[field]);
           if (!textValidation.isValid) {
-            result.errors.push(field && textValidation && textValidation.error ? `${field}: ${textValidation.error}` : 'Validation error: 詳細不明');
+            if (field && textValidation && textValidation.error) {
+              result.errors.push(`${field}: ${textValidation.error}`);
+            } else {
+              result.errors.push('Validation error: 詳細不明');
+            }
             result.isValid = false;
           } else {
             result.sanitizedData[field] = textValidation.sanitized;
@@ -147,7 +151,11 @@ function validateUserData(userData) {
       }
 
     } catch (error) {
-      result.errors.push(error && error.message ? `検証エラー: ${error.message}` : '検証エラー: 詳細不明');
+      if (error && error.message) {
+        result.errors.push(`検証エラー: ${error.message}`);
+      } else {
+        result.errors.push('検証エラー: 詳細不明');
+      }
       result.isValid = false;
     }
 
@@ -187,8 +195,8 @@ function checkSecurityUserPermission(userId, requiredLevel = 'authenticated_user
         };
       }
 
-      // UserServiceから権限レベル取得
-      const accessLevel = getUserAccessLevel(userId);
+      // 統一されたアクセスレベル取得（email-based access control）
+      const accessLevel = getUnifiedAccessLevel(currentEmail, userId);
       const hasPermission = compareSecurityAccessLevels(accessLevel, requiredLevel);
 
       return {
@@ -310,7 +318,7 @@ function validateSpreadsheetAccess(spreadsheetId) {
       console.log('SecurityService', {
         operation: 'validateSpreadsheetAccess',
         phase: 'start',
-        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null'
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null'
       });
 
       if (!spreadsheetId) {
@@ -338,7 +346,7 @@ function validateSpreadsheetAccess(spreadsheetId) {
       } catch (openError) {
         const errorResponse = {
           success: false,
-          message: openError && openError.message ? `スプレッドシートへのアクセスに失敗: ${openError.message}` : 'スプレッドシートへのアクセスに失敗: 詳細不明',
+          message: (openError && openError.message) ? `スプレッドシートへのアクセスに失敗: ${openError.message}` : 'スプレッドシートへのアクセスに失敗: 詳細不明',
           sheets: [],
           error: openError.message,
           executionTime: `${Date.now() - started}ms`
@@ -370,7 +378,7 @@ function validateSpreadsheetAccess(spreadsheetId) {
       } catch (metaError) {
         const errorResponse = {
           success: false,
-          message: metaError && metaError.message ? `スプレッドシート情報の取得に失敗: ${metaError.message}` : 'スプレッドシート情報の取得に失敗: 詳細不明',
+          message: (metaError && metaError.message) ? `スプレッドシート情報の取得に失敗: ${metaError.message}` : 'スプレッドシート情報の取得に失敗: 詳細不明',
           sheets: [],
           error: metaError.message,
           executionTime: `${Date.now() - started}ms`
@@ -403,7 +411,7 @@ function validateSpreadsheetAccess(spreadsheetId) {
     } catch (error) {
       const errorResponse = {
         success: false,
-        message: error && error.message ? `予期しないエラー: ${error.message}` : '予期しないエラー: 詳細不明',
+        message: (error && error.message) ? `予期しないエラー: ${error.message}` : '予期しないエラー: 詳細不明',
         sheets: [],
         error: error.message,
         executionTime: `${Date.now() - started}ms`
@@ -419,7 +427,7 @@ function validateSpreadsheetAccess(spreadsheetId) {
       console.error('SecurityService.validateSpreadsheetAccess 予期しないエラー:', {
         error: error.message,
         stack: error.stack,
-        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)  }...` : 'null'
+        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null'
       });
 
       // より具体的なエラーメッセージ

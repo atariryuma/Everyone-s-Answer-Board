@@ -1025,13 +1025,7 @@
         }
       }
 
-      // 7. シート名入力フィールドの復元
-      if (config.sheetName) {
-        const sheetNameInput = document.getElementById('sheet-name-input');
-        if (sheetNameInput) {
-          sheetNameInput.value = config.sheetName;
-        }
-      }
+      // シート名は自動検出されるため、復元処理は不要
 
     } catch (error) {
       console.error('❌ 設定反映エラー:', error.message);
@@ -1750,9 +1744,9 @@
     const spreadsheetId = match[1];
     setPartialLoading(true, 'URL検証中...');
 
-    // validateFormLink()による包括的検証 (Zero-Dependency)
-    const sheetNameInput = document.getElementById('sheet-name-input');
-    const sheetName = sheetNameInput.value.trim() || 'フォームの回答 1';
+    // 自動検出されたシート名を使用 (URL automation system)
+    const detectedSheetNameSpan = document.getElementById('detected-sheet-name');
+    const sheetName = detectedSheetNameSpan.textContent.trim() || 'フォームの回答 1';
 
     // 基本的なフォーム-スプレッドシート整合性チェック
     if (typeof validateFormLink === 'function') {
@@ -1790,45 +1784,12 @@
           showSuccess('✅ スプレッドシートへのアクセスが確認できました');
           // スプレッドシートIDを隠しフィールドに保存
           urlInput.dataset.spreadsheetId = spreadsheetId;
-          // フォーム情報更新ボタンを表示
-          document.getElementById('refresh-url-form-info').classList.remove('hidden');
-          // シート一覧を取得してプルダウンを更新
-          if (result.sheets && result.sheets.length > 0) {
-            updateSheetNameSuggestions(result.sheets);
-
-            // シート名が自動設定された場合、フォーム情報も取得
-            const sheetNameInput = document.getElementById('sheet-name-input');
-            if (sheetNameInput.value && sheetNameInput.value.trim() !== '') {
-              console.log('validateAccessAPI成功後、フォーム情報を取得:', {
-                spreadsheetId: spreadsheetId,
-                sheetName: sheetNameInput.value
-              });
-
-              // フォーム情報を非同期で取得
-              google.script.run
-                .withSuccessHandler(function(formResult) {
-                  console.log('validateAccessAPI後のフォーム情報取得成功:', formResult);
-                  const statusInfo = processFormDetectionResult(formResult);
-                  if (statusInfo) {
-                    displayFormInfo(formResult.formData, statusInfo);
-                  } else {
-                    console.warn('フォーム情報取得失敗:', formResult);
-                    displayFormInfo({}, {
-                      status: 'error',
-                      message: 'フォーム情報の取得に失敗しました'
-                    });
-                  }
-                })
-                .withFailureHandler(function(formError) {
-                  console.warn('validateAccessAPI後のフォーム情報取得エラー:', formError);
-                  displayFormInfo({}, {
-                    status: 'error',
-                    message: 'フォーム情報の取得に失敗しました'
-                  });
-                })
-                .getFormInfo(spreadsheetId, sheetNameInput.value);
-            }
+          // 接続ボタンを有効化（URL検証完了）
+          const connectBtn = document.getElementById('connect-url-source');
+          if (connectBtn) {
+            connectBtn.disabled = false;
           }
+
         } else {
           showError('スプレッドシートが開けません');
         }
@@ -2006,120 +1967,8 @@
     }
   }
 
-  // URL入力方式でフォーム情報を手動更新
-  function refreshUrlFormInfo() {
-    const urlInput = document.getElementById('spreadsheet-url');
-    const sheetNameInput = document.getElementById('sheet-name-input');
-    const refreshBtn = document.getElementById('refresh-url-form-info');
 
-    const spreadsheetId = urlInput.dataset.spreadsheetId;
-    const sheetName = sheetNameInput.value.trim();
 
-    if (!spreadsheetId) {
-      showError('先にURL検証を実行してください');
-      return;
-    }
-
-    if (!sheetName) {
-      showError('シート名を入力してください');
-      return;
-    }
-
-    // ボタンを一時的に無効化
-    refreshBtn.disabled = true;
-    refreshBtn.textContent = '🔄 更新中...';
-
-    console.log('🔄 URL方式フォーム情報手動更新:', {
-      spreadsheetId,
-      sheetName
-    });
-
-    google.script.run
-      .withSuccessHandler(function(formResult) {
-        refreshBtn.disabled = false;
-        refreshBtn.textContent = '🔄 フォーム情報更新';
-
-        console.log('✅ フォーム情報手動更新成功:', formResult);
-
-        const statusInfo = processFormDetectionResult(formResult);
-        if (statusInfo) {
-          displayFormInfo(formResult.formData, statusInfo);
-          // ステータスに応じた成功メッセージ
-          if (statusInfo.status === 'linked' || statusInfo.status === 'detected') {
-            showSuccess('フォーム情報を更新しました');
-          } else if (statusInfo.status === 'possible') {
-            showSuccess('フォーム情報を更新しました（可能性検出）');
-          } else {
-            showSuccess('フォーム情報を更新しました（連携なし）');
-          }
-        } else {
-          displayFormInfo({}, {
-            status: 'error',
-            message: 'フォーム情報の取得に失敗しました'
-          });
-        }
-      })
-      .withFailureHandler(function(error) {
-        refreshBtn.disabled = false;
-        refreshBtn.textContent = '🔄 フォーム情報更新';
-        console.error('❌ フォーム情報手動更新エラー:', error);
-        showError('フォーム情報の更新に失敗しました: ' + error.message);
-      })
-      .getFormInfo(spreadsheetId, sheetName);
-  }
-
-  // シート名候補を更新し、空欄時は自動入力
-  function updateSheetNameSuggestions(sheets) {
-    const sheetNameInput = document.getElementById('sheet-name-input');
-    if (sheets && sheets.length > 0) {
-      // シート名が空欄の場合のみ自動入力
-      if (!sheetNameInput.value || sheetNameInput.value.trim() === '') {
-        // 優先順位でシート名を選択
-        const preferredSheetName = selectBestSheetName(sheets);
-        sheetNameInput.value = preferredSheetName;
-        console.log('シート名を自動設定:', preferredSheetName);
-      }
-
-      // datalistで候補を表示（より良いUX）
-      let datalist = document.getElementById('sheet-suggestions');
-      if (!datalist) {
-        datalist = document.createElement('datalist');
-        datalist.id = 'sheet-suggestions';
-        sheetNameInput.setAttribute('list', 'sheet-suggestions');
-        sheetNameInput.parentNode.appendChild(datalist);
-      }
-
-      datalist.innerHTML = '';
-      sheets.forEach((sheet) => {
-        const option = document.createElement('option');
-        option.value = sheet.name;
-        option.text = `${sheet.name} (${sheet.rowCount}行)`;
-        datalist.appendChild(option);
-      });
-    }
-  }
-
-  // 最適なシート名を選択する関数
-  function selectBestSheetName(sheets) {
-    // 1. 「回答」「answer」を含むシートを優先
-    const answerSheets = sheets.filter(sheet =>
-      /回答|answer|データ|data/i.test(sheet.name)
-    );
-    if (answerSheets.length > 0) {
-      return answerSheets[0].name;
-    }
-
-    // 2. 行数が最も多いシート（データが入っていそう）
-    const maxRowSheet = sheets.reduce((max, sheet) =>
-      sheet.rowCount > max.rowCount ? sheet : max
-    );
-    if (maxRowSheet.rowCount > 1) {
-      return maxRowSheet.name;
-    }
-
-    // 3. デフォルトで最初のシート
-    return sheets[0].name;
-  }
 
   // URL入力方式でのデータソース接続
 
@@ -2163,10 +2012,6 @@
       validateCompleteUrl();
     });
 
-    // フォーム情報更新ボタン（URL入力用）
-    document.getElementById('refresh-url-form-info').addEventListener('click', function () {
-      refreshUrlFormInfo();
-    });
 
     // 接続ボタン（URL入力）
     document.getElementById('connect-url-source').addEventListener('click', function () {
@@ -2262,11 +2107,11 @@
       let spreadsheetId, sheetName;
 
       if (isUrlMethod) {
-        // URL方式
+        // URL方式 - 自動検出されたシート名を使用
         const urlInput = document.getElementById('spreadsheet-url');
-        const sheetNameInput = document.getElementById('sheet-name-input');
+        const detectedSheetNameSpan = document.getElementById('detected-sheet-name');
         const url = urlInput.value.trim();
-        sheetName = sheetNameInput.value.trim();
+        sheetName = detectedSheetNameSpan.textContent.trim();
 
         if (!url) {
           showError('URLを入力してください');
@@ -3485,7 +3330,7 @@
       if (match) {
         spreadsheetId = match[1];
       }
-      sheetName = document.getElementById('sheet-name-input').value.trim();
+      sheetName = document.getElementById('detected-sheet-name').textContent.trim();
     } else {
       // 一覧選択方式
       spreadsheetId = document.getElementById('spreadsheet-select').value;
@@ -4260,7 +4105,7 @@
       if (match) {
         spreadsheetId = match[1];
       }
-      sheetName = document.getElementById('sheet-name-input').value.trim();
+      sheetName = document.getElementById('detected-sheet-name').textContent.trim();
     } else {
       // 一覧選択方式
       spreadsheetId = document.getElementById('spreadsheet-select').value;
