@@ -4,7 +4,6 @@
   "filePushOrder": [
     "src/ServiceFactory.gs",
     "src/Config.gs",
-    "src/Auth.gs",
     "src/Data.gs",
     "src/SecurityService.gs",
     "src/UserService.gs",

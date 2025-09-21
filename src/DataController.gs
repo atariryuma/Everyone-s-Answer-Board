@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ConfigService, DataService, getCurrentEmail, createErrorResponse, getUserSheetData, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, getUserConfig */
+/* global ConfigService, DataService, getCurrentEmail, createErrorResponse, getUserSheetData, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, updateUser, getUserSpreadsheetData, getUserConfig */
 
 // ===========================================
 // 📊 メインページデータAPI
@@ -30,8 +30,8 @@ function getRecentSubmissions(userId, limit = 10) {
       };
     }
 
-    // GAS-Native: 直接Session APIでユーザー取得
-    const email = Session.getActiveUser().getEmail();
+    // GAS-Native: getCurrentEmail関数でユーザー取得（統一パターン）
+    const email = getCurrentEmail();
     if (!email) {
       return {
         success: false,
@@ -82,7 +82,18 @@ function getHeaderIndices(spreadsheetId, sheetName) {
       };
     }
 
-    const dataAccess = openSpreadsheet(spreadsheetId);
+    // 🔧 CLAUDE.md準拠: Context-aware service account usage
+    // ✅ **Cross-user**: Only use service account for accessing other user's spreadsheets
+    // ✅ **Self-access**: Use normal permissions for own spreadsheets
+    const currentEmail = getCurrentEmail();
+
+    // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
+    const targetUser = findUserBySpreadsheetId(spreadsheetId);
+    const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
+    const useServiceAccount = !isSelfAccess;
+
+    console.log(`getHeaderIndices: ${useServiceAccount ? 'Cross-user service account' : 'Self-access normal permissions'} for spreadsheet`);
+    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
     const {spreadsheet} = dataAccess;
     const sheet = spreadsheet.getSheetByName(sheetName);
 
@@ -168,7 +179,18 @@ function addSpreadsheetUrl(url) {
 
     // アクセステスト
     try {
-      const dataAccess = openSpreadsheet(spreadsheetId);
+      // 🔧 CLAUDE.md準拠: Context-aware service account usage for URL verification
+      // ✅ **Cross-user**: Only use service account for accessing other user's spreadsheets
+      // ✅ **Self-access**: Use normal permissions for own spreadsheets
+      const currentEmail = getCurrentEmail();
+
+      // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
+      const targetUser = findUserBySpreadsheetId(spreadsheetId);
+      const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
+      const useServiceAccount = !isSelfAccess;
+
+      console.log(`verifySpreadsheetUrl: ${useServiceAccount ? 'Cross-user service account' : 'Self-access normal permissions'} for spreadsheet verification`);
+      const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
     const {spreadsheet} = dataAccess;
       const name = spreadsheet.getName();
 

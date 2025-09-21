@@ -340,7 +340,10 @@ function validateSpreadsheetAccess(spreadsheetId) {
       let spreadsheet;
       try {
         console.log('SecurityService', { operation: 'openSpreadsheet', phase: 'start' });
-        const { spreadsheet: spreadsheetFromData } = openSpreadsheet(spreadsheetId);
+        // 🔧 CLAUDE.md準拠: Security validation - try normal permissions first
+        // ✅ **Self-access**: Use normal permissions for validation
+        // ✅ **Cross-user**: Can fall back to service account if needed
+        const { spreadsheet: spreadsheetFromData } = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
         spreadsheet = spreadsheetFromData;
         console.log('SecurityService', { operation: 'openSpreadsheet', phase: 'success' });
       } catch (openError) {

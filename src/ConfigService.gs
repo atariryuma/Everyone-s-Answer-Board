@@ -13,9 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global validateConfig */
-
-/* global URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, Auth, UserService, isAdministrator, SLEEP_MS */
+/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, getUserSpreadsheetData, Auth, UserService, isAdministrator, SLEEP_MS */
 
 // ===========================================
 // 🔧 GAS-Native ConfigService (直接API版)
@@ -332,7 +330,7 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
  */
 function generateUserPermissions(_userId) {
   try {
-    const email = Session.getActiveUser().getEmail();
+    const email = getCurrentEmail();
     const session = { email };
     const currentEmail = session.email;
     if (!currentEmail) {
@@ -516,13 +514,13 @@ function validateConfigUserId(userId) {
  */
 function isSystemSetup() {
   try {
-    const email = Session.getActiveUser().getEmail();
+    const email = getCurrentEmail();
     const session = { email };
     const currentEmail = session.email;
     if (!currentEmail) return false;
 
-    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用
-    const user = findUserByEmail(currentEmail);
+    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用（CLAUDE.md準拠）
+    const user = findUserByEmail(currentEmail, { requestingUser: currentEmail });
     return !!(user && user.configJson);
   } catch (error) {
     console.error('isSystemSetup: エラー', error.message);
@@ -687,9 +685,10 @@ function hasCoreSystemProps() {
  * headers配列とcolumnMappingから実際の問題文を動的取得
  * headersがない場合はスプレッドシートから動的取得
  * @param {Object} config - ユーザー設定オブジェクト
+ * @param {Object} context - アクセスコンテキスト（target user info for cross-user access）
  * @returns {string} 問題文テキスト
  */
-function getQuestionText(config) {
+function getQuestionText(config, context = {}) {
   try {
     console.log('📝 getQuestionText START:', {
       hasColumnMapping: !!config?.columnMapping,
@@ -715,9 +714,18 @@ function getQuestionText(config) {
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
         console.log('🔄 getQuestionText: Fetching headers from spreadsheet');
-        // 🔧 Zero-Dependency統一: 直接openSpreadsheet使用（ConfigService内部処理）
+        // 🔧 CLAUDE.md準拠: Context-aware service account usage
+        // ✅ **Cross-user**: Use service account when accessing other user's config
+        // ✅ **Self-access**: Use normal permissions for own config
+        const currentEmail = getCurrentEmail();
+
+        // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
+        const targetUser = findUserBySpreadsheetId(config.spreadsheetId);
+        const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
+
+        console.log(`getQuestionText: ${isSelfAccess ? 'Self-access normal permissions' : 'Cross-user service account'} for spreadsheet`);
         try {
-          const dataAccess = openSpreadsheet(config.spreadsheetId);
+          const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
           const { spreadsheet } = dataAccess;
           const sheet = spreadsheet.getSheetByName(config.sheetName);
           if (sheet && sheet.getLastColumn() > 0) {
@@ -781,8 +789,11 @@ function getUserConfig(userId) {
   }
 
   try {
-    // Zero-Dependency: 直接findUserById呼び出し
-    const user = findUserById(userId);
+    // Zero-Dependency: 直接findUserById呼び出し（CLAUDE.md準拠）
+    const currentEmail = getCurrentEmail();
+    const user = findUserById(userId, {
+      requestingUser: currentEmail
+    });
     if (!user) {
       return {
         success: false,
@@ -854,7 +865,7 @@ function saveUserConfig(userId, config, options = {}) {
   try {
     // 🔧 CLAUDE.md準拠: 楽観的ロック（ETag）検証の実装
     if (config.etag) {
-      const user = getUserSpreadsheetData(userId);
+      const user = findUserById(userId);
       if (user && user.configJson) {
         try {
           const currentConfig = JSON.parse(user.configJson);

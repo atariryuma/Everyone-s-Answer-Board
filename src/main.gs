@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, getColumnAnalysis, validateConfig, findUserByEmail, findUserById, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getDataWithServiceAccount */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, getColumnAnalysis, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, connectToSheetInternal, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -77,7 +77,7 @@ function doGet(e) {
         }
 
         // ユーザー情報取得
-        const user = findUserByEmail(email);
+        const user = findUserByEmail(email, { requestingUser: email });
         if (!user) {
           return createRedirectTemplate('ErrorBoundary.html', 'ユーザー情報が見つかりません');
         }
@@ -146,7 +146,7 @@ function doGet(e) {
           return createRedirectTemplate('ErrorBoundary.html', 'ユーザーIDが指定されていません');
         }
 
-        const targetUser = findUserById(targetUserId);
+        const targetUser = findUserById(targetUserId, { requestingUser: getCurrentEmail() });
         if (!targetUser) {
           return createRedirectTemplate('ErrorBoundary.html', '対象ユーザーが見つかりません');
         }
@@ -170,7 +170,7 @@ function doGet(e) {
         template.userEmail = targetUser.userEmail;
 
         // 問題文設定
-        const questionText = getQuestionText(config);
+        const questionText = getQuestionText(config, { targetUserEmail: targetUser.userEmail });
         template.questionText = questionText || '回答ボード';
         template.boardTitle = questionText || targetUser.userEmail || '回答ボード';
 
@@ -286,7 +286,7 @@ function doPost(e) {
       case 'getData':
         // 🎯 GAS-Native: Direct Data class call
         try {
-          const user = findUserByEmail(email);
+          const user = findUserByEmail(email, { requestingUser: email });
           if (!user) {
             result = createUserNotFoundError();
           } else {
@@ -307,7 +307,7 @@ function doPost(e) {
       case 'refreshData':
         // 🎯 GAS-Native: Direct Data class call
         try {
-          const user = findUserByEmail(email);
+          const user = findUserByEmail(email, { requestingUser: email });
           if (!user) {
             result = createUserNotFoundError();
           } else {
@@ -367,7 +367,7 @@ function getUser(infoType = 'email') {
     if (infoType === 'full') {
       // Get user from database if available
       // 🔧 GAS-Native統一: 直接findUserByEmail使用
-      const user = findUserByEmail(email);
+      const user = findUserByEmail(email, { requestingUser: email });
 
       return {
         success: true,
@@ -401,7 +401,7 @@ function getConfig() {
     }
 
     // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
+    const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return createUserNotFoundError();
     }
@@ -551,7 +551,7 @@ function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClie
 
     // Initialize database if needed
     try {
-      const testAccess = openSpreadsheet(databaseId).spreadsheet;
+      const testAccess = openSpreadsheet(databaseId, { useServiceAccount: true }).spreadsheet;
     } catch (dbError) {
       console.warn('Database access test failed:', dbError.message);
     }
@@ -586,7 +586,7 @@ function processLoginAction() {
 
     // Create or get user
     // 🔧 GAS-Native統一: 直接Data使用
-    let user = findUserByEmail(email);
+    let user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       // 🔧 CLAUDE.md準拠: createUser()統一実装
       user = createUser(email);
@@ -695,7 +695,7 @@ function getAppStatus() {
 
     // ユーザー情報とconfigJsonを取得
     // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
+    const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return createErrorResponse('User not found');
     }
@@ -750,7 +750,7 @@ function setAppStatus(isActive) {
 
     // ユーザー情報を取得
     // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
+    const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return createUserNotFoundError();
     }
@@ -816,88 +816,8 @@ function getAdminUsers(options = {}) {
   }
 }
 
-/**
- * Delete user - API endpoint for frontend
- * GAS-Native直接実装（DatabaseCore.gsとは独立）
- * @param {string} userId - ユーザーID
- * @param {string} reason - 削除理由
- * @returns {Object} 削除結果
- */
-function deleteUser(userId, reason = '') {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return createErrorResponse('ユーザー認証が必要です');
-    }
-
-    // 管理者権限チェック
-    if (!isAdministrator(email)) {
-      return createAdminRequiredError();
-    }
-
-    if (!userId) {
-      return createErrorResponse('ユーザーIDが指定されていません');
-    }
-
-    // 対象ユーザー存在確認
-    const targetUser = findUserById(userId);
-    if (!targetUser) {
-      return createErrorResponse('対象ユーザーが見つかりません', { userId });
-    }
-
-    // GAS-Native: 直接データベース操作
-    const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
-    if (!dbId) {
-      return createErrorResponse('データベース設定が見つかりません');
-    }
-
-    const spreadsheet = SpreadsheetApp.openById(dbId);
-    const sheet = spreadsheet.getSheetByName('users');
-    if (!sheet) {
-      return createErrorResponse('ユーザーシートが見つかりません');
-    }
-
-    const data = sheet.getDataRange().getValues();
-    const [headers] = data;
-    const userIdColumnIndex = headers.indexOf('userId');
-    const isActiveIndex = headers.indexOf('isActive');
-    const lastModifiedIndex = headers.indexOf('lastModified');
-
-    if (userIdColumnIndex === -1) {
-      return createErrorResponse('ユーザーIDカラムが見つかりません');
-    }
-
-    // ユーザーを検索してソフト削除
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][userIdColumnIndex] === userId) {
-        // ソフト削除：isActiveをfalseに設定
-        if (isActiveIndex !== -1) {
-          sheet.getRange(i + 1, isActiveIndex + 1).setValue(false);
-        }
-
-        // 最終更新日時を更新
-        if (lastModifiedIndex !== -1) {
-          sheet.getRange(i + 1, lastModifiedIndex + 1).setValue(new Date().toISOString());
-        }
-
-        console.log('✅ User soft deleted successfully:', `${userId.substring(0, 8)}***`, reason ? `Reason: ${reason}` : '');
-
-        return createSuccessResponse('ユーザーを削除しました', {
-          userId,
-          userEmail: targetUser.userEmail,
-          reason: reason || '管理者による削除',
-          deleted: true
-        });
-      }
-    }
-
-    return createErrorResponse('ユーザーが見つかりませんでした', { userId });
-
-  } catch (error) {
-    console.error('deleteUser API error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
+// ✅ CLAUDE.md準拠: 重複実装を削除
+// DatabaseCore.gsのdeleteUser関数を使用することで統一
 
 
 /**
@@ -1138,7 +1058,11 @@ function validateHeaderIntegrity(targetUserId) {
       };
     }
 
-    const dataAccess = openSpreadsheet(config.spreadsheetId);
+    // 🔧 CLAUDE.md準拠: Self vs Cross-user access pattern
+    const isSelfAccess = targetUser.userEmail === currentEmail;
+    const dataAccess = openSpreadsheet(config.spreadsheetId, {
+      useServiceAccount: !isSelfAccess
+    });
     const sheet = dataAccess.getSheet(config.sheetName);
     if (!sheet) {
       return {
@@ -1181,7 +1105,7 @@ function getBoardInfo() {
     }
 
     // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
+    const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       console.error('❌ User not found:', email);
       return { success: false, message: 'User not found' };
@@ -1204,7 +1128,7 @@ function getBoardInfo() {
       success: true,
       isActive: isPublished,
       isPublished,
-      questionText: getQuestionText(config),
+      questionText: getQuestionText(config, { targetUserEmail: user.userEmail }),
       urls: {
         view: `${baseUrl}?mode=view&userId=${user.userId}`,
         admin: `${baseUrl}?mode=admin&userId=${user.userId}`
@@ -1218,48 +1142,29 @@ function getBoardInfo() {
 }
 
 /**
- * Get sheet data - API Gateway function for DataService
+ * 🔧 統合API: getUserSheetData直接呼び出し推奨
+ * この関数は後方互換性のためのラッパーです
+ * @deprecated Use getUserSheetData() directly instead
  * @param {string} userId - ユーザーID
  * @param {Object} options - 取得オプション
  * @returns {Object} シートデータ取得結果
  */
 function getSheetData(userId, options = {}) {
-  try {
-    if (!userId) {
-      console.warn('getSheetData: userId not provided');
-      // Direct return format like admin panel getSheetList
-      return { success: false, message: 'ユーザーIDが必要です' };
-    }
-
-    // Delegate to DataService using GAS-Native pattern
-    const result = getUserSheetData(userId, options);
-
-    // Return directly without wrapping - same pattern as admin panel getSheetList
-    return result;
-  } catch (error) {
-    console.error('getSheetData error:', error.message);
-    // Direct return format like admin panel getSheetList
-    return { success: false, message: error.message || 'データ取得エラー' };
-  }
+  console.warn('getSheetData: Deprecated wrapper - use getUserSheetData() directly');
+  return getUserSheetData(userId, options);
 }
 
 /**
- * フロントエンド回答ボード用のデータ取得関数
+ * 🔧 統合API: フロントエンド用データ取得（最適化版）
  * Page.htmlから呼び出される
  * @param {string} classFilter - クラスフィルター (例: 'すべて', '3年A組')
  * @param {string} sortOrder - ソート順 (例: 'newest', 'oldest', 'random', 'score')
  * @returns {Object} フロントエンド期待形式のデータ
  */
 function getPublishedSheetData(classFilter, sortOrder) {
-  console.log('📊 getPublishedSheetData START:', {
-    classFilter: classFilter || 'すべて',
-    sortOrder: sortOrder || 'newest'
-  });
-
   try {
     const email = getCurrentEmail();
     if (!email) {
-      console.error('❌ Authentication failed');
       return {
         error: 'Authentication required',
         rows: [],
@@ -1268,29 +1173,9 @@ function getPublishedSheetData(classFilter, sortOrder) {
       };
     }
 
-    // Zero-dependency: 直接DB操作でユーザー取得
-    let db = null;
-    try {
-      // GAS-Native: Direct database access (Zero-Dependency Architecture)
-      // eslint-disable-next-line no-undef
-      db = openDatabase();
-    } catch (dbError) {
-      console.error('❌ DB initialization error:', dbError.message);
-    }
-
-    if (!db) {
-      console.error('❌ Database connection failed');
-      return {
-        error: 'Database connection failed',
-        rows: [],
-        sheetName: '',
-        header: 'データベースエラー'
-      };
-    }
-
-    const user = findUserByEmail(email);
+    // 🎯 CLAUDE.md準拠: 直接的なユーザー取得
+    const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
-      console.error('❌ User not found:', email);
       return {
         error: 'User not found',
         rows: [],
@@ -1395,7 +1280,18 @@ function getSheetList(spreadsheetId) {
       return createErrorResponse('Spreadsheet ID required');
     }
 
-    const dataAccess = openSpreadsheet(spreadsheetId);
+    // 🔧 CLAUDE.md準拠: getSheetList - Context-aware service account usage
+    // ✅ **Cross-user**: Only use service account for accessing other user's spreadsheets
+    // ✅ **Self-access**: Use normal permissions for own spreadsheets
+    const currentEmail = getCurrentEmail();
+
+    // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
+    const targetUser = findUserBySpreadsheetId(spreadsheetId);
+    const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
+    const useServiceAccount = !isSelfAccess;
+
+    console.log(`getSheetList: ${useServiceAccount ? 'Cross-user service account' : 'Self-access normal permissions'} for spreadsheet`);
+    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
     const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
 
@@ -1434,7 +1330,7 @@ function getDataCount(classFilter, sortOrder, adminMode = false) {
     }
 
     // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
+    const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return { error: 'User not found', count: 0 };
     }
@@ -1533,7 +1429,7 @@ function detectNewContent(lastUpdateTime) {
 
     // ユーザーデータ取得
     // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
+    const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return {
         success: false,
@@ -1822,7 +1718,7 @@ function getActiveFormInfo() {
     }
 
     // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
+    const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       console.error('❌ User not found:', email);
       return {
@@ -1921,7 +1817,7 @@ function getIncrementalSheetData(sheetName, options = {}) {
     }
 
     // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
+    const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return {
         success: false,
@@ -2016,7 +1912,7 @@ function triggerPollingUpdate(options = {}) {
     // 新しいコンテンツがある場合のみデータ取得
     if (newContentResult.success && newContentResult.hasNewContent) {
       // 🔧 GAS-Native統一: 直接findUserByEmail使用
-      const user = findUserByEmail(email);
+      const user = findUserByEmail(email, { requestingUser: email });
 
       if (user && user.activeSheetName) {
         const sheetResult = getIncrementalSheetData(user.activeSheetName, pollOptions);
@@ -2210,7 +2106,7 @@ function publishApplication(publishConfig) {
     // Fallback implementation
     try {
       // Update user configuration with publication settings
-      const user = findUserByEmail(email);
+      const user = findUserByEmail(email, { requestingUser: email });
       if (!user) {
         return createUserNotFoundError();
       }

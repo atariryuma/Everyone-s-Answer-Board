@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, Config, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, Config, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator */
 
 // ===========================================
 // 📊 システム定数 - Zero-Dependency Architecture
@@ -145,7 +145,7 @@ function testSystemSetup() {
       const props = PropertiesService.getScriptProperties();
       const databaseId = props.getDatabaseSpreadsheetId();
       if (databaseId) {
-        const dataAccess = openSpreadsheet(databaseId);
+        const dataAccess = openSpreadsheet(databaseId, { useServiceAccount: true });
         diagnostics.tests.push({
           name: 'Database Connection',
           status: '✅',
@@ -287,7 +287,7 @@ function testSystemDiagnosis() {
         const databaseId = props.getDatabaseSpreadsheetId();
 
         if (databaseId) {
-          const dataAccess = openSpreadsheet(databaseId);
+          const dataAccess = openSpreadsheet(databaseId, { useServiceAccount: true });
           const {spreadsheet} = dataAccess;
           diagnostics.database = {
             accessible: true,
@@ -458,8 +458,8 @@ function getAdminSpreadsheetList() {
  */
 function getAdminSheetList(spreadsheetId) {
   try {
-    // 🎯 Zero-dependency: サービスアカウント経由でシート一覧取得
-    const dataAccess = openSpreadsheet(spreadsheetId);
+    // 🎯 CLAUDE.md準拠: 管理者機能のため、サービスアカウント使用
+    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
     const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
 
@@ -535,13 +535,13 @@ function publishApplication(publishConfig) {
       }
     }
 
-    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email);
+    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用（CLAUDE.md準拠）
+    const user = findUserByEmail(email, { requestingUser: email });
     let saveResult = null;
 
     if (user) {
       // Re-fetch latest user data to avoid conflicts
-      const latestUser = findUserByEmail(email);
+      const latestUser = findUserByEmail(email, { requestingUser: email });
       const userToUse = latestUser || user;
 
       // 統一API使用: 構造化パース
@@ -655,31 +655,45 @@ function isUserSpreadsheetOwner(spreadsheetId) {
 }
 
 /**
- * 🔧 CLAUDE.md準拠: セキュアなサービスアカウント専用スプレッドシートアクセス
- * オーナー判定は残すが、アクセスは全てサービスアカウント経由で統一
+ * 🔧 CLAUDE.md準拠: Self vs Cross-user Spreadsheet Access
+ * CLAUDE.md Security Pattern: Context-aware service account usage
  * @param {string} spreadsheetId - スプレッドシートID
+ * @param {Object} context - アクセスコンテキスト
  * @returns {Object} {spreadsheet, accessMethod, auth, isOwner}
  */
-function getSpreadsheetAdaptive(spreadsheetId) {
-  // オーナー判定（表示・ログ目的のみ）
+function getSpreadsheetAdaptive(spreadsheetId, context = {}) {
+  const currentEmail = getCurrentEmail();
+
+  // CLAUDE.md準拠: アクセス権限の判定
+  const isAdminRequest = context.forceServiceAccount || (currentEmail && isAdministrator && isAdministrator(currentEmail));
   const isOwner = isUserSpreadsheetOwner(spreadsheetId);
 
-  console.log(`getSpreadsheetAdaptive: ${isOwner ? 'Owner' : 'Non-owner'} accessing via service account`);
+  // ✅ **Self-access**: Owner accessing own spreadsheet (normal permissions unless admin override)
+  // ✅ **Cross-user**: Non-owner or admin accessing spreadsheet (service account)
+  const useServiceAccount = isAdminRequest || !isOwner;
 
-  // 🛡️ セキュアなサービスアカウント専用アクセス
+  console.log(`getSpreadsheetAdaptive: ${useServiceAccount ? 'Service account' : 'Normal permissions'} access to spreadsheet (owner: ${isOwner}, admin: ${isAdminRequest})`);
+
   try {
-    const dataAccess = openSpreadsheet(spreadsheetId);
-    console.log('getSpreadsheetAdaptive: サービスアカウントでアクセス成功');
+    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
+    const accessMethod = useServiceAccount ? 'service_account' : 'normal_permissions';
+
+    console.log(`getSpreadsheetAdaptive: Access successful via ${accessMethod}`);
     return {
       spreadsheet: dataAccess.spreadsheet,
-      accessMethod: 'service_account',
+      accessMethod,
       auth: dataAccess.auth,
-      isOwner
+      isOwner,
+      context: {
+        isAdminRequest,
+        useServiceAccount,
+        currentEmail: currentEmail ? `${currentEmail.split('@')[0]}@***` : null
+      }
     };
-  } catch (serviceError) {
-    console.error('getSpreadsheetAdaptive: サービスアカウントアクセス失敗:', serviceError.message);
-    const errorMessage = serviceError && serviceError.message ? serviceError.message : '詳細不明';
-    throw new Error(`セキュアスプレッドシートアクセス失敗: ${errorMessage}`);
+  } catch (error) {
+    console.error('getSpreadsheetAdaptive: Spreadsheet access failed:', error.message);
+    const errorMessage = error && error.message ? error.message : '詳細不明';
+    throw new Error(`スプレッドシートアクセス失敗: ${errorMessage}`);
   }
 }
 
@@ -1079,8 +1093,8 @@ function getSpreadsheetInfo(spreadsheetId, accessToken) {
  */
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
-    // 🎯 Zero-dependency: サービスアカウント経由でアクセス権確認
-    const dataAccess = openSpreadsheet(spreadsheetId);
+    // 🎯 CLAUDE.md準拠: validateAccess は管理者機能のため、常にサービスアカウント使用
+    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
     const {spreadsheet, auth} = dataAccess;
 
     // サービスアカウントを編集者として自動登録（openSpreadsheetで既に実行済み）
@@ -1361,11 +1375,13 @@ function checkCurrentPublicationStatus(targetUserId) {
     // 🔧 Zero-Dependency統一: 直接Dataクラス使用
     let user = null;
     if (targetUserId) {
-      user = findUserById(targetUserId);
+      user = findUserById(targetUserId, {
+        requestingUser: session.email
+      });
     }
 
     if (!user && session && session.email) {
-      user = findUserByEmail(session.email);
+      user = findUserByEmail(session.email, { requestingUser: session.email });
     }
 
     if (!user) {

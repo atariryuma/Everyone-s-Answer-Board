@@ -68,7 +68,6 @@ module.exports = {
         'cacheManager': 'writable',
         'getSheetsService': 'writable',
         'getSheetsServiceCached': 'writable',
-        'getServiceAccountTokenCached': 'writable',
         'getSecureDatabaseId': 'writable',
         'getSecureServiceAccountCreds': 'writable',
         'batchGetSheetsData': 'writable',

@@ -56,8 +56,9 @@ function getViewerBoardData(targetUserId, viewerEmail) {
     // Own data: use normal permissions
     return getUserSpreadsheetData(targetUser);
   } else {
-    // Other's data: use service account for viewer access
-    return getDataWithServiceAccount(targetUser);
+    // Other's data: use service account for cross-user access
+    const dataAccess = openSpreadsheet(targetUser.spreadsheetId, { useServiceAccount: true });
+    return getUserSpreadsheetData(targetUser, { dataAccess });
   }
 }
 ```
@@ -283,7 +284,9 @@ function getViewerCrossUserData(targetUserId, viewerEmail) {
   if (targetUser.userEmail === viewerEmail) {
     return getUserOwnData(viewerEmail);        // ✅ Own data: normal permissions
   } else {
-    return getDataWithServiceAccount(targetUser); // ✅ Cross-user: service account
+    // ✅ Cross-user: service account via openSpreadsheet
+    const dataAccess = openSpreadsheet(targetUser.spreadsheetId, { useServiceAccount: true });
+    return getUserSpreadsheetData(targetUser, { dataAccess });
   }
 }
 
