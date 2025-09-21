@@ -173,19 +173,19 @@ class StudyQuestApp {
 
     this.gas = {
       // サーバ実装に合わせた直接呼び出し（中間関数なし）
-      getPublishedSheetData: (classFilter, sort, adminMode, bypassCache) =>
-        this.runGas('getPublishedSheetData', classFilter, sort, adminMode, bypassCache),
+      getPublishedSheetData: (classFilter, sort, adminMode, targetUserId) =>
+        this.runGas('getPublishedSheetData', classFilter, sort, adminMode, targetUserId),
       getIncrementalSheetData: (classFilter, sort, adminMode, sinceRowCount) =>
         this.runGas('getIncrementalSheetData', this.state.sheetName, { classFilter, sortOrder: sort, lastSeenCount: sinceRowCount }),
       getAvailableSheets: () => this.runGas('getSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex),
       checkAdmin: () => this.runGas('isAdmin'),
-      clearCache: () => this.runGas('clearConfigCache', this.state.userId),
+      clearCache: () => this.runGas('refreshBoardData', this.state.userId),
       validateData: () => this.validData(),
       // 件数は公開取得から導出
       getDataCount: async (classFilter, sortOrder, adminMode) => {
-        const resp = await this.runGas('getBoardData', this.state.userId, classFilter, sortOrder);
+        const resp = await this.gas.getPublishedSheetData(classFilter, sortOrder, adminMode, null); // 明示的にtargetUserId=null
         const rows = resp?.rows || resp?.data || [];
         return { success: true, count: rows.length };
       }
@@ -239,13 +239,9 @@ class StudyQuestApp {
           return Object.freeze({ ...this._state });
         },
 
-        // 🛡️ CLAUDE.md準拠: 安全な状態更新（Object.freeze対応）
+        // 🛡️ 安全な状態更新
         updateState(updates) {
-          Object.keys(updates).forEach(key => {
-            if (this._state.hasOwnProperty(key)) {
-              this._state[key] = updates[key];
-            }
-          });
+          this._state = { ...this._state, ...updates };
           console.log('🔄 PollingStateManager updated:', Object.keys(updates));
         },
 
@@ -730,14 +726,15 @@ class StudyQuestApp {
       // Apply default low performance tweaks
       this.optimizeForLowPerformance();
 
-      // 🔧 CLAUDE.md準拠: テンプレート変数から権限情報取得（GAS-Native）
-      this.state.isAdminUser = Boolean(window.isAdminUser);
-      this.state.isOwnBoard = Boolean(window.isOwnBoard);
-      debugLog('🔑 権限情報を統一取得:', {
-        isAdminUser: this.state.isAdminUser,
-        isOwnBoard: this.state.isOwnBoard,
-        isEditor: window.isEditor
-      });
+      // Initialize admin user status early in the initialization process
+      try {
+        const isAdmin = await this.gas.checkAdmin();
+        this.state.isAdminUser = Boolean(isAdmin);
+        debugLog('🔑 Admin user status initialized:', { isAdminUser: this.state.isAdminUser });
+      } catch (error) {
+        warnLog('⚠️ Failed to initialize admin status, defaulting to false:', error.message);
+        this.state.isAdminUser = false;
+      }
 
       // Show info modal while loading sheet data in the background
       this.showInfoModal();
@@ -781,8 +778,10 @@ class StudyQuestApp {
           }
         }
         
-        // 🔧 CLAUDE.md準拠: リアルタイム更新開始（Zero-Dependency）
+        // Start polling for new answers
         this.startNewAnswerPolling();
+        
+        // Start polling for new answers
       }, { timeout: 50 });
 
       // AdminPanelからのメッセージをリッスン  
@@ -2135,6 +2134,19 @@ class StudyQuestApp {
         return false;
       }
 
+      // 新着データがある場合
+      if (incrementalData.newCount > 0) {
+        debugLog('🆕 新着回答検出:', {
+          newCount: incrementalData.newCount,
+          totalCount: incrementalData.totalCount
+        });
+
+        this.state.hasNewContent = true;
+        this.state.newContentCount = incrementalData.newCount;
+        this.showNewContentBanner(incrementalData.newCount);
+        return true;
+      }
+
       // 🚀 新着データ処理続行
       return incrementalData.hasNewData || false;
 
@@ -2147,7 +2159,7 @@ class StudyQuestApp {
       this.stateManager.updateState({ checkAnswersSemaphore: false });
     }
   }
-
+  
   // 新しいカードを既存のカードコンテナに追加
   async appendNewCards(newData, sortOrder = 'newest') {
     if (!newData || newData.length === 0) return;
@@ -2200,7 +2212,7 @@ class StudyQuestApp {
       });
     });
   }
-
+  
   // ユーザーフィードバック表示
   provideFeedback(message, type = 'info') {
     if (!this.elements.refreshContentBtn) return;
@@ -3072,84 +3084,56 @@ class StudyQuestApp {
   }
 
   /**
-   * リトライ機能付きデータ取得
+   * シンプルなデータ取得（複雑なリトライロジック削除）
    * @param {object} fetchParams - データ取得パラメータ
    * @param {boolean} isInitialLoad - 初期ロードかどうか
    * @returns {Promise} データ取得結果
    */
   async getUserData(fetchParams, isInitialLoad) {
-    const retryOptions = {
-      maxRetries: isInitialLoad ? 1 : 2, // 0-indexed, so 1 = 2 attempts total
-      baseDelay: isInitialLoad ? 500 : 1000,
-      maxDelay: 5000,
-      context: 'データ取得',
-      retryCondition: (error, attempt) => {
-        const isTemporaryError =
-          error.message.includes('timeout') ||
-          error.message.includes('network') ||
-          error.message.includes('script runtime') ||
-          error.message.includes('temporarily unavailable');
+    console.log('🔧 getUserData called:', fetchParams);
+    console.log('🔧 getPublishedSheetData function available:', typeof this.gas.getPublishedSheetData);
+    console.log('🔧 google.script.run available:', typeof google !== 'undefined' && typeof google.script !== 'undefined' && typeof google.script.run !== 'undefined');
+    console.log('🔧 google.script.run.getPublishedSheetData available:', typeof google !== 'undefined' && google.script && google.script.run && typeof google.script.run.getPublishedSheetData);
 
-        const isUserError = error.message.includes('ユーザー情報が見つかりません');
+    try {
+      console.log('🔧 Calling getPublishedSheetData with params:', fetchParams.classFilter, fetchParams.sortOrder, fetchParams.showAdminFeatures, fetchParams.userId);
 
-        // Retry for temporary errors or user errors (for auto-repair)
-        return isTemporaryError || isUserError;
-      }
-    };
+      // CLAUDE.md準拠: 統合されたgetPublishedSheetDataを使用（userId対応）
+      console.log('🔧 Using unified getPublishedSheetData with userId support');
 
-    return await this.executeWithRetry(async (attempt) => {
-      console.log(`📡 データ取得試行 ${attempt + 1}:`, fetchParams);
-
-      const result = await this.runGas(
-        'getBoardData',
-        fetchParams.userId,
+      const result = await this.gas.getPublishedSheetData(
         fetchParams.classFilter,
-        fetchParams.sortOrder
+        fetchParams.sortOrder,
+        fetchParams.showAdminFeatures || false,  // adminMode
+        fetchParams.userId  // targetUserId（クロスユーザーアクセス）
       );
 
-      // 🔍 CLAUDE.md準拠: 詳細なレスポンスログ出力
-      console.log(`📡 getBoardData レスポンス (試行 ${attempt + 1}):`, {
-        result: result,
-        resultType: typeof result,
-        resultKeys: result ? Object.keys(result) : 'N/A',
-        hasData: result ? !!result.data : false,
-        dataLength: result?.data ? result.data.length : 'N/A',
-        userId: fetchParams.userId,
-        classFilter: fetchParams.classFilter,
-        sortOrder: fetchParams.sortOrder
+      console.log('🔧 getUserData received:', result);
+      console.log('🔧 Result type:', typeof result);
+      console.log('🔧 Result details:', {
+        hasResult: !!result,
+        hasSuccess: result && 'success' in result,
+        successValue: result && result.success,
+        hasData: result && 'data' in result,
+        dataType: result && result.data ? typeof result.data : 'N/A',
+        isArray: result && Array.isArray(result.data)
       });
 
-      // Success case
-      if (result && this.isValidDataResult(result)) {
-        console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
+      if (result && result.success && Array.isArray(result.data)) {
+        console.log('✅ getUserData success:', result.data.length, 'items');
         return result;
       }
 
-      // Handle error responses
-      if (result && result.status === 'error') {
-        const isUserNotFoundError = result.message && result.message.includes('ユーザー情報が見つかりません');
+      console.log('❌ getUserData validation failed');
+      return null;
 
-        if (isUserNotFoundError) {
-          // Auto-repair for user errors
-          try {
-            await this.runGas('performAutoRepair', fetchParams.userId);
-          } catch (repairError) {
-            warnLog('⚠️ サーバー側修復失敗:', repairError);
-          }
-        }
-
-        throw new Error(result.message || '不明なエラー');
-      }
-
-      // Invalid data case
-      const validationReason = this.getFailureReason(result);
-      throw new Error(`無効なデータ: ${validationReason}`);
-
-    }, retryOptions).catch(error => {
-      // Fallback: return partial results if available
-      warnLog(`❌ 最大試行回数に達しました: ${error.message}`);
-      return { status: 'error', message: 'データが見つかりませんでした', data: [] };
-    });
+    } catch (error) {
+      console.log('❌ getUserData error:', error);
+      console.log('❌ Error type:', typeof error);
+      console.log('❌ Error message:', error?.message);
+      console.log('❌ Error stack:', error?.stack);
+      return null;
+    }
   }
 
   /**
@@ -5323,7 +5307,9 @@ class StudyQuestApp {
         errorLog('❌ Invalid server response format:', response);
         throw new Error('Server returned invalid response format');
     }
-  }
+}
+
+
 
   async updateReactionUI(item, immediate = false) {
       const lastUpdateKey = `ui_update_${item.rowIndex}`;

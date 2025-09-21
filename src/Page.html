@@ -131,6 +131,10 @@
     function showSystemFlow() {
     }
 
+    // Unified Configuration - CLAUDE.md Compliant
+    const __CONFIG_JSON__ = '<?= typeof configJSON !== "undefined" ? configJSON : "{}" ?>';
+
+    // Legacy template variables for backward compatibility
     const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : "false" ?>';
     const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
     const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
@@ -145,9 +149,39 @@
     // Unified editor capability - Zero-Dependency Architecture
     window.isEditor = __IS_EDITOR__.startsWith('<') ? false : __IS_EDITOR__ === 'true';
 
-    // Server configuration processing completed
-    const SHEET_NAME = __SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__;
-    const USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
+    // Unified Configuration Parsing - CLAUDE.md Compliant
+    let CONFIG = {};
+    try {
+      if (typeof __CONFIG_JSON__ === 'string' && !__CONFIG_JSON__.startsWith('<')) {
+        CONFIG = JSON.parse(__CONFIG_JSON__);
+        console.log('Unified configuration loaded:', CONFIG);
+      } else {
+        console.warn('ConfigJSON not available, using legacy variables');
+      }
+    } catch (e) {
+      console.warn('Failed to parse configJSON:', e);
+    }
+
+    // Unified access pattern - prefer CONFIG, fallback to legacy
+    window.UNIFIED_CONFIG = {
+      userId: CONFIG.userId || (__USER_ID__.startsWith('<') ? '' : __USER_ID__),
+      userEmail: CONFIG.userEmail || '',
+      spreadsheetId: CONFIG.spreadsheetId || (__SPREADSHEET_ID__.startsWith('<') ? '' : __SPREADSHEET_ID__),
+      sheetName: CONFIG.sheetName || (__SHEET_NAME__.startsWith('<') ? 'テストシート' : __SHEET_NAME__),
+      questionText: CONFIG.questionText || '回答ボード',
+      isPublished: CONFIG.isPublished || false,
+      isEditor: CONFIG.isEditor !== undefined ? CONFIG.isEditor : window.isEditor,
+      isAdminUser: CONFIG.isAdminUser || false,
+      isOwnBoard: CONFIG.isOwnBoard || false,
+      formUrl: CONFIG.formUrl || '',
+      showDetails: CONFIG.showDetails !== false,
+      autoStopEnabled: CONFIG.autoStopEnabled || false,
+      autoStopTime: CONFIG.autoStopTime || null
+    };
+
+    // Legacy variable assignments - use unified config where possible
+    const SHEET_NAME = window.UNIFIED_CONFIG.sheetName;
+    const USER_ID = window.UNIFIED_CONFIG.userId;
     const EDITOR_NAME = __EDITOR_NAME__.startsWith('<') ? '' : __EDITOR_NAME__;
     let MAPPING;
     try {

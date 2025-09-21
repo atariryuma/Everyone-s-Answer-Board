@@ -1,17 +1,51 @@
 <script>
   // Safe template variable extraction from data attributes
   let __USER_ID__ = '';
-  if (typeof __USER_ID__ !== 'undefined') {
-    // __USER_ID__ is already defined
-  }
+  let __CONFIG_JSON__ = '{}';
+
   try {
     const appData = document.getElementById('app-data');
     if (appData) {
       __USER_ID__ = appData.getAttribute('data-user-id') || '';
+      __CONFIG_JSON__ = appData.getAttribute('data-config-json') || '{}';
     }
   } catch (error) {
     __USER_ID__ = '';
+    __CONFIG_JSON__ = '{}';
   }
+
+  // Unified Configuration Parsing - CLAUDE.md Compliant
+  let CONFIG = {};
+  try {
+    if (typeof __CONFIG_JSON__ === 'string' && __CONFIG_JSON__ !== '{}') {
+      CONFIG = JSON.parse(__CONFIG_JSON__);
+      console.log('Admin Panel: Unified configuration loaded:', CONFIG);
+    } else {
+      console.warn('Admin Panel: ConfigJSON not available, using default values');
+    }
+  } catch (e) {
+    console.warn('Admin Panel: Failed to parse configJSON:', e);
+  }
+
+  // Unified Configuration Access Pattern
+  window.UNIFIED_CONFIG = {
+    userId: CONFIG.userId || __USER_ID__,
+    userEmail: CONFIG.userEmail || '',
+    spreadsheetId: CONFIG.spreadsheetId || '',
+    sheetName: CONFIG.sheetName || '',
+    isPublished: CONFIG.isPublished || false,
+    isEditor: CONFIG.isEditor || true,
+    isAdminUser: CONFIG.isAdminUser || true,
+    isOwnBoard: CONFIG.isOwnBoard || true,
+    formUrl: CONFIG.formUrl || '',
+    formTitle: CONFIG.formTitle || '',
+    showDetails: CONFIG.showDetails !== false,
+    autoStopEnabled: CONFIG.autoStopEnabled || false,
+    autoStopTime: CONFIG.autoStopTime || null,
+    setupStatus: CONFIG.setupStatus || 'pending',
+    displaySettings: CONFIG.displaySettings || {},
+    columnMapping: CONFIG.columnMapping || {}
+  };
 
   // === SECTION SEPARATOR ===
 
@@ -337,9 +371,8 @@
 
       // 2. 設定データを1回だけ取得してsystemStateに保存
       step = 'loading config';
-      const configResponse = await getConfigAsync();
-      // 🔧 CLAUDE.md準拠: 安全な設定状態更新
-      systemState.config = configResponse?.success ? { ...configResponse.data.config } : null;
+      // 🔧 CLAUDE.md準拠: UNIFIED_CONFIGから設定状態初期化
+      systemState.config = { ...window.UNIFIED_CONFIG };
 
       // 3. URL パラメータのチェックと適用
       step = 'checking URL params';
@@ -834,15 +867,7 @@
     };
   };
 
-  // 設定データ取得（シンプル版）
-  function getConfigAsync() {
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        .getConfig();
-    });
-  }
+  // 🔧 CLAUDE.md準拠: getConfigAsync削除（UNIFIED_CONFIG使用に移行済み）
 
   function loadCurrentConfig() {
     // systemState.configを使用（既に読み込み済み）
@@ -1585,27 +1610,29 @@
       .getFormInfo(spreadsheetId, sheetName);
   }
 
-  // 設定エクスポート
+  // 設定エクスポート - CLAUDE.md準拠: 統一設定使用
   function exportConfig() {
-    google.script.run
-      .withSuccessHandler(function (response) {
-        const config = response.data.config;
-        const dataStr = JSON.stringify(config, null, 2);
-        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-        const exportFileDefaultName = 'studyquest-config.json';
+    try {
+      if (!systemState.config) {
+        showError('設定データが利用できません');
+        return;
+      }
 
-        const linkElement = document.createElement('a');
-        linkElement.setAttribute('href', dataUri);
-        linkElement.setAttribute('download', exportFileDefaultName);
-        linkElement.click();
+      const config = systemState.config;
+      const dataStr = JSON.stringify(config, null, 2);
+      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+      const exportFileDefaultName = 'studyquest-config.json';
 
-        showSuccess('設定をエクスポートしました');
-      })
-      .withFailureHandler(function (error) {
-        console.error('エクスポートエラー:', error);
-        showError('設定のエクスポートに失敗しました');
-      })
-      .getConfig();
+      const linkElement = document.createElement('a');
+      linkElement.setAttribute('href', dataUri);
+      linkElement.setAttribute('download', exportFileDefaultName);
+      linkElement.click();
+
+      showSuccess('設定をエクスポートしました');
+    } catch (error) {
+      console.error('エクスポートエラー:', error);
+      showError('設定のエクスポートに失敗しました');
+    }
   }
 
   // システム管理者アクセス確認
@@ -4065,47 +4092,24 @@
             // 公開後に最新の設定を取得してボタン状態を更新
             console.log('📋 公開成功 - 最新設定を取得してボタン状態を更新');
 
-            // 公開が成功したので、最新の設定を取得し直してボタン状態を更新
-            google.script.run
-              .withSuccessHandler(function(latestConfigResponse) {
-                console.log('📋 最新設定取得結果:', latestConfigResponse);
-                if (latestConfigResponse && latestConfigResponse.success && latestConfigResponse.data.config) {
-                  updateResourceButtons(latestConfigResponse.data.config);
-                  // ETag更新 - 楽観的ロック機構
-                  if (latestConfigResponse.data.config.etag) {
-                    systemState.config.etag = latestConfigResponse.data.config.etag;
-                  }
-                } else {
-                  // フォールバック: 手動で設定を構築
-                  const updatedConfig = {
-                    ...publishConfig,
-                    isPublished: true,
-                    publishedAt: result.publishedAt || new Date().toISOString(),
-                    setupComplete: true
-                  };
-                  updateResourceButtons(updatedConfig);
-                  // ETag更新 - フォールバック時も実行
-                  if (result.etag || result.config?.etag) {
-                    systemState.config.etag = result.etag || result.config.etag;
-                  }
-                }
-              })
-              .withFailureHandler(function(error) {
-                console.warn('最新設定取得に失敗:', error);
-                // フォールバック: 手動で設定を構築
-                const updatedConfig = {
-                  ...publishConfig,
-                  isPublished: true,
-                  publishedAt: result.publishedAt || new Date().toISOString(),
-                  setupComplete: true
-                };
-                updateResourceButtons(updatedConfig);
-                // ETag更新 - フォールバック時も実行
-                if (result.etag || result.config?.etag) {
-                  systemState.config.etag = result.etag || result.config.etag;
-                }
-              })
-              .getConfig();
+            // 🎯 CLAUDE.md準拠: 公開成功後、systemState.configを直接更新
+            const updatedConfig = {
+              ...systemState.config,
+              isPublished: true,
+              publishedAt: result.publishedAt || new Date().toISOString(),
+              setupComplete: true
+            };
+
+            // systemState.configを更新
+            systemState.config = updatedConfig;
+
+            // UI更新
+            updateResourceButtons(updatedConfig);
+
+            // ETag更新 - 楽観的ロック機構
+            if (result.etag || result.config?.etag) {
+              systemState.config.etag = result.etag || result.config.etag;
+            }
 
             // ✅ CLAUDE.md準拠 & 公開成功後：即座にフッターを更新（UX向上）
             createPromiseDelay(500).then(() => {

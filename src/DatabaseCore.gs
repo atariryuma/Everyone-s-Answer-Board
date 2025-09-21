@@ -8,7 +8,7 @@
  * - サービスアカウント使用時の安全な権限管理
  */
 
-/* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator */
+/* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig */
 
 // ===========================================
 // 🗄️ データベース基盤操作
@@ -616,8 +616,21 @@ function updateUser(userId, updates, context = {}) {
  */
 function getUserSpreadsheetData(targetUser, options = {}) {
   try {
-    if (!targetUser || !targetUser.spreadsheetId) {
-      console.warn('getUserSpreadsheetData: Invalid target user or missing spreadsheet ID');
+    if (!targetUser || !targetUser.userId) {
+      console.warn('getUserSpreadsheetData: Invalid target user or missing userId');
+      return null;
+    }
+
+    // 🔧 CLAUDE.md準拠: configJson-based unified configuration
+    const configResult = getUserConfig(targetUser.userId);
+    if (!configResult.success || !configResult.config) {
+      console.warn('getUserSpreadsheetData: Failed to get user configuration');
+      return null;
+    }
+
+    const {config} = configResult;
+    if (!config.spreadsheetId) {
+      console.warn('getUserSpreadsheetData: No spreadsheetId in user configuration');
       return null;
     }
 
@@ -629,7 +642,7 @@ function getUserSpreadsheetData(targetUser, options = {}) {
       const isSelfAccess = currentEmail === targetUser.userEmail;
 
       console.log(`getUserSpreadsheetData: ${isSelfAccess ? 'Self-access normal permissions' : 'Cross-user service account'} for spreadsheet data`);
-      dataAccess = openSpreadsheet(targetUser.spreadsheetId, {
+      dataAccess = openSpreadsheet(config.spreadsheetId, {
         useServiceAccount: !isSelfAccess,
         context: 'getUserSpreadsheetData'
       });
@@ -644,22 +657,16 @@ function getUserSpreadsheetData(targetUser, options = {}) {
     const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
 
-    // ユーザー設定をパース
-    let userConfig = {};
-    try {
-      userConfig = JSON.parse(targetUser.configJson || '{}');
-    } catch (parseError) {
-      console.warn('getUserSpreadsheetData: Failed to parse user config:', parseError.message);
-      userConfig = {};
-    }
+    // 🧹 レガシーコード削除: 重複するJSON.parse()処理を排除
+    // すでに取得した config オブジェクトを使用
 
     const result = {
       userId: targetUser.userId,
       userEmail: targetUser.userEmail,
-      spreadsheetId: targetUser.spreadsheetId,
-      sheetName: targetUser.sheetName,
-      formUrl: targetUser.formUrl,
-      config: userConfig,
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName || '',
+      formUrl: config.formUrl || '',
+      config,
       sheets: sheets.map(sheet => ({
         name: sheet.getName(),
         id: sheet.getSheetId()
@@ -720,7 +727,15 @@ function getViewerBoardData(targetUserId, viewerEmail) {
     } else {
       // ✅ Other's data: use service account for cross-user access (CLAUDE.md pattern)
       console.log('getViewerBoardData: Cross-user access - using service account');
-      const dataAccess = openSpreadsheet(targetUser.spreadsheetId, {
+
+      // 🔧 CLAUDE.md準拠: configJson-based unified configuration
+      const configResult = getUserConfig(targetUser.userId);
+      if (!configResult.success || !configResult.config?.spreadsheetId) {
+        console.warn('getViewerBoardData: Failed to get target user spreadsheetId from config');
+        return null;
+      }
+
+      const dataAccess = openSpreadsheet(configResult.config.spreadsheetId, {
         useServiceAccount: true,
         context: 'getViewerBoardData'
       });

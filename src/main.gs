@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, transformBoardDataToFrontendFormat */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -88,6 +88,29 @@ function doGet(e) {
         template.userId = user.userId;
         template.accessLevel = 'administrator';
         template.userInfo = user;
+
+        // 🔧 CLAUDE.md準拠: 管理パネル用configJSON統一注入
+        const configResult = getUserConfig(user.userId);
+        const config = configResult.success ? configResult.config : {};
+        template.configJSON = JSON.stringify({
+          userId: user.userId,
+          userEmail: email,
+          spreadsheetId: config.spreadsheetId || '',
+          sheetName: config.sheetName || '',
+          isPublished: Boolean(config.isPublished),
+          isEditor: true, // 管理者は常にエディター権限
+          isAdminUser: true,
+          isOwnBoard: true,
+          formUrl: config.formUrl || '',
+          formTitle: config.formTitle || '',
+          showDetails: config.showDetails !== false,
+          autoStopEnabled: Boolean(config.autoStopEnabled),
+          autoStopTime: config.autoStopTime || null,
+          setupStatus: config.setupStatus || 'pending',
+          displaySettings: config.displaySettings || {},
+          columnMapping: config.columnMapping || {}
+        });
+
         return template.evaluate();
       }
 
@@ -179,6 +202,24 @@ function doGet(e) {
         template.isEditor = isEditor;
         template.isAdminUser = isAdminUser;
         template.isOwnBoard = isOwnBoard;
+
+        // 🔧 CLAUDE.md準拠: configJSON統一取得（Zero-Dependency）
+        template.sheetName = config.sheetName || 'テストシート';
+        template.configJSON = JSON.stringify({
+          userId: targetUserId,
+          userEmail: targetUser.userEmail,
+          spreadsheetId: config.spreadsheetId || '',
+          sheetName: config.sheetName || 'テストシート',
+          questionText: questionText || '回答ボード',
+          isPublished: Boolean(config.isPublished),
+          isEditor: isEditor,
+          isAdminUser: isAdminUser,
+          isOwnBoard: isOwnBoard,
+          formUrl: config.formUrl || '',
+          showDetails: config.showDetails !== false,
+          autoStopEnabled: Boolean(config.autoStopEnabled),
+          autoStopTime: config.autoStopTime || null
+        });
 
         return template.evaluate();
       }
@@ -1156,130 +1197,31 @@ function getSheetData(userId, options = {}) {
   return getUserSheetData(userId, options);
 }
 
-/**
- * 回答ボード表示用データ取得（userId指定対応）
- * @param {string} targetUserId - 表示対象のユーザーID
- * @param {string} classFilter - クラスフィルター (例: 'すべて', '3年A組')
- * @param {string} sortOrder - ソート順 (例: 'newest', 'oldest', 'random', 'score')
- * @returns {Object} フロントエンド期待形式のデータ
- */
-function getBoardData(targetUserId, classFilter, sortOrder) {
-  try {
-    const viewerEmail = getCurrentEmail();
-    if (!viewerEmail) {
-      return {
-        error: 'Authentication required',
-        rows: [],
-        sheetName: '',
-        header: '認証エラー'
-      };
-    }
-
-    // getViewerBoardDataを使用してクロスユーザーアクセスを処理
-    const boardData = getViewerBoardData(targetUserId, viewerEmail);
-    if (!boardData) {
-      return {
-        error: 'User not found',
-        rows: [],
-        sheetName: '',
-        header: 'ユーザーエラー'
-      };
-    }
-
-    // フィルターとソートのオプション
-    const options = {
-      classFilter: classFilter !== 'すべて' ? classFilter : undefined,
-      sortBy: sortOrder || 'newest',
-      includeTimestamp: true
-    };
-
-    // 🔍 CLAUDE.md準拠: データ形式の詳細ログ出力
-    console.log('getBoardData: boardData received:', {
-      hasBoardData: !!boardData,
-      boardDataType: typeof boardData,
-      boardDataKeys: boardData ? Object.keys(boardData) : 'N/A',
-      hasSuccess: boardData ? 'success' in boardData : false,
-      successValue: boardData ? boardData.success : 'N/A',
-      hasData: boardData ? 'data' in boardData : false,
-      dataType: boardData?.data ? typeof boardData.data : 'N/A',
-      dataLength: Array.isArray(boardData?.data) ? boardData.data.length : 'N/A'
-    });
-
-    // フロントエンド期待形式に変換（より堅牢なチェック）
-    if (boardData && (boardData.success !== false) && boardData.data && Array.isArray(boardData.data)) {
-      const transformedData = {
-        header: boardData.header || boardData.sheetName || '回答一覧',
-        sheetName: boardData.sheetName || '不明',
-        data: boardData.data.map(item => ({
-          rowIndex: item.rowIndex || item.id,
-          name: item.name || '',
-          class: item.class || '',
-          opinion: item.answer || item.opinion || '',
-          reason: item.reason || '',
-          reactions: item.reactions || {
-            UNDERSTAND: { count: 0, reacted: false },
-            LIKE: { count: 0, reacted: false },
-            SURPRISE: { count: 0, reacted: false }
-          },
-          highlight: Boolean(item.highlight),
-          timestamp: item.timestamp || '',
-          formattedTimestamp: item.formattedTimestamp || ''
-        }))
-      };
-
-      // クラスフィルターの適用
-      if (options.classFilter) {
-        transformedData.data = transformedData.data.filter(item =>
-          item.class === options.classFilter
-        );
-      }
-
-      // ソート適用
-      if (options.sortBy === 'newest') {
-        transformedData.data.sort((a, b) => (b.rowIndex || 0) - (a.rowIndex || 0));
-      } else if (options.sortBy === 'oldest') {
-        transformedData.data.sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0));
-      }
-
-      return transformedData;
-    }
-
-    // データが存在するが配列でない場合、または空の場合
-    if (boardData && boardData.data) {
-      console.warn('getBoardData: Data exists but not in expected format');
-      return {
-        header: boardData.header || boardData.sheetName || '回答一覧',
-        sheetName: boardData.sheetName || '不明',
-        data: []
-      };
-    }
-
-    console.warn('getBoardData: No valid data found');
-    return {
-      error: 'No data available',
-      rows: [],
-      sheetName: '',
-      header: 'データなし'
-    };
-
-  } catch (error) {
-    console.error('getBoardData error:', error.message);
-    return createExceptionResponse(error, 'getBoardData');
-  }
-}
 
 /**
- * 🔧 統合API: フロントエンド用データ取得（最適化版）
+ * 🔧 統合API: フロントエンド用データ取得（最適化版・クロスユーザー対応）
  * Page.htmlから呼び出される
  * @param {string} classFilter - クラスフィルター (例: 'すべて', '3年A組')
  * @param {string} sortOrder - ソート順 (例: 'newest', 'oldest', 'random', 'score')
+ * @param {boolean} adminMode - 管理者モード（未使用、後方互換性のため保持）
+ * @param {string} targetUserId - 対象ユーザーID（指定時はクロスユーザーアクセス）
  * @returns {Object} フロントエンド期待形式のデータ
  */
-function getPublishedSheetData(classFilter, sortOrder) {
+function getPublishedSheetData(classFilter, sortOrder, adminMode = false, targetUserId = null) {
+  console.log('🔧 getPublishedSheetData called with params:', {
+    classFilter,
+    sortOrder,
+    adminMode,
+    targetUserId,
+    hasTargetUserId: !!targetUserId
+  });
+
   try {
-    const email = getCurrentEmail();
-    if (!email) {
+    const viewerEmail = getCurrentEmail();
+    if (!viewerEmail) {
+      console.log('🔧 getPublishedSheetData: No viewer email, returning auth error');
       return {
+        success: false,
         error: 'Authentication required',
         rows: [],
         sheetName: '',
@@ -1287,15 +1229,39 @@ function getPublishedSheetData(classFilter, sortOrder) {
       };
     }
 
-    // 🎯 CLAUDE.md準拠: 直接的なユーザー取得
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return {
-        error: 'User not found',
-        rows: [],
-        sheetName: '',
-        header: 'ユーザーエラー'
-      };
+    // CLAUDE.md準拠: クロスユーザーアクセス対応
+    let user;
+    if (targetUserId) {
+      // クロスユーザーアクセス: targetUserIdで指定されたユーザーのデータを取得
+      console.log('🔧 getPublishedSheetData: Cross-user access mode');
+      const boardData = getViewerBoardData(targetUserId, viewerEmail);
+      if (!boardData) {
+        console.log('🔧 getPublishedSheetData: Target user not found or access denied');
+        return {
+          success: false,
+          error: 'User not found or access denied',
+          rows: [],
+          sheetName: '',
+          header: 'ユーザーエラー'
+        };
+      }
+
+      // getViewerBoardDataの結果を直接使用
+      return transformBoardDataToFrontendFormat(boardData, classFilter, sortOrder);
+    } else {
+      // 従来通り: 現在のユーザーのデータを取得
+      console.log('🔧 getPublishedSheetData: Self-access mode');
+      user = findUserByEmail(viewerEmail, { requestingUser: viewerEmail });
+      if (!user) {
+        console.log('🔧 getPublishedSheetData: Current user not found');
+        return {
+          success: false,
+          error: 'User not found',
+          rows: [],
+          sheetName: '',
+          header: 'ユーザーエラー'
+        };
+      }
     }
 
     // getUserSheetDataを呼び出し、フィルターオプションを渡す
@@ -1307,51 +1273,20 @@ function getPublishedSheetData(classFilter, sortOrder) {
 
     const result = getUserSheetData(user.userId, options);
 
-    // フロントエンド期待形式に変換
+    // 統一されたtransformBoardDataToFrontendFormat関数を使用
     if (result && result.success && result.data) {
-      const transformedData = {
-        header: result.header || result.sheetName || '回答一覧',
-        sheetName: result.sheetName || '不明',
-        data: result.data.map(item => ({
-          rowIndex: item.rowIndex || item.id,
-          name: item.name || '',
-          class: item.class || '',
-          opinion: item.answer || item.opinion || '',
-          reason: item.reason || '',
-          reactions: item.reactions || {
-            UNDERSTAND: { count: 0, reacted: false },
-            LIKE: { count: 0, reacted: false },
-            CURIOUS: { count: 0, reacted: false }
-          },
-          highlight: item.highlight || false
-        })),
-        rows: result.data.map(item => ({
-          rowIndex: item.rowIndex || item.id,
-          name: item.name || '',
-          class: item.class || '',
-          opinion: item.answer || item.opinion || '',
-          reason: item.reason || '',
-          reactions: item.reactions || {
-            UNDERSTAND: { count: 0, reacted: false },
-            LIKE: { count: 0, reacted: false },
-            CURIOUS: { count: 0, reacted: false }
-          },
-          highlight: item.highlight || false
-        })),
-        showDetails: result.showDetails !== false,
-        success: true
-      };
-
       console.log('✅ getPublishedSheetData SUCCESS:', {
         userId: user.userId,
         dataCount: result.data.length,
         sheetName: result.sheetName
       });
 
-      return transformedData;
+      // CLAUDE.md準拠: 統一されたデータ変換関数使用（DRY原則）
+      return transformBoardDataToFrontendFormat(result, classFilter, sortOrder);
     } else {
       console.error('❌ Data retrieval failed:', result?.message);
       return {
+        success: false,
         error: result?.message || 'データ取得エラー',
         rows: [],
         sheetName: result?.sheetName || '',
@@ -1362,6 +1297,7 @@ function getPublishedSheetData(classFilter, sortOrder) {
   } catch (error) {
     console.error('❌ getPublishedSheetData ERROR:', error.message);
     return {
+      success: false,
       error: error.message || 'データ取得エラー',
       rows: [],
       sheetName: '',
@@ -1370,7 +1306,71 @@ function getPublishedSheetData(classFilter, sortOrder) {
   }
 }
 
+/**
+ * getViewerBoardDataの結果をフロントエンド期待形式に変換
+ * @param {Object} boardData - getViewerBoardDataの戻り値
+ * @param {string} classFilter - クラスフィルター
+ * @param {string} sortOrder - ソート順
+ * @returns {Object} フロントエンド期待形式のデータ
+ */
+function transformBoardDataToFrontendFormat(boardData, classFilter, sortOrder) {
+  console.log('🔧 transformBoardDataToFrontendFormat:', {
+    hasBoardData: !!boardData,
+    hasData: boardData && 'data' in boardData,
+    dataLength: Array.isArray(boardData?.data) ? boardData.data.length : 'N/A'
+  });
 
+  // フロントエンド期待形式に変換（CLAUDE.md準拠）
+  if (boardData && (boardData.success !== false) && boardData.data && Array.isArray(boardData.data)) {
+    const transformedData = {
+      success: true,
+      header: boardData.header || boardData.sheetName || '回答一覧',
+      sheetName: boardData.sheetName || '不明',
+      data: boardData.data.map(item => ({
+        rowIndex: item.rowIndex || item.id,
+        name: item.name || '',
+        class: item.class || '',
+        opinion: item.answer || item.opinion || '',
+        reason: item.reason || '',
+        reactions: item.reactions || {
+          UNDERSTAND: { count: 0, reacted: false },
+          LIKE: { count: 0, reacted: false },
+          SURPRISE: { count: 0, reacted: false }
+        },
+        highlight: Boolean(item.highlight),
+        timestamp: item.timestamp || '',
+        formattedTimestamp: item.formattedTimestamp || ''
+      }))
+    };
+
+    // クラスフィルターの適用
+    if (classFilter && classFilter !== 'すべて') {
+      transformedData.data = transformedData.data.filter(item =>
+        item.class === classFilter
+      );
+    }
+
+    // ソート適用
+    if (sortOrder === 'newest') {
+      transformedData.data.sort((a, b) => (b.rowIndex || 0) - (a.rowIndex || 0));
+    } else if (sortOrder === 'oldest') {
+      transformedData.data.sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0));
+    }
+
+    console.log('🔧 transformBoardDataToFrontendFormat: Success -', transformedData.data.length, 'items');
+    return transformedData;
+  }
+
+  // データが存在しない場合
+  console.warn('🔧 transformBoardDataToFrontendFormat: No valid data found');
+  return {
+    success: false,
+    error: 'No data available',
+    rows: [],
+    sheetName: '',
+    header: 'データなし'
+  };
+}
 
 // ===========================================
 // 🔧 Unified Validation Functions
