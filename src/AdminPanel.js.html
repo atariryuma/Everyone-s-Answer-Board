@@ -3734,7 +3734,7 @@
               console.log(`✅ 設定保存成功 (試行 ${attempt})`);
               resolve(result);
             } else {
-              console.warn(`⚠️ 設定保存失敗 (試行 ${attempt}):`, result.error);
+              console.warn(`⚠️ 設定保存失敗 (試行 ${attempt}):`, result.message || result.error);
               if (attempt < maxRetries) {
                 // CLAUDE.md準拠: Promise-based指数バックオフ (setTimeout代替)
                 const delay = Math.pow(2, attempt) * 1000;
@@ -3750,7 +3750,7 @@
                   checkTime();
                 }).then(attemptSave);
               } else {
-                reject(new Error(result.error || '設定保存に失敗しました'));
+                reject(new Error(result.message || result.error || '設定保存に失敗しました'));
               }
             }
           })
