@@ -185,7 +185,7 @@ class StudyQuestApp {
       validateData: () => this.validData(),
       // 件数は公開取得から導出
       getDataCount: async (classFilter, sortOrder, adminMode) => {
-        const resp = await this.gas.getPublishedSheetData(classFilter, sortOrder, adminMode);
+        const resp = await this.runGas('getBoardData', this.state.userId, classFilter, sortOrder);
         const rows = resp?.rows || resp?.data || [];
         return { success: true, count: rows.length };
       }
@@ -3100,11 +3100,10 @@ class StudyQuestApp {
       debugLog(`📡 データ取得試行 ${attempt + 1}:`, fetchParams);
 
       const result = await this.runGas(
-        'getPublishedSheetData',
+        'getBoardData',
+        fetchParams.userId,
         fetchParams.classFilter,
-        fetchParams.sortOrder,
-        fetchParams.showAdminFeatures,
-        fetchParams.bypassCache || false
+        fetchParams.sortOrder
       );
 
       // Detailed response logging

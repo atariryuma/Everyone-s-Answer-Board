@@ -1155,6 +1155,95 @@ function getSheetData(userId, options = {}) {
 }
 
 /**
+ * 回答ボード表示用データ取得（userId指定対応）
+ * @param {string} targetUserId - 表示対象のユーザーID
+ * @param {string} classFilter - クラスフィルター (例: 'すべて', '3年A組')
+ * @param {string} sortOrder - ソート順 (例: 'newest', 'oldest', 'random', 'score')
+ * @returns {Object} フロントエンド期待形式のデータ
+ */
+function getBoardData(targetUserId, classFilter, sortOrder) {
+  try {
+    const viewerEmail = getCurrentEmail();
+    if (!viewerEmail) {
+      return {
+        error: 'Authentication required',
+        rows: [],
+        sheetName: '',
+        header: '認証エラー'
+      };
+    }
+
+    // getViewerBoardDataを使用してクロスユーザーアクセスを処理
+    const boardData = getViewerBoardData(targetUserId, viewerEmail);
+    if (!boardData) {
+      return {
+        error: 'User not found',
+        rows: [],
+        sheetName: '',
+        header: 'ユーザーエラー'
+      };
+    }
+
+    // フィルターとソートのオプション
+    const options = {
+      classFilter: classFilter !== 'すべて' ? classFilter : undefined,
+      sortBy: sortOrder || 'newest',
+      includeTimestamp: true
+    };
+
+    // フロントエンド期待形式に変換
+    if (boardData && boardData.success && boardData.data) {
+      const transformedData = {
+        header: boardData.header || boardData.sheetName || '回答一覧',
+        sheetName: boardData.sheetName || '不明',
+        data: boardData.data.map(item => ({
+          rowIndex: item.rowIndex || item.id,
+          name: item.name || '',
+          class: item.class || '',
+          opinion: item.answer || item.opinion || '',
+          reason: item.reason || '',
+          reactions: item.reactions || {
+            UNDERSTAND: { count: 0, reacted: false },
+            LIKE: { count: 0, reacted: false },
+            SURPRISE: { count: 0, reacted: false }
+          },
+          highlight: Boolean(item.highlight),
+          timestamp: item.timestamp || '',
+          formattedTimestamp: item.formattedTimestamp || ''
+        }))
+      };
+
+      // クラスフィルターの適用
+      if (options.classFilter) {
+        transformedData.data = transformedData.data.filter(item =>
+          item.class === options.classFilter
+        );
+      }
+
+      // ソート適用
+      if (options.sortBy === 'newest') {
+        transformedData.data.sort((a, b) => (b.rowIndex || 0) - (a.rowIndex || 0));
+      } else if (options.sortBy === 'oldest') {
+        transformedData.data.sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0));
+      }
+
+      return transformedData;
+    }
+
+    return {
+      error: 'Invalid data format',
+      rows: [],
+      sheetName: '',
+      header: 'データエラー'
+    };
+
+  } catch (error) {
+    console.error('getBoardData error:', error.message);
+    return createExceptionResponse(error, 'getBoardData');
+  }
+}
+
+/**
  * 🔧 統合API: フロントエンド用データ取得（最適化版）
  * Page.htmlから呼び出される
  * @param {string} classFilter - クラスフィルター (例: 'すべて', '3年A組')
