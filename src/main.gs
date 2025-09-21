@@ -2357,32 +2357,54 @@ function getFormInfo(spreadsheetId, sheetName) {
         [headers] = headerRange.getValues();
       }
 
-      // Try to detect form URL from sheet if available
+      // 🎯 GASベストプラクティス: sheet.getFormUrl()で確実なフォーム検出
       let formUrl = null;
+      let formTitle = null;
+      let formId = null;
       try {
-        const formUrlProp = `FORM_URL_${spreadsheetId}_${sheetName}`;
-        formUrl = PropertiesService.getScriptProperties().getProperty(formUrlProp);
-      } catch (propError) {
-        console.warn('Could not get form URL from properties:', propError.message);
+        formUrl = sheet.getFormUrl(); // 最も確実なフォーム検出方法
+        if (formUrl) {
+          console.log('✅ フォーム連携検出成功:', formUrl);
+          // フォームIDを抽出してフォーム情報取得
+          const formIdMatch = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+          if (formIdMatch) {
+            [, formId] = formIdMatch;
+            try {
+              const form = FormApp.openById(formId);
+              formTitle = form.getTitle();
+              console.log('✅ フォーム情報取得成功:', { formId, formTitle });
+            } catch (formError) {
+              console.warn('フォーム情報取得失敗:', formError.message);
+            }
+          }
+        } else {
+          console.log('ℹ️ フォーム連携なし - 通常のスプレッドシート');
+        }
+      } catch (error) {
+        console.warn('フォームURL取得エラー:', error.message);
       }
 
-      // 🛡️ CLAUDE.md準拠: フロントエンド互換性のためのformData構造
+      // 🛡️ CLAUDE.md準拠: 改良されたformData構造（GASベストプラクティス準拠）
+      const confidence = formUrl ? 95 : 0; // sheet.getFormUrl()は確実なので高い信頼度
+      const detectionMethod = formUrl ? 'sheet_getFormUrl' : 'no_form_detected';
+
       const formData = {
         formUrl,
-        formTitle: sheetName,
+        formId,
+        formTitle: formTitle || sheetName, // 実際のフォームタイトルまたはシート名
         spreadsheetName: spreadsheet.getName(),
         sheetName,
         detectionDetails: {
-          method: 'fallback',
-          confidence: formUrl ? 80 : 20,
+          method: detectionMethod,
+          confidence,
           accessMethod: 'user',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          gasMethod: 'sheet.getFormUrl()' // 使用したGASメソッド
         }
       };
 
-      // ✅ 修正: フォーム検出の実際の結果に基づくsuccess判定
-      const confidence = formUrl ? 80 : 20;
-      const hasFormDetection = formUrl || confidence >= 70;
+      // ✅ 改良: 確実なフォーム検出に基づくsuccess判定
+      const hasFormDetection = confidence >= 90;
 
       return {
         success: hasFormDetection,

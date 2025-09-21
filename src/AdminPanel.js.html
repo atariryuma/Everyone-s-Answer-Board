@@ -1433,10 +1433,13 @@
     console.log('🔍 processFormDetectionResult 実行:', formResult);
 
     // 🛡️ CLAUDE.md準拠: V8ランタイム対応の柔軟なデータ構造判定
-    if (!formResult || !formResult.success) {
-      console.log('❌ formResult が不正または失敗:', { formResult, success: !!formResult?.success });
+    if (!formResult) {
+      console.log('❌ formResult が存在しません');
       return null;
     }
+
+    // ✅ 修正: フォーム連携がなくてもスプレッドシート情報は処理する
+    // フォーム連携失敗でもスプレッドシートアクセスは成功している可能性がある
 
     // データ構造の正規化（後方互換性維持）
     const normalizedData = formResult.formData || formResult;
@@ -1921,16 +1924,23 @@
             const statusInfo = processFormDetectionResult(result.formInfo);
             if (statusInfo) {
               displayFormInfo(result.formInfo.formData, statusInfo);
+            } else {
+              // フォーム連携なしでも情報表示
+              displayFormInfo(result.formInfo.formData, {
+                status: 'missing',
+                message: 'フォーム連携は検出されませんでした（スプレッドシート接続は可能）'
+              });
             }
           }
 
-          // 接続ボタン有効化
-          if (result.readyToConnect) {
+          // ✅ 修正: スプレッドシートアクセス成功なら接続可能
+          if (result.hasAccess || result.readyToConnect) {
             connectBtn.disabled = false;
             connectBtn.textContent = '✅ 接続';
 
-            // ✅ V8ランタイム対応: Template literals
-            showSuccess(`✅ 検証完了 - シート「${result.sheetName}」に接続できます (${result.executionTime})`);
+            // フォーム連携状況に応じたメッセージ
+            const formStatus = result.formInfo?.success ? 'フォーム連携あり' : 'フォーム連携なし（接続可能）';
+            showSuccess(`✅ 検証完了 - シート「${result.sheetName}」に接続できます (${formStatus}) (${result.executionTime})`);
           } else {
             showWarning('⚠️ アクセス権限に問題があります');
           }
