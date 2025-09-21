@@ -239,9 +239,13 @@ class StudyQuestApp {
           return Object.freeze({ ...this._state });
         },
 
-        // 🛡️ 安全な状態更新
+        // 🛡️ CLAUDE.md準拠: 安全な状態更新（Object.freeze対応）
         updateState(updates) {
-          this._state = { ...this._state, ...updates };
+          Object.keys(updates).forEach(key => {
+            if (this._state.hasOwnProperty(key)) {
+              this._state[key] = updates[key];
+            }
+          });
           console.log('🔄 PollingStateManager updated:', Object.keys(updates));
         },
 
@@ -3094,7 +3098,7 @@ class StudyQuestApp {
     };
 
     return await this.executeWithRetry(async (attempt) => {
-      debugLog(`📡 データ取得試行 ${attempt + 1}:`, fetchParams);
+      console.log(`📡 データ取得試行 ${attempt + 1}:`, fetchParams);
 
       const result = await this.runGas(
         'getBoardData',
@@ -3104,7 +3108,7 @@ class StudyQuestApp {
       );
 
       // 🔍 CLAUDE.md準拠: 詳細なレスポンスログ出力
-      debugLog(`📡 getBoardData レスポンス (試行 ${attempt + 1}):`, {
+      console.log(`📡 getBoardData レスポンス (試行 ${attempt + 1}):`, {
         result: result,
         resultType: typeof result,
         resultKeys: result ? Object.keys(result) : 'N/A',
@@ -3117,7 +3121,7 @@ class StudyQuestApp {
 
       // Success case
       if (result && this.isValidDataResult(result)) {
-        debugLog(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
+        console.log(`✅ データ取得成功 (試行 ${attempt + 1}):`, result.data ? result.data.length : 0, '件');
         return result;
       }
 
