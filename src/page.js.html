@@ -726,15 +726,14 @@ class StudyQuestApp {
       // Apply default low performance tweaks
       this.optimizeForLowPerformance();
 
-      // Initialize admin user status early in the initialization process
-      try {
-        const isAdmin = await this.gas.checkAdmin();
-        this.state.isAdminUser = Boolean(isAdmin);
-        debugLog('🔑 Admin user status initialized:', { isAdminUser: this.state.isAdminUser });
-      } catch (error) {
-        warnLog('⚠️ Failed to initialize admin status, defaulting to false:', error.message);
-        this.state.isAdminUser = false;
-      }
+      // 🔧 CLAUDE.md準拠: テンプレート変数から権限情報取得（GAS-Native）
+      this.state.isAdminUser = Boolean(window.isAdminUser);
+      this.state.isOwnBoard = Boolean(window.isOwnBoard);
+      debugLog('🔑 権限情報を統一取得:', {
+        isAdminUser: this.state.isAdminUser,
+        isOwnBoard: this.state.isOwnBoard,
+        isEditor: window.isEditor
+      });
 
       // Show info modal while loading sheet data in the background
       this.showInfoModal();
@@ -778,10 +777,8 @@ class StudyQuestApp {
           }
         }
         
-        // Start polling for new answers
+        // 🔧 CLAUDE.md準拠: リアルタイム更新開始（Zero-Dependency）
         this.startNewAnswerPolling();
-        
-        // Start polling for new answers
       }, { timeout: 50 });
 
       // AdminPanelからのメッセージをリッスン  

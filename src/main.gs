@@ -174,9 +174,11 @@ function doGet(e) {
         template.questionText = questionText || '回答ボード';
         template.boardTitle = questionText || targetUser.userEmail || '回答ボード';
 
-        // 🔧 統一用語: Editor権限設定（GAS-Native Architecture）
+        // 🔧 CLAUDE.md準拠: 統一権限情報（GAS-Native Architecture）
         const isEditor = isAdminUser || isOwnBoard;
         template.isEditor = isEditor;
+        template.isAdminUser = isAdminUser;
+        template.isOwnBoard = isOwnBoard;
 
         return template.evaluate();
       }
