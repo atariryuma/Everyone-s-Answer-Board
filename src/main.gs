@@ -2430,3 +2430,222 @@ function validateCompleteSpreadsheetUrl(fullUrl) {
     return errorResult;
   }
 }
+
+// ===========================================
+// 🆕 Missing Functions Implementation - Frontend Compatibility
+// ===========================================
+
+// ✅ CLAUDE.md準拠: システム管理関数をSystemController.gsに移動済み
+
+/**
+ * Secure GAS function caller - CLAUDE.md準拠セキュリティ強化版
+ * フロントエンドからの安全な関数呼び出しのみ許可
+ * @param {string} functionName - Function name to call
+ * @param {Object} options - Call options
+ * @param {...any} args - Function arguments
+ * @returns {Object} Function call result
+ */
+function callGAS(functionName, options = {}, ...args) {
+  try {
+    console.log('🔧 callGAS START (Security Enhanced):', {
+      functionName,
+      argsCount: args.length,
+      options,
+      timestamp: new Date().toISOString()
+    });
+
+    const email = getCurrentEmail();
+    if (!email) {
+      // Security log for unauthorized access attempts
+      console.warn('🚨 callGAS: Unauthorized access attempt (no email)');
+      return createAuthError();
+    }
+
+    // ✅ CLAUDE.md準拠: 厳格なセキュリティホワイトリスト
+    // 管理者専用関数と一般ユーザー関数を分離
+    const publicFunctions = [
+      'getCurrentEmail',
+      'getUser',
+      'getConfig',
+      'getBoardInfo',
+      'getWebAppUrl'
+    ];
+
+    const adminOnlyFunctions = [
+      'resetAuth',
+      'testSetup',
+      'validateCompleteSpreadsheetUrl',
+      'setupApplication',
+      'testSystemDiagnosis',
+      'monitorSystem',
+      'checkDataIntegrity'
+    ];
+
+    const isAdmin = isAdministrator(email);
+    const allowedFunctions = [...publicFunctions];
+
+    // 管理者のみ管理者専用関数にアクセス可能
+    if (isAdmin) {
+      allowedFunctions.push(...adminOnlyFunctions);
+    }
+
+    // 🛡️ セキュリティチェック：関数名検証
+    if (!functionName || typeof functionName !== 'string') {
+      console.warn('🚨 callGAS: Invalid function name:', functionName);
+      return {
+        success: false,
+        message: 'Invalid function name provided',
+        securityWarning: true
+      };
+    }
+
+    if (!allowedFunctions.includes(functionName)) {
+      // Security log for unauthorized function access attempts
+      console.warn('🚨 callGAS: Unauthorized function access attempt:', {
+        functionName,
+        userEmail: email ? `${email.split('@')[0]}@***` : 'N/A',
+        isAdmin,
+        timestamp: new Date().toISOString()
+      });
+
+      return {
+        success: false,
+        message: `Function '${functionName}' is not authorized for this user`,
+        userLevel: isAdmin ? 'administrator' : 'user',
+        availableFunctions: allowedFunctions.slice(0, 5) // 最初の5個のみ表示（セキュリティ）
+      };
+    }
+
+    // 🔍 引数検証：過大な引数チェック
+    if (args.length > 10) {
+      console.warn('🚨 callGAS: Excessive arguments detected:', args.length);
+      return {
+        success: false,
+        message: 'Too many arguments provided',
+        securityWarning: true
+      };
+    }
+
+    // ✅ 関数実行（安全な環境で）
+    if (typeof this[functionName] === 'function') {
+      try {
+        const result = this[functionName].apply(this, args);
+
+        // Success audit log
+        console.info('✅ callGAS: Function executed successfully:', {
+          functionName,
+          userEmail: email ? `${email.split('@')[0]}@***` : 'N/A',
+          isAdmin,
+          executedAt: new Date().toISOString()
+        });
+
+        return {
+          success: true,
+          functionName,
+          result,
+          options,
+          executedAt: new Date().toISOString(),
+          securityLevel: isAdmin ? 'admin' : 'user'
+        };
+      } catch (functionError) {
+        // Function execution error log
+        console.error('❌ callGAS: Function execution error:', {
+          functionName,
+          error: functionError.message,
+          userEmail: email ? `${email.split('@')[0]}@***` : 'N/A'
+        });
+
+        return {
+          success: false,
+          message: `Function execution error: ${functionError.message}`,
+          functionName,
+          error: functionError.message,
+          options,
+          securityLevel: isAdmin ? 'admin' : 'user'
+        };
+      }
+    } else {
+      console.warn('🚨 callGAS: Function not found:', functionName);
+      return {
+        success: false,
+        message: `Function '${functionName}' not found or not accessible`,
+        functionName,
+        options,
+        securityLevel: isAdmin ? 'admin' : 'user'
+      };
+    }
+
+  } catch (error) {
+    // Critical security error log
+    console.error('🚨 callGAS: Critical security error:', {
+      error: error.message,
+      functionName,
+      timestamp: new Date().toISOString()
+    });
+    return createExceptionResponse(error, 'Secure function call failed');
+  }
+}
+
+/**
+ * Check user authentication status
+ * @returns {Object} Authentication status
+ */
+function checkUserAuthentication() {
+  try {
+    console.log('🔐 checkUserAuthentication START');
+
+    const email = getCurrentEmail();
+    if (!email) {
+      return {
+        success: false,
+        authenticated: false,
+        message: 'No user session found',
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    // Check if user exists in database
+    const user = findUserByEmail(email, { requestingUser: email });
+    const userExists = !!user;
+
+    // Check administrator status
+    const isAdminUser = isAdministrator(email);
+
+    // Check if user has valid configuration
+    let hasValidConfig = false;
+    if (user) {
+      try {
+        const configResult = getUserConfig(user.userId);
+        hasValidConfig = configResult.success;
+      } catch (configError) {
+        console.warn('Config check failed:', configError.message);
+      }
+    }
+
+    const authLevel = isAdminUser ? 'administrator' : userExists ? 'user' : 'guest';
+
+    return {
+      success: true,
+      authenticated: true,
+      email,
+      userExists,
+      isAdministrator: isAdminUser,
+      hasValidConfig,
+      authLevel,
+      userId: user ? user.userId : null,
+      sessionValid: true,
+      message: `User authenticated as ${authLevel}`,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('checkUserAuthentication error:', error.message);
+    return {
+      success: false,
+      authenticated: false,
+      message: `Authentication check failed: ${error.message}`,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}

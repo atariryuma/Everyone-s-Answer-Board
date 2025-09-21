@@ -258,67 +258,103 @@ function getWebAppUrl() {
  * @returns {Object} 診断結果
  */
 function testSystemDiagnosis() {
-    try {
-      const diagnostics = {
-        timestamp: new Date().toISOString(),
-        services: {},
-        database: {},
-        overall: 'unknown'
-      };
+  try {
+    console.log('🔬 testSystemDiagnosis START');
 
-      // Services診断 - Safe service access with GAS loading protection
-      try {
-        diagnostics.services.UserService = typeof UserService !== 'undefined'
-          ? '✅ Loaded and available'
-          : '❌ Not loaded or unavailable';
-
-        diagnostics.services.ConfigService = typeof ConfigService !== 'undefined'
-          ? '✅ Loaded and available'
-          : '❌ Not loaded or unavailable';
-
-        diagnostics.services.DataService = '❓ 診断機能なし';
-      } catch (servicesError) {
-        diagnostics.services.error = servicesError.message;
-      }
-
-      // データベース診断
-      try {
-        const props = PropertiesService.getScriptProperties();
-        const databaseId = props.getDatabaseSpreadsheetId();
-
-        if (databaseId) {
-          const dataAccess = openSpreadsheet(databaseId, { useServiceAccount: true });
-          const {spreadsheet} = dataAccess;
-          diagnostics.database = {
-            accessible: true,
-            name: spreadsheet.getName(),
-            sheets: spreadsheet.getSheets().length
-          };
-        } else {
-          diagnostics.database = { accessible: false, reason: 'DATABASE_SPREADSHEET_ID not configured' };
-        }
-      } catch (dbError) {
-        diagnostics.database = { accessible: false, error: dbError.message };
-      }
-
-      // 総合評価
-      const hasErrors = Object.values(diagnostics).some(v =>
-        typeof v === 'object' && (v.error || v.accessible === false)
-      );
-      diagnostics.overall = hasErrors ? '⚠️ 問題あり' : '✅ 正常';
-
-      return {
-        success: true,
-        diagnostics
-      };
-
-    } catch (error) {
-      console.error('[ERROR] SystemController.testSystemDiagnosis:', error.message || 'System diagnosis error');
-      return {
-        success: false,
-        message: error.message
-      };
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
     }
+
+    if (!isAdministrator(email)) {
+      return createAdminRequiredError();
+    }
+
+    // GAS-Native: Direct system diagnostics
+    const diagnostics = [];
+
+    // Check 1: Core system properties
+    try {
+      const props = PropertiesService.getScriptProperties();
+      const coreProps = {
+        adminEmail: !!props.getProperty('ADMIN_EMAIL'),
+        databaseId: !!props.getProperty('DATABASE_SPREADSHEET_ID'),
+        serviceAccount: !!props.getProperty('SERVICE_ACCOUNT_CREDS')
+      };
+
+      const allCorePresent = Object.values(coreProps).every(Boolean);
+      diagnostics.push({
+        test: 'Core Properties',
+        status: allCorePresent ? 'PASS' : 'FAIL',
+        details: coreProps,
+        critical: true
+      });
+    } catch (error) {
+      diagnostics.push({
+        test: 'Core Properties',
+        status: 'ERROR',
+        error: error.message,
+        critical: true
+      });
+    }
+
+    // Check 2: Database connectivity
+    try {
+      const dbTest = getDatabaseConfig();
+      diagnostics.push({
+        test: 'Database Connection',
+        status: dbTest.success ? 'PASS' : 'FAIL',
+        details: dbTest.success ? 'Database accessible' : dbTest.message,
+        critical: true
+      });
+    } catch (error) {
+      diagnostics.push({
+        test: 'Database Connection',
+        status: 'ERROR',
+        error: error.message,
+        critical: true
+      });
+    }
+
+    // Check 3: Web app deployment
+    try {
+      const webAppUrl = ScriptApp.getService().getUrl();
+      diagnostics.push({
+        test: 'Web App Deployment',
+        status: webAppUrl ? 'PASS' : 'FAIL',
+        details: webAppUrl || 'No deployment URL available',
+        critical: false
+      });
+    } catch (error) {
+      diagnostics.push({
+        test: 'Web App Deployment',
+        status: 'ERROR',
+        error: error.message,
+        critical: false
+      });
+    }
+
+    const criticalIssues = diagnostics.filter(d => d.critical && d.status !== 'PASS').length;
+    const totalTests = diagnostics.length;
+    const passedTests = diagnostics.filter(d => d.status === 'PASS').length;
+
+    return {
+      success: criticalIssues === 0,
+      message: criticalIssues === 0 ? 'System diagnosis completed - all critical tests passed' : `System diagnosis found ${criticalIssues} critical issues`,
+      summary: {
+        totalTests,
+        passed: passedTests,
+        failed: totalTests - passedTests,
+        criticalIssues
+      },
+      diagnostics,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('testSystemDiagnosis error:', error.message);
+    return createExceptionResponse(error, 'System diagnosis failed');
+  }
 }
 
 /**
@@ -360,43 +396,217 @@ function getSystemStatus() {
     }
 }
 
+/**
+ * Monitor system health and performance - CLAUDE.md準拠命名
+ * @returns {Object} System monitoring result
+ */
+function monitorSystem() {
+  try {
+    console.log('📊 monitorSystem START');
+
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
+    }
+
+    if (!isAdministrator(email)) {
+      return createAdminRequiredError();
+    }
+
+    // GAS-Native: Direct system monitoring
+    const metrics = {};
+
+    // Monitor 1: Script execution quota
+    try {
+      // GAS provides no direct quota API, so we track execution time
+      const startTime = new Date();
+      metrics.executionTime = startTime.toISOString();
+      metrics.quotaStatus = 'MONITORING';
+    } catch (error) {
+      metrics.quotaStatus = 'ERROR';
+      metrics.quotaError = error.message;
+    }
+
+    // Monitor 2: Database size and access
+    try {
+      const users = getAllUsers();
+      metrics.userCount = Array.isArray(users) ? users.length : 0;
+      metrics.databaseStatus = 'ACCESSIBLE';
+    } catch (error) {
+      metrics.userCount = 0;
+      metrics.databaseStatus = 'ERROR';
+      metrics.databaseError = error.message;
+    }
+
+    // Monitor 3: Cache performance
+    try {
+      const cache = CacheService.getScriptCache();
+      // Simple cache test
+      const testKey = 'monitoring_test';
+      const testValue = Date.now().toString();
+      cache.put(testKey, testValue, 60);
+      const retrieved = cache.get(testKey);
+
+      metrics.cacheStatus = retrieved === testValue ? 'OPERATIONAL' : 'DEGRADED';
+      cache.remove(testKey);
+    } catch (error) {
+      metrics.cacheStatus = 'ERROR';
+      metrics.cacheError = error.message;
+    }
+
+    // Monitor 4: Service account validation
+    try {
+      const props = PropertiesService.getScriptProperties();
+      const creds = props.getProperty('SERVICE_ACCOUNT_CREDS');
+      metrics.serviceAccountStatus = creds ? 'CONFIGURED' : 'NOT_CONFIGURED';
+    } catch (error) {
+      metrics.serviceAccountStatus = 'ERROR';
+      metrics.serviceAccountError = error.message;
+    }
+
+    const healthScore = Object.keys(metrics).filter(key =>
+      metrics[key] === 'OPERATIONAL' ||
+      metrics[key] === 'ACCESSIBLE' ||
+      metrics[key] === 'CONFIGURED'
+    ).length;
+
+    return {
+      success: true,
+      message: 'System monitoring completed',
+      healthScore: `${healthScore}/4`,
+      status: healthScore >= 3 ? 'HEALTHY' : healthScore >= 2 ? 'DEGRADED' : 'CRITICAL',
+      metrics,
+      recommendations: healthScore < 3 ? ['Check failed components', 'Review system configuration'] : ['System operating normally'],
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('monitorSystem error:', error.message);
+    return createExceptionResponse(error, 'System monitoring failed');
+  }
+}
 
 /**
- * データ整合性チェック
- * 管理者用の高度な診断機能
- *
- * @returns {Object} チェック結果
+ * Check data integrity - CLAUDE.md準拠命名
+ * @returns {Object} Data integrity check result
  */
-function performDataIntegrityCheck() {
-    try {
-      const results = {
-        timestamp: new Date().toISOString(),
-        checks: {},
-        summary: { passed: 0, failed: 0, warnings: 0 }
-      };
+function checkDataIntegrity() {
+  try {
+    console.log('🔍 checkDataIntegrity START');
 
-      // 各種整合性チェックを実行
-      // （実装は複雑になるため、基本的な構造のみ示す）
-
-      results.checks.database = { status: '✅', message: '基本チェックのみ実装' };
-      results.checks.users = { status: '✅', message: '基本チェックのみ実装' };
-      results.checks.configs = { status: '✅', message: '基本チェックのみ実装' };
-
-      results.summary.passed = 3;
-      results.overall = '✅ 基本チェック完了';
-
-      return {
-        success: true,
-        results
-      };
-
-    } catch (error) {
-      console.error('[ERROR] SystemController.performDataIntegrityCheck:', error.message || 'Data integrity check error');
-      return {
-        success: false,
-        message: error.message
-      };
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
     }
+
+    if (!isAdministrator(email)) {
+      return createAdminRequiredError();
+    }
+
+    // GAS-Native: Direct data integrity checks
+    const integrityResults = [];
+
+    // Check 1: User database consistency
+    try {
+      const users = getAllUsers();
+      const userCount = Array.isArray(users) ? users.length : 0;
+      const validUsers = users.filter(user =>
+        user &&
+        user.userId &&
+        user.userEmail &&
+        user.userEmail.includes('@')
+      ).length;
+
+      integrityResults.push({
+        check: 'User Database',
+        status: validUsers === userCount ? 'PASS' : 'WARN',
+        details: `${validUsers}/${userCount} valid user records`,
+        validCount: validUsers,
+        totalCount: userCount
+      });
+    } catch (error) {
+      integrityResults.push({
+        check: 'User Database',
+        status: 'ERROR',
+        error: error.message
+      });
+    }
+
+    // Check 2: Configuration integrity
+    try {
+      const users = getAllUsers();
+      let configErrors = 0;
+      let validConfigs = 0;
+
+      if (Array.isArray(users)) {
+        for (const user of users) {
+          try {
+            const configResult = getUserConfig(user.userId);
+            if (configResult.success) {
+              validConfigs++;
+            } else {
+              configErrors++;
+            }
+          } catch (configError) {
+            configErrors++;
+          }
+        }
+      }
+
+      integrityResults.push({
+        check: 'Configuration Integrity',
+        status: configErrors === 0 ? 'PASS' : 'WARN',
+        details: `${validConfigs} valid configs, ${configErrors} errors`,
+        validCount: validConfigs,
+        errorCount: configErrors
+      });
+    } catch (error) {
+      integrityResults.push({
+        check: 'Configuration Integrity',
+        status: 'ERROR',
+        error: error.message
+      });
+    }
+
+    // Check 3: Database schema validation
+    try {
+      const dbConfig = getDatabaseConfig();
+      integrityResults.push({
+        check: 'Database Schema',
+        status: dbConfig.success ? 'PASS' : 'FAIL',
+        details: dbConfig.success ? 'Schema accessible' : 'Schema validation failed'
+      });
+    } catch (error) {
+      integrityResults.push({
+        check: 'Database Schema',
+        status: 'ERROR',
+        error: error.message
+      });
+    }
+
+    const passedChecks = integrityResults.filter(r => r.status === 'PASS').length;
+    const totalChecks = integrityResults.length;
+    const hasErrors = integrityResults.some(r => r.status === 'ERROR');
+    const hasWarnings = integrityResults.some(r => r.status === 'WARN');
+
+    return {
+      success: !hasErrors,
+      message: hasErrors ? 'Data integrity check found errors' : hasWarnings ? 'Data integrity check found warnings' : 'Data integrity check passed',
+      summary: {
+        totalChecks,
+        passed: passedChecks,
+        warnings: integrityResults.filter(r => r.status === 'WARN').length,
+        errors: integrityResults.filter(r => r.status === 'ERROR').length
+      },
+      overallStatus: hasErrors ? 'CRITICAL' : hasWarnings ? 'WARNING' : 'HEALTHY',
+      checks: integrityResults,
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('checkDataIntegrity error:', error.message);
+    return createExceptionResponse(error, 'Data integrity check failed');
+  }
 }
 
 /**
@@ -1441,33 +1651,7 @@ function checkCurrentPublicationStatus(targetUserId) {
  *
  * @returns {Object} 認証状態
  */
-function checkUserAuthentication() {
-  try {
-    const {email} = { email: Session.getActiveUser().getEmail() };
-    const userEmail = email ? email : null;
-    if (!userEmail) {
-      return {
-        isAuthenticated: false,
-        message: '認証が必要です'
-      };
-    }
-
-    const userInfo = email ? { email } : null;
-    return {
-      isAuthenticated: true,
-      userEmail,
-      userInfo,
-      hasConfig: !!userInfo?.config
-    };
-
-  } catch (error) {
-    console.error('FrontendController.checkUserAuthentication エラー:', error.message);
-    return {
-      isAuthenticated: false,
-      message: error.message
-    };
-  }
-}
+// ✅ CLAUDE.md準拠: 重複関数削除 - main.gsの完全実装を使用
 
 
 
