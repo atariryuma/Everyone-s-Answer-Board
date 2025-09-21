@@ -2290,7 +2290,7 @@
           showWarning('⚠️ AI列判定に失敗しました。手動で設定するか「🤖 AI列判定」ボタンで再実行してください');
         }
       } else {
-        handleConnectionError(result.error || 'データソース接続に失敗しました', { spreadsheetId, sheetName, method: isUrlMethod ? 'URL' : 'dropdown' });
+        handleConnectionError(result.message || result.error || 'データソース接続に失敗しました', { spreadsheetId, sheetName, method: isUrlMethod ? 'URL' : 'dropdown' });
       }
     } catch (error) {
       console.error('connectToDataSource エラー:', error);
@@ -3948,8 +3948,8 @@
               if (typeof loadAndApplyCurrentConfig === 'function') {
                 loadAndApplyCurrentConfig();
               }
-            } else if (result.error) {
-              console.warn('列設定の保存に失敗:', result.error);
+            } else if (result.message || result.error) {
+              console.warn('列設定の保存に失敗:', result.message || result.error);
             } else {
               console.warn('設定保存で予期しない応答:', result);
             }
@@ -3990,7 +3990,7 @@
             systemState.config.etag = result.etag || result.config.etag;
           }
         } else {
-          showError(result.error || '設定の保存に失敗しました');
+          showError(result.message || result.error || '設定の保存に失敗しました');
         }
         setLoading(false);
         ClientMutex.release('saveDraft');
@@ -4112,7 +4112,7 @@
                 loadAndApplyCurrentConfig();
               }
             } else {
-              showError(result.error || 'アプリの公開に失敗しました');
+              showError(result.message || result.error || 'アプリの公開に失敗しました');
             }
           }
           setLoading(false);
