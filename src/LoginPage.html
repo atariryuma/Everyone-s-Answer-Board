@@ -135,21 +135,6 @@
         z-index: 1;
       }
 
-      /* Form field focus animations */
-      .form-control {
-        transition:
-          all var(--transition-duration) var(--transition-easing),
-          box-shadow var(--animation-duration) var(--transition-easing);
-      }
-
-      .form-control:focus {
-        transform: translateY(-1px);
-        animation: subtle-bounce 0.4s ease-out;
-      }
-
-      .form-control:hover:not(:focus) {
-        transform: translateY(-0.5px);
-      }
 
       /* Form field subtle bounce animation */
       @keyframes subtle-bounce {

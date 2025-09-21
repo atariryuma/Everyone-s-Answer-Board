@@ -3196,34 +3196,6 @@
 
 
 
-  // 🎯 UX向上：次ステップ案内機能
-  function showNextStepGuidance(result) {
-    if (!result || !result.success) return;
-
-    const mapping = result.mapping || {};
-    const confidence = result.confidence || {};
-
-    // バックエンドと統一した闾値システム
-    const THRESHOLDS = {
-      answer: 55, reason: 55,  // 文脈依存列
-      name: 65, class: 65      // 明確な列種別
-    };
-
-    const hasAutoApplied = Object.keys(mapping).some((columnType) => {
-      const columnConfidence = confidence[columnType] || 0;
-      const threshold = THRESHOLDS[columnType] || 55;
-      return columnConfidence >= threshold;
-    });
-
-    // ✅ CLAUDE.md準拠: Promise-based UI feedback delay
-    createPromiseDelay(1500).then(() => {
-      if (hasAutoApplied) {
-        showSuccess('✨ AI判定を自動適用済み。「設定を確認」で完了できます！');
-      } else {
-        showInfo('💡 ドロップダウンで列を手動設定してから「設定を確認」してください');
-      }
-    }); // 他のメッセージの後に表示
-  }
 
   // ドロップダウンの変更イベントリスナーを設定
   function setupDropdownEventListeners(dropdowns) {
