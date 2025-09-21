@@ -1193,8 +1193,20 @@ function getBoardData(targetUserId, classFilter, sortOrder) {
       includeTimestamp: true
     };
 
-    // フロントエンド期待形式に変換
-    if (boardData && boardData.success && boardData.data) {
+    // 🔍 CLAUDE.md準拠: データ形式の詳細ログ出力
+    console.log('getBoardData: boardData received:', {
+      hasBoardData: !!boardData,
+      boardDataType: typeof boardData,
+      boardDataKeys: boardData ? Object.keys(boardData) : 'N/A',
+      hasSuccess: boardData ? 'success' in boardData : false,
+      successValue: boardData ? boardData.success : 'N/A',
+      hasData: boardData ? 'data' in boardData : false,
+      dataType: boardData?.data ? typeof boardData.data : 'N/A',
+      dataLength: Array.isArray(boardData?.data) ? boardData.data.length : 'N/A'
+    });
+
+    // フロントエンド期待形式に変換（より堅牢なチェック）
+    if (boardData && (boardData.success !== false) && boardData.data && Array.isArray(boardData.data)) {
       const transformedData = {
         header: boardData.header || boardData.sheetName || '回答一覧',
         sheetName: boardData.sheetName || '不明',
@@ -1232,11 +1244,22 @@ function getBoardData(targetUserId, classFilter, sortOrder) {
       return transformedData;
     }
 
+    // データが存在するが配列でない場合、または空の場合
+    if (boardData && boardData.data) {
+      console.warn('getBoardData: Data exists but not in expected format');
+      return {
+        header: boardData.header || boardData.sheetName || '回答一覧',
+        sheetName: boardData.sheetName || '不明',
+        data: []
+      };
+    }
+
+    console.warn('getBoardData: No valid data found');
     return {
-      error: 'Invalid data format',
+      error: 'No data available',
       rows: [],
       sheetName: '',
-      header: 'データエラー'
+      header: 'データなし'
     };
 
   } catch (error) {

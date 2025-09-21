@@ -3103,7 +3103,17 @@ class StudyQuestApp {
         fetchParams.sortOrder
       );
 
-      // Detailed response logging
+      // 🔍 CLAUDE.md準拠: 詳細なレスポンスログ出力
+      debugLog(`📡 getBoardData レスポンス (試行 ${attempt + 1}):`, {
+        result: result,
+        resultType: typeof result,
+        resultKeys: result ? Object.keys(result) : 'N/A',
+        hasData: result ? !!result.data : false,
+        dataLength: result?.data ? result.data.length : 'N/A',
+        userId: fetchParams.userId,
+        classFilter: fetchParams.classFilter,
+        sortOrder: fetchParams.sortOrder
+      });
 
       // Success case
       if (result && this.isValidDataResult(result)) {
