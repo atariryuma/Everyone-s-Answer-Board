@@ -71,6 +71,67 @@ function openDatabase(useServiceAccount = false) {
   }
 }
 
+/**
+ * 任意のスプレッドシートを開く（サービスアカウント認証対応）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {Object} options - オプション設定
+ * @returns {Object} { spreadsheet, auth, getSheet() } object
+ */
+function openSpreadsheet(spreadsheetId, options = {}) {
+  try {
+    if (!spreadsheetId || typeof spreadsheetId !== 'string') {
+      console.warn('openSpreadsheet: Invalid spreadsheet ID');
+      return null;
+    }
+
+    // サービスアカウント認証を取得
+    const auth = getServiceAccount();
+    let spreadsheet = null;
+
+    // サービスアカウントが利用可能な場合、自動編集者権限付与
+    if (auth.isValid) {
+      try {
+        // Grant service account editor access for cross-user access
+        DriveApp.getFileById(spreadsheetId).addEditor(auth.email);
+        console.log(`openSpreadsheet: Service account editor access granted for ${spreadsheetId}`);
+      } catch (driveError) {
+        console.warn('openSpreadsheet: Service account access already granted or failed:', driveError.message);
+      }
+    }
+
+    // スプレッドシートを開く
+    try {
+      spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    } catch (openError) {
+      console.error('openSpreadsheet: Failed to open spreadsheet:', openError.message);
+      return null;
+    }
+
+    // 互換性のためのヘルパーメソッド付きオブジェクトを返す
+    const dataAccess = {
+      spreadsheet,
+      auth,
+      getSheet(sheetName) {
+        if (!sheetName) {
+          console.warn('openSpreadsheet.getSheet: Sheet name required');
+          return null;
+        }
+        try {
+          return spreadsheet.getSheetByName(sheetName);
+        } catch (error) {
+          console.warn(`openSpreadsheet.getSheet: Failed to get sheet "${sheetName}":`, error.message);
+          return null;
+        }
+      }
+    };
+
+    return dataAccess;
+  } catch (error) {
+    console.error('openSpreadsheet error:', error.message);
+    return null;
+  }
+}
+
 // ===========================================
 // 👤 ユーザー管理基盤
 // ===========================================
