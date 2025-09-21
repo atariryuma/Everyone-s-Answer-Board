@@ -252,7 +252,10 @@
   })();
 
   // URL検証関数
-  
+  function validateUrl(url) {
+    try {
+      const urlObj = new URL(url);
+      const validHosts = ['docs.google.com'];
       return validHosts.includes(urlObj.hostname);
     } catch {
       return false;
@@ -1055,7 +1058,8 @@
   }
 
   // 基本的なサニタイゼーション
-  
+  function sanitizeInput(input) {
+    if (!input || typeof input !== 'string') return '';
     return input.replace(/[<>\"'&]/g, '').trim();
   }
 
@@ -1715,7 +1719,8 @@
   }
 
   // スプレッドシートURL検証
-  
+  function validateSpreadsheetUrl(url) {
+    const urlInput = document.getElementById('url-input');
 
     // GoogleスプレッドシートURLの基本的な検証
     const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
@@ -4573,14 +4578,14 @@
           } catch (fallbackError) {
             console.error('フォールバック遷移も失敗:', fallbackError);
           }
-        )
+        })
         .getWebAppUrl();
 
-     catch (error) {
+    } catch (error) {
       console.error('openAppSetup error:', error);
       showError('アプリ設定画面への移動に失敗しました');
       setPartialLoading(false);
-    
-  
+    }
+  }
 
 </script>
