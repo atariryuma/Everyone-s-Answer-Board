@@ -412,10 +412,7 @@ function createUser(email, initialConfig = {}, context = {}) {
       email,
       true, // isActive
       JSON.stringify(defaultConfig),
-      now, // lastModified
-      '', // spreadsheetId (to be set later)
-      '', // sheetName (to be set later)
-      '', // formUrl (to be set later)
+      now // lastModified
     ];
 
     sheet.appendRow(newUserData);
@@ -425,10 +422,7 @@ function createUser(email, initialConfig = {}, context = {}) {
       userEmail: email,
       isActive: true,
       configJson: JSON.stringify(defaultConfig),
-      lastModified: now,
-      spreadsheetId: '',
-      sheetName: '',
-      formUrl: ''
+      lastModified: now
     };
 
     console.log('✅ User created successfully:', `${email.split('@')[0]}@***`);
@@ -520,10 +514,7 @@ function createUserObjectFromRow(row, headers) {
     'userEmail': 'userEmail',
     'isActive': 'isActive',
     'configJson': 'configJson',
-    'lastModified': 'lastModified',
-    'spreadsheetId': 'spreadsheetId',
-    'sheetName': 'sheetName',
-    'formUrl': 'formUrl'
+    'lastModified': 'lastModified'
   };
 
   headers.forEach((header, index) => {
@@ -742,10 +733,10 @@ function getViewerBoardData(targetUserId, viewerEmail) {
 }
 
 /**
- * スプレッドシートIDでユーザーを検索（CLAUDE.md準拠 - Context-Aware + Performance Optimized）
+ * SpreadsheetIDによるユーザー検索（configJSON-based）
+ * ✅ CLAUDE.md準拠: Single Source of Truth - configJSON内のspreadsheetIdで検索
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {Object} context - アクセスコンテキスト
- * @param {boolean} context.forceServiceAccount - サービスアカウント強制使用
  * @param {boolean} context.skipCache - キャッシュをスキップ（デフォルト: false）
  * @param {number} context.cacheTtl - キャッシュTTL秒数（デフォルト: 300秒）
  * @returns {Object|null} User object or null if not found
@@ -774,55 +765,45 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       }
     }
 
-    // 🔧 CLAUDE.md準拠: DATABASE_SPREADSHEET_ID は Editor→Admin 共有DB
-    // ✅ **DATABASE_SPREADSHEET_ID**: Shared database accessible by all authenticated users
-    const useServiceAccount = context.forceServiceAccount || false;
+    console.log(`findUserBySpreadsheetId: ConfigJSON-based lookup for spreadsheet ${spreadsheetId.substring(0, 8)}***`);
 
-    console.log(`findUserBySpreadsheetId: ${useServiceAccount ? 'Service account' : 'Normal permissions'} lookup in shared DATABASE_SPREADSHEET_ID for ${spreadsheetId.substring(0, 8)}***`);
-
-    const spreadsheet = openDatabase(useServiceAccount);
-    if (!spreadsheet) {
-      console.warn('findUserBySpreadsheetId: Database access failed');
+    // ✅ Single Source of Truth: getAllUsers()でユーザー一覧を取得し、configJSONから検索
+    const allUsers = getAllUsers({ activeOnly: false }, context);
+    if (!Array.isArray(allUsers)) {
+      console.warn('findUserBySpreadsheetId: Failed to get users list');
       return null;
     }
 
-    const sheet = spreadsheet.getSheetByName('users');
-    if (!sheet) {
-      console.warn('findUserBySpreadsheetId: Users sheet not found');
-      return null;
-    }
+    for (const user of allUsers) {
+      try {
+        // configJSONを解析してspreadsheetIdを確認
+        const configJson = user.configJson || '{}';
+        const config = JSON.parse(configJson);
 
-    const data = sheet.getDataRange().getValues();
-    if (data.length === 0) return null;
+        if (config.spreadsheetId === spreadsheetId) {
+          console.log(`findUserBySpreadsheetId: User found via configJSON lookup - ${user.userEmail ? `${user.userEmail.split('@')[0]}@***` : 'unknown'}`);
 
-    const [headers] = data;
-    const spreadsheetIdColumnIndex = headers.indexOf('spreadsheetId');
-
-    if (spreadsheetIdColumnIndex === -1) {
-      console.warn('findUserBySpreadsheetId: SpreadsheetId column not found');
-      return null;
-    }
-
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (row[spreadsheetIdColumnIndex] === spreadsheetId) {
-        const user = createUserObjectFromRow(row, headers);
-
-        // 🚀 パフォーマンス最適化: キャッシュに保存
-        if (!skipCache) {
-          try {
-            const cacheTtl = context.cacheTtl || CACHE_DURATION.LONG; // 300秒
-            CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), cacheTtl);
-            console.log(`findUserBySpreadsheetId: User cached for spreadsheet ${spreadsheetId.substring(0, 8)}*** (TTL: ${cacheTtl}s)`);
-          } catch (cacheError) {
-            console.warn('findUserBySpreadsheetId: Cache write failed:', cacheError.message);
+          // 🚀 パフォーマンス最適化: キャッシュに保存
+          if (!skipCache) {
+            try {
+              const cacheTtl = context.cacheTtl || CACHE_DURATION.LONG; // 300秒
+              CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), cacheTtl);
+              console.log(`findUserBySpreadsheetId: User cached for spreadsheet ${spreadsheetId.substring(0, 8)}*** (TTL: ${cacheTtl}s)`);
+            } catch (cacheError) {
+              console.warn('findUserBySpreadsheetId: Cache write failed:', cacheError.message);
+            }
           }
-        }
 
-        console.log(`findUserBySpreadsheetId: User found for spreadsheet ${spreadsheetId.substring(0, 8)}***`);
-        return user;
+          return user;
+        }
+      } catch (parseError) {
+        // JSON解析エラーは警告レベル（データ不整合の可能性）
+        console.warn(`findUserBySpreadsheetId: Failed to parse configJSON for user ${user.userId}:`, parseError.message);
+        continue;
       }
     }
+
+    console.log('findUserBySpreadsheetId: No user found with spreadsheetId in configJSON:', `${spreadsheetId.substring(0, 8)}***`);
 
     // ユーザーが見つからない場合も短時間キャッシュ（重複検索回避）
     if (!skipCache) {
