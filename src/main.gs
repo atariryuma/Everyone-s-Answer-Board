@@ -180,6 +180,7 @@ function doGet(e) {
     const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     errorTemplate.title = 'システムエラー';
     errorTemplate.message = 'システムで予期しないエラーが発生しました。管理者にお問い合わせください。';
+    errorTemplate.hideLoginButton = false;
 
     // Validate error object before template literal usage
     if (error.message) {
@@ -228,6 +229,7 @@ function createRedirectTemplate(redirectPage, error) {
     const fallbackTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     fallbackTemplate.title = 'システムエラー';
     fallbackTemplate.message = 'ページの表示中にエラーが発生しました。';
+    fallbackTemplate.hideLoginButton = false;
     return fallbackTemplate.evaluate();
   }
 }
