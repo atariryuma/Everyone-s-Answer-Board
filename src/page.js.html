@@ -1480,16 +1480,16 @@ class StudyQuestApp {
     this.updateNewContentState(newItems, true);
     this.elements.newContentText.textContent = message;
 
-    // チラつき防止：アニメーション準備後に表示
+    // アニメーション準備：初期状態をCSS keyframesに合わせる
     this.elements.newContentBanner.style.animation = '';
-    this.elements.newContentBanner.style.transform = 'translateY(-20px)';
-    this.elements.newContentBanner.style.opacity = '0';
+    this.elements.newContentBanner.style.transform = '';
+    this.elements.newContentBanner.style.opacity = '';
     this.elements.newContentBanner.classList.remove('hidden');
 
-    // 次のフレームでアニメーション開始
+    // 次のフレームでアニメーション開始（CSS keyframesが初期状態を制御）
     requestAnimationFrame(() => {
       if (this.elements.newContentBanner && !this.elements.newContentBanner.classList.contains('hidden')) {
-        this.elements.newContentBanner.style.animation = 'slideInFromTop 0.5s ease-out';
+        this.elements.newContentBanner.style.animation = 'slideInFromTop 0.5s ease-out forwards';
       }
     });
 
@@ -1520,9 +1520,9 @@ class StudyQuestApp {
     };
 
     // シンプルなフェードアウト処理
-    this.elements.newContentBanner.style.animation = 'fadeOut 0.3s ease-out';
+    this.elements.newContentBanner.style.animation = 'fadeOut 0.3s ease-out forwards';
 
-    // 確実な終了処理（イベントリスナーなし）
+    // 確実な終了処理（アニメーション時間に合わせる）
     setTimeout(completeDismissal, 300);
   }
   
