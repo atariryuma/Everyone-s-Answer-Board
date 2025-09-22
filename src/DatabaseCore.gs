@@ -368,9 +368,11 @@ function findUserById(userId, context = {}) {
 function createUser(email, initialConfig = {}, context = {}) {
   try {
     if (!email || !validateEmail(email).isValid) {
-      console.warn('createUser: Invalid email provided');
+      console.warn('createUser: Invalid email provided:', typeof email, email);
       return null;
     }
+
+    console.log('createUser: Processing email:', email);
 
     // 🔧 CLAUDE.md準拠: DATABASE_SPREADSHEET_ID は Editor→Admin 共有DB
     const currentEmail = getCurrentEmail();
@@ -400,19 +402,32 @@ function createUser(email, initialConfig = {}, context = {}) {
 
     const userId = Utilities.getUuid();
     const now = new Date().toISOString();
+
+    // ✅ Optimized: Remove createdAt from configJSON, store in database column
     const defaultConfig = {
       setupStatus: 'pending',
       isPublished: false,
-      createdAt: now,
       ...initialConfig
     };
 
-    const newUserData = [
+    // Check if createdAt column exists in database
+    const data = sheet.getDataRange().getValues();
+    const [headers] = data;
+    const hasCreatedAtColumn = headers.indexOf('createdAt') !== -1;
+
+    const newUserData = hasCreatedAtColumn ? [
       userId,
       email,
       true, // isActive
       JSON.stringify(defaultConfig),
-      now // lastModified
+      now, // createdAt (database column)
+      now  // lastModified
+    ] : [
+      userId,
+      email,
+      true, // isActive
+      JSON.stringify(defaultConfig),
+      now  // lastModified
     ];
 
     sheet.appendRow(newUserData);
@@ -422,6 +437,7 @@ function createUser(email, initialConfig = {}, context = {}) {
       userEmail: email,
       isActive: true,
       configJson: JSON.stringify(defaultConfig),
+      createdAt: hasCreatedAtColumn ? now : undefined,
       lastModified: now
     };
 
@@ -514,6 +530,7 @@ function createUserObjectFromRow(row, headers) {
     'userEmail': 'userEmail',
     'isActive': 'isActive',
     'configJson': 'configJson',
+    'createdAt': 'createdAt',
     'lastModified': 'lastModified'
   };
 
@@ -782,7 +799,8 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
     console.log(`findUserBySpreadsheetId: ConfigJSON-based lookup for spreadsheet ${spreadsheetId.substring(0, 8)}***`);
 
     // ✅ Single Source of Truth: getAllUsers()でユーザー一覧を取得し、configJSONから検索
-    const allUsers = getAllUsers({ activeOnly: false }, context);
+    // Cross-user lookup is legitimate for spreadsheetId-based user identification
+    const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true });
     if (!Array.isArray(allUsers)) {
       console.warn('findUserBySpreadsheetId: Failed to get users list');
       return null;

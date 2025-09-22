@@ -292,10 +292,14 @@
     }
   }
 
-  // グローバルメッセージマネージャー
+  // グローバルメッセージマネージャー - Use SharedUtilities if available
   window.messageManager = new MessageManager();
-  window.showMessage = (message, type, duration) =>
-    window.messageManager.show(message, type, duration);
+
+  // Only override showMessage if SharedUtilities is not available
+  if (!window.notifications) {
+    window.showMessage = (message, type, duration) =>
+      window.messageManager.show(message, type, duration);
+  }
 
   /**
    * ローディング状態のCSS

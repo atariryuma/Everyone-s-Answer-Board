@@ -1132,6 +1132,32 @@
     }
   }
 
+  @keyframes slideInFromTop {
+    0% {
+      opacity: 0;
+      transform: translateY(-20px);
+      will-change: opacity, transform;
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+      will-change: auto;
+    }
+  }
+
+  @keyframes slideInFromBottom {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+      will-change: opacity, transform;
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+      will-change: auto;
+    }
+  }
+
   /* Font Styles */
   .game-font {
     font-family: 'Press Start 2P', cursive;

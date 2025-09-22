@@ -15,7 +15,7 @@
  * - V8ランタイム最適化
  */
 
-/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, resolveColumnIndex */
+/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, resolveColumnIndex */
 
 // ===========================================
 // 🎯 リアクション管理システム - CLAUDE.md準拠
@@ -503,7 +503,7 @@ function addReaction(userId, rowIndex, reaction) {
       return createErrorResponse('Spreadsheet configuration incomplete');
     }
 
-    const parsedRowIndex = typeof rowIndex === 'string' ? parseInt(String(rowIndex).replace('row_', ''), 10) : parseInt(rowIndex, 10);
+    const parsedRowIndex = typeof rowIndex === 'string' ? parseInt(String(rowIndex).replace('row_', ''), SYSTEM_LIMITS.RADIX_DECIMAL) : parseInt(rowIndex, SYSTEM_LIMITS.RADIX_DECIMAL);
     if (!parsedRowIndex || parsedRowIndex < 2) {
       return createErrorResponse('Invalid row ID');
     }
@@ -523,7 +523,7 @@ function addReaction(userId, rowIndex, reaction) {
     try {
       cache.put(reactionKey, true, CACHE_DURATION.MEDIUM); // 30秒ロック
 
-      const res = processReaction(config.spreadsheetId, config.sheetName, parsedRowIndex, reaction, user.userEmail);
+      const res = processReaction(config.spreadsheetId, config.sheetName, parsedRowIndex, reaction, getCurrentEmail());
       if (res && (res.success || res.status === 'success')) {
         // フロントエンド期待形式に合わせたレスポンス
         return {
@@ -553,7 +553,7 @@ function addReaction(userId, rowIndex, reaction) {
       const configForCleanup = getUserConfig(userId);
       const cleanupConfig = configForCleanup.success ? configForCleanup.config : {};
       if (cleanupConfig.spreadsheetId && cleanupConfig.sheetName) {
-        const cleanupRowIndex = typeof rowIndex === 'string' ? parseInt(String(rowIndex).replace('row_', ''), 10) : parseInt(rowIndex, 10);
+        const cleanupRowIndex = typeof rowIndex === 'string' ? parseInt(String(rowIndex).replace('row_', ''), SYSTEM_LIMITS.RADIX_DECIMAL) : parseInt(rowIndex, SYSTEM_LIMITS.RADIX_DECIMAL);
         const cleanupReactionKey = `reaction_${cleanupConfig.spreadsheetId}_${cleanupConfig.sheetName}_${cleanupRowIndex}`;
         cache.remove(cleanupReactionKey);
       }
@@ -588,7 +588,7 @@ function toggleHighlight(userId, rowIndex) {
     // updateHighlightInSheet expects 'row_#'
     const rowNumber = typeof rowIndex === 'string' && rowIndex.startsWith('row_')
       ? rowIndex
-      : `row_${parseInt(rowIndex, 10)}`;
+      : `row_${parseInt(rowIndex, SYSTEM_LIMITS.RADIX_DECIMAL)}`;
 
     // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時ハイライト競合防止（CacheService-based mutex）
     const highlightKey = `highlight_${config.spreadsheetId}_${config.sheetName}_${rowNumber}`;

@@ -103,7 +103,10 @@ window.ErrorHandler = {
     const message = this.getUserMessage(error, context);
     this.logError(error, context);
 
-    if (typeof showError === 'function') {
+    // Use unified notification system if available
+    if (window.notifications) {
+      window.notifications.error(message);
+    } else if (typeof showError === 'function') {
       showError(message);
     } else if (typeof alert === 'function') {
       alert(message);
@@ -232,8 +235,12 @@ window.ErrorHandler = {
       const result = await submitFunction();
 
       // 成功処理
-      if (successMessage && typeof showMessage === 'function') {
-        showMessage(successMessage, 'success');
+      if (successMessage) {
+        if (window.notifications) {
+          window.notifications.success(successMessage);
+        } else if (typeof showMessage === 'function') {
+          showMessage(successMessage, 'success');
+        }
       }
       if (onSuccess && typeof onSuccess === 'function') {
         await onSuccess(result);
@@ -245,7 +252,9 @@ window.ErrorHandler = {
       this.logError(error, context);
       const userMessage = this.getUserMessage(error, context);
 
-      if (typeof showMessage === 'function') {
+      if (window.notifications) {
+        window.notifications.error(userMessage);
+      } else if (typeof showMessage === 'function') {
         showMessage(userMessage, 'error');
       } else {
         this.showError(error, context);
@@ -304,7 +313,9 @@ window.ErrorHandler = {
         // 最終試行でも失敗した場合
         if (showErrors) {
           const userMessage = this.getUserMessage(error, context);
-          if (typeof showMessage === 'function') {
+          if (window.notifications) {
+            window.notifications.error(userMessage);
+          } else if (typeof showMessage === 'function') {
             showMessage(userMessage, 'error');
           }
         }

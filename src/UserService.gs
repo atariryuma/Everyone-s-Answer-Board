@@ -145,60 +145,6 @@ function generateDynamicUserUrls(config) {
 // 🛡️ 権限・アクセス制御
 // ===========================================
 
-/**
- * ユーザーアクセスレベル取得
- * @param {string} userId - ユーザーID
- * @returns {string} アクセスレベル (editor/administrator/authenticated_user/guest/none)
- * @deprecated Use getUnifiedAccessLevel() instead for email-based access control
- */
-function getUserAccessLevel(userId) {
-  try {
-    const ACCESS_LEVELS = {
-      NONE: 'none',
-      GUEST: 'guest',
-      AUTHENTICATED_USER: 'authenticated',
-      EDITOR: 'editor', // 旧: OWNER
-      ADMINISTRATOR: 'administrator' // 旧: SYSTEM_ADMIN
-    };
-
-    if (!userId) {
-      return ACCESS_LEVELS.GUEST;
-    }
-
-    const currentEmail = getCurrentEmail();
-    if (!currentEmail) {
-      return ACCESS_LEVELS.NONE;
-    }
-
-    const userInfo = findUserById(userId);
-    if (!userInfo) {
-      return ACCESS_LEVELS.NONE;
-    }
-
-    // 編集者チェック（旧: 所有者）
-    if (userInfo.userEmail === currentEmail) {
-      return ACCESS_LEVELS.EDITOR;
-    }
-
-    // 管理者チェック（Administrator）
-    if (isAdministrator(currentEmail)) {
-      return ACCESS_LEVELS.ADMINISTRATOR;
-    }
-
-    // 認証済みユーザー
-    return ACCESS_LEVELS.AUTHENTICATED_USER;
-  } catch (error) {
-    const currentEmailForLog = getCurrentEmail();
-    console.error('UserService.getAccessLevel: エラー', {
-      operation: 'getAccessLevel',
-      userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
-      currentEmail: currentEmailForLog && typeof currentEmailForLog === 'string' ? `${currentEmailForLog.split('@')[0]}@***` : 'N/A',
-      error: error.message,
-      stack: error.stack
-    });
-    return 'none';
-  }
-}
 
 /**
  * 編集者権限確認（旧: 所有者権限確認）

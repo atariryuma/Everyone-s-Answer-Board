@@ -58,6 +58,17 @@ const LOG_LEVEL = {
 const CURRENT_LOG_LEVEL = LOG_LEVEL.INFO; // 開発時設定
 
 /**
+ * システム制限値
+ */
+const SYSTEM_LIMITS = {
+  MAX_LOCK_ROWS: 100,        // ロッククリア最大行数
+  PREVIEW_LENGTH: 50,        // プレビュー表示文字数
+  DEFAULT_PAGE_SIZE: 20,     // デフォルトページサイズ
+  MAX_PAGE_SIZE: 100,        // 最大ページサイズ
+  RADIX_DECIMAL: 10          // 10進数変換用基数
+};
+
+/**
  * 統一ログ関数 - Zero-Dependency Architecture
  */
 function sysLog(level, message, ...args) {
@@ -192,13 +203,31 @@ function forceUrlSystemReset() {
     try {
       console.warn('システム強制リセットが実行されました');
 
-      // キャッシュをクリア
+      // キャッシュをクリア - GAS 2025準拠の主要キー削除方式
       const cacheResults = [];
       try {
         const cache = CacheService.getScriptCache();
-        if (cache && typeof cache.removeAll === 'function') {
-          cache.removeAll(); // GAS標準API - 引数不要
-          cacheResults.push('キャッシュクリア完了');
+        if (cache) {
+          // 主要なキャッシュキーを明示的に削除
+          const keysToRemove = [
+            'user_cache_',
+            'config_cache_',
+            'sheet_cache_',
+            'url_cache_',
+            'auth_cache_',
+            'system_cache_'
+          ];
+
+          // 個別キー削除（GAS APIの正しい使用方法）
+          keysToRemove.forEach(keyPrefix => {
+            try {
+              cache.remove(keyPrefix);
+            } catch (e) {
+              // 個別エラーは無視（キーが存在しない場合など）
+            }
+          });
+
+          cacheResults.push('主要キャッシュクリア完了');
         } else {
           cacheResults.push('キャッシュサービスが利用できません');
         }
@@ -1568,7 +1597,7 @@ function checkCurrentPublicationStatus(targetUserId) {
       success: true,
       published: config.isPublished === true,
       publishedAt: config.publishedAt || null,
-      lastModified: config.lastModified || null,
+      lastModified: user.lastModified || null,
       hasDataSource: Boolean(config.spreadsheetId && config.sheetName),
       userId: user.userId
     };

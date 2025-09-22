@@ -41,6 +41,9 @@
     <?!= include('UnifiedStyles.css'); ?>
   </head>
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">
+    <!-- Notification Container for unified notification system -->
+    <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
+
     <div class="max-w-2xl mx-auto">
       <!-- ヘッダー -->
       <div class="text-center mb-8">
@@ -208,27 +211,16 @@
     <script>
       let setupInProgress = false;
 
-      // メッセージ表示関数
+      // メッセージ表示関数 - Use unified notification system
       function showMessage(message, type = 'info') {
-        const messageArea = document.getElementById('message-area');
-        const colors = {
-          success: 'bg-green-600/20 border-green-500/50 text-green-100',
-          error: 'bg-red-600/20 border-red-500/50 text-red-100',
-          warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
-          info: 'bg-blue-600/20 border-blue-500/50 text-blue-100',
-        };
-
-        messageArea.innerHTML = `
-                <div class="message show glass-panel rounded-lg p-4 border ${colors[type]}">
-                    <div class="flex items-center">
-                        <div class="mr-3">
-                            ${type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️'}
-                        </div>
-                        <div class="flex-1">${message}</div>
-                        <button type="button" onclick="this.closest('.message').style.display='none'" class="ml-4 text-gray-400 hover:text-white">✕</button>
-                    </div>
-                </div>
-            `;
+        // Use unified notification system from SharedUtilities
+        if (window.notifications) {
+          const durations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
+          window.notifications.showMessage(message, type, durations[type] || 5000);
+        } else {
+          // Simple console fallback - no DOM manipulation
+          console.warn('Notification system not available:', type, message);
+        }
       }
 
       // バリデーション関数
@@ -400,7 +392,7 @@
             window.top.location.href = url;
           })
           .withFailureHandler(function (error) {
-            alert('アプリケーションのURL取得に失敗しました: ' + error.message);
+            showMessage('アプリケーションのURL取得に失敗しました: ' + error.message, 'error');
             if (btn) {
               btn.innerHTML = '📚 StudyQuestを開始';
               btn.disabled = false;

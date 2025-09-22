@@ -363,8 +363,15 @@
 
     <script>
 
-      // メッセージ表示関数 (通知として右上に表示)
+      // メッセージ表示関数 - Use SharedUtilities notification system if available
       function showMessage(message, type = 'info', duration = 5000) {
+        // Use unified notification system from SharedUtilities if available
+        if (window.notifications) {
+          window.notifications.showMessage(message, type, duration);
+          return;
+        }
+
+        // Fallback to local implementation
         const notificationContainer = document.getElementById('notification-container');
         if (!notificationContainer) {
           console.error('Notification container not found!');

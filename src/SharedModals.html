@@ -1447,7 +1447,11 @@
       if (extendBtn) {
         extendBtn.onclick = () => {
           // 時間延長機能（将来実装）
-          alert('時間延長機能は今後実装予定です。');
+          if (window.notifications) {
+            window.notifications.info('時間延長機能は今後実装予定です。', 5000);
+          } else {
+            alert('時間延長機能は今後実装予定です。');
+          }
         };
       }
     }

@@ -24,6 +24,8 @@
       'speaker',
       'vibrate',
       'vr',
+      // ✅ ブラウザサンドボックス警告抑制
+      'An iframe which has both allow-scripts and allow-same-origin',
     ];
 
     // Syntax errors that need special logging (not suppressed)
@@ -44,6 +46,12 @@
 
       if (shouldSuppress) {
         return true; // Suppress known warnings
+      }
+
+      // ✅ CLAUDE.md準拠: 重要なエラーはユーザーにも通知
+      const isCritical = criticalSyntaxErrors.some((pattern) => errorMessage.includes(pattern));
+      if (isCritical && window.notifications) {
+        window.notifications.error('ページでエラーが発生しました。再読み込みをお試しください。', 8000);
       }
 
       // Let all other errors (including syntax errors) pass through to original handler
@@ -75,6 +83,16 @@
         console.debug('Suppressed internal promise rejection:', reason);
         event.preventDefault();
         return;
+      }
+
+      // ✅ CLAUDE.md準拠: 重要なPromise rejectionはユーザーにも通知
+      const isUserImpacting = reason.includes('Failed to fetch') ||
+                              reason.includes('Network request failed') ||
+                              reason.includes('google.script.run') ||
+                              reason.includes('timeout');
+
+      if (isUserImpacting && window.notifications) {
+        window.notifications.warning('通信エラーが発生しました。しばらく待ってから再試行してください。', 6000);
       }
 
       console.warn('Unhandled promise rejection:', event.reason);
@@ -191,33 +209,38 @@
     }
 
     debounce(func, key, delay = 1000) {
+      // Cancel existing debounce for this key
       if (this.timers.has(key)) {
-        clearTimeout(this.timers.get(key));
+        this.timers.delete(key);
       }
-      // CLAUDE.md V8 compliant: Promise-based delay instead of setTimeout
+
+      // CLAUDE.md V8 compliant: Pure Promise-based delay
       const createPromiseDelay = (ms) => new Promise(resolve => {
         const start = Date.now();
         const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
         check();
       });
 
-      const promise = createPromiseDelay(delay).then(() => {
-        func();
+      const debouncePromise = createPromiseDelay(delay).then(() => {
+        if (this.timers.get(key) === debouncePromise) {
+          func();
+          this.timers.delete(key);
+        }
+      }).catch(() => {
+        // Silent cleanup on cancellation
         this.timers.delete(key);
       });
-      const timeoutId = Symbol('promise-delay');
-      this.timers.set(key, timeoutId);
+
+      this.timers.set(key, debouncePromise);
     }
 
     clear(key) {
-      if (this.timers.has(key)) {
-        clearTimeout(this.timers.get(key));
-        this.timers.delete(key);
-      }
+      // V8 compliant: Promise cancellation by removal
+      this.timers.delete(key);
     }
 
     clearAll() {
-      this.timers.forEach((timer) => clearTimeout(timer));
+      // V8 compliant: Clear all tracked promises
       this.timers.clear();
     }
   }
@@ -245,26 +268,29 @@
         });
 
         const delayTime = delay - (now - lastRun);
-        const promise = createPromiseDelay(delayTime).then(() => {
-          func();
-          this.lastExecution.set(key, Date.now());
+        const throttlePromise = createPromiseDelay(delayTime).then(() => {
+          if (this.timers.get(key) === throttlePromise) {
+            func();
+            this.lastExecution.set(key, Date.now());
+            this.timers.delete(key);
+          }
+        }).catch(() => {
+          // Silent cleanup on cancellation
           this.timers.delete(key);
         });
-        const timeoutId = Symbol('promise-delay');
-        this.timers.set(key, timeoutId);
+
+        this.timers.set(key, throttlePromise);
       }
     }
 
     clear(key) {
-      if (this.timers.has(key)) {
-        clearTimeout(this.timers.get(key));
-        this.timers.delete(key);
-      }
+      // V8 compliant: Promise cancellation by removal
+      this.timers.delete(key);
       this.lastExecution.delete(key);
     }
 
     clearAll() {
-      this.timers.forEach((timer) => clearTimeout(timer));
+      // V8 compliant: Clear all tracked promises and execution times
       this.timers.clear();
       this.lastExecution.clear();
     }
@@ -606,18 +632,31 @@
         const timeoutId = Symbol('promise-timeout');
 
         // GAS関数実行
+        let completed = false;
         google.script.run
           .withSuccessHandler((result) => {
-            clearTimeout(timeoutId);
-            console.log(`✅ [UnifiedDataLoader] ${functionName || 'unknown'} 成功`);
-            resolve(result);
+            if (!completed) {
+              completed = true;
+              console.log(`✅ [UnifiedDataLoader] ${functionName || 'unknown'} 成功`);
+              resolve(result);
+            }
           })
           .withFailureHandler((error) => {
-            clearTimeout(timeoutId);
-            console.error(`❌ [UnifiedDataLoader] ${functionName || 'unknown'} GAS実行エラー:`, error);
-            reject(new Error(error.message || error.toString()));
+            if (!completed) {
+              completed = true;
+              console.error(`❌ [UnifiedDataLoader] ${functionName || 'unknown'} GAS実行エラー:`, error);
+              reject(new Error(error.message || error.toString()));
+            }
           })
           [functionName](...args);
+
+        // V8 compliant timeout handling
+        timeoutPromise.catch((timeoutError) => {
+          if (!completed) {
+            completed = true;
+            reject(timeoutError);
+          }
+        });
       });
     }
 
@@ -1025,18 +1064,15 @@
     if (window.sharedUtilities && window.sharedUtilities.debounce) {
       window.sharedUtilities.debounce.debounce(func, key, delay);
     } else {
-      // CLAUDE.md V8 compliant: requestIdleCallback fallback
-      if (typeof requestIdleCallback !== 'undefined') {
-        requestIdleCallback(() => func(), { timeout: delay });
-      } else {
-        // Promise-based delay as final fallback
-        const createPromiseDelay = (ms) => new Promise(resolve => {
-          const start = Date.now();
-          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-          check();
-        });
-        createPromiseDelay(delay).then(func);
-      }
+      // CLAUDE.md V8 compliant: Promise-based fallback
+      const createPromiseDelay = (ms) => new Promise(resolve => {
+        const start = Date.now();
+        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+        check();
+      });
+      createPromiseDelay(delay).then(func).catch(() => {
+        // Silent error handling for fallback
+      });
     }
   };
 
@@ -1179,6 +1215,72 @@
       alert(msg);
     },
 
+    // 最適化されたログアウト（openAppSetupパターン採用）
+    logout: function () {
+      if (confirm('ログアウトしますか？')) {
+        console.log('🚪 Logout initiated');
+
+        // 1. フロントエンドキャッシュクリア
+        try {
+          if (window.sharedUtilities?.cache?.clear) {
+            window.sharedUtilities.cache.clear();
+          }
+          localStorage.removeItem('current_user_info');
+          sessionStorage.clear();
+          console.log('🗑️ Client cache cleared');
+        } catch (e) {
+          console.warn('Cache clear partially failed:', e);
+        }
+
+        // 2. openAppSetupと同じパターンでWebApp URL取得→遷移
+        google.script.run
+          .withSuccessHandler(function(webAppUrl) {
+            const loginUrl = `${webAppUrl}?mode=login`;
+            console.log('🔄 Redirecting to login page:', loginUrl);
+
+            // openAppSetupと同じ手法: window.open(_top)でサンドボックス制限回避
+            window.open(loginUrl, '_top');
+
+            // バックグラウンドでセッションクリア（非ブロッキング）- V8準拠
+            const createPromiseDelay = (ms) => new Promise(resolve => {
+              const start = Date.now();
+              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+              check();
+            });
+
+            createPromiseDelay(100).then(() => {
+              google.script.run
+                .withSuccessHandler(function(result) {
+                  console.log('✅ Background server session cleared:', result?.message || 'OK');
+                })
+                .withFailureHandler(function(error) {
+                  console.warn('⚠️ Background session clear failed (non-critical):', error);
+                })
+                .resetAuth();
+            }).catch(() => {
+              // Silent error handling for background task
+            });
+          })
+          .withFailureHandler(function(error) {
+            console.warn('WebApp URL取得失敗、フォールバック実行:', error);
+
+            // フォールバック: openAppSetupと同じパターン
+            try {
+              const currentUrl = new URL(window.location.href);
+              const baseUrl = currentUrl.origin + currentUrl.pathname;
+              const loginUrl = `${baseUrl}?mode=login`;
+              console.log('🔄 Fallback redirect to:', loginUrl);
+              window.open(loginUrl, '_top');
+            } catch (fallbackError) {
+              console.warn('フォールバック遷移も失敗:', fallbackError);
+              window.location.reload();
+            }
+          })
+          .getWebAppUrl();
+      }
+    },
+
+
     // Authentication verification with promise
     verifyAuthentication: function () {
       return new Promise((resolve, reject) => {
@@ -1196,22 +1298,34 @@
         });
 
         const timeoutPromise = createPromiseTimeout(10000);
-        const timeoutId = Symbol('auth-timeout');
+        let completed = false;
 
         google.script.run
           .withSuccessHandler((result) => {
-            clearTimeout(timeoutId);
-            if (result && result.authenticated && result.email) {
-              resolve(result);
-            } else {
-              reject(new Error('認証が必要です'));
+            if (!completed) {
+              completed = true;
+              if (result && result.authenticated && result.email) {
+                resolve(result);
+              } else {
+                reject(new Error('認証が必要です'));
+              }
             }
           })
           .withFailureHandler((error) => {
-            clearTimeout(timeoutId);
-            reject(error);
+            if (!completed) {
+              completed = true;
+              reject(error);
+            }
           })
           .checkUserAuthentication();
+
+        // Handle timeout
+        timeoutPromise.catch((timeoutError) => {
+          if (!completed) {
+            completed = true;
+            reject(timeoutError);
+          }
+        });
       });
     },
 
@@ -1260,60 +1374,15 @@
     },
   };
 
-  // Global function for backward compatibility
+  // Global functions for backward compatibility
   window.switchToAnotherAccount = function () {
     window.sharedUtilities.auth.switchToAnotherAccount();
   };
 
-  // =============================================================================
-  // SIMPLE LOADING MANAGER - Minimal loading overlay management
-  // =============================================================================
-
-  // Basic loading manager
-  window.basicLoading = {
-    overlay: null,
-
-    init: function () {
-      this.overlay = document.getElementById('loading-overlay');
-      if (!this.overlay) {
-        // Create simple overlay if it doesn't exist
-        this.overlay = document.createElement('div');
-        this.overlay.id = 'loading-overlay';
-        this.overlay.style.cssText = `
-          position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-          background: rgba(0,0,0,0.5); display: none; z-index: 9999;
-          justify-content: center; align-items: center; color: white;
-        `;
-        this.overlay.innerHTML = '<div>読み込み中...</div>';
-        (document.body || document.documentElement).appendChild(this.overlay);
-      }
-    },
-
-    show: function () {
-      if (!this.overlay) this.init();
-      if (this.overlay) this.overlay.style.display = 'flex';
-    },
-
-    hide: function () {
-      if (!this.overlay) this.init();
-      if (this.overlay) this.overlay.style.display = 'none';
-    },
+  window.logout = function () {
+    window.sharedUtilities.auth.logout();
   };
 
-  // Initialize when DOM is ready and provide backward compatibility
-  document.addEventListener('DOMContentLoaded', () => {
-    window.basicLoading.init();
-  });
-
-  // Backward compatibility wrapper for existing code
-  window.unifiedLoading = window.basicLoading;
-  window.setLoading = function (isLoading, message) {
-    if (isLoading) {
-      window.basicLoading.show();
-    } else {
-      window.basicLoading.hide();
-    }
-  };
 
   // =============================================================================
   // UNIFIED LOADING MANAGER (NEW ENHANCED VERSION)
@@ -1392,7 +1461,11 @@
 
     // Create a fallback overlay if none exists
     createFallbackOverlay() {
-      if (document.getElementById('loading-overlay')) return;
+      if (document.getElementById('loading-overlay')) {
+        this.overlay = document.getElementById('loading-overlay');
+        this.initialized = true;
+        return true;
+      }
 
       console.warn('⚠️ UnifiedLoadingManager: Creating fallback loading-overlay element');
       const fallbackOverlay = document.createElement('div');
@@ -1412,11 +1485,9 @@
     // Main loading function with a unified API and enhanced error handling
     setLoading(isLoading, options = {}) {
       if (!this.initialized) {
-        console.warn('UnifiedLoadingManager: Not initialized, attempting initialization...');
+        // Silent retry - reduce console noise during initialization
         if (!this.init()) {
-          console.error(
-            'UnifiedLoadingManager: Cannot manage loading state - initialization failed.'
-          );
+          // Initialization failed, but continue silently to avoid spam
           return;
         }
       }
@@ -1436,6 +1507,11 @@
 
     // Show loading overlay with options
     show(options = {}) {
+      // V8 Runtime 安全性: オプションが文字列の場合はmessageとして扱う
+      if (typeof options === 'string') {
+        options = { message: options };
+      }
+
       const config = {
         message: options.message || '処理中...',
         type: options.type || 'overlay',
@@ -1447,21 +1523,37 @@
 
       this.currentState = config;
 
-      // Clean up previous variant classes
-      this.variantClasses.forEach((vc) => this.overlay.classList.remove(vc));
+      // V8 Runtime 安全性: overlay が null の場合の早期リターン
+      if (!this.overlay) {
+        console.error('UnifiedLoadingManager: Cannot show overlay - element not initialized');
+        // フォールバック作成を試行
+        if (!this.createFallbackOverlay()) {
+          return;
+        }
+      }
+
+      // Clean up previous variant classes with null safety
+      this.variantClasses.forEach((vc) => {
+        if (this.overlay && this.overlay.classList) {
+          this.overlay.classList.remove(vc);
+        }
+      });
 
       // Add the new variant class if it's not the default overlay
-      if (config.type !== 'overlay') {
+      if (config.type !== 'overlay' && this.overlay && this.overlay.classList) {
         this.overlay.classList.add(config.type);
       }
 
       // Update content and show the overlay
       this.updateContent(config);
-      this.overlay.classList.remove('hidden');
-      this.overlay.style.setProperty('display', 'flex', 'important');
+
+      if (this.overlay && this.overlay.classList) {
+        this.overlay.classList.remove('hidden');
+        this.overlay.style.setProperty('display', 'flex', 'important');
+      }
 
       // Manage user interaction
-      if (config.disableInteraction && config.type !== 'transparent') {
+      if (config.disableInteraction && config.type !== 'transparent' && this.overlay) {
         document.body.style.overflow = 'hidden';
         document.body.style.pointerEvents = 'none';
         this.overlay.style.pointerEvents = 'auto';
@@ -1771,37 +1863,52 @@
     constructor() {
       this.container = null;
       this.initialized = false;
+      this.domContentLoadedAdded = false;
     }
 
-    // Initialize notification container
+    // Initialize notification container (fixed styling conflicts and event duplication)
     init() {
-      if (this.initialized) return;
-
-      // Check if container already exists
+      // Check container existence first (more reliable than initialized flag)
       this.container = document.getElementById('notification-container');
 
-      if (!this.container) {
-        // Create notification container
-        this.container = document.createElement('div');
-        this.container.id = 'notification-container';
-        this.container.className = 'fixed top-4 right-4 z-[10000] space-y-2';
-        this.container.style.cssText = 'position: fixed; top: 1rem; right: 1rem; z-index: 10000;';
-
-        // Append to body when DOM is ready
-        if (document.body) {
-          document.body.appendChild(this.container);
-        } else {
-          document.addEventListener('DOMContentLoaded', () => {
-            document.body.appendChild(this.container);
-          });
-        }
+      if (this.container) {
+        this.initialized = true;
+        return;
       }
 
+      // Create notification container with unified styling
+      this.container = document.createElement('div');
+      this.container.id = 'notification-container';
+
+      // Use CSS classes only (remove style.cssText conflict)
+      this.container.className = 'fixed top-4 right-4 z-[10000] space-y-2 pointer-events-none';
+
+      // Enhanced DOM insertion with duplication prevention
+      this.appendToBody();
       this.initialized = true;
     }
 
+    // Append container to body with event duplication prevention
+    appendToBody() {
+      if (document.body) {
+        document.body.appendChild(this.container);
+      } else if (!this.domContentLoadedAdded) {
+        this.domContentLoadedAdded = true;
+        document.addEventListener('DOMContentLoaded', () => {
+          if (this.container && !this.container.parentNode) {
+            document.body.appendChild(this.container);
+          }
+        });
+      }
+    }
+
     // Show notification message
-    showMessage(message, type = 'info', duration = 5000) {
+    showMessage(message, type = 'info', duration = null) {
+      // Standardized durations: success: 4000, error: 7000, warning: 6000, info: 5000
+      if (duration === null) {
+        const standardDurations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
+        duration = standardDurations[type] || 5000;
+      }
       // Ensure container is initialized
       this.init();
 
@@ -1830,12 +1937,14 @@
         info: 'ℹ️',
       };
 
-      // Create notification element
+      // Create notification element with unified styling approach
       const notification = document.createElement('div');
       const safeTypeColor = colors[type] || colors.info;
-      notification.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${safeTypeColor}`;
 
-      // Add inline styles for better compatibility
+      // Use CSS classes for layout, inline styles only for animations and type-specific colors
+      notification.className = `notification glass-panel rounded-lg border shadow-lg flex items-center ${safeTypeColor}`;
+
+      // Inline styles only for animation states and essential overrides
       notification.style.cssText = `
         transform: translateX(100%);
         opacity: 0;
@@ -1850,9 +1959,8 @@
         box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         backdrop-filter: blur(12px);
         -webkit-backdrop-filter: blur(12px);
-        background: rgba(0, 0, 0, 0.8);
-        border: 1px solid;
         line-height: 1.4;
+        pointer-events: auto;
       `;
 
       const safeIcon = icons[type] || icons.info;
@@ -1870,80 +1978,65 @@
       // Append to container
       this.container.appendChild(notification);
 
-      // CLAUDE.md V8 compliant: requestIdleCallback for notification animation
-      requestIdleCallback(() => {
-        notification.style.transform = 'translateX(0)';
-        notification.style.opacity = '1';
+      // CLAUDE.md V8 compliant: requestAnimationFrame for smooth animation
+      requestAnimationFrame(() => {
+        // Ensure DOM insertion is complete before starting animation
+        if (notification.parentNode) {
+          notification.style.transform = 'translateX(0)';
+          notification.style.opacity = '1';
 
-        // アニメーション完了後に削除タイマーを開始
-        if (duration > 0) {
-          // 表示アニメーション完了後（300ms）+ 安全マージン（100ms）
-          const animationDelay = 400;
-          this.scheduleNotificationRemoval(notification, duration + animationDelay);
-        }
-      }, { timeout: 100 });  // 10ms → 100ms: より確実な表示開始
-    }
-
-    // 最適化されたPromise-based遅延実装（CPU負荷削減）
-    scheduleNotificationRemoval(notification, delay) {
-      // CLAUDE.md V8準拠: 効率的な遅延実装
-      const createOptimizedDelay = (ms) => new Promise(resolve => {
-        // 100ms間隔でのチェック（CPU負荷を大幅削減）
-        const checkInterval = Math.min(100, ms / 10);
-        const start = Date.now();
-
-        const optimizedCheck = () => {
-          const elapsed = Date.now() - start;
-          if (elapsed >= ms) {
-            resolve();
-          } else {
-            // requestIdleCallbackで低優先度実行
-            requestIdleCallback(() => {
-              Promise.resolve().then(optimizedCheck);
-            }, { timeout: checkInterval });
+          // Schedule removal after animation completes
+          if (duration > 0) {
+            // Animation duration (300ms) + safety margin (100ms)
+            const animationDelay = 400;
+            this.scheduleNotificationRemoval(notification, duration + animationDelay);
           }
-        };
-
-        optimizedCheck();
-      });
-
-      createOptimizedDelay(delay).then(() => {
-        this.removeNotification(notification);
+        }
       });
     }
 
-    // Remove notification with animation
-    removeNotification(notification) {
-      if (!notification) return;
+    // Simplified and reliable notification removal scheduling
+    scheduleNotificationRemoval(notification, delay) {
+      // Simple setTimeout for reliable notification removal
+      setTimeout(() => {
+        this.removeNotification(notification);
+      }, delay);
+    }
 
+    // Remove notification with animation (simplified and reliable)
+    removeNotification(notification) {
+      if (!notification || !notification.parentNode) return;
+
+      // Prevent duplicate removal attempts
+      if (notification.dataset.removing === 'true') return;
+      notification.dataset.removing = 'true';
+
+      // Start exit animation
       notification.style.transform = 'translateX(100%)';
       notification.style.opacity = '0';
 
-      notification.addEventListener(
-        'transitionend',
-        () => {
-          if (notification.parentNode) {
-            notification.remove();
-          }
-        },
-        { once: true }
-      );
+      // Simple and reliable removal after animation duration
+      setTimeout(() => {
+        if (notification.parentNode) {
+          notification.remove();
+        }
+      }, 300); // Match CSS transition duration
     }
 
-    // Convenience methods
-    success(message, duration = 5000) {
+    // Convenience methods (simplified - use showMessage defaults)
+    success(message, duration) {
       this.showMessage(message, 'success', duration);
     }
 
-    error(message, duration = 7000) {
+    error(message, duration) {
       this.showMessage(message, 'error', duration);
     }
 
-    warning(message, duration = 6000) {
+    warning(message, duration) {
       this.showMessage(message, 'warning', duration);
     }
 
-    info(message, duration = 5000) {
+    info(message, duration) {
       this.showMessage(message, 'info', duration);
     }
 

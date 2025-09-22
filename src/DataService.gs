@@ -218,7 +218,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
     const { lastRow, lastCol } = getSheetDimensions(sheet);
 
     if (lastRow <= 1) {
-      return helpers.createDataServiceSuccessResponse([], [], config.sheetName || '不明');
+      return helpers.createDataServiceSuccessResponse([], [], config.sheetName);
     }
 
     // ヘッダー取得
@@ -237,7 +237,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
       success: true,
       data: processedData,
       headers,
-      sheetName: config.sheetName || '不明',
+      sheetName: config.sheetName,
       // デバッグ情報（オプショナル）
       filteredRows: processedData.length,
       executionTime: Date.now() - startTime
@@ -287,7 +287,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
           isEmpty: isEmptyRow(row),
 
           // リアクション（ReactionService利用）
-          reactions: extractReactions(row, headers, user.userEmail),
+          reactions: extractReactions(row, headers, getCurrentEmail()),
           highlight: extractHighlight(row, headers)
         };
 
@@ -346,7 +346,7 @@ function processRawData(dataRows, headers, config, options = {}, user = null) {
           isEmpty: isEmptyRow(row),
 
           // リアクション（ReactionService利用）
-          reactions: extractReactions(row, headers, user.userEmail),
+          reactions: extractReactions(row, headers, getCurrentEmail()),
           highlight: extractHighlight(row, headers)
         };
 

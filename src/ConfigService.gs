@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, getUserSpreadsheetData, Auth, UserService, isAdministrator, SLEEP_MS */
+/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, getUserSpreadsheetData, Auth, UserService, isAdministrator, SLEEP_MS */
 
 // ===========================================
 // 🔧 GAS-Native ConfigService (直接API版)
@@ -189,7 +189,7 @@ function openFormWithRetry(formUrl, options = {}) {
  */
 function getDefaultConfig(userId) {
   // 🚀 Zero-dependency: 静的デフォルト値を提供
-  const now = new Date().toISOString();
+  // ✅ Optimized: createdAt and lastModified moved to database columns, removed from configJSON
   return {
     userId,
     setupStatus: 'pending',
@@ -206,9 +206,8 @@ function getDefaultConfig(userId) {
       canView: true,
       canReact: true
     },
-    completionScore: 0,
-    lastModified: now,
-    createdAt: now
+    completionScore: 0
+    // lastModified removed - managed exclusively by database column
   };
 }
 
@@ -286,8 +285,8 @@ function ensureRequiredFields(config, userId) {
     displaySettings: config.displaySettings,
     columnMapping: config.columnMapping,
     userPermissions: config.userPermissions,
-    completionScore: calculateCompletionScore(config),
-    lastModified: new Date().toISOString()
+    completionScore: calculateCompletionScore(config)
+    // lastModified removed - managed exclusively by database column
   };
 }
 
@@ -457,8 +456,8 @@ function sanitizeDisplaySettings(displaySettings) {
   return {
     showNames: Boolean(displaySettings.showNames),
     showReactions: Boolean(displaySettings.showReactions),
-    theme: String(displaySettings.theme || 'default').substring(0, 50),
-    pageSize: Math.min(Math.max(Number(displaySettings.pageSize) || 20, 1), 100)
+    theme: String(displaySettings.theme || 'default').substring(0, SYSTEM_LIMITS.PREVIEW_LENGTH),
+    pageSize: Math.min(Math.max(Number(displaySettings.pageSize) || SYSTEM_LIMITS.DEFAULT_PAGE_SIZE, 1), SYSTEM_LIMITS.MAX_PAGE_SIZE)
   };
 }
 
@@ -865,12 +864,21 @@ function saveUserConfig(userId, config, options = {}) {
 
   try {
     // 🔧 CLAUDE.md準拠: 楽観的ロック（ETag）検証の実装
+    // ✅ Optimized: Use database lastModified for ETag validation
+    const user = findUserById(userId);
+    if (!user) {
+      return {
+        success: false,
+        message: 'User not found'
+      };
+    }
+
     if (config.etag) {
-      const user = findUserById(userId);
-      if (user && user.configJson) {
+      if (user.configJson) {
         try {
           const currentConfig = JSON.parse(user.configJson);
-          const currentETag = currentConfig.etag || currentConfig.lastModified;
+          // ✅ Optimized: Fallback to database lastModified for ETag comparison
+          const currentETag = currentConfig.etag || user.lastModified;
 
           if (currentETag && config.etag !== currentETag) {
             console.warn('saveUserConfig: ETag mismatch detected', {
@@ -907,22 +915,27 @@ function saveUserConfig(userId, config, options = {}) {
     const cleanedConfig = cleanConfigFields(validation.data, options);
 
     // 3. タイムスタンプ更新とETag生成
-    cleanedConfig.lastModified = new Date().toISOString();
+    // ✅ Optimized: Remove lastModified from configJSON, use database column exclusively
+    // lastModified is now managed automatically by database updateUser function
+
     if (!cleanedConfig.lastAccessedAt) {
-      cleanedConfig.lastAccessedAt = cleanedConfig.lastModified;
+      cleanedConfig.lastAccessedAt = new Date().toISOString();
     }
 
     // 🔧 CLAUDE.md準拠: 楽観的ロック用ETag生成
-    cleanedConfig.etag = `${cleanedConfig.lastModified  }_${  Math.random().toString(36).substring(2, 15)}`;
+    // ✅ Optimized: Use database lastModified for ETag generation
+    const currentTime = new Date().toISOString();
+    cleanedConfig.etag = `${currentTime}_${Math.random().toString(36).substring(2, 15)}`;
 
     // 4. 🔧 CLAUDE.md準拠: 書き込み前キャッシュ無効化 - 同期ギャップ防止
     clearConfigCache(userId);
     console.log('saveUserConfig: 書き込み前キャッシュクリア完了');
 
     // 5. Zero-Dependency: 直接updateUser呼び出し
+    // ✅ Optimized: lastModified automatically managed by database updateUser function
     const updateResult = updateUser(userId, {
-      configJson: JSON.stringify(cleanedConfig),
-      lastModified: cleanedConfig.lastModified
+      configJson: JSON.stringify(cleanedConfig)
+      // lastModified removed - automatically updated by DatabaseCore
     });
 
     if (!updateResult || !updateResult.success) {
@@ -960,6 +973,7 @@ function saveUserConfig(userId, config, options = {}) {
     };
   }
 }
+
 
 /**
  * 共通フィールドクリーンアップ - main.gs内の個別delete操作を統一

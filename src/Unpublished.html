@@ -52,6 +52,8 @@
     </style>
   </head>
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans flex items-center justify-center h-screen">
+    <!-- Notification Container for unified notification system -->
+    <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
     <div class="text-center p-4 max-w-lg">
       <? if (typeof isEditor !== 'undefined' && isEditor) { ?>
       <!-- 管理者用画面：統合された管理パネル -->
@@ -205,40 +207,13 @@
       }
 
       function showMessage(message, type = 'info') {
-          const messageArea = document.getElementById('message-area');
-          if (messageArea) {
-              const colors = {
-                  success: 'text-green-400 success-state',
-                  error: 'text-red-400 error-state',
-                  info: 'text-blue-400'
-              };
-              messageArea.className = `mb-4 text-center text-sm min-h-[1.25rem] ${colors[type] || 'text-gray-400'}`;
-              messageArea.textContent = message;
-
-              // CLAUDE.md V8 compliant: CSS transition for visual feedback
-              if (type === 'success' || type === 'error') {
-                  // Use CSS transition completion event instead of setTimeout
-                  messageArea.addEventListener('transitionend', () => {
-                      messageArea.classList.remove('success-state', 'error-state');
-                  }, { once: true });
-
-                  // Fallback with requestIdleCallback
-                  requestIdleCallback(() => {
-                      messageArea.classList.remove('success-state', 'error-state');
-                  }, { timeout: 600 });
-              }
-
-              // CLAUDE.md V8 compliant: Promise-based delay for message clearing
-              const createPromiseDelay = (ms) => new Promise(resolve => {
-                  const start = Date.now();
-                  const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-                  check();
-              });
-
-              createPromiseDelay(3000).then(() => {
-                  messageArea.textContent = '';
-                  messageArea.className = 'mb-4 text-center text-sm min-h-[1.25rem]';
-              });
+          // Use unified notification system from SharedUtilities
+          if (window.notifications) {
+              const durations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
+              window.notifications.showMessage(message, type, durations[type] || 5000);
+          } else {
+              // Simple console fallback - no DOM manipulation
+              console.warn('Notification system not available:', type, message);
           }
       }
 

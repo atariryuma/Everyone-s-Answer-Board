@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -39,6 +39,7 @@ function getCurrentEmail() {
 }
 
 
+
 /**
  * Include HTML template
  * @param {string} filename - Template filename to include
@@ -62,12 +63,15 @@ function doGet(e) {
     const params = e ? e.parameter : {};
     const mode = params.mode || 'main';
 
+    // ✅ Performance optimization: Cache email for authentication-required routes
+    const currentEmail = (mode !== 'login') ? getCurrentEmail() : null;
 
     // Simple routing
     switch (mode) {
-      case 'login':
-        return HtmlService.createTemplateFromFile('LoginPage.html')
-          .evaluate();
+      case 'login': {
+        // 極限シンプル: ログインページ（静的表示のみ）
+        return HtmlService.createTemplateFromFile('LoginPage.html').evaluate();
+      }
 
       case 'admin': {
         // ✅ CLAUDE.md準拠: Batch operations for 70x performance improvement
@@ -129,9 +133,8 @@ function doGet(e) {
         } else {
           // 🔧 統一認証システム: isSystemAdmin変数をAccessRestricted.htmlに渡す
           const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
-          const email = getCurrentEmail();
-          template.isAdministrator = email ? isAdministrator(email) : false;
-          template.userEmail = email || '';
+          template.isAdministrator = currentEmail ? isAdministrator(currentEmail) : false;
+          template.userEmail = currentEmail || '';
           template.timestamp = new Date().toISOString();
           return template.evaluate();
         }
@@ -139,8 +142,7 @@ function doGet(e) {
 
       case 'appSetup': {
         // 🔐 GAS-Native: 直接認証チェック - Administrator専用
-        const email = getCurrentEmail();
-        if (!email || !isAdministrator(email)) {
+        if (!currentEmail || !isAdministrator(currentEmail)) {
           return createRedirectTemplate('ErrorBoundary.html', '管理者権限が必要です');
         }
 
@@ -150,7 +152,6 @@ function doGet(e) {
 
       case 'view': {
         // 🔐 GAS-Native: 直接認証チェック - Viewer権限確認
-        const currentEmail = getCurrentEmail();
         if (!currentEmail) {
           return createRedirectTemplate('ErrorBoundary.html', 'ユーザー認証が必要です');
         }
@@ -189,12 +190,12 @@ function doGet(e) {
         template.isOwnBoard = isOwnBoard;
 
         // 🔧 CLAUDE.md準拠: configJSON統一取得（Zero-Dependency）
-        template.sheetName = config.sheetName || 'テストシート';
+        template.sheetName = config.sheetName;
         template.configJSON = JSON.stringify({
           userId: targetUserId,
           userEmail: targetUser.userEmail,
           spreadsheetId: config.spreadsheetId || '',
-          sheetName: config.sheetName || 'テストシート',
+          sheetName: config.sheetName,
           questionText: questionText || '回答ボード',
           isPublished: Boolean(config.isPublished),
           isEditor,
@@ -525,16 +526,145 @@ function testSetup() {
 }
 
 /**
- * Reset authentication (clear cache)
+ * Reset authentication and clear all user session data
+ * ✅ CLAUDE.md準拠: 包括的キャッシュクリア with 論理的破綻修正
  */
 function resetAuth() {
   try {
     const cache = CacheService.getScriptCache();
-    // Clear authentication-related cache entries
-    cache.remove('current_user_info');
-    return { success: true, message: 'Authentication reset' };
+    let clearedKeysCount = 0;
+    let clearConfigResult = null;
+
+    // 🔧 修正1: 現在ユーザー情報を事前取得（キャッシュクリア前）
+    const currentEmail = getCurrentEmail();
+    const currentUser = currentEmail ? findUserByEmail(currentEmail) : null;
+    const userId = currentUser?.userId;
+
+    // 🔧 修正2: ConfigService専用クリア関数の活用
+    if (userId) {
+      try {
+        clearConfigCache(userId);
+        clearConfigResult = 'ConfigService cache cleared successfully';
+        console.log(`resetAuth: ConfigService cache cleared for user ${userId.substring(0, 8)}***`);
+      } catch (configError) {
+        console.warn('resetAuth: ConfigService cache clear failed:', configError.message);
+        clearConfigResult = `ConfigService cache clear failed: ${configError.message}`;
+      }
+    }
+
+    // 🔧 修正3: 包括的キャッシュキーリスト（実際の使用パターンに合わせて更新）
+    const globalCacheKeysToRemove = [
+      'current_user_info',
+      'admin_auth_cache',
+      'session_data',
+      'system_diagnostic_cache',
+      'bulk_admin_data_cache'
+    ];
+
+    // グローバルキャッシュクリア
+    globalCacheKeysToRemove.forEach(key => {
+      try {
+        cache.remove(key);
+        clearedKeysCount++;
+      } catch (e) {
+        console.warn(`resetAuth: Failed to remove global cache key ${key}:`, e.message);
+      }
+    });
+
+    // 🔧 修正4: User固有キャッシュの完全クリア（email + userId ベース）
+    const userSpecificKeysCleared = [];
+    if (currentEmail) {
+      const emailBasedKeys = [
+        `board_data_${currentEmail}`,
+        `user_data_${currentEmail}`,
+        `admin_panel_${currentEmail}`
+      ];
+
+      emailBasedKeys.forEach(key => {
+        try {
+          cache.remove(key);
+          userSpecificKeysCleared.push(key);
+          clearedKeysCount++;
+        } catch (e) {
+          console.warn(`resetAuth: Failed to remove email-based cache key ${key}:`, e.message);
+        }
+      });
+    }
+
+    if (userId) {
+      const userIdBasedKeys = [
+        `user_config_${userId}`,
+        `config_${userId}`,
+        `user_${userId}`,
+        `board_data_${userId}`,
+        `question_text_${userId}`
+      ];
+
+      userIdBasedKeys.forEach(key => {
+        try {
+          cache.remove(key);
+          userSpecificKeysCleared.push(key);
+          clearedKeysCount++;
+        } catch (e) {
+          console.warn(`resetAuth: Failed to remove userId-based cache key ${key}:`, e.message);
+        }
+      });
+    }
+
+    // 🔧 修正5: リアクション・ハイライトロック完全クリア
+    let reactionLocksCleared = 0;
+    if (userId) {
+      try {
+        // リアクション・ハイライトロックの動的検索・削除は複雑なので、
+        // 基本的なロックキーのパターンをクリア
+        const lockPatterns = [
+          `reaction_${userId}_`,
+          `highlight_${userId}_`
+        ];
+
+        // Note: GAS CacheService doesn't support pattern matching,
+        // so we clear known common patterns and rely on TTL expiration
+        for (let i = 0; i < SYSTEM_LIMITS.MAX_LOCK_ROWS; i++) { // 最大100行のロックをクリア
+          lockPatterns.forEach(pattern => {
+            try {
+              cache.remove(`${pattern}${i}`);
+              reactionLocksCleared++;
+            } catch (e) {
+              // Lock key might not exist - this is expected
+            }
+          });
+        }
+        console.log(`resetAuth: Cleared ${reactionLocksCleared} reaction/highlight locks for user ${userId.substring(0, 8)}***`);
+      } catch (lockError) {
+        console.warn('resetAuth: Reaction lock clearing failed:', lockError.message);
+      }
+    }
+
+    // 🔧 修正6: 包括的なログ出力
+    const logDetails = {
+      currentUser: currentEmail ? `${currentEmail.substring(0, 8)}***@${currentEmail.split('@')[1]}` : 'N/A',
+      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
+      globalKeysCleared: globalCacheKeysToRemove.length,
+      userSpecificKeysCleared: userSpecificKeysCleared.length,
+      reactionLocksCleared,
+      configServiceResult: clearConfigResult,
+      totalKeysCleared: clearedKeysCount
+    };
+
+    console.log('resetAuth: Authentication reset completed', logDetails);
+
+    return {
+      success: true,
+      message: 'Authentication and session data cleared successfully',
+      details: {
+        clearedKeys: clearedKeysCount,
+        userSpecificKeys: userSpecificKeysCleared.length,
+        reactionLocks: reactionLocksCleared,
+        configService: clearConfigResult ? 'success' : 'skipped'
+      }
+    };
   } catch (error) {
-    console.error('resetAuth error:', error.message);
+    console.error('resetAuth error:', error.message, error.stack);
     return createExceptionResponse(error);
   }
 }
@@ -615,8 +745,7 @@ function processLoginAction() {
           isActive: true,
           configJson: JSON.stringify({
             setupStatus: 'pending',
-            isPublished: false,
-            createdAt: new Date().toISOString()
+            isPublished: false
           }),
           lastModified: new Date().toISOString()
         };
@@ -656,84 +785,6 @@ function processLoginAction() {
       success: false,
       message: `Login failed: ${error.message || '詳細不明'}`
     };
-  }
-}
-
-/**
- * Get system domain information - unified implementation
- */
-function getSystemDomainInfo() {
-  try {
-    const currentUser = getCurrentEmail();
-    if (!currentUser) {
-      return {
-        success: false,
-        message: 'Session information not available'
-      };
-    }
-
-    let domain = 'unknown';
-    if (currentUser && currentUser.includes('@')) {
-      [, domain] = currentUser.split('@');
-    }
-
-    const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
-    const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
-
-    return {
-      success: true,
-      domain,
-      currentUser,
-      userDomain: domain,
-      adminDomain,
-      isValidDomain: adminDomain ? domain === adminDomain : true,
-      userEmail: currentUser,
-      timestamp: new Date().toISOString()
-    };
-
-  } catch (error) {
-    console.error('getSystemDomainInfo error:', error.message);
-    return {
-      success: false,
-      message: `Domain information error: ${error.message || '詳細不明'}`
-    };
-  }
-}
-
-/**
- * Get application status - system admin only
- */
-function getAppStatus() {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return createErrorResponse('Authentication required');
-    }
-
-    // ユーザー情報とconfigJsonを取得
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return createErrorResponse('User not found');
-    }
-
-    // 統一API使用: 構造化パース
-    const configResult = getUserConfig(user.userId);
-    const config = configResult.success ? configResult.config : {};
-
-    // ユーザーのボード公開状態を取得
-    const isActive = Boolean(config.isPublished);
-
-    return createSuccessResponse('Application status retrieved', {
-      isActive,
-      appStatus: isActive ? 'active' : 'inactive',
-      timestamp: new Date().toISOString(),
-      adminEmail: email,
-      userId: user.userId
-    });
-  } catch (error) {
-    console.error('getAppStatus error:', error.message);
-    return createErrorResponse(error.message || 'Failed to get application status');
   }
 }
 
@@ -783,11 +834,10 @@ function setAppStatus(isActive) {
         config.publishedAt = new Date().toISOString();
       }
     }
-    config.lastModified = new Date().toISOString();
     config.lastAccessedAt = new Date().toISOString();
 
     // 統一API使用: 検証・サニタイズ・保存
-    const saveResult = saveUserConfig(user.userId, config);
+    const saveResult = saveUserConfig(user.userId, config, { forceUpdate: false });
     if (!saveResult.success) {
       return createErrorResponse(`Failed to update user configuration: ${saveResult.message || '詳細不明'}`);
     }
@@ -905,11 +955,10 @@ function toggleUserBoardStatus(targetUserId) {
         config.publishedAt = new Date().toISOString();
       }
     }
-    config.lastModified = new Date().toISOString();
     config.lastAccessedAt = new Date().toISOString();
 
     // 統一API使用: 検証・サニタイズ・保存
-    const saveResult = saveUserConfig(targetUserId, config);
+    const saveResult = saveUserConfig(targetUserId, config, { forceUpdate: false });
     if (!saveResult.success) {
       return createErrorResponse(`Failed to toggle board status: ${saveResult.message || '詳細不明'}`);
     }
@@ -962,11 +1011,10 @@ function clearActiveSheet(targetUserId) {
     const wasPublished = config.isPublished === true;
     config.isPublished = false;
     config.publishedAt = null;
-    config.lastModified = new Date().toISOString();
     config.lastAccessedAt = new Date().toISOString();
 
     // 統一API使用: 検証・サニタイズ・保存
-    const saveResult = saveUserConfig(targetUser.userId, config);
+    const saveResult = saveUserConfig(targetUser.userId, config, { forceUpdate: false });
     if (!saveResult.success) {
       return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
     }
@@ -1144,7 +1192,7 @@ function getBoardInfo() {
         view: `${baseUrl}?mode=view&userId=${user.userId}`,
         admin: `${baseUrl}?mode=admin&userId=${user.userId}`
       },
-      lastUpdated: config.publishedAt || config.lastModified || new Date().toISOString()
+      lastUpdated: config.publishedAt || user.lastModified
     };
   } catch (error) {
     console.error('❌ getBoardInfo ERROR:', error.message);
@@ -1152,18 +1200,7 @@ function getBoardInfo() {
   }
 }
 
-/**
- * 🔧 統合API: getUserSheetData直接呼び出し推奨
- * この関数は後方互換性のためのラッパーです
- * @deprecated Use getUserSheetData() directly instead
- * @param {string} userId - ユーザーID
- * @param {Object} options - 取得オプション
- * @returns {Object} シートデータ取得結果
- */
-function getSheetData(userId, options = {}) {
-  console.warn('getSheetData: Deprecated wrapper - use getUserSheetData() directly');
-  return getUserSheetData(userId, options);
-}
+
 
 
 /**
@@ -1178,7 +1215,6 @@ function getSheetData(userId, options = {}) {
 function getPublishedSheetData(classFilter, sortOrder, adminMode = false, targetUserId = null) {
   // ✅ Performance optimization: Add timeout for slow responses
   const startTime = Date.now();
-  const TIMEOUT_MS = 15000; // 15 seconds max
 
   try {
     // ✅ CLAUDE.md準拠: Batched admin authentication (70x performance improvement)
@@ -1199,7 +1235,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode = false, target
     let user;
     if (targetUserId) {
       // ✅ Timeout check before expensive operations
-      if (Date.now() - startTime > TIMEOUT_MS) {
+      if (Date.now() - startTime > TIMEOUT_MS.EXTENDED) {
         console.warn('getPublishedSheetData: Timeout during user lookup');
         return {
           success: false,
@@ -1223,7 +1259,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode = false, target
       }
 
       // ✅ Timeout check after data retrieval
-      if (Date.now() - startTime > TIMEOUT_MS) {
+      if (Date.now() - startTime > TIMEOUT_MS.EXTENDED) {
         console.warn('getPublishedSheetData: Timeout during data processing');
         return {
           success: false,
@@ -1321,7 +1357,7 @@ function transformBoardDataToFrontendFormat(boardData, classFilter, sortOrder) {
     const transformedData = {
       success: true,
       header: boardData.header || boardData.sheetName || '回答一覧',
-      sheetName: boardData.sheetName || '不明',
+      sheetName: boardData.sheetName,
       data: boardData.data.map(item => ({
         rowIndex: item.rowIndex || item.id,
         name: item.name || '',
@@ -1517,14 +1553,22 @@ function saveConfig(config, options = {}) {
 
 
 /**
- * 新着コンテンツ検出機能 - GAS-Native直接実装
- * @param {string|number} lastUpdateTime - 最終更新時刻（ISO文字列またはタイムスタンプ）
- * @returns {Object} 新着検出結果
+ * 統合新着通知更新システム - 全ユーザーロール対応
+ * @param {string} targetUserId - 閲覧対象ユーザーID
+ * @param {Object} options - オプション設定
+ * @param {string|number} options.lastUpdateTime - 最終更新時刻
+ * @param {number} options.lastSeenCount - 最終確認件数
+ * @param {string} options.classFilter - クラスフィルター
+ * @param {string} options.sortOrder - ソート順序
+ * @param {number} options.maxBatchSize - 最大バッチサイズ
+ * @param {number} options.timeoutMs - タイムアウト時間
+ * @param {boolean} options.includeMetadata - メタデータ含有フラグ
+ * @returns {Object} 統合通知更新結果
  */
-function detectNewContent(lastUpdateTime) {
+function getNotificationUpdate(targetUserId, options = {}) {
   try {
-    const email = getCurrentEmail();
-    if (!email) {
+    const viewerEmail = getCurrentEmail();
+    if (!viewerEmail) {
       return {
         success: false,
         hasNewContent: false,
@@ -1532,54 +1576,87 @@ function detectNewContent(lastUpdateTime) {
       };
     }
 
+    // 対象ユーザー取得
+    const targetUser = findUserById(targetUserId);
+    if (!targetUser) {
+      return {
+        success: false,
+        hasNewContent: false,
+        message: 'Target user not found'
+      };
+    }
+
+    // アクセス制御判定（getViewerBoardDataパターン踏襲）
+    const isSelfAccess = targetUser.userEmail === viewerEmail;
+    console.log(`getNotificationUpdate: ${isSelfAccess ? 'Self-access' : 'Cross-user access'} for targetUserId: ${targetUserId}`);
+
     // 最終更新時刻の正規化
     let lastUpdate;
     try {
-      if (typeof lastUpdateTime === 'string') {
-        lastUpdate = new Date(lastUpdateTime);
-      } else if (typeof lastUpdateTime === 'number') {
-        lastUpdate = new Date(lastUpdateTime);
+      if (typeof options.lastUpdateTime === 'string') {
+        lastUpdate = new Date(options.lastUpdateTime);
+      } else if (typeof options.lastUpdateTime === 'number') {
+        lastUpdate = new Date(options.lastUpdateTime);
       } else {
         lastUpdate = new Date(0); // 初回チェック
       }
     } catch (e) {
-      console.warn('detectNewContent: timestamp parse error', e);
+      console.warn('getNotificationUpdate: timestamp parse error', e);
       lastUpdate = new Date(0);
     }
 
-    // ユーザーデータ取得
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return {
-        success: false,
-        hasNewContent: false,
-        message: 'User not found'
-      };
+    // 統合データ取得（自己アクセス vs クロスユーザーアクセス）
+    let currentData;
+    if (isSelfAccess) {
+      // ✅ 自己アクセス：通常権限
+      currentData = getUserSheetData(targetUser.userId, {
+        includeTimestamp: true,
+        classFilter: options.classFilter,
+        sortBy: options.sortOrder || 'newest',
+        requestingUser: viewerEmail
+      });
+    } else {
+      // ✅ クロスユーザーアクセス：サービスアカウント（getViewerBoardDataパターン）
+      currentData = getUserSheetData(targetUser.userId, {
+        includeTimestamp: true,
+        classFilter: options.classFilter,
+        sortBy: options.sortOrder || 'newest',
+        requestingUser: viewerEmail,
+        targetUserEmail: targetUser.userEmail // サービスアカウントトリガー
+      });
     }
 
-    // 現在のシートデータ取得
-    const currentData = getUserSheetData(user.userId, { includeTimestamp: true });
     if (!currentData?.success || !currentData.data) {
       return {
         success: true,
         hasNewContent: false,
-        message: 'No data available'
+        hasNewData: false,
+        data: [],
+        totalCount: 0,
+        newItemsCount: 0,
+        message: 'No data available',
+        targetUserId,
+        accessType: isSelfAccess ? 'self' : 'cross-user'
       };
     }
 
-    // 新着コンテンツチェック
+    // 新着検出処理
+    const lastSeenCount = options.lastSeenCount || 0;
+    const currentCount = currentData.data ? currentData.data.length : 0;
+    const hasNewData = currentCount > lastSeenCount;
+
+    // 新着アイテム抽出
     let newItemsCount = 0;
     const newItems = [];
+    let incrementalData = currentData.data || [];
 
+    // 時刻ベース新着検出（優先）
     currentData.data.forEach((item, index) => {
-      // アイテムのタイムスタンプチェック
       let itemTimestamp = new Date(0);
       if (item.timestamp) {
         try {
           itemTimestamp = new Date(item.timestamp);
         } catch (e) {
-          // タイムスタンプが無効な場合、行番号ベースで推定
           itemTimestamp = new Date();
         }
       }
@@ -1589,27 +1666,49 @@ function detectNewContent(lastUpdateTime) {
         newItems.push({
           rowIndex: item.rowIndex || index + 1,
           name: item.name || '匿名',
-          preview: (item.answer || item.opinion) ? `${(item.answer || item.opinion).substring(0, 50)}...` : 'プレビュー不可',
+          preview: (item.answer || item.opinion) ? `${(item.answer || item.opinion).substring(0, SYSTEM_LIMITS.PREVIEW_LENGTH)}...` : 'プレビュー不可',
           timestamp: itemTimestamp.toISOString()
         });
       }
     });
 
+    // 件数ベース新着検出（フォールバック）
+    if (newItemsCount === 0 && hasNewData && lastSeenCount > 0) {
+      newItemsCount = currentCount - lastSeenCount;
+      incrementalData = incrementalData.slice(0, newItemsCount);
+    }
+
+    const hasNewContent = newItemsCount > 0;
+
     return {
       success: true,
-      hasNewContent: newItemsCount > 0,
+      hasNewContent,
+      hasNewData,
+      data: incrementalData,
+      totalCount: currentCount,
       newItemsCount,
-      newItems: newItems.slice(0, 5), // 最新5件まで
-      totalItems: currentData.data.length,
-      checkTimestamp: new Date().toISOString(),
+      newItems: newItems.slice(0, 5), // 最新5件のプレビュー
+      lastSeenCount,
+      targetUserId,
+      accessType: isSelfAccess ? 'self' : 'cross-user',
+      sheetName: currentData.sheetName,
+      header: currentData.header,
+      timestamp: new Date().toISOString(),
       lastUpdateTime: lastUpdate.toISOString()
     };
+
   } catch (error) {
-    console.error('detectNewContent error:', error.message);
+    console.error('getNotificationUpdate error:', error.message);
     return {
       success: false,
       hasNewContent: false,
-      message: error.message
+      hasNewData: false,
+      data: [],
+      totalCount: 0,
+      newItemsCount: 0,
+      message: error.message,
+      targetUserId,
+      timestamp: new Date().toISOString()
     };
   }
 }
@@ -1809,11 +1908,13 @@ function getDeployUserDomainInfo() {
 
   try {
     const email = getCurrentEmail();
-    if (!email) {
-      console.error('❌ Authentication failed');
+
+    // Enhanced type validation for email
+    if (!email || typeof email !== 'string' || email.trim() === '') {
+      console.error('❌ Authentication failed - invalid email:', typeof email, email);
       return {
         success: false,
-        message: 'Authentication required',
+        message: 'Authentication required - invalid email',
         domain: null,
         isValidDomain: false
       };
@@ -1849,11 +1950,11 @@ function getDeployUserDomainInfo() {
  * Get active form info - フロントエンドエラー修正用
  * @returns {Object} フォーム情報
  */
-function getActiveFormInfo() {
+function getActiveFormInfo(userId) {
 
   try {
-    const email = getCurrentEmail();
-    if (!email) {
+    const currentEmail = getCurrentEmail();
+    if (!currentEmail) {
       console.error('❌ Authentication failed');
       return {
         success: false,
@@ -1863,20 +1964,25 @@ function getActiveFormInfo() {
       };
     }
 
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      console.error('❌ User not found:', email);
-      return {
-        success: false,
-        message: 'User not found',
-        formUrl: null,
-        formTitle: null
-      };
+    // 🔧 GAS-Native統一: userIdが指定されていればそのユーザーの設定を取得（board owner's form）
+    // 指定されていなければ現在のユーザーの設定を取得（backward compatibility）
+    let targetUserId = userId;
+    if (!targetUserId) {
+      const currentUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
+      if (!currentUser) {
+        console.error('❌ Current user not found:', currentEmail);
+        return {
+          success: false,
+          message: 'User not found',
+          formUrl: null,
+          formTitle: null
+        };
+      }
+      targetUserId = currentUser.userId;
     }
 
     // 統一API使用: 構造化パース
-    const configResult = getUserConfig(user.userId);
+    const configResult = getUserConfig(targetUserId);
     const config = configResult.success ? configResult.config : {};
 
     // フォーム表示判定: URL存在性を優先、検証は補助的に利用
@@ -1937,152 +2043,11 @@ function isValidFormUrl(url) {
   }
 }
 
-/**
- * Get incremental sheet data - フロントエンドエラー修正用
- * @param {string} sheetName - シート名
- * @param {Object} options - 取得オプション
- * @returns {Object} 増分データ
- */
-function getIncrementalSheetData(sheetName, options = {}) {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return {
-        success: false,
-        message: 'Authentication required',
-        data: [],
-        hasNewData: false
-      };
-    }
-
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return {
-        success: false,
-        message: 'User not found',
-        data: [],
-        hasNewData: false
-      };
-    }
-
-    // getUserSheetDataを使用してデータ取得
-    const result = getUserSheetData(user.userId, {
-      includeTimestamp: true,
-      classFilter: options.classFilter,
-      sortBy: options.sortOrder || 'newest'
-    });
-
-    if (!result?.success) {
-      return {
-        success: false,
-        message: result?.message || 'Data retrieval failed',
-        data: [],
-        hasNewData: false
-      };
-    }
-
-    // 増分データチェック（lastSeenCountベース）
-    const lastSeenCount = options.lastSeenCount || 0;
-    const currentCount = result.data ? result.data.length : 0;
-    const hasNewData = currentCount > lastSeenCount;
-
-    // 新着データのみ抽出（必要に応じて）
-    let incrementalData = result.data || [];
-    if (hasNewData && lastSeenCount > 0) {
-      incrementalData = incrementalData.slice(0, currentCount - lastSeenCount);
-    }
-
-    return {
-      success: true,
-      data: incrementalData,
-      hasNewData,
-      totalCount: currentCount,
-      lastSeenCount,
-      newItemsCount: hasNewData ? currentCount - lastSeenCount : 0,
-      sheetName: result.sheetName || sheetName,
-      header: result.header,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error('getIncrementalSheetData error:', error.message);
-    // Return consistent response format that polling can handle gracefully
-    return {
-      success: false,
-      status: 'error',
-      message: error.message || 'データ取得エラー',
-      data: [],
-      hasNewData: false,
-      newCount: 0,
-      totalCount: 0,
-      timestamp: new Date().toISOString()
-    };
-  }
-}
 
 // ===========================================
 // 🔄 CLAUDE.md準拠: GAS-side Trigger-Based Polling System
 // ===========================================
 
-/**
- * GAS Server-side trigger-based polling endpoint
- * Replaces client-side setInterval with server-initiated updates
- * @param {Object} options - Polling options
- * @returns {Object} Polling response with trigger status
- */
-function triggerPollingUpdate(options = {}) {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
-
-    // デフォルト設定（CLAUDE.md準拠: 性能最適化）
-    const pollOptions = {
-      maxBatchSize: options.maxBatchSize || 100,
-      timeoutMs: options.timeoutMs || 5000,
-      includeMetadata: options.includeMetadata !== false,
-      ...options
-    };
-
-    // サーバーサイド統合チェック
-    const newContentResult = detectNewContent(options.lastUpdateTime);
-
-    // 新しいコンテンツがある場合のみデータ取得
-    if (newContentResult.success && newContentResult.hasNewContent) {
-      // 🔧 GAS-Native統一: 直接findUserByEmail使用
-      const user = findUserByEmail(email, { requestingUser: email });
-
-      if (user && user.activeSheetName) {
-        const sheetResult = getIncrementalSheetData(user.activeSheetName, pollOptions);
-
-        return {
-          success: true,
-          triggerType: 'server-side',
-          hasUpdates: true,
-          contentUpdate: newContentResult,
-          sheetData: sheetResult,
-          serverTimestamp: new Date().toISOString(),
-          pollOptions
-        };
-      }
-    }
-
-    // 更新なしの場合
-    return {
-      success: true,
-      triggerType: 'server-side',
-      hasUpdates: false,
-      contentUpdate: newContentResult,
-      serverTimestamp: new Date().toISOString(),
-      pollOptions
-    };
-
-  } catch (error) {
-    console.error('triggerPollingUpdate error:', error.message);
-    return createExceptionResponse(error, 'Polling trigger failed');
-  }
-}
 
 // ===========================================
 // 🔧 Missing API Endpoints - Frontend/Backend Compatibility
@@ -2090,13 +2055,9 @@ function triggerPollingUpdate(options = {}) {
 
 
 
-// performAutoRepair moved to SystemController.gs for architecture compliance
 
-// forceUrlSystemReset moved to SystemController.gs for architecture compliance
 
-// publishApplication moved to SystemController.gs for architecture compliance
 
-// getFormInfo moved to SystemController.gs for architecture compliance
 
 // ===========================================
 // 🆕 CLAUDE.md準拠: 完全自動化データソース選択システム
@@ -2268,7 +2229,8 @@ function callGAS(functionName, options = {}, ...args) {
       'getUser',
       'getConfig',
       'getBoardInfo',
-      'getWebAppUrl'
+      'getWebAppUrl',
+      'getNotificationUpdate'
     ];
 
     const adminOnlyFunctions = [
@@ -2495,6 +2457,7 @@ function getBatchedViewerData(targetUserId, currentEmail) {
   }
 }
 
+
 /**
  * ✅ CLAUDE.md準拠: Batched admin data retrieval for 70x performance improvement
  * Combines 4 individual API calls into single batch operation:
@@ -2525,11 +2488,27 @@ function getBatchedAdminData() {
     const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
+    // ✅ CLAUDE.md準拠: フロントエンド必要情報を統合取得
+    const questionText = getQuestionText(config, { targetUserEmail: user.userEmail });
+
+    // ✅ URLs とタイムスタンプ情報を config に統合
+    // ✅ Optimized: Use database lastModified instead of config lastModified
+    const baseUrl = ScriptApp.getService().getUrl();
+    const enhancedConfig = {
+      ...config,
+      urls: config.urls || {
+        view: `${baseUrl}?mode=view&userId=${user.userId}`,
+        admin: `${baseUrl}?mode=admin&userId=${user.userId}`
+      },
+      lastModified: user.lastModified || config.publishedAt
+    };
+
     return {
       success: true,
       email,
       user,
-      config
+      config: enhancedConfig,
+      questionText: questionText || '回答ボード'
     };
 
   } catch (error) {
