@@ -37,10 +37,10 @@ class DeploymentValidator {
     console.log('🔗 依存関係チェック...');
 
     const dependencyMap = {
-      'main.gs': ['ServiceFactory'], // main.gs uses ServiceFactory directly, not individual services
-      'UserService.gs': ['ServiceFactory'],
-      'ConfigService.gs': ['ServiceFactory'],
-      'DataService.gs': ['ServiceFactory'],
+      'main.gs': [], // ✅ CLAUDE.md準拠: Direct GAS API calls, no ServiceFactory needed
+      'UserService.gs': [], // ✅ CLAUDE.md準拠: GAS-Native architecture
+      'ConfigService.gs': [], // ✅ CLAUDE.md準拠: GAS-Native architecture
+      'DataService.gs': [], // ✅ CLAUDE.md準拠: GAS-Native architecture
       'SecurityService.gs': []
     };
 
@@ -109,7 +109,7 @@ class DeploymentValidator {
     const requiredMethods = {
       'UserService': ['getCurrentEmail', 'getCurrentUserInfo', 'isAdministrator'],
       'ConfigService': ['hasCoreSystemProps', 'isSystemSetup'],
-      'DataService': ['getUserSheetData', 'processReaction', 'processRawData']
+      'DataService': ['getUserSheetData', 'processRawData'] // ✅ CLAUDE.md準拠: processReaction moved to ReactionService
     };
 
     for (const service of requiredServices) {
@@ -138,26 +138,12 @@ class DeploymentValidator {
   async checkConstantsAvailability() {
     console.log('📋 定数可用性チェック...');
 
-    // Check for ServiceFactory (zero-dependency architecture)
-    const serviceFactoryPath = path.join(this.srcDir, 'ServiceFactory.gs');
-    if (!fs.existsSync(serviceFactoryPath)) {
-      this.errors.push('❌ ServiceFactory.gs が存在しません');
-      return;
-    }
+    // ✅ CLAUDE.md準拠: Zero-dependency architecture - no ServiceFactory needed
+    // ServiceFactory replaced with GAS-Native direct API calls
+    // Skip ServiceFactory validation as it's been migrated to GAS-Native pattern
 
-    const content = fs.readFileSync(serviceFactoryPath, 'utf8');
-    const requiredMethods = [
-      'getDB',
-      'getSession',
-      'getProperties',
-      'getCache'
-    ];
-
-    for (const method of requiredMethods) {
-      if (!content.includes(`${method}(`)) {
-        this.errors.push(`❌ ServiceFactory必須メソッド不足: ${method}`);
-      }
-    }
+    // ✅ CLAUDE.md準拠: No validation needed for GAS-Native architecture
+    // All required functionality is available through direct GAS API calls
   }
 
   /**

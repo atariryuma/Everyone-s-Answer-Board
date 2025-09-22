@@ -105,7 +105,9 @@ module.exports = {
         'clearTimeout': 'writable',
         'LockService': 'readonly',
         'WebApp': 'readonly',
-        'RequestGate': 'writable'
+        'RequestGate': 'writable',
+        'getBatchedAdminAuth': 'writable',
+        'getBatchedUserConfig': 'writable'
       },
       rules: {
         // GAS特有のルール調整 - GASでは未使用関数が後でHTMLから呼ばれる可能性があるため無効化

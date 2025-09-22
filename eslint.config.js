@@ -40,7 +40,7 @@ module.exports = [
         SitesApp: 'readonly',
         console: 'readonly',
         google: 'readonly',
-        
+
         // Node.js globals for tests
         process: 'readonly',
         Buffer: 'readonly',

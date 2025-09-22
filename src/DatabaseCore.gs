@@ -723,23 +723,21 @@ function getViewerBoardData(targetUserId, viewerEmail) {
     if (targetUser.userEmail === viewerEmail) {
       // ✅ Own data: use normal permissions (CLAUDE.md pattern)
       console.log('getViewerBoardData: Self-access - using normal permissions');
-      // ✅ Self-access: Use getUserSpreadsheetData to get basic spreadsheet info
-      return getUserSpreadsheetData(targetUser, {
+      // ✅ Self-access: Use getUserSheetData to get actual sheet data
+      // eslint-disable-next-line no-undef
+      return getUserSheetData(targetUser.userId, {
         includeTimestamp: true,
         requestingUser: viewerEmail
       });
     } else {
       // ✅ Other's data: use service account for cross-user access (CLAUDE.md pattern)
       console.log('getViewerBoardData: Cross-user access - using service account');
-      // ✅ Cross-user: Use getUserSpreadsheetData with service account access
-      const dataAccess = openSpreadsheet(targetUser.spreadsheetId, {
-        useServiceAccount: true,
-        context: 'getViewerBoardData'
-      });
-      return getUserSpreadsheetData(targetUser, {
-        dataAccess,
+      // ✅ Cross-user: Use getUserSheetData with context for service account usage
+      // eslint-disable-next-line no-undef
+      return getUserSheetData(targetUser.userId, {
         includeTimestamp: true,
-        requestingUser: viewerEmail
+        requestingUser: viewerEmail,
+        targetUserEmail: targetUser.userEmail // This will trigger service account usage in getUserSheetData
       });
     }
   } catch (error) {
