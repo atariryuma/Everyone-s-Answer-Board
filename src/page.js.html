@@ -67,7 +67,13 @@ class StudyQuestApp {
   }
 
   constructor() {
+    console.log('🏗️ StudyQuestApp constructor started');
+
+    console.log('📦 Initializing cache...');
     this.cache = new window.UnifiedCache();
+    console.log('✅ Cache initialized');
+
+    console.log('🔧 Setting up initial properties...');
     this.weakCache = new WeakMap(); // For DOM element caching
     this.perf = { frameTime: 0, domOperations: 0 };
     this.visibilityObserver = null;
@@ -77,6 +83,9 @@ class StudyQuestApp {
     this.idleCallbackId = null;
     this.domFragmentPool = [];
     this.isLowPerformanceMode = true;
+    console.log('✅ Initial properties set');
+
+    console.log('🎯 Getting DOM elements...');
     this.elements = {
       body: document.body,
       mainContainer: document.getElementById('main-container'),
@@ -114,6 +123,9 @@ class StudyQuestApp {
       footer: document.getElementById('controlsFooter')
       // loadingOverlay removed: Page.html uses independent skeleton loading
     };
+    console.log('✅ DOM elements obtained');
+
+    console.log('📋 Initializing state...');
     this.state = {
       currentAnswers: [],
       isLoading: false,
@@ -125,6 +137,7 @@ class StudyQuestApp {
       sheetName: SHEET_NAME,
       userId: this.validId(USER_ID),
       hasNewContent: false,
+      initializationComplete: false, // 🔧 CRITICAL FIX: Add initialization completion flag
       newContentCount: 0,
       lastSeenCount: this.loadLastSeenCount(), // ローカルストレージから復元
       pollingFailureCount: 0,
@@ -191,8 +204,19 @@ class StudyQuestApp {
       }
     };
 
+    console.log('✅ State initialized');
+
     // Initialize remaining properties
-    this.initializePollingSettings();
+    console.log('🚀 Starting initialization...');
+    this.init().catch(error => {
+      console.error('❌ StudyQuestApp: Fatal initialization error:', error);
+      this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
+    });
+
+    // 🔧 OPTIMIZED: Start publication status monitoring after initialization
+    // Monitor initialization completion and start monitoring immediately when ready
+    this.scheduleInitializationCompleteCheck();
+    console.log('✅ Constructor completed');
   }
 
 
@@ -242,7 +266,6 @@ class StudyQuestApp {
         // 🛡️ 安全な状態更新
         updateState(updates) {
           this._state = { ...this._state, ...updates };
-          console.log('🔄 PollingStateManager updated:', Object.keys(updates));
         },
 
         // 🧹 完全クリーンアップ
@@ -262,7 +285,6 @@ class StudyQuestApp {
             checkAnswersSemaphore: false,
           };
 
-          console.log('🧹 PollingStateManager reset complete');
         },
 
 
@@ -276,8 +298,7 @@ class StudyQuestApp {
       };
 
       // グローバル登録（不変）
-      window.PollingStateManager = Object.freeze(stateManager);
-      console.log('✅ PollingStateManager singleton initialized');
+      window.PollingStateManager = stateManager;
     }
 
     return window.PollingStateManager;
@@ -287,7 +308,6 @@ class StudyQuestApp {
   initializePollingSettings() {
     // 🔄 CLAUDE.md準拠: シングルトン状態管理者を初期化
     this.stateManager = this.getPollingStateManager();
-    console.log('✅ Singleton state manager initialized');
 
     // レガシー互換性のためのプロキシ（段階的移行）
     this.pollingSettings = this.stateManager.getState();
@@ -303,8 +323,9 @@ class StudyQuestApp {
       this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
     });
 
-    // パブリケーション状態監視システムの初期化
-    this.initPublicationStatusMonitoring();
+    // 🔧 OPTIMIZED: Start publication status monitoring after initialization
+    // Monitor initialization completion and start monitoring immediately when ready
+    this.scheduleInitializationCompleteCheck();
   }
 
   resetStateForCleanInit() {
@@ -726,31 +747,43 @@ class StudyQuestApp {
       // Apply default low performance tweaks
       this.optimizeForLowPerformance();
 
-      // Initialize admin user status early in the initialization process
+      // 🔧 GOAL REDEFINITION: Initialization = UI rendering + modal display
       try {
-        const isAdmin = await this.gas.checkAdmin();
-        this.state.isAdminUser = Boolean(isAdmin);
-        debugLog('🔑 Admin user status initialized:', { isAdminUser: this.state.isAdminUser });
+        // Get admin status directly from UNIFIED_CONFIG (already available)
+        this.state.isAdminUser = window.UNIFIED_CONFIG?.isAdminUser || false;
       } catch (error) {
-        warnLog('⚠️ Failed to initialize admin status, defaulting to false:', error.message);
+        // Ultimate fallback to safe defaults
         this.state.isAdminUser = false;
       }
 
-      // Show info modal while loading sheet data in the background
-      this.showInfoModal();
+      // 🔧 NEW GOAL: Start data loading and show modal as part of initialization
+      try {
+        // 1. スプレッドシートの読み込みを開始
+        this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false })
+          .then(() => {
+            // 2. データ読み込み開始後にモーダル表示
+            this.showInfoModal();
 
-      // Kick off data loading without blocking UI
-      this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false })
-        .catch(error => {
-          errorLog('❌ StudyQuestApp: Critical error in loadSheetData:', error);
-          this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
-        })
-        .finally(() => {
-          if (this.initTimeoutId) {
-            clearTimeout(this.initTimeoutId);
-            this.initTimeoutId = null;
-          }
-        });
+            // 3. 初期化完了フラグを設定
+            this.state.initializationComplete = true;
+            this.hideLoadingOverlay();
+          })
+          .catch(error => {
+            // データ読み込みエラーでも最低限の初期化は完了
+            this.showInfoModal();
+            this.state.initializationComplete = true;
+            this.hideLoadingOverlay();
+
+            console.error('Data loading failed during initialization:', error);
+          });
+      } catch (error) {
+        // 同期エラーの場合も最低限の初期化は完了
+        this.showInfoModal();
+        this.state.initializationComplete = true;
+        this.hideLoadingOverlay();
+
+        console.error('Initialization error:', error);
+      }
       
       // Defer all non-critical operations
       requestIdleCallback(() => {
@@ -1009,7 +1042,7 @@ class StudyQuestApp {
     this.handlers.onVisibilityChange = () => {
       if (document.hidden) {
         console.log('😴 Page hidden - stopping polling');
-        this.clearVisibilityDebounce();
+        // 🔧 CRITICAL FIX: Remove non-existent clearVisibilityDebounce() call
         this.stopNewAnswerPolling();
         this.cleanup();
       } else {
@@ -1104,28 +1137,59 @@ class StudyQuestApp {
       }
     }
 
-    // Enhanced GAS API call with retry support
+    // Enhanced GAS API call with retry support and timeout protection
     return this.executeWithRetry(async () => {
       return new Promise((resolve, reject) => {
+        // Timeout protection
+        const timeoutId = setTimeout(() => {
+          reject(new Error(`API call timeout after 15 seconds for function: ${funcName}`));
+        }, 15000);
+
+        const clearTimeoutAndResolve = (result) => {
+          clearTimeout(timeoutId);
+          if (!isStateChanging) {
+            this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
+          }
+          resolve(result);
+        };
+
+        const clearTimeoutAndReject = (error) => {
+          clearTimeout(timeoutId);
+          reject(error);
+        };
+
       if (typeof google !== 'undefined' && google.script && google.script.run) {
         // API関数存在チェック
         if (!google.script.run[funcName] || typeof google.script.run[funcName] !== 'function') {
           // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
           const safeFuncName = funcName || 'unknown';
-          reject(new Error(`API function '${safeFuncName}' not available`));
+          clearTimeoutAndReject(new Error(`API function '${safeFuncName}' not available`));
           return;
         }
 
+        debugLog(`🚀 Starting google.script.run call for ${funcName}`, {
+          timestamp: new Date().toISOString(),
+          userId: this.state.userId,
+          argsCount: mappedArgs.length
+        });
+
         google.script.run
           .withSuccessHandler((result) => {
-            if (!isStateChanging) {
-              this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
-            }
-            resolve(result);
+            debugLog(`✅ google.script.run success for ${funcName}`, {
+              timestamp: new Date().toISOString(),
+              hasResult: !!result
+            });
+            clearTimeoutAndResolve(result);
           })
           .withFailureHandler((error) => {
-            errorLog('GAS APIエラー受信:', { funcName, originalArgs: args, mappedArgs, error, success: false });
-            reject(this.enhanceError(error, funcName, args));
+            errorLog(`❌ google.script.run failure for ${funcName}:`, {
+              funcName,
+              originalArgs: args,
+              mappedArgs,
+              error,
+              timestamp: new Date().toISOString()
+            });
+            clearTimeoutAndReject(this.enhanceError(error, funcName, args));
           })
           .withUserObject({ userId: this.state.userId })
           [funcName](...mappedArgs);
@@ -1142,15 +1206,30 @@ class StudyQuestApp {
     }, {
       maxRetries: isStateChanging ? 1 : 2, // State-changing operations get fewer retries
       baseDelay: 500,
+      maxDelay: 5000, // Reduced max delay for faster failure
       context: `GAS API (${funcName || 'unknown'})`,
       retryCondition: (error) => {
+        // 🔧 CRITICAL FIX: Don't retry on timeout errors
+        if (error.message.includes('timeout')) {
+          debugLog(`❌ Timeout error for ${funcName}, not retrying:`, error.message);
+          return false;
+        }
+
         const retryableErrors = [
-          'network', 'timeout', 'temporarily unavailable',
+          'network', 'temporarily unavailable',
           'script runtime', 'service invoked'
         ];
-        return retryableErrors.some(errorType =>
+        const shouldRetry = retryableErrors.some(errorType =>
           error.message.toLowerCase().includes(errorType)
         );
+
+        debugLog(`🔧 Retry decision for ${funcName}:`, {
+          error: error.message,
+          shouldRetry,
+          errorType: retryableErrors.find(e => error.message.toLowerCase().includes(e)) || 'unknown'
+        });
+
+        return shouldRetry;
       }
     });
   }
@@ -1551,96 +1630,7 @@ class StudyQuestApp {
     }
   }
 
-  // 🏢 Enterprise-grade Retry Mechanism (CLAUDE.md V8 Compliant)
-  async executeWithRetry(operation, maxRetries = 3, options = {}) {
-    const config = {
-      baseDelay: options.baseDelay || 1000,
-      maxDelay: options.maxDelay || 30000,
-      exponentialBase: options.exponentialBase || 2,
-      jitterEnabled: options.jitterEnabled !== false, // デフォルトで有効
-      timeoutMs: options.timeoutMs || 30000,
-      ...options
-    };
-
-    let retryCount = 0;
-    const startTime = Date.now();
-    const errors = [];
-
-    while (retryCount < maxRetries) {
-      try {
-        // タイムアウトチェック
-        if (Date.now() - startTime > config.timeoutMs) {
-          throw new Error(`Operation timeout after ${config.timeoutMs}ms`);
-        }
-
-        console.log(`🔄 Executing operation (attempt ${retryCount + 1}/${maxRetries})`);
-
-        const result = await operation();
-
-        // 成功時: エラーカウンターをリセット
-        if (retryCount > 0) {
-          console.log(`✅ Operation succeeded after ${retryCount + 1} attempts`);
-        }
-
-        return result;
-
-      } catch (error) {
-        retryCount++;
-        errors.push({
-          attempt: retryCount,
-          error: error.message,
-          timestamp: new Date().toISOString()
-        });
-
-        console.warn(`❌ Operation failed (attempt ${retryCount}/${maxRetries}):`, error.message);
-
-        if (retryCount >= maxRetries) {
-          // 全ての試行が失敗: 詳細なエラー情報を含めて失敗
-          const aggregateError = new Error(
-            `Operation failed after ${maxRetries} attempts. Last error: ${error.message}`
-          );
-          aggregateError.retryHistory = errors;
-          aggregateError.totalDuration = Date.now() - startTime;
-          throw aggregateError;
-        }
-
-        // 🚀 CLAUDE.md準拠: V8 Runtime同期的バックオフ
-        // (setTimeout使わず、同期的遅延)
-        const baseDelay = Math.min(
-          config.baseDelay * Math.pow(config.exponentialBase, retryCount - 1),
-          config.maxDelay
-        );
-
-        // Jitterを追加して thundering herd を防止
-        const jitter = config.jitterEnabled ?
-          Math.random() * 0.1 * baseDelay : 0;
-
-        const finalDelay = Math.floor(baseDelay + jitter);
-
-        console.log(`⏳ Retrying in ${finalDelay}ms (exponential backoff with jitter)`);
-
-        // V8準拠の同期的遅延（サーバーサイドでは Utilities.sleep を使用）
-        if (typeof Utilities !== 'undefined' && Utilities.sleep) {
-          // GAS環境: サーバーサイド同期的スリープ
-          Utilities.sleep(finalDelay);
-        } else {
-          // クライアント環境: Promise-based delay（setTimeout代替）
-          await new Promise(resolve => {
-            const startWait = Date.now();
-            const checkComplete = () => {
-              if (Date.now() - startWait >= finalDelay) {
-                resolve();
-              } else {
-                // 短いポーリングサイクル（setTimeout使わない）
-                Promise.resolve().then(checkComplete);
-              }
-            };
-            checkComplete();
-          });
-        }
-      }
-    }
-  }
+  // 重複定義削除: Line 445の実装を使用
   
   // 新着通知バナーを表示
   showNewContentBanner(newItems) {
@@ -3090,16 +3080,13 @@ class StudyQuestApp {
    * @returns {Promise} データ取得結果
    */
   async getUserData(fetchParams, isInitialLoad) {
-    console.log('🔧 getUserData called:', fetchParams);
-    console.log('🔧 getPublishedSheetData function available:', typeof this.gas.getPublishedSheetData);
-    console.log('🔧 google.script.run available:', typeof google !== 'undefined' && typeof google.script !== 'undefined' && typeof google.script.run !== 'undefined');
-    console.log('🔧 google.script.run.getPublishedSheetData available:', typeof google !== 'undefined' && google.script && google.script.run && typeof google.script.run.getPublishedSheetData);
+    // 🔧 CLAUDE.md準拠: API呼び出し前の確実な権限初期化
+    if (fetchParams.showAdminFeatures == null || fetchParams.showAdminFeatures === undefined) {
+      const isAdminUser = window.UNIFIED_CONFIG?.isAdminUser || false;
+      fetchParams.showAdminFeatures = isAdminUser;
+    }
 
     try {
-      console.log('🔧 Calling getPublishedSheetData with params:', fetchParams.classFilter, fetchParams.sortOrder, fetchParams.showAdminFeatures, fetchParams.userId);
-
-      // CLAUDE.md準拠: 統合されたgetPublishedSheetDataを使用（userId対応）
-      console.log('🔧 Using unified getPublishedSheetData with userId support');
 
       const result = await this.gas.getPublishedSheetData(
         fetchParams.classFilter,
@@ -3108,30 +3095,14 @@ class StudyQuestApp {
         fetchParams.userId  // targetUserId（クロスユーザーアクセス）
       );
 
-      console.log('🔧 getUserData received:', result);
-      console.log('🔧 Result type:', typeof result);
-      console.log('🔧 Result details:', {
-        hasResult: !!result,
-        hasSuccess: result && 'success' in result,
-        successValue: result && result.success,
-        hasData: result && 'data' in result,
-        dataType: result && result.data ? typeof result.data : 'N/A',
-        isArray: result && Array.isArray(result.data)
-      });
-
       if (result && result.success && Array.isArray(result.data)) {
-        console.log('✅ getUserData success:', result.data.length, 'items');
         return result;
       }
 
-      console.log('❌ getUserData validation failed');
       return null;
 
     } catch (error) {
-      console.log('❌ getUserData error:', error);
-      console.log('❌ Error type:', typeof error);
-      console.log('❌ Error message:', error?.message);
-      console.log('❌ Error stack:', error?.stack);
+      errorLog('getUserData error:', error);
       return null;
     }
   }
@@ -3244,7 +3215,7 @@ class StudyQuestApp {
     
     // Prevent concurrent loading
     if (this.state.isLoading && config.showLoading) {
-      return;
+      return Promise.resolve(); // Return resolved Promise to prevent hanging .then() chains
     }
     
     try {
@@ -3634,9 +3605,19 @@ class StudyQuestApp {
         if (isInitialLoad) {
           this.elements.answersContainer.classList.add('render-optimized');
           // If loading is active, also add loading-safe class to prevent stacking context issues
-          if (document.body.classList.contains('loading-active') || 
+          if (document.body.classList.contains('loading-active') ||
               this.elements.answersContainer.classList.contains('loading-active')) {
             this.elements.answersContainer.classList.add('loading-safe');
+          }
+
+          // 🔧 Data load completed for initial load
+          // Note: Initialization may already be marked complete in checkAdmin step
+          if (!this.state.initializationComplete) {
+            this.state.initializationComplete = true;
+            this.hideLoadingOverlay();
+            debugLog('✅ Initialization completed during data load');
+          } else {
+            debugLog('✅ Data load completed - initialization already marked complete');
           }
         }
       } catch (error) {
@@ -7475,19 +7456,11 @@ class StudyQuestApp {
   // 🧹 CLAUDE.md準拠: setTimeout/setInterval完全代替メソッド集
 
   /**
-   * Promise-based delay (setTimeout代替)
+   * Promise-based delay (proper setTimeout wrapper)
    */
   async createPromiseDelay(ms) {
     return new Promise(resolve => {
-      const startTime = Date.now();
-      const checkComplete = () => {
-        if (Date.now() - startTime >= ms) {
-          resolve();
-        } else {
-          Promise.resolve().then(checkComplete);
-        }
-      };
-      checkComplete();
+      setTimeout(resolve, ms);
     });
   }
 
@@ -7505,6 +7478,12 @@ class StudyQuestApp {
    */
   createInitializationTimeout(timeoutMs) {
     return this.createPromiseDelay(timeoutMs).then(() => {
+      // 🔧 CRITICAL FIX: Check if initialization already completed
+      if (this.state.initializationComplete) {
+        debugLog('✅ Initialization timeout cancelled - already completed');
+        return;
+      }
+
       this.hideLoadingOverlay();
       warnLog('⏰ ページの初期化がタイムアウトしました。ネットワーク接続またはサーバーの応答をご確認ください。');
       this.showErrorMessage('初期化がタイムアウトしました。接続状況を確認して、ページを再読み込みしてください。', false);
@@ -7650,6 +7629,24 @@ class StudyQuestApp {
     if (sheetData && sheetData.length > 0) {
       await this.loadSheetData({ bypassCache: true });
     }
+  }
+
+  /**
+   * Schedule initialization completion check (replaces setTimeout)
+   */
+  scheduleInitializationCompleteCheck() {
+    const checkAndStart = () => {
+      if (this.state.initializationComplete) {
+        this.initPublicationStatusMonitoring();
+        debugLog('📊 Publication status monitoring started after initialization');
+      } else {
+        // Check again after a short delay if not complete
+        this.createPromiseDelay(1000).then(checkAndStart);
+      }
+    };
+
+    // Start checking immediately
+    checkAndStart();
   }
 }
 // ドメイン情報処理
@@ -7805,12 +7802,18 @@ try {
     window.studyQuestApp.destroy();
   }
   document.addEventListener('DOMContentLoaded', () => {
-  const app = new StudyQuestApp();
+  console.log('🚀 DOMContentLoaded fired - Starting StudyQuestApp initialization');
+  try {
+    console.log('📱 Creating new StudyQuestApp instance...');
+    const app = new StudyQuestApp();
+    console.log('✅ StudyQuestApp instance created successfully');
+    window.studyQuestApp = app;
+    console.log('✅ StudyQuestApp assigned to window.studyQuestApp');
+  } catch (error) {
+    console.error('❌ Failed to create StudyQuestApp instance:', error);
+    throw error;
+  }
 });
-
-  // ドメイン情報とフォームリンクを取得
-  loadDomainInfo();
-  loadFormLink();
 
   window.addEventListener('beforeunload', () => {
     if (window.studyQuestApp && typeof window.studyQuestApp.destroy === 'function') {

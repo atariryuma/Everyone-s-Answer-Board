@@ -163,8 +163,11 @@ function validateText(text, options = {}) {
       metadata: {}
     };
 
-    if (typeof text !== 'string') {
-      result.errors.push('テキストが必要です');
+    // 🛡️ 型チェック強化 - null/undefined/非string型の完全検証
+    if (text === null || text === undefined || typeof text !== 'string') {
+      result.errors.push('有効なテキスト文字列が必要です');
+      result.metadata.inputType = typeof text;
+      result.metadata.inputValue = text === null ? 'null' : text === undefined ? 'undefined' : String(text);
       return result;
     }
 
@@ -534,35 +537,53 @@ function validateFormLink(formUrl, spreadsheetId) {
 
     // 実際の接続テスト（より確実な検証）
     try {
-      // 1. スプレッドシート接続確認
-      if (typeof getColumnAnalysis === 'function') {
-        const connectionTest = getColumnAnalysis(spreadsheetId, 'フォームの回答 1');
-        if (connectionTest && connectionTest.success) {
-          result.details.connectionVerified = true;
-          result.details.sheetAccessible = true;
-        } else {
+      // 🛡️ Zero-Dependency安全: スプレッドシート接続確認
+      const hasColumnAnalysis = typeof getColumnAnalysis === 'function';
+      if (hasColumnAnalysis) {
+        try {
+          const connectionTest = getColumnAnalysis(spreadsheetId, 'フォームの回答 1');
+          if (connectionTest && connectionTest.success) {
+            result.details.connectionVerified = true;
+            result.details.sheetAccessible = true;
+          } else {
+            result.details.connectionVerified = false;
+            result.details.connectionError = connectionTest?.errorResponse?.message || connectionTest?.message || 'Connection failed';
+          }
+        } catch (connectionError) {
           result.details.connectionVerified = false;
-          result.details.connectionError = connectionTest?.errorResponse?.message || 'Connection failed';
+          result.details.connectionError = connectionError && connectionError.message ? connectionError.message : '接続テスト実行エラー';
         }
+      } else {
+        result.details.connectionVerified = false;
+        result.details.connectionError = 'getColumnAnalysis関数が利用できません';
       }
 
-      // 2. フォーム情報取得・検証
-      if (typeof getFormInfo === 'function') {
-        const formInfoTest = getFormInfo(spreadsheetId, 'フォームの回答 1');
-        if (formInfoTest && formInfoTest.success) {
-          result.details.formInfoVerified = true;
-          result.details.formData = formInfoTest.formData;
+      // 🛡️ Zero-Dependency安全: フォーム情報取得・検証
+      const hasFormInfo = typeof getFormInfo === 'function';
+      if (hasFormInfo) {
+        try {
+          const formInfoTest = getFormInfo(spreadsheetId, 'フォームの回答 1');
+          if (formInfoTest && formInfoTest.success) {
+            result.details.formInfoVerified = true;
+            result.details.formData = formInfoTest.formData;
 
-          // フォームURLが取得できた場合、URLの一致確認
-          if (formInfoTest.formData && formInfoTest.formData.formUrl) {
-            const detectedFormUrl = formInfoTest.formData.formUrl;
-            result.details.detectedFormUrl = detectedFormUrl;
-            result.details.formUrlMatches = (detectedFormUrl === formUrl);
+            // フォームURLが取得できた場合、URLの一致確認
+            if (formInfoTest.formData && formInfoTest.formData.formUrl) {
+              const detectedFormUrl = formInfoTest.formData.formUrl;
+              result.details.detectedFormUrl = detectedFormUrl;
+              result.details.formUrlMatches = (detectedFormUrl === formUrl);
+            }
+          } else {
+            result.details.formInfoVerified = false;
+            result.details.formInfoError = formInfoTest?.message || 'Form info retrieval failed';
           }
-        } else {
+        } catch (formInfoError) {
           result.details.formInfoVerified = false;
-          result.details.formInfoError = formInfoTest?.message || 'Form info retrieval failed';
+          result.details.formInfoError = formInfoError && formInfoError.message ? formInfoError.message : 'フォーム情報取得実行エラー';
         }
+      } else {
+        result.details.formInfoVerified = false;
+        result.details.formInfoError = 'getFormInfo関数が利用できません';
       }
     } catch (connectionError) {
       result.details.connectionVerified = false;

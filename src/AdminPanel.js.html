@@ -19,7 +19,6 @@
   try {
     if (typeof __CONFIG_JSON__ === 'string' && __CONFIG_JSON__ !== '{}') {
       CONFIG = JSON.parse(__CONFIG_JSON__);
-      console.log('Admin Panel: Unified configuration loaded:', CONFIG);
     } else {
       console.warn('Admin Panel: ConfigJSON not available, using default values');
     }
@@ -459,7 +458,6 @@
       }
 
       // 未設定ユーザー: 従来のフル初期化
-      console.log('🔄 未設定ユーザー: フル初期化実行');
       spreadsheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
 
       if (config && config.spreadsheetId) {
@@ -501,7 +499,6 @@
     clearColumnDropdowns();
 
     try {
-      console.log('🔧 setupColumns: 列設定を初期化中:', { spreadsheetId, sheetName });
 
       // シンプルフロー: データソース接続 → 列情報取得 → UI反映
       const analysisResult = await getColumnAnalysis(spreadsheetId, sheetName);
@@ -519,7 +516,6 @@
       // ドロップダウンにヘッダー選択肢を設定
       fillColumnDropdowns(analysisResult.headers, analysisResult.mapping, analysisResult.confidence);
 
-      console.log('✅ 列設定ドロップダウン初期化完了');
     } catch (error) {
       console.error('❌ 列設定ドロップダウン初期化エラー:', error);
     }
@@ -550,10 +546,8 @@
 
     radioButtons.forEach((radio) => {
       radio.addEventListener('change', async function () {
-        console.log('🔘 [RadioEvent] Changed to:', this.value, 'listLoaded:', spreadsheetListLoaded);
         if (this.value === 'dropdown' && !spreadsheetListLoaded) {
           // 「一覧から選択」が選択された時のみスプレッドシート一覧を読み込み
-          console.log('スプレッドシート一覧を読み込み中...');
           setPartialLoading(true, 'スプレッドシート一覧を取得中...');
           try {
             await loadSpreadsheets();
@@ -607,19 +601,6 @@
       google.script.run
         .withSuccessHandler(function (result) {
           // ✅ Phase 2: レスポンス処理改善とnull対応強化
-          console.log('📊 受信した生レスポンス:', result);
-          console.log('📊 レスポンスの詳細:', {
-            type: typeof result,
-            isNull: result === null,
-            isUndefined: result === undefined,
-            isArray: Array.isArray(result),
-            hasSpreadsheets: result && result.spreadsheets !== undefined,
-            spreadsheetsType: result && typeof result.spreadsheets,
-            spreadsheetsLength: result && result.spreadsheets ? result.spreadsheets.length : 'undefined',
-            success: result && result.success,
-            keys: result ? Object.keys(result) : [],
-            rawResultString: JSON.stringify(result)
-          });
 
           // ✅ 強化されたnull/undefined対応
           if (result === null || result === undefined) {

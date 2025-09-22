@@ -143,7 +143,7 @@ function testSystemSetup() {
     // データベース接続テスト
     try {
       const props = PropertiesService.getScriptProperties();
-      const databaseId = props.getDatabaseSpreadsheetId();
+      const databaseId = props.getProperty('DATABASE_SPREADSHEET_ID');
       if (databaseId) {
         const dataAccess = openSpreadsheet(databaseId, { useServiceAccount: true });
         diagnostics.tests.push({
@@ -192,29 +192,19 @@ function forceUrlSystemReset() {
     try {
       console.warn('システム強制リセットが実行されました');
 
-      // キャッシュをクリア（複数の方法を試行）
+      // キャッシュをクリア
       const cacheResults = [];
       try {
         const cache = CacheService.getScriptCache();
         if (cache && typeof cache.removeAll === 'function') {
-          cache.removeAll([]); // Signature-compatible no-op to avoid errors
-          cacheResults.push('ScriptCache クリア要求送信');
+          cache.removeAll(); // GAS標準API - 引数不要
+          cacheResults.push('キャッシュクリア完了');
+        } else {
+          cacheResults.push('キャッシュサービスが利用できません');
         }
       } catch (cacheError) {
-        console.warn('[WARN] SystemController.forceUrlSystemReset: ScriptCache clear error:', cacheError.message || 'Cache clear failed');
-        cacheResults.push(cacheError && cacheError.message ? `ScriptCache クリア失敗: ${cacheError.message}` : 'ScriptCache クリア失敗: 詳細不明');
-      }
-
-      // Document Cache も試行
-      try {
-        const docCache = CacheService.getScriptCache(); // Use unified cache
-        if (docCache && typeof docCache.removeAll === 'function') {
-          docCache.removeAll([]);
-          cacheResults.push('DocumentCache クリア要求送信');
-        }
-      } catch (docCacheError) {
-        console.warn('[WARN] SystemController.forceUrlSystemReset: DocumentCache clear error:', docCacheError.message || 'Document cache clear failed');
-        cacheResults.push(docCacheError && docCacheError.message ? `DocumentCache クリア失敗: ${docCacheError.message}` : 'DocumentCache クリア失敗: 詳細不明');
+        console.warn('[WARN] SystemController.forceUrlSystemReset: Cache clear error:', cacheError.message);
+        cacheResults.push(`キャッシュクリア失敗: ${cacheError.message}`);
       }
 
       // 重要: プロパティはクリアしない（データ損失防止）
@@ -228,7 +218,7 @@ function forceUrlSystemReset() {
       };
 
     } catch (error) {
-      console.error('[ERROR] SystemController.forceUrlSystemReset:', error.message || 'System reset error');
+      console.error('[ERROR] SystemController.forceUrlSystemReset:', error && error.message ? error.message : 'System reset error');
       return {
         success: false,
         message: error && error.message ? error.message : '詳細不明'
@@ -369,8 +359,8 @@ function getSystemStatus() {
       const status = {
         timestamp: new Date().toISOString(),
         setup: {
-          hasDatabase: !!props.getDatabaseSpreadsheetId(),
-          hasAdminEmail: !!props.getAdminEmail(),
+          hasDatabase: !!props.getProperty('DATABASE_SPREADSHEET_ID'),
+          hasAdminEmail: !!props.getProperty('ADMIN_EMAIL'),
           hasServiceAccount: !!getServiceAccount()?.isValid
         },
         services: {
@@ -388,10 +378,10 @@ function getSystemStatus() {
       };
 
     } catch (error) {
-      console.error('[ERROR] SystemController.getSystemStatus:', error.message || 'System status error');
+      console.error('[ERROR] SystemController.getSystemStatus:', error && error.message ? error.message : 'System status error');
       return {
         success: false,
-        message: error.message
+        message: error && error.message ? error.message : 'システム状態取得エラー'
       };
     }
 }
@@ -642,10 +632,10 @@ function performAutoRepair() {
       };
 
     } catch (error) {
-      console.error('[ERROR] SystemController.performAutoRepair:', error.message || 'Auto repair error');
+      console.error('[ERROR] SystemController.performAutoRepair:', error && error.message ? error.message : 'Auto repair error');
       return {
         success: false,
-        message: error.message
+        message: error && error.message ? error.message : '自動修復エラー'
       };
     }
 }
@@ -687,10 +677,10 @@ function getAdminSheetList(spreadsheetId) {
       spreadsheetName: spreadsheet.getName()
     };
   } catch (error) {
-    console.error('[ERROR] SystemController.getSheetList:', error.message || 'Sheet list error');
+    console.error('[ERROR] SystemController.getSheetList:', error && error.message ? error.message : 'Sheet list error');
     return {
       success: false,
-      message: error.message || 'シート一覧取得エラー',
+      message: error && error.message ? error.message : 'シート一覧取得エラー',
       sheets: []
     };
   }

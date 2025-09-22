@@ -723,23 +723,24 @@ function getViewerBoardData(targetUserId, viewerEmail) {
     if (targetUser.userEmail === viewerEmail) {
       // ✅ Own data: use normal permissions (CLAUDE.md pattern)
       console.log('getViewerBoardData: Self-access - using normal permissions');
-      return getUserSpreadsheetData(targetUser);
+      // ✅ Self-access: Use getUserSpreadsheetData to get basic spreadsheet info
+      return getUserSpreadsheetData(targetUser, {
+        includeTimestamp: true,
+        requestingUser: viewerEmail
+      });
     } else {
       // ✅ Other's data: use service account for cross-user access (CLAUDE.md pattern)
       console.log('getViewerBoardData: Cross-user access - using service account');
-
-      // 🔧 CLAUDE.md準拠: configJson-based unified configuration
-      const configResult = getUserConfig(targetUser.userId);
-      if (!configResult.success || !configResult.config?.spreadsheetId) {
-        console.warn('getViewerBoardData: Failed to get target user spreadsheetId from config');
-        return null;
-      }
-
-      const dataAccess = openSpreadsheet(configResult.config.spreadsheetId, {
+      // ✅ Cross-user: Use getUserSpreadsheetData with service account access
+      const dataAccess = openSpreadsheet(targetUser.spreadsheetId, {
         useServiceAccount: true,
         context: 'getViewerBoardData'
       });
-      return getUserSpreadsheetData(targetUser, { dataAccess });
+      return getUserSpreadsheetData(targetUser, {
+        dataAccess,
+        includeTimestamp: true,
+        requestingUser: viewerEmail
+      });
     }
   } catch (error) {
     console.error('getViewerBoardData error:', error.message);
@@ -853,7 +854,7 @@ function deleteUser(userId, reason = '', context = {}) {
 
     if (!isAdmin && !context.forceServiceAccount) {
       console.warn('deleteUser: Non-admin user attempting user deletion:', userId);
-      return { success: false, error: 'Insufficient permissions for user deletion' };
+      return { success: false, message: 'Insufficient permissions for user deletion' };
     }
 
     // User deletion is inherently cross-user administrative operation
@@ -862,13 +863,13 @@ function deleteUser(userId, reason = '', context = {}) {
     const spreadsheet = openDatabase(true); // Always service account for deletion operations
     if (!spreadsheet) {
       console.warn('deleteUser: Database access failed');
-      return { success: false, error: 'Database access failed' };
+      return { success: false, message: 'Database access failed' };
     }
 
     const sheet = spreadsheet.getSheetByName('users');
     if (!sheet) {
       console.warn('deleteUser: Users sheet not found');
-      return { success: false, error: 'Users sheet not found' };
+      return { success: false, message: 'Users sheet not found' };
     }
 
     const data = sheet.getDataRange().getValues();
@@ -877,7 +878,7 @@ function deleteUser(userId, reason = '', context = {}) {
 
     if (userIdColumnIndex === -1) {
       console.warn('deleteUser: UserId column not found');
-      return { success: false, error: 'UserId column not found' };
+      return { success: false, message: 'UserId column not found' };
     }
 
     for (let i = 1; i < data.length; i++) {
@@ -905,9 +906,9 @@ function deleteUser(userId, reason = '', context = {}) {
     }
 
     console.warn('deleteUser: User not found:', userId);
-    return { success: false, error: 'User not found' };
+    return { success: false, message: 'User not found' };
   } catch (error) {
     console.error('deleteUser error:', error.message);
-    return { success: false, error: error.message };
+    return { success: false, message: error.message };
   }
 }

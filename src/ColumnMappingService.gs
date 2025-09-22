@@ -36,24 +36,40 @@ function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}
   };
 
   try {
-    // 入力検証
-    if (!Array.isArray(headers) || headers.length === 0) {
-      debugInfo.error = 'Invalid headers array';
+    // 🛡️ 入力検証強化 - より詳細なチェック
+    if (!headers || !Array.isArray(headers) || headers.length === 0) {
+      debugInfo.error = 'Invalid or empty headers array';
+      debugInfo.details = {
+        headers: headers ? 'defined' : 'null/undefined',
+        isArray: Array.isArray(headers),
+        length: headers ? headers.length : 'N/A'
+      };
       return { index: -1, confidence: 0, method: 'validation_failed', debug: debugInfo };
     }
 
-    if (!fieldType || typeof fieldType !== 'string') {
-      debugInfo.error = 'Invalid fieldType';
+    if (!fieldType || typeof fieldType !== 'string' || fieldType.trim() === '') {
+      debugInfo.error = 'Invalid or empty fieldType';
+      debugInfo.details = {
+        fieldType: fieldType ? fieldType : 'null/undefined',
+        type: typeof fieldType,
+        length: fieldType ? fieldType.length : 'N/A'
+      };
       return { index: -1, confidence: 0, method: 'validation_failed', debug: debugInfo };
     }
 
-    // 1. 優先: 明示的列マッピング（管理パネルまたはAI検出）
-    if (columnMapping && columnMapping[fieldType] !== undefined && columnMapping[fieldType] !== null) {
+    // 🛡️ columnMapping検証とマッピング処理
+    if (columnMapping && typeof columnMapping === 'object' && columnMapping[fieldType] !== undefined && columnMapping[fieldType] !== null) {
       const mappedIndex = columnMapping[fieldType];
-      if (typeof mappedIndex === 'number' && mappedIndex >= 0 && mappedIndex < headers.length) {
+      if (typeof mappedIndex === 'number' && Number.isInteger(mappedIndex) && mappedIndex >= 0 && mappedIndex < headers.length) {
         debugInfo.searchMethods.push({ method: 'explicit_mapping', index: mappedIndex, confidence: 100 });
         debugInfo.finalSelection = { method: 'explicit_mapping', index: mappedIndex };
         return { index: mappedIndex, confidence: 100, method: 'explicit_mapping', debug: debugInfo };
+      } else {
+        debugInfo.searchMethods.push({
+          method: 'explicit_mapping_invalid',
+          index: mappedIndex,
+          error: `Invalid mapped index: ${mappedIndex} (type: ${typeof mappedIndex}, isInteger: ${Number.isInteger(mappedIndex)})`
+        });
       }
     }
 
@@ -178,12 +194,24 @@ function getPositionalFallback(fieldType, columnCountOrRow) {
  */
 function extractFieldValueUnified(row, headers, fieldType, columnMapping = {}, options = {}) {
   try {
-    // 🛡️ 入力検証強化
-    if (!Array.isArray(row)) {
+    // 🛡️ 入力検証強化 - 完全なnull/undefined/型チェック
+    if (!row || !Array.isArray(row) || row.length === 0) {
       if (options.enableDebug) {
-        console.warn(`[WARN] ColumnMappingService.extractFieldValueUnified (${fieldType}): Invalid row data`);
+        console.warn(`[WARN] ColumnMappingService.extractFieldValueUnified (${fieldType}): Invalid or empty row data`, {
+          row: row ? 'defined' : 'null/undefined',
+          isArray: Array.isArray(row),
+          length: row ? row.length : 'N/A'
+        });
       }
       return options.defaultValue || '';
+    }
+
+    // headers配列の検証も追加
+    if (!headers || !Array.isArray(headers)) {
+      if (options.enableDebug) {
+        console.warn(`[WARN] ColumnMappingService.extractFieldValueUnified (${fieldType}): Invalid headers data`);
+      }
+      return handleColumnNotFound(fieldType, row, headers, options);
     }
 
     const columnResult = resolveColumnIndex(headers, fieldType, columnMapping, options);
@@ -204,10 +232,14 @@ function extractFieldValueUnified(row, headers, fieldType, columnMapping = {}, o
       return handleColumnNotFound(fieldType, row, headers, options);
     }
 
-    // 範囲外チェック
-    if (columnResult.index >= row.length) {
+    // 🛡️ 範囲外チェック強化 - 負の値や非整数も検証
+    if (columnResult.index < 0 || columnResult.index >= row.length || !Number.isInteger(columnResult.index)) {
       if (options.enableDebug) {
-        console.warn(`[WARN] ColumnMappingService.extractFieldValueUnified (${fieldType}): Column index ${columnResult.index} is out of range (row length: ${row.length})`);
+        console.warn(`[WARN] ColumnMappingService.extractFieldValueUnified (${fieldType}): Invalid column index`, {
+          index: columnResult.index,
+          rowLength: row.length,
+          isInteger: Number.isInteger(columnResult.index)
+        });
       }
       return options.defaultValue || '';
     }

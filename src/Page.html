@@ -179,6 +179,9 @@
       autoStopTime: CONFIG.autoStopTime || null
     };
 
+    // 🔧 CLAUDE.md準拠: 権限ベースアクセス制御 - 管理者機能初期化
+    window.showAdminFeatures = window.UNIFIED_CONFIG.isAdminUser || false;
+
     // Legacy variable assignments - use unified config where possible
     const SHEET_NAME = window.UNIFIED_CONFIG.sheetName;
     const USER_ID = window.UNIFIED_CONFIG.userId;

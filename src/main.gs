@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, transformBoardDataToFrontendFormat */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -212,9 +212,9 @@ function doGet(e) {
           sheetName: config.sheetName || 'テストシート',
           questionText: questionText || '回答ボード',
           isPublished: Boolean(config.isPublished),
-          isEditor: isEditor,
-          isAdminUser: isAdminUser,
-          isOwnBoard: isOwnBoard,
+          isEditor,
+          isAdminUser,
+          isOwnBoard,
           formUrl: config.formUrl || '',
           showDetails: config.showDetails !== false,
           autoStopEnabled: Boolean(config.autoStopEnabled),
@@ -250,8 +250,8 @@ function doGet(e) {
     errorTemplate.message = 'システムで予期しないエラーが発生しました。管理者にお問い合わせください。';
     errorTemplate.hideLoginButton = false;
 
-    // Validate error object before template literal usage
-    if (error.message) {
+    // V8ランタイム安全: error変数存在チェック後のテンプレートリテラル使用
+    if (error && error.message) {
       errorTemplate.debugInfo = `Error: ${error.message}\nStack: ${error.stack || 'N/A'}`;
     } else {
       errorTemplate.debugInfo = 'An unknown error occurred during request processing.';
@@ -327,38 +327,16 @@ function doPost(e) {
     let result;
     switch (action) {
       case 'getData':
-        // 🎯 GAS-Native: Direct Data class call
-        try {
-          const user = findUserByEmail(email, { requestingUser: email });
-          if (!user) {
-            result = createUserNotFoundError();
-          } else {
-            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
-          }
-        } catch (error) {
-          result = createExceptionResponse(error);
-        }
+        result = handleUserDataRequest(email, request.options || {});
         break;
       case 'addReaction':
-        // Direct DataService call for reactions
         result = addReaction(request.userId || email, request.rowId, request.reactionType);
         break;
       case 'toggleHighlight':
-        // Direct DataService call for highlights
         result = toggleHighlight(request.userId || email, request.rowId);
         break;
       case 'refreshData':
-        // 🎯 GAS-Native: Direct Data class call
-        try {
-          const user = findUserByEmail(email, { requestingUser: email });
-          if (!user) {
-            result = createUserNotFoundError();
-          } else {
-            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
-          }
-        } catch (error) {
-          result = createExceptionResponse(error);
-        }
+        result = handleUserDataRequest(email, request.options || {});
         break;
       default:
         result = createErrorResponse(action ? `Unknown action: ${action}` : 'Unknown action: 不明');
@@ -368,11 +346,33 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
 
   } catch (error) {
-    console.error('doPost error:', error.message);
+    // V8ランタイム安全: error変数とerror.message存在チェック
+    const errorMessage = error && error.message ? error.message : '予期しないエラーが発生しました';
+    console.error('doPost error:', errorMessage);
     return ContentService.createTextOutput(JSON.stringify({
       success: false,
-      message: error.message
+      message: errorMessage
     })).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/**
+ * 統一ユーザーデータリクエスト処理関数
+ * 重複していたgetDataとrefreshDataのロジックを統一
+ * @param {string} email - ユーザーメールアドレス
+ * @param {Object} options - リクエストオプション
+ * @returns {Object} 処理結果
+ */
+function handleUserDataRequest(email, options = {}) {
+  try {
+    const user = findUserByEmail(email, { requestingUser: email });
+    if (!user) {
+      return createUserNotFoundError();
+    }
+    return { success: true, data: getUserSheetData(user.userId, options) };
+  } catch (error) {
+    console.error('handleUserDataRequest error:', error.message);
+    return createExceptionResponse(error);
   }
 }
 
@@ -460,18 +460,7 @@ function getConfig() {
   }
 }
 
-/**
- * Get web app URL
- * @returns {string} The URL of the deployed web app
- */
-function getWebAppUrl() {
-  try {
-    return ScriptApp.getService().getUrl();
-  } catch (error) {
-    console.error('getWebAppUrl error:', error.message);
-    return '';
-  }
-}
+// getWebAppUrl moved to SystemController.gs for architecture compliance
 
 // ===========================================
 // 🔧 フロントエンド互換性API - 統一認証システム対応
@@ -1138,7 +1127,6 @@ function validateHeaderIntegrity(targetUserId) {
  * Get board info - simplified name
  */
 function getBoardInfo() {
-  console.log('🔍 getBoardInfo START');
 
   try {
     const email = getCurrentEmail();
@@ -1161,11 +1149,6 @@ function getBoardInfo() {
     const isPublished = Boolean(config.isPublished);
     const baseUrl = ScriptApp.getService().getUrl();
 
-    console.log('✅ getBoardInfo SUCCESS:', {
-      userId: user.userId,
-      isPublished,
-      hasConfig: !!user.configJson
-    });
 
     return {
       success: true,
@@ -1208,18 +1191,10 @@ function getSheetData(userId, options = {}) {
  * @returns {Object} フロントエンド期待形式のデータ
  */
 function getPublishedSheetData(classFilter, sortOrder, adminMode = false, targetUserId = null) {
-  console.log('🔧 getPublishedSheetData called with params:', {
-    classFilter,
-    sortOrder,
-    adminMode,
-    targetUserId,
-    hasTargetUserId: !!targetUserId
-  });
 
   try {
     const viewerEmail = getCurrentEmail();
     if (!viewerEmail) {
-      console.log('🔧 getPublishedSheetData: No viewer email, returning auth error');
       return {
         success: false,
         error: 'Authentication required',
@@ -1229,14 +1204,15 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode = false, target
       };
     }
 
+    // 🔧 CLAUDE.md準拠: 管理者権限チェック
+    const isSystemAdmin = isAdministrator(viewerEmail);
+
     // CLAUDE.md準拠: クロスユーザーアクセス対応
     let user;
     if (targetUserId) {
       // クロスユーザーアクセス: targetUserIdで指定されたユーザーのデータを取得
-      console.log('🔧 getPublishedSheetData: Cross-user access mode');
       const boardData = getViewerBoardData(targetUserId, viewerEmail);
       if (!boardData) {
-        console.log('🔧 getPublishedSheetData: Target user not found or access denied');
         return {
           success: false,
           error: 'User not found or access denied',
@@ -1250,17 +1226,34 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode = false, target
       return transformBoardDataToFrontendFormat(boardData, classFilter, sortOrder);
     } else {
       // 従来通り: 現在のユーザーのデータを取得
-      console.log('🔧 getPublishedSheetData: Self-access mode');
-      user = findUserByEmail(viewerEmail, { requestingUser: viewerEmail });
+
+      // 🔧 CLAUDE.md準拠: 管理者権限に基づく適切なユーザー検索
+      const searchOptions = {
+        requestingUser: viewerEmail,
+        adminMode: isSystemAdmin // 管理者の場合は特権モード
+      };
+
+      user = findUserByEmail(viewerEmail, searchOptions);
       if (!user) {
-        console.log('🔧 getPublishedSheetData: Current user not found');
-        return {
-          success: false,
-          error: 'User not found',
-          rows: [],
-          sheetName: '',
-          header: 'ユーザーエラー'
-        };
+
+        // 管理者の場合は追加の検索を試行
+        if (isSystemAdmin) {
+          user = findUserByEmail(viewerEmail, {
+            requestingUser: viewerEmail,
+            adminMode: true,
+            ignorePermissions: true
+          });
+        }
+
+        if (!user) {
+          return {
+            success: false,
+            error: 'User not found',
+            rows: [],
+            sheetName: '',
+            header: 'ユーザーエラー'
+          };
+        }
       }
     }
 
@@ -1268,18 +1261,15 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode = false, target
     const options = {
       classFilter: classFilter !== 'すべて' ? classFilter : undefined,
       sortBy: sortOrder || 'newest',
-      includeTimestamp: true
+      includeTimestamp: true,
+      adminMode: isSystemAdmin, // 管理者権限をデータ取得に渡す
+      requestingUser: viewerEmail
     };
 
     const result = getUserSheetData(user.userId, options);
 
     // 統一されたtransformBoardDataToFrontendFormat関数を使用
     if (result && result.success && result.data) {
-      console.log('✅ getPublishedSheetData SUCCESS:', {
-        userId: user.userId,
-        dataCount: result.data.length,
-        sheetName: result.sheetName
-      });
 
       // CLAUDE.md準拠: 統一されたデータ変換関数使用（DRY原則）
       return transformBoardDataToFrontendFormat(result, classFilter, sortOrder);
@@ -1314,14 +1304,16 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode = false, target
  * @returns {Object} フロントエンド期待形式のデータ
  */
 function transformBoardDataToFrontendFormat(boardData, classFilter, sortOrder) {
-  console.log('🔧 transformBoardDataToFrontendFormat:', {
-    hasBoardData: !!boardData,
-    hasData: boardData && 'data' in boardData,
-    dataLength: Array.isArray(boardData?.data) ? boardData.data.length : 'N/A'
-  });
+
+  // 🔧 CLAUDE.md準拠: Enhanced validation with detailed logging
+  const hasValidBoardData = !!boardData;
+  const hasSuccessFlag = boardData?.success === true;
+  const hasDataProperty = boardData && 'data' in boardData;
+  const isDataArray = Array.isArray(boardData?.data);
+
 
   // フロントエンド期待形式に変換（CLAUDE.md準拠）
-  if (boardData && (boardData.success !== false) && boardData.data && Array.isArray(boardData.data)) {
+  if (hasValidBoardData && hasSuccessFlag && hasDataProperty && isDataArray) {
     const transformedData = {
       success: true,
       header: boardData.header || boardData.sheetName || '回答一覧',
@@ -1357,18 +1349,29 @@ function transformBoardDataToFrontendFormat(boardData, classFilter, sortOrder) {
       transformedData.data.sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0));
     }
 
-    console.log('🔧 transformBoardDataToFrontendFormat: Success -', transformedData.data.length, 'items');
     return transformedData;
   }
 
-  // データが存在しない場合
-  console.warn('🔧 transformBoardDataToFrontendFormat: No valid data found');
+  // データが存在しない場合 - 詳細なエラー情報を提供
+  const debugInfo = {
+    hasBoardData: !!boardData,
+    boardDataType: typeof boardData,
+    boardDataSuccess: boardData?.success,
+    hasDataProperty: boardData && 'data' in boardData,
+    dataType: typeof boardData?.data,
+    isDataArray: Array.isArray(boardData?.data),
+    dataLength: Array.isArray(boardData?.data) ? boardData?.data.length : 'not-array'
+  };
+
+  console.warn('🔧 transformBoardDataToFrontendFormat: No valid data found - Debug Info:', debugInfo);
+
   return {
     success: false,
     error: 'No data available',
     rows: [],
-    sheetName: '',
-    header: 'データなし'
+    sheetName: boardData?.sheetName || '',
+    header: boardData?.header || 'データなし',
+    debug: debugInfo // デバッグ情報を含める
   };
 }
 
@@ -1404,7 +1407,6 @@ function getSheetList(spreadsheetId) {
     const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
     const useServiceAccount = !isSelfAccess;
 
-    console.log(`getSheetList: ${useServiceAccount ? 'Cross-user service account' : 'Self-access normal permissions'} for spreadsheet`);
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
     const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
@@ -1621,7 +1623,6 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
       return createAdminRequiredError();
     }
 
-    console.log('connectDataSource called:', { spreadsheetId, sheetName, batchOperations });
 
     // バッチ処理対応 - CLAUDE.md準拠 70x Performance
     if (batchOperations && Array.isArray(batchOperations)) {
@@ -1684,11 +1685,6 @@ function processDataSourceOperations(spreadsheetId, sheetName, operations) {
             results.headers = columnAnalysisResult.headers;
             results.data = columnAnalysisResult.data;
             results.sheet = columnAnalysisResult.sheet;
-            console.log('connectDataSource: AI分析結果を直接送信（キャッシュ利用）', {
-              mappingKeys: Object.keys(columnAnalysisResult.mapping || {}),
-              confidenceKeys: Object.keys(columnAnalysisResult.confidence || {}),
-              headers: columnAnalysisResult.headers?.length || 0
-            });
           } else {
             results.success = false;
             results.error = columnAnalysisResult.errorResponse?.message || columnAnalysisResult.message;
@@ -1723,7 +1719,7 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
     const sheet = dataAccess.getSheet(sheetName);
 
     if (!sheet) {
-      return { success: false, error: 'Sheet not found' };
+      return { success: false, message: 'Sheet not found' };
     }
 
     // 🔧 既存DataService.getSheetHeaders活用
@@ -1777,12 +1773,21 @@ function validateDataSourceAccess(spreadsheetId, sheetName) {
  */
 function getFormInfoInternal(spreadsheetId, sheetName) {
   try {
-    return getFormInfo(spreadsheetId, sheetName);
+    // Zero-Dependency safety: 関数存在チェック
+    if (typeof getFormInfo === 'function') {
+      return getFormInfo(spreadsheetId, sheetName);
+    } else {
+      return {
+        success: false,
+        message: 'getFormInfo関数が初期化されていません'
+      };
+    }
   } catch (error) {
-    console.error('getFormInfoInternal error:', error.message);
+    const errorMessage = error && error.message ? error.message : '予期しないエラーが発生しました';
+    console.error('getFormInfoInternal error:', errorMessage);
     return {
       success: false,
-      message: error.message
+      message: errorMessage
     };
   }
 }
@@ -1797,7 +1802,6 @@ function getFormInfoInternal(spreadsheetId, sheetName) {
  * @returns {Object} ドメイン情報
  */
 function getDeployUserDomainInfo() {
-  console.log('🏢 getDeployUserDomainInfo START');
 
   try {
     const email = getCurrentEmail();
@@ -1816,11 +1820,6 @@ function getDeployUserDomainInfo() {
     const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
     const isValidDomain = adminDomain ? domain === adminDomain : true;
 
-    console.log('✅ getDeployUserDomainInfo SUCCESS:', {
-      userDomain: domain,
-      adminDomain: adminDomain || 'N/A',
-      isValidDomain
-    });
 
     return {
       success: true,
@@ -1847,7 +1846,6 @@ function getDeployUserDomainInfo() {
  * @returns {Object} フォーム情報
  */
 function getActiveFormInfo() {
-  console.log('📝 getActiveFormInfo START');
 
   try {
     const email = getCurrentEmail();
@@ -1881,13 +1879,6 @@ function getActiveFormInfo() {
     const hasFormUrl = !!(config.formUrl && config.formUrl.trim());
     const isValidUrl = hasFormUrl && isValidFormUrl(config.formUrl);
 
-    console.log('✅ getActiveFormInfo SUCCESS:', {
-      userId: user.userId,
-      hasFormUrl,
-      isValidUrl,
-      formUrl: config.formUrl || null,
-      formTitle: config.formTitle || 'フォーム'
-    });
 
     return {
       success: hasFormUrl,
@@ -2095,336 +2086,13 @@ function triggerPollingUpdate(options = {}) {
 
 
 
-/**
- * Perform auto repair on system
- * @returns {Object} Auto repair result
- */
-function performAutoRepair() {
-  try {
-    console.log('🔧 performAutoRepair START');
+// performAutoRepair moved to SystemController.gs for architecture compliance
 
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
+// forceUrlSystemReset moved to SystemController.gs for architecture compliance
 
-    // Check if user is administrator
-    if (!isAdministrator(email)) {
-      return createAdminRequiredError();
-    }
+// publishApplication moved to SystemController.gs for architecture compliance
 
-    // GAS-Native: Direct auto repair implementation
-    const repairSteps = [];
-    let allSuccess = true;
-
-    // Step 1: Validate system configuration
-    try {
-      const hasCore = hasCoreSystemProps();
-      if (!hasCore) {
-        repairSteps.push({ step: 'System configuration', status: 'failed', message: 'Core system properties missing' });
-        allSuccess = false;
-      } else {
-        repairSteps.push({ step: 'System configuration', status: 'success', message: 'Core properties validated' });
-      }
-    } catch (error) {
-      repairSteps.push({ step: 'System configuration', status: 'error', message: error.message });
-      allSuccess = false;
-    }
-
-    // Step 2: Check database connectivity
-    try {
-      const dbConfig = getDatabaseConfig();
-      if (dbConfig.success) {
-        repairSteps.push({ step: 'Database connectivity', status: 'success', message: 'Database accessible' });
-      } else {
-        repairSteps.push({ step: 'Database connectivity', status: 'failed', message: 'Database not accessible' });
-        allSuccess = false;
-      }
-    } catch (error) {
-      repairSteps.push({ step: 'Database connectivity', status: 'error', message: error.message });
-      allSuccess = false;
-    }
-
-    return {
-      success: allSuccess,
-      message: allSuccess ? 'Auto repair completed successfully' : 'Auto repair completed with issues',
-      repairSteps,
-      timestamp: new Date().toISOString()
-    };
-
-  } catch (error) {
-    console.error('performAutoRepair error:', error.message);
-    return createExceptionResponse(error, 'Auto repair failed');
-  }
-}
-
-/**
- * Force URL system reset
- * @returns {Object} Reset result
- */
-function forceUrlSystemReset() {
-  try {
-    console.log('🔄 forceUrlSystemReset START');
-
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
-
-    // Check if user is administrator
-    if (!isAdministrator(email)) {
-      return createAdminRequiredError();
-    }
-
-    // GAS-Native: Direct implementation - clear URL-related cache and properties
-    try {
-      // Clear script properties related to URLs
-      const properties = PropertiesService.getScriptProperties();
-      const urlProps = ['WEB_APP_URL', 'PUBLISHED_URL', 'DEPLOYMENT_URL'];
-
-      urlProps.forEach(prop => {
-        try {
-          properties.deleteProperty(prop);
-        } catch (deleteError) {
-          console.warn(`Failed to delete property ${prop}:`, deleteError.message);
-        }
-      });
-
-      // Clear relevant cache entries
-      try {
-        const cache = CacheService.getScriptCache();
-        cache.removeAll(['url_cache', 'deployment_cache', 'web_app_cache']);
-      } catch (cacheError) {
-        console.warn('Cache clearing failed:', cacheError.message);
-      }
-
-      return {
-        success: true,
-        message: 'URL system reset completed successfully',
-        resetItems: urlProps,
-        timestamp: new Date().toISOString()
-      };
-
-    } catch (resetError) {
-      return {
-        success: false,
-        message: `URL system reset failed: ${resetError.message}`,
-        timestamp: new Date().toISOString()
-      };
-    }
-
-  } catch (error) {
-    console.error('forceUrlSystemReset error:', error.message);
-    return createExceptionResponse(error, 'Force URL system reset failed');
-  }
-}
-
-/**
- * Publish application
- * @param {Object} publishConfig - Publication configuration
- * @returns {Object} Publication result
- */
-function publishApplication(publishConfig) {
-  try {
-    console.log('🚀 publishApplication START:', publishConfig);
-
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
-
-    // Check if user is administrator
-    if (!isAdministrator(email)) {
-      return createAdminRequiredError();
-    }
-
-    // GAS-Native: Direct implementation
-    // Basic validation
-    if (!publishConfig || typeof publishConfig !== 'object') {
-      return {
-        success: false,
-        message: 'Invalid publish configuration provided'
-      };
-    }
-
-    // Fallback implementation
-    try {
-      // Update user configuration with publication settings
-      const user = findUserByEmail(email, { requestingUser: email });
-      if (!user) {
-        return createUserNotFoundError();
-      }
-
-      const configResult = getUserConfig(user.userId);
-      if (!configResult.success) {
-        return {
-          success: false,
-          message: 'Failed to get user configuration for publishing'
-        };
-      }
-
-      // Merge publish configuration
-      const updatedConfig = {
-        ...configResult.config,
-        isPublished: true,
-        publishedUrl: publishConfig.publishedUrl || ScriptApp.getService().getUrl(),
-        publishSettings: publishConfig,
-        publishedAt: new Date().toISOString()
-      };
-
-      const saveResult = saveUserConfig(user.userId, updatedConfig);
-      if (!saveResult.success) {
-        return {
-          success: false,
-          message: 'Failed to save publication configuration'
-        };
-      }
-
-      return {
-        success: true,
-        message: 'Application published successfully',
-        publishedUrl: updatedConfig.publishedUrl,
-        publishConfig,
-        timestamp: new Date().toISOString()
-      };
-
-    } catch (publishError) {
-      return {
-        success: false,
-        message: `Publication failed: ${publishError.message}`
-      };
-    }
-
-  } catch (error) {
-    console.error('publishApplication error:', error.message);
-    return createExceptionResponse(error, 'Application publication failed');
-  }
-}
-
-/**
- * Get form information
- * @param {string} spreadsheetId - Spreadsheet ID
- * @param {string} sheetName - Sheet name
- * @returns {Object} Form information
- */
-
-function getFormInfo(spreadsheetId, sheetName) {
-  try {
-    console.log('📋 getFormInfo START:', { spreadsheetId, sheetName });
-
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
-
-    // GAS-Native: Direct implementation
-    // Validate inputs
-    if (!spreadsheetId || !sheetName) {
-      return {
-        success: false,
-        message: 'Spreadsheet ID and sheet name are required'
-      };
-    }
-
-    // Fallback implementation
-    try {
-      // Open spreadsheet and get sheet
-      const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-      const sheet = spreadsheet.getSheetByName(sheetName);
-
-      if (!sheet) {
-        return {
-          success: false,
-          message: `Sheet '${sheetName}' not found in spreadsheet`
-        };
-      }
-
-      // Get basic sheet information
-      const lastRow = sheet.getLastRow();
-      const lastColumn = sheet.getLastColumn();
-
-      let headers = [];
-      if (lastRow > 0 && lastColumn > 0) {
-        const headerRange = sheet.getRange(1, 1, 1, lastColumn);
-        [headers] = headerRange.getValues();
-      }
-
-      // 🎯 GASベストプラクティス: sheet.getFormUrl()で確実なフォーム検出
-      let formUrl = null;
-      let formTitle = null;
-      let formId = null;
-      try {
-        formUrl = sheet.getFormUrl(); // 最も確実なフォーム検出方法
-        if (formUrl) {
-          console.log('✅ フォーム連携検出成功:', formUrl);
-          // フォームIDを抽出してフォーム情報取得
-          const formIdMatch = formUrl.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
-          if (formIdMatch) {
-            [, formId] = formIdMatch;
-            try {
-              const form = FormApp.openById(formId);
-              formTitle = form.getTitle();
-              console.log('✅ フォーム情報取得成功:', { formId, formTitle });
-            } catch (formError) {
-              console.warn('フォーム情報取得失敗:', formError.message);
-            }
-          }
-        } else {
-          console.log('ℹ️ フォーム連携なし - 通常のスプレッドシート');
-        }
-      } catch (error) {
-        console.warn('[WARN] main.validateFormUrl: Form URL retrieval error:', error.message || 'Form URL error');
-      }
-
-      // 🛡️ CLAUDE.md準拠: 改良されたformData構造（GASベストプラクティス準拠）
-      const confidence = formUrl ? 95 : 0; // sheet.getFormUrl()は確実なので高い信頼度
-      const detectionMethod = formUrl ? 'sheet_getFormUrl' : 'no_form_detected';
-
-      const formData = {
-        formUrl,
-        formId,
-        formTitle: formTitle || sheetName, // 実際のフォームタイトルまたはシート名
-        spreadsheetName: spreadsheet.getName(),
-        sheetName,
-        detectionDetails: {
-          method: detectionMethod,
-          confidence,
-          accessMethod: 'user',
-          timestamp: new Date().toISOString(),
-          gasMethod: 'sheet.getFormUrl()' // 使用したGASメソッド
-        }
-      };
-
-      // ✅ 改良: 確実なフォーム検出に基づくsuccess判定
-      const hasFormDetection = confidence >= 90;
-
-      return {
-        success: hasFormDetection,
-        status: formUrl ? 'FORM_LINK_FOUND' : 'FORM_NOT_LINKED',
-        message: formUrl ? 'Form information retrieved successfully' : 'Form information retrieved (no URL found)',
-        formData, // フロントエンド互換性
-        // 追加の互換性フィールド
-        spreadsheetId,
-        sheetName,
-        formUrl,
-        dataRows: Math.max(0, lastRow - 1),
-        columns: lastColumn,
-        headers: headers.filter(h => h && h.toString().trim()),
-        lastUpdated: new Date().toISOString()
-      };
-
-    } catch (sheetError) {
-      return {
-        success: false,
-        message: `Failed to access sheet: ${sheetError.message}`
-      };
-    }
-
-  } catch (error) {
-    console.error('getFormInfo error:', error.message);
-    return createExceptionResponse(error, 'Failed to get form information');
-  }
-}
+// getFormInfo moved to SystemController.gs for architecture compliance
 
 // ===========================================
 // 🆕 CLAUDE.md準拠: 完全自動化データソース選択システム
@@ -2477,7 +2145,6 @@ function extractSpreadsheetInfo(fullUrl) {
  */
 function getSheetNameFromGid(spreadsheetId, gid) {
   try {
-    console.log('🔍 getSheetNameFromGid:', { spreadsheetId: `${spreadsheetId.substring(0, 8)}...`, gid });
 
     // ✅ GAS-Native: 直接SpreadsheetApp使用
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
@@ -2489,13 +2156,11 @@ function getSheetNameFromGid(spreadsheetId, gid) {
       gid: sheet.getSheetId().toString()
     }));
 
-    console.log('📊 Available sheets:', sheetInfos.map(info => `${info.name}(gid:${info.gid})`));
 
     // GIDに一致するシートを検索
     const targetSheet = sheetInfos.find(info => info.gid === gid);
     const resultName = targetSheet ? targetSheet.name : sheetInfos[0]?.name || 'Sheet1';
 
-    console.log('✅ Sheet name resolved:', { requestedGid: gid, foundSheet: resultName });
     return resultName;
 
   } catch (error) {
@@ -2512,9 +2177,6 @@ function getSheetNameFromGid(spreadsheetId, gid) {
 function validateCompleteSpreadsheetUrl(fullUrl) {
   const started = Date.now();
   try {
-    console.log('🚀 validateCompleteSpreadsheetUrl START:', {
-      url: fullUrl ? `${fullUrl.substring(0, 50)}...` : 'null'
-    });
 
     // Step 1: URL解析
     const parseResult = extractSpreadsheetInfo(fullUrl);
@@ -2528,13 +2190,13 @@ function validateCompleteSpreadsheetUrl(fullUrl) {
     const sheetName = getSheetNameFromGid(spreadsheetId, gid);
 
     // Step 3: ✅ 既存API活用 - 並列相当処理（GAS-Nativeパターン）
-    console.log('🔍 Executing parallel validation...');
 
     const accessResult = validateAccessAPI(spreadsheetId);
-    console.log('📋 Access validation completed:', { success: accessResult.success });
 
-    const formResult = getFormInfo(spreadsheetId, sheetName);
-    console.log('📋 Form info completed:', { success: formResult.success, status: formResult.status });
+    // Zero-Dependency safety: 関数存在チェック
+    const formResult = typeof getFormInfo === 'function' ?
+      getFormInfo(spreadsheetId, sheetName) :
+      { success: false, message: 'getFormInfo関数が初期化されていません' };
 
     // Step 4: 統合結果生成
     const result = {
@@ -2552,13 +2214,6 @@ function validateCompleteSpreadsheetUrl(fullUrl) {
       executionTime: `${Date.now() - started}ms`
     };
 
-    console.log('✅ validateCompleteSpreadsheetUrl SUCCESS:', {
-      sheetName,
-      hasAccess: result.hasAccess,
-      hasFormInfo: !!result.formInfo?.formData,
-      readyToConnect: result.readyToConnect,
-      executionTime: result.executionTime
-    });
 
     return result;
 
@@ -2591,12 +2246,6 @@ function validateCompleteSpreadsheetUrl(fullUrl) {
  */
 function callGAS(functionName, options = {}, ...args) {
   try {
-    console.log('🔧 callGAS START (Security Enhanced):', {
-      functionName,
-      argsCount: args.length,
-      options,
-      timestamp: new Date().toISOString()
-    });
 
     const email = getCurrentEmail();
     if (!email) {
@@ -2736,7 +2385,6 @@ function callGAS(functionName, options = {}, ...args) {
  */
 function checkUserAuthentication() {
   try {
-    console.log('🔐 checkUserAuthentication START');
 
     const email = getCurrentEmail();
     if (!email) {
