@@ -85,6 +85,15 @@ class StudyQuestApp {
 
     // ✅ Clear icon cache on initialization
 
+    // 通知バナーアニメーション設定（CSS と同期）
+    this.NOTIFICATION_ANIMATION = {
+      DURATION_MS: 300,        // CSS 0.3s と同期
+      RETRY_BUFFER_MS: 20,     // リトライ用バッファ
+      get RETRY_DELAY_MS() {
+        return this.DURATION_MS + this.RETRY_BUFFER_MS;
+      }
+    };
+
     // ✅ CLAUDE.md準拠: Efficient DOM element gathering
     this.elements = {
       body: document.body,
@@ -112,6 +121,7 @@ class StudyQuestApp {
       infoIconCurious: document.getElementById('infoIconCurious'),
       infoIconHighlight: document.getElementById('infoIconHighlight'),
       newContentBanner: document.getElementById('newContentBanner'),
+      newContentIcon: document.getElementById('newContentIcon'),
       newContentText: document.getElementById('newContentText'),
       refreshContentBtn: document.getElementById('refreshContentBtn'),
       dismissBannerBtn: document.getElementById('dismissBannerBtn'),
@@ -142,6 +152,10 @@ class StudyQuestApp {
       // pollingFailureCount は pollingState.retryCount に統合
       startTime: Date.now()
     };
+
+    // 通知バナータイマー管理用
+    this.pendingNotificationRequest = null;
+    this.notificationWaitTimer = null;
 
     // 新着チェック用の初期化
     this.lastViewKey = null;
@@ -897,6 +911,12 @@ class StudyQuestApp {
     }
     this.handlers.onDocumentKeydown = (e) => {
       if (e.key === 'Escape') {
+        // 通知バナーが表示中の場合は優先的に閉じる
+        if (this.elements.newContentBanner && !this.elements.newContentBanner.classList.contains('hidden')) {
+          this.dismissNewContentBanner();
+          e.preventDefault();
+          return;
+        }
         this.hideAnswerModal();
       }
     };
@@ -1460,45 +1480,82 @@ class StudyQuestApp {
 
   // 新着通知バナーを表示（論理的整合性とアニメーション競合を修正）
   showNewContentBanner(newItems) {
-    if (!this.elements.newContentBanner || newItems <= 0) return;
+    try {
+      // 基本的な入力検証
+      if (!this.elements.newContentBanner || !newItems || newItems <= 0 || typeof newItems !== 'number') {
+        return;
+      }
+
+      // DOM要素がまだ存在するか確認
+      if (!document.contains(this.elements.newContentBanner)) {
+        return;
+      }
 
     const message = newItems === 1 ?
       '新しい意見が投稿されました' :
       `${newItems}件の新しい意見が投稿されました`;
 
     const isCurrentlyVisible = !this.elements.newContentBanner.classList.contains('hidden');
+    const isDismissing = this.elements.newContentBanner.dataset.dismissing === 'true';
 
-    if (isCurrentlyVisible) {
-      // 既に表示中：状態とテキストのみ更新（アニメーションなし）
+    if (isCurrentlyVisible && !isDismissing) {
+      // 既に表示中で閉じていない：状態と表示内容を更新（アニメーションなし）
       this.updateNewContentState(newItems, true);
-      this.elements.newContentText.textContent = message;
+      this.updateNotificationBannerContent(newItems, message);
       debugLog('📱 通知更新: 既存バナー数値更新', { newCount: newItems });
+      return;
+    }
+
+    if (isDismissing) {
+      // 閉じている途中の場合：最新の引数で待機リクエストを更新
+      this.pendingNotificationRequest = { newItems, message };
+      debugLog('📱 通知待機: バナー閉じ待ち（リクエスト更新）', { newCount: newItems });
+
+      // 重複するタイマーを防ぐため、既存のタイマーをチェック
+      if (!this.notificationWaitTimer) {
+        this.notificationWaitTimer = setTimeout(() => {
+          const request = this.pendingNotificationRequest;
+          this.pendingNotificationRequest = null;
+          this.notificationWaitTimer = null;
+
+          if (request) {
+            this.showNewContentBanner(request.newItems);
+          }
+        }, this.NOTIFICATION_ANIMATION.RETRY_DELAY_MS);
+      }
       return;
     }
 
     // 新規表示：状態更新 → DOM準備 → アニメーション
     this.updateNewContentState(newItems, true);
-    this.elements.newContentText.textContent = message;
+    this.updateNotificationBannerContent(newItems, message);
 
-    // アニメーション準備：初期状態をCSS keyframesに合わせる
-    this.elements.newContentBanner.style.animation = '';
-    this.elements.newContentBanner.style.transform = '';
-    this.elements.newContentBanner.style.opacity = '';
-    this.elements.newContentBanner.classList.remove('hidden');
+    // CSS classベースのアニメーション制御（競合防止）
+    this.elements.newContentBanner.classList.remove('hidden', 'notification-banner-exit');
+    this.elements.newContentBanner.classList.add('notification-banner-enter');
+    this.elements.newContentBanner.dataset.dismissing = 'false'; // 状態明確化
 
-    // 次のフレームでアニメーション開始（CSS keyframesが初期状態を制御）
-    requestAnimationFrame(() => {
-      if (this.elements.newContentBanner && !this.elements.newContentBanner.classList.contains('hidden')) {
-        this.elements.newContentBanner.style.animation = 'slideInFromTop 0.5s ease-out forwards';
-      }
-    });
+      // アクセシビリティ属性更新
+      this.elements.newContentBanner.setAttribute('aria-hidden', 'false');
+      this.elements.newContentBanner.setAttribute('aria-label', `新着通知: ${message}`);
 
-    debugLog('📢 新着通知表示:', { count: newItems, message });
+      debugLog('📢 新着通知表示:', { count: newItems, message });
+    } catch (error) {
+      errorLog('showNewContentBanner エラー:', error);
+      this.updateNewContentState(0, false);
+    }
   }
   
   // 新着バナーを閉じる（簡潔で堅牢な終了処理）
   dismissNewContentBanner() {
-    if (!this.elements.newContentBanner) return;
+    try {
+      if (!this.elements.newContentBanner) return;
+
+      // DOM要素がまだ存在するか確認
+      if (!document.contains(this.elements.newContentBanner)) {
+        this.updateNewContentState(0, false);
+        return;
+      }
 
     const isCurrentlyVisible = !this.elements.newContentBanner.classList.contains('hidden');
     if (!isCurrentlyVisible) {
@@ -1507,30 +1564,86 @@ class StudyQuestApp {
       return;
     }
 
-    // 重複実行防止
-    if (this.elements.newContentBanner.dataset.dismissing === 'true') return;
+    // 重複実行防止と状態整合性確保
+    if (this.elements.newContentBanner.dataset.dismissing === 'true') {
+      debugLog('📴 dismissNewContentBanner: 既に実行中のためスキップ');
+      return;
+    }
     this.elements.newContentBanner.dataset.dismissing = 'true';
 
-    // 終了処理実行
-    const completeDismissal = () => {
-      this.elements.newContentBanner.classList.add('hidden');
-      this.elements.newContentBanner.style.animation = '';
-      this.elements.newContentBanner.dataset.dismissing = 'false';
+    // CSS classベースの終了処理
+    this.elements.newContentBanner.classList.remove('notification-banner-enter');
+    this.elements.newContentBanner.classList.add('notification-banner-exit');
+
+    // 既存の待機中通知をキャンセル（バナーが閉じられる場合）
+    if (this.notificationWaitTimer) {
+      clearTimeout(this.notificationWaitTimer);
+      this.notificationWaitTimer = null;
+      this.pendingNotificationRequest = null;
+      debugLog('📴 待機中通知リクエストをキャンセル');
+    }
+
+    // アニメーション完了後の処理（メモリリーク防止とDOM存在確認）
+    const timeoutId = setTimeout(() => {
+      // DOM要素が削除されていないことを確認
+      if (this.elements.newContentBanner && document.contains(this.elements.newContentBanner)) {
+        this.elements.newContentBanner.classList.add('hidden');
+        this.elements.newContentBanner.classList.remove('notification-banner-exit');
+        this.elements.newContentBanner.dataset.dismissing = 'false';
+
+        // アクセシビリティ属性更新
+        this.elements.newContentBanner.setAttribute('aria-hidden', 'true');
+        this.elements.newContentBanner.setAttribute('aria-label', '新着通知バナー');
+
+        this.updateNewContentState(0, false);
+        debugLog('📴 通知バナー完全非表示');
+      }
+    }, this.NOTIFICATION_ANIMATION.DURATION_MS);
+
+      // クリーンアップ用timeout ID保存
+      this.elements.newContentBanner.dataset.timeoutId = timeoutId;
+    } catch (error) {
+      errorLog('dismissNewContentBanner エラー:', error);
       this.updateNewContentState(0, false);
-    };
-
-    // シンプルなフェードアウト処理
-    this.elements.newContentBanner.style.animation = 'fadeOut 0.3s ease-out forwards';
-
-    // 確実な終了処理（アニメーション時間に合わせる）
-    setTimeout(completeDismissal, 300);
+    }
   }
-  
+
+  // 通知バナー子要素の内容更新（一貫性保証）
+  updateNotificationBannerContent(newItems, message) {
+    try {
+      // 基本的な入力検証
+      if (!newItems || typeof newItems !== 'number' || !message || typeof message !== 'string') {
+        return;
+      }
+
+      if (!this.elements.newContentText) return;
+
+    // テキスト更新
+    this.elements.newContentText.textContent = message;
+
+    // アイコン更新（件数に応じて適切なアイコンを表示）
+    if (this.elements.newContentIcon) {
+      if (newItems === 1) {
+        this.elements.newContentIcon.textContent = '📄'; // 単数
+      } else if (newItems <= 5) {
+        this.elements.newContentIcon.textContent = '📋'; // 複数（少）
+      } else {
+        this.elements.newContentIcon.textContent = '📚'; // 複数（多）
+      }
+    }
+
+      debugLog('📱 バナー内容更新:', { newItems, message });
+    } catch (error) {
+      errorLog('updateNotificationBannerContent エラー:', error);
+    }
+  }
+
+
   // コンテンツ更新（通知バナーからの呼び出し）
   async refreshContent() {
     try {
-      // まず増分更新を試行
-      await this.refreshContentIncremental();
+      // まず増分更新を試行（手動更新として扱う）
+      await this.refreshContentIncremental(true);
     } catch (error) {
       errorLog('コンテンツ更新エラー:', error);
       // 増分更新が失敗した場合はフル更新にフォールバック
@@ -1539,7 +1652,7 @@ class StudyQuestApp {
   }
   
   // 増分コンテンツ更新（新しいカードのみ取得・追加）
-  async refreshContentIncremental() {
+  async refreshContentIncremental(isManualUpdate = false) {
     this.dismissNewContentBanner();
     
     try {
@@ -1648,11 +1761,19 @@ class StudyQuestApp {
         newBaseline: this.state.lastSeenCount
       });
 
-      // 手動更新時の通知処理
-      if (incrementalData.newItemsCount > 0) {
-        this.showNewContentBanner(incrementalData.newItemsCount);
+      // 更新完了時の通知処理（手動・自動で分岐）
+      if (isManualUpdate) {
+        // 手動更新：ユーザーが意図的に更新したので新着通知不要
+        if (incrementalData.newItemsCount > 0) {
+          this.provideFeedback(`${incrementalData.newItemsCount}件の新着を表示しました`, 'success');
+        } else {
+          this.provideFeedback('最新の状態です', 'info');
+        }
       } else {
-        this.provideFeedback('最新の状態です', 'info');
+        // 自動更新：新着があれば通知バナー表示
+        if (incrementalData.newItemsCount > 0) {
+          this.showNewContentBanner(incrementalData.newItemsCount);
+        }
       }
       
     } catch (error) {
@@ -1958,9 +2079,8 @@ class StudyQuestApp {
         cardElement.setAttribute('data-differential-card', 'true');
         cardElement.setAttribute('data-added-timestamp', Date.now().toString());
 
-        // 新しいカードであることを示すアニメーション
-        cardElement.style.opacity = '0';
-        cardElement.style.transform = 'translateY(20px)';
+        // CSS classベースの新着カードアニメーション
+        cardElement.classList.add('new-card-enter');
         fragment.appendChild(cardElement);
 
         // 追加されたカードのIDを記録
@@ -2001,24 +2121,20 @@ class StudyQuestApp {
     let completedAnimations = 0;
     const totalCards = newCards.length;
 
-    // Apply CSS keyframes animation with staggered delay
+    // Apply CSS classes for animation with staggered delay
     newCards.forEach((card, index) => {
-      // Fix: Reset to initial animation state first
-      card.style.opacity = '0';
-      card.style.transform = 'translateY(20px)';
+      // Use CSS class-based animation
+      card.classList.add('new-card-enter');
+      card.style.animationDelay = `${index * 0.1}s`;
 
-      // Use slideInFromBottom animation (matches translateY(20px) initial state)
-      card.style.animation = `slideInFromBottom 0.5s ease-out ${index * 0.1}s forwards`;
-
-      // Listen for animationend event (more reliable than transitionend)
+      // Listen for animationend event
       const onAnimationEnd = () => {
         completedAnimations++;
         card.removeEventListener('animationend', onAnimationEnd);
 
-        // Clean up animation style when done
-        card.style.animation = '';
-        card.style.opacity = '1';
-        card.style.transform = 'translateY(0)';
+        // Clean up animation classes when done
+        card.classList.remove('new-card-enter');
+        card.style.animationDelay = '';
 
         if (completedAnimations === totalCards) {
           resolve();
@@ -2050,9 +2166,16 @@ class StudyQuestApp {
     }
   }
 
-  // ボタンフィードバック表示（更新ボタン専用）
-  showButtonFeedback(message, type = 'info') {
-    if (!this.elements.refreshContentBtn) return;
+  // 通知バナー更新ボタンフィードバック表示（バナー表示中のみ）
+  showNotificationBannerButtonFeedback(message, type = 'info') {
+    // バナーが非表示または要素が存在しない場合は何もしない
+    if (!this.elements.refreshContentBtn || !this.elements.newContentBanner) return;
+
+    const isCurrentlyVisible = !this.elements.newContentBanner.classList.contains('hidden');
+    if (!isCurrentlyVisible) {
+      debugLog('⚠️ バナー非表示中のためボタンフィードバックをスキップ');
+      return;
+    }
 
     const originalText = this.elements.refreshContentBtn.textContent;
     const originalBackground = this.elements.refreshContentBtn.style.background;
@@ -2194,6 +2317,14 @@ class StudyQuestApp {
           delete this.handlers[key];
         }
       });
+    }
+
+    // 通知バナータイマーのクリーンアップ
+    if (this.notificationWaitTimer) {
+      clearTimeout(this.notificationWaitTimer);
+      this.notificationWaitTimer = null;
+      this.pendingNotificationRequest = null;
+      debugLog('🧹 通知バナータイマーをクリーンアップ');
     }
   }
   
@@ -5682,11 +5813,17 @@ class StudyQuestApp {
     if (!this.elements.newContentBanner) {
       issues.push('newContentBanner要素が見つかりません');
     }
+    if (!this.elements.newContentIcon) {
+      issues.push('newContentIcon要素が見つかりません');
+    }
     if (!this.elements.newContentText) {
       issues.push('newContentText要素が見つかりません');
     }
     if (!this.elements.refreshContentBtn) {
       issues.push('refreshContentBtn要素が見つかりません');
+    }
+    if (!this.elements.dismissBannerBtn) {
+      issues.push('dismissBannerBtn要素が見つかりません');
     }
     
     // 2. 初期化状態の確認
@@ -7130,11 +7267,9 @@ class StudyQuestApp {
   }
   
   hideCard(card, rowIndex) {
-    // Use CSS transform instead of visibility for better performance
-    card.style.transform = 'translateZ(0) scale(0.01)';
-    card.style.opacity = '0';
-    card.style.pointerEvents = 'none';
+    // Use CSS class for better performance and consistency
     card.classList.add('hidden-card');
+    card.classList.remove('visible-card');
     this.virtualScrollState.hiddenCards.add(rowIndex);
     
     // Temporarily unobserve from intersection observers to prevent state confusion
@@ -7148,11 +7283,8 @@ class StudyQuestApp {
   
   restoreCard(card, rowIndex) {
     // Restore card to full visibility
-    card.style.transform = '';
-    card.style.opacity = '';
-    card.style.pointerEvents = '';
     card.classList.remove('hidden-card');
-    card.classList.add('visible');
+    card.classList.add('visible-card');
     this.virtualScrollState.hiddenCards.delete(rowIndex);
     
     // Re-add to intersection observers
@@ -7197,12 +7329,8 @@ class StudyQuestApp {
     // Restore all cards to visible state
     const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
     cards.forEach(card => {
-      card.style.transform = '';
-      card.style.opacity = '';
-      card.style.pointerEvents = '';
-      card.style.visibility = '';
       card.classList.remove('hidden-card');
-      card.classList.add('visible');
+      card.classList.add('visible-card');
     });
     
     // Re-setup observers

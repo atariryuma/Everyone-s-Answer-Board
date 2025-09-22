@@ -153,6 +153,49 @@ header {
   animation: spin 1s linear infinite;
 }
 
+/* Notification Banner Base and Animation Classes */
+.notification-banner-base {
+  transform: translate(-50%, 0);
+}
+
+.notification-banner-enter {
+  animation: slideInFromTop 0.3s ease-out forwards;
+}
+
+.notification-banner-exit {
+  animation: fadeOut 0.3s ease-out forwards;
+}
+
+/* New Card Animation Classes */
+.new-card-enter {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: slideInFromBottom 0.5s ease-out forwards;
+}
+
+/* Staggered animation delays for multiple cards */
+.new-card-enter:nth-child(1) { animation-delay: 0s; }
+.new-card-enter:nth-child(2) { animation-delay: 0.1s; }
+.new-card-enter:nth-child(3) { animation-delay: 0.2s; }
+.new-card-enter:nth-child(4) { animation-delay: 0.3s; }
+.new-card-enter:nth-child(5) { animation-delay: 0.4s; }
+.new-card-enter:nth-child(n+6) { animation-delay: 0.5s; }
+
+/* Virtual scroll card visibility states */
+.hidden-card {
+  transform: translateZ(0) scale(0.01);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+.visible-card {
+  transform: none;
+  opacity: 1;
+  pointer-events: auto;
+  transition: transform 0.2s ease-out, opacity 0.2s ease-out;
+}
+
 /* Removed duplicate @keyframes definitions - now using UnifiedStyles.css.html versions */
 
 
