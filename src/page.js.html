@@ -412,6 +412,11 @@ class StudyQuestApp {
       this.state.isInitializing = false;
       this.hideLoadingOverlay();
 
+      // Enable info modal button after initialization
+      if (this.elements.infoModalConfirmBtn) {
+        this.elements.infoModalConfirmBtn.disabled = false;
+      }
+
       // ✅ CLAUDE.md準拠: Direct UI setup (no requestIdleCallback over-engineering)
       this.setupNonCriticalEventListeners();
       this.adjustLayout();
@@ -552,12 +557,10 @@ class StudyQuestApp {
 
   setupCriticalElements() {
     if (this.elements.headingLabel) {
-      // ✅ Initial placeholder - will be updated when data loads
-      const initialText = __OPINION_HEADER__.startsWith('<') || __OPINION_HEADER__.includes('読み込み')
-        ? '読み込み中...'  // Temporary placeholder
-        : window.sharedUtilities.security.escapeHtml(__OPINION_HEADER__);
+      // ✅ Use questionText from unified config instead of legacy template variable
+      const initialText = window.UNIFIED_CONFIG?.questionText || '読み込み中...';
       this.elements.headingLabel.textContent = initialText;
-      debugLog('✅ Initial heading set:', initialText);
+      debugLog('✅ Initial heading set from unified config:', initialText);
     }
 
     // Only setup absolutely critical event listeners

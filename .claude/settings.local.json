@@ -46,7 +46,8 @@
       "Bash(cut:*)",
       "mcp__ide__getDiagnostics",
       "Bash(git restore:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": [],
