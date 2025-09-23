@@ -1248,19 +1248,33 @@ class StudyQuestApp {
   }
   
 
-  // ✅ シンプルな新着通知バナー表示（見た目の挙動は保持）
-  showNewContentBanner(newItems) {
+  // ✅ フィルタ対応新着通知バナー表示
+  showNewContentBanner(newItems, filterState = null) {
     if (!this.elements.newContentBanner || !newItems || newItems <= 0) return;
 
-    const message = newItems === 1
-      ? '新しい意見が投稿されました'
-      : `${newItems}件の新しい意見が投稿されました`;
+    // Generate filter-aware message
+    let message;
+    if (filterState && filterState.rawClassFilter && filterState.rawClassFilter !== 'すべて') {
+      // Filter-specific message
+      message = newItems === 1
+        ? `${filterState.rawClassFilter}の新しい意見が投稿されました`
+        : `${filterState.rawClassFilter}の新しい意見が${newItems}件投稿されました`;
+    } else {
+      // General message (no filter or "すべて" selected)
+      message = newItems === 1
+        ? '新しい意見が投稿されました'
+        : `${newItems}件の新しい意見が投稿されました`;
+    }
 
     this.elements.newContentText.textContent = message;
     this.elements.newContentBanner.classList.remove('hidden', 'notification-banner-exit');
     this.elements.newContentBanner.classList.add('notification-banner-enter');
 
-    debugLog('📢 新着通知表示:', { count: newItems, message });
+    debugLog('📢 フィルタ対応新着通知表示:', {
+      count: newItems,
+      filter: filterState?.rawClassFilter || 'すべて',
+      message
+    });
   }
   
   // ✅ シンプルな通知バナー非表示
@@ -1335,11 +1349,14 @@ class StudyQuestApp {
       // ✅ フィルター対応通知処理（現在の表示に関連する新着のみ）
       if (filteredNewCount > 0) {
         if (!isManualUpdate) {
-          // 自動更新時のみ新着バナー表示（フィルター対応）
-          this.showNewContentBanner(filteredNewCount);
+          // 自動更新時のみ新着バナー表示（フィルター状態込み）
+          this.showNewContentBanner(filteredNewCount, filterState);
         } else {
-          // 手動更新時はフィードバックのみ
-          this.provideFeedback(`${filteredNewCount}件の新着を表示しました`, 'success');
+          // 手動更新時はフィードバックのみ（フィルター対応）
+          const filterMessage = filterState.rawClassFilter !== 'すべて'
+            ? `${filterState.rawClassFilter}の新着を${filteredNewCount}件表示しました`
+            : `${filteredNewCount}件の新着を表示しました`;
+          this.provideFeedback(filterMessage, 'success');
         }
       }
 
