@@ -45,7 +45,8 @@
       "Bash(do echo \"=== $func usage ===\")",
       "Bash(cut:*)",
       "mcp__ide__getDiagnostics",
-      "Bash(git restore:*)"
+      "Bash(git restore:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": [],
