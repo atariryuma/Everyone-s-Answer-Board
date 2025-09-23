@@ -70,6 +70,7 @@ class StudyQuestApp {
 
     // Core components initialization
     this.cache = new window.UnifiedCache();
+    this.activeRequests = 0;
 
     // ✅ CLAUDE.md準拠: Batched property initialization for performance
     this.weakCache = new WeakMap();
@@ -336,6 +337,12 @@ class StudyQuestApp {
 
         // Calculate exponential backoff delay with jitter
         let delay = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt), maxDelay);
+
+        // Special handling for rate limit errors (HTTP 429)
+        if (error && error.message && error.message.includes('429')) {
+          delay = Math.max(delay, 15000 + (attempt * 10000)); // Start at 15s, add 10s per attempt
+        }
+
         if (jitter) {
           delay = delay * (0.5 + Math.random() * 0.5); // Add 50% jitter
         }
@@ -762,6 +769,11 @@ class StudyQuestApp {
     this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
   }
   runGas(funcName, ...args) {
+    // Simple rate limiting - prevent too many concurrent requests
+    if (this.activeRequests >= 3) {
+      return Promise.reject(new Error('Too many concurrent requests'));
+    }
+
     // 直接呼び出し（マッピング層なし）
     const mappedArgs = args;
 
@@ -779,8 +791,10 @@ class StudyQuestApp {
 
     // ✅ CLAUDE.md準拠: Direct GAS API call (timeout handled by GAS runtime)
     const promise = this.executeWithRetry(async () => {
+      this.activeRequests++;
       return new Promise((resolve, reject) => {
         const handleSuccess = (result) => {
+          this.activeRequests--;
           if (!isStateChanging) {
             this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
           }
@@ -788,6 +802,7 @@ class StudyQuestApp {
         };
 
         const handleError = (error) => {
+          this.activeRequests--;
           reject(error);
         };
 
