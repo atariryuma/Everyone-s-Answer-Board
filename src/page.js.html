@@ -1773,8 +1773,16 @@ class StudyQuestApp {
     try {
       // キャッシュクリーンアップ
       if (includeCache && this.cache) {
-        const cacheSize = this.cache.size();
-        this.cache.cleanup();
+        // Safe cache size check - UnifiedCache may not have size() method
+        const cacheSize = (typeof this.cache.size === 'function') ? this.cache.size() : 'unknown';
+
+        // Safe cleanup call - use clear() if cleanup() doesn't exist
+        if (typeof this.cache.cleanup === 'function') {
+          this.cache.cleanup();
+        } else if (typeof this.cache.clear === 'function') {
+          this.cache.clear();
+        }
+
         debugLog('✅ Cache cleanup completed:', { cacheSize });
       }
 
@@ -1826,7 +1834,14 @@ class StudyQuestApp {
       }
 
     } catch (error) {
-      warnLog('⚠️ Cleanup failed:', error);
+      // Enhanced error logging for debugging
+      const errorDetails = {
+        message: error.message || 'Unknown error',
+        stack: error.stack || 'No stack trace',
+        cacheExists: !!this.cache,
+        cacheType: this.cache ? typeof this.cache : 'undefined'
+      };
+      warnLog('⚠️ Cleanup failed:', errorDetails);
     }
   }
 
