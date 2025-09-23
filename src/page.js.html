@@ -612,7 +612,9 @@ class StudyQuestApp {
     this.handlers.onClassFilterChange = async () => {
       this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
       try {
-        await this.loadSheetData({ bypassCache: true });
+        const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+        debugLog('🔄 Class filter changed to:', selectedClass);
+        await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
         this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
       } catch (error) {
         errorLog('クラスフィルター変更時のデータ読み込みエラー:', error);
@@ -621,7 +623,9 @@ class StudyQuestApp {
     this.handlers.onSortOrderChange = async () => {
       this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
       try {
-        await this.loadSheetData({ bypassCache: true });
+        const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+        debugLog('🔄 Sort order changed to:', sortOrder);
+        await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
         this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
       } catch (error) {
         errorLog('ソート順変更時のデータ読み込みエラー:', error);
@@ -2642,6 +2646,14 @@ class StudyQuestApp {
                          (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
 
+    debugLog('🔧 buildLoadConfiguration:', {
+      isInitialLoad,
+      selectedClass,
+      sortOrder,
+      classFilterElement: !!this.elements.classFilter,
+      classFilterValue: this.elements.classFilter?.value
+    });
+
     return {
       isInitialLoad,
       requestedSheetName: config.requestedSheetName,
@@ -2670,7 +2682,7 @@ class StudyQuestApp {
     const classFilter = !config.selectedClass || config.selectedClass === 'すべて' ?
       null : config.selectedClass;
 
-    return {
+    const params = {
       userId: this.state.userId,
       classFilter,
       sortOrder: config.sortOrder,
@@ -2678,6 +2690,9 @@ class StudyQuestApp {
       requestedSheetName: config.requestedSheetName,
       bypassCache: config.bypassCache || false
     };
+
+    debugLog('📤 prepareFetchParameters result:', params);
+    return params;
   }
 
   async loadAvailableSheets() {
