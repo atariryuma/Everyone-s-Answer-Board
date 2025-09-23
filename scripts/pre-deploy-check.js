@@ -107,10 +107,22 @@ class DeploymentValidator {
     ];
 
     const requiredMethods = {
-      'UserService': ['getCurrentEmail', 'getCurrentUserInfo', 'isAdministrator'],
+      'UserService': ['getCurrentUserInfo', 'isAdministrator'],
       'ConfigService': ['hasCoreSystemProps', 'isSystemSetup'],
       'DataService': ['getUserSheetData', 'processRawData'] // ✅ CLAUDE.md準拠: processReaction moved to ReactionService
     };
+
+    // Check for main.gs functions separately (CLAUDE.md compliance: Direct GAS API calls)
+    const mainGsPath = path.join(this.srcDir, 'main.gs');
+    if (fs.existsSync(mainGsPath)) {
+      const mainContent = fs.readFileSync(mainGsPath, 'utf8');
+      const requiredMainFunctions = ['getCurrentEmail'];
+      for (const func of requiredMainFunctions) {
+        if (!mainContent.includes(`function ${func}`)) {
+          this.errors.push(`❌ 必須メソッド不足: main.${func}`);
+        }
+      }
+    }
 
     for (const service of requiredServices) {
       const servicePath = path.join(this.srcDir, service);

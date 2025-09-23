@@ -615,25 +615,9 @@ class StudyQuestApp {
       this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
       try {
         const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-        const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-
         debugLog('🔄 Class filter changed to:', selectedClass);
-
-        // If we have cached data, use client-side filtering (much faster!)
-        if (this.state.allAnswers && this.state.allAnswers.length > 0) {
-          const classFilter = selectedClass === 'すべて' ? null : selectedClass;
-          this.state.currentAnswers = this.filterAndSortAnswers(classFilter, sortOrder);
-
-          // Re-render with filtered data
-          await this.renderBoard(false, false);
-          debugLog('⚡ Client-side class filtering completed in <1ms');
-        } else {
-          // Fallback to server-side filtering if no cached data
-          debugLog('📡 No cached data, falling back to server-side filtering');
-          await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-        }
-
-        this.updateLastSeenCount(this.state.allAnswers.length); // 全データベースでの既読位置設定
+        await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+        this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
       } catch (error) {
         errorLog('クラスフィルター変更時のデータ読み込みエラー:', error);
       }
@@ -642,25 +626,9 @@ class StudyQuestApp {
       this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
       try {
         const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-        const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-
         debugLog('🔄 Sort order changed to:', sortOrder);
-
-        // If we have cached data, use client-side sorting (much faster!)
-        if (this.state.allAnswers && this.state.allAnswers.length > 0) {
-          const classFilter = selectedClass === 'すべて' ? null : selectedClass;
-          this.state.currentAnswers = this.filterAndSortAnswers(classFilter, sortOrder);
-
-          // Re-render with sorted data
-          await this.renderBoard(false, false);
-          debugLog('⚡ Client-side sort completed in <1ms');
-        } else {
-          // Fallback to server-side sorting if no cached data
-          debugLog('📡 No cached data, falling back to server-side sorting');
-          await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-        }
-
-        this.updateLastSeenCount(this.state.allAnswers.length); // 全データベースでの既読位置設定
+        await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+        this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
       } catch (error) {
         errorLog('ソート順変更時のデータ読み込みエラー:', error);
       }
@@ -1350,16 +1318,11 @@ class StudyQuestApp {
       // Update full dataset cache
       this.state.allAnswers = newData;
 
-      // Calculate filtered new items for current view
-      const currentClassFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-      const currentSortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-      const classFilter = currentClassFilter === 'すべて' ? null : currentClassFilter;
+      // Reload current view with server-side filtering
+      await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
 
-      // Apply current filter to get updated display data
-      this.state.currentAnswers = this.filterAndSortAnswers(classFilter, currentSortOrder);
-
-      // Calculate how many new items are visible in current filter
-      const filteredNewCount = this.calculateFilteredNewItems(totalNewCount, classFilter);
+      // Calculate how many new items are visible in current filter (based on current answers)
+      const filteredNewCount = Math.max(0, this.state.currentAnswers.length - (this.state.lastSeenCount || 0));
 
       // ✅ 既存の描画システムを再利用（安全で確実）
       if (this.elements.answersContainer && newData.length > 0) {
@@ -2664,18 +2627,9 @@ class StudyQuestApp {
       // Process the successful result
       const responseData = result.data || [];
 
-      // If we fetched all data, update full cache and apply client-side filtering
-      if (fetchParams.fetchAllData) {
-        this.state.allAnswers = responseData;
-        debugLog('📦 Full dataset cached:', this.state.allAnswers.length, 'items');
-
-        // Apply client-side filtering and sorting
-        const classFilter = loadConfig.selectedClass === 'すべて' ? null : loadConfig.selectedClass;
-        this.state.currentAnswers = this.filterAndSortAnswers(classFilter, loadConfig.sortOrder);
-      } else {
-        // Fallback to direct assignment for filtered server responses
-        this.state.currentAnswers = responseData;
-      }
+      // Always use server response directly (server-side filtering applied)
+      this.state.currentAnswers = responseData;
+      debugLog('📦 Server-filtered data received:', this.state.currentAnswers.length, 'items');
 
       this.state.currentActiveSheet = result.activeSheet || loadConfig.requestedSheetName;
 
@@ -2688,12 +2642,9 @@ class StudyQuestApp {
       // Update UI
       await this.renderBoard(false, loadConfig.isInitialLoad, oldAnswers);
 
-      // Only update class filter options on initial load or when all data changes
-      // Always use allAnswers to maintain full option set
-      if (loadConfig.isInitialLoad || !this.state.previousAllAnswersLength ||
-          this.state.previousAllAnswersLength !== this.state.allAnswers.length) {
-        this.populateClassFilter(this.state.allAnswers);
-        this.state.previousAllAnswersLength = this.state.allAnswers.length;
+      // Update class filter options on initial load
+      if (loadConfig.isInitialLoad) {
+        this.populateClassFilter(this.state.currentAnswers);
       }
 
     } catch (error) {
@@ -2745,18 +2696,17 @@ class StudyQuestApp {
   }
 
   prepareFetchParameters(config) {
-    // For initial load or data updates, get ALL data (no filtering/sorting on server)
-    // Client-side filtering/sorting will be applied after data is cached
-    const shouldFetchAllData = config.isInitialLoad || config.bypassCache || !this.state.allAnswers.length;
+    // Always use server-side filtering and sorting
+    const classFilter = !config.selectedClass || config.selectedClass === 'すべて' ?
+      null : config.selectedClass;
 
     const params = {
       userId: this.state.userId,
-      classFilter: shouldFetchAllData ? null : (!config.selectedClass || config.selectedClass === 'すべて' ? null : config.selectedClass),
-      sortOrder: shouldFetchAllData ? null : config.sortOrder,
+      classFilter,
+      sortOrder: config.sortOrder,
       showAdminFeatures: this.state.showAdminFeatures,
       requestedSheetName: config.requestedSheetName,
-      bypassCache: config.bypassCache || false,
-      fetchAllData: shouldFetchAllData
+      bypassCache: config.bypassCache || false
     };
 
     debugLog('📤 prepareFetchParameters result:', params);
@@ -3055,58 +3005,6 @@ class StudyQuestApp {
     }
   }
 
-  // Client-side filtering and sorting for performance optimization
-  filterAndSortAnswers(classFilter = null, sortOrder = 'newest') {
-    if (!this.state.allAnswers || this.state.allAnswers.length === 0) {
-      return [];
-    }
-
-    let filtered = this.state.allAnswers;
-
-    // Apply class filter
-    if (classFilter && classFilter !== 'すべて') {
-      filtered = filtered.filter(answer => answer.class === classFilter);
-    }
-
-    // Apply sorting
-    let sorted = [...filtered];
-    switch (sortOrder) {
-      case 'newest':
-        sorted.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-        break;
-      case 'oldest':
-        sorted.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
-        break;
-      case 'random':
-        // Fisher-Yates shuffle for true random
-        for (let i = sorted.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [sorted[i], sorted[j]] = [sorted[j], sorted[i]];
-        }
-        break;
-      case 'score':
-        // Sort by total reaction count descending
-        sorted.sort((a, b) => {
-          const scoreA = this.calculateReactionScore(a.reactions);
-          const scoreB = this.calculateReactionScore(b.reactions);
-          return scoreB - scoreA;
-        });
-        break;
-      default:
-        break;
-    }
-
-    debugLog('🔍 Client-side filter/sort result:', {
-      totalItems: this.state.allAnswers.length,
-      filteredItems: filtered.length,
-      finalItems: sorted.length,
-      classFilter,
-      sortOrder
-    });
-
-    return sorted;
-  }
-
   // Helper method to calculate reaction score
   calculateReactionScore(reactions) {
     if (!reactions) return 0;
@@ -3115,29 +3013,6 @@ class StudyQuestApp {
     }, 0);
   }
 
-  // Calculate how many new items match current filter
-  calculateFilteredNewItems(totalNewCount, classFilter) {
-    if (!this.state.allAnswers || totalNewCount <= 0) return 0;
-
-    // If no filter (showing all), all new items are relevant
-    if (!classFilter) return totalNewCount;
-
-    // Get the latest items (new ones are at the end of sorted array)
-    const allItems = this.state.allAnswers;
-    const newItems = allItems.slice(-totalNewCount);
-
-    // Count how many new items match the current class filter
-    const filteredNewItems = newItems.filter(item => item.class === classFilter);
-
-    debugLog('🔍 Filtered new items calculation:', {
-      totalNewCount,
-      classFilter,
-      filteredNewCount: filteredNewItems.length,
-      newItemClasses: newItems.map(item => item.class)
-    });
-
-    return filteredNewItems.length;
-  }
 
   async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
     try {
@@ -4996,7 +4871,7 @@ class StudyQuestApp {
       // 管理モード切り替え時は設定変更のため再描画が必要
       this.loadSheetData({ bypassCache: true }).then(() => {
         // 管理モード切り替え後に新着チェックの基準を更新
-        this.updateLastSeenCount(this.state.allAnswers.length);
+        this.updateLastSeenCount(this.state.currentAnswers.length);
         debugLog('🔄 管理モード切り替え完了、新着チェック基準更新:', {
           newBaselineCount: this.state.lastSeenCount,
           adminMode: this.state.showAdminFeatures
