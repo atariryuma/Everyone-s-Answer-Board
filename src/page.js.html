@@ -2737,7 +2737,12 @@ class StudyQuestApp {
 
     } catch (error) {
       errorLog('❌ loadSheetData error:', error);
-      this.handleLoadError(error);
+      this.handleError(error, {
+        type: 'data_load',
+        operation: 'loadSheetData',
+        showUser: true,
+        context: 'データ読み込み中にエラーが発生しました'
+      });
     } finally {
       this.state.isLoading = false;
       this.hideLoadingOverlay();
