@@ -298,8 +298,6 @@ class StudyQuestApp {
       }
     }
     
-    // Clear differential cards to prevent residual data
-    this.clearDifferentialCards();
     
     // Reset initialization flags
     this.initialDataLoaded = false;
@@ -1472,171 +1470,28 @@ class StudyQuestApp {
   }
 
 
-  // 新着コンテンツ状態を更新
-  updateNewContentState(newItems, isVisible = true) {
-    this.state.newContentCount = newItems;
-    this.state.hasNewContent = isVisible && newItems > 0;
-  }
 
-  // 新着通知バナーを表示（論理的整合性とアニメーション競合を修正）
+  // ✅ シンプルな新着通知バナー表示
   showNewContentBanner(newItems) {
-    try {
-      // 基本的な入力検証
-      if (!this.elements.newContentBanner || !newItems || newItems <= 0 || typeof newItems !== 'number') {
-        return;
-      }
+    if (!this.elements.newContentBanner || !newItems || newItems <= 0) return;
 
-      // DOM要素がまだ存在するか確認
-      if (!document.contains(this.elements.newContentBanner)) {
-        return;
-      }
+    const message = newItems === 1
+      ? '新しい意見が投稿されました'
+      : `${newItems}件の新しい意見が投稿されました`;
 
-    const message = newItems === 1 ?
-      '新しい意見が投稿されました' :
-      `${newItems}件の新しい意見が投稿されました`;
+    this.elements.newContentText.textContent = message;
+    this.elements.newContentBanner.classList.remove('hidden');
 
-    const isCurrentlyVisible = !this.elements.newContentBanner.classList.contains('hidden');
-    const isDismissing = this.elements.newContentBanner.dataset.dismissing === 'true';
-
-    if (isCurrentlyVisible && !isDismissing) {
-      // 既に表示中で閉じていない：状態と表示内容を更新（アニメーションなし）
-      this.updateNewContentState(newItems, true);
-      this.updateNotificationBannerContent(newItems, message);
-      debugLog('📱 通知更新: 既存バナー数値更新', { newCount: newItems });
-      return;
-    }
-
-    if (isDismissing) {
-      // 閉じている途中の場合：最新の引数で待機リクエストを更新
-      this.pendingNotificationRequest = { newItems, message };
-      debugLog('📱 通知待機: バナー閉じ待ち（リクエスト更新）', { newCount: newItems });
-
-      // 重複するタイマーを防ぐため、既存のタイマーをチェック
-      if (!this.notificationWaitTimer) {
-        this.notificationWaitTimer = setTimeout(() => {
-          const request = this.pendingNotificationRequest;
-          this.pendingNotificationRequest = null;
-          this.notificationWaitTimer = null;
-
-          if (request) {
-            this.showNewContentBanner(request.newItems);
-          }
-        }, this.NOTIFICATION_ANIMATION.RETRY_DELAY_MS);
-      }
-      return;
-    }
-
-    // 新規表示：状態更新 → DOM準備 → アニメーション
-    this.updateNewContentState(newItems, true);
-    this.updateNotificationBannerContent(newItems, message);
-
-    // CSS classベースのアニメーション制御（競合防止）
-    this.elements.newContentBanner.classList.remove('hidden', 'notification-banner-exit');
-    this.elements.newContentBanner.classList.add('notification-banner-enter');
-    this.elements.newContentBanner.dataset.dismissing = 'false'; // 状態明確化
-
-      // アクセシビリティ属性更新
-      this.elements.newContentBanner.setAttribute('aria-hidden', 'false');
-      this.elements.newContentBanner.setAttribute('aria-label', `新着通知: ${message}`);
-
-      debugLog('📢 新着通知表示:', { count: newItems, message });
-    } catch (error) {
-      errorLog('showNewContentBanner エラー:', error);
-      this.updateNewContentState(0, false);
-    }
+    debugLog('📢 新着通知表示:', { count: newItems, message });
   }
   
-  // 新着バナーを閉じる（簡潔で堅牢な終了処理）
+  // ✅ シンプルな通知バナー非表示
   dismissNewContentBanner() {
-    try {
-      if (!this.elements.newContentBanner) return;
-
-      // DOM要素がまだ存在するか確認
-      if (!document.contains(this.elements.newContentBanner)) {
-        this.updateNewContentState(0, false);
-        return;
-      }
-
-    const isCurrentlyVisible = !this.elements.newContentBanner.classList.contains('hidden');
-    if (!isCurrentlyVisible) {
-      // 既に非表示の場合は状態のみリセット
-      this.updateNewContentState(0, false);
-      return;
-    }
-
-    // 重複実行防止と状態整合性確保
-    if (this.elements.newContentBanner.dataset.dismissing === 'true') {
-      debugLog('📴 dismissNewContentBanner: 既に実行中のためスキップ');
-      return;
-    }
-    this.elements.newContentBanner.dataset.dismissing = 'true';
-
-    // CSS classベースの終了処理
-    this.elements.newContentBanner.classList.remove('notification-banner-enter');
-    this.elements.newContentBanner.classList.add('notification-banner-exit');
-
-    // 既存の待機中通知をキャンセル（バナーが閉じられる場合）
-    if (this.notificationWaitTimer) {
-      clearTimeout(this.notificationWaitTimer);
-      this.notificationWaitTimer = null;
-      this.pendingNotificationRequest = null;
-      debugLog('📴 待機中通知リクエストをキャンセル');
-    }
-
-    // アニメーション完了後の処理（メモリリーク防止とDOM存在確認）
-    const timeoutId = setTimeout(() => {
-      // DOM要素が削除されていないことを確認
-      if (this.elements.newContentBanner && document.contains(this.elements.newContentBanner)) {
-        this.elements.newContentBanner.classList.add('hidden');
-        this.elements.newContentBanner.classList.remove('notification-banner-exit');
-        this.elements.newContentBanner.dataset.dismissing = 'false';
-
-        // アクセシビリティ属性更新
-        this.elements.newContentBanner.setAttribute('aria-hidden', 'true');
-        this.elements.newContentBanner.setAttribute('aria-label', '新着通知バナー');
-
-        this.updateNewContentState(0, false);
-        debugLog('📴 通知バナー完全非表示');
-      }
-    }, this.NOTIFICATION_ANIMATION.DURATION_MS);
-
-      // クリーンアップ用timeout ID保存
-      this.elements.newContentBanner.dataset.timeoutId = timeoutId;
-    } catch (error) {
-      errorLog('dismissNewContentBanner エラー:', error);
-      this.updateNewContentState(0, false);
+    if (this.elements.newContentBanner) {
+      this.elements.newContentBanner.classList.add('hidden');
     }
   }
 
-  // 通知バナー子要素の内容更新（一貫性保証）
-  updateNotificationBannerContent(newItems, message) {
-    try {
-      // 基本的な入力検証
-      if (!newItems || typeof newItems !== 'number' || !message || typeof message !== 'string') {
-        return;
-      }
-
-      if (!this.elements.newContentText) return;
-
-    // テキスト更新
-    this.elements.newContentText.textContent = message;
-
-    // アイコン更新（件数に応じて適切なアイコンを表示）
-    if (this.elements.newContentIcon) {
-      if (newItems === 1) {
-        this.elements.newContentIcon.textContent = '📄'; // 単数
-      } else if (newItems <= 5) {
-        this.elements.newContentIcon.textContent = '📋'; // 複数（少）
-      } else {
-        this.elements.newContentIcon.textContent = '📚'; // 複数（多）
-      }
-    }
-
-      debugLog('📱 バナー内容更新:', { newItems, message });
-    } catch (error) {
-      errorLog('updateNotificationBannerContent エラー:', error);
-    }
-  }
 
 
   // コンテンツ更新（通知バナーからの呼び出し）
@@ -1656,150 +1511,41 @@ class StudyQuestApp {
     }
   }
   
-  // 増分コンテンツ更新（新しいカードのみ取得・追加）
+  // ✅ シンプルな増分コンテンツ更新（synchronizeStateAfterDataUpdate基盤活用）
   async refreshContentIncremental(isManualUpdate = false) {
     this.dismissNewContentBanner();
-    
+
     try {
-      const originalText = this.elements.refreshContentBtn ? this.elements.refreshContentBtn.textContent : '';
-      if (this.elements.refreshContentBtn) {
-        this.elements.refreshContentBtn.textContent = '更新中...';
-        this.elements.refreshContentBtn.disabled = true;
-      }
-      
-      
-      // 現在のフィルタ設定を取得
-      const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-      const classFilter = !selectedClass || selectedClass === 'すべて'
-        ? null
-        : selectedClass;
-      const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-      const adminMode = this.state.showAdminFeatures;
-      
-      
       // 統合新着通知データを取得
       const incrementalData = await this.runGas('getNotificationUpdate', this.state.userId, {
-        lastUpdateTime: this.state.lastUpdateTime || new Date(0).toISOString(),
         lastSeenCount: this.state.lastSeenCount || 0,
-        classFilter,
-        sortOrder,
         includeMetadata: true
       });
-
-      debugLog(`Unified notification data: ${incrementalData.newItemsCount} new/${incrementalData.totalCount} total (${incrementalData.accessType})`);
 
       if (!incrementalData.success) {
         throw new Error(incrementalData.message);
       }
 
-
-      // Enhanced incremental data analysis (Phase 3.2) - 統合版
-      const preUpdateAnalysis = {
-        newCount: incrementalData.newItemsCount,
-        totalCount: incrementalData.totalCount,
-        hasNewData: incrementalData.hasNewData,
-        lastSeenCount: this.state.lastSeenCount,
-        serverExpectedCount: incrementalData.totalCount,
-        serverNewItems: incrementalData.newItemsCount,
-        accessType: incrementalData.accessType,
-        targetUserId: incrementalData.targetUserId
-      };
-      
-      
-      // サーバーベースの一貫性チェック（DOM更新前の最小限チェック）
-      const criticalInconsistency = {
-        zeroStateWithServerData: preUpdateAnalysis.totalCount > 0 && 
-                                this.state.currentAnswers.length === 0 && 
-                                this.state.lastSeenCount > 0,
-        significantCountMismatch: Math.abs(preUpdateAnalysis.totalCount - this.state.lastSeenCount) > 10
-      };
-      
-      // 重大な不整合のみフルリフレッシュ（false positiveを削減）
-      if (criticalInconsistency.zeroStateWithServerData || 
-          criticalInconsistency.significantCountMismatch) {
-        warnLog('🚨 重大なサーバー・クライアント不整合検出 - フルリフレッシュ実行:', {
-          preUpdateAnalysis,
-          criticalInconsistency,
-          currentAnswersLength: this.state.currentAnswers.length
-        });
-        
-        // 重大な不整合の場合のみ全体リフレッシュを実行
-        await this.refreshContentFull();
-        return;
-      }
-      
       // 新しいデータがない場合
       if (incrementalData.newItemsCount === 0) {
         this.provideFeedback('最新の状態です', 'info');
-        // Use unified state management even for no-data updates (Phase 2.3)
-        this.synchronizeStateAfterDataUpdate(this.state.currentAnswers, 'incrementalRefresh-noNewData');
         return;
       }
-      
-      // Prepare merged data with proper ordering (Phase 3.2)
-      let mergedData;
-      if (sortOrder === 'newest') {
-        mergedData = incrementalData.data.concat(this.state.currentAnswers);
-      } else {
-        mergedData = this.state.currentAnswers.concat(incrementalData.data);
-      }
-      
-      // First: DOM update with new cards
-      await this.appendNewCards(incrementalData.data, sortOrder);
 
-      // Second: State synchronization without new content recalculation (root fix)
-      this.state.currentAnswers = mergedData;
-      this.updateLastSeenCount(mergedData.length);
-      this.pollingState.retryCount = 0;
+      // ✅ 既存の優れたsynchronizeStateAfterDataUpdate基盤を活用
+      const mergedData = incrementalData.data.concat(this.state.currentAnswers);
+      this.synchronizeStateAfterDataUpdate(mergedData, 'incrementalUpdate');
 
-      // Third: Set accurate new content count from server data (not calculated)
-      if (incrementalData.newItemsCount > 0) {
-        this.updateNewContentState(incrementalData.newItemsCount, true);
-      }
-
-      // Third: Clear server cache for consistency across sort orders
-      // CLAUDE.md準拠: clearCache関数は現在実装されていない - 内部管理
-      // this.gas.clearCache().catch(err => warnLog('Cache clear failed', err));
-
-      debugLog('✅ 増分リフレッシュ完了:', {
-        addedCards: incrementalData.newItemsCount,
-        totalCards: this.state.currentAnswers.length,
-        newBaseline: this.state.lastSeenCount
-      });
-
-      // 更新完了時の通知処理（手動・自動で分岐）
+      // 通知処理
       if (isManualUpdate) {
-        // 手動更新：ユーザーが意図的に更新したので新着通知不要
-        if (incrementalData.newItemsCount > 0) {
-          this.provideFeedback(`${incrementalData.newItemsCount}件の新着を表示しました`, 'success');
-        } else {
-          this.provideFeedback('最新の状態です', 'info');
-        }
+        this.provideFeedback(`${incrementalData.newItemsCount}件の新着を表示しました`, 'success');
       } else {
-        // 自動更新：新着があれば通知バナー表示
-        if (incrementalData.newItemsCount > 0) {
-          this.showNewContentBanner(incrementalData.newItemsCount);
-        }
+        this.showNewContentBanner(incrementalData.newItemsCount);
       }
-      
-    } catch (error) {
-      errorLog('増分コンテンツ更新に失敗:', {
-        message: error.message,
-        stack: error.stack,
-        error: error,
-        context: 'refreshContentIncremental'
-      });
 
-      // エラー時は従来の全体更新にフォールバック
+    } catch (error) {
+      errorLog('増分コンテンツ更新に失敗:', error);
       await this.refreshContentFull();
-      
-    } finally {
-      // ボタンを元に戻す
-      if (this.elements.refreshContentBtn) {
-        this.elements.refreshContentBtn.textContent = this.elements.refreshContentBtn.textContent.includes('更新中') ? 
-          (originalText || '更新して表示') : this.elements.refreshContentBtn.textContent;
-        this.elements.refreshContentBtn.disabled = false;
-      }
     }
   }
   
@@ -2066,91 +1812,7 @@ class StudyQuestApp {
   }
 
   
-  // 新しいカードを既存のカードコンテナに追加
-  async appendNewCards(newData, sortOrder = 'newest') {
-    if (!newData || newData.length === 0) return;
 
-    const container = this.elements.answersContainer;
-    if (!container) return;
-
-    this.removeEmptyState();
-
-    // 新しいカードを作成してコンテナに追加
-    const fragment = document.createDocumentFragment();
-    const addedCardIds = [];
-
-    for (const data of newData) {
-      const cardElement = this.createAnswerCard(data);
-      if (cardElement) {
-        // 差分追加カードとしてマーク
-        cardElement.setAttribute('data-differential-card', 'true');
-        cardElement.setAttribute('data-added-timestamp', Date.now().toString());
-
-        // CSS classベースの新着カードアニメーション
-        cardElement.classList.add('new-card-enter');
-        fragment.appendChild(cardElement);
-
-        // 追加されたカードのIDを記録
-        if (data.rowIndex !== undefined) {
-          addedCardIds.push(data.rowIndex);
-        }
-      }
-    }
-
-    // 差分追加カードのIDをローカルストレージに保存
-    if (addedCardIds.length > 0) {
-      this.saveDifferentialCards(addedCardIds);
-    }
-
-    if (sortOrder === 'newest') {
-      container.prepend(fragment);
-    } else {
-      container.appendChild(fragment);
-    }
-
-    // アニメーションで新しいカードを表示
-    await new Promise(resolve => {
-      requestAnimationFrame(() => {
-        const newCards = container.querySelectorAll('.answer-card[style*="opacity: 0"]');
-        // CLAUDE.md準拠: CSS-based staggered animation (setTimeout代替)
-        this.animateCardsWithCSSStagger(newCards, resolve);
-      });
-    });
-  }
-
-  // CLAUDE.md準拠: CSS keyframes animation (統一実装・setTimeout完全排除)
-  animateCardsWithCSSStagger(newCards, resolve) {
-    if (!newCards || newCards.length === 0) {
-      resolve();
-      return;
-    }
-
-    let completedAnimations = 0;
-    const totalCards = newCards.length;
-
-    // Apply CSS classes for animation with staggered delay
-    newCards.forEach((card, index) => {
-      // Use CSS class-based animation
-      card.classList.add('new-card-enter');
-      card.style.animationDelay = `${index * 0.1}s`;
-
-      // Listen for animationend event
-      const onAnimationEnd = () => {
-        completedAnimations++;
-        card.removeEventListener('animationend', onAnimationEnd);
-
-        // Clean up animation classes when done
-        card.classList.remove('new-card-enter');
-        card.style.animationDelay = '';
-
-        if (completedAnimations === totalCards) {
-          resolve();
-        }
-      };
-
-      card.addEventListener('animationend', onAnimationEnd);
-    });
-  }
 
   // ユーザー通知表示（Toast専用）
   showNotification(message, type = 'info') {
@@ -5488,66 +5150,6 @@ class StudyQuestApp {
     }
   }
 
-  // 差分カード管理メソッド
-  loadDifferentialCards() {
-    try {
-      const key = this.getScopedKey('differentialCards');
-      const stored = localStorage.getItem(key);
-      const cards = stored ? JSON.parse(stored) : [];
-      
-      debugLog('📥 差分カード復元:', { key, count: cards.length });
-      return Array.isArray(cards) ? cards : [];
-    } catch (error) {
-      warnLog('⚠️ 差分カード読み込みエラー:', error);
-      return [];
-    }
-  }
-
-  saveDifferentialCards(cardIds) {
-    try {
-      const key = this.getScopedKey('differentialCards');
-      const existing = this.loadDifferentialCards();
-      const merged = [...new Set([...existing, ...cardIds])];
-      localStorage.setItem(key, JSON.stringify(merged));
-      
-      debugLog('💾 差分カード保存:', { key, count: merged.length, new: cardIds.length });
-    } catch (error) {
-      warnLog('⚠️ 差分カード保存エラー:', error);
-    }
-  }
-
-  clearDifferentialCards() {
-    try {
-      const key = this.getScopedKey('differentialCards');
-      localStorage.removeItem(key);
-    } catch (error) {
-      warnLog('⚠️ 差分カードクリアエラー:', error);
-    }
-  }
-
-  // 差分カードの復元（ページ再読み込み時）
-  restoreDifferentialCards() {
-    const differentialCardIds = this.loadDifferentialCards();
-    if (differentialCardIds.length === 0) return;
-
-    
-    const container = this.elements.answersContainer;
-    if (!container) return;
-
-    const allCards = container.querySelectorAll('.answer-card');
-    let restoredCount = 0;
-    
-    allCards.forEach(card => {
-      const rowIndex = parseInt(card.getAttribute('data-row-index'));
-      if (differentialCardIds.includes(rowIndex)) {
-        card.setAttribute('data-differential-card', 'true');
-        card.setAttribute('data-restored', 'true');
-        restoredCount++;
-        debugLog('📌 差分カード復元:', rowIndex);
-      }
-    });
-    
-  }
 
   async handleReactionError(error, rowIndex, reaction) {
     errorLog('リアクションエラーの詳細:', {
