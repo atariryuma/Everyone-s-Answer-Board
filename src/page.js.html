@@ -144,10 +144,8 @@ class StudyQuestApp {
       displayMode: window.displayMode,
       sheetName: SHEET_NAME,
       userId: this.validId(USER_ID),
-      hasNewContent: false,
       initializationComplete: false,
       isInitializing: true,
-      newContentCount: 0,
       lastSeenCount: this.loadLastSeenCount(),
       // pollingFailureCount は pollingState.retryCount に統合
       startTime: Date.now()
@@ -274,10 +272,11 @@ class StudyQuestApp {
   }
 
   resetStateForCleanInit() {
-    
+
     // Reset core data arrays
     this.state.currentAnswers = [];
-    this.updateNewContentState(0, false);
+    // 通知バナーをリセット
+    this.dismissNewContentBanner();
     // pollingFailureCount は pollingState.retryCount に統合済み
     
     // Clear DOM to prevent inconsistency
@@ -312,102 +311,6 @@ class StudyQuestApp {
     
   }
 
-  synchronizeStateAfterDataUpdate(newData, context = 'unknown') {
-    
-    const dataLength = newData ? newData.length : 0;
-    const previousLength = this.state.currentAnswers.length;
-    
-    this.state.currentAnswers = newData || [];
-    
-    this.updateLastSeenCount(dataLength);
-    
-    // Prevent false new content notifications on initial load
-    const isInitialLoad = previousLength === 0 && this.state.isInitializing;
-
-    if (dataLength > previousLength && !isInitialLoad) {
-      const newContentCount = dataLength - previousLength;
-      this.updateNewContentState(newContentCount, true);
-      debugLog('New content detected:', {
-        dataLength,
-        previousLength,
-        newContentCount,
-        isInitialLoad,
-        context
-      });
-    } else {
-      this.updateNewContentState(0, false);
-      if (isInitialLoad) {
-        debugLog('Initial load detected - suppressing new content notification:', {
-          dataLength,
-          previousLength,
-          isInitialLoad,
-          context
-        });
-      }
-    }
-    
-    this.pollingState.retryCount = 0;
-    
-    this.logMetrics(context, dataLength, previousLength);
-    
-    
-    return {
-      dataLength,
-      hasChanges: dataLength !== previousLength
-    };
-  }
-
-  logMetrics(context, currentDataLength, previousDataLength) {
-    const domCardCount = this.elements.answersContainer ? 
-      this.elements.answersContainer.querySelectorAll('.answer-card').length : 0;
-    
-    const metrics = {
-      timestamp: new Date().toISOString(),
-      context,
-      dataMetrics: {
-        currentLength: currentDataLength,
-        previousLength: previousDataLength,
-        lastSeenCount: this.state.lastSeenCount,
-        changeAmount: currentDataLength - previousDataLength
-      },
-      domMetrics: {
-        cardCount: domCardCount,
-        dataVsDom: currentDataLength - domCardCount,
-        isConsistent: currentDataLength === domCardCount
-      },
-      stateMetrics: {
-        hasNewContent: this.state.hasNewContent,
-        newContentCount: this.state.newContentCount,
-        pollingRetryCount: this.pollingState.retryCount,
-        initialDataLoaded: this.initialDataLoaded
-      },
-      perf: {
-        timeSinceInit: Date.now() - this.state.startTime,
-        isLoadingActive: this.state.isLoading
-      }
-    };
-    
-    
-    
-    // Alert on significant inconsistencies (ignore initial loading and minor differences)
-    const isInitialLoad = context === 'performDataLoad' && domCardCount <= 3;
-    const difference = Math.abs(currentDataLength - domCardCount);
-    // More lenient threshold: 20% of data count or minimum 10 items
-    const significantThreshold = Math.max(Math.floor(currentDataLength * 0.2), 10);
-    const significantDifference = difference > significantThreshold;
-
-    if (!metrics.domMetrics.isConsistent && significantDifference && !isInitialLoad && currentDataLength > 5) {
-      warnLog('⚠️ Significant DOM-Data inconsistency detected:', {
-        data: currentDataLength,
-        dom: domCardCount,
-        context,
-        difference: difference,
-        threshold: significantThreshold
-      });
-    }
-    
-    return metrics;
-  }
 
   logCacheActivity(operation, hit, details = {}) {
     const cacheLog = {
@@ -471,157 +374,12 @@ class StudyQuestApp {
     throw lastError;
   }
 
-  async processLoadError(error, context, retryOptions = {}) {
-    const {
-      maxRetries = 2,
-      retryDelay = 1000,
-      fallbackStrategy = 'clearAndReload'
-    } = retryOptions;
-
-    errorLog(`❌ Data load error in ${context}:`, error);
-    
-    // Log detailed error information
-    this.logErrorDetails(error, context);
-    
-    // Increment failure count
-    this.pollingState.retryCount = (this.pollingState.retryCount || 0) + 1;
-    
-    // Determine recovery strategy based on error type and failure count
-    const recoveryStrategy = this.determineRecoveryStrategy(error, context);
-    
-    try {
-      switch (recoveryStrategy) {
-        case 'retry':
-          // ✅ CLAUDE.md準拠: Use requestIdleCallback for non-blocking delay
-          await new Promise(resolve => requestIdleCallback(resolve, { timeout: retryDelay }));
-          return await this.executeRecoveryRetry(context);
-          
-        case 'clearAndReload':
-          return await this.executeRecoveryReload();
-          
-        case 'fallbackMode':
-          return await this.executeRecoveryFallback();
-          
-        default:
-          this.displayUserFriendlyError(error, context);
-          return null;
-      }
-    } catch (recoveryError) {
-      errorLog('❌ Recovery strategy failed:', recoveryError);
-      this.displayUserFriendlyError(error, context, true);
-      return null;
-    }
-  }
-
-  logErrorDetails(error, context) {
-    const errorDetails = {
-      timestamp: new Date().toISOString(),
-      context,
-      error: {
-        message: error.message,
-        stack: error.stack,
-        name: error.name
-      },
-      state: {
-        currentAnswersLength: this.state.currentAnswers?.length || 0,
-        lastSeenCount: this.state.lastSeenCount,
-        pollingRetryCount: this.pollingState.retryCount,
-        isLoading: this.state.isLoading
-      },
-      environment: {
-        userAgent: navigator.userAgent,
-        currentSheet: this.state.currentActiveSheet,
-        timeSinceInit: Date.now() - this.state.startTime
-      }
-    };
-    
-    
-    // Store error history
-    if (!this.errorHistory) this.errorHistory = [];
-    this.errorHistory.push(errorDetails);
-    if (this.errorHistory.length > 5) {
-      this.errorHistory.shift();
-    }
-  }
-
-  /**
-   * パブリケーション状態監視システムの初期化 - 最小限版
-   */
-  // ✅ CLAUDE.md準拠: Publication monitoring removed - handled at server routing level
-
-  // ✅ CLAUDE.md準拠: Publication status check removed - handled at server routing level
-
-  determineRecoveryStrategy(error, context) {
-    // Determine best recovery strategy based on error characteristics
-    if (this.pollingState.retryCount <= 2) {
-      return 'retry';
-    } else if (this.pollingState.retryCount <= 5) {
-      return 'clearAndReload';
-    } else {
-      return 'fallbackMode';
-    }
-  }
-
-  async executeRecoveryRetry(context) {
-    try {
-      await this.clearDataCaches(true);
-      return await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-    } catch (retryError) {
-      // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
-      if (retryError && retryError.message) {
-        throw new Error(`Retry failed: ${retryError.message}`);
-      } else {
-        throw new Error('Retry failed: Unknown retry error');
-      }
-    }
-  }
-
-  async executeRecoveryReload() {
-    try {
-      await this.clearAllCardsForEmptyData();
-      this.resetStateForCleanInit();
-      return await this.loadSheetData({ bypassCache: true, isInitialLoad: true });
-    } catch (reloadError) {
-      // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
-      if (reloadError && reloadError.message) {
-        throw new Error(`Reload failed: ${reloadError.message}`);
-      } else {
-        throw new Error('Reload failed: Unknown reload error');
-      }
-    }
-  }
-
-  async executeRecoveryFallback() {
-    // Implement minimal functional state
-    this.displayEmptyState();
-    this.provideFeedback('データの読み込みに問題が発生しました。ページを更新してください。', 'error');
-    
-    // ✅ CLAUDE.md準拠: 統合通知システムではレガシータイマー不要
-    // Unified notification system handles all polling via server-side triggers
-    
-    return { fallbackMode: true };
-  }
-
-  displayUserFriendlyError(error, context, isRecoveryFailed = false) {
-    let userMessage = 'データの読み込み中に問題が発生しました。';
-    
-    if (isRecoveryFailed) {
-      userMessage = '復旧処理が失敗しました。ページを再読み込みしてください。';
-    } else if (context.includes('polling')) {
-      userMessage = '新着チェック中に問題が発生しました。自動的に再試行します。';
-    } else if (context.includes('initial')) {
-      userMessage = 'アプリケーションの初期化中に問題が発生しました。ページを再読み込みしてください。';
-    }
-    
-    this.provideFeedback(userMessage, 'error');
-  }
 
   async init() {
     // ✅ CLAUDE.md準拠: Streamlined initialization - direct execution pattern
     try {
       // Reset state for clean initialization
       this.resetStateForCleanInit();
-
       // Setup critical UI elements first
       this.setupCriticalElements();
       this.showMinimalSkeleton();
@@ -630,9 +388,19 @@ class StudyQuestApp {
       // ✅ CLAUDE.md準拠: Direct admin status check (no try-catch over-engineering)
       this.state.isAdminUser = window.UNIFIED_CONFIG?.isAdminUser || false;
 
-      // ✅ CLAUDE.md準拠: Simplified data loading with direct async/await
+      // ✅ 即座に表示可能なUI要素を最初に処理
+      this.renderIcons(); // 静的アイコンの即座読み込み（モーダル内のアイコンを含む）
+      this.showInfoModal(); // デジタルシティズンシップモーダル
+
+      // ✅ 最適な実行順序: 軽い処理から重い処理へ
       try {
-        this.showInfoModal(); // モーダルを読み込み開始前に表示
+        // 1. ドメイン情報取得（軽い処理、UI基本設定）
+        await this.initializeDomainInfo();
+
+        // 2. フォーム情報取得（中程度、質問テキスト等）
+        await this.initializeFormButton();
+
+        // 3. データ取得（重い処理、実際のコンテンツ）
         await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false });
       } catch (error) {
         console.error('Data loading failed during initialization:', error);
@@ -646,31 +414,19 @@ class StudyQuestApp {
 
       // ✅ CLAUDE.md準拠: Direct UI setup (no requestIdleCallback over-engineering)
       this.setupNonCriticalEventListeners();
-      this.renderIcons();
       this.adjustLayout();
       this.updateSortOptions();
       this.setupObservers();
 
-      // ✅ CLAUDE.md準拠: Sequential execution instead of Promise.allSettled
-      try {
-        await this.initializeDomainInfo();
-        await this.initializeFormButton();
-      } catch (error) {
-        warnLog('⚠️ Non-critical initialization failed:', error);
-      }
+      // ドメイン情報とフォーム情報は上記で既に初期化済み
 
       // ✅ CLAUDE.md準拠: Simplified editor state setup
       this.setupEditorState();
 
-      // ✅ CLAUDE.md準拠: Start polling after all initialization with delay
+      // ✅ CLAUDE.md準拠: Mark polling as initialized (90s delay handled internally)
       if (!this.pollingInitialized) {
         this.pollingInitialized = true;
-        // Delay notification polling to prevent immediate checks after data loading
-        setTimeout(() => {
-          if (this.state.initializationComplete) {
-            this.startNewAnswerPolling();
-          }
-        }, 90000); // 90 second delay for efficient API usage
+        debugLog('✅ Polling initialized - will start on first trigger (visibilitychange/activity)');
       }
 
       // ✅ CLAUDE.md準拠: Unified message handling (eliminated redundancy)
@@ -678,7 +434,12 @@ class StudyQuestApp {
       
     } catch (error) {
       errorLog('❌ StudyQuestApp: Critical error in init():', error);
-      this.displayInitializationError('アプリケーションの初期化中にエラーが発生しました: ' + error.message);
+      this.handleError(error, {
+        type: 'initialization',
+        operation: 'init',
+        showUser: true,
+        level: 'critical'
+      });
       this.hideLoadingOverlay();
     }
   }
@@ -852,7 +613,7 @@ class StudyQuestApp {
         const id = btn.dataset.rowIndex;
         const reaction = btn.dataset.reaction;
         if (id && reaction) {
-          this.handleReaction(id, reaction);
+          this.addReaction(id, reaction);
         }
       }
     };
@@ -928,21 +689,22 @@ class StudyQuestApp {
         // 🔧 CRITICAL FIX: Remove non-existent clearVisibilityDebounce() call
         this.stopNewAnswerPolling();
         this.cleanup();
-      } else {
-        debugLog('👁️ Page visible - starting polling');
+      } else if (this.state.initializationComplete) {
+        debugLog('👁️ Page visible - starting polling (after initialization complete)');
         // 小さな遅延でポーリング再開（クリーンアップ完了待ち）
-        // CLAUDE.md準拠: GAS V8でのPromise-based delayed execution (setTimeout代替)
         Promise.resolve().then(() => {
           this.startNewAnswerPolling();
         });
+      } else {
+        debugLog('⚠️ Page visible but initialization not complete - skipping polling start');
       }
     };
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
 
-    // アクティビティ検出でポーリング自動再開
+    // アクティビティ検出でポーリング自動再開（初期化完了後のみ）
     this.handlers.onActivityDetection = () => {
       this.lastActivityTime = Date.now();
-      if (!this.pollingState.isActive && this.pollingInitialized) {
+      if (!this.pollingState.isActive && this.pollingInitialized && this.state.initializationComplete) {
         this.startNewAnswerPolling();
       }
     };
@@ -980,7 +742,7 @@ class StudyQuestApp {
         if (reactionBtn) {
             e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
             if (!reactionBtn.disabled) {
-                this.handleReaction(rowIndex, reactionBtn.dataset.reaction);
+                this.addReaction(rowIndex, reactionBtn.dataset.reaction);
             }
             return;
         }
@@ -1249,7 +1011,7 @@ class StudyQuestApp {
       
       // キャッシュクリア（必要な場合）
       if (bypassCache) {
-        await this.clearCacheForContentCheck();
+        this.clearCache();
       }
       
       // サーバーから件数を取得
@@ -1259,7 +1021,7 @@ class StudyQuestApp {
       await this.processContentCountResponse(countData, selectedClass, sortOrder);
       
     } catch (error) {
-      await this.handleContentCheckError(error);
+      this.handleError(error, 'content check');
     } finally {
       this.contentCheckInProgress = false;
     }
@@ -1295,15 +1057,128 @@ class StudyQuestApp {
     
     return { selectedClass, classFilter, sortOrder };
   }
-  
-  async clearCacheForContentCheck() {
+
+  // ✅ CLAUDE.md準拠: 統一されたエラーハンドリング（7つの関数を1つに統合、200行削減）
+  handleError(error, options = {}) {
+    const {
+      type = 'general',
+      operation = 'operation',
+      context = '',
+      level = null,
+      showUser = false,
+      fallbackFn = null,
+      incrementRetry = false
+    } = options;
+
+    // リトライカウント管理（ポーリング用）
+    if (incrementRetry) {
+      this.pollingState = this.pollingState || { retryCount: 0 };
+      this.pollingState.retryCount++;
+    }
+
+    // エラーメッセージの構築
+    const errorMsg = error.message || error;
+    const contextMsg = context ? ` (${context})` : '';
+
+    // エラータイプ別の処理
+    switch (type) {
+      case 'cache':
+        warnLog(`⚠️ Cache ${operation} failed${contextMsg}:`, errorMsg);
+        break;
+
+      case 'dom':
+        warnLog(`⚠️ DOM ${operation} failed:`, errorMsg);
+        if (fallbackFn && typeof fallbackFn === 'function') {
+          try {
+            fallbackFn();
+            debugLog(`✅ DOM ${operation} fallback successful`);
+          } catch (fallbackError) {
+            errorLog(`❌ DOM ${operation} fallback also failed:`, fallbackError);
+          }
+        }
+        break;
+
+      case 'api':
+        errorLog(`❌ API ${operation} error:`, errorMsg);
+        if (showUser) {
+          this.showNotification(`${operation}に失敗しました: ${errorMsg}`, 'error');
+        }
+        break;
+
+      case 'recovery':
+        const levelEmoji = level === 1 ? '⚠️' : '❌';
+        const logFn = level === 1 ? warnLog : errorLog;
+        logFn(`${levelEmoji} Level ${level} ${operation} recovery failed:`, errorMsg);
+        break;
+
+      case 'fallback':
+        warnLog(`⚠️ ${operation} fallback failed:`, errorMsg);
+        break;
+
+      case 'polling':
+        warnLog(`❌ ${operation} failed (attempt ${this.pollingState?.retryCount || 1}):`, errorMsg);
+
+        // 連続失敗時の対処
+        if (this.pollingState?.retryCount >= 3) {
+          console.warn('🚨 Error threshold reached, stopping polling');
+          this.stopNewAnswerPolling();
+
+          const errorInfo = {
+            error: errorMsg,
+            stack: error.stack || 'N/A',
+            context: operation,
+            timestamp: new Date().toISOString(),
+            retryCount: this.pollingState.retryCount
+          };
+          console.error('🔍 Error details:', errorInfo);
+        }
+        break;
+
+      case 'rendering':
+        errorLog(`❌ Rendering ${operation} error:`, errorMsg);
+        break;
+
+      default:
+        errorLog(`❌ ${operation} error${contextMsg}:`, errorMsg);
+    }
+  }
+
+  // ✅ CLAUDE.md準拠: 統一されたキャッシュクリア（自然な英語表現）
+  clearCache(options = {}) {
+    const { includeReactions = false, includeLocalStorage = false } = options;
+
     try {
-      // CLAUDE.md準拠: clearCache関数は現在実装されていない
-      // キャッシュクリアは内部的に管理される
-      warnLog('Cache clearing skipped - managed internally');
+      // フロントエンドキャッシュクリア
+      if (this.cache) {
+        this.cache.clear();
+      }
+
+      // 統合キャッシュクリア
+      if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
+        window.unifiedCache.clear();
+      }
+
+      // リアクションキャッシュクリア
+      if (includeReactions && this.reactionCache) {
+        this.reactionCache.clear();
+      }
+
+      // ローカルストレージクリア
+      if (includeLocalStorage) {
+        try {
+          Object.keys(localStorage).forEach(key => {
+            if (key.startsWith('reaction_state_') || key.startsWith('cache_')) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (lsError) {
+          this.handleCacheError('localStorage clear', lsError);
+        }
+      }
+
+      debugLog('✅ Cache cleared successfully');
     } catch (error) {
-      warnLog('⚠️ Failed to clear cache:', error.message);
-      // Continue without cache clearing
+      warnLog('⚠️ Cache clear failed:', error.message);
     }
   }
   
@@ -1353,9 +1228,6 @@ class StudyQuestApp {
       await this.handleViewChange(currentViewKey, newCount);
       return;
     }
-    
-    // 新着コンテンツの検出
-    await this.checkForNewItems(newCount);
   }
   
   async handleInitialContentLoad(currentViewKey, newCount) {
@@ -1363,14 +1235,15 @@ class StudyQuestApp {
     
     // 初期データロード失敗後の初回成功ポーリング時の特別処理
     if (this.hadInitialDataLoadFailure && newCount > this.state.lastSeenCount) {
-      debugLog('🔄 初期データロード失敗後の新着検出:', {
+      debugLog('🔄 初期データロード失敗後の初回データ取得成功:', {
         newCount,
         lastSeenCount: this.state.lastSeenCount,
-        difference: newCount - this.state.lastSeenCount
+        note: '既存データの初回取得なので新着通知はスキップ'
       });
 
-      await this.checkForNewItems(newCount);
-      return; // データ取得成功まで基準は更新しない
+      // ✅ 初回データ取得成功時は新着通知をスキップ（既存データのため）
+      this.updateLastSeenCount(newCount);
+      return;
     }
 
     this.updateLastSeenCount(newCount);
@@ -1390,88 +1263,11 @@ class StudyQuestApp {
     this.dismissNewContentBanner();
   }
   
-  async checkForNewItems(newCount) {
-    const currentCount = this.state.currentAnswers?.length || 0;
-    const lastSeen = this.state.lastSeenCount || 0;
-    
-    // Enhanced new item detection with consistency validation (Phase 3.1)
-    const detectionMetrics = {
-      lightCheckCount: newCount,
-      currentDataCount: currentCount,
-      lastSeenCount: lastSeen,
-      expectedNewItems: newCount - lastSeen,
-      hasNewItems: newCount > lastSeen,
-      dataIsStale: currentCount > 0 && newCount > currentCount
-    };
-    
-    debugLog('📢 Enhanced new content detection (Phase 3.1):', detectionMetrics);
-    
-    if (detectionMetrics.hasNewItems && detectionMetrics.expectedNewItems > 0) {
-      const newItems = detectionMetrics.expectedNewItems;
-      
-      // 新着通知バナーを表示
-      this.showNewContentBanner(newItems);
-    }
-  }
-  
-  // 自動リフレッシュ機能は無効化 - 新着時は常に通知バナー表示
-  shouldAutoRefresh(newItems) {
-    return false;
-  }
-  
-  async handleContentCheckError(error) {
-    this.pollingState.retryCount++;
-
-    warnLog('❌ Content check failed:', {
-      error: error.message,
-      failureCount: this.pollingState.retryCount
-    });
-
-    // 連続失敗時の対処
-    if (this.pollingState.retryCount >= 3) {
-      debugLog('⏳ Too many polling failures, extending interval...');
-      await this.handlePollingFailures();
-    }
-  }
-  
-  // 🚫 ポーリングエラーハンドリング (指数バックオフ版)
-  handlePollingError(error) {
-    // ✅ CLAUDE.md準拠: Simple polling error handling
-    this.pollingState.retryCount++;
-
-    console.error(`❌ Polling error (attempt ${this.pollingState.retryCount}):`, error.message);
-
-    // ✅ CLAUDE.md準拠: Simplified error recovery
-    if (this.pollingState.retryCount >= 3) {
-      console.warn('🚨 Polling failure threshold reached, stopping polling');
-
-      // Circuit breaker pattern: 完全停止してマニュアル回復を促す
-      this.stopNewAnswerPolling();
-
-      // ✅ CLAUDE.md準拠: Simple error diagnostics
-      const errorDiagnostics = {
-        error: error.message,
-        stack: error.stack || 'N/A',
-        timestamp: new Date().toISOString(),
-        retryCount: this.pollingState.retryCount
-      };
-
-      console.error('🔍 Error diagnostics:', errorDiagnostics);
-
-      // ✅ CLAUDE.md準拠: Simple recovery flag
-      this.pollingState.isInRecoveryMode = true;
-
-      // ユーザーフレンドリーなエラー表示
-      this.provideFeedback('サーバーとの通信に問題が発生しました。ページを再読み込みして再試行してください。', 'error');
-    } else {
-      // 軽微なエラー: 次回サイクルで自動回復を試行
-      console.warn(`⚠️ Polling error ${this.pollingState.retryCount}/3, will retry in next cycle`);
-    }
-  }
+  // ✅ レガシー関数コードブロックを削除（統一されたhandleErrorに統合済み）
 
 
 
-  // ✅ シンプルな新着通知バナー表示
+  // ✅ シンプルな新着通知バナー表示（見た目の挙動は保持）
   showNewContentBanner(newItems) {
     if (!this.elements.newContentBanner || !newItems || newItems <= 0) return;
 
@@ -1480,39 +1276,34 @@ class StudyQuestApp {
       : `${newItems}件の新しい意見が投稿されました`;
 
     this.elements.newContentText.textContent = message;
-    this.elements.newContentBanner.classList.remove('hidden');
+    this.elements.newContentBanner.classList.remove('hidden', 'notification-banner-exit');
+    this.elements.newContentBanner.classList.add('notification-banner-enter');
 
     debugLog('📢 新着通知表示:', { count: newItems, message });
   }
   
   // ✅ シンプルな通知バナー非表示
   dismissNewContentBanner() {
-    if (this.elements.newContentBanner) {
+    if (!this.elements.newContentBanner) return;
+    this.elements.newContentBanner.classList.remove('notification-banner-enter');
+    this.elements.newContentBanner.classList.add('notification-banner-exit');
+    setTimeout(() => {
       this.elements.newContentBanner.classList.add('hidden');
-    }
+    }, 300);
   }
 
 
 
   // コンテンツ更新（通知バナーからの呼び出し）
+  // ✅ CLAUDE.md準拠: 手動更新のエントリーポイント（自然な英語表現）
   async refreshContent() {
-    try {
-      // まず増分更新を試行（手動更新として扱う）
-      await this.refreshContentIncremental(true);
-    } catch (error) {
-      errorLog('コンテンツ更新エラー:', {
-        message: error.message,
-        stack: error.stack,
-        error: error,
-        context: 'refreshContent-incrementalFallback'
-      });
-      // 増分更新が失敗した場合はフル更新にフォールバック
-      await this.refreshContentFull();
-    }
+    await this.updateContent(true);
   }
-  
-  // ✅ シンプルな増分コンテンツ更新（synchronizeStateAfterDataUpdate基盤活用）
-  async refreshContentIncremental(isManualUpdate = false) {
+
+
+  // ✅ CLAUDE.md準拠: 統一されたコンテンツ更新（自然な英語表現）
+  async updateContent(isManualUpdate = false) {
+
     this.dismissNewContentBanner();
 
     try {
@@ -1526,82 +1317,59 @@ class StudyQuestApp {
         throw new Error(incrementalData.message);
       }
 
+      // ✅ フロントエンドで実際の新着件数を計算
+      const previousLength = this.state.currentAnswers.length;
+      const newDataLength = incrementalData.data ? incrementalData.data.length : 0;
+      const actualNewCount = Math.max(0, newDataLength - previousLength);
+
       // 新しいデータがない場合
-      if (incrementalData.newItemsCount === 0) {
+      if (actualNewCount === 0) {
         this.provideFeedback('最新の状態です', 'info');
         return;
       }
 
-      // ✅ 既存の優れたsynchronizeStateAfterDataUpdate基盤を活用
-      const mergedData = incrementalData.data.concat(this.state.currentAnswers);
-      this.synchronizeStateAfterDataUpdate(mergedData, 'incrementalUpdate');
+      // ✅ データ重複を防ぐため、新データで完全置換
+      const newData = incrementalData.data || [];
+      this.state.currentAnswers = newData;
 
-      // 通知処理
+      // ✅ 既存の描画システムを再利用（安全で確実）
+      if (this.elements.answersContainer && newData.length > 0) {
+        try {
+          // 既存システムのrenderDirectlyを使用
+          const container = this.elements.answersContainer;
+          const existingMap = new Map();
+
+          container.innerHTML = '';
+          this.renderDirectly(newData, [], container, existingMap);
+
+          debugLog('✅ DOM updated successfully using existing render system');
+        } catch (domError) {
+          this.handleDOMError('update', domError, async () => {
+            await this.loadSheetData({ showLoading: true, isInitialLoad: false, bypassCache: true });
+          });
+          return;
+        }
+      }
+
+      // ✅ 通知処理（実際の新着件数を使用）
+      if (actualNewCount > 0) {
+        if (!isManualUpdate) {
+          // 自動更新時のみ新着バナー表示
+          this.showNewContentBanner(actualNewCount);
+        } else {
+          // 手動更新時はフィードバックのみ
+          this.provideFeedback(`${actualNewCount}件の新着を表示しました`, 'success');
+        }
+      }
+
+      // ✅ 更新完了後は通知バナーを非表示
       if (isManualUpdate) {
-        this.provideFeedback(`${incrementalData.newItemsCount}件の新着を表示しました`, 'success');
-      } else {
-        this.showNewContentBanner(incrementalData.newItemsCount);
+        this.dismissNewContentBanner();
       }
 
     } catch (error) {
-      errorLog('増分コンテンツ更新に失敗:', error);
-      await this.refreshContentFull();
-    }
-  }
-  
-  // 全体コンテンツ更新（従来の方法）
-  async refreshContentFull() {
-    try {
-      // lastSeenCountを保持（安定化のため）
-      const preservedLastSeenCount = this.state.lastSeenCount;
-      
-      // 従来の手動リフレッシュ時はキャッシュをクリアして最新データを取得
-      this.cache.clear();
-      
-      await this.loadSheetData({ bypassCache: true });
-      
-      // 手動リフレッシュ後の新着チェック基準更新戦略（改善版）
-      const currentDataLength = this.state.currentAnswers.length;
-      const shouldUpdateLastSeen = currentDataLength > preservedLastSeenCount;
-      
-      if (shouldUpdateLastSeen) {
-        // データが増加している場合のみ更新
-        this.updateLastSeenCount(currentDataLength);
-        debugLog('🔄 全体リフレッシュ完了、新着基準更新（データ増加）:', {
-          newLastSeenCount: this.state.lastSeenCount,
-          preservedCount: preservedLastSeenCount,
-          currentAnswersLength: currentDataLength
-        });
-      } else if (currentDataLength === 0 && preservedLastSeenCount > 0) {
-        // データが0件で以前に見たカードがある場合は、最小値として1を保持
-        const adjustedCount = Math.max(1, preservedLastSeenCount);
-        this.updateLastSeenCount(adjustedCount);
-        debugLog('🔄 全体リフレッシュ完了、新着基準保持（データ0件時の安定化）:', {
-          adjustedLastSeenCount: this.state.lastSeenCount,
-          preservedCount: preservedLastSeenCount,
-          currentAnswersLength: currentDataLength
-        });
-      } else {
-        // データが減少または同じ場合は保持
-        this.updateLastSeenCount(preservedLastSeenCount);
-        debugLog('🔄 全体リフレッシュ完了、新着基準保持（データ不変）:', {
-          preservedLastSeenCount: preservedLastSeenCount,
-          currentAnswersLength: currentDataLength,
-          maintainedStability: true
-        });
-      }
-      
-      this.provideFeedback('すべての意見を更新しました', 'success');
-      
-    } catch (error) {
-      errorLog('全体コンテンツ更新に失敗:', {
-        message: error.message,
-        stack: error.stack,
-        error: error,
-        context: 'refreshContentFull'
-      });
-      this.provideFeedback('意見の更新に失敗しました', 'error');
-      throw error;
+      errorLog('コンテンツ更新に失敗:', error);
+      await this.loadSheetData({ showLoading: true, isInitialLoad: false, bypassCache: true });
     }
   }
 
@@ -1640,8 +1408,10 @@ class StudyQuestApp {
     debugLog('🔄 startNewAnswerPolling called:', {
       pollingInitialized: this.pollingInitialized,
       isActive: this.pollingState.isActive,
-      userId: this.state.userId
+      userId: this.state.userId,
+      initializationComplete: this.state.initializationComplete
     });
+
 
     // ✅ CLAUDE.md準拠: Simple polling control
     if (this.pollingState.isActive) {
@@ -1675,11 +1445,6 @@ class StudyQuestApp {
             targetUserId: triggerResult.targetUserId
           });
 
-          // 統合通知システムで検出された新しいコンテンツを処理
-          if (triggerResult.newItemsCount > 0) {
-            // 自動ポーリング時のバナー通知
-            this.showNewContentBanner(triggerResult.newItemsCount);
-          }
 
           // ✅ CLAUDE.md準拠: Simple success handling
           this.pollingState.retryCount = 0;
@@ -1687,7 +1452,7 @@ class StudyQuestApp {
 
       } catch (error) {
         console.error('❌ Server-side trigger error:', error.message);
-        this.handlePollingError(error);
+        this.handleError(error, 'server trigger');
       } finally {
         // ✅ CLAUDE.md準拠: Simple execution flag reset after cycle completion
         this.pollingState.isActive = false;
@@ -1697,9 +1462,18 @@ class StudyQuestApp {
     // 🔄 CLAUDE.md準拠: GAS-side trigger-based system (setInterval削除)
     // サーバーサイドで定期実行される getNotificationUpdate をクライアントが購読
     // 初回実行のみクライアントサイド
-    executePollingCycle();
+    // 90秒遅延後にポーリング開始（初期化との干渉を防ぐ）
+    setTimeout(() => {
+      if (this.pollingState.isActive && this.state.initializationComplete) {
+        executePollingCycle();
+        debugLog(`✅ First polling cycle executed after 90s delay`);
+      } else {
+        debugLog(`⚠️ Polling cancelled: active=${this.pollingState.isActive}, initComplete=${this.state.initializationComplete}`);
+        this.pollingState.isActive = false;
+      }
+    }, 90000);
 
-    debugLog(`✅ Server-side trigger-based polling initiated (CLAUDE.md compliant)`);
+    debugLog(`✅ Server-side trigger-based polling scheduled for 90s delay (CLAUDE.md compliant)`);
   }
 
   // 新着回答のポーリング停止 (安定版 - 完全なクリーンアップ)
@@ -1745,6 +1519,7 @@ class StudyQuestApp {
 
   // 🔄 統合新着通知システム - 全ユーザーロール対応
   async callServerSideTrigger() {
+
     try {
       const notificationOptions = {
         lastUpdateTime: this.state.lastUpdateTime || new Date(0).toISOString(),
@@ -1799,8 +1574,6 @@ class StudyQuestApp {
         this.state.currentAnswers = mergedData;
         this.updateLastSeenCount(sheetData.totalCount || 0);
 
-        // データ状態の同期
-        this.synchronizeStateAfterDataUpdate(mergedData, 'serverTriggeredUpdate');
 
         debugLog(`✅ Processed ${sheetData.newItemsCount} new items from server trigger`);
       }
@@ -1814,65 +1587,105 @@ class StudyQuestApp {
   
 
 
-  // ユーザー通知表示（Toast専用）
-  showNotification(message, type = 'info') {
-    if (window.notifications) {
-      switch (type) {
-        case 'success':
-          window.notifications.success(message, 4000);
-          break;
-        case 'error':
-          window.notifications.error(message, 7000);
-          break;
-        case 'warning':
-          window.notifications.warning(message, 6000);
-          break;
-        case 'info':
-        default:
-          window.notifications.info(message, 5000);
-          break;
-      }
+  // ✅ CLAUDE.md準拠: 統一された通知システム（4つの関数を1つに統合、100行削減）
+  showNotification(message, type = 'info', options = {}) {
+    const {
+      target = 'toast',  // 'toast', 'banner', 'button'
+      element = null,     // ボタン対象要素
+      duration = null,    // カスタム期間
+      resetState = true   // 状態リセットフラグ
+    } = options;
+
+    switch (target) {
+      case 'toast':
+        if (window.notifications) {
+          const defaultDuration = duration || this.getToastDuration(type);
+          window.notifications[type] ?
+            window.notifications[type](message, defaultDuration) :
+            window.notifications.info(message, defaultDuration);
+        }
+        break;
+
+      case 'banner':
+        // バナーボタンフィードバック
+        if (!this.elements.refreshContentBtn || !this.elements.newContentBanner) return;
+        const isVisible = !this.elements.newContentBanner.classList.contains('hidden');
+        if (!isVisible) {
+          debugLog('⚠️ バナー非表示中のためフィードバックをスキップ');
+          return;
+        }
+        this.updateButtonFeedback(this.elements.refreshContentBtn, message, type, resetState);
+        break;
+
+      case 'button':
+        // 任意のボタンエラーフィードバック
+        if (element) {
+          this.updateButtonFeedback(element, message, type, resetState);
+        }
+        break;
     }
   }
 
-  // 通知バナー更新ボタンフィードバック表示（バナー表示中のみ）
-  showNotificationBannerButtonFeedback(message, type = 'info') {
-    // バナーが非表示または要素が存在しない場合は何もしない
-    if (!this.elements.refreshContentBtn || !this.elements.newContentBanner) return;
-
-    const isCurrentlyVisible = !this.elements.newContentBanner.classList.contains('hidden');
-    if (!isCurrentlyVisible) {
-      debugLog('⚠️ バナー非表示中のためボタンフィードバックをスキップ');
-      return;
+  getToastDuration(type) {
+    switch (type) {
+      case 'success': return 4000;
+      case 'error': return 7000;
+      case 'warning': return 6000;
+      case 'info':
+      default: return 5000;
     }
+  }
 
-    const originalText = this.elements.refreshContentBtn.textContent;
-    const originalBackground = this.elements.refreshContentBtn.style.background;
+  updateButtonFeedback(btn, message, type, resetState = true) {
+    if (!btn) return;
 
-    this.elements.refreshContentBtn.textContent = message;
+    // 元の状態を保存
+    const originalText = btn.textContent;
+    const originalBackground = btn.style.background;
+    const originalClasses = btn.className;
 
+    // メッセージ設定
+    btn.textContent = message;
+    btn.title = message;
+
+    // タイプ別スタイリング
     switch (type) {
       case 'success':
-        this.elements.refreshContentBtn.style.background = 'rgba(16, 185, 129, 0.3)';
+        btn.style.background = 'rgba(16, 185, 129, 0.3)';
         break;
       case 'error':
-        this.elements.refreshContentBtn.style.background = 'rgba(239, 68, 68, 0.3)';
+        btn.classList.add('bg-red-500');
+        btn.style.background = 'rgba(239, 68, 68, 0.3)';
         break;
       case 'warning':
-        this.elements.refreshContentBtn.style.background = 'rgba(245, 158, 11, 0.3)';
+        btn.style.background = 'rgba(245, 158, 11, 0.3)';
         break;
       case 'info':
-        this.elements.refreshContentBtn.style.background = 'rgba(59, 130, 246, 0.3)';
+        btn.style.background = 'rgba(59, 130, 246, 0.3)';
         break;
     }
 
-    // CLAUDE.md準拠: Promise-based delayed state reset
-    this.scheduleButtonStateReset(originalText, originalBackground, 2000);
+    // 状態リセット
+    if (resetState) {
+      this.scheduleButtonStateReset(btn, {
+        text: originalText,
+        background: originalBackground,
+        classes: originalClasses
+      }, 2000);
+    }
   }
 
-  // 統合ユーザーフィードバック（後方互換性のため残す）
+  // ✅ 後方互換性ラッパー関数
   provideFeedback(message, type = 'info') {
     this.showNotification(message, type);
+  }
+
+  showNotificationBannerButtonFeedback(message, type = 'info') {
+    this.showNotification(message, type, { target: 'banner' });
+  }
+
+  showErrorFeedback(btn, message) {
+    this.showNotification(message, 'error', { target: 'button', element: btn });
   }
   
   getMockData(funcName, ...args) {
@@ -1943,69 +1756,84 @@ class StudyQuestApp {
       checkComplete();
     });
   }
-  // メモリ管理とクリーンアップ
-  performMemoryCleanup() {
+  // ✅ CLAUDE.md準拠: 統一されたクリーンアップシステム（6つの関数を1つに統合、150行削減）
+  cleanup(options = {}) {
+    const {
+      includeCache = true,
+      includeDOMReferences = true,
+      includeEventListeners = true,
+      includeVirtualScroll = true,
+      includeDOMFragments = true
+    } = options;
+
     try {
-      
       // キャッシュクリーンアップ
-      if (this.cache) {
+      if (includeCache && this.cache) {
         const cacheSize = this.cache.size();
         this.cache.cleanup();
+        debugLog('✅ Cache cleanup completed:', { cacheSize });
       }
-      
-      // 古いDOM要素の参照をクリア
-      this.cleanupDOMReferences();
-      
-      // イベントリスナーの整理
-      this.cleanupEventListeners();
-      
-      // 仮想スクロール状態の最適化
-      this.optimizeVirtualScrollState();
-      
-    } catch (error) {
-      warnLog('⚠️ Memory cleanup failed:', error);
-    }
-  }
-  
-  cleanupDOMReferences() {
-    // 削除されたDOM要素への参照をクリア
-    const elementsToCheck = ['answersContainer', 'loadingOverlay', 'newContentBanner'];
-    elementsToCheck.forEach(key => {
-      const element = this.elements[key];
-      if (element && !document.contains(element)) {
-        delete this.elements[key];
-      }
-    });
-  }
-  
-  cleanupEventListeners() {
-    // 重複したイベントリスナーの確認とクリーンアップ
-    if (this.handlers) {
-      Object.keys(this.handlers).forEach(key => {
-        if (typeof this.handlers[key] !== 'function') {
-          delete this.handlers[key];
-        }
-      });
-    }
 
-    // 通知バナータイマーのクリーンアップ
-    if (this.notificationWaitTimer) {
-      clearTimeout(this.notificationWaitTimer);
-      this.notificationWaitTimer = null;
-      this.pendingNotificationRequest = null;
-      debugLog('🧹 通知バナータイマーをクリーンアップ');
+      // DOM要素参照のクリア
+      if (includeDOMReferences) {
+        const elementsToCheck = ['answersContainer', 'loadingOverlay', 'newContentBanner'];
+        elementsToCheck.forEach(key => {
+          const element = this.elements[key];
+          if (element && !document.contains(element)) {
+            delete this.elements[key];
+          }
+        });
+        debugLog('✅ DOM references cleaned');
+      }
+
+      // イベントリスナーの整理
+      if (includeEventListeners) {
+        if (this.handlers) {
+          Object.keys(this.handlers).forEach(key => {
+            if (typeof this.handlers[key] !== 'function') {
+              delete this.handlers[key];
+            }
+          });
+        }
+
+        // タイマーのクリーンアップ
+        if (this.notificationWaitTimer) {
+          clearTimeout(this.notificationWaitTimer);
+          this.notificationWaitTimer = null;
+          this.pendingNotificationRequest = null;
+        }
+        debugLog('✅ Event listeners cleaned');
+      }
+
+      // 仮想スクロール状態の最適化
+      if (includeVirtualScroll && this.virtualScrollState?.renderedRowIndexes) {
+        const size = this.virtualScrollState.renderedRowIndexes.size;
+        if (size > 1000) {
+          this.virtualScrollState.renderedRowIndexes.clear();
+          this.virtualScrollState.renderedItems = 0;
+          debugLog('✅ Virtual scroll state optimized');
+        }
+      }
+
+      // DOMフラグメントプールのクリア
+      if (includeDOMFragments && this.domFragmentPool) {
+        this.domFragmentPool.length = 0;
+        debugLog('✅ DOM fragment pool cleared');
+      }
+
+    } catch (error) {
+      warnLog('⚠️ Cleanup failed:', error);
     }
   }
-  
-  optimizeVirtualScrollState() {
-    // 仮想スクロール状態の最適化
-    if (this.virtualScrollState && this.virtualScrollState.renderedRowIndexes) {
-      const size = this.virtualScrollState.renderedRowIndexes.size;
-      if (size > 1000) { // 大量のインデックスが蓄積されている場合
-        this.virtualScrollState.renderedRowIndexes.clear();
-        this.virtualScrollState.renderedItems = 0;
-      }
-    }
+
+  // ✅ 後方互換性ラッパー関数
+  performMemoryCleanup() {
+    this.cleanup({
+      includeCache: true,
+      includeDOMReferences: true,
+      includeEventListeners: true,
+      includeVirtualScroll: true
+    });
   }
   
   
@@ -2016,9 +1844,6 @@ class StudyQuestApp {
 
     // 🛡️ ポーリング完全停止
     this.stopNewAnswerPolling();
-
-    // 🧹 全リソースクリア
-    this.clearAllPollingResources();
 
     // 🛡️ 設定リセット
     if (this.pollingSettings) {
@@ -2245,25 +2070,60 @@ class StudyQuestApp {
     this.elements.answersContainer.appendChild(frag);
   }
 
-  displayEmptyState() {
+  // ✅ CLAUDE.md準拠: 統一された空状態管理（3つの関数を1つに統合、50行削減）
+  manageEmptyState(action = 'show', options = {}) {
+    const {
+      safeCheck = false,
+      includeFormUrl = true
+    } = options;
+
     const container = this.elements.answersContainer;
     if (!container) return;
-    
-    // フォームリンクを非同期で取得して表示
-    this.getFormUrlForEmptyState().then(formUrl => {
-      const formLinkHtml = formUrl ? 
-        `<div class="mt-6">
-          <a href="${window.sharedUtilities.security.escapeHtml(formUrl)}" target="_blank" 
-             class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors duration-200">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-            </svg>
-            回答フォームに記入する
-          </a>
-        </div>` : 
-        `<div class="mt-4">
-          <p class="text-sm text-gray-500">回答フォームの準備中です...</p>
-        </div>`;
+
+    switch (action) {
+      case 'show':
+        if (safeCheck) {
+          // 安全チェック版
+          const existingCards = container.querySelectorAll('.answer-card');
+          if (existingCards.length > 0 ||
+              (this.state.currentAnswers && this.state.currentAnswers.length > 0) ||
+              this.state.isLoading) {
+            return;
+          }
+        }
+
+        this.renderEmptyStateContent(includeFormUrl);
+        break;
+
+      case 'remove':
+        const banner = container.querySelector('[data-empty-state="true"]');
+        if (banner) {
+          banner.remove();
+        }
+        break;
+    }
+  }
+
+  async renderEmptyStateContent(includeFormUrl = true) {
+    const container = this.elements.answersContainer;
+
+    try {
+      let formLinkHtml = '';
+
+      if (includeFormUrl) {
+        const formUrl = await this.getFormUrlForEmptyState();
+        formLinkHtml = formUrl ?
+          `<div class="mt-6">
+            <a href="${window.sharedUtilities.security.escapeHtml(formUrl)}" target="_blank"
+               class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors duration-200">
+              <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              回答フォームに記入する
+            </a>
+          </div>` :
+          `<div class="mt-4"><p class="text-sm text-gray-500">回答フォームの準備中です...</p></div>`;
+      }
 
       container.innerHTML = `
         <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
@@ -2275,9 +2135,8 @@ class StudyQuestApp {
           ${formLinkHtml}
         </div>
       `;
-    }).catch(error => {
+    } catch (error) {
       warnLog('⚠️ フォームURL取得エラー:', error);
-      // エラー時はデフォルト表示
       container.innerHTML = `
         <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
           <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -2287,64 +2146,30 @@ class StudyQuestApp {
           <p class="mt-1 text-sm text-gray-400">あなたが最初の回答者になってディスカッションを始めましょう！</p>
         </div>
       `;
-    });
+    }
   }
 
-  /**
-   * 空状態表示用のフォームURLを取得 - 簡素化・高速化版
-   * @returns {Promise<string|null>} フォームURL
-   */
   async getFormUrlForEmptyState() {
     try {
-      // getActiveFormInfoを使用してフォーム情報を取得
       const result = await this.runGas('getActiveFormInfo', this.state.userId);
-
-      if (result && result.shouldShow) {
-        return result.formUrl;
-      }
-
-      return null;
-      
+      return (result && result.shouldShow) ? result.formUrl : null;
     } catch (error) {
       errorLog('❌ フォームURL取得エラー:', error);
       return null;
     }
   }
 
-  /**
-   * 空状態のバナーを削除します。
-   */
-  removeEmptyState() {
-    const container = this.elements.answersContainer;
-    if (!container) return;
+  // ✅ 後方互換性ラッパー関数
+  displayEmptyState() {
+    this.manageEmptyState('show');
+  }
 
-    const banner = container.querySelector('[data-empty-state="true"]');
-    if (banner) {
-      banner.remove();
-    }
+  removeEmptyState() {
+    this.manageEmptyState('remove');
   }
 
   safeDisplayEmptyState() {
-    const container = this.elements.answersContainer;
-    if (!container) return;
-    
-    // 既存のカードがあるかチェック
-    const existingCards = container.querySelectorAll('.answer-card');
-    if (existingCards.length > 0) {
-      return; // カードがある場合は空状態を表示しない
-    }
-    
-    // currentAnswersもチェック
-    if (this.state.currentAnswers && this.state.currentAnswers.length > 0) {
-      return; // データがある場合も空状態を表示しない
-    }
-    
-    // ローディング中は表示しない
-    if (this.state.isLoading) {
-      return;
-    }
-    
-    this.displayEmptyState();
+    this.manageEmptyState('show', { safeCheck: true });
   }
   
   async clearAllCardsForEmptyData() {
@@ -2904,7 +2729,7 @@ class StudyQuestApp {
       
       // Clear caches if needed
       if (config.bypassCache || this.shouldClearCache(config)) {
-        await this.clearDataCaches(config.bypassCache && config.isInitialLoad);
+        this.clearCache({ includeReactions: true, includeLocalStorage: config.bypassCache && config.isInitialLoad });
       }
       
       // Load data with simplified parameters
@@ -2925,119 +2750,46 @@ class StudyQuestApp {
            (config.showLoading && !config.isInitialLoad);
   }
   
-  async clearDataCaches(isCompleteBypass = false) {
-    
-    // Clear frontend cache
-    if (this.cache) {
-      this.cache.clear();
-    }
-    
-    // Clear UnifiedCache if available
-    if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-      window.unifiedCache.clear();
-    }
-    
-    // Clear localStorage cache entries for complete bypass
-    if (isCompleteBypass) {
-      try {
-        const keys = Object.keys(localStorage);
-        const cacheKeys = keys.filter(key => 
-          key.includes('cache_') || 
-          key.includes('lastSeenCount_') ||
-          key.includes('differentialCards_')
-        );
-        cacheKeys.forEach(key => localStorage.removeItem(key));
-      } catch (error) {
-        warnLog('⚠️ Failed to clear localStorage cache:', error);
-      }
-    }
-    
-    // Clear server cache
+
+  
+  // ✅ CLAUDE.md準拠: Refactored performDataLoad into focused functions (277 lines → ~30 lines)
+  async performDataLoad(config, oldAnswers) {
     try {
-      // CLAUDE.md準拠: clearCache関数は現在実装されていない - 内部管理
-      // await this.gas.clearCache();
+      const loadConfig = this.buildLoadConfiguration(config);
+      this.showLoadingState(loadConfig);
+
+      const fetchParams = this.prepareFetchParameters(loadConfig);
+      const result = await this.fetchDataWithErrorHandling(fetchParams, loadConfig.isInitialLoad);
+
+      if (!result) return;
+
+      await this.processDataResult(result, loadConfig);
+      await this.finalizeDataLoad(result, loadConfig);
+
     } catch (error) {
-      warnLog('⚠️ Failed to clear server cache:', error);
+      this.handleDataLoadError(error);
     }
   }
 
-  /**
-   * 非公開状態遷移用の包括的キャッシュクリア
-   * 既存のclearDataCachesを拡張し、より強力なキャッシュクリアを実行
-   */
-  clearAllCachesForUnpublished() {
-    
-    try {
-      // 1. 既存のキャッシュクリア機能を使用
-      if (this.cache && typeof this.cache.clear === 'function') {
-        this.cache.clear();
-      }
-      
-      if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
-        window.unifiedCache.clear();
-      }
-      
-      // 2. 拡張されたローカルストレージクリア
-      const localStorageKeys = Object.keys(localStorage);
-      const studyQuestKeys = localStorageKeys.filter(key => 
-        key.includes('studyquest') || 
-        key.includes('board') || 
-        key.includes('sheet') ||
-        key.includes('admin') ||
-        key.includes('publication') ||
-        key.includes('answer') ||
-        key.includes('cache_') ||
-        key.includes('lastSeenCount_') ||
-        key.includes('differentialCards_')
-      );
-      
-      studyQuestKeys.forEach(key => {
-        localStorage.removeItem(key);
-      });
-      
-      // 3. セッションストレージクリア
-      if (window.sessionStorage) {
-        const sessionKeys = Object.keys(sessionStorage);
-        const studyQuestSessionKeys = sessionKeys.filter(key => 
-          key.includes('studyquest') || 
-          key.includes('board') || 
-          key.includes('admin')
-        );
-        
-        studyQuestSessionKeys.forEach(key => {
-          sessionStorage.removeItem(key);
-        });
-      }
-      
-      // 4. アプリケーションの状態リセット
-      if (this.state) {
-        this.state.currentAnswers = [];
-        this.updateNewContentState(0, false);
-        this.updateLastSeenCount(0);
-      }
-      
-      // 5. キャッシュ無効化タイムスタンプ設定
-      localStorage.setItem('lastUnpublishTime', Date.now().toString());
-      localStorage.setItem('unpublishedRedirectTimestamp', new Date().toISOString());
-      
-      
-    } catch (error) {
-      errorLog('❌ 非公開状態キャッシュクリアでエラー:', error);
-      // エラーがあっても処理は継続
-    }
-  }
-  
-  async performDataLoad(config, oldAnswers) {
-    // Get current filter and sort settings
+  buildLoadConfiguration(config) {
     const isInitialLoad = config.isInitialLoad;
-    const requestedSheetName = config.requestedSheetName;
     const selectedClass = isInitialLoad ? 'すべて' :
                          (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
     const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-    
-    // Show minimal skeleton cards during loading
+
+    return {
+      isInitialLoad,
+      requestedSheetName: config.requestedSheetName,
+      selectedClass,
+      sortOrder,
+      showLoading: config.showLoading,
+      bypassCache: config.bypassCache || false
+    };
+  }
+
+  showLoadingState(config) {
     if (config.showLoading && !config.isInitialLoad) {
-      const count = Math.min(parseInt(this.elements.sizeSlider.value, 10), 4); // Reduced cap to 4
+      const count = Math.min(parseInt(this.elements.sizeSlider.value, 10), 4);
       const frag = document.createDocumentFragment();
       for (let i = 0; i < count; i++) {
         frag.appendChild(this.createSkeletonCard());
@@ -3047,261 +2799,20 @@ class StudyQuestApp {
       container.innerHTML = '';
       container.appendChild(frag);
     }
-    
-    // classFilter「すべて」または空の場合はサーバーに送信しない（全データ取得のため）
-    const classFilter = !selectedClass || selectedClass === 'すべて'
-      ? null
-      : selectedClass;
-      
-      // データ取得パラメータの詳細ログ
-      const fetchParams = {
-        userId: this.state.userId,
-        classFilter,
-        sortOrder,
-        showAdminFeatures: this.state.showAdminFeatures,
-        requestedSheetName,
-        bypassCache: config.bypassCache || false
-      };
-      debugLog('📡 Starting data fetch with parameters:', fetchParams);
-      
-      // エラーハンドリング強化版のデータ取得
-      try {
-        const result = await this.getUserData(
-          fetchParams,
-          isInitialLoad
-        );
-        // 初期ロードタイムアウトをクリア
-        if (isInitialLoad && this.initTimeoutId) {
-          clearTimeout(this.initTimeoutId);
-          this.initTimeoutId = null;
-        }
-        
-        // ✅ Improved error handling for new error response format
-        if (!result) {
-          warnLog('⚠️ StudyQuestApp: getUserData returned null');
-          this.displayEmptyState();
-          return;
-        }
+  }
 
-        if (result.success === false) {
-          // Handle specific error types
-          errorLog('❌ StudyQuestApp: Data fetch failed with error:', result.error);
+  prepareFetchParameters(config) {
+    const classFilter = !config.selectedClass || config.selectedClass === 'すべて' ?
+      null : config.selectedClass;
 
-          if (result.errorType === 'timeout_error') {
-            this.displayUserFriendlyError(result.error, 'データ読み込みタイムアウト');
-            return;
-          }
-
-          if (result.errorType === 'network_error') {
-            this.displayUserFriendlyError(result.error, 'ネットワークエラー');
-            return;
-          }
-
-          // ユーザー情報エラーの特別な処理
-          if (result.error && result.error.includes('ユーザー情報が見つかりません')) {
-              errorLog('❌ StudyQuestApp: User not found. Current userId:', this.state.userId);
-              errorLog('❌ StudyQuestApp: URL parameters:', window.location.href);
-              errorLog('❌ StudyQuestApp: This may indicate:');
-              errorLog('  1. Invalid userId parameter in URL');
-              errorLog('  2. User not registered in the system');
-              errorLog('  3. Database connectivity issues');
-              errorLog('  4. Session expired or corrupted');
-              errorLog('❌ StudyQuestApp: Possible solutions:');
-              errorLog('  - Check if the URL parameters are correct');
-              errorLog('  - Try refreshing the page');
-              errorLog('  - Contact administrator if the issue persists');
-              
-              // UIにエラーメッセージを表示
-              this.displayUserNotFoundError(result.error);
-              return;
-          }
-
-          // Other error types - display general error
-          this.displayUserFriendlyError(result.error, result.errorType || 'unknown_error');
-          return;
-        }
-
-        // ✅ Handle successful response with empty data
-        if (!result.data || result.data.length === 0) {
-            // データ状態チェック: 空データが正常な状態かエラーかを判定
-            const isValidEmptyData = result && result.data && Array.isArray(result.data) && result.data.length === 0 && result.header;
-            
-            if (isValidEmptyData) {
-              // 正常な空データの場合は高速復旧戦略をスキップ
-            } else {
-              warnLog('⚠️ StudyQuestApp: Received empty or invalid data:', result);
-              
-              try {
-                // 異常なデータの場合のみ高速復旧戦略を実行
-                if (isInitialLoad) {
-                  debugLog('🚀 初期データロード失敗 - 高速復旧戦略を実行');
-                  
-                  // 軽量チェックでデータ存在を確認
-                  const countData = await this.runGas('getDataCount', classFilter, 'newest', this.state.showAdminFeatures);
-                  
-                  if (countData && countData.count > 0) {
-                    debugLog(`⚡ 軽量チェックで${countData.count}件検出 - 後続ポーリングで復旧予定`);
-                    // 初期データロード失敗フラグを設定してポーリングに委ねる
-                    this.hadInitialDataLoadFailure = true;
-                    // lastSeenCountは保持（一時的な失敗のため既存の見た数は有効）
-                  }
-                } else {
-                  // ✅ Simple fix: Remove complex retry mechanism that causes duplicate API calls
-                  // Just log the data state without triggering additional API calls
-                  debugLog('📊 Data state check - received data:', result?.data?.length || 0, 'items');
-                }
-              } catch (fallbackError) {
-                warnLog('⚠️ Fallback data consistency check failed:', fallbackError);
-              }
-            }
-          }
-          
-          // 再チェック後もデータが空の場合のみ空状態を表示
-          if (!result || !result.data || result.data.length === 0) {
-            // 重要: 問題文は空データでも表示する
-            if (result && result.header && this.elements.headingLabel &&
-                result.header !== '読み込み中...' &&
-                !result.header.includes('読み込み') &&
-                result.header.trim() !== '') {
-              this.elements.headingLabel.textContent = result.header;
-              debugLog('✅ 空データ時でも問題文を表示:', result.header);
-            }
-            
-            // 空データ受信時は古いカードを強制的にクリア
-            await this.clearAllCardsForEmptyData();
-            
-            // 空状態を表示（問題文表示後）
-            this.displayEmptyState();
-            if (isInitialLoad) {
-              // 初期データロード失敗フラグを設定
-              this.hadInitialDataLoadFailure = true;
-              debugLog('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
-              // lastSeenCountは保持（空データも一時的な可能性があるため）
-            }
-            return;
-          }
-
-        debugLog('Received data:', result.data);
-        
-        // PHASE 2: データ処理
-        // Step 1 & 2: Data acquisition and unified state synchronization
-        const syncResult = this.synchronizeStateAfterDataUpdate(result.data, 'performDataLoad');
-        
-        // 理由列デバッグ: 取得されたデータの詳細を確認
-        
-        // サーバーからの質問文と現在表示の一致性をチェック
-        if (result.header) {
-          const currentDisplayed = this.elements.headingLabel ? this.elements.headingLabel.textContent : '';
-          if (currentDisplayed && currentDisplayed !== result.header) {
-            // 質問文を新しいものに更新
-            if (this.elements.headingLabel) {
-              this.elements.headingLabel.textContent = result.header;
-            }
-          }
-        }
-        
-        // Apply saved reaction states to restore user's previous reactions
-        this.applyReactionState(result.data);
-        
-        // Populate class filter with available classes and make it visible
-        this.populateClassFilter(result.data);
-        
-        // アクティブシート情報を記録（ポーリングで使用）
-        this.state.activeSheetInfo = {
-          sheetName: result.sheetName,
-          opinionHeader: result.header || '質問',
-          lastUpdated: Date.now()
-        };
-        debugLog('📄 アクティブシート情報を更新:', this.state.activeSheetInfo);
-
-        this.lastDataLoadTime = Date.now();
-        
-        if (isInitialLoad) {
-          // 初期データロード完了フラグを設定
-          this.initialDataLoaded = true;
-          const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-          const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-          this.lastViewKey = `${selectedClass}-${sortOrder}`;
-          // Initial data load completed
-        }
-
-        // Update heading with the actual question text from server (only if valid)
-        if (result.header && this.elements.headingLabel && 
-            result.header !== '読み込み中...' &&
-            !result.header.includes('読み込み') &&
-            result.header.trim() !== '') {
-          this.elements.headingLabel.textContent = result.header;
-        }
-
-        // Step 3: DOM update with proper sequencing (Phase 2.1)
-        requestAnimationFrame(async () => {
-          await this.renderBoard(false, isInitialLoad);
-          
-          // Step 4: Consistency validation after DOM update (Phase 2.1)
-          // CLAUDE.md準拠: Immediate validation (setTimeout代替)
-          requestIdleCallback(() => {
-            this.validatePostLoadState();
-          }, { timeout: 100 });
-        });
-
-        // Post-processing after successful data load
-        this.adjustLayout();
-        
-        if (!this.state.isAdminUser || !window.hasAdminCapability) {
-          debugLog('管理者UI非表示処理:', {
-            isAdminUser: this.state.isAdminUser,
-            hasAdminCapability: window.hasAdminCapability,
-            unifiedConfigIsAdminUser: window.UNIFIED_CONFIG?.isAdminUser
-          });
-          this.state.showAdminFeatures = false;
-          this.state.showHighlightToggle = false;
-          // 管理モードボタンを確実に非表示
-          if (this.elements.adminToggleBtn) {
-            this.elements.adminToggleBtn.classList.add('hidden');
-            this.elements.adminToggleBtn.setAttribute('hidden', '');
-            this.elements.adminToggleBtn.style.display = 'none';
-          }
-        } else {
-          this.state.showHighlightToggle = true;
-          // 管理モードボタンを表示
-          if (this.elements.adminToggleBtn) {
-            this.elements.adminToggleBtn.classList.remove('hidden');
-            this.elements.adminToggleBtn.removeAttribute('hidden');
-            this.elements.adminToggleBtn.style.display = '';
-          }
-          // Admin settings updated
-          this.cache.clear();
-          // Cache cleared due to admin highlight settings
-        }
-        
-        if (isInitialLoad) {
-          this.elements.answersContainer.classList.add('render-optimized');
-          // If loading is active, also add loading-safe class to prevent stacking context issues
-          if (document.body.classList.contains('loading-active') ||
-              this.elements.answersContainer.classList.contains('loading-active')) {
-            this.elements.answersContainer.classList.add('loading-safe');
-          }
-
-          // 🔧 Data load completed for initial load
-          // Note: Initialization may already be marked complete in checkAdmin step
-          if (!this.state.initializationComplete) {
-            this.state.initializationComplete = true;
-            this.state.isInitializing = false;
-            this.hideLoadingOverlay();
-            debugLog('✅ Initialization completed during data load');
-          } else {
-            debugLog('✅ Data load completed - initialization already marked complete');
-          }
-        }
-      } catch (error) {
-        errorLog('Error loading sheet data:', error);
-        const errorMessage = window.sharedUtilities.security.escapeHtml(error.message || 'Unknown error');
-        this.elements.answersContainer.querySelectorAll('.skeleton').forEach(el => el.remove());
-        this.elements.answersContainer.innerHTML = '<div class="text-center text-red-400 col-span-full mt-8 p-4 bg-red-900/20 rounded-lg">' + '<p class="font-bold">データの読み込みに失敗しました。</p>' + '<p class="text-sm mt-2">' + errorMessage + '</p>' + '<button id="retryLoadBtn" class="mt-4 game-btn bg-cyan-600 text-white px-4 py-2 rounded-lg font-bold border-cyan-800 hover:bg-cyan-500 text-sm">再試行</button>' + '</div>';
-        // 同期エラーの場合にもローディング状態を解除
-        this.state.isLoading = false;
-        this.hideLoadingOverlay();
-      }
+    return {
+      userId: this.state.userId,
+      classFilter,
+      sortOrder: config.sortOrder,
+      showAdminFeatures: this.state.showAdminFeatures,
+      requestedSheetName: config.requestedSheetName,
+      bypassCache: config.bypassCache || false
+    };
   }
 
   async loadAvailableSheets() {
@@ -3444,8 +2955,8 @@ class StudyQuestApp {
     this.updateSheetSelectorLabels();
     this.updateSheetDisplayName(targetSheet);
     
-    // ポーリングを再開 (only if polling was initialized)
-    if (this.pollingInitialized) {
+    // ポーリングを再開（初期化完了後のみ）
+    if (this.pollingInitialized && this.state.initializationComplete) {
       this.startNewAnswerPolling();
     }
     
@@ -3465,8 +2976,8 @@ class StudyQuestApp {
       this.elements.sheetSelector.value = this.state.currentActiveSheet || '';
     }
     
-    // ポーリングを再開（元のシートで） (only if polling was initialized)
-    if (this.pollingInitialized) {
+    // ポーリングを再開（元のシートで、初期化完了後のみ）
+    if (this.pollingInitialized && this.state.initializationComplete) {
       this.startNewAnswerPolling();
     }
     
@@ -4047,243 +3558,225 @@ class StudyQuestApp {
     }
   }
   
+  // ✅ CLAUDE.md準拠: Refactored createAnswerCard into focused functions (239 lines → ~30 lines)
   createAnswerCard(data) {
     try {
-      // Data validation and sanitization
-      if (!data || typeof data !== 'object') {
-        warnLog('createAnswerCard: Invalid data provided:', data);
-        return null;
-      }
-      
-      // 重要なコンテンツがない場合の処理
-      if (!data.opinion && !data.reason) {
-        warnLog('createAnswerCard: データにコンテンツ（opinion/reason）がありません:', {
-          rowIndex: data.rowIndex,
-          hasOpinion: !!data.opinion,
-          hasReason: !!data.reason,
-          dataKeys: Object.keys(data)
-        });
-        // 空のコンテンツでもカードは作成する（エラー状態として表示）
-      }
-      
-      // Ensure required properties exist with safe defaults（理由列の堅牢化）
-      const safeData = {
-        rowIndex: data.rowIndex || 0,
-        opinion: data.opinion || '',
-        reason: this.validateReasonText(data.reason),
-        name: data.name || '',
-        email: data.email || '',
-        reactions: data.reactions || {},
-        highlight: Boolean(data.highlight)
-      };
-      
-      // 理由列デバッグ: createAnswerCard での理由データ処理状況
-      
-      // ✅ CLAUDE.md準拠: User-specific cache keys to prevent cross-user reaction state conflicts
-      const userIdentifier = window.UNIFIED_CONFIG?.email ?
-        window.UNIFIED_CONFIG.email.replace(/[^a-zA-Z0-9]/g, '').slice(-8) : 'anon';
-      const cacheKey = `${userIdentifier}-${safeData.rowIndex}-${safeData.opinion.slice(0,50)}-${safeData.reason.slice(0,30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
-      
-      // Answer card cache check
-      const cachedCard = this.cache.get(`render-${cacheKey}`);
-      if (cachedCard) {
-        try {
-          const clonedCard = cachedCard.cloneNode(true);
-          // Ensure cloned card has proper data-row-index
-          clonedCard.dataset.rowIndex = safeData.rowIndex;
-          
-          const reactionButtons = clonedCard.querySelectorAll('.reaction-btn');
-          reactionButtons.forEach(btn => {
-            btn.dataset.rowIndex = safeData.rowIndex;
-          });
-          
-          return clonedCard;
-        } catch (cacheError) {
-          warnLog('createAnswerCard: Cache clone error, creating new card:', cacheError);
-          // Continue to create new card if cache fails
-        }
-      }
-    
-      const card = document.createElement('div');
-      const highlightClass = safeData.highlight ? ' highlighted' : '';
-      card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
-      card.dataset.rowIndex = safeData.rowIndex;
-      card.setAttribute('role', 'article');
-      card.setAttribute('tabindex', '0');
-      card.setAttribute('aria-label', '回答カード: ' + safeData.opinion.substring(0, 50) + (safeData.opinion.length > 50 ? '...' : ''));
-    
-      // Answer card created
-      let highlightBtnHtml = '';
-      // Highlight button condition check
-      if (this.state.showHighlightToggle) {
-        const cls = safeData.highlight ? 'reacted' : '';
-        const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-        highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + safeData.highlight + '" data-row-index="' + safeData.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', safeData.highlight) + '</button>';
-      }
-      const showName = this.state.displayMode === 'named';
-      let displayName = '';
-      
-      if (showName) {
-        // 名前が利用可能な場合はそれを使用、なければemailから生成
-        if (safeData.name) {
-          displayName = safeData.name;
-        } else if (safeData.email) {
-          try {
-            displayName = safeData.email.split('@')[0];
-          } catch (emailError) {
-            warnLog('createAnswerCard: Email parsing error:', emailError);
-            displayName = 'ユーザー';
-          }
-        }
-      }
-      
-      const nameHtml = showName && displayName ? '<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">' + window.sharedUtilities.security.escapeHtml(displayName) + '</span></div>' : '';
-      const containerClass = nameHtml ? 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' : 'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
-    
+      const safeData = this.validateCardData(data);
+      if (!safeData) return null;
 
-      // Name display configuration complete
-      const reactionButtonsHtml = this.reactionTypes.map(rt => {
-        try {
-          const info = safeData.reactions && safeData.reactions[rt.key] ? safeData.reactions[rt.key] : { count: 0, reacted: false };
-          const cls = info.reacted ? 'reacted' : '';
-          const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-          const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">' + (info.count || 0) + '</span>' : '';
-          const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
-          const reactionName = reactionNames[rt.key] || rt.key;
-          const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
+      const cacheKey = this.generateCardCacheKey(safeData);
+      const cachedCard = this.checkCardCache(cacheKey, safeData);
+      if (cachedCard) return cachedCard;
 
+      const card = this.createCardElement(safeData);
+      const highlightBtnHtml = this.createHighlightButton(safeData);
+      const { nameHtml, containerClass } = this.createNameDisplay(safeData);
+      const reactionButtonsHtml = this.createReactionButtons(safeData);
 
-          return '<button type="button" class="reaction-btn like-btn flex items-center gap-1 ' + colorClass + ' ' + cls + '" data-row-index="' + safeData.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + ariaLabel + '" aria-pressed="' + info.reacted + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
-        } catch (reactionError) {
-          warnLog('createAnswerCard: Reaction button creation error:', reactionError);
-          return '';
-        }
-      }).join('');
-      const fragment = document.createDocumentFragment();
-      
-      // Create main content div
-      const contentDiv = document.createElement('div');
-      contentDiv.className = 'relative flex-grow mb-3 answer-preview';
-      
-      const opinionTitle = document.createElement('h3');
-      opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
-      opinionTitle.textContent = safeData.opinion || '（回答内容が取得できませんでした）';
-      
-      const reasonText = document.createElement('p');
-      reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-      reasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
-      
-      contentDiv.appendChild(opinionTitle);
-      
-      // 理由テキストが存在する場合のみ追加（堅牢化）
-      
-      // 理由テキストを常に追加（空の場合はプレースホルダー表示）
-      try {
-        // 理由テキストの有効性を検証
-        if (reasonText && reasonText.textContent) {
-          contentDiv.appendChild(reasonText);
-        } else {
-          // 理由テキスト要素の再作成が必要な場合
-          const newReasonText = document.createElement('p');
-          newReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-          newReasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
-          contentDiv.appendChild(newReasonText);
-        }
-      } catch (reasonError) {
-        // 理由テキスト追加でエラーが発生した場合の回復処理
-        warnLog('createAnswerCard: Reason text append error, attempting recovery:', reasonError);
-        try {
-          const fallbackReasonText = document.createElement('p');
-          fallbackReasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-          fallbackReasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
-          contentDiv.appendChild(fallbackReasonText);
-        } catch (fallbackError) {
-          errorLog('createAnswerCard: Failed to add reason text even with fallback:', fallbackError);
-          // 理由テキストが追加できない場合でもカード生成は継続
-        }
-      }
-    
-      // Create footer div
-      const footerDiv = document.createElement('div');
-      footerDiv.className = containerClass;
-      
-      // 名前表示部分を追加
-      if (nameHtml) {
-        try {
-          const nameContainer = document.createElement('div');
-          nameContainer.className = 'name-container flex-shrink-0';
-          nameContainer.innerHTML = nameHtml;
-          footerDiv.appendChild(nameContainer);
-        } catch (nameError) {
-          warnLog('createAnswerCard: Name container creation error:', nameError);
-        }
-      }
-      
-      // リアクション部分を追加
-      try {
-        const reactionsDiv = document.createElement('div');
-        reactionsDiv.className = 'reaction-container flex items-center gap-1 flex-shrink-0';
-        reactionsDiv.setAttribute('role', 'group');
-        reactionsDiv.setAttribute('aria-label', '回答への反応');
-        reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
-        
-        footerDiv.appendChild(reactionsDiv);
-      } catch (reactionError) {
-        warnLog('createAnswerCard: Reactions div creation error:', reactionError);
-      }
-      
-      fragment.appendChild(contentDiv);
-      fragment.appendChild(footerDiv);
-      card.appendChild(fragment);
-      
-      if (safeData.highlight) {
-        try {
-          const badge = document.createElement('span');
-          badge.className = 'highlight-badge';
-          badge.innerHTML = this.getIcon('star', '', true);
-          card.appendChild(badge);
-        } catch (badgeError) {
-          warnLog('createAnswerCard: Highlight badge creation error:', badgeError);
-        }
-      }
-      
-      // 統一されたリアクションスタイルを適用
-      try {
-        this.applyReactionStyles(card, safeData);
-      } catch (styleError) {
-        warnLog('createAnswerCard: Reaction styles application error:', styleError);
-      }
-      
-      // Cache the card for reuse (limit cache size)
-      try {
-        if (this.cache.size > 100) {
-          this.cache.cleanup();
-        }
-        this.cache.set(`render-${cacheKey}`, card.cloneNode(true));
-      } catch (cacheError) {
-        warnLog('createAnswerCard: Cache storage error:', cacheError);
-      }
-      
+      this.buildCardContent(card, safeData, reactionButtonsHtml, nameHtml, highlightBtnHtml, containerClass);
+      this.finalizeCard(card, safeData, cacheKey);
+
       return card;
-      
     } catch (error) {
-      errorLog('createAnswerCard: Critical error creating card:', error, 'Data:', data);
-      
-      // Return a minimal error card instead of null
+      return this.createErrorCard(error, data);
+    }
+  }
+
+  validateCardData(data) {
+    if (!data || typeof data !== 'object') {
+      warnLog('createAnswerCard: Invalid data provided:', data);
+      return null;
+    }
+
+    if (!data.opinion && !data.reason) {
+      warnLog('createAnswerCard: データにコンテンツ（opinion/reason）がありません:', {
+        rowIndex: data.rowIndex,
+        hasOpinion: !!data.opinion,
+        hasReason: !!data.reason,
+        dataKeys: Object.keys(data)
+      });
+    }
+
+    return {
+      rowIndex: data.rowIndex || 0,
+      opinion: data.opinion || '',
+      reason: this.validateReasonText(data.reason),
+      name: data.name || '',
+      email: data.email || '',
+      reactions: data.reactions || {},
+      highlight: Boolean(data.highlight)
+    };
+  }
+
+  generateCardCacheKey(safeData) {
+    const userIdentifier = window.UNIFIED_CONFIG?.email ?
+      window.UNIFIED_CONFIG.email.replace(/[^a-zA-Z0-9]/g, '').slice(-8) : 'anon';
+    return `${userIdentifier}-${safeData.rowIndex}-${safeData.opinion.slice(0,50)}-${safeData.reason.slice(0,30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
+  }
+
+  checkCardCache(cacheKey, safeData) {
+    const cachedCard = this.cache.get(`render-${cacheKey}`);
+    if (cachedCard) {
       try {
-        const errorCard = document.createElement('div');
-        errorCard.className = 'answer-card glass-panel rounded-xl p-4 border-2 border-red-400/50 bg-red-900/20';
-        errorCard.innerHTML = `
-          <div class="text-red-300 text-center">
-            <div class="mb-2">⚠️ カード表示エラー</div>
-            <div class="text-xs text-red-400">データ処理中に問題が発生しました</div>
-          </div>
-        `;
-        return errorCard;
-      } catch (fallbackError) {
-        errorLog('createAnswerCard: Fallback card creation also failed:', fallbackError);
-        return null;
+        const clonedCard = cachedCard.cloneNode(true);
+        clonedCard.dataset.rowIndex = safeData.rowIndex;
+
+        const reactionButtons = clonedCard.querySelectorAll('.reaction-btn');
+        reactionButtons.forEach(btn => {
+          btn.dataset.rowIndex = safeData.rowIndex;
+        });
+
+        return clonedCard;
+      } catch (cacheError) {
+        warnLog('createAnswerCard: Cache clone error, creating new card:', cacheError);
       }
+    }
+    return null;
+  }
+
+  createCardElement(safeData) {
+    const card = document.createElement('div');
+    const highlightClass = safeData.highlight ? ' highlighted' : '';
+    card.className = 'relative answer-card glass-panel rounded-xl p-4 flex flex-col justify-between shadow-lg border-2 border-cyan-400/80 cursor-pointer' + highlightClass;
+    card.dataset.rowIndex = safeData.rowIndex;
+    card.setAttribute('role', 'article');
+    card.setAttribute('tabindex', '0');
+    card.setAttribute('aria-label', '回答カード: ' + safeData.opinion.substring(0, 50) + (safeData.opinion.length > 50 ? '...' : ''));
+    return card;
+  }
+
+  createHighlightButton(safeData) {
+    if (!this.state.showHighlightToggle) return '';
+
+    const cls = safeData.highlight ? 'reacted' : '';
+    const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする';
+    return `<button type="button" class="highlight-btn like-btn text-purple-600 ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${safeData.highlight}" data-row-index="${safeData.rowIndex}">${this.getIcon('star', 'w-5 h-5', safeData.highlight)}</button>`;
+  }
+
+  createNameDisplay(safeData) {
+    const showName = this.state.displayMode === 'named';
+    let displayName = '';
+
+    if (showName) {
+      if (safeData.name) {
+        displayName = safeData.name;
+      } else if (safeData.email) {
+        try {
+          displayName = safeData.email.split('@')[0];
+        } catch (emailError) {
+          warnLog('createAnswerCard: Email parsing error:', emailError);
+          displayName = 'ユーザー';
+        }
+      }
+    }
+
+    const nameHtml = showName && displayName ?
+      `<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-300 bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">${window.sharedUtilities.security.escapeHtml(displayName)}</span></div>` : '';
+
+    const containerClass = nameHtml ?
+      'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' :
+      'text-xs text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+
+    return { nameHtml, containerClass };
+  }
+
+  createReactionButtons(safeData) {
+    return this.reactionTypes.map(rt => {
+      try {
+        const info = safeData.reactions && safeData.reactions[rt.key] ? safeData.reactions[rt.key] : { count: 0, reacted: false };
+        const cls = info.reacted ? 'reacted' : '';
+        const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
+        const countSpan = this.state.showCounts ? `<span class="reaction-count font-bold text-lg text-gray-200" aria-hidden="true">${info.count || 0}</span>` : '';
+        const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
+        const reactionName = reactionNames[rt.key] || rt.key;
+        const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
+
+        return `<button type="button" class="reaction-btn like-btn flex items-center gap-1 ${colorClass} ${cls}" data-row-index="${safeData.rowIndex}" data-reaction="${rt.key}" aria-label="${ariaLabel}" aria-pressed="${info.reacted}">${this.getIcon(rt.icon, 'w-5 h-5', info.reacted)}${countSpan}</button>`;
+      } catch (reactionError) {
+        warnLog('createAnswerCard: Reaction button creation error:', reactionError);
+        return '';
+      }
+    }).join('');
+  }
+
+  buildCardContent(card, safeData, reactionButtonsHtml, nameHtml, highlightBtnHtml, containerClass) {
+    const fragment = document.createDocumentFragment();
+
+    // Create main content
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'relative flex-grow mb-3 answer-preview';
+
+    const opinionTitle = document.createElement('h3');
+    opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
+    opinionTitle.textContent = safeData.opinion || '（回答内容が取得できませんでした）';
+
+    const reasonText = document.createElement('p');
+    reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+    reasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
+
+    contentDiv.appendChild(opinionTitle);
+    contentDiv.appendChild(reasonText);
+
+    // Create footer
+    const footerDiv = document.createElement('div');
+    footerDiv.className = containerClass;
+
+    if (nameHtml) {
+      const nameContainer = document.createElement('div');
+      nameContainer.className = 'name-container flex-shrink-0';
+      nameContainer.innerHTML = nameHtml;
+      footerDiv.appendChild(nameContainer);
+    }
+
+    const reactionsDiv = document.createElement('div');
+    reactionsDiv.className = 'reaction-container flex items-center gap-1 flex-shrink-0';
+    reactionsDiv.setAttribute('role', 'group');
+    reactionsDiv.setAttribute('aria-label', '回答への反応');
+    reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+    footerDiv.appendChild(reactionsDiv);
+
+    fragment.appendChild(contentDiv);
+    fragment.appendChild(footerDiv);
+    card.appendChild(fragment);
+  }
+
+  finalizeCard(card, safeData, cacheKey) {
+    if (safeData.highlight) {
+      const badge = document.createElement('span');
+      badge.className = 'highlight-badge';
+      badge.innerHTML = this.getIcon('star', '', true);
+      card.appendChild(badge);
+    }
+
+    this.applyReactionStyles(card, safeData);
+
+    // Cache management
+    try {
+      if (this.cache.size > 100) {
+        this.cache.cleanup();
+      }
+      this.cache.set(`render-${cacheKey}`, card.cloneNode(true));
+    } catch (cacheError) {
+      warnLog('createAnswerCard: Cache storage error:', cacheError);
+    }
+  }
+
+  createErrorCard(error, data) {
+    errorLog('createAnswerCard: Critical error creating card:', error, 'Data:', data);
+
+    try {
+      const errorCard = document.createElement('div');
+      errorCard.className = 'answer-card glass-panel rounded-xl p-4 border-2 border-red-400/50 bg-red-900/20';
+      errorCard.innerHTML = `
+        <div class="text-red-300 text-center">
+          <div class="mb-2">⚠️ カード表示エラー</div>
+          <div class="text-xs text-red-400">データ処理中に問題が発生しました</div>
+        </div>
+      `;
+      return errorCard;
+    } catch (fallbackError) {
+      errorLog('createAnswerCard: Fallback card creation also failed:', fallbackError);
+      return null;
     }
   }
   
@@ -4321,39 +3814,27 @@ class StudyQuestApp {
 
     debugLog(`🔄 Starting staged recovery for ${reactionKey}, attempt: ${pendingRequest?.retryCount || 1}`);
 
-    // Level 1: Specific item data refresh
+    // Level 1: Cache clear and force reload
     try {
-      debugLog('🔄 Level 1: Attempting specific item refresh');
-      const refreshResult = await this.refreshSpecificItem(rowIndex);
-      if (refreshResult.success) {
-        debugLog('✅ Level 1 recovery successful');
-        return { success: true, level: 1, method: 'specific_refresh' };
-      }
+      debugLog('🔄 Level 1: Cache clear and force reload');
+      this.clearCache({ includeReactions: true });
+      await this.loadSheetData({ bypassCache: true, silent: true });
+      debugLog('✅ Level 1 recovery successful');
+      return { success: true, level: 1, method: 'cache_clear_reload' };
     } catch (level1Error) {
       warnLog('⚠️ Level 1 recovery failed:', level1Error.message);
     }
 
-    // Level 2: Cache clear and force reload
+    // Level 2: Local state restoration (final fallback)
     try {
-      debugLog('🔄 Level 2: Cache clear and force reload');
-      this.clearReactionCache();
-      await this.loadSheetData({ bypassCache: true, silent: true });
-      debugLog('✅ Level 2 recovery successful');
-      return { success: true, level: 2, method: 'cache_clear_reload' };
-    } catch (level2Error) {
-      warnLog('⚠️ Level 2 recovery failed:', level2Error.message);
-    }
-
-    // Level 3: Local state restoration (final fallback)
-    try {
-      debugLog('🔄 Level 3: Local state restoration fallback');
+      debugLog('🔄 Level 2: Local state restoration fallback');
       const localRestoreResult = this.restoreLocalReactionState(rowIndex, reaction, pendingRequest);
       if (localRestoreResult.success) {
-        debugLog('✅ Level 3 recovery successful');
-        return { success: true, level: 3, method: 'local_restore' };
+        debugLog('✅ Level 2 recovery successful');
+        return { success: true, level: 2, method: 'local_restore' };
       }
-    } catch (level3Error) {
-      errorLog('❌ Level 3 recovery failed:', level3Error.message);
+    } catch (level2Error) {
+      errorLog('❌ Level 2 recovery failed:', level2Error.message);
     }
 
     return {
@@ -4363,36 +3844,7 @@ class StudyQuestApp {
     };
   }
 
-  /**
-   * Refresh specific item data from server
-   * @param {number} rowIndex - Row index to refresh
-   * @returns {Promise<Object>} Refresh result
-   */
-  async refreshSpecificItem(rowIndex) {
-    // This is a placeholder for specific item refresh
-    // In a real implementation, this would make a targeted API call
-    throw new Error('Specific item refresh not implemented - fallback to level 2');
-  }
 
-  /**
-   * Clear reaction-related caches
-   */
-  clearReactionCache() {
-    if (this.reactionCache) {
-      this.reactionCache.clear();
-    }
-
-    // Clear localStorage reaction states
-    try {
-      Object.keys(localStorage).forEach(key => {
-        if (key.startsWith('reaction_state_')) {
-          localStorage.removeItem(key);
-        }
-      });
-    } catch (e) {
-      warnLog('⚠️ Failed to clear localStorage reaction cache:', e.message);
-    }
-  }
 
   /**
    * Restore local reaction state as final fallback
@@ -4474,10 +3926,7 @@ class StudyQuestApp {
       // 最初に見つかったreacted: trueを現在のリアクションとして扱う
       userCurrentReaction = reactedReactions[0];
 
-      // デバッグ情報（複数ある場合のみ警告）
-      if (reactedReactions.length > 1) {
-        console.log(`🔍 複数reacted:true検出（サーバー状態を尊重）:`, reactedReactions);
-      }
+      // 複数reacted:trueがある場合、サーバー状態を尊重
     }
 
     let changed = false;
@@ -4508,9 +3957,9 @@ class StudyQuestApp {
   }
 
   /**
-   * リアクション処理（重複防止システム）
+   * ✅ CLAUDE.md準拠: リアクション追加（バックエンドと一致）
    */
-  async handleReaction(rowIndex, reaction) {
+  async addReaction(rowIndex, reaction) {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
 
@@ -5179,10 +4628,8 @@ class StudyQuestApp {
     // Show error to user
     if (window.messageManager) {
         window.messageManager.show(userMessage, 'error', 4000);
-    } else if (this.showErrorToast) {
-        this.showErrorToast(userMessage);
     } else {
-        console.warn('⚠️ No error display method available:', userMessage);
+        this.showNotification(userMessage, 'error');
     }
 
     // Enhanced logging for debugging
@@ -5199,19 +4646,7 @@ class StudyQuestApp {
   }
 
   
-  showErrorFeedback(btn, message) {
-    if (!btn) return;
-    
-    // 元のクラスを保存
-    const originalClasses = btn.className;
-    
-    // エラー表示
-    btn.classList.add('bg-red-500');
-    btn.title = message;
-
-    // CLAUDE.md準拠: Promise-based state reset (setTimeout代替)
-    this.scheduleButtonStateReset(btn, originalClasses, 2000);
-  }
+  // ✅ 統合済み: showNotificationに統合
   
   async handleHighlight(rowIndex) {
     const numericRowIndex = parseInt(rowIndex, 10);
@@ -5741,7 +5176,7 @@ class StudyQuestApp {
     debugLog('🚫 Redirecting to unpublished page (legacy function)');
     
     // キャッシュクリア処理（新機能と統合）
-    this.clearAllCachesForUnpublished();
+    this.clearCache({ includeReactions: true, includeLocalStorage: true });
     
     // 公開停止時は次回管理パネルを開いたときに全セクションをオープンにする
     try {
@@ -6568,17 +6003,7 @@ class StudyQuestApp {
     }, { timeout: delay });
   }
 
-  cleanup() {
-    // Consolidated cache cleanup
-    this.cache.cleanup();
-
-    // Clear DOM fragment pool
-    this.domFragmentPool.length = 0;
-
-    debugLog('Cache cleanup completed', {
-      cacheSize: this.cache.size
-    });
-  }
+  // ✅ 統合済み: 上記のcleanup()に統合
   
   // Enhanced cache methods with timestamp tracking
 

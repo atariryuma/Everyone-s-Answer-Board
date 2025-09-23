@@ -20,11 +20,11 @@
 // ===========================================
 
 /**
- * 統一列判定関数 - フロントエンドとバックエンドで一貫した列解決
+ * 統一列判定関数 - 最適化されたAI判定システム
  * @param {Array} headers - ヘッダー配列
  * @param {string} fieldType - フィールドタイプ
  * @param {Object} columnMapping - 列マッピング（優先）
- * @param {Object} options - オプション設定
+ * @param {Object} options - オプション設定（sampleData含む）
  * @returns {Object} { index: number, confidence: number, method: string, debug: Object }
  */
 function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}) {
@@ -32,86 +32,85 @@ function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}
     fieldType,
     searchMethods: [],
     candidateHeaders: [],
-    finalSelection: null
+    finalSelection: null,
+    scoringDetails: {}
   };
 
   try {
-    // 🛡️ 入力検証強化 - より詳細なチェック
+    // 🛡️ 入力検証強化
     if (!headers || !Array.isArray(headers) || headers.length === 0) {
       debugInfo.error = 'Invalid or empty headers array';
-      debugInfo.details = {
-        headers: headers ? 'defined' : 'null/undefined',
-        isArray: Array.isArray(headers),
-        length: headers ? headers.length : 'N/A'
-      };
       return { index: -1, confidence: 0, method: 'validation_failed', debug: debugInfo };
     }
 
     if (!fieldType || typeof fieldType !== 'string' || fieldType.trim() === '') {
       debugInfo.error = 'Invalid or empty fieldType';
-      debugInfo.details = {
-        fieldType: fieldType ? fieldType : 'null/undefined',
-        type: typeof fieldType,
-        length: fieldType ? fieldType.length : 'N/A'
-      };
       return { index: -1, confidence: 0, method: 'validation_failed', debug: debugInfo };
     }
 
-    // 🛡️ columnMapping検証とマッピング処理
+    // 1. 明示的マッピング（最高優先度）
     if (columnMapping && typeof columnMapping === 'object' && columnMapping[fieldType] !== undefined && columnMapping[fieldType] !== null) {
       const mappedIndex = columnMapping[fieldType];
       if (typeof mappedIndex === 'number' && Number.isInteger(mappedIndex) && mappedIndex >= 0 && mappedIndex < headers.length) {
         debugInfo.searchMethods.push({ method: 'explicit_mapping', index: mappedIndex, confidence: 100 });
         debugInfo.finalSelection = { method: 'explicit_mapping', index: mappedIndex };
         return { index: mappedIndex, confidence: 100, method: 'explicit_mapping', debug: debugInfo };
-      } else {
-        debugInfo.searchMethods.push({
-          method: 'explicit_mapping_invalid',
-          index: mappedIndex,
-          error: `Invalid mapped index: ${mappedIndex} (type: ${typeof mappedIndex}, isInteger: ${Number.isInteger(mappedIndex)})`
-        });
       }
     }
 
-    // 2. ヘッダーパターンマッチング（拡張版）
+    // 2. 🧠 AI強化パターンマッチング - 全候補を評価してベストマッチを選択
+    const candidates = [];
     const headerPatterns = getHeaderPatterns();
     const patterns = headerPatterns[fieldType] || [];
 
-    if (patterns.length > 0) {
-      debugInfo.searchMethods.push({ method: 'pattern_matching', patterns });
+    // 各ヘッダーを候補として評価
+    headers.forEach((header, index) => {
+      if (!header || typeof header !== 'string') return;
 
-      // 完全一致を最優先
-      for (const pattern of patterns) {
-        const exactMatch = headers.findIndex(header =>
-          header && header.toLowerCase().trim() === pattern.toLowerCase().trim()
-        );
-        if (exactMatch !== -1) {
-          debugInfo.candidateHeaders.push({ index: exactMatch, header: headers[exactMatch], pattern, matchType: 'exact' });
-          debugInfo.finalSelection = { method: 'pattern_exact', index: exactMatch, pattern };
-          return { index: exactMatch, confidence: 95, method: 'pattern_exact', debug: debugInfo };
-        }
+      const candidate = evaluateHeaderCandidate(header, index, fieldType, patterns, options);
+      if (candidate.totalScore > 0) {
+        candidates.push(candidate);
       }
+    });
 
-      // 部分一致（includes）
-      for (const pattern of patterns) {
-        const partialMatch = headers.findIndex(header =>
-          header && header.toLowerCase().includes(pattern.toLowerCase())
-        );
-        if (partialMatch !== -1) {
-          debugInfo.candidateHeaders.push({ index: partialMatch, header: headers[partialMatch], pattern, matchType: 'partial' });
-          debugInfo.finalSelection = { method: 'pattern_partial', index: partialMatch, pattern };
-          return { index: partialMatch, confidence: 80, method: 'pattern_partial', debug: debugInfo };
-        }
+    debugInfo.candidateHeaders = candidates.slice(0, 3); // 上位3候補をデバッグ表示
+
+    // 最高スコアの候補を選択
+    if (candidates.length > 0) {
+      const bestCandidate = candidates.reduce((best, current) =>
+        current.totalScore > best.totalScore ? current : best
+      );
+
+      // 🎯 信頼度基準: 50以上で採用、80以上で高信頼
+      if (bestCandidate.totalScore >= 50) {
+        debugInfo.scoringDetails = bestCandidate.scoreBreakdown;
+        debugInfo.finalSelection = {
+          method: 'ai_enhanced_pattern',
+          index: bestCandidate.index,
+          score: bestCandidate.totalScore
+        };
+
+        return {
+          index: bestCandidate.index,
+          confidence: Math.min(bestCandidate.totalScore, 99), // 99%上限
+          method: 'ai_enhanced_pattern',
+          debug: debugInfo
+        };
       }
     }
 
-    // 3. フォールバック: 位置ベース推測（必要に応じて）
+    // 3. 位置ベースフォールバック（改良版）
     if (options.allowPositionalFallback !== false) {
-      const positionalIndex = getPositionalFallback(fieldType, headers.length);
-      if (positionalIndex !== -1 && positionalIndex < headers.length) {
-        debugInfo.searchMethods.push({ method: 'positional_fallback', index: positionalIndex });
-        debugInfo.finalSelection = { method: 'positional_fallback', index: positionalIndex };
-        return { index: positionalIndex, confidence: 30, method: 'positional_fallback', debug: debugInfo };
+      const positionalResult = getSmartPositionalFallback(fieldType, headers, options);
+      if (positionalResult.index !== -1) {
+        debugInfo.searchMethods.push({ method: 'smart_positional', ...positionalResult });
+        debugInfo.finalSelection = { method: 'smart_positional', ...positionalResult };
+        return {
+          index: positionalResult.index,
+          confidence: positionalResult.confidence,
+          method: 'smart_positional',
+          debug: debugInfo
+        };
       }
     }
 
@@ -181,6 +180,371 @@ function getPositionalFallback(fieldType, columnCountOrRow) {
   // 列数が渡された場合（従来のgetPositionalFallback）
   const columnCount = columnCountOrRow;
   return (position !== undefined && position < columnCount) ? position : -1;
+}
+
+/**
+ * 🧠 AI強化ヘッダー候補評価システム - 多要素スコアリング
+ * @param {string} header - ヘッダー文字列
+ * @param {number} index - ヘッダーのインデックス
+ * @param {string} fieldType - 対象フィールドタイプ
+ * @param {Array} patterns - パターン配列
+ * @param {Object} options - オプション設定
+ * @returns {Object} { index, totalScore, scoreBreakdown }
+ */
+function evaluateHeaderCandidate(header, index, fieldType, patterns, options = {}) {
+  const candidate = {
+    index,
+    header,
+    totalScore: 0,
+    scoreBreakdown: {
+      patternMatch: 0,
+      semanticSimilarity: 0,
+      positionalScore: 0,
+      contentValidation: 0,
+      lengthPenalty: 0
+    }
+  };
+
+  try {
+    const normalizedHeader = header.toLowerCase().trim();
+
+    // 1. 🎯 パターンマッチングスコア（重み40%）
+    let patternScore = 0;
+    let bestPattern = null;
+
+    for (const pattern of patterns) {
+      const normalizedPattern = pattern.toLowerCase().trim();
+
+      // 完全一致: 100点
+      if (normalizedHeader === normalizedPattern) {
+        patternScore = 100;
+        bestPattern = pattern;
+        break;
+      }
+
+      // 部分一致の詳細評価
+      if (normalizedHeader.includes(normalizedPattern)) {
+        // 含有度によるスコア調整
+        const containmentRatio = normalizedPattern.length / normalizedHeader.length;
+        const containmentScore = 60 + (containmentRatio * 30); // 60-90点
+
+        if (containmentScore > patternScore) {
+          patternScore = containmentScore;
+          bestPattern = pattern;
+        }
+      }
+
+      // 逆含有（パターンがヘッダーを含む場合）
+      if (normalizedPattern.includes(normalizedHeader)) {
+        const reverseScore = 40 + ((normalizedHeader.length / normalizedPattern.length) * 20); // 40-60点
+        if (reverseScore > patternScore) {
+          patternScore = reverseScore;
+          bestPattern = pattern;
+        }
+      }
+    }
+
+    candidate.scoreBreakdown.patternMatch = patternScore;
+    candidate.bestPattern = bestPattern;
+
+    // 2. 🔤 意味的類似性スコア（重み20%）
+    candidate.scoreBreakdown.semanticSimilarity = calculateSemanticSimilarity(normalizedHeader, fieldType);
+
+    // 3. 📍 位置的適合性スコア（重み20%）
+    candidate.scoreBreakdown.positionalScore = calculatePositionalScore(index, fieldType, header.length);
+
+    // 4. 📊 コンテンツ検証スコア（重み15%）
+    if (options.sampleData && Array.isArray(options.sampleData) && options.sampleData.length > 0) {
+      candidate.scoreBreakdown.contentValidation = validateContentType(options.sampleData, index, fieldType);
+    }
+
+    // 5. 📏 長さペナルティ（重み5%）
+    candidate.scoreBreakdown.lengthPenalty = calculateLengthPenalty(normalizedHeader);
+
+    // 🧮 重み付き総合スコア計算
+    candidate.totalScore = Math.round(
+      (candidate.scoreBreakdown.patternMatch * 0.40) +
+      (candidate.scoreBreakdown.semanticSimilarity * 0.20) +
+      (candidate.scoreBreakdown.positionalScore * 0.20) +
+      (candidate.scoreBreakdown.contentValidation * 0.15) +
+      (candidate.scoreBreakdown.lengthPenalty * 0.05)
+    );
+
+    return candidate;
+
+  } catch (error) {
+    console.error('evaluateHeaderCandidate エラー:', error.message);
+    return { index, header, totalScore: 0, scoreBreakdown: {}, error: error.message };
+  }
+}
+
+/**
+ * 🔤 意味的類似性計算（フィールドタイプ特化）
+ * @param {string} header - 正規化済みヘッダー
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {number} 類似性スコア（0-100）
+ */
+function calculateSemanticSimilarity(header, fieldType) {
+  // フィールドタイプ別の関連キーワード
+  const semanticKeywords = {
+    timestamp: ['時間', '日時', 'time', 'date', '作成', '投稿', '記録'],
+    email: ['メール', 'mail', 'address', 'アドレス', '@', 'contact'],
+    answer: ['回答', '答え', 'answer', 'response', '意見', 'opinion'],
+    reason: ['理由', '根拠', 'reason', '説明', 'explain', 'why'],
+    class: ['クラス', '学年', '組', 'class', 'grade'],
+    name: ['名前', '氏名', 'name', '名', 'user']
+  };
+
+  const keywords = semanticKeywords[fieldType] || [];
+  let semanticScore = 0;
+
+  // キーワード含有チェック
+  for (const keyword of keywords) {
+    if (header.includes(keyword.toLowerCase())) {
+      semanticScore += (keyword.length > 2) ? 20 : 15; // 長いキーワードほど高スコア
+    }
+  }
+
+  // フィールドタイプ特有のパターンチェック
+  switch (fieldType) {
+    case 'email':
+      if (header.includes('@') || header.includes('mail')) semanticScore += 25;
+      break;
+    case 'timestamp':
+      if (/\d{4}|\d{2}\/|\d{2}-/.test(header)) semanticScore += 20;
+      break;
+    case 'class':
+      if (/\d+|[1-6]/.test(header)) semanticScore += 15;
+      break;
+  }
+
+  return Math.min(semanticScore, 100);
+}
+
+/**
+ * 📍 位置的適合性スコア計算
+ * @param {number} index - ヘッダーのインデックス
+ * @param {string} fieldType - フィールドタイプ
+ * @param {number} headerLength - ヘッダー文字数
+ * @returns {number} 位置スコア（0-100）
+ */
+function calculatePositionalScore(index, fieldType, headerLength) {
+  // Google Forms典型的位置
+  const idealPositions = {
+    timestamp: 0,
+    answer: 1,
+    reason: 2,
+    class: 3,
+    name: 4,
+    email: 5
+  };
+
+  const idealPos = idealPositions[fieldType];
+  if (idealPos === undefined) return 50; // 不明フィールドは中立
+
+  // 位置差によるペナルティ（距離に比例）
+  const positionDiff = Math.abs(index - idealPos);
+  let positionScore = Math.max(0, 100 - (positionDiff * 15));
+
+  // 特殊調整
+  switch (fieldType) {
+    case 'timestamp':
+      // タイムスタンプは最初の列が最も理想的
+      positionScore = index === 0 ? 100 : Math.max(20, 100 - (index * 20));
+      break;
+    case 'answer':
+      // 回答は1-3列目が理想的
+      if (index >= 1 && index <= 3) positionScore = Math.max(positionScore, 80);
+      break;
+  }
+
+  return Math.min(positionScore, 100);
+}
+
+/**
+ * 📊 コンテンツタイプ検証スコア
+ * @param {Array} sampleData - サンプルデータ配列
+ * @param {number} index - 列インデックス
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {number} コンテンツ検証スコア（0-100）
+ */
+function validateContentType(sampleData, index, fieldType) {
+  try {
+    if (!sampleData || sampleData.length === 0) return 0;
+
+    // 最大5行のサンプルをチェック
+    const sampleSize = Math.min(5, sampleData.length);
+    let validCount = 0;
+    const samples = [];
+
+    for (let i = 0; i < sampleSize; i++) {
+      const row = sampleData[i];
+      if (!row || !Array.isArray(row) || index >= row.length) continue;
+
+      const cellValue = row[index];
+      if (!cellValue || typeof cellValue !== 'string') continue;
+
+      samples.push(cellValue.trim());
+    }
+
+    if (samples.length === 0) return 0;
+
+    // フィールドタイプ別検証
+    switch (fieldType) {
+      case 'email':
+        validCount = samples.filter(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)).length;
+        break;
+
+      case 'timestamp':
+        validCount = samples.filter(val => {
+          const parsed = new Date(val);
+          return !isNaN(parsed.getTime()) && parsed.getTime() > 0;
+        }).length;
+        break;
+
+      case 'answer':
+      case 'reason':
+        // 文章らしさ（3文字以上、かつ複数文字種）
+        validCount = samples.filter(val =>
+          val.length >= 3 && /[あ-ん]|[ア-ン]|[a-zA-Z]/.test(val)
+        ).length;
+        break;
+
+      case 'name':
+        // 名前らしさ（1-20文字、記号少ない）
+        validCount = samples.filter(val =>
+          val.length >= 1 && val.length <= 20 && !/[0-9@#$%^&*()_+={}[\]|\\:";'<>?,./]/.test(val)
+        ).length;
+        break;
+
+      case 'class':
+        // クラス表記（数字または年組形式）
+        validCount = samples.filter(val =>
+          /^[1-6][年組A-Z]?|^[1-9]\d?[組年]?$/.test(val)
+        ).length;
+        break;
+
+      default:
+        return 50; // 不明フィールドは中立
+    }
+
+    // 有効率をスコアに変換
+    const validityRatio = validCount / samples.length;
+    return Math.round(validityRatio * 100);
+
+  } catch (error) {
+    console.error('validateContentType エラー:', error.message);
+    return 0;
+  }
+}
+
+/**
+ * 📏 ヘッダー長さペナルティ計算
+ * @param {string} header - 正規化済みヘッダー
+ * @returns {number} 長さスコア（0-100）
+ */
+function calculateLengthPenalty(header) {
+  const {length} = header;
+
+  // 理想的な長さ: 3-15文字
+  if (length >= 3 && length <= 15) return 100;
+
+  // 短すぎる（1-2文字）
+  if (length < 3) return Math.max(0, 50 - ((3 - length) * 20));
+
+  // 長すぎる（16文字以上）
+  return Math.max(20, 100 - ((length - 15) * 5));
+}
+
+/**
+ * 🎯 スマート位置ベースフォールバック（改良版）
+ * @param {string} fieldType - フィールドタイプ
+ * @param {Array} headers - ヘッダー配列
+ * @param {Object} options - オプション設定
+ * @returns {Object} { index: number, confidence: number }
+ */
+function getSmartPositionalFallback(fieldType, headers, options = {}) {
+  try {
+    const typicalPositions = {
+      timestamp: [0],
+      answer: [1, 2, 3],
+      reason: [2, 3, 4],
+      class: [3, 4, 5],
+      name: [4, 5, 6],
+      email: [5, 6, 7]
+    };
+
+    const candidatePositions = typicalPositions[fieldType] || [];
+    if (candidatePositions.length === 0) return { index: -1, confidence: 0 };
+
+    // 有効な位置から最も適切なものを選択
+    for (const pos of candidatePositions) {
+      if (pos < headers.length && headers[pos]) {
+        // 位置による信頼度調整
+        let confidence;
+        if (pos === candidatePositions[0]) {
+          confidence = 40; // 第一候補
+        } else if (pos === candidatePositions[1]) {
+          confidence = 30; // 第二候補
+        } else {
+          confidence = 20; // その他
+        }
+
+        // ヘッダーの妥当性による微調整
+        const headerQuality = evaluateHeaderQuality(headers[pos], fieldType);
+        confidence = Math.min(50, confidence + headerQuality);
+
+        return { index: pos, confidence };
+      }
+    }
+
+    return { index: -1, confidence: 0 };
+
+  } catch (error) {
+    console.error('getSmartPositionalFallback エラー:', error.message);
+    return { index: -1, confidence: 0 };
+  }
+}
+
+/**
+ * 📈 ヘッダー品質評価（位置フォールバック用）
+ * @param {string} header - ヘッダー文字列
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {number} 品質調整値（-10 to +10）
+ */
+function evaluateHeaderQuality(header, fieldType) {
+  if (!header || typeof header !== 'string') return -10;
+
+  let quality = 0;
+  const normalizedHeader = header.toLowerCase().trim();
+
+  // 長さチェック
+  if (normalizedHeader.length >= 2 && normalizedHeader.length <= 20) quality += 3;
+
+  // フィールドタイプ関連語句
+  const relatedTerms = {
+    timestamp: ['時', 'time', 'date'],
+    email: ['mail', 'メール'],
+    answer: ['答', 'answer'],
+    reason: ['理由', 'reason'],
+    class: ['class', 'クラス'],
+    name: ['name', '名']
+  };
+
+  const terms = relatedTerms[fieldType] || [];
+  for (const term of terms) {
+    if (normalizedHeader.includes(term)) {
+      quality += 5;
+      break;
+    }
+  }
+
+  // 意味のない文字列のペナルティ
+  if (/^[0-9]+$|^[!@#$%^&*()]+$|^[\s]+$/.test(normalizedHeader)) {
+    quality -= 8;
+  }
+
+  return Math.max(-10, Math.min(10, quality));
 }
 
 /**
@@ -478,9 +842,9 @@ function generateColumnRecommendations(report) {
 // ===========================================
 
 /**
- * AI列分析：ヘッダーから推奨マッピングと信頼度を自動生成
+ * 🧠 AI強化列分析：ヘッダーから推奨マッピングと信頼度を自動生成
  * @param {Array} headers - ヘッダー配列
- * @param {Object} options - 分析オプション
+ * @param {Object} options - 分析オプション（sampleData含む）
  * @returns {Object} { recommendedMapping, confidence, analysis }
  */
 function generateRecommendedMapping(headers, options = {}) {
@@ -488,44 +852,114 @@ function generateRecommendedMapping(headers, options = {}) {
     timestamp: new Date().toISOString(),
     headers: headers || [],
     fieldResults: {},
-    overallScore: 0
+    conflictResolution: {},
+    qualityMetrics: {},
+    overallScore: 0,
+    aiEnhancementUsed: true
   };
 
   try {
     const targetFields = options.fields || ['answer', 'reason', 'class', 'name', 'timestamp', 'email'];
+    const sampleData = options.sampleData || [];
     const recommendedMapping = {};
     const confidence = {};
+    const usedIndices = new Set(); // 重複チェック用
+
+    // 🧠 AI強化分析オプション設定
+    const aiOptions = {
+      allowPositionalFallback: true,
+      sampleData: sampleData.slice(0, 5), // 最大5行のサンプル
+      enableContentValidation: sampleData.length > 0
+    };
+
     let totalConfidence = 0;
     let resolvedFields = 0;
+    const fieldAnalysisResults = [];
 
-    // 各フィールドのAI分析実行
+    // 🎯 段階1: 各フィールドのAI分析実行（重複チェックなし）
     targetFields.forEach(fieldType => {
-      const result = resolveColumnIndex(headers, fieldType, {}, { allowPositionalFallback: true });
+      const result = resolveColumnIndex(headers, fieldType, {}, aiOptions);
 
-      analysis.fieldResults[fieldType] = {
+      const fieldAnalysis = {
+        fieldType,
         resolved: result.index !== -1,
         index: result.index,
         confidence: result.confidence,
         method: result.method,
-        header: result.index !== -1 ? headers[result.index] : null
+        header: result.index !== -1 ? headers[result.index] : null,
+        scoringDetails: result.debug?.scoringDetails || null
       };
 
-      // 推奨マッピング生成（解決済みフィールドのみ）
-      if (result.index !== -1) {
-        recommendedMapping[fieldType] = result.index;
-        confidence[fieldType] = result.confidence;
-        totalConfidence += result.confidence;
-        resolvedFields++;
-      }
+      analysis.fieldResults[fieldType] = fieldAnalysis;
+      fieldAnalysisResults.push({ fieldType, result, analysis: fieldAnalysis });
     });
 
-    // 全体スコア計算
-    analysis.overallScore = resolvedFields > 0 ? Math.round(totalConfidence / resolvedFields) : 0;
+    // 🎯 段階2: 重複解決アルゴリズム（信頼度ベース優先順位）
+    fieldAnalysisResults
+      .filter(item => item.result.index !== -1)
+      .sort((a, b) => b.result.confidence - a.result.confidence) // 信頼度降順
+      .forEach(item => {
+        const { fieldType, result } = item;
 
-    console.log('✅ AI列分析完了:', {
+        if (!usedIndices.has(result.index)) {
+          // 重複なし: 採用
+          recommendedMapping[fieldType] = result.index;
+          confidence[fieldType] = result.confidence;
+          usedIndices.add(result.index);
+          totalConfidence += result.confidence;
+          resolvedFields++;
+
+          analysis.fieldResults[fieldType].adopted = true;
+        } else {
+          // 🔧 重複解決: 代替候補を探索
+          const alternativeResult = findAlternativeColumn(headers, fieldType, usedIndices, aiOptions);
+
+          if (alternativeResult.index !== -1) {
+            recommendedMapping[fieldType] = alternativeResult.index;
+            confidence[fieldType] = alternativeResult.confidence;
+            usedIndices.add(alternativeResult.index);
+            totalConfidence += alternativeResult.confidence;
+            resolvedFields++;
+
+            analysis.fieldResults[fieldType].adopted = true;
+            analysis.fieldResults[fieldType].alternativeUsed = true;
+            analysis.conflictResolution[fieldType] = {
+              originalIndex: result.index,
+              alternativeIndex: alternativeResult.index,
+              reason: 'index_conflict_resolved'
+            };
+          } else {
+            analysis.fieldResults[fieldType].adopted = false;
+            analysis.conflictResolution[fieldType] = {
+              originalIndex: result.index,
+              reason: 'no_alternative_found'
+            };
+          }
+        }
+      });
+
+    // 🎯 段階3: 品質メトリクス計算
+    analysis.qualityMetrics = calculateMappingQuality(recommendedMapping, headers, sampleData);
+
+    // 全体スコア計算（品質メトリクスを考慮）
+    const baseScore = resolvedFields > 0 ? Math.round(totalConfidence / resolvedFields) : 0;
+    const qualityBonus = Math.round(analysis.qualityMetrics.overallQuality * 0.1); // 10%まで品質ボーナス
+    analysis.overallScore = Math.min(99, baseScore + qualityBonus);
+
+    // 🎯 段階4: 論理整合性チェック
+    const consistencyCheck = validateLogicalConsistency(recommendedMapping, headers, targetFields);
+    analysis.consistencyCheck = consistencyCheck;
+
+    if (!consistencyCheck.isConsistent) {
+      analysis.overallScore = Math.max(50, analysis.overallScore - 15); // 整合性ペナルティ
+    }
+
+    console.log('✅ AI強化列分析完了:', {
       resolvedFields: `${resolvedFields}/${targetFields.length}`,
       overallScore: analysis.overallScore,
-      mappingKeys: Object.keys(recommendedMapping)
+      qualityScore: analysis.qualityMetrics.overallQuality,
+      consistencyCheck: consistencyCheck.isConsistent,
+      conflicts: Object.keys(analysis.conflictResolution).length
     });
 
     return {
@@ -542,6 +976,167 @@ function generateRecommendedMapping(headers, options = {}) {
       confidence: {},
       analysis: { ...analysis, error: error.message },
       success: false
+    };
+  }
+}
+
+/**
+ * 🔍 代替列候補探索（重複解決用）
+ * @param {Array} headers - ヘッダー配列
+ * @param {string} fieldType - フィールドタイプ
+ * @param {Set} usedIndices - 使用済みインデックス
+ * @param {Object} options - オプション設定
+ * @returns {Object} { index: number, confidence: number }
+ */
+function findAlternativeColumn(headers, fieldType, usedIndices, options = {}) {
+  try {
+    const headerPatterns = getHeaderPatterns();
+    const patterns = headerPatterns[fieldType] || [];
+    let bestAlternative = { index: -1, confidence: 0 };
+
+    // 各ヘッダーを代替候補として評価（使用済み除外）
+    headers.forEach((header, index) => {
+      if (usedIndices.has(index) || !header || typeof header !== 'string') return;
+
+      const candidate = evaluateHeaderCandidate(header, index, fieldType, patterns, options);
+
+      // より良い代替候補があれば更新
+      if (candidate.totalScore > bestAlternative.confidence) {
+        bestAlternative = {
+          index: candidate.index,
+          confidence: Math.min(candidate.totalScore - 5, 90), // 代替候補は少しペナルティ
+          method: 'alternative_search'
+        };
+      }
+    });
+
+    return bestAlternative;
+
+  } catch (error) {
+    console.error('findAlternativeColumn エラー:', error.message);
+    return { index: -1, confidence: 0 };
+  }
+}
+
+/**
+ * 📊 マッピング品質評価
+ * @param {Object} mapping - 推奨マッピング
+ * @param {Array} headers - ヘッダー配列
+ * @param {Array} sampleData - サンプルデータ
+ * @returns {Object} 品質メトリクス
+ */
+function calculateMappingQuality(mapping, headers, sampleData = []) {
+  const metrics = {
+    mappingCoverage: 0,
+    headerQuality: 0,
+    contentConsistency: 0,
+    duplicateCheck: 0,
+    overallQuality: 0
+  };
+
+  try {
+    const requiredFields = ['answer', 'reason'];
+    const optionalFields = ['class', 'name', 'timestamp', 'email'];
+    const mappedFields = Object.keys(mapping);
+
+    // 1. マッピングカバレッジ（必須フィールドの解決率）
+    const resolvedRequired = requiredFields.filter(field => mappedFields.includes(field));
+    metrics.mappingCoverage = (resolvedRequired.length / requiredFields.length) * 100;
+
+    // 2. ヘッダー品質（平均的なヘッダーの明確さ）
+    const headerQualities = mappedFields.map(field => {
+      const index = mapping[field];
+      return evaluateHeaderQuality(headers[index], field) + 50; // -10~+10 を 40~60 に変換
+    });
+    metrics.headerQuality = headerQualities.length > 0 ?
+      headerQualities.reduce((sum, q) => sum + q, 0) / headerQualities.length : 50;
+
+    // 3. コンテンツ整合性（サンプルデータがある場合）
+    if (sampleData.length > 0) {
+      const contentScores = mappedFields.map(field => {
+        const index = mapping[field];
+        return validateContentType(sampleData, index, field);
+      });
+      metrics.contentConsistency = contentScores.length > 0 ?
+        contentScores.reduce((sum, score) => sum + score, 0) / contentScores.length : 50;
+    } else {
+      metrics.contentConsistency = 50; // 中立値
+    }
+
+    // 4. 重複チェック（すべて異なるインデックスか）
+    const indices = Object.values(mapping);
+    const uniqueIndices = new Set(indices);
+    metrics.duplicateCheck = (uniqueIndices.size === indices.length) ? 100 : 0;
+
+    // 総合品質スコア
+    metrics.overallQuality = Math.round(
+      (metrics.mappingCoverage * 0.35) +
+      (metrics.headerQuality * 0.25) +
+      (metrics.contentConsistency * 0.25) +
+      (metrics.duplicateCheck * 0.15)
+    );
+
+    return metrics;
+
+  } catch (error) {
+    console.error('calculateMappingQuality エラー:', error.message);
+    return { ...metrics, error: error.message };
+  }
+}
+
+/**
+ * 🧩 論理整合性検証
+ * @param {Object} mapping - 推奨マッピング
+ * @param {Array} headers - ヘッダー配列
+ * @param {Array} targetFields - 対象フィールド
+ * @returns {Object} 整合性チェック結果
+ */
+function validateLogicalConsistency(mapping, headers, targetFields) {
+  const result = {
+    isConsistent: true,
+    issues: [],
+    warnings: []
+  };
+
+  try {
+    // 1. 重複インデックスチェック
+    const indices = Object.values(mapping);
+    const uniqueIndices = new Set(indices);
+    if (uniqueIndices.size !== indices.length) {
+      result.isConsistent = false;
+      result.issues.push('重複するインデックスが検出されました');
+    }
+
+    // 2. 範囲外インデックスチェック
+    indices.forEach(index => {
+      if (index < 0 || index >= headers.length) {
+        result.isConsistent = false;
+        result.issues.push(`範囲外インデックス: ${index}`);
+      }
+    });
+
+    // 3. 必須フィールドの存在チェック
+    const requiredFields = ['answer'];
+    const missingRequired = requiredFields.filter(field => !mapping[field]);
+    if (missingRequired.length > 0) {
+      result.warnings.push(`必須フィールド未解決: ${missingRequired.join(', ')}`);
+    }
+
+    // 4. 論理的順序チェック（timestamp < answer など）
+    if (mapping.timestamp !== undefined && mapping.answer !== undefined) {
+      if (mapping.timestamp > mapping.answer) {
+        result.warnings.push('タイムスタンプが回答フィールドより後にあります');
+      }
+    }
+
+    return result;
+
+  } catch (error) {
+    console.error('validateLogicalConsistency エラー:', error.message);
+    return {
+      isConsistent: false,
+      issues: [`整合性チェック中にエラー: ${error.message}`],
+      warnings: []
     };
   }
 }
