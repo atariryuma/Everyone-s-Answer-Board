@@ -2772,7 +2772,12 @@ class StudyQuestApp {
       await this.finalizeDataLoad(result, loadConfig);
 
     } catch (error) {
-      this.handleDataLoadError(error);
+      this.handleError(error, {
+        type: 'data_load',
+        operation: 'performDataLoad',
+        showUser: true,
+        context: 'データ処理中にエラーが発生しました'
+      });
     }
   }
 
