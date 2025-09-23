@@ -275,6 +275,8 @@ function validateSpreadsheetId(spreadsheetId) {
  * @returns {Object} 検証結果
  */
 function validateColumnMapping(columnMapping) {
+    console.log('🔍 validateColumnMapping開始:', JSON.stringify(columnMapping, null, 2));
+
     const result = {
       isValid: false,
       errors: [],
@@ -282,13 +284,17 @@ function validateColumnMapping(columnMapping) {
     };
 
     if (!columnMapping || typeof columnMapping !== 'object') {
-      result.errors.push('列マッピングが必要です');
+      const errorMsg = '列マッピングが必要です';
+      console.log(`❌ ${  errorMsg}`);
+      result.errors.push(errorMsg);
       return result;
     }
 
     // バックエンド構造：columnMapping.mapping（CLAUDE.md準拠）
     if (!columnMapping.mapping || typeof columnMapping.mapping !== 'object') {
-      result.errors.push('列マッピング内のmappingプロパティが必要です');
+      const errorMsg = '列マッピング内のmappingプロパティが必要です';
+      console.log(`❌ ${  errorMsg}`);
+      result.errors.push(errorMsg);
       return result;
     }
     const {mapping} = columnMapping;
@@ -304,17 +310,23 @@ function validateColumnMapping(columnMapping) {
     // 必須列チェック（バックエンド構造対応）
     for (const col of requiredColumns) {
       const index = mapping[col];
+      console.log(`🔍 validateColumnMapping: ${col} = ${index} (type: ${typeof index})`);
       if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
-        result.errors.push(`必須列 '${col}' のインデックスが無効です（値: ${index}）`);
+        const errorMsg = `必須列 '${col}' のインデックスが無効です（値: ${index}）`;
+        console.log(`❌ ${  errorMsg}`);
+        result.errors.push(errorMsg);
       }
     }
 
     // オプション列チェック（バックエンド構造対応）
     for (const col of optionalColumns) {
       const index = mapping[col];
+      console.log(`🔍 validateColumnMapping (optional): ${col} = ${index} (type: ${typeof index})`);
       if (index !== undefined) {
         if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
-          result.warnings.push(`オプション列 '${col}' のインデックスが無効です（値: ${index}）`);
+          const warningMsg = `オプション列 '${col}' のインデックスが無効です（値: ${index}）`;
+          console.log(`⚠️ ${  warningMsg}`);
+          result.warnings.push(warningMsg);
         }
       }
     }

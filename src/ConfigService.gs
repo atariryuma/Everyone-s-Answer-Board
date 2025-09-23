@@ -389,6 +389,12 @@ function generateUserPermissions(_userId) {
  */
 function validateAndSanitizeConfig(config, userId) {
   try {
+    // デバッグ用ログ
+    console.log('🔍 ConfigService受信データ:', JSON.stringify(config, null, 2));
+    if (config.columnMapping) {
+      console.log('🔍 受信したcolumnMapping:', JSON.stringify(config.columnMapping, null, 2));
+    }
+
     // 統一検証: validators.gsのvalidateConfigを活用
     const validationResult = validateConfig(config);
     if (!validationResult.isValid) {
