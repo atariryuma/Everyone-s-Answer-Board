@@ -2764,12 +2764,26 @@ class StudyQuestApp {
       this.showLoadingState(loadConfig);
 
       const fetchParams = this.prepareFetchParameters(loadConfig);
-      const result = await this.fetchDataWithErrorHandling(fetchParams, loadConfig.isInitialLoad);
 
-      if (!result) return;
+      // Use existing unified data fetching function
+      const result = await this.getUserData(fetchParams, loadConfig.isInitialLoad);
 
-      await this.processDataResult(result, loadConfig);
-      await this.finalizeDataLoad(result, loadConfig);
+      if (!result || !result.success) {
+        this.handleError(new Error(result?.error || 'データ取得に失敗しました'), {
+          type: 'api',
+          operation: 'getUserData',
+          showUser: true
+        });
+        return;
+      }
+
+      // Process the successful result
+      this.state.currentAnswers = result.data || [];
+      this.state.currentActiveSheet = result.activeSheet || loadConfig.requestedSheetName;
+
+      // Update UI
+      await this.renderBoard(false, loadConfig.isInitialLoad, oldAnswers);
+      this.populateClassFilter(this.state.currentAnswers);
 
     } catch (error) {
       this.handleError(error, {
