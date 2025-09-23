@@ -633,7 +633,7 @@ class StudyQuestApp {
           await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
         }
 
-        this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
+        this.updateLastSeenCount(this.state.allAnswers.length); // 全データベースでの既読位置設定
       } catch (error) {
         errorLog('クラスフィルター変更時のデータ読み込みエラー:', error);
       }
@@ -660,7 +660,7 @@ class StudyQuestApp {
           await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
         }
 
-        this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
+        this.updateLastSeenCount(this.state.allAnswers.length); // 全データベースでの既読位置設定
       } catch (error) {
         errorLog('ソート順変更時のデータ読み込みエラー:', error);
       }
@@ -1335,23 +1335,31 @@ class StudyQuestApp {
         throw new Error(incrementalData.message);
       }
 
-      // ✅ フロントエンドで実際の新着件数を計算
-      const previousLength = this.state.currentAnswers.length;
-      const newDataLength = incrementalData.data ? incrementalData.data.length : 0;
-      const actualNewCount = Math.max(0, newDataLength - previousLength);
+      // ✅ CLAUDE.md準拠: 全データベースでの正確な新着計算
+      const newData = incrementalData.data || [];
+      const previousAllLength = this.state.allAnswers.length;
+      const newAllLength = newData.length;
+      const totalNewCount = Math.max(0, newAllLength - previousAllLength);
 
       // 新しいデータがない場合
-      if (actualNewCount === 0) {
+      if (totalNewCount === 0) {
         this.provideFeedback('最新の状態です', 'info');
         return;
       }
 
-      // ✅ データ重複を防ぐため、新データで完全置換
-      const newData = incrementalData.data || [];
+      // Update full dataset cache
+      this.state.allAnswers = newData;
 
-      // Update both full cache and current display
-      this.state.allAnswers = newData;           // Update full dataset cache
-      this.state.currentAnswers = newData;       // Direct assignment for incremental updates
+      // Calculate filtered new items for current view
+      const currentClassFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+      const currentSortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+      const classFilter = currentClassFilter === 'すべて' ? null : currentClassFilter;
+
+      // Apply current filter to get updated display data
+      this.state.currentAnswers = this.filterAndSortAnswers(classFilter, currentSortOrder);
+
+      // Calculate how many new items are visible in current filter
+      const filteredNewCount = this.calculateFilteredNewItems(totalNewCount, classFilter);
 
       // ✅ 既存の描画システムを再利用（安全で確実）
       if (this.elements.answersContainer && newData.length > 0) {
@@ -1372,14 +1380,14 @@ class StudyQuestApp {
         }
       }
 
-      // ✅ 通知処理（実際の新着件数を使用）
-      if (actualNewCount > 0) {
+      // ✅ フィルター対応通知処理（現在の表示に関連する新着のみ）
+      if (filteredNewCount > 0) {
         if (!isManualUpdate) {
-          // 自動更新時のみ新着バナー表示
-          this.showNewContentBanner(actualNewCount);
+          // 自動更新時のみ新着バナー表示（フィルター対応）
+          this.showNewContentBanner(filteredNewCount);
         } else {
           // 手動更新時はフィードバックのみ
-          this.provideFeedback(`${actualNewCount}件の新着を表示しました`, 'success');
+          this.provideFeedback(`${filteredNewCount}件の新着を表示しました`, 'success');
         }
       }
 
@@ -2679,7 +2687,14 @@ class StudyQuestApp {
 
       // Update UI
       await this.renderBoard(false, loadConfig.isInitialLoad, oldAnswers);
-      this.populateClassFilter(this.state.currentAnswers);
+
+      // Only update class filter options on initial load or when all data changes
+      // Always use allAnswers to maintain full option set
+      if (loadConfig.isInitialLoad || !this.state.previousAllAnswersLength ||
+          this.state.previousAllAnswersLength !== this.state.allAnswers.length) {
+        this.populateClassFilter(this.state.allAnswers);
+        this.state.previousAllAnswersLength = this.state.allAnswers.length;
+      }
 
     } catch (error) {
       this.handleError(error, {
@@ -3098,6 +3113,30 @@ class StudyQuestApp {
     return Object.values(reactions).reduce((total, reaction) => {
       return total + (reaction?.count || 0);
     }, 0);
+  }
+
+  // Calculate how many new items match current filter
+  calculateFilteredNewItems(totalNewCount, classFilter) {
+    if (!this.state.allAnswers || totalNewCount <= 0) return 0;
+
+    // If no filter (showing all), all new items are relevant
+    if (!classFilter) return totalNewCount;
+
+    // Get the latest items (new ones are at the end of sorted array)
+    const allItems = this.state.allAnswers;
+    const newItems = allItems.slice(-totalNewCount);
+
+    // Count how many new items match the current class filter
+    const filteredNewItems = newItems.filter(item => item.class === classFilter);
+
+    debugLog('🔍 Filtered new items calculation:', {
+      totalNewCount,
+      classFilter,
+      filteredNewCount: filteredNewItems.length,
+      newItemClasses: newItems.map(item => item.class)
+    });
+
+    return filteredNewItems.length;
   }
 
   async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
@@ -4957,7 +4996,7 @@ class StudyQuestApp {
       // 管理モード切り替え時は設定変更のため再描画が必要
       this.loadSheetData({ bypassCache: true }).then(() => {
         // 管理モード切り替え後に新着チェックの基準を更新
-        this.updateLastSeenCount(this.state.currentAnswers.length);
+        this.updateLastSeenCount(this.state.allAnswers.length);
         debugLog('🔄 管理モード切り替え完了、新着チェック基準更新:', {
           newBaselineCount: this.state.lastSeenCount,
           adminMode: this.state.showAdminFeatures
