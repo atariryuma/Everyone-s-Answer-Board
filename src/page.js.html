@@ -1645,7 +1645,12 @@ class StudyQuestApp {
       // まず増分更新を試行（手動更新として扱う）
       await this.refreshContentIncremental(true);
     } catch (error) {
-      errorLog('コンテンツ更新エラー:', error);
+      errorLog('コンテンツ更新エラー:', {
+        message: error.message,
+        stack: error.stack,
+        error: error,
+        context: 'refreshContent-incrementalFallback'
+      });
       // 増分更新が失敗した場合はフル更新にフォールバック
       await this.refreshContentFull();
     }
@@ -1686,6 +1691,7 @@ class StudyQuestApp {
       if (!incrementalData.success) {
         throw new Error(incrementalData.message);
       }
+
 
       // Enhanced incremental data analysis (Phase 3.2) - 統合版
       const preUpdateAnalysis = {
@@ -1822,7 +1828,8 @@ class StudyQuestApp {
         });
       } else if (currentDataLength === 0 && preservedLastSeenCount > 0) {
         // データが0件で以前に見たカードがある場合は、最小値として1を保持
-        this.state.lastSeenCount = Math.max(1, preservedLastSeenCount);
+        const adjustedCount = Math.max(1, preservedLastSeenCount);
+        this.updateLastSeenCount(adjustedCount);
         debugLog('🔄 全体リフレッシュ完了、新着基準保持（データ0件時の安定化）:', {
           adjustedLastSeenCount: this.state.lastSeenCount,
           preservedCount: preservedLastSeenCount,
@@ -1830,7 +1837,7 @@ class StudyQuestApp {
         });
       } else {
         // データが減少または同じ場合は保持
-        this.state.lastSeenCount = preservedLastSeenCount;
+        this.updateLastSeenCount(preservedLastSeenCount);
         debugLog('🔄 全体リフレッシュ完了、新着基準保持（データ不変）:', {
           preservedLastSeenCount: preservedLastSeenCount,
           currentAnswersLength: currentDataLength,
@@ -2044,7 +2051,7 @@ class StudyQuestApp {
 
         // 状態更新
         this.state.currentAnswers = mergedData;
-        this.state.lastSeenCount = sheetData.totalCount || 0;
+        this.updateLastSeenCount(sheetData.totalCount || 0);
 
         // データ状態の同期
         this.synchronizeStateAfterDataUpdate(mergedData, 'serverTriggeredUpdate');
@@ -2918,7 +2925,7 @@ class StudyQuestApp {
     // lastSeenCount復元（安定化のため）
     const shouldPreserveLastSeen = this.state.currentAnswers.length <= preservedLastSeenCount;
     if (shouldPreserveLastSeen && preservedLastSeenCount > 0) {
-      this.state.lastSeenCount = preservedLastSeenCount;
+      this.updateLastSeenCount(preservedLastSeenCount);
       debugLog('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
         preservedCount: preservedLastSeenCount,
         currentAnswersLength: this.state.currentAnswers.length,
@@ -3344,7 +3351,7 @@ class StudyQuestApp {
       if (this.state) {
         this.state.currentAnswers = [];
         this.updateNewContentState(0, false);
-        this.state.lastSeenCount = 0;
+        this.updateLastSeenCount(0);
       }
       
       // 5. キャッシュ無効化タイムスタンプ設定
@@ -3474,7 +3481,7 @@ class StudyQuestApp {
                     debugLog(`⚡ 軽量チェックで${countData.count}件検出 - 後続ポーリングで復旧予定`);
                     // 初期データロード失敗フラグを設定してポーリングに委ねる
                     this.hadInitialDataLoadFailure = true;
-                    this.state.lastSeenCount = 0;
+                    // lastSeenCountは保持（一時的な失敗のため既存の見た数は有効）
                   }
                 } else {
                   // ✅ Simple fix: Remove complex retry mechanism that causes duplicate API calls
@@ -3504,10 +3511,10 @@ class StudyQuestApp {
             // 空状態を表示（問題文表示後）
             this.displayEmptyState();
             if (isInitialLoad) {
-              this.state.lastSeenCount = 0;
               // 初期データロード失敗フラグを設定
               this.hadInitialDataLoadFailure = true;
               debugLog('🚨 初期データロード失敗をマーク（後続ポーリングで通知を有効化）');
+              // lastSeenCountは保持（空データも一時的な可能性があるため）
             }
             return;
           }
@@ -3767,9 +3774,9 @@ class StudyQuestApp {
     // 状態の確定
     this.state.currentActiveSheet = targetSheet;
     this.state.sheetName = targetSheet;
-    
+
     // 新着通知の基準をリセット
-    this.state.lastSeenCount = this.state.currentAnswers?.length || 0;
+    this.updateLastSeenCount(this.state.currentAnswers?.length || 0);
     
     // UIの更新
     this.updateSheetSelectorLabels();
@@ -5472,9 +5479,9 @@ class StudyQuestApp {
       const oldCount = this.state.lastSeenCount;
       this.state.lastSeenCount = newCount;
       this.saveLastSeenCount(newCount);
-      
-      debugLog('📊 lastSeenCount更新:', { 
-        oldCount, 
+
+      debugLog('📊 lastSeenCount更新:', {
+        oldCount,
         newCount,
         timestamp: new Date().toISOString()
       });
