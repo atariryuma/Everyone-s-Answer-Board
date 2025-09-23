@@ -614,8 +614,8 @@ class StudyQuestApp {
     this.handlers.onClassFilterChange = async () => {
       this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
       try {
-        const selectedClass = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
-        debugLog('🔄 Class filter changed to:', selectedClass);
+        const filterState = this.getCurrentFilterState();
+        debugLog('🔄 Class filter changed to:', filterState.rawClassFilter);
         await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
         this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
       } catch (error) {
@@ -625,8 +625,8 @@ class StudyQuestApp {
     this.handlers.onSortOrderChange = async () => {
       this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
       try {
-        const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
-        debugLog('🔄 Sort order changed to:', sortOrder);
+        const filterState = this.getCurrentFilterState();
+        debugLog('🔄 Sort order changed to:', filterState.sortOrder);
         await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
         this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
       } catch (error) {
@@ -1034,18 +1034,12 @@ class StudyQuestApp {
   }
   
   prepareContentCheckParams() {
-    let selectedClass = this.elements.classFilter.value || 'すべて';
-    if (!selectedClass.trim()) {
-      selectedClass = 'すべて';
-    }
-    
-    // 「すべて」の場合はnullに変換してサーバーに送信
-    const classFilter = !selectedClass || selectedClass === 'すべて'
-      ? null
-      : selectedClass;
-    const sortOrder = this.elements.sortOrder.value || 'newest';
-    
-    return { selectedClass, classFilter, sortOrder };
+    const filterState = this.getCurrentFilterState();
+    return {
+      selectedClass: filterState.rawClassFilter,
+      classFilter: filterState.classFilter,
+      sortOrder: filterState.sortOrder
+    };
   }
 
   // Unified error handling
@@ -1293,48 +1287,43 @@ class StudyQuestApp {
     this.dismissNewContentBanner();
 
     try {
-      // 統合新着通知データを取得
+      // Get current filter state for consistent filtering
+      const filterState = this.getCurrentFilterState();
+
+      // 統合新着通知データを取得（フィルタ付き）
       const incrementalData = await this.runGas('getNotificationUpdate', this.state.userId, {
         lastSeenCount: this.state.lastSeenCount || 0,
-        includeMetadata: true
+        includeMetadata: true,
+        classFilter: filterState.classFilter,
+        sortOrder: filterState.sortOrder
       });
 
       if (!incrementalData.success) {
         throw new Error(incrementalData.message);
       }
 
-      // ✅ CLAUDE.md準拠: 全データベースでの正確な新着計算
-      const newData = incrementalData.data || [];
-      const previousAllLength = this.state.allAnswers.length;
-      const newAllLength = newData.length;
-      const totalNewCount = Math.max(0, newAllLength - previousAllLength);
+      // ✅ CLAUDE.md準拠: フィルタ済みデータでの効率的な差分更新
+      const filteredData = incrementalData.data || [];
+      const previousCount = this.state.currentAnswers.length;
+      const newCount = filteredData.length;
+      const filteredNewCount = Math.max(0, newCount - (this.state.lastSeenCount || 0));
 
       // 新しいデータがない場合
-      if (totalNewCount === 0) {
+      if (filteredNewCount === 0) {
         this.provideFeedback('最新の状態です', 'info');
         return;
       }
 
-      // Update full dataset cache
-      this.state.allAnswers = newData;
+      // ✅ 効率化: サーバーフィルタ済みデータを直接使用
+      this.state.currentAnswers = filteredData;
+      debugLog('📦 Filtered update data received:', filteredData.length, 'items');
 
-      // Reload current view with server-side filtering
-      await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-
-      // Calculate how many new items are visible in current filter (based on current answers)
-      const filteredNewCount = Math.max(0, this.state.currentAnswers.length - (this.state.lastSeenCount || 0));
-
-      // ✅ 既存の描画システムを再利用（安全で確実）
-      if (this.elements.answersContainer && newData.length > 0) {
+      // ✅ 効率的な直接描画（フィルタ済みデータ使用）
+      if (this.elements.answersContainer && filteredData.length > 0) {
         try {
-          // 既存システムのrenderDirectlyを使用
-          const container = this.elements.answersContainer;
-          const existingMap = new Map();
-
-          container.innerHTML = '';
-          this.renderDirectly(newData, [], container, existingMap);
-
-          debugLog('✅ DOM updated successfully using existing render system');
+          // 既存システムのrenderBoardを使用（最適化済み）
+          await this.renderBoard(false, false, []);
+          debugLog('✅ DOM updated successfully using optimized render system');
         } catch (domError) {
           this.handleDOMError('update', domError, async () => {
             await this.loadSheetData({ showLoading: true, isInitialLoad: false, bypassCache: true });
@@ -1513,12 +1502,17 @@ class StudyQuestApp {
   async callServerSideTrigger() {
 
     try {
+      // Get current filter state for consistent filtering
+      const filterState = this.getCurrentFilterState();
+
       const notificationOptions = {
         lastUpdateTime: this.state.lastUpdateTime || new Date(0).toISOString(),
         lastSeenCount: this.state.lastSeenCount || 0,
         maxBatchSize: 100,
         timeoutMs: 5000,
-        includeMetadata: true
+        includeMetadata: true,
+        classFilter: filterState.classFilter,
+        sortOrder: filterState.sortOrder
       };
 
       debugLog('📡 Calling unified notification update with options:', {
@@ -2659,23 +2653,23 @@ class StudyQuestApp {
 
   buildLoadConfiguration(config) {
     const isInitialLoad = config.isInitialLoad;
-    const selectedClass = isInitialLoad ? 'すべて' :
-                         (this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
-    const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+    const filterState = isInitialLoad ?
+      { rawClassFilter: 'すべて', classFilter: null, sortOrder: 'newest' } :
+      this.getCurrentFilterState();
 
     debugLog('🔧 buildLoadConfiguration:', {
       isInitialLoad,
-      selectedClass,
-      sortOrder,
+      selectedClass: filterState.rawClassFilter,
+      sortOrder: filterState.sortOrder,
       classFilterElement: !!this.elements.classFilter,
-      classFilterValue: this.elements.classFilter?.value
+      classFilterValue: filterState.rawClassFilter
     });
 
     return {
       isInitialLoad,
       requestedSheetName: config.requestedSheetName,
-      selectedClass,
-      sortOrder,
+      selectedClass: filterState.rawClassFilter,
+      sortOrder: filterState.sortOrder,
       showLoading: config.showLoading,
       bypassCache: config.bypassCache || false
     };
@@ -3011,6 +3005,18 @@ class StudyQuestApp {
     return Object.values(reactions).reduce((total, reaction) => {
       return total + (reaction?.count || 0);
     }, 0);
+  }
+
+  // Get current filter state consistently across all methods
+  getCurrentFilterState() {
+    const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
+    const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+
+    return {
+      classFilter: classFilter === 'すべて' ? null : classFilter,
+      sortOrder,
+      rawClassFilter: classFilter // Keep original for UI purposes
+    };
   }
 
 
@@ -5515,7 +5521,8 @@ class StudyQuestApp {
         this.elements.scoreOption.style.display = 'block';
       } else {
         this.elements.scoreOption.style.display = 'none';
-        if (this.elements.sortOrder.value === 'score') {
+        const filterState = this.getCurrentFilterState();
+        if (filterState.sortOrder === 'score') {
           this.elements.sortOrder.value = 'newest';
         }
       }
