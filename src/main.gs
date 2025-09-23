@@ -168,7 +168,7 @@ function doGet(e) {
           return createRedirectTemplate('ErrorBoundary.html', viewerData.error || '対象ユーザーが見つかりません');
         }
 
-        const { targetUser, config, isAdminUser, questionText } = viewerData;
+        const { targetUser, config, isAdminUser } = viewerData;
         const isOwnBoard = currentEmail === targetUser.userEmail;
         const isPublished = Boolean(config.isPublished);
 
@@ -180,8 +180,8 @@ function doGet(e) {
         const template = HtmlService.createTemplateFromFile('Page.html');
         template.userId = targetUserId;
         template.userEmail = targetUser.userEmail;
-        template.questionText = questionText || '回答ボード';
-        template.boardTitle = questionText || targetUser.userEmail || '回答ボード';
+        template.questionText = '読み込み中...';
+        template.boardTitle = targetUser.userEmail || '回答ボード';
 
         // 🔧 CLAUDE.md準拠: 統一権限情報（GAS-Native Architecture）
         const isEditor = isAdminUser || isOwnBoard;
@@ -196,7 +196,7 @@ function doGet(e) {
           userEmail: targetUser.userEmail,
           spreadsheetId: config.spreadsheetId || '',
           sheetName: config.sheetName,
-          questionText: questionText || '回答ボード',
+          questionText: '読み込み中...',
           isPublished: Boolean(config.isPublished),
           isEditor,
           isAdminUser,
@@ -2437,15 +2437,11 @@ function getBatchedViewerData(targetUserId, currentEmail) {
 
     const isAdminUser = isAdministrator(currentEmail);
 
-    // Get question text with target user context
-    const questionText = getQuestionText(config, { targetUserEmail: targetUser.userEmail });
-
     return {
       success: true,
       targetUser,
       config,
-      isAdminUser,
-      questionText: questionText || '回答ボード'
+      isAdminUser
     };
 
   } catch (error) {

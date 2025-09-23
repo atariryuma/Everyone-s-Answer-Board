@@ -64,9 +64,13 @@ function getUserSheetData(userId, options = {}) {
 
     // Standardized response format
     if (result.success) {
+      // ✅ パフォーマンス最適化: 既に取得済みのheadersを活用
+      const preloadedHeaders = result.headers;
+      const questionText = getQuestionText(config, { targetUserEmail: user.userEmail }, preloadedHeaders);
+
       return {
         ...result,
-        header: getQuestionText(config, { targetUserEmail: user.userEmail }) || result.sheetName || '回答一覧',
+        header: questionText || result.sheetName || '回答一覧',
         showDetails: config.showDetails !== false // デフォルトはtrue
       };
     }

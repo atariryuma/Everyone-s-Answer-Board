@@ -687,14 +687,15 @@ function hasCoreSystemProps() {
 // ===========================================
 
 /**
- * 動的questionText取得（configJson最適化対応 + 動的headers取得）
+ * 動的questionText取得（configJson最適化対応 + パフォーマンス最適化済み）
  * headers配列とcolumnMappingから実際の問題文を動的取得
- * headersがない場合はスプレッドシートから動的取得
+ * preloadedHeadersが提供された場合は重複スプレッドシートアクセスを回避
  * @param {Object} config - ユーザー設定オブジェクト
  * @param {Object} context - アクセスコンテキスト（target user info for cross-user access）
+ * @param {Array} preloadedHeaders - 事前取得されたヘッダー配列（パフォーマンス最適化用）
  * @returns {string} 問題文テキスト
  */
-function getQuestionText(config, context = {}) {
+function getQuestionText(config, context = {}, preloadedHeaders = null) {
   try {
     console.log('📝 getQuestionText START:', {
       hasColumnMapping: !!config?.columnMapping,
@@ -716,7 +717,16 @@ function getQuestionText(config, context = {}) {
       }
     }
 
-    // 2. headersがない場合、スプレッドシートから動的取得
+    // 2. ✅ パフォーマンス最適化: 事前取得されたheadersから取得を試行
+    if (typeof answerIndex === 'number' && preloadedHeaders && preloadedHeaders[answerIndex]) {
+      const questionText = preloadedHeaders[answerIndex];
+      if (questionText && typeof questionText === 'string' && questionText.trim()) {
+        console.log('⚡ getQuestionText SUCCESS (from preloaded headers - OPTIMIZED):', questionText.trim());
+        return questionText.trim();
+      }
+    }
+
+    // 3. headersがない場合、スプレッドシートから動的取得
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
         console.log('🔄 getQuestionText: Fetching headers from spreadsheet');
@@ -752,13 +762,13 @@ function getQuestionText(config, context = {}) {
       }
     }
 
-    // 3. formTitleからの取得
+    // 4. formTitleからの取得
     if (config?.formTitle && typeof config.formTitle === 'string' && config.formTitle.trim()) {
       console.log('✅ getQuestionText SUCCESS (from formTitle):', config.formTitle.trim());
       return config.formTitle.trim();
     }
 
-    // 4. デフォルトフォールバック
+    // 5. デフォルトフォールバック
     console.log('🔄 getQuestionText FALLBACK: Using default title');
     return 'Everyone\'s Answer Board';
   } catch (error) {

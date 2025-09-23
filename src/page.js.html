@@ -552,11 +552,12 @@ class StudyQuestApp {
 
   setupCriticalElements() {
     if (this.elements.headingLabel) {
-      // 問題文を常に表示（読み込み中は表示しない）
-      const opinionHeader = __OPINION_HEADER__.startsWith('<') || __OPINION_HEADER__.includes('読み込み')
-        ? '質問'  // デフォルトテキスト
+      // ✅ Initial placeholder - will be updated when data loads
+      const initialText = __OPINION_HEADER__.startsWith('<') || __OPINION_HEADER__.includes('読み込み')
+        ? '読み込み中...'  // Temporary placeholder
         : window.sharedUtilities.security.escapeHtml(__OPINION_HEADER__);
-      this.elements.headingLabel.textContent = opinionHeader;
+      this.elements.headingLabel.textContent = initialText;
+      debugLog('✅ Initial heading set:', initialText);
     }
 
     // Only setup absolutely critical event listeners
@@ -2780,6 +2781,12 @@ class StudyQuestApp {
       // Process the successful result
       this.state.currentAnswers = result.data || [];
       this.state.currentActiveSheet = result.activeSheet || loadConfig.requestedSheetName;
+
+      // ✅ Update question text from data response
+      if (result.header && this.elements.headingLabel) {
+        this.elements.headingLabel.textContent = result.header;
+        debugLog('✅ Question text updated from data:', result.header);
+      }
 
       // Update UI
       await this.renderBoard(false, loadConfig.isInitialLoad, oldAnswers);
