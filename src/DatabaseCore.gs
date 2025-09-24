@@ -20,12 +20,12 @@
  */
 function getServiceAccount() {
   try {
-    const creds = PropertiesService.getScriptProperties().getProperty('SERVICE_ACCOUNT_CREDS');
-    if (!creds || typeof creds !== 'string') {
+    const credentials = PropertiesService.getScriptProperties().getProperty('SERVICE_ACCOUNT_CREDS');
+    if (!credentials || typeof credentials !== 'string') {
       return { isValid: false, error: 'No credentials found' };
     }
 
-    const serviceAccount = JSON.parse(creds);
+    const serviceAccount = JSON.parse(credentials);
 
     // 🛡️ Enhanced validation for required fields
     const requiredFields = ['client_email', 'private_key', 'type'];
@@ -149,6 +149,127 @@ function openDatabase(useServiceAccount = false, options = {}) {
  * const dataAccess = openSpreadsheet(otherSpreadsheetId, { useServiceAccount: true });
  */
 function openSpreadsheet(spreadsheetId, options = {}) {
+
+  // 🔧 内部関数: サービスアカウント経由でSheets API直接アクセス
+  function openSpreadsheetViaServiceAccount(sheetId) {
+    try {
+      const credentials = PropertiesService.getScriptProperties().getProperty('SERVICE_ACCOUNT_CREDS');
+      if (!credentials) return null;
+
+      const serviceAccount = JSON.parse(credentials);
+
+      // JWT作成
+      const now = Math.floor(Date.now() / 1000);
+      const payload = {
+        iss: serviceAccount.client_email,
+        scope: 'https://www.googleapis.com/auth/spreadsheets',
+        aud: 'https://oauth2.googleapis.com/token',
+        exp: now + 3600,
+        iat: now
+      };
+
+      const header = { alg: 'RS256', typ: 'JWT' };
+      const jwt = createJWT(header, payload, serviceAccount.private_key);
+
+      // アクセストークン取得
+      const tokenResponse = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        payload: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+      });
+
+      const tokenData = JSON.parse(tokenResponse.getContentText());
+      if (!tokenData.access_token) return null;
+
+      // Sheets API経由でアクセス
+      console.log(`SA_API_ACCESS: Successfully authenticated via service account for ${sheetId.substring(0, 8)}***`);
+      return createServiceAccountSpreadsheetProxy(sheetId, tokenData.access_token);
+
+    } catch (error) {
+      console.error('openSpreadsheetViaServiceAccount error:', error.message);
+      return null;
+    }
+  }
+
+  // JWT作成のヘルパー関数
+  function createJWT(header, payload, privateKey) {
+    const headerB64 = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=/g, '');
+    const payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=/g, '');
+    const signatureInput = `${headerB64}.${payloadB64}`;
+
+    const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
+    const signatureB64 = Utilities.base64EncodeWebSafe(signature).replace(/=/g, '');
+
+    return `${signatureInput}.${signatureB64}`;
+  }
+
+  // サービスアカウント用スプレッドシートプロキシ
+  function createServiceAccountSpreadsheetProxy(sheetId, accessToken) {
+    return {
+      getId: () => sheetId,
+      getSheetByName: (sheetName) => {
+        // 必要最小限のSheetプロキシを返す
+        return createServiceAccountSheetProxy(sheetId, sheetName, accessToken);
+      }
+    };
+  }
+
+  // サービスアカウント用シートプロキシ（基本メソッドのみ実装）
+  function createServiceAccountSheetProxy(sheetId, sheetName, accessToken) {
+    const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+
+    return {
+      getName: () => sheetName,
+      getLastRow: () => {
+        // Sheets APIで行数取得
+        try {
+          const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          const data = JSON.parse(response.getContentText());
+          return data.values ? data.values.length : 1;
+        } catch (error) {
+          console.warn('getLastRow via API failed:', error.message);
+          return 1;
+        }
+      },
+      getLastColumn: () => {
+        // Sheets APIで列数取得
+        try {
+          const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}!1:1`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          const data = JSON.parse(response.getContentText());
+          return data.values && data.values[0] ? data.values[0].length : 1;
+        } catch (error) {
+          console.warn('getLastColumn via API failed:', error.message);
+          return 1;
+        }
+      },
+      getRange: (row, col, numRows, numCols) => {
+        // Sheets APIでデータ取得
+        const range = numRows && numCols
+          ? `${sheetName}!R${row}C${col}:R${row + numRows - 1}C${col + numCols - 1}`
+          : `${sheetName}!R${row}C${col}`;
+
+        return {
+          getValues: () => {
+            try {
+              const response = UrlFetchApp.fetch(`${baseUrl}/values/${range}`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+              });
+              const data = JSON.parse(response.getContentText());
+              return data.values || [];
+            } catch (error) {
+              console.warn('getValues via API failed:', error.message);
+              return [];
+            }
+          }
+        };
+      }
+    };
+  }
+
   try {
     if (!spreadsheetId || typeof spreadsheetId !== 'string') {
       console.warn('openSpreadsheet: Invalid spreadsheet ID');
@@ -203,7 +324,16 @@ function openSpreadsheet(spreadsheetId, options = {}) {
 
     // スプレッドシートを開く
     try {
-      spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      if (options.useServiceAccount === true && auth && auth.isValid) {
+        // 🔧 GAS Service Account実装: JWT認証でSheets API直接アクセス
+        spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
+        if (!spreadsheet) {
+          console.error('openSpreadsheet: Service account access failed, falling back to normal access');
+          spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+        }
+      } else {
+        spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+      }
     } catch (openError) {
       console.error('openSpreadsheet: Failed to open spreadsheet:', openError.message);
       return null;
@@ -559,7 +689,6 @@ function createUserObjectFromRow(row, headers) {
 function updateUser(userId, updates, context = {}) {
   try {
     // 🔧 CLAUDE.md準拠: Self vs Cross-user Access for User Updates
-    const currentEmail = getCurrentEmail();
 
     // Initial user lookup to determine target user
     const targetUser = findUserById(userId, context);
