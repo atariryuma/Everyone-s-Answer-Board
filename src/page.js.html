@@ -146,7 +146,7 @@ class StudyQuestApp {
       userId: this.validId(USER_ID),
       initializationComplete: false,
       isInitializing: true,
-      lastSeenCount: this.loadLastSeenCount(),
+      lastSeenTimestamp: this.loadLastSeenTimestamp(),
       // pollingFailureCount は pollingState.retryCount に統合
       startTime: Date.now()
     };
@@ -617,7 +617,9 @@ class StudyQuestApp {
         const filterState = this.getCurrentFilterState();
         debugLog('🔄 Class filter changed to:', filterState.rawClassFilter);
         await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-        this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
+
+        // ✅ 修正: 時刻ベース基準で更新（件数基準の論理的破綻を修正）
+        this.updateLastSeenTimestamp(); // フィルター変更時は現在時刻で基準更新
       } catch (error) {
         errorLog('クラスフィルター変更時のデータ読み込みエラー:', error);
       }
@@ -628,7 +630,9 @@ class StudyQuestApp {
         const filterState = this.getCurrentFilterState();
         debugLog('🔄 Sort order changed to:', filterState.sortOrder);
         await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-        this.updateLastSeenCount(this.state.currentAnswers.length); // 新しいベースラインを設定
+
+        // ✅ 修正: 時刻ベース基準で更新（件数基準の論理的破綻を修正）
+        this.updateLastSeenTimestamp(); // ソート変更時は現在時刻で基準更新
       } catch (error) {
         errorLog('ソート順変更時のデータ読み込みエラー:', error);
       }
@@ -981,66 +985,6 @@ class StudyQuestApp {
   }
   
   // サーバー管理者権限確認の共通メソッド
-  
-  async checkForNewContentLight(bypassCache = false) {
-    // ポーリング実行中の場合は重複実行を防ぐ
-    if (this.contentCheckInProgress) {
-      return;
-    }
-    
-    try {
-      this.contentCheckInProgress = true;
-      
-      // 基本状態の検証
-      if (!this.validateContentCheckPrerequisites()) {
-        return;
-      }
-      
-      // パラメータの準備
-      const { selectedClass, sortOrder } = this.prepareContentCheckParams();
-      
-      // キャッシュクリア（必要な場合）
-      if (bypassCache) {
-        this.clearCache();
-      }
-      
-      // サーバーから件数を取得
-      const countData = await this.fetchContentCount(selectedClass, sortOrder);
-      
-      // レスポンスの処理
-      await this.processContentCountResponse(countData, selectedClass, sortOrder);
-      
-    } catch (error) {
-      this.handleError(error, 'content check');
-    } finally {
-      this.contentCheckInProgress = false;
-    }
-  }
-  
-  validateContentCheckPrerequisites() {
-    // 必要な要素の存在確認
-    if (!this.elements.classFilter || !this.elements.sortOrder) {
-      warnLog('Required UI elements not available for content check');
-      return false;
-    }
-    
-    // 初期化状態の確認
-    if (!this.state.userId) {
-      warnLog('User ID not available for content check');
-      return false;
-    }
-    
-    return true;
-  }
-  
-  prepareContentCheckParams() {
-    const filterState = this.getCurrentFilterState();
-    return {
-      selectedClass: filterState.rawClassFilter,
-      classFilter: filterState.classFilter,
-      sortOrder: filterState.sortOrder
-    };
-  }
 
   // Unified error handling
   handleError(error, options = {}) {
@@ -1166,114 +1110,74 @@ class StudyQuestApp {
     }
   }
   
-  async fetchContentCount(selectedClass, sortOrder) {
-    const countData = await this.runGas('getDataCount',
-      selectedClass,
-      sortOrder,
-      this.state.showAdminFeatures
-    );
-    
-    if (!countData) {
-      throw new Error('No response from server for content count');
-    }
-    
-    return countData;
-  }
   
-  async processContentCountResponse(countData, selectedClass, sortOrder) {
-    const newCount = countData.count || 0;
-    const currentCount = this.state.currentAnswers?.length || 0;
-    const lastSeen = this.state.lastSeenCount || 0;
-    
-    // Enhanced consistency verification (Phase 3.1)
-    const consistencyCheck = {
-      lightCheckCount: newCount,
-      currentDataCount: currentCount,
-      lastSeenCount: lastSeen,
-      hasInconsistency: Math.abs(newCount - currentCount) > 0 && currentCount > 0,
-      significantChange: newCount !== lastSeen
-    };
-    
-    
-    // ポーリング成功のマーク - unified state management (Phase 2.3)
-    this.pollingState.retryCount = 0;
-    
-    // 現在のビューキー
-    const currentViewKey = `${selectedClass}-${sortOrder}`;
-    
-    // 初回データロード完了の処理
-    if (!this.initialDataLoaded) {
-      await this.handleInitialContentLoad(currentViewKey, newCount);
-      return;
-    }
-    
-    // ビュー設定変更の処理
-    if (this.lastViewKey !== currentViewKey) {
-      await this.handleViewChange(currentViewKey, newCount);
-      return;
-    }
-  }
-  
-  async handleInitialContentLoad(currentViewKey, newCount) {
+  // ✅ 修正: 時刻ベース統一システム（件数パラメータ削除）
+  async handleInitialContentLoad(currentViewKey) {
     this.lastViewKey = currentViewKey;
-    
+
     // 初期データロード失敗後の初回成功ポーリング時の特別処理
-    if (this.hadInitialDataLoadFailure && newCount > this.state.lastSeenCount) {
+    if (this.hadInitialDataLoadFailure) {
       debugLog('🔄 初期データロード失敗後の初回データ取得成功:', {
-        newCount,
-        lastSeenCount: this.state.lastSeenCount,
-        note: '既存データの初回取得なので新着通知はスキップ'
+        lastSeenTimestamp: this.state.lastSeenTimestamp,
+        note: '既存データの初回取得なので新着通知はスキップ (時刻ベース統一)'
       });
 
-      // ✅ 初回データ取得成功時は新着通知をスキップ（既存データのため）
-      this.updateLastSeenCount(newCount);
+      // ✅ 修正: 時刻ベース基準で初回成功時更新
+      this.updateLastSeenTimestamp();
       return;
     }
 
-    this.updateLastSeenCount(newCount);
+    // ✅ 修正: 時刻ベース基準で更新
+    this.updateLastSeenTimestamp();
     this.initialDataLoaded = true;
-    
+
   }
   
-  async handleViewChange(currentViewKey, newCount) {
+  // ✅ 修正: 時刻ベース統一システム（件数パラメータ削除）
+  async handleViewChange(currentViewKey) {
     debugLog('🔄 View settings changed:', {
       from: this.lastViewKey,
       to: currentViewKey,
-      newCount
+      timestampBasedSystem: true
     });
-    
+
     this.lastViewKey = currentViewKey;
-    this.updateLastSeenCount(newCount);
+    // ✅ 修正: 時刻ベース基準で更新
+    this.updateLastSeenTimestamp();
     this.dismissNewContentBanner();
   }
   
 
-  // ✅ フィルタ対応新着通知バナー表示
-  showNewContentBanner(newItems, filterState = null) {
-    if (!this.elements.newContentBanner || !newItems || newItems <= 0) return;
+  // ✅ 修正: フィルター状態一貫性対応 新着通知バナー表示
+  showNewContentBanner(newItemsCount, filterState = null) {
+    if (!this.elements.newContentBanner || !newItemsCount || newItemsCount <= 0) return;
 
-    // Generate filter-aware message
+    // ✅ 修正: filterStateのnullチェック改善
+    const currentFilter = filterState?.rawClassFilter || 'すべて';
+    const isFilteredView = currentFilter !== 'すべて';
+
+    // ✅ 修正: フィルター状態の適切な処理
     let message;
-    if (filterState && filterState.rawClassFilter && filterState.rawClassFilter !== 'すべて') {
-      // Filter-specific message
-      message = newItems === 1
-        ? `${filterState.rawClassFilter}の新しい意見が投稿されました`
-        : `${filterState.rawClassFilter}の新しい意見が${newItems}件投稿されました`;
+    if (isFilteredView) {
+      message = newItemsCount === 1
+        ? `${currentFilter}の新しい意見が投稿されました`
+        : `${currentFilter}の新しい意見が${newItemsCount}件投稿されました`;
     } else {
-      // General message (no filter or "すべて" selected)
-      message = newItems === 1
+      message = newItemsCount === 1
         ? '新しい意見が投稿されました'
-        : `${newItems}件の新しい意見が投稿されました`;
+        : `${newItemsCount}件の新しい意見が投稿されました`;
     }
 
     this.elements.newContentText.textContent = message;
     this.elements.newContentBanner.classList.remove('hidden', 'notification-banner-exit');
     this.elements.newContentBanner.classList.add('notification-banner-enter');
 
-    debugLog('📢 フィルタ対応新着通知表示:', {
-      count: newItems,
-      filter: filterState?.rawClassFilter || 'すべて',
-      message
+    debugLog('📢 一貫した新着通知表示 (時刻ベース統一):', {
+      count: newItemsCount,
+      filter: currentFilter,
+      isFilteredView,
+      message,
+      source: 'server-timestamp-based-detection'
     });
   }
   
@@ -1295,7 +1199,7 @@ class StudyQuestApp {
   }
 
 
-  // ✅ CLAUDE.md準拠: 統一されたコンテンツ更新（自然な英語表現）
+  // ✅ CLAUDE.md準拠: 時刻ベース統一通知システム（論理的破綻修正）
   async updateContent(isManualUpdate = false) {
 
     this.dismissNewContentBanner();
@@ -1304,9 +1208,9 @@ class StudyQuestApp {
       // Get current filter state for consistent filtering
       const filterState = this.getCurrentFilterState();
 
-      // 統合新着通知データを取得（フィルタ付き）
+      // ✅ 修正: 時刻ベース検出に統一（件数ベース比較を削除）
       const incrementalData = await this.runGas('getNotificationUpdate', this.state.userId, {
-        lastSeenCount: this.state.lastSeenCount || 0,
+        lastUpdateTime: this.state.lastSeenTimestamp || new Date(0).toISOString(),
         includeMetadata: true,
         classFilter: filterState.classFilter,
         sortOrder: filterState.sortOrder
@@ -1316,21 +1220,19 @@ class StudyQuestApp {
         throw new Error(incrementalData.message);
       }
 
-      // ✅ CLAUDE.md準拠: フィルタ済みデータでの効率的な差分更新
+      // ✅ 修正: サーバーサイドの時刻ベース検出結果のみ使用
       const filteredData = incrementalData.data || [];
-      const previousCount = this.state.currentAnswers.length;
-      const newCount = filteredData.length;
-      const filteredNewCount = Math.max(0, newCount - (this.state.lastSeenCount || 0));
+      const serverDetectedNewItems = incrementalData.newItemsCount || 0;
 
-      // 新しいデータがない場合
-      if (filteredNewCount === 0) {
+      // サーバーが検出した新着がない場合
+      if (serverDetectedNewItems === 0) {
         this.provideFeedback('最新の状態です', 'info');
         return;
       }
 
       // ✅ 効率化: サーバーフィルタ済みデータを直接使用
       this.state.currentAnswers = filteredData;
-      debugLog('📦 Filtered update data received:', filteredData.length, 'items');
+      debugLog('📦 Server-filtered data received:', filteredData.length, 'items with', serverDetectedNewItems, 'new');
 
       // ✅ 効率的な直接描画（フィルタ済みデータ使用）
       if (this.elements.answersContainer && filteredData.length > 0) {
@@ -1346,18 +1248,21 @@ class StudyQuestApp {
         }
       }
 
-      // ✅ フィルター対応通知処理（現在の表示に関連する新着のみ）
-      if (filteredNewCount > 0) {
+      // ✅ 修正: 一貫したフィルター対応通知処理（時刻ベース結果のみ）
+      if (serverDetectedNewItems > 0) {
         if (!isManualUpdate) {
           // 自動更新時のみ新着バナー表示（フィルター状態込み）
-          this.showNewContentBanner(filteredNewCount, filterState);
+          this.showNewContentBanner(serverDetectedNewItems, filterState);
         } else {
           // 手動更新時はフィードバックのみ（フィルター対応）
           const filterMessage = filterState.rawClassFilter !== 'すべて'
-            ? `${filterState.rawClassFilter}の新着を${filteredNewCount}件表示しました`
-            : `${filteredNewCount}件の新着を表示しました`;
+            ? `${filterState.rawClassFilter}の新着を${serverDetectedNewItems}件表示しました`
+            : `${serverDetectedNewItems}件の新着を表示しました`;
           this.provideFeedback(filterMessage, 'success');
         }
+
+        // ✅ 修正: 時刻ベース基準で更新（件数基準削除）
+        this.updateLastSeenTimestamp(incrementalData.timestamp);
       }
 
       // ✅ 更新完了後は通知バナーを非表示
@@ -1522,12 +1427,9 @@ class StudyQuestApp {
       // Get current filter state for consistent filtering
       const filterState = this.getCurrentFilterState();
 
+      // ✅ 修正: 時刻ベース統一API契約
       const notificationOptions = {
-        lastUpdateTime: this.state.lastUpdateTime || new Date(0).toISOString(),
-        lastSeenCount: this.state.lastSeenCount || 0,
-        maxBatchSize: 100,
-        timeoutMs: 5000,
-        includeMetadata: true,
+        lastUpdateTime: this.state.lastSeenTimestamp || new Date(0).toISOString(),
         classFilter: filterState.classFilter,
         sortOrder: filterState.sortOrder
       };
@@ -1550,8 +1452,8 @@ class StudyQuestApp {
           timestamp: response.timestamp
         });
 
-        // 最終更新時刻を保存
-        this.state.lastUpdateTime = response.timestamp;
+        // ✅ 修正: 時刻ベース統一システム
+        this.state.lastSeenTimestamp = response.timestamp;
 
         return response;
       } else {
@@ -2235,9 +2137,10 @@ class StudyQuestApp {
   hasRelevantLocalStorage() {
     const userId = this.state?.userId || USER_ID;
     const sheetName = SHEET_NAME;
-    
+
     return {
-      hasLastSeen: localStorage.getItem(`lastSeenCount_${userId}_${sheetName}`) !== null,
+      // ✅ 修正: 時刻ベース統一システムに対応
+      hasLastSeen: localStorage.getItem(`lastSeenTimestamp_${userId}_${sheetName}`) !== null,
       hasDiffCards: localStorage.getItem(`differentialCards_${userId}_${sheetName}`) !== null
     };
   }
@@ -2245,16 +2148,16 @@ class StudyQuestApp {
 
   
   async forceDataRefresh() {
-    
-    // lastSeenCountを保持（安定化のため）
-    const preservedLastSeenCount = this.state.lastSeenCount;
-    
+
+    // ✅ 修正: 時刻ベース統一システム（件数ベース安定化処理は不要）
+    const preservedLastSeenTimestamp = this.state.lastSeenTimestamp;
+
     // フロントエンドキャッシュをクリア
     if (this.cache) {
       this.cache.clear();
-      debugLog('✅ フロントエンドキャッシュをクリア, lastSeenCount保持:', preservedLastSeenCount);
+      debugLog('✅ フロントエンドキャッシュをクリア, lastSeenTimestamp保持:', preservedLastSeenTimestamp);
     }
-    
+
     // サーバーキャッシュをクリア
     try {
       // CLAUDE.md準拠: clearCache関数は現在実装されていない - 内部管理
@@ -2263,26 +2166,18 @@ class StudyQuestApp {
     } catch (error) {
       warnLog('⚠️ サーバーキャッシュクリアでエラー:', error);
     }
-    
+
     // 強制データ再読み込み
     await this.loadSheetData({ bypassCache: true });
-    
-    // lastSeenCount復元（安定化のため）
-    const shouldPreserveLastSeen = this.state.currentAnswers.length <= preservedLastSeenCount;
-    if (shouldPreserveLastSeen && preservedLastSeenCount > 0) {
-      this.updateLastSeenCount(preservedLastSeenCount);
-      debugLog('✅ 強制データリフレッシュ完了、lastSeenCount復元:', {
-        preservedCount: preservedLastSeenCount,
-        currentAnswersLength: this.state.currentAnswers.length,
-        stabilityMaintained: true
-      });
-    } else {
-      debugLog('✅ 強制データリフレッシュ完了、新データによりlastSeenCount更新:', {
-        oldCount: preservedLastSeenCount,
-        newCount: this.state.lastSeenCount,
-        currentAnswersLength: this.state.currentAnswers.length
-      });
-    }
+
+    // ✅ 修正: 時刻ベース基準で更新（件数比較による復元処理は不要）
+    this.updateLastSeenTimestamp();
+    debugLog('✅ 強制データリフレッシュ完了、時刻ベース基準更新:', {
+      preservedTimestamp: preservedLastSeenTimestamp,
+      newTimestamp: this.state.lastSeenTimestamp,
+      currentAnswersLength: this.state.currentAnswers.length,
+      timestampBasedSystem: true
+    });
   }
 
   /**
@@ -4459,39 +4354,27 @@ class StudyQuestApp {
     return `${base}_${userId}_${SHEET_NAME}`;
   }
 
-  // lastSeenCount永続化機能
-  loadLastSeenCount() {
-    try {
-      const key = this.getScopedKey('lastSeenCount');
-      const stored = localStorage.getItem(key);
-      const count = stored ? parseInt(stored, 10) : 0;
-      
-      debugLog('📥 lastSeenCount復元:', { key, count });
-      return isNaN(count) ? 0 : count;
-    } catch (error) {
-      warnLog('⚠️ lastSeenCount読み込みエラー:', error);
-      return 0;
-    }
-  }
+  // 時刻ベース永続化機能
 
   // 真の初回ボードアクセス判定
   isFirstTimeBoardAccess() {
     try {
-      const hasLastSeen = localStorage.getItem(this.getScopedKey('lastSeenCount')) !== null;
+      // ✅ 修正: 時刻ベースシステム対応
+      const hasLastSeenTimestamp = localStorage.getItem(this.getScopedKey('lastSeenTimestamp')) !== null;
       const hasDiffCards = localStorage.getItem(this.getScopedKey('differentialCards')) !== null;
       const hasInitialLoad = this.initialDataLoaded === true;
       const container = this.elements?.answersContainer;
       const hasDOMCards = container && container.querySelectorAll('.answer-card').length > 0;
-      const isFirstTime = !hasLastSeen && !hasDiffCards && !hasInitialLoad && !hasDOMCards;
-      
-      debugLog('🔍 初回判定結果:', {
-        hasLastSeen,
+      const isFirstTime = !hasLastSeenTimestamp && !hasDiffCards && !hasInitialLoad && !hasDOMCards;
+
+      debugLog('🔍 初回判定結果 (時刻ベース統一):', {
+        hasLastSeenTimestamp,
         hasDiffCards,
         hasInitialLoad,
         hasDOMCards,
         isFirstTime
       });
-      
+
       return isFirstTime;
     } catch (error) {
       warnLog('⚠️ 初回判定エラー:', error);
@@ -4499,30 +4382,47 @@ class StudyQuestApp {
     }
   }
 
-  saveLastSeenCount(count) {
+  // ✅ 修正: 時刻ベース統一システム
+  loadLastSeenTimestamp() {
     try {
-      const key = this.getScopedKey('lastSeenCount');
-      localStorage.setItem(key, count.toString());
-      
-      debugLog('💾 lastSeenCount保存:', { key, count });
+      const key = this.getScopedKey('lastSeenTimestamp');
+      const stored = localStorage.getItem(key);
+      const timestamp = stored || new Date(0).toISOString();
+
+      debugLog('📥 lastSeenTimestamp復元 (時刻ベース統一):', { key, timestamp });
+      return timestamp;
     } catch (error) {
-      warnLog('⚠️ lastSeenCount保存エラー:', error);
+      warnLog('⚠️ lastSeenTimestamp読み込みエラー:', error);
+      return new Date(0).toISOString();
     }
   }
 
-  updateLastSeenCount(newCount) {
-    if (typeof newCount === 'number' && newCount >= 0) {
-      const oldCount = this.state.lastSeenCount;
-      this.state.lastSeenCount = newCount;
-      this.saveLastSeenCount(newCount);
+  saveLastSeenTimestamp(timestamp) {
+    try {
+      const key = this.getScopedKey('lastSeenTimestamp');
+      localStorage.setItem(key, timestamp);
 
-      debugLog('📊 lastSeenCount更新:', {
-        oldCount,
-        newCount,
-        timestamp: new Date().toISOString()
-      });
+      debugLog('💾 lastSeenTimestamp保存 (時刻ベース統一):', { key, timestamp });
+    } catch (error) {
+      warnLog('⚠️ lastSeenTimestamp保存エラー:', error);
     }
   }
+
+  // ✅ 時刻ベース統一システム（論理的破綻修正）
+  updateLastSeenTimestamp(timestamp = null) {
+    const newTimestamp = timestamp || new Date().toISOString();
+    const oldTimestamp = this.state.lastSeenTimestamp;
+
+    this.state.lastSeenTimestamp = newTimestamp;
+    this.saveLastSeenTimestamp(newTimestamp);
+
+    debugLog('⏰ lastSeenTimestamp更新 (時刻ベース統一):', {
+      oldTimestamp,
+      newTimestamp,
+      context: 'filter-independent-notification-system'
+    });
+  }
+
 
 
   async handleReactionError(error, rowIndex, reaction) {
@@ -4893,11 +4793,12 @@ class StudyQuestApp {
       this.updateEndPublicationButtonUI();
       // 管理モード切り替え時は設定変更のため再描画が必要
       this.loadSheetData({ bypassCache: true }).then(() => {
-        // 管理モード切り替え後に新着チェックの基準を更新
-        this.updateLastSeenCount(this.state.currentAnswers.length);
-        debugLog('🔄 管理モード切り替え完了、新着チェック基準更新:', {
-          newBaselineCount: this.state.lastSeenCount,
-          adminMode: this.state.showAdminFeatures
+        // ✅ 修正: 管理モード切り替え後に時刻ベース基準更新
+        this.updateLastSeenTimestamp();
+        debugLog('🔄 管理モード切り替え完了、時刻ベース基準更新:', {
+          newTimestamp: this.state.lastSeenTimestamp,
+          adminMode: this.state.showAdminFeatures,
+          note: '件数基準から時刻基準に統一'
         });
       });
     } finally {

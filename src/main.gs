@@ -1553,17 +1553,13 @@ function saveConfig(config, options = {}) {
 
 
 /**
- * 統合新着通知更新システム - 全ユーザーロール対応
+ * ✅ 時刻ベース統一新着通知システム - 全ユーザーロール対応
  * @param {string} targetUserId - 閲覧対象ユーザーID
  * @param {Object} options - オプション設定
- * @param {string|number} options.lastUpdateTime - 最終更新時刻
- * @param {number} options.lastSeenCount - 最終確認件数
- * @param {string} options.classFilter - クラスフィルター
- * @param {string} options.sortOrder - ソート順序
- * @param {number} options.maxBatchSize - 最大バッチサイズ
- * @param {number} options.timeoutMs - タイムアウト時間
- * @param {boolean} options.includeMetadata - メタデータ含有フラグ
- * @returns {Object} 統合通知更新結果
+ * @param {string} options.lastUpdateTime - 最終更新時刻（ISO文字列）
+ * @param {string} options.classFilter - クラスフィルター（null=すべて）
+ * @param {string} options.sortOrder - ソート順序（newest/oldest）
+ * @returns {Object} 時刻ベース統一通知更新結果
  */
 function getNotificationUpdate(targetUserId, options = {}) {
   try {
@@ -1640,17 +1636,12 @@ function getNotificationUpdate(targetUserId, options = {}) {
       };
     }
 
-    // 新着検出処理
-    const lastSeenCount = options.lastSeenCount || 0;
-    const currentCount = currentData.data ? currentData.data.length : 0;
-    const hasNewData = currentCount > lastSeenCount;
-
-    // 新着アイテム抽出
+    // ✅ 修正: 時刻ベース統一新着検出（件数ベース比較完全除去）
     let newItemsCount = 0;
     const newItems = [];
-    let incrementalData = currentData.data || [];
+    const incrementalData = currentData.data || [];
 
-    // 時刻ベース新着検出（優先）
+    // 時刻ベース新着検出のみ
     currentData.data.forEach((item, index) => {
       let itemTimestamp = new Date(0);
       if (item.timestamp) {
@@ -1672,23 +1663,15 @@ function getNotificationUpdate(targetUserId, options = {}) {
       }
     });
 
-    // 件数ベース新着検出（フォールバック）
-    if (newItemsCount === 0 && hasNewData && lastSeenCount > 0) {
-      newItemsCount = currentCount - lastSeenCount;
-      incrementalData = incrementalData.slice(0, newItemsCount);
-    }
-
     const hasNewContent = newItemsCount > 0;
 
+    // ✅ 修正: 時刻ベース統一レスポンス（不要フィールド削除）
     return {
       success: true,
       hasNewContent,
-      hasNewData,
       data: incrementalData,
-      totalCount: currentCount,
       newItemsCount,
       newItems: newItems.slice(0, 5), // 最新5件のプレビュー
-      lastSeenCount,
       targetUserId,
       accessType: isSelfAccess ? 'self' : 'cross-user',
       sheetName: currentData.sheetName,
@@ -1702,9 +1685,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     return {
       success: false,
       hasNewContent: false,
-      hasNewData: false,
       data: [],
-      totalCount: 0,
       newItemsCount: 0,
       message: error.message,
       targetUserId,
