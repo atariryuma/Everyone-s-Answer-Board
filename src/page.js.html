@@ -1150,10 +1150,13 @@ class StudyQuestApp {
 
   // ✅ 修正: フィルター状態一貫性対応 新着通知バナー表示
   showNewContentBanner(newItemsCount, filterState = null) {
-    if (!this.elements.newContentBanner || !newItemsCount || newItemsCount <= 0) return;
+    if (!this.elements.newContentBanner || !newItemsCount || newItemsCount <= 0) {
+      return;
+    }
 
-    // ✅ 修正: filterStateのnullチェック改善
-    const currentFilter = filterState?.rawClassFilter || 'すべて';
+    // ✅ 修正: filterStateが未提供の場合は自動取得
+    const actualFilterState = filterState || this.getCurrentFilterState();
+    const currentFilter = actualFilterState.rawClassFilter || 'すべて';
     const isFilteredView = currentFilter !== 'すべて';
 
     // ✅ 修正: フィルター状態の適切な処理
@@ -1172,22 +1175,22 @@ class StudyQuestApp {
     this.elements.newContentBanner.classList.remove('hidden', 'notification-banner-exit');
     this.elements.newContentBanner.classList.add('notification-banner-enter');
 
-    debugLog('📢 一貫した新着通知表示 (時刻ベース統一):', {
-      count: newItemsCount,
-      filter: currentFilter,
-      isFilteredView,
-      message,
-      source: 'server-timestamp-based-detection'
-    });
+    // ✅ 修正: aria-hidden属性を更新して表示を有効化
+    this.elements.newContentBanner.setAttribute('aria-hidden', 'false');
   }
   
   // ✅ シンプルな通知バナー非表示
   dismissNewContentBanner() {
-    if (!this.elements.newContentBanner) return;
+    if (!this.elements.newContentBanner) {
+      return;
+    }
+
     this.elements.newContentBanner.classList.remove('notification-banner-enter');
     this.elements.newContentBanner.classList.add('notification-banner-exit');
     setTimeout(() => {
       this.elements.newContentBanner.classList.add('hidden');
+      // ✅ 修正: aria-hidden属性を更新してアクセシビリティを保持
+      this.elements.newContentBanner.setAttribute('aria-hidden', 'true');
     }, 300);
   }
 
@@ -1195,84 +1198,30 @@ class StudyQuestApp {
   // コンテンツ更新（通知バナーからの呼び出し）
   // ✅ CLAUDE.md準拠: 手動更新のエントリーポイント（自然な英語表現）
   async refreshContent() {
-    await this.updateContent(true);
+    // ✅ シンプル化: 複雑な差分処理を廃止し、常にloadSheetDataで全データ取得
+    // フィルター状態は自動的に維持される（loadSheetDataが現在のフィルター状態を使用）
+    await this.loadSheetData({
+      showLoading: true,
+      bypassCache: true
+    });
+
+    // 通知バナーを閉じる（新しいデータが表示されたため）
+    this.dismissNewContentBanner();
   }
 
 
-  // ✅ CLAUDE.md準拠: 時刻ベース統一通知システム（論理的破綻修正）
-  async updateContent(isManualUpdate = false) {
-
-    this.dismissNewContentBanner();
-
-    try {
-      // Get current filter state for consistent filtering
-      const filterState = this.getCurrentFilterState();
-
-      // ✅ 修正: 時刻ベース検出に統一（件数ベース比較を削除）
-      const incrementalData = await this.runGas('getNotificationUpdate', this.state.userId, {
-        lastUpdateTime: this.state.lastSeenTimestamp || new Date(0).toISOString(),
-        includeMetadata: true,
-        classFilter: filterState.classFilter,
-        sortOrder: filterState.sortOrder
-      });
-
-      if (!incrementalData.success) {
-        throw new Error(incrementalData.message);
+  // ✅ シンプル化: updateContent関数を簡素化（後方互換性のため保持）
+  async updateContent(isManualUpdate = false, preloadedTriggerResult = null) {
+    if (isManualUpdate) {
+      // 手動更新は refreshContent() に委譲
+      await this.refreshContent();
+    } else {
+      // 自動更新の場合は通知表示のみ（実際のデータ更新は手動で行う）
+      if (preloadedTriggerResult && preloadedTriggerResult.hasNewContent) {
+        // ✅ 修正: サーバーから返されたフィルター情報を使用（フィルター状態不整合の修正）
+        const appliedFilterState = preloadedTriggerResult.appliedFilter || this.getCurrentFilterState();
+        this.showNewContentBanner(preloadedTriggerResult.newItemsCount, appliedFilterState);
       }
-
-      // ✅ 修正: サーバーサイドの時刻ベース検出結果のみ使用
-      const filteredData = incrementalData.data || [];
-      const serverDetectedNewItems = incrementalData.newItemsCount || 0;
-
-      // サーバーが検出した新着がない場合
-      if (serverDetectedNewItems === 0) {
-        this.provideFeedback('最新の状態です', 'info');
-        return;
-      }
-
-      // ✅ 効率化: サーバーフィルタ済みデータを直接使用
-      this.state.currentAnswers = filteredData;
-      debugLog('📦 Server-filtered data received:', filteredData.length, 'items with', serverDetectedNewItems, 'new');
-
-      // ✅ 効率的な直接描画（フィルタ済みデータ使用）
-      if (this.elements.answersContainer && filteredData.length > 0) {
-        try {
-          // 既存システムのrenderBoardを使用（最適化済み）
-          await this.renderBoard(false, false, []);
-          debugLog('✅ DOM updated successfully using optimized render system');
-        } catch (domError) {
-          this.handleDOMError('update', domError, async () => {
-            await this.loadSheetData({ showLoading: true, isInitialLoad: false, bypassCache: true });
-          });
-          return;
-        }
-      }
-
-      // ✅ 修正: 一貫したフィルター対応通知処理（時刻ベース結果のみ）
-      if (serverDetectedNewItems > 0) {
-        if (!isManualUpdate) {
-          // 自動更新時のみ新着バナー表示（フィルター状態込み）
-          this.showNewContentBanner(serverDetectedNewItems, filterState);
-        } else {
-          // 手動更新時はフィードバックのみ（フィルター対応）
-          const filterMessage = filterState.rawClassFilter !== 'すべて'
-            ? `${filterState.rawClassFilter}の新着を${serverDetectedNewItems}件表示しました`
-            : `${serverDetectedNewItems}件の新着を表示しました`;
-          this.provideFeedback(filterMessage, 'success');
-        }
-
-        // ✅ 修正: 時刻ベース基準で更新（件数基準削除）
-        this.updateLastSeenTimestamp(incrementalData.timestamp);
-      }
-
-      // ✅ 更新完了後は通知バナーを非表示
-      if (isManualUpdate) {
-        this.dismissNewContentBanner();
-      }
-
-    } catch (error) {
-      errorLog('コンテンツ更新に失敗:', error);
-      await this.loadSheetData({ showLoading: true, isInitialLoad: false, bypassCache: true });
     }
   }
 
@@ -1326,31 +1275,47 @@ class StudyQuestApp {
 
     // 🚀 V8準拠: const/let使用、エラーハンドリング強化
     const executePollingCycle = async () => {
+      console.log('🔄 POLLING CYCLE START:', {
+        isActive: this.pollingState.isActive,
+        lastActivityTime: new Date(this.lastActivityTime).toISOString(),
+        userId: this.state.userId,
+        timestamp: new Date().toISOString()
+      });
+
       // ✅ CLAUDE.md準拠: Simplified polling execution
       if (!this.pollingState.isActive) {
+        console.log('⚠️ Polling cycle skipped: not active');
         return;
       }
       // 15分無操作チェック
       if (Date.now() - this.lastActivityTime > 900000) {
+        console.log('⏰ Polling stopped: 15min inactivity');
         this.stopNewAnswerPolling();
         return;
       }
 
       try {
+        console.log('🔗 Calling server-side trigger...');
         // 🔄 CLAUDE.md準拠: サーバーサイドトリガーベースポーリング
         const triggerResult = await this.callServerSideTrigger();
+        console.log('📥 Server trigger result:', triggerResult);
 
         if (triggerResult.success && triggerResult.hasNewContent) {
-          debugLog('✅ Unified notification system detected updates:', {
-            hasNewContent: triggerResult.hasNewContent,
-            newItemsCount: triggerResult.newItemsCount,
-            accessType: triggerResult.accessType,
-            targetUserId: triggerResult.targetUserId
-          });
+          // ✅ 修正: 新着検出時はバナー表示のみ（差分更新は手動のみ）
+          // サーバーから返されたフィルター情報を使用（フィルター状態不整合の修正）
+          const appliedFilterState = triggerResult.appliedFilter || this.getCurrentFilterState();
+          this.showNewContentBanner(triggerResult.newItemsCount, appliedFilterState);
 
+          // ✅ タイムスタンプ更新は callServerSideTrigger 内で完了済み（重複除去）
+          // this.updateLastSeenTimestamp() は不要
 
           // ✅ CLAUDE.md準拠: Simple success handling
           this.pollingState.retryCount = 0;
+        } else {
+          console.log('ℹ️ No new content detected:', {
+            success: triggerResult.success,
+            hasNewContent: triggerResult.hasNewContent
+          });
         }
 
       } catch (error) {
@@ -1359,6 +1324,7 @@ class StudyQuestApp {
       } finally {
         // ✅ CLAUDE.md準拠: Simple execution flag reset after cycle completion
         this.pollingState.isActive = false;
+        console.log('🏁 POLLING CYCLE END');
       }
     };
 
@@ -1367,16 +1333,22 @@ class StudyQuestApp {
     // 初回実行のみクライアントサイド
     // 90秒遅延後にポーリング開始（初期化との干渉を防ぐ）
     setTimeout(() => {
+      console.log('⏰ 90s TIMEOUT REACHED - Checking polling conditions:', {
+        isActive: this.pollingState.isActive,
+        initComplete: this.state.initializationComplete,
+        timestamp: new Date().toISOString()
+      });
+
       if (this.pollingState.isActive && this.state.initializationComplete) {
+        console.log('✅ Starting first polling cycle after 90s delay');
         executePollingCycle();
-        debugLog(`✅ First polling cycle executed after 90s delay`);
       } else {
-        debugLog(`⚠️ Polling cancelled: active=${this.pollingState.isActive}, initComplete=${this.state.initializationComplete}`);
+        console.log(`⚠️ Polling cancelled: active=${this.pollingState.isActive}, initComplete=${this.state.initializationComplete}`);
         this.pollingState.isActive = false;
       }
     }, 90000);
 
-    debugLog(`✅ Server-side trigger-based polling scheduled for 90s delay (CLAUDE.md compliant)`);
+    console.log(`📅 Server-side trigger-based polling scheduled for 90s delay at ${new Date(Date.now() + 90000).toISOString()}`);
   }
 
   // 新着回答のポーリング停止 (安定版 - 完全なクリーンアップ)
@@ -1434,27 +1406,12 @@ class StudyQuestApp {
         sortOrder: filterState.sortOrder
       };
 
-      debugLog('📡 Calling unified notification update with options:', {
-        targetUserId: this.state.userId,
-        options: notificationOptions
-      });
-
       // 統合 getNotificationUpdate エンドポイント呼び出し
-      debugLog('🚀 About to call getNotificationUpdate API');
       const response = await this.runGas('getNotificationUpdate', this.state.userId, notificationOptions);
-      debugLog('📥 getNotificationUpdate API response:', response);
 
       if (response.success) {
-        debugLog('✅ Unified notification response:', {
-          hasNewContent: response.hasNewContent,
-          accessType: response.accessType,
-          targetUserId: response.targetUserId,
-          timestamp: response.timestamp
-        });
-
         // ✅ 修正: 時刻ベース統一システム
         this.state.lastSeenTimestamp = response.timestamp;
-
         return response;
       } else {
         throw new Error(response.message || 'Notification update failed');
@@ -1466,30 +1423,6 @@ class StudyQuestApp {
     }
   }
 
-  // サーバーサイドトリガーで検出された更新の処理
-  async handleServerTriggeredUpdate(sheetData) {
-    try {
-      debugLog('🔄 Processing server-triggered update:', sheetData);
-
-      if (sheetData.hasNewData && sheetData.data && sheetData.data.length > 0) {
-        // 新しいデータを既存データとマージ（newest順を維持）
-        const mergedData = sheetData.data.concat(this.state.currentAnswers || []);
-
-        // 状態更新
-        this.state.currentAnswers = mergedData;
-        this.updateLastSeenCount(sheetData.totalCount || 0);
-
-
-        debugLog(`✅ Processed ${sheetData.newItemsCount} new items from server trigger`);
-      }
-
-    } catch (error) {
-      console.error('❌ handleServerTriggeredUpdate error:', error.message);
-      throw error;
-    }
-  }
-
-  
 
 
   // Unified notification system
@@ -2752,8 +2685,8 @@ class StudyQuestApp {
     this.state.currentActiveSheet = targetSheet;
     this.state.sheetName = targetSheet;
 
-    // 新着通知の基準をリセット
-    this.updateLastSeenCount(this.state.currentAnswers?.length || 0);
+    // ✅ 修正: 時刻ベース通知システムに統一（件数ベース基準は不要）
+    this.updateLastSeenTimestamp();
     
     // UIの更新
     this.updateSheetSelectorLabels();

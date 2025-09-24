@@ -1665,7 +1665,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
 
     const hasNewContent = newItemsCount > 0;
 
-    // ✅ 修正: 時刻ベース統一レスポンス（不要フィールド削除）
+    // ✅ 修正: 時刻ベース統一レスポンス + フィルター情報追加（論理的破綻修正）
     return {
       success: true,
       hasNewContent,
@@ -1677,7 +1677,13 @@ function getNotificationUpdate(targetUserId, options = {}) {
       sheetName: currentData.sheetName,
       header: currentData.header,
       timestamp: new Date().toISOString(),
-      lastUpdateTime: lastUpdate.toISOString()
+      lastUpdateTime: lastUpdate.toISOString(),
+      // ✅ 追加: 使用されたフィルター情報（フィルター状態不整合の修正）
+      appliedFilter: {
+        classFilter: options.classFilter,
+        sortOrder: options.sortOrder,
+        rawClassFilter: options.classFilter || 'すべて'
+      }
     };
 
   } catch (error) {
