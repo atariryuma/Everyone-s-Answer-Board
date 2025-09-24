@@ -63,10 +63,17 @@ function getServiceAccount() {
 function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context = 'unknown') {
   try {
     const currentEmail = getCurrentEmail();
+    const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
 
     // Service account not requested - always allowed
     if (!useServiceAccount) {
       return { allowed: true, reason: 'Normal permissions requested' };
+    }
+
+    // DATABASE_SPREADSHEET_ID is always a shared resource requiring service account
+    if (spreadsheetId === dbId) {
+      console.log(`SA_VALIDATION: DATABASE_SPREADSHEET_ID access - service account required`);
+      return { allowed: true, reason: 'DATABASE_SPREADSHEET_ID is shared resource' };
     }
 
     // Check if current user is admin - admins can use service account
@@ -75,16 +82,10 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
       return { allowed: true, reason: 'Admin privileges' };
     }
 
-    // For non-admin users, verify this is truly cross-user access
-    const targetUser = findUserBySpreadsheetId(spreadsheetId);
-    if (targetUser && targetUser.userEmail === currentEmail) {
-      console.warn(`SA_VALIDATION: User ${currentEmail} attempting service account for self-access in ${context}`);
-      return { allowed: false, reason: 'Service account not needed for self-access' };
-    }
-
-    // Cross-user access by authenticated user - allowed
-    console.log(`SA_VALIDATION: Cross-user access approved for ${currentEmail} in ${context}`);
-    return { allowed: true, reason: 'Cross-user access' };
+    // For non-admin users accessing other spreadsheets, allow service account
+    // Skip user lookup to prevent circular reference (findUserBySpreadsheetId -> getAllUsers -> openDatabase -> validateServiceAccountUsage)
+    console.log(`SA_VALIDATION: Cross-user access approved for ${currentEmail} in ${context} (skipping user lookup to prevent circular reference)`);
+    return { allowed: true, reason: 'Cross-user access (assumed)' };
 
   } catch (error) {
     console.error('SA_VALIDATION: Validation failed:', error.message);
