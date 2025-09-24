@@ -94,11 +94,13 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
 
 /**
  * データベーススプレッドシートを開く（CLAUDE.md準拠 - Editor→Admin共有DB）
- * @param {boolean} useServiceAccount - サービスアカウントを使用するか
+ * @param {boolean} useServiceAccount - サービスアカウントを使用するか（互換性のため保持、実際は常にtrue）
  * @param {Object} options - オプション設定
  * @returns {Object|null} Database spreadsheet object
  */
 function openDatabase(useServiceAccount = false, options = {}) {
+   
+  const _ = useServiceAccount; // Suppress unused parameter warning
   try {
     const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
     if (!dbId) {
@@ -106,10 +108,17 @@ function openDatabase(useServiceAccount = false, options = {}) {
       return null;
     }
 
-    // 🔧 CLAUDE.md準拠: Context-based service account usage
-    // ✅ **Editor→Admin**: Accessing shared user database (DATABASE_SPREADSHEET_ID)
-    // ✅ **Self-access**: Use normal permissions when appropriate
-    const dataAccess = openSpreadsheet(dbId, { useServiceAccount });
+    // 🔧 CLAUDE.md準拠: DATABASE_SPREADSHEET_ID is shared resource - always use service account
+    // ✅ **Critical**: DATABASE_SPREADSHEET_ID contains all user data and requires elevated permissions
+    // ✅ **Security**: General users cannot access DATABASE_SPREADSHEET_ID with normal permissions
+    // Note: useServiceAccount parameter preserved for API compatibility but overridden for security
+    const forceServiceAccount = true; // DATABASE_SPREADSHEET_ID always requires service account
+    console.log(`openDatabase: Using service account for shared DATABASE_SPREADSHEET_ID (forced: ${forceServiceAccount})`);
+
+    const dataAccess = openSpreadsheet(dbId, {
+      useServiceAccount: forceServiceAccount,
+      context: 'database_access'
+    });
     if (!dataAccess) {
       console.warn('openDatabase: Failed to access database via openSpreadsheet with service account');
       return null;
