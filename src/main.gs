@@ -316,10 +316,20 @@ function doPost(e) {
         result = handleUserDataRequest(email, request.options || {});
         break;
       case 'addReaction':
-        result = addReaction(request.userId || email, request.rowId, request.reactionType);
+        // 🎯 Multi-tenant: request.userId = target user (board owner), email = actor (current user)
+        if (!request.userId) {
+          result = createErrorResponse('Target user ID required for reaction');
+        } else {
+          result = addReaction(request.userId, request.rowId, request.reactionType);
+        }
         break;
       case 'toggleHighlight':
-        result = toggleHighlight(request.userId || email, request.rowId);
+        // 🎯 Multi-tenant: request.userId = target user (board owner), email = actor (current user)
+        if (!request.userId) {
+          result = createErrorResponse('Target user ID required for highlight');
+        } else {
+          result = toggleHighlight(request.userId, request.rowId);
+        }
         break;
       case 'refreshData':
         result = handleUserDataRequest(email, request.options || {});

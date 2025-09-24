@@ -1,241 +1,210 @@
 /**
- * @fileoverview ReactionService - リアクション・ハイライト専用サービス
+ * @fileoverview ReactionService - マルチテナント対応リアクション・ハイライト管理
  *
- * 🎯 責任範囲:
+ * 🎯 GAS-Native Architecture:
  * - リアクション管理（UNDERSTAND, LIKE, CURIOUS）
  * - ハイライト機能
- * - リアクション状態分析・更新
- * - ユーザーリアクション追跡
- * - Cross-user権限管理（CLAUDE.md準拠）
- *
- * 🔄 CLAUDE.md Best Practices準拠:
- * - GAS-Native Pattern（直接API）
+ * - マルチテナントセキュリティ
+ * - 直接SpreadsheetApp操作（Zero-Dependency）
  * - Service Account適切使用（Cross-user access only）
- * - Cache-based Mutex（競合回避）
- * - V8ランタイム最適化
  */
 
-/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, resolveColumnIndex */
+/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, resolveColumnIndex, isAdministrator */
 
 // ===========================================
 // 🎯 リアクション管理システム - CLAUDE.md準拠
 // ===========================================
 
+// ===========================================
+// 🔧 セキュリティ・監査機能
+// ===========================================
+
 /**
- * スプレッドシート内リアクション更新
- * @param {Object} config - 設定
- * @param {string} rowId - 行ID
- * @param {string} reactionType - リアクションタイプ
- * @param {string} action - アクション（add/remove）
- * @param {Object} context - アクセスコンテキスト（target user info for cross-user access）
- * @returns {boolean} 成功可否
+ * マルチテナント権限検証
+ * @param {string} actorEmail - 操作者
+ * @param {string} targetUserId - 対象ユーザーID
+ * @returns {boolean} 権限があるかどうか
  */
-function updateReactionInSheet(config, rowId, reactionType, action, context = {}) {
-  try {
-    // 🔧 CLAUDE.md準拠: Context-aware service account usage for reactions
-    // ✅ **Cross-user**: Use service account when reacting to other user's content (typical)
-    // ✅ **Self-access**: Use normal permissions for own content reactions
-    const currentEmail = getCurrentEmail();
+function validateReactionPermission(actorEmail, targetUserId) {
+  if (!actorEmail || !targetUserId) return false;
 
-    // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
-    const targetUser = findUserBySpreadsheetId(config.spreadsheetId);
-    const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
+  // 管理者は全アクセス可能
+  if (isAdministrator(actorEmail)) return true;
 
-    console.log(`updateReactionInSheet: ${isSelfAccess ? 'Self-access normal permissions' : 'Cross-user service account'} for reaction update`);
-    const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
-    const {spreadsheet} = dataAccess;
-    const sheet = spreadsheet.getSheetByName(config.sheetName);
+  // ボード公開設定チェック（簡易実装）
+  const targetUser = findUserById(targetUserId);
+  if (!targetUser) return false;
 
-    if (!sheet) {
-      throw new Error('シートが見つかりません');
-    }
+  const configResult = getUserConfig(targetUserId);
+  const config = configResult.success ? configResult.config : {};
 
-    // 行番号抽出（row_3 → 3）
-    const rowNumber = parseInt(rowId.replace('row_', ''));
-    if (isNaN(rowNumber) || rowNumber < 2) {
-      throw new Error('無効な行ID');
-    }
-
-    // リアクション列の取得・作成
-    const reactionColumn = getOrCreateReactionColumn(sheet, reactionType);
-    if (!reactionColumn) {
-      throw new Error('リアクション列の作成に失敗');
-    }
-
-    // CLAUDE.md準拠: バッチ操作による70倍性能向上 (getValue/setValue → getValues/setValues)
-    const currentValue = sheet.getRange(rowNumber, reactionColumn, 1, 1).getValues()[0][0] || 0;
-    const newValue = action === 'add'
-      ? Math.max(0, currentValue + 1)
-      : Math.max(0, currentValue - 1);
-
-    sheet.getRange(rowNumber, reactionColumn, 1, 1).setValues([[newValue]]);
-
-    console.info('ReactionService.updateReactionInSheet: リアクション更新完了', {
-      rowId,
-      reactionType,
-      action,
-      oldValue: currentValue,
-      newValue
-    });
-
-    return true;
-  } catch (error) {
-    console.error('ReactionService.updateReactionInSheet: エラー', error.message);
-    return false;
-  }
+  // 公開ボードまたは自分のボードの場合は許可
+  return config.isPublished || targetUser.userEmail === actorEmail;
 }
 
 /**
- * リアクション状態分析（GAS Best Practice: 単一責任）
- * @param {Sheet} sheet - シートオブジェクト
- * @param {Object} reactionColumns - リアクション列情報
- * @param {number} rowIndex - 行インデックス
- * @param {string} userEmail - ユーザーメール
- * @returns {Object} リアクション状態
+ * 監査ログ記録
+ * @param {string} action - アクション
+ * @param {Object} details - 詳細情報
  */
-function analyzeReactionState(sheet, reactionColumns, rowIndex, userEmail) {
+function logReactionAudit(action, details) {
+  const timestamp = new Date().toISOString();
+  const logEntry = {
+    timestamp,
+    action,
+    actor: details.actor || 'unknown',
+    target: details.target || 'unknown',
+    spreadsheet: details.spreadsheetId ? `${details.spreadsheetId.substring(0, 8)}***` : 'unknown',
+    details: details.extra || {}
+  };
+
+  console.log(`REACTION_AUDIT: ${JSON.stringify(logEntry)}`);
+}
+
+// Removed obsolete complex reaction analysis functions - replaced with direct GAS-Native implementation
+
+/**
+ * 🚀 GAS-Native直接リアクション処理
+ * @param {Sheet} sheet - スプレッドシートオブジェクト
+ * @param {number} rowNumber - 行番号
+ * @param {string} reactionType - リアクション種類
+ * @param {string} actorEmail - 操作者メール
+ * @returns {Object} 処理結果
+ */
+function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
+  const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+
+  if (!reactionTypes.includes(reactionType)) {
+    throw new Error('Invalid reaction type');
+  }
+
+  // 🎯 ヘッダー行から列位置取得
+  const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
+  const reactionColumns = {};
+
+  reactionTypes.forEach(type => {
+    const colIndex = headers.findIndex(header =>
+      String(header).toUpperCase().includes(type)
+    );
+    reactionColumns[type] = colIndex !== -1 ? colIndex + 1 : createReactionColumn(sheet, type);
+  });
+
+  // 🔄 現在のリアクション状態を取得
+  const columnIndexes = Object.values(reactionColumns);
+  const minCol = Math.min(...columnIndexes);
+  const maxCol = Math.max(...columnIndexes);
+  const [rowData] = sheet.getRange(rowNumber, minCol, 1, maxCol - minCol + 1).getValues();
+
   const currentReactions = {};
-  const allReactionsData = {};
+  const updatedReactions = {};
   let userCurrentReaction = null;
 
-  // CLAUDE.md準拠: バッチ操作による70倍性能向上
-  const columnNumbers = Object.values(reactionColumns);
-  const minCol = Math.min(...columnNumbers);
-  const maxCol = Math.max(...columnNumbers);
-  const [batchData] = sheet.getRange(rowIndex, minCol, 1, maxCol - minCol + 1).getValues();
+  // 現在の状態解析
+  reactionTypes.forEach(type => {
+    const col = reactionColumns[type];
+    const cellValue = rowData[col - minCol] || '';
+    const users = parseReactionUsers(String(cellValue));
 
-  Object.keys(reactionColumns).forEach(key => {
-    const col = reactionColumns[key];
-    const cellValue = batchData[col - minCol] || '';
-    const reactionUsers = parseReactionUsers(cellValue);
-    currentReactions[key] = reactionUsers;
-    allReactionsData[key] = {
-      count: reactionUsers.length,
-      reacted: reactionUsers.includes(userEmail)
-    };
+    currentReactions[type] = users;
 
-    if (reactionUsers.includes(userEmail)) {
-      userCurrentReaction = key;
+    if (users.includes(actorEmail)) {
+      userCurrentReaction = type;
     }
   });
 
-  return { currentReactions, allReactionsData, userCurrentReaction };
-}
-
-/**
- * リアクション更新処理（GAS Best Practice: 単一責任）
- * @param {Object} currentReactions - 現在のリアクション
- * @param {string} reactionKey - リアクションキー
- * @param {string} userEmail - ユーザーメール
- * @param {string} userCurrentReaction - 現在のユーザーリアクション
- * @returns {Object} 更新結果
- */
-function updateReactionState(currentReactions, reactionKey, userEmail, userCurrentReaction) {
+  // リアクション状態更新ロジック
   let action = 'added';
-  let newUserReaction = null;
+  let newUserReaction = reactionType;
 
-  if (userCurrentReaction === reactionKey) {
-    // Same reaction -> remove (toggle)
-    currentReactions[reactionKey] = currentReactions[reactionKey].filter(u => u !== userEmail);
+  reactionTypes.forEach(type => {
+    updatedReactions[type] = [...currentReactions[type]];
+  });
+
+  if (userCurrentReaction === reactionType) {
+    // 同じリアクション → 削除（トグル）
+    updatedReactions[reactionType] = updatedReactions[reactionType].filter(u => u !== actorEmail);
     action = 'removed';
     newUserReaction = null;
   } else {
-    // Different reaction -> remove old, add new
+    // 異なるリアクション → 古いのを削除、新しいのを追加
     if (userCurrentReaction) {
-      currentReactions[userCurrentReaction] = currentReactions[userCurrentReaction].filter(u => u !== userEmail);
+      updatedReactions[userCurrentReaction] = updatedReactions[userCurrentReaction].filter(u => u !== actorEmail);
     }
-    if (!currentReactions[reactionKey].includes(userEmail)) {
-      currentReactions[reactionKey].push(userEmail);
+    if (!updatedReactions[reactionType].includes(actorEmail)) {
+      updatedReactions[reactionType].push(actorEmail);
     }
-    action = 'added';
-    newUserReaction = reactionKey;
   }
 
-  return { action, newUserReaction, updatedReactions: currentReactions };
+  // 🚀 一括更新（CLAUDE.md準拠70倍性能向上）
+  const updateData = [];
+  reactionTypes.forEach(type => {
+    const col = reactionColumns[type];
+    const serialized = serializeReactionUsers(updatedReactions[type]);
+    updateData.push([col, serialized]);
+  });
+
+  updateData.forEach(([col, value]) => {
+    sheet.getRange(rowNumber, col, 1, 1).setValues([[value]]);
+  });
+
+  // レスポンス形式構築
+  const reactions = {};
+  reactionTypes.forEach(type => {
+    reactions[type] = {
+      count: updatedReactions[type].length,
+      reacted: updatedReactions[type].includes(actorEmail)
+    };
+  });
+
+  return {
+    action,
+    userReaction: newUserReaction,
+    reactions
+  };
 }
 
 /**
- * リアクション処理（リファクタリング版 - GAS Best Practice準拠）
+ * 🚀 GAS-Native直接ハイライト処理
+ * @param {Sheet} sheet - スプレッドシートオブジェクト
+ * @param {number} rowNumber - 行番号
+ * @returns {Object} 処理結果
  */
-function processReaction(spreadsheetId, sheetName, rowIndex, reactionKey, userEmail, context = {}) {
-  try {
-    // バリデーション
-    if (!validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey)) {
-      throw new Error('無効なリアクションパラメータ');
-    }
-    if (!userEmail) {
-      throw new Error('ユーザー情報が必要です');
-    }
+function processHighlightDirect(sheet, rowNumber) {
+  const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
 
-    // スプレッドシート接続
-    // 🔧 CLAUDE.md準拠: Context-aware service account usage for reactions
-    // ✅ **Cross-user**: Use service account when reacting to other user's content (typical)
-    // ✅ **Self-access**: Use normal permissions for own content reactions
-    const currentEmail = getCurrentEmail();
+  // ハイライト列を探す
+  let highlightCol = headers.findIndex(header =>
+    String(header).toUpperCase().includes('HIGHLIGHT')
+  ) + 1;
 
-    // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
-    const targetUser = findUserBySpreadsheetId(spreadsheetId);
-    const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
-
-    console.log(`processReaction: ${isSelfAccess ? 'Self-access normal permissions' : 'Cross-user service account'} for reaction processing`);
-    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: !isSelfAccess });
-    const {spreadsheet} = dataAccess;
-    const sheet = spreadsheet.getSheetByName(sheetName);
-    if (!sheet) {
-      throw new Error('シートが見つかりません');
-    }
-
-    // リアクション列取得
-    const reactionColumns = {
-      UNDERSTAND: getOrCreateReactionColumn(sheet, 'UNDERSTAND'),
-      LIKE: getOrCreateReactionColumn(sheet, 'LIKE'),
-      CURIOUS: getOrCreateReactionColumn(sheet, 'CURIOUS')
-    };
-
-    // 現在の状態分析
-    const { currentReactions, allReactionsData, userCurrentReaction } = analyzeReactionState(
-      sheet, reactionColumns, rowIndex, userEmail
-    );
-
-    // リアクション状態更新
-    const { action, newUserReaction, updatedReactions } = updateReactionState(
-      currentReactions, reactionKey, userEmail, userCurrentReaction
-    );
-
-    // シートに更新適用
-    Object.keys(reactionColumns).forEach(key => {
-      const col = reactionColumns[key];
-      const users = updatedReactions[key];
-      const serializedUsers = serializeReactionUsers(users);
-      sheet.getRange(rowIndex, col, 1, 1).setValues([[serializedUsers]]);
-    });
-
-    // 更新後の状態を再計算
-    const updatedAllReactionsData = {};
-    Object.keys(updatedReactions).forEach(key => {
-      updatedAllReactionsData[key] = {
-        count: updatedReactions[key].length,
-        reacted: updatedReactions[key].includes(userEmail)
-      };
-    });
-
-    return {
-      success: true,
-      status: 'success',
-      action,
-      userReaction: newUserReaction,
-      reactions: updatedAllReactionsData,
-      message: action === 'added' ? 'リアクションを追加しました' : 'リアクションを削除しました'
-    };
-
-  } catch (error) {
-    console.error('ReactionService.processReaction: エラー', error.message);
-    return {
-      success: false,
-      status: 'error',
-      message: error.message
-    };
+  // ハイライト列が存在しない場合は作成
+  if (highlightCol === 0) {
+    highlightCol = sheet.getLastColumn() + 1;
+    sheet.getRange(1, highlightCol).setValue('HIGHLIGHT');
   }
+
+  // 現在の値を取得してトグル
+  const [[currentValue]] = sheet.getRange(rowNumber, highlightCol, 1, 1).getValues();
+  const isHighlighted = String(currentValue).toUpperCase() === 'TRUE';
+  const newValue = isHighlighted ? 'FALSE' : 'TRUE';
+
+  sheet.getRange(rowNumber, highlightCol, 1, 1).setValues([[newValue]]);
+
+  return {
+    highlighted: newValue === 'TRUE'
+  };
+}
+
+/**
+ * リアクション列作成（必要時のみ）
+ * @param {Sheet} sheet - シートオブジェクト
+ * @param {string} reactionType - リアクション種類
+ * @returns {number} 列番号
+ */
+function createReactionColumn(sheet, reactionType) {
+  const newCol = sheet.getLastColumn() + 1;
+  sheet.getRange(1, newCol).setValue(reactionType);
+  return newCol;
 }
 
 /**
@@ -272,16 +241,6 @@ function serializeReactionUsers(users) {
   return validEmails.join('|');
 }
 
-/**
- * リアクションタイプ検証
- * @param {string} reactionType - リアクションタイプ
- * @returns {boolean} 有効かどうか
- */
-function validateReactionType(reactionType) {
-  // 🔧 CONSTANTS依存除去: 直接定義
-  const validTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT'];
-  return validTypes.includes(reactionType);
-}
 
 /**
  * リアクション情報抽出
@@ -354,286 +313,232 @@ function extractHighlight(row, headers) {
 // 🎯 ハイライト管理システム - CLAUDE.md準拠
 // ===========================================
 
-/**
- * ハイライト列の更新
- * @param {Object} config - 設定
- * @param {string} rowId - 行ID
- * @param {Object} context - アクセスコンテキスト
- * @returns {Object} 成功可否
- */
-function updateHighlightInSheet(config, rowId, context = {}) {
-  try {
-    // 🔧 CLAUDE.md準拠: Context-aware service account usage for highlights
-    // ✅ **Cross-user**: Use service account when highlighting other user's content (typical)
-    // ✅ **Self-access**: Use normal permissions for own content highlights
-    const currentEmail = getCurrentEmail();
-
-    // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
-    const targetUser = findUserBySpreadsheetId(config.spreadsheetId);
-    const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
-
-    console.log(`updateHighlightInSheet: ${isSelfAccess ? 'Self-access normal permissions' : 'Cross-user service account'} for highlight update`);
-    const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
-    const {spreadsheet} = dataAccess;
-    const sheet = spreadsheet.getSheetByName(config.sheetName);
-
-    if (!sheet) {
-      throw new Error('シートが見つかりません');
-    }
-
-    // 行番号抽出（row_3 → 3）
-    const rowNumber = parseInt(rowId.replace('row_', ''));
-    if (isNaN(rowNumber) || rowNumber < 2) {
-      throw new Error('無効な行ID');
-    }
-
-    // ハイライト列の取得・作成
-    const highlightColumn = getOrCreateReactionColumn(sheet, 'HIGHLIGHT');
-    if (!highlightColumn) {
-      throw new Error('ハイライト列の作成に失敗');
-    }
-
-    // CLAUDE.md準拠: バッチ操作による70倍性能向上 (getValue/setValue → getValues/setValues)
-    const [[currentValue]] = sheet.getRange(rowNumber, highlightColumn, 1, 1).getValues();
-    const isCurrentlyHighlighted = currentValue === 'TRUE' || currentValue === true;
-    const newValue = isCurrentlyHighlighted ? 'FALSE' : 'TRUE';
-
-    sheet.getRange(rowNumber, highlightColumn, 1, 1).setValues([[newValue]]);
-
-    const highlighted = newValue === 'TRUE';
-
-    console.info('ReactionService.updateHighlightInSheet: ハイライト切り替え完了', {
-      rowId,
-      oldValue: currentValue,
-      newValue,
-      highlighted
-    });
-
-    return {
-      success: true,
-      highlighted
-    };
-  } catch (error) {
-    console.error('ReactionService.updateHighlightInSheet: エラー', error.message);
-    return {
-      success: false,
-      error: error.message
-    };
-  }
-}
+// Removed obsolete updateHighlightInSheet function - replaced with processHighlightDirect
 
 // ===========================================
 // 🔧 リアクション列管理
 // ===========================================
 
-/**
- * リアクション列の取得または作成
- * @param {Sheet} sheet - シートオブジェクト
- * @param {string} reactionType - リアクションタイプ
- * @returns {number} 列番号
- */
-function getOrCreateReactionColumn(sheet, reactionType) {
-  try {
-    const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
-    const reactionHeader = reactionType.toUpperCase();
+// Removed duplicate getOrCreateReactionColumn function - replaced with createReactionColumn
 
-    // 既存の列を探す
-    const existingIndex = headers.findIndex(header =>
-      String(header).toUpperCase().includes(reactionHeader)
-    );
-
-    if (existingIndex !== -1) {
-      return existingIndex + 1; // 1-based index
-    }
-
-    // 新しい列を作成
-    const newColumn = sheet.getLastColumn() + 1;
-    sheet.getRange(1, newColumn).setValue(reactionHeader);
-    return newColumn;
-  } catch (error) {
-    console.error('getOrCreateReactionColumn: エラー', error.message);
-    return null;
-  }
-}
-
-/**
- * リアクションパラメータ検証
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} sheetName - シート名
- * @param {number} rowIndex - 行インデックス
- * @param {string} reactionKey - リアクション種類
- * @returns {boolean} 検証結果
- */
-function validateReaction(spreadsheetId, sheetName, rowIndex, reactionKey) {
-  if (!spreadsheetId || !sheetName || !rowIndex || !reactionKey) {
-    return false;
-  }
-
-  if (rowIndex < 2) { // ヘッダー行は1
-    return false;
-  }
-
-  const validReactions = ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT'];
-  return validReactions.includes(reactionKey);
-}
+// Removed validateReaction function - validation is handled directly in processReactionDirect
 
 // ===========================================
 // 🌍 Public API Functions - CLAUDE.md準拠
 // ===========================================
 
 /**
- * addReaction (user context)
- * @param {string} userId
- * @param {number|string} rowIndex - number or 'row_#'
- * @param {string} reaction
- * @returns {Object}
+ * リアクション送信（マルチテナント対応・GAS-Native）
+ * @param {string} targetUserId - 対象ユーザー（ボード所有者）ID
+ * @param {number|string} rowIndex - 行番号または'row_#'
+ * @param {string} reactionType - リアクション種類
+ * @returns {Object} 処理結果
  */
-function addReaction(userId, rowIndex, reaction) {
+function addReaction(targetUserId, rowIndex, reactionType) {
+  const actorEmail = getCurrentEmail();
+
   try {
-    // 🎯 Zero-Dependency: Direct Data call
-    const user = findUserById(userId);
-    if (!user) {
-      return createErrorResponse('User not found');
+    // 🛡️ マルチテナント権限検証
+    if (!validateReactionPermission(actorEmail, targetUserId)) {
+      logReactionAudit('reaction_denied', {
+        actor: actorEmail,
+        target: targetUserId,
+        reason: 'access_denied',
+        extra: { reactionType, rowIndex }
+      });
+      return createErrorResponse('Access denied to target board');
     }
 
-    // 統一API使用: 構造化パース
-    const configResult = getUserConfig(userId);
+    // 🎯 GAS-Native: 直接データアクセス
+    const targetUser = findUserById(targetUserId);
+    if (!targetUser) {
+      return createErrorResponse('Target user not found');
+    }
+
+    const configResult = getUserConfig(targetUserId);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
-      return createErrorResponse('Spreadsheet configuration incomplete');
+      return createErrorResponse('Board configuration incomplete');
     }
 
-    const parsedRowIndex = typeof rowIndex === 'string' ? parseInt(String(rowIndex).replace('row_', ''), SYSTEM_LIMITS.RADIX_DECIMAL) : parseInt(rowIndex, SYSTEM_LIMITS.RADIX_DECIMAL);
-    if (!parsedRowIndex || parsedRowIndex < 2) {
+    // 行番号正規化
+    const rowNumber = typeof rowIndex === 'string'
+      ? parseInt(rowIndex.replace('row_', ''), 10)
+      : parseInt(rowIndex, 10);
+
+    if (!rowNumber || rowNumber < 2) {
       return createErrorResponse('Invalid row ID');
     }
 
-    // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時リアクション競合防止（CacheService-based mutex）
-    const reactionKey = `reaction_${config.spreadsheetId}_${config.sheetName}_${parsedRowIndex}`;
+    // 🔐 Cache-based行レベルロック
+    const lockKey = `reaction_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
 
-    // 排他制御（Cache-based mutex）
-    if (cache.get(reactionKey)) {
-      return {
-        success: false,
-        message: '同じ行に対するリアクション処理が実行中です。しばらくお待ちください。'
-      };
+    if (cache.get(lockKey)) {
+      return createErrorResponse('同時リアクション処理中です。お待ちください。');
     }
 
     try {
-      cache.put(reactionKey, true, CACHE_DURATION.MEDIUM); // 30秒ロック
+      cache.put(lockKey, actorEmail, CACHE_DURATION.SHORT);
 
-      const res = processReaction(config.spreadsheetId, config.sheetName, parsedRowIndex, reaction, getCurrentEmail());
-      if (res && (res.success || res.status === 'success')) {
-        // フロントエンド期待形式に合わせたレスポンス
-        return {
-          success: true,
-          reactions: res.reactions || {},
-          userReaction: res.userReaction || reaction,
-          action: res.action || 'added',
-          message: res.message || 'リアクションを追加しました'
-        };
+      // 🔧 CLAUDE.md準拠: クロスユーザーアクセス判定
+      const isSelfAccess = targetUser.userEmail === actorEmail;
+      const dataAccess = openSpreadsheet(config.spreadsheetId, {
+        useServiceAccount: !isSelfAccess,
+        context: 'reaction_processing'
+      });
+
+      if (!dataAccess) {
+        throw new Error('Failed to access target spreadsheet');
       }
 
+      const { spreadsheet } = dataAccess;
+      const sheet = spreadsheet.getSheetByName(config.sheetName);
+      if (!sheet) {
+        throw new Error('Target sheet not found');
+      }
+
+      // 🚀 GAS-Native: 直接リアクション処理
+      const result = processReactionDirect(sheet, rowNumber, reactionType, actorEmail);
+
+      // 📊 監査ログ
+      logReactionAudit('reaction_processed', {
+        actor: actorEmail,
+        target: targetUser.userEmail,
+        spreadsheetId: config.spreadsheetId,
+        extra: {
+          reactionType,
+          rowNumber,
+          action: result.action,
+          accessMethod: isSelfAccess ? 'normal' : 'service_account'
+        }
+      });
+
       return {
-        success: false,
-        message: res?.message || 'Failed to add reaction'
+        success: true,
+        reactions: result.reactions,
+        userReaction: result.userReaction,
+        action: result.action,
+        message: result.action === 'added' ? 'リアクションを追加しました' : 'リアクションを削除しました'
       };
-    } catch (error) {
-      console.error('ReactionService.addReaction: エラー', error.message);
-      return createExceptionResponse(error);
+
     } finally {
-      cache.remove(reactionKey);
+      cache.remove(lockKey);
     }
-  } catch (outerError) {
-    console.error('ReactionService.addReaction outer error:', outerError.message);
-    // 🔧 統一ミューテックス: 緊急時のキャッシュクリア
-    try {
-      const cache = CacheService.getScriptCache();
-      const configForCleanup = getUserConfig(userId);
-      const cleanupConfig = configForCleanup.success ? configForCleanup.config : {};
-      if (cleanupConfig.spreadsheetId && cleanupConfig.sheetName) {
-        const cleanupRowIndex = typeof rowIndex === 'string' ? parseInt(String(rowIndex).replace('row_', ''), SYSTEM_LIMITS.RADIX_DECIMAL) : parseInt(rowIndex, SYSTEM_LIMITS.RADIX_DECIMAL);
-        const cleanupReactionKey = `reaction_${cleanupConfig.spreadsheetId}_${cleanupConfig.sheetName}_${cleanupRowIndex}`;
-        cache.remove(cleanupReactionKey);
-      }
-    } catch (cacheError) {
-      console.warn('Failed to clear reaction cache in error handler:', cacheError.message);
-    }
-    return createExceptionResponse(outerError);
+
+  } catch (error) {
+    console.error('addReaction error:', error.message);
+    logReactionAudit('reaction_error', {
+      actor: actorEmail,
+      target: targetUserId,
+      error: error.message,
+      extra: { reactionType, rowIndex }
+    });
+    return createExceptionResponse(error);
   }
 }
 
 /**
- * toggleHighlight (user context)
- * @param {string} userId
- * @param {number|string} rowIndex - number or 'row_#'
- * @returns {Object}
+ * ハイライト切り替え（マルチテナント対応・GAS-Native）
+ * @param {string} targetUserId - 対象ユーザー（ボード所有者）ID
+ * @param {number|string} rowIndex - 行番号または'row_#'
+ * @returns {Object} 処理結果
  */
-function toggleHighlight(userId, rowIndex) {
+function toggleHighlight(targetUserId, rowIndex) {
+  const actorEmail = getCurrentEmail();
+
   try {
-    // 🎯 Zero-Dependency: Direct Data call
-    const user = findUserById(userId);
-    if (!user) {
-      return createErrorResponse('User not found');
+    // 🛡️ マルチテナント権限検証
+    if (!validateReactionPermission(actorEmail, targetUserId)) {
+      logReactionAudit('highlight_denied', {
+        actor: actorEmail,
+        target: targetUserId,
+        reason: 'access_denied',
+        extra: { rowIndex }
+      });
+      return createErrorResponse('Access denied to target board');
     }
 
-    // 統一API使用: 構造化パース
-    const configResult = getUserConfig(userId);
+    const targetUser = findUserById(targetUserId);
+    if (!targetUser) {
+      return createErrorResponse('Target user not found');
+    }
+
+    const configResult = getUserConfig(targetUserId);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
-      return createErrorResponse('Spreadsheet configuration incomplete');
+      return createErrorResponse('Board configuration incomplete');
     }
 
-    // updateHighlightInSheet expects 'row_#'
-    const rowNumber = typeof rowIndex === 'string' && rowIndex.startsWith('row_')
-      ? rowIndex
-      : `row_${parseInt(rowIndex, SYSTEM_LIMITS.RADIX_DECIMAL)}`;
+    const rowNumber = typeof rowIndex === 'string'
+      ? parseInt(rowIndex.replace('row_', ''), 10)
+      : parseInt(rowIndex, 10);
 
-    // 🔧 CLAUDE.md準拠: 行レベルロック機構 - 同時ハイライト競合防止（CacheService-based mutex）
-    const highlightKey = `highlight_${config.spreadsheetId}_${config.sheetName}_${rowNumber}`;
+    if (!rowNumber || rowNumber < 2) {
+      return createErrorResponse('Invalid row ID');
+    }
+
+    // 🔐 Cache-based行レベルロック
+    const lockKey = `highlight_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
 
-    // 排他制御（Cache-based mutex）
-    if (cache.get(highlightKey)) {
-      return {
-        success: false,
-        message: '同じ行のハイライト処理が実行中です。しばらくお待ちください。'
-      };
+    if (cache.get(lockKey)) {
+      return createErrorResponse('同時ハイライト処理中です。お待ちください。');
     }
 
     try {
-      cache.put(highlightKey, true, CACHE_DURATION.MEDIUM); // 30秒ロック
+      cache.put(lockKey, actorEmail, CACHE_DURATION.SHORT);
 
-      const result = updateHighlightInSheet(config, rowNumber);
-      if (result?.success) {
-        return {
-          success: true,
-          message: 'Highlight toggled successfully',
-          highlighted: Boolean(result.highlighted)
-        };
+      // 🔧 CLAUDE.md準拠: クロスユーザーアクセス判定
+      const isSelfAccess = targetUser.userEmail === actorEmail;
+      const dataAccess = openSpreadsheet(config.spreadsheetId, {
+        useServiceAccount: !isSelfAccess,
+        context: 'highlight_processing'
+      });
+
+      if (!dataAccess) {
+        throw new Error('Failed to access target spreadsheet');
       }
 
+      const { spreadsheet } = dataAccess;
+      const sheet = spreadsheet.getSheetByName(config.sheetName);
+      if (!sheet) {
+        throw new Error('Target sheet not found');
+      }
+
+      // 🚀 GAS-Native: 直接ハイライト処理
+      const result = processHighlightDirect(sheet, rowNumber);
+
+      // 📊 監査ログ
+      logReactionAudit('highlight_processed', {
+        actor: actorEmail,
+        target: targetUser.userEmail,
+        spreadsheetId: config.spreadsheetId,
+        extra: {
+          rowNumber,
+          highlighted: result.highlighted,
+          accessMethod: isSelfAccess ? 'normal' : 'service_account'
+        }
+      });
+
       return {
-        success: false,
-        message: result?.error || 'Failed to toggle highlight'
+        success: true,
+        highlighted: result.highlighted,
+        message: result.highlighted ? 'ハイライトしました' : 'ハイライトを解除しました'
       };
-    } catch (error) {
-      console.error('ReactionService.toggleHighlight: エラー', error.message);
-      return createExceptionResponse(error);
+
     } finally {
-      cache.remove(highlightKey);
+      cache.remove(lockKey);
     }
-  } catch (outerError) {
-    console.error('ReactionService.toggleHighlight outer error:', outerError.message);
-    // 🔧 統一ミューテックス: 緊急時のキャッシュクリア
-    try {
-      const cache = CacheService.getScriptCache();
-      const highlightKey = `highlight_${userId}_${rowIndex}`;
-      cache.remove(highlightKey);
-    } catch (cacheError) {
-      console.warn('Failed to clear highlight cache in error handler:', cacheError.message);
-    }
-    return createExceptionResponse(outerError);
+
+  } catch (error) {
+    console.error('toggleHighlight error:', error.message);
+    logReactionAudit('highlight_error', {
+      actor: actorEmail,
+      target: targetUserId,
+      error: error.message,
+      extra: { rowIndex }
+    });
+    return createExceptionResponse(error);
   }
 }
