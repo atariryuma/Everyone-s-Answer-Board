@@ -220,17 +220,50 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       getSheetByName: (sheetName) => {
         // 必要最小限のSheetプロキシを返す
         return createServiceAccountSheetProxy(sheetId, sheetName, accessToken);
+      },
+      getSheets: () => {
+        // Sheets APIでシート一覧を取得
+        try {
+          const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+          const response = UrlFetchApp.fetch(`${baseUrl}?includeGridData=false`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
+          }
+
+          const data = JSON.parse(response.getContentText());
+          const sheets = data.sheets || [];
+
+          return sheets.map(sheetData => {
+            const properties = sheetData.properties || {};
+            return createServiceAccountSheetProxy(sheetId, properties.title || 'Sheet1', accessToken, {
+              sheetId: properties.sheetId,
+              rowCount: properties.gridProperties?.rowCount || 1000,
+              columnCount: properties.gridProperties?.columnCount || 26
+            });
+          });
+        } catch (error) {
+          console.warn('getSheets via API failed:', error.message);
+          return [];
+        }
       }
     };
   }
 
   // サービスアカウント用シートプロキシ（基本メソッドのみ実装）
-  function createServiceAccountSheetProxy(sheetId, sheetName, accessToken) {
+  function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additionalInfo = {}) {
     const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
 
     return {
       getName: () => sheetName,
+      getSheetId: () => additionalInfo.sheetId || 0,
       getLastRow: () => {
+        // additionalInfoが利用可能な場合は使用、そうでなければAPIで取得
+        if (additionalInfo.rowCount) {
+          return additionalInfo.rowCount;
+        }
         // Sheets APIで行数取得
         try {
           const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}`, {
@@ -244,6 +277,10 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         }
       },
       getLastColumn: () => {
+        // additionalInfoが利用可能な場合は使用、そうでなければAPIで取得
+        if (additionalInfo.columnCount) {
+          return additionalInfo.columnCount;
+        }
         // Sheets APIで列数取得
         try {
           const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}!1:1`, {
@@ -273,6 +310,31 @@ function openSpreadsheet(spreadsheetId, options = {}) {
             } catch (error) {
               console.warn('getValues via API failed:', error.message);
               return [];
+            }
+          },
+          setValue: (value) => {
+            try {
+              // 単一値の場合は2次元配列にラップしてsetValuesを使用
+              const payload = {
+                values: [[value]]
+              };
+              const response = UrlFetchApp.fetch(`${baseUrl}/values/${range}?valueInputOption=RAW`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                payload: JSON.stringify(payload)
+              });
+
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
+              }
+
+              return response;
+            } catch (error) {
+              console.warn('setValue via API failed:', error.message);
+              throw error;
             }
           },
           setValues: (values) => {
@@ -315,8 +377,57 @@ function openSpreadsheet(spreadsheetId, options = {}) {
               console.warn('getDataRange via API failed:', error.message);
               return [];
             }
+          },
+          setValues: (values) => {
+            try {
+              const payload = {
+                values
+              };
+              const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}?valueInputOption=RAW`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                payload: JSON.stringify(payload)
+              });
+
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
+              }
+
+              return response;
+            } catch (error) {
+              console.warn('getDataRange setValues via API failed:', error.message);
+              throw error;
+            }
           }
         };
+      },
+      appendRow: (rowData) => {
+        // Sheets APIで行を追加
+        try {
+          const payload = {
+            values: [rowData]
+          };
+          const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}:append?valueInputOption=RAW`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            payload: JSON.stringify(payload)
+          });
+
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
+          }
+
+          return response;
+        } catch (error) {
+          console.warn('appendRow via API failed:', error.message);
+          throw error;
+        }
       }
     };
   }
@@ -366,8 +477,9 @@ function openSpreadsheet(spreadsheetId, options = {}) {
               console.log(`SA_USAGE: editor-access-existing - ${auth.email} -> ${spreadsheetId.substring(0, 8)}*** - already_has_access`);
             }
           } catch (driveError) {
-            console.warn('openSpreadsheet: Service account access check/grant failed:', driveError.message);
-            console.log(`SA_USAGE: editor-access-failed - ${auth.email} -> ${spreadsheetId.substring(0, 8)}*** - ${driveError.message}`);
+            console.warn('openSpreadsheet: DriveApp permission check failed, proceeding with Sheets API access:', driveError.message);
+            console.log(`SA_USAGE: editor-access-failed-proceeding - ${auth.email} -> ${spreadsheetId.substring(0, 8)}*** - ${driveError.message}`);
+            console.log('openSpreadsheet: Continuing with direct Sheets API access (CLAUDE.md compliant fallback)');
           }
         }
       } else {
@@ -811,81 +923,6 @@ function updateUser(userId, updates, context = {}) {
   }
 }
 
-/**
- * ユーザーのスプレッドシートデータを取得（CLAUDE.md準拠 - Context-Aware）
- * @param {Object} targetUser - 対象ユーザーオブジェクト
- * @param {Object} options - オプション設定
- * @param {Object} options.dataAccess - 事前取得されたデータアクセスオブジェクト
- * @returns {Object} User spreadsheet data with configuration
- */
-function getUserSpreadsheetData(targetUser, options = {}) {
-  try {
-    if (!targetUser || !targetUser.userId) {
-      console.warn('getUserSpreadsheetData: Invalid target user or missing userId');
-      return null;
-    }
-
-    // 🔧 CLAUDE.md準拠: configJson-based unified configuration
-    const configResult = getUserConfig(targetUser.userId);
-    if (!configResult.success || !configResult.config) {
-      console.warn('getUserSpreadsheetData: Failed to get user configuration');
-      return null;
-    }
-
-    const {config} = configResult;
-    if (!config.spreadsheetId) {
-      console.warn('getUserSpreadsheetData: No spreadsheetId in user configuration');
-      return null;
-    }
-
-    // 事前に取得されたdataAccessがある場合はそれを使用（最適化）
-    let {dataAccess} = options;
-    if (!dataAccess) {
-      // データアクセスが提供されていない場合、新規取得
-      const currentEmail = getCurrentEmail();
-      const isSelfAccess = currentEmail === targetUser.userEmail;
-
-      console.log(`getUserSpreadsheetData: ${isSelfAccess ? 'Self-access normal permissions' : 'Cross-user service account'} for spreadsheet data`);
-      dataAccess = openSpreadsheet(config.spreadsheetId, {
-        useServiceAccount: !isSelfAccess,
-        context: 'getUserSpreadsheetData'
-      });
-    }
-
-    if (!dataAccess || !dataAccess.spreadsheet) {
-      console.warn('getUserSpreadsheetData: Failed to access target spreadsheet');
-      return null;
-    }
-
-    // 基本的なスプレッドシート情報を取得
-    const {spreadsheet} = dataAccess;
-    const sheets = spreadsheet.getSheets();
-
-    // 🧹 レガシーコード削除: 重複するJSON.parse()処理を排除
-    // すでに取得した config オブジェクトを使用
-
-    const result = {
-      userId: targetUser.userId,
-      userEmail: targetUser.userEmail,
-      spreadsheetId: config.spreadsheetId,
-      sheetName: config.sheetName || '',
-      formUrl: config.formUrl || '',
-      config,
-      sheets: sheets.map(sheet => ({
-        name: sheet.getName(),
-        id: sheet.getSheetId()
-      })),
-      dataAccess // For subsequent operations
-    };
-
-    console.log(`getUserSpreadsheetData: Successfully retrieved data for ${targetUser.userEmail ? `${targetUser.userEmail.split('@')[0]  }@***` : 'unknown user'}`);
-    return result;
-
-  } catch (error) {
-    console.error('getUserSpreadsheetData error:', error.message);
-    return null;
-  }
-}
 
 /**
  * 閲覧者向けボードデータ取得（CLAUDE.md準拠 - 模範実装）
@@ -1115,3 +1152,4 @@ function deleteUser(userId, reason = '', context = {}) {
     return { success: false, message: error.message };
   }
 }
+

@@ -61,7 +61,6 @@ function logReactionAudit(action, details) {
   console.log(`REACTION_AUDIT: ${JSON.stringify(logEntry)}`);
 }
 
-// Removed obsolete complex reaction analysis functions - replaced with direct GAS-Native implementation
 
 /**
  * 🚀 GAS-Native直接リアクション処理
@@ -173,14 +172,14 @@ function processHighlightDirect(sheet, rowNumber) {
   const [headers = []] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
 
   // ハイライト列を探す
-  let highlightCol = headers.findIndex(header =>
+  const highlightCol = headers.findIndex(header =>
     String(header).toUpperCase().includes('HIGHLIGHT')
   ) + 1;
 
-  // ハイライト列が存在しない場合は作成
+  // ハイライト列が存在しない場合はエラー
   if (highlightCol === 0) {
-    highlightCol = sheet.getLastColumn() + 1;
-    sheet.getRange(1, highlightCol).setValue('HIGHLIGHT');
+    console.error('processHighlightDirect: HIGHLIGHT column not found. Columns must be pre-created during data source setup.');
+    throw new Error('Required HIGHLIGHT column not found. Please reconnect your data source to set up highlight columns.');
   }
 
   // 現在の値を取得してトグル
@@ -202,9 +201,8 @@ function processHighlightDirect(sheet, rowNumber) {
  * @returns {number} 列番号
  */
 function createReactionColumn(sheet, reactionType) {
-  const newCol = sheet.getLastColumn() + 1;
-  sheet.getRange(1, newCol).setValue(reactionType);
-  return newCol;
+  console.error(`createReactionColumn: Column ${reactionType} not found. Columns must be pre-created during data source setup.`);
+  throw new Error(`Required reaction column '${reactionType}' not found. Please reconnect your data source to set up reaction columns.`);
 }
 
 /**
@@ -295,7 +293,7 @@ function extractReactions(row, headers, userEmail = null) {
 function extractHighlight(row, headers) {
   try {
     // 🎯 統一列判定システムを使用（ColumnMappingServiceから）
-    const columnResult = resolveColumnIndex(headers, 'highlight');
+    const columnResult = resolveColumnIndex(headers, 'HIGHLIGHT');
 
     if (columnResult.index !== -1) {
       const value = String(row[columnResult.index] || '').toUpperCase();
@@ -313,15 +311,6 @@ function extractHighlight(row, headers) {
 // 🎯 ハイライト管理システム - CLAUDE.md準拠
 // ===========================================
 
-// Removed obsolete updateHighlightInSheet function - replaced with processHighlightDirect
-
-// ===========================================
-// 🔧 リアクション列管理
-// ===========================================
-
-// Removed duplicate getOrCreateReactionColumn function - replaced with createReactionColumn
-
-// Removed validateReaction function - validation is handled directly in processReactionDirect
 
 // ===========================================
 // 🌍 Public API Functions - CLAUDE.md準拠

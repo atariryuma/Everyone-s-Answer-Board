@@ -13,7 +13,7 @@
  * - 単一責任原則の維持
  */
 
-/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, URL */
+/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL */
 
 
 // ===========================================

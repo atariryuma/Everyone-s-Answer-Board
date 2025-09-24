@@ -10,7 +10,7 @@
  * 📝 main.gsから移動されたデータ操作関数群
  */
 
-/* global ConfigService, DataService, getCurrentEmail, createErrorResponse, getUserSheetData, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, updateUser, getUserSpreadsheetData, getUserConfig */
+/* global ConfigService, DataService, getCurrentEmail, createErrorResponse, getUserSheetData, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, updateUser, getUserConfig */
 
 // ===========================================
 // 📊 メインページデータAPI

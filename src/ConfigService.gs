@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, getUserSpreadsheetData, Auth, UserService, isAdministrator, SLEEP_MS */
+/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, Auth, UserService, isAdministrator, SLEEP_MS */
 
 // ===========================================
 // 🔧 GAS-Native ConfigService (直接API版)

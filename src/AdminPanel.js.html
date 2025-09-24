@@ -471,6 +471,8 @@
         } else {
           resetSheetSelect();
         }
+        // 接続ボタン状態を更新
+        updateDropdownConnectionButton();
       });
     } else {
       console.warn('⚠️ spreadsheet-select要素が見つかりません');
@@ -488,6 +490,8 @@
         } else {
           hideFormInfo();
         }
+        // 接続ボタン状態を更新
+        updateDropdownConnectionButton();
       });
     }
 
@@ -1797,6 +1801,31 @@
   }
 
   /**
+   * ドロップダウン選択方式の接続ボタン状態を更新
+   * 両方のセレクト（スプレッドシート・シート）が選択されている場合のみ有効化
+   */
+  function updateDropdownConnectionButton() {
+    const connectBtn = document.getElementById('connect-source');
+    const spreadsheetSelect = document.getElementById('spreadsheet-select');
+    const sheetSelect = document.getElementById('sheet-select');
+
+    if (!connectBtn || !spreadsheetSelect || !sheetSelect) {
+      return;
+    }
+
+    const spreadsheetSelected = spreadsheetSelect.value && spreadsheetSelect.value.trim();
+    const sheetSelected = sheetSelect.value && sheetSelect.value.trim();
+
+    if (spreadsheetSelected && sheetSelected) {
+      connectBtn.disabled = false;
+      connectBtn.textContent = '接続';
+    } else {
+      connectBtn.disabled = true;
+      connectBtn.textContent = '接続（データソース選択後に有効化）';
+    }
+  }
+
+  /**
    * 完全URL統合検証 - 既存API活用版
    */
   function validateCompleteUrl() {
@@ -2606,7 +2635,7 @@
       curious: ['curious'], // バックエンド: curious フィールド
 
       // ハイライト列（システム内部用）
-      highlight: ['highlight'] // バックエンド: highlight フィールド
+      highlight: ['HIGHLIGHT'] // バックエンド: HIGHLIGHT フィールド
     };
 
     let detectedCount = 0;

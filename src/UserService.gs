@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserSpreadsheetData, getUserConfig, isAdministrator, CACHE_DURATION */
+/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserConfig, isAdministrator, CACHE_DURATION */
 
 // ===========================================
 // 🔧 GAS-Native UserService (直接API版)

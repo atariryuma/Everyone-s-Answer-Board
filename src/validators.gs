@@ -290,24 +290,26 @@ function validateColumnMapping(columnMapping) {
       return result;
     }
 
-    // バックエンド構造：columnMapping.mapping（CLAUDE.md準拠）
+    // columnMapping.mapping構造のみサポート（統一仕様）
     if (!columnMapping.mapping || typeof columnMapping.mapping !== 'object') {
       const errorMsg = '列マッピング内のmappingプロパティが必要です';
-      console.log(`❌ ${  errorMsg}`);
+      console.log(`❌ ${errorMsg}`);
       result.errors.push(errorMsg);
       return result;
     }
+
     const {mapping} = columnMapping;
+    console.log('🔍 validateColumnMapping: Using unified mapping structure:', JSON.stringify(mapping, null, 2));
 
     // メタプロパティをフィルタリング（V8最適化）
-    const metaProperties = ['_aiMapping', 'headers', 'verifiedAt', '_hasSelections'];
+    const metaProperties = ['_aiMapping', 'headers', 'verifiedAt', '_hasSelections', 'confidence'];
     const actualColumns = Object.keys(mapping)
       .filter(key => !metaProperties.includes(key));
     const requiredColumns = ['answer'];
     const optionalColumns = ['reason', 'class', 'name'];
     const allColumns = [...requiredColumns, ...optionalColumns];
 
-    // 必須列チェック（バックエンド構造対応）
+    // 必須列チェック（新旧構造対応）
     for (const col of requiredColumns) {
       const index = mapping[col];
       console.log(`🔍 validateColumnMapping: ${col} = ${index} (type: ${typeof index})`);
@@ -318,7 +320,7 @@ function validateColumnMapping(columnMapping) {
       }
     }
 
-    // オプション列チェック（バックエンド構造対応）
+    // オプション列チェック（新旧構造対応）
     for (const col of optionalColumns) {
       const index = mapping[col];
       console.log(`🔍 validateColumnMapping (optional): ${col} = ${index} (type: ${typeof index})`);

@@ -251,7 +251,7 @@ function evaluateHeaderCandidate(header, index, fieldType, patterns, options = {
     candidate.scoreBreakdown.semanticSimilarity = calculateSemanticSimilarity(normalizedHeader, fieldType);
 
     // 3. 📍 位置的適合性スコア（重み20%）
-    candidate.scoreBreakdown.positionalScore = calculatePositionalScore(index, fieldType, header.length);
+    candidate.scoreBreakdown.positionalScore = calculatePositionalScore(index, fieldType);
 
     // 4. 📊 コンテンツ検証スコア（重み15%）
     if (options.sampleData && Array.isArray(options.sampleData) && options.sampleData.length > 0) {
@@ -261,13 +261,14 @@ function evaluateHeaderCandidate(header, index, fieldType, patterns, options = {
     // 5. 📏 長さペナルティ（重み5%）
     candidate.scoreBreakdown.lengthPenalty = calculateLengthPenalty(normalizedHeader);
 
-    // 🧮 重み付き総合スコア計算
+    // 🧮 適応的重み付き総合スコア計算
+    const adaptiveWeights = getAdaptiveWeights(fieldType, options);
     candidate.totalScore = Math.round(
-      (candidate.scoreBreakdown.patternMatch * 0.40) +
-      (candidate.scoreBreakdown.semanticSimilarity * 0.20) +
-      (candidate.scoreBreakdown.positionalScore * 0.20) +
-      (candidate.scoreBreakdown.contentValidation * 0.15) +
-      (candidate.scoreBreakdown.lengthPenalty * 0.05)
+      (candidate.scoreBreakdown.patternMatch * adaptiveWeights.patternMatch) +
+      (candidate.scoreBreakdown.semanticSimilarity * adaptiveWeights.semanticSimilarity) +
+      (candidate.scoreBreakdown.positionalScore * adaptiveWeights.positionalScore) +
+      (candidate.scoreBreakdown.contentValidation * adaptiveWeights.contentValidation) +
+      (candidate.scoreBreakdown.lengthPenalty * adaptiveWeights.lengthPenalty)
     );
 
     return candidate;
@@ -279,56 +280,370 @@ function evaluateHeaderCandidate(header, index, fieldType, patterns, options = {
 }
 
 /**
- * 🔤 意味的類似性計算（フィールドタイプ特化）
+ * 🔤 意味的類似性計算（統計的文字列距離アルゴリズム強化版）
  * @param {string} header - 正規化済みヘッダー
  * @param {string} fieldType - フィールドタイプ
  * @returns {number} 類似性スコア（0-100）
  */
 function calculateSemanticSimilarity(header, fieldType) {
-  // フィールドタイプ別の関連キーワード
+  // フィールドタイプ別の関連キーワード（優先度付き）
   const semanticKeywords = {
-    timestamp: ['時間', '日時', 'time', 'date', '作成', '投稿', '記録'],
-    email: ['メール', 'mail', 'address', 'アドレス', '@', 'contact'],
-    answer: ['回答', '答え', 'answer', 'response', '意見', 'opinion'],
-    reason: ['理由', '根拠', 'reason', '説明', 'explain', 'why'],
-    class: ['クラス', '学年', '組', 'class', 'grade'],
-    name: ['名前', '氏名', 'name', '名', 'user']
+    timestamp: [
+      { term: '日時', weight: 30, priority: 1 },
+      { term: 'timestamp', weight: 35, priority: 1 },
+      { term: 'タイムスタンプ', weight: 35, priority: 1 },
+      { term: '時間', weight: 25, priority: 2 },
+      { term: '投稿', weight: 20, priority: 2 },
+      { term: 'time', weight: 25, priority: 2 },
+      { term: 'date', weight: 25, priority: 2 }
+    ],
+    email: [
+      { term: 'email', weight: 35, priority: 1 },
+      { term: 'メール', weight: 35, priority: 1 },
+      { term: 'mail', weight: 30, priority: 1 },
+      { term: 'アドレス', weight: 25, priority: 2 },
+      { term: 'address', weight: 25, priority: 2 }
+    ],
+    answer: [
+      { term: '回答', weight: 35, priority: 1 },
+      { term: 'answer', weight: 35, priority: 1 },
+      { term: '答え', weight: 30, priority: 1 },
+      { term: '意見', weight: 25, priority: 2 },
+      { term: 'response', weight: 30, priority: 2 },
+      { term: 'opinion', weight: 25, priority: 2 }
+    ],
+    reason: [
+      { term: '理由', weight: 35, priority: 1 },
+      { term: 'reason', weight: 35, priority: 1 },
+      { term: '根拠', weight: 30, priority: 1 },
+      { term: '説明', weight: 25, priority: 2 },
+      { term: 'explain', weight: 25, priority: 2 },
+      { term: 'why', weight: 30, priority: 2 }
+    ],
+    class: [
+      { term: 'クラス', weight: 35, priority: 1 },
+      { term: 'class', weight: 35, priority: 1 },
+      { term: '学年', weight: 30, priority: 1 },
+      { term: '組', weight: 25, priority: 2 },
+      { term: 'grade', weight: 25, priority: 2 }
+    ],
+    name: [
+      { term: '名前', weight: 35, priority: 1 },
+      { term: 'name', weight: 35, priority: 1 },
+      { term: '氏名', weight: 30, priority: 1 },
+      { term: '名', weight: 20, priority: 2 },
+      { term: 'user', weight: 15, priority: 3 }
+    ]
   };
 
   const keywords = semanticKeywords[fieldType] || [];
-  let semanticScore = 0;
+  let totalScore = 0;
+  let bestStringDistance = 0;
 
-  // キーワード含有チェック
-  for (const keyword of keywords) {
-    if (header.includes(keyword.toLowerCase())) {
-      semanticScore += (keyword.length > 2) ? 20 : 15; // 長いキーワードほど高スコア
+  // 🎯 段階1: 高精度文字列類似度計算
+  keywords.forEach(keywordObj => {
+    const { term, weight, priority } = keywordObj;
+
+    // 完全一致チェック
+    if (header === term.toLowerCase()) {
+      totalScore += weight;
+      return;
+    }
+
+    // レーベンシュタイン距離による類似度
+    const levenshteinSimilarity = calculateLevenshteinSimilarity(header, term.toLowerCase());
+    if (levenshteinSimilarity > 0.7) {
+      const distanceScore = Math.round(weight * levenshteinSimilarity * (priority === 1 ? 1.0 : 0.8));
+      totalScore += distanceScore;
+      bestStringDistance = Math.max(bestStringDistance, levenshteinSimilarity * 100);
+    }
+
+    // ジャロ・ウィンクラー類似度（短い文字列に効果的）
+    if (term.length <= 8) {
+      const jaroSimilarity = calculateJaroWinklerSimilarity(header, term.toLowerCase());
+      if (jaroSimilarity > 0.8) {
+        const jaroScore = Math.round(weight * jaroSimilarity * 0.9);
+        totalScore += Math.max(0, jaroScore);
+      }
+    }
+
+    // n-gram類似度（部分一致向上）
+    const ngramSimilarity = calculateNGramSimilarity(header, term.toLowerCase(), 2);
+    if (ngramSimilarity > 0.6) {
+      const ngramScore = Math.round(weight * ngramSimilarity * 0.7);
+      totalScore += Math.max(0, ngramScore);
+    }
+
+    // 従来の含有チェック（基本ベース）
+    if (header.includes(term.toLowerCase())) {
+      const containmentScore = priority === 1 ? weight * 0.8 : weight * 0.6;
+      totalScore += Math.round(containmentScore);
+    }
+  });
+
+  // 🎯 段階2: フィールドタイプ特有パターン検証（統計的パターン強化）
+  const patternScore = calculateFieldSpecificPatterns(header, fieldType);
+  totalScore += patternScore;
+
+  // 🎯 段階3: 統計的正規化・異常値検出
+  const normalizedScore = normalizeSemanticScore(totalScore, bestStringDistance, keywords.length);
+
+  return Math.min(normalizedScore, 100);
+}
+
+/**
+ * 🧮 レーベンシュタイン距離による類似度計算
+ * @param {string} str1 - 文字列1
+ * @param {string} str2 - 文字列2
+ * @returns {number} 類似度（0-1）
+ */
+function calculateLevenshteinSimilarity(str1, str2) {
+  try {
+    if (str1 === str2) return 1.0;
+    if (!str1 || !str2) return 0.0;
+
+    const maxLength = Math.max(str1.length, str2.length);
+    if (maxLength === 0) return 1.0;
+
+    const distance = calculateLevenshteinDistance(str1, str2);
+    return (maxLength - distance) / maxLength;
+  } catch (error) {
+    console.warn('Levenshtein similarity calculation error:', error.message);
+    return 0.0;
+  }
+}
+
+/**
+ * 🧮 レーベンシュタイン距離計算（動的プログラミング）
+ * @param {string} str1 - 文字列1
+ * @param {string} str2 - 文字列2
+ * @returns {number} 編集距離
+ */
+function calculateLevenshteinDistance(str1, str2) {
+  const matrix = Array.from({length: str1.length + 1}, () =>
+    Array.from({length: str2.length + 1}, () => 0)
+  );
+
+  // 初期化
+  for (let i = 0; i <= str1.length; i++) matrix[i][0] = i;
+  for (let j = 0; j <= str2.length; j++) matrix[0][j] = j;
+
+  // 動的プログラミング
+  for (let i = 1; i <= str1.length; i++) {
+    for (let j = 1; j <= str2.length; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,     // 削除
+          matrix[i][j - 1] + 1,     // 挿入
+          matrix[i - 1][j - 1] + 1  // 置換
+        );
+      }
     }
   }
 
-  // フィールドタイプ特有のパターンチェック
-  switch (fieldType) {
-    case 'email':
-      if (header.includes('@') || header.includes('mail')) semanticScore += 25;
-      break;
-    case 'timestamp':
-      if (/\d{4}|\d{2}\/|\d{2}-/.test(header)) semanticScore += 20;
-      break;
-    case 'class':
-      if (/\d+|[1-6]/.test(header)) semanticScore += 15;
-      break;
-  }
+  return matrix[str1.length][str2.length];
+}
 
-  return Math.min(semanticScore, 100);
+/**
+ * 🧮 ジャロ・ウィンクラー類似度計算
+ * @param {string} str1 - 文字列1
+ * @param {string} str2 - 文字列2
+ * @returns {number} 類似度（0-1）
+ */
+function calculateJaroWinklerSimilarity(str1, str2) {
+  try {
+    if (str1 === str2) return 1.0;
+    if (!str1 || !str2) return 0.0;
+
+    const maxDistance = Math.floor(Math.max(str1.length, str2.length) / 2) - 1;
+    const matches1 = Array(str1.length).fill(false);
+    const matches2 = Array(str2.length).fill(false);
+    let matches = 0;
+    let transpositions = 0;
+
+    // マッチング検出
+    for (let i = 0; i < str1.length; i++) {
+      const start = Math.max(0, i - maxDistance);
+      const end = Math.min(i + maxDistance + 1, str2.length);
+
+      for (let j = start; j < end; j++) {
+        if (matches2[j] || str1[i] !== str2[j]) continue;
+        matches1[i] = matches2[j] = true;
+        matches++;
+        break;
+      }
+    }
+
+    if (matches === 0) return 0.0;
+
+    // 転置カウント
+    let k = 0;
+    for (let i = 0; i < str1.length; i++) {
+      if (!matches1[i]) continue;
+      while (!matches2[k]) k++;
+      if (str1[i] !== str2[k]) transpositions++;
+      k++;
+    }
+
+    // ジャロ類似度計算
+    const jaro = (matches / str1.length + matches / str2.length +
+                  (matches - transpositions / 2) / matches) / 3;
+
+    // ウィンクラー調整（共通プレフィックス）
+    let prefixLength = 0;
+    for (let i = 0; i < Math.min(str1.length, str2.length, 4); i++) {
+      if (str1[i] === str2[i]) prefixLength++;
+      else break;
+    }
+
+    return jaro + (0.1 * prefixLength * (1 - jaro));
+  } catch (error) {
+    console.warn('Jaro-Winkler similarity calculation error:', error.message);
+    return 0.0;
+  }
+}
+
+/**
+ * 🧮 n-gram類似度計算
+ * @param {string} str1 - 文字列1
+ * @param {string} str2 - 文字列2
+ * @param {number} n - n-gramサイズ
+ * @returns {number} 類似度（0-1）
+ */
+function calculateNGramSimilarity(str1, str2, n = 2) {
+  try {
+    if (str1 === str2) return 1.0;
+    if (!str1 || !str2) return 0.0;
+
+    const ngrams1 = generateNGrams(str1, n);
+    const ngrams2 = generateNGrams(str2, n);
+
+    if (ngrams1.length === 0 && ngrams2.length === 0) return 1.0;
+    if (ngrams1.length === 0 || ngrams2.length === 0) return 0.0;
+
+    // ジャッカード係数計算
+    const set1 = new Set(ngrams1);
+    const set2 = new Set(ngrams2);
+    const intersection = new Set([...set1].filter(x => set2.has(x)));
+    const union = new Set([...set1, ...set2]);
+
+    return intersection.size / union.size;
+  } catch (error) {
+    console.warn('N-gram similarity calculation error:', error.message);
+    return 0.0;
+  }
+}
+
+/**
+ * 🔤 n-gram生成
+ * @param {string} str - 文字列
+ * @param {number} n - n-gramサイズ
+ * @returns {Array} n-gram配列
+ */
+function generateNGrams(str, n) {
+  if (str.length < n) return [str];
+  const ngrams = [];
+  for (let i = 0; i <= str.length - n; i++) {
+    ngrams.push(str.slice(i, i + n));
+  }
+  return ngrams;
+}
+
+/**
+ * 📊 フィールド特有パターン検証（統計的パターン強化版）
+ * @param {string} header - ヘッダー文字列
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {number} パターンスコア（0-30）
+ */
+function calculateFieldSpecificPatterns(header, fieldType) {
+  let patternScore = 0;
+
+  try {
+    switch (fieldType) {
+      case 'email':
+        // より厳密なメール形式検証
+        if (/@/.test(header)) patternScore += 15;
+        if (/mail|メール/.test(header)) patternScore += 10;
+        if (/address|アドレス/.test(header)) patternScore += 8;
+        break;
+
+      case 'timestamp':
+        // タイムスタンプパターンの多様性対応
+        if (/\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(header)) patternScore += 20;
+        if (/時|time|date|日/.test(header)) patternScore += 12;
+        if (/記録|投稿|作成/.test(header)) patternScore += 10;
+        break;
+
+      case 'class':
+        // クラス表記の多様性
+        if (/[1-6][年組AB]|[1-9]\d*[組年クラス]/.test(header)) patternScore += 18;
+        if (/\d+/.test(header)) patternScore += 10;
+        if (/class|クラス|学年|組/.test(header)) patternScore += 8;
+        break;
+
+      case 'name':
+        // 名前フィールドの特徴
+        if (header.length >= 2 && header.length <= 10) patternScore += 8;
+        if (/名|name|user/.test(header)) patternScore += 12;
+        break;
+
+      case 'answer':
+        // 回答フィールドの特徴
+        if (/回答|答|answer|response|意見/.test(header)) patternScore += 15;
+        if (header.length >= 2 && header.length <= 15) patternScore += 5;
+        break;
+
+      case 'reason':
+        // 理由フィールドの特徴
+        if (/理由|根拠|reason|why|説明/.test(header)) patternScore += 15;
+        if (header.includes('？') || header.includes('?')) patternScore += 8;
+        break;
+    }
+
+    return Math.min(patternScore, 30);
+  } catch (error) {
+    console.warn('Field-specific pattern calculation error:', error.message);
+    return 0;
+  }
+}
+
+/**
+ * 📊 意味スコア正規化・統計的調整
+ * @param {number} rawScore - 生スコア
+ * @param {number} bestDistance - 最高文字列距離
+ * @param {number} keywordCount - キーワード数
+ * @returns {number} 正規化スコア（0-100）
+ */
+function normalizeSemanticScore(rawScore, bestDistance, keywordCount) {
+  try {
+    // 基本正規化（キーワード数基準）
+    const maxPossibleScore = keywordCount * 35; // 最高重み35点×キーワード数
+    let normalizedScore = maxPossibleScore > 0 ? (rawScore / maxPossibleScore) * 100 : 0;
+
+    // 文字列距離ボーナス（高精度一致への追加重み）
+    if (bestDistance > 80) {
+      normalizedScore *= 1.1; // 10%ボーナス
+    } else if (bestDistance > 90) {
+      normalizedScore *= 1.15; // 15%ボーナス
+    }
+
+    // 統計的上限・下限調整
+    return Math.max(0, Math.min(100, Math.round(normalizedScore)));
+  } catch (error) {
+    console.warn('Semantic score normalization error:', error.message);
+    return Math.min(rawScore, 100);
+  }
 }
 
 /**
  * 📍 位置的適合性スコア計算
  * @param {number} index - ヘッダーのインデックス
  * @param {string} fieldType - フィールドタイプ
- * @param {number} headerLength - ヘッダー文字数
  * @returns {number} 位置スコア（0-100）
  */
-function calculatePositionalScore(index, fieldType, headerLength) {
+function calculatePositionalScore(index, fieldType) {
   // Google Forms典型的位置
   const idealPositions = {
     timestamp: 0,
@@ -362,7 +677,7 @@ function calculatePositionalScore(index, fieldType, headerLength) {
 }
 
 /**
- * 📊 コンテンツタイプ検証スコア
+ * 📊 統計的コンテンツ検証システム（ベイズ推定＋信頼区間）
  * @param {Array} sampleData - サンプルデータ配列
  * @param {number} index - 列インデックス
  * @param {string} fieldType - フィールドタイプ
@@ -372,71 +687,702 @@ function validateContentType(sampleData, index, fieldType) {
   try {
     if (!sampleData || sampleData.length === 0) return 0;
 
-    // 最大5行のサンプルをチェック
-    const sampleSize = Math.min(5, sampleData.length);
-    let validCount = 0;
-    const samples = [];
-
-    for (let i = 0; i < sampleSize; i++) {
-      const row = sampleData[i];
-      if (!row || !Array.isArray(row) || index >= row.length) continue;
-
-      const cellValue = row[index];
-      if (!cellValue || typeof cellValue !== 'string') continue;
-
-      samples.push(cellValue.trim());
-    }
+    // 🎯 段階1: 統計的サンプルサイズ最適化
+    const optimalSampleSize = calculateOptimalSampleSize(sampleData.length, fieldType);
+    const samples = extractStatisticalSamples(sampleData, index, optimalSampleSize);
 
     if (samples.length === 0) return 0;
 
-    // フィールドタイプ別検証
-    switch (fieldType) {
-      case 'email':
-        validCount = samples.filter(val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)).length;
-        break;
+    // 🎯 段階2: ベイズ推定ベース検証
+    const bayesianResult = performBayesianValidation(samples, fieldType);
 
-      case 'timestamp':
-        validCount = samples.filter(val => {
-          const parsed = new Date(val);
-          return !isNaN(parsed.getTime()) && parsed.getTime() > 0;
-        }).length;
-        break;
+    // 🎯 段階3: 統計的信頼区間計算
+    const confidenceInterval = calculateValidationConfidenceInterval(
+      bayesianResult.validCount,
+      samples.length,
+      0.95 // 95%信頼区間
+    );
 
-      case 'answer':
-      case 'reason':
-        // 文章らしさ（3文字以上、かつ複数文字種）
-        validCount = samples.filter(val =>
-          val.length >= 3 && /[あ-ん]|[ア-ン]|[a-zA-Z]/.test(val)
-        ).length;
-        break;
+    // 🎯 段階4: 異常値検出・除去
+    const filteredSamples = detectAndRemoveOutliers(samples, fieldType);
+    const outlierPenalty = (samples.length - filteredSamples.length) * 5; // 異常値ペナルティ
 
-      case 'name':
-        // 名前らしさ（1-20文字、記号少ない）
-        validCount = samples.filter(val =>
-          val.length >= 1 && val.length <= 20 && !/[0-9@#$%^&*()_+={}[\]|\\:";'<>?,./]/.test(val)
-        ).length;
-        break;
+    // 🎯 段階5: 統計的スコア計算
+    const baseScore = calculateStatisticalValidityScore(
+      bayesianResult.posteriorProbability,
+      confidenceInterval,
+      samples.length,
+      optimalSampleSize
+    );
 
-      case 'class':
-        // クラス表記（数字または年組形式）
-        validCount = samples.filter(val =>
-          /^[1-6][年組A-Z]?|^[1-9]\d?[組年]?$/.test(val)
-        ).length;
-        break;
+    // 異常値ペナルティ適用
+    const finalScore = Math.max(0, Math.min(100, baseScore - outlierPenalty));
 
-      default:
-        return 50; // 不明フィールドは中立
-    }
-
-    // 有効率をスコアに変換
-    const validityRatio = validCount / samples.length;
-    return Math.round(validityRatio * 100);
+    return Math.round(finalScore);
 
   } catch (error) {
     console.error('validateContentType エラー:', error.message);
     return 0;
   }
 }
+
+/**
+ * 📊 統計的サンプルサイズ最適化
+ * @param {number} totalDataSize - 全データサイズ
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {number} 最適サンプルサイズ
+ */
+function calculateOptimalSampleSize(totalDataSize, fieldType) {
+  try {
+    // フィールドタイプ別の必要精度
+    const precisionRequirements = {
+      email: 0.95,      // メール形式は高精度が必要
+      timestamp: 0.90,  // 日時形式も高精度
+      answer: 0.80,     // 回答は中程度
+      reason: 0.80,     // 理由も中程度
+      class: 0.85,      // クラスは比較的高精度
+      name: 0.75        // 名前は中程度
+    };
+
+    const requiredPrecision = precisionRequirements[fieldType] || 0.80;
+
+    // サンプルサイズ計算（Wilson Score Interval基準）
+    // n = (z²p(1-p)) / e² (z=1.96 for 95% confidence, e=margin of error)
+    const z = 1.96; // 95%信頼区間
+    const p = requiredPrecision;
+    const marginError = 0.1; // 10%誤差許容
+
+    const theoreticalSampleSize = Math.ceil(
+      (z * z * p * (1 - p)) / (marginError * marginError)
+    );
+
+    // 実データサイズを考慮した調整
+    const minSample = Math.max(3, Math.min(10, Math.floor(totalDataSize * 0.3)));
+    const maxSample = Math.min(20, totalDataSize);
+
+    return Math.max(minSample, Math.min(maxSample, theoreticalSampleSize));
+
+  } catch (error) {
+    console.warn('Optimal sample size calculation error:', error.message);
+    return Math.min(8, totalDataSize); // フォールバック
+  }
+}
+
+/**
+ * 📊 統計的サンプル抽出
+ * @param {Array} sampleData - 元データ配列
+ * @param {number} index - 列インデックス
+ * @param {number} sampleSize - サンプルサイズ
+ * @returns {Array} 抽出されたサンプル
+ */
+function extractStatisticalSamples(sampleData, index, sampleSize) {
+  const samples = [];
+  const dataSize = sampleData.length;
+
+  try {
+    // 等間隔サンプリング（systematic sampling）で偏りを減少
+    const interval = Math.max(1, Math.floor(dataSize / sampleSize));
+
+    for (let i = 0; i < dataSize && samples.length < sampleSize; i += interval) {
+      const row = sampleData[i];
+      if (!row || !Array.isArray(row) || index >= row.length) continue;
+
+      const cellValue = row[index];
+      if (cellValue !== null && cellValue !== undefined) {
+        const cleanValue = String(cellValue).trim();
+        if (cleanValue.length > 0) {
+          samples.push(cleanValue);
+        }
+      }
+    }
+
+    return samples;
+  } catch (error) {
+    console.warn('Statistical sampling error:', error.message);
+    return [];
+  }
+}
+
+/**
+ * 🧠 ベイズ推定ベース検証
+ * @param {Array} samples - サンプル配列
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {Object} { validCount, posteriorProbability, priorProbability }
+ */
+function performBayesianValidation(samples, fieldType) {
+  try {
+    // 🎯 事前確率（Prior Probability）設定
+    const priorProbabilities = {
+      email: 0.85,      // メール形式は比較的明確
+      timestamp: 0.90,  // 日時形式は識別しやすい
+      answer: 0.70,     // 回答は多様性がある
+      reason: 0.70,     // 理由も多様
+      class: 0.80,      // クラスは比較的明確
+      name: 0.65        // 名前は最も多様
+    };
+
+    const priorProbability = priorProbabilities[fieldType] || 0.70;
+
+    // 🎯 尤度計算（Likelihood）
+    let validCount = 0;
+    const validationResults = samples.map(sample => validateSingleSample(sample, fieldType));
+    validCount = validationResults.filter(result => result.isValid).length;
+
+    const observedSuccessRate = samples.length > 0 ? validCount / samples.length : 0;
+
+    // 🎯 ベイズ更新（Beta分布での事後確率計算）
+    // Beta(α + successes, β + failures)
+    const alpha = priorProbability * 10; // 事前情報の重み
+    const beta = (1 - priorProbability) * 10;
+
+    const posteriorAlpha = alpha + validCount;
+    const posteriorBeta = beta + (samples.length - validCount);
+
+    // 事後確率の期待値
+    const posteriorProbability = posteriorAlpha / (posteriorAlpha + posteriorBeta);
+
+    return {
+      validCount,
+      posteriorProbability,
+      priorProbability,
+      observedSuccessRate,
+      confidenceInValidation: Math.abs(posteriorProbability - 0.5) * 2 // 0.5からの距離で信頼度
+    };
+
+  } catch (error) {
+    console.warn('Bayesian validation error:', error.message);
+    return { validCount: 0, posteriorProbability: 0.5, priorProbability: 0.5 };
+  }
+}
+
+/**
+ * 🔍 単一サンプル検証（高度パターンマッチング）
+ * @param {string} sample - サンプル値
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {Object} { isValid, confidence, reasons }
+ */
+function validateSingleSample(sample, fieldType) {
+  const result = {
+    isValid: false,
+    confidence: 0,
+    reasons: []
+  };
+
+  try {
+    switch (fieldType) {
+      case 'email': {
+        // RFC5322準拠の詳細メール検証
+        const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
+        if (emailRegex.test(sample)) {
+          result.isValid = true;
+          result.confidence = 95;
+          result.reasons.push('正規表現マッチ');
+        }
+        break;
+      }
+
+      case 'timestamp': {
+        // 多様なタイムスタンプ形式対応
+        const timePatterns = [
+          /^\d{4}[-/]\d{1,2}[-/]\d{1,2}/,  // YYYY-MM-DD, YYYY/MM/DD
+          /^\d{1,2}[-/]\d{1,2}[-/]\d{4}/,  // MM-DD-YYYY, MM/DD/YYYY
+          /^\d{4}年\d{1,2}月\d{1,2}日/,     // 和暦形式
+          /^\d{1,2}:\d{2}(:\d{2})?/          // 時刻形式
+        ];
+
+        const parsedDate = new Date(sample);
+        const isValidDate = !isNaN(parsedDate.getTime()) && parsedDate.getTime() > 0;
+        const matchesPattern = timePatterns.some(pattern => pattern.test(sample));
+
+        if (isValidDate && matchesPattern) {
+          result.isValid = true;
+          result.confidence = 90;
+          result.reasons.push('日時パース成功', 'パターンマッチ');
+        } else if (isValidDate) {
+          result.isValid = true;
+          result.confidence = 70;
+          result.reasons.push('日時パース成功');
+        }
+        break;
+      }
+
+      case 'answer':
+      case 'reason': {
+        // 文章品質評価
+        const hasText = sample.length >= 3;
+        const hasVariedChars = /[あ-ん]|[ア-ン]|[a-zA-Z]/.test(sample);
+        const hasReasonableLength = sample.length <= 500;
+        const notOnlyNumbers = !/^\d+$/.test(sample);
+
+        if (hasText && hasVariedChars && hasReasonableLength && notOnlyNumbers) {
+          result.isValid = true;
+          result.confidence = 80;
+          result.reasons.push('文章構造適切');
+        }
+        break;
+      }
+
+      case 'name': {
+        // 名前パターン検証
+        const nameLength = sample.length >= 1 && sample.length <= 30;
+        const noSpecialChars = !/[@#$%^&*()_+={}[\]|\\:";'<>?,./]/.test(sample);
+        const notOnlySpaces = /\S/.test(sample);
+
+        if (nameLength && noSpecialChars && notOnlySpaces) {
+          result.isValid = true;
+          result.confidence = 75;
+          result.reasons.push('名前形式適合');
+        }
+        break;
+      }
+
+      case 'class': {
+        // クラス表記検証
+        const classPatterns = [
+          /^[1-6][年組AB]?$/,               // 1年A組形式
+          /^[1-9]\d?[組年クラス]?$/,       // 数字+組/年/クラス
+          /^\d+$/                            // 純粋な数字
+        ];
+
+        if (classPatterns.some(pattern => pattern.test(sample))) {
+          result.isValid = true;
+          result.confidence = 85;
+          result.reasons.push('クラス形式マッチ');
+        }
+        break;
+      }
+
+      default:
+        result.isValid = sample.length >= 1;
+        result.confidence = 50;
+        result.reasons.push('基本検証のみ');
+    }
+
+    return result;
+
+  } catch (error) {
+    console.warn('Single sample validation error:', error.message);
+    return { isValid: false, confidence: 0, reasons: ['検証エラー'] };
+  }
+}
+
+/**
+ * 📊 統計的信頼区間計算
+ * @param {number} successes - 成功数
+ * @param {number} trials - 試行数
+ * @param {number} confidenceLevel - 信頼水準（0-1）
+ * @returns {Object} { lowerBound, upperBound, margin }
+ */
+function calculateValidationConfidenceInterval(successes, trials, confidenceLevel = 0.95) {
+  try {
+    if (trials === 0) return { lowerBound: 0, upperBound: 0, margin: 0 };
+
+    const p = successes / trials;
+    const z = confidenceLevel === 0.95 ? 1.96 : 2.58; // 95% or 99%
+
+    // Wilson Score Interval（より正確）
+    const denominator = 1 + (z * z) / trials;
+    const center = (p + (z * z) / (2 * trials)) / denominator;
+    const margin = (z / denominator) * Math.sqrt((p * (1 - p) / trials) + ((z * z) / (4 * trials * trials)));
+
+    return {
+      lowerBound: Math.max(0, center - margin),
+      upperBound: Math.min(1, center + margin),
+      margin
+    };
+
+  } catch (error) {
+    console.warn('Confidence interval calculation error:', error.message);
+    return { lowerBound: 0, upperBound: 1, margin: 0.5 };
+  }
+}
+
+/**
+ * 🚫 異常値検出・除去
+ * @param {Array} samples - サンプル配列
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {Array} 異常値を除去したサンプル配列
+ */
+function detectAndRemoveOutliers(samples, fieldType) {
+  try {
+    const outlierDetectors = {
+      email: (sample) => sample.length > 100 || sample.split('@').length !== 2,
+      timestamp: (sample) => sample.length > 50 || sample.includes('undefined'),
+      answer: (sample) => sample.length > 1000 || /^(.)\1{10,}$/.test(sample), // 同じ文字の繰り返し
+      reason: (sample) => sample.length > 1000 || /^(.)\1{10,}$/.test(sample),
+      class: (sample) => sample.length > 20 || /[!@#$%^&*()_+={}[\]|\\:";'<>?,./]/.test(sample),
+      name: (sample) => sample.length > 50 || /\d{5,}/.test(sample) // 長い数字列
+    };
+
+    const detector = outlierDetectors[fieldType] || (() => false);
+    return samples.filter(sample => !detector(sample));
+
+  } catch (error) {
+    console.warn('Outlier detection error:', error.message);
+    return samples;
+  }
+}
+
+/**
+ * 📊 統計的妥当性スコア計算
+ * @param {number} posteriorProbability - 事後確率
+ * @param {Object} confidenceInterval - 信頼区間
+ * @param {number} actualSampleSize - 実際のサンプルサイズ
+ * @param {number} optimalSampleSize - 最適サンプルサイズ
+ * @returns {number} 統計的スコア（0-100）
+ */
+function calculateStatisticalValidityScore(posteriorProbability, confidenceInterval, actualSampleSize, optimalSampleSize) {
+  try {
+    // 🎯 ベイズ確率スコア（重み60%）
+    const bayesScore = posteriorProbability * 100;
+
+    // 🎯 信頼区間品質スコア（重み25%）
+    const intervalWidth = confidenceInterval.upperBound - confidenceInterval.lowerBound;
+    const precisionScore = Math.max(0, (1 - intervalWidth) * 100); // 狭い区間ほど高スコア
+
+    // 🎯 サンプルサイズ適切性スコア（重み15%）
+    const sampleRatio = actualSampleSize / optimalSampleSize;
+    const sampleScore = sampleRatio >= 1 ? 100 : Math.max(50, sampleRatio * 100);
+
+    // 重み付き統合スコア
+    const totalScore = (bayesScore * 0.60) + (precisionScore * 0.25) + (sampleScore * 0.15);
+
+    return Math.max(0, Math.min(100, totalScore));
+
+  } catch (error) {
+    console.warn('Statistical validity score calculation error:', error.message);
+    return 50; // 中立値
+  }
+}
+
+/**
+ * 🧠 適応的重み調整システム（学習ベース最適化）
+ * @param {string} fieldType - フィールドタイプ
+ * @param {Object} options - オプション設定
+ * @returns {Object} 適応的重みオブジェクト
+ */
+function getAdaptiveWeights(fieldType, options = {}) {
+  try {
+    // 🎯 デフォルト重み（ベースライン）
+    const baseWeights = {
+      patternMatch: 0.40,
+      semanticSimilarity: 0.20,
+      positionalScore: 0.20,
+      contentValidation: 0.15,
+      lengthPenalty: 0.05
+    };
+
+    // 🎯 段階1: フィールドタイプ別重み調整
+    const fieldSpecificWeights = getFieldSpecificWeights(fieldType, baseWeights);
+
+    // 🎯 段階2: データ環境適応調整
+    const environmentAdaptedWeights = adaptWeightsToEnvironment(
+      fieldSpecificWeights,
+      options.sampleData || [],
+      options.headers || []
+    );
+
+    // 🎯 段階3: 過去成功パターン学習調整（キャッシュベース）
+    const learningAdaptedWeights = applyLearningBasedAdjustments(
+      environmentAdaptedWeights,
+      fieldType
+    );
+
+    // 🎯 段階4: 重み正規化（合計が1.0になるよう調整）
+    const normalizedWeights = normalizeWeights(learningAdaptedWeights);
+
+    return normalizedWeights;
+
+  } catch (error) {
+    console.warn('Adaptive weights calculation error:', error.message);
+    return {
+      patternMatch: 0.40,
+      semanticSimilarity: 0.20,
+      positionalScore: 0.20,
+      contentValidation: 0.15,
+      lengthPenalty: 0.05
+    };
+  }
+}
+
+/**
+ * 📊 フィールドタイプ別重み特化
+ * @param {string} fieldType - フィールドタイプ
+ * @param {Object} baseWeights - ベース重み
+ * @returns {Object} 特化重み
+ */
+function getFieldSpecificWeights(fieldType, baseWeights) {
+  const weightAdjustments = {
+    email: {
+      // メール形式は明確なパターンがあるため、パターンマッチングを重視
+      patternMatch: 0.50,      // +0.10
+      semanticSimilarity: 0.15, // -0.05
+      positionalScore: 0.15,   // -0.05
+      contentValidation: 0.15, // 変更なし
+      lengthPenalty: 0.05      // 変更なし
+    },
+
+    timestamp: {
+      // タイムスタンプは位置（最初の列）とパターンが重要
+      patternMatch: 0.35,      // -0.05
+      semanticSimilarity: 0.20, // 変更なし
+      positionalScore: 0.25,   // +0.05
+      contentValidation: 0.15, // 変更なし
+      lengthPenalty: 0.05      // 変更なし
+    },
+
+    answer: {
+      // 回答は内容とパターンの組み合わせが重要
+      patternMatch: 0.35,      // -0.05
+      semanticSimilarity: 0.25, // +0.05
+      positionalScore: 0.15,   // -0.05
+      contentValidation: 0.20, // +0.05
+      lengthPenalty: 0.05      // 変更なし
+    },
+
+    reason: {
+      // 理由も回答と似た調整
+      patternMatch: 0.35,      // -0.05
+      semanticSimilarity: 0.25, // +0.05
+      positionalScore: 0.15,   // -0.05
+      contentValidation: 0.20, // +0.05
+      lengthPenalty: 0.05      // 変更なし
+    },
+
+    class: {
+      // クラスはパターンと位置が重要
+      patternMatch: 0.45,      // +0.05
+      semanticSimilarity: 0.15, // -0.05
+      positionalScore: 0.25,   // +0.05
+      contentValidation: 0.10, // -0.05
+      lengthPenalty: 0.05      // 変更なし
+    },
+
+    name: {
+      // 名前は最も多様なため、内容検証を重視
+      patternMatch: 0.30,      // -0.10
+      semanticSimilarity: 0.20, // 変更なし
+      positionalScore: 0.15,   // -0.05
+      contentValidation: 0.25, // +0.10
+      lengthPenalty: 0.10      // +0.05（長さも重要）
+    }
+  };
+
+  return weightAdjustments[fieldType] || baseWeights;
+}
+
+/**
+ * 🌍 データ環境適応調整
+ * @param {Object} weights - 現在の重み
+ * @param {Array} sampleData - サンプルデータ
+ * @param {Array} headers - ヘッダー配列
+ * @returns {Object} 環境適応重み
+ */
+function adaptWeightsToEnvironment(weights, sampleData, headers) {
+  try {
+    const adaptedWeights = { ...weights };
+
+    // 🔍 データ環境分析
+    const environment = analyzeDataEnvironment(sampleData, headers);
+
+    // 🎯 環境特性に基づく重み調整
+
+    // 小規模データセット（<10行）: コンテンツ検証の重みを下げる
+    if (environment.isSmallDataset) {
+      adaptedWeights.contentValidation *= 0.7;
+      adaptedWeights.patternMatch *= 1.1;
+    }
+
+    // ヘッダー品質が低い場合: 意味的類似性を重視
+    if (environment.hasLowQualityHeaders) {
+      adaptedWeights.semanticSimilarity *= 1.2;
+      adaptedWeights.patternMatch *= 0.9;
+    }
+
+    // 非標準的なヘッダー構造: 位置ベース判定の重みを下げる
+    if (environment.hasNonStandardStructure) {
+      adaptedWeights.positionalScore *= 0.8;
+      adaptedWeights.semanticSimilarity *= 1.1;
+    }
+
+    // 多様なデータタイプが混在: コンテンツ検証を重視
+    if (environment.hasMixedDataTypes) {
+      adaptedWeights.contentValidation *= 1.3;
+      adaptedWeights.positionalScore *= 0.9;
+    }
+
+    return adaptedWeights;
+
+  } catch (error) {
+    console.warn('Environment adaptation error:', error.message);
+    return weights;
+  }
+}
+
+/**
+ * 🔍 データ環境分析
+ * @param {Array} sampleData - サンプルデータ
+ * @param {Array} headers - ヘッダー配列
+ * @returns {Object} 環境特性オブジェクト
+ */
+function analyzeDataEnvironment(sampleData, headers) {
+  const analysis = {
+    isSmallDataset: false,
+    hasLowQualityHeaders: false,
+    hasNonStandardStructure: false,
+    hasMixedDataTypes: false
+  };
+
+  try {
+    // 小規模データセット判定
+    analysis.isSmallDataset = sampleData.length < 10;
+
+    // ヘッダー品質評価
+    if (headers && headers.length > 0) {
+      const avgHeaderLength = headers.reduce((sum, h) => sum + (h ? h.length : 0), 0) / headers.length;
+      const shortHeaders = headers.filter(h => h && h.length < 3).length;
+      const longHeaders = headers.filter(h => h && h.length > 20).length;
+
+      analysis.hasLowQualityHeaders =
+        avgHeaderLength < 4 ||
+        (shortHeaders / headers.length) > 0.3 ||
+        (longHeaders / headers.length) > 0.2;
+    }
+
+    // 非標準構造判定（タイムスタンプが最初の列でない等）
+    if (headers && headers.length > 0) {
+      const firstHeader = headers[0] ? headers[0].toLowerCase() : '';
+      const hasTimestampFirst = /time|日時|timestamp/.test(firstHeader);
+      analysis.hasNonStandardStructure = !hasTimestampFirst && headers.length > 3;
+    }
+
+    // データタイプ多様性分析
+    if (sampleData.length > 0) {
+      const firstRow = sampleData[0] || [];
+      const dataTypes = firstRow.map(cell => {
+        if (!cell) return 'empty';
+        const str = String(cell);
+        if (/^\d+$/.test(str)) return 'number';
+        if (/@/.test(str)) return 'email';
+        if (/\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(str)) return 'date';
+        return 'text';
+      });
+
+      const uniqueTypes = new Set(dataTypes);
+      analysis.hasMixedDataTypes = uniqueTypes.size > 3;
+    }
+
+    return analysis;
+
+  } catch (error) {
+    console.warn('Data environment analysis error:', error.message);
+    return analysis;
+  }
+}
+
+/**
+ * 🎓 過去成功パターン学習調整（シンプルキャッシュベース）
+ * @param {Object} weights - 現在の重み
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {Object} 学習調整済み重み
+ */
+function applyLearningBasedAdjustments(weights, fieldType) {
+  try {
+    // 🎯 学習データ取得（キャッシュから）
+    const learningData = getLearningData(fieldType);
+
+    if (!learningData || learningData.samples < 5) {
+      return weights; // 学習データが不足している場合はそのまま
+    }
+
+    const adjustedWeights = { ...weights };
+
+    // 🎯 成功パターンに基づく重み調整
+    const successPatterns = learningData.successPatterns || {};
+
+    // パターンマッチング成功率が高い場合
+    if (successPatterns.patternMatchSuccessRate > 0.8) {
+      adjustedWeights.patternMatch *= 1.1;
+      adjustedWeights.semanticSimilarity *= 0.95;
+    }
+
+    // 意味的類似性による成功が多い場合
+    if (successPatterns.semanticSuccessRate > 0.7) {
+      adjustedWeights.semanticSimilarity *= 1.1;
+      adjustedWeights.patternMatch *= 0.95;
+    }
+
+    // 位置ベース予測が外れることが多い場合
+    if (successPatterns.positionalFailureRate > 0.6) {
+      adjustedWeights.positionalScore *= 0.8;
+      adjustedWeights.semanticSimilarity *= 1.1;
+    }
+
+    return adjustedWeights;
+
+  } catch (error) {
+    console.warn('Learning-based adjustment error:', error.message);
+    return weights;
+  }
+}
+
+/**
+ * 📚 学習データ取得（シンプル実装）
+ * @param {string} fieldType - フィールドタイプ
+ * @returns {Object|null} 学習データ
+ */
+function getLearningData(fieldType) {
+  try {
+    // 🎯 PropertiesServiceから学習データを取得
+    const cacheKey = `aiColumnLearning_${fieldType}`;
+    const cachedData = PropertiesService.getScriptProperties().getProperty(cacheKey);
+
+    if (cachedData) {
+      return JSON.parse(cachedData);
+    }
+
+    return null;
+  } catch (error) {
+    console.warn('Learning data retrieval error:', error.message);
+    return null;
+  }
+}
+
+/**
+ * 📊 重み正規化（合計1.0に調整）
+ * @param {Object} weights - 重みオブジェクト
+ * @returns {Object} 正規化済み重み
+ */
+function normalizeWeights(weights) {
+  try {
+    const total = Object.values(weights).reduce((sum, w) => sum + w, 0);
+
+    if (total === 0) {
+      // 全て0の場合はデフォルトに戻す
+      return {
+        patternMatch: 0.40,
+        semanticSimilarity: 0.20,
+        positionalScore: 0.20,
+        contentValidation: 0.15,
+        lengthPenalty: 0.05
+      };
+    }
+
+    const normalized = {};
+    Object.keys(weights).forEach(key => {
+      normalized[key] = weights[key] / total;
+    });
+
+    return normalized;
+
+  } catch (error) {
+    console.warn('Weight normalization error:', error.message);
+    return weights;
+  }
+}
+
+// 学習データ更新機能は現在未使用のためコメントアウト
+// 将来的な機械学習機能拡張時に再利用予定
 
 /**
  * 📏 ヘッダー長さペナルティ計算
@@ -460,10 +1406,9 @@ function calculateLengthPenalty(header) {
  * 🎯 スマート位置ベースフォールバック（改良版）
  * @param {string} fieldType - フィールドタイプ
  * @param {Array} headers - ヘッダー配列
- * @param {Object} options - オプション設定
  * @returns {Object} { index: number, confidence: number }
  */
-function getSmartPositionalFallback(fieldType, headers, options = {}) {
+function getSmartPositionalFallback(fieldType, headers) {
   try {
     const typicalPositions = {
       timestamp: [0],
@@ -947,7 +1892,7 @@ function generateRecommendedMapping(headers, options = {}) {
     analysis.overallScore = Math.min(99, baseScore + qualityBonus);
 
     // 🎯 段階4: 論理整合性チェック
-    const consistencyCheck = validateLogicalConsistency(recommendedMapping, headers, targetFields);
+    const consistencyCheck = validateLogicalConsistency(recommendedMapping, headers);
     analysis.consistencyCheck = consistencyCheck;
 
     if (!consistencyCheck.isConsistent) {
@@ -1036,7 +1981,6 @@ function calculateMappingQuality(mapping, headers, sampleData = []) {
 
   try {
     const requiredFields = ['answer', 'reason'];
-    const optionalFields = ['class', 'name', 'timestamp', 'email'];
     const mappedFields = Object.keys(mapping);
 
     // 1. マッピングカバレッジ（必須フィールドの解決率）
@@ -1088,10 +2032,9 @@ function calculateMappingQuality(mapping, headers, sampleData = []) {
  * 🧩 論理整合性検証
  * @param {Object} mapping - 推奨マッピング
  * @param {Array} headers - ヘッダー配列
- * @param {Array} targetFields - 対象フィールド
  * @returns {Object} 整合性チェック結果
  */
-function validateLogicalConsistency(mapping, headers, targetFields) {
+function validateLogicalConsistency(mapping, headers) {
   const result = {
     isConsistent: true,
     issues: [],

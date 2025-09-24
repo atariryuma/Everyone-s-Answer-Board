@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, DataController, SystemController, getDatabaseConfig, getUserSpreadsheetData, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, DataController, SystemController, getDatabaseConfig, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -81,12 +81,13 @@ function doGet(e) {
         }
 
         const { email, user, config } = adminData;
+        const isAdmin = isAdministrator(email);
 
-        // 認証済み - Administrator権限でAdminPanel表示
+        // 認証済み - Administrator/Editor権限でAdminPanel表示
         const template = HtmlService.createTemplateFromFile('AdminPanel.html');
         template.userEmail = email;
         template.userId = user.userId;
-        template.accessLevel = 'administrator';
+        template.accessLevel = isAdmin ? 'administrator' : 'editor';
         template.userInfo = user;
         template.configJSON = JSON.stringify({
           userId: user.userId,
@@ -94,8 +95,8 @@ function doGet(e) {
           spreadsheetId: config.spreadsheetId || '',
           sheetName: config.sheetName || '',
           isPublished: Boolean(config.isPublished),
-          isEditor: true, // 管理者は常にエディター権限
-          isAdminUser: true,
+          isEditor: true, // 管理者・編集ユーザーは常にエディター権限
+          isAdminUser: isAdmin,
           isOwnBoard: true,
           formUrl: config.formUrl || '',
           formTitle: config.formTitle || '',
@@ -1000,8 +1001,8 @@ function toggleUserBoardStatus(targetUserId) {
 function clearActiveSheet(targetUserId) {
   try {
     const email = getCurrentEmail();
-    if (!email || !isAdministrator(email)) {
-      return createAdminRequiredError();
+    if (!email) {
+      return createAuthError();
     }
 
     // 🔧 GAS-Native統一: 直接Data使用
@@ -1012,6 +1013,14 @@ function clearActiveSheet(targetUserId) {
 
     if (!targetUser) {
       return createUserNotFoundError();
+    }
+
+    // ✅ 編集者権限チェック: 管理者または自分のボード
+    const isAdmin = isAdministrator(email);
+    const isOwnBoard = targetUser.userEmail === email;
+
+    if (!isAdmin && !isOwnBoard) {
+      return createErrorResponse('ボードの非公開権限がありません');
     }
 
     // 統一API使用: 設定取得・更新・保存
@@ -1071,35 +1080,89 @@ function getLogs(options = {}) {
 
 
 /**
- * Get sheets - simplified name for spreadsheet list
+ * Get user's spreadsheets from their Drive - available to authenticated users
+ * ✅ CLAUDE.md準拠: Editor access for own Drive resources
+ * ✅ Performance optimized with caching and batch operations
  */
 function getSheets() {
   try {
     const email = getCurrentEmail();
-    if (!email || !isAdministrator(email)) {
-      return createAdminRequiredError();
+    if (!email) {
+      console.warn('getSheets: Unauthenticated access attempt');
+      return {
+        success: false,
+        error: 'ユーザー認証が必要です'
+      };
     }
-    // Direct implementation for spreadsheet access
+
+    // 🚀 Performance optimization: Cache user's spreadsheet list
+    const cacheKey = `sheets_${email}`;
+    try {
+      const cached = CacheService.getScriptCache().get(cacheKey);
+      if (cached) {
+        console.log('getSheets: Cache hit for user:', `${email.split('@')[0]}@***`);
+        return JSON.parse(cached);
+      }
+    } catch (cacheError) {
+      console.warn('getSheets: Cache read failed:', cacheError.message);
+    }
+
+    console.log('getSheets: Fetching spreadsheets for user:', `${email.split('@')[0]}@***`);
+
+    // ✅ CLAUDE.md準拠: Direct DriveApp access for own resources
     const drive = DriveApp;
     const spreadsheets = drive.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
 
     const sheets = [];
+    let processedCount = 0;
+
     while (spreadsheets.hasNext()) {
-      const file = spreadsheets.next();
-      sheets.push({
-        id: file.getId(),
-        name: file.getName(),
-        url: file.getUrl()
-      });
+      try {
+        const file = spreadsheets.next();
+        sheets.push({
+          id: file.getId(),
+          name: file.getName(),
+          url: file.getUrl()
+        });
+        processedCount++;
+
+        // 🛡️ Safety limit to prevent timeout
+        if (processedCount > 100) {
+          console.warn('getSheets: Processing limit reached (100 files)');
+          break;
+        }
+      } catch (fileError) {
+        console.warn('getSheets: Error processing file:', fileError.message);
+        continue;
+      }
     }
 
-    return {
+    const result = {
       success: true,
-      sheets
+      sheets,
+      totalFound: sheets.length,
+      processingLimited: processedCount > 100
     };
+
+    console.log('getSheets: Found', sheets.length, 'spreadsheets for user:', `${email.split('@')[0]}@***`);
+
+    // 🚀 Performance optimization: Cache results for 5 minutes
+    try {
+      const cacheTtl = CACHE_DURATION.LONG; // 300 seconds
+      CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), cacheTtl);
+      console.log('getSheets: Results cached for user:', `${email.split('@')[0]}@***`, 'TTL:', cacheTtl, 's');
+    } catch (cacheError) {
+      console.warn('getSheets: Cache write failed:', cacheError.message);
+    }
+
+    return result;
   } catch (error) {
     console.error('getSheets error:', error.message);
-    return createExceptionResponse(error);
+    return {
+      success: false,
+      error: `スプレッドシート取得エラー: ${error.message}`,
+      details: error.stack
+    };
   }
 }
 
@@ -1447,18 +1510,52 @@ function getSheetList(spreadsheetId) {
       return createErrorResponse('Spreadsheet ID required');
     }
 
-    // 🔧 CLAUDE.md準拠: getSheetList - Context-aware service account usage
-    // ✅ **Cross-user**: Only use service account for accessing other user's spreadsheets
-    // ✅ **Self-access**: Use normal permissions for own spreadsheets
     const currentEmail = getCurrentEmail();
+    if (!currentEmail) {
+      console.warn('getSheetList: Unauthenticated access attempt');
+      return {
+        success: false,
+        error: 'ユーザー認証が必要です'
+      };
+    }
 
-    // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
-    const targetUser = findUserBySpreadsheetId(spreadsheetId);
-    const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
-    const useServiceAccount = !isSelfAccess;
+    console.log('getSheetList: Access by user:', `${currentEmail.split('@')[0]}@***`, 'for spreadsheet:', `${spreadsheetId.substring(0, 8)}***`);
 
-    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
-    const {spreadsheet} = dataAccess;
+    // ✅ CLAUDE.md準拠: Progressive access - try normal permissions first, fallback to service account
+    // This ensures editors can access their own spreadsheets with appropriate permissions
+    let dataAccess = null;
+    let usedServiceAccount = false;
+
+    try {
+      // First attempt: Normal permissions
+      console.log('getSheetList: Attempting normal permissions access');
+      dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
+
+      if (!dataAccess || !dataAccess.spreadsheet) {
+        // Second attempt: Service account (for cross-user access or permission issues)
+        console.log('getSheetList: Fallback to service account access');
+        dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
+        usedServiceAccount = true;
+      }
+    } catch (accessError) {
+      console.warn('getSheetList: Both access methods failed:', accessError.message);
+      return {
+        success: false,
+        error: 'スプレッドシートにアクセスできません'
+      };
+    }
+
+    if (!dataAccess || !dataAccess.spreadsheet) {
+      console.warn('getSheetList: Failed to access spreadsheet:', `${spreadsheetId.substring(0, 8)}***`);
+      return {
+        success: false,
+        error: 'スプレッドシートを開くことができませんでした'
+      };
+    }
+
+    const { spreadsheet } = dataAccess;
+    console.log('getSheetList: Successfully accessed spreadsheet via', usedServiceAccount ? 'service account' : 'normal permissions');
+
     const sheets = spreadsheet.getSheets();
 
     const sheetList = sheets.map(sheet => ({
@@ -1468,13 +1565,20 @@ function getSheetList(spreadsheetId) {
       columnCount: sheet.getLastColumn()
     }));
 
+    console.log('getSheetList: Found', sheetList.length, 'sheets in spreadsheet:', `${spreadsheetId.substring(0, 8)}***`);
+
     return {
       success: true,
-      sheets: sheetList
+      sheets: sheetList,
+      accessMethod: usedServiceAccount ? 'service_account' : 'normal_permissions'
     };
   } catch (error) {
     console.error('getSheetList error:', error.message);
-    return createExceptionResponse(error);
+    return {
+      success: false,
+      error: `シート一覧取得エラー: ${error.message}`,
+      details: error.stack
+    };
   }
 }
 
@@ -1719,9 +1823,17 @@ function getNotificationUpdate(targetUserId, options = {}) {
 function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
   try {
     const email = getCurrentEmail();
-    if (!email || !isAdministrator(email)) {
-      return createAdminRequiredError();
+    if (!email) {
+      console.warn('connectDataSource: Unauthenticated access attempt');
+      return {
+        success: false,
+        error: 'ユーザー認証が必要です'
+      };
     }
+
+    // ✅ CLAUDE.md準拠: Editor access for own spreadsheets
+    // getColumnAnalysis内で詳細なアクセス権チェックが実装済み
+    console.log('connectDataSource: Access by user:', `${email.split('@')[0]}@***`);
 
 
     // バッチ処理対応 - CLAUDE.md準拠 70x Performance
@@ -1810,12 +1922,44 @@ function processDataSourceOperations(spreadsheetId, sheetName, operations) {
 function getColumnAnalysis(spreadsheetId, sheetName) {
   try {
     const email = getCurrentEmail();
-    if (!email || !isAdministrator(email)) {
-      return createAdminRequiredError();
+    if (!email) {
+      console.warn('getColumnAnalysis: Unauthenticated access attempt');
+      return {
+        success: false,
+        error: 'ユーザー認証が必要です'
+      };
     }
 
-    // 🔧 CLAUDE.md準拠: openSpreadsheet + 既存サービス活用
-    const dataAccess = openSpreadsheet(spreadsheetId);
+    const isAdmin = isAdministrator(email);
+
+    // ✅ CLAUDE.md準拠: Enhanced access control for editor users
+    // 管理者は任意のスプレッドシートにアクセス、編集ユーザーは自分がアクセス権を持つもののみ
+    let dataAccess;
+    try {
+      // 編集ユーザーの場合、まず通常権限でアクセステストを行う
+      dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
+      if (!dataAccess) {
+        if (isAdmin) {
+          // 管理者の場合、サービスアカウントでリトライ
+          console.log('getColumnAnalysis: Admin fallback to service account access');
+          dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
+        }
+
+        if (!dataAccess) {
+          return {
+            success: false,
+            error: 'スプレッドシートにアクセスできません'
+          };
+        }
+      }
+    } catch (accessError) {
+      console.warn('getColumnAnalysis: Spreadsheet access failed for user:', `${email.split('@')[0]}@***`, accessError.message);
+      return {
+        success: false,
+        error: 'スプレッドシートにアクセス権がありません'
+      };
+    }
+
     const sheet = dataAccess.getSheet(sheetName);
 
     if (!sheet) {
@@ -1829,6 +1973,31 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
     // 🔧 既存ColumnMappingService活用
     const diagnostics = performIntegratedColumnDiagnostics(headers);
 
+    // ✅ 編集者自身のアカウントでリアクション列・ハイライト列を事前追加
+    try {
+      const columnSetupResult = setupReactionAndHighlightColumns(spreadsheetId, sheetName, headers);
+      if (columnSetupResult.columnsAdded && columnSetupResult.columnsAdded.length > 0) {
+        console.log(`getColumnAnalysis: Added columns: ${columnSetupResult.columnsAdded.join(', ')}`);
+        // ヘッダーを再取得して更新されたリストを返す
+        const updatedSheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
+        const updatedLastCol = updatedSheet.getLastColumn();
+        const updatedHeaders = updatedLastCol > 0 ? getSheetHeaders(updatedSheet, updatedLastCol) : [];
+
+        return {
+          success: true,
+          sheet: updatedSheet,
+          headers: updatedHeaders,
+          data: [], // 軽量化: 接続時は不要
+          mapping: diagnostics.recommendedMapping || {},
+          confidence: diagnostics.confidence || {},
+          columnsAdded: columnSetupResult.columnsAdded
+        };
+      }
+    } catch (columnError) {
+      console.warn('getColumnAnalysis: Column setup failed:', columnError.message);
+      // 列追加失敗でも、基本的な分析結果は返す
+    }
+
     return {
       success: true,
       sheet,
@@ -1840,6 +2009,93 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
   } catch (error) {
     console.error('getColumnAnalysis error:', error.message);
     return createExceptionResponse(error);
+  }
+}
+
+/**
+ * リアクション列とハイライト列を事前セットアップ
+ * 編集者自身のアカウントで実行（CLAUDE.md準拠）
+ * @param {string} spreadsheetId - スプレッドシートID
+ * @param {string} sheetName - シート名
+ * @param {Array} currentHeaders - 現在のヘッダー配列
+ * @returns {Object} 追加結果
+ */
+function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeaders = []) {
+  try {
+    const email = getCurrentEmail();
+    console.log(`setupReactionAndHighlightColumns: Setting up columns for ${email ? `${email.split('@')[0]}@***` : 'unknown'}`);
+
+    // 編集者自身のアカウントで直接アクセス（サービスアカウント不使用）
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    const sheet = spreadsheet.getSheetByName(sheetName);
+
+    if (!sheet) {
+      throw new Error(`Sheet '${sheetName}' not found`);
+    }
+
+    // 必要な列の定義
+    const requiredColumns = [
+      'UNDERSTAND',
+      'LIKE',
+      'CURIOUS',
+      'HIGHLIGHT' // ハイライト列
+    ];
+
+    const columnsToAdd = [];
+    const currentHeadersUpper = currentHeaders.map(h => String(h).toUpperCase());
+
+    // 存在しない列を特定
+    requiredColumns.forEach(columnName => {
+      const exists = currentHeadersUpper.some(header =>
+        header.includes(columnName.toUpperCase())
+      );
+
+      if (!exists) {
+        columnsToAdd.push(columnName);
+      } else {
+        console.log(`setupReactionAndHighlightColumns: Column ${columnName} already exists`);
+      }
+    });
+
+    const columnsAdded = [];
+
+    if (columnsToAdd.length > 0) {
+      const currentLastCol = sheet.getLastColumn();
+
+      // 各列を順次追加
+      columnsToAdd.forEach((columnName, index) => {
+        const newColIndex = currentLastCol + index + 1;
+        console.log(`setupReactionAndHighlightColumns: Adding column '${columnName}' at position ${newColIndex}`);
+
+        try {
+          // ヘッダー行に列名を設定
+          sheet.getRange(1, newColIndex).setValue(columnName);
+          columnsAdded.push(columnName);
+          console.log(`setupReactionAndHighlightColumns: Successfully added column '${columnName}' at position ${newColIndex}`);
+        } catch (colError) {
+          console.error(`setupReactionAndHighlightColumns: Failed to add column '${columnName}':`, colError.message);
+        }
+      });
+
+      console.log(`setupReactionAndHighlightColumns: Added ${columnsAdded.length} columns: ${columnsAdded.join(', ')}`);
+    } else {
+      console.log('setupReactionAndHighlightColumns: All required columns already exist');
+    }
+
+    return {
+      success: true,
+      columnsAdded,
+      totalColumns: requiredColumns.length,
+      alreadyExists: requiredColumns.length - columnsToAdd.length
+    };
+
+  } catch (error) {
+    console.error('setupReactionAndHighlightColumns error:', error.message);
+    return {
+      success: false,
+      error: error.message,
+      columnsAdded: []
+    };
   }
 }
 
@@ -2469,13 +2725,18 @@ function getBatchedAdminData() {
       return { success: false, error: 'ユーザー認証が必要です' };
     }
 
-    if (!isAdministrator(email)) {
-      return { success: false, error: '管理者権限が必要です' };
+    // ✅ 編集ユーザー対応: 管理者でなくても自分のボードの管理パネルにアクセス可能
+    const isAdmin = isAdministrator(email);
+    const user = findUserByEmail(email, { requestingUser: email });
+
+    // ユーザー情報が見つからない場合は権限チェック前にエラー
+    if (!user && !isAdmin) {
+      return { success: false, error: 'ユーザー情報が見つかりません' };
     }
 
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return { success: false, error: 'ユーザー情報が見つかりません' };
+    // 管理者ではない場合、最低でもアクティブなユーザーである必要がある
+    if (!isAdmin && (!user || !user.isActive)) {
+      return { success: false, error: '編集権限が必要です' };
     }
 
     const configResult = getUserConfig(user.userId);

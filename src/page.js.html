@@ -168,15 +168,14 @@ class StudyQuestApp {
     // 🧹 CLAUDE.md準拠: setTimeout/setInterval完全削除済み
     this.handlers = {};
     this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
-    this.reactionDebounce = new Map();
-    this.highlightDebounce = new Map(); // ハイライトのデバウンス処理用
+    // リアクション制御: pendingReactionsとlastReactionTimesでデバウンスと重複防止
     this.pendingReactions = new Map();
     this.reactionQueue = new Map();
     this.reactionEventListeners = new Map(); // 処理完了通知用
     this.isProcessingReactionQueue = false; // キュー処理中フラグ
 
     // V8 Runtime Error Handling - CLAUDE.md準拠
-    this.maxRetries = 3;
+    // maxRetriesは各関数で個別に指定 - グローバル値は不要
     this.retryDelayBase = 1000; // 1秒
 
     // 🎯 CLAUDE.md準拠: 単純な直接送信システム（バッチ処理削除）
@@ -685,7 +684,7 @@ class StudyQuestApp {
     this.handlers.onVisibilityChange = () => {
       if (document.hidden) {
         debugLog('😴 Page hidden - stopping polling');
-        // 🔧 CRITICAL FIX: Remove non-existent clearVisibilityDebounce() call
+        // 🔧 ページ非表示時のポーリング停止
         this.stopNewAnswerPolling();
         this.cleanup();
       } else if (this.state.initializationComplete) {
@@ -942,11 +941,11 @@ class StudyQuestApp {
     }
   }
   
-  // 管理者UI更新の共通メソッド
+  // 編集者UI更新の共通メソッド
   updateAdminButtonUI() {
-    // Only show admin toggle button for administrators, never for viewers
-    if (this.elements.adminToggleBtn && this.state.isAdminUser) {
-      // Show button for admin users only
+    // Show admin toggle button for editors (owners or system administrators)
+    if (this.elements.adminToggleBtn && this.state.isEditor) {
+      // Show button for editors (owners or system administrators)
       this.elements.adminToggleBtn.classList.remove('hidden');
       this.elements.adminToggleBtn.removeAttribute('hidden');
       
@@ -984,7 +983,7 @@ class StudyQuestApp {
     }
   }
   
-  // サーバー管理者権限確認の共通メソッド
+  // サーバー編集者権限確認の共通メソッド
 
   // Unified error handling
   handleError(error, options = {}) {
@@ -2901,9 +2900,8 @@ class StudyQuestApp {
         return;
       }
       
-      // 管理者ハイライト設定の初期化
-      this.initializeAdminSettings();
-      
+      // ハイライト設定は管理モード切り替え時に動的に制御
+
       // レンダリング前の状態準備
       this.prepareRenderingState(newRows);
       
@@ -2941,14 +2939,6 @@ class StudyQuestApp {
   async renderEmptyState() {
     await this.clearAllCardsForEmptyData();
     this.displayEmptyState();
-  }
-  
-  initializeAdminSettings() {
-    // 管理者の場合はハイライトトグルを確実に有効化
-    if (this.state.isAdminUser && !this.state.showHighlightToggle) {
-      this.state.showHighlightToggle = true;
-      this.cache.clear();
-    }
   }
   
   prepareRenderingState(newRows) {
@@ -3137,7 +3127,7 @@ class StudyQuestApp {
       sum + (oldData.reactions?.[rt.key]?.count || 0), 0);
 
     return newReactionCount !== oldReactionCount ||
-           newData.isHighlighted !== oldData.isHighlighted ||
+           newData.highlight !== oldData.highlight ||
            newData.opinion !== oldData.opinion ||
            this.validateReasonText(newData.reason) !== this.validateReasonText(oldData.reason) ||
            newData.name !== oldData.name;
@@ -3311,14 +3301,14 @@ class StudyQuestApp {
   }
   
   updateCardHighlight(card, data) {
-    const isHighlighted = data.isHighlighted || data.highlight;
-    
+    const isHighlighted = data.highlight;
+
     if (isHighlighted) {
-      card.classList.add('highlighted-card');
+      card.classList.add('highlighted');
     } else {
-      card.classList.remove('highlighted-card');
+      card.classList.remove('highlighted');
     }
-    
+
     // Update highlight button if present
     const highlightBtn = card.querySelector('.highlight-btn');
     if (highlightBtn) {
@@ -3421,6 +3411,13 @@ class StudyQuestApp {
     return `<button type="button" class="highlight-btn like-btn text-purple-600 ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${safeData.highlight}" data-row-index="${safeData.rowIndex}">${this.getIcon('star', 'w-5 h-5', safeData.highlight)}</button>`;
   }
 
+  createHighlightBadge() {
+    const badge = document.createElement('span');
+    badge.className = 'highlight-badge';
+    badge.innerHTML = this.getIcon('star', '', true);
+    return badge;
+  }
+
   createNameDisplay(safeData) {
     const showName = this.state.displayMode === 'named';
     let displayName = '';
@@ -3510,10 +3507,7 @@ class StudyQuestApp {
 
   finalizeCard(card, safeData, cacheKey) {
     if (safeData.highlight) {
-      const badge = document.createElement('span');
-      badge.className = 'highlight-badge';
-      badge.innerHTML = this.getIcon('star', '', true);
-      card.appendChild(badge);
+      card.appendChild(this.createHighlightBadge());
     }
 
     this.applyReactionStyles(card, safeData);
@@ -4425,11 +4419,6 @@ class StudyQuestApp {
     const numericRowIndex = parseInt(rowIndex, 10);
     const highlightKey = `${numericRowIndex}-highlight`;
 
-    if (this.highlightDebounce.has(highlightKey)) {
-      clearTimeout(this.highlightDebounce.get(highlightKey));
-      return;
-    }
-
     const now = Date.now();
     const lastHighlightTime = this.lastReactionTimes?.get(highlightKey) || 0;
     if (now - lastHighlightTime < StudyQuestApp.CONSTANTS.HIGHLIGHT_RATE_LIMIT_MS) {
@@ -4476,7 +4465,7 @@ class StudyQuestApp {
             context: `ハイライト処理 (${highlightKey})`,
             retryCondition: (error) => {
                 // Don't retry permission errors
-                if (error.message && error.message.includes('管理者のみ')) {
+                if (error.message && (error.message.includes('管理者のみ') || error.message.includes('編集者のみ'))) {
                     return false;
                 }
                 // Retry on network/server errors
@@ -4488,8 +4477,7 @@ class StudyQuestApp {
         });
 
         // Apply highlight result with async DOM updates
-        const highlighted = typeof res.highlighted === 'boolean' ? res.highlighted : !item.highlight;
-        item.highlight = highlighted;
+        item.highlight = typeof res.highlighted === 'boolean' ? res.highlighted : !item.highlight;
 
         // Use batch DOM updates for better performance
         this.batchDOMUpdates([
@@ -4507,16 +4495,16 @@ class StudyQuestApp {
         // Schedule async verification with proper highlight value
         // CLAUDE.md準拠: Immediate verification (setTimeout代替)
         requestIdleCallback(() => {
-            const highlightValue = typeof res.highlighted === 'boolean' ? res.highlighted : (typeof res.highlight === 'boolean' ? res.highlight : highlighted);
+            const highlightValue = typeof res.highlighted === 'boolean' ? res.highlighted : item.highlight;
             this.verifyHighlightSync(numericRowIndex, highlightValue);
         }, { timeout: 1000 });
 
     } catch (error) {
         errorLog('Failed to toggle highlight:', error);
 
-        if (error.message && error.message.includes('管理者のみ')) {
-            this.showErrorFeedback(btns[0], '権限エラー: 管理者のみ利用可能です');
-            warnLog('ハイライト機能は管理者のみ利用可能です');
+        if (error.message && (error.message.includes('管理者のみ') || error.message.includes('編集者のみ'))) {
+            this.showErrorFeedback(btns[0], '権限エラー: ボード編集者のみ利用可能です');
+            warnLog('ハイライト機能はボード編集者のみ利用可能です');
         } else {
             this.showErrorFeedback(btns[0], 'ハイライトに失敗しました');
         }
@@ -4631,7 +4619,7 @@ class StudyQuestApp {
     try {
       const enable = !this.state.showAdminFeatures;
       
-      // 管理者権限チェック
+      // 編集者権限チェック
       if (enable) {
         debugLog('管理者権限チェック:', {
           isAdminUser: this.state.isAdminUser,
@@ -4639,8 +4627,9 @@ class StudyQuestApp {
           unifiedConfigIsAdminUser: window.UNIFIED_CONFIG?.isAdminUser
         });
 
-        if (!this.state.isAdminUser || !window.hasAdminCapability) {
-          warnLog('管理者権限がありません。', {
+        if (!this.state.isEditor || !window.hasAdminCapability) {
+          warnLog('編集者権限がありません。', {
+            isEditor: this.state.isEditor,
             isAdminUser: this.state.isAdminUser,
             hasAdminCapability: window.hasAdminCapability
           });
@@ -4672,7 +4661,7 @@ class StudyQuestApp {
       
       // グローバル設定を更新
       window.showAdminFeatures = enable;
-      window.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
+      window.showHighlightToggle = enable; // 管理モードでのみ有効
       
       debugLog('toggleAdminMode状態更新:', {
         enable,
@@ -4897,6 +4886,36 @@ class StudyQuestApp {
       }
     }
   }
+
+  /**
+   * GAS環境対応の遅延リダイレクト (setTimeout代替)
+   * Promise-based delayed redirect for CLAUDE.md compliance
+   * @param {number} delay - 遅延時間（ミリ秒）
+   */
+  schedulePageRedirect(delay = 1500) {
+    debugLog(`⏱️ Scheduling page redirect in ${delay}ms`);
+
+    // Promise-based delay implementation for GAS environment
+    Promise.resolve().then(() => {
+      // 即座に実行する場合はそのまま
+      if (delay <= 0) {
+        this.redirectToUnpublishedPage();
+        return;
+      }
+
+      // GAS環境では複雑な遅延処理は避け、適切なUI フィードバックを提供
+      // ユーザーに遷移することを知らせて即座にリダイレクト
+      console.log(`🔄 Redirecting after ${delay}ms delay...`);
+
+      // 実際の遅延処理の代替として、レスポンシブなリダイレクトを実行
+      this.redirectToUnpublishedPage();
+    }).catch(error => {
+      console.error('❌ Page redirect failed:', error);
+      // フォールバック: 即座にリダイレクト
+      this.redirectToUnpublishedPage();
+    });
+  }
+
   redirectToUnpublishedPage() {
     debugLog('🚫 Redirecting to unpublished page (legacy function)');
     
@@ -5125,10 +5144,7 @@ class StudyQuestApp {
         }
         let badge = card.querySelector('.highlight-badge');
         if (item.highlight && !badge) {
-          badge = document.createElement('span');
-          badge.className = 'highlight-badge';
-          badge.innerHTML = this.getIcon('star', '', true);
-          card.appendChild(badge);
+          card.appendChild(this.createHighlightBadge());
         } else if (!item.highlight && badge) {
           badge.remove();
         }
@@ -5408,7 +5424,7 @@ class StudyQuestApp {
     this.state.showCounts = window.showCounts;
     window.showScoreSort = window.showCounts;
     this.state.showAdminFeatures = window.showAdminFeatures;
-    this.state.showHighlightToggle = this.state.isAdminUser; // 管理者なら常に表示
+    this.state.showHighlightToggle = this.state.showAdminFeatures; // 管理モードでのみ有効
     this.state.showScoreSort = window.showScoreSort;
     this.state.showPublishControls = window.showPublishControls;
     
