@@ -1154,9 +1154,13 @@ class StudyQuestApp {
       return;
     }
 
-    // ✅ 修正: filterStateが未提供の場合は自動取得
-    const actualFilterState = filterState || this.getCurrentFilterState();
-    const currentFilter = actualFilterState.rawClassFilter || 'すべて';
+    // ✅ 最適化: フィルター名を効率的に取得（冗長な呼び出し削除）
+    let currentFilter = 'すべて';
+    if (filterState?.rawClassFilter) {
+      currentFilter = filterState.rawClassFilter;
+    } else {
+      currentFilter = this.getCurrentFilterState().rawClassFilter || 'すべて';
+    }
     const isFilteredView = currentFilter !== 'すべて';
 
     // ✅ 修正: フィルター状態の適切な処理
@@ -1251,23 +1255,16 @@ class StudyQuestApp {
       );
     }
 
-    // 📋 ログ出力（デバッグ用）
-    debugLog(`🎯 Polling interval adjusted: ${settings.currentInterval}ms (activity: ${settings.activityScore})`);
+    // 間隔更新を記録（本番環境では無効）
   }
 
   // 新着回答のポーリング開始 (安定版 - 競合状態解決)
   startNewAnswerPolling() {
-    debugLog('🔄 startNewAnswerPolling called:', {
-      pollingInitialized: this.pollingInitialized,
-      isActive: this.pollingState.isActive,
-      userId: this.state.userId,
-      initializationComplete: this.state.initializationComplete
-    });
-
+    // ✅ 修正: ポーリング状態の確実な初期化
+    this.getPollingState();
 
     // ✅ CLAUDE.md準拠: Simple polling control
     if (this.pollingState.isActive) {
-      console.warn('⚠️ Polling already active, skipping duplicate start');
       return;
     }
 
@@ -1275,30 +1272,18 @@ class StudyQuestApp {
 
     // 🚀 V8準拠: const/let使用、エラーハンドリング強化
     const executePollingCycle = async () => {
-      console.log('🔄 POLLING CYCLE START:', {
-        isActive: this.pollingState.isActive,
-        lastActivityTime: new Date(this.lastActivityTime).toISOString(),
-        userId: this.state.userId,
-        timestamp: new Date().toISOString()
-      });
-
       // ✅ CLAUDE.md準拠: Simplified polling execution
       if (!this.pollingState.isActive) {
-        console.log('⚠️ Polling cycle skipped: not active');
         return;
       }
       // 15分無操作チェック
       if (Date.now() - this.lastActivityTime > 900000) {
-        console.log('⏰ Polling stopped: 15min inactivity');
         this.stopNewAnswerPolling();
         return;
       }
 
       try {
-        console.log('🔗 Calling server-side trigger...');
-        // 🔄 CLAUDE.md準拠: サーバーサイドトリガーベースポーリング
         const triggerResult = await this.callServerSideTrigger();
-        console.log('📥 Server trigger result:', triggerResult);
 
         if (triggerResult.success && triggerResult.hasNewContent) {
           // ✅ 修正: 新着検出時はバナー表示のみ（差分更新は手動のみ）
@@ -1306,69 +1291,99 @@ class StudyQuestApp {
           const appliedFilterState = triggerResult.appliedFilter || this.getCurrentFilterState();
           this.showNewContentBanner(triggerResult.newItemsCount, appliedFilterState);
 
-          // ✅ タイムスタンプ更新は callServerSideTrigger 内で完了済み（重複除去）
-          // this.updateLastSeenTimestamp() は不要
-
-          // ✅ CLAUDE.md準拠: Simple success handling
+          // 動的間隔調整: 新着時は頻度アップ
+          this.adjustPollingIntervalStable(true);
           this.pollingState.retryCount = 0;
         } else {
-          console.log('ℹ️ No new content detected:', {
-            success: triggerResult.success,
-            hasNewContent: triggerResult.hasNewContent
-          });
+          // 新着なし: 間隔を徐々に延長
+          this.adjustPollingIntervalStable(false);
         }
 
       } catch (error) {
         console.error('❌ Server-side trigger error:', error.message);
-        this.handleError(error, 'server trigger');
-      } finally {
-        // ✅ CLAUDE.md準拠: Simple execution flag reset after cycle completion
-        this.pollingState.isActive = false;
-        console.log('🏁 POLLING CYCLE END');
+
+        // ✅ 修正: ポーリング用リトライ機構
+        this.handleError(error, {
+          type: 'polling',
+          operation: 'server trigger',
+          incrementRetry: true,
+          showUser: false // ポーリングエラーはユーザーに表示しない
+        });
+
+        // エラー時は間隔を延長（負荷軽減）
+        this.adjustPollingIntervalStable(false);
       }
+      // ✅ 注意: this.pollingState.isActiveはポーリング全体の状態なので、
+      // 個別サイクル完了でfalseにしない（継続的ポーリングのため）
     };
 
-    // 🔄 CLAUDE.md準拠: GAS-side trigger-based system (setInterval削除)
-    // サーバーサイドで定期実行される getNotificationUpdate をクライアントが購読
-    // 初回実行のみクライアントサイド
-    // 90秒遅延後にポーリング開始（初期化との干渉を防ぐ）
-    setTimeout(() => {
-      console.log('⏰ 90s TIMEOUT REACHED - Checking polling conditions:', {
-        isActive: this.pollingState.isActive,
-        initComplete: this.state.initializationComplete,
-        timestamp: new Date().toISOString()
-      });
+    // ✅ 修正: メモリリーク防止と堅牢なポーリングサイクル
+    const scheduleNextCycle = () => {
+      if (!this.pollingState.isActive) return;
 
+      // 動的間隔調整（30秒〜5分の範囲）
+      const interval = this.pollingSettings?.currentInterval || 60000;
+
+      // タイマーIDを保存してメモリリーク防止
+      this.pollingState.currentTimerId = setTimeout(async () => {
+        if (!this.pollingState.isActive || !this.state.initializationComplete) {
+          return; // 早期終了で不要な処理回避
+        }
+
+        try {
+          await executePollingCycle();
+        } catch (error) {
+          console.error('❌ Polling cycle error:', error.message);
+        } finally {
+          // エラーの有無に関係なく次のサイクルをスケジュール
+          if (this.pollingState.isActive) {
+            scheduleNextCycle();
+          }
+        }
+      }, interval);
+    };
+
+    // 初回ポーリング開始（90秒後）
+    this.pollingState.initialTimerId = setTimeout(() => {
       if (this.pollingState.isActive && this.state.initializationComplete) {
-        console.log('✅ Starting first polling cycle after 90s delay');
-        executePollingCycle();
-      } else {
-        console.log(`⚠️ Polling cancelled: active=${this.pollingState.isActive}, initComplete=${this.state.initializationComplete}`);
-        this.pollingState.isActive = false;
+        executePollingCycle()
+          .then(() => {
+            if (this.pollingState.isActive) {
+              scheduleNextCycle();
+            }
+          })
+          .catch(error => {
+            console.error('❌ Initial polling error:', error.message);
+            // エラー時も継続的ポーリングを開始
+            if (this.pollingState.isActive) {
+              scheduleNextCycle();
+            }
+          });
       }
     }, 90000);
-
-    console.log(`📅 Server-side trigger-based polling scheduled for 90s delay at ${new Date(Date.now() + 90000).toISOString()}`);
   }
 
   // 新着回答のポーリング停止 (安定版 - 完全なクリーンアップ)
   stopNewAnswerPolling() {
-    // ✅ CLAUDE.md準拠: Simple polling state cleanup
-    const pollingState = this.getPollingState();
+    if (!this.pollingState) return;
 
-    if (pollingState.isActive) {
-      debugLog('🛑 Stopping polling via simple state management');
-
-      // ✅ CLAUDE.md準拠: Simple state reset
-      this.pollingState = {
-        isActive: false,
-        interval: 30000,
-        retryCount: 0,
-        isInRecoveryMode: false
-      };
-
-      debugLog('✅ Polling stopped cleanly via singleton (synchronous)');
+    // ✅ 修正: アクティブなタイマーを全てクリア（メモリリーク防止）
+    if (this.pollingState.currentTimerId) {
+      clearTimeout(this.pollingState.currentTimerId);
     }
+    if (this.pollingState.initialTimerId) {
+      clearTimeout(this.pollingState.initialTimerId);
+    }
+
+    // ✅ CLAUDE.md準拠: Complete state cleanup
+    this.pollingState = {
+      isActive: false,
+      interval: 30000,
+      retryCount: 0,
+      isInRecoveryMode: false,
+      currentTimerId: null,
+      initialTimerId: null
+    };
 
     // 🧹 レガシータイマークリーンアップ（互換性維持）
     if (this.pollingInterval) {
