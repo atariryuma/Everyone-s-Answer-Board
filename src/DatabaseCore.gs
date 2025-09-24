@@ -274,6 +274,30 @@ function openSpreadsheet(spreadsheetId, options = {}) {
               console.warn('getValues via API failed:', error.message);
               return [];
             }
+          },
+          setValues: (values) => {
+            try {
+              const payload = {
+                values
+              };
+              const response = UrlFetchApp.fetch(`${baseUrl}/values/${range}?valueInputOption=RAW`, {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                payload: JSON.stringify(payload)
+              });
+
+              if (response.getResponseCode() !== 200) {
+                throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
+              }
+
+              return response;
+            } catch (error) {
+              console.warn('setValues via API failed:', error.message);
+              throw error;
+            }
           }
         };
       },
