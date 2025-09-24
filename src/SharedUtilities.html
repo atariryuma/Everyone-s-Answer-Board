@@ -1509,8 +1509,6 @@
       const config = {
         message: options.message || '処理中...',
         type: options.type || 'overlay',
-        progress: options.progress || null,
-        steps: options.steps || null,
         disableInteraction: options.disableInteraction !== false,
         ...options,
       };
@@ -1601,34 +1599,15 @@
         messageElement.textContent = config.message;
       }
 
-      // Handle progress display if configured
-      if (config.progress !== null && config.progress !== undefined) {
-        let progressElement = this.overlay.querySelector('.loading-progress');
-        if (!progressElement) {
-          progressElement = document.createElement('div');
-          progressElement.className = 'loading-progress';
-          this.overlay.appendChild(progressElement);
-        }
-        const safeProgress = (config && typeof config.progress === 'number') ? config.progress : 0;
-        progressElement.textContent = `${safeProgress}%`;
+      // Remove any existing progress elements for clean display
+      const existingProgress = this.overlay.querySelector('.loading-progress');
+      if (existingProgress) {
+        existingProgress.remove();
       }
 
-      // Handle step display if configured
-      if (config.steps && Array.isArray(config.steps)) {
-        let stepsElement = this.overlay.querySelector('.loading-steps');
-        if (!stepsElement) {
-          stepsElement = document.createElement('div');
-          stepsElement.className = 'loading-steps';
-          this.overlay.appendChild(stepsElement);
-        }
-
-        stepsElement.innerHTML = config.steps
-          .map((step) => {
-            const safeStatus = (step && step.status) || 'pending';
-            const safeText = (step && step.text) || 'Step';
-            return `<div class="loading-step ${safeStatus}">${safeText}</div>`;
-          })
-          .join('');
+      const existingSteps = this.overlay.querySelector('.loading-steps');
+      if (existingSteps) {
+        existingSteps.remove();
       }
     }
 
@@ -1640,42 +1619,6 @@
     showTransparent(message = '処理中...') {
       this.setLoading(true, { message, type: 'transparent' });
     }
-
-    showWithProgress(message = '処理中...', progress = 0) {
-      this.setLoading(true, { message, type: 'overlay', progress });
-    }
-
-    // Admin panel specific loading with predefined steps
-    showAdminProgress(message = 'システムを準備中...', step = 1, percentage) {
-      const options = {
-        message,
-        type: 'overlay',
-        progress: percentage,
-      };
-
-      // Define standard admin loading steps
-      if (step && step > 0) {
-        options.steps = [
-          {
-            text: 'システム情報を読み込み中...',
-            status: step > 1 ? 'completed' : step === 1 ? 'active' : 'pending',
-          },
-          {
-            text: 'ユーザー情報を取得中...',
-            status: step > 2 ? 'completed' : step === 2 ? 'active' : 'pending',
-          },
-          {
-            text: 'シート情報と設定を適用中...',
-            status: step > 3 ? 'completed' : step === 3 ? 'active' : 'pending',
-          },
-          {
-            text: 'UIを最終調整中...',
-            status: step > 4 ? 'completed' : step === 4 ? 'active' : 'pending',
-          },
-        ];
-      }
-      this.setLoading(true, options);
-    }
   }
 
   // Create and initialize the global instance once the DOM is ready.
@@ -1685,7 +1628,7 @@
   });
 
   // Backward compatibility wrapper for the global setLoading function.
-  window.setLoading = function (isLoading, message, step, percentage) {
+  window.setLoading = function (isLoading, message) {
     if (!isLoading) {
       window.unifiedLoading.setLoading(false);
       return;
@@ -1693,8 +1636,6 @@
 
     if (typeof message === 'object') {
       window.unifiedLoading.setLoading(true, message);
-    } else if (typeof step === 'number' && step > 0) {
-      window.unifiedLoading.showAdminProgress(message, step, percentage);
     } else {
       window.unifiedLoading.showOverlay(message || '処理中...');
     }

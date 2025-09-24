@@ -1,7 +1,5 @@
 <script>
-  // グローバルエラーハンドラーはSharedUtilities.htmlで処理
 
-  // 最小限のボタン状態管理
   function setLoginButtonState(disabled, text = 'はじめる') {
     const loginBtn = document.getElementById('login-btn');
     if (loginBtn) {
@@ -107,25 +105,18 @@
         let isLogoutRedirect = false;
         let fallbackReason = null;
 
-        try {
-          loginState = <?= typeof loginState !== 'undefined' ? JSON.stringify(loginState) : '{}' ?> || {};
-        } catch (e) {
-          console.warn('loginState parsing failed, using default:', e);
-          loginState = {};
-        }
+        // サーバーサイド変数の安全な取得
+        loginState = {};
+        isLogoutRedirect = false;
+        fallbackReason = null;
 
-        try {
-          isLogoutRedirect = <?= typeof isLogoutRedirect !== 'undefined' ? isLogoutRedirect : false ?> || false;
-        } catch (e) {
-          console.warn('isLogoutRedirect parsing failed, using default:', e);
-          isLogoutRedirect = false;
+        // URLパラメータから状態を復元
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('logout') === 'true') {
+          isLogoutRedirect = true;
         }
-
-        try {
-          fallbackReason = <?= typeof fallbackReason !== 'undefined' ? JSON.stringify(fallbackReason) : 'null' ?>;
-        } catch (e) {
-          console.warn('fallbackReason parsing failed, using default:', e);
-          fallbackReason = null;
+        if (urlParams.get('fallback')) {
+          fallbackReason = urlParams.get('fallback');
         }
 
         console.log('🔄 Fresh login experience initialized', {
@@ -187,10 +178,6 @@
         // フォールバック: 通常のログイン処理を継続
       }
 
-    } catch (error) {
-      console.error('❌ Fresh login experience initialization failed:', error);
-      // フォールバック処理は不要 - 新しいinit()関数がエラーハンドリングを担当
-    }
   }
 
     // registerAndRedirect関数削除 - getLoginStatus()で自動登録を実行
@@ -245,6 +232,7 @@
 
     // ユーザーメール表示を既定値にリセット
     const setEmailDisplayDefault = () => {
+      const userEmailDisplay = document.getElementById('user-email-display');
       if (!userEmailDisplay) return;
       userEmailDisplay.textContent = 'Google アカウントでログインしてください';
       userEmailDisplay.classList.remove('text-red-400', 'text-yellow-400', 'text-blue-400');
@@ -253,6 +241,12 @@
 
     // 現在のユーザーメールアドレスを取得・表示（GAS内部上書き保護付き）
     const displayCurrentUserEmail = () => {
+      const userEmailDisplay = document.getElementById('user-email-display');
+      if (!userEmailDisplay) {
+        console.error('❌ userEmailDisplay element not found');
+        return;
+      }
+
       try {
         userEmailDisplay.textContent = '🔄 アカウント情報を確認中...';
 
@@ -504,44 +498,6 @@
     }
   }; // switchAccount function end
 
-  } catch (domError) {
-    console.error('❌ Critical DOM initialization error:', domError);
-
-    // 緊急フォールバック: 基本的なログイン機能を確保
-    try {
-      const fallbackBtn = document.getElementById('login-btn');
-      const fallbackDisplay = document.getElementById('user-email-display');
-
-      if (fallbackDisplay) {
-        fallbackDisplay.textContent = '初期化エラーが発生しました。ページを更新してください。';
-        fallbackDisplay.classList.add('text-red-400');
-      }
-
-      if (fallbackBtn) {
-        fallbackBtn.disabled = false;
-        fallbackBtn.textContent = 'はじめる';
-        fallbackBtn.addEventListener('click', () => {
-          if (window.notifications) {
-            window.notifications.error('初期化エラーのため、ページを更新してから再試行してください。', 5000);
-          } else {
-            alert('初期化エラーのため、ページを更新してから再試行してください。');
-          }
-          window.location.reload();
-        });
-      }
-    } catch (fallbackError) {
-      console.error('❌ Emergency fallback failed:', fallbackError);
-      // 最後の手段: ページ全体に警告表示
-      document.body.innerHTML = `
-        <div style="padding: 20px; text-align: center; background: #1a1b26; color: #f7f7f7; min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column;">
-          <h1 style="color: #ff6b6b; margin-bottom: 20px;">⚠️ 初期化エラー</h1>
-          <p style="margin-bottom: 20px;">アプリケーションの初期化に失敗しました。</p>
-          <button onclick="window.location.reload()" style="padding: 10px 20px; background: #4ade80; color: #000; border: none; border-radius: 5px; cursor: pointer;">ページを更新</button>
-        </div>
-      `;
-    }
-  }
-  }); // DOMContentLoaded イベントリスナー終了
 
   // =============================================================================
   // グローバル関数定義（DOMContentLoaded外で定義）

@@ -6435,16 +6435,11 @@ try {
       }
 
       debugLog('🚀 DOMContentLoaded fired - Starting StudyQuestApp initialization');
-      try {
-        debugLog('📱 Creating new StudyQuestApp instance...');
-        const app = new StudyQuestApp();
-        debugLog('✅ StudyQuestApp instance created successfully');
-        window.studyQuestApp = app;
-        debugLog('✅ StudyQuestApp assigned to window.studyQuestApp');
-      } catch (error) {
-        console.error('❌ Failed to create StudyQuestApp instance:', error);
-        throw error;
-      }
+      debugLog('📱 Creating new StudyQuestApp instance...');
+      const app = new StudyQuestApp();
+      debugLog('✅ StudyQuestApp instance created successfully');
+      window.studyQuestApp = app;
+      debugLog('✅ StudyQuestApp assigned to window.studyQuestApp');
     });
   } else {
     debugLog('✅ StudyQuestApp already initialized, skipping');
