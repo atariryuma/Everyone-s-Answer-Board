@@ -890,15 +890,15 @@ function isUserSpreadsheetOwner(spreadsheetId) {
 function getSpreadsheetAdaptive(spreadsheetId, context = {}) {
   const currentEmail = getCurrentEmail();
 
-  // CLAUDE.md準拠: アクセス権限の判定
-  const isAdminRequest = context.forceServiceAccount || (currentEmail && isAdministrator && isAdministrator(currentEmail));
+  // CLAUDE.md準拠: アクセス権限の判定 - 自分のデータは管理者でも通常権限を使用
   const isOwner = isUserSpreadsheetOwner(spreadsheetId);
 
-  // ✅ **Self-access**: Owner accessing own spreadsheet (normal permissions unless admin override)
-  // ✅ **Cross-user**: Non-owner or admin accessing spreadsheet (service account)
-  const useServiceAccount = isAdminRequest || !isOwner;
+  // ✅ **Self-access**: Owner accessing own spreadsheet (normal permissions unless force override)
+  // ✅ **Cross-user**: Non-owner accessing spreadsheet (service account)
+  // ❌ **Anti-pattern**: Admin unnecessarily using service account for own data
+  const useServiceAccount = context.forceServiceAccount || !isOwner;
 
-  console.log(`getSpreadsheetAdaptive: ${useServiceAccount ? 'Service account' : 'Normal permissions'} access to spreadsheet (owner: ${isOwner}, admin: ${isAdminRequest})`);
+  console.log(`getSpreadsheetAdaptive: ${useServiceAccount ? 'Service account' : 'Normal permissions'} access to spreadsheet (owner: ${isOwner}, forceServiceAccount: ${!!context.forceServiceAccount})`);
 
   try {
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
@@ -911,7 +911,7 @@ function getSpreadsheetAdaptive(spreadsheetId, context = {}) {
       auth: dataAccess.auth,
       isOwner,
       context: {
-        isAdminRequest,
+        forceServiceAccount: !!context.forceServiceAccount,
         useServiceAccount,
         currentEmail: currentEmail ? `${currentEmail.split('@')[0]}@***` : null
       }

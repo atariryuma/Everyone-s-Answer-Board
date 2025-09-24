@@ -217,6 +217,23 @@ function openSpreadsheet(spreadsheetId, options = {}) {
   function createServiceAccountSpreadsheetProxy(sheetId, accessToken) {
     return {
       getId: () => sheetId,
+      getName: () => {
+        // Sheets APIでスプレッドシート名を取得
+        try {
+          const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+          const response = UrlFetchApp.fetch(`${baseUrl}?includeGridData=false&fields=properties.title`, {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          });
+          if (response.getResponseCode() !== 200) {
+            throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
+          }
+          const data = JSON.parse(response.getContentText());
+          return data.properties?.title || `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
+        } catch (error) {
+          console.warn('getName via API failed:', error.message);
+          return `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
+        }
+      },
       getSheetByName: (sheetName) => {
         // 必要最小限のSheetプロキシを返す
         return createServiceAccountSheetProxy(sheetId, sheetName, accessToken);
