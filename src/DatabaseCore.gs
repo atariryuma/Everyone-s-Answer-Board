@@ -276,6 +276,23 @@ function openSpreadsheet(spreadsheetId, options = {}) {
             }
           }
         };
+      },
+      getDataRange: () => {
+        // Sheets APIでデータ範囲全体を取得
+        return {
+          getValues: () => {
+            try {
+              const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}`, {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+              });
+              const data = JSON.parse(response.getContentText());
+              return data.values || [];
+            } catch (error) {
+              console.warn('getDataRange via API failed:', error.message);
+              return [];
+            }
+          }
+        };
       }
     };
   }
@@ -305,22 +322,29 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       // クロスユーザーアクセス - サービスアカウント使用
       auth = getServiceAccount();
       if (auth.isValid) {
-        try {
-          // 🚀 Performance Optimization: Check if access already exists before granting
-          const file = DriveApp.getFileById(spreadsheetId);
-          const editors = file.getEditors();
-          const hasAccess = editors.some(editor => editor.getEmail() === auth.email);
+        const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
 
-          if (!hasAccess) {
-            file.addEditor(auth.email);
-            console.log(`openSpreadsheet: Service account editor access granted for cross-user access: ${spreadsheetId.substring(0, 8)}***`);
-            console.log(`SA_USAGE: editor-access-granted - ${auth.email} -> ${spreadsheetId.substring(0, 8)}***`);
-          } else {
-            console.log(`SA_USAGE: editor-access-existing - ${auth.email} -> ${spreadsheetId.substring(0, 8)}*** - already_has_access`);
+        // DATABASE_SPREADSHEET_IDの場合、DriveApp権限チェックをスキップしてSheets API直接アクセス
+        if (spreadsheetId === dbId) {
+          console.log('openSpreadsheet: Skipping DriveApp permission check for DATABASE_SPREADSHEET_ID (using direct Sheets API access)');
+        } else {
+          try {
+            // 🚀 Performance Optimization: Check if access already exists before granting
+            const file = DriveApp.getFileById(spreadsheetId);
+            const editors = file.getEditors();
+            const hasAccess = editors.some(editor => editor.getEmail() === auth.email);
+
+            if (!hasAccess) {
+              file.addEditor(auth.email);
+              console.log(`openSpreadsheet: Service account editor access granted for cross-user access: ${spreadsheetId.substring(0, 8)}***`);
+              console.log(`SA_USAGE: editor-access-granted - ${auth.email} -> ${spreadsheetId.substring(0, 8)}***`);
+            } else {
+              console.log(`SA_USAGE: editor-access-existing - ${auth.email} -> ${spreadsheetId.substring(0, 8)}*** - already_has_access`);
+            }
+          } catch (driveError) {
+            console.warn('openSpreadsheet: Service account access check/grant failed:', driveError.message);
+            console.log(`SA_USAGE: editor-access-failed - ${auth.email} -> ${spreadsheetId.substring(0, 8)}*** - ${driveError.message}`);
           }
-        } catch (driveError) {
-          console.warn('openSpreadsheet: Service account access check/grant failed:', driveError.message);
-          console.log(`SA_USAGE: editor-access-failed - ${auth.email} -> ${spreadsheetId.substring(0, 8)}*** - ${driveError.message}`);
         }
       } else {
         console.warn('openSpreadsheet: Service account requested but invalid credentials');
