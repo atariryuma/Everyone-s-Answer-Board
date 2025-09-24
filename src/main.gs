@@ -1966,12 +1966,27 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
       return { success: false, message: 'Sheet not found' };
     }
 
-    // 🔧 既存DataService.getSheetHeaders活用
+    // 🔧 高精度分析用データ取得
     const lastCol = sheet.getLastColumn();
+    const lastRow = sheet.getLastRow();
     const headers = lastCol > 0 ? getSheetHeaders(sheet, lastCol) : [];
 
-    // 🔧 既存ColumnMappingService活用
-    const diagnostics = performIntegratedColumnDiagnostics(headers);
+    // 🎯 サンプルデータ取得（ハイブリッドシステム用）
+    let sampleData = [];
+    if (lastRow > 1 && lastCol > 0) {
+      const sampleSize = Math.min(10, lastRow - 1); // 最大10行のサンプル
+      try {
+        const dataRange = sheet.getRange(2, 1, sampleSize, lastCol);
+        sampleData = dataRange.getValues();
+        console.log(`getColumnAnalysis: サンプルデータ ${sampleSize}行取得完了`);
+      } catch (sampleError) {
+        console.warn('getColumnAnalysis: サンプルデータ取得失敗:', sampleError.message);
+        sampleData = [];
+      }
+    }
+
+    // 🎯 高精度ColumnMappingService活用（サンプルデータ付き）
+    const diagnostics = performIntegratedColumnDiagnostics(headers, { sampleData });
 
     // ✅ 編集者自身のアカウントでリアクション列・ハイライト列を事前追加
     try {

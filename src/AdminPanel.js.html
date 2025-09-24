@@ -1950,25 +1950,183 @@
     }
   }
 
-  // 🆕 列分析実行関数
-  async function performColumnAnalysis(spreadsheetId, sheetName) {
-    const analysisResult = await getColumnAnalysis(spreadsheetId, sheetName);
+  // 🆕 高精度列分析実行関数（リトライ・回復機能付き）
+  async function performColumnAnalysis(spreadsheetId, sheetName, retryCount = 0) {
+    const maxRetries = 3;
+    const retryDelay = Math.pow(2, retryCount) * 1000; // 指数バックオフ
 
-    if (!analysisResult || !analysisResult.success) {
-      throw new Error('列分析に失敗しました');
+    try {
+      console.log(`🔍 列分析実行開始 (試行 ${retryCount + 1}/${maxRetries + 1})`);
+
+      const analysisResult = await getColumnAnalysis(spreadsheetId, sheetName);
+
+      // 🎯 高精度検証: 結果品質チェック
+      const qualityCheck = validateAnalysisResult(analysisResult);
+
+      if (!qualityCheck.isValid) {
+        if (retryCount < maxRetries) {
+          console.warn(`⚠️ 分析品質不足、リトライします: ${qualityCheck.reason}`);
+          showInfo(`🔄 分析品質向上のため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
+
+          // 指数バックオフ待機
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+
+          return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
+        } else {
+          console.error('🚫 最大リトライ回数に到達、品質不足の結果を使用');
+          showWarning('⚠️ AI分析の精度が期待値を下回りましたが、利用可能な結果を表示します', 5000);
+        }
+      }
+
+      if (!analysisResult || !analysisResult.success) {
+        throw new Error('列分析に失敗しました');
+      }
+
+      if (!analysisResult.headers || !Array.isArray(analysisResult.headers) || analysisResult.headers.length === 0) {
+        throw new Error('ヘッダー情報が取得できませんでした');
+      }
+
+      // 🎯 ドロップダウンにヘッダー選択肢を設定（高精度版）
+      fillColumnDropdowns(analysisResult.headers, analysisResult.mapping, analysisResult.confidence);
+
+      // 🎯 分析結果品質レポート表示
+      displayAnalysisQualityReport(analysisResult, qualityCheck);
+
+      // 設定完了状況を更新
+      updateCompletionStatus();
+
+      console.log('✅ 高精度列分析完了');
+
+    } catch (error) {
+      console.error(`❌ 列分析エラー (試行 ${retryCount + 1}):`, error);
+
+      // リトライ可能エラーの場合
+      if (retryCount < maxRetries && isRetryableError(error)) {
+        console.warn(`🔄 リトライ可能エラー、再試行します: ${error.message}`);
+        showInfo(`🔄 接続エラーのため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
+
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
+      }
+
+      // 最終的な失敗処理
+      console.error('🚫 列分析の全試行が失敗しました');
+
+      // 🔄 緊急フォールバック: 基本的なヘッダー取得を試行
+      try {
+        console.log('🆘 緊急フォールバック: 基本ヘッダー取得を試行');
+        await attemptEmergencyFallback(spreadsheetId, sheetName);
+      } catch (fallbackError) {
+        console.error('🚫 緊急フォールバックも失敗:', fallbackError.message);
+        throw new Error(`分析に失敗しました (全${maxRetries + 1}回試行): ${error.message}`);
+      }
+    }
+  }
+
+  /**
+   * 🔍 分析結果品質検証
+   */
+  function validateAnalysisResult(result) {
+    if (!result || !result.success) {
+      return { isValid: false, reason: 'API呼び出し失敗' };
     }
 
-    if (!analysisResult.headers || !Array.isArray(analysisResult.headers) || analysisResult.headers.length === 0) {
-      throw new Error('ヘッダー情報が取得できませんでした');
+    const mapping = result.mapping || {};
+    const confidence = result.confidence || {};
+
+    const requiredFields = ['answer', 'name', 'class'];
+    const detectedCount = requiredFields.filter(field =>
+      mapping[field] !== undefined && confidence[field] > 30
+    ).length;
+
+    const avgConfidence = Object.values(confidence).length > 0
+      ? Object.values(confidence).reduce((sum, c) => sum + c, 0) / Object.values(confidence).length
+      : 0;
+
+    // 品質基準
+    const minDetectedFields = 2; // 最低2フィールド検出
+    const minAvgConfidence = 40; // 平均40%以上
+
+    const isValid = detectedCount >= minDetectedFields && avgConfidence >= minAvgConfidence;
+
+    return {
+      isValid,
+      reason: !isValid ? `検出フィールド不足: ${detectedCount}/${requiredFields.length}, 平均信頼度: ${avgConfidence.toFixed(1)}%` : 'OK',
+      detectedCount,
+      avgConfidence
+    };
+  }
+
+  /**
+   * 🔄 リトライ可能エラー判定
+   */
+  function isRetryableError(error) {
+    const retryableMessages = [
+      'network', 'timeout', 'connection', '接続', 'アクセス',
+      'temporary', 'busy', 'rate limit', '一時的', 'サーバー'
+    ];
+
+    const message = error.message.toLowerCase();
+    return retryableMessages.some(pattern => message.includes(pattern));
+  }
+
+  /**
+   * 🆘 緊急フォールバック処理
+   */
+  async function attemptEmergencyFallback(spreadsheetId, sheetName) {
+    console.log('🆘 緊急フォールバック実行');
+    showWarning('⚠️ AI分析に問題が発生しました。基本的なヘッダー情報のみ取得します。', 5000);
+
+    // 基本的なヘッダー取得のみ試行
+    try {
+      const basicResult = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .getSheetHeaders(spreadsheetId, sheetName); // 簡易ヘッダー取得API
+      });
+
+      if (basicResult && basicResult.headers) {
+        // AIなしでドロップダウン設定
+        fillColumnDropdowns(basicResult.headers, {}, {});
+        showWarning('💡 手動で列を設定してください。AI分析は利用できませんでした。', 8000);
+      }
+
+    } catch (basicError) {
+      throw new Error('基本的なデータ取得も失敗しました');
     }
+  }
 
-    // ドロップダウンにヘッダー選択肢を設定
-    fillColumnDropdowns(analysisResult.headers, analysisResult.mapping, analysisResult.confidence);
+  /**
+   * 📊 分析品質レポート表示
+   */
+  function displayAnalysisQualityReport(result, quality) {
+    const detectedFields = Object.keys(result.mapping || {}).length;
+    const avgConfidence = quality.avgConfidence;
 
-    // 設定完了状況を更新
-    updateCompletionStatus();
+    let qualityLevel = 'excellent';
+    if (avgConfidence < 60) qualityLevel = 'good';
+    if (avgConfidence < 40) qualityLevel = 'fair';
+    if (avgConfidence < 20) qualityLevel = 'poor';
 
-    
+    const qualityIcons = {
+      excellent: '🎯',
+      good: '✅',
+      fair: '⚠️',
+      poor: '🔍'
+    };
+
+    const qualityMessages = {
+      excellent: `高精度分析完了 (${detectedFields}フィールド検出, 平均${avgConfidence.toFixed(1)}%信頼度)`,
+      good: `良好な分析結果 (${detectedFields}フィールド検出, 平均${avgConfidence.toFixed(1)}%信頼度)`,
+      fair: `分析完了 (${detectedFields}フィールド検出, 平均${avgConfidence.toFixed(1)}%信頼度) - 手動確認推奨`,
+      poor: `分析結果が不十分 (${detectedFields}フィールド検出, 平均${avgConfidence.toFixed(1)}%信頼度) - 手動設定推奨`
+    };
+
+    const icon = qualityIcons[qualityLevel];
+    const message = qualityMessages[qualityLevel];
+
+    showSuccess(`${icon} ${message}`, 6000);
   }
 
   // 🆕 現在のスプレッドシートID取得
@@ -2674,24 +2832,42 @@
         
         detectedCount++;
       } else if (columnConfidence > 0) {
-        // AI判定システム: 統一絶対閾値による判定
-        const THRESHOLDS = {
-          answer: 55, reason: 55,  // 文脈依存列
-          name: 65, class: 65      // 明確な列種別
+        // 🎯 高精度AI判定システム: 強化された閾値設定
+        const HIGH_PRECISION_THRESHOLDS = {
+          answer: 75,   // 複雑質問文 - ハイブリッドシステム対応
+          reason: 70,   // 理由説明文 - セマンティック強化
+          name: 80,     // 単純識別子 - 高精度期待
+          class: 85,    // 明確パターン - 最高精度期待
+          email: 90     // フォーマット固定 - 完全一致期待
         };
-        const threshold = THRESHOLDS[columnType] || 55;
+        const threshold = HIGH_PRECISION_THRESHOLDS[columnType] || 75;
 
         let badgeType = 'low-confidence';
         let statusMessage = '';
 
+        // 🎯 インテリジェントフォールバック機能
         if (columnConfidence >= threshold) {
           badgeType = 'candidate';
           statusMessage = `候補 (閾値${threshold}%達成)`;
-        } else if (columnConfidence >= 20) {
+        } else if (columnConfidence >= 50) {
+          // 中間信頼度: フォールバック候補として提示
+          badgeType = 'fallback-candidate';
+          statusMessage = `要確認候補 (${Math.round(columnConfidence)}% - 閾値${threshold}%未満)`;
+
+          // 🔄 自動リトライ機能: 複数検出手法を試行
+          attemptFallbackDetection(columnType, dropdown, headers, actualMapping, confidence);
+        } else if (columnConfidence >= 30) {
           badgeType = 'low-confidence';
-          statusMessage = `検討中 (${Math.round(columnConfidence)}%)`;
+          statusMessage = `検討候補 (${Math.round(columnConfidence)}% - 手動確認推奨)`;
+
+          // 💡 ユーザーガイダンス提供
+          provideLowConfidenceGuidance(columnType, dropdown);
         } else {
-          statusMessage = `信頼度不足 (${Math.round(columnConfidence)}%)`;
+          badgeType = 'very-low';
+          statusMessage = `信頼度不足 (${Math.round(columnConfidence)}% - 手動設定を推奨)`;
+
+          // 🔍 代替検出手法を試行
+          attemptAlternativeDetection(columnType, dropdown, headers);
         }
 
         
@@ -2721,6 +2897,169 @@
 
     // 🆕 設定完了状況を更新
     updateCompletionStatus();
+  }
+
+  // ===========================================
+  // 🎯 インテリジェントフォールバック支援機能
+  // ===========================================
+
+  /**
+   * 🔄 フォールバック検出試行
+   */
+  function attemptFallbackDetection(columnType, dropdown, headers, mapping, confidence) {
+    try {
+      console.log(`🔄 フォールバック検出開始: ${columnType}`);
+
+      // 代替パターンマッチング
+      const alternativePatterns = {
+        answer: ['回答', '答え', 'answer', '意見', '考え', 'コメント'],
+        reason: ['理由', 'reason', '根拠', '説明', 'なぜ', 'どうして'],
+        name: ['名前', 'name', '氏名', 'お名前', 'ニックネーム'],
+        class: ['クラス', 'class', '組', '学年', 'グレード']
+      };
+
+      const patterns = alternativePatterns[columnType] || [];
+      let bestCandidate = null;
+      let bestScore = 0;
+
+      headers.forEach((header, index) => {
+        if (!header) return;
+
+        const normalizedHeader = header.toLowerCase();
+        let score = 0;
+
+        // 単語一致スコア
+        patterns.forEach(pattern => {
+          if (normalizedHeader.includes(pattern.toLowerCase())) {
+            score += 25;
+          }
+        });
+
+        // 位置ボーナス（フィールドタイプ別）
+        if (columnType === 'answer' && index < 3) score += 10;
+        if (columnType === 'reason' && index >= 2 && index < 5) score += 10;
+        if (columnType === 'name' && index >= headers.length - 3) score += 15;
+        if (columnType === 'class' && index >= headers.length - 3) score += 15;
+
+        if (score > bestScore) {
+          bestScore = score;
+          bestCandidate = index;
+        }
+      });
+
+      // フォールバック候補提示
+      if (bestCandidate !== null && bestScore >= 25) {
+        console.log(`✅ フォールバック候補検出: ${columnType} = ${bestCandidate} (${bestScore}点)`);
+
+        // ソフトな候補提示（自動選択はしない）
+        const option = dropdown.querySelector(`option[value="${bestCandidate}"]`);
+        if (option) {
+          option.textContent = `🔍 ${option.textContent} (AI候補)`;
+          option.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
+          option.style.fontWeight = 'bold';
+        }
+
+        // 候補についての説明を表示
+        showFallbackCandidateInfo(columnType, bestCandidate, bestScore, headers[bestCandidate]);
+      }
+
+    } catch (error) {
+      console.error(`フォールバック検出エラー (${columnType}):`, error);
+    }
+  }
+
+  /**
+   * 💡 低信頼度時のユーザーガイダンス
+   */
+  function provideLowConfidenceGuidance(columnType, dropdown) {
+    const guidanceMessages = {
+      answer: '💡 ヒント: 質問に対する学習者の回答が記録されている列を探してください。通常、最も長い文章が含まれる列です。',
+      reason: '💡 ヒント: 回答の理由や説明が記録されている列を探してください。「なぜ」「理由」という言葉を含む列名を確認してください。',
+      name: '💡 ヒント: 回答者の名前が記録されている列を探してください。通常、表の右側にある短いテキストの列です。',
+      class: '💡 ヒント: クラスや学年情報が記録されている列を探してください。「3-A」「1年1組」のような形式のデータを含む列です。'
+    };
+
+    const message = guidanceMessages[columnType];
+    if (message) {
+      // ドロップダウンの下にガイダンス表示
+      let guidanceEl = document.getElementById(`${columnType}-guidance`);
+      if (!guidanceEl) {
+        guidanceEl = document.createElement('div');
+        guidanceEl.id = `${columnType}-guidance`;
+        guidanceEl.className = 'text-xs text-blue-300 mt-1 p-2 bg-blue-500/10 rounded border-l-2 border-blue-400';
+        dropdown.parentNode.appendChild(guidanceEl);
+      }
+      guidanceEl.textContent = message;
+
+      // 8秒後に非表示
+      setTimeout(() => {
+        if (guidanceEl && guidanceEl.parentNode) {
+          guidanceEl.parentNode.removeChild(guidanceEl);
+        }
+      }, 8000);
+    }
+  }
+
+  /**
+   * 🔍 代替検出手法の試行
+   */
+  function attemptAlternativeDetection(columnType, dropdown, headers) {
+    console.log(`🔍 代替検出開始: ${columnType}`);
+
+    // 文字数・データ特徴による推測
+    const candidates = [];
+
+    headers.forEach((header, index) => {
+      if (!header) return;
+
+      let score = 0;
+      const headerLower = header.toLowerCase();
+
+      // 文字数による推測
+      switch (columnType) {
+        case 'answer':
+          if (header.length > 20) score += 20; // 長い列名 = 質問文の可能性
+          if (headerLower.includes('？') || headerLower.includes('?')) score += 30;
+          break;
+        case 'reason':
+          if (headerLower.includes('理') || headerLower.includes('説明')) score += 25;
+          break;
+        case 'name':
+          if (header.length < 15 && header.length > 1) score += 15; // 短い列名
+          break;
+        case 'class':
+          if (header.length < 10 && header.length > 1) score += 15; // 短い列名
+          break;
+      }
+
+      if (score > 0) {
+        candidates.push({ index, score, header });
+      }
+    });
+
+    // 最良候補をハイライト
+    if (candidates.length > 0) {
+      candidates.sort((a, b) => b.score - a.score);
+      const bestCandidate = candidates[0];
+
+      if (bestCandidate.score >= 15) {
+        const option = dropdown.querySelector(`option[value="${bestCandidate.index}"]`);
+        if (option) {
+          option.textContent = `❓ ${option.textContent} (推測候補)`;
+          option.style.backgroundColor = 'rgba(245, 158, 11, 0.1)';
+        }
+
+        console.log(`📋 代替候補提示: ${columnType} = ${bestCandidate.index} (${bestCandidate.score}点)`);
+      }
+    }
+  }
+
+  /**
+   * 📋 フォールバック候補情報表示
+   */
+  function showFallbackCandidateInfo(columnType, index, score, header) {
+    const message = `🔍 AI分析: ${String.fromCharCode(65 + index)}列「${header}」が${columnType}の候補として検出されました (信頼度: ${score}/100)`;
+    showInfo(message, 5000);
   }
 
   // ===========================================
