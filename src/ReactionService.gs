@@ -79,7 +79,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
   }
 
   // 🎯 ヘッダー行から列位置取得
-  const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
+  const [headers = []] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
   const reactionColumns = {};
 
   reactionTypes.forEach(type => {
@@ -93,7 +93,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
   const columnIndexes = Object.values(reactionColumns);
   const minCol = Math.min(...columnIndexes);
   const maxCol = Math.max(...columnIndexes);
-  const [rowData] = sheet.getRange(rowNumber, minCol, 1, maxCol - minCol + 1).getValues();
+  const [rowData = []] = sheet.getRange(rowNumber, minCol, 1, maxCol - minCol + 1).getValues();
 
   const currentReactions = {};
   const updatedReactions = {};
@@ -170,7 +170,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
  * @returns {Object} 処理結果
  */
 function processHighlightDirect(sheet, rowNumber) {
-  const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
+  const [headers = []] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
 
   // ハイライト列を探す
   let highlightCol = headers.findIndex(header =>
@@ -184,7 +184,7 @@ function processHighlightDirect(sheet, rowNumber) {
   }
 
   // 現在の値を取得してトグル
-  const [[currentValue]] = sheet.getRange(rowNumber, highlightCol, 1, 1).getValues();
+  const [[currentValue = '']] = sheet.getRange(rowNumber, highlightCol, 1, 1).getValues();
   const isHighlighted = String(currentValue).toUpperCase() === 'TRUE';
   const newValue = isHighlighted ? 'FALSE' : 'TRUE';
 
