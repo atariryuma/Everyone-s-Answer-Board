@@ -73,6 +73,11 @@ function doGet(e) {
         return HtmlService.createTemplateFromFile('LoginPage.html').evaluate();
       }
 
+      case 'manual': {
+        // 教師向けマニュアルページ（静的表示のみ）
+        return HtmlService.createTemplateFromFile('TeacherManual.html').evaluate();
+      }
+
       case 'admin': {
         // ✅ CLAUDE.md準拠: Batch operations for 70x performance improvement
         const adminData = getBatchedAdminData();
@@ -209,6 +214,11 @@ function doGet(e) {
         });
 
         return template.evaluate();
+      }
+
+      case 'manual': {
+        // 📚 Teacher Manual - PC初心者の教師向けガイド
+        return HtmlService.createTemplateFromFile('TeacherManual.html').evaluate();
       }
 
       case 'main':
