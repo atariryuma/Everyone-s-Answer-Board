@@ -48,7 +48,8 @@
       "Bash(git restore:*)",
       "Bash(python3:*)",
       "Bash(git checkout:*)",
-      "mcp__ide__executeCode"
+      "mcp__ide__executeCode",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": [],
