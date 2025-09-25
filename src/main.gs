@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, DataController, SystemController, getDatabaseConfig, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, DataController, SystemController, getDatabaseConfig, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls */
 
 // ===========================================
 // 🔧 Core Utility Functions
@@ -88,6 +88,9 @@ function doGet(e) {
         const { email, user, config } = adminData;
         const isAdmin = isAdministrator(email);
 
+        // ✅ 動的URL生成 (CLAUDE.md準拠: システム統一)
+        const enhancedConfig = enhanceConfigWithDynamicUrls(config, user.userId);
+
         // 認証済み - Administrator/Editor権限でAdminPanel表示
         const template = HtmlService.createTemplateFromFile('AdminPanel.html');
         template.userEmail = email;
@@ -110,7 +113,8 @@ function doGet(e) {
           autoStopTime: config.autoStopTime || null,
           setupStatus: config.setupStatus || 'pending',
           displaySettings: config.displaySettings || {},
-          columnMapping: config.columnMapping || {}
+          columnMapping: config.columnMapping || {},
+          dynamicUrls: enhancedConfig.dynamicUrls || {}  // ✅ 動的URL追加
         });
 
         return template.evaluate();
@@ -214,11 +218,6 @@ function doGet(e) {
         });
 
         return template.evaluate();
-      }
-
-      case 'manual': {
-        // 📚 Teacher Manual - PC初心者の教師向けガイド
-        return HtmlService.createTemplateFromFile('TeacherManual.html').evaluate();
       }
 
       case 'main':
@@ -345,6 +344,9 @@ function doPost(e) {
       case 'refreshData':
         result = handleUserDataRequest(email, request.options || {});
         break;
+      case 'publishApp':
+        result = handlePublishApp(email, request.config || {});
+        break;
       default:
         result = createErrorResponse(action ? `Unknown action: ${action}` : 'Unknown action: 不明');
     }
@@ -379,6 +381,46 @@ function handleUserDataRequest(email, options = {}) {
     return { success: true, data: getUserSheetData(user.userId, options) };
   } catch (error) {
     console.error('handleUserDataRequest error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * アプリ公開処理
+ * @param {string} email - ユーザーメールアドレス
+ * @param {Object} config - 公開設定
+ * @returns {Object} 処理結果
+ */
+function handlePublishApp(email, config) {
+  try {
+    const user = findUserByEmail(email, { requestingUser: email });
+    if (!user) {
+      return createUserNotFoundError();
+    }
+
+    // 設定にisPublished: trueを設定
+    const publishConfig = {
+      ...config,
+      isPublished: true,
+      publishedAt: new Date().toISOString(),
+      setupComplete: true
+    };
+
+    // 設定を保存
+    const saveResult = saveUserConfig(user.userId, publishConfig);
+    if (!saveResult.success) {
+      return createErrorResponse(saveResult.message || '公開設定の保存に失敗しました');
+    }
+
+    return {
+      success: true,
+      message: 'アプリが正常に公開されました',
+      publishedAt: publishConfig.publishedAt,
+      config: saveResult.config,
+      etag: saveResult.etag
+    };
+  } catch (error) {
+    console.error('handlePublishApp error:', error.message);
     return createExceptionResponse(error);
   }
 }

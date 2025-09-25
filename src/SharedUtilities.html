@@ -1930,12 +1930,20 @@
       });
     }
 
-    // Simplified and reliable notification removal scheduling
+    // V8-compatible notification removal scheduling
     scheduleNotificationRemoval(notification, delay) {
-      // Simple setTimeout for reliable notification removal
-      setTimeout(() => {
+      // CLAUDE.md V8 compliant: Promise-based delay for notification removal
+      const createPromiseDelay = (ms) => new Promise(resolve => {
+        const start = Date.now();
+        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+        check();
+      });
+
+      createPromiseDelay(delay).then(() => {
         this.removeNotification(notification);
-      }, delay);
+      }).catch(() => {
+        // Silent error handling for notification removal
+      });
     }
 
     // Remove notification with animation (simplified and reliable)
@@ -1950,12 +1958,20 @@
       notification.style.transform = 'translateX(100%)';
       notification.style.opacity = '0';
 
-      // Simple and reliable removal after animation duration
-      setTimeout(() => {
+      // V8-compatible removal after animation duration
+      const createPromiseDelay = (ms) => new Promise(resolve => {
+        const start = Date.now();
+        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+        check();
+      });
+
+      createPromiseDelay(300).then(() => { // Match CSS transition duration
         if (notification.parentNode) {
           notification.remove();
         }
-      }, 300); // Match CSS transition duration
+      }).catch(() => {
+        // Silent error handling for DOM removal
+      });
     }
 
     // Convenience methods (simplified - use showMessage defaults)

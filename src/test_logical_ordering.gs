@@ -1,3 +1,5 @@
+/* global generateRecommendedMapping, analyzeFieldRelationships */
+
 /**
  * Test logical field ordering constraints (answer before reason)
  */
@@ -89,7 +91,7 @@ function testLogicalOrdering() {
     try {
       const result = generateRecommendedMapping(testCase.headers);
       const mapping = result.recommendedMapping;
-      const confidence = result.confidence;
+      const {confidence} = result;
       const validation = result.analysis?.logicalValidation;
 
       const actualAnswerIndex = mapping.answer;
@@ -98,7 +100,7 @@ function testLogicalOrdering() {
 
       // Check against expectations
       let testPassed = true;
-      let details = [];
+      const details = [];
 
       if (testCase.expected.answerIndex !== undefined) {
         const answerCorrect = actualAnswerIndex === testCase.expected.answerIndex;

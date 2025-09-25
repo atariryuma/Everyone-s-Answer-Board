@@ -1287,6 +1287,34 @@
     window.open(formUrl, '_blank');
   }
 
+  // ✅ 使い方ガイドを新タブで開く (CLAUDE.md準拠: 現在のベースURL使用)
+  function openManualGuide() {
+    try {
+      // 現在のページと同じベースURLを使用（本番/開発環境を自動判別）
+      const currentUrl = new URL(window.location.href);
+      const baseUrl = currentUrl.origin + currentUrl.pathname.replace(/\/[^/]*$/, '');
+      let manualUrl;
+
+      // パス形式に応じてURL構築
+      if (currentUrl.pathname.includes('/dev')) {
+        // 開発環境: /dev?mode=manual
+        manualUrl = baseUrl + '/dev?mode=manual';
+      } else if (currentUrl.pathname.includes('/exec')) {
+        // 本番環境: /exec?mode=manual
+        manualUrl = baseUrl + '/exec?mode=manual';
+      } else {
+        // フォールバック: クエリパラメータのみ変更
+        manualUrl = window.location.href.split('?')[0] + '?mode=manual';
+      }
+
+      console.log('使い方ガイドURL:', manualUrl);
+      window.open(manualUrl, '_blank');
+    } catch (error) {
+      console.error('使い方ガイドを開けませんでした:', error);
+      showError('使い方ガイドを開けませんでした。再度お試しください。');
+    }
+  }
+
   // リソースボタンの表示状態を更新
   function updateResourceButtons(config) {
     const spreadsheetBtn = document.getElementById('open-spreadsheet-btn');
@@ -3079,7 +3107,7 @@
       
 
       // 現在の設定を収集
-      const currentConfig = gatherConfiguration();
+      const currentConfig = getConfiguration();
       const headers = window.currentHeaders || [];
       const columnMapping = currentConfig.columnMapping || {};
 
@@ -3666,14 +3694,24 @@
         .filter(Boolean);
     }
 
-    // ドロップダウンからマッピングを収集
-    const selections = gatherColumnSelections();
-    const mapping = { mapping: {}, confidence: {} };
+    // ✅ CLAUDE.md準拠: シンプル構造の直接収集
+    const columnMapping = getColumnMapping();
+    const mapping = { mapping: columnMapping, confidence: {} };
+
+    // 信頼度は既存のUI要素から収集（互換性のため）
     ['answer', 'reason', 'class', 'name'].forEach((key) => {
-      const sel = selections[key];
-      if (sel && typeof sel.columnIndex === 'number') {
-        mapping.mapping[key] = sel.columnIndex;
-        if (typeof sel.confidence === 'number') mapping.confidence[key] = sel.confidence;
+      if (typeof columnMapping[key] === 'number') {
+        const confidenceElement = document.getElementById(key + '-confidence');
+        if (confidenceElement && !confidenceElement.classList.contains('hidden')) {
+          const badge = confidenceElement.querySelector('.confidence-badge');
+          if (badge) {
+            const confidenceText = badge.textContent;
+            const match = confidenceText.match(/(\d+)%/);
+            if (match) {
+              mapping.confidence[key] = parseInt(match[1]);
+            }
+          }
+        }
       }
     });
 
@@ -4197,7 +4235,7 @@
       showInfo('保存処理を実行中です…');
       return;
     }
-    const config = gatherConfiguration();
+    const config = getConfiguration();
 
     window.setLoading(true, '処理中...');
     google.script.run
@@ -4240,7 +4278,7 @@
 
     try {
       // 🔧 UI状態から完全な設定データを収集
-      const config = gatherConfiguration();
+      const config = getConfiguration();
 
 
       if (!config || !config.spreadsheetId) {
@@ -4254,7 +4292,7 @@
         return;
       }
 
-      // 🚀 完全な設定データを使用（gatherConfiguration()の結果を完全信頼）
+      // 🚀 完全な設定データを使用（getConfiguration()の結果を完全信頼）
       const publishConfig = config;
 
 
@@ -4354,31 +4392,11 @@
     }
   }
 
-  // 列マッピング情報の安全な収集（V8 Runtime最適化準拠）
-  function gatherColumnSelectionsSafe() {
-    try {
-      // ✅ 既存関数の拡張（破壊的変更回避）
-      const existing = gatherColumnSelections();
+  // ✅ CLAUDE.md準拠: 重複関数削除（シンプル化）
+  // getColumnMapping() → getColumnMapping()に統一
 
-      // ✅ ヘッダー情報の安全な収集
-      const answerSelect = document.getElementById('answer-column-select');
-      const headers = answerSelect ?
-        Array.from(answerSelect.options).slice(1).map(opt => opt.textContent) :
-        [];
-
-      return {
-        ...existing,
-        headers,
-        verifiedAt: new Date().toISOString()
-      };
-    } catch (error) {
-      console.warn('gatherColumnSelectionsSafe error:', error.message);
-      return { mapping: {}, confidence: {}, headers: [] };
-    }
-  }
-
-  // 設定収集（ドロップダウン式対応）
-  function gatherConfiguration() {
+  // ✅ CLAUDE.md準拠: 自然な英語パターン
+  function getConfiguration() {
     const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
 
     let spreadsheetId, sheetName;
@@ -4403,7 +4421,7 @@
 
     // ✅ 完全なデータ収集（既存統一API活用）
     const formInfo = getCurrentFormInfoSafe();
-    const columnMapping = gatherColumnSelectionsSafe();
+    const columnMapping = getColumnMapping();
 
     return {
       spreadsheetId,
@@ -4421,8 +4439,8 @@
     };
   }
 
-  // ドロップダウンから列選択情報を収集
-  function gatherColumnSelections() {
+  // ✅ CLAUDE.md準拠: 自然な英語パターン（シンプル化）
+  function getColumnMapping() {
     const dropdowns = {
       answer: document.getElementById('answer-column-select'),
       reason: document.getElementById('reason-column-select'),
@@ -4430,37 +4448,20 @@
       name: document.getElementById('name-column-select'),
     };
 
-    const selections = {};
-    let hasAnySelection = false;
+    // 🎯 最適構造: {answer: 4, reason: 5, class: 2} - 変換処理不要
+    const columnMapping = {};
 
     Object.keys(dropdowns).forEach((columnType) => {
       const dropdown = dropdowns[columnType];
       if (!dropdown) return;
-
       const selectedValue = dropdown.value;
-      const isAI = dropdown.classList.contains('has-ai-selection');
-      const isManual = dropdown.classList.contains('has-manual-selection');
-
       if (selectedValue !== '') {
-        selections[columnType] = {
-          columnIndex: parseInt(selectedValue),
-          columnLabel: String.fromCharCode(65 + parseInt(selectedValue)) + '列',
-          selectionType: isManual ? 'manual' : 'ai',
-          confidence: getColumnConfidence(columnType),
-        };
-        hasAnySelection = true;
+        columnMapping[columnType] = parseInt(selectedValue);
       }
     });
 
-    // AI検出の元データも含める
-    if (window.currentAIMapping) {
-      selections._aiMapping = window.currentAIMapping;
-    }
-
-    selections._hasSelections = hasAnySelection;
-
-    console.log('gatherColumnSelections:', selections);
-    return selections;
+    console.log('✅ getColumnMapping (simplified):', columnMapping);
+    return columnMapping;
   }
 
   // Get column confidence level

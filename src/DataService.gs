@@ -18,7 +18,7 @@
  * - ReactionService.gs（リアクション・ハイライト）
  */
 
-/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, helpers, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight */
+/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, createDataServiceSuccessResponse */
 
 // ===========================================
 // 🎯 Core Data Operations - CLAUDE.md準拠
@@ -41,7 +41,7 @@ function getUserSheetData(userId, options = {}) {
     const user = findUserById(userId);
     if (!user) {
       console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
-      return helpers.createDataServiceErrorResponse('ユーザーが見つかりません');
+      return createDataServiceErrorResponse('ユーザーが見つかりません');
     }
 
     // 統一API使用: 構造化パース
@@ -49,7 +49,7 @@ function getUserSheetData(userId, options = {}) {
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId) {
       console.warn('[WARN] DataService.getUserSheetData: Spreadsheet ID not configured', { userId });
-      return helpers.createDataServiceErrorResponse('スプレッドシートが設定されていません');
+      return createDataServiceErrorResponse('スプレッドシートが設定されていません');
     }
 
     // データ取得実行
@@ -81,7 +81,7 @@ function getUserSheetData(userId, options = {}) {
       userId,
       error: error.message
     });
-    return helpers.createDataServiceErrorResponse(error.message || 'データ取得エラー');
+    return createDataServiceErrorResponse(error.message || 'データ取得エラー');
   }
 }
 
@@ -222,7 +222,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
     const { lastRow, lastCol } = getSheetDimensions(sheet);
 
     if (lastRow <= 1) {
-      return helpers.createDataServiceSuccessResponse([], [], config.sheetName);
+      return createDataServiceSuccessResponse([], [], config.sheetName);
     }
 
     // ヘッダー取得
@@ -264,7 +264,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
  */
 function processRawDataBatch(batchRows, headers, config, options = {}, startOffset = 0, user = null) {
   try {
-    const columnMapping = config.columnMapping?.mapping || {};
+    const columnMapping = config.columnMapping || {};
     const processedBatch = [];
 
     batchRows.forEach((row, batchIndex) => {
@@ -276,18 +276,18 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
         const item = {
           id: `row_${globalIndex + 2}`,
           rowIndex: globalIndex + 2, // 1-based row number including header
-          timestamp: extractFieldValueUnified(row, headers, 'timestamp') || '',
-          email: extractFieldValueUnified(row, headers, 'email') || '',
+          timestamp: extractFieldValueUnified(row, headers, 'timestamp')?.value || '',
+          email: extractFieldValueUnified(row, headers, 'email')?.value || '',
 
           // メインコンテンツ（ColumnMappingService利用）
-          answer: extractFieldValueUnified(row, headers, 'answer', columnMapping) || '',
-          opinion: extractFieldValueUnified(row, headers, 'answer', columnMapping) || '', // Alias for answer field
-          reason: extractFieldValueUnified(row, headers, 'reason', columnMapping) || '',
-          class: extractFieldValueUnified(row, headers, 'class', columnMapping) || '',
-          name: extractFieldValueUnified(row, headers, 'name', columnMapping) || '',
+          answer: extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || '',
+          opinion: extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || '', // Alias for answer field
+          reason: extractFieldValueUnified(row, headers, 'reason', columnMapping)?.value || '',
+          class: extractFieldValueUnified(row, headers, 'class', columnMapping)?.value || '',
+          name: extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || '',
 
           // メタデータ
-          formattedTimestamp: formatTimestamp(extractFieldValueUnified(row, headers, 'timestamp')),
+          formattedTimestamp: formatTimestamp(extractFieldValueUnified(row, headers, 'timestamp')?.value),
           isEmpty: isEmptyRow(row),
 
           // リアクション（ReactionService利用）
@@ -326,7 +326,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
  */
 function processRawData(dataRows, headers, config, options = {}, user = null) {
   try {
-    const columnMapping = config.columnMapping?.mapping || {};
+    const columnMapping = config.columnMapping || {};
     const processedData = [];
 
     dataRows.forEach((row, index) => {
@@ -335,18 +335,18 @@ function processRawData(dataRows, headers, config, options = {}, user = null) {
         const item = {
           id: `row_${index + 2}`,
           rowIndex: index + 2,
-          timestamp: extractFieldValueUnified(row, headers, 'timestamp') || '',
-          email: extractFieldValueUnified(row, headers, 'email') || '',
+          timestamp: extractFieldValueUnified(row, headers, 'timestamp')?.value || '',
+          email: extractFieldValueUnified(row, headers, 'email')?.value || '',
 
           // メインコンテンツ（ColumnMappingService利用）
-          answer: extractFieldValueUnified(row, headers, 'answer', columnMapping) || '',
-          opinion: extractFieldValueUnified(row, headers, 'answer', columnMapping) || '', // Alias for answer field
-          reason: extractFieldValueUnified(row, headers, 'reason', columnMapping) || '',
-          class: extractFieldValueUnified(row, headers, 'class', columnMapping) || '',
-          name: extractFieldValueUnified(row, headers, 'name', columnMapping) || '',
+          answer: extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || '',
+          opinion: extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || '', // Alias for answer field
+          reason: extractFieldValueUnified(row, headers, 'reason', columnMapping)?.value || '',
+          class: extractFieldValueUnified(row, headers, 'class', columnMapping)?.value || '',
+          name: extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || '',
 
           // メタデータ
-          formattedTimestamp: formatTimestamp(extractFieldValueUnified(row, headers, 'timestamp')),
+          formattedTimestamp: formatTimestamp(extractFieldValueUnified(row, headers, 'timestamp')?.value),
           isEmpty: isEmptyRow(row),
 
           // リアクション（ReactionService利用）

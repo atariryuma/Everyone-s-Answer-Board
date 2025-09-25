@@ -306,7 +306,8 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
       webAppUrl,
       adminPanelUrl: `${webAppUrl}?mode=admin&userId=${userId}`,
       viewBoardUrl: `${webAppUrl}?mode=view&userId=${userId}`,
-      setupUrl: `${webAppUrl}?mode=setup&userId=${userId}`
+      setupUrl: `${webAppUrl}?mode=setup&userId=${userId}`,
+      manualUrl: `${webAppUrl}?mode=manual`  // ✅ 使い方ガイド用URL追加
     };
 
     // システムメタデータ追加
@@ -420,7 +421,7 @@ function validateAndSanitizeConfig(config, userId) {
       sanitized.displaySettings = sanitizeDisplaySettings(sanitized.displaySettings);
     }
     if (sanitized.columnMapping) {
-      sanitized.columnMapping = sanitizeColumnMapping(sanitized.columnMapping);
+      sanitized.columnMapping = sanitizeMapping(sanitized.columnMapping);
     }
 
     if (errors.length > 0) {
@@ -472,20 +473,19 @@ function sanitizeDisplaySettings(displaySettings) {
  * @param {Object} columnMapping - 列マッピング
  * @returns {Object} サニタイズ済み列マッピング
  */
-function sanitizeColumnMapping(columnMapping) {
-  const sanitized = { mapping: {} };
+function sanitizeMapping(columnMapping) {
+  // ✅ CLAUDE.md準拠: シンプル構造直接サニタイズ {answer: 4, class: 2}
+  const sanitized = {};
+  const validFields = ['answer', 'reason', 'class', 'name', 'timestamp', 'email'];
 
-  if (columnMapping.mapping && typeof columnMapping.mapping === 'object') {
-    const validFields = ['answer', 'reason', 'class', 'name', 'timestamp', 'email'];
+  validFields.forEach(field => {
+    const index = columnMapping[field];
+    if (typeof index === 'number' && index >= 0 && index < 100) {
+      sanitized[field] = index;
+    }
+  });
 
-    validFields.forEach(field => {
-      const index = columnMapping.mapping[field];
-      if (typeof index === 'number' && index >= 0 && index < 100) {
-        sanitized.mapping[field] = index;
-      }
-    });
-  }
-
+  console.log('✅ sanitizeMapping (simplified):', sanitized);
   return sanitized;
 }
 
@@ -700,13 +700,14 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
     console.log('📝 getQuestionText START:', {
       hasColumnMapping: !!config?.columnMapping,
       hasHeaders: !!config?.columnMapping?.headers,
-      answerIndex: config?.columnMapping?.mapping?.answer,
+      answerIndex: config?.columnMapping?.answer,  // ✅ CLAUDE.md準拠: 統一形式対応
       headersLength: config?.columnMapping?.headers?.length || 0,
       hasSpreadsheetId: !!config?.spreadsheetId,
       hasSheetName: !!config?.sheetName
     });
 
-    const answerIndex = config?.columnMapping?.mapping?.answer;
+    // ✅ CLAUDE.md準拠: 統一形式対応
+    const answerIndex = config?.columnMapping?.answer;
 
     // 1. 既存のheadersから取得を試行
     if (typeof answerIndex === 'number' && config?.columnMapping?.headers?.[answerIndex]) {

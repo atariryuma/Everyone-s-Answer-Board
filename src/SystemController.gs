@@ -743,23 +743,10 @@ function publishApplication(publishConfig) {
     }
 
     const publishedAt = new Date().toISOString();
-    const props = PropertiesService.getScriptProperties();
 
-    // Set properties
-    try {
-      props.setProperty('APPLICATION_STATUS', 'active');
-      props.setProperty('PUBLISHED_AT', publishedAt);
-    } catch (propsError) {
-      console.error('[ERROR] SystemController.publishApplication: Properties update failed:', propsError.message || 'Properties update error');
-    }
-
-    if (publishConfig) {
-      try {
-        props.setProperty('PUBLISH_CONFIG', JSON.stringify(publishConfig));
-      } catch (publishConfigError) {
-        console.error('❌ PUBLISH_CONFIG save failed:', publishConfigError.message);
-      }
-    }
+    // ✅ CLAUDE.md準拠: マルチテナント対応
+    // ユーザー固有データはconfigJSONにのみ保存、スクリプトプロパティは不使用
+    // publishedAt, isPublished, configはユーザー個別のconfigJSONで管理
 
     // 🔧 Zero-Dependency統一: 直接findUserByEmail使用（CLAUDE.md準拠）
     const user = findUserByEmail(email, { requestingUser: email });

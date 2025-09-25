@@ -199,7 +199,7 @@ function calculateBaseScore(header, fieldType, patterns) {
  */
 function calculateScoreWithLogic(header, fieldType, patterns, index, relationships, options = {}) {
   const normalizedHeader = header.toLowerCase().trim();
-  let baseScore = calculateBaseScore(header, fieldType, patterns);
+  const baseScore = calculateBaseScore(header, fieldType, patterns);
 
   // Apply logical ordering constraints
   let logicalBonus = 0;

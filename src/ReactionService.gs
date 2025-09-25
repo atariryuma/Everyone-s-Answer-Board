@@ -9,11 +9,12 @@
  * - Service Account適切使用（Cross-user access only）
  */
 
-/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, resolveColumnIndex, isAdministrator */
+/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
 
 // ===========================================
 // 🎯 リアクション管理システム - CLAUDE.md準拠
 // ===========================================
+
 
 // ===========================================
 // 🔧 セキュリティ・監査機能
@@ -82,10 +83,11 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
   const reactionColumns = {};
 
   reactionTypes.forEach(type => {
-    const colIndex = headers.findIndex(header =>
-      String(header).toUpperCase().includes(type)
-    );
-    reactionColumns[type] = colIndex !== -1 ? colIndex + 1 : createReactionColumn(sheet, type);
+    const colIndex = headers.findIndex(header => String(header).toUpperCase().trim() === type);
+    reactionColumns[type] = colIndex !== -1 ? colIndex + 1 : (() => {
+      console.error(`Required reaction column '${type}' not found. Columns must be pre-created during data source setup.`);
+      throw new Error(`Required reaction column '${type}' not found. Please reconnect your data source to set up reaction columns.`);
+    })();
   });
 
   // 🔄 現在のリアクション状態を取得
@@ -102,7 +104,10 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
   reactionTypes.forEach(type => {
     const col = reactionColumns[type];
     const cellValue = rowData[col - minCol] || '';
-    const users = parseReactionUsers(String(cellValue));
+    const cellString = String(cellValue);
+    const users = cellString && cellString.trim()
+      ? cellString.trim().split('|').filter(email => email.trim().length > 0)
+      : [];
 
     currentReactions[type] = users;
 
@@ -138,7 +143,10 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
   const updateData = [];
   reactionTypes.forEach(type => {
     const col = reactionColumns[type];
-    const serialized = serializeReactionUsers(updatedReactions[type]);
+    const users = updatedReactions[type];
+    const serialized = Array.isArray(users) && users.length > 0
+      ? users.filter(email => email && email.trim().length > 0).join('|')
+      : '';
     updateData.push([col, serialized]);
   });
 
@@ -172,9 +180,7 @@ function processHighlightDirect(sheet, rowNumber) {
   const [headers = []] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
 
   // ハイライト列を探す
-  const highlightCol = headers.findIndex(header =>
-    String(header).toUpperCase().includes('HIGHLIGHT')
-  ) + 1;
+  const highlightCol = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT') + 1;
 
   // ハイライト列が存在しない場合はエラー
   if (highlightCol === 0) {
@@ -194,50 +200,8 @@ function processHighlightDirect(sheet, rowNumber) {
   };
 }
 
-/**
- * リアクション列作成（必要時のみ）
- * @param {Sheet} sheet - シートオブジェクト
- * @param {string} reactionType - リアクション種類
- * @returns {number} 列番号
- */
-function createReactionColumn(sheet, reactionType) {
-  console.error(`createReactionColumn: Column ${reactionType} not found. Columns must be pre-created during data source setup.`);
-  throw new Error(`Required reaction column '${reactionType}' not found. Please reconnect your data source to set up reaction columns.`);
-}
 
-/**
- * リアクションユーザー配列をパース
- * @param {string} cellValue - セル値
- * @returns {Array<string>} ユーザーメール配列
- */
-function parseReactionUsers(cellValue) {
-  if (!cellValue || typeof cellValue !== 'string') {
-    return [];
-  }
 
-  const trimmed = cellValue.trim();
-  if (!trimmed) {
-    return [];
-  }
-
-  // Split by delimiter and filter out empty strings
-  return trimmed.split('|').filter(email => email.trim().length > 0);
-}
-
-/**
- * ユーザー配列をセル用文字列にシリアライズ
- * @param {Array<string>} users - ユーザーメール配列
- * @returns {string} セル格納用文字列
- */
-function serializeReactionUsers(users) {
-  if (!Array.isArray(users) || users.length === 0) {
-    return '';
-  }
-
-  // Filter out empty emails and join with delimiter
-  const validEmails = users.filter(email => email && email.trim().length > 0);
-  return validEmails.join('|');
-}
 
 
 /**
@@ -255,18 +219,19 @@ function extractReactions(row, headers, userEmail = null) {
       CURIOUS: { count: 0, reacted: false }
     };
 
-    // 🎯 統一列判定システムを使用（ColumnMappingServiceから）
-    const reactionTypes = ['understand', 'like', 'curious'];
+    // 🎯 直接列名マッチング（大文字小文字対応）
+    const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
 
     reactionTypes.forEach(reactionType => {
-      const columnResult = resolveColumnIndex(headers, reactionType);
+      const columnIndex = headers.findIndex(header => String(header).toUpperCase().trim() === reactionType);
 
-      if (columnResult.index !== -1) {
-        const cellValue = row[columnResult.index] || '';
-        const reactionUsers = parseReactionUsers(cellValue);
-        const upperType = reactionType.toUpperCase();
+      if (columnIndex !== -1) {
+        const cellValue = row[columnIndex] || '';
+        const reactionUsers = cellValue && typeof cellValue === 'string' && cellValue.trim()
+          ? cellValue.trim().split('|').filter(email => email.trim().length > 0)
+          : [];
 
-        reactions[upperType] = {
+        reactions[reactionType] = {
           count: reactionUsers.length,
           reacted: userEmail ? reactionUsers.includes(userEmail) : false
         };
@@ -292,11 +257,11 @@ function extractReactions(row, headers, userEmail = null) {
  */
 function extractHighlight(row, headers) {
   try {
-    // 🎯 統一列判定システムを使用（ColumnMappingServiceから）
-    const columnResult = resolveColumnIndex(headers, 'HIGHLIGHT');
+    // 🎯 直接列名マッチング（CLAUDE.md準拠: 直接API使用）
+    const columnIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
 
-    if (columnResult.index !== -1) {
-      const value = String(row[columnResult.index] || '').toUpperCase();
+    if (columnIndex !== -1) {
+      const value = String(row[columnIndex] || '').toUpperCase();
       return value === 'TRUE' || value === '1' || value === 'YES';
     }
 

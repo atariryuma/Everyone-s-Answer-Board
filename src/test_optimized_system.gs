@@ -1,3 +1,5 @@
+/* global generateRecommendedMapping, resolveColumnIndex */
+
 /**
  * Quick test for the optimized column detection system
  * Tests the specific user-reported problem cases
@@ -53,7 +55,7 @@ function testOptimizedSystem() {
     const avgNewConfidence = (answerResult.confidence + classResult.confidence + nameResult.confidence) / 3;
     const avgImprovement = avgNewConfidence - avgOldConfidence;
 
-    console.log('\\n' + '='.repeat(50));
+    console.log(`\\n${  '='.repeat(50)}`);
     console.log('🏁 OPTIMIZATION RESULTS:');
     console.log(`✓ All Fields Detected: ${allSuccess ? '✅ YES' : '❌ NO'}`);
     console.log(`✓ Average Confidence: ${avgOldConfidence.toFixed(1)}% → ${avgNewConfidence.toFixed(1)}%`);
@@ -119,7 +121,7 @@ function runAllOptimizationTests() {
   // Run mapping generation test
   const mappingTest = testMappingGeneration();
 
-  console.log('\\n' + '='.repeat(60));
+  console.log(`\\n${  '='.repeat(60)}`);
   console.log('🏆 FINAL ASSESSMENT');
   console.log('='.repeat(60));
 
