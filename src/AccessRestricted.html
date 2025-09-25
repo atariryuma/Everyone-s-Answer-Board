@@ -268,7 +268,7 @@
               .withFailureHandler(function(error) {
                 console.error('ユーザー情報取得失敗:', error);
                 if (window.notifications) {
-                  window.notifications.warning('ユーザー情報の取得に失敗しました。管理者にお問い合わせください。', 7000);
+                  window.notifications.warning('ユーザー情報の取得に失敗しました。ページを再読み込みしてください。', 7000);
                 }
                 appSetupLink.href = `${webAppUrl}?mode=appSetup`;
               })

@@ -975,7 +975,7 @@
         return true;
       } else {
         // 直接URLで接続を試行
-        showInfo('💡 設定済みスプレッドシートに直接接続を試行します');
+        showInfo('設定済みスプレッドシートに直接接続を試行します');
         return false;
       }
     } catch (error) {
@@ -1003,7 +1003,7 @@
 
         // 一覧選択モードでかつ実際にドロップダウンが読み込まれている場合のみ通知
         if (isDropdownMode && select.options.length > 1) {
-          showInfo('💡 シート「' + sheetName + '」が見つかりません。手動で選択してください');
+          showInfo('シート「' + sheetName + '」が見つかりません。手動で選択してください');
         }
         return false;
       }
@@ -1899,9 +1899,9 @@
 
             // フォーム連携状況に応じたメッセージ
             const formStatus = result.formInfo?.success ? 'フォーム連携あり' : 'フォーム連携なし（接続可能）';
-            showSuccess(`✅ 検証完了 - シート「${result.sheetName}」に接続できます (${formStatus}) (${result.executionTime})`);
+            showSuccess(`検証完了 - シート「${result.sheetName}」に接続できます (${formStatus})`);
           } else {
-            showWarning('⚠️ アクセス権限に問題があります');
+            showWarning('アクセス権限に問題があります');
           }
 
           // スプレッドシートIDを保存（既存機能との互換性）
@@ -1957,13 +1957,13 @@
 
     try {
       window.setLoading(true, '処理中...');
-      showInfo('🤖 AI列判定実行中...', 3000);
+      showInfo('AI列判定実行中...', 3000);
 
       await performColumnAnalysis(spreadsheetId, sheetName);
-      showSuccess('🎯 AI列判定完了！設定を確認してください');
+      showSuccess('AI列判定完了！設定を確認してください');
     } catch (error) {
       console.error('手動AI列判定エラー:', error);
-      showError('⚠️ AI列判定に失敗しました。接続を確認して再試行してください');
+      showError('AI列判定に失敗しました。接続を確認して再試行してください');
     } finally {
       window.setLoading(false);
     }
@@ -1985,7 +1985,7 @@
       if (!qualityCheck.isValid) {
         if (retryCount < maxRetries) {
           console.warn(`⚠️ 分析品質不足、リトライします: ${qualityCheck.reason}`);
-          showInfo(`🔄 分析品質向上のため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
+          showInfo(`分析品質向上のため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
 
           // 指数バックオフ待機
           await new Promise(resolve => setTimeout(resolve, retryDelay));
@@ -1993,7 +1993,7 @@
           return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
         } else {
           console.error('🚫 最大リトライ回数に到達、品質不足の結果を使用');
-          showWarning('⚠️ AI分析の精度が期待値を下回りましたが、利用可能な結果を表示します', 5000);
+          showWarning('AI分析の精度が期待値を下回りましたが、利用可能な結果を表示します', 5000);
         }
       }
 
@@ -2022,7 +2022,7 @@
       // リトライ可能エラーの場合
       if (retryCount < maxRetries && isRetryableError(error)) {
         console.warn(`🔄 リトライ可能エラー、再試行します: ${error.message}`);
-        showInfo(`🔄 接続エラーのため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
+        showInfo(`接続エラーのため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
 
         await new Promise(resolve => setTimeout(resolve, retryDelay));
         return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
@@ -2094,7 +2094,7 @@
    */
   async function attemptEmergencyFallback(spreadsheetId, sheetName) {
     console.log('🆘 緊急フォールバック実行');
-    showWarning('⚠️ AI分析に問題が発生しました。基本的なヘッダー情報のみ取得します。', 5000);
+    showWarning('AI分析に問題が発生しました。基本的なヘッダー情報のみ取得します。', 5000);
 
     // 基本的なヘッダー取得のみ試行
     try {
@@ -2108,7 +2108,7 @@
       if (basicResult && basicResult.headers) {
         // AIなしでドロップダウン設定
         fillColumnDropdowns(basicResult.headers, {}, {});
-        showWarning('💡 手動で列を設定してください。AI分析は利用できませんでした。', 8000);
+        showWarning('手動で列を設定してください。AI分析は利用できませんでした。', 8000);
       }
 
     } catch (basicError) {
@@ -2145,7 +2145,7 @@
     const icon = qualityIcons[qualityLevel];
     const message = qualityMessages[qualityLevel];
 
-    showSuccess(`${icon} ${message}`, 6000);
+    showSuccess(`${message}`, 6000);
   }
 
   // 🆕 現在のスプレッドシートID取得
@@ -2239,7 +2239,7 @@
         select.classList.remove('partial-loading-target');
 
         setPartialLoading(false);
-        showSuccess(`✅ ${sheets?.length || 0}個のシートを読み込みました`);
+        showSuccess(`${sheets?.length || 0}個のシートを読み込みました`);
       })
       .withFailureHandler(function (error) {
         console.error('❌ loadSheetList: シート読み込みエラー', {
@@ -2340,17 +2340,17 @@
         if (result.headers && result.mapping) {
           console.log('🎯 統合処理で分析完了済み、UI更新のみ実行');
           fillColumnDropdowns(result.headers, result.mapping, result.confidence);
-          showSuccess('🎯 接続とAI列判定が完了しました！');
+          showSuccess('接続とAI列判定が完了しました！');
         } else {
           // フォールバック: 分析データがない場合のみ追加実行
           console.log('⚠️ 分析データなし、追加のAI列判定実行');
-          showInfo('🤖 AI列判定実行中...', 3000);
+          showInfo('AI列判定実行中...', 3000);
           try {
             await performColumnAnalysis(spreadsheetId, sheetName);
-            showSuccess('🎯 AI列判定完了！設定を確認してください');
+            showSuccess('AI列判定完了！設定を確認してください');
           } catch (analysisError) {
             console.warn('AI列判定エラー:', analysisError);
-            showWarning('⚠️ AI列判定に失敗しました。手動で設定するか「🤖 AI列判定」ボタンで再実行してください');
+            showWarning('AI列判定に失敗しました。手動で設定するか「AI列判定」ボタンで再実行してください');
           }
         }
       } else {
@@ -2452,7 +2452,7 @@
     showError(fullMessage);
 
     // ドロップダウン式では手動設定は自動的に利用可能
-    showInfo('💡 ドロップダウンを使用して手動で列を設定できます。');
+    showInfo('ドロップダウンを使用して手動で列を設定できます。');
   }
 
 
@@ -2498,7 +2498,7 @@
     // 接続時はAI検出結果を優先し、保存済み設定復元は行わない
     // AI検出が無い場合のみヘッダー情報を表示
 
-    showSuccess('✅ 列設定を更新しました');
+    showSuccess('列設定を更新しました');
   }
 
   // ドロップダウンにヘッダーオプションを設定 - エラーハンドリング強化版
@@ -3200,11 +3200,11 @@
 
       // 結果に応じた通知
       if (diagnostics.summary.overallScore >= 90) {
-        showSuccess(`✅ 列判定システム検証完了！総合スコア: ${diagnostics.summary.overallScore}%`);
+        showSuccess(`列判定システム検証完了！総合スコア: ${diagnostics.summary.overallScore}%`);
       } else if (diagnostics.summary.overallScore >= 70) {
-        showInfo(`⚠️ 列判定システムに改善余地あり。総合スコア: ${diagnostics.summary.overallScore}%`);
+        showInfo(`列判定システムに改善余地あり。総合スコア: ${diagnostics.summary.overallScore}%`);
       } else {
-        showError(`❌ 列判定システムに問題があります。総合スコア: ${diagnostics.summary.overallScore}%`);
+        showError(`列判定システムに問題があります。総合スコア: ${diagnostics.summary.overallScore}%`);
       }
 
       // 推奨事項の表示
@@ -3632,7 +3632,7 @@
       resetButton.style.display = 'none';
     }
 
-    showSuccess('✅ AI検出結果にリセットしました');
+    showSuccess('AI検出結果にリセットしました');
   }
 
   // 列マッピング確認
@@ -4190,7 +4190,7 @@
             // ✅ 論理的整合性: UI状態を統一して更新
             updateResourceButtons(systemState.config);
             updateConfigSummary(systemState.config);
-            showSuccess('✅ 列マッピング設定が完了しました');
+            showSuccess('列マッピング設定が完了しました');
           } else {
             if (result.error === 'etag_mismatch') {
               showInfo('設定が他で更新されました。画面を更新しました。もう一度保存してください。');

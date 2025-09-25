@@ -74,7 +74,7 @@
 
       // 統一された通知システムを使用
       if (window.notifications) {
-        window.notifications.error('ページの初期化に失敗しました。ページを再読み込みしてください。', 10000);
+        window.notifications.error('初期化に失敗しました。ページを再読み込みしてください。', 10000);
       }
 
       // 最終フォールバック: 基本的な表示を確保
@@ -552,7 +552,7 @@
       if (!adminUrl || typeof adminUrl !== 'string') {
         console.error('showAdminPanelRedirect: 無効なadminUrlが渡されました:', adminUrl);
         if (window.notifications) {
-          window.notifications.error('管理パネルのURLが無効です。ページを再読み込みしてください。', 7000);
+          window.notifications.error('管理パネルのURLが無効です。再読み込みしてください。', 7000);
         } else {
           alert('管理パネルのURLが無効です。ページを再読み込みしてください。');
         }

@@ -31,7 +31,22 @@
  */
 function getCurrentEmail() {
   try {
-    return Session.getActiveUser().getEmail();
+    const activeUser = Session.getActiveUser();
+    const email = activeUser ? activeUser.getEmail() : null;
+
+    if (!email || email.trim() === '') {
+      try {
+        const effectiveUser = Session.getEffectiveUser();
+        const effectiveEmail = effectiveUser ? effectiveUser.getEmail() : null;
+        if (effectiveEmail && effectiveEmail.trim() !== '') {
+          return effectiveEmail;
+        }
+      } catch (altError) {
+        console.log('getCurrentEmail: Alternative method failed:', altError.message);
+      }
+    }
+
+    return email || null;
   } catch (error) {
     console.error('getCurrentEmail error:', error.message);
     return null;
@@ -1337,18 +1352,30 @@ function getBoardInfo() {
  * @param {string} targetUserId - 対象ユーザーID（指定時はクロスユーザーアクセス）
  * @returns {Object} フロントエンド期待形式のデータ
  */
-function getPublishedSheetData(classFilter, sortOrder, adminMode = false, targetUserId = null) {
-  // ✅ Performance optimization: Add timeout for slow responses
+function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) {
+  // ✅ Simplified parameters - back to working version
+  classFilter = classFilter || null;
+  sortOrder = sortOrder || 'newest';
+  adminMode = adminMode || false;
+  targetUserId = targetUserId || null;
+
   const startTime = Date.now();
+  console.info('getPublishedSheetData: Function called', {
+    classFilter,
+    sortOrder,
+    adminMode,
+    targetUserId,
+    timestamp: new Date().toISOString(),
+    startTime
+  });
 
   try {
-    // ✅ CLAUDE.md準拠: Batched admin authentication (70x performance improvement)
     const adminAuth = getBatchedAdminAuth({ allowNonAdmin: true });
     if (!adminAuth.success || !adminAuth.authenticated) {
       return {
         success: false,
         error: 'Authentication required',
-        data: [],  // ✅ CLAUDE.md準拠: 統一レスポンス形式（rows → data）
+        data: [],
         sheetName: '',
         header: '認証エラー'
       };
@@ -1356,189 +1383,293 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode = false, target
 
     const { email: viewerEmail, isAdmin: isSystemAdmin } = adminAuth;
 
-    // CLAUDE.md準拠: クロスユーザーアクセス対応
-    let user;
     if (targetUserId) {
-      // ✅ Timeout check before expensive operations
-      if (Date.now() - startTime > TIMEOUT_MS.EXTENDED) {
-        console.warn('getPublishedSheetData: Timeout during user lookup');
+      // ✅ CLAUDE.md準拠: 認証済み情報を再利用 - 重複チェック排除
+      const targetUser = findUserById(targetUserId);
+      if (!targetUser) {
         return {
           success: false,
-          error: 'Request timeout - please try again',
-          data: [],  // ✅ CLAUDE.md準拠: 統一レスポンス形式（rows → data）
-          sheetName: '',
-          header: 'タイムアウト'
-        };
-      }
-
-      // クロスユーザーアクセス: targetUserIdで指定されたユーザーのデータを取得
-      const boardData = getViewerBoardData(targetUserId, viewerEmail);
-      if (!boardData) {
-        return {
-          success: false,
-          error: 'User not found or access denied',
-          data: [],  // ✅ CLAUDE.md準拠: 統一レスポンス形式（rows → data）
+          error: 'Target user not found',
+          data: [],
           sheetName: '',
           header: 'ユーザーエラー'
         };
       }
 
-      // ✅ Timeout check after data retrieval
-      if (Date.now() - startTime > TIMEOUT_MS.EXTENDED) {
-        console.warn('getPublishedSheetData: Timeout during data processing');
-        return {
-          success: false,
-          error: 'Data processing timeout - please try again',
-          data: [],  // ✅ CLAUDE.md準拠: 統一レスポンス形式（rows → data）
-          sheetName: '',
-          header: 'タイムアウト'
-        };
-      }
-
-      // getViewerBoardDataの結果を直接使用
-      return transformBoardDataToFrontendFormat(boardData, classFilter, sortOrder);
-    } else {
-      // 従来通り: 現在のユーザーのデータを取得
-
-      // ✅ CLAUDE.md準拠: Optimized single user lookup (eliminated duplicate findUserByEmail call)
-      const searchOptions = {
-        requestingUser: viewerEmail,
-        adminMode: isSystemAdmin,
-        // Use enhanced permissions for admins from the start to avoid second lookup
-        ignorePermissions: isSystemAdmin
+      // 直接データ取得 - getViewerBoardData内の重複認証を回避
+      const options = {
+        classFilter: classFilter !== 'すべて' ? classFilter : undefined,
+        sortBy: sortOrder || 'newest',
+        includeTimestamp: true,
+        adminMode: isSystemAdmin || (targetUser.userEmail === viewerEmail),
+        requestingUser: viewerEmail
       };
 
-      user = findUserByEmail(viewerEmail, searchOptions);
-      if (!user) {
+      const dataFetchStart = Date.now();
+      console.info('getPublishedSheetData: Starting getUserSheetData call', {
+        targetUserId: targetUser.userId,
+        dataFetchStart,
+        options
+      });
+
+      const result = getUserSheetData(targetUser.userId, options);
+      const dataFetchEnd = Date.now();
+
+      console.info('getPublishedSheetData: getUserSheetData completed', {
+        hasResult: !!result,
+        success: result?.success,
+        dataLength: result?.data?.length || 0,
+        executionTime: dataFetchEnd - dataFetchStart,
+        totalTime: dataFetchEnd - startTime
+      });
+
+      if (!result || !result.success) {
+        console.error('getPublishedSheetData: getUserSheetData failed', {
+          result,
+          error: result?.message || 'データ取得エラー',
+          totalTime: Date.now() - startTime
+        });
         return {
           success: false,
-          error: 'User not found',
-          rows: [],
-          sheetName: '',
-          header: 'ユーザーエラー'
+          error: result?.message || 'データ取得エラー',
+          data: [],
+          sheetName: result?.sheetName || '',
+          header: result?.header || '問題'
+        };
+      }
+
+      const finalResult = {
+        success: true,
+        data: result.data || [],
+        header: result.header || result.sheetName || '回答一覧',
+        sheetName: result.sheetName || 'Sheet1'
+      };
+
+      console.info('getPublishedSheetData: Final result prepared', {
+        dataLength: finalResult.data.length,
+        hasHeader: !!finalResult.header,
+        hasSheetName: !!finalResult.sheetName,
+        totalExecutionTime: Date.now() - startTime
+      });
+
+      // ✅ Safe serialization test before return
+      try {
+        const testSerialization = JSON.stringify(finalResult);
+        console.info('getPublishedSheetData: Serialization test passed', {
+          serializationLength: testSerialization.length,
+          isValidJson: true
+        });
+
+        // ✅ Create clean, safe result object with Date protection
+        const safeResult = {
+          success: true,
+          data: Array.isArray(finalResult.data) ? finalResult.data.map(item => {
+            if (typeof item === 'object' && item !== null) {
+              // ✅ Deep clean with Date object protection
+              const cleaned = {};
+              for (const [key, value] of Object.entries(item)) {
+                if (value instanceof Date) {
+                  cleaned[key] = value.toISOString();
+                  console.log(`⚠️ Date object found and converted: ${key} = ${value.toISOString()}`);
+                } else if (typeof value === 'object' && value !== null) {
+                  try {
+                    cleaned[key] = JSON.parse(JSON.stringify(value));
+                  } catch (e) {
+                    cleaned[key] = String(value);
+                  }
+                } else {
+                  cleaned[key] = value;
+                }
+              }
+              return cleaned;
+            }
+            return item;
+          }) : [],
+          header: String(finalResult.header || '回答一覧'),
+          sheetName: String(finalResult.sheetName || 'Sheet1')
+        };
+
+        console.info('getPublishedSheetData: Safe result created, returning to frontend', {
+          dataLength: safeResult.data.length,
+          headerLength: safeResult.header.length,
+          sheetNameLength: safeResult.sheetName.length
+        });
+
+        return safeResult;
+
+      } catch (serializationError) {
+        console.error('getPublishedSheetData: Serialization failed', {
+          error: serializationError.message,
+          dataLength: finalResult.data?.length || 0,
+          headerType: typeof finalResult.header,
+          sheetNameType: typeof finalResult.sheetName
+        });
+
+        // ✅ Return minimal safe response
+        return {
+          success: true,
+          data: [],
+          header: '回答一覧（データ変換エラー）',
+          sheetName: 'Sheet1'
         };
       }
     }
 
-    // getUserSheetDataを呼び出し、フィルターオプションを渡す
+    // ✅ 既存認証情報活用 - 認証済み情報でユーザー検索
+    const user = findUserByEmail(viewerEmail, {
+      requestingUser: viewerEmail,
+      adminMode: isSystemAdmin,
+      ignorePermissions: isSystemAdmin
+    });
+
+    if (!user) {
+      return {
+        success: false,
+        error: 'User not found',
+        data: [],
+        sheetName: '',
+        header: 'ユーザーエラー'
+      };
+    }
+
+    // ✅ Simplified options - remove pagination complexity
     const options = {
       classFilter: classFilter !== 'すべて' ? classFilter : undefined,
       sortBy: sortOrder || 'newest',
       includeTimestamp: true,
-      adminMode: isSystemAdmin, // 管理者権限をデータ取得に渡す
+      adminMode: isSystemAdmin,
       requestingUser: viewerEmail
     };
 
+    const dataFetchStart = Date.now();
+    console.info('getPublishedSheetData: Starting getUserSheetData call (self-access)', {
+      userId: user.userId,
+      dataFetchStart,
+      options
+    });
+
     const result = getUserSheetData(user.userId, options);
+    const dataFetchEnd = Date.now();
 
-    // 統一されたtransformBoardDataToFrontendFormat関数を使用
-    if (result && result.success && result.data) {
+    console.info('getPublishedSheetData: getUserSheetData completed (self-access)', {
+      hasResult: !!result,
+      success: result?.success,
+      dataLength: result?.data?.length || 0,
+      executionTime: dataFetchEnd - dataFetchStart,
+      totalTime: dataFetchEnd - startTime
+    });
 
-      // CLAUDE.md準拠: 統一されたデータ変換関数使用（DRY原則）
-      return transformBoardDataToFrontendFormat(result, classFilter, sortOrder);
-    } else {
-      console.error('❌ Data retrieval failed:', result?.message);
+    // ✅ Simple null check and direct return
+    if (!result || !result.success) {
+      console.error('getPublishedSheetData: getUserSheetData failed (self-access)', {
+        result,
+        error: result?.message || 'データ取得エラー',
+        totalTime: Date.now() - startTime
+      });
       return {
         success: false,
         error: result?.message || 'データ取得エラー',
-        data: [],  // ✅ CLAUDE.md準拠: 統一レスポンス形式（rows → data）
+        data: [],
         sheetName: result?.sheetName || '',
-        header: result?.header || '問題'
+        header: result?.header || '問題',
       };
     }
 
+    const finalResult = {
+      success: true,
+      data: result.data || [],
+      header: result.header || result.sheetName || '回答一覧',
+      sheetName: result.sheetName || 'Sheet1'
+    };
+
+    console.info('getPublishedSheetData: Final result prepared (self-access)', {
+      dataLength: finalResult.data.length,
+      hasHeader: !!finalResult.header,
+      hasSheetName: !!finalResult.sheetName,
+      totalExecutionTime: Date.now() - startTime
+    });
+
+    // ✅ Safe serialization test before return (self-access)
+    try {
+      const testSerialization = JSON.stringify(finalResult);
+      console.info('getPublishedSheetData: Serialization test passed (self-access)', {
+        serializationLength: testSerialization.length,
+        isValidJson: true
+      });
+
+      // ✅ Create clean, safe result object with Date protection (self-access)
+      const safeResult = {
+        success: true,
+        data: Array.isArray(finalResult.data) ? finalResult.data.map(item => {
+          if (typeof item === 'object' && item !== null) {
+            // ✅ Deep clean with Date object protection
+            const cleaned = {};
+            for (const [key, value] of Object.entries(item)) {
+              if (value instanceof Date) {
+                cleaned[key] = value.toISOString();
+                console.log(`⚠️ Date object found and converted (self-access): ${key} = ${value.toISOString()}`);
+              } else if (typeof value === 'object' && value !== null) {
+                try {
+                  cleaned[key] = JSON.parse(JSON.stringify(value));
+                } catch (e) {
+                  cleaned[key] = String(value);
+                }
+              } else {
+                cleaned[key] = value;
+              }
+            }
+            return cleaned;
+          }
+          return item;
+        }) : [],
+        header: String(finalResult.header || '回答一覧'),
+        sheetName: String(finalResult.sheetName || 'Sheet1')
+      };
+
+      console.info('getPublishedSheetData: Safe result created, returning to frontend (self-access)', {
+        dataLength: safeResult.data.length,
+        headerLength: safeResult.header.length,
+        sheetNameLength: safeResult.sheetName.length
+      });
+
+      return safeResult;
+
+    } catch (serializationError) {
+      console.error('getPublishedSheetData: Serialization failed (self-access)', {
+        error: serializationError.message,
+        dataLength: finalResult.data?.length || 0,
+        headerType: typeof finalResult.header,
+        sheetNameType: typeof finalResult.sheetName
+      });
+
+      // ✅ Return minimal safe response
+      return {
+        success: true,
+        data: [],
+        header: '回答一覧（データ変換エラー）',
+        sheetName: 'Sheet1'
+      };
+    }
   } catch (error) {
-    // ✅ CLAUDE.md V8準拠: 変数存在チェック後のエラーハンドリング
-    const errorMessage = (error && error.message) ? error.message : 'データ取得エラー';
-    console.error('❌ getPublishedSheetData ERROR:', errorMessage);
+    console.error('getPublishedSheetData: Exception caught', {
+      error: error?.message || 'Unknown error',
+      stack: error?.stack,
+      classFilter,
+      sortOrder,
+      adminMode,
+      targetUserId,
+      timestamp: new Date().toISOString()
+    });
     return {
       success: false,
-      error: errorMessage,
-      data: [],  // ✅ CLAUDE.md準拠: 統一レスポンス形式（rows → data）
+      error: error?.message || 'データ取得エラー',
+      data: [],
       sheetName: '',
       header: '問題'
     };
   }
 }
 
-/**
- * getViewerBoardDataの結果をフロントエンド期待形式に変換
- * @param {Object} boardData - getViewerBoardDataの戻り値
- * @param {string} classFilter - クラスフィルター
- * @param {string} sortOrder - ソート順
- * @returns {Object} フロントエンド期待形式のデータ
- */
-function transformBoardDataToFrontendFormat(boardData, classFilter, sortOrder) {
-
-  // 🔧 CLAUDE.md準拠: Enhanced validation with detailed logging
-  const hasValidBoardData = !!boardData;
-  const hasSuccessFlag = boardData?.success === true;
-  const hasDataProperty = boardData && 'data' in boardData;
-  const isDataArray = Array.isArray(boardData?.data);
-
-
-  // フロントエンド期待形式に変換（CLAUDE.md準拠）
-  if (hasValidBoardData && hasSuccessFlag && hasDataProperty && isDataArray) {
-    const transformedData = {
-      success: true,
-      header: boardData.header || boardData.sheetName || '回答一覧',
-      sheetName: boardData.sheetName,
-      data: boardData.data.map(item => ({
-        rowIndex: item.rowIndex || item.id,
-        name: item.name || '',
-        class: item.class || '',
-        opinion: item.answer || item.opinion || '',
-        reason: item.reason || '',
-        reactions: item.reactions || {
-          UNDERSTAND: { count: 0, reacted: false },
-          LIKE: { count: 0, reacted: false },
-          SURPRISE: { count: 0, reacted: false }
-        },
-        highlight: Boolean(item.highlight),
-        timestamp: item.timestamp || '',
-        formattedTimestamp: item.formattedTimestamp || ''
-      }))
-    };
-
-    // クラスフィルターの適用
-    if (classFilter && classFilter !== 'すべて') {
-      transformedData.data = transformedData.data.filter(item =>
-        item.class === classFilter
-      );
-    }
-
-    // ソート適用
-    if (sortOrder === 'newest') {
-      transformedData.data.sort((a, b) => (b.rowIndex || 0) - (a.rowIndex || 0));
-    } else if (sortOrder === 'oldest') {
-      transformedData.data.sort((a, b) => (a.rowIndex || 0) - (b.rowIndex || 0));
-    }
-
-    return transformedData;
-  }
-
-  // データが存在しない場合 - 詳細なエラー情報を提供
-  const debugInfo = {
-    hasBoardData: !!boardData,
-    boardDataType: typeof boardData,
-    boardDataSuccess: boardData?.success,
-    hasDataProperty: boardData && 'data' in boardData,
-    dataType: typeof boardData?.data,
-    isDataArray: Array.isArray(boardData?.data),
-    dataLength: Array.isArray(boardData?.data) ? boardData?.data.length : 'not-array'
-  };
-
-  console.warn('🔧 transformBoardDataToFrontendFormat: No valid data found - Debug Info:', debugInfo);
-
-  return {
-    success: false,
-    error: 'No data available',
-    rows: [],
-    sheetName: boardData?.sheetName || '',
-    header: boardData?.header || 'データなし',
-    debug: debugInfo // デバッグ情報を含める
-  };
-}
 
 // ===========================================
 // 🔧 Unified Validation Functions
@@ -1762,6 +1893,11 @@ function getNotificationUpdate(targetUserId, options = {}) {
       } else {
         lastUpdate = new Date(0); // 初回チェック
       }
+      console.log('getNotificationUpdate: lastUpdateTime parsing:', {
+        input: options.lastUpdateTime,
+        inputType: typeof options.lastUpdateTime,
+        parsed: lastUpdate.toISOString()
+      });
     } catch (e) {
       console.warn('getNotificationUpdate: timestamp parse error', e);
       lastUpdate = new Date(0);
@@ -1807,6 +1943,16 @@ function getNotificationUpdate(targetUserId, options = {}) {
     const newItems = [];
     const incrementalData = currentData.data || [];
 
+    console.log('getNotificationUpdate: Starting timestamp comparison:', {
+      lastUpdate: lastUpdate.toISOString(),
+      totalItems: currentData.data.length,
+      firstItemSample: currentData.data[0] ? {
+        hasTimestamp: !!currentData.data[0].timestamp,
+        timestamp: currentData.data[0].timestamp,
+        name: currentData.data[0].name || 'N/A'
+      } : null
+    });
+
     // 時刻ベース新着検出のみ
     currentData.data.forEach((item, index) => {
       let itemTimestamp = new Date(0);
@@ -1818,7 +1964,17 @@ function getNotificationUpdate(targetUserId, options = {}) {
         }
       }
 
-      if (itemTimestamp > lastUpdate) {
+      const isNew = itemTimestamp > lastUpdate;
+      if (index < 3) { // 最初の3件をログ出力
+        console.log(`getNotificationUpdate: Item ${index} timestamp check:`, {
+          itemTimestamp: itemTimestamp.toISOString(),
+          lastUpdate: lastUpdate.toISOString(),
+          isNew: isNew,
+          hasTimestamp: !!item.timestamp
+        });
+      }
+
+      if (isNew) {
         newItemsCount++;
         newItems.push({
           rowIndex: item.rowIndex || index + 1,
@@ -1832,7 +1988,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     const hasNewContent = newItemsCount > 0;
 
     // ✅ 修正: 時刻ベース統一レスポンス + フィルター情報追加（論理的破綻修正）
-    return {
+    const response = {
       success: true,
       hasNewContent,
       data: incrementalData,
@@ -1851,6 +2007,16 @@ function getNotificationUpdate(targetUserId, options = {}) {
         rawClassFilter: options.classFilter || 'すべて'
       }
     };
+
+    console.log('getNotificationUpdate: Final response:', {
+      success: response.success,
+      hasNewContent: response.hasNewContent,
+      newItemsCount: response.newItemsCount,
+      totalDataItems: response.data.length,
+      targetUserId: response.targetUserId
+    });
+
+    return response;
 
   } catch (error) {
     console.error('getNotificationUpdate error:', error.message);
@@ -2852,7 +3018,6 @@ function getBatchedAdminData() {
  */
 function getBatchedAdminAuth(options = {}) {
   try {
-    // ✅ Batch operation: Get email and admin status in single coordinated call
     const email = getCurrentEmail();
     if (!email) {
       return {
@@ -2865,6 +3030,7 @@ function getBatchedAdminAuth(options = {}) {
     }
 
     const isAdmin = isAdministrator(email);
+
     if (!isAdmin && !options.allowNonAdmin) {
       return {
         success: false,

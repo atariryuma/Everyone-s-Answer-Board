@@ -81,7 +81,52 @@ function getUserSheetData(userId, options = {}) {
       userId,
       error: error.message
     });
-    return createDataServiceErrorResponse(error.message || 'データ取得エラー');
+    // ✅ Ensure proper error response structure
+    const errorResponse = createDataServiceErrorResponse(error.message || 'データ取得エラー');
+    console.error('DataService.getUserSheetData: Creating error response', errorResponse);
+    return errorResponse;
+  }
+}
+
+/**
+ * タイムスタンプ専用抽出関数（通知システム用）
+ * @param {Array} row - データ行
+ * @param {Array} headers - ヘッダー配列
+ * @returns {string} タイムスタンプ値
+ */
+function extractTimestampValue(row, headers) {
+  try {
+    // 1. 最初のカラムがタイムスタンプかチェック（Googleフォーム標準）
+    if (headers.length > 0 && row.length > 0) {
+      const firstHeader = headers[0];
+      if (firstHeader && typeof firstHeader === 'string') {
+        const normalizedHeader = firstHeader.toLowerCase().trim();
+        if (normalizedHeader.includes('タイムスタンプ') ||
+            normalizedHeader.includes('timestamp') ||
+            normalizedHeader.includes('日時')) {
+          return row[0] || '';
+        }
+      }
+    }
+
+    // 2. ヘッダー名でタイムスタンプカラムを検索
+    for (let i = 0; i < headers.length; i++) {
+      const header = headers[i];
+      if (header && typeof header === 'string') {
+        const normalizedHeader = header.toLowerCase().trim();
+        if (normalizedHeader.includes('タイムスタンプ') ||
+            normalizedHeader.includes('timestamp') ||
+            normalizedHeader.includes('日時') ||
+            normalizedHeader.includes('日付')) {
+          return row[i] || '';
+        }
+      }
+    }
+
+    return '';
+  } catch (error) {
+    console.warn('extractTimestampValue error:', error.message);
+    return '';
   }
 }
 
@@ -276,7 +321,7 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
         const item = {
           id: `row_${globalIndex + 2}`,
           rowIndex: globalIndex + 2, // 1-based row number including header
-          timestamp: extractFieldValueUnified(row, headers, 'timestamp')?.value || '',
+          timestamp: extractTimestampValue(row, headers) || '',
           email: extractFieldValueUnified(row, headers, 'email')?.value || '',
 
           // メインコンテンツ（ColumnMappingService利用）
@@ -287,13 +332,19 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
           name: extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || '',
 
           // メタデータ
-          formattedTimestamp: formatTimestamp(extractFieldValueUnified(row, headers, 'timestamp')?.value),
+          formattedTimestamp: formatTimestamp(extractTimestampValue(row, headers)),
           isEmpty: isEmptyRow(row),
 
           // リアクション（ReactionService利用）
           reactions: extractReactions(row, headers, getCurrentEmail()),
           highlight: extractHighlight(row, headers)
         };
+
+        // ✅ includeTimestamp オプション処理
+        if (options.includeTimestamp === false) {
+          delete item.timestamp;
+          delete item.formattedTimestamp;
+        }
 
         // フィルタリング
         if (shouldIncludeRow(item, options)) {
@@ -346,13 +397,19 @@ function processRawData(dataRows, headers, config, options = {}, user = null) {
           name: extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || '',
 
           // メタデータ
-          formattedTimestamp: formatTimestamp(extractFieldValueUnified(row, headers, 'timestamp')?.value),
+          formattedTimestamp: formatTimestamp(extractTimestampValue(row, headers)),
           isEmpty: isEmptyRow(row),
 
           // リアクション（ReactionService利用）
           reactions: extractReactions(row, headers, getCurrentEmail()),
           highlight: extractHighlight(row, headers)
         };
+
+        // ✅ includeTimestamp オプション処理
+        if (options.includeTimestamp === false) {
+          delete item.timestamp;
+          delete item.formattedTimestamp;
+        }
 
         // フィルタリング
         if (shouldIncludeRow(item, options)) {

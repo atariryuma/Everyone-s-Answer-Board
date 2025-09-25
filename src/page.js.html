@@ -1208,6 +1208,9 @@ class StudyQuestApp {
       bypassCache: true
     });
 
+    // ✅ 修正: 手動更新後に時刻ベース基準更新（論理的破綻修正）
+    this.updateLastSeenTimestamp(); // 新着通知の無限ループを防止
+
     // 通知バナーを閉じる（新しいデータが表示されたため）
     this.dismissNewContentBanner();
   }
