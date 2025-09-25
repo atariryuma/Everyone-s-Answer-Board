@@ -106,10 +106,11 @@ window.ErrorHandler = {
     // Use unified notification system if available
     if (window.notifications) {
       window.notifications.error(message);
-    } else if (typeof showError === 'function') {
-      showError(message);
     } else if (typeof alert === 'function') {
       alert(message);
+    } else {
+      // Fallback: console output for debugging
+      console.error('Error notification fallback:', message);
     }
   },
 

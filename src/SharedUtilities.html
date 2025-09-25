@@ -2007,8 +2007,26 @@
     }
   }
 
-  // Create global notification instance
-  window.notifications = new NotificationSystem();
+  // Create global notification instance with error handling
+  try {
+    window.notifications = new NotificationSystem();
+  } catch (error) {
+    console.error('Failed to initialize NotificationSystem:', error);
+    // Fallback notification system
+    window.notifications = {
+      showMessage: function(message, type, duration) {
+        if (type === 'error') {
+          alert('エラー: ' + message);
+        } else {
+          console.log(`[${type}] ${message}`);
+        }
+      },
+      success: function(message, duration) { this.showMessage(message, 'success', duration); },
+      error: function(message, duration) { this.showMessage(message, 'error', duration); },
+      warning: function(message, duration) { this.showMessage(message, 'warning', duration); },
+      info: function(message, duration) { this.showMessage(message, 'info', duration); }
+    };
+  }
 
   // Add to shared utilities
   if (window.sharedUtilities) {
@@ -2017,24 +2035,49 @@
 
   // Global convenience functions for backward compatibility
   window.showSuccess = function (message, duration) {
-    window.notifications.success(message, duration);
+    if (window.notifications && window.notifications.success) {
+      window.notifications.success(message, duration);
+    } else {
+      console.log('[SUCCESS] ' + message);
+    }
   };
 
   window.showError = function (message, duration) {
-    window.notifications.error(message, duration);
+    if (window.notifications && window.notifications.error) {
+      window.notifications.error(message, duration);
+    } else {
+      alert('エラー: ' + message);
+    }
   };
 
   window.showWarning = function (message, duration) {
-    window.notifications.warning(message, duration);
+    if (window.notifications && window.notifications.warning) {
+      window.notifications.warning(message, duration);
+    } else {
+      console.warn('[WARNING] ' + message);
+    }
   };
 
   window.showInfo = function (message, duration) {
-    window.notifications.info(message, duration);
+    if (window.notifications && window.notifications.info) {
+      window.notifications.info(message, duration);
+    } else {
+      console.log('[INFO] ' + message);
+    }
   };
 
   // Alias for generic show message
   window.showMessage = function (message, type, duration) {
-    window.notifications.showMessage(message, type, duration);
+    if (window.notifications && window.notifications.showMessage) {
+      window.notifications.showMessage(message, type, duration);
+    } else {
+      // Fallback based on type
+      if (type === 'error') {
+        alert('エラー: ' + message);
+      } else {
+        console.log(`[${type.toUpperCase()}] ${message}`);
+      }
+    }
   };
 
   // Add styles for notification system if not using Tailwind
