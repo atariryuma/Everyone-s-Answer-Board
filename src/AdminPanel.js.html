@@ -1287,27 +1287,18 @@
     window.open(formUrl, '_blank');
   }
 
-  // ✅ 使い方ガイドを新タブで開く (CLAUDE.md準拠: 現在のベースURL使用)
+  // ✅ 使い方ガイドを新タブで開く (CLAUDE.md準拠: シンプル&効率的)
   function openManualGuide() {
     try {
-      // 現在のページと同じベースURLを使用（本番/開発環境を自動判別）
-      const currentUrl = new URL(window.location.href);
-      const baseUrl = currentUrl.origin + currentUrl.pathname.replace(/\/[^/]*$/, '');
-      let manualUrl;
+      // 管理パネルは既に正しいURLで表示されている
+      // → 現在のページURLから userId を削除して mode=manual に変更するだけ
+      const currentUrl = new URL(window.top.location.href);
+      currentUrl.searchParams.set('mode', 'manual');
+      currentUrl.searchParams.delete('userId');
 
-      // パス形式に応じてURL構築
-      if (currentUrl.pathname.includes('/dev')) {
-        // 開発環境: /dev?mode=manual
-        manualUrl = baseUrl + '/dev?mode=manual';
-      } else if (currentUrl.pathname.includes('/exec')) {
-        // 本番環境: /exec?mode=manual
-        manualUrl = baseUrl + '/exec?mode=manual';
-      } else {
-        // フォールバック: クエリパラメータのみ変更
-        manualUrl = window.location.href.split('?')[0] + '?mode=manual';
-      }
+      const manualUrl = currentUrl.toString();
+      console.log('使い方ガイドURL (シンプル方式):', manualUrl);
 
-      console.log('使い方ガイドURL:', manualUrl);
       window.open(manualUrl, '_blank');
     } catch (error) {
       console.error('使い方ガイドを開けませんでした:', error);
