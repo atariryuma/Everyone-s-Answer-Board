@@ -76,7 +76,7 @@ function filterSystemColumns(headers) {
 }
 
 /**
- * Optimized column detection engine focused on precision and efficiency
+ * Enhanced column detection with logical field ordering
  */
 function detectColumn(headers, fieldType, options = {}) {
   const patterns = getFieldPatterns()[fieldType];
@@ -84,18 +84,21 @@ function detectColumn(headers, fieldType, options = {}) {
     return { index: -1, confidence: 0, method: 'unknown_field' };
   }
 
+  // Analyze field relationships for logical ordering
+  const fieldRelationships = analyzeFieldRelationships(headers);
+
   let bestMatch = { index: -1, confidence: 0, method: 'no_match' };
 
   headers.forEach((header, index) => {
     if (!header || typeof header !== 'string') return;
 
-    const score = calculateScore(header, fieldType, patterns, options);
+    const score = calculateScoreWithLogic(header, fieldType, patterns, index, fieldRelationships, options);
 
     if (score > bestMatch.confidence) {
       bestMatch = {
         index,
         confidence: Math.min(score, 95),
-        method: 'pattern_match'
+        method: 'pattern_match_with_logic'
       };
     }
   });
@@ -104,18 +107,66 @@ function detectColumn(headers, fieldType, options = {}) {
 }
 
 /**
- * Calculate header score using streamlined algorithm
+ * Analyze field relationships and logical constraints across all headers
  */
-function calculateScore(header, fieldType, patterns, options = {}) {
+function analyzeFieldRelationships(headers) {
+  const relationships = {
+    answerCandidates: [],
+    reasonCandidates: [],
+    answerReasonPairs: []
+  };
+
+  const patterns = getFieldPatterns();
+
+  // Identify potential answer and reason columns
+  headers.forEach((header, index) => {
+    if (!header || typeof header !== 'string') return;
+
+    const normalizedHeader = header.toLowerCase().trim();
+
+    // Check for answer patterns
+    const answerScore = calculateBaseScore(header, 'answer', patterns.answer);
+    if (answerScore > 60) {
+      relationships.answerCandidates.push({ index, header, score: answerScore });
+    }
+
+    // Check for reason patterns
+    const reasonScore = calculateBaseScore(header, 'reason', patterns.reason);
+    if (reasonScore > 60) {
+      relationships.reasonCandidates.push({ index, header, score: reasonScore });
+    }
+  });
+
+  // Identify logical answer → reason pairs
+  relationships.answerCandidates.forEach(answer => {
+    relationships.reasonCandidates.forEach(reason => {
+      if (answer.index < reason.index) { // Answer comes before reason (logical)
+        relationships.answerReasonPairs.push({
+          answerIndex: answer.index,
+          reasonIndex: reason.index,
+          logicalOrder: true,
+          confidence: (answer.score + reason.score) / 2
+        });
+      }
+    });
+  });
+
+  return relationships;
+}
+
+/**
+ * Calculate base score without positional logic (for relationship analysis)
+ */
+function calculateBaseScore(header, fieldType, patterns) {
   const normalizedHeader = header.toLowerCase().trim();
   let maxScore = 0;
 
-  // 1. Direct pattern matching (most important)
+  // Direct pattern matching
   if (patterns.exact && patterns.exact.some(keyword => normalizedHeader === keyword.toLowerCase())) {
     maxScore = 95;
   }
 
-  // 2. Keyword matching
+  // Keyword matching
   if (patterns.keywords) {
     for (const keyword of patterns.keywords) {
       if (normalizedHeader.includes(keyword.toLowerCase())) {
@@ -125,7 +176,7 @@ function calculateScore(header, fieldType, patterns, options = {}) {
     }
   }
 
-  // 3. Question pattern matching (for answer fields)
+  // Question pattern matching (for answer fields)
   if (fieldType === 'answer' && patterns.questionPatterns) {
     for (const pattern of patterns.questionPatterns) {
       if (pattern.test(header)) {
@@ -135,18 +186,66 @@ function calculateScore(header, fieldType, patterns, options = {}) {
     }
   }
 
-  // 4. Regex patterns
+  // Regex patterns
   if (patterns.regex && patterns.regex.test(header)) {
     maxScore = Math.max(maxScore, 85);
   }
 
-  // 5. Sample data validation (if available)
-  if (options.sampleData && options.sampleData.length > 0 && maxScore > 0) {
-    const validationBonus = validateSampleData(options.sampleData, normalizedHeader, fieldType);
-    maxScore = Math.min(maxScore + validationBonus, 95);
+  return maxScore;
+}
+
+/**
+ * Calculate header score with logical field ordering constraints
+ */
+function calculateScoreWithLogic(header, fieldType, patterns, index, relationships, options = {}) {
+  const normalizedHeader = header.toLowerCase().trim();
+  let baseScore = calculateBaseScore(header, fieldType, patterns);
+
+  // Apply logical ordering constraints
+  let logicalBonus = 0;
+  let logicalPenalty = 0;
+
+  if (fieldType === 'answer') {
+    // Boost answer fields that appear before reason candidates
+    const hasReasonAfter = relationships.reasonCandidates.some(reason => reason.index > index);
+    if (hasReasonAfter && baseScore > 70) {
+      logicalBonus = 8; // Significant boost for logical answer placement
+    }
+
+    // Check if this answer is part of a logical pair
+    const isInLogicalPair = relationships.answerReasonPairs.some(pair => pair.answerIndex === index);
+    if (isInLogicalPair) {
+      logicalBonus += 5; // Additional boost for confirmed logical pairs
+    }
   }
 
-  return maxScore;
+  if (fieldType === 'reason') {
+    // Penalize reason fields that appear before answer candidates
+    const hasAnswerBefore = relationships.answerCandidates.some(answer => answer.index < index);
+    if (!hasAnswerBefore && baseScore > 70) {
+      logicalPenalty = 15; // Strong penalty for illogical reason placement
+    }
+
+    // Boost reason fields that appear after answer candidates
+    if (hasAnswerBefore) {
+      logicalBonus = 5; // Moderate boost for logical reason placement
+    }
+
+    // Check if this reason is part of a logical pair
+    const isInLogicalPair = relationships.answerReasonPairs.some(pair => pair.reasonIndex === index);
+    if (isInLogicalPair) {
+      logicalBonus += 3; // Additional boost for confirmed logical pairs
+    }
+  }
+
+  // Apply sample data validation bonus
+  let sampleBonus = 0;
+  if (options.sampleData && options.sampleData.length > 0 && baseScore > 0) {
+    sampleBonus = validateSampleData(options.sampleData, normalizedHeader, fieldType);
+  }
+
+  const finalScore = Math.min(baseScore + logicalBonus + sampleBonus - logicalPenalty, 95);
+  return Math.max(finalScore, 0); // Ensure score doesn't go negative
 }
 
 /**
@@ -225,6 +324,83 @@ function getFieldPatterns() {
 }
 
 /**
+ * Validate and correct field ordering logic in final mapping
+ */
+function validateFieldOrderLogic(mapping, confidence, headers) {
+  const validatedMapping = { ...mapping };
+  const validatedConfidence = { ...confidence };
+  const validation = {
+    checks: [],
+    corrections: [],
+    warnings: []
+  };
+
+  // Check answer → reason ordering constraint
+  if (validatedMapping.answer !== undefined && validatedMapping.reason !== undefined) {
+    const answerIndex = validatedMapping.answer;
+    const reasonIndex = validatedMapping.reason;
+
+    validation.checks.push({
+      rule: 'answer_before_reason',
+      answerIndex,
+      reasonIndex,
+      logical: answerIndex < reasonIndex
+    });
+
+    // If reason comes before answer (illogical), apply correction
+    if (reasonIndex < answerIndex) {
+      const answerHeader = headers[answerIndex];
+      const reasonHeader = headers[reasonIndex];
+
+      // Check if we should swap or remove the weaker field
+      if (validatedConfidence.reason < validatedConfidence.answer - 10) {
+        // Remove reason field if it's significantly weaker
+        delete validatedMapping.reason;
+        delete validatedConfidence.reason;
+        validation.corrections.push({
+          action: 'removed_illogical_reason',
+          field: 'reason',
+          index: reasonIndex,
+          header: reasonHeader,
+          reason: 'Reason field appears before answer field with low confidence'
+        });
+      } else if (validatedConfidence.answer < validatedConfidence.reason - 10) {
+        // Consider if the "answer" might actually be a reason
+        const answerAsReasonScore = calculateBaseScore(answerHeader, 'reason', getFieldPatterns().reason);
+        if (answerAsReasonScore > validatedConfidence.answer - 20) {
+          validation.warnings.push({
+            warning: 'potential_field_swap',
+            message: 'Answer field may actually be a reason field',
+            answerIndex,
+            reasonIndex,
+            suggestion: 'Manual review recommended'
+          });
+        }
+      } else {
+        // Similar confidence levels - prefer logical ordering
+        validation.corrections.push({
+          action: 'preserved_logical_order',
+          message: 'Maintained answer before reason despite close confidence scores',
+          answerIndex,
+          reasonIndex
+        });
+      }
+    } else {
+      validation.checks[validation.checks.length - 1].status = 'passed';
+    }
+  }
+
+  // Additional logical constraints can be added here
+  // Example: timestamp should be first, email/name should be last, etc.
+
+  return {
+    mapping: validatedMapping,
+    confidence: validatedConfidence,
+    validation
+  };
+}
+
+/**
  * Generate recommended column mapping with high precision
  */
 function generateRecommendedMapping(headers, options = {}) {
@@ -251,16 +427,20 @@ function generateRecommendedMapping(headers, options = {}) {
       }
     }
 
-    const avgConfidence = Object.keys(mapping).length > 0 ?
-      Math.round(Object.values(confidence).reduce((sum, c) => sum + c, 0) / Object.keys(mapping).length) : 0;
+    // Apply cross-field logical validation
+    const validatedMapping = validateFieldOrderLogic(mapping, confidence, headers);
+
+    const avgConfidence = Object.keys(validatedMapping.mapping).length > 0 ?
+      Math.round(Object.values(validatedMapping.confidence).reduce((sum, c) => sum + c, 0) / Object.keys(validatedMapping.mapping).length) : 0;
 
     return {
-      recommendedMapping: mapping,
-      confidence,
+      recommendedMapping: validatedMapping.mapping,
+      confidence: validatedMapping.confidence,
       analysis: {
-        resolvedFields: Object.keys(mapping).length,
+        resolvedFields: Object.keys(validatedMapping.mapping).length,
         totalFields: targetFields.length,
-        overallScore: avgConfidence
+        overallScore: avgConfidence,
+        logicalValidation: validatedMapping.validation
       },
       success: true
     };
