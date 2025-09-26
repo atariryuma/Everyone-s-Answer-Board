@@ -31,22 +31,28 @@
  * @param {Object} options - 取得オプション
  * @returns {Object} GAS公式推奨レスポンス形式
  */
-function getUserSheetData(userId, options = {}) {
+function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedConfig = null) {
   const startTime = Date.now();
 
   try {
     // 🚀 Zero-dependency data processing
 
-    // 🔧 Zero-Dependency統一: 直接findUserById使用
-    const user = findUserById(userId);
+    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得データ活用
+    const user = preloadedUser || findUserById(userId);
     if (!user) {
       console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
       return createDataServiceErrorResponse('ユーザーが見つかりません');
     }
 
-    // 統一API使用: 構造化パース
-    const configResult = getUserConfig(userId);
-    const config = configResult.success ? configResult.config : {};
+    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得設定活用
+    let config;
+    if (preloadedConfig) {
+      config = preloadedConfig;
+    } else {
+      const configResult = getUserConfig(userId);
+      config = configResult.success ? configResult.config : {};
+    }
+
     if (!config.spreadsheetId) {
       console.warn('[WARN] DataService.getUserSheetData: Spreadsheet ID not configured', { userId });
       return createDataServiceErrorResponse('スプレッドシートが設定されていません');
@@ -142,8 +148,10 @@ function connectToSpreadsheetSheet(config, context = {}) {
   // ✅ **Self-access**: Use normal permissions for own spreadsheet
   const currentEmail = getCurrentEmail();
 
-  // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
-  const targetUser = findUserBySpreadsheetId(config.spreadsheetId);
+  // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得ユーザー活用でDB重複回避
+  const targetUser = context.preloadedUser || findUserBySpreadsheetId(config.spreadsheetId, {
+    preloadedAuth: context.preloadedAuth // 認証情報を渡して重複認証回避
+  });
   const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
 
   console.log(`connectToSpreadsheetSheet: ${isSelfAccess ? 'Self-access normal permissions' : 'Cross-user service account'} for spreadsheet`);
@@ -260,8 +268,12 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
   const startTime = Date.now();
 
   try {
-    // シート接続
-    const { sheet } = connectToSpreadsheetSheet(config, { targetUserEmail: user?.userEmail });
+    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得ユーザー情報を活用してDB重複呼び出し排除
+    const { sheet } = connectToSpreadsheetSheet(config, {
+      targetUserEmail: user?.userEmail,
+      preloadedUser: user, // 事前取得ユーザーを渡してfindUserBySpreadsheetId重複回避
+      preloadedAuth: options.preloadedAuth // 認証情報も渡して重複認証回避
+    });
 
     // 寸法取得
     const { lastRow, lastCol } = getSheetDimensions(sheet);
@@ -324,12 +336,12 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
           timestamp: extractTimestampValue(row, headers) || '',
           email: extractFieldValueUnified(row, headers, 'email')?.value || '',
 
-          // メインコンテンツ（ColumnMappingService利用）
-          answer: extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || '',
-          opinion: extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || '', // Alias for answer field
-          reason: extractFieldValueUnified(row, headers, 'reason', columnMapping)?.value || '',
-          class: extractFieldValueUnified(row, headers, 'class', columnMapping)?.value || '',
-          name: extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || '',
+          // メインコンテンツ（ColumnMappingService利用）- ✅ V8ランタイム安全: 型保証強化
+          answer: String(extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || ''),
+          opinion: String(extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || ''), // Alias for answer field
+          reason: String(extractFieldValueUnified(row, headers, 'reason', columnMapping)?.value || ''),
+          class: String(extractFieldValueUnified(row, headers, 'class', columnMapping)?.value || ''),
+          name: String(extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || ''),
 
           // メタデータ
           formattedTimestamp: formatTimestamp(extractTimestampValue(row, headers)),
@@ -389,12 +401,12 @@ function processRawData(dataRows, headers, config, options = {}, user = null) {
           timestamp: extractFieldValueUnified(row, headers, 'timestamp')?.value || '',
           email: extractFieldValueUnified(row, headers, 'email')?.value || '',
 
-          // メインコンテンツ（ColumnMappingService利用）
-          answer: extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || '',
-          opinion: extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || '', // Alias for answer field
-          reason: extractFieldValueUnified(row, headers, 'reason', columnMapping)?.value || '',
-          class: extractFieldValueUnified(row, headers, 'class', columnMapping)?.value || '',
-          name: extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || '',
+          // メインコンテンツ（ColumnMappingService利用）- ✅ V8ランタイム安全: 型保証強化
+          answer: String(extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || ''),
+          opinion: String(extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || ''), // Alias for answer field
+          reason: String(extractFieldValueUnified(row, headers, 'reason', columnMapping)?.value || ''),
+          class: String(extractFieldValueUnified(row, headers, 'class', columnMapping)?.value || ''),
+          name: String(extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || ''),
 
           // メタデータ
           formattedTimestamp: formatTimestamp(extractTimestampValue(row, headers)),
@@ -531,9 +543,12 @@ function shouldIncludeRow(item, options = {}) {
       return false;
     }
 
-    // メイン回答が空の行をフィルタリング
-    if (options.requireAnswer !== false && (!item.answer || item.answer.trim() === '')) {
-      return false;
+    // メイン回答が空の行をフィルタリング - ✅ V8ランタイム安全: 型チェック強化
+    if (options.requireAnswer !== false) {
+      const answerStr = item.answer ? String(item.answer).trim() : '';
+      if (!answerStr) {
+        return false;
+      }
     }
 
     // 日付範囲フィルタリング

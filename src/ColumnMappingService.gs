@@ -487,9 +487,9 @@ function performIntegratedColumnDiagnostics(originalHeaders, options = {}) {
 /**
  * Extract field value from row data
  */
-function extractFieldValueUnified(row, originalHeaders, fieldType, options = {}) {
+function extractFieldValueUnified(row, originalHeaders, fieldType, columnMapping = {}, options = {}) {
   try {
-    const result = resolveColumnIndex(originalHeaders, fieldType, {}, options);
+    const result = resolveColumnIndex(originalHeaders, fieldType, columnMapping, options);
 
     if (result.index !== -1 && row && row[result.index] !== undefined) {
       return {

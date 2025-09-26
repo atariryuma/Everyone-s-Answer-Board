@@ -290,25 +290,32 @@ function validateMapping(columnMapping) {
       return result;
     }
 
-    // ✅ CLAUDE.md準拠: シンプル構造のみサポート {answer: 4, class: 2}
-    // 変換処理不要、70x Performance Improvement実現
-    if (Object.keys(columnMapping).length === 0) {
+    // ✅ 構造判定: 複雑構造 {mapping: {...}} vs シンプル構造 {answer: 4, class: 2}
+    let actualMapping = columnMapping;
+    if (columnMapping.mapping && typeof columnMapping.mapping === 'object') {
+      console.log('🔄 validateMapping: 複雑構造を検出 - mapping プロパティを使用');
+      actualMapping = columnMapping.mapping;
+    } else {
+      console.log('🔄 validateMapping: シンプル構造を検出 - 直接使用');
+    }
+
+    if (Object.keys(actualMapping).length === 0) {
       const errorMsg = '列マッピングデータが必要です';
       console.log(`❌ ${errorMsg}`);
       result.errors.push(errorMsg);
       return result;
     }
 
-    console.log('✅ validateMapping: Direct validation of simple structure:', JSON.stringify(columnMapping, null, 2));
+    console.log('✅ validateMapping: 使用するマッピング:', JSON.stringify(actualMapping, null, 2));
 
-    // ✅ シンプル構造の直接検証
+    // ✅ 構造に対応した検証
     const requiredColumns = ['answer'];
     const optionalColumns = ['reason', 'class', 'name'];
     const allColumns = [...requiredColumns, ...optionalColumns];
 
     // 必須列チェック
     for (const col of requiredColumns) {
-      const index = columnMapping[col];
+      const index = actualMapping[col];
       console.log(`🔍 validateMapping: ${col} = ${index} (type: ${typeof index})`);
       if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
         const errorMsg = `必須列 '${col}' のインデックスが無効です（値: ${index}）`;
@@ -319,7 +326,7 @@ function validateMapping(columnMapping) {
 
     // オプション列チェック
     for (const col of optionalColumns) {
-      const index = columnMapping[col];
+      const index = actualMapping[col];
       if (index !== undefined) {
         console.log(`🔍 validateMapping (optional): ${col} = ${index} (type: ${typeof index})`);
         if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
@@ -331,9 +338,9 @@ function validateMapping(columnMapping) {
     }
 
     // 重複チェック
-    const validColumns = Object.keys(columnMapping).filter(key => allColumns.includes(key));
+    const validColumns = Object.keys(actualMapping).filter(key => allColumns.includes(key));
     const usedIndices = validColumns
-      .map(col => columnMapping[col])
+      .map(col => actualMapping[col])
       .filter(index => typeof index === 'number');
     const uniqueIndices = [...new Set(usedIndices)];
     if (usedIndices.length !== uniqueIndices.length) {
@@ -341,7 +348,7 @@ function validateMapping(columnMapping) {
     }
 
     // 未知の列チェック
-    for (const col of Object.keys(columnMapping)) {
+    for (const col of Object.keys(actualMapping)) {
       if (!allColumns.includes(col)) {
         result.warnings.push(`未知の列タイプ '${col}' が含まれています`);
       }

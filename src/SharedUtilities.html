@@ -42,7 +42,7 @@
         return true; // Suppress known warnings
       }
 
-      // ✅ CLAUDE.md準拠: 重要なエラーはユーザーにも通知
+      // Show critical errors as notifications
       const isCritical = criticalSyntaxErrors.some((pattern) => errorMessage.includes(pattern));
       if (isCritical && window.notifications) {
         window.notifications.error('ページでエラーが発生しました。再読み込みをお試しください。', 8000);
@@ -74,12 +74,12 @@
       const shouldSuppress = suppressedErrors.some((pattern) => reason.includes(pattern));
 
       if (shouldSuppress) {
-        console.debug('Suppressed internal promise rejection:', reason);
+        console.log('Suppressed internal promise rejection:', reason);
         event.preventDefault();
         return;
       }
 
-      // ✅ CLAUDE.md準拠: 重要なPromise rejectionはユーザーにも通知
+      // Show user-impacting promise rejections as notifications
       const isUserImpacting = reason.includes('Failed to fetch') ||
                               reason.includes('Network request failed') ||
                               reason.includes('google.script.run') ||
@@ -126,71 +126,6 @@
     };
   })();
 
-  // =============================================================================
-  // SAFE RESPONSE PROCESSING - Fix response.trim() errors
-  // =============================================================================
-
-  /**
-   * 安全なレスポンス処理 - response.trim()エラーを防ぐ
-   * @param {any} response - サーバーからのレスポンス
-   * @returns {string} 安全な文字列レスポンス
-   */
-  window.safeResponseTrim = function(response) {
-    if (response === null || response === undefined) {
-      return '';
-    }
-
-    // 既に文字列の場合
-    if (typeof response === 'string') {
-      return response.trim();
-    }
-
-    // オブジェクトの場合はJSON文字列化
-    if (typeof response === 'object') {
-      try {
-        return JSON.stringify(response).trim();
-      } catch (error) {
-        console.warn('safeResponseTrim: JSON stringify failed', error);
-        return String(response).trim();
-      }
-    }
-
-    // その他の型は文字列変換
-    return String(response).trim();
-  };
-
-  /**
-   * 安全なGoogle Apps Scriptレスポンス処理
-   * @param {any} response - GASからのレスポンス
-   * @returns {Object} パースされたレスポンスオブジェクト
-   */
-  window.safeParseGASResponse = function(response) {
-    try {
-      // レスポンスが既にオブジェクトの場合
-      if (typeof response === 'object' && response !== null) {
-        return response;
-      }
-
-      // 文字列の場合はJSONパース
-      if (typeof response === 'string') {
-        const trimmed = response.trim();
-        if (trimmed === '') {
-          return { success: false, message: '空のレスポンス' };
-        }
-        return JSON.parse(trimmed);
-      }
-
-      return { success: false, message: '不正なレスポンス形式', raw: response };
-    } catch (error) {
-      console.warn('safeParseGASResponse: Parse failed', error, response);
-      return {
-        success: false,
-        message: 'レスポンス解析エラー',
-        error: error.message,
-        raw: response
-      };
-    }
-  };
 
   // =============================================================================
   // PERFORMANCE UTILITIES
@@ -290,92 +225,7 @@
     }
   }
 
-  // =============================================================================
-  // DOM UTILITIES
-  // =============================================================================
-
-  // Enhanced DOM utility functions
-  class DOMUtilities {
-    constructor() {
-      this.elementCache = new Map();
-    }
-
-    // Safe element creation
-    createSafeElement(tag, className, textContent) {
-      const element = document.createElement(tag);
-      if (className) element.className = className;
-      if (textContent) element.textContent = textContent;
-      return element;
-    }
-
-    // Safe element selection with caching
-    getCachedElement(id) {
-      if (this.elementCache.has(id)) {
-        return this.elementCache.get(id);
-      }
-
-      const element = document.getElementById(id);
-      if (element) {
-        this.elementCache.set(id, element);
-      } else {
-        console.warn('Element not found:', id);
-      }
-      return element;
-    }
-
-    // Batch cache multiple elements
-    cacheElements(elementIds) {
-      const cached = {};
-      elementIds.forEach((id) => {
-        cached[id] = this.getCachedElement(id);
-      });
-      return cached;
-    }
-
-    // Clear element cache
-    clearElementCache(id = null) {
-      if (id) {
-        this.elementCache.delete(id);
-      } else {
-        this.elementCache.clear();
-      }
-    }
-
-    // Safe button state management
-    setButtonState(button, isDisabled, text) {
-      if (!button) return;
-      button.disabled = isDisabled;
-      if (text) button.textContent = text;
-    }
-
-    // Safe text content setting
-    setSafeTextContent(element, text) {
-      if (!element) return;
-      element.textContent = text || '';
-    }
-
-    // Safe class toggling
-    toggleClass(element, className, condition) {
-      if (!element) return;
-      if (condition) {
-        element.classList.add(className);
-      } else {
-        element.classList.remove(className);
-      }
-    }
-
-    // Safe event listener management
-    addSafeEventListener(element, event, handler, options = {}) {
-      if (!element) return null;
-      element.addEventListener(event, handler, options);
-      return handler;
-    }
-
-    removeSafeEventListener(element, event, handler) {
-      if (!element || !handler) return;
-      element.removeEventListener(event, handler);
-    }
-  }
+  // DOM utilities removed - unused throughout codebase
 
   // =============================================================================
   // CACHE MANAGEMENT
@@ -834,99 +684,7 @@
     }
   }
 
-  // =============================================================================
-  // GAS INTEGRATION UTILITIES
-  // =============================================================================
-
-  class GASUtilities {
-    constructor() {
-      this.callCache = new Cache(50, 1000); // 1 second cache for API calls
-    }
-
-    // Cached GAS function call
-    callWithCache(functionName, cacheKey, ttl, ...args) {
-      const cached = this.callCache.get(cacheKey);
-      if (cached) {
-        return Promise.resolve(cached);
-      }
-
-      return new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler((result) => {
-            this.callCache.set(cacheKey, result, ttl);
-            resolve(result);
-          })
-          .withFailureHandler(reject)
-          [functionName](...args);
-      });
-    }
-
-    // Simple GAS function call
-    call(functionName, ...args) {
-      return new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(reject)
-          [functionName](...args);
-      });
-    }
-
-    // GAS function call with loading overlay - 重複リクエスト防止版
-    callWithLoading(functionName, message = '処理中...', loadingType = 'overlay', ...args) {
-      // Support config object as message parameter
-      if (typeof message === 'object' && message !== null) {
-        const config = message;
-        message = config.message || '処理中...';
-        loadingType = config.type || loadingType;
-      }
-
-      // 重複リクエスト防止: 同じ関数が実行中の場合は既存のPromiseを返す
-      const funcName = functionName || 'unknown';
-      const requestKey = `${funcName}_${JSON.stringify(args || [])}`;
-      if (this.pendingRequests && this.pendingRequests.has(requestKey)) {
-        console.log(`🚫 Duplicate request prevented: ${funcName}`);
-        return this.pendingRequests.get(requestKey);
-      }
-
-      // pendingRequestsがない場合は初期化
-      if (!this.pendingRequests) {
-        this.pendingRequests = new Map();
-      }
-
-      const promise = new Promise((resolve, reject) => {
-        // Use appropriate loading method based on type
-        if (loadingType === 'transparent') {
-          window.unifiedLoading.showTransparent(message);
-        } else {
-          window.unifiedLoading.show(message);
-        }
-
-        google.script.run
-          .withSuccessHandler((result) => {
-            window.unifiedLoading.hide(); // Hide loading overlay on success
-            this.pendingRequests.delete(requestKey); // 完了後にキャッシュから削除
-            resolve(result);
-          })
-          .withFailureHandler((error) => {
-            window.unifiedLoading.hide(); // Hide loading overlay on failure
-            this.pendingRequests.delete(requestKey); // エラー時にもキャッシュから削除
-            // Log the error using the shared error handler
-            window.sharedUtilities.errors.logError(error, `GAS call failed: ${funcName}`);
-            reject(error);
-          })
-          [functionName](...args);
-      });
-
-      // 実行中リクエストとしてキャッシュ
-      this.pendingRequests.set(requestKey, promise);
-      return promise;
-    }
-
-    // Check if running in GAS environment
-    isGASEnvironment() {
-      return typeof google !== 'undefined' && google.script && google.script.run;
-    }
-  }
+  // GAS integration utilities removed - unused throughout codebase
 
   // =============================================================================
   // SECURITY UTILITIES
@@ -1040,11 +798,9 @@
   window.sharedUtilities = {
     debounce: new DebounceManager(),
     throttle: new ThrottleManager(),
-    dom: new DOMUtilities(),
     cache: new Cache(),
     errors: new ErrorHandler(),
     loading: new LoadingManager(),
-    gas: new GASUtilities(),
     security: new SecurityUtilities(),
     privacy: PrivacyLogger,
   };
@@ -1094,69 +850,7 @@
     }
   };
 
-  // Debug function for console access
-  window.getSharedUtilitiesStats = function () {
-    return {
-      debounceTimers: window.sharedUtilities.debounce.timers.size,
-      throttleTimers: window.sharedUtilities.throttle.timers.size,
-      cacheSize: window.sharedUtilities.cache.size,
-      cacheStats: window.sharedUtilities.cache.getStats(),
-      domCacheSize: window.sharedUtilities.dom.elementCache.size,
-      recentErrors: window.sharedUtilities.errors.getRecentErrors(5),
-      loadingStates: Object.fromEntries(window.sharedUtilities.loading.loadingStates),
-      gasEnvironment: window.sharedUtilities.gas.isGASEnvironment(),
-    };
-  };
 
-  // Performance monitoring
-  window.clearAllSharedUtilities = function () {
-    window.sharedUtilities.debounce.clearAll();
-    window.sharedUtilities.throttle.clearAll();
-    window.sharedUtilities.cache.clear();
-    window.sharedUtilities.dom.clearElementCache();
-    window.sharedUtilities.errors.clearErrors();
-    window.sharedUtilities.loading.clearAllLoading();
-    console.log('🧹 All SharedUtilities cleared');
-  };
-
-  // Integration test function
-  window.testSharedUtilities = function () {
-    console.group('🧪 SharedUtilities Integration Test');
-
-    // Test debounce
-    let debounceCount = 0;
-    const testDebounce = () => debounceCount++;
-    window.sharedUtilities.debounce.debounce(testDebounce, 'test', 100);
-    window.sharedUtilities.debounce.debounce(testDebounce, 'test', 100);
-
-    // CLAUDE.md V8 compliant: Promise-based delay for test
-    const createPromiseDelay = (ms) => new Promise(resolve => {
-      const start = Date.now();
-      const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-      check();
-    });
-
-    createPromiseDelay(150).then(() => {
-      console.log('Debounce test:', debounceCount === 1 ? '✅ PASS' : '❌ FAIL');
-    });
-
-    // Test cache
-    window.sharedUtilities.cache.set('test', 'value', 1000);
-    const cached = window.sharedUtilities.cache.get('test');
-    console.log('Cache test:', cached === 'value' ? '✅ PASS' : '❌ FAIL');
-
-    // Test DOM utilities
-    const testEl = window.sharedUtilities.dom.createSafeElement('div', 'test-class', 'test');
-    console.log('DOM creation test:', testEl.className === 'test-class' ? '✅ PASS' : '❌ FAIL');
-
-    // Test error handling
-    window.sharedUtilities.errors.logError(new Error('Test error'), 'Integration test');
-    const errors = window.sharedUtilities.errors.getRecentErrors(1);
-    console.log('Error handling test:', errors.length > 0 ? '✅ PASS' : '❌ FAIL');
-
-    console.groupEnd();
-    return window.getSharedUtilitiesStats();
-  };
 
   // =============================================================================
   // AUTHENTICATION UTILITIES
@@ -1798,43 +1492,30 @@
     constructor() {
       this.container = null;
       this.initialized = false;
-      this.domContentLoadedAdded = false;
     }
 
-    // Initialize notification container (fixed styling conflicts and event duplication)
+    // Initialize notification container
     init() {
-      // Check container existence first (more reliable than initialized flag)
+      // Ensure DOM is ready
+      if (!document.body) {
+        return false;
+      }
+
       this.container = document.getElementById('notification-container');
 
       if (this.container) {
         this.initialized = true;
-        return;
+        return true;
       }
 
-      // Create notification container with unified styling
+      // Create notification container
       this.container = document.createElement('div');
       this.container.id = 'notification-container';
-
-      // Use CSS classes only (remove style.cssText conflict)
       this.container.className = 'fixed top-4 right-4 z-[10000] space-y-2 pointer-events-none';
 
-      // Enhanced DOM insertion with duplication prevention
-      this.appendToBody();
+      document.body.appendChild(this.container);
       this.initialized = true;
-    }
-
-    // Append container to body with event duplication prevention
-    appendToBody() {
-      if (document.body) {
-        document.body.appendChild(this.container);
-      } else if (!this.domContentLoadedAdded) {
-        this.domContentLoadedAdded = true;
-        document.addEventListener('DOMContentLoaded', () => {
-          if (this.container && !this.container.parentNode) {
-            document.body.appendChild(this.container);
-          }
-        });
-      }
+      return true;
     }
 
     // Show notification message
@@ -1844,12 +1525,19 @@
         const standardDurations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
         duration = standardDurations[type] || 5000;
       }
-      // Ensure container is initialized
-      this.init();
+
+      // Try to initialize, fallback if DOM not ready
+      if (!this.init()) {
+        if (type === 'error') {
+          alert('エラー: ' + message);
+        } else {
+          console.log(`[${type}] ${message}`);
+        }
+        return;
+      }
 
       if (!this.container) {
         console.error('Notification container could not be initialized');
-        // Fallback to alert for critical messages
         if (type === 'error') {
           alert('エラー: ' + message);
         }
@@ -1872,14 +1560,12 @@
         info: 'ℹ️',
       };
 
-      // Create notification element with unified styling approach
+      // Create notification element
       const notification = document.createElement('div');
       const safeTypeColor = colors[type] || colors.info;
 
-      // Use CSS classes for layout, inline styles only for animations and type-specific colors
       notification.className = `notification glass-panel rounded-lg border shadow-lg flex items-center ${safeTypeColor}`;
 
-      // Inline styles only for animation states and essential overrides
       notification.style.cssText = `
         transform: translateX(100%);
         opacity: 0;
@@ -1913,44 +1599,26 @@
       // Append to container
       this.container.appendChild(notification);
 
-      // CLAUDE.md V8 compliant: requestAnimationFrame for smooth animation
+      // Animate in
       requestAnimationFrame(() => {
-        // Ensure DOM insertion is complete before starting animation
         if (notification.parentNode) {
           notification.style.transform = 'translateX(0)';
           notification.style.opacity = '1';
 
-          // Schedule removal after animation completes
+          // Schedule removal
           if (duration > 0) {
-            // Animation duration (300ms) + safety margin (100ms)
-            const animationDelay = 400;
-            this.scheduleNotificationRemoval(notification, duration + animationDelay);
+            setTimeout(() => {
+              this.removeNotification(notification);
+            }, duration + 400);
           }
         }
       });
     }
 
-    // V8-compatible notification removal scheduling
-    scheduleNotificationRemoval(notification, delay) {
-      // CLAUDE.md V8 compliant: Promise-based delay for notification removal
-      const createPromiseDelay = (ms) => new Promise(resolve => {
-        const start = Date.now();
-        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-        check();
-      });
-
-      createPromiseDelay(delay).then(() => {
-        this.removeNotification(notification);
-      }).catch(() => {
-        // Silent error handling for notification removal
-      });
-    }
-
-    // Remove notification with animation (simplified and reliable)
+    // Remove notification with animation
     removeNotification(notification) {
       if (!notification || !notification.parentNode) return;
 
-      // Prevent duplicate removal attempts
       if (notification.dataset.removing === 'true') return;
       notification.dataset.removing = 'true';
 
@@ -1958,20 +1626,12 @@
       notification.style.transform = 'translateX(100%)';
       notification.style.opacity = '0';
 
-      // V8-compatible removal after animation duration
-      const createPromiseDelay = (ms) => new Promise(resolve => {
-        const start = Date.now();
-        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-        check();
-      });
-
-      createPromiseDelay(300).then(() => { // Match CSS transition duration
-        if (notification.parentNode) {
+      // Remove after animation using setTimeout (memory efficient)
+      setTimeout(() => {
+        if (notification && notification.parentNode) {
           notification.remove();
         }
-      }).catch(() => {
-        // Silent error handling for DOM removal
-      });
+      }, 300);
     }
 
     // Convenience methods (simplified - use showMessage defaults)
@@ -2007,25 +1667,9 @@
     }
   }
 
-  // Create global notification instance with error handling
-  try {
+  // Create global notification instance (prevent duplicates)
+  if (!window.notifications) {
     window.notifications = new NotificationSystem();
-  } catch (error) {
-    console.error('Failed to initialize NotificationSystem:', error);
-    // Fallback notification system
-    window.notifications = {
-      showMessage: function(message, type, duration) {
-        if (type === 'error') {
-          alert('エラー: ' + message);
-        } else {
-          console.log(`[${type}] ${message}`);
-        }
-      },
-      success: function(message, duration) { this.showMessage(message, 'success', duration); },
-      error: function(message, duration) { this.showMessage(message, 'error', duration); },
-      warning: function(message, duration) { this.showMessage(message, 'warning', duration); },
-      info: function(message, duration) { this.showMessage(message, 'info', duration); }
-    };
   }
 
   // Add to shared utilities
@@ -2033,56 +1677,67 @@
     window.sharedUtilities.notifications = window.notifications;
   }
 
-  // Global convenience functions for backward compatibility
-  window.showSuccess = function (message, duration) {
-    if (window.notifications && window.notifications.success) {
-      window.notifications.success(message, duration);
-    } else {
-      console.log('[SUCCESS] ' + message);
-    }
-  };
-
-  window.showError = function (message, duration) {
-    if (window.notifications && window.notifications.error) {
-      window.notifications.error(message, duration);
-    } else {
-      alert('エラー: ' + message);
-    }
-  };
-
-  window.showWarning = function (message, duration) {
-    if (window.notifications && window.notifications.warning) {
-      window.notifications.warning(message, duration);
-    } else {
-      console.warn('[WARNING] ' + message);
-    }
-  };
-
-  window.showInfo = function (message, duration) {
-    if (window.notifications && window.notifications.info) {
-      window.notifications.info(message, duration);
-    } else {
-      console.log('[INFO] ' + message);
-    }
-  };
-
-  // Alias for generic show message
-  window.showMessage = function (message, type, duration) {
-    if (window.notifications && window.notifications.showMessage) {
-      window.notifications.showMessage(message, type, duration);
-    } else {
-      // Fallback based on type
-      if (type === 'error') {
-        alert('エラー: ' + message);
+  // Global convenience functions for backward compatibility (prevent duplicates)
+  if (!window.showSuccess) {
+    window.showSuccess = function (message, duration) {
+      if (window.notifications && window.notifications.success) {
+        window.notifications.success(message, duration);
       } else {
-        console.log(`[${type.toUpperCase()}] ${message}`);
+        console.log('[SUCCESS] ' + message);
       }
-    }
-  };
+    };
+  }
 
-  // Add styles for notification system if not using Tailwind
-  if (!document.querySelector('script[src*="tailwindcss"]')) {
+  if (!window.showError) {
+    window.showError = function (message, duration) {
+      if (window.notifications && window.notifications.error) {
+        window.notifications.error(message, duration);
+      } else {
+        alert('エラー: ' + message);
+      }
+    };
+  }
+
+  if (!window.showWarning) {
+    window.showWarning = function (message, duration) {
+      if (window.notifications && window.notifications.warning) {
+        window.notifications.warning(message, duration);
+      } else {
+        console.warn('[WARNING] ' + message);
+      }
+    };
+  }
+
+  if (!window.showInfo) {
+    window.showInfo = function (message, duration) {
+      if (window.notifications && window.notifications.info) {
+        window.notifications.info(message, duration);
+      } else {
+        console.log('[INFO] ' + message);
+      }
+    };
+  }
+
+  // Alias for generic show message (prevent duplicates)
+  if (!window.showMessage) {
+    window.showMessage = function (message, type, duration) {
+      if (window.notifications && window.notifications.showMessage) {
+        window.notifications.showMessage(message, type, duration);
+      } else {
+        // Fallback based on type
+        if (type === 'error') {
+          alert('エラー: ' + message);
+        } else {
+          console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+      }
+    };
+  }
+
+  // Add styles for notification system if not using Tailwind (prevent duplicates)
+  if (!document.querySelector('script[src*="tailwindcss"]') && !document.querySelector('#notification-fallback-styles')) {
     const style = document.createElement('style');
+    style.id = 'notification-fallback-styles';
     style.textContent = `
       #notification-container {
         position: fixed;

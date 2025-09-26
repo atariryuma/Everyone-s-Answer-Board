@@ -775,9 +775,15 @@ function createUser(email, initialConfig = {}, context = {}) {
  */
 function getAllUsers(options = {}, context = {}) {
   try {
-    // 🔧 CLAUDE.md準拠: Cross-user Access for getAllUsers (Admin-only operation)
-    const currentEmail = getCurrentEmail();
-    const isAdmin = isAdministrator(currentEmail);
+    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得認証情報活用
+    let currentEmail, isAdmin;
+    if (context.preloadedAuth) {
+      currentEmail = context.preloadedAuth.email;
+      isAdmin = context.preloadedAuth.isAdmin;
+    } else {
+      currentEmail = getCurrentEmail();
+      isAdmin = isAdministrator(currentEmail);
+    }
 
     if (!isAdmin && !context.forceServiceAccount) {
       console.warn('getAllUsers: Non-admin user attempting cross-user data access');
@@ -1041,7 +1047,8 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
 
     // ✅ Single Source of Truth: getAllUsers()でユーザー一覧を取得し、configJSONから検索
     // Cross-user lookup is legitimate for spreadsheetId-based user identification
-    const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true });
+    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得認証情報を渡して重複認証回避
+    const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, preloadedAuth: context.preloadedAuth });
     if (!Array.isArray(allUsers)) {
       console.warn('findUserBySpreadsheetId: Failed to get users list');
       return null;

@@ -1396,13 +1396,18 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         };
       }
 
+      // ✅ CLAUDE.md準拠: 70x Performance Improvement - 設定も事前取得（DB重複アクセス排除）
+      const configResult = getUserConfig(targetUserId, targetUser);
+      const targetUserConfig = configResult.success ? configResult.config : {};
+
       // 直接データ取得 - getViewerBoardData内の重複認証を回避
       const options = {
         classFilter: classFilter !== 'すべて' ? classFilter : undefined,
         sortBy: sortOrder || 'newest',
         includeTimestamp: true,
         adminMode: isSystemAdmin || (targetUser.userEmail === viewerEmail),
-        requestingUser: viewerEmail
+        requestingUser: viewerEmail,
+        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin } // ✅ 認証情報を渡して重複認証回避
       };
 
       const dataFetchStart = Date.now();
@@ -1412,7 +1417,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         options
       });
 
-      const result = getUserSheetData(targetUser.userId, options);
+      // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得データを渡してDB重複アクセス排除
+      const result = getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig);
       const dataFetchEnd = Date.now();
 
       console.info('getPublishedSheetData: getUserSheetData completed', {
@@ -1470,7 +1476,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
               for (const [key, value] of Object.entries(item)) {
                 if (value instanceof Date) {
                   cleaned[key] = value.toISOString();
-                  console.log(`⚠️ Date object found and converted: ${key} = ${value.toISOString()}`);
                 } else if (typeof value === 'object' && value !== null) {
                   try {
                     cleaned[key] = JSON.parse(JSON.stringify(value));
@@ -1532,13 +1537,18 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       };
     }
 
+    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 設定も事前取得（DB重複アクセス排除）
+    const configResult = getUserConfig(user.userId, user);
+    const userConfig = configResult.success ? configResult.config : {};
+
     // ✅ Simplified options - remove pagination complexity
     const options = {
       classFilter: classFilter !== 'すべて' ? classFilter : undefined,
       sortBy: sortOrder || 'newest',
       includeTimestamp: true,
       adminMode: isSystemAdmin,
-      requestingUser: viewerEmail
+      requestingUser: viewerEmail,
+      preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin } // ✅ 認証情報を渡して重複認証回避
     };
 
     const dataFetchStart = Date.now();
@@ -1548,7 +1558,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       options
     });
 
-    const result = getUserSheetData(user.userId, options);
+    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得データを渡してDB重複アクセス排除
+    const result = getUserSheetData(user.userId, options, user, userConfig);
     const dataFetchEnd = Date.now();
 
     console.info('getPublishedSheetData: getUserSheetData completed (self-access)', {
@@ -1607,7 +1618,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
             for (const [key, value] of Object.entries(item)) {
               if (value instanceof Date) {
                 cleaned[key] = value.toISOString();
-                console.log(`⚠️ Date object found and converted (self-access): ${key} = ${value.toISOString()}`);
               } else if (typeof value === 'object' && value !== null) {
                 try {
                   cleaned[key] = JSON.parse(JSON.stringify(value));
@@ -1969,7 +1979,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
         console.log(`getNotificationUpdate: Item ${index} timestamp check:`, {
           itemTimestamp: itemTimestamp.toISOString(),
           lastUpdate: lastUpdate.toISOString(),
-          isNew: isNew,
+          isNew,
           hasTimestamp: !!item.timestamp
         });
       }

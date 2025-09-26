@@ -255,9 +255,9 @@ function repairNestedConfig(config, userId) {
     };
   }
 
-  // columnMapping修復
+  // columnMapping修復 - ✅ CLAUDE.md準拠: シンプル構造 {answer: 4, class: 2}
   if (!repaired.columnMapping || typeof repaired.columnMapping !== 'object') {
-    repaired.columnMapping = { mapping: {} };
+    repaired.columnMapping = {};
   }
 
   // userPermissions修復
@@ -555,8 +555,8 @@ function calculateCompletionScore(config) {
   // 表示設定 (10点)
   if (config.displaySettings) score += 10;
 
-  // 列マッピング (10点)
-  if (config.columnMapping && config.columnMapping.mapping) score += 10;
+  // 列マッピング (10点) - ✅ CLAUDE.md準拠: シンプル構造対応
+  if (config.columnMapping && Object.keys(config.columnMapping).length > 0) score += 10;
 
   return Math.min(score, maxScore);
 }
@@ -699,21 +699,23 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
   try {
     console.log('📝 getQuestionText START:', {
       hasColumnMapping: !!config?.columnMapping,
-      hasHeaders: !!config?.columnMapping?.headers,
-      answerIndex: config?.columnMapping?.answer,  // ✅ CLAUDE.md準拠: 統一形式対応
-      headersLength: config?.columnMapping?.headers?.length || 0,
+      hasHeaders: !!config?.headers,
+      hasPreloadedHeaders: !!preloadedHeaders,
+      answerIndex: config?.columnMapping?.answer,  // ✅ CLAUDE.md準拠: シンプル構造対応
+      configHeadersLength: config?.headers?.length || 0,
+      preloadedHeadersLength: preloadedHeaders?.length || 0,
       hasSpreadsheetId: !!config?.spreadsheetId,
       hasSheetName: !!config?.sheetName
     });
 
-    // ✅ CLAUDE.md準拠: 統一形式対応
+    // ✅ CLAUDE.md準拠: シンプル構造対応
     const answerIndex = config?.columnMapping?.answer;
 
-    // 1. 既存のheadersから取得を試行
-    if (typeof answerIndex === 'number' && config?.columnMapping?.headers?.[answerIndex]) {
-      const questionText = config.columnMapping.headers[answerIndex];
+    // 1. config.headersから取得を試行 - ✅ シンプル構造対応
+    if (typeof answerIndex === 'number' && config?.headers?.[answerIndex]) {
+      const questionText = config.headers[answerIndex];
       if (questionText && typeof questionText === 'string' && questionText.trim()) {
-        console.log('✅ getQuestionText SUCCESS (from stored headers):', questionText.trim());
+        console.log('✅ getQuestionText SUCCESS (from config.headers):', questionText.trim());
         return questionText.trim();
       }
     }
@@ -793,9 +795,10 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
  * 統一設定読み込みAPI - V8最適化、変数チェック強化
  * main.gs内の直接JSON.parse()操作を置換する統一関数
  * @param {string} userId - ユーザーID
+ * @param {Object} preloadedUser - 事前取得済みユーザーオブジェクト（パフォーマンス最適化用）
  * @returns {Object} {success: boolean, config: Object, message?: string, userId?: string}
  */
-function getUserConfig(userId) {
+function getUserConfig(userId, preloadedUser = null) {
   // V8最適化: 事前変数チェック（CLAUDE.md 151-169行準拠）
   if (!userId || typeof userId !== 'string' || !userId.trim()) {
     return {
@@ -806,10 +809,9 @@ function getUserConfig(userId) {
   }
 
   try {
-    // Zero-Dependency: 直接findUserById呼び出し（CLAUDE.md準拠）
-    const currentEmail = getCurrentEmail();
-    const user = findUserById(userId, {
-      requestingUser: currentEmail
+    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得データ活用
+    const user = preloadedUser || findUserById(userId, {
+      requestingUser: getCurrentEmail()
     });
     if (!user) {
       return {

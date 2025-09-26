@@ -600,7 +600,7 @@
       const config = systemState.config;
 
       // 🚀 最適化: 設定済みユーザーは軽量復元モード
-      if (config?.spreadsheetId && config?.sheetName && config?.columnMapping?.mapping) {
+      if (config?.spreadsheetId && config?.sheetName && config?.columnMapping && Object.keys(config.columnMapping).length > 0) {
 
         // 既存設定の直接復元（重いAPI呼び出しなし）
         // 🔧 パフォーマンス最適化: 単一innerHTML操作でDOM reflow削減
@@ -1169,7 +1169,7 @@
         currentStep = 2; // データソース接続完了
       }
 
-      if (config.columnMapping && config.columnMapping.mapping && Object.keys(config.columnMapping.mapping).length > 0) {
+      if (config.columnMapping && Object.keys(config.columnMapping).length > 0) {
         currentStep = 3; // 列設定完了
       }
 
@@ -1177,9 +1177,9 @@
         currentStep = 3; // セットアップ完了確定
       }
 
-      // ✅ CLAUDE.md準拠: 統一された完了判定ロジック（ボタン状態更新と同じ）
+      // ✅ CLAUDE.md準拠: 統一された完了判定ロジック（ボタン状態更新と同じ）- シンプル構造対応
       const hasSpreadsheetConfig = Boolean(config.spreadsheetId && config.sheetName);
-      const hasColumnMapping = Boolean(config.columnMapping && config.columnMapping.mapping && Object.keys(config.columnMapping.mapping).length > 0);
+      const hasColumnMapping = Boolean(config.columnMapping && Object.keys(config.columnMapping).length > 0);
       const setupComplete = config.setupStatus === 'completed' || (hasSpreadsheetConfig && hasColumnMapping);
 
       
@@ -1289,21 +1289,32 @@
 
   // ✅ 使い方ガイドを新タブで開く (CLAUDE.md準拠: シンプル&効率的)
   function openManualGuide() {
-    try {
-      // 管理パネルは既に正しいURLで表示されている
-      // → 現在のページURLから userId を削除して mode=manual に変更するだけ
-      const currentUrl = new URL(window.top.location.href);
-      currentUrl.searchParams.set('mode', 'manual');
-      currentUrl.searchParams.delete('userId');
+    const btn = document.getElementById('manual-guide-btn');
+    if (!btn) return;
 
-      const manualUrl = currentUrl.toString();
-      console.log('使い方ガイドURL (シンプル方式):', manualUrl);
+    // ボタンの状態変更でユーザーフィードバック
+    btn.disabled = true;
+    btn.innerHTML = '📚 開いています...';
 
-      window.open(manualUrl, '_blank');
-    } catch (error) {
-      console.error('使い方ガイドを開けませんでした:', error);
-      showError('使い方ガイドを開けませんでした。再度お試しください。');
-    }
+    // 3秒後にボタンを元に戻す（新しいタブなのでページは残る）
+    setTimeout(() => {
+      btn.disabled = false;
+      btn.innerHTML = '📚 使い方ガイド';
+    }, 3000);
+
+    google.script.run
+      .withSuccessHandler(function (webAppUrl) {
+        if (webAppUrl) {
+          window.open(webAppUrl + '?mode=manual', '_blank');
+        }
+      })
+      .withFailureHandler(function (error) {
+        console.error('使い方ガイドエラー:', error);
+        // エラー時はボタンをすぐ復元
+        btn.disabled = false;
+        btn.innerHTML = '📚 使い方ガイド';
+      })
+      .getWebAppUrl();
   }
 
   // リソースボタンの表示状態を更新
@@ -1337,8 +1348,8 @@
       return;
     }
 
-    // 🚀 列マッピング完了状態の判定
-    const hasColumnMapping = !!(config.columnMapping && config.columnMapping.mapping);
+    // 🚀 列マッピング完了状態の判定 - ✅ CLAUDE.md準拠: シンプル構造対応
+    const hasColumnMapping = !!(config.columnMapping && Object.keys(config.columnMapping).length > 0);
     const hasSpreadsheetConfig = !!(config.spreadsheetId && config.sheetName);
     // setupStatusまたは、実際にマッピング要件が満たされている場合も完了とみなす
     const isSetupComplete = config.setupStatus === 'completed' ||
@@ -3685,11 +3696,11 @@
         .filter(Boolean);
     }
 
-    // ✅ CLAUDE.md準拠: シンプル構造の直接収集
+    // ✅ CLAUDE.md準拠: シンプル構造の直接収集 - 新形式対応
     const columnMapping = getColumnMapping();
-    const mapping = { mapping: columnMapping, confidence: {} };
 
-    // 信頼度は既存のUI要素から収集（互換性のため）
+    // 信頼度データの収集（メタデータとして別管理）
+    const confidence = {};
     ['answer', 'reason', 'class', 'name'].forEach((key) => {
       if (typeof columnMapping[key] === 'number') {
         const confidenceElement = document.getElementById(key + '-confidence');
@@ -3699,7 +3710,7 @@
             const confidenceText = badge.textContent;
             const match = confidenceText.match(/(\d+)%/);
             if (match) {
-              mapping.confidence[key] = parseInt(match[1]);
+              confidence[key] = parseInt(match[1]);
             }
           }
         }
@@ -3709,8 +3720,8 @@
     // 表示用に検証結果を描画
     displayVerificationResults({ ok: true });
 
-    // 設定を保存（headers + columnMapping で統一）
-    saveColumnConfiguration(spreadsheetId, sheetName, headers, mapping);
+    // 設定を保存（✅ CLAUDE.md準拠: シンプル構造で直接送信）
+    saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping, confidence);
 
     showSuccess('列マッピングの検証が完了しました');
     updateProgress(3);
@@ -3818,10 +3829,11 @@
    * @param {string} spreadsheetId - スプレッドシートID
    * @param {string} sheetName - シート名
    * @param {Array} headers - ヘッダー配列
-   * @param {Object} columnMapping - 列マッピング
+   * @param {Object} columnMapping - 列マッピング（シンプル構造）
+   * @param {Object} confidence - 信頼度データ（オプション）
    * @returns {Object} 検証結果
    */
-  function validateColumnConfigurationData(spreadsheetId, sheetName, headers, columnMapping) {
+  function validateColumnConfigurationData(spreadsheetId, sheetName, headers, columnMapping, confidence = {}) {
     const validation = {
       isValid: true,
       errors: [],
@@ -3852,13 +3864,13 @@
         }
       }
 
-      // 🔍 列マッピング検証
+      // 🔍 列マッピング検証 - ✅ CLAUDE.md準拠: シンプル構造対応
       if (!columnMapping || typeof columnMapping !== 'object') {
         validation.errors.push('列マッピングが無効です');
         validation.isValid = false;
       } else {
-        const mappingData = columnMapping.mapping || {};
-        const confidenceData = columnMapping.confidence || {};
+        const mappingData = columnMapping; // ✅ 直接シンプル構造使用
+        const confidenceData = confidence; // ✅ 別パラメータから取得
 
         // 必須フィールドの確認
         const requiredFields = ['answer'];
@@ -3905,7 +3917,7 @@
 
       // 🎯 設定品質スコア算出
       if (validation.isValid) {
-        validation.qualityScore = calculateConfigurationQualityScore(headers, columnMapping);
+        validation.qualityScore = calculateConfigurationQualityScore(headers, columnMapping, confidence);
         if (validation.qualityScore < 70) {
           validation.warnings.push(`設定品質スコア: ${validation.qualityScore}% - 改善余地あり`);
         }
@@ -3925,18 +3937,19 @@
   }
 
   /**
-   * 設定品質スコア算出
+   * 設定品質スコア算出 - ✅ CLAUDE.md準拠: シンプル構造対応
    * @param {Array} headers - ヘッダー配列
-   * @param {Object} columnMapping - 列マッピング
+   * @param {Object} columnMapping - 列マッピング（シンプル構造）
+   * @param {Object} confidence - 信頼度データ（オプション）
    * @returns {number} 品質スコア (0-100)
    */
-  function calculateConfigurationQualityScore(headers, columnMapping) {
+  function calculateConfigurationQualityScore(headers, columnMapping, confidence = {}) {
     let score = 0;
     const maxScore = 100;
 
     try {
-      const mappingData = columnMapping.mapping || {};
-      const confidenceData = columnMapping.confidence || {};
+      const mappingData = columnMapping; // ✅ 直接シンプル構造使用
+      const confidenceData = confidence; // ✅ 別パラメータから取得
 
       // 基本フィールド存在 (40点)
       const basicFields = ['answer', 'reason', 'class', 'name'];
@@ -4038,8 +4051,8 @@
   }
 
 
-  // 🔒 列設定の保存（堅牢化版）
-  function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping) {
+  // 🔒 列設定の保存（堅牢化版） - ✅ CLAUDE.md準拠: シンプル構造対応
+  function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping, confidence = {}) {
     // 🔧 CLAUDE.md準拠: ClientMutexで重複実行防止
     if (!ClientMutex.acquire('saveColumnConfiguration')) {
       showInfo('列設定の保存処理を実行中です…');
@@ -4047,8 +4060,8 @@
     }
 
     try {
-      // 🛡️ 入力データの検証
-      const validationResult = validateColumnConfigurationData(spreadsheetId, sheetName, headers, columnMapping);
+      // 🛡️ 入力データの検証 - ✅ CLAUDE.md準拠: シンプル構造対応
+      const validationResult = validateColumnConfigurationData(spreadsheetId, sheetName, headers, columnMapping, confidence);
       if (!validationResult.isValid) {
         showError(`列設定の検証に失敗: ${validationResult.errors.join(', ')}`);
         ClientMutex.release('saveColumnConfiguration');
@@ -4061,12 +4074,10 @@
     const baseConfig = {
       spreadsheetId,
       sheetName,
-      headers: headers, // トップレベルheaders（UI表示用）
-      columnMapping: {
-        ...columnMapping,
-        headers: headers, // columnMapping内headers（システム利用）
-        verifiedAt: timestamp // 検証時刻は論理的にmapping内のみ
-      },
+      headers: headers, // ✅ CLAUDE.md準拠: トップレベルheaders（UI表示用）
+      columnMapping: columnMapping, // ✅ CLAUDE.md準拠: シンプル構造 {answer:4, reason:5, ...}
+      verifiedAt: timestamp, // メタデータは別途管理
+      confidence: confidence, // 信頼度データは別途管理
       setupComplete: true,
       setupStatus: 'completed',
       etag: (systemState && systemState.config && systemState.config.etag) || undefined,
@@ -4113,10 +4124,7 @@
 
       }
 
-      // 🎯 Object.assign残存分クリーンアップ（最小限）
-      if (optimizedConfig.verifiedAt) {
-        delete optimizedConfig.verifiedAt; // columnMapping.verifiedAtのみ使用
-      }
+      // 🎯 Object.assign残存分クリーンアップ（最小限） - ✅ CLAUDE.md準拠: verifiedAtはトップレベル保持
 
       // 🔗 フォーム自動連携: 既存フォーム検出・統合（安全版）
       if (!optimizedConfig.formUrl) {
@@ -4779,41 +4787,26 @@
 
   // アプリ設定画面を開く
   function openAppSetup() {
-    try {
-      setPartialLoading(true, 'アプリ設定画面に移動中...');
+    const btn = document.getElementById('app-setup-btn');
+    if (!btn) return;
 
-      // Google Apps Script WebApp URL取得してappSetupモードで遷移
-      google.script.run
-        .withSuccessHandler(function (webAppUrl) {
-          const setupUrl = webAppUrl + '?mode=appSetup';
-          console.log('アプリ設定画面への遷移:', setupUrl);
+    // ボタンの状態変更でユーザーフィードバック（同じタブで遷移するので元に戻さない）
+    btn.disabled = true;
+    btn.innerHTML = '⚙️ 移動中...';
 
-          // Google Apps Script環境では window.open(_top) を使用
-          window.open(setupUrl, '_top');
-        })
-        .withFailureHandler(function (error) {
-          console.error('WebApp URL取得エラー:', error);
-          setPartialLoading(false);
-          showError('アプリ設定画面への移動に失敗しました');
-
-          // フォールバック: 現在のURLベースで遷移
-          try {
-            const currentUrl = new URL(window.location.href);
-            const baseUrl = currentUrl.origin + currentUrl.pathname;
-            const setupUrl = baseUrl + '?mode=appSetup';
-            console.log('フォールバック遷移:', setupUrl);
-            window.open(setupUrl, '_top');
-          } catch (fallbackError) {
-            console.error('フォールバック遷移も失敗:', fallbackError);
-          }
-        })
-        .getWebAppUrl();
-
-    } catch (error) {
-      console.error('openAppSetup error:', error);
-      showError('アプリ設定画面への移動に失敗しました');
-      setPartialLoading(false);
-    }
+    google.script.run
+      .withSuccessHandler(function (webAppUrl) {
+        if (webAppUrl) {
+          window.open(webAppUrl + '?mode=appSetup', '_top');
+        }
+      })
+      .withFailureHandler(function (error) {
+        console.error('アプリ設定エラー:', error);
+        // エラー時のみボタンを復元
+        btn.disabled = false;
+        btn.innerHTML = '⚙️ アプリ設定';
+      })
+      .getWebAppUrl();
   }
 
 </script>
