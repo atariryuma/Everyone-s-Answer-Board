@@ -1367,43 +1367,49 @@
   };
 
   // =============================================================================
-  // SIMPLE & EFFECTIVE WARNING SUPPRESSION FOR GAS
+  // IMMEDIATE WARNING SUPPRESSION - a1a610ab WORKING VERSION
   // =============================================================================
 
-  // ✅ Immediate and simple warning suppression
-  const originalWarn = console.warn;
-  const originalError = console.error;
+  // ✅ Return to working implementation from a1a610ab
+  (function() {
+    const suppressedErrors = [
+      'cdn.tailwindcss.com should not be used in production',
+      'cdnjs.cloudflare.com',
+      'tailwind',
+      'TailwindCSS',
+      'iframe which has both allow-scripts and allow-same-origin',
+      'can escape its sandboxing',
+      'An iframe which has both allow-scripts and allow-same-origin',
+      // ✅ Add specific GAS warnings that are causing issues
+      'Unrecognized feature',
+      'ambient-light-sensor',
+      'speaker',
+      'vibrate',
+      'vr',
+      'Unsafe attempt to initiate navigation',
+      'net state changed'
+    ];
 
-  console.warn = function(...args) {
-    const msg = args.join(' ');
-    // Simple pattern matching for known GAS warnings
-    if (msg.includes('Unrecognized feature') ||
-        msg.includes('ambient-light-sensor') ||
-        msg.includes('speaker') ||
-        msg.includes('vibrate') ||
-        msg.includes('vr') ||
-        msg.includes('iframe') ||
-        msg.includes('sandbox') ||
-        msg.includes('navigation') ||
-        msg.includes('net state changed') ||
-        msg.includes('warden_bin')) {
-      return; // Suppress these warnings
-    }
-    originalWarn.apply(console, args);
-  };
+    // Override console.warn immediately
+    const originalWarn = console.warn;
+    console.warn = function(message, ...args) {
+      const errorMessage = message ? message.toString() : '';
+      const shouldSuppress = suppressedErrors.some(pattern => errorMessage.includes(pattern));
+      if (!shouldSuppress) {
+        originalWarn.apply(console, [message, ...args]);
+      }
+    };
 
-  console.error = function(...args) {
-    const msg = args.join(' ');
-    // Simple pattern matching for known GAS errors
-    if (msg.includes('Unsafe attempt to initiate navigation') ||
-        msg.includes('sandboxed with the') ||
-        msg.includes('iframe') ||
-        msg.includes('about:blank') ||
-        msg.includes('can escape its sandboxing')) {
-      return; // Suppress these errors
-    }
-    originalError.apply(console, args);
-  };
+    // Override console.error immediately
+    const originalError = console.error;
+    console.error = function(message, ...args) {
+      const errorMessage = message ? message.toString() : '';
+      const shouldSuppress = suppressedErrors.some(pattern => errorMessage.includes(pattern));
+      if (!shouldSuppress) {
+        originalError.apply(console, [message, ...args]);
+      }
+    };
+  })();
 
   // =============================================================================
   // NOTIFICATION TOAST SYSTEM
@@ -1737,11 +1743,18 @@
     }
   }
 
-  // Create global notification instance (prevent duplicates)
-  if (!window.notifications) {
-    window.notifications = new NotificationSystem();
-    // Force immediate initialization
+  // ✅ IMMEDIATE NOTIFICATION SYSTEM CREATION - a1a610ab style
+  window.notifications = new NotificationSystem();
+
+  // ✅ Force immediate initialization when DOM is ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() {
+      window.notifications.init();
+      console.log('🔧 Notifications initialized on DOMContentLoaded');
+    });
+  } else {
     window.notifications.init();
+    console.log('🔧 Notifications initialized immediately');
   }
 
   // Add to shared utilities
@@ -1806,84 +1819,60 @@
     };
   }
 
-  // Add styles for notification system if not using Tailwind (prevent duplicates)
-  if (!document.querySelector('script[src*="tailwindcss"]') && !document.querySelector('#notification-fallback-styles')) {
+  // ✅ ALWAYS ADD FALLBACK STYLES - Ensure z-index works
+  if (!document.querySelector('#notification-fallback-styles')) {
     const style = document.createElement('style');
     style.id = 'notification-fallback-styles';
     style.textContent = `
       #notification-container {
-        position: fixed;
-        top: 1rem;
-        right: 1rem;
-        z-index: 10000;
-        pointer-events: none;
+        position: fixed !important;
+        top: 1rem !important;
+        right: 1rem !important;
+        z-index: 10000 !important;
+        pointer-events: none !important;
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
       }
       #notification-container .notification {
-        pointer-events: auto;
+        pointer-events: auto !important;
         min-width: 300px;
         max-width: 500px;
+        padding: 0.75rem 1rem;
+        border-radius: 0.5rem;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
       }
     `;
     document.head.appendChild(style);
+    console.log('🔧 Notification fallback styles added');
   }
 
-  // ✅ Simple test function for notifications - immediately available
-  function testNotifications() {
+  // ✅ IMMEDIATE TEST FUNCTION - Direct window assignment
+  window.testNotifications = function() {
     console.log('🧪 Testing notification system...');
 
-    // Check if notification system is available
     if (!window.notifications) {
       console.error('❌ NotificationSystem not available');
       return false;
     }
 
-    // Ensure it's initialized
-    try {
-      window.notifications.init();
-    } catch (e) {
-      console.warn('Notification init warning:', e.message);
-    }
+    // Test immediately
+    window.notifications.info('🧪 Info test', 2000);
+    window.notifications.success('✅ Success test', 2000);
+    window.notifications.warning('⚠️ Warning test', 2000);
+    window.notifications.error('❌ Error test', 2000);
 
-    // Test all notification types
-    try {
-      window.notifications.info('🧪 Info test - z-index fixed', 2000);
-      window.notifications.success('✅ Success test', 2000);
-      window.notifications.warning('⚠️ Warning test', 2000);
-      window.notifications.error('❌ Error test', 2000);
+    console.log('✅ Test notifications sent');
+    return true;
+  };
 
-      console.log('✅ All notification types sent successfully');
-
-      // Log container info for debugging
-      if (window.notifications.container) {
-        const styles = window.getComputedStyle(window.notifications.container);
-        console.log(`📍 Container z-index: ${styles.zIndex}`);
-        console.log(`📍 Container position: ${styles.position}`);
-        console.log(`📍 Container classes: ${window.notifications.container.className}`);
-      }
-
-      return true;
-    } catch (error) {
-      console.error('❌ Notification test failed:', error.message);
-      return false;
-    }
-  }
-
-  // Make function globally available
-  window.testNotifications = testNotifications;
-
-  // Also make it available as a global function (multiple ways for reliability)
-  if (typeof globalThis !== 'undefined') {
-    globalThis.testNotifications = testNotifications;
-  }
-
-  console.log('🔧 testNotifications() is now globally available');
-
-  // ✅ Immediate system status check
-  console.log('📊 Notification System Status:', {
-    notificationsAvailable: !!window.notifications,
-    testFunctionAvailable: !!window.testNotifications,
-    showMessageAvailable: !!window.showMessage
-  });
+  // ✅ Status check - immediate execution
+  console.log('🔧 Notification system ready:', !!window.notifications);
+  console.log('🔧 Test function ready:', !!window.testNotifications);
 
   // =============================================================================
   // DYNAMIC PERFORMANCE CONSTANTS - Shared across all HTML files
