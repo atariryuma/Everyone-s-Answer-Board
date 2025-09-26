@@ -1382,7 +1382,7 @@
       console.warn = function (...args) {
         const message = args.join(' ').toLowerCase();
 
-        // Suppress common iframe/sandbox warnings in GAS environment
+        // Suppress common iframe/sandbox warnings and browser feature warnings in GAS environment
         const suppressPatterns = [
           'iframe',
           'sandbox',
@@ -1394,31 +1394,44 @@
           'document.domain',
           'postmessage',
           'unrecognized feature',
+          // ✅ Browser API Features (common warnings in GAS environment)
+          'ambient-light-sensor',
+          'speaker',
+          'vibrate',
+          'vr',
           'gyroscope',
           'accelerometer',
           'magnetometer',
           'camera',
           'microphone',
           'geolocation',
+          'fullscreen',
+          'midi',
+          'notifications',
+          'persistent-storage',
+          'push',
+          'background-sync',
+          // ✅ Permission Policy & Feature Policy
           'allow-scripts',
           'allow-same-origin',
           'feature',
           'permission',
           'permissions policy',
           'feature policy',
+          // ✅ Sandbox & Frame Security
           'escape its sandboxing',
           'document.domain setter',
           'an iframe which has both allow-scripts and allow-same-origin',
           'can escape its sandboxing',
+          // ✅ Network State & Internal Google Scripts
           'net state changed from idle to busy',
           'net state changed from busy to idle',
           'warden_bin_i18n_warden',
-          'geolocation',
-          'microphone',
-          'camera',
-          'gyroscope',
-          'accelerometer',
-          'magnetometer',
+          'usercodepanel',
+          'mae_html_user_bin_i18n_mae_html_user',
+          '3088782566-warden_bin_i18n_warden__ja.js',
+          '2056725483-mae_html_user_bin_i18n_mae_html_user__ja.js',
+          // ✅ Advanced Device APIs
           'usb',
           'serial',
           'bluetooth',
@@ -1427,17 +1440,15 @@
           'display-capture',
           'screen-wake-lock',
           'web-share',
-          'unrecognized feature',
-          'usercodepanel',
-          'mae_html_user_bin_i18n_mae_html_user',
-          '3088782566-warden_bin_i18n_warden__ja.js',
-          '2056725483-mae_html_user_bin_i18n_mae_html_user__ja.js',
-          'an iframe which has both allow-scripts and allow-same-origin',
-          'can escape its sandboxing',
-          'usercodepanel',
-          'mae_html_user_bin_i18n_mae_html_user',
-          '3088782566-warden_bin_i18n_warden__ja.js',
-          '2056725483-mae_html_user_bin_i18n_mae_html_user__ja.js',
+          'clipboard',
+          'clipboard-read',
+          'clipboard-write',
+          // ✅ Navigation & Security
+          'navigate',
+          'top-level-storage-access',
+          'document-access',
+          'storage-access',
+          'autoplay'
         ];
 
         const shouldSuppress = suppressPatterns.some((pattern) => message.includes(pattern));
@@ -1447,17 +1458,34 @@
         }
       };
 
-      // Suppress common iframe-related errors
+      // Suppress common iframe-related errors and feature policy errors
       const originalConsoleError = console.error;
       console.error = function (...args) {
         const message = args.join(' ').toLowerCase();
 
-        if (
-          message.includes('iframe') &&
-          (message.includes('refused to frame') ||
-            message.includes('x-frame-options') ||
-            message.includes('frame-ancestors'))
-        ) {
+        // ✅ Enhanced suppression for iframe and feature policy errors
+        const errorSuppressPatterns = [
+          'iframe',
+          'refused to frame',
+          'x-frame-options',
+          'frame-ancestors',
+          'unrecognized feature',
+          'ambient-light-sensor',
+          'speaker',
+          'vibrate',
+          'vr',
+          'permissions policy',
+          'feature policy',
+          'navigation restricted',
+          'navigation denied',
+          'frame navigation'
+        ];
+
+        const shouldSuppressError = errorSuppressPatterns.some((pattern) =>
+          message.includes(pattern)
+        );
+
+        if (shouldSuppressError) {
           return;
         }
 
@@ -1502,51 +1530,96 @@
       };
     }
 
-    // Initialize notification container
+    // Initialize notification container with enhanced resilience
     init() {
-      // Ensure DOM is ready
-      if (!document.body) {
+      try {
+        // ✅ Enhanced DOM readiness check
+        if (!document.body) {
+          // Try again after a short delay if DOM not ready
+          if (!this.initRetryCount) this.initRetryCount = 0;
+          if (this.initRetryCount < 3) {
+            this.initRetryCount++;
+            setTimeout(() => this.init(), 50);
+            return false;
+          }
+          console.warn('NotificationSystem: DOM not ready after retries, skipping initialization');
+          return false;
+        }
+
+        this.container = document.getElementById('notification-container');
+
+        if (this.container) {
+          this.initialized = true;
+          return true;
+        }
+
+        // ✅ Create notification container with enhanced error handling
+        try {
+          this.container = document.createElement('div');
+          this.container.id = 'notification-container';
+          this.container.className = 'fixed top-4 right-4 z-[10000] space-y-2 pointer-events-none';
+
+          document.body.appendChild(this.container);
+          this.initialized = true;
+          return true;
+        } catch (domError) {
+          console.warn('NotificationSystem: Failed to create container:', domError.message);
+          // Fallback: try to use document.head if body fails
+          try {
+            this.container = document.createElement('div');
+            this.container.id = 'notification-container-fallback';
+            this.container.className = 'fixed top-4 right-4 z-[10000] space-y-2 pointer-events-none';
+            document.head.appendChild(this.container);
+            this.initialized = true;
+            return true;
+          } catch (fallbackError) {
+            console.error('NotificationSystem: Complete initialization failure:', fallbackError.message);
+            return false;
+          }
+        }
+      } catch (error) {
+        console.error('NotificationSystem: Unexpected initialization error:', error.message);
         return false;
       }
-
-      this.container = document.getElementById('notification-container');
-
-      if (this.container) {
-        this.initialized = true;
-        return true;
-      }
-
-      // Create notification container
-      this.container = document.createElement('div');
-      this.container.id = 'notification-container';
-      this.container.className = 'fixed top-4 right-4 z-[10000] space-y-2 pointer-events-none';
-
-      document.body.appendChild(this.container);
-      this.initialized = true;
-      return true;
     }
 
-    // Show notification message with performance optimization
+    // Show notification message with enhanced resilience and performance optimization
     showMessage(message, type = 'info', duration = null) {
-      // Standardized durations: success: 4000, error: 7000, warning: 6000, info: 5000
-      if (duration === null) {
-        const standardDurations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
-        duration = standardDurations[type] || 5000;
-      }
-
-      // Performance optimization: Queue notifications on low-end devices
-      if (this.isLowEndDevice && this.getActiveNotificationCount() >= 3) {
-        this.queueNotification({ message, type, duration });
-        return;
-      }
-
-      // Try to initialize, fallback if DOM not ready
-      if (!this.init()) {
-        if (type === 'error') {
-          alert('エラー: ' + message);
-        } else {
-          console.log(`[${type}] ${message}`);
+      try {
+        // ✅ Input validation and sanitization
+        if (!message || typeof message !== 'string') {
+          console.warn('NotificationSystem: Invalid message provided:', message);
+          return;
         }
+
+        // Standardized durations: success: 4000, error: 7000, warning: 6000, info: 5000
+        if (duration === null) {
+          const standardDurations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
+          duration = standardDurations[type] || 5000;
+        }
+
+        // Performance optimization: Queue notifications on low-end devices
+        if (this.isLowEndDevice && this.getActiveNotificationCount() >= 3) {
+          this.queueNotification({ message, type, duration });
+          return;
+        }
+
+        // ✅ Enhanced initialization with retry mechanism
+        let initSuccess = this.init();
+        if (!initSuccess) {
+          // Retry initialization once more after small delay
+          setTimeout(() => {
+            if (this.init()) {
+              this.showMessage(message, type, duration);
+            } else {
+              this.fallbackNotification(message, type);
+            }
+          }, 100);
+          return;
+        }
+      } catch (error) {
+        console.error('NotificationSystem: Error in showMessage:', error.message);
+        this.fallbackNotification(message, type);
         return;
       }
 
@@ -1696,6 +1769,23 @@
 
       const notifications = this.container.querySelectorAll('.notification');
       notifications.forEach((notification) => this.removeNotification(notification));
+    }
+
+    // ✅ Fallback notification system for critical failures
+    fallbackNotification(message, type) {
+      try {
+        // Primary fallback: Use browser alert/console for critical messages
+        if (type === 'error') {
+          alert(`エラー: ${message}`);
+        } else if (type === 'warning') {
+          console.warn(`[警告] ${message}`);
+        } else {
+          console.log(`[${type}] ${message}`);
+        }
+      } catch (fallbackError) {
+        // Ultimate fallback: Basic console output
+        console.log(`NotificationSystem fallback: [${type}] ${message}`);
+      }
     }
 
     // Performance optimization helper methods

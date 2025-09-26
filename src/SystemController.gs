@@ -2149,6 +2149,112 @@ function testDatabaseConnection() {
 }
 
 // ===========================================
+// 🔧 Application Setup Functions (from main.gs)
+// ===========================================
+
+/**
+ * Setup application with system properties
+ * @param {string} serviceAccountJson - Service account credentials
+ * @param {string} databaseId - Database spreadsheet ID
+ * @param {string} adminEmail - Administrator email
+ * @param {string} googleClientId - Google Client ID (optional)
+ * @returns {Object} Setup result
+ */
+function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
+  try {
+    // Validation
+    if (!serviceAccountJson || !databaseId || !adminEmail) {
+      return {
+        success: false,
+        message: '必須パラメータが不足しています'
+      };
+    }
+
+    // System properties setup
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty('DATABASE_SPREADSHEET_ID', databaseId);
+    props.setProperty('ADMIN_EMAIL', adminEmail);
+    props.setProperty('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
+
+    if (googleClientId) {
+      props.setProperty('GOOGLE_CLIENT_ID', googleClientId);
+    }
+
+    // Initialize database if needed
+    try {
+      const testAccess = openSpreadsheet(databaseId, { useServiceAccount: true }).spreadsheet;
+    } catch (dbError) {
+      console.warn('Database access test failed:', dbError.message);
+    }
+
+    return {
+      success: true,
+      message: 'Application setup completed successfully',
+      data: {
+        databaseId,
+        adminEmail,
+        googleClientId: googleClientId || null
+      }
+    };
+  } catch (error) {
+    console.error('setupApplication error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * Set application status (publish/unpublish board)
+ * @param {boolean} isActive - Whether to activate/publish the board
+ * @returns {Object} Status update result
+ */
+function setAppStatus(isActive) {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError();
+    }
+
+    // ユーザー情報を取得
+    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    const user = findUserByEmail(email, { requestingUser: email });
+    if (!user) {
+      return createUserNotFoundError();
+    }
+
+    // 統一API使用: 設定取得・更新・保存
+    const configResult = getUserConfig(user.userId);
+    const config = configResult.success ? configResult.config : {};
+
+    // ボード公開状態を更新
+    config.isPublished = Boolean(isActive);
+    if (isActive) {
+      if (!config.publishedAt) {
+        config.publishedAt = new Date().toISOString();
+      }
+    }
+    config.lastAccessedAt = new Date().toISOString();
+
+    // 統一API使用: 検証・サニタイズ・保存
+    const saveResult = saveUserConfig(user.userId, config, { forceUpdate: false });
+    if (!saveResult.success) {
+      return createErrorResponse(`Failed to update user configuration: ${saveResult.message || '詳細不明'}`);
+    }
+
+    return {
+      success: true,
+      isActive: Boolean(isActive),
+      status: isActive ? 'active' : 'inactive',
+      updatedBy: email,
+      userId: user.userId,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('setAppStatus error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+// ===========================================
 // 🌍 Global SystemController Object Export
 // ===========================================
 
@@ -2166,5 +2272,8 @@ __rootSC.SystemController = {
   testForceLogoutRedirect,
   // 📊 Performance Metrics Extension
   getPerformanceMetrics,
-  diagnosePerformance
+  diagnosePerformance,
+  // 🔧 Application Setup Functions (from main.gs)
+  setupApplication,
+  setAppStatus
 };

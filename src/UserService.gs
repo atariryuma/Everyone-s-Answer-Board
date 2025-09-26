@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserConfig, isAdministrator, CACHE_DURATION */
+/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserConfig, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse */
 
 // ===========================================
 // 🔧 GAS-Native UserService (直接API版)
@@ -213,6 +213,218 @@ function getUnifiedAccessLevel(email, targetUserId) {
 // 🔧 ユーティリティ
 // ===========================================
 
+// ===========================================
+// 🔧 User Management Functions (from main.gs)
+// ===========================================
+
+/**
+ * 管理者権限確認（フロントエンド互換性）
+ * 統一認証システムのAdministrator権限をチェック
+ * @returns {boolean} 管理者権限があるか
+ */
+function isAdmin() {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return false;
+    }
+    return isAdministrator(email);
+  } catch (error) {
+    console.error('isAdmin error:', error.message);
+    return false;
+  }
+}
+
+/**
+ * Get user information with specified type
+ * @param {string} infoType - Type of info: 'email', 'full'
+ * @returns {Object} User information
+ */
+function getUser(infoType = 'email') {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return {
+        success: false,
+        message: 'Not authenticated'
+      };
+    }
+
+    if (infoType === 'email') {
+      return {
+        success: true,
+        email
+      };
+    }
+
+    if (infoType === 'full') {
+      // Get user from database if available
+      // 🔧 GAS-Native統一: 直接findUserByEmail使用
+      const user = findUserByEmail(email, { requestingUser: email });
+      return {
+        success: true,
+        email,
+        user: user || null
+      };
+    }
+
+    // Default return for unsupported infoType
+    return {
+      success: false,
+      message: `Unsupported infoType: ${infoType}`
+    };
+  } catch (error) {
+    console.error('getUser error:', error.message);
+    return {
+      success: false,
+      message: error.message || 'User retrieval failed'
+    };
+  }
+}
+
+/**
+ * Reset authentication and clear all user session data
+ * ✅ CLAUDE.md準拠: 包括的キャッシュクリア with 論理的破綻修正
+ */
+function resetAuth() {
+  try {
+    const cache = CacheService.getScriptCache();
+    let clearedKeysCount = 0;
+    let clearConfigResult = null;
+
+    // 🔧 修正1: 現在ユーザー情報を事前取得（キャッシュクリア前）
+    const currentEmail = getCurrentEmail();
+    const currentUser = currentEmail ? findUserByEmail(currentEmail) : null;
+    const userId = currentUser?.userId;
+
+    // 🔧 修正2: ConfigService専用クリア関数の活用
+    if (userId) {
+      try {
+        clearConfigCache(userId);
+        clearConfigResult = 'ConfigService cache cleared successfully';
+        console.log(`resetAuth: ConfigService cache cleared for user ${userId.substring(0, 8)}***`);
+      } catch (configError) {
+        console.warn('resetAuth: ConfigService cache clear failed:', configError.message);
+        clearConfigResult = `ConfigService cache clear failed: ${configError.message}`;
+      }
+    }
+
+    // 🔧 修正3: 包括的キャッシュキーリスト（実際の使用パターンに合わせて更新）
+    const globalCacheKeysToRemove = [
+      'current_user_info',
+      'admin_auth_cache',
+      'session_data',
+      'system_diagnostic_cache',
+      'bulk_admin_data_cache'
+    ];
+
+    // グローバルキャッシュクリア
+    globalCacheKeysToRemove.forEach(key => {
+      try {
+        cache.remove(key);
+        clearedKeysCount++;
+      } catch (e) {
+        console.warn(`resetAuth: Failed to remove global cache key ${key}:`, e.message);
+      }
+    });
+
+    // 🔧 修正4: User固有キャッシュの完全クリア（email + userId ベース）
+    const userSpecificKeysCleared = [];
+    if (currentEmail) {
+      const emailBasedKeys = [
+        `board_data_${currentEmail}`,
+        `user_data_${currentEmail}`,
+        `admin_panel_${currentEmail}`
+      ];
+
+      emailBasedKeys.forEach(key => {
+        try {
+          cache.remove(key);
+          userSpecificKeysCleared.push(key);
+          clearedKeysCount++;
+        } catch (e) {
+          console.warn(`resetAuth: Failed to remove email-based cache key ${key}:`, e.message);
+        }
+      });
+    }
+
+    if (userId) {
+      const userIdBasedKeys = [
+        `user_config_${userId}`,
+        `config_${userId}`,
+        `user_${userId}`,
+        `board_data_${userId}`,
+        `question_text_${userId}`
+      ];
+
+      userIdBasedKeys.forEach(key => {
+        try {
+          cache.remove(key);
+          userSpecificKeysCleared.push(key);
+          clearedKeysCount++;
+        } catch (e) {
+          console.warn(`resetAuth: Failed to remove userId-based cache key ${key}:`, e.message);
+        }
+      });
+    }
+
+    // 🔧 修正5: リアクション・ハイライトロック完全クリア
+    let reactionLocksCleared = 0;
+    if (userId) {
+      try {
+        // リアクション・ハイライトロックの動的検索・削除は複雑なので、
+        // 基本的なロックキーのパターンをクリア
+        const lockPatterns = [
+          `reaction_${userId}_`,
+          `highlight_${userId}_`
+        ];
+
+        // Note: GAS CacheService doesn't support pattern matching,
+        // so we clear known common patterns and rely on TTL expiration
+        for (let i = 0; i < SYSTEM_LIMITS.MAX_LOCK_ROWS; i++) { // 最大100行のロックをクリア
+          lockPatterns.forEach(pattern => {
+            try {
+              cache.remove(`${pattern}${i}`);
+              reactionLocksCleared++;
+            } catch (e) {
+              // Lock key might not exist - this is expected
+            }
+          });
+        }
+        console.log(`resetAuth: Cleared ${reactionLocksCleared} reaction/highlight locks for user ${userId.substring(0, 8)}***`);
+      } catch (lockError) {
+        console.warn('resetAuth: Reaction lock clearing failed:', lockError.message);
+      }
+    }
+
+    // 🔧 修正6: 包括的なログ出力
+    const logDetails = {
+      currentUser: currentEmail ? `${currentEmail.substring(0, 8)}***@${currentEmail.split('@')[1]}` : 'N/A',
+      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
+      globalKeysCleared: globalCacheKeysToRemove.length,
+      userSpecificKeysCleared: userSpecificKeysCleared.length,
+      reactionLocksCleared,
+      configServiceResult: clearConfigResult,
+      totalKeysCleared: clearedKeysCount
+    };
+
+    console.log('resetAuth: Authentication reset completed', logDetails);
+
+    return {
+      success: true,
+      message: 'Authentication and session data cleared successfully',
+      details: {
+        clearedKeys: clearedKeysCount,
+        userSpecificKeys: userSpecificKeysCleared.length,
+        reactionLocks: reactionLocksCleared,
+        configService: clearConfigResult ? 'success' : 'skipped'
+      }
+    };
+  } catch (error) {
+    console.error('resetAuth error:', error.message, error.stack);
+    return createExceptionResponse(error);
+  }
+}
 
 /**
  * メールアドレス検証（SecurityServiceに委譲）

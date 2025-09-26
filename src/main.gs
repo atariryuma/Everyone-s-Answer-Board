@@ -471,53 +471,6 @@ function doPost(e) {
  * Direct call - GAS Best Practice
  */
 
-/**
- * Get user information with specified type
- * @param {string} infoType - Type of info: 'email', 'full'
- * @returns {Object} User information
- */
-function getUser(infoType = 'email') {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return {
-        success: false,
-        message: 'Not authenticated'
-      };
-    }
-
-    if (infoType === 'email') {
-      return {
-        success: true,
-        email
-      };
-    }
-
-    if (infoType === 'full') {
-      // Get user from database if available
-      // 🔧 GAS-Native統一: 直接findUserByEmail使用
-      const user = findUserByEmail(email, { requestingUser: email });
-
-      return {
-        success: true,
-        email,
-        userId: user ? user.userId : null,
-        userInfo: user || { email }
-      };
-    }
-
-    return {
-      success: false,
-      message: infoType ? `Unknown info type: ${infoType}` : 'Unknown info type: 不明'
-    };
-  } catch (error) {
-    console.error('getUser error:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 /**
  * Get user configuration - unified function for current user
@@ -587,217 +540,13 @@ function isAdministrator(email) {
   }
 }
 
-/**
- * 管理者権限確認（フロントエンド互換性）
- * 統一認証システムのAdministrator権限をチェック
- * @returns {boolean} 管理者権限があるか
- */
-function isAdmin() {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return false;
-    }
-    return isAdministrator(email);
-  } catch (error) {
-    console.error('isAdmin error:', error.message);
-    return false;
-  }
-}
 
 
-/**
- * Reset authentication and clear all user session data
- * ✅ CLAUDE.md準拠: 包括的キャッシュクリア with 論理的破綻修正
- */
-function resetAuth() {
-  try {
-    const cache = CacheService.getScriptCache();
-    let clearedKeysCount = 0;
-    let clearConfigResult = null;
-
-    // 🔧 修正1: 現在ユーザー情報を事前取得（キャッシュクリア前）
-    const currentEmail = getCurrentEmail();
-    const currentUser = currentEmail ? findUserByEmail(currentEmail) : null;
-    const userId = currentUser?.userId;
-
-    // 🔧 修正2: ConfigService専用クリア関数の活用
-    if (userId) {
-      try {
-        clearConfigCache(userId);
-        clearConfigResult = 'ConfigService cache cleared successfully';
-        console.log(`resetAuth: ConfigService cache cleared for user ${userId.substring(0, 8)}***`);
-      } catch (configError) {
-        console.warn('resetAuth: ConfigService cache clear failed:', configError.message);
-        clearConfigResult = `ConfigService cache clear failed: ${configError.message}`;
-      }
-    }
-
-    // 🔧 修正3: 包括的キャッシュキーリスト（実際の使用パターンに合わせて更新）
-    const globalCacheKeysToRemove = [
-      'current_user_info',
-      'admin_auth_cache',
-      'session_data',
-      'system_diagnostic_cache',
-      'bulk_admin_data_cache'
-    ];
-
-    // グローバルキャッシュクリア
-    globalCacheKeysToRemove.forEach(key => {
-      try {
-        cache.remove(key);
-        clearedKeysCount++;
-      } catch (e) {
-        console.warn(`resetAuth: Failed to remove global cache key ${key}:`, e.message);
-      }
-    });
-
-    // 🔧 修正4: User固有キャッシュの完全クリア（email + userId ベース）
-    const userSpecificKeysCleared = [];
-    if (currentEmail) {
-      const emailBasedKeys = [
-        `board_data_${currentEmail}`,
-        `user_data_${currentEmail}`,
-        `admin_panel_${currentEmail}`
-      ];
-
-      emailBasedKeys.forEach(key => {
-        try {
-          cache.remove(key);
-          userSpecificKeysCleared.push(key);
-          clearedKeysCount++;
-        } catch (e) {
-          console.warn(`resetAuth: Failed to remove email-based cache key ${key}:`, e.message);
-        }
-      });
-    }
-
-    if (userId) {
-      const userIdBasedKeys = [
-        `user_config_${userId}`,
-        `config_${userId}`,
-        `user_${userId}`,
-        `board_data_${userId}`,
-        `question_text_${userId}`
-      ];
-
-      userIdBasedKeys.forEach(key => {
-        try {
-          cache.remove(key);
-          userSpecificKeysCleared.push(key);
-          clearedKeysCount++;
-        } catch (e) {
-          console.warn(`resetAuth: Failed to remove userId-based cache key ${key}:`, e.message);
-        }
-      });
-    }
-
-    // 🔧 修正5: リアクション・ハイライトロック完全クリア
-    let reactionLocksCleared = 0;
-    if (userId) {
-      try {
-        // リアクション・ハイライトロックの動的検索・削除は複雑なので、
-        // 基本的なロックキーのパターンをクリア
-        const lockPatterns = [
-          `reaction_${userId}_`,
-          `highlight_${userId}_`
-        ];
-
-        // Note: GAS CacheService doesn't support pattern matching,
-        // so we clear known common patterns and rely on TTL expiration
-        for (let i = 0; i < SYSTEM_LIMITS.MAX_LOCK_ROWS; i++) { // 最大100行のロックをクリア
-          lockPatterns.forEach(pattern => {
-            try {
-              cache.remove(`${pattern}${i}`);
-              reactionLocksCleared++;
-            } catch (e) {
-              // Lock key might not exist - this is expected
-            }
-          });
-        }
-        console.log(`resetAuth: Cleared ${reactionLocksCleared} reaction/highlight locks for user ${userId.substring(0, 8)}***`);
-      } catch (lockError) {
-        console.warn('resetAuth: Reaction lock clearing failed:', lockError.message);
-      }
-    }
-
-    // 🔧 修正6: 包括的なログ出力
-    const logDetails = {
-      currentUser: currentEmail ? `${currentEmail.substring(0, 8)}***@${currentEmail.split('@')[1]}` : 'N/A',
-      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
-      globalKeysCleared: globalCacheKeysToRemove.length,
-      userSpecificKeysCleared: userSpecificKeysCleared.length,
-      reactionLocksCleared,
-      configServiceResult: clearConfigResult,
-      totalKeysCleared: clearedKeysCount
-    };
-
-    console.log('resetAuth: Authentication reset completed', logDetails);
-
-    return {
-      success: true,
-      message: 'Authentication and session data cleared successfully',
-      details: {
-        clearedKeys: clearedKeysCount,
-        userSpecificKeys: userSpecificKeysCleared.length,
-        reactionLocks: reactionLocksCleared,
-        configService: clearConfigResult ? 'success' : 'skipped'
-      }
-    };
-  } catch (error) {
-    console.error('resetAuth error:', error.message, error.stack);
-    return createExceptionResponse(error);
-  }
-}
 
 /**
  * Get user configuration by userId - for compatibility with existing HTML calls
  */
 
-/**
- * Setup application - unified implementation from SystemController
- */
-function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
-  try {
-    // Validation
-    if (!serviceAccountJson || !databaseId || !adminEmail) {
-      return {
-        success: false,
-        message: '必須パラメータが不足しています'
-      };
-    }
-
-    // System properties setup
-    const props = PropertiesService.getScriptProperties();
-    props.setProperty('DATABASE_SPREADSHEET_ID', databaseId);
-    props.setProperty('ADMIN_EMAIL', adminEmail);
-    props.setProperty('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
-
-    if (googleClientId) {
-      props.setProperty('GOOGLE_CLIENT_ID', googleClientId);
-    }
-
-    // Initialize database if needed
-    try {
-      const testAccess = openSpreadsheet(databaseId, { useServiceAccount: true }).spreadsheet;
-    } catch (dbError) {
-      console.warn('Database access test failed:', dbError.message);
-    }
-
-    return {
-      success: true,
-      message: 'Application setup completed successfully',
-      data: {
-        databaseId,
-        adminEmail,
-        googleClientId: googleClientId || null
-      }
-    };
-  } catch (error) {
-    console.error('setupApplication error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
 
 /**
  * Process login action - handles user login flow
@@ -870,55 +619,6 @@ function processLoginAction() {
 }
 
 
-/**
- * Set application status - simplified name
- */
-function setAppStatus(isActive) {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
-
-    // ユーザー情報を取得
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return createUserNotFoundError();
-    }
-
-    // 統一API使用: 設定取得・更新・保存
-    const configResult = getUserConfig(user.userId);
-    const config = configResult.success ? configResult.config : {};
-
-    // ボード公開状態を更新
-    config.isPublished = Boolean(isActive);
-    if (isActive) {
-      if (!config.publishedAt) {
-        config.publishedAt = new Date().toISOString();
-      }
-    }
-    config.lastAccessedAt = new Date().toISOString();
-
-    // 統一API使用: 検証・サニタイズ・保存
-    const saveResult = saveUserConfig(user.userId, config, { forceUpdate: false });
-    if (!saveResult.success) {
-      return createErrorResponse(`Failed to update user configuration: ${saveResult.message || '詳細不明'}`);
-    }
-
-    return {
-      success: true,
-      isActive: Boolean(isActive),
-      status: isActive ? 'active' : 'inactive',
-      updatedBy: email,
-      userId: user.userId,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error('setAppStatus error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
 
 /**
  * Check if user is system admin - simplified name
@@ -2811,9 +2511,7 @@ function callGAS(functionName, options = {}, ...args) {
     ];
 
     const adminOnlyFunctions = [
-      'resetAuth',
       'validateCompleteSpreadsheetUrl',
-      'setupApplication',
       'testSystemDiagnosis',
       'monitorSystem',
       'checkDataIntegrity'
