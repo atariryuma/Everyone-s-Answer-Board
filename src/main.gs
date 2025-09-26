@@ -2812,7 +2812,6 @@ function callGAS(functionName, options = {}, ...args) {
 
     const adminOnlyFunctions = [
       'resetAuth',
-      'testSetup',
       'validateCompleteSpreadsheetUrl',
       'setupApplication',
       'testSystemDiagnosis',
@@ -3160,10 +3159,9 @@ function getBatchedAdminAuth(options = {}) {
  * - findUserByEmail
  * - getUserConfig
  *
- * @param {Object} options - Additional options for user config retrieval
  * @returns {Object} Batched result with user and config data
  */
-function getBatchedUserConfig(options = {}) {
+function getBatchedUserConfig() {
   try {
     // ✅ Batch operation: Get email, user, and config in single coordinated call
     const email = getCurrentEmail();

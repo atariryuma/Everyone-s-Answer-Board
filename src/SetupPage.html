@@ -336,11 +336,11 @@
             this.innerHTML = '🔍 システムテスト実行';
           })
           .withFailureHandler((error) => {
-            showMessage('テストの実行に失敗しました', 'error');
+            showMessage('システム診断の実行に失敗しました', 'error');
             this.disabled = false;
             this.innerHTML = '🔍 システムテスト実行';
           })
-          .testSetup();
+          .testSystemDiagnosis();
       });
 
       // 入力フィールドのリアルタイムバリデーション
