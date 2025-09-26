@@ -104,7 +104,7 @@ function extractTimestampValue(row, headers) {
   try {
     // 1. 最初のカラムがタイムスタンプかチェック（Googleフォーム標準）
     if (headers.length > 0 && row.length > 0) {
-      const firstHeader = headers[0];
+      const [firstHeader] = headers;
       if (firstHeader && typeof firstHeader === 'string') {
         const normalizedHeader = firstHeader.toLowerCase().trim();
         if (normalizedHeader.includes('タイムスタンプ') ||
@@ -621,5 +621,107 @@ function applySortAndLimit(data, options = {}) {
   } catch (error) {
     console.error('DataService.applySortAndLimit: エラー', error.message);
     return data; // エラー時は元データを返す
+  }
+}
+
+// ===========================================
+// 🗑️ Data Deletion Operations - CLAUDE.md準拠
+// ===========================================
+
+/**
+ * 回答行を削除（管理モード専用）
+ * @param {string} userId - ユーザーID
+ * @param {number} rowIndex - 削除対象の行インデックス（1-based, ヘッダー含む）
+ * @param {Object} options - オプション設定
+ * @returns {Object} 削除結果
+ */
+function deleteAnswerRow(userId, rowIndex, options = {}) {
+  const startTime = Date.now();
+
+  try {
+    // 🛡️ CLAUDE.md準拠: Security Gate - 管理者権限チェック
+    const currentEmail = getCurrentEmail();
+    const user = findUserById(userId);
+
+    if (!user) {
+      console.error('deleteAnswerRow: User not found:', userId);
+      return createDataServiceErrorResponse('ユーザーが見つかりません');
+    }
+
+    // 所有者または管理者のみ削除可能
+    const isOwner = user.userEmail === currentEmail;
+    const isAdmin = (() => {
+      try {
+        const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+        return currentEmail?.toLowerCase() === adminEmail?.toLowerCase();
+      } catch (error) {
+        console.warn('Administrator check failed:', error);
+        return false;
+      }
+    })();
+
+    if (!isOwner && !isAdmin) {
+      console.warn('deleteAnswerRow: Insufficient permissions:', { userId, currentEmail });
+      return createDataServiceErrorResponse('削除権限がありません');
+    }
+
+    // ✅ CLAUDE.md準拠: GAS-Native Architecture - Direct SpreadsheetApp usage
+    const config = getUserConfig(userId);
+    if (!config.success || !config.config.spreadsheetId) {
+      return createDataServiceErrorResponse('スプレッドシート設定が見つかりません');
+    }
+
+    const {spreadsheetId} = config.config;
+    const sheetName = config.config.sheetName || 'フォームの回答 1';
+
+    // 🚀 Zero-dependency spreadsheet access
+    const dataAccess = openSpreadsheet(spreadsheetId, {
+      useServiceAccount: !isOwner, // Cross-user access for admins
+      targetUserEmail: user.userEmail,
+      context: 'deleteAnswerRow'
+    });
+
+    if (!dataAccess || !dataAccess.spreadsheet) {
+      return createDataServiceErrorResponse('スプレッドシートにアクセスできません');
+    }
+
+    const sheet = dataAccess.spreadsheet.getSheetByName(sheetName);
+    if (!sheet) {
+      return createDataServiceErrorResponse(`シート「${sheetName}」が見つかりません`);
+    }
+
+    // 行範囲検証
+    const lastRow = sheet.getLastRow();
+    if (rowIndex < 2 || rowIndex > lastRow) {
+      return createDataServiceErrorResponse('無効な行番号です');
+    }
+
+    // ✅ CLAUDE.md準拠: 70x Performance Improvement - Batch operation
+    const [rowData] = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues();
+
+    // 削除実行
+    sheet.deleteRows(rowIndex, 1);
+
+    const executionTime = Date.now() - startTime;
+    console.log('✅ Answer row deleted successfully:', {
+      userId: `${userId.substring(0, 8)  }***`,
+      rowIndex,
+      executionTime
+    });
+
+    return {
+      success: true,
+      message: '回答を削除しました',
+      deletedRowIndex: rowIndex,
+      executionTime
+    };
+
+  } catch (error) {
+    console.error('deleteAnswerRow error:', {
+      userId,
+      rowIndex,
+      error: error.message
+    });
+    return createDataServiceErrorResponse(`削除エラー: ${error.message}`);
   }
 }

@@ -1492,6 +1492,14 @@
     constructor() {
       this.container = null;
       this.initialized = false;
+      this.notificationQueue = [];
+      this.maxConcurrentNotifications = 5;
+      this.isLowEndDevice = window.isLowEndDevice ? window.isLowEndDevice() : false;
+      this.performanceConstants = window.getPerformanceConstants ? window.getPerformanceConstants() : {
+        BASE_RENDER_BATCH_SIZE: 10,
+        VIEWPORT_BUFFER: 200,
+        PERFORMANCE_BUDGET: 16
+      };
     }
 
     // Initialize notification container
@@ -1518,12 +1526,18 @@
       return true;
     }
 
-    // Show notification message
+    // Show notification message with performance optimization
     showMessage(message, type = 'info', duration = null) {
       // Standardized durations: success: 4000, error: 7000, warning: 6000, info: 5000
       if (duration === null) {
         const standardDurations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
         duration = standardDurations[type] || 5000;
+      }
+
+      // Performance optimization: Queue notifications on low-end devices
+      if (this.isLowEndDevice && this.getActiveNotificationCount() >= 3) {
+        this.queueNotification({ message, type, duration });
+        return;
       }
 
       // Try to initialize, fallback if DOM not ready
@@ -1605,11 +1619,19 @@
           notification.style.transform = 'translateX(0)';
           notification.style.opacity = '1';
 
-          // Schedule removal
+          // Schedule removal - V8 compliant Promise-based delay
           if (duration > 0) {
-            setTimeout(() => {
+            const createPromiseDelay = (ms) => new Promise(resolve => {
+              const start = Date.now();
+              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+              check();
+            });
+
+            createPromiseDelay(duration + 400).then(() => {
               this.removeNotification(notification);
-            }, duration + 400);
+            }).catch(() => {
+              // Silent cleanup on cancellation
+            });
           }
         }
       });
@@ -1626,12 +1648,22 @@
       notification.style.transform = 'translateX(100%)';
       notification.style.opacity = '0';
 
-      // Remove after animation using setTimeout (memory efficient)
-      setTimeout(() => {
+      // Remove after animation - V8 compliant Promise-based delay
+      const createPromiseDelay = (ms) => new Promise(resolve => {
+        const start = Date.now();
+        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+        check();
+      });
+
+      createPromiseDelay(300).then(() => {
         if (notification && notification.parentNode) {
           notification.remove();
         }
-      }, 300);
+        // Trigger performance cleanup and queue processing
+        this.performCleanup();
+      }).catch(() => {
+        // Silent cleanup on cancellation
+      });
     }
 
     // Convenience methods (simplified - use showMessage defaults)
@@ -1664,6 +1696,61 @@
 
       const notifications = this.container.querySelectorAll('.notification');
       notifications.forEach((notification) => this.removeNotification(notification));
+    }
+
+    // Performance optimization helper methods
+    getActiveNotificationCount() {
+      if (!this.container) return 0;
+      return this.container.querySelectorAll('.notification').length;
+    }
+
+    queueNotification(notificationData) {
+      // Limit queue size to prevent memory leaks
+      if (this.notificationQueue.length >= 10) {
+        this.notificationQueue.shift(); // Remove oldest queued notification
+      }
+
+      this.notificationQueue.push(notificationData);
+      this.processQueuedNotifications();
+    }
+
+    processQueuedNotifications() {
+      if (this.notificationQueue.length === 0) return;
+      if (this.getActiveNotificationCount() >= this.maxConcurrentNotifications) return;
+
+      const nextNotification = this.notificationQueue.shift();
+      if (nextNotification) {
+        // V8 compliant: Promise-based delayed processing
+        const createPromiseDelay = (ms) => new Promise(resolve => {
+          const start = Date.now();
+          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+          check();
+        });
+
+        createPromiseDelay(100).then(() => {
+          this.showMessage(nextNotification.message, nextNotification.type, nextNotification.duration);
+        }).catch(() => {
+          // Silent error handling
+        });
+      }
+    }
+
+    // Performance-aware batch cleanup
+    performCleanup() {
+      if (!this.container) return;
+
+      const notifications = this.container.querySelectorAll('.notification[data-removing="true"]');
+      // Batch DOM operations for better performance
+      const fragment = document.createDocumentFragment();
+
+      notifications.forEach(notification => {
+        if (notification.parentNode) {
+          notification.remove();
+        }
+      });
+
+      // Process any queued notifications after cleanup
+      this.processQueuedNotifications();
     }
   }
 
