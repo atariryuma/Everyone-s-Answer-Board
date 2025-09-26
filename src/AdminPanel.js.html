@@ -1289,18 +1289,10 @@
 
   // ✅ 使い方ガイドを新タブで開く (CLAUDE.md準拠: シンプル&効率的)
   function openManualGuide() {
-    const btn = document.getElementById('manual-guide-btn');
-    if (!btn) return;
-
-    // ボタンの状態変更でユーザーフィードバック
-    btn.disabled = true;
-    btn.innerHTML = '📚 開いています...';
-
-    // 3秒後にボタンを元に戻す（新しいタブなのでページは残る）
-    setTimeout(() => {
-      btn.disabled = false;
-      btn.innerHTML = '📚 使い方ガイド';
-    }, 3000);
+    // 通知トーストで遷移をユーザーに知らせる
+    if (window.notifications) {
+      window.notifications.info('📚 使い方ガイドを開いています...', 2000);
+    }
 
     google.script.run
       .withSuccessHandler(function (webAppUrl) {
@@ -1310,9 +1302,9 @@
       })
       .withFailureHandler(function (error) {
         console.error('使い方ガイドエラー:', error);
-        // エラー時はボタンをすぐ復元
-        btn.disabled = false;
-        btn.innerHTML = '📚 使い方ガイド';
+        if (window.notifications) {
+          window.notifications.error('使い方ガイドを開けませんでした。', 3000);
+        }
       })
       .getWebAppUrl();
   }
@@ -4787,12 +4779,10 @@
 
   // アプリ設定画面を開く
   function openAppSetup() {
-    const btn = document.getElementById('app-setup-btn');
-    if (!btn) return;
-
-    // ボタンの状態変更でユーザーフィードバック（同じタブで遷移するので元に戻さない）
-    btn.disabled = true;
-    btn.innerHTML = '⚙️ 移動中...';
+    // 通知トーストで遷移をユーザーに知らせる
+    if (window.notifications) {
+      window.notifications.info('⚙️ アプリ設定画面に移動中...', 2000);
+    }
 
     google.script.run
       .withSuccessHandler(function (webAppUrl) {
@@ -4802,9 +4792,9 @@
       })
       .withFailureHandler(function (error) {
         console.error('アプリ設定エラー:', error);
-        // エラー時のみボタンを復元
-        btn.disabled = false;
-        btn.innerHTML = '⚙️ アプリ設定';
+        if (window.notifications) {
+          window.notifications.error('アプリ設定画面を開けませんでした。', 3000);
+        }
       })
       .getWebAppUrl();
   }

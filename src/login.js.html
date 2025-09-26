@@ -47,11 +47,14 @@
         }
       });
 
-      // ドメイン表示の更新
+      // ドメイン表示の更新 - ✅ CLAUDE.md準拠: 実際のドメイン情報取得
       try {
-        updateDomainDisplay('match', 'naha-okinawa.ed.jp', 'セキュアアクセス有効');
+        const domainInfo = await fetchDomainInfo();
+        displayDomainInfo(domainInfo);
+        debugLog('✅ Domain info loaded in login page:', domainInfo);
       } catch (error) {
-        console.warn('⚠️ Domain display update failed:', error);
+        warnLog('⚠️ Domain display update failed:', error);
+        displayDomainInfo({ error: error.message, fallback: true });
       }
 
       // ユーザーメール表示の初期化 (非同期 - 最後に実行)
@@ -348,39 +351,7 @@
 
     // initializeMainLoginLogic function removed - logic integrated into main init() function
 
-    // ドメイン表示を更新するヘルパー関数
-    function updateDomainDisplay(type, domainText, statusText) {
-      const initialDiv = document.getElementById('header-domain-initial');
-      const matchDiv = document.getElementById('header-domain-match');
-      const mismatchDiv = document.getElementById('header-domain-mismatch');
-
-      if (initialDiv) initialDiv.classList.add('hidden');
-      if (matchDiv) matchDiv.classList.add('hidden');
-      if (mismatchDiv) mismatchDiv.classList.add('hidden');
-
-      if (type === 'match') {
-        if (matchDiv) {
-          matchDiv.classList.remove('hidden');
-          const textEl = document.getElementById('header-domain-match-text');
-          if (textEl) textEl.textContent = domainText;
-        }
-      } else if (type === 'mismatch') {
-        if (mismatchDiv) {
-          mismatchDiv.classList.remove('hidden');
-          const textEl = document.getElementById('header-domain-mismatch-text');
-          if (textEl) textEl.textContent = domainText;
-        }
-      } else {
-        // initial
-        if (initialDiv) {
-          initialDiv.classList.remove('hidden');
-          const domainEl = document.getElementById('header-domain-name-initial');
-          const statusEl = document.getElementById('header-status-text-initial');
-          if (domainEl) domainEl.textContent = domainText;
-          if (statusEl) statusEl.textContent = statusText;
-        }
-      }
-    }
+    // ✅ CLAUDE.md準拠: updateDomainDisplay削除 - displayDomainInfoに統一
 
     // Initial loading state setup will be handled by new init() function
 

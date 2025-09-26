@@ -778,8 +778,9 @@ function getAllUsers(options = {}, context = {}) {
     // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得認証情報活用
     let currentEmail, isAdmin;
     if (context.preloadedAuth) {
-      currentEmail = context.preloadedAuth.email;
-      isAdmin = context.preloadedAuth.isAdmin;
+      const { email, isAdmin: adminFlag } = context.preloadedAuth;
+      currentEmail = email;
+      isAdmin = adminFlag;
     } else {
       currentEmail = getCurrentEmail();
       isAdmin = isAdministrator(currentEmail);
@@ -1124,12 +1125,15 @@ function deleteUser(userId, reason = '', context = {}) {
     // User deletion is inherently cross-user administrative operation
     // Always requires service account for safety and audit trail
     console.log(`deleteUser: Admin cross-user deletion in DATABASE_SPREADSHEET_ID`);
-    const spreadsheet = openDatabase(true); // Always service account for deletion operations
-    if (!spreadsheet) {
-      console.warn('deleteUser: Database access failed');
-      return { success: false, message: 'Database access failed' };
+
+    // Direct SpreadsheetApp access for deletion - most reliable approach
+    const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+    if (!dbId) {
+      console.warn('deleteUser: DATABASE_SPREADSHEET_ID not configured');
+      return { success: false, message: 'Database not configured' };
     }
 
+    const spreadsheet = SpreadsheetApp.openById(dbId);
     const sheet = spreadsheet.getSheetByName('users');
     if (!sheet) {
       console.warn('deleteUser: Users sheet not found');
@@ -1147,19 +1151,11 @@ function deleteUser(userId, reason = '', context = {}) {
 
     for (let i = 1; i < data.length; i++) {
       if (data[i][userIdColumnIndex] === userId) {
-        // Soft delete by setting isActive to false
-        const isActiveIndex = headers.indexOf('isActive');
-        if (isActiveIndex !== -1) {
-          sheet.getRange(i + 1, isActiveIndex + 1).setValue(false);
-        }
+        // Simple hard delete - remove the row using correct GAS API
+        const rowToDelete = i + 1;
+        sheet.deleteRows(rowToDelete, 1);
 
-        // Update lastModified
-        const lastModifiedIndex = headers.indexOf('lastModified');
-        if (lastModifiedIndex !== -1) {
-          sheet.getRange(i + 1, lastModifiedIndex + 1).setValue(new Date().toISOString());
-        }
-
-        console.log('✅ User soft deleted successfully:', `${userId.substring(0, 8)}***`, reason ? `Reason: ${reason}` : '');
+        console.log('✅ User deleted successfully from database:', `${userId.substring(0, 8)}***`, reason ? `Reason: ${reason}` : '');
         return {
           success: true,
           userId,

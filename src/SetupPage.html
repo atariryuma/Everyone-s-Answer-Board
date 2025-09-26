@@ -381,10 +381,9 @@
       });
 
       function startApp() {
-        const btn = document.getElementById('start-studyquest-btn');
-        if (btn) {
-          btn.innerHTML = '<span>読み込み中...</span>';
-          btn.disabled = true;
+        // 通知トーストで遷移をユーザーに知らせる
+        if (window.notifications) {
+          window.notifications.info('📚 StudyQuestを開始しています...', 2000);
         }
 
         google.script.run
@@ -393,10 +392,6 @@
           })
           .withFailureHandler(function (error) {
             showMessage('アプリケーションのURL取得に失敗しました: ' + error.message, 'error');
-            if (btn) {
-              btn.innerHTML = '📚 StudyQuestを開始';
-              btn.disabled = false;
-            }
           })
           .getWebAppUrl();
       }

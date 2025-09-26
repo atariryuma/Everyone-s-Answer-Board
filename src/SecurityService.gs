@@ -13,12 +13,59 @@
  * - 単一責任原則の維持
  */
 
-/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL */
+/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL, getCurrentEmail */
 
 
 // ===========================================
 // 🔑 認証・セッション管理
 // ===========================================
+
+/**
+ * Deploy user domain information retrieval
+ * ✅ CLAUDE.md準拠: SecurityService配置（ドメイン認証・検証）
+ * Used by frontend to check domain compatibility and user information
+ * Enhanced version with improved validation and error handling
+ * @returns {Object} Domain information and validation result
+ */
+function getDeployUserDomainInfo() {
+  try {
+    const email = getCurrentEmail();
+
+    // Enhanced type validation for email
+    if (!email || typeof email !== 'string' || email.trim() === '') {
+      console.error('❌ Authentication failed - invalid email:', typeof email, email);
+      return {
+        success: false,
+        message: 'Authentication required - invalid email',
+        domain: null,
+        isValidDomain: false
+      };
+    }
+
+    const domain = email.includes('@') ? email.split('@')[1] : 'unknown';
+    const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+    const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
+    const isValidDomain = adminDomain ? domain === adminDomain : true;
+
+    return {
+      success: true,
+      domain,
+      userEmail: email,
+      userDomain: domain,
+      adminDomain,
+      isValidDomain,
+      timestamp: new Date().toISOString()
+    };
+  } catch (error) {
+    console.error('❌ SecurityService.getDeployUserDomainInfo ERROR:', error.message);
+    return {
+      success: false,
+      message: error.message,
+      domain: null,
+      isValidDomain: false
+    };
+  }
+}
 
 
 /**
