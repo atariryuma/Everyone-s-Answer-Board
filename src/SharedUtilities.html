@@ -1415,464 +1415,161 @@
   // NOTIFICATION TOAST SYSTEM
   // =============================================================================
 
+  // ✅ SIMPLIFIED NOTIFICATION SYSTEM - Anti-Over-Engineering
   class NotificationSystem {
     constructor() {
       this.container = null;
-      this.initialized = false;
-      this.notificationQueue = [];
-      this.maxConcurrentNotifications = 5;
-      this.isLowEndDevice = window.isLowEndDevice ? window.isLowEndDevice() : false;
-      this.performanceConstants = window.getPerformanceConstants ? window.getPerformanceConstants() : {
-        BASE_RENDER_BATCH_SIZE: 10,
-        VIEWPORT_BUFFER: 200,
-        PERFORMANCE_BUDGET: 16
-      };
+      this.createContainer();
     }
 
-    // Initialize notification container with enhanced resilience
-    init() {
-      try {
-        // ✅ Enhanced DOM readiness check
-        if (!document.body) {
-          // Try again after a short delay if DOM not ready
-          if (!this.initRetryCount) this.initRetryCount = 0;
-          if (this.initRetryCount < 3) {
-            this.initRetryCount++;
-            setTimeout(() => this.init(), 50);
-            return false;
-          }
-          console.warn('NotificationSystem: DOM not ready after retries, skipping initialization');
-          return false;
-        }
+    // ✅ Single, reliable container creation
+    createContainer() {
+      if (this.container) return;
 
-        this.container = document.getElementById('notification-container');
-
-        if (this.container) {
-          this.initialized = true;
-          return true;
-        }
-
-        // ✅ Create notification container with enhanced error handling
-        try {
-          this.container = document.createElement('div');
-          this.container.id = 'notification-container';
-          this.container.className = 'fixed top-4 right-4 z-50 space-y-2 pointer-events-none';
-
-          document.body.appendChild(this.container);
-          this.initialized = true;
-          return true;
-        } catch (domError) {
-          console.warn('NotificationSystem: Failed to create container:', domError.message);
-          // Fallback: try to use document.head if body fails
-          try {
-            this.container = document.createElement('div');
-            this.container.id = 'notification-container-fallback';
-            this.container.className = 'fixed top-4 right-4 z-50 space-y-2 pointer-events-none';
-            document.head.appendChild(this.container);
-            this.initialized = true;
-            return true;
-          } catch (fallbackError) {
-            console.error('NotificationSystem: Complete initialization failure:', fallbackError.message);
-            return false;
-          }
-        }
-      } catch (error) {
-        console.error('NotificationSystem: Unexpected initialization error:', error.message);
-        return false;
-      }
-    }
-
-    // Show notification message with enhanced resilience and performance optimization
-    showMessage(message, type = 'info', duration = null) {
-      try {
-        // ✅ Input validation and sanitization
-        if (!message || typeof message !== 'string') {
-          console.warn('NotificationSystem: Invalid message provided:', message);
-          return;
-        }
-
-        // Standardized durations: success: 4000, error: 7000, warning: 6000, info: 5000
-        if (duration === null) {
-          const standardDurations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
-          duration = standardDurations[type] || 5000;
-        }
-
-        // Performance optimization: Queue notifications on low-end devices
-        if (this.isLowEndDevice && this.getActiveNotificationCount() >= 3) {
-          this.queueNotification({ message, type, duration });
-          return;
-        }
-
-        // ✅ Enhanced initialization with retry mechanism
-        let initSuccess = this.init();
-        if (!initSuccess) {
-          // Retry initialization once more after small delay
-          setTimeout(() => {
-            if (this.init()) {
-              this.showMessage(message, type, duration);
-            } else {
-              this.fallbackNotification(message, type);
-            }
-          }, 100);
-          return;
-        }
-      } catch (error) {
-        console.error('NotificationSystem: Error in showMessage:', error.message);
-        this.fallbackNotification(message, type);
-        return;
-      }
-
-      if (!this.container) {
-        console.error('Notification container could not be initialized');
-        if (type === 'error') {
-          alert('エラー: ' + message);
-        }
-        return;
-      }
-
-      // Color schemes for different types
-      const colors = {
-        success: 'border-green-400 bg-green-900/50 text-green-100',
-        error: 'border-red-400 bg-red-900/50 text-red-100',
-        warning: 'border-yellow-400 bg-yellow-900/50 text-yellow-100',
-        info: 'border-blue-400 bg-blue-900/50 text-blue-100',
-      };
-
-      // Icons for different types
-      const icons = {
-        success: '✅',
-        error: '❌',
-        warning: '⚠️',
-        info: 'ℹ️',
-      };
-
-      // Create notification element
-      const notification = document.createElement('div');
-      const safeTypeColor = colors[type] || colors.info;
-
-      notification.className = `notification glass-panel rounded-lg border shadow-lg flex items-center ${safeTypeColor}`;
-
-      notification.style.cssText = `
-        transform: translateX(100%);
-        opacity: 0;
-        transition: all 0.3s ease-out;
+      this.container = document.createElement('div');
+      this.container.id = 'notification-container';
+      this.container.style.cssText = `
+        position: fixed;
+        top: 1rem;
+        right: 1rem;
+        z-index: 10000;
+        pointer-events: none;
         display: flex;
-        align-items: center;
+        flex-direction: column;
+        gap: 0.5rem;
+      `;
+
+      // Add to DOM when ready
+      if (document.body) {
+        document.body.appendChild(this.container);
+      } else {
+        document.addEventListener('DOMContentLoaded', () => {
+          if (document.body && !document.body.contains(this.container)) {
+            document.body.appendChild(this.container);
+          }
+        });
+      }
+    }
+
+    // ✅ Simple notification display
+    showMessage(message, type = 'info') {
+      if (!message) return;
+
+      this.createContainer();
+
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        background: ${this.getBackground(type)};
+        color: white;
         padding: 0.75rem 1rem;
         border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        min-height: 3rem;
-        max-height: 5rem;
-        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        line-height: 1.4;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        backdrop-filter: blur(8px);
+        -webkit-backdrop-filter: blur(8px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
         pointer-events: auto;
+        cursor: pointer;
+        min-width: 280px;
+        max-width: 420px;
+        opacity: 0;
+        transform: translateX(100%);
+        transition: all 0.3s ease-out;
       `;
 
-      const safeIcon = icons[type] || icons.info;
-      const safeHtmlMessage = this.escapeHtml(message || 'No message');
-      notification.innerHTML = `
-        <div class="mr-3 text-lg flex-shrink-0 leading-none">${safeIcon}</div>
-        <div class="flex-1 text-sm leading-normal">${safeHtmlMessage}</div>
-        <button type="button" class="ml-4 text-gray-400 hover:text-white text-lg leading-none flex-shrink-0" style="background: none; border: none; cursor: pointer; line-height: 1;">✕</button>
-      `;
+      notification.innerHTML = `${this.getIcon(type)} ${this.escapeHtml(message)}`;
+      notification.onclick = () => this.remove(notification);
 
-      // Add close button handler
-      const closeBtn = notification.querySelector('button');
-      closeBtn.addEventListener('click', () => this.removeNotification(notification));
-
-      // Append to container
       this.container.appendChild(notification);
 
       // Animate in
       requestAnimationFrame(() => {
-        if (notification.parentNode) {
-          notification.style.transform = 'translateX(0)';
-          notification.style.opacity = '1';
-
-          // Schedule removal - V8 compliant Promise-based delay
-          if (duration > 0) {
-            const createPromiseDelay = (ms) => new Promise(resolve => {
-              const start = Date.now();
-              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-              check();
-            });
-
-            createPromiseDelay(duration + 400).then(() => {
-              this.removeNotification(notification);
-            }).catch(() => {
-              // Silent cleanup on cancellation
-            });
-          }
-        }
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateX(0)';
       });
+
+      // Auto-remove - GAS V8 compatible
+      const duration = this.getDuration(type);
+      const startTime = Date.now();
+      const checkRemoval = () => {
+        if (Date.now() - startTime >= duration) {
+          this.remove(notification);
+        } else {
+          requestAnimationFrame(checkRemoval);
+        }
+      };
+      requestAnimationFrame(checkRemoval);
     }
 
-    // Remove notification with animation
-    removeNotification(notification) {
+    // ✅ Simple removal with animation - GAS V8 compatible
+    remove(notification) {
       if (!notification || !notification.parentNode) return;
 
-      if (notification.dataset.removing === 'true') return;
-      notification.dataset.removing = 'true';
-
-      // Start exit animation
-      notification.style.transform = 'translateX(100%)';
       notification.style.opacity = '0';
+      notification.style.transform = 'translateX(100%)';
 
-      // Remove after animation - V8 compliant Promise-based delay
-      const createPromiseDelay = (ms) => new Promise(resolve => {
-        const start = Date.now();
-        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-        check();
-      });
-
-      createPromiseDelay(300).then(() => {
-        if (notification && notification.parentNode) {
-          notification.remove();
+      // GAS V8 compatible delay
+      const startTime = Date.now();
+      const checkCompletion = () => {
+        if (Date.now() - startTime >= 300) {
+          if (notification.parentNode) {
+            notification.remove();
+          }
+        } else {
+          requestAnimationFrame(checkCompletion);
         }
-        // Trigger performance cleanup and queue processing
-        this.performCleanup();
-      }).catch(() => {
-        // Silent cleanup on cancellation
-      });
+      };
+      requestAnimationFrame(checkCompletion);
     }
 
-    // Convenience methods (simplified - use showMessage defaults)
-    success(message, duration) {
-      this.showMessage(message, 'success', duration);
+    // ✅ Type configurations
+    getBackground(type) {
+      const colors = {
+        success: 'rgba(34, 197, 94, 0.95)',
+        error: 'rgba(239, 68, 68, 0.95)',
+        warning: 'rgba(245, 158, 11, 0.95)',
+        info: 'rgba(59, 130, 246, 0.95)'
+      };
+      return colors[type] || colors.info;
     }
 
-    error(message, duration) {
-      this.showMessage(message, 'error', duration);
+    getIcon(type) {
+      const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
+      return icons[type] || icons.info;
     }
 
-    warning(message, duration) {
-      this.showMessage(message, 'warning', duration);
+    getDuration(type) {
+      const durations = { success: 3000, error: 5000, warning: 4000, info: 3000 };
+      return durations[type] || 3000;
     }
 
-    info(message, duration) {
-      this.showMessage(message, 'info', duration);
-    }
-
-    // Escape HTML to prevent XSS
     escapeHtml(text) {
       const div = document.createElement('div');
-      div.textContent = text || '';
+      div.textContent = text;
       return div.innerHTML;
     }
 
-    // Clear all notifications
-    clearAll() {
-      if (!this.container) return;
-
-      const notifications = this.container.querySelectorAll('.notification');
-      notifications.forEach((notification) => this.removeNotification(notification));
-    }
-
-    // ✅ Fallback notification system for critical failures
-    fallbackNotification(message, type) {
-      try {
-        // Primary fallback: Use browser alert/console for critical messages
-        if (type === 'error') {
-          alert(`エラー: ${message}`);
-        } else if (type === 'warning') {
-          console.warn(`[警告] ${message}`);
-        } else {
-          console.log(`[${type}] ${message}`);
-        }
-      } catch (fallbackError) {
-        // Ultimate fallback: Basic console output
-        console.log(`NotificationSystem fallback: [${type}] ${message}`);
-      }
-    }
-
-    // Performance optimization helper methods
-    getActiveNotificationCount() {
-      if (!this.container) return 0;
-      return this.container.querySelectorAll('.notification').length;
-    }
-
-    queueNotification(notificationData) {
-      // Limit queue size to prevent memory leaks
-      if (this.notificationQueue.length >= 10) {
-        this.notificationQueue.shift(); // Remove oldest queued notification
-      }
-
-      this.notificationQueue.push(notificationData);
-      this.processQueuedNotifications();
-    }
-
-    processQueuedNotifications() {
-      if (this.notificationQueue.length === 0) return;
-      if (this.getActiveNotificationCount() >= this.maxConcurrentNotifications) return;
-
-      const nextNotification = this.notificationQueue.shift();
-      if (nextNotification) {
-        // V8 compliant: Promise-based delayed processing
-        const createPromiseDelay = (ms) => new Promise(resolve => {
-          const start = Date.now();
-          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-          check();
-        });
-
-        createPromiseDelay(100).then(() => {
-          this.showMessage(nextNotification.message, nextNotification.type, nextNotification.duration);
-        }).catch(() => {
-          // Silent error handling
-        });
-      }
-    }
-
-    // Performance-aware batch cleanup
-    performCleanup() {
-      if (!this.container) return;
-
-      const notifications = this.container.querySelectorAll('.notification[data-removing="true"]');
-      // Batch DOM operations for better performance
-      const fragment = document.createDocumentFragment();
-
-      notifications.forEach(notification => {
-        if (notification.parentNode) {
-          notification.remove();
-        }
-      });
-
-      // Process any queued notifications after cleanup
-      this.processQueuedNotifications();
-    }
+    // ✅ API compatibility methods
+    success(message) { this.showMessage(message, 'success'); }
+    error(message) { this.showMessage(message, 'error'); }
+    warning(message) { this.showMessage(message, 'warning'); }
+    info(message) { this.showMessage(message, 'info'); }
   }
 
-  // ✅ IMMEDIATE NOTIFICATION SYSTEM CREATION - a1a610ab style
+  // ✅ SIMPLE GLOBAL SETUP
   window.notifications = new NotificationSystem();
 
-  // ✅ Force immediate initialization when DOM is ready
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', function() {
-      window.notifications.init();
-      console.log('🔧 Notifications initialized on DOMContentLoaded');
-    });
-  } else {
-    window.notifications.init();
-    console.log('🔧 Notifications initialized immediately');
-  }
-
-  // Add to shared utilities
-  if (window.sharedUtilities) {
-    window.sharedUtilities.notifications = window.notifications;
-  }
-
-  // Global convenience functions for backward compatibility (prevent duplicates)
-  if (!window.showSuccess) {
-    window.showSuccess = function (message, duration) {
-      if (window.notifications && window.notifications.success) {
-        window.notifications.success(message, duration);
-      } else {
-        console.log('[SUCCESS] ' + message);
-      }
-    };
-  }
-
-  if (!window.showError) {
-    window.showError = function (message, duration) {
-      if (window.notifications && window.notifications.error) {
-        window.notifications.error(message, duration);
-      } else {
-        alert('エラー: ' + message);
-      }
-    };
-  }
-
-  if (!window.showWarning) {
-    window.showWarning = function (message, duration) {
-      if (window.notifications && window.notifications.warning) {
-        window.notifications.warning(message, duration);
-      } else {
-        console.warn('[WARNING] ' + message);
-      }
-    };
-  }
-
-  if (!window.showInfo) {
-    window.showInfo = function (message, duration) {
-      if (window.notifications && window.notifications.info) {
-        window.notifications.info(message, duration);
-      } else {
-        console.log('[INFO] ' + message);
-      }
-    };
-  }
-
-  // Alias for generic show message (prevent duplicates)
-  if (!window.showMessage) {
-    window.showMessage = function (message, type, duration) {
-      if (window.notifications && window.notifications.showMessage) {
-        window.notifications.showMessage(message, type, duration);
-      } else {
-        // Fallback based on type
-        if (type === 'error') {
-          alert('エラー: ' + message);
-        } else {
-          console.log(`[${type.toUpperCase()}] ${message}`);
-        }
-      }
-    };
-  }
-
-  // ✅ ALWAYS ADD FALLBACK STYLES - Ensure z-index works
-  if (!document.querySelector('#notification-fallback-styles')) {
-    const style = document.createElement('style');
-    style.id = 'notification-fallback-styles';
-    style.textContent = `
-      #notification-container {
-        position: fixed !important;
-        top: 1rem !important;
-        right: 1rem !important;
-        z-index: 10000 !important;
-        pointer-events: none !important;
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-      #notification-container .notification {
-        pointer-events: auto !important;
-        min-width: 300px;
-        max-width: 500px;
-        padding: 0.75rem 1rem;
-        border-radius: 0.5rem;
-        background: rgba(0, 0, 0, 0.9);
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-      }
-    `;
-    document.head.appendChild(style);
-    console.log('🔧 Notification fallback styles added');
-  }
-
-  // ✅ IMMEDIATE TEST FUNCTION - Direct window assignment
-  window.testNotifications = function() {
-    console.log('🧪 Testing notification system...');
-
-    if (!window.notifications) {
-      console.error('❌ NotificationSystem not available');
-      return false;
-    }
-
-    // Test immediately
-    window.notifications.info('🧪 Info test', 2000);
-    window.notifications.success('✅ Success test', 2000);
-    window.notifications.warning('⚠️ Warning test', 2000);
-    window.notifications.error('❌ Error test', 2000);
-
-    console.log('✅ Test notifications sent');
-    return true;
+  // ✅ Essential compatibility functions only
+  window.showMessage = function(message, type) {
+    window.notifications.showMessage(message, type);
   };
 
-  // ✅ Status check - immediate execution
-  console.log('🔧 Notification system ready:', !!window.notifications);
-  console.log('🔧 Test function ready:', !!window.testNotifications);
+  window.testNotifications = function() {
+    window.notifications.info('🧪 Info test');
+    window.notifications.success('✅ Success test');
+    window.notifications.warning('⚠️ Warning test');
+    window.notifications.error('❌ Error test');
+    console.log('✅ Notification test completed');
+  };
 
   // =============================================================================
   // DYNAMIC PERFORMANCE CONSTANTS - Shared across all HTML files
