@@ -14,9 +14,21 @@
     <!-- Shared Styles -->
     <?!= include('UnifiedStyles.css'); ?>
     <script>
-      // Administrator access - no userId needed
-      let __USER_ID__ = '';
-      console.log('✅ AppSetup page loaded for administrator');
+      // ✅ URLパラメータからuserIdを取得（管理パネルに戻る際に必要）
+      function getUrlParameterUserId() {
+        try {
+          const urlParams = new URLSearchParams(window.location.search);
+          return urlParams.get('userId') || '';
+        } catch (error) {
+          console.warn('URL parameter extraction failed:', error);
+          return '';
+        }
+      }
+
+      // ✅ バックエンドから渡されたuserIdとURLパラメータの両方をチェック
+      const templateUserId = '<?= typeof userIdParam !== "undefined" ? userIdParam : "" ?>';
+      let __USER_ID__ = getUrlParameterUserId() || templateUserId;
+      console.log('✅ AppSetup page loaded for administrator, userId:', __USER_ID__ ? `${__USER_ID__.substring(0, 8)}***` : 'not specified');
     </script>
   </head>
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">

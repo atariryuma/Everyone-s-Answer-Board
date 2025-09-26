@@ -116,8 +116,19 @@ function doGet(e) {
       }
 
       case 'admin': {
+        // 🔐 GAS-Native: 直接認証チェック - Admin権限確認
+        if (!currentEmail) {
+          return createRedirectTemplate('ErrorBoundary.html', 'ユーザー認証が必要です');
+        }
+
+        // 対象ユーザー確認（userIdパラメータが指定されている場合）
+        const targetUserId = params.userId;
+        if (!targetUserId) {
+          return createRedirectTemplate('ErrorBoundary.html', 'ユーザーIDが指定されていません');
+        }
+
         // ✅ CLAUDE.md準拠: Batch operations for 70x performance improvement
-        const adminData = getBatchedAdminData();
+        const adminData = getBatchedAdminData(targetUserId);
         if (!adminData.success) {
           return createRedirectTemplate('ErrorBoundary.html', adminData.error || '管理者権限が必要です');
         }
@@ -193,8 +204,16 @@ function doGet(e) {
           return createRedirectTemplate('ErrorBoundary.html', '管理者権限が必要です');
         }
 
+        // ✅ userIdパラメータを取得（管理パネルに戻るリンクで使用）
+        const userIdParam = params.userId;
+
         // 認証済み - Administrator権限でAppSetup表示
-        return HtmlService.createTemplateFromFile('AppSetupPage.html').evaluate();
+        const template = HtmlService.createTemplateFromFile('AppSetupPage.html');
+
+        // ✅ 管理パネルに戻るリンクのためにuserIdを渡す（オプション）
+        template.userIdParam = userIdParam || '';
+
+        return template.evaluate();
       }
 
       case 'view': {
@@ -2731,40 +2750,50 @@ function getBatchedViewerData(targetUserId, currentEmail) {
 /**
  * ✅ CLAUDE.md準拠: Batched admin data retrieval for 70x performance improvement
  * Combines 4 individual API calls into single batch operation:
- * - getCurrentEmail
+ * - getCurrentEmail (session email)
+ * - findUserById (target user validation)
  * - isAdministrator
- * - findUserByEmail
+ * - permission validation
  * - getUserConfig
  *
+ * @param {string} targetUserId - Target user ID for admin access
  * @returns {Object} Batched result with all required admin data
  */
-function getBatchedAdminData() {
+function getBatchedAdminData(targetUserId) {
   try {
-    // ✅ Batch operation: Get all required admin data in single coordinated call
-    const email = getCurrentEmail();
-    if (!email) {
+    // ✅ Batch operation: Get current email from session
+    const currentEmail = getCurrentEmail();
+    if (!currentEmail) {
       return { success: false, error: 'ユーザー認証が必要です' };
     }
 
-    // ✅ 編集ユーザー対応: 管理者でなくても自分のボードの管理パネルにアクセス可能
-    const isAdmin = isAdministrator(email);
-    const user = findUserByEmail(email, { requestingUser: email });
-
-    // ユーザー情報が見つからない場合は権限チェック前にエラー
-    if (!user && !isAdmin) {
-      return { success: false, error: 'ユーザー情報が見つかりません' };
+    // ✅ 対象ユーザーの存在確認
+    const targetUser = findUserById(targetUserId, { requestingUser: currentEmail });
+    if (!targetUser) {
+      return { success: false, error: '指定されたユーザーが見つかりません' };
     }
 
-    // 管理者ではない場合、最低でもアクティブなユーザーである必要がある
-    if (!isAdmin && (!user || !user.isActive)) {
-      return { success: false, error: '編集権限が必要です' };
+    // ✅ 権限チェック: 管理者またはターゲットユーザー本人のみアクセス可能
+    const isAdmin = isAdministrator(currentEmail);
+    const isOwnBoard = currentEmail === targetUser.userEmail;
+
+    if (!isAdmin && !isOwnBoard) {
+      return {
+        success: false,
+        error: `他のユーザーの管理画面にはアクセスできません。管理者権限が必要です。`
+      };
     }
 
-    const configResult = getUserConfig(user.userId);
+    // ✅ 編集者権限の追加確認（管理者でない場合）
+    if (!isAdmin && !targetUser.isActive) {
+      return { success: false, error: '対象ユーザーがアクティブではありません' };
+    }
+
+    const configResult = getUserConfig(targetUserId);
     const config = configResult.success ? configResult.config : {};
 
     // ✅ CLAUDE.md準拠: フロントエンド必要情報を統合取得
-    const questionText = getQuestionText(config, { targetUserEmail: user.userEmail });
+    const questionText = getQuestionText(config, { targetUserEmail: targetUser.userEmail });
 
     // ✅ URLs とタイムスタンプ情報を config に統合
     // ✅ Optimized: Use database lastModified instead of config lastModified
@@ -2772,18 +2801,19 @@ function getBatchedAdminData() {
     const enhancedConfig = {
       ...config,
       urls: config.urls || {
-        view: `${baseUrl}?mode=view&userId=${user.userId}`,
-        admin: `${baseUrl}?mode=admin&userId=${user.userId}`
+        view: `${baseUrl}?mode=view&userId=${targetUserId}`,
+        admin: `${baseUrl}?mode=admin&userId=${targetUserId}`
       },
-      lastModified: user.lastModified || config.publishedAt
+      lastModified: targetUser.lastModified || config.publishedAt
     };
 
     return {
       success: true,
-      email,
-      user,
+      email: currentEmail,
+      user: targetUser,
       config: enhancedConfig,
-      questionText: questionText || '回答ボード'
+      questionText: questionText || '回答ボード',
+      isAdminAccess: isAdmin && !isOwnBoard // 管理者として他ユーザーにアクセスしているかどうか
     };
 
   } catch (error) {

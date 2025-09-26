@@ -26,9 +26,24 @@
     console.warn('Admin Panel: Failed to parse configJSON:', e);
   }
 
+  // ✅ URLパラメータから userId を取得（最優先）
+  function getUrlParameterUserId() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get('userId') || '';
+    } catch (error) {
+      console.warn('URL parameter extraction failed:', error);
+      return '';
+    }
+  }
+
+  // ✅ 実際のターゲットユーザーID（URLパラメータ優先）
+  const TARGET_USER_ID = getUrlParameterUserId() || CONFIG.userId || __USER_ID__;
+
   // Unified Configuration Access Pattern
   window.UNIFIED_CONFIG = {
     userId: CONFIG.userId || __USER_ID__,
+    targetUserId: TARGET_USER_ID, // ✅ 実際のターゲットユーザーID
     userEmail: CONFIG.userEmail || '',
     spreadsheetId: CONFIG.spreadsheetId || '',
     sheetName: CONFIG.sheetName || '',
@@ -392,7 +407,7 @@
           }
         })
         .withFailureHandler(reject)
-        .getBatchedAdminData();
+        .getBatchedAdminData(window.UNIFIED_CONFIG.targetUserId);
     });
   }
 
@@ -1740,7 +1755,8 @@
       ],
     };
 
-    // TODO: フォーム作成処理の実装
+    // NOTE: フォーム作成機能は SystemController.gs で実装済み
+    // この関数は未使用のレガシーコード
     showInfo('フォーム作成機能は準備中です');
   }
 
@@ -4652,7 +4668,7 @@
           error: error.message,
         });
       })
-      .getBatchedAdminData();
+      .getBatchedAdminData(window.UNIFIED_CONFIG.targetUserId);
   }
 
   // フッター表示更新
@@ -4801,10 +4817,15 @@
       window.notifications.info('⚙️ アプリ設定画面に移動中...', 2000);
     }
 
+    // ✅ 現在のターゲットユーザーIDを取得
+    const targetUserId = window.UNIFIED_CONFIG.targetUserId;
+
     google.script.run
       .withSuccessHandler(function (webAppUrl) {
         if (webAppUrl) {
-          window.open(webAppUrl + '?mode=appSetup', '_top');
+          // ✅ userIdパラメータを付与してアプリ設定画面に遷移
+          const appSetupUrl = webAppUrl + '?mode=appSetup' + (targetUserId ? '&userId=' + targetUserId : '');
+          window.open(appSetupUrl, '_top');
         }
       })
       .withFailureHandler(function (error) {
