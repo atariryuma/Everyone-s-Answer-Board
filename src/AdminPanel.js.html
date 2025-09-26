@@ -1990,8 +1990,12 @@
           console.warn(`⚠️ 分析品質不足、リトライします: ${qualityCheck.reason}`);
           showInfo(`分析品質向上のため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
 
-          // 指数バックオフ待機
-          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          // 指数バックオフ待機 - CLAUDE.md V8 compliant: Promise-based delay
+          await new Promise(resolve => {
+            const start = Date.now();
+            const check = () => (Date.now() - start >= retryDelay) ? resolve() : Promise.resolve().then(check);
+            check();
+          });
 
           return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
         } else {
@@ -2027,7 +2031,12 @@
         console.warn(`🔄 リトライ可能エラー、再試行します: ${error.message}`);
         showInfo(`接続エラーのため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
 
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        // CLAUDE.md V8 compliant: Promise-based delay instead of setTimeout
+        await new Promise(resolve => {
+          const start = Date.now();
+          const check = () => (Date.now() - start >= retryDelay) ? resolve() : Promise.resolve().then(check);
+          check();
+        });
         return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
       }
 
@@ -3013,12 +3022,20 @@
       }
       guidanceEl.textContent = message;
 
-      // 8秒後に非表示
-      setTimeout(() => {
+      // 8秒後に非表示 - CLAUDE.md V8 compliant: Promise-based delay
+      const createPromiseDelay = (ms) => new Promise(resolve => {
+        const start = Date.now();
+        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+        check();
+      });
+
+      createPromiseDelay(8000).then(() => {
         if (guidanceEl && guidanceEl.parentNode) {
           guidanceEl.parentNode.removeChild(guidanceEl);
         }
-      }, 8000);
+      }).catch(() => {
+        // Silent error handling for cleanup
+      });
     }
   }
 

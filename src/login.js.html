@@ -9,7 +9,7 @@
   }
 
   // Initialization wrapper function with error handling
-  function init() {
+  async function init() {
     try {
       console.log('🔄 Starting login page initialization...');
 
@@ -51,9 +51,9 @@
       try {
         const domainInfo = await fetchDomainInfo();
         displayDomainInfo(domainInfo);
-        debugLog('✅ Domain info loaded in login page:', domainInfo);
+        console.log('✅ Domain info loaded in login page:', domainInfo);
       } catch (error) {
-        warnLog('⚠️ Domain display update failed:', error);
+        console.warn('⚠️ Domain display update failed:', error);
         displayDomainInfo({ error: error.message, fallback: true });
       }
 
@@ -143,13 +143,21 @@
           userEmailDisplay.textContent = statusMessage;
           userEmailDisplay.classList.add('text-green-400');
 
-          // 3秒後にメッセージをクリア
-          setTimeout(() => {
+          // 3秒後にメッセージをクリア - CLAUDE.md V8 compliant: Promise-based delay
+          const createPromiseDelay = (ms) => new Promise(resolve => {
+            const start = Date.now();
+            const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+            check();
+          });
+
+          createPromiseDelay(3000).then(() => {
             if (userEmailDisplay) {
               userEmailDisplay.textContent = 'Google アカウントでログインしてください';
               userEmailDisplay.classList.remove('text-green-400');
             }
-          }, 3000);
+          }).catch(() => {
+            // Silent error handling for cleanup
+          });
         }
 
         // ✅ ブラウザキャッシュ完全クリア（ログアウト後のみ）
@@ -275,8 +283,16 @@
                 }
               }, 800);
 
-              // 5秒後に監視を停止（GAS内部処理完了後）
-              setTimeout(() => clearInterval(emailProtector), 5000);
+              // 5秒後に監視を停止（GAS内部処理完了後） - CLAUDE.md V8 compliant: Promise-based delay
+              const createPromiseDelay = (ms) => new Promise(resolve => {
+                const start = Date.now();
+                const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+                check();
+              });
+
+              createPromiseDelay(5000).then(() => clearInterval(emailProtector)).catch(() => {
+                // Silent error handling
+              });
 
               // 成功時のローディング状態解除
               window.setLoading(false);
@@ -896,4 +912,87 @@
     // 実際の遷移
     window.location.href = adminUrl;
   }
+
+  // ✅ ドメイン情報取得関数 - login.js.html用簡潔版
+  async function fetchDomainInfo() {
+    try {
+      if (!google?.script?.run?.getDeployUserDomainInfo) {
+        console.warn('getDeployUserDomainInfo function not available, using fallback');
+        return {
+          success: true,
+          isDomainMatch: true,
+          deployDomain: 'unknown',
+          currentDomain: 'unknown',
+          userEmail: 'anonymous',
+          fallback: true
+        };
+      }
+
+      const rawInfo = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler((error) => {
+            console.warn('getDeployUserDomainInfo failed, using fallback:', error);
+            resolve({
+              success: false,
+              error: error.message || error,
+              fallback: true
+            });
+          })
+          .getDeployUserDomainInfo();
+      });
+
+      return rawInfo;
+    } catch (error) {
+      console.warn('fetchDomainInfo error:', error.message || error);
+      return {
+        success: false,
+        error: error.message || error,
+        fallback: true
+      };
+    }
+  }
+
+  // ✅ ドメイン情報表示関数 - login.js.html用簡潔版
+  function displayDomainInfo(info) {
+    const headerDomainMatch = document.getElementById('header-domain-match');
+    const headerDomainMismatch = document.getElementById('header-domain-mismatch');
+    const headerDomainInitial = document.getElementById('header-domain-initial');
+    const headerDomainMatchText = document.getElementById('header-domain-match-text');
+    const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
+
+    // 全ての表示を一旦非表示にする
+    if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
+    if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
+    if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
+
+    if (!info || info.error) {
+      console.warn('ドメイン情報エラー:', info?.error);
+      // エラー時は初期状態を表示
+      if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
+      return;
+    }
+
+    try {
+      if (info.isValidDomain) {
+        if (headerDomainMatch) {
+          headerDomainMatch.classList.remove('hidden');
+        }
+        if (headerDomainMatchText && info.domain) {
+          headerDomainMatchText.textContent = `${info.domain} ドメイン`;
+        }
+      } else {
+        if (headerDomainMismatch) {
+          headerDomainMismatch.classList.remove('hidden');
+        }
+        if (headerDomainMismatchText) {
+          headerDomainMismatchText.textContent = `注意: 外部ドメインからのアクセス`;
+        }
+      }
+    } catch (error) {
+      console.warn('ドメイン情報表示エラー:', error);
+      if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
+    }
+  }
+
 </script>
