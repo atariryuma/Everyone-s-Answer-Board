@@ -1461,7 +1461,14 @@
           'top-level-storage-access',
           'document-access',
           'storage-access',
-          'autoplay'
+          'autoplay',
+          // ✅ Additional GAS Specific Patterns
+          'about:blank',
+          'an iframe which has both allow-scripts and allow-same-origin',
+          'can escape its sandboxing',
+          'net state changed',
+          'warden_bin_i18n',
+          'permanently-removed.invalid'
         ];
 
         const shouldSuppress = suppressPatterns.some((pattern) => message.includes(pattern));
@@ -1501,7 +1508,14 @@
           'frame attempting navigation',
           'top-level window',
           'googleusercontent.com',
-          'userCodeAppPanel'
+          'userCodeAppPanel',
+          // ✅ Additional GAS Error Patterns
+          'about:blank',
+          'an iframe which has both allow-scripts and allow-same-origin',
+          'can escape its sandboxing',
+          'net state changed',
+          'warden_bin_i18n',
+          'permanently-removed.invalid'
         ];
 
         const shouldSuppressError = errorSuppressPatterns.some((pattern) =>
@@ -1955,45 +1969,89 @@
     document.head.appendChild(style);
   }
 
-  // ✅ Test function for notification system verification
-  if (!window.testNotifications) {
-    window.testNotifications = function() {
-      console.log('🧪 Testing notification system...');
+  // ✅ Test function for notification system verification (global scope)
+  window.testNotifications = function() {
+    console.log('🧪 Testing notification system...');
 
-      if (!window.notifications) {
-        console.error('❌ NotificationSystem not available');
+    if (!window.notifications) {
+      console.error('❌ NotificationSystem not available');
+      return false;
+    }
+
+    try {
+      // Test container creation
+      const initResult = window.notifications.init();
+      if (!initResult) {
+        console.error('❌ NotificationSystem initialization failed');
         return false;
       }
 
-      try {
-        // Test container creation
-        const initResult = window.notifications.init();
-        if (!initResult) {
-          console.error('❌ NotificationSystem initialization failed');
-          return false;
-        }
+      // Test z-index application
+      if (window.notifications.container) {
+        const computedStyle = window.getComputedStyle(window.notifications.container);
+        const zIndex = computedStyle.zIndex;
+        console.log(`✅ Container z-index: ${zIndex}`);
+        console.log(`✅ Container classes: ${window.notifications.container.className}`);
 
-        // Test z-index application
-        if (window.notifications.container) {
-          const computedStyle = window.getComputedStyle(window.notifications.container);
-          const zIndex = computedStyle.zIndex;
-          console.log(`✅ Container z-index: ${zIndex}`);
-          console.log(`✅ Container classes: ${window.notifications.container.className}`);
+        // Test notification display with all types
+        window.notifications.info('🧪 Test notification - z-index fix applied', 3000);
 
-          // Test notification display
-          window.notifications.info('🧪 Test notification - z-index fix applied', 3000);
-          console.log('✅ Test notification sent');
-          return true;
-        } else {
-          console.error('❌ Notification container not created');
-          return false;
-        }
-      } catch (error) {
-        console.error('❌ Notification test failed:', error.message);
+        // ✅ GAS V8 Runtime compatible delays using Promise.resolve()
+        Promise.resolve().then(() => {
+          return new Promise(resolve => {
+            let start = Date.now();
+            function check() {
+              if (Date.now() - start >= 500) {
+                window.notifications.success('✅ Success notification test', 2000);
+                resolve();
+              } else {
+                Promise.resolve().then(check);
+              }
+            }
+            check();
+          });
+        }).then(() => {
+          return new Promise(resolve => {
+            let start = Date.now();
+            function check() {
+              if (Date.now() - start >= 500) {
+                window.notifications.warning('⚠️ Warning notification test', 2000);
+                resolve();
+              } else {
+                Promise.resolve().then(check);
+              }
+            }
+            check();
+          });
+        }).then(() => {
+          return new Promise(resolve => {
+            let start = Date.now();
+            function check() {
+              if (Date.now() - start >= 500) {
+                window.notifications.error('❌ Error notification test', 2000);
+                resolve();
+              } else {
+                Promise.resolve().then(check);
+              }
+            }
+            check();
+          });
+        });
+
+        console.log('✅ Test notifications sent (4 types)');
+        return true;
+      } else {
+        console.error('❌ Notification container not created');
         return false;
       }
-    };
-  }
+    } catch (error) {
+      console.error('❌ Notification test failed:', error.message);
+      return false;
+    }
+  };
+
+  // ✅ Immediate availability check - log when function becomes available
+  console.log('🔧 testNotifications() function is now available globally');
 
   // =============================================================================
   // DYNAMIC PERFORMANCE CONSTANTS - Shared across all HTML files
