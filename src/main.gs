@@ -64,6 +64,7 @@ function include(filename) {
   return HtmlService.createTemplateFromFile(filename).evaluate().getContent();
 }
 
+
 // ===========================================
 // 🌐 HTTP Entry Points
 // ===========================================
@@ -80,6 +81,27 @@ function doGet(e) {
 
     // ✅ Performance optimization: Cache email for authentication-required routes
     const currentEmail = (mode !== 'login') ? getCurrentEmail() : null;
+
+    // 🚫 アプリ全体のアクセス制限チェック
+    // APP_DISABLED フラグがtrueの場合、管理者以外のアクセスを制限
+    const isAppDisabled = checkAppAccessRestriction();
+    if (isAppDisabled) {
+      const isAdmin = currentEmail ? isAdministrator(currentEmail) : false;
+
+      // 管理者のみappSetupモードでのアクセスを許可（復旧作業用）
+      if (mode === 'appSetup' && isAdmin) {
+        // 管理者のappSetup アクセスは通常通り処理
+      } else {
+        // 停止中画面を表示（管理者には復旧用のリンクを表示）
+        const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
+        template.isAdministrator = isAdmin;
+        template.userEmail = currentEmail || '';
+        template.timestamp = new Date().toISOString();
+        template.isAppDisabled = true; // アプリ停止状態を明示
+        return template.evaluate();
+      }
+    }
+
 
     // Simple routing
     switch (mode) {
@@ -197,8 +219,18 @@ function doGet(e) {
         const isOwnBoard = currentEmail === targetUser.userEmail;
         const isPublished = Boolean(config.isPublished);
 
-        if (!isAdminUser && !isOwnBoard && !isPublished) {
-          return createRedirectTemplate('ErrorBoundary.html', 'このボードは非公開に設定されています');
+        // 🔧 論理的修正: 非公開状態なら所有者・非所有者問わずUnpublished.htmlを表示
+        if (!isPublished) {
+          const template = HtmlService.createTemplateFromFile('Unpublished.html');
+          template.isEditor = isAdminUser || isOwnBoard; // 表示内容制御
+          template.editorName = targetUser.userName || targetUser.userEmail || '';
+
+          // Generate board URL
+          const baseUrl = ScriptApp.getService().getUrl();
+          template.boardUrl = `${baseUrl}?mode=view&userId=${targetUserId}`;
+
+
+          return template.evaluate();
         }
 
         // 認証済み - 公開ボード表示
@@ -338,7 +370,17 @@ function doPost(e) {
     let result;
     switch (action) {
       case 'getData':
-        result = handleUserDataRequest(email, request.options || {});
+        try {
+          const user = findUserByEmail(email, { requestingUser: email });
+          if (!user) {
+            result = createUserNotFoundError();
+          } else {
+            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
+          }
+        } catch (error) {
+          console.error('getData error:', error.message);
+          result = createExceptionResponse(error);
+        }
         break;
       case 'addReaction':
         // 🎯 Multi-tenant: request.userId = target user (board owner), email = actor (current user)
@@ -357,10 +399,48 @@ function doPost(e) {
         }
         break;
       case 'refreshData':
-        result = handleUserDataRequest(email, request.options || {});
+        try {
+          const user = findUserByEmail(email, { requestingUser: email });
+          if (!user) {
+            result = createUserNotFoundError();
+          } else {
+            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
+          }
+        } catch (error) {
+          console.error('refreshData error:', error.message);
+          result = createExceptionResponse(error);
+        }
         break;
       case 'publishApp':
-        result = handlePublishApp(email, request.config || {});
+        try {
+          const user = findUserByEmail(email, { requestingUser: email });
+          if (!user) {
+            result = createUserNotFoundError();
+          } else {
+            const publishConfig = {
+              ...request.config,
+              isPublished: true,
+              publishedAt: new Date().toISOString(),
+              setupComplete: true
+            };
+
+            const saveResult = saveUserConfig(user.userId, publishConfig);
+            if (!saveResult.success) {
+              result = createErrorResponse(saveResult.message || '公開設定の保存に失敗しました');
+            } else {
+              result = {
+                success: true,
+                message: 'アプリが正常に公開されました',
+                publishedAt: publishConfig.publishedAt,
+                config: saveResult.config,
+                etag: saveResult.etag
+              };
+            }
+          }
+        } catch (error) {
+          console.error('publishApp error:', error.message);
+          result = createExceptionResponse(error);
+        }
         break;
       default:
         result = createErrorResponse(action ? `Unknown action: ${action}` : 'Unknown action: 不明');
@@ -380,65 +460,7 @@ function doPost(e) {
   }
 }
 
-/**
- * 統一ユーザーデータリクエスト処理関数
- * 重複していたgetDataとrefreshDataのロジックを統一
- * @param {string} email - ユーザーメールアドレス
- * @param {Object} options - リクエストオプション
- * @returns {Object} 処理結果
- */
-function handleUserDataRequest(email, options = {}) {
-  try {
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return createUserNotFoundError();
-    }
-    return { success: true, data: getUserSheetData(user.userId, options) };
-  } catch (error) {
-    console.error('handleUserDataRequest error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
 
-/**
- * アプリ公開処理
- * @param {string} email - ユーザーメールアドレス
- * @param {Object} config - 公開設定
- * @returns {Object} 処理結果
- */
-function handlePublishApp(email, config) {
-  try {
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return createUserNotFoundError();
-    }
-
-    // 設定にisPublished: trueを設定
-    const publishConfig = {
-      ...config,
-      isPublished: true,
-      publishedAt: new Date().toISOString(),
-      setupComplete: true
-    };
-
-    // 設定を保存
-    const saveResult = saveUserConfig(user.userId, publishConfig);
-    if (!saveResult.success) {
-      return createErrorResponse(saveResult.message || '公開設定の保存に失敗しました');
-    }
-
-    return {
-      success: true,
-      message: 'アプリが正常に公開されました',
-      publishedAt: publishConfig.publishedAt,
-      config: saveResult.config,
-      etag: saveResult.etag
-    };
-  } catch (error) {
-    console.error('handlePublishApp error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
 
 // ===========================================
 // 🔧 API Functions (called from HTML)
@@ -583,25 +605,6 @@ function isAdmin() {
   }
 }
 
-/**
- * Test system setup
- * @returns {Object} Setup status with success flag and message
- */
-function testSetup() {
-  try {
-    const props = PropertiesService.getScriptProperties();
-    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
-    const adminEmail = props.getProperty('ADMIN_EMAIL');
-
-    return {
-      success: !!(dbId && adminEmail),
-      message: dbId && adminEmail ? 'Setup complete' : 'Setup incomplete'
-    };
-  } catch (error) {
-    console.error('testSetup error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
 
 /**
  * Reset authentication and clear all user session data
@@ -866,23 +869,6 @@ function processLoginAction() {
   }
 }
 
-/**
- * Validate spreadsheet access with service account
- * Frontend API for validateAccess function in SystemController.gs
- */
-function validateAccessAPI(spreadsheetId, autoAddEditor = true) {
-  try {
-    // Zero-dependency: Direct function call from SystemController
-    return validateAccess(spreadsheetId, autoAddEditor);
-  } catch (error) {
-    console.error('validateAccessAPI error:', error.message);
-    return {
-      success: false,
-      message: error.message,
-      sheets: []
-    };
-  }
-}
 
 /**
  * Set application status - simplified name
@@ -949,7 +935,7 @@ function getAdminUsers(options = {}) {
       return createAdminRequiredError();
     }
 
-    // 🔧 GAS-Native統一: 直接getAllUsers使用
+    // 🔧 GAS-Native統一: 全ユーザー取得（物理削除のためフィルター不要）
     const users = getAllUsers();
     return {
       success: true,
@@ -1007,13 +993,18 @@ function toggleUserActiveStatus(targetUserId) {
 
 
 /**
- * Toggle user board publication status for admin - system admin only
+ * Toggle user board publication status - admin only (for managing other users)
  */
 function toggleUserBoardStatus(targetUserId) {
   try {
     const email = getCurrentEmail();
-    if (!email || !isAdministrator(email)) {
-      return createAdminRequiredError();
+    if (!email) {
+      return createAuthError('ユーザー認証が必要です');
+    }
+
+    // 権限チェック: 管理者のみ（他ユーザーのボード状態を管理するため）
+    if (!isAdministrator(email)) {
+      return createAuthError('管理者権限が必要です');
     }
 
     // 🔧 GAS-Native統一: 直接findUserById使用
@@ -1022,39 +1013,92 @@ function toggleUserBoardStatus(targetUserId) {
       return createUserNotFoundError();
     }
 
-    // 統一API使用: 設定取得・更新・保存
-    const configResult = getUserConfig(targetUserId);
-    const config = configResult.success ? configResult.config : {};
-
-    // ボード公開状態を切り替え
-    config.isPublished = !config.isPublished;
-    if (config.isPublished) {
-      if (!config.publishedAt) {
-        config.publishedAt = new Date().toISOString();
-      }
-    }
-    config.lastAccessedAt = new Date().toISOString();
-
-    // 統一API使用: 検証・サニタイズ・保存
-    const saveResult = saveUserConfig(targetUserId, config, { forceUpdate: false });
-    if (!saveResult.success) {
-      return createErrorResponse(`Failed to toggle board status: ${saveResult.message || '詳細不明'}`);
+    // 🔧 最小限更新: isPublishedフィールドのみを変更
+    // 現在のconfigJsonを取得してパース
+    let currentConfig = {};
+    try {
+      const configJsonStr = targetUser.configJson || '{}';
+      currentConfig = JSON.parse(configJsonStr);
+    } catch (error) {
+      console.warn('toggleUserBoardStatus: Invalid configJson, using empty config:', error.message);
+      currentConfig = {};
     }
 
-    const result = saveResult; // 統一APIレスポンスをそのまま利用
-    if (result.success) {
-      return {
-        success: true,
-        message: `ボードを${config.isPublished ? '公開' : '非公開'}に変更しました`,
-        userId: targetUserId,
-        boardPublished: config.isPublished,
-        timestamp: new Date().toISOString()
-      };
-    } else {
-      return createErrorResponse('ボード状態の更新に失敗しました');
+    // 公開状態のみを切り替え
+    const newIsPublished = !currentConfig.isPublished;
+    const updates = {};
+
+    // 新しいconfigJsonを構築（isPublishedとpublishedAtのみ更新）
+    const updatedConfig = { ...currentConfig };
+    updatedConfig.isPublished = newIsPublished;
+    if (newIsPublished && !updatedConfig.publishedAt) {
+      updatedConfig.publishedAt = new Date().toISOString();
     }
+    updatedConfig.lastAccessedAt = new Date().toISOString();
+
+    updates.configJson = JSON.stringify(updatedConfig);
+    updates.lastModified = new Date().toISOString();
+
+    // 🔧 直接データベース更新: 最小限の変更のみ
+    const updateResult = updateUser(targetUserId, updates);
+    if (!updateResult.success) {
+      return createErrorResponse(`Failed to toggle board status: ${updateResult.message || '詳細不明'}`);
+    }
+
+    return {
+      success: true,
+      message: `ボードを${newIsPublished ? '公開' : '非公開'}に変更しました`,
+      userId: targetUserId,
+      boardPublished: newIsPublished,
+      timestamp: new Date().toISOString()
+    };
   } catch (error) {
     console.error('toggleUserBoardStatus error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * 自分のボードを再公開（所有者用のシンプル関数）
+ */
+function republishMyBoard() {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError('ユーザー認証が必要です');
+    }
+
+    // 現在のユーザーを取得
+    const currentUser = findUserByEmail(email);
+    if (!currentUser) {
+      return createUserNotFoundError('ユーザーが見つかりません');
+    }
+
+    // 設定を取得
+    const configResult = getUserConfig(currentUser.userId);
+    const config = configResult.success ? configResult.config : {};
+
+    // 公開状態に変更
+    config.isPublished = true;
+    config.publishedAt = new Date().toISOString();
+
+    // 設定を保存
+    const saveResult = saveUserConfig(currentUser.userId, config);
+    if (!saveResult.success) {
+      return {
+        success: false,
+        message: '設定の保存に失敗しました'
+      };
+    }
+
+    return {
+      success: true,
+      message: '回答ボードを再公開しました',
+      userId: currentUser.userId
+    };
+
+  } catch (error) {
+    console.error('republishMyBoard error:', error.message);
     return createExceptionResponse(error);
   }
 }
@@ -1869,29 +1913,84 @@ function saveConfig(config, options = {}) {
  * @returns {Object} 時刻ベース統一通知更新結果
  */
 function getNotificationUpdate(targetUserId, options = {}) {
+  const startTime = Date.now();
+  const logPrefix = '🔔 getNotificationUpdate:';
+
   try {
-    const viewerEmail = getCurrentEmail();
-    if (!viewerEmail) {
+    // ✅ 入力パラメータの詳細ログ
+    console.log(`${logPrefix} Starting`, {
+      targetUserId: targetUserId ? `${targetUserId.substring(0, 8)}***` : 'null',
+      optionsKeys: options ? Object.keys(options) : 'null',
+      timestamp: new Date().toISOString()
+    });
+
+    // ✅ null安全性: targetUserIdの検証
+    if (!targetUserId || typeof targetUserId !== 'string') {
+      console.warn(`${logPrefix} Invalid targetUserId:`, typeof targetUserId);
       return {
         success: false,
         hasNewContent: false,
-        message: 'Authentication required'
+        newItemsCount: 0,
+        data: [],
+        message: 'Invalid target user ID',
+        timestamp: new Date().toISOString(),
+        targetUserId: targetUserId || 'undefined'
       };
     }
 
-    // 対象ユーザー取得
-    const targetUser = findUserById(targetUserId);
-    if (!targetUser) {
+    const viewerEmail = getCurrentEmail();
+    if (!viewerEmail) {
+      console.warn(`${logPrefix} Authentication failed`);
       return {
         success: false,
         hasNewContent: false,
-        message: 'Target user not found'
+        newItemsCount: 0,
+        data: [],
+        message: 'Authentication required',
+        timestamp: new Date().toISOString(),
+        targetUserId
+      };
+    }
+
+    // ✅ 対象ユーザー取得（null安全性強化）
+    const targetUser = findUserById(targetUserId);
+    if (!targetUser) {
+      console.warn(`${logPrefix} Target user not found:`, {
+        targetUserId: `${targetUserId.substring(0, 8)}***`,
+        viewerEmail: `${viewerEmail.substring(0, 3)}***`
+      });
+      return {
+        success: false,
+        hasNewContent: false,
+        newItemsCount: 0,
+        data: [],
+        message: 'Target user not found',
+        timestamp: new Date().toISOString(),
+        targetUserId
+      };
+    }
+
+    // ✅ ユーザーデータの完全性検証
+    if (!targetUser.spreadsheetId || !targetUser.userEmail) {
+      console.warn(`${logPrefix} Target user data incomplete:`, {
+        hasSpreadsheetId: !!targetUser.spreadsheetId,
+        hasUserEmail: !!targetUser.userEmail,
+        targetUserId: `${targetUserId.substring(0, 8)}***`
+      });
+      return {
+        success: false,
+        hasNewContent: false,
+        newItemsCount: 0,
+        data: [],
+        message: 'Target user data incomplete',
+        timestamp: new Date().toISOString(),
+        targetUserId
       };
     }
 
     // アクセス制御判定（getViewerBoardDataパターン踏襲）
     const isSelfAccess = targetUser.userEmail === viewerEmail;
-    console.log(`getNotificationUpdate: ${isSelfAccess ? 'Self-access' : 'Cross-user access'} for targetUserId: ${targetUserId}`);
+    console.log(`${logPrefix} ${isSelfAccess ? 'Self-access' : 'Cross-user access'} for targetUserId: ${targetUserId.substring(0, 8)}***`);
 
     // 最終更新時刻の正規化
     let lastUpdate;
@@ -2018,26 +2117,53 @@ function getNotificationUpdate(targetUserId, options = {}) {
       }
     };
 
-    console.log('getNotificationUpdate: Final response:', {
+    // ✅ 実行時間測定とパフォーマンスログ
+    const executionTime = Date.now() - startTime;
+    console.log(`${logPrefix} Final response:`, {
       success: response.success,
       hasNewContent: response.hasNewContent,
       newItemsCount: response.newItemsCount,
       totalDataItems: response.data.length,
-      targetUserId: response.targetUserId
+      targetUserId: `${response.targetUserId.substring(0, 8)  }***`,
+      executionTime: `${executionTime}ms`,
+      isPerformant: executionTime < 2000
     });
+
+    // ✅ パフォーマンス警告
+    if (executionTime > 3000) {
+      console.warn(`${logPrefix} Slow execution detected:`, {
+        executionTime: `${executionTime}ms`,
+        targetUserId: `${targetUserId.substring(0, 8)  }***`,
+        dataSize: response.data.length
+      });
+    }
 
     return response;
 
   } catch (error) {
-    console.error('getNotificationUpdate error:', error.message);
+    const executionTime = Date.now() - startTime;
+
+    // ✅ エラー詳細ログ強化
+    console.error(`${logPrefix} Error occurred:`, {
+      error: error.message,
+      stack: error.stack ? `${error.stack.substring(0, 200)  }...` : 'No stack trace',
+      targetUserId: targetUserId ? `${targetUserId.substring(0, 8)}***` : 'undefined',
+      optionsProvided: options ? Object.keys(options) : 'none',
+      executionTime: `${executionTime}ms`,
+      timestamp: new Date().toISOString()
+    });
+
+    // ✅ 統一されたエラーレスポンス
     return {
       success: false,
       hasNewContent: false,
       data: [],
       newItemsCount: 0,
-      message: error.message,
-      targetUserId,
-      timestamp: new Date().toISOString()
+      message: error.message || 'Unknown error occurred',
+      targetUserId: targetUserId || 'undefined',
+      timestamp: new Date().toISOString(),
+      errorType: 'exception',
+      executionTime: `${executionTime}ms`
     };
   }
 }
@@ -2396,51 +2522,6 @@ function getFormInfoInternal(spreadsheetId, sheetName) {
 // 🔧 Missing API Functions for Frontend Error Fix
 // ===========================================
 
-/**
- * Get deploy user domain info - フロントエンドエラー修正用
- * @returns {Object} ドメイン情報
- */
-function getDeployUserDomainInfo() {
-
-  try {
-    const email = getCurrentEmail();
-
-    // Enhanced type validation for email
-    if (!email || typeof email !== 'string' || email.trim() === '') {
-      console.error('❌ Authentication failed - invalid email:', typeof email, email);
-      return {
-        success: false,
-        message: 'Authentication required - invalid email',
-        domain: null,
-        isValidDomain: false
-      };
-    }
-
-    const domain = email.includes('@') ? email.split('@')[1] : 'unknown';
-    const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
-    const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
-    const isValidDomain = adminDomain ? domain === adminDomain : true;
-
-
-    return {
-      success: true,
-      domain,
-      userEmail: email,
-      userDomain: domain,
-      adminDomain,
-      isValidDomain,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error('❌ getDeployUserDomainInfo ERROR:', error.message);
-    return {
-      success: false,
-      message: error.message,
-      domain: null,
-      isValidDomain: false
-    };
-  }
-}
 
 /**
  * Get active form info - フロントエンドエラー修正用
@@ -2655,7 +2736,7 @@ function validateCompleteSpreadsheetUrl(fullUrl) {
 
     // Step 3: ✅ 既存API活用 - 並列相当処理（GAS-Nativeパターン）
 
-    const accessResult = validateAccessAPI(spreadsheetId);
+    const accessResult = validateAccess(spreadsheetId, true);
 
     // Zero-Dependency safety: 関数存在チェック
     const formResult = typeof getFormInfo === 'function' ?
@@ -3250,4 +3331,183 @@ function isRetryableError(errorMessage) {
 
   // Default to retryable for unknown errors (conservative approach)
   return true;
+}
+
+// ===========================================
+// 📊 Performance Metrics API - Priority 1 Enhancement
+// ===========================================
+
+/**
+ * パフォーマンスメトリクス取得API (管理者専用)
+ * Priority 1改善: 詳細監視機能追加
+ *
+ * @param {string} category - メトリクスカテゴリ ('api', 'cache', 'batch', 'error', 'all')
+ * @param {Object} options - 取得オプション
+ * @returns {Object} パフォーマンス統計結果
+ */
+function getPerformanceMetrics(category = 'all', options = {}) {
+  try {
+    // SystemController経由でメトリクス取得
+    return SystemController.getPerformanceMetrics(category, options);
+  } catch (error) {
+    console.error('getPerformanceMetrics API error:', error.message);
+    return {
+      success: false,
+      error: `Performance metrics collection failed: ${error.message}`,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+/**
+ * パフォーマンス診断API (管理者専用)
+ * Priority 1改善: システム健全性診断
+ *
+ * @param {Object} options - 診断オプション
+ * @returns {Object} 診断結果と改善推奨事項
+ */
+function diagnosePerformance(options = {}) {
+  try {
+    // SystemController経由で診断実行
+    return SystemController.diagnosePerformance(options);
+  } catch (error) {
+    console.error('diagnosePerformance API error:', error.message);
+    return {
+      success: false,
+      error: `Performance diagnosis failed: ${error.message}`,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
+// ===========================================
+// 🔒 Application Access Control - アプリ全体制御機能
+// ===========================================
+
+/**
+ * アプリ全体のアクセス制限状態をチェック
+ * APP_DISABLED プロパティの状態を確認
+ * @returns {boolean} true: アプリ停止中, false: 正常運用中
+ */
+function checkAppAccessRestriction() {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const appDisabled = props.getProperty('APP_DISABLED');
+    return appDisabled === 'true';
+  } catch (error) {
+    console.error('checkAppAccessRestriction error:', error.message);
+    // エラー時は安全側として制限なしとする
+    return false;
+  }
+}
+
+/**
+ * アプリ全体のアクセスを停止する（管理者専用）
+ * @param {string} reason - 停止理由（オプション）
+ * @returns {Object} 実行結果
+ */
+function disableAppAccess(reason = 'システムメンテナンス') {
+  try {
+    const currentEmail = getCurrentEmail();
+    if (!currentEmail || !isAdministrator(currentEmail)) {
+      return createAdminRequiredError();
+    }
+
+    const props = PropertiesService.getScriptProperties();
+    props.setProperty('APP_DISABLED', 'true');
+    props.setProperty('APP_DISABLED_REASON', reason);
+    props.setProperty('APP_DISABLED_BY', currentEmail);
+    props.setProperty('APP_DISABLED_AT', new Date().toISOString());
+
+    return createSuccessResponse('アプリケーションを停止しました', {
+      reason,
+      disabledBy: currentEmail,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('disableAppAccess error:', error.message);
+    return createExceptionResponse(error, 'アプリケーション停止処理');
+  }
+}
+
+/**
+ * アプリ全体のアクセス制限を解除する（管理者専用）
+ * @returns {Object} 実行結果
+ */
+function enableAppAccess() {
+  try {
+    const currentEmail = getCurrentEmail();
+    if (!currentEmail || !isAdministrator(currentEmail)) {
+      return createAdminRequiredError();
+    }
+
+    const props = PropertiesService.getScriptProperties();
+
+    // 停止情報を記録用に保持してから削除
+    const disabledReason = props.getProperty('APP_DISABLED_REASON') || '';
+    const disabledBy = props.getProperty('APP_DISABLED_BY') || '';
+    const disabledAt = props.getProperty('APP_DISABLED_AT') || '';
+
+    props.deleteProperty('APP_DISABLED');
+    props.deleteProperty('APP_DISABLED_REASON');
+    props.deleteProperty('APP_DISABLED_BY');
+    props.deleteProperty('APP_DISABLED_AT');
+
+    // 復旧記録を残す
+    props.setProperty('APP_ENABLED_BY', currentEmail);
+    props.setProperty('APP_ENABLED_AT', new Date().toISOString());
+
+    return createSuccessResponse('アプリケーションを再開しました', {
+      enabledBy: currentEmail,
+      previousRestriction: {
+        reason: disabledReason,
+        disabledBy,
+        disabledAt
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('enableAppAccess error:', error.message);
+    return createExceptionResponse(error, 'アプリケーション再開処理');
+  }
+}
+
+/**
+ * アプリアクセス制限の状態情報を取得（管理者専用）
+ * @returns {Object} アクセス制限状態の詳細情報
+ */
+function getAppAccessStatus() {
+  try {
+    const currentEmail = getCurrentEmail();
+    if (!currentEmail || !isAdministrator(currentEmail)) {
+      return createAdminRequiredError();
+    }
+
+    const props = PropertiesService.getScriptProperties();
+    const isDisabled = props.getProperty('APP_DISABLED') === 'true';
+
+    const status = {
+      isDisabled,
+      status: isDisabled ? 'disabled' : 'enabled',
+      timestamp: new Date().toISOString()
+    };
+
+    if (isDisabled) {
+      status.restriction = {
+        reason: props.getProperty('APP_DISABLED_REASON') || '',
+        disabledBy: props.getProperty('APP_DISABLED_BY') || '',
+        disabledAt: props.getProperty('APP_DISABLED_AT') || ''
+      };
+    } else {
+      status.lastEnabled = {
+        enabledBy: props.getProperty('APP_ENABLED_BY') || '',
+        enabledAt: props.getProperty('APP_ENABLED_AT') || ''
+      };
+    }
+
+    return createSuccessResponse('アクセス制限状態を取得しました', status);
+  } catch (error) {
+    console.error('getAppAccessStatus error:', error.message);
+    return createExceptionResponse(error, 'アクセス制限状態取得処理');
+  }
 }

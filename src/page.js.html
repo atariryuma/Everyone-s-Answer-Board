@@ -436,18 +436,18 @@ class StudyQuestApp {
   }
 
   /**
-   * ✅ Restore domain info display functionality
-   * Initialize domain information display in the UI
+   * ✅ CLAUDE.md準拠: 最適化されたドメイン情報初期化
+   * Promise-based、単一責任原則に基づく実装
    */
   async initializeDomainInfo() {
     try {
       debugLog('🌐 Initializing domain info display...');
-      await loadDomainInfo(
-        (info) => debugLog('✅ Domain info loaded successfully:', info),
-        (error) => warnLog('⚠️ Domain info loading failed:', error)
-      );
+      const info = await fetchDomainInfo();
+      displayDomainInfo(info);
+      debugLog('✅ Domain info loaded successfully:', info);
     } catch (error) {
       warnLog('⚠️ Failed to initialize domain info:', error);
+      displayDomainInfo({ error: error.message, fallback: true });
     }
   }
 
@@ -475,7 +475,7 @@ class StudyQuestApp {
         this.elements.adminToggleBtn.classList.remove('hidden');
         this.elements.adminToggleBtn.removeAttribute('hidden');
         this.elements.adminToggleBtn.style.display = '';
-        this.elements.adminToggleBtn.textContent = '管理モード';
+        // 元々のアイコンを維持（テキスト上書きしない）
       }
     } else {
       this.state.isEditor = false;
@@ -745,6 +745,14 @@ class StudyQuestApp {
             return;
         }
 
+        // 削除ボタンのクリックを処理
+        const deleteBtn = e.target.closest('.delete-answer-btn');
+        if (deleteBtn) {
+            e.stopPropagation(); // イベントの伝播を止める
+            this.confirmDeleteAnswer(rowIndex);
+            return;
+        }
+
         // ハイライトボタンのクリックを処理
         const highlightBtn = e.target.closest('.highlight-btn');
         if (highlightBtn) {
@@ -804,7 +812,16 @@ class StudyQuestApp {
       return new Promise((resolve, reject) => {
         const handleSuccess = (result) => {
           this.activeRequests--;
-          if (!isStateChanging) {
+
+          // ✅ 成功時の詳細ログ
+          debugLog(`✅ handleSuccess for ${funcName}`, {
+            resultValid: result !== null && result !== undefined,
+            resultType: typeof result,
+            cacheKey: !isStateChanging ? cacheKey : 'N/A (state-changing)',
+            timestamp: new Date().toISOString()
+          });
+
+          if (!isStateChanging && result !== null && result !== undefined) {
             this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
           }
           resolve(result);
@@ -812,6 +829,23 @@ class StudyQuestApp {
 
         const handleError = (error) => {
           this.activeRequests--;
+
+          // ✅ エラー時のキャッシュクリア
+          if (!isStateChanging && this.cache.has(cacheKey)) {
+            this.cache.delete(cacheKey);
+            debugLog(`🗑️ Cleared cache for ${funcName} due to error`);
+          }
+
+          // ✅ エラー詳細ログ強化
+          errorLog(`❌ handleError for ${funcName}`, {
+            error: error.message || error.toString(),
+            errorType: typeof error,
+            isEnhanced: !!error.functionName,
+            cacheCleared: !isStateChanging,
+            timestamp: new Date().toISOString(),
+            activeRequests: this.activeRequests
+          });
+
           reject(error);
         };
 
@@ -834,8 +868,24 @@ class StudyQuestApp {
           .withSuccessHandler((result) => {
             debugLog(`✅ google.script.run success for ${funcName}`, {
               timestamp: new Date().toISOString(),
-              hasResult: !!result
+              hasResult: !!result,
+              resultType: typeof result
             });
+
+            // ✅ レスポンス検証強化: null/undefined チェック
+            if (result === null || result === undefined) {
+              console.warn(`⚠️ runGas: ${funcName} returned null/undefined, treating as error`);
+              handleError(new Error(`Function ${funcName} returned null/undefined response`));
+              return;
+            }
+
+            // ✅ GAS関数の基本レスポンス形式検証（オプション）
+            if (typeof result === 'object' && result.hasOwnProperty('success') && typeof result.success !== 'boolean') {
+              console.warn(`⚠️ runGas: ${funcName} returned invalid success property:`, result.success);
+              // 正規化して続行
+              result.success = Boolean(result.success);
+            }
+
             handleSuccess(result);
           })
           .withFailureHandler((error) => {
@@ -948,10 +998,9 @@ class StudyQuestApp {
       // Show button for editors (owners or system administrators)
       this.elements.adminToggleBtn.classList.remove('hidden');
       this.elements.adminToggleBtn.removeAttribute('hidden');
-      
-      // Always show "管理モード" text, never show "閲覧モード" to avoid confusion
-      this.elements.adminToggleBtn.textContent = '管理モード';
-      
+
+      // 元々のアイコンを維持（テキスト設定しない）
+
       // Apply styling based on current admin mode state
       if (this.state.showAdminFeatures) {
         // Active admin mode: highlighted styling
@@ -1260,6 +1309,184 @@ class StudyQuestApp {
     // 間隔更新を記録（本番環境では無効）
   }
 
+  // ✅ ポーリングエラー分類システム
+  classifyPollingError(error) {
+    const errorMessage = error.message || error.toString();
+
+    // 重大エラー: システム再起動や設定変更が必要
+    if (errorMessage.includes('Authentication required') ||
+        errorMessage.includes('Target user not found') ||
+        errorMessage.includes('Invalid target user ID') ||
+        errorMessage.includes('Target user data incomplete')) {
+      return 'critical';
+    }
+
+    // 一時的エラー: ネットワークやサーバーの一時的問題
+    if (errorMessage.includes('network') ||
+        errorMessage.includes('timeout') ||
+        errorMessage.includes('temporarily unavailable') ||
+        errorMessage.includes('script runtime') ||
+        errorMessage.includes('Rate limit')) {
+      return 'temporary';
+    }
+
+    // デフォルト: 軽微なエラー
+    return 'minor';
+  }
+
+  // ✅ ポーリング健全性監視システム
+  trackPollingHealth(error) {
+    if (!this.pollingHealth) {
+      this.pollingHealth = {
+        consecutiveErrors: 0,
+        lastErrorTime: null,
+        errorHistory: [],
+        isHealthy: true
+      };
+    }
+
+    const now = Date.now();
+    this.pollingHealth.consecutiveErrors++;
+    this.pollingHealth.lastErrorTime = now;
+
+    // エラー履歴を記録（最新20件のみ保持）
+    this.pollingHealth.errorHistory.unshift({
+      timestamp: now,
+      message: error.message,
+      type: this.classifyPollingError(error)
+    });
+    if (this.pollingHealth.errorHistory.length > 20) {
+      this.pollingHealth.errorHistory.pop();
+    }
+
+    // 健全性判定
+    if (this.pollingHealth.consecutiveErrors >= 3) {
+      if (this.pollingHealth.isHealthy) {
+        console.warn('🚨 Polling health degraded:', {
+          consecutiveErrors: this.pollingHealth.consecutiveErrors,
+          lastError: error.message
+        });
+        this.pollingHealth.isHealthy = false;
+
+        // 健全性悪化時の処理
+        this.handlePollingDegradation();
+      }
+    }
+  }
+
+  // ✅ ポーリング健全性回復
+  markPollingHealthy() {
+    if (this.pollingHealth) {
+      const wasUnhealthy = !this.pollingHealth.isHealthy;
+
+      this.pollingHealth.consecutiveErrors = 0;
+      this.pollingHealth.isHealthy = true;
+
+      if (wasUnhealthy) {
+        console.log('✅ Polling health recovered');
+
+        // 健全性回復時の処理
+        this.handlePollingRecovery();
+      }
+    }
+  }
+
+  // ✅ ポーリング悪化時の処理
+  handlePollingDegradation() {
+    // 間隔を大幅に延長
+    this.pollingSettings.currentInterval = Math.min(300000, this.pollingSettings.currentInterval * 5);
+
+    // 通知バナーをクリア（古い情報の可能性）
+    this.dismissNewContentBanner();
+  }
+
+  // ✅ ポーリング回復時の処理
+  handlePollingRecovery() {
+    // 間隔をリセット
+    this.pollingSettings.currentInterval = this.pollingSettings.baseInterval || 60000;
+
+    // アクティビティスコアをリセット
+    this.pollingSettings.activityScore = 0;
+  }
+
+  // ✅ 操作中のポーリング一時停止
+  pausePollingForOperation(operationType) {
+    if (!this.pollingOperationState) {
+      this.pollingOperationState = {
+        pausedFor: null,
+        pausedAt: null,
+        wasActive: false
+      };
+    }
+
+    // 既に一時停止中の場合は警告
+    if (this.pollingOperationState.pausedFor) {
+      console.warn(`⚠️ Polling already paused for ${this.pollingOperationState.pausedFor}, overriding with ${operationType}`);
+    }
+
+    this.pollingOperationState.pausedFor = operationType;
+    this.pollingOperationState.pausedAt = Date.now();
+    this.pollingOperationState.wasActive = this.pollingState?.isActive || false;
+
+    // ポーリングを一時的に停止
+    if (this.pollingOperationState.wasActive) {
+      this.pollingState.isActive = false;
+
+      // 現在のタイマーをクリア
+      if (this.pollingState.currentTimerId) {
+        clearTimeout(this.pollingState.currentTimerId);
+        this.pollingState.currentTimerId = null;
+      }
+
+      console.log(`⏸️ Polling paused for ${operationType} operation`);
+    }
+  }
+
+  // ✅ 操作後のポーリング復旧
+  resumePollingAfterOperation(operationType, options = {}) {
+    if (!this.pollingOperationState || this.pollingOperationState.pausedFor !== operationType) {
+      console.warn(`⚠️ No matching pause state for ${operationType}, ignoring resume request`);
+      return;
+    }
+
+    const pauseDuration = Date.now() - this.pollingOperationState.pausedAt;
+    const wasActive = this.pollingOperationState.wasActive;
+
+    // 状態をクリア
+    this.pollingOperationState.pausedFor = null;
+    this.pollingOperationState.pausedAt = null;
+
+    console.log(`▶️ Resuming polling after ${operationType} operation (paused for ${pauseDuration}ms)`);
+
+    if (wasActive) {
+      // デフォルトの復旧遅延（削除の場合は2秒、その他は1秒）
+      const defaultDelay = operationType === 'deletion' ? 2000 : 1000;
+      const resumeDelay = options.immediate ? 0 : (options.delay || defaultDelay);
+
+      if (resumeDelay > 0) {
+        console.log(`⏱️ Delaying polling resume by ${resumeDelay}ms for ${operationType}`);
+
+        // V8準拠のPromise-based delay
+        const createPromiseDelay = (ms) => new Promise(resolve => {
+          const start = Date.now();
+          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
+          check();
+        });
+
+        createPromiseDelay(resumeDelay).then(() => {
+          if (this.pollingState && !this.pollingState.isActive) {
+            this.pollingState.isActive = true;
+            this.startNewAnswerPolling(); // ポーリングを再開
+          }
+        });
+      } else {
+        // 即座に再開
+        this.pollingState.isActive = true;
+        this.startNewAnswerPolling();
+      }
+    }
+  }
+
   // 新着回答のポーリング開始 (安定版 - 競合状態解決)
   startNewAnswerPolling() {
     // ✅ 修正: ポーリング状態の確実な初期化
@@ -1287,6 +1514,9 @@ class StudyQuestApp {
       try {
         const triggerResult = await this.callServerSideTrigger();
 
+        // ✅ 成功時のポーリング健全性回復
+        this.markPollingHealthy();
+
         if (triggerResult.success && triggerResult.hasNewContent) {
           // ✅ 修正: 新着検出時はバナー表示のみ（差分更新は手動のみ）
           // サーバーから返されたフィルター情報を使用（フィルター状態不整合の修正）
@@ -1296,24 +1526,44 @@ class StudyQuestApp {
           // 動的間隔調整: 新着時は頻度アップ
           this.adjustPollingIntervalStable(true);
           this.pollingState.retryCount = 0;
-        } else {
+        } else if (triggerResult.success) {
           // 新着なし: 間隔を徐々に延長
+          this.adjustPollingIntervalStable(false);
+        } else {
+          // レスポンスは得られたが成功していない場合
+          console.warn('⚠️ Polling response not successful:', triggerResult.message);
           this.adjustPollingIntervalStable(false);
         }
 
       } catch (error) {
         console.error('❌ Server-side trigger error:', error.message);
 
-        // ✅ 修正: ポーリング用リトライ機構
+        // ✅ エラー分類とハンドリング強化
+        const errorType = this.classifyPollingError(error);
+
+        // ✅ 修正: ポーリング用リトライ機構強化
         this.handleError(error, {
           type: 'polling',
           operation: 'server trigger',
           incrementRetry: true,
-          showUser: false // ポーリングエラーはユーザーに表示しない
+          showUser: false, // ポーリングエラーはユーザーに表示しない
+          errorType: errorType
         });
 
-        // エラー時は間隔を延長（負荷軽減）
-        this.adjustPollingIntervalStable(false);
+        // ✅ エラータイプ別の間隔調整
+        if (errorType === 'critical') {
+          // 重大エラー: 大幅に間隔延長
+          this.pollingSettings.currentInterval = Math.min(300000, this.pollingSettings.currentInterval * 3); // 最大5分
+        } else if (errorType === 'temporary') {
+          // 一時的エラー: 中程度の延長
+          this.adjustPollingIntervalStable(false);
+        } else {
+          // 軽微エラー: 軽微な延長
+          this.pollingSettings.currentInterval = Math.min(120000, this.pollingSettings.currentInterval * 1.5); // 最大2分
+        }
+
+        // ✅ 復旧メカニズム: 連続エラー監視
+        this.trackPollingHealth(error);
       }
       // ✅ 注意: this.pollingState.isActiveはポーリング全体の状態なので、
       // 個別サイクル完了でfalseにしない（継続的ポーリングのため）
@@ -1426,9 +1676,52 @@ class StudyQuestApp {
       // 統合 getNotificationUpdate エンドポイント呼び出し
       const response = await this.runGas('getNotificationUpdate', this.state.userId, notificationOptions);
 
+      // ✅ 緊急修正: null/undefined レスポンスの安全な処理
+      if (!response) {
+        console.warn('⚠️ callServerSideTrigger: Got null/undefined response from getNotificationUpdate');
+        return {
+          success: false,
+          hasNewContent: false,
+          newItemsCount: 0,
+          data: [],
+          message: 'No response from server',
+          timestamp: new Date().toISOString(),
+          targetUserId: this.state.userId
+        };
+      }
+
+      // レスポンス構造の検証
+      if (typeof response !== 'object') {
+        console.warn('⚠️ callServerSideTrigger: Invalid response type:', typeof response);
+        return {
+          success: false,
+          hasNewContent: false,
+          newItemsCount: 0,
+          data: [],
+          message: 'Invalid response format',
+          timestamp: new Date().toISOString(),
+          targetUserId: this.state.userId
+        };
+      }
+
+      // success プロパティの存在確認
+      if (typeof response.success === 'undefined') {
+        console.warn('⚠️ callServerSideTrigger: Response missing success property:', response);
+        // レスポンスを正規化
+        return {
+          success: false,
+          hasNewContent: false,
+          newItemsCount: 0,
+          data: response.data || [],
+          message: response.message || 'Response missing success property',
+          timestamp: response.timestamp || new Date().toISOString(),
+          targetUserId: this.state.userId
+        };
+      }
+
       if (response.success) {
         // ✅ 修正: 時刻ベース統一システム
-        this.state.lastSeenTimestamp = response.timestamp;
+        this.state.lastSeenTimestamp = response.timestamp || new Date().toISOString();
         return response;
       } else {
         throw new Error(response.message || 'Notification update failed');
@@ -1436,6 +1729,17 @@ class StudyQuestApp {
 
     } catch (error) {
       console.error('❌ callServerSideTrigger error:', error.message);
+
+      // ✅ エラー詳細ログ追加
+      console.error('🔍 Error details:', {
+        error: error.message,
+        stack: error.stack,
+        context: 'server trigger',
+        timestamp: new Date().toISOString(),
+        userId: this.state.userId,
+        retryCount: this.pollingState?.retryCount || 0
+      });
+
       throw error;
     }
   }
@@ -2449,6 +2753,13 @@ class StudyQuestApp {
     } finally {
       this.state.isLoading = false;
       this.hideLoadingOverlay();
+
+      // 🔧 管理モード状態の強化保持
+      if (config.preserveAdminMode) {
+        this.state.showAdminFeatures = true;
+        this.updateAdminButtonUI();
+        debugLog('✅ Admin mode preserved after data load');
+      }
     }
   }
   
@@ -3473,6 +3784,19 @@ class StudyQuestApp {
     // Create main content
     const contentDiv = document.createElement('div');
     contentDiv.className = 'relative flex-grow mb-3 answer-preview';
+
+    // 管理モード時に削除ボタンを追加
+    if (this.state.showAdminFeatures) {
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'absolute top-2 right-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-full p-2 transition-all duration-200 z-10 delete-answer-btn';
+      deleteBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+      </svg>`;
+      deleteBtn.setAttribute('aria-label', '回答を削除');
+      deleteBtn.setAttribute('title', '回答を削除');
+      deleteBtn.dataset.rowIndex = safeData.rowIndex;
+      contentDiv.appendChild(deleteBtn);
+    }
 
     const opinionTitle = document.createElement('h3');
     opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
@@ -4609,6 +4933,264 @@ class StudyQuestApp {
     return JSON.stringify(state);
   }
 
+  // ===========================================
+  // 🗑️ Answer Deletion Functions
+  // ===========================================
+
+  /**
+   * 削除確認モーダルを表示
+   * @param {string} rowIndex - 削除対象の行インデックス
+   */
+  async confirmDeleteAnswer(rowIndex) {
+    try {
+      const answerData = this.state.currentAnswers.find(answer =>
+        String(answer.rowIndex) === String(rowIndex)
+      );
+
+      if (!answerData) {
+        console.error('削除対象の回答が見つかりません:', rowIndex);
+        return;
+      }
+
+      const confirmed = await this.showDeleteConfirmationModal(answerData);
+      if (confirmed) {
+        await this.deleteAnswer(rowIndex);
+      }
+    } catch (error) {
+      console.error('削除確認処理エラー:', error);
+      if (window.notifications) {
+        window.notifications.error('削除処理でエラーが発生しました。', 3000);
+      }
+    }
+  }
+
+  /**
+   * 削除確認モーダルを表示
+   * @param {Object} answerData - 削除対象の回答データ
+   * @returns {Promise<boolean>} 削除確認の結果
+   */
+  showDeleteConfirmationModal(answerData) {
+    return new Promise((resolve) => {
+      // モーダル要素を作成
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001] animate-fade-in';
+      modal.innerHTML = `
+        <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4 animate-scale-up">
+          <div class="flex items-center gap-3 mb-4">
+            <div class="text-red-400">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+              </svg>
+            </div>
+            <h3 class="text-xl font-semibold text-white">回答を削除しますか？</h3>
+          </div>
+
+          <div class="bg-gray-800 rounded-lg p-4 mb-6">
+            <p class="text-gray-300 text-sm mb-2">削除対象の回答:</p>
+            <p class="text-cyan-300 font-medium">${window.sharedUtilities.security.escapeHtml(answerData.opinion.substring(0, 100))}${answerData.opinion.length > 100 ? '...' : ''}</p>
+            ${answerData.name ? `<p class="text-gray-400 text-xs mt-2">回答者: ${window.sharedUtilities.security.escapeHtml(answerData.name)}</p>` : ''}
+          </div>
+
+          <div class="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-6">
+            <p class="text-red-200 text-sm">
+              ⚠️ この操作は取り消せません。スプレッドシートから該当の行が完全に削除されます。
+            </p>
+          </div>
+
+          <div class="flex gap-3">
+            <button type="button" class="flex-1 btn bg-gray-600 hover:bg-gray-700 text-white py-2 px-4 rounded-lg cancel-btn">
+              キャンセル
+            </button>
+            <button type="button" class="flex-1 btn bg-red-600 hover:bg-red-700 text-white py-2 px-4 rounded-lg confirm-btn">
+              削除実行
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      // イベントハンドラーを設定
+      const cancelBtn = modal.querySelector('.cancel-btn');
+      const confirmBtn = modal.querySelector('.confirm-btn');
+
+      const cleanup = () => {
+        modal.remove();
+      };
+
+      cancelBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(false);
+      });
+
+      confirmBtn.addEventListener('click', () => {
+        cleanup();
+        resolve(true);
+      });
+
+      // 背景クリックでキャンセル
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          cleanup();
+          resolve(false);
+        }
+      });
+
+      // ESCキーでキャンセル
+      const handleKeyDown = (e) => {
+        if (e.key === 'Escape') {
+          cleanup();
+          resolve(false);
+          document.removeEventListener('keydown', handleKeyDown);
+        }
+      };
+      document.addEventListener('keydown', handleKeyDown);
+    });
+  }
+
+  /**
+   * 回答を削除する
+   * @param {string} rowIndex - 削除対象の行インデックス
+   */
+  async deleteAnswer(rowIndex) {
+    try {
+      if (window.notifications) {
+        window.notifications.info('回答を削除中...', 2000);
+      }
+
+      // ✅ 削除操作前: ポーリング一時停止
+      const pollingWasActive = this.pollingState?.isActive || false;
+      if (pollingWasActive) {
+        console.log('🔄 Temporarily pausing polling for deletion operation');
+        this.pausePollingForOperation('deletion');
+      }
+
+      const result = await new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler(resolve)
+          .withFailureHandler(reject)
+          .deleteAnswerRow(this.state.userId, parseInt(rowIndex));
+      });
+
+      if (result.success) {
+        // 成功通知
+        if (window.notifications) {
+          window.notifications.success('回答を削除しました', 3000);
+        }
+
+        // ✅ 削除成功後: 通知バナーをクリア（削除されたデータの可能性）
+        this.dismissNewContentBanner();
+
+        // データとUIを更新
+        await this.refreshAfterDelete(rowIndex);
+
+        // ✅ 削除操作完了: ポーリング復旧（遅延付き）
+        if (pollingWasActive) {
+          this.resumePollingAfterOperation('deletion');
+        }
+      } else {
+        throw new Error(result.message || '削除に失敗しました');
+      }
+    } catch (error) {
+      console.error('削除処理エラー:', error);
+      if (window.notifications) {
+        window.notifications.error(`削除に失敗しました: ${error.message}`, 5000);
+      }
+
+      // ✅ エラー時: ポーリング即座復旧
+      if (this.pollingOperationState?.pausedFor === 'deletion') {
+        this.resumePollingAfterOperation('deletion', { immediate: true });
+      }
+    }
+  }
+
+  /**
+   * 削除後の画面更新（最適化版 - 不要な全リセット削除）
+   * @param {string} deletedRowIndex - 削除された行インデックス
+   */
+  async refreshAfterDelete(deletedRowIndex) {
+    try {
+      // 管理モード状態を明示的に保持
+      const currentAdminState = this.state.showAdminFeatures;
+
+      // データ配列から削除された項目を除去
+      const initialCount = this.state.currentAnswers?.length || 0;
+
+      if (this.state.currentAnswers) {
+        this.state.currentAnswers = this.state.currentAnswers.filter(answer =>
+          String(answer.rowIndex) !== String(deletedRowIndex)
+        );
+      }
+      if (this.state.allAnswers) {
+        this.state.allAnswers = this.state.allAnswers.filter(answer =>
+          String(answer.rowIndex) !== String(deletedRowIndex)
+        );
+      }
+
+      // DOM から該当カードを削除
+      const cardToRemove = document.querySelector(`[data-row-index="${deletedRowIndex}"]`);
+      if (cardToRemove) {
+        // アニメーション付きで削除
+        cardToRemove.style.transition = 'all 0.3s ease-out';
+        cardToRemove.style.transform = 'scale(0.8)';
+        cardToRemove.style.opacity = '0';
+
+        setTimeout(() => {
+          cardToRemove.remove();
+          this.updateAnswerCount();
+
+          // 🔧 管理モード状態を強化維持（アニメーション後も確実に保持）
+          if (currentAdminState) {
+            this.state.showAdminFeatures = true;
+            this.updateAdminButtonUI();
+            debugLog('✅ Admin mode preserved after animation');
+          }
+        }, 300);
+      } else {
+        // カードが見つからない場合は即座に更新
+        this.updateAnswerCount();
+
+        // 🔧 管理モード状態を強化維持（即座更新時も確実に保持）
+        if (currentAdminState) {
+          this.state.showAdminFeatures = true;
+          this.updateAdminButtonUI();
+          debugLog('✅ Admin mode preserved after immediate update');
+        }
+      }
+
+      // データ整合性チェック：削除が正常に反映されているか確認
+      const finalCount = this.state.currentAnswers?.length || 0;
+      const isDataConsistent = (initialCount - finalCount) === 1;
+
+      if (!isDataConsistent) {
+        console.warn('削除後データ不整合検出:', { initialCount, finalCount });
+        // データ不整合時のみ部分リフレッシュ（全リセットではない）
+        setTimeout(() => {
+          this.loadSheetData({ preserveAdminMode: true, bypassCache: true });
+        }, 500);
+      }
+
+      console.log('✅ 効率的削除完了:', {
+        deletedRowIndex,
+        initialCount,
+        finalCount,
+        adminModePreserved: currentAdminState
+      });
+
+    } catch (error) {
+      console.error('削除後更新エラー:', error);
+      // エラー時のみフォールバック（管理モード保持付き）
+      if (window.notifications) {
+        window.notifications.warning('削除後の更新でエラーが発生しました。画面を更新します。', 3000);
+      }
+      setTimeout(() => {
+        // 管理モード状態を保持してリロード
+        const preserveAdminMode = this.state.showAdminFeatures;
+        this.loadSheetData({ preserveAdminMode, bypassCache: true });
+      }, 500);
+    }
+  }
+
   // バッチ処理の健全性チェック
 
   // 通知システムの健全性チェック
@@ -4920,27 +5502,13 @@ class StudyQuestApp {
   }
 
   redirectToUnpublishedPage() {
-    debugLog('🚫 Redirecting to unpublished page (legacy function)');
-    
-    // キャッシュクリア処理（新機能と統合）
+    debugLog('🚫 Redirecting to unpublished page - reloading current URL');
+
+    // キャッシュクリア処理
     this.clearCache({ includeReactions: true, includeLocalStorage: true });
-    
-    // 公開停止時は次回管理パネルを開いたときに全セクションをオープンにする
-    try {
-      localStorage.setItem('expandAllSections', 'true');
-      debugLog('✅ アコーディオン全展開フラグを設定しました');
-    } catch (error) {
-      warnLog('⚠️ localStorage設定に失敗:', error);
-    }
-    
-    // 新しいキャッシュバスティング機能を使用したリダイレクト
-    const unpublishedUrl = new URL(window.location.href);
-    unpublishedUrl.searchParams.delete('mode'); // mode=viewを削除
-    unpublishedUrl.searchParams.set('_cb', Date.now()); // キャッシュバスティング
-    unpublishedUrl.searchParams.set('_redirect', 'unpublished'); // リダイレクト理由
-    
-    debugLog('🔄 Redirecting to unpublished URL:', unpublishedUrl.toString());
-    window.location.href = unpublishedUrl.toString();
+
+    // シンプルなページリロード（現在のURLがすでに非公開状態を表示する）
+    window.location.reload();
   }
   
   
@@ -6296,24 +6864,29 @@ class StudyQuestApp {
 
 }
 // ドメイン情報処理
+// ✅ CLAUDE.md準拠: Zero-Dependency Architecture - 最適化されたドメイン情報システム
 // AdminPanel.html と Login.html で共通使用
 
-// ドメイン情報取得
-async function loadDomainInfo(onSuccess, onError) {
+/**
+ * ドメイン情報取得（Promise-based）
+ * 単一責任: データ取得のみ
+ * @returns {Promise<Object>} ドメイン情報オブジェクト
+ */
+async function fetchDomainInfo() {
   try {
-    const info = await new Promise((resolve, reject) => {
-      if (!google?.script?.run?.getDeployUserDomainInfo) {
-        warnLog('getDeployUserDomainInfo function not available, using fallback');
-        resolve({
-          success: true,
-          domain: 'unknown',
-          userEmail: 'anonymous',
-          isValidDomain: true,
-          fallback: true
-        });
-        return;
-      }
+    if (!google?.script?.run?.getDeployUserDomainInfo) {
+      warnLog('getDeployUserDomainInfo function not available, using fallback');
+      return {
+        success: true,
+        isDomainMatch: true,
+        deployDomain: 'unknown',
+        currentDomain: 'unknown',
+        userEmail: 'anonymous',
+        fallback: true
+      };
+    }
 
+    const rawInfo = await new Promise((resolve, reject) => {
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler((error) => {
@@ -6327,25 +6900,38 @@ async function loadDomainInfo(onSuccess, onError) {
         .getDeployUserDomainInfo();
     });
 
-    // Map backend response to frontend expected format
-    if (info && info.success && !info.error) {
-      const mappedInfo = {
-        success: info.success,
-        isDomainMatch: info.isValidDomain,
-        deployDomain: info.adminDomain,
-        currentDomain: info.userDomain || info.domain,
-        userEmail: info.userEmail
+    // Map backend response to standardized frontend format
+    if (rawInfo && rawInfo.success && !rawInfo.error) {
+      return {
+        success: rawInfo.success,
+        isDomainMatch: rawInfo.isValidDomain,
+        deployDomain: rawInfo.adminDomain,
+        currentDomain: rawInfo.userDomain || rawInfo.domain,
+        userEmail: rawInfo.userEmail,
+        timestamp: rawInfo.timestamp
       };
-      displayDomainInfo(mappedInfo);
-      if (onSuccess) onSuccess(mappedInfo);
     } else {
-      displayDomainInfo(info);
-      if (onSuccess) onSuccess(info);
+      return {
+        success: false,
+        isDomainMatch: false,
+        deployDomain: 'unknown',
+        currentDomain: 'unknown',
+        userEmail: 'anonymous',
+        error: rawInfo?.error || 'Domain info fetch failed',
+        fallback: true
+      };
     }
   } catch (error) {
-    warnLog('ドメイン情報エラー:', error.message || error);
-    displayDomainInfo({ error: error.message || error, fallback: true });
-    if (onError) onError(error);
+    warnLog('fetchDomainInfo error:', error.message || error);
+    return {
+      success: false,
+      isDomainMatch: false,
+      deployDomain: 'unknown',
+      currentDomain: 'unknown',
+      userEmail: 'anonymous',
+      error: error.message || error,
+      fallback: true
+    };
   }
 }
 
