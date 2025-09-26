@@ -1580,7 +1580,7 @@
         try {
           this.container = document.createElement('div');
           this.container.id = 'notification-container';
-          this.container.className = 'fixed top-4 right-4 z-[10000] space-y-2 pointer-events-none';
+          this.container.className = 'fixed top-4 right-4 z-50 space-y-2 pointer-events-none';
 
           document.body.appendChild(this.container);
           this.initialized = true;
@@ -1591,7 +1591,7 @@
           try {
             this.container = document.createElement('div');
             this.container.id = 'notification-container-fallback';
-            this.container.className = 'fixed top-4 right-4 z-[10000] space-y-2 pointer-events-none';
+            this.container.className = 'fixed top-4 right-4 z-50 space-y-2 pointer-events-none';
             document.head.appendChild(this.container);
             this.initialized = true;
             return true;
@@ -1953,6 +1953,46 @@
       }
     `;
     document.head.appendChild(style);
+  }
+
+  // ✅ Test function for notification system verification
+  if (!window.testNotifications) {
+    window.testNotifications = function() {
+      console.log('🧪 Testing notification system...');
+
+      if (!window.notifications) {
+        console.error('❌ NotificationSystem not available');
+        return false;
+      }
+
+      try {
+        // Test container creation
+        const initResult = window.notifications.init();
+        if (!initResult) {
+          console.error('❌ NotificationSystem initialization failed');
+          return false;
+        }
+
+        // Test z-index application
+        if (window.notifications.container) {
+          const computedStyle = window.getComputedStyle(window.notifications.container);
+          const zIndex = computedStyle.zIndex;
+          console.log(`✅ Container z-index: ${zIndex}`);
+          console.log(`✅ Container classes: ${window.notifications.container.className}`);
+
+          // Test notification display
+          window.notifications.info('🧪 Test notification - z-index fix applied', 3000);
+          console.log('✅ Test notification sent');
+          return true;
+        } else {
+          console.error('❌ Notification container not created');
+          return false;
+        }
+      } catch (error) {
+        console.error('❌ Notification test failed:', error.message);
+        return false;
+      }
+    };
   }
 
   // =============================================================================
