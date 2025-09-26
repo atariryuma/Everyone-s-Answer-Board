@@ -1445,6 +1445,19 @@
           'clipboard-write',
           // ✅ Navigation & Security
           'navigate',
+          'navigation',
+          'unsafe attempt to initiate navigation',
+          'sandboxed',
+          'allow-top-navigation',
+          'allow-top-navigation-by-user-activation',
+          'user activation',
+          'user gesture',
+          'top-level navigation',
+          'top-level window',
+          'frame attempting navigation',
+          'frame with origin',
+          'googleusercontent.com',
+          'userCodeAppPanel',
           'top-level-storage-access',
           'document-access',
           'storage-access',
@@ -1463,7 +1476,7 @@
       console.error = function (...args) {
         const message = args.join(' ').toLowerCase();
 
-        // ✅ Enhanced suppression for iframe and feature policy errors
+        // ✅ Enhanced suppression for iframe, feature policy, and navigation errors
         const errorSuppressPatterns = [
           'iframe',
           'refused to frame',
@@ -1478,7 +1491,17 @@
           'feature policy',
           'navigation restricted',
           'navigation denied',
-          'frame navigation'
+          'frame navigation',
+          // ✅ GAS Sandbox Navigation Errors
+          'unsafe attempt to initiate navigation',
+          'sandboxed with the',
+          'allow-top-navigation-by-user-activation',
+          'has no user activation',
+          'user gesture',
+          'frame attempting navigation',
+          'top-level window',
+          'googleusercontent.com',
+          'userCodeAppPanel'
         ];
 
         const shouldSuppressError = errorSuppressPatterns.some((pattern) =>
