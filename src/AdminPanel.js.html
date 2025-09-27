@@ -4622,6 +4622,19 @@
         }
       }
 
+      // displaySettings UIチェックボックスの更新
+      if (config.displaySettings) {
+        const showNamesCheckbox = document.getElementById('show-names');
+        const showReactionsCheckbox = document.getElementById('show-reactions');
+
+        if (showNamesCheckbox) {
+          showNamesCheckbox.checked = Boolean(config.displaySettings.showNames);
+        }
+        if (showReactionsCheckbox) {
+          showReactionsCheckbox.checked = Boolean(config.displaySettings.showReactions);
+        }
+      }
+
       // 最終更新時刻更新
       const timeElement = document.getElementById('last-updated-time');
       if (timeElement) {
