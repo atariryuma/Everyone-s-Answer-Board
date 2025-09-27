@@ -4125,6 +4125,10 @@
       sheetName,
       headers: headers, // ✅ CLAUDE.md準拠: トップレベルheaders（UI表示用）
       columnMapping: columnMapping, // ✅ CLAUDE.md準拠: シンプル構造 {answer:4, reason:5, ...}
+      displaySettings: {
+        showNames: document.getElementById('show-names')?.checked || false,
+        showReactions: document.getElementById('show-reactions')?.checked || false
+      },
       verifiedAt: timestamp, // メタデータは別途管理
       confidence: confidence, // 信頼度データは別途管理
       setupComplete: true,
@@ -4141,7 +4145,10 @@
       isPublished: systemState.config.isPublished,
       publishedAt: systemState.config.publishedAt,
       userPermissions: systemState.config.userPermissions,
-      displaySettings: systemState.config.displaySettings,
+      displaySettings: {
+        showNames: document.getElementById('show-names')?.checked || false,
+        showReactions: document.getElementById('show-reactions')?.checked || false
+      },
       // 新しい設定で明示的に上書き（baseConfigで既に設定済みだが明示的に保証）
       spreadsheetId,
       sheetName,
