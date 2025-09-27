@@ -1333,128 +1333,6 @@
       modal.classList.remove('hidden');
     }
 
-    // 6時間自動停止確認モーダルの表示（完全版エラーハンドリング）
-    showAutoStopConfirmation(publishResult) {
-      // ローディングオーバーレイを確実に非表示にする
-      if (window.unifiedLoadingManager) {
-        window.unifiedLoadingManager.setLoading(false);
-        console.log('🔄 自動停止モーダル表示前にローディングを非表示にしました');
-      }
-
-      this.loadModals(['auto-stop-confirmation-modal']);
-
-      const modal = document.getElementById('auto-stop-confirmation-modal');
-      if (!modal) {
-        console.error('❌ 自動停止確認モーダルが見つかりません');
-        return;
-      }
-
-      // 公開結果データの完全性検証
-      const validationResult = this.validatePublishResult(publishResult);
-      console.log('🔍 公開結果データ検証:', validationResult);
-
-      // 公開時間と停止時間の設定（完全版）
-      if (validationResult.isValid && publishResult.publishedAt) {
-        const publishTime = new Date(publishResult.publishedAt);
-        const minutes = publishResult.autoStopMinutes || 360; // 6時間 = 360分（デフォルト）
-        const stopTime = new Date(publishTime.getTime() + minutes * 60 * 1000);
-
-        console.log('🕒 自動停止時間設定:', {
-          publishedAt: publishResult.publishedAt,
-          autoStopMinutes: minutes,
-          source: publishResult.autoStopMinutes ? 'server' : 'default',
-          publishTime: publishTime.toLocaleString('ja-JP'),
-          stopTime: stopTime.toLocaleString('ja-JP'),
-          hasValidUrl: validationResult.hasValidUrl,
-          url: publishResult.url || 'undefined',
-        });
-
-        document.getElementById('publish-start-time').textContent =
-          publishTime.toLocaleString('ja-JP');
-        document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
-
-        // URL状態の表示
-        this.updateUrlStatusDisplay(publishResult, validationResult);
-
-        // 残り時間のカウントダウンを開始
-        this.startCountdown(stopTime);
-      } else {
-        // Critical errors がある場合のみ警告表示、軽微な問題は情報レベル
-        if (validationResult.criticalErrors && validationResult.criticalErrors.length > 0) {
-          console.warn('⚠️ 公開結果データに重要な問題があります:', {
-            publishResult: publishResult,
-            criticalErrors: validationResult.criticalErrors,
-            fallbackAction: 'デフォルト設定を適用',
-          });
-        } else if (validationResult.warningErrors && validationResult.warningErrors.length > 0) {
-          console.log('ℹ️ 公開結果データに軽微な問題がありますが正常に処理します:', {
-            publishResult: publishResult,
-            warningErrors: validationResult.warningErrors,
-            fallbackAction: 'デフォルト設定を適用',
-          });
-        } else {
-          console.log('🔧 フォールバック処理を実行中:', {
-            publishResult: publishResult,
-            reason: '検証結果がfalse（原因不明）',
-          });
-        }
-
-        const now = new Date();
-        const minutes = 360; // デフォルト6時間
-        const stopTime = new Date(now.getTime() + minutes * 60 * 1000);
-
-        document.getElementById('publish-start-time').textContent = now.toLocaleString('ja-JP');
-        document.getElementById('auto-stop-time').textContent = stopTime.toLocaleString('ja-JP');
-
-        // エラー状態の詳細表示（Critical errors のみ表示）
-        const remainingTimeEl = document.getElementById('remaining-time');
-        if (remainingTimeEl) {
-          if (validationResult.criticalErrors && validationResult.criticalErrors.length > 0) {
-            const errorCount = validationResult.criticalErrors.length;
-            remainingTimeEl.textContent = `⚠️ ${errorCount}個の重要な問題を検出 - 設定を確認してください`;
-            remainingTimeEl.className = 'font-medium text-yellow-100';
-          } else {
-            // Critical errors がない場合は通常のカウントダウンを開始
-            this.startCountdown(stopTime);
-          }
-        }
-
-        // URL状態の表示（エラーケース）
-        this.updateUrlStatusDisplay(publishResult, validationResult);
-
-        console.log('🕒 フォールバック自動停止時間設定:', {
-          publishTime: now.toLocaleString('ja-JP'),
-          autoStopMinutes: minutes,
-          stopTime: stopTime.toLocaleString('ja-JP'),
-          fallbackReason: '公開結果データ不足',
-          validationErrors: validationResult.errors,
-        });
-      }
-
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-
-      // イベントリスナーの設定
-      const confirmBtn = document.getElementById('confirm-auto-stop-btn');
-      const extendBtn = document.getElementById('extend-time-btn');
-
-      if (confirmBtn) {
-        confirmBtn.onclick = () => {
-          this.hideModal('auto-stop-confirmation-modal');
-        };
-      }
-
-      if (extendBtn) {
-        extendBtn.onclick = () => {
-          // 時間延長機能（将来実装）
-          if (window.notifications) {
-            window.notifications.info('時間延長機能は今後実装予定です。', 5000);
-          } else {
-            alert('時間延長機能は今後実装予定です。');
-          }
-        };
-      }
-    }
 
     // 公開結果データの完全性検証
     validatePublishResult(publishResult) {
@@ -1531,13 +1409,7 @@
           }
         }
 
-        // 自動停止時間チェック
-        if (
-          publishResult.autoStopMinutes &&
-          (publishResult.autoStopMinutes < 1 || publishResult.autoStopMinutes > 1440)
-        ) {
-          errors.push('自動停止時間が範囲外です（1分-24時間）');
-        }
+        // 自動停止機能削除: autoStopMinutes チェック不要
       }
 
       // Critical errors vs Warning errors の分類
@@ -1609,58 +1481,7 @@
     }
 
 
-    // 残り時間カウントダウン
-    startCountdown(stopTime) {
-      const updateRemainingTime = () => {
-        const now = new Date();
-        const remaining = stopTime - now;
-
-        if (remaining <= 0) {
-          document.getElementById('remaining-time').textContent = '自動停止済み';
-          return;
-        }
-
-        const hours = Math.floor(remaining / (1000 * 60 * 60));
-        const minutes = Math.floor((remaining % (1000 * 60 * 60)) / (1000 * 60));
-        document.getElementById('remaining-time').textContent = `${hours}時間${minutes}分`;
-      };
-
-      // 初回実行
-      updateRemainingTime();
-
-      // CLAUDE.md V8 compliant: Promise-based periodic updates
-      let isUpdating = true;
-      const createPeriodicUpdate = async () => {
-        while (isUpdating) {
-          await new Promise(resolve => {
-            const start = Date.now();
-            const check = () => (Date.now() - start >= 60000) ? resolve() : Promise.resolve().then(check);
-            check();
-          });
-          if (isUpdating) {
-            updateRemainingTime();
-          }
-        }
-      };
-      createPeriodicUpdate();
-
-      // モーダルが閉じられたときにインターバルをクリア
-      const modal = document.getElementById('auto-stop-confirmation-modal');
-      if (modal) {
-        const observer = new MutationObserver((mutations) => {
-          mutations.forEach((mutation) => {
-            if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-              if (modal.classList.contains('hidden')) {
-                // CLAUDE.md V8 compliant: Stop promise-based updates
-                isUpdating = false;
-                observer.disconnect();
-              }
-            }
-          });
-        });
-        observer.observe(modal, { attributes: true });
-      }
-    }
+    // ✅ 自動停止機能削除: startCountdown 関数は不要
 
     // フォーム設定モーダルの表示
     showFormConfig() {
@@ -1774,27 +1595,7 @@
         return;
       }
 
-      // 自動停止時間の表示を更新
-      const autoStopDisplay = document.getElementById('auto-stop-time-display');
-      if (autoStopDisplay) {
-        if (autoStopSettings && autoStopSettings.enabled) {
-          const minutes = autoStopSettings.minutes || 360; // 6時間 = 360分（config.gsと統一）
-          const hours = Math.floor(minutes / 60);
-          const remainingMinutes = minutes % 60;
-
-          if (hours > 0 && remainingMinutes > 0) {
-            autoStopDisplay.textContent = `${hours}時間${remainingMinutes}分後に自動停止`;
-          } else if (hours > 0) {
-            autoStopDisplay.textContent = `${hours}時間後に自動停止`;
-          } else {
-            autoStopDisplay.textContent = `${minutes}分後に自動停止`;
-          }
-          autoStopDisplay.className = 'text-blue-100';
-        } else {
-          autoStopDisplay.textContent = '自動停止は無効';
-          autoStopDisplay.className = 'text-gray-400';
-        }
-      }
+      // ✅ 自動停止機能削除: autoStopDisplay 不要
 
       modal.classList.remove('hidden');
 
@@ -1910,11 +1711,7 @@
         publishReadyIcon.innerHTML = window.IconLibrary.get('check-circle', {size: 'w-6 h-6'});
       }
 
-      // 自動停止機能時計アイコン
-      const autoStopClockIcon = document.getElementById('auto-stop-clock-icon');
-      if (autoStopClockIcon) {
-        autoStopClockIcon.innerHTML = window.IconLibrary.get('clock', {size: 'w-4 h-4'});
-      }
+      // ✅ 自動停止機能削除: autoStopClockIcon 不要
 
       // 公開ボタンアイコン
       const publishBroadcastIcon = document.getElementById('publish-broadcast-icon');
@@ -1956,7 +1753,7 @@
   // window.sharedModals.showPrivacy(onContinue)
   // window.sharedModals.showDigitalCitizenship()
   // window.sharedModals.showPublish(onPublish, onCancel, autoStopSettings)
-  // window.sharedModals.showAutoStopConfirmation(publishResult)
+  // ✅ 自動停止機能削除: showAutoStopConfirmation 不要
   // window.sharedModals.showFormConfig(), etc.
 
   window.hideModal = function (modalId) {

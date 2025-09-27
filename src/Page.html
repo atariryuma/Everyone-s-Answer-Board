@@ -224,16 +224,13 @@
     const __CONFIG_JSON__ = '<?= typeof configJSON !== "undefined" ? configJSON : "{}" ?>';
 
     // Legacy template variables for backward compatibility
-    const __SHOW_COUNTS__ = '<?= typeof showCounts !== "undefined" ? showCounts : "false" ?>';
-    const __DISPLAY_MODE__ = '<?= typeof displayMode !== "undefined" ? displayMode : "anonymous" ?>';
-    const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
     const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
-    const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
     const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
     const __EDITOR_NAME__ = '<?= typeof editorName !== "undefined" ? editorName : "" ?>';
     const __IS_EDITOR__ = '<?= typeof isEditor !== "undefined" ? isEditor : "false" ?>';
-    window.showCounts = __SHOW_COUNTS__.startsWith('<') ? false : __SHOW_COUNTS__ === 'true';
-    window.displayMode = __DISPLAY_MODE__.startsWith('<') ? 'anonymous' : __DISPLAY_MODE__;
+    // Legacy variables - will be updated from CONFIG.displaySettings after parsing
+    window.showCounts = false; // Placeholder - will be updated from displaySettings
+    window.displayMode = 'anonymous'; // Placeholder - will be updated from displaySettings
     // Unified editor capability - Zero-Dependency Architecture
     window.isEditor = __IS_EDITOR__.startsWith('<') ? false : __IS_EDITOR__ === 'true';
 
@@ -263,13 +260,22 @@
       isOwnBoard: CONFIG.isOwnBoard || false,
       formUrl: CONFIG.formUrl || '',
       showDetails: CONFIG.showDetails !== false,
-      autoStopEnabled: CONFIG.autoStopEnabled || false,
-      autoStopTime: CONFIG.autoStopTime || null
+      displaySettings: CONFIG.displaySettings || { showNames: false, showReactions: false }
     };
 
     // 🔧 CLAUDE.md準拠: 権限ベースアクセス制御 - 管理者機能初期化
     window.showAdminFeatures = window.UNIFIED_CONFIG.isAdminUser || false;
     window.hasAdminCapability = window.UNIFIED_CONFIG.isAdminUser || false;
+
+    // 🔧 表示設定統一: displaySettings に基づくレガシー変数更新
+    window.showCounts = window.UNIFIED_CONFIG.displaySettings.showReactions || false;
+    window.displayMode = window.UNIFIED_CONFIG.displaySettings.showNames ? 'named' : 'anonymous';
+    console.log('Display settings updated:', {
+      showNames: window.UNIFIED_CONFIG.displaySettings.showNames,
+      showReactions: window.UNIFIED_CONFIG.displaySettings.showReactions,
+      showCounts: window.showCounts,
+      displayMode: window.displayMode
+    });
 
     // Legacy variable assignments - use unified config where possible
     const SHEET_NAME = window.UNIFIED_CONFIG.sheetName;

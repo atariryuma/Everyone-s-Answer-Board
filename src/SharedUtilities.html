@@ -1104,6 +1104,66 @@
     window.sharedUtilities.auth.logout();
   };
 
+  // =============================================================================
+  // UNIFIED PAGE UTILITIES (SAFE RELOAD AND REDIRECT)
+  // =============================================================================
+
+  window.sharedUtilities.page = {
+    // 安全なページリロード（GAS特性対応）
+    safeReload: function(options = {}) {
+      console.log('🔄 Safe page reload initiated');
+
+      try {
+        // 1. フロントエンドキャッシュクリア
+        if (window.sharedUtilities?.cache?.clear) {
+          window.sharedUtilities.cache.clear();
+        }
+        localStorage.removeItem('current_user_info');
+        sessionStorage.clear();
+        console.log('🗑️ Client cache cleared for reload');
+      } catch (e) {
+        console.warn('Cache clear partially failed during reload:', e);
+      }
+
+      // 2. GAS-safe reload with URL cleanup
+      try {
+        const currentUrl = new URL(window.location.href);
+
+        // オプション: URLパラメータをクリーンアップ
+        if (options.cleanParams) {
+          const keepParams = options.keepParams || [];
+          const params = new URLSearchParams();
+          keepParams.forEach(param => {
+            if (currentUrl.searchParams.has(param)) {
+              params.set(param, currentUrl.searchParams.get(param));
+            }
+          });
+          currentUrl.search = params.toString();
+        }
+
+        // 安全なリロード実行
+        window.location.href = currentUrl.toString();
+      } catch (error) {
+        console.warn('Smart reload failed, falling back to simple reload:', error);
+        window.location.reload(true); // Force reload from server
+      }
+    },
+
+    // ログイン画面への統一リダイレクト（logout関数のエイリアス）
+    redirectToLogin: function() {
+      console.log('🏠 Redirecting to login page');
+      window.sharedUtilities.auth.logout();
+    }
+  };
+
+  // グローバル関数エイリアス（後方互換性）
+  window.safeReload = function(options) {
+    window.sharedUtilities.page.safeReload(options);
+  };
+
+  window.redirectToLogin = function() {
+    window.sharedUtilities.page.redirectToLogin();
+  };
 
   // =============================================================================
   // UNIFIED LOADING MANAGER (NEW ENHANCED VERSION)

@@ -146,8 +146,6 @@ function doGet(e) {
           formUrl: config.formUrl || '',
           formTitle: config.formTitle || '',
           showDetails: config.showDetails !== false,
-          autoStopEnabled: Boolean(config.autoStopEnabled),
-          autoStopTime: config.autoStopTime || null,
           setupStatus: config.setupStatus || 'pending',
           displaySettings: config.displaySettings || {},
           columnMapping: config.columnMapping || {},
@@ -268,8 +266,7 @@ function doGet(e) {
           isOwnBoard,
           formUrl: config.formUrl || '',
           showDetails: config.showDetails !== false,
-          autoStopEnabled: Boolean(config.autoStopEnabled),
-          autoStopTime: config.autoStopTime || null
+          displaySettings: config.displaySettings || { showNames: false, showReactions: false }
         });
 
         return template.evaluate();
@@ -1201,7 +1198,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
             return item;
           }) : [],
           header: String(finalResult.header || '回答一覧'),
-          sheetName: String(finalResult.sheetName || 'Sheet1')
+          sheetName: String(finalResult.sheetName || 'Sheet1'),
+          displaySettings: targetUserConfig.displaySettings || { showNames: false, showReactions: false }
         };
 
         return safeResult;
@@ -1219,7 +1217,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
           success: true,
           data: [],
           header: '回答一覧（データ変換エラー）',
-          sheetName: 'Sheet1'
+          sheetName: 'Sheet1',
+          displaySettings: targetUserConfig.displaySettings || { showNames: false, showReactions: false }
         };
       }
     }
@@ -1324,7 +1323,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
           return item;
         }) : [],
         header: String(finalResult.header || '回答一覧'),
-        sheetName: String(finalResult.sheetName || 'Sheet1')
+        sheetName: String(finalResult.sheetName || 'Sheet1'),
+        displaySettings: userConfig.displaySettings || { showNames: false, showReactions: false }
       };
 
       console.info('getPublishedSheetData: Safe result created, returning to frontend (self-access)', {
@@ -1348,7 +1348,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         success: true,
         data: [],
         header: '回答一覧（データ変換エラー）',
-        sheetName: 'Sheet1'
+        sheetName: 'Sheet1',
+        displaySettings: userConfig.displaySettings || { showNames: false, showReactions: false }
       };
     }
   } catch (error) {

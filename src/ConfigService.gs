@@ -990,10 +990,7 @@ function cleanConfigFields(config, options = {}) {
     'questionText'    // 動的生成されるフィールド
   ];
 
-  // オプション指定による追加クリーンアップ
-  if (options.cleanLegacyFields) {
-    fieldsToRemove.push('setupStatus_old', 'configVersion_old');
-  }
+  // Legacy field cleanup removed - no longer needed
 
   // フィールド削除実行
   fieldsToRemove.forEach(field => {

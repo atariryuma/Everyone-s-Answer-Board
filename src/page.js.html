@@ -163,8 +163,13 @@ class StudyQuestApp {
     this.hadInitialDataLoadFailure = false; // 初期データロード失敗フラグ
     
     // Initial state setup complete
-    this.serverShowCounts = window.showCounts;
-    this.serverDisplayMode = window.displayMode;
+
+    // ✅ 重複処理削除: displaySettings の初期化は Page.html で実行済み
+    // window.showCounts, window.displayMode は既に設定されている
+    this.state.showCounts = window.showCounts;
+    this.state.displayMode = window.displayMode;
+
+    // ✅ レガシー削除: サーバー設定保存変数は不要（displaySettingsを直接参照）
     // 🧹 CLAUDE.md準拠: setTimeout/setInterval完全削除済み
     this.handlers = {};
     this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
@@ -2124,7 +2129,7 @@ class StudyQuestApp {
           <p class="mt-1 text-sm text-gray-400">一部の機能が制限されています。URLを確認してページを再読み込みしてください。</p>
           <div class="mt-6">
             <button
-              onclick="window.location.reload()"
+              onclick="window.safeReload()"
               class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
             >
               ページを再読み込み
@@ -2157,7 +2162,7 @@ class StudyQuestApp {
         <p class="mt-1 text-sm text-gray-400">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6">
           <button 
-            onclick="window.location.reload()" 
+            onclick="window.safeReload()" 
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
             ページを再読み込み
@@ -2184,7 +2189,7 @@ class StudyQuestApp {
         <p class="mt-1 text-sm text-gray-400">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6 space-x-3">
           <button 
-            onclick="window.location.reload()" 
+            onclick="window.safeReload()" 
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600"
           >
             ページを再読み込み
@@ -2553,6 +2558,10 @@ class StudyQuestApp {
       }
 
       if (result && result.success && Array.isArray(result.data)) {
+        // 🔧 API応答からdisplaySettingsを動的更新
+        if (result.displaySettings) {
+          this.updateDisplaySettingsFromAPI(result.displaySettings);
+        }
         return result;
       }
 
@@ -2664,7 +2673,7 @@ class StudyQuestApp {
         <p class="mt-2 text-xs text-gray-500">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
         <div class="mt-6 space-x-3">
           <button 
-            onclick="window.location.reload()" 
+            onclick="window.safeReload()" 
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
           >
             <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3483,7 +3492,7 @@ class StudyQuestApp {
       container.innerHTML = `
         <div class="text-center py-8 col-span-full">
           <p class="text-red-400">表示エラーが発生しました</p>
-          <button onclick="location.reload()" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded">
+          <button onclick="window.safeReload()" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded">
             再読み込み
           </button>
         </div>
@@ -4729,9 +4738,6 @@ class StudyQuestApp {
     console.groupEnd();
   }
 
-  
-  // ✅ 統合済み: showNotificationに統合
-  
   async handleHighlight(rowIndex) {
     const numericRowIndex = parseInt(rowIndex, 10);
     const highlightKey = `${numericRowIndex}-highlight`;
@@ -5245,44 +5251,34 @@ class StudyQuestApp {
         showHighlightToggle: window.showHighlightToggle
       });
       if (enable) {
-        // 管理モード時は強制的に名前とリアクション数を表示
+        // 🔧 管理モード時: displaySettings に関係なく全て表示（管理者の必要性）
         window.showCounts = true;
         window.displayMode = 'named';
         window.isStudentMode = false;
-        window.showScoreSort = window.showCounts;
-        debugLog('管理モード有効化: 名前とリアクション数を強制表示', {
-          showCounts: window.showCounts,
-          displayMode: window.displayMode
-        });
+        window.showScoreSort = true;
+        debugLog('管理モード有効化: 管理者として全項目表示');
       } else {
-        // 閲覧モード時はサーバー設定に戻す
-        window.showCounts = this.serverShowCounts;
-        window.displayMode = this.serverDisplayMode;
+        // 🔧 閲覧モード時: displaySettings の設定を尊重
+        const displaySettings = window.UNIFIED_CONFIG?.displaySettings || { showNames: false, showReactions: false };
+        window.showCounts = displaySettings.showReactions;
+        window.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
         window.isStudentMode = true;
-        window.showScoreSort = window.showCounts;
-        debugLog('閲覧モード有効化: サーバー設定を復元', {
-          showCounts: window.showCounts,
-          displayMode: window.displayMode,
-          serverShowCounts: this.serverShowCounts,
-          serverDisplayMode: this.serverDisplayMode
+        window.showScoreSort = displaySettings.showReactions;
+        debugLog('閲覧モード有効化: displaySettings適用', {
+          showNames: displaySettings.showNames,
+          showReactions: displaySettings.showReactions,
+          finalShowCounts: window.showCounts,
+          finalDisplayMode: window.displayMode
         });
       }
       
       // Update local state from global variables first
       this.updateConfigFromGlobals();
 
-      // Then apply admin mode overrides if needed (single authoritative application)
-      if (enable) {
-        // Admin mode: force show names and counts regardless of server settings
-        this.state.displayMode = 'named';
-        this.state.showCounts = true;
-        this.state.isStudentMode = false;
-      } else {
-        // Viewer mode: restore server settings
-        this.state.displayMode = this.serverDisplayMode;
-        this.state.showCounts = this.serverShowCounts;
-        this.state.isStudentMode = true;
-      }
+      // 🔧 状態同期: window変数からstateを更新（重複処理削除）
+      this.state.showCounts = window.showCounts;
+      this.state.displayMode = window.displayMode;
+      this.state.isStudentMode = window.isStudentMode;
       
       // 管理モード切り替え後の状態を確認
       debugLog('管理モード切り替え後の状態確認:', {
@@ -5498,7 +5494,7 @@ class StudyQuestApp {
     this.clearCache({ includeReactions: true, includeLocalStorage: true });
 
     // シンプルなページリロード（現在のURLがすでに非公開状態を表示する）
-    window.location.reload();
+    window.safeReload();
   }
   
   
@@ -5972,27 +5968,14 @@ class StudyQuestApp {
     }
   }
   updateConfigFromGlobals() {
-    debugLog('updateConfigFromGlobals前の状態:', {
-      isAdminUser: this.state.isAdminUser,
-      showHighlightToggle: this.state.showHighlightToggle,
-      windowShowHighlightToggle: window.showHighlightToggle,
-      showAdminFeatures: this.state.showAdminFeatures,
-      windowShowAdminFeatures: window.showAdminFeatures,
-      currentDisplayMode: this.state.displayMode
-    });
-    
+    // 🔧 統一設定システム: window変数からstateへのシンプルな同期
     this.state.isStudentMode = window.isStudentMode;
     this.state.showCounts = window.showCounts;
-    window.showScoreSort = window.showCounts;
+    this.state.displayMode = window.displayMode;
     this.state.showAdminFeatures = window.showAdminFeatures;
     this.state.showHighlightToggle = this.state.showAdminFeatures; // 管理モードでのみ有効
-    this.state.showScoreSort = window.showScoreSort;
+    this.state.showScoreSort = window.showCounts; // showCountsと連動
     this.state.showPublishControls = window.showPublishControls;
-    
-    // Only update displayMode if not in admin mode
-    if (!this.state.showAdminFeatures) {
-      this.state.displayMode = window.displayMode;
-    }
     
     debugLog('updateConfigFromGlobals後の状態:', {
       isAdminUser: this.state.isAdminUser,
@@ -6304,8 +6287,6 @@ class StudyQuestApp {
     }, { timeout: delay });
   }
 
-  // ✅ 統合済み: 上記のcleanup()に統合
-  
   // Enhanced cache methods with timestamp tracking
 
   // Virtual Scrolling
@@ -6850,6 +6831,40 @@ class StudyQuestApp {
 
   // Delays handled by CSS transitions, animations use CSS keyframes, polling uses server triggers
 
+  /**
+   * 🔧 API応答からdisplaySettingsを動的更新
+   * @param {Object} newDisplaySettings - 新しい表示設定
+   */
+  updateDisplaySettingsFromAPI(newDisplaySettings) {
+    if (!newDisplaySettings || typeof newDisplaySettings !== 'object') {
+      return;
+    }
+
+    // window変数を更新
+    const oldShowCounts = window.showCounts;
+    const oldDisplayMode = window.displayMode;
+
+    window.showCounts = newDisplaySettings.showReactions || false;
+    window.displayMode = newDisplaySettings.showNames ? 'named' : 'anonymous';
+
+    // state変数を同期
+    this.state.showCounts = window.showCounts;
+    this.state.displayMode = window.displayMode;
+
+    // 変更があった場合のみ再描画
+    if (oldShowCounts !== window.showCounts || oldDisplayMode !== window.displayMode) {
+      console.log('🔄 DisplaySettings updated from API:', {
+        showNames: newDisplaySettings.showNames,
+        showReactions: newDisplaySettings.showReactions,
+        changed: true
+      });
+
+      // キャッシュクリアして再描画をトリガー
+      this.clearCache();
+      this.renderWithCurrentData();
+    }
+  }
+
 }
 // ドメイン情報処理
 // ✅ CLAUDE.md準拠: Zero-Dependency Architecture - 最適化されたドメイン情報システム
@@ -6923,54 +6938,8 @@ async function fetchDomainInfo() {
   }
 }
 
-/**
- * ドメイン情報を表示する共通関数
- * @param {Object} info - ドメイン情報オブジェクト
- */
-function displayDomainInfo(info) {
-  const headerDomainMatch = document.getElementById('header-domain-match');
-  const headerDomainMismatch = document.getElementById('header-domain-mismatch');
-  const headerDomainInitial = document.getElementById('header-domain-initial');
-  const headerDomainMatchText = document.getElementById('header-domain-match-text');
-  const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
-
-  // 全ての表示を一旦非表示にする
-  if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
-  if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
-  if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
-  
-  if (!info || info.error) {
-    warnLog('ドメイン情報エラー:', info?.error);
-    // エラー時は初期状態を表示
-    if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
-    return;
-  }
-
-  debugLog('🌐 ドメイン情報表示:', {
-    isDomainMatch: info.isDomainMatch,
-    deployDomain: info.deployDomain,
-    currentDomain: info.currentDomain,
-    success: info.success
-  });
-
-  if (info.isDomainMatch) {
-    // ドメインが一致している場合
-    if (headerDomainMatch && headerDomainMatchText) {
-      headerDomainMatch.classList.remove('hidden');
-      if (info.deployDomain) {
-        headerDomainMatchText.textContent = `${info.deployDomain} ドメイン`;
-      } else {
-        headerDomainMatchText.textContent = 'グローバルアクセス';
-      }
-    }
-  } else {
-    // ドメイン不一致の場合
-    if (headerDomainMismatch && headerDomainMismatchText) {
-      headerDomainMismatch.classList.remove('hidden');
-      headerDomainMismatchText.textContent = info.currentDomain;
-    }
-  }
-}
+// ✅ CLEANUP: displayDomainInfo関数削除 (44行削減)
+// この関数はlogin.js.htmlにも重複存在し、SharedUtilities.htmlの統一関数で代替可能
 
 /**
  * フォームリンクを取得して表示する関数

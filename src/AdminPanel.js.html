@@ -54,8 +54,6 @@
     formUrl: CONFIG.formUrl || '',
     formTitle: CONFIG.formTitle || '',
     showDetails: CONFIG.showDetails !== false,
-    autoStopEnabled: CONFIG.autoStopEnabled || false,
-    autoStopTime: CONFIG.autoStopTime || null,
     setupStatus: CONFIG.setupStatus || 'pending',
     displaySettings: CONFIG.displaySettings || {},
     columnMapping: CONFIG.columnMapping || {}
@@ -4384,8 +4382,24 @@
               check();
             });
 
-            createPromiseDelay(500).then(() => {
-              loadBoardInfo(); // フッター情報を再読み込み
+            createPromiseDelay(500).then(async () => {
+              // フッター情報を再読み込み - 統一データ取得使用
+              try {
+                const adminData = await loadBatchedAdminData();
+                if (adminData && adminData.config) {
+                  const boardInfo = {
+                    isActive: adminData.config.isPublished || false,
+                    questionText: adminData.questionText || '回答ボード',
+                    userEmail: adminData.user?.userEmail || '',
+                    spreadsheetId: adminData.config?.spreadsheetId || '',
+                    sheetName: adminData.config?.sheetName || ''
+                  };
+                  currentBoardInfo = boardInfo;
+                  updateFooterDisplay(boardInfo);
+                }
+              } catch (error) {
+                console.warn('Footer refresh failed:', error);
+              }
             }).catch(() => {
               // Silent error handling for non-critical delay
             });
@@ -4661,41 +4675,7 @@
   // グローバル変数
   let currentBoardInfo = null;
 
-  // ✅ CLAUDE.md準拠: Batched board info loading for 70x performance improvement
-  // Uses getBatchedAdminData instead of individual getBoardInfo API call
-  function loadBoardInfo() {
-    google.script.run
-      .withSuccessHandler(function (adminData) {
-        if (adminData.success) {
-          // Extract board info from batched admin data
-          const boardInfo = {
-            isActive: adminData.config?.isPublished || false,
-            questionText: adminData.questionText || '回答ボード',
-            userEmail: adminData.user?.userEmail || '',
-            spreadsheetId: adminData.config?.spreadsheetId || '',
-            sheetName: adminData.config?.sheetName || ''
-          };
-          currentBoardInfo = boardInfo;
-          updateFooterDisplay(boardInfo);
-        } else {
-          console.error('管理者データ取得エラー:', adminData.error);
-          updateFooterDisplay({
-            isActive: false,
-            questionText: '情報取得エラー',
-            error: adminData.error || 'Unknown error',
-          });
-        }
-      })
-      .withFailureHandler(function (error) {
-        console.error('ボード情報取得エラー:', error);
-        updateFooterDisplay({
-          isActive: false,
-          questionText: '情報取得エラー',
-          error: error.message,
-        });
-      })
-      .getBatchedAdminData(window.UNIFIED_CONFIG.targetUserId);
-  }
+  // ✅ レガシー関数削除: loadBoardInfo() は loadBatchedAdminData() に統合済み
 
   // フッター表示更新
   function updateFooterDisplay(boardInfo) {

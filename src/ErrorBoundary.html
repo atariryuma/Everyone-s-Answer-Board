@@ -7,46 +7,37 @@
     <title><?= title || 'エラー' ?> - みんなの回答ボード</title>
     <?!= HtmlService.createHtmlOutputFromFile('UnifiedStyles.css').getContent(); ?>
     <script>
-      // 強制ログアウトしてログイン画面にリダイレクトする関数（安全版）
-      function forceLogoutAndRedirect() {
-        console.log('ログイン画面にリダイレクト開始...');
-
-        // リダイレクトループ防止：既にログインページにいる場合は単純にリロード
-        if (window.location.href.includes('mode=login')) {
-          console.log('既にログインモードです。ページをリロードします。');
-          window.location.reload();
-          return;
+      // ✅ ハイブリッド自己完結方式: SharedUtilities活用 + 完全フォールバック
+      function safeReload() {
+        // SharedUtilitiesが利用可能なら優先使用
+        if (window.sharedUtilities?.page?.safeReload) {
+          return window.sharedUtilities.page.safeReload();
         }
 
-        // ボタンを無効化して重複実行を防ぐ
-        const logoutBtn = event.target;
-        if (logoutBtn) {
-          logoutBtn.disabled = true;
-          logoutBtn.innerHTML = '処理中...';
-        }
-
+        // フォールバック: 基本的な安全リロード
         try {
-          // 安全なリダイレクト方法
-          console.log('Redirecting to login page...');
-
-          const currentUrl = new URL(window.location.href);
-          currentUrl.searchParams.set('mode', 'login');
-
-          // 即座にリダイレクト実行
-          window.location.href = currentUrl.toString();
-        } catch (error) {
-          console.error('リダイレクト処理でエラー:', error);
-          fallbackReload();
+          localStorage.removeItem('current_user_info');
+          sessionStorage.clear();
+          window.location.reload(true);
+        } catch (e) {
+          window.location.href = window.location.href;
         }
       }
 
-      // シンプルなフォールバック関数
-      function fallbackReload() {
-        console.log('フォールバック：ページリロード実行');
-        const confirmMessage =
-          'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
-        if (confirm(confirmMessage)) {
-          window.location.reload();
+      function redirectToLogin() {
+        // SharedUtilitiesが利用可能なら優先使用
+        if (window.sharedUtilities?.auth?.logout) {
+          return window.sharedUtilities.auth.logout();
+        }
+
+        // フォールバック: 基本的なログイン画面リダイレクト
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set('mode', 'login');
+          url.searchParams.delete('userId');
+          window.location.href = url.toString();
+        } catch (e) {
+          window.location.href = window.location.origin + window.location.pathname + '?mode=login';
         }
       }
     </script>
@@ -62,11 +53,11 @@
       </p>
 
       <div class="error-actions">
-        <button type="button" class="btn btn-primary" onclick="location.reload()">
+        <button type="button" class="btn btn-primary" onclick="try { safeReload(); } catch(e) { location.reload(); }">
           🔄 再読み込み
         </button>
         <? if (!hideLoginButton) { ?>
-        <button type="button" class="btn btn-secondary" onclick="forceLogoutAndRedirect()">
+        <button type="button" class="btn btn-secondary" onclick="try { redirectToLogin(); } catch(e) { location.href='?mode=login'; }">
           🏠 ログイン画面に戻る
         </button>
         <? } ?>

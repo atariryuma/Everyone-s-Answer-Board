@@ -531,22 +531,7 @@ function processDataWithColumnMapping(dataRows, headers, columnMapping) {
   });
 }
 
-/**
- * 自動停止時間計算（Core.gsより移行）
- * @param {string} publishedAt - 公開開始時間のISO文字列
- * @param {number} minutes - 自動停止までの分数
- * @returns {Object} 停止時間情報
- */
-function getAutoStopTime(publishedAt, minutes) {
-  const startTime = new Date(publishedAt);
-  const stopTime = new Date(startTime.getTime() + minutes * 60000);
-
-  return {
-    stopTime: stopTime.toISOString(),
-    formattedStopTime: formatTimestamp(stopTime.toISOString()),
-    remainingMinutes: Math.max(0, Math.ceil((stopTime.getTime() - new Date().getTime()) / 60000))
-  };
-}
+// ✅ 自動停止機能削除: getAutoStopTime 関数は不要
 
 // Utility helpers
 
