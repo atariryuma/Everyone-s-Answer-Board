@@ -763,7 +763,7 @@ function getAdminSheetList(spreadsheetId) {
  * @param {Object} publishConfig - 公開設定
  * @returns {Object} 公開結果
  */
-function publishApplication(publishConfig) {
+function publishApp(publishConfig) {
   const startTime = new Date().toISOString();
 
   try {
@@ -832,7 +832,7 @@ function publishApplication(publishConfig) {
     };
 
   } catch (error) {
-    console.error('❌ publishApplication ERROR:', {
+    console.error('❌ publishApp ERROR:', {
       error: error.message,
       spreadsheetId: publishConfig?.spreadsheetId,
       sheetName: publishConfig?.sheetName,
@@ -2204,7 +2204,7 @@ __rootSC.SystemController = {
   checkCurrentPublicationStatus,
   performAutoRepair,
   forceUrlSystemReset,
-  publishApplication,
+  publishApp,
   testForceLogoutRedirect,
   // 📊 Performance Metrics Extension
   getPerformanceMetrics,

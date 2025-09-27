@@ -363,7 +363,7 @@
 
     // 基本設定の反映（UI更新のみ）
     if (systemState.config) {
-      updatePanelState(systemState.config);
+      updatePanel(systemState.config);
     }
   }
 
@@ -936,7 +936,7 @@
   function loadCurrentConfig() {
     // systemState.configを使用（既に読み込み済み）
     if (systemState.config) {
-      updatePanelState(systemState.config);
+      updatePanel(systemState.config);
     }
   }
 
@@ -1025,16 +1025,15 @@
     }
   }
 
-  // 設定の完全反映（拡張版）
-  // パネル状態の統一更新
-  function updatePanelState(config) {
+  // ✅ CLAUDE.md準拠: よりシンプルで明確な命名
+  function updatePanel(config) {
     if (!config) return;
-    applyExistingConfig(config);
+    applyConfig(config);
     updateResourceButtons(config);
     updateConfigSummary(config);
   }
 
-  function applyExistingConfig(config) {
+  function applyConfig(config) {
     if (!config) return;
 
     try {
@@ -3131,7 +3130,7 @@
       
 
       // 現在の設定を収集
-      const currentConfig = getConfiguration();
+      const currentConfig = getConfig();
       const headers = window.currentHeaders || [];
       const columnMapping = currentConfig.columnMapping || {};
 
@@ -3744,7 +3743,7 @@
     displayVerificationResults({ ok: true });
 
     // 設定を保存（✅ CLAUDE.md準拠: シンプル構造で直接送信）
-    saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping, confidence);
+    saveColumnConfig(spreadsheetId, sheetName, headers, columnMapping, confidence);
 
     showSuccess('列マッピングの検証が完了しました');
     updateProgress(3);
@@ -4023,7 +4022,7 @@
    * @param {number} maxRetries - 最大リトライ回数
    * @returns {Promise} 保存結果
    */
-  function saveConfigurationWithRetry(config, maxRetries = 3) {
+  function saveConfigWithRetry(config, maxRetries = 3) {
     return new Promise((resolve, reject) => {
       let attempt = 0;
 
@@ -4086,9 +4085,9 @@
 
 
   // 🔒 列設定の保存（堅牢化版） - ✅ CLAUDE.md準拠: シンプル構造対応
-  function saveColumnConfiguration(spreadsheetId, sheetName, headers, columnMapping, confidence = {}) {
+  function saveColumnConfig(spreadsheetId, sheetName, headers, columnMapping, confidence = {}) {
     // 🔧 CLAUDE.md準拠: ClientMutexで重複実行防止
-    if (!ClientMutex.acquire('saveColumnConfiguration')) {
+    if (!ClientMutex.acquire('saveColumnConfig')) {
       showInfo('列設定の保存処理を実行中です…');
       return;
     }
@@ -4098,7 +4097,7 @@
       const validationResult = validateColumnConfigurationData(spreadsheetId, sheetName, headers, columnMapping, confidence);
       if (!validationResult.isValid) {
         showError(`列設定の検証に失敗: ${validationResult.errors.join(', ')}`);
-        ClientMutex.release('saveColumnConfiguration');
+        ClientMutex.release('saveColumnConfig');
         return;
       }
 
@@ -4110,7 +4109,7 @@
       sheetName,
       headers: headers, // ✅ CLAUDE.md準拠: トップレベルheaders（UI表示用）
       columnMapping: columnMapping, // ✅ CLAUDE.md準拠: シンプル構造 {answer:4, reason:5, ...}
-      displaySettings: getCurrentDisplaySettings(),
+      displaySettings: getDisplaySettings(),
       verifiedAt: timestamp, // メタデータは別途管理
       confidence: confidence, // 信頼度データは別途管理
       setupComplete: true,
@@ -4127,7 +4126,7 @@
       isPublished: systemState.config.isPublished,
       publishedAt: systemState.config.publishedAt,
       userPermissions: systemState.config.userPermissions,
-      displaySettings: getCurrentDisplaySettings(),
+      displaySettings: getDisplaySettings(),
       // 新しい設定で明示的に上書き（baseConfigで既に設定済みだが明示的に保証）
       spreadsheetId,
       sheetName,
@@ -4246,12 +4245,12 @@
               console.warn('設定保存で予期しない応答:', result);
             }
           }
-          ClientMutex.release('saveColumnConfiguration');
+          ClientMutex.release('saveColumnConfig');
         })
         .withFailureHandler(function (error) {
           console.error('列設定保存エラー:', error);
           showError('列設定の保存に失敗しました');
-          ClientMutex.release('saveColumnConfiguration');
+          ClientMutex.release('saveColumnConfig');
         })
         .saveConfig(optimizedConfig);
     }
@@ -4259,7 +4258,7 @@
     } catch (error) {
       console.error('列設定保存処理エラー:', error);
       showError('列設定の保存処理に失敗しました: ' + error.message);
-      ClientMutex.release('saveColumnConfiguration');
+      ClientMutex.release('saveColumnConfig');
     }
   }
 
@@ -4269,7 +4268,7 @@
       showInfo('保存処理を実行中です…');
       return;
     }
-    const config = getConfiguration();
+    const config = getConfig();
 
     window.setLoading(true, '処理中...');
     google.script.run
@@ -4312,7 +4311,7 @@
 
     try {
       // 🔧 UI状態から完全な設定データを収集
-      const config = getConfiguration();
+      const config = getConfig();
 
 
       if (!config || !config.spreadsheetId) {
@@ -4326,11 +4325,11 @@
         return;
       }
 
-      // 🚀 完全な設定データを使用（getConfiguration()の結果を完全信頼）
+      // 🚀 完全な設定データを使用（getConfig()の結果を完全信頼）
       const publishConfig = config;
 
 
-      // 完全な設定でpublishApplicationを呼び出し
+      // 完全な設定でpublishAppを呼び出し
       google.script.run
         .withSuccessHandler(function (result) {
           if (result.success) {
@@ -4410,7 +4409,7 @@
           window.setLoading(false);
           ClientMutex.release('publishApp');
         })
-        .publishApplication(publishConfig);
+        .publishApp(publishConfig);
 
     } catch (error) {
       console.error('❌ publishApp: UI設定収集エラー:', error);
@@ -4445,16 +4444,16 @@
   // ✅ CLAUDE.md準拠: 重複関数削除（シンプル化）
   // getColumnMapping() → getColumnMapping()に統一
 
-  // ✅ displaySettings収集を共通化
-  function getCurrentDisplaySettings() {
+  // ✅ CLAUDE.md準拠: 自然でシンプルな関数名
+  function getDisplaySettings() {
     return {
       showNames: document.getElementById('show-names')?.checked || false,
       showReactions: document.getElementById('show-reactions')?.checked || false
     };
   }
 
-  // ✅ CLAUDE.md準拠: 自然な英語パターン
-  function getConfiguration() {
+  // ✅ CLAUDE.md準拠: よりシンプルで一貫した命名
+  function getConfig() {
     const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
 
     let spreadsheetId, sheetName;
@@ -4484,7 +4483,7 @@
     return {
       spreadsheetId,
       sheetName,
-      displaySettings: getCurrentDisplaySettings(),
+      displaySettings: getDisplaySettings(),
       // 🔧 NEW: フォーム情報追加（安全な収集）
       formUrl: formInfo.formUrl,
       formTitle: formInfo.formTitle,
