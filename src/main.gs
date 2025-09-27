@@ -1,7 +1,7 @@
 /**
  * main.gs - Simplified Application Entry Points
  *
- * 🎯 Responsibilities:
+ * Responsibilities:
  * - HTTP request routing (doGet/doPost)
  * - Simple mode validation
  * - Template serving
@@ -12,22 +12,13 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, DataController, SystemController, getDatabaseConfig, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getDatabaseConfig, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls */
 
-// ===========================================
-// 🔧 Core Utility Functions
-// ===========================================
+// Core Utility Functions
 
 /**
  * 現在のユーザーのメールアドレスを取得
- * GAS-Native直接APIでセッション情報を安全に取得
- * @description GAS-Native Architecture準拠の統一アクセス方法
  * @returns {string|null} ユーザーのメールアドレス、または認証されていない場合はnull
- * @example
- * const email = getCurrentEmail();
- * if (email) {
- *   console.log('Current user:', email);
- * }
  */
 function getCurrentEmail() {
   try {
@@ -42,7 +33,7 @@ function getCurrentEmail() {
           return effectiveEmail;
         }
       } catch (altError) {
-        console.log('getCurrentEmail: Alternative method failed:', altError.message);
+        // Alternative email retrieval failed, continue to fallback return
       }
     }
 
@@ -65,9 +56,7 @@ function include(filename) {
 }
 
 
-// ===========================================
 // 🌐 HTTP Entry Points
-// ===========================================
 
 /**
  * Handle GET requests
@@ -79,7 +68,7 @@ function doGet(e) {
     const params = e ? e.parameter : {};
     const mode = params.mode || 'main';
 
-    // ✅ Performance optimization: Cache email for authentication-required routes
+    //Performance optimization: Cache email for authentication-required routes
     const currentEmail = (mode !== 'login') ? getCurrentEmail() : null;
 
     // 🚫 アプリ全体のアクセス制限チェック
@@ -127,7 +116,7 @@ function doGet(e) {
           return createRedirectTemplate('ErrorBoundary.html', 'ユーザーIDが指定されていません');
         }
 
-        // ✅ CLAUDE.md準拠: Batch operations for 70x performance improvement
+        // Batch operations for 70x performance improvement
         const adminData = getBatchedAdminData(targetUserId);
         if (!adminData.success) {
           return createRedirectTemplate('ErrorBoundary.html', adminData.error || '管理者権限が必要です');
@@ -136,7 +125,7 @@ function doGet(e) {
         const { email, user, config } = adminData;
         const isAdmin = isAdministrator(email);
 
-        // ✅ 動的URL生成 (CLAUDE.md準拠: システム統一)
+        // Dynamic URL generation
         const enhancedConfig = enhanceConfigWithDynamicUrls(config, user.userId);
 
         // 認証済み - Administrator/Editor権限でAdminPanel表示
@@ -162,7 +151,7 @@ function doGet(e) {
           setupStatus: config.setupStatus || 'pending',
           displaySettings: config.displaySettings || {},
           columnMapping: config.columnMapping || {},
-          dynamicUrls: enhancedConfig.dynamicUrls || {}  // ✅ 動的URL追加
+          dynamicUrls: enhancedConfig.dynamicUrls || {}
         });
 
         return template.evaluate();
@@ -189,7 +178,7 @@ function doGet(e) {
         if (showSetup) {
           return HtmlService.createTemplateFromFile('SetupPage.html').evaluate();
         } else {
-          // 🔧 統一認証システム: isSystemAdmin変数をAccessRestricted.htmlに渡す
+          // Pass isSystemAdmin variable to AccessRestricted.html
           const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
           template.isAdministrator = currentEmail ? isAdministrator(currentEmail) : false;
           template.userEmail = currentEmail || '';
@@ -204,13 +193,13 @@ function doGet(e) {
           return createRedirectTemplate('ErrorBoundary.html', '管理者権限が必要です');
         }
 
-        // ✅ userIdパラメータを取得（管理パネルに戻るリンクで使用）
+        //userIdパラメータを取得（管理パネルに戻るリンクで使用）
         const userIdParam = params.userId;
 
         // 認証済み - Administrator権限でAppSetup表示
         const template = HtmlService.createTemplateFromFile('AppSetupPage.html');
 
-        // ✅ 管理パネルに戻るリンクのためにuserIdを渡す（オプション）
+        //管理パネルに戻るリンクのためにuserIdを渡す（オプション）
         template.userIdParam = userIdParam || '';
 
         return template.evaluate();
@@ -228,7 +217,7 @@ function doGet(e) {
           return createRedirectTemplate('ErrorBoundary.html', 'ユーザーIDが指定されていません');
         }
 
-        // ✅ CLAUDE.md準拠: Batch operations for 70x performance improvement
+        // Batch operations for 70x performance improvement
         const viewerData = getBatchedViewerData(targetUserId, currentEmail);
         if (!viewerData.success) {
           return createRedirectTemplate('ErrorBoundary.html', viewerData.error || '対象ユーザーが見つかりません');
@@ -259,13 +248,13 @@ function doGet(e) {
         template.questionText = '読み込み中...';
         template.boardTitle = targetUser.userEmail || '回答ボード';
 
-        // 🔧 CLAUDE.md準拠: 統一権限情報（GAS-Native Architecture）
+        // Unified permission information
         const isEditor = isAdminUser || isOwnBoard;
         template.isEditor = isEditor;
         template.isAdminUser = isAdminUser;
         template.isOwnBoard = isOwnBoard;
 
-        // 🔧 CLAUDE.md準拠: configJSON統一取得（Zero-Dependency）
+        // Unified configJSON retrieval
         template.sheetName = config.sheetName;
         template.configJSON = JSON.stringify({
           userId: targetUserId,
@@ -290,7 +279,7 @@ function doGet(e) {
       default: {
         // Default landing is AccessRestricted to prevent unintended login/account creation.
         // Viewers must specify ?mode=view&userId=... and admins explicitly use ?mode=login.
-        // 🔧 統一認証システム: isSystemAdmin変数をAccessRestricted.htmlに渡す
+        // Pass isSystemAdmin variable to AccessRestricted.html
         const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
         const email = getCurrentEmail();
         template.isAdministrator = email ? isAdministrator(email) : false;
@@ -337,7 +326,7 @@ function createRedirectTemplate(redirectPage, error) {
   try {
     const template = HtmlService.createTemplateFromFile(redirectPage);
 
-    // 🔧 統一認証システム: AccessRestricted.htmlの場合は必要な変数を設定
+    // Set necessary variables for AccessRestricted.html
     if (redirectPage === 'AccessRestricted.html') {
       const email = getCurrentEmail();
       template.isAdministrator = email ? isAdministrator(email) : false;
@@ -481,9 +470,7 @@ function doPost(e) {
 
 
 
-// ===========================================
-// 🔧 API Functions (called from HTML)
-// ===========================================
+// API Functions (called from HTML)
 
 /**
  * Get current user email for HTML templates
@@ -501,13 +488,13 @@ function getConfig() {
       return createAuthError();
     }
 
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    // Direct findUserByEmail usage
     const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return createUserNotFoundError();
     }
 
-    // 🔧 統一API使用: getUserConfigで設定取得
+    // Use getUserConfig for configuration retrieval
     const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
@@ -520,9 +507,7 @@ function getConfig() {
 
 // getWebAppUrl moved to SystemController.gs for architecture compliance
 
-// ===========================================
-// 🔧 フロントエンド互換性API - 統一認証システム対応
-// ===========================================
+// Frontend compatibility API - unified authentication system
 
 /**
  * 統一管理者認証関数（メイン実装）
@@ -544,9 +529,7 @@ function isAdministrator(email) {
 
     const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
     if (isAdmin) {
-      console.info('isAdministrator: Administrator認証成功', {
-        email: email && typeof email === 'string' ? `${email.split('@')[0]}@***` : 'N/A'
-      });
+      // Administrator authenticated
     }
 
     return isAdmin;
@@ -581,10 +564,10 @@ function processLoginAction() {
     }
 
     // Create or get user
-    // 🔧 GAS-Native統一: 直接Data使用
+    // Direct Data usage
     let user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
-      // 🔧 CLAUDE.md準拠: createUser()統一実装
+      // Unified createUser() implementation
       user = createUser(email);
       if (!user) {
         console.warn('createUser failed, creating fallback user object');
@@ -654,7 +637,7 @@ function getAdminUsers(options = {}) {
       return createAdminRequiredError();
     }
 
-    // 🔧 GAS-Native統一: 全ユーザー取得（物理削除のためフィルター不要）
+    // Get all users (no filter needed for physical deletion)
     const users = getAllUsers();
     return {
       success: true,
@@ -666,7 +649,7 @@ function getAdminUsers(options = {}) {
   }
 }
 
-// ✅ CLAUDE.md準拠: 重複実装を削除
+// Remove duplicate implementation
 // DatabaseCore.gsのdeleteUser関数を使用することで統一
 
 
@@ -680,7 +663,7 @@ function toggleUserActiveStatus(targetUserId) {
       return createAdminRequiredError();
     }
 
-    // 🔧 GAS-Native統一: 直接findUserById使用
+    // Direct findUserById usage
     const targetUser = findUserById(targetUserId);
     if (!targetUser) {
       return createUserNotFoundError();
@@ -726,13 +709,13 @@ function toggleUserBoardStatus(targetUserId) {
       return createAuthError('管理者権限が必要です');
     }
 
-    // 🔧 GAS-Native統一: 直接findUserById使用
+    // Direct findUserById usage
     const targetUser = findUserById(targetUserId);
     if (!targetUser) {
       return createUserNotFoundError();
     }
 
-    // 🔧 最小限更新: isPublishedフィールドのみを変更
+    // Minimal update: change only isPublished field
     // 現在のconfigJsonを取得してパース
     let currentConfig = {};
     try {
@@ -758,7 +741,7 @@ function toggleUserBoardStatus(targetUserId) {
     updates.configJson = JSON.stringify(updatedConfig);
     updates.lastModified = new Date().toISOString();
 
-    // 🔧 直接データベース更新: 最小限の変更のみ
+    // Direct database update: minimal changes only
     const updateResult = updateUser(targetUserId, updates);
     if (!updateResult.success) {
       return createErrorResponse(`Failed to toggle board status: ${updateResult.message || '詳細不明'}`);
@@ -835,7 +818,7 @@ function clearActiveSheet(targetUserId) {
       return createAuthError();
     }
 
-    // 🔧 GAS-Native統一: 直接Data使用
+    // Direct Data usage
     let targetUser = targetUserId ? findUserById(targetUserId) : null;
     if (!targetUser) {
       targetUser = findUserByEmail(email);
@@ -845,7 +828,7 @@ function clearActiveSheet(targetUserId) {
       return createUserNotFoundError();
     }
 
-    // ✅ 編集者権限チェック: 管理者または自分のボード
+    // Editor permission check: admin or own board
     const isAdmin = isAdministrator(email);
     const isOwnBoard = targetUser.userEmail === email;
 
@@ -925,21 +908,19 @@ function getSheets() {
       };
     }
 
-    // 🚀 Performance optimization: Cache user's spreadsheet list
+    // Performance optimization: Cache user's spreadsheet list
     const cacheKey = `sheets_${email}`;
     try {
       const cached = CacheService.getScriptCache().get(cacheKey);
       if (cached) {
-        console.log('getSheets: Cache hit for user:', `${email.split('@')[0]}@***`);
         return JSON.parse(cached);
       }
     } catch (cacheError) {
       console.warn('getSheets: Cache read failed:', cacheError.message);
     }
 
-    console.log('getSheets: Fetching spreadsheets for user:', `${email.split('@')[0]}@***`);
 
-    // ✅ CLAUDE.md準拠: Direct DriveApp access for own resources
+    // Direct DriveApp access for own resources
     const drive = DriveApp;
     const spreadsheets = drive.searchFiles('mimeType="application/vnd.google-apps.spreadsheet"');
 
@@ -956,7 +937,7 @@ function getSheets() {
         });
         processedCount++;
 
-        // 🛡️ Safety limit to prevent timeout
+        // Safety limit to prevent timeout
         if (processedCount > 100) {
           console.warn('getSheets: Processing limit reached (100 files)');
           break;
@@ -974,13 +955,11 @@ function getSheets() {
       processingLimited: processedCount > 100
     };
 
-    console.log('getSheets: Found', sheets.length, 'spreadsheets for user:', `${email.split('@')[0]}@***`);
 
-    // 🚀 Performance optimization: Cache results for 5 minutes
+    // Performance optimization: Cache results for 5 minutes
     try {
       const cacheTtl = CACHE_DURATION.LONG; // 300 seconds
       CacheService.getScriptCache().put(cacheKey, JSON.stringify(result), cacheTtl);
-      console.log('getSheets: Results cached for user:', `${email.split('@')[0]}@***`, 'TTL:', cacheTtl, 's');
     } catch (cacheError) {
       console.warn('getSheets: Cache write failed:', cacheError.message);
     }
@@ -1005,7 +984,7 @@ function getSheets() {
 function validateHeaderIntegrity(targetUserId) {
   try {
     const currentEmail = getCurrentEmail();
-    // 🔧 GAS-Native: 直接Data使用
+    // Direct Data usage
     let targetUser = targetUserId ? findUserById(targetUserId) : null;
     if (!targetUser && currentEmail) {
       targetUser = findUserByEmail(currentEmail);
@@ -1026,7 +1005,7 @@ function validateHeaderIntegrity(targetUserId) {
       };
     }
 
-    // 🔧 CLAUDE.md準拠: Self vs Cross-user access pattern
+    // Self vs Cross-user access pattern
     const isSelfAccess = targetUser.userEmail === currentEmail;
     const dataAccess = openSpreadsheet(config.spreadsheetId, {
       useServiceAccount: !isSelfAccess
@@ -1067,14 +1046,14 @@ function getBoardInfo() {
   try {
     const email = getCurrentEmail();
     if (!email) {
-      console.error('❌ Authentication failed');
+      console.error('Authentication failed');
       return createAuthError();
     }
 
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    // Direct findUserByEmail usage
     const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
-      console.error('❌ User not found:', email);
+      console.error('User not found:', email);
       return { success: false, message: 'User not found' };
     }
 
@@ -1098,7 +1077,7 @@ function getBoardInfo() {
       lastUpdated: config.publishedAt || user.lastModified
     };
   } catch (error) {
-    console.error('❌ getBoardInfo ERROR:', error.message);
+    console.error('getBoardInfo ERROR:', error.message);
     return createExceptionResponse(error);
   }
 }
@@ -1116,21 +1095,13 @@ function getBoardInfo() {
  * @returns {Object} フロントエンド期待形式のデータ
  */
 function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) {
-  // ✅ Simplified parameters - back to working version
+  // Simplified parameters - back to working version
   classFilter = classFilter || null;
   sortOrder = sortOrder || 'newest';
   adminMode = adminMode || false;
   targetUserId = targetUserId || null;
 
   const startTime = Date.now();
-  console.info('getPublishedSheetData: Function called', {
-    classFilter,
-    sortOrder,
-    adminMode,
-    targetUserId,
-    timestamp: new Date().toISOString(),
-    startTime
-  });
 
   try {
     const adminAuth = getBatchedAdminAuth({ allowNonAdmin: true });
@@ -1147,7 +1118,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
     const { email: viewerEmail, isAdmin: isSystemAdmin } = adminAuth;
 
     if (targetUserId) {
-      // ✅ CLAUDE.md準拠: 認証済み情報を再利用 - 重複チェック排除
+      // Reuse authenticated info - eliminate duplicate checks
       const targetUser = findUserById(targetUserId);
       if (!targetUser) {
         return {
@@ -1159,7 +1130,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         };
       }
 
-      // ✅ CLAUDE.md準拠: 70x Performance Improvement - 設定も事前取得（DB重複アクセス排除）
+      // Performance improvement - preload config to avoid duplicate DB access
       const configResult = getUserConfig(targetUserId, targetUser);
       const targetUserConfig = configResult.success ? configResult.config : {};
 
@@ -1170,27 +1141,14 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         includeTimestamp: true,
         adminMode: isSystemAdmin || (targetUser.userEmail === viewerEmail),
         requestingUser: viewerEmail,
-        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin } // ✅ 認証情報を渡して重複認証回避
+        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin } // Pass auth info to avoid duplicate authentication
       };
 
       const dataFetchStart = Date.now();
-      console.info('getPublishedSheetData: Starting getUserSheetData call', {
-        targetUserId: targetUser.userId,
-        dataFetchStart,
-        options
-      });
 
-      // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得データを渡してDB重複アクセス排除
+      // Performance improvement - pass preloaded data to avoid duplicate DB access
       const result = getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig);
       const dataFetchEnd = Date.now();
-
-      console.info('getPublishedSheetData: getUserSheetData completed', {
-        hasResult: !!result,
-        success: result?.success,
-        dataLength: result?.data?.length || 0,
-        executionTime: dataFetchEnd - dataFetchStart,
-        totalTime: dataFetchEnd - startTime
-      });
 
       if (!result || !result.success) {
         console.error('getPublishedSheetData: getUserSheetData failed', {
@@ -1214,27 +1172,16 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         sheetName: result.sheetName || 'Sheet1'
       };
 
-      console.info('getPublishedSheetData: Final result prepared', {
-        dataLength: finalResult.data.length,
-        hasHeader: !!finalResult.header,
-        hasSheetName: !!finalResult.sheetName,
-        totalExecutionTime: Date.now() - startTime
-      });
-
-      // ✅ Safe serialization test before return
+      // Safe serialization test before return
       try {
         const testSerialization = JSON.stringify(finalResult);
-        console.info('getPublishedSheetData: Serialization test passed', {
-          serializationLength: testSerialization.length,
-          isValidJson: true
-        });
 
-        // ✅ Create clean, safe result object with Date protection
+        // Create clean, safe result object with Date protection
         const safeResult = {
           success: true,
           data: Array.isArray(finalResult.data) ? finalResult.data.map(item => {
             if (typeof item === 'object' && item !== null) {
-              // ✅ Deep clean with Date object protection
+              // Deep clean with Date object protection
               const cleaned = {};
               for (const [key, value] of Object.entries(item)) {
                 if (value instanceof Date) {
@@ -1257,12 +1204,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
           sheetName: String(finalResult.sheetName || 'Sheet1')
         };
 
-        console.info('getPublishedSheetData: Safe result created, returning to frontend', {
-          dataLength: safeResult.data.length,
-          headerLength: safeResult.header.length,
-          sheetNameLength: safeResult.sheetName.length
-        });
-
         return safeResult;
 
       } catch (serializationError) {
@@ -1273,7 +1214,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
           sheetNameType: typeof finalResult.sheetName
         });
 
-        // ✅ Return minimal safe response
+        // Return minimal safe response
         return {
           success: true,
           data: [],
@@ -1283,7 +1224,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       }
     }
 
-    // ✅ 既存認証情報活用 - 認証済み情報でユーザー検索
+    // Use existing authentication info for user search
     const user = findUserByEmail(viewerEmail, {
       requestingUser: viewerEmail,
       adminMode: isSystemAdmin,
@@ -1300,11 +1241,11 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       };
     }
 
-    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 設定も事前取得（DB重複アクセス排除）
+    // Performance improvement - preload config to avoid duplicate DB access
     const configResult = getUserConfig(user.userId, user);
     const userConfig = configResult.success ? configResult.config : {};
 
-    // ✅ Simplified options - remove pagination complexity
+    // Simplified options - remove pagination complexity
     const options = {
       classFilter: classFilter !== 'すべて' ? classFilter : undefined,
       sortBy: sortOrder || 'newest',
@@ -1315,25 +1256,12 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
     };
 
     const dataFetchStart = Date.now();
-    console.info('getPublishedSheetData: Starting getUserSheetData call (self-access)', {
-      userId: user.userId,
-      dataFetchStart,
-      options
-    });
 
-    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得データを渡してDB重複アクセス排除
+    // 70x Performance Improvement - 事前取得データを渡してDB重複アクセス排除
     const result = getUserSheetData(user.userId, options, user, userConfig);
     const dataFetchEnd = Date.now();
 
-    console.info('getPublishedSheetData: getUserSheetData completed (self-access)', {
-      hasResult: !!result,
-      success: result?.success,
-      dataLength: result?.data?.length || 0,
-      executionTime: dataFetchEnd - dataFetchStart,
-      totalTime: dataFetchEnd - startTime
-    });
-
-    // ✅ Simple null check and direct return
+    //Simple null check and direct return
     if (!result || !result.success) {
       console.error('getPublishedSheetData: getUserSheetData failed (self-access)', {
         result,
@@ -1363,7 +1291,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       totalExecutionTime: Date.now() - startTime
     });
 
-    // ✅ Safe serialization test before return (self-access)
+    //Safe serialization test before return (self-access)
     try {
       const testSerialization = JSON.stringify(finalResult);
       console.info('getPublishedSheetData: Serialization test passed (self-access)', {
@@ -1371,12 +1299,12 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         isValidJson: true
       });
 
-      // ✅ Create clean, safe result object with Date protection (self-access)
+      //Create clean, safe result object with Date protection (self-access)
       const safeResult = {
         success: true,
         data: Array.isArray(finalResult.data) ? finalResult.data.map(item => {
           if (typeof item === 'object' && item !== null) {
-            // ✅ Deep clean with Date object protection
+            //Deep clean with Date object protection
             const cleaned = {};
             for (const [key, value] of Object.entries(item)) {
               if (value instanceof Date) {
@@ -1415,7 +1343,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         sheetNameType: typeof finalResult.sheetName
       });
 
-      // ✅ Return minimal safe response
+      //Return minimal safe response
       return {
         success: true,
         data: [],
@@ -1444,18 +1372,12 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 }
 
 
-// ===========================================
-// 🔧 Unified Validation Functions
-// ===========================================
+// Unified Validation Functions
 
-// ===========================================
-// 🔧 Unified Data Operations
-// ===========================================
+// Unified Data Operations
 
 
-// ===========================================
-// 🔧 Additional HTML-Called Functions
-// ===========================================
+// Additional HTML-Called Functions
 
 /**
  * Get sheet list for spreadsheet - simplified name
@@ -1475,21 +1397,18 @@ function getSheetList(spreadsheetId) {
       };
     }
 
-    console.log('getSheetList: Access by user:', `${currentEmail.split('@')[0]}@***`, 'for spreadsheet:', `${spreadsheetId.substring(0, 8)}***`);
 
-    // ✅ CLAUDE.md準拠: Progressive access - try normal permissions first, fallback to service account
+    // Progressive access - try normal permissions first, fallback to service account
     // This ensures editors can access their own spreadsheets with appropriate permissions
     let dataAccess = null;
     let usedServiceAccount = false;
 
     try {
       // First attempt: Normal permissions
-      console.log('getSheetList: Attempting normal permissions access');
       dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
 
       if (!dataAccess || !dataAccess.spreadsheet) {
         // Second attempt: Service account (for cross-user access or permission issues)
-        console.log('getSheetList: Fallback to service account access');
         dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
         usedServiceAccount = true;
       }
@@ -1510,7 +1429,6 @@ function getSheetList(spreadsheetId) {
     }
 
     const { spreadsheet } = dataAccess;
-    console.log('getSheetList: Successfully accessed spreadsheet via', usedServiceAccount ? 'service account' : 'normal permissions');
 
     const sheets = spreadsheet.getSheets();
 
@@ -1521,7 +1439,6 @@ function getSheetList(spreadsheetId) {
       columnCount: sheet.getLastColumn()
     }));
 
-    console.log('getSheetList: Found', sheetList.length, 'sheets in spreadsheet:', `${spreadsheetId.substring(0, 8)}***`);
 
     return {
       success: true,
@@ -1555,7 +1472,7 @@ function getDataCount(classFilter, sortOrder, adminMode = false) {
       return { error: 'Authentication required', count: 0 };
     }
 
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    // Direct findUserByEmail usage
     const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return { error: 'User not found', count: 0 };
@@ -1596,7 +1513,7 @@ function saveConfig(config, options = {}) {
       return { success: false, message: 'ユーザー認証が必要です' };
     }
 
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
+    // Direct findUserByEmail usage
     const user = findUserByEmail(userEmail);
     if (!user) {
       return { success: false, message: 'ユーザーが見つかりません' };
@@ -1617,9 +1534,7 @@ function saveConfig(config, options = {}) {
   }
 }
 
-// ===========================================
-// 🎯 f0068fa復元機能 - GAS-Native Architecture準拠
-// ===========================================
+// f0068fa restoration function - GAS-Native Architecture
 
 
 /**
@@ -1633,17 +1548,12 @@ function saveConfig(config, options = {}) {
  */
 function getNotificationUpdate(targetUserId, options = {}) {
   const startTime = Date.now();
-  const logPrefix = '🔔 getNotificationUpdate:';
+  const logPrefix = 'getNotificationUpdate:';
 
   try {
-    // ✅ 入力パラメータの詳細ログ
-    console.log(`${logPrefix} Starting`, {
-      targetUserId: targetUserId ? `${targetUserId.substring(0, 8)}***` : 'null',
-      optionsKeys: options ? Object.keys(options) : 'null',
-      timestamp: new Date().toISOString()
-    });
+    // Input parameter validation
 
-    // ✅ null安全性: targetUserIdの検証
+    //null安全性: targetUserIdの検証
     if (!targetUserId || typeof targetUserId !== 'string') {
       console.warn(`${logPrefix} Invalid targetUserId:`, typeof targetUserId);
       return {
@@ -1671,7 +1581,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
       };
     }
 
-    // ✅ 対象ユーザー取得（null安全性強化）
+    //対象ユーザー取得（null安全性強化）
     const targetUser = findUserById(targetUserId);
     if (!targetUser) {
       console.warn(`${logPrefix} Target user not found:`, {
@@ -1689,7 +1599,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
       };
     }
 
-    // ✅ ユーザーデータの完全性検証
+    //ユーザーデータの完全性検証
     if (!targetUser.spreadsheetId || !targetUser.userEmail) {
       console.warn(`${logPrefix} Target user data incomplete:`, {
         hasSpreadsheetId: !!targetUser.spreadsheetId,
@@ -1721,11 +1631,6 @@ function getNotificationUpdate(targetUserId, options = {}) {
       } else {
         lastUpdate = new Date(0); // 初回チェック
       }
-      console.log('getNotificationUpdate: lastUpdateTime parsing:', {
-        input: options.lastUpdateTime,
-        inputType: typeof options.lastUpdateTime,
-        parsed: lastUpdate.toISOString()
-      });
     } catch (e) {
       console.warn('getNotificationUpdate: timestamp parse error', e);
       lastUpdate = new Date(0);
@@ -1734,7 +1639,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     // 統合データ取得（自己アクセス vs クロスユーザーアクセス）
     let currentData;
     if (isSelfAccess) {
-      // ✅ 自己アクセス：通常権限
+      //自己アクセス：通常権限
       currentData = getUserSheetData(targetUser.userId, {
         includeTimestamp: true,
         classFilter: options.classFilter,
@@ -1742,7 +1647,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
         requestingUser: viewerEmail
       });
     } else {
-      // ✅ クロスユーザーアクセス：サービスアカウント（getViewerBoardDataパターン）
+      //クロスユーザーアクセス：サービスアカウント（getViewerBoardDataパターン）
       currentData = getUserSheetData(targetUser.userId, {
         includeTimestamp: true,
         classFilter: options.classFilter,
@@ -1766,20 +1671,11 @@ function getNotificationUpdate(targetUserId, options = {}) {
       };
     }
 
-    // ✅ 修正: 時刻ベース統一新着検出（件数ベース比較完全除去）
+    //修正: 時刻ベース統一新着検出（件数ベース比較完全除去）
     let newItemsCount = 0;
     const newItems = [];
     const incrementalData = currentData.data || [];
 
-    console.log('getNotificationUpdate: Starting timestamp comparison:', {
-      lastUpdate: lastUpdate.toISOString(),
-      totalItems: currentData.data.length,
-      firstItemSample: currentData.data[0] ? {
-        hasTimestamp: !!currentData.data[0].timestamp,
-        timestamp: currentData.data[0].timestamp,
-        name: currentData.data[0].name || 'N/A'
-      } : null
-    });
 
     // 時刻ベース新着検出のみ
     currentData.data.forEach((item, index) => {
@@ -1793,14 +1689,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
       }
 
       const isNew = itemTimestamp > lastUpdate;
-      if (index < 3) { // 最初の3件をログ出力
-        console.log(`getNotificationUpdate: Item ${index} timestamp check:`, {
-          itemTimestamp: itemTimestamp.toISOString(),
-          lastUpdate: lastUpdate.toISOString(),
-          isNew,
-          hasTimestamp: !!item.timestamp
-        });
-      }
+      // Check if item is new based on timestamp
 
       if (isNew) {
         newItemsCount++;
@@ -1815,7 +1704,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
 
     const hasNewContent = newItemsCount > 0;
 
-    // ✅ 修正: 時刻ベース統一レスポンス + フィルター情報追加（論理的破綻修正）
+    //修正: 時刻ベース統一レスポンス + フィルター情報追加（論理的破綻修正）
     const response = {
       success: true,
       hasNewContent,
@@ -1828,7 +1717,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
       header: currentData.header,
       timestamp: new Date().toISOString(),
       lastUpdateTime: lastUpdate.toISOString(),
-      // ✅ 追加: 使用されたフィルター情報（フィルター状態不整合の修正）
+      //追加: 使用されたフィルター情報（フィルター状態不整合の修正）
       appliedFilter: {
         classFilter: options.classFilter,
         sortOrder: options.sortOrder,
@@ -1836,19 +1725,10 @@ function getNotificationUpdate(targetUserId, options = {}) {
       }
     };
 
-    // ✅ 実行時間測定とパフォーマンスログ
+    // Performance measurement
     const executionTime = Date.now() - startTime;
-    console.log(`${logPrefix} Final response:`, {
-      success: response.success,
-      hasNewContent: response.hasNewContent,
-      newItemsCount: response.newItemsCount,
-      totalDataItems: response.data.length,
-      targetUserId: `${response.targetUserId.substring(0, 8)  }***`,
-      executionTime: `${executionTime}ms`,
-      isPerformant: executionTime < 2000
-    });
 
-    // ✅ パフォーマンス警告
+    //パフォーマンス警告
     if (executionTime > 3000) {
       console.warn(`${logPrefix} Slow execution detected:`, {
         executionTime: `${executionTime}ms`,
@@ -1862,7 +1742,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
   } catch (error) {
     const executionTime = Date.now() - startTime;
 
-    // ✅ エラー詳細ログ強化
+    //エラー詳細ログ強化
     console.error(`${logPrefix} Error occurred:`, {
       error: error.message,
       stack: error.stack ? `${error.stack.substring(0, 200)  }...` : 'No stack trace',
@@ -1872,7 +1752,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
       timestamp: new Date().toISOString()
     });
 
-    // ✅ 統一されたエラーレスポンス
+    //統一されたエラーレスポンス
     return {
       success: false,
       hasNewContent: false,
@@ -1904,7 +1784,7 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
       };
     }
 
-    // ✅ CLAUDE.md準拠: Editor access for own spreadsheets
+    // Editor access for own spreadsheets
     // getColumnAnalysis内で詳細なアクセス権チェックが実装済み
     console.log('connectDataSource: Access by user:', `${email.split('@')[0]}@***`);
 
@@ -1935,7 +1815,7 @@ function processDataSourceOperations(spreadsheetId, sheetName, operations) {
       message: '統合処理完了'
     };
 
-    // 🎯 最適化: getColumnAnalysisの結果をキャッシュして再利用
+    // Optimization: cache getColumnAnalysis results for reuse
     let columnAnalysisResult = null;
 
     // 各操作を効率的に実行（重複API呼び出し回避）
@@ -1958,7 +1838,7 @@ function processDataSourceOperations(spreadsheetId, sheetName, operations) {
           results.batchResults.formInfo = getFormInfoInternal(spreadsheetId, sheetName);
           break;
         case 'connectDataSource': {
-          // ✅ キャッシュされた結果を使用（重複API呼び出しなし）
+          //キャッシュされた結果を使用（重複API呼び出しなし）
           if (!columnAnalysisResult) {
             columnAnalysisResult = getColumnAnalysis(spreadsheetId, sheetName);
           }
@@ -2005,7 +1885,7 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
 
     const isAdmin = isAdministrator(email);
 
-    // ✅ CLAUDE.md準拠: Enhanced access control for editor users
+    // Enhanced access control for editor users
     // 管理者は任意のスプレッドシートにアクセス、編集ユーザーは自分がアクセス権を持つもののみ
     let dataAccess;
     try {
@@ -2014,7 +1894,6 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
       if (!dataAccess) {
         if (isAdmin) {
           // 管理者の場合、サービスアカウントでリトライ
-          console.log('getColumnAnalysis: Admin fallback to service account access');
           dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
         }
 
@@ -2039,33 +1918,31 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
       return { success: false, message: 'Sheet not found' };
     }
 
-    // 🔧 高精度分析用データ取得
+    // High-precision analysis data retrieval
     const lastCol = sheet.getLastColumn();
     const lastRow = sheet.getLastRow();
     const headers = lastCol > 0 ? getSheetHeaders(sheet, lastCol) : [];
 
-    // 🎯 サンプルデータ取得（ハイブリッドシステム用）
+    // Sample data retrieval for hybrid system
     let sampleData = [];
     if (lastRow > 1 && lastCol > 0) {
       const sampleSize = Math.min(10, lastRow - 1); // 最大10行のサンプル
       try {
         const dataRange = sheet.getRange(2, 1, sampleSize, lastCol);
         sampleData = dataRange.getValues();
-        console.log(`getColumnAnalysis: サンプルデータ ${sampleSize}行取得完了`);
       } catch (sampleError) {
         console.warn('getColumnAnalysis: サンプルデータ取得失敗:', sampleError.message);
         sampleData = [];
       }
     }
 
-    // 🎯 高精度ColumnMappingService活用（サンプルデータ付き）
+    // High-precision ColumnMappingService with sample data
     const diagnostics = performIntegratedColumnDiagnostics(headers, { sampleData });
 
-    // ✅ 編集者自身のアカウントでリアクション列・ハイライト列を事前追加
+    //編集者自身のアカウントでリアクション列・ハイライト列を事前追加
     try {
       const columnSetupResult = setupReactionAndHighlightColumns(spreadsheetId, sheetName, headers);
       if (columnSetupResult.columnsAdded && columnSetupResult.columnsAdded.length > 0) {
-        console.log(`getColumnAnalysis: Added columns: ${columnSetupResult.columnsAdded.join(', ')}`);
         // ヘッダーを再取得して更新されたリストを返す
         const updatedSheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
         const updatedLastCol = updatedSheet.getLastColumn();
@@ -2111,7 +1988,6 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
 function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeaders = []) {
   try {
     const email = getCurrentEmail();
-    console.log(`setupReactionAndHighlightColumns: Setting up columns for ${email ? `${email.split('@')[0]}@***` : 'unknown'}`);
 
     // 編集者自身のアカウントで直接アクセス（サービスアカウント不使用）
     const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
@@ -2140,8 +2016,6 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
 
       if (!exists) {
         columnsToAdd.push(columnName);
-      } else {
-        console.log(`setupReactionAndHighlightColumns: Column ${columnName} already exists`);
       }
     });
 
@@ -2159,7 +2033,6 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
           // ヘッダー行に列名を設定
           sheet.getRange(1, newColIndex).setValue(columnName);
           columnsAdded.push(columnName);
-          console.log(`setupReactionAndHighlightColumns: Successfully added column '${columnName}' at position ${newColIndex}`);
         } catch (colError) {
           console.error(`setupReactionAndHighlightColumns: Failed to add column '${columnName}':`, colError.message);
         }
@@ -2237,9 +2110,7 @@ function getFormInfoInternal(spreadsheetId, sheetName) {
 }
 
 
-// ===========================================
-// 🔧 Missing API Functions for Frontend Error Fix
-// ===========================================
+// Missing API Functions for Frontend Error Fix
 
 
 /**
@@ -2251,7 +2122,7 @@ function getActiveFormInfo(userId) {
   try {
     const currentEmail = getCurrentEmail();
     if (!currentEmail) {
-      console.error('❌ Authentication failed');
+      console.error('Authentication failed');
       return {
         success: false,
         message: 'Authentication required',
@@ -2260,13 +2131,13 @@ function getActiveFormInfo(userId) {
       };
     }
 
-    // 🔧 GAS-Native統一: userIdが指定されていればそのユーザーの設定を取得（board owner's form）
+    // Get user config if userId specified (board owner's form)
     // 指定されていなければ現在のユーザーの設定を取得（backward compatibility）
     let targetUserId = userId;
     if (!targetUserId) {
       const currentUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
       if (!currentUser) {
-        console.error('❌ Current user not found:', currentEmail);
+        console.error('Current user not found:', currentEmail);
         return {
           success: false,
           message: 'User not found',
@@ -2340,14 +2211,10 @@ function isValidFormUrl(url) {
 }
 
 
-// ===========================================
-// 🔄 CLAUDE.md準拠: GAS-side Trigger-Based Polling System
-// ===========================================
+// GAS-side Trigger-Based Polling System
 
 
-// ===========================================
-// 🔧 Missing API Endpoints - Frontend/Backend Compatibility
-// ===========================================
+// Missing API Endpoints - Frontend/Backend Compatibility
 
 
 
@@ -2355,9 +2222,7 @@ function isValidFormUrl(url) {
 
 
 
-// ===========================================
 // 🆕 CLAUDE.md準拠: 完全自動化データソース選択システム
-// ===========================================
 
 /**
  * スプレッドシートURL解析 - GAS-Native Implementation
@@ -2373,7 +2238,7 @@ function extractSpreadsheetInfo(fullUrl) {
       };
     }
 
-    // ✅ V8ランタイム対応: const使用 + 正規表現最適化
+    //V8ランタイム対応: const使用 + 正規表現最適化
     const spreadsheetIdMatch = fullUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
     const gidMatch = fullUrl.match(/[#&]gid=(\d+)/);
 
@@ -2407,14 +2272,14 @@ function extractSpreadsheetInfo(fullUrl) {
 function getSheetNameFromGid(spreadsheetId, gid) {
   try {
 
-    // ✅ CLAUDE.md準拠: Exponential backoff retry for resilient spreadsheet access
+    // Exponential backoff retry for resilient spreadsheet access
     const spreadsheet = executeWithRetry(
       () => SpreadsheetApp.openById(spreadsheetId),
       { operationName: 'SpreadsheetApp.openById', maxRetries: 3 }
     );
     const sheets = spreadsheet.getSheets();
 
-    // ✅ Batch Operations: 全シート情報を一括取得（70x improvement）
+    //Batch Operations: 全シート情報を一括取得（70x improvement）
     const sheetInfos = sheets.map(sheet => ({
       name: sheet.getName(),
       gid: sheet.getSheetId().toString()
@@ -2494,11 +2359,9 @@ function validateCompleteSpreadsheetUrl(fullUrl) {
   }
 }
 
-// ===========================================
 // 🆕 Missing Functions Implementation - Frontend Compatibility
-// ===========================================
 
-// ✅ CLAUDE.md準拠: システム管理関数をSystemController.gsに移動済み
+// システム管理関数をSystemController.gsに移動済み
 
 /**
  * Secure GAS function caller - CLAUDE.md準拠セキュリティ強化版
@@ -2514,11 +2377,11 @@ function callGAS(functionName, options = {}, ...args) {
     const email = getCurrentEmail();
     if (!email) {
       // Security log for unauthorized access attempts
-      console.warn('🚨 callGAS: Unauthorized access attempt (no email)');
+      console.warn('callGAS: Unauthorized access attempt (no email)');
       return createAuthError();
     }
 
-    // ✅ CLAUDE.md準拠: 厳格なセキュリティホワイトリスト
+    // 厳格なセキュリティホワイトリスト
     // 管理者専用関数と一般ユーザー関数を分離
     const publicFunctions = [
       'getCurrentEmail',
@@ -2544,9 +2407,9 @@ function callGAS(functionName, options = {}, ...args) {
       allowedFunctions.push(...adminOnlyFunctions);
     }
 
-    // 🛡️ セキュリティチェック：関数名検証
+    // Security check: function name validation
     if (!functionName || typeof functionName !== 'string') {
-      console.warn('🚨 callGAS: Invalid function name:', functionName);
+      console.warn('callGAS: Invalid function name:', functionName);
       return {
         success: false,
         message: 'Invalid function name provided',
@@ -2556,7 +2419,7 @@ function callGAS(functionName, options = {}, ...args) {
 
     if (!allowedFunctions.includes(functionName)) {
       // Security log for unauthorized function access attempts
-      console.warn('🚨 callGAS: Unauthorized function access attempt:', {
+      console.warn('callGAS: Unauthorized function access attempt:', {
         functionName,
         userEmail: email ? `${email.split('@')[0]}@***` : 'N/A',
         isAdmin,
@@ -2573,7 +2436,7 @@ function callGAS(functionName, options = {}, ...args) {
 
     // 🔍 引数検証：過大な引数チェック
     if (args.length > 10) {
-      console.warn('🚨 callGAS: Excessive arguments detected:', args.length);
+      console.warn('callGAS: Excessive arguments detected:', args.length);
       return {
         success: false,
         message: 'Too many arguments provided',
@@ -2581,13 +2444,13 @@ function callGAS(functionName, options = {}, ...args) {
       };
     }
 
-    // ✅ 関数実行（安全な環境で）
+    //関数実行（安全な環境で）
     if (typeof this[functionName] === 'function') {
       try {
         const result = this[functionName].apply(this, args);
 
         // Success audit log
-        console.info('✅ callGAS: Function executed successfully:', {
+        console.info('callGAS: Function executed successfully:', {
           functionName,
           userEmail: email ? `${email.split('@')[0]}@***` : 'N/A',
           isAdmin,
@@ -2604,7 +2467,7 @@ function callGAS(functionName, options = {}, ...args) {
         };
       } catch (functionError) {
         // Function execution error log
-        console.error('❌ callGAS: Function execution error:', {
+        console.error('callGAS: Function execution error:', {
           functionName,
           error: functionError.message,
           userEmail: email ? `${email.split('@')[0]}@***` : 'N/A'
@@ -2620,7 +2483,7 @@ function callGAS(functionName, options = {}, ...args) {
         };
       }
     } else {
-      console.warn('🚨 callGAS: Function not found:', functionName);
+      console.warn('callGAS: Function not found:', functionName);
       return {
         success: false,
         message: `Function '${functionName}' not found or not accessible`,
@@ -2632,7 +2495,7 @@ function callGAS(functionName, options = {}, ...args) {
 
   } catch (error) {
     // Critical security error log
-    console.error('🚨 callGAS: Critical security error:', {
+    console.error('callGAS: Critical security error:', {
       error: error.message,
       functionName,
       timestamp: new Date().toISOString()
@@ -2718,7 +2581,7 @@ function checkUserAuthentication() {
  */
 function getBatchedViewerData(targetUserId, currentEmail) {
   try {
-    // ✅ Batch operation: Get all required data in single coordinated call
+    //Batch operation: Get all required data in single coordinated call
     const targetUser = findUserById(targetUserId, { requestingUser: currentEmail });
     if (!targetUser) {
       return { success: false, error: '対象ユーザーが見つかりません' };
@@ -2761,19 +2624,19 @@ function getBatchedViewerData(targetUserId, currentEmail) {
  */
 function getBatchedAdminData(targetUserId) {
   try {
-    // ✅ Batch operation: Get current email from session
+    //Batch operation: Get current email from session
     const currentEmail = getCurrentEmail();
     if (!currentEmail) {
       return { success: false, error: 'ユーザー認証が必要です' };
     }
 
-    // ✅ 対象ユーザーの存在確認
+    //対象ユーザーの存在確認
     const targetUser = findUserById(targetUserId, { requestingUser: currentEmail });
     if (!targetUser) {
       return { success: false, error: '指定されたユーザーが見つかりません' };
     }
 
-    // ✅ 権限チェック: 管理者またはターゲットユーザー本人のみアクセス可能
+    //権限チェック: 管理者またはターゲットユーザー本人のみアクセス可能
     const isAdmin = isAdministrator(currentEmail);
     const isOwnBoard = currentEmail === targetUser.userEmail;
 
@@ -2784,7 +2647,7 @@ function getBatchedAdminData(targetUserId) {
       };
     }
 
-    // ✅ 編集者権限の追加確認（管理者でない場合）
+    //編集者権限の追加確認（管理者でない場合）
     if (!isAdmin && !targetUser.isActive) {
       return { success: false, error: '対象ユーザーがアクティブではありません' };
     }
@@ -2792,11 +2655,11 @@ function getBatchedAdminData(targetUserId) {
     const configResult = getUserConfig(targetUserId);
     const config = configResult.success ? configResult.config : {};
 
-    // ✅ CLAUDE.md準拠: フロントエンド必要情報を統合取得
+    // フロントエンド必要情報を統合取得
     const questionText = getQuestionText(config, { targetUserEmail: targetUser.userEmail });
 
-    // ✅ URLs とタイムスタンプ情報を config に統合
-    // ✅ Optimized: Use database lastModified instead of config lastModified
+    //URLs とタイムスタンプ情報を config に統合
+    //Optimized: Use database lastModified instead of config lastModified
     const baseUrl = ScriptApp.getService().getUrl();
     const enhancedConfig = {
       ...config,
@@ -2891,7 +2754,7 @@ function getBatchedAdminAuth(options = {}) {
  */
 function getBatchedUserConfig() {
   try {
-    // ✅ Batch operation: Get email, user, and config in single coordinated call
+    //Batch operation: Get email, user, and config in single coordinated call
     const email = getCurrentEmail();
     if (!email) {
       return {
@@ -2977,7 +2840,7 @@ function executeWithRetry(operation, options = {}) {
 
       // Success - log only if this was a retry
       if (retryCount > 0) {
-        console.info(`✅ ${operationName}: Succeeded on retry ${retryCount}`);
+        console.info(`${operationName}: Succeeded on retry ${retryCount}`);
       }
 
       return result;
@@ -2991,7 +2854,7 @@ function executeWithRetry(operation, options = {}) {
       // Check if this is a retryable error
       const isRetryable = isRetryableError(errorMessage);
 
-      console.warn(`❌ ${operationName}: Attempt ${retryCount} failed: ${errorMessage}`);
+      console.warn(`${operationName}: Attempt ${retryCount} failed: ${errorMessage}`);
 
       // Don't retry if error is not retryable or we've reached max retries
       if (!isRetryable || retryCount >= maxRetries) {
@@ -3002,7 +2865,7 @@ function executeWithRetry(operation, options = {}) {
 
   // All retries exhausted
   const finalError = lastError && lastError.message ? lastError.message : 'Unknown error';
-  console.error(`🚨 ${operationName}: Failed after ${retryCount} attempts: ${finalError}`);
+  console.error(`${operationName}: Failed after ${retryCount} attempts: ${finalError}`);
   throw lastError || new Error(`${operationName} failed after ${retryCount} attempts`);
 }
 
@@ -3059,9 +2922,7 @@ function isRetryableError(errorMessage) {
   return true;
 }
 
-// ===========================================
-// 📊 Performance Metrics API - Priority 1 Enhancement
-// ===========================================
+// Performance Metrics API - Priority 1 Enhancement
 
 /**
  * パフォーマンスメトリクス取得API (管理者専用)
@@ -3106,9 +2967,7 @@ function diagnosePerformance(options = {}) {
   }
 }
 
-// ===========================================
-// 🔒 Application Access Control - アプリ全体制御機能
-// ===========================================
+// Application Access Control - app-wide control functions
 
 /**
  * アプリ全体のアクセス制限状態をチェック

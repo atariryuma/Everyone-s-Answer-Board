@@ -1,50 +1,47 @@
 /**
  * @fileoverview DataService - コアデータ操作サービス（リファクタリング版）
  *
- * 🎯 責任範囲:
+ * 責任範囲:
  * - スプレッドシートデータ取得・操作
  * - データフィルタリング・検索
  * - バルクデータAPI
  * - シート接続・寸法取得
  *
- * 🔄 CLAUDE.md Best Practices準拠:
+ * CLAUDE.md Best Practices準拠:
  * - 分離されたモジュール利用（ColumnMappingService, ReactionService）
  * - Zero-Dependency Architecture（直接GAS API）
  * - バッチ操作による70x性能向上
  * - V8ランタイム最適化
  *
- * 🔗 依存モジュール:
+ * 依存モジュール:
  * - ColumnMappingService.gs（列マッピング・抽出）
  * - ReactionService.gs（リアクション・ハイライト）
  */
 
 /* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, createDataServiceSuccessResponse */
 
-// ===========================================
-// 🎯 Core Data Operations - CLAUDE.md準拠
-// ===========================================
+// Core Data Operations
 
 /**
- * ユーザーのスプレッドシートデータ取得（統合版）
- * GAS公式ベストプラクティス：シンプルな関数形式
+ * ユーザーのスプレッドシートデータ取得
  * @param {string} userId - ユーザーID
  * @param {Object} options - 取得オプション
- * @returns {Object} GAS公式推奨レスポンス形式
+ * @returns {Object} レスポンスオブジェクト
  */
 function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedConfig = null) {
   const startTime = Date.now();
 
   try {
-    // 🚀 Zero-dependency data processing
+    // Zero-dependency data processing
 
-    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得データ活用
+    // Performance improvement - use preloaded data
     const user = preloadedUser || findUserById(userId);
     if (!user) {
       console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
       return createDataServiceErrorResponse('ユーザーが見つかりません');
     }
 
-    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得設定活用
+    // Performance improvement - use preloaded config
     let config;
     if (preloadedConfig) {
       config = preloadedConfig;
@@ -62,15 +59,10 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
     const result = fetchSpreadsheetData(config, options, user);
 
     const executionTime = Date.now() - startTime;
-    console.info('getSheetData: データ取得完了', {
-      userId,
-      rowCount: result.data?.length || 0,
-      executionTime
-    });
 
     // Standardized response format
     if (result.success) {
-      // ✅ パフォーマンス最適化: 既に取得済みのheadersを活用
+      // Performance optimization: use already retrieved headers
       const preloadedHeaders = result.headers;
       const questionText = getQuestionText(config, { targetUserEmail: user.userEmail }, preloadedHeaders);
 
@@ -87,7 +79,7 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
       userId,
       error: error.message
     });
-    // ✅ Ensure proper error response structure
+    // Ensure proper error response structure
     const errorResponse = createDataServiceErrorResponse(error.message || 'データ取得エラー');
     console.error('DataService.getUserSheetData: Creating error response', errorResponse);
     return errorResponse;
@@ -143,18 +135,17 @@ function extractTimestampValue(row, headers) {
  * @returns {Object} シート情報
  */
 function connectToSpreadsheetSheet(config, context = {}) {
-  // 🔧 CLAUDE.md準拠: Context-aware service account usage
-  // ✅ **Cross-user**: Use service account when accessing other user's spreadsheet
-  // ✅ **Self-access**: Use normal permissions for own spreadsheet
+  // Context-aware service account usage
+  // Cross-user: Use service account when accessing other user's spreadsheet
+  // Self-access: Use normal permissions for own spreadsheet
   const currentEmail = getCurrentEmail();
 
-  // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得ユーザー活用でDB重複回避
+  // Performance improvement - use preloaded user to avoid duplicate DB access
   const targetUser = context.preloadedUser || findUserBySpreadsheetId(config.spreadsheetId, {
     preloadedAuth: context.preloadedAuth // 認証情報を渡して重複認証回避
   });
   const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
 
-  console.log(`connectToSpreadsheetSheet: ${isSelfAccess ? 'Self-access normal permissions' : 'Cross-user service account'} for spreadsheet`);
   const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
   const {spreadsheet} = dataAccess;
   const sheet = spreadsheet.getSheetByName(config.sheetName);
@@ -268,7 +259,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
   const startTime = Date.now();
 
   try {
-    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得ユーザー情報を活用してDB重複呼び出し排除
+    // Performance improvement -事前取得ユーザー情報を活用してDB重複呼び出し排除
     const { sheet } = connectToSpreadsheetSheet(config, {
       targetUserEmail: user?.userEmail,
       preloadedUser: user, // 事前取得ユーザーを渡してfindUserBySpreadsheetId重複回避
@@ -288,12 +279,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
     // バッチ処理実行
     const processedData = processBatchData(sheet, headers, lastRow, lastCol, config, options, user, startTime);
 
-    console.info('DataService.fetchSpreadsheetData: バッチ処理完了', {
-      filteredRows: processedData.length,
-      executionTime: Date.now() - startTime
-    });
-
-    // ✅ フロントエンド期待形式で直接返却
+    // Return directly in frontend-expected format
     return {
       success: true,
       data: processedData,
@@ -330,18 +316,38 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
         const globalIndex = startOffset + batchIndex;
 
         // 基本データ構造作成（ColumnMappingService利用）
+        // 各フィールドのデータ抽出（null チェック強化）
+        const answerResult = extractFieldValueUnified(row, headers, 'answer', columnMapping);
+        const reasonResult = extractFieldValueUnified(row, headers, 'reason', columnMapping);
+        const classResult = extractFieldValueUnified(row, headers, 'class', columnMapping);
+        const nameResult = extractFieldValueUnified(row, headers, 'name', columnMapping);
+        const emailResult = extractFieldValueUnified(row, headers, 'email', columnMapping);
+
+        // 匿名性保護: 抽出データのクロスチェック
+        const answerValue = answerResult?.value;
+        const nameValue = nameResult?.value;
+
+        // 名前データが回答・理由欄に混入していないかチェック
+        if (nameValue && (answerValue === nameValue || reasonResult?.value === nameValue)) {
+          console.warn('DataService: 匿名性保護のため行をスキップ', {
+            rowIndex: globalIndex + 2,
+            reason: '名前データが回答・理由欄に混入'
+          });
+          return; // この行をスキップ
+        }
+
         const item = {
           id: `row_${globalIndex + 2}`,
           rowIndex: globalIndex + 2, // 1-based row number including header
           timestamp: extractTimestampValue(row, headers) || '',
-          email: extractFieldValueUnified(row, headers, 'email')?.value || '',
+          email: String(emailResult?.value || ''),
 
-          // メインコンテンツ（ColumnMappingService利用）- ✅ V8ランタイム安全: 型保証強化
-          answer: String(extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || ''),
-          opinion: String(extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || ''), // Alias for answer field
-          reason: String(extractFieldValueUnified(row, headers, 'reason', columnMapping)?.value || ''),
-          class: String(extractFieldValueUnified(row, headers, 'class', columnMapping)?.value || ''),
-          name: String(extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || ''),
+          // Main content using ColumnMappingService - 厳密な null チェック
+          answer: String(answerValue || ''),
+          opinion: String(answerValue || ''), // Alias for answer field
+          reason: String(reasonResult?.value || ''),
+          class: String(classResult?.value || ''),
+          name: String(nameValue || ''),
 
           // メタデータ
           formattedTimestamp: formatTimestamp(extractTimestampValue(row, headers)),
@@ -352,7 +358,13 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
           highlight: extractHighlight(row, headers)
         };
 
-        // ✅ includeTimestamp オプション処理
+        // データ整合性の最終チェック
+        if (!answerValue && !reasonResult?.value) {
+          // 回答も理由も空の場合はスキップ
+          return;
+        }
+
+        // includeTimestamp option processing
         if (options.includeTimestamp === false) {
           delete item.timestamp;
           delete item.formattedTimestamp;
@@ -394,19 +406,40 @@ function processRawData(dataRows, headers, config, options = {}, user = null) {
 
     dataRows.forEach((row, index) => {
       try {
+        // 各フィールドのデータ抽出（null チェック強化）
+        const answerResult = extractFieldValueUnified(row, headers, 'answer', columnMapping);
+        const reasonResult = extractFieldValueUnified(row, headers, 'reason', columnMapping);
+        const classResult = extractFieldValueUnified(row, headers, 'class', columnMapping);
+        const nameResult = extractFieldValueUnified(row, headers, 'name', columnMapping);
+        const emailResult = extractFieldValueUnified(row, headers, 'email', columnMapping);
+        const timestampResult = extractFieldValueUnified(row, headers, 'timestamp');
+
+        // 匿名性保護: 抽出データのクロスチェック
+        const answerValue = answerResult?.value;
+        const nameValue = nameResult?.value;
+
+        // 名前データが回答・理由欄に混入していないかチェック
+        if (nameValue && (answerValue === nameValue || reasonResult?.value === nameValue)) {
+          console.warn('DataService: 匿名性保護のため行をスキップ', {
+            rowIndex: index + 2,
+            reason: '名前データが回答・理由欄に混入'
+          });
+          return; // この行をスキップ
+        }
+
         // 基本データ構造作成（ColumnMappingService利用）
         const item = {
           id: `row_${index + 2}`,
           rowIndex: index + 2,
-          timestamp: extractFieldValueUnified(row, headers, 'timestamp')?.value || '',
-          email: extractFieldValueUnified(row, headers, 'email')?.value || '',
+          timestamp: String(timestampResult?.value || ''),
+          email: String(emailResult?.value || ''),
 
-          // メインコンテンツ（ColumnMappingService利用）- ✅ V8ランタイム安全: 型保証強化
-          answer: String(extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || ''),
-          opinion: String(extractFieldValueUnified(row, headers, 'answer', columnMapping)?.value || ''), // Alias for answer field
-          reason: String(extractFieldValueUnified(row, headers, 'reason', columnMapping)?.value || ''),
-          class: String(extractFieldValueUnified(row, headers, 'class', columnMapping)?.value || ''),
-          name: String(extractFieldValueUnified(row, headers, 'name', columnMapping)?.value || ''),
+          // Main content using ColumnMappingService - 厳密な null チェック
+          answer: String(answerValue || ''),
+          opinion: String(answerValue || ''), // Alias for answer field
+          reason: String(reasonResult?.value || ''),
+          class: String(classResult?.value || ''),
+          name: String(nameValue || ''),
 
           // メタデータ
           formattedTimestamp: formatTimestamp(extractTimestampValue(row, headers)),
@@ -417,7 +450,13 @@ function processRawData(dataRows, headers, config, options = {}, user = null) {
           highlight: extractHighlight(row, headers)
         };
 
-        // ✅ includeTimestamp オプション処理
+        // データ整合性の最終チェック
+        if (!answerValue && !reasonResult?.value) {
+          // 回答も理由も空の場合はスキップ
+          return;
+        }
+
+        // includeTimestamp option processing
         if (options.includeTimestamp === false) {
           delete item.timestamp;
           delete item.formattedTimestamp;
@@ -452,13 +491,11 @@ function processRawData(dataRows, headers, config, options = {}, user = null) {
  * @returns {*} フィールド値
  */
 function extractFieldValue(row, headers, fieldType, columnMapping = {}) {
-  // 🎯 ColumnMappingServiceに委譲（後方互換性保持）
+  // Delegate to ColumnMappingService (backward compatibility)
   return extractFieldValueUnified(row, headers, fieldType, columnMapping);
 }
 
-// ===========================================
 // 🔍 データ分析・フィルタリング
-// ===========================================
 
 /**
  * columnMappingを使用したデータ処理（Core.gsより移行）
@@ -471,12 +508,6 @@ function processDataWithColumnMapping(dataRows, headers, columnMapping) {
   if (!dataRows || !Array.isArray(dataRows)) {
     return [];
   }
-
-  console.info('DataService.processDataWithColumnMapping', {
-    rowCount: dataRows.length,
-    headerCount: headers ? headers.length : 0,
-    mappingKeys: columnMapping ? Object.keys(columnMapping) : []
-  });
 
   return dataRows.map((row, index) => {
     const processedRow = {
@@ -517,9 +548,7 @@ function getAutoStopTime(publishedAt, minutes) {
   };
 }
 
-// ===========================================
-// 🔧 ユーティリティ・ヘルパー
-// ===========================================
+// Utility helpers
 
 /**
  * 空行判定（ReactionServiceから移動したisEmptyRowを利用）
@@ -543,7 +572,7 @@ function shouldIncludeRow(item, options = {}) {
       return false;
     }
 
-    // メイン回答が空の行をフィルタリング - ✅ V8ランタイム安全: 型チェック強化
+    // Filter out rows with empty main answers - V8 runtime safe with enhanced type checking
     if (options.requireAnswer !== false) {
       const answerStr = item.answer ? String(item.answer).trim() : '';
       if (!answerStr) {
@@ -624,9 +653,7 @@ function applySortAndLimit(data, options = {}) {
   }
 }
 
-// ===========================================
-// 🗑️ Data Deletion Operations - CLAUDE.md準拠
-// ===========================================
+// Data Deletion Operations
 
 /**
  * 回答行を削除（管理モード専用）
@@ -696,18 +723,13 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
       return createDataServiceErrorResponse('無効な行番号です');
     }
 
-    // ✅ CLAUDE.md準拠: 70x Performance Improvement - Batch operation
+    // Performance improvement -Batch operation
     const [rowData] = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues();
 
     // 削除実行
     sheet.deleteRows(rowIndex, 1);
 
     const executionTime = Date.now() - startTime;
-    console.log('✅ Answer row deleted successfully:', {
-      userId: `${userId.substring(0, 8)  }***`,
-      rowIndex,
-      executionTime
-    });
 
     return {
       success: true,

@@ -15,9 +15,9 @@
 
 /* global URL, getColumnAnalysis, getFormInfo */
 
-// ===========================================
+
 // 🔒 基本データ型検証関数群
-// ===========================================
+
 
 /**
  * メールアドレス検証
@@ -238,9 +238,9 @@ function validateText(text, options = {}) {
     return result;
 }
 
-// ===========================================
+
 // 📊 設定・構造検証
-// ===========================================
+
 
 /**
  * スプレッドシートID検証
@@ -275,7 +275,7 @@ function validateSpreadsheetId(spreadsheetId) {
  * @returns {Object} 検証結果
  */
 function validateMapping(columnMapping) {
-    console.log('🔍 validateMapping開始:', JSON.stringify(columnMapping, null, 2));
+    // console.log('🔍 validateMapping開始:', JSON.stringify(columnMapping, null, 2));
 
     const result = {
       isValid: false,
@@ -285,7 +285,7 @@ function validateMapping(columnMapping) {
 
     if (!columnMapping || typeof columnMapping !== 'object') {
       const errorMsg = '列マッピングが必要です';
-      console.log(`❌ ${  errorMsg}`);
+      // console.log(`❌ ${  errorMsg}`);
       result.errors.push(errorMsg);
       return result;
     }
@@ -293,20 +293,20 @@ function validateMapping(columnMapping) {
     // ✅ 構造判定: 複雑構造 {mapping: {...}} vs シンプル構造 {answer: 4, class: 2}
     let actualMapping = columnMapping;
     if (columnMapping.mapping && typeof columnMapping.mapping === 'object') {
-      console.log('🔄 validateMapping: 複雑構造を検出 - mapping プロパティを使用');
+      // console.log('🔄 validateMapping: 複雑構造を検出 - mapping プロパティを使用');
       actualMapping = columnMapping.mapping;
     } else {
-      console.log('🔄 validateMapping: シンプル構造を検出 - 直接使用');
+      // console.log('🔄 validateMapping: シンプル構造を検出 - 直接使用');
     }
 
     if (Object.keys(actualMapping).length === 0) {
       const errorMsg = '列マッピングデータが必要です';
-      console.log(`❌ ${errorMsg}`);
+      // console.log(`❌ ${errorMsg}`);
       result.errors.push(errorMsg);
       return result;
     }
 
-    console.log('✅ validateMapping: 使用するマッピング:', JSON.stringify(actualMapping, null, 2));
+    // console.log('✅ validateMapping: 使用するマッピング:', JSON.stringify(actualMapping, null, 2));
 
     // ✅ 構造に対応した検証
     const requiredColumns = ['answer'];
@@ -316,10 +316,10 @@ function validateMapping(columnMapping) {
     // 必須列チェック
     for (const col of requiredColumns) {
       const index = actualMapping[col];
-      console.log(`🔍 validateMapping: ${col} = ${index} (type: ${typeof index})`);
+      // console.log(`🔍 validateMapping: ${col} = ${index} (type: ${typeof index})`);
       if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
         const errorMsg = `必須列 '${col}' のインデックスが無効です（値: ${index}）`;
-        console.log(`❌ ${errorMsg}`);
+        // console.log(`❌ ${errorMsg}`);
         result.errors.push(errorMsg);
       }
     }
@@ -328,10 +328,10 @@ function validateMapping(columnMapping) {
     for (const col of optionalColumns) {
       const index = actualMapping[col];
       if (index !== undefined) {
-        console.log(`🔍 validateMapping (optional): ${col} = ${index} (type: ${typeof index})`);
+        // console.log(`🔍 validateMapping (optional): ${col} = ${index} (type: ${typeof index})`);
         if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
           const warningMsg = `オプション列 '${col}' のインデックスが無効です（値: ${index}）`;
-          console.log(`⚠️ ${warningMsg}`);
+          // console.log(`⚠️ ${warningMsg}`);
           result.warnings.push(warningMsg);
         }
       }
@@ -433,9 +433,9 @@ function validateConfig(config) {
     return result;
 }
 
-// ===========================================
+
 // 🔧 ユーティリティ・診断
-// ===========================================
+
 
 /**
  * バリデーター診断

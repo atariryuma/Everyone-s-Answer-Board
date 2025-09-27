@@ -1,13 +1,13 @@
 /**
  * @fileoverview ConfigService - 統一設定管理サービス (遅延初期化対応)
  *
- * 🎯 責任範囲:
+ * 責任範囲:
  * - configJSON の CRUD操作
  * - 設定検証・サニタイズ
  * - 動的設定生成（URL等）
  * - 設定マイグレーション
  *
- * 🔄 GAS Best Practices準拠:
+ * GAS Best Practices準拠:
  * - 遅延初期化パターン (各公開関数先頭でinit)
  * - ファイル読み込み順序非依存設計
  * - グローバル副作用排除
@@ -15,9 +15,9 @@
 
 /* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, Auth, UserService, isAdministrator, SLEEP_MS */
 
-// ===========================================
-// 🔧 GAS-Native ConfigService (直接API版)
-// ===========================================
+
+// GAS-Native ConfigService (直接API版)
+
 
 /**
  * ConfigService - ゼロ依存アーキテクチャ
@@ -372,15 +372,15 @@ function generateUserPermissions(_userId) {
   }
 }
 
-// ===========================================
+
 // 💾 設定保存・更新
-// ===========================================
 
 
 
-// ===========================================
+
+
 // ✅ 設定検証・サニタイズ
-// ===========================================
+
 
 /**
  * 設定検証・サニタイズ（統合版）
@@ -390,10 +390,9 @@ function generateUserPermissions(_userId) {
  */
 function validateAndSanitizeConfig(config, userId) {
   try {
-    // デバッグ用ログ
-    console.log('🔍 ConfigService受信データ:', JSON.stringify(config, null, 2));
+    // Validate column mapping if present
     if (config.columnMapping) {
-      console.log('🔍 受信したcolumnMapping:', JSON.stringify(config.columnMapping, null, 2));
+      // Column mapping validation handled by validateConfig
     }
 
     // 統一検証: validators.gsのvalidateConfigを活用
@@ -450,9 +449,9 @@ function validateAndSanitizeConfig(config, userId) {
   }
 }
 
-// ===========================================
+
 // 🔧 ヘルパー関数
-// ===========================================
+
 
 /**
  * 表示設定サニタイズ
@@ -485,7 +484,6 @@ function sanitizeMapping(columnMapping) {
     }
   });
 
-  console.log('✅ sanitizeMapping (simplified):', sanitized);
   return sanitized;
 }
 
@@ -510,9 +508,9 @@ function validateConfigUserId(userId) {
  * @returns {boolean} 有効性
  */
 
-// ===========================================
+
 // 📊 システム状態・診断
-// ===========================================
+
 
 
 /**
@@ -582,11 +580,6 @@ function clearConfigCache(userId) {
     if (keysToRemove.length > 0) {
       cache.removeAll(keysToRemove);
     }
-
-    console.info('clearConfigCache: 依存関係キャッシュクリア完了', {
-      userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
-      keysCleared: keysToRemove.length
-    });
   } catch (error) {
     console.warn('clearConfigCache: キャッシュクリアエラー', error.message);
   }
@@ -618,10 +611,6 @@ function clearAllConfigCache(userIds = []) {
 
     if (allKeysToRemove.length > 0) {
       CacheService.getScriptCache().removeAll(allKeysToRemove);
-      console.info('clearAllConfigCache: ユーザー群キャッシュクリア完了', {
-        userCount: userIds.length,
-        keysCleared: allKeysToRemove.length
-      });
     }
   } catch (error) {
     console.warn('clearAllConfigCache: エラー', error.message);
@@ -674,17 +663,17 @@ function hasCoreSystemProps() {
   }
 }
 
-// ===========================================
+
 // 📱 アプリケーション管理
-// ===========================================
 
 
 
 
 
-// ===========================================
+
+
 // 🔧 ヘルパー関数（依存関数）
-// ===========================================
+
 
 /**
  * 動的questionText取得（configJson最適化対応 + パフォーマンス最適化済み）
@@ -697,16 +686,6 @@ function hasCoreSystemProps() {
  */
 function getQuestionText(config, context = {}, preloadedHeaders = null) {
   try {
-    console.log('📝 getQuestionText START:', {
-      hasColumnMapping: !!config?.columnMapping,
-      hasHeaders: !!config?.headers,
-      hasPreloadedHeaders: !!preloadedHeaders,
-      answerIndex: config?.columnMapping?.answer,  // ✅ CLAUDE.md準拠: シンプル構造対応
-      configHeadersLength: config?.headers?.length || 0,
-      preloadedHeadersLength: preloadedHeaders?.length || 0,
-      hasSpreadsheetId: !!config?.spreadsheetId,
-      hasSheetName: !!config?.sheetName
-    });
 
     // ✅ CLAUDE.md準拠: シンプル構造対応
     const answerIndex = config?.columnMapping?.answer;
@@ -715,7 +694,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
     if (typeof answerIndex === 'number' && config?.headers?.[answerIndex]) {
       const questionText = config.headers[answerIndex];
       if (questionText && typeof questionText === 'string' && questionText.trim()) {
-        console.log('✅ getQuestionText SUCCESS (from config.headers):', questionText.trim());
         return questionText.trim();
       }
     }
@@ -724,7 +702,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
     if (typeof answerIndex === 'number' && preloadedHeaders && preloadedHeaders[answerIndex]) {
       const questionText = preloadedHeaders[answerIndex];
       if (questionText && typeof questionText === 'string' && questionText.trim()) {
-        console.log('⚡ getQuestionText SUCCESS (from preloaded headers - OPTIMIZED):', questionText.trim());
         return questionText.trim();
       }
     }
@@ -732,7 +709,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
     // 3. headersがない場合、スプレッドシートから動的取得
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
-        console.log('🔄 getQuestionText: Fetching headers from spreadsheet');
         // 🔧 CLAUDE.md準拠: Context-aware service account usage
         // ✅ **Cross-user**: Use service account when accessing other user's config
         // ✅ **Self-access**: Use normal permissions for own config
@@ -742,7 +718,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
         const targetUser = findUserBySpreadsheetId(config.spreadsheetId);
         const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
 
-        console.log(`getQuestionText: ${isSelfAccess ? 'Self-access normal permissions' : 'Cross-user service account'} for spreadsheet`);
         try {
           const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
           const { spreadsheet } = dataAccess;
@@ -787,9 +762,9 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
  * @returns {boolean} システム管理者かどうか
  */
 
-// ===========================================
+
 // 🔧 統一configJson操作API (CLAUDE.md準拠)
-// ===========================================
+
 
 /**
  * 統一設定読み込みAPI - V8最適化、変数チェック強化

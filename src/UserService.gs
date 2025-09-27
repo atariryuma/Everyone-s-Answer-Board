@@ -1,13 +1,13 @@
 /**
  * @fileoverview UserService - 統一ユーザー管理サービス (遅延初期化対応)
  *
- * 🎯 責任範囲:
+ * 責任範囲:
  * - ユーザー認証・セッション管理
  * - ユーザー情報の取得・更新
  * - 権限・アクセス制御
  * - ユーザーキャッシュ管理
  *
- * 🔄 GAS Best Practices準拠:
+ * GAS Best Practices準拠:
  * - 遅延初期化パターン (各公開関数先頭でinit)
  * - ファイル読み込み順序非依存設計
  * - グローバル副作用排除
@@ -15,9 +15,9 @@
 
 /* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserConfig, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse */
 
-// ===========================================
-// 🔧 GAS-Native UserService (直接API版)
-// ===========================================
+
+// GAS-Native UserService (直接API版)
+
 
 /**
  * UserService - ゼロ依存アーキテクチャ
@@ -52,7 +52,6 @@ function getCurrentUserInfo() {
     // データベース検索
     const userInfo = findUserByEmail(email);
     if (!userInfo) {
-      console.info('UserService.getCurrentUserInfo: 新規ユーザーの可能性', { email });
       return null;
     }
 
@@ -141,9 +140,9 @@ function generateDynamicUserUrls(config) {
     }
 }
 
-// ===========================================
+
 // 🛡️ 権限・アクセス制御
-// ===========================================
+
 
 
 /**
@@ -162,9 +161,9 @@ function checkUserEditorAccess(userId) {
 }
 
 
-// ===========================================
+
 // 🔐 統一認証システム（Administrator/Editor/Viewer）
-// ===========================================
+
 
 
 /**
@@ -199,9 +198,9 @@ function getUnifiedAccessLevel(email, targetUserId) {
   return email ? 'authenticated_user' : 'guest';
 }
 
-// ===========================================
+
 // 🧹 キャッシュ・セッション管理
-// ===========================================
+
 
 /**
  * ユーザーキャッシュクリア
@@ -209,13 +208,13 @@ function getUnifiedAccessLevel(email, targetUserId) {
  */
 
 
-// ===========================================
-// 🔧 ユーティリティ
-// ===========================================
 
-// ===========================================
+// 🔧 ユーティリティ
+
+
+
 // 🔧 User Management Functions (from main.gs)
-// ===========================================
+
 
 /**
  * 管理者権限確認（フロントエンド互換性）
@@ -302,7 +301,6 @@ function resetAuth() {
       try {
         clearConfigCache(userId);
         clearConfigResult = 'ConfigService cache cleared successfully';
-        console.log(`resetAuth: ConfigService cache cleared for user ${userId.substring(0, 8)}***`);
       } catch (configError) {
         console.warn('resetAuth: ConfigService cache clear failed:', configError.message);
         clearConfigResult = `ConfigService cache clear failed: ${configError.message}`;
@@ -391,7 +389,6 @@ function resetAuth() {
             }
           });
         }
-        console.log(`resetAuth: Cleared ${reactionLocksCleared} reaction/highlight locks for user ${userId.substring(0, 8)}***`);
       } catch (lockError) {
         console.warn('resetAuth: Reaction lock clearing failed:', lockError.message);
       }
@@ -408,7 +405,6 @@ function resetAuth() {
       totalKeysCleared: clearedKeysCount
     };
 
-    console.log('resetAuth: Authentication reset completed', logDetails);
 
     return {
       success: true,

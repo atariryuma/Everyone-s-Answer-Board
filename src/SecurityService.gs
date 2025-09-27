@@ -1,30 +1,20 @@
 /**
  * @fileoverview SecurityService - 統一セキュリティサービス
  *
- * 🎯 責任範囲:
+ * 責任範囲:
  * - 認証・認可管理
  * - 入力検証・サニタイズ
  * - セキュリティ監査・ログ
  * - Service Account管理
- *
- * 🔄 GAS Best Practices準拠:
- * - フラット関数構造 (Object.freeze削除)
- * - 直接的な関数エクスポート
- * - 単一責任原則の維持
  */
 
 /* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL, getCurrentEmail */
 
 
-// ===========================================
-// 🔑 認証・セッション管理
-// ===========================================
+// 認証・セッション管理
 
 /**
  * Deploy user domain information retrieval
- * ✅ CLAUDE.md準拠: SecurityService配置（ドメイン認証・検証）
- * Used by frontend to check domain compatibility and user information
- * Enhanced version with improved validation and error handling
  * @returns {Object} Domain information and validation result
  */
 function getDeployUserDomainInfo() {
@@ -33,7 +23,7 @@ function getDeployUserDomainInfo() {
 
     // Enhanced type validation for email
     if (!email || typeof email !== 'string' || email.trim() === '') {
-      console.error('❌ Authentication failed - invalid email:', typeof email, email);
+      console.error('Authentication failed - invalid email:', typeof email, email);
       return {
         success: false,
         message: 'Authentication required - invalid email',
@@ -57,7 +47,7 @@ function getDeployUserDomainInfo() {
       timestamp: new Date().toISOString()
     };
   } catch (error) {
-    console.error('❌ SecurityService.getDeployUserDomainInfo ERROR:', error.message);
+    console.error('SecurityService.getDeployUserDomainInfo ERROR:', error.message);
     return {
       success: false,
       message: error.message,
@@ -68,65 +58,8 @@ function getDeployUserDomainInfo() {
 }
 
 
-/**
- * トークン形式検証（セキュリティ強化）
- * @param {string} token - 検証対象トークン
- * @returns {boolean} 有効かどうか
- */
-function validateTokenFormat(token) {
-    if (!token || typeof token !== 'string') {
-      return false;
-    }
 
-    // 基本的な形式チェック
-    if (token.length < 20 || token.length > 4000) {
-      return false;
-    }
-
-    // OAuth 2.0トークンの一般的な形式チェック
-    if (!/^[A-Za-z0-9._-]+$/.test(token)) {
-      return false;
-    }
-
-    // 明らかに無効な値の除外
-    const invalidTokens = ['undefined', 'null', 'error', 'expired'];
-    if (invalidTokens.includes(token.toLowerCase())) {
-      return false;
-    }
-
-    return true;
-}
-
-/**
- * セッション状態検証
- * @returns {Object} セッション検証結果
- */
-function validateSession() {
-    try {
-      const session = { email: Session.getActiveUser().getEmail() };
-      const {email} = session;
-      const effectiveEmail = Session.getEffectiveUser().getEmail();
-
-      return {
-        isValid: !!email,
-        userEmail: email,
-        effectiveEmail,
-        isImpersonated: email !== effectiveEmail,
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      console.error('SecurityService.validateSession: エラー', error.message);
-      return {
-        isValid: false,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      };
-    }
-}
-
-// ===========================================
-// 🛡️ 入力検証・サニタイズ
-// ===========================================
+// 入力検証・サニタイズ
 
 /**
  * ユーザーデータ総合検証
@@ -209,9 +142,7 @@ function validateUserData(userData) {
     return result;
 }
 
-// ===========================================
 // 🔒 アクセス制御・権限管理
-// ===========================================
 
 /**
  * ユーザー権限確認
@@ -274,8 +205,8 @@ function compareSecurityAccessLevels(currentLevel, requiredLevel) {
       'none': 0,
       'guest': 1,
       'authenticated_user': 2,
-      'editor': 3,           // 🔧 用語統一: owner → editor
-      'administrator': 4,    // 🔧 用語統一: system_admin → administrator
+      'editor': 3,
+      'administrator': 4
     };
 
     const currentScore = levelHierarchy[currentLevel] || 0;
@@ -284,9 +215,7 @@ function compareSecurityAccessLevels(currentLevel, requiredLevel) {
     return currentScore >= requiredScore;
 }
 
-// ===========================================
-// 📊 セキュリティ監査・ログ
-// ===========================================
+// セキュリティ監査・ログ
 
 /**
  * セキュリティイベントログ
@@ -310,13 +239,13 @@ function logSecurityEvent(event) {
       switch (event.severity) {
         case 'critical':
         case 'high':
-          console.error('🚨 SecurityEvent:', logEntry);
+          console.error('SecurityEvent:', logEntry);
           break;
         case 'medium':
-          console.warn('⚠️ SecurityEvent:', logEntry);
+          console.warn('SecurityEvent:', logEntry);
           break;
         default:
-          console.info('ℹ️ SecurityEvent:', logEntry);
+          console.info('SecurityEvent:', logEntry);
       }
 
       // 重要なログのみ永続化（PropertiesServiceで統一）
@@ -335,7 +264,6 @@ function logSecurityEvent(event) {
  */
 function persistSecurityLog(logEntry) {
     try {
-      // 🚀 Zero-dependency security logging
       const props = PropertiesService.getScriptProperties();
       const logKey = `security_log_${Date.now()}`;
       
@@ -349,9 +277,7 @@ function persistSecurityLog(logEntry) {
 }
 
 
-// ===========================================
-// 🔧 ユーティリティ・診断
-// ===========================================
+// ユーティリティ・診断
 
 
 /**
@@ -362,11 +288,6 @@ function persistSecurityLog(logEntry) {
 function validateSpreadsheetAccess(spreadsheetId) {
     const started = Date.now();
     try {
-      console.log('SecurityService', {
-        operation: 'validateSpreadsheetAccess',
-        phase: 'start',
-        spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null'
-      });
 
       if (!spreadsheetId) {
         const errorResponse = {
@@ -375,24 +296,15 @@ function validateSpreadsheetAccess(spreadsheetId) {
           sheets: [],
           executionTime: `${Date.now() - started}ms`
         };
-        console.error('SecurityService', {
-          operation: 'validateSpreadsheetAccess',
-          error: 'Missing spreadsheetId',
-          executionTime: errorResponse.executionTime
-        });
         return errorResponse;
       }
 
       // アクセステスト - 段階的にチェック
       let spreadsheet;
       try {
-        console.log('SecurityService', { operation: 'openSpreadsheet', phase: 'start' });
-        // 🔧 CLAUDE.md準拠: Security validation - try normal permissions first
-        // ✅ **Self-access**: Use normal permissions for validation
-        // ✅ **Cross-user**: Can fall back to service account if needed
+        // Try normal permissions first, fall back to service account if needed
         const { spreadsheet: spreadsheetFromData } = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
         spreadsheet = spreadsheetFromData;
-        console.log('SecurityService', { operation: 'openSpreadsheet', phase: 'success' });
       } catch (openError) {
         const errorResponse = {
           success: false,
@@ -401,30 +313,18 @@ function validateSpreadsheetAccess(spreadsheetId) {
           error: openError.message,
           executionTime: `${Date.now() - started}ms`
         };
-        console.error('SecurityService', {
-          operation: 'SpreadsheetApp.openById',
-          error: openError.message,
-          executionTime: errorResponse.executionTime
-        });
         return errorResponse;
       }
 
       // 名前とシート情報を取得
       let name, sheets;
       try {
-        console.log('SecurityService', { operation: 'spreadsheet.getName', phase: 'start' });
         name = spreadsheet.getName();
 
-        console.log('SecurityService', { operation: 'spreadsheet.getSheets', phase: 'start' });
         sheets = spreadsheet.getSheets().map(sheet => ({
           name: sheet.getName(),
           index: sheet.getIndex()
         }));
-        console.log('SecurityService', {
-          operation: 'spreadsheet metadata',
-          phase: 'success',
-          sheetsCount: sheets.length
-        });
       } catch (metaError) {
         const errorResponse = {
           success: false,
@@ -433,11 +333,6 @@ function validateSpreadsheetAccess(spreadsheetId) {
           error: metaError.message,
           executionTime: `${Date.now() - started}ms`
         };
-        console.error('SecurityService', {
-          operation: 'spreadsheet metadata',
-          error: metaError.message,
-          executionTime: errorResponse.executionTime
-        });
         return errorResponse;
       }
 
@@ -449,12 +344,6 @@ function validateSpreadsheetAccess(spreadsheetId) {
         executionTime: `${Date.now() - started}ms`
       };
 
-      console.log('SecurityService', {
-        operation: 'validateSpreadsheetAccess',
-        spreadsheetName: name,
-        sheetsCount: sheets.length,
-        executionTime: result.executionTime
-      });
 
       return result;
 
@@ -467,12 +356,6 @@ function validateSpreadsheetAccess(spreadsheetId) {
         executionTime: `${Date.now() - started}ms`
       };
 
-      console.error('SecurityService', {
-        operation: 'validateSpreadsheetAccess',
-        error: error.message,
-        stack: error.stack,
-        executionTime: errorResponse.executionTime
-      });
 
       console.error('SecurityService.validateSpreadsheetAccess 予期しないエラー:', {
         error: error.message,
@@ -527,7 +410,6 @@ function cleanupOldSecurityLogs() {
         }
       });
 
-      console.log(`SecurityService: Cleaned up ${keysToDelete.length} old logs. Kept ${sortedKeys.length - keysToDelete.length} recent entries.`);
     }
   } catch (error) {
     console.warn('SecurityService.cleanupOldSecurityLogs: Cleanup failed:', error.message);

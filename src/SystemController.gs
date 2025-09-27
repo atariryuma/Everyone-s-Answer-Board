@@ -4,9 +4,7 @@
 
 /* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, Config, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getDatabaseConfig, getAllUsers, openDatabase */
 
-// ===========================================
-// 📊 システム定数 - Zero-Dependency Architecture
-// ===========================================
+// システム定数 - Zero-Dependency Architecture
 
 /**
  * キャッシュ期間 (秒)
@@ -93,9 +91,7 @@ function sysLog(level, message, ...args) {
   }
 }
 
-// ===========================================
 // 🌍 グローバル定数設定 - Zero-Dependency Architecture
-// ===========================================
 
 /**
  * グローバルスコープにシステム定数を設定
@@ -108,9 +104,7 @@ __rootSys.SLEEP_MS = SLEEP_MS;
 __rootSys.LOG_LEVEL = LOG_LEVEL;
 __rootSys.sysLog = sysLog;
 
-// ===========================================
-// 🔧 Zero-Dependency Utility Functions
-// ===========================================
+// Zero-Dependency Utility Functions
 
 /**
  * Service Discovery for Zero-Dependency Architecture
@@ -140,13 +134,13 @@ function testSystemSetup() {
       const session = { email: Session.getActiveUser().getEmail() };
       diagnostics.tests.push({
         name: 'Session Service',
-        status: session.isValid ? '✅' : '❌',
+        status: session.isValid ? 'OK' : 'ERROR',
         details: session.isValid ? `User: ${  session.email}` : 'No active session'
       });
     } catch (sessionError) {
       diagnostics.tests.push({
         name: 'Session Service',
-        status: '❌',
+        status: 'ERROR',
         details: sessionError.message
       });
     }
@@ -159,27 +153,27 @@ function testSystemSetup() {
         const dataAccess = openSpreadsheet(databaseId, { useServiceAccount: true });
         diagnostics.tests.push({
           name: 'Database Connection',
-          status: '✅',
+          status: 'OK',
           details: 'Database accessible'
         });
       } else {
         diagnostics.tests.push({
           name: 'Database Connection',
-          status: '❌',
+          status: 'ERROR',
           details: 'Database not configured'
         });
       }
     } catch (dbError) {
       diagnostics.tests.push({
         name: 'Database Connection',
-        status: '❌',
+        status: 'ERROR',
         details: dbError.message
       });
     }
 
     // 総合評価
-    const hasErrors = diagnostics.tests.some(test => test.status === '❌');
-    diagnostics.overall = hasErrors ? '⚠️ 問題あり' : '✅ 正常';
+    const hasErrors = diagnostics.tests.some(test => test.status === 'ERROR');
+    diagnostics.overall = hasErrors ? 'WARNING' : 'OK';
 
     return {
       success: !hasErrors,
@@ -278,9 +272,8 @@ function getWebAppUrl() {
  */
 function testSystemDiagnosis() {
   try {
-    console.log('🔬 testSystemDiagnosis START');
 
-    // ✅ CLAUDE.md準拠: Batched admin authentication (70x performance improvement)
+    // Batched admin authentication
     const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
@@ -420,9 +413,8 @@ function getSystemStatus() {
  */
 function monitorSystem() {
   try {
-    console.log('📊 monitorSystem START');
 
-    // ✅ CLAUDE.md準拠: Batched admin authentication (70x performance improvement)
+    // Batched admin authentication
     const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
@@ -509,9 +501,8 @@ function monitorSystem() {
  */
 function checkDataIntegrity() {
   try {
-    console.log('🔍 checkDataIntegrity START');
 
-    // ✅ CLAUDE.md準拠: Batched admin authentication (70x performance improvement)
+    // Batched admin authentication
     const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
@@ -633,9 +624,8 @@ function checkDataIntegrity() {
  */
 function performAutoRepair() {
   try {
-    console.log('🔧 performAutoRepair START');
 
-    // ✅ CLAUDE.md準拠: Batched admin authentication (70x performance improvement)
+    // Batched admin authentication
     const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
@@ -775,11 +765,6 @@ function getAdminSheetList(spreadsheetId) {
  */
 function publishApplication(publishConfig) {
   const startTime = new Date().toISOString();
-  console.log('=== publishApplication START ===', {
-    spreadsheetId: publishConfig?.spreadsheetId || 'N/A',
-    sheetName: publishConfig?.sheetName || 'N/A',
-    configSize: publishConfig ? JSON.stringify(publishConfig).length : 0
-  });
 
   try {
     const email = getCurrentEmail();
@@ -791,16 +776,16 @@ function publishApplication(publishConfig) {
 
     const publishedAt = new Date().toISOString();
 
-    // ✅ CLAUDE.md準拠: マルチテナント対応
+    // Multi-tenant support
     // ユーザー固有データはconfigJSONにのみ保存、スクリプトプロパティは不使用
     // publishedAt, isPublished, configはユーザー個別のconfigJSONで管理
 
-    // 🔧 Zero-Dependency統一: 直接findUserByEmail使用（CLAUDE.md準拠）
+    // Direct findUserByEmail usage
     const user = findUserByEmail(email, { requestingUser: email });
     let saveResult = null;
 
     if (user) {
-      // ✅ CLAUDE.md準拠: Eliminated duplicate findUserByEmail call for performance
+      // Eliminated duplicate findUserByEmail call for performance
       // Using the already fetched user data (race conditions are handled by underlying database locking)
       const userToUse = user;
 
@@ -808,17 +793,7 @@ function publishApplication(publishConfig) {
       const configResult = getUserConfig(userToUse.userId);
       const currentConfig = configResult.success ? configResult.config : {};
 
-      console.log('📋 Config merge:', {
-        userId: user.userId,
-        currentSpreadsheetId: currentConfig.spreadsheetId,
-        newSpreadsheetId: publishConfig?.spreadsheetId,
-        currentFormUrl: currentConfig.formUrl,
-        newFormUrl: publishConfig?.formUrl,
-        currentSheetName: currentConfig.sheetName,
-        newSheetName: publishConfig?.sheetName
-      });
-
-      // 🔧 重要フィールドの明示的上書き（新しい値を優先）
+      // Explicit override of important fields
       const updatedConfig = {
         ...currentConfig,
         ...publishConfig,
@@ -826,7 +801,7 @@ function publishApplication(publishConfig) {
         formUrl: publishConfig?.formUrl || currentConfig.formUrl,
         formTitle: publishConfig?.formTitle || currentConfig.formTitle,
         columnMapping: publishConfig?.columnMapping || currentConfig.columnMapping,
-        // 🔧 system fields
+        // system fields
         isPublished: true,
         publishedAt,
         setupStatus: 'completed',
@@ -834,7 +809,6 @@ function publishApplication(publishConfig) {
       };
 
       // ✅ バックエンド構造統一完了：フロントエンドは既に正しい構造を送信
-      console.log('✅ ColumnMapping backend structure unified - no transformation needed');
 
       // 🔧 CLAUDE.md準拠: 統一API使用 - saveUserConfigでETag対応の安全な更新
       saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
@@ -842,22 +816,10 @@ function publishApplication(publishConfig) {
       if (!saveResult.success) {
         console.error('❌ saveUserConfig failed during publish:', saveResult.message);
         // エラーでも処理を継続（互換性のため）
-      } else {
-        console.log('✅ Config saved via saveUserConfig:', {
-          userId: user.userId,
-          etag: saveResult.etag
-        });
       }
     } else {
       console.error('❌ User not found:', email);
     }
-
-    console.log('✅ publishApplication SUCCESS:', {
-      userId: user?.userId || 'N/A',
-      spreadsheetId: publishConfig?.spreadsheetId,
-      sheetName: publishConfig?.sheetName,
-      userFound: !!user
-    });
 
     return {
       success: true,
@@ -899,14 +861,9 @@ function isUserSpreadsheetOwner(spreadsheetId) {
     const owner = file.getOwner();
 
     if (owner && owner.getEmail() === currentEmail) {
-      console.log('isUserSpreadsheetOwner: ユーザーはオーナーです:', currentEmail);
       return true;
     }
 
-    console.log('isUserSpreadsheetOwner: ユーザーはオーナーではありません:', {
-      currentEmail,
-      ownerEmail: owner ? owner.getEmail() : 'unknown'
-    });
     return false;
   } catch (error) {
     console.warn('isUserSpreadsheetOwner: 権限チェック失敗:', error.message);
@@ -932,13 +889,11 @@ function getSpreadsheetAdaptive(spreadsheetId, context = {}) {
   // ❌ **Anti-pattern**: Admin unnecessarily using service account for own data
   const useServiceAccount = context.forceServiceAccount || !isOwner;
 
-  console.log(`getSpreadsheetAdaptive: ${useServiceAccount ? 'Service account' : 'Normal permissions'} access to spreadsheet (owner: ${isOwner}, forceServiceAccount: ${!!context.forceServiceAccount})`);
 
   try {
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
     const accessMethod = useServiceAccount ? 'service_account' : 'normal_permissions';
 
-    console.log(`getSpreadsheetAdaptive: Access successful via ${accessMethod}`);
     return {
       spreadsheet: dataAccess.spreadsheet,
       accessMethod,
@@ -976,7 +931,6 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
 
   // Method 1: 標準API - オーナー権限の場合のみ
   if (isOwner) {
-    console.log('🔍 detectFormConnection: オーナー権限でAPI検出開始');
     try {
       // シートレベルでフォームURL取得（最優先）
       console.log('🔍 sheet.getFormUrl() 実行中...');
@@ -1039,7 +993,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
       results.details.push(apiError && apiError.message ? `API検出失敗: ${apiError.message}` : 'API検出失敗: 詳細不明');
     }
   } else {
-    console.log('⚠️ オーナー権限なし - API検出をスキップ');
+    // No owner permissions available
   }
 
   // Method 1.5: Drive APIフォーム検索（API検出失敗時のフォールバック）
@@ -1381,11 +1335,6 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
  */
 function getFormInfo(spreadsheetId, sheetName) {
   const startTime = new Date().toISOString();
-  console.log('=== getFormInfo START ===', {
-    spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 12)  }***` : 'N/A',
-    sheetName: sheetName || 'N/A',
-    timestamp: startTime
-  });
 
   try {
     // 引数検証
@@ -1636,12 +1585,6 @@ function checkCurrentPublicationStatus(targetUserId) {
       userId: user.userId
     };
 
-    console.log('✅ checkCurrentPublicationStatus SUCCESS:', {
-      userId: user.userId,
-      published: result.published,
-      hasDataSource: result.hasDataSource
-    });
-
     return result;
   } catch (error) {
     console.error('❌ checkCurrentPublicationStatus ERROR:', error.message);
@@ -1663,9 +1606,7 @@ function checkCurrentPublicationStatus(targetUserId) {
 
 
 
-// ===========================================
 // 📊 認証・ログイン関連API
-// ===========================================
 
 
 
@@ -1740,9 +1681,7 @@ function testForceLogoutRedirect() {
   }
 }
 
-// ===========================================
 // 📊 Performance Metrics Extension
-// ===========================================
 
 /**
  * パフォーマンスメトリクス収集システム (GAS-Native Architecture準拠)
@@ -2148,9 +2087,7 @@ function testDatabaseConnection() {
   }
 }
 
-// ===========================================
 // 🔧 Application Setup Functions (from main.gs)
-// ===========================================
 
 /**
  * Setup application with system properties
@@ -2254,9 +2191,7 @@ function setAppStatus(isActive) {
   }
 }
 
-// ===========================================
 // 🌍 Global SystemController Object Export
-// ===========================================
 
 /**
  * SystemController統一インターフェース

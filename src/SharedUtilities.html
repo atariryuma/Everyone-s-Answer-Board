@@ -1454,9 +1454,9 @@
       this.container = document.createElement('div');
       this.container.style.cssText = `
         position: fixed;
-        top: 20px;
-        right: 20px;
-        z-index: 9999;
+        top: var(--space-5);
+        right: var(--space-5);
+        z-index: var(--z-notification);
         pointer-events: none;
       `;
 
@@ -1475,10 +1475,10 @@
       notification.style.cssText = `
         background: ${this.getColor(type)};
         color: white;
-        padding: 12px 16px;
-        border-radius: 6px;
-        margin-bottom: 8px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        padding: var(--space-3) var(--space-4);
+        border-radius: var(--radius-md);
+        margin-bottom: var(--space-2);
+        box-shadow: var(--shadow-md);
         pointer-events: auto;
         cursor: pointer;
         font-size: 14px;
@@ -1517,13 +1517,13 @@
     warning(message) { this.showMessage(message, 'warning'); }
     info(message) { this.showMessage(message, 'info'); }
 
-    // ✅ Simple color mapping
+    // ✅ CSS変数準拠の色マッピング
     getColor(type) {
       const colors = {
-        success: '#22c55e',
-        error: '#ef4444',
-        warning: '#f59e0b',
-        info: '#3b82f6'
+        success: 'var(--status-success)',
+        error: 'var(--status-error)',
+        warning: 'var(--status-warning)',
+        info: 'var(--status-info)'
       };
       return colors[type] || colors.info;
     }

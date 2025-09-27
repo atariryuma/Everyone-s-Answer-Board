@@ -9,8 +9,10 @@
     /* =============================================================================
      * Brand & Core Colors - Primary Design System
      * ============================================================================= */
-    --brand-primary: #8be9fd;
+    --brand-primary: #3b82f6;
+    --brand-primary-secondary: #1d4ed8;
     --brand-accent: #fbbf24;
+    --brand-accent-light: #8be9fd;
     --brand-background: #1a1b26;
     --brand-surface: rgba(26, 27, 38, 0.7);
     --brand-text: #c0caf5;
@@ -52,6 +54,8 @@
     --z-modal: 1000;       /* Modal dialogs */
     --z-notification: 8000; /* Notifications */
     --z-tooltip: 9000;     /* Tooltips */
+    --z-loading-overlay: 9500;  /* Loading overlays (critical but below tooltips) */
+    --z-loading-quickstart: 9600; /* QuickStart loading (higher than standard loading) */
     --z-critical: 9999;    /* Critical system overlays */
 
     /* =============================================================================
@@ -183,9 +187,13 @@
     will-change: border-color;
   }
 
+  .glass-panel:not(:hover) {
+    will-change: auto;
+  }
+
   /* Google Workspace Integration Styles */
   .google-integration {
-    background: linear-gradient(135deg, var(--google-blue), var(--google-green));
+    background: var(--google-blue);
     border: 1px solid rgba(66, 133, 244, 0.3);
   }
 
@@ -259,12 +267,13 @@
 
   .btn:not(:disabled):active {
     transform: translate3d(0, 0, 0);
+    will-change: auto;
   }
 
   /* Button Variants */
   .btn-primary {
-    background: linear-gradient(135deg, var(--brand-primary), #50fa7b);
-    color: #000;
+    background: var(--brand-primary);
+    color: white;
     font-weight: 700;
   }
 
@@ -280,10 +289,10 @@
   }
 
   .btn-google {
-    background: linear-gradient(135deg, #3b7ad9, #2d944a); /* Slightly darker shades */
+    background: var(--google-blue);
     color: white;
     font-weight: 700;
-    border: 1px solid rgba(255, 255, 255, 0.2); /* Add a subtle border */
+    border: 1px solid rgba(255, 255, 255, 0.2);
   }
 
   .btn-success {
@@ -298,8 +307,8 @@
 
   /* Game-Style Buttons (from Page.html) */
   .game-btn {
-    background: linear-gradient(135deg, var(--brand-primary), #50fa7b);
-    color: #000;
+    background: var(--brand-primary);
+    color: white;
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
@@ -322,8 +331,8 @@
   .cta-button {
     position: relative;
     overflow: hidden;
-    background: linear-gradient(135deg, var(--brand-primary), #50fa7b);
-    color: #000;
+    background: var(--brand-primary);
+    color: white;
     font-weight: 700;
   }
 
@@ -385,6 +394,11 @@
     transform: var(--card-hover-transform);
     box-shadow: var(--shadow-lg);
     border-color: rgba(255, 255, 255, 0.2);
+    will-change: transform;
+  }
+
+  .answer-card:not(:hover) {
+    will-change: auto;
   }
 
 
@@ -403,6 +417,11 @@
 
   .admin-toggle:hover {
     transform: translateY(-1px);
+    will-change: transform;
+  }
+
+  .admin-toggle:not(:hover) {
+    will-change: auto;
   }
 
   /* Step Indicator System (from Login.html) */
@@ -447,6 +466,11 @@
     transform: translateY(-4px);
     box-shadow: var(--shadow-lg);
     border-color: rgba(255, 255, 255, 0.2);
+    will-change: transform;
+  }
+
+  .feature-card:not(:hover) {
+    will-change: auto;
   }
 
   /* Loading States */
@@ -479,42 +503,49 @@
    UNIFIED LOADING OVERLAY SYSTEM
    ============================================================================= */
 
-  /* Base loading overlay - Enhanced specificity to override TailwindCSS and prevent stacking context issues */
+  /* Base loading overlay - Optimized specificity without excessive !important */
   .loading-overlay {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    display: flex !important;
-    flex-direction: column !important;
-    align-items: center !important;
-    justify-content: center !important;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
     transition:
       opacity 0.3s ease,
       background-color 0.3s ease;
-    z-index: var(--z-critical) !important;
-    background-color: rgba(0, 0, 0, 0) !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    transform: none !important;
+    z-index: var(--z-loading-overlay);
+    background-color: rgba(0, 0, 0, 0);
+    visibility: visible;
+    opacity: 1;
+    margin: 0;
+    padding: 0;
+    transform: none;
     /* Force isolation from any parent stacking contexts */
-    isolation: isolate !important;
+    isolation: isolate;
     /* Ensure the overlay is always positioned relative to viewport */
-    contain: layout !important;
+    contain: layout;
     /* Override any parent transforms that might affect positioning */
-    will-change: auto !important;
+    will-change: auto;
+  }
+
+  /* High specificity override for framework conflicts (only when necessary) */
+  body .loading-overlay:not(.hidden) {
+    display: flex !important;
+    position: fixed !important;
+    z-index: var(--z-loading-overlay) !important;
   }
 
   /* Variant: Transparent overlay - completely invisible interaction blocker */
   .loading-overlay.transparent {
-    background-color: rgba(0, 0, 0, 0) !important; /* Completely transparent */
-    backdrop-filter: none !important; /* No visual effects */
-    -webkit-backdrop-filter: none !important;
+    background-color: rgba(0, 0, 0, 0); /* Completely transparent */
+    backdrop-filter: none; /* No visual effects */
+    -webkit-backdrop-filter: none;
   }
 
   /* Content container for all loading elements */
@@ -603,16 +634,16 @@
 
   /* Variant: Modal, for critical blocking actions */
   .loading-overlay.modal {
-    background-color: rgba(0, 0, 0, 0.9) !important;
-    z-index: var(--z-notification) !important;
+    background-color: rgba(0, 0, 0, 0.9);
+    z-index: var(--z-notification);
   }
 
   /* Variant: Page-specific removed - Page.html uses independent skeleton loading */
 
   /* Variant: QuickStart, lightweight and non-blocking */
   .loading-overlay.quickstart {
-    background-color: rgba(0, 0, 0, 0.1) !important;
-    z-index: var(--z-critical) !important;
+    background-color: rgba(0, 0, 0, 0.1);
+    z-index: var(--z-loading-quickstart);
   }
 
   /* Spinner Variants */
@@ -642,8 +673,6 @@
     border-radius: 50%;
     animation: spin 1s linear infinite;
     flex-shrink: 0;
-  }
-
   }
 
   /* Tooltip System */
@@ -680,8 +709,13 @@
   }
 
   .card-hover:hover {
-    transform: translateY(-2px);
+    transform: translate3d(0, -2px, 0);
     box-shadow: 0 8px 25px rgba(139, 233, 253, 0.15);
+    will-change: transform;
+  }
+
+  .card-hover:not(:hover) {
+    will-change: auto;
   }
 
   /* State Classes */
@@ -825,24 +859,29 @@
   /* Performance Optimizations */
   .render-optimized {
     will-change: transform, opacity;
-    transform: translateZ(0);
+    transform: translate3d(0, 0, 0);
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
+  }
+
+  /* Reset optimization when interaction ends */
+  .render-optimized:not(:hover):not(:focus):not(:active):not(.animating) {
+    will-change: auto;
   }
 
   /* Disable render optimization when global loading is active to prevent stacking context issues */
   body.gas-loading .render-optimized,
   .loading-active .render-optimized {
-    transform: none !important;
-    will-change: auto !important;
+    transform: none;
+    will-change: auto;
   }
 
   /* Alternative loading-safe optimization for when we need performance but loading is active */
   .render-optimized.loading-safe {
     /* Use containment instead of transform for performance without stacking context issues */
-    contain: style layout !important;
-    transform: none !important;
-    will-change: auto !important;
+    contain: style layout;
+    transform: none;
+    will-change: auto;
   }
 
   /* Accessibility */
@@ -1104,20 +1143,13 @@
 
   /* Loading Overlay Hidden State Override */
   .loading-overlay.hidden {
-    display: none !important;
-    visibility: hidden !important;
-    opacity: 0 !important;
+    display: none;
+    visibility: hidden;
+    opacity: 0;
   }
 
   .tailwind-fallback .hidden {
-    display: none !important;
-  }
-
-  /* Loading Overlay Override for TailwindCSS conflicts */
-  .loading-overlay:not(.hidden) {
-    display: flex !important;
-    visibility: visible !important;
-    opacity: 1 !important;
+    display: none;
   }
 
   /* Media Queries */
@@ -1326,7 +1358,7 @@
   .modern-input:focus {
     outline: none;
     border-color: var(--brand-primary);
-    box-shadow: 0 0 0 3px rgba(139, 233, 253, 0.1);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
     background: rgba(255, 255, 255, 0.08);
   }
 

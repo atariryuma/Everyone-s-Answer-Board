@@ -2201,28 +2201,42 @@
     }
   }
 
-  // 🆕 設定完了状況更新
+  // 🆕 設定完了状況更新（修正版：回答列のみ必須）
   function updateCompletionStatus() {
-    const columnTypes = ['answer', 'reason', 'class', 'name'];
-    let completedCount = 0;
+    const requiredColumns = ['answer']; // 必須列：回答列のみ
+    const optionalColumns = ['reason', 'class', 'name']; // オプション列
 
-    columnTypes.forEach(type => {
+    // 必須列の設定状況チェック
+    let requiredCompleted = 0;
+    requiredColumns.forEach(type => {
       const select = document.getElementById(`${type}-column-select`);
       if (select && select.value) {
-        completedCount++;
+        requiredCompleted++;
       }
     });
 
+    // オプション列の設定状況チェック
+    let optionalCompleted = 0;
+    optionalColumns.forEach(type => {
+      const select = document.getElementById(`${type}-column-select`);
+      if (select && select.value) {
+        optionalCompleted++;
+      }
+    });
+
+    // ステータス表示更新
     const statusElement = document.getElementById('completion-status');
     if (statusElement) {
-      const statusIcon = completedCount === 4 ? '🟢' : completedCount > 0 ? '🟡' : '⚪';
-      statusElement.textContent = `${statusIcon} 設定状況: ${completedCount}/4列完了`;
+      const isRequiredComplete = requiredCompleted === requiredColumns.length;
+      const statusIcon = isRequiredComplete ? (optionalCompleted === optionalColumns.length ? '🟢' : '🟡') : '⚪';
+      statusElement.textContent = `${statusIcon} 必須: ${requiredCompleted}/${requiredColumns.length} オプション: ${optionalCompleted}/${optionalColumns.length}`;
     }
 
-    // 設定確認ボタンの状態更新
+    // 設定確認ボタンの状態更新（回答列が設定されていれば有効）
     const verifyButton = document.getElementById('verify-mapping');
     if (verifyButton) {
-      verifyButton.disabled = completedCount < 4;
+      const isAnswerSet = document.getElementById('answer-column-select')?.value;
+      verifyButton.disabled = !isAnswerSet;
     }
   }
 
@@ -3504,10 +3518,11 @@
     updateCompletionStatus();
   }
 
-  // ✅ CLAUDE.md準拠: AI判定閾値システム統一化（パフォーマンス最適化）
+  // ✅ CLAUDE.md準拠: AI判定閾値システム統一化（必須列重視）
   const AI_CONFIDENCE_THRESHOLDS = {
-    answer: 55, reason: 55,  // 文脈依存列
-    name: 65, class: 65      // 明確な列種別
+    answer: 45,              // 必須列: 閾値を下げて設定しやすく
+    reason: 60,              // オプション列: 品質維持のため閾値上げ
+    name: 65, class: 65      // オプション列: 明確な列種別
   };
 
   // 信頼度バッジを表示（V8ランタイム最適化版）
@@ -3754,18 +3769,20 @@
     ClientMutex.release('verifyColumnMapping');
   }
 
-  // 検証結果の表示（V8ランタイム最適化版）
+  // 検証結果の表示（V8ランタイム最適化版・必須/オプション対応）
   function displayVerificationResults(headerIndices) {
     console.log('検証結果の表示を開始:', headerIndices);
 
-    // ✅ CLAUDE.md準拠: Batch DOM操作でパフォーマンス向上（70x改善）
-    const columnTypes = ['answer', 'reason', 'class', 'name'];
+    // ✅ 必須列とオプション列を区別（新しい列設定ロジックに対応）
+    const requiredColumns = ['answer']; // 必須列
+    const optionalColumns = ['reason', 'class', 'name']; // オプション列
+    const allColumns = [...requiredColumns, ...optionalColumns];
     let badgesAdded = 0;
 
     // V8 Runtime 最適化: DOM操作をバッチ化
     const badgeElements = [];
 
-    columnTypes.forEach(columnType => {
+    allColumns.forEach(columnType => {
       const dropdown = document.getElementById(`${columnType}-column-select`);
       const confidenceDiv = document.getElementById(`${columnType}-confidence`);
 
@@ -3976,12 +3993,21 @@
       const mappingData = columnMapping; // ✅ 直接シンプル構造使用
       const confidenceData = confidence; // ✅ 別パラメータから取得
 
-      // 基本フィールド存在 (40点)
-      const basicFields = ['answer', 'reason', 'class', 'name'];
-      const definedFields = basicFields.filter(field =>
+      // フィールド存在スコア (40点) - 必須列重視の新ロジック
+      const requiredFields = ['answer']; // 必須列: 30点
+      const optionalFields = ['reason', 'class', 'name']; // オプション列: 10点
+
+      // 必須列スコア (30点) - 回答列が最重要
+      const requiredCompleted = requiredFields.filter(field =>
         mappingData[field] !== undefined && mappingData[field] !== null && mappingData[field] >= 0
       );
-      score += (definedFields.length / basicFields.length) * 40;
+      score += (requiredCompleted.length / requiredFields.length) * 30;
+
+      // オプション列スコア (10点) - 追加設定による品質向上
+      const optionalCompleted = optionalFields.filter(field =>
+        mappingData[field] !== undefined && mappingData[field] !== null && mappingData[field] >= 0
+      );
+      score += (optionalCompleted.length / optionalFields.length) * 10;
 
       // 信頼度の高さ (30点)
       const avgConfidence = Object.values(confidenceData).length > 0

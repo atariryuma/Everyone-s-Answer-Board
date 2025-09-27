@@ -9,11 +9,11 @@
     <script>
       // 強制ログアウトしてログイン画面にリダイレクトする関数（安全版）
       function forceLogoutAndRedirect() {
-        console.log('🔄 ログイン画面にリダイレクト開始...');
+        console.log('ログイン画面にリダイレクト開始...');
 
         // リダイレクトループ防止：既にログインページにいる場合は単純にリロード
         if (window.location.href.includes('mode=login')) {
-          console.log('⚠️ 既にログインモードです。ページをリロードします。');
+          console.log('既にログインモードです。ページをリロードします。');
           window.location.reload();
           return;
         }
@@ -22,12 +22,12 @@
         const logoutBtn = event.target;
         if (logoutBtn) {
           logoutBtn.disabled = true;
-          logoutBtn.innerHTML = '🔄 処理中...';
+          logoutBtn.innerHTML = '処理中...';
         }
 
         try {
           // 安全なリダイレクト方法
-          console.log('🔄 Redirecting to login page...');
+          console.log('Redirecting to login page...');
 
           const currentUrl = new URL(window.location.href);
           currentUrl.searchParams.set('mode', 'login');
@@ -35,14 +35,14 @@
           // 即座にリダイレクト実行
           window.location.href = currentUrl.toString();
         } catch (error) {
-          console.error('❌ リダイレクト処理でエラー:', error);
+          console.error('リダイレクト処理でエラー:', error);
           fallbackReload();
         }
       }
 
       // シンプルなフォールバック関数
       function fallbackReload() {
-        console.log('🔄 フォールバック：ページリロード実行');
+        console.log('フォールバック：ページリロード実行');
         const confirmMessage =
           'ログイン画面への移動に失敗しました。\nページを再読み込みしてもよろしいですか？';
         if (confirm(confirmMessage)) {

@@ -10,9 +10,9 @@
 
 /* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig */
 
-// ===========================================
-// 🗄️ データベース基盤操作
-// ===========================================
+
+// データベース基盤操作
+
 
 /**
  * サービスアカウント認証情報を取得
@@ -27,7 +27,6 @@ function getServiceAccount() {
 
     const serviceAccount = JSON.parse(credentials);
 
-    // 🛡️ Enhanced validation for required fields
     const requiredFields = ['client_email', 'private_key', 'type'];
     const missingFields = requiredFields.filter(field => !serviceAccount[field]);
 
@@ -72,19 +71,16 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
 
     // DATABASE_SPREADSHEET_ID is always a shared resource requiring service account
     if (spreadsheetId === dbId) {
-      console.log(`SA_VALIDATION: DATABASE_SPREADSHEET_ID access - service account required`);
       return { allowed: true, reason: 'DATABASE_SPREADSHEET_ID is shared resource' };
     }
 
     // Check if current user is admin - admins can use service account
     if (isAdministrator(currentEmail)) {
-      console.log(`SA_VALIDATION: Admin ${currentEmail} authorized for service account usage in ${context}`);
       return { allowed: true, reason: 'Admin privileges' };
     }
 
     // For non-admin users accessing other spreadsheets, allow service account
     // Skip user lookup to prevent circular reference (findUserBySpreadsheetId -> getAllUsers -> openDatabase -> validateServiceAccountUsage)
-    console.log(`SA_VALIDATION: Cross-user access approved for ${currentEmail} in ${context} (skipping user lookup to prevent circular reference)`);
     return { allowed: true, reason: 'Cross-user access (assumed)' };
 
   } catch (error) {
@@ -109,12 +105,9 @@ function openDatabase(useServiceAccount = false, options = {}) {
       return null;
     }
 
-    // 🔧 CLAUDE.md準拠: DATABASE_SPREADSHEET_ID is shared resource - always use service account
-    // ✅ **Critical**: DATABASE_SPREADSHEET_ID contains all user data and requires elevated permissions
-    // ✅ **Security**: General users cannot access DATABASE_SPREADSHEET_ID with normal permissions
+    // DATABASE_SPREADSHEET_ID is shared resource - always use service account
     // Note: useServiceAccount parameter preserved for API compatibility but overridden for security
     const forceServiceAccount = true; // DATABASE_SPREADSHEET_ID always requires service account
-    console.log(`openDatabase: Using service account for shared DATABASE_SPREADSHEET_ID (forced: ${forceServiceAccount})`);
 
     const dataAccess = openSpreadsheet(dbId, {
       useServiceAccount: forceServiceAccount,
@@ -136,14 +129,8 @@ function openDatabase(useServiceAccount = false, options = {}) {
 /**
  * 任意のスプレッドシートを開く（CLAUDE.md準拠 - 条件付きサービスアカウント）
  *
- * 🔐 **CLAUDE.md Security-Critical Implementation**
- * サービスアカウントの使用は CROSS-USER ACCESS ONLY に制限されています。
- * この関数は CLAUDE.md の Security Best Practices に完全準拠し、
- * 適切な権限制御とログ記録を実装しています。
- *
- * 📊 **Usage Metrics**:
- * すべてのアクセスは SA_USAGE プレフィックスでログ記録され、
- * セキュリティ監査とパフォーマンス分析に使用されます。
+ * Service account usage is restricted to CROSS-USER ACCESS ONLY.
+ * Implements proper permission control and logging.
  *
  * @param {string} spreadsheetId - Google スプレッドシートのユニークID
  * @param {Object} options - オプション設定オブジェクト
@@ -160,7 +147,7 @@ function openDatabase(useServiceAccount = false, options = {}) {
  */
 function openSpreadsheet(spreadsheetId, options = {}) {
 
-  // 🔧 内部関数: サービスアカウント経由でSheets API直接アクセス
+  // Service account access via Sheets API
   function openSpreadsheetViaServiceAccount(sheetId) {
     try {
       const credentials = PropertiesService.getScriptProperties().getProperty('SERVICE_ACCOUNT_CREDS');
@@ -192,7 +179,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       if (!tokenData.access_token) return null;
 
       // Sheets API経由でアクセス
-      console.log(`SA_API_ACCESS: Successfully authenticated via service account for ${sheetId.substring(0, 8)}***`);
       return createServiceAccountSpreadsheetProxy(sheetId, tokenData.access_token);
 
     } catch (error) {
@@ -455,7 +441,7 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       return null;
     }
 
-    // 🛡️ CLAUDE.md Security Gate: Validate service account usage
+    // Validate service account usage
     const validation = validateServiceAccountUsage(spreadsheetId, options.useServiceAccount, options.context || 'openSpreadsheet');
     if (!validation.allowed) {
       console.warn('openSpreadsheet: Service account usage denied:', validation.reason);
@@ -465,11 +451,9 @@ function openSpreadsheet(spreadsheetId, options = {}) {
     let spreadsheet = null;
     let auth = null;
 
-    // 🔧 CLAUDE.md準拠: CROSS-USER ACCESS ONLYでサービスアカウント使用
+    // CROSS-USER ACCESS ONLY - service account usage
     if (options.useServiceAccount === true) {
-      // 📊 詳細ログ: サービスアカウント使用メトリクス
       const currentUser = getCurrentEmail() || 'unknown';
-      console.log(`SA_USAGE: cross-user-access - ${currentUser} -> ${spreadsheetId.substring(0, 8)}*** - service_account_mode`);
 
       // クロスユーザーアクセス - サービスアカウント使用
       auth = getServiceAccount();
@@ -477,42 +461,32 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
 
         // DATABASE_SPREADSHEET_IDの場合、DriveApp権限チェックをスキップしてSheets API直接アクセス
-        if (spreadsheetId === dbId) {
-          console.log('openSpreadsheet: Skipping DriveApp permission check for DATABASE_SPREADSHEET_ID (using direct Sheets API access)');
-        } else {
+        if (spreadsheetId !== dbId) {
           try {
-            // 🚀 Performance Optimization: Check if access already exists before granting
+            // Check if access already exists before granting
             const file = DriveApp.getFileById(spreadsheetId);
             const editors = file.getEditors();
             const hasAccess = editors.some(editor => editor.getEmail() === auth.email);
 
             if (!hasAccess) {
               file.addEditor(auth.email);
-              console.log(`openSpreadsheet: Service account editor access granted for cross-user access: ${spreadsheetId.substring(0, 8)}***`);
-              console.log(`SA_USAGE: editor-access-granted - ${auth.email} -> ${spreadsheetId.substring(0, 8)}***`);
-            } else {
-              console.log(`SA_USAGE: editor-access-existing - ${auth.email} -> ${spreadsheetId.substring(0, 8)}*** - already_has_access`);
             }
           } catch (driveError) {
             console.warn('openSpreadsheet: DriveApp permission check failed, proceeding with Sheets API access:', driveError.message);
-            console.log(`SA_USAGE: editor-access-failed-proceeding - ${auth.email} -> ${spreadsheetId.substring(0, 8)}*** - ${driveError.message}`);
-            console.log('openSpreadsheet: Continuing with direct Sheets API access (CLAUDE.md compliant fallback)');
           }
         }
       } else {
         console.warn('openSpreadsheet: Service account requested but invalid credentials');
       }
     } else {
-      // ✅ デフォルト: 通常権限でアクセス（CLAUDE.md準拠）
+      // Default: normal user permissions
       const currentUser = getCurrentEmail() || 'unknown';
-      console.log(`openSpreadsheet: Using normal user permissions for ${spreadsheetId.substring(0, 8)}***`);
-      console.log(`SA_USAGE: self-access - ${currentUser} -> ${spreadsheetId.substring(0, 8)}*** - normal_permissions`);
     }
 
     // スプレッドシートを開く
     try {
       if (options.useServiceAccount === true && auth && auth.isValid) {
-        // 🔧 GAS Service Account実装: JWT認証でSheets API直接アクセス
+        // Service account implementation via JWT authentication
         spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
         if (!spreadsheet) {
           console.error('openSpreadsheet: Service account access failed, falling back to normal access');
@@ -551,9 +525,9 @@ function openSpreadsheet(spreadsheetId, options = {}) {
   }
 }
 
-// ===========================================
-// 👤 ユーザー管理基盤
-// ===========================================
+
+// ユーザー管理基盤
+
 
 /**
  * メールアドレスでユーザーを検索（CLAUDE.md準拠 - Editor→Admin共有DB）
@@ -569,12 +543,8 @@ function findUserByEmail(email, context = {}) {
       return null;
     }
 
-    // 🔧 CLAUDE.md準拠: DATABASE_SPREADSHEET_ID は Editor→Admin 共有DB
-    // ✅ **DATABASE_SPREADSHEET_ID**: Shared database accessible by all authenticated users
-    // ✅ **Service Account**: Only required for system operations or when specifically requested
+    // DATABASE_SPREADSHEET_ID is shared database accessible by authenticated users
     const useServiceAccount = context.forceServiceAccount || false;
-
-    console.log(`findUserByEmail: ${useServiceAccount ? 'Service account' : 'Normal permissions'} access to shared DATABASE_SPREADSHEET_ID`);
 
     const spreadsheet = openDatabase(useServiceAccount);
     if (!spreadsheet) {
@@ -627,12 +597,8 @@ function findUserById(userId, context = {}) {
       return null;
     }
 
-    // 🔧 CLAUDE.md準拠: DATABASE_SPREADSHEET_ID は Editor→Admin 共有DB
-    // ✅ **DATABASE_SPREADSHEET_ID**: Shared database accessible by all authenticated users
-    // ✅ **Service Account**: Only required for system operations or when specifically requested
+    // DATABASE_SPREADSHEET_ID is shared database accessible by authenticated users
     const useServiceAccount = context.forceServiceAccount || false;
-
-    console.log(`findUserById: ${useServiceAccount ? 'Service account' : 'Normal permissions'} lookup in shared DATABASE_SPREADSHEET_ID`);
 
     const spreadsheet = openDatabase(useServiceAccount);
     if (!spreadsheet) {
@@ -662,7 +628,6 @@ function findUserById(userId, context = {}) {
       if (row[userIdColumnIndex] === userId) {
         const user = createUserObjectFromRow(row, headers);
 
-        console.log(`findUserById: User found via ${useServiceAccount ? 'service account' : 'normal permissions'} lookup in shared DATABASE_SPREADSHEET_ID`);
 
         return user;
       }
@@ -689,22 +654,18 @@ function createUser(email, initialConfig = {}, context = {}) {
       return null;
     }
 
-    console.log('createUser: Processing email:', email);
 
-    // 🔧 CLAUDE.md準拠: DATABASE_SPREADSHEET_ID は Editor→Admin 共有DB
+    // DATABASE_SPREADSHEET_ID is shared database
     const currentEmail = getCurrentEmail();
 
     const existingUser = findUserByEmail(email, {
       requestingUser: currentEmail
     });
     if (existingUser) {
-      console.info('createUser: 既存ユーザーを返却', { email: `${email.substring(0, 5)}***` });
       return existingUser;
     }
 
-    // ✅ **DATABASE_SPREADSHEET_ID**: Shared database for user creation (normal permissions)
-    // ✅ **Service Account**: Only use when specifically required by context
-    console.log(`createUser: User creation in shared DATABASE_SPREADSHEET_ID`);
+    // DATABASE_SPREADSHEET_ID: Shared database for user creation
     const spreadsheet = openDatabase(context.forceServiceAccount || false);
     if (!spreadsheet) {
       console.warn('createUser: Database access failed');
@@ -720,7 +681,6 @@ function createUser(email, initialConfig = {}, context = {}) {
     const userId = Utilities.getUuid();
     const now = new Date().toISOString();
 
-    // ✅ Optimized: Remove createdAt from configJSON, store in database column
     const defaultConfig = {
       setupStatus: 'pending',
       isPublished: false,
@@ -758,7 +718,6 @@ function createUser(email, initialConfig = {}, context = {}) {
       lastModified: now
     };
 
-    console.log('✅ User created successfully:', `${email.split('@')[0]}@***`);
     return user;
 
   } catch (error) {
@@ -775,7 +734,7 @@ function createUser(email, initialConfig = {}, context = {}) {
  */
 function getAllUsers(options = {}, context = {}) {
   try {
-    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得認証情報活用
+    // Performance improvement - use preloaded auth when available
     let currentEmail, isAdmin;
     if (context.preloadedAuth) {
       const { email, isAdmin: adminFlag } = context.preloadedAuth;
@@ -793,7 +752,6 @@ function getAllUsers(options = {}, context = {}) {
 
     // getAllUsers is inherently cross-user operation, always requires service account
     // unless admin is accessing for administrative purposes
-    console.log(`getAllUsers: ${isAdmin ? 'Admin' : 'System'} cross-user access to DATABASE_SPREADSHEET_ID`);
     const spreadsheet = openDatabase(true); // Always service account for cross-user data
     if (!spreadsheet) {
       console.warn('getAllUsers: Database access failed');
@@ -837,9 +795,9 @@ function getAllUsers(options = {}, context = {}) {
   }
 }
 
-// ===========================================
-// 🛠️ ヘルパー関数
-// ===========================================
+
+// ヘルパー関数
+
 
 /**
  * 行データからユーザーオブジェクトを作成
@@ -882,7 +840,7 @@ function createUserObjectFromRow(row, headers) {
  */
 function updateUser(userId, updates, context = {}) {
   try {
-    // 🔧 CLAUDE.md準拠: Self vs Cross-user Access for User Updates
+    // Self vs Cross-user Access for User Updates
 
     // Initial user lookup to determine target user
     const targetUser = findUserById(userId, context);
@@ -892,11 +850,9 @@ function updateUser(userId, updates, context = {}) {
       return { success: false, message: 'User not found' };
     }
 
-    // ✅ **DATABASE_SPREADSHEET_ID**: Shared database accessible by authenticated users
-    // ✅ **Service Account**: Only use when specifically required by context
+    // DATABASE_SPREADSHEET_ID: Shared database accessible by authenticated users
     const useServiceAccount = context.forceServiceAccount || false;
 
-    console.log(`updateUser: Update operation in shared DATABASE_SPREADSHEET_ID ${useServiceAccount ? 'with service account' : 'with normal permissions'}`);
 
     const spreadsheet = openDatabase(useServiceAccount);
     if (!spreadsheet) {
@@ -951,19 +907,12 @@ function updateUser(userId, updates, context = {}) {
 /**
  * 閲覧者向けボードデータ取得（CLAUDE.md準拠 - 模範実装）
  *
- * 🎯 **CLAUDE.md Pattern Implementation (Lines 52-64)**
- * この関数はCLAUDE.mdで推奨されるサービスアカウント使用パターンの完全実装です。
- * Context-awareアクセス制御により、自分のデータは通常権限、他人のデータは
- * サービスアカウントを使用してセキュリティを確保します。
+ * Context-aware access control implementation.
+ * Self-access uses normal permissions, cross-user access uses service account.
  *
- * 🔐 **Security Pattern**:
- * - Self-access: `targetUser.userEmail === viewerEmail` → Normal permissions
- * - Cross-user access: `targetUser.userEmail !== viewerEmail` → Service account
- *
- * 🚀 **Performance Features**:
- * - Efficient user lookup by ID
- * - Reuses dataAccess object for subsequent operations
- * - Proper error handling and logging
+ * Security Pattern:
+ * - Self-access: targetUser.userEmail === viewerEmail → Normal permissions
+ * - Cross-user access: targetUser.userEmail !== viewerEmail → Service account
  *
  * @param {string} targetUserId - 対象ユーザーのユニークID（UUID形式）
  * @param {string} viewerEmail - 閲覧者のメールアドレス（アクセス判定用）
@@ -986,18 +935,14 @@ function getViewerBoardData(targetUserId, viewerEmail) {
     }
 
     if (targetUser.userEmail === viewerEmail) {
-      // ✅ Own data: use normal permissions (CLAUDE.md pattern)
-      console.log('getViewerBoardData: Self-access - using normal permissions');
-      // ✅ Self-access: Use getUserSheetData to get actual sheet data
+      // Own data: use normal permissions
       // eslint-disable-next-line no-undef
       return getUserSheetData(targetUser.userId, {
         includeTimestamp: true,
         requestingUser: viewerEmail
       });
     } else {
-      // ✅ Other's data: use service account for cross-user access (CLAUDE.md pattern)
-      console.log('getViewerBoardData: Cross-user access - using service account');
-      // ✅ Cross-user: Use getUserSheetData with context for service account usage
+      // Other's data: use service account for cross-user access
       // eslint-disable-next-line no-undef
       return getUserSheetData(targetUser.userId, {
         includeTimestamp: true,
@@ -1013,7 +958,7 @@ function getViewerBoardData(targetUserId, viewerEmail) {
 
 /**
  * SpreadsheetIDによるユーザー検索（configJSON-based）
- * ✅ CLAUDE.md準拠: Single Source of Truth - configJSON内のspreadsheetIdで検索
+ * Single Source of Truth - search by spreadsheetId in configJSON
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {Object} context - アクセスコンテキスト
  * @param {boolean} context.skipCache - キャッシュをスキップ（デフォルト: false）
@@ -1027,7 +972,7 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       return null;
     }
 
-    // 🚀 パフォーマンス最適化: キャッシュ機能実装
+    // Performance optimization: caching implementation
     const cacheKey = `user_by_sheet_${spreadsheetId}`;
     const skipCache = context.skipCache || false;
 
@@ -1036,7 +981,6 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
         const cached = CacheService.getScriptCache().get(cacheKey);
         if (cached) {
           const cachedUser = JSON.parse(cached);
-          console.log(`findUserBySpreadsheetId: Cache hit for spreadsheet ${spreadsheetId.substring(0, 8)}***`);
           return cachedUser;
         }
       } catch (cacheError) {
@@ -1044,11 +988,9 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       }
     }
 
-    console.log(`findUserBySpreadsheetId: ConfigJSON-based lookup for spreadsheet ${spreadsheetId.substring(0, 8)}***`);
 
-    // ✅ Single Source of Truth: getAllUsers()でユーザー一覧を取得し、configJSONから検索
+    // Single Source of Truth: get all users and search in configJSON
     // Cross-user lookup is legitimate for spreadsheetId-based user identification
-    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得認証情報を渡して重複認証回避
     const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, preloadedAuth: context.preloadedAuth });
     if (!Array.isArray(allUsers)) {
       console.warn('findUserBySpreadsheetId: Failed to get users list');
@@ -1062,14 +1004,12 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
         const config = JSON.parse(configJson);
 
         if (config.spreadsheetId === spreadsheetId) {
-          console.log(`findUserBySpreadsheetId: User found via configJSON lookup - ${user.userEmail ? `${user.userEmail.split('@')[0]}@***` : 'unknown'}`);
 
-          // 🚀 パフォーマンス最適化: キャッシュに保存
+          // Cache the result
           if (!skipCache) {
             try {
               const cacheTtl = context.cacheTtl || CACHE_DURATION.LONG; // 300秒
               CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), cacheTtl);
-              console.log(`findUserBySpreadsheetId: User cached for spreadsheet ${spreadsheetId.substring(0, 8)}*** (TTL: ${cacheTtl}s)`);
             } catch (cacheError) {
               console.warn('findUserBySpreadsheetId: Cache write failed:', cacheError.message);
             }
@@ -1084,14 +1024,12 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       }
     }
 
-    console.log('findUserBySpreadsheetId: No user found with spreadsheetId in configJSON:', `${spreadsheetId.substring(0, 8)}***`);
 
     // ユーザーが見つからない場合も短時間キャッシュ（重複検索回避）
     if (!skipCache) {
       try {
         const notFoundTtl = 60; // 60秒
         CacheService.getScriptCache().put(cacheKey, JSON.stringify(null), notFoundTtl);
-        console.log(`findUserBySpreadsheetId: Not found result cached for ${spreadsheetId.substring(0, 8)}*** (TTL: ${notFoundTtl}s)`);
       } catch (cacheError) {
         console.warn('findUserBySpreadsheetId: Cache write failed for not found result:', cacheError.message);
       }
@@ -1113,7 +1051,7 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
  */
 function deleteUser(userId, reason = '', context = {}) {
   try {
-    // 🔧 CLAUDE.md準拠: Cross-user Access for User Deletion (Admin-only operation)
+    // Cross-user Access for User Deletion (Admin-only operation)
     const currentEmail = getCurrentEmail();
     const isAdmin = isAdministrator(currentEmail);
 
@@ -1124,7 +1062,6 @@ function deleteUser(userId, reason = '', context = {}) {
 
     // User deletion is inherently cross-user administrative operation
     // Always requires service account for safety and audit trail
-    console.log(`deleteUser: Admin cross-user deletion in DATABASE_SPREADSHEET_ID`);
 
     // Direct SpreadsheetApp access for deletion - most reliable approach
     const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
@@ -1155,7 +1092,6 @@ function deleteUser(userId, reason = '', context = {}) {
         const rowToDelete = i + 1;
         sheet.deleteRows(rowToDelete, 1);
 
-        console.log('✅ User deleted successfully from database:', `${userId.substring(0, 8)}***`, reason ? `Reason: ${reason}` : '');
         return {
           success: true,
           userId,

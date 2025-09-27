@@ -491,19 +491,56 @@ function extractFieldValueUnified(row, originalHeaders, fieldType, columnMapping
   try {
     const result = resolveColumnIndex(originalHeaders, fieldType, columnMapping, options);
 
-    if (result.index !== -1 && row && row[result.index] !== undefined) {
+    // 厳密な検証: インデックス、行データ、値の存在をチェック
+    if (result.index !== -1 && row && result.index < row.length && row[result.index] !== undefined) {
+      const extractedValue = row[result.index];
+
+      // 値の妥当性チェック: 空文字、null、undefinedは null として扱う
+      if (extractedValue === null || extractedValue === undefined || String(extractedValue).trim() === '') {
+        return { value: null, index: -1, confidence: 0, method: 'empty_value' };
+      }
+
+      // 匿名性保護: 名前フィールド以外で名前らしいデータを検出した場合の警告
+      if (fieldType !== 'name' && isPotentiallyNameData(extractedValue)) {
+        console.warn(`extractFieldValueUnified: ${fieldType}フィールドに名前らしいデータを検出:`, extractedValue);
+        // 匿名性保護のため null を返す
+        return { value: null, index: -1, confidence: 0, method: 'anonymity_protection' };
+      }
+
       return {
-        value: row[result.index],
+        value: extractedValue,
         index: result.index,
         confidence: result.confidence,
         method: result.method
       };
     }
 
+    // 検出失敗時は確実に null を返す（フォールバックなし）
     return { value: null, index: -1, confidence: 0, method: 'not_found' };
 
   } catch (error) {
     console.error(`extractFieldValueUnified error for ${fieldType}:`, error.message);
     return { value: null, index: -1, confidence: 0, method: 'error', error: error.message };
   }
+}
+
+/**
+ * 名前らしいデータかどうかを簡単に判定
+ * @param {*} value - 判定する値
+ * @returns {boolean} 名前らしいデータの場合 true
+ */
+function isPotentiallyNameData(value) {
+  if (!value || typeof value !== 'string') return false;
+
+  const trimmedValue = value.trim();
+
+  // 簡単な名前パターン検出
+  // 2-4文字の日本語、または First Last の英語名パターン
+  const namePatterns = [
+    /^[あ-んア-ン一-龯]{2,4}$/,  // 2-4文字のひらがな・カタカナ・漢字
+    /^[A-Za-z]+ [A-Za-z]+$/,      // First Last 英語名
+    /^[A-Za-z]{2,10}$/            // 短い英語名
+  ];
+
+  return namePatterns.some(pattern => pattern.test(trimmedValue));
 }

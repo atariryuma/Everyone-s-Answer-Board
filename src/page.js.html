@@ -168,11 +168,10 @@ class StudyQuestApp {
     // 🧹 CLAUDE.md準拠: setTimeout/setInterval完全削除済み
     this.handlers = {};
     this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
-    // リアクション制御: pendingReactionsとlastReactionTimesでデバウンスと重複防止
+    // 🎯 CLAUDE.md準拠: 最適化されたリアクション制御システム
     this.pendingReactions = new Map();
-    this.reactionQueue = new Map();
+    this.reactionDebounceTimeouts = new Map(); // 行単位デバウンシング用（300ms）
     this.reactionEventListeners = new Map(); // 処理完了通知用
-    this.isProcessingReactionQueue = false; // キュー処理中フラグ
 
     // V8 Runtime Error Handling - CLAUDE.md準拠
     // maxRetriesは各関数で個別に指定 - グローバル値は不要
@@ -208,7 +207,7 @@ class StudyQuestApp {
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex),
       checkAdmin: () => this.runGas('isAdmin'),
-      clearCache: () => this.runGas('refreshBoardData', this.state.userId),
+      clearCache: () => this.runGas('clearActiveSheet', this.state.userId),
       validateData: () => this.validData(),
       // ✅ Simple fix: Get count from already loaded data instead of making another API call
       getDataCount: (classFilter, sortOrder, adminMode) => {
@@ -4046,11 +4045,12 @@ class StudyQuestApp {
   }
 
   /**
-   * ✅ CLAUDE.md準拠: リアクション追加（バックエンドと一致）
+   * 🚀 フェーズ2: デバウンシング方式リアクション処理（CLAUDE.md準拠最適化）
    */
   async addReaction(rowIndex, reaction) {
     const numericRowIndex = parseInt(rowIndex, 10);
     const reactionKey = `${numericRowIndex}-${reaction}`;
+    const rowKey = `row_${numericRowIndex}`; // 行単位のデバウンシング用
 
     // Generate unique request ID for this operation
     const requestId = this.generateRequestId();
@@ -4086,7 +4086,6 @@ class StudyQuestApp {
       if (card) {
         this.updateCardReactions(card, item);
       }
-    } else {
     }
 
     // Current reaction state capture for rollback support
@@ -4102,118 +4101,173 @@ class StudyQuestApp {
       retryCount: 0
     });
 
-    this.reactionQueue.set(reactionKey, {
-      requestId,
-      rowIndex: numericRowIndex,
-      reaction,
-      timestamp: Date.now(),
-      originalState: currentState
-    });
-
-    // 🎯 CLAUDE.md準拠: バッチ処理システム削除
-
-    this.processReactionQueue();
+    // 🎯 フェーズ2最適化: デバウンシング方式で行単位の最適化
+    this.debounceReactionByRow(rowKey, numericRowIndex, reaction, reactionKey);
   }
 
-  async processReactionQueue() {
-    if (this.isProcessingReactionQueue) return;
-    this.isProcessingReactionQueue = true;
+  /**
+   * 🎯 CLAUDE.md準拠: 行単位デバウンシング処理（300ms）
+   */
+  debounceReactionByRow(rowKey, rowIndex, reaction, reactionKey) {
+    // 既存のタイムアウトをクリア（最新の操作のみ実行）
+    if (this.reactionDebounceTimeouts.has(rowKey)) {
+      clearTimeout(this.reactionDebounceTimeouts.get(rowKey));
+    }
 
-    const processingStart = Date.now();
-    let processedCount = 0;
-    let errorCount = 0;
+    // 300msデバウンスで最新操作のみ実行
+    const timeoutId = setTimeout(async () => {
+      try {
+        // デバウンシングタイムアウト管理
+        this.reactionDebounceTimeouts.delete(rowKey);
+
+        debugLog(`🚀 デバウンス実行開始: ${rowKey} -> ${reaction}`);
+        await this.sendReactionToServerDirect(rowIndex, reaction, reactionKey);
+        debugLog(`✅ デバウンス実行完了: ${rowKey} -> ${reaction}`);
+
+      } catch (error) {
+        errorLog(`❌ デバウンス実行エラー (${reactionKey}):`, error);
+
+        // 🎯 追加のエラー時確認処理（sendReactionToServerDirectのfinallyと重複するが安全確保）
+        this.ensureReactionCleanup(rowIndex, reaction, reactionKey, error);
+
+      } finally {
+        // デバウンシングタイムアウトの確実な削除
+        this.reactionDebounceTimeouts.delete(rowKey);
+      }
+    }, 300);
+
+    this.reactionDebounceTimeouts.set(rowKey, timeoutId);
+    debugLog(`🎯 デバウンス設定: ${rowKey} -> ${reaction} (300ms)`);
+  }
+
+  /**
+   * 🚀 直接リアクション送信（デバウンシング後）
+   */
+  async sendReactionToServerDirect(rowIndex, reaction, reactionKey) {
+    let success = false;
+    let errorMessage = null;
 
     try {
-      
-      // 🎯 CLAUDE.md準拠: 直接送信システム（バッチ処理削除）
-      const queueEntries = Array.from(this.reactionQueue.entries());
-      
-      for (const [reactionKey, operation] of queueEntries) {
-        try {
-          this.reactionQueue.delete(reactionKey);
-          await this.processReaction(operation, reactionKey);
-          processedCount++;
-        } catch (error) {
-          errorCount++;
-          errorLog(`❌ 個別リアクション処理エラー (${reactionKey}):`, error);
-          
-          // エラー時の復旧処理
-          await this.handleReactionError(error, operation.rowIndex, operation.reaction);
+      const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
+      if (!item) {
+        throw new Error(`Item not found for rowIndex: ${rowIndex}`);
+      }
+
+      // Use executeWithRetry for robust async reaction processing
+      await this.executeWithRetry(async (attempt) => {
+        debugLog(`📡 デバウンス後リアクション送信 (試行 ${attempt + 1}):`, { rowIndex, reaction });
+
+        // Server-first approach with retry support
+        const response = await this.sendReactionToServer(rowIndex, reaction);
+        await this.processResponse(item, response, reaction);
+
+        // UI update (only after successful server response)
+        await this.updateReactionUI(item, false);
+
+        return response;
+      }, {
+        maxRetries: 2,
+        baseDelay: 500,
+        context: `デバウンスリアクション処理 (${reactionKey})`,
+        retryCondition: (error) => {
+          return error.message && !error.message.includes('権限') && !error.message.includes('無効');
         }
-      }
-      
+      });
+
+      success = true;
+
     } catch (error) {
-      errorLog('❌ リアクションキュー処理致命的エラー:', error);
-      errorCount++;
+      success = false;
+      errorMessage = error.message;
+      errorLog(`❌ デバウンス処理エラー (${reactionKey}):`, error);
+
+      // エラー時の復旧処理
+      await this.handleReactionError(error, rowIndex, reaction);
+
     } finally {
-      this.isProcessingReactionQueue = false;
-      
-      const processingTime = Date.now() - processingStart;
-      debugLog(`📊 リアクションキュー処理完了: ${processedCount}件成功, ${errorCount}件エラー, ${processingTime}ms`);
-      
-      // 残っているキューがある場合の警告
-      if (this.reactionQueue.size > 0) {
-        warnLog(`⚠️ キュー処理後も${this.reactionQueue.size}件が残っています`);
-      }
-      
-      // エラー率が高い場合の対処
-      if (errorCount > 0 && errorCount / (processedCount + errorCount) > 0.5) {
-        warnLog('🚨 リアクション処理エラー率が高いです。システム状態を確認してください。');
-      }
+      // 🎯 確実なクリーンアップ処理（成功・失敗問わず必ず実行）
+      const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+      this.setReactionButtonsLoading(buttons, false);
+      this.pendingReactions.delete(reactionKey);
+
+      // 完了通知（成功・失敗の情報を含む）
+      this.notifyReactionComplete(reactionKey, {
+        success,
+        error: errorMessage,
+        rowIndex,
+        reaction
+      });
     }
   }
 
-  async processReaction(operation, reactionKey) {
-    const { rowIndex, reaction } = operation;
-
+  /**
+   * 🛡️ 共通クリーンアップ関数 - UI状態とサーバー処理の確実な同期
+   */
+  ensureReactionCleanup(rowIndex, reaction, reactionKey, error = null) {
     try {
-        const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
-        if (!item) {
-            throw new Error(`Item not found for rowIndex: ${rowIndex}`);
-        }
+      debugLog(`🧹 リアクションクリーンアップ実行: ${reactionKey}`, { rowIndex, reaction, hasError: !!error });
 
-        // Use executeWithRetry for robust async reaction processing
-        await this.executeWithRetry(async (attempt) => {
-            debugLog(`📡 リアクション送信 (試行 ${attempt + 1}):`, { rowIndex, reaction, sheetName: this.state.sheetName });
+      // 1. ローディング状態の確実な解除
+      const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+      if (buttons.length > 0) {
+        this.setReactionButtonsLoading(buttons, false);
+        debugLog(`✅ ローディング状態解除: ${buttons.length}個のボタン`);
+      } else {
+        warnLog(`⚠️ ボタンが見つからない: row=${rowIndex}, reaction=${reaction}`);
+      }
 
-            // Server-first approach with retry support
-            const response = await this.sendReactionToServer(rowIndex, reaction);
-            await this.processResponse(item, response, reaction);
-
-            // UI update (only after successful server response)
-            await this.updateReactionUI(item, false);
-
-            return response;
-        }, {
-            maxRetries: 2,
-            baseDelay: 500,
-            context: `リアクション処理 (${reactionKey})`,
-            retryCondition: (error) => {
-                // Retry on network errors, timeouts, or temporary server issues
-                const retryableErrors = [
-                    'network', 'timeout', 'temporarily unavailable',
-                    'server error', 'service unavailable'
-                ];
-                return retryableErrors.some(errorType =>
-                    error.message.toLowerCase().includes(errorType)
-                );
-            }
-        });
-
-        this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: true });
-
-    } catch (error) {
-        errorLog('❌ リアクション処理エラー:', error);
-        await this.handleReactionError(error, rowIndex, reaction);
-        this.notifyReactionComplete(reactionKey, { rowIndex, reaction, success: false, error: error.message });
-    } finally {
-        // Simple cleanup
-        const btns = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-        this.setReactionButtonsLoading(btns, false);
-
+      // 2. pendingReactionsの確実な削除
+      if (this.pendingReactions.has(reactionKey)) {
         this.pendingReactions.delete(reactionKey);
+        debugLog(`✅ pendingReactions削除: ${reactionKey}`);
+      }
+
+      // 3. エラー時のUI状態復旧確認
+      if (error) {
+        warnLog(`🔄 エラー時UI状態復旧確認: ${reactionKey}`, error.message);
+
+        // UI状態の一貫性確認
+        buttons.forEach(btn => {
+          if (btn.disabled || btn.classList.contains('loading') || btn.getAttribute('aria-busy') === 'true') {
+            warnLog(`🚨 UI状態不整合検出、強制復旧: ${reactionKey}`);
+            btn.disabled = false;
+            btn.classList.remove('loading');
+            btn.setAttribute('aria-busy', 'false');
+            btn.removeAttribute('data-request-id');
+          }
+        });
+      }
+
+      // 4. 完了通知の安全確保（重複実行防止）
+      if (!this.reactionEventListeners.has(reactionKey)) {
+        this.notifyReactionComplete(reactionKey, {
+          success: !error,
+          error: error?.message,
+          rowIndex,
+          reaction,
+          cleanupReason: 'ensureReactionCleanup'
+        });
+      }
+
+    } catch (cleanupError) {
+      errorLog(`❌ クリーンアップ処理自体でエラー: ${reactionKey}`, cleanupError);
+      // クリーンアップ処理自体でエラーが発生した場合も、最低限のUI復旧を試行
+      try {
+        const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
+        buttons.forEach(btn => {
+          btn.disabled = false;
+          btn.classList.remove('loading');
+          btn.setAttribute('aria-busy', 'false');
+        });
+      } catch (finalError) {
+        errorLog(`❌ 最終UI復旧もエラー: ${reactionKey}`, finalError);
+      }
     }
   }
+
+  // 🎯 CLAUDE.md準拠: processReactionQueue削除済み（デバウンシング方式に移行）
+
+  // 🎯 CLAUDE.md準拠: processReaction削除済み（デバウンシング方式のsendReactionToServerDirectに統合）
 
   notifyReactionComplete(reactionKey, result) {
     const listeners = this.reactionEventListeners.get(reactionKey);
@@ -4368,72 +4422,9 @@ class StudyQuestApp {
     }
   }
 
-  async tryBatchProcessing() {
-    try {
-      if (this.batchProcessingActive || this.reactionQueue.size === 0) {
-        return false;
-      }
+  // 🎯 CLAUDE.md準拠: tryBatchProcessing削除済み（デバウンシング方式に移行）
 
-      this.batchProcessingActive = true;
-
-      // キューからバッチ操作を準備
-      const batchOperations = Array.from(this.reactionQueue.values());
-      
-      if (batchOperations.length === 1) {
-        // 単一操作の場合はバッチ処理しない
-        this.batchProcessingActive = false;
-        return false;
-      }
-
-      // サーバ側のバッチAPIは使用せず、直接逐次送信
-      const responseData = [];
-      for (const op of batchOperations) {
-        try {
-          const r = await this.runGas('addReaction', op.rowIndex, op.reaction, this.state.sheetName);
-          const ok = r && (r.success === true || r.status === 'success');
-          if (ok) {
-            responseData.push({ rowIndex: op.rowIndex, reactions: r.reactions || null, reaction: op.reaction });
-          }
-          const reactionKey = `${op.rowIndex}-${op.reaction}`;
-          this.notifyReactionComplete(reactionKey, { success: ok, batch: true });
-        } catch (e) {
-          const reactionKey = `${op.rowIndex}-${op.reaction}`;
-          this.notifyReactionComplete(reactionKey, { success: false, error: e?.message || String(e), batch: true });
-        }
-      }
-
-      if (responseData.length > 0) {
-        this.processBatchReactionResponse(responseData, batchOperations);
-        return true;
-      }
-      warnLog('バッチ処理失敗、個別処理にフォールバック');
-      return false;
-    } catch (error) {
-      warnLog('バッチ処理エラー、個別処理にフォールバック:', error);
-      return false;
-    } finally {
-      this.batchProcessingActive = false;
-    }
-  }
-
-  processBatchReactionResponse(responseData, originalOperations) {
-    try {
-      if (!responseData || !Array.isArray(responseData)) {
-        warnLog('無効なバッチレスポンス、個別処理で続行');
-        return;
-      }
-      
-      responseData.forEach(rowData => {
-        const item = this.state.currentAnswers.find(i => i.rowIndex == rowData.rowIndex);
-        if (item) {
-          this.processResponse(item, rowData, rowData.reaction);
-        }
-      });
-      
-    } catch (error) {
-      errorLog('バッチレスポンス処理エラー:', error);
-    }
-  }
+  // 🎯 CLAUDE.md準拠: processBatchReactionResponse削除済み（デバウンシング方式に移行）
 
   setReactionButtonsLoading(buttons, isLoading, requestId = null) {
     buttons.forEach(btn => {
@@ -6059,39 +6050,37 @@ class StudyQuestApp {
     const style = document.createElement('style');
     style.id = 'low-performance-optimizations';
     style.textContent = `
-      /* Disable expensive visual effects */
-      .glass-panel {
-        -webkit-backdrop-filter: blur(4px) !important;
-        backdrop-filter: blur(4px) !important;
-        background: var(--brand-surface) !important;
+      /* Low-performance optimizations with appropriate specificity */
+      body.low-performance .glass-panel {
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+        background: var(--brand-surface);
       }
-      
-      /* Simplify hover effects */
-      .answer-card:hover {
-        transform: none !important;
-        box-shadow: var(--shadow-sm) !important;
+
+      /* Simplify hover effects for low-performance devices */
+      body.low-performance .answer-card:hover {
+        transform: none;
+        box-shadow: var(--shadow-sm);
       }
-      
-      .reaction-btn:hover {
-        transform: scale(1.02) !important;
+
+      body.low-performance .reaction-btn:hover {
+        transform: scale(1.02);
       }
-      
-      .game-btn:hover {
-        transform: translateY(-1px) !important;
+
+      body.low-performance .game-btn:hover {
+        transform: translateY(-1px);
       }
-      
-      /* Disable complex animations */
-      
+
       /* Remove will-change to reduce GPU usage */
-      * {
-        will-change: auto !important;
+      body.low-performance * {
+        will-change: auto;
       }
-      
+
       /* Simplify shadows */
-      .answer-card {
-        box-shadow: var(--shadow-sm) !important;
+      body.low-performance .answer-card {
+        box-shadow: var(--shadow-sm);
       }
-      
+
     `;
     document.head.appendChild(style);
     

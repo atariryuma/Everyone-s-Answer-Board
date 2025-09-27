@@ -11,14 +11,14 @@
 
 /* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
 
-// ===========================================
+
 // 🎯 リアクション管理システム - CLAUDE.md準拠
-// ===========================================
 
 
-// ===========================================
+
+
 // 🔧 セキュリティ・監査機能
-// ===========================================
+
 
 /**
  * マルチテナント権限検証
@@ -59,7 +59,7 @@ function logReactionAudit(action, details) {
     details: details.extra || {}
   };
 
-  console.log(`REACTION_AUDIT: ${JSON.stringify(logEntry)}`);
+  // console.log(`REACTION_AUDIT: ${JSON.stringify(logEntry)}`);
 }
 
 
@@ -272,14 +272,14 @@ function extractHighlight(row, headers) {
   }
 }
 
-// ===========================================
+
 // 🎯 ハイライト管理システム - CLAUDE.md準拠
-// ===========================================
 
 
-// ===========================================
+
+
 // 🌍 Public API Functions - CLAUDE.md準拠
-// ===========================================
+
 
 /**
  * リアクション送信（マルチテナント対応・GAS-Native）
