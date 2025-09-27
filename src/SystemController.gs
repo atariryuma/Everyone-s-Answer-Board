@@ -2098,7 +2098,7 @@ function testDatabaseConnection() {
  * @param {string} googleClientId - Google Client ID (optional)
  * @returns {Object} Setup result
  */
-function setupApplication(serviceAccountJson, databaseId, adminEmail, googleClientId) {
+function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
   try {
     // Validation
     if (!serviceAccountJson || !databaseId || !adminEmail) {
@@ -2210,6 +2210,6 @@ __rootSC.SystemController = {
   getPerformanceMetrics,
   diagnosePerformance,
   // 🔧 Application Setup Functions (from main.gs)
-  setupApplication,
+  setupApp,
   setAppStatus
 };

@@ -112,7 +112,7 @@
               />
               <button
                 id="disable-app-btn"
-                onclick="disableApplication()"
+                onclick="disableApp()"
                 class="w-full px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-semibold rounded-lg transition-colors"
               >
                 🚫 アプリケーションを停止
@@ -128,7 +128,7 @@
             <div class="pt-8">
               <button
                 id="enable-app-btn"
-                onclick="enableApplication()"
+                onclick="enableApp()"
                 class="w-full px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors"
               >
                 ✅ アプリケーションを再開
@@ -900,7 +900,7 @@
       }
 
       // アプリケーションを停止
-      function disableApplication() {
+      function disableApp() {
         const reasonInput = document.getElementById('disable-reason');
         const reason = reasonInput.value.trim() || 'システムメンテナンス';
 
@@ -933,7 +933,7 @@
       }
 
       // アプリケーションを再開
-      function enableApplication() {
+      function enableApp() {
         const confirmMessage = 'アプリケーションを再開します。\n全ユーザーがアクセス可能になります。続行しますか？';
         if (!confirm(confirmMessage)) return;
 

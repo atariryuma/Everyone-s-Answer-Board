@@ -256,7 +256,7 @@ class SystemFlowAnalyzer {
    */
   checkFrontendBackendConsistency() {
     // 重要な関数の整合性チェック
-    const criticalFunctions = ['getConfig', 'getData', 'connectDataSource', 'publishApplication'];
+    const criticalFunctions = ['getConfig', 'getData', 'connectDataSource', 'publishApp'];
     
     for (const functionName of criticalFunctions) {
       const backendDefined = this.functions.has(functionName);

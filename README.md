@@ -395,7 +395,7 @@ getAdminUsers() → {success: boolean, users?: Array}
 deleteUser(userId, reason) → {success: boolean, message?: string}
 
 // システムセットアップ
-setupApplication(serviceAccountJson, databaseId, adminEmail) → {success: boolean}
+setupApp(serviceAccountJson, databaseId, adminEmail) → {success: boolean}
 ```
 
 ### エラーレスポンス形式

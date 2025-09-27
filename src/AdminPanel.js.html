@@ -3857,7 +3857,7 @@
    * @param {Object} confidence - 信頼度データ（オプション）
    * @returns {Object} 検証結果
    */
-  function validateColumnConfigurationData(spreadsheetId, sheetName, headers, columnMapping, confidence = {}) {
+  function validateColumnConfig(spreadsheetId, sheetName, headers, columnMapping, confidence = {}) {
     const validation = {
       isValid: true,
       errors: [],
@@ -3941,7 +3941,7 @@
 
       // 🎯 設定品質スコア算出
       if (validation.isValid) {
-        validation.qualityScore = calculateConfigurationQualityScore(headers, columnMapping, confidence);
+        validation.qualityScore = calculateConfigScore(headers, columnMapping, confidence);
         if (validation.qualityScore < 70) {
           validation.warnings.push(`設定品質スコア: ${validation.qualityScore}% - 改善余地あり`);
         }
@@ -3967,7 +3967,7 @@
    * @param {Object} confidence - 信頼度データ（オプション）
    * @returns {number} 品質スコア (0-100)
    */
-  function calculateConfigurationQualityScore(headers, columnMapping, confidence = {}) {
+  function calculateConfigScore(headers, columnMapping, confidence = {}) {
     let score = 0;
     const maxScore = 100;
 
@@ -4094,7 +4094,7 @@
 
     try {
       // 🛡️ 入力データの検証 - ✅ CLAUDE.md準拠: シンプル構造対応
-      const validationResult = validateColumnConfigurationData(spreadsheetId, sheetName, headers, columnMapping, confidence);
+      const validationResult = validateColumnConfig(spreadsheetId, sheetName, headers, columnMapping, confidence);
       if (!validationResult.isValid) {
         showError(`列設定の検証に失敗: ${validationResult.errors.join(', ')}`);
         ClientMutex.release('saveColumnConfig');
