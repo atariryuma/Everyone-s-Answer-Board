@@ -37,7 +37,7 @@
       class="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
     >
       <div
-        class="loading-spinner w-16 h-16 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"
+        class="global-spinner"
       ></div>
     </div>
 
@@ -62,7 +62,7 @@
               <span class="text-gray-300 mr-3">アプリ状態:</span>
               <span id="current-status" class="px-3 py-1 rounded-full text-sm font-medium">
                 <span
-                  class="loading-spinner w-4 h-4 border-2 border-white border-t-transparent rounded-full inline-block mr-2"
+                  class="spinner-small mr-2"
                 ></span>
                 読み込み中...
               </span>
@@ -71,7 +71,7 @@
           <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
             <div class="flex items-center">
               <span class="text-gray-300 mr-3">管理者:</span>
-              <span id="current-admin" class="text-cyan-300">読み込み中...</span>
+              <span id="current-admin" class="text-white">読み込み中...</span>
             </div>
           </div>
           <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
@@ -279,7 +279,7 @@
             <div id="user-table-wrapper" class="bg-gray-800 rounded-lg overflow-hidden">
               <div id="user-loading" class="p-8 text-center text-gray-400">
                 <div
-                  class="loading-spinner w-8 h-8 border-2 border-gray-400 border-t-transparent rounded-full mx-auto mb-2"
+                  class="spinner mx-auto mb-2"
                 ></div>
                 ユーザー一覧を読み込み中...
               </div>

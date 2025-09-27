@@ -3046,10 +3046,9 @@ class StudyQuestApp {
     }
     
     // ユーザーにエラーを通知
-    if (window.messageManager) {
-      window.messageManager.show(
+    if (window.notifications) {
+      window.notifications.error(
         `ボードの切り替えに失敗しました: ${error.message}`,
-        'error',
         5000
       );
     }
@@ -4711,8 +4710,8 @@ class StudyQuestApp {
     }
 
     // Show error to user
-    if (window.messageManager) {
-        window.messageManager.show(userMessage, 'error', 4000);
+    if (window.notifications) {
+        window.notifications.error(userMessage, 4000);
     } else {
         this.showNotification(userMessage, 'error');
     }

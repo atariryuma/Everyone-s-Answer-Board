@@ -144,14 +144,7 @@ header {
 .admin-toggle:hover {
   background-color: rgba(139, 233, 253, 0.1);
 }
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid rgba(139, 233, 253, 0.3);
-  border-top: 4px solid var(--brand-primary);
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-}
+/* Spinner definition moved to UnifiedStyles.css.html - use .spinner-medium for 40px spinner */
 
 /* Notification Banner Base and Animation Classes */
 .notification-banner-base {
@@ -327,7 +320,7 @@ header {
   position: absolute; 
   inset: 0; 
   border: 2px solid transparent; 
-  border-top: 2px solid currentColor; 
+  border-top: 2px solid #67e8f9; /* bright cyan */ 
   border-radius: 50%; 
   animation: spin 0.8s linear infinite; 
   width: 16px; 

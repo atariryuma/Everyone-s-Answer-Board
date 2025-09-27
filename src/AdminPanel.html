@@ -248,11 +248,8 @@
       style="background-color: var(--brand-background-overlay, rgba(16, 17, 28, 0.9));"
     >
       <div class="flex flex-col items-center gap-4">
-        <div
-          class="loading-spinner w-16 h-16 border-4 rounded-full animate-spin"
-          style="border-color: rgba(139, 233, 253, 0.3); border-top-color: var(--brand-primary);"
-        ></div>
-        <div class="loading-message text-center" style="color: var(--brand-text);">処理中...</div>
+        <div class="global-spinner"></div>
+        <div class="loading-message text-center text-white">処理中...</div>
       </div>
     </div>
 
@@ -545,7 +542,7 @@
           <div class="space-y-3">
             <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
               <span class="text-gray-300">メールアドレス:</span>
-              <span id="current-user-email" class="text-cyan-300">読み込み中...</span>
+              <span id="current-user-email" class="text-white">読み込み中...</span>
             </div>
             <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
               <span class="text-gray-300">ユーザーID:</span>

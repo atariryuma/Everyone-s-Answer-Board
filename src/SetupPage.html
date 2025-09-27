@@ -143,7 +143,7 @@
             <span id="setup-text">🚀 セットアップを開始</span>
             <div
               id="setup-spinner"
-              class="loading-spinner w-5 h-5 border-2 border-white border-t-transparent rounded-full mx-auto hidden"
+              class="spinner-xs mx-auto hidden"
             ></div>
           </button>
         </form>
@@ -327,7 +327,7 @@
       document.getElementById('test-btn').addEventListener('click', function () {
         this.disabled = true;
         this.innerHTML =
-          '<div class="loading-spinner w-4 h-4 border-2 border-white border-t-transparent rounded-full mx-auto"></div>';
+          '<div class="spinner-small mx-auto"></div>';
 
         google.script.run
           .withSuccessHandler((result) => {
