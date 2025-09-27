@@ -1069,22 +1069,7 @@
         }
       }
 
-      // 4. 表示設定の反映（統一構造）
-      const displaySettings = config.displaySettings;
-      const showNames = displaySettings.showNames;
-      const showReactions = displaySettings.showReactions;
-
-      // 名前表示トグル
-      const showNamesToggle = document.getElementById('show-names');
-      if (showNamesToggle && typeof showNames === 'boolean') {
-        showNamesToggle.checked = showNames;
-      }
-
-      // リアクション表示トグル
-      const showReactionsToggle = document.getElementById('show-reactions');
-      if (showReactionsToggle && typeof showReactions === 'boolean') {
-        showReactionsToggle.checked = showReactions;
-      }
+      // 4. displaySettings UI反映は updateConfigSummary に統一（重複削除）
 
       // 5. 表示モードの反映
       if (config.displayMode) {
@@ -4125,10 +4110,7 @@
       sheetName,
       headers: headers, // ✅ CLAUDE.md準拠: トップレベルheaders（UI表示用）
       columnMapping: columnMapping, // ✅ CLAUDE.md準拠: シンプル構造 {answer:4, reason:5, ...}
-      displaySettings: {
-        showNames: document.getElementById('show-names')?.checked || false,
-        showReactions: document.getElementById('show-reactions')?.checked || false
-      },
+      displaySettings: getCurrentDisplaySettings(),
       verifiedAt: timestamp, // メタデータは別途管理
       confidence: confidence, // 信頼度データは別途管理
       setupComplete: true,
@@ -4145,10 +4127,7 @@
       isPublished: systemState.config.isPublished,
       publishedAt: systemState.config.publishedAt,
       userPermissions: systemState.config.userPermissions,
-      displaySettings: {
-        showNames: document.getElementById('show-names')?.checked || false,
-        showReactions: document.getElementById('show-reactions')?.checked || false
-      },
+      displaySettings: getCurrentDisplaySettings(),
       // 新しい設定で明示的に上書き（baseConfigで既に設定済みだが明示的に保証）
       spreadsheetId,
       sheetName,
@@ -4466,6 +4445,14 @@
   // ✅ CLAUDE.md準拠: 重複関数削除（シンプル化）
   // getColumnMapping() → getColumnMapping()に統一
 
+  // ✅ displaySettings収集を共通化
+  function getCurrentDisplaySettings() {
+    return {
+      showNames: document.getElementById('show-names')?.checked || false,
+      showReactions: document.getElementById('show-reactions')?.checked || false
+    };
+  }
+
   // ✅ CLAUDE.md準拠: 自然な英語パターン
   function getConfiguration() {
     const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
@@ -4497,10 +4484,7 @@
     return {
       spreadsheetId,
       sheetName,
-      displaySettings: {
-        showNames: document.getElementById('show-names')?.checked || false,
-        showReactions: document.getElementById('show-reactions')?.checked || false
-      },
+      displaySettings: getCurrentDisplaySettings(),
       // 🔧 NEW: フォーム情報追加（安全な収集）
       formUrl: formInfo.formUrl,
       formTitle: formInfo.formTitle,
