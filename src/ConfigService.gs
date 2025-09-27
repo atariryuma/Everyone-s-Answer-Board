@@ -282,7 +282,7 @@ function ensureRequiredFields(config, userId) {
     spreadsheetId: config.spreadsheetId || '',
     sheetName: config.sheetName || '',
     formUrl: config.formUrl || '',
-    displaySettings: config.displaySettings,
+    displaySettings: config.displaySettings || { showNames: false, showReactions: false },
     columnMapping: config.columnMapping,
     userPermissions: config.userPermissions,
     completionScore: calculateCompletionScore(config)
