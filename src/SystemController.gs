@@ -801,6 +801,7 @@ function publishApplication(publishConfig) {
         formUrl: publishConfig?.formUrl || currentConfig.formUrl,
         formTitle: publishConfig?.formTitle || currentConfig.formTitle,
         columnMapping: publishConfig?.columnMapping || currentConfig.columnMapping,
+        displaySettings: publishConfig?.displaySettings || currentConfig.displaySettings,
         // system fields
         isPublished: true,
         publishedAt,
