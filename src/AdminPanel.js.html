@@ -303,8 +303,6 @@
 
         updateFooterDisplay(currentBoardInfo);
 
-        // ✅ 論理的整合性: 右パネルも最新設定で更新（displaySettingsはHTMLデフォルトのまま）
-        // updateConfigSummary(systemState.config); // 初期化時は不要 - HTMLデフォルト(unchecked)を活用
 
         // Update user email display
         if (adminData.userInfo.email) {
@@ -421,7 +419,6 @@
           currentBoardInfo = adminData.boardInfo;
 
           updateFooterDisplay(adminData.boardInfo);
-          // updateConfigSummary(systemState.config); // リフレッシュ時も不要 - HTMLデフォルト維持
         } catch (error) {
           console.error('Failed to refresh board info:', error);
         }
@@ -597,6 +594,31 @@
           window.sharedUtilities.debounce.debounce(() => publishApp(), 'publish-now', 800);
         } else {
           publishApp();
+        }
+      });
+    }
+
+    // 表示設定トグルボタン
+    const showNamesCheckbox = document.getElementById('show-names');
+    if (showNamesCheckbox) {
+      showNamesCheckbox.addEventListener('change', function () {
+        // SharedUtilitiesのデバウンス機能を使用
+        if (window.sharedUtilities && window.sharedUtilities.debounce) {
+          window.sharedUtilities.debounce.debounce(() => saveDraft(), 'toggle-save', 800);
+        } else {
+          saveDraft();
+        }
+      });
+    }
+
+    const showReactionsCheckbox = document.getElementById('show-reactions');
+    if (showReactionsCheckbox) {
+      showReactionsCheckbox.addEventListener('change', function () {
+        // SharedUtilitiesのデバウンス機能を使用
+        if (window.sharedUtilities && window.sharedUtilities.debounce) {
+          window.sharedUtilities.debounce.debounce(() => saveDraft(), 'toggle-save', 800);
+        } else {
+          saveDraft();
         }
       });
     }
