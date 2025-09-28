@@ -4208,34 +4208,20 @@
             }
 
             // ✅ CLAUDE.md準拠 & 公開成功後：即座にフッターを更新（UX向上）
-            // ✅ CLAUDE.md準拠: V8 compliant Promise-based delay
-            const createPromiseDelay = (ms) => new Promise(resolve => {
-              const start = Date.now();
-              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-              check();
-            });
-
-            createPromiseDelay(500).then(async () => {
-              // フッター情報を再読み込み - 統一データ取得使用
+            // 遅延なしで直接フッター更新を実行
+            (async () => {
               try {
                 const adminData = await loadBatchedAdminData();
-                if (adminData && adminData.config) {
-                  const boardInfo = {
-                    isActive: adminData.config.isPublished || false,
-                    questionText: adminData.questionText || '回答ボード',
-                    userEmail: adminData.user?.userEmail || '',
-                    spreadsheetId: adminData.config?.spreadsheetId || '',
-                    sheetName: adminData.config?.sheetName || ''
-                  };
-                  currentBoardInfo = boardInfo;
-                  updateFooterDisplay(boardInfo);
+                console.log('🔍 Footer update - adminData:', adminData);
+                if (adminData && adminData.boardInfo) {
+                  // ✅ 既存のboardInfoを直接使用（正しいデータが既に含まれている）
+                  currentBoardInfo = adminData.boardInfo;
+                  updateFooterDisplay(adminData.boardInfo);
                 }
               } catch (error) {
                 console.warn('Footer refresh failed:', error);
               }
-            }).catch(() => {
-              // Silent error handling for non-critical delay
-            });
+            })();
           } else {
             if (result.error === 'etag_mismatch') {
               showInfo('設定が他で更新されました。画面を更新してから再度公開してください。');
