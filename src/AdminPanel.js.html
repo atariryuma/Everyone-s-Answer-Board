@@ -598,31 +598,6 @@
       });
     }
 
-    // 表示設定トグルボタン
-    const showNamesCheckbox = document.getElementById('show-names');
-    if (showNamesCheckbox) {
-      showNamesCheckbox.addEventListener('change', function () {
-        // SharedUtilitiesのデバウンス機能を使用
-        if (window.sharedUtilities && window.sharedUtilities.debounce) {
-          window.sharedUtilities.debounce.debounce(() => saveDraft(), 'toggle-save', 800);
-        } else {
-          saveDraft();
-        }
-      });
-    }
-
-    const showReactionsCheckbox = document.getElementById('show-reactions');
-    if (showReactionsCheckbox) {
-      showReactionsCheckbox.addEventListener('change', function () {
-        // SharedUtilitiesのデバウンス機能を使用
-        if (window.sharedUtilities && window.sharedUtilities.debounce) {
-          window.sharedUtilities.debounce.debounce(() => saveDraft(), 'toggle-save', 800);
-        } else {
-          saveDraft();
-        }
-      });
-    }
-
   }
 
   // ✅ CLAUDE.md準拠: Clean initialization pattern - legacy functions removed
