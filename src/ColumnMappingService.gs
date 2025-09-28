@@ -500,12 +500,6 @@ function extractFieldValueUnified(row, originalHeaders, fieldType, columnMapping
         return { value: null, index: -1, confidence: 0, method: 'empty_value' };
       }
 
-      // 匿名性保護: 名前フィールド以外で名前らしいデータを検出した場合の警告
-      if (fieldType !== 'name' && isPotentiallyNameData(extractedValue)) {
-        console.warn(`extractFieldValueUnified: ${fieldType}フィールドに名前らしいデータを検出:`, extractedValue);
-        // 匿名性保護のため null を返す
-        return { value: null, index: -1, confidence: 0, method: 'anonymity_protection' };
-      }
 
       return {
         value: extractedValue,
@@ -524,23 +518,3 @@ function extractFieldValueUnified(row, originalHeaders, fieldType, columnMapping
   }
 }
 
-/**
- * 名前らしいデータかどうかを簡単に判定
- * @param {*} value - 判定する値
- * @returns {boolean} 名前らしいデータの場合 true
- */
-function isPotentiallyNameData(value) {
-  if (!value || typeof value !== 'string') return false;
-
-  const trimmedValue = value.trim();
-
-  // 簡単な名前パターン検出
-  // 2-4文字の日本語、または First Last の英語名パターン
-  const namePatterns = [
-    /^[あ-んア-ン一-龯]{2,4}$/,  // 2-4文字のひらがな・カタカナ・漢字
-    /^[A-Za-z]+ [A-Za-z]+$/,      // First Last 英語名
-    /^[A-Za-z]{2,10}$/            // 短い英語名
-  ];
-
-  return namePatterns.some(pattern => pattern.test(trimmedValue));
-}

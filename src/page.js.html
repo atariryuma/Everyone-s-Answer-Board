@@ -581,6 +581,10 @@ class StudyQuestApp {
       this.elements.endPublicationBtn.addEventListener('click', this.handlers.onEndPublicationClick);
     }
     if (this.elements.adminToggleBtn) {
+      // ✅ 重複登録防止: 既存のイベントリスナーを先に削除
+      if (this.handlers.onAdminToggleClick) {
+        this.elements.adminToggleBtn.removeEventListener('click', this.handlers.onAdminToggleClick);
+      }
       this.handlers.onAdminToggleClick = () => this.toggleAdminMode();
       this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
     }
@@ -641,6 +645,12 @@ class StudyQuestApp {
       }
     };
     document.addEventListener('click', this.handlers.onActivityDetection, { passive: true });
+
+    // ✅ Critical Fix: 初期化完了後の通知ポーリング自動開始
+    if (this.state.initializationComplete && !this.polling.isActive) {
+      console.log('🔔 通知システム: 初期化完了後の自動開始');
+      this.startSimplePolling();
+    }
 
     this.nonCriticalListenersSetup = true;
     // Non-critical event listener setup complete
@@ -1149,8 +1159,20 @@ class StudyQuestApp {
   schedulePollingCheck() {
     if (!this.polling.isActive) return;
 
-    // Simple interval: 30s if recent activity, 2m otherwise
-    const interval = this.hasRecentActivity() ? 30000 : 120000;
+    // ✅ Optimization: 段階的間隔調整によるスマートポーリング
+    const interval = this.getPollingInterval();
+    const timeSinceActivity = Date.now() - this.lastActivityTime;
+
+    // ✅ Development Monitoring: 開発環境でのみ詳細ログ出力
+    const isDev = window.location.href.includes('dev');
+    if (isDev) {
+      console.log('🔔 通知ポーリング: 次回チェック予約', {
+        interval: `${interval/1000}秒`,
+        timeSinceActivity: `${Math.round(timeSinceActivity/1000)}秒前`,
+        errorCount: this.polling.errorCount,
+        lastSeenTimestamp: this.state.lastSeenTimestamp
+      });
+    }
 
     this.polling.timerId = setTimeout(async () => {
       if (!this.polling.isActive) return;
@@ -1160,6 +1182,17 @@ class StudyQuestApp {
           lastUpdateTime: this.state.lastSeenTimestamp
         });
 
+        // ✅ Development Monitoring: 開発環境でのみ詳細ログ出力
+        if (isDev) {
+          console.log('🔔 通知チェック結果:', {
+            success: response.success,
+            hasNewContent: response.hasNewContent,
+            newItemsCount: response.newItemsCount,
+            timestamp: response.timestamp,
+            lastSeenTimestamp: this.state.lastSeenTimestamp
+          });
+        }
+
         if (response.success && response.hasNewContent) {
           this.showNewContentBanner(response.newItemsCount);
         }
@@ -1168,12 +1201,25 @@ class StudyQuestApp {
 
       } catch (error) {
         this.polling.errorCount++;
-        console.warn(`Polling error (${this.polling.errorCount}/3):`, error.message);
+
+        // ✅ Enhanced Monitoring: エラー詳細ログ
+        console.warn('❌ 通知ポーリングエラー:', {
+          errorCount: `${this.polling.errorCount}/3`,
+          errorMessage: error.message,
+          errorStack: error.stack?.substring(0, 200) + '...',
+          userId: this.state.userId,
+          lastSeenTimestamp: this.state.lastSeenTimestamp,
+          timestamp: new Date().toISOString()
+        });
 
         // Stop after 3 consecutive errors, auto-restart in 5 minutes
         if (this.polling.errorCount >= 3) {
+          console.error('💥 通知ポーリング: 連続エラー上限に達したため5分間停止');
           this.stopSimplePolling();
-          setTimeout(() => this.startSimplePolling(), 300000);
+          setTimeout(() => {
+            console.log('🔄 通知ポーリング: 自動復旧開始');
+            this.startSimplePolling();
+          }, 300000);
           return;
         }
       }
@@ -1191,6 +1237,18 @@ class StudyQuestApp {
     }
   }
 
+  // ✅ Optimization: より柔軟な段階的ポーリング間隔
+  getPollingInterval() {
+    const timeSinceActivity = Date.now() - this.lastActivityTime;
+
+    // 段階的間隔調整（使用状況に応じて最適化）
+    if (timeSinceActivity < 60000) return 15000;      // 1分以内: 15秒
+    if (timeSinceActivity < 300000) return 30000;     // 5分以内: 30秒
+    if (timeSinceActivity < 900000) return 120000;    // 15分以内: 2分
+    return 300000;                                     // 15分超: 5分
+  }
+
+  // 後方互換性のため残す
   hasRecentActivity() {
     return (Date.now() - this.lastActivityTime) < 300000; // 5 minutes
   }
@@ -4303,9 +4361,10 @@ class StudyQuestApp {
     if (this.elements.adminToggleBtn) {
       this.elements.adminToggleBtn.disabled = true;
     }
-    
+
     try {
       const enable = !this.state.showAdminFeatures;
+
       
       // 編集者権限チェック
       if (enable) {
@@ -4363,10 +4422,28 @@ class StudyQuestApp {
         window.showCounts = true;
         window.displayMode = 'named';
       } else {
-        // 閲覧モード: ConfigJSON設定に戻す
+        // ✅ 閲覧モード: ConfigJSON設定に戻す（強化版）
         const displaySettings = window.UNIFIED_CONFIG?.displaySettings || {};
+
+        // ✅ デバッグログでConfigJSON値を確認
+        debugLog('管理モード無効化: ConfigJSON設定を復旧', {
+          configExists: !!window.UNIFIED_CONFIG,
+          displaySettingsExists: !!displaySettings,
+          originalShowReactions: displaySettings.showReactions,
+          originalShowNames: displaySettings.showNames,
+          beforeShowCounts: window.showCounts,
+          beforeDisplayMode: window.displayMode
+        });
+
         window.showCounts = displaySettings.showReactions || false;
         window.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
+
+        // ✅ 復旧後の値を確認
+        debugLog('ConfigJSON設定復旧完了', {
+          afterShowCounts: window.showCounts,
+          afterDisplayMode: window.displayMode,
+          configApplied: true
+        });
       }
 
       window.isStudentMode = !enable;
@@ -4375,20 +4452,33 @@ class StudyQuestApp {
       debugLog(enable ? '管理モード有効化' : '閲覧モード有効化', {
         showCounts: window.showCounts,
         displayMode: window.displayMode,
-        fromConfig: !enable
+        fromConfig: !enable,
+        isStudentMode: window.isStudentMode,
+        showScoreSort: window.showScoreSort
       });
       
       // Update local state from global variables
       this.updateConfigFromGlobals();
-      
-      
+
+      // ✅ 管理モード無効化時の確実な状態同期
+      if (!enable) {
+        // ConfigJSON設定がstateに確実に反映されているか確認
+        debugLog('管理モード無効化: state同期確認', {
+          stateShowCounts: this.state.showCounts,
+          stateDisplayMode: this.state.displayMode,
+          windowShowCounts: window.showCounts,
+          windowDisplayMode: window.displayMode,
+          syncMatch: this.state.showCounts === window.showCounts && this.state.displayMode === window.displayMode
+        });
+      }
+
       // キャッシュをクリアして新しい設定で再描画
       this.cache.clear();
-      
+
       // 管理モード切り替え時は既存のカードを全て削除して強制再生成
       this.elements.answersContainer.innerHTML = '';
-      
-      // UI状態を更新
+
+      // ✅ UI状態を確実に更新（ConfigJSON設定反映）
       this.updateSortOptions();
       this.updateAdminButtonUI();
       this.updateEndPublicationButtonUI();
@@ -4396,11 +4486,7 @@ class StudyQuestApp {
       this.loadSheetData({ bypassCache: true }).then(() => {
         // ✅ 修正: 管理モード切り替え後に時刻ベース基準更新
         this.updateLastSeenTimestamp();
-        debugLog('🔄 管理モード切り替え完了、時刻ベース基準更新:', {
-          newTimestamp: this.state.lastSeenTimestamp,
-          adminMode: this.state.showAdminFeatures,
-          note: '件数基準から時刻基準に統一'
-        });
+
       });
     } finally {
       // Re-enable button
@@ -5869,8 +5955,8 @@ class StudyQuestApp {
       return;
     }
 
-    // 管理者は初期化時に設定済み、API更新不要
-    if (window.UNIFIED_CONFIG?.isAdminUser) {
+    // ✅ 管理モード中のみAPI更新をスキップ（シンプル条件で確実に動作）
+    if (window.showAdminFeatures) {
       return;
     }
 

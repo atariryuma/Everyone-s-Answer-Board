@@ -360,20 +360,9 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
         const nameResult = extractFieldValueUnified(row, headers, 'name', columnMapping);
         const emailResult = extractFieldValueUnified(row, headers, 'email', columnMapping);
 
-        // 匿名性保護: 抽出データのクロスチェック（管理モード時は無効）
+        // 基本データ抽出
         const answerValue = answerResult?.value;
         const nameValue = nameResult?.value;
-
-        if (!options.adminMode) {
-          // 名前データが回答・理由欄に混入していないかチェック
-          if (nameValue && (answerValue === nameValue || reasonResult?.value === nameValue)) {
-            console.warn('DataService: 匿名性保護のため行をスキップ', {
-              rowIndex: globalIndex + 2,
-              reason: '名前データが回答・理由欄に混入'
-            });
-            return; // この行をスキップ
-          }
-        }
 
         const item = {
           id: `row_${globalIndex + 2}`,
@@ -453,20 +442,9 @@ function processRawData(dataRows, headers, config, options = {}, user = null) {
         const emailResult = extractFieldValueUnified(row, headers, 'email', columnMapping);
         const timestampResult = extractFieldValueUnified(row, headers, 'timestamp');
 
-        // 匿名性保護: 抽出データのクロスチェック（管理モード時は無効）
+        // 基本データ抽出
         const answerValue = answerResult?.value;
         const nameValue = nameResult?.value;
-
-        if (!options.adminMode) {
-          // 名前データが回答・理由欄に混入していないかチェック
-          if (nameValue && (answerValue === nameValue || reasonResult?.value === nameValue)) {
-            console.warn('DataService: 匿名性保護のため行をスキップ', {
-              rowIndex: index + 2,
-              reason: '名前データが回答・理由欄に混入'
-            });
-            return; // この行をスキップ
-          }
-        }
 
         // 基本データ構造作成（ColumnMappingService利用）
         const item = {

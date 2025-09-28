@@ -974,6 +974,34 @@
     }
   }
 
+  /* 通知バナー専用: 上から下にドロップダウン */
+  @keyframes fadeInFromTop {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -20px);
+      will-change: opacity, transform;
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      will-change: auto;
+    }
+  }
+
+  /* 通知トースト専用: 右から左にスライドイン */
+  @keyframes fadeInFromRight {
+    0% {
+      opacity: 0;
+      transform: translateX(100px);
+      will-change: opacity, transform;
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+      will-change: auto;
+    }
+  }
+
   @keyframes slideUp {
     0% {
       opacity: 0;
