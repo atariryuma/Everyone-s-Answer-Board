@@ -1525,7 +1525,7 @@
       }
     }
 
-    // ✅ Essential notification display
+    // ✅ Essential notification display with animations
     showMessage(message, type = 'info') {
       if (!message) return;
 
@@ -1544,6 +1544,8 @@
         font-size: 14px;
         max-width: 350px;
         word-wrap: break-word;
+        animation: fadeIn 0.4s ease-out forwards;
+        will-change: transform, opacity;
       `;
 
       notification.textContent = `${this.getIcon(type)} ${message}`;
@@ -1564,10 +1566,19 @@
       requestAnimationFrame(checkRemoval);
     }
 
-    // ✅ Simple removal
+    // ✅ Animated removal
     remove(notification) {
       if (notification && notification.parentNode) {
-        notification.remove();
+        // Apply slide out animation
+        notification.style.animation = 'fadeOut 0.3s ease-out forwards';
+        notification.style.willChange = 'transform, opacity';
+
+        // Remove after animation completes
+        setTimeout(() => {
+          if (notification && notification.parentNode) {
+            notification.remove();
+          }
+        }, 300);
       }
     }
 
