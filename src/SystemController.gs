@@ -768,10 +768,23 @@ function publishApp(publishConfig) {
 
   try {
     const email = getCurrentEmail();
+    console.log(`publishApp: Started for user ${email} at ${startTime}`);
 
     if (!email) {
-      console.error('❌ User authentication failed');
+      console.error('publishApp: User authentication failed');
       return { success: false, message: 'ユーザー認証が必要です' };
+    }
+
+    // Log input data
+    console.log(`publishApp: Input config keys: [${Object.keys(publishConfig || {}).join(', ')}]`);
+    if (publishConfig?.spreadsheetId) {
+      console.log(`publishApp: Target spreadsheet: ${publishConfig.spreadsheetId}`);
+    }
+
+    // Log display settings (responder name & reaction count)
+    if (publishConfig?.displaySettings) {
+      const ds = publishConfig.displaySettings;
+      console.log(`publishApp: Display settings - show names: ${ds.showNames}, show reactions: ${ds.showReactions}`);
     }
 
     const publishedAt = new Date().toISOString();
@@ -782,6 +795,8 @@ function publishApp(publishConfig) {
 
     // Direct findUserByEmail usage
     const user = findUserByEmail(email, { requestingUser: email });
+    console.log(`publishApp: User lookup result: ${user ? 'found' : 'not found'} (userId: ${user?.userId || 'N/A'})`);
+
     let saveResult = null;
 
     if (user) {
@@ -792,6 +807,7 @@ function publishApp(publishConfig) {
       // 統一API使用: 構造化パース
       const configResult = getUserConfig(userToUse.userId);
       const currentConfig = configResult.success ? configResult.config : {};
+      console.log(`publishApp: Current config loaded: ${configResult.success ? 'success' : 'failed'} (keys: [${Object.keys(currentConfig).join(', ')}])`);
 
       // Explicit override of important fields
       const updatedConfig = {
@@ -811,18 +827,25 @@ function publishApp(publishConfig) {
 
       // ✅ バックエンド構造統一完了：フロントエンドは既に正しい構造を送信
 
+      console.log('publishApp: Attempting to save config with isPublished=true');
+
       // 🔧 CLAUDE.md準拠: 統一API使用 - saveUserConfigでETag対応の安全な更新
       saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
 
-      if (!saveResult.success) {
-        console.error('❌ saveUserConfig failed during publish:', saveResult.message);
+      if (saveResult.success) {
+        console.log(`publishApp: Config saved successfully (ETag: ${saveResult.etag || 'N/A'})`);
+      } else {
+        console.error('publishApp: saveUserConfig failed:', saveResult.message);
         // エラーでも処理を継続（互換性のため）
       }
     } else {
-      console.error('❌ User not found:', email);
+      console.error('publishApp: User not found:', email);
     }
 
-    return {
+    const endTime = new Date().toISOString();
+    const duration = new Date(endTime) - new Date(startTime);
+
+    const result = {
       success: true,
       message: 'アプリケーションが正常に公開されました',
       publishedAt,
@@ -830,6 +853,9 @@ function publishApp(publishConfig) {
       etag: user && saveResult?.etag ? saveResult.etag : null,
       config: user && saveResult?.config ? saveResult.config : null
     };
+
+    console.log(`publishApp: Completed successfully in ${duration}ms at ${endTime}`);
+    return result;
 
   } catch (error) {
     console.error('❌ publishApp ERROR:', {

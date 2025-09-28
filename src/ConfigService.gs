@@ -196,15 +196,9 @@ function getDefaultConfig(userId) {
     isPublished: false,
     displaySettings: {
       showNames: false,
-      showReactions: false
-    },
-    userPermissions: {
-      isEditor: false,
-      isAdministrator: false,
-      accessLevel: 'viewer',
-      canEdit: false,
-      canView: true,
-      canReact: true
+      showReactions: false,
+      theme: 'default',
+      pageSize: 20
     },
     completionScore: 0
     // lastModified removed - managed exclusively by database column
@@ -251,18 +245,15 @@ function repairNestedConfig(config, userId) {
   if (!repaired.displaySettings || typeof repaired.displaySettings !== 'object') {
     repaired.displaySettings = {
       showNames: false,
-      showReactions: false
+      showReactions: false,
+      theme: 'default',
+      pageSize: 20
     };
   }
 
   // columnMapping修復 - ✅ CLAUDE.md準拠: シンプル構造 {answer: 4, class: 2}
   if (!repaired.columnMapping || typeof repaired.columnMapping !== 'object') {
     repaired.columnMapping = {};
-  }
-
-  // userPermissions修復
-  if (!repaired.userPermissions) {
-    repaired.userPermissions = generateUserPermissions(userId);
   }
 
   return repaired;
@@ -282,9 +273,8 @@ function ensureRequiredFields(config, userId) {
     spreadsheetId: config.spreadsheetId || '',
     sheetName: config.sheetName || '',
     formUrl: config.formUrl || '',
-    displaySettings: config.displaySettings || { showNames: false, showReactions: false },
+    displaySettings: config.displaySettings || { showNames: false, showReactions: false, theme: 'default', pageSize: 20 },
     columnMapping: config.columnMapping,
-    userPermissions: config.userPermissions,
     completionScore: calculateCompletionScore(config)
     // lastModified removed - managed exclusively by database column
   };
@@ -326,51 +316,6 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
   return enhanced;
 }
 
-/**
- * ユーザー権限生成
- * @param {string} userId - ユーザーID
- * @returns {Object} 権限オブジェクト
- */
-function generateUserPermissions(_userId) {
-  try {
-    // ✅ CLAUDE.md準拠: Batched admin authentication (70x performance improvement)
-    const adminAuth = getBatchedAdminAuth({ allowNonAdmin: true }); // eslint-disable-line no-undef
-    if (!adminAuth.success || !adminAuth.authenticated) {
-      return {
-        isEditor: false,
-        isAdministrator: false,
-        accessLevel: 'viewer',
-        canEdit: false,
-        canView: true,
-        canReact: true
-      };
-    }
-
-    const { email: currentEmail, isAdmin } = adminAuth;
-
-    return {
-      isEditor: true, // 現在のユーザーは自分の設定の編集者
-      isAdministrator: isAdmin,
-      accessLevel: isAdmin ? 'administrator' : 'editor',
-      canEdit: true,
-      canView: true,
-      canReact: true,
-      canDelete: isAdmin,
-      canManageUsers: isAdmin
-    };
-
-  } catch (error) {
-    console.error('generateUserPermissions: エラー', error.message);
-    return {
-      isEditor: false,
-      isAdministrator: false,
-      accessLevel: 'viewer',
-      canEdit: false,
-      canView: true,
-      canReact: true
-    };
-  }
-}
 
 
 // 💾 設定保存・更新
@@ -921,11 +866,7 @@ function saveUserConfig(userId, config, options = {}) {
     const currentTime = new Date().toISOString();
     cleanedConfig.etag = `${currentTime}_${Math.random().toString(36).substring(2, 15)}`;
 
-    // 4. 🔧 CLAUDE.md準拠: 書き込み前キャッシュ無効化 - 同期ギャップ防止
-    clearConfigCache(userId);
-    console.log('saveUserConfig: 書き込み前キャッシュクリア完了');
-
-    // 5. Zero-Dependency: 直接updateUser呼び出し
+    // 4. Zero-Dependency: 直接updateUser呼び出し
     // ✅ Optimized: lastModified automatically managed by database updateUser function
     const updateResult = updateUser(userId, {
       configJson: JSON.stringify(cleanedConfig)
@@ -939,12 +880,8 @@ function saveUserConfig(userId, config, options = {}) {
       };
     }
 
-    // 6. 🔧 CLAUDE.md準拠: 書き込み後的確キャッシュ無効化 - 最終一貫性保証
+    // 5. キャッシュ無効化
     clearConfigCache(userId);
-    console.log('saveUserConfig: 書き込み後的確キャッシュクリア完了', {
-      userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
-      newETag: cleanedConfig.etag
-    });
 
     return {
       success: true,

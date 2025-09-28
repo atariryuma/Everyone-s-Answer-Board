@@ -1,7 +1,4 @@
 <script>
-// Constants and utilities now loaded from page.html initialization
-
-// Access global constants from page.html
 
 class StudyQuestApp {
   // アプリケーション定数
@@ -19,8 +16,6 @@ class StudyQuestApp {
       INIT_TIMEOUT_MS: isLowEndDevice ? 45000 : 30000
     };
   }
-
-  // Performance detection functions now provided by SharedUtilities.html
 
   /**
    * ユーザーIDを検証し、必要に応じてフォールバック値を提供
@@ -44,8 +39,8 @@ class StudyQuestApp {
 
       // グローバル変数からのフォールバック
       try {
-        if (typeof USER_ID !== 'undefined' && USER_ID && USER_ID.trim()) {
-          return USER_ID.trim();
+        if (typeof window.USER_ID !== 'undefined' && window.USER_ID && window.USER_ID.trim()) {
+          return window.USER_ID.trim();
         }
       } catch (error) {
         warnLog('⚠️ StudyQuestApp: Failed to get userId from global USER_ID:', error.message);
@@ -142,18 +137,14 @@ class StudyQuestApp {
       isAdminUser: false,
       showCounts: window.showCounts,
       displayMode: window.displayMode,
-      sheetName: SHEET_NAME,
-      userId: this.validId(USER_ID),
+      sheetName: window.SHEET_NAME,
+      userId: this.validId(window.USER_ID),
       initializationComplete: false,
       isInitializing: true,
       lastSeenTimestamp: this.loadLastSeenTimestamp(),
-      // pollingFailureCount は pollingState.retryCount に統合
       startTime: Date.now()
     };
 
-    // 通知バナータイマー管理用
-    this.pendingNotificationRequest = null;
-    this.notificationWaitTimer = null;
 
     // 新着チェック用の初期化
     this.lastViewKey = null;
@@ -198,8 +189,8 @@ class StudyQuestApp {
     // ✅ Use current user ID (viewer) instead of board owner ID for reaction storage isolation
     const currentUserIdentifier = window.UNIFIED_CONFIG?.email ?
       window.UNIFIED_CONFIG.email.replace(/[^a-zA-Z0-9]/g, '').slice(-8) : 'anon';
-    const safeSheetName = (typeof SHEET_NAME !== 'undefined' && SHEET_NAME) ?
-      SHEET_NAME.trim() : 'default';
+    const safeSheetName = (typeof window.SHEET_NAME !== 'undefined' && window.SHEET_NAME) ?
+      window.SHEET_NAME.trim() : 'default';
     this.reactionStorageKey = 'reactions_' + currentUserIdentifier + '_' + safeSheetName;
 
     this.gas = {
@@ -208,7 +199,6 @@ class StudyQuestApp {
         this.runGas('getPublishedSheetData', classFilter, sort, adminMode, targetUserId),
       getNotificationUpdate: (targetUserId, options) =>
         this.runGas('getNotificationUpdate', targetUserId, options),
-      getAvailableSheets: () => this.runGas('getSheets'),
       addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction),
       toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex),
       checkAdmin: () => this.runGas('isAdmin'),
@@ -221,11 +211,9 @@ class StudyQuestApp {
       }
     };
 
-    // ✅ CLAUDE.md準拠: Initialize polling flag to prevent duplicate starts
-    this.pollingInitialized = false;
 
-    // Initialize polling settings (must be called before startNewAnswerPolling)
-    this.initializePollingSettings();
+    // Initialize simple polling (must be called before starting polling)
+    this.initializeSimplePolling();
 
     // ✅ CLAUDE.md準拠: Start async initialization
     this.init().catch(error => {
@@ -234,31 +222,12 @@ class StudyQuestApp {
     });
   }
 
-
-  getPollingState() {
-    // Simple polling state - no over-engineered singleton needed
-    if (!this.pollingState) {
-      this.pollingState = {
-        isActive: false,
-        interval: 30000,
-        retryCount: 0
-      };
-    }
-    return this.pollingState;
-  }
-
-  initializePollingSettings() {
-    // Initialize simple polling state
-    this.getPollingState();
-
-    // ✅ パフォーマンス設定に基づく適応的ポーリング設定
-    const perfConfig = StudyQuestApp.CONSTANTS;
-    this.pollingSettings = {
-      enabled: true,
-      POLLING_INTERVAL_MS: perfConfig.POLLING_INTERVAL_MS,
-      baseInterval: perfConfig.POLLING_INTERVAL_MS,
-      currentInterval: perfConfig.POLLING_INTERVAL_MS,
-      activityScore: 0
+  initializeSimplePolling() {
+    // Simple polling state - only essential properties
+    this.polling = {
+      isActive: false,
+      timerId: null,
+      errorCount: 0
     };
 
     const savedCols = localStorage.getItem('boardColumns');
@@ -267,9 +236,6 @@ class StudyQuestApp {
       this.elements.sliderValue.textContent = savedCols;
       this.updateSliderBackground(this.elements.sizeSlider);
     }
-
-    // ✅ CLAUDE.md準拠: 重複init()呼び出し除去 - constructor で既に呼び出し済み
-    // this.init() の重複呼び出しを削除（パフォーマンス最適化）
   }
 
   resetStateForCleanInit() {
@@ -279,8 +245,7 @@ class StudyQuestApp {
     this.state.currentAnswers = [];
     // 通知バナーをリセット
     this.dismissNewContentBanner();
-    // pollingFailureCount は pollingState.retryCount に統合済み
-    
+
     // Clear DOM to prevent inconsistency
     const container = this.elements.answersContainer;
     if (container) {
@@ -308,8 +273,6 @@ class StudyQuestApp {
     // Clear content check flags
     this.contentCheckInProgress = false;
     
-    // Reset current active sheet state
-    this.state.currentActiveSheet = SHEET_NAME;
     
   }
 
@@ -368,7 +331,6 @@ class StudyQuestApp {
     throw lastError;
   }
 
-
   async init() {
     try {
       // Reset state for clean initialization
@@ -386,13 +348,10 @@ class StudyQuestApp {
 
       // ✅ 最適な実行順序: 軽い処理から重い処理へ
       try {
-        // 1. ドメイン情報取得（軽い処理、UI基本設定）
-        await this.initializeDomainInfo();
-
-        // 2. フォーム情報取得（中程度、質問テキスト等）
+        // 1. フォーム情報取得（中程度、質問テキスト等）
         await this.initializeFormButton();
 
-        // 3. データ取得（重い処理、実際のコンテンツ）
+        // 2. データ取得（重い処理、実際のコンテンツ）
         await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false });
       } catch (error) {
         console.error('Data loading failed during initialization:', error);
@@ -419,41 +378,16 @@ class StudyQuestApp {
       // ✅ CLAUDE.md準拠: Simplified editor state setup
       this.setupEditorState();
 
-      // ✅ CLAUDE.md準拠: Mark polling as initialized (90s delay handled internally)
-      if (!this.pollingInitialized) {
-        this.pollingInitialized = true;
-        debugLog('✅ Polling initialized - will start on first trigger (visibilitychange/activity)');
-      }
 
       this.setupMessageListeners();
       
     } catch (error) {
       errorLog('❌ StudyQuestApp: Critical error in init():', error);
-      this.handleError(error, {
-        type: 'initialization',
-        operation: 'init',
-        showUser: true,
-        level: 'critical'
-      });
+      this.handleError(error, 'initialization', true);
       this.hideLoadingOverlay();
     }
   }
 
-  /**
-   * ✅ CLAUDE.md準拠: 最適化されたドメイン情報初期化
-   * Promise-based、単一責任原則に基づく実装
-   */
-  async initializeDomainInfo() {
-    try {
-      debugLog('🌐 Initializing domain info display...');
-      const info = await fetchDomainInfo();
-      displayDomainInfo(info);
-      debugLog('✅ Domain info loaded successfully:', info);
-    } catch (error) {
-      warnLog('⚠️ Failed to initialize domain info:', error);
-      displayDomainInfo({ error: error.message, fallback: true });
-    }
-  }
 
   /**
    * ✅ Restore form button display functionality
@@ -579,8 +513,6 @@ class StudyQuestApp {
       return;
     }
     
-    // answersContainer のクリックリスナーは setupEventDelegation() で登録済み
-    
     // Modal handlers
     this.handlers.onAnswerModalContainerClick = (e) => {
       if (e.target === e.currentTarget) {
@@ -615,7 +547,6 @@ class StudyQuestApp {
       this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
     }
     this.handlers.onClassFilterChange = async () => {
-      this.dismissNewContentBanner(); // フィルター変更時は既存の通知を消去
       try {
         const filterState = this.getCurrentFilterState();
         debugLog('🔄 Class filter changed to:', filterState.rawClassFilter);
@@ -628,7 +559,6 @@ class StudyQuestApp {
       }
     };
     this.handlers.onSortOrderChange = async () => {
-      this.dismissNewContentBanner(); // ソート変更時は既存の通知を消去
       try {
         const filterState = this.getCurrentFilterState();
         debugLog('🔄 Sort order changed to:', filterState.sortOrder);
@@ -689,13 +619,13 @@ class StudyQuestApp {
       if (document.hidden) {
         debugLog('😴 Page hidden - stopping polling');
         // 🔧 ページ非表示時のポーリング停止
-        this.stopNewAnswerPolling();
+        this.stopSimplePolling();
         this.cleanup();
       } else if (this.state.initializationComplete) {
         debugLog('👁️ Page visible - starting polling (after initialization complete)');
         // 小さな遅延でポーリング再開（クリーンアップ完了待ち）
         Promise.resolve().then(() => {
-          this.startNewAnswerPolling();
+          this.startSimplePolling();
         });
       } else {
         debugLog('⚠️ Page visible but initialization not complete - skipping polling start');
@@ -706,8 +636,8 @@ class StudyQuestApp {
     // アクティビティ検出でポーリング自動再開（初期化完了後のみ）
     this.handlers.onActivityDetection = () => {
       this.lastActivityTime = Date.now();
-      if (!this.pollingState.isActive && this.pollingInitialized && this.state.initializationComplete) {
-        this.startNewAnswerPolling();
+      if (!this.polling.isActive && this.state.initializationComplete) {
+        this.startSimplePolling();
       }
     };
     document.addEventListener('click', this.handlers.onActivityDetection, { passive: true });
@@ -1036,91 +966,20 @@ class StudyQuestApp {
     }
   }
   
-  // サーバー編集者権限確認の共通メソッド
-
   // Unified error handling
-  handleError(error, options = {}) {
-    const {
-      type = 'general',
-      operation = 'operation',
-      context = '',
-      level = null,
-      showUser = false,
-      fallbackFn = null,
-      incrementRetry = false
-    } = options;
+  handleError(error, type = 'general', showUser = false) {
 
-    // リトライカウント管理（ポーリング用）
-    if (incrementRetry) {
-      this.pollingState = this.pollingState || { retryCount: 0 };
-      this.pollingState.retryCount++;
-    }
-
-    // エラーメッセージの構築
     const errorMsg = error.message || error;
-    const contextMsg = context ? ` (${context})` : '';
 
-    // エラータイプ別の処理
-    switch (type) {
-      case 'cache':
-        warnLog(`⚠️ Cache ${operation} failed${contextMsg}:`, errorMsg);
-        break;
 
-      case 'dom':
-        warnLog(`⚠️ DOM ${operation} failed:`, errorMsg);
-        if (fallbackFn && typeof fallbackFn === 'function') {
-          try {
-            fallbackFn();
-            debugLog(`✅ DOM ${operation} fallback successful`);
-          } catch (fallbackError) {
-            errorLog(`❌ DOM ${operation} fallback also failed:`, fallbackError);
-          }
-        }
-        break;
+    // 一般的なエラー処理
+    console.error(`❌ ${type} error:`, errorMsg);
 
-      case 'api':
-        errorLog(`❌ API ${operation} error:`, errorMsg);
-        if (showUser) {
-          this.showNotification(`${operation}に失敗しました: ${errorMsg}`, 'error');
-        }
-        break;
-
-      case 'recovery':
-        const levelEmoji = level === 1 ? '⚠️' : '❌';
-        const logFn = level === 1 ? warnLog : errorLog;
-        logFn(`${levelEmoji} Level ${level} ${operation} recovery failed:`, errorMsg);
-        break;
-
-      case 'fallback':
-        warnLog(`⚠️ ${operation} fallback failed:`, errorMsg);
-        break;
-
-      case 'polling':
-        warnLog(`❌ ${operation} failed (attempt ${this.pollingState?.retryCount || 1}):`, errorMsg);
-
-        // 連続失敗時の対処
-        if (this.pollingState?.retryCount >= 3) {
-          console.warn('🚨 Error threshold reached, stopping polling');
-          this.stopNewAnswerPolling();
-
-          const errorInfo = {
-            error: errorMsg,
-            stack: error.stack || 'N/A',
-            context: operation,
-            timestamp: new Date().toISOString(),
-            retryCount: this.pollingState.retryCount
-          };
-          console.error('🔍 Error details:', errorInfo);
-        }
-        break;
-
-      case 'rendering':
-        errorLog(`❌ Rendering ${operation} error:`, errorMsg);
-        break;
-
-      default:
-        errorLog(`❌ ${operation} error${contextMsg}:`, errorMsg);
+    if (showUser) {
+      this.showNotification(`操作に失敗しました: ${errorMsg}`, 'error');
     }
+
+    return error;
   }
 
   // ✅ CLAUDE.md準拠: 統一されたキャッシュクリア（自然な英語表現）
@@ -1206,26 +1065,10 @@ class StudyQuestApp {
       return;
     }
 
-    // ✅ 最適化: フィルター名を効率的に取得（冗長な呼び出し削除）
-    let currentFilter = 'すべて';
-    if (filterState?.rawClassFilter) {
-      currentFilter = filterState.rawClassFilter;
-    } else {
-      currentFilter = this.getCurrentFilterState().rawClassFilter || 'すべて';
-    }
-    const isFilteredView = currentFilter !== 'すべて';
-
-    // ✅ 修正: フィルター状態の適切な処理
-    let message;
-    if (isFilteredView) {
-      message = newItemsCount === 1
-        ? `${currentFilter}の新しい意見が投稿されました`
-        : `${currentFilter}の新しい意見が${newItemsCount}件投稿されました`;
-    } else {
-      message = newItemsCount === 1
-        ? '新しい意見が投稿されました'
-        : `${newItemsCount}件の新しい意見が投稿されました`;
-    }
+    // Simplified message generation
+    const message = newItemsCount === 1
+      ? '新しい意見が投稿されました'
+      : `${newItemsCount}件の新しい意見が投稿されました`;
 
     this.elements.newContentText.textContent = message;
     this.elements.newContentBanner.classList.remove('hidden', 'notification-banner-exit');
@@ -1254,20 +1097,28 @@ class StudyQuestApp {
   // コンテンツ更新（通知バナーからの呼び出し）
   // ✅ CLAUDE.md準拠: 手動更新のエントリーポイント（自然な英語表現）
   async refreshContent() {
-    // ✅ シンプル化: 複雑な差分処理を廃止し、常にloadSheetDataで全データ取得
-    // フィルター状態は自動的に維持される（loadSheetDataが現在のフィルター状態を使用）
-    await this.loadSheetData({
-      showLoading: true,
-      bypassCache: true
-    });
+    try {
+      // ✅ シンプル化: 複雑な差分処理を廃止し、常にloadSheetDataで全データ取得
+      // フィルター状態は自動的に維持される（loadSheetDataが現在のフィルター状態を使用）
+      await this.loadSheetData({
+        showLoading: true,
+        bypassCache: true
+      });
 
-    // ✅ 修正: 手動更新後に時刻ベース基準更新（論理的破綻修正）
-    this.updateLastSeenTimestamp(); // 新着通知の無限ループを防止
+      // ✅ 修正: 手動更新後に時刻ベース基準更新（論理的破綻修正）
+      this.updateLastSeenTimestamp(); // 新着通知の無限ループを防止
 
-    // 通知バナーを閉じる（新しいデータが表示されたため）
-    this.dismissNewContentBanner();
+      // 通知バナーを閉じる（新しいデータが表示されたため）
+      this.dismissNewContentBanner();
+
+      // User feedback for successful update
+      this.showNotification('コンテンツを更新しました', 'success');
+
+    } catch (error) {
+      errorLog('コンテンツ更新エラー:', error);
+      this.showNotification('コンテンツの更新に失敗しました', 'error');
+    }
   }
-
 
   // ✅ シンプル化: updateContent関数を簡素化（後方互換性のため保持）
   async updateContent(isManualUpdate = false, preloadedTriggerResult = null) {
@@ -1284,572 +1135,82 @@ class StudyQuestApp {
     }
   }
 
-  // 🎯 動的ポーリング間隔調整 (安定版 - GAS制限対応)
-  adjustPollingIntervalStable(hasNewContent = false) {
-    // 🛡️ CLAUDE.md準拠: V8安全な値操作
-    const settings = this.pollingSettings || {};
 
-    // 🚀 GASパフォーマンス最適化: 最小30秒間隔（CLAUDE.md推奨）
-    const MIN_SAFE_INTERVAL = 30000; // 30秒
-    const MAX_SAFE_INTERVAL = 300000; // 5分
-    const BASE_INTERVAL = this.pollingSettings?.POLLING_INTERVAL_MS || 60000; // 設定値または1分
+  // Simple polling system - replaces over-engineered version
+  startSimplePolling() {
+    if (this.polling.isActive) return;
 
-    if (hasNewContent) {
-      // 新着コンテンツ時: 積極的モード（但し安全な範囲内）
-      settings.activityScore = Math.min((settings.activityScore || 0) + 5, 50);
-      settings.currentInterval = Math.max(
-        MIN_SAFE_INTERVAL,
-        BASE_INTERVAL - (settings.activityScore * 600) // 最大30秒短縮
-      );
-    } else {
-      // 新着なし: 数分かけて漸減（サーバー負荷軽減）
-      settings.activityScore = Math.max((settings.activityScore || 0) - 2, 0);
-      settings.currentInterval = Math.min(
-        MAX_SAFE_INTERVAL,
-        BASE_INTERVAL + (settings.activityScore * 1200) // 最大5分延長
-      );
-    }
+    this.polling.isActive = true;
+    this.polling.errorCount = 0;
 
-    // 間隔更新を記録（本番環境では無効）
+    this.schedulePollingCheck();
   }
 
-  // ✅ ポーリングエラー分類システム
-  classifyPollingError(error) {
-    const errorMessage = error.message || error.toString();
+  schedulePollingCheck() {
+    if (!this.polling.isActive) return;
 
-    // 重大エラー: システム再起動や設定変更が必要
-    if (errorMessage.includes('Authentication required') ||
-        errorMessage.includes('Target user not found') ||
-        errorMessage.includes('Invalid target user ID') ||
-        errorMessage.includes('Target user data incomplete')) {
-      return 'critical';
-    }
+    // Simple interval: 30s if recent activity, 2m otherwise
+    const interval = this.hasRecentActivity() ? 30000 : 120000;
 
-    // 一時的エラー: ネットワークやサーバーの一時的問題
-    if (errorMessage.includes('network') ||
-        errorMessage.includes('timeout') ||
-        errorMessage.includes('temporarily unavailable') ||
-        errorMessage.includes('script runtime') ||
-        errorMessage.includes('Rate limit')) {
-      return 'temporary';
-    }
-
-    // デフォルト: 軽微なエラー
-    return 'minor';
-  }
-
-  // ✅ ポーリング健全性監視システム
-  trackPollingHealth(error) {
-    if (!this.pollingHealth) {
-      this.pollingHealth = {
-        consecutiveErrors: 0,
-        lastErrorTime: null,
-        errorHistory: [],
-        isHealthy: true
-      };
-    }
-
-    const now = Date.now();
-    this.pollingHealth.consecutiveErrors++;
-    this.pollingHealth.lastErrorTime = now;
-
-    // エラー履歴を記録（最新20件のみ保持）
-    this.pollingHealth.errorHistory.unshift({
-      timestamp: now,
-      message: error.message,
-      type: this.classifyPollingError(error)
-    });
-    if (this.pollingHealth.errorHistory.length > 20) {
-      this.pollingHealth.errorHistory.pop();
-    }
-
-    // 健全性判定
-    if (this.pollingHealth.consecutiveErrors >= 3) {
-      if (this.pollingHealth.isHealthy) {
-        console.warn('🚨 Polling health degraded:', {
-          consecutiveErrors: this.pollingHealth.consecutiveErrors,
-          lastError: error.message
-        });
-        this.pollingHealth.isHealthy = false;
-
-        // 健全性悪化時の処理
-        this.handlePollingDegradation();
-      }
-    }
-  }
-
-  // ✅ ポーリング健全性回復
-  markPollingHealthy() {
-    if (this.pollingHealth) {
-      const wasUnhealthy = !this.pollingHealth.isHealthy;
-
-      this.pollingHealth.consecutiveErrors = 0;
-      this.pollingHealth.isHealthy = true;
-
-      if (wasUnhealthy) {
-        console.log('✅ Polling health recovered');
-
-        // 健全性回復時の処理
-        this.handlePollingRecovery();
-      }
-    }
-  }
-
-  // ✅ ポーリング悪化時の処理
-  handlePollingDegradation() {
-    // 間隔を大幅に延長
-    this.pollingSettings.currentInterval = Math.min(300000, this.pollingSettings.currentInterval * 5);
-
-    // 通知バナーをクリア（古い情報の可能性）
-    this.dismissNewContentBanner();
-  }
-
-  // ✅ ポーリング回復時の処理
-  handlePollingRecovery() {
-    // 間隔をリセット
-    this.pollingSettings.currentInterval = this.pollingSettings.baseInterval || 60000;
-
-    // アクティビティスコアをリセット
-    this.pollingSettings.activityScore = 0;
-  }
-
-  // ✅ 操作中のポーリング一時停止
-  pausePollingForOperation(operationType) {
-    if (!this.pollingOperationState) {
-      this.pollingOperationState = {
-        pausedFor: null,
-        pausedAt: null,
-        wasActive: false
-      };
-    }
-
-    // 既に一時停止中の場合は警告
-    if (this.pollingOperationState.pausedFor) {
-      console.warn(`⚠️ Polling already paused for ${this.pollingOperationState.pausedFor}, overriding with ${operationType}`);
-    }
-
-    this.pollingOperationState.pausedFor = operationType;
-    this.pollingOperationState.pausedAt = Date.now();
-    this.pollingOperationState.wasActive = this.pollingState?.isActive || false;
-
-    // ポーリングを一時的に停止
-    if (this.pollingOperationState.wasActive) {
-      this.pollingState.isActive = false;
-
-      // 現在のタイマーをクリア
-      if (this.pollingState.currentTimerId) {
-        clearTimeout(this.pollingState.currentTimerId);
-        this.pollingState.currentTimerId = null;
-      }
-
-      console.log(`⏸️ Polling paused for ${operationType} operation`);
-    }
-  }
-
-  // ✅ 操作後のポーリング復旧
-  resumePollingAfterOperation(operationType, options = {}) {
-    if (!this.pollingOperationState || this.pollingOperationState.pausedFor !== operationType) {
-      console.warn(`⚠️ No matching pause state for ${operationType}, ignoring resume request`);
-      return;
-    }
-
-    const pauseDuration = Date.now() - this.pollingOperationState.pausedAt;
-    const wasActive = this.pollingOperationState.wasActive;
-
-    // 状態をクリア
-    this.pollingOperationState.pausedFor = null;
-    this.pollingOperationState.pausedAt = null;
-
-    console.log(`▶️ Resuming polling after ${operationType} operation (paused for ${pauseDuration}ms)`);
-
-    if (wasActive) {
-      // デフォルトの復旧遅延（削除の場合は2秒、その他は1秒）
-      const defaultDelay = operationType === 'deletion' ? 2000 : 1000;
-      const resumeDelay = options.immediate ? 0 : (options.delay || defaultDelay);
-
-      if (resumeDelay > 0) {
-        console.log(`⏱️ Delaying polling resume by ${resumeDelay}ms for ${operationType}`);
-
-        // V8準拠のPromise-based delay
-        const createPromiseDelay = (ms) => new Promise(resolve => {
-          const start = Date.now();
-          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-          check();
-        });
-
-        createPromiseDelay(resumeDelay).then(() => {
-          if (this.pollingState && !this.pollingState.isActive) {
-            this.pollingState.isActive = true;
-            this.startNewAnswerPolling(); // ポーリングを再開
-          }
-        });
-      } else {
-        // 即座に再開
-        this.pollingState.isActive = true;
-        this.startNewAnswerPolling();
-      }
-    }
-  }
-
-  // 新着回答のポーリング開始 (安定版 - 競合状態解決)
-  startNewAnswerPolling() {
-    // ✅ 修正: ポーリング状態の確実な初期化
-    this.getPollingState();
-
-    // ✅ CLAUDE.md準拠: Simple polling control
-    if (this.pollingState.isActive) {
-      return;
-    }
-
-    this.pollingState.isActive = true;
-
-    // 🚀 V8準拠: const/let使用、エラーハンドリング強化
-    const executePollingCycle = async () => {
-      // ✅ CLAUDE.md準拠: Simplified polling execution
-      if (!this.pollingState.isActive) {
-        return;
-      }
-      // 15分無操作チェック
-      if (Date.now() - this.lastActivityTime > 900000) {
-        this.stopNewAnswerPolling();
-        return;
-      }
+    this.polling.timerId = setTimeout(async () => {
+      if (!this.polling.isActive) return;
 
       try {
-        const triggerResult = await this.callServerSideTrigger();
-
-        // ✅ 成功時のポーリング健全性回復
-        this.markPollingHealthy();
-
-        if (triggerResult.success && triggerResult.hasNewContent) {
-          // ✅ 修正: 新着検出時はバナー表示のみ（差分更新は手動のみ）
-          // サーバーから返されたフィルター情報を使用（フィルター状態不整合の修正）
-          const appliedFilterState = triggerResult.appliedFilter || this.getCurrentFilterState();
-          this.showNewContentBanner(triggerResult.newItemsCount, appliedFilterState);
-
-          // 動的間隔調整: 新着時は頻度アップ
-          this.adjustPollingIntervalStable(true);
-          this.pollingState.retryCount = 0;
-        } else if (triggerResult.success) {
-          // 新着なし: 間隔を徐々に延長
-          this.adjustPollingIntervalStable(false);
-        } else {
-          // レスポンスは得られたが成功していない場合
-          console.warn('⚠️ Polling response not successful:', triggerResult.message);
-          this.adjustPollingIntervalStable(false);
-        }
-
-      } catch (error) {
-        console.error('❌ Server-side trigger error:', error.message);
-
-        // ✅ エラー分類とハンドリング強化
-        const errorType = this.classifyPollingError(error);
-
-        // ✅ 修正: ポーリング用リトライ機構強化
-        this.handleError(error, {
-          type: 'polling',
-          operation: 'server trigger',
-          incrementRetry: true,
-          showUser: false, // ポーリングエラーはユーザーに表示しない
-          errorType: errorType
+        const response = await this.runGas('getNotificationUpdate', this.state.userId, {
+          lastUpdateTime: this.state.lastSeenTimestamp
         });
 
-        // ✅ エラータイプ別の間隔調整
-        if (errorType === 'critical') {
-          // 重大エラー: 大幅に間隔延長
-          this.pollingSettings.currentInterval = Math.min(300000, this.pollingSettings.currentInterval * 3); // 最大5分
-        } else if (errorType === 'temporary') {
-          // 一時的エラー: 中程度の延長
-          this.adjustPollingIntervalStable(false);
-        } else {
-          // 軽微エラー: 軽微な延長
-          this.pollingSettings.currentInterval = Math.min(120000, this.pollingSettings.currentInterval * 1.5); // 最大2分
+        if (response.success && response.hasNewContent) {
+          this.showNewContentBanner(response.newItemsCount);
         }
 
-        // ✅ 復旧メカニズム: 連続エラー監視
-        this.trackPollingHealth(error);
+        this.polling.errorCount = 0;
+
+      } catch (error) {
+        this.polling.errorCount++;
+        console.warn(`Polling error (${this.polling.errorCount}/3):`, error.message);
+
+        // Stop after 3 consecutive errors, auto-restart in 5 minutes
+        if (this.polling.errorCount >= 3) {
+          this.stopSimplePolling();
+          setTimeout(() => this.startSimplePolling(), 300000);
+          return;
+        }
       }
-      // ✅ 注意: this.pollingState.isActiveはポーリング全体の状態なので、
-      // 個別サイクル完了でfalseにしない（継続的ポーリングのため）
-    };
 
-    // ✅ 修正: メモリリーク防止と堅牢なポーリングサイクル
-    const scheduleNextCycle = () => {
-      if (!this.pollingState.isActive) return;
-
-      // 動的間隔調整（30秒〜5分の範囲）
-      const interval = this.pollingSettings?.currentInterval || 60000;
-
-      // タイマーIDを保存してメモリリーク防止
-      this.pollingState.currentTimerId = setTimeout(async () => {
-        if (!this.pollingState.isActive || !this.state.initializationComplete) {
-          return; // 早期終了で不要な処理回避
-        }
-
-        try {
-          await executePollingCycle();
-        } catch (error) {
-          console.error('❌ Polling cycle error:', error.message);
-        } finally {
-          // エラーの有無に関係なく次のサイクルをスケジュール
-          if (this.pollingState.isActive) {
-            scheduleNextCycle();
-          }
-        }
-      }, interval);
-    };
-
-    // 初回ポーリング開始（90秒後）
-    this.pollingState.initialTimerId = setTimeout(() => {
-      if (this.pollingState.isActive && this.state.initializationComplete) {
-        executePollingCycle()
-          .then(() => {
-            if (this.pollingState.isActive) {
-              scheduleNextCycle();
-            }
-          })
-          .catch(error => {
-            console.error('❌ Initial polling error:', error.message);
-            // エラー時も継続的ポーリングを開始
-            if (this.pollingState.isActive) {
-              scheduleNextCycle();
-            }
-          });
-      }
-    }, 90000);
+      // Schedule next check
+      this.schedulePollingCheck();
+    }, interval);
   }
 
-  // 新着回答のポーリング停止 (安定版 - 完全なクリーンアップ)
-  stopNewAnswerPolling() {
-    if (!this.pollingState) return;
-
-    // ✅ 修正: アクティブなタイマーを全てクリア（メモリリーク防止）
-    if (this.pollingState.currentTimerId) {
-      clearTimeout(this.pollingState.currentTimerId);
-    }
-    if (this.pollingState.initialTimerId) {
-      clearTimeout(this.pollingState.initialTimerId);
-    }
-
-    // ✅ CLAUDE.md準拠: Complete state cleanup
-    this.pollingState = {
-      isActive: false,
-      interval: 30000,
-      retryCount: 0,
-      isInRecoveryMode: false,
-      currentTimerId: null,
-      initialTimerId: null
-    };
-
-    // 🧹 レガシータイマークリーンアップ（互換性維持）
-    if (this.pollingInterval) {
-      clearInterval(this.pollingInterval);
-      this.pollingInterval = null;
-    }
-
-    if (this.pollingTimeout) {
-      clearTimeout(this.pollingTimeout);
-      this.pollingTimeout = null;
-    }
-
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
-
-    if (this.longRunningCheckInterval) {
-      clearInterval(this.longRunningCheckInterval);
-      this.longRunningCheckInterval = null;
+  stopSimplePolling() {
+    this.polling.isActive = false;
+    if (this.polling.timerId) {
+      clearTimeout(this.polling.timerId);
+      this.polling.timerId = null;
     }
   }
+
+  hasRecentActivity() {
+    return (Date.now() - this.lastActivityTime) < 300000; // 5 minutes
+  }
+
 
   // 🔄 統合新着通知システム - 全ユーザーロール対応
-  async callServerSideTrigger() {
-
-    try {
-      // Get current filter state for consistent filtering
-      const filterState = this.getCurrentFilterState();
-
-      // ✅ 修正: 時刻ベース統一API契約
-      const notificationOptions = {
-        lastUpdateTime: this.state.lastSeenTimestamp || new Date(0).toISOString(),
-        classFilter: filterState.classFilter,
-        sortOrder: filterState.sortOrder
-      };
-
-      // 統合 getNotificationUpdate エンドポイント呼び出し
-      const response = await this.runGas('getNotificationUpdate', this.state.userId, notificationOptions);
-
-      // ✅ 緊急修正: null/undefined レスポンスの安全な処理
-      if (!response) {
-        console.warn('⚠️ callServerSideTrigger: Got null/undefined response from getNotificationUpdate');
-        return {
-          success: false,
-          hasNewContent: false,
-          newItemsCount: 0,
-          data: [],
-          message: 'No response from server',
-          timestamp: new Date().toISOString(),
-          targetUserId: this.state.userId
-        };
-      }
-
-      // レスポンス構造の検証
-      if (typeof response !== 'object') {
-        console.warn('⚠️ callServerSideTrigger: Invalid response type:', typeof response);
-        return {
-          success: false,
-          hasNewContent: false,
-          newItemsCount: 0,
-          data: [],
-          message: 'Invalid response format',
-          timestamp: new Date().toISOString(),
-          targetUserId: this.state.userId
-        };
-      }
-
-      // success プロパティの存在確認
-      if (typeof response.success === 'undefined') {
-        console.warn('⚠️ callServerSideTrigger: Response missing success property:', response);
-        // レスポンスを正規化
-        return {
-          success: false,
-          hasNewContent: false,
-          newItemsCount: 0,
-          data: response.data || [],
-          message: response.message || 'Response missing success property',
-          timestamp: response.timestamp || new Date().toISOString(),
-          targetUserId: this.state.userId
-        };
-      }
-
-      if (response.success) {
-        // ✅ 修正: 時刻ベース統一システム
-        this.state.lastSeenTimestamp = response.timestamp || new Date().toISOString();
-        return response;
-      } else {
-        throw new Error(response.message || 'Notification update failed');
-      }
-
-    } catch (error) {
-      console.error('❌ callServerSideTrigger error:', error.message);
-
-      // ✅ エラー詳細ログ追加
-      console.error('🔍 Error details:', {
-        error: error.message,
-        stack: error.stack,
-        context: 'server trigger',
-        timestamp: new Date().toISOString(),
-        userId: this.state.userId,
-        retryCount: this.pollingState?.retryCount || 0
-      });
-
-      throw error;
-    }
-  }
 
 
 
   // Unified notification system
   showNotification(message, type = 'info', options = {}) {
-    const {
-      target = 'toast',  // 'toast', 'banner', 'button'
-      element = null,     // ボタン対象要素
-      duration = null,    // カスタム期間
-      resetState = true   // 状態リセットフラグ
-    } = options;
-
-    switch (target) {
-      case 'toast':
-        if (window.notifications) {
-          const defaultDuration = duration || this.getToastDuration(type);
-          window.notifications[type] ?
-            window.notifications[type](message, defaultDuration) :
-            window.notifications.info(message, defaultDuration);
-        }
-        break;
-
-      case 'banner':
-        // バナーボタンフィードバック
-        if (!this.elements.refreshContentBtn || !this.elements.newContentBanner) return;
-        const isVisible = !this.elements.newContentBanner.classList.contains('hidden');
-        if (!isVisible) {
-          debugLog('⚠️ バナー非表示中のためフィードバックをスキップ');
-          return;
-        }
-        this.updateButtonFeedback(this.elements.refreshContentBtn, message, type, resetState);
-        break;
-
-      case 'button':
-        // 任意のボタンエラーフィードバック
-        if (element) {
-          this.updateButtonFeedback(element, message, type, resetState);
-        }
-        break;
+    // Simplified: Direct delegation to window.notifications
+    if (window.notifications) {
+      const duration = options.duration || 5000;
+      window.notifications[type] ?
+        window.notifications[type](message, duration) :
+        window.notifications.info(message, duration);
     }
   }
 
-  getToastDuration(type) {
-    switch (type) {
-      case 'success': return 4000;
-      case 'error': return 7000;
-      case 'warning': return 6000;
-      case 'info':
-      default: return 5000;
-    }
-  }
-
-  updateButtonFeedback(btn, message, type, resetState = true) {
-    if (!btn) return;
-
-    // 元の状態を保存
-    const originalText = btn.textContent;
-    const originalBackground = btn.style.background;
-    const originalClasses = btn.className;
-
-    // メッセージ設定
-    btn.textContent = message;
-    btn.title = message;
-
-    // タイプ別スタイリング
-    switch (type) {
-      case 'success':
-        btn.style.background = 'rgba(16, 185, 129, 0.3)';
-        break;
-      case 'error':
-        btn.classList.add('bg-red-500');
-        btn.style.background = 'rgba(239, 68, 68, 0.3)';
-        break;
-      case 'warning':
-        btn.style.background = 'rgba(245, 158, 11, 0.3)';
-        break;
-      case 'info':
-        btn.style.background = 'rgba(59, 130, 246, 0.3)';
-        break;
-    }
-
-    // 状態リセット
-    if (resetState) {
-      this.scheduleButtonStateReset(btn, {
-        text: originalText,
-        background: originalBackground,
-        classes: originalClasses
-      }, 2000);
-    }
-  }
-
-  // ✅ 後方互換性ラッパー関数
-  provideFeedback(message, type = 'info') {
-    this.showNotification(message, type);
-  }
-
-  showNotificationBannerButtonFeedback(message, type = 'info') {
-    this.showNotification(message, type, { target: 'banner' });
-  }
-
-  showErrorFeedback(btn, message) {
-    this.showNotification(message, 'error', { target: 'button', element: btn });
-  }
   
   getMockData(funcName, ...args) {
     // CLAUDE.md準拠: Promise-based mock delay (setTimeout代替)
@@ -1967,12 +1328,6 @@ class StudyQuestApp {
           });
         }
 
-        // タイマーのクリーンアップ
-        if (this.notificationWaitTimer) {
-          clearTimeout(this.notificationWaitTimer);
-          this.notificationWaitTimer = null;
-          this.pendingNotificationRequest = null;
-        }
         debugLog('✅ Event listeners cleaned');
       }
 
@@ -2013,14 +1368,8 @@ class StudyQuestApp {
     debugLog('🧹 Destroying polling system...');
 
     // 🛡️ ポーリング完全停止
-    this.stopNewAnswerPolling();
+    this.stopSimplePolling();
 
-    // 🛡️ 設定リセット
-    if (this.pollingSettings) {
-      this.pollingSettings.enabled = false;
-      this.pollingSettings.activityScore = 0;
-      this.pollingSettings.currentInterval = this.pollingSettings.baseInterval || 60000;
-    }
 
     // 🧹 既存のクリーンアップ
     this.cleanup();
@@ -2090,9 +1439,6 @@ class StudyQuestApp {
     }
     if (this.elements.endPublicationBtn && this.handlers.onEndPublicationClick) {
       this.elements.endPublicationBtn.removeEventListener('click', this.handlers.onEndPublicationClick);
-    }
-    if (this.elements.sheetSelector && this.handlers.onSheetSelectorChange) {
-      this.elements.sheetSelector.removeEventListener('change', this.handlers.onSheetSelectorChange);
     }
     
     // イベントリスナー設定フラグのリセット
@@ -2393,8 +1739,8 @@ class StudyQuestApp {
   }
 
   hasRelevantLocalStorage() {
-    const userId = this.state?.userId || USER_ID;
-    const sheetName = SHEET_NAME;
+    const userId = this.state?.userId || window.USER_ID;
+    const sheetName = window.SHEET_NAME;
 
     return {
       // ✅ 修正: 時刻ベース統一システムに対応
@@ -2449,13 +1795,7 @@ class StudyQuestApp {
       if (!result || typeof result !== 'object') {
         return false;
       }
-      
-      // レスポンス構造の詳細ログ
-      
-      // 2つの可能なレスポンス形式に対応
-      // 1. 新形式: { status: 'success', data: [...], header: '...', sheetName: '...' }
-      // 2. 旧形式: { data: [...], header: '...', sheetName: '...' } (statusフィールドなし)
-      
+           
       const hasStatusField = 'status' in result;
       
       // ステータス確認（存在する場合のみ）
@@ -2530,8 +1870,7 @@ class StudyQuestApp {
   async getUserData(fetchParams, isInitialLoad) {
     // 🔧 CLAUDE.md準拠: API呼び出し前の確実な権限初期化
     if (fetchParams.showAdminFeatures == null || fetchParams.showAdminFeatures === undefined) {
-      const isAdminUser = window.UNIFIED_CONFIG?.isAdminUser || false;
-      fetchParams.showAdminFeatures = isAdminUser;
+      fetchParams.showAdminFeatures = window.UNIFIED_CONFIG?.isAdminUser || this.state?.isAdminUser || false;
     }
 
     try {
@@ -2752,12 +2091,7 @@ class StudyQuestApp {
 
     } catch (error) {
       errorLog('❌ loadSheetData error:', error);
-      this.handleError(error, {
-        type: 'data_load',
-        operation: 'loadSheetData',
-        showUser: true,
-        context: 'データ読み込み中にエラーが発生しました'
-      });
+      this.handleError(error, 'data_load', true);
     } finally {
       this.state.isLoading = false;
       this.hideLoadingOverlay();
@@ -2772,9 +2106,8 @@ class StudyQuestApp {
   }
   
   shouldClearCache(config) {
-    // Clear cache on sheet switching or explicit refresh
-    return (config.requestedSheetName && config.requestedSheetName !== this.state.currentActiveSheet) ||
-           (config.showLoading && !config.isInitialLoad);
+    // Clear cache on explicit refresh
+    return config.showLoading && !config.isInitialLoad;
   }
   
 
@@ -2791,11 +2124,7 @@ class StudyQuestApp {
       const result = await this.getUserData(fetchParams, loadConfig.isInitialLoad);
 
       if (!result || !result.success) {
-        this.handleError(new Error(result?.error || 'データ取得に失敗しました'), {
-          type: 'api',
-          operation: 'getUserData',
-          showUser: true
-        });
+        this.handleError(new Error(result?.error || 'データ取得に失敗しました'), 'api', true);
         return;
       }
 
@@ -2806,7 +2135,6 @@ class StudyQuestApp {
       this.state.currentAnswers = responseData;
       debugLog('📦 Server-filtered data received:', this.state.currentAnswers.length, 'items');
 
-      this.state.currentActiveSheet = result.activeSheet || loadConfig.requestedSheetName;
 
       // ✅ Update question text from data response
       if (result.header && this.elements.headingLabel) {
@@ -2823,12 +2151,7 @@ class StudyQuestApp {
       }
 
     } catch (error) {
-      this.handleError(error, {
-        type: 'data_load',
-        operation: 'performDataLoad',
-        showUser: true,
-        context: 'データ処理中にエラーが発生しました'
-      });
+      this.handleError(error, 'data_load', true);
     }
   }
 
@@ -2888,194 +2211,6 @@ class StudyQuestApp {
     return params;
   }
 
-  async loadAvailableSheets() {
-    try {
-      const sheetsData = await this.runGas('getSheets');
-      this.populateSheetSelector(sheetsData);
-    } catch (error) {
-      errorLog('Failed to load available sheets:', error);
-      if (this.elements.sheetSelector) {
-        this.elements.sheetSelector.innerHTML = '<option value="">エラー: シート読み込み失敗</option>';
-      }
-    }
-  }
-  populateSheetSelector(sheets) {
-    const selector = this.elements.sheetSelector;
-    
-    if (!selector) return;
-
-    if (!sheets || sheets.length === 0) {
-      selector.innerHTML = '<option value="">利用可能なシートがありません</option>';
-      selector.disabled = true;
-      return;
-    }
-    
-    // シート選択肢を構築
-    if (!Array.isArray(sheets)) {
-      errorLog('Invalid sheets data:', sheets);
-      selector.innerHTML = '<option>シートデータが無効です</option>';
-      selector.disabled = true;
-      return;
-    }
-    
-    const options = sheets.map(sheet => {
-      const selected = sheet.name === this.state.sheetName ? 'selected' : ''; // Use sheet.name for comparison
-      const activeLabel = sheet.name === this.state.sheetName ? ' (現在のアクティブシート)' : '';
-      return `<option value="${window.sharedUtilities.security.escapeHtml(sheet.name)}" ${selected}>${window.sharedUtilities.security.escapeHtml(sheet.name)}${activeLabel}</option>`;
-    }).join('');
-    
-    selector.innerHTML = options;
-    selector.disabled = false;
-    
-    // 現在のアクティブシートを記録
-    // this.state.currentActiveSheet is already set by loadSheetData
-  }
-  async switchSheet() {
-    const selectedSheet = this.elements.sheetSelector.value;
-    
-    // 早期リターン: 無効な選択または同じシート
-    if (!selectedSheet || selectedSheet === this.state.currentActiveSheet) {
-      debugLog('Sheet switch skipped - same sheet or invalid selection');
-      return;
-    }
-    
-    // 現在切り替え中の場合は処理を拒否
-    if (this.sheetSwitchInProgress) {
-      debugLog('Sheet switch already in progress - ignoring request');
-      return;
-    }
-    
-    try {
-      this.sheetSwitchInProgress = true;
-      
-      // 前処理: 状態のクリーンアップ
-      await this.prepareForSheetSwitch(selectedSheet);
-      
-      // メインプロセス: データ読み込み
-      await this.performSheetSwitch(selectedSheet);
-      
-      // 後処理: 状態の確定
-      await this.finalizeSheetSwitch(selectedSheet);
-      
-    } catch (error) {
-      errorLog('❌ Sheet switch failed:', error);
-      await this.handleSheetSwitchError(error, selectedSheet);
-    } finally {
-      this.sheetSwitchInProgress = false;
-    }
-  }
-  
-  async prepareForSheetSwitch(targetSheet) {
-    // 必要な前提条件をチェック
-    if (!this.state.userId) {
-      throw new Error('User ID is missing - cannot switch sheet');
-    }
-    
-    // UI状態をリセット
-    this.dismissNewContentBanner();
-    
-    // 仮想スクロール状態をクリア
-    this.clearVirtualScrollingState();
-    
-    // ✅ CLAUDE.md準拠: 統合通知システムではレガシータイマー不要
-    // Server-side trigger based polling will automatically handle state changes
-    
-    debugLog('Sheet switch preparation completed');
-  }
-  
-  async performSheetSwitch(targetSheet) {
-    const maxRetries = 3;
-    let lastError = null;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        debugLog(`🔄 Loading sheet data (attempt ${attempt}/${maxRetries}):`, targetSheet);
-        
-        await this.loadSheetData({ 
-          bypassCache: true, 
-          requestedSheetName: targetSheet,
-          showLoading: true
-        });
-        
-        return; // 成功時は早期リターン
-        
-      } catch (error) {
-        lastError = error;
-        warnLog(`⚠️ Sheet load attempt ${attempt} failed:`, error.message);
-        
-        if (attempt < maxRetries) {
-          const delay = attempt * 1000; // 指数バックオフ
-          debugLog(`⏳ Retrying in ${delay}ms...`);
-          // ✅ CLAUDE.md準拠: Use requestIdleCallback for non-blocking exponential backoff
-          await new Promise(resolve => requestIdleCallback(resolve, { timeout: delay }));
-        }
-      }
-    }
-    
-    // すべての試行が失敗した場合
-    throw new Error(`Failed to load sheet after ${maxRetries} attempts: ${lastError?.message || 'Unknown error'}`);
-  }
-  
-  async finalizeSheetSwitch(targetSheet) {
-    // 状態の確定
-    this.state.currentActiveSheet = targetSheet;
-    this.state.sheetName = targetSheet;
-
-    // ✅ 修正: 時刻ベース通知システムに統一（件数ベース基準は不要）
-    this.updateLastSeenTimestamp();
-    
-    // UIの更新
-    this.updateSheetSelectorLabels();
-    this.updateSheetDisplayName(targetSheet);
-    
-    // ポーリングを再開（初期化完了後のみ）
-    if (this.pollingInitialized && this.state.initializationComplete) {
-      this.startNewAnswerPolling();
-    }
-    
-    debugLog('Sheet switch finalization completed');
-  }
-  
-  async handleSheetSwitchError(error, targetSheet) {
-    errorLog('Sheet switch error details:', {
-      error: error.message,
-      targetSheet,
-      currentSheet: this.state.currentActiveSheet,
-      userId: this.state.userId
-    });
-    
-    // 元のシートの選択に戻す
-    if (this.elements.sheetSelector) {
-      this.elements.sheetSelector.value = this.state.currentActiveSheet || '';
-    }
-    
-    // ポーリングを再開（元のシートで、初期化完了後のみ）
-    if (this.pollingInitialized && this.state.initializationComplete) {
-      this.startNewAnswerPolling();
-    }
-    
-    // ユーザーにエラーを通知
-    if (window.notifications) {
-      window.notifications.error(
-        `ボードの切り替えに失敗しました: ${error.message}`,
-        5000
-      );
-    }
-    
-    // 現在のデータでUI更新を試行
-    try {
-      this.renderBoard(false, false);
-    } catch (renderError) {
-      errorLog('Failed to render board after sheet switch error:', renderError);
-    }
-  }
-  
-  updateSheetDisplayName(sheetName) {
-    if (this.elements.sheetNameText && sheetName) {
-      const sheetIcon = this.getIcon('users', 'w-3 h-3 inline-block mr-1');
-      this.elements.sheetNameText.innerHTML = sheetIcon + window.sharedUtilities.security.escapeHtml(sheetName);
-    }
-  }
   
   clearVirtualScrollingState() {
     // バーチャルスクロール状態をリセット
@@ -3101,22 +2236,6 @@ class StudyQuestApp {
     }
   }
 
-  updateSheetSelectorLabels() {
-    const selector = this.elements.sheetSelector;
-    const options = Array.from(selector.options);
-    
-    options.forEach(option => {
-      const sheetName = option.value;
-      const isActive = sheetName === this.state.currentActiveSheet;
-      const cleanName = sheetName.replace(/ \(現在のアクティブシート\)$/, '');
-      
-      if (isActive) {
-        option.textContent = `${cleanName} (現在のアクティブシート)`;
-      } else {
-        option.textContent = cleanName;
-      }
-    });
-  }
   
   populateClassFilter(rows) {
     const classFilter = this.elements.classFilter;
@@ -4443,6 +3562,8 @@ class StudyQuestApp {
             if (requestId) {
                 btn.setAttribute('data-request-id', requestId);
             }
+
+
         } else {
             btn.classList.remove('loading');
             btn.setAttribute('aria-busy', 'false');
@@ -4618,8 +3739,8 @@ class StudyQuestApp {
   }
 
   getScopedKey(base) {
-    const userId = this.state?.userId || USER_ID;
-    return `${base}_${userId}_${SHEET_NAME}`;
+    const userId = this.state?.userId || window.USER_ID;
+    return `${base}_${userId}_${window.SHEET_NAME}`;
   }
 
   // 時刻ベース永続化機能
@@ -4826,10 +3947,10 @@ class StudyQuestApp {
         errorLog('Failed to toggle highlight:', error);
 
         if (error.message && (error.message.includes('管理者のみ') || error.message.includes('編集者のみ'))) {
-            this.showErrorFeedback(btns[0], '権限エラー: ボード編集者のみ利用可能です');
+            this.showNotification('権限エラー: ボード編集者のみ利用可能です', 'error');
             warnLog('ハイライト機能はボード編集者のみ利用可能です');
         } else {
-            this.showErrorFeedback(btns[0], 'ハイライトに失敗しました');
+            this.showNotification('ハイライトに失敗しました', 'error');
         }
     } finally {
         btns.forEach(btn => {
@@ -5054,12 +4175,6 @@ class StudyQuestApp {
         window.notifications.info('回答を削除中...', 2000);
       }
 
-      // ✅ 削除操作前: ポーリング一時停止
-      const pollingWasActive = this.pollingState?.isActive || false;
-      if (pollingWasActive) {
-        console.log('🔄 Temporarily pausing polling for deletion operation');
-        this.pausePollingForOperation('deletion');
-      }
 
       const result = await new Promise((resolve, reject) => {
         google.script.run
@@ -5080,10 +4195,6 @@ class StudyQuestApp {
         // データとUIを更新
         await this.refreshAfterDelete(rowIndex);
 
-        // ✅ 削除操作完了: ポーリング復旧（遅延付き）
-        if (pollingWasActive) {
-          this.resumePollingAfterOperation('deletion');
-        }
       } else {
         throw new Error(result.message || '削除に失敗しました');
       }
@@ -5093,10 +4204,6 @@ class StudyQuestApp {
         window.notifications.error(`削除に失敗しました: ${error.message}`, 5000);
       }
 
-      // ✅ エラー時: ポーリング即座復旧
-      if (this.pollingOperationState?.pausedFor === 'deletion') {
-        this.resumePollingAfterOperation('deletion', { immediate: true });
-      }
     }
   }
 
@@ -5250,44 +4357,30 @@ class StudyQuestApp {
         showAdminFeatures: window.showAdminFeatures,
         showHighlightToggle: window.showHighlightToggle
       });
+      // 🔧 表示設定の動的切り替え（管理モード⇔ConfigJSON設定）
       if (enable) {
-        // 🔧 管理モード時: displaySettings に関係なく全て表示（管理者の必要性）
+        // 管理モード: 強制表示
         window.showCounts = true;
         window.displayMode = 'named';
-        window.isStudentMode = false;
-        window.showScoreSort = true;
-        debugLog('管理モード有効化: 管理者として全項目表示');
       } else {
-        // 🔧 閲覧モード時: displaySettings の設定を尊重
-        const displaySettings = window.UNIFIED_CONFIG?.displaySettings || { showNames: false, showReactions: false };
-        window.showCounts = displaySettings.showReactions;
+        // 閲覧モード: ConfigJSON設定に戻す
+        const displaySettings = window.UNIFIED_CONFIG?.displaySettings || {};
+        window.showCounts = displaySettings.showReactions || false;
         window.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
-        window.isStudentMode = true;
-        window.showScoreSort = displaySettings.showReactions;
-        debugLog('閲覧モード有効化: displaySettings適用', {
-          showNames: displaySettings.showNames,
-          showReactions: displaySettings.showReactions,
-          finalShowCounts: window.showCounts,
-          finalDisplayMode: window.displayMode
-        });
       }
-      
-      // Update local state from global variables first
-      this.updateConfigFromGlobals();
 
-      // 🔧 状態同期: window変数からstateを更新（重複処理削除）
-      this.state.showCounts = window.showCounts;
-      this.state.displayMode = window.displayMode;
-      this.state.isStudentMode = window.isStudentMode;
-      
-      // 管理モード切り替え後の状態を確認
-      debugLog('管理モード切り替え後の状態確認:', {
-        enable,
-        stateDisplayMode: this.state.displayMode,
-        stateShowCounts: this.state.showCounts,
-        windowDisplayMode: window.displayMode,
-        windowShowCounts: window.showCounts
+      window.isStudentMode = !enable;
+      window.showScoreSort = window.showCounts;
+
+      debugLog(enable ? '管理モード有効化' : '閲覧モード有効化', {
+        showCounts: window.showCounts,
+        displayMode: window.displayMode,
+        fromConfig: !enable
       });
+      
+      // Update local state from global variables
+      this.updateConfigFromGlobals();
+      
       
       // キャッシュをクリアして新しい設定で再描画
       this.cache.clear();
@@ -5968,24 +5061,14 @@ class StudyQuestApp {
     }
   }
   updateConfigFromGlobals() {
-    // 🔧 統一設定システム: window変数からstateへのシンプルな同期
+    // 🔧 統一設定システム: window変数からstateへの同期
     this.state.isStudentMode = window.isStudentMode;
     this.state.showCounts = window.showCounts;
     this.state.displayMode = window.displayMode;
     this.state.showAdminFeatures = window.showAdminFeatures;
-    this.state.showHighlightToggle = this.state.showAdminFeatures; // 管理モードでのみ有効
-    this.state.showScoreSort = window.showCounts; // showCountsと連動
+    this.state.showHighlightToggle = this.state.showAdminFeatures;
+    this.state.showScoreSort = window.showCounts;
     this.state.showPublishControls = window.showPublishControls;
-    
-    debugLog('updateConfigFromGlobals後の状態:', {
-      isAdminUser: this.state.isAdminUser,
-      showHighlightToggle: this.state.showHighlightToggle,
-      windowShowHighlightToggle: window.showHighlightToggle,
-      showAdminFeatures: this.state.showAdminFeatures,
-      windowShowAdminFeatures: window.showAdminFeatures,
-      finalDisplayMode: this.state.displayMode,
-      windowDisplayMode: window.displayMode
-    });
   }
 
   // Performance optimization methods
@@ -6777,60 +5860,6 @@ class StudyQuestApp {
     }
   }
 
-  // 🧹 CLAUDE.md準拠: setTimeout/setInterval完全代替メソッド集
-
-  // CLAUDE.md準拠: Promise-based delayed state reset (setTimeout代替)
-  scheduleButtonStateReset(elementOrText, stateOrBackground, delayMs) {
-    // Handle both button element and text reset scenarios
-    if (typeof elementOrText === 'string') {
-      // Text and background reset scenario
-      const originalText = elementOrText;
-      const originalBackground = stateOrBackground;
-
-      return new Promise(resolve => {
-        // Use requestAnimationFrame for smooth updates (CLAUDE.md準拠)
-        const startTime = performance.now();
-        const checkAndReset = (currentTime) => {
-          if (currentTime - startTime >= delayMs) {
-            // Reset button state
-            if (this.elements.refreshContentBtn) {
-              this.elements.refreshContentBtn.textContent = originalText;
-              this.elements.refreshContentBtn.style.background = originalBackground;
-              this.elements.refreshContentBtn.disabled = false;
-            }
-            resolve();
-          } else {
-            requestAnimationFrame(checkAndReset);
-          }
-        };
-        requestAnimationFrame(checkAndReset);
-      });
-    } else {
-      // Button element reset scenario
-      const button = elementOrText;
-      const originalClasses = stateOrBackground;
-
-      return new Promise(resolve => {
-        const startTime = performance.now();
-        const checkAndReset = (currentTime) => {
-          if (currentTime - startTime >= delayMs) {
-            // Reset button classes
-            if (button) {
-              button.className = originalClasses;
-              button.title = '';
-            }
-            resolve();
-          } else {
-            requestAnimationFrame(checkAndReset);
-          }
-        };
-        requestAnimationFrame(checkAndReset);
-      });
-    }
-  }
-
-  // Delays handled by CSS transitions, animations use CSS keyframes, polling uses server triggers
-
   /**
    * 🔧 API応答からdisplaySettingsを動的更新
    * @param {Object} newDisplaySettings - 新しい表示設定
@@ -6840,7 +5869,12 @@ class StudyQuestApp {
       return;
     }
 
-    // window変数を更新
+    // 管理者は初期化時に設定済み、API更新不要
+    if (window.UNIFIED_CONFIG?.isAdminUser) {
+      return;
+    }
+
+    // 通常ユーザーのみAPI設定を適用
     const oldShowCounts = window.showCounts;
     const oldDisplayMode = window.displayMode;
 
@@ -6853,93 +5887,26 @@ class StudyQuestApp {
 
     // 変更があった場合のみ再描画
     if (oldShowCounts !== window.showCounts || oldDisplayMode !== window.displayMode) {
-      console.log('🔄 DisplaySettings updated from API:', {
-        showNames: newDisplaySettings.showNames,
-        showReactions: newDisplaySettings.showReactions,
-        changed: true
-      });
-
       // キャッシュクリアして再描画をトリガー
       this.clearCache();
       this.renderWithCurrentData();
     }
   }
 
-}
-// ドメイン情報処理
-// ✅ CLAUDE.md準拠: Zero-Dependency Architecture - 最適化されたドメイン情報システム
-// AdminPanel.html と Login.html で共通使用
-
-/**
- * ドメイン情報取得（Promise-based）
- * 単一責任: データ取得のみ
- * @returns {Promise<Object>} ドメイン情報オブジェクト
- */
-async function fetchDomainInfo() {
-  try {
-    if (!google?.script?.run?.getDeployUserDomainInfo) {
-      warnLog('getDeployUserDomainInfo function not available, using fallback');
-      return {
-        success: true,
-        isDomainMatch: true,
-        deployDomain: 'unknown',
-        currentDomain: 'unknown',
-        userEmail: 'anonymous',
-        fallback: true
-      };
+  /**
+   * 現在のデータで画面を再描画する
+   * 表示設定変更時やキャッシュクリア後の再描画に使用
+   */
+  renderWithCurrentData() {
+    try {
+      // 現在のデータでボードを再描画
+      this.renderBoard(false, false);
+    } catch (error) {
+      errorLog('❌ renderWithCurrentData failed:', error);
     }
-
-    const rawInfo = await new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler((error) => {
-          warnLog('getDeployUserDomainInfo failed, using fallback:', error);
-          resolve({
-            success: false,
-            error: error.message || error,
-            fallback: true
-          });
-        })
-        .getDeployUserDomainInfo();
-    });
-
-    // Map backend response to standardized frontend format
-    if (rawInfo && rawInfo.success && !rawInfo.error) {
-      return {
-        success: rawInfo.success,
-        isDomainMatch: rawInfo.isValidDomain,
-        deployDomain: rawInfo.adminDomain,
-        currentDomain: rawInfo.userDomain || rawInfo.domain,
-        userEmail: rawInfo.userEmail,
-        timestamp: rawInfo.timestamp
-      };
-    } else {
-      return {
-        success: false,
-        isDomainMatch: false,
-        deployDomain: 'unknown',
-        currentDomain: 'unknown',
-        userEmail: 'anonymous',
-        error: rawInfo?.error || 'Domain info fetch failed',
-        fallback: true
-      };
-    }
-  } catch (error) {
-    warnLog('fetchDomainInfo error:', error.message || error);
-    return {
-      success: false,
-      isDomainMatch: false,
-      deployDomain: 'unknown',
-      currentDomain: 'unknown',
-      userEmail: 'anonymous',
-      error: error.message || error,
-      fallback: true
-    };
   }
-}
 
-// ✅ CLEANUP: displayDomainInfo関数削除 (44行削減)
-// この関数はlogin.js.htmlにも重複存在し、SharedUtilities.htmlの統一関数で代替可能
+}
 
 /**
  * フォームリンクを取得して表示する関数

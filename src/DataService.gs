@@ -31,18 +31,21 @@
 function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedConfig = null) {
   const startTime = Date.now();
 
+  // 変数をtryブロック外で初期化（catchブロックでも参照可能）
+  let user = null;
+  let config = null;
+
   try {
     // Zero-dependency data processing
 
     // Performance improvement - use preloaded data
-    const user = preloadedUser || findUserById(userId);
+    user = preloadedUser || findUserById(userId);
     if (!user) {
       console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
       return createDataServiceErrorResponse('ユーザーが見つかりません');
     }
 
     // Performance improvement - use preloaded config
-    let config;
     if (preloadedConfig) {
       config = preloadedConfig;
     } else {
@@ -56,7 +59,22 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
     }
 
     // データ取得実行
+    console.log('DataService.getUserSheetData: fetchSpreadsheetData開始', {
+      userId,
+      spreadsheetId: config.spreadsheetId,
+      sheetName: config.sheetName,
+      hasOptions: !!options,
+      optionsKeys: Object.keys(options || {})
+    });
+
     const result = fetchSpreadsheetData(config, options, user);
+
+    console.log('DataService.getUserSheetData: fetchSpreadsheetData完了', {
+      userId,
+      resultSuccess: result?.success,
+      hasData: !!(result?.data),
+      dataLength: result?.data?.length || 0
+    });
 
     const executionTime = Date.now() - startTime;
 
@@ -75,13 +93,22 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
 
     return result;
   } catch (error) {
-    console.error('DataService.getUserSheetData: エラー', {
+    const executionTime = Date.now() - startTime;
+    console.error('DataService.getUserSheetData: 重大エラー', {
       userId,
-      error: error.message
+      error: error.message,
+      stack: error.stack ? `${error.stack.substring(0, 300)  }...` : 'No stack trace',
+      executionTime: `${executionTime}ms`,
+      configSpreadsheetId: config?.spreadsheetId || 'undefined',
+      configSheetName: config?.sheetName || 'undefined',
+      userEmail: user?.userEmail || 'undefined',
+      optionsProvided: options ? Object.keys(options) : 'none',
+      timestamp: new Date().toISOString()
     });
+
     // Ensure proper error response structure
-    const errorResponse = createDataServiceErrorResponse(error.message || 'データ取得エラー');
-    console.error('DataService.getUserSheetData: Creating error response', errorResponse);
+    const errorResponse = createDataServiceErrorResponse(`データ取得エラー: ${error.message}`);
+    console.error('DataService.getUserSheetData: エラーレスポンス作成', errorResponse);
     return errorResponse;
   }
 }
@@ -147,6 +174,16 @@ function connectToSpreadsheetSheet(config, context = {}) {
   const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
 
   const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
+
+  if (!dataAccess || !dataAccess.spreadsheet) {
+    console.error('connectToSpreadsheetSheet: スプレッドシートアクセス失敗', {
+      spreadsheetId: config.spreadsheetId,
+      useServiceAccount: !isSelfAccess,
+      hasDataAccess: !!dataAccess
+    });
+    throw new Error(`スプレッドシートアクセスに失敗しました: ${config.spreadsheetId}`);
+  }
+
   const {spreadsheet} = dataAccess;
   const sheet = spreadsheet.getSheetByName(config.sheetName);
 
@@ -194,8 +231,8 @@ function getSheetHeaders(sheet, lastCol) {
  * @returns {Array} 処理済みデータ
  */
 function processBatchData(sheet, headers, lastRow, lastCol, config, options, user, startTime) {
-  const MAX_EXECUTION_TIME = 180000; // 3分制限
-  const MAX_BATCH_SIZE = 200; // バッチサイズ
+  const MAX_EXECUTION_TIME = 20000; // 20秒制限（高速化）
+  const MAX_BATCH_SIZE = 100; // バッチサイズ削減（200→100）
 
   let processedData = [];
   let processedCount = 0;
@@ -221,9 +258,9 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
       processedData = processedData.concat(batchProcessed);
       processedCount += batchSize;
 
-      // API制限対策: 1000行毎に短い休憩
-      if (processedCount % 1000 === 0) {
-        Utilities.sleep(100); // 0.1秒休憩
+      // パフォーマンス最適化: 休憩頻度を削減
+      if (processedCount % 500 === 0) {
+        Utilities.sleep(50); // 0.05秒休憩（短縮）
       }
 
     } catch (batchError) {
@@ -323,17 +360,19 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
         const nameResult = extractFieldValueUnified(row, headers, 'name', columnMapping);
         const emailResult = extractFieldValueUnified(row, headers, 'email', columnMapping);
 
-        // 匿名性保護: 抽出データのクロスチェック
+        // 匿名性保護: 抽出データのクロスチェック（管理モード時は無効）
         const answerValue = answerResult?.value;
         const nameValue = nameResult?.value;
 
-        // 名前データが回答・理由欄に混入していないかチェック
-        if (nameValue && (answerValue === nameValue || reasonResult?.value === nameValue)) {
-          console.warn('DataService: 匿名性保護のため行をスキップ', {
-            rowIndex: globalIndex + 2,
-            reason: '名前データが回答・理由欄に混入'
-          });
-          return; // この行をスキップ
+        if (!options.adminMode) {
+          // 名前データが回答・理由欄に混入していないかチェック
+          if (nameValue && (answerValue === nameValue || reasonResult?.value === nameValue)) {
+            console.warn('DataService: 匿名性保護のため行をスキップ', {
+              rowIndex: globalIndex + 2,
+              reason: '名前データが回答・理由欄に混入'
+            });
+            return; // この行をスキップ
+          }
         }
 
         const item = {
@@ -414,17 +453,19 @@ function processRawData(dataRows, headers, config, options = {}, user = null) {
         const emailResult = extractFieldValueUnified(row, headers, 'email', columnMapping);
         const timestampResult = extractFieldValueUnified(row, headers, 'timestamp');
 
-        // 匿名性保護: 抽出データのクロスチェック
+        // 匿名性保護: 抽出データのクロスチェック（管理モード時は無効）
         const answerValue = answerResult?.value;
         const nameValue = nameResult?.value;
 
-        // 名前データが回答・理由欄に混入していないかチェック
-        if (nameValue && (answerValue === nameValue || reasonResult?.value === nameValue)) {
-          console.warn('DataService: 匿名性保護のため行をスキップ', {
-            rowIndex: index + 2,
-            reason: '名前データが回答・理由欄に混入'
-          });
-          return; // この行をスキップ
+        if (!options.adminMode) {
+          // 名前データが回答・理由欄に混入していないかチェック
+          if (nameValue && (answerValue === nameValue || reasonResult?.value === nameValue)) {
+            console.warn('DataService: 匿名性保護のため行をスキップ', {
+              rowIndex: index + 2,
+              reason: '名前データが回答・理由欄に混入'
+            });
+            return; // この行をスキップ
+          }
         }
 
         // 基本データ構造作成（ColumnMappingService利用）

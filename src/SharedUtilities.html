@@ -1688,6 +1688,45 @@
     return window.getPerformanceConstants().IDLE_TIMEOUT;
   };
 
+  // =============================================================================
+  // UNIFIED CONFIG SYSTEM
+  // =============================================================================
+
+  /**
+   * 統一UNIFIED_CONFIG構築関数 - CLAUDE.md準拠
+   * @param {Object} CONFIG - パース済みconfigJSON
+   * @param {Object} legacyVars - レガシーテンプレート変数
+   * @param {Object} pageDefaults - ページ固有のデフォルト値
+   * @returns {Object} 統一設定オブジェクト
+   */
+  window.sharedUtilities.createUnifiedConfig = function(CONFIG, legacyVars = {}, pageDefaults = {}) {
+    // V8安全性: 最小限のフォールバック（userIdのみ保持）
+    const safeUserId = (value) => {
+      return (typeof value === 'string' && !value.startsWith('<')) ? value : '';
+    };
+
+    return {
+      userId: CONFIG.userId || safeUserId(legacyVars.__USER_ID__),
+      targetUserId: pageDefaults.targetUserId || CONFIG.userId || safeUserId(legacyVars.__USER_ID__),
+      userEmail: CONFIG.userEmail || '',
+      spreadsheetId: CONFIG.spreadsheetId || '', // Legacy削除 - configJSONで十分
+      sheetName: CONFIG.sheetName || '',         // Legacy削除 - configJSONで十分
+      questionText: CONFIG.questionText || '回答ボード',
+      isPublished: CONFIG.isPublished || false,
+      isEditor: CONFIG.isEditor !== undefined ? CONFIG.isEditor : (pageDefaults.isEditor || false),
+      isAdminUser: CONFIG.isAdminUser || (pageDefaults.isAdminUser || false),
+      isOwnBoard: CONFIG.isOwnBoard || (pageDefaults.isOwnBoard || false),
+      formUrl: CONFIG.formUrl || '',
+      formTitle: CONFIG.formTitle || '',
+      showDetails: CONFIG.showDetails !== false,
+      setupStatus: CONFIG.setupStatus || 'pending',
+      displaySettings: CONFIG.displaySettings || { showNames: false, showReactions: false },
+      columnMapping: CONFIG.columnMapping || {}
+    };
+  };
+
+  // =============================================================================
+
   // Prevent duplicate loading messages
   if (!window.sharedUtilitiesLoaded) {
     window.sharedUtilitiesLoaded = true;

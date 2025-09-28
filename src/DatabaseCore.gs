@@ -485,18 +485,43 @@ function openSpreadsheet(spreadsheetId, options = {}) {
 
     // スプレッドシートを開く
     try {
+      console.log('openSpreadsheet: 接続試行開始', {
+        spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
+        useServiceAccount: options.useServiceAccount,
+        hasAuth: !!auth,
+        authValid: auth?.isValid
+      });
+
       if (options.useServiceAccount === true && auth && auth.isValid) {
         // Service account implementation via JWT authentication
+        console.log('openSpreadsheet: サービスアカウント接続試行');
         spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
         if (!spreadsheet) {
-          console.error('openSpreadsheet: Service account access failed, falling back to normal access');
+          console.error('openSpreadsheet: サービスアカウント接続失敗、通常アクセスにフォールバック', {
+            spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
+            authEmail: auth.email
+          });
           spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+        } else {
+          console.log('openSpreadsheet: サービスアカウント接続成功');
         }
       } else {
+        console.log('openSpreadsheet: 通常権限で接続');
         spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       }
+
+      console.log('openSpreadsheet: 接続成功', {
+        spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
+        hasSpreadsheet: !!spreadsheet
+      });
     } catch (openError) {
-      console.error('openSpreadsheet: Failed to open spreadsheet:', openError.message);
+      console.error('openSpreadsheet: スプレッドシート接続失敗', {
+        spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
+        error: openError.message,
+        stack: openError.stack ? `${openError.stack.substring(0, 200)  }...` : 'No stack trace',
+        useServiceAccount: options.useServiceAccount,
+        hasAuth: !!auth
+      });
       return null;
     }
 
@@ -684,6 +709,12 @@ function createUser(email, initialConfig = {}, context = {}) {
     const defaultConfig = {
       setupStatus: 'pending',
       isPublished: false,
+      displaySettings: {
+        showNames: false,
+        showReactions: false,
+        theme: 'default',
+        pageSize: 20
+      },
       ...initialConfig
     };
 

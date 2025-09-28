@@ -40,24 +40,17 @@
   // ✅ 実際のターゲットユーザーID（URLパラメータ優先）
   const TARGET_USER_ID = getUrlParameterUserId() || CONFIG.userId || __USER_ID__;
 
-  // Unified Configuration Access Pattern
-  window.UNIFIED_CONFIG = {
-    userId: CONFIG.userId || __USER_ID__,
-    targetUserId: TARGET_USER_ID, // ✅ 実際のターゲットユーザーID
-    userEmail: CONFIG.userEmail || '',
-    spreadsheetId: CONFIG.spreadsheetId || '',
-    sheetName: CONFIG.sheetName || '',
-    isPublished: CONFIG.isPublished || false,
-    isEditor: CONFIG.isEditor || true,
-    isAdminUser: CONFIG.isAdminUser || true,
-    isOwnBoard: CONFIG.isOwnBoard || true,
-    formUrl: CONFIG.formUrl || '',
-    formTitle: CONFIG.formTitle || '',
-    showDetails: CONFIG.showDetails !== false,
-    setupStatus: CONFIG.setupStatus || 'pending',
-    displaySettings: CONFIG.displaySettings || {},
-    columnMapping: CONFIG.columnMapping || {}
-  };
+  // Unified Configuration Access Pattern - SharedUtilities使用
+  window.UNIFIED_CONFIG = window.sharedUtilities.createUnifiedConfig(
+    CONFIG,
+    {}, // Legacy変数削除 - configJSONで全情報カバー
+    {
+      targetUserId: TARGET_USER_ID,
+      isEditor: true,
+      isAdminUser: true,
+      isOwnBoard: true
+    }
+  );
 
   // === SECTION SEPARATOR ===
 
@@ -310,8 +303,8 @@
 
         updateFooterDisplay(currentBoardInfo);
 
-        // ✅ 論理的整合性: 右パネルも最新設定で更新
-        updateConfigSummary(systemState.config);
+        // ✅ 論理的整合性: 右パネルも最新設定で更新（displaySettingsはHTMLデフォルトのまま）
+        // updateConfigSummary(systemState.config); // 初期化時は不要 - HTMLデフォルト(unchecked)を活用
 
         // Update user email display
         if (adminData.userInfo.email) {
@@ -334,6 +327,7 @@
       window.setLoading(false);
     }
   }
+
 
   /**
    * Core panel initialization (no API calls)
@@ -427,7 +421,7 @@
           currentBoardInfo = adminData.boardInfo;
 
           updateFooterDisplay(adminData.boardInfo);
-          updateConfigSummary(systemState.config);
+          // updateConfigSummary(systemState.config); // リフレッシュ時も不要 - HTMLデフォルト維持
         } catch (error) {
           console.error('Failed to refresh board info:', error);
         }
@@ -512,7 +506,16 @@
     const refreshDataBtn = document.getElementById('refresh-data');
     if (refreshDataBtn) {
       refreshDataBtn.addEventListener('click', function () {
-        loadSpreadsheets();
+        // キャッシュクリア → データ読み込み
+        google.script.run
+          .withSuccessHandler(() => {
+            loadSpreadsheets(); // 既存の関数をそのまま使用
+          })
+          .withFailureHandler((error) => {
+            console.warn('キャッシュクリア失敗、通常読み込みを実行:', error);
+            loadSpreadsheets(); // エラーでも読み込みは実行
+          })
+          .clearSheetsCache();
       });
     }
 
@@ -597,6 +600,7 @@
         }
       });
     }
+
   }
 
   // ✅ CLAUDE.md準拠: Clean initialization pattern - legacy functions removed
@@ -2595,193 +2599,42 @@
   }
 
   // ===========================================
-  // 🔧 AI検出と手動設定の競合解決システム
+  // 🔧 シンプル競合チェックシステム
   // ===========================================
 
   /**
-   * 列選択の競合状態分析
+   * シンプル競合チェック
    * @param {Object} mapping - AI検出マッピング
    * @param {Object} dropdowns - ドロップダウン要素
-   * @param {Object} confidence - AI信頼度データ
-   * @returns {Object} 競合分析結果
+   * @returns {boolean} 競合があるかどうか
    */
-  function analyzeColumnSelectionConflicts(mapping, dropdowns, confidence = {}) {
-    const analysis = {
-      hasConflicts: false,
-      conflicts: [],
-      recommendations: [],
-      summary: {
-        aiSelections: 0,
-        manualSelections: 0,
-        conflictingFields: []
+  function checkSimpleConflicts(mapping, dropdowns) {
+    if (!mapping || !dropdowns) return false;
+
+    const actualMapping = mapping?.mapping || mapping || {};
+
+    for (const fieldType of Object.keys(dropdowns)) {
+      const dropdown = dropdowns[fieldType];
+      if (!dropdown) continue;
+
+      const hasAI = actualMapping[fieldType] !== undefined;
+      const hasManual = dropdown.value && dropdown.value !== '';
+
+      if (hasAI && hasManual && actualMapping[fieldType] !== parseInt(dropdown.value)) {
+        return true;
       }
-    };
-
-    try {
-      const actualMapping = mapping?.mapping || mapping || {};
-
-      Object.keys(dropdowns).forEach(fieldType => {
-        const dropdown = dropdowns[fieldType];
-        if (!dropdown) return;
-
-        const hasAISelection = actualMapping[fieldType] !== undefined && actualMapping[fieldType] !== null;
-        const hasManualSelection = dropdown.value && dropdown.value !== '';
-        const aiConfidence = confidence[fieldType] || 0;
-
-        if (hasAISelection) analysis.summary.aiSelections++;
-        if (hasManualSelection) analysis.summary.manualSelections++;
-
-        // 競合検出: AI検出と手動選択が異なる場合
-        if (hasAISelection && hasManualSelection) {
-          const aiIndex = actualMapping[fieldType];
-          const manualIndex = parseInt(dropdown.value);
-
-          if (aiIndex !== manualIndex) {
-            analysis.hasConflicts = true;
-            analysis.conflicts.push({
-              field: fieldType,
-              aiSelection: { index: aiIndex, confidence: aiConfidence },
-              manualSelection: { index: manualIndex },
-              severity: aiConfidence > 70 ? 'high' : 'medium'
-            });
-            analysis.summary.conflictingFields.push(fieldType);
-          }
-        }
-      });
-
-      // 推奨事項の生成
-      if (analysis.hasConflicts) {
-        analysis.recommendations = generateConflictResolutionRecommendations(analysis);
-      }
-
-    } catch (error) {
-      console.error('analyzeColumnSelectionConflicts エラー:', error);
-      analysis.hasConflicts = false;
-      analysis.conflicts = [];
-      analysis.recommendations = [];
     }
-
-    return analysis;
-  }
-
-  /**
-   * 競合状況の処理と解決
-   * @param {Object} conflictStatus - 競合状態分析結果
-   * @param {Object} mapping - AI検出マッピング
-   * @param {Object} dropdowns - ドロップダウン要素
-   * @param {Object} confidence - AI信頼度データ
-   */
-  function handleColumnSelectionConflicts(conflictStatus, mapping, dropdowns, confidence) {
-    try {
-      console.log('🔧 handleColumnSelectionConflicts: 競合解決処理開始');
-
-      // 🎯 競合解決戦略: 信頼度ベース自動解決 + ユーザー確認
-      conflictStatus.conflicts.forEach(conflict => {
-        const dropdown = dropdowns[conflict.field];
-        if (!dropdown) return;
-
-        if (conflict.severity === 'high') {
-          // 高信頼度のAI検出: 自動でAI選択を採用
-          dropdown.value = conflict.aiSelection.index;
-          dropdown.classList.add('auto-resolved-ai');
-
-          
-
-          // 信頼度バッジを更新
-          showConfidenceBadge(conflict.field, conflict.aiSelection.confidence, 'ai-auto');
-
-        } else {
-          // 中程度の信頼度: 手動選択を維持し、確認を促す
-          dropdown.classList.add('needs-user-confirmation');
-
-          console.log(`⚠️ 確認要求: ${conflict.field} → 手動選択維持、確認推奨`);
-
-          // 確認バッジを表示
-          showConfidenceBadge(conflict.field, 100, 'manual-confirm');
-        }
-      });
-
-      // 🎯 競合解決結果の通知
-      displayConflictResolutionResults(conflictStatus);
-
-      // グローバル状態の更新
-      window.currentAIMapping = mapping;
-      window.conflictResolutionStatus = conflictStatus;
-
-    } catch (error) {
-      console.error('handleColumnSelectionConflicts エラー:', error);
-      showError('列設定の競合解決中にエラーが発生しました');
-    }
-  }
-
-  /**
-   * 競合解決結果の表示
-   * @param {Object} conflictStatus - 競合状態分析結果
-   */
-  function displayConflictResolutionResults(conflictStatus) {
-    try {
-      const autoResolved = conflictStatus.conflicts.filter(c => c.severity === 'high').length;
-      const needsConfirmation = conflictStatus.conflicts.filter(c => c.severity === 'medium').length;
-
-      let message = '🔧 列設定の競合を解決しました:\n';
-
-      if (autoResolved > 0) {
-        message += `• ${autoResolved}件を自動解決（高信頼度AI検出採用）\n`;
-      }
-
-      if (needsConfirmation > 0) {
-        message += `• ${needsConfirmation}件の確認が必要（手動選択維持）`;
-      }
-
-      showInfo(message, 8000);
-
-      // 詳細情報パネルの更新
-      updateConflictInfoPanel(conflictStatus);
-
-    } catch (error) {
-      console.error('displayConflictResolutionResults エラー:', error);
-    }
-  }
-
-  /**
-   * 競合情報パネルの更新
-   * @param {Object} conflictStatus - 競合状態分析結果
-   */
-  function updateConflictInfoPanel(conflictStatus) {
-    try {
-      const infoPanel = document.getElementById('column-conflict-info');
-      if (!infoPanel) return;
-
-      if (conflictStatus.hasConflicts) {
-        infoPanel.classList.remove('hidden');
-        infoPanel.innerHTML = `
-          <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-4 mt-4">
-            <h4 class="text-yellow-400 font-medium mb-2">🔧 列設定競合解決状況</h4>
-            <div class="text-sm text-yellow-200 space-y-1">
-              ${conflictStatus.recommendations.map(rec =>
-                `<div>• ${rec.message}</div>`
-              ).join('')}
-            </div>
-          </div>
-        `;
-      } else {
-        infoPanel.classList.add('hidden');
-      }
-
-    } catch (error) {
-      console.error('updateConflictInfoPanel エラー:', error);
-    }
+    return false;
   }
 
 
   // 🎯 AI検出結果をドロップダウンの初期選択として設定（競合解決強化版）
   function setAIDetectionSelections(mapping, dropdowns, confidence = {}) {
 
-    // 🛡️ 競合状態の事前チェック
-    const conflictStatus = analyzeColumnSelectionConflicts(mapping, dropdowns, confidence);
-    if (conflictStatus.hasConflicts) {
-      console.warn('⚠️ AI検出と手動設定の競合検出:', conflictStatus.conflicts);
-      return handleColumnSelectionConflicts(conflictStatus, mapping, dropdowns, confidence);
+    // 🛡️ シンプル競合チェック
+    const hasConflicts = checkSimpleConflicts(mapping, dropdowns);
+    if (hasConflicts) {
+      console.warn('⚠️ AI検出と手動設定の競合があります - 手動選択が優先されます');
     }
 
     // 防御的チェック: mappingがundefined/nullの場合は早期リターン
@@ -2807,7 +2660,6 @@
     const hasConfidenceData = confidence && Object.keys(confidence).length > 0;
 
     if (!hasValidMapping && !hasConfidenceData) {
-      console.log('💡 AI検出結果がありません - 手動選択をお使いください');
       return;
     }
 
@@ -2928,8 +2780,6 @@
       const avgConfidence = Object.values(confidence).reduce((a, b) => a + b, 0) / Object.values(confidence).length;
       
       
-    } else {
-      console.log('💡 AI検出結果がありません - 手動選択をお使いください');
     }
 
     // AI検出情報パネルを表示
@@ -3587,7 +3437,6 @@
 
     // 防御的チェック: mappingがundefined/nullの場合は早期リターン
     if (!mapping || typeof mapping !== 'object') {
-      console.log('💡 AI検出結果がありません - displayAIDetectionInfo');
       detailsDiv.innerHTML = '<div class="text-gray-400 text-sm">AI検出結果がありません</div>';
       return;
     }
@@ -4125,7 +3974,6 @@
       setupStatus: systemState.config.setupStatus,
       isPublished: systemState.config.isPublished,
       publishedAt: systemState.config.publishedAt,
-      userPermissions: systemState.config.userPermissions,
       displaySettings: getDisplaySettings(),
       // 新しい設定で明示的に上書き（baseConfigで既に設定済みだが明示的に保証）
       spreadsheetId,

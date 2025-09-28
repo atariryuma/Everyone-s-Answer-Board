@@ -215,22 +215,27 @@
         return '[Stringify Error: ' + error.message + ']';
       }
     }
+  </script>
 
-    // システム全体フロー表示機能
-    function showSystemFlow() {
-    }
+  <?!= include('SharedUtilities'); ?>
 
+  <script>
     // Unified Configuration - CLAUDE.md Compliant
     const __CONFIG_JSON__ = '<?= typeof configJSON !== "undefined" ? configJSON : "{}" ?>';
 
     // Legacy template variables for backward compatibility
     const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
     const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
+    const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
+    const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
     const __EDITOR_NAME__ = '<?= typeof editorName !== "undefined" ? editorName : "" ?>';
     const __IS_EDITOR__ = '<?= typeof isEditor !== "undefined" ? isEditor : "false" ?>';
-    // Legacy variables - will be updated from CONFIG.displaySettings after parsing
-    window.showCounts = false; // Placeholder - will be updated from displaySettings
-    window.displayMode = 'anonymous'; // Placeholder - will be updated from displaySettings
+
+    // Immediate window variable assignment for page.js.html compatibility
+    window.SHEET_NAME = __SHEET_NAME__.startsWith('<') ? '' : __SHEET_NAME__;
+    window.USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
+
+    // Display settings will be initialized after ConfigJSON parsing
     // Unified editor capability - Zero-Dependency Architecture
     window.isEditor = __IS_EDITOR__.startsWith('<') ? false : __IS_EDITOR__ === 'true';
 
@@ -239,7 +244,7 @@
     try {
       if (typeof __CONFIG_JSON__ === 'string' && !__CONFIG_JSON__.startsWith('<')) {
         CONFIG = JSON.parse(__CONFIG_JSON__);
-        console.log('Unified configuration loaded:', CONFIG);
+        console.log('ConfigJSON parsed successfully');
       } else {
         console.warn('ConfigJSON not available, using legacy variables');
       }
@@ -247,39 +252,50 @@
       console.warn('Failed to parse configJSON:', e);
     }
 
-    // Unified access pattern - prefer CONFIG, fallback to legacy
-    window.UNIFIED_CONFIG = {
-      userId: CONFIG.userId || (__USER_ID__.startsWith('<') ? '' : __USER_ID__),
-      userEmail: CONFIG.userEmail || '',
-      spreadsheetId: CONFIG.spreadsheetId || (__SPREADSHEET_ID__.startsWith('<') ? '' : __SPREADSHEET_ID__),
-      sheetName: CONFIG.sheetName || (__SHEET_NAME__.startsWith('<') ? '' : __SHEET_NAME__),
-      questionText: CONFIG.questionText || '回答ボード',
-      isPublished: CONFIG.isPublished || false,
-      isEditor: CONFIG.isEditor !== undefined ? CONFIG.isEditor : window.isEditor,
-      isAdminUser: CONFIG.isAdminUser || false,
-      isOwnBoard: CONFIG.isOwnBoard || false,
-      formUrl: CONFIG.formUrl || '',
-      showDetails: CONFIG.showDetails !== false,
-      displaySettings: CONFIG.displaySettings || { showNames: false, showReactions: false }
-    };
+    // Unified access pattern - SharedUtilities使用
+    window.UNIFIED_CONFIG = window.sharedUtilities.createUnifiedConfig(
+      CONFIG,
+      { __USER_ID__ }, // Legacy変数最小化 - userIdのみ保持（教育現場安全性考慮）
+      {
+        isEditor: window.isEditor,
+        isAdminUser: false,
+        isOwnBoard: false
+      }
+    );
 
     // 🔧 CLAUDE.md準拠: 権限ベースアクセス制御 - 管理者機能初期化
     window.showAdminFeatures = window.UNIFIED_CONFIG.isAdminUser || false;
     window.hasAdminCapability = window.UNIFIED_CONFIG.isAdminUser || false;
 
-    // 🔧 表示設定統一: displaySettings に基づくレガシー変数更新
-    window.showCounts = window.UNIFIED_CONFIG.displaySettings.showReactions || false;
-    window.displayMode = window.UNIFIED_CONFIG.displaySettings.showNames ? 'named' : 'anonymous';
-    console.log('Display settings updated:', {
-      showNames: window.UNIFIED_CONFIG.displaySettings.showNames,
-      showReactions: window.UNIFIED_CONFIG.displaySettings.showReactions,
+    // 🔧 表示設定初期化（管理モード優先・一回処理）
+    function initDisplaySettings() {
+      const config = window.UNIFIED_CONFIG;
+      const isAdmin = config?.isAdminUser || false;
+
+      if (isAdmin) {
+        return { showReactions: true, showNames: true, displayMode: 'named' };
+      } else {
+        const settings = config?.displaySettings || {};
+        return {
+          showReactions: settings.showReactions || false,
+          showNames: settings.showNames || false,
+          displayMode: settings.showNames ? 'named' : 'anonymous'
+        };
+      }
+    }
+
+    const finalSettings = initDisplaySettings();
+    window.showCounts = finalSettings.showReactions;
+    window.displayMode = finalSettings.displayMode;
+    console.log('Display settings initialized:', {
+      isAdmin: window.UNIFIED_CONFIG.isAdminUser,
       showCounts: window.showCounts,
       displayMode: window.displayMode
     });
 
     // Legacy variable assignments - use unified config where possible
-    const SHEET_NAME = window.UNIFIED_CONFIG.sheetName;
-    const USER_ID = window.UNIFIED_CONFIG.userId;
+    window.SHEET_NAME = window.UNIFIED_CONFIG.sheetName;
+    window.USER_ID = window.UNIFIED_CONFIG.userId;
     const EDITOR_NAME = __EDITOR_NAME__.startsWith('<') ? '' : __EDITOR_NAME__;
     let MAPPING;
     try {
@@ -294,7 +310,6 @@
     }
   </script>
 
-  <?!= include('SharedUtilities'); ?>
   <?!= include('UnifiedStyles.css'); ?>
   <?!= include('page.css'); ?>
 
@@ -333,35 +348,6 @@
             </svg>
           </button>
           
-          <div>
-            <!-- ドメイン一致表示 -->
-            <div id="header-domain-match" class="bg-green-500/10 border border-green-400/30 rounded-lg px-3 py-1.5 hidden transition-all duration-200">
-              <div class="flex items-center gap-1.5">
-                <svg class="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <span class="text-green-400 font-semibold text-xs" id="header-domain-match-text">学校ドメイン</span>
-              </div>
-            </div>
-
-            <!-- ドメイン不一致表示 -->
-            <div id="header-domain-mismatch" class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg px-3 py-1.5 hidden transition-all duration-200">
-              <div class="flex items-center gap-1.5">
-                <svg class="w-3 h-3 text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"></path>
-                </svg>
-                <span class="text-yellow-400 font-semibold text-xs" id="header-domain-mismatch-text">外部アクセス</span>
-              </div>
-            </div>
-
-            <!-- 初期状態表示 -->
-            <div id="header-domain-initial" class="bg-blue-500/10 border border-blue-400/30 rounded-lg px-3 py-1.5 transition-all duration-200">
-              <div class="flex items-center gap-1.5">
-                <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                <span class="text-blue-400 font-semibold text-xs">確認中</span>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
       

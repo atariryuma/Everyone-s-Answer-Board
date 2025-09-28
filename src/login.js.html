@@ -47,15 +47,9 @@
         }
       });
 
-      // ドメイン表示の更新 - ✅ CLAUDE.md準拠: 実際のドメイン情報取得
-      try {
-        const domainInfo = await fetchDomainInfo();
-        displayDomainInfo(domainInfo);
-        console.log('✅ Domain info loaded in login page:', domainInfo);
-      } catch (error) {
-        console.warn('⚠️ Domain display update failed:', error);
-        displayDomainInfo({ error: error.message, fallback: true });
-      }
+      // ドメイン表示の更新
+      const domainInfo = await fetchDomainInfo();
+      displayDomainInfo(domainInfo);
 
       // ユーザーメール表示の初期化 (非同期 - 最後に実行)
       try {
@@ -367,9 +361,54 @@
 
     // initializeMainLoginLogic function removed - logic integrated into main init() function
 
-    // ✅ CLAUDE.md準拠: updateDomainDisplay削除 - displayDomainInfoに統一
+    /**
+     * ローカルドメイン情報表示 - ログインページ専用
+     */
+    function displayDomainInfo(info) {
+      const match = document.getElementById('header-domain-match');
+      const mismatch = document.getElementById('header-domain-mismatch');
+      const initial = document.getElementById('header-domain-initial');
 
-    // Initial loading state setup will be handled by new init() function
+      // 全て非表示
+      [match, mismatch, initial].forEach(element => {
+        if (element) element.style.display = 'none';
+      });
+
+      if (info.error) return;
+
+      if (info.isValidDomain) {
+        if (match) {
+          document.getElementById('header-domain-match-text').textContent = info.domain || '学校ドメイン';
+          match.style.display = 'block';
+        }
+      } else {
+        if (mismatch) {
+          document.getElementById('header-domain-mismatch-text').textContent = info.domain ? `外部: ${info.domain}` : '外部アクセス';
+          mismatch.style.display = 'block';
+        }
+      }
+    }
+
+    /**
+     * ローカルドメイン情報取得 - ログインページ専用
+     */
+    async function fetchDomainInfo() {
+      if (!google?.script?.run?.getDeployUserDomainInfo) {
+        return { isValidDomain: true, domain: 'unknown' };
+      }
+
+      try {
+        return await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .getDeployUserDomainInfo();
+        });
+      } catch (error) {
+        console.error('Domain info fetch failed:', error);
+        return { error: true };
+      }
+    }
 
   // ✅ CLAUDE.md準拠: DOM ready initialization pattern
   if (document.readyState === 'loading') {
@@ -913,86 +952,8 @@
     window.location.href = adminUrl;
   }
 
-  // ✅ ドメイン情報取得関数 - login.js.html用簡潔版
-  async function fetchDomainInfo() {
-    try {
-      if (!google?.script?.run?.getDeployUserDomainInfo) {
-        console.warn('getDeployUserDomainInfo function not available, using fallback');
-        return {
-          success: true,
-          isDomainMatch: true,
-          deployDomain: 'unknown',
-          currentDomain: 'unknown',
-          userEmail: 'anonymous',
-          fallback: true
-        };
-      }
+  // ✅ ドメイン情報取得: SharedUtilities.htmlの統一関数を使用
 
-      const rawInfo = await new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler((error) => {
-            console.warn('getDeployUserDomainInfo failed, using fallback:', error);
-            resolve({
-              success: false,
-              error: error.message || error,
-              fallback: true
-            });
-          })
-          .getDeployUserDomainInfo();
-      });
-
-      return rawInfo;
-    } catch (error) {
-      console.warn('fetchDomainInfo error:', error.message || error);
-      return {
-        success: false,
-        error: error.message || error,
-        fallback: true
-      };
-    }
-  }
-
-  // ✅ ドメイン情報表示関数 - login.js.html用簡潔版
-  function displayDomainInfo(info) {
-    const headerDomainMatch = document.getElementById('header-domain-match');
-    const headerDomainMismatch = document.getElementById('header-domain-mismatch');
-    const headerDomainInitial = document.getElementById('header-domain-initial');
-    const headerDomainMatchText = document.getElementById('header-domain-match-text');
-    const headerDomainMismatchText = document.getElementById('header-domain-mismatch-text');
-
-    // 全ての表示を一旦非表示にする
-    if (headerDomainMatch) headerDomainMatch.classList.add('hidden');
-    if (headerDomainMismatch) headerDomainMismatch.classList.add('hidden');
-    if (headerDomainInitial) headerDomainInitial.classList.add('hidden');
-
-    if (!info || info.error) {
-      console.warn('ドメイン情報エラー:', info?.error);
-      // エラー時は初期状態を表示
-      if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
-      return;
-    }
-
-    try {
-      if (info.isValidDomain) {
-        if (headerDomainMatch) {
-          headerDomainMatch.classList.remove('hidden');
-        }
-        if (headerDomainMatchText && info.domain) {
-          headerDomainMatchText.textContent = `${info.domain} ドメイン`;
-        }
-      } else {
-        if (headerDomainMismatch) {
-          headerDomainMismatch.classList.remove('hidden');
-        }
-        if (headerDomainMismatchText) {
-          headerDomainMismatchText.textContent = `注意: 外部ドメインからのアクセス`;
-        }
-      }
-    } catch (error) {
-      console.warn('ドメイン情報表示エラー:', error);
-      if (headerDomainInitial) headerDomainInitial.classList.remove('hidden');
-    }
-  }
+  // ✅ ドメイン情報表示: SharedUtilities.htmlの統一関数を使用
 
 </script>

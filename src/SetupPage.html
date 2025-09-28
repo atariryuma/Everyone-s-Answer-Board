@@ -46,11 +46,12 @@
 
     <div class="max-w-2xl mx-auto">
       <!-- ヘッダー -->
-      <div class="text-center mb-8">
+      <div class="text-center mb-6">
         <h1 class="text-4xl font-bold text-cyan-400 mb-2">📚 StudyQuest</h1>
         <p class="text-xl text-gray-300">初回セットアップ</p>
         <p class="text-sm text-gray-400 mt-2">システムを使用開始するための設定を行います</p>
       </div>
+
 
       <!-- メッセージエリア -->
       <div id="message-area" class="mb-6"></div>
@@ -396,8 +397,15 @@
           .getWebAppUrl();
       }
 
-      // ページ読み込み時に現在のユーザーのメールアドレスを自動取得
+      // ドメイン情報初期化
+      async function initializeDomainInfo() {
+        const info = await window.sharedUtilities.fetchDomainInfo();
+        window.sharedUtilities.displayDomainInfo(info);
+      }
+
+      // ページ読み込み時に現在のユーザーのメールアドレスとドメイン情報を自動取得
       window.addEventListener('load', function () {
+        initializeDomainInfo(); // ドメイン情報初期化
         const adminEmailField = document.getElementById('admin-email');
         if (adminEmailField && !adminEmailField.value) {
           google.script.run

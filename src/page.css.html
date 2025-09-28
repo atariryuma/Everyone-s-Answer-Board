@@ -315,17 +315,49 @@ header {
   text-overflow: ellipsis; 
   min-height: 120px; 
 }
-.like-btn.loading::after { 
-  content: ""; 
-  position: absolute; 
-  inset: 0; 
-  border: 2px solid transparent; 
-  border-top: 2px solid #67e8f9; /* bright cyan */ 
-  border-radius: 50%; 
-  animation: spin 0.8s linear infinite; 
-  width: 16px; 
-  height: 16px; 
-  margin: auto; 
+/* ✅ リアクション専用スピナー - アイコン色と整合性を保つ */
+.like-btn.loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  width: 16px;
+  height: 16px;
+  margin: auto;
+}
+
+/* リアクションタイプ別スピナー色 - アイコン色と完全一致 */
+.like-btn.loading.text-red-500::after {
+  border-top: 2px solid #ef4444; /* LIKE - 赤色 */
+}
+
+.like-btn.loading.text-yellow-500::after {
+  border-top: 2px solid #fbbf24; /* UNDERSTAND - 黄色 */
+}
+
+.like-btn.loading.text-green-500::after {
+  border-top: 2px solid #10b981; /* CURIOUS - 緑色 */
+}
+
+/* ハイライトボタン専用スピナー色 */
+.highlight-btn.loading::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  border-top: 2px solid #9333ea; /* HIGHLIGHT - 紫色 (text-purple-600) */
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  width: 16px;
+  height: 16px;
+  margin: auto;
+}
+
+/* フォールバック: 色クラスが指定されていない場合はデフォルト色 */
+.like-btn.loading:not(.text-red-500):not(.text-yellow-500):not(.text-green-500)::after {
+  border-top: 2px solid #67e8f9; /* デフォルト - シアン */
 }
 .highlight-btn { 
   transition: background var(--transition-normal) var(--transition-easing),

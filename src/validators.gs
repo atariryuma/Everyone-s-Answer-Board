@@ -416,10 +416,25 @@ function validateConfig(config) {
     }
 
     // ブール値フィールド
-    const booleanFields = ['isPublished', 'showNames', 'showReactions'];
-    booleanFields.forEach(field => {
+    if (config.isPublished !== undefined) {
+      result.sanitized.isPublished = Boolean(config.isPublished);
+    }
+
+    // displaySettings処理（ネスト構造対応）
+    if (config.displaySettings && typeof config.displaySettings === 'object') {
+      result.sanitized.displaySettings = {
+        showNames: Boolean(config.displaySettings.showNames),
+        showReactions: Boolean(config.displaySettings.showReactions),
+        theme: String(config.displaySettings.theme || 'default').substring(0, 50),
+        pageSize: Math.min(Math.max(Number(config.displaySettings.pageSize) || 20, 1), 100)
+      };
+    }
+
+    // 基本フィールドの保持（検証済みでない場合もパススルー）
+    const basicFields = ['userId', 'setupStatus', 'etag', 'lastAccessedAt'];
+    basicFields.forEach(field => {
       if (config[field] !== undefined) {
-        result.sanitized[field] = Boolean(config[field]);
+        result.sanitized[field] = config[field];
       }
     });
 
