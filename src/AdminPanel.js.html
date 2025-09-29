@@ -1343,9 +1343,11 @@
     if (config.spreadsheetId) {
       spreadsheetBtn.disabled = false;
       spreadsheetBtn.dataset.spreadsheetId = config.spreadsheetId;
+      spreadsheetBtn.classList.remove('opacity-50');
     } else {
       spreadsheetBtn.disabled = true;
       spreadsheetBtn.dataset.spreadsheetId = '';
+      spreadsheetBtn.classList.add('opacity-50');
     }
 
     // フォームボタン（有効なフォームURLが設定されている場合に表示）
