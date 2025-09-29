@@ -305,7 +305,8 @@
       // ✅ Final UI updates (non-blocking)
       initializeFooterUI();
       initializeEventListeners();
-      // Initialize progress to step 1 (fresh state)
+
+      // ✅ 管理パネルは常にstep 1から開始（既存設定に関わらず新規設定フローを提供）
       updateProgress(1);
 
     } catch (error) {
@@ -1338,9 +1339,14 @@
       }
     }
 
-    // スプレッドシート情報はConfigurationManagerで管理されるため、API経由で取得
-    spreadsheetBtn.disabled = true;
-    statusDiv.textContent = 'スプレッドシート機能はConfigurationManager統合中';
+    // スプレッドシートボタンの状態管理
+    if (config.spreadsheetId) {
+      spreadsheetBtn.disabled = false;
+      spreadsheetBtn.dataset.spreadsheetId = config.spreadsheetId;
+    } else {
+      spreadsheetBtn.disabled = true;
+      spreadsheetBtn.dataset.spreadsheetId = '';
+    }
 
     // フォームボタン（有効なフォームURLが設定されている場合に表示）
     const shouldShowForm = config.formUrl && isValidFormUrl(config.formUrl);
@@ -1352,9 +1358,19 @@
       formBtn.classList.add('hidden');
     }
 
+    // ボードボタン（公開済みの場合に表示）
+    if (boardBtn) {
+      if (config.isPublished) {
+        boardBtn.classList.remove('hidden');
+        boardBtn.disabled = false;
+      } else {
+        boardBtn.classList.add('hidden');
+      }
+    }
+
     // ステータス更新
     let statusParts = [];
-    // スプレッドシートステータスはConfigurationManager経由で取得
+    if (config.spreadsheetId) statusParts.push('📊 スプレッドシート');
     if (config.formUrl) statusParts.push('📝 フォーム');
     if (config.isPublished) statusParts.push('🎯 ボード');
 
@@ -1367,27 +1383,7 @@
     }
 
     // 🤖 AI列判定ボタンの状態管理
-    const aiAnalyzeBtn = document.getElementById('ai-analyze-btn');
-    if (aiAnalyzeBtn) {
-      // より正確な判定基準：スプレッドシート接続 + ヘッダーデータの存在
-      const hasHeaders = Array.isArray(window.currentHeaders) && window.currentHeaders.length > 0;
-      const hasDropdownOptions = document.querySelectorAll('#answer-column-select option').length > 1; // "未選択"以外のオプション
-      const canAnalyze = hasSpreadsheetConfig && (hasHeaders || hasDropdownOptions);
-
-      if (canAnalyze) {
-        aiAnalyzeBtn.disabled = false;
-        aiAnalyzeBtn.textContent = '🤖 AI列判定';
-        aiAnalyzeBtn.classList.remove('opacity-50');
-      } else {
-        aiAnalyzeBtn.disabled = true;
-        if (!hasSpreadsheetConfig) {
-          aiAnalyzeBtn.textContent = '🤖 AI列判定（データソース接続が必要）';
-        } else {
-          aiAnalyzeBtn.textContent = '🤖 AI列判定（ヘッダー取得が必要）';
-        }
-        aiAnalyzeBtn.classList.add('opacity-50');
-      }
-    }
+    updateAIAnalyzeButtonState(config);
 
     // 🎯 設定完了状態のフィードバック
     if (isSetupComplete && hasColumnMapping && hasSpreadsheetConfig) {
@@ -1409,6 +1405,59 @@
     updateConfigSummary(config);
   }
 
+  // 🤖 AI列判定ボタンの状態を更新
+  function updateAIAnalyzeButtonState(config) {
+    const aiAnalyzeBtn = document.getElementById('ai-analyze-btn');
+    if (!aiAnalyzeBtn) return;
+
+    // より正確な判定基準：スプレッドシート接続 + ヘッダーデータの存在
+    const hasSpreadsheetConfig = !!(config && config.spreadsheetId && config.sheetName);
+    const hasHeaders = Array.isArray(window.currentHeaders) && window.currentHeaders.length > 0;
+    const hasDropdownOptions = document.querySelectorAll('#answer-column-select option').length > 1; // "未選択"以外のオプション
+    const canAnalyze = hasSpreadsheetConfig && (hasHeaders || hasDropdownOptions);
+
+    if (canAnalyze) {
+      aiAnalyzeBtn.disabled = false;
+      aiAnalyzeBtn.textContent = '🤖 AI列判定';
+      aiAnalyzeBtn.classList.remove('opacity-50');
+    } else {
+      aiAnalyzeBtn.disabled = true;
+      if (!hasSpreadsheetConfig) {
+        aiAnalyzeBtn.textContent = '🤖 AI列判定（データソース接続が必要）';
+      } else {
+        aiAnalyzeBtn.textContent = '🤖 AI列判定（ヘッダー取得が必要）';
+      }
+      aiAnalyzeBtn.classList.add('opacity-50');
+    }
+  }
+
+  // ✅ 統一状態更新関数（重複コードを集約）
+  function updateSystemState(updates = {}) {
+    const { spreadsheetId, sheetName, columnMapping, setupStatus, needsProgress = false } = updates;
+
+    // systemState.config を更新
+    if (spreadsheetId || sheetName || columnMapping || setupStatus) {
+      systemState.config = {
+        ...systemState.config,
+        ...(spreadsheetId && { spreadsheetId }),
+        ...(sheetName && { sheetName }),
+        ...(columnMapping && { columnMapping }),
+        ...(setupStatus && { setupStatus })
+      };
+    }
+
+    // 状態更新を一括実行
+    updateAIAnalyzeButtonState(systemState.config);
+    updateResourceButtons(systemState.config);
+
+    // 進捗更新（オプション）
+    if (needsProgress) {
+      const hasSpreadsheetConfig = systemState.config?.spreadsheetId && systemState.config?.sheetName;
+      const hasColumnMapping = systemState.config?.columnMapping && Object.keys(systemState.config.columnMapping).length > 0;
+      const step = hasSpreadsheetConfig && hasColumnMapping ? 3 : (hasSpreadsheetConfig ? 2 : 1);
+      updateProgress(step);
+    }
+  }
 
   // フォーム情報コンテナ取得 (Zero-Dependency UI統合)
   function getFormInfoContainer() {
@@ -1933,6 +1982,17 @@
       showInfo('AI列判定実行中...', 3000);
 
       await performColumnAnalysis(spreadsheetId, sheetName);
+
+      // ✅ 統一関数で状態更新
+      const currentMapping = getColumnMapping();
+      updateSystemState({
+        spreadsheetId,
+        sheetName,
+        columnMapping: currentMapping,
+        setupStatus: 'completed',
+        needsProgress: true
+      });
+
       showSuccess('AI列判定完了！設定を確認してください');
     } catch (error) {
       console.error('手動AI列判定エラー:', error);
@@ -2336,6 +2396,16 @@
         if (result.headers && result.mapping) {
           console.log('🎯 統合処理で分析完了済み、UI更新のみ実行');
           fillColumnDropdowns(result.headers, result.mapping, result.confidence);
+
+          // ✅ 統一関数で状態更新
+          updateSystemState({
+            spreadsheetId,
+            sheetName,
+            columnMapping: result.mapping,
+            setupStatus: 'completed',
+            needsProgress: true
+          });
+
           showSuccess('接続とAI列判定が完了しました！');
         } else {
           // フォールバック: 分析データがない場合のみ追加実行
@@ -2343,6 +2413,16 @@
           showInfo('AI列判定実行中...', 3000);
           try {
             await performColumnAnalysis(spreadsheetId, sheetName);
+
+            // ✅ 統一関数で状態更新
+            const currentMapping = getColumnMapping();
+            updateSystemState({
+              spreadsheetId,
+              sheetName,
+              columnMapping: currentMapping,
+              setupStatus: 'completed'
+            });
+
             showSuccess('AI列判定完了！設定を確認してください');
           } catch (analysisError) {
             console.warn('AI列判定エラー:', analysisError);
@@ -3316,6 +3396,15 @@
 
     // 🆕 設定完了状況を更新
     updateCompletionStatus();
+
+    // ✅ 統一関数で状態更新（列設定がある場合のみ）
+    const currentMapping = getColumnMapping();
+    if (Object.keys(currentMapping).length > 0) {
+      updateSystemState({
+        columnMapping: currentMapping,
+        setupStatus: 'completed'
+      });
+    }
   }
 
   // ✅ CLAUDE.md準拠: AI判定閾値システム統一化（必須列重視）
@@ -3558,6 +3647,15 @@
 
     // 表示用に検証結果を描画
     displayVerificationResults({ ok: true });
+
+    // ✅ 統一関数で状態更新
+    const currentMapping = getColumnMapping();
+    updateSystemState({
+      spreadsheetId,
+      sheetName,
+      columnMapping: currentMapping,
+      setupStatus: 'completed'
+    });
 
     // ✅ 検証専用に変更：保存処理は下書き保存・公開ボタンで実行
     showSuccess('✅ 列マッピング検証完了');
