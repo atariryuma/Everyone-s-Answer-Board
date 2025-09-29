@@ -308,14 +308,31 @@ header {
 .reaction-border-1 { border-width: 2px; }
 .reaction-border-2 { border-width: 4px; }
 .reaction-border-3 { border-width: 6px; }
-.answer-preview { 
-  display: -webkit-box; 
-  -webkit-line-clamp: 5; 
-  line-clamp: 5; 
-  -webkit-box-orient: vertical; 
-  overflow: hidden; 
-  text-overflow: ellipsis; 
-  min-height: 120px; 
+.answer-card {
+  height: 220px;
+}
+.answer-preview {
+  min-height: 60px;
+  max-height: 140px;
+  overflow: hidden;
+}
+
+.opinion-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.answer-preview p {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 /* ✅ リアクション専用スピナー - アイコン色と整合性を保つ */
 .like-btn.loading::after {
