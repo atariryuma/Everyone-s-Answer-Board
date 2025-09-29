@@ -298,6 +298,9 @@
           document.getElementById('current-user-email').textContent = adminData.userInfo.email;
           document.getElementById('current-user-id').textContent = adminData.userInfo.userId || 'N/A';
         }
+
+        // ✅ 初期化時に設定情報とリソースボタンを更新
+        updatePanel(systemState.config);
       } catch (error) {
         console.warn('Batched admin data loading failed:', error);
       }

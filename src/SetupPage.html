@@ -47,7 +47,7 @@
     <div class="max-w-2xl mx-auto">
       <!-- ヘッダー -->
       <div class="text-center mb-6">
-        <h1 class="text-4xl font-bold text-cyan-400 mb-2">📚 StudyQuest</h1>
+        <h1 class="text-4xl font-bold text-cyan-400 mb-2">📚 みんなの回答ボード</h1>
         <p class="text-xl text-gray-300">初回セットアップ</p>
         <p class="text-sm text-gray-400 mt-2">システムを使用開始するための設定を行います</p>
       </div>
@@ -170,7 +170,7 @@
             onclick="startApp()"
             class="inline-block btn bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold py-2 px-4 rounded-lg"
           >
-            📚 StudyQuestを開始
+            📚 みんなの回答ボードを開始
           </button>
         </div>
       </div>
@@ -384,7 +384,7 @@
       function startApp() {
         // 通知トーストで遷移をユーザーに知らせる
         if (window.notifications) {
-          window.notifications.info('📚 StudyQuestを開始しています...', 2000);
+          window.notifications.info('📚 みんなの回答ボードを開始しています...', 2000);
         }
 
         google.script.run

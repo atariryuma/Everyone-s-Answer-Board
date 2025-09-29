@@ -171,129 +171,6 @@
   </div>
 </div>
 
-<!-- 6時間自動停止確認モーダル -->
-<div
-  id="auto-stop-confirmation-modal"
-  class="fixed inset-0 bg-black/80 z-[10001] hidden flex items-center justify-center"
-  role="dialog"
-  aria-modal="true"
->
-  <div class="flex items-center justify-center min-h-full p-4">
-    <div class="glass-panel rounded-xl p-6 max-w-md w-full">
-      <div class="flex items-center gap-3 mb-4">
-        <span id="success-check-icon" class="text-green-400"></span>
-        <h3 class="text-xl font-bold text-green-400">📋 公開完了</h3>
-      </div>
-
-      <div class="space-y-4 text-gray-300">
-        <p class="text-center text-gray-200">回答ボードが正常に公開されました。</p>
-
-        <!-- 自動停止機能の詳細 -->
-        <div class="bg-blue-500/10 border border-blue-400/30 rounded-lg p-4">
-          <h4 class="text-sm font-semibold text-blue-400 mb-3 flex items-center gap-2">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-              ></path>
-            </svg>
-            ⏰ 自動停止設定
-          </h4>
-          <div class="space-y-3 text-sm text-blue-200">
-            <div class="grid grid-cols-1 gap-2">
-              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                <span class="text-gray-400 text-xs">公開開始時間:</span>
-                <span id="publish-start-time" class="font-medium text-blue-100 text-sm"
-                  >確認中...</span
-                >
-              </div>
-              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                <span class="text-gray-400 text-xs">自動停止予定:</span>
-                <span id="auto-stop-time" class="font-medium text-yellow-100 text-sm"
-                  >確認中...</span
-                >
-              </div>
-              <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1">
-                <span class="text-gray-400 text-xs">残り時間:</span>
-                <span id="remaining-time" class="font-medium text-green-100 text-sm"
-                  >確認中...</span
-                >
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- URL生成状態表示 -->
-        <div
-          id="url-status-section"
-          class="bg-green-500/10 border border-green-400/30 rounded-lg p-3"
-        >
-          <div class="flex items-center gap-2 mb-2">
-            <svg
-              class="w-4 h-4 text-green-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 1 0 5.656 5.656l1.102-1.101m-.758-4.899a4 4 0 0 0 5.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-              ></path>
-            </svg>
-            <span id="url-status-text" class="text-sm font-medium text-green-200"
-              >✅ URL生成済み</span
-            >
-          </div>
-          <p id="url-preview" class="text-xs text-green-100 font-mono break-all">確認中...</p>
-        </div>
-
-        <div class="bg-yellow-500/10 border border-yellow-400/30 rounded-lg p-3">
-          <p class="text-sm text-yellow-200 leading-relaxed">
-            <strong>⚠️ 重要:</strong>
-            6時間後に自動的に公開が停止されます。学習者の回答期間を考慮して適切に管理してください。
-          </p>
-        </div>
-      </div>
-
-      <div class="flex flex-col sm:flex-row justify-end gap-3 mt-6">
-        <button
-          type="button"
-          id="extend-time-btn"
-          class="btn btn-secondary flex items-center justify-center gap-2"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M12 8v4l3 3m6-3a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"
-            ></path>
-          </svg>
-          時間延長
-        </button>
-        <button
-          type="button"
-          id="confirm-auto-stop-btn"
-          class="btn btn-primary flex items-center justify-center gap-2"
-        >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2"
-              d="M5 13l4 4L19 7"
-            ></path>
-          </svg>
-          確認
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
 
 <!-- プライバシーモーダル -->
 <div
@@ -1129,7 +1006,6 @@
         'form-config-modal',
         'security-details-modal',
         'google-integration-modal',
-        'auto-stop-confirmation-modal',
         'quickstart-stop-confirmation-modal',
         'custom-setup-selection-modal',
       ]);
