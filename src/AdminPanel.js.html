@@ -1369,13 +1369,22 @@
     // 🤖 AI列判定ボタンの状態管理
     const aiAnalyzeBtn = document.getElementById('ai-analyze-btn');
     if (aiAnalyzeBtn) {
-      if (hasSpreadsheetConfig) {
+      // より正確な判定基準：スプレッドシート接続 + ヘッダーデータの存在
+      const hasHeaders = Array.isArray(window.currentHeaders) && window.currentHeaders.length > 0;
+      const hasDropdownOptions = document.querySelectorAll('#answer-column-select option').length > 1; // "未選択"以外のオプション
+      const canAnalyze = hasSpreadsheetConfig && (hasHeaders || hasDropdownOptions);
+
+      if (canAnalyze) {
         aiAnalyzeBtn.disabled = false;
         aiAnalyzeBtn.textContent = '🤖 AI列判定';
         aiAnalyzeBtn.classList.remove('opacity-50');
       } else {
         aiAnalyzeBtn.disabled = true;
-        aiAnalyzeBtn.textContent = '🤖 AI列判定（データソース接続が必要）';
+        if (!hasSpreadsheetConfig) {
+          aiAnalyzeBtn.textContent = '🤖 AI列判定（データソース接続が必要）';
+        } else {
+          aiAnalyzeBtn.textContent = '🤖 AI列判定（ヘッダー取得が必要）';
+        }
         aiAnalyzeBtn.classList.add('opacity-50');
       }
     }
