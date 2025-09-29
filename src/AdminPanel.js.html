@@ -1285,9 +1285,13 @@
     if (!config) {
       spreadsheetBtn.disabled = true;
       spreadsheetBtn.dataset.spreadsheetId = '';
+      spreadsheetBtn.classList.add('opacity-50');
       formBtn.classList.add('hidden');
       if (boardBtn) boardBtn.classList.add('hidden');
-      statusDiv.textContent = '設定が見つかりません';
+      if (statusDiv) {
+        statusDiv.textContent = '';
+        statusDiv.className = 'hidden';
+      }
 
       // 下書き保存・公開ボタンを無効化
       if (saveDraftBtn) {
@@ -1370,18 +1374,10 @@
       }
     }
 
-    // ステータス更新
-    let statusParts = [];
-    if (config.spreadsheetId) statusParts.push('📊 スプレッドシート');
-    if (config.formUrl) statusParts.push('📝 フォーム');
-    if (config.isPublished) statusParts.push('🎯 ボード');
-
-    if (statusParts.length > 0) {
-      statusDiv.textContent = '✅ 利用可能: ' + statusParts.join(', ');
-      statusDiv.className = 'text-xs text-green-400 mt-2 text-center';
-    } else {
-      statusDiv.textContent = '💡 リソースの設定を開始してください';
-      statusDiv.className = 'text-xs text-yellow-400 mt-2 text-center';
+    // ✅ シンプル化: ボタンの表示/非表示で状態は十分表現されているため、冗長なステータス表示を削除
+    if (statusDiv) {
+      statusDiv.textContent = '';
+      statusDiv.className = 'hidden';
     }
 
     // 🤖 AI列判定ボタンの状態管理
