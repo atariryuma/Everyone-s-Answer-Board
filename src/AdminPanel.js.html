@@ -1,30 +1,19 @@
 <script>
   // Safe template variable extraction from data attributes
   let __USER_ID__ = '';
-  let __CONFIG_JSON__ = '{}';
 
   try {
     const appData = document.getElementById('app-data');
     if (appData) {
       __USER_ID__ = appData.getAttribute('data-user-id') || '';
-      __CONFIG_JSON__ = appData.getAttribute('data-config-json') || '{}';
     }
   } catch (error) {
     __USER_ID__ = '';
-    __CONFIG_JSON__ = '{}';
   }
 
-  // Unified Configuration Parsing - CLAUDE.md Compliant
+  // ✅ Simplified Configuration - No configJSON restoration
   let CONFIG = {};
-  try {
-    if (typeof __CONFIG_JSON__ === 'string' && __CONFIG_JSON__ !== '{}') {
-      CONFIG = JSON.parse(__CONFIG_JSON__);
-    } else {
-      console.warn('Admin Panel: ConfigJSON not available, using default values');
-    }
-  } catch (e) {
-    console.warn('Admin Panel: Failed to parse configJSON:', e);
-  }
+  console.log('Admin Panel: Using fresh state (configJSON restoration disabled)');
 
   // ✅ URLパラメータから userId を取得（最優先）
   function getUrlParameterUserId() {
@@ -38,12 +27,12 @@
   }
 
   // ✅ 実際のターゲットユーザーID（URLパラメータ優先）
-  const TARGET_USER_ID = getUrlParameterUserId() || CONFIG.userId || __USER_ID__;
+  const TARGET_USER_ID = getUrlParameterUserId() || __USER_ID__;
 
-  // Unified Configuration Access Pattern - SharedUtilities使用
+  // Unified Configuration Access Pattern - Fresh state only
   window.UNIFIED_CONFIG = window.sharedUtilities.createUnifiedConfig(
-    CONFIG,
-    {}, // Legacy変数削除 - configJSONで全情報カバー
+    {}, // Empty config - no restoration from configJSON
+    {}, // Legacy変数削除
     {
       targetUserId: TARGET_USER_ID,
       isEditor: true,
@@ -316,7 +305,8 @@
       // ✅ Final UI updates (non-blocking)
       initializeFooterUI();
       initializeEventListeners();
-      updateProgressFromConfig(systemState.config);
+      // Initialize progress to step 1 (fresh state)
+      updateProgress(1);
 
     } catch (error) {
       console.error('Batched admin panel initialization error:', error);
@@ -1158,34 +1148,6 @@
     return sanitized;
   }
 
-  // 進捗ステップを設定から更新
-  function updateProgressFromConfig(config) {
-    try {
-      let currentStep = 1;
-
-      if (config.sheetName && config.spreadsheetId) {
-        currentStep = 2; // データソース接続完了
-      }
-
-      if (config.columnMapping && Object.keys(config.columnMapping).length > 0) {
-        currentStep = 3; // 列設定完了
-      }
-
-      if (config.setupStatus === 'completed') {
-        currentStep = 3; // セットアップ完了確定
-      }
-
-      // ✅ CLAUDE.md準拠: 統一された完了判定ロジック（ボタン状態更新と同じ）- シンプル構造対応
-      const hasSpreadsheetConfig = Boolean(config.spreadsheetId && config.sheetName);
-      const hasColumnMapping = Boolean(config.columnMapping && Object.keys(config.columnMapping).length > 0);
-      const setupComplete = config.setupStatus === 'completed' || (hasSpreadsheetConfig && hasColumnMapping);
-
-      
-      updateProgress(currentStep);
-    } catch (error) {
-      console.warn('updateProgressFromConfig error:', error);
-    }
-  }
 
   // 非同期版の補助関数群
   function loadSheets(spreadsheetId) {
@@ -3588,11 +3550,8 @@
     // 表示用に検証結果を描画
     displayVerificationResults({ ok: true });
 
-    // 設定を保存（✅ CLAUDE.md準拠: シンプル構造で直接送信）
-    saveColumnConfig(spreadsheetId, sheetName, headers, columnMapping, confidence);
-
-    showSuccess('列マッピングの検証が完了しました');
-    updateProgress(3);
+    // ✅ 検証専用に変更：保存処理は下書き保存・公開ボタンで実行
+    showSuccess('✅ 列マッピング検証完了');
     window.setLoading(false);
     ClientMutex.release('verifyColumnMapping');
   }
@@ -4107,71 +4066,201 @@
     }
   }
 
-  // 下書き保存
+  // ✅ 列設定検証付きconfig取得関数
+  function getValidatedConfig() {
+    try {
+      // 基本設定取得
+      const config = getConfig();
+
+      // スプレッドシート接続の確認
+      if (!config.spreadsheetId || !config.sheetName) {
+        return {
+          config: null,
+          validationError: 'データソースが接続されていません。まずスプレッドシートとシートを接続してください。'
+        };
+      }
+
+      // 列マッピングの検証
+      const columnMapping = getColumnMapping();
+      if (!columnMapping.answer && columnMapping.answer !== 0) {
+        return {
+          config: null,
+          validationError: '回答列が設定されていません。列マッピングで回答列を設定してください。'
+        };
+      }
+
+      // ヘッダー情報の取得・確認
+      let headers = Array.isArray(window.currentHeaders) ? window.currentHeaders : [];
+      if (!headers.length) {
+        const options = document.querySelectorAll('#answer-column-select option');
+        headers = Array.from(options)
+          .map((opt) => {
+            const txt = opt.textContent || '';
+            const parts = txt.split(': ');
+            return parts.length > 1 ? parts.slice(1).join(': ') : '';
+          })
+          .filter(Boolean);
+      }
+
+      // 信頼度データの収集
+      const confidence = {};
+      ['answer', 'reason', 'class', 'name'].forEach((key) => {
+        if (typeof columnMapping[key] === 'number') {
+          const confidenceElement = document.getElementById(key + '-confidence');
+          if (confidenceElement && !confidenceElement.classList.contains('hidden')) {
+            const badge = confidenceElement.querySelector('.confidence-badge');
+            if (badge) {
+              const confidenceText = badge.textContent;
+              const match = confidenceText.match(/(\d+)%/);
+              if (match) {
+                confidence[key] = parseInt(match[1]);
+              }
+            }
+          }
+        }
+      });
+
+      // 設定の統合
+      const timestamp = new Date().toISOString();
+      const validatedConfig = {
+        ...config,
+        headers: headers,
+        columnMapping: columnMapping,
+        confidence: confidence,
+        verifiedAt: timestamp,
+        setupComplete: true,
+        setupStatus: 'completed'
+      };
+
+      return { config: validatedConfig, validationError: null };
+
+    } catch (error) {
+      console.error('設定検証エラー:', error);
+      return {
+        config: null,
+        validationError: '設定の検証中にエラーが発生しました: ' + error.message
+      };
+    }
+  }
+
+  // 下書き保存（列設定検証・フォーム連携統合版）
   function saveDraft() {
     if (!ClientMutex.acquire('saveDraft')) {
       showInfo('保存処理を実行中です…');
       return;
     }
-    const config = getConfig();
 
-    window.setLoading(true, '処理中...');
-    google.script.run
-      .withSuccessHandler(function (result) {
-        if (result.success) {
-          showSuccess('下書きを保存しました');
+    try {
+      // ✅ 列設定の検証と取得
+      const { config, validationError } = getValidatedConfig();
+      if (validationError) {
+        showError(validationError);
+        ClientMutex.release('saveDraft');
+        return;
+      }
 
-          // ✅ 論理的整合性: 保存後は最新config情報で更新
-          systemState.config = { ...systemState.config, ...result.config };
-          updateResourceButtons(systemState.config);
-          updateConfigSummary(systemState.config);
+      window.setLoading(true, '設定を保存中...');
 
-          // ETag更新 - 楽観的ロック機構
-          if (result.etag || result.config?.etag) {
-            systemState.config.etag = result.etag || result.config.etag;
+      // ✅ フォーム連携処理（既存コードを統合）
+      if (!config.formUrl && config.spreadsheetId && config.sheetName) {
+        google.script.run
+          .withSuccessHandler(function(formResult) {
+            if (formResult.success && formResult.formData && formResult.formData.formUrl) {
+              config.formUrl = formResult.formData.formUrl;
+              config.formTitle = formResult.formData.formTitle;
+            }
+            executeDraftSave(config);
+          })
+          .withFailureHandler(function(error) {
+            console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
+            executeDraftSave(config);
+          })
+          .getFormInfo(config.spreadsheetId, config.sheetName);
+      } else {
+        executeDraftSave(config);
+      }
+
+    } catch (error) {
+      console.error('下書き保存準備エラー:', error);
+      showError('設定の準備に失敗しました: ' + error.message);
+      ClientMutex.release('saveDraft');
+    }
+
+    function executeDraftSave(finalConfig) {
+      google.script.run
+        .withSuccessHandler(function (result) {
+          if (result.success) {
+            showSuccess('下書きを保存しました');
+
+            // ✅ 論理的整合性: 保存後は最新config情報で更新
+            systemState.config = { ...systemState.config, ...result.config };
+            updateResourceButtons(systemState.config);
+            updateConfigSummary(systemState.config);
+
+            // ETag更新 - 楽観的ロック機構
+            if (result.etag || result.config?.etag) {
+              systemState.config.etag = result.etag || result.config.etag;
+            }
+          } else {
+            showError(result.message || result.error || '設定の保存に失敗しました');
           }
-        } else {
-          showError(result.message || result.error || '設定の保存に失敗しました');
-        }
-        window.setLoading(false);
-        ClientMutex.release('saveDraft');
-      })
-      .withFailureHandler(function (error) {
-        console.error('保存エラー:', error);
-        showError('下書きの保存に失敗しました');
-        window.setLoading(false);
-        ClientMutex.release('saveDraft');
-      })
-      .saveConfig(config, { isDraft: true });
+          window.setLoading(false);
+          ClientMutex.release('saveDraft');
+        })
+        .withFailureHandler(function (error) {
+          console.error('保存エラー:', error);
+          showError('下書きの保存に失敗しました');
+          window.setLoading(false);
+          ClientMutex.release('saveDraft');
+        })
+        .saveConfig(finalConfig, { isDraft: true });
+    }
   }
 
-  // アプリ公開（getConfig依存を削除して重複保存防止版）
+  // アプリ公開（列設定検証・フォーム連携統合版）
   function publishApp() {
     if (!ClientMutex.acquire('publishApp')) {
       showInfo('公開処理を実行中です…');
       return;
     }
 
-    window.setLoading(true, '処理中...');
-
     try {
-      // 🔧 UI状態から完全な設定データを収集
-      const config = getConfig();
-
-
-      if (!config || !config.spreadsheetId) {
-        console.error('❌ publishApp: UI設定データが不完全:', {
-          hasConfig: !!config,
-          hasSpreadsheetId: !!(config?.spreadsheetId),
-        });
-        showError('まずデータソースを設定してください。');
-        window.setLoading(false);
+      // ✅ 列設定の検証と取得
+      const { config, validationError } = getValidatedConfig();
+      if (validationError) {
+        showError(validationError);
         ClientMutex.release('publishApp');
         return;
       }
 
-      // 🚀 完全な設定データを使用（getConfig()の結果を完全信頼）
-      const publishConfig = config;
+      window.setLoading(true, 'アプリを公開中...');
+
+      // ✅ フォーム連携処理（既存コードを統合）
+      if (!config.formUrl && config.spreadsheetId && config.sheetName) {
+        google.script.run
+          .withSuccessHandler(function(formResult) {
+            if (formResult.success && formResult.formData && formResult.formData.formUrl) {
+              config.formUrl = formResult.formData.formUrl;
+              config.formTitle = formResult.formData.formTitle;
+            }
+            executePublish(config);
+          })
+          .withFailureHandler(function(error) {
+            console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
+            executePublish(config);
+          })
+          .getFormInfo(config.spreadsheetId, config.sheetName);
+      } else {
+        executePublish(config);
+      }
+
+    } catch (error) {
+      console.error('公開準備エラー:', error);
+      showError('公開の準備に失敗しました: ' + error.message);
+      ClientMutex.release('publishApp');
+    }
+
+    function executePublish(publishConfig) {
 
 
       // 完全な設定でpublishAppを呼び出し
@@ -4241,12 +4330,6 @@
           ClientMutex.release('publishApp');
         })
         .publishApp(publishConfig);
-
-    } catch (error) {
-      console.error('❌ publishApp: UI設定収集エラー:', error);
-      showError('設定の収集に失敗しました: ' + error.message);
-      window.setLoading(false);
-      ClientMutex.release('publishApp');
     }
   }
 
@@ -4423,7 +4506,7 @@
       // シート名更新
       const sheetnameElement = document.getElementById('current-sheetname');
       if (sheetnameElement) {
-        // ✅ configJSONの実際のsheetNameを優先使用
+        // ✅ 現在のシート名を取得（APIデータ優先）
         const sheetName = config?.sheetName || systemState.config?.sheetName;
 
         if (sheetName && sheetName.trim()) {
