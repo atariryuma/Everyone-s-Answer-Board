@@ -893,7 +893,7 @@ function getLogs(options = {}) {
  * 自分がオーナーのスプレッドシートを30件取得
  */
 function getSheets() {
-  const files = DriveApp.getFilesByType(MimeType.GOOGLE_SHEETS);
+  const files = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
   const sheets = [];
 
   while (files.hasNext() && sheets.length < 30) {

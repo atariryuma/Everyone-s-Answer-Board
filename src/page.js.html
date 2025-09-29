@@ -2627,7 +2627,7 @@ class StudyQuestApp {
     return newReactionCount !== oldReactionCount ||
            newData.highlight !== oldData.highlight ||
            newData.opinion !== oldData.opinion ||
-           this.validateReasonText(newData.reason) !== this.validateReasonText(oldData.reason) ||
+           newData.reason !== oldData.reason ||
            newData.name !== oldData.name;
   }
   
@@ -2683,6 +2683,27 @@ class StudyQuestApp {
     if (!card || !newData) return;
 
     try {
+      // 理由の有無状態が変化した場合はカード全体を再構築
+      const oldHasReason = oldData && oldData.reason && oldData.reason.trim();
+      const newHasReason = newData.reason && newData.reason.trim();
+
+      if (oldHasReason !== newHasReason) {
+        // 理由の有無状態変化：カード全体を再構築
+        debugLog('🔄 updateAnswerCard: 理由の有無状態が変化したため、カードを再構築します', {
+          oldHasReason: Boolean(oldHasReason),
+          newHasReason: Boolean(newHasReason),
+          rowIndex: newData.rowIndex
+        });
+
+        // カードを完全に再作成して置き換え
+        const newCard = this.createAnswerCard(newData);
+        if (newCard && card.parentNode) {
+          card.parentNode.replaceChild(newCard, card);
+        }
+        return;
+      }
+
+      // 通常の更新処理（理由の有無状態は同じ）
       if (!oldData || oldData.opinion !== newData.opinion) {
         const opinionElement = card.querySelector('.opinion-text');
         if (opinionElement) {
@@ -2690,10 +2711,11 @@ class StudyQuestApp {
         }
       }
 
-      if (!oldData || this.validateReasonText(oldData.reason) !== this.validateReasonText(newData.reason)) {
+      // 理由がある場合のみ理由エリアを更新
+      if (newHasReason && (!oldData || oldData.reason !== newData.reason)) {
         const reasonElement = card.querySelector('.answer-preview p');
         if (reasonElement) {
-          reasonElement.textContent = newData.reason || '';
+          reasonElement.textContent = newData.reason;
         }
       }
 
@@ -2844,11 +2866,11 @@ class StudyQuestApp {
       return null;
     }
 
-    if (!data.opinion && !data.reason) {
-      warnLog('createAnswerCard: データにコンテンツ（opinion/reason）がありません:', {
+    // 回答（opinion）がない場合のみ警告を出す（理由のみなしは正常なケース）
+    if (!data.opinion) {
+      warnLog('createAnswerCard: 回答データ（opinion）がありません:', {
         rowIndex: data.rowIndex,
         hasOpinion: !!data.opinion,
-        hasReason: !!data.reason,
         dataKeys: Object.keys(data)
       });
     }
@@ -2986,12 +3008,15 @@ class StudyQuestApp {
     opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
     opinionTitle.textContent = safeData.opinion || '（回答内容が取得できませんでした）';
 
-    const reasonText = document.createElement('p');
-    reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
-    reasonText.textContent = safeData.reason || '（理由・詳細情報なし）';
-
     contentDiv.appendChild(opinionTitle);
-    contentDiv.appendChild(reasonText);
+
+    // 理由データがある場合のみ理由エリアを作成
+    if (safeData.reason && safeData.reason.trim()) {
+      const reasonText = document.createElement('p');
+      reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
+      reasonText.textContent = safeData.reason;
+      contentDiv.appendChild(reasonText);
+    }
 
     // Create footer
     const footerDiv = document.createElement('div');
@@ -4932,7 +4957,15 @@ class StudyQuestApp {
       reason: data.reason?.substring(0, 50) + '...'
     });
     this.state.lastFocusedElement = document.activeElement;
-    this.elements.modalAnswer.innerHTML = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>' + '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason || '') + '</p>';
+    // モーダル内容の条件付き構築
+    let modalHtml = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
+
+    // 理由データがある場合のみ理由部分を追加
+    if (data.reason && data.reason.trim()) {
+      modalHtml += '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
+    }
+
+    this.elements.modalAnswer.innerHTML = modalHtml;
     const showName = this.state.displayMode === 'named';
     let modalDisplayName = '';
     

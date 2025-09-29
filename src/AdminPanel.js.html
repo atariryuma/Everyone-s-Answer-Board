@@ -1070,19 +1070,30 @@
         }
       }
 
-      // 6. フォーム情報の反映
-      if (config.formUrl) {
-        const formUrlDisplay = document.getElementById('form-url');
-        if (formUrlDisplay) {
+      // 6. フォーム情報の反映（プレースホルダー対応）
+      const formUrlDisplay = document.getElementById('form-url');
+      if (formUrlDisplay) {
+        if (config.formUrl) {
           formUrlDisplay.textContent = config.formUrl;
           formUrlDisplay.href = config.formUrl;
+          formUrlDisplay.className = 'text-sm text-white';
+        } else {
+          // ✅ プレースホルダーを表示
+          formUrlDisplay.textContent = '未設定';
+          formUrlDisplay.href = '#';
+          formUrlDisplay.className = 'text-sm text-gray-400';
         }
       }
 
-      if (config.formTitle) {
-        const formTitleDisplay = document.getElementById('form-title');
-        if (formTitleDisplay) {
+      const formTitleDisplay = document.getElementById('form-title');
+      if (formTitleDisplay) {
+        if (config.formTitle) {
           formTitleDisplay.textContent = config.formTitle;
+          formTitleDisplay.className = 'text-sm text-white';
+        } else {
+          // ✅ プレースホルダーを表示
+          formTitleDisplay.textContent = '未設定';
+          formTitleDisplay.className = 'text-sm text-gray-400';
         }
       }
 
@@ -1219,34 +1230,7 @@
 
 
 
-  // ========== リソースボタン関連関数 ==========
-
-  // スプレッドシートを新タブで開く
-  function openSpreadsheet() {
-    const btn = document.getElementById('open-spreadsheet-btn');
-    const spreadsheetId = btn.dataset.spreadsheetId;
-
-    if (!spreadsheetId) {
-      showError('スプレッドシートを選択してください');
-      return;
-    }
-
-    const spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + spreadsheetId + '/edit';
-    window.open(spreadsheetUrl, '_blank');
-  }
-
-  // フォームを新タブで開く
-  function openForm() {
-    const btn = document.getElementById('open-form-btn');
-    const formUrl = btn.dataset.formUrl;
-
-    if (!formUrl) {
-      showError('フォームURLを入力してください');
-      return;
-    }
-
-    window.open(formUrl, '_blank');
-  }
+  // ✅ 削除: 重複関数削除 - updateResourceButtons()内で直接管理
 
   // ✅ 使い方ガイドを新タブで開く (CLAUDE.md準拠: シンプル&効率的)
   function openManualGuide() {
@@ -1277,33 +1261,21 @@
     const boardBtn = document.getElementById('open-board-btn');
     const statusDiv = document.getElementById('resource-status');
 
+    // 🔍 デバッグ: 開発環境でのみリソースボタン状態ログを出力
+    if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
+      console.log('🔍 updateResourceButtons 呼び出し:', {
+        spreadsheetId: config?.spreadsheetId,
+        formUrl: config?.formUrl,
+        isPublished: config?.isPublished,
+        hasConfig: !!config
+      });
+    }
+
     // 🎯 下書き保存・公開ボタンの状態管理
     const saveDraftBtn = document.getElementById('save-draft');
     const publishNowBtn = document.getElementById('publish-now');
 
-    // 設定が無い場合の初期状態
-    if (!config) {
-      spreadsheetBtn.disabled = true;
-      spreadsheetBtn.dataset.spreadsheetId = '';
-      spreadsheetBtn.classList.add('opacity-50');
-      formBtn.classList.add('hidden');
-      if (boardBtn) boardBtn.classList.add('hidden');
-      if (statusDiv) {
-        statusDiv.textContent = '';
-        statusDiv.className = 'hidden';
-      }
-
-      // 下書き保存・公開ボタンを無効化
-      if (saveDraftBtn) {
-        saveDraftBtn.disabled = true;
-        saveDraftBtn.textContent = '下書き保存（設定未完了）';
-      }
-      if (publishNowBtn) {
-        publishNowBtn.disabled = true;
-        publishNowBtn.textContent = '今すぐ公開（設定未完了）';
-      }
-      return;
-    }
+    // ✅ 削除: 冗長な早期リターンを削除 - 後続の統一ロジックで全ケース対応
 
     // 🚀 列マッピング完了状態の判定 - ✅ CLAUDE.md準拠: シンプル構造対応
     const hasColumnMapping = !!(config.columnMapping && Object.keys(config.columnMapping).length > 0);
@@ -1343,25 +1315,34 @@
       }
     }
 
-    // スプレッドシートボタンの状態管理
-    if (config.spreadsheetId) {
-      spreadsheetBtn.disabled = false;
-      spreadsheetBtn.dataset.spreadsheetId = config.spreadsheetId;
-      spreadsheetBtn.classList.remove('opacity-50');
-    } else {
-      spreadsheetBtn.disabled = true;
-      spreadsheetBtn.dataset.spreadsheetId = '';
-      spreadsheetBtn.classList.add('opacity-50');
+    // スプレッドシートボタンの状態管理（論理的破綻修正）
+    const hasSpreadsheet = !!(config && config.spreadsheetId);
+    spreadsheetBtn.disabled = !hasSpreadsheet;
+    spreadsheetBtn.dataset.spreadsheetId = hasSpreadsheet ? config.spreadsheetId : '';
+
+    // ✅ 安全なクラス管理: toggle方式で重複蓄積を防止
+    spreadsheetBtn.classList.toggle('opacity-50', !hasSpreadsheet);
+
+    // ✅ シンプルな有効時のみクリックハンドラー設定
+    if (hasSpreadsheet) {
+      spreadsheetBtn.onclick = () => {
+        window.open('https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit', '_blank');
+      };
     }
 
-    // フォームボタン（有効なフォームURLが設定されている場合に表示）
-    const shouldShowForm = config.formUrl && isValidFormUrl(config.formUrl);
-    if (shouldShowForm) {
-      formBtn.classList.remove('hidden');
-      formBtn.disabled = false;
-      formBtn.dataset.formUrl = config.formUrl;
-    } else {
-      formBtn.classList.add('hidden');
+    // フォームボタンの状態管理（スプレッドシートボタンと完全に同じパターン）
+    const hasForm = !!(config && config.formUrl && isValidFormUrl(config.formUrl));
+    formBtn.disabled = !hasForm;
+    formBtn.dataset.formUrl = hasForm ? config.formUrl : '';
+
+    // ✅ 安全なクラス管理: toggle方式でスプレッドシートボタンと統一
+    formBtn.classList.toggle('opacity-50', !hasForm);
+
+    // ✅ シンプルな有効時のみクリックハンドラー設定
+    if (hasForm) {
+      formBtn.onclick = () => {
+        window.open(config.formUrl, '_blank');
+      };
     }
 
     // ボードボタン（公開済みの場合に表示）
@@ -4266,13 +4247,17 @@
 
       window.setLoading(true, '設定を保存中...');
 
-      // ✅ フォーム連携処理（既存コードを統合）
+      // ✅ フォーム連携処理（状態同期改善）
       if (!config.formUrl && config.spreadsheetId && config.sheetName) {
         google.script.run
           .withSuccessHandler(function(formResult) {
             if (formResult.success && formResult.formData && formResult.formData.formUrl) {
               config.formUrl = formResult.formData.formUrl;
               config.formTitle = formResult.formData.formTitle;
+
+              // 🔧 状態同期修正: systemState.configを即座に更新
+              systemState.config = { ...systemState.config, ...config };
+              updateResourceButtons(systemState.config);
             }
             executeDraftSave(config);
           })
@@ -4340,13 +4325,17 @@
 
       window.setLoading(true, 'アプリを公開中...');
 
-      // ✅ フォーム連携処理（既存コードを統合）
+      // ✅ フォーム連携処理（状態同期改善）
       if (!config.formUrl && config.spreadsheetId && config.sheetName) {
         google.script.run
           .withSuccessHandler(function(formResult) {
             if (formResult.success && formResult.formData && formResult.formData.formUrl) {
               config.formUrl = formResult.formData.formUrl;
               config.formTitle = formResult.formData.formTitle;
+
+              // 🔧 状態同期修正: systemState.configを即座に更新
+              systemState.config = { ...systemState.config, ...config };
+              updateResourceButtons(systemState.config);
             }
             executePublish(config);
           })
@@ -4563,130 +4552,56 @@
     }
   }
 
-  // ✅ V8ランタイム準拠: グローバルスコープでの変数初期化（重複実行防止機能付き）
-  var lastConfigUpdate = null;  // V8ランタイム安全性: varによる適切な初期化
+  // ✅ 削除: 不要な重複実行防止機構を削除
 
   function updateConfigSummary(config) {
-    try {
-      // V8ランタイム安全性: configの存在確認
-      if (!config) {
-        console.warn('updateConfigSummary: config is null or undefined');
-        return;
+    if (!config) return;
+
+    // 公開状態バッジ更新
+    const isPublished = Boolean(config.isPublished);
+    const publishBadge = document.getElementById('app-publish-status');
+    if (publishBadge) {
+      if (isPublished) {
+        publishBadge.className = 'status-badge published';
+        publishBadge.textContent = '公開中';
+      } else {
+        publishBadge.className = 'status-badge unpublished';
+        publishBadge.textContent = '未公開';
       }
+    }
 
-      // V8ランタイム安全性: lastConfigUpdate変数の確実な初期化
-      if (typeof lastConfigUpdate === 'undefined') {
-        lastConfigUpdate = null;
+
+    // シート名更新
+    const sheetnameElement = document.getElementById('current-sheetname');
+    if (sheetnameElement) {
+      const sheetName = config.sheetName;
+      if (sheetName) {
+        sheetnameElement.textContent = sheetName;
+        sheetnameElement.className = 'text-sm text-white';
+      } else {
+        sheetnameElement.textContent = '未設定';
+        sheetnameElement.className = 'text-sm text-gray-400';
       }
+    }
 
-      // 同一の設定データでの重複実行を防ぐ
-      const configHash = JSON.stringify({
-        isPublished: config.isPublished || false,
-        spreadsheetId: config.spreadsheetId || '',
-        spreadsheetName: config.spreadsheetName || '',
-        sheetName: config.sheetName || '',
-        lastModified: systemState.user?.lastModified || ''
-      });
-
-      // V8ランタイム安全性: lastConfigUpdateの存在確認
-      if (lastConfigUpdate !== null && lastConfigUpdate === configHash) {
-        return;
+    // 最終更新時刻更新
+    const timeElement = document.getElementById('last-updated-time');
+    if (timeElement) {
+      const lastModified = systemState.user?.lastModified || config.lastModified;
+      if (lastModified) {
+        const date = new Date(lastModified);
+        timeElement.textContent = date.toLocaleString('ja-JP', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+        });
+        timeElement.className = 'text-sm text-white';
+      } else {
+        timeElement.textContent = '--:--';
+        timeElement.className = 'text-sm text-gray-400';
       }
-      lastConfigUpdate = configHash;
-
-      // ✅ CLAUDE.md準拠: Simple boolean check without over-engineering
-      const isPublished = Boolean(config?.isPublished || config?.isActive);
-      const publishBadge = document.getElementById('app-publish-status');
-      if (publishBadge) {
-        if (isPublished) {
-          publishBadge.className = 'status-badge published';
-          publishBadge.textContent = '公開中';
-        } else {
-          publishBadge.className = 'status-badge unpublished';
-          publishBadge.textContent = '未公開';
-        }
-      }
-
-
-      // シート名更新
-      const sheetnameElement = document.getElementById('current-sheetname');
-      if (sheetnameElement) {
-        // ✅ 現在のシート名を取得（APIデータ優先）
-        const sheetName = config?.sheetName || systemState.config?.sheetName;
-
-        if (sheetName && sheetName.trim()) {
-          sheetnameElement.textContent = sheetName;
-          sheetnameElement.className = 'text-sm text-white';
-          sheetnameElement.parentElement.style.display = '';
-        } else {
-          // シート名がない場合は要素自体を非表示
-          sheetnameElement.parentElement.style.display = 'none';
-        }
-      }
-
-      // displaySettings UIチェックボックスの更新
-      if (config.displaySettings) {
-        const showNamesCheckbox = document.getElementById('show-names');
-        const showReactionsCheckbox = document.getElementById('show-reactions');
-
-        if (showNamesCheckbox) {
-          showNamesCheckbox.checked = Boolean(config.displaySettings.showNames);
-        }
-        if (showReactionsCheckbox) {
-          showReactionsCheckbox.checked = Boolean(config.displaySettings.showReactions);
-        }
-      }
-
-      // 最終更新時刻更新
-      const timeElement = document.getElementById('last-updated-time');
-      if (timeElement) {
-        // ✅ Optimized: Use database lastModified instead of config lastModified
-        const lastModified = systemState.user?.lastModified || config?.lastModified;
-
-        if (lastModified) {
-          const date = new Date(lastModified);
-          const timeString = date.toLocaleString('ja-JP', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-          });
-          timeElement.textContent = timeString;
-          timeElement.className = 'text-sm text-white';
-          timeElement.parentElement.style.display = '';
-        } else {
-          // タイムスタンプがない場合は要素自体を非表示
-          timeElement.parentElement.style.display = 'none';
-        }
-      }
-
-      // スプレッドシートリンク更新（リソースセクション用）
-      const openSheetBtn = document.getElementById('open-spreadsheet-btn');
-      if (openSheetBtn && config?.spreadsheetId) {
-        openSheetBtn.disabled = false;
-        openSheetBtn.onclick = () => {
-          const spreadsheetUrl =
-            'https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit';
-          window.open(spreadsheetUrl, '_blank');
-              };
-        openSheetBtn.style.pointerEvents = 'auto';
-      } else if (openSheetBtn) {
-        openSheetBtn.onclick = (e) => {
-          e.preventDefault();
-          showError('スプレッドシートを選択してください');
-        };
-        openSheetBtn.style.opacity = '0.5';
-        openSheetBtn.style.pointerEvents = 'auto';
-      }
-    } catch (error) {
-      console.error('updateConfigSummary エラー:', error);
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-        name: error.name,
-        config: config ? JSON.stringify(config, null, 2) : 'null'
-      });
     }
   }
 
