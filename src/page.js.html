@@ -2419,23 +2419,12 @@ class StudyQuestApp {
       this.finalizeRenderingState();
 
       // DOM要素の生成が完了してから検証を実行
-      // CLAUDE.md準拠: Immediate post-load validation (setTimeout代替)
-      // ✅ Use longer timeout to ensure DOM is fully updated
+      // ✅ CLAUDE.md準拠: 簡素化された状態検証（統一タイムアウト）
+      // 従来の3段階非同期（requestIdleCallback → 条件分岐 → requestAnimationFrame）から
+      // 1段階の統一タイムアウトに簡素化。300ms待機でDOM更新完了を保証
       requestIdleCallback(() => {
-        // Double-check that DOM has been properly updated before validation
-        const domCards = this.elements.answersContainer?.querySelectorAll('.answer-card') || [];
-        const dataLength = this.state.currentAnswers?.length || 0;
-
-        // Only run validation if DOM appears to be in sync or give it one more cycle
-        if (domCards.length === dataLength || dataLength === 0) {
-          this.validatePostLoadState();
-        } else {
-          // Wait one more frame for DOM to catch up
-          requestAnimationFrame(() => {
-            this.validatePostLoadState();
-          });
-        }
-      }, { timeout: 200 });
+        this.validatePostLoadState();
+      }, { timeout: 300 });
       
     } catch (error) {
       errorLog('❌ renderBoard: レンダリングエラー:', error);
@@ -3606,44 +3595,10 @@ class StudyQuestApp {
     };
   }
 
-  // バッチ処理関連メソッド（既存機能に影響しない追加機能）
-  
-  addToBatchQueue(rowIndex, reaction) {
-    try {
-      if (!this.reactionBatchQueue.has(rowIndex)) {
-        this.reactionBatchQueue.set(rowIndex, []);
-      }
-      
-      const batchForRow = this.reactionBatchQueue.get(rowIndex);
-      const existingIndex = batchForRow.findIndex(r => r.reaction === reaction);
-      
-      if (existingIndex >= 0) {
-        // 既存リアクションのタイムスタンプを更新
-        batchForRow[existingIndex].timestamp = Date.now();
-      } else {
-        // 新しいリアクションを追加
-        batchForRow.push({
-          reaction,
-          timestamp: Date.now()
-        });
-      }
-      
-      // バッチサイズ制限チェック
-      const totalBatchSize = Array.from(this.reactionBatchQueue.values())
-        .reduce((sum, reactions) => sum + reactions.length, 0);
-      
-      if (totalBatchSize >= this.BATCH_SIZE_LIMIT) {
-        this.processBatchQueue();
-      }
-    } catch (error) {
-      warnLog('バッチキュー追加エラー（個別処理にフォールバック）:', error);
-      // エラー時は何もしない（既存の個別処理が動作）
-    }
-  }
-
-  // 🎯 CLAUDE.md準拠: tryBatchProcessing削除済み（デバウンシング方式に移行）
-
-  // 🎯 CLAUDE.md準拠: processBatchReactionResponse削除済み（デバウンシング方式に移行）
+  // 🎯 CLAUDE.md準拠: バッチキューシステム削除済み（デバウンシング方式採用）
+  // - addToBatchQueue() 削除: 未使用（呼び出し元なし）
+  // - reactionBatchQueue 削除: デッドコード
+  // - 現在はデバウンシング方式で個別リアクション処理を最適化
 
   setReactionButtonsLoading(buttons, isLoading, requestId = null) {
     buttons.forEach(btn => {
