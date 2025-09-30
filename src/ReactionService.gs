@@ -21,7 +21,27 @@
 
 
 /**
- * マルチテナント権限検証
+ * マルチテナント権限検証（事前読み込みデータ版）
+ * ✅ CLAUDE.md準拠: DB呼び出しなしの権限チェックでパフォーマンス最適化
+ * @param {string} actorEmail - 操作者
+ * @param {Object} targetUser - 事前取得済みの対象ユーザー
+ * @param {Object} config - 事前取得済みの設定
+ * @returns {boolean} 権限があるかどうか
+ */
+function validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config) {
+  if (!actorEmail || !targetUser) return false;
+
+  // 管理者は全アクセス可能
+  if (isAdministrator(actorEmail)) return true;
+
+  // 公開ボードまたは自分のボードの場合は許可
+  return config.isPublished || targetUser.userEmail === actorEmail;
+}
+
+/**
+ * マルチテナント権限検証（レガシー版 - 後方互換性のため残す）
+ * ⚠️ 非推奨: validateReactionPermissionWithPreloadedData を使用してください
+ * @deprecated Use validateReactionPermissionWithPreloadedData with preloaded data instead
  * @param {string} actorEmail - 操作者
  * @param {string} targetUserId - 対象ユーザーID
  * @returns {boolean} 権限があるかどうか
@@ -304,18 +324,7 @@ function addReaction(targetUserId, rowIndex, reactionType) {
   const actorEmail = getCurrentEmail();
 
   try {
-    // 🛡️ マルチテナント権限検証
-    if (!validateReactionPermission(actorEmail, targetUserId)) {
-      logReactionAudit('reaction_denied', {
-        actor: actorEmail,
-        target: targetUserId,
-        reason: 'access_denied',
-        extra: { reactionType, rowIndex }
-      });
-      return createErrorResponse('Access denied to target board');
-    }
-
-    // ✅ CLAUDE.md準拠: preloadedAuth構築でDB重複アクセス排除
+    // ✅ CLAUDE.md準拠: データ取得を先行して実行（1回のDB呼び出しのみ）
     const isAdmin = isAdministrator(actorEmail);
     const preloadedAuth = { email: actorEmail, isAdmin };
 
@@ -333,6 +342,17 @@ function addReaction(targetUserId, rowIndex, reactionType) {
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Board configuration incomplete');
+    }
+
+    // 🛡️ 事前取得データで権限検証（DB呼び出しなし）
+    if (!validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config)) {
+      logReactionAudit('reaction_denied', {
+        actor: actorEmail,
+        target: targetUserId,
+        reason: 'access_denied',
+        extra: { reactionType, rowIndex }
+      });
+      return createErrorResponse('Access denied to target board');
     }
 
     // 行番号正規化
@@ -422,18 +442,7 @@ function toggleHighlight(targetUserId, rowIndex) {
   const actorEmail = getCurrentEmail();
 
   try {
-    // 🛡️ マルチテナント権限検証
-    if (!validateReactionPermission(actorEmail, targetUserId)) {
-      logReactionAudit('highlight_denied', {
-        actor: actorEmail,
-        target: targetUserId,
-        reason: 'access_denied',
-        extra: { rowIndex }
-      });
-      return createErrorResponse('Access denied to target board');
-    }
-
-    // ✅ CLAUDE.md準拠: preloadedAuth構築でDB重複アクセス排除
+    // ✅ CLAUDE.md準拠: データ取得を先行して実行（1回のDB呼び出しのみ）
     const isAdmin = isAdministrator(actorEmail);
     const preloadedAuth = { email: actorEmail, isAdmin };
 
@@ -451,6 +460,17 @@ function toggleHighlight(targetUserId, rowIndex) {
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Board configuration incomplete');
+    }
+
+    // 🛡️ 事前取得データで権限検証（DB呼び出しなし）
+    if (!validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config)) {
+      logReactionAudit('highlight_denied', {
+        actor: actorEmail,
+        target: targetUserId,
+        reason: 'access_denied',
+        extra: { rowIndex }
+      });
+      return createErrorResponse('Access denied to target board');
     }
 
     const rowNumber = typeof rowIndex === 'string'
