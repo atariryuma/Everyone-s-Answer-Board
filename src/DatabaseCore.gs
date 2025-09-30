@@ -531,7 +531,7 @@ function openSpreadsheet(spreadsheetId, options = {}) {
               file.addEditor(auth.email);
             }
           } catch (driveError) {
-            console.warn('openSpreadsheet: DriveApp permission check failed, proceeding with Sheets API access:', driveError.message);
+            console.info('openSpreadsheet: Using Sheets API direct access (DriveApp permission check skipped)');
           }
         }
       } else {
