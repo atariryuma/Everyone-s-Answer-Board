@@ -397,7 +397,6 @@ class StudyQuestApp {
     try {
       console.log('📝 Initializing form button display...');
       await loadFormLink();
-      console.log('✅ Form button initialization completed');
     } catch (error) {
       console.warn('⚠️ Failed to initialize form button:', error);
     }
@@ -484,7 +483,6 @@ class StudyQuestApp {
       // ✅ Use questionText from unified config instead of legacy template variable
       const initialText = window.UNIFIED_CONFIG?.questionText || '読み込み中...';
       this.elements.headingLabel.textContent = initialText;
-      console.log('✅ Initial heading set from unified config:', initialText);
     }
 
     // Only setup absolutely critical event listeners
@@ -756,13 +754,6 @@ class StudyQuestApp {
         const handleSuccess = (result) => {
           this.activeRequests--;
 
-          // ✅ 成功時の詳細ログ
-          console.log(`✅ handleSuccess for ${funcName}`, {
-            resultValid: result !== null && result !== undefined,
-            resultType: typeof result,
-            cacheKey: !isStateChanging ? cacheKey : 'N/A (state-changing)',
-            timestamp: new Date().toISOString()
-          });
 
           if (!isStateChanging && result !== null && result !== undefined) {
             this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
@@ -809,11 +800,6 @@ class StudyQuestApp {
 
         google.script.run
           .withSuccessHandler((result) => {
-            console.log(`✅ google.script.run success for ${funcName}`, {
-              timestamp: new Date().toISOString(),
-              hasResult: !!result,
-              resultType: typeof result
-            });
 
             // ✅ レスポンス検証強化: null/undefined チェック
             if (result === null || result === undefined) {
@@ -1024,7 +1010,6 @@ class StudyQuestApp {
         }
       }
 
-      console.log('✅ Cache cleared successfully');
     } catch (error) {
       console.warn('⚠️ Cache clear failed:', error.message);
     }
@@ -1359,7 +1344,6 @@ class StudyQuestApp {
           this.cache.clear();
         }
 
-        console.log('✅ Cache cleanup completed:', { cacheSize });
       }
 
       // DOM要素参照のクリア
@@ -1371,7 +1355,6 @@ class StudyQuestApp {
             delete this.elements[key];
           }
         });
-        console.log('✅ DOM references cleaned');
       }
 
       // イベントリスナーの整理
@@ -1384,7 +1367,6 @@ class StudyQuestApp {
           });
         }
 
-        console.log('✅ Event listeners cleaned');
       }
 
       // 仮想スクロール状態の最適化
@@ -1393,14 +1375,12 @@ class StudyQuestApp {
         if (size > 1000) {
           this.virtualScrollState.renderedRowIndexes.clear();
           this.virtualScrollState.renderedItems = 0;
-          console.log('✅ Virtual scroll state optimized');
         }
       }
 
       // DOMフラグメントプールのクリア
       if (includeDOMFragments && this.domFragmentPool) {
         this.domFragmentPool.length = 0;
-        console.log('✅ DOM fragment pool cleared');
       }
 
     } catch (error) {
@@ -1430,7 +1410,6 @@ class StudyQuestApp {
     // 🧹 既存のクリーンアップ
     this.cleanup();
 
-    console.log('✅ Polling system destroyed cleanly');
     
     // イベントリスナーの削除（既存）
     if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
@@ -2161,7 +2140,6 @@ class StudyQuestApp {
       if (config.preserveAdminMode) {
         this.state.showAdminFeatures = true;
         this.updateAdminButtonUI();
-        console.log('✅ Admin mode preserved after data load');
       }
     }
   }
@@ -2198,13 +2176,11 @@ class StudyQuestApp {
 
       // Always use server response directly (server-side filtering applied)
       this.state.currentAnswers = responseData;
-      console.log('📦 Server-filtered data received:', this.state.currentAnswers.length, 'items');
 
 
       // ✅ Update question text from data response
       if (result.header && this.elements.headingLabel) {
         this.elements.headingLabel.textContent = result.header;
-        console.log('✅ Question text updated from data:', result.header);
       }
 
       // Update UI
@@ -2226,13 +2202,6 @@ class StudyQuestApp {
       { rawClassFilter: 'すべて', classFilter: null, sortOrder: 'newest' } :
       this.getCurrentFilterState();
 
-    console.log('🔧 buildLoadConfiguration:', {
-      isInitialLoad,
-      selectedClass: filterState.rawClassFilter,
-      sortOrder: filterState.sortOrder,
-      classFilterElement: !!this.elements.classFilter,
-      classFilterValue: filterState.rawClassFilter
-    });
 
     return {
       isInitialLoad,
@@ -2272,7 +2241,6 @@ class StudyQuestApp {
       bypassCache: config.bypassCache || false
     };
 
-    console.log('📤 prepareFetchParameters result:', params);
     return params;
   }
 
@@ -2389,14 +2357,6 @@ class StudyQuestApp {
       // Define newRows first to avoid TDZ error
       const newRows = this.state.currentAnswers;
 
-      // Enhanced debugging for DOM-data inconsistency
-      console.log('renderBoard called:', {
-        isLayoutChange,
-        isInitialLoad,
-        newRowsLength: newRows ? newRows.length : 'undefined',
-        stateData: this.state.currentAnswers ? this.state.currentAnswers.length : 'undefined',
-        context: 'renderBoard-start'
-      });
 
       // 空データの場合の早期処理
       if (!newRows || newRows.length === 0) {
@@ -2494,11 +2454,6 @@ class StudyQuestApp {
   renderDirectly(newRows, oldRows, container, existingMap) {
     const fragment = this.getReusableFragment();
 
-    console.log('renderDirectly start:', {
-      newRowsLength: newRows.length,
-      existingMapSize: existingMap.size,
-      containerExists: !!container
-    });
 
     let cardsCreated = 0;
     let cardsReused = 0;
@@ -2525,18 +2480,8 @@ class StudyQuestApp {
       }
     });
 
-    console.log('renderDirectly cards processed:', {
-      cardsCreated,
-      cardsReused,
-      cardsFailed,
-      fragmentChildrenLength: fragment.children.length
-    });
-
     if (fragment.children.length > 0) {
       container.appendChild(fragment);
-      console.log('renderDirectly: Fragment appended to container with', fragment.children.length, 'cards');
-    } else {
-      console.log('🔄 renderDirectly: Fragment empty during layout transition (normal during slider operations)');
     }
   }
   
@@ -3113,7 +3058,6 @@ class StudyQuestApp {
       console.log('🔄 Level 1: Cache clear and force reload');
       this.clearCache({ includeReactions: true });
       await this.loadSheetData({ bypassCache: true, silent: true });
-      console.log('✅ Level 1 recovery successful');
       return { success: true, level: 1, method: 'cache_clear_reload' };
     } catch (level1Error) {
       console.warn('⚠️ Level 1 recovery failed:', level1Error.message);
@@ -3124,7 +3068,6 @@ class StudyQuestApp {
       console.log('🔄 Level 2: Local state restoration fallback');
       const localRestoreResult = this.restoreLocalReactionState(rowIndex, reaction, pendingRequest);
       if (localRestoreResult.success) {
-        console.log('✅ Level 2 recovery successful');
         return { success: true, level: 2, method: 'local_restore' };
       }
     } catch (level2Error) {
@@ -3821,7 +3764,6 @@ class StudyQuestApp {
       const stored = localStorage.getItem(key);
       const timestamp = stored || new Date(0).toISOString();
 
-      console.log('📥 lastSeenTimestamp復元 (時刻ベース統一):', { key, timestamp });
       return timestamp;
     } catch (error) {
       console.warn('⚠️ lastSeenTimestamp読み込みエラー:', error);
@@ -5121,7 +5063,6 @@ class StudyQuestApp {
     slider.style.backgroundSize = `${percentage}% 100%`;
     slider.style.backgroundRepeat = 'no-repeat';
 
-    console.log('スライダー背景更新:', { value, percentage: `${percentage}%` });
   }
 
   updateSortOptions() {
@@ -5787,28 +5728,13 @@ class StudyQuestApp {
    */
   validateReasonText(reason) {
     try {
-      console.log('🔍 validateReasonText デバッグ:', {
-        input: reason,
-        inputType: typeof reason,
-        inputIsNull: reason === null,
-        inputIsUndefined: reason === undefined,
-        inputLength: reason?.length
-      });
-      
       // null, undefined, 空文字列チェック
       if (!reason && reason !== 0) {
-        console.log('🔍 validateReasonText: 空の理由データ検出 - 空文字列を返します');
         return '';
       }
-      
+
       // 文字列変換と基本検証
       const reasonStr = String(reason).trim();
-      
-      console.log('🔍 validateReasonText 処理結果:', {
-        reasonStr: reasonStr,
-        reasonStrLength: reasonStr.length,
-        willBeEmpty: reasonStr.length === 0
-      });
       
       // 長すぎる理由テキストの制限（10000文字まで）
       if (reasonStr.length > 10000) {
@@ -6039,14 +5965,9 @@ try {
         return;
       }
 
-      console.log('📱 Creating new StudyQuestApp instance...');
       const app = new StudyQuestApp();
-      console.log('✅ StudyQuestApp instance created successfully');
       window.studyQuestApp = app;
-      console.log('✅ StudyQuestApp assigned to window.studyQuestApp');
     });
-  } else {
-    console.log('✅ StudyQuestApp already initialized, skipping');
   }
 
   window.addEventListener('beforeunload', () => {
