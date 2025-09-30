@@ -4818,12 +4818,6 @@ class StudyQuestApp {
     }
   }
   showAnswerModal(rowIndex) {
-    if (DEBUG_MODE) console.log('📱 [MODAL DEBUG] showAnswerModal called:', {
-        rowIndex: rowIndex,
-        rowIndexType: typeof rowIndex,
-        timestamp: new Date().toISOString()
-    });
-
     // Show answer modal called
 
     // Data search context
@@ -5192,15 +5186,6 @@ class StudyQuestApp {
         
         // Process batched changes
         cardChanges.forEach(({ card, entry }) => {
-          // Only log significant visibility changes for debugging
-          if (DEBUG_MODE && (entry.intersectionRatio === 0 || entry.intersectionRatio === 1)) {
-            console.log('IntersectionObserver visibility change:', {
-              rowIndex: card.dataset.rowIndex,
-              isIntersecting: entry.isIntersecting,
-              intersectionRatio: entry.intersectionRatio
-            });
-          }
-
           if (entry.isIntersecting) {
             // Card is becoming visible
             if (!card.classList.contains('visible')) {
