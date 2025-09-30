@@ -39,10 +39,17 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
     // Zero-dependency data processing
 
     // Performance improvement - use preloaded data
-    user = preloadedUser || findUserById(userId);
+    user = preloadedUser || findUserById(userId, { requestingUser: getCurrentEmail() });
     if (!user) {
       console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
-      return createDataServiceErrorResponse('ユーザーが見つかりません');
+      return {
+        success: false,
+        message: 'ユーザーが見つかりません',
+        debugMessage: 'ユーザー検索に失敗しました',
+        data: [],
+        header: '',
+        sheetName: ''
+      };
     }
 
     // Performance improvement - use preloaded config
@@ -55,7 +62,14 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
 
     if (!config.spreadsheetId) {
       console.warn('[WARN] DataService.getUserSheetData: Spreadsheet ID not configured', { userId });
-      return createDataServiceErrorResponse('スプレッドシートが設定されていません');
+      return {
+        success: false,
+        message: 'スプレッドシートが設定されていません',
+        debugMessage: 'スプレッドシート設定が見つかりません',
+        data: [],
+        header: '',
+        sheetName: ''
+      };
     }
 
     // データ取得実行
@@ -157,6 +171,7 @@ function extractTimestampValue(row, headers) {
 
 /**
  * スプレッドシート接続とシート取得（GAS Best Practice: 単一責任）
+ * ✅ CLAUDE.md準拠: preloadedUser優先使用でDB重複アクセス排除
  * @param {Object} config - 設定オブジェクト
  * @param {Object} context - アクセスコンテキスト（target user info for cross-user access）
  * @returns {Object} シート情報
@@ -167,10 +182,19 @@ function connectToSpreadsheetSheet(config, context = {}) {
   // Self-access: Use normal permissions for own spreadsheet
   const currentEmail = getCurrentEmail();
 
-  // Performance improvement - use preloaded user to avoid duplicate DB access
+  // ✅ CLAUDE.md準拠: preloadedUser優先使用でfindUserBySpreadsheetId重複呼び出しを排除
+  // preloadedUserが渡されている場合は、DB検索をスキップして大幅なAPI削減
   const targetUser = context.preloadedUser || findUserBySpreadsheetId(config.spreadsheetId, {
-    preloadedAuth: context.preloadedAuth // 認証情報を渡して重複認証回避
+    preloadedAuth: context.preloadedAuth, // 認証情報を渡して重複認証回避
+    skipCache: false // キャッシュ活用
   });
+
+  if (!targetUser) {
+    console.warn('connectToSpreadsheetSheet: Target user not found for spreadsheet', {
+      spreadsheetId: config.spreadsheetId ? `${config.spreadsheetId.substring(0, 8)}...` : 'undefined'
+    });
+  }
+
   const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
 
   const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
@@ -296,10 +320,10 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
   const startTime = Date.now();
 
   try {
-    // Performance improvement -事前取得ユーザー情報を活用してDB重複呼び出し排除
+    // ✅ CLAUDE.md準拠: 事前取得ユーザー情報を活用してDB重複呼び出し排除
     const { sheet } = connectToSpreadsheetSheet(config, {
       targetUserEmail: user?.userEmail,
-      preloadedUser: user, // 事前取得ユーザーを渡してfindUserBySpreadsheetId重複回避
+      preloadedUser: user, // preloadedUserを渡してfindUserBySpreadsheetId重複回避（最重要）
       preloadedAuth: options.preloadedAuth // 認証情報も渡して重複認証回避
     });
 
@@ -672,7 +696,7 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
   try {
     // 🛡️ CLAUDE.md準拠: Security Gate - 管理者権限チェック
     const currentEmail = getCurrentEmail();
-    const user = findUserById(userId);
+    const user = findUserById(userId, { requestingUser: currentEmail });
 
     if (!user) {
       console.error('deleteAnswerRow: User not found:', userId);

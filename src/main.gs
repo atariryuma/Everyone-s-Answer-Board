@@ -635,7 +635,7 @@ function getAdminUsers(options = {}) {
     }
 
     // Get all users (no filter needed for physical deletion)
-    const users = getAllUsers();
+    const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
     return {
       success: true,
       users: users || []
@@ -661,7 +661,7 @@ function toggleUserActiveStatus(targetUserId) {
     }
 
     // Direct findUserById usage
-    const targetUser = findUserById(targetUserId);
+    const targetUser = findUserById(targetUserId, { requestingUser: email });
     if (!targetUser) {
       return createUserNotFoundError();
     }
@@ -707,7 +707,7 @@ function toggleUserBoardStatus(targetUserId) {
     }
 
     // Direct findUserById usage
-    const targetUser = findUserById(targetUserId);
+    const targetUser = findUserById(targetUserId, { requestingUser: email });
     if (!targetUser) {
       return createUserNotFoundError();
     }
@@ -768,7 +768,7 @@ function republishMyBoard() {
     }
 
     // 現在のユーザーを取得
-    const currentUser = findUserByEmail(email);
+    const currentUser = findUserByEmail(email, { requestingUser: email });
     if (!currentUser) {
       return createUserNotFoundError('ユーザーが見つかりません');
     }
@@ -816,9 +816,9 @@ function clearActiveSheet(targetUserId) {
     }
 
     // Direct Data usage
-    let targetUser = targetUserId ? findUserById(targetUserId) : null;
+    let targetUser = targetUserId ? findUserById(targetUserId, { requestingUser: email }) : null;
     if (!targetUser) {
-      targetUser = findUserByEmail(email);
+      targetUser = findUserByEmail(email, { requestingUser: email });
     }
 
     if (!targetUser) {
@@ -920,9 +920,9 @@ function validateHeaderIntegrity(targetUserId) {
   try {
     const currentEmail = getCurrentEmail();
     // Direct Data usage
-    let targetUser = targetUserId ? findUserById(targetUserId) : null;
+    let targetUser = targetUserId ? findUserById(targetUserId, { requestingUser: currentEmail }) : null;
     if (!targetUser && currentEmail) {
-      targetUser = findUserByEmail(currentEmail);
+      targetUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
     }
 
     if (!targetUser) {
@@ -1053,35 +1053,41 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
     const { email: viewerEmail, isAdmin: isSystemAdmin } = adminAuth;
 
     if (targetUserId) {
-      // Reuse authenticated info - eliminate duplicate checks
-      const targetUser = findUserById(targetUserId);
+      // ✅ CLAUDE.md準拠: 完全な事前読み込みとpreloadedAuth伝播
+      // 認証情報を渡してfindUserByIdの重複DB呼び出しを排除
+      const targetUser = findUserById(targetUserId, {
+        requestingUser: viewerEmail,
+        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
+      });
       if (!targetUser) {
+        console.error('getPublishedSheetData: Target user not found', { targetUserId, viewerEmail });
         return {
           success: false,
           error: 'Target user not found',
+          debugMessage: 'ユーザー検索に失敗しました',
           data: [],
           sheetName: '',
           header: 'ユーザーエラー'
         };
       }
 
-      // Performance improvement - preload config to avoid duplicate DB access
+      // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
       const configResult = getUserConfig(targetUserId, targetUser);
       const targetUserConfig = configResult.success ? configResult.config : {};
 
-      // 直接データ取得 - getViewerBoardData内の重複認証を回避
+      // ✅ 完全なpreloadedAuth伝播 - getUserSheetData内の全DB呼び出しに伝達
       const options = {
         classFilter: classFilter !== 'すべて' ? classFilter : undefined,
         sortBy: sortOrder || 'newest',
         includeTimestamp: true,
         adminMode: isSystemAdmin || (targetUser.userEmail === viewerEmail),
         requestingUser: viewerEmail,
-        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin } // Pass auth info to avoid duplicate authentication
+        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
       };
 
       const dataFetchStart = Date.now();
 
-      // Performance improvement - pass preloaded data to avoid duplicate DB access
+      // ✅ 完全な事前読み込みデータを渡してDB重複アクセス排除
       const result = getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig);
       const dataFetchEnd = Date.now();
 
@@ -1094,6 +1100,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         return {
           success: false,
           error: result?.message || 'データ取得エラー',
+          debugMessage: 'スプレッドシート接続に失敗しました',
           data: [],
           sheetName: result?.sheetName || '',
           header: result?.header || '問題'
@@ -1161,14 +1168,16 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       }
     }
 
-    // Use existing authentication info for user search
+    // ✅ CLAUDE.md準拠: preloadedAuthを渡してfindUserByEmail内の重複DB呼び出しを排除
     const user = findUserByEmail(viewerEmail, {
       requestingUser: viewerEmail,
       adminMode: isSystemAdmin,
-      ignorePermissions: isSystemAdmin
+      ignorePermissions: isSystemAdmin,
+      preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
     });
 
     if (!user) {
+      console.error('getPublishedSheetData: User not found (self-access)', { viewerEmail });
       return {
         success: false,
         error: 'User not found',
@@ -1178,23 +1187,23 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       };
     }
 
-    // Performance improvement - preload config to avoid duplicate DB access
+    // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
     const configResult = getUserConfig(user.userId, user);
     const userConfig = configResult.success ? configResult.config : {};
 
-    // Simplified options - remove pagination complexity
+    // ✅ 完全なpreloadedAuth伝播 - getUserSheetData内の全DB呼び出しに伝達
     const options = {
       classFilter: classFilter !== 'すべて' ? classFilter : undefined,
       sortBy: sortOrder || 'newest',
       includeTimestamp: true,
       adminMode: isSystemAdmin,
       requestingUser: viewerEmail,
-      preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin } // ✅ 認証情報を渡して重複認証回避
+      preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
     };
 
     const dataFetchStart = Date.now();
 
-    // 70x Performance Improvement - 事前取得データを渡してDB重複アクセス排除
+    // ✅ 完全な事前読み込みデータを渡してDB重複アクセス排除
     const result = getUserSheetData(user.userId, options, user, userConfig);
     const dataFetchEnd = Date.now();
 
@@ -1208,6 +1217,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       return {
         success: false,
         error: result?.message || 'データ取得エラー',
+        debugMessage: 'スプレッドシート接続に失敗しました',
         data: [],
         sheetName: result?.sheetName || '',
         header: result?.header || '問題',
@@ -1475,7 +1485,7 @@ function saveConfig(config, options = {}) {
     }
 
     // Direct findUserByEmail usage
-    const user = findUserByEmail(userEmail);
+    const user = findUserByEmail(userEmail, { requestingUser: userEmail });
     console.log(`saveConfig: User lookup result: ${user ? 'found' : 'not found'} (userId: ${user?.userId || 'N/A'})`);
 
     if (!user) {
@@ -1531,7 +1541,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     }
 
     // Get target user data
-    const targetUser = findUserById(targetUserId);
+    const targetUser = findUserById(targetUserId, { requestingUser: email });
     if (!targetUser) {
       return { success: false, message: 'User not found' };
     }

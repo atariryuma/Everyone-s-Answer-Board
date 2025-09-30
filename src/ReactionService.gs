@@ -33,7 +33,7 @@ function validateReactionPermission(actorEmail, targetUserId) {
   if (isAdministrator(actorEmail)) return true;
 
   // ボード公開設定チェック（簡易実装）
-  const targetUser = findUserById(targetUserId);
+  const targetUser = findUserById(targetUserId, { requestingUser: actorEmail });
   if (!targetUser) return false;
 
   const configResult = getUserConfig(targetUserId);
@@ -84,10 +84,16 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
 
   reactionTypes.forEach(type => {
     const colIndex = headers.findIndex(header => String(header).toUpperCase().trim() === type);
-    reactionColumns[type] = colIndex !== -1 ? colIndex + 1 : (() => {
-      console.error(`Required reaction column '${type}' not found. Columns must be pre-created during data source setup.`);
-      throw new Error(`Required reaction column '${type}' not found. Please reconnect your data source to set up reaction columns.`);
-    })();
+    if (colIndex === -1) {
+      console.error(`❌ processReactionDirect: Required reaction column '${type}' not found`, {
+        type,
+        availableHeaders: headers.map(h => String(h || '').trim()).filter(h => h).join(', '),
+        headerCount: headers.length,
+        systemColumns: ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT']
+      });
+      throw new Error(`リアクション列「${type}」が見つかりません。データソースを再接続してリアクション列を作成してください。`);
+    }
+    reactionColumns[type] = colIndex + 1;
   });
 
   // 🔄 現在のリアクション状態を取得
@@ -180,13 +186,19 @@ function processHighlightDirect(sheet, rowNumber) {
   const [headers = []] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
 
   // ハイライト列を探す
-  const highlightCol = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT') + 1;
+  const highlightColIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
 
   // ハイライト列が存在しない場合はエラー
-  if (highlightCol === 0) {
-    console.error('processHighlightDirect: HIGHLIGHT column not found. Columns must be pre-created during data source setup.');
-    throw new Error('Required HIGHLIGHT column not found. Please reconnect your data source to set up highlight columns.');
+  if (highlightColIndex === -1) {
+    console.error(`❌ processHighlightDirect: Required HIGHLIGHT column not found`, {
+      availableHeaders: headers.map(h => String(h || '').trim()).filter(h => h).join(', '),
+      headerCount: headers.length,
+      systemColumns: ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT']
+    });
+    throw new Error('ハイライト列「HIGHLIGHT」が見つかりません。データソースを再接続してハイライト列を作成してください。');
   }
+
+  const highlightCol = highlightColIndex + 1;
 
   // 現在の値を取得してトグル
   const [[currentValue = '']] = sheet.getRange(rowNumber, highlightCol, 1, 1).getValues();
@@ -304,7 +316,7 @@ function addReaction(targetUserId, rowIndex, reactionType) {
     }
 
     // 🎯 GAS-Native: 直接データアクセス
-    const targetUser = findUserById(targetUserId);
+    const targetUser = findUserById(targetUserId, { requestingUser: actorEmail });
     if (!targetUser) {
       return createErrorResponse('Target user not found');
     }
@@ -413,7 +425,7 @@ function toggleHighlight(targetUserId, rowIndex) {
       return createErrorResponse('Access denied to target board');
     }
 
-    const targetUser = findUserById(targetUserId);
+    const targetUser = findUserById(targetUserId, { requestingUser: actorEmail });
     if (!targetUser) {
       return createErrorResponse('Target user not found');
     }
