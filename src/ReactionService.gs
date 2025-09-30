@@ -39,31 +39,6 @@ function validateReactionPermissionWithPreloadedData(actorEmail, targetUser, con
 }
 
 /**
- * マルチテナント権限検証（レガシー版 - 後方互換性のため残す）
- * ⚠️ 非推奨: validateReactionPermissionWithPreloadedData を使用してください
- * @deprecated Use validateReactionPermissionWithPreloadedData with preloaded data instead
- * @param {string} actorEmail - 操作者
- * @param {string} targetUserId - 対象ユーザーID
- * @returns {boolean} 権限があるかどうか
- */
-function validateReactionPermission(actorEmail, targetUserId) {
-  if (!actorEmail || !targetUserId) return false;
-
-  // 管理者は全アクセス可能
-  if (isAdministrator(actorEmail)) return true;
-
-  // ボード公開設定チェック（簡易実装）
-  const targetUser = findUserById(targetUserId, { requestingUser: actorEmail });
-  if (!targetUser) return false;
-
-  const configResult = getUserConfig(targetUserId);
-  const config = configResult.success ? configResult.config : {};
-
-  // 公開ボードまたは自分のボードの場合は許可
-  return config.isPublished || targetUser.userEmail === actorEmail;
-}
-
-/**
  * 監査ログ記録
  * @param {string} action - アクション
  * @param {Object} details - 詳細情報

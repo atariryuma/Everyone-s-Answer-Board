@@ -45,7 +45,6 @@ function getCurrentEmail() {
 }
 
 
-
 /**
  * Include HTML template
  * @param {string} filename - Template filename to include
@@ -466,7 +465,6 @@ function doPost(e) {
 }
 
 
-
 // API Functions (called from HTML)
 
 /**
@@ -538,8 +536,6 @@ function isAdministrator(email) {
     return false;
   }
 }
-
-
 
 
 /**
@@ -616,7 +612,6 @@ function processLoginAction() {
     };
   }
 }
-
 
 
 /**
@@ -909,8 +904,6 @@ function getSheets() {
 }
 
 
-
-
 /**
  * Validate header integrity for user's active sheet
  * @param {string} targetUserId - 対象ユーザーID（省略可能）
@@ -1016,8 +1009,6 @@ function getBoardInfo() {
     return createExceptionResponse(error);
   }
 }
-
-
 
 
 /**
@@ -1405,8 +1396,6 @@ function getSheetList(spreadsheetId) {
 }
 
 
-
-
 /**
  * データカウント取得（フロントエンド整合性のため追加）
  * @param {string} classFilter - クラスフィルター
@@ -1568,7 +1557,7 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
 
     // Editor access for own spreadsheets
     // getColumnAnalysis内で詳細なアクセス権チェックが実装済み
-    console.log('connectDataSource: Access by user:', `${email.split('@')[0]}@***`);
+    console.info('connectDataSource: Access by user:', `${email.split('@')[0]}@***`);
 
 
     // バッチ処理対応 - CLAUDE.md準拠 70x Performance
@@ -1809,7 +1798,7 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
       // 各列を順次追加
       columnsToAdd.forEach((columnName, index) => {
         const newColIndex = currentLastCol + index + 1;
-        console.log(`setupReactionAndHighlightColumns: Adding column '${columnName}' at position ${newColIndex}`);
+        console.info(`setupReactionAndHighlightColumns: Adding column '${columnName}' at position ${newColIndex}`);
 
         try {
           // ヘッダー行に列名を設定
@@ -1997,11 +1986,6 @@ function isValidFormUrl(url) {
 
 
 // Missing API Endpoints - Frontend/Backend Compatibility
-
-
-
-
-
 
 
 // 🆕 CLAUDE.md準拠: 完全自動化データソース選択システム

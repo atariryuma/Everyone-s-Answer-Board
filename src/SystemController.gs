@@ -70,10 +70,6 @@ __rootSys.SLEEP_MS = SLEEP_MS;
  */
 
 
-
-
-
-
 /**
  * セットアップのテスト実行
  * AppSetupPage.html から呼び出される
@@ -663,7 +659,6 @@ function performAutoRepair() {
 }
 
 
-
 /**
  * スプレッドシート一覧を取得（管理者向け）
  * DataService.getSpreadsheetList()の管理者モードラッパー
@@ -714,7 +709,6 @@ function getAdminSheetList(spreadsheetId) {
  * @param {string} sheetName - シート名
  * @returns {Object} 列分析結果
  */
-
 
 
 /**
@@ -1226,9 +1220,6 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
 }
 
 
-
-
-
 /**
  * フォーム情報を取得（実装関数）- 適応的アクセス対応版
  * main.gs API Gateway から呼び出される
@@ -1497,10 +1488,7 @@ function checkCurrentPublicationStatus(targetUserId) {
  */
 
 
-
-
 // 📊 認証・ログイン関連API
-
 
 
 /**
@@ -1510,7 +1498,6 @@ function checkCurrentPublicationStatus(targetUserId) {
  * @returns {Object} 認証状態
  */
 // ✅ CLAUDE.md準拠: 重複関数削除 - main.gsの完全実装を使用
-
 
 
 /**
