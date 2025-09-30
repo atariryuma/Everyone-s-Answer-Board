@@ -13,6 +13,8 @@ const CACHE_DURATION = {
   SHORT: 10,           // 10秒 - 認証ロック
   MEDIUM: 30,          // 30秒 - リアクション・ハイライトロック
   LONG: 300,           // 5分 - ユーザー情報キャッシュ
+  DATABASE_LONG: 600,  // 10分 - データベース全体キャッシュ（クォータ制限対策）
+  USER_INDIVIDUAL: 900, // 15分 - 個別ユーザーキャッシュ（冗長性強化）
   EXTRA_LONG: 3600     // 1時間 - 設定キャッシュ
 };
 
@@ -438,7 +440,7 @@ function monitorSystem() {
 
     // Monitor 2: Database size and access
     try {
-      const users = getAllUsers();
+      const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
       metrics.userCount = Array.isArray(users) ? users.length : 0;
       metrics.databaseStatus = 'ACCESSIBLE';
     } catch (error) {
@@ -515,7 +517,7 @@ function checkDataIntegrity() {
 
     // Check 1: User database consistency
     try {
-      const users = getAllUsers();
+      const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
       const userCount = Array.isArray(users) ? users.length : 0;
       const validUsers = users.filter(user =>
         user &&
@@ -541,7 +543,7 @@ function checkDataIntegrity() {
 
     // Check 2: Configuration integrity
     try {
-      const users = getAllUsers();
+      const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
       let configErrors = 0;
       let validConfigs = 0;
 

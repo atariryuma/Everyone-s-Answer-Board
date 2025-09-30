@@ -8,10 +8,39 @@
  * - サービスアカウント使用時の安全な権限管理
  */
 
-/* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig */
+/* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry */
 
 
 // データベース基盤操作
+
+
+/**
+ * Google Sheets APIの堅牢な呼び出しラッパー（クォータ制限対応）
+ * @param {string} url - API URL
+ * @param {Object} options - Fetch options
+ * @param {string} operationName - Operation name for logging
+ * @returns {Object} Response object
+ */
+function fetchSheetsAPIWithRetry(url, options, operationName) {
+  return executeWithRetry(
+    () => {
+      const response = UrlFetchApp.fetch(url, options);
+
+      if (response.getResponseCode() !== 200) {
+        const errorText = response.getContentText();
+        throw new Error(`API returned ${response.getResponseCode()}: ${errorText}`);
+      }
+
+      return response;
+    },
+    {
+      maxRetries: 3,
+      initialDelay: 1000, // 1秒 - APIクォータ制限のため長め
+      maxDelay: 10000,   // 10秒 - クォータエラー対応
+      operationName: operationName || 'Sheets API call'
+    }
+  );
+}
 
 
 /**
@@ -113,9 +142,22 @@ function openDatabase(useServiceAccount = false, options = {}) {
       useServiceAccount: forceServiceAccount,
       context: 'database_access'
     });
+
     if (!dataAccess) {
-      console.warn('openDatabase: Failed to access database via openSpreadsheet with service account');
-      return null;
+      console.warn('openDatabase: Failed to access database via Sheets API, attempting SpreadsheetApp.openById fallback');
+
+      // フォールバック: SpreadsheetApp.openByIdを使用（API制限対策）
+      try {
+        const fallbackSpreadsheet = SpreadsheetApp.openById(dbId);
+        console.info('openDatabase: Successfully accessed database via SpreadsheetApp.openById fallback');
+        return fallbackSpreadsheet;
+      } catch (fallbackError) {
+        console.error('openDatabase: Both Sheets API and SpreadsheetApp.openById failed:', {
+          sheetsApiError: 'Failed via openSpreadsheet',
+          fallbackError: fallbackError.message
+        });
+        return null;
+      }
     }
 
     // 下位互換性のため、従来のインターフェースを維持
@@ -207,16 +249,17 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         // Sheets APIでスプレッドシート名を取得
         try {
           const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
-          const response = UrlFetchApp.fetch(`${baseUrl}?includeGridData=false&fields=properties.title`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
-          if (response.getResponseCode() !== 200) {
-            throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
-          }
+          const response = fetchSheetsAPIWithRetry(
+            `${baseUrl}?includeGridData=false&fields=properties.title`,
+            {
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+            },
+            `getName(${sheetId.substring(0, 8)}...)`
+          );
           const data = JSON.parse(response.getContentText());
           return data.properties?.title || `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
         } catch (error) {
-          console.warn('getName via API failed:', error.message);
+          console.warn('getName via API failed after retries:', error.message);
           return `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
         }
       },
@@ -228,13 +271,13 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         // Sheets APIでシート一覧を取得
         try {
           const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
-          const response = UrlFetchApp.fetch(`${baseUrl}?includeGridData=false`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
-
-          if (response.getResponseCode() !== 200) {
-            throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
-          }
+          const response = fetchSheetsAPIWithRetry(
+            `${baseUrl}?includeGridData=false`,
+            {
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+            },
+            `getSheets(${sheetId.substring(0, 8)}...)`
+          );
 
           const data = JSON.parse(response.getContentText());
           const sheets = data.sheets || [];
@@ -248,7 +291,7 @@ function openSpreadsheet(spreadsheetId, options = {}) {
             });
           });
         } catch (error) {
-          console.warn('getSheets via API failed:', error.message);
+          console.warn('getSheets via API failed after retries:', error.message);
           return [];
         }
       }
@@ -269,13 +312,17 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         }
         // Sheets APIで行数取得
         try {
-          const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
+          const response = fetchSheetsAPIWithRetry(
+            `${baseUrl}/values/${sheetName}`,
+            {
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+            },
+            `getLastRow(${sheetName})`
+          );
           const data = JSON.parse(response.getContentText());
           return data.values ? data.values.length : 1;
         } catch (error) {
-          console.warn('getLastRow via API failed:', error.message);
+          console.warn('getLastRow via API failed after retries:', error.message);
           return 1;
         }
       },
@@ -286,13 +333,17 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         }
         // Sheets APIで列数取得
         try {
-          const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}!1:1`, {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          });
+          const response = fetchSheetsAPIWithRetry(
+            `${baseUrl}/values/${sheetName}!1:1`,
+            {
+              headers: { 'Authorization': `Bearer ${accessToken}` }
+            },
+            `getLastColumn(${sheetName})`
+          );
           const data = JSON.parse(response.getContentText());
           return data.values && data.values[0] ? data.values[0].length : 1;
         } catch (error) {
-          console.warn('getLastColumn via API failed:', error.message);
+          console.warn('getLastColumn via API failed after retries:', error.message);
           return 1;
         }
       },
@@ -305,13 +356,17 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         return {
           getValues: () => {
             try {
-              const response = UrlFetchApp.fetch(`${baseUrl}/values/${range}`, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-              });
+              const response = fetchSheetsAPIWithRetry(
+                `${baseUrl}/values/${range}`,
+                {
+                  headers: { 'Authorization': `Bearer ${accessToken}` }
+                },
+                `getRange.getValues(${range})`
+              );
               const data = JSON.parse(response.getContentText());
               return data.values || [];
             } catch (error) {
-              console.warn('getValues via API failed:', error.message);
+              console.warn('getValues via API failed after retries:', error.message);
               return [];
             }
           },
@@ -321,22 +376,22 @@ function openSpreadsheet(spreadsheetId, options = {}) {
               const payload = {
                 values: [[value]]
               };
-              const response = UrlFetchApp.fetch(`${baseUrl}/values/${range}?valueInputOption=RAW`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
+              const response = fetchSheetsAPIWithRetry(
+                `${baseUrl}/values/${range}?valueInputOption=RAW`,
+                {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  payload: JSON.stringify(payload)
                 },
-                payload: JSON.stringify(payload)
-              });
-
-              if (response.getResponseCode() !== 200) {
-                throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
-              }
+                `setValue(${range})`
+              );
 
               return response;
             } catch (error) {
-              console.warn('setValue via API failed:', error.message);
+              console.warn('setValue via API failed after retries:', error.message);
               throw error;
             }
           },
@@ -345,22 +400,22 @@ function openSpreadsheet(spreadsheetId, options = {}) {
               const payload = {
                 values
               };
-              const response = UrlFetchApp.fetch(`${baseUrl}/values/${range}?valueInputOption=RAW`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
+              const response = fetchSheetsAPIWithRetry(
+                `${baseUrl}/values/${range}?valueInputOption=RAW`,
+                {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  payload: JSON.stringify(payload)
                 },
-                payload: JSON.stringify(payload)
-              });
-
-              if (response.getResponseCode() !== 200) {
-                throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
-              }
+                `setValues(${range})`
+              );
 
               return response;
             } catch (error) {
-              console.warn('setValues via API failed:', error.message);
+              console.warn('setValues via API failed after retries:', error.message);
               throw error;
             }
           }
@@ -371,13 +426,17 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         return {
           getValues: () => {
             try {
-              const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}`, {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-              });
+              const response = fetchSheetsAPIWithRetry(
+                `${baseUrl}/values/${sheetName}`,
+                {
+                  headers: { 'Authorization': `Bearer ${accessToken}` }
+                },
+                `getDataRange(${sheetName})`
+              );
               const data = JSON.parse(response.getContentText());
               return data.values || [];
             } catch (error) {
-              console.warn('getDataRange via API failed:', error.message);
+              console.warn('getDataRange via API failed after retries:', error.message);
               return [];
             }
           },
@@ -386,22 +445,22 @@ function openSpreadsheet(spreadsheetId, options = {}) {
               const payload = {
                 values
               };
-              const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}?valueInputOption=RAW`, {
-                method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
+              const response = fetchSheetsAPIWithRetry(
+                `${baseUrl}/values/${sheetName}?valueInputOption=RAW`,
+                {
+                  method: 'PUT',
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  payload: JSON.stringify(payload)
                 },
-                payload: JSON.stringify(payload)
-              });
-
-              if (response.getResponseCode() !== 200) {
-                throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
-              }
+                `getDataRange.setValues(${sheetName})`
+              );
 
               return response;
             } catch (error) {
-              console.warn('getDataRange setValues via API failed:', error.message);
+              console.warn('getDataRange setValues via API failed after retries:', error.message);
               throw error;
             }
           }
@@ -413,22 +472,22 @@ function openSpreadsheet(spreadsheetId, options = {}) {
           const payload = {
             values: [rowData]
           };
-          const response = UrlFetchApp.fetch(`${baseUrl}/values/${sheetName}:append?valueInputOption=RAW`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
+          const response = fetchSheetsAPIWithRetry(
+            `${baseUrl}/values/${sheetName}:append?valueInputOption=RAW`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+              },
+              payload: JSON.stringify(payload)
             },
-            payload: JSON.stringify(payload)
-          });
-
-          if (response.getResponseCode() !== 200) {
-            throw new Error(`API returned ${response.getResponseCode()}: ${response.getContentText()}`);
-          }
+            `appendRow(${sheetName})`
+          );
 
           return response;
         } catch (error) {
-          console.warn('appendRow via API failed:', error.message);
+          console.warn('appendRow via API failed after retries:', error.message);
           throw error;
         }
       }
@@ -568,7 +627,43 @@ function findUserByEmail(email, context = {}) {
       return null;
     }
 
-    // DATABASE_SPREADSHEET_ID is shared database accessible by authenticated users
+    // 個別ユーザーキャッシュ優先チェック（バージョニングで管理）
+    const cacheVersion = PropertiesService.getScriptProperties().getProperty('USER_CACHE_VERSION') || '0';
+    const individualCacheKey = `user_by_email_v${cacheVersion}_${email}`;
+    try {
+      const cached = CacheService.getScriptCache().get(individualCacheKey);
+      if (cached) {
+        const cachedUser = JSON.parse(cached);
+        console.log(`findUserByEmail: Found user in individual cache (v${cacheVersion}), highest performance`);
+        return cachedUser;
+      }
+    } catch (individualCacheError) {
+      console.warn('findUserByEmail: Individual cache read failed:', individualCacheError.message);
+    }
+
+    // キャッシュ最適化: まずgetAllUsers()のキャッシュを活用
+    try {
+      const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, skipCache: false });
+      if (Array.isArray(allUsers) && allUsers.length > 0) {
+        const user = allUsers.find(u => u.userEmail === email);
+        if (user) {
+          console.log('findUserByEmail: Found user in cached data, avoiding direct API call');
+
+          // 個別キャッシュに保存（冗長性強化）
+          try {
+            CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
+          } catch (saveError) {
+            console.warn('findUserByEmail: Individual cache save failed:', saveError.message);
+          }
+
+          return user;
+        }
+      }
+    } catch (cacheError) {
+      console.warn('findUserByEmail: Cache-based search failed, falling back to direct DB access:', cacheError.message);
+    }
+
+    // フォールバック: 直接データベースアクセス
     const useServiceAccount = context.forceServiceAccount || false;
 
     const spreadsheet = openDatabase(useServiceAccount);
@@ -597,7 +692,16 @@ function findUserByEmail(email, context = {}) {
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
       if (row[emailColumnIndex] === email) {
-        return createUserObjectFromRow(row, headers);
+        const user = createUserObjectFromRow(row, headers);
+
+        // 個別キャッシュに保存（冗長性強化）
+        try {
+          CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
+        } catch (saveError) {
+          console.warn('findUserByEmail: Individual cache save failed:', saveError.message);
+        }
+
+        return user;
       }
     }
 
@@ -622,7 +726,43 @@ function findUserById(userId, context = {}) {
       return null;
     }
 
-    // DATABASE_SPREADSHEET_ID is shared database accessible by authenticated users
+    // 個別ユーザーキャッシュ優先チェック（バージョニングで管理）
+    const cacheVersion = PropertiesService.getScriptProperties().getProperty('USER_CACHE_VERSION') || '0';
+    const individualCacheKey = `user_by_id_v${cacheVersion}_${userId}`;
+    try {
+      const cached = CacheService.getScriptCache().get(individualCacheKey);
+      if (cached) {
+        const cachedUser = JSON.parse(cached);
+        console.log(`findUserById: Found user in individual cache (v${cacheVersion}), highest performance`);
+        return cachedUser;
+      }
+    } catch (individualCacheError) {
+      console.warn('findUserById: Individual cache read failed:', individualCacheError.message);
+    }
+
+    // キャッシュ最適化: まずgetAllUsers()のキャッシュを活用
+    try {
+      const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, skipCache: false });
+      if (Array.isArray(allUsers) && allUsers.length > 0) {
+        const user = allUsers.find(u => u.userId === userId);
+        if (user) {
+          console.log('findUserById: Found user in cached data, avoiding direct API call');
+
+          // 個別キャッシュに保存（冗長性強化）
+          try {
+            CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
+          } catch (saveError) {
+            console.warn('findUserById: Individual cache save failed:', saveError.message);
+          }
+
+          return user;
+        }
+      }
+    } catch (cacheError) {
+      console.warn('findUserById: Cache-based search failed, falling back to direct DB access:', cacheError.message);
+    }
+
+    // フォールバック: 直接データベースアクセス
     const useServiceAccount = context.forceServiceAccount || false;
 
     const spreadsheet = openDatabase(useServiceAccount);
@@ -653,6 +793,12 @@ function findUserById(userId, context = {}) {
       if (row[userIdColumnIndex] === userId) {
         const user = createUserObjectFromRow(row, headers);
 
+        // 個別キャッシュに保存（冗長性強化）
+        try {
+          CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
+        } catch (saveError) {
+          console.warn('findUserById: Individual cache save failed:', saveError.message);
+        }
 
         return user;
       }
@@ -673,20 +819,30 @@ function findUserById(userId, context = {}) {
  * @returns {Object|null} Created user object
  */
 function createUser(email, initialConfig = {}, context = {}) {
+  // 🔒 Concurrency Safety: LockService for exclusive user creation
+  const lock = LockService.getScriptLock();
+
   try {
     if (!email || !validateEmail(email).isValid) {
       console.warn('createUser: Invalid email provided:', typeof email, email);
       return null;
     }
 
+    // Acquire lock to prevent concurrent user creation
+    if (!lock.tryLock(10000)) { // 10秒待機
+      console.warn('createUser: Lock timeout - concurrent user creation detected');
+      return null;
+    }
 
     // DATABASE_SPREADSHEET_ID is shared database
     const currentEmail = getCurrentEmail();
 
+    // 重複チェック（ロック内で実行）
     const existingUser = findUserByEmail(email, {
       requestingUser: currentEmail
     });
     if (existingUser) {
+      console.log('createUser: User already exists, returning existing:', email);
       return existingUser;
     }
 
@@ -739,6 +895,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     ];
 
     sheet.appendRow(newUserData);
+    SpreadsheetApp.flush(); // 確実に書き込み
 
     const user = {
       userId,
@@ -749,11 +906,19 @@ function createUser(email, initialConfig = {}, context = {}) {
       lastModified: now
     };
 
+    // ユーザー作成後にキャッシュをクリア
+    clearDatabaseUserCache('user_creation');
+    clearIndividualUserCache(user, 'user_creation');
+
+    console.log('createUser: User created successfully:', userId);
     return user;
 
   } catch (error) {
     console.error('createUser error:', error.message);
     return null;
+  } finally {
+    // 確実にロックを解放
+    lock.releaseLock();
   }
 }
 
@@ -779,6 +944,24 @@ function getAllUsers(options = {}, context = {}) {
     if (!isAdmin && !context.forceServiceAccount) {
       console.warn('getAllUsers: Non-admin user attempting cross-user data access');
       return [];
+    }
+
+    // 10分キャッシュ戦略（バージョニングで管理）
+    const cacheVersion = PropertiesService.getScriptProperties().getProperty('USER_CACHE_VERSION') || '0';
+    const cacheKey = `all_users_v${cacheVersion}_${JSON.stringify(options)}_${context.forceServiceAccount ? 'sa' : 'norm'}`;
+    const skipCache = context.skipCache || false;
+
+    if (!skipCache) {
+      try {
+        const cached = CacheService.getScriptCache().get(cacheKey);
+        if (cached) {
+          const cachedUsers = JSON.parse(cached);
+          console.log(`getAllUsers: Returned cached data (v${cacheVersion}), avoiding API call`);
+          return cachedUsers;
+        }
+      } catch (cacheError) {
+        console.warn('getAllUsers: Cache read failed:', cacheError.message);
+      }
     }
 
     // getAllUsers is inherently cross-user operation, always requires service account
@@ -819,6 +1002,16 @@ function getAllUsers(options = {}, context = {}) {
       users.push(user);
     }
 
+    // 10分キャッシュに保存（API呼び出し削減）
+    if (!skipCache) {
+      try {
+        CacheService.getScriptCache().put(cacheKey, JSON.stringify(users), CACHE_DURATION.DATABASE_LONG);
+        console.log('getAllUsers: Cached user data for 10 minutes');
+      } catch (cacheError) {
+        console.warn('getAllUsers: Cache write failed:', cacheError.message);
+      }
+    }
+
     return users;
   } catch (error) {
     console.error('getAllUsers error:', error.message);
@@ -829,6 +1022,38 @@ function getAllUsers(options = {}, context = {}) {
 
 // ヘルパー関数
 
+
+/**
+ * データベースユーザーキャッシュをクリア（ユーザー作成・更新・削除時）
+ * シンプルなバージョニング戦略でキャッシュを無効化
+ * @param {string} operation - 操作名（ログ用）
+ */
+function clearDatabaseUserCache(operation = 'database_operation') {
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const currentVersion = parseInt(props.getProperty('USER_CACHE_VERSION') || '0');
+    const newVersion = currentVersion + 1;
+
+    props.setProperty('USER_CACHE_VERSION', newVersion.toString());
+
+    console.log(`clearDatabaseUserCache: Cache invalidated after ${operation} (v${currentVersion} → v${newVersion})`);
+  } catch (error) {
+    console.warn('clearDatabaseUserCache: Failed to clear cache:', error.message);
+  }
+}
+
+/**
+ * 特定ユーザーの個別キャッシュをクリア
+ * バージョニング戦略により、この関数は不要（clearDatabaseUserCacheで一括無効化）
+ * 後方互換性のため空実装を保持
+ * @deprecated Use clearDatabaseUserCache() instead - versioning strategy handles all caches
+ * @param {Object} user - ユーザーオブジェクト
+ * @param {string} operation - 操作名（ログ用）
+ */
+function clearIndividualUserCache(user, operation = 'user_operation') {
+  // No-op: Versioning strategy in clearDatabaseUserCache() invalidates all user caches
+  // This function preserved for backward compatibility only
+}
 
 /**
  * 行データからユーザーオブジェクトを作成
@@ -870,7 +1095,16 @@ function createUserObjectFromRow(row, headers) {
  * @returns {Object} {success: boolean, message?: string} Operation result
  */
 function updateUser(userId, updates, context = {}) {
+  // 🔒 Concurrency Safety: LockService for exclusive user update
+  const lock = LockService.getScriptLock();
+
   try {
+    // Acquire lock to prevent concurrent updates
+    if (!lock.tryLock(5000)) { // 5秒待機
+      console.warn('updateUser: Lock timeout - concurrent update detected');
+      return { success: false, message: 'Concurrent update in progress. Please retry.' };
+    }
+
     // Self vs Cross-user Access for User Updates
 
     // Initial user lookup to determine target user
@@ -922,6 +1156,13 @@ function updateUser(userId, updates, context = {}) {
           sheet.getRange(i + 1, lastModifiedIndex + 1).setValue(new Date().toISOString());
         }
 
+        SpreadsheetApp.flush(); // 確実に書き込み
+
+        // ユーザー更新後にキャッシュをクリア
+        clearDatabaseUserCache('user_update');
+        clearIndividualUserCache(targetUser, 'user_update');
+
+        console.log('updateUser: User updated successfully:', userId);
         return { success: true };
       }
     }
@@ -931,6 +1172,9 @@ function updateUser(userId, updates, context = {}) {
   } catch (error) {
     console.error('updateUser error:', error.message);
     return { success: false, message: error.message || 'Unknown error occurred' };
+  } finally {
+    // 確実にロックを解放
+    lock.releaseLock();
   }
 }
 
@@ -959,7 +1203,7 @@ function updateUser(userId, updates, context = {}) {
  */
 function getViewerBoardData(targetUserId, viewerEmail) {
   try {
-    const targetUser = findUserById(targetUserId);
+    const targetUser = findUserById(targetUserId, { requestingUser: viewerEmail });
     if (!targetUser) {
       console.warn('getViewerBoardData: Target user not found:', targetUserId);
       return null;
@@ -1119,9 +1363,16 @@ function deleteUser(userId, reason = '', context = {}) {
 
     for (let i = 1; i < data.length; i++) {
       if (data[i][userIdColumnIndex] === userId) {
+        // 削除前にユーザー情報を取得（キャッシュクリア用）
+        const userToDelete = createUserObjectFromRow(data[i], headers);
+
         // Simple hard delete - remove the row using correct GAS API
         const rowToDelete = i + 1;
         sheet.deleteRows(rowToDelete, 1);
+
+        // ユーザー削除後にキャッシュをクリア
+        clearDatabaseUserCache('user_deletion');
+        clearIndividualUserCache(userToDelete, 'user_deletion');
 
         return {
           success: true,

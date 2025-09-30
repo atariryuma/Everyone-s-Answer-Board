@@ -40,6 +40,39 @@
           window.location.href = window.location.origin + window.location.pathname + '?mode=login';
         }
       }
+
+      // シンプルエラー表示（ErrorBoundary版）
+      function showSimpleError(message) {
+        if (!message) return;
+
+        // 既存のモーダルを削除
+        const existingModal = document.getElementById('simple-error-modal');
+        if (existingModal) existingModal.remove();
+
+        // シンプルなエラーモーダル
+        const modalHTML = `
+          <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="simple-error-modal">
+            <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 text-white">
+              <div class="flex items-center mb-4">
+                <span class="text-2xl mr-3">❌</span>
+                <h3 class="text-lg font-semibold">エラーが発生しました</h3>
+              </div>
+              <p class="text-gray-300 mb-6">${message}</p>
+              <div class="text-right">
+                <button onclick="document.getElementById('simple-error-modal').remove()"
+                        class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white">
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+      }
+
+      // グローバルに利用可能にする
+      window.showSimpleError = showSimpleError;
     </script>
   </head>
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans error-page">

@@ -50,7 +50,7 @@ function getCurrentUserInfo() {
     }
 
     // データベース検索
-    const userInfo = findUserByEmail(email);
+    const userInfo = findUserByEmail(email, { requestingUser: email });
     if (!userInfo) {
       return null;
     }
@@ -152,7 +152,7 @@ function generateDynamicUserUrls(config) {
  */
 function checkUserEditorAccess(userId) {
   // userIdからemailを取得してgetUnifiedAccessLevelを使用
-  const user = findUserById(userId);
+  const user = findUserById(userId, { requestingUser: getCurrentEmail() });
   if (!user) return false;
 
   const accessLevel = getUnifiedAccessLevel(user.userEmail, userId);
@@ -178,7 +178,7 @@ function isEditor(email, targetUserId) {
   }
 
   try {
-    const user = findUserByEmail(email);
+    const user = findUserByEmail(email, { requestingUser: email });
     return user && user.userId === targetUserId;
   } catch (error) {
     console.error('UserService.isEditor: エラー', error.message);
@@ -293,7 +293,7 @@ function resetAuth() {
 
     // 🔧 修正1: 現在ユーザー情報を事前取得（キャッシュクリア前）
     const currentEmail = getCurrentEmail();
-    const currentUser = currentEmail ? findUserByEmail(currentEmail) : null;
+    const currentUser = currentEmail ? findUserByEmail(currentEmail, { requestingUser: currentEmail }) : null;
     const userId = currentUser?.userId;
 
     // 🔧 修正2: ConfigService専用クリア関数の活用

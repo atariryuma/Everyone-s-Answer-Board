@@ -1580,9 +1580,14 @@ class StudyQuestApp {
    * Display data loading error to user
    * @param {string} message - Error message to display
    */
-  displayDataLoadError(message) {
+  displayDataLoadError(message, result = null) {
     const container = this.elements.answersContainer;
     if (!container) return;
+
+    // シンプルエラー表示（デバッグ情報がある場合）
+    if (result && result.debugMessage && typeof window.showSimpleError === 'function') {
+      window.showSimpleError(result.debugMessage);
+    }
     
     container.innerHTML = `
       <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
@@ -2182,6 +2187,10 @@ class StudyQuestApp {
       const result = await this.getUserData(fetchParams, loadConfig.isInitialLoad);
 
       if (!result || !result.success) {
+        // シンプルエラー表示（デバッグ情報がある場合）
+        if (result && result.debugMessage && typeof window.showSimpleError === 'function') {
+          window.showSimpleError(result.debugMessage);
+        }
         this.handleError(new Error(result?.error || 'データ取得に失敗しました'), 'api', true);
         return;
       }

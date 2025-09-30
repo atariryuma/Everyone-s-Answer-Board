@@ -804,7 +804,7 @@ function saveUserConfig(userId, config, options = {}) {
   try {
     // 🔧 CLAUDE.md準拠: 楽観的ロック（ETag）検証の実装
     // ✅ Optimized: Use database lastModified for ETag validation
-    const user = findUserById(userId);
+    const user = findUserById(userId, { requestingUser: getCurrentEmail() });
     if (!user) {
       return {
         success: false,

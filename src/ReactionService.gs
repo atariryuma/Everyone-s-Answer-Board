@@ -364,16 +364,26 @@ function addReaction(targetUserId, rowIndex, reactionType) {
       return createErrorResponse('Invalid row ID');
     }
 
-    // 🔐 Cache-based行レベルロック
+    // 🔐 二重ロック: Cache-based（第1段階） + LockService（第2段階）
     const lockKey = `reaction_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
 
+    // 第1段階: 高速なキャッシュチェック（即座にリジェクト）
     if (cache.get(lockKey)) {
       return createErrorResponse('同時リアクション処理中です。お待ちください。');
     }
 
+    // 第2段階: 確実なLockService排他制御
+    const lock = LockService.getDocumentLock();
+
     try {
-      cache.put(lockKey, actorEmail, CACHE_DURATION.SHORT);
+      // 短期間のキャッシュロック（3秒）
+      cache.put(lockKey, actorEmail, 3);
+
+      // 真のロック取得
+      if (!lock.tryLock(3000)) { // 3秒待機
+        return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
+      }
 
       // 🔧 CLAUDE.md準拠: クロスユーザーアクセス判定
       const isSelfAccess = targetUser.userEmail === actorEmail;
@@ -394,6 +404,7 @@ function addReaction(targetUserId, rowIndex, reactionType) {
 
       // 🚀 GAS-Native: 直接リアクション処理
       const result = processReactionDirect(sheet, rowNumber, reactionType, actorEmail);
+      SpreadsheetApp.flush(); // 確実に書き込み
 
       // 📊 監査ログ
       logReactionAudit('reaction_processed', {
@@ -417,6 +428,8 @@ function addReaction(targetUserId, rowIndex, reactionType) {
       };
 
     } finally {
+      // 確実にロック解放（両方）
+      lock.releaseLock();
       cache.remove(lockKey);
     }
 
@@ -481,16 +494,26 @@ function toggleHighlight(targetUserId, rowIndex) {
       return createErrorResponse('Invalid row ID');
     }
 
-    // 🔐 Cache-based行レベルロック
+    // 🔐 二重ロック: Cache-based（第1段階） + LockService（第2段階）
     const lockKey = `highlight_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
 
+    // 第1段階: 高速なキャッシュチェック（即座にリジェクト）
     if (cache.get(lockKey)) {
       return createErrorResponse('同時ハイライト処理中です。お待ちください。');
     }
 
+    // 第2段階: 確実なLockService排他制御
+    const lock = LockService.getDocumentLock();
+
     try {
-      cache.put(lockKey, actorEmail, CACHE_DURATION.SHORT);
+      // 短期間のキャッシュロック（3秒）
+      cache.put(lockKey, actorEmail, 3);
+
+      // 真のロック取得
+      if (!lock.tryLock(3000)) { // 3秒待機
+        return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
+      }
 
       // 🔧 CLAUDE.md準拠: クロスユーザーアクセス判定
       const isSelfAccess = targetUser.userEmail === actorEmail;
@@ -511,6 +534,7 @@ function toggleHighlight(targetUserId, rowIndex) {
 
       // 🚀 GAS-Native: 直接ハイライト処理
       const result = processHighlightDirect(sheet, rowNumber);
+      SpreadsheetApp.flush(); // 確実に書き込み
 
       // 📊 監査ログ
       logReactionAudit('highlight_processed', {
@@ -531,6 +555,8 @@ function toggleHighlight(targetUserId, rowIndex) {
       };
 
     } finally {
+      // 確実にロック解放（両方）
+      lock.releaseLock();
       cache.remove(lockKey);
     }
 
