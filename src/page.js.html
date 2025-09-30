@@ -2630,13 +2630,6 @@ class StudyQuestApp {
 
       if (oldHasReason !== newHasReason) {
         // 理由の有無状態変化：カード全体を再構築
-        console.log('🔄 updateAnswerCard: 理由の有無状態が変化したため、カードを再構築します', {
-          oldHasReason: Boolean(oldHasReason),
-          newHasReason: Boolean(newHasReason),
-          rowIndex: newData.rowIndex
-        });
-
-        // カードを完全に再作成して置き換え
         const newCard = this.createAnswerCard(newData);
         if (newCard && card.parentNode) {
           card.parentNode.replaceChild(newCard, card);
