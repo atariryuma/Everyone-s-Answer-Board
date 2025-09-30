@@ -73,22 +73,7 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
     }
 
     // データ取得実行
-    console.log('DataService.getUserSheetData: fetchSpreadsheetData開始', {
-      userId,
-      spreadsheetId: config.spreadsheetId,
-      sheetName: config.sheetName,
-      hasOptions: !!options,
-      optionsKeys: Object.keys(options || {})
-    });
-
     const result = fetchSpreadsheetData(config, options, user);
-
-    console.log('DataService.getUserSheetData: fetchSpreadsheetData完了', {
-      userId,
-      resultSuccess: result?.success,
-      hasData: !!(result?.data),
-      dataLength: result?.data?.length || 0
-    });
 
     const executionTime = Date.now() - startTime;
 

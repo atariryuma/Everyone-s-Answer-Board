@@ -1461,35 +1461,15 @@ function saveConfig(config, options = {}) {
 
   try {
     const userEmail = getCurrentEmail();
-    console.log(`saveConfig: Started for user ${userEmail} (type: ${saveType})`);
 
     if (!userEmail) {
-      console.log('saveConfig: User authentication failed');
       return { success: false, message: 'ユーザー認証が必要です' };
-    }
-
-    // Log input data size and key fields
-    const configKeys = Object.keys(config || {});
-    console.log(`saveConfig: Input config (${configKeys.length} keys): [${configKeys.join(', ')}]`);
-    if (config?.spreadsheetId) {
-      console.log(`saveConfig: Target spreadsheet: ${config.spreadsheetId}`);
-    }
-    if (config?.isPublished !== undefined) {
-      console.log(`saveConfig: Publication status: ${config.isPublished}`);
-    }
-
-    // Log display settings (responder name & reaction count)
-    if (config?.displaySettings) {
-      const ds = config.displaySettings;
-      console.log(`saveConfig: Display settings - show names: ${ds.showNames}, show reactions: ${ds.showReactions}`);
     }
 
     // Direct findUserByEmail usage
     const user = findUserByEmail(userEmail, { requestingUser: userEmail });
-    console.log(`saveConfig: User lookup result: ${user ? 'found' : 'not found'} (userId: ${user?.userId || 'N/A'})`);
 
     if (!user) {
-      console.log('saveConfig: User not found in database');
       return { success: false, message: 'ユーザーが見つかりません' };
     }
 
@@ -1498,17 +1478,8 @@ function saveConfig(config, options = {}) {
       { isDraft: true } :
       { isMainConfig: true };
 
-    console.log(`saveConfig: Attempting save with options: ${JSON.stringify(saveOptions)}`);
-
     // 統一API使用: saveUserConfigで安全保存
     const result = saveUserConfig(user.userId, config, saveOptions);
-
-    const duration = Date.now() - startTime;
-    if (result.success) {
-      console.log(`saveConfig: Completed successfully in ${duration}ms (ETag: ${result.etag || 'N/A'})`);
-    } else {
-      console.log(`saveConfig: Failed after ${duration}ms - ${result.message}`);
-    }
 
     return result;
 

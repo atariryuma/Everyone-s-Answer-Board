@@ -24,7 +24,7 @@ class StudyQuestApp {
    */
   validId(userId) {
     if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-      warnLog('⚠️ StudyQuestApp: Invalid or empty userId provided:', userId);
+      console.warn('⚠️ StudyQuestApp: Invalid or empty userId provided:', userId);
 
       try {
         const urlParams = new URLSearchParams(window.location.search);
@@ -34,7 +34,7 @@ class StudyQuestApp {
           return fallbackUserId.trim();
         }
       } catch (error) {
-        warnLog('⚠️ StudyQuestApp: Failed to get userId from URL parameters:', error.message);
+        console.warn('⚠️ StudyQuestApp: Failed to get userId from URL parameters:', error.message);
       }
 
       // グローバル変数からのフォールバック
@@ -43,11 +43,11 @@ class StudyQuestApp {
           return window.USER_ID.trim();
         }
       } catch (error) {
-        warnLog('⚠️ StudyQuestApp: Failed to get userId from global USER_ID:', error.message);
+        console.warn('⚠️ StudyQuestApp: Failed to get userId from global USER_ID:', error.message);
       }
 
       // 最後のフォールバック: 空文字列を返すが、アプリケーションは続行
-      warnLog('⚠️ StudyQuestApp: No valid userId available. Using limited functionality mode.');
+      console.warn('⚠️ StudyQuestApp: No valid userId available. Using limited functionality mode.');
       return '';
     }
 
@@ -57,7 +57,7 @@ class StudyQuestApp {
     }
 
     // その他の形式も許可するが警告を出す
-    warnLog('⚠️ StudyQuestApp: Unusual userId format, but proceeding:', userId.substring(0, 8) + '...');
+    console.warn('⚠️ StudyQuestApp: Unusual userId format, but proceeding:', userId.substring(0, 8) + '...');
     return userId;
   }
 
@@ -293,7 +293,7 @@ class StudyQuestApp {
       try {
         const result = await operation(attempt);
         if (attempt > 0) {
-          debugLog(`${context} succeeded (attempt ${attempt + 1})`);
+          console.log(`${context} succeeded (attempt ${attempt + 1})`);
         }
         return result;
       } catch (error) {
@@ -318,9 +318,9 @@ class StudyQuestApp {
         // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
         const safeContext = context || 'Operation';
         if (error && error.message) {
-          warnLog(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
+          console.warn(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
         } else {
-          warnLog(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): Unknown error`);
+          console.warn(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): Unknown error`);
         }
 
         // ✅ CLAUDE.md準拠: Use requestIdleCallback for non-blocking delay
@@ -382,7 +382,7 @@ class StudyQuestApp {
       this.setupMessageListeners();
       
     } catch (error) {
-      errorLog('❌ StudyQuestApp: Critical error in init():', error);
+      console.error('❌ StudyQuestApp: Critical error in init():', error);
       this.handleError(error, 'initialization', true);
       this.hideLoadingOverlay();
     }
@@ -395,11 +395,11 @@ class StudyQuestApp {
    */
   async initializeFormButton() {
     try {
-      debugLog('📝 Initializing form button display...');
+      console.log('📝 Initializing form button display...');
       await loadFormLink();
-      debugLog('✅ Form button initialization completed');
+      console.log('✅ Form button initialization completed');
     } catch (error) {
-      warnLog('⚠️ Failed to initialize form button:', error);
+      console.warn('⚠️ Failed to initialize form button:', error);
     }
   }
 
@@ -468,13 +468,13 @@ class StudyQuestApp {
           break;
       }
     } catch (error) {
-      warnLog('Message handling error:', error);
+      console.warn('Message handling error:', error);
       // ✅ CLAUDE.md準拠: Simple fallback without complex try-catch chains
       try {
         await this.loadSheetData({ bypassCache: true });
         this.showInfoModal();
       } catch (fallbackError) {
-        errorLog('Fallback data loading failed:', fallbackError);
+        console.error('Fallback data loading failed:', fallbackError);
       }
     }
   }
@@ -484,7 +484,7 @@ class StudyQuestApp {
       // ✅ Use questionText from unified config instead of legacy template variable
       const initialText = window.UNIFIED_CONFIG?.questionText || '読み込み中...';
       this.elements.headingLabel.textContent = initialText;
-      debugLog('✅ Initial heading set from unified config:', initialText);
+      console.log('✅ Initial heading set from unified config:', initialText);
     }
 
     // Only setup absolutely critical event listeners
@@ -549,25 +549,25 @@ class StudyQuestApp {
     this.handlers.onClassFilterChange = async () => {
       try {
         const filterState = this.getCurrentFilterState();
-        debugLog('🔄 Class filter changed to:', filterState.rawClassFilter);
+        console.log('🔄 Class filter changed to:', filterState.rawClassFilter);
         await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
 
         // ✅ 修正: 時刻ベース基準で更新（件数基準の論理的破綻を修正）
         this.updateLastSeenTimestamp(); // フィルター変更時は現在時刻で基準更新
       } catch (error) {
-        errorLog('クラスフィルター変更時のデータ読み込みエラー:', error);
+        console.error('クラスフィルター変更時のデータ読み込みエラー:', error);
       }
     };
     this.handlers.onSortOrderChange = async () => {
       try {
         const filterState = this.getCurrentFilterState();
-        debugLog('🔄 Sort order changed to:', filterState.sortOrder);
+        console.log('🔄 Sort order changed to:', filterState.sortOrder);
         await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
 
         // ✅ 修正: 時刻ベース基準で更新（件数基準の論理的破綻を修正）
         this.updateLastSeenTimestamp(); // ソート変更時は現在時刻で基準更新
       } catch (error) {
-        errorLog('ソート順変更時のデータ読み込みエラー:', error);
+        console.error('ソート順変更時のデータ読み込みエラー:', error);
       }
     };
     if (this.elements.classFilter) {
@@ -595,7 +595,7 @@ class StudyQuestApp {
         try {
           await this.refreshContent();
         } catch (error) {
-          errorLog('コンテンツ更新エラー:', error);
+          console.error('コンテンツ更新エラー:', error);
         }
       };
       this.elements.refreshContentBtn.addEventListener('click', this.handlers.onRefreshContentClick);
@@ -621,18 +621,18 @@ class StudyQuestApp {
     // 🔄 ページ可視性イベント (競合状態修正版)
     this.handlers.onVisibilityChange = () => {
       if (document.hidden) {
-        debugLog('😴 Page hidden - stopping polling');
+        console.log('😴 Page hidden - stopping polling');
         // 🔧 ページ非表示時のポーリング停止
         this.stopSimplePolling();
         this.cleanup();
       } else if (this.state.initializationComplete) {
-        debugLog('👁️ Page visible - starting polling (after initialization complete)');
+        console.log('👁️ Page visible - starting polling (after initialization complete)');
         // 小さな遅延でポーリング再開（クリーンアップ完了待ち）
         Promise.resolve().then(() => {
           this.startSimplePolling();
         });
       } else {
-        debugLog('⚠️ Page visible but initialization not complete - skipping polling start');
+        console.log('⚠️ Page visible but initialization not complete - skipping polling start');
       }
     };
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
@@ -648,7 +648,6 @@ class StudyQuestApp {
 
     // ✅ Critical Fix: 初期化完了後の通知ポーリング自動開始
     if (this.state.initializationComplete && !this.polling.isActive) {
-      console.log('🔔 通知システム: 初期化完了後の自動開始');
       this.startSimplePolling();
     }
 
@@ -717,7 +716,7 @@ class StudyQuestApp {
         this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
         this.eventDelegationSetup = true;
     } else {
-        errorLog('No answers container found for event delegation');
+        console.error('No answers container found for event delegation');
     }
   }
   
@@ -758,7 +757,7 @@ class StudyQuestApp {
           this.activeRequests--;
 
           // ✅ 成功時の詳細ログ
-          debugLog(`✅ handleSuccess for ${funcName}`, {
+          console.log(`✅ handleSuccess for ${funcName}`, {
             resultValid: result !== null && result !== undefined,
             resultType: typeof result,
             cacheKey: !isStateChanging ? cacheKey : 'N/A (state-changing)',
@@ -777,11 +776,11 @@ class StudyQuestApp {
           // ✅ エラー時のキャッシュクリア
           if (!isStateChanging && this.cache.has(cacheKey)) {
             this.cache.delete(cacheKey);
-            debugLog(`🗑️ Cleared cache for ${funcName} due to error`);
+            console.log(`🗑️ Cleared cache for ${funcName} due to error`);
           }
 
           // ✅ エラー詳細ログ強化
-          errorLog(`❌ handleError for ${funcName}`, {
+          console.error(`❌ handleError for ${funcName}`, {
             error: error.message || error.toString(),
             errorType: typeof error,
             isEnhanced: !!error.functionName,
@@ -802,7 +801,7 @@ class StudyQuestApp {
           return;
         }
 
-        debugLog(`🚀 Starting google.script.run call for ${funcName}`, {
+        console.log(`🚀 Starting google.script.run call for ${funcName}`, {
           timestamp: new Date().toISOString(),
           userId: this.state.userId,
           argsCount: mappedArgs.length
@@ -810,7 +809,7 @@ class StudyQuestApp {
 
         google.script.run
           .withSuccessHandler((result) => {
-            debugLog(`✅ google.script.run success for ${funcName}`, {
+            console.log(`✅ google.script.run success for ${funcName}`, {
               timestamp: new Date().toISOString(),
               hasResult: !!result,
               resultType: typeof result
@@ -833,7 +832,7 @@ class StudyQuestApp {
             handleSuccess(result);
           })
           .withFailureHandler((error) => {
-            errorLog(`❌ google.script.run failure for ${funcName}:`, {
+            console.error(`❌ google.script.run failure for ${funcName}:`, {
               funcName,
               originalArgs: args,
               mappedArgs,
@@ -845,7 +844,7 @@ class StudyQuestApp {
           .withUserObject({ userId: this.state.userId })
           [funcName](...mappedArgs);
       } else {
-        warnLog('Google Apps Script environment not detected.');
+        console.warn('Google Apps Script environment not detected.');
         this.getMockData(funcName, ...mappedArgs).then((result) => {
           if (!isStateChanging) {
             this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
@@ -862,7 +861,7 @@ class StudyQuestApp {
       retryCondition: (error) => {
         // 🔧 CRITICAL FIX: Don't retry on timeout errors
         if (error.message.includes('timeout')) {
-          debugLog(`❌ Timeout error for ${funcName}, not retrying:`, error.message);
+          console.log(`❌ Timeout error for ${funcName}, not retrying:`, error.message);
           return false;
         }
 
@@ -874,7 +873,7 @@ class StudyQuestApp {
           error.message.toLowerCase().includes(errorType)
         );
 
-        debugLog(`🔧 Retry decision for ${funcName}:`, {
+        console.log(`🔧 Retry decision for ${funcName}:`, {
           error: error.message,
           shouldRetry,
           errorType: retryableErrors.find(e => error.message.toLowerCase().includes(e)) || 'unknown'
@@ -931,7 +930,7 @@ class StudyQuestApp {
         this.updateEndPublicationButtonUI();
       }
     } catch (e) {
-      errorLog('Admin check failed', e);
+      console.error('Admin check failed', e);
     }
   }
   
@@ -1025,9 +1024,9 @@ class StudyQuestApp {
         }
       }
 
-      debugLog('✅ Cache cleared successfully');
+      console.log('✅ Cache cleared successfully');
     } catch (error) {
-      warnLog('⚠️ Cache clear failed:', error.message);
+      console.warn('⚠️ Cache clear failed:', error.message);
     }
   }
   
@@ -1038,7 +1037,7 @@ class StudyQuestApp {
 
     // 初期データロード失敗後の初回成功ポーリング時の特別処理
     if (this.hadInitialDataLoadFailure) {
-      debugLog('🔄 初期データロード失敗後の初回データ取得成功:', {
+      console.log('🔄 初期データロード失敗後の初回データ取得成功:', {
         lastSeenTimestamp: this.state.lastSeenTimestamp,
         note: '既存データの初回取得なので新着通知はスキップ (時刻ベース統一)'
       });
@@ -1056,7 +1055,7 @@ class StudyQuestApp {
   
   // ✅ 修正: 時刻ベース統一システム（件数パラメータ削除）
   async handleViewChange(currentViewKey) {
-    debugLog('🔄 View settings changed:', {
+    console.log('🔄 View settings changed:', {
       from: this.lastViewKey,
       to: currentViewKey,
       timestampBasedSystem: true
@@ -1125,7 +1124,7 @@ class StudyQuestApp {
       this.showNotification('コンテンツを更新しました', 'success');
 
     } catch (error) {
-      errorLog('コンテンツ更新エラー:', error);
+      console.error('コンテンツ更新エラー:', error);
       this.showNotification('コンテンツの更新に失敗しました', 'error');
     }
   }
@@ -1217,7 +1216,6 @@ class StudyQuestApp {
           console.error('💥 通知ポーリング: 連続エラー上限に達したため5分間停止');
           this.stopSimplePolling();
           setTimeout(() => {
-            console.log('🔄 通知ポーリング: 自動復旧開始');
             this.startSimplePolling();
           }, 300000);
           return;
@@ -1361,7 +1359,7 @@ class StudyQuestApp {
           this.cache.clear();
         }
 
-        debugLog('✅ Cache cleanup completed:', { cacheSize });
+        console.log('✅ Cache cleanup completed:', { cacheSize });
       }
 
       // DOM要素参照のクリア
@@ -1373,7 +1371,7 @@ class StudyQuestApp {
             delete this.elements[key];
           }
         });
-        debugLog('✅ DOM references cleaned');
+        console.log('✅ DOM references cleaned');
       }
 
       // イベントリスナーの整理
@@ -1386,7 +1384,7 @@ class StudyQuestApp {
           });
         }
 
-        debugLog('✅ Event listeners cleaned');
+        console.log('✅ Event listeners cleaned');
       }
 
       // 仮想スクロール状態の最適化
@@ -1395,14 +1393,14 @@ class StudyQuestApp {
         if (size > 1000) {
           this.virtualScrollState.renderedRowIndexes.clear();
           this.virtualScrollState.renderedItems = 0;
-          debugLog('✅ Virtual scroll state optimized');
+          console.log('✅ Virtual scroll state optimized');
         }
       }
 
       // DOMフラグメントプールのクリア
       if (includeDOMFragments && this.domFragmentPool) {
         this.domFragmentPool.length = 0;
-        debugLog('✅ DOM fragment pool cleared');
+        console.log('✅ DOM fragment pool cleared');
       }
 
     } catch (error) {
@@ -1413,7 +1411,7 @@ class StudyQuestApp {
         cacheExists: !!this.cache,
         cacheType: this.cache ? typeof this.cache : 'undefined'
       };
-      warnLog('⚠️ Cleanup failed:', errorDetails);
+      console.warn('⚠️ Cleanup failed:', errorDetails);
     }
   }
 
@@ -1423,7 +1421,7 @@ class StudyQuestApp {
 
   // 🧹 システム破棄（安定版 - メモリリーク防止）
   destroy() {
-    debugLog('🧹 Destroying polling system...');
+    console.log('🧹 Destroying polling system...');
 
     // 🛡️ ポーリング完全停止
     this.stopSimplePolling();
@@ -1432,7 +1430,7 @@ class StudyQuestApp {
     // 🧹 既存のクリーンアップ
     this.cleanup();
 
-    debugLog('✅ Polling system destroyed cleanly');
+    console.log('✅ Polling system destroyed cleanly');
     
     // イベントリスナーの削除（既存）
     if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
@@ -1691,7 +1689,7 @@ class StudyQuestApp {
         </div>
       `;
     } catch (error) {
-      warnLog('⚠️ フォームURL取得エラー:', error);
+      console.warn('⚠️ フォームURL取得エラー:', error);
       container.innerHTML = `
         <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
           <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -1709,7 +1707,7 @@ class StudyQuestApp {
       const result = await this.runGas('getActiveFormInfo', this.state.userId);
       return (result && result.shouldShow) ? result.formUrl : null;
     } catch (error) {
-      errorLog('❌ フォームURL取得エラー:', error);
+      console.error('❌ フォームURL取得エラー:', error);
       return null;
     }
   }
@@ -1782,7 +1780,7 @@ class StudyQuestApp {
     
     // 空データなのにDOMにカードが残っている場合
     if (dataLength === 0 && domCards.length > 0) {
-      warnLog('⚠️ 状態不整合検出: 空データなのにDOMに', domCards.length, '個のカードが残っています');
+      console.warn('⚠️ 状態不整合検出: 空データなのにDOMに', domCards.length, '個のカードが残っています');
       
       // 空データのためのクリーンアップを実行
       await this.clearAllCardsForEmptyData();
@@ -1792,7 +1790,7 @@ class StudyQuestApp {
       
       
     } else if (dataLength !== domCards.length) { // 数の不一致も不整合とみなす
-      debugLog('🔄 Layout transition: DOM card count temporarily differs from data count. DOM:', domCards.length, 'Data:', dataLength, '(Auto-correcting)');
+      console.log('🔄 Layout transition: DOM card count temporarily differs from data count. DOM:', domCards.length, 'Data:', dataLength, '(Auto-correcting)');
 
       // 不整合がある場合は再レンダリング
       this.renderBoard(false, false);
@@ -1822,16 +1820,16 @@ class StudyQuestApp {
     // フロントエンドキャッシュをクリア
     if (this.cache) {
       this.cache.clear();
-      debugLog('✅ フロントエンドキャッシュをクリア, lastSeenTimestamp保持:', preservedLastSeenTimestamp);
+      console.log('✅ フロントエンドキャッシュをクリア, lastSeenTimestamp保持:', preservedLastSeenTimestamp);
     }
 
     // サーバーキャッシュをクリア
     try {
       // CLAUDE.md準拠: clearCache関数は現在実装されていない - 内部管理
       // await this.gas.clearCache();
-      debugLog('✅ サーバーキャッシュクリア - 内部管理済み');
+      console.log('✅ サーバーキャッシュクリア - 内部管理済み');
     } catch (error) {
-      warnLog('⚠️ サーバーキャッシュクリアでエラー:', error);
+      console.warn('⚠️ サーバーキャッシュクリアでエラー:', error);
     }
 
     // 強制データ再読み込み
@@ -1839,7 +1837,7 @@ class StudyQuestApp {
 
     // ✅ 修正: 時刻ベース基準で更新（件数比較による復元処理は不要）
     this.updateLastSeenTimestamp();
-    debugLog('✅ 強制データリフレッシュ完了、時刻ベース基準更新:', {
+    console.log('Force refresh complete, updated time-based reference:', {
       preservedTimestamp: preservedLastSeenTimestamp,
       newTimestamp: this.state.lastSeenTimestamp,
       currentAnswersLength: this.state.currentAnswers.length,
@@ -1884,7 +1882,7 @@ class StudyQuestApp {
       
       return true;
     } catch (error) {
-      warnLog('⚠️ データ判定エラー:', error);
+      console.warn('⚠️ データ判定エラー:', error);
       return false;
     }
   }
@@ -1974,7 +1972,7 @@ class StudyQuestApp {
 
         // Handle timeout errors specifically (CLAUDE.md pattern)
         if (errorMessage.includes('timeout') || errorMessage.includes('タイムアウト')) {
-          warnLog('getUserData: Timeout detected');
+          console.warn('getUserData: Timeout detected');
           return {
             success: false,
             error: 'データの読み込みがタイムアウトしました。ページを再読み込みしてください。',
@@ -1985,7 +1983,7 @@ class StudyQuestApp {
         }
 
         // General backend error (CLAUDE.md V8-safe pattern)
-        warnLog('getUserData: Backend returned error:', errorMessage);
+        console.warn('getUserData: Backend returned error:', errorMessage);
         return {
           success: false,
           error: errorMessage,
@@ -1995,7 +1993,7 @@ class StudyQuestApp {
         };
       }
 
-      warnLog('getUserData: Invalid response format:', result);
+      console.warn('getUserData: Invalid response format:', result);
       return {
         success: false,
         error: 'データ形式が正しくありません',
@@ -2009,10 +2007,10 @@ class StudyQuestApp {
       let errorInfo;
       if (error && error.message) {
         errorInfo = `Error: ${error.message}`;
-        errorLog('getUserData error:', errorInfo);
+        console.error('getUserData error:', errorInfo);
       } else {
         errorInfo = 'データ取得中にエラーが発生しました';
-        errorLog('getUserData error: Unknown error occurred');
+        console.error('getUserData error: Unknown error occurred');
       }
 
       return {
@@ -2153,7 +2151,7 @@ class StudyQuestApp {
       await this.performDataLoad(config, oldAnswers);
 
     } catch (error) {
-      errorLog('❌ loadSheetData error:', error);
+      console.error('❌ loadSheetData error:', error);
       this.handleError(error, 'data_load', true);
     } finally {
       this.state.isLoading = false;
@@ -2163,7 +2161,7 @@ class StudyQuestApp {
       if (config.preserveAdminMode) {
         this.state.showAdminFeatures = true;
         this.updateAdminButtonUI();
-        debugLog('✅ Admin mode preserved after data load');
+        console.log('✅ Admin mode preserved after data load');
       }
     }
   }
@@ -2200,13 +2198,13 @@ class StudyQuestApp {
 
       // Always use server response directly (server-side filtering applied)
       this.state.currentAnswers = responseData;
-      debugLog('📦 Server-filtered data received:', this.state.currentAnswers.length, 'items');
+      console.log('📦 Server-filtered data received:', this.state.currentAnswers.length, 'items');
 
 
       // ✅ Update question text from data response
       if (result.header && this.elements.headingLabel) {
         this.elements.headingLabel.textContent = result.header;
-        debugLog('✅ Question text updated from data:', result.header);
+        console.log('✅ Question text updated from data:', result.header);
       }
 
       // Update UI
@@ -2228,7 +2226,7 @@ class StudyQuestApp {
       { rawClassFilter: 'すべて', classFilter: null, sortOrder: 'newest' } :
       this.getCurrentFilterState();
 
-    debugLog('🔧 buildLoadConfiguration:', {
+    console.log('🔧 buildLoadConfiguration:', {
       isInitialLoad,
       selectedClass: filterState.rawClassFilter,
       sortOrder: filterState.sortOrder,
@@ -2274,7 +2272,7 @@ class StudyQuestApp {
       bypassCache: config.bypassCache || false
     };
 
-    debugLog('📤 prepareFetchParameters result:', params);
+    console.log('📤 prepareFetchParameters result:', params);
     return params;
   }
 
@@ -2392,7 +2390,7 @@ class StudyQuestApp {
       const newRows = this.state.currentAnswers;
 
       // Enhanced debugging for DOM-data inconsistency
-      debugLog('renderBoard called:', {
+      console.log('renderBoard called:', {
         isLayoutChange,
         isInitialLoad,
         newRowsLength: newRows ? newRows.length : 'undefined',
@@ -2402,7 +2400,7 @@ class StudyQuestApp {
 
       // 空データの場合の早期処理
       if (!newRows || newRows.length === 0) {
-        debugLog('renderBoard: 空データを受信、DOMをクリアして空状態を表示します');
+        console.log('renderBoard: 空データを受信、DOMをクリアして空状態を表示します');
         await this.renderEmptyState();
         return;
       }
@@ -2427,7 +2425,7 @@ class StudyQuestApp {
       }, { timeout: 300 });
       
     } catch (error) {
-      errorLog('❌ renderBoard: レンダリングエラー:', error);
+      console.error('❌ renderBoard: レンダリングエラー:', error);
       this.handleRenderingError(error);
     }
   }
@@ -2496,7 +2494,7 @@ class StudyQuestApp {
   renderDirectly(newRows, oldRows, container, existingMap) {
     const fragment = this.getReusableFragment();
 
-    debugLog('renderDirectly start:', {
+    console.log('renderDirectly start:', {
       newRowsLength: newRows.length,
       existingMapSize: existingMap.size,
       containerExists: !!container
@@ -2518,7 +2516,7 @@ class StudyQuestApp {
           fragment.appendChild(card);
           cardsCreated++;
         } else {
-          debugLog('🔄 Card creation deferred during layout transition for row:', row.rowIndex);
+          console.log('🔄 Card creation deferred during layout transition for row:', row.rowIndex);
           cardsFailed++;
         }
       } else if (this.shouldUpdateCard(row, oldData)) {
@@ -2527,7 +2525,7 @@ class StudyQuestApp {
       }
     });
 
-    debugLog('renderDirectly cards processed:', {
+    console.log('renderDirectly cards processed:', {
       cardsCreated,
       cardsReused,
       cardsFailed,
@@ -2536,16 +2534,16 @@ class StudyQuestApp {
 
     if (fragment.children.length > 0) {
       container.appendChild(fragment);
-      debugLog('renderDirectly: Fragment appended to container with', fragment.children.length, 'cards');
+      console.log('renderDirectly: Fragment appended to container with', fragment.children.length, 'cards');
     } else {
-      debugLog('🔄 renderDirectly: Fragment empty during layout transition (normal during slider operations)');
+      console.log('🔄 renderDirectly: Fragment empty during layout transition (normal during slider operations)');
     }
   }
   
   calculateVisibleRange(totalItems) {
     const container = this.elements.answersContainer;
     if (!container) {
-      warnLog('calculateVisibleRange: answersContainer not found.');
+      console.warn('calculateVisibleRange: answersContainer not found.');
       return { startIndex: 0, endIndex: totalItems };
     }
 
@@ -2580,7 +2578,7 @@ class StudyQuestApp {
   }
 
   renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad) {
-    debugLog('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
+    console.log('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
 
     if (isInitialLoad || this.state.currentAnswers.length === 0) {
       this.clearVirtualScrollingState();
@@ -2590,7 +2588,7 @@ class StudyQuestApp {
     const fragment = this.getReusableFragment();
     const visibleRange = this.calculateVisibleRange(newRows.length);
     const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
-    debugLog('Virtual scroll rendering:', { visibleRows: visibleRows.length });
+    console.log('Virtual scroll rendering:', { visibleRows: visibleRows.length });
 
     visibleRows.forEach((row) => {
       const rowId = String(row.rowIndex);
@@ -2608,7 +2606,7 @@ class StudyQuestApp {
       }
     });
 
-    debugLog('Virtual scroll completed:', { renderedCards: fragment.children.length });
+    console.log('Virtual scroll completed:', { renderedCards: fragment.children.length });
     if (fragment.children.length > 0) {
       container.appendChild(fragment);
     }
@@ -2659,7 +2657,7 @@ class StudyQuestApp {
   }
   
   handleRenderingError(error) {
-    errorLog('レンダリングエラーの詳細:', error);
+    console.error('レンダリングエラーの詳細:', error);
     
     // フォールバック: 最小限の表示を試行
     try {
@@ -2673,7 +2671,7 @@ class StudyQuestApp {
         </div>
       `;
     } catch (fallbackError) {
-      errorLog('フォールバック表示も失敗:', fallbackError);
+      console.error('フォールバック表示も失敗:', fallbackError);
     }
   }
   
@@ -2687,7 +2685,7 @@ class StudyQuestApp {
 
       if (oldHasReason !== newHasReason) {
         // 理由の有無状態変化：カード全体を再構築
-        debugLog('🔄 updateAnswerCard: 理由の有無状態が変化したため、カードを再構築します', {
+        console.log('🔄 updateAnswerCard: 理由の有無状態が変化したため、カードを再構築します', {
           oldHasReason: Boolean(oldHasReason),
           newHasReason: Boolean(newHasReason),
           rowIndex: newData.rowIndex
@@ -2731,7 +2729,7 @@ class StudyQuestApp {
       this.updateCardHighlight(card, newData);
       
     } catch (error) {
-      errorLog('updateAnswerCard error:', error);
+      console.error('updateAnswerCard error:', error);
     }
   }
   
@@ -2802,7 +2800,7 @@ class StudyQuestApp {
         });
 
       } catch (error) {
-        errorLog('batchUpdateReactionButtons error:', error);
+        console.error('batchUpdateReactionButtons error:', error);
       }
     };
 
@@ -2860,13 +2858,13 @@ class StudyQuestApp {
 
   validateCardData(data) {
     if (!data || typeof data !== 'object') {
-      warnLog('createAnswerCard: Invalid data provided:', data);
+      console.warn('createAnswerCard: Invalid data provided:', data);
       return null;
     }
 
     // 回答（opinion）がない場合のみ警告を出す（理由のみなしは正常なケース）
     if (!data.opinion) {
-      warnLog('createAnswerCard: 回答データ（opinion）がありません:', {
+      console.warn('createAnswerCard: 回答データ（opinion）がありません:', {
         rowIndex: data.rowIndex,
         hasOpinion: !!data.opinion,
         dataKeys: Object.keys(data)
@@ -2904,7 +2902,7 @@ class StudyQuestApp {
 
         return clonedCard;
       } catch (cacheError) {
-        warnLog('createAnswerCard: Cache clone error, creating new card:', cacheError);
+        console.warn('createAnswerCard: Cache clone error, creating new card:', cacheError);
       }
     }
     return null;
@@ -2947,7 +2945,7 @@ class StudyQuestApp {
         try {
           displayName = safeData.email.split('@')[0];
         } catch (emailError) {
-          warnLog('createAnswerCard: Email parsing error:', emailError);
+          console.warn('createAnswerCard: Email parsing error:', emailError);
           displayName = 'ユーザー';
         }
       }
@@ -2976,7 +2974,7 @@ class StudyQuestApp {
 
         return `<button type="button" class="reaction-btn like-btn flex items-center gap-1 ${colorClass} ${cls}" data-row-index="${safeData.rowIndex}" data-reaction="${rt.key}" aria-label="${ariaLabel}" aria-pressed="${info.reacted}">${this.getIcon(rt.icon, 'w-5 h-5', info.reacted)}${countSpan}</button>`;
       } catch (reactionError) {
-        warnLog('createAnswerCard: Reaction button creation error:', reactionError);
+        console.warn('createAnswerCard: Reaction button creation error:', reactionError);
         return '';
       }
     }).join('');
@@ -3053,12 +3051,12 @@ class StudyQuestApp {
       }
       this.cache.set(`render-${cacheKey}`, card.cloneNode(true));
     } catch (cacheError) {
-      warnLog('createAnswerCard: Cache storage error:', cacheError);
+      console.warn('createAnswerCard: Cache storage error:', cacheError);
     }
   }
 
   createErrorCard(error, data) {
-    errorLog('createAnswerCard: Critical error creating card:', error, 'Data:', data);
+    console.error('createAnswerCard: Critical error creating card:', error, 'Data:', data);
 
     try {
       const errorCard = document.createElement('div');
@@ -3071,7 +3069,7 @@ class StudyQuestApp {
       `;
       return errorCard;
     } catch (fallbackError) {
-      errorLog('createAnswerCard: Fallback card creation also failed:', fallbackError);
+      console.error('createAnswerCard: Fallback card creation also failed:', fallbackError);
       return null;
     }
   }
@@ -3108,29 +3106,29 @@ class StudyQuestApp {
       pendingRequest.retryCount = (pendingRequest.retryCount || 0) + 1;
     }
 
-    debugLog(`🔄 Starting staged recovery for ${reactionKey}, attempt: ${pendingRequest?.retryCount || 1}`);
+    console.log(`🔄 Starting staged recovery for ${reactionKey}, attempt: ${pendingRequest?.retryCount || 1}`);
 
     // Level 1: Cache clear and force reload
     try {
-      debugLog('🔄 Level 1: Cache clear and force reload');
+      console.log('🔄 Level 1: Cache clear and force reload');
       this.clearCache({ includeReactions: true });
       await this.loadSheetData({ bypassCache: true, silent: true });
-      debugLog('✅ Level 1 recovery successful');
+      console.log('✅ Level 1 recovery successful');
       return { success: true, level: 1, method: 'cache_clear_reload' };
     } catch (level1Error) {
-      warnLog('⚠️ Level 1 recovery failed:', level1Error.message);
+      console.warn('⚠️ Level 1 recovery failed:', level1Error.message);
     }
 
     // Level 2: Local state restoration (final fallback)
     try {
-      debugLog('🔄 Level 2: Local state restoration fallback');
+      console.log('🔄 Level 2: Local state restoration fallback');
       const localRestoreResult = this.restoreLocalReactionState(rowIndex, reaction, pendingRequest);
       if (localRestoreResult.success) {
-        debugLog('✅ Level 2 recovery successful');
+        console.log('✅ Level 2 recovery successful');
         return { success: true, level: 2, method: 'local_restore' };
       }
     } catch (level2Error) {
-      errorLog('❌ Level 2 recovery failed:', level2Error.message);
+      console.error('❌ Level 2 recovery failed:', level2Error.message);
     }
 
     return {
@@ -3266,13 +3264,13 @@ class StudyQuestApp {
     // Duplicate prevention: check if any request for this reaction is pending
     if (this.pendingReactions.has(reactionKey)) {
       const pendingRequest = this.pendingReactions.get(reactionKey);
-      debugLog(`⏳ 処理中のためスキップ: ${reactionKey}, requestId: ${pendingRequest.requestId}`);
+      console.log(`⏳ 処理中のためスキップ: ${reactionKey}, requestId: ${pendingRequest.requestId}`);
       return;
     }
 
     const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
     if (!item) {
-      warnLog(`⚠️ アイテムが見つかりません: rowIndex=${numericRowIndex}`);
+      console.warn(`⚠️ アイテムが見つかりません: rowIndex=${numericRowIndex}`);
       return;
     }
 
@@ -3328,12 +3326,10 @@ class StudyQuestApp {
         // デバウンシングタイムアウト管理
         this.reactionDebounceTimeouts.delete(rowKey);
 
-        debugLog(`🚀 デバウンス実行開始: ${rowKey} -> ${reaction}`);
         await this.sendReactionToServerDirect(rowIndex, reaction, reactionKey);
-        debugLog(`✅ デバウンス実行完了: ${rowKey} -> ${reaction}`);
 
       } catch (error) {
-        errorLog(`❌ デバウンス実行エラー (${reactionKey}):`, error);
+        console.error(`❌ デバウンス実行エラー (${reactionKey}):`, error);
 
         // 🎯 追加のエラー時確認処理（sendReactionToServerDirectのfinallyと重複するが安全確保）
         this.ensureReactionCleanup(rowIndex, reaction, reactionKey, error);
@@ -3345,7 +3341,7 @@ class StudyQuestApp {
     }, 300);
 
     this.reactionDebounceTimeouts.set(rowKey, timeoutId);
-    debugLog(`🎯 デバウンス設定: ${rowKey} -> ${reaction} (300ms)`);
+    console.log(`🎯 デバウンス設定: ${rowKey} -> ${reaction} (300ms)`);
   }
 
   /**
@@ -3363,7 +3359,7 @@ class StudyQuestApp {
 
       // Use executeWithRetry for robust async reaction processing
       await this.executeWithRetry(async (attempt) => {
-        debugLog(`📡 デバウンス後リアクション送信 (試行 ${attempt + 1}):`, { rowIndex, reaction });
+        console.log(`📡 デバウンス後リアクション送信 (試行 ${attempt + 1}):`, { rowIndex, reaction });
 
         // Server-first approach with retry support
         const response = await this.sendReactionToServer(rowIndex, reaction);
@@ -3387,7 +3383,7 @@ class StudyQuestApp {
     } catch (error) {
       success = false;
       errorMessage = error.message;
-      errorLog(`❌ デバウンス処理エラー (${reactionKey}):`, error);
+      console.error(`❌ デバウンス処理エラー (${reactionKey}):`, error);
 
       // エラー時の復旧処理
       await this.handleReactionError(error, rowIndex, reaction);
@@ -3413,31 +3409,31 @@ class StudyQuestApp {
    */
   ensureReactionCleanup(rowIndex, reaction, reactionKey, error = null) {
     try {
-      debugLog(`🧹 リアクションクリーンアップ実行: ${reactionKey}`, { rowIndex, reaction, hasError: !!error });
+      console.log(`🧹 リアクションクリーンアップ実行: ${reactionKey}`, { rowIndex, reaction, hasError: !!error });
 
       // 1. ローディング状態の確実な解除
       const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
       if (buttons.length > 0) {
         this.setReactionButtonsLoading(buttons, false);
-        debugLog(`✅ ローディング状態解除: ${buttons.length}個のボタン`);
+        console.log(`✅ ローディング状態解除: ${buttons.length}個のボタン`);
       } else {
-        warnLog(`⚠️ ボタンが見つからない: row=${rowIndex}, reaction=${reaction}`);
+        console.warn(`⚠️ ボタンが見つからない: row=${rowIndex}, reaction=${reaction}`);
       }
 
       // 2. pendingReactionsの確実な削除
       if (this.pendingReactions.has(reactionKey)) {
         this.pendingReactions.delete(reactionKey);
-        debugLog(`✅ pendingReactions削除: ${reactionKey}`);
+        console.log(`✅ pendingReactions削除: ${reactionKey}`);
       }
 
       // 3. エラー時のUI状態復旧確認
       if (error) {
-        warnLog(`🔄 エラー時UI状態復旧確認: ${reactionKey}`, error.message);
+        console.warn(`🔄 エラー時UI状態復旧確認: ${reactionKey}`, error.message);
 
         // UI状態の一貫性確認
         buttons.forEach(btn => {
           if (btn.disabled || btn.classList.contains('loading') || btn.getAttribute('aria-busy') === 'true') {
-            warnLog(`🚨 UI状態不整合検出、強制復旧: ${reactionKey}`);
+            console.warn(`🚨 UI状態不整合検出、強制復旧: ${reactionKey}`);
             btn.disabled = false;
             btn.classList.remove('loading');
             btn.setAttribute('aria-busy', 'false');
@@ -3458,7 +3454,7 @@ class StudyQuestApp {
       }
 
     } catch (cleanupError) {
-      errorLog(`❌ クリーンアップ処理自体でエラー: ${reactionKey}`, cleanupError);
+      console.error(`❌ クリーンアップ処理自体でエラー: ${reactionKey}`, cleanupError);
       // クリーンアップ処理自体でエラーが発生した場合も、最低限のUI復旧を試行
       try {
         const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
@@ -3468,7 +3464,7 @@ class StudyQuestApp {
           btn.setAttribute('aria-busy', 'false');
         });
       } catch (finalError) {
-        errorLog(`❌ 最終UI復旧もエラー: ${reactionKey}`, finalError);
+        console.error(`❌ 最終UI復旧もエラー: ${reactionKey}`, finalError);
       }
     }
   }
@@ -3484,7 +3480,7 @@ class StudyQuestApp {
         try {
           listener(result);
         } catch (error) {
-          errorLog('❌ リアクション完了リスナーエラー:', error);
+          console.error('❌ リアクション完了リスナーエラー:', error);
         }
       });
       this.reactionEventListeners.delete(reactionKey);
@@ -3569,7 +3565,7 @@ class StudyQuestApp {
       const result = await this.waitForReactionComplete(reactionKey, maxWaitMs);
       return result || { timeout: false, success: true };
     } catch (error) {
-      warnLog(`⚠️ リアクション待機タイムアウト: ${reactionKey}`, error.message);
+      console.warn(`⚠️ リアクション待機タイムアウト: ${reactionKey}`, error.message);
       return { 
         error: error.message, 
         timeout: true,
@@ -3662,7 +3658,7 @@ class StudyQuestApp {
         // 状態を安全に更新（楽観的更新との整合性を保つ）
         item.reactions = validatedReactions;
 
-        debugLog('✅ Processed server response with validation:', {
+        console.log('✅ Processed server response with validation:', {
             reaction,
             action: response.action,
             userReaction: response.userReaction,
@@ -3674,7 +3670,7 @@ class StudyQuestApp {
         this.saveReactionState(item.rowIndex, item.reactions);
     } else {
         // Handle error cases
-        errorLog('❌ Invalid server response format:', response);
+        console.error('❌ Invalid server response format:', response);
         throw new Error('Server returned invalid response format');
     }
   }
@@ -3701,7 +3697,7 @@ class StudyQuestApp {
 
     // ✅ 複数のreacted: trueが存在する場合の修正処理
     if (reactedKeys.length > 1) {
-      warnLog(`⚠️ サーバーレスポンスで複数のreacted: trueを検出。修正中:`, reactedKeys);
+      console.warn(`⚠️ サーバーレスポンスで複数のreacted: trueを検出。修正中:`, reactedKeys);
 
       // 最初のもの以外を全てfalseにリセット（データ整合性を保つ）
       const keepReaction = reactedKeys[0];
@@ -3710,7 +3706,7 @@ class StudyQuestApp {
         validatedReactions[key].count = Math.max(0, validatedReactions[key].count - 1);
       });
 
-      warnLog(`⚠️ 修正完了: ${keepReaction}を維持、他を無効化`);
+      console.warn(`⚠️ 修正完了: ${keepReaction}を維持、他を無効化`);
     }
 
     return validatedReactions;
@@ -3724,7 +3720,7 @@ class StudyQuestApp {
     const lastStateHash = this.lastUIStates?.get(lastUpdateKey);
 
     if (lastStateHash === currentStateHash && !immediate) {
-      debugLog(`⚡ UI更新スキップ (変更なし): rowIndex=${item.rowIndex}`);
+      console.log(`⚡ UI更新スキップ (変更なし): rowIndex=${item.rowIndex}`);
       return;
     }
 
@@ -3738,7 +3734,7 @@ class StudyQuestApp {
           this.updateCardReactions(card, item);
           this.applyReactionStyles(card, item);
         } else {
-          warnLog('⚠️ カード要素が見つかりません:', item.rowIndex);
+          console.warn('⚠️ カード要素が見つかりません:', item.rowIndex);
         }
 
         if (!this.elements.answerModalContainer.classList.contains('hidden')) {
@@ -3751,7 +3747,7 @@ class StudyQuestApp {
         }
 
       } catch (error) {
-        errorLog('❌ UI即座更新エラー:', error);
+        console.error('❌ UI即座更新エラー:', error);
       }
       return;
     }
@@ -3764,7 +3760,7 @@ class StudyQuestApp {
                     this.updateCardReactions(card, item);
                     this.applyReactionStyles(card, item);
                 } else {
-                    warnLog('⚠️ カード要素が見つかりません:', item.rowIndex);
+                    console.warn('⚠️ カード要素が見つかりません:', item.rowIndex);
                 }
 
                 if (!this.elements.answerModalContainer.classList.contains('hidden')) {
@@ -3778,7 +3774,7 @@ class StudyQuestApp {
 
                 resolve();
             } catch (error) {
-                errorLog('UI更新エラー:', error);
+                console.error('UI更新エラー:', error);
                 resolve();
             }
         });
@@ -3803,7 +3799,7 @@ class StudyQuestApp {
       const hasDOMCards = container && container.querySelectorAll('.answer-card').length > 0;
       const isFirstTime = !hasLastSeenTimestamp && !hasDiffCards && !hasInitialLoad && !hasDOMCards;
 
-      debugLog('🔍 初回判定結果 (時刻ベース統一):', {
+      console.log('🔍 初回判定結果 (時刻ベース統一):', {
         hasLastSeenTimestamp,
         hasDiffCards,
         hasInitialLoad,
@@ -3813,7 +3809,7 @@ class StudyQuestApp {
 
       return isFirstTime;
     } catch (error) {
-      warnLog('⚠️ 初回判定エラー:', error);
+      console.warn('⚠️ 初回判定エラー:', error);
       return false;
     }
   }
@@ -3825,10 +3821,10 @@ class StudyQuestApp {
       const stored = localStorage.getItem(key);
       const timestamp = stored || new Date(0).toISOString();
 
-      debugLog('📥 lastSeenTimestamp復元 (時刻ベース統一):', { key, timestamp });
+      console.log('📥 lastSeenTimestamp復元 (時刻ベース統一):', { key, timestamp });
       return timestamp;
     } catch (error) {
-      warnLog('⚠️ lastSeenTimestamp読み込みエラー:', error);
+      console.warn('⚠️ lastSeenTimestamp読み込みエラー:', error);
       return new Date(0).toISOString();
     }
   }
@@ -3838,9 +3834,9 @@ class StudyQuestApp {
       const key = this.getScopedKey('lastSeenTimestamp');
       localStorage.setItem(key, timestamp);
 
-      debugLog('💾 lastSeenTimestamp保存 (時刻ベース統一):', { key, timestamp });
+      console.log('💾 lastSeenTimestamp保存 (時刻ベース統一):', { key, timestamp });
     } catch (error) {
-      warnLog('⚠️ lastSeenTimestamp保存エラー:', error);
+      console.warn('⚠️ lastSeenTimestamp保存エラー:', error);
     }
   }
 
@@ -3852,7 +3848,7 @@ class StudyQuestApp {
     this.state.lastSeenTimestamp = newTimestamp;
     this.saveLastSeenTimestamp(newTimestamp);
 
-    debugLog('⏰ lastSeenTimestamp更新 (時刻ベース統一):', {
+    console.log('⏰ lastSeenTimestamp更新 (時刻ベース統一):', {
       oldTimestamp,
       newTimestamp,
       context: 'filter-independent-notification-system'
@@ -3862,7 +3858,7 @@ class StudyQuestApp {
 
 
   async handleReactionError(error, rowIndex, reaction) {
-    errorLog('リアクションエラーの詳細:', {
+    console.error('リアクションエラーの詳細:', {
         error: error.message,
         rowIndex,
         reaction,
@@ -3873,7 +3869,7 @@ class StudyQuestApp {
     const recoveryResult = await this.performStagedRecovery(rowIndex, reaction, error);
 
     if (!recoveryResult.success) {
-      errorLog('❌ All recovery attempts failed:', recoveryResult.message);
+      console.error('❌ All recovery attempts failed:', recoveryResult.message);
     }
     
     // Enhanced user feedback with actionable error messages
@@ -3940,7 +3936,7 @@ class StudyQuestApp {
     try {
         // Use executeWithRetry for robust async highlight processing
         const res = await this.executeWithRetry(async (attempt) => {
-            debugLog(`🔥 ハイライト処理 (試行 ${attempt + 1}):`, { rowIndex: numericRowIndex, sheetName: this.state.sheetName });
+            console.log(`🔥 ハイライト処理 (試行 ${attempt + 1}):`, { rowIndex: numericRowIndex, sheetName: this.state.sheetName });
 
             const response = await this.runGas('toggleHighlight', this.state.userId, numericRowIndex);
 
@@ -3991,11 +3987,11 @@ class StudyQuestApp {
         }, { timeout: 1000 });
 
     } catch (error) {
-        errorLog('Failed to toggle highlight:', error);
+        console.error('Failed to toggle highlight:', error);
 
         if (error.message && (error.message.includes('管理者のみ') || error.message.includes('編集者のみ'))) {
             this.showNotification('権限エラー: ボード編集者のみ利用可能です', 'error');
-            warnLog('ハイライト機能はボード編集者のみ利用可能です');
+            console.warn('ハイライト機能はボード編集者のみ利用可能です');
         } else {
             this.showNotification('ハイライトに失敗しました', 'error');
         }
@@ -4015,22 +4011,22 @@ class StudyQuestApp {
 
       // Skip verification if expectedHighlight is undefined
       if (typeof expectedHighlight === 'undefined') {
-        debugLog('✅ ハイライト状態同期確認: スキップ (expectedHighlight is undefined)');
+        console.log('✅ ハイライト状態同期確認: スキップ (expectedHighlight is undefined)');
         return;
       }
 
       if (item.highlight !== expectedHighlight) {
-        warnLog(`⚠️ ハイライト状態不整合検出: rowIndex=${rowIndex}, UI=${item.highlight}, Expected=${expectedHighlight}`);
+        console.warn(`⚠️ ハイライト状態不整合検出: rowIndex=${rowIndex}, UI=${item.highlight}, Expected=${expectedHighlight}`);
 
         item.highlight = expectedHighlight;
         requestAnimationFrame(() => this.applyUpdates([item]));
 
-        debugLog('✅ ハイライト状態を修正しました');
+        console.log('✅ ハイライト状態を修正しました');
       } else {
-        debugLog('✅ ハイライト状態同期確認: 正常');
+        console.log('✅ ハイライト状態同期確認: 正常');
       }
     } catch (error) {
-      errorLog('ハイライト状態同期確認エラー:', error);
+      console.error('ハイライト状態同期確認エラー:', error);
     }
   }
 
@@ -4059,7 +4055,7 @@ class StudyQuestApp {
             break;
             
           case 'data_staleness':
-            debugLog('🔄 古いデータを検出、強制リフレッシュ実行');
+            console.log('🔄 古いデータを検出、強制リフレッシュ実行');
             await this.forceDataRefresh();
             fixed++;
             break;
@@ -4076,12 +4072,11 @@ class StudyQuestApp {
             break;
         }
       } catch (fixError) {
-        errorLog(`修復失敗 (${issue.type}):`, fixError);
+        console.error(`修復失敗 (${issue.type}):`, fixError);
         skipped++;
       }
     }
     
-    debugLog(`🔧 自動修復完了: ${fixed}件修復, ${skipped}件スキップ`);
     return { fixed, skipped };
   }
 
@@ -4293,7 +4288,7 @@ class StudyQuestApp {
           if (currentAdminState) {
             this.state.showAdminFeatures = true;
             this.updateAdminButtonUI();
-            debugLog('✅ Admin mode preserved after animation');
+            console.log('✅ Admin mode preserved after animation');
           }
         }, 300);
       } else {
@@ -4304,7 +4299,7 @@ class StudyQuestApp {
         if (currentAdminState) {
           this.state.showAdminFeatures = true;
           this.updateAdminButtonUI();
-          debugLog('✅ Admin mode preserved after immediate update');
+          console.log('✅ Admin mode preserved after immediate update');
         }
       }
 
@@ -4320,7 +4315,7 @@ class StudyQuestApp {
         }, 500);
       }
 
-      console.log('✅ 効率的削除完了:', {
+      console.log('Efficient deletion complete:', {
         deletedRowIndex,
         initialCount,
         finalCount,
@@ -4357,14 +4352,14 @@ class StudyQuestApp {
       
       // 編集者権限チェック
       if (enable) {
-        debugLog('管理者権限チェック:', {
+        console.log('管理者権限チェック:', {
           isAdminUser: this.state.isAdminUser,
           hasAdminCapability: window.hasAdminCapability,
           unifiedConfigIsAdminUser: window.UNIFIED_CONFIG?.isAdminUser
         });
 
         if (!this.state.isEditor || !window.hasAdminCapability) {
-          warnLog('編集者権限がありません。', {
+          console.warn('編集者権限がありません。', {
             isEditor: this.state.isEditor,
             isAdminUser: this.state.isAdminUser,
             hasAdminCapability: window.hasAdminCapability
@@ -4384,12 +4379,12 @@ class StudyQuestApp {
             const authResult = await this.runGas('checkUserAuthentication');
             const ok = authResult && authResult.isAdministrator;
             if (!ok) {
-              warnLog('サーバー側の権限確認に失敗しました。');
+              console.warn('サーバー側の権限確認に失敗しました。');
               // ローカルの権限情報を信頼して継続
             }
             this.adminModeVerified = true;
           } catch (e) {
-            warnLog('権限確認API呼び出しに失敗しました', e);
+            console.warn('権限確認API呼び出しに失敗しました', e);
             // エラーが発生してもローカルの権限情報を信頼して継続
           }
         }
@@ -4399,7 +4394,7 @@ class StudyQuestApp {
       window.showAdminFeatures = enable;
       window.showHighlightToggle = enable; // 管理モードでのみ有効
       
-      debugLog('toggleAdminMode状態更新:', {
+      console.log('toggleAdminMode状態更新:', {
         enable,
         isAdminUser: this.state.isAdminUser,
         showAdminFeatures: window.showAdminFeatures,
@@ -4415,7 +4410,7 @@ class StudyQuestApp {
         const displaySettings = window.UNIFIED_CONFIG?.displaySettings || {};
 
         // ✅ デバッグログでConfigJSON値を確認
-        debugLog('管理モード無効化: ConfigJSON設定を復旧', {
+        console.log('管理モード無効化: ConfigJSON設定を復旧', {
           configExists: !!window.UNIFIED_CONFIG,
           displaySettingsExists: !!displaySettings,
           originalShowReactions: displaySettings.showReactions,
@@ -4428,7 +4423,7 @@ class StudyQuestApp {
         window.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
 
         // ✅ 復旧後の値を確認
-        debugLog('ConfigJSON設定復旧完了', {
+        console.log('ConfigJSON recovery complete', {
           afterShowCounts: window.showCounts,
           afterDisplayMode: window.displayMode,
           configApplied: true
@@ -4438,7 +4433,7 @@ class StudyQuestApp {
       window.isStudentMode = !enable;
       window.showScoreSort = window.showCounts;
 
-      debugLog(enable ? '管理モード有効化' : '閲覧モード有効化', {
+      console.log(enable ? '管理モード有効化' : '閲覧モード有効化', {
         showCounts: window.showCounts,
         displayMode: window.displayMode,
         fromConfig: !enable,
@@ -4452,7 +4447,7 @@ class StudyQuestApp {
       // ✅ 管理モード無効化時の確実な状態同期
       if (!enable) {
         // ConfigJSON設定がstateに確実に反映されているか確認
-        debugLog('管理モード無効化: state同期確認', {
+        console.log('管理モード無効化: state同期確認', {
           stateShowCounts: this.state.showCounts,
           stateDisplayMode: this.state.displayMode,
           windowShowCounts: window.showCounts,
@@ -4599,7 +4594,7 @@ class StudyQuestApp {
       this.schedulePageRedirect(1500);
       
     } catch (error) {
-      errorLog('❌ 公開終了に失敗しました:', error);
+      console.error('❌ 公開終了に失敗しました:', error);
       
       // エラーメッセージを構成
       let errorMsg = '公開終了に失敗しました';
@@ -4632,7 +4627,7 @@ class StudyQuestApp {
    * @param {number} delay - 遅延時間（ミリ秒）
    */
   schedulePageRedirect(delay = 1500) {
-    debugLog(`⏱️ Scheduling page redirect in ${delay}ms`);
+    console.log(`⏱️ Scheduling page redirect in ${delay}ms`);
 
     // Promise-based delay implementation for GAS environment
     Promise.resolve().then(() => {
@@ -4656,7 +4651,7 @@ class StudyQuestApp {
   }
 
   redirectToUnpublishedPage() {
-    debugLog('🚫 Redirecting to unpublished page - reloading current URL');
+    console.log('🚫 Redirecting to unpublished page - reloading current URL');
 
     // キャッシュクリア処理
     this.clearCache({ includeReactions: true, includeLocalStorage: true });
@@ -4694,9 +4689,9 @@ class StudyQuestApp {
       }
       
       localStorage.setItem(this.reactionStorageKey, JSON.stringify(existingData));
-      debugLog('リアクション状態を保存:', { rowIndex, reactions: existingData[rowIndex] });
+      console.log('リアクション状態を保存:', { rowIndex, reactions: existingData[rowIndex] });
     } catch (error) {
-      warnLog('リアクション状態の保存に失敗:', error);
+      console.warn('リアクション状態の保存に失敗:', error);
     }
   }
   
@@ -4707,10 +4702,10 @@ class StudyQuestApp {
   loadReactionState() {
     try {
       const savedData = JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
-      debugLog('リアクション状態を読み込み:', savedData);
+      console.log('リアクション状態を読み込み:', savedData);
       return savedData;
     } catch (error) {
-      warnLog('リアクション状態の読み込みに失敗:', error);
+      console.warn('リアクション状態の読み込みに失敗:', error);
       return {};
     }
   }
@@ -4759,7 +4754,7 @@ class StudyQuestApp {
             delete savedReactions[answer.rowIndex];
           }
 
-          debugLog(`✅ リアクション状態同期 [行${answer.rowIndex}][${reactionType}]:`, {
+          console.log(`✅ リアクション状態同期 [行${answer.rowIndex}][${reactionType}]:`, {
             serverReacted,
             localReacted,
             finalReacted: info.reacted,
@@ -4773,7 +4768,6 @@ class StudyQuestApp {
       localStorage.setItem(this.reactionStorageKey, JSON.stringify(savedReactions));
     }
 
-    debugLog('サーバーとローカルのリアクション状態同期完了');
   }
 
   updateModalReactionButtons(item) {
@@ -4830,11 +4824,11 @@ class StudyQuestApp {
     });
     
     if (itemsToUpdate.length === 0) {
-      debugLog('⚡ applyUpdates: 全アイテムスキップ (変更なし)');
+      console.log('⚡ applyUpdates: 全アイテムスキップ (変更なし)');
       return;
     }
     
-    debugLog(`⚡ applyUpdates: ${itemsToUpdate.length}/${items.length}件を更新`);
+    console.log(`⚡ applyUpdates: ${itemsToUpdate.length}/${items.length}件を更新`);
 
     // バッチ処理用にリアクション更新データを蓄積
     const reactionUpdates = [];
@@ -4882,7 +4876,7 @@ class StudyQuestApp {
     }
   }
   showAnswerModal(rowIndex) {
-    if (DEBUG_MODE) debugLog('📱 [MODAL DEBUG] showAnswerModal called:', {
+    if (DEBUG_MODE) console.log('📱 [MODAL DEBUG] showAnswerModal called:', {
         rowIndex: rowIndex,
         rowIndexType: typeof rowIndex,
         timestamp: new Date().toISOString()
@@ -4898,7 +4892,7 @@ class StudyQuestApp {
     
     if (!data && this.state.filteredData) {
       data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
-      debugLog('Data search in filteredData:', {
+      console.log('Data search in filteredData:', {
         found: !!data,
         searchRowIndex: rowIndex,
         availableRowIndexes: this.state.filteredData?.map(r => r.rowIndex) || []
@@ -4906,7 +4900,7 @@ class StudyQuestApp {
     }
     
     if (!data) {
-      debugLog('ERROR: No data found for rowIndex:', {
+      console.log('ERROR: No data found for rowIndex:', {
         rowIndex: rowIndex,
         currentAnswers: this.state.currentAnswers,
         filteredData: this.state.filteredData
@@ -4914,7 +4908,7 @@ class StudyQuestApp {
       return;
     }
     
-    debugLog('Data found for modal:', {
+    console.log('Data found for modal:', {
       rowIndex: rowIndex,
       data: data,
       opinion: data.opinion?.substring(0, 50) + '...',
@@ -4934,7 +4928,7 @@ class StudyQuestApp {
     let modalDisplayName = '';
     
     // Debug: Log modal display mode state
-    debugLog('Modal display state:', {
+    console.log('Modal display state:', {
       displayMode: this.state.displayMode,
       showName,
       showAdminFeatures: this.state.showAdminFeatures,
@@ -4974,14 +4968,14 @@ class StudyQuestApp {
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
     
     // リアクションに基づくカード色の適用
-    debugLog('モーダルにリアクション装飾適用:', {
+    console.log('モーダルにリアクション装飾適用:', {
       rowIndex: data.rowIndex,
       highlight: data.highlight,
       reactions: data.reactions,
       element: this.elements.answerModalCard.className
     });
     this.applyReactionStyles(this.elements.answerModalCard, data);
-    debugLog('モーダル装飾適用後:', {
+    console.log('モーダル装飾適用後:', {
       className: this.elements.answerModalCard.className
     });
     
@@ -5014,7 +5008,7 @@ class StudyQuestApp {
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
     
     // モーダルカードのスタイルを更新
-    debugLog('updateModalContent装飾適用:', {
+    console.log('updateModalContent装飾適用:', {
       rowIndex: data.rowIndex,
       highlight: data.highlight,
       reactions: data.reactions
@@ -5127,7 +5121,7 @@ class StudyQuestApp {
     slider.style.backgroundSize = `${percentage}% 100%`;
     slider.style.backgroundRepeat = 'no-repeat';
 
-    debugLog('スライダー背景更新:', { value, percentage: `${percentage}%` });
+    console.log('スライダー背景更新:', { value, percentage: `${percentage}%` });
   }
 
   updateSortOptions() {
@@ -5169,7 +5163,7 @@ class StudyQuestApp {
         
         // If frame time is consistently over 16ms, enable low performance mode
         if (delta > getPerformanceBudget() && !this.isLowPerformanceMode) {
-          warnLog('Low performance detected, enabling optimizations');
+          console.warn('Low performance detected, enabling optimizations');
           this.isLowPerformanceMode = true;
           this.optimizeForLowPerformance();
         }
@@ -5187,7 +5181,7 @@ class StudyQuestApp {
   }
 
   optimizeForLowPerformance() {
-    debugLog('Enabling low performance optimizations');
+    console.log('Enabling low performance optimizations');
     
     // Reduce animation and transition durations
     document.documentElement.style.setProperty('--transition-duration', '0.1s');
@@ -5259,7 +5253,7 @@ class StudyQuestApp {
         cardChanges.forEach(({ card, entry }) => {
           // Only log significant visibility changes for debugging
           if (DEBUG_MODE && (entry.intersectionRatio === 0 || entry.intersectionRatio === 1)) {
-            debugLog('IntersectionObserver visibility change:', {
+            console.log('IntersectionObserver visibility change:', {
               rowIndex: card.dataset.rowIndex,
               isIntersecting: entry.isIntersecting,
               intersectionRatio: entry.intersectionRatio
@@ -5459,13 +5453,13 @@ class StudyQuestApp {
   
   setupScrollObserver() {
     if (!this.elements.answersContainer) {
-      warnLog('setupScrollObserver: answersContainer not found');
+      console.warn('setupScrollObserver: answersContainer not found');
       return;
     }
     
     const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
     if (cards.length === 0) {
-      debugLog('setupScrollObserver: No cards found, skipping setup');
+      console.log('setupScrollObserver: No cards found, skipping setup');
       return;
     }
     
@@ -5479,7 +5473,7 @@ class StudyQuestApp {
       // Only process the first intersecting entry to prevent multiple simultaneous loads
       const intersectingEntry = entries.find(entry => entry.isIntersecting);
       if (intersectingEntry) {
-        debugLog('setupScrollObserver: Trigger card intersecting:', intersectingEntry.target.dataset.rowIndex);
+        console.log('setupScrollObserver: Trigger card intersecting:', intersectingEntry.target.dataset.rowIndex);
         this.handleVirtualScroll(intersectingEntry.target);
       }
     }, 150); // 150ms debounce for scroll triggers to prevent rapid firing
@@ -5501,7 +5495,7 @@ class StudyQuestApp {
       }
     }
     
-    debugLog('setupScrollObserver: Observing cards for dynamic loading:', {
+    console.log('setupScrollObserver: Observing cards for dynamic loading:', {
       totalCards: cards.length,
       observedCount: observedCards.length,
       observedRowIndexes: observedCards,
@@ -5516,7 +5510,7 @@ class StudyQuestApp {
     }
     
     if (this.virtualScrollState.isLoading) {
-      debugLog('handleVirtualScroll: Already loading, skipping');
+      console.log('handleVirtualScroll: Already loading, skipping');
       return;
     }
     
@@ -5524,7 +5518,7 @@ class StudyQuestApp {
     const totalAvailable = this.state.currentAnswers.length;
     const currentRendered = currentCards.length;
     
-    debugLog('handleVirtualScroll triggered:', {
+    console.log('handleVirtualScroll triggered:', {
       currentRendered,
       totalAvailable,
       triggerRowIndex: triggerElement.dataset.rowIndex
@@ -5572,11 +5566,11 @@ class StudyQuestApp {
     
     if (remainingItems.length === 0) {
       this.virtualScrollState.isLoading = false;
-      debugLog('loadMoreItems: No more items to load - all items rendered');
+      console.log('loadMoreItems: No more items to load - all items rendered');
       return;
     }
     
-    debugLog('loadMoreItems: Loading', remainingItems.length, 'additional items with batch size', batchSize, 
+    console.log('loadMoreItems: Loading', remainingItems.length, 'additional items with batch size', batchSize, 
       'Total rendered:', this.virtualScrollState.renderedRowIndexes.size, 'Total available:', this.state.currentAnswers.length);
     
     // Use deferred rendering for performance
@@ -5588,7 +5582,7 @@ class StudyQuestApp {
   renderAdditionalItems(items) {
     if (!items || items.length === 0) {
       this.virtualScrollState.isLoading = false;
-      debugLog('renderAdditionalItems: No items to render');
+      console.log('renderAdditionalItems: No items to render');
       return;
     }
     
@@ -5606,7 +5600,7 @@ class StudyQuestApp {
       
       // Skip if already rendered (defensive check)
       if (this.virtualScrollState.renderedRowIndexes.has(rowIndexStr)) {
-        debugLog('renderAdditionalItems: Item', rowIndexStr, 'already rendered, skipping');
+        console.log('renderAdditionalItems: Item', rowIndexStr, 'already rendered, skipping');
         return;
       }
       
@@ -5632,7 +5626,7 @@ class StudyQuestApp {
         changedItems.push(item);
         successfullyCreated++;
       } else {
-        warnLog('renderAdditionalItems: Failed to create card for item:', item.rowIndex);
+        console.warn('renderAdditionalItems: Failed to create card for item:', item.rowIndex);
       }
     });
     
@@ -5643,10 +5637,10 @@ class StudyQuestApp {
       // Update virtual scroll state with actual counts
       this.virtualScrollState.renderedItems = this.elements.answersContainer.children.length;
       
-      debugLog('renderAdditionalItems: Added', fragment.children.length, 'new cards. Total rendered:', 
+      console.log('renderAdditionalItems: Added', fragment.children.length, 'new cards. Total rendered:', 
         this.virtualScrollState.renderedRowIndexes.size, 'DOM children:', this.virtualScrollState.renderedItems);
     } else {
-      debugLog('renderAdditionalItems: No cards were successfully created from', items.length, 'items');
+      console.log('renderAdditionalItems: No cards were successfully created from', items.length, 'items');
     }
     
     // Apply updates if needed
@@ -5687,7 +5681,7 @@ class StudyQuestApp {
     const extraInDOM = [...domRowIndexes].filter(x => !this.virtualScrollState.renderedRowIndexes.has(x));
     
     if (missingInDOM.length > 0 || extraInDOM.length > 0 || trackedCount !== domCount) {
-      warnLog('Virtual scroll state inconsistency detected:', {
+      console.warn('Virtual scroll state inconsistency detected:', {
         trackedCount,
         domCount,
         totalAvailable,
@@ -5699,7 +5693,7 @@ class StudyQuestApp {
       this.virtualScrollState.renderedRowIndexes = domRowIndexes;
       this.virtualScrollState.renderedItems = domCount;
       
-      debugLog('validateVirtualScrollState: Auto-repaired state. New tracked count:', domCount);
+      console.log('validateVirtualScrollState: Auto-repaired state. New tracked count:', domCount);
     }
   }
   
@@ -5744,7 +5738,7 @@ class StudyQuestApp {
     });
     
     if (hiddenCount > 0 || restoredCount > 0) {
-      debugLog('optimizeVisibleElements: Hidden', hiddenCount, 'cards, restored', restoredCount, 'cards');
+      console.log('optimizeVisibleElements: Hidden', hiddenCount, 'cards, restored', restoredCount, 'cards');
     }
   }
   
@@ -5793,7 +5787,7 @@ class StudyQuestApp {
    */
   validateReasonText(reason) {
     try {
-      debugLog('🔍 validateReasonText デバッグ:', {
+      console.log('🔍 validateReasonText デバッグ:', {
         input: reason,
         inputType: typeof reason,
         inputIsNull: reason === null,
@@ -5803,14 +5797,14 @@ class StudyQuestApp {
       
       // null, undefined, 空文字列チェック
       if (!reason && reason !== 0) {
-        debugLog('🔍 validateReasonText: 空の理由データ検出 - 空文字列を返します');
+        console.log('🔍 validateReasonText: 空の理由データ検出 - 空文字列を返します');
         return '';
       }
       
       // 文字列変換と基本検証
       const reasonStr = String(reason).trim();
       
-      debugLog('🔍 validateReasonText 処理結果:', {
+      console.log('🔍 validateReasonText 処理結果:', {
         reasonStr: reasonStr,
         reasonStrLength: reasonStr.length,
         willBeEmpty: reasonStr.length === 0
@@ -5818,19 +5812,19 @@ class StudyQuestApp {
       
       // 長すぎる理由テキストの制限（10000文字まで）
       if (reasonStr.length > 10000) {
-        warnLog('validateReasonText: Reason text too long, truncating:', reasonStr.length);
+        console.warn('validateReasonText: Reason text too long, truncating:', reasonStr.length);
         return reasonStr.substring(0, 10000) + '...';
       }
       
       // HTMLエスケープが必要な文字をチェック
       if (reasonStr.includes('<') || reasonStr.includes('>') || reasonStr.includes('&')) {
         // HTMLが含まれている可能性がある場合は警告
-        warnLog('validateReasonText: Potentially unsafe HTML content detected');
+        console.warn('validateReasonText: Potentially unsafe HTML content detected');
       }
       
       return reasonStr;
     } catch (error) {
-      errorLog('validateReasonText: Error validating reason text:', error);
+      console.error('validateReasonText: Error validating reason text:', error);
       return ''; // エラー時は空文字列を返す
     }
   }
@@ -5841,7 +5835,7 @@ class StudyQuestApp {
    */
   async validData() {
     try {
-      debugLog('🔍 Starting real-time board data integrity validation...');
+      console.log('🔍 Starting real-time board data integrity validation...');
       
       const validationResults = {
         timestamp: new Date().toISOString(),
@@ -5901,20 +5895,20 @@ class StudyQuestApp {
       // 検証結果のログ出力
       const issueCount = validationResults.invalidCards + validationResults.reasonFieldIssues + validationResults.headerIssues;
       if (issueCount > 0) {
-        warnLog('⚠️ Board data integrity issues detected:', validationResults);
+        console.warn('⚠️ Board data integrity issues detected:', validationResults);
         
         // 自動修復の試行（理由列の問題のみ）
         if (validationResults.reasonFieldIssues > 0) {
-          debugLog('🔧 Attempting automatic reason field recovery...');
+          console.log('🔧 Attempting automatic reason field recovery...');
           await this.autoRecoverReasonFields();
         }
       } else {
-        debugLog('✅ Board data integrity validation passed');
+        console.log('✅ Board data integrity validation passed');
       }
 
       return validationResults;
     } catch (error) {
-      errorLog('❌ Board data integrity validation failed:', error);
+      console.error('❌ Board data integrity validation failed:', error);
       return {
         timestamp: new Date().toISOString(),
         error: error.message,
@@ -5928,7 +5922,7 @@ class StudyQuestApp {
    */
   async autoRecoverReasonFields() {
     try {
-      debugLog('🔧 Starting automatic reason field recovery...');
+      console.log('🔧 Starting automatic reason field recovery...');
       
       // キャッシュクリアして最新データを取得
       // CLAUDE.md準拠: clearCache関数は現在実装されていない - 内部管理
@@ -5937,9 +5931,9 @@ class StudyQuestApp {
       // データを再取得してカードを更新
       await this.loadBoardData();
       
-      debugLog('✅ Reason field recovery completed');
+      console.log('✅ Reason field recovery completed');
     } catch (error) {
-      errorLog('❌ Automatic reason field recovery failed:', error);
+      console.error('❌ Automatic reason field recovery failed:', error);
     }
   }
 
@@ -5985,7 +5979,7 @@ class StudyQuestApp {
       // 現在のデータでボードを再描画
       this.renderBoard(false, false);
     } catch (error) {
-      errorLog('❌ renderWithCurrentData failed:', error);
+      console.error('❌ renderWithCurrentData failed:', error);
     }
   }
 
@@ -5998,7 +5992,7 @@ async function loadFormLink() {
   try {
     const formInfo = await new Promise((resolve, reject) => {
       if (!google?.script?.run?.getActiveFormInfo) {
-        warnLog('getActiveFormInfo function not available, skipping form link');
+        console.warn('getActiveFormInfo function not available, skipping form link');
         resolve(null);
         return;
       }
@@ -6006,7 +6000,7 @@ async function loadFormLink() {
       google.script.run
         .withSuccessHandler(resolve)
         .withFailureHandler((error) => {
-          warnLog('getActiveFormInfo failed:', error);
+          console.warn('getActiveFormInfo failed:', error);
           resolve(null);
         })
         .getActiveFormInfo(window.UNIFIED_CONFIG?.userId);
@@ -6027,7 +6021,7 @@ async function loadFormLink() {
       }
     }
   } catch (error) {
-    warnLog('フォーム情報の取得に失敗しました:', error);
+    console.warn('フォーム情報の取得に失敗しました:', error);
     // エラー時はフォームボタンを非表示にする
     const formLinkBtn = document.getElementById('form-link-btn');
     if (formLinkBtn) {
@@ -6042,19 +6036,17 @@ try {
     document.addEventListener('DOMContentLoaded', () => {
       // Double-check to prevent race conditions
       if (window.studyQuestApp) {
-        debugLog('✅ StudyQuestApp already exists, skipping DOMContentLoaded init');
         return;
       }
 
-      debugLog('🚀 DOMContentLoaded fired - Starting StudyQuestApp initialization');
-      debugLog('📱 Creating new StudyQuestApp instance...');
+      console.log('📱 Creating new StudyQuestApp instance...');
       const app = new StudyQuestApp();
-      debugLog('✅ StudyQuestApp instance created successfully');
+      console.log('✅ StudyQuestApp instance created successfully');
       window.studyQuestApp = app;
-      debugLog('✅ StudyQuestApp assigned to window.studyQuestApp');
+      console.log('✅ StudyQuestApp assigned to window.studyQuestApp');
     });
   } else {
-    debugLog('✅ StudyQuestApp already initialized, skipping');
+    console.log('✅ StudyQuestApp already initialized, skipping');
   }
 
   window.addEventListener('beforeunload', () => {
@@ -6063,7 +6055,7 @@ try {
     }
   });
 } catch (error) {
-  errorLog('Error creating StudyQuestApp instance:', error);
+  console.error('Error creating StudyQuestApp instance:', error);
   const container = document.getElementById('answers');
   if (container) {
     const msg = window.sharedUtilities.security.escapeHtml(error.message || '');

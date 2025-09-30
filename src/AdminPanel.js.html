@@ -1990,8 +1990,6 @@
     const retryDelay = Math.pow(2, retryCount) * 1000; // 指数バックオフ
 
     try {
-      console.log(`🔍 列分析実行開始 (試行 ${retryCount + 1}/${maxRetries + 1})`);
-
       const analysisResult = await getColumnAnalysis(spreadsheetId, sheetName);
 
       // 🎯 高精度検証: 結果品質チェック
@@ -2032,8 +2030,6 @@
 
       // 設定完了状況を更新
       updateCompletionStatus();
-
-      console.log('✅ 高精度列分析完了');
 
     } catch (error) {
       console.error(`❌ 列分析エラー (試行 ${retryCount + 1}):`, error);
@@ -2238,7 +2234,6 @@
 
   // シート一覧読み込み
   function loadSheetList(spreadsheetId) {
-    console.log('🚀 loadSheetList開始:', spreadsheetId);
     const select = document.getElementById('sheet-select');
     if (!select) {
       console.error('❌ loadSheetList: sheet-select要素が見つかりません');
@@ -2350,7 +2345,6 @@
       }
 
       window.setLoading(true, '処理中...');
-      console.log('connectToDataSource: 統一接続開始', { spreadsheetId, sheetName, method: isUrlMethod ? 'URL' : 'dropdown' });
 
       // 真のバッチ処理実装 (CLAUDE.md準拠 - 70x Performance)
       const result = await processBatchOperations([
@@ -2376,7 +2370,6 @@
 
         // ✅ 最適化: 既に分析データがある場合は再実行しない
         if (result.headers && result.mapping) {
-          console.log('🎯 統合処理で分析完了済み、UI更新のみ実行');
           fillColumnDropdowns(result.headers, result.mapping, result.confidence);
 
           // ✅ 統一関数で状態更新
@@ -2831,7 +2824,6 @@
    */
   function attemptFallbackDetection(columnType, dropdown, headers, mapping, confidence) {
     try {
-      console.log(`🔄 フォールバック検出開始: ${columnType}`);
 
       // 代替パターンマッチング
       const alternativePatterns = {
@@ -2935,7 +2927,6 @@
    * 🔍 代替検出手法の試行
    */
   function attemptAlternativeDetection(columnType, dropdown, headers) {
-    console.log(`🔍 代替検出開始: ${columnType}`);
 
     // 文字数・データ特徴による推測
     const candidates = [];
@@ -3591,7 +3582,6 @@
 
     window.setLoading(true, '処理中...');
 
-    console.log('verifyColumnMapping: 列マッピング検証開始', { spreadsheetId, sheetName });
 
     // ヘッダーは接続時に保持したものを使用（なければ最小化）
     let headers = Array.isArray(window.currentHeaders) ? window.currentHeaders : [];
@@ -3647,7 +3637,6 @@
 
   // 検証結果の表示（V8ランタイム最適化版・必須/オプション対応）
   function displayVerificationResults(headerIndices) {
-    console.log('検証結果の表示を開始:', headerIndices);
 
     // ✅ 必須列とオプション列を区別（新しい列設定ロジックに対応）
     const requiredColumns = ['answer']; // 必須列
@@ -4034,7 +4023,7 @@
       // 🎯 ConfigJson完全同期: Derived Fields自動更新
       const isSpreadsheetChanged = optimizedConfig.spreadsheetId !== systemState.config.spreadsheetId;
       if (isSpreadsheetChanged) {
-        console.log('🔄 SpreadsheetId変更検出 - Derived Fields更新開始:', {
+        console.log('SpreadsheetId change detected - updating derived fields:', {
           oldId: systemState.config.spreadsheetId,
           newId: optimizedConfig.spreadsheetId
         });

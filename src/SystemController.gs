@@ -42,22 +42,6 @@ const SLEEP_MS = {
 };
 
 /**
- * ログレベル制御
- */
-const LOG_LEVEL = {
-  DEBUG: 0,        // 開発時詳細ログ
-  INFO: 1,         // 一般情報
-  WARN: 2,         // 警告
-  ERROR: 3,        // エラーのみ
-  NONE: 4          // プロダクション（ログ無効）
-};
-
-/**
- * 現在のログレベル (プロダクション環境では ERROR または NONE を推奨)
- */
-const CURRENT_LOG_LEVEL = LOG_LEVEL.INFO; // 開発時設定
-
-/**
  * システム制限値
  */
 const SYSTEM_LIMITS = {
@@ -67,31 +51,6 @@ const SYSTEM_LIMITS = {
   MAX_PAGE_SIZE: 100,        // 最大ページサイズ
   RADIX_DECIMAL: 10          // 10進数変換用基数
 };
-
-/**
- * 統一ログ関数 - Zero-Dependency Architecture
- */
-function sysLog(level, message, ...args) {
-  if (level < CURRENT_LOG_LEVEL) return;
-
-  const timestamp = new Date().toISOString();
-  const prefix = `[${timestamp}]`;
-
-  switch (level) {
-    case LOG_LEVEL.DEBUG:
-      console.log(`${prefix} [DEBUG]`, message, ...args);
-      break;
-    case LOG_LEVEL.INFO:
-      console.log(`${prefix} [INFO]`, message, ...args);
-      break;
-    case LOG_LEVEL.WARN:
-      console.warn(`${prefix} [WARN]`, message, ...args);
-      break;
-    case LOG_LEVEL.ERROR:
-      console.error(`${prefix} [ERROR]`, message, ...args);
-      break;
-  }
-}
 
 // 🌍 グローバル定数設定 - Zero-Dependency Architecture
 
@@ -103,8 +62,6 @@ const __rootSys = (typeof globalThis !== 'undefined') ? globalThis : (typeof glo
 __rootSys.CACHE_DURATION = CACHE_DURATION;
 __rootSys.TIMEOUT_MS = TIMEOUT_MS;
 __rootSys.SLEEP_MS = SLEEP_MS;
-__rootSys.LOG_LEVEL = LOG_LEVEL;
-__rootSys.sysLog = sysLog;
 
 // Zero-Dependency Utility Functions
 
@@ -766,27 +723,12 @@ function getAdminSheetList(spreadsheetId) {
  * @returns {Object} 公開結果
  */
 function publishApp(publishConfig) {
-  const startTime = new Date().toISOString();
-
   try {
     const email = getCurrentEmail();
-    console.log(`publishApp: Started for user ${email} at ${startTime}`);
 
     if (!email) {
       console.error('publishApp: User authentication failed');
       return { success: false, message: 'ユーザー認証が必要です' };
-    }
-
-    // Log input data
-    console.log(`publishApp: Input config keys: [${Object.keys(publishConfig || {}).join(', ')}]`);
-    if (publishConfig?.spreadsheetId) {
-      console.log(`publishApp: Target spreadsheet: ${publishConfig.spreadsheetId}`);
-    }
-
-    // Log display settings (responder name & reaction count)
-    if (publishConfig?.displaySettings) {
-      const ds = publishConfig.displaySettings;
-      console.log(`publishApp: Display settings - show names: ${ds.showNames}, show reactions: ${ds.showReactions}`);
     }
 
     const publishedAt = new Date().toISOString();
@@ -797,7 +739,6 @@ function publishApp(publishConfig) {
 
     // Direct findUserByEmail usage
     const user = findUserByEmail(email, { requestingUser: email });
-    console.log(`publishApp: User lookup result: ${user ? 'found' : 'not found'} (userId: ${user?.userId || 'N/A'})`);
 
     let saveResult = null;
 
@@ -809,7 +750,6 @@ function publishApp(publishConfig) {
       // 統一API使用: 構造化パース
       const configResult = getUserConfig(userToUse.userId);
       const currentConfig = configResult.success ? configResult.config : {};
-      console.log(`publishApp: Current config loaded: ${configResult.success ? 'success' : 'failed'} (keys: [${Object.keys(currentConfig).join(', ')}])`);
 
       // Explicit override of important fields
       const updatedConfig = {
@@ -829,23 +769,16 @@ function publishApp(publishConfig) {
 
       // ✅ バックエンド構造統一完了：フロントエンドは既に正しい構造を送信
 
-      console.log('publishApp: Attempting to save config with isPublished=true');
-
       // 🔧 CLAUDE.md準拠: 統一API使用 - saveUserConfigでETag対応の安全な更新
       saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
 
-      if (saveResult.success) {
-        console.log(`publishApp: Config saved successfully (ETag: ${saveResult.etag || 'N/A'})`);
-      } else {
+      if (!saveResult.success) {
         console.error('publishApp: saveUserConfig failed:', saveResult.message);
         // エラーでも処理を継続（互換性のため）
       }
     } else {
       console.error('publishApp: User not found:', email);
     }
-
-    const endTime = new Date().toISOString();
-    const duration = new Date(endTime) - new Date(startTime);
 
     const result = {
       success: true,
@@ -855,8 +788,6 @@ function publishApp(publishConfig) {
       etag: user && saveResult?.etag ? saveResult.etag : null,
       config: user && saveResult?.config ? saveResult.config : null
     };
-
-    console.log(`publishApp: Completed successfully in ${duration}ms at ${endTime}`);
     return result;
 
   } catch (error) {
@@ -962,10 +893,8 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
   if (isOwner) {
     try {
       // シートレベルでフォームURL取得（最優先）
-      console.log('🔍 sheet.getFormUrl() 実行中...');
       if (typeof sheet.getFormUrl === 'function') {
         const formUrl = sheet.getFormUrl();
-        console.log('🔍 sheet.getFormUrl() 結果:', { formUrl: formUrl || 'null' });
         if (formUrl) {
           results.formUrl = formUrl;
           results.confidence = 95;
@@ -982,18 +911,13 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
             results.formTitle = generateFormTitle(sheetName, spreadsheet.getName());
             results.details.push('FormApp権限エラー - フォールバックタイトル使用');
           }
-          console.log('✅ シートレベルでフォーム検出成功:', results);
           return results;
         }
-      } else {
-        console.log('⚠️ sheet.getFormUrl メソッドが使用できません');
       }
 
       // スプレッドシートレベルでフォームURL取得（フォールバック）
-      console.log('🔍 spreadsheet.getFormUrl() 実行中...');
       if (typeof spreadsheet.getFormUrl === 'function') {
         const formUrl = spreadsheet.getFormUrl();
-        console.log('🔍 spreadsheet.getFormUrl() 結果:', { formUrl: formUrl || 'null' });
         if (formUrl) {
           results.formUrl = formUrl;
           results.confidence = 85;
@@ -1010,13 +934,9 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
             results.formTitle = generateFormTitle(sheetName, spreadsheet.getName());
             results.details.push('FormApp権限エラー - フォールバックタイトル使用');
           }
-          console.log('✅ スプレッドシートレベルでフォーム検出成功:', results);
           return results;
         }
-      } else {
-        console.log('⚠️ spreadsheet.getFormUrl メソッドが使用できません');
       }
-      console.log('❌ API検出: フォームURLが取得できませんでした');
     } catch (apiError) {
       console.warn('detectFormConnection: API検出失敗:', apiError.message);
       results.details.push(apiError && apiError.message ? `API検出失敗: ${apiError.message}` : 'API検出失敗: 詳細不明');
@@ -1027,25 +947,16 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
 
   // Method 1.5: Drive APIフォーム検索（API検出失敗時のフォールバック）
   if (isOwner) {
-    console.log('🔍 Drive API検索開始...');
     try {
       const spreadsheetId = spreadsheet.getId();
-      console.log('🔍 Drive API検索 - spreadsheetId:', `${spreadsheetId.substring(0, 12)}***`);
       const driveFormResult = searchFormsByDrive(spreadsheetId, sheetName);
-      console.log('🔍 Drive API検索結果:', {
-        hasFormUrl: !!driveFormResult.formUrl,
-        formTitle: driveFormResult.formTitle || 'null'
-      });
       if (driveFormResult.formUrl) {
         results.formUrl = driveFormResult.formUrl;
         results.formTitle = driveFormResult.formTitle;
         results.confidence = 80;
         results.detectionMethod = 'drive_search';
         results.details.push('Drive API検索で検出');
-        console.log('✅ Drive API検索でフォーム検出成功:', results);
         return results;
-      } else {
-        console.log('❌ Drive API検索: フォームが見つかりませんでした');
       }
     } catch (driveError) {
       console.warn('detectFormConnection: Drive API検索失敗:', driveError.message);
@@ -1054,20 +965,14 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
   }
 
   // Method 2: ヘッダーパターン解析
-  console.log('🔍 ヘッダーパターン解析開始...');
   try {
     const [headers] = sheet.getRange(1, 1, 1, Math.min(sheet.getLastColumn(), 10)).getValues();
-    console.log('🔍 取得したヘッダー:', headers);
     const headerAnalysis = analyzeFormHeaders(headers);
-    console.log('🔍 ヘッダー解析結果:', headerAnalysis);
 
     if (headerAnalysis.isFormLike) {
       results.confidence = Math.max(results.confidence, headerAnalysis.confidence);
       results.detectionMethod = results.detectionMethod === 'none' ? 'header_analysis' : results.detectionMethod;
       results.details.push(headerAnalysis && headerAnalysis.reason ? `ヘッダー解析: ${headerAnalysis.reason}` : 'ヘッダー解析: 結果不明');
-      console.log('✅ ヘッダー分析でフォームパターン検出');
-    } else {
-      console.log('❌ ヘッダー分析: フォームパターンなし');
     }
   } catch (headerError) {
     console.warn('detectFormConnection: ヘッダー解析失敗:', headerError.message);
@@ -1075,30 +980,17 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
   }
 
   // Method 3: シート名パターン解析
-  console.log('🔍 シート名パターン解析開始...');
   const sheetNameAnalysis = analyzeSheetName(sheetName);
-  console.log('🔍 シート名解析結果:', sheetNameAnalysis);
   if (sheetNameAnalysis.isFormLike) {
     results.confidence = Math.max(results.confidence, sheetNameAnalysis.confidence);
     results.detectionMethod = results.detectionMethod === 'none' ? 'sheet_name' : results.detectionMethod;
     results.details.push(sheetNameAnalysis && sheetNameAnalysis.reason ? `シート名解析: ${sheetNameAnalysis.reason}` : 'シート名解析: 結果不明');
-    console.log('✅ シート名分析でフォームパターン検出');
-  } else {
-    console.log('❌ シート名分析: フォームパターンなし');
   }
 
   // フォーム検出時のタイトル生成
   if (results.confidence >= 40) {
     results.formTitle = `${sheetName} (フォーム検出済み)`;
   }
-
-  console.log('🔍 detectFormConnection 最終結果:', {
-    formUrl: results.formUrl || 'null',
-    confidence: results.confidence,
-    detectionMethod: results.detectionMethod,
-    formTitle: results.formTitle || 'null',
-    detailsCount: results.details.length
-  });
 
   return results;
 }
@@ -1235,7 +1127,6 @@ function generateFormTitle(sheetName, spreadsheetName) {
  */
 function searchFormsByDrive(spreadsheetId, sheetName) {
   try {
-    console.log('searchFormsByDrive: 検索開始', { spreadsheetId: `${spreadsheetId.substring(0, 12)  }***`, sheetName });
 
     // Drive APIでフォーム一覧を取得
     const forms = DriveApp.getFilesByType('application/vnd.google-apps.form');
@@ -1263,17 +1154,7 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
         }
 
         if (destId === spreadsheetId) {
-          console.log('searchFormsByDrive: 対象スプレッドシートへのフォーム発見', {
-            formId: formFile.getId(),
-            formTitle
-          });
-
           // Form IDとspreadsheet IDが一致していれば接続確認済み
-          console.log('searchFormsByDrive: フォーム接続確認成功', {
-            sheetName,
-            formTitle
-          });
-
           return {
             formUrl: formPublishedUrl,
             formTitle
@@ -1285,7 +1166,6 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
       }
     }
 
-    console.log('searchFormsByDrive: 対象フォームが見つかりませんでした');
     return { formUrl: null, formTitle: null };
 
   } catch (error) {
@@ -1308,11 +1188,6 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
     // 🎯 CLAUDE.md準拠: validateAccess は管理者機能のため、常にサービスアカウント使用
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
     const {spreadsheet, auth} = dataAccess;
-
-    // サービスアカウントを編集者として自動登録（openSpreadsheetで既に実行済み）
-    if (autoAddEditor) {
-      console.log('validateAccess: サービスアカウント編集者権限は openSpreadsheet で既に処理済み');
-    }
 
     // カスタムラッパーのgetSheets()メソッドを使用
     const sheets = spreadsheet.getSheets();
@@ -1438,13 +1313,6 @@ function getFormInfo(spreadsheetId, sheetName) {
 
     // 多層フォーム検出システム実行
     const formDetectionResult = detectFormConnection(spreadsheet, sheet, sheetName, isOwner);
-
-    console.log('getFormInfoImpl: フォーム検出結果', {
-      hasFormUrl: !!formDetectionResult.formUrl,
-      detectionMethod: formDetectionResult.detectionMethod,
-      confidence: formDetectionResult.confidence,
-      accessMethod
-    });
 
     const formData = {
       formUrl: formDetectionResult.formUrl || null,
@@ -1578,10 +1446,6 @@ function createForm(userId, config) {
  * @returns {Object} 公開状態情報
  */
 function checkCurrentPublicationStatus(targetUserId) {
-  console.log('📊 checkCurrentPublicationStatus START:', {
-    targetUserId: targetUserId || 'current_user'
-  });
-
   try {
     const session = { email: Session.getActiveUser().getEmail() };
     // 🔧 Zero-Dependency統一: 直接Dataクラス使用

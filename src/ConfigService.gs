@@ -672,7 +672,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
             if (headers && headers[answerIndex]) {
               const questionText = headers[answerIndex];
               if (questionText && typeof questionText === 'string' && questionText.trim()) {
-                console.log('✅ getQuestionText SUCCESS (from dynamic headers):', questionText.trim());
                 return questionText.trim();
               }
             }
@@ -687,12 +686,10 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
 
     // 4. formTitleからの取得
     if (config?.formTitle && typeof config.formTitle === 'string' && config.formTitle.trim()) {
-      console.log('✅ getQuestionText SUCCESS (from formTitle):', config.formTitle.trim());
       return config.formTitle.trim();
     }
 
     // 5. デフォルトフォールバック
-    console.log('🔄 getQuestionText FALLBACK: Using default title');
     return 'Everyone\'s Answer Board';
   } catch (error) {
     console.error('❌ getQuestionText ERROR:', error.message);
