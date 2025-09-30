@@ -544,16 +544,8 @@ function openSpreadsheet(spreadsheetId, options = {}) {
 
     // スプレッドシートを開く
     try {
-      console.log('openSpreadsheet: 接続試行開始', {
-        spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
-        useServiceAccount: options.useServiceAccount,
-        hasAuth: !!auth,
-        authValid: auth?.isValid
-      });
-
       if (options.useServiceAccount === true && auth && auth.isValid) {
         // Service account implementation via JWT authentication
-        console.log('openSpreadsheet: サービスアカウント接続試行');
         spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
         if (!spreadsheet) {
           console.error('openSpreadsheet: サービスアカウント接続失敗、通常アクセスにフォールバック', {
@@ -561,18 +553,10 @@ function openSpreadsheet(spreadsheetId, options = {}) {
             authEmail: auth.email
           });
           spreadsheet = SpreadsheetApp.openById(spreadsheetId);
-        } else {
-          console.log('openSpreadsheet: サービスアカウント接続成功');
         }
       } else {
-        console.log('openSpreadsheet: 通常権限で接続');
         spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       }
-
-      console.log('openSpreadsheet: 接続成功', {
-        spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
-        hasSpreadsheet: !!spreadsheet
-      });
     } catch (openError) {
       console.error('openSpreadsheet: スプレッドシート接続失敗', {
         spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
@@ -633,12 +617,10 @@ function findUserByEmail(email, context = {}) {
     try {
       const cached = CacheService.getScriptCache().get(individualCacheKey);
       if (cached) {
-        const cachedUser = JSON.parse(cached);
-        console.log(`findUserByEmail: Found user in individual cache (v${cacheVersion}), highest performance`);
-        return cachedUser;
+        return JSON.parse(cached);
       }
     } catch (individualCacheError) {
-      console.warn('findUserByEmail: Individual cache read failed:', individualCacheError.message);
+      console.error('findUserByEmail: Individual cache read failed:', individualCacheError.message);
     }
 
     // キャッシュ最適化: まずgetAllUsers()のキャッシュを活用
@@ -647,20 +629,18 @@ function findUserByEmail(email, context = {}) {
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find(u => u.userEmail === email);
         if (user) {
-          console.log('findUserByEmail: Found user in cached data, avoiding direct API call');
-
           // 個別キャッシュに保存（冗長性強化）
           try {
             CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
           } catch (saveError) {
-            console.warn('findUserByEmail: Individual cache save failed:', saveError.message);
+            console.error('findUserByEmail: Individual cache save failed:', saveError.message);
           }
 
           return user;
         }
       }
     } catch (cacheError) {
-      console.warn('findUserByEmail: Cache-based search failed, falling back to direct DB access:', cacheError.message);
+      console.error('findUserByEmail: Cache-based search failed, falling back to direct DB access:', cacheError.message);
     }
 
     // フォールバック: 直接データベースアクセス
@@ -732,12 +712,10 @@ function findUserById(userId, context = {}) {
     try {
       const cached = CacheService.getScriptCache().get(individualCacheKey);
       if (cached) {
-        const cachedUser = JSON.parse(cached);
-        console.log(`findUserById: Found user in individual cache (v${cacheVersion}), highest performance`);
-        return cachedUser;
+        return JSON.parse(cached);
       }
     } catch (individualCacheError) {
-      console.warn('findUserById: Individual cache read failed:', individualCacheError.message);
+      console.error('findUserById: Individual cache read failed:', individualCacheError.message);
     }
 
     // キャッシュ最適化: まずgetAllUsers()のキャッシュを活用
@@ -746,20 +724,18 @@ function findUserById(userId, context = {}) {
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find(u => u.userId === userId);
         if (user) {
-          console.log('findUserById: Found user in cached data, avoiding direct API call');
-
           // 個別キャッシュに保存（冗長性強化）
           try {
             CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
           } catch (saveError) {
-            console.warn('findUserById: Individual cache save failed:', saveError.message);
+            console.error('findUserById: Individual cache save failed:', saveError.message);
           }
 
           return user;
         }
       }
     } catch (cacheError) {
-      console.warn('findUserById: Cache-based search failed, falling back to direct DB access:', cacheError.message);
+      console.error('findUserById: Cache-based search failed, falling back to direct DB access:', cacheError.message);
     }
 
     // フォールバック: 直接データベースアクセス
@@ -842,7 +818,6 @@ function createUser(email, initialConfig = {}, context = {}) {
       requestingUser: currentEmail
     });
     if (existingUser) {
-      console.log('createUser: User already exists, returning existing:', email);
       return existingUser;
     }
 
@@ -910,7 +885,6 @@ function createUser(email, initialConfig = {}, context = {}) {
     clearDatabaseUserCache('user_creation');
     clearIndividualUserCache(user, 'user_creation');
 
-    console.log('createUser: User created successfully:', userId);
     return user;
 
   } catch (error) {
@@ -955,12 +929,10 @@ function getAllUsers(options = {}, context = {}) {
       try {
         const cached = CacheService.getScriptCache().get(cacheKey);
         if (cached) {
-          const cachedUsers = JSON.parse(cached);
-          console.log(`getAllUsers: Returned cached data (v${cacheVersion}), avoiding API call`);
-          return cachedUsers;
+          return JSON.parse(cached);
         }
       } catch (cacheError) {
-        console.warn('getAllUsers: Cache read failed:', cacheError.message);
+        console.error('getAllUsers: Cache read failed:', cacheError.message);
       }
     }
 
@@ -1006,9 +978,8 @@ function getAllUsers(options = {}, context = {}) {
     if (!skipCache) {
       try {
         CacheService.getScriptCache().put(cacheKey, JSON.stringify(users), CACHE_DURATION.DATABASE_LONG);
-        console.log('getAllUsers: Cached user data for 10 minutes');
       } catch (cacheError) {
-        console.warn('getAllUsers: Cache write failed:', cacheError.message);
+        console.error('getAllUsers: Cache write failed:', cacheError.message);
       }
     }
 
@@ -1035,10 +1006,8 @@ function clearDatabaseUserCache(operation = 'database_operation') {
     const newVersion = currentVersion + 1;
 
     props.setProperty('USER_CACHE_VERSION', newVersion.toString());
-
-    console.log(`clearDatabaseUserCache: Cache invalidated after ${operation} (v${currentVersion} → v${newVersion})`);
   } catch (error) {
-    console.warn('clearDatabaseUserCache: Failed to clear cache:', error.message);
+    console.error('clearDatabaseUserCache: Failed to clear cache:', error.message);
   }
 }
 
@@ -1162,7 +1131,6 @@ function updateUser(userId, updates, context = {}) {
         clearDatabaseUserCache('user_update');
         clearIndividualUserCache(targetUser, 'user_update');
 
-        console.log('updateUser: User updated successfully:', userId);
         return { success: true };
       }
     }
