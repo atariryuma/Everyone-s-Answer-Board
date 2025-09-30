@@ -2392,17 +2392,22 @@ function checkUserAuthentication() {
  */
 function getBatchedViewerData(targetUserId, currentEmail) {
   try {
-    //Batch operation: Get all required data in single coordinated call
-    const targetUser = findUserById(targetUserId, { requestingUser: currentEmail });
+    // ✅ CLAUDE.md準拠: preloadedAuth構築でDB重複アクセス排除
+    const isAdminUser = isAdministrator(currentEmail);
+    const preloadedAuth = { email: currentEmail, isAdmin: isAdminUser };
+
+    // ✅ preloadedAuthを渡してfindUserById内のgetAllUsers重複呼び出しを排除
+    const targetUser = findUserById(targetUserId, {
+      requestingUser: currentEmail,
+      preloadedAuth
+    });
     if (!targetUser) {
       return { success: false, error: '対象ユーザーが見つかりません' };
     }
 
-    // Batch remaining operations with user context
-    const configResult = getUserConfig(targetUserId);
+    // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
+    const configResult = getUserConfig(targetUserId, targetUser);
     const config = configResult.success ? configResult.config : {};
-
-    const isAdminUser = isAdministrator(currentEmail);
 
     return {
       success: true,
@@ -2441,14 +2446,20 @@ function getBatchedAdminData(targetUserId) {
       return { success: false, error: 'ユーザー認証が必要です' };
     }
 
-    //対象ユーザーの存在確認
-    const targetUser = findUserById(targetUserId, { requestingUser: currentEmail });
+    // ✅ CLAUDE.md準拠: preloadedAuth構築でDB重複アクセス排除
+    const isAdmin = isAdministrator(currentEmail);
+    const preloadedAuth = { email: currentEmail, isAdmin };
+
+    // ✅ preloadedAuthを渡してfindUserById内のgetAllUsers重複呼び出しを排除
+    const targetUser = findUserById(targetUserId, {
+      requestingUser: currentEmail,
+      preloadedAuth
+    });
     if (!targetUser) {
       return { success: false, error: '指定されたユーザーが見つかりません' };
     }
 
     //権限チェック: 管理者またはターゲットユーザー本人のみアクセス可能
-    const isAdmin = isAdministrator(currentEmail);
     const isOwnBoard = currentEmail === targetUser.userEmail;
 
     if (!isAdmin && !isOwnBoard) {
@@ -2463,7 +2474,8 @@ function getBatchedAdminData(targetUserId) {
       return { success: false, error: '対象ユーザーがアクティブではありません' };
     }
 
-    const configResult = getUserConfig(targetUserId);
+    // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
+    const configResult = getUserConfig(targetUserId, targetUser);
     const config = configResult.success ? configResult.config : {};
 
     // フロントエンド必要情報を統合取得

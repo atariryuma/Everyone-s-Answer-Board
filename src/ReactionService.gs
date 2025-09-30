@@ -315,13 +315,21 @@ function addReaction(targetUserId, rowIndex, reactionType) {
       return createErrorResponse('Access denied to target board');
     }
 
-    // 🎯 GAS-Native: 直接データアクセス
-    const targetUser = findUserById(targetUserId, { requestingUser: actorEmail });
+    // ✅ CLAUDE.md準拠: preloadedAuth構築でDB重複アクセス排除
+    const isAdmin = isAdministrator(actorEmail);
+    const preloadedAuth = { email: actorEmail, isAdmin };
+
+    // ✅ preloadedAuthを渡してfindUserById内のgetAllUsers重複呼び出しを排除
+    const targetUser = findUserById(targetUserId, {
+      requestingUser: actorEmail,
+      preloadedAuth
+    });
     if (!targetUser) {
       return createErrorResponse('Target user not found');
     }
 
-    const configResult = getUserConfig(targetUserId);
+    // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
+    const configResult = getUserConfig(targetUserId, targetUser);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Board configuration incomplete');
@@ -425,12 +433,21 @@ function toggleHighlight(targetUserId, rowIndex) {
       return createErrorResponse('Access denied to target board');
     }
 
-    const targetUser = findUserById(targetUserId, { requestingUser: actorEmail });
+    // ✅ CLAUDE.md準拠: preloadedAuth構築でDB重複アクセス排除
+    const isAdmin = isAdministrator(actorEmail);
+    const preloadedAuth = { email: actorEmail, isAdmin };
+
+    // ✅ preloadedAuthを渡してfindUserById内のgetAllUsers重複呼び出しを排除
+    const targetUser = findUserById(targetUserId, {
+      requestingUser: actorEmail,
+      preloadedAuth
+    });
     if (!targetUser) {
       return createErrorResponse('Target user not found');
     }
 
-    const configResult = getUserConfig(targetUserId);
+    // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
+    const configResult = getUserConfig(targetUserId, targetUser);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Board configuration incomplete');
