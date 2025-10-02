@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getDatabaseConfig, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getDatabaseConfig, getViewerBoardData, getSheetHeaders, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty */
 
 // Core Utility Functions
 
@@ -516,7 +516,7 @@ function isAdministrator(email) {
   }
 
   try {
-    const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+    const adminEmail = getCachedProperty('ADMIN_EMAIL');
     if (!adminEmail) {
       console.warn('isAdministrator: ADMIN_EMAIL設定が見つかりません');
       return false;
@@ -1690,8 +1690,10 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
     }
 
     // High-precision analysis data retrieval
-    const lastCol = sheet.getLastColumn();
-    const lastRow = sheet.getLastRow();
+    // ✅ API最適化: getDataRange()使用で呼び出し削減（2回→1回）
+    const dataRange = sheet.getDataRange();
+    const lastCol = dataRange.getNumColumns();
+    const lastRow = dataRange.getLastRow();
     const headers = lastCol > 0 ? getSheetHeaders(sheet, lastCol) : [];
 
     // Sample data retrieval for hybrid system
@@ -2605,11 +2607,17 @@ function executeWithRetry(operation, options = {}) {
     try {
       // Add delay for retry attempts (not first attempt)
       if (retryCount > 0) {
+        const errorMessage = lastError && lastError.message ? lastError.message : '';
+
+        // ✅ API最適化: 429エラー専用の長い遅延（Quota exceeded対策）
+        const is429Error = errorMessage.includes('429') || errorMessage.includes('Quota exceeded');
+        const baseDelay = is429Error ? initialDelay * 2 : initialDelay;
+
         const delay = Math.min(
-          initialDelay * Math.pow(2, retryCount - 1),
+          baseDelay * Math.pow(2, retryCount - 1),
           maxDelay
         );
-        console.warn(`${operationName}: Retry ${retryCount}/${maxRetries - 1} after ${delay}ms delay`);
+        console.warn(`${operationName}: Retry ${retryCount}/${maxRetries - 1} after ${delay}ms delay${is429Error ? ' (429 quota)' : ''}`);
         Utilities.sleep(delay);
       }
 

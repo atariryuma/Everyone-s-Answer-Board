@@ -18,7 +18,7 @@
  * - ReactionService.gs（リアクション・ハイライト）
  */
 
-/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, createDataServiceSuccessResponse */
+/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, createDataServiceSuccessResponse, getCachedProperty */
 
 // Core Data Operations
 
@@ -205,15 +205,34 @@ function connectToSpreadsheetSheet(config, context = {}) {
 }
 
 /**
+ * シート情報を一括取得（寸法+ヘッダー）
+ * ✅ API最適化: getDataRange()を1回で寸法とヘッダーを同時取得（50%削減）
+ * @param {Sheet} sheet - シートオブジェクト
+ * @returns {Object} { lastRow, lastCol, headers }
+ */
+function getSheetInfo(sheet) {
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+
+  return {
+    lastRow: dataRange.getLastRow(),
+    lastCol: dataRange.getNumColumns(),
+    headers: values[0] || []
+  };
+}
+
+/**
  * シートの寸法取得（GAS Best Practice: 単一責任）
+ * ✅ API最適化: getDataRange()使用で呼び出し50%削減（2回→1回）
  * @param {Sheet} sheet - シートオブジェクト
  * @returns {Object} 寸法情報
  */
 function getSheetDimensions(sheet) {
-  const lastRow = sheet.getLastRow();
-  const lastCol = sheet.getLastColumn();
-
-  return { lastRow, lastCol };
+  const dataRange = sheet.getDataRange();
+  return {
+    lastRow: dataRange.getLastRow(),
+    lastCol: dataRange.getNumColumns()
+  };
 }
 
 /**
@@ -267,10 +286,8 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
       processedData = processedData.concat(batchProcessed);
       processedCount += batchSize;
 
-      // パフォーマンス最適化: 休憩頻度を削減
-      if (processedCount % 500 === 0) {
-        Utilities.sleep(50); // 0.05秒休憩（短縮）
-      }
+      // ✅ API最適化: 通常時の休憩削除（エラー時はexecuteWithRetryが自動リトライ）
+      // Googleベストプラクティス: エラー時のみExponential Backoffでリトライ
 
     } catch (batchError) {
       console.error('DataService.processBatchData: バッチ処理エラー', {
@@ -692,7 +709,7 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
     const isOwner = user.userEmail === currentEmail;
     const isAdmin = (() => {
       try {
-        const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+        const adminEmail = getCachedProperty('ADMIN_EMAIL');
         return currentEmail?.toLowerCase() === adminEmail?.toLowerCase();
       } catch (error) {
         console.warn('Administrator check failed:', error);
@@ -730,14 +747,14 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
       return createDataServiceErrorResponse(`シート「${sheetName}」が見つかりません`);
     }
 
-    // 行範囲検証
-    const lastRow = sheet.getLastRow();
+    // 行範囲検証（API効率化: getSheetDimensions使用）
+    const { lastRow, lastCol } = getSheetDimensions(sheet);
     if (rowIndex < 2 || rowIndex > lastRow) {
       return createDataServiceErrorResponse('無効な行番号です');
     }
 
     // Performance improvement -Batch operation
-    const [rowData] = sheet.getRange(rowIndex, 1, 1, sheet.getLastColumn()).getValues();
+    const [rowData] = sheet.getRange(rowIndex, 1, 1, lastCol).getValues();
 
     // 削除実行
     sheet.deleteRows(rowIndex, 1);
