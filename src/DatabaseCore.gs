@@ -16,15 +16,27 @@
 
 /**
  * Google Sheets APIの堅牢な呼び出しラッパー（クォータ制限対応）
+ * ✅ 適応型バックオフ: 初回エラーは短い待機、連続エラー時は段階的延長
  * @param {string} url - API URL
  * @param {Object} options - Fetch options
  * @param {string} operationName - Operation name for logging
  * @returns {Object} Response object
  */
 function fetchSheetsAPIWithRetry(url, options, operationName) {
+  let retryCount = 0;
+
   return executeWithRetry(
     () => {
       const response = UrlFetchApp.fetch(url, options);
+
+      // ✅ 適応型429エラー処理: 連続エラー回数に応じて待機時間を段階的延長
+      if (response.getResponseCode() === 429) {
+        const backoffTime = Math.min(5000 + (retryCount * 3000), 15000);
+        console.warn(`⚠️ 429 Quota exceeded for ${operationName || 'Sheets API'}, waiting ${backoffTime}ms (retry: ${retryCount})`);
+        Utilities.sleep(backoffTime);
+        retryCount++;
+        throw new Error('Quota exceeded (429), retry with adaptive backoff');
+      }
 
       if (response.getResponseCode() !== 200) {
         const errorText = response.getContentText();
@@ -35,8 +47,8 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
     },
     {
       maxRetries: 3,
-      initialDelay: 1000, // 1秒 - APIクォータ制限のため長め
-      maxDelay: 10000,   // 10秒 - クォータエラー対応
+      initialDelay: 2000,
+      maxDelay: 20000,
       operationName: operationName || 'Sheets API call'
     }
   );
@@ -120,13 +132,11 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
 
 /**
  * データベーススプレッドシートを開く（CLAUDE.md準拠 - Editor→Admin共有DB）
- * @param {boolean} useServiceAccount - サービスアカウントを使用するか（互換性のため保持、実際は常にtrue）
+ * DATABASE_SPREADSHEET_IDは常にサービスアカウントでアクセス（セキュリティ要件）
  * @param {Object} options - オプション設定
  * @returns {Object|null} Database spreadsheet object
  */
-function openDatabase(useServiceAccount = false, options = {}) {
-   
-  const _ = useServiceAccount; // Suppress unused parameter warning
+function openDatabase(options = {}) {
   try {
     const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
     if (!dbId) {
@@ -135,8 +145,7 @@ function openDatabase(useServiceAccount = false, options = {}) {
     }
 
     // DATABASE_SPREADSHEET_ID is shared resource - always use service account
-    // Note: useServiceAccount parameter preserved for API compatibility but overridden for security
-    const forceServiceAccount = true; // DATABASE_SPREADSHEET_ID always requires service account
+    const forceServiceAccount = true;
 
     const dataAccess = openSpreadsheet(dbId, {
       useServiceAccount: forceServiceAccount,
@@ -647,9 +656,7 @@ function findUserByEmail(email, context = {}) {
     }
 
     // フォールバック: 直接データベースアクセス
-    const useServiceAccount = context.forceServiceAccount || false;
-
-    const spreadsheet = openDatabase(useServiceAccount);
+    const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('findUserByEmail: Database access failed');
       return null;
@@ -742,9 +749,7 @@ function findUserById(userId, context = {}) {
     }
 
     // フォールバック: 直接データベースアクセス
-    const useServiceAccount = context.forceServiceAccount || false;
-
-    const spreadsheet = openDatabase(useServiceAccount);
+    const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('findUserById: Database access failed');
       return null;
@@ -825,7 +830,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     }
 
     // DATABASE_SPREADSHEET_ID: Shared database for user creation
-    const spreadsheet = openDatabase(context.forceServiceAccount || false);
+    const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('createUser: Database access failed');
       return null;
@@ -947,7 +952,7 @@ function getAllUsers(options = {}, context = {}) {
 
     // getAllUsers is inherently cross-user operation, always requires service account
     // unless admin is accessing for administrative purposes
-    const spreadsheet = openDatabase(true); // Always service account for cross-user data
+    const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('getAllUsers: Database access failed');
       return [];
@@ -1083,10 +1088,7 @@ function updateUser(userId, updates, context = {}) {
     }
 
     // DATABASE_SPREADSHEET_ID: Shared database accessible by authenticated users
-    const useServiceAccount = context.forceServiceAccount || false;
-
-
-    const spreadsheet = openDatabase(useServiceAccount);
+    const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('updateUser: Database access failed');
       return { success: false, message: 'Database access failed' };
@@ -1240,7 +1242,7 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       return null;
     }
 
-    // Performance optimization: caching implementation
+    // ✅ Phase 1: Performance optimization - 5分キャッシュでAPI呼び出し削減
     const cacheKey = `user_by_sheet_${spreadsheetId}`;
     const skipCache = context.skipCache || false;
 
@@ -1273,10 +1275,10 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
 
         if (config.spreadsheetId === spreadsheetId) {
 
-          // Cache the result
+          // ✅ Phase 1: キャッシュ保存（5分→10分に延長でヒット率向上）
           if (!skipCache) {
             try {
-              const cacheTtl = context.cacheTtl || CACHE_DURATION.LONG; // 300秒
+              const cacheTtl = context.cacheTtl || 600; // 300秒 → 600秒（10分）
               CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), cacheTtl);
             } catch (cacheError) {
               console.warn('findUserBySpreadsheetId: Cache write failed:', cacheError.message);
