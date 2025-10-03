@@ -212,62 +212,40 @@ function connectToSpreadsheetSheet(config, context = {}) {
  * @returns {Object} { lastRow, lastCol, headers }
  */
 function getSheetInfo(sheet) {
-  try {
-    // シートIDベースのキャッシュキー生成
-    const sheetId = sheet.getSheetId ? sheet.getSheetId() : sheet.getName();
-    const cacheKey = `sheet_info_${sheetId}`;
-    const cache = CacheService.getScriptCache();
+  // シートIDベースのキャッシュキー生成
+  const sheetId = sheet.getSheetId ? sheet.getSheetId() : sheet.getName();
+  const cacheKey = `sheet_info_${sheetId}`;
+  const cache = CacheService.getScriptCache();
 
-    // キャッシュ確認
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch (parseError) {
-        console.warn('getSheetInfo: Cache parse failed, fetching fresh data');
-      }
-    }
-
-    // キャッシュミス: API呼び出し
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
-
-    const info = {
-      lastRow: dataRange.getLastRow(),
-      lastCol: dataRange.getNumColumns(),
-      headers: values[0] || []
-    };
-
-    // ✅ API最適化: 10分キャッシュでヒット率20-30%向上
+  // キャッシュ確認
+  const cached = cache.get(cacheKey);
+  if (cached) {
     try {
-      cache.put(cacheKey, JSON.stringify(info), CACHE_DURATION.DATABASE_LONG);
-    } catch (cacheError) {
-      console.warn('getSheetInfo: Cache write failed:', cacheError.message);
+      return JSON.parse(cached);
+    } catch (parseError) {
+      console.warn('getSheetInfo: Cache parse failed, fetching fresh data');
     }
-
-    return info;
-  } catch (error) {
-    console.error('getSheetInfo: Error:', error.message);
-    // フォールバック: キャッシュなしで取得
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
-    return {
-      lastRow: dataRange.getLastRow(),
-      lastCol: dataRange.getNumColumns(),
-      headers: values[0] || []
-    };
   }
-}
 
-/**
- * ヘッダー行取得（GAS Best Practice: 単一責任）
- * @param {Sheet} sheet - シートオブジェクト
- * @param {number} lastCol - 最終列
- * @returns {Array} ヘッダー配列
- */
-function getSheetHeaders(sheet, lastCol) {
-  const [headers] = sheet.getRange(1, 1, 1, lastCol).getValues();
-  return headers;
+  // キャッシュミス: API呼び出し
+  const dataRange = sheet.getDataRange();
+  const values = dataRange.getValues();
+
+  // ✅ Sheets API モック対応: values配列から直接取得（SpreadsheetAppでも動作）
+  const info = {
+    lastRow: values.length,
+    lastCol: values[0]?.length || 0,
+    headers: values[0] || []
+  };
+
+  // ✅ API最適化: 10分キャッシュでヒット率20-30%向上
+  try {
+    cache.put(cacheKey, JSON.stringify(info), CACHE_DURATION.DATABASE_LONG);
+  } catch (cacheError) {
+    console.warn('getSheetInfo: Cache write failed:', cacheError.message);
+  }
+
+  return info;
 }
 
 /**

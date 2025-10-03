@@ -29,9 +29,9 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
     () => {
       const response = UrlFetchApp.fetch(url, options);
 
-      // ✅ 適応型429エラー処理: 連続エラー回数に応じて待機時間を段階的延長
+      // ✅ 適応型429エラー処理: Quota回復を待つための延長バックオフ
       if (response.getResponseCode() === 429) {
-        const backoffTime = Math.min(5000 + (retryCount * 3000), 15000);
+        const backoffTime = Math.min(8000 + (retryCount * 5000), 25000);
         console.warn(`⚠️ 429 Quota exceeded for ${operationName || 'Sheets API'}, waiting ${backoffTime}ms (retry: ${retryCount})`);
         Utilities.sleep(backoffTime);
         retryCount++;

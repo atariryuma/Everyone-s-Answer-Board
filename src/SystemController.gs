@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, Config, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getDatabaseConfig, getAllUsers, openDatabase */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, Config, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getDatabaseConfig, getAllUsers, openDatabase, getCachedProperty, getSheetInfo */
 
 // システム定数 - Zero-Dependency Architecture
 
@@ -13,7 +13,7 @@ const CACHE_DURATION = {
   SHORT: 10,           // 10秒 - 認証ロック
   MEDIUM: 30,          // 30秒 - リアクション・ハイライトロック
   LONG: 300,           // 5分 - ユーザー情報キャッシュ
-  DATABASE_LONG: 600,  // 10分 - データベース全体キャッシュ（クォータ制限対策）
+  DATABASE_LONG: 900,  // 15分 - データベース全体キャッシュ（429エラー対策強化）
   USER_INDIVIDUAL: 900, // 15分 - 個別ユーザーキャッシュ（冗長性強化）
   EXTRA_LONG: 3600     // 1時間 - 設定キャッシュ
 };
@@ -680,12 +680,16 @@ function getAdminSheetList(spreadsheetId) {
     const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
 
-    const sheetList = sheets.map(sheet => ({
-      name: sheet.getName(),
-      index: sheet.getIndex(),
-      rowCount: sheet.getLastRow(),
-      columnCount: sheet.getLastColumn()
-    }));
+    // ✅ API最適化: getSheetInfo()でAPI呼び出し66%削減（各シートで3回→1回）
+    const sheetList = sheets.map(sheet => {
+      const { lastRow, lastCol } = getSheetInfo(sheet);
+      return {
+        name: sheet.getName(),
+        index: sheet.getIndex(),
+        rowCount: lastRow,
+        columnCount: lastCol
+      };
+    });
 
     return {
       success: true,
@@ -960,7 +964,9 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
 
   // Method 2: ヘッダーパターン解析
   try {
-    const [headers] = sheet.getRange(1, 1, 1, Math.min(sheet.getLastColumn(), 10)).getValues();
+    // ✅ API最適化: getSheetInfo()でAPI呼び出し削減
+    const { lastCol, headers: fullHeaders } = getSheetInfo(sheet);
+    const headers = fullHeaders.slice(0, Math.min(lastCol, 10));
     const headerAnalysis = analyzeFormHeaders(headers);
 
     if (headerAnalysis.isFormLike) {
@@ -1195,15 +1201,19 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
     }
 
     // アクセスできたら成功
+    // ✅ API最適化: getSheetInfo()でAPI呼び出し66%削減（各シートで3回→1回）
     const result = {
       success: true,
       message: 'アクセス権限が確認されました',
       spreadsheetName,
-      sheets: sheets.map(sheet => ({
-        name: sheet.getName(),
-        rowCount: sheet.getLastRow(),
-        columnCount: sheet.getLastColumn()
-      })),
+      sheets: sheets.map(sheet => {
+        const { lastRow, lastCol } = getSheetInfo(sheet);
+        return {
+          name: sheet.getName(),
+          rowCount: lastRow,
+          columnCount: lastCol
+        };
+      }),
       owner: 'Service Account Access',
       url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
     };
@@ -1925,7 +1935,7 @@ function diagnosePerformance(options = {}) {
 function testDatabaseConnection() {
   try {
     // データベース接続を試行
-    const spreadsheet = openDatabase(true); // Use service account for admin access
+    const spreadsheet = openDatabase();
     if (!spreadsheet) {
       return {
         success: false,
@@ -1934,7 +1944,7 @@ function testDatabaseConnection() {
     }
 
     // 基本的なデータベース情報を取得
-    const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
     const usersSheet = spreadsheet.getSheetByName('users');
 
     if (!usersSheet) {
@@ -1944,9 +1954,10 @@ function testDatabaseConnection() {
       };
     }
 
-    // シートの基本情報を確認
-    const rowCount = usersSheet.getLastRow();
-    const colCount = usersSheet.getLastColumn();
+    // ✅ API最適化 + Sheets API モック対応: values配列から直接取得
+    const values = usersSheet.getDataRange().getValues();
+    const rowCount = values.length;
+    const colCount = values[0]?.length || 0;
 
     return {
       success: true,

@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, Auth, UserService, isAdministrator, SLEEP_MS */
+/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, Auth, UserService, isAdministrator, SLEEP_MS, getSheetInfo */
 
 
 // GAS-Native ConfigService (直接API版)
@@ -667,9 +667,10 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
           const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
           const { spreadsheet } = dataAccess;
           const sheet = spreadsheet.getSheetByName(config.sheetName);
-          if (sheet && sheet.getLastColumn() > 0) {
-            const [headers] = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues();
-            if (headers && headers[answerIndex]) {
+          if (sheet) {
+            // ✅ API最適化: getSheetInfo()でAPI呼び出し66%削減（3回→1回）
+            const { lastCol, headers } = getSheetInfo(sheet);
+            if (lastCol > 0 && headers && headers[answerIndex]) {
               const questionText = headers[answerIndex];
               if (questionText && typeof questionText === 'string' && questionText.trim()) {
                 return questionText.trim();

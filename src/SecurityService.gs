@@ -8,7 +8,7 @@
  * - Service Account管理
  */
 
-/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL, getCurrentEmail */
+/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL, getCurrentEmail, getCachedProperty */
 
 
 // 認証・セッション管理
@@ -33,7 +33,7 @@ function getDeployUserDomainInfo() {
     }
 
     const domain = email.includes('@') ? email.split('@')[1] : 'unknown';
-    const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+    const adminEmail = getCachedProperty('ADMIN_EMAIL');
     const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
     const isValidDomain = adminDomain ? domain === adminDomain : true;
 
