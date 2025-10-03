@@ -18,7 +18,7 @@
  * - ReactionService.gs（リアクション・ハイライト）
  */
 
-/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, createDataServiceSuccessResponse, getCachedProperty */
+/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty */
 
 // Core Data Operations
 
@@ -45,7 +45,6 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
       return {
         success: false,
         message: 'ユーザーが見つかりません',
-        debugMessage: 'ユーザー検索に失敗しました',
         data: [],
         header: '',
         sheetName: ''
@@ -65,7 +64,6 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
       return {
         success: false,
         message: 'スプレッドシートが設定されていません',
-        debugMessage: 'スプレッドシート設定が見つかりません',
         data: [],
         header: '',
         sheetName: ''

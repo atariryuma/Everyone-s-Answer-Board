@@ -884,56 +884,6 @@
     loadSpreadsheets();
   }
 
-  // ✅ Legacy function - now replaced by loadBatchedAdminData()
-  // This function is no longer used in main initialization flow
-
-  // 設定データの読み込みと完全自動反映（新実装）
-
-  // ✅ CLAUDE.md準拠: Promise-based simple debounce
-  const simpleDebounce = (fn, delay) => {
-    let isDebouncing = false;
-    let currentPromise = null;
-
-    return async (...args) => {
-      // Cancel existing debounce
-      if (isDebouncing) {
-        isDebouncing = false;
-      }
-
-      isDebouncing = true;
-
-      // Create new debounce promise
-      // ✅ CLAUDE.md準拠: V8 compliant Promise-based delay
-      currentPromise = (async () => {
-        const createPromiseDelay = (ms) => new Promise(resolve => {
-          const start = Date.now();
-          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-          check();
-        });
-
-        await createPromiseDelay(delay);
-        if (isDebouncing) {
-          isDebouncing = false;
-          try {
-            await fn.apply(this, args);
-          } catch (error) {
-            console.error('Debounced function error:', error);
-          }
-        }
-      })();
-
-      return currentPromise;
-    };
-  };
-
-  // 🔧 CLAUDE.md準拠: getConfigAsync削除（UNIFIED_CONFIG使用に移行済み）
-
-  function loadCurrentConfig() {
-    // systemState.configを使用（既に読み込み済み）
-    if (systemState.config) {
-      updatePanel(systemState.config);
-    }
-  }
 
   // ========== URL パラメータ解析 ==========
 
@@ -1701,51 +1651,6 @@
   }
 
   // フォーム作成インターフェース
-  function createFormInterface() {
-    // ユーザーIDの確認
-    if (!__USER_ID__ || __USER_ID__.trim() === '') {
-      showError('接続に問題があります。再読み込みしてください');
-      return;
-    }
-
-    const formName = prompt(
-      '作成するフォーム名を入力してください：\n例：アンケートフォーム、質問フォーム'
-    );
-
-    if (!formName || !formName.trim()) {
-      showError('フォーム名を入力してください');
-      return;
-    }
-
-    if (formName.trim().length > 50) {
-      showError('50文字以内で入力してください');
-      return;
-    }
-
-    // 基本的なフォーム設定
-    const config = {
-      title: formName.trim(),
-      description: 'カスタムフォームが作成されました',
-      fields: [
-        {
-          type: 'text',
-          label: '名前',
-          required: true,
-        },
-        {
-          type: 'text',
-          label: 'メッセージ',
-          required: true,
-        },
-      ],
-    };
-
-    // NOTE: フォーム作成機能は SystemController.gs で実装済み
-    // この関数は未使用のレガシーコード
-    showInfo('フォーム作成機能は準備中です');
-  }
-
-
   // ===========================================
   // 🆕 CLAUDE.md準拠: V8ランタイム対応 完全自動化URL解析・検証
   // ===========================================

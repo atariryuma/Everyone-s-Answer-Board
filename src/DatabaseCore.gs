@@ -94,7 +94,7 @@ function getServiceAccount() {
 }
 
 /**
- * サービスアカウント使用の妥当性を検証（CLAUDE.md準拠 - Security Gate）
+ * サービスアカウント使用の妥当性を検証（CLAUDE.md準拠 - Security Gate強化版）
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {boolean} useServiceAccount - サービスアカウント使用フラグ
  * @param {string} context - 使用コンテキスト（ログ用）
@@ -120,9 +120,54 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
       return { allowed: true, reason: 'Admin privileges' };
     }
 
-    // For non-admin users accessing other spreadsheets, allow service account
-    // Skip user lookup to prevent circular reference (findUserBySpreadsheetId -> getAllUsers -> openDatabase -> validateServiceAccountUsage)
-    return { allowed: true, reason: 'Cross-user access (assumed)' };
+    // ✅ SECURITY GATE: 非管理者は公開済みボードのみアクセス許可
+    try {
+      // 循環参照回避のため、軽量なキャッシュベース検証を優先
+      const cacheKey = `sa_validation_${spreadsheetId}`;
+      const cached = CacheService.getScriptCache().get(cacheKey);
+
+      if (cached) {
+        const validation = JSON.parse(cached);
+        return {
+          allowed: validation.isPublished,
+          reason: validation.isPublished ? 'Public board access (cached)' : 'Board not published (cached)'
+        };
+      }
+
+      // キャッシュミス時のみDB検証（findUserBySpreadsheetId使用）
+      const targetUser = findUserBySpreadsheetId(spreadsheetId, { skipCache: true });
+
+      if (!targetUser) {
+        console.warn('SA_VALIDATION: Target user not found for spreadsheet:', spreadsheetId.substring(0, 8));
+        return { allowed: false, reason: 'Target user not found' };
+      }
+
+      const configResult = getUserConfig(targetUser.userId);
+      const isPublished = configResult.success && configResult.config.isPublished;
+
+      // 検証結果をキャッシュ（5分間）
+      try {
+        CacheService.getScriptCache().put(cacheKey, JSON.stringify({ isPublished }), 300);
+      } catch (cacheError) {
+        console.warn('SA_VALIDATION: Cache write failed:', cacheError.message);
+      }
+
+      if (!isPublished) {
+        console.warn('SA_VALIDATION: Non-admin user attempting to access unpublished board:', {
+          currentEmail: currentEmail ? `${currentEmail.split('@')[0]}@***` : 'unknown',
+          spreadsheetId: spreadsheetId.substring(0, 8),
+          context
+        });
+        return { allowed: false, reason: 'Board not published' };
+      }
+
+      return { allowed: true, reason: 'Public board access' };
+
+    } catch (validationError) {
+      console.error('SA_VALIDATION: Security check failed:', validationError.message);
+      // セキュリティエラー時はデフォルト拒否
+      return { allowed: false, reason: 'Security validation error' };
+    }
 
   } catch (error) {
     console.error('SA_VALIDATION: Validation failed:', error.message);

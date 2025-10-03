@@ -20,19 +20,23 @@
       };
 
       // Suppress TailwindCSS production warnings immediately
-      const originalWarn = console.warn;
-      console.warn = function (...args) {
-        const message = args.join(' ');
-        if (
-          message.includes('cdn.tailwindcss.com should not be used in production') ||
-          message.includes('cdnjs.cloudflare.com') ||
-          message.includes('tailwind') ||
-          message.includes('TailwindCSS')
-        ) {
-          return; // Completely suppress
-        }
-        originalWarn.apply(console, args);
-      };
+      // ✅ 重複宣言回避: SharedUtilities.htmlと競合しないよう条件付き
+      if (!window.__WARN_SUPPRESSION_INITIALIZED__) {
+        const originalWarnUnpub = console.warn;
+        console.warn = function (...args) {
+          const message = args.join(' ');
+          if (
+            message.includes('cdn.tailwindcss.com should not be used in production') ||
+            message.includes('cdnjs.cloudflare.com') ||
+            message.includes('tailwind') ||
+            message.includes('TailwindCSS')
+          ) {
+            return; // Completely suppress
+          }
+          originalWarnUnpub.apply(console, args);
+        };
+        window.__WARN_SUPPRESSION_INITIALIZED__ = true;
+      }
     </script>
     <!-- Shared TailwindCSS Configuration -->
     <?!= include('SharedTailwindConfig'); ?>
@@ -61,12 +65,12 @@
 
     <!-- Notification Container for unified notification system -->
     <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
-    <div class="text-center p-4 max-w-lg">
+    <div class="w-full max-w-2xl mx-auto px-4 py-8">
       <? if (typeof isEditor !== 'undefined' && isEditor) { ?>
       <!-- 編集者用: 再公開セクション -->
-      <div class="glass-panel rounded-xl p-8 shadow-2xl">
-        <h1 class="text-3xl font-bold mb-4 text-yellow-300">回答ボード管理</h1>
-        <p class="text-gray-400 mb-6">回答ボードは現在非公開状態です</p>
+      <div class="glass-panel rounded-xl p-6 md:p-8 shadow-2xl">
+        <h1 class="text-2xl md:text-3xl font-bold mb-3 text-yellow-300">回答ボード管理</h1>
+        <p class="text-gray-400 mb-5">回答ボードは現在非公開状態です</p>
 
         <? if (typeof editorName !== 'undefined' && editorName) { ?>
         <p class="text-xs text-gray-500 mb-4">管理者: <?= editorName ?></p>
@@ -101,9 +105,19 @@
           type="button"
           id="republish-btn"
           onclick="republishBoard()"
-          class="w-full px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-bold text-lg transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-800"
+          class="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-800"
         >
           <span role="img" aria-label="公開">🌟</span> 回答ボードを再公開
+        </button>
+
+        <!-- 管理パネル遷移ボタン -->
+        <button
+          type="button"
+          id="admin-panel-btn"
+          onclick="openAdminPanel()"
+          class="w-full mt-3 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium text-base transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+        >
+          <span role="img" aria-label="設定">⚙️</span> 管理パネルを開く
         </button>
 
         <!-- メッセージエリア -->
@@ -183,10 +197,12 @@
           .withSuccessHandler(function(result) {
             if (result && result.success) {
               showMessage('回答ボードを再公開しました！', 'success');
-              // 成功時はページをリロードして公開ボードを表示
-              setTimeout(() => {
-                window.location.reload();
-              }, 1500);
+
+              // ✅ 同一ページリロード: location.replace()で履歴を残さず置き換え
+              // window.top.location.reload()はクロスオリジンでセキュリティエラー
+              // サーバー側で状態管理（isPublished=true）されているため、
+              // リロード後にdoGet()が自動的に公開ボードを返す
+              window.location.replace(window.location.href);
             } else {
               showMessage(result.message || '再公開に失敗しました', 'error');
               button.disabled = false;
@@ -199,6 +215,36 @@
             button.innerHTML = originalContent;
           })
           .republishMyBoard();
+      }
+
+      // 管理パネル遷移機能
+      function openAdminPanel() {
+        const button = document.getElementById('admin-panel-btn');
+        if (!button) return;
+
+        const originalContent = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 読み込み中...';
+
+        google.script.run
+          .withSuccessHandler(function(webAppUrl) {
+            if (webAppUrl) {
+              const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+              const adminUrl = webAppUrl + '?mode=admin&userId=' + userId;
+              // GAS iframe対策: window.open(_top) で確実に遷移
+              window.open(adminUrl, '_top');
+            } else {
+              showMessage('管理パネルURLの取得に失敗しました', 'error');
+              button.disabled = false;
+              button.innerHTML = originalContent;
+            }
+          })
+          .withFailureHandler(function(error) {
+            showMessage('管理パネルを開けませんでした: ' + (error.message || error), 'error');
+            button.disabled = false;
+            button.innerHTML = originalContent;
+          })
+          .getWebAppUrl();
       }
     </script>
 

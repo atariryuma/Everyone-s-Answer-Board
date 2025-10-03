@@ -467,7 +467,8 @@
           }
 
           setTimeout(() => {
-            window.location.reload();
+            // GAS 2021年以降: window.open(_top) でリロード
+            window.open(window.location.href, '_top');
           }, 1000);
         }, 3500); // 3.5秒でタイムアウト
 
@@ -487,7 +488,8 @@
             }
 
             setTimeout(() => {
-              window.location.reload();
+              // GAS 2021年以降: window.open(_top) でリロード
+              window.open(window.location.href, '_top');
             }, 1000);
           }
         }, 500);
@@ -949,7 +951,8 @@
     // 例: buttonText.textContent = '管理パネルへ遷移中...';
 
     // 実際の遷移
-    window.location.href = adminUrl;
+    // GAS 2021年以降: window.open(_top) でリダイレクト
+    window.open(adminUrl, '_top');
   }
 
   // ✅ ドメイン情報取得: SharedUtilities.htmlの統一関数を使用

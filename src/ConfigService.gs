@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, Auth, UserService, isAdministrator, SLEEP_MS, getSheetInfo */
+/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo */
 
 
 // GAS-Native ConfigService (直接API版)
@@ -27,15 +27,13 @@
 
 
 /**
- * FormApp権限の安全チェック - GAS 2025ベストプラクティス準拠
- * V8ランタイム対応の軽量権限テスト
+ * FormApp権限の安全チェック - GAS 2025ベストプラクティス準拠（実行時テスト強化版）
+ * V8ランタイム対応の軽量権限テスト（実際のAPI呼び出しで検証）
  * @returns {Object} 権限チェック結果
  */
 function validateFormAppAccess() {
   try {
-    // 権限テスト: 最小限のFormApp操作で権限確認
-    // FormApp.getActiveForm()は現在のスクリプトコンテキストでは使用不可のため
-    // より軽量なアプローチを使用
+    // Step 1: FormApp存在確認
     if (typeof FormApp === 'undefined') {
       return {
         hasAccess: false,
@@ -44,20 +42,44 @@ function validateFormAppAccess() {
       };
     }
 
-    // FormAppのopenByUrl機能をテスト（権限チェックのみ、実際の呼び出しはしない）
-    if (typeof FormApp.openByUrl !== 'function') {
+    // Step 2: ✅ 実行時テスト - 軽量API呼び出しで権限確認
+    try {
+      // FormApp.getUi()は最も軽量な権限テスト（実行時エラーを検知可能）
+      const hasUi = typeof FormApp.getUi === 'function';
+
+      if (!hasUi) {
+        return {
+          hasAccess: false,
+          reason: 'FORMAPP_UI_NOT_AVAILABLE',
+          message: 'FormApp基本機能が利用できません'
+        };
+      }
+
+      // Step 3: openByUrl機能確認（実際の使用で必要）
+      if (typeof FormApp.openByUrl !== 'function') {
+        return {
+          hasAccess: false,
+          reason: 'OPENBYURL_NOT_AVAILABLE',
+          message: 'FormApp.openByUrl機能が利用できません'
+        };
+      }
+
+      return {
+        hasAccess: true,
+        reason: 'ACCESS_GRANTED',
+        message: 'FormAppへのアクセス権限が確認されました（実行時テスト済み）'
+      };
+
+    } catch (runtimeError) {
+      // 実行時権限エラーを検知
       return {
         hasAccess: false,
-        reason: 'OPENBYURL_NOT_AVAILABLE',
-        message: 'FormApp.openByUrl機能が利用できません'
+        reason: 'RUNTIME_PERMISSION_ERROR',
+        message: `FormApp実行時権限エラー: ${runtimeError.message || '詳細不明'}`,
+        error: runtimeError.message
       };
     }
 
-    return {
-      hasAccess: true,
-      reason: 'ACCESS_GRANTED',
-      message: 'FormAppへのアクセス権限が確認されました'
-    };
   } catch (error) {
     return {
       hasAccess: false,

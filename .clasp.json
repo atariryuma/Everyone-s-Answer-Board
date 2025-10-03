@@ -2,15 +2,17 @@
   "scriptId": "1SAAWR_m9TNMPsxCiX9wSm3KBU7yWAe_mN8PafZ00Dqr1hUTgXZhB2g3Z",
   "rootDir": "src",
   "filePushOrder": [
-    "src/ServiceFactory.gs",
-    "src/Config.gs",
-    "src/Data.gs",
+    "src/helpers.gs",
+    "src/validators.gs",
+    "src/formatters.gs",
+    "src/DatabaseCore.gs",
     "src/SecurityService.gs",
     "src/UserService.gs",
     "src/ConfigService.gs",
+    "src/ColumnMappingService.gs",
+    "src/ReactionService.gs",
     "src/DataService.gs",
     "src/SystemController.gs",
-    "src/DataController.gs",
     "src/main.gs"
   ]
 }

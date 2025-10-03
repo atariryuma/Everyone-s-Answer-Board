@@ -110,17 +110,6 @@ function createDataServiceErrorResponse(message, sheetName = '') {
   return createErrorResponse(message, [], { headers: [], sheetName });
 }
 
-/**
- * データサービス用成功レスポンス
- * @param {Array} data - データ配列
- * @param {Array} headers - ヘッダー配列
- * @param {string} sheetName - シート名
- * @param {string} message - 成功メッセージ
- * @returns {Object} データサービス用成功レスポンス
- */
-function createDataServiceSuccessResponse(data, headers, sheetName, message = 'データ取得成功') {
-  return createSuccessResponse(message, data, { headers, sheetName });
-}
 
 /**
  * 認証エラーレスポンス

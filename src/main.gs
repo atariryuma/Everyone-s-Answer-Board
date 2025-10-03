@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, DB, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getDatabaseConfig, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getDatabaseConfig, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo */
 
 // Core Utility Functions
 
@@ -229,6 +229,7 @@ function doGet(e) {
           const template = HtmlService.createTemplateFromFile('Unpublished.html');
           template.isEditor = isAdminUser || isOwnBoard; // 表示内容制御
           template.editorName = targetUser.userName || targetUser.userEmail || '';
+          template.userId = targetUserId; // 管理パネル遷移用
 
           // Generate board URL
           const baseUrl = ScriptApp.getService().getUrl();
@@ -296,13 +297,6 @@ function doGet(e) {
     errorTemplate.title = 'システムエラー';
     errorTemplate.message = 'システムで予期しないエラーが発生しました。管理者にお問い合わせください。';
     errorTemplate.hideLoginButton = false;
-
-    // V8ランタイム安全: error変数存在チェック後のテンプレートリテラル使用
-    if (error && error.message) {
-      errorTemplate.debugInfo = `Error: ${error.message}\nStack: ${error.stack || 'N/A'}`;
-    } else {
-      errorTemplate.debugInfo = 'An unknown error occurred during request processing.';
-    }
 
     return errorTemplate.evaluate();
   }
@@ -1056,7 +1050,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         return {
           success: false,
           error: 'Target user not found',
-          debugMessage: 'ユーザー検索に失敗しました',
           data: [],
           sheetName: '',
           header: 'ユーザーエラー'
@@ -1092,7 +1085,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         return {
           success: false,
           error: result?.message || 'データ取得エラー',
-          debugMessage: 'スプレッドシート接続に失敗しました',
           data: [],
           sheetName: result?.sheetName || '',
           header: result?.header || '問題'
@@ -1209,7 +1201,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       return {
         success: false,
         error: result?.message || 'データ取得エラー',
-        debugMessage: 'スプレッドシート接続に失敗しました',
         data: [],
         sheetName: result?.sheetName || '',
         header: result?.header || '問題',

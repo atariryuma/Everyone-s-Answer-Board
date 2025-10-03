@@ -1384,14 +1384,7 @@ class StudyQuestApp {
       }
 
     } catch (error) {
-      // Enhanced error logging for debugging
-      const errorDetails = {
-        message: error.message || 'Unknown error',
-        stack: error.stack || 'No stack trace',
-        cacheExists: !!this.cache,
-        cacheType: this.cache ? typeof this.cache : 'undefined'
-      };
-      console.warn('⚠️ Cleanup failed:', errorDetails);
+      console.warn('⚠️ Cleanup failed:', error.message || error);
     }
   }
 
@@ -1561,11 +1554,6 @@ class StudyQuestApp {
     const container = this.elements.answersContainer;
     if (!container) return;
 
-    // シンプルエラー表示（デバッグ情報がある場合）
-    if (result && result.debugMessage && typeof window.showSimpleError === 'function') {
-      window.showSimpleError(result.debugMessage);
-    }
-    
     container.innerHTML = `
       <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
         <svg class="mx-auto h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
@@ -2163,10 +2151,6 @@ class StudyQuestApp {
       const result = await this.getUserData(fetchParams, loadConfig.isInitialLoad);
 
       if (!result || !result.success) {
-        // シンプルエラー表示（デバッグ情報がある場合）
-        if (result && result.debugMessage && typeof window.showSimpleError === 'function') {
-          window.showSimpleError(result.debugMessage);
-        }
         this.handleError(new Error(result?.error || 'データ取得に失敗しました'), 'api', true);
         return;
       }
@@ -2523,7 +2507,6 @@ class StudyQuestApp {
   }
 
   renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad) {
-    console.log('DEBUG: renderBoard - Using virtual scrolling for', newRows.length, 'items (initial load:', isInitialLoad, ')');
 
     if (isInitialLoad || this.state.currentAnswers.length === 0) {
       this.clearVirtualScrollingState();
@@ -3824,17 +3807,7 @@ class StudyQuestApp {
         this.showNotification(userMessage, 'error');
     }
 
-    // Enhanced logging for debugging
-    console.group('🔍 Reaction Error Analysis');
-    console.error('Error details:', {
-      message: error.message,
-      stack: error.stack,
-      rowIndex,
-      reaction,
-      timestamp: new Date().toISOString(),
-      currentReactionState: this.state.currentAnswers?.find(i => i.rowIndex == rowIndex)?.reactions?.[reaction]
-    });
-    console.groupEnd();
+    console.error('🔍 Reaction Error:', error.message, { rowIndex, reaction });
   }
 
   async handleHighlight(rowIndex) {
@@ -4489,11 +4462,11 @@ class StudyQuestApp {
     });
   }
   
-  async endPublication() {
+  endPublication() {
     if (!confirm('公開を終了しますか？生徒は回答ボードにアクセスできなくなります。')) {
       return;
     }
-    
+
     // ボタンのローディング状態を設定
     const endPublicationBtn = this.elements.endPublicationBtn;
     let originalButtonContent = '';
@@ -4507,92 +4480,52 @@ class StudyQuestApp {
         公開終了中...
       `;
     }
-    
-    try {
-      
-      // サーバーに公開終了リクエストを送信
-      const result = await this.runGas('clearActiveSheet', this.state.userId);
-      
-      
-      // 成功メッセージを表示
-      const successMessage = result.message || '公開を終了しました。非公開画面に移動します。';
-      if (window.sharedModals) {
-        window.sharedModals.showAlert('公開終了', successMessage, 'success');
-      } else if (window.notifications) {
-        window.notifications.success(successMessage, 4000);
-      } else {
-        alert(successMessage);
-      }
 
-      // 少し遅延してからUnpublished.htmlに移動（ユーザーがメッセージを確認できるように）
-      // CLAUDE.md準拠: Promise-based delayed redirect (setTimeout代替)
-      this.schedulePageRedirect(1500);
-      
-    } catch (error) {
-      console.error('❌ 公開終了に失敗しました:', error);
-      
-      // エラーメッセージを構成
-      let errorMsg = '公開終了に失敗しました';
-      if (error && error.message) {
-        errorMsg += ': ' + error.message;
-      } else if (typeof error === 'string') {
-        errorMsg += ': ' + error;
-      }
-      
-      // エラーメッセージを表示
-      if (window.sharedModals) {
-        window.sharedModals.showAlert('エラー', errorMsg, 'error');
-      } else if (window.notifications) {
-        window.notifications.error(errorMsg, 7000);
-      } else {
-        alert(errorMsg);
-      }
-      
-      // ボタンを元の状態に戻す
-      if (endPublicationBtn && originalButtonContent) {
-        endPublicationBtn.disabled = false;
-        endPublicationBtn.innerHTML = originalButtonContent;
-      }
-    }
-  }
+    // ✅ GAS Sandbox対応: google.script.runのSuccessHandler内でリロード
+    // async/awaitではなく、コールバック内でページ遷移（ユーザージェスチャーコンテキスト維持）
+    const self = this;
 
-  /**
-   * GAS環境対応の遅延リダイレクト (setTimeout代替)
-   * Promise-based delayed redirect for CLAUDE.md compliance
-   * @param {number} delay - 遅延時間（ミリ秒）
-   */
-  schedulePageRedirect(delay = 1500) {
-    console.log(`⏱️ Scheduling page redirect in ${delay}ms`);
+    google.script.run
+      .withSuccessHandler(function(result) {
+        console.log('✅ clearActiveSheet success:', result);
 
-    // Promise-based delay implementation for GAS environment
-    Promise.resolve().then(() => {
-      // 即座に実行する場合はそのまま
-      if (delay <= 0) {
-        this.redirectToUnpublishedPage();
-        return;
-      }
+        // ✅ キャッシュクリア
+        console.log('🔄 Clearing cache and reloading page...');
+        self.clearCache({ includeReactions: true, includeLocalStorage: true });
 
-      // GAS環境では複雑な遅延処理は避け、適切なUI フィードバックを提供
-      // ユーザーに遷移することを知らせて即座にリダイレクト
-      console.log(`🔄 Redirecting after ${delay}ms delay...`);
+        // ✅ 同一ページリロード: location.replace()で履歴を残さず置き換え
+        // window.top.location.reload()はクロスオリジンでセキュリティエラー
+        // サーバー側で状態管理（isPublished=false）されているため、
+        // リロード後にdoGet()が自動的に非公開画面を返す
+        window.location.replace(window.location.href);
+      })
+      .withFailureHandler(function(error) {
+        console.error('❌ 公開終了に失敗しました:', error);
 
-      // 実際の遅延処理の代替として、レスポンシブなリダイレクトを実行
-      this.redirectToUnpublishedPage();
-    }).catch(error => {
-      console.error('❌ Page redirect failed:', error);
-      // フォールバック: 即座にリダイレクト
-      this.redirectToUnpublishedPage();
-    });
-  }
+        // エラーメッセージを構成
+        let errorMsg = '公開終了に失敗しました';
+        if (error && error.message) {
+          errorMsg += ': ' + error.message;
+        } else if (typeof error === 'string') {
+          errorMsg += ': ' + error;
+        }
 
-  redirectToUnpublishedPage() {
-    console.log('🚫 Redirecting to unpublished page - reloading current URL');
+        // エラーメッセージを表示
+        if (window.sharedModals) {
+          window.sharedModals.showAlert('エラー', errorMsg, 'error');
+        } else if (window.notifications) {
+          window.notifications.error(errorMsg, 7000);
+        } else {
+          alert(errorMsg);
+        }
 
-    // キャッシュクリア処理
-    this.clearCache({ includeReactions: true, includeLocalStorage: true });
-
-    // シンプルなページリロード（現在のURLがすでに非公開状態を表示する）
-    window.safeReload();
+        // ボタンを元の状態に戻す
+        if (endPublicationBtn && originalButtonContent) {
+          endPublicationBtn.disabled = false;
+          endPublicationBtn.innerHTML = originalButtonContent;
+        }
+      })
+      .clearActiveSheet(this.state.userId);
   }
   
   

@@ -389,7 +389,8 @@
 
         google.script.run
           .withSuccessHandler(function (url) {
-            window.top.location.href = url;
+            // GAS 2021年以降: window.open(_top) でリダイレクト
+            window.open(url, '_top');
           })
           .withFailureHandler(function (error) {
             showMessage('アプリケーションのURL取得に失敗しました: ' + error.message, 'error');

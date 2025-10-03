@@ -14,13 +14,15 @@
           return window.sharedUtilities.page.safeReload();
         }
 
-        // フォールバック: 基本的な安全リロード
+        // フォールバック: GAS iframe sandbox対応リロード
         try {
           localStorage.removeItem('current_user_info');
           sessionStorage.clear();
-          window.location.reload(true);
+          // GAS 2021年以降: window.open(_top) でリロード
+          window.open(window.location.href, '_top');
         } catch (e) {
-          window.location.href = window.location.href;
+          // 最終フォールバック
+          window.open(window.location.href, '_top');
         }
       }
 
@@ -30,14 +32,16 @@
           return window.sharedUtilities.auth.logout();
         }
 
-        // フォールバック: 基本的なログイン画面リダイレクト
+        // フォールバック: GAS iframe sandbox対応リダイレクト
         try {
           const url = new URL(window.location.href);
           url.searchParams.set('mode', 'login');
           url.searchParams.delete('userId');
-          window.location.href = url.toString();
+          // GAS 2021年以降: window.open(_top) でリダイレクト
+          window.open(url.toString(), '_top');
         } catch (e) {
-          window.location.href = window.location.origin + window.location.pathname + '?mode=login';
+          const loginUrl = window.location.origin + window.location.pathname + '?mode=login';
+          window.open(loginUrl, '_top');
         }
       }
 
@@ -86,7 +90,7 @@
       </p>
 
       <div class="error-actions">
-        <button type="button" class="btn btn-primary" onclick="try { safeReload(); } catch(e) { location.reload(); }">
+        <button type="button" class="btn btn-primary" onclick="try { safeReload(); } catch(e) { window.open(window.location.href, '_top'); }">
           🔄 再読み込み
         </button>
         <? if (!hideLoginButton) { ?>
@@ -95,13 +99,6 @@
         </button>
         <? } ?>
       </div>
-
-      <? if (typeof debugInfo !== 'undefined' && debugInfo) { ?>
-      <div class="debug-info">
-        <strong>デバッグ情報:</strong><br />
-        <?= htmlEncode(debugInfo) ?>
-      </div>
-      <? } ?>
 
       <div class="timestamp">エラー発生時刻: <?= new Date().toLocaleString('ja-JP') ?></div>
     </div>

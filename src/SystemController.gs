@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, Config, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getDatabaseConfig, getAllUsers, openDatabase, getCachedProperty, getSheetInfo */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getDatabaseConfig, getAllUsers, openDatabase, getCachedProperty, getSheetInfo */
 
 // システム定数 - Zero-Dependency Architecture
 
@@ -70,77 +70,6 @@ __rootSys.SLEEP_MS = SLEEP_MS;
  */
 
 
-/**
- * セットアップのテスト実行
- * AppSetupPage.html から呼び出される
- *
- * @returns {Object} テスト結果
- */
-function testSystemSetup() {
-  try {
-    const diagnostics = {
-      timestamp: new Date().toISOString(),
-      tests: [],
-      overall: 'unknown'
-    };
-
-    // 基本コンポーネントテスト
-    try {
-      const session = { email: Session.getActiveUser().getEmail() };
-      diagnostics.tests.push({
-        name: 'Session Service',
-        status: session.isValid ? 'OK' : 'ERROR',
-        details: session.isValid ? `User: ${  session.email}` : 'No active session'
-      });
-    } catch (sessionError) {
-      diagnostics.tests.push({
-        name: 'Session Service',
-        status: 'ERROR',
-        details: sessionError.message
-      });
-    }
-
-    // データベース接続テスト
-    try {
-      const props = PropertiesService.getScriptProperties();
-      const databaseId = props.getProperty('DATABASE_SPREADSHEET_ID');
-      if (databaseId) {
-        const dataAccess = openSpreadsheet(databaseId, { useServiceAccount: true });
-        diagnostics.tests.push({
-          name: 'Database Connection',
-          status: 'OK',
-          details: 'Database accessible'
-        });
-      } else {
-        diagnostics.tests.push({
-          name: 'Database Connection',
-          status: 'ERROR',
-          details: 'Database not configured'
-        });
-      }
-    } catch (dbError) {
-      diagnostics.tests.push({
-        name: 'Database Connection',
-        status: 'ERROR',
-        details: dbError.message
-      });
-    }
-
-    // 総合評価
-    const hasErrors = diagnostics.tests.some(test => test.status === 'ERROR');
-    diagnostics.overall = hasErrors ? 'WARNING' : 'OK';
-
-    return {
-      success: !hasErrors,
-      diagnostics
-    };
-  } catch (error) {
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 /**
  * システム状態の強制リセット
@@ -1548,28 +1477,6 @@ function getLoginStatus() {
 }
 
 
-/**
- * 強制ログアウトとリダイレクトのテスト
- * ErrorBoundary.html から呼び出される
- *
- * @returns {Object} テスト結果
- */
-function testForceLogoutRedirect() {
-  try {
-
-    return {
-      success: true,
-      message: 'ログアウトテスト完了',
-      redirectUrl: `${ScriptApp.getService().getUrl()}?mode=login`
-    };
-  } catch (error) {
-    console.error('FrontendController.testForceLogoutRedirect エラー:', error.message);
-    return {
-      success: false,
-      message: error.message
-    };
-  }
-}
 
 // 📊 Performance Metrics Extension
 
@@ -2095,7 +2002,6 @@ __rootSC.SystemController = {
   performAutoRepair,
   forceUrlSystemReset,
   publishApp,
-  testForceLogoutRedirect,
   // 📊 Performance Metrics Extension
   getPerformanceMetrics,
   diagnosePerformance,
