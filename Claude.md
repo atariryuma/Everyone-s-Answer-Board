@@ -3,16 +3,17 @@
 > **🎯 Project**: Google Apps Script Web Application
 > **🔧 Stack**: Zero-Dependency Architecture, Direct GAS API Calls
 > **🤖 Claude Code**: 2025 Best Practices Compliant
-> **⚡ Updated**: 2025-09-20 (Unified Naming Conventions Implemented)
+> **⚡ Updated**: 2025-10-05 (Architecture Optimization: auth.gs separation, TTL caching, API Gateway clarification)
 
-## 🧠 Claude Code Core Principles
+## 🧠 Claude Code Workflow
 
-### 📋 Primary Workflow: **Explore → Plan → Code → Commit**
+**Explore → Plan → Code → Test → Commit**
 
-1. **Explore**: Read relevant files, analyze codebase - **NO CODING YET**
-2. **Plan**: Create detailed implementation plan with TodoWrite
-3. **Code**: Implement incrementally with TDD-first approach
-4. **Commit**: Structured git workflow with proper documentation
+1. **Explore**: Read files, analyze (NO coding)
+2. **Plan**: TodoWrite for tracking
+3. **Code**: TDD-first incremental implementation
+4. **Test**: `npm run check` MUST pass
+5. **Commit**: Structured git workflow
 
 ## 🏗️ GAS-Optimized Architecture
 
@@ -30,6 +31,7 @@
 ```
 
 ### **GAS-Native Implementation Pattern**
+
 ```javascript
 // ✅ Direct GAS API usage - natural global scope
 function getCurrentEmail() {
@@ -37,13 +39,41 @@ function getCurrentEmail() {
 }
 
 function isAdministrator(email) {
-  const adminEmail = PropertiesService.getScriptProperties().getProperty('ADMIN_EMAIL');
+  const adminEmail = getCachedProperty('ADMIN_EMAIL');  // ✅ With 30s TTL cache
   return email?.toLowerCase() === adminEmail?.toLowerCase();
+}
+
+// ✅ PropertiesService caching with TTL (80-90% API call reduction)
+const RUNTIME_PROPERTIES_CACHE = {};
+const PROPERTY_CACHE_TTL = 30000; // 30 seconds
+
+function getCachedProperty(key) {
+  const now = Date.now();
+  const cached = RUNTIME_PROPERTIES_CACHE[key];
+
+  // ✅ TTL check: re-fetch if expired
+  if (cached && cached.timestamp && (now - cached.timestamp < PROPERTY_CACHE_TTL)) {
+    return cached.value;
+  }
+
+  // Fetch from PropertiesService and cache
+  const value = PropertiesService.getScriptProperties().getProperty(key);
+  RUNTIME_PROPERTIES_CACHE[key] = { value, timestamp: now };
+  return value;
+}
+
+// ✅ Explicit cache clearing (for system setup/config updates)
+function clearPropertyCache(key = null) {
+  if (key) {
+    delete RUNTIME_PROPERTIES_CACHE[key];
+  } else {
+    Object.keys(RUNTIME_PROPERTIES_CACHE).forEach(k => delete RUNTIME_PROPERTIES_CACHE[k]);
+  }
 }
 
 function getUserData(email) {
   // Direct SpreadsheetApp usage for owner data
-  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
+  const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');  // ✅ Cached access
   const spreadsheet = SpreadsheetApp.openById(dbId);
   const sheet = spreadsheet.getSheetByName('users');
   // ... direct data operations
@@ -65,150 +95,54 @@ function getViewerBoardData(targetUserId, viewerEmail) {
 
 ## 🛠️ Development Commands
 
-### **Essential Commands**
-```bash
-# Quality Gate (MUST pass before commit)
-npm run check                   # Combined linting, testing, validation
+### **🚨 Quick Start (Most Used)**
 
-# GAS Development Cycle
-clasp push                      # Deploy to Google Apps Script
-clasp logs                      # View execution logs
-npm run deploy:safe             # Production deployment with validation
+```bash
+npm run check          # ✅ MUST pass before commit (lint + test)
+clasp push            # Deploy to GAS
+clasp logs            # View execution logs
+npm run deploy:safe   # Production deployment
 ```
 
 ### **Claude Code Workflow**
-```markdown
-1. Ask Claude to read CLAUDE.md - Context loading
-2. **Explore**: "Read [files] and analyze [problem] - DO NOT CODE YET"
-3. **Plan**: "Create detailed implementation plan with TodoWrite"
-4. **Code**: TDD-first implementation with task tracking
-5. **Test**: `npm run check` - Quality gate (MUST pass)
-6. **Deploy**: `npm run deploy:safe`
-```
 
-## 📝 Google Apps Script V8 Best Practices
+1. **Explore** → Read files, analyze (NO coding yet)
+2. **Plan** → TodoWrite for task tracking
+3. **Code** → TDD-first implementation
+4. **Test** → `npm run check` (MUST pass)
+5. **Deploy** → `npm run deploy:safe`
 
-### 🚨 **Critical Migration (2025)**
-- **Rhino Deprecated**: Feb 20, 2025
-- **Rhino Shutdown**: Jan 31, 2026 (scripts will stop working)
-- **Action Required**: Migrate all scripts to V8 runtime
+## 📝 Google Apps Script Critical Rules
 
-### 🎯 **Performance Optimization (70x Improvement)**
-
-#### **Batch Operations**
-```javascript
-// ✅ BEST: Batch operations (1 second vs 70 seconds)
-function efficientDataProcessing() {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  const data = sheet.getDataRange().getValues();
-  const processedData = data.map(row => row.map(cell => processTransformation(cell)));
-  sheet.getDataRange().setValues(processedData);
-}
-
-// ❌ AVOID: Individual operations
-function inefficientDataProcessing() {
-  const sheet = SpreadsheetApp.getActiveSheet();
-  for (let i = 1; i <= sheet.getLastRow(); i++) {
-    const value = sheet.getRange(i, 1).getValue();
-    sheet.getRange(i, 1).setValue(processTransformation(value));
-  }
-}
-```
-
-#### **Modern JavaScript (V8 Runtime)**
-```javascript
-// ✅ V8 Features: const/let, destructuring, template literals
-const { users, configs } = data;
-const message = `Processing ${data.length} records`;
-
-// ✅ Error Handling with Exponential Backoff
-function executeWithRetry(operation, maxRetries = 3) {
-  let retryCount = 0;
-  while (retryCount < maxRetries) {
-    try {
-      return operation();
-    } catch (error) {
-      retryCount++;
-      console.warn(`Attempt ${retryCount} failed:`, error.message);
-      if (retryCount >= maxRetries) throw error;
-      Utilities.sleep(Math.pow(2, retryCount) * 1000);
-    }
-  }
-}
-```
-
-### 🛡️ **V8 Runtime Critical Differences**
-
-#### **Variable Declaration**
-```javascript
-// ✅ RECOMMENDED: Use const/let, avoid var
-const CONFIG_VALUES = { timeout: 5000, retries: 3 };
-let processedValue = null;
-
-// ❌ AVOID: var causes scope/hoisting issues
-var globalVar = 'avoid this';
-```
-
-#### **Undefined Parameter Handling**
-```javascript
-// ✅ V8-safe undefined checks
-function safeFunction(param) {
-  if (typeof param !== 'undefined' && param !== null) {
-    return param.toString();
-  }
-  return 'default value';
-}
-
-// ✅ Safe object access
-const safeValue = (myObject || {}).propertyName;
-const safeArrayValue = (myArray || [])[index];
-```
-
-#### **Template Literals with Validation**
-問題はテンプレートリテラルではなく、**変数の値が実行時に存在しない可能性**です。`+`連結に書き換えても根本解決になりません。正しい修正は**変数の存在チェック**です。
+### 🚨 **MUST: Performance & V8 Runtime**
 
 ```javascript
-// ❌ 誤った修正（対症療法）
-const errorInfo = 'Error: ' + error.message; // errorがnullなら同じエラー
+// ✅ MUST: Use batch operations (70x faster)
+const data = sheet.getDataRange().getValues();  // ✅ One API call
+const processed = data.map(row => transform(row));
+sheet.getDataRange().setValues(processed);
 
-// ✅ 正しい修正（根本治療）
-if (error && error.message) {
-  const errorInfo = `Error: ${error.message}\nStack: ${error.stack || 'N/A'}`;
-} else {
-  const errorInfo = 'An unknown error occurred.';
+// ❌ NEVER: Individual cell operations in loops
+for (let i = 1; i <= sheet.getLastRow(); i++) {  // ❌ Hundreds of API calls
+  const value = sheet.getRange(i, 1).getValue();
 }
 
-// ✅ 推奨パターン：事前チェック後のテンプレートリテラル使用
-if (spreadsheetId && spreadsheetId.trim()) {
-  const url = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`;
+// ✅ MUST: Validate variables before template literals
+if (error?.message) {
+  const msg = `Error: ${error.message}`;  // ✅ Safe
 }
-```
 
-#### **Async/Sync Limitations**
-```javascript
-// ❌ NOT AVAILABLE: setTimeout/setInterval
-// setTimeout(() => {}, 1000); // ReferenceError
-
-// ✅ ALTERNATIVE: Utilities.sleep (synchronous, blocks execution)
-Utilities.sleep(1000);
-
-// ✅ RECOMMENDED: Batch processing for efficiency
-function efficientProcessing(data) {
-  const batchSize = 100;
-  const results = [];
-  for (let i = 0; i < data.length; i += batchSize) {
-    const batch = data.slice(i, i + batchSize);
-    results.push(...processBatch(batch));
-  }
-  return results;
-}
+// ❌ NEVER: Use setTimeout/setInterval (not available in GAS)
+// ✅ USE: Utilities.sleep(1000) for delays
 ```
 
 ## 📁 File Structure
 
 ```
 src/
-├── main.gs                    # API Gateway (Zero-Dependency)
+├── main.gs                    # API Gateway (frontend-callable functions only)
+├── auth.gs                    # Authentication helpers (getCurrentEmail, isAdministrator)
+├── helpers.gs                 # Utility functions (cache, response helpers)
 ├── UserService.gs             # User management
 ├── ConfigService.gs           # Configuration management
 ├── DataService.gs             # Spreadsheet operations
@@ -219,297 +153,166 @@ src/
 └── *.html                     # UI templates
 ```
 
-## 🎯 Main API Functions
+### **Architecture Rationale: main.gs as API Gateway**
+
+**Why main.gs must contain all frontend-callable functions:**
+
+- GAS requirement: Frontend uses `google.script.run[funcName]()` which requires global scope functions
+- Only functions in main.gs (or globally loaded files) can be called from frontend
+- Helper functions NOT called by frontend (e.g., `getCurrentEmail`, `isAdministrator`) should be in separate files
+
+**Design principle:**
 
 ```javascript
-// User Management
-getCurrentEmail()              // Get current user email
-getUser(infoType)             // Get user information
-processLoginAction(action)     // Handle login
+// ✅ main.gs: Frontend-callable API functions only
+function getUser(infoType) { /* ... */ }           // ✅ Called by frontend
+function addReaction(userId, rowId, type) { }      // ✅ Called by frontend
 
-// Data Operations
-addReaction(userId, rowId, type)     // Add reaction
-toggleHighlight(userId, rowId)       // Toggle highlight
-getBulkAdminPanelData()             // Admin data
+// ✅ auth.gs: Internal helpers (not called by frontend)
+function getCurrentEmail() { /* ... */ }           // ✅ Helper function
+function isAdministrator(email) { /* ... */ }      // ✅ Helper function
 
-// Configuration
-getConfig()                   // Get configuration
-getUserConfig(userId)         // Get user config
+// ✅ helpers.gs: Shared utilities
+function getCachedProperty(key) { /* ... */ }      // ✅ Utility function
+function createErrorResponse(msg) { /* ... */ }    // ✅ Response helper
 ```
+
+## 🎯 Main API Functions (Frontend-Callable)
+
+**Important**: Functions in this section MUST be in `main.gs` to be callable via `google.script.run[funcName]()`
+
+```javascript
+// User Management (main.gs - frontend-callable)
+getUser(infoType)                    // Get user information
+processLoginAction(action)            // Handle login
+getBatchedUserConfig()                // Get batched user config
+
+// Data Operations (main.gs - frontend-callable)
+addReaction(userId, rowId, type)      // Add reaction
+toggleHighlight(userId, rowId)        // Toggle highlight
+getBulkAdminPanelData()              // Admin data
+
+// Configuration (main.gs - frontend-callable)
+getConfig()                          // Get configuration
+getUserConfig(userId)                // Get user config
+
+// Internal Helpers (auth.gs - NOT frontend-callable)
+getCurrentEmail()                    // Get current user email (internal use)
+isAdministrator(email)               // Check admin privileges (internal use)
+
+// Utilities (helpers.gs - NOT frontend-callable)
+getCachedProperty(key)               // Cached property access with 30s TTL
+clearPropertyCache(key)              // Explicit cache clearing
+createErrorResponse(msg, data)       // Standard error response
+createSuccessResponse(msg, data)     // Standard success response
+```
+
+### **Why this separation?**
+
+**GAS Constraint**: Frontend can only call global scope functions. Therefore:
+
+- ✅ **main.gs**: Contains ALL functions called by frontend (API Gateway pattern)
+- ✅ **auth.gs/helpers.gs**: Contains internal helpers NOT called by frontend
+- ❌ **Anti-pattern**: Moving frontend-callable functions out of main.gs breaks frontend calls
 
 ## 🧪 Testing & Quality
 
 ### **Current Status**
-- **113/113 tests passing** (100% success rate)
+
+- **123/123 tests passing** (100% success rate)
 - **Zero ESLint errors**
 - **Complete coverage** of critical paths
 
 ### **Quality Gate**
+
 ```bash
 npm run check                 # MUST pass before any commit
 npm run deploy:safe           # Safe deployment with validation
 ```
 
-## 🛡️ Security & Anti-Patterns
+## 🛡️ Security & Critical Rules
 
-### **Security Best Practices**
-- **Input Validation**: All user inputs validated
-- **XSS/CSRF Protection**: HTML sanitization, token-based validation
-- **Access Control**: Role-based permissions
-- **Service Account**: **CROSS-USER ACCESS ONLY** - Security-critical restrictions
-  - ✅ **Viewer→Editor**: Accessing published board data and reactions
-  - ✅ **Editor→Admin**: Accessing shared user database (DATABASE_SPREADSHEET_ID)
-  - ✅ **Cross-tenant operations**: Any access across user boundaries
-  - ❌ **Self-access**: User accessing own spreadsheets (use direct GAS APIs)
-  - ❌ **Same-tenant**: Operations within user's own permissions scope
+### **🚨 MUST (Enforced by Design)**
 
-### **Anti-Patterns to Avoid**
 ```javascript
-// ❌ AVOID: Individual API calls in loops (use batch operations)
-// ❌ AVOID: Unnecessary service account usage
-function getUserOwnData(email) {
-  const auth = Auth.serviceAccount();        // ❌ Unnecessary privilege escalation
-  return Data.findUserByEmail(email, auth); // ❌ User accessing own data
-}
-
-// ✅ CORRECT: Appropriate permission usage
-function getUserOwnData(email) {
-  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
-  const spreadsheet = SpreadsheetApp.openById(dbId); // ✅ Normal user permissions
-  return findUserInSheet(spreadsheet, email);
-}
-
-function getViewerCrossUserData(targetUserId, viewerEmail) {
-  const targetUser = findUserById(targetUserId);
-  if (targetUser.userEmail === viewerEmail) {
-    return getUserOwnData(viewerEmail);        // ✅ Own data: normal permissions
+// ✅ MUST: Service Account ONLY for cross-user access
+function getViewerBoardData(targetUserId, viewerEmail) {
+  const target = findUserById(targetUserId);
+  if (target.userEmail === viewerEmail) {
+    return getUserData(target);  // ✅ Own data: normal permissions
   } else {
-    // ✅ Cross-user: service account via openSpreadsheet
-    const dataAccess = openSpreadsheet(targetUser.spreadsheetId, { useServiceAccount: true });
-    return getUserSpreadsheetData(targetUser, { dataAccess });
+    // ✅ Cross-user ONLY: use service account
+    const access = openSpreadsheet(target.spreadsheetId, { useServiceAccount: true });
+    return getUserData(target, { dataAccess: access });
   }
 }
 
-// ❌ AVOID: Synchronous UI blocking operations
-// ❌ AVOID: typeof undefined checks (unnecessary in GAS)
-```
-
-## 📝 Naming Conventions & Code Standards
-
-### **🎯 Pragmatic Naming System**
-
-**Core Principle**: 自然で読みやすい関数名を優先し、GAS-Native Architectureの可読性と実用性を最大化
-
-#### **Function Naming - Natural English Pattern**
-```javascript
-// ✅ 推奨: 自然な英語表現パターン
-getCurrentEmail()        // 直感的で分かりやすい
-getUser()               // シンプルで明確
-validateEmail()         // 目的が明確
-createErrorResponse()   // 自然な動詞+名詞構造
-isAdmin()              // 簡潔な状態確認
-checkUserAccess()      // 分かりやすいアクション
-
-// ✅ 特殊機能のみプレフィックス使用
-getUserSheetData()   // DataService特有の複雑なデータ処理
-addReaction()        // DataService特有の機能
-sysLog()              // システムレベルの統一ログ機能
-
-// ❌ 避けるべき: 不要なプレフィックス強制
-authGetCurrentEmail()  // → getCurrentEmail() の方が自然
-configGetUserConfig()  // → getUserConfig() の方が読みやすい
-authIsAdministrator()  // → isAdministrator() の方がシンプル
-```
-
-#### **Variable & Property Naming**
-```javascript
-// ✅ camelCase + 意味的プレフィックス
-const isPublished = Boolean(config.isPublished);    // ✅ boolean値: is/has/can
-const isEditor = isAdministrator || isOwnBoard;     // ✅ 統一された権限表現
-const hasValidForm = validateUrl(formUrl).isValid; // ✅ 存在確認: has
-
-// ✅ オブジェクトプロパティの統一
-{
-  isPublished: true,        // ✅ appPublished → isPublished
-  isEditor: false,          // ✅ showAdminFeatures → isEditor
-  spreadsheetId: 'abc123',  // ✅ camelCase統一
-  sheetName: 'Sheet1'       // ✅ 標準化されたパラメータ名
+// ❌ NEVER: Service account for own data
+function getUserOwnData(email) {
+  const auth = Auth.serviceAccount();  // ❌ Privilege escalation
+  return Data.findUserByEmail(email, auth);
 }
 
-// ❌ 非推奨パターン
-const appPublished = true;           // ❌ 曖昧な名前
-const isAdminUser = false;          // ❌ 重複する概念
-const showAdminFeatures = true;     // ❌ 表示ロジックと権限の混在
+// ✅ MUST: Validate all user inputs
+// ✅ MUST: Sanitize HTML before rendering
+// ✅ MUST: Use role-based access control
 ```
 
-#### **Constants - System Standards**
+### **⚠️ SHOULD (Best Practices)**
+
+- **Input Validation**: Validate email format, spreadsheet IDs, URLs
+- **Error Handling**: Use try-catch with exponential backoff
+- **Cache Strategy**: Use getCachedProperty for PropertiesService (80-90% API reduction)
+- **Batch Operations**: Always prefer batch over individual operations
+
+## 📝 Naming Conventions
+
+### **Core Principle**: Natural English > Forced Prefixes
+
 ```javascript
-// ✅ UPPER_SNAKE_CASE + カテゴリ別構造
-const CACHE_DURATION = {
-  SHORT: 10,           // 認証ロック
-  MEDIUM: 30,          // リアクション・ハイライト
-  LONG: 300,           // ユーザー情報キャッシュ
-  EXTRA_LONG: 3600     // 設定キャッシュ
-};
+// ✅ RECOMMENDED: Natural, readable names
+getCurrentEmail()        // Clear and intuitive
+getUserConfig(userId)    // Simple and direct
+isAdmin()               // Boolean check
+createErrorResponse()   // Verb + noun pattern
 
-const TIMEOUT_MS = {
-  QUICK: 100,          // UI応答性
-  DEFAULT: 5000,       // デフォルトタイムアウト
-  EXTENDED: 30000      // 拡張タイムアウト
-};
+// ✅ Constants: UPPER_SNAKE_CASE with categories
+const CACHE_DURATION = { SHORT: 10, MEDIUM: 30, LONG: 300 };
+const TIMEOUT_MS = { QUICK: 100, DEFAULT: 5000 };
 
-// ✅ 使用例
-cache.put(cacheKey, data, CACHE_DURATION.LONG);
-Utilities.sleep(SLEEP_MS.SHORT);
+// ✅ Variables: camelCase with semantic prefixes
+const isPublished = Boolean(config.isPublished);  // Boolean: is/has/can
+const hasValidForm = validateUrl(url).isValid;
 
-// ❌ マジックナンバー（非推奨）
-cache.put(cacheKey, data, 300);     // ❌ 意味が不明
-Utilities.sleep(100);               // ❌ なぜ100ms？
+// ❌ AVOID: Unnecessary prefixes, magic numbers
+authGetCurrentEmail()   // ❌ → getCurrentEmail()
+cache.put(key, data, 300);  // ❌ → CACHE_DURATION.LONG
 ```
 
-#### **Function Categories & Naming Patterns**
-```javascript
-// ✅ カテゴリ別命名パターン
-
-// 1. データ取得・操作
-getCurrentEmail()       // get + 対象名
-getUser()              // シンプルで明確
-getUserConfig()        // 対象を明確に
-saveUserConfig()       // 動作を明確に
-
-// 2. 検証・確認
-validateEmail()        // validate + 対象
-isAdmin()             // 状態確認（boolean返却）
-checkUserAccess()     // check + 確認内容
-
-// 3. 作成・生成
-createErrorResponse()  // create + 作成対象
-generateDynamicUrls()  // generate + 生成内容
-
-// 4. 処理・変換
-processLoginAction()   // process + 処理対象
-handleGetData()       // handle + ハンドル対象
-formatTimestamp()     // format + 変換対象
-
-// 5. 特殊プレフィックス（必要時のみ）
-getUserSheetData()  // 複雑なデータ処理
-sysLog()             // システムレベル機能
-```
-
-#### **Parameter Naming Standards**
-```javascript
-// ✅ 統一されたパラメータ名
-function processUserData(userId, spreadsheetId, sheetName, options = {}) {
-  // userId: 常にcamelCase、一意識別子
-  // spreadsheetId: Google Sheets ID（統一形式）
-  // sheetName: シート名（camelCase）
-  // options: オプション引数は常にオブジェクト
-}
-
-// ✅ 一貫性のあるAPI設計
-getCurrentEmail()                           // Auth layer
-getUserConfig(userId)                       // Config layer
-getUserSheetData(userId, options)        // Data layer (特殊処理)
-
-// ❌ 非一貫的なパラメータ（非推奨）
-function badFunction(user_id, spreadsheet-id, sheet_name) { } // ❌ 命名規則混在
-function anotherBad(userID, spreadSheetId, SheetName) { }     // ❌ 大文字小文字不統一
-```
-
-### **🔧 Implementation Guidelines**
-
-#### **GAS-Native Pattern Compliance**
-```javascript
-// ✅ GAS-Native: Direct API calls with natural global scope
-function getCurrentEmail() {
-  return Session.getActiveUser().getEmail();
-}
-
-function getUserConfig(userId) {
-  const dbId = PropertiesService.getScriptProperties().getProperty('DATABASE_SPREADSHEET_ID');
-  const spreadsheet = SpreadsheetApp.openById(dbId);
-  // Direct SpreadsheetApp usage - no abstraction layers
-}
-
-// ✅ Specialized functions with clear prefixes
-function getUserSheetData(userId, options = {}) {
-  // Complex data operations warrant specific naming
-  // Clear functional responsibility
-}
-
-// ✅ GAS-Native constants (no typeof checks needed)
-const CACHE_DURATION = {
-  SHORT: 10,
-  MEDIUM: 30,
-  LONG: 300
-};
-
-const TIMEOUT_MS = {
-  QUICK: 100,
-  DEFAULT: 5000,
-  EXTENDED: 30000
-};
-```
-
-#### **Naming Philosophy & Migration**
-```javascript
-// ✅ CLAUDE.md準拠：実用性重視のシンプル命名
-// 自然な英語 > 強制的なプレフィックス
-// 読みやすさ > 厳格な分類
-
-// ✅ 保持すべき関数名パターン
-getCurrentEmail()         // 直感的
-getUserConfig()          // 明確
-validateEmail()          // 目的が分かりやすい
-createErrorResponse()    // 自然な動詞+名詞
-isAdmin()               // シンプルな状態確認
-
-// ✅ 必要なプレフィックス（機能的理由）
-getUserSheetData()    // DataService特有の複雑処理
-addReaction()         // DataService特有の機能
-sysLog()               // システムレベル統一機能
-
-// ❌ 不要なプレフィックス強制は避ける
-// 読みやすさを損なうプレフィックスは使用しない
-```
-
-### **📊 Benefits of Pragmatic Naming**
-
-- **🎯 Natural Readability**: 自然な英語表現で直感的に理解可能
-- **⚡ Development Speed**: シンプルな関数名で開発効率向上
-- **📖 Self-Documenting Code**: 機能が名前から即座に理解できる
-- **🛠️ Maintenance Efficiency**: 読みやすい関数名で保守性向上
-- **🔄 Zero-Dependency Compliance**: ファイル読み込み順序に依存しない設計
-- **🎨 Code Aesthetics**: 美しく読みやすいコードベース実現
-
-## 📋 Important Application Notes
+## 📋 Important Notes
 
 ### **Web App Entry Flow**
+
 ```
-/exec access → AccessRestricted (safe landing)
-            → (explicit) ?mode=login → Setup → Admin Panel
-            → (viewer)  ?mode=view&userId=... → Public Board View
+/exec → AccessRestricted (default safe landing)
+     → ?mode=login → Setup → Admin Panel
+     → ?mode=view&userId=... → Public Board View
 ```
 
-**Policy**: `/exec`のデフォルトはログインページではなく、安全な着地点（AccessRestricted）を表示。これは閲覧ユーザーが不用意にアカウント生成することを防ぐ安全策。
+### **API Guidelines**
 
-### **API Compatibility Guidance**
-- フロントエンドは既存API名に合わせる（例: `isAdmin`、`getSheets`）
-- リアクション系はDataServiceの公開関数を直接利用（`addReaction`, `toggleHighlight`）
-- 新たな中間API（Gatewayラッパ）は原則追加しない
-
-### **OAuth Scopes Policy**
-- 必要最小限のスコープのみ採用
-- 既定: `spreadsheets`, `drive`, `script.external_request`, `userinfo.email`
-- 未使用のAdvanced Servicesは無効化
+- ✅ Frontend uses existing API names (no wrapper additions)
+- ✅ Reactions: Direct DataService calls (`addReaction`, `toggleHighlight`)
+- ✅ OAuth: Minimal scopes only (`spreadsheets`, `drive`, `userinfo.email`)
 
 ## 🏆 Architecture Benefits
 
 - **70x Performance Improvement**: Batch operations (1s vs 70s)
 - **Zero Dependencies**: Direct GAS API calls for maximum reliability
 - **Loading Order Independence**: No file dependency chains
-- **100% Test Coverage**: 113/113 tests passing
+- **100% Test Coverage**: 123/123 tests passing
 - **Production Stability**: Enterprise-grade error handling
+- **Optimized Caching**: 80-90% PropertiesService API call reduction with 30s TTL
 
 ---
 

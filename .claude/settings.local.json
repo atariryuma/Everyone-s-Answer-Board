@@ -2,7 +2,22 @@
   "permissions": {
     "allow": [
       "Bash(git push:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(npm run check:*)",
+      "Bash(awk:*)",
+      "WebSearch",
+      "WebFetch(domain:developers.google.com)",
+      "Bash(find:*)",
+      "Bash(while read file)",
+      "Bash(do echo \"=== $file ===\")",
+      "Bash(done)",
+      "Bash(clasp push:*)",
+      "Bash(clasp open)",
+      "Bash(clasp:*)",
+      "Bash(git log:*)",
+      "Bash(git restore:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": [],
