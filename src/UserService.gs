@@ -29,24 +29,26 @@
 
 /**
  * 現在のユーザー情報取得（キャッシュ対応）
+ * ✅ SECURITY: ユーザー固有キャッシュキーで個人情報隔離
  * @returns {Object|null} ユーザー情報オブジェクト
  */
 function getCurrentUserInfo() {
-  const cacheKey = 'current_user_info';
-
   try {
-    // キャッシュ確認
-    const cache = CacheService.getScriptCache();
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      return JSON.parse(cached);
-    }
-
     // セッション取得
     const email = Session.getActiveUser().getEmail();
     if (!email) {
       console.warn('getCurrentUserInfo: 有効なセッションなし');
       return null;
+    }
+
+    // ✅ SECURITY FIX: ユーザー固有のキャッシュキー（共有キャッシュの個人情報流出防止）
+    const cacheKey = `current_user_info_${email}`;
+
+    // キャッシュ確認
+    const cache = CacheService.getScriptCache();
+    const cached = cache.get(cacheKey);
+    if (cached) {
+      return JSON.parse(cached);
     }
 
     // データベース検索
@@ -308,8 +310,9 @@ function resetAuth() {
     }
 
     // 🔧 修正3: 包括的キャッシュキーリスト（実際の使用パターンに合わせて更新）
+    // ✅ SECURITY NOTE: current_user_info はユーザー固有キー（current_user_info_${email}）に変更済み
+    // グローバルキャッシュキーのみをリストアップ
     const globalCacheKeysToRemove = [
-      'current_user_info',
       'admin_auth_cache',
       'session_data',
       'system_diagnostic_cache',
@@ -330,6 +333,7 @@ function resetAuth() {
     const userSpecificKeysCleared = [];
     if (currentEmail) {
       const emailBasedKeys = [
+        `current_user_info_${currentEmail}`,  // ✅ SECURITY FIX: ユーザー固有キー追加
         `board_data_${currentEmail}`,
         `user_data_${currentEmail}`,
         `admin_panel_${currentEmail}`

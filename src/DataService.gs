@@ -206,13 +206,16 @@ function connectToSpreadsheetSheet(config, context = {}) {
  * シート情報を一括取得（寸法+ヘッダー）
  * ✅ API最適化: getDataRange()を1回で寸法とヘッダーを同時取得（50%削減）
  * ✅ 10分キャッシュでAPI呼び出し70%削減、ヒット率20-30%向上
+ * ✅ SECURITY: spreadsheetId+sheetName でキャッシュキー一意性確保（サービスアカウントプロキシ対応）
  * @param {Sheet} sheet - シートオブジェクト
  * @returns {Object} { lastRow, lastCol, headers }
  */
 function getSheetInfo(sheet) {
-  // シートIDベースのキャッシュキー生成
-  const sheetId = sheet.getSheetId ? sheet.getSheetId() : sheet.getName();
-  const cacheKey = `sheet_info_${sheetId}`;
+  // ✅ SECURITY FIX: スプレッドシートID + シート名で一意性確保
+  // サービスアカウントプロキシの getSheetId() が 0 を返すケースに対応
+  const spreadsheetId = sheet.getParent ? sheet.getParent().getId() : 'unknown';
+  const sheetName = sheet.getName();
+  const cacheKey = `sheet_info_${spreadsheetId}_${sheetName}`;
   const cache = CacheService.getScriptCache();
 
   // キャッシュ確認

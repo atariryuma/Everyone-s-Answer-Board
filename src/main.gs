@@ -18,25 +18,12 @@
 
 /**
  * 現在のユーザーのメールアドレスを取得
+ * ✅ SECURITY: getActiveUser() のみ使用（getEffectiveUser() は権限昇格リスクあり）
  * @returns {string|null} ユーザーのメールアドレス、または認証されていない場合はnull
  */
 function getCurrentEmail() {
   try {
-    const activeUser = Session.getActiveUser();
-    const email = activeUser ? activeUser.getEmail() : null;
-
-    if (!email || email.trim() === '') {
-      try {
-        const effectiveUser = Session.getEffectiveUser();
-        const effectiveEmail = effectiveUser ? effectiveUser.getEmail() : null;
-        if (effectiveEmail && effectiveEmail.trim() !== '') {
-          return effectiveEmail;
-        }
-      } catch (altError) {
-        // Alternative email retrieval failed, continue to fallback return
-      }
-    }
-
+    const email = Session.getActiveUser().getEmail();
     return email || null;
   } catch (error) {
     console.error('getCurrentEmail error:', error.message);

@@ -223,10 +223,11 @@ function compareSecurityAccessLevels(currentLevel, requiredLevel) {
  */
 function logSecurityEvent(event) {
     try {
+      // ✅ SECURITY FIX: getActiveUser() のみ使用（getEffectiveUser() は権限昇格リスクあり）
+      const sessionEmail = Session.getActiveUser().getEmail();
       const logEntry = {
         timestamp: new Date().toISOString(),
-        sessionEmail: { email: Session.getActiveUser().getEmail() }.email,
-        effectiveEmail: Session.getEffectiveUser().getEmail(),
+        sessionEmail,
         eventType: event.type || 'unknown',
         severity: event.severity || 'info',
         description: event.description || '',
