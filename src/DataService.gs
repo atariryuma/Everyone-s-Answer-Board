@@ -160,9 +160,8 @@ function extractTimestampValue(row, headers) {
  * @returns {Object} シート情報
  */
 function connectToSpreadsheetSheet(config, context = {}) {
-  // Context-aware service account usage
-  // Cross-user: Use service account when accessing other user's spreadsheet
-  // Self-access: Use normal permissions for own spreadsheet
+  // ✅ CRITICAL: ユーザーの回答ボードは同一ドメイン共有設定で対応
+  // サービスアカウントは使用しない（DatabaseCore.gsで自動制御）
   const currentEmail = getCurrentEmail();
 
   // ✅ CLAUDE.md準拠: preloadedUser優先使用でfindUserBySpreadsheetId重複呼び出しを排除
@@ -178,15 +177,15 @@ function connectToSpreadsheetSheet(config, context = {}) {
     });
   }
 
-  const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
-
-  const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
+  // ✅ 常に通常権限でアクセス（同一ドメイン共有設定前提）
+  const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
 
   if (!dataAccess || !dataAccess.spreadsheet) {
     console.error('connectToSpreadsheetSheet: スプレッドシートアクセス失敗', {
       spreadsheetId: config.spreadsheetId,
-      useServiceAccount: !isSelfAccess,
-      hasDataAccess: !!dataAccess
+      useServiceAccount: false,
+      hasDataAccess: !!dataAccess,
+      hint: '同一ドメイン内で編集可能に設定してください'
     });
     throw new Error(`スプレッドシートアクセスに失敗しました: ${config.spreadsheetId}`);
   }
@@ -633,7 +632,7 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
 
     // 🚀 Zero-dependency spreadsheet access
     const dataAccess = openSpreadsheet(spreadsheetId, {
-      useServiceAccount: !isOwner, // Cross-user access for admins
+      useServiceAccount: false, // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応
       targetUserEmail: user.userEmail,
       context: 'deleteAnswerRow'
     });

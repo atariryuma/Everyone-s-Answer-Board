@@ -79,17 +79,18 @@ function getUserData(email) {
   // ... direct data operations
 }
 
-// ✅ Service Account usage - ONLY for cross-user access
+// ✅ Service Account usage - ONLY for DATABASE_SPREADSHEET
+// ユーザーの回答ボードは同一ドメイン共有設定（DOMAIN_WITH_LINK + EDIT）で対応
 function getViewerBoardData(targetUserId, viewerEmail) {
+  // DATABASE_SPREADSHEETからユーザー情報を取得（サービスアカウント使用）
   const targetUser = findUserById(targetUserId);
-  if (targetUser.userEmail === viewerEmail) {
-    // Own data: use normal permissions
-    return getUserSpreadsheetData(targetUser);
-  } else {
-    // Other's data: use service account for cross-user access
-    const dataAccess = openSpreadsheet(targetUser.spreadsheetId, { useServiceAccount: true });
-    return getUserSpreadsheetData(targetUser, { dataAccess });
-  }
+
+  // ユーザーの回答ボードは同一ドメイン共有設定により、全員が通常権限でアクセス可能
+  // サービスアカウント不要（API quota問題を回避）
+  return getUserSheetData(targetUser.userId, {
+    includeTimestamp: true,
+    requestingUser: viewerEmail
+  });
 }
 ```
 

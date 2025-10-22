@@ -348,6 +348,64 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
 
 // ✅ 設定検証・サニタイズ
 
+/**
+ * 公開専用設定検証（厳格版）
+ * ✅ CRITICAL FIX: 公開時の必須フィールドを厳格に検証
+ * @param {Object} config - 設定オブジェクト
+ * @param {string} userId - ユーザーID
+ * @returns {Object} 検証結果
+ */
+function validatePublishConfig(config, userId) {
+  try {
+    // 基本検証を実行
+    const baseValidation = validateAndSanitizeConfig(config, userId);
+    if (!baseValidation.success) {
+      return baseValidation;
+    }
+
+    const errors = [];
+
+    // 公開時の必須フィールド検証
+    if (!config.spreadsheetId || typeof config.spreadsheetId !== 'string' || !config.spreadsheetId.trim()) {
+      errors.push('公開にはスプレッドシートIDが必要です');
+    }
+
+    if (!config.sheetName || typeof config.sheetName !== 'string' || !config.sheetName.trim()) {
+      errors.push('公開にはシート名が必要です');
+    }
+
+    if (!config.columnMapping || typeof config.columnMapping !== 'object') {
+      errors.push('公開には列マッピングが必要です');
+    } else if (Object.keys(config.columnMapping).length === 0) {
+      errors.push('公開には列マッピングが必要です（空のマッピングは無効）');
+    } else {
+      // 必須: answer 列の検証（0 も有効な列番号）
+      const answerColumn = config.columnMapping.answer;
+      if (answerColumn === undefined || answerColumn === null || (typeof answerColumn === 'number' && answerColumn < 0)) {
+        errors.push('公開には回答列（answer）の設定が必要です');
+      }
+    }
+
+    if (errors.length > 0) {
+      return {
+        success: false,
+        message: '公開に必要な設定が不足しています',
+        errors,
+        data: baseValidation.data
+      };
+    }
+
+    return baseValidation;
+
+  } catch (error) {
+    console.error('validatePublishConfig: エラー', error.message);
+    return {
+      success: false,
+      message: '公開設定検証中にエラーが発生しました',
+      errors: [error.message]
+    };
+  }
+}
 
 /**
  * 設定検証・サニタイズ（統合版）
@@ -676,17 +734,10 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
     // 3. headersがない場合、スプレッドシートから動的取得
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
-        // 🔧 CLAUDE.md準拠: Context-aware service account usage
-        // ✅ **Cross-user**: Use service account when accessing other user's config
-        // ✅ **Self-access**: Use normal permissions for own config
+        // ✅ CRITICAL: 同一ドメイン共有設定で対応（サービスアカウント不使用）
         const currentEmail = getCurrentEmail();
-
-        // CLAUDE.md準拠: spreadsheetIdから所有者を特定して直接比較
-        const targetUser = findUserBySpreadsheetId(config.spreadsheetId);
-        const isSelfAccess = targetUser && targetUser.userEmail === currentEmail;
-
         try {
-          const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: !isSelfAccess });
+          const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
           const { spreadsheet } = dataAccess;
           const sheet = spreadsheet.getSheetByName(config.sheetName);
           if (sheet) {

@@ -17,6 +17,7 @@
 /**
  * Google Sheets APIの堅牢な呼び出しラッパー（クォータ制限対応）
  * ✅ 適応型バックオフ: 初回エラーは短い待機、連続エラー時は段階的延長
+ * ✅ サーキットブレーカー: 連続エラー時にAPI呼び出しを一時停止
  * @param {string} url - API URL
  * @param {Object} options - Fetch options
  * @param {string} operationName - Operation name for logging
@@ -25,14 +26,37 @@
 function fetchSheetsAPIWithRetry(url, options, operationName) {
   let retryCount = 0;
 
+  // ✅ サーキットブレーカー: 連続エラー検知用の静的カウンター
+  if (typeof fetchSheetsAPIWithRetry.consecutiveErrors === 'undefined') {
+    fetchSheetsAPIWithRetry.consecutiveErrors = 0;
+    fetchSheetsAPIWithRetry.circuitOpenUntil = 0;
+  }
+
+  // サーキットブレーカー状態チェック
+  const now = Date.now();
+  if (fetchSheetsAPIWithRetry.circuitOpenUntil > now) {
+    const waitTime = Math.round((fetchSheetsAPIWithRetry.circuitOpenUntil - now) / 1000);
+    throw new Error(`Circuit breaker open: API calls paused for ${waitTime}s to allow quota recovery`);
+  }
+
   return executeWithRetry(
     () => {
       const response = UrlFetchApp.fetch(url, options);
 
       // ✅ 適応型429エラー処理: Quota回復を待つための延長バックオフ
       if (response.getResponseCode() === 429) {
-        const backoffTime = Math.min(8000 + (retryCount * 5000), 25000);
+        const backoffTime = Math.min(15000 + (retryCount * 15000), 60000);
         console.warn(`⚠️ 429 Quota exceeded for ${operationName || 'Sheets API'}, waiting ${backoffTime}ms (retry: ${retryCount})`);
+
+        // 連続エラーカウント増加
+        fetchSheetsAPIWithRetry.consecutiveErrors++;
+
+        // サーキットブレーカー発動: 連続3回エラーで60秒間停止
+        if (fetchSheetsAPIWithRetry.consecutiveErrors >= 3) {
+          fetchSheetsAPIWithRetry.circuitOpenUntil = now + 60000;
+          console.error(`🚨 Circuit breaker activated: Too many 429 errors. API calls paused for 60s.`);
+        }
+
         Utilities.sleep(backoffTime);
         retryCount++;
         throw new Error('Quota exceeded (429), retry with adaptive backoff');
@@ -42,6 +66,10 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
         const errorText = response.getContentText();
         throw new Error(`API returned ${response.getResponseCode()}: ${errorText}`);
       }
+
+      // ✅ 成功時: 連続エラーカウントリセット
+      fetchSheetsAPIWithRetry.consecutiveErrors = 0;
+      fetchSheetsAPIWithRetry.circuitOpenUntil = 0;
 
       return response;
     },
@@ -562,8 +590,15 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       return null;
     }
 
+    // ✅ CRITICAL: サービスアカウントはDATABASE_SPREADSHEETのみ使用
+    const databaseId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    const isDatabaseAccess = spreadsheetId === databaseId;
+
+    // ユーザーの回答ボードにはサービスアカウントを使わない（同一ドメイン共有設定で対応）
+    const effectiveUseServiceAccount = isDatabaseAccess && options.useServiceAccount === true;
+
     // Validate service account usage
-    const validation = validateServiceAccountUsage(spreadsheetId, options.useServiceAccount, options.context || 'openSpreadsheet');
+    const validation = validateServiceAccountUsage(spreadsheetId, effectiveUseServiceAccount, options.context || 'openSpreadsheet');
     if (!validation.allowed) {
       console.warn('openSpreadsheet: Service account usage denied:', validation.reason);
       return null;
@@ -572,36 +607,20 @@ function openSpreadsheet(spreadsheetId, options = {}) {
     let spreadsheet = null;
     let auth = null;
 
-    // CROSS-USER ACCESS ONLY - service account usage
-    if (options.useServiceAccount === true) {
-      // クロスユーザーアクセス - サービスアカウント使用
+    // CROSS-USER ACCESS ONLY - service account usage (DATABASE_SPREADSHEET only)
+    if (effectiveUseServiceAccount) {
+      // ✅ DATABASE_SPREADSHEET_ID専用のサービスアカウントアクセス
       auth = getServiceAccount();
-      if (auth.isValid) {
-        const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-
-        // DATABASE_SPREADSHEET_IDの場合、DriveApp権限チェックをスキップしてSheets API直接アクセス
-        if (spreadsheetId !== dbId) {
-          try {
-            // Check if access already exists before granting
-            const file = DriveApp.getFileById(spreadsheetId);
-            const editors = file.getEditors();
-            const hasAccess = editors.some(editor => editor.getEmail() === auth.email);
-
-            if (!hasAccess) {
-              file.addEditor(auth.email);
-            }
-          } catch (driveError) {
-            console.info('openSpreadsheet: Using Sheets API direct access (DriveApp permission check skipped)');
-          }
-        }
-      } else {
+      if (!auth.isValid) {
         console.warn('openSpreadsheet: Service account requested but invalid credentials');
       }
+      // ✅ CRITICAL: サービスアカウント登録コードを削除
+      // ユーザーの回答ボードには同一ドメイン共有設定で対応
     }
 
     // スプレッドシートを開く
     try {
-      if (options.useServiceAccount === true && auth && auth.isValid) {
+      if (effectiveUseServiceAccount && auth && auth.isValid) {
         // Service account implementation via JWT authentication
         spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
         if (!spreadsheet) {
@@ -1222,49 +1241,38 @@ function updateUser(userId, updates, context = {}) {
 /**
  * 閲覧者向けボードデータ取得（CLAUDE.md準拠 - 模範実装）
  *
- * Context-aware access control implementation.
- * Self-access uses normal permissions, cross-user access uses service account.
- *
- * Security Pattern:
- * - Self-access: targetUser.userEmail === viewerEmail → Normal permissions
- * - Cross-user access: targetUser.userEmail !== viewerEmail → Service account
+ * 🎯 アクセス管理:
+ * - DATABASE_SPREADSHEET: サービスアカウントで全員がアクセス（ユーザー一覧取得）
+ * - ユーザーの回答ボード: 同一ドメイン共有設定（DOMAIN_WITH_LINK + EDIT）で全員がアクセス可能
  *
  * @param {string} targetUserId - 対象ユーザーのユニークID（UUID形式）
  * @param {string} viewerEmail - 閲覧者のメールアドレス（アクセス判定用）
  * @returns {Object|null} Board data with spreadsheet info, config, and sheets list, or null if error
  *
  * @example
- * // 自分のデータにアクセス（通常権限）
+ * // 自分のデータにアクセス（同一ドメイン共有設定）
  * const myData = getViewerBoardData(myUserId, myEmail);
  *
  * @example
- * // 他人のデータにアクセス（サービスアカウント）
+ * // 他人のデータにアクセス（同一ドメイン共有設定）
  * const othersData = getViewerBoardData(otherUserId, myEmail);
  */
 function getViewerBoardData(targetUserId, viewerEmail) {
   try {
+    // DATABASE_SPREADSHEETからユーザー情報を取得（サービスアカウント経由）
     const targetUser = findUserById(targetUserId, { requestingUser: viewerEmail });
     if (!targetUser) {
       console.warn('getViewerBoardData: Target user not found:', targetUserId);
       return null;
     }
 
-    if (targetUser.userEmail === viewerEmail) {
-      // Own data: use normal permissions
-      // eslint-disable-next-line no-undef
-      return getUserSheetData(targetUser.userId, {
-        includeTimestamp: true,
-        requestingUser: viewerEmail
-      });
-    } else {
-      // Other's data: use service account for cross-user access
-      // eslint-disable-next-line no-undef
-      return getUserSheetData(targetUser.userId, {
-        includeTimestamp: true,
-        requestingUser: viewerEmail,
-        targetUserEmail: targetUser.userEmail // This will trigger service account usage in getUserSheetData
-      });
-    }
+    // ユーザーの回答ボードは同一ドメイン共有設定により、全員が通常権限でアクセス可能
+    // 自分のデータも他人のデータも同じ方法で取得（サービスアカウント不要）
+    // eslint-disable-next-line no-undef
+    return getUserSheetData(targetUser.userId, {
+      includeTimestamp: true,
+      requestingUser: viewerEmail
+    });
   } catch (error) {
     console.error('getViewerBoardData error:', error.message);
     return null;

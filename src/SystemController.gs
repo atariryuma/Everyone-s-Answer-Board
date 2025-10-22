@@ -13,7 +13,7 @@ const CACHE_DURATION = {
   SHORT: 10,           // 10秒 - 認証ロック
   MEDIUM: 30,          // 30秒 - リアクション・ハイライトロック
   LONG: 300,           // 5分 - ユーザー情報キャッシュ
-  DATABASE_LONG: 900,  // 15分 - データベース全体キャッシュ（429エラー対策強化）
+  DATABASE_LONG: 1200, // 20分 - データベース全体キャッシュ（429エラー対策強化）
   USER_INDIVIDUAL: 900, // 15分 - 個別ユーザーキャッシュ（冗長性強化）
   EXTRA_LONG: 3600     // 1時間 - 設定キャッシュ
 };
@@ -599,12 +599,13 @@ function getAdminSpreadsheetList() {
 
 /**
  * シート一覧を取得
+ * ⚠️ 現在未使用の関数（将来の拡張用に保持）
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {Object} シート一覧
  */
 function getAdminSheetList(spreadsheetId) {
   try {
-    // 🎯 CLAUDE.md準拠: 管理者機能のため、サービスアカウント使用
+    // ⚠️ DATABASE_SPREADSHEET専用（DatabaseCore.gs:598のガードにより制限）
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
     const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
@@ -656,6 +657,36 @@ function publishApp(publishConfig) {
     if (!email) {
       console.error('publishApp: User authentication failed');
       return { success: false, message: 'ユーザー認証が必要です' };
+    }
+
+    // ✅ CRITICAL FIX: 必須フィールドの事前検証
+    if (!publishConfig) {
+      return { success: false, message: '公開設定が必要です' };
+    }
+
+    // spreadsheetId 検証
+    if (!publishConfig.spreadsheetId || typeof publishConfig.spreadsheetId !== 'string' || !publishConfig.spreadsheetId.trim()) {
+      return { success: false, message: 'データソース（スプレッドシートID）が設定されていません' };
+    }
+
+    // sheetName 検証
+    if (!publishConfig.sheetName || typeof publishConfig.sheetName !== 'string' || !publishConfig.sheetName.trim()) {
+      return { success: false, message: 'データソース（シート名）が設定されていません' };
+    }
+
+    // columnMapping 検証
+    if (!publishConfig.columnMapping || typeof publishConfig.columnMapping !== 'object') {
+      return { success: false, message: '列マッピングが設定されていません' };
+    }
+
+    if (Object.keys(publishConfig.columnMapping).length === 0) {
+      return { success: false, message: '列マッピングが空です。少なくとも回答列を設定してください' };
+    }
+
+    // answer 列必須チェック（0 も有効な列番号）
+    const answerColumn = publishConfig.columnMapping.answer;
+    if (answerColumn === undefined || answerColumn === null || (typeof answerColumn === 'number' && answerColumn < 0)) {
+      return { success: false, message: '回答列（answer）が設定されていません' };
     }
 
     const publishedAt = new Date().toISOString();
@@ -768,18 +799,17 @@ function isUserSpreadsheetOwner(spreadsheetId) {
 function getSpreadsheetAdaptive(spreadsheetId, context = {}) {
   const currentEmail = getCurrentEmail();
 
-  // CLAUDE.md準拠: アクセス権限の判定 - 自分のデータは管理者でも通常権限を使用
-  const isOwner = isUserSpreadsheetOwner(spreadsheetId);
-
-  // ✅ **Self-access**: Owner accessing own spreadsheet (normal permissions unless force override)
-  // ✅ **Cross-user**: Non-owner accessing spreadsheet (service account)
-  // ❌ **Anti-pattern**: Admin unnecessarily using service account for own data
-  const useServiceAccount = context.forceServiceAccount || !isOwner;
+  // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応
+  // サービスアカウントは共有データベースのみで使用
+  const useServiceAccount = false;
 
 
   try {
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
     const accessMethod = useServiceAccount ? 'service_account' : 'normal_permissions';
+
+    // ✅ オーナー権限判定: サービスアカウント使用時はfalse、通常アクセス時はtrue
+    const isOwner = !useServiceAccount;
 
     return {
       spreadsheet: dataAccess.spreadsheet,
@@ -1107,15 +1137,18 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
 
 /**
  * スプレッドシートへのアクセス権限を検証
- * AdminPanel.js.html から呼び出される
+ * main.gs:2065 から呼び出される（URL検証時）
+ *
+ * ✅ ユーザーの回答ボードへのアクセス検証
+ * - 同一ドメイン共有設定により通常権限でアクセス
  *
  * @param {string} spreadsheetId - スプレッドシートID
  * @returns {Object} 検証結果
  */
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
-    // 🎯 CLAUDE.md準拠: validateAccess は管理者機能のため、常にサービスアカウント使用
-    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
+    // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応（通常権限でアクセス）
+    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
     const {spreadsheet, auth} = dataAccess;
 
     // カスタムラッパーのgetSheets()メソッドを使用
@@ -1143,7 +1176,7 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
           columnCount: lastCol
         };
       }),
-      owner: 'Service Account Access',
+      owner: 'Domain Shared Access',
       url: `https://docs.google.com/spreadsheets/d/${spreadsheetId}/edit`
     };
 
@@ -1280,6 +1313,7 @@ function getFormInfo(spreadsheetId, sheetName) {
         message: isHighConfidence ?
           'フォーム連携パターンを検出（URL取得不可）' :
           'フォーム連携が確認できませんでした',
+        reason: isHighConfidence ? 'FORM_DETECTED_NO_URL' : 'FORM_NOT_LINKED',
         formData,
         suggestions: formDetectionResult.suggestions || [
           'Googleフォームの「回答の行き先」を開き、対象のシートにリンクしてください',

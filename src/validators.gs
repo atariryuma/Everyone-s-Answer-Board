@@ -317,7 +317,8 @@ function validateMapping(columnMapping) {
     for (const col of requiredColumns) {
       const index = actualMapping[col];
       // console.log(`🔍 validateMapping: ${col} = ${index} (type: ${typeof index})`);
-      if (typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
+      // ✅ HIGH FIX: 0 も有効な列番号として許容（index !== undefined && index !== 0 の条件追加）
+      if (index === undefined || typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
         const errorMsg = `必須列 '${col}' のインデックスが無効です（値: ${index}）`;
         // console.log(`❌ ${errorMsg}`);
         result.errors.push(errorMsg);

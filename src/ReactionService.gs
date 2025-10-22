@@ -6,7 +6,7 @@
  * - ハイライト機能
  * - マルチテナントセキュリティ
  * - 直接SpreadsheetApp操作（Zero-Dependency）
- * - Service Account適切使用（Cross-user access only）
+ * - 同一ドメイン共有設定によるアクセス管理
  */
 
 /* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
@@ -60,6 +60,7 @@ function logReactionAudit(action, details) {
 
 /**
  * 🚀 GAS-Native直接リアクション処理
+ * ✅ Graceful Degradation: ヘッダー取得失敗時も継続動作
  * @param {Sheet} sheet - スプレッドシートオブジェクト
  * @param {number} rowNumber - 行番号
  * @param {string} reactionType - リアクション種類
@@ -76,6 +77,26 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
   // 🎯 ヘッダー行から列位置取得（API効率化: getDataRange使用）
   const dataRange = sheet.getDataRange();
   const [headers = []] = dataRange.getValues();
+
+  // ✅ Graceful Degradation: ヘッダー空配列対応（429エラー時のフォールバック）
+  if (!headers || headers.length === 0) {
+    console.warn(`⚠️ processReactionDirect: Headers unavailable (likely due to API quota). Reaction feature temporarily disabled.`, {
+      rowNumber,
+      reactionType,
+      context: 'graceful-degradation'
+    });
+    return {
+      action: 'unavailable',
+      userReaction: null,
+      reactions: {
+        UNDERSTAND: { count: 0, reacted: false },
+        LIKE: { count: 0, reacted: false },
+        CURIOUS: { count: 0, reacted: false }
+      },
+      message: 'リアクション機能が一時的に利用できません。しばらくしてから再度お試しください。'
+    };
+  }
+
   const reactionColumns = {};
 
   reactionTypes.forEach(type => {
@@ -176,6 +197,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
 
 /**
  * 🚀 GAS-Native直接ハイライト処理
+ * ✅ Graceful Degradation: ヘッダー取得失敗時も継続動作
  * @param {Sheet} sheet - スプレッドシートオブジェクト
  * @param {number} rowNumber - 行番号
  * @returns {Object} 処理結果
@@ -184,6 +206,18 @@ function processHighlightDirect(sheet, rowNumber) {
   // API効率化: getDataRange使用
   const dataRange = sheet.getDataRange();
   const [headers = []] = dataRange.getValues();
+
+  // ✅ Graceful Degradation: ヘッダー空配列対応（429エラー時のフォールバック）
+  if (!headers || headers.length === 0) {
+    console.warn(`⚠️ processHighlightDirect: Headers unavailable (likely due to API quota). Highlight feature temporarily disabled.`, {
+      rowNumber,
+      context: 'graceful-degradation'
+    });
+    return {
+      highlighted: false,
+      message: 'ハイライト機能が一時的に利用できません。しばらくしてから再度お試しください。'
+    };
+  }
 
   // ハイライト列を探す
   const highlightColIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
@@ -367,10 +401,9 @@ function addReaction(targetUserId, rowIndex, reactionType) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
 
-      // 🔧 CLAUDE.md準拠: クロスユーザーアクセス判定
-      const isSelfAccess = targetUser.userEmail === actorEmail;
+      // ✅ CRITICAL: 同一ドメイン共有設定で対応（サービスアカウント不使用）
       const dataAccess = openSpreadsheet(config.spreadsheetId, {
-        useServiceAccount: !isSelfAccess,
+        useServiceAccount: false,
         context: 'reaction_processing'
       });
 
@@ -397,7 +430,7 @@ function addReaction(targetUserId, rowIndex, reactionType) {
           reactionType,
           rowNumber,
           action: result.action,
-          accessMethod: isSelfAccess ? 'normal' : 'service_account'
+          accessMethod: 'normal_permissions'
         }
       });
 
@@ -509,10 +542,9 @@ function toggleHighlight(targetUserId, rowIndex) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
 
-      // 🔧 CLAUDE.md準拠: クロスユーザーアクセス判定
-      const isSelfAccess = targetUser.userEmail === actorEmail;
+      // ✅ CRITICAL: 同一ドメイン共有設定で対応（サービスアカウント不使用）
       const dataAccess = openSpreadsheet(config.spreadsheetId, {
-        useServiceAccount: !isSelfAccess,
+        useServiceAccount: false,
         context: 'highlight_processing'
       });
 
@@ -538,7 +570,7 @@ function toggleHighlight(targetUserId, rowIndex) {
         extra: {
           rowNumber,
           highlighted: result.highlighted,
-          accessMethod: isSelfAccess ? 'normal' : 'service_account'
+          accessMethod: 'normal_permissions'
         }
       });
 

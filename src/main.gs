@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getDatabaseConfig, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getDatabaseConfig, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing */
 
 // Core Utility Functions
 
@@ -914,10 +914,9 @@ function validateHeaderIntegrity(targetUserId) {
       };
     }
 
-    // Self vs Cross-user access pattern
-    const isSelfAccess = targetUser.userEmail === currentEmail;
+    // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応
     const dataAccess = openSpreadsheet(config.spreadsheetId, {
-      useServiceAccount: !isSelfAccess
+      useServiceAccount: false
     });
     const sheet = dataAccess.getSheet(config.sheetName);
     if (!sheet) {
@@ -1317,25 +1316,16 @@ function getSheetList(spreadsheetId) {
     }
 
 
-    // Progressive access - try normal permissions first, fallback to service account
-    // This ensures editors can access their own spreadsheets with appropriate permissions
+    // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応（通常権限でアクセス）
     let dataAccess = null;
-    let usedServiceAccount = false;
 
     try {
-      // First attempt: Normal permissions
       dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
-
-      if (!dataAccess || !dataAccess.spreadsheet) {
-        // Second attempt: Service account (for cross-user access or permission issues)
-        dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
-        usedServiceAccount = true;
-      }
     } catch (accessError) {
-      console.warn('getSheetList: Both access methods failed:', accessError.message);
+      console.warn('getSheetList: Spreadsheet access failed:', accessError.message);
       return {
         success: false,
-        error: 'スプレッドシートにアクセスできません'
+        error: 'スプレッドシートにアクセスできません。同一ドメイン内で編集可能に設定されているか確認してください。'
       };
     }
 
@@ -1343,7 +1333,7 @@ function getSheetList(spreadsheetId) {
       console.warn('getSheetList: Failed to access spreadsheet:', `${spreadsheetId.substring(0, 8)}***`);
       return {
         success: false,
-        error: 'スプレッドシートを開くことができませんでした'
+        error: 'スプレッドシートを開くことができませんでした。同一ドメイン内で編集可能に設定されているか確認してください。'
       };
     }
 
@@ -1366,7 +1356,7 @@ function getSheetList(spreadsheetId) {
     return {
       success: true,
       sheets: sheetList,
-      accessMethod: usedServiceAccount ? 'service_account' : 'normal_permissions'
+      accessMethod: 'normal_permissions' // ✅ 同一ドメイン共有設定
     };
   } catch (error) {
     console.error('getSheetList error:', error.message);
@@ -1538,6 +1528,14 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
       };
     }
 
+    // ✅ STEP 1: スプレッドシートを同一ドメイン内で編集可能に設定
+    try {
+      setupDomainWideSharing(spreadsheetId, email);
+    } catch (sharingError) {
+      console.warn('connectDataSource: Domain-wide sharing setup failed (non-critical):', sharingError.message);
+      // 共有設定失敗は警告のみ（ユーザーが既に設定している可能性）
+    }
+
     // Editor access for own spreadsheets
     // getColumnAnalysis内で詳細なアクセス権チェックが実装済み
     console.info('connectDataSource: Access by user:', `${email.split('@')[0]}@***`);
@@ -1639,30 +1637,21 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
 
     const isAdmin = isAdministrator(email);
 
-    // Enhanced access control for editor users
-    // 管理者は任意のスプレッドシートにアクセス、編集ユーザーは自分がアクセス権を持つもののみ
+    // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応（通常権限でアクセス）
     let dataAccess;
     try {
-      // 編集ユーザーの場合、まず通常権限でアクセステストを行う
       dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
       if (!dataAccess) {
-        if (isAdmin) {
-          // 管理者の場合、サービスアカウントでリトライ
-          dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
-        }
-
-        if (!dataAccess) {
-          return {
-            success: false,
-            error: 'スプレッドシートにアクセスできません'
-          };
-        }
+        return {
+          success: false,
+          error: 'スプレッドシートにアクセスできません。同一ドメイン内で編集可能に設定されているか確認してください。'
+        };
       }
     } catch (accessError) {
       console.warn('getColumnAnalysis: Spreadsheet access failed for user:', `${email.split('@')[0]}@***`, accessError.message);
       return {
         success: false,
-        error: 'スプレッドシートにアクセス権がありません'
+        error: 'スプレッドシートにアクセス権がありません。同一ドメイン内で編集可能に設定されているか確認してください。'
       };
     }
 
