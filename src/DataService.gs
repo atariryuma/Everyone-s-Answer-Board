@@ -202,19 +202,15 @@ function connectToSpreadsheetSheet(config, context = {}) {
 }
 
 /**
- * シート情報を一括取得（寸法+ヘッダー）
- * ✅ API最適化: getDataRange()を1回で寸法とヘッダーを同時取得（50%削減）
- * ✅ 10分キャッシュでAPI呼び出し70%削減、ヒット率20-30%向上
- * ✅ SECURITY: spreadsheetId+sheetName でキャッシュキー一意性確保（サービスアカウントプロキシ対応）
+ * ヘッダー情報取得（長期キャッシュ - ヘッダーは変更されないため）
+ * ✅ FIX: フォーム投稿即時反映のため、ヘッダーと行数を分離
  * @param {Sheet} sheet - シートオブジェクト
- * @returns {Object} { lastRow, lastCol, headers }
+ * @returns {Object} { lastCol, headers }
  */
-function getSheetInfo(sheet) {
-  // ✅ SECURITY FIX: スプレッドシートID + シート名で一意性確保
-  // サービスアカウントプロキシの getSheetId() が 0 を返すケースに対応
+function getSheetHeaders(sheet) {
   const spreadsheetId = sheet.getParent ? sheet.getParent().getId() : 'unknown';
   const sheetName = sheet.getName();
-  const cacheKey = `sheet_info_${spreadsheetId}_${sheetName}`;
+  const cacheKey = `sheet_headers_${spreadsheetId}_${sheetName}`;
   const cache = CacheService.getScriptCache();
 
   // キャッシュ確認
@@ -223,7 +219,7 @@ function getSheetInfo(sheet) {
     try {
       return JSON.parse(cached);
     } catch (parseError) {
-      console.warn('getSheetInfo: Cache parse failed, fetching fresh data');
+      console.warn('getSheetHeaders: Cache parse failed, fetching fresh data');
     }
   }
 
@@ -231,21 +227,76 @@ function getSheetInfo(sheet) {
   const dataRange = sheet.getDataRange();
   const values = dataRange.getValues();
 
-  // ✅ Sheets API モック対応: values配列から直接取得（SpreadsheetAppでも動作）
   const info = {
-    lastRow: values.length,
     lastCol: values[0]?.length || 0,
     headers: values[0] || []
   };
 
-  // ✅ API最適化: 10分キャッシュでヒット率20-30%向上
+  // ✅ 20分キャッシュ（ヘッダーは変更されない）
   try {
     cache.put(cacheKey, JSON.stringify(info), CACHE_DURATION.DATABASE_LONG);
   } catch (cacheError) {
-    console.warn('getSheetInfo: Cache write failed:', cacheError.message);
+    console.warn('getSheetHeaders: Cache write failed:', cacheError.message);
   }
 
   return info;
+}
+
+/**
+ * シート行数取得（短期キャッシュ - フォーム投稿で変化）
+ * ✅ FIX: 30秒キャッシュで新しいフォーム投稿を即時反映
+ * @param {Sheet} sheet - シートオブジェクト
+ * @returns {number} lastRow
+ */
+function getSheetRowCount(sheet) {
+  const spreadsheetId = sheet.getParent ? sheet.getParent().getId() : 'unknown';
+  const sheetName = sheet.getName();
+  const cacheKey = `sheet_rows_${spreadsheetId}_${sheetName}`;
+  const cache = CacheService.getScriptCache();
+
+  // キャッシュ確認
+  const cached = cache.get(cacheKey);
+  if (cached) {
+    try {
+      const parsed = parseInt(cached, 10);
+      if (!isNaN(parsed)) {
+        return parsed;
+      }
+    } catch (parseError) {
+      console.warn('getSheetRowCount: Cache parse failed, fetching fresh data');
+    }
+  }
+
+  // ✅ 軽量API: getLastRow()のみ呼び出し（getDataRange()より高速）
+  const lastRow = sheet.getLastRow();
+
+  // ✅ 30秒キャッシュ（フォーム投稿即時反映のため短期）
+  try {
+    cache.put(cacheKey, String(lastRow), CACHE_DURATION.FORM_DATA);
+  } catch (cacheError) {
+    console.warn('getSheetRowCount: Cache write failed:', cacheError.message);
+  }
+
+  return lastRow;
+}
+
+/**
+ * シート情報を一括取得（寸法+ヘッダー）
+ * ✅ FIX: ヘッダーと行数を別々にキャッシュして即時性を確保
+ * ✅ API最適化: ヘッダーは20分、行数は30秒キャッシュで最適なバランス
+ * ✅ SECURITY: spreadsheetId+sheetName でキャッシュキー一意性確保
+ * @param {Sheet} sheet - シートオブジェクト
+ * @returns {Object} { lastRow, lastCol, headers }
+ */
+function getSheetInfo(sheet) {
+  const headersInfo = getSheetHeaders(sheet);  // 20分キャッシュ
+  const lastRow = getSheetRowCount(sheet);     // ✅ 30秒キャッシュ（即時反映）
+
+  return {
+    lastRow,
+    lastCol: headersInfo.lastCol,
+    headers: headersInfo.headers
+  };
 }
 
 /**

@@ -1808,31 +1808,6 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
 }
 
 /**
- * データソースアクセス検証
- */
-function validateDataSourceAccess(spreadsheetId, sheetName) {
-  try {
-    // GAS-Native: Direct function call instead of ServiceFactory
-    const testConnection = getColumnAnalysis(spreadsheetId, sheetName);
-    return {
-      success: testConnection.success,
-      details: {
-        connectionVerified: testConnection.success,
-        connectionError: testConnection.success ? null : testConnection.message
-      }
-    };
-  } catch (error) {
-    return {
-      success: false,
-      details: {
-        connectionVerified: false,
-        connectionError: error.message
-      }
-    };
-  }
-}
-
-/**
  * フォーム情報取得（バッチ処理用）
  */
 function getFormInfoInternal(spreadsheetId, sheetName) {

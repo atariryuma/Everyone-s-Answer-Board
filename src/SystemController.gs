@@ -12,8 +12,9 @@
 const CACHE_DURATION = {
   SHORT: 10,           // 10秒 - 認証ロック
   MEDIUM: 30,          // 30秒 - リアクション・ハイライトロック
+  FORM_DATA: 30,       // 30秒 - フォームデータ行数キャッシュ（即時反映のため短期）
   LONG: 300,           // 5分 - ユーザー情報キャッシュ
-  DATABASE_LONG: 1200, // 20分 - データベース全体キャッシュ（429エラー対策強化）
+  DATABASE_LONG: 1200, // 20分 - ヘッダー情報キャッシュ（変更されないため長期）
   USER_INDIVIDUAL: 900, // 15分 - 個別ユーザーキャッシュ（冗長性強化）
   EXTRA_LONG: 3600     // 1時間 - 設定キャッシュ
 };
@@ -587,15 +588,6 @@ function performAutoRepair() {
   }
 }
 
-
-/**
- * スプレッドシート一覧を取得（管理者向け）
- * DataService.getSpreadsheetList()の管理者モードラッパー
- * @returns {Object} スプレッドシート一覧
- */
-function getAdminSpreadsheetList() {
-  return getSpreadsheetList({ adminMode: true });
-}
 
 /**
  * シート一覧を取得

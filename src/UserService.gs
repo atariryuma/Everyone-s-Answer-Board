@@ -147,22 +147,6 @@ function generateDynamicUserUrls(config) {
 
 
 
-/**
- * 編集者権限確認（旧: 所有者権限確認）
- * @param {string} userId - 確認対象ユーザーID
- * @returns {boolean} 編集者かどうか
- */
-function checkUserEditorAccess(userId) {
-  // userIdからemailを取得してgetUnifiedAccessLevelを使用
-  const user = findUserById(userId, { requestingUser: getCurrentEmail() });
-  if (!user) return false;
-
-  const accessLevel = getUnifiedAccessLevel(user.userEmail, userId);
-  // 🔧 用語統一: owner → editor
-  return accessLevel === 'editor';
-}
-
-
 
 // 🔐 統一認証システム（Administrator/Editor/Viewer）
 

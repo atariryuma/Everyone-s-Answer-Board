@@ -16,30 +16,40 @@
 /* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS */
 
 
-// ⚡ Runtime Memory Cache for PropertiesService
+// ⚡ Runtime Memory Cache for PropertiesService with TTL
 // ✅ API最適化: PropertiesService呼び出し80-90%削減
+// ✅ CLAUDE.md準拠: 30秒TTLで自動期限切れ
 const RUNTIME_PROPERTIES_CACHE = {};
+const PROPERTY_CACHE_TTL = 30000; // 30秒（CLAUDE.md準拠）
 
 /**
- * PropertiesServiceのメモリキャッシュ付きアクセス
+ * PropertiesServiceのメモリキャッシュ付きアクセス（TTL対応）
+ * ✅ CLAUDE.md準拠: 30秒TTLで自動期限切れ
  * ✅ Google公式推奨: 頻繁アクセスする設定値はメモリにキャッシュ
  * @param {string} key - プロパティキー
  * @returns {string|null} プロパティ値
  */
 function getCachedProperty(key) {
-  // メモリキャッシュ確認
-  if (RUNTIME_PROPERTIES_CACHE[key] !== undefined) {
-    return RUNTIME_PROPERTIES_CACHE[key];
+  const now = Date.now();
+  const cached = RUNTIME_PROPERTIES_CACHE[key];
+
+  // ✅ TTLチェック: 有効期限内ならキャッシュを返す
+  if (cached && cached.timestamp && (now - cached.timestamp < PROPERTY_CACHE_TTL)) {
+    return cached.value;
   }
 
-  // PropertiesServiceから取得してキャッシュ
+  // キャッシュミスまたは期限切れ: PropertiesServiceから取得
   const value = PropertiesService.getScriptProperties().getProperty(key);
-  RUNTIME_PROPERTIES_CACHE[key] = value;
+  RUNTIME_PROPERTIES_CACHE[key] = {
+    value,
+    timestamp: now  // ✅ タイムスタンプ記録
+  };
   return value;
 }
 
 /**
  * メモリキャッシュをクリア（テスト用・設定変更時用）
+ * ✅ 明示的なクリアも可能（システム設定更新時など）
  * @param {string} key - クリアするキー（省略時は全クリア）
  */
 function clearPropertyCache(key = null) {

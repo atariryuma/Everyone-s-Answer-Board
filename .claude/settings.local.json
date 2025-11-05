@@ -19,12 +19,20 @@
       "Bash(git checkout:*)",
       "Bash(git add:*)",
       "Bash(claude:*)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(cat:*)",
+      "Bash(rm:*)",
+      "Bash(npm cache verify:*)",
+      "Bash(code:*)",
+      "Bash(chmod:*)",
+      "Bash(for func in \"clearActiveSheet\" \"clearSheetsCache\" \"htmlEncode\" \"isRetryableError\")",
+      "Bash(do echo \"=== $func ===\")",
+      "Bash(for func in \"getColumnAnalysis\" \"getActiveFormInfo\" \"getSheetNameFromGid\" \"resetAuth\" \"toggleUserActiveStatus\" \"toggleUserBoardStatus\")",
+      "Bash(wc:*)",
+      "Bash(for:*)",
+      "Bash(do echo -n \"$script: \")"
     ],
     "deny": [],
-    "ask": [],
-    "additionalDirectories": [
-      "/"
-    ]
+    "ask": []
   }
 }
