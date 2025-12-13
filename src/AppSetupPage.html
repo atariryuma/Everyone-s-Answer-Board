@@ -28,7 +28,6 @@
       // ✅ バックエンドから渡されたuserIdとURLパラメータの両方をチェック
       const templateUserId = '<?= typeof userIdParam !== "undefined" ? userIdParam : "" ?>';
       let __USER_ID__ = getUrlParameterUserId() || templateUserId;
-      console.log('✅ AppSetup page loaded for administrator, userId:', __USER_ID__ ? `${__USER_ID__.substring(0, 8)}***` : 'not specified');
     </script>
   </head>
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">

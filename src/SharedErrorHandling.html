@@ -298,7 +298,6 @@ window.ErrorHandler = {
         this.logError(error, `${context} (試行${attempt}/${retryCount})`);
 
         if (attempt < retryCount) {
-          console.log(`🔄 ${context}: ${retryDelay}ms後にリトライします`);
           // CLAUDE.md V8 compliant: Promise-based delay for retry logic
           await new Promise(resolve => {
             const createPromiseDelay = (ms) => {
@@ -322,7 +321,6 @@ window.ErrorHandler = {
         }
 
         if (fallbackData !== null) {
-          console.log(`📦 ${context}: フォールバックデータを使用`);
           return fallbackData;
         }
 
@@ -449,5 +447,4 @@ window.addEventListener('unhandledrejection', (event) => {
   event.preventDefault(); // デフォルトのコンソールログを防ぐ
 });
 
-console.info('SharedErrorHandling loaded successfully');
 </script>

@@ -247,7 +247,6 @@ function openDatabase(options = {}) {
       // フォールバック: SpreadsheetApp.openByIdを使用（API制限対策）
       try {
         const fallbackSpreadsheet = SpreadsheetApp.openById(dbId);
-        console.info('openDatabase: Successfully accessed database via SpreadsheetApp.openById fallback');
         return fallbackSpreadsheet;
       } catch (fallbackError) {
         console.error('openDatabase: Both Sheets API and SpreadsheetApp.openById failed:', {

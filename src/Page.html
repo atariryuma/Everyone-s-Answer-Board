@@ -160,7 +160,6 @@
     try {
       if (typeof __CONFIG_JSON__ === 'string' && !__CONFIG_JSON__.startsWith('<')) {
         CONFIG = JSON.parse(__CONFIG_JSON__);
-        console.log('ConfigJSON parsed successfully');
       } else {
         console.warn('ConfigJSON not available, using legacy variables');
       }
@@ -190,7 +189,6 @@
     // ✅ 開発環境でのみConfigJSON詳細ログを出力
     const isDev = window.location.href.includes('dev');
     if (isDev) {
-      console.log('📋 ConfigJSON詳細 (開発環境):', {
         fullConfigJSON: CONFIG,
         unifiedConfig: window.UNIFIED_CONFIG,
         extractedDisplaySettings: settings

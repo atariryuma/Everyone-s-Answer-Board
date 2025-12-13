@@ -204,7 +204,6 @@ function logSecurityEvent(event) {
           console.warn('SecurityEvent:', logEntry);
           break;
         default:
-          console.info('SecurityEvent:', logEntry);
       }
 
       // 重要なログのみ永続化（PropertiesServiceで統一）

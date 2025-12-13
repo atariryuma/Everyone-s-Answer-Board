@@ -412,19 +412,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       sheetName: result.sheetName || 'Sheet1'
     };
 
-    console.info('getPublishedSheetData: Final result prepared (self-access)', {
-      dataLength: finalResult.data.length,
-      hasHeader: !!finalResult.header,
-      hasSheetName: !!finalResult.sheetName,
-      totalExecutionTime: Date.now() - startTime
-    });
-
     try {
       const testSerialization = JSON.stringify(finalResult);
-      console.info('getPublishedSheetData: Serialization test passed (self-access)', {
-        serializationLength: testSerialization.length,
-        isValidJson: true
-      });
 
       const safeResult = {
         success: true,
@@ -452,12 +441,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         sheetName: String(finalResult.sheetName || 'Sheet1'),
         displaySettings: userConfig.displaySettings || { showNames: false, showReactions: false }
       };
-
-      console.info('getPublishedSheetData: Safe result created, returning to frontend (self-access)', {
-        dataLength: safeResult.data.length,
-        headerLength: safeResult.header.length,
-        sheetNameLength: safeResult.sheetName.length
-      });
 
       return safeResult;
 
@@ -650,7 +633,6 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
       console.warn('connectDataSource: Domain-wide sharing setup failed (non-critical):', sharingError.message);
     }
 
-    console.info('connectDataSource: Access by user:', `${email.split('@')[0]}@***`);
 
     if (batchOperations && Array.isArray(batchOperations)) {
       return processDataSourceOperations(spreadsheetId, sheetName, batchOperations);
@@ -863,7 +845,6 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
 
       columnsToAdd.forEach((columnName, index) => {
         const newColIndex = lastCol + index + 1;
-        console.info(`setupReactionAndHighlightColumns: Adding column '${columnName}' at position ${newColIndex}`);
 
         try {
           sheet.getRange(1, newColIndex).setValue(columnName);

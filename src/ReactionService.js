@@ -54,7 +54,6 @@ function logReactionAudit(action, details) {
     details: details.extra || {}
   };
 
-  // console.log(`REACTION_AUDIT: ${JSON.stringify(logEntry)}`);
 }
 
 

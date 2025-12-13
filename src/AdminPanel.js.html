@@ -13,7 +13,6 @@
 
   // ✅ Simplified Configuration - No configJSON restoration
   let CONFIG = {};
-  console.log('Admin Panel: Using fresh state (configJSON restoration disabled)');
 
   // ✅ URLパラメータから userId を取得（最優先）
   function getUrlParameterUserId() {
@@ -460,10 +459,8 @@
     // スプレッドシート選択時（シート一覧読み込み）
     const spreadsheetSelect = document.getElementById('spreadsheet-select');
     if (spreadsheetSelect) {
-      console.log('✅ スプレッドシート選択のイベントリスナーを設定しました');
       spreadsheetSelect.addEventListener('change', function () {
         const spreadsheetId = this.value;
-        console.log('🔍 スプレッドシート選択変更:', spreadsheetId);
         if (spreadsheetId) {
           loadSheetList(spreadsheetId);
         } else {
@@ -1216,7 +1213,6 @@
 
     // 🔍 デバッグ: 開発環境でのみリソースボタン状態ログを出力
     if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-      console.log('🔍 updateResourceButtons 呼び出し:', {
         spreadsheetId: config?.spreadsheetId,
         formUrl: config?.formUrl,
         isPublished: config?.isPublished,
@@ -1468,7 +1464,6 @@
 
     // 🛡️ CLAUDE.md準拠: V8ランタイム対応の柔軟なデータ構造判定
     if (!formResult) {
-      console.log('❌ formResult が存在しません');
       return null;
     }
 
@@ -1498,12 +1493,10 @@
 
     // 中程度信頼度での検出
     if (confidence >= 40) {
-      console.log('⚠️ 中程度信頼度パターン検出');
       return { status: 'possible', message: 'フォーム連携パターンを検出しました' };
     }
 
     // 検出なし
-    console.log('❌ フォーム連携パターンなし');
     return { status: 'missing', message: 'フォーム連携が確認できませんでした' };
   }
 
@@ -1632,10 +1625,8 @@
         const appSetupBtn = document.getElementById('app-setup-btn');
         if (appSetupBtn) {
           if (isAdmin) {
-            console.log('システム管理者として認識されました');
             appSetupBtn.style.display = 'block';
           } else {
-            console.log('一般ユーザーとして認識されました');
             appSetupBtn.style.display = 'none';
           }
         }
@@ -1958,7 +1949,6 @@
 
       // 🔄 緊急フォールバック: 基本的なヘッダー取得を試行
       try {
-        console.log('🆘 緊急フォールバック: 基本ヘッダー取得を試行');
         await attemptEmergencyFallback(spreadsheetId, sheetName);
       } catch (fallbackError) {
         console.error('🚫 緊急フォールバックも失敗:', fallbackError.message);
@@ -2018,7 +2008,6 @@
    * 🆘 緊急フォールバック処理
    */
   async function attemptEmergencyFallback(spreadsheetId, sheetName) {
-    console.log('🆘 緊急フォールバック実行');
     showWarning('AI分析に問題が発生しました。基本的なヘッダー情報のみ取得します。', 5000);
 
     // 基本的なヘッダー取得のみ試行
@@ -2289,7 +2278,6 @@
           showSuccess('接続とAI列判定が完了しました！');
         } else {
           // フォールバック: 分析データがない場合のみ追加実行
-          console.log('⚠️ 分析データなし、追加のAI列判定実行');
           showInfo('AI列判定実行中...', 3000);
           try {
             await performColumnAnalysis(spreadsheetId, sheetName);
@@ -2427,7 +2415,6 @@
 
   // 列マッピング更新（ドロップダウン式）- シンプル版
   function updateColumnMapping(result) {
-    console.log('Column mapping received:', result);
 
     if (!result || !result.success) {
       console.warn('列マッピング結果が不正です');
@@ -2439,7 +2426,6 @@
     const confidence = result.confidence || {};
     const headers = result.headers || [];
 
-    console.log('Headers:', headers, 'Mapping:', mapping, 'Confidence:', confidence);
 
     // ドロップダウンにヘッダーオプションを設定
     fillColumnDropdowns(headers, mapping, confidence);
@@ -2567,7 +2553,6 @@
 
     // 防御的チェック: mappingがundefined/nullの場合は早期リターン
     if (!mapping || typeof mapping !== 'object') {
-      console.log('💡 AI検出結果がありません - 手動選択をお使いください');
       return;
     }
 
@@ -2769,7 +2754,6 @@
 
       // フォールバック候補提示
       if (bestCandidate !== null && bestScore >= 25) {
-        console.log(`✅ フォールバック候補検出: ${columnType} = ${bestCandidate} (${bestScore}点)`);
 
         // ソフトな候補提示（自動選択はしない）
         const option = dropdown.querySelector(`option[value="${bestCandidate}"]`);
@@ -2876,7 +2860,6 @@
           option.style.backgroundColor = 'rgba(245, 158, 11, 0.1)';
         }
 
-        console.log(`📋 代替候補提示: ${columnType} = ${bestCandidate.index} (${bestCandidate.score}点)`);
       }
     }
   }
@@ -3252,7 +3235,6 @@
   // ドロップダウン変更の処理
   function handleDropdownChange(columnType, dropdown) {
     const selectedValue = dropdown.value;
-    console.log(`ドロップダウン変更: ${columnType} → ${selectedValue}`);
 
     // 既存のCSSクラスを削除
     dropdown.classList.remove('has-ai-selection', 'has-manual-selection');
@@ -3417,7 +3399,6 @@
       document.querySelectorAll('.modern-select.has-manual-selection').length > 0;
     const hasAISelection = document.querySelectorAll('.modern-select.has-ai-selection').length > 0;
 
-    console.log('選択状況:', { hasManualSelection, hasAISelection });
 
     // AI検出情報とリセットボタンの表示制御
     const resetButton = document.getElementById('reset-to-ai');
@@ -3428,7 +3409,6 @@
 
   // AI検出結果に戻す
   function resetToAIDetection() {
-    console.log('AI検出結果にリセット');
 
     if (!window.currentAIMapping) {
       showError('AI検出データがありません');
@@ -3744,7 +3724,6 @@
         }
       }
 
-      console.log('🛡️ validateColumnConfigurationData結果:', validation);
       return validation;
 
     } catch (error) {
@@ -3825,7 +3804,6 @@
 
       function attemptSave() {
         attempt++;
-        console.log(`🔄 設定保存試行 ${attempt}/${maxRetries}`);
 
         google.script.run
           .withSuccessHandler(function(result) {
@@ -3937,7 +3915,6 @@
       // 🎯 ConfigJson完全同期: Derived Fields自動更新
       const isSpreadsheetChanged = optimizedConfig.spreadsheetId !== systemState.config.spreadsheetId;
       if (isSpreadsheetChanged) {
-        console.log('SpreadsheetId change detected - updating derived fields:', {
           oldId: systemState.config.spreadsheetId,
           newId: optimizedConfig.spreadsheetId
         });
@@ -3966,7 +3943,6 @@
               optimizedConfig.formUrl = formResult.formData.formUrl;
               optimizedConfig.formTitle = formResult.formData.formTitle;
             } else {
-              console.log('ℹ️ フォーム連携なし（通常状態）');
             }
             executeConfigSave();
           })
@@ -3995,13 +3971,10 @@
       if (optimizedConfig.formUrl) logData.formUrl = optimizedConfig.formUrl;
       if (optimizedConfig.formTitle) logData.formTitle = optimizedConfig.formTitle;
 
-      console.log('📋 Config保存準備:', logData);
-      console.log('🔍 送信するcolumnMapping:', optimizedConfig.columnMapping);
 
       google.script.run
         .withSuccessHandler(function (result) {
           if (result.success) {
-            console.log('✅ Config保存成功:', {
               spreadsheetId: optimizedConfig.spreadsheetId,
               savedHeaders: headers.length,
               hasMapping: !!columnMapping,
@@ -4298,7 +4271,6 @@
             (async () => {
               try {
                 const adminData = await loadBatchedAdminData();
-                console.log('🔍 Footer update - adminData:', adminData);
                 if (adminData && adminData.boardInfo) {
                   // ✅ 既存のboardInfoを直接使用（正しいデータが既に含まれている）
                   currentBoardInfo = adminData.boardInfo;
@@ -4428,7 +4400,6 @@
       }
     });
 
-    console.log('✅ getColumnMapping (simplified):', columnMapping);
     return columnMapping;
   }
 

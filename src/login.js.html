@@ -11,7 +11,6 @@
   // Initialization wrapper function with error handling
   async function init() {
     try {
-      console.log('🔄 Starting login page initialization...');
 
       // Set initial loading state
       window.setLoading(true, '読み込み中…');
@@ -64,7 +63,6 @@
         setLoginButtonState(false);
       }
 
-      console.log('✅ Login page initialization completed');
     } catch (error) {
       console.error('❌ Initialization failed:', error);
       window.setLoading(false);
@@ -91,7 +89,6 @@
 
   function initLogin() {
     try {
-      console.log('🔄 Fresh login experience initialization...');
 
       const loginBtn = document.getElementById('login-btn');
       const userEmailDisplay = document.getElementById('user-email-display');
@@ -116,7 +113,6 @@
           fallbackReason = urlParams.get('fallback');
         }
 
-        console.log('🔄 Fresh login experience initialized', {
           loginState,
           isLogoutRedirect,
           fallbackReason
@@ -175,7 +171,6 @@
             });
           }
 
-          console.log('🧹 Browser cache cleared for fresh login experience');
         }
 
       } catch (error) {
@@ -341,7 +336,6 @@
         // URL システムのリセットを事前に実行
         google.script.run
           .withSuccessHandler(() => {
-            console.log('URL system reset completed');
             // 統合されたログインフローを実行
             processUnifiedLogin().catch(handleLoginError);
           })
@@ -434,11 +428,9 @@
         userEmailDisplay.classList.add('text-yellow-400');
       }
 
-      console.log('🔄 Starting account switch process...');
 
       try {
         // Phase 1: ポップアップでGmailログアウトを実行
-        console.log('📤 Opening Gmail logout popup...');
         const logoutWindow = window.open(
           'https://mail.google.com/mail/?logout&hl=ja',
           'GoogleAccountSwitch',
@@ -451,7 +443,6 @@
 
         // Phase 2: シンプルなタイムアウト制御（セッションクリア不要）
         let timeoutId = setTimeout(() => {
-          console.log('⏰ Popup timeout reached, closing popup...');
 
           // ポップアップを閉じる
           if (logoutWindow && !logoutWindow.closed) {
@@ -459,7 +450,6 @@
           }
 
           // Gmailログアウト完了後は直接リロード（resetAuth不要）
-          console.log('✅ Gmail logout completed, reloading page...');
           if (userEmailDisplay) {
             userEmailDisplay.textContent = '✅ アカウント切り替え完了！ページを更新します...';
             userEmailDisplay.classList.remove('text-yellow-400');
@@ -477,10 +467,8 @@
           if (logoutWindow.closed) {
             clearInterval(checkClosed);
             clearTimeout(timeoutId);
-            console.log('👆 Popup closed by user, proceeding with reload...');
 
             // 直接リロード（セッションは既にGmailでクリア済み）
-            console.log('✅ Gmail logout completed, reloading page...');
             if (userEmailDisplay) {
               userEmailDisplay.textContent = '✅ アカウント切り替え完了！ページを更新します...';
               userEmailDisplay.classList.remove('text-yellow-400');
@@ -602,7 +590,6 @@
         return;
       }
 
-      console.log('管理パネルアクセス成功画面を表示:', adminUrl);
 
       // XSS対策: エスケープ処理
       const safeMessage = escapeHtml(message || 'ログインが完了しました');
@@ -825,12 +812,10 @@
       document.body.innerHTML = successHtml;
 
       // シンプルなリンク方式 + 二重クリック防止
-      console.log('✅ シンプルリンク方式 - 管理パネルボタンが表示されました');
 
       // 二重クリック防止処理
       window.handleSingleClick = function(buttonElement) {
         if (buttonElement.dataset.clicked === 'true') {
-          console.log('二重クリック防止: 既にクリック済みです');
           return false;
         }
 
@@ -845,7 +830,6 @@
         buttonElement.style.opacity = '0.7';
         buttonElement.style.pointerEvents = 'none';
 
-        console.log('管理パネルに移動します');
         return true; // リンクの通常動作を継続
       };
 
@@ -854,7 +838,6 @@
         document.body.classList.add('success-transition');
       }, { timeout: 300 });
 
-      console.log('✅ シンプルリンク画面を表示しました');
     } catch (error) {
       console.error('成功画面表示エラー:', error);
       // フォールバック: シンプルなconfirm

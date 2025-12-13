@@ -995,7 +995,6 @@
       modalIds.forEach((modalId) => {
         if (!this.loadedModals.has(modalId)) {
           this.loadedModals.add(modalId);
-          console.log(`Modal ${modalId} loaded`);
         }
       });
     }
@@ -1257,7 +1256,6 @@
             // メインURLフィールドが空の場合は代替URLで補完
             if (!publishResult.url || publishResult.url.trim() === '') {
               publishResult.url = validUrl;
-              console.log('🔄 公開URL を代替URL で補完:', validUrl);
             }
           } else {
             errors.push('公開URLが不完全です（長さ不足）');
@@ -1268,9 +1266,7 @@
         if (!publishResult.publishedAt || publishResult.publishedAt.trim() === '') {
           // 公開時刻が設定されていない場合のみ現在時刻を使用
           publishResult.publishedAt = new Date().toISOString();
-          console.log('🕒 公開時刻を現在時刻で補完:', publishResult.publishedAt);
           // 補完は情報レベル（警告ではない）
-          console.log('ℹ️ 公開時刻が未設定のため現在時刻で補完しました');
         } else {
           // 公開時刻が既に存在する場合は検証のみ実行
           try {
@@ -1278,7 +1274,6 @@
             if (isNaN(publishTime.getTime())) {
               errors.push('公開時刻の形式が無効です');
             } else {
-              console.log('✅ 公開時刻は正常です:', publishResult.publishedAt);
             }
           } catch (e) {
             errors.push('公開時刻の解析に失敗しました');
@@ -1302,7 +1297,6 @@
       const warningErrors = errors.filter((error) => !criticalErrors.includes(error));
       const hasCriticalErrors = criticalErrors.length > 0;
 
-      console.log('🔍 エラー分類:', {
         criticalErrors: criticalErrors,
         warningErrors: warningErrors,
         totalErrors: errors.length,

@@ -107,7 +107,6 @@
       const shouldSuppress = suppressedErrors.some((pattern) => reason.includes(pattern));
 
       if (shouldSuppress) {
-        console.log('Suppressed internal promise rejection:', reason);
         event.preventDefault();
         return;
       }
@@ -137,12 +136,10 @@
             return originalSrc;
           },
           set(value) {
-            console.log('🔍 Script loading:', value);
 
             // Monitor specific scripts that might cause syntax errors
             if (value.includes('tailwindcss') || value.includes('cdn.')) {
               element.addEventListener('load', () => {
-                console.log('✅ External script loaded successfully:', value);
               });
 
               element.addEventListener('error', (e) => {
@@ -413,7 +410,6 @@
         if (cache && this.cache.has(finalCacheKey)) {
           const cached = this.cache.get(finalCacheKey);
           if (Date.now() - cached.timestamp < cacheTTL) {
-            console.log(`📦 [UnifiedDataLoader] キャッシュから取得: ${funcName}`);
             return cached.data;
           }
           this.cache.delete(finalCacheKey);
@@ -441,7 +437,6 @@
         console.error(`❌ [UnifiedDataLoader] ${funcName} エラー:`, error);
 
         if (retryOnError && this.shouldRetry(requestId)) {
-          console.log(`🔄 [UnifiedDataLoader] ${funcName} リトライ実行`);
           return this.loadData(functionName, { ...options, retryOnError: false }, ...args);
         }
 
@@ -460,7 +455,6 @@
      * @returns {Promise<Array>} 各リクエストの結果配列
      */
     async loadBatchData(requests) {
-      console.log(`📦 [UnifiedDataLoader] バッチ読み込み開始: ${(requests && requests.length) || 0}件`);
 
       const promises = requests.map((request, index) => {
         const { functionName, args = [], options = {} } = request;
@@ -514,7 +508,6 @@
           .withSuccessHandler((result) => {
             if (!completed) {
               completed = true;
-              console.log(`✅ [UnifiedDataLoader] ${functionName || 'unknown'} 成功`);
               resolve(result);
             }
           })
@@ -588,7 +581,6 @@
       } else {
         this.cache.clear();
       }
-      console.log(`🧹 [UnifiedDataLoader] キャッシュクリア: ${pattern || 'ALL'}`);
     }
 
     /**
@@ -613,7 +605,6 @@
   window.loadBatchData = (requests) =>
     window.unifiedDataLoader.loadBatchData(requests);
 
-  console.info('✅ UnifiedDataLoader initialized - GAS 2025 最適化版');
 
   // =============================================================================
   // ERROR HANDLING UTILITIES
@@ -646,11 +637,6 @@
 
         // Better error logging with more details
         console.group('🚨 Error Logged');
-        console.log('Message:', errorInfo.message);
-        console.log('Type:', errorInfo.errorType);
-        console.log('Context:', errorInfo.context);
-        console.log('Stack:', errorInfo.stack);
-        console.log('Full Error Object:', error);
         console.groupEnd();
       } catch (loggingError) {
         console.error('Error in error logging:', loggingError);
@@ -805,9 +791,7 @@
     // Safe console logging with privacy protection
     static log(message, data = null) {
       if (data) {
-        console.log(message, this.anonymize(data));
       } else {
-        console.log(message);
       }
     }
 
@@ -940,7 +924,6 @@
     // 最適化されたログアウト（openAppSetupパターン採用）
     logout: function () {
       if (confirm('ログアウトしますか？')) {
-        console.log('🚪 Logout initiated');
 
         // 1. フロントエンドキャッシュクリア
         try {
@@ -949,7 +932,6 @@
           }
           localStorage.removeItem('current_user_info');
           sessionStorage.clear();
-          console.log('🗑️ Client cache cleared');
         } catch (e) {
           console.warn('Cache clear partially failed:', e);
         }
@@ -958,7 +940,6 @@
         google.script.run
           .withSuccessHandler(function(webAppUrl) {
             const loginUrl = `${webAppUrl}?mode=login`;
-            console.log('🔄 Redirecting to login page:', loginUrl);
 
             // openAppSetupと同じ手法: window.open(_top)でサンドボックス制限回避
             window.open(loginUrl, '_top');
@@ -973,7 +954,6 @@
             createPromiseDelay(100).then(() => {
               google.script.run
                 .withSuccessHandler(function(result) {
-                  console.log('✅ Background server session cleared:', result?.message || 'OK');
                 })
                 .withFailureHandler(function(error) {
                   console.warn('⚠️ Background session clear failed (non-critical):', error);
@@ -991,7 +971,6 @@
               const currentUrl = new URL(window.location.href);
               const baseUrl = currentUrl.origin + currentUrl.pathname;
               const loginUrl = `${baseUrl}?mode=login`;
-              console.log('🔄 Fallback redirect to:', loginUrl);
               window.open(loginUrl, '_top');
             } catch (fallbackError) {
               console.warn('フォールバック遷移も失敗:', fallbackError);
@@ -1113,7 +1092,6 @@
   window.sharedUtilities.page = {
     // 安全なページリロード（GAS Sandbox対応）
     safeReload: function(options = {}) {
-      console.log('🔄 Safe page reload initiated');
 
       try {
         // 1. フロントエンドキャッシュクリア
@@ -1122,7 +1100,6 @@
         }
         localStorage.removeItem('current_user_info');
         sessionStorage.clear();
-        console.log('🗑️ Client cache cleared for reload');
       } catch (e) {
         console.warn('Cache clear partially failed during reload:', e);
       }
@@ -1157,7 +1134,6 @@
 
     // ログイン画面への統一リダイレクト（logout関数のエイリアス）
     redirectToLogin: function() {
-      console.log('🏠 Redirecting to login page');
       window.sharedUtilities.auth.logout();
     }
   };
@@ -1186,14 +1162,12 @@
     // Initialize the loading manager with DOM element detection
     init(retries = 5, delay = 100, onSuccess = null) {
       if (this.initialized) {
-        console.log('UnifiedLoadingManager: Already initialized.');
         if (onSuccess) onSuccess();
         return true;
       }
 
       // Enhanced DOM readiness check
       if (document.readyState === 'loading') {
-        console.log('UnifiedLoadingManager: DOM still loading, waiting for DOMContentLoaded...');
         document.addEventListener(
           'DOMContentLoaded',
           () => {
@@ -1209,7 +1183,6 @@
       if (this.overlay) {
         if (!window.unifiedLoadingInitialized) {
           window.unifiedLoadingInitialized = true;
-          console.log(
             '✅ UnifiedLoadingManager: Initialized successfully with element:',
             this.overlay.className
           );
@@ -1263,7 +1236,6 @@
         document.body.insertBefore(fallbackOverlay, document.body.firstChild);
         this.overlay = fallbackOverlay;
         this.initialized = true;
-        console.log('✅ UnifiedLoadingManager: Fallback overlay created and initialized');
         return true;
       }
       return false;
@@ -1281,10 +1253,8 @@
 
       try {
         if (isLoading) {
-          console.log('UnifiedLoadingManager: Showing loading overlay with options:', options);
           this.show(options);
         } else {
-          console.log('UnifiedLoadingManager: Hiding loading overlay.');
           this.hide();
         }
       } catch (error) {
@@ -1344,7 +1314,6 @@
         this.overlay.style.pointerEvents = 'auto';
       }
 
-      console.log(
         (() => {
           const safeConfigType = (config && config.type) || 'unknown';
           const safeConfigMessage = (config && config.message) || 'No message';
@@ -1370,7 +1339,6 @@
       // Clear current state
       this.currentState = null;
 
-      console.log('UnifiedLoadingManager: Overlay hidden');
     }
 
     // Update the overlay content dynamically
@@ -1785,7 +1753,6 @@
   // Prevent duplicate loading messages
   if (!window.sharedUtilitiesLoaded) {
     window.sharedUtilitiesLoaded = true;
-    console.log(
       '✅ SharedUtilities loaded successfully - Version 3.0.0-flat (Zero-Dependency Architecture)'
     );
   }

@@ -31,20 +31,12 @@ function setupDomainWideSharing(spreadsheetId, ownerEmail) {
     // DOMAIN_WITH_LINK または DOMAIN + EDIT 権限
     if (sharingAccess === DriveApp.Access.DOMAIN || sharingAccess === DriveApp.Access.DOMAIN_WITH_LINK) {
       if (sharingPermission === DriveApp.Permission.EDIT) {
-        console.info('setupDomainWideSharing: Already configured correctly');
         return { success: true, message: 'Already configured' };
       }
     }
 
     // ✅ 同一ドメイン内で編集可能に設定
     file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
-
-    console.info('setupDomainWideSharing: Successfully configured domain-wide editing', {
-      spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
-      domain,
-      access: 'DOMAIN_WITH_LINK',
-      permission: 'EDIT'
-    });
 
     return { success: true, message: 'Domain-wide sharing configured' };
 

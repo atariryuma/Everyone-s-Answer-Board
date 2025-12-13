@@ -633,14 +633,6 @@ function callGAS(functionName, options = {}, ...args) {
       try {
         const result = this[functionName].apply(this, args);
 
-        // Success audit log
-        console.info('callGAS: Function executed successfully:', {
-          functionName,
-          userEmail: email ? `${email.split('@')[0]}@***` : 'N/A',
-          isAdmin,
-          executedAt: new Date().toISOString()
-        });
-
         return {
           success: true,
           functionName,
@@ -923,7 +915,6 @@ function executeWithRetry(operation, options = {}) {
 
       // Success - log only if this was a retry
       if (retryCount > 0) {
-        console.info(`${operationName}: Succeeded on retry ${retryCount}`);
       }
 
       return result;
