@@ -1055,9 +1055,6 @@
       if (this.overlay) {
         if (!window.unifiedLoadingInitialized) {
           window.unifiedLoadingInitialized = true;
-            '✅ UnifiedLoadingManager: Initialized successfully with element:',
-            this.overlay.className
-          );
         }
         this.initialized = true;
         if (onSuccess) onSuccess();
@@ -1171,13 +1168,6 @@
         document.body.style.pointerEvents = 'none';
         this.overlay.style.pointerEvents = 'auto';
       }
-
-        (() => {
-          const safeConfigType = (config && config.type) || 'unknown';
-          const safeConfigMessage = (config && config.message) || 'No message';
-          return `UnifiedLoadingManager: Overlay shown with type '${safeConfigType}' and message '${safeConfigMessage}'`;
-        })()
-      );
     }
 
     hide() {
@@ -1555,7 +1545,5 @@
 
   if (!window.sharedUtilitiesLoaded) {
     window.sharedUtilitiesLoaded = true;
-      '✅ SharedUtilities loaded successfully - Version 3.0.0-flat (Zero-Dependency Architecture)'
-    );
   }
 </script>

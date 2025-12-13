@@ -3516,10 +3516,6 @@
 
       const isSpreadsheetChanged = optimizedConfig.spreadsheetId !== systemState.config.spreadsheetId;
       if (isSpreadsheetChanged) {
-          oldId: systemState.config.spreadsheetId,
-          newId: optimizedConfig.spreadsheetId
-        });
-
         optimizedConfig.sourceKey = 'sheet_' + optimizedConfig.spreadsheetId + '_' + Date.now();
 
         optimizedConfig.spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + optimizedConfig.spreadsheetId + '/edit';
@@ -3570,12 +3566,6 @@
       google.script.run
         .withSuccessHandler(function (result) {
           if (result.success) {
-              spreadsheetId: optimizedConfig.spreadsheetId,
-              savedHeaders: headers.length,
-              hasMapping: !!columnMapping,
-              setupComplete: true
-            });
-
             if (systemState && systemState.config) {
               systemState.config = {
                 ...systemState.config,

@@ -1268,11 +1268,6 @@
       const warningErrors = errors.filter((error) => !criticalErrors.includes(error));
       const hasCriticalErrors = criticalErrors.length > 0;
 
-        criticalErrors: criticalErrors,
-        warningErrors: warningErrors,
-        totalErrors: errors.length,
-      });
-
       return {
         isValid: isValid && !hasCriticalErrors, // Critical errors のみで判定
         hasValidUrl: hasValidUrl,

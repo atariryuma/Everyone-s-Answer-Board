@@ -169,13 +169,6 @@
     const settings = window.UNIFIED_CONFIG?.displaySettings || {};
     window.showCounts = settings.showReactions || false;
     window.displayMode = settings.showNames ? 'named' : 'anonymous';
-    const isDev = window.location.href.includes('dev');
-    if (isDev) {
-        fullConfigJSON: CONFIG,
-        unifiedConfig: window.UNIFIED_CONFIG,
-        extractedDisplaySettings: settings
-      });
-    }
 
     window.SHEET_NAME = window.UNIFIED_CONFIG.sheetName;
     window.USER_ID = window.UNIFIED_CONFIG.userId;

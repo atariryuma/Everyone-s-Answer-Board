@@ -696,11 +696,6 @@ class StudyQuestApp {
           return;
         }
 
-          timestamp: new Date().toISOString(),
-          userId: this.state.userId,
-          argsCount: mappedArgs.length
-        });
-
         google.script.run
           .withSuccessHandler((result) => {
 
@@ -757,11 +752,6 @@ class StudyQuestApp {
         const shouldRetry = retryableErrors.some(errorType =>
           error.message.toLowerCase().includes(errorType)
         );
-
-          error: error.message,
-          shouldRetry,
-          errorType: retryableErrors.find(e => error.message.toLowerCase().includes(e)) || 'unknown'
-        });
 
         return shouldRetry;
       }
@@ -907,11 +897,6 @@ class StudyQuestApp {
   }
   
   async handleViewChange(currentViewKey) {
-      from: this.lastViewKey,
-      to: currentViewKey,
-      timestampBasedSystem: true
-    });
-
     this.lastViewKey = currentViewKey;
     this.updateLastSeenTimestamp();
     this.dismissNewContentBanner();
@@ -993,15 +978,6 @@ class StudyQuestApp {
 
     const interval = this.getPollingInterval();
     const timeSinceActivity = Date.now() - this.lastActivityTime;
-
-    const isDev = window.location.href.includes('dev');
-    if (isDev) {
-        interval: `${interval/1000}秒`,
-        timeSinceActivity: `${Math.round(timeSinceActivity/1000)}秒前`,
-        errorCount: this.polling.errorCount,
-        lastSeenTimestamp: this.state.lastSeenTimestamp
-      });
-    }
 
     this.polling.timerId = setTimeout(async () => {
       if (!this.polling.isActive) return;
@@ -1581,11 +1557,6 @@ class StudyQuestApp {
     await this.loadSheetData({ bypassCache: true });
 
     this.updateLastSeenTimestamp();
-      preservedTimestamp: preservedLastSeenTimestamp,
-      newTimestamp: this.state.lastSeenTimestamp,
-      currentAnswersLength: this.state.currentAnswers.length,
-      timestampBasedSystem: true
-    });
   }
 
   /**
@@ -3309,13 +3280,6 @@ class StudyQuestApp {
       const hasDOMCards = container && container.querySelectorAll('.answer-card').length > 0;
       const isFirstTime = !hasLastSeenTimestamp && !hasDiffCards && !hasInitialLoad && !hasDOMCards;
 
-        hasLastSeenTimestamp,
-        hasDiffCards,
-        hasInitialLoad,
-        hasDOMCards,
-        isFirstTime
-      });
-
       return isFirstTime;
     } catch (error) {
       console.warn('⚠️ 初回判定エラー:', error);
@@ -3352,11 +3316,6 @@ class StudyQuestApp {
 
     this.state.lastSeenTimestamp = newTimestamp;
     this.saveLastSeenTimestamp(newTimestamp);
-
-      oldTimestamp,
-      newTimestamp,
-      context: 'filter-independent-notification-system'
-    });
   }
 
 
@@ -3767,12 +3726,6 @@ class StudyQuestApp {
         }, 500);
       }
 
-        deletedRowIndex,
-        initialCount,
-        finalCount,
-        adminModePreserved: currentAdminState
-      });
-
     } catch (error) {
       console.error('削除後更新エラー:', error);
       if (window.notifications) {
@@ -3827,12 +3780,7 @@ class StudyQuestApp {
       
       window.showAdminFeatures = enable;
       window.showHighlightToggle = enable; // 管理モードでのみ有効
-      
-        enable,
-        isAdminUser: this.state.isAdminUser,
-        showAdminFeatures: window.showAdminFeatures,
-        showHighlightToggle: window.showHighlightToggle
-      });
+
       if (enable) {
         window.showCounts = true;
         window.displayMode = 'named';
@@ -4075,12 +4023,6 @@ class StudyQuestApp {
           if (Object.keys(savedReaction).length === 0) {
             delete savedReactions[answer.rowIndex];
           }
-
-            serverReacted,
-            localReacted,
-            finalReacted: info.reacted,
-            timestamp: new Date().toISOString()
-          });
         });
       }
     });
@@ -4208,15 +4150,7 @@ class StudyQuestApp {
     this.elements.modalAnswer.innerHTML = modalHtml;
     const showName = this.state.displayMode === 'named';
     let modalDisplayName = '';
-    
-      displayMode: this.state.displayMode,
-      showName,
-      showAdminFeatures: this.state.showAdminFeatures,
-      isAdminUser: this.state.isAdminUser,
-      dataName: data.name,
-      dataEmail: data.email
-    });
-    
+
     if (showName) {
       if (data.name) {
         modalDisplayName = data.name;
@@ -4244,16 +4178,9 @@ class StudyQuestApp {
     }
     
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
-    
-      rowIndex: data.rowIndex,
-      highlight: data.highlight,
-      reactions: data.reactions,
-      element: this.elements.answerModalCard.className
-    });
+
     this.applyReactionStyles(this.elements.answerModalCard, data);
-      className: this.elements.answerModalCard.className
-    });
-    
+
     this.elements.answerModalContainer.classList.remove('hidden');
     this.elements.answerModalContainer.classList.add('modal-fade');
     this.elements.answerModalCard.classList.add('modal-scale');
@@ -4279,11 +4206,7 @@ class StudyQuestApp {
     }
     
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
-    
-      rowIndex: data.rowIndex,
-      highlight: data.highlight,
-      reactions: data.reactions
-    });
+
     this.applyReactionStyles(this.elements.answerModalCard, data);
   }
   hideAnswerModal() {
@@ -4702,13 +4625,6 @@ class StudyQuestApp {
         observedCards.push(cards[i].dataset.rowIndex);
       }
     }
-    
-      totalCards: cards.length,
-      observedCount: observedCards.length,
-      observedRowIndexes: observedCards,
-      totalItems: this.virtualScrollState?.totalItems || 0,
-      renderedItems: this.virtualScrollState?.renderedItems || 0
-    });
   }
   
   handleVirtualScroll(triggerElement) {
@@ -4723,12 +4639,7 @@ class StudyQuestApp {
     const currentCards = this.elements.answersContainer.querySelectorAll('.answer-card');
     const totalAvailable = this.state.currentAnswers.length;
     const currentRendered = currentCards.length;
-    
-      currentRendered,
-      totalAvailable,
-      triggerRowIndex: triggerElement.dataset.rowIndex
-    });
-    
+
     if (currentRendered < totalAvailable) {
       this.loadMoreItems();
     } else {
@@ -4766,9 +4677,7 @@ class StudyQuestApp {
       this.virtualScrollState.isLoading = false;
       return;
     }
-    
-      'Total rendered:', this.virtualScrollState.renderedRowIndexes.size, 'Total available:', this.state.currentAnswers.length);
-    
+
     this.deferredRender(() => {
       this.renderAdditionalItems(remainingItems);
     });
@@ -4820,10 +4729,8 @@ class StudyQuestApp {
     
     if (fragment.children.length > 0) {
       this.elements.answersContainer.appendChild(fragment);
-      
+
       this.virtualScrollState.renderedItems = this.elements.answersContainer.children.length;
-      
-        this.virtualScrollState.renderedRowIndexes.size, 'DOM children:', this.virtualScrollState.renderedItems);
     } else {
     }
     
