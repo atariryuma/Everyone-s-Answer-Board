@@ -5,31 +5,31 @@
      ============================================================================= */
 
   // ✅ IMMEDIATE WARNING SUPPRESSION - HIGHEST PRIORITY
-  (function() {
+  (function () {
     const originalWarn = window.console.warn;
     const originalError = window.console.error;
 
-    window.console.warn = function(...args) {
+    window.console.warn = function (...args) {
       const message = String(args[0] || '');
       if (message.includes('Unrecognized feature') ||
-          message.includes('ambient-light-sensor') ||
-          message.includes('speaker') ||
-          message.includes('vibrate') ||
-          message.includes('vr') ||
-          message.includes('iframe') ||
-          message.includes('sandboxing') ||
-          message.includes('tailwind') ||
-          message.includes('net state changed')) {
+        message.includes('ambient-light-sensor') ||
+        message.includes('speaker') ||
+        message.includes('vibrate') ||
+        message.includes('vr') ||
+        message.includes('iframe') ||
+        message.includes('sandboxing') ||
+        message.includes('tailwind') ||
+        message.includes('net state changed')) {
         return; // Suppress
       }
       originalWarn.apply(console, args);
     };
 
-    window.console.error = function(...args) {
+    window.console.error = function (...args) {
       const message = String(args[0] || '');
       if (message.includes('Unsafe attempt to initiate navigation') ||
-          message.includes('sandboxed with the') ||
-          message.includes('about:blank')) {
+        message.includes('sandboxed with the') ||
+        message.includes('about:blank')) {
         return; // Suppress
       }
       originalError.apply(console, args);
@@ -98,9 +98,9 @@
       }
 
       const isUserImpacting = reason.includes('Failed to fetch') ||
-                              reason.includes('Network request failed') ||
-                              reason.includes('google.script.run') ||
-                              reason.includes('timeout');
+        reason.includes('Network request failed') ||
+        reason.includes('google.script.run') ||
+        reason.includes('timeout');
 
       if (isUserImpacting && window.notifications) {
         window.notifications.warning('通信エラーが発生しました。しばらく待ってから再試行してください。', 6000);
@@ -468,7 +468,7 @@
               reject(new Error(error.message || error.toString()));
             }
           })
-          [functionName](...args);
+        [functionName](...args);
 
         timeoutPromise.catch((timeoutError) => {
           if (!completed) {
@@ -838,7 +838,7 @@
         }
 
         google.script.run
-          .withSuccessHandler(function(webAppUrl) {
+          .withSuccessHandler(function (webAppUrl) {
             const loginUrl = `${webAppUrl}?mode=login`;
 
             window.open(loginUrl, '_top');
@@ -851,16 +851,16 @@
 
             createPromiseDelay(100).then(() => {
               google.script.run
-                .withSuccessHandler(function(result) {
+                .withSuccessHandler(function (result) {
                 })
-                .withFailureHandler(function(error) {
+                .withFailureHandler(function (error) {
                   console.warn('⚠️ Background session clear failed (non-critical):', error);
                 })
                 .resetAuth();
             }).catch(() => {
             });
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             console.warn('WebApp URL取得失敗、フォールバック実行:', error);
 
             try {
@@ -931,36 +931,35 @@
         window.sharedUtilities && window.sharedUtilities.security
           ? window.sharedUtilities.security.escapeHtml(email)
           : (email || '').replace(/[<>&"']/g, function (match) {
-              switch (match) {
-                case '<':
-                  return '&lt;';
-                case '>':
-                  return '&gt;';
-                case '&':
-                  return '&amp;';
-                case '"':
-                  return '&quot;';
-                case "'":
-                  return '&#39;';
-                default:
-                  return match;
-              }
-            });
+            switch (match) {
+              case '<':
+                return '&lt;';
+              case '>':
+                return '&gt;';
+              case '&':
+                return '&amp;';
+              case '"':
+                return '&quot;';
+              case "'":
+                return '&#39;';
+              default:
+                return match;
+            }
+          });
 
       container.innerHTML = `
         <div class="bg-gray-800 rounded-lg p-4 mb-4">
           <p class="text-sm text-gray-400 mb-1">認証済みアカウント:</p>
           <p class="text-white font-semibold">${safeEmail}</p>
         </div>
-        ${
-          showSwitchOption
-            ? `
+        ${showSwitchOption
+          ? `
         <div class="text-right">
           <button type="button" onclick="window.sharedUtilities.auth.switchToAnotherAccount()" class="text-cyan-400 hover:text-cyan-300 hover:underline text-sm">
             別のアカウントでログイン
           </button>
         </div>`
-            : ''
+          : ''
         }
       `;
     },
@@ -976,7 +975,7 @@
 
 
   window.sharedUtilities.page = {
-    safeReload: function(options = {}) {
+    safeReload: function (options = {}) {
 
       try {
         if (window.sharedUtilities?.cache?.clear) {
@@ -1004,24 +1003,31 @@
           targetUrl = currentUrl.toString();
         }
 
-        window.location.href = targetUrl;
+        // GAS iFrameセキュリティ制限を回避するため、window.open with _topを使用
+        window.open(targetUrl, '_top');
 
       } catch (error) {
         console.error('Page reload failed:', error);
-        window.location.reload();
+        // GAS iFrameではコールバック内でwindow.openが動作しないため、
+        // エラー時はユーザーに手動リロードを案内
+        if (window.notifications) {
+          window.notifications.warning('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。', 5000);
+        } else {
+          alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。');
+        }
       }
     },
 
-    redirectToLogin: function() {
+    redirectToLogin: function () {
       window.sharedUtilities.auth.logout();
     }
   };
 
-  window.safeReload = function(options) {
+  window.safeReload = function (options) {
     window.sharedUtilities.page.safeReload(options);
   };
 
-  window.redirectToLogin = function() {
+  window.redirectToLogin = function () {
     window.sharedUtilities.page.redirectToLogin();
   };
 
@@ -1268,37 +1274,7 @@
     }
   };
 
-  // IMMEDIATE WARNING SUPPRESSION - EMERGENCY FIX
-
-  const originalWarn = console.warn;
-  const originalError = console.error;
-
-  console.warn = function(...args) {
-    const message = String(args[0] || '');
-    if (message.includes('Unrecognized feature: \'ambient-light-sensor\'') ||
-        message.includes('Unrecognized feature: \'speaker\'') ||
-        message.includes('Unrecognized feature: \'vibrate\'') ||
-        message.includes('Unrecognized feature: \'vr\'') ||
-        message.includes('iframe which has both allow-scripts and allow-same-origin') ||
-        message.includes('can escape its sandboxing') ||
-        message.includes('tailwind') ||
-        message.includes('cdn.tailwindcss.com') ||
-        message.includes('net state changed')) {
-      return;
-    }
-    originalWarn.apply(console, args);
-  };
-
-  console.error = function(...args) {
-    const message = String(args[0] || '');
-    if (message.includes('Unsafe attempt to initiate navigation') ||
-        message.includes('sandboxed with the') ||
-        message.includes('iframe') ||
-        message.includes('about:blank')) {
-      return;
-    }
-    originalError.apply(console, args);
-  };
+  // WARNING SUPPRESSION は先頭のIIFE内で定義済みのため、ここでは不要
 
 
   class NotificationSystem {
@@ -1413,7 +1389,7 @@
 
 
 
-  window.getPerformanceLevel = function() {
+  window.getPerformanceLevel = function () {
     if (typeof navigator === 'undefined') return 'medium';
 
     const memory = navigator.deviceMemory || 4;
@@ -1433,7 +1409,7 @@
     return 'medium';
   };
 
-  window.isLowEndDevice = function() {
+  window.isLowEndDevice = function () {
     if (typeof navigator === 'undefined') return false;
 
     const memory = navigator.deviceMemory;
@@ -1442,7 +1418,7 @@
     return (memory && memory <= 2) || (cores && cores <= 2);
   };
 
-  window.getPerformanceConstants = function() {
+  window.getPerformanceConstants = function () {
     const perfLevel = window.getPerformanceLevel();
     const isLowEnd = window.isLowEndDevice();
 
@@ -1457,25 +1433,25 @@
     };
   };
 
-  window.getBatchSize = function(type = 'base') {
+  window.getBatchSize = function (type = 'base') {
     const constants = window.getPerformanceConstants();
     const safeType = (type && type.toUpperCase) ? type.toUpperCase() : 'DEFAULT';
     return constants[`${safeType}_BATCH_SIZE`] || constants.BASE_RENDER_BATCH_SIZE;
   };
 
-  window.getViewportBuffer = function() {
+  window.getViewportBuffer = function () {
     return window.getPerformanceConstants().VIEWPORT_BUFFER;
   };
 
-  window.getPerformanceBudget = function() {
+  window.getPerformanceBudget = function () {
     return window.getPerformanceConstants().PERFORMANCE_BUDGET;
   };
 
-  window.getChunkSize = function() {
+  window.getChunkSize = function () {
     return window.getPerformanceConstants().CHUNK_SIZE;
   };
 
-  window.getIdleTimeout = function() {
+  window.getIdleTimeout = function () {
     return window.getPerformanceConstants().IDLE_TIMEOUT;
   };
 
@@ -1487,7 +1463,7 @@
    * @param {Object} pageDefaults - ページ固有のデフォルト値
    * @returns {Object} 統一設定オブジェクト
    */
-  window.sharedUtilities.createUnifiedConfig = function(CONFIG, legacyVars = {}, pageDefaults = {}) {
+  window.sharedUtilities.createUnifiedConfig = function (CONFIG, legacyVars = {}, pageDefaults = {}) {
     const safeUserId = (value) => {
       return (typeof value === 'string' && !value.startsWith('<')) ? value : '';
     };
@@ -1515,7 +1491,7 @@
    * シンプルエラー表示関数
    * 開発者が問題を特定できる最小限の情報を中央モーダルで表示
    */
-  window.showSimpleError = function(message) {
+  window.showSimpleError = function (message) {
     if (!message) return;
 
     const existingModal = document.getElementById('simple-error-modal');

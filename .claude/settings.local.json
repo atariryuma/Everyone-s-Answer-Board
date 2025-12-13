@@ -52,7 +52,13 @@
       "Bash(continue)",
       "Bash(do echo \"=== Checking $file ===\" grep -n \"^\\s*[a-zA-Z_][a-zA-Z0-9_]*:\\s*[^/]\" \"$file\")",
       "Bash([ -f src/SharedErrorHandling.html ])",
-      "Bash([ -f src/page.js.html ])"
+      "Bash([ -f src/page.js.html ])",
+      "Bash(echo:*)",
+      "Bash(node --check:*)",
+      "Bash(node:*)",
+      "Bash(__NEW_LINE__ echo \"\")",
+      "Bash(head -10 echo \"\" echo \"2. MAX_EXECUTION_TIME (DataService.js)\" grep -n \"MAX_EXECUTION_TIME\" src/DataService.js echo \"\" echo \"3. CIRCUIT_BREAKER_KEY (DatabaseCore.js)\" grep -n \"CIRCUIT_BREAKER_KEY\" src/DatabaseCore.js)",
+      "Bash(head -5 echo \"\" echo \"4. ADMIN_EMAIL, DATABASE_SPREADSHEET_ID (SystemController.js)\" grep -n \"ADMIN_EMAIL\\|DATABASE_SPREADSHEET_ID\\|SERVICE_ACCOUNT_CREDS\" src/SystemController.js)"
     ],
     "deny": [],
     "ask": []

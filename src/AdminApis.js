@@ -183,10 +183,14 @@ function republishMyBoard() {
       };
     }
 
+    // リダイレクトURL（GAS iFrame対応）
+    const redirectUrl = getWebAppUrl() + '?mode=view&userId=' + currentUser.userId;
+
     return {
       success: true,
       message: '回答ボードを再公開しました',
-      userId: currentUser.userId
+      userId: currentUser.userId,
+      redirectUrl: redirectUrl
     };
 
   } catch (error) {
@@ -236,11 +240,15 @@ function clearActiveSheet(targetUserId) {
       return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
     }
 
+    // リダイレクトURL（GAS iFrame対応 - Unpublishedページへ）
+    const redirectUrl = getWebAppUrl() + '?mode=unpublished&userId=' + targetUser.userId;
+
     return {
       success: true,
       message: wasPublished ? 'ボードを非公開にしました' : 'ボードは既に非公開です',
       boardPublished: false,
-      userId: targetUser.userId
+      userId: targetUser.userId,
+      redirectUrl: redirectUrl
     };
   } catch (error) {
     console.error('clearActiveSheet error:', error.message);

@@ -1,244 +1,262 @@
 <!doctype html>
 <html lang="ja">
-  <head>
-    <base target="_top" />
-    <title>みんなの回答ボード - 未公開</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- Shared Security Headers -->
-    <?!= include('SharedSecurityHeaders'); ?>
+<head>
+  <base target="_top" />
+  <title>みんなの回答ボード - 未公開</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
-    <script>
-      window.__TAILWIND_DISABLE_TOUCH__ = true;
-      window.tailwind = {
-        config: {
-          corePlugins: { preflight: false },
-          important: true,
-        },
+  <!-- Shared Security Headers -->
+  <?!= include('SharedSecurityHeaders'); ?>
+
+  <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
+  <script>
+    window.__TAILWIND_DISABLE_TOUCH__ = true;
+    window.tailwind = {
+      config: {
+        corePlugins: { preflight: false },
+        important: true,
+      },
+    };
+
+    if (!window.__WARN_SUPPRESSION_INITIALIZED__) {
+      const originalWarnUnpub = console.warn;
+      console.warn = function (...args) {
+        const message = args.join(' ');
+        if (
+          message.includes('cdn.tailwindcss.com should not be used in production') ||
+          message.includes('cdnjs.cloudflare.com') ||
+          message.includes('tailwind') ||
+          message.includes('TailwindCSS')
+        ) {
+          return; // Completely suppress
+        }
+        originalWarnUnpub.apply(console, args);
       };
+      window.__WARN_SUPPRESSION_INITIALIZED__ = true;
+    }
+  </script>
+  <!-- Shared TailwindCSS Configuration -->
+  <?!= include('SharedTailwindConfig'); ?>
 
-      if (!window.__WARN_SUPPRESSION_INITIALIZED__) {
-        const originalWarnUnpub = console.warn;
-        console.warn = function (...args) {
-          const message = args.join(' ');
-          if (
-            message.includes('cdn.tailwindcss.com should not be used in production') ||
-            message.includes('cdnjs.cloudflare.com') ||
-            message.includes('tailwind') ||
-            message.includes('TailwindCSS')
-          ) {
-            return; // Completely suppress
-          }
-          originalWarnUnpub.apply(console, args);
-        };
-        window.__WARN_SUPPRESSION_INITIALIZED__ = true;
-      }
-    </script>
-    <!-- Shared TailwindCSS Configuration -->
-    <?!= include('SharedTailwindConfig'); ?>
+  <!-- Unified Styles and Shared Components -->
+  <?!= include('UnifiedStyles.css'); ?>
+  <style>
+    body {
+      margin: 0;
+    }
 
-    <!-- Unified Styles and Shared Components -->
-    <?!= include('UnifiedStyles.css'); ?>
-    <style>
-      body {
-        margin: 0;
-      }
-      .glass-panel {
-        background: rgba(26, 27, 38, 0.7);
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-      }
-    </style>
-  </head>
-  <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans flex items-center justify-center h-screen">
-    <!-- Loading Overlay for UnifiedLoadingManager -->
-    <div id="loading-overlay" class="loading-overlay page-specific hidden">
-      <div
-        class="global-spinner"
-      ></div>
-    </div>
+    .glass-panel {
+      background: rgba(26, 27, 38, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
 
-    <!-- Notification Container for unified notification system -->
-    <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
-    <div class="w-full max-w-2xl mx-auto px-4 py-8">
-      <? if (typeof isEditor !== 'undefined' && isEditor) { ?>
-      <!-- 編集者用: 再公開セクション -->
-      <div class="glass-panel rounded-xl p-6 md:p-8 shadow-2xl">
-        <h1 class="text-2xl md:text-3xl font-bold mb-3 text-yellow-300">回答ボード管理</h1>
-        <p class="text-gray-400 mb-5">回答ボードは現在非公開状態です</p>
+<body style="background: var(--brand-background); color: var(--brand-text);"
+  class="font-sans flex items-center justify-center h-screen">
+  <!-- Loading Overlay for UnifiedLoadingManager -->
+  <div id="loading-overlay" class="loading-overlay page-specific hidden">
+    <div class="global-spinner"></div>
+  </div>
 
-        <? if (typeof editorName !== 'undefined' && editorName) { ?>
-        <p class="text-xs text-gray-500 mb-4">管理者: <?= editorName ?></p>
-        <? } ?>
+  <!-- Notification Container for unified notification system -->
+  <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
+  <div class="w-full max-w-2xl mx-auto px-4 py-8">
+    <? if (typeof isEditor !== 'undefined' && isEditor) { ?>
+    <!-- 編集者用: 再公開セクション -->
+    <div class="glass-panel rounded-xl p-6 md:p-8 shadow-2xl">
+      <h1 class="text-2xl md:text-3xl font-bold mb-3 text-yellow-300">回答ボード管理</h1>
+      <p class="text-gray-400 mb-5">回答ボードは現在非公開状態です</p>
 
-        <!-- 生徒用URL表示 -->
-        <div class="mb-6 p-4 bg-gray-700 rounded-lg">
-          <p class="text-sm text-gray-400 mb-2">生徒用URL:</p>
-          <div class="flex gap-2">
-            <input
-              type="text"
-              id="board-url"
-              readonly
-              value="<?= typeof boardUrl !== 'undefined' ? boardUrl : '' ?>"
-              class="flex-1 p-2 bg-gray-600 border border-gray-500 rounded text-sm cursor-pointer hover:bg-gray-500"
-              onclick="this.select()"
-              aria-label="生徒用URL"
-              title="クリックしてURLを選択"
-            />
-            <button
-              type="button"
-              onclick="copyBoardUrl()"
-              class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm"
-            >
-              コピー
-            </button>
-          </div>
-        </div>
+      <? if (typeof editorName !== 'undefined' && editorName) { ?>
+      <p class="text-xs text-gray-500 mb-4">管理者:
+        <?= editorName ?>
+      </p>
+      <? } ?>
 
-        <!-- 再公開ボタン -->
-        <button
-          type="button"
-          id="republish-btn"
-          onclick="republishBoard()"
-          class="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-800"
-        >
-          <span role="img" aria-label="公開">🌟</span> 回答ボードを再公開
-        </button>
-
-        <!-- 管理パネル遷移ボタン -->
-        <button
-          type="button"
-          id="admin-panel-btn"
-          onclick="openAdminPanel()"
-          class="w-full mt-3 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium text-base transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
-        >
-          <span role="img" aria-label="設定">⚙️</span> 管理パネルを開く
-        </button>
-
-        <!-- メッセージエリア -->
-        <div
-          id="message-area"
-          class="mt-4 text-center text-sm h-5"
-          aria-live="polite"
-          role="status"
-        ></div>
-      </div>
-      <? } else { ?>
-      <!-- 閲覧者用: 準備中メッセージ -->
-      <div class="glass-panel rounded-xl p-8 shadow-2xl">
-        <h1 class="text-4xl font-bold mb-4 text-yellow-300">現在は準備中です</h1>
-        <p class="text-gray-400 mb-4">先生が回答ボードを設定中です。しばらくお待ちください。</p>
-
-        <? if (typeof editorName !== 'undefined' && editorName) { ?>
-        <p class="text-xs text-gray-500 mb-4">管理者: <?= editorName ?></p>
-        <? } ?>
-
-        <div class="mt-6">
-          <button
-            type="button"
-            onclick="window.safeReload()"
-            class="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold"
-          >
-            更新
+      <!-- 生徒用URL表示 -->
+      <div class="mb-6 p-4 bg-gray-700 rounded-lg">
+        <p class="text-sm text-gray-400 mb-2">生徒用URL:</p>
+        <div class="flex gap-2">
+          <input type="text" id="board-url" readonly value="<?= typeof boardUrl !== 'undefined' ? boardUrl : '' ?>"
+            class="flex-1 p-2 bg-gray-600 border border-gray-500 rounded text-sm cursor-pointer hover:bg-gray-500"
+            onclick="this.select()" aria-label="生徒用URL" title="クリックしてURLを選択" />
+          <button type="button" onclick="copyBoardUrl()"
+            class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm">
+            コピー
           </button>
         </div>
       </div>
-      <? } ?>
+
+      <!-- 再公開ボタン -->
+      <button type="button" id="republish-btn" onclick="republishBoard()"
+        class="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-800">
+        <span role="img" aria-label="公開">🌟</span> 回答ボードを再公開
+      </button>
+
+      <!-- 管理パネル遷移ボタン -->
+      <button type="button" id="admin-panel-btn" onclick="openAdminPanel()"
+        class="w-full mt-3 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium text-base transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+        <span role="img" aria-label="設定">⚙️</span> 管理パネルを開く
+      </button>
+
+      <!-- メッセージエリア -->
+      <div id="message-area" class="mt-4 text-center text-sm h-5" aria-live="polite" role="status"></div>
     </div>
+    <? } else { ?>
+    <!-- 閲覧者用: 準備中メッセージ -->
+    <div class="glass-panel rounded-xl p-8 shadow-2xl">
+      <h1 class="text-4xl font-bold mb-4 text-yellow-300">現在は準備中です</h1>
+      <p class="text-gray-400 mb-4">先生が回答ボードを設定中です。しばらくお待ちください。</p>
 
-    <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
-    <?!= include('SharedUtilities'); ?>
-    <?!= include('SharedErrorHandling'); ?>
+      <? if (typeof editorName !== 'undefined' && editorName) { ?>
+      <p class="text-xs text-gray-500 mb-4">管理者:
+        <?= editorName ?>
+      </p>
+      <? } ?>
 
-    <script>
-      function copyBoardUrl() {
-        const urlInput = document.getElementById('board-url');
-        if (urlInput) {
-          try {
-            if (navigator.clipboard && window.isSecureContext) {
-              navigator.clipboard.writeText(urlInput.value);
-            } else {
-              urlInput.select();
-              document.execCommand('copy');
-            }
-            showMessage('URLをコピーしました', 'success');
-          } catch (error) {
-            showMessage('コピーに失敗しました', 'error');
+      <div class="mt-6">
+        <button type="button" onclick="window.safeReload()"
+          class="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold">
+          更新
+        </button>
+      </div>
+    </div>
+    <? } ?>
+  </div>
+
+  <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
+  <?!= include('SharedUtilities'); ?>
+  <?!= include('SharedErrorHandling'); ?>
+
+  <script>
+    function copyBoardUrl() {
+      const urlInput = document.getElementById('board-url');
+      if (urlInput) {
+        try {
+          if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(urlInput.value);
+          } else {
+            urlInput.select();
+            document.execCommand('copy');
           }
+          showMessage('URLをコピーしました', 'success');
+        } catch (error) {
+          showMessage('コピーに失敗しました', 'error');
         }
       }
+    }
 
-      function showMessage(message, type = 'info') {
-        if (window.notifications) {
-          const durations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
-          window.notifications.showMessage(message, type, durations[type] || 5000);
+    function showMessage(message, type = 'info') {
+      if (window.notifications) {
+        const durations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
+        window.notifications.showMessage(message, type, durations[type] || 5000);
+      } else {
+        console.warn('Notification system not available:', type, message);
+      }
+    }
+
+    function republishBoard() {
+      const button = document.getElementById('republish-btn');
+      if (!button) return;
+
+      const originalContent = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 再公開中...';
+
+      google.script.run
+        .withSuccessHandler(function (result) {
+          if (result && result.success) {
+            // GAS iFrameではコールバック内でwindow.openが動作しないため、
+            // ユーザーがクリックするリダイレクトモーダルを表示
+            showRedirectModal('再公開完了！', '回答ボードを再公開しました。', result.redirectUrl);
+          } else {
+            showMessage(result.message || '再公開に失敗しました', 'error');
+            button.disabled = false;
+            button.innerHTML = originalContent;
+          }
+        })
+        .withFailureHandler(function (error) {
+          showMessage('再公開中にエラーが発生しました: ' + (error.message || error), 'error');
+          button.disabled = false;
+          button.innerHTML = originalContent;
+        })
+        .republishMyBoard();
+    }
+
+    /**
+     * リダイレクト用モーダルを表示（GAS iFrame対応）
+     */
+    function showRedirectModal(title, message, redirectUrl) {
+      const existingModal = document.getElementById('redirect-modal');
+      if (existingModal) existingModal.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'redirect-modal';
+      modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10002]';
+      modal.innerHTML = `
+        <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4 text-center">
+          <div class="text-green-400 mb-4">
+            <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <h3 class="text-xl font-bold text-white mb-2">${title}</h3>
+          <p class="text-gray-300 mb-6">${message}</p>
+          <button type="button" id="redirect-btn" class="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg">
+            回答ボードを開く
+          </button>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+
+      const redirectBtn = document.getElementById('redirect-btn');
+      redirectBtn.addEventListener('click', function () {
+        if (redirectUrl) {
+          window.open(redirectUrl, '_top');
         } else {
-          console.warn('Notification system not available:', type, message);
+          const url = new URL(window.location.href);
+          url.hash = '';
+          window.open(url.toString(), '_top');
         }
-      }
+      });
 
-      function republishBoard() {
-        const button = document.getElementById('republish-btn');
-        if (!button) return;
+      redirectBtn.focus();
+    }
 
-        const originalContent = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 再公開中...';
+    function openAdminPanel() {
+      const button = document.getElementById('admin-panel-btn');
+      if (!button) return;
 
-        google.script.run
-          .withSuccessHandler(function(result) {
-            if (result && result.success) {
-              showMessage('回答ボードを再公開しました！', 'success');
+      const originalContent = button.innerHTML;
+      button.disabled = true;
+      button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 読み込み中...';
 
-              setTimeout(function() {
-                const url = new URL(window.location.href);
-                url.hash = '';
-                window.location.href = url.toString();
-              }, 1000);
-            } else {
-              showMessage(result.message || '再公開に失敗しました', 'error');
-              button.disabled = false;
-              button.innerHTML = originalContent;
-            }
-          })
-          .withFailureHandler(function(error) {
-            showMessage('再公開中にエラーが発生しました: ' + (error.message || error), 'error');
+      google.script.run
+        .withSuccessHandler(function (webAppUrl) {
+          if (webAppUrl) {
+            const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+            const adminUrl = webAppUrl + '?mode=admin&userId=' + userId;
+            window.open(adminUrl, '_top');
+          } else {
+            showMessage('管理パネルURLの取得に失敗しました', 'error');
             button.disabled = false;
             button.innerHTML = originalContent;
-          })
-          .republishMyBoard();
-      }
+          }
+        })
+        .withFailureHandler(function (error) {
+          showMessage('管理パネルを開けませんでした: ' + (error.message || error), 'error');
+          button.disabled = false;
+          button.innerHTML = originalContent;
+        })
+        .getWebAppUrl();
+    }
+  </script>
 
-      function openAdminPanel() {
-        const button = document.getElementById('admin-panel-btn');
-        if (!button) return;
+</body>
 
-        const originalContent = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 読み込み中...';
-
-        google.script.run
-          .withSuccessHandler(function(webAppUrl) {
-            if (webAppUrl) {
-              const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-              const adminUrl = webAppUrl + '?mode=admin&userId=' + userId;
-              window.open(adminUrl, '_top');
-            } else {
-              showMessage('管理パネルURLの取得に失敗しました', 'error');
-              button.disabled = false;
-              button.innerHTML = originalContent;
-            }
-          })
-          .withFailureHandler(function(error) {
-            showMessage('管理パネルを開けませんでした: ' + (error.message || error), 'error');
-            button.disabled = false;
-            button.innerHTML = originalContent;
-          })
-          .getWebAppUrl();
-      }
-    </script>
-
-  </body>
 </html>
