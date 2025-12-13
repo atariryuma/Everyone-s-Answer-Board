@@ -249,7 +249,7 @@
         }
 
         const result = await window.ErrorHandler.handleFormSubmission(
-          () => window.ErrorHandler.callGAS('setupApplication', {
+          () => window.ErrorHandler.callGAS('setupApp', {
             showLoading: true,
             loadingMessage: 'セットアップを実行中...'
           }, serviceAccountJson, databaseId, adminEmail, googleClientId),
