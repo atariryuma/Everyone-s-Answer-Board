@@ -19,6 +19,13 @@ const CACHE_DURATION = {
 };
 
 /**
+ * プロパティキャッシュTTL (ミリ秒)
+ * PropertiesServiceのメモリキャッシュ用
+ * CLAUDE.md準拠: 30秒TTLで自動期限切れ
+ */
+const PROPERTY_CACHE_TTL = 30000; // 30秒
+
+/**
  * タイムアウト期間 (ミリ秒)
  */
 const TIMEOUT_MS = {

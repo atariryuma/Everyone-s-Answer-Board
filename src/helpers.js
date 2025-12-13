@@ -13,7 +13,7 @@
  * - 簡素なユーティリティ関数群
  */
 
-/* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS */
+/* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, PROPERTY_CACHE_TTL */
 
 
 const RUNTIME_PROPERTIES_CACHE = {};
