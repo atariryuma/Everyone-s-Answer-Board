@@ -41,7 +41,8 @@
       "Bash(npx clasp deploy:*)",
       "Bash(npx clasp versions)",
       "Bash(npx clasp:*)",
-      "Bash(du:*)"
+      "Bash(du:*)",
+      "Bash(git pull:*)"
     ],
     "deny": [],
     "ask": []
