@@ -132,7 +132,7 @@ function getBoardInfo() {
     const config = configResult.success ? configResult.config : {};
 
     const isPublished = Boolean(config.isPublished);
-    const baseUrl = ScriptApp.getService().getUrl();
+    const baseUrl = getWebAppUrl(); // eslint-disable-line no-undef
 
     return {
       success: true,

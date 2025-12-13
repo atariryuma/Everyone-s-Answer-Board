@@ -83,69 +83,121 @@ __rootSys.SLEEP_MS = SLEEP_MS;
  * @returns {Object} リセット結果
  */
 function forceUrlSystemReset() {
+  try {
+    console.warn('システム強制リセットが実行されました');
+
+    const cacheResults = [];
     try {
-      console.warn('システム強制リセットが実行されました');
+      const cache = CacheService.getScriptCache();
+      if (cache) {
+        const keysToRemove = [
+          'user_cache_',
+          'config_cache_',
+          'sheet_cache_',
+          'url_cache_',
+          'auth_cache_',
+          'system_cache_'
+        ];
 
-      const cacheResults = [];
-      try {
-        const cache = CacheService.getScriptCache();
-        if (cache) {
-          const keysToRemove = [
-            'user_cache_',
-            'config_cache_',
-            'sheet_cache_',
-            'url_cache_',
-            'auth_cache_',
-            'system_cache_'
-          ];
+        keysToRemove.forEach(keyPrefix => {
+          try {
+            cache.remove(keyPrefix);
+          } catch (e) {
+          }
+        });
 
-          keysToRemove.forEach(keyPrefix => {
-            try {
-              cache.remove(keyPrefix);
-            } catch (e) {
-            }
-          });
-
-          cacheResults.push('主要キャッシュクリア完了');
-        } else {
-          cacheResults.push('キャッシュサービスが利用できません');
-        }
-      } catch (cacheError) {
-        console.warn('[WARN] SystemController.forceUrlSystemReset: Cache clear error:', cacheError.message);
-        cacheResults.push(`キャッシュクリア失敗: ${cacheError.message}`);
+        cacheResults.push('主要キャッシュクリア完了');
+      } else {
+        cacheResults.push('キャッシュサービスが利用できません');
       }
-
-
-      return {
-        success: true,
-        message: 'システムリセットが完了しました',
-        actions: cacheResults,
-        cacheStatus: cacheResults.join(', '),
-        timestamp: new Date().toISOString()
-      };
-
-    } catch (error) {
-      console.error('[ERROR] SystemController.forceUrlSystemReset:', error && error.message ? error.message : 'System reset error');
-      return {
-        success: false,
-        message: error && error.message ? error.message : '詳細不明'
-      };
+    } catch (cacheError) {
+      console.warn('[WARN] SystemController.forceUrlSystemReset: Cache clear error:', cacheError.message);
+      cacheResults.push(`キャッシュクリア失敗: ${cacheError.message}`);
     }
+
+
+    return {
+      success: true,
+      message: 'システムリセットが完了しました',
+      actions: cacheResults,
+      cacheStatus: cacheResults.join(', '),
+      timestamp: new Date().toISOString()
+    };
+
+  } catch (error) {
+    console.error('[ERROR] SystemController.forceUrlSystemReset:', error && error.message ? error.message : 'System reset error');
+    return {
+      success: false,
+      message: error && error.message ? error.message : '詳細不明'
+    };
+  }
 }
 
 /**
- * WebアプリのURL取得
+ * WebアプリのURL取得（バリデーション強化版）
  * 各種HTMLファイルから呼び出される
+ * 
+ * 無効なURL（userCodeAppPanel等）を検出し、フォールバックを提供
  *
- * @returns {string} WebアプリURL
+ * @returns {string} WebアプリURL（無効な場合は空文字）
  */
 function getWebAppUrl() {
   try {
-    return ScriptApp.getService().getUrl();
+    const url = ScriptApp.getService().getUrl();
+
+    // URLバリデーション
+    if (!isValidWebAppUrl_(url)) {
+      console.warn('[WARN] getWebAppUrl: Invalid URL detected (OAuth/cold start issue):',
+        url ? url.substring(0, 80) + '...' : 'empty');
+
+      // フォールバック: スクリプトプロパティから保存済みURLを取得
+      const props = PropertiesService.getScriptProperties();
+      const savedUrl = props.getProperty('DEPLOYED_WEB_APP_URL');
+
+      if (savedUrl && isValidWebAppUrl_(savedUrl)) {
+        console.log('[INFO] getWebAppUrl: Using saved fallback URL');
+        return savedUrl;
+      }
+
+      return ''; // 無効なURLは空文字を返す
+    }
+
+    // 正常なURLをスクリプトプロパティに保存（次回のフォールバック用）
+    try {
+      const props = PropertiesService.getScriptProperties();
+      const savedUrl = props.getProperty('DEPLOYED_WEB_APP_URL');
+      if (savedUrl !== url) {
+        props.setProperty('DEPLOYED_WEB_APP_URL', url);
+      }
+    } catch (saveError) {
+      // 保存エラーは無視（読み取りのみ権限の場合など）
+    }
+
+    return url;
   } catch (error) {
-    console.error('[ERROR] SystemController.getWebAppUrl:', error.message || 'Web app URL error');
+    console.error('[ERROR] getWebAppUrl:', error.message || 'Web app URL error');
     return '';
   }
+}
+
+/**
+ * WebアプリURLのバリデーション
+ * @private
+ * @param {string} url - 検証するURL
+ * @returns {boolean} 有効なURLの場合true
+ */
+function isValidWebAppUrl_(url) {
+  if (!url || typeof url !== 'string') return false;
+
+  // 無効なパターン（OAuth初期化中のURL）
+  if (url.includes('userCodeAppPanel')) return false;
+  if (url.includes('createOAuthDialog')) return false;
+
+  // 正常なWebアプリURLの条件
+  // /exec または /dev を含む必要がある
+  if (!url.includes('/exec') && !url.includes('/dev')) return false;
+
+  return true;
 }
 
 /**
@@ -254,36 +306,36 @@ function testSystemDiagnosis() {
  * @returns {Object} システム状態
  */
 function getSystemStatus() {
-    try {
-      const props = PropertiesService.getScriptProperties();
-      const status = {
-        timestamp: new Date().toISOString(),
-        setup: {
-          hasDatabase: !!props.getProperty('DATABASE_SPREADSHEET_ID'),
-          hasAdminEmail: !!props.getProperty('ADMIN_EMAIL'),
-          hasServiceAccount: !!getServiceAccount()?.isValid
-        },
-        services: {
-          available: ['UserService', 'ConfigService', 'DataService', 'SecurityService']
-        }
-      };
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const status = {
+      timestamp: new Date().toISOString(),
+      setup: {
+        hasDatabase: !!props.getProperty('DATABASE_SPREADSHEET_ID'),
+        hasAdminEmail: !!props.getProperty('ADMIN_EMAIL'),
+        hasServiceAccount: !!getServiceAccount()?.isValid
+      },
+      services: {
+        available: ['UserService', 'ConfigService', 'DataService', 'SecurityService']
+      }
+    };
 
-      status.setup.isComplete = status.setup.hasDatabase &&
-                                 status.setup.hasAdminEmail &&
-                                 status.setup.hasServiceAccount;
+    status.setup.isComplete = status.setup.hasDatabase &&
+      status.setup.hasAdminEmail &&
+      status.setup.hasServiceAccount;
 
-      return {
-        success: true,
-        status
-      };
+    return {
+      success: true,
+      status
+    };
 
-    } catch (error) {
-      console.error('[ERROR] SystemController.getSystemStatus:', error && error.message ? error.message : 'System status error');
-      return {
-        success: false,
-        message: error && error.message ? error.message : 'システム状態取得エラー'
-      };
-    }
+  } catch (error) {
+    console.error('[ERROR] SystemController.getSystemStatus:', error && error.message ? error.message : 'System status error');
+    return {
+      success: false,
+      message: error && error.message ? error.message : 'システム状態取得エラー'
+    };
+  }
 }
 
 /**
@@ -576,7 +628,7 @@ function getAdminSheetList(spreadsheetId) {
   try {
     // ⚠️ DATABASE_SPREADSHEET専用（DatabaseCore.gs:598のガードにより制限）
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
-    const {spreadsheet} = dataAccess;
+    const { spreadsheet } = dataAccess;
     const sheets = spreadsheet.getSheets();
 
     const sheetList = sheets.map(sheet => {
@@ -992,21 +1044,21 @@ function generateFormTitle(sheetName, spreadsheetName) {
             .trim();
 
           if (formTitle.length > 0) {
-            return `${formTitle  } (フォーム)`;
+            return `${formTitle} (フォーム)`;
           }
         }
       }
     }
 
     if (spreadsheetName && typeof spreadsheetName === 'string') {
-      return `${spreadsheetName  } - ${  sheetName  } (フォーム)`;
+      return `${spreadsheetName} - ${sheetName} (フォーム)`;
     }
 
-    return `${sheetName || 'データ'  } (フォーム)`;
+    return `${sheetName || 'データ'} (フォーム)`;
 
   } catch (error) {
     console.warn('generateFormTitle error:', error.message);
-    return `${sheetName || 'フォーム'  } (タイトル生成エラー)`;
+    return `${sheetName || 'フォーム'} (タイトル生成エラー)`;
   }
 }
 
@@ -1073,7 +1125,7 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
-    const {spreadsheet, auth} = dataAccess;
+    const { spreadsheet, auth } = dataAccess;
 
     const sheets = spreadsheet.getSheets();
 
@@ -1168,7 +1220,7 @@ function getFormInfo(spreadsheetId, sheetName) {
     } catch (nameError) {
       console.warn('getFormInfoImpl: スプレッドシート名取得エラー:', nameError.message);
       if (spreadsheetId && spreadsheetId.trim()) {
-        spreadsheetName = `スプレッドシート (ID: ${  spreadsheetId.substring(0, 8)  }...)`;
+        spreadsheetName = `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
       }
     }
 
@@ -1240,7 +1292,7 @@ function getFormInfo(spreadsheetId, sheetName) {
     console.error('=== getFormInfoImpl ERROR ===', {
       startTime,
       endTime,
-      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 12)  }***` : 'N/A',
+      spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 12)}***` : 'N/A',
       sheetName,
       error: error.message,
       stack: error.stack
@@ -1386,7 +1438,7 @@ function checkCurrentPublicationStatus(targetUserId) {
  */
 function getLoginStatus() {
   try {
-    const {email} = { email: Session.getActiveUser().getEmail() };
+    const { email } = { email: Session.getActiveUser().getEmail() };
     const userEmail = email ? email : null;
     if (!userEmail) {
       return {
@@ -1576,7 +1628,7 @@ function collectCacheMetrics(options = {}) {
   try {
     const cache = CacheService.getScriptCache();
 
-    const testKey = `perf_cache_test_${  Date.now()}`;
+    const testKey = `perf_cache_test_${Date.now()}`;
     const testValue = JSON.stringify({ test: true, timestamp: Date.now() });
 
     const writeStartTime = Date.now();

@@ -79,32 +79,32 @@ function getCurrentUserInfo() {
  * @returns {Object} 拡張されたユーザー情報
  */
 function enrichUserInfo(userInfo) {
-    try {
-      if (!userInfo || !userInfo.userId) {
-        throw new Error('無効なユーザー情報');
-      }
+  try {
+    if (!userInfo || !userInfo.userId) {
+      throw new Error('無効なユーザー情報');
+    }
 
-      const configResult = getUserConfig(userInfo.userId);
-      const config = configResult.success ? configResult.config : {};
+    const configResult = getUserConfig(userInfo.userId);
+    const config = configResult.success ? configResult.config : {};
 
-      const enrichedConfig = generateDynamicUserUrls(config);
+    const enrichedConfig = generateDynamicUserUrls(config);
 
-      return {
+    return {
+      userId: userInfo.userId,
+      userEmail: userInfo.userEmail,
+      isActive: userInfo.isActive,
+      lastModified: userInfo.lastModified,
+      config: enrichedConfig,
+      userInfo: {
         userId: userInfo.userId,
         userEmail: userInfo.userEmail,
-        isActive: userInfo.isActive,
-        lastModified: userInfo.lastModified,
-        config: enrichedConfig,
-        userInfo: {
-          userId: userInfo.userId,
-          userEmail: userInfo.userEmail,
-          isActive: userInfo.isActive
-        }
-      };
-    } catch (error) {
-      console.error('UserService.enrichUserInfo: エラー', error.message);
-      return userInfo; // フォールバック
-    }
+        isActive: userInfo.isActive
+      }
+    };
+  } catch (error) {
+    console.error('UserService.enrichUserInfo: エラー', error.message);
+    return userInfo; // フォールバック
+  }
 }
 
 /**
@@ -113,28 +113,28 @@ function enrichUserInfo(userInfo) {
  * @returns {Object} URL付き設定オブジェクト
  */
 function generateDynamicUserUrls(config) {
-    try {
-      const enhanced = { ...config };
+  try {
+    const enhanced = { ...config };
 
-      if (config.spreadsheetId && !config.spreadsheetUrl) {
-        if (config.spreadsheetId && typeof config.spreadsheetId === 'string') {
-          enhanced.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`;
-        }
+    if (config.spreadsheetId && !config.spreadsheetUrl) {
+      if (config.spreadsheetId && typeof config.spreadsheetId === 'string') {
+        enhanced.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`;
       }
-
-      if (config.isPublished && !config.appUrl) {
-        enhanced.appUrl = ScriptApp.getService().getUrl();
-      }
-
-      if (config.formUrl) {
-        enhanced.hasValidForm = validateUrl(config.formUrl)?.isValid || false;
-      }
-
-      return enhanced;
-    } catch (error) {
-      console.error('UserService.generateDynamicUrls: エラー', error.message);
-      return config; // フォールバック
     }
+
+    if (config.isPublished && !config.appUrl) {
+      enhanced.appUrl = getWebAppUrl(); // eslint-disable-line no-undef
+    }
+
+    if (config.formUrl) {
+      enhanced.hasValidForm = validateUrl(config.formUrl)?.isValid || false;
+    }
+
+    return enhanced;
+  } catch (error) {
+    console.error('UserService.generateDynamicUrls: エラー', error.message);
+    return config; // フォールバック
+  }
 }
 
 

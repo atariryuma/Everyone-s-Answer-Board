@@ -139,11 +139,11 @@ function processLoginAction() {
       }
     }
 
-    const baseUrl = ScriptApp.getService().getUrl();
+    const baseUrl = getWebAppUrl(); // eslint-disable-line no-undef
     if (!baseUrl) {
       return {
         success: false,
-        message: 'Web app URL not available'
+        message: 'Web app URL not available (deployment may be initializing)'
       };
     }
     if (!user || !user.userId) {

@@ -4156,10 +4156,14 @@
 
     google.script.run
       .withSuccessHandler(function (webAppUrl) {
-        if (webAppUrl) {
-          const appSetupUrl = webAppUrl + '?mode=appSetup' + (targetUserId ? '&userId=' + targetUserId : '');
-          appSetupBtn.href = appSetupUrl;
+        // 無効なURLパターンを検証（OAuth初期化中のURL）
+        if (!webAppUrl || webAppUrl.includes('userCodeAppPanel') || !webAppUrl.includes('/exec')) {
+          console.warn('prefetchAppSetupUrl: Invalid URL detected, link disabled');
+          return;
         }
+
+        const appSetupUrl = webAppUrl + '?mode=appSetup' + (targetUserId ? '&userId=' + targetUserId : '');
+        appSetupBtn.href = appSetupUrl;
       })
       .withFailureHandler(function (error) {
         console.error('アプリ設定URL取得エラー:', error);

@@ -191,8 +191,8 @@ function doGet(e) {
           template.editorName = targetUser.userName || targetUser.userEmail || '';
           template.userId = targetUserId; // 管理パネル遷移用
 
-          const baseUrl = ScriptApp.getService().getUrl();
-          template.boardUrl = `${baseUrl}?mode=view&userId=${targetUserId}`;
+          const baseUrl = getWebAppUrl();
+          template.boardUrl = baseUrl ? `${baseUrl}?mode=view&userId=${targetUserId}` : '';
 
 
           return template.evaluate();
@@ -318,7 +318,7 @@ function doPost(e) {
         error: 'JSON_PARSE_ERROR'
       })).setMimeType(ContentService.MimeType.JSON);
     }
-    const {action} = request;
+    const { action } = request;
 
 
     const email = getCurrentEmail();
@@ -687,12 +687,12 @@ function getBatchedAdminData(targetUserId) {
 
     const questionText = getQuestionText(config, { targetUserEmail: targetUser.userEmail });
 
-    const baseUrl = ScriptApp.getService().getUrl();
+    const baseUrl = getWebAppUrl();
     const enhancedConfig = {
       ...config,
       urls: config.urls || {
-        view: `${baseUrl}?mode=view&userId=${targetUserId}`,
-        admin: `${baseUrl}?mode=admin&userId=${targetUserId}`
+        view: baseUrl ? `${baseUrl}?mode=view&userId=${targetUserId}` : '',
+        admin: baseUrl ? `${baseUrl}?mode=admin&userId=${targetUserId}` : ''
       },
       lastModified: targetUser.lastModified || config.publishedAt
     };

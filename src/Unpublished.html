@@ -238,7 +238,13 @@
 
       google.script.run
         .withSuccessHandler(function (webAppUrl) {
-          if (webAppUrl && userId) {
+          // 無効なURLパターンを検証（OAuth初期化中のURL）
+          if (!webAppUrl || webAppUrl.includes('userCodeAppPanel') || !webAppUrl.includes('/exec')) {
+            console.warn('prefetchNavigationUrls: Invalid URL detected, skipping link setup');
+            return;
+          }
+
+          if (userId) {
             // 管理パネルリンク
             if (adminBtn) {
               adminBtn.href = webAppUrl + '?mode=admin&userId=' + userId;

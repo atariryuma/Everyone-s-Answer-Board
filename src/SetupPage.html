@@ -350,12 +350,17 @@
 
       google.script.run
         .withSuccessHandler(function (url) {
-          if (url) {
-            btn.href = url;
-            btn.style.pointerEvents = 'auto';
-            btn.style.opacity = '1';
-            if (loadingText) loadingText.classList.add('hidden');
+          // 無効なURLパターンを検証（OAuth初期化中のURL）
+          if (!url || url.includes('userCodeAppPanel') || !url.includes('/exec')) {
+            console.warn('prefetchAppUrl: Invalid URL detected, app start disabled');
+            btn.textContent = '⏳ 初期化中...再読み込みしてください';
+            return;
           }
+
+          btn.href = url;
+          btn.style.pointerEvents = 'auto';
+          btn.style.opacity = '1';
+          if (loadingText) loadingText.classList.add('hidden');
         })
         .withFailureHandler(function (error) {
           console.error('URL prefetch failed:', error);

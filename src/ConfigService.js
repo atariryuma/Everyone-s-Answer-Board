@@ -185,14 +185,14 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
   const enhanced = { ...baseConfig };
 
   try {
-    const webAppUrl = ScriptApp.getService().getUrl();
+    const webAppUrl = getWebAppUrl(); // eslint-disable-line no-undef
 
     enhanced.dynamicUrls = {
-      webAppUrl,
-      adminPanelUrl: `${webAppUrl}?mode=admin&userId=${userId}`,
-      viewBoardUrl: `${webAppUrl}?mode=view&userId=${userId}`,
-      setupUrl: `${webAppUrl}?mode=setup&userId=${userId}`,
-      manualUrl: `${webAppUrl}?mode=manual`  // ✅ 使い方ガイド用URL追加
+      webAppUrl: webAppUrl || '',
+      adminPanelUrl: webAppUrl ? `${webAppUrl}?mode=admin&userId=${userId}` : '',
+      viewBoardUrl: webAppUrl ? `${webAppUrl}?mode=view&userId=${userId}` : '',
+      setupUrl: webAppUrl ? `${webAppUrl}?mode=setup&userId=${userId}` : '',
+      manualUrl: webAppUrl ? `${webAppUrl}?mode=manual` : ''
     };
 
     enhanced.systemMeta = {
