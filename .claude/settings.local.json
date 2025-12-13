@@ -30,7 +30,11 @@
       "Bash(for func in \"getColumnAnalysis\" \"getActiveFormInfo\" \"getSheetNameFromGid\" \"resetAuth\" \"toggleUserActiveStatus\" \"toggleUserBoardStatus\")",
       "Bash(wc:*)",
       "Bash(for:*)",
-      "Bash(do echo -n \"$script: \")"
+      "Bash(do echo -n \"$script: \")",
+      "Bash(ls:*)",
+      "Bash(git rm:*)",
+      "Bash(npm install:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []

@@ -3,30 +3,34 @@
 > **🎯 Project**: Google Apps Script Web Application
 > **🔧 Stack**: Zero-Dependency Architecture, Direct GAS API Calls
 > **🤖 Claude Code**: 2025 Best Practices Compliant
-> **⚡ Updated**: 2025-10-05 (Architecture Optimization: auth.gs separation, TTL caching, API Gateway clarification)
+> **⚡ Updated**: 2025-12-13 (GAS + clasp + GitHub Best Practices: .js extension, proper .gitignore/.claspignore)
 
 ## 🧠 Claude Code Workflow
 
-**Explore → Plan → Code → Test → Commit**
+**Explore → Plan → Code → Deploy**
 
 1. **Explore**: Read files, analyze (NO coding)
 2. **Plan**: TodoWrite for tracking
-3. **Code**: TDD-first incremental implementation
-4. **Test**: `npm run check` MUST pass
-5. **Commit**: Structured git workflow
+3. **Code**: Incremental implementation
+4. **Deploy**: `clasp push` to GAS
+5. **Commit**: Structured git workflow (source code only)
 
 ## 🏗️ GAS-Optimized Architecture
 
 **Core Pattern**: Direct GAS API calls with natural global scope utilization
 
 ```
-🌟 GAS-Native Architecture
-├── main.gs                    # Entry Point (doGet/doPost only)
-├── auth.gs                    # Authentication (unified logic)
-├── database.gs                # Database Operations (direct SpreadsheetApp)
-├── permissions.gs             # Permission Management (simple role-based)
-├── reactions.gs               # Reaction System (specialized feature)
-├── utils.gs                   # Utility Functions (shared operations)
+🌟 GAS-Native Architecture (.js extension - clasp standard)
+├── main.js                    # Entry Point (doGet/doPost only)
+├── helpers.js                 # Utility Functions (shared operations)
+├── validators.js              # Input Validation
+├── formatters.js              # Data Formatting
+├── DatabaseCore.js            # Database Operations (direct SpreadsheetApp)
+├── SecurityService.js         # Security & Access Control
+├── UserService.js             # User Management
+├── ConfigService.js           # Configuration Management
+├── DataService.js             # Data Operations
+├── SystemController.js        # System Management
 └── *.html                     # Frontend Templates
 ```
 
@@ -96,22 +100,22 @@ function getViewerBoardData(targetUserId, viewerEmail) {
 
 ## 🛠️ Development Commands
 
-### **🚨 Quick Start (Most Used)**
+### **Quick Start (Most Used)**
 
 ```bash
-npm run check          # ✅ MUST pass before commit (lint + test)
-clasp push            # Deploy to GAS
-clasp logs            # View execution logs
-npm run deploy:safe   # Production deployment
+npm run pull          # Pull code from GAS
+npm run push          # Push code to GAS
+npm run open          # Open GAS editor
+npm run logs          # View execution logs
 ```
 
 ### **Claude Code Workflow**
 
 1. **Explore** → Read files, analyze (NO coding yet)
 2. **Plan** → TodoWrite for task tracking
-3. **Code** → TDD-first implementation
-4. **Test** → `npm run check` (MUST pass)
-5. **Deploy** → `npm run deploy:safe`
+3. **Code** → Incremental implementation
+4. **Push** → `clasp push` to deploy
+5. **Commit** → Git commit source code only
 
 ## 📝 Google Apps Script Critical Rules
 
@@ -141,67 +145,66 @@ if (error?.message) {
 
 ```
 src/
-├── main.gs                    # API Gateway (frontend-callable functions only)
-├── auth.gs                    # Authentication helpers (getCurrentEmail, isAdministrator)
-├── helpers.gs                 # Utility functions (cache, response helpers)
-├── UserService.gs             # User management
-├── ConfigService.gs           # Configuration management
-├── DataService.gs             # Spreadsheet operations
-├── SecurityService.gs         # Security & validation
-├── DatabaseCore.gs            # Database operations
-├── SystemController.gs        # System management
-├── DataController.gs          # Data operations
+├── main.js                    # API Gateway (frontend-callable functions only)
+├── helpers.js                 # Utility functions (cache, response helpers)
+├── validators.js              # Input validation functions
+├── formatters.js              # Data formatting functions
+├── DatabaseCore.js            # Database operations
+├── SecurityService.js         # Security & validation
+├── UserService.js             # User management
+├── ConfigService.js           # Configuration management
+├── ColumnMappingService.js    # Column mapping logic
+├── ReactionService.js         # Reaction system
+├── DataService.js             # Data operations
+├── SystemController.js        # System management
+├── SharingHelper.js           # Sharing utilities
 └── *.html                     # UI templates
 ```
 
-### **Architecture Rationale: main.gs as API Gateway**
+### **Architecture Rationale: main.js as API Gateway**
 
-**Why main.gs must contain all frontend-callable functions:**
+**Why main.js must contain all frontend-callable functions:**
 
 - GAS requirement: Frontend uses `google.script.run[funcName]()` which requires global scope functions
-- Only functions in main.gs (or globally loaded files) can be called from frontend
+- Only functions in main.js (or globally loaded files) can be called from frontend
 - Helper functions NOT called by frontend (e.g., `getCurrentEmail`, `isAdministrator`) should be in separate files
 
 **Design principle:**
 
 ```javascript
-// ✅ main.gs: Frontend-callable API functions only
+// ✅ main.js: Frontend-callable API functions only
 function getUser(infoType) { /* ... */ }           // ✅ Called by frontend
 function addReaction(userId, rowId, type) { }      // ✅ Called by frontend
 
-// ✅ auth.gs: Internal helpers (not called by frontend)
+// ✅ helpers.js: Shared utilities (not called by frontend)
 function getCurrentEmail() { /* ... */ }           // ✅ Helper function
 function isAdministrator(email) { /* ... */ }      // ✅ Helper function
-
-// ✅ helpers.gs: Shared utilities
 function getCachedProperty(key) { /* ... */ }      // ✅ Utility function
 function createErrorResponse(msg) { /* ... */ }    // ✅ Response helper
 ```
 
 ## 🎯 Main API Functions (Frontend-Callable)
 
-**Important**: Functions in this section MUST be in `main.gs` to be callable via `google.script.run[funcName]()`
+**Important**: Functions in this section MUST be in `main.js` to be callable via `google.script.run[funcName]()`
 
 ```javascript
-// User Management (main.gs - frontend-callable)
+// User Management (main.js - frontend-callable)
 getUser(infoType)                    // Get user information
 processLoginAction(action)            // Handle login
 getBatchedUserConfig()                // Get batched user config
 
-// Data Operations (main.gs - frontend-callable)
+// Data Operations (main.js - frontend-callable)
 addReaction(userId, rowId, type)      // Add reaction
 toggleHighlight(userId, rowId)        // Toggle highlight
 getBulkAdminPanelData()              // Admin data
 
-// Configuration (main.gs - frontend-callable)
+// Configuration (main.js - frontend-callable)
 getConfig()                          // Get configuration
 getUserConfig(userId)                // Get user config
 
-// Internal Helpers (auth.gs - NOT frontend-callable)
+// Internal Helpers (helpers.js - NOT frontend-callable)
 getCurrentEmail()                    // Get current user email (internal use)
 isAdministrator(email)               // Check admin privileges (internal use)
-
-// Utilities (helpers.gs - NOT frontend-callable)
 getCachedProperty(key)               // Cached property access with 30s TTL
 clearPropertyCache(key)              // Explicit cache clearing
 createErrorResponse(msg, data)       // Standard error response
@@ -212,24 +215,9 @@ createSuccessResponse(msg, data)     // Standard success response
 
 **GAS Constraint**: Frontend can only call global scope functions. Therefore:
 
-- ✅ **main.gs**: Contains ALL functions called by frontend (API Gateway pattern)
-- ✅ **auth.gs/helpers.gs**: Contains internal helpers NOT called by frontend
-- ❌ **Anti-pattern**: Moving frontend-callable functions out of main.gs breaks frontend calls
-
-## 🧪 Testing & Quality
-
-### **Current Status**
-
-- **123/123 tests passing** (100% success rate)
-- **Zero ESLint errors**
-- **Complete coverage** of critical paths
-
-### **Quality Gate**
-
-```bash
-npm run check                 # MUST pass before any commit
-npm run deploy:safe           # Safe deployment with validation
-```
+- ✅ **main.js**: Contains ALL functions called by frontend (API Gateway pattern)
+- ✅ **helpers.js**: Contains internal helpers NOT called by frontend
+- ❌ **Anti-pattern**: Moving frontend-callable functions out of main.js breaks frontend calls
 
 ## 🛡️ Security & Critical Rules
 
@@ -311,9 +299,97 @@ cache.put(key, data, 300);  // ❌ → CACHE_DURATION.LONG
 - **70x Performance Improvement**: Batch operations (1s vs 70s)
 - **Zero Dependencies**: Direct GAS API calls for maximum reliability
 - **Loading Order Independence**: No file dependency chains
-- **100% Test Coverage**: 123/123 tests passing
 - **Production Stability**: Enterprise-grade error handling
 - **Optimized Caching**: 80-90% PropertiesService API call reduction with 30s TTL
+- **Simple Deployment**: Direct push to GAS with clasp (no build step)
+
+## 🔧 clasp + GitHub Best Practices
+
+### **File Extensions**
+
+- ✅ **Use .js extension**: clasp's default format (not .gs)
+- ✅ **Push with .js**: GAS editor displays them as .gs files
+- ✅ **Pull gets .js**: clasp pull downloads files as .js
+
+### **Git Workflow**
+
+**Files to .gitignore:**
+```
+# Credentials (MUST ignore - contains scriptId)
+.clasp.json
+.clasprc.json
+
+# Build artifacts
+node_modules/
+coverage/
+dist/
+
+# IDE files
+.vscode/
+.DS_Store
+```
+
+**Files to commit:**
+```
+# Source code
+src/**/*.js
+src/**/*.html
+src/appsscript.json
+
+# Config templates
+.clasp.json.template    # Reference for team setup
+.claspignore            # What to push to GAS
+.gitignore              # What to ignore in git
+
+# Dev environment
+package.json
+eslint.config.js
+jest.config.js
+```
+
+### **Setup Instructions**
+
+1. **Clone repository**:
+   ```bash
+   git clone <repo-url>
+   cd Everyone-s-Answer-Board
+   npm install
+   ```
+
+2. **Create .clasp.json** (copy from template):
+   ```bash
+   cp .clasp.json.template .clasp.json
+   # Edit .clasp.json and add your scriptId
+   ```
+
+3. **Login to clasp**:
+   ```bash
+   npx clasp login
+   ```
+
+4. **Pull/Push code**:
+   ```bash
+   npm run pull    # Download from GAS
+   npm run push    # Upload to GAS
+   npm run open    # Open GAS editor
+   npm run logs    # View execution logs
+   ```
+
+### **.claspignore Pattern**
+
+```gitignore
+# Ignore everything, then explicitly include
+**/**
+!appsscript.json
+!**/*.js
+!**/*.html
+
+# Exclude from push
+node_modules/**
+.git/**
+```
+
+This ensures only production code is pushed to GAS, keeping the project clean.
 
 ---
 

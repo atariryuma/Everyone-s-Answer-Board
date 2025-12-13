@@ -1,0 +1,23 @@
+# Default .claspignore pattern for GAS projects
+# This ensures only necessary files are pushed to Apps Script
+
+# Ignore everything by default
+**/**
+
+# Then explicitly include what we need
+!appsscript.json
+!**/*.js
+!**/*.html
+
+# But exclude these patterns
+.git/**
+node_modules/**
+
+# IDE and config files
+.vscode/**
+.idea/**
+.DS_Store
+
+# Environment and secrets
+.env
+.env.*

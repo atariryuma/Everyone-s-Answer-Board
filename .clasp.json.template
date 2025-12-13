@@ -1,0 +1,18 @@
+{
+  "scriptId": "YOUR_SCRIPT_ID_HERE",
+  "rootDir": "src",
+  "filePushOrder": [
+    "src/helpers.js",
+    "src/validators.js",
+    "src/formatters.js",
+    "src/DatabaseCore.js",
+    "src/SecurityService.js",
+    "src/UserService.js",
+    "src/ConfigService.js",
+    "src/ColumnMappingService.js",
+    "src/ReactionService.js",
+    "src/DataService.js",
+    "src/SystemController.js",
+    "src/main.js"
+  ]
+}

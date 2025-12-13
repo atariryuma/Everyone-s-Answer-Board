@@ -1,6 +1,35 @@
+# Node modules
 node_modules/
+
+# Environment variables
 .env
+.env.*
+
+# Coverage and test reports
 coverage/
+*.log
+*.lcov
+junit.xml
 
 # Deployment backups
 backups/
+
+# Build artifacts
+dist/
+build/
+*.tsbuildinfo
+
+# IDE specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Clasp credentials and config (contains sensitive scriptId)
+.clasp.json
+.clasprc.json
+
+# Optional: Keep .clasp.json.template for reference
+!.clasp.json.template
