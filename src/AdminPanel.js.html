@@ -1079,13 +1079,6 @@
     const boardBtn = document.getElementById('open-board-btn');
     const statusDiv = document.getElementById('resource-status');
 
-    if (typeof window !== 'undefined' && window.location?.hostname === 'localhost') {
-        spreadsheetId: config?.spreadsheetId,
-        formUrl: config?.formUrl,
-        isPublished: config?.isPublished,
-        hasConfig: !!config
-      });
-    }
 
     const saveDraftBtn = document.getElementById('save-draft');
     const publishNowBtn = document.getElementById('publish-now');
