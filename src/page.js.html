@@ -897,10 +897,6 @@ class StudyQuestApp {
     this.lastViewKey = currentViewKey;
 
     if (this.hadInitialDataLoadFailure) {
-        lastSeenTimestamp: this.state.lastSeenTimestamp,
-        note: '既存データの初回取得なので新着通知はスキップ (時刻ベース統一)'
-      });
-
       this.updateLastSeenTimestamp();
       return;
     }
@@ -1014,15 +1010,6 @@ class StudyQuestApp {
         const response = await this.runGas('getNotificationUpdate', this.state.userId, {
           lastUpdateTime: this.state.lastSeenTimestamp
         });
-
-        if (isDev) {
-            success: response.success,
-            hasNewContent: response.hasNewContent,
-            newItemsCount: response.newItemsCount,
-            timestamp: response.timestamp,
-            lastSeenTimestamp: this.state.lastSeenTimestamp
-          });
-        }
 
         if (response.success && response.hasNewContent) {
           this.showNewContentBanner(response.newItemsCount);
@@ -3198,13 +3185,6 @@ class StudyQuestApp {
 
         item.reactions = validatedReactions;
 
-            reaction,
-            action: response.action,
-            userReaction: response.userReaction,
-            originalReactions: response.reactions,
-            validatedReactions: validatedReactions
-        });
-
         this.saveReactionState(item.rowIndex, item.reactions);
     } else {
         console.error('❌ Invalid server response format:', response);
@@ -3815,13 +3795,8 @@ class StudyQuestApp {
     try {
       const enable = !this.state.showAdminFeatures;
 
-      
-      if (enable) {
-          isAdminUser: this.state.isAdminUser,
-          hasAdminCapability: window.hasAdminCapability,
-          unifiedConfigIsAdminUser: window.UNIFIED_CONFIG?.isAdminUser
-        });
 
+      if (enable) {
         if (!this.state.isEditor || !window.hasAdminCapability) {
           console.warn('編集者権限がありません。', {
             isEditor: this.state.isEditor,
@@ -3864,43 +3839,14 @@ class StudyQuestApp {
       } else {
         const displaySettings = window.UNIFIED_CONFIG?.displaySettings || {};
 
-          configExists: !!window.UNIFIED_CONFIG,
-          displaySettingsExists: !!displaySettings,
-          originalShowReactions: displaySettings.showReactions,
-          originalShowNames: displaySettings.showNames,
-          beforeShowCounts: window.showCounts,
-          beforeDisplayMode: window.displayMode
-        });
-
         window.showCounts = displaySettings.showReactions || false;
         window.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
-
-          afterShowCounts: window.showCounts,
-          afterDisplayMode: window.displayMode,
-          configApplied: true
-        });
       }
 
       window.isStudentMode = !enable;
       window.showScoreSort = window.showCounts;
 
-        showCounts: window.showCounts,
-        displayMode: window.displayMode,
-        fromConfig: !enable,
-        isStudentMode: window.isStudentMode,
-        showScoreSort: window.showScoreSort
-      });
-      
       this.updateConfigFromGlobals();
-
-      if (!enable) {
-          stateShowCounts: this.state.showCounts,
-          stateDisplayMode: this.state.displayMode,
-          windowShowCounts: window.showCounts,
-          windowDisplayMode: window.displayMode,
-          syncMatch: this.state.showCounts === window.showCounts && this.state.displayMode === window.displayMode
-        });
-      }
 
       this.cache.clear();
 
@@ -4241,30 +4187,17 @@ class StudyQuestApp {
   }
   showAnswerModal(rowIndex) {
 
-    
+
     let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
-    
+
     if (!data && this.state.filteredData) {
       data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
-        found: !!data,
-        searchRowIndex: rowIndex,
-        availableRowIndexes: this.state.filteredData?.map(r => r.rowIndex) || []
-      });
     }
-    
+
     if (!data) {
-        rowIndex: rowIndex,
-        currentAnswers: this.state.currentAnswers,
-        filteredData: this.state.filteredData
-      });
       return;
     }
-    
-      rowIndex: rowIndex,
-      data: data,
-      opinion: data.opinion?.substring(0, 50) + '...',
-      reason: data.reason?.substring(0, 50) + '...'
-    });
+
     this.state.lastFocusedElement = document.activeElement;
     let modalHtml = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
 
