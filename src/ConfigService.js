@@ -841,6 +841,17 @@ function saveUserConfig(userId, config, options = {}) {
     // 5. キャッシュ無効化
     clearConfigCache(userId);
 
+    // ✅ セキュリティ: published変更時のSA検証キャッシュを無効化
+    // ユーザーが公開設定を変更した場合、即座に反映させる
+    if (user.spreadsheetId) {
+      const saValidationKey = `sa_validation_${user.spreadsheetId}`;
+      try {
+        CacheService.getScriptCache().remove(saValidationKey);
+      } catch (cacheRemoveError) {
+        console.warn('saveUserConfig: Failed to clear SA validation cache:', cacheRemoveError.message);
+      }
+    }
+
     return {
       success: true,
       message: 'Config saved successfully',

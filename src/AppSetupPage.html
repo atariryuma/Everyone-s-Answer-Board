@@ -542,22 +542,22 @@
 
               return `
                         <tr class="hover:bg-gray-700/50">
-                            <td class="px-4 py-3 text-sm text-white">${user.userEmail || 'N/A'}</td>
-                            <td class="px-4 py-3 text-sm text-gray-300">${registrationDate}</td>
+                            <td class="px-4 py-3 text-sm text-white">${window.sharedUtilities.security.escapeHtml(user.userEmail || 'N/A')}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${window.sharedUtilities.security.escapeHtml(registrationDate)}</td>
                             <td class="px-4 py-3">${statusBadge}</td>
                             <td class="px-4 py-3">${boardBadge}</td>
-                            <td class="px-4 py-3 text-sm text-gray-300">${lastAccess}</td>
+                            <td class="px-4 py-3 text-sm text-gray-300">${window.sharedUtilities.security.escapeHtml(lastAccess)}</td>
                             <td class="px-4 py-3 text-center">
                                 <div class="flex gap-1 justify-center">
                                     <button
-                                        data-user-id="${user.userId}"
+                                        data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         onclick="toggleUserStatus(this.dataset.userId)"
                                         class="btn ${isActive ? 'bg-orange-600 hover:bg-orange-700' : 'bg-green-600 hover:bg-green-700'} text-white px-2 py-1 rounded text-xs"
                                         title="${isActive ? 'ユーザーを非アクティブに' : 'ユーザーをアクティブに'}">
                                         ${isActive ? '無効化' : '有効化'}
                                     </button>
                                     <button
-                                        data-user-id="${user.userId}"
+                                        data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         onclick="toggleUserBoard(this.dataset.userId)"
                                         class="btn ${boardPublished ? 'bg-gray-600 hover:bg-gray-700' : 'bg-purple-600 hover:bg-purple-700'} text-white px-2 py-1 rounded text-xs"
                                         title="${boardPublished ? 'ボードを非公開に' : 'ボードを公開に'}">

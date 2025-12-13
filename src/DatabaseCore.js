@@ -8,7 +8,7 @@
  * - サービスアカウント使用時の安全な権限管理
  */
 
-/* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash */
+/* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck */
 
 
 // データベース基盤操作
@@ -26,16 +26,16 @@
 function fetchSheetsAPIWithRetry(url, options, operationName) {
   let retryCount = 0;
 
-  // ✅ サーキットブレーカー: 連続エラー検知用の静的カウンター
-  if (typeof fetchSheetsAPIWithRetry.consecutiveErrors === 'undefined') {
-    fetchSheetsAPIWithRetry.consecutiveErrors = 0;
-    fetchSheetsAPIWithRetry.circuitOpenUntil = 0;
-  }
+  // ✅ サーキットブレーカー: CacheServiceで実行コンテキスト間で状態共有
+  const cache = CacheService.getScriptCache();
+  const CIRCUIT_BREAKER_KEY = 'circuit_breaker_state';
+  const cachedState = cache.get(CIRCUIT_BREAKER_KEY);
+  let circuitState = cachedState ? JSON.parse(cachedState) : { consecutiveErrors: 0, circuitOpenUntil: 0 };
 
   // サーキットブレーカー状態チェック
   const now = Date.now();
-  if (fetchSheetsAPIWithRetry.circuitOpenUntil > now) {
-    const waitTime = Math.round((fetchSheetsAPIWithRetry.circuitOpenUntil - now) / 1000);
+  if (circuitState.circuitOpenUntil > now) {
+    const waitTime = Math.round((circuitState.circuitOpenUntil - now) / 1000);
     throw new Error(`Circuit breaker open: API calls paused for ${waitTime}s to allow quota recovery`);
   }
 
@@ -48,14 +48,17 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
         const backoffTime = Math.min(15000 + (retryCount * 15000), 60000);
         console.warn(`⚠️ 429 Quota exceeded for ${operationName || 'Sheets API'}, waiting ${backoffTime}ms (retry: ${retryCount})`);
 
-        // 連続エラーカウント増加
-        fetchSheetsAPIWithRetry.consecutiveErrors++;
+        // 連続エラーカウント増加（CacheServiceに保存）
+        circuitState.consecutiveErrors++;
 
         // サーキットブレーカー発動: 連続3回エラーで60秒間停止
-        if (fetchSheetsAPIWithRetry.consecutiveErrors >= 3) {
-          fetchSheetsAPIWithRetry.circuitOpenUntil = now + 60000;
+        if (circuitState.consecutiveErrors >= 3) {
+          circuitState.circuitOpenUntil = now + 60000;
           console.error(`🚨 Circuit breaker activated: Too many 429 errors. API calls paused for 60s.`);
         }
+
+        // 更新された状態をキャッシュに保存（60秒TTL）
+        cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 60);
 
         Utilities.sleep(backoffTime);
         retryCount++;
@@ -67,9 +70,10 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
         throw new Error(`API returned ${response.getResponseCode()}: ${errorText}`);
       }
 
-      // ✅ 成功時: 連続エラーカウントリセット
-      fetchSheetsAPIWithRetry.consecutiveErrors = 0;
-      fetchSheetsAPIWithRetry.circuitOpenUntil = 0;
+      // ✅ 成功時: 連続エラーカウントリセット（CacheServiceに保存）
+      circuitState.consecutiveErrors = 0;
+      circuitState.circuitOpenUntil = 0;
+      cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 60);
 
       return response;
     },
@@ -255,7 +259,8 @@ function openDatabase(options = {}) {
     }
 
     // 下位互換性のため、従来のインターフェースを維持
-    return dataAccess.spreadsheet;
+    // ✅ Null check: dataAccessがnullの場合はnullを返す
+    return dataAccess?.spreadsheet || null;
   } catch (error) {
     console.error('openDatabase error:', error.message);
     return null;
@@ -718,19 +723,7 @@ function findUserByEmail(email, context = {}) {
         const user = allUsers.find(u => u.userEmail === email);
         if (user) {
           // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
-          try {
-            const userJson = JSON.stringify(user);
-            // CacheServiceの制限（100KB）を考慮
-            if (userJson.length > 100000) {
-              console.warn('findUserByEmail: User object too large for cache:', userJson.length, 'bytes');
-            } else {
-              CacheService.getScriptCache().put(individualCacheKey, userJson, CACHE_DURATION.USER_INDIVIDUAL);
-            }
-          } catch (saveError) {
-            console.warn('findUserByEmail: Cache save failed, continuing without cache:', saveError.message);
-            // キャッシュ失敗はログのみ、データ自体は返す
-          }
-
+          saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
           return user;
         }
       }
@@ -768,17 +761,7 @@ function findUserByEmail(email, context = {}) {
         const user = createUserObjectFromRow(row, headers);
 
         // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
-        try {
-          const userJson = JSON.stringify(user);
-          // CacheServiceの制限（100KB）を考慮
-          if (userJson.length > 100000) {
-            console.warn('findUserByEmail: User object too large for cache:', userJson.length, 'bytes');
-          } else {
-            CacheService.getScriptCache().put(individualCacheKey, userJson, CACHE_DURATION.USER_INDIVIDUAL);
-          }
-        } catch (saveError) {
-          console.warn('findUserByEmail: Cache save failed, continuing without cache:', saveError.message);
-        }
+        saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
 
         return user;
       }
@@ -824,19 +807,7 @@ function findUserById(userId, context = {}) {
         const user = allUsers.find(u => u.userId === userId);
         if (user) {
           // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
-          try {
-            const userJson = JSON.stringify(user);
-            // CacheServiceの制限（100KB）を考慮
-            if (userJson.length > 100000) {
-              console.warn('findUserById: User object too large for cache:', userJson.length, 'bytes');
-            } else {
-              CacheService.getScriptCache().put(individualCacheKey, userJson, CACHE_DURATION.USER_INDIVIDUAL);
-            }
-          } catch (saveError) {
-            console.warn('findUserById: Cache save failed, continuing without cache:', saveError.message);
-            // キャッシュ失敗はログのみ、データ自体は返す
-          }
-
+          saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
           return user;
         }
       }
@@ -874,17 +845,7 @@ function findUserById(userId, context = {}) {
         const user = createUserObjectFromRow(row, headers);
 
         // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
-        try {
-          const userJson = JSON.stringify(user);
-          // CacheServiceの制限（100KB）を考慮
-          if (userJson.length > 100000) {
-            console.warn('findUserById: User object too large for cache:', userJson.length, 'bytes');
-          } else {
-            CacheService.getScriptCache().put(individualCacheKey, userJson, CACHE_DURATION.USER_INDIVIDUAL);
-          }
-        } catch (saveError) {
-          console.warn('findUserById: Cache save failed, continuing without cache:', saveError.message);
-        }
+        saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
 
         return user;
       }
@@ -1366,10 +1327,10 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
 
         if (config.spreadsheetId === spreadsheetId) {
 
-          // ✅ Phase 1: キャッシュ保存（5分→10分に延長でヒット率向上）
+          // ✅ Phase 1: キャッシュ保存（デフォルト10分でヒット率向上）
           if (!skipCache) {
             try {
-              const cacheTtl = context.cacheTtl || 600; // 300秒 → 600秒（10分）
+              const cacheTtl = context.cacheTtl || 600; // デフォルト10分（600秒）
               CacheService.getScriptCache().put(cacheKey, JSON.stringify(user), cacheTtl);
             } catch (cacheError) {
               console.warn('findUserBySpreadsheetId: Cache write failed:', cacheError.message);

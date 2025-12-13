@@ -34,7 +34,14 @@
       "Bash(ls:*)",
       "Bash(git rm:*)",
       "Bash(npm install:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(grep:*)",
+      "Bash(npx clasp deployments:*)",
+      "Bash(npx clasp push:*)",
+      "Bash(npx clasp deploy:*)",
+      "Bash(npx clasp versions)",
+      "Bash(npx clasp:*)",
+      "Bash(du:*)"
     ],
     "deny": [],
     "ask": []

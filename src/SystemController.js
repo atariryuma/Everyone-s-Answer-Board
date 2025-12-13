@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getDatabaseConfig, getAllUsers, openDatabase, getCachedProperty, getSheetInfo */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, getSheetInfo */
 
 // システム定数 - Zero-Dependency Architecture
 

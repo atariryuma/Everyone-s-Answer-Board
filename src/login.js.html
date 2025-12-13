@@ -570,6 +570,21 @@
   // =============================================================================
 
   /**
+   * Simple HTML escape function for XSS protection
+   * @param {string} unsafe - Unsafe string
+   * @returns {string} Escaped string
+   */
+  function escapeHtml(unsafe) {
+    if (!unsafe || typeof unsafe !== 'string') return '';
+    return unsafe
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+
+  /**
    * 管理パネルアクセス成功画面を表示 (ユーザーアクティベーション必須)
    * @param {string} adminUrl - 管理パネルのURL
    * @param {string} message - 表示メッセージ
@@ -589,6 +604,10 @@
 
       console.log('管理パネルアクセス成功画面を表示:', adminUrl);
 
+      // XSS対策: エスケープ処理
+      const safeMessage = escapeHtml(message || 'ログインが完了しました');
+      const safeAdminUrl = escapeHtml(adminUrl);
+
       // ローディング状態を停止
       window.setLoading(false);
       setLoginButtonState(false);
@@ -598,7 +617,7 @@
         <!DOCTYPE html>
         <html>
         <head>
-          <title>${message || 'ログインが完了しました'}</title>
+          <title>${safeMessage}</title>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1">
           <style>
@@ -775,16 +794,16 @@
         <body>
           <div class="container">
             <div class="icon">✅</div>
-            <h1 class="title">${message || 'ログインが完了しました'}</h1>
+            <h1 class="title">${safeMessage}</h1>
             <p class="subtitle">管理パネルにアクセスしてください</p>
-            
+
             <a href="${adminUrl}" class="main-button" id="admin-panel-btn" onclick="handleSingleClick(this)">
               <span id="admin-panel-btn-text">🚀 管理パネルを開く</span>
             </a>
-            
+
             <div class="url-info">
               <div class="url-label">📱 管理パネルURL:</div>
-              <div class="url-text">${adminUrl}</div>
+              <div class="url-text">${safeAdminUrl}</div>
               <button onclick="copyUrlToClipboard('${adminUrl}', this)" class="copy-btn">
                 📋 URLをコピー
               </button>

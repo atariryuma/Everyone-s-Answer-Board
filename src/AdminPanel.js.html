@@ -3111,6 +3111,10 @@
    * @returns {string} HTML
    */
   function generateSystemHealthHTML(systemHealth) {
+    const safeBackendStatus = window.sharedUtilities.security.escapeHtml(systemHealth.backend.status || '');
+    const safeFrontendStatus = window.sharedUtilities.security.escapeHtml(systemHealth.frontend.status || '');
+    const safeIntegrationStatus = window.sharedUtilities.security.escapeHtml(systemHealth.integration.status || '');
+
     return `
       <div class="mb-4">
         <h4 class="font-medium text-white mb-2">システム健全性</h4>
@@ -3118,19 +3122,19 @@
           <div class="flex justify-between p-2 bg-gray-800 rounded">
             <span>バックエンド:</span>
             <span class="text-${getStatusColor(systemHealth.backend.status)}-400">
-              ${systemHealth.backend.score}% (${systemHealth.backend.status})
+              ${Number(systemHealth.backend.score) || 0}% (${safeBackendStatus})
             </span>
           </div>
           <div class="flex justify-between p-2 bg-gray-800 rounded">
             <span>フロントエンド:</span>
             <span class="text-${getStatusColor(systemHealth.frontend.status)}-400">
-              ${systemHealth.frontend.score}% (${systemHealth.frontend.status})
+              ${Number(systemHealth.frontend.score) || 0}% (${safeFrontendStatus})
             </span>
           </div>
           <div class="flex justify-between p-2 bg-gray-800 rounded">
             <span>統合:</span>
             <span class="text-${getStatusColor(systemHealth.integration.status)}-400">
-              ${systemHealth.integration.score}% (${systemHealth.integration.status})
+              ${Number(systemHealth.integration.score) || 0}% (${safeIntegrationStatus})
             </span>
           </div>
         </div>
@@ -3153,12 +3157,15 @@
     Object.entries(columnTests).forEach(([field, test]) => {
       const statusIcon = test.resolved ? '✅' : '❌';
       const severityColor = test.severity === 'critical' ? 'red' : test.severity === 'warning' ? 'yellow' : 'green';
+      const safeField = window.sharedUtilities.security.escapeHtml(field);
+      const safeConfidence = Number(test.confidence) || 0;
+      const safeMethod = window.sharedUtilities.security.escapeHtml(test.method || '');
 
       html += `
         <div class="flex justify-between items-center p-2 bg-gray-800 rounded">
-          <span>${statusIcon} ${field}</span>
+          <span>${statusIcon} ${safeField}</span>
           <span class="text-${severityColor}-400">
-            ${test.resolved ? `${test.confidence}% (${test.method})` : 'Not Resolved'}
+            ${test.resolved ? `${safeConfidence}% (${safeMethod})` : 'Not Resolved'}
           </span>
         </div>
       `;
@@ -3186,10 +3193,12 @@
 
     recommendations.forEach(rec => {
       const priorityColor = rec.priority === 'critical' ? 'red' : rec.priority === 'high' ? 'orange' : 'yellow';
+      const safePriority = window.sharedUtilities.security.escapeHtml(String(rec.priority || '').toUpperCase());
+      const safeMessage = window.sharedUtilities.security.escapeHtml(rec.message || '');
       html += `
         <div class="p-2 bg-gray-800 rounded">
-          <div class="text-${priorityColor}-400 font-medium">${rec.priority.toUpperCase()}</div>
-          <div class="text-gray-300">${rec.message}</div>
+          <div class="text-${priorityColor}-400 font-medium">${safePriority}</div>
+          <div class="text-gray-300">${safeMessage}</div>
         </div>
       `;
     });

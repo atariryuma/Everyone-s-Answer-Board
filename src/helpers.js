@@ -48,9 +48,13 @@ function getCachedProperty(key) {
 
   // キャッシュサイズ管理: 最大サイズを超える場合、最も古いエントリを削除
   if (Object.keys(RUNTIME_PROPERTIES_CACHE).length >= MAX_CACHE_SIZE) {
-    // 最も古いエントリを検索（lastAccessが最も小さい）
-    const oldestKey = Object.entries(RUNTIME_PROPERTIES_CACHE)
-      .sort(([, a], [, b]) => (a.lastAccess || a.timestamp) - (b.lastAccess || b.timestamp))[0][0];
+    // ✅ 最適化: ソートではなくreduceで最小値を検索（O(n log n) → O(n)）
+    const entries = Object.entries(RUNTIME_PROPERTIES_CACHE);
+    const oldestKey = entries.reduce((oldest, [key, value]) => {
+      const oldestTime = oldest[1].lastAccess || oldest[1].timestamp;
+      const currentTime = value.lastAccess || value.timestamp;
+      return currentTime < oldestTime ? [key, value] : oldest;
+    }, entries[0])[0];
     delete RUNTIME_PROPERTIES_CACHE[oldestKey];
   }
 
@@ -72,6 +76,32 @@ function clearPropertyCache(key = null) {
     delete RUNTIME_PROPERTIES_CACHE[key];
   } else {
     Object.keys(RUNTIME_PROPERTIES_CACHE).forEach(k => delete RUNTIME_PROPERTIES_CACHE[k]);
+  }
+}
+
+/**
+ * CacheServiceにオブジェクトを保存（サイズチェック付き）
+ * ✅ DRY原則: 重複コード削減
+ * ✅ CacheServiceの制限（100KB）を自動チェック
+ * @param {string} cacheKey - キャッシュキー
+ * @param {Object} data - 保存するデータ
+ * @param {number} ttl - TTL（秒）
+ * @param {number} maxSize - 最大サイズ（バイト）、デフォルト100KB
+ * @returns {boolean} 保存成功したらtrue
+ */
+function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
+  try {
+    const dataJson = JSON.stringify(data);
+    // CacheServiceの制限（100KB）を考慮
+    if (dataJson.length > maxSize) {
+      console.warn(`saveToCacheWithSizeCheck: Data too large for cache (${dataJson.length} bytes, max ${maxSize})`);
+      return false;
+    }
+    CacheService.getScriptCache().put(cacheKey, dataJson, ttl);
+    return true;
+  } catch (saveError) {
+    console.warn(`saveToCacheWithSizeCheck: Cache save failed for key "${cacheKey}":`, saveError.message);
+    return false;
   }
 }
 

@@ -1380,7 +1380,8 @@
       // Use existing content or create default structure
       let messageElement = this.overlay.querySelector('.loading-message');
       if (!messageElement) {
-        const safeOverlayMessage = (config && config.message) || 'Loading...';
+        const rawMessage = (config && config.message) || 'Loading...';
+        const safeOverlayMessage = window.sharedUtilities.security.escapeHtml(rawMessage);
         this.overlay.innerHTML = `
           <div class="loading-content">
             <div class="loading-spinner"></div>
