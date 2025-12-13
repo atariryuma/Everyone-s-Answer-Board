@@ -337,9 +337,24 @@ function createRedirectTemplate(redirectPage, error) {
  */
 function doPost(e) {
   try {
-    // Parse request
+    // ✅ BUG FIX: JSON.parseの詳細エラーハンドリング追加
+    // Parse request with explicit error handling
     const postData = e.postData ? e.postData.contents : '{}';
-    const request = JSON.parse(postData);
+    let request;
+    try {
+      request = JSON.parse(postData);
+    } catch (parseError) {
+      console.error('doPost: Invalid JSON received:', {
+        error: parseError.message,
+        dataLength: postData ? postData.length : 0,
+        dataPreview: postData ? postData.substring(0, 100) : 'N/A'
+      });
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        message: 'Invalid JSON format in request body',
+        error: 'JSON_PARSE_ERROR'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
     const {action} = request;
 
 
