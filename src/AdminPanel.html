@@ -1,695 +1,624 @@
 <!doctype html>
 <html lang="ja">
-  <head>
-    <meta charset="UTF-8" />
-    <base target="_top" />
-    <title>みんなの回答ボード 設定</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <!-- GAS推奨: セキュリティヘッダー最優先 -->
-    <?!= include('SharedSecurityHeaders'); ?>
 
-    <!-- GAS推奨: CSS読み込みはhead内に集約 -->
-    <?!= include('SharedTailwindConfig'); ?>
-    <?!= include('UnifiedStyles.css'); ?>
-    
-    <!-- Safe template variable injection using HTML data attributes -->
-    <div id="app-data"
-         data-user-id="<?= userInfo && userInfo.userId ? userInfo.userId.replace(/"/g, '&quot;').replace(/'/g, '&#39;') : '' ?>"
-         style="display: none;"></div>
-    <style>
-      /* AdminPanel専用スタイル */
+<head>
+  <meta charset="UTF-8" />
+  <base target="_top" />
+  <title>みんなの回答ボード 設定</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- GAS推奨: セキュリティヘッダー最優先 -->
+  <?!= include('SharedSecurityHeaders'); ?>
 
+  <!-- GAS推奨: CSS読み込みはhead内に集約 -->
+  <?!= include('SharedTailwindConfig'); ?>
+  <?!= include('UnifiedStyles.css'); ?>
+
+  <!-- Safe template variable injection using HTML data attributes -->
+  <div id="app-data" data-user-id="<?= userInfo && userInfo.userId ? userInfo.userId.replace(/" /g, '&quot;'
+    ).replace(/'/g, '&#39;' ) : '' ?>"
+    style="display: none;"></div>
+  <style>
+    /* AdminPanel専用スタイル */
+
+    .admin-container {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: var(--space-4);
+      min-height: 100vh;
+      padding: var(--space-4);
+    }
+
+    .main-editor {
+      padding: 1.5rem;
+    }
+
+    .info-panel {
+      padding: var(--space-4);
+      overflow-y: auto;
+    }
+
+    .card {
+      margin-bottom: var(--space-4);
+    }
+
+    .info-card {
+      margin-bottom: 0.75rem;
+    }
+
+    /* ステータスヘッダー */
+    .status-header {
+      padding: 1rem 1.5rem;
+      margin-bottom: var(--space-4);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .status-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 700;
+    }
+
+
+    /* 進捗スタイルを簡素化 */
+    .setup-progress {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .step {
+      flex: 1;
+      text-align: center;
+      padding: 0.75rem;
+      border-radius: var(--radius-md);
+      font-size: 0.875rem;
+      font-weight: 500;
+      background: rgba(107, 114, 128, var(--alpha-subtle));
+      color: var(--brand-text);
+      transition: all var(--transition-normal);
+    }
+
+    .step.completed {
+      background: rgba(16, 185, 129, var(--alpha-light));
+      color: var(--status-success);
+    }
+
+    .step.current {
+      background: rgba(59, 130, 246, var(--alpha-light));
+      color: var(--status-info);
+      border: 2px solid rgba(59, 130, 246, var(--alpha-visible));
+    }
+
+
+
+
+
+
+
+
+    .expandable-section {
+      margin-top: 0.75rem;
+    }
+
+    .expandable-section summary {
+      cursor: pointer;
+      font-weight: 500;
+      color: rgba(96, 165, 250, 1);
+      padding: 0.75rem 0;
+    }
+
+    /* 列マッピング表示 - ダークテーマ */
+    .auto-detected-columns {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .column-match {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: var(--space-4);
+      background: rgba(16, 185, 129, var(--alpha-subtle));
+      border: var(--border-status-success);
+      border-radius: var(--radius-md);
+    }
+
+    .column-type {
+      font-weight: 600;
+      color: var(--status-success);
+    }
+
+    .detected-column {
+      background: rgba(16, 185, 129, var(--alpha-light));
+      color: var(--status-success);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+
+    .confidence {
+      font-size: 0.8rem;
+      color: var(--status-success);
+      opacity: 0.8;
+    }
+
+    /* レスポンシブデザイン */
+    @media (max-width: 768px) {
       .admin-container {
-        display: grid;
-        grid-template-columns: 2fr 1fr;
-        gap: var(--space-4);
-        min-height: 100vh;
+        grid-template-columns: 1fr;
+        grid-template-rows: auto auto;
         padding: var(--space-4);
       }
 
-      .main-editor {
-        padding: 1.5rem;
-      }
-
-      .info-panel {
-        padding: var(--space-4);
-        overflow-y: auto;
-      }
-
-      .card {
-        margin-bottom: var(--space-4);
-      }
-
-      .info-card {
-        margin-bottom: 0.75rem;
-      }
-
-      /* ステータスヘッダー */
       .status-header {
-        padding: 1rem 1.5rem;
-        margin-bottom: var(--space-4);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-      }
-
-      .status-header h1 {
-        margin: 0;
-        font-size: 1.5rem;
-        font-weight: 700;
-      }
-
-
-      /* 進捗スタイルを簡素化 */
-      .setup-progress {
-        display: flex;
-        gap: 0.75rem;
-        margin-bottom: 1.5rem;
-      }
-
-      .step {
-        flex: 1;
-        text-align: center;
-        padding: 0.75rem;
-        border-radius: var(--radius-md);
-        font-size: 0.875rem;
-        font-weight: 500;
-        background: rgba(107, 114, 128, var(--alpha-subtle));
-        color: var(--brand-text);
-        transition: all var(--transition-normal);
-      }
-
-      .step.completed {
-        background: rgba(16, 185, 129, var(--alpha-light));
-        color: var(--status-success);
-      }
-
-      .step.current {
-        background: rgba(59, 130, 246, var(--alpha-light));
-        color: var(--status-info);
-        border: 2px solid rgba(59, 130, 246, var(--alpha-visible));
-      }
-
-
-
-
-
-
-
-
-      .expandable-section {
-        margin-top: 0.75rem;
-      }
-
-      .expandable-section summary {
-        cursor: pointer;
-        font-weight: 500;
-        color: rgba(96, 165, 250, 1);
-        padding: 0.75rem 0;
-      }
-
-      /* 列マッピング表示 - ダークテーマ */
-      .auto-detected-columns {
-        display: flex;
         flex-direction: column;
-        gap: 0.75rem;
+        align-items: flex-start;
+        gap: 0.5rem;
       }
 
-      .column-match {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: var(--space-4);
-        background: rgba(16, 185, 129, var(--alpha-subtle));
-        border: var(--border-status-success);
-        border-radius: var(--radius-md);
+      .setup-progress {
+        flex-direction: column;
+        gap: 0.5rem;
       }
 
-      .column-type {
-        font-weight: 600;
-        color: var(--status-success);
-      }
+    }
 
-      .detected-column {
-        background: rgba(16, 185, 129, var(--alpha-light));
-        color: var(--status-success);
-        padding: var(--space-2) var(--space-3);
-        border-radius: var(--radius-sm);
-        font-size: 0.8rem;
-        font-weight: 500;
-      }
+    /* SharedUtilitiesのローディングシステムを使用 */
 
-      .confidence {
-        font-size: 0.8rem;
-        color: var(--status-success);
-        opacity: 0.8;
-      }
-
-      /* レスポンシブデザイン */
-      @media (max-width: 768px) {
-        .admin-container {
-          grid-template-columns: 1fr;
-          grid-template-rows: auto auto;
-          padding: var(--space-4);
-        }
-
-        .status-header {
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 0.5rem;
-        }
-
-        .setup-progress {
-          flex-direction: column;
-          gap: 0.5rem;
-        }
-
-      }
-
-      /* SharedUtilitiesのローディングシステムを使用 */
-
-      /* =============================================================================
+    /* =============================================================================
      * フッター：現在のボード情報表示スタイル
      * ============================================================================= */
-      #boardInfoFooter {
-        /* 既存のz-indexよりも低く設定（通知コンテナより下） */
-        z-index: var(--z-elevated);
+    #boardInfoFooter {
+      /* 既存のz-indexよりも低く設定（通知コンテナより下） */
+      z-index: var(--z-elevated);
+    }
+
+    #boardInfoFooter .glass-panel {
+      /* フッター専用のガラス調スタイル - CSS変数統一 */
+      background: var(--brand-surface);
+      border: var(--border-primary);
+      -webkit-backdrop-filter: var(--glass-backdrop);
+      backdrop-filter: var(--glass-backdrop);
+    }
+
+    #boardInfoFooter .glass-panel:hover {
+      border-color: rgba(139, 233, 253, 0.4);
+      transition: border-color var(--transition-normal) var(--transition-easing);
+    }
+
+    /* 問題文表示エリア */
+    #currentQuestionText {
+      max-width: 100%;
+      line-height: 1.4;
+    }
+
+    /* アクションボタンのレスポンシブ対応 */
+    @media (max-width: 768px) {
+      #boardInfoFooter .flex.items-center.justify-between {
+        flex-direction: column;
+        align-items: stretch;
+        gap: var(--space-4);
       }
 
-      #boardInfoFooter .glass-panel {
-        /* フッター専用のガラス調スタイル - CSS変数統一 */
-        background: var(--brand-surface);
-        border: var(--border-primary);
-        -webkit-backdrop-filter: var(--glass-backdrop);
-        backdrop-filter: var(--glass-backdrop);
+      #boardInfoFooter .flex-1.min-w-0 {
+        flex: none;
+        text-align: center;
       }
 
-      #boardInfoFooter .glass-panel:hover {
-        border-color: rgba(139, 233, 253, 0.4);
-        transition: border-color var(--transition-normal) var(--transition-easing);
+      #boardInfoFooter .flex.items-center.gap-2.flex-shrink-0 {
+        justify-content: center;
+        flex-wrap: wrap;
       }
 
-      /* 問題文表示エリア */
       #currentQuestionText {
-        max-width: 100%;
-        line-height: 1.4;
+        white-space: normal;
+        overflow: visible;
+        text-overflow: unset;
       }
+    }
 
-      /* アクションボタンのレスポンシブ対応 */
-      @media (max-width: 768px) {
-        #boardInfoFooter .flex.items-center.justify-between {
-          flex-direction: column;
-          align-items: stretch;
-          gap: var(--space-4);
-        }
+    /* ボタンスタイル微調整 */
+    #boardInfoFooter .btn-primary,
+    #boardInfoFooter .btn-secondary {
+      white-space: nowrap;
+      min-width: -webkit-fill-available;
+      min-width: fit-content;
+    }
 
-        #boardInfoFooter .flex-1.min-w-0 {
-          flex: none;
-          text-align: center;
-        }
+    /* コピー完了状態のスタイル */
+    #copyViewUrlBtn:disabled {
+      opacity: 0.8;
+      cursor: not-allowed;
+    }
 
-        #boardInfoFooter .flex.items-center.gap-2.flex-shrink-0 {
-          justify-content: center;
-          flex-wrap: wrap;
-        }
+    /* フッター表示時のbody余白調整 */
+    body.has-footer {
+      padding-bottom: 100px;
+    }
+  </style>
+</head>
 
-        #currentQuestionText {
-          white-space: normal;
-          overflow: visible;
-          text-overflow: unset;
-        }
-      }
+<body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">
+  <div id="loading-overlay" class="fixed inset-0 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
+    style="background-color: var(--brand-background-overlay, rgba(16, 17, 28, 0.9));">
+    <div class="flex flex-col items-center gap-4">
+      <div class="global-spinner"></div>
+      <div class="loading-message text-center text-white">処理中...</div>
+    </div>
+  </div>
 
-      /* ボタンスタイル微調整 */
-      #boardInfoFooter .btn-primary,
-      #boardInfoFooter .btn-secondary {
-        white-space: nowrap;
-        min-width: -webkit-fill-available;
-        min-width: fit-content;
-      }
 
-      /* コピー完了状態のスタイル */
-      #copyViewUrlBtn:disabled {
-        opacity: 0.8;
-        cursor: not-allowed;
-      }
+  <div class="admin-container">
+    <!-- 左パネル: メインエディタ -->
+    <div class="main-editor">
+      <!-- ステータスヘッダー -->
+      <header class="status-header glass-panel rounded-xl">
+        <h1 class="text-cyan-400 font-bold">みんなの回答ボード 設定</h1>
+        <div class="flex items-center gap-3">
+          <button id="manual-guide-btn" type="button" class="btn btn-secondary" onclick="openManualGuide()"
+            title="PC初心者向けの使い方ガイドを開きます">
+            📚 使い方ガイド
+          </button>
+        </div>
+      </header>
 
-      /* フッター表示時のbody余白調整 */
-      body.has-footer {
-        padding-bottom: 100px;
-      }
-    </style>
-  </head>
-  <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">
-    <div
-      id="loading-overlay"
-      class="fixed inset-0 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
-      style="background-color: var(--brand-background-overlay, rgba(16, 17, 28, 0.9));"
-    >
-      <div class="flex flex-col items-center gap-4">
-        <div class="global-spinner"></div>
-        <div class="loading-message text-center text-white">処理中...</div>
+      <!-- セットアップ進捗 -->
+      <div class="setup-progress">
+        <div class="step current">1. データソース設定</div>
+        <div class="step">2. 公開設定</div>
       </div>
+      <!-- データソース選択カード -->
+      <section class="card glass-panel rounded-xl p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">📊 データソース選択</h2>
+
+        <!-- データソース選択方式 -->
+        <div class="mb-6">
+          <div class="flex gap-4 mb-4">
+            <label class="flex items-center cursor-pointer">
+              <input type="radio" name="source-method" value="url" checked class="mr-2" id="method-url" />
+              <span class="text-gray-300">🔗 URL直接入力</span>
+            </label>
+            <label class="flex items-center cursor-pointer">
+              <input type="radio" name="source-method" value="dropdown" class="mr-2" id="method-dropdown" />
+              <span class="text-gray-300">📋 一覧から選択</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- URL直接入力方式 -->
+        <div id="url-method" class="space-y-4">
+          <div class="form-group">
+            <label for="spreadsheet-url"
+              class="block text-sm font-medium text-gray-300 mb-2">スプレッドシートURL（シート指定含む）:</label>
+            <input type="url" id="spreadsheet-url" class="modern-input"
+              placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=123456"
+              oninput="autoAnalyzeUrl(this.value)" />
+            <div class="text-xs text-gray-400 mt-1" id="url-validation-message">
+              💡 GoogleスプレッドシートのURL（シート指定含む）を貼り付けてください
+            </div>
+
+            <!-- 自動検出情報表示（コンパクト版） -->
+            <div id="auto-detection-info" class="hidden mt-2 text-xs text-blue-300">
+              📊 検出シート: <span id="detected-sheet-name">-</span> | 🆔 GID: <span id="detected-gid">-</span>
+            </div>
+          </div>
+          <!-- フォーム情報表示（URL直接入力用） -->
+          <div id="url-form-info" class="form-info hidden">
+            <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mt-4">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-blue-400">📋</span>
+                <span class="text-sm font-medium text-blue-300">連携フォーム情報</span>
+              </div>
+              <div class="text-sm text-gray-300">
+                <div class="mb-1">
+                  <span class="font-medium">タイトル:</span>
+                  <span id="url-form-title">-</span>
+                </div>
+                <div>
+                  <span class="font-medium">URL:</span>
+                  <a id="url-form-url" href="#" target="_blank" class="text-blue-400 hover:underline break-all">-</a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button id="url-validate" class="btn btn-secondary" type="button">🔍 URL検証</button>
+            <button id="connect-url-source" class="btn btn-primary" type="button" disabled>
+              接続（検証完了後に有効化）
+            </button>
+          </div>
+        </div>
+
+        <!-- 一覧選択方式 -->
+        <div id="dropdown-method" class="space-y-4 hidden">
+          <div class="form-group">
+            <label for="spreadsheet-select" class="block text-sm font-medium text-gray-300 mb-2">スプレッドシート:</label>
+            <select id="spreadsheet-select" class="modern-select">
+              <option value="">-- クリックして読み込み --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="sheet-select" class="block text-sm font-medium text-gray-300 mb-2">シート:</label>
+            <select id="sheet-select" class="modern-select">
+              <option value="">スプレッドシートを選択してください</option>
+            </select>
+          </div>
+          <!-- フォーム情報表示 -->
+          <div id="form-info" class="form-info hidden">
+            <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mt-4">
+              <div class="flex items-center gap-2 mb-2">
+                <span class="text-blue-400">📋</span>
+                <span class="text-sm font-medium text-blue-300">連携フォーム情報</span>
+              </div>
+              <div class="text-sm text-gray-300">
+                <div class="mb-1">
+                  <span class="font-medium">タイトル:</span>
+                  <span id="form-title">-</span>
+                </div>
+                <div>
+                  <span class="font-medium">URL:</span>
+                  <a id="form-url" href="#" target="_blank" class="text-blue-400 hover:underline break-all">-</a>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="action-buttons">
+            <button id="refresh-data" class="btn btn-secondary" type="button">🔄 更新</button>
+            <button id="connect-source" class="btn btn-primary" type="button" disabled>接続（データソース選択後に有効化）</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 列マッピングカード -->
+      <section class="card glass-panel rounded-xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold text-white">📋 列設定</h2>
+          <button id="ai-analyze-btn" class="btn btn-secondary" type="button">
+            🤖 AI列判定
+          </button>
+        </div>
+
+        <div class="column-dropdowns space-y-4 mb-4">
+          <!-- 回答列選択 -->
+          <div class="form-group">
+            <label for="answer-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+              💬 回答列:
+              <span class="text-xs text-gray-400 ml-2">(個別の回答内容が入っている列)</span>
+            </label>
+            <select id="answer-column-select" class="modern-select" data-column-type="answer">
+              <option value="">選択してください...</option>
+            </select>
+            <div id="answer-confidence" class="text-xs mt-1 hidden">
+              <span class="confidence-badge"></span>
+            </div>
+          </div>
+
+          <!-- 理由列選択 -->
+          <div class="form-group">
+            <label for="reason-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+              📋 理由列:
+              <span class="text-xs text-gray-400 ml-2">(回答の理由・根拠が入っている列)</span>
+            </label>
+            <select id="reason-column-select" class="modern-select" data-column-type="reason">
+              <option value="">選択してください...</option>
+            </select>
+            <div id="reason-confidence" class="text-xs mt-1 hidden">
+              <span class="confidence-badge"></span>
+            </div>
+          </div>
+
+          <!-- クラス列選択 -->
+          <div class="form-group">
+            <label for="class-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+              🏫 クラス列:
+              <span class="text-xs text-gray-400 ml-2">(所属クラス情報が入っている列)</span>
+            </label>
+            <select id="class-column-select" class="modern-select" data-column-type="class">
+              <option value="">選択してください...</option>
+            </select>
+            <div id="class-confidence" class="text-xs mt-1 hidden">
+              <span class="confidence-badge"></span>
+            </div>
+          </div>
+
+          <!-- 名前列選択 -->
+          <div class="form-group">
+            <label for="name-column-select" class="block text-sm font-medium text-gray-300 mb-2">
+              👤 名前列:
+              <span class="text-xs text-gray-400 ml-2">(回答者の名前が入っている列)</span>
+            </label>
+            <select id="name-column-select" class="modern-select" data-column-type="name">
+              <option value="">選択してください...</option>
+            </select>
+            <div id="name-confidence" class="text-xs mt-1 hidden">
+              <span class="confidence-badge"></span>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 設定完了状況表示 -->
+        <div class="text-sm text-gray-400 mb-4">
+          <span id="completion-status">⚪ 設定状況: 0/4列完了</span>
+        </div>
+
+        <div class="action-buttons">
+          <button id="verify-mapping" class="btn btn-secondary" type="button">列マッピング検証</button>
+        </div>
+      </section>
+
+      <!-- 表示設定カード -->
+      <section class="card glass-panel rounded-xl p-6">
+        <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
+        <div class="space-y-4">
+          <!-- 表示設定（心理的安全性重視でデフォルトOFF） -->
+          <div class="mb-4">
+            <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 mb-4">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-yellow-400">🔒</span>
+                <span class="text-sm font-medium text-yellow-300">心理的安全性への配慮</span>
+              </div>
+              <p class="text-xs text-yellow-200">初期設定では回答者のプライバシーを保護しています。必要に応じて表示設定を調整してください。</p>
+            </div>
+            <div class="toggle-group">
+              <label class="toggle-switch">
+                <input type="checkbox" id="show-names" />
+                <span class="slider"></span>
+                回答者名を表示
+              </label>
+              <label class="toggle-switch">
+                <input type="checkbox" id="show-reactions" />
+                <span class="slider"></span>
+                リアクション数を表示
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <div class="action-buttons">
+          <button id="save-draft" class="btn btn-secondary" type="button">下書き保存</button>
+          <button id="publish-now" class="btn btn-primary" type="button">今すぐ公開</button>
+        </div>
+      </section>
     </div>
 
-
-    <div class="admin-container">
-      <!-- 左パネル: メインエディタ -->
-      <div class="main-editor">
-        <!-- ステータスヘッダー -->
-        <header class="status-header glass-panel rounded-xl">
-          <h1 class="text-cyan-400 font-bold">みんなの回答ボード 設定</h1>
-          <div class="flex items-center gap-3">
-            <button
-              id="manual-guide-btn"
-              type="button"
-              class="btn btn-secondary"
-              onclick="openManualGuide()"
-              title="PC初心者向けの使い方ガイドを開きます"
-            >
-              📚 使い方ガイド
-            </button>
+    <!-- 右パネル: 情報表示 -->
+    <div class="info-panel">
+      <!-- 現在の設定サマリー -->
+      <section class="info-card glass-panel rounded-xl p-4">
+        <h3 class="text-lg font-semibold text-white mb-3">📋 現在の設定</h3>
+        <div class="config-summary">
+          <div class="config-item">
+            <span class="label">公開状態:</span>
+            <span id="app-publish-status" class="status-badge unpublished">未公開</span>
           </div>
-        </header>
-
-        <!-- セットアップ進捗 -->
-        <div class="setup-progress">
-          <div class="step current">1. データソース設定</div>
-          <div class="step">2. 公開設定</div>
-        </div>
-        <!-- データソース選択カード -->
-        <section class="card glass-panel rounded-xl p-6">
-          <h2 class="text-xl font-semibold text-white mb-4">📊 データソース選択</h2>
-
-          <!-- データソース選択方式 -->
-          <div class="mb-6">
-            <div class="flex gap-4 mb-4">
-              <label class="flex items-center cursor-pointer">
-                <input
-                  type="radio"
-                  name="source-method"
-                  value="url"
-                  checked
-                  class="mr-2"
-                  id="method-url"
-                />
-                <span class="text-gray-300">🔗 URL直接入力</span>
-              </label>
-              <label class="flex items-center cursor-pointer">
-                <input type="radio" name="source-method" value="dropdown" class="mr-2" id="method-dropdown" />
-                <span class="text-gray-300">📋 一覧から選択</span>
-              </label>
-            </div>
+          <div class="config-item">
+            <span class="label">シート名:</span>
+            <span id="current-sheetname" class="text-sm text-gray-400">未設定</span>
           </div>
-
-          <!-- URL直接入力方式 -->
-          <div id="url-method" class="space-y-4">
-            <div class="form-group">
-              <label for="spreadsheet-url" class="block text-sm font-medium text-gray-300 mb-2"
-                >スプレッドシートURL（シート指定含む）:</label
-              >
-              <input
-                type="url"
-                id="spreadsheet-url"
-                class="modern-input"
-                placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=123456"
-                oninput="autoAnalyzeUrl(this.value)"
-              />
-              <div class="text-xs text-gray-400 mt-1" id="url-validation-message">
-                💡 GoogleスプレッドシートのURL（シート指定含む）を貼り付けてください
-              </div>
-
-              <!-- 自動検出情報表示（コンパクト版） -->
-              <div id="auto-detection-info" class="hidden mt-2 text-xs text-blue-300">
-                📊 検出シート: <span id="detected-sheet-name">-</span> | 🆔 GID: <span id="detected-gid">-</span>
-              </div>
-            </div>
-            <!-- フォーム情報表示（URL直接入力用） -->
-            <div id="url-form-info" class="form-info hidden">
-              <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mt-4">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-blue-400">📋</span>
-                  <span class="text-sm font-medium text-blue-300">連携フォーム情報</span>
-                </div>
-                <div class="text-sm text-gray-300">
-                  <div class="mb-1">
-                    <span class="font-medium">タイトル:</span>
-                    <span id="url-form-title">-</span>
-                  </div>
-                  <div>
-                    <span class="font-medium">URL:</span>
-                    <a id="url-form-url" href="#" target="_blank" class="text-blue-400 hover:underline break-all">-</a>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="action-buttons">
-              <button id="url-validate" class="btn btn-secondary" type="button">🔍 URL検証</button>
-              <button id="connect-url-source" class="btn btn-primary" type="button" disabled>
-                接続（検証完了後に有効化）
-              </button>
-            </div>
-          </div>
-
-          <!-- 一覧選択方式 -->
-          <div id="dropdown-method" class="space-y-4 hidden">
-            <div class="form-group">
-              <label for="spreadsheet-select" class="block text-sm font-medium text-gray-300 mb-2"
-                >スプレッドシート:</label
-              >
-              <select id="spreadsheet-select" class="modern-select">
-                <option value="">-- クリックして読み込み --</option>
-              </select>
-            </div>
-            <div class="form-group">
-              <label for="sheet-select" class="block text-sm font-medium text-gray-300 mb-2"
-                >シート:</label
-              >
-              <select id="sheet-select" class="modern-select">
-                <option value="">スプレッドシートを選択してください</option>
-              </select>
-            </div>
-            <!-- フォーム情報表示 -->
-            <div id="form-info" class="form-info hidden">
-              <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mt-4">
-                <div class="flex items-center gap-2 mb-2">
-                  <span class="text-blue-400">📋</span>
-                  <span class="text-sm font-medium text-blue-300">連携フォーム情報</span>
-                </div>
-                <div class="text-sm text-gray-300">
-                  <div class="mb-1">
-                    <span class="font-medium">タイトル:</span>
-                    <span id="form-title">-</span>
-                  </div>
-                  <div>
-                    <span class="font-medium">URL:</span>
-                    <a id="form-url" href="#" target="_blank" class="text-blue-400 hover:underline break-all">-</a>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="action-buttons">
-              <button id="refresh-data" class="btn btn-secondary" type="button">🔄 更新</button>
-              <button id="connect-source" class="btn btn-primary" type="button" disabled>接続（データソース選択後に有効化）</button>
-            </div>
-          </div>
-        </section>
-
-        <!-- 列マッピングカード -->
-        <section class="card glass-panel rounded-xl p-6">
-          <div class="flex items-center justify-between mb-4">
-            <h2 class="text-xl font-semibold text-white">📋 列設定</h2>
-            <button id="ai-analyze-btn" class="btn btn-secondary" type="button">
-              🤖 AI列判定
-            </button>
-          </div>
-
-          <div class="column-dropdowns space-y-4 mb-4">
-            <!-- 回答列選択 -->
-            <div class="form-group">
-              <label
-                for="answer-column-select"
-                class="block text-sm font-medium text-gray-300 mb-2"
-              >
-                💬 回答列:
-                <span class="text-xs text-gray-400 ml-2">(個別の回答内容が入っている列)</span>
-              </label>
-              <select id="answer-column-select" class="modern-select" data-column-type="answer">
-                <option value="">選択してください...</option>
-              </select>
-              <div id="answer-confidence" class="text-xs mt-1 hidden">
-                <span class="confidence-badge"></span>
-              </div>
-            </div>
-
-            <!-- 理由列選択 -->
-            <div class="form-group">
-              <label
-                for="reason-column-select"
-                class="block text-sm font-medium text-gray-300 mb-2"
-              >
-                📋 理由列:
-                <span class="text-xs text-gray-400 ml-2">(回答の理由・根拠が入っている列)</span>
-              </label>
-              <select id="reason-column-select" class="modern-select" data-column-type="reason">
-                <option value="">選択してください...</option>
-              </select>
-              <div id="reason-confidence" class="text-xs mt-1 hidden">
-                <span class="confidence-badge"></span>
-              </div>
-            </div>
-
-            <!-- クラス列選択 -->
-            <div class="form-group">
-              <label for="class-column-select" class="block text-sm font-medium text-gray-300 mb-2">
-                🏫 クラス列:
-                <span class="text-xs text-gray-400 ml-2">(所属クラス情報が入っている列)</span>
-              </label>
-              <select id="class-column-select" class="modern-select" data-column-type="class">
-                <option value="">選択してください...</option>
-              </select>
-              <div id="class-confidence" class="text-xs mt-1 hidden">
-                <span class="confidence-badge"></span>
-              </div>
-            </div>
-
-            <!-- 名前列選択 -->
-            <div class="form-group">
-              <label for="name-column-select" class="block text-sm font-medium text-gray-300 mb-2">
-                👤 名前列:
-                <span class="text-xs text-gray-400 ml-2">(回答者の名前が入っている列)</span>
-              </label>
-              <select id="name-column-select" class="modern-select" data-column-type="name">
-                <option value="">選択してください...</option>
-              </select>
-              <div id="name-confidence" class="text-xs mt-1 hidden">
-                <span class="confidence-badge"></span>
-              </div>
-            </div>
-
-          </div>
-
-          <!-- 設定完了状況表示 -->
-          <div class="text-sm text-gray-400 mb-4">
-            <span id="completion-status">⚪ 設定状況: 0/4列完了</span>
-          </div>
-
-          <div class="action-buttons">
-            <button id="verify-mapping" class="btn btn-secondary" type="button">列マッピング検証</button>
-          </div>
-        </section>
-
-        <!-- 表示設定カード -->
-        <section class="card glass-panel rounded-xl p-6">
-          <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
-          <div class="space-y-4">
-            <!-- 表示設定（心理的安全性重視でデフォルトOFF） -->
-            <div class="mb-4">
-              <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 mb-4">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-yellow-400">🔒</span>
-                  <span class="text-sm font-medium text-yellow-300">心理的安全性への配慮</span>
-                </div>
-                <p class="text-xs text-yellow-200">初期設定では回答者のプライバシーを保護しています。必要に応じて表示設定を調整してください。</p>
-              </div>
-              <div class="toggle-group">
-                <label class="toggle-switch">
-                  <input type="checkbox" id="show-names" />
-                  <span class="slider"></span>
-                  回答者名を表示
-                </label>
-                <label class="toggle-switch">
-                  <input type="checkbox" id="show-reactions" />
-                  <span class="slider"></span>
-                  リアクション数を表示
-                </label>
-              </div>
-            </div>
-          </div>
-          
-          <div class="action-buttons">
-            <button id="save-draft" class="btn btn-secondary" type="button">下書き保存</button>
-            <button id="publish-now" class="btn btn-primary" type="button">今すぐ公開</button>
-          </div>
-        </section>
-      </div>
-
-      <!-- 右パネル: 情報表示 -->
-      <div class="info-panel">
-        <!-- 現在の設定サマリー -->
-        <section class="info-card glass-panel rounded-xl p-4">
-          <h3 class="text-lg font-semibold text-white mb-3">📋 現在の設定</h3>
-          <div class="config-summary">
-            <div class="config-item">
-              <span class="label">公開状態:</span>
-              <span id="app-publish-status" class="status-badge unpublished">未公開</span>
-            </div>
-            <div class="config-item">
-              <span class="label">シート名:</span>
-              <span id="current-sheetname" class="text-sm text-gray-400">未設定</span>
-            </div>
-            <div class="config-item">
-              <span class="label">最終更新:</span>
-              <span id="last-updated-time" class="text-sm text-gray-400">--:--</span>
-            </div>
-          </div>
-        </section>
-
-        <!-- ユーザー情報 -->
-        <div class="info-card glass-panel rounded-xl p-4">
-          <h3 class="text-lg font-semibold text-white mb-3">👤 ユーザー情報</h3>
-          <div class="space-y-3">
-            <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <span class="text-gray-300">メールアドレス:</span>
-              <span id="current-user-email" class="text-white">読み込み中...</span>
-            </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <span class="text-gray-300">ユーザーID:</span>
-              <span id="current-user-id" class="text-gray-400">読み込み中...</span>
-            </div>
-            <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-              <span class="text-gray-300">アクション:</span>
-              <button
-                onclick="window.sharedUtilities.auth.logout()"
-                type="button"
-                class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors"
-              >
-                ログアウト
-              </button>
-            </div>
+          <div class="config-item">
+            <span class="label">最終更新:</span>
+            <span id="last-updated-time" class="text-sm text-gray-400">--:--</span>
           </div>
         </div>
+      </section>
 
-        <!-- リソース -->
-        <section class="info-card glass-panel rounded-xl p-4">
-          <h3 class="text-lg font-semibold text-white mb-3">📚 リソース</h3>
-          <div class="resource-buttons space-y-2">
-            <button
-              id="open-spreadsheet-btn"
-              class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              onclick="openSpreadsheet()"
-              disabled
-              type="button"
-            >
-              <span>📊</span>
-              <span>スプレッドシートを開く</span>
-            </button>
-
-            <button
-              id="open-form-btn"
-              class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              onclick="openForm()"
-              disabled
-              type="button"
-            >
-              <span>📝</span>
-              <span>フォームを開く</span>
-            </button>
-
-
-            <div id="resource-status" class="text-xs text-gray-400 mt-2 text-center">
-              設定を読み込み中...
-            </div>
+      <!-- ユーザー情報 -->
+      <div class="info-card glass-panel rounded-xl p-4">
+        <h3 class="text-lg font-semibold text-white mb-3">👤 ユーザー情報</h3>
+        <div class="space-y-3">
+          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+            <span class="text-gray-300">メールアドレス:</span>
+            <span id="current-user-email" class="text-white">読み込み中...</span>
           </div>
-        </section>
-
-        <!-- クイックアクション -->
-        <section class="info-card glass-panel rounded-xl p-4">
-          <h3 class="text-lg font-semibold text-white mb-3">⚡ クイックアクション</h3>
-          <div class="space-y-3">
-            <button
-              class="link-btn w-full text-center"
-              type="button"
-              onclick="window.open('https://drive.google.com', '_blank')"
-            >
-              📁 Googleドライブを開く
-            </button>
-            <button
-              class="link-btn w-full text-center"
-              type="button"
-              onclick="window.open('https://docs.google.com/forms/', '_blank')"
-            >
-              📝 Googleフォームを開く
-            </button>
-            <button
-              class="link-btn w-full text-center"
-              type="button"
-              onclick="window.open('https://classroom.google.com', '_blank')"
-            >
-              🎓 Googleクラスルームを開く
-            </button>
-            <!-- システム管理者用ボタン -->
-            <button
-              id="app-setup-btn"
-              class="link-btn w-full text-center"
-              type="button"
-              onclick="openAppSetup()"
-              style="display: none;"
-            >
-              ⚙️ アプリ設定
+          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+            <span class="text-gray-300">ユーザーID:</span>
+            <span id="current-user-id" class="text-gray-400">読み込み中...</span>
+          </div>
+          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
+            <span class="text-gray-300">アクション:</span>
+            <button onclick="window.sharedUtilities.auth.logout()" type="button"
+              class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors">
+              ログアウト
             </button>
           </div>
-        </section>
+        </div>
       </div>
+
+      <!-- リソース -->
+      <section class="info-card glass-panel rounded-xl p-4">
+        <h3 class="text-lg font-semibold text-white mb-3">📚 リソース</h3>
+        <div class="resource-buttons space-y-2">
+          <button id="open-spreadsheet-btn"
+            class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onclick="openSpreadsheet()" disabled type="button">
+            <span>📊</span>
+            <span>スプレッドシートを開く</span>
+          </button>
+
+          <button id="open-form-btn"
+            class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            onclick="openForm()" disabled type="button">
+            <span>📝</span>
+            <span>フォームを開く</span>
+          </button>
+
+
+          <div id="resource-status" class="text-xs text-gray-400 mt-2 text-center">
+            設定を読み込み中...
+          </div>
+        </div>
+      </section>
+
+      <!-- クイックアクション -->
+      <section class="info-card glass-panel rounded-xl p-4">
+        <h3 class="text-lg font-semibold text-white mb-3">⚡ クイックアクション</h3>
+        <div class="space-y-3">
+          <button class="link-btn w-full text-center" type="button"
+            onclick="window.open('https://drive.google.com', '_blank')">
+            📁 Googleドライブを開く
+          </button>
+          <button class="link-btn w-full text-center" type="button"
+            onclick="window.open('https://docs.google.com/forms/', '_blank')">
+            📝 Googleフォームを開く
+          </button>
+          <button class="link-btn w-full text-center" type="button"
+            onclick="window.open('https://classroom.google.com', '_blank')">
+            🎓 Googleクラスルームを開く
+          </button>
+          <!-- システム管理者用ボタン -->
+          <a id="app-setup-btn" href="#" target="_top" class="link-btn w-full text-center block" style="display: none;">
+            ⚙️ アプリ設定
+          </a>
+        </div>
+      </section>
     </div>
+  </div>
 
 
-    <!-- 現在のボード情報フッター -->
-    <footer
-      id="boardInfoFooter"
-      class="fixed bottom-0 left-0 right-0 z-30 p-3 hidden"
-    >
-      <div class="glass-panel rounded-xl p-4 max-w-5xl mx-auto">
-        <div class="flex items-center justify-between gap-4">
-          <!-- 左側：問題文表示 -->
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 mb-1">
-              <span class="text-yellow-400">📝</span>
-              <span class="text-xs text-gray-400">現在の回答ボード</span>
-            </div>
-            <div id="currentQuestionText" class="text-white font-medium truncate">
-              読み込み中...
-            </div>
+  <!-- 現在のボード情報フッター -->
+  <footer id="boardInfoFooter" class="fixed bottom-0 left-0 right-0 z-30 p-3 hidden">
+    <div class="glass-panel rounded-xl p-4 max-w-5xl mx-auto">
+      <div class="flex items-center justify-between gap-4">
+        <!-- 左側：問題文表示 -->
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-yellow-400">📝</span>
+            <span class="text-xs text-gray-400">現在の回答ボード</span>
           </div>
-
-          <!-- 右側：アクションボタン -->
-          <div class="flex items-center gap-2 flex-shrink-0">
-            <button
-              id="copyViewUrlBtn"
-              class="btn btn-secondary text-sm px-3 py-2"
-              title="閲覧用URLをコピー（共有用）"
-              type="button"
-            >
-              📋 URLコピー
-            </button>
-            <button
-              id="openBoardBtn"
-              class="btn btn-primary text-sm px-3 py-2"
-              title="回答ボードを開く"
-              type="button"
-            >
-              📊 ボードを開く
-            </button>
-            <button
-              id="refreshBoardInfo"
-              class="btn btn-secondary text-sm px-2 py-2"
-              title="情報を更新"
-              type="button"
-            >
-              🔄
-            </button>
+          <div id="currentQuestionText" class="text-white font-medium truncate">
+            読み込み中...
           </div>
         </div>
 
-
-        <!-- ステータス表示（最小限） -->
-        <div class="text-xs text-gray-500 mt-2" id="boardStatus">最終更新: --:--</div>
+        <!-- 右側：アクションボタン -->
+        <div class="flex items-center gap-2 flex-shrink-0">
+          <button id="copyViewUrlBtn" class="btn btn-secondary text-sm px-3 py-2" title="閲覧用URLをコピー（共有用）" type="button">
+            📋 URLコピー
+          </button>
+          <button id="openBoardBtn" class="btn btn-primary text-sm px-3 py-2" title="回答ボードを開く" type="button">
+            📊 ボードを開く
+          </button>
+          <button id="refreshBoardInfo" class="btn btn-secondary text-sm px-2 py-2" title="情報を更新" type="button">
+            🔄
+          </button>
+        </div>
       </div>
-    </footer>
 
-    <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
-    <?!= include('SharedUtilities'); ?>
-    <?!= include('SharedErrorHandling'); ?>
-    <?!= include('AdminPanel.js'); ?>
-  </body>
+
+      <!-- ステータス表示（最小限） -->
+      <div class="text-xs text-gray-500 mt-2" id="boardStatus">最終更新: --:--</div>
+    </div>
+  </footer>
+
+  <!-- GAS推奨: JavaScript読み込みは</body>直前に集約 -->
+  <?!= include('SharedUtilities'); ?>
+  <?!= include('SharedErrorHandling'); ?>
+  <?!= include('AdminPanel.js'); ?>
+</body>
+
 </html>

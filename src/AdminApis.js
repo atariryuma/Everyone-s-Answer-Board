@@ -240,8 +240,8 @@ function clearActiveSheet(targetUserId) {
       return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
     }
 
-    // リダイレクトURL（GAS iFrame対応 - Unpublishedページへ）
-    const redirectUrl = getWebAppUrl() + '?mode=unpublished&userId=' + targetUser.userId;
+    // リダイレクトURL（GAS iFrame対応 - viewモードでサーバー側が公開状態を判定）
+    const redirectUrl = getWebAppUrl() + '?mode=view&userId=' + targetUser.userId;
 
     return {
       success: true,

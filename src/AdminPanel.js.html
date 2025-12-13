@@ -108,13 +108,13 @@
           })
           .withFailureHandler((error) => {
             console.error(`GAS関数呼び出しエラー: ${funcName}`, error);
-            
+
             const isRetryable = this.isRetryableError(error);
-            
+
             if (isRetryable && this.retryCount < this.maxRetries) {
               this.retryCount++;
               console.warn(`リトライ実行: ${this.retryCount}/${this.maxRetries} (${funcName})`);
-              
+
               const createPromiseDelay = (ms) => new Promise(resolve => {
                 const start = Date.now();
                 const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
@@ -134,7 +134,7 @@
               reject(this.normalizeError(error, funcName));
             }
           })
-          [funcName](...args);
+        [funcName](...args);
       });
     },
 
@@ -148,7 +148,7 @@
         'service unavailable',
         'internal error'
       ];
-      
+
       return retryablePatterns.some(pattern => errorString.includes(pattern));
     },
 
@@ -156,14 +156,14 @@
       if (error instanceof Error) {
         return error;
       }
-      
-      const message = typeof error === 'string' ? error : 
-                     error?.message || '不明なエラーが発生しました';
-      
+
+      const message = typeof error === 'string' ? error :
+        error?.message || '不明なエラーが発生しました';
+
       const normalizedError = new Error(`${funcName}: ${message}`);
       normalizedError.originalError = error;
       normalizedError.functionName = funcName;
-      
+
       return normalizedError;
     }
   };
@@ -210,7 +210,7 @@
     try {
       const urlObj = new URL(url);
       return urlObj.hostname === 'docs.google.com' &&
-             urlObj.pathname.includes('/forms/');
+        urlObj.pathname.includes('/forms/');
     } catch {
       return false;
     }
@@ -1033,11 +1033,11 @@
       return new Promise((resolve, reject) => {
 
         google.script.run
-          .withSuccessHandler(function(result) {
+          .withSuccessHandler(function (result) {
             ClientMutex.release(gateKey);
             resolve(result);
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             console.error('❌ getColumnAnalysis direct error:', error);
             ClientMutex.release(gateKey);
             reject(error);
@@ -1087,7 +1087,7 @@
     const hasColumnMapping = !!(config.columnMapping && Object.keys(config.columnMapping).length > 0);
     const hasSpreadsheetConfig = !!(config.spreadsheetId && config.sheetName);
     const isSetupComplete = config.setupStatus === 'completed' ||
-                          (hasSpreadsheetConfig && hasColumnMapping);
+      (hasSpreadsheetConfig && hasColumnMapping);
 
 
     if (saveDraftBtn) {
@@ -1301,15 +1301,15 @@
 
 
     if (hasFormUrl) {
-      
+
       return { status: 'linked', message: 'フォーム連携を確認しました' };
     }
 
     const isFormDetected = formResult.status === 'FORM_LINK_FOUND' ||
-                          (formResult.success && confidence >= 70);
+      (formResult.success && confidence >= 70);
 
     if (isFormDetected) {
-      
+
       return { status: 'detected', message: 'フォーム連携パターンを検出（URL取得不可）' };
     }
 
@@ -1577,11 +1577,11 @@
 
 
     google.script.run
-      .withSuccessHandler(function(result) {
+      .withSuccessHandler(function (result) {
         validateBtn.disabled = false;
         validateBtn.textContent = '🔍 URL検証';
 
-        
+
 
         if (result.success) {
           updateDetectedInfo(result);
@@ -1614,7 +1614,7 @@
           showError(`検証失敗: ${result.message}`);
         }
       })
-      .withFailureHandler(function(error) {
+      .withFailureHandler(function (error) {
         validateBtn.disabled = false;
         validateBtn.textContent = '🔍 統合検証';
         console.error('❌ validateCompleteSpreadsheetUrl error:', error);
@@ -2104,7 +2104,7 @@
 
     if (context && context.validation && context.validation.details) {
       const validationDetails = context.validation.details;
-      
+
 
       if (validationDetails.connectionVerified === false) {
         userMessage = 'スプレッドシートへの接続に失敗しました。';
@@ -2182,7 +2182,7 @@
     fillColumnDropdowns(headers, mapping, confidence);
     try {
       window.currentHeaders = headers;
-    } catch (_) {}
+    } catch (_) { }
 
     displayAIDetectionInfo(mapping, confidence);
 
@@ -2306,7 +2306,7 @@
     }
 
     if (!hasValidMapping && hasConfidenceData) {
-      
+
     }
 
     window.currentAIMapping = mapping;
@@ -2356,7 +2356,7 @@
 
         showConfidenceBadge(columnType, columnConfidence, 'ai');
 
-        
+
         detectedCount++;
       } else if (columnConfidence > 0) {
         const HIGH_PRECISION_THRESHOLDS = {
@@ -2391,20 +2391,20 @@
           attemptAlternativeDetection(columnType, dropdown, headers);
         }
 
-        
+
         showConfidenceBadge(columnType, columnConfidence, badgeType);
       }
     });
 
     if (detectedCount > 0) {
       const maxConfidence = Math.max(...Object.values(confidence));
-      
-      
+
+
     } else if (totalConfidenceInfo.length > 0) {
       const maxConfidence = Math.max(...Object.values(confidence));
       const avgConfidence = Object.values(confidence).reduce((a, b) => a + b, 0) / Object.values(confidence).length;
-      
-      
+
+
     }
 
     const aiInfo = document.getElementById('ai-detection-info');
@@ -2578,7 +2578,7 @@
     }
 
     try {
-      
+
 
       const currentConfig = getConfig();
       const headers = window.currentHeaders || [];
@@ -2593,12 +2593,12 @@
       const sampleData = generateTestSampleData(headers);
 
       google.script.run
-        .withSuccessHandler(function(diagnosticsResult) {
-          
+        .withSuccessHandler(function (diagnosticsResult) {
+
           displayIntegratedTestResults(diagnosticsResult);
           ClientMutex.release('runIntegratedColumnTest');
         })
-        .withFailureHandler(function(error) {
+        .withFailureHandler(function (error) {
           console.error('❌ 統合診断エラー:', error);
           showError('統合診断中にエラーが発生しました');
           ClientMutex.release('runIntegratedColumnTest');
@@ -2646,7 +2646,7 @@
       });
 
       sampleData.push(testRow);
-      
+
 
       return sampleData;
 
@@ -2662,7 +2662,7 @@
    */
   function displayIntegratedTestResults(diagnostics) {
     try {
-      
+
 
       let resultsPanel = document.getElementById('integrated-test-results');
       if (!resultsPanel) {
@@ -2705,8 +2705,8 @@
     panel.className = 'hidden mt-6 p-4 bg-gray-900/50 border border-gray-600 rounded-lg';
 
     const insertAfter = document.getElementById('ai-detection-info') ||
-                       document.querySelector('section[data-section="column-mapping"]') ||
-                       document.querySelector('.column-mapping-section');
+      document.querySelector('section[data-section="column-mapping"]') ||
+      document.querySelector('.column-mapping-section');
 
     if (insertAfter && insertAfter.parentNode) {
       insertAfter.parentNode.insertBefore(panel, insertAfter.nextSibling);
@@ -3207,7 +3207,7 @@
       try {
         container.appendChild(badge);
         badgesAdded++;
-        
+
       } catch (error) {
         console.warn(`検証バッジ追加エラー: ${columnType}`, error);
       }
@@ -3248,7 +3248,7 @@
       }
     }
 
-    
+
   }
 
 
@@ -3419,9 +3419,9 @@
         attempt++;
 
         google.script.run
-          .withSuccessHandler(function(result) {
+          .withSuccessHandler(function (result) {
             if (result.success) {
-              
+
               resolve(result);
             } else {
               console.warn(`⚠️ 設定保存失敗 (試行 ${attempt}):`, result.message || result.error);
@@ -3443,7 +3443,7 @@
               }
             }
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             console.error(`❌ 設定保存エラー (試行 ${attempt}):`, error);
             if (attempt < maxRetries) {
               const delay = Math.pow(2, attempt) * 1000;
@@ -3486,33 +3486,33 @@
 
       const timestamp = new Date().toISOString();
 
-    const baseConfig = {
-      spreadsheetId,
-      sheetName,
-      displaySettings: getDisplaySettings(),
-      verifiedAt: timestamp, // メタデータは別途管理
-      confidence: confidence, // 信頼度データは別途管理
-      setupComplete: true,
-      setupStatus: 'completed',
-      etag: (systemState && systemState.config && systemState.config.etag) || undefined,
-    };
+      const baseConfig = {
+        spreadsheetId,
+        sheetName,
+        displaySettings: getDisplaySettings(),
+        verifiedAt: timestamp, // メタデータは別途管理
+        confidence: confidence, // 信頼度データは別途管理
+        setupComplete: true,
+        setupStatus: 'completed',
+        etag: (systemState && systemState.config && systemState.config.etag) || undefined,
+      };
 
-    const optimizedConfig = systemState && systemState.config ? {
-      ...baseConfig, // 新しい設定を基本とする
-      userId: systemState.config.userId,
-      setupStatus: systemState.config.setupStatus,
-      isPublished: systemState.config.isPublished,
-      publishedAt: systemState.config.publishedAt,
-      displaySettings: getDisplaySettings(),
-      spreadsheetId,
-      sheetName,
-      headers,
-      columnMapping: {
-        ...columnMapping,
-        headers: headers,
-        verifiedAt: timestamp // 統一されたタイムスタンプ
-      }
-    } : baseConfig;
+      const optimizedConfig = systemState && systemState.config ? {
+        ...baseConfig, // 新しい設定を基本とする
+        userId: systemState.config.userId,
+        setupStatus: systemState.config.setupStatus,
+        isPublished: systemState.config.isPublished,
+        publishedAt: systemState.config.publishedAt,
+        displaySettings: getDisplaySettings(),
+        spreadsheetId,
+        sheetName,
+        headers,
+        columnMapping: {
+          ...columnMapping,
+          headers: headers,
+          verifiedAt: timestamp // 統一されたタイムスタンプ
+        }
+      } : baseConfig;
 
       const isSpreadsheetChanged = optimizedConfig.spreadsheetId !== systemState.config.spreadsheetId;
       if (isSpreadsheetChanged) {
@@ -3527,10 +3527,10 @@
 
 
       if (!optimizedConfig.formUrl) {
-        
+
 
         google.script.run
-          .withSuccessHandler(function(formResult) {
+          .withSuccessHandler(function (formResult) {
             if (formResult.success && formResult.formData && formResult.formData.formUrl) {
               optimizedConfig.formUrl = formResult.formData.formUrl;
               optimizedConfig.formTitle = formResult.formData.formTitle;
@@ -3538,7 +3538,7 @@
             }
             executeConfigSave();
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
             executeConfigSave();
           })
@@ -3546,63 +3546,63 @@
         return;
       }
 
-    executeConfigSave();
+      executeConfigSave();
 
-    function executeConfigSave() {
-      const logData = {
-        spreadsheetId: optimizedConfig.spreadsheetId,
-        sheetName: optimizedConfig.sheetName,
-        hasColumnMapping: !!optimizedConfig.columnMapping,
-        setupComplete: optimizedConfig.setupComplete,
-        configSize: JSON.stringify(optimizedConfig).length
-      };
+      function executeConfigSave() {
+        const logData = {
+          spreadsheetId: optimizedConfig.spreadsheetId,
+          sheetName: optimizedConfig.sheetName,
+          hasColumnMapping: !!optimizedConfig.columnMapping,
+          setupComplete: optimizedConfig.setupComplete,
+          configSize: JSON.stringify(optimizedConfig).length
+        };
 
-      if (optimizedConfig.sourceKey) logData.sourceKey = optimizedConfig.sourceKey;
-      if (optimizedConfig.spreadsheetUrl) logData.spreadsheetUrl = optimizedConfig.spreadsheetUrl;
-      if (optimizedConfig.formUrl) logData.formUrl = optimizedConfig.formUrl;
-      if (optimizedConfig.formTitle) logData.formTitle = optimizedConfig.formTitle;
+        if (optimizedConfig.sourceKey) logData.sourceKey = optimizedConfig.sourceKey;
+        if (optimizedConfig.spreadsheetUrl) logData.spreadsheetUrl = optimizedConfig.spreadsheetUrl;
+        if (optimizedConfig.formUrl) logData.formUrl = optimizedConfig.formUrl;
+        if (optimizedConfig.formTitle) logData.formTitle = optimizedConfig.formTitle;
 
 
-      google.script.run
-        .withSuccessHandler(function (result) {
-          if (result.success) {
-            if (systemState && systemState.config) {
-              systemState.config = {
-                ...systemState.config,
-                spreadsheetId: optimizedConfig.spreadsheetId,
-                sheetName: optimizedConfig.sheetName,
-                headers: optimizedConfig.headers,
-                columnMapping: optimizedConfig.columnMapping,
-                setupComplete: optimizedConfig.setupComplete,
-                lastModified: systemState.user?.lastModified || optimizedConfig.lastModified,
-                etag: result.etag || result.config?.etag || systemState.config.etag
-              };
-            }
-
-            updateResourceButtons(systemState.config);
-            updateConfigSummary(systemState.config);
-            showSuccess('列マッピング設定が完了しました');
-          } else {
-            if (result.error === 'etag_mismatch') {
-              showInfo('設定が他で更新されました。画面を更新しました。もう一度保存してください。');
-              if (typeof loadAndApplyCurrentConfig === 'function') {
-                loadAndApplyCurrentConfig();
+        google.script.run
+          .withSuccessHandler(function (result) {
+            if (result.success) {
+              if (systemState && systemState.config) {
+                systemState.config = {
+                  ...systemState.config,
+                  spreadsheetId: optimizedConfig.spreadsheetId,
+                  sheetName: optimizedConfig.sheetName,
+                  headers: optimizedConfig.headers,
+                  columnMapping: optimizedConfig.columnMapping,
+                  setupComplete: optimizedConfig.setupComplete,
+                  lastModified: systemState.user?.lastModified || optimizedConfig.lastModified,
+                  etag: result.etag || result.config?.etag || systemState.config.etag
+                };
               }
-            } else if (result.message || result.error) {
-              console.warn('列設定の保存に失敗:', result.message || result.error);
+
+              updateResourceButtons(systemState.config);
+              updateConfigSummary(systemState.config);
+              showSuccess('列マッピング設定が完了しました');
             } else {
-              console.warn('設定保存で予期しない応答:', result);
+              if (result.error === 'etag_mismatch') {
+                showInfo('設定が他で更新されました。画面を更新しました。もう一度保存してください。');
+                if (typeof loadAndApplyCurrentConfig === 'function') {
+                  loadAndApplyCurrentConfig();
+                }
+              } else if (result.message || result.error) {
+                console.warn('列設定の保存に失敗:', result.message || result.error);
+              } else {
+                console.warn('設定保存で予期しない応答:', result);
+              }
             }
-          }
-          ClientMutex.release('saveColumnConfig');
-        })
-        .withFailureHandler(function (error) {
-          console.error('列設定保存エラー:', error);
-          showError('列設定の保存に失敗しました');
-          ClientMutex.release('saveColumnConfig');
-        })
-        .saveConfig(optimizedConfig);
-    }
+            ClientMutex.release('saveColumnConfig');
+          })
+          .withFailureHandler(function (error) {
+            console.error('列設定保存エラー:', error);
+            showError('列設定の保存に失敗しました');
+            ClientMutex.release('saveColumnConfig');
+          })
+          .saveConfig(optimizedConfig);
+      }
 
     } catch (error) {
       console.error('列設定保存処理エラー:', error);
@@ -3699,7 +3699,7 @@
 
       if (!config.formUrl && config.spreadsheetId && config.sheetName) {
         google.script.run
-          .withSuccessHandler(function(formResult) {
+          .withSuccessHandler(function (formResult) {
             if (formResult.success && formResult.formData && formResult.formData.formUrl) {
               config.formUrl = formResult.formData.formUrl;
               config.formTitle = formResult.formData.formTitle;
@@ -3709,7 +3709,7 @@
             }
             executeDraftSave(config);
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
             executeDraftSave(config);
           })
@@ -3771,7 +3771,7 @@
 
       if (!config.formUrl && config.spreadsheetId && config.sheetName) {
         google.script.run
-          .withSuccessHandler(function(formResult) {
+          .withSuccessHandler(function (formResult) {
             if (formResult.success && formResult.formData && formResult.formData.formUrl) {
               config.formUrl = formResult.formData.formUrl;
               config.formTitle = formResult.formData.formTitle;
@@ -3781,7 +3781,7 @@
             }
             executePublish(config);
           })
-          .withFailureHandler(function(error) {
+          .withFailureHandler(function (error) {
             console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
             executePublish(config);
           })
@@ -3805,7 +3805,7 @@
             showSuccess('アプリを公開しました！');
             updatePublishStatus('published');
 
-            
+
 
             const updatedConfig = {
               ...systemState.config,
@@ -4144,27 +4144,34 @@
       .getBoardInfo();
   }
 
-  function openAppSetup() {
-    if (window.notifications) {
-      window.notifications.info('⚙️ アプリ設定画面に移動中...', 2000);
-    }
+  /**
+   * アプリ設定URLをプリフェッチ（GAS iFrame対応）
+   * ページ読み込み時に呼び出され、リンクのhrefを設定
+   */
+  function prefetchAppSetupUrl() {
+    const appSetupBtn = document.getElementById('app-setup-btn');
+    if (!appSetupBtn) return;
 
-    const targetUserId = window.UNIFIED_CONFIG.targetUserId;
+    const targetUserId = window.UNIFIED_CONFIG?.targetUserId;
 
     google.script.run
       .withSuccessHandler(function (webAppUrl) {
         if (webAppUrl) {
           const appSetupUrl = webAppUrl + '?mode=appSetup' + (targetUserId ? '&userId=' + targetUserId : '');
-          window.open(appSetupUrl, '_top');
+          appSetupBtn.href = appSetupUrl;
         }
       })
       .withFailureHandler(function (error) {
-        console.error('アプリ設定エラー:', error);
-        if (window.notifications) {
-          window.notifications.error('アプリ設定画面を開けませんでした。', 3000);
-        }
+        console.error('アプリ設定URL取得エラー:', error);
       })
       .getWebAppUrl();
+  }
+
+  // ページ読み込み時にアプリ設定URLをプリフェッチ
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', prefetchAppSetupUrl);
+  } else {
+    prefetchAppSetupUrl();
   }
 
 </script>

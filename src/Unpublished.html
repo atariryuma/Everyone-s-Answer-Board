@@ -98,10 +98,10 @@
       </button>
 
       <!-- 管理パネル遷移ボタン -->
-      <button type="button" id="admin-panel-btn" onclick="openAdminPanel()"
-        class="w-full mt-3 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium text-base transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800">
+      <a id="admin-panel-btn" href="#" target="_top"
+        class="block w-full mt-3 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium text-base transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800 text-center">
         <span role="img" aria-label="設定">⚙️</span> 管理パネルを開く
-      </button>
+      </a>
 
       <!-- メッセージエリア -->
       <div id="message-area" class="mt-4 text-center text-sm h-5" aria-live="polite" role="status"></div>
@@ -119,10 +119,10 @@
       <? } ?>
 
       <div class="mt-6">
-        <button type="button" onclick="window.safeReload()"
-          class="px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold">
+        <a id="refresh-btn" href="#" target="_top"
+          class="inline-block px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold text-center">
           更新
-        </button>
+        </a>
       </div>
     </div>
     <? } ?>
@@ -228,32 +228,38 @@
       redirectBtn.focus();
     }
 
-    function openAdminPanel() {
-      const button = document.getElementById('admin-panel-btn');
-      if (!button) return;
-
-      const originalContent = button.innerHTML;
-      button.disabled = true;
-      button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 読み込み中...';
+    /**
+     * ページ読み込み時にURLをプリフェッチ（GAS iFrame対応）
+     */
+    function prefetchNavigationUrls() {
+      const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
+      const adminBtn = document.getElementById('admin-panel-btn');
+      const refreshBtn = document.getElementById('refresh-btn');
 
       google.script.run
         .withSuccessHandler(function (webAppUrl) {
-          if (webAppUrl) {
-            const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-            const adminUrl = webAppUrl + '?mode=admin&userId=' + userId;
-            window.open(adminUrl, '_top');
-          } else {
-            showMessage('管理パネルURLの取得に失敗しました', 'error');
-            button.disabled = false;
-            button.innerHTML = originalContent;
+          if (webAppUrl && userId) {
+            // 管理パネルリンク
+            if (adminBtn) {
+              adminBtn.href = webAppUrl + '?mode=admin&userId=' + userId;
+            }
+            // 更新リンク（生徒用）
+            if (refreshBtn) {
+              refreshBtn.href = webAppUrl + '?mode=view&userId=' + userId;
+            }
           }
         })
         .withFailureHandler(function (error) {
-          showMessage('管理パネルを開けませんでした: ' + (error.message || error), 'error');
-          button.disabled = false;
-          button.innerHTML = originalContent;
+          console.error('URL prefetch failed:', error);
         })
         .getWebAppUrl();
+    }
+
+    // ページ読み込み時にURLをプリフェッチ
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', prefetchNavigationUrls);
+    } else {
+      prefetchNavigationUrls();
     }
   </script>
 
