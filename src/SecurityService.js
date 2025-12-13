@@ -14,6 +14,26 @@
 // 認証・セッション管理
 
 /**
+ * 安全にメールアドレスからドメインを抽出する
+ * @param {string} email - メールアドレス
+ * @returns {string|null} ドメイン（抽出失敗時はnull）
+ */
+function extractDomainSafely(email) {
+  if (!email || typeof email !== 'string') {
+    return null;
+  }
+
+  try {
+    // 正規表現で厳密にメールアドレスをパース（複数@の防止）
+    const parsed = email.match(/^[^@]+@([^@]+)$/);
+    return parsed ? parsed[1].toLowerCase() : null;
+  } catch (error) {
+    console.warn('extractDomainSafely: Failed to extract domain:', error.message);
+    return null;
+  }
+}
+
+/**
  * Deploy user domain information retrieval
  * @returns {Object} Domain information and validation result
  */
@@ -32,9 +52,19 @@ function getDeployUserDomainInfo() {
       };
     }
 
-    const domain = email.includes('@') ? email.split('@')[1] : 'unknown';
+    const domain = extractDomainSafely(email);
+    if (!domain) {
+      console.warn('getDeployUserDomainInfo: Invalid email format:', email);
+      return {
+        success: false,
+        message: 'Invalid email format',
+        domain: null,
+        isValidDomain: false
+      };
+    }
+
     const adminEmail = getCachedProperty('ADMIN_EMAIL');
-    const adminDomain = adminEmail ? adminEmail.split('@')[1] : null;
+    const adminDomain = adminEmail ? extractDomainSafely(adminEmail) : null;
     const isValidDomain = adminDomain ? domain === adminDomain : true;
 
     return {

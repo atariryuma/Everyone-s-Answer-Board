@@ -96,28 +96,40 @@ function getServiceAccount() {
 
     const serviceAccount = JSON.parse(credentials);
 
+    // 必須フィールドの確認（秘密鍵をログに出さない）
     const requiredFields = ['client_email', 'private_key', 'type'];
     const missingFields = requiredFields.filter(field => !serviceAccount[field]);
 
     if (missingFields.length > 0) {
-      console.warn('getServiceAccount: Missing required fields:', missingFields);
-      return { isValid: false, error: `Missing fields: ${missingFields.join(', ')}` };
+      // セキュリティ: 秘密鍵情報をログに含めない
+      console.warn('getServiceAccount: Missing required fields');
+      return { isValid: false, error: 'Invalid credentials' };
     }
 
-    // Validate email format
-    if (!serviceAccount.client_email.includes('@') || !serviceAccount.client_email.includes('.')) {
-      console.warn('getServiceAccount: Invalid service account email format');
+    // 厳密なメールアドレス検証（複数@の防止）
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(serviceAccount.client_email)) {
+      console.warn('getServiceAccount: Invalid email format');
       return { isValid: false, error: 'Invalid email format' };
+    }
+
+    // 秘密鍵フォーマット検証（BEGIN PRIVATE KEY または BEGIN RSA PRIVATE KEY）
+    if (typeof serviceAccount.private_key !== 'string' ||
+        (!serviceAccount.private_key.includes('BEGIN RSA PRIVATE KEY') &&
+         !serviceAccount.private_key.includes('BEGIN PRIVATE KEY'))) {
+      console.warn('getServiceAccount: Invalid private key format');
+      return { isValid: false, error: 'Invalid private key format' };
     }
 
     return {
       isValid: true,
       email: serviceAccount.client_email,
       type: serviceAccount.type
+      // 秘密鍵は返さない（セキュリティ）
     };
   } catch (error) {
-    console.warn('getServiceAccount: Invalid credentials format:', error.message);
-    return { isValid: false, error: 'JSON parse error' };
+    console.warn('getServiceAccount: Invalid credentials format');
+    return { isValid: false, error: 'Invalid format' };
   }
 }
 
@@ -705,11 +717,18 @@ function findUserByEmail(email, context = {}) {
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find(u => u.userEmail === email);
         if (user) {
-          // 個別キャッシュに保存（冗長性強化）
+          // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
           try {
-            CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
+            const userJson = JSON.stringify(user);
+            // CacheServiceの制限（100KB）を考慮
+            if (userJson.length > 100000) {
+              console.warn('findUserByEmail: User object too large for cache:', userJson.length, 'bytes');
+            } else {
+              CacheService.getScriptCache().put(individualCacheKey, userJson, CACHE_DURATION.USER_INDIVIDUAL);
+            }
           } catch (saveError) {
-            console.error('findUserByEmail: Individual cache save failed:', saveError.message);
+            console.warn('findUserByEmail: Cache save failed, continuing without cache:', saveError.message);
+            // キャッシュ失敗はログのみ、データ自体は返す
           }
 
           return user;
@@ -748,11 +767,17 @@ function findUserByEmail(email, context = {}) {
       if (row[emailColumnIndex] === email) {
         const user = createUserObjectFromRow(row, headers);
 
-        // 個別キャッシュに保存（冗長性強化）
+        // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
         try {
-          CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
+          const userJson = JSON.stringify(user);
+          // CacheServiceの制限（100KB）を考慮
+          if (userJson.length > 100000) {
+            console.warn('findUserByEmail: User object too large for cache:', userJson.length, 'bytes');
+          } else {
+            CacheService.getScriptCache().put(individualCacheKey, userJson, CACHE_DURATION.USER_INDIVIDUAL);
+          }
         } catch (saveError) {
-          console.warn('findUserByEmail: Individual cache save failed:', saveError.message);
+          console.warn('findUserByEmail: Cache save failed, continuing without cache:', saveError.message);
         }
 
         return user;
@@ -798,11 +823,18 @@ function findUserById(userId, context = {}) {
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find(u => u.userId === userId);
         if (user) {
-          // 個別キャッシュに保存（冗長性強化）
+          // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
           try {
-            CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
+            const userJson = JSON.stringify(user);
+            // CacheServiceの制限（100KB）を考慮
+            if (userJson.length > 100000) {
+              console.warn('findUserById: User object too large for cache:', userJson.length, 'bytes');
+            } else {
+              CacheService.getScriptCache().put(individualCacheKey, userJson, CACHE_DURATION.USER_INDIVIDUAL);
+            }
           } catch (saveError) {
-            console.error('findUserById: Individual cache save failed:', saveError.message);
+            console.warn('findUserById: Cache save failed, continuing without cache:', saveError.message);
+            // キャッシュ失敗はログのみ、データ自体は返す
           }
 
           return user;
@@ -841,11 +873,17 @@ function findUserById(userId, context = {}) {
       if (row[userIdColumnIndex] === userId) {
         const user = createUserObjectFromRow(row, headers);
 
-        // 個別キャッシュに保存（冗長性強化）
+        // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
         try {
-          CacheService.getScriptCache().put(individualCacheKey, JSON.stringify(user), CACHE_DURATION.USER_INDIVIDUAL);
+          const userJson = JSON.stringify(user);
+          // CacheServiceの制限（100KB）を考慮
+          if (userJson.length > 100000) {
+            console.warn('findUserById: User object too large for cache:', userJson.length, 'bytes');
+          } else {
+            CacheService.getScriptCache().put(individualCacheKey, userJson, CACHE_DURATION.USER_INDIVIDUAL);
+          }
         } catch (saveError) {
-          console.warn('findUserById: Individual cache save failed:', saveError.message);
+          console.warn('findUserById: Cache save failed, continuing without cache:', saveError.message);
         }
 
         return user;
@@ -1409,26 +1447,34 @@ function deleteUser(userId, reason = '', context = {}) {
       return { success: false, message: 'UserId column not found' };
     }
 
+    // 削除対象行を収集（行番号ずれ対策）
+    const rowsToDelete = [];
     for (let i = 1; i < data.length; i++) {
       if (data[i][userIdColumnIndex] === userId) {
-        // Simple hard delete - remove the row using correct GAS API
-        const rowToDelete = i + 1;
-        sheet.deleteRows(rowToDelete, 1);
-
-        // ユーザー削除後にキャッシュをクリア
-        clearDatabaseUserCache();
-
-        return {
-          success: true,
-          userId,
-          deleted: true,
-          reason: reason || 'No reason provided'
-        };
+        rowsToDelete.push(i + 1); // シート行番号（1-indexed）
       }
     }
 
-    console.warn('deleteUser: User not found:', userId);
-    return { success: false, message: 'User not found' };
+    if (rowsToDelete.length === 0) {
+      console.warn('deleteUser: User not found:', userId);
+      return { success: false, message: 'User not found' };
+    }
+
+    // 逆順で削除（行番号ずれを防ぐ）
+    for (let i = rowsToDelete.length - 1; i >= 0; i--) {
+      sheet.deleteRows(rowsToDelete[i], 1);
+    }
+
+    // ユーザー削除後にキャッシュをクリア
+    clearDatabaseUserCache();
+
+    return {
+      success: true,
+      userId,
+      deleted: true,
+      deletedRows: rowsToDelete.length,
+      reason: reason || 'No reason provided'
+    };
   } catch (error) {
     console.error('deleteUser error:', error.message);
     return { success: false, message: error.message };

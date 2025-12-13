@@ -258,8 +258,8 @@ function validateSpreadsheetId(spreadsheetId) {
       return result;
     }
 
-    // Google Sheets IDの形式チェック
-    const idPattern = /^[a-zA-Z0-9-_]{44}$/;
+    // Google Sheets IDの形式チェック（40-50文字に緩和）
+    const idPattern = /^[a-zA-Z0-9-_]{40,50}$/;
     if (!idPattern.test(spreadsheetId)) {
       result.errors.push('無効なスプレッドシートID形式');
       return result;

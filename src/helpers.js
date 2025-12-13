@@ -19,13 +19,16 @@
 // ⚡ Runtime Memory Cache for PropertiesService with TTL
 // ✅ API最適化: PropertiesService呼び出し80-90%削減
 // ✅ CLAUDE.md準拠: 30秒TTLで自動期限切れ
+// ✅ メモリリーク対策: 最大50エントリに制限
 const RUNTIME_PROPERTIES_CACHE = {};
 const PROPERTY_CACHE_TTL = 30000; // 30秒（CLAUDE.md準拠）
+const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
 
 /**
- * PropertiesServiceのメモリキャッシュ付きアクセス（TTL対応）
+ * PropertiesServiceのメモリキャッシュ付きアクセス（TTL + サイズ制限対応）
  * ✅ CLAUDE.md準拠: 30秒TTLで自動期限切れ
  * ✅ Google公式推奨: 頻繁アクセスする設定値はメモリにキャッシュ
+ * ✅ メモリリーク対策: 最大50エントリ、LRU削除
  * @param {string} key - プロパティキー
  * @returns {string|null} プロパティ値
  */
@@ -35,14 +38,26 @@ function getCachedProperty(key) {
 
   // ✅ TTLチェック: 有効期限内ならキャッシュを返す
   if (cached && cached.timestamp && (now - cached.timestamp < PROPERTY_CACHE_TTL)) {
+    // アクセス時刻を更新（LRU用）
+    cached.lastAccess = now;
     return cached.value;
   }
 
   // キャッシュミスまたは期限切れ: PropertiesServiceから取得
   const value = PropertiesService.getScriptProperties().getProperty(key);
+
+  // キャッシュサイズ管理: 最大サイズを超える場合、最も古いエントリを削除
+  if (Object.keys(RUNTIME_PROPERTIES_CACHE).length >= MAX_CACHE_SIZE) {
+    // 最も古いエントリを検索（lastAccessが最も小さい）
+    const oldestKey = Object.entries(RUNTIME_PROPERTIES_CACHE)
+      .sort(([, a], [, b]) => (a.lastAccess || a.timestamp) - (b.lastAccess || b.timestamp))[0][0];
+    delete RUNTIME_PROPERTIES_CACHE[oldestKey];
+  }
+
   RUNTIME_PROPERTIES_CACHE[key] = {
     value,
-    timestamp: now  // ✅ タイムスタンプ記録
+    timestamp: now,  // ✅ タイムスタンプ記録
+    lastAccess: now  // ✅ 最終アクセス時刻（LRU用）
   };
   return value;
 }

@@ -531,12 +531,26 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
 // Utility helpers
 
 /**
- * 空行判定（ReactionServiceから移動したisEmptyRowを利用）
+ * 空行判定（null安全）
  * @param {Array} row - データ行
  * @returns {boolean} 空行かどうか
  */
 function isEmptyRow(row) {
-  return !row || row.every(cell => !cell || cell.toString().trim() === '');
+  // 配列チェック
+  if (!row || !Array.isArray(row) || row.length === 0) {
+    return true;
+  }
+
+  // 各セルの値を厳密にチェック
+  return row.every(cell => {
+    // null/undefinedは空と判定
+    if (cell === null || cell === undefined) {
+      return true;
+    }
+    // 文字列変換後にtrimして空文字列なら空と判定
+    const cellStr = String(cell).trim();
+    return cellStr === '';
+  });
 }
 
 /**
