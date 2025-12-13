@@ -192,7 +192,11 @@
             if (result && result.success) {
               showMessage('回答ボードを再公開しました！', 'success');
 
-              google.script.history.replace(null, {}, window.location.href);
+              setTimeout(function() {
+                const url = new URL(window.location.href);
+                url.hash = '';
+                window.location.href = url.toString();
+              }, 1000);
             } else {
               showMessage(result.message || '再公開に失敗しました', 'error');
               button.disabled = false;

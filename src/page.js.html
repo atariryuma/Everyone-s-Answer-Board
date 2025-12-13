@@ -3904,10 +3904,24 @@ class StudyQuestApp {
 
     google.script.run
       .withSuccessHandler(function(result) {
+        if (result && result.success) {
+          self.clearCache({ includeReactions: true, includeLocalStorage: true });
 
-        self.clearCache({ includeReactions: true, includeLocalStorage: true });
+          const url = new URL(window.location.href);
+          url.hash = '';
+          window.location.href = url.toString();
+        } else {
+          console.error('公開終了に失敗:', result);
 
-        google.script.history.replace(null, {}, window.location.href);
+          if (window.notifications) {
+            window.notifications.error(result.message || '公開終了に失敗しました', 7000);
+          }
+
+          if (endPublicationBtn && originalButtonContent) {
+            endPublicationBtn.disabled = false;
+            endPublicationBtn.innerHTML = originalButtonContent;
+          }
+        }
       })
       .withFailureHandler(function(error) {
         console.error('❌ 公開終了に失敗しました:', error);
