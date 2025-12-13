@@ -254,9 +254,13 @@ function calculateScoreWithLogic(header, fieldType, patterns, index, relationshi
 function validateSampleData(sampleData, header, fieldType) {
   if (!sampleData || sampleData.length < 2) return 0;
 
+  // ✅ BUG FIX: 空ヘッダーの場合は検証をスキップ（全セルがマッチする問題を回避）
+  const headerKeyword = header ? String(header).split(' ')[0] : '';
+  if (!headerKeyword || headerKeyword.trim() === '') return 0;
+
   // Extract column values (assume header is at a specific index)
   const columnValues = sampleData.slice(0, Math.min(5, sampleData.length))
-    .map(row => row.find(cell => String(cell || '').toLowerCase().includes(header.split(' ')[0])))
+    .map(row => row.find(cell => String(cell || '').toLowerCase().includes(headerKeyword.toLowerCase())))
     .filter(val => val != null && String(val).trim());
 
   if (columnValues.length === 0) return 0;

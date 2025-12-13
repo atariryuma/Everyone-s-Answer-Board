@@ -48,7 +48,14 @@ function getCurrentUserInfo() {
     const cache = CacheService.getScriptCache();
     const cached = cache.get(cacheKey);
     if (cached) {
-      return JSON.parse(cached);
+      // ✅ BUG FIX: キャッシュ破損時のJSON.parse例外を明示的に処理
+      try {
+        return JSON.parse(cached);
+      } catch (parseError) {
+        console.warn('getCurrentUserInfo: Cache parse failed, fetching fresh data:', parseError.message);
+        // キャッシュが破損している場合は削除して続行
+        cache.remove(cacheKey);
+      }
     }
 
     // データベース検索

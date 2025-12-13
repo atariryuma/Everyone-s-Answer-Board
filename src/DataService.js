@@ -382,11 +382,10 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
     }
   }
 
-  // フィルタリングとソート適用
-  if (options.classFilter) {
-    processedData = processedData.filter(item => item.class === options.classFilter);
-  }
+  // ✅ BUG FIX: classFilterはshouldIncludeRow()で既に処理されているため、ここでの二重フィルタリングを削除
+  // フィルタリング（classFilter）は processRawDataBatch → shouldIncludeRow で実行済み
 
+  // ソート適用
   if (options.sortBy) {
     processedData = applySortAndLimit(processedData, {
       sortBy: options.sortBy,
