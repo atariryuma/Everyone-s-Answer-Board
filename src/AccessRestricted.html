@@ -12,7 +12,6 @@
 
     <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
     <script>
-      // Complete TailwindCSS warning suppression and early configuration
       window.__TAILWIND_DISABLE_TOUCH__ = true;
       window.tailwind = {
         config: {
@@ -21,7 +20,6 @@
         },
       };
 
-      // Suppress TailwindCSS production warnings immediately
       const originalWarn = console.warn;
       console.warn = function (...args) {
         const message = args.join(' ');
@@ -211,28 +209,23 @@
     <?!= include('SharedErrorHandling'); ?>
 
     <script>
-      // 🎯 統一アイコンシステム - アイコン配置
       function initializeAccessRestrictedIcons() {
         if (typeof window.IconLibrary !== 'undefined') {
-          // 制限警告アイコン
           const restrictionWarningIcon = document.getElementById('restriction-warning-icon');
           if (restrictionWarningIcon) {
             restrictionWarningIcon.innerHTML = window.IconLibrary.get('alert-triangle', {size: 'w-12 h-12'});
           }
 
-          // 情報アイコン
           const infoIcon = document.getElementById('info-icon');
           if (infoIcon) {
             infoIcon.innerHTML = window.IconLibrary.get('info', {size: 'w-6 h-6'});
           }
 
-          // 管理者ロックアイコン
           const adminLockIcon = document.getElementById('admin-lock-icon');
           if (adminLockIcon) {
             adminLockIcon.innerHTML = window.IconLibrary.get('lock', {size: 'w-5 h-5'});
           }
 
-          // 設定歯車アイコン
           const settingsGearIcon = document.getElementById('settings-gear-icon');
           if (settingsGearIcon) {
             settingsGearIcon.innerHTML = window.IconLibrary.get('settings', {size: 'w-5 h-5'});
@@ -240,25 +233,20 @@
         }
       }
 
-      // DOM読み込み完了後とIconLibrary読み込み完了後の両方で初期化
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initializeAccessRestrictedIcons);
       } else {
         initializeAccessRestrictedIcons();
       }
 
-      // CLAUDE.md V8 compliant: requestIdleCallback for icon initialization
       requestIdleCallback(initializeAccessRestrictedIcons, { timeout: 100 });
 
-      // アプリ設定リンクの動的URL生成（本番URLを取得して生成）
       document.addEventListener('DOMContentLoaded', function() {
         const appSetupLink = document.getElementById('app-setup-link');
         if (!appSetupLink) return;
 
-        // Web アプリの本番URLを取得（window.location 由来の開発URLを回避）
         google.script.run
           .withSuccessHandler(function(webAppUrl) {
-            // 現在のユーザー情報を取得してURLを構築
             google.script.run
               .withSuccessHandler(function(userInfo) {
                 const userId = (userInfo && userInfo.userId) ? userInfo.userId : '';
@@ -279,7 +267,6 @@
             if (window.notifications) {
               window.notifications.error('システムの初期化に失敗しました。ページを再読み込みしてください。', 7000);
             }
-            // フォールバック: 現在URLからクエリ除去して生成
             const baseUrl = window.location.href.split('?')[0];
             appSetupLink.href = `${baseUrl}?mode=appSetup`;
           })

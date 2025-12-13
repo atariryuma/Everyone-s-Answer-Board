@@ -983,14 +983,12 @@
 </div>
 
 <script>
-  // 共通モーダル管理クラス
   class SharedModals {
     constructor() {
       this.loadedModals = new Set();
       this.setupEventListeners();
     }
 
-    // 選択的モーダル読み込み
     loadModals(modalIds) {
       modalIds.forEach((modalId) => {
         if (!this.loadedModals.has(modalId)) {
@@ -999,7 +997,6 @@
       });
     }
 
-    // 管理者専用モーダルの読み込み
     loadAdminModals() {
       this.loadModals([
         'form-config-modal',
@@ -1010,7 +1007,6 @@
       ]);
     }
 
-    // 確認モーダルの表示
     showConfirmation(title, message, onConfirm, onCancel) {
       const modal = document.getElementById('confirmation-modal');
       const titleEl = document.getElementById('modal-title');
@@ -1018,7 +1014,6 @@
       const confirmBtn = document.getElementById('modal-confirm-btn');
       const cancelBtn = document.getElementById('modal-cancel-btn');
 
-      // null checks for modal elements
       if (!modal || !titleEl || !messageEl || !confirmBtn || !cancelBtn) {
         console.error('モーダル要素が見つかりません');
         return;
@@ -1030,7 +1025,6 @@
       modal.classList.remove('hidden');
       modal.classList.add('flex');
 
-      // イベントリスナーを一度削除してから追加
       confirmBtn.onclick = () => {
         this.hideModal('confirmation-modal');
         if (onConfirm) onConfirm();
@@ -1042,7 +1036,6 @@
       };
     }
 
-    // アラートモーダルの表示
     showAlert(title, message, type = 'info') {
       const modal = document.getElementById('alert-modal');
       const titleEl = document.getElementById('alert-modal-title');
@@ -1050,7 +1043,6 @@
       const iconEl = document.getElementById('alert-modal-icon');
       const closeBtn = document.getElementById('alert-modal-close-btn');
 
-      // null checks for modal elements
       if (!modal || !titleEl || !messageEl || !iconEl || !closeBtn) {
         console.error('アラートモーダル要素が見つかりません');
         return;
@@ -1059,7 +1051,6 @@
       titleEl.textContent = title;
       messageEl.textContent = message;
 
-      // アイコンとカラーを設定
       const typeConfig = {
         info: {
           color: 'text-blue-400',
@@ -1083,7 +1074,6 @@
       closeBtn.onclick = () => this.hideModal('alert-modal');
     }
 
-    // ローディングモーダルの表示
     showLoading(title = '処理中...', message = 'しばらくお待ちください') {
       const modal = document.getElementById('loading-modal');
       const titleEl = document.getElementById('loading-modal-title');
@@ -1095,7 +1085,6 @@
       if (modal) modal.classList.remove('hidden');
     }
 
-    // モーダルの非表示
     hideModal(modalId) {
       const modal = document.getElementById(modalId);
       if (modal) {
@@ -1104,9 +1093,7 @@
       }
     }
 
-    // イベントリスナーの設定
     setupEventListeners() {
-      // ESCキーでモーダルを閉じる
       document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
           const modals = [
@@ -1132,7 +1119,6 @@
         }
       });
 
-      // クローズボタンの設定
       const closeButtons = [
         'digital-citizenship-modal-close',
         'digital-citizenship-modal-close-btn',
@@ -1170,7 +1156,6 @@
       });
     }
 
-    // プライバシーモーダルの表示
     showPrivacy(onContinue) {
       const modal = document.getElementById('privacy-modal');
       if (!modal) {
@@ -1197,7 +1182,6 @@
       }
     }
 
-    // デジタル・シティズンシップモーダルの表示
     showDigitalCitizenship() {
       const modal = document.getElementById('digital-citizenship-modal');
       if (!modal) {
@@ -1209,18 +1193,15 @@
     }
 
 
-    // 公開結果データの完全性検証
     validatePublishResult(publishResult) {
       const errors = [];
       let isValid = true;
       let hasValidUrl = false;
 
-      // 基本的な存在チェック
       if (!publishResult) {
         errors.push('公開結果データが存在しません');
         isValid = false;
       } else {
-        // 公開成功フラグのチェック（クイックスタート用の柔軟な判定）
         const isPublishedSuccessfully =
           publishResult.success ||
           publishResult.status === 'success' ||
@@ -1228,7 +1209,6 @@
 
         if (!isPublishedSuccessfully) {
           errors.push('公開が成功していません');
-          // クイックスタートの場合は警告レベルに下げる
           if (publishResult.status === 'success') {
             console.warn(
               '⚠️ success フラグは false だが status は success - クイックスタート結果として受け入れます'
@@ -1238,7 +1218,6 @@
           }
         }
 
-        // URL検証（複数のURLフィールドをチェック）
         const candidateUrls = [
           publishResult.url,
           publishResult.boardUrl,
@@ -1249,11 +1228,9 @@
         if (candidateUrls.length === 0) {
           errors.push('公開URLが空です');
         } else {
-          // 有効なURLが1つでもあれば OK
           const validUrl = candidateUrls.find((url) => url.length > 10);
           if (validUrl) {
             hasValidUrl = true;
-            // メインURLフィールドが空の場合は代替URLで補完
             if (!publishResult.url || publishResult.url.trim() === '') {
               publishResult.url = validUrl;
             }
@@ -1262,13 +1239,9 @@
           }
         }
 
-        // 公開時刻チェック（最適化版）
         if (!publishResult.publishedAt || publishResult.publishedAt.trim() === '') {
-          // 公開時刻が設定されていない場合のみ現在時刻を使用
           publishResult.publishedAt = new Date().toISOString();
-          // 補完は情報レベル（警告ではない）
         } else {
-          // 公開時刻が既に存在する場合は検証のみ実行
           try {
             const publishTime = new Date(publishResult.publishedAt);
             if (isNaN(publishTime.getTime())) {
@@ -1280,10 +1253,8 @@
           }
         }
 
-        // 自動停止機能削除: autoStopMinutes チェック不要
       }
 
-      // Critical errors vs Warning errors の分類
       const criticalErrors = errors.filter(
         (error) =>
           error.includes('公開が成功していません') ||
@@ -1316,7 +1287,6 @@
       };
     }
 
-    // URL状態表示の更新（改善版）
     updateUrlStatusDisplay(publishResult, validationResult) {
       const urlStatusText = document.getElementById('url-status-text');
       const urlPreview = document.getElementById('url-preview');
@@ -1328,12 +1298,10 @@
       }
 
       if (validationResult.hasValidUrl && publishResult.url) {
-        // 成功状態
         urlStatusSection.className = 'bg-green-500/10 border border-green-400/30 rounded-lg p-3';
         urlStatusText.innerHTML = '<span class="text-green-400">✅</span> URL生成済み';
         urlStatusText.className = 'text-sm font-medium text-green-200';
 
-        // URLを短縮表示
         const shortUrl =
           publishResult.url.length > 60
             ? publishResult.url.substring(0, 57) + '...'
@@ -1341,7 +1309,6 @@
         urlPreview.textContent = shortUrl;
         urlPreview.className = 'text-xs text-green-100 font-mono break-all';
       } else {
-        // エラー状態
         urlStatusSection.className = 'bg-red-500/10 border border-red-400/30 rounded-lg p-3';
         urlStatusText.innerHTML = '<span class="text-red-400">❌</span> URL生成に問題があります';
         urlStatusText.className = 'text-sm font-medium text-red-200';
@@ -1351,9 +1318,7 @@
     }
 
 
-    // ✅ 自動停止機能削除: startCountdown 関数は不要
 
-    // フォーム設定モーダルの表示
     showFormConfig() {
       this.loadAdminModals();
       const modal = document.getElementById('form-config-modal');
@@ -1365,7 +1330,6 @@
       modal.classList.remove('hidden');
       modal.classList.add('flex');
 
-      // 回答方法の選択肢に応じて選択肢設定の表示を切り替えるロジック
       const mainQuestionTypeSelect = document.getElementById('main-question-type');
       const mainQuestionChoicesDiv = document.getElementById('main-question-choices-div');
 
@@ -1382,17 +1346,14 @@
         }
       };
 
-      // 初期表示時の設定
       toggleChoicesVisibility();
 
-      // 選択肢が変更されたときのイベントリスナー
       if (mainQuestionTypeSelect) {
         mainQuestionTypeSelect.removeEventListener('change', toggleChoicesVisibility); // 重複登録防止
         mainQuestionTypeSelect.addEventListener('change', toggleChoicesVisibility);
       }
     }
 
-    // セキュリティ詳細モーダルの表示
     showSecurityDetails() {
       this.loadAdminModals();
       const modal = document.getElementById('security-details-modal');
@@ -1405,7 +1366,6 @@
       modal.classList.add('flex');
     }
 
-    // Google連携モーダルの表示
     showGoogleIntegration() {
       this.loadAdminModals();
       const modal = document.getElementById('google-integration-modal');
@@ -1418,7 +1378,6 @@
       modal.classList.add('flex');
     }
 
-    // プライバシー警告モーダルの表示
     showPrivacyWarning(onConfirm, onCancel) {
       this.loadAdminModals();
       const modal = document.getElementById('privacy-warning-modal');
@@ -1427,7 +1386,6 @@
         return;
       }
 
-      // ボタンのイベントリスナーを設定
       const confirmBtn = document.getElementById('privacy-warning-confirm');
       const cancelBtn = document.getElementById('privacy-warning-cancel');
       const closeBtn = document.getElementById('privacy-warning-modal-close');
@@ -1457,7 +1415,6 @@
       modal.classList.add('flex');
     }
 
-    // 公開モーダルの表示（自動停止時間表示付き）
     showPublish(onPublish, onCancel, autoStopSettings = null) {
       const modal = document.getElementById('publish-modal');
       if (!modal) {
@@ -1465,7 +1422,6 @@
         return;
       }
 
-      // ✅ 自動停止機能削除: autoStopDisplay 不要
 
       modal.classList.remove('hidden');
 
@@ -1487,7 +1443,6 @@
       }
     }
 
-    // クイックスタート停止確認モーダルの表示
     showQuickStartStopConfirmation(onConfirm, onCancel) {
       this.loadAdminModals();
       const modal = document.getElementById('quickstart-stop-confirmation-modal');
@@ -1516,7 +1471,6 @@
       }
     }
 
-    // カスタムセットアップ選択モーダルの表示
     showCustomSetupSelection(onConfirm, onCancel) {
       this.loadAdminModals();
       const modal = document.getElementById('custom-setup-selection-modal');
@@ -1527,7 +1481,6 @@
 
       modal.classList.remove('hidden');
 
-      // ラジオボタンの制御
       const stopOption = document.getElementById('custom-stop-option');
       const continueOption = document.getElementById('custom-continue-option');
       const stopRadio = document.getElementById('custom-stop-radio');
@@ -1569,39 +1522,31 @@
     }
   }
 
-  // グローバルインスタンスの作成
   window.sharedModals = new SharedModals();
 
-  // 🎯 統一アイコンシステム - アイコン配置
   function initializeModalIcons() {
     if (typeof window.IconLibrary !== 'undefined') {
-      // 公開準備完了アイコン
       const publishReadyIcon = document.getElementById('publish-ready-icon');
       if (publishReadyIcon) {
         publishReadyIcon.innerHTML = window.IconLibrary.get('check-circle', {size: 'w-6 h-6'});
       }
 
-      // ✅ 自動停止機能削除: autoStopClockIcon 不要
 
-      // 公開ボタンアイコン
       const publishBroadcastIcon = document.getElementById('publish-broadcast-icon');
       if (publishBroadcastIcon) {
         publishBroadcastIcon.innerHTML = window.IconLibrary.get('broadcast', {size: 'w-4 h-4'});
       }
 
-      // 警告アイコン
       const warningIcon = document.getElementById('warning-icon');
       if (warningIcon) {
         warningIcon.innerHTML = window.IconLibrary.get('alert-triangle', {size: 'w-8 h-8'});
       }
 
-      // プラスアイコン
       const plusIcon = document.getElementById('plus-icon');
       if (plusIcon) {
         plusIcon.innerHTML = window.IconLibrary.get('plus', {size: 'w-8 h-8'});
       }
 
-      // 成功チェックアイコン
       const successCheckIcon = document.getElementById('success-check-icon');
       if (successCheckIcon) {
         successCheckIcon.innerHTML = window.IconLibrary.get('check-circle', {size: 'w-8 h-8'});
@@ -1609,22 +1554,14 @@
     }
   }
 
-  // DOM読み込み完了後とIconLibrary読み込み完了後の両方で初期化
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', initializeModalIcons);
   } else {
     initializeModalIcons();
   }
   
-  // CLAUDE.md V8 compliant: requestIdleCallback for icon initialization
   requestIdleCallback(initializeModalIcons, { timeout: 100 });
 
-  // Direct usage via window.sharedModals is recommended:
-  // window.sharedModals.showPrivacy(onContinue)
-  // window.sharedModals.showDigitalCitizenship()
-  // window.sharedModals.showPublish(onPublish, onCancel, autoStopSettings)
-  // ✅ 自動停止機能削除: showAutoStopConfirmation 不要
-  // window.sharedModals.showFormConfig(), etc.
 
   window.hideModal = function (modalId) {
     window.sharedModals.hideModal(modalId);

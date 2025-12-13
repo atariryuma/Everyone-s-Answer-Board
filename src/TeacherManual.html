@@ -1054,7 +1054,6 @@
     <?!= include('SharedUtilities'); ?>
 
     <script>
-      // スムーズスクロール機能
       document.querySelectorAll('a[href^="#"]').forEach(anchor => {
         anchor.addEventListener('click', function (e) {
           e.preventDefault();
@@ -1068,7 +1067,6 @@
         });
       });
 
-      // アコーディオンのインタラクション改善
       document.querySelectorAll('details').forEach(detail => {
         detail.addEventListener('toggle', function() {
           if (this.open) {
@@ -1081,20 +1079,17 @@
         });
       });
 
-      // 印刷対応
       if (window.matchMedia) {
         const mediaQuery = window.matchMedia('print');
         mediaQuery.addListener(function(mq) {
           if (mq.matches) {
             document.body.style.background = 'white';
             document.body.style.color = 'black';
-            // サイドナビを印刷時に非表示
             document.querySelector('.quick-nav').style.display = 'none';
           }
         });
       }
 
-      // 目次のハイライト機能
       const sections = document.querySelectorAll('[id]');
       const navLinks = document.querySelectorAll('.quick-nav a');
 

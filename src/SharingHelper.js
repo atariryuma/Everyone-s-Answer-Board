@@ -17,25 +17,20 @@ function setupDomainWideSharing(spreadsheetId, ownerEmail) {
   try {
     const file = DriveApp.getFileById(spreadsheetId);
 
-    // オーナーのドメインを取得
     const [, domain] = ownerEmail.split('@');
     if (!domain) {
       throw new Error('Invalid email format');
     }
 
-    // 既存の共有設定を確認
     const sharingAccess = file.getSharingAccess();
     const sharingPermission = file.getSharingPermission();
 
-    // ✅ 目標: 同一ドメイン内のユーザーが編集可能
-    // DOMAIN_WITH_LINK または DOMAIN + EDIT 権限
     if (sharingAccess === DriveApp.Access.DOMAIN || sharingAccess === DriveApp.Access.DOMAIN_WITH_LINK) {
       if (sharingPermission === DriveApp.Permission.EDIT) {
         return { success: true, message: 'Already configured' };
       }
     }
 
-    // ✅ 同一ドメイン内で編集可能に設定
     file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
 
     return { success: true, message: 'Domain-wide sharing configured' };

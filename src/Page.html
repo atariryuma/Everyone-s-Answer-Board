@@ -14,7 +14,6 @@
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&amp;display=swap" rel="stylesheet">
   <!-- Global error handling and TailwindCSS setup -->
   <script>
-    // Global error handling for document.write and other issues
     window.addEventListener('error', function(event) {
       if (event.error && event.error.message) {
         if (event.error.message.includes('document.write') ||
@@ -30,7 +29,6 @@
       }
     });
 
-    // ✅ ICONS定義 - 最上部でアイコンを即座に利用可能にする
     const ICONS = {
       'lightbulb-outline': '<svg fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6zM9 16.5h6v4H9v-4zm0 1h6zm0 1h6zM10.5 11l.5 2h2l.5-2m-3 1h3"/></svg>',
       'lightbulb-solid': '<svg fill="currentColor" viewBox="0 0 24 24"><path fill-rule="evenodd" clip-rule="evenodd" d="M12 2V.5M5.25 6.75L4.2 5.7M18.75 6.75l1.05-1.05" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path fill-rule="evenodd" clip-rule="evenodd" d="M12 4a6 6 0 00-6 6c0 2.25 1 4.2 2.5 5.34V16.5h7v-1.16A6.002 6.002 0 0018 10a6 6 0 00-6-6z M10.5 11.25 L11 13 L13 13 L13.5 11.25 H 10.5 Z"/><path d="M9 16.5h6v1H9z M9 18h6v1H9z M9 19.5h6v1H9z"/></svg>',
@@ -45,10 +43,8 @@
       'users': '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>'
     };
 
-    // グローバルに即座に利用可能にする
     window.ICONS = ICONS;
 
-    // ✅ UnifiedCacheクラス - アイコンキャッシュなど基本機能で使用
     class UnifiedCache {
       constructor() {
         this.data = new Map();
@@ -100,7 +96,6 @@
       }
     }
 
-    // ✅ パフォーマンス最適化 - UnifiedCacheに依存
     function getDynamicBatchSize(perf = {}) {
       const frameTime = perf.frameTime || 16;
       const perfLevel = window.getPerformanceLevel?.() || 'medium';
@@ -116,10 +111,8 @@
       return window.getBatchSize?.('base') || 10;
     }
 
-    // Pre-calculate batch size for performance
     const RENDER_BATCH_SIZE = getDynamicBatchSize();
 
-    // Handle unhandled promise rejections
     window.addEventListener('unhandledrejection', function(event) {
       console.warn('Unhandled promise rejection:', event.reason);
       event.preventDefault();
@@ -130,16 +123,13 @@
   <!-- Shared TailwindCSS Configuration -->
   <?!= include('SharedTailwindConfig'); ?>
   <script>
-    // GASネイティブログ使用: console.log/warn/error を直接使用
   </script>
 
   <?!= include('SharedUtilities'); ?>
 
   <script>
-    // Unified Configuration - CLAUDE.md Compliant
     const __CONFIG_JSON__ = '<?= typeof configJSON !== "undefined" ? configJSON : "{}" ?>';
 
-    // Legacy template variables for backward compatibility
     const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
     const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
     const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
@@ -147,15 +137,11 @@
     const __EDITOR_NAME__ = '<?= typeof editorName !== "undefined" ? editorName : "" ?>';
     const __IS_EDITOR__ = '<?= typeof isEditor !== "undefined" ? isEditor : "false" ?>';
 
-    // Immediate window variable assignment for page.js.html compatibility
     window.SHEET_NAME = __SHEET_NAME__.startsWith('<') ? '' : __SHEET_NAME__;
     window.USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;
 
-    // Display settings will be initialized after ConfigJSON parsing
-    // Unified editor capability - Zero-Dependency Architecture
     window.isEditor = __IS_EDITOR__.startsWith('<') ? false : __IS_EDITOR__ === 'true';
 
-    // Unified Configuration Parsing - CLAUDE.md Compliant
     let CONFIG = {};
     try {
       if (typeof __CONFIG_JSON__ === 'string' && !__CONFIG_JSON__.startsWith('<')) {
@@ -167,7 +153,6 @@
       console.warn('Failed to parse configJSON:', e);
     }
 
-    // Unified access pattern - SharedUtilities使用
     window.UNIFIED_CONFIG = window.sharedUtilities.createUnifiedConfig(
       CONFIG,
       { __USER_ID__ }, // Legacy変数最小化 - userIdのみ保持（教育現場安全性考慮）
@@ -178,15 +163,12 @@
       }
     );
 
-    // ✅ 管理者機能の初期化
     window.showAdminFeatures = window.UNIFIED_CONFIG.isAdminUser || false;
     window.hasAdminCapability = window.UNIFIED_CONFIG.isAdminUser || false;
 
-    // ✅ ConfigJSONから直接設定を取得（全ユーザー共通）
     const settings = window.UNIFIED_CONFIG?.displaySettings || {};
     window.showCounts = settings.showReactions || false;
     window.displayMode = settings.showNames ? 'named' : 'anonymous';
-    // ✅ 開発環境でのみConfigJSON詳細ログを出力
     const isDev = window.location.href.includes('dev');
     if (isDev) {
         fullConfigJSON: CONFIG,
@@ -195,7 +177,6 @@
       });
     }
 
-    // Legacy variable assignments - use unified config where possible
     window.SHEET_NAME = window.UNIFIED_CONFIG.sheetName;
     window.USER_ID = window.UNIFIED_CONFIG.userId;
     const EDITOR_NAME = __EDITOR_NAME__.startsWith('<') ? '' : __EDITOR_NAME__;

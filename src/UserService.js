@@ -16,7 +16,6 @@
 /* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserConfig, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse */
 
 
-// GAS-Native UserService (直接API版)
 
 
 /**
@@ -34,7 +33,6 @@
  */
 function getCurrentUserInfo() {
   try {
-    // セッション取得
     const email = Session.getActiveUser().getEmail();
     if (!email) {
       console.warn('getCurrentUserInfo: 有効なセッションなし');
@@ -44,7 +42,6 @@ function getCurrentUserInfo() {
     // ✅ SECURITY FIX: ユーザー固有のキャッシュキー（共有キャッシュの個人情報流出防止）
     const cacheKey = `current_user_info_${email}`;
 
-    // キャッシュ確認
     const cache = CacheService.getScriptCache();
     const cached = cache.get(cacheKey);
     if (cached) {
@@ -53,21 +50,17 @@ function getCurrentUserInfo() {
         return JSON.parse(cached);
       } catch (parseError) {
         console.warn('getCurrentUserInfo: Cache parse failed, fetching fresh data:', parseError.message);
-        // キャッシュが破損している場合は削除して続行
         cache.remove(cacheKey);
       }
     }
 
-    // データベース検索
     const userInfo = findUserByEmail(email, { requestingUser: email });
     if (!userInfo) {
       return null;
     }
 
-    // 設定情報を統合
     const completeUserInfo = enrichUserInfo(userInfo);
 
-    // キャッシュ保存（5分間）
     cache.put(cacheKey, JSON.stringify(completeUserInfo), CACHE_DURATION.LONG);
 
     return completeUserInfo;
@@ -91,11 +84,9 @@ function enrichUserInfo(userInfo) {
         throw new Error('無効なユーザー情報');
       }
 
-      // 統一API使用: 構造化パース
       const configResult = getUserConfig(userInfo.userId);
       const config = configResult.success ? configResult.config : {};
 
-      // 動的URLを生成・キャッシュ
       const enrichedConfig = generateDynamicUserUrls(config);
 
       return {
@@ -125,19 +116,16 @@ function generateDynamicUserUrls(config) {
     try {
       const enhanced = { ...config };
 
-      // スプレッドシートURL生成
       if (config.spreadsheetId && !config.spreadsheetUrl) {
         if (config.spreadsheetId && typeof config.spreadsheetId === 'string') {
           enhanced.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`;
         }
       }
 
-      // アプリURL生成（公開済みの場合）
       if (config.isPublished && !config.appUrl) {
         enhanced.appUrl = ScriptApp.getService().getUrl();
       }
 
-      // フォームURL存在確認
       if (config.formUrl) {
         enhanced.hasValidForm = validateUrl(config.formUrl)?.isValid || false;
       }
@@ -150,12 +138,10 @@ function generateDynamicUserUrls(config) {
 }
 
 
-// 🛡️ 権限・アクセス制御
 
 
 
 
-// 🔐 統一認証システム（Administrator/Editor/Viewer）
 
 
 
@@ -192,7 +178,6 @@ function getUnifiedAccessLevel(email, targetUserId) {
 }
 
 
-// 🧹 キャッシュ・セッション管理
 
 
 /**
@@ -202,11 +187,9 @@ function getUnifiedAccessLevel(email, targetUserId) {
 
 
 
-// 🔧 ユーティリティ
 
 
 
-// 🔧 User Management Functions (from main.gs)
 
 
 /**
@@ -250,8 +233,6 @@ function getUser(infoType = 'email') {
     }
 
     if (infoType === 'full') {
-      // Get user from database if available
-      // 🔧 GAS-Native統一: 直接findUserByEmail使用
       const user = findUserByEmail(email, { requestingUser: email });
       return {
         success: true,
@@ -260,7 +241,6 @@ function getUser(infoType = 'email') {
       };
     }
 
-    // Default return for unsupported infoType
     return {
       success: false,
       message: `Unsupported infoType: ${infoType}`
@@ -284,12 +264,10 @@ function resetAuth() {
     let clearedKeysCount = 0;
     let clearConfigResult = null;
 
-    // 🔧 修正1: 現在ユーザー情報を事前取得（キャッシュクリア前）
     const currentEmail = getCurrentEmail();
     const currentUser = currentEmail ? findUserByEmail(currentEmail, { requestingUser: currentEmail }) : null;
     const userId = currentUser?.userId;
 
-    // 🔧 修正2: ConfigService専用クリア関数の活用
     if (userId) {
       try {
         clearConfigCache(userId);
@@ -300,9 +278,7 @@ function resetAuth() {
       }
     }
 
-    // 🔧 修正3: 包括的キャッシュキーリスト（実際の使用パターンに合わせて更新）
     // ✅ SECURITY NOTE: current_user_info はユーザー固有キー（current_user_info_${email}）に変更済み
-    // グローバルキャッシュキーのみをリストアップ
     const globalCacheKeysToRemove = [
       'admin_auth_cache',
       'session_data',
@@ -310,7 +286,6 @@ function resetAuth() {
       'bulk_admin_data_cache'
     ];
 
-    // グローバルキャッシュクリア
     globalCacheKeysToRemove.forEach(key => {
       try {
         cache.remove(key);
@@ -320,7 +295,6 @@ function resetAuth() {
       }
     });
 
-    // 🔧 修正4: User固有キャッシュの完全クリア（email + userId ベース）
     const userSpecificKeysCleared = [];
     if (currentEmail) {
       const emailBasedKeys = [
@@ -361,26 +335,20 @@ function resetAuth() {
       });
     }
 
-    // 🔧 修正5: リアクション・ハイライトロック完全クリア
     let reactionLocksCleared = 0;
     if (userId) {
       try {
-        // リアクション・ハイライトロックの動的検索・削除は複雑なので、
-        // 基本的なロックキーのパターンをクリア
         const lockPatterns = [
           `reaction_${userId}_`,
           `highlight_${userId}_`
         ];
 
-        // Note: GAS CacheService doesn't support pattern matching,
-        // so we clear known common patterns and rely on TTL expiration
         for (let i = 0; i < SYSTEM_LIMITS.MAX_LOCK_ROWS; i++) { // 最大100行のロックをクリア
           lockPatterns.forEach(pattern => {
             try {
               cache.remove(`${pattern}${i}`);
               reactionLocksCleared++;
             } catch (e) {
-              // Lock key might not exist - this is expected
             }
           });
         }
@@ -389,7 +357,6 @@ function resetAuth() {
       }
     }
 
-    // 🔧 修正6: 包括的なログ出力
     const logDetails = {
       currentUser: currentEmail ? `${currentEmail.substring(0, 8)}***@${currentEmail.split('@')[1]}` : 'N/A',
       userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',

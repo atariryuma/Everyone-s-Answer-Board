@@ -18,7 +18,6 @@
  */
 function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}) {
   try {
-    // 1. Existing mapping takes priority
     if (columnMapping && columnMapping[fieldType] !== undefined) {
       const mappedIndex = columnMapping[fieldType];
       if (typeof mappedIndex === 'number' && mappedIndex >= 0 && mappedIndex < headers.length) {
@@ -26,13 +25,11 @@ function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}
       }
     }
 
-    // 2. Filter system columns
     const { cleanHeaders, indexMap } = filterSystemColumns(headers);
     if (cleanHeaders.length === 0) {
       return { index: -1, confidence: 0, method: 'no_valid_headers' };
     }
 
-    // 3. Run optimized detection
     const detection = detectColumn(cleanHeaders, fieldType, options);
     const originalIndex = detection.index !== -1 ? indexMap[detection.index] : -1;
 
@@ -84,7 +81,6 @@ function detectColumn(headers, fieldType, options = {}) {
     return { index: -1, confidence: 0, method: 'unknown_field' };
   }
 
-  // Analyze field relationships for logical ordering
   const fieldRelationships = analyzeFieldRelationships(headers);
 
   let bestMatch = { index: -1, confidence: 0, method: 'no_match' };
@@ -118,26 +114,22 @@ function analyzeFieldRelationships(headers) {
 
   const patterns = getFieldPatterns();
 
-  // Identify potential answer and reason columns
   headers.forEach((header, index) => {
     if (!header || typeof header !== 'string') return;
 
     const normalizedHeader = header.toLowerCase().trim();
 
-    // Check for answer patterns
     const answerScore = calculateBaseScore(header, 'answer', patterns.answer);
     if (answerScore > 60) {
       relationships.answerCandidates.push({ index, header, score: answerScore });
     }
 
-    // Check for reason patterns
     const reasonScore = calculateBaseScore(header, 'reason', patterns.reason);
     if (reasonScore > 60) {
       relationships.reasonCandidates.push({ index, header, score: reasonScore });
     }
   });
 
-  // Identify logical answer → reason pairs
   relationships.answerCandidates.forEach(answer => {
     relationships.reasonCandidates.forEach(reason => {
       if (answer.index < reason.index) { // Answer comes before reason (logical)
@@ -161,12 +153,10 @@ function calculateBaseScore(header, fieldType, patterns) {
   const normalizedHeader = header.toLowerCase().trim();
   let maxScore = 0;
 
-  // Direct pattern matching
   if (patterns.exact && patterns.exact.some(keyword => normalizedHeader === keyword.toLowerCase())) {
     maxScore = 95;
   }
 
-  // Keyword matching
   if (patterns.keywords) {
     for (const keyword of patterns.keywords) {
       if (normalizedHeader.includes(keyword.toLowerCase())) {
@@ -176,7 +166,6 @@ function calculateBaseScore(header, fieldType, patterns) {
     }
   }
 
-  // Question pattern matching (for answer fields)
   if (fieldType === 'answer' && patterns.questionPatterns) {
     for (const pattern of patterns.questionPatterns) {
       if (pattern.test(header)) {
@@ -186,7 +175,6 @@ function calculateBaseScore(header, fieldType, patterns) {
     }
   }
 
-  // Regex patterns
   if (patterns.regex && patterns.regex.test(header)) {
     maxScore = Math.max(maxScore, 85);
   }
@@ -201,18 +189,15 @@ function calculateScoreWithLogic(header, fieldType, patterns, index, relationshi
   const normalizedHeader = header.toLowerCase().trim();
   const baseScore = calculateBaseScore(header, fieldType, patterns);
 
-  // Apply logical ordering constraints
   let logicalBonus = 0;
   let logicalPenalty = 0;
 
   if (fieldType === 'answer') {
-    // Boost answer fields that appear before reason candidates
     const hasReasonAfter = relationships.reasonCandidates.some(reason => reason.index > index);
     if (hasReasonAfter && baseScore > 70) {
       logicalBonus = 8; // Significant boost for logical answer placement
     }
 
-    // Check if this answer is part of a logical pair
     const isInLogicalPair = relationships.answerReasonPairs.some(pair => pair.answerIndex === index);
     if (isInLogicalPair) {
       logicalBonus += 5; // Additional boost for confirmed logical pairs
@@ -220,25 +205,21 @@ function calculateScoreWithLogic(header, fieldType, patterns, index, relationshi
   }
 
   if (fieldType === 'reason') {
-    // Penalize reason fields that appear before answer candidates
     const hasAnswerBefore = relationships.answerCandidates.some(answer => answer.index < index);
     if (!hasAnswerBefore && baseScore > 70) {
       logicalPenalty = 15; // Strong penalty for illogical reason placement
     }
 
-    // Boost reason fields that appear after answer candidates
     if (hasAnswerBefore) {
       logicalBonus = 5; // Moderate boost for logical reason placement
     }
 
-    // Check if this reason is part of a logical pair
     const isInLogicalPair = relationships.answerReasonPairs.some(pair => pair.reasonIndex === index);
     if (isInLogicalPair) {
       logicalBonus += 3; // Additional boost for confirmed logical pairs
     }
   }
 
-  // Apply sample data validation bonus
   let sampleBonus = 0;
   if (options.sampleData && options.sampleData.length > 0 && baseScore > 0) {
     sampleBonus = validateSampleData(options.sampleData, normalizedHeader, fieldType);
@@ -258,7 +239,6 @@ function validateSampleData(sampleData, header, fieldType) {
   const headerKeyword = header ? String(header).split(' ')[0] : '';
   if (!headerKeyword || headerKeyword.trim() === '') return 0;
 
-  // Extract column values (assume header is at a specific index)
   const columnValues = sampleData.slice(0, Math.min(5, sampleData.length))
     .map(row => row.find(cell => String(cell || '').toLowerCase().includes(headerKeyword.toLowerCase())))
     .filter(val => val != null && String(val).trim());
@@ -339,7 +319,6 @@ function validateFieldOrderLogic(mapping, confidence, headers) {
     warnings: []
   };
 
-  // Check answer → reason ordering constraint
   if (validatedMapping.answer !== undefined && validatedMapping.reason !== undefined) {
     const answerIndex = validatedMapping.answer;
     const reasonIndex = validatedMapping.reason;
@@ -351,14 +330,11 @@ function validateFieldOrderLogic(mapping, confidence, headers) {
       logical: answerIndex < reasonIndex
     });
 
-    // If reason comes before answer (illogical), apply correction
     if (reasonIndex < answerIndex) {
       const answerHeader = headers[answerIndex];
       const reasonHeader = headers[reasonIndex];
 
-      // Check if we should swap or remove the weaker field
       if (validatedConfidence.reason < validatedConfidence.answer - 10) {
-        // Remove reason field if it's significantly weaker
         delete validatedMapping.reason;
         delete validatedConfidence.reason;
         validation.corrections.push({
@@ -369,7 +345,6 @@ function validateFieldOrderLogic(mapping, confidence, headers) {
           reason: 'Reason field appears before answer field with low confidence'
         });
       } else if (validatedConfidence.answer < validatedConfidence.reason - 10) {
-        // Consider if the "answer" might actually be a reason
         const answerAsReasonScore = calculateBaseScore(answerHeader, 'reason', getFieldPatterns().reason);
         if (answerAsReasonScore > validatedConfidence.answer - 20) {
           validation.warnings.push({
@@ -381,7 +356,6 @@ function validateFieldOrderLogic(mapping, confidence, headers) {
           });
         }
       } else {
-        // Similar confidence levels - prefer logical ordering
         validation.corrections.push({
           action: 'preserved_logical_order',
           message: 'Maintained answer before reason despite close confidence scores',
@@ -394,8 +368,6 @@ function validateFieldOrderLogic(mapping, confidence, headers) {
     }
   }
 
-  // Additional logical constraints can be added here
-  // Example: timestamp should be first, email/name should be last, etc.
 
   return {
     mapping: validatedMapping,
@@ -414,13 +386,11 @@ function generateRecommendedMapping(headers, options = {}) {
     const confidence = {};
     const usedIndices = new Set();
 
-    // Sort fields by priority (answer first)
     const sortedFields = targetFields.sort((a, b) => {
       const priority = { answer: 10, reason: 8, email: 6, name: 4, class: 2 };
       return (priority[b] || 0) - (priority[a] || 0);
     });
 
-    // Resolve each field
     for (const fieldType of sortedFields) {
       const result = resolveColumnIndex(headers, fieldType, {}, options);
 
@@ -431,7 +401,6 @@ function generateRecommendedMapping(headers, options = {}) {
       }
     }
 
-    // Apply cross-field logical validation
     const validatedMapping = validateFieldOrderLogic(mapping, confidence, headers);
 
     const avgConfidence = Object.keys(validatedMapping.mapping).length > 0 ?
@@ -495,11 +464,9 @@ function extractFieldValueUnified(row, originalHeaders, fieldType, columnMapping
   try {
     const result = resolveColumnIndex(originalHeaders, fieldType, columnMapping, options);
 
-    // 厳密な検証: インデックス、行データ、値の存在をチェック
     if (result.index !== -1 && row && result.index < row.length && row[result.index] !== undefined) {
       const extractedValue = row[result.index];
 
-      // 値の妥当性チェック: 空文字、null、undefinedは null として扱う
       if (extractedValue === null || extractedValue === undefined || String(extractedValue).trim() === '') {
         return { value: null, index: -1, confidence: 0, method: 'empty_value' };
       }
@@ -513,7 +480,6 @@ function extractFieldValueUnified(row, originalHeaders, fieldType, columnMapping
       };
     }
 
-    // 検出失敗時は確実に null を返す（フォールバックなし）
     return { value: null, index: -1, confidence: 0, method: 'not_found' };
 
   } catch (error) {

@@ -5,7 +5,6 @@
      ============================================================================= */
 
   // ✅ IMMEDIATE WARNING SUPPRESSION - HIGHEST PRIORITY
-  // Execute before any other code to catch early warnings
   (function() {
     const originalWarn = window.console.warn;
     const originalError = window.console.error;
@@ -37,13 +36,8 @@
     };
   })();
 
-  // =============================================================================
-  // ENHANCED ERROR HANDLING FOR ASYNC/AWAIT ISSUES
-  // =============================================================================
 
-  // Global error handling for Google Apps Script compatibility issues
   (function () {
-    // Simplified error suppression - safe for GAS template processing
     const suppressedErrors = [
       'cdn.tailwindcss.com should not be used in production',
       'cdnjs.cloudflare.com',
@@ -51,11 +45,9 @@
       'TailwindCSS',
       'iframe which has both allow-scripts and allow-same-origin',
       'can escape its sandboxing',
-      // ✅ ブラウザサンドボックス警告抑制
       'An iframe which has both allow-scripts and allow-same-origin',
     ];
 
-    // Syntax errors that need special logging (not suppressed)
     const criticalSyntaxErrors = [
       'Unexpected end of input',
       'Unexpected token',
@@ -63,32 +55,27 @@
       'Invalid or unexpected token',
     ];
 
-    // Simplified and safe error handling for GAS template processing
     const originalErrorHandler = window.onerror;
     window.onerror = function (message, source, lineno, colno, error) {
       const errorMessage = message ? message.toString() : '';
 
-      // Only suppress specific known warnings that interfere with GAS
       const shouldSuppress = suppressedErrors.some((pattern) => errorMessage.includes(pattern));
 
       if (shouldSuppress) {
         return true; // Suppress known warnings
       }
 
-      // Show critical errors as notifications
       const isCritical = criticalSyntaxErrors.some((pattern) => errorMessage.includes(pattern));
       if (isCritical && window.notifications) {
         window.notifications.error('ページでエラーが発生しました。再読み込みをお試しください。', 8000);
       }
 
-      // Let all other errors (including syntax errors) pass through to original handler
       if (originalErrorHandler) {
         return originalErrorHandler.call(this, message, source, lineno, colno, error);
       }
       return false;
     };
 
-    // Console.warn suppression for Permissions Policy warnings
     const originalWarn = console.warn;
     console.warn = function (...args) {
       const message = args.join(' ');
@@ -101,7 +88,6 @@
       originalWarn.apply(console, args);
     };
 
-    // Enhanced promise rejection handling
     window.addEventListener('unhandledrejection', function (event) {
       const reason = event.reason?.toString() || '';
       const shouldSuppress = suppressedErrors.some((pattern) => reason.includes(pattern));
@@ -111,7 +97,6 @@
         return;
       }
 
-      // Show user-impacting promise rejections as notifications
       const isUserImpacting = reason.includes('Failed to fetch') ||
                               reason.includes('Network request failed') ||
                               reason.includes('google.script.run') ||
@@ -124,7 +109,6 @@
       console.warn('Unhandled promise rejection:', event.reason);
     });
 
-    // Script loading monitoring to detect problematic scripts
     const originalCreateElement = document.createElement;
     document.createElement = function (tagName) {
       const element = originalCreateElement.call(this, tagName);
@@ -137,7 +121,6 @@
           },
           set(value) {
 
-            // Monitor specific scripts that might cause syntax errors
             if (value.includes('tailwindcss') || value.includes('cdn.')) {
               element.addEventListener('load', () => {
               });
@@ -157,23 +140,17 @@
   })();
 
 
-  // =============================================================================
-  // PERFORMANCE UTILITIES
-  // =============================================================================
 
-  // Debounce function with key-based tracking
   class DebounceManager {
     constructor() {
       this.timers = new Map();
     }
 
     debounce(func, key, delay = 1000) {
-      // Cancel existing debounce for this key
       if (this.timers.has(key)) {
         this.timers.delete(key);
       }
 
-      // CLAUDE.md V8 compliant: Pure Promise-based delay
       const createPromiseDelay = (ms) => new Promise(resolve => {
         const start = Date.now();
         const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
@@ -186,7 +163,6 @@
           this.timers.delete(key);
         }
       }).catch(() => {
-        // Silent cleanup on cancellation
         this.timers.delete(key);
       });
 
@@ -194,17 +170,14 @@
     }
 
     clear(key) {
-      // V8 compliant: Promise cancellation by removal
       this.timers.delete(key);
     }
 
     clearAll() {
-      // V8 compliant: Clear all tracked promises
       this.timers.clear();
     }
   }
 
-  // Throttle function with key-based tracking
   class ThrottleManager {
     constructor() {
       this.timers = new Map();
@@ -219,7 +192,6 @@
         func();
         this.lastExecution.set(key, now);
       } else if (!this.timers.has(key)) {
-        // CLAUDE.md V8 compliant: Promise-based delay for throttle
         const createPromiseDelay = (ms) => new Promise(resolve => {
           const start = Date.now();
           const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
@@ -234,7 +206,6 @@
             this.timers.delete(key);
           }
         }).catch(() => {
-          // Silent cleanup on cancellation
           this.timers.delete(key);
         });
 
@@ -243,28 +214,20 @@
     }
 
     clear(key) {
-      // V8 compliant: Promise cancellation by removal
       this.timers.delete(key);
       this.lastExecution.delete(key);
     }
 
     clearAll() {
-      // V8 compliant: Clear all tracked promises and execution times
       this.timers.clear();
       this.lastExecution.clear();
     }
   }
 
-  // DOM utilities removed - unused throughout codebase
 
-  // =============================================================================
-  // CACHE MANAGEMENT
-  // =============================================================================
 
-  // Cache manager with TTL and size limits
   class Cache {
     constructor(maxSize = 100, defaultTTL = 300000) {
-      // 5 minutes default
       this.cache = new Map();
       this.timestamps = new Map();
       this.ttls = new Map();
@@ -276,7 +239,6 @@
       const now = Date.now();
       const actualTTL = ttl || this.defaultTTL;
 
-      // If cache is full, remove oldest entry
       if (this.cache.size >= this.maxSize && !this.cache.has(key)) {
         this.removeOldest();
       }
@@ -364,9 +326,6 @@
     }
   }
 
-  // =============================================================================
-  // GAS DATA LOADING API - Phase 2.1 & 2.2 Implementation
-  // =============================================================================
 
   /**
    * 統一データローディングAPI - GAS 2025ベストプラクティス準拠
@@ -400,13 +359,11 @@
         timeout = this.defaultTimeout
       } = options;
 
-      // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
       const funcName = functionName || 'unknown';
       const finalCacheKey = cacheKey || `${funcName}_${JSON.stringify(args || []).substring(0, 50)}`;
       const requestId = `${funcName}_${Date.now()}`;
 
       try {
-        // キャッシュチェック
         if (cache && this.cache.has(finalCacheKey)) {
           const cached = this.cache.get(finalCacheKey);
           if (Date.now() - cached.timestamp < cacheTTL) {
@@ -415,15 +372,12 @@
           this.cache.delete(finalCacheKey);
         }
 
-        // ローディング表示
         if (showLoading) {
           this.setLoadingState(requestId, true, loadingMessage);
         }
 
-        // データ読み込み実行
         const result = await this.executeGASCall(functionName, timeout, ...args);
 
-        // キャッシュ保存
         if (cache && result) {
           this.cache.set(finalCacheKey, {
             data: result,
@@ -479,14 +433,11 @@
      */
     executeGASCall(functionName, timeout, ...args) {
       return new Promise((resolve, reject) => {
-        // GAS環境チェック
         if (typeof google === 'undefined' || !google.script?.run) {
           reject(new Error('Google Apps Script環境が利用できません'));
           return;
         }
 
-        // タイムアウト設定
-        // CLAUDE.md V8 compliant: Promise-based timeout
         const createPromiseTimeout = (ms) => new Promise((_, reject) => {
           const start = Date.now();
           const check = () => {
@@ -502,7 +453,6 @@
         const timeoutPromise = createPromiseTimeout(timeout);
         const timeoutId = Symbol('promise-timeout');
 
-        // GAS関数実行
         let completed = false;
         google.script.run
           .withSuccessHandler((result) => {
@@ -520,7 +470,6 @@
           })
           [functionName](...args);
 
-        // V8 compliant timeout handling
         timeoutPromise.catch((timeoutError) => {
           if (!completed) {
             completed = true;
@@ -595,10 +544,8 @@
     }
   }
 
-  // グローバルインスタンス作成
   window.unifiedDataLoader = new UnifiedDataLoader();
 
-  // 後方互換性のためのヘルパー関数
   window.loadData = (functionName, options, ...args) =>
     window.unifiedDataLoader.loadData(functionName, options, ...args);
 
@@ -606,9 +553,6 @@
     window.unifiedDataLoader.loadBatchData(requests);
 
 
-  // =============================================================================
-  // ERROR HANDLING UTILITIES
-  // =============================================================================
 
   class ErrorHandler {
     constructor() {
@@ -630,12 +574,10 @@
 
         this.errors.push(errorInfo);
 
-        // Keep only recent errors
         if (this.errors.length > this.maxErrors) {
           this.errors.shift();
         }
 
-        // Better error logging with more details
         console.group('🚨 Error Logged');
         console.groupEnd();
       } catch (loggingError) {
@@ -663,9 +605,6 @@
     }
   }
 
-  // =============================================================================
-  // LOADING STATE MANAGEMENT
-  // =============================================================================
 
   class LoadingManager {
     constructor() {
@@ -675,7 +614,6 @@
     setLoading(key, isLoading, message = '') {
       this.loadingStates.set(key, { isLoading, message, timestamp: Date.now() });
 
-      // Emit custom event for UI updates
       const event = new CustomEvent('loadingStateChange', {
         detail: { key, isLoading, message },
       });
@@ -703,15 +641,10 @@
     }
   }
 
-  // GAS integration utilities removed - unused throughout codebase
 
-  // =============================================================================
   // SECURITY UTILITIES
-  // =============================================================================
 
-  // Security utilities for XSS prevention and data sanitization
   class SecurityUtilities {
-    // Escape HTML characters to prevent XSS attacks
     escapeHtml(text) {
       if (!text) return '';
       const div = document.createElement('div');
@@ -719,44 +652,33 @@
       return div.innerHTML;
     }
 
-    // Sanitize HTML content by removing dangerous tags
     sanitizeHtml(html) {
       if (!html) return '';
       const div = document.createElement('div');
       div.innerHTML = html;
 
-      // Remove script tags and other dangerous elements
       const scripts = div.querySelectorAll('script, object, embed, iframe, form');
       scripts.forEach((script) => script.remove());
 
       return div.innerHTML;
     }
 
-    // Validate email format
     isValidEmail(email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return emailRegex.test(email);
     }
   }
 
-  // =============================================================================
-  // INITIALIZATION AND GLOBAL SETUP
-  // =============================================================================
 
-  // Initialize global utilities
-  // Privacy-aware logging utilities
   class PrivacyLogger {
-    // Anonymize sensitive data for logging
     static anonymize(data) {
       if (typeof data === 'string') {
-        // Email anonymization
         if (data.includes('@')) {
           const parts = data.split('@');
           const safePart0 = (parts[0] && parts[0].substring) ? parts[0].substring(0, 2) : 'xx';
           const safePart1 = parts[1] || 'unknown';
           return `${safePart0}***@${safePart1}`;
         }
-        // Long text anonymization (potential user content)
         if (data.length > 30) {
           const safeDataPrefix = (data && data.substring) ? data.substring(0, 15) : 'unknown';
           const safeDataLength = (data && data.length) || 0;
@@ -768,11 +690,9 @@
       if (typeof data === 'object' && data !== null) {
         const anonymized = {};
         for (const [key, value] of Object.entries(data)) {
-          // Skip sensitive keys
           if (['email', 'userEmail', 'reason', 'opinion', 'answer', 'content'].includes(key)) {
             anonymized[key] = this.anonymize(value);
           } else if (key.includes('Id') && typeof value === 'string') {
-            // Anonymize IDs partially
             if (value && value.length && value.substring) {
               anonymized[key] = value.length > 8 ? `${value.substring(0, 4)}***` : value;
             } else {
@@ -788,7 +708,6 @@
       return data;
     }
 
-    // Safe console logging with privacy protection
     static log(message, data = null) {
       if (data) {
       } else {
@@ -822,43 +741,34 @@
     privacy: PrivacyLogger,
   };
 
-  // Setup global error handling
   window.sharedUtilities.errors.setupGlobalErrorHandling();
 
-  // Helper functions for backward compatibility
   window.debounce = (func, delay, key = 'default') => {
-    // Check if sharedUtilities exists before using
     if (window.sharedUtilities && window.sharedUtilities.debounce) {
       window.sharedUtilities.debounce.debounce(func, key, delay);
     } else {
-      // CLAUDE.md V8 compliant: Promise-based fallback
       const createPromiseDelay = (ms) => new Promise(resolve => {
         const start = Date.now();
         const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
         check();
       });
       createPromiseDelay(delay).then(func).catch(() => {
-        // Silent error handling for fallback
       });
     }
   };
 
   window.throttle = (func, delay, key = 'default') => {
-    // Check if sharedUtilities exists before using
     if (window.sharedUtilities && window.sharedUtilities.throttle) {
       window.sharedUtilities.throttle.throttle(func, key, delay);
     } else {
-      // Simple fallback
       func();
     }
   };
 
-  // Global cache instance for backward compatibility
   if (!window.UnifiedCache) {
     window.UnifiedCache = Cache;
   }
 
-  // DOM ready utility
   window.onDOMReady = function (callback) {
     if (document.readyState === 'loading') {
       document.addEventListener('DOMContentLoaded', callback);
@@ -869,13 +779,8 @@
 
 
 
-  // =============================================================================
-  // AUTHENTICATION UTILITIES
-  // =============================================================================
 
-  // Shared authentication functions for consistent behavior across pages
   window.sharedUtilities.auth = {
-    // Account switching functionality shared across pages
     switchToAnotherAccount: function () {
       if (
         confirm(
@@ -888,7 +793,6 @@
               if (result && result.success) {
                 const url = new URL(window.location.href);
                 url.searchParams.set('force_account_selection', 'true');
-                // GAS 2021年以降: window.open(_top) でリダイレクト
                 window.open(url.toString(), '_top');
               } else {
                 window.sharedUtilities.auth.showAccountSwitchFallback();
@@ -906,7 +810,6 @@
       }
     },
 
-    // Fallback guidance when automatic switch fails
     showAccountSwitchFallback: function () {
       const msg = `
           アカウントを切り替えるには以下の手順をお試しください：
@@ -921,11 +824,9 @@
       alert(msg);
     },
 
-    // 最適化されたログアウト（openAppSetupパターン採用）
     logout: function () {
       if (confirm('ログアウトしますか？')) {
 
-        // 1. フロントエンドキャッシュクリア
         try {
           if (window.sharedUtilities?.cache?.clear) {
             window.sharedUtilities.cache.clear();
@@ -936,15 +837,12 @@
           console.warn('Cache clear partially failed:', e);
         }
 
-        // 2. openAppSetupと同じパターンでWebApp URL取得→遷移
         google.script.run
           .withSuccessHandler(function(webAppUrl) {
             const loginUrl = `${webAppUrl}?mode=login`;
 
-            // openAppSetupと同じ手法: window.open(_top)でサンドボックス制限回避
             window.open(loginUrl, '_top');
 
-            // バックグラウンドでセッションクリア（非ブロッキング）- V8準拠
             const createPromiseDelay = (ms) => new Promise(resolve => {
               const start = Date.now();
               const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
@@ -960,13 +858,11 @@
                 })
                 .resetAuth();
             }).catch(() => {
-              // Silent error handling for background task
             });
           })
           .withFailureHandler(function(error) {
             console.warn('WebApp URL取得失敗、フォールバック実行:', error);
 
-            // フォールバック: openAppSetupと同じパターン
             try {
               const currentUrl = new URL(window.location.href);
               const baseUrl = currentUrl.origin + currentUrl.pathname;
@@ -974,7 +870,6 @@
               window.open(loginUrl, '_top');
             } catch (fallbackError) {
               console.warn('フォールバック遷移も失敗:', fallbackError);
-              // 最終フォールバック: 現在のページをリロード
               window.open(window.location.href, '_top');
             }
           })
@@ -983,10 +878,8 @@
     },
 
 
-    // Authentication verification with promise
     verifyAuthentication: function () {
       return new Promise((resolve, reject) => {
-        // CLAUDE.md V8 compliant: Promise-based timeout for auth verification
         const createPromiseTimeout = (ms) => new Promise((_, timeoutReject) => {
           const start = Date.now();
           const check = () => {
@@ -1021,7 +914,6 @@
           })
           .checkUserAuthentication();
 
-        // Handle timeout
         timeoutPromise.catch((timeoutError) => {
           if (!completed) {
             completed = true;
@@ -1031,12 +923,10 @@
       });
     },
 
-    // Display authentication info in standardized format
     displayAuthInfo: function (containerId, email, showSwitchOption = true) {
       const container = document.getElementById(containerId);
       if (!container) return;
 
-      // Safely escape email with fallback
       const safeEmail =
         window.sharedUtilities && window.sharedUtilities.security
           ? window.sharedUtilities.security.escapeHtml(email)
@@ -1076,7 +966,6 @@
     },
   };
 
-  // Global functions for backward compatibility
   window.switchToAnotherAccount = function () {
     window.sharedUtilities.auth.switchToAnotherAccount();
   };
@@ -1085,16 +974,11 @@
     window.sharedUtilities.auth.logout();
   };
 
-  // =============================================================================
-  // UNIFIED PAGE UTILITIES (SAFE RELOAD AND REDIRECT)
-  // =============================================================================
 
   window.sharedUtilities.page = {
-    // 安全なページリロード（GAS Sandbox対応）
     safeReload: function(options = {}) {
 
       try {
-        // 1. フロントエンドキャッシュクリア
         if (window.sharedUtilities?.cache?.clear) {
           window.sharedUtilities.cache.clear();
         }
@@ -1104,11 +988,9 @@
         console.warn('Cache clear partially failed during reload:', e);
       }
 
-      // 2. ページリロード（URLクリーンアップオプション対応）
       try {
         let targetUrl = window.location.href;
 
-        // オプション: URLパラメータをクリーンアップ
         if (options.cleanParams) {
           const currentUrl = new URL(window.location.href);
           const keepParams = options.keepParams || [];
@@ -1122,23 +1004,19 @@
           targetUrl = currentUrl.toString();
         }
 
-        // Direct location change (sandbox-safe, 99.9% success rate)
         window.location.href = targetUrl;
 
       } catch (error) {
         console.error('Page reload failed:', error);
-        // Fallback: Simple reload
         window.location.reload();
       }
     },
 
-    // ログイン画面への統一リダイレクト（logout関数のエイリアス）
     redirectToLogin: function() {
       window.sharedUtilities.auth.logout();
     }
   };
 
-  // グローバル関数エイリアス（後方互換性）
   window.safeReload = function(options) {
     window.sharedUtilities.page.safeReload(options);
   };
@@ -1147,9 +1025,6 @@
     window.sharedUtilities.page.redirectToLogin();
   };
 
-  // =============================================================================
-  // UNIFIED LOADING MANAGER (NEW ENHANCED VERSION)
-  // =============================================================================
 
   class UnifiedLoadingManager {
     constructor() {
@@ -1159,19 +1034,16 @@
       this.variantClasses = ['transparent', 'minimal', 'modal'];
     }
 
-    // Initialize the loading manager with DOM element detection
     init(retries = 5, delay = 100, onSuccess = null) {
       if (this.initialized) {
         if (onSuccess) onSuccess();
         return true;
       }
 
-      // Enhanced DOM readiness check
       if (document.readyState === 'loading') {
         document.addEventListener(
           'DOMContentLoaded',
           () => {
-            // CLAUDE.md V8 compliant: requestIdleCallback for DOM-ready retry
             requestIdleCallback(() => this.init(retries, delay, onSuccess), { timeout: 50 });
           },
           { once: true }
@@ -1192,7 +1064,6 @@
         return true;
       }
 
-      // Enhanced retry logic
       if (retries > 0) {
         console.warn(
           (() => {
@@ -1202,7 +1073,6 @@
             return `⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${safeReadyState}. Retrying in ${safeDelay}ms (${safeRetries} retries left)...`;
           })()
         );
-        // CLAUDE.md V8 compliant: Promise-based delay for loading manager retry
         const createPromiseDelay = (ms) => new Promise(resolve => {
           const start = Date.now();
           const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
@@ -1219,7 +1089,6 @@
       return false;
     }
 
-    // Create a fallback overlay if none exists
     createFallbackOverlay() {
       if (document.getElementById('loading-overlay')) {
         this.overlay = document.getElementById('loading-overlay');
@@ -1241,12 +1110,9 @@
       return false;
     }
 
-    // Main loading function with a unified API and enhanced error handling
     setLoading(isLoading, options = {}) {
       if (!this.initialized) {
-        // Silent retry - reduce console noise during initialization
         if (!this.init()) {
-          // Initialization failed, but continue silently to avoid spam
           return;
         }
       }
@@ -1262,9 +1128,7 @@
       }
     }
 
-    // Show loading overlay with options
     show(options = {}) {
-      // V8 Runtime 安全性: オプションが文字列の場合はmessageとして扱う
       if (typeof options === 'string') {
         options = { message: options };
       }
@@ -1278,28 +1142,23 @@
 
       this.currentState = config;
 
-      // V8 Runtime 安全性: overlay が null の場合の早期リターン
       if (!this.overlay) {
         console.error('UnifiedLoadingManager: Cannot show overlay - element not initialized');
-        // フォールバック作成を試行
         if (!this.createFallbackOverlay()) {
           return;
         }
       }
 
-      // Clean up previous variant classes with null safety
       this.variantClasses.forEach((vc) => {
         if (this.overlay && this.overlay.classList) {
           this.overlay.classList.remove(vc);
         }
       });
 
-      // Add the new variant class if it's not the default overlay
       if (config.type !== 'overlay' && this.overlay && this.overlay.classList) {
         this.overlay.classList.add(config.type);
       }
 
-      // Update content and show the overlay
       this.updateContent(config);
 
       if (this.overlay && this.overlay.classList) {
@@ -1307,7 +1166,6 @@
         this.overlay.style.setProperty('display', 'flex', 'important');
       }
 
-      // Manage user interaction
       if (config.disableInteraction && config.type !== 'transparent' && this.overlay) {
         document.body.style.overflow = 'hidden';
         document.body.style.pointerEvents = 'none';
@@ -1322,30 +1180,24 @@
       );
     }
 
-    // Hide loading overlay with cleanup
     hide() {
       if (!this.overlay) return;
 
       this.overlay.classList.add('hidden');
       this.overlay.style.setProperty('display', 'none', 'important');
 
-      // Clean up variant classes
       this.variantClasses.forEach((vc) => this.overlay.classList.remove(vc));
 
-      // Re-enable user interaction
       document.body.style.overflow = '';
       document.body.style.pointerEvents = '';
 
-      // Clear current state
       this.currentState = null;
 
     }
 
-    // Update the overlay content dynamically
     updateContent(config) {
       if (!this.overlay) return;
 
-      // Use existing content or create default structure
       let messageElement = this.overlay.querySelector('.loading-message');
       if (!messageElement) {
         const rawMessage = (config && config.message) || 'Loading...';
@@ -1361,7 +1213,6 @@
         messageElement.textContent = config.message;
       }
 
-      // Remove any existing progress elements for clean display
       const existingProgress = this.overlay.querySelector('.loading-progress');
       if (existingProgress) {
         existingProgress.remove();
@@ -1373,7 +1224,6 @@
       }
     }
 
-    // Convenience methods for different loading types
     showOverlay(message = '処理中...') {
       this.setLoading(true, { message, type: 'overlay' });
     }
@@ -1383,13 +1233,11 @@
     }
   }
 
-  // Create and initialize the global instance once the DOM is ready.
   window.unifiedLoading = new UnifiedLoadingManager();
   document.addEventListener('DOMContentLoaded', () => {
     window.unifiedLoading.init();
   });
 
-  // Backward compatibility wrapper for the global setLoading function.
   window.setLoading = function (isLoading, message) {
     if (!isLoading) {
       window.unifiedLoading.setLoading(false);
@@ -1403,14 +1251,11 @@
     }
   };
 
-  // 🚀 部分ローディング機能（軽量操作用）
   window.setPartialLoading = function (loading, message) {
     if (loading) {
-      // 部分ローディング: 通知 + インラインスピナー、画面操作可能
       const safeInfoMessage = message || '処理中...';
       window.showInfo(safeInfoMessage);
 
-      // インライン要素にスピナークラスを追加（あれば）
       const activeElements = document.querySelectorAll('.partial-loading-target');
       activeElements.forEach((el) => {
         el.classList.add('partial-loading');
@@ -1421,7 +1266,6 @@
         el.disabled = true;
       });
     } else {
-      // 終了時: スピナー除去、元の状態に復元
       const activeElements = document.querySelectorAll('.partial-loading');
       activeElements.forEach((el) => {
         el.classList.remove('partial-loading');
@@ -1434,17 +1278,13 @@
     }
   };
 
-  // =============================================================================
   // IMMEDIATE WARNING SUPPRESSION - EMERGENCY FIX
-  // =============================================================================
 
-  // ✅ Immediate execution - highest priority
   const originalWarn = console.warn;
   const originalError = console.error;
 
   console.warn = function(...args) {
     const message = String(args[0] || '');
-    // Specific pattern matching for exact warning text
     if (message.includes('Unrecognized feature: \'ambient-light-sensor\'') ||
         message.includes('Unrecognized feature: \'speaker\'') ||
         message.includes('Unrecognized feature: \'vibrate\'') ||
@@ -1454,7 +1294,6 @@
         message.includes('tailwind') ||
         message.includes('cdn.tailwindcss.com') ||
         message.includes('net state changed')) {
-      // Suppress completely
       return;
     }
     originalWarn.apply(console, args);
@@ -1466,23 +1305,17 @@
         message.includes('sandboxed with the') ||
         message.includes('iframe') ||
         message.includes('about:blank')) {
-      // Suppress completely
       return;
     }
     originalError.apply(console, args);
   };
 
-  // =============================================================================
-  // NOTIFICATION TOAST SYSTEM
-  // =============================================================================
 
-  // ✅ GAS-NATIVE NOTIFICATION SYSTEM - CLAUDE.md準拠
   class NotificationSystem {
     constructor() {
       this.container = null;
     }
 
-    // ✅ Simple container creation
     createContainer() {
       if (this.container) return;
 
@@ -1500,7 +1333,6 @@
       }
     }
 
-    // ✅ Essential notification display with animations
     showMessage(message, type = 'info') {
       if (!message) return;
 
@@ -1528,7 +1360,6 @@
 
       this.container.appendChild(notification);
 
-      // Auto-remove - GAS V8 compatible
       const duration = this.getDuration(type);
       const startTime = Date.now();
       const checkRemoval = () => {
@@ -1541,14 +1372,11 @@
       requestAnimationFrame(checkRemoval);
     }
 
-    // ✅ Animated removal
     remove(notification) {
       if (notification && notification.parentNode) {
-        // Apply slide out animation
         notification.style.animation = 'fadeOut 0.3s ease-out forwards';
         notification.style.willChange = 'transform, opacity';
 
-        // Remove after animation completes
         setTimeout(() => {
           if (notification && notification.parentNode) {
             notification.remove();
@@ -1557,13 +1385,11 @@
       }
     }
 
-    // ✅ Essential compatibility methods (used by existing code)
     success(message) { this.showMessage(message, 'success'); }
     error(message) { this.showMessage(message, 'error'); }
     warning(message) { this.showMessage(message, 'warning'); }
     info(message) { this.showMessage(message, 'info'); }
 
-    // ✅ CSS変数準拠の色マッピング
     getColor(type) {
       const colors = {
         success: 'var(--status-success)',
@@ -1587,10 +1413,8 @@
 
   }
 
-  // ✅ SIMPLE GLOBAL SETUP
   window.notifications = new NotificationSystem();
 
-  // ✅ DIRECT GLOBAL FUNCTIONS - GAS-Native Pattern
   window.showMessage = (message, type) => window.notifications.showMessage(message, type);
   window.showSuccess = (message) => window.notifications.showMessage(message, 'success');
   window.showError = (message) => window.notifications.showMessage(message, 'error');
@@ -1598,11 +1422,7 @@
   window.showInfo = (message) => window.notifications.showMessage(message, 'info');
 
 
-  // =============================================================================
-  // DYNAMIC PERFORMANCE CONSTANTS - Shared across all HTML files
-  // =============================================================================
 
-  // Performance level detection
   window.getPerformanceLevel = function() {
     if (typeof navigator === 'undefined') return 'medium';
 
@@ -1610,13 +1430,10 @@
     const cores = navigator.hardwareConcurrency || 4;
     const connection = navigator.connection;
 
-    // High-end device criteria
     if (memory >= 8 && cores >= 8) return 'high';
 
-    // Low-end device criteria
     if (memory <= 2 || cores <= 2) return 'low';
 
-    // Network considerations
     if (connection) {
       const { effectiveType, downlink } = connection;
       if (effectiveType === '2g' || (downlink && downlink < 1)) return 'low';
@@ -1635,7 +1452,6 @@
     return (memory && memory <= 2) || (cores && cores <= 2);
   };
 
-  // Dynamic performance constants
   window.getPerformanceConstants = function() {
     const perfLevel = window.getPerformanceLevel();
     const isLowEnd = window.isLowEndDevice();
@@ -1651,7 +1467,6 @@
     };
   };
 
-  // Getter functions for dynamic constants
   window.getBatchSize = function(type = 'base') {
     const constants = window.getPerformanceConstants();
     const safeType = (type && type.toUpperCase) ? type.toUpperCase() : 'DEFAULT';
@@ -1674,9 +1489,6 @@
     return window.getPerformanceConstants().IDLE_TIMEOUT;
   };
 
-  // =============================================================================
-  // UNIFIED CONFIG SYSTEM
-  // =============================================================================
 
   /**
    * 統一UNIFIED_CONFIG構築関数 - CLAUDE.md準拠
@@ -1686,7 +1498,6 @@
    * @returns {Object} 統一設定オブジェクト
    */
   window.sharedUtilities.createUnifiedConfig = function(CONFIG, legacyVars = {}, pageDefaults = {}) {
-    // V8安全性: 最小限のフォールバック（userIdのみ保持）
     const safeUserId = (value) => {
       return (typeof value === 'string' && !value.startsWith('<')) ? value : '';
     };
@@ -1695,8 +1506,6 @@
       userId: CONFIG.userId || safeUserId(legacyVars.__USER_ID__),
       targetUserId: pageDefaults.targetUserId || CONFIG.userId || safeUserId(legacyVars.__USER_ID__),
       userEmail: CONFIG.userEmail || '',
-      spreadsheetId: CONFIG.spreadsheetId || '', // Legacy削除 - configJSONで十分
-      sheetName: CONFIG.sheetName || '',         // Legacy削除 - configJSONで十分
       questionText: CONFIG.questionText || '回答ボード',
       isPublished: CONFIG.isPublished || false,
       isEditor: CONFIG.isEditor !== undefined ? CONFIG.isEditor : (pageDefaults.isEditor || false),
@@ -1711,9 +1520,6 @@
     };
   };
 
-  // =============================================================================
-  // SIMPLE ERROR DISPLAY - Minimal debug system
-  // =============================================================================
 
   /**
    * シンプルエラー表示関数
@@ -1722,11 +1528,9 @@
   window.showSimpleError = function(message) {
     if (!message) return;
 
-    // 既存のモーダルを削除
     const existingModal = document.getElementById('simple-error-modal');
     if (existingModal) existingModal.remove();
 
-    // シンプルなエラーモーダル
     const modalHTML = `
       <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="simple-error-modal">
         <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 text-white">
@@ -1748,9 +1552,7 @@
     document.body.insertAdjacentHTML('beforeend', modalHTML);
   };
 
-  // =============================================================================
 
-  // Prevent duplicate loading messages
   if (!window.sharedUtilitiesLoaded) {
     window.sharedUtilitiesLoaded = true;
       '✅ SharedUtilities loaded successfully - Version 3.0.0-flat (Zero-Dependency Architecture)'

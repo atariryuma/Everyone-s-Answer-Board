@@ -6,7 +6,6 @@
 
 window.ErrorHandler = {
 
-  // エラータイプ定義（バックエンドと統一）
   ErrorTypes: Object.freeze({
     AUTHENTICATION: 'authentication',
     AUTHORIZATION: 'authorization',
@@ -103,13 +102,11 @@ window.ErrorHandler = {
     const message = this.getUserMessage(error, context);
     this.logError(error, context);
 
-    // Use unified notification system if available
     if (window.notifications) {
       window.notifications.error(message);
     } else if (typeof alert === 'function') {
       alert(message);
     } else {
-      // Fallback: console output for debugging
       console.error('Error notification fallback:', message);
     }
   },
@@ -123,7 +120,6 @@ window.ErrorHandler = {
    */
   async callGAS(funcName, options = {}, ...args) {
     try {
-      // UnifiedDataLoaderが利用可能な場合はそれを使用
       if (window.unifiedDataLoader) {
         return await window.unifiedDataLoader.loadData(funcName, {
           showLoading: options.showLoading !== false,
@@ -133,7 +129,6 @@ window.ErrorHandler = {
         }, ...args);
       }
 
-      // フォールバック: 従来のGAS呼び出し
       return new Promise((resolve, reject) => {
         if (typeof google === 'undefined' || !google.script?.run) {
           const error = new Error('Google Apps Script環境が利用できません');
@@ -175,7 +170,6 @@ window.ErrorHandler = {
         return await window.unifiedDataLoader.loadBatchData(formattedRequests);
       }
 
-      // フォールバック: 個別実行
       const promises = requests.map(req =>
         this.callGAS(req.funcName, req.options || {}, ...(req.args || []))
           .catch(error => ({ error: error.message, funcName: req.funcName }))
@@ -219,7 +213,6 @@ window.ErrorHandler = {
     } = options;
 
     try {
-      // フォーム検証
       if (validateForm && typeof validateForm === 'function') {
         const validationResult = await validateForm();
         if (!validationResult.isValid) {
@@ -227,15 +220,12 @@ window.ErrorHandler = {
         }
       }
 
-      // ローディング表示
       if (window.unifiedLoading && showLoadingMessage) {
         window.unifiedLoading.show(showLoadingMessage);
       }
 
-      // 送信実行
       const result = await submitFunction();
 
-      // 成功処理
       if (successMessage) {
         if (window.notifications) {
           window.notifications.success(successMessage);
@@ -298,7 +288,6 @@ window.ErrorHandler = {
         this.logError(error, `${context} (試行${attempt}/${retryCount})`);
 
         if (attempt < retryCount) {
-          // CLAUDE.md V8 compliant: Promise-based delay for retry logic
           await new Promise(resolve => {
             const createPromiseDelay = (ms) => {
               const start = Date.now();
@@ -310,7 +299,6 @@ window.ErrorHandler = {
           continue;
         }
 
-        // 最終試行でも失敗した場合
         if (showErrors) {
           const userMessage = this.getUserMessage(error, context);
           if (window.notifications) {
@@ -353,22 +341,18 @@ window.ErrorHandler = {
       try {
         const result = await validator(field.value);
 
-        // スタイル更新
         field.classList.remove(invalidClass);
         field.classList.add(validClass);
 
-        // ツールチップ削除
         if (showTooltip) {
           this.removeTooltip(field);
         }
 
         return { isValid: true, result };
       } catch (error) {
-        // スタイル更新
         field.classList.remove(validClass);
         field.classList.add(invalidClass);
 
-        // ツールチップ表示
         if (showTooltip) {
           this.showTooltip(field, error.message);
         }
@@ -377,7 +361,6 @@ window.ErrorHandler = {
       }
     };
 
-    // CLAUDE.md V8 compliant: Promise-based debouncing
     let debouncePromise = null;
     field.addEventListener('input', () => {
       if (debouncePromise) {
@@ -433,7 +416,6 @@ window.ErrorHandler = {
   }
 };
 
-// グローバルエラーハンドリング設定
 window.addEventListener('error', (event) => {
   window.ErrorHandler.logError(event.error, 'グローバルエラー', {
     filename: event.filename,

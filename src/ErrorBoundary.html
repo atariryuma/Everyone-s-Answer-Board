@@ -7,37 +7,29 @@
     <title><?= title || 'エラー' ?> - みんなの回答ボード</title>
     <?!= HtmlService.createHtmlOutputFromFile('UnifiedStyles.css').getContent(); ?>
     <script>
-      // ✅ ハイブリッド自己完結方式: SharedUtilities活用 + 完全フォールバック
       function safeReload() {
-        // SharedUtilitiesが利用可能なら優先使用
         if (window.sharedUtilities?.page?.safeReload) {
           return window.sharedUtilities.page.safeReload();
         }
 
-        // フォールバック: GAS iframe sandbox対応リロード
         try {
           localStorage.removeItem('current_user_info');
           sessionStorage.clear();
-          // GAS 2021年以降: window.open(_top) でリロード
           window.open(window.location.href, '_top');
         } catch (e) {
-          // 最終フォールバック
           window.open(window.location.href, '_top');
         }
       }
 
       function redirectToLogin() {
-        // SharedUtilitiesが利用可能なら優先使用
         if (window.sharedUtilities?.auth?.logout) {
           return window.sharedUtilities.auth.logout();
         }
 
-        // フォールバック: GAS iframe sandbox対応リダイレクト
         try {
           const url = new URL(window.location.href);
           url.searchParams.set('mode', 'login');
           url.searchParams.delete('userId');
-          // GAS 2021年以降: window.open(_top) でリダイレクト
           window.open(url.toString(), '_top');
         } catch (e) {
           const loginUrl = window.location.origin + window.location.pathname + '?mode=login';
@@ -45,15 +37,12 @@
         }
       }
 
-      // シンプルエラー表示（ErrorBoundary版）
       function showSimpleError(message) {
         if (!message) return;
 
-        // 既存のモーダルを削除
         const existingModal = document.getElementById('simple-error-modal');
         if (existingModal) existingModal.remove();
 
-        // シンプルなエラーモーダル
         const modalHTML = `
           <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="simple-error-modal">
             <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 text-white">
@@ -75,7 +64,6 @@
         document.body.insertAdjacentHTML('beforeend', modalHTML);
       }
 
-      // グローバルに利用可能にする
       window.showSimpleError = showSimpleError;
     </script>
   </head>

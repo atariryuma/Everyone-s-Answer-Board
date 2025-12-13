@@ -1,19 +1,15 @@
 <!-- Shared TailwindCSS CDN Configuration -->
 <!-- 手軽さ重視のCDN読み込み方式 - シンプル統一設定 -->
 <script>
-  // TailwindCSS configuration with production mode detection
   (function () {
     const isProduction =
       window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1';
-    // Google Apps Script環境は常に本番として扱う
 
     window.tailwind = {
       config: {
         mode: 'jit',
         corePlugins: { preflight: false },
-        // Suppress console warnings in production
         devtools: !isProduction,
-        // Additional production optimizations
         ...(isProduction && {
           important: true,
           purge: { enabled: true },
@@ -22,7 +18,6 @@
       },
     };
 
-    // Suppress Tailwind development warnings in production
     if (isProduction || window.location.protocol === 'https:') {
       const originalWarn = console.warn;
       const originalLog = console.log;

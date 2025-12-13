@@ -16,7 +16,6 @@
 /* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo */
 
 
-// GAS-Native ConfigService (直接API版)
 
 
 /**
@@ -33,7 +32,6 @@
  */
 function validateFormAppAccess() {
   try {
-    // Step 1: FormApp存在確認
     if (typeof FormApp === 'undefined') {
       return {
         hasAccess: false,
@@ -42,9 +40,7 @@ function validateFormAppAccess() {
       };
     }
 
-    // Step 2: ✅ 実行時テスト - 軽量API呼び出しで権限確認
     try {
-      // FormApp.getUi()は最も軽量な権限テスト（実行時エラーを検知可能）
       const hasUi = typeof FormApp.getUi === 'function';
 
       if (!hasUi) {
@@ -55,7 +51,6 @@ function validateFormAppAccess() {
         };
       }
 
-      // Step 3: openByUrl機能確認（実際の使用で必要）
       if (typeof FormApp.openByUrl !== 'function') {
         return {
           hasAccess: false,
@@ -71,7 +66,6 @@ function validateFormAppAccess() {
       };
 
     } catch (runtimeError) {
-      // 実行時権限エラーを検知
       return {
         hasAccess: false,
         reason: 'RUNTIME_PERMISSION_ERROR',
@@ -97,8 +91,6 @@ function validateFormAppAccess() {
  * @returns {Object} デフォルト設定
  */
 function getDefaultConfig(userId) {
-  // 🚀 Zero-dependency: 静的デフォルト値を提供
-  // ✅ Optimized: createdAt and lastModified moved to database columns, removed from configJSON
   return {
     userId,
     setupStatus: 'pending',
@@ -110,7 +102,6 @@ function getDefaultConfig(userId) {
       pageSize: 20
     },
     completionScore: 0
-    // lastModified removed - managed exclusively by database column
   };
 }
 
@@ -124,10 +115,8 @@ function parseAndRepairConfig(configJson, userId) {
   try {
     const config = JSON.parse(configJson || '{}');
 
-    // 基本修復
     const repairedConfig = repairNestedConfig(config, userId);
 
-    // 必須フィールド確保
     return ensureRequiredFields(repairedConfig, userId);
   } catch (parseError) {
     console.warn('parseAndRepairConfig: JSON解析失敗 - デフォルト設定を使用', {
@@ -150,7 +139,6 @@ function parseAndRepairConfig(configJson, userId) {
 function repairNestedConfig(config, userId) {
   const repaired = { ...config };
 
-  // displaySettings修復
   if (!repaired.displaySettings || typeof repaired.displaySettings !== 'object') {
     repaired.displaySettings = {
       showNames: false,
@@ -160,7 +148,6 @@ function repairNestedConfig(config, userId) {
     };
   }
 
-  // columnMapping修復 - ✅ CLAUDE.md準拠: シンプル構造 {answer: 4, class: 2}
   if (!repaired.columnMapping || typeof repaired.columnMapping !== 'object') {
     repaired.columnMapping = {};
   }
@@ -185,7 +172,6 @@ function ensureRequiredFields(config, userId) {
     displaySettings: config.displaySettings || { showNames: false, showReactions: false, theme: 'default', pageSize: 20 },
     columnMapping: config.columnMapping,
     completionScore: calculateCompletionScore(config)
-    // lastModified removed - managed exclusively by database column
   };
 }
 
@@ -209,7 +195,6 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
       manualUrl: `${webAppUrl}?mode=manual`  // ✅ 使い方ガイド用URL追加
     };
 
-    // システムメタデータ追加
     enhanced.systemMeta = {
       lastGenerated: new Date().toISOString(),
       version: '3.0.0-flat',
@@ -227,13 +212,11 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
 
 
 
-// 💾 設定保存・更新
 
 
 
 
 
-// ✅ 設定検証・サニタイズ
 
 /**
  * 公開専用設定検証（厳格版）
@@ -244,7 +227,6 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
  */
 function validatePublishConfig(config, userId) {
   try {
-    // 基本検証を実行
     const baseValidation = validateAndSanitizeConfig(config, userId);
     if (!baseValidation.success) {
       return baseValidation;
@@ -252,7 +234,6 @@ function validatePublishConfig(config, userId) {
 
     const errors = [];
 
-    // 公開時の必須フィールド検証
     if (!config.spreadsheetId || typeof config.spreadsheetId !== 'string' || !config.spreadsheetId.trim()) {
       errors.push('公開にはスプレッドシートIDが必要です');
     }
@@ -266,7 +247,6 @@ function validatePublishConfig(config, userId) {
     } else if (Object.keys(config.columnMapping).length === 0) {
       errors.push('公開には列マッピングが必要です（空のマッピングは無効）');
     } else {
-      // 必須: answer 列の検証（0 も有効な列番号）
       const answerColumn = config.columnMapping.answer;
       if (answerColumn === undefined || answerColumn === null || (typeof answerColumn === 'number' && answerColumn < 0)) {
         errors.push('公開には回答列（answer）の設定が必要です');
@@ -302,12 +282,9 @@ function validatePublishConfig(config, userId) {
  */
 function validateAndSanitizeConfig(config, userId) {
   try {
-    // Validate column mapping if present
     if (config.columnMapping) {
-      // Column mapping validation handled by validateConfig
     }
 
-    // 統一検証: validators.gsのvalidateConfigを活用
     const validationResult = validateConfig(config);
     if (!validationResult.isValid) {
       return {
@@ -318,13 +295,11 @@ function validateAndSanitizeConfig(config, userId) {
       };
     }
 
-    // ユーザーIDの追加検証
     const errors = [];
     if (!validateConfigUserId(userId)) {
       errors.push('無効なユーザーID形式');
     }
 
-    // ConfigService固有の追加サニタイズ
     const sanitized = { ...validationResult.sanitized };
     sanitized.userId = userId;
 
@@ -362,7 +337,6 @@ function validateAndSanitizeConfig(config, userId) {
 }
 
 
-// 🔧 ヘルパー関数
 
 
 /**
@@ -385,7 +359,6 @@ function sanitizeDisplaySettings(displaySettings) {
  * @returns {Object} サニタイズ済み列マッピング
  */
 function sanitizeMapping(columnMapping) {
-  // ✅ CLAUDE.md準拠: シンプル構造直接サニタイズ {answer: 4, class: 2}
   const sanitized = {};
   const validFields = ['answer', 'reason', 'class', 'name', 'timestamp', 'email'];
 
@@ -421,7 +394,6 @@ function validateConfigUserId(userId) {
  */
 
 
-// 📊 システム状態・診断
 
 
 
@@ -431,7 +403,6 @@ function validateConfigUserId(userId) {
  */
 function isSystemSetup() {
   try {
-    // ✅ CLAUDE.md準拠: Batched user config retrieval (70x performance improvement)
     const userConfigResult = getBatchedUserConfig(); // eslint-disable-line no-undef
     if (!userConfigResult.success || !userConfigResult.user) {
       return false;
@@ -455,17 +426,13 @@ function calculateCompletionScore(config) {
   let score = 0;
   const maxScore = 100;
 
-  // 基本設定 (50点)
   if (config.spreadsheetId) score += 25;
   if (config.sheetName) score += 25;
 
-  // フォーム設定 (30点)
   if (config.formUrl) score += 30;
 
-  // 表示設定 (10点)
   if (config.displaySettings) score += 10;
 
-  // 列マッピング (10点) - ✅ CLAUDE.md準拠: シンプル構造対応
   if (config.columnMapping && Object.keys(config.columnMapping).length > 0) score += 10;
 
   return Math.min(score, maxScore);
@@ -479,7 +446,6 @@ function clearConfigCache(userId) {
   try {
     const cache = CacheService.getScriptCache();
 
-    // 🔧 CLAUDE.md準拠: 依存関係キャッシュの完全無効化
     const keysToRemove = [
       `config_${userId}`,           // 設定キャッシュ
       `user_${userId}`,             // ユーザーキャッシュ
@@ -488,7 +454,6 @@ function clearConfigCache(userId) {
       `question_text_${userId}`     // 質問テキストキャッシュ
     ];
 
-    // 一括削除でパフォーマンス向上
     if (keysToRemove.length > 0) {
       cache.removeAll(keysToRemove);
     }
@@ -507,7 +472,6 @@ function clearAllConfigCache(userIds = []) {
       return;
     }
 
-    // 特定ユーザー群のキャッシュを一括クリア
     const allKeysToRemove = [];
     userIds.forEach(userId => {
       if (typeof userId === 'string' && userId.trim()) {
@@ -542,7 +506,6 @@ function hasCoreSystemProps() {
   try {
     const props = PropertiesService.getScriptProperties();
 
-    // 3つの必須項目をすべてチェック（依存関係なしで直接指定）
     const adminEmail = props.getProperty('ADMIN_EMAIL');
     const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
     const creds = props.getProperty('SERVICE_ACCOUNT_CREDS');
@@ -556,7 +519,6 @@ function hasCoreSystemProps() {
       return false;
     }
 
-    // SERVICE_ACCOUNT_CREDSのJSON検証
     try {
       const parsed = JSON.parse(creds);
       if (!parsed || typeof parsed !== 'object' || !parsed.client_email) {
@@ -576,7 +538,6 @@ function hasCoreSystemProps() {
 }
 
 
-// 📱 アプリケーション管理
 
 
 
@@ -584,7 +545,6 @@ function hasCoreSystemProps() {
 
 
 
-// 🔧 ヘルパー関数（依存関数）
 
 
 /**
@@ -599,10 +559,8 @@ function hasCoreSystemProps() {
 function getQuestionText(config, context = {}, preloadedHeaders = null) {
   try {
 
-    // ✅ CLAUDE.md準拠: シンプル構造対応
     const answerIndex = config?.columnMapping?.answer;
 
-    // 1. config.headersから取得を試行 - ✅ シンプル構造対応
     if (typeof answerIndex === 'number' && config?.headers?.[answerIndex]) {
       const questionText = config.headers[answerIndex];
       if (questionText && typeof questionText === 'string' && questionText.trim()) {
@@ -610,7 +568,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
       }
     }
 
-    // 2. ✅ パフォーマンス最適化: 事前取得されたheadersから取得を試行
     if (typeof answerIndex === 'number' && preloadedHeaders && preloadedHeaders[answerIndex]) {
       const questionText = preloadedHeaders[answerIndex];
       if (questionText && typeof questionText === 'string' && questionText.trim()) {
@@ -618,7 +575,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
       }
     }
 
-    // 3. headersがない場合、スプレッドシートから動的取得
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
         // ✅ CRITICAL: 同一ドメイン共有設定で対応（サービスアカウント不使用）
@@ -628,7 +584,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
           const { spreadsheet } = dataAccess;
           const sheet = spreadsheet.getSheetByName(config.sheetName);
           if (sheet) {
-            // ✅ API最適化: getSheetInfo()でAPI呼び出し66%削減（3回→1回）
             const { lastCol, headers } = getSheetInfo(sheet);
             if (lastCol > 0 && headers && headers[answerIndex]) {
               const questionText = headers[answerIndex];
@@ -645,12 +600,10 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
       }
     }
 
-    // 4. formTitleからの取得
     if (config?.formTitle && typeof config.formTitle === 'string' && config.formTitle.trim()) {
       return config.formTitle.trim();
     }
 
-    // 5. デフォルトフォールバック
     return 'Everyone\'s Answer Board';
   } catch (error) {
     console.error('❌ getQuestionText ERROR:', error.message);
@@ -666,7 +619,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
  */
 
 
-// 🔧 統一configJson操作API (CLAUDE.md準拠)
 
 
 /**
@@ -677,7 +629,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
  * @returns {Object} {success: boolean, config: Object, message?: string, userId?: string}
  */
 function getUserConfig(userId, preloadedUser = null) {
-  // V8最適化: 事前変数チェック（CLAUDE.md 151-169行準拠）
   if (!userId || typeof userId !== 'string' || !userId.trim()) {
     return {
       success: false,
@@ -687,7 +638,6 @@ function getUserConfig(userId, preloadedUser = null) {
   }
 
   try {
-    // ✅ CLAUDE.md準拠: 70x Performance Improvement - 事前取得データ活用
     const user = preloadedUser || findUserById(userId, {
       requestingUser: getCurrentEmail()
     });
@@ -700,7 +650,6 @@ function getUserConfig(userId, preloadedUser = null) {
       };
     }
 
-    // V8最適化: configJson存在チェック + 構造化パース
     if (!user.configJson || typeof user.configJson !== 'string') {
       return {
         success: true,
@@ -710,7 +659,6 @@ function getUserConfig(userId, preloadedUser = null) {
       };
     }
 
-    // 構造化パース（修復機能付き）- 既存parseAndRepairConfig利用
     const config = parseAndRepairConfig(user.configJson, userId);
 
     return {
@@ -744,7 +692,6 @@ function getUserConfig(userId, preloadedUser = null) {
  * @returns {Object} {success: boolean, message: string, data?: Object}
  */
 function saveUserConfig(userId, config, options = {}) {
-  // V8最適化: 入力検証（事前チェック）
   if (!userId || typeof userId !== 'string' || !userId.trim()) {
     return {
       success: false,
@@ -760,8 +707,6 @@ function saveUserConfig(userId, config, options = {}) {
   }
 
   try {
-    // 🔧 CLAUDE.md準拠: 楽観的ロック（ETag）検証の実装
-    // ✅ Optimized: Use database lastModified for ETag validation
     const user = findUserById(userId, { requestingUser: getCurrentEmail() });
     if (!user) {
       return {
@@ -774,7 +719,6 @@ function saveUserConfig(userId, config, options = {}) {
       if (user.configJson) {
         try {
           const currentConfig = JSON.parse(user.configJson);
-          // ✅ Optimized: Fallback to database lastModified for ETag comparison
           const currentETag = currentConfig.etag || user.lastModified;
 
           if (currentETag && config.etag !== currentETag) {
@@ -793,12 +737,10 @@ function saveUserConfig(userId, config, options = {}) {
           }
         } catch (parseError) {
           console.warn('saveUserConfig: Current config parse error for ETag validation:', parseError.message);
-          // パースエラーの場合は競合チェックをスキップして続行
         }
       }
     }
 
-    // 1. 統合検証・サニタイズ（既存validateAndSanitizeConfig利用）
     const validation = validateAndSanitizeConfig(config, userId);
     if (!validation.success) {
       return {
@@ -808,27 +750,18 @@ function saveUserConfig(userId, config, options = {}) {
       };
     }
 
-    // 2. 共通フィールドクリーンアップ
     const cleanedConfig = cleanConfigFields(validation.data, options);
 
-    // 3. タイムスタンプ更新とETag生成
-    // ✅ Optimized: Remove lastModified from configJSON, use database column exclusively
-    // lastModified is now managed automatically by database updateUser function
 
     if (!cleanedConfig.lastAccessedAt) {
       cleanedConfig.lastAccessedAt = new Date().toISOString();
     }
 
-    // 🔧 CLAUDE.md準拠: 楽観的ロック用ETag生成
-    // ✅ Optimized: Use database lastModified for ETag generation
     const currentTime = new Date().toISOString();
     cleanedConfig.etag = `${currentTime}_${Math.random().toString(36).substring(2, 15)}`;
 
-    // 4. Zero-Dependency: 直接updateUser呼び出し
-    // ✅ Optimized: lastModified automatically managed by database updateUser function
     const updateResult = updateUser(userId, {
       configJson: JSON.stringify(cleanedConfig)
-      // lastModified removed - automatically updated by DatabaseCore
     });
 
     if (!updateResult || !updateResult.success) {
@@ -838,11 +771,8 @@ function saveUserConfig(userId, config, options = {}) {
       };
     }
 
-    // 5. キャッシュ無効化
     clearConfigCache(userId);
 
-    // ✅ セキュリティ: published変更時のSA検証キャッシュを無効化
-    // ユーザーが公開設定を変更した場合、即座に反映させる
     if (user.spreadsheetId) {
       const saValidationKey = `sa_validation_${user.spreadsheetId}`;
       try {
@@ -886,26 +816,21 @@ function cleanConfigFields(config, options = {}) {
     return config;
   }
 
-  // V8最適化: const/destructuring使用
   const cleanedConfig = { ...config };
 
-  // 標準的なクリーンアップフィールド（main.gsパターンから抽出）
   const fieldsToRemove = [
     'setupComplete',  // レガシーフィールド
     'isDraft',        // レガシーフィールド
     'questionText'    // 動的生成されるフィールド
   ];
 
-  // Legacy field cleanup removed - no longer needed
 
-  // フィールド削除実行
   fieldsToRemove.forEach(field => {
     if (field in cleanedConfig) {
       delete cleanedConfig[field];
     }
   });
 
-  // lastAccessedAt自動更新（オプション）
   if (options.updateAccessTime !== false) {
     cleanedConfig.lastAccessedAt = new Date().toISOString();
   }

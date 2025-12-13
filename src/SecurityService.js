@@ -11,7 +11,6 @@
 /* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL, getCurrentEmail, getCachedProperty */
 
 
-// 認証・セッション管理
 
 /**
  * 安全にメールアドレスからドメインを抽出する
@@ -24,7 +23,6 @@ function extractDomainSafely(email) {
   }
 
   try {
-    // 正規表現で厳密にメールアドレスをパース（複数@の防止）
     const parsed = email.match(/^[^@]+@([^@]+)$/);
     return parsed ? parsed[1].toLowerCase() : null;
   } catch (error) {
@@ -41,7 +39,6 @@ function getDeployUserDomainInfo() {
   try {
     const email = getCurrentEmail();
 
-    // Enhanced type validation for email
     if (!email || typeof email !== 'string' || email.trim() === '') {
       console.error('Authentication failed - invalid email:', typeof email, email);
       return {
@@ -89,7 +86,6 @@ function getDeployUserDomainInfo() {
 
 
 
-// 入力検証・サニタイズ
 
 /**
  * ユーザーデータ総合検証
@@ -111,7 +107,6 @@ function validateUserData(userData) {
         return result;
       }
 
-      // メールアドレス検証
       if (userData.email) {
         const emailValidation = validateEmail(userData.email);
         if (!emailValidation.isValid) {
@@ -122,7 +117,6 @@ function validateUserData(userData) {
         }
       }
 
-      // テキストフィールド検証・サニタイズ
       ['answer', 'reason', 'name', 'className'].forEach(field => {
         if (userData[field]) {
           const textValidation = validateText(userData[field]);
@@ -142,7 +136,6 @@ function validateUserData(userData) {
         }
       });
 
-      // URL検証
       if (userData.url) {
         const urlValidation = validateUrl(userData.url);
         if (!urlValidation.isValid) {
@@ -153,7 +146,6 @@ function validateUserData(userData) {
         }
       }
 
-      // ファイルサイズ制限チェック
       const dataSize = JSON.stringify(result.sanitizedData).length;
       if (dataSize > 32000) {
         result.errors.push('データサイズが制限を超えています');
@@ -173,7 +165,6 @@ function validateUserData(userData) {
 }
 
 
-// セキュリティ監査・ログ
 
 /**
  * セキュリティイベントログ
@@ -194,7 +185,6 @@ function logSecurityEvent(event) {
         ipAddress: event.ipAddress || ''
       };
 
-      // 重要度によってログレベル調整
       switch (event.severity) {
         case 'critical':
         case 'high':
@@ -206,7 +196,6 @@ function logSecurityEvent(event) {
         default:
       }
 
-      // 重要なログのみ永続化（PropertiesServiceで統一）
       if (event.severity === 'critical' || event.severity === 'high') {
         persistSecurityLog(logEntry);
       }
@@ -227,7 +216,6 @@ function persistSecurityLog(logEntry) {
       
       props.setProperty(logKey, JSON.stringify(logEntry));
       
-      // 古いログの削除（最新100件まで保持）
       cleanupOldSecurityLogs();
     } catch (error) {
       console.error('SecurityService.persistSecurityLog: エラー', error.message);
@@ -235,7 +223,6 @@ function persistSecurityLog(logEntry) {
 }
 
 
-// ユーティリティ・診断
 
 
 /**
@@ -257,10 +244,8 @@ function validateSpreadsheetAccess(spreadsheetId) {
         return errorResponse;
       }
 
-      // アクセステスト - 段階的にチェック
       let spreadsheet;
       try {
-        // Try normal permissions first, fall back to service account if needed
         const { spreadsheet: spreadsheetFromData } = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
         spreadsheet = spreadsheetFromData;
       } catch (openError) {
@@ -274,7 +259,6 @@ function validateSpreadsheetAccess(spreadsheetId) {
         return errorResponse;
       }
 
-      // 名前とシート情報を取得
       let name, sheets;
       try {
         name = spreadsheet.getName();
@@ -321,7 +305,6 @@ function validateSpreadsheetAccess(spreadsheetId) {
         spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : 'null'
       });
 
-      // より具体的なエラーメッセージ
       let userMessage = 'スプレッドシートにアクセスできません。';
       if (error.message.includes('Permission') || error.message.includes('権限')) {
         userMessage = 'スプレッドシートへのアクセス権限がありません。編集権限を確認してください。';
@@ -333,7 +316,6 @@ function validateSpreadsheetAccess(spreadsheetId) {
 
       errorResponse.message = userMessage;
 
-      // 絶対にnullを返さない
       return errorResponse;
     }
 }
@@ -347,18 +329,15 @@ function cleanupOldSecurityLogs() {
     const props = PropertiesService.getScriptProperties();
     const allProps = props.getProperties();
 
-    // セキュリティログのキーを抽出
     const logKeys = Object.keys(allProps).filter(key => key.startsWith('security_log_'));
 
     if (logKeys.length > 100) {
-      // タイムスタンプでソートして古いものから削除
       const sortedKeys = logKeys.sort((a, b) => {
         const timestampA = parseInt(a.split('_')[2], 10);
         const timestampB = parseInt(b.split('_')[2], 10);
         return timestampA - timestampB;
       });
 
-      // 古いログを削除（最新100件を残す）
       const keysToDelete = sortedKeys.slice(0, -100);
       keysToDelete.forEach(key => {
         try {

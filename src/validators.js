@@ -16,7 +16,6 @@
 /* global URL, getColumnAnalysis, getFormInfo */
 
 
-// 🔒 基本データ型検証関数群
 
 
 /**
@@ -37,7 +36,6 @@ function validateEmail(email) {
       return result;
     }
 
-    // 基本的なメールアドレス形式チェック
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email.trim())) {
       result.errors.push('無効なメールアドレス形式です');
@@ -84,12 +82,10 @@ function validateUrl(url) {
             hash: u.hash || ''
           };
         } catch {
-          // fall through to regex parser
         }
       }
 
       if (!parsed) {
-        // Regex-based parser for GAS backend where URL may be undefined
         const m = String(url).match(new RegExp('^(https?)://([^/?#]+)([^?#]*)([?][^#]*)?(#.*)?$', 'i'));
         if (!m) throw new Error('invalid');
         parsed = {
@@ -101,14 +97,12 @@ function validateUrl(url) {
         };
       }
 
-      // 許可されたプロトコル
       const allowedProtocols = ['https:', 'http:'];
       if (!allowedProtocols.includes(parsed.protocol)) {
         result.errors.push('HTTPSまたはHTTPプロトコルが必要です');
         return result;
       }
 
-      // 許可されたドメイン（Google関連のみ）
       const allowedDomains = [
         'docs.google.com',
         'forms.gle',
@@ -163,10 +157,8 @@ function validateText(text, options = {}) {
       metadata: {}
     };
 
-    // 🛡️ 型チェック強化 - null/undefined/非string型の完全検証
     if (text === null || text === undefined || typeof text !== 'string') {
       result.errors.push('有効なテキスト文字列が必要です');
-      // ✅ 簡素化: 型情報を一度だけ取得
       const inputType = text === null ? 'null' : text === undefined ? 'undefined' : typeof text;
       result.metadata.inputType = inputType;
       result.metadata.inputValue = text == null ? inputType : String(text);
@@ -176,7 +168,6 @@ function validateText(text, options = {}) {
     let sanitized = text;
     const originalLength = text.length;
 
-    // 長さチェック
     if (sanitized.length < minLength) {
       result.errors.push(`${minLength  }文字以上である必要があります`);
       return result;
@@ -187,7 +178,6 @@ function validateText(text, options = {}) {
       return result;
     }
 
-    // セキュリティチェック（XSS対策）
     const dangerousPatterns = [
       /<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi,
       /javascript:/gi,
@@ -208,7 +198,6 @@ function validateText(text, options = {}) {
       }
     });
 
-    // HTMLサニタイズ（許可されていない場合）
     if (!allowHtml) {
       sanitized = sanitized
         .replace(/&/g, '&amp;')
@@ -218,14 +207,12 @@ function validateText(text, options = {}) {
         .replace(/'/g, '&#x27;');
     }
 
-    // 改行処理
     if (!allowNewlines) {
       sanitized = sanitized.replace(/[\r\n]/g, ' ');
     } else {
       sanitized = sanitized.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
     }
 
-    // 連続空白の正規化
     sanitized = sanitized.replace(/\s+/g, ' ').trim();
 
     result.isValid = true;
@@ -241,7 +228,6 @@ function validateText(text, options = {}) {
 }
 
 
-// 📊 設定・構造検証
 
 
 /**
@@ -260,7 +246,6 @@ function validateSpreadsheetId(spreadsheetId) {
       return result;
     }
 
-    // Google Sheets IDの形式チェック（40-50文字に緩和）
     const idPattern = /^[a-zA-Z0-9-_]{40,50}$/;
     if (!idPattern.test(spreadsheetId)) {
       result.errors.push('無効なスプレッドシートID形式');
@@ -289,7 +274,6 @@ function validateMapping(columnMapping) {
       return result;
     }
 
-    // ✅ 構造判定: 複雑構造 {mapping: {...}} vs シンプル構造 {answer: 4, class: 2}
     let actualMapping = columnMapping;
     if (columnMapping.mapping && typeof columnMapping.mapping === 'object') {
       actualMapping = columnMapping.mapping;
@@ -301,22 +285,18 @@ function validateMapping(columnMapping) {
       return result;
     }
 
-    // ✅ 構造に対応した検証
     const requiredColumns = ['answer'];
     const optionalColumns = ['reason', 'class', 'name'];
     const allColumns = [...requiredColumns, ...optionalColumns];
 
-    // 必須列チェック
     for (const col of requiredColumns) {
       const index = actualMapping[col];
-      // ✅ HIGH FIX: 0 も有効な列番号として許容（index !== undefined && index !== 0 の条件追加）
       if (index === undefined || typeof index !== 'number' || index < 0 || !Number.isInteger(index)) {
         const errorMsg = `必須列 '${col}' のインデックスが無効です（値: ${index}）`;
         result.errors.push(errorMsg);
       }
     }
 
-    // オプション列チェック
     for (const col of optionalColumns) {
       const index = actualMapping[col];
       if (index !== undefined) {
@@ -327,7 +307,6 @@ function validateMapping(columnMapping) {
       }
     }
 
-    // 重複チェック
     const validColumns = Object.keys(actualMapping).filter(key => allColumns.includes(key));
     const usedIndices = validColumns
       .map(col => actualMapping[col])
@@ -337,7 +316,6 @@ function validateMapping(columnMapping) {
       result.errors.push('列インデックスに重複があります');
     }
 
-    // 未知の列チェック
     for (const col of Object.keys(actualMapping)) {
       if (!allColumns.includes(col)) {
         result.warnings.push(`未知の列タイプ '${col}' が含まれています`);
@@ -366,7 +344,6 @@ function validateConfig(config) {
       return result;
     }
 
-    // 基本フィールド検証
     const fields = {
       spreadsheetId: { validator: validateSpreadsheetId, required: false },
       formUrl: { validator: validateUrl, required: false },
@@ -391,7 +368,6 @@ function validateConfig(config) {
       }
     }
 
-    // 列マッピング検証
     if (config.columnMapping) {
       const mappingValidation = validateMapping(config.columnMapping);
       if (!mappingValidation.isValid) {
@@ -405,12 +381,10 @@ function validateConfig(config) {
       }
     }
 
-    // ブール値フィールド
     if (config.isPublished !== undefined) {
       result.sanitized.isPublished = Boolean(config.isPublished);
     }
 
-    // displaySettings処理（ネスト構造対応）
     if (config.displaySettings && typeof config.displaySettings === 'object') {
       result.sanitized.displaySettings = {
         showNames: Boolean(config.displaySettings.showNames),
@@ -420,7 +394,6 @@ function validateConfig(config) {
       };
     }
 
-    // 基本フィールドの保持（検証済みでない場合もパススルー）
     const basicFields = ['userId', 'setupStatus', 'etag', 'lastAccessedAt'];
     basicFields.forEach(field => {
       if (config[field] !== undefined) {
@@ -428,7 +401,6 @@ function validateConfig(config) {
       }
     });
 
-    // 設定サイズチェック（32KB制限）
     const configSize = JSON.stringify(result.sanitized).length;
     if (configSize > 32000) {
       result.errors.push('設定データが大きすぎます（32KB制限）');
@@ -439,6 +411,5 @@ function validateConfig(config) {
 }
 
 
-// 🔧 ユーティリティ・診断
 
 

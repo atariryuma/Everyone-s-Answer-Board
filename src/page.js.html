@@ -1,9 +1,7 @@
 <script>
 
 class StudyQuestApp {
-  // アプリケーション定数
   static get CONSTANTS() {
-    // Dynamic configuration using SharedUtilities performance functions
     const perfLevel = window.getPerformanceLevel?.() || 'medium';
     const isLowEndDevice = window.isLowEndDevice?.() || false;
 
@@ -37,7 +35,6 @@ class StudyQuestApp {
         console.warn('⚠️ StudyQuestApp: Failed to get userId from URL parameters:', error.message);
       }
 
-      // グローバル変数からのフォールバック
       try {
         if (typeof window.USER_ID !== 'undefined' && window.USER_ID && window.USER_ID.trim()) {
           return window.USER_ID.trim();
@@ -46,28 +43,23 @@ class StudyQuestApp {
         console.warn('⚠️ StudyQuestApp: Failed to get userId from global USER_ID:', error.message);
       }
 
-      // 最後のフォールバック: 空文字列を返すが、アプリケーションは続行
       console.warn('⚠️ StudyQuestApp: No valid userId available. Using limited functionality mode.');
       return '';
     }
 
-    // UUID形式の基本的な形式チェック（36文字、ハイフン付き）
     if (userId.length === 36 && userId.includes('-')) {
       return userId;
     }
 
-    // その他の形式も許可するが警告を出す
     console.warn('⚠️ StudyQuestApp: Unusual userId format, but proceeding:', userId.substring(0, 8) + '...');
     return userId;
   }
 
   constructor() {
 
-    // Core components initialization
     this.cache = new window.UnifiedCache();
     this.activeRequests = 0;
 
-    // ✅ CLAUDE.md準拠: Batched property initialization for performance
     this.weakCache = new WeakMap();
     this.perf = { frameTime: 0, domOperations: 0 };
     this.visibilityObserver = null;
@@ -78,9 +70,7 @@ class StudyQuestApp {
     this.domFragmentPool = [];
     this.isLowPerformanceMode = true;
 
-    // ✅ Clear icon cache on initialization
 
-    // 通知バナーアニメーション設定（CSS と同期）
     this.NOTIFICATION_ANIMATION = {
       DURATION_MS: 300,        // CSS 0.3s と同期
       RETRY_BUFFER_MS: 20,     // リトライ用バッファ
@@ -89,7 +79,6 @@ class StudyQuestApp {
       }
     };
 
-    // ✅ CLAUDE.md準拠: Efficient DOM element gathering
     this.elements = {
       body: document.body,
       mainContainer: document.getElementById('main-container'),
@@ -146,36 +135,24 @@ class StudyQuestApp {
     };
 
 
-    // 新着チェック用の初期化
     this.lastViewKey = null;
     this.initialDataLoaded = false;
-    // アクティビティ監視初期化
     this.lastActivityTime = Date.now();
     this.hadInitialDataLoadFailure = false; // 初期データロード失敗フラグ
     
-    // Initial state setup complete
 
-    // ✅ 重複処理削除: displaySettings の初期化は Page.html で実行済み
-    // window.showCounts, window.displayMode は既に設定されている
     this.state.showCounts = window.showCounts;
     this.state.displayMode = window.displayMode;
 
-    // ✅ レガシー削除: サーバー設定保存変数は不要（displaySettingsを直接参照）
-    // 🧹 CLAUDE.md準拠: setTimeout/setInterval完全削除済み
     this.handlers = {};
     this.adminModeVerified = false; // 管理モード切り替え時の権限確認フラグ
-    // 🎯 CLAUDE.md準拠: 最適化されたリアクション制御システム
     this.pendingReactions = new Map();
     this.reactionDebounceTimeouts = new Map(); // 行単位デバウンシング用（300ms）
     this.reactionEventListeners = new Map(); // 処理完了通知用
 
-    // V8 Runtime Error Handling - CLAUDE.md準拠
-    // maxRetriesは各関数で個別に指定 - グローバル値は不要
     this.retryDelayBase = 1000; // 1秒
 
-    // 🎯 CLAUDE.md準拠: 単純な直接送信システム（バッチ処理削除）
 
-    // イベントリスナー重複登録防止フラグ
     this.eventDelegationSetup = false;
     this.nonCriticalListenersSetup = false;
     this.modalOperationPending = false;
@@ -185,8 +162,6 @@ class StudyQuestApp {
       { key: 'CURIOUS', icon: 'magnifying-glass-plus' }
     ];
 
-    // リアクション状態保存用のキー - CLAUDE.md準拠: 現在のユーザー固有キー
-    // ✅ Use current user ID (viewer) instead of board owner ID for reaction storage isolation
     const currentUserIdentifier = window.UNIFIED_CONFIG?.email ?
       window.UNIFIED_CONFIG.email.replace(/[^a-zA-Z0-9]/g, '').slice(-8) : 'anon';
     const safeSheetName = (typeof window.SHEET_NAME !== 'undefined' && window.SHEET_NAME) ?
@@ -194,7 +169,6 @@ class StudyQuestApp {
     this.reactionStorageKey = 'reactions_' + currentUserIdentifier + '_' + safeSheetName;
 
     this.gas = {
-      // サーバ実装に合わせた直接呼び出し（中間関数なし）
       getPublishedSheetData: (classFilter, sort, adminMode, targetUserId) =>
         this.runGas('getPublishedSheetData', classFilter, sort, adminMode, targetUserId),
       getNotificationUpdate: (targetUserId, options) =>
@@ -204,7 +178,6 @@ class StudyQuestApp {
       checkAdmin: () => this.runGas('isAdmin'),
       clearCache: () => this.runGas('clearActiveSheet', this.state.userId),
       validateData: () => this.validData(),
-      // ✅ Simple fix: Get count from already loaded data instead of making another API call
       getDataCount: (classFilter, sortOrder, adminMode) => {
         const rows = this.state.currentAnswers || [];
         return { success: true, count: rows.length };
@@ -212,10 +185,8 @@ class StudyQuestApp {
     };
 
 
-    // Initialize simple polling (must be called before starting polling)
     this.initializeSimplePolling();
 
-    // ✅ CLAUDE.md準拠: Start async initialization
     this.init().catch(error => {
       console.error('❌ StudyQuestApp: Fatal initialization error:', error);
       this.displayInitializationError('アプリケーションの起動に失敗しました: ' + error.message);
@@ -223,7 +194,6 @@ class StudyQuestApp {
   }
 
   initializeSimplePolling() {
-    // Simple polling state - only essential properties
     this.polling = {
       isActive: false,
       timerId: null,
@@ -240,18 +210,14 @@ class StudyQuestApp {
 
   resetStateForCleanInit() {
 
-    // Reset core data arrays
     this.state.allAnswers = [];        // Clear full dataset cache
     this.state.currentAnswers = [];
-    // 通知バナーをリセット
     this.dismissNewContentBanner();
 
-    // Clear DOM to prevent inconsistency
     const container = this.elements.answersContainer;
     if (container) {
       const existingCards = container.querySelectorAll('.answer-card');
       if (existingCards.length > 0) {
-        // Remove observers
         existingCards.forEach(card => {
           if (this.visibilityObserver) {
             this.visibilityObserver.unobserve(card);
@@ -265,12 +231,10 @@ class StudyQuestApp {
     }
     
     
-    // Reset initialization flags
     this.initialDataLoaded = false;
     this.hadInitialDataLoadFailure = false;
     this.lastViewKey = null;
     
-    // Clear content check flags
     this.contentCheckInProgress = false;
     
     
@@ -302,10 +266,8 @@ class StudyQuestApp {
           break;
         }
 
-        // Calculate exponential backoff delay with jitter
         let delay = Math.min(baseDelay * Math.pow(backoffMultiplier, attempt), maxDelay);
 
-        // Special handling for rate limit errors (HTTP 429)
         if (error && error.message && error.message.includes('429')) {
           delay = Math.max(delay, 15000 + (attempt * 10000)); // Start at 15s, add 10s per attempt
         }
@@ -314,7 +276,6 @@ class StudyQuestApp {
           delay = delay * (0.5 + Math.random() * 0.5); // Add 50% jitter
         }
 
-        // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
         const safeContext = context || 'Operation';
         if (error && error.message) {
           console.warn(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
@@ -322,7 +283,6 @@ class StudyQuestApp {
           console.warn(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): Unknown error`);
         }
 
-        // ✅ CLAUDE.md準拠: Use requestIdleCallback for non-blocking delay
         await new Promise(resolve => requestIdleCallback(resolve, { timeout: delay }));
       }
     }
@@ -332,37 +292,29 @@ class StudyQuestApp {
 
   async init() {
     try {
-      // Reset state for clean initialization
       this.resetStateForCleanInit();
-      // Setup critical UI elements first
       this.setupCriticalElements();
       this.showMinimalSkeleton();
       this.optimizeForLowPerformance();
 
       this.state.isAdminUser = window.UNIFIED_CONFIG?.isAdminUser || false;
 
-      // ✅ 即座に表示可能なUI要素を最初に処理
       this.renderIcons(); // 静的アイコンの即座読み込み（モーダル内のアイコンを含む）
       this.showInfoModal(); // デジタルシティズンシップモーダル
 
-      // ✅ 最適な実行順序: 軽い処理から重い処理へ
       try {
-        // 1. フォーム情報取得（中程度、質問テキスト等）
         await this.initializeFormButton();
 
-        // 2. データ取得（重い処理、実際のコンテンツ）
         await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false });
       } catch (error) {
         console.error('Data loading failed during initialization:', error);
         this.showInfoModal(); // Show modal even on error
       }
 
-      // Mark initialization complete
       this.state.initializationComplete = true;
       this.state.isInitializing = false;
       this.hideLoadingOverlay();
 
-      // Enable info modal button after initialization
       if (this.elements.infoModalConfirmBtn) {
         this.elements.infoModalConfirmBtn.disabled = false;
       }
@@ -372,9 +324,7 @@ class StudyQuestApp {
       this.updateSortOptions();
       this.setupObservers();
 
-      // ドメイン情報とフォーム情報は上記で既に初期化済み
 
-      // ✅ CLAUDE.md準拠: Simplified editor state setup
       this.setupEditorState();
 
 
@@ -410,7 +360,6 @@ class StudyQuestApp {
         this.elements.adminToggleBtn.classList.remove('hidden');
         this.elements.adminToggleBtn.removeAttribute('hidden');
         this.elements.adminToggleBtn.style.display = '';
-        // 元々のアイコンを維持（テキスト上書きしない）
       }
     } else {
       this.state.isEditor = false;
@@ -426,12 +375,10 @@ class StudyQuestApp {
    * Unified message listener setup
    */
   setupMessageListeners() {
-    // ✅ CLAUDE.md準拠: Single message handler for all events
     window.addEventListener('message', (event) => {
       this.handleMessage(event.data);
     });
 
-    // ✅ CLAUDE.md準拠: BroadcastChannel for cross-tab communication
     if (typeof BroadcastChannel !== 'undefined') {
       const channel = new BroadcastChannel('board-updates');
       channel.addEventListener('message', (event) => {
@@ -466,7 +413,6 @@ class StudyQuestApp {
       }
     } catch (error) {
       console.warn('Message handling error:', error);
-      // ✅ CLAUDE.md準拠: Simple fallback without complex try-catch chains
       try {
         await this.loadSheetData({ bypassCache: true });
         this.showInfoModal();
@@ -478,18 +424,15 @@ class StudyQuestApp {
 
   setupCriticalElements() {
     if (this.elements.headingLabel) {
-      // ✅ Use questionText from unified config instead of legacy template variable
       const initialText = window.UNIFIED_CONFIG?.questionText || '読み込み中...';
       this.elements.headingLabel.textContent = initialText;
     }
 
-    // Only setup absolutely critical event listeners
     this.setupEventDelegation();
     this.handlers.onAnswerModalCloseClick = () => this.hideAnswerModal();
     if (this.elements.answerModalCloseBtn) {
       this.elements.answerModalCloseBtn.addEventListener('click', this.handlers.onAnswerModalCloseClick);
     }
-    // Size slider for immediate response with throttling
     const debouncedRender = this.debounce(() => this.renderBoard(true, false), 200);
     this.handlers.onSizeSliderInput = this.throttle((e) => {
       localStorage.setItem('boardColumns', e.target.value);
@@ -503,13 +446,10 @@ class StudyQuestApp {
   }
   
   setupNonCriticalEventListeners() {
-    // 重複登録防止
     if (this.nonCriticalListenersSetup) {
-      // Non-critical event listeners already set up
       return;
     }
     
-    // Modal handlers
     this.handlers.onAnswerModalContainerClick = (e) => {
       if (e.target === e.currentTarget) {
         this.hideAnswerModal();
@@ -547,7 +487,6 @@ class StudyQuestApp {
         const filterState = this.getCurrentFilterState();
         await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
 
-        // ✅ 修正: 時刻ベース基準で更新（件数基準の論理的破綻を修正）
         this.updateLastSeenTimestamp(); // フィルター変更時は現在時刻で基準更新
       } catch (error) {
         console.error('クラスフィルター変更時のデータ読み込みエラー:', error);
@@ -558,7 +497,6 @@ class StudyQuestApp {
         const filterState = this.getCurrentFilterState();
         await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
 
-        // ✅ 修正: 時刻ベース基準で更新（件数基準の論理的破綻を修正）
         this.updateLastSeenTimestamp(); // ソート変更時は現在時刻で基準更新
       } catch (error) {
         console.error('ソート順変更時のデータ読み込みエラー:', error);
@@ -575,7 +513,6 @@ class StudyQuestApp {
       this.elements.endPublicationBtn.addEventListener('click', this.handlers.onEndPublicationClick);
     }
     if (this.elements.adminToggleBtn) {
-      // ✅ 重複登録防止: 既存のイベントリスナーを先に削除
       if (this.handlers.onAdminToggleClick) {
         this.elements.adminToggleBtn.removeEventListener('click', this.handlers.onAdminToggleClick);
       }
@@ -583,7 +520,6 @@ class StudyQuestApp {
       this.elements.adminToggleBtn.addEventListener('click', this.handlers.onAdminToggleClick);
     }
     
-    // 新着通知バナーのイベントハンドラー
     if (this.elements.refreshContentBtn) {
       this.handlers.onRefreshContentClick = async () => {
         try {
@@ -600,7 +536,6 @@ class StudyQuestApp {
     }
     this.handlers.onDocumentKeydown = (e) => {
       if (e.key === 'Escape') {
-        // 通知バナーが表示中の場合は優先的に閉じる
         if (this.elements.newContentBanner && !this.elements.newContentBanner.classList.contains('hidden')) {
           this.dismissNewContentBanner();
           e.preventDefault();
@@ -612,14 +547,11 @@ class StudyQuestApp {
     document.addEventListener('keydown', this.handlers.onDocumentKeydown);
     this.handlers.onWindowResize = this.debounce(() => this.adjustLayout(), 100);
     window.addEventListener('resize', this.handlers.onWindowResize, { passive: true });
-    // 🔄 ページ可視性イベント (競合状態修正版)
     this.handlers.onVisibilityChange = () => {
       if (document.hidden) {
-        // 🔧 ページ非表示時のポーリング停止
         this.stopSimplePolling();
         this.cleanup();
       } else if (this.state.initializationComplete) {
-        // 小さな遅延でポーリング再開（クリーンアップ完了待ち）
         Promise.resolve().then(() => {
           this.startSimplePolling();
         });
@@ -628,7 +560,6 @@ class StudyQuestApp {
     };
     document.addEventListener('visibilitychange', this.handlers.onVisibilityChange, { passive: true });
 
-    // アクティビティ検出でポーリング自動再開（初期化完了後のみ）
     this.handlers.onActivityDetection = () => {
       this.lastActivityTime = Date.now();
       if (!this.polling.isActive && this.state.initializationComplete) {
@@ -637,22 +568,18 @@ class StudyQuestApp {
     };
     document.addEventListener('click', this.handlers.onActivityDetection, { passive: true });
 
-    // ✅ Critical Fix: 初期化完了後の通知ポーリング自動開始
     if (this.state.initializationComplete && !this.polling.isActive) {
       this.startSimplePolling();
     }
 
     this.nonCriticalListenersSetup = true;
-    // Non-critical event listener setup complete
   }
   /**
  * イベント委譲の設定（安定版の堅牢なロジックを採用）
  * これにより、クリックイベントが他のイベントと競合しなくなります。
  */
   setupEventDelegation() {
-    // 重複登録防止
     if (this.eventDelegationSetup) {
-        // Event delegation already set up
         return;
     }
     
@@ -669,7 +596,6 @@ class StudyQuestApp {
             return;
         }
 
-        // リアクションボタンのクリックを処理
         const reactionBtn = e.target.closest('.reaction-btn');
         if (reactionBtn) {
             e.stopPropagation(); // ★重要: イベントの伝播を止め、カード本体のクリックと分離
@@ -679,7 +605,6 @@ class StudyQuestApp {
             return;
         }
 
-        // 削除ボタンのクリックを処理
         const deleteBtn = e.target.closest('.delete-answer-btn');
         if (deleteBtn) {
             e.stopPropagation(); // イベントの伝播を止める
@@ -687,7 +612,6 @@ class StudyQuestApp {
             return;
         }
 
-        // ハイライトボタンのクリックを処理
         const highlightBtn = e.target.closest('.highlight-btn');
         if (highlightBtn) {
             e.stopPropagation(); // ★重要: 同様にイベントの伝播を停止
@@ -697,12 +621,10 @@ class StudyQuestApp {
             return;
         }
 
-        // 上記以外の場合は、カード本体のクリックとしてモーダルを表示
         this.showAnswerModal(rowIndex);
     };
 
     if (this.elements.answersContainer) {
-        // 既存のリスナーをクリアしてから追加
         this.elements.answersContainer.removeEventListener('click', this.handlers.onAnswersContainerClick);
         this.elements.answersContainer.addEventListener('click', this.handlers.onAnswersContainerClick);
         this.eventDelegationSetup = true;
@@ -711,7 +633,6 @@ class StudyQuestApp {
     }
   }
   
-  // Layout adjustment functionality
   adjustLayout() {
     if (this.baseBodyPadding === undefined) {
       this.baseBodyPadding = parseFloat(getComputedStyle(this.elements.body).paddingBottom) || 0;
@@ -720,27 +641,22 @@ class StudyQuestApp {
     this.elements.body.style.paddingBottom = footerHeight + this.baseBodyPadding + 'px';
   }
   runGas(funcName, ...args) {
-    // Simple rate limiting - prevent too many concurrent requests
     if (this.activeRequests >= 3) {
       return Promise.reject(new Error('Too many concurrent requests'));
     }
 
-    // 直接呼び出し（マッピング層なし）
     const mappedArgs = args;
 
-    // Enhanced request deduplication for identical calls
     const cacheKey = funcName + JSON.stringify(mappedArgs);
     const isStateChanging = ['toggleHighlight', 'addReaction'].includes(funcName);
 
     if (!isStateChanging) {
-      // Check cache first
       const cached = this.cache.get(cacheKey);
       if (cached) {
         return Promise.resolve(cached);
       }
     }
 
-    // ✅ CLAUDE.md準拠: Direct GAS API call (timeout handled by GAS runtime)
     const promise = this.executeWithRetry(async () => {
       this.activeRequests++;
       return new Promise((resolve, reject) => {
@@ -757,12 +673,10 @@ class StudyQuestApp {
         const handleError = (error) => {
           this.activeRequests--;
 
-          // ✅ エラー時のキャッシュクリア
           if (!isStateChanging && this.cache.has(cacheKey)) {
             this.cache.delete(cacheKey);
           }
 
-          // ✅ エラー詳細ログ強化
           console.error(`❌ handleError for ${funcName}`, {
             error: error.message || error.toString(),
             errorType: typeof error,
@@ -776,9 +690,7 @@ class StudyQuestApp {
         };
 
       if (typeof google !== 'undefined' && google.script && google.script.run) {
-        // API関数存在チェック
         if (!google.script.run[funcName] || typeof google.script.run[funcName] !== 'function') {
-          // CLAUDE.md準拠: 変数存在チェック後のテンプレートリテラル使用
           const safeFuncName = funcName || 'unknown';
           handleError(new Error(`API function '${safeFuncName}' not available`));
           return;
@@ -792,17 +704,14 @@ class StudyQuestApp {
         google.script.run
           .withSuccessHandler((result) => {
 
-            // ✅ レスポンス検証強化: null/undefined チェック
             if (result === null || result === undefined) {
               console.warn(`⚠️ runGas: ${funcName} returned null/undefined, treating as error`);
               handleError(new Error(`Function ${funcName} returned null/undefined response`));
               return;
             }
 
-            // ✅ GAS関数の基本レスポンス形式検証（オプション）
             if (typeof result === 'object' && result.hasOwnProperty('success') && typeof result.success !== 'boolean') {
               console.warn(`⚠️ runGas: ${funcName} returned invalid success property:`, result.success);
-              // 正規化して続行
               result.success = Boolean(result.success);
             }
 
@@ -861,14 +770,12 @@ class StudyQuestApp {
     return promise;
   }
 
-  // エラー情報強化
   enhanceError(error, funcName, args) {
     const enhancedError = new Error(error.message || error);
     enhancedError.originalError = error;
     enhancedError.functionName = funcName;
     enhancedError.arguments = args;
 
-    // 🎯 CLAUDE.md準拠: 統一されたエラーメッセージ
     switch (funcName) {
       case 'addReaction':
         enhancedError.userMessage = 'リアクション処理エラー';
@@ -883,16 +790,13 @@ class StudyQuestApp {
     return enhancedError;
   }
   async verifyEditorAsync() {
-    // Use server-provided flag first (fast)
     if (window.isEditor) {
       this.state.isEditor = true;
-      // Editor permissions verified
       this.updateAdminButtonUI();
       this.updateEndPublicationButtonUI();
       return;
     }
 
-    // Fallback API call (slower)
     let prevState;
     try {
       const authResult = await this.runGas('checkUserAuthentication');
@@ -900,7 +804,6 @@ class StudyQuestApp {
       if (isAdmin) {
         window.isEditor = true;
         this.state.isEditor = true;
-        // API editor permissions verified
         this.updateAdminButtonUI();
         this.updateEndPublicationButtonUI();
       }
@@ -909,28 +812,20 @@ class StudyQuestApp {
     }
   }
   
-  // 編集者UI更新の共通メソッド
   updateAdminButtonUI() {
-    // Show admin toggle button for editors (owners or system administrators)
     if (this.elements.adminToggleBtn && this.state.isEditor) {
-      // Show button for editors (owners or system administrators)
       this.elements.adminToggleBtn.classList.remove('hidden');
       this.elements.adminToggleBtn.removeAttribute('hidden');
 
-      // 元々のアイコンを維持（テキスト設定しない）
 
-      // Apply styling based on current admin mode state
       if (this.state.showAdminFeatures) {
-        // Active admin mode: highlighted styling
         this.elements.adminToggleBtn.classList.remove('text-gray-500', 'opacity-60');
         this.elements.adminToggleBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
       } else {
-        // Inactive admin mode: subtle gray styling
         this.elements.adminToggleBtn.classList.remove('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
         this.elements.adminToggleBtn.classList.add('text-gray-500', 'opacity-60');
       }
     } else {
-      // Hide button for non-admin users
       if (this.elements.adminToggleBtn) {
         this.elements.adminToggleBtn.classList.add('hidden');
         this.elements.adminToggleBtn.setAttribute('hidden', '');
@@ -950,13 +845,11 @@ class StudyQuestApp {
     }
   }
   
-  // Unified error handling
   handleError(error, type = 'general', showUser = false) {
 
     const errorMsg = error.message || error;
 
 
-    // 一般的なエラー処理
     console.error(`❌ ${type} error:`, errorMsg);
 
     if (showUser) {
@@ -966,27 +859,22 @@ class StudyQuestApp {
     return error;
   }
 
-  // ✅ CLAUDE.md準拠: 統一されたキャッシュクリア（自然な英語表現）
   clearCache(options = {}) {
     const { includeReactions = false, includeLocalStorage = false } = options;
 
     try {
-      // フロントエンドキャッシュクリア
       if (this.cache) {
         this.cache.clear();
       }
 
-      // 統合キャッシュクリア
       if (window.unifiedCache && typeof window.unifiedCache.clear === 'function') {
         window.unifiedCache.clear();
       }
 
-      // リアクションキャッシュクリア
       if (includeReactions && this.reactionCache) {
         this.reactionCache.clear();
       }
 
-      // ローカルストレージクリア
       if (includeLocalStorage) {
         try {
           Object.keys(localStorage).forEach(key => {
@@ -1005,28 +893,23 @@ class StudyQuestApp {
   }
   
   
-  // ✅ 修正: 時刻ベース統一システム（件数パラメータ削除）
   async handleInitialContentLoad(currentViewKey) {
     this.lastViewKey = currentViewKey;
 
-    // 初期データロード失敗後の初回成功ポーリング時の特別処理
     if (this.hadInitialDataLoadFailure) {
         lastSeenTimestamp: this.state.lastSeenTimestamp,
         note: '既存データの初回取得なので新着通知はスキップ (時刻ベース統一)'
       });
 
-      // ✅ 修正: 時刻ベース基準で初回成功時更新
       this.updateLastSeenTimestamp();
       return;
     }
 
-    // ✅ 修正: 時刻ベース基準で更新
     this.updateLastSeenTimestamp();
     this.initialDataLoaded = true;
 
   }
   
-  // ✅ 修正: 時刻ベース統一システム（件数パラメータ削除）
   async handleViewChange(currentViewKey) {
       from: this.lastViewKey,
       to: currentViewKey,
@@ -1034,19 +917,16 @@ class StudyQuestApp {
     });
 
     this.lastViewKey = currentViewKey;
-    // ✅ 修正: 時刻ベース基準で更新
     this.updateLastSeenTimestamp();
     this.dismissNewContentBanner();
   }
   
 
-  // ✅ 修正: フィルター状態一貫性対応 新着通知バナー表示
   showNewContentBanner(newItemsCount, filterState = null) {
     if (!this.elements.newContentBanner || !newItemsCount || newItemsCount <= 0) {
       return;
     }
 
-    // Simplified message generation
     const message = newItemsCount === 1
       ? '新しい意見が投稿されました'
       : `${newItemsCount}件の新しい意見が投稿されました`;
@@ -1055,11 +935,9 @@ class StudyQuestApp {
     this.elements.newContentBanner.classList.remove('hidden', 'notification-banner-exit');
     this.elements.newContentBanner.classList.add('notification-banner-enter');
 
-    // ✅ 修正: aria-hidden属性を更新して表示を有効化
     this.elements.newContentBanner.setAttribute('aria-hidden', 'false');
   }
   
-  // ✅ シンプルな通知バナー非表示
   dismissNewContentBanner() {
     if (!this.elements.newContentBanner) {
       return;
@@ -1069,30 +947,22 @@ class StudyQuestApp {
     this.elements.newContentBanner.classList.add('notification-banner-exit');
     setTimeout(() => {
       this.elements.newContentBanner.classList.add('hidden');
-      // ✅ 修正: aria-hidden属性を更新してアクセシビリティを保持
       this.elements.newContentBanner.setAttribute('aria-hidden', 'true');
     }, 300);
   }
 
 
-  // コンテンツ更新（通知バナーからの呼び出し）
-  // ✅ CLAUDE.md準拠: 手動更新のエントリーポイント（自然な英語表現）
   async refreshContent() {
     try {
-      // ✅ シンプル化: 複雑な差分処理を廃止し、常にloadSheetDataで全データ取得
-      // フィルター状態は自動的に維持される（loadSheetDataが現在のフィルター状態を使用）
       await this.loadSheetData({
         showLoading: true,
         bypassCache: true
       });
 
-      // ✅ 修正: 手動更新後に時刻ベース基準更新（論理的破綻修正）
       this.updateLastSeenTimestamp(); // 新着通知の無限ループを防止
 
-      // 通知バナーを閉じる（新しいデータが表示されたため）
       this.dismissNewContentBanner();
 
-      // User feedback for successful update
       this.showNotification('コンテンツを更新しました', 'success');
 
     } catch (error) {
@@ -1101,15 +971,11 @@ class StudyQuestApp {
     }
   }
 
-  // ✅ シンプル化: updateContent関数を簡素化（後方互換性のため保持）
   async updateContent(isManualUpdate = false, preloadedTriggerResult = null) {
     if (isManualUpdate) {
-      // 手動更新は refreshContent() に委譲
       await this.refreshContent();
     } else {
-      // 自動更新の場合は通知表示のみ（実際のデータ更新は手動で行う）
       if (preloadedTriggerResult && preloadedTriggerResult.hasNewContent) {
-        // ✅ 修正: サーバーから返されたフィルター情報を使用（フィルター状態不整合の修正）
         const appliedFilterState = preloadedTriggerResult.appliedFilter || this.getCurrentFilterState();
         this.showNewContentBanner(preloadedTriggerResult.newItemsCount, appliedFilterState);
       }
@@ -1117,7 +983,6 @@ class StudyQuestApp {
   }
 
 
-  // Simple polling system - replaces over-engineered version
   startSimplePolling() {
     if (this.polling.isActive) return;
 
@@ -1130,11 +995,9 @@ class StudyQuestApp {
   schedulePollingCheck() {
     if (!this.polling.isActive) return;
 
-    // ✅ Optimization: 段階的間隔調整によるスマートポーリング
     const interval = this.getPollingInterval();
     const timeSinceActivity = Date.now() - this.lastActivityTime;
 
-    // ✅ Development Monitoring: 開発環境でのみ詳細ログ出力
     const isDev = window.location.href.includes('dev');
     if (isDev) {
         interval: `${interval/1000}秒`,
@@ -1152,7 +1015,6 @@ class StudyQuestApp {
           lastUpdateTime: this.state.lastSeenTimestamp
         });
 
-        // ✅ Development Monitoring: 開発環境でのみ詳細ログ出力
         if (isDev) {
             success: response.success,
             hasNewContent: response.hasNewContent,
@@ -1171,7 +1033,6 @@ class StudyQuestApp {
       } catch (error) {
         this.polling.errorCount++;
 
-        // ✅ Enhanced Monitoring: エラー詳細ログ
         console.warn('❌ 通知ポーリングエラー:', {
           errorCount: `${this.polling.errorCount}/3`,
           errorMessage: error.message,
@@ -1181,7 +1042,6 @@ class StudyQuestApp {
           timestamp: new Date().toISOString()
         });
 
-        // Stop after 3 consecutive errors, auto-restart in 5 minutes
         if (this.polling.errorCount >= 3) {
           console.error('💥 通知ポーリング: 連続エラー上限に達したため5分間停止');
           this.stopSimplePolling();
@@ -1192,7 +1052,6 @@ class StudyQuestApp {
         }
       }
 
-      // Schedule next check
       this.schedulePollingCheck();
     }, interval);
   }
@@ -1205,30 +1064,24 @@ class StudyQuestApp {
     }
   }
 
-  // ✅ Optimization: より柔軟な段階的ポーリング間隔
   getPollingInterval() {
     const timeSinceActivity = Date.now() - this.lastActivityTime;
 
-    // 段階的間隔調整（使用状況に応じて最適化）
     if (timeSinceActivity < 60000) return 15000;      // 1分以内: 15秒
     if (timeSinceActivity < 300000) return 30000;     // 5分以内: 30秒
     if (timeSinceActivity < 900000) return 120000;    // 15分以内: 2分
     return 300000;                                     // 15分超: 5分
   }
 
-  // 後方互換性のため残す
   hasRecentActivity() {
     return (Date.now() - this.lastActivityTime) < 300000; // 5 minutes
   }
 
 
-  // 🔄 統合新着通知システム - 全ユーザーロール対応
 
 
 
-  // Unified notification system
   showNotification(message, type = 'info', options = {}) {
-    // Simplified: Direct delegation to window.notifications
     if (window.notifications) {
       const duration = options.duration || 5000;
       window.notifications[type] ?
@@ -1239,7 +1092,6 @@ class StudyQuestApp {
 
   
   getMockData(funcName, ...args) {
-    // CLAUDE.md準拠: Promise-based mock delay (setTimeout代替)
     return new Promise((resolve) => {
       const startTime = Date.now();
       const mockDelay = 300;
@@ -1306,7 +1158,6 @@ class StudyQuestApp {
       checkComplete();
     });
   }
-  // Unified cleanup system
   cleanup(options = {}) {
     const {
       includeCache = true,
@@ -1317,12 +1168,9 @@ class StudyQuestApp {
     } = options;
 
     try {
-      // キャッシュクリーンアップ
       if (includeCache && this.cache) {
-        // Safe cache size check - UnifiedCache may not have size() method
         const cacheSize = (typeof this.cache.size === 'function') ? this.cache.size() : 'unknown';
 
-        // Safe cleanup call - use clear() if cleanup() doesn't exist
         if (typeof this.cache.cleanup === 'function') {
           this.cache.cleanup();
         } else if (typeof this.cache.clear === 'function') {
@@ -1331,7 +1179,6 @@ class StudyQuestApp {
 
       }
 
-      // DOM要素参照のクリア
       if (includeDOMReferences) {
         const elementsToCheck = ['answersContainer', 'loadingOverlay', 'newContentBanner'];
         elementsToCheck.forEach(key => {
@@ -1342,7 +1189,6 @@ class StudyQuestApp {
         });
       }
 
-      // イベントリスナーの整理
       if (includeEventListeners) {
         if (this.handlers) {
           Object.keys(this.handlers).forEach(key => {
@@ -1354,7 +1200,6 @@ class StudyQuestApp {
 
       }
 
-      // 仮想スクロール状態の最適化
       if (includeVirtualScroll && this.virtualScrollState?.renderedRowIndexes) {
         const size = this.virtualScrollState.renderedRowIndexes.size;
         if (size > 1000) {
@@ -1363,7 +1208,6 @@ class StudyQuestApp {
         }
       }
 
-      // DOMフラグメントプールのクリア
       if (includeDOMFragments && this.domFragmentPool) {
         this.domFragmentPool.length = 0;
       }
@@ -1373,22 +1217,17 @@ class StudyQuestApp {
     }
   }
 
-  // ✅ 後方互換性ラッパー関数
   
   
 
-  // 🧹 システム破棄（安定版 - メモリリーク防止）
   destroy() {
 
-    // 🛡️ ポーリング完全停止
     this.stopSimplePolling();
 
 
-    // 🧹 既存のクリーンアップ
     this.cleanup();
 
     
-    // イベントリスナーの削除（既存）
     if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
       this.elements.sizeSlider.removeEventListener('input', this.handlers.onSizeSliderInput);
     }
@@ -1428,21 +1267,18 @@ class StudyQuestApp {
     if (this.handlers.onDocumentClick) {
       document.removeEventListener('click', this.handlers.onDocumentClick);
     }
-    // Cleanup observers
     if (this.visibilityObserver) {
       this.visibilityObserver.disconnect();
     }
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
     }
-    // Cancel any pending callbacks
     if (this.animationFrameId) {
       cancelAnimationFrame(this.animationFrameId);
     }
     if (this.idleCallbackId) {
       cancelIdleCallback(this.idleCallbackId);
     }
-    // 漏れていたイベントリスナーの削除
     if (this.elements.refreshContentBtn && this.handlers.onRefreshContentClick) {
       this.elements.refreshContentBtn.removeEventListener('click', this.handlers.onRefreshContentClick);
     }
@@ -1453,12 +1289,10 @@ class StudyQuestApp {
       this.elements.endPublicationBtn.removeEventListener('click', this.handlers.onEndPublicationClick);
     }
     
-    // イベントリスナー設定フラグのリセット
     this.eventDelegationSetup = false;
     this.nonCriticalListenersSetup = false;
     this.modalOperationPending = false;
     
-    // Clear caches
     this.cache.clear();
     this.deferredUpdates.clear();
     this.domFragmentPool.length = 0;
@@ -1476,7 +1310,6 @@ class StudyQuestApp {
   enableLimitedFunctionalityMode() {
     this.isLimitedMode = true;
 
-    // 基本的なUI表示
     if (this.elements.answersContainer) {
       this.elements.answersContainer.innerHTML = `
         <div class="text-center py-16 px-6 col-span-full" data-limited-mode="true">
@@ -1497,7 +1330,6 @@ class StudyQuestApp {
       `;
     }
 
-    // タイトル更新
     if (this.elements.headingLabel) {
       this.elements.headingLabel.textContent = '制限機能モード';
     }
@@ -1565,7 +1397,6 @@ class StudyQuestApp {
   
   
   showMinimalSkeleton() {
-    // Show only 2 minimal skeletons for immediate visual feedback
     const count = 2;
     const frag = document.createDocumentFragment();
     for (let i = 0; i < count; i++) {
@@ -1574,7 +1405,6 @@ class StudyQuestApp {
     this.elements.answersContainer.appendChild(frag);
   }
 
-  // Unified empty state management
   manageEmptyState(action = 'show', options = {}) {
     const {
       safeCheck = false,
@@ -1587,7 +1417,6 @@ class StudyQuestApp {
     switch (action) {
       case 'show':
         if (safeCheck) {
-          // 安全チェック版
           const existingCards = container.querySelectorAll('.answer-card');
           if (existingCards.length > 0 ||
               (this.state.currentAnswers && this.state.currentAnswers.length > 0) ||
@@ -1663,7 +1492,6 @@ class StudyQuestApp {
     }
   }
 
-  // ✅ 後方互換性ラッパー関数
   displayEmptyState() {
     this.manageEmptyState('show');
   }
@@ -1677,20 +1505,16 @@ class StudyQuestApp {
   }
   
   async clearAllCardsForEmptyData() {
-    // 真の初回判定: localStorage状態 + DOM状態を確認
     const isFirstTime = this.isFirstTimeBoardAccess();
     
-    // currentAnswersを空にリセット
     this.state.currentAnswers = [];
     
-    // DOM内の全カードをクリア
     const container = this.elements.answersContainer;
     if (container) {
       const existingCards = container.querySelectorAll('.answer-card');
       
       if (existingCards.length > 0) {
         
-        // オブザーバーからカードを解除
         existingCards.forEach(card => {
           if (this.visibilityObserver) {
             this.visibilityObserver.unobserve(card);
@@ -1700,15 +1524,12 @@ class StudyQuestApp {
           }
         });
         
-        // DOMをクリア
         container.innerHTML = '';
         
-        // DOM clearing completion wait (Phase 1.3)
         await new Promise(resolve => requestAnimationFrame(resolve));
       }
     }
     
-    // バーチャルスクロール状態をリセット
     if (this.virtualScrollState) {
       this.virtualScrollState = {
         renderedItems: 0,
@@ -1729,20 +1550,16 @@ class StudyQuestApp {
     const dataLength = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
     
     
-    // 空データなのにDOMにカードが残っている場合
     if (dataLength === 0 && domCards.length > 0) {
       console.warn('⚠️ 状態不整合検出: 空データなのにDOMに', domCards.length, '個のカードが残っています');
       
-      // 空データのためのクリーンアップを実行
       await this.clearAllCardsForEmptyData();
       
-      // 空状態を表示
       this.displayEmptyState();
       
       
     } else if (dataLength !== domCards.length) { // 数の不一致も不整合とみなす
 
-      // 不整合がある場合は再レンダリング
       this.renderBoard(false, false);
       
     } else {
@@ -1754,7 +1571,6 @@ class StudyQuestApp {
     const sheetName = window.SHEET_NAME;
 
     return {
-      // ✅ 修正: 時刻ベース統一システムに対応
       hasLastSeen: localStorage.getItem(`lastSeenTimestamp_${userId}_${sheetName}`) !== null,
       hasDiffCards: localStorage.getItem(`differentialCards_${userId}_${sheetName}`) !== null
     };
@@ -1764,26 +1580,19 @@ class StudyQuestApp {
   
   async forceDataRefresh() {
 
-    // ✅ 修正: 時刻ベース統一システム（件数ベース安定化処理は不要）
     const preservedLastSeenTimestamp = this.state.lastSeenTimestamp;
 
-    // フロントエンドキャッシュをクリア
     if (this.cache) {
       this.cache.clear();
     }
 
-    // サーバーキャッシュをクリア
     try {
-      // CLAUDE.md準拠: clearCache関数は現在実装されていない - 内部管理
-      // await this.gas.clearCache();
     } catch (error) {
       console.warn('⚠️ サーバーキャッシュクリアでエラー:', error);
     }
 
-    // 強制データ再読み込み
     await this.loadSheetData({ bypassCache: true });
 
-    // ✅ 修正: 時刻ベース基準で更新（件数比較による復元処理は不要）
     this.updateLastSeenTimestamp();
       preservedTimestamp: preservedLastSeenTimestamp,
       newTimestamp: this.state.lastSeenTimestamp,
@@ -1799,29 +1608,24 @@ class StudyQuestApp {
    */
   isValidDataResult(result) {
     try {
-      // 基本構造の確認
       if (!result || typeof result !== 'object') {
         return false;
       }
            
       const hasStatusField = 'status' in result;
       
-      // ステータス確認（存在する場合のみ）
       if (hasStatusField && result.status !== 'success') {
         return false;
       }
       
-      // データ配列の存在確認
       if (!Array.isArray(result.data)) {
         return false;
       }
       
-      // ヘッダー情報の確認（任意フィールド）
       if (result.header && typeof result.header !== 'string') {
         return false;
       }
       
-      // シート名の確認（任意フィールド）
       if (result.sheetName && typeof result.sheetName !== 'string') {
         return false;
       }
@@ -1876,18 +1680,14 @@ class StudyQuestApp {
    * @returns {Promise} データ取得結果
    */
   async getUserData(fetchParams, isInitialLoad) {
-    // 🔧 CLAUDE.md準拠: API呼び出し前の確実な権限初期化
     if (fetchParams.showAdminFeatures == null || fetchParams.showAdminFeatures === undefined) {
       fetchParams.showAdminFeatures = window.UNIFIED_CONFIG?.isAdminUser || this.state?.isAdminUser || false;
     }
 
     try {
-      // ✅ CLAUDE.md準拠: Use optimized batched API for better performance
-      // Route to appropriate batched API based on access pattern
       let result;
 
       if (fetchParams.userId) {
-        // Cross-user access: use getBatchedViewerData for optimized cross-user data retrieval
         result = await this.runGas('getPublishedSheetData',
           fetchParams.classFilter,
           fetchParams.sortOrder,
@@ -1895,7 +1695,6 @@ class StudyQuestApp {
           fetchParams.userId  // targetUserId（クロスユーザーアクセス）
         );
       } else {
-        // Self-access: use existing optimized getPublishedSheetData (already uses batched auth internally)
         result = await this.runGas('getPublishedSheetData',
           fetchParams.classFilter,
           fetchParams.sortOrder,
@@ -1905,19 +1704,15 @@ class StudyQuestApp {
       }
 
       if (result && result.success && Array.isArray(result.data)) {
-        // 🔧 API応答からdisplaySettingsを動的更新
         if (result.displaySettings) {
           this.updateDisplaySettingsFromAPI(result.displaySettings);
         }
         return result;
       }
 
-      // ✅ CLAUDE.md V8準拠: 変数存在チェック後のエラーハンドリング
       if (result && result.error) {
-        // V8-safe error message handling
         const errorMessage = (result.error && typeof result.error === 'string') ? result.error : 'Unknown backend error';
 
-        // Handle timeout errors specifically (CLAUDE.md pattern)
         if (errorMessage.includes('timeout') || errorMessage.includes('タイムアウト')) {
           console.warn('getUserData: Timeout detected');
           return {
@@ -1929,7 +1724,6 @@ class StudyQuestApp {
           };
         }
 
-        // General backend error (CLAUDE.md V8-safe pattern)
         console.warn('getUserData: Backend returned error:', errorMessage);
         return {
           success: false,
@@ -1950,7 +1744,6 @@ class StudyQuestApp {
       };
 
     } catch (error) {
-      // ✅ CLAUDE.md V8準拠: 変数存在チェック後のテンプレートリテラル使用
       let errorInfo;
       if (error && error.message) {
         errorInfo = `Error: ${error.message}`;
@@ -2034,14 +1827,10 @@ class StudyQuestApp {
     
   }
 
-  // Page.html uses independent skeleton loading - no overlay needed
   showLoadingOverlay(message = '') {
-    // Add loading-active class to body and container to disable render optimizations
-    // This prevents stacking context issues during loading
     document.body.classList.add('loading-active');
     if (this.elements.answersContainer) {
       this.elements.answersContainer.classList.add('loading-active');
-      // Replace render-optimized with loading-safe temporarily
       if (this.elements.answersContainer.classList.contains('render-optimized')) {
         this.elements.answersContainer.classList.add('loading-safe');
       }
@@ -2049,17 +1838,14 @@ class StudyQuestApp {
   }
 
   hideLoadingOverlay() {
-    // Remove loading-active classes to restore render optimizations
     document.body.classList.remove('loading-active');
     if (this.elements.answersContainer) {
       this.elements.answersContainer.classList.remove('loading-active');
-      // Remove loading-safe class to restore normal render optimization
       this.elements.answersContainer.classList.remove('loading-safe');
     }
   }
 
   async loadSheetData(options = {}) {
-    // Normalize options with defaults
     const config = {
       showLoading: options.showLoading !== false, // default true
       bypassCache: options.bypassCache || false,
@@ -2068,15 +1854,12 @@ class StudyQuestApp {
       ...options
     };
 
-    // 初回読み込み最適化: bypassCacheが明示的に指定されていない場合のみキャッシュ活用
     if (config.isInitialLoad && options.bypassCache === undefined) {
-      // 初回読み込み時は適度なキャッシュ活用で高速化
       config.bypassCache = false;
     } else if (config.isInitialLoad && options.bypassCache === true) {
       config.bypassCache = true;
     }
     
-    // Prevent concurrent loading
     if (this.state.isLoading && config.showLoading) {
       return Promise.resolve(); // Return resolved Promise to prevent hanging .then() chains
     }
@@ -2089,12 +1872,10 @@ class StudyQuestApp {
       
       const oldAnswers = [...this.state.currentAnswers];
       
-      // Clear caches if needed
       if (config.bypassCache || this.shouldClearCache(config)) {
         this.clearCache({ includeReactions: true, includeLocalStorage: config.bypassCache && config.isInitialLoad });
       }
       
-      // Load data with simplified parameters
       await this.performDataLoad(config, oldAnswers);
 
     } catch (error) {
@@ -2104,7 +1885,6 @@ class StudyQuestApp {
       this.state.isLoading = false;
       this.hideLoadingOverlay();
 
-      // 🔧 管理モード状態の強化保持
       if (config.preserveAdminMode) {
         this.state.showAdminFeatures = true;
         this.updateAdminButtonUI();
@@ -2113,13 +1893,11 @@ class StudyQuestApp {
   }
   
   shouldClearCache(config) {
-    // Clear cache on explicit refresh
     return config.showLoading && !config.isInitialLoad;
   }
   
 
   
-  // ✅ CLAUDE.md準拠: Refactored performDataLoad into focused functions (277 lines → ~30 lines)
   async performDataLoad(config, oldAnswers) {
     try {
       const loadConfig = this.buildLoadConfiguration(config);
@@ -2127,7 +1905,6 @@ class StudyQuestApp {
 
       const fetchParams = this.prepareFetchParameters(loadConfig);
 
-      // Use existing unified data fetching function
       const result = await this.getUserData(fetchParams, loadConfig.isInitialLoad);
 
       if (!result || !result.success) {
@@ -2135,22 +1912,17 @@ class StudyQuestApp {
         return;
       }
 
-      // Process the successful result
       const responseData = result.data || [];
 
-      // Always use server response directly (server-side filtering applied)
       this.state.currentAnswers = responseData;
 
 
-      // ✅ Update question text from data response
       if (result.header && this.elements.headingLabel) {
         this.elements.headingLabel.textContent = result.header;
       }
 
-      // Update UI
       await this.renderBoard(false, loadConfig.isInitialLoad, oldAnswers);
 
-      // Update class filter options on initial load
       if (loadConfig.isInitialLoad) {
         this.populateClassFilter(this.state.currentAnswers);
       }
@@ -2192,7 +1964,6 @@ class StudyQuestApp {
   }
 
   prepareFetchParameters(config) {
-    // Always use server-side filtering and sorting
     const classFilter = !config.selectedClass || config.selectedClass === 'すべて' ?
       null : config.selectedClass;
 
@@ -2210,7 +1981,6 @@ class StudyQuestApp {
 
   
   clearVirtualScrollingState() {
-    // バーチャルスクロール状態をリセット
     if (this.virtualScrollState) {
       this.virtualScrollState = {
         renderedItems: 0,
@@ -2221,7 +1991,6 @@ class StudyQuestApp {
       };
     }
     
-    // 既存のオブザーバーを切断
     if (this.scrollObserver) {
       this.scrollObserver.disconnect();
       this.scrollObserver = null;
@@ -2229,14 +1998,12 @@ class StudyQuestApp {
     
     if (this.visibilityObserver) {
       this.visibilityObserver.disconnect();
-      // visibilityObserver は setupObservers() で再作成されるので null にしない
     }
   }
 
   
   populateClassFilter(rows) {
     const classFilter = this.elements.classFilter;
-    // Ensure rows is an array before mapping
     const uniqueClasses = ['すべて', ...new Set(Array.isArray(rows) ? rows.map(r => r.class).filter(Boolean) : [])];
     classFilter.innerHTML = uniqueClasses.map(c => '<option value="' + window.sharedUtilities.security.escapeHtml(c) + '">' + window.sharedUtilities.security.escapeHtml(c) + '</option>').join('');
     classFilter.value = 'すべて';
@@ -2246,7 +2013,6 @@ class StudyQuestApp {
   applyReactionStyles(element, data) {
     if (!element || !data || !(element instanceof HTMLElement)) return;
     
-    // 既存のリアクション関連クラスをクリア
     const reactionClasses = [
       'reaction-bg-like', 'reaction-bg-understand', 'reaction-bg-curious',
       'reaction-bg-like-understand', 'reaction-bg-like-curious', 'reaction-bg-understand-curious',
@@ -2255,22 +2021,16 @@ class StudyQuestApp {
     ];
     reactionClasses.forEach(cls => element.classList.remove(cls));
     
-    // ハイライト状態を適用（リアクション装飾より優先）
     if (data.highlight) {
       element.classList.add('highlighted');
-      // Highlight decoration applied
-      // ハイライト時はリアクション装飾をスキップ
       return;
     } else {
-      // No highlight decoration
     }
     
-    // アクティブなリアクションを特定
     const active = this.reactionTypes.filter(rt => 
       data.reactions && data.reactions[rt.key] && data.reactions[rt.key].count > 0
     ).map(rt => rt.key);
     
-    // 背景色クラスを適用
     if (active.length === 1) {
       if (active[0] === 'LIKE') element.classList.add('reaction-bg-like');
       else if (active[0] === 'UNDERSTAND') element.classList.add('reaction-bg-understand');
@@ -2284,7 +2044,6 @@ class StudyQuestApp {
       element.classList.add('reaction-bg-like-understand-curious');
     }
     
-    // ボーダー幅を適用
     const totalReactions = this.reactionTypes.reduce((sum, rt) => sum + (data.reactions?.[rt.key]?.count || 0), 0);
     if (totalReactions >= 10) {
       element.classList.add('reaction-border-3');
@@ -2295,7 +2054,6 @@ class StudyQuestApp {
     }
   }
 
-  // Helper method to calculate reaction score
   calculateReactionScore(reactions) {
     if (!reactions) return 0;
     return Object.values(reactions).reduce((total, reaction) => {
@@ -2303,7 +2061,6 @@ class StudyQuestApp {
     }, 0);
   }
 
-  // Get current filter state consistently across all methods
   getCurrentFilterState() {
     const classFilter = this.elements.classFilter ? this.elements.classFilter.value : 'すべて';
     const sortOrder = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
@@ -2318,31 +2075,21 @@ class StudyQuestApp {
 
   async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
     try {
-      // Define newRows first to avoid TDZ error
       const newRows = this.state.currentAnswers;
 
 
-      // 空データの場合の早期処理
       if (!newRows || newRows.length === 0) {
         await this.renderEmptyState();
         return;
       }
       
-      // ハイライト設定は管理モード切り替え時に動的に制御
 
-      // レンダリング前の状態準備
       this.prepareRenderingState(newRows);
       
-      // メインレンダリング処理
       this.performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad);
       
-      // レンダリング後の状態更新
       this.finalizeRenderingState();
 
-      // DOM要素の生成が完了してから検証を実行
-      // ✅ CLAUDE.md準拠: 簡素化された状態検証（統一タイムアウト）
-      // 従来の3段階非同期（requestIdleCallback → 条件分岐 → requestAnimationFrame）から
-      // 1段階の統一タイムアウトに簡素化。300ms待機でDOM更新完了を保証
       requestIdleCallback(() => {
         this.validatePostLoadState();
       }, { timeout: 300 });
@@ -2390,13 +2137,11 @@ class StudyQuestApp {
   performMainRendering(newRows, oldRows, isLayoutChange, isInitialLoad) {
     const container = this.elements.answersContainer;
 
-    // ✅ Fix DOM rendering issue: Properly handle existing cards before clearing
     const existingMap = new Map();
     container.querySelectorAll('.answer-card').forEach(card => {
       existingMap.set(card.dataset.rowIndex, card);
     });
 
-    // Remove cards that are no longer needed BEFORE clearing container
     existingMap.forEach((card, id) => {
       if (!newRows.some(r => String(r.rowIndex) === id)) {
         card.remove();
@@ -2404,7 +2149,6 @@ class StudyQuestApp {
       }
     });
 
-    // Clear container only after removing specific cards
     container.innerHTML = '';
 
     if (newRows.length > window.RENDER_BATCH_SIZE) {
@@ -2454,15 +2198,12 @@ class StudyQuestApp {
       return { startIndex: 0, endIndex: totalItems };
     }
 
-    // DOM が準備完了するまで待つ
     if (!container.offsetParent && container.offsetHeight === 0) {
-      // コンテナがまだ表示されていない場合は少し待つ
       requestAnimationFrame(() => {
         const retryHeight = container.clientHeight;
         if (retryHeight > 0) {
         }
       });
-      // フォールバックとして全アイテムを表示
       return { startIndex: 0, endIndex: totalItems };
     }
 
@@ -2477,7 +2218,6 @@ class StudyQuestApp {
       startIndex = Math.floor(scrollTop / cardHeight);
       endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
     } else {
-      // Container not yet rendered, use fallback range
       return { startIndex: 0, endIndex: totalItems };
     }
 
@@ -2490,7 +2230,6 @@ class StudyQuestApp {
       this.clearVirtualScrollingState();
     }
 
-    // 仮想スクロールでも既存のリアクション状態を保持
     const fragment = this.getReusableFragment();
     const visibleRange = this.calculateVisibleRange(newRows.length);
     const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
@@ -2506,7 +2245,6 @@ class StudyQuestApp {
           fragment.appendChild(card);
         }
       } else if (this.shouldUpdateCard(row, oldData)) {
-        // 既存カードを更新（リアクション状態を保持）
         this.updateAnswerCard(card, row, oldData);
       }
     });
@@ -2532,7 +2270,6 @@ class StudyQuestApp {
   }
   
   finalizeRenderingState() {
-    // レンダリング完了後の状態更新
     this.updateAnswerCount();
     this.applyAnimations();
   }
@@ -2563,7 +2300,6 @@ class StudyQuestApp {
   handleRenderingError(error) {
     console.error('レンダリングエラーの詳細:', error);
     
-    // フォールバック: 最小限の表示を試行
     try {
       const container = this.elements.answersContainer;
       container.innerHTML = `
@@ -2583,12 +2319,10 @@ class StudyQuestApp {
     if (!card || !newData) return;
 
     try {
-      // 理由の有無状態が変化した場合はカード全体を再構築
       const oldHasReason = oldData && oldData.reason && oldData.reason.trim();
       const newHasReason = newData.reason && newData.reason.trim();
 
       if (oldHasReason !== newHasReason) {
-        // 理由の有無状態変化：カード全体を再構築
         const newCard = this.createAnswerCard(newData);
         if (newCard && card.parentNode) {
           card.parentNode.replaceChild(newCard, card);
@@ -2596,7 +2330,6 @@ class StudyQuestApp {
         return;
       }
 
-      // 通常の更新処理（理由の有無状態は同じ）
       if (!oldData || oldData.opinion !== newData.opinion) {
         const opinionElement = card.querySelector('.opinion-text');
         if (opinionElement) {
@@ -2604,7 +2337,6 @@ class StudyQuestApp {
         }
       }
 
-      // 理由がある場合のみ理由エリアを更新
       if (newHasReason && (!oldData || oldData.reason !== newData.reason)) {
         const reasonElement = card.querySelector('.answer-preview p');
         if (reasonElement) {
@@ -2619,10 +2351,8 @@ class StudyQuestApp {
         }
       }
       
-      // リアクション状態を保持しつつ更新
       this.updateCardReactions(card, newData);
       
-      // ハイライト状態を更新
       this.updateCardHighlight(card, newData);
       
     } catch (error) {
@@ -2638,14 +2368,12 @@ class StudyQuestApp {
       return;
     }
 
-    // DOM操作をバッチ化
     const updates = [];
     
     this.reactionTypes.forEach(reactionType => {
       const newCount = data.reactions?.[reactionType.key]?.count || 0;
       const reacted = data.reactions?.[reactionType.key]?.reacted || false;
 
-      // バッチ更新用にデータを蓄積
       updates.push({
         rowIndex: data.rowIndex,
         reaction: reactionType.key,
@@ -2655,12 +2383,10 @@ class StudyQuestApp {
       });
     });
 
-    // バッチでDOM更新を実行 - 楽観的UI更新では即座の反応が必要
     this.batchUpdateReactionButtons(updates, { immediate: true });
     this.updateCardReactionBackground(card, data);
   }
 
-  // バッチ処理でリアクションボタンを更新
   batchUpdateReactionButtons(updates, options = {}) {
     const { immediate = false } = options;
 
@@ -2670,7 +2396,6 @@ class StudyQuestApp {
           const buttons = document.querySelectorAll(`[data-row-index="${update.rowIndex}"][data-reaction="${update.reaction}"]`);
 
           buttons.forEach(btn => {
-            // ✅ Direct button updates without duplicate prevention
             const countEl = btn.querySelector('.reaction-count');
             if (countEl && this.state.showCounts) {
               countEl.textContent = update.count;
@@ -2709,7 +2434,6 @@ class StudyQuestApp {
   }
   
   updateCardReactionBackground(card, data) {
-    // リアクションに基づいてカードの背景とボーダーを更新
     this.applyReactionStyles(card, data);
   }
   
@@ -2722,14 +2446,12 @@ class StudyQuestApp {
       card.classList.remove('highlighted');
     }
 
-    // Update highlight button if present
     const highlightBtn = card.querySelector('.highlight-btn');
     if (highlightBtn) {
       highlightBtn.classList.toggle('active', isHighlighted);
     }
   }
   
-  // ✅ CLAUDE.md準拠: Refactored createAnswerCard into focused functions (239 lines → ~30 lines)
   createAnswerCard(data) {
     try {
       const safeData = this.validateCardData(data);
@@ -2759,7 +2481,6 @@ class StudyQuestApp {
       return null;
     }
 
-    // 回答（opinion）がない場合のみ警告を出す（理由のみなしは正常なケース）
     if (!data.opinion) {
       console.warn('createAnswerCard: 回答データ（opinion）がありません:', {
         rowIndex: data.rowIndex,
@@ -2880,11 +2601,9 @@ class StudyQuestApp {
   buildCardContent(card, safeData, reactionButtonsHtml, nameHtml, highlightBtnHtml, containerClass) {
     const fragment = document.createDocumentFragment();
 
-    // Create main content
     const contentDiv = document.createElement('div');
     contentDiv.className = 'relative flex-grow mb-3 answer-preview';
 
-    // 管理モード時に削除ボタンを追加
     if (this.state.showAdminFeatures) {
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'absolute top-2 right-2 text-red-400 hover:text-red-300 hover:bg-red-900/20 rounded-full p-2 transition-all duration-200 z-10 delete-answer-btn';
@@ -2903,7 +2622,6 @@ class StudyQuestApp {
 
     contentDiv.appendChild(opinionTitle);
 
-    // 理由データがある場合のみ理由エリアを作成
     if (safeData.reason && safeData.reason.trim()) {
       const reasonText = document.createElement('p');
       reasonText.className = 'text-gray-100 whitespace-pre-wrap break-words mt-4';
@@ -2911,7 +2629,6 @@ class StudyQuestApp {
       contentDiv.appendChild(reasonText);
     }
 
-    // Create footer
     const footerDiv = document.createElement('div');
     footerDiv.className = containerClass;
 
@@ -2941,7 +2658,6 @@ class StudyQuestApp {
 
     this.applyReactionStyles(card, safeData);
 
-    // Cache management
     try {
       if (this.cache.size > 100) {
         this.cache.cleanup();
@@ -2974,7 +2690,6 @@ class StudyQuestApp {
   createSkeletonCard() {
     const card = document.createElement('div');
     card.className = 'answer-card glass-panel rounded-xl p-4 opacity-50 skeleton';
-    // Ultra-simple skeleton without animation for better performance and UX
     card.innerHTML = '<div class="h-20 w-full rounded bg-gray-500/20 mb-4"></div><div class="h-4 w-3/4 rounded bg-gray-500/15"></div>';
     return card;
   }
@@ -2997,14 +2712,12 @@ class StudyQuestApp {
   async performStagedRecovery(rowIndex, reaction, error) {
     const reactionKey = `${rowIndex}-${reaction}`;
 
-    // Get pending request info for recovery context
     const pendingRequest = this.pendingReactions.get(reactionKey);
     if (pendingRequest) {
       pendingRequest.retryCount = (pendingRequest.retryCount || 0) + 1;
     }
 
 
-    // Level 1: Cache clear and force reload
     try {
       this.clearCache({ includeReactions: true });
       await this.loadSheetData({ bypassCache: true, silent: true });
@@ -3013,7 +2726,6 @@ class StudyQuestApp {
       console.warn('⚠️ Level 1 recovery failed:', level1Error.message);
     }
 
-    // Level 2: Local state restoration (final fallback)
     try {
       const localRestoreResult = this.restoreLocalReactionState(rowIndex, reaction, pendingRequest);
       if (localRestoreResult.success) {
@@ -3047,7 +2759,6 @@ class StudyQuestApp {
 
     const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
 
-    // Revert to original state before the failed operation
     if (pendingRequest && typeof pendingRequest.originalState === 'boolean') {
       item.reactions[reaction].reacted = pendingRequest.originalState;
       if (pendingRequest.originalState) {
@@ -3056,7 +2767,6 @@ class StudyQuestApp {
         item.reactions[reaction].count = Math.max(0, (item.reactions[reaction].count || 1) - 1);
       }
     } else {
-      // Simple revert: toggle current state
       const wasReacted = item.reactions[reaction].reacted;
       item.reactions[reaction].reacted = !wasReacted;
       if (wasReacted) {
@@ -3066,7 +2776,6 @@ class StudyQuestApp {
       }
     }
 
-    // Update UI
     if (card) {
       this.updateCardReactions(card, item);
     }
@@ -3084,46 +2793,35 @@ class StudyQuestApp {
   simulateServerExclusiveReaction(item, reaction) {
     if (!item.reactions) item.reactions = {};
 
-    // Create deep copy of current reactions to simulate server logic
     const predictedReactions = JSON.parse(JSON.stringify(item.reactions));
 
-    // Initialize reaction types if they don't exist
     this.reactionTypes.forEach(rt => {
       if (!predictedReactions[rt.key]) {
         predictedReactions[rt.key] = { count: 0, reacted: false };
       }
     });
 
-    // ✅ 修正: サーバー状態を尊重した排他性ロジック
     let userCurrentReaction = null;
     const reactedReactions = [];
 
-    // 全てのreacted: trueのリアクションを収集
     Object.keys(predictedReactions).forEach(key => {
       if (predictedReactions[key].reacted) {
         reactedReactions.push(key);
       }
     });
 
-    // 🔧 FIXED: サーバーからの正しいデータを尊重
-    // 複数のreacted: trueがある場合でも、強制リセットはしない
-    // サーバー側の排他性は addReaction API で適切に処理される
     if (reactedReactions.length >= 1) {
-      // 最初に見つかったreacted: trueを現在のリアクションとして扱う
       userCurrentReaction = reactedReactions[0];
 
-      // 複数reacted:trueがある場合、サーバー状態を尊重
     }
 
     let changed = false;
 
     if (userCurrentReaction === reaction) {
-      // User clicking same reaction -> remove (toggle)
       predictedReactions[reaction].reacted = false;
       predictedReactions[reaction].count = Math.max(0, predictedReactions[reaction].count - 1);
       changed = true;
     } else {
-      // User clicking different reaction -> remove old (if any), add new
       if (userCurrentReaction) {
         predictedReactions[userCurrentReaction].reacted = false;
         predictedReactions[userCurrentReaction].count = Math.max(0, predictedReactions[userCurrentReaction].count - 1);
@@ -3150,10 +2848,8 @@ class StudyQuestApp {
     const reactionKey = `${numericRowIndex}-${reaction}`;
     const rowKey = `row_${numericRowIndex}`; // 行単位のデバウンシング用
 
-    // Generate unique request ID for this operation
     const requestId = this.generateRequestId();
 
-    // Duplicate prevention: check if any request for this reaction is pending
     if (this.pendingReactions.has(reactionKey)) {
       const pendingRequest = this.pendingReactions.get(reactionKey);
       return;
@@ -3167,17 +2863,13 @@ class StudyQuestApp {
 
     const buttons = document.querySelectorAll(`[data-row-index="${numericRowIndex}"][data-reaction="${reaction}"]`);
 
-    // Set loading state
     this.setReactionButtonsLoading(buttons, true, requestId);
 
-    // Enhanced optimistic update - simulate server-side exclusive logic
     const optimisticUpdate = this.simulateServerExclusiveReaction(item, reaction);
 
     if (optimisticUpdate.changed) {
-      // Apply the predicted server response to local state
       item.reactions = optimisticUpdate.reactions;
 
-      // Update card reactions
       const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
 
       if (card) {
@@ -3185,10 +2877,8 @@ class StudyQuestApp {
       }
     }
 
-    // Current reaction state capture for rollback support
     const currentState = item.reactions?.[reaction] || { count: 0, reacted: false };
 
-    // Register this request in pending reactions with full tracking
     this.pendingReactions.set(reactionKey, {
       requestId,
       rowIndex: numericRowIndex,
@@ -3198,7 +2888,6 @@ class StudyQuestApp {
       retryCount: 0
     });
 
-    // 🎯 フェーズ2最適化: デバウンシング方式で行単位の最適化
     this.debounceReactionByRow(rowKey, numericRowIndex, reaction, reactionKey);
   }
 
@@ -3206,15 +2895,12 @@ class StudyQuestApp {
    * 🎯 CLAUDE.md準拠: 行単位デバウンシング処理（300ms）
    */
   debounceReactionByRow(rowKey, rowIndex, reaction, reactionKey) {
-    // 既存のタイムアウトをクリア（最新の操作のみ実行）
     if (this.reactionDebounceTimeouts.has(rowKey)) {
       clearTimeout(this.reactionDebounceTimeouts.get(rowKey));
     }
 
-    // 300msデバウンスで最新操作のみ実行
     const timeoutId = setTimeout(async () => {
       try {
-        // デバウンシングタイムアウト管理
         this.reactionDebounceTimeouts.delete(rowKey);
 
         await this.sendReactionToServerDirect(rowIndex, reaction, reactionKey);
@@ -3222,11 +2908,9 @@ class StudyQuestApp {
       } catch (error) {
         console.error(`❌ デバウンス実行エラー (${reactionKey}):`, error);
 
-        // 🎯 追加のエラー時確認処理（sendReactionToServerDirectのfinallyと重複するが安全確保）
         this.ensureReactionCleanup(rowIndex, reaction, reactionKey, error);
 
       } finally {
-        // デバウンシングタイムアウトの確実な削除
         this.reactionDebounceTimeouts.delete(rowKey);
       }
     }, 300);
@@ -3247,14 +2931,11 @@ class StudyQuestApp {
         throw new Error(`Item not found for rowIndex: ${rowIndex}`);
       }
 
-      // Use executeWithRetry for robust async reaction processing
       await this.executeWithRetry(async (attempt) => {
 
-        // Server-first approach with retry support
         const response = await this.sendReactionToServer(rowIndex, reaction);
         await this.processResponse(item, response, reaction);
 
-        // UI update (only after successful server response)
         await this.updateReactionUI(item, false);
 
         return response;
@@ -3274,16 +2955,13 @@ class StudyQuestApp {
       errorMessage = error.message;
       console.error(`❌ デバウンス処理エラー (${reactionKey}):`, error);
 
-      // エラー時の復旧処理
       await this.handleReactionError(error, rowIndex, reaction);
 
     } finally {
-      // 🎯 確実なクリーンアップ処理（成功・失敗問わず必ず実行）
       const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
       this.setReactionButtonsLoading(buttons, false);
       this.pendingReactions.delete(reactionKey);
 
-      // 完了通知（成功・失敗の情報を含む）
       this.notifyReactionComplete(reactionKey, {
         success,
         error: errorMessage,
@@ -3299,7 +2977,6 @@ class StudyQuestApp {
   ensureReactionCleanup(rowIndex, reaction, reactionKey, error = null) {
     try {
 
-      // 1. ローディング状態の確実な解除
       const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
       if (buttons.length > 0) {
         this.setReactionButtonsLoading(buttons, false);
@@ -3307,16 +2984,13 @@ class StudyQuestApp {
         console.warn(`⚠️ ボタンが見つからない: row=${rowIndex}, reaction=${reaction}`);
       }
 
-      // 2. pendingReactionsの確実な削除
       if (this.pendingReactions.has(reactionKey)) {
         this.pendingReactions.delete(reactionKey);
       }
 
-      // 3. エラー時のUI状態復旧確認
       if (error) {
         console.warn(`🔄 エラー時UI状態復旧確認: ${reactionKey}`, error.message);
 
-        // UI状態の一貫性確認
         buttons.forEach(btn => {
           if (btn.disabled || btn.classList.contains('loading') || btn.getAttribute('aria-busy') === 'true') {
             console.warn(`🚨 UI状態不整合検出、強制復旧: ${reactionKey}`);
@@ -3328,7 +3002,6 @@ class StudyQuestApp {
         });
       }
 
-      // 4. 完了通知の安全確保（重複実行防止）
       if (!this.reactionEventListeners.has(reactionKey)) {
         this.notifyReactionComplete(reactionKey, {
           success: !error,
@@ -3341,7 +3014,6 @@ class StudyQuestApp {
 
     } catch (cleanupError) {
       console.error(`❌ クリーンアップ処理自体でエラー: ${reactionKey}`, cleanupError);
-      // クリーンアップ処理自体でエラーが発生した場合も、最低限のUI復旧を試行
       try {
         const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
         buttons.forEach(btn => {
@@ -3355,9 +3027,7 @@ class StudyQuestApp {
     }
   }
 
-  // 🎯 CLAUDE.md準拠: processReactionQueue削除済み（デバウンシング方式に移行）
 
-  // 🎯 CLAUDE.md準拠: processReaction削除済み（デバウンシング方式のsendReactionToServerDirectに統合）
 
   notifyReactionComplete(reactionKey, result) {
     const listeners = this.reactionEventListeners.get(reactionKey);
@@ -3375,11 +3045,9 @@ class StudyQuestApp {
 
   waitForReactionComplete(reactionKey, timeout = 5000) {
     return new Promise((resolve, reject) => {
-      // CLAUDE.md準拠: Promise-based timeout handling (setTimeout代替)
       const timeoutPromise = this.createReactionTimeout(reactionKey, timeout, reject);
 
       const listener = (result) => {
-        // No need to clear timeout with Promise-based approach
         resolve(result);
       };
 
@@ -3390,7 +3058,6 @@ class StudyQuestApp {
     });
   }
 
-  // 動的状態変化待機システム
   async waitForReactionStateChange(rowIndex, reaction, initialState, timeoutMs = 3000, pollIntervalMs = 50) {
     const startTime = Date.now();
     
@@ -3434,7 +3101,6 @@ class StudyQuestApp {
           return;
         }
         
-        // CLAUDE.md準拠: Promise-based polling (setTimeout代替)
         this.scheduleNextPoll(poll, pollIntervalMs);
       };
       
@@ -3442,12 +3108,10 @@ class StudyQuestApp {
     });
   }
 
-  // シンプルなリアクション状態監視（通知システム中心）
   async waitForReactionUpdate(rowIndex, reaction, expectedChange = null, maxWaitMs = 3000) {
     const reactionKey = `${rowIndex}-${reaction}`;
     
     try {
-      // 完了通知システムのみを使用（シンプルで信頼性が高い）
       const result = await this.waitForReactionComplete(reactionKey, maxWaitMs);
       return result || { timeout: false, success: true };
     } catch (error) {
@@ -3460,7 +3124,6 @@ class StudyQuestApp {
     }
   }
 
-  // リアクションボタン状態取得ヘルパー
   getReactionButtonState(rowIndex, reaction) {
     const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
     if (buttons.length === 0) return null;
@@ -3477,10 +3140,6 @@ class StudyQuestApp {
     };
   }
 
-  // 🎯 CLAUDE.md準拠: バッチキューシステム削除済み（デバウンシング方式採用）
-  // - addToBatchQueue() 削除: 未使用（呼び出し元なし）
-  // - reactionBatchQueue 削除: デッドコード
-  // - 現在はデバウンシング方式で個別リアクション処理を最適化
 
   setReactionButtonsLoading(buttons, isLoading, requestId = null) {
     buttons.forEach(btn => {
@@ -3519,7 +3178,6 @@ class StudyQuestApp {
 
       return response;
     } catch (error) {
-      // エラータイプを判定して適切なメッセージを返す
       if (error.userMessage) {
         throw new Error(error.userMessage);
       } else if (error.message && error.message.includes('timeout')) {
@@ -3533,15 +3191,11 @@ class StudyQuestApp {
   }
 
   async processResponse(item, response, reaction) {
-    // Modern backend format only: {success, reactions, userReaction, action}
     if (response.success && response.reactions && typeof response.reactions === 'object') {
-        // ✅ 修正: サーバーレスポンスの排他性検証と安全な状態更新
         const serverReactions = JSON.parse(JSON.stringify(response.reactions));
 
-        // サーバーレスポンスでも排他性を検証
         const validatedReactions = this.validateAndFixReactionExclusivity(serverReactions);
 
-        // 状態を安全に更新（楽観的更新との整合性を保つ）
         item.reactions = validatedReactions;
 
             reaction,
@@ -3551,10 +3205,8 @@ class StudyQuestApp {
             validatedReactions: validatedReactions
         });
 
-        // Save to localStorage
         this.saveReactionState(item.rowIndex, item.reactions);
     } else {
-        // Handle error cases
         console.error('❌ Invalid server response format:', response);
         throw new Error('Server returned invalid response format');
     }
@@ -3573,18 +3225,15 @@ class StudyQuestApp {
     const validatedReactions = JSON.parse(JSON.stringify(reactions));
     const reactedKeys = [];
 
-    // reacted: true のリアクションを収集
     Object.keys(validatedReactions).forEach(key => {
       if (validatedReactions[key] && validatedReactions[key].reacted) {
         reactedKeys.push(key);
       }
     });
 
-    // ✅ 複数のreacted: trueが存在する場合の修正処理
     if (reactedKeys.length > 1) {
       console.warn(`⚠️ サーバーレスポンスで複数のreacted: trueを検出。修正中:`, reactedKeys);
 
-      // 最初のもの以外を全てfalseにリセット（データ整合性を保つ）
       const keepReaction = reactedKeys[0];
       reactedKeys.slice(1).forEach(key => {
         validatedReactions[key].reacted = false;
@@ -3670,12 +3319,9 @@ class StudyQuestApp {
     return `${base}_${userId}_${window.SHEET_NAME}`;
   }
 
-  // 時刻ベース永続化機能
 
-  // 真の初回ボードアクセス判定
   isFirstTimeBoardAccess() {
     try {
-      // ✅ 修正: 時刻ベースシステム対応
       const hasLastSeenTimestamp = localStorage.getItem(this.getScopedKey('lastSeenTimestamp')) !== null;
       const hasDiffCards = localStorage.getItem(this.getScopedKey('differentialCards')) !== null;
       const hasInitialLoad = this.initialDataLoaded === true;
@@ -3697,7 +3343,6 @@ class StudyQuestApp {
     }
   }
 
-  // ✅ 修正: 時刻ベース統一システム
   loadLastSeenTimestamp() {
     try {
       const key = this.getScopedKey('lastSeenTimestamp');
@@ -3721,7 +3366,6 @@ class StudyQuestApp {
     }
   }
 
-  // ✅ 時刻ベース統一システム（論理的破綻修正）
   updateLastSeenTimestamp(timestamp = null) {
     const newTimestamp = timestamp || new Date().toISOString();
     const oldTimestamp = this.state.lastSeenTimestamp;
@@ -3745,14 +3389,12 @@ class StudyQuestApp {
         timestamp: new Date().toISOString()
     });
 
-    // Staged error recovery strategy
     const recoveryResult = await this.performStagedRecovery(rowIndex, reaction, error);
 
     if (!recoveryResult.success) {
       console.error('❌ All recovery attempts failed:', recoveryResult.message);
     }
     
-    // Enhanced user feedback with actionable error messages
     let userMessage = 'リアクション更新エラーが発生しました';
     if (error.message.includes('timeout') || error.message.includes('タイムアウト')) {
       userMessage = 'ネットワークが遅いため、リアクションの更新に時間がかかっています';
@@ -3762,7 +3404,6 @@ class StudyQuestApp {
       userMessage = 'リアクション機能への権限がありません';
     }
 
-    // Show error to user
     if (window.notifications) {
         window.notifications.error(userMessage, 4000);
     } else {
@@ -3804,7 +3445,6 @@ class StudyQuestApp {
     });
 
     try {
-        // Use executeWithRetry for robust async highlight processing
         const res = await this.executeWithRetry(async (attempt) => {
 
             const response = await this.runGas('toggleHighlight', this.state.userId, numericRowIndex);
@@ -3820,11 +3460,9 @@ class StudyQuestApp {
             baseDelay: 300,
             context: `ハイライト処理 (${highlightKey})`,
             retryCondition: (error) => {
-                // Don't retry permission errors
                 if (error.message && (error.message.includes('管理者のみ') || error.message.includes('編集者のみ'))) {
                     return false;
                 }
-                // Retry on network/server errors
                 const retryableErrors = ['network', 'timeout', 'server error', 'temporarily unavailable'];
                 return retryableErrors.some(errorType =>
                     error.message.toLowerCase().includes(errorType)
@@ -3832,15 +3470,12 @@ class StudyQuestApp {
             }
         });
 
-        // Apply highlight result with async DOM updates
         item.highlight = typeof res.highlighted === 'boolean' ? res.highlighted : !item.highlight;
 
-        // Use batch DOM updates for better performance
         this.batchDOMUpdates([
             () => this.applyUpdates([item])
         ]);
 
-        // Update modal if open
         if (!this.elements.answerModalContainer.classList.contains('hidden')) {
             const modalRowIndex = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
             if (modalRowIndex == numericRowIndex) {
@@ -3848,8 +3483,6 @@ class StudyQuestApp {
             }
         }
 
-        // Schedule async verification with proper highlight value
-        // CLAUDE.md準拠: Immediate verification (setTimeout代替)
         requestIdleCallback(() => {
             const highlightValue = typeof res.highlighted === 'boolean' ? res.highlighted : item.highlight;
             this.verifyHighlightSync(numericRowIndex, highlightValue);
@@ -3878,7 +3511,6 @@ class StudyQuestApp {
       const item = this.state.currentAnswers.find(i => i.rowIndex == rowIndex);
       if (!item) return;
 
-      // Skip verification if expectedHighlight is undefined
       if (typeof expectedHighlight === 'undefined') {
         return;
       }
@@ -3896,9 +3528,7 @@ class StudyQuestApp {
     }
   }
 
-  // Data integrity management
 
-  // 不整合の自動修復
   async fixSyncIssues(healthCheckResult) {
     if (!healthCheckResult.issues || healthCheckResult.issues.length === 0) {
       return { fixed: 0, skipped: 0 };
@@ -3945,9 +3575,7 @@ class StudyQuestApp {
     return { fixed, skipped };
   }
 
-  // State hash calculation utilities
 
-  // アイテム状態のハッシュを計算（変更検出用）
   calculateStateHash(item) {
     const state = {
       reactions: item.reactions,
@@ -3957,9 +3585,6 @@ class StudyQuestApp {
     return JSON.stringify(state);
   }
 
-  // ===========================================
-  // 🗑️ Answer Deletion Functions
-  // ===========================================
 
   /**
    * 削除確認モーダルを表示
@@ -3995,7 +3620,6 @@ class StudyQuestApp {
    */
   showDeleteConfirmationModal(answerData) {
     return new Promise((resolve) => {
-      // モーダル要素を作成
       const modal = document.createElement('div');
       modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001] animate-fade-in';
       modal.innerHTML = `
@@ -4034,7 +3658,6 @@ class StudyQuestApp {
 
       document.body.appendChild(modal);
 
-      // イベントハンドラーを設定
       const cancelBtn = modal.querySelector('.cancel-btn');
       const confirmBtn = modal.querySelector('.confirm-btn');
 
@@ -4052,7 +3675,6 @@ class StudyQuestApp {
         resolve(true);
       });
 
-      // 背景クリックでキャンセル
       modal.addEventListener('click', (e) => {
         if (e.target === modal) {
           cleanup();
@@ -4060,7 +3682,6 @@ class StudyQuestApp {
         }
       });
 
-      // ESCキーでキャンセル
       const handleKeyDown = (e) => {
         if (e.key === 'Escape') {
           cleanup();
@@ -4091,15 +3712,12 @@ class StudyQuestApp {
       });
 
       if (result.success) {
-        // 成功通知
         if (window.notifications) {
           window.notifications.success('回答を削除しました', 3000);
         }
 
-        // ✅ 削除成功後: 通知バナーをクリア（削除されたデータの可能性）
         this.dismissNewContentBanner();
 
-        // データとUIを更新
         await this.refreshAfterDelete(rowIndex);
 
       } else {
@@ -4120,10 +3738,8 @@ class StudyQuestApp {
    */
   async refreshAfterDelete(deletedRowIndex) {
     try {
-      // 管理モード状態を明示的に保持
       const currentAdminState = this.state.showAdminFeatures;
 
-      // データ配列から削除された項目を除去
       const initialCount = this.state.currentAnswers?.length || 0;
 
       if (this.state.currentAnswers) {
@@ -4137,10 +3753,8 @@ class StudyQuestApp {
         );
       }
 
-      // DOM から該当カードを削除
       const cardToRemove = document.querySelector(`[data-row-index="${deletedRowIndex}"]`);
       if (cardToRemove) {
-        // アニメーション付きで削除
         cardToRemove.style.transition = 'all 0.3s ease-out';
         cardToRemove.style.transform = 'scale(0.8)';
         cardToRemove.style.opacity = '0';
@@ -4149,30 +3763,25 @@ class StudyQuestApp {
           cardToRemove.remove();
           this.updateAnswerCount();
 
-          // 🔧 管理モード状態を強化維持（アニメーション後も確実に保持）
           if (currentAdminState) {
             this.state.showAdminFeatures = true;
             this.updateAdminButtonUI();
           }
         }, 300);
       } else {
-        // カードが見つからない場合は即座に更新
         this.updateAnswerCount();
 
-        // 🔧 管理モード状態を強化維持（即座更新時も確実に保持）
         if (currentAdminState) {
           this.state.showAdminFeatures = true;
           this.updateAdminButtonUI();
         }
       }
 
-      // データ整合性チェック：削除が正常に反映されているか確認
       const finalCount = this.state.currentAnswers?.length || 0;
       const isDataConsistent = (initialCount - finalCount) === 1;
 
       if (!isDataConsistent) {
         console.warn('削除後データ不整合検出:', { initialCount, finalCount });
-        // データ不整合時のみ部分リフレッシュ（全リセットではない）
         setTimeout(() => {
           this.loadSheetData({ preserveAdminMode: true, bypassCache: true });
         }, 500);
@@ -4186,24 +3795,19 @@ class StudyQuestApp {
 
     } catch (error) {
       console.error('削除後更新エラー:', error);
-      // エラー時のみフォールバック（管理モード保持付き）
       if (window.notifications) {
         window.notifications.warning('削除後の更新でエラーが発生しました。画面を更新します。', 3000);
       }
       setTimeout(() => {
-        // 管理モード状態を保持してリロード
         const preserveAdminMode = this.state.showAdminFeatures;
         this.loadSheetData({ preserveAdminMode, bypassCache: true });
       }, 500);
     }
   }
 
-  // バッチ処理の健全性チェック
 
-  // 通知システムの健全性チェック
   
   async toggleAdminMode() {
-    // Temporarily disable button to prevent duplicate clicks
     if (this.elements.adminToggleBtn) {
       this.elements.adminToggleBtn.disabled = true;
     }
@@ -4212,7 +3816,6 @@ class StudyQuestApp {
       const enable = !this.state.showAdminFeatures;
 
       
-      // 編集者権限チェック
       if (enable) {
           isAdminUser: this.state.isAdminUser,
           hasAdminCapability: window.hasAdminCapability,
@@ -4228,30 +3831,25 @@ class StudyQuestApp {
           return;
         }
         
-        // 管理モード移行時の確認モーダル
         const confirmed = await this.showAdminModeConfirmation();
         if (!confirmed) {
           return; // ユーザーがキャンセルした場合
         }
         
-        // 最初の管理モード切り替え時のみサーバー側で再確認（オプション）
         if (!this.adminModeVerified) {
           try {
             const authResult = await this.runGas('checkUserAuthentication');
             const ok = authResult && authResult.isAdministrator;
             if (!ok) {
               console.warn('サーバー側の権限確認に失敗しました。');
-              // ローカルの権限情報を信頼して継続
             }
             this.adminModeVerified = true;
           } catch (e) {
             console.warn('権限確認API呼び出しに失敗しました', e);
-            // エラーが発生してもローカルの権限情報を信頼して継続
           }
         }
       }
       
-      // グローバル設定を更新
       window.showAdminFeatures = enable;
       window.showHighlightToggle = enable; // 管理モードでのみ有効
       
@@ -4260,16 +3858,12 @@ class StudyQuestApp {
         showAdminFeatures: window.showAdminFeatures,
         showHighlightToggle: window.showHighlightToggle
       });
-      // 🔧 表示設定の動的切り替え（管理モード⇔ConfigJSON設定）
       if (enable) {
-        // 管理モード: 強制表示
         window.showCounts = true;
         window.displayMode = 'named';
       } else {
-        // ✅ 閲覧モード: ConfigJSON設定に戻す（強化版）
         const displaySettings = window.UNIFIED_CONFIG?.displaySettings || {};
 
-        // ✅ デバッグログでConfigJSON値を確認
           configExists: !!window.UNIFIED_CONFIG,
           displaySettingsExists: !!displaySettings,
           originalShowReactions: displaySettings.showReactions,
@@ -4281,7 +3875,6 @@ class StudyQuestApp {
         window.showCounts = displaySettings.showReactions || false;
         window.displayMode = displaySettings.showNames ? 'named' : 'anonymous';
 
-        // ✅ 復旧後の値を確認
           afterShowCounts: window.showCounts,
           afterDisplayMode: window.displayMode,
           configApplied: true
@@ -4298,12 +3891,9 @@ class StudyQuestApp {
         showScoreSort: window.showScoreSort
       });
       
-      // Update local state from global variables
       this.updateConfigFromGlobals();
 
-      // ✅ 管理モード無効化時の確実な状態同期
       if (!enable) {
-        // ConfigJSON設定がstateに確実に反映されているか確認
           stateShowCounts: this.state.showCounts,
           stateDisplayMode: this.state.displayMode,
           windowShowCounts: window.showCounts,
@@ -4312,24 +3902,18 @@ class StudyQuestApp {
         });
       }
 
-      // キャッシュをクリアして新しい設定で再描画
       this.cache.clear();
 
-      // 管理モード切り替え時は既存のカードを全て削除して強制再生成
       this.elements.answersContainer.innerHTML = '';
 
-      // ✅ UI状態を確実に更新（ConfigJSON設定反映）
       this.updateSortOptions();
       this.updateAdminButtonUI();
       this.updateEndPublicationButtonUI();
-      // 管理モード切り替え時は設定変更のため再描画が必要
       this.loadSheetData({ bypassCache: true }).then(() => {
-        // ✅ 修正: 管理モード切り替え後に時刻ベース基準更新
         this.updateLastSeenTimestamp();
 
       });
     } finally {
-      // Re-enable button
       if (this.elements.adminToggleBtn) {
         this.elements.adminToggleBtn.disabled = false;
       }
@@ -4341,7 +3925,6 @@ class StudyQuestApp {
    */
   async showAdminModeConfirmation() {
     return new Promise((resolve) => {
-      // モーダル要素を作成
       const modal = document.createElement('div');
       modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
       modal.innerHTML = `
@@ -4373,7 +3956,6 @@ class StudyQuestApp {
         </div>
       `;
       
-      // イベントリスナーを追加
       const cancelBtn = modal.querySelector('.cancel-btn');
       const confirmBtn = modal.querySelector('.confirm-btn');
       
@@ -4391,7 +3973,6 @@ class StudyQuestApp {
         resolve(true);
       });
       
-      // Escapeキーでキャンセル
       const handleKeydown = (e) => {
         if (e.key === 'Escape') {
           cleanup();
@@ -4401,11 +3982,8 @@ class StudyQuestApp {
       };
       document.addEventListener('keydown', handleKeydown);
       
-      // モーダルを表示
       document.body.appendChild(modal);
 
-      // フォーカスを確認ボタンに移動
-      // CLAUDE.md準拠: Immediate focus (setTimeout代替)
       requestIdleCallback(() => confirmBtn.focus(), { timeout: 100 });
     });
   }
@@ -4415,7 +3993,6 @@ class StudyQuestApp {
       return;
     }
 
-    // ボタンのローディング状態を設定
     const endPublicationBtn = this.elements.endPublicationBtn;
     let originalButtonContent = '';
     if (endPublicationBtn) {
@@ -4429,26 +4006,18 @@ class StudyQuestApp {
       `;
     }
 
-    // ✅ GAS Sandbox対応: google.script.runのSuccessHandler内でリロード
-    // async/awaitではなく、コールバック内でページ遷移（ユーザージェスチャーコンテキスト維持）
     const self = this;
 
     google.script.run
       .withSuccessHandler(function(result) {
 
-        // ✅ キャッシュクリア
         self.clearCache({ includeReactions: true, includeLocalStorage: true });
 
-        // ✅ GAS iframe対応: google.script.history.replace()でページリロード
-        // window.location.replace()はiframe sandbox制約でブロックされる可能性あり
-        // サーバー側で状態管理（isPublished=false）されているため、
-        // リロード後にdoGet()が自動的に非公開画面を返す
         google.script.history.replace(null, {}, window.location.href);
       })
       .withFailureHandler(function(error) {
         console.error('❌ 公開終了に失敗しました:', error);
 
-        // エラーメッセージを構成
         let errorMsg = '公開終了に失敗しました';
         if (error && error.message) {
           errorMsg += ': ' + error.message;
@@ -4456,7 +4025,6 @@ class StudyQuestApp {
           errorMsg += ': ' + error;
         }
 
-        // エラーメッセージを表示
         if (window.sharedModals) {
           window.sharedModals.showAlert('エラー', errorMsg, 'error');
         } else if (window.notifications) {
@@ -4465,7 +4033,6 @@ class StudyQuestApp {
           alert(errorMsg);
         }
 
-        // ボタンを元の状態に戻す
         if (endPublicationBtn && originalButtonContent) {
           endPublicationBtn.disabled = false;
           endPublicationBtn.innerHTML = originalButtonContent;
@@ -4482,10 +4049,8 @@ class StudyQuestApp {
    */
   saveReactionState(rowIndex, reactions) {
     try {
-      // 既存の保存データを取得
       const existingData = JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
       
-      // 現在のリアクション状態を保存
       existingData[rowIndex] = {};
       Object.keys(reactions).forEach(reactionType => {
         const reaction = reactions[reactionType];
@@ -4497,7 +4062,6 @@ class StudyQuestApp {
         }
       });
       
-      // 空のオブジェクトの場合は削除
       if (Object.keys(existingData[rowIndex]).length === 0) {
         delete existingData[rowIndex];
       }
@@ -4589,27 +4153,23 @@ class StudyQuestApp {
       const modalBtn = this.elements.modalReactionContainer.querySelector(`[data-reaction="${rt.key}"]`);
       
       if (modalBtn) {
-        // カウント表示更新
         const countEl = modalBtn.querySelector('.reaction-count');
         if (countEl && this.state.showCounts) {
           countEl.textContent = info.count;
         }
         
-        // ✅ Direct SVG replacement for modal reactions
         const svgEl = modalBtn.querySelector('svg');
         if (svgEl) {
           const newIcon = this.getIcon(rt.icon, 'w-5 h-5', info.reacted);
           svgEl.outerHTML = newIcon;
         }
         
-        // スタイル更新
         const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
         modalBtn.classList.remove('text-red-500', 'text-yellow-500', 'text-green-500');
         modalBtn.classList.add(colorClass);
         modalBtn.classList.toggle('reacted', info.reacted);
         modalBtn.setAttribute('aria-pressed', info.reacted.toString());
         
-        // aria-label更新
         const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
         const reactionName = reactionNames[rt.key] || rt.key;
         const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count}件)` : ''}`;
@@ -4618,7 +4178,6 @@ class StudyQuestApp {
     });
   }
   applyUpdates(items) {
-    // パフォーマンス最適化: 変更が必要なアイテムのみ処理
     const itemsToUpdate = items.filter(item => {
       const updateKey = `apply_update_${item.rowIndex}`;
       const currentHash = this.calculateStateHash(item);
@@ -4628,7 +4187,6 @@ class StudyQuestApp {
         return false; // 変更なし - スキップ
       }
       
-      // 状態を記録
       if (!this.lastApplyStates) this.lastApplyStates = new Map();
       this.lastApplyStates.set(updateKey, currentHash);
       return true; // 変更あり - 更新対象
@@ -4639,7 +4197,6 @@ class StudyQuestApp {
     }
     
 
-    // バッチ処理用にリアクション更新データを蓄積
     const reactionUpdates = [];
     
     itemsToUpdate.forEach(item => {
@@ -4665,7 +4222,6 @@ class StudyQuestApp {
           highlightBtn.setAttribute('aria-label', label);
           const svgEl = highlightBtn.querySelector('svg');
           if (svgEl) {
-            // ✅ Direct SVG replacement for highlights
             const newIcon = this.getIcon('star', 'w-5 h-5', item.highlight);
             svgEl.outerHTML = newIcon;
           }
@@ -4679,19 +4235,14 @@ class StudyQuestApp {
       }
     });
 
-    // バッチ処理でリアクション更新を実行
     if (reactionUpdates.length > 0) {
       this.batchUpdateReactionButtons(reactionUpdates);
     }
   }
   showAnswerModal(rowIndex) {
-    // Show answer modal called
 
-    // Data search context
     
-    // 最新データを取得（filteredDataとcurrentAnswersの両方から）
     let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
-    // Data search in currentAnswers
     
     if (!data && this.state.filteredData) {
       data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
@@ -4715,10 +4266,8 @@ class StudyQuestApp {
       reason: data.reason?.substring(0, 50) + '...'
     });
     this.state.lastFocusedElement = document.activeElement;
-    // モーダル内容の条件付き構築
     let modalHtml = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
 
-    // 理由データがある場合のみ理由部分を追加
     if (data.reason && data.reason.trim()) {
       modalHtml += '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
     }
@@ -4727,7 +4276,6 @@ class StudyQuestApp {
     const showName = this.state.displayMode === 'named';
     let modalDisplayName = '';
     
-    // Debug: Log modal display mode state
       displayMode: this.state.displayMode,
       showName,
       showAdminFeatures: this.state.showAdminFeatures,
@@ -4737,7 +4285,6 @@ class StudyQuestApp {
     });
     
     if (showName) {
-      // 名前が利用可能な場合はそれを使用、なければemailから生成
       if (data.name) {
         modalDisplayName = data.name;
       } else if (data.email) {
@@ -4756,7 +4303,6 @@ class StudyQuestApp {
       return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
     }).join('');
     
-    // ハイライトボタンを追加
     let highlightBtnHtml = '';
     if (this.state.showHighlightToggle) {
       const cls = data.highlight ? 'reacted' : '';
@@ -4766,7 +4312,6 @@ class StudyQuestApp {
     
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
     
-    // リアクションに基づくカード色の適用
       rowIndex: data.rowIndex,
       highlight: data.highlight,
       reactions: data.reactions,
@@ -4785,7 +4330,6 @@ class StudyQuestApp {
   updateModalContent(data) {
     if (!data) return;
     
-    // リアクションボタンを更新
     const reactionButtonsHtml = this.reactionTypes.map(rt => {
       const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
       const cls = info.reacted ? 'reacted' : '';
@@ -4794,7 +4338,6 @@ class StudyQuestApp {
       return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
     }).join('');
     
-    // ハイライトボタンを更新
     let highlightBtnHtml = '';
     if (this.state.showHighlightToggle) {
       const cls = data.highlight ? 'reacted' : '';
@@ -4804,7 +4347,6 @@ class StudyQuestApp {
     
     this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
     
-    // モーダルカードのスタイルを更新
       rowIndex: data.rowIndex,
       highlight: data.highlight,
       reactions: data.reactions
@@ -4825,10 +4367,7 @@ class StudyQuestApp {
     this.elements.infoModalContainer.classList.add('modal-fade');
     this.elements.infoModalCard.classList.add('modal-scale');
     
-    // Ensure modal starts from the top
     this.elements.infoModalCard.scrollTop = 0;
-    // Focus on the modal container first, then the button
-    // CLAUDE.md準拠: Immediate focus (setTimeout代替)
     requestIdleCallback(() => {
       this.elements.infoModalConfirmBtn.focus();
     }, { timeout: 100 });
@@ -4838,7 +4377,6 @@ class StudyQuestApp {
     this.elements.infoModalContainer.classList.remove('modal-fade');
     this.elements.infoModalCard.classList.remove('modal-scale');
     
-    // Modal always shows on board updates for important information
     if (this.state.lastFocusedElement) {
       this.state.lastFocusedElement.focus();
     }
@@ -4883,7 +4421,6 @@ class StudyQuestApp {
     }
   }
   debounce(func, delay) {
-    // Use SharedUtilities with instance-specific keys
     const key = `studyquest-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
     return (...args) => {
       window.sharedUtilities.debounce.debounce(() => func.apply(this, args), key, delay);
@@ -4891,7 +4428,6 @@ class StudyQuestApp {
   }
   
   throttle(func, delay) {
-    // Use SharedUtilities with instance-specific keys
     const key = `studyquest-throttle-${this.instanceId || 'default'}-${Math.random().toString(36).substr(2, 9)}`;
     return (...args) => {
       window.sharedUtilities.throttle.throttle(() => func.apply(this, args), key, delay);
@@ -4909,10 +4445,8 @@ class StudyQuestApp {
     const max = parseFloat(slider.max) || 6;
     const value = parseFloat(slider.value) || 4;
 
-    // パーセンテージ計算: (現在値 - 最小値) / (最大値 - 最小値) * 100
     const percentage = ((value - min) / (max - min)) * 100;
 
-    // 背景グラデーションを動的に設定
     slider.style.backgroundImage = `linear-gradient(var(--brand-primary), var(--brand-primary))`;
     slider.style.backgroundSize = `${percentage}% 100%`;
     slider.style.backgroundRepeat = 'no-repeat';
@@ -4933,7 +4467,6 @@ class StudyQuestApp {
     }
   }
   updateConfigFromGlobals() {
-    // 🔧 統一設定システム: window変数からstateへの同期
     this.state.isStudentMode = window.isStudentMode;
     this.state.showCounts = window.showCounts;
     this.state.displayMode = window.displayMode;
@@ -4943,7 +4476,6 @@ class StudyQuestApp {
     this.state.showPublishControls = window.showPublishControls;
   }
 
-  // Performance optimization methods
 
   setupPerformanceMonitoring() {
     let frameCount = 0;
@@ -4956,7 +4488,6 @@ class StudyQuestApp {
       if (frameCount > 0) {
         this.perf.frameTime = delta;
         
-        // If frame time is consistently over 16ms, enable low performance mode
         if (delta > getPerformanceBudget() && !this.isLowPerformanceMode) {
           console.warn('Low performance detected, enabling optimizations');
           this.isLowPerformanceMode = true;
@@ -4977,12 +4508,10 @@ class StudyQuestApp {
 
   optimizeForLowPerformance() {
     
-    // Reduce animation and transition durations
     document.documentElement.style.setProperty('--transition-duration', '0.1s');
     document.documentElement.style.setProperty('--animation-duration', '0.1s');
     document.documentElement.style.setProperty('--backdrop-blur', '4px');
     
-    // Create comprehensive low-performance stylesheet
     const style = document.createElement('style');
     style.id = 'low-performance-optimizations';
     style.textContent = `
@@ -5020,37 +4549,27 @@ class StudyQuestApp {
     `;
     document.head.appendChild(style);
     
-    // Add low-performance class to body for CSS targeting
     document.body.classList.add('low-performance');
     
-    // ✅ CLAUDE.md準拠: パフォーマンス調整は統合通知システムで自動対応
-    // Server-side trigger polling automatically adjusts based on performance config
   }
 
   setupObservers() {
-    // Intersection Observer for virtual scrolling - optimized for performance
     if ('IntersectionObserver' in window) {
-      // Enhanced debounce visibility changes with batching to reduce excessive firing
       const debouncedVisibilityHandler = this.debounce((entries) => {
-        // Batch entries by card to prevent rapid state changes on the same element
         const cardChanges = new Map();
         
         entries.forEach(entry => {
           const card = entry.target;
           const rowIndex = card.dataset.rowIndex;
           
-          // Keep only the latest change for each card
           cardChanges.set(rowIndex, { card, entry });
         });
         
-        // Process batched changes
         cardChanges.forEach(({ card, entry }) => {
           if (entry.isIntersecting) {
-            // Card is becoming visible
             if (!card.classList.contains('visible')) {
               card.classList.add('visible');
               card.classList.remove('hidden-card');
-              // Restore visibility and display if it was hidden
               if (card.style.visibility === 'hidden') {
                 card.style.visibility = 'visible';
               }
@@ -5059,13 +4578,9 @@ class StudyQuestApp {
               }
             }
           } else {
-            // MODIFIED: Do not hide cards for virtual scrolling - keep them in DOM
-            // This prevents cards from disappearing when scrolling back up
-            // Only mark as not visible for optimization purposes
             if (entry.intersectionRatio === 0 && card.classList.contains('visible')) {
               card.classList.remove('visible');
               card.classList.add('hidden-card');
-              // Do NOT hide or remove from DOM - just mark as not visible
             }
           }
         });
@@ -5077,7 +4592,6 @@ class StudyQuestApp {
       });
     }
 
-    // ResizeObserver for responsive adjustments
     if ('ResizeObserver' in window) {
       this.resizeObserver = new ResizeObserver(this.debounce(() => {
         this.adjustLayout();
@@ -5088,10 +4602,8 @@ class StudyQuestApp {
 
   deferredRender(callback, priority = 'normal') {
     if (this.isLowPerformanceMode) {
-      // Use requestIdleCallback for low priority updates
       this.idleCallbackId = requestIdleCallback(callback, { timeout: getIdleTimeout() });
     } else {
-      // Use requestAnimationFrame for normal updates
       this.animationFrameId = requestAnimationFrame(callback);
     }
   }
@@ -5107,32 +4619,24 @@ class StudyQuestApp {
       const startTime = performance.now();
       const chunkEnd = Math.min(processedCount + CHUNK_SIZE, updates.length);
 
-      // Process chunk with fragment batching
       for (let i = processedCount; i < chunkEnd; i++) {
         const update = updates[i];
         if (typeof update === 'function') {
-          // Execute update with fragment context
           update.call(this, fragment);
         } else if (update && update.element && update.operation) {
-          // Handle structured DOM updates
           this.executeDOMOperation(update, fragment);
         }
       }
 
       processedCount = chunkEnd;
 
-      // Yield control if more work remains and budget exceeded
       if (processedCount < updates.length) {
         if (performance.now() - startTime < getPerformanceBudget()) {
-          // Continue synchronously if within budget
-          // CLAUDE.md準拠: Immediate processing (setTimeout代替)
           requestIdleCallback(processBatch, { timeout: 0 });
         } else {
-          // Defer to next frame if budget exceeded
           requestAnimationFrame(processBatch);
         }
       } else {
-        // All updates complete - recycle fragment
         this.recycleFragment(fragment);
       }
     };
@@ -5189,10 +4693,8 @@ class StudyQuestApp {
       return this.domFragmentPool.pop();
     }
 
-    // Create new fragment and pre-warm pool if low
     const fragment = document.createDocumentFragment();
     if (this.domFragmentPool.length < 3) {
-      // Pre-allocate fragments to avoid creation overhead
       for (let i = this.domFragmentPool.length; i < 3; i++) {
         this.domFragmentPool.push(document.createDocumentFragment());
       }
@@ -5203,17 +4705,14 @@ class StudyQuestApp {
   recycleFragment(fragment) {
     if (!fragment) return;
 
-    // Optimized fragment clearing using replaceChildren (faster than removeChild loop)
     if (fragment.replaceChildren) {
       fragment.replaceChildren(); // Modern browsers - much faster
     } else {
-      // Fallback for older browsers
       while (fragment.firstChild) {
         fragment.removeChild(fragment.firstChild);
       }
     }
 
-    // Pool management with optimal size for 70x performance
     if (this.domFragmentPool.length < 8) { // Increased optimal pool size
       this.domFragmentPool.push(fragment);
     }
@@ -5225,16 +4724,13 @@ class StudyQuestApp {
     }
     
     this.deferredUpdates.add(key);
-    // CLAUDE.md準拠: Immediate deferred execution (setTimeout代替)
     requestIdleCallback(() => {
       callback();
       this.deferredUpdates.delete(key);
     }, { timeout: delay });
   }
 
-  // Enhanced cache methods with timestamp tracking
 
-  // Virtual Scrolling
   
   setupScrollObserver() {
     if (!this.elements.answersContainer) {
@@ -5247,14 +4743,11 @@ class StudyQuestApp {
       return;
     }
     
-    // Clear existing scroll observer if it exists
     if (this.scrollObserver) {
       this.scrollObserver.disconnect();
     }
     
-    // Create scroll observer for dynamic loading with debouncing
     const debouncedScrollHandler = this.debounce((entries) => {
-      // Only process the first intersecting entry to prevent multiple simultaneous loads
       const intersectingEntry = entries.find(entry => entry.isIntersecting);
       if (intersectingEntry) {
         this.handleVirtualScroll(intersectingEntry.target);
@@ -5267,7 +4760,6 @@ class StudyQuestApp {
       threshold: 0.1
     });
     
-    // Observe the last few elements for dynamic loading trigger
     const observeCount = Math.min(3, cards.length); // Reduced to last 3 cards for better performance
     const observedCards = [];
     
@@ -5304,11 +4796,9 @@ class StudyQuestApp {
       triggerRowIndex: triggerElement.dataset.rowIndex
     });
     
-    // Check if we need to load more items
     if (currentRendered < totalAvailable) {
       this.loadMoreItems();
     } else {
-      // Optimize visible elements when we've rendered everything
       this.optimizeVisibleElements();
     }
   }
@@ -5320,10 +4810,8 @@ class StudyQuestApp {
     
     this.virtualScrollState.isLoading = true;
     
-    // Enhanced item tracking - use Set instead of relying on DOM count
     if (!this.virtualScrollState.renderedRowIndexes) {
       this.virtualScrollState.renderedRowIndexes = new Set();
-      // Initialize with existing cards in DOM
       const existingCards = this.elements.answersContainer.querySelectorAll('.answer-card');
       existingCards.forEach(card => {
         if (card.dataset.rowIndex) {
@@ -5332,16 +4820,13 @@ class StudyQuestApp {
       });
     }
     
-    // Use dynamic batch sizing for better performance adaptation
     const dynamicBatchSize = getDynamicBatchSize(this.performanceMetrics);
     const batchSize = this.isLowPerformanceMode ? Math.min(CHUNK_SIZE, dynamicBatchSize) : dynamicBatchSize;
     
-    // Find items that haven't been rendered yet
     const unrenderedItems = this.state.currentAnswers.filter(item => 
       !this.virtualScrollState.renderedRowIndexes.has(String(item.rowIndex))
     );
     
-    // Take next batch of unrendered items
     const remainingItems = unrenderedItems.slice(0, batchSize);
     
     if (remainingItems.length === 0) {
@@ -5351,7 +4836,6 @@ class StudyQuestApp {
     
       'Total rendered:', this.virtualScrollState.renderedRowIndexes.size, 'Total available:', this.state.currentAnswers.length);
     
-    // Use deferred rendering for performance
     this.deferredRender(() => {
       this.renderAdditionalItems(remainingItems);
     });
@@ -5367,7 +4851,6 @@ class StudyQuestApp {
     const changedItems = [];
     let successfullyCreated = 0;
     
-    // Ensure renderedRowIndexes exists
     if (!this.virtualScrollState.renderedRowIndexes) {
       this.virtualScrollState.renderedRowIndexes = new Set();
     }
@@ -5375,7 +4858,6 @@ class StudyQuestApp {
     items.forEach((item) => {
       const rowIndexStr = String(item.rowIndex);
       
-      // Skip if already rendered (defensive check)
       if (this.virtualScrollState.renderedRowIndexes.has(rowIndexStr)) {
         return;
       }
@@ -5384,15 +4866,12 @@ class StudyQuestApp {
       if (card) {
         card.classList.add('new-card');
         
-        // Track this item as rendered
         this.virtualScrollState.renderedRowIndexes.add(rowIndexStr);
         
-        // Add to visibility observer
         if (this.visibilityObserver) {
           this.visibilityObserver.observe(card);
         }
         
-        // Add to scroll observer for the last few items
         const isLastFew = items.indexOf(item) >= items.length - 3;
         if (isLastFew && this.scrollObserver) {
           this.scrollObserver.observe(card);
@@ -5406,29 +4885,23 @@ class StudyQuestApp {
       }
     });
     
-    // Append new items to container
     if (fragment.children.length > 0) {
       this.elements.answersContainer.appendChild(fragment);
       
-      // Update virtual scroll state with actual counts
       this.virtualScrollState.renderedItems = this.elements.answersContainer.children.length;
       
         this.virtualScrollState.renderedRowIndexes.size, 'DOM children:', this.virtualScrollState.renderedItems);
     } else {
     }
     
-    // Apply updates if needed
     if (changedItems.length > 0) {
       this.deferredRender(() => this.applyUpdates(changedItems));
     }
     
-    // Recycle fragment
     this.recycleFragment(fragment);
     
-    // Reset loading state
     this.virtualScrollState.isLoading = false;
     
-    // Validate state consistency
     this.validateVirtualScrollState();
   }
   
@@ -5450,7 +4923,6 @@ class StudyQuestApp {
     const domCount = domRowIndexes.size;
     const totalAvailable = this.state.currentAnswers.length;
     
-    // Check for inconsistencies
     const missingInDOM = [...this.virtualScrollState.renderedRowIndexes].filter(x => !domRowIndexes.has(x));
     const extraInDOM = [...domRowIndexes].filter(x => !this.virtualScrollState.renderedRowIndexes.has(x));
     
@@ -5463,7 +4935,6 @@ class StudyQuestApp {
         extraInDOM: extraInDOM.slice(0, 5)
       });
       
-      // Auto-repair: sync tracked state with DOM reality
       this.virtualScrollState.renderedRowIndexes = domRowIndexes;
       this.virtualScrollState.renderedItems = domCount;
       
@@ -5481,7 +4952,6 @@ class StudyQuestApp {
     const viewportHeight = window.innerHeight;
     const hideThreshold = viewportHeight * 3; // Increased threshold for better UX
     
-    // Track hidden cards for better restoration
     if (!this.virtualScrollState.hiddenCards) {
       this.virtualScrollState.hiddenCards = new Set();
     }
@@ -5493,18 +4963,15 @@ class StudyQuestApp {
       const isCurrentlyHidden = this.virtualScrollState.hiddenCards.has(rowIndex);
       
       if (!isInViewport && !isCurrentlyHidden) {
-        // Calculate distance from viewport
         const distanceFromViewport = rect.top > viewportHeight 
           ? rect.top - viewportHeight  // Below viewport
           : -rect.bottom;             // Above viewport
         
-        // Only hide cards that are really far away
         if (distanceFromViewport > hideThreshold) {
           this.hideCard(card, rowIndex);
           hiddenCount++;
         }
       } else if (isInViewport && isCurrentlyHidden) {
-        // Restore cards that are back in viewport
         this.restoreCard(card, rowIndex);
         restoredCount++;
       }
@@ -5515,12 +4982,10 @@ class StudyQuestApp {
   }
   
   hideCard(card, rowIndex) {
-    // Use CSS class for better performance and consistency
     card.classList.add('hidden-card');
     card.classList.remove('visible-card');
     this.virtualScrollState.hiddenCards.add(rowIndex);
     
-    // Temporarily unobserve from intersection observers to prevent state confusion
     if (this.visibilityObserver) {
       this.visibilityObserver.unobserve(card);
     }
@@ -5530,17 +4995,14 @@ class StudyQuestApp {
   }
   
   restoreCard(card, rowIndex) {
-    // Restore card to full visibility
     card.classList.remove('hidden-card');
     card.classList.add('visible-card');
     this.virtualScrollState.hiddenCards.delete(rowIndex);
     
-    // Re-add to intersection observers
     if (this.visibilityObserver) {
       this.visibilityObserver.observe(card);
     }
     
-    // Only re-add to scroll observer if it's one of the last few cards
     const allCards = this.elements.answersContainer.querySelectorAll('.answer-card');
     const cardIndex = Array.from(allCards).indexOf(card);
     const isLastFew = cardIndex >= allCards.length - 3;
@@ -5550,7 +5012,6 @@ class StudyQuestApp {
     }
   }
   
-  // Reset virtual scrolling state for debugging and recovery
 
   /**
    * 理由テキストの堅牢化検証
@@ -5559,23 +5020,18 @@ class StudyQuestApp {
    */
   validateReasonText(reason) {
     try {
-      // null, undefined, 空文字列チェック
       if (!reason && reason !== 0) {
         return '';
       }
 
-      // 文字列変換と基本検証
       const reasonStr = String(reason).trim();
       
-      // 長すぎる理由テキストの制限（10000文字まで）
       if (reasonStr.length > 10000) {
         console.warn('validateReasonText: Reason text too long, truncating:', reasonStr.length);
         return reasonStr.substring(0, 10000) + '...';
       }
       
-      // HTMLエスケープが必要な文字をチェック
       if (reasonStr.includes('<') || reasonStr.includes('>') || reasonStr.includes('&')) {
-        // HTMLが含まれている可能性がある場合は警告
         console.warn('validateReasonText: Potentially unsafe HTML content detected');
       }
       
@@ -5603,7 +5059,6 @@ class StudyQuestApp {
         errors: []
       };
 
-      // DOM内のカードを検証
       const cards = this.elements.answersContainer?.querySelectorAll('.answer-card') || [];
       validationResults.totalCards = cards.length;
 
@@ -5613,14 +5068,12 @@ class StudyQuestApp {
           const opinionElement = card.querySelector('.opinion-text');
           const reasonElement = card.querySelector('.answer-preview p');
           
-          // 基本要素の存在チェック
           if (!opinionElement || !rowIndex) {
             validationResults.invalidCards++;
             validationResults.errors.push(`Card ${index}: Missing essential elements`);
             return;
           }
 
-          // 理由列の状態チェック
           const hasReasonData = this.state.currentAnswers.find(a => a.rowIndex == rowIndex)?.reason;
           const hasReasonElement = reasonElement && reasonElement.textContent.trim();
           
@@ -5636,7 +5089,6 @@ class StudyQuestApp {
         }
       });
 
-      // ヘッダー情報の検証
       try {
         const headerValidation = await this.runGas('validateHeaderIntegrity', this.state.userId);
         if (!headerValidation.success) {
@@ -5648,12 +5100,10 @@ class StudyQuestApp {
         validationResults.errors.push(`Header validation error: ${headerError.message}`);
       }
 
-      // 検証結果のログ出力
       const issueCount = validationResults.invalidCards + validationResults.reasonFieldIssues + validationResults.headerIssues;
       if (issueCount > 0) {
         console.warn('⚠️ Board data integrity issues detected:', validationResults);
         
-        // 自動修復の試行（理由列の問題のみ）
         if (validationResults.reasonFieldIssues > 0) {
           await this.autoRecoverReasonFields();
         }
@@ -5677,11 +5127,7 @@ class StudyQuestApp {
   async autoRecoverReasonFields() {
     try {
       
-      // キャッシュクリアして最新データを取得
-      // CLAUDE.md準拠: clearCache関数は現在実装されていない - 内部管理
-      // await this.gas.clearCache();
       
-      // データを再取得してカードを更新
       await this.loadBoardData();
       
     } catch (error) {
@@ -5698,25 +5144,20 @@ class StudyQuestApp {
       return;
     }
 
-    // ✅ 管理モード中のみAPI更新をスキップ（シンプル条件で確実に動作）
     if (window.showAdminFeatures) {
       return;
     }
 
-    // 通常ユーザーのみAPI設定を適用
     const oldShowCounts = window.showCounts;
     const oldDisplayMode = window.displayMode;
 
     window.showCounts = newDisplaySettings.showReactions || false;
     window.displayMode = newDisplaySettings.showNames ? 'named' : 'anonymous';
 
-    // state変数を同期
     this.state.showCounts = window.showCounts;
     this.state.displayMode = window.displayMode;
 
-    // 変更があった場合のみ再描画
     if (oldShowCounts !== window.showCounts || oldDisplayMode !== window.displayMode) {
-      // キャッシュクリアして再描画をトリガー
       this.clearCache();
       this.renderWithCurrentData();
     }
@@ -5728,7 +5169,6 @@ class StudyQuestApp {
    */
   renderWithCurrentData() {
     try {
-      // 現在のデータでボードを再描画
       this.renderBoard(false, false);
     } catch (error) {
       console.error('❌ renderWithCurrentData failed:', error);
@@ -5774,7 +5214,6 @@ async function loadFormLink() {
     }
   } catch (error) {
     console.warn('フォーム情報の取得に失敗しました:', error);
-    // エラー時はフォームボタンを非表示にする
     const formLinkBtn = document.getElementById('form-link-btn');
     if (formLinkBtn) {
       formLinkBtn.classList.add('hidden');
@@ -5783,10 +5222,8 @@ async function loadFormLink() {
 }
 
 try {
-  // ✅ Simple fix: Prevent multiple initialization
   if (!window.studyQuestApp) {
     document.addEventListener('DOMContentLoaded', () => {
-      // Double-check to prevent race conditions
       if (window.studyQuestApp) {
         return;
       }

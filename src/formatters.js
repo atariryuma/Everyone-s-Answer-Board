@@ -16,7 +16,6 @@
 /* global */
 
 
-// 📅 データ表示用フォーマット関数群
 
 
 /**
@@ -31,7 +30,6 @@ function formatTimestamp(timestamp) {
     const date = new Date(timestamp);
     if (isNaN(date.getTime())) return '-';
 
-    // YYYY/MM/DD HH:MM形式
     return Utilities.formatDate(date, Session.getScriptTimeZone(), 'yyyy/MM/dd HH:mm');
   } catch (error) {
     console.warn('formatTimestamp error:', error.message);
@@ -40,7 +38,6 @@ function formatTimestamp(timestamp) {
 }
 
 
-// 🌐 HTML出力用フォーマット関数群
 
 
 /**

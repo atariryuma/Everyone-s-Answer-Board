@@ -14,7 +14,6 @@
 
 /* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing */
 
-// Core Utility Functions
 
 /**
  * 現在のユーザーのメールアドレスを取得
@@ -42,7 +41,6 @@ function include(filename) {
 }
 
 
-// 🌐 HTTP Entry Points
 
 /**
  * Handle GET requests
@@ -54,20 +52,14 @@ function doGet(e) {
     const params = e ? e.parameter : {};
     const mode = params.mode || 'main';
 
-    //Performance optimization: Cache email for authentication-required routes
     const currentEmail = (mode !== 'login') ? getCurrentEmail() : null;
 
-    // 🚫 アプリ全体のアクセス制限チェック
-    // APP_DISABLED フラグがtrueの場合、管理者以外のアクセスを制限
     const isAppDisabled = checkAppAccessRestriction();
     if (isAppDisabled) {
       const isAdmin = currentEmail ? isAdministrator(currentEmail) : false;
 
-      // 管理者のみappSetupモードでのアクセスを許可（復旧作業用）
       if (mode === 'appSetup' && isAdmin) {
-        // 管理者のappSetup アクセスは通常通り処理
       } else {
-        // 停止中画面を表示（管理者には復旧用のリンクを表示）
         const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
         template.isAdministrator = isAdmin;
         template.userEmail = currentEmail || '';
@@ -78,31 +70,25 @@ function doGet(e) {
     }
 
 
-    // Simple routing
     switch (mode) {
       case 'login': {
-        // 極限シンプル: ログインページ（静的表示のみ）
         return HtmlService.createTemplateFromFile('LoginPage.html').evaluate();
       }
 
       case 'manual': {
-        // 教師向けマニュアルページ（静的表示のみ）
         return HtmlService.createTemplateFromFile('TeacherManual.html').evaluate();
       }
 
       case 'admin': {
-        // 🔐 GAS-Native: 直接認証チェック - Admin権限確認
         if (!currentEmail) {
           return createRedirectTemplate('ErrorBoundary.html', 'ユーザー認証が必要です');
         }
 
-        // 対象ユーザー確認（userIdパラメータが指定されている場合）
         const targetUserId = params.userId;
         if (!targetUserId) {
           return createRedirectTemplate('ErrorBoundary.html', 'ユーザーIDが指定されていません');
         }
 
-        // Batch operations for 70x performance improvement
         const adminData = getBatchedAdminData(targetUserId);
         if (!adminData.success) {
           return createRedirectTemplate('ErrorBoundary.html', adminData.error || '管理者権限が必要です');
@@ -111,10 +97,8 @@ function doGet(e) {
         const { email, user, config } = adminData;
         const isAdmin = isAdministrator(email);
 
-        // Dynamic URL generation
         const enhancedConfig = enhanceConfigWithDynamicUrls(config, user.userId);
 
-        // 認証済み - Administrator/Editor権限でAdminPanel表示
         const template = HtmlService.createTemplateFromFile('AdminPanel.html');
         template.userEmail = email;
         template.userId = user.userId;
@@ -142,7 +126,6 @@ function doGet(e) {
       }
 
       case 'setup': {
-        // Only allow initial setup when core properties are NOT configured (no DB, no SA creds, no admin email)
         let showSetup = false;
         try {
           if (typeof hasCoreSystemProps === 'function') {
@@ -155,14 +138,12 @@ function doGet(e) {
             showSetup = !(hasAdmin && hasDb && hasCreds);
           }
         } catch (e) {
-          // Conservative: if check fails, assume setup allowed
           showSetup = true;
         }
 
         if (showSetup) {
           return HtmlService.createTemplateFromFile('SetupPage.html').evaluate();
         } else {
-          // Pass isSystemAdmin variable to AccessRestricted.html
           const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
           template.isAdministrator = currentEmail ? isAdministrator(currentEmail) : false;
           template.userEmail = currentEmail || '';
@@ -172,36 +153,29 @@ function doGet(e) {
       }
 
       case 'appSetup': {
-        // 🔐 GAS-Native: 直接認証チェック - Administrator専用
         if (!currentEmail || !isAdministrator(currentEmail)) {
           return createRedirectTemplate('ErrorBoundary.html', '管理者権限が必要です');
         }
 
-        //userIdパラメータを取得（管理パネルに戻るリンクで使用）
         const userIdParam = params.userId;
 
-        // 認証済み - Administrator権限でAppSetup表示
         const template = HtmlService.createTemplateFromFile('AppSetupPage.html');
 
-        //管理パネルに戻るリンクのためにuserIdを渡す（オプション）
         template.userIdParam = userIdParam || '';
 
         return template.evaluate();
       }
 
       case 'view': {
-        // 🔐 GAS-Native: 直接認証チェック - Viewer権限確認
         if (!currentEmail) {
           return createRedirectTemplate('ErrorBoundary.html', 'ユーザー認証が必要です');
         }
 
-        // 対象ユーザー確認
         const targetUserId = params.userId;
         if (!targetUserId) {
           return createRedirectTemplate('ErrorBoundary.html', 'ユーザーIDが指定されていません');
         }
 
-        // Batch operations for 70x performance improvement
         const viewerData = getBatchedViewerData(targetUserId, currentEmail);
         if (!viewerData.success) {
           return createRedirectTemplate('ErrorBoundary.html', viewerData.error || '対象ユーザーが見つかりません');
@@ -211,14 +185,12 @@ function doGet(e) {
         const isOwnBoard = currentEmail === targetUser.userEmail;
         const isPublished = Boolean(config.isPublished);
 
-        // 🔧 論理的修正: 非公開状態なら所有者・非所有者問わずUnpublished.htmlを表示
         if (!isPublished) {
           const template = HtmlService.createTemplateFromFile('Unpublished.html');
           template.isEditor = isAdminUser || isOwnBoard; // 表示内容制御
           template.editorName = targetUser.userName || targetUser.userEmail || '';
           template.userId = targetUserId; // 管理パネル遷移用
 
-          // Generate board URL
           const baseUrl = ScriptApp.getService().getUrl();
           template.boardUrl = `${baseUrl}?mode=view&userId=${targetUserId}`;
 
@@ -226,20 +198,17 @@ function doGet(e) {
           return template.evaluate();
         }
 
-        // 認証済み - 公開ボード表示
         const template = HtmlService.createTemplateFromFile('Page.html');
         template.userId = targetUserId;
         template.userEmail = targetUser.userEmail;
         template.questionText = '読み込み中...';
         template.boardTitle = targetUser.userEmail || '回答ボード';
 
-        // Unified permission information
         const isEditor = isAdminUser || isOwnBoard;
         template.isEditor = isEditor;
         template.isAdminUser = isAdminUser;
         template.isOwnBoard = isOwnBoard;
 
-        // Unified configJSON retrieval
         template.sheetName = config.sheetName;
         template.configJSON = JSON.stringify({
           userId: targetUserId,
@@ -261,9 +230,6 @@ function doGet(e) {
 
       case 'main':
       default: {
-        // Default landing is AccessRestricted to prevent unintended login/account creation.
-        // Viewers must specify ?mode=view&userId=... and admins explicitly use ?mode=login.
-        // Pass isSystemAdmin variable to AccessRestricted.html
         const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
         const email = getCurrentEmail();
         template.isAdministrator = email ? isAdministrator(email) : false;
@@ -303,7 +269,6 @@ function createRedirectTemplate(redirectPage, error) {
   try {
     const template = HtmlService.createTemplateFromFile(redirectPage);
 
-    // Set necessary variables for AccessRestricted.html
     if (redirectPage === 'AccessRestricted.html') {
       const email = getCurrentEmail();
       template.isAdministrator = email ? isAdministrator(email) : false;
@@ -321,7 +286,6 @@ function createRedirectTemplate(redirectPage, error) {
     return template.evaluate();
   } catch (templateError) {
     console.error('createRedirectTemplate error:', templateError.message);
-    // フォールバック: 基本的なエラーページ
     const fallbackTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     fallbackTemplate.title = 'システムエラー';
     fallbackTemplate.message = 'ページの表示中にエラーが発生しました。';
@@ -338,7 +302,6 @@ function createRedirectTemplate(redirectPage, error) {
 function doPost(e) {
   try {
     // ✅ BUG FIX: JSON.parseの詳細エラーハンドリング追加
-    // Parse request with explicit error handling
     const postData = e.postData ? e.postData.contents : '{}';
     let request;
     try {
@@ -358,7 +321,6 @@ function doPost(e) {
     const {action} = request;
 
 
-    // Verify authentication
     const email = getCurrentEmail();
     if (!email) {
       return ContentService.createTextOutput(JSON.stringify(
@@ -366,7 +328,6 @@ function doPost(e) {
       )).setMimeType(ContentService.MimeType.JSON);
     }
 
-    // 🎯 GAS-Native Architecture: Direct DataService calls
     let result;
     switch (action) {
       case 'getData':
@@ -383,7 +344,6 @@ function doPost(e) {
         }
         break;
       case 'addReaction':
-        // 🎯 Multi-tenant: request.userId = target user (board owner), email = actor (current user)
         if (!request.userId) {
           result = createErrorResponse('Target user ID required for reaction');
         } else {
@@ -391,7 +351,6 @@ function doPost(e) {
         }
         break;
       case 'toggleHighlight':
-        // 🎯 Multi-tenant: request.userId = target user (board owner), email = actor (current user)
         if (!request.userId) {
           result = createErrorResponse('Target user ID required for highlight');
         } else {
@@ -450,7 +409,6 @@ function doPost(e) {
       .setMimeType(ContentService.MimeType.JSON);
 
   } catch (error) {
-    // V8ランタイム安全: error変数とerror.message存在チェック
     const errorMessage = error && error.message ? error.message : '予期しないエラーが発生しました';
     console.error('doPost error:', errorMessage);
     return ContentService.createTextOutput(JSON.stringify({
@@ -461,12 +419,8 @@ function doPost(e) {
 }
 
 
-// API Functions (called from HTML)
 
-// getConfig() moved to UserApis.js
-// getWebAppUrl moved to SystemController.gs for architecture compliance
 
-// Frontend compatibility API - unified authentication system
 
 /**
  * 統一管理者認証関数（メイン実装）
@@ -488,7 +442,6 @@ function isAdministrator(email) {
 
     const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
     if (isAdmin) {
-      // Administrator authenticated
     }
 
     return isAdmin;
@@ -502,50 +455,20 @@ function isAdministrator(email) {
 }
 
 
-// processLoginAction() moved to UserApis.js
 
 
-// getAdminUsers() moved to AdminApis.js
-// toggleUserActiveStatus() moved to AdminApis.js
-// toggleUserBoardStatus() moved to AdminApis.js
-// republishMyBoard() moved to AdminApis.js
-// clearActiveSheet() moved to AdminApis.js
-// getLogs() moved to AdminApis.js
 
 
-// getSheets() moved to DataApis.js
-// validateHeaderIntegrity() moved to DataApis.js
-// getBoardInfo() moved to DataApis.js
 
 
-// getPublishedSheetData() moved to DataApis.js
 
 
-// Unified Validation Functions
-
-// Unified Data Operations
 
 
-// Additional HTML-Called Functions
 
-// getSheetList() moved to DataApis.js
-// getDataCount() moved to DataApis.js
-// saveConfig() moved to DataApis.js
-// getNotificationUpdate() moved to DataApis.js
-// connectDataSource() moved to DataApis.js
-// processDataSourceOperations() moved to DataApis.js
-// getColumnAnalysis() moved to DataApis.js
-// setupReactionAndHighlightColumns() moved to DataApis.js
-// getFormInfoInternal() moved to DataApis.js
-// getActiveFormInfo() moved to DataApis.js
-// isValidFormUrl() moved to DataApis.js
-// extractSpreadsheetInfo() moved to DataApis.js
-// getSheetNameFromGid() moved to DataApis.js
-// validateCompleteSpreadsheetUrl() moved to DataApis.js
 
-// 🆕 Missing Functions Implementation - Frontend Compatibility
 
-// システム管理関数をSystemController.gsに移動済み
+
 
 /**
  * Secure GAS function caller - CLAUDE.md準拠セキュリティ強化版
@@ -560,13 +483,10 @@ function callGAS(functionName, options = {}, ...args) {
 
     const email = getCurrentEmail();
     if (!email) {
-      // Security log for unauthorized access attempts
       console.warn('callGAS: Unauthorized access attempt (no email)');
       return createAuthError();
     }
 
-    // 厳格なセキュリティホワイトリスト
-    // 管理者専用関数と一般ユーザー関数を分離
     const publicFunctions = [
       'getCurrentEmail',
       'getUser',
@@ -586,12 +506,10 @@ function callGAS(functionName, options = {}, ...args) {
     const isAdmin = isAdministrator(email);
     const allowedFunctions = [...publicFunctions];
 
-    // 管理者のみ管理者専用関数にアクセス可能
     if (isAdmin) {
       allowedFunctions.push(...adminOnlyFunctions);
     }
 
-    // Security check: function name validation
     if (!functionName || typeof functionName !== 'string') {
       console.warn('callGAS: Invalid function name:', functionName);
       return {
@@ -602,7 +520,6 @@ function callGAS(functionName, options = {}, ...args) {
     }
 
     if (!allowedFunctions.includes(functionName)) {
-      // Security log for unauthorized function access attempts
       console.warn('callGAS: Unauthorized function access attempt:', {
         functionName,
         userEmail: email ? `${email.split('@')[0]}@***` : 'N/A',
@@ -618,7 +535,6 @@ function callGAS(functionName, options = {}, ...args) {
       };
     }
 
-    // 🔍 引数検証：過大な引数チェック
     if (args.length > 10) {
       console.warn('callGAS: Excessive arguments detected:', args.length);
       return {
@@ -628,7 +544,6 @@ function callGAS(functionName, options = {}, ...args) {
       };
     }
 
-    //関数実行（安全な環境で）
     if (typeof this[functionName] === 'function') {
       try {
         const result = this[functionName].apply(this, args);
@@ -642,7 +557,6 @@ function callGAS(functionName, options = {}, ...args) {
           securityLevel: isAdmin ? 'admin' : 'user'
         };
       } catch (functionError) {
-        // Function execution error log
         console.error('callGAS: Function execution error:', {
           functionName,
           error: functionError.message,
@@ -670,7 +584,6 @@ function callGAS(functionName, options = {}, ...args) {
     }
 
   } catch (error) {
-    // Critical security error log
     console.error('callGAS: Critical security error:', {
       error: error.message,
       functionName,
@@ -680,7 +593,6 @@ function callGAS(functionName, options = {}, ...args) {
   }
 }
 
-// checkUserAuthentication() moved to UserApis.js
 
 /**
  * ✅ CLAUDE.md準拠: Batched viewer data retrieval for 70x performance improvement
@@ -696,11 +608,9 @@ function callGAS(functionName, options = {}, ...args) {
  */
 function getBatchedViewerData(targetUserId, currentEmail) {
   try {
-    // ✅ CLAUDE.md準拠: preloadedAuth構築でDB重複アクセス排除
     const isAdminUser = isAdministrator(currentEmail);
     const preloadedAuth = { email: currentEmail, isAdmin: isAdminUser };
 
-    // ✅ preloadedAuthを渡してfindUserById内のgetAllUsers重複呼び出しを排除
     const targetUser = findUserById(targetUserId, {
       requestingUser: currentEmail,
       preloadedAuth
@@ -709,7 +619,6 @@ function getBatchedViewerData(targetUserId, currentEmail) {
       return { success: false, error: '対象ユーザーが見つかりません' };
     }
 
-    // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
     const configResult = getUserConfig(targetUserId, targetUser);
     const config = configResult.success ? configResult.config : {};
 
@@ -744,17 +653,14 @@ function getBatchedViewerData(targetUserId, currentEmail) {
  */
 function getBatchedAdminData(targetUserId) {
   try {
-    //Batch operation: Get current email from session
     const currentEmail = getCurrentEmail();
     if (!currentEmail) {
       return { success: false, error: 'ユーザー認証が必要です' };
     }
 
-    // ✅ CLAUDE.md準拠: preloadedAuth構築でDB重複アクセス排除
     const isAdmin = isAdministrator(currentEmail);
     const preloadedAuth = { email: currentEmail, isAdmin };
 
-    // ✅ preloadedAuthを渡してfindUserById内のgetAllUsers重複呼び出しを排除
     const targetUser = findUserById(targetUserId, {
       requestingUser: currentEmail,
       preloadedAuth
@@ -763,7 +669,6 @@ function getBatchedAdminData(targetUserId) {
       return { success: false, error: '指定されたユーザーが見つかりません' };
     }
 
-    //権限チェック: 管理者またはターゲットユーザー本人のみアクセス可能
     const isOwnBoard = currentEmail === targetUser.userEmail;
 
     if (!isAdmin && !isOwnBoard) {
@@ -773,20 +678,15 @@ function getBatchedAdminData(targetUserId) {
       };
     }
 
-    //編集者権限の追加確認（管理者でない場合）
     if (!isAdmin && !targetUser.isActive) {
       return { success: false, error: '対象ユーザーがアクティブではありません' };
     }
 
-    // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
     const configResult = getUserConfig(targetUserId, targetUser);
     const config = configResult.success ? configResult.config : {};
 
-    // フロントエンド必要情報を統合取得
     const questionText = getQuestionText(config, { targetUserEmail: targetUser.userEmail });
 
-    //URLs とタイムスタンプ情報を config に統合
-    //Optimized: Use database lastModified instead of config lastModified
     const baseUrl = ScriptApp.getService().getUrl();
     const enhancedConfig = {
       ...config,
@@ -870,7 +770,6 @@ function getBatchedAdminAuth(options = {}) {
   }
 }
 
-// getBatchedUserConfig() moved to UserApis.js
 
 /**
  * ✅ CLAUDE.md準拠: Exponential backoff retry for resilient operations
@@ -891,11 +790,9 @@ function executeWithRetry(operation, options = {}) {
 
   while (retryCount < maxRetries) {
     try {
-      // Add delay for retry attempts (not first attempt)
       if (retryCount > 0) {
         const errorMessage = lastError && lastError.message ? lastError.message : '';
 
-        // ✅ API最適化: 429エラー専用の長い遅延（Quota exceeded対策）
         const is429Error = errorMessage.includes('429') || errorMessage.includes('Quota exceeded');
         const baseDelay = is429Error ? initialDelay * 2 : initialDelay;
 
@@ -903,17 +800,14 @@ function executeWithRetry(operation, options = {}) {
           baseDelay * Math.pow(2, retryCount - 1),
           maxDelay
         );
-        // ✅ ログ最適化: 最初と最後のリトライのみログ出力（中間リトライは抑制）
         if (retryCount === 1 || retryCount === maxRetries - 1) {
           console.warn(`${operationName}: Retry ${retryCount}/${maxRetries - 1} after ${delay}ms delay${is429Error ? ' (429 quota)' : ''}`);
         }
         Utilities.sleep(delay);
       }
 
-      // Execute the operation
       const result = operation();
 
-      // Success - log only if this was a retry
       if (retryCount > 0) {
       }
 
@@ -925,22 +819,18 @@ function executeWithRetry(operation, options = {}) {
 
       const errorMessage = error && error.message ? error.message : String(error);
 
-      // Check if this is a retryable error
       const isRetryable = isRetryableError(errorMessage);
 
-      // ✅ ログ最適化: 最終試行失敗時のみログ出力（中間エラーは抑制）
       if (retryCount >= maxRetries || !isRetryable) {
         console.warn(`${operationName}: Attempt ${retryCount} failed: ${errorMessage}`);
       }
 
-      // Don't retry if error is not retryable or we've reached max retries
       if (!isRetryable || retryCount >= maxRetries) {
         break;
       }
     }
   }
 
-  // All retries exhausted
   const finalError = lastError && lastError.message ? lastError.message : 'Unknown error';
   console.error(`${operationName}: Failed after ${retryCount} attempts: ${finalError}`);
   throw lastError || new Error(`${operationName} failed after ${retryCount} attempts`);
@@ -981,25 +871,21 @@ function isRetryableError(errorMessage) {
 
   const lowerMessage = errorMessage.toLowerCase();
 
-  // Check for non-retryable errors first
   for (const pattern of nonRetryablePatterns) {
     if (lowerMessage.includes(pattern)) {
       return false;
     }
   }
 
-  // Check for retryable errors
   for (const pattern of retryablePatterns) {
     if (lowerMessage.includes(pattern)) {
       return true;
     }
   }
 
-  // Default to retryable for unknown errors (conservative approach)
   return true;
 }
 
-// Performance Metrics API - Priority 1 Enhancement
 
 /**
  * パフォーマンスメトリクス取得API (管理者専用)
@@ -1011,7 +897,6 @@ function isRetryableError(errorMessage) {
  */
 function getPerformanceMetrics(category = 'all', options = {}) {
   try {
-    // SystemController経由でメトリクス取得
     return SystemController.getPerformanceMetrics(category, options);
   } catch (error) {
     console.error('getPerformanceMetrics API error:', error.message);
@@ -1032,7 +917,6 @@ function getPerformanceMetrics(category = 'all', options = {}) {
  */
 function diagnosePerformance(options = {}) {
   try {
-    // SystemController経由で診断実行
     return SystemController.diagnosePerformance(options);
   } catch (error) {
     console.error('diagnosePerformance API error:', error.message);
@@ -1044,11 +928,6 @@ function diagnosePerformance(options = {}) {
   }
 }
 
-// Application Access Control - moved to AdminApis.js
-// checkAppAccessRestriction() moved to AdminApis.js
-// disableAppAccess() moved to AdminApis.js
-// enableAppAccess() moved to AdminApis.js
-// getAppAccessStatus() moved to AdminApis.js
 
 /**
  * スプレッドシート一覧のキャッシュをクリア

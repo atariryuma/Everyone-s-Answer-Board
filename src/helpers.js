@@ -16,12 +16,7 @@
 /* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS */
 
 
-// ⚡ Runtime Memory Cache for PropertiesService with TTL
-// ✅ API最適化: PropertiesService呼び出し80-90%削減
-// ✅ CLAUDE.md準拠: 30秒TTLで自動期限切れ
-// ✅ メモリリーク対策: 最大50エントリに制限
 const RUNTIME_PROPERTIES_CACHE = {};
-const PROPERTY_CACHE_TTL = 30000; // 30秒（CLAUDE.md準拠）
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
 
 /**
@@ -36,19 +31,14 @@ function getCachedProperty(key) {
   const now = Date.now();
   const cached = RUNTIME_PROPERTIES_CACHE[key];
 
-  // ✅ TTLチェック: 有効期限内ならキャッシュを返す
   if (cached && cached.timestamp && (now - cached.timestamp < PROPERTY_CACHE_TTL)) {
-    // アクセス時刻を更新（LRU用）
     cached.lastAccess = now;
     return cached.value;
   }
 
-  // キャッシュミスまたは期限切れ: PropertiesServiceから取得
   const value = PropertiesService.getScriptProperties().getProperty(key);
 
-  // キャッシュサイズ管理: 最大サイズを超える場合、最も古いエントリを削除
   if (Object.keys(RUNTIME_PROPERTIES_CACHE).length >= MAX_CACHE_SIZE) {
-    // ✅ 最適化: ソートではなくreduceで最小値を検索（O(n log n) → O(n)）
     const entries = Object.entries(RUNTIME_PROPERTIES_CACHE);
     const oldestKey = entries.reduce((oldest, [key, value]) => {
       const oldestTime = oldest[1].lastAccess || oldest[1].timestamp;
@@ -92,7 +82,6 @@ function clearPropertyCache(key = null) {
 function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
   try {
     const dataJson = JSON.stringify(data);
-    // CacheServiceの制限（100KB）を考慮
     if (dataJson.length > maxSize) {
       console.warn(`saveToCacheWithSizeCheck: Data too large for cache (${dataJson.length} bytes, max ${maxSize})`);
       return false;
@@ -119,7 +108,6 @@ function simpleHash(obj) {
 
 
 
-// 📋 Response Standardization (Zero-Dependency)
 
 
 /**

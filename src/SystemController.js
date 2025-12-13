@@ -4,7 +4,6 @@
 
 /* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, getSheetInfo */
 
-// システム定数 - Zero-Dependency Architecture
 
 /**
  * キャッシュ期間 (秒)
@@ -53,7 +52,6 @@ const SYSTEM_LIMITS = {
   RADIX_DECIMAL: 10          // 10進数変換用基数
 };
 
-// 🌍 グローバル定数設定 - Zero-Dependency Architecture
 
 /**
  * グローバルスコープにシステム定数を設定
@@ -64,7 +62,6 @@ __rootSys.CACHE_DURATION = CACHE_DURATION;
 __rootSys.TIMEOUT_MS = TIMEOUT_MS;
 __rootSys.SLEEP_MS = SLEEP_MS;
 
-// Zero-Dependency Utility Functions
 
 /**
  * Service Discovery for Zero-Dependency Architecture
@@ -82,12 +79,10 @@ function forceUrlSystemReset() {
     try {
       console.warn('システム強制リセットが実行されました');
 
-      // キャッシュをクリア - GAS 2025準拠の主要キー削除方式
       const cacheResults = [];
       try {
         const cache = CacheService.getScriptCache();
         if (cache) {
-          // 主要なキャッシュキーを明示的に削除
           const keysToRemove = [
             'user_cache_',
             'config_cache_',
@@ -97,12 +92,10 @@ function forceUrlSystemReset() {
             'system_cache_'
           ];
 
-          // 個別キー削除（GAS APIの正しい使用方法）
           keysToRemove.forEach(keyPrefix => {
             try {
               cache.remove(keyPrefix);
             } catch (e) {
-              // 個別エラーは無視（キーが存在しない場合など）
             }
           });
 
@@ -115,7 +108,6 @@ function forceUrlSystemReset() {
         cacheResults.push(`キャッシュクリア失敗: ${cacheError.message}`);
       }
 
-      // 重要: プロパティはクリアしない（データ損失防止）
 
       return {
         success: true,
@@ -158,7 +150,6 @@ function getWebAppUrl() {
 function testSystemDiagnosis() {
   try {
 
-    // Batched admin authentication
     const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
@@ -166,10 +157,8 @@ function testSystemDiagnosis() {
 
     const { email } = adminAuth;
 
-    // GAS-Native: Direct system diagnostics
     const diagnostics = [];
 
-    // Check 1: Core system properties
     try {
       const props = PropertiesService.getScriptProperties();
       const coreProps = {
@@ -194,7 +183,6 @@ function testSystemDiagnosis() {
       });
     }
 
-    // Check 2: Database connectivity
     try {
       const dbTest = testDatabaseConnection();
       diagnostics.push({
@@ -212,7 +200,6 @@ function testSystemDiagnosis() {
       });
     }
 
-    // Check 3: Web app deployment
     try {
       const webAppUrl = ScriptApp.getService().getUrl();
       diagnostics.push({
@@ -299,7 +286,6 @@ function getSystemStatus() {
 function monitorSystem() {
   try {
 
-    // Batched admin authentication
     const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
@@ -307,12 +293,9 @@ function monitorSystem() {
 
     const { email } = adminAuth;
 
-    // GAS-Native: Direct system monitoring
     const metrics = {};
 
-    // Monitor 1: Script execution quota
     try {
-      // GAS provides no direct quota API, so we track execution time
       const startTime = new Date();
       metrics.executionTime = startTime.toISOString();
       metrics.quotaStatus = 'MONITORING';
@@ -321,7 +304,6 @@ function monitorSystem() {
       metrics.quotaError = error.message;
     }
 
-    // Monitor 2: Database size and access
     try {
       const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
       metrics.userCount = Array.isArray(users) ? users.length : 0;
@@ -332,10 +314,8 @@ function monitorSystem() {
       metrics.databaseError = error.message;
     }
 
-    // Monitor 3: Cache performance
     try {
       const cache = CacheService.getScriptCache();
-      // Simple cache test
       const testKey = 'monitoring_test';
       const testValue = Date.now().toString();
       cache.put(testKey, testValue, 60);
@@ -348,7 +328,6 @@ function monitorSystem() {
       metrics.cacheError = error.message;
     }
 
-    // Monitor 4: Service account validation
     try {
       const props = PropertiesService.getScriptProperties();
       const creds = props.getProperty('SERVICE_ACCOUNT_CREDS');
@@ -387,7 +366,6 @@ function monitorSystem() {
 function checkDataIntegrity() {
   try {
 
-    // Batched admin authentication
     const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
@@ -395,10 +373,8 @@ function checkDataIntegrity() {
 
     const { email } = adminAuth;
 
-    // GAS-Native: Direct data integrity checks
     const integrityResults = [];
 
-    // Check 1: User database consistency
     try {
       const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
       const userCount = Array.isArray(users) ? users.length : 0;
@@ -424,7 +400,6 @@ function checkDataIntegrity() {
       });
     }
 
-    // Check 2: Configuration integrity
     try {
       const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
       let configErrors = 0;
@@ -460,7 +435,6 @@ function checkDataIntegrity() {
       });
     }
 
-    // Check 3: Database schema validation
     try {
       const dbConfig = testDatabaseConnection();
       integrityResults.push({
@@ -510,7 +484,6 @@ function checkDataIntegrity() {
 function performAutoRepair() {
   try {
 
-    // Batched admin authentication
     const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
@@ -527,7 +500,6 @@ function performAutoRepair() {
 
     let actionCount = 0;
 
-    // Repair 1: キャッシュクリア
     try {
       const cache = CacheService.getScriptCache();
       if (cache && typeof cache.removeAll === 'function') {
@@ -539,7 +511,6 @@ function performAutoRepair() {
       repairResults.warnings.push(`キャッシュクリア失敗: ${cacheError.message || 'Unknown error'}`);
     }
 
-    // Repair 2: データベース接続テスト
     try {
       const dbTest = testDatabaseConnection();
       if (!dbTest.success) {
@@ -552,7 +523,6 @@ function performAutoRepair() {
       repairResults.warnings.push(`データベーステスト失敗: ${dbError.message || 'Unknown error'}`);
     }
 
-    // Repair 3: プロパティサービス検証
     try {
       const props = PropertiesService.getScriptProperties();
       const coreProps = {
@@ -602,7 +572,6 @@ function getAdminSheetList(spreadsheetId) {
     const {spreadsheet} = dataAccess;
     const sheets = spreadsheet.getSheets();
 
-    // ✅ API最適化: getSheetInfo()でAPI呼び出し66%削減（各シートで3回→1回）
     const sheetList = sheets.map(sheet => {
       const { lastRow, lastCol } = getSheetInfo(sheet);
       return {
@@ -656,17 +625,14 @@ function publishApp(publishConfig) {
       return { success: false, message: '公開設定が必要です' };
     }
 
-    // spreadsheetId 検証
     if (!publishConfig.spreadsheetId || typeof publishConfig.spreadsheetId !== 'string' || !publishConfig.spreadsheetId.trim()) {
       return { success: false, message: 'データソース（スプレッドシートID）が設定されていません' };
     }
 
-    // sheetName 検証
     if (!publishConfig.sheetName || typeof publishConfig.sheetName !== 'string' || !publishConfig.sheetName.trim()) {
       return { success: false, message: 'データソース（シート名）が設定されていません' };
     }
 
-    // columnMapping 検証
     if (!publishConfig.columnMapping || typeof publishConfig.columnMapping !== 'object') {
       return { success: false, message: '列マッピングが設定されていません' };
     }
@@ -675,7 +641,6 @@ function publishApp(publishConfig) {
       return { success: false, message: '列マッピングが空です。少なくとも回答列を設定してください' };
     }
 
-    // answer 列必須チェック（0 も有効な列番号）
     const answerColumn = publishConfig.columnMapping.answer;
     if (answerColumn === undefined || answerColumn === null || (typeof answerColumn === 'number' && answerColumn < 0)) {
       return { success: false, message: '回答列（answer）が設定されていません' };
@@ -683,48 +648,35 @@ function publishApp(publishConfig) {
 
     const publishedAt = new Date().toISOString();
 
-    // Multi-tenant support
-    // ユーザー固有データはconfigJSONにのみ保存、スクリプトプロパティは不使用
-    // publishedAt, isPublished, configはユーザー個別のconfigJSONで管理
 
-    // Direct findUserByEmail usage
     const user = findUserByEmail(email, { requestingUser: email });
 
     let saveResult = null;
 
     if (user) {
-      // Eliminated duplicate findUserByEmail call for performance
-      // Using the already fetched user data (race conditions are handled by underlying database locking)
       const userToUse = user;
 
-      // 統一API使用: 構造化パース
       const configResult = getUserConfig(userToUse.userId);
       const currentConfig = configResult.success ? configResult.config : {};
 
-      // Explicit override of important fields
       const updatedConfig = {
         ...currentConfig,
         ...publishConfig,
-        // 🎯 critical fields: 必ず新しい値を使用
         formUrl: publishConfig?.formUrl || currentConfig.formUrl,
         formTitle: publishConfig?.formTitle || currentConfig.formTitle,
         columnMapping: publishConfig?.columnMapping || currentConfig.columnMapping,
         displaySettings: publishConfig?.displaySettings || currentConfig.displaySettings,
-        // system fields
         isPublished: true,
         publishedAt,
         setupStatus: 'completed',
         lastModified: publishedAt
       };
 
-      // ✅ バックエンド構造統一完了：フロントエンドは既に正しい構造を送信
 
-      // 🔧 CLAUDE.md準拠: 統一API使用 - saveUserConfigでETag対応の安全な更新
       saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
 
       if (!saveResult.success) {
         console.error('publishApp: saveUserConfig failed:', saveResult.message);
-        // エラーでも処理を継続（互換性のため）
       }
     } else {
       console.error('publishApp: User not found:', email);
@@ -766,7 +718,6 @@ function isUserSpreadsheetOwner(spreadsheetId) {
     const currentEmail = getCurrentEmail();
     if (!currentEmail) return false;
 
-    // DriveAppで所有者確認を試行
     const file = DriveApp.getFileById(spreadsheetId);
     const owner = file.getOwner();
 
@@ -791,8 +742,6 @@ function isUserSpreadsheetOwner(spreadsheetId) {
 function getSpreadsheetAdaptive(spreadsheetId, context = {}) {
   const currentEmail = getCurrentEmail();
 
-  // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応
-  // サービスアカウントは共有データベースのみで使用
   const useServiceAccount = false;
 
 
@@ -800,7 +749,6 @@ function getSpreadsheetAdaptive(spreadsheetId, context = {}) {
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount });
     const accessMethod = useServiceAccount ? 'service_account' : 'normal_permissions';
 
-    // ✅ オーナー権限判定: サービスアカウント使用時はfalse、通常アクセス時はtrue
     const isOwner = !useServiceAccount;
 
     return {
@@ -838,10 +786,8 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
     details: []
   };
 
-  // Method 1: 標準API - オーナー権限の場合のみ
   if (isOwner) {
     try {
-      // シートレベルでフォームURL取得（最優先）
       if (typeof sheet.getFormUrl === 'function') {
         const formUrl = sheet.getFormUrl();
         if (formUrl) {
@@ -850,7 +796,6 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
           results.detectionMethod = 'sheet_api';
           results.details.push('Sheet.getFormUrl()で検出');
 
-          // FormApp.openByUrlでタイトル取得
           try {
             const form = FormApp.openByUrl(formUrl);
             results.formTitle = form.getTitle();
@@ -864,7 +809,6 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
         }
       }
 
-      // スプレッドシートレベルでフォームURL取得（フォールバック）
       if (typeof spreadsheet.getFormUrl === 'function') {
         const formUrl = spreadsheet.getFormUrl();
         if (formUrl) {
@@ -873,7 +817,6 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
           results.detectionMethod = 'spreadsheet_api';
           results.details.push('SpreadsheetApp.getFormUrl()で検出');
 
-          // FormApp.openByUrlでタイトル取得
           try {
             const form = FormApp.openByUrl(formUrl);
             results.formTitle = form.getTitle();
@@ -891,10 +834,8 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
       results.details.push(apiError && apiError.message ? `API検出失敗: ${apiError.message}` : 'API検出失敗: 詳細不明');
     }
   } else {
-    // No owner permissions available
   }
 
-  // Method 1.5: Drive APIフォーム検索（API検出失敗時のフォールバック）
   if (isOwner) {
     try {
       const spreadsheetId = spreadsheet.getId();
@@ -913,9 +854,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
     }
   }
 
-  // Method 2: ヘッダーパターン解析
   try {
-    // ✅ API最適化: getSheetInfo()でAPI呼び出し削減
     const { lastCol, headers: fullHeaders } = getSheetInfo(sheet);
     const headers = fullHeaders.slice(0, Math.min(lastCol, 10));
     const headerAnalysis = analyzeFormHeaders(headers);
@@ -930,7 +869,6 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
     results.details.push(headerError && headerError.message ? `ヘッダー解析失敗: ${headerError.message}` : 'ヘッダー解析失敗: 詳細不明');
   }
 
-  // Method 3: シート名パターン解析
   const sheetNameAnalysis = analyzeSheetName(sheetName);
   if (sheetNameAnalysis.isFormLike) {
     results.confidence = Math.max(results.confidence, sheetNameAnalysis.confidence);
@@ -938,7 +876,6 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
     results.details.push(sheetNameAnalysis && sheetNameAnalysis.reason ? `シート名解析: ${sheetNameAnalysis.reason}` : 'シート名解析: 結果不明');
   }
 
-  // フォーム検出時のタイトル生成
   if (results.confidence >= 40) {
     results.formTitle = `${sheetName} (フォーム検出済み)`;
   }
@@ -1031,7 +968,6 @@ function analyzeSheetName(sheetName) {
  */
 function generateFormTitle(sheetName, spreadsheetName) {
   try {
-    // シート名がフォーム関連の場合
     if (sheetName && typeof sheetName === 'string') {
       const formPatterns = [
         /フォームの回答|form.*responses?/i,
@@ -1042,7 +978,6 @@ function generateFormTitle(sheetName, spreadsheetName) {
 
       for (const pattern of formPatterns) {
         if (pattern.test(sheetName)) {
-          // フォーム関連のシート名の場合、「の回答」を除去してフォームタイトルとする
           const formTitle = sheetName
             .replace(/の回答.*$/i, '')
             .replace(/.*responses?.*$/i, '')
@@ -1056,12 +991,10 @@ function generateFormTitle(sheetName, spreadsheetName) {
       }
     }
 
-    // スプレッドシート名ベースのタイトル生成
     if (spreadsheetName && typeof spreadsheetName === 'string') {
       return `${spreadsheetName  } - ${  sheetName  } (フォーム)`;
     }
 
-    // 最終フォールバック
     return `${sheetName || 'データ'  } (フォーム)`;
 
   } catch (error) {
@@ -1079,13 +1012,11 @@ function generateFormTitle(sheetName, spreadsheetName) {
 function searchFormsByDrive(spreadsheetId, sheetName) {
   try {
 
-    // Drive APIでフォーム一覧を取得
     const forms = DriveApp.getFilesByType('application/vnd.google-apps.form');
 
     while (forms.hasNext()) {
       const formFile = forms.next();
       try {
-        // FormAppアクセスを制限的に実行
         let form = null;
         let destId = null;
         let formTitle = null;
@@ -1097,22 +1028,18 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
           formTitle = form.getTitle();
           formPublishedUrl = form.getPublishedUrl();
         } catch (formAccessError) {
-          // FormApp権限エラーの場合はファイル名から推測
           console.warn('searchFormsByDrive: FormApp権限制限、ファイル名から推測:', formAccessError.message);
           formTitle = formFile.getName();
-          // 権限のないフォームはスキップ
           continue;
         }
 
         if (destId === spreadsheetId) {
-          // Form IDとspreadsheet IDが一致していれば接続確認済み
           return {
             formUrl: formPublishedUrl,
             formTitle
           };
         }
       } catch (formError) {
-        // 個別フォームアクセスエラーは無視して継続
         console.warn('searchFormsByDrive: フォームアクセスエラー（継続）:', formError.message);
       }
     }
@@ -1125,7 +1052,6 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
   }
 }
 
-// ✅ getSpreadsheetInfo関数を削除 - GAS-Native APIのみ使用
 
 /**
  * スプレッドシートへのアクセス権限を検証
@@ -1139,14 +1065,11 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
  */
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
-    // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応（通常権限でアクセス）
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
     const {spreadsheet, auth} = dataAccess;
 
-    // カスタムラッパーのgetSheets()メソッドを使用
     const sheets = spreadsheet.getSheets();
 
-    // ✅ GAS-Native: SpreadsheetApp APIを使用してスプレッドシート名を取得
     let spreadsheetName;
     try {
       spreadsheetName = spreadsheet.getName();
@@ -1154,8 +1077,6 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
       spreadsheetName = `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
     }
 
-    // アクセスできたら成功
-    // ✅ API最適化: getSheetInfo()でAPI呼び出し66%削減（各シートで3回→1回）
     const result = {
       success: true,
       message: 'アクセス権限が確認されました',
@@ -1196,7 +1117,6 @@ function getFormInfo(spreadsheetId, sheetName) {
   const startTime = new Date().toISOString();
 
   try {
-    // 引数検証
     if (!spreadsheetId || !sheetName) {
       return {
         success: false,
@@ -1211,7 +1131,6 @@ function getFormInfo(spreadsheetId, sheetName) {
       };
     }
 
-    // 適応的スプレッドシートアクセス（ユーザー所有 vs サービスアカウント）
     const accessResult = getSpreadsheetAdaptive(spreadsheetId);
     if (!accessResult.spreadsheet) {
       return {
@@ -1231,14 +1150,11 @@ function getFormInfo(spreadsheetId, sheetName) {
 
     const { spreadsheet, accessMethod, auth, isOwner } = accessResult;
 
-    // スプレッドシート名取得（アクセス方法により異なる）
     let spreadsheetName;
     try {
-      // ✅ GAS-Native: 常にspreadsheet.getName()を使用（権限があれば動作）
       try {
         spreadsheetName = spreadsheet.getName();
       } catch (error) {
-        // サービスアカウントでもgetName()は通常動作する
         console.warn('getFormInfoImpl: getName() failed, using fallback:', error.message);
         spreadsheetName = `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
       }
@@ -1249,7 +1165,6 @@ function getFormInfo(spreadsheetId, sheetName) {
       }
     }
 
-    // シート取得
     const sheet = spreadsheet.getSheetByName(sheetName);
     if (!sheet) {
       return {
@@ -1266,7 +1181,6 @@ function getFormInfo(spreadsheetId, sheetName) {
       };
     }
 
-    // 多層フォーム検出システム実行
     const formDetectionResult = detectFormConnection(spreadsheet, sheet, sheetName, isOwner);
 
     const formData = {
@@ -1282,7 +1196,6 @@ function getFormInfo(spreadsheetId, sheetName) {
       }
     };
 
-    // レスポンス生成
     if (formDetectionResult.formUrl) {
       return {
         success: true,
@@ -1297,7 +1210,6 @@ function getFormInfo(spreadsheetId, sheetName) {
         }
       };
     } else {
-      // フォーム未検出時も詳細情報を提供
       const isHighConfidence = formDetectionResult.confidence >= 70;
       return {
         success: isHighConfidence,
@@ -1367,13 +1279,11 @@ function createForm(userId, config) {
       };
     }
 
-    // ServiceFactory経由でConfigServiceアクセス
     const configService = null /* ConfigService direct call */;
     if (!configService) {
       console.error('AdminController.createForm: ConfigService not available');
       return { success: false, message: 'ConfigServiceが利用できません' };
     }
-    // createForm機能は現在サポートされていません
     const result = { success: false, message: 'フォーム作成機能は現在利用できません' };
 
     if (result && result.success) {
@@ -1404,7 +1314,6 @@ function createForm(userId, config) {
 function checkCurrentPublicationStatus(targetUserId) {
   try {
     const session = { email: Session.getActiveUser().getEmail() };
-    // 🔧 Zero-Dependency統一: 直接Dataクラス使用
     let user = null;
     if (targetUserId) {
       user = findUserById(targetUserId, {
@@ -1421,7 +1330,6 @@ function checkCurrentPublicationStatus(targetUserId) {
       return createUserNotFoundError();
     }
 
-    // 統一API使用: 構造化パース
     const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
@@ -1453,7 +1361,6 @@ function checkCurrentPublicationStatus(targetUserId) {
  */
 
 
-// 📊 認証・ログイン関連API
 
 
 /**
@@ -1462,7 +1369,6 @@ function checkCurrentPublicationStatus(targetUserId) {
  *
  * @returns {Object} 認証状態
  */
-// ✅ CLAUDE.md準拠: 重複関数削除 - main.gsの完全実装を使用
 
 
 /**
@@ -1504,7 +1410,6 @@ function getLoginStatus() {
 
 
 
-// 📊 Performance Metrics Extension
 
 /**
  * パフォーマンスメトリクス収集システム (GAS-Native Architecture準拠)
@@ -1529,7 +1434,6 @@ function getPerformanceMetrics(category = 'all', options = {}) {
     const startTime = Date.now();
     const currentEmail = getCurrentEmail();
 
-    // 管理者権限確認
     if (!currentEmail || !isAdministrator(currentEmail)) {
       return {
         success: false,
@@ -1545,7 +1449,6 @@ function getPerformanceMetrics(category = 'all', options = {}) {
       categories: {}
     };
 
-    // カテゴリ別メトリクス収集
     if (category === 'all' || category === 'api') {
       metrics.categories.api = collectApiMetrics(options);
     }
@@ -1589,7 +1492,6 @@ function getSystemPerformanceInfo() {
   try {
     const startTime = Date.now();
 
-    // GAS環境の基本情報収集
     const systemInfo = {
       gasRuntime: 'V8',
       quotaInfo: {
@@ -1623,7 +1525,6 @@ function collectApiMetrics(options = {}) {
     const cache = CacheService.getScriptCache();
     const metricsKey = 'perf_api_metrics';
 
-    // API呼び出し統計をシミュレート（実際の本番環境では実データを使用）
     const apiStats = {
       totalCalls: 0,
       averageResponseTime: 0,
@@ -1633,10 +1534,8 @@ function collectApiMetrics(options = {}) {
       cacheHitRate: 0
     };
 
-    // 実際のテスト実行でパフォーマンス測定
     const testStartTime = Date.now();
 
-    // 軽量なAPI呼び出しテスト
     try {
       const testEmail = getCurrentEmail();
       const testEndTime = Date.now();
@@ -1651,7 +1550,6 @@ function collectApiMetrics(options = {}) {
       apiStats.errorRate = 1;
     }
 
-    // CLAUDE.md準拠: 70x改善の効果を評価
     apiStats.batchEfficiencyNote = 'バッチ処理により70倍の性能改善を実現';
     apiStats.architecture = 'GAS-Native Direct API';
 
@@ -1671,7 +1569,6 @@ function collectCacheMetrics(options = {}) {
   try {
     const cache = CacheService.getScriptCache();
 
-    // キャッシュテスト実行
     const testKey = `perf_cache_test_${  Date.now()}`;
     const testValue = JSON.stringify({ test: true, timestamp: Date.now() });
 
@@ -1683,7 +1580,6 @@ function collectCacheMetrics(options = {}) {
     const readValue = cache.get(testKey);
     const readTime = Date.now() - readStartTime;
 
-    // テストデータクリーンアップ
     cache.remove(testKey);
 
     const cacheStats = {
@@ -1700,7 +1596,6 @@ function collectCacheMetrics(options = {}) {
       recommendations: []
     };
 
-    // 推奨事項生成
     if (writeTime > 50) {
       cacheStats.recommendations.push('キャッシュ書き込み速度が遅い - データ量を最適化を検討');
     }
@@ -1736,10 +1631,8 @@ function collectBatchMetrics(options = {}) {
       ]
     };
 
-    // 実際のバッチ処理テスト（軽量版）
     const testStartTime = Date.now();
     try {
-      // スプレッドシートアクセステスト
       const testAccess = SpreadsheetApp.getActiveSpreadsheet ? 'available' : 'unavailable';
       const testEndTime = Date.now();
 
@@ -1782,7 +1675,6 @@ function collectErrorMetrics(options = {}) {
       ]
     };
 
-    // 基本的なエラーハンドリングテスト
     try {
       const testResult = getCurrentEmail();
       errorStats.basicFunctionality = testResult ? 'working' : 'needs_attention';
@@ -1807,7 +1699,6 @@ function diagnosePerformance(options = {}) {
   try {
     const currentEmail = getCurrentEmail();
 
-    // 管理者権限確認
     if (!currentEmail || !isAdministrator(currentEmail)) {
       return {
         success: false,
@@ -1867,7 +1758,6 @@ function diagnosePerformance(options = {}) {
  */
 function testDatabaseConnection() {
   try {
-    // データベース接続を試行
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
       return {
@@ -1876,7 +1766,6 @@ function testDatabaseConnection() {
       };
     }
 
-    // 基本的なデータベース情報を取得
     const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
     const usersSheet = spreadsheet.getSheetByName('users');
 
@@ -1887,7 +1776,6 @@ function testDatabaseConnection() {
       };
     }
 
-    // ✅ API最適化 + Sheets API モック対応: values配列から直接取得
     const values = usersSheet.getDataRange().getValues();
     const rowCount = values.length;
     const colCount = values[0]?.length || 0;
@@ -1911,7 +1799,6 @@ function testDatabaseConnection() {
   }
 }
 
-// 🔧 Application Setup Functions (from main.gs)
 
 /**
  * Setup application with system properties
@@ -1923,7 +1810,6 @@ function testDatabaseConnection() {
  */
 function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
   try {
-    // Validation
     if (!serviceAccountJson || !databaseId || !adminEmail) {
       return {
         success: false,
@@ -1931,7 +1817,6 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
       };
     }
 
-    // System properties setup
     const props = PropertiesService.getScriptProperties();
     props.setProperty('DATABASE_SPREADSHEET_ID', databaseId);
     props.setProperty('ADMIN_EMAIL', adminEmail);
@@ -1941,7 +1826,6 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
       props.setProperty('GOOGLE_CLIENT_ID', googleClientId);
     }
 
-    // Initialize database if needed
     try {
       const testAccess = openSpreadsheet(databaseId, { useServiceAccount: true }).spreadsheet;
     } catch (dbError) {
@@ -1975,18 +1859,14 @@ function setAppStatus(isActive) {
       return createAuthError();
     }
 
-    // ユーザー情報を取得
-    // 🔧 GAS-Native統一: 直接findUserByEmail使用
     const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return createUserNotFoundError();
     }
 
-    // 統一API使用: 設定取得・更新・保存
     const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
-    // ボード公開状態を更新
     config.isPublished = Boolean(isActive);
     if (isActive) {
       if (!config.publishedAt) {
@@ -1995,7 +1875,6 @@ function setAppStatus(isActive) {
     }
     config.lastAccessedAt = new Date().toISOString();
 
-    // 統一API使用: 検証・サニタイズ・保存
     const saveResult = saveUserConfig(user.userId, config, { forceUpdate: false });
     if (!saveResult.success) {
       return createErrorResponse(`Failed to update user configuration: ${saveResult.message || '詳細不明'}`);
@@ -2015,7 +1894,6 @@ function setAppStatus(isActive) {
   }
 }
 
-// 🌍 Global SystemController Object Export
 
 /**
  * SystemController統一インターフェース
@@ -2028,10 +1906,8 @@ __rootSC.SystemController = {
   performAutoRepair,
   forceUrlSystemReset,
   publishApp,
-  // 📊 Performance Metrics Extension
   getPerformanceMetrics,
   diagnosePerformance,
-  // 🔧 Application Setup Functions (from main.gs)
   setupApp,
   setAppStatus
 };

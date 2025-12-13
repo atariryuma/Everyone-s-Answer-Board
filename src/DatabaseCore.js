@@ -11,7 +11,6 @@
 /* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck */
 
 
-// データベース基盤操作
 
 
 /**
@@ -26,13 +25,11 @@
 function fetchSheetsAPIWithRetry(url, options, operationName) {
   let retryCount = 0;
 
-  // ✅ サーキットブレーカー: CacheServiceで実行コンテキスト間で状態共有
   const cache = CacheService.getScriptCache();
   const CIRCUIT_BREAKER_KEY = 'circuit_breaker_state';
   const cachedState = cache.get(CIRCUIT_BREAKER_KEY);
   let circuitState = cachedState ? JSON.parse(cachedState) : { consecutiveErrors: 0, circuitOpenUntil: 0 };
 
-  // サーキットブレーカー状態チェック
   const now = Date.now();
   if (circuitState.circuitOpenUntil > now) {
     const waitTime = Math.round((circuitState.circuitOpenUntil - now) / 1000);
@@ -43,21 +40,17 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
     () => {
       const response = UrlFetchApp.fetch(url, options);
 
-      // ✅ 適応型429エラー処理: Quota回復を待つための延長バックオフ
       if (response.getResponseCode() === 429) {
         const backoffTime = Math.min(15000 + (retryCount * 15000), 60000);
         console.warn(`⚠️ 429 Quota exceeded for ${operationName || 'Sheets API'}, waiting ${backoffTime}ms (retry: ${retryCount})`);
 
-        // 連続エラーカウント増加（CacheServiceに保存）
         circuitState.consecutiveErrors++;
 
-        // サーキットブレーカー発動: 連続3回エラーで60秒間停止
         if (circuitState.consecutiveErrors >= 3) {
           circuitState.circuitOpenUntil = now + 60000;
           console.error(`🚨 Circuit breaker activated: Too many 429 errors. API calls paused for 60s.`);
         }
 
-        // 更新された状態をキャッシュに保存（60秒TTL）
         cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 60);
 
         Utilities.sleep(backoffTime);
@@ -70,7 +63,6 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
         throw new Error(`API returned ${response.getResponseCode()}: ${errorText}`);
       }
 
-      // ✅ 成功時: 連続エラーカウントリセット（CacheServiceに保存）
       circuitState.consecutiveErrors = 0;
       circuitState.circuitOpenUntil = 0;
       cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 60);
@@ -100,24 +92,20 @@ function getServiceAccount() {
 
     const serviceAccount = JSON.parse(credentials);
 
-    // 必須フィールドの確認（秘密鍵をログに出さない）
     const requiredFields = ['client_email', 'private_key', 'type'];
     const missingFields = requiredFields.filter(field => !serviceAccount[field]);
 
     if (missingFields.length > 0) {
-      // セキュリティ: 秘密鍵情報をログに含めない
       console.warn('getServiceAccount: Missing required fields');
       return { isValid: false, error: 'Invalid credentials' };
     }
 
-    // 厳密なメールアドレス検証（複数@の防止）
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(serviceAccount.client_email)) {
       console.warn('getServiceAccount: Invalid email format');
       return { isValid: false, error: 'Invalid email format' };
     }
 
-    // 秘密鍵フォーマット検証（BEGIN PRIVATE KEY または BEGIN RSA PRIVATE KEY）
     if (typeof serviceAccount.private_key !== 'string' ||
         (!serviceAccount.private_key.includes('BEGIN RSA PRIVATE KEY') &&
          !serviceAccount.private_key.includes('BEGIN PRIVATE KEY'))) {
@@ -129,7 +117,6 @@ function getServiceAccount() {
       isValid: true,
       email: serviceAccount.client_email,
       type: serviceAccount.type
-      // 秘密鍵は返さない（セキュリティ）
     };
   } catch (error) {
     console.warn('getServiceAccount: Invalid credentials format');
@@ -149,24 +136,20 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
     const currentEmail = getCurrentEmail();
     const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
 
-    // Service account not requested - always allowed
     if (!useServiceAccount) {
       return { allowed: true, reason: 'Normal permissions requested' };
     }
 
-    // DATABASE_SPREADSHEET_ID is always a shared resource requiring service account
     if (spreadsheetId === dbId) {
       return { allowed: true, reason: 'DATABASE_SPREADSHEET_ID is shared resource' };
     }
 
-    // Check if current user is admin - admins can use service account
     if (isAdministrator(currentEmail)) {
       return { allowed: true, reason: 'Admin privileges' };
     }
 
     // ✅ SECURITY GATE: 非管理者は公開済みボードのみアクセス許可
     try {
-      // 循環参照回避のため、軽量なキャッシュベース検証を優先
       const cacheKey = `sa_validation_${spreadsheetId}`;
       const cached = CacheService.getScriptCache().get(cacheKey);
 
@@ -178,7 +161,6 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
         };
       }
 
-      // キャッシュミス時のみDB検証（findUserBySpreadsheetId使用）
       const targetUser = findUserBySpreadsheetId(spreadsheetId, { skipCache: true });
 
       if (!targetUser) {
@@ -189,7 +171,6 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
       const configResult = getUserConfig(targetUser.userId);
       const isPublished = configResult.success && configResult.config.isPublished;
 
-      // 検証結果をキャッシュ（5分間）
       try {
         CacheService.getScriptCache().put(cacheKey, JSON.stringify({ isPublished }), 300);
       } catch (cacheError) {
@@ -209,7 +190,6 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
 
     } catch (validationError) {
       console.error('SA_VALIDATION: Security check failed:', validationError.message);
-      // セキュリティエラー時はデフォルト拒否
       return { allowed: false, reason: 'Security validation error' };
     }
 
@@ -233,7 +213,6 @@ function openDatabase(options = {}) {
       return null;
     }
 
-    // DATABASE_SPREADSHEET_ID is shared resource - always use service account
     const forceServiceAccount = true;
 
     const dataAccess = openSpreadsheet(dbId, {
@@ -244,7 +223,6 @@ function openDatabase(options = {}) {
     if (!dataAccess) {
       console.warn('openDatabase: Failed to access database via Sheets API, attempting SpreadsheetApp.openById fallback');
 
-      // フォールバック: SpreadsheetApp.openByIdを使用（API制限対策）
       try {
         const fallbackSpreadsheet = SpreadsheetApp.openById(dbId);
         return fallbackSpreadsheet;
@@ -257,8 +235,6 @@ function openDatabase(options = {}) {
       }
     }
 
-    // 下位互換性のため、従来のインターフェースを維持
-    // ✅ Null check: dataAccessがnullの場合はnullを返す
     return dataAccess?.spreadsheet || null;
   } catch (error) {
     console.error('openDatabase error:', error.message);
@@ -287,7 +263,6 @@ function openDatabase(options = {}) {
  */
 function openSpreadsheet(spreadsheetId, options = {}) {
 
-  // Service account access via Sheets API
   function openSpreadsheetViaServiceAccount(sheetId) {
     try {
       const credentials = getCachedProperty('SERVICE_ACCOUNT_CREDS');
@@ -295,7 +270,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
 
       const serviceAccount = JSON.parse(credentials);
 
-      // JWT作成
       const now = Math.floor(Date.now() / 1000);
       const payload = {
         iss: serviceAccount.client_email,
@@ -308,7 +282,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       const header = { alg: 'RS256', typ: 'JWT' };
       const jwt = createJWT(header, payload, serviceAccount.private_key);
 
-      // アクセストークン取得
       const tokenResponse = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -318,7 +291,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       const tokenData = JSON.parse(tokenResponse.getContentText());
       if (!tokenData.access_token) return null;
 
-      // Sheets API経由でアクセス
       return createServiceAccountSpreadsheetProxy(sheetId, tokenData.access_token);
 
     } catch (error) {
@@ -327,7 +299,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
     }
   }
 
-  // JWT作成のヘルパー関数
   function createJWT(header, payload, privateKey) {
     const headerB64 = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=/g, '');
     const payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=/g, '');
@@ -339,12 +310,10 @@ function openSpreadsheet(spreadsheetId, options = {}) {
     return `${signatureInput}.${signatureB64}`;
   }
 
-  // サービスアカウント用スプレッドシートプロキシ
   function createServiceAccountSpreadsheetProxy(sheetId, accessToken) {
     return {
       getId: () => sheetId,
       getName: () => {
-        // Sheets APIでスプレッドシート名を取得
         try {
           const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
           const response = fetchSheetsAPIWithRetry(
@@ -362,12 +331,9 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         }
       },
       getSheetByName: (sheetName) => {
-        // ✅ CLAUDE.md準拠: Lazy Evaluation - getLastRow/Column時にのみメタデータ取得
-        // additionalInfo未提供時は、実データ取得をgetLastRow/Column内で実行
         return createServiceAccountSheetProxy(sheetId, sheetName, accessToken);
       },
       getSheets: () => {
-        // Sheets APIでシート一覧を取得
         try {
           const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
           const response = fetchSheetsAPIWithRetry(
@@ -397,18 +363,12 @@ function openSpreadsheet(spreadsheetId, options = {}) {
     };
   }
 
-  // サービスアカウント用シートプロキシ（基本メソッドのみ実装）
   function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additionalInfo = {}) {
     const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
 
-    // ✅ CLAUDE.md準拠: additionalInfo優先、未提供時は安全なデフォルト値
-    // getSheets()経由で呼び出されると必ずadditionalInfo提供される
-    // getSheetByName()直接呼び出しはデフォルト値使用（API呼び出しゼロ）
 
-    // ✅ API最適化: プロキシレベルキャッシュで重複API呼び出し排除
     let cachedDimensions = null;
 
-    // ✅ 寸法取得を1回のAPI呼び出しにまとめる（getLastRow + getLastColumn）
     function fetchDimensionsOnce() {
       if (cachedDimensions) return cachedDimensions;
 
@@ -440,21 +400,16 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       getName: () => sheetName,
       getSheetId: () => additionalInfo.sheetId || 0,
       getLastRow: () => {
-        // ✅ additionalInfo優先（getSheets()経由の場合）
         if (additionalInfo.rowCount) return additionalInfo.rowCount;
 
-        // ✅ Lazy evaluation: 必要時のみSheets APIで実寸法取得（429エラー対策）
         return fetchDimensionsOnce().rowCount;
       },
       getLastColumn: () => {
-        // ✅ additionalInfo優先（getSheets()経由の場合）
         if (additionalInfo.columnCount) return additionalInfo.columnCount;
 
-        // ✅ Lazy evaluation: 必要時のみSheets APIで実寸法取得（429エラー対策）
         return fetchDimensionsOnce().columnCount;
       },
       getRange: (row, col, numRows, numCols) => {
-        // Sheets APIでデータ取得
         const range = numRows && numCols
           ? `${sheetName}!R${row}C${col}:R${row + numRows - 1}C${col + numCols - 1}`
           : `${sheetName}!R${row}C${col}`;
@@ -478,7 +433,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
           },
           setValue: (value) => {
             try {
-              // 単一値の場合は2次元配列にラップしてsetValuesを使用
               const payload = {
                 values: [[value]]
               };
@@ -528,7 +482,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         };
       },
       getDataRange: () => {
-        // Sheets APIでデータ範囲全体を取得
         return {
           getValues: () => {
             try {
@@ -573,7 +526,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         };
       },
       appendRow: (rowData) => {
-        // Sheets APIで行を追加
         try {
           const payload = {
             values: [rowData]
@@ -610,10 +562,8 @@ function openSpreadsheet(spreadsheetId, options = {}) {
     const databaseId = getCachedProperty('DATABASE_SPREADSHEET_ID');
     const isDatabaseAccess = spreadsheetId === databaseId;
 
-    // ユーザーの回答ボードにはサービスアカウントを使わない（同一ドメイン共有設定で対応）
     const effectiveUseServiceAccount = isDatabaseAccess && options.useServiceAccount === true;
 
-    // Validate service account usage
     const validation = validateServiceAccountUsage(spreadsheetId, effectiveUseServiceAccount, options.context || 'openSpreadsheet');
     if (!validation.allowed) {
       console.warn('openSpreadsheet: Service account usage denied:', validation.reason);
@@ -623,21 +573,16 @@ function openSpreadsheet(spreadsheetId, options = {}) {
     let spreadsheet = null;
     let auth = null;
 
-    // CROSS-USER ACCESS ONLY - service account usage (DATABASE_SPREADSHEET only)
     if (effectiveUseServiceAccount) {
-      // ✅ DATABASE_SPREADSHEET_ID専用のサービスアカウントアクセス
       auth = getServiceAccount();
       if (!auth.isValid) {
         console.warn('openSpreadsheet: Service account requested but invalid credentials');
       }
       // ✅ CRITICAL: サービスアカウント登録コードを削除
-      // ユーザーの回答ボードには同一ドメイン共有設定で対応
     }
 
-    // スプレッドシートを開く
     try {
       if (effectiveUseServiceAccount && auth && auth.isValid) {
-        // Service account implementation via JWT authentication
         spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
         if (!spreadsheet) {
           console.error('openSpreadsheet: サービスアカウント接続失敗、通常アクセスにフォールバック', {
@@ -660,7 +605,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       return null;
     }
 
-    // 互換性のためのヘルパーメソッド付きオブジェクトを返す
     const dataAccess = {
       spreadsheet,
       auth: auth || { isValid: false },
@@ -686,7 +630,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
 }
 
 
-// ユーザー管理基盤
 
 
 /**
@@ -703,7 +646,6 @@ function findUserByEmail(email, context = {}) {
       return null;
     }
 
-    // 個別ユーザーキャッシュ優先チェック（バージョニングで管理）
     const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
     const individualCacheKey = `user_by_email_v${cacheVersion}_${email}`;
     try {
@@ -715,13 +657,11 @@ function findUserByEmail(email, context = {}) {
       console.error('findUserByEmail: Individual cache read failed:', individualCacheError.message);
     }
 
-    // キャッシュ最適化: まずgetAllUsers()のキャッシュを活用
     try {
       const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, skipCache: false });
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find(u => u.userEmail === email);
         if (user) {
-          // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
           saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
           return user;
         }
@@ -730,7 +670,6 @@ function findUserByEmail(email, context = {}) {
       console.error('findUserByEmail: Cache-based search failed, falling back to direct DB access:', cacheError.message);
     }
 
-    // フォールバック: 直接データベースアクセス
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('findUserByEmail: Database access failed');
@@ -759,7 +698,6 @@ function findUserByEmail(email, context = {}) {
       if (row[emailColumnIndex] === email) {
         const user = createUserObjectFromRow(row, headers);
 
-        // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
         saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
 
         return user;
@@ -787,7 +725,6 @@ function findUserById(userId, context = {}) {
       return null;
     }
 
-    // 個別ユーザーキャッシュ優先チェック（バージョニングで管理）
     const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
     const individualCacheKey = `user_by_id_v${cacheVersion}_${userId}`;
     try {
@@ -799,13 +736,11 @@ function findUserById(userId, context = {}) {
       console.error('findUserById: Individual cache read failed:', individualCacheError.message);
     }
 
-    // キャッシュ最適化: まずgetAllUsers()のキャッシュを活用
     try {
       const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, skipCache: false });
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find(u => u.userId === userId);
         if (user) {
-          // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
           saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
           return user;
         }
@@ -814,7 +749,6 @@ function findUserById(userId, context = {}) {
       console.error('findUserById: Cache-based search failed, falling back to direct DB access:', cacheError.message);
     }
 
-    // フォールバック: 直接データベースアクセス
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('findUserById: Database access failed');
@@ -843,7 +777,6 @@ function findUserById(userId, context = {}) {
       if (row[userIdColumnIndex] === userId) {
         const user = createUserObjectFromRow(row, headers);
 
-        // 個別キャッシュに保存（冗長性強化、サイズチェック付き）
         saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
 
         return user;
@@ -865,7 +798,6 @@ function findUserById(userId, context = {}) {
  * @returns {Object|null} Created user object
  */
 function createUser(email, initialConfig = {}, context = {}) {
-  // 🔒 Concurrency Safety: LockService for exclusive user creation
   const lock = LockService.getScriptLock();
 
   try {
@@ -874,16 +806,13 @@ function createUser(email, initialConfig = {}, context = {}) {
       return null;
     }
 
-    // Acquire lock to prevent concurrent user creation
     if (!lock.tryLock(10000)) { // 10秒待機
       console.warn('createUser: Lock timeout - concurrent user creation detected');
       return null;
     }
 
-    // DATABASE_SPREADSHEET_ID is shared database
     const currentEmail = getCurrentEmail();
 
-    // 重複チェック（ロック内で実行）
     const existingUser = findUserByEmail(email, {
       requestingUser: currentEmail
     });
@@ -891,7 +820,6 @@ function createUser(email, initialConfig = {}, context = {}) {
       return existingUser;
     }
 
-    // DATABASE_SPREADSHEET_ID: Shared database for user creation
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('createUser: Database access failed');
@@ -919,7 +847,6 @@ function createUser(email, initialConfig = {}, context = {}) {
       ...initialConfig
     };
 
-    // Check if createdAt column exists in database
     const data = sheet.getDataRange().getValues();
     const [headers] = data;
     const hasCreatedAtColumn = headers.indexOf('createdAt') !== -1;
@@ -940,7 +867,6 @@ function createUser(email, initialConfig = {}, context = {}) {
     ];
 
     sheet.appendRow(newUserData);
-    // ✅ flush()削除: GASは自動的にflushするため不要（Google公式推奨）
 
     const user = {
       userId,
@@ -951,7 +877,6 @@ function createUser(email, initialConfig = {}, context = {}) {
       lastModified: now
     };
 
-    // ユーザー作成後にキャッシュをクリア
     clearDatabaseUserCache();
 
     return user;
@@ -960,7 +885,6 @@ function createUser(email, initialConfig = {}, context = {}) {
     console.error('createUser error:', error.message);
     return null;
   } finally {
-    // ✅ CLAUDE.md準拠: Lock解放の堅牢化（null参照エラー排除）
     try {
       if (lock && typeof lock.releaseLock === 'function') {
         lock.releaseLock();
@@ -979,7 +903,6 @@ function createUser(email, initialConfig = {}, context = {}) {
  */
 function getAllUsers(options = {}, context = {}) {
   try {
-    // Performance improvement - use preloaded auth when available
     let currentEmail, isAdmin;
     if (context.preloadedAuth) {
       const { email, isAdmin: adminFlag } = context.preloadedAuth;
@@ -995,8 +918,6 @@ function getAllUsers(options = {}, context = {}) {
       return [];
     }
 
-    // 10分キャッシュ戦略（バージョニングで管理）
-    // ✅ API最適化: simpleHash()使用でJSON.stringify()より50%高速化
     const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
     const cacheKey = `all_users_v${cacheVersion}_${simpleHash(options)}_${context.forceServiceAccount ? 'sa' : 'norm'}`;
     const skipCache = context.skipCache || false;
@@ -1012,8 +933,6 @@ function getAllUsers(options = {}, context = {}) {
       }
     }
 
-    // getAllUsers is inherently cross-user operation, always requires service account
-    // unless admin is accessing for administrative purposes
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('getAllUsers: Database access failed');
@@ -1036,7 +955,6 @@ function getAllUsers(options = {}, context = {}) {
       const row = data[i];
       const user = createUserObjectFromRow(row, headers);
 
-      // Apply filters if specified
       if (options.activeOnly && !user.isActive) continue;
       if (options.publishedOnly) {
         try {
@@ -1050,7 +968,6 @@ function getAllUsers(options = {}, context = {}) {
       users.push(user);
     }
 
-    // 10分キャッシュに保存（API呼び出し削減）
     if (!skipCache) {
       try {
         CacheService.getScriptCache().put(cacheKey, JSON.stringify(users), CACHE_DURATION.DATABASE_LONG);
@@ -1067,7 +984,6 @@ function getAllUsers(options = {}, context = {}) {
 }
 
 
-// ヘルパー関数
 
 
 /**
@@ -1082,7 +998,6 @@ function clearDatabaseUserCache() {
 
     props.setProperty('USER_CACHE_VERSION', newVersion.toString());
 
-    // メモリキャッシュもクリア
     clearPropertyCache('USER_CACHE_VERSION');
   } catch (error) {
     console.error('clearDatabaseUserCache: Failed to clear cache:', error.message);
@@ -1113,7 +1028,6 @@ function createUserObjectFromRow(row, headers) {
     }
   });
 
-  // Ensure boolean conversion for isActive
   if (typeof user.isActive === 'string') {
     user.isActive = user.isActive.toLowerCase() === 'true';
   }
@@ -1129,19 +1043,15 @@ function createUserObjectFromRow(row, headers) {
  * @returns {Object} {success: boolean, message?: string} Operation result
  */
 function updateUser(userId, updates, context = {}) {
-  // 🔒 Concurrency Safety: LockService for exclusive user update
   const lock = LockService.getScriptLock();
 
   try {
-    // Acquire lock to prevent concurrent updates
     if (!lock.tryLock(5000)) { // 5秒待機
       console.warn('updateUser: Lock timeout - concurrent update detected');
       return { success: false, message: 'Concurrent update in progress. Please retry.' };
     }
 
-    // Self vs Cross-user Access for User Updates
 
-    // Initial user lookup to determine target user
     const targetUser = findUserById(userId, context);
 
     if (!targetUser) {
@@ -1149,7 +1059,6 @@ function updateUser(userId, updates, context = {}) {
       return { success: false, message: 'User not found' };
     }
 
-    // DATABASE_SPREADSHEET_ID: Shared database accessible by authenticated users
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn('updateUser: Database access failed');
@@ -1173,10 +1082,8 @@ function updateUser(userId, updates, context = {}) {
 
     for (let i = 1; i < data.length; i++) {
       if (data[i][userIdColumnIndex] === userId) {
-        // ✅ API最適化: バッチ更新で80-90%削減（N+1回→1回）
         const updateCells = [];
 
-        // Update specified fields
         Object.keys(updates).forEach(field => {
           const columnIndex = headers.indexOf(field);
           if (columnIndex !== -1) {
@@ -1184,34 +1091,27 @@ function updateUser(userId, updates, context = {}) {
           }
         });
 
-        // Update lastModified
         const lastModifiedIndex = headers.indexOf('lastModified');
         if (lastModifiedIndex !== -1) {
           updateCells.push({ col: lastModifiedIndex + 1, value: new Date().toISOString() });
         }
 
-        // バッチ更新：全フィールドを1回のAPI呼び出しで更新
-        // ✅ API最適化: Rangeオブジェクト再利用でgetRange()削減
         if (updateCells.length > 0) {
           const cols = updateCells.map(c => c.col);
           const minCol = Math.min(...cols);
           const maxCol = Math.max(...cols);
           const colSpan = maxCol - minCol + 1;
 
-          // Rangeオブジェクトを再利用
           const rangeToUpdate = sheet.getRange(i + 1, minCol, 1, colSpan);
           const [currentRowData] = rangeToUpdate.getValues();
 
-          // 更新するセルの値を設定
           updateCells.forEach(({ col, value }) => {
             currentRowData[col - minCol] = value;
           });
 
-          // 同じRangeオブジェクトで書き込み
           rangeToUpdate.setValues([currentRowData]);
         }
 
-        // ユーザー更新後にキャッシュをクリア
         clearDatabaseUserCache();
 
         return { success: true };
@@ -1224,7 +1124,6 @@ function updateUser(userId, updates, context = {}) {
     console.error('updateUser error:', error.message);
     return { success: false, message: error.message || 'Unknown error occurred' };
   } finally {
-    // ✅ CLAUDE.md準拠: Lock解放の堅牢化（null参照エラー排除）
     try {
       if (lock && typeof lock.releaseLock === 'function') {
         lock.releaseLock();
@@ -1257,16 +1156,12 @@ function updateUser(userId, updates, context = {}) {
  */
 function getViewerBoardData(targetUserId, viewerEmail) {
   try {
-    // DATABASE_SPREADSHEETからユーザー情報を取得（サービスアカウント経由）
     const targetUser = findUserById(targetUserId, { requestingUser: viewerEmail });
     if (!targetUser) {
       console.warn('getViewerBoardData: Target user not found:', targetUserId);
       return null;
     }
 
-    // ユーザーの回答ボードは同一ドメイン共有設定により、全員が通常権限でアクセス可能
-    // 自分のデータも他人のデータも同じ方法で取得（サービスアカウント不要）
-    // eslint-disable-next-line no-undef
     return getUserSheetData(targetUser.userId, {
       includeTimestamp: true,
       requestingUser: viewerEmail
@@ -1293,7 +1188,6 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       return null;
     }
 
-    // ✅ Phase 1: Performance optimization - 5分キャッシュでAPI呼び出し削減
     const cacheKey = `user_by_sheet_${spreadsheetId}`;
     const skipCache = context.skipCache || false;
 
@@ -1310,8 +1204,6 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
     }
 
 
-    // Single Source of Truth: get all users and search in configJSON
-    // Cross-user lookup is legitimate for spreadsheetId-based user identification
     const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, preloadedAuth: context.preloadedAuth });
     if (!Array.isArray(allUsers)) {
       console.warn('findUserBySpreadsheetId: Failed to get users list');
@@ -1320,13 +1212,11 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
 
     for (const user of allUsers) {
       try {
-        // configJSONを解析してspreadsheetIdを確認
         const configJson = user.configJson || '{}';
         const config = JSON.parse(configJson);
 
         if (config.spreadsheetId === spreadsheetId) {
 
-          // ✅ Phase 1: キャッシュ保存（デフォルト10分でヒット率向上）
           if (!skipCache) {
             try {
               const cacheTtl = context.cacheTtl || 600; // デフォルト10分（600秒）
@@ -1339,14 +1229,12 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
           return user;
         }
       } catch (parseError) {
-        // JSON解析エラーは警告レベル（データ不整合の可能性）
         console.warn(`findUserBySpreadsheetId: Failed to parse configJSON for user ${user.userId}:`, parseError.message);
         continue;
       }
     }
 
 
-    // ユーザーが見つからない場合も短時間キャッシュ（重複検索回避）
     if (!skipCache) {
       try {
         const notFoundTtl = 60; // 60秒
@@ -1372,7 +1260,6 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
  */
 function deleteUser(userId, reason = '', context = {}) {
   try {
-    // Cross-user Access for User Deletion (Admin-only operation)
     const currentEmail = getCurrentEmail();
     const isAdmin = isAdministrator(currentEmail);
 
@@ -1381,10 +1268,7 @@ function deleteUser(userId, reason = '', context = {}) {
       return { success: false, message: 'Insufficient permissions for user deletion' };
     }
 
-    // User deletion is inherently cross-user administrative operation
-    // Always requires service account for safety and audit trail
 
-    // Direct SpreadsheetApp access for deletion - most reliable approach
     const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
     if (!dbId) {
       console.warn('deleteUser: DATABASE_SPREADSHEET_ID not configured');
@@ -1407,7 +1291,6 @@ function deleteUser(userId, reason = '', context = {}) {
       return { success: false, message: 'UserId column not found' };
     }
 
-    // 削除対象行を収集（行番号ずれ対策）
     const rowsToDelete = [];
     for (let i = 1; i < data.length; i++) {
       if (data[i][userIdColumnIndex] === userId) {
@@ -1420,12 +1303,10 @@ function deleteUser(userId, reason = '', context = {}) {
       return { success: false, message: 'User not found' };
     }
 
-    // 逆順で削除（行番号ずれを防ぐ）
     for (let i = rowsToDelete.length - 1; i >= 0; i--) {
       sheet.deleteRows(rowsToDelete[i], 1);
     }
 
-    // ユーザー削除後にキャッシュをクリア
     clearDatabaseUserCache();
 
     return {

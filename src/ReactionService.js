@@ -12,12 +12,10 @@
 /* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
 
 
-// 🎯 リアクション管理システム - CLAUDE.md準拠
 
 
 
 
-// 🔧 セキュリティ・監査機能
 
 
 /**
@@ -31,10 +29,8 @@
 function validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config) {
   if (!actorEmail || !targetUser) return false;
 
-  // 管理者は全アクセス可能
   if (isAdministrator(actorEmail)) return true;
 
-  // 公開ボードまたは自分のボードの場合は許可
   return config.isPublished || targetUser.userEmail === actorEmail;
 }
 
@@ -73,11 +69,9 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
     throw new Error('Invalid reaction type');
   }
 
-  // 🎯 ヘッダー行から列位置取得（API効率化: getDataRange使用）
   const dataRange = sheet.getDataRange();
   const [headers = []] = dataRange.getValues();
 
-  // ✅ Graceful Degradation: ヘッダー空配列対応（429エラー時のフォールバック）
   if (!headers || headers.length === 0) {
     console.warn(`⚠️ processReactionDirect: Headers unavailable (likely due to API quota). Reaction feature temporarily disabled.`, {
       rowNumber,
@@ -112,7 +106,6 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
     reactionColumns[type] = colIndex + 1;
   });
 
-  // 🔄 現在のリアクション状態を取得
   const columnIndexes = Object.values(reactionColumns);
   const minCol = Math.min(...columnIndexes);
   const maxCol = Math.max(...columnIndexes);
@@ -122,7 +115,6 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
   const updatedReactions = {};
   let userCurrentReaction = null;
 
-  // 現在の状態解析
   reactionTypes.forEach(type => {
     const col = reactionColumns[type];
     const cellValue = rowData[col - minCol] || '';
@@ -138,7 +130,6 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
     }
   });
 
-  // リアクション状態更新ロジック
   let action = 'added';
   let newUserReaction = reactionType;
 
@@ -147,12 +138,10 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
   });
 
   if (userCurrentReaction === reactionType) {
-    // 同じリアクション → 削除（トグル）
     updatedReactions[reactionType] = updatedReactions[reactionType].filter(u => u !== actorEmail);
     action = 'removed';
     newUserReaction = null;
   } else {
-    // 異なるリアクション → 古いのを削除、新しいのを追加
     if (userCurrentReaction) {
       updatedReactions[userCurrentReaction] = updatedReactions[userCurrentReaction].filter(u => u !== actorEmail);
     }
@@ -161,11 +150,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
     }
   }
 
-  // 🚀 一括更新（CLAUDE.md準拠70倍性能向上）
-  // ✅ API最適化: Read-Write分離パターン（Google公式推奨）
-  // ✅ 同じRangeオブジェクトで読み取り→書き込みでキャッシュ効率最大化
 
-  // 読み取ったrowDataを直接更新（既存データ保持）
   reactionTypes.forEach(type => {
     const col = reactionColumns[type];
     const users = updatedReactions[type];
@@ -175,10 +160,8 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
     rowData[col - minCol] = serialized;
   });
 
-  // 同じ範囲に書き戻す（Googleキャッシュ最適化）
   sheet.getRange(rowNumber, minCol, 1, maxCol - minCol + 1).setValues([rowData]);
 
-  // レスポンス形式構築
   const reactions = {};
   reactionTypes.forEach(type => {
     reactions[type] = {
@@ -202,11 +185,9 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
  * @returns {Object} 処理結果
  */
 function processHighlightDirect(sheet, rowNumber) {
-  // API効率化: getDataRange使用
   const dataRange = sheet.getDataRange();
   const [headers = []] = dataRange.getValues();
 
-  // ✅ Graceful Degradation: ヘッダー空配列対応（429エラー時のフォールバック）
   if (!headers || headers.length === 0) {
     console.warn(`⚠️ processHighlightDirect: Headers unavailable (likely due to API quota). Highlight feature temporarily disabled.`, {
       rowNumber,
@@ -218,10 +199,8 @@ function processHighlightDirect(sheet, rowNumber) {
     };
   }
 
-  // ハイライト列を探す
   const highlightColIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
 
-  // ハイライト列が存在しない場合はエラー
   if (highlightColIndex === -1) {
     console.error(`❌ processHighlightDirect: Required HIGHLIGHT column not found`, {
       availableHeaders: headers.map(h => String(h || '').trim()).filter(h => h).join(', '),
@@ -233,8 +212,6 @@ function processHighlightDirect(sheet, rowNumber) {
 
   const highlightCol = highlightColIndex + 1;
 
-  // 現在の値を取得してトグル
-  // ✅ API最適化: Rangeオブジェクト再利用でgetRange()50%削減
   const highlightRange = sheet.getRange(rowNumber, highlightCol, 1, 1);
   const [[currentValue = '']] = highlightRange.getValues();
   const isHighlighted = String(currentValue).toUpperCase() === 'TRUE';
@@ -266,7 +243,6 @@ function extractReactions(row, headers, userEmail = null) {
       CURIOUS: { count: 0, reacted: false }
     };
 
-    // 🎯 直接列名マッチング（大文字小文字対応）
     const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
 
     reactionTypes.forEach(reactionType => {
@@ -304,7 +280,6 @@ function extractReactions(row, headers, userEmail = null) {
  */
 function extractHighlight(row, headers) {
   try {
-    // 🎯 直接列名マッチング（CLAUDE.md準拠: 直接API使用）
     const columnIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
 
     if (columnIndex !== -1) {
@@ -320,12 +295,10 @@ function extractHighlight(row, headers) {
 }
 
 
-// 🎯 ハイライト管理システム - CLAUDE.md準拠
 
 
 
 
-// 🌍 Public API Functions - CLAUDE.md準拠
 
 
 /**
@@ -339,11 +312,9 @@ function addReaction(targetUserId, rowIndex, reactionType) {
   const actorEmail = getCurrentEmail();
 
   try {
-    // ✅ CLAUDE.md準拠: データ取得を先行して実行（1回のDB呼び出しのみ）
     const isAdmin = isAdministrator(actorEmail);
     const preloadedAuth = { email: actorEmail, isAdmin };
 
-    // ✅ preloadedAuthを渡してfindUserById内のgetAllUsers重複呼び出しを排除
     const targetUser = findUserById(targetUserId, {
       requestingUser: actorEmail,
       preloadedAuth
@@ -352,14 +323,12 @@ function addReaction(targetUserId, rowIndex, reactionType) {
       return createErrorResponse('Target user not found');
     }
 
-    // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
     const configResult = getUserConfig(targetUserId, targetUser);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Board configuration incomplete');
     }
 
-    // 🛡️ 事前取得データで権限検証（DB呼び出しなし）
     if (!validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config)) {
       logReactionAudit('reaction_denied', {
         actor: actorEmail,
@@ -370,7 +339,6 @@ function addReaction(targetUserId, rowIndex, reactionType) {
       return createErrorResponse('Access denied to target board');
     }
 
-    // 行番号正規化
     const rowNumber = typeof rowIndex === 'string'
       ? parseInt(rowIndex.replace('row_', ''), 10)
       : parseInt(rowIndex, 10);
@@ -379,23 +347,18 @@ function addReaction(targetUserId, rowIndex, reactionType) {
       return createErrorResponse('Invalid row ID');
     }
 
-    // 🔐 二重ロック: Cache-based（第1段階） + LockService（第2段階）
     const lockKey = `reaction_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
 
-    // 第1段階: 高速なキャッシュチェック（即座にリジェクト）
     if (cache.get(lockKey)) {
       return createErrorResponse('同時リアクション処理中です。お待ちください。');
     }
 
-    // 第2段階: 確実なLockService排他制御（Web App対応）
     const lock = LockService.getScriptLock();
 
     try {
-      // 短期間のキャッシュロック（3秒）
       cache.put(lockKey, actorEmail, 3);
 
-      // 真のロック取得
       if (!lock.tryLock(3000)) { // 3秒待機
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
@@ -416,11 +379,8 @@ function addReaction(targetUserId, rowIndex, reactionType) {
         throw new Error('Target sheet not found');
       }
 
-      // 🚀 GAS-Native: 直接リアクション処理
       const result = processReactionDirect(sheet, rowNumber, reactionType, actorEmail);
-      // ✅ flush()削除: GASは自動的にflushするため不要（Google公式推奨）
 
-      // 📊 監査ログ
       logReactionAudit('reaction_processed', {
         actor: actorEmail,
         target: targetUser.userEmail,
@@ -442,7 +402,6 @@ function addReaction(targetUserId, rowIndex, reactionType) {
       };
 
     } finally {
-      // ✅ CLAUDE.md準拠: Lock解放の堅牢化（null参照エラー排除）
       try {
         if (lock && typeof lock.releaseLock === 'function') {
           lock.releaseLock();
@@ -451,7 +410,6 @@ function addReaction(targetUserId, rowIndex, reactionType) {
         console.warn('addReaction: Lock release failed:', unlockError.message);
       }
 
-      // キャッシュロック解放
       try {
         cache.remove(lockKey);
       } catch (cacheError) {
@@ -481,11 +439,9 @@ function toggleHighlight(targetUserId, rowIndex) {
   const actorEmail = getCurrentEmail();
 
   try {
-    // ✅ CLAUDE.md準拠: データ取得を先行して実行（1回のDB呼び出しのみ）
     const isAdmin = isAdministrator(actorEmail);
     const preloadedAuth = { email: actorEmail, isAdmin };
 
-    // ✅ preloadedAuthを渡してfindUserById内のgetAllUsers重複呼び出しを排除
     const targetUser = findUserById(targetUserId, {
       requestingUser: actorEmail,
       preloadedAuth
@@ -494,14 +450,12 @@ function toggleHighlight(targetUserId, rowIndex) {
       return createErrorResponse('Target user not found');
     }
 
-    // ✅ preloadedUserを渡してgetUserConfig内のfindUserById重複呼び出しを排除
     const configResult = getUserConfig(targetUserId, targetUser);
     const config = configResult.success ? configResult.config : {};
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Board configuration incomplete');
     }
 
-    // 🛡️ 事前取得データで権限検証（DB呼び出しなし）
     if (!validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config)) {
       logReactionAudit('highlight_denied', {
         actor: actorEmail,
@@ -520,23 +474,18 @@ function toggleHighlight(targetUserId, rowIndex) {
       return createErrorResponse('Invalid row ID');
     }
 
-    // 🔐 二重ロック: Cache-based（第1段階） + LockService（第2段階）
     const lockKey = `highlight_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
 
-    // 第1段階: 高速なキャッシュチェック（即座にリジェクト）
     if (cache.get(lockKey)) {
       return createErrorResponse('同時ハイライト処理中です。お待ちください。');
     }
 
-    // 第2段階: 確実なLockService排他制御（Web App対応）
     const lock = LockService.getScriptLock();
 
     try {
-      // 短期間のキャッシュロック（3秒）
       cache.put(lockKey, actorEmail, 3);
 
-      // 真のロック取得
       if (!lock.tryLock(3000)) { // 3秒待機
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
@@ -557,11 +506,8 @@ function toggleHighlight(targetUserId, rowIndex) {
         throw new Error('Target sheet not found');
       }
 
-      // 🚀 GAS-Native: 直接ハイライト処理
       const result = processHighlightDirect(sheet, rowNumber);
-      // ✅ flush()削除: GASは自動的にflushするため不要（Google公式推奨）
 
-      // 📊 監査ログ
       logReactionAudit('highlight_processed', {
         actor: actorEmail,
         target: targetUser.userEmail,
@@ -580,7 +526,6 @@ function toggleHighlight(targetUserId, rowIndex) {
       };
 
     } finally {
-      // ✅ CLAUDE.md準拠: Lock解放の堅牢化（null参照エラー排除）
       try {
         if (lock && typeof lock.releaseLock === 'function') {
           lock.releaseLock();
@@ -589,7 +534,6 @@ function toggleHighlight(targetUserId, rowIndex) {
         console.warn('toggleHighlight: Lock release failed:', unlockError.message);
       }
 
-      // キャッシュロック解放
       try {
         cache.remove(lockKey);
       } catch (cacheError) {

@@ -14,7 +14,6 @@
     <!-- Shared Styles -->
     <?!= include('UnifiedStyles.css'); ?>
     <script>
-      // ✅ URLパラメータからuserIdを取得（管理パネルに戻る際に必要）
       function getUrlParameterUserId() {
         try {
           const urlParams = new URLSearchParams(window.location.search);
@@ -25,7 +24,6 @@
         }
       }
 
-      // ✅ バックエンドから渡されたuserIdとURLパラメータの両方をチェック
       const templateUserId = '<?= typeof userIdParam !== "undefined" ? userIdParam : "" ?>';
       let __USER_ID__ = getUrlParameterUserId() || templateUserId;
     </script>
@@ -379,15 +377,12 @@
 
     <script>
 
-      // メッセージ表示関数 - Use SharedUtilities notification system if available
       function showMessage(message, type = 'info', duration = 5000) {
-        // Use unified notification system from SharedUtilities if available
         if (window.notifications) {
           window.notifications.showMessage(message, type, duration);
           return;
         }
 
-        // Fallback to local implementation
         const notificationContainer = document.getElementById('notification-container');
         if (!notificationContainer) {
           console.error('Notification container not found!');
@@ -418,13 +413,11 @@
 
         notificationContainer.appendChild(notification);
 
-        // CLAUDE.md V8 compliant: requestIdleCallback for notification animation
         requestIdleCallback(() => {
           notification.classList.remove('translate-x-full', 'opacity-0');
           notification.classList.add('translate-x-0', 'opacity-100');
         }, { timeout: 10 });
 
-        // CLAUDE.md V8 compliant: Promise-based auto-removal
         if (duration > 0) {
           const createPromiseDelay = (ms) => new Promise(resolve => {
             const start = Date.now();
@@ -442,9 +435,7 @@
 
 
 
-      // 管理パネルに戻る
       function goBackToAdminPanel() {
-        // 通知トーストで遷移をユーザーに知らせる
         if (window.notifications) {
           window.notifications.info('← 管理パネルに戻っています...', 2000);
         }
@@ -452,7 +443,6 @@
         google.script.run
           .withSuccessHandler((webAppUrl) => {
             const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;             // サンドボックス環境では window.top への直接アクセスが制限されるため
-            // 確実に遷移させるために window.open を利用する
             window.open(targetUrl, '_top');
           })
           .withFailureHandler((error) => {
@@ -467,12 +457,10 @@
       }
 
 
-      // ユーザー管理機能のJavaScript関数
       let currentUserList = [];
       let userToDelete = null;
 
 
-      // ユーザー一覧を取得して表示
       function loadUserList() {
         const loadingDiv = document.getElementById('user-loading');
         const contentDiv = document.getElementById('user-table-content');
@@ -497,7 +485,6 @@
           .getAdminUsers();
       }
 
-      // ユーザー一覧をテーブルに表示
       function displayUserList(users) {
         const tableBody = document.getElementById('user-table-body');
         const contentDiv = document.getElementById('user-table-content');
@@ -518,7 +505,6 @@
                 ? '<span class="px-2 py-1 bg-green-600 text-green-100 rounded-full text-xs">アクティブ</span>'
                 : '<span class="px-2 py-1 bg-red-600 text-red-100 rounded-full text-xs">非アクティブ</span>';
 
-              // ボード公開状態を判定
               let boardPublished = false;
               try {
                 const config = JSON.parse(user.configJson || '{}');
@@ -529,12 +515,10 @@
                 ? '<span class="px-2 py-1 bg-purple-600 text-purple-100 rounded-full text-xs">公開中</span>'
                 : '<span class="px-2 py-1 bg-gray-600 text-gray-100 rounded-full text-xs">非公開</span>';
 
-              // 登録日はcreatedAtを使用
               const registrationDate = user.createdAt
                 ? new Date(user.createdAt).toLocaleDateString('ja-JP')
                 : '不明';
 
-              // 最終アクセスはlastModifiedを使用
               const lastAccess = user.lastModified
                 ? new Date(user.lastModified).toLocaleDateString('ja-JP')
                 : '不明';
@@ -581,7 +565,6 @@
         contentDiv.classList.remove('hidden');
       }
 
-      // 削除確認モーダルを表示
       function showDeleteConfirmation(userId, userEmail) {
         userToDelete = { userId, userEmail };
 
@@ -591,13 +574,11 @@
         document.getElementById('delete-modal').classList.remove('hidden');
       }
 
-      // 削除をキャンセル
       function cancelDeletion() {
         userToDelete = null;
         document.getElementById('delete-modal').classList.add('hidden');
       }
 
-      // 削除を実行
       function confirmDeletion() {
         if (!userToDelete) return;
 
@@ -634,7 +615,6 @@
 
 
 
-      // システム診断・監視機能
       function runSystemDiagnosis() {
         executeSystemFunction(
           'run-diagnosis-btn',
@@ -666,30 +646,23 @@
         );
       }
 
-      // 共通のシステム機能実行関数
       function executeSystemFunction(buttonId, progressMessage, functionName, originalText) {
         const button = document.getElementById(buttonId);
         const resultsDiv = document.getElementById('diagnostic-results');
         const outputElement = document.getElementById('diagnostic-output');
 
-        // ボタンを無効化
         button.disabled = true;
         button.textContent = progressMessage;
 
-        // 結果エリアをクリア
         outputElement.textContent = '実行中...';
         resultsDiv.classList.remove('hidden');
 
-        // プログレス表示を更新
         showMessage(progressMessage, 'info');
 
-        // Google Apps Script関数を呼び出し
         google.script.run
           .withSuccessHandler((result) => {
-            // シンプルな結果表示
             showDiagnosticResult(result, functionName);
 
-            // ボタンを復元
             button.disabled = false;
             button.textContent = originalText;
           })
@@ -700,7 +673,6 @@
               'error'
             );
 
-            // ボタンを復元
             button.disabled = false;
             button.textContent = originalText;
           })
@@ -708,22 +680,18 @@
       }
 
 
-      // シンプルな診断結果表示関数
       function showDiagnosticResult(result, functionName) {
         const output = document.getElementById('diagnostic-output');
         const timestamp = new Date().toLocaleString('ja-JP');
 
-        // シンプルな結果表示
         output.textContent = `【${functionName} 実行結果】\n実行時間: ${timestamp}\n\n${JSON.stringify(result, null, 2)}`;
 
-        // 成功/失敗に応じた通知表示
         showMessage(
           result.success ? `✅ ${functionName}: 実行完了` : `❌ ${functionName}: エラーが発生`,
           result.success ? 'success' : 'error'
         );
       }
 
-      // システム統計を生成・表示
       function loadSystemStats() {
         google.script.run
           .withSuccessHandler(function(users) {
@@ -737,7 +705,6 @@
           .getAdminUsers();
       }
 
-      // システム統計を表示
       function displaySystemStats(users) {
         const totalUsers = users.length;
         const activeUsers = users.filter(u => u.isActive === true).length;
@@ -747,13 +714,11 @@
         const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
         users.forEach(user => {
-          // ボード公開数を計算
           try {
             const config = JSON.parse(user.configJson || '{}');
             if (config.isPublished === true) publishedBoards++;
           } catch (e) {}
 
-          // 24時間以内の活動を計算
           const lastActivity = new Date(user.lastModified || user.createdAt);
           if (lastActivity > yesterday) recentActivity++;
         });
@@ -764,7 +729,6 @@
         document.getElementById('recent-activity').textContent = recentActivity;
       }
 
-      // ユーザーのアクティブ状態を切り替え
       function toggleUserStatus(userId) {
         const confirmMessage = 'ユーザーの状態を切り替えますか？';
         if (!confirm(confirmMessage)) return;
@@ -784,7 +748,6 @@
           .toggleUserActiveStatus(userId);
       }
 
-      // ユーザーのボード公開状態を切り替え
       function toggleUserBoard(userId) {
         const confirmMessage = 'このユーザーのボード公開状態を切り替えますか？';
         if (!confirm(confirmMessage)) return;
@@ -804,11 +767,7 @@
           .toggleUserBoardStatus(userId);
       }
 
-      // ===========================================
-      // 🔒 アプリケーション制御機能
-      // ===========================================
 
-      // アプリケーション制御状態を更新
       function updateAppControlStatus() {
         google.script.run
           .withSuccessHandler(function(result) {
@@ -816,25 +775,21 @@
               const data = result.data;
               const isDisabled = data.isDisabled;
 
-              // ===== 📊 現在のステータス部分を更新 =====
               const currentStatus = document.getElementById('current-status');
               const currentAdmin = document.getElementById('current-admin');
               const lastUpdated = document.getElementById('last-updated');
 
-              // アプリ状態を更新
               if (isDisabled) {
                 currentStatus.innerHTML = '<span class="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">🚫 停止中</span>';
               } else {
                 currentStatus.innerHTML = '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">✅ 運用中</span>';
               }
 
-              // 管理者情報を更新
               if (data.restriction && data.restriction.disabledBy) {
                 currentAdmin.textContent = data.restriction.disabledBy;
               } else if (data.lastEnabled && data.lastEnabled.enabledBy) {
                 currentAdmin.textContent = data.lastEnabled.enabledBy;
               } else {
-                // 現在のユーザー情報を取得
                 google.script.run
                   .withSuccessHandler(function(email) {
                     if (email) currentAdmin.textContent = email;
@@ -842,7 +797,6 @@
                   .getCurrentEmail();
               }
 
-              // 最終更新時刻を更新
               let updateTime = data.timestamp;
               if (data.restriction && data.restriction.disabledAt) {
                 updateTime = data.restriction.disabledAt;
@@ -856,7 +810,6 @@
                 lastUpdated.textContent = new Date().toLocaleString('ja-JP');
               }
 
-              // ===== 🔒 アプリケーション制御部分を更新 =====
               const statusIndicator = document.getElementById('app-status-indicator');
               const statusText = document.getElementById('app-status-text');
               const disableBtn = document.getElementById('disable-app-btn');
@@ -870,7 +823,6 @@
                 disableBtn.disabled = true;
                 enableBtn.disabled = false;
 
-                // 制限情報を表示
                 if (data.restriction) {
                   document.getElementById('restriction-reason').textContent =
                     data.restriction.reason || 'システムメンテナンス';
@@ -899,7 +851,6 @@
           .getAppAccessStatus();
       }
 
-      // アプリケーションを停止
       function disableApp() {
         const reasonInput = document.getElementById('disable-reason');
         const reason = reasonInput.value.trim() || 'システムメンテナンス';
@@ -932,7 +883,6 @@
           .disableAppAccess(reason);
       }
 
-      // アプリケーションを再開
       function enableApp() {
         const confirmMessage = 'アプリケーションを再開します。\n全ユーザーがアクセス可能になります。続行しますか？';
         if (!confirm(confirmMessage)) return;
@@ -961,7 +911,6 @@
           .enableAppAccess();
       }
 
-      // ページ読み込み時にユーザー管理を自動表示
       document.addEventListener('DOMContentLoaded', function() {
         loadUserList();
         loadSystemStats();

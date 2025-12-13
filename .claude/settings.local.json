@@ -43,7 +43,13 @@
       "Bash(npx clasp:*)",
       "Bash(du:*)",
       "Bash(git pull:*)",
-      "Bash(npm run open:*)"
+      "Bash(npm run open:*)",
+      "Bash(sort:*)",
+      "Bash(xargs:*)",
+      "Bash(do)",
+      "Bash(python3:*)",
+      "Bash([ -f \"$file\" ])",
+      "Bash(continue)"
     ],
     "deny": [],
     "ask": []

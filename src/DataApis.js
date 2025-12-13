@@ -32,9 +32,6 @@
 
 /* global getCurrentEmail, findUserById, findUserByEmail, getUserConfig, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL */
 
-// ================================
-// スプレッドシート操作API
-// ================================
 
 /**
  * 自分がオーナーのスプレッドシートを30件取得
@@ -222,9 +219,6 @@ function getSheetList(spreadsheetId) {
   }
 }
 
-// ================================
-// データ取得・保存API
-// ================================
 
 /**
  * 統合API: フロントエンド用データ取得（最適化版・クロスユーザー対応）
@@ -605,9 +599,6 @@ function getNotificationUpdate(targetUserId, options = {}) {
   }
 }
 
-// ================================
-// データソース接続API
-// ================================
 
 /**
  * Connect to data source - API Gateway function for DataService
@@ -989,9 +980,6 @@ function isValidFormUrl(url) {
   }
 }
 
-// ================================
-// URL解析・検証API
-// ================================
 
 /**
  * スプレッドシートURL解析 - GAS-Native Implementation

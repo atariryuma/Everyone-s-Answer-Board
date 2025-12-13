@@ -10,7 +10,6 @@
 
     <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
     <script>
-      // Complete TailwindCSS warning suppression and early configuration
       window.__TAILWIND_DISABLE_TOUCH__ = true;
       window.tailwind = {
         config: {
@@ -19,7 +18,6 @@
         },
       };
 
-      // Suppress TailwindCSS production warnings immediately
       const originalWarn = console.warn;
       console.warn = function (...args) {
         const message = args.join(' ');
@@ -212,19 +210,15 @@
     <script>
       let setupInProgress = false;
 
-      // メッセージ表示関数 - Use unified notification system
       function showMessage(message, type = 'info') {
-        // Use unified notification system from SharedUtilities
         if (window.notifications) {
           const durations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
           window.notifications.showMessage(message, type, durations[type] || 5000);
         } else {
-          // Simple console fallback - no DOM manipulation
           console.warn('Notification system not available:', type, message);
         }
       }
 
-      // バリデーション関数
       function validateJSON(jsonString) {
         try {
           const parsed = JSON.parse(jsonString);
@@ -253,7 +247,6 @@
         return true;
       }
 
-      // セットアップフォーム送信処理
       document.getElementById('setup-form').addEventListener('submit', async function (e) {
         e.preventDefault();
 
@@ -265,22 +258,18 @@
         const setupSpinner = document.getElementById('setup-spinner');
 
         try {
-          // ボタン状態を変更
           setupBtn.disabled = true;
           setupText.style.display = 'none';
           setupSpinner.classList.remove('hidden');
 
-          // 入力値取得
           const serviceAccountJson = document.getElementById('service-account-json').value.trim();
           const databaseId = document.getElementById('database-id').value.trim();
           const adminEmail = document.getElementById('admin-email').value.trim();
           const googleClientId = document.getElementById('google-client-id').value.trim();
 
-          // バリデーション
           validateJSON(serviceAccountJson);
           validateSpreadsheetId(databaseId);
 
-          // 管理者メールのバリデーション
           if (!adminEmail) {
             throw new Error('管理者メールアドレスが入力されていません');
           }
@@ -288,7 +277,6 @@
             throw new Error('有効なメールアドレスを入力してください');
           }
 
-          // 統一エラーハンドリングでセットアップ実行
           const result = await window.ErrorHandler.handleFormSubmission(
             () => window.ErrorHandler.callGAS('setupApplication', {
               showLoading: true,
@@ -301,7 +289,6 @@
                 document.getElementById('test-section').classList.remove('hidden');
               },
               onError: (error) => {
-                // 特定エラーの詳細メッセージ表示
                 if (error.message?.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
                   const detailedMessage = `
                     <p class="font-bold">${error.message}</p>
@@ -316,7 +303,6 @@
         } catch (error) {
           showMessage('セットアップに失敗しました', 'error');
         } finally {
-          // ボタン状態をリセット
           setupBtn.disabled = false;
           setupText.style.display = 'inline';
           setupSpinner.classList.add('hidden');
@@ -324,7 +310,6 @@
         }
       });
 
-      // テストボタン処理
       document.getElementById('test-btn').addEventListener('click', function () {
         this.disabled = true;
         this.innerHTML =
@@ -344,7 +329,6 @@
           .testSystemDiagnosis();
       });
 
-      // 入力フィールドのリアルタイムバリデーション
       document.getElementById('service-account-json').addEventListener('blur', function () {
         try {
           if (this.value.trim()) {
@@ -382,14 +366,12 @@
       });
 
       function startApp() {
-        // 通知トーストで遷移をユーザーに知らせる
         if (window.notifications) {
           window.notifications.info('📚 みんなの回答ボードを開始しています...', 2000);
         }
 
         google.script.run
           .withSuccessHandler(function (url) {
-            // GAS 2021年以降: window.open(_top) でリダイレクト
             window.open(url, '_top');
           })
           .withFailureHandler(function (error) {
@@ -398,13 +380,11 @@
           .getWebAppUrl();
       }
 
-      // ドメイン情報初期化
       async function initializeDomainInfo() {
         const info = await window.sharedUtilities.fetchDomainInfo();
         window.sharedUtilities.displayDomainInfo(info);
       }
 
-      // ページ読み込み時に現在のユーザーのメールアドレスとドメイン情報を自動取得
       window.addEventListener('load', function () {
         initializeDomainInfo(); // ドメイン情報初期化
         const adminEmailField = document.getElementById('admin-email');

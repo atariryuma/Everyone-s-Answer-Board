@@ -20,7 +20,6 @@
 
 /* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty */
 
-// Core Data Operations
 
 /**
  * ユーザーのスプレッドシートデータ取得
@@ -31,14 +30,11 @@
 function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedConfig = null) {
   const startTime = Date.now();
 
-  // 変数をtryブロック外で初期化（catchブロックでも参照可能）
   let user = null;
   let config = null;
 
   try {
-    // Zero-dependency data processing
 
-    // Performance improvement - use preloaded data
     user = preloadedUser || findUserById(userId, { requestingUser: getCurrentEmail() });
     if (!user) {
       console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
@@ -51,7 +47,6 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
       };
     }
 
-    // Performance improvement - use preloaded config
     if (preloadedConfig) {
       config = preloadedConfig;
     } else {
@@ -70,14 +65,11 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
       };
     }
 
-    // データ取得実行
     const result = fetchSpreadsheetData(config, options, user);
 
     const executionTime = Date.now() - startTime;
 
-    // Standardized response format
     if (result.success) {
-      // Performance optimization: use already retrieved headers
       const preloadedHeaders = result.headers;
       const questionText = getQuestionText(config, { targetUserEmail: user.userEmail }, preloadedHeaders);
 
@@ -103,7 +95,6 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
       timestamp: new Date().toISOString()
     });
 
-    // Ensure proper error response structure
     const errorResponse = createDataServiceErrorResponse(`データ取得エラー: ${error.message}`);
     console.error('DataService.getUserSheetData: エラーレスポンス作成', errorResponse);
     return errorResponse;
@@ -118,7 +109,6 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
  */
 function extractTimestampValue(row, headers) {
   try {
-    // 1. 最初のカラムがタイムスタンプかチェック（Googleフォーム標準）
     if (headers.length > 0 && row.length > 0) {
       const [firstHeader] = headers;
       if (firstHeader && typeof firstHeader === 'string') {
@@ -131,7 +121,6 @@ function extractTimestampValue(row, headers) {
       }
     }
 
-    // 2. ヘッダー名でタイムスタンプカラムを検索
     for (let i = 0; i < headers.length; i++) {
       const header = headers[i];
       if (header && typeof header === 'string') {
@@ -161,11 +150,8 @@ function extractTimestampValue(row, headers) {
  */
 function connectToSpreadsheetSheet(config, context = {}) {
   // ✅ CRITICAL: ユーザーの回答ボードは同一ドメイン共有設定で対応
-  // サービスアカウントは使用しない（DatabaseCore.gsで自動制御）
   const currentEmail = getCurrentEmail();
 
-  // ✅ CLAUDE.md準拠: preloadedUser優先使用でfindUserBySpreadsheetId重複呼び出しを排除
-  // preloadedUserが渡されている場合は、DB検索をスキップして大幅なAPI削減
   const targetUser = context.preloadedUser || findUserBySpreadsheetId(config.spreadsheetId, {
     preloadedAuth: context.preloadedAuth, // 認証情報を渡して重複認証回避
     skipCache: false // キャッシュ活用
@@ -177,7 +163,6 @@ function connectToSpreadsheetSheet(config, context = {}) {
     });
   }
 
-  // ✅ 常に通常権限でアクセス（同一ドメイン共有設定前提）
   const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
 
   if (!dataAccess || !dataAccess.spreadsheet) {
@@ -213,7 +198,6 @@ function getSheetHeaders(sheet) {
   const cacheKey = `sheet_headers_${spreadsheetId}_${sheetName}`;
   const cache = CacheService.getScriptCache();
 
-  // キャッシュ確認
   const cached = cache.get(cacheKey);
   if (cached) {
     try {
@@ -223,7 +207,6 @@ function getSheetHeaders(sheet) {
     }
   }
 
-  // キャッシュミス: API呼び出し
   const dataRange = sheet.getDataRange();
   const values = dataRange.getValues();
 
@@ -232,7 +215,6 @@ function getSheetHeaders(sheet) {
     headers: values[0] || []
   };
 
-  // ✅ 20分キャッシュ（ヘッダーは変更されない）
   try {
     cache.put(cacheKey, JSON.stringify(info), CACHE_DURATION.DATABASE_LONG);
   } catch (cacheError) {
@@ -254,7 +236,6 @@ function getSheetRowCount(sheet) {
   const cacheKey = `sheet_rows_${spreadsheetId}_${sheetName}`;
   const cache = CacheService.getScriptCache();
 
-  // キャッシュ確認
   const cached = cache.get(cacheKey);
   if (cached) {
     try {
@@ -267,10 +248,8 @@ function getSheetRowCount(sheet) {
     }
   }
 
-  // ✅ 軽量API: getLastRow()のみ呼び出し（getDataRange()より高速）
   const lastRow = sheet.getLastRow();
 
-  // ✅ 30秒キャッシュ（フォーム投稿即時反映のため短期）
   try {
     cache.put(cacheKey, String(lastRow), CACHE_DURATION.FORM_DATA);
   } catch (cacheError) {
@@ -334,7 +313,6 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
   let consecutiveErrors = 0; // ✅ 連続エラーカウント（適応型バッチサイズ用）
 
   for (let startRow = 2; startRow <= lastRow; ) {
-    // 実行時間チェック
     if (Date.now() - startTime > MAX_EXECUTION_TIME) {
       console.warn('DataService.processBatchData: 実行時間制限のため処理を中断', {
         processedRows: processedCount,
@@ -343,7 +321,6 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
       break;
     }
 
-    // ✅ 適応型バッチサイズ: エラー状況に応じて動的調整
     const currentBatchSize = getAdaptiveBatchSize(consecutiveErrors);
     const endRow = Math.min(startRow + currentBatchSize - 1, lastRow);
     const batchSize = endRow - startRow + 1;
@@ -370,22 +347,18 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
         nextBatchSize: getAdaptiveBatchSize(consecutiveErrors)
       });
 
-      // ✅ 429エラー専用の適応型バックオフ
       if (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('quota')) {
         const backoffMs = Math.min(1000 * Math.pow(2, consecutiveErrors), 8000);
         console.warn(`⚠️ API quota exceeded, backing off ${backoffMs}ms (errors: ${consecutiveErrors})`);
         Utilities.sleep(backoffMs);
       }
 
-      // エラー発生時も次のバッチへ進む（スタックしない）
       startRow += batchSize;
     }
   }
 
   // ✅ BUG FIX: classFilterはshouldIncludeRow()で既に処理されているため、ここでの二重フィルタリングを削除
-  // フィルタリング（classFilter）は processRawDataBatch → shouldIncludeRow で実行済み
 
-  // ソート適用
   if (options.sortBy) {
     processedData = applySortAndLimit(processedData, {
       sortBy: options.sortBy,
@@ -407,26 +380,21 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
   const startTime = Date.now();
 
   try {
-    // ✅ CLAUDE.md準拠: 事前取得ユーザー情報を活用してDB重複呼び出し排除
     const { sheet } = connectToSpreadsheetSheet(config, {
       targetUserEmail: user?.userEmail,
       preloadedUser: user, // preloadedUserを渡してfindUserBySpreadsheetId重複回避（最重要）
       preloadedAuth: options.preloadedAuth // 認証情報も渡して重複認証回避
     });
 
-    // ✅ API最適化: getSheetInfo使用で寸法+ヘッダーを1回で取得（50%削減）
     const { lastRow, lastCol, headers } = getSheetInfo(sheet);
 
-    // バッチ処理実行
     const processedData = processBatchData(sheet, headers, lastRow, lastCol, config, options, user, startTime);
 
-    // Return directly in frontend-expected format
     return {
       success: true,
       data: processedData,
       headers,
       sheetName: config.sheetName,
-      // デバッグ情報（オプショナル）
       filteredRows: processedData.length,
       executionTime: Date.now() - startTime
     };
@@ -453,18 +421,14 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
 
     batchRows.forEach((row, batchIndex) => {
       try {
-        // グローバル行インデックス計算
         const globalIndex = startOffset + batchIndex;
 
-        // 基本データ構造作成（ColumnMappingService利用）
-        // 各フィールドのデータ抽出（null チェック強化）
         const answerResult = extractFieldValueUnified(row, headers, 'answer', columnMapping);
         const reasonResult = extractFieldValueUnified(row, headers, 'reason', columnMapping);
         const classResult = extractFieldValueUnified(row, headers, 'class', columnMapping);
         const nameResult = extractFieldValueUnified(row, headers, 'name', columnMapping);
         const emailResult = extractFieldValueUnified(row, headers, 'email', columnMapping);
 
-        // 基本データ抽出
         const answerValue = answerResult?.value;
         const nameValue = nameResult?.value;
 
@@ -474,35 +438,28 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
           timestamp: extractTimestampValue(row, headers) || '',
           email: String(emailResult?.value || ''),
 
-          // Main content using ColumnMappingService - 厳密な null チェック
           answer: String(answerValue || ''),
           opinion: String(answerValue || ''), // Alias for answer field
           reason: String(reasonResult?.value || ''),
           class: String(classResult?.value || ''),
           name: String(nameValue || ''),
 
-          // メタデータ
           formattedTimestamp: formatTimestamp(extractTimestampValue(row, headers)),
           isEmpty: isEmptyRow(row),
 
-          // リアクション（ReactionService利用）
           reactions: extractReactions(row, headers, getCurrentEmail()),
           highlight: extractHighlight(row, headers)
         };
 
-        // データ整合性の最終チェック
         if (!answerValue && !reasonResult?.value) {
-          // 回答も理由も空の場合はスキップ
           return;
         }
 
-        // includeTimestamp option processing
         if (options.includeTimestamp === false) {
           delete item.timestamp;
           delete item.formattedTimestamp;
         }
 
-        // フィルタリング
         if (shouldIncludeRow(item, options)) {
           processedBatch.push(item);
         }
@@ -523,11 +480,8 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
 }
 
 
-// 🔍 データ分析・フィルタリング
 
-// ✅ 自動停止機能削除: getAutoStopTime 関数は不要
 
-// Utility helpers
 
 /**
  * 空行判定（null安全）
@@ -535,18 +489,14 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
  * @returns {boolean} 空行かどうか
  */
 function isEmptyRow(row) {
-  // 配列チェック
   if (!row || !Array.isArray(row) || row.length === 0) {
     return true;
   }
 
-  // 各セルの値を厳密にチェック
   return row.every(cell => {
-    // null/undefinedは空と判定
     if (cell === null || cell === undefined) {
       return true;
     }
-    // 文字列変換後にtrimして空文字列なら空と判定
     const cellStr = String(cell).trim();
     return cellStr === '';
   });
@@ -560,12 +510,10 @@ function isEmptyRow(row) {
  */
 function shouldIncludeRow(item, options = {}) {
   try {
-    // 空行のフィルタリング
     if (options.excludeEmpty !== false && item.isEmpty) {
       return false;
     }
 
-    // Filter out rows with empty main answers - V8 runtime safe with enhanced type checking
     if (options.requireAnswer !== false) {
       const answerStr = item.answer ? String(item.answer).trim() : '';
       if (!answerStr) {
@@ -573,7 +521,6 @@ function shouldIncludeRow(item, options = {}) {
       }
     }
 
-    // 日付範囲フィルタリング
     if (options.dateFrom && item.timestamp) {
       const itemDate = new Date(item.timestamp);
       const fromDate = new Date(options.dateFrom);
@@ -590,7 +537,6 @@ function shouldIncludeRow(item, options = {}) {
       }
     }
 
-    // クラスフィルタリング
     if (options.classFilter && item.class !== options.classFilter) {
       return false;
     }
@@ -612,7 +558,6 @@ function applySortAndLimit(data, options = {}) {
   try {
     let sortedData = [...data];
 
-    // ソート実行
     if (options.sortBy) {
       switch (options.sortBy) {
         case 'timestamp':
@@ -629,12 +574,10 @@ function applySortAndLimit(data, options = {}) {
           sortedData.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           break;
         default:
-          // デフォルトは新しい順
           sortedData.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
       }
     }
 
-    // 制限適用
     if (options.limit && typeof options.limit === 'number' && options.limit > 0) {
       sortedData = sortedData.slice(0, options.limit);
     }
@@ -646,7 +589,6 @@ function applySortAndLimit(data, options = {}) {
   }
 }
 
-// Data Deletion Operations
 
 /**
  * 回答行を削除（管理モード専用）
@@ -659,7 +601,6 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
   const startTime = Date.now();
 
   try {
-    // 🛡️ CLAUDE.md準拠: Security Gate - 管理者権限チェック
     const currentEmail = getCurrentEmail();
     const user = findUserById(userId, { requestingUser: currentEmail });
 
@@ -668,7 +609,6 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
       return createDataServiceErrorResponse('ユーザーが見つかりません');
     }
 
-    // 所有者または管理者のみ削除可能
     const isOwner = user.userEmail === currentEmail;
     const isAdmin = (() => {
       try {
@@ -685,7 +625,6 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
       return createDataServiceErrorResponse('削除権限がありません');
     }
 
-    // ✅ CLAUDE.md準拠: GAS-Native Architecture - Direct SpreadsheetApp usage
     const config = getUserConfig(userId);
     if (!config.success || !config.config.spreadsheetId) {
       return createDataServiceErrorResponse('スプレッドシート設定が見つかりません');
@@ -694,7 +633,6 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
     const {spreadsheetId} = config.config;
     const sheetName = config.config.sheetName || 'フォームの回答 1';
 
-    // 🚀 Zero-dependency spreadsheet access
     const dataAccess = openSpreadsheet(spreadsheetId, {
       useServiceAccount: false, // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応
       targetUserEmail: user.userEmail,
@@ -710,16 +648,13 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
       return createDataServiceErrorResponse(`シート「${sheetName}」が見つかりません`);
     }
 
-    // ✅ API最適化: getSheetInfo使用で寸法+ヘッダーを1回で取得（50%削減）
     const { lastRow, lastCol } = getSheetInfo(sheet);
     if (rowIndex < 2 || rowIndex > lastRow) {
       return createDataServiceErrorResponse('無効な行番号です');
     }
 
-    // Performance improvement -Batch operation
     const [rowData] = sheet.getRange(rowIndex, 1, 1, lastCol).getValues();
 
-    // 削除実行
     sheet.deleteRows(rowIndex, 1);
 
     const executionTime = Date.now() - startTime;

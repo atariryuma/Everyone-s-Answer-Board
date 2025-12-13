@@ -27,9 +27,6 @@
 
 /* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, PropertiesService */
 
-// ================================
-// ユーザー管理API
-// ================================
 
 /**
  * Get users - simplified name for admin panel
@@ -43,7 +40,6 @@ function getAdminUsers(_options = {}) {
       return createAdminRequiredError();
     }
 
-    // Get all users (no filter needed for physical deletion)
     const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
     return {
       success: true,
@@ -117,7 +113,6 @@ function toggleUserBoardStatus(targetUserId) {
       return createUserNotFoundError();
     }
 
-    // 現在のconfigJsonを取得してパース
     let currentConfig = {};
     try {
       const configJsonStr = targetUser.configJson || '{}';
@@ -127,11 +122,9 @@ function toggleUserBoardStatus(targetUserId) {
       currentConfig = {};
     }
 
-    // 公開状態のみを切り替え
     const newIsPublished = !currentConfig.isPublished;
     const updates = {};
 
-    // 新しいconfigJsonを構築
     const updatedConfig = { ...currentConfig };
     updatedConfig.isPublished = newIsPublished;
     if (newIsPublished && !updatedConfig.publishedAt) {
@@ -179,7 +172,6 @@ function republishMyBoard() {
     const configResult = getUserConfig(currentUser.userId);
     const config = configResult.success ? configResult.config : {};
 
-    // 公開状態に変更
     config.isPublished = true;
     config.publishedAt = new Date().toISOString();
 
@@ -224,7 +216,6 @@ function clearActiveSheet(targetUserId) {
       return createUserNotFoundError();
     }
 
-    // Editor permission check: admin or own board
     const isAdmin = isAdministrator(email);
     const isOwnBoard = targetUser.userEmail === email;
 
@@ -269,7 +260,6 @@ function getLogs(_options = {}) {
       return createAdminRequiredError();
     }
 
-    // For now, return empty logs (can be enhanced later)
     return {
       success: true,
       logs: [],
@@ -281,9 +271,6 @@ function getLogs(_options = {}) {
   }
 }
 
-// ================================
-// アプリアクセス制限API
-// ================================
 
 /**
  * アプリ全体のアクセス制限状態をチェック
@@ -342,7 +329,6 @@ function enableAppAccess() {
 
     const props = PropertiesService.getScriptProperties();
 
-    // 停止情報を記録用に保持
     const disabledReason = props.getProperty('APP_DISABLED_REASON') || '';
     const disabledBy = props.getProperty('APP_DISABLED_BY') || '';
     const disabledAt = props.getProperty('APP_DISABLED_AT') || '';
@@ -352,7 +338,6 @@ function enableAppAccess() {
     props.deleteProperty('APP_DISABLED_BY');
     props.deleteProperty('APP_DISABLED_AT');
 
-    // 復旧記録を残す
     props.setProperty('APP_ENABLED_BY', currentEmail);
     props.setProperty('APP_ENABLED_AT', new Date().toISOString());
 

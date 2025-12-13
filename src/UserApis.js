@@ -21,9 +21,6 @@
 
 /* global getCurrentEmail, findUserByEmail, isAdministrator, getUserConfig, createUser, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities */
 
-// ================================
-// ユーザー設定API
-// ================================
 
 /**
  * Get user configuration - unified function for current user
@@ -36,13 +33,11 @@ function getConfig() {
       return createAuthError();
     }
 
-    // Direct findUserByEmail usage
     const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
       return createUserNotFoundError();
     }
 
-    // Use getUserConfig for configuration retrieval
     const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
@@ -111,9 +106,6 @@ function getBatchedUserConfig() {
   }
 }
 
-// ================================
-// 認証・ログインAPI
-// ================================
 
 /**
  * Process login action - handles user login flow
@@ -129,10 +121,8 @@ function processLoginAction() {
       };
     }
 
-    // Create or get user
     let user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
-      // Unified createUser() implementation
       user = createUser(email);
       if (!user) {
         console.warn('createUser failed, creating fallback user object');
@@ -164,7 +154,6 @@ function processLoginAction() {
     }
     const redirectUrl = `${baseUrl}?mode=admin&userId=${user.userId}`;
 
-    // Return redirect URL at top-level for client compatibility
     return {
       success: true,
       message: 'Login successful',
@@ -202,14 +191,11 @@ function checkUserAuthentication() {
       };
     }
 
-    // Check if user exists in database
     const user = findUserByEmail(email, { requestingUser: email });
     const userExists = !!user;
 
-    // Check administrator status
     const isAdminUser = isAdministrator(email);
 
-    // Check if user has valid configuration
     let hasValidConfig = false;
     if (user) {
       try {
