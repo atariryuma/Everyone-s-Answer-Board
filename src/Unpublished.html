@@ -198,11 +198,11 @@
             if (result && result.success) {
               showMessage('回答ボードを再公開しました！', 'success');
 
-              // ✅ 同一ページリロード: location.replace()で履歴を残さず置き換え
-              // window.top.location.reload()はクロスオリジンでセキュリティエラー
+              // ✅ GAS iframe対応: google.script.history.replace()でページリロード
+              // window.location.replace()はiframe sandbox制約でブロックされる可能性あり
               // サーバー側で状態管理（isPublished=true）されているため、
               // リロード後にdoGet()が自動的に公開ボードを返す
-              window.location.replace(window.location.href);
+              google.script.history.replace(null, {}, window.location.href);
             } else {
               showMessage(result.message || '再公開に失敗しました', 'error');
               button.disabled = false;
