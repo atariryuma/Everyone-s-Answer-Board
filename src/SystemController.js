@@ -751,7 +751,7 @@ function publishApp(publishConfig) {
 
     const result = {
       success: true,
-      message: 'アプリケーションが正常に公開されました',
+      message: '回答ボードが正常に公開されました',
       publishedAt,
       userId: user ? user.userId : null,
       etag: user && saveResult?.etag ? saveResult.etag : null,

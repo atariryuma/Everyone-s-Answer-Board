@@ -390,7 +390,7 @@ function doPost(e) {
             } else {
               result = {
                 success: true,
-                message: 'アプリが正常に公開されました',
+                message: '回答ボードが正常に公開されました',
                 publishedAt: publishConfig.publishedAt,
                 config: saveResult.config,
                 etag: saveResult.etag

@@ -3692,7 +3692,7 @@
         return;
       }
 
-      window.setLoading(true, 'アプリを公開中...');
+      window.setLoading(true, '回答ボードを公開中...');
 
       if (!config.formUrl && config.spreadsheetId && config.sheetName) {
         google.script.run
@@ -3727,7 +3727,7 @@
       google.script.run
         .withSuccessHandler(function (result) {
           if (result.success) {
-            showSuccess('アプリを公開しました！');
+            showSuccess('回答ボードを公開しました！');
             updatePublishStatus('published');
 
 
@@ -3766,7 +3766,7 @@
                 loadAndApplyCurrentConfig();
               }
             } else {
-              showError(result.message || result.error || 'アプリの公開に失敗しました');
+              showError(result.message || result.error || '回答ボードの公開に失敗しました');
             }
           }
           window.setLoading(false);
@@ -3775,7 +3775,7 @@
         .withFailureHandler(function (error) {
           console.error('公開エラー:', error);
           showError(
-            'アプリの公開に失敗しました。データソースが正しく設定されているか確認してください。'
+            '回答ボードの公開に失敗しました。データソースが正しく設定されているか確認してください。'
           );
           window.setLoading(false);
           ClientMutex.release('publishApp');
