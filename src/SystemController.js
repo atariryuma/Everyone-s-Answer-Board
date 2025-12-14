@@ -561,8 +561,16 @@ function performAutoRepair() {
 
     try {
       const cache = CacheService.getScriptCache();
-      if (cache && typeof cache.removeAll === 'function') {
-        cache.removeAll();
+      if (cache) {
+        // removeAll() は削除するキーの配列が必要
+        // 既知のキャッシュキーをクリアする
+        const knownCacheKeys = [
+          'config_cache',
+          'user_cache',
+          'db_connection_status',
+          'system_status'
+        ];
+        cache.removeAll(knownCacheKeys);
         repairResults.actions.push('キャッシュクリア実行');
         actionCount++;
       }

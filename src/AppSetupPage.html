@@ -181,71 +181,87 @@
       <!-- システム診断・監視セクション -->
       <div class="glass-panel rounded-xl p-6 mb-6">
         <h2 class="text-xl font-semibold text-white mb-4">🔍 システム診断・監視</h2>
+        <p class="text-sm text-gray-400 mb-4">システムの健全性確認と問題解決のためのツールです</p>
 
         <div class="space-y-4">
-          <!-- 診断機能 -->
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="p-4 bg-gray-800 rounded-lg">
-              <h3 class="text-lg font-medium text-white mb-3">📊 システム診断</h3>
-              <p class="text-sm text-gray-400 mb-4">
-                データベース接続、権限、データ整合性をチェックします
-              </p>
+          <!-- 基本診断（よく使う機能） -->
+          <div class="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+            <div class="flex items-center justify-between mb-3">
+              <div>
+                <h3 class="text-lg font-medium text-blue-400">🩺 基本診断</h3>
+                <p class="text-sm text-gray-400">まずはこちらを実行してください</p>
+              </div>
+              <span class="px-2 py-1 bg-blue-600/30 text-blue-300 rounded text-xs">推奨</span>
+            </div>
+            <p class="text-sm text-gray-300 mb-4">
+              システムの基本的な健全性（DB接続・設定・権限）を確認します。問題が見つかった場合は自動修復をお試しください。
+            </p>
+            <div class="flex gap-3">
               <button
                 type="button"
                 id="run-diagnosis-btn"
                 onclick="runSystemDiagnosis()"
-                class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg w-full"
+                class="btn bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg flex-1"
               >
                 診断実行
               </button>
-            </div>
-
-            <div class="p-4 bg-gray-800 rounded-lg">
-              <h3 class="text-lg font-medium text-white mb-3">🔧 自動修復</h3>
-              <p class="text-sm text-gray-400 mb-4">検出された問題を自動的に修復します</p>
               <button
                 type="button"
                 id="run-repair-btn"
                 onclick="runAutoRepair()"
-                class="btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg w-full"
+                class="btn bg-orange-600 hover:bg-orange-700 text-white font-bold py-2 px-4 rounded-lg flex-1"
               >
-                修復実行
+                自動修復
               </button>
             </div>
           </div>
 
-          <!-- 監視機能とデータ整合性 -->
-          <div class="grid md:grid-cols-2 gap-4">
-            <div class="p-4 bg-gray-800 rounded-lg">
-              <h3 class="text-lg font-medium text-white mb-3">📈 システム監視</h3>
-              <p class="text-sm text-gray-400 mb-4">システム全体の健全性をチェックします</p>
-              <button
-                type="button"
-                id="run-monitoring-btn"
-                onclick="runSystemMonitoring()"
-                class="btn bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-lg w-full"
-              >
-                監視実行
-              </button>
-            </div>
+          <!-- 詳細診断（折りたたみ） -->
+          <details class="bg-gray-800 rounded-lg">
+            <summary class="p-4 cursor-pointer text-gray-300 hover:text-white">
+              🔬 詳細診断ツール（クリックで展開）
+            </summary>
+            <div class="p-4 pt-0 grid md:grid-cols-2 gap-4">
+              <div class="p-4 bg-gray-700/50 rounded-lg">
+                <h4 class="text-md font-medium text-purple-400 mb-2">📈 システム監視</h4>
+                <p class="text-xs text-gray-400 mb-3">リソース使用状況・実行ログ・エラー率を確認</p>
+                <button
+                  type="button"
+                  id="run-monitoring-btn"
+                  onclick="runSystemMonitoring()"
+                  class="btn bg-purple-600 hover:bg-purple-700 text-white py-2 px-4 rounded-lg w-full text-sm"
+                >
+                  監視実行
+                </button>
+              </div>
 
-            <div class="p-4 bg-gray-800 rounded-lg">
-              <h3 class="text-lg font-medium text-white mb-3">✅ データ整合性</h3>
-              <p class="text-sm text-gray-400 mb-4">データベースの整合性をチェックします</p>
-              <button
-                type="button"
-                id="run-integrity-btn"
-                onclick="runIntegrityCheck()"
-                class="btn bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-lg w-full"
-              >
-                整合性チェック
-              </button>
+              <div class="p-4 bg-gray-700/50 rounded-lg">
+                <h4 class="text-md font-medium text-green-400 mb-2">✅ データ整合性</h4>
+                <p class="text-xs text-gray-400 mb-3">ユーザーデータ・設定の整合性を詳細チェック</p>
+                <button
+                  type="button"
+                  id="run-integrity-btn"
+                  onclick="runIntegrityCheck()"
+                  class="btn bg-green-600 hover:bg-green-700 text-white py-2 px-4 rounded-lg w-full text-sm"
+                >
+                  整合性チェック
+                </button>
+              </div>
             </div>
-          </div>
+          </details>
 
           <!-- 結果表示エリア -->
           <div id="diagnostic-results" class="hidden mt-6">
-            <h3 class="text-lg font-medium text-white mb-3">📋 診断結果</h3>
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="text-lg font-medium text-white">📋 診断結果</h3>
+              <button
+                type="button"
+                onclick="copyDiagnosticResult()"
+                class="btn bg-gray-600 hover:bg-gray-700 text-white py-1 px-3 rounded text-sm flex items-center gap-2"
+              >
+                📋 コピー
+              </button>
+            </div>
             <div class="bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
               <pre id="diagnostic-output" class="text-sm text-gray-300 whitespace-pre-wrap"></pre>
             </div>
@@ -690,6 +706,37 @@
           result.success ? `✅ ${functionName}: 実行完了` : `❌ ${functionName}: エラーが発生`,
           result.success ? 'success' : 'error'
         );
+      }
+
+      function copyDiagnosticResult() {
+        const output = document.getElementById('diagnostic-output');
+        const text = output.textContent;
+
+        if (!text || text === '実行中...') {
+          showMessage('コピーする結果がありません', 'warning');
+          return;
+        }
+
+        navigator.clipboard.writeText(text)
+          .then(() => {
+            showMessage('📋 診断結果をクリップボードにコピーしました', 'success');
+          })
+          .catch((err) => {
+            // フォールバック: テキストエリアを使用
+            const textarea = document.createElement('textarea');
+            textarea.value = text;
+            textarea.style.position = 'fixed';
+            textarea.style.opacity = '0';
+            document.body.appendChild(textarea);
+            textarea.select();
+            try {
+              document.execCommand('copy');
+              showMessage('📋 診断結果をクリップボードにコピーしました', 'success');
+            } catch (e) {
+              showMessage('コピーに失敗しました', 'error');
+            }
+            document.body.removeChild(textarea);
+          });
       }
 
       function loadSystemStats() {
