@@ -172,7 +172,7 @@
           if (result && result.success) {
             // GAS iFrameではコールバック内でwindow.openが動作しないため、
             // ユーザーがクリックするリダイレクトモーダルを表示
-            showRedirectModal('再公開完了！', '回答ボードを再公開しました。', result.redirectUrl);
+            showRedirectModal('再公開完了', '公開ページへ移動します。', result.redirectUrl);
           } else {
             showMessage(result.message || '再公開に失敗しました', 'error');
             button.disabled = false;

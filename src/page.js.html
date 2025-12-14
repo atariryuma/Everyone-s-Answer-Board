@@ -3909,7 +3909,7 @@
 
             // GAS iFrameではコールバック内でwindow.openが動作しないため、
             // ユーザーがクリックするリダイレクトモーダルを表示
-            self.showRedirectModal('公開終了完了', '回答ボードの公開を終了しました。', result.redirectUrl);
+            self.showRedirectModal('公開終了', '非公開ページへ移動します。', result.redirectUrl);
           } else {
             console.error('公開終了に失敗:', result);
 
