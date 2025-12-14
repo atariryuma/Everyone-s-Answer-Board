@@ -30,7 +30,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, findUserById, findUserByEmail, getUserConfig, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp */
+/* global getCurrentEmail, findUserById, findUserByEmail, getUserConfig, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp */
 
 
 /**
@@ -117,10 +117,12 @@ function createTemplateForm() {
     const formTitle = 'みんなの回答ボード';
     const form = FormApp.create(formTitle);
 
-    // メールアドレス収集を「確認済み」モードに設定
-    // setLimitOneResponsePerUser(true) でGoogleログイン必須になり、メールが確認済みになる
-    // 参考: https://developers.google.com/apps-script/reference/forms/form
-    form.setCollectEmail(true);
+    // Forms REST API で emailCollectionType を VERIFIED に設定
+    // Apps Script の setCollectEmail(true) では「回答者入力」モードになるため、REST APIを使用
+    // 参考: https://developers.google.com/forms/api/reference/rest/v1/forms/batchUpdate
+    setFormEmailCollectionVerified_(form.getId());
+
+    // 1人1回答制限（ログイン必須）
     form.setLimitOneResponsePerUser(true);
 
     // 1. クラス選択（ドロップダウン - ListItem）
@@ -1322,5 +1324,56 @@ function validateCompleteSpreadsheetUrl(fullUrl) {
 
     console.error('validateCompleteSpreadsheetUrl ERROR:', errorResult);
     return errorResult;
+  }
+}
+
+
+/**
+ * Forms REST API を使用してメール収集設定を「確認済み（VERIFIED）」に設定
+ * Apps Script の setCollectEmail(true) では「回答者入力」モードになるため、REST APIを使用
+ * 参考: https://developers.google.com/forms/api/reference/rest/v1/forms/batchUpdate
+ * @param {string} formId - フォームID
+ * @private
+ */
+function setFormEmailCollectionVerified_(formId) {
+  try {
+    const url = `https://forms.googleapis.com/v1/forms/${formId}:batchUpdate`;
+    const payload = {
+      requests: [{
+        updateSettings: {
+          settings: {
+            emailCollectionType: 'VERIFIED'
+          },
+          updateMask: 'emailCollectionType'
+        }
+      }]
+    };
+
+    const response = UrlFetchApp.fetch(url, {
+      method: 'post',
+      headers: {
+        'Authorization': 'Bearer ' + ScriptApp.getOAuthToken()
+      },
+      contentType: 'application/json',
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    });
+
+    const responseCode = response.getResponseCode();
+    if (responseCode !== 200) {
+      console.warn('Forms API emailCollectionType設定に失敗:', responseCode, response.getContentText());
+      // フォールバック: Apps Script の setCollectEmail を使用
+      const form = FormApp.openById(formId);
+      form.setCollectEmail(true);
+    }
+  } catch (error) {
+    console.warn('Forms REST API呼び出しエラー（フォールバック実行）:', error.message);
+    // フォールバック: Apps Script の setCollectEmail を使用
+    try {
+      const form = FormApp.openById(formId);
+      form.setCollectEmail(true);
+    } catch (fallbackError) {
+      console.error('フォールバックも失敗:', fallbackError.message);
+    }
   }
 }
