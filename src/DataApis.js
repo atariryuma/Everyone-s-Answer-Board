@@ -34,6 +34,29 @@
 
 
 /**
+ * ユーザー専用フォルダを作成
+ * 各ユーザーのマイドライブに「みんなの回答ボード」フォルダを作成
+ * @returns {GoogleAppsScript.Drive.Folder|null} 作成/取得したフォルダ
+ */
+function createUserFolder() {
+  try {
+    const folderName = 'みんなの回答ボード';
+
+    // フォルダを検索または作成
+    const folders = DriveApp.getFoldersByName(folderName);
+    if (folders.hasNext()) {
+      return folders.next();
+    } else {
+      return DriveApp.createFolder(folderName);
+    }
+
+  } catch (e) {
+    console.error('createUserFolder エラー:', e.message);
+    return null;
+  }
+}
+
+/**
  * 自分がオーナーのスプレッドシートを30件取得
  * @returns {Object} スプレッドシート一覧
  */
@@ -94,12 +117,14 @@ function createTemplateForm() {
     const formTitle = 'みんなの回答ボード';
     const form = FormApp.create(formTitle);
 
-    // メールアドレス自動取得を有効化（ユーザー入力不要）
+    // メールアドレス自動取得を有効化（確認済み）
+    // setRequireLogin(true) + setCollectEmail(true) で「確認済み」モードになる
+    form.setRequireLogin(true);
     form.setCollectEmail(true);
 
     // 1. クラス選択（ドロップダウン - ListItem）
-    const classItem = form.addListItem();
-    classItem.setTitle('クラス')
+    form.addListItem()
+      .setTitle('クラス')
       .setRequired(true)
       .setHelpText('所属クラスを選択してください')
       .setChoiceValues(['クラス1', 'クラス2', 'クラス3', 'クラス4']);
@@ -111,8 +136,8 @@ function createTemplateForm() {
       .setHelpText('表示名を入力してください');
 
     // 3. 回答（選択肢 - MultipleChoiceItem）
-    const answerItem = form.addMultipleChoiceItem();
-    answerItem.setTitle('回答')
+    form.addMultipleChoiceItem()
+      .setTitle('回答')
       .setRequired(true)
       .setHelpText('回答を選択してください')
       .setChoiceValues(['賛成', '反対', 'どちらでもない']);
@@ -127,6 +152,26 @@ function createTemplateForm() {
     const ss = SpreadsheetApp.create(formTitle + ' (回答)');
     form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
 
+    // ユーザー専用フォルダを作成してファイルを移動
+    let folder = null;
+    let folderUrl = '';
+    try {
+      folder = createUserFolder();
+      if (folder) {
+        folderUrl = folder.getUrl();
+        // フォームをフォルダに移動
+        const formFile = DriveApp.getFileById(form.getId());
+        folder.addFile(formFile);
+        DriveApp.getRootFolder().removeFile(formFile);
+        // スプレッドシートをフォルダに移動
+        const ssFile = DriveApp.getFileById(ss.getId());
+        folder.addFile(ssFile);
+        DriveApp.getRootFolder().removeFile(ssFile);
+      }
+    } catch (folderError) {
+      console.warn('フォルダ作成/移動エラー（処理は続行）:', folderError.message);
+    }
+
     return {
       success: true,
       formUrl: form.getPublishedUrl(),
@@ -136,6 +181,7 @@ function createTemplateForm() {
       spreadsheetId: ss.getId(),
       spreadsheetUrl: ss.getUrl(),
       sheetName: 'シート1',
+      folderUrl: folderUrl,
       wasCreated: true,
       message: 'テンプレートフォームを作成しました'
     };

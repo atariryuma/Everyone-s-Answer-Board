@@ -60,7 +60,8 @@
       "Bash(head -10 echo \"\" echo \"2. MAX_EXECUTION_TIME (DataService.js)\" grep -n \"MAX_EXECUTION_TIME\" src/DataService.js echo \"\" echo \"3. CIRCUIT_BREAKER_KEY (DatabaseCore.js)\" grep -n \"CIRCUIT_BREAKER_KEY\" src/DatabaseCore.js)",
       "Bash(head -5 echo \"\" echo \"4. ADMIN_EMAIL, DATABASE_SPREADSHEET_ID (SystemController.js)\" grep -n \"ADMIN_EMAIL\\|DATABASE_SPREADSHEET_ID\\|SERVICE_ACCOUNT_CREDS\" src/SystemController.js)",
       "Bash(do echo \"=== $func ===\" grep -n \"$func\" /Users/ryuma/Everyone-s-Answer-Board/src/AdminPanel.js.html)",
-      "Bash(npm run push:*)"
+      "Bash(npm run push:*)",
+      "Bash(git show:*)"
     ],
     "deny": [],
     "ask": []

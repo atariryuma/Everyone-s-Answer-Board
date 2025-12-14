@@ -425,12 +425,11 @@
       formSelect.addEventListener('change', function () {
         const formUrl = this.value;
         if (formUrl) {
-          // フォームURLを検証して情報を取得
+          // フォームURLを検証して自動接続
           validateFormFromDropdown(formUrl);
         } else {
           hideFormInfo();
         }
-        updateDropdownConnectionButton();
       });
     }
 
@@ -443,28 +442,10 @@
       });
     }
 
-    const connectBtn = document.getElementById('connect-source');
-    if (connectBtn) {
-      connectBtn.addEventListener('click', function () {
-        if (window.sharedUtilities && window.sharedUtilities.debounce) {
-          window.sharedUtilities.debounce.debounce(() => connectToDataSource(), 'connect-source', 400);
-        } else {
-          connectToDataSource();
-        }
-      });
-    }
-
     const urlValidateBtn = document.getElementById('url-validate');
     if (urlValidateBtn) {
       urlValidateBtn.addEventListener('click', function () {
         validateCompleteUrl();
-      });
-    }
-
-    const connectUrlBtn = document.getElementById('connect-url-source');
-    if (connectUrlBtn) {
-      connectUrlBtn.addEventListener('click', function () {
-        connectToDataSource();
       });
     }
 
@@ -1093,7 +1074,6 @@
     const formTitle = document.getElementById('form-title');
     const formSpreadsheetStatus = document.getElementById('form-spreadsheet-status');
     const formUrlLink = document.getElementById('form-url');
-    const connectBtn = document.getElementById('connect-source');
 
     if (!formUrl) {
       hideFormInfo();
@@ -1131,15 +1111,12 @@
             formSelect.dataset.formUrl = result.formUrl;
           }
 
-          // 接続ボタン有効化
-          if (connectBtn) {
-            connectBtn.disabled = false;
-            connectBtn.textContent = '✅ 接続';
-          }
-
           if (result.wasCreated) {
             showSuccess('回答先スプレッドシートを作成しました');
           }
+
+          // 自動的に接続処理を実行
+          setTimeout(() => connectToDataSource(), 300);
         } else {
           if (formTitle) formTitle.textContent = 'エラー';
           if (formSpreadsheetStatus) formSpreadsheetStatus.textContent = result.error || '検証に失敗しました';
@@ -1197,17 +1174,13 @@
           if (detectedTitle) detectedTitle.textContent = result.formTitle;
           if (detectedStatus) detectedStatus.textContent = '新規作成しました';
 
-          // 接続ボタン有効化
-          const connectBtn = document.getElementById('connect-url-source');
-          if (connectBtn) {
-            connectBtn.disabled = false;
-            connectBtn.textContent = '✅ 接続';
-          }
-
           // 編集用URLを新しいタブで開く
           if (result.editUrl) {
             window.open(result.editUrl, '_blank');
           }
+
+          // 自動的に接続処理を実行
+          setTimeout(() => connectToDataSource(), 300);
         } else {
           showError(result.error || 'フォーム作成に失敗しました');
         }
@@ -1510,35 +1483,11 @@
   }
 
   /**
-   * ドロップダウン選択方式の接続ボタン状態を更新
-   * フォームが選択されている場合のみ有効化
-   */
-  function updateDropdownConnectionButton() {
-    const connectBtn = document.getElementById('connect-source');
-    const formSelect = document.getElementById('form-select');
-
-    if (!connectBtn || !formSelect) {
-      return;
-    }
-
-    const formSelected = formSelect.value && formSelect.value.trim();
-
-    if (formSelected) {
-      connectBtn.disabled = false;
-      connectBtn.textContent = '接続';
-    } else {
-      connectBtn.disabled = true;
-      connectBtn.textContent = '接続（フォーム選択後に有効化）';
-    }
-  }
-
-  /**
    * フォームURL検証 - processFormUrlInput API使用
    */
   function validateCompleteUrl() {
     const urlInput = document.getElementById('form-url-input');
     const validateBtn = document.getElementById('url-validate');
-    const connectBtn = document.getElementById('connect-url-source');
 
     if (!urlInput) {
       console.error('form-url-input element not found');
@@ -1560,22 +1509,16 @@
     }
 
     validateBtn.disabled = true;
-    validateBtn.textContent = '🔍 検証中...';
-    connectBtn.disabled = true;
-    connectBtn.textContent = '検証完了後に有効化';
+    validateBtn.textContent = '検証中...';
 
     google.script.run
       .withSuccessHandler(function (result) {
         validateBtn.disabled = false;
-        validateBtn.textContent = '🔍 検証';
+        validateBtn.textContent = '🔍 検証して接続';
 
         if (result.success) {
           // フォーム情報を表示
           showFormDetectionInfo(result);
-
-          // 接続ボタン有効化
-          connectBtn.disabled = false;
-          connectBtn.textContent = '✅ 接続';
 
           // データを保持
           urlInput.dataset.spreadsheetId = result.spreadsheetId;
@@ -1586,12 +1529,12 @@
           // メッセージ表示
           if (result.wasCreated) {
             showSuccess('回答先スプレッドシートを作成しました');
-          } else {
-            showSuccess(`検証完了 - 「${result.formTitle}」に接続できます`);
           }
 
           updateUrlValidationMessage('✓ 検証完了', 'success');
 
+          // 自動的に接続処理を実行
+          setTimeout(() => connectToDataSource(), 300);
         } else {
           hideFormDetectionInfo();
           showError(result.error || '検証に失敗しました');
@@ -1600,7 +1543,7 @@
       })
       .withFailureHandler(function (error) {
         validateBtn.disabled = false;
-        validateBtn.textContent = '🔍 検証';
+        validateBtn.textContent = '🔍 検証して接続';
         console.error('❌ processFormUrlInput error:', error);
         showError(error.message || '検証エラーが発生しました');
         updateUrlValidationMessage('⚠ エラーが発生しました', 'error');
