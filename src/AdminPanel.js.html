@@ -1154,13 +1154,18 @@
         if (result.success) {
           showSuccess(result.message || 'テンプレートフォームを作成しました');
 
-          // URL入力欄にフォームURLをセット
+          // URL入力欄にフォームURLと接続情報をセット
           const formUrlInput = document.getElementById('form-url-input');
           if (formUrlInput) {
             formUrlInput.value = result.editUrl;
+            // connectToDataSource()で使用するdatasetも設定
+            formUrlInput.dataset.spreadsheetId = result.spreadsheetId;
+            formUrlInput.dataset.sheetName = result.sheetName;
+            formUrlInput.dataset.formTitle = result.formTitle;
+            formUrlInput.dataset.formUrl = result.formUrl;
           }
 
-          // フォーム選択データを保持
+          // フォーム選択データも保持（後方互換性）
           const formSelect = document.getElementById('form-select');
           if (formSelect) {
             formSelect.dataset.spreadsheetId = result.spreadsheetId;
@@ -1178,15 +1183,16 @@
           if (detectedStatus) detectedStatus.textContent = '新規作成しました';
 
           // 編集用URLを新しいタブで開く（事前に開いたウィンドウにURLを設定）
-          if (result.editUrl && newWindow) {
+          // 接続処理より先に実行して確実にタブを開く
+          if (result.editUrl && newWindow && !newWindow.closed) {
             newWindow.location.href = result.editUrl;
           } else if (result.editUrl) {
             // フォールバック: newWindowが閉じられていた場合
             window.open(result.editUrl, '_blank');
           }
 
-          // 自動的に接続処理を実行
-          setTimeout(() => connectToDataSource(), 300);
+          // 自動的に接続処理を実行（フォームを開いた後に非同期で実行）
+          setTimeout(() => connectToDataSource(), 500);
         } else {
           // エラー時は空のタブを閉じる
           if (newWindow) newWindow.close();
