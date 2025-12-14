@@ -417,13 +417,13 @@
                         <ul class="text-gray-300 space-y-3 text-sm">
                           <li>
                             <strong>👤 回答者名を表示：</strong><br>
-                            チェック時：生徒の名前が回答と一緒に表示<br>
-                            <span class="text-gray-400">（デフォルト：チェックなし＝匿名表示）</span>
+                            ON時：生徒の名前が回答と一緒に表示<br>
+                            <span class="text-gray-400">（デフォルト：OFF＝匿名表示）</span>
                           </li>
                           <li>
                             <strong>📊 リアクション数を表示：</strong><br>
-                            チェック時：各回答に付いたリアクションの数を公開<br>
-                            <span class="text-gray-400">（デフォルト：チェックなし＝非表示）</span>
+                            ON時：各回答に付いたリアクションの数を公開<br>
+                            <span class="text-gray-400">（デフォルト：OFF＝非表示）</span>
                           </li>
                         </ul>
                       </div>
@@ -432,10 +432,10 @@
                         <h5 class="text-cyan-400 font-semibold mb-3">公開手順：</h5>
                         <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
                           <li>表示オプションを確認・調整</li>
-                          <li>プレビューで表示内容を確認</li>
+                          <li>「📊 ボードを開く」でプレビュー確認</li>
                           <li>「今すぐ公開」ボタンをクリック</li>
-                          <li>画面下部に生徒用URLが表示されることを確認</li>
-                          <li>「📋 URLコピー」で生徒用リンクを取得</li>
+                          <li>ステータスが「公開中」に変わることを確認</li>
+                          <li>フッターの「📋 URLコピー」で生徒用リンクを取得</li>
                         </ol>
                       </div>
                     </div>
@@ -454,7 +454,7 @@
             <div class="figure-box">
               <h4 class="text-blue-400 font-semibold mb-3">📊 設定完了後の画面イメージ</h4>
               <p class="text-gray-300 text-sm">
-                セットアップが完了すると、管理画面に「公開中」ステータスが表示され、画面下部に生徒用URLのコピーボタンが現れます。この状態で生徒は回答ボードを閲覧し、リアクションを付けることができるようになります。
+                セットアップが完了すると、管理画面に「公開中」ステータスが表示されます。フッター部分に「📋 URLコピー」「📊 ボードを開く」ボタンが表示され、生徒用URLの取得や実際のボード確認ができます。この状態で生徒は回答ボードを閲覧し、リアクションを付けることができるようになります。
               </p>
             </div>
           </div>
@@ -477,21 +477,23 @@
                   <div class="instruction-box">
                     <h5 class="text-cyan-400 font-semibold mb-3">画面構成の説明：</h5>
                     <ul class="text-gray-300 space-y-2 text-sm">
-                      <li><strong>上部：</strong>質問タイトル（フォームタイトルから自動取得）</li>
-                      <li><strong>左側：</strong>現在の回答数、並び順設定（新着順/ランダム順/スコア順）</li>
-                      <li><strong>右上：</strong>管理モード切替ボタン（歯車アイコン）</li>
-                      <li><strong>中央：</strong>回答カード一覧</li>
-                      <li><strong>下部：</strong>カードサイズ調整スライダー</li>
+                      <li><strong>ヘッダー上段左：</strong>📝 回答フォームリンク（フォーム連携時）</li>
+                      <li><strong>ヘッダー上段右：</strong>⚙️ 管理モードボタン（先生のみ表示）</li>
+                      <li><strong>ヘッダー中段左：</strong>回答数、クラスフィルター、並び順選択</li>
+                      <li><strong>ヘッダー中段中央：</strong>質問タイトル</li>
+                      <li><strong>ヘッダー中段右：</strong>公開終了ボタン（先生のみ表示）</li>
+                      <li><strong>メイン：</strong>回答カード一覧（グリッド表示）</li>
+                      <li><strong>フッター：</strong>カード表示列数スライダー</li>
                     </ul>
                   </div>
 
                   <div class="instruction-box">
                     <h5 class="text-cyan-400 font-semibold mb-3">操作パネルの機能：</h5>
                     <ul class="text-gray-300 space-y-2 text-sm">
-                      <li><strong>🏫 クラスフィルター：</strong>特定のクラスの回答のみ表示（設定時のみ表示）</li>
-                      <li><strong>🔄 並び順：</strong>新着順・ランダム順・スコア順から選択</li>
-                      <li><strong>📝 回答フォーム：</strong>生徒がここから回答入力（フォーム設定時）</li>
-                      <li><strong>⚙️ 管理モード：</strong>先生専用の管理機能（歯車アイコン）</li>
+                      <li><strong>📝 回答フォーム：</strong>生徒がここからGoogleフォームへ（フォーム連携時のみ表示）</li>
+                      <li><strong>🏫 クラスフィルター：</strong>特定のクラスの回答のみ表示（クラス列設定時のみ表示）</li>
+                      <li><strong>🔄 並び順：</strong>新着順・ランダム順から選択</li>
+                      <li><strong>📊 サイズスライダー：</strong>回答カードの表示列数を2〜6列で調整</li>
                     </ul>
                   </div>
                 </div>
@@ -499,7 +501,7 @@
                 <div class="info-box">
                   <h5 class="text-blue-400 font-semibold mb-2">👁️ 先生と生徒の見え方の違い</h5>
                   <p class="text-blue-300 text-sm leading-relaxed">
-                    先生がログインして閲覧している場合、画面右上に管理モード切替ボタン（⚙️歯車アイコン）が表示されますが、生徒には表示されません。また、管理モードに切り替えると、各回答カードに⭐ハイライトボタンや🗑️削除ボタンが表示されます。
+                    先生（ボードのオーナー）がログインして閲覧している場合、画面右上に「公開終了」ボタンや管理画面へのリンクが表示されますが、生徒には表示されません。また、先生には各回答カードに⭐ハイライトボタンや🗑️削除ボタンが表示されます。
                   </p>
                 </div>
               </div>
@@ -693,8 +695,8 @@
                   <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
                     <li>管理画面にアクセス</li>
                     <li>「表示設定」セクションを確認</li>
-                    <li>「回答者名を表示」「リアクション数を表示」のチェックボックスを調整</li>
-                    <li>「公開」または「設定を更新」ボタンをクリック</li>
+                    <li>「回答者名を表示」「リアクション数を表示」のトグルスイッチを調整</li>
+                    <li>「今すぐ公開」ボタンをクリックして設定を反映</li>
                     <li>回答ボードに反映されることを確認</li>
                   </ol>
                 </div>
@@ -726,9 +728,9 @@
                 <div class="instruction-box mb-6">
                   <h5 class="text-cyan-400 font-semibold mb-3">URL共有の手順：</h5>
                   <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                    <li>回答ボード公開後、画面下部フッターを確認</li>
+                    <li>回答ボード公開後、管理画面下部のフッターを確認</li>
                     <li>「📋 URLコピー」ボタンをクリック</li>
-                    <li>クリップボードにURLがコピーされる</li>
+                    <li>クリップボードに生徒用URLがコピーされる</li>
                     <li>メール、チャット、オンライン掲示板などに貼り付け</li>
                     <li>生徒に「このリンクから回答ボードを見てください」と案内</li>
                   </ol>
@@ -757,8 +759,8 @@
                     <h5 class="text-cyan-400 font-semibold mb-3">フォーム連携の流れ：</h5>
                     <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
                       <li>生徒が回答ボードURLにアクセス</li>
-                      <li>ページ左上の「📝 回答フォーム」ボタンを確認</li>
-                      <li>ボタンをクリックしてGoogleフォームを開く</li>
+                      <li>ヘッダー左上の「📝 回答フォーム」リンクを確認</li>
+                      <li>リンクをクリックしてGoogleフォームを開く</li>
                       <li>フォームで回答を入力・送信</li>
                       <li>数秒後に回答ボードに反映</li>
                     </ol>
@@ -768,7 +770,7 @@
                     <h5 class="text-cyan-400 font-semibold mb-3">生徒への説明例：</h5>
                     <div class="text-gray-300 text-sm">
                       <p class="mb-2"><strong>「みなさん、こちらのリンクにアクセスしてください」</strong></p>
-                      <p class="mb-2">「ページが開いたら、左上の『回答フォーム』ボタンを押してください」</p>
+                      <p class="mb-2">「ページが開いたら、左上の『📝 回答フォーム』を押してください」</p>
                       <p class="mb-2">「フォームに回答を入力して送信すると、みんなの画面に表示されます」</p>
                       <p>「送信後は、他の人の回答も見てリアクションしてみましょう」</p>
                     </div>
@@ -900,8 +902,8 @@
                     <li><strong>管理画面アクセス：</strong>ログイン後、自分のボードの管理画面にアクセス</li>
                     <li><strong>接続変更：</strong>別のスプレッドシートに変更したい場合、新しいURLで再接続</li>
                     <li><strong>列設定変更：</strong>列マッピングを変更したい場合、列設定画面で再設定</li>
-                    <li><strong>表示設定変更：</strong>名前表示やリアクション数の表示は表示設定で変更可能</li>
-                    <li><strong>設定保存：</strong>変更後は必ず「公開」ボタンをクリック</li>
+                    <li><strong>表示設定変更：</strong>名前表示やリアクション数の表示はトグルスイッチで変更可能</li>
+                    <li><strong>設定保存：</strong>変更後は「下書き保存」または「今すぐ公開」ボタンをクリック</li>
                   </ol>
                 </div>
               </details>
@@ -967,14 +969,24 @@
               <!-- セッション管理 -->
               <div>
                 <h4 class="text-xl text-cyan-400 font-semibold mb-4">🔄 セッション管理のベストプラクティス</h4>
-                <div class="instruction-box mb-6">
-                  <h5 class="text-cyan-400 font-semibold mb-3">授業終了時の手順：</h5>
-                  <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                    <li>管理画面にアクセスし、「公開停止」ボタンをクリック</li>
-                    <li>ボードが「未公開状態」になることを確認</li>
-                    <li>生徒には「現在は準備中です」と表示される</li>
-                    <li>次回使用時は同じURLで再度「公開」すれば閲覧可能に</li>
-                  </ol>
+                <div class="grid md:grid-cols-2 gap-6 mb-6">
+                  <div class="instruction-box">
+                    <h5 class="text-cyan-400 font-semibold mb-3">授業終了時（公開終了）：</h5>
+                    <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
+                      <li>回答ボード画面の右上にある「公開終了」ボタンをクリック</li>
+                      <li>確認ダイアログで「公開終了」を選択</li>
+                      <li>ボードが未公開状態になり、生徒は閲覧できなくなります</li>
+                      <li>次回使用時は管理画面から再度「今すぐ公開」で公開可能</li>
+                    </ol>
+                  </div>
+                  <div class="instruction-box">
+                    <h5 class="text-cyan-400 font-semibold mb-3">次の授業への準備：</h5>
+                    <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
+                      <li>同じスプレッドシートを使い続ける場合は、そのまま継続利用可能</li>
+                      <li>新しい質問用に別のスプレッドシートを使う場合は、管理画面でデータソースを変更</li>
+                      <li>生徒用URLは固定なので、毎回同じリンクを案内できます</li>
+                    </ol>
+                  </div>
                 </div>
 
                 <div class="tip-box">
