@@ -326,15 +326,14 @@
           <div class="bg-gray-800 p-4 rounded-lg">
             <h4 class="font-medium text-cyan-400 mb-2">🏢 ドメイン制限</h4>
             <p>
-              このシステムは<strong>naha-okinawa.ed.jp</strong>ドメインのユーザーのみアクセス可能です。組織外からのアクセスは制限されています。
+              このシステムは<strong>管理者と同一ドメイン</strong>のユーザーのみアクセス可能です。組織外からのアクセスは制限されています。
             </p>
           </div>
 
           <div class="bg-gray-800 p-4 rounded-lg">
             <h4 class="font-medium text-cyan-400 mb-2">🔐 認証システム</h4>
             <p>
-              Google
-              Workspace内部OAuth認証を使用しており、外部認証は受け付けません。組織のセキュリティポリシーに準拠しています。
+              Google Workspace認証（Session.getActiveUser()）を使用しており、組織のセキュリティポリシーに準拠しています。
             </p>
           </div>
 
@@ -344,7 +343,7 @@
               <li>Content Security Policy (CSP) による外部リソース制限</li>
               <li>X-Content-Type-Options: nosniff による MIME タイプ保護</li>
               <li>Referrer-Policy による情報漏洩防止</li>
-              <li>ユーザーデータの暗号化と安全な保存</li>
+              <li>HTTPS暗号化通信によるデータ転送保護</li>
             </ul>
           </div>
 
@@ -358,7 +357,7 @@
           <div class="bg-gray-800 p-4 rounded-lg">
             <h4 class="font-medium text-cyan-400 mb-2">📝 監査ログ</h4>
             <p>
-              システムの全操作は監査ログに記録され、セキュリティインシデントの追跡と分析が可能です。
+              重要度の高いセキュリティイベントは監査ログに記録され、追跡と分析が可能です。
             </p>
           </div>
 
