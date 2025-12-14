@@ -2,7 +2,7 @@
 
 **Project**: Google Apps Script Web Application for organization-internal use
 **Stack**: Zero-dependency, direct GAS API calls, V8 runtime
-**Updated**: 2025-12-13
+**Updated**: 2025-12-14
 
 ---
 
@@ -29,19 +29,18 @@
   - Impact: 70x performance (1s vs 70s)
   - See: `src/DatabaseCore.js:125-128` for reference implementation
 - **Cache PropertiesService** - 30s TTL, 80-90% API call reduction
-  - See: `src/helpers.js:50-67` for getCachedProperty implementation
+  - See: `src/helpers.js:30-57` for getCachedProperty implementation
 - **Minimize external service calls** - JavaScript operations within script are faster
 
 ### Security
 
 - **Use Session.getActiveUser() only** - never `getEffectiveUser()` (privilege escalation risk)
-  - See: `src/main.js:26`
+  - See: `src/main.js:25`
 - **Validate all inputs** - email, IDs, URLs before processing
   - See: `src/validators.js` for validation functions
 - **Sanitize HTML** - use `textContent` not `innerHTML` for user content
   - Use `escapeHtml()` helper if innerHTML required
-  - See: `src/SharedUtilities.html:731-747`
-- **XSS prevention critical** - 100+ innerHTML usage in codebase needs review
+  - See: `src/SharedUtilities.html` for escapeHtml implementation
 
 ### V8 Runtime
 
@@ -56,31 +55,20 @@
 ### File Organization
 
 - **Target 500-1500 lines per file** - for readability/maintainability
-- **Current status**: `main.js` = 2,841 lines → split recommended for readability
-- **Suggested split** (optional, not required):
-  - `main.js` (500 lines) - doGet/doPost + core APIs
-  - `AdminApis.js` (800 lines) - Admin panel APIs
-  - `UserApis.js` (600 lines) - User management APIs
-  - `DataApis.js` (700 lines) - Data operation APIs
-
-**Note**: This is a readability guideline, not a GAS constraint. Functions work from any file due to global scope.
+- **Current status**: Files are well-organized with clear separation of concerns
+- **Largest file**: `SystemController.js` (1,980 lines) - contains system management and performance monitoring
 
 ### Architecture Patterns
 
-- **main.js as API Gateway** (recommended pattern for this project)
-  - Frontend-callable functions centralized for clarity
-  - Internal helpers in separate files (helpers.js, SecurityService.js, etc.)
-  - Benefit: Clear API surface, easier onboarding
+- **main.js as API Gateway** - Entry points (doGet/doPost) and core authentication
+- **Service-based architecture**:
+  - `*Service.js` - Business logic (UserService, ConfigService, DataService, etc.)
+  - `*Apis.js` - API endpoints grouped by domain (AdminApis, UserApis, DataApis)
+  - `helpers.js` - Shared utilities and response helpers
+  - `validators.js` - Input validation functions
 - **Error handling** - try-catch with exponential backoff for external calls
-  - See: `src/DatabaseCore.js:25-86` for circuit breaker pattern
+  - See: `src/main.js:782-837` for executeWithRetry pattern
 - **Naming** - natural English > forced prefixes (`getCurrentEmail` not `authGetCurrentEmail`)
-
-### Environment Detection
-
-**Current issue**: `localhost` detection doesn't work in GAS (always script.google.com domain)
-
-- Fix: Use PropertiesService flag (`ENVIRONMENT=development|production`)
-- Or: Use deployment URL pattern (`.includes('/dev')` vs `.includes('/exec')`)
 
 ---
 
@@ -88,16 +76,48 @@
 
 ```text
 src/
-├── main.js (2841 lines - split recommended)
-├── helpers.js - Utility functions
-├── validators.js - Input validation
-├── DatabaseCore.js - DB operations
-├── SecurityService.js - Security/auth
-├── UserService.js - User management
-├── ConfigService.js - Configuration
-├── DataService.js - Data operations
-├── SystemController.js - System management
-└── *.html - Frontend templates
+├── main.js (939 lines)           # Entry points, auth, batched data retrieval
+├── SystemController.js (1980)    # System management, diagnostics, performance
+├── DatabaseCore.js (1324)        # Database operations, circuit breaker
+├── DataApis.js (1210)            # Data operation APIs
+├── ConfigService.js (839)        # User configuration management
+├── DataService.js (676)          # Data retrieval and processing
+├── ReactionService.js (553)      # Reactions and highlights
+├── ColumnMappingService.js (490) # Column mapping for form data
+├── validators.js (415)           # Input validation
+├── AdminApis.js (405)            # Admin panel APIs
+├── UserService.js (402)          # User management
+├── SecurityService.js (355)      # Security and auth helpers
+├── UserApis.js (235)             # User-related APIs
+├── helpers.js (189)              # Utility functions, response helpers
+├── formatters.js (55)            # Data formatting utilities
+├── SharingHelper.js (42)         # Sharing and permission helpers
+└── *.html (19 files)             # Frontend templates and components
+```
+
+### HTML Templates
+
+```text
+src/
+├── Page.html                 # Main board view
+├── AdminPanel.html           # Admin dashboard
+├── AdminPanel.js.html         # Admin panel JavaScript
+├── LoginPage.html            # Login page
+├── SetupPage.html            # Initial setup wizard
+├── AppSetupPage.html         # App configuration
+├── AccessRestricted.html     # Access denied page
+├── ErrorBoundary.html        # Error display
+├── Unpublished.html          # Unpublished board notice
+├── TeacherManual.html        # User manual
+├── SharedUtilities.html      # Shared JS utilities
+├── SharedModals.html         # Modal components
+├── SharedErrorHandling.html  # Error handling
+├── SharedSecurityHeaders.html # Security headers
+├── SharedTailwindConfig.html # Tailwind CSS config
+├── UnifiedStyles.css.html    # Unified styles
+├── page.css.html             # Page-specific styles
+├── page.js.html              # Page JavaScript
+└── login.js.html             # Login JavaScript
 ```
 
 ---
@@ -106,12 +126,13 @@ src/
 
 ```bash
 npm run pull    # Pull from GAS
-npm run push    # Push to GAS (use before git commit)
+npm run push    # Push to GAS
 npm run open    # Open GAS editor
 npm run logs    # View execution logs
+npm run deploy  # Deploy new version
 ```
 
-**Workflow**: Explore → Plan (TodoWrite) → Code → `clasp push` → Test → Git commit (source only)
+**Workflow**: Explore → Plan → Code → `npm run push` → Test in browser → Git commit
 
 ---
 
@@ -123,49 +144,29 @@ npm run logs    # View execution logs
 - **Commit**: `src/**/*.js`, `src/**/*.html`, `src/appsscript.json`, `.clasp.json.template`
 - **File extension**: Use `.js` (clasp standard), GAS editor shows as `.gs`
 
-### .claspignore
+### Required Script Properties
 
-```gitignore
-**/**
-!appsscript.json
-!**/*.js
-!**/*.html
-node_modules/**
-.git/**
-```
+System requires these properties (set via GAS editor or SetupPage):
 
----
-
-## 📝 Known Issues & Lessons Learned
-
-### XSS Vulnerability (2025-12-13)
-
-- **Issue**: 100+ `innerHTML` usages without sanitization
-- **Risk**: User-generated content injection (even internal users)
-- **Fix priority**: High - review all innerHTML usages, use textContent or escapeHtml()
-
-### Environment Detection Not Working (2025-12-13)
-
-- **Issue**: `window.location.hostname === 'localhost'` never true (GAS always script.google.com)
-- **Impact**: Debug logs in production, performance metrics always on
-- **Fix**: Use PropertiesService flag or deployment URL pattern
-
-### main.js Size (2025-12-13)
-
-- **Issue**: 2,841 lines in single file
-- **Impact**: Reduced readability, harder code review
-- **Status**: Functional but recommended to split for maintainability
-- **Note**: Not a violation - GAS global scope allows any organization
+| Property | Description |
+|----------|-------------|
+| `ADMIN_EMAIL` | Administrator email address |
+| `DATABASE_SPREADSHEET_ID` | Main database spreadsheet ID |
+| `SERVICE_ACCOUNT_CREDS` | Service account JSON credentials |
+| `GOOGLE_CLIENT_ID` | (Optional) OAuth client ID |
 
 ---
 
 ## 🔗 Web App Entry Points
 
 ```text
-/exec → AccessRestricted (default)
-     → ?mode=login → LoginPage → Admin Panel
-     → ?mode=view&userId=X → Public Board View
-     → ?mode=admin&userId=X → Admin Panel
+/exec                          → AccessRestricted (default landing)
+/exec?mode=login               → LoginPage (user authentication)
+/exec?mode=setup               → SetupPage (initial system setup)
+/exec?mode=appSetup            → AppSetupPage (admin only)
+/exec?mode=manual              → TeacherManual (user guide)
+/exec?mode=view&userId=X       → Page.html (public board view)
+/exec?mode=admin&userId=X      → AdminPanel (board management)
 ```
 
 ---
@@ -179,17 +180,6 @@ node_modules/**
 - [clasp CLI](https://github.com/google/clasp)
 - [Web Apps Guide](https://developers.google.com/apps-script/guides/web)
 
-**Community Resources**:
-
-- [Mastering Code Organization in GAS](https://geekjob.medium.com/mastering-code-organization-in-google-apps-script-c3fdeedc3115)
-- [Building Reliable GAS Architecture](https://medium.com/google-developer-experts/tips-on-building-a-reliable-secure-scalable-architecture-using-google-apps-script-615afd4d4066)
-
-**CLAUDE.md Best Practices**:
-
-- [Anthropic: Claude Code Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)
-- [Writing a Good CLAUDE.md](https://www.humanlayer.dev/blog/writing-a-good-claude-md)
-- [Using CLAUDE.md Files](https://claude.com/blog/using-claude-md-files)
-
 ---
 
-*This file is optimized for AI consumption following 2025 best practices: concise, universal instructions, file references over code snippets, living documentation.*
+*This file is optimized for AI consumption following 2025 best practices.*

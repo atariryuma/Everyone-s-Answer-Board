@@ -382,7 +382,7 @@
                           <li>各項目のプルダウンメニューを開く</li>
                           <li>適切な列名を選択</li>
                           <li>該当しない項目は「未選択」のまま</li>
-                          <li>「🤖 AI列判定」で自動推測も可能</li>
+                          <li>「自動列判定」で自動推測も可能</li>
                           <li>「設定を確認」で最終チェック</li>
                         </ol>
                       </div>
@@ -393,7 +393,7 @@
                       <ul class="text-yellow-300 text-sm space-y-1">
                         <li>• <strong>回答列は必須</strong>です。必ず生徒の主要な回答が入っている列を選択してください</li>
                         <li>• 理由列、クラス列、名前列は任意です。該当する情報がない場合は無理に選ぶ必要はありません</li>
-                        <li>• AI列判定機能を使うと、列名から自動的に適切な列を推測してくれます</li>
+                        <li>• 自動列判定機能を使うと、列名から自動的に適切な列を推測してくれます</li>
                         <li>• 間違って設定した場合は、後から管理画面で変更できます</li>
                       </ul>
                     </div>
@@ -582,21 +582,21 @@
             <div class="warning-box mb-6">
               <h4 class="text-yellow-400 font-bold mb-2">🔒 管理者権限について</h4>
               <p class="text-yellow-300">
-                以下の機能は先生（管理者）のみが使用できます。生徒には表示されません。管理機能を使用するには、回答ボード画面右上の⚙️歯車アイコンをクリックして管理モードに切り替えてください。
+                以下の機能は先生（ボードのオーナーまたは管理者）のみが使用できます。生徒には表示されません。管理機能を使用するには、ログイン後に管理画面にアクセスしてください。
               </p>
             </div>
 
             <div class="space-y-8">
-              <!-- 管理モード切替 -->
+              <!-- 管理画面へのアクセス -->
               <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">🔧 管理モードの切替</h4>
+                <h4 class="text-xl text-cyan-400 font-semibold mb-4">🔧 管理画面へのアクセス</h4>
                 <div class="instruction-box">
-                  <h5 class="text-cyan-400 font-semibold mb-3">切替手順：</h5>
+                  <h5 class="text-cyan-400 font-semibold mb-3">アクセス方法：</h5>
                   <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                    <li>回答ボード画面の右上にある⚙️歯車アイコンを確認</li>
-                    <li>歯車アイコンをクリックして管理モードに切替</li>
-                    <li>各回答カードに管理ボタン（⭐削除ボタンなど）が表示されることを確認</li>
-                    <li>管理作業完了後、再度歯車アイコンをクリックして通常モードに戻る</li>
+                    <li>ログイン後、自分のボードの「管理画面」リンクをクリック</li>
+                    <li>または、回答ボード画面のヘッダーにある⚙️歯車アイコンをクリック</li>
+                    <li>管理画面では、データソース設定、列マッピング、表示設定などを変更可能</li>
+                    <li>回答ボード表示中は、管理者として各回答カードに⭐ハイライトや🗑️削除ボタンが表示されます</li>
                   </ol>
                 </div>
               </div>
@@ -612,10 +612,10 @@
                   <div class="instruction-box">
                     <h5 class="text-cyan-400 font-semibold mb-3">ハイライトの付け方：</h5>
                     <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                      <li>管理モードに切り替え</li>
+                      <li>回答ボードに管理者としてアクセス</li>
                       <li>注目させたい回答カードを見つける</li>
                       <li>カード上の⭐星形ボタンをクリック</li>
-                      <li>カードの背景色が変わることを確認</li>
+                      <li>カードの背景色が金色に変わることを確認</li>
                       <li>取り消す場合は再度⭐ボタンをクリック</li>
                     </ol>
                   </div>
@@ -660,7 +660,7 @@
                   <div class="instruction-box">
                     <h5 class="text-cyan-400 font-semibold mb-3">削除手順：</h5>
                     <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                      <li>管理モードに切り替え</li>
+                      <li>回答ボードに管理者としてアクセス</li>
                       <li>削除したい回答カードを確認</li>
                       <li>カード上の🗑️ゴミ箱アイコンをクリック</li>
                       <li>確認ダイアログで「削除する」をクリック</li>
@@ -691,10 +691,10 @@
                 <div class="instruction-box">
                   <h5 class="text-cyan-400 font-semibold mb-3">設定変更手順：</h5>
                   <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                    <li>管理画面（セットアップ画面）にアクセス</li>
+                    <li>管理画面にアクセス</li>
                     <li>「表示設定」セクションを確認</li>
                     <li>「回答者名を表示」「リアクション数を表示」のチェックボックスを調整</li>
-                    <li>「設定を更新」ボタンをクリック</li>
+                    <li>「公開」または「設定を更新」ボタンをクリック</li>
                     <li>回答ボードに反映されることを確認</li>
                   </ol>
                 </div>
@@ -897,11 +897,11 @@
                 <div class="mt-4 text-gray-300">
                   <h5 class="font-semibold mb-2">設定変更の手順：</h5>
                   <ol class="list-decimal list-inside space-y-2 text-sm">
-                    <li><strong>管理画面アクセス：</strong>回答ボードの管理画面（セットアップ画面）にアクセス</li>
+                    <li><strong>管理画面アクセス：</strong>ログイン後、自分のボードの管理画面にアクセス</li>
                     <li><strong>接続変更：</strong>別のスプレッドシートに変更したい場合、新しいURLで再接続</li>
                     <li><strong>列設定変更：</strong>列マッピングを変更したい場合、列設定画面で再設定</li>
                     <li><strong>表示設定変更：</strong>名前表示やリアクション数の表示は表示設定で変更可能</li>
-                    <li><strong>設定保存：</strong>変更後は必ず「設定を更新」または「今すぐ公開」をクリック</li>
+                    <li><strong>設定保存：</strong>変更後は必ず「公開」ボタンをクリック</li>
                   </ol>
                 </div>
               </details>
@@ -970,10 +970,10 @@
                 <div class="instruction-box mb-6">
                   <h5 class="text-cyan-400 font-semibold mb-3">授業終了時の手順：</h5>
                   <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                    <li>回答ボード上部の「公開終了」ボタンをクリック</li>
+                    <li>管理画面にアクセスし、「公開停止」ボタンをクリック</li>
                     <li>ボードが「未公開状態」になることを確認</li>
                     <li>生徒には「現在は準備中です」と表示される</li>
-                    <li>次回使用時は同じURLで新しい内容を公開可能</li>
+                    <li>次回使用時は同じURLで再度「公開」すれば閲覧可能に</li>
                   </ol>
                 </div>
 
