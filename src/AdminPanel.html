@@ -273,7 +273,7 @@
       </div>
       <!-- データソース選択カード -->
       <section class="card glass-panel rounded-xl p-6">
-        <h2 class="text-xl font-semibold text-white mb-4">📊 データソース選択</h2>
+        <h2 class="text-xl font-semibold text-white mb-4">📝 Googleフォーム選択</h2>
 
         <!-- データソース選択方式 -->
         <div class="mb-6">
@@ -292,41 +292,25 @@
         <!-- URL直接入力方式 -->
         <div id="url-method" class="space-y-4">
           <div class="form-group">
-            <label for="spreadsheet-url"
-              class="block text-sm font-medium text-gray-300 mb-2">スプレッドシートURL（シート指定含む）:</label>
-            <input type="url" id="spreadsheet-url" class="modern-input"
-              placeholder="https://docs.google.com/spreadsheets/d/.../edit#gid=123456"
-              oninput="autoAnalyzeUrl(this.value)" />
+            <label for="form-url-input"
+              class="block text-sm font-medium text-gray-300 mb-2">GoogleフォームURL:</label>
+            <input type="url" id="form-url-input" class="modern-input"
+              placeholder="https://docs.google.com/forms/d/.../viewform"
+              oninput="autoAnalyzeFormUrl(this.value)" />
             <div class="text-xs text-gray-400 mt-1" id="url-validation-message">
-              💡 GoogleスプレッドシートのURL（シート指定含む）を貼り付けてください
+              💡 GoogleフォームのURLを貼り付けてください
             </div>
 
-            <!-- 自動検出情報表示（コンパクト版） -->
-            <div id="auto-detection-info" class="hidden mt-2 text-xs text-blue-300">
-              📊 検出シート: <span id="detected-sheet-name">-</span> | 🆔 GID: <span id="detected-gid">-</span>
-            </div>
-          </div>
-          <!-- フォーム情報表示（URL直接入力用） -->
-          <div id="url-form-info" class="form-info hidden">
-            <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mt-4">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="text-blue-400">📋</span>
-                <span class="text-sm font-medium text-blue-300">連携フォーム情報</span>
-              </div>
-              <div class="text-sm text-gray-300">
-                <div class="mb-1">
-                  <span class="font-medium">タイトル:</span>
-                  <span id="url-form-title">-</span>
-                </div>
-                <div>
-                  <span class="font-medium">URL:</span>
-                  <a id="url-form-url" href="#" target="_blank" class="text-blue-400 hover:underline break-all">-</a>
-                </div>
+            <!-- フォーム検出情報表示 -->
+            <div id="form-detection-info" class="hidden mt-3 p-3 bg-green-900/30 border border-green-500/30 rounded-lg">
+              <div class="text-sm text-green-300">
+                <div class="mb-1">📝 フォーム: <span id="detected-form-title" class="font-medium">-</span></div>
+                <div>📊 回答先: <span id="detected-spreadsheet-status" class="font-medium">-</span></div>
               </div>
             </div>
           </div>
           <div class="action-buttons">
-            <button id="url-validate" class="btn btn-secondary" type="button">🔍 URL検証</button>
+            <button id="url-validate" class="btn btn-secondary" type="button">🔍 検証</button>
             <button id="connect-url-source" class="btn btn-primary" type="button" disabled>
               接続（検証完了後に有効化）
             </button>
@@ -336,39 +320,26 @@
         <!-- 一覧選択方式 -->
         <div id="dropdown-method" class="space-y-4 hidden">
           <div class="form-group">
-            <label for="spreadsheet-select" class="block text-sm font-medium text-gray-300 mb-2">スプレッドシート:</label>
-            <select id="spreadsheet-select" class="modern-select">
+            <label for="form-select" class="block text-sm font-medium text-gray-300 mb-2">Googleフォーム:</label>
+            <select id="form-select" class="modern-select">
               <option value="">-- クリックして読み込み --</option>
             </select>
           </div>
-          <div class="form-group">
-            <label for="sheet-select" class="block text-sm font-medium text-gray-300 mb-2">シート:</label>
-            <select id="sheet-select" class="modern-select">
-              <option value="">スプレッドシートを選択してください</option>
-            </select>
-          </div>
-          <!-- フォーム情報表示 -->
+          <!-- フォーム選択後の情報表示 -->
           <div id="form-info" class="form-info hidden">
-            <div class="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4 mt-4">
-              <div class="flex items-center gap-2 mb-2">
-                <span class="text-blue-400">📋</span>
-                <span class="text-sm font-medium text-blue-300">連携フォーム情報</span>
-              </div>
-              <div class="text-sm text-gray-300">
-                <div class="mb-1">
-                  <span class="font-medium">タイトル:</span>
-                  <span id="form-title">-</span>
-                </div>
+            <div class="bg-green-900/30 border border-green-500/30 rounded-lg p-4 mt-2">
+              <div class="text-sm text-green-300">
+                <div class="mb-1">📝 フォーム: <span id="form-title" class="font-medium">-</span></div>
+                <div class="mb-1">📊 回答先: <span id="form-spreadsheet-status" class="font-medium">-</span></div>
                 <div>
-                  <span class="font-medium">URL:</span>
-                  <a id="form-url" href="#" target="_blank" class="text-blue-400 hover:underline break-all">-</a>
+                  <a id="form-url" href="#" target="_blank" class="text-blue-400 hover:underline text-xs">フォームを開く</a>
                 </div>
               </div>
             </div>
           </div>
           <div class="action-buttons">
             <button id="refresh-data" class="btn btn-secondary" type="button">🔄 更新</button>
-            <button id="connect-source" class="btn btn-primary" type="button" disabled>接続（データソース選択後に有効化）</button>
+            <button id="connect-source" class="btn btn-primary" type="button" disabled>接続（フォーム選択後に有効化）</button>
           </div>
         </div>
       </section>
@@ -444,6 +415,23 @@
         <!-- 設定完了状況表示 -->
         <div class="text-sm text-gray-400 mb-4">
           <span id="completion-status">⚪ 設定状況: 0/4列完了</span>
+        </div>
+
+        <!-- AI検出情報表示 -->
+        <div id="ai-detection-info" class="hidden mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-blue-400">🤖</span>
+            <span class="text-sm font-medium text-blue-300">AI列判定結果</span>
+            <button id="reset-to-ai" class="text-xs text-blue-400 hover:text-blue-300 ml-auto hidden" type="button">
+              ↩ AI判定に戻す
+            </button>
+          </div>
+          <div id="ai-detection-details" class="text-xs text-gray-300 space-y-1"></div>
+        </div>
+
+        <!-- 手動変更通知 -->
+        <div id="manual-override-info" class="hidden mb-4 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
+          <span class="text-xs text-yellow-300">✋ 手動で変更されました。AI判定に戻すには「AI判定に戻す」をクリック</span>
         </div>
 
         <div class="action-buttons">
@@ -535,14 +523,14 @@
         <div class="resource-buttons space-y-2">
           <button id="open-spreadsheet-btn"
             class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            onclick="openSpreadsheet()" disabled type="button">
+            disabled type="button">
             <span>📊</span>
             <span>スプレッドシートを開く</span>
           </button>
 
           <button id="open-form-btn"
             class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            onclick="openForm()" disabled type="button">
+            disabled type="button">
             <span>📝</span>
             <span>フォームを開く</span>
           </button>

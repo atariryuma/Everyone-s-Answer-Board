@@ -30,7 +30,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, findUserById, findUserByEmail, getUserConfig, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL */
+/* global getCurrentEmail, findUserById, findUserByEmail, getUserConfig, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp */
 
 
 /**
@@ -51,6 +51,115 @@ function getSheets() {
   }
 
   return { success: true, sheets };
+}
+
+/**
+ * 自分がオーナーのGoogleフォームを30件取得
+ * @returns {Object} フォーム一覧
+ */
+function getForms() {
+  try {
+    const files = DriveApp.getFilesByType('application/vnd.google-apps.form');
+    const forms = [];
+
+    while (files.hasNext() && forms.length < 30) {
+      const file = files.next();
+      forms.push({
+        id: file.getId(),
+        name: file.getName(),
+        url: file.getUrl()
+      });
+    }
+
+    return { success: true, forms };
+  } catch (error) {
+    console.error('getForms error:', error.message);
+    return { success: false, error: error.message, forms: [] };
+  }
+}
+
+/**
+ * フォームURLから回答ボード接続情報を取得
+ * スプレッドシートがなければ新規作成してリンク
+ * @param {string} formUrl - GoogleフォームURL
+ * @returns {Object} 接続情報
+ */
+function processFormUrlInput(formUrl) {
+  try {
+    // 1. URL検証
+    if (!formUrl || typeof formUrl !== 'string') {
+      return { success: false, error: 'GoogleフォームのURLを入力してください' };
+    }
+
+    // フォームURL形式チェック
+    const isFormUrl = formUrl.includes('/forms/d/') || formUrl.includes('forms.gle/');
+    if (!isFormUrl) {
+      return { success: false, error: 'GoogleフォームのURLを入力してください' };
+    }
+
+    // 2. フォームを開く
+    let form;
+    try {
+      form = FormApp.openByUrl(formUrl);
+    } catch (e) {
+      return { success: false, error: 'フォームの編集権限が必要です' };
+    }
+
+    const formTitle = form.getTitle();
+    const formId = form.getId();
+    const publishedUrl = form.getPublishedUrl();
+
+    // 3. 回答先スプレッドシートを検出
+    let spreadsheetId = form.getDestinationId();
+    let wasCreated = false;
+    let spreadsheetUrl = '';
+
+    // 4. スプレッドシートがなければ新規作成
+    if (!spreadsheetId) {
+      try {
+        const ss = SpreadsheetApp.create(formTitle + ' (回答)');
+        form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+        spreadsheetId = ss.getId();
+        spreadsheetUrl = ss.getUrl();
+        wasCreated = true;
+      } catch (e) {
+        return { success: false, error: '作成できませんでした。再試行してください' };
+      }
+    } else {
+      try {
+        const ss = SpreadsheetApp.openById(spreadsheetId);
+        spreadsheetUrl = ss.getUrl();
+      } catch (e) {
+        return { success: false, error: '回答先スプレッドシートにアクセスできません' };
+      }
+    }
+
+    // 5. 回答シート名を特定
+    const ss = SpreadsheetApp.openById(spreadsheetId);
+    const sheets = ss.getSheets();
+    const responseSheet = sheets.find(s =>
+      s.getName().includes('フォームの回答') ||
+      s.getName().toLowerCase().includes('form response')
+    ) || sheets[0];
+
+    const sheetName = responseSheet.getName();
+
+    return {
+      success: true,
+      formId,
+      formTitle,
+      formUrl: publishedUrl,
+      spreadsheetId,
+      spreadsheetUrl,
+      sheetName,
+      wasCreated,
+      message: wasCreated ? '回答先スプレッドシートを作成しました' : null
+    };
+
+  } catch (error) {
+    console.error('processFormUrlInput error:', error.message);
+    return { success: false, error: '予期しないエラーが発生しました' };
+  }
 }
 
 /**

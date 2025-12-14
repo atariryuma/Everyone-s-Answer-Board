@@ -401,9 +401,10 @@
       urlMethod?.classList.add('hidden');
       dropdownMethod?.classList.remove('hidden');
 
-      const spreadsheetSelect = document.getElementById('spreadsheet-select');
-      if (spreadsheetSelect && spreadsheetSelect.children.length <= 1) {
-        loadSpreadsheetList();
+      // フォーム一覧を読み込む
+      const formSelect = document.getElementById('form-select');
+      if (formSelect && formSelect.children.length <= 1) {
+        loadForms();
       }
     }
   }
@@ -418,29 +419,14 @@
       });
     });
 
-    const spreadsheetSelect = document.getElementById('spreadsheet-select');
-    if (spreadsheetSelect) {
-      spreadsheetSelect.addEventListener('change', function () {
-        const spreadsheetId = this.value;
-        if (spreadsheetId) {
-          loadSheetList(spreadsheetId);
-        } else {
-          resetSheetSelect();
-        }
-        updateDropdownConnectionButton();
-      });
-    } else {
-      console.warn('⚠️ spreadsheet-select要素が見つかりません');
-    }
-
-    const sheetSelect = document.getElementById('sheet-select');
-    if (sheetSelect) {
-      sheetSelect.addEventListener('change', function () {
-        const spreadsheetId = document.getElementById('spreadsheet-select').value;
-        const sheetName = this.value;
-
-        if (spreadsheetId && sheetName) {
-          checkSheetFormConnection(spreadsheetId, sheetName);
+    // フォーム選択時の処理
+    const formSelect = document.getElementById('form-select');
+    if (formSelect) {
+      formSelect.addEventListener('change', function () {
+        const formUrl = this.value;
+        if (formUrl) {
+          // フォームURLを検証して情報を取得
+          validateFormFromDropdown(formUrl);
         } else {
           hideFormInfo();
         }
@@ -451,15 +437,9 @@
     const refreshDataBtn = document.getElementById('refresh-data');
     if (refreshDataBtn) {
       refreshDataBtn.addEventListener('click', function () {
-        google.script.run
-          .withSuccessHandler(() => {
-            loadSpreadsheets(); // 既存の関数をそのまま使用
-          })
-          .withFailureHandler((error) => {
-            console.warn('キャッシュクリア失敗、通常読み込みを実行:', error);
-            loadSpreadsheets(); // エラーでも読み込みは実行
-          })
-          .clearSheetsCache();
+        loadForms().catch(error => {
+          console.warn('フォーム一覧の読み込みに失敗:', error);
+        });
       });
     }
 
@@ -536,61 +516,44 @@
 
 
   async function initializeDropdowns() {
-    const spreadsheetSelect = document.getElementById('spreadsheet-select');
-    const sheetSelect = document.getElementById('sheet-select');
-
-    if (!spreadsheetSelect) return;
+    const formSelect = document.getElementById('form-select');
+    const formUrlInput = document.getElementById('form-url-input');
 
     try {
       const config = systemState.config;
 
-      if (config?.spreadsheetId && config?.sheetName && config?.columnMapping && Object.keys(config.columnMapping).length > 0) {
-
-        const spreadsheetName = config.spreadsheetName;
-        spreadsheetSelect.innerHTML = `
-          <option value="">スプレッドシートを選択してください</option>
-          <option value="${config.spreadsheetId}" selected>現在の設定: ${spreadsheetName}</option>
-        `;
-        spreadsheetSelect.value = config.spreadsheetId;
-
-        if (sheetSelect) {
-          sheetSelect.innerHTML = `
-            <option value="">シートを選択してください</option>
-            <option value="${config.sheetName}" selected>${config.sheetName}</option>
-          `;
-          sheetSelect.value = config.sheetName;
+      // 既存の設定がある場合、データを保持
+      if (config?.spreadsheetId && config?.sheetName) {
+        // URL入力方式のデータセットに設定を保持
+        if (formUrlInput) {
+          formUrlInput.dataset.spreadsheetId = config.spreadsheetId;
+          formUrlInput.dataset.sheetName = config.sheetName;
+          formUrlInput.dataset.formTitle = config.formTitle || '';
+          formUrlInput.dataset.formUrl = config.formUrl || '';
         }
 
-        setupChangeEvents();
+        // ドロップダウン方式のデータセットにも設定を保持
+        if (formSelect) {
+          formSelect.dataset.spreadsheetId = config.spreadsheetId;
+          formSelect.dataset.sheetName = config.sheetName;
+          formSelect.dataset.formTitle = config.formTitle || '';
+          formSelect.dataset.formUrl = config.formUrl || '';
+        }
 
-        return; // 軽量初期化完了
-      }
-
-      spreadsheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
-
-      if (config && config.spreadsheetId) {
-        const option = document.createElement('option');
-        option.value = config.spreadsheetId;
-        option.textContent = '現在の設定: ' + config.spreadsheetName;
-        spreadsheetSelect.appendChild(option);
-        spreadsheetSelect.value = config.spreadsheetId;
-
-        if (config.spreadsheetId) {
-          await loadSheetList(config.spreadsheetId);
-          if (config.sheetName && sheetSelect) {
-            sheetSelect.value = config.sheetName;
-          }
+        // フォーム情報を表示
+        if (config.formTitle) {
+          showFormDetectionInfo({
+            formTitle: config.formTitle,
+            sheetName: config.sheetName,
+            wasCreated: false
+          });
         }
       }
 
       setupChangeEvents();
 
-
     } catch (error) {
       console.error('ドロップダウン初期化エラー:', error);
-      if (spreadsheetSelect) {
-        spreadsheetSelect.innerHTML = '<option value="">初期化エラー - 再読み込みしてください</option>';
-      }
       showError('管理パネルの初期化に失敗しました。ページを再読み込みしてください。');
     }
   }
@@ -636,153 +599,71 @@
   }
 
   function resetSheetSelect() {
-    const sheetSelect = DOMHelpers.safeGetById('sheet-select', 'sheet select reset');
-    if (sheetSelect) {
-      sheetSelect.innerHTML = '<option value="">スプレッドシートを選択してください</option>';
-    }
+    // フォーム統一後は不要だが、後方互換性のため残す
   }
 
-  function loadSpreadsheets() {
+  /**
+   * Googleフォーム一覧を読み込む
+   */
+  function loadForms() {
     return new Promise((resolve, reject) => {
-      const select = DOMHelpers.safeGetById('spreadsheet-select', 'spreadsheet list loading');
+      const select = document.getElementById('form-select');
       if (!select) {
-        reject(new Error('spreadsheet-select element not found'));
+        reject(new Error('form-select element not found'));
         return;
       }
 
       select.innerHTML = '<option value="">読み込み中...</option>';
-
-      setPartialLoading(true, 'スプレッドシート一覧を読み込み中...');
+      setPartialLoading(true, 'Googleフォーム一覧を読み込み中...');
 
       google.script.run
         .withSuccessHandler(function (result) {
+          setPartialLoading(false);
 
-          if (result === null || result === undefined) {
-            console.error('📊 null/undefinedレスポンスを受信 - google.script.run送信問題');
-            select.innerHTML = '<option value="">通信エラー（null response）</option>';
-            setPartialLoading(false);
-            reject(new Error('サーバーからnullレスポンスが返されました。main.gs:getSheets()の実行を確認してください。'));
+          if (!result || result.success === false) {
+            select.innerHTML = '<option value="">読み込みエラー</option>';
+            reject(new Error(result?.error || 'フォーム一覧の取得に失敗しました'));
             return;
           }
 
-          if (typeof result !== 'object') {
-            console.error('📊 非オブジェクトレスポンス:', { resultType: typeof result, result });
-            select.innerHTML = '<option value="">無効なレスポンス形式</option>';
-            setPartialLoading(false);
-            reject(new Error(`無効なレスポンス形式: ${typeof result}`));
-            return;
-          }
+          const forms = result.forms || [];
+          select.innerHTML = '<option value="">フォームを選択...</option>';
 
-          if (result.success === false) {
-            console.warn('📊 エラーレスポンス受信:', result.message || result.error);
-            select.innerHTML = `<option value="">${result.message || 'サーバーエラー'}</option>`;
-            setPartialLoading(false);
-            reject(new Error(result.message || result.error || 'サーバーでエラーが発生しました'));
-            return;
-          }
-
-          const spreadsheets = Array.isArray(result)
-            ? result
-            : result && Array.isArray(result.spreadsheets)
-              ? result.spreadsheets
-              : result && Array.isArray(result.sheets)
-                ? result.sheets
-                : [];
-
-
-          const currentValue = select.value;
-          const wasPrePopulated = select.querySelector('[selected]');
-
-          select.innerHTML = '<option value="">スプレッドシートを選択...</option>';
-
-
-          if (spreadsheets && Array.isArray(spreadsheets) && spreadsheets.length > 0) {
-            spreadsheets.forEach((sheet) => {
+          if (forms.length > 0) {
+            forms.forEach((form) => {
               const option = document.createElement('option');
-              option.value = sheet.id;
-              option.textContent = sheet.name;
-
-              if (currentValue && currentValue === sheet.id) {
-                option.selected = true;
-              }
-
-              if (sheet.formUrl) {
-                option.dataset.formUrl = sheet.formUrl;
-                option.dataset.formTitle = sheet.formTitle || 'フォーム';
-              }
-
+              option.value = form.url; // URLを値として保持
+              option.textContent = form.name;
+              option.dataset.formId = form.id;
               select.appendChild(option);
             });
-
-            if (wasPrePopulated && !select.querySelector(`option[value="${currentValue}"]`)) {
-              const prePopulatedText = wasPrePopulated.textContent;
-              const preserveOption = document.createElement('option');
-              preserveOption.value = currentValue;
-              preserveOption.textContent = prePopulatedText;
-              preserveOption.selected = true;
-              select.appendChild(preserveOption);
-            }
-          } else if (Array.isArray(spreadsheets) && spreadsheets.length === 0) {
+          } else {
             const noDataOption = document.createElement('option');
             noDataOption.value = '';
-            noDataOption.textContent = 'あなたが所有するスプレッドシートはありません';
+            noDataOption.textContent = 'あなたが所有するフォームはありません';
             noDataOption.disabled = true;
             select.appendChild(noDataOption);
-          } else if (!Array.isArray(spreadsheets)) {
-            console.error('📊 spreadsheets が配列ではありません:', {
-              spreadsheetsType: typeof spreadsheets,
-              spreadsheets: spreadsheets,
-              originalResult: result
-            });
-            const errorOption = document.createElement('option');
-            errorOption.value = '';
-            errorOption.textContent = 'データ構造エラー（配列でない）';
-            errorOption.disabled = true;
-            select.appendChild(errorOption);
-          } else {
-            console.error('📊 予期しないレスポンス構造:', {
-              result,
-              spreadsheets,
-              spreadsheetsIsArray: Array.isArray(spreadsheets),
-              spreadsheetsLength: spreadsheets ? spreadsheets.length : 'N/A'
-            });
-            const errorOption = document.createElement('option');
-            errorOption.value = '';
-            errorOption.textContent = 'データ構造エラー';
-            errorOption.disabled = true;
-            select.appendChild(errorOption);
           }
 
-          setPartialLoading(false);
-          resolve(spreadsheets);
+          resolve(forms);
         })
         .withFailureHandler(function (error) {
           select.innerHTML = '<option value="">読み込みエラー</option>';
           setPartialLoading(false);
-
-          console.error('📊 getSheets通信エラー:', {
-            error: error,
-            errorMessage: error.message,
-            errorType: typeof error,
-            errorStack: error.stack
-          });
-
-          let detailedMessage;
-          if (error.message && error.message.includes('not initialized')) {
-            detailedMessage = 'システムの初期化中です。ページをリロードしてください。';
-            console.warn('🔄 ServiceRegistry初期化エラー検出 - リロード推奨');
-          } else {
-            detailedMessage = 'スプレッドシートの読み込みに失敗しました: ' + error.message;
-          }
-
-          reject(new Error(detailedMessage));
+          console.error('📝 getForms通信エラー:', error);
+          reject(new Error('フォーム一覧の読み込みに失敗しました: ' + error.message));
         })
-        .getSheets();
+        .getForms();
     });
   }
 
+  // 後方互換性のため残す
+  function loadSpreadsheets() {
+    return loadForms();
+  }
+
   function loadSpreadsheetList() {
-    loadSpreadsheets();
+    loadForms();
   }
 
 
@@ -811,51 +692,13 @@
   }
 
 
+  // フォーム統一後は不要だが、後方互換性のため空関数として残す
   async function autoSelectSpreadsheet(spreadsheetId) {
-    try {
-      const select = document.getElementById('spreadsheet-select');
-      if (!select) {
-        throw new Error('スプレッドシート選択要素が見つかりません');
-      }
-
-      const option = Array.from(select.options).find((opt) => opt.value === spreadsheetId);
-      if (option) {
-        select.value = spreadsheetId;
-
-        await loadSheets(spreadsheetId);
-        return true;
-      } else {
-        showInfo('設定済みスプレッドシートに直接接続を試行します');
-        return false;
-      }
-    } catch (error) {
-      throw error;
-    }
+    return true;
   }
 
   async function autoSelectSheet(sheetName) {
-    try {
-      const select = document.getElementById('sheet-select');
-      if (!select) {
-        throw new Error('シート選択要素が見つかりません');
-      }
-
-      const option = Array.from(select.options).find((opt) => opt.textContent === sheetName);
-      if (option) {
-        select.value = option.value;
-        return true;
-      } else {
-        const dropdownMethod = document.getElementById('dropdown-method');
-        const isDropdownMode = dropdownMethod && !dropdownMethod.classList.contains('hidden');
-
-        if (isDropdownMode && select.options.length > 1) {
-          showInfo('シート「' + sheetName + '」が見つかりません。手動で選択してください');
-        }
-        return false;
-      }
-    } catch (error) {
-      throw error;
-    }
+    return true;
   }
 
   function updatePanel(config) {
@@ -869,34 +712,25 @@
     if (!config) return;
 
     try {
+      // フォーム用のデータをセット
+      if (config.spreadsheetId && config.sheetName) {
+        const formUrlInput = document.getElementById('form-url-input');
+        const formSelect = document.getElementById('form-select');
 
-      if (config.spreadsheetId) {
-        const spreadsheetSelect = document.getElementById('spreadsheet-select');
-        if (spreadsheetSelect) {
-          spreadsheetSelect.value = config.spreadsheetId;
-        } else {
-          console.warn('⚠️ スプレッドシートセレクト (spreadsheet-select) が見つかりません');
+        if (formUrlInput) {
+          formUrlInput.dataset.spreadsheetId = config.spreadsheetId;
+          formUrlInput.dataset.sheetName = config.sheetName;
+          formUrlInput.dataset.formTitle = config.formTitle || '';
+          formUrlInput.dataset.formUrl = config.formUrl || '';
+        }
+
+        if (formSelect) {
+          formSelect.dataset.spreadsheetId = config.spreadsheetId;
+          formSelect.dataset.sheetName = config.sheetName;
+          formSelect.dataset.formTitle = config.formTitle || '';
+          formSelect.dataset.formUrl = config.formUrl || '';
         }
       }
-
-      if (config.spreadsheetUrl) {
-        const urlInput = document.getElementById('spreadsheet-url');
-        if (urlInput) {
-          urlInput.value = config.spreadsheetUrl;
-        } else {
-          console.warn('⚠️ URL入力フィールド (spreadsheet-url) が見つかりません');
-        }
-      }
-
-      if (config.sheetName) {
-        const sheetSelect = document.getElementById('sheet-select');
-        if (sheetSelect) {
-          sheetSelect.value = config.sheetName;
-        } else {
-          console.warn('⚠️ シートセレクト (sheet-select) が見つかりません');
-        }
-      }
-
 
       if (config.displayMode) {
         const displayModeSelect = document.getElementById('display-mode');
@@ -905,12 +739,13 @@
         }
       }
 
+      // フォームURL表示を更新
       const formUrlDisplay = document.getElementById('form-url');
       if (formUrlDisplay) {
         if (config.formUrl) {
-          formUrlDisplay.textContent = config.formUrl;
+          formUrlDisplay.textContent = 'フォームを開く';
           formUrlDisplay.href = config.formUrl;
-          formUrlDisplay.className = 'text-sm text-white';
+          formUrlDisplay.className = 'text-blue-400 hover:underline text-xs';
         } else {
           formUrlDisplay.textContent = '未設定';
           formUrlDisplay.href = '#';
@@ -936,36 +771,7 @@
   }
 
 
-  function validateUrlInput(inputElement) {
-    if (!inputElement) {
-      console.warn('validateUrlInput: inputElement is null');
-      return;
-    }
-    const url = inputElement.value.trim();
-    const messageEl = document.getElementById('url-validation-message');
-
-    if (!url) {
-      messageEl.textContent = '💡 GoogleスプレッドシートのURLを貼り付けてください';
-      messageEl.className = 'text-xs text-gray-400 mt-1';
-      inputElement.classList.remove('border-red-500', 'border-green-500');
-      return;
-    }
-
-    const urlPattern = /^https:\/\/docs\.google\.com\/spreadsheets\/d\/[a-zA-Z0-9-_]+/;
-
-    if (urlPattern.test(url)) {
-      messageEl.textContent = '✅ 有効なスプレッドシートURLです';
-      messageEl.className = 'text-xs text-green-400 mt-1';
-      inputElement.classList.remove('border-red-500');
-      inputElement.classList.add('border-green-500');
-    } else {
-      messageEl.textContent =
-        '❌ 無効なURL形式です。Googleスプレッドシートの正しいURLを入力してください';
-      messageEl.className = 'text-xs text-red-400 mt-1';
-      inputElement.classList.remove('border-green-500');
-      inputElement.classList.add('border-red-500');
-    }
-  }
+  // validateUrlInput - 削除済み（スプレッドシートURL検証用の未使用関数）
 
   function sanitizeInput(input) {
     if (!input || typeof input !== 'string') return '';
@@ -987,38 +793,9 @@
   }
 
 
+  // フォーム統一後は不要だが、後方互換性のため空関数として残す
   function loadSheets(spreadsheetId) {
-    return new Promise((resolve, reject) => {
-      const select = document.getElementById('sheet-select');
-      select.innerHTML = '<option value="">読み込み中...</option>';
-
-      google.script.run
-        .withSuccessHandler(function (response) {
-          select.innerHTML = '<option value="">シートを選択...</option>';
-          const sheets = response?.success ? response.sheets : [];
-          sheets.forEach((sheet) => {
-            const option = document.createElement('option');
-            option.value = sheet.name;
-
-            if (sheet.isFormResponseSheet && sheet.formConnected) {
-              option.textContent = `📋 ${sheet.name} (フォーム回答)`;
-              option.dataset.isFormSheet = 'true';
-              option.dataset.formTitle = sheet.formTitle || '';
-            } else {
-              option.textContent = sheet.name;
-              option.dataset.isFormSheet = 'false';
-            }
-
-            select.appendChild(option);
-          });
-          resolve(sheets);
-        })
-        .withFailureHandler(function (error) {
-          select.innerHTML = '<option value="">読み込みエラー</option>';
-          reject(new Error('シートの読み込みに失敗しました: ' + error.message));
-        })
-        .getSheetList(spreadsheetId);
-    });
+    return Promise.resolve([]);
   }
 
   async function getColumnAnalysis(spreadsheetId, sheetName) {
@@ -1119,27 +896,29 @@
     }
 
     const hasSpreadsheet = !!(config && config.spreadsheetId);
-    spreadsheetBtn.disabled = !hasSpreadsheet;
-    spreadsheetBtn.dataset.spreadsheetId = hasSpreadsheet ? config.spreadsheetId : '';
+    if (spreadsheetBtn) {
+      spreadsheetBtn.disabled = !hasSpreadsheet;
+      spreadsheetBtn.dataset.spreadsheetId = hasSpreadsheet ? config.spreadsheetId : '';
+      spreadsheetBtn.classList.toggle('opacity-50', !hasSpreadsheet);
 
-    spreadsheetBtn.classList.toggle('opacity-50', !hasSpreadsheet);
-
-    if (hasSpreadsheet) {
-      spreadsheetBtn.onclick = () => {
-        window.open('https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit', '_blank');
-      };
+      if (hasSpreadsheet) {
+        spreadsheetBtn.onclick = () => {
+          window.open('https://docs.google.com/spreadsheets/d/' + config.spreadsheetId + '/edit', '_blank');
+        };
+      }
     }
 
     const hasForm = !!(config && config.formUrl && isValidFormUrl(config.formUrl));
-    formBtn.disabled = !hasForm;
-    formBtn.dataset.formUrl = hasForm ? config.formUrl : '';
+    if (formBtn) {
+      formBtn.disabled = !hasForm;
+      formBtn.dataset.formUrl = hasForm ? config.formUrl : '';
+      formBtn.classList.toggle('opacity-50', !hasForm);
 
-    formBtn.classList.toggle('opacity-50', !hasForm);
-
-    if (hasForm) {
-      formBtn.onclick = () => {
-        window.open(config.formUrl, '_blank');
-      };
+      if (hasForm) {
+        formBtn.onclick = () => {
+          window.open(config.formUrl, '_blank');
+        };
+      }
     }
 
     if (boardBtn) {
@@ -1226,50 +1005,59 @@
   function getFormInfoContainer() {
     const urlMethodElement = document.getElementById('url-method');
     const isUrlMethod = urlMethodElement && !urlMethodElement.classList.contains('hidden');
+    // URL方式: form-detection-info, ドロップダウン方式: form-info
     return isUrlMethod ?
-      document.getElementById('url-form-info') :
+      document.getElementById('form-detection-info') :
       document.getElementById('form-info');
   }
 
   function updateFormInfo(formData, options = {}) {
-    const container = getFormInfoContainer();
-    if (!container) {
-      console.warn('updateFormInfo: フォーム情報コンテナが見つかりません');
-      return;
-    }
-
-    const safeData = formData || {};
-    const status = options.status || (safeData.formUrl ? 'linked' : 'missing');
-
     const urlMethodElement = document.getElementById('url-method');
     const isUrlMethod = urlMethodElement && !urlMethodElement.classList.contains('hidden');
-    const titleElement = isUrlMethod ?
-      document.getElementById('url-form-title') :
-      document.getElementById('form-title');
-    const urlElement = isUrlMethod ?
-      document.getElementById('url-form-url') :
-      document.getElementById('form-url');
 
-    if (titleElement) {
-      titleElement.textContent = safeData.formTitle || 'フォーム情報なし';
-    }
+    const safeData = formData || {};
 
-    if (urlElement) {
-      if (safeData.formUrl) {
-        urlElement.textContent = safeData.formUrl;
-        urlElement.href = safeData.formUrl;
-        urlElement.classList.remove('text-gray-500');
-        urlElement.classList.add('text-blue-400');
-      } else {
-        urlElement.textContent = '未連携';
-        urlElement.href = '#';
-        urlElement.classList.add('text-gray-500');
-        urlElement.classList.remove('text-blue-400');
+    if (isUrlMethod) {
+      // URL方式の場合: form-detection-info を使用
+      const container = document.getElementById('form-detection-info');
+      const titleElement = document.getElementById('detected-form-title');
+      const statusElement = document.getElementById('detected-spreadsheet-status');
+
+      if (titleElement) {
+        titleElement.textContent = safeData.formTitle || 'フォーム情報なし';
+      }
+      if (statusElement) {
+        statusElement.textContent = safeData.sheetName || '検出済み';
+      }
+      if (container) {
+        container.classList.remove('hidden');
+      }
+    } else {
+      // ドロップダウン方式の場合: form-info を使用
+      const container = document.getElementById('form-info');
+      const titleElement = document.getElementById('form-title');
+      const urlElement = document.getElementById('form-url');
+
+      if (titleElement) {
+        titleElement.textContent = safeData.formTitle || 'フォーム情報なし';
+      }
+      if (urlElement) {
+        if (safeData.formUrl) {
+          urlElement.textContent = 'フォームを開く';
+          urlElement.href = safeData.formUrl;
+          urlElement.classList.remove('text-gray-500');
+          urlElement.classList.add('text-blue-400');
+        } else {
+          urlElement.textContent = '未連携';
+          urlElement.href = '#';
+          urlElement.classList.add('text-gray-500');
+          urlElement.classList.remove('text-blue-400');
+        }
+      }
+      if (container) {
+        container.classList.remove('hidden');
       }
     }
-
-    container.classList.remove('hidden');
-
   }
 
   function displayFormInfo(formData, options = {}) {
@@ -1286,6 +1074,77 @@
       formInfo.removeAttribute('data-form-reason');
       formInfo.removeAttribute('data-form-diagnostics');
     }
+  }
+
+  /**
+   * ドロップダウンから選択されたフォームを検証
+   * @param {string} formUrl - フォームURL
+   */
+  function validateFormFromDropdown(formUrl) {
+    const formSelect = document.getElementById('form-select');
+    const formInfo = document.getElementById('form-info');
+    const formTitle = document.getElementById('form-title');
+    const formSpreadsheetStatus = document.getElementById('form-spreadsheet-status');
+    const formUrlLink = document.getElementById('form-url');
+    const connectBtn = document.getElementById('connect-source');
+
+    if (!formUrl) {
+      hideFormInfo();
+      return;
+    }
+
+    // ローディング表示
+    if (formInfo) {
+      formInfo.classList.remove('hidden');
+      if (formTitle) formTitle.textContent = '検証中...';
+      if (formSpreadsheetStatus) formSpreadsheetStatus.textContent = '-';
+    }
+
+    google.script.run
+      .withSuccessHandler(function (result) {
+        if (result.success) {
+          // フォーム情報を表示
+          if (formTitle) formTitle.textContent = result.formTitle;
+          if (formSpreadsheetStatus) {
+            formSpreadsheetStatus.textContent = result.wasCreated
+              ? '新規作成しました'
+              : result.sheetName;
+          }
+          if (formUrlLink) {
+            formUrlLink.href = result.formUrl;
+            formUrlLink.textContent = 'フォームを開く';
+          }
+          formInfo?.classList.remove('hidden');
+
+          // データを保持
+          if (formSelect) {
+            formSelect.dataset.spreadsheetId = result.spreadsheetId;
+            formSelect.dataset.sheetName = result.sheetName;
+            formSelect.dataset.formTitle = result.formTitle;
+            formSelect.dataset.formUrl = result.formUrl;
+          }
+
+          // 接続ボタン有効化
+          if (connectBtn) {
+            connectBtn.disabled = false;
+            connectBtn.textContent = '✅ 接続';
+          }
+
+          if (result.wasCreated) {
+            showSuccess('回答先スプレッドシートを作成しました');
+          }
+        } else {
+          if (formTitle) formTitle.textContent = 'エラー';
+          if (formSpreadsheetStatus) formSpreadsheetStatus.textContent = result.error || '検証に失敗しました';
+          showError(result.error || '検証に失敗しました');
+        }
+      })
+      .withFailureHandler(function (error) {
+        if (formTitle) formTitle.textContent = 'エラー';
+        if (formSpreadsheetStatus) formSpreadsheetStatus.textContent = error.message;
+        showError(error.message || '検証エラーが発生しました');
+      })
+      .processFormUrlInput(formUrl);
   }
 
   function processFormDetectionResult(formResult) {
@@ -1460,184 +1319,220 @@
 
 
   /**
-   * URL自動解析（リアルタイム）- V8ランタイム対応
-   * @param {string} fullUrl - 入力された完全URL
+   * フォームURL自動解析（リアルタイム）
+   * @param {string} fullUrl - 入力されたフォームURL
    */
-  function autoAnalyzeUrl(fullUrl) {
+  function autoAnalyzeFormUrl(fullUrl) {
     if (!fullUrl || fullUrl.trim() === '') {
-      hideAutoDetectionInfo();
+      hideFormDetectionInfo();
+      updateUrlValidationMessage('💡 GoogleフォームのURLを貼り付けてください', 'info');
       return;
     }
 
-    const urlInfo = parseUrlClientSide(fullUrl);
+    const urlInfo = parseFormUrlClientSide(fullUrl);
 
     if (urlInfo.isValid) {
-      showAutoDetectionInfo(urlInfo);
+      updateUrlValidationMessage('✓ 有効なフォームURLです。「検証」をクリックして詳細を確認', 'success');
     } else {
-      hideAutoDetectionInfo();
+      hideFormDetectionInfo();
+      updateUrlValidationMessage('⚠ GoogleフォームのURLを入力してください', 'warning');
     }
   }
 
+  // 後方互換性のため残す（既存コードからの参照用）
+  function autoAnalyzeUrl(fullUrl) {
+    autoAnalyzeFormUrl(fullUrl);
+  }
+
   /**
-   * クライアントサイドURL解析 - V8ランタイム最適化
+   * クライアントサイドフォームURL解析
    * @param {string} url - 解析対象URL
    * @returns {Object} 解析結果
    */
-  function parseUrlClientSide(url) {
+  function parseFormUrlClientSide(url) {
     try {
-      const spreadsheetMatch = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-      const gidMatch = url.match(/[#&]gid=(\d+)/);
+      // フォームURL形式: /forms/d/{formId}/ または forms.gle/{shortId}
+      const formMatch = url.match(/\/forms\/d\/([a-zA-Z0-9-_]+)/);
+      const shortMatch = url.match(/forms\.gle\/([a-zA-Z0-9]+)/);
 
-      if (!spreadsheetMatch) {
+      if (!formMatch && !shortMatch) {
         return { isValid: false };
       }
 
       return {
         isValid: true,
-        spreadsheetId: spreadsheetMatch[1],
-        gid: gidMatch ? gidMatch[1] : '0',
-        displayGid: gidMatch ? gidMatch[1] : 'デフォルト'
+        formId: formMatch ? formMatch[1] : shortMatch[1],
+        isShortUrl: !!shortMatch
       };
     } catch (error) {
-      console.warn('parseUrlClientSide error:', error.message);
+      console.warn('parseFormUrlClientSide error:', error.message);
       return { isValid: false };
     }
   }
 
-  /**
-   * 自動検出情報表示
-   * @param {Object} urlInfo - URL解析結果
-   */
-  function showAutoDetectionInfo(urlInfo) {
-    const container = document.getElementById('auto-detection-info');
-    const sheetNameSpan = document.getElementById('detected-sheet-name');
-    const gidSpan = document.getElementById('detected-gid');
+  // 後方互換性のため残す
+  function parseUrlClientSide(url) {
+    return parseFormUrlClientSide(url);
+  }
 
-    if (container && sheetNameSpan && gidSpan) {
-      sheetNameSpan.textContent = '解析中...';
-      gidSpan.textContent = urlInfo.displayGid;
+  /**
+   * URL検証メッセージを更新
+   */
+  function updateUrlValidationMessage(message, type) {
+    const messageEl = document.getElementById('url-validation-message');
+    if (messageEl) {
+      messageEl.textContent = message;
+      messageEl.className = 'text-xs mt-1 ';
+      if (type === 'success') {
+        messageEl.className += 'text-green-400';
+      } else if (type === 'warning') {
+        messageEl.className += 'text-yellow-400';
+      } else if (type === 'error') {
+        messageEl.className += 'text-red-400';
+      } else {
+        messageEl.className += 'text-gray-400';
+      }
+    }
+  }
+
+  /**
+   * フォーム検出情報を表示
+   * @param {Object} formData - フォーム情報
+   */
+  function showFormDetectionInfo(formData) {
+    const container = document.getElementById('form-detection-info');
+    const titleSpan = document.getElementById('detected-form-title');
+    const statusSpan = document.getElementById('detected-spreadsheet-status');
+
+    if (container && titleSpan && statusSpan) {
+      titleSpan.textContent = formData.formTitle || '-';
+      if (formData.wasCreated) {
+        statusSpan.textContent = '新規作成しました';
+      } else {
+        statusSpan.textContent = formData.sheetName || '検出済み';
+      }
       container.classList.remove('hidden');
     }
   }
 
   /**
-   * 自動検出情報非表示
+   * フォーム検出情報を非表示
    */
-  function hideAutoDetectionInfo() {
-    const container = document.getElementById('auto-detection-info');
+  function hideFormDetectionInfo() {
+    const container = document.getElementById('form-detection-info');
     if (container) {
       container.classList.add('hidden');
     }
   }
 
+  // 後方互換性のため残す
+  function showAutoDetectionInfo(urlInfo) {
+    // フォーム用に変換
+  }
+
+  function hideAutoDetectionInfo() {
+    hideFormDetectionInfo();
+  }
+
   /**
    * ドロップダウン選択方式の接続ボタン状態を更新
-   * 両方のセレクト（スプレッドシート・シート）が選択されている場合のみ有効化
+   * フォームが選択されている場合のみ有効化
    */
   function updateDropdownConnectionButton() {
     const connectBtn = document.getElementById('connect-source');
-    const spreadsheetSelect = document.getElementById('spreadsheet-select');
-    const sheetSelect = document.getElementById('sheet-select');
+    const formSelect = document.getElementById('form-select');
 
-    if (!connectBtn || !spreadsheetSelect || !sheetSelect) {
+    if (!connectBtn || !formSelect) {
       return;
     }
 
-    const spreadsheetSelected = spreadsheetSelect.value && spreadsheetSelect.value.trim();
-    const sheetSelected = sheetSelect.value && sheetSelect.value.trim();
+    const formSelected = formSelect.value && formSelect.value.trim();
 
-    if (spreadsheetSelected && sheetSelected) {
+    if (formSelected) {
       connectBtn.disabled = false;
       connectBtn.textContent = '接続';
     } else {
       connectBtn.disabled = true;
-      connectBtn.textContent = '接続（データソース選択後に有効化）';
+      connectBtn.textContent = '接続（フォーム選択後に有効化）';
     }
   }
 
   /**
-   * 完全URL統合検証 - 既存API活用版
+   * フォームURL検証 - processFormUrlInput API使用
    */
   function validateCompleteUrl() {
-    const urlInput = document.getElementById('spreadsheet-url');
+    const urlInput = document.getElementById('form-url-input');
     const validateBtn = document.getElementById('url-validate');
     const connectBtn = document.getElementById('connect-url-source');
 
-    const fullUrl = urlInput.value.trim();
+    if (!urlInput) {
+      console.error('form-url-input element not found');
+      return;
+    }
 
-    if (!fullUrl) {
-      showError('URLを入力してください');
+    const formUrl = urlInput.value.trim();
+
+    if (!formUrl) {
+      showError('GoogleフォームのURLを入力してください');
+      return;
+    }
+
+    // クライアント側で簡易チェック
+    const urlInfo = parseFormUrlClientSide(formUrl);
+    if (!urlInfo.isValid) {
+      showError('GoogleフォームのURLを入力してください');
       return;
     }
 
     validateBtn.disabled = true;
-    validateBtn.textContent = '🔍 URL検証中...';
+    validateBtn.textContent = '🔍 検証中...';
     connectBtn.disabled = true;
     connectBtn.textContent = '検証完了後に有効化';
-
 
     google.script.run
       .withSuccessHandler(function (result) {
         validateBtn.disabled = false;
-        validateBtn.textContent = '🔍 URL検証';
-
-
+        validateBtn.textContent = '🔍 検証';
 
         if (result.success) {
-          updateDetectedInfo(result);
+          // フォーム情報を表示
+          showFormDetectionInfo(result);
 
-          if (result.formInfo && result.formInfo.formData) {
-            const statusInfo = processFormDetectionResult(result.formInfo);
-            if (statusInfo) {
-              displayFormInfo(result.formInfo.formData, statusInfo);
-            } else {
-              displayFormInfo(result.formInfo.formData, {
-                status: 'missing',
-                message: 'フォーム連携は検出されませんでした（スプレッドシート接続は可能）'
-              });
-            }
-          }
+          // 接続ボタン有効化
+          connectBtn.disabled = false;
+          connectBtn.textContent = '✅ 接続';
 
-          if (result.hasAccess || result.readyToConnect) {
-            connectBtn.disabled = false;
-            connectBtn.textContent = '✅ 接続';
-
-            const formStatus = result.formInfo?.success ? 'フォーム連携あり' : 'フォーム連携なし（接続可能）';
-            showSuccess(`検証完了 - シート「${result.sheetName}」に接続できます (${formStatus})`);
-          } else {
-            showWarning('アクセス権限に問題があります');
-          }
-
+          // データを保持
           urlInput.dataset.spreadsheetId = result.spreadsheetId;
+          urlInput.dataset.sheetName = result.sheetName;
+          urlInput.dataset.formTitle = result.formTitle;
+          urlInput.dataset.formUrl = result.formUrl;
+
+          // メッセージ表示
+          if (result.wasCreated) {
+            showSuccess('回答先スプレッドシートを作成しました');
+          } else {
+            showSuccess(`検証完了 - 「${result.formTitle}」に接続できます`);
+          }
+
+          updateUrlValidationMessage('✓ 検証完了', 'success');
 
         } else {
-          showError(`検証失敗: ${result.message}`);
+          hideFormDetectionInfo();
+          showError(result.error || '検証に失敗しました');
+          updateUrlValidationMessage('⚠ ' + (result.error || '検証に失敗しました'), 'error');
         }
       })
       .withFailureHandler(function (error) {
         validateBtn.disabled = false;
-        validateBtn.textContent = '🔍 統合検証';
-        console.error('❌ validateCompleteSpreadsheetUrl error:', error);
-        showError(`統合検証エラー: ${error.message}`);
+        validateBtn.textContent = '🔍 検証';
+        console.error('❌ processFormUrlInput error:', error);
+        showError(error.message || '検証エラーが発生しました');
+        updateUrlValidationMessage('⚠ エラーが発生しました', 'error');
       })
-      .validateCompleteSpreadsheetUrl(fullUrl);
+      .processFormUrlInput(formUrl);
   }
-
-  /**
-   * 検出情報UI更新
-   * @param {Object} result - 検証結果
-   */
-  function updateDetectedInfo(result) {
-    const sheetNameSpan = document.getElementById('detected-sheet-name');
-    const gidSpan = document.getElementById('detected-gid');
-
-    if (sheetNameSpan) {
-      sheetNameSpan.textContent = result.sheetName || '-';
-    }
-    if (gidSpan) {
-      gidSpan.textContent = result.gid || '0';
-    }
-  }
+  // updateDetectedInfo - 削除済み（スプレッドシートURL用の未使用関数）
 
 
 
@@ -1651,7 +1546,7 @@
     const sheetName = getCurrentSheetName();
 
     if (!spreadsheetId || !sheetName) {
-      showError('スプレッドシートとシートを選択してください');
+      showError('先にフォームを接続してください');
       return;
     }
 
@@ -1849,25 +1744,30 @@
   }
 
   function getCurrentSpreadsheetId() {
-    const urlMethod = document.getElementById('method-url').checked;
-    if (urlMethod) {
-      const urlInput = document.getElementById('spreadsheet-url').value;
-      if (urlInput) {
-        const match = urlInput.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-        return match ? match[1] : null;
-      }
+    // url-methodのhidden状態で判定（toggleSourceMethodと同期）
+    const urlMethodElement = document.getElementById('url-method');
+    const isUrlMethod = urlMethodElement && !urlMethodElement.classList.contains('hidden');
+
+    if (isUrlMethod) {
+      const urlInput = document.getElementById('form-url-input');
+      return urlInput?.dataset.spreadsheetId || null;
     } else {
-      return document.getElementById('spreadsheet-select').value;
+      const formSelect = document.getElementById('form-select');
+      return formSelect?.dataset.spreadsheetId || null;
     }
-    return null;
   }
 
   function getCurrentSheetName() {
-    const urlMethod = document.getElementById('method-url').checked;
-    if (urlMethod) {
-      return document.getElementById('detected-sheet-name').textContent || null;
+    // url-methodのhidden状態で判定（toggleSourceMethodと同期）
+    const urlMethodElement = document.getElementById('url-method');
+    const isUrlMethod = urlMethodElement && !urlMethodElement.classList.contains('hidden');
+
+    if (isUrlMethod) {
+      const urlInput = document.getElementById('form-url-input');
+      return urlInput?.dataset.sheetName || null;
     } else {
-      return document.getElementById('sheet-select').value;
+      const formSelect = document.getElementById('form-select');
+      return formSelect?.dataset.sheetName || null;
     }
   }
 
@@ -1905,58 +1805,9 @@
     }
   }
 
+  // フォーム統一後は不要だが、後方互換性のため空関数として残す
   function loadSheetList(spreadsheetId) {
-    const select = document.getElementById('sheet-select');
-    if (!select) {
-      console.error('❌ loadSheetList: sheet-select要素が見つかりません');
-      showError('シート選択要素が見つかりません');
-      return;
-    }
-
-    select.innerHTML = '<option value="">読み込み中...</option>';
-
-    setPartialLoading(true, 'シート一覧を読み込み中...');
-
-    google.script.run
-      .withSuccessHandler(function (response) {
-        select.innerHTML = '<option value="">シートを選択...</option>';
-
-        const sheets = response?.success ? response.sheets : [];
-
-        if (!sheets || sheets.length === 0) {
-          const noSheetOption = document.createElement('option');
-          noSheetOption.value = '';
-          noSheetOption.textContent = '利用可能なシートがありません';
-          noSheetOption.disabled = true;
-          select.appendChild(noSheetOption);
-        } else {
-          sheets.forEach((sheet) => {
-            const option = document.createElement('option');
-            option.value = sheet.name;
-            option.textContent = sheet.name;
-            select.appendChild(option);
-          });
-        }
-
-        select.classList.remove('partial-loading-target');
-
-        setPartialLoading(false);
-        showSuccess(`${sheets?.length || 0}個のシートを読み込みました`);
-      })
-      .withFailureHandler(function (error) {
-        console.error('❌ loadSheetList: シート読み込みエラー', {
-          error: error.message || error,
-          spreadsheetId: typeof spreadsheetId === 'string' && spreadsheetId ? `${spreadsheetId.substring(0, 10)}...` : `[${typeof spreadsheetId}]`,
-          timestamp: new Date().toISOString(),
-        });
-
-        select.innerHTML = '<option value="">読み込みエラー - 再試行してください</option>';
-        select.classList.remove('partial-loading-target');
-
-        setPartialLoading(false);
-        showError(`シート一覧の読み込みに失敗しました: ${error.message || error}`);
-      })
-      .getSheetList(spreadsheetId);
+    // フォーム方式では processFormUrlInput() でシート情報も取得するため不要
   }
 
   async function connectToDataSource() {
@@ -1966,43 +1817,46 @@
       return;
     }
 
+    // 変数をtryブロック外で宣言（catchブロックからのアクセス用）
+    const urlMethodElement = document.getElementById('url-method');
+    const isUrlMethod = urlMethodElement && !urlMethodElement.classList.contains('hidden');
+    let spreadsheetId = '';
+    let sheetName = '';
+
     try {
-      const urlMethodElement = document.getElementById('url-method');
-      const isUrlMethod = urlMethodElement && !urlMethodElement.classList.contains('hidden');
-      let spreadsheetId, sheetName;
 
       if (isUrlMethod) {
-        const urlInput = document.getElementById('spreadsheet-url');
-        const detectedSheetNameSpan = document.getElementById('detected-sheet-name');
-        const url = urlInput.value.trim();
-        sheetName = detectedSheetNameSpan.textContent.trim();
-
-        if (!url) {
-          showError('URLを入力してください');
-          return;
-        }
-        if (!sheetName) {
-          showError('シート名を入力してください');
+        // URL入力方式: フォームURL検証で取得したデータを使用
+        const urlInput = document.getElementById('form-url-input');
+        if (!urlInput) {
+          showError('フォームURL入力欄が見つかりません');
+          ClientMutex.release(gateKey);
           return;
         }
 
-        const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
-        const match = url.match(spreadsheetRegex);
-        if (!match) {
-          showError('URLをコピペしてください（例: docs.google.com/spreadsheets/...）');
+        spreadsheetId = urlInput.dataset.spreadsheetId;
+        sheetName = urlInput.dataset.sheetName;
+
+        if (!spreadsheetId || !sheetName) {
+          showError('先に「検証」ボタンを押してフォームを検証してください');
+          ClientMutex.release(gateKey);
           return;
         }
-        spreadsheetId = match[1];
       } else {
-        spreadsheetId = document.getElementById('spreadsheet-select').value;
-        sheetName = document.getElementById('sheet-select').value;
-
-        if (!spreadsheetId) {
-          showError('スプレッドシートを選択してください。先に「更新」ボタンを押して一覧を読み込んでください。');
+        // ドロップダウン方式: フォーム選択で取得したデータを使用
+        const formSelect = document.getElementById('form-select');
+        if (!formSelect) {
+          showError('フォーム選択欄が見つかりません');
+          ClientMutex.release(gateKey);
           return;
         }
-        if (!sheetName) {
-          showError('シートを選択してください。スプレッドシートを選択すると、シート一覧が表示されます。');
+
+        spreadsheetId = formSelect.dataset.spreadsheetId;
+        sheetName = formSelect.dataset.sheetName;
+
+        if (!spreadsheetId || !sheetName) {
+          showError('フォームを選択してください');
+          ClientMutex.release(gateKey);
           return;
         }
       }
@@ -2107,8 +1961,8 @@
 
 
       if (validationDetails.connectionVerified === false) {
-        userMessage = 'スプレッドシートへの接続に失敗しました。';
-        suggestions.push('スプレッドシートのアクセス権限を確認してください');
+        userMessage = 'フォームの回答先への接続に失敗しました。';
+        suggestions.push('フォームの編集権限があることを確認してください');
         suggestions.push('サービスアカウントに編集者権限が付与されているか確認してください');
 
         if (validationDetails.connectionError) {
@@ -2132,16 +1986,16 @@
       }
     } else {
       if (errorMessage.includes('Permission') || errorMessage.includes('権限')) {
-        suggestions.push('スプレッドシートへのアクセス権限を確認してください');
-        suggestions.push('スプレッドシートを開いて、編集権限があることを確認してください');
+        suggestions.push('フォームの編集権限があることを確認してください');
+        suggestions.push('回答先スプレッドシートへのアクセス権限を確認してください');
       } else if (errorMessage.includes('not found') || errorMessage.includes('見つかりません')) {
-        suggestions.push('指定されたスプレッドシートまたはシートが存在するか確認してください');
+        suggestions.push('指定されたフォームまたは回答シートが存在するか確認してください');
         suggestions.push('シート名が正確か確認してください');
       } else if (errorMessage.includes('timeout') || errorMessage.includes('タイムアウト')) {
         suggestions.push('ネットワーク接続を確認してください');
         suggestions.push('しばらく時間をおいて再試行してください');
       } else {
-        suggestions.push('スプレッドシートが開けることを確認してください');
+        suggestions.push('フォームにアクセスできることを確認してください');
         suggestions.push('手動で列を設定することも可能です');
       }
     }
@@ -2240,7 +2094,7 @@
         }
       });
 
-      setAIDetectionSelections(mapping, dropdowns, confidence);
+      setAIDetectionSelections(mapping, dropdowns, confidence, headers);
 
       setupDropdownEventListeners(dropdowns);
     } catch (error) {
@@ -2276,7 +2130,7 @@
   }
 
 
-  function setAIDetectionSelections(mapping, dropdowns, confidence = {}) {
+  function setAIDetectionSelections(mapping, dropdowns, confidence = {}, headers = []) {
 
     const hasConflicts = checkSimpleConflicts(mapping, dropdowns);
     if (hasConflicts) {
@@ -3077,7 +2931,7 @@
       name: document.getElementById('name-column-select'),
     };
 
-    setAIDetectionSelections(window.currentAIMapping, dropdowns);
+    setAIDetectionSelections(window.currentAIMapping, dropdowns, {}, window.currentHeaders || []);
 
     const manualInfo = document.getElementById('manual-override-info');
     if (manualInfo) {
@@ -3098,26 +2952,13 @@
       return;
     }
 
-    const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
-    let spreadsheetId, sheetName;
-
-    if (sourceMethod === 'url') {
-      const urlInput = document.getElementById('spreadsheet-url');
-      const url = urlInput.value.trim();
-      const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
-      const match = url.match(spreadsheetRegex);
-
-      if (match) {
-        spreadsheetId = match[1];
-      }
-      sheetName = document.getElementById('detected-sheet-name').textContent.trim();
-    } else {
-      spreadsheetId = document.getElementById('spreadsheet-select').value;
-      sheetName = document.getElementById('sheet-select').value;
-    }
+    // フォーム検証で取得したデータを使用
+    const spreadsheetId = getCurrentSpreadsheetId();
+    const sheetName = getCurrentSheetName();
 
     if (!spreadsheetId || !sheetName) {
-      showError('検証するにはまず、スプレッドシートとシートを接続してください');
+      showError('検証するにはまず、フォームを接続してください');
+      ClientMutex.release('verifyColumnMapping');
       return;
     }
 
@@ -3486,9 +3327,14 @@
 
       const timestamp = new Date().toISOString();
 
+      // フォーム情報をdatasetから取得
+      const formInfo = getCurrentFormInfoSafe();
+
       const baseConfig = {
         spreadsheetId,
         sheetName,
+        formUrl: formInfo.formUrl || null,
+        formTitle: formInfo.formTitle || null,
         displaySettings: getDisplaySettings(),
         verifiedAt: timestamp, // メタデータは別途管理
         confidence: confidence, // 信頼度データは別途管理
@@ -3506,6 +3352,8 @@
         displaySettings: getDisplaySettings(),
         spreadsheetId,
         sheetName,
+        formUrl: formInfo.formUrl || null,
+        formTitle: formInfo.formTitle || null,
         headers,
         columnMapping: {
           ...columnMapping,
@@ -3514,15 +3362,15 @@
         }
       } : baseConfig;
 
-      const isSpreadsheetChanged = optimizedConfig.spreadsheetId !== systemState.config.spreadsheetId;
+      const isSpreadsheetChanged = systemState?.config?.spreadsheetId
+        ? optimizedConfig.spreadsheetId !== systemState.config.spreadsheetId
+        : true; // 初回設定時は常に新規扱い
       if (isSpreadsheetChanged) {
         optimizedConfig.sourceKey = 'sheet_' + optimizedConfig.spreadsheetId + '_' + Date.now();
 
         optimizedConfig.spreadsheetUrl = 'https://docs.google.com/spreadsheets/d/' + optimizedConfig.spreadsheetId + '/edit';
 
-        optimizedConfig.formUrl = null;
-        optimizedConfig.formTitle = null;
-
+        // フォーム情報は既にdatasetから取得済みなので、null化しない
       }
 
 
@@ -3575,7 +3423,7 @@
                   columnMapping: optimizedConfig.columnMapping,
                   setupComplete: optimizedConfig.setupComplete,
                   lastModified: systemState.user?.lastModified || optimizedConfig.lastModified,
-                  etag: result.etag || result.config?.etag || systemState.config.etag
+                  etag: result.etag || result.config?.etag || systemState.config?.etag
                 };
               }
 
@@ -3618,7 +3466,7 @@
       if (!config.spreadsheetId || !config.sheetName) {
         return {
           config: null,
-          validationError: 'データソースが接続されていません。まずスプレッドシートとシートを接続してください。'
+          validationError: 'データソースが接続されていません。まずフォームを接続してください。'
         };
       }
 
@@ -3863,17 +3711,20 @@
     try {
       const isUrlMethod = !document.getElementById('url-method')?.classList?.contains('hidden');
 
-      const titleElement = isUrlMethod ?
-        document.getElementById('url-form-title') :
-        document.getElementById('form-title');
-      const urlElement = isUrlMethod ?
-        document.getElementById('url-form-url') :
-        document.getElementById('form-url');
-
-      return {
-        formUrl: (urlElement?.href !== '#' && urlElement?.href) || null,
-        formTitle: (titleElement?.textContent !== '-' && titleElement?.textContent) || null
-      };
+      // フォーム情報をデータセットから取得
+      if (isUrlMethod) {
+        const urlInput = document.getElementById('form-url-input');
+        return {
+          formUrl: urlInput?.dataset.formUrl || null,
+          formTitle: urlInput?.dataset.formTitle || null
+        };
+      } else {
+        const formSelect = document.getElementById('form-select');
+        return {
+          formUrl: formSelect?.dataset.formUrl || null,
+          formTitle: formSelect?.dataset.formTitle || null
+        };
+      }
     } catch (error) {
       console.warn('getCurrentFormInfoSafe error:', error.message);
       return { formUrl: null, formTitle: null };
@@ -3888,26 +3739,33 @@
     };
   }
 
-  function getConfig() {
-    const sourceMethod = document.querySelector('input[name="source-method"]:checked').value;
+  /**
+   * 現在の設定を再読み込みして適用
+   * etag不一致時のリロード処理で使用
+   */
+  async function loadAndApplyCurrentConfig() {
+    try {
+      const adminData = await loadBatchedAdminData();
+      if (adminData) {
+        systemState.userInfo = adminData.userInfo;
+        systemState.user = adminData.userInfo;
+        systemState.config = { ...systemState.config, ...adminData.config };
+        currentBoardInfo = adminData.boardInfo;
 
-    let spreadsheetId, sheetName;
-
-    if (sourceMethod === 'url') {
-      const urlInput = document.getElementById('spreadsheet-url');
-      const url = urlInput.value.trim();
-      const spreadsheetRegex = /https:\/\/docs\.google\.com\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/;
-      const match = url.match(spreadsheetRegex);
-
-      if (match) {
-        spreadsheetId = match[1];
+        updatePanel(systemState.config);
+        updateFooterDisplay(adminData.boardInfo);
+        showInfo('設定を最新の状態に更新しました');
       }
-      sheetName = document.getElementById('detected-sheet-name').textContent.trim();
-    } else {
-      spreadsheetId = document.getElementById('spreadsheet-select').value;
-      sheetName = document.getElementById('sheet-select').value;
+    } catch (error) {
+      console.error('設定の再読み込みに失敗:', error);
+      showError('設定の再読み込みに失敗しました。ページを更新してください。');
     }
+  }
 
+  function getConfig() {
+    // フォーム検証で取得したデータを使用
+    const spreadsheetId = getCurrentSpreadsheetId();
+    const sheetName = getCurrentSheetName();
 
     const formInfo = getCurrentFormInfoSafe();
     const columnMapping = getColumnMapping();
