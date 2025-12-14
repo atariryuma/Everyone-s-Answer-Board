@@ -1163,6 +1163,25 @@
       btn.textContent = '作成中...';
     }
 
+    // ポップアップブロッカー対策: ユーザークリック直後にウィンドウを開く
+    // 非同期コールバック内ではwindow.openがブロックされるため
+    // 参考: https://www.abeautifulsite.net/posts/opening-a-new-window-after-an-async-operation/
+    const newWindow = window.open('about:blank', '_blank');
+    if (newWindow) {
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head><title>フォーム作成中...</title></head>
+        <body style="background:#1a1a2e;color:white;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:sans-serif;">
+          <div style="text-align:center;">
+            <div style="font-size:48px;margin-bottom:16px;">📝</div>
+            <p style="font-size:18px;">フォームを作成中...</p>
+          </div>
+        </body>
+        </html>
+      `);
+    }
+
     google.script.run
       .withSuccessHandler(function (result) {
         if (btn) {
@@ -1207,18 +1226,22 @@
             detectedSpreadsheetLink.href = result.spreadsheetUrl || '#';
           }
 
-          // 編集用URLを新しいタブで開く（作成完了後に開く）
-          if (result.editUrl) {
-            window.open(result.editUrl, '_blank');
+          // 事前に開いたウィンドウにフォームURLを設定
+          if (result.editUrl && newWindow && !newWindow.closed) {
+            newWindow.location.href = result.editUrl;
           }
 
           // 自動的に接続処理を実行
           setTimeout(() => connectToDataSource(), 500);
         } else {
+          // エラー時はローディング画面を閉じる
+          if (newWindow && !newWindow.closed) newWindow.close();
           showError(result.error || 'フォーム作成に失敗しました');
         }
       })
       .withFailureHandler(function (error) {
+        // エラー時はローディング画面を閉じる
+        if (newWindow && !newWindow.closed) newWindow.close();
         if (btn) {
           btn.disabled = false;
           btn.textContent = '✨ テンプレート作成';
