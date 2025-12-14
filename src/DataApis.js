@@ -216,7 +216,7 @@ function processFormUrlInput(formUrl) {
     try {
       form = FormApp.openByUrl(formUrl);
     } catch (e) {
-      return { success: false, error: 'フォームの編集権限が必要です' };
+      return { success: false, error: 'フォームにアクセスできません。編集用URL（/editで終わるURL）を使用するか、テンプレート作成をお試しください' };
     }
 
     const formTitle = form.getTitle();

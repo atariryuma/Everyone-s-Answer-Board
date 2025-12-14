@@ -65,18 +65,18 @@ function doGet(e) {
         template.userEmail = currentEmail || '';
         template.timestamp = new Date().toISOString();
         template.isAppDisabled = true; // アプリ停止状態を明示
-        return template.evaluate();
+        return template.evaluate().setTitle('回答ボード');
       }
     }
 
 
     switch (mode) {
       case 'login': {
-        return HtmlService.createTemplateFromFile('LoginPage.html').evaluate();
+        return HtmlService.createTemplateFromFile('LoginPage.html').evaluate().setTitle('ログイン');
       }
 
       case 'manual': {
-        return HtmlService.createTemplateFromFile('TeacherManual.html').evaluate();
+        return HtmlService.createTemplateFromFile('TeacherManual.html').evaluate().setTitle('使い方ガイド');
       }
 
       case 'admin': {
@@ -122,7 +122,7 @@ function doGet(e) {
           dynamicUrls: enhancedConfig.dynamicUrls || {}
         });
 
-        return template.evaluate();
+        return template.evaluate().setTitle('管理');
       }
 
       case 'setup': {
@@ -142,13 +142,13 @@ function doGet(e) {
         }
 
         if (showSetup) {
-          return HtmlService.createTemplateFromFile('SetupPage.html').evaluate();
+          return HtmlService.createTemplateFromFile('SetupPage.html').evaluate().setTitle('初期設定');
         } else {
           const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
           template.isAdministrator = currentEmail ? isAdministrator(currentEmail) : false;
           template.userEmail = currentEmail || '';
           template.timestamp = new Date().toISOString();
-          return template.evaluate();
+          return template.evaluate().setTitle('回答ボード');
         }
       }
 
@@ -163,7 +163,7 @@ function doGet(e) {
 
         template.userIdParam = userIdParam || '';
 
-        return template.evaluate();
+        return template.evaluate().setTitle('システム設定');
       }
 
       case 'view': {
@@ -195,7 +195,7 @@ function doGet(e) {
           template.boardUrl = baseUrl ? `${baseUrl}?mode=view&userId=${targetUserId}` : '';
 
 
-          return template.evaluate();
+          return template.evaluate().setTitle('未公開');
         }
 
         const template = HtmlService.createTemplateFromFile('Page.html');
@@ -225,7 +225,7 @@ function doGet(e) {
           displaySettings: config.displaySettings || { showNames: false, showReactions: false }
         });
 
-        return template.evaluate();
+        return template.evaluate().setTitle('回答ボード');
       }
 
       case 'main':
@@ -235,7 +235,7 @@ function doGet(e) {
         template.isAdministrator = email ? isAdministrator(email) : false;
         template.userEmail = email || '';
         template.timestamp = new Date().toISOString();
-        return template.evaluate();
+        return template.evaluate().setTitle('回答ボード');
       }
     }
   } catch (error) {
@@ -251,7 +251,7 @@ function doGet(e) {
     errorTemplate.message = 'システムで予期しないエラーが発生しました。管理者にお問い合わせください。';
     errorTemplate.hideLoginButton = false;
 
-    return errorTemplate.evaluate();
+    return errorTemplate.evaluate().setTitle('エラー');
   }
 }
 
@@ -283,14 +283,15 @@ function createRedirectTemplate(redirectPage, error) {
       template.hideLoginButton = true;
     }
 
-    return template.evaluate();
+    const title = redirectPage === 'ErrorBoundary.html' ? 'エラー' : '回答ボード';
+    return template.evaluate().setTitle(title);
   } catch (templateError) {
     console.error('createRedirectTemplate error:', templateError.message);
     const fallbackTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     fallbackTemplate.title = 'システムエラー';
     fallbackTemplate.message = 'ページの表示中にエラーが発生しました。';
     fallbackTemplate.hideLoginButton = false;
-    return fallbackTemplate.evaluate();
+    return fallbackTemplate.evaluate().setTitle('エラー');
   }
 }
 
