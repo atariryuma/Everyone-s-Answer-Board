@@ -758,9 +758,6 @@
     }
   }
 
-
-  // validateUrlInput - 削除済み（スプレッドシートURL検証用の未使用関数）
-
   function sanitizeInput(input) {
     if (!input || typeof input !== 'string') return '';
     return input.replace(/[<>\"'&]/g, '').trim();
@@ -1143,6 +1140,10 @@
       btn.textContent = '作成中...';
     }
 
+    // ポップアップブロッカー対策: ユーザークリック直後にウィンドウを開く
+    // 後でURLを設定する（about:blankで開いておく）
+    const newWindow = window.open('about:blank', '_blank');
+
     google.script.run
       .withSuccessHandler(function (result) {
         if (btn) {
@@ -1176,18 +1177,25 @@
           if (detectedTitle) detectedTitle.textContent = result.formTitle;
           if (detectedStatus) detectedStatus.textContent = '新規作成しました';
 
-          // 編集用URLを新しいタブで開く
-          if (result.editUrl) {
+          // 編集用URLを新しいタブで開く（事前に開いたウィンドウにURLを設定）
+          if (result.editUrl && newWindow) {
+            newWindow.location.href = result.editUrl;
+          } else if (result.editUrl) {
+            // フォールバック: newWindowが閉じられていた場合
             window.open(result.editUrl, '_blank');
           }
 
           // 自動的に接続処理を実行
           setTimeout(() => connectToDataSource(), 300);
         } else {
+          // エラー時は空のタブを閉じる
+          if (newWindow) newWindow.close();
           showError(result.error || 'フォーム作成に失敗しました');
         }
       })
       .withFailureHandler(function (error) {
+        // エラー時は空のタブを閉じる
+        if (newWindow) newWindow.close();
         if (btn) {
           btn.disabled = false;
           btn.textContent = '✨ テンプレート作成';
@@ -1552,13 +1560,6 @@
       })
       .processFormUrlInput(formUrl);
   }
-  // updateDetectedInfo - 削除済み（スプレッドシートURL用の未使用関数）
-
-
-
-
-
-
 
 
   async function manualColumnAnalysis() {

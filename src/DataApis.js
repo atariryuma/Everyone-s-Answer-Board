@@ -117,10 +117,11 @@ function createTemplateForm() {
     const formTitle = 'みんなの回答ボード';
     const form = FormApp.create(formTitle);
 
-    // メールアドレス自動取得を有効化（確認済み）
-    // setRequireLogin(true) + setCollectEmail(true) で「確認済み」モードになる
-    form.setRequireLogin(true);
+    // メールアドレス収集を「確認済み」モードに設定
+    // setLimitOneResponsePerUser(true) でGoogleログイン必須になり、メールが確認済みになる
+    // 参考: https://developers.google.com/apps-script/reference/forms/form
     form.setCollectEmail(true);
+    form.setLimitOneResponsePerUser(true);
 
     // 1. クラス選択（ドロップダウン - ListItem）
     form.addListItem()
