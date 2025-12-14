@@ -967,15 +967,17 @@
   }
 
   function updateSystemState(updates = {}) {
-    const { spreadsheetId, sheetName, columnMapping, setupStatus, needsProgress = false } = updates;
+    const { spreadsheetId, sheetName, columnMapping, setupStatus, formUrl, formTitle, needsProgress = false } = updates;
 
-    if (spreadsheetId || sheetName || columnMapping || setupStatus) {
+    if (spreadsheetId || sheetName || columnMapping || setupStatus || formUrl || formTitle) {
       systemState.config = {
         ...systemState.config,
         ...(spreadsheetId && { spreadsheetId }),
         ...(sheetName && { sheetName }),
         ...(columnMapping && { columnMapping }),
-        ...(setupStatus && { setupStatus })
+        ...(setupStatus && { setupStatus }),
+        ...(formUrl && { formUrl }),
+        ...(formTitle && { formTitle })
       };
     }
 
@@ -1901,6 +1903,11 @@
 
         showSuccess(successDetails.join(' | '));
 
+        // フォーム情報を取得
+        const formInfo = result.batchResults?.formInfo?.formData || getCurrentFormInfoSafe();
+        const formUrl = formInfo?.formUrl || null;
+        const formTitle = formInfo?.formTitle || null;
+
         if (result.headers && result.mapping) {
           fillColumnDropdowns(result.headers, result.mapping, result.confidence);
 
@@ -1909,6 +1916,8 @@
             sheetName,
             columnMapping: result.mapping,
             setupStatus: 'completed',
+            formUrl,
+            formTitle,
             needsProgress: true
           });
 
@@ -1923,7 +1932,9 @@
               spreadsheetId,
               sheetName,
               columnMapping: currentMapping,
-              setupStatus: 'completed'
+              setupStatus: 'completed',
+              formUrl,
+              formTitle
             });
 
             showSuccess('AI列判定完了！設定を確認してください');
