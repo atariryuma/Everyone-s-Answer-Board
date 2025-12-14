@@ -365,20 +365,41 @@
    * Footer UI initialization (no API calls)
    */
   function initializeFooterUI() {
-    const refreshBtn = document.getElementById('refreshBoardInfo');
-    if (refreshBtn) {
-      refreshBtn.addEventListener('click', async () => {
+    const unpublishBtn = document.getElementById('unpublishBoardBtn');
+    if (unpublishBtn) {
+      unpublishBtn.addEventListener('click', async () => {
+        if (!systemState.config?.isPublished) {
+          showInfo('このボードは既に非公開です');
+          return;
+        }
+
+        if (!confirm('このボードを非公開にしますか？\n学生はボードにアクセスできなくなります。')) {
+          return;
+        }
+
         try {
-          const adminData = await loadBatchedAdminData();
+          window.setLoading(true, 'ボードを非公開にしています...');
 
-          systemState.userInfo = adminData.userInfo;
-          systemState.user = adminData.userInfo;
-          systemState.config = { ...systemState.config, ...adminData.config };
-          currentBoardInfo = adminData.boardInfo;
+          const result = await new Promise((resolve, reject) => {
+            google.script.run
+              .withSuccessHandler(resolve)
+              .withFailureHandler(reject)
+              .clearActiveSheet(window.UNIFIED_CONFIG.targetUserId);
+          });
 
-          updateFooterDisplay(adminData.boardInfo);
+          if (result.success) {
+            showSuccess(result.message || 'ボードを非公開にしました');
+            systemState.config.isPublished = false;
+            updatePublishStatus('unpublished');
+            updateFooterDisplay({ ...currentBoardInfo, isPublished: false });
+          } else {
+            showError(result.message || result.error || 'ボードの非公開に失敗しました');
+          }
         } catch (error) {
-          console.error('Failed to refresh board info:', error);
+          console.error('公開終了エラー:', error);
+          showError('ボードの非公開に失敗しました');
+        } finally {
+          window.setLoading(false);
         }
       });
     }
@@ -3921,10 +3942,10 @@
     const questionText = document.getElementById('currentQuestionText');
     const openBtn = document.getElementById('openBoardBtn');
     const copyBtn = document.getElementById('copyViewUrlBtn');
+    const unpublishBtn = document.getElementById('unpublishBoardBtn');
     const statusText = document.getElementById('boardStatus');
 
     const isPublished = Boolean(boardInfo?.isPublished || boardInfo?.isActive);
-
 
     if (!isPublished) {
       footer.classList.add('hidden');
@@ -3938,6 +3959,7 @@
     if (boardInfo.isActive && boardInfo.urls) {
       openBtn.style.display = 'block';
       copyBtn.style.display = 'block';
+      if (unpublishBtn) unpublishBtn.style.display = 'block';
 
       openBtn.onclick = () => window.open(boardInfo.urls.view, '_blank');
       copyBtn.onclick = () => copyViewUrl(boardInfo.urls.view);
@@ -3948,6 +3970,7 @@
     } else {
       openBtn.style.display = 'none';
       copyBtn.style.display = 'none';
+      if (unpublishBtn) unpublishBtn.style.display = 'none';
       if (statusText) {
         statusText.textContent = boardInfo.error || 'ボードが非アクティブです';
       }

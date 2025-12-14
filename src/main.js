@@ -932,7 +932,6 @@ function diagnosePerformance(options = {}) {
 
 /**
  * スプレッドシート一覧のキャッシュをクリア
- * 🔄 更新ボタン用のキャッシュクリア機能
  * @returns {Object} 処理結果
  */
 function clearSheetsCache() {
