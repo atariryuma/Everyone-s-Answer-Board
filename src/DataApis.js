@@ -185,7 +185,8 @@ function createTemplateForm() {
       formTitle: formTitle,
       spreadsheetId: ss.getId(),
       spreadsheetUrl: ss.getUrl(),
-      sheetName: 'シート1',
+      spreadsheetName: ss.getName(),
+      sheetName: 'フォームの回答 1',
       folderUrl: folderUrl,
       wasCreated: true,
       message: 'テンプレートフォームを作成しました'
@@ -271,6 +272,7 @@ function processFormUrlInput(formUrl) {
       formUrl: publishedUrl,
       spreadsheetId,
       spreadsheetUrl,
+      spreadsheetName: ss.getName(),
       sheetName,
       wasCreated,
       message: wasCreated ? '回答先スプレッドシートを作成しました' : null

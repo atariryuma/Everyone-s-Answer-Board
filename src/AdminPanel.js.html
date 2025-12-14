@@ -1036,7 +1036,7 @@
         formLink.href = safeData.editUrl || safeData.formUrl || '#';
       }
       if (spreadsheetLink) {
-        spreadsheetLink.textContent = safeData.sheetName || '検出済み';
+        spreadsheetLink.textContent = safeData.spreadsheetName || safeData.sheetName || '検出済み';
         spreadsheetLink.href = safeData.spreadsheetUrl || '#';
       }
       if (container) {
@@ -1222,7 +1222,7 @@
             detectedFormLink.href = result.editUrl || '#';
           }
           if (detectedSpreadsheetLink) {
-            detectedSpreadsheetLink.textContent = result.sheetName || 'スプレッドシート';
+            detectedSpreadsheetLink.textContent = result.spreadsheetName || result.sheetName || 'スプレッドシート';
             detectedSpreadsheetLink.href = result.spreadsheetUrl || '#';
           }
 
@@ -1512,11 +1512,8 @@
       formLink.textContent = formData.formTitle || '-';
       formLink.href = formData.editUrl || formData.formUrl || '#';
 
-      if (formData.wasCreated) {
-        spreadsheetLink.textContent = formData.sheetName || 'スプレッドシート';
-      } else {
-        spreadsheetLink.textContent = formData.sheetName || '検出済み';
-      }
+      // スプレッドシート名を優先表示（なければシート名）
+      spreadsheetLink.textContent = formData.spreadsheetName || formData.sheetName || 'スプレッドシート';
       spreadsheetLink.href = formData.spreadsheetUrl || '#';
 
       container.classList.remove('hidden');
