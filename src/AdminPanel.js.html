@@ -1026,16 +1026,18 @@
     const safeData = formData || {};
 
     if (isUrlMethod) {
-      // URL方式の場合: form-detection-info を使用
+      // URL方式の場合: form-detection-info を使用（リンク付き）
       const container = document.getElementById('form-detection-info');
-      const titleElement = document.getElementById('detected-form-title');
-      const statusElement = document.getElementById('detected-spreadsheet-status');
+      const formLink = document.getElementById('detected-form-link');
+      const spreadsheetLink = document.getElementById('detected-spreadsheet-link');
 
-      if (titleElement) {
-        titleElement.textContent = safeData.formTitle || 'フォーム情報なし';
+      if (formLink) {
+        formLink.textContent = safeData.formTitle || 'フォーム情報なし';
+        formLink.href = safeData.editUrl || safeData.formUrl || '#';
       }
-      if (statusElement) {
-        statusElement.textContent = safeData.sheetName || '検出済み';
+      if (spreadsheetLink) {
+        spreadsheetLink.textContent = safeData.sheetName || '検出済み';
+        spreadsheetLink.href = safeData.spreadsheetUrl || '#';
       }
       if (container) {
         container.classList.remove('hidden');
@@ -1161,10 +1163,6 @@
       btn.textContent = '作成中...';
     }
 
-    // ポップアップブロッカー対策: ユーザークリック直後にウィンドウを開く
-    // 後でURLを設定する（about:blankで開いておく）
-    const newWindow = window.open('about:blank', '_blank');
-
     google.script.run
       .withSuccessHandler(function (result) {
         if (btn) {
@@ -1195,34 +1193,32 @@
             formSelect.dataset.formUrl = result.formUrl;
           }
 
-          // 検出情報を表示
+          // 検出情報を表示（リンク付き）
           const detectionInfo = document.getElementById('form-detection-info');
-          const detectedTitle = document.getElementById('detected-form-title');
-          const detectedStatus = document.getElementById('detected-spreadsheet-status');
+          const detectedFormLink = document.getElementById('detected-form-link');
+          const detectedSpreadsheetLink = document.getElementById('detected-spreadsheet-link');
           if (detectionInfo) detectionInfo.classList.remove('hidden');
-          if (detectedTitle) detectedTitle.textContent = result.formTitle;
-          if (detectedStatus) detectedStatus.textContent = '新規作成しました';
+          if (detectedFormLink) {
+            detectedFormLink.textContent = result.formTitle;
+            detectedFormLink.href = result.editUrl || '#';
+          }
+          if (detectedSpreadsheetLink) {
+            detectedSpreadsheetLink.textContent = result.sheetName || 'スプレッドシート';
+            detectedSpreadsheetLink.href = result.spreadsheetUrl || '#';
+          }
 
-          // 編集用URLを新しいタブで開く（事前に開いたウィンドウにURLを設定）
-          // 接続処理より先に実行して確実にタブを開く
-          if (result.editUrl && newWindow && !newWindow.closed) {
-            newWindow.location.href = result.editUrl;
-          } else if (result.editUrl) {
-            // フォールバック: newWindowが閉じられていた場合
+          // 編集用URLを新しいタブで開く（作成完了後に開く）
+          if (result.editUrl) {
             window.open(result.editUrl, '_blank');
           }
 
-          // 自動的に接続処理を実行（フォームを開いた後に非同期で実行）
+          // 自動的に接続処理を実行
           setTimeout(() => connectToDataSource(), 500);
         } else {
-          // エラー時は空のタブを閉じる
-          if (newWindow) newWindow.close();
           showError(result.error || 'フォーム作成に失敗しました');
         }
       })
       .withFailureHandler(function (error) {
-        // エラー時は空のタブを閉じる
-        if (newWindow) newWindow.close();
         if (btn) {
           btn.disabled = false;
           btn.textContent = '✨ テンプレート作成';
@@ -1481,21 +1477,25 @@
   }
 
   /**
-   * フォーム検出情報を表示
+   * フォーム検出情報を表示（リンク付き）
    * @param {Object} formData - フォーム情報
    */
   function showFormDetectionInfo(formData) {
     const container = document.getElementById('form-detection-info');
-    const titleSpan = document.getElementById('detected-form-title');
-    const statusSpan = document.getElementById('detected-spreadsheet-status');
+    const formLink = document.getElementById('detected-form-link');
+    const spreadsheetLink = document.getElementById('detected-spreadsheet-link');
 
-    if (container && titleSpan && statusSpan) {
-      titleSpan.textContent = formData.formTitle || '-';
+    if (container && formLink && spreadsheetLink) {
+      formLink.textContent = formData.formTitle || '-';
+      formLink.href = formData.editUrl || formData.formUrl || '#';
+
       if (formData.wasCreated) {
-        statusSpan.textContent = '新規作成しました';
+        spreadsheetLink.textContent = formData.sheetName || 'スプレッドシート';
       } else {
-        statusSpan.textContent = formData.sheetName || '検出済み';
+        spreadsheetLink.textContent = formData.sheetName || '検出済み';
       }
+      spreadsheetLink.href = formData.spreadsheetUrl || '#';
+
       container.classList.remove('hidden');
     }
   }
