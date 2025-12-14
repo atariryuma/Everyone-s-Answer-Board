@@ -468,6 +468,13 @@
       });
     }
 
+    const createTemplateBtn = document.getElementById('create-template-form');
+    if (createTemplateBtn) {
+      createTemplateBtn.addEventListener('click', function () {
+        createTemplateForm();
+      });
+    }
+
     const verifyBtn = document.getElementById('verify-mapping');
     if (verifyBtn) {
       verifyBtn.addEventListener('click', function () {
@@ -1145,6 +1152,74 @@
         showError(error.message || '検証エラーが発生しました');
       })
       .processFormUrlInput(formUrl);
+  }
+
+  /**
+   * テンプレートフォームを作成
+   */
+  function createTemplateForm() {
+    const btn = document.getElementById('create-template-form');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = '作成中...';
+    }
+
+    google.script.run
+      .withSuccessHandler(function (result) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '✨ テンプレート作成';
+        }
+
+        if (result.success) {
+          showSuccess(result.message || 'テンプレートフォームを作成しました');
+
+          // URL入力欄にフォームURLをセット
+          const formUrlInput = document.getElementById('form-url-input');
+          if (formUrlInput) {
+            formUrlInput.value = result.formUrl;
+          }
+
+          // フォーム選択データを保持
+          const formSelect = document.getElementById('form-select');
+          if (formSelect) {
+            formSelect.dataset.spreadsheetId = result.spreadsheetId;
+            formSelect.dataset.sheetName = result.sheetName;
+            formSelect.dataset.formTitle = result.formTitle;
+            formSelect.dataset.formUrl = result.formUrl;
+          }
+
+          // 検出情報を表示
+          const detectionInfo = document.getElementById('form-detection-info');
+          const detectedTitle = document.getElementById('detected-form-title');
+          const detectedStatus = document.getElementById('detected-spreadsheet-status');
+          if (detectionInfo) detectionInfo.classList.remove('hidden');
+          if (detectedTitle) detectedTitle.textContent = result.formTitle;
+          if (detectedStatus) detectedStatus.textContent = '新規作成しました';
+
+          // 接続ボタン有効化
+          const connectBtn = document.getElementById('connect-url-source');
+          if (connectBtn) {
+            connectBtn.disabled = false;
+            connectBtn.textContent = '✅ 接続';
+          }
+
+          // 編集用URLを新しいタブで開く
+          if (result.editUrl) {
+            window.open(result.editUrl, '_blank');
+          }
+        } else {
+          showError(result.error || 'フォーム作成に失敗しました');
+        }
+      })
+      .withFailureHandler(function (error) {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = '✨ テンプレート作成';
+        }
+        showError(error.message || 'フォーム作成中にエラーが発生しました');
+      })
+      .createTemplateForm();
   }
 
   function processFormDetectionResult(formResult) {

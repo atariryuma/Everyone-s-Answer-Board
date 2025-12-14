@@ -329,8 +329,12 @@
         </ul>
         <p class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800/30 transition-colors duration-200"><span id="infoIconHighlight" class="w-5 h-5 text-purple-400 flex-shrink-0"></span><span class="text-gray-200">先生が注目してほしい意見につけています</span></p>
 
-        <div class="text-center mt-6">
+        <div class="text-center mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
           <button type="button" id="infoModalConfirmBtn" disabled class="px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-500 disabled:cursor-not-allowed disabled:opacity-60 text-white rounded-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95 disabled:hover:scale-100 focus:ring-2 focus:ring-blue-400/50 focus:outline-none shadow-lg">わかった</button>
+          <a id="infoModalFormBtn" href="#" target="_blank" class="hidden px-6 py-3 bg-green-600 hover:bg-green-700 active:bg-green-800 text-white rounded-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-green-400/50 focus:outline-none shadow-lg inline-flex items-center gap-2">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            フォームで回答
+          </a>
         </div>
       </div>
     </div>

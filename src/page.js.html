@@ -4283,6 +4283,14 @@
       this.elements.infoModalContainer.classList.add('modal-fade');
       this.elements.infoModalCard.classList.add('modal-scale');
 
+      // フォームURLがある場合は「フォームで回答」ボタンを表示
+      const formBtn = document.getElementById('infoModalFormBtn');
+      const formUrl = window.UNIFIED_CONFIG?.formUrl;
+      if (formBtn && formUrl) {
+        formBtn.href = formUrl;
+        formBtn.classList.remove('hidden');
+      }
+
       this.elements.infoModalCard.scrollTop = 0;
       requestIdleCallback(() => {
         this.elements.infoModalConfirmBtn.focus();

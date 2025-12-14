@@ -79,6 +79,74 @@ function getForms() {
 }
 
 /**
+ * テンプレートフォームを作成
+ * ベストプラクティス: https://developers.google.com/apps-script/reference/forms/form
+ * @returns {Object} 作成結果（フォームURL、スプレッドシートID等）
+ */
+function createTemplateForm() {
+  try {
+    const currentEmail = getCurrentEmail();
+    if (!currentEmail) {
+      return { success: false, error: '認証が必要です' };
+    }
+
+    // テンプレートフォーム作成
+    const formTitle = 'みんなの回答ボード';
+    const form = FormApp.create(formTitle);
+
+    // メールアドレス自動取得を有効化（ユーザー入力不要）
+    form.setCollectEmail(true);
+
+    // 1. クラス選択（ドロップダウン - ListItem）
+    const classItem = form.addListItem();
+    classItem.setTitle('クラス')
+      .setRequired(true)
+      .setHelpText('所属クラスを選択してください')
+      .setChoiceValues(['クラス1', 'クラス2', 'クラス3', 'クラス4']);
+
+    // 2. 名前（短文 - TextItem）
+    form.addTextItem()
+      .setTitle('名前')
+      .setRequired(true)
+      .setHelpText('表示名を入力してください');
+
+    // 3. 回答（選択肢 - MultipleChoiceItem）
+    const answerItem = form.addMultipleChoiceItem();
+    answerItem.setTitle('回答')
+      .setRequired(true)
+      .setHelpText('回答を選択してください')
+      .setChoiceValues(['賛成', '反対', 'どちらでもない']);
+
+    // 4. 理由（長文 - ParagraphTextItem）
+    form.addParagraphTextItem()
+      .setTitle('理由')
+      .setRequired(true)
+      .setHelpText('選択した理由を詳しく記入してください');
+
+    // 回答先スプレッドシートを作成してリンク
+    const ss = SpreadsheetApp.create(formTitle + ' (回答)');
+    form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+
+    return {
+      success: true,
+      formUrl: form.getPublishedUrl(),
+      editUrl: form.getEditUrl(),
+      formId: form.getId(),
+      formTitle: formTitle,
+      spreadsheetId: ss.getId(),
+      spreadsheetUrl: ss.getUrl(),
+      sheetName: 'シート1',
+      wasCreated: true,
+      message: 'テンプレートフォームを作成しました'
+    };
+
+  } catch (error) {
+    console.error('createTemplateForm error:', error.message);
+    return { success: false, error: 'フォーム作成に失敗しました: ' + error.message };
+  }
+}
+
+/**
  * フォームURLから回答ボード接続情報を取得
  * スプレッドシートがなければ新規作成してリンク
  * @param {string} formUrl - GoogleフォームURL
@@ -113,29 +181,30 @@ function processFormUrlInput(formUrl) {
     let spreadsheetId = form.getDestinationId();
     let wasCreated = false;
     let spreadsheetUrl = '';
+    let ss;
 
     // 4. スプレッドシートがなければ新規作成
     if (!spreadsheetId) {
       try {
-        const ss = SpreadsheetApp.create(formTitle + ' (回答)');
-        form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
+        ss = SpreadsheetApp.create(formTitle + ' (回答)');
         spreadsheetId = ss.getId();
         spreadsheetUrl = ss.getUrl();
+        form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
         wasCreated = true;
       } catch (e) {
-        return { success: false, error: '作成できませんでした。再試行してください' };
+        console.error('Spreadsheet creation error:', e.message);
+        return { success: false, error: 'スプレッドシートの作成に失敗しました: ' + e.message };
       }
     } else {
       try {
-        const ss = SpreadsheetApp.openById(spreadsheetId);
+        ss = SpreadsheetApp.openById(spreadsheetId);
         spreadsheetUrl = ss.getUrl();
       } catch (e) {
         return { success: false, error: '回答先スプレッドシートにアクセスできません' };
       }
     }
 
-    // 5. 回答シート名を特定
-    const ss = SpreadsheetApp.openById(spreadsheetId);
+    // 5. 回答シート名を特定（新規作成時は「シート1」、既存は回答シート）
     const sheets = ss.getSheets();
     const responseSheet = sheets.find(s =>
       s.getName().includes('フォームの回答') ||
