@@ -403,3 +403,39 @@ function getAppAccessStatus() {
     return createExceptionResponse(error, 'アクセス制限状態取得処理');
   }
 }
+
+/**
+ * ウェルカムモーダルを既読にする
+ * @returns {Object} 実行結果
+ */
+function markWelcomeSeen() {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return createAuthError('ユーザー認証が必要です');
+    }
+
+    const currentUser = findUserByEmail(email, { requestingUser: email });
+    if (!currentUser) {
+      return createUserNotFoundError('ユーザーが見つかりません');
+    }
+
+    const configResult = getUserConfig(currentUser.userId);
+    const config = configResult.success ? configResult.config : {};
+
+    config.hasSeenWelcome = true;
+
+    const saveResult = saveUserConfig(currentUser.userId, config);
+    if (!saveResult.success) {
+      return createErrorResponse('設定の保存に失敗しました');
+    }
+
+    return createSuccessResponse('ウェルカムモーダルを既読にしました', {
+      userId: currentUser.userId,
+      hasSeenWelcome: true
+    });
+  } catch (error) {
+    console.error('markWelcomeSeen error:', error.message);
+    return createExceptionResponse(error);
+  }
+}

@@ -284,12 +284,62 @@
 
       updateProgress(1);
 
+      // 初回アクセス時のウェルカムモーダル表示
+      checkAndShowWelcomeModal();
+
     } catch (error) {
       console.error('Batched admin panel initialization error:', error);
       throw error;
     } finally {
       window.setLoading(false);
     }
+  }
+
+  /**
+   * 初回アクセス時のウェルカムモーダル表示チェック
+   */
+  function checkAndShowWelcomeModal() {
+    const hasSeenWelcome = systemState.config?.hasSeenWelcome;
+
+    if (!hasSeenWelcome && window.sharedModals) {
+      window.sharedModals.showWelcome({
+        onStart: () => {
+          // モーダルを閉じて通常フローへ
+          console.log('Welcome modal: user started');
+        },
+        onManual: () => {
+          // マニュアルを開く
+          openManualGuide();
+        },
+        onDontShow: (checked) => {
+          if (checked) {
+            markWelcomeSeenOnServer();
+          }
+        }
+      });
+    }
+  }
+
+  /**
+   * ウェルカムモーダルを既読にする（サーバー側保存）
+   */
+  function markWelcomeSeenOnServer() {
+    google.script.run
+      .withSuccessHandler((result) => {
+        if (result.success) {
+          console.log('Welcome seen flag saved');
+          // ローカル状態も更新
+          if (systemState.config) {
+            systemState.config.hasSeenWelcome = true;
+          }
+        } else {
+          console.warn('Failed to save welcome seen flag:', result.message);
+        }
+      })
+      .withFailureHandler((error) => {
+        console.error('markWelcomeSeen error:', error);
+      })
+      .markWelcomeSeen();
   }
 
 
@@ -1171,11 +1221,60 @@
       newWindow.document.write(`
         <!DOCTYPE html>
         <html>
-        <head><title>フォーム作成中...</title></head>
-        <body style="background:#1a1a2e;color:white;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:sans-serif;">
-          <div style="text-align:center;">
-            <div style="font-size:48px;margin-bottom:16px;">📝</div>
-            <p style="font-size:18px;">フォームを作成中...</p>
+        <head>
+          <title>フォーム作成中...</title>
+          <style>
+            @keyframes spin { to { transform: rotate(360deg); } }
+            .spinner { animation: spin 1s linear infinite; display: inline-block; }
+            .btn-primary {
+              background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+              color: white;
+              border: none;
+              padding: 16px 32px;
+              font-size: 16px;
+              font-weight: bold;
+              border-radius: 12px;
+              cursor: pointer;
+              transition: all 0.2s;
+              display: none;
+            }
+            .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99,102,241,0.4); }
+          </style>
+        </head>
+        <body style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:white;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+          <div style="text-align:center;max-width:500px;padding:24px;">
+            <div id="status-icon" style="font-size:48px;margin-bottom:16px;" class="spinner">⚙️</div>
+            <p id="status-text" style="font-size:20px;font-weight:bold;margin-bottom:24px;">テンプレートフォームを作成中...</p>
+
+            <div style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);border-radius:12px;padding:20px;text-align:left;margin-bottom:16px;">
+              <p style="font-size:14px;color:#fbbf24;margin:0 0 12px 0;font-weight:bold;">⚠️ 編集が必要な項目</p>
+              <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
+                <li><strong>クラス</strong> → 実際のクラス名に変更</li>
+                <li><strong>回答の選択肢</strong> → 質問に合った選択肢に変更</li>
+              </ul>
+            </div>
+
+            <div style="background:rgba(255,255,255,0.1);border-radius:12px;padding:20px;text-align:left;margin-bottom:16px;">
+              <p style="font-size:14px;color:#a0aec0;margin:0 0 12px 0;">📝 そのまま使える項目</p>
+              <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
+                <li>名前（テキスト入力）</li>
+                <li>理由（長文入力）</li>
+              </ul>
+            </div>
+
+            <div style="background:rgba(34,197,94,0.2);border:1px solid rgba(34,197,94,0.3);border-radius:12px;padding:20px;text-align:left;">
+              <p style="font-size:14px;color:#86efac;margin:0 0 12px 0;font-weight:bold;">✅ 次のステップ</p>
+              <ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.9;color:#e2e8f0;">
+                <li>下のボタンでフォーム編集画面を開く</li>
+                <li>クラス名・回答の選択肢を編集</li>
+                <li>管理パネルに戻り「<strong>🔍 検証して接続</strong>」をクリック</li>
+                <li>「<strong>今すぐ公開</strong>」で完了！</li>
+              </ol>
+            </div>
+
+            <button id="open-form-btn" class="btn-primary" style="margin-top:24px;">
+              📝 フォームを編集する
+            </button>
           </div>
         </body>
         </html>
@@ -1193,10 +1292,10 @@
           showSuccess(result.message || 'テンプレートフォームを作成しました');
 
           // URL入力欄にフォームURLと接続情報をセット
+          // ユーザーが「🔍 検証して接続」をクリックした際に使用される
           const formUrlInput = document.getElementById('form-url-input');
           if (formUrlInput) {
             formUrlInput.value = result.editUrl;
-            // connectToDataSource()で使用するdatasetも設定
             formUrlInput.dataset.spreadsheetId = result.spreadsheetId;
             formUrlInput.dataset.sheetName = result.sheetName;
             formUrlInput.dataset.formTitle = result.formTitle;
@@ -1226,13 +1325,37 @@
             detectedSpreadsheetLink.href = result.spreadsheetUrl || '#';
           }
 
-          // 事前に開いたウィンドウにフォームURLを設定
+          // 作成完了後、ボタンを表示してユーザーのクリックで遷移
           if (result.editUrl && newWindow && !newWindow.closed) {
-            newWindow.location.href = result.editUrl;
+            try {
+              const doc = newWindow.document;
+              const statusIcon = doc.getElementById('status-icon');
+              const statusText = doc.getElementById('status-text');
+              const openFormBtn = doc.getElementById('open-form-btn');
+
+              if (statusIcon) {
+                statusIcon.textContent = '✅';
+                statusIcon.classList.remove('spinner');
+              }
+              if (statusText) {
+                statusText.textContent = 'フォームの作成が完了しました！';
+              }
+              if (openFormBtn) {
+                openFormBtn.style.display = 'inline-block';
+                openFormBtn.onclick = function() {
+                  newWindow.location.href = result.editUrl;
+                };
+              }
+            } catch (e) {
+              // フォールバック: 直接遷移
+              newWindow.location.href = result.editUrl;
+            }
           }
 
-          // 自動的に接続処理を実行
-          setTimeout(() => connectToDataSource(), 500);
+          // フォーム編集後に手動で接続してもらうため、自動接続は行わない
+          // 理由: ユーザーがフォームの質問を編集すると列構造が変わるため、
+          // 編集完了後に接続（AI列判定）を行う必要がある
+          showInfo('フォーム編集後、「🔍 検証して接続」ボタンをクリックしてください', 5000);
         } else {
           // エラー時はローディング画面を閉じる
           if (newWindow && !newWindow.closed) newWindow.close();

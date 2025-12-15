@@ -95,6 +95,7 @@ function getDefaultConfig(userId) {
     userId,
     setupStatus: 'pending',
     isPublished: false,
+    hasSeenWelcome: false,
     displaySettings: {
       showNames: false,
       showReactions: false,
