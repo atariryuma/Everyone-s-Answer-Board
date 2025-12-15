@@ -1065,16 +1065,24 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
     if (columnsToAdd.length > 0) {
       const { lastCol } = getSheetInfo(sheet);
 
-      columnsToAdd.forEach((columnName, index) => {
-        const newColIndex = lastCol + index + 1;
-
-        try {
-          sheet.getRange(1, newColIndex).setValue(columnName);
-          columnsAdded.push(columnName);
-        } catch (colError) {
-          console.error(`setupReactionAndHighlightColumns: Failed to add column '${columnName}':`, colError.message);
-        }
-      });
+      try {
+        // バッチ処理: 全カラムを一度に追加（パフォーマンス最適化）
+        const startCol = lastCol + 1;
+        const values = [columnsToAdd]; // 2D配列（1行 × n列）
+        sheet.getRange(1, startCol, 1, columnsToAdd.length).setValues(values);
+        columnsAdded.push(...columnsToAdd);
+      } catch (colError) {
+        console.error(`setupReactionAndHighlightColumns: Failed to add columns:`, colError.message);
+        // フォールバック: 個別追加を試行
+        columnsToAdd.forEach((columnName, index) => {
+          try {
+            sheet.getRange(1, lastCol + index + 1).setValue(columnName);
+            columnsAdded.push(columnName);
+          } catch (individualError) {
+            console.error(`setupReactionAndHighlightColumns: Failed to add column '${columnName}':`, individualError.message);
+          }
+        });
+      }
     }
 
     return {
