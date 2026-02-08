@@ -1,4 +1,4 @@
-name: CI
+name: CI & Deploy to Google Apps Script
 
 on:
   push:
@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  syntax-check:
+  ci-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,6 +19,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: npm
 
       - name: Check JavaScript syntax
         run: |
@@ -35,3 +36,17 @@ jobs:
             exit 1
           fi
           echo "✅ All JavaScript files passed syntax check"
+
+      - name: Install dependencies
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: npm ci
+
+      - name: Setup clasp auth
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: |
+          echo '${{ secrets.CLASPRC_JSON }}' > ~/.clasprc.json
+          echo '{"scriptId":"${{ secrets.CLASP_SCRIPT_ID }}","rootDir":"src"}' > .clasp.json
+
+      - name: Push to Apps Script
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        run: npx clasp push --force
