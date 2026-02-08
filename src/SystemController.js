@@ -717,47 +717,47 @@ function publishApp(publishConfig) {
 
 
     const user = findUserByEmail(email, { requestingUser: email });
-
-    let saveResult = null;
-
-    if (user) {
-      const userToUse = user;
-
-      const configResult = getUserConfig(userToUse.userId);
-      const currentConfig = configResult.success ? configResult.config : {};
-
-      const updatedConfig = {
-        ...currentConfig,
-        ...publishConfig,
-        formUrl: publishConfig?.formUrl || currentConfig.formUrl,
-        formTitle: publishConfig?.formTitle || currentConfig.formTitle,
-        columnMapping: publishConfig?.columnMapping || currentConfig.columnMapping,
-        displaySettings: publishConfig?.displaySettings || currentConfig.displaySettings,
-        isPublished: true,
-        publishedAt,
-        setupStatus: 'completed',
-        lastModified: publishedAt
-      };
-
-
-      saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
-
-      if (!saveResult.success) {
-        console.error('publishApp: saveUserConfig failed:', saveResult.message);
-      }
-    } else {
+    if (!user) {
       console.error('publishApp: User not found:', email);
+      return { success: false, message: 'ユーザーが見つかりません' };
     }
 
-    const result = {
+    const configResult = getUserConfig(user.userId);
+    const currentConfig = configResult.success ? configResult.config : {};
+
+    const updatedConfig = {
+      ...currentConfig,
+      ...publishConfig,
+      formUrl: publishConfig?.formUrl || currentConfig.formUrl,
+      formTitle: publishConfig?.formTitle || currentConfig.formTitle,
+      columnMapping: publishConfig?.columnMapping || currentConfig.columnMapping,
+      displaySettings: publishConfig?.displaySettings || currentConfig.displaySettings,
+      isPublished: true,
+      publishedAt,
+      setupStatus: 'completed',
+      lastModified: publishedAt
+    };
+
+    const saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
+
+    if (!saveResult.success) {
+      console.error('publishApp: saveUserConfig failed:', saveResult.message);
+      return {
+        success: false,
+        message: saveResult.message || '公開設定の保存に失敗しました',
+        error: saveResult.error || null,
+        currentConfig: saveResult.currentConfig || null
+      };
+    }
+
+    return {
       success: true,
       message: '回答ボードが正常に公開されました',
       publishedAt,
-      userId: user ? user.userId : null,
-      etag: user && saveResult?.etag ? saveResult.etag : null,
-      config: user && saveResult?.config ? saveResult.config : null
+      userId: user.userId,
+      etag: saveResult.etag || null,
+      config: saveResult.config || null
     };
-    return result;
 
   } catch (error) {
     console.error('❌ publishApp ERROR:', {

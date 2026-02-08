@@ -129,7 +129,7 @@ function validateUserData(userData) {
             result.isValid = false;
           } else {
             result.sanitizedData[field] = textValidation.sanitized;
-            if (textValidation.hasSecurityRisk) {
+            if (textValidation.metadata && textValidation.metadata.hadSecurityRisk) {
               result.securityWarnings.push(`${field}: セキュリティリスクを検出`);
             }
           }
@@ -352,4 +352,3 @@ function cleanupOldSecurityLogs() {
     console.warn('SecurityService.cleanupOldSecurityLogs: Cleanup failed:', error.message);
   }
 }
-

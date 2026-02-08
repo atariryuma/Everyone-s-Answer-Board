@@ -301,7 +301,8 @@ function validateAndSanitizeConfig(config, userId) {
       errors.push('無効なユーザーID形式');
     }
 
-    const sanitized = { ...validationResult.sanitized };
+    // 既存設定フィールドを保持しつつ、検証済みフィールドで上書きする
+    const sanitized = { ...config, ...validationResult.sanitized };
     sanitized.userId = userId;
 
     if (sanitized.displaySettings) {
@@ -309,6 +310,15 @@ function validateAndSanitizeConfig(config, userId) {
     }
     if (sanitized.columnMapping) {
       sanitized.columnMapping = sanitizeMapping(sanitized.columnMapping);
+    }
+
+    try {
+      const configSize = JSON.stringify(sanitized).length;
+      if (configSize > 32000) {
+        errors.push('設定データが大きすぎます（32KB制限）');
+      }
+    } catch (sizeCheckError) {
+      errors.push(`設定サイズ検証に失敗しました: ${sizeCheckError.message}`);
     }
 
     if (errors.length > 0) {
@@ -742,7 +752,9 @@ function saveUserConfig(userId, config, options = {}) {
       }
     }
 
-    const validation = validateAndSanitizeConfig(config, userId);
+    const validation = options.isPublish
+      ? validatePublishConfig(config, userId)
+      : validateAndSanitizeConfig(config, userId);
     if (!validation.success) {
       return {
         success: false,

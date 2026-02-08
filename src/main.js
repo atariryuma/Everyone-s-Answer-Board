@@ -304,6 +304,14 @@ function doPost(e) {
   try {
     // ✅ BUG FIX: JSON.parseの詳細エラーハンドリング追加
     const postData = e.postData ? e.postData.contents : '{}';
+    const MAX_POST_BODY_SIZE = 1024 * 1024; // 1MB
+    if (postData && postData.length > MAX_POST_BODY_SIZE) {
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        message: 'Request body too large',
+        error: 'PAYLOAD_TOO_LARGE'
+      })).setMimeType(ContentService.MimeType.JSON);
+    }
     let request;
     try {
       request = JSON.parse(postData);
@@ -373,29 +381,13 @@ function doPost(e) {
         break;
       case 'publishApp':
         try {
-          const user = findUserByEmail(email, { requestingUser: email });
-          if (!user) {
-            result = createUserNotFoundError();
+          const publishConfig = request && typeof request.config === 'object' ? request.config : {};
+          if (SystemController && typeof SystemController.publishApp === 'function') {
+            result = SystemController.publishApp(publishConfig);
+          } else if (typeof publishApp === 'function') {
+            result = publishApp(publishConfig);
           } else {
-            const publishConfig = {
-              ...request.config,
-              isPublished: true,
-              publishedAt: new Date().toISOString(),
-              setupComplete: true
-            };
-
-            const saveResult = saveUserConfig(user.userId, publishConfig);
-            if (!saveResult.success) {
-              result = createErrorResponse(saveResult.message || '公開設定の保存に失敗しました');
-            } else {
-              result = {
-                success: true,
-                message: '回答ボードが正常に公開されました',
-                publishedAt: publishConfig.publishedAt,
-                config: saveResult.config,
-                etag: saveResult.etag
-              };
-            }
+            result = createErrorResponse('公開処理関数が見つかりません');
           }
         } catch (error) {
           console.error('publishApp error:', error.message);

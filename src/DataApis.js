@@ -30,7 +30,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, findUserById, findUserByEmail, getUserConfig, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getUserConfig, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
 
 
 /**
@@ -499,12 +499,24 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 
       const configResult = getUserConfig(targetUserId, targetUser);
       const targetUserConfig = configResult.success ? configResult.config : {};
+      const isOwnBoard = targetUser.userEmail === viewerEmail;
+      const isPublished = Boolean(targetUserConfig.isPublished);
+
+      if (!isSystemAdmin && !isOwnBoard && !isPublished) {
+        return {
+          success: false,
+          error: 'このボードは未公開です',
+          data: [],
+          sheetName: '',
+          header: '未公開'
+        };
+      }
 
       const options = {
         classFilter: classFilter !== 'すべて' ? classFilter : undefined,
         sortBy: sortOrder || 'newest',
         includeTimestamp: true,
-        adminMode: isSystemAdmin || (targetUser.userEmail === viewerEmail),
+        adminMode: isSystemAdmin || isOwnBoard,
         requestingUser: viewerEmail,
         preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
       };
@@ -800,13 +812,22 @@ function getNotificationUpdate(targetUserId, options = {}) {
       return { success: false, message: 'User not found' };
     }
 
+    const configResult = getUserConfig(targetUser.userId, targetUser);
+    const targetConfig = configResult.success ? configResult.config : {};
+    const isOwnBoard = targetUser.userEmail === email;
+    const isAdmin = isAdministrator(email);
+
+    if (!isAdmin && !isOwnBoard && !targetConfig.isPublished) {
+      return { success: false, message: 'Access denied' };
+    }
+
     const userData = getUserSheetData(targetUserId, {
       includeTimestamp: true,
       classFilter: options.classFilter,
       sortBy: options.sortOrder || 'newest',
       requestingUser: email,
       targetUserEmail: targetUser.userEmail
-    });
+    }, targetUser, targetConfig);
 
     if (!userData.success) {
       return { success: false, message: 'Data access failed' };
