@@ -52,7 +52,7 @@ jobs:
           printf '%s\n' '${{ secrets.CLASPRC_JSON }}' > .clasprc.json
           printf '{"scriptId":"%s","rootDir":"src"}\n' '${{ secrets.CLASP_SCRIPT_ID }}' > .clasp.json
 
-          node -e "const fs=require('fs');const p='.clasprc.json';const raw=fs.readFileSync(p,'utf8');const j=JSON.parse(raw);if(!j.tokens||!j.tokens.default){throw new Error('Invalid CLASPRC_JSON: tokens.default is required');}"
+          node -e "const fs=require('fs');const p='.clasprc.json';const raw=fs.readFileSync(p,'utf8');const j=JSON.parse(raw);if(!j||typeof j!=='object'||Array.isArray(j)||Object.keys(j).length===0){throw new Error('Invalid CLASPRC_JSON: expected a non-empty JSON object');}"
 
       - name: Push to Apps Script
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
