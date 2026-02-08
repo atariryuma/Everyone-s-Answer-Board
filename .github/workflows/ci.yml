@@ -38,11 +38,11 @@ jobs:
           echo "✅ All JavaScript files passed syntax check"
 
       - name: Install dependencies
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         run: npm ci
 
       - name: Setup clasp auth
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         run: |
           if [ -z '${{ secrets.CLASPRC_JSON }}' ] || [ -z '${{ secrets.CLASP_SCRIPT_ID }}' ]; then
             echo "::error::Missing required secrets: CLASPRC_JSON and/or CLASP_SCRIPT_ID"
@@ -55,5 +55,5 @@ jobs:
           node -e "const fs=require('fs');const p='.clasprc.json';const raw=fs.readFileSync(p,'utf8');const j=JSON.parse(raw);if(!j||typeof j!=='object'||Array.isArray(j)||Object.keys(j).length===0){throw new Error('Invalid CLASPRC_JSON: expected a non-empty JSON object');}"
 
       - name: Push to Apps Script
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
         run: npx clasp push --force --auth "$GITHUB_WORKSPACE/.clasprc.json"
