@@ -268,10 +268,40 @@ function getLogs(_options = {}) {
       return createAdminRequiredError();
     }
 
+    const limit = Math.max(1, Math.min(Number(_options.limit || 50), 200));
+    const props = PropertiesService.getScriptProperties().getProperties();
+    const logKeys = Object.keys(props)
+      .filter(key => key.startsWith('security_log_'))
+      .sort((a, b) => {
+        const tsA = Number(a.split('_')[2] || 0);
+        const tsB = Number(b.split('_')[2] || 0);
+        return tsB - tsA;
+      })
+      .slice(0, limit);
+
+    const logs = logKeys.map(key => {
+      try {
+        const parsed = JSON.parse(props[key]);
+        return {
+          key,
+          ...parsed
+        };
+      } catch (parseError) {
+        return {
+          key,
+          timestamp: null,
+          severity: 'unknown',
+          description: 'ログ解析に失敗しました',
+          parseError: parseError.message
+        };
+      }
+    });
+
     return {
       success: true,
-      logs: [],
-      message: 'Logs functionality available'
+      logs,
+      count: logs.length,
+      message: logs.length > 0 ? 'セキュリティログを取得しました' : 'セキュリティログはありません'
     };
   } catch (error) {
     console.error('getLogs error:', error.message);

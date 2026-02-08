@@ -8,7 +8,7 @@
  * - Service Account管理
  */
 
-/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL, getCurrentEmail, getCachedProperty */
+/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL, getCurrentEmail, getCachedProperty, hasCoreSystemProps */
 
 
 
@@ -32,45 +32,113 @@ function extractDomainSafely(email) {
 }
 
 /**
+ * システムセットアップ完了状態を判定
+ * @returns {boolean} セットアップ完了状態
+ */
+function isSystemSetupComplete() {
+  try {
+    if (typeof hasCoreSystemProps === 'function') {
+      return hasCoreSystemProps();
+    }
+
+    const props = PropertiesService.getScriptProperties();
+    const hasAdmin = !!props.getProperty('ADMIN_EMAIL');
+    const hasDb = !!props.getProperty('DATABASE_SPREADSHEET_ID');
+    const hasCreds = !!props.getProperty('SERVICE_ACCOUNT_CREDS');
+    return hasAdmin && hasDb && hasCreds;
+  } catch (error) {
+    console.warn('isSystemSetupComplete: Failed to evaluate setup status:', error.message);
+    return false;
+  }
+}
+
+/**
+ * ドメイン制限を適用すべきか判定
+ * @returns {boolean} ドメイン制限を適用する場合 true
+ */
+function shouldEnforceDomainRestrictions() {
+  return isSystemSetupComplete();
+}
+
+/**
+ * メールアドレスのドメインアクセスを検証
+ * @param {string|null} email - 検証対象メール
+ * @param {Object} options - オプション
+ * @returns {Object} 検証結果
+ */
+function validateDomainAccess(email, options = {}) {
+  const allowIfAdminUnconfigured = options.allowIfAdminUnconfigured !== false;
+  const allowIfEmailMissing = options.allowIfEmailMissing === true;
+
+  if (!email || typeof email !== 'string' || !email.trim()) {
+    return {
+      success: false,
+      allowed: allowIfEmailMissing,
+      message: allowIfEmailMissing ? 'No email provided, access allowed by configuration' : 'Authentication required',
+      reason: 'missing_email',
+      userDomain: null,
+      adminDomain: null
+    };
+  }
+
+  const normalizedEmail = email.trim();
+  const userDomain = extractDomainSafely(normalizedEmail);
+  if (!userDomain) {
+    return {
+      success: false,
+      allowed: false,
+      message: 'Invalid email format',
+      reason: 'invalid_email_format',
+      userDomain: null,
+      adminDomain: null
+    };
+  }
+
+  const adminEmail = getCachedProperty('ADMIN_EMAIL');
+  const adminDomain = adminEmail ? extractDomainSafely(adminEmail) : null;
+  if (!adminDomain) {
+    return {
+      success: true,
+      allowed: allowIfAdminUnconfigured,
+      message: allowIfAdminUnconfigured ? 'Admin domain not configured, access allowed' : 'Admin domain not configured',
+      reason: 'admin_domain_unconfigured',
+      userDomain,
+      adminDomain: null
+    };
+  }
+
+  const allowed = userDomain === adminDomain;
+  return {
+    success: true,
+    allowed,
+    message: allowed ? 'Domain access allowed' : 'Domain mismatch',
+    reason: allowed ? 'domain_match' : 'domain_mismatch',
+    userDomain,
+    adminDomain
+  };
+}
+
+/**
  * Deploy user domain information retrieval
  * @returns {Object} Domain information and validation result
  */
 function getDeployUserDomainInfo() {
   try {
     const email = getCurrentEmail();
-
-    if (!email || typeof email !== 'string' || email.trim() === '') {
-      console.error('Authentication failed - invalid email:', typeof email, email);
-      return {
-        success: false,
-        message: 'Authentication required - invalid email',
-        domain: null,
-        isValidDomain: false
-      };
-    }
-
-    const domain = extractDomainSafely(email);
-    if (!domain) {
-      console.warn('getDeployUserDomainInfo: Invalid email format:', email);
-      return {
-        success: false,
-        message: 'Invalid email format',
-        domain: null,
-        isValidDomain: false
-      };
-    }
-
-    const adminEmail = getCachedProperty('ADMIN_EMAIL');
-    const adminDomain = adminEmail ? extractDomainSafely(adminEmail) : null;
-    const isValidDomain = adminDomain ? domain === adminDomain : true;
+    const accessResult = validateDomainAccess(email, {
+      allowIfAdminUnconfigured: true,
+      allowIfEmailMissing: false
+    });
 
     return {
-      success: true,
-      domain,
+      success: accessResult.success,
+      domain: accessResult.userDomain,
       userEmail: email,
-      userDomain: domain,
-      adminDomain,
-      isValidDomain,
+      userDomain: accessResult.userDomain,
+      adminDomain: accessResult.adminDomain,
+      isValidDomain: accessResult.allowed,
+      reason: accessResult.reason,
+      message: accessResult.message,
       timestamp: new Date().toISOString()
     };
   } catch (error) {

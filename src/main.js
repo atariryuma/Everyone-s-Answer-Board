@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess */
 
 
 /**
@@ -40,6 +40,66 @@ function include(filename) {
   return HtmlService.createTemplateFromFile(filename).evaluate().getContent();
 }
 
+/**
+ * ドメイン制限を評価
+ * @param {string|null} email - 検証対象メール
+ * @returns {Object} 検証結果
+ */
+function evaluateDomainRestriction(email) {
+  try {
+    const mustEnforce = (typeof shouldEnforceDomainRestrictions === 'function')
+      ? shouldEnforceDomainRestrictions()
+      : true;
+
+    if (!mustEnforce) {
+      return {
+        allowed: true,
+        reason: 'setup_incomplete',
+        message: 'Domain restriction skipped during setup'
+      };
+    }
+
+    if (typeof validateDomainAccess !== 'function') {
+      return {
+        allowed: true,
+        reason: 'validator_missing',
+        message: 'Domain validator not available'
+      };
+    }
+
+    return validateDomainAccess(email, {
+      allowIfAdminUnconfigured: true,
+      allowIfEmailMissing: true
+    });
+  } catch (error) {
+    console.warn('evaluateDomainRestriction failed:', error.message);
+    return {
+      allowed: true,
+      reason: 'validation_error',
+      message: error.message
+    };
+  }
+}
+
+/**
+ * アクセス制限テンプレートを生成
+ * @param {string|null} email - 現在ユーザーのメール
+ * @param {boolean} isAppDisabled - アプリ停止状態
+ * @param {string} message - 表示メッセージ
+ * @returns {HtmlOutput} 制限ページ
+ */
+function createAccessRestrictedTemplate(email, isAppDisabled = false, message = '') {
+  const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
+  template.isAdministrator = email ? isAdministrator(email) : false;
+  template.userEmail = email || '';
+  template.timestamp = new Date().toISOString();
+  template.isAppDisabled = Boolean(isAppDisabled);
+  if (message) {
+    template.message = message;
+  }
+  return template.evaluate().setTitle('回答ボード');
+}
+
 
 
 /**
@@ -52,7 +112,17 @@ function doGet(e) {
     const params = e ? e.parameter : {};
     const mode = params.mode || 'main';
 
-    const currentEmail = (mode !== 'login') ? getCurrentEmail() : null;
+    const currentEmail = getCurrentEmail();
+
+    // セットアップ完了後は管理者ドメイン外アクセスを遮断
+    const domainRestriction = evaluateDomainRestriction(currentEmail);
+    if (domainRestriction && domainRestriction.allowed === false) {
+      return createAccessRestrictedTemplate(
+        currentEmail,
+        false,
+        '管理者と同一ドメインのアカウントでアクセスしてください。'
+      );
+    }
 
     const isAppDisabled = checkAppAccessRestriction();
     if (isAppDisabled) {
@@ -60,12 +130,7 @@ function doGet(e) {
 
       if (mode === 'appSetup' && isAdmin) {
       } else {
-        const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
-        template.isAdministrator = isAdmin;
-        template.userEmail = currentEmail || '';
-        template.timestamp = new Date().toISOString();
-        template.isAppDisabled = true; // アプリ停止状態を明示
-        return template.evaluate().setTitle('回答ボード');
+        return createAccessRestrictedTemplate(currentEmail, true);
       }
     }
 
@@ -144,11 +209,7 @@ function doGet(e) {
         if (showSetup) {
           return HtmlService.createTemplateFromFile('SetupPage.html').evaluate().setTitle('初期設定');
         } else {
-          const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
-          template.isAdministrator = currentEmail ? isAdministrator(currentEmail) : false;
-          template.userEmail = currentEmail || '';
-          template.timestamp = new Date().toISOString();
-          return template.evaluate().setTitle('回答ボード');
+          return createAccessRestrictedTemplate(currentEmail);
         }
       }
 
@@ -230,12 +291,7 @@ function doGet(e) {
 
       case 'main':
       default: {
-        const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
-        const email = getCurrentEmail();
-        template.isAdministrator = email ? isAdministrator(email) : false;
-        template.userEmail = email || '';
-        template.timestamp = new Date().toISOString();
-        return template.evaluate().setTitle('回答ボード');
+        return createAccessRestrictedTemplate(currentEmail);
       }
     }
   } catch (error) {
@@ -335,6 +391,15 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify(
         createAuthError()
       )).setMimeType(ContentService.MimeType.JSON);
+    }
+
+    const domainRestriction = evaluateDomainRestriction(email);
+    if (domainRestriction && domainRestriction.allowed === false) {
+      return ContentService.createTextOutput(JSON.stringify({
+        success: false,
+        message: '管理者と同一ドメインのアカウントでアクセスしてください。',
+        error: 'DOMAIN_ACCESS_DENIED'
+      })).setMimeType(ContentService.MimeType.JSON);
     }
 
     let result;

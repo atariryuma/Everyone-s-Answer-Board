@@ -19,7 +19,27 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, findUserByEmail, isAdministrator, getUserConfig, createUser, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities */
+/* global getCurrentEmail, findUserByEmail, isAdministrator, getUserConfig, createUser, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, shouldEnforceDomainRestrictions, validateDomainAccess */
+
+/**
+ * ドメインアクセス検証（必要時のみ）
+ * @param {string} email - 検証対象メール
+ * @returns {Object} 検証結果
+ */
+function ensureDomainAccess(email) {
+  const enforce = (typeof shouldEnforceDomainRestrictions === 'function')
+    ? shouldEnforceDomainRestrictions()
+    : true;
+
+  if (!enforce || typeof validateDomainAccess !== 'function') {
+    return { allowed: true };
+  }
+
+  return validateDomainAccess(email, {
+    allowIfAdminUnconfigured: true,
+    allowIfEmailMissing: false
+  });
+}
 
 
 /**
@@ -31,6 +51,14 @@ function getConfig() {
     const email = getCurrentEmail();
     if (!email) {
       return createAuthError();
+    }
+
+    const domainAccess = ensureDomainAccess(email);
+    if (!domainAccess.allowed) {
+      return {
+        success: false,
+        message: '管理者と同一ドメインのアカウントでアクセスしてください'
+      };
     }
 
     const user = findUserByEmail(email, { requestingUser: email });
@@ -64,6 +92,18 @@ function getBatchedUserConfig() {
         user: null,
         config: null,
         authError: createAuthError()
+      };
+    }
+
+    const domainAccess = ensureDomainAccess(email);
+    if (!domainAccess.allowed) {
+      return {
+        success: false,
+        authenticated: true,
+        error: '管理者と同一ドメインのアカウントでアクセスしてください',
+        email,
+        user: null,
+        config: null
       };
     }
 
@@ -118,6 +158,14 @@ function processLoginAction() {
       return {
         success: false,
         message: 'Authentication failed - no user email available'
+      };
+    }
+
+    const domainAccess = ensureDomainAccess(email);
+    if (!domainAccess.allowed) {
+      return {
+        success: false,
+        message: '管理者と同一ドメインのアカウントでログインしてください。'
       };
     }
 
@@ -187,6 +235,16 @@ function checkUserAuthentication() {
         success: false,
         authenticated: false,
         message: 'No user session found',
+        timestamp: new Date().toISOString()
+      };
+    }
+
+    const domainAccess = ensureDomainAccess(email);
+    if (!domainAccess.allowed) {
+      return {
+        success: false,
+        authenticated: true,
+        message: '管理者と同一ドメインのアカウントでアクセスしてください',
         timestamp: new Date().toISOString()
       };
     }

@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, getSheetInfo */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess */
 
 
 /**
@@ -1331,7 +1331,6 @@ function getFormInfo(spreadsheetId, sheetName) {
  */
 function createForm(userId, config) {
   try {
-
     if (!userId) {
       return {
         success: false,
@@ -1346,22 +1345,11 @@ function createForm(userId, config) {
       };
     }
 
-    const configService = null /* ConfigService direct call */;
-    if (!configService) {
-      console.error('AdminController.createForm: ConfigService not available');
-      return { success: false, message: 'ConfigServiceが利用できません' };
-    }
-    const result = { success: false, message: 'フォーム作成機能は現在利用できません' };
-
-    if (result && result.success) {
-      return result;
-    } else {
-      console.error('AdminController.createForm: ConfigService失敗', result);
-      return {
-        success: false,
-        error: result?.error || 'フォーム作成に失敗しました'
-      };
-    }
+    return {
+      success: false,
+      error: 'このバージョンではフォーム自動作成機能は未対応です。管理画面のテンプレート作成機能を利用してください。',
+      code: 'NOT_IMPLEMENTED'
+    };
 
   } catch (error) {
     console.error('AdminController.createForm エラー:', error.message);
@@ -1726,28 +1714,54 @@ function collectBatchMetrics(options = {}) {
  */
 function collectErrorMetrics(options = {}) {
   try {
+    const recentWindowHours = Number(options.recentWindowHours || 24);
+    const now = Date.now();
+    const windowMs = recentWindowHours * 60 * 60 * 1000;
+
     const errorStats = {
       errorHandlingImplemented: true,
-      testSuiteStatus: '113/113 tests passing (100%)',
+      source: 'runtime_observation',
       errorCategories: {
-        authentication: { frequency: 'low', handling: 'comprehensive' },
-        validation: { frequency: 'low', handling: 'comprehensive' },
-        network: { frequency: 'low', handling: 'comprehensive' },
-        permission: { frequency: 'low', handling: 'comprehensive' }
+        authentication: { status: 'implemented' },
+        validation: { status: 'implemented' },
+        network: { status: 'implemented' },
+        permission: { status: 'implemented' }
       },
-      recommendations: [
-        'エラーハンドリングは適切に実装済み',
-        '100%テスト合格による信頼性確保',
-        '継続的監視を推奨'
-      ]
+      recommendations: [],
+      recentSecurityEvents: 0
     };
 
     try {
-      const testResult = getCurrentEmail();
-      errorStats.basicFunctionality = testResult ? 'working' : 'needs_attention';
-    } catch (error) {
+      const currentEmail = getCurrentEmail();
+      errorStats.basicFunctionality = currentEmail ? 'working' : 'degraded';
+    } catch (probeError) {
       errorStats.basicFunctionality = 'error';
-      errorStats.lastError = error.message;
+      errorStats.lastError = probeError.message;
+    }
+
+    try {
+      const props = PropertiesService.getScriptProperties().getProperties();
+      const securityLogKeys = Object.keys(props).filter(key => key.startsWith('security_log_'));
+      const recentKeys = securityLogKeys.filter(key => {
+        const ts = Number(key.split('_')[2] || 0);
+        return ts > 0 && (now - ts) <= windowMs;
+      });
+      errorStats.recentSecurityEvents = recentKeys.length;
+    } catch (logError) {
+      errorStats.recentSecurityEvents = -1;
+      errorStats.logReadWarning = logError.message;
+    }
+
+    if (errorStats.basicFunctionality !== 'working') {
+      errorStats.recommendations.push('認証状態の検証を実施し、Webアプリの公開設定を確認してください。');
+    }
+
+    if (errorStats.recentSecurityEvents > 20) {
+      errorStats.recommendations.push('高重要度イベントが増加しています。アクセスログと運用設定を確認してください。');
+    }
+
+    if (errorStats.recommendations.length === 0) {
+      errorStats.recommendations.push('現在は重大な異常を検出していません。定期監視を継続してください。');
     }
 
     return errorStats;
@@ -1774,39 +1788,57 @@ function diagnosePerformance(options = {}) {
       };
     }
 
+    const metricsResult = getPerformanceMetrics('all', options);
+    if (!metricsResult.success) {
+      return metricsResult;
+    }
+
+    const categories = metricsResult.metrics?.categories || {};
+    const issues = [];
+
+    if (categories.api?.errorRate >= 1) {
+      issues.push('API基本動作でエラーを検出');
+    }
+    if (categories.cache?.hitRate === 0) {
+      issues.push('キャッシュが有効に機能していない可能性');
+    }
+    if (categories.error?.recentSecurityEvents > 20) {
+      issues.push('最近のセキュリティイベントが増加');
+    }
+
+    let overallStatus = 'healthy';
+    if (issues.length >= 2) {
+      overallStatus = 'critical';
+    } else if (issues.length === 1) {
+      overallStatus = 'warning';
+    }
+
     const diagnosis = {
       timestamp: new Date().toISOString(),
-      overallStatus: 'excellent',
+      overallStatus,
       architecture: {
         pattern: 'GAS-Native Zero-Dependency',
         v8Runtime: true,
-        batchProcessing: true,
-        rating: 'A級企業レベル'
+        batchProcessing: true
       },
-      achievements: [
-        '70倍パフォーマンス改善実現',
-        '100%テスト合格 (113/113)',
-        'Zero-Dependency Architecture完成',
-        'V8 Runtime完全対応'
-      ],
+      summary: {
+        collectionTimeMs: metricsResult.performanceImpact?.collectionTimeMs || null,
+        overhead: metricsResult.performanceImpact?.overhead || 'unknown',
+        detectedIssues: issues.length
+      },
+      issues,
       recommendations: [
-        '現在の高品質を維持',
-        'バッチ処理パターンの継続',
-        '定期的なメトリクス監視',
-        '新機能追加時の品質基準維持'
+        ...(issues.length > 0
+          ? ['検出した課題に対する運用対応を優先してください。']
+          : ['重大な異常は検出されませんでした。現行運用を維持してください。']),
+        '定期的なメトリクス監視を継続してください。'
       ],
-      potentialImprovements: [
-        '国際化対応による多言語サポート',
-        'リアルタイム通知機能の追加',
-        '高度な分析ダッシュボード機能'
-      ]
+      categories
     };
 
     return {
       success: true,
-      diagnosis,
-      completionScore: '92/100',
-      grade: 'A級 (企業レベル)'
+      diagnosis
     };
 
   } catch (error) {
@@ -1884,9 +1916,79 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
       };
     }
 
+    const currentEmail = getCurrentEmail();
+    if (!currentEmail) {
+      return {
+        success: false,
+        message: 'セットアップ実行者の認証が必要です'
+      };
+    }
+
+    const normalizedAdminEmail = String(adminEmail).trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedAdminEmail)) {
+      return {
+        success: false,
+        message: '管理者メールアドレスの形式が不正です'
+      };
+    }
+
+    if (!/^[a-zA-Z0-9-_]{40,60}$/.test(String(databaseId).trim())) {
+      return {
+        success: false,
+        message: 'データベーススプレッドシートIDの形式が不正です'
+      };
+    }
+
+    let parsedCredentials;
+    try {
+      parsedCredentials = JSON.parse(serviceAccountJson);
+    } catch (jsonError) {
+      return {
+        success: false,
+        message: `サービスアカウントJSONの解析に失敗しました: ${jsonError.message}`
+      };
+    }
+
+    const requiredCredFields = ['type', 'project_id', 'private_key', 'client_email'];
+    const missingCredFields = requiredCredFields.filter(field => !parsedCredentials[field]);
+    if (missingCredFields.length > 0) {
+      return {
+        success: false,
+        message: `サービスアカウントJSONに必須項目が不足しています: ${missingCredFields.join(', ')}`
+      };
+    }
+
+    const alreadyConfigured = (typeof hasCoreSystemProps === 'function')
+      ? hasCoreSystemProps()
+      : false;
+
+    if (alreadyConfigured) {
+      if (!isAdministrator(currentEmail)) {
+        return createAdminRequiredError();
+      }
+
+      if (typeof validateDomainAccess === 'function') {
+        const domainCheck = validateDomainAccess(currentEmail, {
+          allowIfAdminUnconfigured: false,
+          allowIfEmailMissing: false
+        });
+        if (!domainCheck.allowed) {
+          return {
+            success: false,
+            message: '管理者と同一ドメインのアカウントでセットアップを実行してください'
+          };
+        }
+      }
+    } else if (currentEmail.toLowerCase() !== normalizedAdminEmail) {
+      return {
+        success: false,
+        message: '初回セットアップは入力した管理者メールアドレス本人で実行してください'
+      };
+    }
+
     const props = PropertiesService.getScriptProperties();
-    props.setProperty('DATABASE_SPREADSHEET_ID', databaseId);
-    props.setProperty('ADMIN_EMAIL', adminEmail);
+    props.setProperty('DATABASE_SPREADSHEET_ID', String(databaseId).trim());
+    props.setProperty('ADMIN_EMAIL', normalizedAdminEmail);
     props.setProperty('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
 
     if (googleClientId) {
@@ -1894,7 +1996,10 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
     }
 
     try {
-      const testAccess = openSpreadsheet(databaseId, { useServiceAccount: true }).spreadsheet;
+      const testAccess = openSpreadsheet(String(databaseId).trim(), { useServiceAccount: true });
+      if (!testAccess || !testAccess.spreadsheet) {
+        console.warn('Database access test failed: Spreadsheet object unavailable');
+      }
     } catch (dbError) {
       console.warn('Database access test failed:', dbError.message);
     }
@@ -1903,8 +2008,8 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
       success: true,
       message: 'Application setup completed successfully',
       data: {
-        databaseId,
-        adminEmail,
+        databaseId: String(databaseId).trim(),
+        adminEmail: normalizedAdminEmail,
         googleClientId: googleClientId || null
       }
     };
