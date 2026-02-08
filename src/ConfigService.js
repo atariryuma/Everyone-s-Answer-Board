@@ -16,73 +16,11 @@
 /* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo */
 
 
-
-
 /**
  * ConfigService - ゼロ依存アーキテクチャ
  * GAS-Nativeパターンによる直接APIアクセス
  * PROPS_KEYS, DB依存を完全排除
  */
-
-
-/**
- * FormApp権限の安全チェック - GAS 2025ベストプラクティス準拠（実行時テスト強化版）
- * V8ランタイム対応の軽量権限テスト（実際のAPI呼び出しで検証）
- * @returns {Object} 権限チェック結果
- */
-function validateFormAppAccess() {
-  try {
-    if (typeof FormApp === 'undefined') {
-      return {
-        hasAccess: false,
-        reason: 'FORMAPP_NOT_AVAILABLE',
-        message: 'FormAppサービスが利用できません'
-      };
-    }
-
-    try {
-      const hasUi = typeof FormApp.getUi === 'function';
-
-      if (!hasUi) {
-        return {
-          hasAccess: false,
-          reason: 'FORMAPP_UI_NOT_AVAILABLE',
-          message: 'FormApp基本機能が利用できません'
-        };
-      }
-
-      if (typeof FormApp.openByUrl !== 'function') {
-        return {
-          hasAccess: false,
-          reason: 'OPENBYURL_NOT_AVAILABLE',
-          message: 'FormApp.openByUrl機能が利用できません'
-        };
-      }
-
-      return {
-        hasAccess: true,
-        reason: 'ACCESS_GRANTED',
-        message: 'FormAppへのアクセス権限が確認されました（実行時テスト済み）'
-      };
-
-    } catch (runtimeError) {
-      return {
-        hasAccess: false,
-        reason: 'RUNTIME_PERMISSION_ERROR',
-        message: `FormApp実行時権限エラー: ${runtimeError.message || '詳細不明'}`,
-        error: runtimeError.message
-      };
-    }
-
-  } catch (error) {
-    return {
-      hasAccess: false,
-      reason: 'PERMISSION_ERROR',
-      message: error && error.message ? `FormApp権限エラー: ${error.message}` : 'FormApp権限エラー: 詳細不明',
-      error: error.message
-    };
-  }
-}
 
 
 /**

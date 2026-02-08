@@ -3,10 +3,10 @@ name: CI & Deploy to Google Apps Script
 on:
   push:
     branches: [main]
-    paths: ['src/**']
+    paths: ['src/**', 'tests/**', 'package.json', 'package-lock.json', '.github/workflows/ci.yml']
   pull_request:
     branches: [main]
-    paths: ['src/**']
+    paths: ['src/**', 'tests/**', 'package.json', 'package-lock.json', '.github/workflows/ci.yml']
   workflow_dispatch:
 
 jobs:
@@ -36,6 +36,9 @@ jobs:
             exit 1
           fi
           echo "✅ All JavaScript files passed syntax check"
+
+      - name: Run unit tests
+        run: npm test
 
       - name: Install dependencies
         if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')

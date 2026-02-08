@@ -137,14 +137,6 @@ function generateDynamicUserUrls(config) {
   }
 }
 
-
-
-
-
-
-
-
-
 /**
  * 編集者権限判定（Editor）
  * @param {string} email - メールアドレス
@@ -164,33 +156,6 @@ function isEditor(email, targetUserId) {
     return false;
   }
 }
-
-/**
- * 統一アクセスレベル取得（Email-based）
- * @param {string} email - メールアドレス
- * @param {string} targetUserId - 対象ユーザーID（オプショナル）
- * @returns {string} アクセスレベル
- */
-function getUnifiedAccessLevel(email, targetUserId) {
-  if (isAdministrator(email)) return 'administrator';
-  if (targetUserId && isEditor(email, targetUserId)) return 'editor';
-  return email ? 'authenticated_user' : 'guest';
-}
-
-
-
-
-/**
- * ユーザーキャッシュクリア
- * @param {string} userId - ユーザーID（オプション、未指定時は全体）
- */
-
-
-
-
-
-
-
 
 /**
  * 管理者権限確認（フロントエンド互換性）

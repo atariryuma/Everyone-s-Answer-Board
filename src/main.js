@@ -127,9 +127,8 @@ function doGet(e) {
     const isAppDisabled = checkAppAccessRestriction();
     if (isAppDisabled) {
       const isAdmin = currentEmail ? isAdministrator(currentEmail) : false;
-
-      if (mode === 'appSetup' && isAdmin) {
-      } else {
+      const canOpenAppSetup = mode === 'appSetup' && isAdmin;
+      if (!canOpenAppSetup) {
         return createAccessRestrictedTemplate(currentEmail, true);
       }
     }
@@ -357,17 +356,55 @@ function createRedirectTemplate(redirectPage, error) {
  * @returns {TextOutput} JSON response with operation result
  */
 function doPost(e) {
+  const jsonResponse = (payload) => ContentService.createTextOutput(JSON.stringify(payload))
+    .setMimeType(ContentService.MimeType.JSON);
+
+  const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+  const isJsonContentType = (contentType) => {
+    if (!contentType || typeof contentType !== 'string') {
+      return true;
+    }
+    const normalized = contentType.toLowerCase();
+    return normalized.includes('application/json') || normalized.includes('+json');
+  };
+
   try {
-    // ✅ BUG FIX: JSON.parseの詳細エラーハンドリング追加
-    const postData = e.postData ? e.postData.contents : '{}';
+    if (!e || !e.postData || typeof e.postData.contents !== 'string') {
+      return jsonResponse({
+        success: false,
+        message: 'Request body is required',
+        error: 'MISSING_POST_BODY'
+      });
+    }
+
+    const contentType = e.postData.type || '';
+    if (!isJsonContentType(contentType)) {
+      return jsonResponse({
+        success: false,
+        message: 'Unsupported Content-Type. Use application/json',
+        error: 'UNSUPPORTED_CONTENT_TYPE'
+      });
+    }
+
+    const postData = e.postData.contents;
     const MAX_POST_BODY_SIZE = 1024 * 1024; // 1MB
     if (postData && postData.length > MAX_POST_BODY_SIZE) {
-      return ContentService.createTextOutput(JSON.stringify({
+      return jsonResponse({
         success: false,
         message: 'Request body too large',
         error: 'PAYLOAD_TOO_LARGE'
-      })).setMimeType(ContentService.MimeType.JSON);
+      });
     }
+
+    if (!postData.trim()) {
+      return jsonResponse({
+        success: false,
+        message: 'Empty request body',
+        error: 'EMPTY_POST_BODY'
+      });
+    }
+
     let request;
     try {
       request = JSON.parse(postData);
@@ -377,34 +414,53 @@ function doPost(e) {
         dataLength: postData ? postData.length : 0,
         dataPreview: postData ? postData.substring(0, 100) : 'N/A'
       });
-      return ContentService.createTextOutput(JSON.stringify({
+      return jsonResponse({
         success: false,
         message: 'Invalid JSON format in request body',
         error: 'JSON_PARSE_ERROR'
-      })).setMimeType(ContentService.MimeType.JSON);
+      });
     }
-    const { action } = request;
 
+    if (!isPlainObject(request)) {
+      return jsonResponse({
+        success: false,
+        message: 'Request payload must be a JSON object',
+        error: 'INVALID_REQUEST_PAYLOAD'
+      });
+    }
+
+    const action = typeof request.action === 'string' ? request.action.trim() : '';
+    const allowedActions = ['getData', 'addReaction', 'toggleHighlight', 'refreshData', 'publishApp'];
+    if (!allowedActions.includes(action)) {
+      return jsonResponse({
+        success: false,
+        message: action ? `Unknown action: ${action}` : 'Unknown action: 不明',
+        error: 'UNKNOWN_ACTION'
+      });
+    }
 
     const email = getCurrentEmail();
     if (!email) {
-      return ContentService.createTextOutput(JSON.stringify(
-        createAuthError()
-      )).setMimeType(ContentService.MimeType.JSON);
+      return jsonResponse(createAuthError());
     }
 
     const domainRestriction = evaluateDomainRestriction(email);
     if (domainRestriction && domainRestriction.allowed === false) {
-      return ContentService.createTextOutput(JSON.stringify({
+      return jsonResponse({
         success: false,
         message: '管理者と同一ドメインのアカウントでアクセスしてください。',
         error: 'DOMAIN_ACCESS_DENIED'
-      })).setMimeType(ContentService.MimeType.JSON);
+      });
     }
 
     let result;
     switch (action) {
       case 'getData':
+      case 'refreshData': {
+        if (request.options !== undefined && !isPlainObject(request.options)) {
+          result = createErrorResponse('Invalid options payload');
+          break;
+        }
         try {
           const user = findUserByEmail(email, { requestingUser: email });
           if (!user) {
@@ -413,40 +469,38 @@ function doPost(e) {
             result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
           }
         } catch (error) {
-          console.error('getData error:', error.message);
+          console.error(`${action} error:`, error.message);
           result = createExceptionResponse(error);
         }
         break;
+      }
       case 'addReaction':
-        if (!request.userId) {
+        if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
           result = createErrorResponse('Target user ID required for reaction');
+        } else if (request.rowId === undefined || request.rowId === null) {
+          result = createErrorResponse('Target row ID required for reaction');
+        } else if (typeof request.reactionType !== 'string') {
+          result = createErrorResponse('Reaction type required');
         } else {
           result = addReaction(request.userId, request.rowId, request.reactionType);
         }
         break;
       case 'toggleHighlight':
-        if (!request.userId) {
+        if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
           result = createErrorResponse('Target user ID required for highlight');
+        } else if (request.rowId === undefined || request.rowId === null) {
+          result = createErrorResponse('Target row ID required for highlight');
         } else {
           result = toggleHighlight(request.userId, request.rowId);
         }
         break;
-      case 'refreshData':
-        try {
-          const user = findUserByEmail(email, { requestingUser: email });
-          if (!user) {
-            result = createUserNotFoundError();
-          } else {
-            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
-          }
-        } catch (error) {
-          console.error('refreshData error:', error.message);
-          result = createExceptionResponse(error);
-        }
-        break;
       case 'publishApp':
         try {
-          const publishConfig = request && typeof request.config === 'object' ? request.config : {};
+          const publishConfig = isPlainObject(request.config) ? request.config : {};
+          if (!isPlainObject(publishConfig) || Object.keys(publishConfig).length === 0) {
+            result = createErrorResponse('Publish config is required');
+            break;
+          }
           if (SystemController && typeof SystemController.publishApp === 'function') {
             result = SystemController.publishApp(publishConfig);
           } else if (typeof publishApp === 'function') {
@@ -463,16 +517,15 @@ function doPost(e) {
         result = createErrorResponse(action ? `Unknown action: ${action}` : 'Unknown action: 不明');
     }
 
-    return ContentService.createTextOutput(JSON.stringify(result))
-      .setMimeType(ContentService.MimeType.JSON);
+    return jsonResponse(result);
 
   } catch (error) {
     const errorMessage = error && error.message ? error.message : '予期しないエラーが発生しました';
     console.error('doPost error:', errorMessage);
-    return ContentService.createTextOutput(JSON.stringify({
+    return jsonResponse({
       success: false,
       message: errorMessage
-    })).setMimeType(ContentService.MimeType.JSON);
+    });
   }
 }
 
@@ -499,9 +552,6 @@ function isAdministrator(email) {
     }
 
     const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
-    if (isAdmin) {
-    }
-
     return isAdmin;
   } catch (error) {
     console.error('[ERROR] main.isAdministrator:', {
@@ -985,13 +1035,4 @@ function diagnosePerformance(options = {}) {
       timestamp: new Date().toISOString()
     };
   }
-}
-
-
-/**
- * スプレッドシート一覧のキャッシュをクリア
- * @returns {Object} 処理結果
- */
-function clearSheetsCache() {
-  return { success: true, message: 'キャッシュをクリアしました' };
 }

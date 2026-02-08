@@ -7,7 +7,8 @@
     "push": "clasp push",
     "open": "clasp open",
     "logs": "clasp logs",
-    "deploy": "clasp deploy"
+    "deploy": "clasp deploy",
+    "test": "node --test tests/*.test.cjs"
   },
   "repository": {
     "type": "git",

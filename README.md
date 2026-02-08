@@ -155,6 +155,14 @@ npm run deploy  # 新バージョンをデプロイ
 4. ブラウザでテスト（`/exec?mode=...`）
 5. 動作確認後、Gitにコミット
 
+### GAS保守ルール
+
+- `src/page.js.html` / `src/AdminPanel.js.html` は当面「単一ファイル運用」を維持（無理な物理分割はしない）
+- トップレベル副作用を禁止（`google.script.run`・DOM操作・自動実行タイマーは `init()` 内のみ）
+- `doPost` の `action` は allowlist 管理し、追加時は入力検証を同時に追加
+- `publishApp` は allowlist フィールドのみ受け付け、`etag` 競合検知を維持
+- include順は固定し、変更する場合は単独コミットで扱う
+
 ### 技術スタック
 
 - **バックエンド**: Google Apps Script (V8 runtime)

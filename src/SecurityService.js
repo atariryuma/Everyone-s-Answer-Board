@@ -8,7 +8,7 @@
  * - Service Account管理
  */
 
-/* global validateEmail, validateText, validateUrl, getUnifiedAccessLevel, findUserByEmail, findUserById, openSpreadsheet, updateUser, URL, getCurrentEmail, getCachedProperty, hasCoreSystemProps */
+/* global openSpreadsheet, getCurrentEmail, getCachedProperty, hasCoreSystemProps */
 
 
 
@@ -151,89 +151,6 @@ function getDeployUserDomainInfo() {
     };
   }
 }
-
-
-
-
-/**
- * ユーザーデータ総合検証
- * @param {Object} userData - ユーザーデータ
- * @returns {Object} 検証結果
- */
-function validateUserData(userData) {
-    const result = {
-      isValid: true,
-      errors: [],
-      sanitizedData: {},
-      securityWarnings: []
-    };
-
-    try {
-      if (!userData || typeof userData !== 'object') {
-        result.errors.push('無効なデータ形式');
-        result.isValid = false;
-        return result;
-      }
-
-      if (userData.email) {
-        const emailValidation = validateEmail(userData.email);
-        if (!emailValidation.isValid) {
-          result.errors.push('無効なメールアドレス');
-          result.isValid = false;
-        } else {
-          result.sanitizedData.email = emailValidation.sanitized;
-        }
-      }
-
-      ['answer', 'reason', 'name', 'className'].forEach(field => {
-        if (userData[field]) {
-          const textValidation = validateText(userData[field]);
-          if (!textValidation.isValid) {
-            if (field && textValidation && textValidation.error) {
-              result.errors.push(`${field}: ${textValidation.error}`);
-            } else {
-              result.errors.push('Validation error: 詳細不明');
-            }
-            result.isValid = false;
-          } else {
-            result.sanitizedData[field] = textValidation.sanitized;
-            if (textValidation.metadata && textValidation.metadata.hadSecurityRisk) {
-              result.securityWarnings.push(`${field}: セキュリティリスクを検出`);
-            }
-          }
-        }
-      });
-
-      if (userData.url) {
-        const urlValidation = validateUrl(userData.url);
-        if (!urlValidation.isValid) {
-          result.errors.push('無効なURL');
-          result.isValid = false;
-        } else {
-          result.sanitizedData.url = urlValidation.sanitized;
-        }
-      }
-
-      const dataSize = JSON.stringify(result.sanitizedData).length;
-      if (dataSize > 32000) {
-        result.errors.push('データサイズが制限を超えています');
-        result.isValid = false;
-      }
-
-    } catch (error) {
-      if (error && error.message) {
-        result.errors.push(`検証エラー: ${error.message}`);
-      } else {
-        result.errors.push('検証エラー: 詳細不明');
-      }
-      result.isValid = false;
-    }
-
-    return result;
-}
-
-
-
 /**
  * セキュリティイベントログ
  * @param {Object} event - セキュリティイベント
@@ -278,16 +195,62 @@ function logSecurityEvent(event) {
  * @param {Object} logEntry - ログエントリ
  */
 function persistSecurityLog(logEntry) {
-    try {
-      const props = PropertiesService.getScriptProperties();
-      const logKey = `security_log_${Date.now()}`;
-      
-      props.setProperty(logKey, JSON.stringify(logEntry));
-      
-      cleanupOldSecurityLogs();
-    } catch (error) {
-      console.error('SecurityService.persistSecurityLog: エラー', error.message);
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const allProps = props.getProperties();
+
+    const MAX_LOG_ENTRIES = 100;
+    const MAX_TOTAL_STORAGE_CHARS = 450000;
+    const MAX_LOG_ENTRY_CHARS = 8000;
+
+    const logKeys = Object.keys(allProps)
+      .filter((key) => key.startsWith('security_log_'))
+      .sort((a, b) => {
+        const ta = parseInt(a.split('_')[2], 10) || 0;
+        const tb = parseInt(b.split('_')[2], 10) || 0;
+        return ta - tb;
+      });
+
+    let totalStorageChars = 0;
+    Object.entries(allProps).forEach(([key, value]) => {
+      totalStorageChars += key.length + String(value || '').length;
+    });
+
+    const serializedEntryRaw = JSON.stringify(logEntry || {});
+    const serializedEntry = serializedEntryRaw.length > MAX_LOG_ENTRY_CHARS
+      ? serializedEntryRaw.substring(0, MAX_LOG_ENTRY_CHARS)
+      : serializedEntryRaw;
+
+    const keysToDelete = [];
+    const mutableLogKeys = [...logKeys];
+    while (
+      mutableLogKeys.length >= MAX_LOG_ENTRIES ||
+      totalStorageChars + serializedEntry.length > MAX_TOTAL_STORAGE_CHARS
+    ) {
+      const oldestKey = mutableLogKeys.shift();
+      if (!oldestKey) break;
+      keysToDelete.push(oldestKey);
+      totalStorageChars -= oldestKey.length + String(allProps[oldestKey] || '').length;
     }
+
+    keysToDelete.forEach((key) => {
+      try {
+        props.deleteProperty(key);
+      } catch (deleteError) {
+        console.warn(`SecurityService: Failed to delete log ${key}:`, deleteError.message);
+      }
+    });
+
+    if (totalStorageChars + serializedEntry.length > MAX_TOTAL_STORAGE_CHARS) {
+      console.warn('SecurityService.persistSecurityLog: Skip due to storage quota safety guard');
+      return;
+    }
+
+    const logKey = `security_log_${Date.now()}`;
+    props.setProperty(logKey, serializedEntry);
+  } catch (error) {
+    console.error('SecurityService.persistSecurityLog: エラー', error.message);
+  }
 }
 
 

@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, sanitizeDisplaySettings, sanitizeMapping */
 
 
 /**
@@ -627,57 +627,79 @@ function performAutoRepair() {
 
 
 /**
- * シート一覧を取得
- * ⚠️ 現在未使用の関数（将来の拡張用に保持）
- * @param {string} spreadsheetId - スプレッドシートID
- * @returns {Object} シート一覧
- */
-function getAdminSheetList(spreadsheetId) {
-  try {
-    // ⚠️ DATABASE_SPREADSHEET専用（DatabaseCore.gs:598のガードにより制限）
-    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: true });
-    const { spreadsheet } = dataAccess;
-    const sheets = spreadsheet.getSheets();
-
-    const sheetList = sheets.map(sheet => {
-      const { lastRow, lastCol } = getSheetInfo(sheet);
-      return {
-        name: sheet.getName(),
-        index: sheet.getIndex(),
-        rowCount: lastRow,
-        columnCount: lastCol
-      };
-    });
-
-    return {
-      success: true,
-      sheets: sheetList,
-      total: sheetList.length,
-      spreadsheetName: spreadsheet.getName()
-    };
-  } catch (error) {
-    console.error('[ERROR] SystemController.getSheetList:', error && error.message ? error.message : 'Sheet list error');
-    return {
-      success: false,
-      message: error && error.message ? error.message : 'シート一覧取得エラー',
-      sheets: []
-    };
-  }
-}
-
-/**
- * 列を分析
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} sheetName - シート名
- * @returns {Object} 列分析結果
- */
-
-
-/**
  * アプリケーションの公開
  * @param {Object} publishConfig - 公開設定
  * @returns {Object} 公開結果
  */
+function sanitizePublishPayload_(publishConfig, currentConfig = {}) {
+  const source = (publishConfig && typeof publishConfig === 'object' && !Array.isArray(publishConfig))
+    ? publishConfig
+    : {};
+
+  const allowedKeys = new Set([
+    'spreadsheetId',
+    'sheetName',
+    'columnMapping',
+    'displaySettings',
+    'formUrl',
+    'formTitle',
+    'showDetails',
+    'etag'
+  ]);
+  const ignoredKeys = Object.keys(source).filter((key) => !allowedKeys.has(key));
+
+  const sanitized = {};
+
+  if (typeof source.spreadsheetId === 'string') {
+    sanitized.spreadsheetId = source.spreadsheetId.trim();
+  }
+
+  if (typeof source.sheetName === 'string') {
+    sanitized.sheetName = source.sheetName.trim();
+  }
+
+  if (source.columnMapping && typeof source.columnMapping === 'object' && !Array.isArray(source.columnMapping)) {
+    sanitized.columnMapping = (typeof sanitizeMapping === 'function')
+      ? sanitizeMapping(source.columnMapping)
+      : source.columnMapping;
+  }
+
+  if (source.displaySettings && typeof source.displaySettings === 'object' && !Array.isArray(source.displaySettings)) {
+    sanitized.displaySettings = (typeof sanitizeDisplaySettings === 'function')
+      ? sanitizeDisplaySettings(source.displaySettings)
+      : source.displaySettings;
+  } else if (currentConfig.displaySettings && typeof currentConfig.displaySettings === 'object') {
+    sanitized.displaySettings = (typeof sanitizeDisplaySettings === 'function')
+      ? sanitizeDisplaySettings(currentConfig.displaySettings)
+      : currentConfig.displaySettings;
+  }
+
+  if (typeof source.formUrl === 'string' && source.formUrl.trim()) {
+    sanitized.formUrl = source.formUrl.trim();
+  } else if (typeof currentConfig.formUrl === 'string' && currentConfig.formUrl.trim()) {
+    sanitized.formUrl = currentConfig.formUrl.trim();
+  }
+
+  const maxFormTitleLength = SYSTEM_LIMITS.PREVIEW_LENGTH * 4;
+  if (typeof source.formTitle === 'string' && source.formTitle.trim()) {
+    sanitized.formTitle = source.formTitle.trim().substring(0, maxFormTitleLength);
+  } else if (typeof currentConfig.formTitle === 'string' && currentConfig.formTitle.trim()) {
+    sanitized.formTitle = currentConfig.formTitle.trim().substring(0, maxFormTitleLength);
+  }
+
+  if (typeof source.showDetails === 'boolean') {
+    sanitized.showDetails = source.showDetails;
+  } else if (typeof currentConfig.showDetails === 'boolean') {
+    sanitized.showDetails = currentConfig.showDetails;
+  }
+
+  if (typeof source.etag === 'string' && source.etag.length > 0 && source.etag.length <= 255) {
+    sanitized.etag = source.etag;
+  }
+
+  return { config: sanitized, ignoredKeys };
+}
+
 function publishApp(publishConfig) {
   try {
     const email = getCurrentEmail();
@@ -687,34 +709,9 @@ function publishApp(publishConfig) {
       return { success: false, message: 'ユーザー認証が必要です' };
     }
 
-    // ✅ CRITICAL FIX: 必須フィールドの事前検証
-    if (!publishConfig) {
+    if (!publishConfig || typeof publishConfig !== 'object' || Array.isArray(publishConfig)) {
       return { success: false, message: '公開設定が必要です' };
     }
-
-    if (!publishConfig.spreadsheetId || typeof publishConfig.spreadsheetId !== 'string' || !publishConfig.spreadsheetId.trim()) {
-      return { success: false, message: 'データソース（スプレッドシートID）が設定されていません' };
-    }
-
-    if (!publishConfig.sheetName || typeof publishConfig.sheetName !== 'string' || !publishConfig.sheetName.trim()) {
-      return { success: false, message: 'データソース（シート名）が設定されていません' };
-    }
-
-    if (!publishConfig.columnMapping || typeof publishConfig.columnMapping !== 'object') {
-      return { success: false, message: '列マッピングが設定されていません' };
-    }
-
-    if (Object.keys(publishConfig.columnMapping).length === 0) {
-      return { success: false, message: '列マッピングが空です。少なくとも回答列を設定してください' };
-    }
-
-    const answerColumn = publishConfig.columnMapping.answer;
-    if (answerColumn === undefined || answerColumn === null || (typeof answerColumn === 'number' && answerColumn < 0)) {
-      return { success: false, message: '回答列（answer）が設定されていません' };
-    }
-
-    const publishedAt = new Date().toISOString();
-
 
     const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
@@ -724,14 +721,49 @@ function publishApp(publishConfig) {
 
     const configResult = getUserConfig(user.userId);
     const currentConfig = configResult.success ? configResult.config : {};
+    const { config: safePublishConfig, ignoredKeys } = sanitizePublishPayload_(publishConfig, currentConfig);
+
+    if (ignoredKeys.length > 0) {
+      console.warn('publishApp: Ignored non-allowlisted publish fields', {
+        userId: user.userId ? `${user.userId.substring(0, 8)}***` : 'N/A',
+        ignoredFields: ignoredKeys
+      });
+    }
+
+    if (!safePublishConfig.spreadsheetId) {
+      return { success: false, message: 'データソース（スプレッドシートID）が設定されていません' };
+    }
+
+    if (!safePublishConfig.sheetName) {
+      return { success: false, message: 'データソース（シート名）が設定されていません' };
+    }
+
+    if (!safePublishConfig.columnMapping || typeof safePublishConfig.columnMapping !== 'object') {
+      return { success: false, message: '列マッピングが設定されていません' };
+    }
+
+    if (Object.keys(safePublishConfig.columnMapping).length === 0) {
+      return { success: false, message: '列マッピングが空です。少なくとも回答列を設定してください' };
+    }
+
+    const answerColumn = safePublishConfig.columnMapping.answer;
+    if (answerColumn === undefined || answerColumn === null || (typeof answerColumn === 'number' && answerColumn < 0)) {
+      return { success: false, message: '回答列（answer）が設定されていません' };
+    }
+
+    if (currentConfig.etag && !safePublishConfig.etag) {
+      return {
+        success: false,
+        error: 'etag_required',
+        message: '設定が更新されている可能性があります。画面を再読み込みしてから再公開してください。'
+      };
+    }
+
+    const publishedAt = new Date().toISOString();
 
     const updatedConfig = {
       ...currentConfig,
-      ...publishConfig,
-      formUrl: publishConfig?.formUrl || currentConfig.formUrl,
-      formTitle: publishConfig?.formTitle || currentConfig.formTitle,
-      columnMapping: publishConfig?.columnMapping || currentConfig.columnMapping,
-      displaySettings: publishConfig?.displaySettings || currentConfig.displaySettings,
+      ...safePublishConfig,
       isPublished: true,
       publishedAt,
       setupStatus: 'completed',
