@@ -317,7 +317,8 @@ function addReaction(targetUserId, rowIndex, reactionType) {
 
     const targetUser = findUserById(targetUserId, {
       requestingUser: actorEmail,
-      preloadedAuth
+      preloadedAuth,
+      allowPublishedRead: true
     });
     if (!targetUser) {
       return createErrorResponse('Target user not found');
@@ -444,7 +445,8 @@ function toggleHighlight(targetUserId, rowIndex) {
 
     const targetUser = findUserById(targetUserId, {
       requestingUser: actorEmail,
-      preloadedAuth
+      preloadedAuth,
+      allowPublishedRead: true
     });
     if (!targetUser) {
       return createErrorResponse('Target user not found');

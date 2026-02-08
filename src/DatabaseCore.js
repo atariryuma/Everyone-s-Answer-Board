@@ -633,6 +633,122 @@ function openSpreadsheet(spreadsheetId, options = {}) {
 
 
 /**
+ * ユーザー検索の呼び出し元メールアドレスを解決
+ * @param {Object} context - アクセスコンテキスト
+ * @returns {string|null} リクエストユーザーのメール
+ */
+function resolveRequestingUser(context = {}) {
+  if (context.requestingUser && typeof context.requestingUser === 'string' && context.requestingUser.trim()) {
+    return context.requestingUser.trim();
+  }
+  try {
+    return getCurrentEmail();
+  } catch (error) {
+    return null;
+  }
+}
+
+/**
+ * 対象ユーザーのボード公開状態を判定
+ * @param {Object} targetUser - 対象ユーザー
+ * @returns {boolean} 公開中かどうか
+ */
+function isUserBoardPublished(targetUser) {
+  if (!targetUser) {
+    return false;
+  }
+
+  try {
+    if (targetUser.configJson && typeof targetUser.configJson === 'string') {
+      const parsed = JSON.parse(targetUser.configJson);
+      return Boolean(parsed && parsed.isPublished);
+    }
+  } catch (parseError) {
+    console.warn('isUserBoardPublished: Failed to parse configJson:', parseError.message);
+  }
+
+  if (!targetUser.userId) {
+    return false;
+  }
+
+  try {
+    const configResult = getUserConfig(targetUser.userId, targetUser);
+    return Boolean(configResult && configResult.success && configResult.config && configResult.config.isPublished);
+  } catch (configError) {
+    console.warn('isUserBoardPublished: Failed to resolve config:', configError.message);
+    return false;
+  }
+}
+
+/**
+ * ユーザー検索のアクセス可否を判定
+ * @param {Object} targetUser - 対象ユーザー
+ * @param {Object} context - アクセスコンテキスト
+ * @returns {boolean} アクセス許可されるか
+ */
+function canAccessTargetUser(targetUser, context = {}) {
+  if (!targetUser) {
+    return false;
+  }
+
+  if (context.skipAccessCheck === true) {
+    return true;
+  }
+
+  const requestingUser = resolveRequestingUser(context);
+  if (!requestingUser) {
+    return false;
+  }
+
+  let isAdmin = false;
+  if (context.preloadedAuth && typeof context.preloadedAuth.isAdmin === 'boolean') {
+    isAdmin = context.preloadedAuth.isAdmin;
+  } else {
+    isAdmin = isAdministrator(requestingUser);
+  }
+
+  if (isAdmin) {
+    return true;
+  }
+
+  if (targetUser.userEmail === requestingUser) {
+    return true;
+  }
+
+  if (context.allowPublishedRead === true) {
+    return isUserBoardPublished(targetUser);
+  }
+
+  return false;
+}
+
+/**
+ * ユーザー検索結果にアクセス制御を適用
+ * @param {Object|null} user - 検索結果ユーザー
+ * @param {Object} context - アクセスコンテキスト
+ * @param {string} operation - 操作名
+ * @returns {Object|null} 許可済みユーザーまたはnull
+ */
+function applyUserAccessControl(user, context = {}, operation = 'user_lookup') {
+  if (!user) {
+    return null;
+  }
+
+  if (canAccessTargetUser(user, context)) {
+    return user;
+  }
+
+  const requestingUser = resolveRequestingUser(context);
+  const maskedRequester = requestingUser ? `${requestingUser.split('@')[0]}@***` : 'N/A';
+  const maskedTarget = user.userEmail ? `${String(user.userEmail).split('@')[0]}@***` : 'unknown';
+  console.warn(`${operation}: Access denied`, {
+    requestingUser: maskedRequester,
+    target: maskedTarget
+  });
+  return null;
+}
+
+/**
  * メールアドレスでユーザーを検索（CLAUDE.md準拠 - Editor→Admin共有DB）
  * @param {string} email - ユーザーのメールアドレス
  * @param {Object} context - アクセスコンテキスト
@@ -651,7 +767,8 @@ function findUserByEmail(email, context = {}) {
     try {
       const cached = CacheService.getScriptCache().get(individualCacheKey);
       if (cached) {
-        return JSON.parse(cached);
+        const cachedUser = JSON.parse(cached);
+        return applyUserAccessControl(cachedUser, context, 'findUserByEmail');
       }
     } catch (individualCacheError) {
       console.error('findUserByEmail: Individual cache read failed:', individualCacheError.message);
@@ -662,8 +779,12 @@ function findUserByEmail(email, context = {}) {
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find(u => u.userEmail === email);
         if (user) {
-          saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
-          return user;
+          const allowedUser = applyUserAccessControl(user, context, 'findUserByEmail');
+          if (!allowedUser) {
+            return null;
+          }
+          saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+          return allowedUser;
         }
       }
     } catch (cacheError) {
@@ -697,10 +818,12 @@ function findUserByEmail(email, context = {}) {
       const row = data[i];
       if (row[emailColumnIndex] === email) {
         const user = createUserObjectFromRow(row, headers);
-
-        saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
-
-        return user;
+        const allowedUser = applyUserAccessControl(user, context, 'findUserByEmail');
+        if (!allowedUser) {
+          return null;
+        }
+        saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+        return allowedUser;
       }
     }
 
@@ -730,7 +853,8 @@ function findUserById(userId, context = {}) {
     try {
       const cached = CacheService.getScriptCache().get(individualCacheKey);
       if (cached) {
-        return JSON.parse(cached);
+        const cachedUser = JSON.parse(cached);
+        return applyUserAccessControl(cachedUser, context, 'findUserById');
       }
     } catch (individualCacheError) {
       console.error('findUserById: Individual cache read failed:', individualCacheError.message);
@@ -741,8 +865,12 @@ function findUserById(userId, context = {}) {
       if (Array.isArray(allUsers) && allUsers.length > 0) {
         const user = allUsers.find(u => u.userId === userId);
         if (user) {
-          saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
-          return user;
+          const allowedUser = applyUserAccessControl(user, context, 'findUserById');
+          if (!allowedUser) {
+            return null;
+          }
+          saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+          return allowedUser;
         }
       }
     } catch (cacheError) {
@@ -776,10 +904,12 @@ function findUserById(userId, context = {}) {
       const row = data[i];
       if (row[userIdColumnIndex] === userId) {
         const user = createUserObjectFromRow(row, headers);
-
-        saveToCacheWithSizeCheck(individualCacheKey, user, CACHE_DURATION.USER_INDIVIDUAL);
-
-        return user;
+        const allowedUser = applyUserAccessControl(user, context, 'findUserById');
+        if (!allowedUser) {
+          return null;
+        }
+        saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+        return allowedUser;
       }
     }
 
@@ -1052,7 +1182,11 @@ function updateUser(userId, updates, context = {}) {
     }
 
 
-    const targetUser = findUserById(userId, context);
+    const requestingUser = context.requestingUser || getCurrentEmail();
+    const targetUser = findUserById(userId, {
+      ...context,
+      requestingUser
+    });
 
     if (!targetUser) {
       console.warn('updateUser: Target user not found:', userId);
@@ -1156,7 +1290,10 @@ function updateUser(userId, updates, context = {}) {
  */
 function getViewerBoardData(targetUserId, viewerEmail) {
   try {
-    const targetUser = findUserById(targetUserId, { requestingUser: viewerEmail });
+    const targetUser = findUserById(targetUserId, {
+      requestingUser: viewerEmail,
+      allowPublishedRead: true
+    });
     if (!targetUser) {
       console.warn('getViewerBoardData: Target user not found:', targetUserId);
       return null;
@@ -1321,4 +1458,3 @@ function deleteUser(userId, reason = '', context = {}) {
     return { success: false, message: error.message };
   }
 }
-

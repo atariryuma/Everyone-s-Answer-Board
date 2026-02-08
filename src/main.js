@@ -606,7 +606,8 @@ function getBatchedViewerData(targetUserId, currentEmail) {
 
     const targetUser = findUserById(targetUserId, {
       requestingUser: currentEmail,
-      preloadedAuth
+      preloadedAuth,
+      allowPublishedRead: true
     });
     if (!targetUser) {
       return { success: false, error: '対象ユーザーが見つかりません' };

@@ -484,7 +484,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
     if (targetUserId) {
       const targetUser = findUserById(targetUserId, {
         requestingUser: viewerEmail,
-        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
+        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin },
+        allowPublishedRead: true
       });
       if (!targetUser) {
         console.error('getPublishedSheetData: Target user not found', { targetUserId, viewerEmail });
@@ -807,7 +808,10 @@ function getNotificationUpdate(targetUserId, options = {}) {
       return { success: false, message: 'Invalid request' };
     }
 
-    const targetUser = findUserById(targetUserId, { requestingUser: email });
+    const targetUser = findUserById(targetUserId, {
+      requestingUser: email,
+      allowPublishedRead: true
+    });
     if (!targetUser) {
       return { success: false, message: 'User not found' };
     }
