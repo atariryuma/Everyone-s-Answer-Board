@@ -9,34 +9,6 @@
   <!-- Shared Security Headers -->
   <?!= include('SharedSecurityHeaders'); ?>
 
-  <!-- TailwindCSS Optimized Loading - highest priority, no warnings -->
-  <script>
-    window.__TAILWIND_DISABLE_TOUCH__ = true;
-    window.tailwind = {
-      config: {
-        corePlugins: { preflight: false },
-        important: true,
-      },
-    };
-
-    if (!window.__WARN_SUPPRESSION_INITIALIZED__) {
-      const originalWarnUnpub = console.warn;
-      console.warn = function (...args) {
-        const message = args.join(' ');
-        if (
-          message.includes('cdn.tailwindcss.com should not be used in production') ||
-          message.includes('cdnjs.cloudflare.com') ||
-          message.includes('tailwind') ||
-          message.includes('TailwindCSS')
-        ) {
-          return; // Completely suppress
-        }
-        originalWarnUnpub.apply(console, args);
-      };
-      window.__WARN_SUPPRESSION_INITIALIZED__ = true;
-    }
-  </script>
-  <!-- Shared TailwindCSS Configuration -->
   <?!= include('SharedTailwindConfig'); ?>
 
   <!-- Unified Styles and Shared Components -->

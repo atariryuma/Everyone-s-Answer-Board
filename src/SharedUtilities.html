@@ -4,95 +4,40 @@
      GAS Compatible utility functions for all HTML files
      ============================================================================= */
 
-  // ✅ IMMEDIATE WARNING SUPPRESSION - HIGHEST PRIORITY
+  // GAS iframe/sandbox環境の既知の警告・エラーを抑制
+  // Tailwind関連はSharedTailwindConfig.htmlで処理済み
   (function () {
+    const gasSuppressPatterns = [
+      'Unrecognized feature',
+      'ambient-light-sensor',
+      'speaker',
+      'vibrate',
+      'vr',
+      'sandboxing',
+      'iframe which has both allow-scripts',
+      'can escape its sandboxing',
+      'Unsafe attempt to initiate navigation',
+      'about:blank'
+    ];
+
     const originalWarn = window.console.warn;
     const originalError = window.console.error;
 
     window.console.warn = function (...args) {
       const message = String(args[0] || '');
-      if (message.includes('Unrecognized feature') ||
-        message.includes('ambient-light-sensor') ||
-        message.includes('speaker') ||
-        message.includes('vibrate') ||
-        message.includes('vr') ||
-        message.includes('iframe') ||
-        message.includes('sandboxing') ||
-        message.includes('tailwind') ||
-        message.includes('net state changed')) {
-        return; // Suppress
-      }
+      if (gasSuppressPatterns.some(p => message.includes(p))) return;
       originalWarn.apply(console, args);
     };
 
     window.console.error = function (...args) {
       const message = String(args[0] || '');
-      if (message.includes('Unsafe attempt to initiate navigation') ||
-        message.includes('sandboxed with the') ||
-        message.includes('about:blank')) {
-        return; // Suppress
-      }
+      if (gasSuppressPatterns.some(p => message.includes(p))) return;
       originalError.apply(console, args);
-    };
-  })();
-
-
-  (function () {
-    const suppressedErrors = [
-      'cdn.tailwindcss.com should not be used in production',
-      'cdnjs.cloudflare.com',
-      'tailwind',
-      'TailwindCSS',
-      'iframe which has both allow-scripts and allow-same-origin',
-      'can escape its sandboxing',
-      'An iframe which has both allow-scripts and allow-same-origin',
-    ];
-
-    const criticalSyntaxErrors = [
-      'Unexpected end of input',
-      'Unexpected token',
-      'SyntaxError: Unexpected',
-      'Invalid or unexpected token',
-    ];
-
-    const originalErrorHandler = window.onerror;
-    window.onerror = function (message, source, lineno, colno, error) {
-      const errorMessage = message ? message.toString() : '';
-
-      const shouldSuppress = suppressedErrors.some((pattern) => errorMessage.includes(pattern));
-
-      if (shouldSuppress) {
-        return true; // Suppress known warnings
-      }
-
-      const isCritical = criticalSyntaxErrors.some((pattern) => errorMessage.includes(pattern));
-      if (isCritical && window.notifications) {
-        window.notifications.error('ページでエラーが発生しました。再読み込みをお試しください。', 8000);
-      }
-
-      if (originalErrorHandler) {
-        return originalErrorHandler.call(this, message, source, lineno, colno, error);
-      }
-      return false;
-    };
-
-    const originalWarn = console.warn;
-    console.warn = function (...args) {
-      const message = args.join(' ');
-      const shouldSuppress = suppressedErrors.some((pattern) => message.includes(pattern));
-
-      if (shouldSuppress) {
-        return; // Suppress known warnings
-      }
-
-      originalWarn.apply(console, args);
     };
 
     window.addEventListener('unhandledrejection', function (event) {
       const reason = event.reason?.toString() || '';
-      const shouldSuppress = suppressedErrors.some((pattern) => reason.includes(pattern));
-
-      if (shouldSuppress) {
+      if (gasSuppressPatterns.some(p => reason.includes(p))) {
         event.preventDefault();
         return;
       }
