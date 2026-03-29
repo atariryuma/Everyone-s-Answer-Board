@@ -146,9 +146,10 @@ test('doPost: getData success path', () => {
 
 // --- setupApiKey tests ---
 
-test('doPost: setupApiKey sets key when not configured', () => {
+test('doPost: setupApiKey sets key when admin and not configured', () => {
   const props = {};
   const context = loadMainContext({
+    Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: (k) => props[k] || null,
@@ -176,8 +177,23 @@ test('doPost: setupApiKey rejects when already configured', () => {
   assert.equal(response.error, 'ALREADY_CONFIGURED');
 });
 
-test('doPost: setupApiKey rejects short key', () => {
+test('doPost: setupApiKey rejects non-admin', () => {
   const context = loadMainContext({
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: () => null
+      })
+    }
+  });
+  const event = createPostEvent({ action: 'setupApiKey', apiKey: 'long-enough-key-1234' });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+  assert.equal(response.error, 'ADMIN_REQUIRED');
+});
+
+test('doPost: setupApiKey rejects short key for admin', () => {
+  const context = loadMainContext({
+    Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
     PropertiesService: {
       getScriptProperties: () => ({
         getProperty: () => null

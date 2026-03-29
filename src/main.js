@@ -445,7 +445,12 @@ function doPost(e) {
     if (action === 'setupApiKey') {
       const existingKey = PropertiesService.getScriptProperties().getProperty('ADMIN_API_KEY');
       if (existingKey) {
-        return jsonResponse(createErrorResponse('ADMIN_API_KEY is already configured. Use adminApi with setProperty to change it.', null, { error: 'ALREADY_CONFIGURED' }));
+        return jsonResponse(createErrorResponse('ADMIN_API_KEY is already configured', null, { error: 'ALREADY_CONFIGURED' }));
+      }
+      // 初回設定は管理者のみ許可
+      const setupEmail = getCurrentEmail();
+      if (!setupEmail || !isAdministrator(setupEmail)) {
+        return jsonResponse(createErrorResponse('Admin authentication required', null, { error: 'ADMIN_REQUIRED' }));
       }
       const newKey = typeof request.apiKey === 'string' && request.apiKey.length >= 16 ? request.apiKey : null;
       if (!newKey) {
