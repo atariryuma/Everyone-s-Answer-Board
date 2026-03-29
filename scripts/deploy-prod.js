@@ -45,13 +45,21 @@ try {
   const deployId = config.prodDeployId;
   console.log(`Updating production deployment ${deployId.substring(0, 20)}...`);
 
-  const deployRaw = execSync(
-    `curl -s -X PUT "https://script.googleapis.com/v1/projects/${scriptId}/deployments/${deployId}" ` +
-    `-H "Content-Type: application/json" ` +
-    `-H "Authorization: Bearer ${token}" ` +
-    `-d '{"deploymentConfig":{"scriptId":"${scriptId}","versionNumber":${version}}}'`,
-    { encoding: 'utf8' }
-  );
+  const deployBody = JSON.stringify({ deploymentConfig: { scriptId, versionNumber: version } });
+  const deployPayload = path.join(require('os').tmpdir(), `gas-deploy-${Date.now()}.json`);
+  fs.writeFileSync(deployPayload, deployBody, { mode: 0o600 });
+  let deployRaw;
+  try {
+    deployRaw = execSync(
+      `curl -s -X PUT "https://script.googleapis.com/v1/projects/${scriptId}/deployments/${deployId}" ` +
+      `-H "Content-Type: application/json" ` +
+      `-H "Authorization: Bearer ${token}" ` +
+      `-d @"${deployPayload}"`,
+      { encoding: 'utf8' }
+    );
+  } finally {
+    try { fs.unlinkSync(deployPayload); } catch (_) {}
+  }
   let deployData;
   try { deployData = JSON.parse(deployRaw); } catch (e) {
     throw new Error(`Failed to parse deploy response: ${deployRaw.substring(0, 200)}`);

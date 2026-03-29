@@ -113,11 +113,7 @@
             if (isRetryable && this.retryCount < this.maxRetries) {
               this.retryCount++;
 
-              const createPromiseDelay = (ms) => new Promise(resolve => {
-                const start = Date.now();
-                const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-                check();
-              });
+              const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
               createPromiseDelay(Math.pow(2, this.retryCount) * 1000).then(async () => {
                 try {
@@ -2533,11 +2529,7 @@
       }
       guidanceEl.textContent = message;
 
-      const createPromiseDelay = (ms) => new Promise(resolve => {
-        const start = Date.now();
-        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-        check();
-      });
+      const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
       createPromiseDelay(8000).then(() => {
         if (guidanceEl && guidanceEl.parentNode) {
@@ -4133,11 +4125,7 @@
           btn.textContent = '✅ コピー完了';
           btn.disabled = true;
 
-          const createPromiseDelay = (ms) => new Promise(resolve => {
-            const start = Date.now();
-            const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-            check();
-          });
+          const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
           createPromiseDelay(2000).then(() => {
             btn.textContent = originalText;

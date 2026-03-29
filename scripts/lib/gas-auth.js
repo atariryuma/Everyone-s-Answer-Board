@@ -96,8 +96,8 @@ function postJSONSync(url, body, token) {
   const scriptFile = path.join(os.tmpdir(), `gas-req-${Date.now()}.py`);
   const data = typeof body === 'string' ? body : JSON.stringify(body);
 
-  fs.writeFileSync(payloadFile, data);
-  fs.writeFileSync(tokenFile, token || '');
+  fs.writeFileSync(payloadFile, data, { mode: 0o600 });
+  fs.writeFileSync(tokenFile, token || '', { mode: 0o600 });
   fs.writeFileSync(scriptFile, [
     'import json, urllib.request',
     `payload = open(${JSON.stringify(payloadFile)}, "rb").read()`,

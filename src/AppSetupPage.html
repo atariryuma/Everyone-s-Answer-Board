@@ -468,11 +468,7 @@
         }, { timeout: 10 });
 
         if (duration > 0) {
-          const createPromiseDelay = (ms) => new Promise(resolve => {
-            const start = Date.now();
-            const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-            check();
-          });
+          const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
           createPromiseDelay(duration).then(() => {
             notification.classList.remove('translate-x-0', 'opacity-100');

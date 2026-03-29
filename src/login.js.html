@@ -112,11 +112,7 @@
           userEmailDisplay.textContent = statusMessage;
           userEmailDisplay.classList.add('text-green-400');
 
-          const createPromiseDelay = (ms) => new Promise(resolve => {
-            const start = Date.now();
-            const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-            check();
-          });
+          const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
           createPromiseDelay(3000).then(() => {
             if (userEmailDisplay) {
@@ -233,11 +229,7 @@
                 }
               }, 800);
 
-              const createPromiseDelay = (ms) => new Promise(resolve => {
-                const start = Date.now();
-                const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-                check();
-              });
+              const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
               createPromiseDelay(5000).then(() => clearInterval(emailProtector)).catch(() => {
               });
@@ -789,11 +781,7 @@
             const originalText = buttonElement.textContent;
             buttonElement.textContent = '✅ コピー完了!';
             buttonElement.disabled = true;
-            const createPromiseDelay = (ms) => new Promise(resolve => {
-              const start = Date.now();
-              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-              check();
-            });
+            const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
             createPromiseDelay(2000).then(() => {
               buttonElement.textContent = originalText;
@@ -806,11 +794,7 @@
             messageElement.textContent = ' (手動でコピーしてください)';
             messageElement.style.color = 'orange';
             buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-            const createPromiseDelay = (ms) => new Promise(resolve => {
-              const start = Date.now();
-              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-              check();
-            });
+            const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
             createPromiseDelay(5000).then(() => messageElement.remove());
           });
@@ -821,11 +805,7 @@
           ' (ブラウザがコピーをサポートしていません。手動でコピーしてください)';
         messageElement.style.color = 'orange';
         buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-        const createPromiseDelay = (ms) => new Promise(resolve => {
-          const start = Date.now();
-          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-          check();
-        });
+        const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         createPromiseDelay(5000).then(() => messageElement.remove());
       }
@@ -835,11 +815,7 @@
       messageElement.textContent = ' (コピー中にエラーが発生しました)';
       messageElement.style.color = 'red';
       buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-      const createPromiseDelay = (ms) => new Promise(resolve => {
-        const start = Date.now();
-        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-        check();
-      });
+      const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
       createPromiseDelay(5000).then(() => messageElement.remove());
     }

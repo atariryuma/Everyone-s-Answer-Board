@@ -288,14 +288,7 @@ window.ErrorHandler = {
         this.logError(error, `${context} (試行${attempt}/${retryCount})`);
 
         if (attempt < retryCount) {
-          await new Promise(resolve => {
-            const createPromiseDelay = (ms) => {
-              const start = Date.now();
-              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-              check();
-            };
-            createPromiseDelay(retryDelay);
-          });
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
           continue;
         }
 

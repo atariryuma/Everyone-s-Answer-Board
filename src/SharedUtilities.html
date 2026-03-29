@@ -96,11 +96,7 @@
         this.timers.delete(key);
       }
 
-      const createPromiseDelay = (ms) => new Promise(resolve => {
-        const start = Date.now();
-        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-        check();
-      });
+      const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
       const debouncePromise = createPromiseDelay(delay).then(() => {
         if (this.timers.get(key) === debouncePromise) {
@@ -137,11 +133,7 @@
         func();
         this.lastExecution.set(key, now);
       } else if (!this.timers.has(key)) {
-        const createPromiseDelay = (ms) => new Promise(resolve => {
-          const start = Date.now();
-          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-          check();
-        });
+        const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         const delayTime = delay - (now - lastRun);
         const throttlePromise = createPromiseDelay(delayTime).then(() => {
@@ -692,11 +684,7 @@
     if (window.sharedUtilities && window.sharedUtilities.debounce) {
       window.sharedUtilities.debounce.debounce(func, key, delay);
     } else {
-      const createPromiseDelay = (ms) => new Promise(resolve => {
-        const start = Date.now();
-        const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-        check();
-      });
+      const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
       createPromiseDelay(delay).then(func).catch(() => {
       });
     }
@@ -788,11 +776,7 @@
 
             window.open(loginUrl, '_top');
 
-            const createPromiseDelay = (ms) => new Promise(resolve => {
-              const start = Date.now();
-              const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-              check();
-            });
+            const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
             createPromiseDelay(100).then(() => {
               google.script.run
@@ -1005,11 +989,7 @@
             return `⚠️ UnifiedLoadingManager: loading-overlay element not found. DOM state: ${safeReadyState}. Retrying in ${safeDelay}ms (${safeRetries} retries left)...`;
           })()
         );
-        const createPromiseDelay = (ms) => new Promise(resolve => {
-          const start = Date.now();
-          const check = () => (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-          check();
-        });
+        const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
         createPromiseDelay(delay).then(() => this.init(retries - 1, delay * 1.5, onSuccess));
       } else {

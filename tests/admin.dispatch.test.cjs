@@ -151,6 +151,11 @@ test('dispatch: listProperties masks sensitive keys', () => {
   const ctx = loadAdminContext();
   const result = ctx.dispatchAdminOperation('listProperties', {});
   assert.equal(result.success, true);
+  // Non-sensitive key: shown as-is
   assert.equal(result.data.properties['APP_NAME'], 'test');
-  assert.match(result.data.properties['ADMIN_API_KEY'], /\*\*\*/);
+  // Sensitive key (contains KEY): must be fully masked, not contain actual value
+  const masked = result.data.properties['ADMIN_API_KEY'];
+  assert.ok(masked.startsWith('***'), 'Should start with ***');
+  assert.ok(masked.includes('chars'), 'Should indicate character count');
+  assert.ok(!masked.includes('secret123'), 'Must not contain actual value');
 });
