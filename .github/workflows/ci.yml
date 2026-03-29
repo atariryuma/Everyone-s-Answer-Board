@@ -1,16 +1,15 @@
-name: CI & Deploy to Google Apps Script
+name: CI
 
 on:
   push:
     branches: [main]
-    paths: ['src/**', 'tests/**', 'package.json', 'package-lock.json', '.github/workflows/ci.yml']
+    paths: ['src/**', 'tests/**', 'package.json', '.github/workflows/ci.yml']
   pull_request:
     branches: [main]
-    paths: ['src/**', 'tests/**', 'package.json', 'package-lock.json', '.github/workflows/ci.yml']
-  workflow_dispatch:
+    paths: ['src/**', 'tests/**', 'package.json', '.github/workflows/ci.yml']
 
 jobs:
-  ci-and-deploy:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,40 +22,17 @@ jobs:
 
       - name: Check JavaScript syntax
         run: |
-          echo "Checking JavaScript syntax..."
           errors=0
           for file in src/*.js; do
             if ! node --check "$file" 2>/dev/null; then
-              echo "❌ Syntax error: $file"
+              echo "Syntax error: $file"
               errors=$((errors + 1))
             fi
           done
           if [ "$errors" -gt 0 ]; then
-            echo "❌ Found $errors file(s) with syntax errors"
+            echo "Found $errors file(s) with syntax errors"
             exit 1
           fi
-          echo "✅ All JavaScript files passed syntax check"
 
       - name: Run unit tests
         run: npm test
-
-      - name: Install dependencies
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        run: npm ci
-
-      - name: Setup clasp auth
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        run: |
-          if [ -z '${{ secrets.CLASPRC_JSON }}' ] || [ -z '${{ secrets.CLASP_SCRIPT_ID }}' ]; then
-            echo "::error::Missing required secrets: CLASPRC_JSON and/or CLASP_SCRIPT_ID"
-            exit 1
-          fi
-
-          printf '%s\n' '${{ secrets.CLASPRC_JSON }}' > .clasprc.json
-          printf '{"scriptId":"%s","rootDir":"src"}\n' '${{ secrets.CLASP_SCRIPT_ID }}' > .clasp.json
-
-          node -e "const fs=require('fs');const p='.clasprc.json';const raw=fs.readFileSync(p,'utf8');const j=JSON.parse(raw);if(!j||typeof j!=='object'||Array.isArray(j)||Object.keys(j).length===0){throw new Error('Invalid CLASPRC_JSON: expected a non-empty JSON object');}"
-
-      - name: Push to Apps Script
-        if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-        run: npx clasp push --force --auth "$GITHUB_WORKSPACE/.clasprc.json"

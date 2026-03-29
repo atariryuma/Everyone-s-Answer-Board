@@ -31,9 +31,9 @@ npm run deploy            # 新しいURLでデプロイ（テスト用）
 node --test tests/main.doPost.test.cjs   # Run a single test file
 ```
 
-**Dev workflow**: Edit locally → `npm test` → `npm run deploy:prod` → Git commit
+**Dev workflow**: Edit locally → `npm test` → `npm run deploy:prod` → Git commit → `git push`
 
-**CI** (.github/workflows/ci.yml): Syntax check all `src/*.js` → `npm test` → clasp push (main branch only)
+**CI** (.github/workflows/ci.yml): Syntax check + `npm test`（品質ゲートのみ。デプロイはローカルの `deploy:prod` で行う）
 
 ---
 
