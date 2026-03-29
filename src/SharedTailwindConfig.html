@@ -18,28 +18,24 @@
       },
     };
 
-    if (isProduction || window.location.protocol === 'https:') {
-      const originalWarn = console.warn;
-      const originalLog = console.log;
+    // 本番: console.warnとconsole.logを抑制（errorのみ残す）
+    // 開発: Tailwind CDN警告のみ抑制
+    const originalWarn = console.warn;
+    const originalLog = console.log;
+    const tailwindPatterns = ['tailwind', 'TailwindCSS', 'cdn.tailwindcss.com', 'should not be used in production'];
+
+    if (isProduction) {
+      console.warn = function () {};
+      console.log = function () {};
+    } else {
       console.warn = function (...args) {
-        const message = args.join(' ');
-        if (
-          message.includes('tailwind') ||
-          message.includes('TailwindCSS') ||
-          message.includes('cdn.tailwindcss.com') ||
-          message.includes('cdnjs.cloudflare.com') ||
-          message.includes('should not be used in production')
-        ) {
-          return;
-        }
+        const msg = args.join(' ');
+        if (tailwindPatterns.some(p => msg.includes(p))) return;
         originalWarn.apply(console, args);
       };
       console.log = function (...args) {
-        const message = args.join(' ');
-        if (message.includes('cdn.tailwindcss.com should not be used in production') ||
-            message.includes('cdnjs.cloudflare.com')) {
-          return;
-        }
+        const msg = args.join(' ');
+        if (tailwindPatterns.some(p => msg.includes(p))) return;
         originalLog.apply(console, args);
       };
     }
