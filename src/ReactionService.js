@@ -93,6 +93,11 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
   const maxCol = Math.max(...columnIndexes);
   const [rowData = []] = sheet.getRange(rowNumber, minCol, 1, maxCol - minCol + 1).getValues();
 
+  // 行が削除済み（全セル空）の場合はエラー
+  if (rowData.every(cell => !cell && cell !== 0)) {
+    throw new Error('対象の回答が見つかりません（削除された可能性があります）');
+  }
+
   const currentReactions = {};
   const updatedReactions = {};
   let userCurrentReaction = null;

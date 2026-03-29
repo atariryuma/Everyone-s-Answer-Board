@@ -173,16 +173,10 @@ function processLoginAction() {
     if (!user) {
       user = createUser(email);
       if (!user) {
-        console.warn('createUser failed, creating fallback user object');
-        user = {
-          userId: Utilities.getUuid(),
-          userEmail: email,
-          isActive: true,
-          configJson: JSON.stringify({
-            setupStatus: 'pending',
-            isPublished: false
-          }),
-          lastModified: new Date().toISOString()
+        console.error('processLoginAction: createUser failed for', email);
+        return {
+          success: false,
+          message: 'ユーザー登録に失敗しました。しばらくしてから再度お試しください。'
         };
       }
     }

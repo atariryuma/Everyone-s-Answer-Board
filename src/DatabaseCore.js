@@ -1000,6 +1000,11 @@ function createUser(email, initialConfig = {}, context = {}) {
       now  // lastModified
     ];
 
+    if (sheet.getLastRow() >= 10000) {
+      console.error('createUser: Users sheet at capacity');
+      return null;
+    }
+
     sheet.appendRow(newUserData);
 
     const user = {
