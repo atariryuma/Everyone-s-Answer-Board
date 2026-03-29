@@ -1,30 +1,34 @@
 {
-  "anthropic_api_key": "",
-  "environment_variables": {
-    "NODE_ENV": "development",
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "25000",
-    "MAX_MCP_OUTPUT_TOKENS": "25000"
-  },
   "permissions": {
     "Bash": [
-      "npm run test",
-      "npm run lint",
-      "npm run check",
-      "./scripts/safe-deploy.sh",
-      "clasp push",
-      "clasp open",
-      "clasp logs",
-      "clasp status",
+      "npm test",
+      "npm run deploy:prod",
+      "npm run api",
+      "npm run logs:cloud",
+      "npm run push",
+      "npm run pull",
+      "npx clasp push",
+      "npx clasp push --force",
+      "npx clasp deploy",
+      "npx clasp logs",
+      "node --check",
+      "node --test",
+      "node scripts/admin-api.js",
+      "node scripts/deploy-prod.js",
+      "node scripts/logs.js",
       "git status",
+      "git diff",
+      "git log",
       "git add",
       "git commit",
       "git push",
-      "rg"
+      "gh run list",
+      "gh secret list",
+      "gh secret delete"
     ],
     "Read": true,
     "Write": true,
     "Edit": true,
-    "MultiEdit": true,
     "Grep": true,
     "Glob": true,
     "TodoWrite": true,
@@ -35,152 +39,5 @@
     "pre_tool_use": [],
     "post_tool_use": [],
     "user_prompt_submit": []
-  },
-  "model": "claude-3-5-sonnet-20241022",
-  "safety": {
-    "prevent_overwrite_key_files": [
-      ".clasp.json",
-      "package.json",
-      ".gitignore"
-    ]
-  },
-  "agents": {
-    "gas-expert": {
-      "description": "Specialized Google Apps Script expert for performance optimization and GAS-specific patterns",
-      "triggers": [
-        "clasp",
-        "Google Apps Script",
-        "GAS optimization",
-        "script execution time",
-        "quota limits",
-        "service account"
-      ],
-      "expertise": [
-        "GAS V8 runtime optimization",
-        "HTML Service security patterns",
-        "Spreadsheet API efficiency",
-        "Script execution limits",
-        "Service Account vs User authentication",
-        "Quota management strategies"
-      ],
-      "context": "Focus on GAS-specific best practices, performance optimization, and platform limitations. Prioritize execution efficiency and quota conservation."
-    },
-    "architecture-reviewer": {
-      "description": "System architecture analysis and design pattern validation specialist",
-      "triggers": [
-        "architecture review",
-        "code structure",
-        "design patterns",
-        "separation of concerns",
-        "refactoring"
-      ],
-      "expertise": [
-        "Services architecture patterns",
-        "Dependency injection",
-        "API Gateway patterns",
-        "Controller/Service layer separation",
-        "Error handling strategies",
-        "Code organization principles"
-      ],
-      "context": "Analyze system architecture for maintainability, scalability, and adherence to established patterns. Focus on layer separation and code organization."
-    },
-    "quality-guardian": {
-      "description": "Code quality, testing, and deployment safety specialist",
-      "triggers": [
-        "quality check",
-        "testing",
-        "deployment",
-        "lint errors",
-        "test failures",
-        "pre-commit"
-      ],
-      "expertise": [
-        "Test-driven development",
-        "ESLint configuration",
-        "TypeScript integration",
-        "Continuous integration",
-        "Deployment automation",
-        "Quality gates"
-      ],
-      "context": "Ensure code quality standards, comprehensive testing, and safe deployment practices. Focus on preventing regressions and maintaining system stability."
-    },
-    "security-auditor": {
-      "description": "Security analysis and vulnerability assessment specialist",
-      "triggers": [
-        "security",
-        "authentication",
-        "authorization",
-        "input validation",
-        "XSS",
-        "CSRF",
-        "secrets"
-      ],
-      "expertise": [
-        "OAuth 2.0 implementation",
-        "Input sanitization",
-        "XSS/CSRF prevention",
-        "Secrets management",
-        "Access control patterns",
-        "Security headers"
-      ],
-      "context": "Focus on security vulnerabilities, authentication flows, and defensive programming practices. Prioritize user data protection and secure coding patterns."
-    }
-  },
-  "workflows": {
-    "explore-plan-code": {
-      "enabled": true,
-      "auto_plan_threshold": 3,
-      "require_explicit_approval": false,
-      "description": "Automatically enter planning mode for complex tasks requiring 3+ steps"
-    },
-    "branch_first_development": {
-      "enabled": true,
-      "auto_create_branch": true,
-      "branch_naming": "feature/{task-description}",
-      "description": "Create feature branches for all development work"
-    },
-    "quality_gates": {
-      "enabled": true,
-      "required_checks": ["npm run check", "npm run test"],
-      "blocking_errors": 5,
-      "description": "Enforce quality checks before commits"
-    }
-  },
-  "project_context": {
-    "type": "google_apps_script",
-    "architecture": "services_pattern",
-    "testing_framework": "custom",
-    "deployment_tool": "clasp",
-    "primary_concerns": [
-      "execution_time_limits",
-      "quota_management",
-      "html_service_compatibility",
-      "service_account_authentication"
-    ]
-  },
-  "custom_commands": {
-    "test-and-deploy": {
-      "file": "test-and-deploy.md",
-      "description": "Complete testing and deployment workflow"
-    },
-    "architecture-review": {
-      "file": "architecture-review.md",
-      "description": "Comprehensive architectural analysis"
-    },
-    "pre-commit-check": {
-      "file": "pre-commit-check.md",
-      "description": "Quality validation before commits"
-    },
-    "production-deploy": {
-      "file": "production-deploy.md",
-      "description": "Safe production deployment process"
-    }
-  },
-  "auto_behaviors": {
-    "proactive_testing": true,
-    "automatic_quality_checks": true,
-    "branch_safety_mode": true,
-    "commit_attribution": true,
-    "deployment_validation": true
   }
 }

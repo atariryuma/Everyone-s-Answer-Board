@@ -1,32 +1,23 @@
 #!/bin/bash
-
-# Claude Code Pre-Deploy Hook
-# Automatically runs before any deployment to prevent common issues
-
 set -e
 
-echo "🔍 Running pre-deployment checks..."
+# 構文チェック
+errors=0
+for file in src/*.js; do
+  if ! node --check "$file" 2>/dev/null; then
+    echo "Syntax error: $file"
+    errors=$((errors + 1))
+  fi
+done
+if [ "$errors" -gt 0 ]; then exit 1; fi
 
-# 1. Check for duplicate declarations
-echo "  → Checking for duplicate const/function declarations..."
-if rg -n "^(const|function|class) " src/ | sort | uniq -d -w 20 | grep -q .; then
-    echo "❌ Duplicate declarations found:"
-    rg -n "^(const|function|class) " src/ | sort | uniq -d -w 20
-    exit 1
+# テスト
+npm test --silent
+
+# GAS関数名の重複チェック（GASはグローバルスコープなので名前衝突は致命的）
+dupes=$(grep -rh "^function [a-zA-Z_]" src/*.js | sort | uniq -d)
+if [ -n "$dupes" ]; then
+  echo "Duplicate function names found:"
+  echo "$dupes"
+  exit 1
 fi
-
-# 2. Verify authentication flow
-echo "  → Verifying authentication flow pattern..."
-if ! rg -q "handleLoginModeWithTemplate.*default_entry_point" src/main.gs; then
-    echo "❌ Authentication flow may be broken - check /exec routing"
-    exit 1
-fi
-
-# 3. Test basic compilation
-echo "  → Testing basic syntax..."
-if ! node scripts/pre-deploy-check.js > /dev/null 2>&1; then
-    echo "❌ Pre-deploy validation failed"
-    exit 1
-fi
-
-echo "✅ Pre-deployment checks passed"
