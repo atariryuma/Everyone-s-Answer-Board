@@ -46,12 +46,15 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
 
         circuitState.consecutiveErrors++;
 
-        if (circuitState.consecutiveErrors >= 3) {
-          circuitState.circuitOpenUntil = now + 60000;
-          console.error(`🚨 Circuit breaker activated: Too many 429 errors. API calls paused for 60s.`);
+        if (circuitState.consecutiveErrors >= 7) {
+          // 段階的バックオフ: 7回=30s, 10回=60s, 15回+=120s
+          const lockoutMs = circuitState.consecutiveErrors >= 15 ? 120000
+            : circuitState.consecutiveErrors >= 10 ? 60000 : 30000;
+          circuitState.circuitOpenUntil = now + lockoutMs;
+          console.error(`Circuit breaker activated: ${circuitState.consecutiveErrors} errors. Paused for ${lockoutMs / 1000}s.`);
         }
 
-        cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 60);
+        cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 120);
 
         Utilities.sleep(backoffTime);
         retryCount++;
@@ -172,7 +175,7 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
       const isPublished = configResult.success && configResult.config.isPublished;
 
       try {
-        CacheService.getScriptCache().put(cacheKey, JSON.stringify({ isPublished }), 300);
+        CacheService.getScriptCache().put(cacheKey, JSON.stringify({ isPublished }), 60);
       } catch (cacheError) {
         console.warn('SA_VALIDATION: Cache write failed:', cacheError.message);
       }
@@ -586,7 +589,7 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
         if (!spreadsheet) {
           console.error('openSpreadsheet: サービスアカウント接続失敗、通常アクセスにフォールバック', {
-            spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
+            spreadsheetId: `${spreadsheetId.substring(0, 20)}...`,
             authEmail: auth.email
           });
           spreadsheet = SpreadsheetApp.openById(spreadsheetId);
@@ -596,9 +599,9 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       }
     } catch (openError) {
       console.error('openSpreadsheet: スプレッドシート接続失敗', {
-        spreadsheetId: `${spreadsheetId.substring(0, 20)  }...`,
+        spreadsheetId: `${spreadsheetId.substring(0, 20)}...`,
         error: openError.message,
-        stack: openError.stack ? `${openError.stack.substring(0, 200)  }...` : 'No stack trace',
+        stack: openError.stack ? `${openError.stack.substring(0, 200)}...` : 'No stack trace',
         useServiceAccount: options.useServiceAccount,
         hasAuth: !!auth
       });
@@ -1016,9 +1019,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     return null;
   } finally {
     try {
-      if (lock && typeof lock.releaseLock === 'function') {
-        lock.releaseLock();
-      }
+      lock.releaseLock();
     } catch (unlockError) {
       console.warn('createUser: Lock release failed:', unlockError.message);
     }
@@ -1259,9 +1260,7 @@ function updateUser(userId, updates, context = {}) {
     return { success: false, message: error.message || 'Unknown error occurred' };
   } finally {
     try {
-      if (lock && typeof lock.releaseLock === 'function') {
-        lock.releaseLock();
-      }
+      lock.releaseLock();
     } catch (unlockError) {
       console.warn('updateUser: Lock release failed:', unlockError.message);
     }

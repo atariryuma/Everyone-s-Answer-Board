@@ -28,10 +28,12 @@ function loadMainContext(overrides = {}) {
       error: () => {}
     },
     ContentService: createContentServiceStub(),
+    createSuccessResponse: (message, data, extra) => ({ success: true, message, ...(data && { data }), ...extra }),
     createAuthError: () => ({ success: false, message: 'auth required' }),
     createUserNotFoundError: () => ({ success: false, message: 'user not found' }),
-    createErrorResponse: (message) => ({ success: false, message, error: message }),
+    createErrorResponse: (message, data, extra) => ({ success: false, message, error: message, ...extra }),
     createExceptionResponse: (error) => ({ success: false, message: error.message, error: error.message }),
+    createAdminRequiredError: () => ({ success: false, message: 'admin required' }),
     Session: {
       getActiveUser: () => ({
         getEmail: () => 'teacher@example.com'
@@ -44,6 +46,12 @@ function loadMainContext(overrides = {}) {
     toggleHighlight: (userId, rowId) => ({ success: true, userId, rowId }),
     SystemController: {
       publishApp: (config) => ({ success: true, config })
+    },
+    getCachedProperty: (key) => key === 'ADMIN_API_KEY' ? 'test-secret-key' : key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    dispatchAdminOperation: (operation, params) => {
+      if (operation === 'getUsers') return { success: true, users: [] };
+      if (operation === 'getAppStatus') return { success: true, status: 'enabled' };
+      return { success: false, message: `Unknown operation: ${operation}`, error: 'UNKNOWN_OPERATION' };
     }
   };
 
@@ -132,4 +140,96 @@ test('doPost: getData success path', () => {
   const response = parseResponse(context.doPost(event));
   assert.equal(response.success, true);
   assert.deepEqual(response.data, { rows: [{ id: 1 }] });
+});
+
+// --- adminApi tests ---
+
+// --- setupApiKey tests ---
+
+test('doPost: setupApiKey sets key when not configured', () => {
+  const props = {};
+  const context = loadMainContext({
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: (k) => props[k] || null,
+        setProperty: (k, v) => { props[k] = v; }
+      })
+    }
+  });
+  const event = createPostEvent({ action: 'setupApiKey', apiKey: 'my-secret-key-1234' });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, true);
+  assert.equal(props['ADMIN_API_KEY'], 'my-secret-key-1234');
+});
+
+test('doPost: setupApiKey rejects when already configured', () => {
+  const context = loadMainContext({
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: () => 'existing-key'
+      })
+    }
+  });
+  const event = createPostEvent({ action: 'setupApiKey', apiKey: 'new-key-12345678' });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+  assert.equal(response.error, 'ALREADY_CONFIGURED');
+});
+
+test('doPost: setupApiKey rejects short key', () => {
+  const context = loadMainContext({
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: () => null
+      })
+    }
+  });
+  const event = createPostEvent({ action: 'setupApiKey', apiKey: 'short' });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+  assert.equal(response.error, 'INVALID_KEY_FORMAT');
+});
+
+// --- adminApi tests ---
+
+test('doPost: adminApi rejects invalid API key', () => {
+  const context = loadMainContext();
+  const event = createPostEvent({ action: 'adminApi', apiKey: 'wrong-key', operation: 'getUsers' });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+  assert.equal(response.error, 'INVALID_API_KEY');
+});
+
+test('doPost: adminApi rejects missing API key', () => {
+  const context = loadMainContext();
+  const event = createPostEvent({ action: 'adminApi', operation: 'getUsers' });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+  assert.equal(response.error, 'INVALID_API_KEY');
+});
+
+test('doPost: adminApi returns error when ADMIN_API_KEY not configured', () => {
+  const context = loadMainContext({
+    getCachedProperty: () => null
+  });
+  const event = createPostEvent({ action: 'adminApi', apiKey: 'any-key', operation: 'getUsers' });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+  assert.equal(response.error, 'API_KEY_NOT_CONFIGURED');
+});
+
+test('doPost: adminApi dispatches with valid key', () => {
+  const context = loadMainContext();
+  const event = createPostEvent({ action: 'adminApi', apiKey: 'test-secret-key', operation: 'getUsers' });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, true);
+  assert.deepEqual(response.users, []);
+});
+
+test('doPost: adminApi forwards unknown operation error', () => {
+  const context = loadMainContext();
+  const event = createPostEvent({ action: 'adminApi', apiKey: 'test-secret-key', operation: 'badOp' });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+  assert.equal(response.error, 'UNKNOWN_OPERATION');
 });

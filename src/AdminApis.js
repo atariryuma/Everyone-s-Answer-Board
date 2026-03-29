@@ -469,3 +469,102 @@ function markWelcomeSeen() {
     return createExceptionResponse(error);
   }
 }
+
+/**
+ * Admin API ディスパッチャー
+ * doPost の adminApi アクションおよび google.script.run から呼び出される
+ * @param {string} operation - 操作名
+ * @param {Object} params - パラメータ
+ * @returns {Object} 操作結果
+ */
+function dispatchAdminOperation(operation, params) {
+  if (!operation || typeof operation !== 'string') {
+    return createErrorResponse('operation is required', null, { error: 'MISSING_OPERATION' });
+  }
+
+  const op = operation.trim();
+
+  switch (op) {
+    // --- User Management ---
+    case 'getUsers':
+      return getAdminUsers();
+
+    case 'toggleUserActive':
+      if (!params.targetUserId || typeof params.targetUserId !== 'string') {
+        return createErrorResponse('targetUserId is required');
+      }
+      return toggleUserActiveStatus(params.targetUserId);
+
+    case 'toggleUserBoard':
+      if (!params.targetUserId || typeof params.targetUserId !== 'string') {
+        return createErrorResponse('targetUserId is required');
+      }
+      return toggleUserBoardStatus(params.targetUserId);
+
+    // --- App Control ---
+    case 'getLogs':
+      return getLogs({ limit: Number(params.limit) || 50 });
+
+    case 'disableApp':
+      return disableAppAccess(typeof params.reason === 'string' ? params.reason : 'システムメンテナンス');
+
+    case 'enableApp':
+      return enableAppAccess();
+
+    case 'getAppStatus':
+      return getAppAccessStatus();
+
+    // --- System Diagnostics ---
+    case 'systemDiagnosis':
+      return testSystemDiagnosis();
+
+    case 'autoRepair':
+      return performAutoRepair();
+
+    case 'cacheReset':
+      return forceUrlSystemReset();
+
+    case 'perfMetrics': {
+      const category = typeof params.category === 'string' ? params.category : 'all';
+      return getPerformanceMetrics(category, params.options || {});
+    }
+
+    case 'perfDiagnosis':
+      return diagnosePerformance(params.options || {});
+
+    // --- Property Management ---
+    case 'getProperty': {
+      if (!params.key || typeof params.key !== 'string') {
+        return createErrorResponse('key is required');
+      }
+      const value = PropertiesService.getScriptProperties().getProperty(params.key);
+      return createSuccessResponse('Property retrieved', { key: params.key, value });
+    }
+
+    case 'setProperty': {
+      if (!params.key || typeof params.key !== 'string') {
+        return createErrorResponse('key is required');
+      }
+      if (typeof params.value !== 'string') {
+        return createErrorResponse('value must be a string');
+      }
+      PropertiesService.getScriptProperties().setProperty(params.key, params.value);
+      return createSuccessResponse('Property set', { key: params.key });
+    }
+
+    case 'listProperties': {
+      const allProps = PropertiesService.getScriptProperties().getProperties();
+      // マスク: 認証情報は値を隠す
+      const masked = {};
+      for (const [k, v] of Object.entries(allProps)) {
+        masked[k] = (k.includes('CREDS') || k.includes('KEY') || k.includes('SECRET'))
+          ? `***${v.length}chars***`
+          : v;
+      }
+      return createSuccessResponse('Properties listed', { properties: masked });
+    }
+
+    default:
+      return createErrorResponse(`Unknown operation: ${op}`, null, { error: 'UNKNOWN_OPERATION' });
+  }
+}

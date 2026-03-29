@@ -34,24 +34,6 @@ function validateReactionPermissionWithPreloadedData(actorEmail, targetUser, con
   return config.isPublished || targetUser.userEmail === actorEmail;
 }
 
-/**
- * 監査ログ記録
- * @param {string} action - アクション
- * @param {Object} details - 詳細情報
- */
-function logReactionAudit(action, details) {
-  const timestamp = new Date().toISOString();
-  const logEntry = {
-    timestamp,
-    action,
-    actor: details.actor || 'unknown',
-    target: details.target || 'unknown',
-    spreadsheet: details.spreadsheetId ? `${details.spreadsheetId.substring(0, 8)}***` : 'unknown',
-    details: details.extra || {}
-  };
-
-}
-
 
 /**
  * 🚀 GAS-Native直接リアクション処理
@@ -331,12 +313,6 @@ function addReaction(targetUserId, rowIndex, reactionType) {
     }
 
     if (!validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config)) {
-      logReactionAudit('reaction_denied', {
-        actor: actorEmail,
-        target: targetUserId,
-        reason: 'access_denied',
-        extra: { reactionType, rowIndex }
-      });
       return createErrorResponse('Access denied to target board');
     }
 
@@ -358,13 +334,12 @@ function addReaction(targetUserId, rowIndex, reactionType) {
     const lock = LockService.getScriptLock();
 
     try {
-      cache.put(lockKey, actorEmail, 3);
+      cache.put(lockKey, actorEmail, 15);
 
-      if (!lock.tryLock(3000)) { // 3秒待機
+      if (!lock.tryLock(15000)) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
 
-      // ✅ CRITICAL: 同一ドメイン共有設定で対応（サービスアカウント不使用）
       const dataAccess = openSpreadsheet(config.spreadsheetId, {
         useServiceAccount: false,
         context: 'reaction_processing'
@@ -382,18 +357,6 @@ function addReaction(targetUserId, rowIndex, reactionType) {
 
       const result = processReactionDirect(sheet, rowNumber, reactionType, actorEmail);
 
-      logReactionAudit('reaction_processed', {
-        actor: actorEmail,
-        target: targetUser.userEmail,
-        spreadsheetId: config.spreadsheetId,
-        extra: {
-          reactionType,
-          rowNumber,
-          action: result.action,
-          accessMethod: 'normal_permissions'
-        }
-      });
-
       return {
         success: true,
         reactions: result.reactions,
@@ -404,9 +367,7 @@ function addReaction(targetUserId, rowIndex, reactionType) {
 
     } finally {
       try {
-        if (lock && typeof lock.releaseLock === 'function') {
-          lock.releaseLock();
-        }
+        lock.releaseLock();
       } catch (unlockError) {
         console.warn('addReaction: Lock release failed:', unlockError.message);
       }
@@ -420,12 +381,6 @@ function addReaction(targetUserId, rowIndex, reactionType) {
 
   } catch (error) {
     console.error('addReaction error:', error.message);
-    logReactionAudit('reaction_error', {
-      actor: actorEmail,
-      target: targetUserId,
-      error: error.message,
-      extra: { reactionType, rowIndex }
-    });
     return createExceptionResponse(error);
   }
 }
@@ -459,12 +414,6 @@ function toggleHighlight(targetUserId, rowIndex) {
     }
 
     if (!validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config)) {
-      logReactionAudit('highlight_denied', {
-        actor: actorEmail,
-        target: targetUserId,
-        reason: 'access_denied',
-        extra: { rowIndex }
-      });
       return createErrorResponse('Access denied to target board');
     }
 
@@ -486,13 +435,12 @@ function toggleHighlight(targetUserId, rowIndex) {
     const lock = LockService.getScriptLock();
 
     try {
-      cache.put(lockKey, actorEmail, 3);
+      cache.put(lockKey, actorEmail, 15);
 
-      if (!lock.tryLock(3000)) { // 3秒待機
+      if (!lock.tryLock(15000)) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
 
-      // ✅ CRITICAL: 同一ドメイン共有設定で対応（サービスアカウント不使用）
       const dataAccess = openSpreadsheet(config.spreadsheetId, {
         useServiceAccount: false,
         context: 'highlight_processing'
@@ -510,17 +458,6 @@ function toggleHighlight(targetUserId, rowIndex) {
 
       const result = processHighlightDirect(sheet, rowNumber);
 
-      logReactionAudit('highlight_processed', {
-        actor: actorEmail,
-        target: targetUser.userEmail,
-        spreadsheetId: config.spreadsheetId,
-        extra: {
-          rowNumber,
-          highlighted: result.highlighted,
-          accessMethod: 'normal_permissions'
-        }
-      });
-
       return {
         success: true,
         highlighted: result.highlighted,
@@ -529,9 +466,7 @@ function toggleHighlight(targetUserId, rowIndex) {
 
     } finally {
       try {
-        if (lock && typeof lock.releaseLock === 'function') {
-          lock.releaseLock();
-        }
+        lock.releaseLock();
       } catch (unlockError) {
         console.warn('toggleHighlight: Lock release failed:', unlockError.message);
       }
@@ -545,12 +480,6 @@ function toggleHighlight(targetUserId, rowIndex) {
 
   } catch (error) {
     console.error('toggleHighlight error:', error.message);
-    logReactionAudit('highlight_error', {
-      actor: actorEmail,
-      target: targetUserId,
-      error: error.message,
-      extra: { rowIndex }
-    });
     return createExceptionResponse(error);
   }
 }

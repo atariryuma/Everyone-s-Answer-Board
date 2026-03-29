@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation */
 
 
 /**
@@ -430,13 +430,40 @@ function doPost(e) {
     }
 
     const action = typeof request.action === 'string' ? request.action.trim() : '';
-    const allowedActions = ['getData', 'addReaction', 'toggleHighlight', 'refreshData', 'publishApp'];
+    const allowedActions = ['getData', 'addReaction', 'toggleHighlight', 'refreshData', 'publishApp', 'adminApi', 'setupApiKey'];
     if (!allowedActions.includes(action)) {
       return jsonResponse({
         success: false,
         message: action ? `Unknown action: ${action}` : 'Unknown action: 不明',
         error: 'UNKNOWN_ACTION'
       });
+    }
+
+    // setupApiKey: 初回APIキー設定（キー未設定時のみ動作）
+    if (action === 'setupApiKey') {
+      const existingKey = PropertiesService.getScriptProperties().getProperty('ADMIN_API_KEY');
+      if (existingKey) {
+        return jsonResponse(createErrorResponse('ADMIN_API_KEY is already configured. Use adminApi with setProperty to change it.', null, { error: 'ALREADY_CONFIGURED' }));
+      }
+      const newKey = typeof request.apiKey === 'string' && request.apiKey.length >= 16 ? request.apiKey : null;
+      if (!newKey) {
+        return jsonResponse(createErrorResponse('apiKey must be a string of at least 16 characters', null, { error: 'INVALID_KEY_FORMAT' }));
+      }
+      PropertiesService.getScriptProperties().setProperty('ADMIN_API_KEY', newKey);
+      return jsonResponse(createSuccessResponse('ADMIN_API_KEY has been set', { configured: true }));
+    }
+
+    // adminApi: APIキー認証（Session不要 → AIエージェントからアクセス可能）
+    if (action === 'adminApi') {
+      const apiKey = typeof request.apiKey === 'string' ? request.apiKey : '';
+      const storedKey = getCachedProperty('ADMIN_API_KEY');
+      if (!storedKey) {
+        return jsonResponse(createErrorResponse('ADMIN_API_KEY is not configured. Use setupApiKey action first.', null, { error: 'API_KEY_NOT_CONFIGURED' }));
+      }
+      if (!apiKey || apiKey !== storedKey) {
+        return jsonResponse(createErrorResponse('Invalid API key', null, { error: 'INVALID_API_KEY' }));
+      }
+      return jsonResponse(dispatchAdminOperation(request.operation, request.params || {}));
     }
 
     const email = getCurrentEmail();
@@ -496,15 +523,14 @@ function doPost(e) {
         break;
       case 'publishApp':
         try {
-          const publishConfig = isPlainObject(request.config) ? request.config : {};
-          if (!isPlainObject(publishConfig) || Object.keys(publishConfig).length === 0) {
+          if (!isPlainObject(request.config) || Object.keys(request.config).length === 0) {
             result = createErrorResponse('Publish config is required');
             break;
           }
           if (SystemController && typeof SystemController.publishApp === 'function') {
-            result = SystemController.publishApp(publishConfig);
+            result = SystemController.publishApp(request.config);
           } else if (typeof publishApp === 'function') {
-            result = publishApp(publishConfig);
+            result = publishApp(request.config);
           } else {
             result = createErrorResponse('公開処理関数が見つかりません');
           }
@@ -551,27 +577,12 @@ function isAdministrator(email) {
       return false;
     }
 
-    const isAdmin = email.toLowerCase() === adminEmail.toLowerCase();
-    return isAdmin;
+    return email.toLowerCase() === adminEmail.toLowerCase();
   } catch (error) {
-    console.error('[ERROR] main.isAdministrator:', {
-      error: error.message,
-      email: email && typeof email === 'string' ? `${email.split('@')[0]}@***` : 'null'
-    });
+    console.error('[ERROR] main.isAdministrator:', error.message);
     return false;
   }
 }
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -915,12 +926,7 @@ function executeWithRetry(operation, options = {}) {
         Utilities.sleep(delay);
       }
 
-      const result = operation();
-
-      if (retryCount > 0) {
-      }
-
-      return result;
+      return operation();
 
     } catch (error) {
       lastError = error;
@@ -996,43 +1002,3 @@ function isRetryableError(errorMessage) {
 }
 
 
-/**
- * パフォーマンスメトリクス取得API (管理者専用)
- * Priority 1改善: 詳細監視機能追加
- *
- * @param {string} category - メトリクスカテゴリ ('api', 'cache', 'batch', 'error', 'all')
- * @param {Object} options - 取得オプション
- * @returns {Object} パフォーマンス統計結果
- */
-function getPerformanceMetrics(category = 'all', options = {}) {
-  try {
-    return SystemController.getPerformanceMetrics(category, options);
-  } catch (error) {
-    console.error('getPerformanceMetrics API error:', error.message);
-    return {
-      success: false,
-      error: `Performance metrics collection failed: ${error.message}`,
-      timestamp: new Date().toISOString()
-    };
-  }
-}
-
-/**
- * パフォーマンス診断API (管理者専用)
- * Priority 1改善: システム健全性診断
- *
- * @param {Object} options - 診断オプション
- * @returns {Object} 診断結果と改善推奨事項
- */
-function diagnosePerformance(options = {}) {
-  try {
-    return SystemController.diagnosePerformance(options);
-  } catch (error) {
-    console.error('diagnosePerformance API error:', error.message);
-    return {
-      success: false,
-      error: `Performance diagnosis failed: ${error.message}`,
-      timestamp: new Date().toISOString()
-    };
-  }
-}

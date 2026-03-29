@@ -137,25 +137,6 @@ function generateDynamicUserUrls(config) {
   }
 }
 
-/**
- * 編集者権限判定（Editor）
- * @param {string} email - メールアドレス
- * @param {string} targetUserId - 対象ユーザーID
- * @returns {boolean} 編集権限があるか
- */
-function isEditor(email, targetUserId) {
-  if (!email || !targetUserId) {
-    return false;
-  }
-
-  try {
-    const user = findUserByEmail(email, { requestingUser: email });
-    return user && user.userId === targetUserId;
-  } catch (error) {
-    console.error('UserService.isEditor: エラー', error.message);
-    return false;
-  }
-}
 
 /**
  * 管理者権限確認（フロントエンド互換性）
@@ -281,13 +262,7 @@ function resetAuth() {
     }
 
     if (userId) {
-      const userIdBasedKeys = [
-        `user_config_${userId}`,
-        `config_${userId}`,
-        `user_${userId}`,
-        `board_data_${userId}`,
-        `question_text_${userId}`
-      ];
+      const userIdBasedKeys = [`user_config_${userId}`, ...getUserCacheKeys_(userId)];
 
       userIdBasedKeys.forEach(key => {
         try {

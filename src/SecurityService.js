@@ -72,12 +72,9 @@ function validateDomainAccess(email, options = {}) {
 
   if (!email || typeof email !== 'string' || !email.trim()) {
     return {
-      success: false,
       allowed: allowIfEmailMissing,
       message: allowIfEmailMissing ? 'No email provided, access allowed by configuration' : 'Authentication required',
-      reason: 'missing_email',
-      userDomain: null,
-      adminDomain: null
+      reason: 'missing_email'
     };
   }
 
@@ -85,12 +82,9 @@ function validateDomainAccess(email, options = {}) {
   const userDomain = extractDomainSafely(normalizedEmail);
   if (!userDomain) {
     return {
-      success: false,
       allowed: false,
       message: 'Invalid email format',
-      reason: 'invalid_email_format',
-      userDomain: null,
-      adminDomain: null
+      reason: 'invalid_email_format'
     };
   }
 
@@ -98,23 +92,17 @@ function validateDomainAccess(email, options = {}) {
   const adminDomain = adminEmail ? extractDomainSafely(adminEmail) : null;
   if (!adminDomain) {
     return {
-      success: true,
       allowed: allowIfAdminUnconfigured,
       message: allowIfAdminUnconfigured ? 'Admin domain not configured, access allowed' : 'Admin domain not configured',
-      reason: 'admin_domain_unconfigured',
-      userDomain,
-      adminDomain: null
+      reason: 'admin_domain_unconfigured'
     };
   }
 
   const allowed = userDomain === adminDomain;
   return {
-    success: true,
     allowed,
     message: allowed ? 'Domain access allowed' : 'Domain mismatch',
-    reason: allowed ? 'domain_match' : 'domain_mismatch',
-    userDomain,
-    adminDomain
+    reason: allowed ? 'domain_match' : 'domain_mismatch'
   };
 }
 
@@ -349,37 +337,4 @@ function validateSpreadsheetAccess(spreadsheetId) {
 
       return errorResponse;
     }
-}
-
-/**
- * 古いセキュリティログのクリーンアップ
- * PropertiesServiceで統一管理（最新100件まで保持）
- */
-function cleanupOldSecurityLogs() {
-  try {
-    const props = PropertiesService.getScriptProperties();
-    const allProps = props.getProperties();
-
-    const logKeys = Object.keys(allProps).filter(key => key.startsWith('security_log_'));
-
-    if (logKeys.length > 100) {
-      const sortedKeys = logKeys.sort((a, b) => {
-        const timestampA = parseInt(a.split('_')[2], 10);
-        const timestampB = parseInt(b.split('_')[2], 10);
-        return timestampA - timestampB;
-      });
-
-      const keysToDelete = sortedKeys.slice(0, -100);
-      keysToDelete.forEach(key => {
-        try {
-          props.deleteProperty(key);
-        } catch (deleteError) {
-          console.warn(`SecurityService: Failed to delete log ${key}:`, deleteError.message);
-        }
-      });
-
-    }
-  } catch (error) {
-    console.warn('SecurityService.cleanupOldSecurityLogs: Cleanup failed:', error.message);
-  }
 }

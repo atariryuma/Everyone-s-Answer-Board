@@ -58,7 +58,6 @@ function getCachedProperty(key) {
 
 /**
  * メモリキャッシュをクリア（テスト用・設定変更時用）
- * ✅ 明示的なクリアも可能（システム設定更新時など）
  * @param {string} key - クリアするキー（省略時は全クリア）
  */
 function clearPropertyCache(key = null) {
@@ -67,6 +66,16 @@ function clearPropertyCache(key = null) {
   } else {
     Object.keys(RUNTIME_PROPERTIES_CACHE).forEach(k => delete RUNTIME_PROPERTIES_CACHE[k]);
   }
+}
+
+/**
+ * Script Propertyを書き込み、メモリキャッシュも即座に無効化
+ * @param {string} key - プロパティキー
+ * @param {string} value - プロパティ値
+ */
+function setCachedProperty(key, value) {
+  PropertiesService.getScriptProperties().setProperty(key, value);
+  delete RUNTIME_PROPERTIES_CACHE[key];
 }
 
 /**

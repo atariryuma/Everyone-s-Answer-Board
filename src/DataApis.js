@@ -56,25 +56,6 @@ function createUserFolder() {
   }
 }
 
-/**
- * 自分がオーナーのスプレッドシートを30件取得
- * @returns {Object} スプレッドシート一覧
- */
-function getSheets() {
-  const files = DriveApp.getFilesByType('application/vnd.google-apps.spreadsheet');
-  const sheets = [];
-
-  while (files.hasNext() && sheets.length < 30) {
-    const file = files.next();
-    sheets.push({
-      id: file.getId(),
-      name: file.getName(),
-      url: file.getUrl()
-    });
-  }
-
-  return { success: true, sheets };
-}
 
 /**
  * 自分がオーナーのGoogleフォームを30件取得

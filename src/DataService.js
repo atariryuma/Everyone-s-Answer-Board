@@ -432,19 +432,21 @@ function processRawDataBatch(batchRows, headers, config, options = {}, startOffs
         const answerValue = answerResult?.value;
         const nameValue = nameResult?.value;
 
+        const tsValue = extractTimestampValue(row, headers) || '';
+
         const item = {
           id: `row_${globalIndex + 2}`,
-          rowIndex: globalIndex + 2, // 1-based row number including header
-          timestamp: extractTimestampValue(row, headers) || '',
-          email: String(emailResult?.value || ''),
+          rowIndex: globalIndex + 2,
+          timestamp: tsValue,
+          email: emailResult?.value || '',
 
-          answer: String(answerValue || ''),
-          opinion: String(answerValue || ''), // Alias for answer field
-          reason: String(reasonResult?.value || ''),
-          class: String(classResult?.value || ''),
-          name: String(nameValue || ''),
+          answer: answerValue || '',
+          opinion: answerValue || '',
+          reason: reasonResult?.value || '',
+          class: classResult?.value || '',
+          name: nameValue || '',
 
-          formattedTimestamp: formatTimestamp(extractTimestampValue(row, headers)),
+          formattedTimestamp: formatTimestamp(tsValue),
           isEmpty: isEmptyRow(row),
 
           reactions: extractReactions(row, headers, getCurrentEmail()),
@@ -521,18 +523,12 @@ function shouldIncludeRow(item, options = {}) {
       }
     }
 
-    if (options.dateFrom && item.timestamp) {
+    if ((options.dateFrom || options.dateTo) && item.timestamp) {
       const itemDate = new Date(item.timestamp);
-      const fromDate = new Date(options.dateFrom);
-      if (itemDate < fromDate) {
+      if (options.dateFrom && itemDate < new Date(options.dateFrom)) {
         return false;
       }
-    }
-
-    if (options.dateTo && item.timestamp) {
-      const itemDate = new Date(item.timestamp);
-      const toDate = new Date(options.dateTo);
-      if (itemDate > toDate) {
+      if (options.dateTo && itemDate > new Date(options.dateTo)) {
         return false;
       }
     }

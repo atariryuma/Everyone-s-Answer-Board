@@ -134,27 +134,13 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
       manualUrl: webAppUrl ? `${webAppUrl}?mode=manual` : ''
     };
 
-    enhanced.systemMeta = {
-      lastGenerated: new Date().toISOString(),
-      version: '3.0.0-flat',
-      architecture: 'gas-flat-functions'
-    };
-
   } catch (error) {
     console.warn('enhanceConfigWithDynamicUrls: URL生成エラー', error.message);
     enhanced.dynamicUrls = {};
-    enhanced.systemMeta = {};
   }
 
   return enhanced;
 }
-
-
-
-
-
-
-
 
 
 /**
@@ -221,9 +207,6 @@ function validatePublishConfig(config, userId) {
  */
 function validateAndSanitizeConfig(config, userId) {
   try {
-    if (config.columnMapping) {
-    }
-
     const validationResult = validateConfig(config);
     if (!validationResult.isValid) {
       return {
@@ -285,9 +268,6 @@ function validateAndSanitizeConfig(config, userId) {
   }
 }
 
-
-
-
 /**
  * 表示設定サニタイズ
  * @param {Object} displaySettings - 表示設定
@@ -331,40 +311,6 @@ function validateConfigUserId(userId) {
 }
 
 /**
- * スプレッドシートID検証
- * @param {string} spreadsheetId - スプレッドシートID
- * @returns {boolean} 有効性
- */
-
-/**
- * フォームURL検証
- * @param {string} formUrl - フォームURL
- * @returns {boolean} 有効性
- */
-
-
-
-
-
-/**
- * システムセットアップ状態確認
- * @returns {boolean} セットアップ済みかどうか
- */
-function isSystemSetup() {
-  try {
-    const userConfigResult = getBatchedUserConfig(); // eslint-disable-line no-undef
-    if (!userConfigResult.success || !userConfigResult.user) {
-      return false;
-    }
-
-    return !!(userConfigResult.user && userConfigResult.user.configJson);
-  } catch (error) {
-    console.error('isSystemSetup: エラー', error.message);
-    return false;
-  }
-}
-
-/**
  * 設定完了スコア計算
  * @param {Object} config - 設定オブジェクト
  * @returns {number} 完了スコア (0-100)
@@ -373,18 +319,24 @@ function calculateCompletionScore(config) {
   if (!config) return 0;
 
   let score = 0;
-  const maxScore = 100;
 
   if (config.spreadsheetId) score += 25;
   if (config.sheetName) score += 25;
-
   if (config.formUrl) score += 30;
-
   if (config.displaySettings) score += 10;
-
   if (config.columnMapping && Object.keys(config.columnMapping).length > 0) score += 10;
 
-  return Math.min(score, maxScore);
+  return score;
+}
+
+function getUserCacheKeys_(userId) {
+  return [
+    `config_${userId}`,
+    `user_${userId}`,
+    `board_data_${userId}`,
+    `admin_panel_${userId}`,
+    `question_text_${userId}`
+  ];
 }
 
 /**
@@ -393,19 +345,7 @@ function calculateCompletionScore(config) {
  */
 function clearConfigCache(userId) {
   try {
-    const cache = CacheService.getScriptCache();
-
-    const keysToRemove = [
-      `config_${userId}`,           // 設定キャッシュ
-      `user_${userId}`,             // ユーザーキャッシュ
-      `board_data_${userId}`,       // ボードデータキャッシュ
-      `admin_panel_${userId}`,      // 管理パネルデータ
-      `question_text_${userId}`     // 質問テキストキャッシュ
-    ];
-
-    if (keysToRemove.length > 0) {
-      cache.removeAll(keysToRemove);
-    }
+    CacheService.getScriptCache().removeAll(getUserCacheKeys_(userId));
   } catch (error) {
     console.warn('clearConfigCache: キャッシュクリアエラー', error.message);
   }
@@ -416,36 +356,19 @@ function clearConfigCache(userId) {
  */
 function clearAllConfigCache(userIds = []) {
   try {
-    if (!Array.isArray(userIds) || userIds.length === 0) {
-      console.warn('clearAllConfigCache: ユーザーID配列が空または無効');
-      return;
-    }
+    if (!Array.isArray(userIds) || userIds.length === 0) return;
 
-    const allKeysToRemove = [];
-    userIds.forEach(userId => {
-      if (typeof userId === 'string' && userId.trim()) {
-        allKeysToRemove.push(
-          `config_${userId}`,
-          `user_${userId}`,
-          `board_data_${userId}`,
-          `admin_panel_${userId}`,
-          `question_text_${userId}`
-        );
-      }
-    });
+    const allKeys = userIds
+      .filter(id => typeof id === 'string' && id.trim())
+      .flatMap(getUserCacheKeys_);
 
-    if (allKeysToRemove.length > 0) {
-      CacheService.getScriptCache().removeAll(allKeysToRemove);
+    if (allKeys.length > 0) {
+      CacheService.getScriptCache().removeAll(allKeys);
     }
   } catch (error) {
     console.warn('clearAllConfigCache: エラー', error.message);
   }
 }
-
-/**
- * システム診断
- * @returns {Object} 診断結果
- */
 
 /**
  * コアシステムプロパティ確認 - 3つの必須項目をすべてチェック
@@ -485,16 +408,6 @@ function hasCoreSystemProps() {
     return false;
   }
 }
-
-
-
-
-
-
-
-
-
-
 
 /**
  * 動的questionText取得（configJson最適化対応 + パフォーマンス最適化済み）
@@ -559,16 +472,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
     return 'Everyone\'s Answer Board';
   }
 }
-
-
-/**
- * システム管理者確認
- * @param {string} email - メールアドレス
- * @returns {boolean} システム管理者かどうか
- */
-
-
-
 
 /**
  * 統一設定読み込みAPI - V8最適化、変数チェック強化
@@ -724,10 +627,10 @@ function saveUserConfig(userId, config, options = {}) {
 
     clearConfigCache(userId);
 
-    if (user.spreadsheetId) {
-      const saValidationKey = `sa_validation_${user.spreadsheetId}`;
+    const ssId = user.spreadsheetId || cleanedConfig.spreadsheetId;
+    if (ssId) {
       try {
-        CacheService.getScriptCache().remove(saValidationKey);
+        CacheService.getScriptCache().remove(`sa_validation_${ssId}`);
       } catch (cacheRemoveError) {
         console.warn('saveUserConfig: Failed to clear SA validation cache:', cacheRemoveError.message);
       }
