@@ -35,5 +35,8 @@ build/
 scripts/config.json
 .clasp-gcp-project
 
+# Claude Code local settings (per-machine permissions)
+.claude/settings.local.json
+
 # Optional: Keep .clasp.json.template for reference
 !.clasp.json.template
