@@ -8,6 +8,9 @@
     "open": "clasp open",
     "logs": "clasp logs",
     "deploy": "clasp deploy",
+    "deploy:prod": "node scripts/deploy-prod.js",
+    "api": "node scripts/admin-api.js",
+    "logs:cloud": "node scripts/logs.js",
     "test": "node --test tests/*.test.cjs"
   },
   "repository": {

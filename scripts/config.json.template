@@ -1,0 +1,6 @@
+{
+  "prodDeployId": "YOUR_DEPLOY_ID_HERE",
+  "prodUrl": "https://script.google.com/a/macros/YOUR_DOMAIN/s/YOUR_DEPLOY_ID/exec",
+  "apiKey": "YOUR_ADMIN_API_KEY",
+  "gcpProjectId": "YOUR_GCP_PROJECT_ID"
+}

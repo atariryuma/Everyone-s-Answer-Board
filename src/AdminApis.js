@@ -118,7 +118,7 @@ function toggleUserBoardStatus(targetUserId) {
       const configJsonStr = targetUser.configJson || '{}';
       currentConfig = JSON.parse(configJsonStr);
     } catch (error) {
-      console.warn('toggleUserBoardStatus: Invalid configJson, using empty config:', error.message);
+      console.error('toggleUserBoardStatus: Invalid configJson for user', targetUserId, ':', error.message);
       currentConfig = {};
     }
 

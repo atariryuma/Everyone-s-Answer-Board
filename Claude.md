@@ -24,16 +24,65 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ```bash
 npm run push              # Push code to GAS
 npm run pull              # Pull from GAS
-npm run open              # Open GAS editor
 npm run logs              # View execution logs
-npm run deploy            # Deploy new version
 npm test                  # Run all tests
+npm run deploy:prod       # URL維持で本番デプロイ（pushも含む）
+npm run deploy            # 新しいURLでデプロイ（テスト用）
 node --test tests/main.doPost.test.cjs   # Run a single test file
 ```
 
-**Dev workflow**: Edit locally → `npm run push` → Test in browser (`/exec?mode=...`) → Git commit
+**Dev workflow**: Edit locally → `npm test` → `npm run deploy:prod` → Git commit
 
 **CI** (.github/workflows/ci.yml): Syntax check all `src/*.js` → `npm test` → clasp push (main branch only)
+
+---
+
+## Admin API (本番アプリの状態取得・操作)
+
+コード変更後、本番で正しく動いているか確認するために使う。
+
+```bash
+npm run api -- systemDiagnosis      # システム診断（DB接続、設定、デプロイ状態）
+npm run api -- getAppStatus         # アプリ有効/無効状態
+npm run api -- getUsers             # 全ユーザー一覧と設定状態
+npm run api -- getLogs --limit 20   # セキュリティログ
+npm run api -- perfMetrics          # パフォーマンスメトリクス
+npm run api -- perfDiagnosis        # パフォーマンス診断と推奨事項
+npm run api -- listProperties       # Script Properties一覧（認証情報はマスク）
+npm run api -- cacheReset           # キャッシュ全クリア
+npm run api -- autoRepair           # 自動修復
+```
+
+**いつ使うか:**
+
+- コード変更後のデプロイ後 → `systemDiagnosis` で本番が壊れていないか確認
+- エラー調査時 → `getLogs` でセキュリティログを確認、`perfMetrics` でボトルネック特定
+- ユーザー問題の調査 → `getUsers` で設定状態を確認
+- 設定変更後 → `listProperties` で反映を確認
+
+**仕組み:** doPostの`adminApi`アクションにAPIキー認証でアクセス。ディスパッチャーは`src/AdminApis.js:dispatchAdminOperation()`。
+
+---
+
+## Cloud Logging (実行ログの取得・分析)
+
+GCPのCloud Logging APIからGASの実行ログを直接取得する。ブラウザ不要。
+
+```bash
+npm run logs:cloud                            # 直近6hのWARNING以上
+npm run logs:cloud -- --severity ERROR         # ERRORのみ
+npm run logs:cloud -- --severity INFO          # INFO以上（全ログ）
+npm run logs:cloud -- --hours 24 --limit 50    # 過去24時間、50件
+npm run logs:cloud -- --function doPost        # 特定関数のログ
+npm run logs:cloud -- --user 35t22             # 特定ユーザーのログ
+npm run logs:cloud -- --json                   # JSON形式で出力
+```
+
+**いつ使うか:**
+
+- エラー調査 → `--severity ERROR --hours 72` で直近のエラーを確認
+- 特定ユーザーの問題 → `--user メールアドレスの一部` でフィルタ
+- デプロイ後の監視 → `--severity WARNING --hours 1` で直近の異常を確認
 
 ---
 
@@ -126,3 +175,4 @@ Set via GAS editor or SetupPage:
 | `DATABASE_SPREADSHEET_ID` | Main database spreadsheet ID |
 | `SERVICE_ACCOUNT_CREDS` | Service account JSON credentials |
 | `GOOGLE_CLIENT_ID` | (Optional) OAuth client ID |
+| `ADMIN_API_KEY` | Admin API authentication key |

@@ -203,7 +203,8 @@ function processFormUrlInput(formUrl) {
     try {
       form = FormApp.openByUrl(formUrl);
     } catch (e) {
-      return { success: false, error: 'フォームにアクセスできません。編集用URL（/editで終わるURL）を使用するか、テンプレート作成をお試しください' };
+      console.error('connectDataSource: FormApp.openByUrl failed:', e.message);
+      return { success: false, error: `フォームにアクセスできません: ${e.message}` };
     }
 
     const formTitle = form.getTitle();
@@ -233,7 +234,8 @@ function processFormUrlInput(formUrl) {
         ss = SpreadsheetApp.openById(spreadsheetId);
         spreadsheetUrl = ss.getUrl();
       } catch (e) {
-        return { success: false, error: '回答先スプレッドシートにアクセスできません' };
+        console.error('connectDataSource: SpreadsheetApp.openById failed:', e.message);
+        return { success: false, error: `回答先スプレッドシートにアクセスできません: ${e.message}` };
       }
     }
 
@@ -832,6 +834,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     };
 
   } catch (error) {
+    console.error('getNotificationUpdate error:', error.message);
     return { success: false, message: error.message };
   }
 }

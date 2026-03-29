@@ -31,5 +31,9 @@ build/
 .clasp.json
 .clasprc.json
 
+# Scripts config (contains API keys and deploy IDs)
+scripts/config.json
+.clasp-gcp-project
+
 # Optional: Keep .clasp.json.template for reference
 !.clasp.json.template

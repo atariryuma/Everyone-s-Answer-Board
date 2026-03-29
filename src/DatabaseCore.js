@@ -647,6 +647,7 @@ function resolveRequestingUser(context = {}) {
   try {
     return getCurrentEmail();
   } catch (error) {
+    console.error('resolveRequestingUser: getCurrentEmail failed:', error.message);
     return null;
   }
 }

@@ -288,8 +288,7 @@ function resetAuth() {
             try {
               cache.remove(`${pattern}${i}`);
               reactionLocksCleared++;
-            } catch (e) {
-            }
+            } catch (_) { /* individual key removal - ignore */ }
           });
         }
       } catch (lockError) {
