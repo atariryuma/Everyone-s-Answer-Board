@@ -805,18 +805,8 @@
             }).catch(() => {
             });
           })
-          .withFailureHandler(function (error) {
-            console.warn('WebApp URL取得失敗、フォールバック実行:', error);
-
-            try {
-              const currentUrl = new URL(window.location.href);
-              const baseUrl = currentUrl.origin + currentUrl.pathname;
-              const loginUrl = `${baseUrl}?mode=login`;
-              window.open(loginUrl, '_top');
-            } catch (fallbackError) {
-              console.warn('フォールバック遷移も失敗:', fallbackError);
-              window.open(window.location.href, '_top');
-            }
+          .withFailureHandler(function () {
+            alert('ログアウトに失敗しました。ブラウザのタブを閉じて、再度アクセスしてください。');
           })
           .getWebAppUrl();
       }

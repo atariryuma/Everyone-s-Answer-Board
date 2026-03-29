@@ -336,6 +336,7 @@ function createRedirectTemplate(redirectPage, error) {
       template.title = 'アクセスエラー';
       template.message = error;
       template.hideLoginButton = true;
+      template.webAppUrl = getWebAppUrl() || '';
     }
 
     const title = redirectPage === 'ErrorBoundary.html' ? 'エラー' : '回答ボード';
@@ -346,6 +347,7 @@ function createRedirectTemplate(redirectPage, error) {
     fallbackTemplate.title = 'システムエラー';
     fallbackTemplate.message = 'ページの表示中にエラーが発生しました。';
     fallbackTemplate.hideLoginButton = false;
+    fallbackTemplate.webAppUrl = getWebAppUrl() || '';
     return fallbackTemplate.evaluate().setTitle('エラー');
   }
 }

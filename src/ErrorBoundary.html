@@ -4,28 +4,26 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base target="_top" />
     <title><?= title || 'エラー' ?> - みんなの回答ボード</title>
     <?!= include('SharedTailwindConfig'); ?>
     <?!= include('UnifiedStyles.css'); ?>
     <script>
+      var WEB_APP_URL = '<?= typeof webAppUrl !== "undefined" ? webAppUrl : "" ?>';
+
       function safeReload() {
-        try {
-          localStorage.removeItem('current_user_info');
-          sessionStorage.clear();
-          window.open(window.location.href, '_top');
-        } catch (e) {
-          window.open(window.location.href, '_top');
+        if (WEB_APP_URL) {
+          window.open(WEB_APP_URL, '_top');
+        } else {
+          window.top.location.reload();
         }
       }
 
       function redirectToLogin() {
-        try {
-          const url = new URL(window.location.href);
-          url.searchParams.set('mode', 'login');
-          url.searchParams.delete('userId');
-          window.open(url.toString(), '_top');
-        } catch (e) {
-          window.open(window.location.origin + window.location.pathname + '?mode=login', '_top');
+        if (WEB_APP_URL) {
+          window.open(WEB_APP_URL + '?mode=login', '_top');
+        } else {
+          window.top.location.href = '?mode=login';
         }
       }
     </script>

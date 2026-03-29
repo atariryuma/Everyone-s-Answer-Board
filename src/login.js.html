@@ -397,9 +397,12 @@
           }
 
           setTimeout(() => {
-            window.open(window.location.href, '_top');
+            google.script.run
+              .withSuccessHandler(function(url) { window.open(url + '?mode=login', '_top'); })
+              .withFailureHandler(function() { window.top.location.reload(); })
+              .getWebAppUrl();
           }, 1000);
-        }, 3500); // 3.5秒でタイムアウト
+        }, 3500);
 
         const checkClosed = setInterval(() => {
           if (logoutWindow.closed) {
@@ -413,7 +416,10 @@
             }
 
             setTimeout(() => {
-              window.open(window.location.href, '_top');
+              google.script.run
+                .withSuccessHandler(function(url) { window.open(url + '?mode=login', '_top'); })
+                .withFailureHandler(function() { window.top.location.reload(); })
+                .getWebAppUrl();
             }, 1000);
           }
         }, 500);
