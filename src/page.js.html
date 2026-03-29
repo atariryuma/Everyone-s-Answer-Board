@@ -22,36 +22,23 @@
      */
     validId(userId) {
       if (!userId || typeof userId !== 'string' || userId.trim() === '') {
-        console.warn('⚠️ StudyQuestApp: Invalid or empty userId provided:', userId);
-
         try {
           const urlParams = new URLSearchParams(window.location.search);
           const fallbackUserId = urlParams.get('userId');
-
           if (fallbackUserId && fallbackUserId.trim()) {
             return fallbackUserId.trim();
           }
-        } catch (error) {
-          console.warn('⚠️ StudyQuestApp: Failed to get userId from URL parameters:', error.message);
-        }
+        } catch (_) {}
 
         try {
           if (typeof window.USER_ID !== 'undefined' && window.USER_ID && window.USER_ID.trim()) {
             return window.USER_ID.trim();
           }
-        } catch (error) {
-          console.warn('⚠️ StudyQuestApp: Failed to get userId from global USER_ID:', error.message);
-        }
+        } catch (_) {}
 
-        console.warn('⚠️ StudyQuestApp: No valid userId available. Using limited functionality mode.');
         return '';
       }
 
-      if (userId.length === 36 && userId.includes('-')) {
-        return userId;
-      }
-
-      console.warn('⚠️ StudyQuestApp: Unusual userId format, but proceeding:', userId.substring(0, 8) + '...');
       return userId;
     }
 
@@ -276,13 +263,6 @@
             delay = delay * (0.5 + Math.random() * 0.5); // Add 50% jitter
           }
 
-          const safeContext = context || 'Operation';
-          if (error && error.message) {
-            console.warn(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
-          } else {
-            console.warn(`⚠️ ${safeContext} failed (attempt ${attempt + 1}/${maxRetries + 1}): Unknown error`);
-          }
-
           await new Promise(resolve => requestIdleCallback(resolve, { timeout: delay }));
         }
       }
@@ -345,9 +325,7 @@
     async initializeFormButton() {
       try {
         await loadFormLink();
-      } catch (error) {
-        console.warn('⚠️ Failed to initialize form button:', error);
-      }
+      } catch (_) {}
     }
 
     /**
@@ -700,13 +678,11 @@
               .withSuccessHandler((result) => {
 
                 if (result === null || result === undefined) {
-                  console.warn(`⚠️ runGas: ${funcName} returned null/undefined, treating as error`);
                   handleError(new Error(`Function ${funcName} returned null/undefined response`));
                   return;
                 }
 
                 if (typeof result === 'object' && result.hasOwnProperty('success') && typeof result.success !== 'boolean') {
-                  console.warn(`⚠️ runGas: ${funcName} returned invalid success property:`, result.success);
                   result.success = Boolean(result.success);
                 }
 
@@ -725,7 +701,6 @@
               .withUserObject({ userId: this.state.userId })
             [funcName](...mappedArgs);
           } else {
-            console.warn('Google Apps Script environment not detected.');
             this.getMockData(funcName, ...mappedArgs).then((result) => {
               if (!isStateChanging) {
                 this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
@@ -1514,7 +1489,6 @@
 
 
       if (dataLength === 0 && domCards.length > 0) {
-        console.warn('⚠️ 状態不整合検出: 空データなのにDOMに', domCards.length, '個のカードが残っています');
 
         await this.clearAllCardsForEmptyData();
 
@@ -1672,7 +1646,6 @@
           const errorMessage = (result.error && typeof result.error === 'string') ? result.error : 'Unknown backend error';
 
           if (errorMessage.includes('timeout') || errorMessage.includes('タイムアウト')) {
-            console.warn('getUserData: Timeout detected');
             return {
               success: false,
               error: 'データの読み込みがタイムアウトしました。ページを再読み込みしてください。',
@@ -1682,7 +1655,6 @@
             };
           }
 
-          console.warn('getUserData: Backend returned error:', errorMessage);
           return {
             success: false,
             error: errorMessage,
@@ -1692,7 +1664,6 @@
           };
         }
 
-        console.warn('getUserData: Invalid response format:', result);
         return {
           success: false,
           error: 'データ形式が正しくありません',
@@ -2152,7 +2123,6 @@
     calculateVisibleRange(totalItems) {
       const container = this.elements.answersContainer;
       if (!container) {
-        console.warn('calculateVisibleRange: answersContainer not found.');
         return { startIndex: 0, endIndex: totalItems };
       }
 
@@ -2435,7 +2405,6 @@
 
     validateCardData(data) {
       if (!data || typeof data !== 'object') {
-        console.warn('createAnswerCard: Invalid data provided:', data);
         return null;
       }
 
@@ -2815,7 +2784,6 @@
 
       const item = this.state.currentAnswers.find(i => i.rowIndex == numericRowIndex);
       if (!item) {
-        console.warn(`⚠️ アイテムが見つかりません: rowIndex=${numericRowIndex}`);
         return;
       }
 
@@ -2939,7 +2907,6 @@
         if (buttons.length > 0) {
           this.setReactionButtonsLoading(buttons, false);
         } else {
-          console.warn(`⚠️ ボタンが見つからない: row=${rowIndex}, reaction=${reaction}`);
         }
 
         if (this.pendingReactions.has(reactionKey)) {
@@ -2947,11 +2914,9 @@
         }
 
         if (error) {
-          console.warn(`🔄 エラー時UI状態復旧確認: ${reactionKey}`, error.message);
 
           buttons.forEach(btn => {
             if (btn.disabled || btn.classList.contains('loading') || btn.getAttribute('aria-busy') === 'true') {
-              console.warn(`🚨 UI状態不整合検出、強制復旧: ${reactionKey}`);
               btn.disabled = false;
               btn.classList.remove('loading');
               btn.setAttribute('aria-busy', 'false');
@@ -3183,7 +3148,6 @@
       });
 
       if (reactedKeys.length > 1) {
-        console.warn(`⚠️ サーバーレスポンスで複数のreacted: trueを検出。修正中:`, reactedKeys);
 
         const keepReaction = reactedKeys[0];
         reactedKeys.slice(1).forEach(key => {
@@ -3191,7 +3155,6 @@
           validatedReactions[key].count = Math.max(0, validatedReactions[key].count - 1);
         });
 
-        console.warn(`⚠️ 修正完了: ${keepReaction}を維持、他を無効化`);
       }
 
       return validatedReactions;
@@ -3218,7 +3181,6 @@
             this.updateCardReactions(card, item);
             this.applyReactionStyles(card, item);
           } else {
-            console.warn('⚠️ カード要素が見つかりません:', item.rowIndex);
           }
 
           if (!this.elements.answerModalContainer.classList.contains('hidden')) {
@@ -3244,7 +3206,6 @@
               this.updateCardReactions(card, item);
               this.applyReactionStyles(card, item);
             } else {
-              console.warn('⚠️ カード要素が見つかりません:', item.rowIndex);
             }
 
             if (!this.elements.answerModalContainer.classList.contains('hidden')) {
@@ -3432,7 +3393,6 @@
 
         if (error.message && (error.message.includes('管理者のみ') || error.message.includes('編集者のみ'))) {
           this.showNotification('権限エラー: ボード編集者のみ利用可能です', 'error');
-          console.warn('ハイライト機能はボード編集者のみ利用可能です');
         } else {
           this.showNotification('ハイライトに失敗しました', 'error');
         }
@@ -3455,7 +3415,6 @@
         }
 
         if (item.highlight !== expectedHighlight) {
-          console.warn(`⚠️ ハイライト状態不整合検出: rowIndex=${rowIndex}, UI=${item.highlight}, Expected=${expectedHighlight}`);
 
           item.highlight = expectedHighlight;
           requestAnimationFrame(() => this.applyUpdates([item]));
@@ -3720,7 +3679,6 @@
         const isDataConsistent = (initialCount - finalCount) === 1;
 
         if (!isDataConsistent) {
-          console.warn('削除後データ不整合検出:', { initialCount, finalCount });
           setTimeout(() => {
             this.loadSheetData({ preserveAdminMode: true, bypassCache: true });
           }, 500);
@@ -3751,11 +3709,6 @@
 
         if (enable) {
           if (!this.state.isEditor || !window.hasAdminCapability) {
-            console.warn('編集者権限がありません。', {
-              isEditor: this.state.isEditor,
-              isAdminUser: this.state.isAdminUser,
-              hasAdminCapability: window.hasAdminCapability
-            });
             return;
           }
 
@@ -3769,7 +3722,6 @@
               const authResult = await this.runGas('checkUserAuthentication');
               const ok = authResult && authResult.isAdministrator;
               if (!ok) {
-                console.warn('サーバー側の権限確認に失敗しました。');
               }
               this.adminModeVerified = true;
             } catch (e) {
@@ -4307,7 +4259,6 @@
     }
     getIcon(name, classes = '', solid = false) {
       if (!window.ICONS) {
-        console.warn('❌ window.ICONS not available');
         return '<svg class="' + classes + '" aria-hidden="true">⭐</svg>';
       }
 
@@ -4315,7 +4266,6 @@
       const icon = window.ICONS[key] || window.ICONS[name];
 
       if (!icon) {
-        console.warn('❌ Icon not found, using fallback');
         return '<svg class="' + classes + '" aria-hidden="true">⭐</svg>';
       }
 
@@ -4413,7 +4363,6 @@
           this.perf.frameTime = delta;
 
           if (delta > getPerformanceBudget() && !this.isLowPerformanceMode) {
-            console.warn('Low performance detected, enabling optimizations');
             this.isLowPerformanceMode = true;
             this.optimizeForLowPerformance();
           }
@@ -4658,7 +4607,6 @@
 
     setupScrollObserver() {
       if (!this.elements.answersContainer) {
-        console.warn('setupScrollObserver: answersContainer not found');
         return;
       }
 
@@ -4791,7 +4739,6 @@
           changedItems.push(item);
           successfullyCreated++;
         } else {
-          console.warn('renderAdditionalItems: Failed to create card for item:', item.rowIndex);
         }
       });
 
@@ -4835,13 +4782,6 @@
       const extraInDOM = [...domRowIndexes].filter(x => !this.virtualScrollState.renderedRowIndexes.has(x));
 
       if (missingInDOM.length > 0 || extraInDOM.length > 0 || trackedCount !== domCount) {
-        console.warn('Virtual scroll state inconsistency detected:', {
-          trackedCount,
-          domCount,
-          totalAvailable,
-          missingInDOM: missingInDOM.slice(0, 5),
-          extraInDOM: extraInDOM.slice(0, 5)
-        });
 
         this.virtualScrollState.renderedRowIndexes = domRowIndexes;
         this.virtualScrollState.renderedItems = domCount;
@@ -4935,12 +4875,10 @@
         const reasonStr = String(reason).trim();
 
         if (reasonStr.length > 10000) {
-          console.warn('validateReasonText: Reason text too long, truncating:', reasonStr.length);
           return reasonStr.substring(0, 10000) + '...';
         }
 
         if (reasonStr.includes('<') || reasonStr.includes('>') || reasonStr.includes('&')) {
-          console.warn('validateReasonText: Potentially unsafe HTML content detected');
         }
 
         return reasonStr;
@@ -5010,7 +4948,6 @@
 
         const issueCount = validationResults.invalidCards + validationResults.reasonFieldIssues + validationResults.headerIssues;
         if (issueCount > 0) {
-          console.warn('⚠️ Board data integrity issues detected:', validationResults);
 
           if (validationResults.reasonFieldIssues > 0) {
             await this.autoRecoverReasonFields();
@@ -5092,7 +5029,6 @@
     try {
       const formInfo = await new Promise((resolve, reject) => {
         if (!google?.script?.run?.getActiveFormInfo) {
-          console.warn('getActiveFormInfo function not available, skipping form link');
           resolve(null);
           return;
         }
