@@ -399,7 +399,7 @@
           setTimeout(() => {
             google.script.run
               .withSuccessHandler(function(url) { window.open(url + '?mode=login', '_top'); })
-              .withFailureHandler(function() { window.top.location.reload(); })
+              .withFailureHandler(function() { alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。'); })
               .getWebAppUrl();
           }, 1000);
         }, 3500);
@@ -418,7 +418,7 @@
             setTimeout(() => {
               google.script.run
                 .withSuccessHandler(function(url) { window.open(url + '?mode=login', '_top'); })
-                .withFailureHandler(function() { window.top.location.reload(); })
+                .withFailureHandler(function() { alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。'); })
                 .getWebAppUrl();
             }, 1000);
           }

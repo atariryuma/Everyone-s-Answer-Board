@@ -15,7 +15,7 @@
         if (WEB_APP_URL) {
           window.open(WEB_APP_URL, '_top');
         } else {
-          window.top.location.reload();
+          alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。');
         }
       }
 
@@ -23,7 +23,7 @@
         if (WEB_APP_URL) {
           window.open(WEB_APP_URL + '?mode=login', '_top');
         } else {
-          window.top.location.href = '?mode=login';
+          alert('ログイン画面に移動できませんでした。ブラウザのアドレスバーからアクセスしてください。');
         }
       }
     </script>

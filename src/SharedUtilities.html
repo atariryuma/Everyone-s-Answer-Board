@@ -923,33 +923,27 @@
       }
 
       try {
-        let targetUrl = window.location.href;
-
-        if (options.cleanParams) {
-          const currentUrl = new URL(window.location.href);
-          const keepParams = options.keepParams || [];
-          const params = new URLSearchParams();
-          keepParams.forEach(param => {
-            if (currentUrl.searchParams.has(param)) {
-              params.set(param, currentUrl.searchParams.get(param));
+        google.script.run
+          .withSuccessHandler(function(baseUrl) {
+            if (!baseUrl) { alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。'); return; }
+            let targetUrl = baseUrl;
+            if (options.keepParams) {
+              const currentParams = new URLSearchParams(window.location.search);
+              const params = new URLSearchParams();
+              options.keepParams.forEach(function(param) {
+                if (currentParams.has(param)) params.set(param, currentParams.get(param));
+              });
+              const qs = params.toString();
+              if (qs) targetUrl += '?' + qs;
             }
-          });
-          currentUrl.search = params.toString();
-          targetUrl = currentUrl.toString();
-        }
-
-        // GAS iFrameセキュリティ制限を回避するため、window.open with _topを使用
-        window.open(targetUrl, '_top');
-
+            window.open(targetUrl, '_top');
+          })
+          .withFailureHandler(function() {
+            alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。');
+          })
+          .getWebAppUrl();
       } catch (error) {
-        console.error('Page reload failed:', error);
-        // GAS iFrameではコールバック内でwindow.openが動作しないため、
-        // エラー時はユーザーに手動リロードを案内
-        if (window.notifications) {
-          window.notifications.warning('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。', 5000);
-        } else {
-          alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。');
-        }
+        alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。');
       }
     },
 
