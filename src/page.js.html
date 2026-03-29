@@ -809,11 +809,11 @@
 
 
         if (this.state.showAdminFeatures) {
-          this.elements.adminToggleBtn.classList.remove('text-gray-500', 'opacity-60');
+          this.elements.adminToggleBtn.classList.remove('text-gray-400');
           this.elements.adminToggleBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
         } else {
           this.elements.adminToggleBtn.classList.remove('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
-          this.elements.adminToggleBtn.classList.add('text-gray-500', 'opacity-60');
+          this.elements.adminToggleBtn.classList.add('text-gray-400');
         }
       } else {
         if (this.elements.adminToggleBtn) {
@@ -1280,7 +1280,7 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <h3 class="mt-2 text-lg font-medium text-blue-400">制限機能モード</h3>
-          <p class="mt-1 text-sm text-gray-400">一部の機能が制限されています。URLを確認してページを再読み込みしてください。</p>
+          <p class="mt-1 text-sm text-gray-300">一部の機能が制限されています。URLを確認してページを再読み込みしてください。</p>
           <div class="mt-6">
             <button
               onclick="window.safeReload()"
@@ -1312,7 +1312,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <h3 class="mt-2 text-lg font-medium text-red-400">初期化エラー</h3>
-        <p class="mt-1 text-sm text-gray-400">${window.sharedUtilities.security.escapeHtml(message)}</p>
+        <p class="mt-1 text-sm text-gray-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6">
           <button 
             onclick="window.safeReload()" 
@@ -1339,7 +1339,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
         <h3 class="mt-2 text-lg font-medium text-yellow-400">データ読み込みエラー</h3>
-        <p class="mt-1 text-sm text-gray-400">${window.sharedUtilities.security.escapeHtml(message)}</p>
+        <p class="mt-1 text-sm text-gray-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6 space-x-3">
           <button 
             onclick="window.safeReload()" 
@@ -1418,16 +1418,16 @@
               回答フォームに記入する
             </a>
           </div>` :
-            `<div class="mt-4"><p class="text-sm text-gray-500">回答フォームの準備中です...</p></div>`;
+            `<div class="mt-4"><p class="text-sm text-gray-300">回答フォームの準備中です...</p></div>`;
         }
 
         container.innerHTML = `
         <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
-          <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
           <h3 class="mt-2 text-lg font-medium text-white">まだ回答がありません</h3>
-          <p class="mt-1 text-sm text-gray-400">あなたが最初の回答者になってディスカッションを始めましょう！</p>
+          <p class="mt-1 text-sm text-gray-300">あなたが最初の回答者になってディスカッションを始めましょう！</p>
           ${formLinkHtml}
         </div>
       `;
@@ -1435,11 +1435,11 @@
         console.warn('⚠️ フォームURL取得エラー:', error);
         container.innerHTML = `
         <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
-          <svg class="mx-auto h-12 w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
           <h3 class="mt-2 text-lg font-medium text-white">まだ回答がありません</h3>
-          <p class="mt-1 text-sm text-gray-400">あなたが最初の回答者になってディスカッションを始めましょう！</p>
+          <p class="mt-1 text-sm text-gray-300">あなたが最初の回答者になってディスカッションを始めましょう！</p>
         </div>
       `;
       }
@@ -1740,7 +1740,7 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
         <h3 class="mt-2 text-lg font-medium text-red-400">${isUserNotFoundError ? 'ユーザー情報が見つかりません' : 'アクセスエラー'}</h3>
-        <p class="mt-1 text-sm text-gray-400">${isUserNotFoundError ?
+        <p class="mt-1 text-sm text-gray-300">${isUserNotFoundError ?
           'この回答ボードは存在しないか、アクセス権限が不正です' :
           'この回答ボードにアクセスする権限がありません'}</p>
         ${isUserNotFoundError ? `
@@ -1768,7 +1768,7 @@
           <h4 class="text-sm font-medium text-yellow-400 mb-2">🛠️ 自動修復：</h4>
           <p class="text-xs text-gray-400">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
         </div>` : ''}
-        <p class="mt-2 text-xs text-gray-500">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
+        <p class="mt-2 text-xs text-gray-400">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
         <div class="mt-6 space-x-3">
           <button 
             onclick="window.safeReload()" 

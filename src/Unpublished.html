@@ -56,7 +56,7 @@
 </head>
 
 <body style="background: var(--brand-background); color: var(--brand-text);"
-  class="font-sans flex items-center justify-center h-screen">
+  class="font-sans flex items-center justify-center min-h-screen overflow-auto p-4">
   <!-- Loading Overlay for UnifiedLoadingManager -->
   <div id="loading-overlay" class="loading-overlay page-specific hidden">
     <div class="global-spinner"></div>
@@ -82,7 +82,7 @@
         <p class="text-sm text-gray-400 mb-2">生徒用URL:</p>
         <div class="flex gap-2">
           <input type="text" id="board-url" readonly value="<?= typeof boardUrl !== 'undefined' ? boardUrl : '' ?>"
-            class="flex-1 p-2 bg-gray-600 border border-gray-500 rounded text-sm cursor-pointer hover:bg-gray-500"
+            class="flex-1 p-2 bg-gray-600 border border-gray-500 rounded text-sm cursor-pointer hover:bg-gray-500 focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"
             onclick="this.select()" aria-label="生徒用URL" title="クリックしてURLを選択" />
           <button type="button" onclick="copyBoardUrl()"
             class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm">

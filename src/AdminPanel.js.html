@@ -808,7 +808,7 @@
         } else {
           formUrlDisplay.textContent = '未設定';
           formUrlDisplay.href = '#';
-          formUrlDisplay.className = 'text-sm text-gray-400';
+          formUrlDisplay.className = 'text-sm text-gray-300';
         }
       }
 
@@ -819,7 +819,7 @@
           formTitleDisplay.className = 'text-sm text-white';
         } else {
           formTitleDisplay.textContent = '未設定';
-          formTitleDisplay.className = 'text-sm text-gray-400';
+          formTitleDisplay.className = 'text-sm text-gray-300';
         }
       }
 
@@ -2785,15 +2785,15 @@
         <h3 class="text-lg font-semibold text-white mb-2">🔍 列判定システム統合診断結果</h3>
         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div class="bg-gray-800 p-3 rounded">
-            <div class="text-sm text-gray-400">総合スコア</div>
+            <div class="text-sm text-gray-300">総合スコア</div>
             <div class="text-xl font-bold text-${scoreColor}-400">${overallScore}%</div>
           </div>
           <div class="bg-gray-800 p-3 rounded">
-            <div class="text-sm text-gray-400">重大な問題</div>
+            <div class="text-sm text-gray-300">重大な問題</div>
             <div class="text-xl font-bold text-red-400">${diagnostics.summary.criticalIssues || 0}件</div>
           </div>
           <div class="bg-gray-800 p-3 rounded">
-            <div class="text-sm text-gray-400">警告</div>
+            <div class="text-sm text-gray-300">警告</div>
             <div class="text-xl font-bold text-yellow-400">${diagnostics.summary.warnings || 0}件</div>
           </div>
         </div>
@@ -2813,7 +2813,7 @@
     }
 
     html += `
-      <div class="text-xs text-gray-500 mt-4">
+      <div class="text-xs text-gray-400 mt-4">
         診断実行時刻: ${new Date(diagnostics.timestamp).toLocaleString()}
       </div>
     `;
@@ -4052,7 +4052,7 @@
         sheetnameElement.className = 'text-sm text-white';
       } else {
         sheetnameElement.textContent = '未設定';
-        sheetnameElement.className = 'text-sm text-gray-400';
+        sheetnameElement.className = 'text-sm text-gray-300';
       }
     }
 
@@ -4071,7 +4071,7 @@
         timeElement.className = 'text-sm text-white';
       } else {
         timeElement.textContent = '--:--';
-        timeElement.className = 'text-sm text-gray-400';
+        timeElement.className = 'text-sm text-gray-300';
       }
     }
   }
