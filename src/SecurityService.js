@@ -101,6 +101,8 @@ function validateDomainAccess(email, options = {}) {
   const allowed = userDomain === adminDomain;
   return {
     allowed,
+    userDomain,
+    adminDomain,
     message: allowed ? 'Domain access allowed' : 'Domain mismatch',
     reason: allowed ? 'domain_match' : 'domain_mismatch'
   };

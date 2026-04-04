@@ -8,10 +8,18 @@
     }
   }
 
+  let cachedLoginUrl = '';
+
   async function init() {
     try {
 
       setLoginButtonState(true, '読み込み中');
+
+      // リダイレクト用URLをプリフェッチ
+      google.script.run
+        .withSuccessHandler(function(url) { if (url) cachedLoginUrl = url + '?mode=login'; })
+        .withFailureHandler(function() {})
+        .getWebAppUrl();
 
       const loginBtn = document.getElementById('login-btn');
       const userEmailDisplay = document.getElementById('user-email-display');
@@ -297,7 +305,7 @@
 
       if (info.isValidDomain) {
         if (match) {
-          document.getElementById('header-domain-match-text').textContent = info.domain || '学校ドメイン';
+          document.getElementById('header-domain-match-text').textContent = info.domain || 'ドメイン確認済み';
           match.style.display = 'block';
         }
       } else {
@@ -362,43 +370,32 @@
           throw new Error('ポップアップがブロックされました');
         }
 
-        let timeoutId = setTimeout(() => {
-
-          if (logoutWindow && !logoutWindow.closed) {
-            logoutWindow.close();
-          }
-
+        function redirectAfterSwitch() {
           if (userEmailDisplay) {
             userEmailDisplay.textContent = '✅ アカウント切り替え完了！ページを更新します...';
             userEmailDisplay.classList.remove('text-yellow-400');
             userEmailDisplay.classList.add('text-green-400');
           }
-
-          setTimeout(() => {
+          if (cachedLoginUrl) {
+            setTimeout(() => window.open(cachedLoginUrl, '_top'), 500);
+          } else {
             google.script.run
               .withSuccessHandler(function(url) { window.open(url + '?mode=login', '_top'); })
               .withFailureHandler(function() { alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。'); })
               .getWebAppUrl();
-          }, 1000);
+          }
+        }
+
+        let timeoutId = setTimeout(() => {
+          if (logoutWindow && !logoutWindow.closed) logoutWindow.close();
+          redirectAfterSwitch();
         }, 3500);
 
         const checkClosed = setInterval(() => {
           if (logoutWindow.closed) {
             clearInterval(checkClosed);
             clearTimeout(timeoutId);
-
-            if (userEmailDisplay) {
-              userEmailDisplay.textContent = '✅ アカウント切り替え完了！ページを更新します...';
-              userEmailDisplay.classList.remove('text-yellow-400');
-              userEmailDisplay.classList.add('text-green-400');
-            }
-
-            setTimeout(() => {
-              google.script.run
-                .withSuccessHandler(function(url) { window.open(url + '?mode=login', '_top'); })
-                .withFailureHandler(function() { alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。'); })
-                .getWebAppUrl();
-            }, 1000);
+            redirectAfterSwitch();
           }
         }, 500);
 
