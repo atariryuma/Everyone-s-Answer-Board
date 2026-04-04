@@ -56,12 +56,18 @@
           <label for="database-id" class="block text-sm font-medium text-gray-300 mb-2">
             📊 データベーススプレッドシートID
           </label>
-          <input type="text" id="database-id" name="databaseId"
-            class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
-            placeholder="1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH" pattern="[a-zA-Z0-9_\-]{44}" maxlength="44"
-            required />
+          <div class="flex gap-2">
+            <input type="text" id="database-id" name="databaseId"
+              class="flex-1 p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+              placeholder="1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH" pattern="[a-zA-Z0-9_\-]{44}" maxlength="44"
+              required />
+            <button type="button" id="create-db-btn" onclick="createDatabaseAuto()"
+              class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg whitespace-nowrap transition-colors">
+              自動作成
+            </button>
+          </div>
           <p class="text-xs text-gray-400 mt-1">
-            データベース用スプレッドシートのIDを入力してください（44文字）
+            既存のスプレッドシートIDを入力するか、「自動作成」でGASと同じフォルダに新規作成できます
           </p>
         </div>
 
@@ -156,6 +162,31 @@
   <script>
     let setupInProgress = false;
 
+    function createDatabaseAuto() {
+      const btn = document.getElementById('create-db-btn');
+      const input = document.getElementById('database-id');
+      btn.disabled = true;
+      btn.textContent = '作成中…';
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            input.value = result.spreadsheetId;
+            showMessage(result.message, 'success');
+          } else {
+            showMessage(result.message, 'error');
+          }
+          btn.disabled = false;
+          btn.textContent = '自動作成';
+        })
+        .withFailureHandler(function(error) {
+          showMessage('データベース作成に失敗しました: ' + error.message, 'error');
+          btn.disabled = false;
+          btn.textContent = '自動作成';
+        })
+        .createDatabase();
+    }
+
     function showMessage(message, type = 'info') {
       if (window.notifications) {
         const durations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
@@ -223,31 +254,25 @@
           throw new Error('有効なメールアドレスを入力してください');
         }
 
-        const result = await window.ErrorHandler.handleFormSubmission(
-          () => window.ErrorHandler.callGAS('setupApp', {
-            showLoading: true,
-            loadingMessage: 'セットアップを実行中...'
-          }, serviceAccountJson, databaseId, adminEmail, googleClientId),
-          'アプリケーションセットアップ',
-          {
-            successMessage: `✅ セットアップが正常に完了しました！管理者: ${adminEmail}`,
-            onSuccess: (result) => {
-              document.getElementById('test-section').classList.remove('hidden');
-            },
-            onError: (error) => {
-              if (error.message?.includes('スプレッドシートの共有設定が「制限付き」になっていません')) {
-                const detailedMessage = `
-                    <p class="font-bold">${error.message}</p>
-                    <p class="mt-2">セキュリティのため、データベースとして使用するスプレッドシートの共有設定を「制限付き」に変更してください。</p>
-                    <p>変更方法: スプレッドシートを開き、「共有」ボタン → 「一般的なアクセス」を「制限付き」に変更。</p>
-                  `;
-                showMessage(detailedMessage, 'error');
+        await new Promise((resolve, reject) => {
+          google.script.run
+            .withSuccessHandler((result) => {
+              if (result && result.success) {
+                showMessage(`セットアップが正常に完了しました！管理者: ${adminEmail}`, 'success');
+                document.getElementById('test-section').classList.remove('hidden');
+              } else {
+                showMessage(result?.message || 'セットアップに失敗しました', 'error');
               }
-            }
-          }
-        );
+              resolve(result);
+            })
+            .withFailureHandler((error) => {
+              showMessage('セットアップに失敗しました: ' + error.message, 'error');
+              reject(error);
+            })
+            .setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId);
+        });
       } catch (error) {
-        showMessage('セットアップに失敗しました', 'error');
+        // withFailureHandler で既にエラー表示済み
       } finally {
         setupBtn.disabled = false;
         setupText.style.display = 'inline';
@@ -263,7 +288,7 @@
 
       google.script.run
         .withSuccessHandler((result) => {
-          showMessage(`${result.message}`, result.status === 'success' ? 'success' : 'warning');
+          showMessage(`${result.message}`, result.success ? 'success' : 'warning');
           this.disabled = false;
           this.innerHTML = '🔍 システムテスト実行';
         })
@@ -332,7 +357,7 @@
             return;
           }
 
-          btn.href = url;
+          btn.href = url + '?mode=login';
           btn.style.pointerEvents = 'auto';
           btn.style.opacity = '1';
           if (loadingText) loadingText.classList.add('hidden');

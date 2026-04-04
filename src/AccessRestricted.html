@@ -139,6 +139,19 @@
           </div>
         </div>
 
+        <!-- 登録済みユーザー向け（管理者以外） -->
+        <? if (typeof isRegisteredUser !== 'undefined' && isRegisteredUser && !(typeof isAdministrator !== 'undefined' && isAdministrator)) { ?>
+        <div class="scenario-message rounded-2xl p-6 mb-6">
+          <div class="bg-gray-700/50 rounded-lg p-4 text-center">
+            <p class="text-sm text-gray-300 mb-3">登録済みユーザーとして確認されました</p>
+            <a href="#" id="editor-login-link"
+              class="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-semibold rounded-xl transition-all transform hover:scale-105 shadow-lg">
+              ログインしてはじめる
+            </a>
+          </div>
+        </div>
+        <? } ?>
+
         <!-- 管理者向け情報 -->
         <? if (typeof isAdministrator !== 'undefined' && isAdministrator) { ?>
         <div class="restriction-notice rounded-2xl p-6">
@@ -217,33 +230,34 @@
       requestIdleCallback(initializeAccessRestrictedIcons, { timeout: 100 });
 
       document.addEventListener('DOMContentLoaded', function() {
-        const appSetupLink = document.getElementById('app-setup-link');
-        if (!appSetupLink) return;
-
         google.script.run
           .withSuccessHandler(function(webAppUrl) {
-            google.script.run
-              .withSuccessHandler(function(userInfo) {
-                const userId = (userInfo && userInfo.userId) ? userInfo.userId : '';
-                const targetUrl = `${webAppUrl}?mode=appSetup${userId ? '&userId=' + userId : ''}`;
-                appSetupLink.href = targetUrl;
-              })
-              .withFailureHandler(function(error) {
-                console.error('ユーザー情報取得失敗:', error);
-                if (window.notifications) {
-                  window.notifications.warning('ユーザー情報の取得に失敗しました。ページを再読み込みしてください。', 7000);
-                }
-                appSetupLink.href = `${webAppUrl}?mode=appSetup`;
-              })
-              .getUser('full');
-          })
-          .withFailureHandler(function(error) {
-            console.error('WebApp URL取得失敗:', error);
-            if (window.notifications) {
-              window.notifications.error('システムの初期化に失敗しました。ページを再読み込みしてください。', 7000);
+            // 管理者向けリンク
+            const appSetupLink = document.getElementById('app-setup-link');
+            if (appSetupLink) {
+              google.script.run
+                .withSuccessHandler(function(userInfo) {
+                  const userId = (userInfo && userInfo.userId) ? userInfo.userId : '';
+                  appSetupLink.href = `${webAppUrl}?mode=appSetup${userId ? '&userId=' + userId : ''}`;
+                })
+                .withFailureHandler(function() {
+                  appSetupLink.href = `${webAppUrl}?mode=appSetup`;
+                })
+                .getUser('full');
             }
+
+            // 登録済みユーザー向けログインリンク
+            const editorLoginLink = document.getElementById('editor-login-link');
+            if (editorLoginLink) {
+              editorLoginLink.href = `${webAppUrl}?mode=login`;
+            }
+          })
+          .withFailureHandler(function() {
             const baseUrl = window.location.href.split('?')[0];
-            appSetupLink.href = `${baseUrl}?mode=appSetup`;
+            const appSetupLink = document.getElementById('app-setup-link');
+            if (appSetupLink) appSetupLink.href = `${baseUrl}?mode=appSetup`;
+            const editorLoginLink = document.getElementById('editor-login-link');
+            if (editorLoginLink) editorLoginLink.href = `${baseUrl}?mode=login`;
           })
           .getWebAppUrl();
       });

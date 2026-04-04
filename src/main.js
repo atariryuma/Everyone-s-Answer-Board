@@ -99,6 +99,7 @@ function evaluateDomainRestriction(email) {
 function createAccessRestrictedTemplate(email, isAppDisabled = false, message = '') {
   const template = HtmlService.createTemplateFromFile('AccessRestricted.html');
   template.isAdministrator = email ? isAdministrator(email) : false;
+  template.isRegisteredUser = email ? !!findUserByEmail(email, { requestingUser: email }) : false;
   template.userEmail = email || '';
   template.timestamp = new Date().toISOString();
   template.isAppDisabled = Boolean(isAppDisabled);
@@ -141,6 +142,14 @@ function doGet(e) {
       }
     }
 
+
+    // セットアップ未完了なら自動でセットアップページへ
+    if (mode !== 'setup') {
+      const setupDone = (typeof hasCoreSystemProps === 'function') ? hasCoreSystemProps() : true;
+      if (!setupDone) {
+        return HtmlService.createTemplateFromFile('SetupPage.html').evaluate().setTitle('初期設定');
+      }
+    }
 
     switch (mode) {
       case 'login': {
@@ -312,7 +321,7 @@ function doGet(e) {
     const errorTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     errorTemplate.title = 'システムエラー';
     errorTemplate.message = 'システムで予期しないエラーが発生しました。管理者にお問い合わせください。';
-    errorTemplate.hideLoginButton = false;
+    errorTemplate.hideLoginButton = true;
 
     return errorTemplate.evaluate().setTitle('エラー');
   }
@@ -354,7 +363,7 @@ function createRedirectTemplate(redirectPage, error) {
     const fallbackTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     fallbackTemplate.title = 'システムエラー';
     fallbackTemplate.message = 'ページの表示中にエラーが発生しました。';
-    fallbackTemplate.hideLoginButton = false;
+    fallbackTemplate.hideLoginButton = true;
     fallbackTemplate.webAppUrl = getWebAppUrl() || '';
     return fallbackTemplate.evaluate().setTitle('エラー');
   }

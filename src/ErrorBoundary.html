@@ -19,11 +19,11 @@
         }
       }
 
-      function redirectToLogin() {
+      function goToTop() {
         if (WEB_APP_URL) {
-          window.open(WEB_APP_URL + '?mode=login', '_top');
+          window.open(WEB_APP_URL, '_top');
         } else {
-          alert('ログイン画面に移動できませんでした。ブラウザのアドレスバーからアクセスしてください。');
+          alert('ページに移動できませんでした。ブラウザのアドレスバーからアクセスしてください。');
         }
       }
     </script>
@@ -40,11 +40,9 @@
         <button type="button" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors" onclick="safeReload()">
           再読み込み
         </button>
-        <? if (!hideLoginButton) { ?>
-        <button type="button" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium transition-colors" onclick="redirectToLogin()">
-          ログイン画面に戻る
+        <button type="button" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium transition-colors" onclick="goToTop()">
+          トップページに戻る
         </button>
-        <? } ?>
       </div>
 
       <p class="text-xs text-gray-500 pt-4"><?= new Date().toLocaleString('ja-JP') ?></p>

@@ -18,6 +18,8 @@ const CACHE_DURATION = {
   EXTRA_LONG: 3600     // 1時間 - 設定キャッシュ
 };
 
+const USERS_SHEET_HEADERS = ['userId', 'userEmail', 'googleId', 'isActive', 'configJson', 'lastModified', 'createdAt'];
+
 /**
  * プロパティキャッシュTTL (ミリ秒)
  * PropertiesServiceのメモリキャッシュ用
@@ -281,7 +283,7 @@ function testSystemDiagnosis() {
 
     return {
       success: criticalIssues === 0,
-      message: criticalIssues === 0 ? 'System diagnosis completed - all critical tests passed' : `System diagnosis found ${criticalIssues} critical issues`,
+      message: criticalIssues === 0 ? 'システム診断完了 - すべてのテストに合格しました' : `システム診断で ${criticalIssues} 件の重大な問題が見つかりました`,
       summary: {
         totalTests,
         passed: passedTests,
@@ -1820,13 +1822,31 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
       setCachedProperty('GOOGLE_CLIENT_ID', googleClientId);
     }
 
+    // DB初期化: SA共有 + usersシート作成（全てユーザー権限で実行）
     try {
-      const testAccess = openSpreadsheet(String(databaseId).trim(), { useServiceAccount: true });
-      if (!testAccess || !testAccess.spreadsheet) {
-        console.warn('Database access test failed: Spreadsheet object unavailable');
+      const trimmedId = String(databaseId).trim();
+      const ss = SpreadsheetApp.openById(trimmedId);
+
+      // サービスアカウントを編集者として自動共有
+      const saEmail = parsedCredentials.client_email;
+      const editors = ss.getEditors().map(e => e.getEmail().toLowerCase());
+      if (!editors.includes(saEmail.toLowerCase())) {
+        ss.addEditor(saEmail);
+        console.log('setupApp: Added service account as editor:', saEmail);
+      }
+
+      // usersシートがなければ自動作成
+      let usersSheet = ss.getSheetByName('users');
+      if (!usersSheet) {
+        usersSheet = ss.insertSheet('users');
+        usersSheet.appendRow(USERS_SHEET_HEADERS);
+        console.log('setupApp: Created users sheet with headers');
+      } else if (usersSheet.getLastRow() === 0) {
+        usersSheet.appendRow(USERS_SHEET_HEADERS);
+        console.log('setupApp: Added headers to empty users sheet');
       }
     } catch (dbError) {
-      console.warn('Database access test failed:', dbError.message);
+      console.warn('setupApp: Database initialization failed:', dbError.message);
     }
 
     return {
@@ -1890,6 +1910,44 @@ function setAppStatus(isPublished) {
   }
 }
 
+
+/**
+ * データベーススプレッドシートをGASプロジェクトと同じフォルダに自動作成
+ * @returns {Object} { success, spreadsheetId, message }
+ */
+function createDatabase() {
+  try {
+    const email = getCurrentEmail();
+    if (!email) {
+      return { success: false, message: '認証が必要です' };
+    }
+
+    // GASプロジェクトの親フォルダを取得
+    const scriptId = ScriptApp.getScriptId();
+    const scriptFile = DriveApp.getFileById(scriptId);
+    const parents = scriptFile.getParents();
+    const folder = parents.hasNext() ? parents.next() : null;
+
+    // スプレッドシート作成
+    const ss = SpreadsheetApp.create('みんなの回答ボード DB');
+    const sheet = ss.getSheets()[0];
+    sheet.setName('users');
+    sheet.appendRow(USERS_SHEET_HEADERS);
+
+    if (folder) {
+      DriveApp.getFileById(ss.getId()).moveTo(folder);
+    }
+
+    return {
+      success: true,
+      spreadsheetId: ss.getId(),
+      message: 'データベースを作成しました'
+    };
+  } catch (error) {
+    console.error('createDatabase error:', error.message);
+    return { success: false, message: `作成に失敗しました: ${error.message}` };
+  }
+}
 
 /**
  * SystemController統一インターフェース
