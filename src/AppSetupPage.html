@@ -861,17 +861,7 @@
                 currentStatus.innerHTML = '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">✅ 運用中</span>';
               }
 
-              if (data.restriction && data.restriction.disabledBy) {
-                currentAdmin.textContent = data.restriction.disabledBy;
-              } else if (data.lastEnabled && data.lastEnabled.enabledBy) {
-                currentAdmin.textContent = data.lastEnabled.enabledBy;
-              } else {
-                google.script.run
-                  .withSuccessHandler(function(email) {
-                    if (email) currentAdmin.textContent = email;
-                  })
-                  .getCurrentEmail();
-              }
+              currentAdmin.textContent = data.adminEmail || currentAdmin.textContent;
 
               let updateTime = data.timestamp;
               if (data.restriction && data.restriction.disabledAt) {

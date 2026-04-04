@@ -411,6 +411,7 @@ function getAppAccessStatus() {
     const status = {
       isDisabled,
       status: isDisabled ? 'disabled' : 'enabled',
+      adminEmail: props.getProperty('ADMIN_EMAIL') || '',
       timestamp: new Date().toISOString()
     };
 
