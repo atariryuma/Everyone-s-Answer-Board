@@ -376,11 +376,9 @@ function enableAppAccess() {
     props.deleteProperty('APP_DISABLED_BY');
     props.deleteProperty('APP_DISABLED_AT');
 
-    props.setProperty('APP_ENABLED_BY', currentEmail);
     props.setProperty('APP_ENABLED_AT', new Date().toISOString());
 
     return createSuccessResponse('アプリケーションを再開しました', {
-      enabledBy: currentEmail,
       previousRestriction: {
         reason: disabledReason,
         disabledBy,
@@ -423,7 +421,6 @@ function getAppAccessStatus() {
       };
     } else {
       status.lastEnabled = {
-        enabledBy: props.getProperty('APP_ENABLED_BY') || '',
         enabledAt: props.getProperty('APP_ENABLED_AT') || ''
       };
     }
