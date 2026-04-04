@@ -96,6 +96,8 @@ function loadUserApisContext(overrides = {}) {
     }),
     updateUser: () => ({ success: true }),
     getGoogleIdFromToken: () => ({ googleId: 'google-id-123', email: 'newmail@example.com' }),
+    getCachedProperty: () => null,
+    setCachedProperty: () => {},
     getWebAppUrl: () => 'https://script.google.com/app',
     createAuthError: () => ({ success: false, message: 'auth required' }),
     createUserNotFoundError: () => ({ success: false, message: 'user not found' }),
@@ -139,6 +141,55 @@ test('processLoginAction: detects email change via googleId and updates user', (
   const emailUpdate = updates.find(u => u.userEmail === 'newmail@example.com');
   assert.ok(emailUpdate, 'userEmail should be updated to new email');
   assert.equal(emailUpdate.userId, 'existing-user-id');
+});
+
+test('processLoginAction: updates ADMIN_EMAIL when admin email changes', () => {
+  const updates = [];
+  let savedAdminEmail = null;
+  const oldUser = {
+    userId: 'admin-user-id',
+    userEmail: 'old-admin@example.com',
+    googleId: 'google-id-admin',
+    isActive: true
+  };
+
+  const ctx = loadUserApisContext({
+    getCurrentEmail: () => 'new-admin@example.com',
+    findUserByEmail: () => null,
+    findUserByGoogleId: (gid, ctx) => gid === 'google-id-admin' ? { ...oldUser } : null,
+    updateUser: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; },
+    getGoogleIdFromToken: () => ({ googleId: 'google-id-admin', email: 'new-admin@example.com' }),
+    getCachedProperty: (key) => key === 'ADMIN_EMAIL' ? 'old-admin@example.com' : null,
+    setCachedProperty: (key, value) => { if (key === 'ADMIN_EMAIL') savedAdminEmail = value; }
+  });
+
+  const result = ctx.processLoginAction();
+  assert.equal(result.success, true);
+  assert.equal(savedAdminEmail, 'new-admin@example.com');
+});
+
+test('processLoginAction: does not update ADMIN_EMAIL for non-admin email change', () => {
+  let savedAdminEmail = null;
+  const oldUser = {
+    userId: 'regular-user-id',
+    userEmail: 'old-user@example.com',
+    googleId: 'google-id-regular',
+    isActive: true
+  };
+
+  const ctx = loadUserApisContext({
+    getCurrentEmail: () => 'new-user@example.com',
+    findUserByEmail: () => null,
+    findUserByGoogleId: (gid, ctx) => gid === 'google-id-regular' ? { ...oldUser } : null,
+    updateUser: () => ({ success: true }),
+    getGoogleIdFromToken: () => ({ googleId: 'google-id-regular', email: 'new-user@example.com' }),
+    getCachedProperty: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    setCachedProperty: (key, value) => { if (key === 'ADMIN_EMAIL') savedAdminEmail = value; }
+  });
+
+  const result = ctx.processLoginAction();
+  assert.equal(result.success, true);
+  assert.equal(savedAdminEmail, null, 'ADMIN_EMAIL should not be changed for non-admin users');
 });
 
 test('processLoginAction: backfills googleId for existing user without it', () => {

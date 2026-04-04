@@ -19,7 +19,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, createUser, updateUser, getGoogleIdFromToken, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, shouldEnforceDomainRestrictions, validateDomainAccess */
+/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, createUser, updateUser, getGoogleIdFromToken, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, shouldEnforceDomainRestrictions, validateDomainAccess */
 
 /**
  * ドメインアクセス検証（必要時のみ）
@@ -182,6 +182,12 @@ function processLoginAction() {
         const result = updateUser(user.userId, { userEmail: email }, { skipAccessCheck: true });
         if (result?.success) {
           user.userEmail = email;
+          // 管理者メールも自動更新
+          const adminEmail = getCachedProperty('ADMIN_EMAIL');
+          if (adminEmail && adminEmail.toLowerCase() === oldEmail.toLowerCase()) {
+            setCachedProperty('ADMIN_EMAIL', email);
+            console.log('processLoginAction: ADMIN_EMAIL updated', { oldEmail, newEmail: email });
+          }
         }
         console.log('processLoginAction: Email change detected', {
           userId: user.userId,
