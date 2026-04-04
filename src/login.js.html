@@ -11,7 +11,6 @@
   async function init() {
     try {
 
-      window.setLoading(true, '読み込み中…');
       setLoginButtonState(true, '読み込み中');
 
       const loginBtn = document.getElementById('login-btn');
@@ -19,12 +18,10 @@
 
       if (!loginBtn) {
         console.error('❌ Critical: login-btn element not found');
-        window.setLoading(false);
         return;
       }
       if (!userEmailDisplay) {
         console.error('❌ Critical: user-email-display element not found');
-        window.setLoading(false);
         return;
       }
 
@@ -50,13 +47,11 @@
         if (!userEmailDisplay.dataset.emailSet) {
           setEmailDisplayDefault();
         }
-        window.setLoading(false);
         setLoginButtonState(false);
       }
 
     } catch (error) {
       console.error('❌ Initialization failed:', error);
-      window.setLoading(false);
 
       if (window.notifications) {
         window.notifications.error('初期化に失敗しました。ページを再読み込みしてください。', 10000);
@@ -175,7 +170,6 @@
               console.error('processUnifiedLogin: 管理URLが返されませんでした', response);
               userEmailDisplay.textContent = 'ログインは成功しましたが、管理URLが見つかりません。管理者に連絡してください。';
               userEmailDisplay.classList.add('text-yellow-400');
-              window.setLoading(false);
               setLoginButtonState(false);
             }
             resolve();
@@ -183,7 +177,6 @@
           .withFailureHandler((error) => {
             userEmailDisplay.textContent = `エラー: ${error.message}`;
             userEmailDisplay.classList.add('text-red-400');
-            window.setLoading(false);
             setLoginButtonState(false);
             reject(error);
           })
@@ -234,26 +227,22 @@
               createPromiseDelay(5000).then(() => clearInterval(emailProtector)).catch(() => {
               });
 
-              window.setLoading(false);
               setLoginButtonState(false);
 
             } else {
               setEmailDisplayDefault();
-              window.setLoading(false);
               setLoginButtonState(false);
             }
           })
           .withFailureHandler((error) => {
             console.warn('Email fetch failed:', error.message);
             setEmailDisplayDefault();
-            window.setLoading(false);
             setLoginButtonState(false);
           })
           .getCurrentEmail();
       } catch (error) {
         console.error('DisplayCurrentUserEmail error:', error);
         setEmailDisplayDefault();
-        window.setLoading(false);
         setLoginButtonState(false);
       }
     };
@@ -268,14 +257,12 @@
         userEmailDisplay.textContent = displayMessage;
         userEmailDisplay.classList.add('text-red-400');
       }
-      window.setLoading(false);
       setLoginButtonState(false);
     };
 
     const handleLogin = () => {
       try {
-        window.setLoading(true, 'ユーザー情報確認中…');
-        setLoginButtonState(true, '処理中');
+        setLoginButtonState(true, '処理中…');
 
         google.script.run
           .withSuccessHandler(() => {
@@ -289,7 +276,6 @@
       } catch (err) {
         console.error('Login function error:', err);
         userEmailDisplay.textContent = 'ログイン処理エラー';
-        window.setLoading(false);
       setLoginButtonState(false);
       }
     };
@@ -514,7 +500,6 @@
       const safeMessage = escapeHtml(message || 'ログインが完了しました');
       const safeAdminUrl = escapeHtml(adminUrl);
 
-      window.setLoading(false);
       setLoginButtonState(false);
 
       const successHtml = `

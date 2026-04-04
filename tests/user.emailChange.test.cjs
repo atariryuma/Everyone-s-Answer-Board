@@ -57,7 +57,7 @@ test('getGoogleIdFromToken: extracts sub and email from valid JWT', () => {
     ScriptApp: { getIdentityToken: () => mockToken }
   });
   const result = ctx.getGoogleIdFromToken();
-  assert.equal(result.googleId, '123456789');
+  assert.equal(result.googleId, 'gid_123456789');
   assert.equal(result.email, 'user@example.com');
 });
 
@@ -124,7 +124,10 @@ test('processLoginAction: detects email change via googleId and updates user', (
   const ctx = loadUserApisContext({
     getCurrentEmail: () => 'newmail@example.com',
     findUserByEmail: () => null, // new email not found
-    findUserByGoogleId: (gid) => gid === 'google-id-123' ? { ...oldUser } : null,
+    findUserByGoogleId: (gid, ctx) => {
+      assert.equal(ctx.skipAccessCheck, true, 'skipAccessCheck must be true for email migration');
+      return gid === 'google-id-123' ? { ...oldUser } : null;
+    },
     updateUser: (userId, data) => { updates.push({ userId, ...data }); return { success: true }; },
     getGoogleIdFromToken: () => ({ googleId: 'google-id-123', email: 'newmail@example.com' })
   });

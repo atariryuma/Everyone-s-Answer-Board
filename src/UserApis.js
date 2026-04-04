@@ -176,10 +176,10 @@ function processLoginAction() {
 
     // Google Workspace管理者がメール変更した場合、sub(googleId)は不変なので旧ユーザーを特定できる
     if (!user && googleId) {
-      user = findUserByGoogleId(googleId, { requestingUser: email });
+      user = findUserByGoogleId(googleId, { requestingUser: email, skipAccessCheck: true });
       if (user) {
         const oldEmail = user.userEmail;
-        const result = updateUser(user.userId, { userEmail: email });
+        const result = updateUser(user.userId, { userEmail: email }, { skipAccessCheck: true });
         if (result?.success) {
           user.userEmail = email;
         }

@@ -133,7 +133,8 @@ function getGoogleIdFromToken() {
       return null;
     }
 
-    return { googleId: payload.sub, email: payload.email || null };
+    // プレフィックス付きで返す（スプレッドシートの数値自動変換による精度損失を防止）
+    return { googleId: 'gid_' + payload.sub, email: payload.email || null };
   } catch (error) {
     console.error('getGoogleIdFromToken error:', error.message);
     return null;
