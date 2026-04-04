@@ -11,8 +11,8 @@
 
 /* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
 
-
-
+const LOCK_TIMEOUT_MS = 10000;
+const LOCK_CACHE_TTL_SECONDS = 10;
 
 
 
@@ -334,9 +334,9 @@ function addReaction(targetUserId, rowIndex, reactionType) {
     const lock = LockService.getScriptLock();
 
     try {
-      cache.put(lockKey, actorEmail, 15);
+      cache.put(lockKey, actorEmail, LOCK_CACHE_TTL_SECONDS);
 
-      if (!lock.tryLock(15000)) {
+      if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
 
@@ -435,9 +435,9 @@ function toggleHighlight(targetUserId, rowIndex) {
     const lock = LockService.getScriptLock();
 
     try {
-      cache.put(lockKey, actorEmail, 15);
+      cache.put(lockKey, actorEmail, LOCK_CACHE_TTL_SECONDS);
 
-      if (!lock.tryLock(15000)) {
+      if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
 

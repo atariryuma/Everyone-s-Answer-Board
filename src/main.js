@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual */
 
 
 /**
@@ -467,7 +467,7 @@ function doPost(e) {
       if (!storedKey) {
         return jsonResponse(createErrorResponse('ADMIN_API_KEY is not configured. Use setupApiKey action first.', null, { error: 'API_KEY_NOT_CONFIGURED' }));
       }
-      if (!apiKey || apiKey !== storedKey) {
+      if (!apiKey || !timingSafeEqual(apiKey, storedKey)) {
         return jsonResponse(createErrorResponse('Invalid API key', null, { error: 'INVALID_API_KEY' }));
       }
       return jsonResponse(dispatchAdminOperation(request.operation, request.params || {}));
@@ -557,7 +557,7 @@ function doPost(e) {
     console.error('doPost error:', errorMessage);
     return jsonResponse({
       success: false,
-      message: errorMessage
+      message: 'リクエスト処理中にエラーが発生しました。再度お試しください。'
     });
   }
 }

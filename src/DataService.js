@@ -305,7 +305,8 @@ function getAdaptiveBatchSize(consecutiveErrors) {
  * @returns {Array} 処理済みデータ
  */
 function processBatchData(sheet, headers, lastRow, lastCol, config, options, user, startTime) {
-  const MAX_EXECUTION_TIME = 20000; // 20秒制限（高速化）
+  const MAX_EXECUTION_TIME = 20000;
+  const MAX_CONSECUTIVE_ERRORS = 3;
 
   let processedData = [];
   let processedCount = 0;
@@ -336,7 +337,7 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
       startRow += batchSize; // 次のバッチへ進む
 
     } catch (batchError) {
-      consecutiveErrors++; // ✅ エラーカウント増加（次回バッチサイズ縮小）
+      consecutiveErrors++;
 
       const errorMessage = batchError && batchError.message ? batchError.message : 'エラー詳細不明';
       console.error('DataService.processBatchData: バッチ処理エラー', {
@@ -353,7 +354,11 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
         Utilities.sleep(backoffMs);
       }
 
-      startRow += batchSize;
+      const isPermanent = errorMessage.includes('not found') || errorMessage.includes('out of range');
+      if (isPermanent || consecutiveErrors >= MAX_CONSECUTIVE_ERRORS) {
+        console.warn(`⚠️ バッチスキップ: 行${startRow}-${endRow}（${isPermanent ? '永続エラー' : consecutiveErrors + '回連続エラー'}）`);
+        startRow += batchSize;
+      }
     }
   }
 

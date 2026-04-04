@@ -52,7 +52,8 @@ function loadMainContext(overrides = {}) {
       if (operation === 'getUsers') return { success: true, users: [] };
       if (operation === 'getAppStatus') return { success: true, status: 'enabled' };
       return { success: false, message: `Unknown operation: ${operation}`, error: 'UNKNOWN_OPERATION' };
-    }
+    },
+    timingSafeEqual: (a, b) => typeof a === 'string' && typeof b === 'string' && a === b
   };
 
   Object.assign(context, overrides);

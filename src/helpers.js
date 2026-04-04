@@ -57,6 +57,22 @@ function getCachedProperty(key) {
 }
 
 /**
+ * タイミングセーフな文字列比較（タイミング攻撃防止）
+ * @param {string} a - 比較文字列1
+ * @param {string} b - 比較文字列2
+ * @returns {boolean} 一致するかどうか
+ */
+function timingSafeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  if (a.length !== b.length) return false;
+  let result = 0;
+  for (let i = 0; i < a.length; i++) {
+    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return result === 0;
+}
+
+/**
  * メモリキャッシュをクリア（テスト用・設定変更時用）
  * @param {string} key - クリアするキー（省略時は全クリア）
  */
