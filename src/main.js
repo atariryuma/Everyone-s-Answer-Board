@@ -16,11 +16,19 @@
 
 
 /**
+ * APIキー認証時にgetCurrentEmail()が管理者メールを返すためのコンテキスト
+ * GASはシングルスレッドのため、グローバル変数で安全に管理できる
+ */
+var _apiKeyAdminEmail = null;
+
+/**
  * 現在のユーザーのメールアドレスを取得
  * ✅ SECURITY: getActiveUser() のみ使用（getEffectiveUser() は権限昇格リスクあり）
+ * APIキー認証コンテキスト中はADMIN_EMAILをフォールバックとして返す
  * @returns {string|null} ユーザーのメールアドレス、または認証されていない場合はnull
  */
 function getCurrentEmail() {
+  if (_apiKeyAdminEmail) return _apiKeyAdminEmail;
   try {
     const email = Session.getActiveUser().getEmail();
     return email || null;
@@ -470,7 +478,12 @@ function doPost(e) {
       if (!apiKey || !timingSafeEqual(apiKey, storedKey)) {
         return jsonResponse(createErrorResponse('Invalid API key', null, { error: 'INVALID_API_KEY' }));
       }
-      return jsonResponse(dispatchAdminOperation(request.operation, request.params || {}));
+      _apiKeyAdminEmail = getCachedProperty('ADMIN_EMAIL');
+      try {
+        return jsonResponse(dispatchAdminOperation(request.operation, request.params || {}));
+      } finally {
+        _apiKeyAdminEmail = null;
+      }
     }
 
     const email = getCurrentEmail();
