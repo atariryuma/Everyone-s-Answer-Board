@@ -592,7 +592,7 @@ function applySortAndLimit(data, options = {}) {
 
 
 /**
- * 回答行を削除（管理モード専用）
+ * 回答行を削除（編集者権限必須）
  * @param {string} userId - ユーザーID
  * @param {number} rowIndex - 削除対象の行インデックス（1-based, ヘッダー含む）
  * @param {Object} options - オプション設定

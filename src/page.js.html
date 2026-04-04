@@ -2377,6 +2377,7 @@
       const highlightBtn = card.querySelector('.highlight-btn');
       if (highlightBtn) {
         highlightBtn.classList.toggle('active', isHighlighted);
+        highlightBtn.innerHTML = this.getIcon('star', '', isHighlighted);
       }
     }
 
@@ -2390,11 +2391,10 @@
         if (cachedCard) return cachedCard;
 
         const card = this.createCardElement(safeData);
-        const highlightBtnHtml = this.createHighlightButton(safeData);
         const { nameHtml, containerClass } = this.createNameDisplay(safeData);
         const reactionButtonsHtml = this.createReactionButtons(safeData);
 
-        this.buildCardContent(card, safeData, reactionButtonsHtml, nameHtml, highlightBtnHtml, containerClass);
+        this.buildCardContent(card, safeData, reactionButtonsHtml, nameHtml, containerClass);
         this.finalizeCard(card, safeData, cacheKey);
 
         return card;
@@ -2430,7 +2430,7 @@
     generateCardCacheKey(safeData) {
       const userIdentifier = window.UNIFIED_CONFIG?.email ?
         window.UNIFIED_CONFIG.email.replace(/[^a-zA-Z0-9]/g, '').slice(-8) : 'anon';
-      return `${userIdentifier}-${safeData.rowIndex}-${safeData.opinion.slice(0, 50)}-${safeData.reason.slice(0, 30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.showHighlightToggle}`;
+      return `${userIdentifier}-${safeData.rowIndex}-${safeData.opinion.slice(0, 50)}-${safeData.reason.slice(0, 30)}-${safeData.name}-${JSON.stringify(safeData.reactions)}-${safeData.highlight}-${this.state.showCounts}-${this.state.displayMode}-${this.state.isEditor}`;
     }
 
     checkCardCache(cacheKey, safeData) {
@@ -2465,11 +2465,23 @@
     }
 
     createHighlightButton(safeData) {
-      if (!this.state.showHighlightToggle) return '';
+      if (!this.state.isEditor) return '';
 
       const cls = safeData.highlight ? 'reacted' : '';
       const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-      return `<button type="button" class="highlight-btn like-btn text-purple-600 ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${safeData.highlight}" data-row-index="${safeData.rowIndex}">${this.getIcon('star', 'w-5 h-5', safeData.highlight)}</button>`;
+      return `<button type="button" class="highlight-btn like-btn text-yellow-400 ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${safeData.highlight}" data-row-index="${safeData.rowIndex}">${this.getIcon('star', 'w-5 h-5', safeData.highlight)}</button>`;
+    }
+
+    createHighlightToggle(safeData) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'highlight-badge highlight-btn';
+      btn.dataset.rowIndex = safeData.rowIndex;
+      btn.setAttribute('aria-label', safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする');
+      btn.setAttribute('aria-pressed', String(safeData.highlight));
+      btn.innerHTML = this.getIcon('star', '', safeData.highlight);
+      if (safeData.highlight) btn.classList.add('active');
+      return btn;
     }
 
     createHighlightBadge() {
@@ -2525,7 +2537,7 @@
       }).join('');
     }
 
-    buildCardContent(card, safeData, reactionButtonsHtml, nameHtml, highlightBtnHtml, containerClass) {
+    buildCardContent(card, safeData, reactionButtonsHtml, nameHtml, containerClass) {
       const fragment = document.createDocumentFragment();
 
       const contentDiv = document.createElement('div');
@@ -2570,7 +2582,7 @@
       reactionsDiv.className = 'reaction-container flex items-center gap-1 flex-shrink-0';
       reactionsDiv.setAttribute('role', 'group');
       reactionsDiv.setAttribute('aria-label', '回答への反応');
-      reactionsDiv.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+      reactionsDiv.innerHTML = reactionButtonsHtml;
       footerDiv.appendChild(reactionsDiv);
 
       fragment.appendChild(contentDiv);
@@ -2579,7 +2591,9 @@
     }
 
     finalizeCard(card, safeData, cacheKey) {
-      if (safeData.highlight) {
+      if (this.state.isEditor) {
+        card.appendChild(this.createHighlightToggle(safeData));
+      } else if (safeData.highlight) {
         card.appendChild(this.createHighlightBadge());
       }
 
@@ -3731,7 +3745,7 @@
         }
 
         window.showAdminFeatures = enable;
-        window.showHighlightToggle = enable; // 管理モードでのみ有効
+        window.showHighlightToggle = enable;
 
         if (enable) {
           window.showCounts = true;
@@ -4117,20 +4131,19 @@
           const highlightBtn = card.querySelector('.highlight-btn');
           if (highlightBtn) {
             highlightBtn.classList.toggle('reacted', item.highlight);
+            highlightBtn.classList.toggle('active', item.highlight);
             highlightBtn.setAttribute('aria-pressed', String(item.highlight));
             const label = item.highlight ? 'ハイライトを解除する' : 'ハイライトする';
             highlightBtn.setAttribute('aria-label', label);
-            const svgEl = highlightBtn.querySelector('svg');
-            if (svgEl) {
-              const newIcon = this.getIcon('star', 'w-5 h-5', item.highlight);
-              svgEl.outerHTML = newIcon;
-            }
+            highlightBtn.innerHTML = this.getIcon('star', '', item.highlight);
           }
-          let badge = card.querySelector('.highlight-badge');
-          if (item.highlight && !badge) {
-            card.appendChild(this.createHighlightBadge());
-          } else if (!item.highlight && badge) {
-            badge.remove();
+          if (!this.state.isEditor) {
+            let badge = card.querySelector('.highlight-badge');
+            if (item.highlight && !badge) {
+              card.appendChild(this.createHighlightBadge());
+            } else if (!item.highlight && badge) {
+              badge.remove();
+            }
           }
         }
       });
@@ -4182,14 +4195,7 @@
         return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
       }).join('');
 
-      let highlightBtnHtml = '';
-      if (this.state.showHighlightToggle) {
-        const cls = data.highlight ? 'reacted' : '';
-        const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-        highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
-      }
-
-      this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+      this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
 
       this.applyReactionStyles(this.elements.answerModalCard, data);
 
@@ -4210,14 +4216,7 @@
         return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
       }).join('');
 
-      let highlightBtnHtml = '';
-      if (this.state.showHighlightToggle) {
-        const cls = data.highlight ? 'reacted' : '';
-        const highlightAriaLabel = data.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-        highlightBtnHtml = '<button type="button" class="highlight-btn like-btn text-purple-600 ' + cls + '" aria-label="' + highlightAriaLabel + '" aria-pressed="' + data.highlight + '" data-row-index="' + data.rowIndex + '">' + this.getIcon('star', 'w-5 h-5', data.highlight) + '</button>';
-      }
-
-      this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + highlightBtnHtml;
+      this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
 
       this.applyReactionStyles(this.elements.answerModalCard, data);
     }
