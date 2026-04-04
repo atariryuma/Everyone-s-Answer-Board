@@ -162,17 +162,17 @@ function doGet(e) {
 
       case 'admin': {
         if (!currentEmail) {
-          return createRedirectTemplate('ErrorBoundary.html', 'ユーザー認証が必要です');
+          return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。トップページに戻ってログインしてください。');
         }
 
         const targetUserId = params.userId;
         if (!targetUserId) {
-          return createRedirectTemplate('ErrorBoundary.html', 'ユーザーIDが指定されていません');
+          return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。ログインページからやり直してください。');
         }
 
         const adminData = getBatchedAdminData(targetUserId);
         if (!adminData.success) {
-          return createRedirectTemplate('ErrorBoundary.html', adminData.error || '管理者権限が必要です');
+          return createRedirectTemplate('ErrorBoundary.html', adminData.error || 'このページへのアクセス権限がありません。');
         }
 
         const { email, user, config } = adminData;
@@ -231,7 +231,7 @@ function doGet(e) {
 
       case 'appSetup': {
         if (!currentEmail || !isAdministrator(currentEmail)) {
-          return createRedirectTemplate('ErrorBoundary.html', '管理者権限が必要です');
+          return createRedirectTemplate('ErrorBoundary.html', 'このページへのアクセス権限がありません。');
         }
 
         const userIdParam = params.userId;
@@ -245,17 +245,17 @@ function doGet(e) {
 
       case 'view': {
         if (!currentEmail) {
-          return createRedirectTemplate('ErrorBoundary.html', 'ユーザー認証が必要です');
+          return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。トップページに戻ってログインしてください。');
         }
 
         const targetUserId = params.userId;
         if (!targetUserId) {
-          return createRedirectTemplate('ErrorBoundary.html', 'ユーザーIDが指定されていません');
+          return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。ログインページからやり直してください。');
         }
 
         const viewerData = getBatchedViewerData(targetUserId, currentEmail);
         if (!viewerData.success) {
-          return createRedirectTemplate('ErrorBoundary.html', viewerData.error || '対象ユーザーが見つかりません');
+          return createRedirectTemplate('ErrorBoundary.html', viewerData.error || '対象のボードが見つかりません。URLを確認してください。');
         }
 
         const { targetUser, config, isAdminUser } = viewerData;
