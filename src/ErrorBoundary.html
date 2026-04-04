@@ -37,13 +37,16 @@
       </p>
 
       <div class="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
-        <button type="button" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors" onclick="safeReload()">
+        <button type="button" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="safeReload()">
           再読み込み
         </button>
-        <button type="button" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium transition-colors" onclick="goToTop()">
+        <button type="button" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="goToTop()">
           トップページに戻る
         </button>
       </div>
+      <? if (!webAppUrl) { ?>
+      <p class="text-xs text-yellow-400">URLの取得に失敗しました。ブラウザの戻るボタンまたはリロードをお試しください。</p>
+      <? } ?>
 
       <p class="text-xs text-gray-500 pt-4"><?= new Date().toLocaleString('ja-JP') ?></p>
     </div>
