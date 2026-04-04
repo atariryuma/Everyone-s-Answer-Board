@@ -39,8 +39,7 @@ function getCurrentUserInfo() {
       return null;
     }
 
-    // ✅ SECURITY FIX: ユーザー固有のキャッシュキー（共有キャッシュの個人情報流出防止）
-    const cacheKey = `current_user_info_${email}`;
+    const cacheKey = getUserInfoCacheKey(email);
 
     const cache = CacheService.getScriptCache();
     const cached = cache.get(cacheKey);
@@ -105,6 +104,15 @@ function enrichUserInfo(userInfo) {
     console.error('UserService.enrichUserInfo: エラー', error.message);
     return userInfo; // フォールバック
   }
+}
+
+/**
+ * ユーザー情報キャッシュキーを生成
+ * @param {string} email
+ * @returns {string}
+ */
+function getUserInfoCacheKey(email) {
+  return `current_user_info_${email}`;
 }
 
 /**
@@ -278,7 +286,7 @@ function resetAuth() {
     const userSpecificKeysCleared = [];
     if (currentEmail) {
       const emailBasedKeys = [
-        `current_user_info_${currentEmail}`,  // ✅ SECURITY FIX: ユーザー固有キー追加
+        getUserInfoCacheKey(currentEmail),
         `board_data_${currentEmail}`,
         `user_data_${currentEmail}`,
         `admin_panel_${currentEmail}`

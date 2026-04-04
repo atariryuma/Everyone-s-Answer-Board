@@ -375,7 +375,7 @@
       google.script.run
         .withSuccessHandler((adminData) => {
           if (adminData.success) {
-            const isPublished = Boolean(adminData.config?.isPublished || adminData.config?.isActive);
+            const isPublished = Boolean(adminData.config?.isPublished);
             const userInfo = {
               email: adminData.user?.userEmail || '',
               userId: adminData.user?.userId || null,
@@ -384,7 +384,6 @@
             };
             const boardInfo = {
               isPublished: isPublished,
-              isActive: isPublished,
               questionText: adminData.questionText || '回答ボード',
               userEmail: adminData.user?.userEmail || '',
               spreadsheetId: adminData.config?.spreadsheetId || '',
@@ -4061,7 +4060,7 @@
     const unpublishBtn = document.getElementById('unpublishBoardBtn');
     const statusText = document.getElementById('boardStatus');
 
-    const isPublished = Boolean(boardInfo?.isPublished || boardInfo?.isActive);
+    const isPublished = Boolean(boardInfo?.isPublished);
 
     if (!isPublished) {
       footer.classList.add('hidden');
@@ -4072,7 +4071,7 @@
 
     questionText.textContent = boardInfo.questionText || 'エラーが発生しました';
 
-    if (boardInfo.isActive && boardInfo.urls) {
+    if (isPublished && boardInfo.urls) {
       openBtn.style.display = 'block';
       copyBtn.style.display = 'block';
       if (unpublishBtn) unpublishBtn.style.display = 'block';

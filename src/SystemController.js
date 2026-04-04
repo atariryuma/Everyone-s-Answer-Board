@@ -1848,10 +1848,10 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
 
 /**
  * Set application status (publish/unpublish board)
- * @param {boolean} isActive - Whether to activate/publish the board
+ * @param {boolean} isPublished - Whether to publish the board
  * @returns {Object} Status update result
  */
-function setAppStatus(isActive) {
+function setAppStatus(isPublished) {
   try {
     const email = getCurrentEmail();
     if (!email) {
@@ -1866,8 +1866,8 @@ function setAppStatus(isActive) {
     const configResult = getUserConfig(user.userId);
     const config = configResult.success ? configResult.config : {};
 
-    config.isPublished = Boolean(isActive);
-    if (isActive) {
+    config.isPublished = Boolean(isPublished);
+    if (isPublished) {
       if (!config.publishedAt) {
         config.publishedAt = new Date().toISOString();
       }
@@ -1881,8 +1881,8 @@ function setAppStatus(isActive) {
 
     return {
       success: true,
-      isActive: Boolean(isActive),
-      status: isActive ? 'active' : 'inactive',
+      isPublished: Boolean(isPublished),
+      status: isPublished ? 'published' : 'unpublished',
       updatedBy: email,
       userId: user.userId,
       timestamp: new Date().toISOString()

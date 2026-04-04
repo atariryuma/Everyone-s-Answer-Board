@@ -19,7 +19,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, createUser, updateUser, getGoogleIdFromToken, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, shouldEnforceDomainRestrictions, validateDomainAccess */
+/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, createUser, updateUser, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, CacheService, shouldEnforceDomainRestrictions, validateDomainAccess */
 
 /**
  * ドメインアクセス検証（必要時のみ）
@@ -182,6 +182,11 @@ function processLoginAction() {
         const result = updateUser(user.userId, { userEmail: email }, { skipAccessCheck: true });
         if (result?.success) {
           user.userEmail = email;
+          try {
+            CacheService.getScriptCache().remove(getUserInfoCacheKey(oldEmail));
+          } catch (e) {
+            console.warn('processLoginAction: Failed to clear old email cache:', e.message);
+          }
           // 管理者メールも自動更新
           const adminEmail = getCachedProperty('ADMIN_EMAIL');
           if (adminEmail && adminEmail.toLowerCase() === oldEmail.toLowerCase()) {

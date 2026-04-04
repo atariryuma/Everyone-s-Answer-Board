@@ -350,7 +350,6 @@ function getBoardInfo() {
 
     return {
       success: true,
-      isActive: isPublished,
       isPublished,
       questionText: getQuestionText(config, { targetUserEmail: user.userEmail }),
       urls: {
