@@ -715,85 +715,49 @@
 
 
 
+  // ページ読み込み時にベースURLをプリフェッチ（logout/reload用）
+  var _cachedWebAppUrl = '';
+  try {
+    google.script.run
+      .withSuccessHandler(function(url) { if (url) _cachedWebAppUrl = url; })
+      .withFailureHandler(function() {})
+      .getWebAppUrl();
+  } catch (_) {}
+
   window.sharedUtilities.auth = {
     switchToAnotherAccount: function () {
-      if (
-        confirm(
-          '別のGoogleアカウントでログインしますか？現在のセッションからログアウトされ、アカウント選択画面が表示されます。'
-        )
-      ) {
-        try {
-          google.script.run
-            .withSuccessHandler(function (result) {
-              if (result && result.success) {
-                const url = new URL(window.location.href);
-                url.searchParams.set('force_account_selection', 'true');
-                window.open(url.toString(), '_top');
-              } else {
-                window.sharedUtilities.auth.showAccountSwitchFallback();
-              }
-            })
-            .withFailureHandler(function (error) {
-              console.warn('認証リセットエラー:', error);
-              window.sharedUtilities.auth.showAccountSwitchFallback();
-            })
-            .resetAuth();
-        } catch (error) {
-          console.warn('アカウント切り替えエラー:', error);
-          window.sharedUtilities.auth.showAccountSwitchFallback();
-        }
-      }
-    },
-
-    showAccountSwitchFallback: function () {
-      const msg = `
-          アカウントを切り替えるには以下の手順をお試しください：
-
-          1. 新しいブラウザタブでGoogle（google.com）にアクセス
-          2. 右上のプロフィール画像をクリック
-          3. 「別のアカウントを追加」または使用したいアカウントを選択
-          4. このページに戻って再度認証を開始
-
-          または、ブラウザのシークレット/プライベートモードで新しいタブを開いてこのページにアクセスしてください。
-        `;
-      alert(msg);
+      // Googleアカウント選択画面に直接遷移（ユーザーのクリックイベント内で実行）
+      const continueUrl = _cachedWebAppUrl
+        ? _cachedWebAppUrl + '?mode=login'
+        : window.location.href;
+      window.open(
+        'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(continueUrl),
+        '_top'
+      );
     },
 
     logout: function () {
-      if (confirm('ログアウトしますか？')) {
+      if (!confirm('ログアウトしますか？')) return;
 
-        try {
-          if (window.sharedUtilities?.cache?.clear) {
-            window.sharedUtilities.cache.clear();
-          }
-          localStorage.removeItem('current_user_info');
-          sessionStorage.clear();
-        } catch (e) {
-          console.warn('Cache clear partially failed:', e);
-        }
+      try {
+        if (window.sharedUtilities?.cache?.clear) window.sharedUtilities.cache.clear();
+        localStorage.removeItem('current_user_info');
+        sessionStorage.clear();
+      } catch (e) {
+        console.warn('Cache clear partially failed:', e);
+      }
 
+      // ユーザーのクリックイベント内なので window.open が確実に動く
+      const loginUrl = _cachedWebAppUrl
+        ? _cachedWebAppUrl + '?mode=login&logout=true'
+        : '';
+      if (loginUrl) {
+        window.open(loginUrl, '_top');
+      } else {
+        // フォールバック: URLが取得できていない場合
         google.script.run
-          .withSuccessHandler(function (webAppUrl) {
-            const loginUrl = `${webAppUrl}?mode=login`;
-
-            window.open(loginUrl, '_top');
-
-            const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-            createPromiseDelay(100).then(() => {
-              google.script.run
-                .withSuccessHandler(function (result) {
-                })
-                .withFailureHandler(function (error) {
-                  console.warn('⚠️ Background session clear failed (non-critical):', error);
-                })
-                .resetAuth();
-            }).catch(() => {
-            });
-          })
-          .withFailureHandler(function () {
-            alert('ログアウトに失敗しました。ブラウザのタブを閉じて、再度アクセスしてください。');
-          })
+          .withSuccessHandler(function(url) { window.open(url + '?mode=login&logout=true', '_top'); })
+          .withFailureHandler(function() { alert('ログアウトに失敗しました。ブラウザのタブを閉じて再度アクセスしてください。'); })
           .getWebAppUrl();
       }
     },
@@ -897,32 +861,36 @@
 
   window.sharedUtilities.page = {
     safeReload: function (options = {}) {
-
       try {
-        if (window.sharedUtilities?.cache?.clear) {
-          window.sharedUtilities.cache.clear();
-        }
+        if (window.sharedUtilities?.cache?.clear) window.sharedUtilities.cache.clear();
         localStorage.removeItem('current_user_info');
         sessionStorage.clear();
       } catch (e) {
         console.warn('Cache clear partially failed during reload:', e);
       }
 
+      // プリフェッチ済みURLがあれば即座にリロード（ユーザーのクリックイベント内）
+      if (_cachedWebAppUrl) {
+        let targetUrl = _cachedWebAppUrl;
+        if (options.keepParams) {
+          const currentParams = new URLSearchParams(window.location.search);
+          const params = new URLSearchParams();
+          options.keepParams.forEach(function(param) {
+            if (currentParams.has(param)) params.set(param, currentParams.get(param));
+          });
+          const qs = params.toString();
+          if (qs) targetUrl += '?' + qs;
+        }
+        window.open(targetUrl, '_top');
+        return;
+      }
+
+      // フォールバック: URLが未取得の場合
       try {
         google.script.run
           .withSuccessHandler(function(baseUrl) {
             if (!baseUrl) { alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。'); return; }
-            let targetUrl = baseUrl;
-            if (options.keepParams) {
-              const currentParams = new URLSearchParams(window.location.search);
-              const params = new URLSearchParams();
-              options.keepParams.forEach(function(param) {
-                if (currentParams.has(param)) params.set(param, currentParams.get(param));
-              });
-              const qs = params.toString();
-              if (qs) targetUrl += '?' + qs;
-            }
-            window.open(targetUrl, '_top');
+            window.open(baseUrl, '_top');
           })
           .withFailureHandler(function() {
             alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。');

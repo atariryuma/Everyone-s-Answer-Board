@@ -70,7 +70,7 @@
       </button>
 
       <!-- 管理パネル遷移ボタン -->
-      <a id="admin-panel-btn" href="#" target="_top"
+      <a id="admin-panel-btn" href="?mode=admin&userId=<?= typeof userId !== 'undefined' ? userId : '' ?>" target="_top"
         class="block w-full mt-3 px-6 py-3 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium text-base transition-all shadow-md focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800 text-center">
         <span role="img" aria-label="設定">⚙️</span> 管理パネルを開く
       </a>
@@ -91,7 +91,7 @@
       <? } ?>
 
       <div class="mt-6">
-        <a id="refresh-btn" href="#" target="_top"
+        <a id="refresh-btn" href="?mode=view&userId=<?= typeof userId !== 'undefined' ? userId : '' ?>" target="_top"
           class="inline-block px-6 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg font-semibold text-center">
           更新
         </a>

@@ -481,24 +481,9 @@
 
 
       function goBackToAdminPanel() {
-        if (window.notifications) {
-          window.notifications.info('← 管理パネルに戻っています...', 2000);
-        }
-
-        google.script.run
-          .withSuccessHandler((webAppUrl) => {
-            const targetUrl = webAppUrl + '?mode=admin&userId=' + __USER_ID__;             // サンドボックス環境では window.top への直接アクセスが制限されるため
-            window.open(targetUrl, '_top');
-          })
-          .withFailureHandler((error) => {
-            console.error('WebApp URL取得エラー:', error);
-            if (window.notifications) {
-              window.notifications.error('管理パネルに戻れませんでした。', 3000);
-            }
-            const currentUrl = window.location.href.split('?')[0];
-            const targetUrl = currentUrl + '?mode=admin&userId=' + __USER_ID__;             window.open(targetUrl, '_top');
-          })
-          .getWebAppUrl();
+        // プリフェッチ済みURLがあれば即遷移（ユーザーのクリックイベント内）
+        const baseUrl = _cachedWebAppUrl || window.location.href.split('?')[0];
+        window.open(baseUrl + '?mode=admin&userId=' + __USER_ID__, '_top');
       }
 
 

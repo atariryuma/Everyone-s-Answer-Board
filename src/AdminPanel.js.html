@@ -879,19 +879,22 @@
       window.notifications.info('📚 使い方ガイドを開いています...', 2000);
     }
 
-    google.script.run
-      .withSuccessHandler(function (webAppUrl) {
-        if (webAppUrl) {
-          window.open(webAppUrl + '?mode=manual', '_blank');
-        }
-      })
-      .withFailureHandler(function (error) {
-        console.error('使い方ガイドエラー:', error);
-        if (window.notifications) {
-          window.notifications.error('使い方ガイドを開けませんでした。', 3000);
-        }
-      })
-      .getWebAppUrl();
+    // プリフェッチ済みURLがあれば即座に開く（ユーザーのクリックイベント内）
+    const manualUrl = _cachedWebAppUrl
+      ? _cachedWebAppUrl + '?mode=manual'
+      : null;
+    if (manualUrl) {
+      window.open(manualUrl, '_blank');
+    } else {
+      google.script.run
+        .withSuccessHandler(function (webAppUrl) {
+          if (webAppUrl) window.open(webAppUrl + '?mode=manual', '_blank');
+        })
+        .withFailureHandler(function () {
+          if (window.notifications) window.notifications.error('使い方ガイドを開けませんでした。', 3000);
+        })
+        .getWebAppUrl();
+    }
   }
 
   function updateResourceButtons(config) {
@@ -4152,15 +4155,19 @@
 
 
   function openAnswerBoard() {
+    // ユーザーのクリックイベント内でウィンドウを先に開く（ブロック防止）
+    const newWindow = window.open('about:blank', '_blank');
     google.script.run
       .withSuccessHandler(function (result) {
-        if (result && result.appUrl) {
-          window.open(result.appUrl, '_blank');
+        if (result && result.appUrl && newWindow) {
+          newWindow.location.href = result.appUrl;
         } else {
+          if (newWindow) newWindow.close();
           showError('回答ボードのURLが取得できませんでした');
         }
       })
       .withFailureHandler(function (error) {
+        if (newWindow) newWindow.close();
         showError('回答ボードを開けませんでした: ' + error.message);
       })
       .getBoardInfo();

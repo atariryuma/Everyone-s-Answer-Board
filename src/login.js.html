@@ -344,90 +344,12 @@
   }
 
     window.switchAccount = function() {
-    const userEmailDisplay = document.getElementById('user-email-display');
-    const switchBtn = document.getElementById('switch-account-btn');
-
-    if (confirm('別のアカウントでログインしますか？\n\nポップアップウィンドウが開きます。\nポップアップブロッカーが有効な場合は、一時的に無効にしてください。')) {
-      if (switchBtn) {
-        switchBtn.disabled = true;
-        switchBtn.textContent = 'アカウント切り替え中...';
-      }
-      if (userEmailDisplay) {
-        userEmailDisplay.textContent = '🔄 別のアカウントでログインしています...';
-        userEmailDisplay.classList.remove('text-red-400', 'text-green-400');
-        userEmailDisplay.classList.add('text-yellow-400');
-      }
-
-
-      try {
-        const logoutWindow = window.open(
-          'https://mail.google.com/mail/?logout&hl=ja',
-          'GoogleAccountSwitch',
-          'width=500,height=400,menubar=no,status=no,location=no,toolbar=no,scrollbars=no,top=200,left=200'
-        );
-
-        if (!logoutWindow) {
-          throw new Error('ポップアップがブロックされました');
-        }
-
-        function redirectAfterSwitch() {
-          if (userEmailDisplay) {
-            userEmailDisplay.textContent = '✅ アカウント切り替え完了！ページを更新します...';
-            userEmailDisplay.classList.remove('text-yellow-400');
-            userEmailDisplay.classList.add('text-green-400');
-          }
-          if (cachedLoginUrl) {
-            setTimeout(() => window.open(cachedLoginUrl, '_top'), 500);
-          } else {
-            google.script.run
-              .withSuccessHandler(function(url) { window.open(url + '?mode=login', '_top'); })
-              .withFailureHandler(function() { alert('ページの更新に失敗しました。ブラウザのリロードボタンを押してください。'); })
-              .getWebAppUrl();
-          }
-        }
-
-        let timeoutId = setTimeout(() => {
-          if (logoutWindow && !logoutWindow.closed) logoutWindow.close();
-          redirectAfterSwitch();
-        }, 3500);
-
-        const checkClosed = setInterval(() => {
-          if (logoutWindow.closed) {
-            clearInterval(checkClosed);
-            clearTimeout(timeoutId);
-            redirectAfterSwitch();
-          }
-        }, 500);
-
-      } catch (error) {
-        console.error('❌ Popup failed:', error);
-
-        if (userEmailDisplay) {
-          userEmailDisplay.textContent = '❌ ポップアップが開けませんでした。手動での切り替えが必要です。';
-          userEmailDisplay.classList.remove('text-yellow-400');
-          userEmailDisplay.classList.add('text-red-400');
-        }
-
-        if (switchBtn) {
-          switchBtn.disabled = false;
-          switchBtn.textContent = '別のアカウントでログイン';
-        }
-
-        setTimeout(() => {
-          if (window.notifications) {
-            window.notifications.warning(
-              'ポップアップブロッカーによりアカウント切り替えができませんでした。\n\n手動での切り替え手順：\n1. 新しいタブでGmailを開く\n2. 右上のアカウントアイコンをクリック\n3. 「別のアカウントを追加」または「ログアウト」を選択\n4. このページを更新してください',
-              10000
-            );
-          } else {
-            alert(
-              'ポップアップブロッカーによりアカウント切り替えができませんでした。\n\n手動での切り替え手順：\n1. 新しいタブでGmailを開く\n2. 右上のアカウントアイコンをクリック\n3. 「別のアカウントを追加」または「ログアウト」を選択\n4. このページを更新してください'
-            );
-          }
-        }, 1000);
-      }
-    }
-  }; // switchAccount function end
+      const url = cachedLoginUrl || window.location.href;
+      window.open(
+        'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(url),
+        '_top'
+      );
+    };
 
 
 
