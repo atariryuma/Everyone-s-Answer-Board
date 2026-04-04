@@ -234,11 +234,14 @@ function doGet(e) {
           return createRedirectTemplate('ErrorBoundary.html', 'このページへのアクセス権限がありません。');
         }
 
-        const userIdParam = params.userId;
+        let userIdParam = params.userId || '';
+        if (!userIdParam) {
+          const adminUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
+          if (adminUser) userIdParam = adminUser.userId;
+        }
 
         const template = HtmlService.createTemplateFromFile('AppSetupPage.html');
-
-        template.userIdParam = userIdParam || '';
+        template.userIdParam = userIdParam;
 
         return template.evaluate().setTitle('システム設定');
       }
