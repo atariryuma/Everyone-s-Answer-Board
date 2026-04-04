@@ -18,7 +18,7 @@
  * - ReactionService.gs（リアクション・ハイライト）
  */
 
-/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty */
+/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty */
 
 
 /**
@@ -50,8 +50,7 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
     if (preloadedConfig) {
       config = preloadedConfig;
     } else {
-      const configResult = getUserConfig(userId);
-      config = configResult.success ? configResult.config : {};
+      config = getConfigOrDefault(userId);
     }
 
     if (!config.spreadsheetId) {
@@ -112,10 +111,10 @@ function extractTimestampValue(row, headers) {
     if (headers.length > 0 && row.length > 0) {
       const [firstHeader] = headers;
       if (firstHeader && typeof firstHeader === 'string') {
-        const normalizedHeader = firstHeader.toLowerCase().trim();
-        if (normalizedHeader.includes('タイムスタンプ') ||
-            normalizedHeader.includes('timestamp') ||
-            normalizedHeader.includes('日時')) {
+        const normalizedFirst = normalizeHeader(firstHeader);
+        if (normalizedFirst.includes('タイムスタンプ') ||
+            normalizedFirst.includes('timestamp') ||
+            normalizedFirst.includes('日時')) {
           return row[0] || '';
         }
       }
@@ -124,11 +123,11 @@ function extractTimestampValue(row, headers) {
     for (let i = 0; i < headers.length; i++) {
       const header = headers[i];
       if (header && typeof header === 'string') {
-        const normalizedHeader = header.toLowerCase().trim();
-        if (normalizedHeader.includes('タイムスタンプ') ||
-            normalizedHeader.includes('timestamp') ||
-            normalizedHeader.includes('日時') ||
-            normalizedHeader.includes('日付')) {
+        const normalized = normalizeHeader(header);
+        if (normalized.includes('タイムスタンプ') ||
+            normalized.includes('timestamp') ||
+            normalized.includes('日時') ||
+            normalized.includes('日付')) {
           return row[i] || '';
         }
       }

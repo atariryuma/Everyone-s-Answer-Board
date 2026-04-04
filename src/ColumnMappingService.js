@@ -8,6 +8,8 @@
  * - Zero-dependency GAS-native implementation
  */
 
+/* global normalizeHeader */
+
 /**
  * Main column detection engine - optimized for precision and efficiency
  * @param {Array} headers - Header array
@@ -117,7 +119,7 @@ function analyzeFieldRelationships(headers) {
   headers.forEach((header, index) => {
     if (!header || typeof header !== 'string') return;
 
-    const normalizedHeader = header.toLowerCase().trim();
+    const normalizedHeader = normalizeHeader(header);
 
     const answerScore = calculateBaseScore(header, 'answer', patterns.answer);
     if (answerScore > 60) {
@@ -150,7 +152,7 @@ function analyzeFieldRelationships(headers) {
  * Calculate base score without positional logic (for relationship analysis)
  */
 function calculateBaseScore(header, fieldType, patterns) {
-  const normalizedHeader = header.toLowerCase().trim();
+  const normalizedHeader = normalizeHeader(header);
   let maxScore = 0;
 
   if (patterns.exact && patterns.exact.some(keyword => normalizedHeader === keyword.toLowerCase())) {
@@ -186,7 +188,7 @@ function calculateBaseScore(header, fieldType, patterns) {
  * Calculate header score with logical field ordering constraints
  */
 function calculateScoreWithLogic(header, fieldType, patterns, index, relationships, options = {}) {
-  const normalizedHeader = header.toLowerCase().trim();
+  const normalizedHeader = normalizeHeader(header);
   const baseScore = calculateBaseScore(header, fieldType, patterns);
 
   let logicalBonus = 0;

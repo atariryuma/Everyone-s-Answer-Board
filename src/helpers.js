@@ -13,7 +13,7 @@
  * - 簡素なユーティリティ関数群
  */
 
-/* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, PROPERTY_CACHE_TTL */
+/* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig */
 
 
 const RUNTIME_PROPERTIES_CACHE = {};
@@ -211,4 +211,47 @@ function createAdminRequiredError() {
 function createExceptionResponse(error) {
   return createErrorResponse(error.message || 'Unknown error');
 }
+
+/**
+ * 認証チェック: メール取得 + 管理者判定を一括実行
+ * @returns {{email: string, isAdmin: boolean}|null} 認証情報、未認証時はnull
+ */
+function requireAuth() {
+  const email = getCurrentEmail();
+  if (!email) return null;
+  return { email, isAdmin: isAdministrator(email) };
+}
+
+/**
+ * 管理者チェック: 未認証またはadminでなければnull
+ * @returns {{email: string}|null} 管理者メール、権限不足時はnull
+ */
+function requireAdmin() {
+  const auth = requireAuth();
+  if (!auth || !auth.isAdmin) return null;
+  return auth;
+}
+
+/**
+ * getUserConfig結果からconfigを安全に取得
+ * @param {string} userId - ユーザーID
+ * @param {Object} user - ユーザーオブジェクト（省略可）
+ * @returns {Object} config（失敗時は空オブジェクト）
+ */
+function getConfigOrDefault(userId, user) {
+  const result = getUserConfig(userId, user);
+  return result.success ? result.config : {};
+}
+
+/**
+ * ヘッダー文字列の正規化
+ * @param {*} header - ヘッダー値
+ * @returns {string} 正規化された文字列
+ */
+function normalizeHeader(header) {
+  return String(header || '').toLowerCase().trim();
+}
+
+/** デフォルト表示設定 */
+const DEFAULT_DISPLAY_SETTINGS = { showNames: false, showReactions: false, theme: 'default', pageSize: 20 };
 

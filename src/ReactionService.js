@@ -9,7 +9,7 @@
  * - 同一ドメイン共有設定によるアクセス管理
  */
 
-/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
+/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
 
 const LOCK_TIMEOUT_MS = 10000;
 const LOCK_CACHE_TTL_SECONDS = 10;
@@ -306,8 +306,7 @@ function addReaction(targetUserId, rowIndex, reactionType) {
       return createErrorResponse('Target user not found');
     }
 
-    const configResult = getUserConfig(targetUserId, targetUser);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(targetUserId, targetUser);
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Board configuration incomplete');
     }
@@ -407,8 +406,7 @@ function toggleHighlight(targetUserId, rowIndex) {
       return createErrorResponse('Target user not found');
     }
 
-    const configResult = getUserConfig(targetUserId, targetUser);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(targetUserId, targetUser);
     if (!config.spreadsheetId || !config.sheetName) {
       return createErrorResponse('Board configuration incomplete');
     }

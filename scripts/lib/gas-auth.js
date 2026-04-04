@@ -7,7 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 
-function getClaspCredentials() {
+function getClaspCredentials(tokenName) {
   const paths = [
     path.join(process.cwd(), '.clasprc.json'),
     path.join(os.homedir(), '.clasprc.json')
@@ -15,15 +15,24 @@ function getClaspCredentials() {
   for (const p of paths) {
     if (fs.existsSync(p)) {
       const data = JSON.parse(fs.readFileSync(p, 'utf8'));
-      const creds = data.tokens?.default || data.tokens?.organization;
+      let creds;
+      if (tokenName) {
+        creds = data.tokens?.[tokenName];
+        if (!creds) {
+          const available = Object.keys(data.tokens || {}).join(', ');
+          throw new Error(`Token "${tokenName}" not found in .clasprc.json. Available: ${available}`);
+        }
+      } else {
+        creds = data.tokens?.default || data.tokens?.organization;
+      }
       if (creds?.refresh_token) return creds;
     }
   }
   throw new Error('No clasp credentials found. Run: npx clasp login');
 }
 
-function getAccessToken() {
-  const creds = getClaspCredentials();
+function getAccessToken(tokenName) {
+  const creds = getClaspCredentials(tokenName);
   const params = new URLSearchParams({
     client_id: creds.client_id,
     client_secret: creds.client_secret,
@@ -124,12 +133,22 @@ function postJSONSync(url, body, token) {
   }
 }
 
-function getConfig() {
-  const configPath = path.join(__dirname, '..', 'config.json');
+function getConfig(env) {
+  const filename = env ? `config.${env}.json` : 'config.json';
+  const configPath = path.join(__dirname, '..', filename);
   if (!fs.existsSync(configPath)) {
-    throw new Error('scripts/config.json not found. Copy from config.json.template and fill in values.');
+    throw new Error(`scripts/${filename} not found. Copy from template and fill in values.`);
   }
   return JSON.parse(fs.readFileSync(configPath, 'utf8'));
 }
 
-module.exports = { getAccessToken, postJSON, postJSONSync, getConfig };
+function parseEnvFromArgs(args) {
+  const idx = args.indexOf('--env');
+  if (idx === -1) return { env: null, remainingArgs: args };
+  const env = args[idx + 1];
+  if (!env) throw new Error('--env requires a value (e.g. --env open)');
+  const remainingArgs = [...args.slice(0, idx), ...args.slice(idx + 2)];
+  return { env, remainingArgs };
+}
+
+module.exports = { getAccessToken, postJSON, postJSONSync, getConfig, parseEnvFromArgs };

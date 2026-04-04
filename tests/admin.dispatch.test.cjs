@@ -21,6 +21,8 @@ function loadAdminContext(overrides = {}) {
     updateUser: () => ({ success: true }),
     getUserConfig: () => ({ success: true, config: {} }),
     saveUserConfig: () => ({ success: true }),
+    requireAdmin: () => ({ email: 'admin@example.com', isAdmin: true }),
+    getConfigOrDefault: () => ({}),
     getBatchedAdminAuth: () => ({ success: true, email: 'admin@example.com', isAdmin: true }),
     // SystemController functions (called by dispatch)
     testSystemDiagnosis: () => ({ success: true, message: 'diagnosis ok' }),

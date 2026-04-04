@@ -9,7 +9,7 @@
  *   npm run api -- perfMetrics --category api
  *   npm run api -- listProperties
  */
-const { getAccessToken, postJSONSync, getConfig } = require('./lib/gas-auth');
+const { getAccessToken, postJSONSync, getConfig, parseEnvFromArgs } = require('./lib/gas-auth');
 
 const OPERATIONS = [
   'getUsers', 'toggleUserActive', 'toggleUserBoard',
@@ -32,19 +32,19 @@ function parseArgs(args) {
   return { operation, params };
 }
 
-const args = process.argv.slice(2);
-if (!args[0] || args[0] === '--help') {
-  console.log('Usage: npm run api -- <operation> [--param value ...]');
+const { env, remainingArgs } = parseEnvFromArgs(process.argv.slice(2));
+if (!remainingArgs[0] || remainingArgs[0] === '--help') {
+  console.log('Usage: npm run api -- <operation> [--env <env>] [--param value ...]');
   console.log('\nOperations:');
   OPERATIONS.forEach(op => console.log(`  ${op}`));
   process.exit(0);
 }
 
-const { operation, params } = parseArgs(args);
+const { operation, params } = parseArgs(remainingArgs);
 
 try {
-  const config = getConfig();
-  const token = getAccessToken();
+  const config = getConfig(env);
+  const token = getAccessToken(config.tokenName);
   const payload = { action: 'adminApi', apiKey: config.apiKey, operation, params };
   const json = postJSONSync(config.prodUrl, payload, token);
   console.log(JSON.stringify(json, null, 2));

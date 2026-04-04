@@ -22,6 +22,7 @@ function loadSystemControllerContext(overrides = {}) {
         formTitle: 'Current Form'
       }
     }),
+    DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: false, theme: 'default', pageSize: 20 },
     saveUserConfig: () => ({ success: true, etag: 'etag-2', config: {} }),
     sanitizeDisplaySettings: (settings) => ({
       showNames: Boolean(settings.showNames),
@@ -37,6 +38,11 @@ function loadSystemControllerContext(overrides = {}) {
       });
       return sanitized;
     }
+  };
+
+  context.getConfigOrDefault = (userId, user) => {
+    const result = context.getUserConfig(userId, user);
+    return result.success ? result.config : {};
   };
 
   Object.assign(context, overrides);

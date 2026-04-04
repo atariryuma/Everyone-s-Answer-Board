@@ -668,6 +668,9 @@
     }
   }
 
+  /** Promise-based delay utility */
+  window.createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
   window.sharedUtilities = {
     debounce: new DebounceManager(),
     throttle: new ThrottleManager(),
@@ -684,8 +687,7 @@
     if (window.sharedUtilities && window.sharedUtilities.debounce) {
       window.sharedUtilities.debounce.debounce(func, key, delay);
     } else {
-      const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-      createPromiseDelay(delay).then(func).catch(() => {
+      window.createPromiseDelay(delay).then(func).catch(() => {
       });
     }
   };

@@ -9,8 +9,12 @@
     "logs": "clasp logs",
     "deploy": "clasp deploy",
     "deploy:prod": "node scripts/deploy-prod.js",
+    "push:open": "node scripts/env-switch.js open npx clasp push --force",
+    "deploy:open": "node scripts/env-switch.js open node scripts/deploy-prod.js --env open",
     "api": "node scripts/admin-api.js",
+    "api:open": "node scripts/admin-api.js --env open",
     "logs:cloud": "node scripts/logs.js",
+    "logs:open": "node scripts/logs.js --env open",
     "test": "node --test tests/*.test.cjs"
   },
   "repository": {

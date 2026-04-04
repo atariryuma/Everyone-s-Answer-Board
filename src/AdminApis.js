@@ -25,7 +25,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, PropertiesService */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, PropertiesService */
 
 
 /**
@@ -35,10 +35,8 @@
  */
 function getAdminUsers(_options = {}) {
   try {
-    const email = getCurrentEmail();
-    if (!email || !isAdministrator(email)) {
-      return createAdminRequiredError();
-    }
+    const auth = requireAdmin();
+    if (!auth) return createAdminRequiredError();
 
     const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
     return {
@@ -58,10 +56,9 @@ function getAdminUsers(_options = {}) {
  */
 function toggleUserActiveStatus(targetUserId) {
   try {
-    const email = getCurrentEmail();
-    if (!email || !isAdministrator(email)) {
-      return createAdminRequiredError();
-    }
+    const auth = requireAdmin();
+    if (!auth) return createAdminRequiredError();
+    const email = auth.email;
 
     const targetUser = findUserById(targetUserId, { requestingUser: email });
     if (!targetUser) {
@@ -99,14 +96,9 @@ function toggleUserActiveStatus(targetUserId) {
  */
 function toggleUserBoardStatus(targetUserId) {
   try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError('ユーザー認証が必要です');
-    }
-
-    if (!isAdministrator(email)) {
-      return createAuthError('管理者権限が必要です');
-    }
+    const auth = requireAdmin();
+    if (!auth) return createAdminRequiredError();
+    const email = auth.email;
 
     const targetUser = findUserById(targetUserId, { requestingUser: email });
     if (!targetUser) {
@@ -169,8 +161,7 @@ function republishMyBoard() {
       return createUserNotFoundError('ユーザーが見つかりません');
     }
 
-    const configResult = getUserConfig(currentUser.userId);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(currentUser.userId);
 
     config.isPublished = true;
     config.publishedAt = new Date().toISOString();
@@ -227,8 +218,7 @@ function clearActiveSheet(targetUserId) {
       return createErrorResponse('ボードの非公開権限がありません');
     }
 
-    const configResult = getUserConfig(targetUser.userId);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(targetUser.userId);
 
     const wasPublished = config.isPublished === true;
     config.isPublished = false;
@@ -263,10 +253,8 @@ function clearActiveSheet(targetUserId) {
  */
 function getLogs(_options = {}) {
   try {
-    const email = getCurrentEmail();
-    if (!email || !isAdministrator(email)) {
-      return createAdminRequiredError();
-    }
+    const auth = requireAdmin();
+    if (!auth) return createAdminRequiredError();
 
     const limit = Math.max(1, Math.min(Number(_options.limit || 50), 200));
     const props = PropertiesService.getScriptProperties().getProperties();
@@ -332,10 +320,9 @@ function checkAppAccessRestriction() {
  */
 function disableAppAccess(reason = 'システムメンテナンス') {
   try {
-    const currentEmail = getCurrentEmail();
-    if (!currentEmail || !isAdministrator(currentEmail)) {
-      return createAdminRequiredError();
-    }
+    const auth = requireAdmin();
+    if (!auth) return createAdminRequiredError();
+    const currentEmail = auth.email;
 
     const props = PropertiesService.getScriptProperties();
     props.setProperty('APP_DISABLED', 'true');
@@ -360,10 +347,8 @@ function disableAppAccess(reason = 'システムメンテナンス') {
  */
 function enableAppAccess() {
   try {
-    const currentEmail = getCurrentEmail();
-    if (!currentEmail || !isAdministrator(currentEmail)) {
-      return createAdminRequiredError();
-    }
+    const auth = requireAdmin();
+    if (!auth) return createAdminRequiredError();
 
     const props = PropertiesService.getScriptProperties();
 
@@ -398,10 +383,8 @@ function enableAppAccess() {
  */
 function getAppAccessStatus() {
   try {
-    const currentEmail = getCurrentEmail();
-    if (!currentEmail || !isAdministrator(currentEmail)) {
-      return createAdminRequiredError();
-    }
+    const auth = requireAdmin();
+    if (!auth) return createAdminRequiredError();
 
     const props = PropertiesService.getScriptProperties();
     const isDisabled = props.getProperty('APP_DISABLED') === 'true';
@@ -448,8 +431,7 @@ function markWelcomeSeen() {
       return createUserNotFoundError('ユーザーが見つかりません');
     }
 
-    const configResult = getUserConfig(currentUser.userId);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(currentUser.userId);
 
     config.hasSeenWelcome = true;
 

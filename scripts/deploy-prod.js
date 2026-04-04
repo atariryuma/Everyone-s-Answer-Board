@@ -7,14 +7,16 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
-const { getAccessToken, getConfig } = require('./lib/gas-auth');
+const { getAccessToken, getConfig, parseEnvFromArgs } = require('./lib/gas-auth');
 
 function run(cmd) {
   return execSync(cmd, { encoding: 'utf8' }).trim();
 }
 
+const { env } = parseEnvFromArgs(process.argv.slice(2));
+
 try {
-  const config = getConfig();
+  const config = getConfig(env);
   const claspJson = JSON.parse(fs.readFileSync(path.join(process.cwd(), '.clasp.json'), 'utf8'));
   const scriptId = claspJson.scriptId;
 
@@ -24,7 +26,7 @@ try {
 
   // 2. Create new version
   console.log('Creating new version...');
-  const token = getAccessToken();
+  const token = getAccessToken(config.tokenName);
 
   const versionRaw = execSync(
     `curl -s -X POST "https://script.googleapis.com/v1/projects/${scriptId}/versions" ` +

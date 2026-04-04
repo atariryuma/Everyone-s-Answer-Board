@@ -30,7 +30,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getUserConfig, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
 
 
 /**
@@ -284,8 +284,7 @@ function validateHeaderIntegrity(targetUserId) {
       return createUserNotFoundError();
     }
 
-    const configResult = getUserConfig(targetUser.userId);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(targetUser.userId);
 
     if (!config.spreadsheetId || !config.sheetName) {
       return {
@@ -342,8 +341,7 @@ function getBoardInfo() {
       return { success: false, message: 'User not found' };
     }
 
-    const configResult = getUserConfig(user.userId);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(user.userId);
 
     const isPublished = Boolean(config.isPublished);
     const baseUrl = getWebAppUrl(); // eslint-disable-line no-undef
@@ -480,8 +478,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         };
       }
 
-      const configResult = getUserConfig(targetUserId, targetUser);
-      const targetUserConfig = configResult.success ? configResult.config : {};
+      const targetUserConfig = getConfigOrDefault(targetUserId, targetUser);
       const isOwnBoard = targetUser.userEmail === viewerEmail;
       const isPublished = Boolean(targetUserConfig.isPublished);
 
@@ -555,7 +552,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
           }) : [],
           header: String(finalResult.header || '回答一覧'),
           sheetName: String(finalResult.sheetName || 'Sheet1'),
-          displaySettings: targetUserConfig.displaySettings || { showNames: false, showReactions: false }
+          displaySettings: targetUserConfig.displaySettings || DEFAULT_DISPLAY_SETTINGS
         };
 
         return safeResult;
@@ -573,7 +570,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
           data: [],
           header: '回答一覧（データ変換エラー）',
           sheetName: 'Sheet1',
-          displaySettings: targetUserConfig.displaySettings || { showNames: false, showReactions: false }
+          displaySettings: targetUserConfig.displaySettings || DEFAULT_DISPLAY_SETTINGS
         };
       }
     }
@@ -596,8 +593,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       };
     }
 
-    const configResult = getUserConfig(user.userId, user);
-    const userConfig = configResult.success ? configResult.config : {};
+    const userConfig = getConfigOrDefault(user.userId, user);
 
     const options = {
       classFilter: classFilter !== 'すべて' ? classFilter : undefined,
@@ -659,7 +655,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         }) : [],
         header: String(finalResult.header || '回答一覧'),
         sheetName: String(finalResult.sheetName || 'Sheet1'),
-        displaySettings: userConfig.displaySettings || { showNames: false, showReactions: false }
+        displaySettings: userConfig.displaySettings || DEFAULT_DISPLAY_SETTINGS
       };
 
       return safeResult;
@@ -677,7 +673,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         data: [],
         header: '回答一覧（データ変換エラー）',
         sheetName: 'Sheet1',
-        displaySettings: userConfig.displaySettings || { showNames: false, showReactions: false }
+        displaySettings: userConfig.displaySettings || DEFAULT_DISPLAY_SETTINGS
       };
     }
   } catch (error) {
@@ -798,8 +794,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
       return { success: false, message: 'User not found' };
     }
 
-    const configResult = getUserConfig(targetUser.userId, targetUser);
-    const targetConfig = configResult.success ? configResult.config : {};
+    const targetConfig = getConfigOrDefault(targetUser.userId, targetUser);
     const isOwnBoard = targetUser.userEmail === email;
     const isAdmin = isAdministrator(email);
 
@@ -1169,8 +1164,7 @@ function getActiveFormInfo(userId) {
       targetUserId = currentUser.userId;
     }
 
-    const configResult = getUserConfig(targetUserId);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(targetUserId);
 
     const hasFormUrl = !!(config.formUrl && config.formUrl.trim());
     const isValidUrl = hasFormUrl && isValidFormUrl(config.formUrl);

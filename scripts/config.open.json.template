@@ -1,0 +1,7 @@
+{
+  "prodDeployId": "YOUR_OPEN_DEPLOY_ID",
+  "prodUrl": "https://script.google.com/a/macros/open.ed.jp/s/YOUR_OPEN_DEPLOY_ID/exec",
+  "apiKey": "YOUR_OPEN_ADMIN_API_KEY",
+  "gcpProjectId": "YOUR_OPEN_GCP_PROJECT_ID",
+  "tokenName": "open"
+}

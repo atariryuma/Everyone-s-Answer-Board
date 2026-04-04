@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, sanitizeDisplaySettings, sanitizeMapping */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS */
 
 
 /**
@@ -664,8 +664,7 @@ function publishApp(publishConfig) {
       return { success: false, message: 'ユーザーが見つかりません' };
     }
 
-    const configResult = getUserConfig(user.userId);
-    const currentConfig = configResult.success ? configResult.config : {};
+    const currentConfig = getConfigOrDefault(user.userId);
     const { config: safePublishConfig, ignoredKeys } = sanitizePublishPayload_(publishConfig, currentConfig);
 
     if (ignoredKeys.length > 0) {
@@ -1275,8 +1274,7 @@ function checkCurrentPublicationStatus(targetUserId) {
       return createUserNotFoundError();
     }
 
-    const configResult = getUserConfig(user.userId);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(user.userId);
 
     const result = {
       success: true,
@@ -1863,8 +1861,7 @@ function setAppStatus(isPublished) {
       return createUserNotFoundError();
     }
 
-    const configResult = getUserConfig(user.userId);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(user.userId);
 
     config.isPublished = Boolean(isPublished);
     if (isPublished) {

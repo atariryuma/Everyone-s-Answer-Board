@@ -1,0 +1,22 @@
+{
+  "scriptId": "YOUR_OPEN_SCRIPT_ID",
+  "rootDir": "src",
+  "token": "open",
+  "filePushOrder": [
+    "src/helpers.js",
+    "src/validators.js",
+    "src/formatters.js",
+    "src/DatabaseCore.js",
+    "src/SecurityService.js",
+    "src/UserService.js",
+    "src/ConfigService.js",
+    "src/ColumnMappingService.js",
+    "src/ReactionService.js",
+    "src/DataService.js",
+    "src/SystemController.js",
+    "src/UserApis.js",
+    "src/AdminApis.js",
+    "src/DataApis.js",
+    "src/main.js"
+  ]
+}

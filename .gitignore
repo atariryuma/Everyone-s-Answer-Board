@@ -29,11 +29,16 @@ build/
 
 # Clasp credentials and config (contains sensitive scriptId)
 .clasp.json
+.clasp.*.json
+!.clasp.*.json.template
+.clasp.json.bak
 .clasprc.json
+.clasp-gcp-project
 
 # Scripts config (contains API keys and deploy IDs)
 scripts/config.json
-.clasp-gcp-project
+scripts/config.*.json
+!scripts/config.*.json.template
 
 # Claude Code local settings (per-machine permissions)
 .claude/settings.local.json

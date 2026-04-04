@@ -107,7 +107,7 @@
           userEmailDisplay.textContent = statusMessage;
           userEmailDisplay.classList.add('text-green-400');
 
-          const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 
           createPromiseDelay(3000).then(() => {
             if (userEmailDisplay) {
@@ -222,7 +222,7 @@
                 }
               }, 800);
 
-              const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+    
 
               createPromiseDelay(5000).then(() => clearInterval(emailProtector)).catch(() => {
               });
@@ -464,19 +464,9 @@
   }
 
 
-  /**
-   * Simple HTML escape function for XSS protection
-   * @param {string} unsafe - Unsafe string
-   * @returns {string} Escaped string
-   */
-  function escapeHtml(unsafe) {
-    if (!unsafe || typeof unsafe !== 'string') return '';
-    return unsafe
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#039;');
+  /** @see window.sharedUtilities.security.escapeHtml */
+  function escapeHtml(str) {
+    return window.sharedUtilities?.security?.escapeHtml(str) || '';
   }
 
   /**
@@ -766,7 +756,7 @@
             const originalText = buttonElement.textContent;
             buttonElement.textContent = '✅ コピー完了!';
             buttonElement.disabled = true;
-            const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  
 
             createPromiseDelay(2000).then(() => {
               buttonElement.textContent = originalText;
@@ -779,7 +769,7 @@
             messageElement.textContent = ' (手動でコピーしてください)';
             messageElement.style.color = 'orange';
             buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-            const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+  
 
             createPromiseDelay(5000).then(() => messageElement.remove());
           });
@@ -790,8 +780,6 @@
           ' (ブラウザがコピーをサポートしていません。手動でコピーしてください)';
         messageElement.style.color = 'orange';
         buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-        const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
         createPromiseDelay(5000).then(() => messageElement.remove());
       }
     } catch (error) {
@@ -800,8 +788,6 @@
       messageElement.textContent = ' (コピー中にエラーが発生しました)';
       messageElement.style.color = 'red';
       buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-      const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
       createPromiseDelay(5000).then(() => messageElement.remove());
     }
   };

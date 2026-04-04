@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo */
+/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo, DEFAULT_DISPLAY_SETTINGS */
 
 
 /**
@@ -34,12 +34,7 @@ function getDefaultConfig(userId) {
     setupStatus: 'pending',
     isPublished: false,
     hasSeenWelcome: false,
-    displaySettings: {
-      showNames: false,
-      showReactions: false,
-      theme: 'default',
-      pageSize: 20
-    },
+    displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
     completionScore: 0
   };
 }
@@ -79,12 +74,7 @@ function repairNestedConfig(config, userId) {
   const repaired = { ...config };
 
   if (!repaired.displaySettings || typeof repaired.displaySettings !== 'object') {
-    repaired.displaySettings = {
-      showNames: false,
-      showReactions: false,
-      theme: 'default',
-      pageSize: 20
-    };
+    repaired.displaySettings = { ...DEFAULT_DISPLAY_SETTINGS };
   }
 
   if (!repaired.columnMapping || typeof repaired.columnMapping !== 'object') {
@@ -108,7 +98,7 @@ function ensureRequiredFields(config, userId) {
     spreadsheetId: config.spreadsheetId || '',
     sheetName: config.sheetName || '',
     formUrl: config.formUrl || '',
-    displaySettings: config.displaySettings || { showNames: false, showReactions: false, theme: 'default', pageSize: 20 },
+    displaySettings: config.displaySettings || { ...DEFAULT_DISPLAY_SETTINGS },
     columnMapping: config.columnMapping,
     completionScore: calculateCompletionScore(config)
   };

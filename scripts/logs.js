@@ -10,7 +10,7 @@
  *   npm run logs:cloud -- --user 35t22             # 特定ユーザーのログ
  *   npm run logs:cloud -- --json                   # JSON形式で出力
  */
-const { getAccessToken, postJSONSync, getConfig } = require('./lib/gas-auth');
+const { getAccessToken, postJSONSync, getConfig, parseEnvFromArgs } = require('./lib/gas-auth');
 
 function parseArgs(args) {
   const opts = { severity: 'WARNING', limit: 20, hours: 6, user: null, func: null, json: false };
@@ -27,11 +27,12 @@ function parseArgs(args) {
   return opts;
 }
 
-const opts = parseArgs(process.argv.slice(2));
+const { env, remainingArgs } = parseEnvFromArgs(process.argv.slice(2));
+const opts = parseArgs(remainingArgs);
 
 try {
-  const config = getConfig();
-  const token = getAccessToken();
+  const config = getConfig(env);
+  const token = getAccessToken(config.tokenName);
 
   const cutoff = new Date(Date.now() - opts.hours * 3600000).toISOString();
   let filter = `resource.type="app_script_function" severity>=${opts.severity} timestamp>="${cutoff}"`;

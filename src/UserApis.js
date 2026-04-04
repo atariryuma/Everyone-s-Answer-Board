@@ -19,7 +19,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, createUser, updateUser, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, CacheService, shouldEnforceDomainRestrictions, validateDomainAccess */
+/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, getConfigOrDefault, createUser, updateUser, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, CacheService, shouldEnforceDomainRestrictions, validateDomainAccess */
 
 /**
  * ドメインアクセス検証（必要時のみ）
@@ -66,8 +66,7 @@ function getConfig() {
       return createUserNotFoundError();
     }
 
-    const configResult = getUserConfig(user.userId);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(user.userId);
 
     return { success: true, data: { config, userId: user.userId } };
   } catch (error) {

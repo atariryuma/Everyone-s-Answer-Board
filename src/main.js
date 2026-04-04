@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, getConfigOrDefault, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, DEFAULT_DISPLAY_SETTINGS */
 
 
 /**
@@ -290,7 +290,7 @@ function doGet(e) {
           isOwnBoard,
           formUrl: config.formUrl || '',
           showDetails: config.showDetails !== false,
-          displaySettings: config.displaySettings || { showNames: false, showReactions: false }
+          displaySettings: config.displaySettings || DEFAULT_DISPLAY_SETTINGS
         });
 
         return template.evaluate().setTitle('回答ボード');
@@ -759,8 +759,7 @@ function getBatchedViewerData(targetUserId, currentEmail) {
       return { success: false, error: '対象ユーザーが見つかりません' };
     }
 
-    const configResult = getUserConfig(targetUserId, targetUser);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(targetUserId, targetUser);
 
     return {
       success: true,
@@ -822,8 +821,7 @@ function getBatchedAdminData(targetUserId) {
       return { success: false, error: '対象ユーザーがアクティブではありません' };
     }
 
-    const configResult = getUserConfig(targetUserId, targetUser);
-    const config = configResult.success ? configResult.config : {};
+    const config = getConfigOrDefault(targetUserId, targetUser);
 
     const questionText = getQuestionText(config, { targetUserEmail: targetUser.userEmail });
 
