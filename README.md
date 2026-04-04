@@ -81,7 +81,7 @@ cp .clasp.json.template .clasp.json
 2. シート名を `users` に変更
 3. 1行目にヘッダーを追加:
    ```
-   userId | userEmail | userName | isActive | createdAt | lastModified | config
+   userId | userEmail | googleId | isActive | configJson | lastModified | createdAt
    ```
 4. スプレッドシートIDをメモ（URLの `/d/` と `/edit` の間の文字列）
 5. サービスアカウントのメールアドレス（`xxx@xxx.iam.gserviceaccount.com`）を編集者として共有
