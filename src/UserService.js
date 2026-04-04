@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, openSpreadsheet, updateUser, getUserConfig, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse */
+/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, findUserByGoogleId, openSpreadsheet, updateUser, getUserConfig, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse, ScriptApp, Utilities */
 
 
 
@@ -104,6 +104,39 @@ function enrichUserInfo(userInfo) {
   } catch (error) {
     console.error('UserService.enrichUserInfo: エラー', error.message);
     return userInfo; // フォールバック
+  }
+}
+
+/**
+ * IDトークンからGoogleアカウントの不変ID（sub）を取得
+ * メールアドレスが変更されても sub は不変のため、アカウント同一性の判定に使用
+ * @returns {Object|null} { googleId: string, email: string } or null
+ */
+function getGoogleIdFromToken() {
+  try {
+    const token = ScriptApp.getIdentityToken();
+    if (!token) {
+      return null;
+    }
+
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.warn('getGoogleIdFromToken: Invalid JWT format');
+      return null;
+    }
+
+    const payload = JSON.parse(
+      Utilities.newBlob(Utilities.base64DecodeWebSafe(parts[1])).getDataAsString()
+    );
+
+    if (!payload.sub) {
+      return null;
+    }
+
+    return { googleId: payload.sub, email: payload.email || null };
+  } catch (error) {
+    console.error('getGoogleIdFromToken error:', error.message);
+    return null;
   }
 }
 

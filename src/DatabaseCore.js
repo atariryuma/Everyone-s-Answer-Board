@@ -925,10 +925,74 @@ function findUserById(userId, context = {}) {
 }
 
 /**
+ * GoogleアカウントID（不変ID）でユーザーを検索
+ * メールアドレス変更時のフォールバック検索に使用
+ * @param {string} googleId - Googleアカウントのsub値
+ * @param {Object} context - アクセスコンテキスト
+ * @returns {Object|null} User object
+ */
+function findUserByGoogleId(googleId, context = {}) {
+  try {
+    if (!googleId) {
+      return null;
+    }
+
+    // getAllUsersキャッシュを利用（findUserByEmail/findUserByIdと同じパターン）
+    try {
+      const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, skipCache: false });
+      if (Array.isArray(allUsers) && allUsers.length > 0) {
+        const user = allUsers.find(u => u.googleId === googleId);
+        if (user) {
+          return applyUserAccessControl(user, context, 'findUserByGoogleId');
+        }
+      }
+    } catch (cacheError) {
+      console.error('findUserByGoogleId: Cache-based search failed, falling back to direct DB access:', cacheError.message);
+    }
+
+    // フォールバック: 直接DB検索
+    const spreadsheet = openDatabase();
+    if (!spreadsheet) {
+      console.warn('findUserByGoogleId: Database access failed');
+      return null;
+    }
+
+    const sheet = spreadsheet.getSheetByName('users');
+    if (!sheet) {
+      console.warn('findUserByGoogleId: Users sheet not found');
+      return null;
+    }
+
+    const data = sheet.getDataRange().getValues();
+    if (data.length === 0) return null;
+
+    const [headers] = data;
+    const googleIdColumnIndex = headers.indexOf('googleId');
+
+    if (googleIdColumnIndex === -1) {
+      return null;
+    }
+
+    for (let i = 1; i < data.length; i++) {
+      if (data[i][googleIdColumnIndex] === googleId) {
+        const user = createUserObjectFromRow(data[i], headers);
+        return applyUserAccessControl(user, context, 'findUserByGoogleId');
+      }
+    }
+
+    return null;
+  } catch (error) {
+    console.error('findUserByGoogleId error:', error.message);
+    return null;
+  }
+}
+
+/**
  * 新しいユーザーを作成（CLAUDE.md準拠 - Context-Aware）
  * @param {string} email - ユーザーのメールアドレス
  * @param {Object} initialConfig - 初期設定
  * @param {Object} context - アクセスコンテキスト
+ * @param {string} [context.googleId] - Googleアカウント不変ID
  * @returns {Object|null} Created user object
  */
 function createUser(email, initialConfig = {}, context = {}) {
@@ -984,32 +1048,33 @@ function createUser(email, initialConfig = {}, context = {}) {
     const data = sheet.getDataRange().getValues();
     const [headers] = data;
     const hasCreatedAtColumn = headers.indexOf('createdAt') !== -1;
+    const hasGoogleIdColumn = headers.indexOf('googleId') !== -1;
+    const googleId = context.googleId || '';
 
-    const newUserData = hasCreatedAtColumn ? [
-      userId,
-      email,
-      true, // isActive
-      JSON.stringify(defaultConfig),
-      now, // createdAt (database column)
-      now  // lastModified
-    ] : [
-      userId,
-      email,
-      true, // isActive
-      JSON.stringify(defaultConfig),
-      now  // lastModified
-    ];
+    const newUserRow = new Array(headers.length).fill('');
+    const setCol = (name, value) => {
+      const idx = headers.indexOf(name);
+      if (idx !== -1) newUserRow[idx] = value;
+    };
+    setCol('userId', userId);
+    setCol('userEmail', email);
+    if (hasGoogleIdColumn) setCol('googleId', googleId);
+    setCol('isActive', true);
+    setCol('configJson', JSON.stringify(defaultConfig));
+    if (hasCreatedAtColumn) setCol('createdAt', now);
+    setCol('lastModified', now);
 
     if (sheet.getLastRow() >= 10000) {
       console.error('createUser: Users sheet at capacity');
       return null;
     }
 
-    sheet.appendRow(newUserData);
+    sheet.appendRow(newUserRow);
 
     const user = {
       userId,
       userEmail: email,
+      googleId: hasGoogleIdColumn ? googleId : undefined,
       isActive: true,
       configJson: JSON.stringify(defaultConfig),
       createdAt: hasCreatedAtColumn ? now : undefined,
@@ -1152,6 +1217,7 @@ function createUserObjectFromRow(row, headers) {
   const fieldMapping = {
     'userId': 'userId',
     'userEmail': 'userEmail',
+    'googleId': 'googleId',
     'isActive': 'isActive',
     'configJson': 'configJson',
     'createdAt': 'createdAt',

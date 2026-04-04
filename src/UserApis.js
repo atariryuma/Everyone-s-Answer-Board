@@ -19,7 +19,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, findUserByEmail, isAdministrator, getUserConfig, createUser, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, shouldEnforceDomainRestrictions, validateDomainAccess */
+/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, createUser, updateUser, getGoogleIdFromToken, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, shouldEnforceDomainRestrictions, validateDomainAccess */
 
 /**
  * ドメインアクセス検証（必要時のみ）
@@ -169,9 +169,38 @@ function processLoginAction() {
       };
     }
 
+    const tokenInfo = getGoogleIdFromToken();
+    const googleId = tokenInfo?.googleId || '';
+
     let user = findUserByEmail(email, { requestingUser: email });
+
+    // Google Workspace管理者がメール変更した場合、sub(googleId)は不変なので旧ユーザーを特定できる
+    if (!user && googleId) {
+      user = findUserByGoogleId(googleId, { requestingUser: email });
+      if (user) {
+        const oldEmail = user.userEmail;
+        const result = updateUser(user.userId, { userEmail: email });
+        if (result?.success) {
+          user.userEmail = email;
+        }
+        console.log('processLoginAction: Email change detected', {
+          userId: user.userId,
+          oldEmail,
+          newEmail: email,
+          updated: !!result?.success
+        });
+      }
+    }
+
+    if (user && googleId && !user.googleId) {
+      const result = updateUser(user.userId, { googleId });
+      if (result?.success) {
+        user.googleId = googleId;
+      }
+    }
+
     if (!user) {
-      user = createUser(email);
+      user = createUser(email, {}, { googleId });
       if (!user) {
         console.error('processLoginAction: createUser failed for', email);
         return {
