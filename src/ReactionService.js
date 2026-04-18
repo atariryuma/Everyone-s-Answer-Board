@@ -323,6 +323,20 @@ function addReaction(targetUserId, rowIndex, reactionType) {
       return createErrorResponse('Invalid row ID');
     }
 
+    // Spreadsheetのオープンとシート取得は読取操作で競合しない。
+    // ロック保持時間を最小化するためクリティカルセクション外で実行する。
+    const dataAccess = openSpreadsheet(config.spreadsheetId, {
+      useServiceAccount: false,
+      context: 'reaction_processing'
+    });
+    if (!dataAccess) {
+      return createErrorResponse('Failed to access target spreadsheet');
+    }
+    const sheet = dataAccess.spreadsheet.getSheetByName(config.sheetName);
+    if (!sheet) {
+      return createErrorResponse('Target sheet not found');
+    }
+
     const lockKey = `reaction_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
 
@@ -337,21 +351,6 @@ function addReaction(targetUserId, rowIndex, reactionType) {
 
       if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
-      }
-
-      const dataAccess = openSpreadsheet(config.spreadsheetId, {
-        useServiceAccount: false,
-        context: 'reaction_processing'
-      });
-
-      if (!dataAccess) {
-        throw new Error('Failed to access target spreadsheet');
-      }
-
-      const { spreadsheet } = dataAccess;
-      const sheet = spreadsheet.getSheetByName(config.sheetName);
-      if (!sheet) {
-        throw new Error('Target sheet not found');
       }
 
       const result = processReactionDirect(sheet, rowNumber, reactionType, actorEmail);
@@ -423,6 +422,19 @@ function toggleHighlight(targetUserId, rowIndex) {
       return createErrorResponse('Invalid row ID');
     }
 
+    // addReactionと同様、Spreadsheetのオープンはロック外に出して保持時間を最小化する。
+    const dataAccess = openSpreadsheet(config.spreadsheetId, {
+      useServiceAccount: false,
+      context: 'highlight_processing'
+    });
+    if (!dataAccess) {
+      return createErrorResponse('Failed to access target spreadsheet');
+    }
+    const sheet = dataAccess.spreadsheet.getSheetByName(config.sheetName);
+    if (!sheet) {
+      return createErrorResponse('Target sheet not found');
+    }
+
     const lockKey = `highlight_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
 
@@ -437,21 +449,6 @@ function toggleHighlight(targetUserId, rowIndex) {
 
       if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
-      }
-
-      const dataAccess = openSpreadsheet(config.spreadsheetId, {
-        useServiceAccount: false,
-        context: 'highlight_processing'
-      });
-
-      if (!dataAccess) {
-        throw new Error('Failed to access target spreadsheet');
-      }
-
-      const { spreadsheet } = dataAccess;
-      const sheet = spreadsheet.getSheetByName(config.sheetName);
-      if (!sheet) {
-        throw new Error('Target sheet not found');
       }
 
       const result = processHighlightDirect(sheet, rowNumber);
