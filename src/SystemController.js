@@ -13,7 +13,7 @@ const CACHE_DURATION = {
   MEDIUM: 30,          // 30秒 - リアクション・ハイライトロック
   FORM_DATA: 30,       // 30秒 - フォームデータ行数キャッシュ（即時反映のため短期）
   LONG: 300,           // 5分 - ユーザー情報キャッシュ
-  DATABASE_LONG: 1200, // 20分 - ヘッダー情報キャッシュ（変更されないため長期）
+  DATABASE_LONG: 600,  // 10分 - ヘッダー情報キャッシュ（列セットアップ時はinvalidateSheetHeadersCacheで明示的に無効化）
   USER_INDIVIDUAL: 900, // 15分 - 個別ユーザーキャッシュ（冗長性強化）
   EXTRA_LONG: 3600     // 1時間 - 設定キャッシュ
 };
@@ -132,15 +132,24 @@ function forceUrlSystemReset() {
   }
 }
 
+// WebアプリURLの実行内メモリキャッシュ。テンプレートレンダごとに
+// ScriptApp.getService().getUrl() が呼ばれる重複を削減する。
+let _webAppUrlCache = { url: null, expiresAt: 0 };
+const WEB_APP_URL_CACHE_TTL_MS = 60000;
+
 /**
  * WebアプリのURL取得（バリデーション強化版）
  * 各種HTMLファイルから呼び出される
- * 
+ *
  * 無効なURL（userCodeAppPanel等）を検出し、フォールバックを提供
  *
  * @returns {string} WebアプリURL（無効な場合は空文字）
  */
 function getWebAppUrl() {
+  const now = Date.now();
+  if (_webAppUrlCache.url && now < _webAppUrlCache.expiresAt) {
+    return _webAppUrlCache.url;
+  }
   try {
     const url = ScriptApp.getService().getUrl();
 
@@ -155,6 +164,7 @@ function getWebAppUrl() {
 
       if (savedUrl && isValidWebAppUrl_(savedUrl)) {
         console.log('[INFO] getWebAppUrl: Using saved fallback URL');
+        _webAppUrlCache = { url: savedUrl, expiresAt: now + WEB_APP_URL_CACHE_TTL_MS };
         return savedUrl;
       }
 
@@ -172,6 +182,7 @@ function getWebAppUrl() {
       // 保存エラーは無視（読み取りのみ権限の場合など）
     }
 
+    _webAppUrlCache = { url, expiresAt: now + WEB_APP_URL_CACHE_TTL_MS };
     return url;
   } catch (error) {
     console.error('[ERROR] getWebAppUrl:', error.message || 'Web app URL error');

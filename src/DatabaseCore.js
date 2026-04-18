@@ -1171,11 +1171,9 @@ function getAllUsers(options = {}, context = {}) {
     }
 
     if (!skipCache) {
-      try {
-        CacheService.getScriptCache().put(cacheKey, JSON.stringify(users), CACHE_DURATION.DATABASE_LONG);
-      } catch (cacheError) {
-        console.error('getAllUsers: Cache write failed:', cacheError.message);
-      }
+      // Why: 100+ユーザでJSONが100KB超えるとCacheService.putが黙って失敗する。
+      //      saveToCacheWithSizeCheckでサイズ超過を検出しログに残す。
+      saveToCacheWithSizeCheck(cacheKey, users, CACHE_DURATION.DATABASE_LONG);
     }
 
     return users;

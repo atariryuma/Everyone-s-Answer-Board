@@ -1088,6 +1088,10 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
       }
     }
 
+    if (columnsAdded.length > 0) {
+      invalidateSheetHeadersCache(spreadsheetId, sheetName);
+    }
+
     return {
       success: true,
       columnsAdded,

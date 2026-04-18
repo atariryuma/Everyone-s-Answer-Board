@@ -224,6 +224,22 @@ function getSheetHeaders(sheet) {
 }
 
 /**
+ * ヘッダーキャッシュを明示的に無効化
+ * 列追加・削除・リネーム後に呼び出し、次回リアクション処理等で最新ヘッダーを強制取得させる。
+ * Why: getSheetHeadersは10分キャッシュするため、列セットアップ直後に新しい列が見えず
+ *      「リアクション列が見つかりません」エラーが発生するのを防ぐ。
+ */
+function invalidateSheetHeadersCache(spreadsheetId, sheetName) {
+  if (!spreadsheetId || !sheetName) return;
+  try {
+    const cacheKey = `sheet_headers_${spreadsheetId}_${sheetName}`;
+    CacheService.getScriptCache().remove(cacheKey);
+  } catch (error) {
+    console.warn('invalidateSheetHeadersCache: Cache remove failed:', error.message);
+  }
+}
+
+/**
  * シート行数取得（短期キャッシュ - フォーム投稿で変化）
  * ✅ FIX: 30秒キャッシュで新しいフォーム投稿を即時反映
  * @param {Sheet} sheet - シートオブジェクト

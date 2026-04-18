@@ -28,6 +28,21 @@
 /* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, PropertiesService */
 
 
+// Admin API経由での読み書きから保護する Script Properties キー。
+// APIキー漏洩時のブラスト半径を最小化する目的で、
+// 認証情報系（substring match）と、攻撃者に差し替えられるとサービス乗っ取り/
+// 偽DBへの誘導が可能になる基幹キーを明示的にブロックする。
+const PROTECTED_PROPERTY_SUBSTRINGS = ['KEY', 'CREDS', 'SECRET', 'TOKEN', 'PASSWORD'];
+const PROTECTED_PROPERTY_EXACT_KEYS = ['ADMIN_EMAIL', 'DATABASE_SPREADSHEET_ID'];
+
+function isProtectedPropertyKey(key) {
+  if (typeof key !== 'string' || !key) return false;
+  const upper = key.toUpperCase();
+  if (PROTECTED_PROPERTY_EXACT_KEYS.includes(upper)) return true;
+  return PROTECTED_PROPERTY_SUBSTRINGS.some((s) => upper.includes(s));
+}
+
+
 /**
  * Get users - simplified name for admin panel
  * @param {Object} _options - Options (reserved for future use)
@@ -517,6 +532,9 @@ function dispatchAdminOperation(operation, params) {
       if (!params.key || typeof params.key !== 'string') {
         return createErrorResponse('key is required');
       }
+      if (isProtectedPropertyKey(params.key)) {
+        return createErrorResponse(`Property "${params.key}" is protected and cannot be read via admin API`, null, { error: 'PROTECTED_PROPERTY' });
+      }
       const value = PropertiesService.getScriptProperties().getProperty(params.key);
       return createSuccessResponse('Property retrieved', { key: params.key, value });
     }
@@ -528,16 +546,18 @@ function dispatchAdminOperation(operation, params) {
       if (typeof params.value !== 'string') {
         return createErrorResponse('value must be a string');
       }
+      if (isProtectedPropertyKey(params.key)) {
+        return createErrorResponse(`Property "${params.key}" is protected and cannot be modified via admin API. Use the GAS editor to rotate secrets.`, null, { error: 'PROTECTED_PROPERTY' });
+      }
       PropertiesService.getScriptProperties().setProperty(params.key, params.value);
       return createSuccessResponse('Property set', { key: params.key });
     }
 
     case 'listProperties': {
       const allProps = PropertiesService.getScriptProperties().getProperties();
-      // マスク: 認証情報は値を隠す
       const masked = {};
       for (const [k, v] of Object.entries(allProps)) {
-        masked[k] = (k.includes('CREDS') || k.includes('KEY') || k.includes('SECRET'))
+        masked[k] = isProtectedPropertyKey(k)
           ? `***${v.length}chars***`
           : v;
       }
