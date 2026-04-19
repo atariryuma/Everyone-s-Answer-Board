@@ -385,7 +385,11 @@
             break;
 
           case 'FORM_CREATED':
-            if (data.formUrl) {
+            // Why gate on https:// : postMessage payloads can be forged by
+            //      any frame/window we accept messages from. Without this
+            //      check a javascript: URL would fire when the user clicks
+            //      the form-link button.
+            if (data.formUrl && typeof data.formUrl === 'string' && /^https:\/\//i.test(data.formUrl)) {
               const formLinkBtn = document.getElementById('form-link-btn');
               if (formLinkBtn) {
                 formLinkBtn.href = data.formUrl;
