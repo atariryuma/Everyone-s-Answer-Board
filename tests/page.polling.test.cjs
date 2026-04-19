@@ -421,3 +421,56 @@ test('simulateServerExclusiveReaction: does not mutate input item.reactions', ()
   assert.equal(input.LIKE.count, 5);
   assert.equal(input.LIKE.reacted, false);
 });
+
+// =====================================================================
+// hasRecentActivity — simple activity gate
+// =====================================================================
+
+test('hasRecentActivity: true when lastActivityTime is recent', () => {
+  const { instance } = makeInstance({ lastActivityTime: Date.now() - 60000 });
+  assert.equal(instance.hasRecentActivity(), true);
+});
+
+test('hasRecentActivity: false when older than 5 minutes', () => {
+  const { instance } = makeInstance({ lastActivityTime: Date.now() - 400000 });
+  assert.equal(instance.hasRecentActivity(), false);
+});
+
+// =====================================================================
+// clearCache — option-gated cache clearing
+// =====================================================================
+
+test('clearCache: clears this.cache unconditionally', () => {
+  const { instance } = makeInstance();
+  let cleared = false;
+  instance.cache = { clear: () => { cleared = true; } };
+  instance.clearCache();
+  assert.equal(cleared, true);
+});
+
+test('clearCache: tolerates missing this.cache', () => {
+  const { instance } = makeInstance();
+  instance.cache = null;
+  // Should not throw
+  instance.clearCache();
+});
+
+test('clearCache: clears reactionCache only when includeReactions=true', () => {
+  const { instance } = makeInstance();
+  let reactionCleared = false;
+  instance.cache = { clear: () => {} };
+  instance.reactionCache = { clear: () => { reactionCleared = true; } };
+
+  instance.clearCache({ includeReactions: false });
+  assert.equal(reactionCleared, false);
+
+  instance.clearCache({ includeReactions: true });
+  assert.equal(reactionCleared, true);
+});
+
+test('clearCache: swallows errors so callers don\'t break', () => {
+  const { instance } = makeInstance();
+  instance.cache = { clear: () => { throw new Error('cache dead'); } };
+  // Should not throw
+  instance.clearCache();
+});
