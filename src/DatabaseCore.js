@@ -747,81 +747,8 @@ function applyUserAccessControl(user, context = {}, operation = 'user_lookup') {
  * @returns {Object|null} User object
  */
 function findUserByEmail(email, context = {}) {
-  try {
-    if (!email || !validateEmail(email).isValid) {
-      return null;
-    }
-
-    const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
-    const individualCacheKey = `user_by_email_v${cacheVersion}_${email}`;
-    try {
-      const cached = CacheService.getScriptCache().get(individualCacheKey);
-      if (cached) {
-        const cachedUser = JSON.parse(cached);
-        return applyUserAccessControl(cachedUser, context, 'findUserByEmail');
-      }
-    } catch (individualCacheError) {
-      console.error('findUserByEmail: Individual cache read failed:', individualCacheError.message);
-    }
-
-    try {
-      const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, skipCache: false });
-      if (Array.isArray(allUsers) && allUsers.length > 0) {
-        const user = allUsers.find(u => u.userEmail === email);
-        if (user) {
-          const allowedUser = applyUserAccessControl(user, context, 'findUserByEmail');
-          if (!allowedUser) {
-            return null;
-          }
-          saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
-          return allowedUser;
-        }
-      }
-    } catch (cacheError) {
-      console.error('findUserByEmail: Cache-based search failed, falling back to direct DB access:', cacheError.message);
-    }
-
-    const spreadsheet = openDatabase();
-    if (!spreadsheet) {
-      console.warn('findUserByEmail: Database access failed');
-      return null;
-    }
-
-    const sheet = spreadsheet.getSheetByName('users');
-    if (!sheet) {
-      console.warn('findUserByEmail: Users sheet not found');
-      return null;
-    }
-
-    const data = sheet.getDataRange().getValues();
-    if (data.length === 0) return null;
-
-    const [headers] = data;
-    const emailColumnIndex = headers.indexOf('userEmail');
-
-    if (emailColumnIndex === -1) {
-      console.warn('findUserByEmail: Email column not found');
-      return null;
-    }
-
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (row[emailColumnIndex] === email) {
-        const user = createUserObjectFromRow(row, headers);
-        const allowedUser = applyUserAccessControl(user, context, 'findUserByEmail');
-        if (!allowedUser) {
-          return null;
-        }
-        saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
-        return allowedUser;
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('findUserByEmail error:', error.message);
-    return null;
-  }
+  if (!email || !validateEmail(email).isValid) return null;
+  return findUserByField('userEmail', email, { ...context, cacheKeyPrefix: 'user_by_email', label: 'findUserByEmail' });
 }
 
 /**
@@ -833,81 +760,8 @@ function findUserByEmail(email, context = {}) {
  * @returns {Object|null} User object
  */
 function findUserById(userId, context = {}) {
-  try {
-    if (!userId) {
-      return null;
-    }
-
-    const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
-    const individualCacheKey = `user_by_id_v${cacheVersion}_${userId}`;
-    try {
-      const cached = CacheService.getScriptCache().get(individualCacheKey);
-      if (cached) {
-        const cachedUser = JSON.parse(cached);
-        return applyUserAccessControl(cachedUser, context, 'findUserById');
-      }
-    } catch (individualCacheError) {
-      console.error('findUserById: Individual cache read failed:', individualCacheError.message);
-    }
-
-    try {
-      const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, skipCache: false });
-      if (Array.isArray(allUsers) && allUsers.length > 0) {
-        const user = allUsers.find(u => u.userId === userId);
-        if (user) {
-          const allowedUser = applyUserAccessControl(user, context, 'findUserById');
-          if (!allowedUser) {
-            return null;
-          }
-          saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
-          return allowedUser;
-        }
-      }
-    } catch (cacheError) {
-      console.error('findUserById: Cache-based search failed, falling back to direct DB access:', cacheError.message);
-    }
-
-    const spreadsheet = openDatabase();
-    if (!spreadsheet) {
-      console.warn('findUserById: Database access failed');
-      return null;
-    }
-
-    const sheet = spreadsheet.getSheetByName('users');
-    if (!sheet) {
-      console.warn('findUserById: Users sheet not found');
-      return null;
-    }
-
-    const data = sheet.getDataRange().getValues();
-    if (data.length === 0) return null;
-
-    const [headers] = data;
-    const userIdColumnIndex = headers.indexOf('userId');
-
-    if (userIdColumnIndex === -1) {
-      console.warn('findUserById: UserId column not found');
-      return null;
-    }
-
-    for (let i = 1; i < data.length; i++) {
-      const row = data[i];
-      if (row[userIdColumnIndex] === userId) {
-        const user = createUserObjectFromRow(row, headers);
-        const allowedUser = applyUserAccessControl(user, context, 'findUserById');
-        if (!allowedUser) {
-          return null;
-        }
-        saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
-        return allowedUser;
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('findUserById error:', error.message);
-    return null;
-  }
+  if (!userId) return null;
+  return findUserByField('userId', userId, { ...context, cacheKeyPrefix: 'user_by_id', label: 'findUserById' });
 }
 
 /**
@@ -918,57 +772,95 @@ function findUserById(userId, context = {}) {
  * @returns {Object|null} User object
  */
 function findUserByGoogleId(googleId, context = {}) {
+  if (!googleId) return null;
+  // Note: historically this path did not populate an individual cache entry, so
+  // we explicitly opt out via cacheKeyPrefix=null to preserve behavior.
+  return findUserByField('googleId', googleId, { ...context, cacheKeyPrefix: null, label: 'findUserByGoogleId' });
+}
+
+/**
+ * findUserBy*系の共通実装。
+ * 探索は (1) individual cache → (2) getAllUsers キャッシュ → (3) 直接DB の順。
+ * @param {string} fieldName - 検索するユーザーフィールド ('userEmail' | 'userId' | 'googleId')
+ * @param {*} fieldValue - 一致させる値
+ * @param {Object} context - requestingUser / preloadedAuth / forceServiceAccount 等に加え、
+ *                          内部用の cacheKeyPrefix (null で個別キャッシュ無効) と label を受け取る
+ * @returns {Object|null} アクセス制御適用済みのユーザー、または null
+ */
+function findUserByField(fieldName, fieldValue, context = {}) {
+  const { cacheKeyPrefix = null, label = `findUserBy_${fieldName}` } = context;
+
   try {
-    if (!googleId) {
-      return null;
+    let individualCacheKey = null;
+    if (cacheKeyPrefix) {
+      const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
+      individualCacheKey = `${cacheKeyPrefix}_v${cacheVersion}_${fieldValue}`;
+      try {
+        const cached = CacheService.getScriptCache().get(individualCacheKey);
+        if (cached) {
+          const cachedUser = JSON.parse(cached);
+          return applyUserAccessControl(cachedUser, context, label);
+        }
+      } catch (individualCacheError) {
+        console.error(`${label}: Individual cache read failed:`, individualCacheError.message);
+      }
     }
 
-    // getAllUsersキャッシュを利用（findUserByEmail/findUserByIdと同じパターン）
     try {
-      const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, skipCache: false });
+      const allUsers = getAllUsers(
+        { activeOnly: false },
+        { ...context, forceServiceAccount: true, skipCache: false }
+      );
       if (Array.isArray(allUsers) && allUsers.length > 0) {
-        const user = allUsers.find(u => u.googleId === googleId);
+        const user = allUsers.find((u) => u[fieldName] === fieldValue);
         if (user) {
-          return applyUserAccessControl(user, context, 'findUserByGoogleId');
+          const allowedUser = applyUserAccessControl(user, context, label);
+          if (!allowedUser) return null;
+          if (individualCacheKey) {
+            saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+          }
+          return allowedUser;
         }
       }
     } catch (cacheError) {
-      console.error('findUserByGoogleId: Cache-based search failed, falling back to direct DB access:', cacheError.message);
+      console.error(`${label}: Cache-based search failed, falling back to direct DB access:`, cacheError.message);
     }
 
-    // フォールバック: 直接DB検索
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
-      console.warn('findUserByGoogleId: Database access failed');
+      console.warn(`${label}: Database access failed`);
       return null;
     }
-
     const sheet = spreadsheet.getSheetByName('users');
     if (!sheet) {
-      console.warn('findUserByGoogleId: Users sheet not found');
+      console.warn(`${label}: Users sheet not found`);
       return null;
     }
-
     const data = sheet.getDataRange().getValues();
     if (data.length === 0) return null;
 
     const [headers] = data;
-    const googleIdColumnIndex = headers.indexOf('googleId');
-
-    if (googleIdColumnIndex === -1) {
+    const columnIndex = headers.indexOf(fieldName);
+    if (columnIndex === -1) {
+      console.warn(`${label}: ${fieldName} column not found`);
       return null;
     }
 
     for (let i = 1; i < data.length; i++) {
-      if (data[i][googleIdColumnIndex] === googleId) {
+      if (data[i][columnIndex] === fieldValue) {
         const user = createUserObjectFromRow(data[i], headers);
-        return applyUserAccessControl(user, context, 'findUserByGoogleId');
+        const allowedUser = applyUserAccessControl(user, context, label);
+        if (!allowedUser) return null;
+        if (individualCacheKey) {
+          saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+        }
+        return allowedUser;
       }
     }
 
     return null;
   } catch (error) {
-    console.error('findUserByGoogleId error:', error.message);
+    console.error(`${label} error:`, error.message);
     return null;
   }
 }
