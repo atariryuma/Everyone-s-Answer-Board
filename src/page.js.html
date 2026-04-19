@@ -1074,11 +1074,11 @@
 
     getMockData(funcName, ...args) {
       return new Promise((resolve) => {
-        const startTime = Date.now();
         const mockDelay = 300;
-        const checkComplete = () => {
-          if (Date.now() - startTime >= mockDelay) {
-            if (funcName === 'getPublishedSheetData') {
+        // setTimeout instead of microtask busy-wait — see matching fixes
+        // in SharedUtilities.html / SharedErrorHandling.html.
+        setTimeout(() => {
+          if (funcName === 'getPublishedSheetData') {
               const currentDisplayMode = window.displayMode || this.state.displayMode;
               const studentName1 = currentDisplayMode === 'named' ? '田中太郎' : '';
               const studentName2 = currentDisplayMode === 'named' ? '佐藤花子' : '';
@@ -1132,11 +1132,7 @@
             } else if (funcName === 'checkAdmin' || funcName === 'isAdmin') {
               resolve(true);
             }
-          } else {
-            Promise.resolve().then(checkComplete);
-          }
-        };
-        checkComplete();
+        }, mockDelay);
       });
     }
     cleanup(options = {}) {

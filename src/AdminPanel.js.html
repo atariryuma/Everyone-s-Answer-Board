@@ -1765,11 +1765,8 @@
         if (retryCount < maxRetries) {
           showInfo(`分析品質向上のため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
 
-          await new Promise(resolve => {
-            const start = Date.now();
-            const check = () => (Date.now() - start >= retryDelay) ? resolve() : Promise.resolve().then(check);
-            check();
-          });
+          // setTimeout instead of microtask busy-wait loop.
+          await new Promise((resolve) => setTimeout(resolve, retryDelay));
 
           return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
         } else {
@@ -1798,11 +1795,7 @@
       if (retryCount < maxRetries && isRetryableError(error)) {
         showInfo(`接続エラーのため再試行中... (${retryCount + 2}/${maxRetries + 1})`, 3000);
 
-        await new Promise(resolve => {
-          const start = Date.now();
-          const check = () => (Date.now() - start >= retryDelay) ? resolve() : Promise.resolve().then(check);
-          check();
-        });
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
         return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
       }
 
