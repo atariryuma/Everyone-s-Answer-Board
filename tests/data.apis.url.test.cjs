@@ -651,3 +651,97 @@ test('processFormUrlInput: accepts /forms/d/ and /forms.gle/ URLs', () => {
   assert.equal(r2.success, false);
   assert.match(r2.error, /アクセスできません/);
 });
+
+// =====================================================================
+// saveConfig
+// =====================================================================
+
+test('saveConfig: returns auth error without session', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => null
+  });
+  const result = ctx.saveConfig({}, {});
+  assert.equal(result.success, false);
+  assert.match(result.message, /認証/);
+});
+
+test('saveConfig: returns user-not-found when email unknown', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'ghost@example.com',
+    findUserByEmail: () => null
+  });
+  const result = ctx.saveConfig({}, {});
+  assert.equal(result.success, false);
+  assert.match(result.message, /ユーザー/);
+});
+
+test('saveConfig: delegates to saveUserConfig with isMainConfig by default', () => {
+  let capturedOpts = null;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig: (_userId, _config, opts) => {
+      capturedOpts = opts;
+      return { success: true };
+    }
+  });
+  ctx.saveConfig({ spreadsheetId: 'ss' });
+  assert.equal(capturedOpts.isMainConfig, true);
+  assert.equal(capturedOpts.isDraft, undefined);
+});
+
+test('saveConfig: uses isDraft when options.isDraft is truthy', () => {
+  let capturedOpts = null;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig: (_userId, _config, opts) => {
+      capturedOpts = opts;
+      return { success: true };
+    }
+  });
+  ctx.saveConfig({ spreadsheetId: 'ss' }, { isDraft: true });
+  assert.equal(capturedOpts.isDraft, true);
+  assert.equal(capturedOpts.isMainConfig, undefined);
+});
+
+test('saveConfig: forwards userId and config to saveUserConfig unchanged', () => {
+  let capturedUserId = null;
+  let capturedConfig = null;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig: (userId, config) => {
+      capturedUserId = userId;
+      capturedConfig = config;
+      return { success: true };
+    }
+  });
+  const input = { spreadsheetId: 'ss', sheetName: 'Sheet1', columnMapping: { answer: 2 } };
+  ctx.saveConfig(input);
+  assert.equal(capturedUserId, 'u1');
+  assert.equal(capturedConfig.spreadsheetId, 'ss');
+  assert.equal(capturedConfig.columnMapping.answer, 2);
+});
+
+test('saveConfig: propagates saveUserConfig error', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig: () => ({ success: false, message: 'validation failed: invalid sheetName' })
+  });
+  const result = ctx.saveConfig({});
+  assert.equal(result.success, false);
+  assert.match(result.message, /validation failed/);
+});
+
+test('saveConfig: returns exception response when saveUserConfig throws', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    saveUserConfig: () => { throw new Error('storage down'); }
+  });
+  const result = ctx.saveConfig({});
+  assert.equal(result.success, false);
+  assert.match(result.message, /storage down/);
+});
