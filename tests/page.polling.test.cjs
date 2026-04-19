@@ -474,3 +474,53 @@ test('clearCache: swallows errors so callers don\'t break', () => {
   // Should not throw
   instance.clearCache();
 });
+
+// =====================================================================
+// enhanceError — annotates an error with function-specific user message
+// =====================================================================
+
+test('enhanceError: wraps error with originalError reference and metadata', () => {
+  const { instance } = makeInstance();
+  const original = new Error('network timeout');
+  const enhanced = instance.enhanceError(original, 'addReaction', [1, 'LIKE']);
+
+  assert.equal(enhanced instanceof Error, true);
+  assert.equal(enhanced.message, 'network timeout');
+  assert.equal(enhanced.originalError, original);
+  assert.equal(enhanced.functionName, 'addReaction');
+  assert.deepEqual([...enhanced.arguments], [1, 'LIKE']);
+});
+
+test('enhanceError: addReaction → リアクション処理エラー userMessage', () => {
+  const { instance } = makeInstance();
+  const e = instance.enhanceError(new Error('x'), 'addReaction', []);
+  assert.equal(e.userMessage, 'リアクション処理エラー');
+});
+
+test('enhanceError: toggleHighlight → ハイライト処理エラー userMessage', () => {
+  const { instance } = makeInstance();
+  const e = instance.enhanceError(new Error('x'), 'toggleHighlight', []);
+  assert.equal(e.userMessage, 'ハイライト処理エラー');
+});
+
+test('enhanceError: unknown funcName → default 通信エラー userMessage', () => {
+  const { instance } = makeInstance();
+  const e = instance.enhanceError(new Error('x'), 'getData', []);
+  assert.equal(e.userMessage, '通信エラー');
+});
+
+test('enhanceError: accepts a string error (not an Error instance)', () => {
+  const { instance } = makeInstance();
+  const e = instance.enhanceError('raw error string', 'addReaction', []);
+  assert.equal(e.message, 'raw error string');
+});
+
+test('enhanceError: accepts an error with falsy message, falls back to stringified', () => {
+  const { instance } = makeInstance();
+  // Object-like error without a .message
+  const fakeError = { toString: () => 'toString fallback' };
+  const e = instance.enhanceError(fakeError, 'addReaction', []);
+  // new Error(error.message || error) — since .message is undefined, falls to the object,
+  // and new Error(obj) coerces to string via toString()
+  assert.match(e.message, /toString fallback/);
+});
