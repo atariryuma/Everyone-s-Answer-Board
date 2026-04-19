@@ -745,3 +745,101 @@ test('saveConfig: returns exception response when saveUserConfig throws', () => 
   assert.equal(result.success, false);
   assert.match(result.message, /storage down/);
 });
+
+// =====================================================================
+// getActiveFormInfo
+// =====================================================================
+
+test('getActiveFormInfo: returns auth error without session', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => null
+  });
+  const result = ctx.getActiveFormInfo(null);
+  assert.equal(result.success, false);
+  assert.equal(result.formUrl, null);
+  assert.equal(result.formTitle, null);
+});
+
+test('getActiveFormInfo: resolves current user when no userId given', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({
+      formUrl: 'https://docs.google.com/forms/d/abc/viewform',
+      formTitle: 'クラスアンケート'
+    })
+  });
+  const result = ctx.getActiveFormInfo(null);
+  assert.equal(result.success, true);
+  assert.equal(result.shouldShow, true);
+  assert.equal(result.formTitle, 'クラスアンケート');
+  assert.equal(result.isValidUrl, true);
+});
+
+test('getActiveFormInfo: returns user-not-found when self-lookup fails', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'ghost@example.com',
+    findUserByEmail: () => null
+  });
+  const result = ctx.getActiveFormInfo(null);
+  assert.equal(result.success, false);
+  assert.match(result.message, /User not found/);
+});
+
+test('getActiveFormInfo: uses explicit userId over current user', () => {
+  let findByEmailCalled = false;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'viewer@example.com',
+    findUserByEmail: () => { findByEmailCalled = true; return null; },
+    getConfigOrDefault: (uid) => {
+      assert.equal(uid, 'other-user-id');
+      return { formUrl: 'https://forms.gle/xyz', formTitle: 'Other' };
+    }
+  });
+  const result = ctx.getActiveFormInfo('other-user-id');
+  assert.equal(result.success, true);
+  assert.equal(findByEmailCalled, false, 'Must not look up current user when id given');
+});
+
+test('getActiveFormInfo: reports shouldShow=false when formUrl absent', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({})
+  });
+  const result = ctx.getActiveFormInfo(null);
+  assert.equal(result.success, false);
+  assert.equal(result.shouldShow, false);
+  assert.equal(result.formUrl, null);
+});
+
+test('getActiveFormInfo: reports isValidUrl=false when formUrl is non-Google URL', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ formUrl: 'https://evil.example.com/fake-form' })
+  });
+  const result = ctx.getActiveFormInfo(null);
+  assert.equal(result.shouldShow, true); // hasFormUrl=true → shouldShow
+  assert.equal(result.isValidUrl, false); // but isValidFormUrl rejects it
+});
+
+test('getActiveFormInfo: whitespace-only formUrl treated as absent', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ formUrl: '   ' })
+  });
+  const result = ctx.getActiveFormInfo(null);
+  assert.equal(result.shouldShow, false);
+});
+
+test('getActiveFormInfo: default formTitle when absent from config', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ formUrl: 'https://docs.google.com/forms/d/abc/viewform' })
+  });
+  const result = ctx.getActiveFormInfo(null);
+  assert.equal(result.formTitle, 'フォーム');
+});
