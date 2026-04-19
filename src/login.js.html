@@ -734,22 +734,4 @@
     }
   };
 
-  function handleAdminPanelRedirect(event, adminUrl, buttonElement) {
-    event.preventDefault(); // デフォルトのリンク遷移をキャンセル
-
-    const buttonText = buttonElement.querySelector('#admin-panel-btn-text');
-    const buttonSpinner = buttonElement.querySelector('#admin-panel-btn-spinner');
-
-    if (buttonText) buttonText.classList.add('hidden');
-    if (buttonSpinner) buttonSpinner.classList.remove('hidden');
-    buttonElement.classList.add('cursor-not-allowed'); // カーソルを変更
-    buttonElement.style.pointerEvents = 'none'; // クリックイベントを無効化
-    buttonElement.setAttribute('aria-disabled', 'true'); // アクセシビリティ対応
-
-
-    window.open(adminUrl, '_top');
-  }
-
-
-
 </script>
