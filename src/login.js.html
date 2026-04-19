@@ -405,6 +405,20 @@
         return;
       }
 
+      // Why: the upcoming template interpolates adminUrl into an href and an
+      //      inline onclick string. escapeHtml can't neutralize javascript: /
+      //      data: protocols, nor can it safely escape single quotes for use
+      //      inside a JS-string argument. Reject anything that isn't https://
+      //      before it can reach those sinks.
+      if (!/^https:\/\//i.test(adminUrl)) {
+        console.error('showAdminPanelRedirect: adminUrl is not https:', adminUrl);
+        if (window.notifications) {
+          window.notifications.error('管理パネルのURLが無効です。再読み込みしてください。', 7000);
+        } else {
+          alert('管理パネルのURLが無効です。ページを再読み込みしてください。');
+        }
+        return;
+      }
 
       const safeMessage = escapeHtml(message || 'ログインが完了しました');
       const safeAdminUrl = escapeHtml(adminUrl);
@@ -595,14 +609,14 @@
             <h1 class="title">${safeMessage}</h1>
             <p class="subtitle">管理パネルにアクセスしてください</p>
 
-            <a href="${adminUrl}" class="main-button" id="admin-panel-btn" onclick="handleSingleClick(this)">
+            <a href="${safeAdminUrl}" class="main-button" id="admin-panel-btn" onclick="handleSingleClick(this)">
               <span id="admin-panel-btn-text">🚀 管理パネルを開く</span>
             </a>
 
             <div class="url-info">
               <div class="url-label">📱 管理パネルURL:</div>
               <div class="url-text">${safeAdminUrl}</div>
-              <button onclick="copyUrlToClipboard('${adminUrl}', this)" class="copy-btn">
+              <button data-copy-url class="copy-btn">
                 📋 URLをコピー
               </button>
             </div>
@@ -620,6 +634,15 @@
       `;
 
       document.body.innerHTML = successHtml;
+
+      // Bind the copy button after injection. adminUrl is held in the
+      // closure (already validated as https above) rather than
+      // interpolated into markup, so no risk of breaking out of a JS
+      // string literal with quotes or script tags.
+      const copyBtn = document.querySelector('[data-copy-url]');
+      if (copyBtn) {
+        copyBtn.addEventListener('click', () => window.copyUrlToClipboard(adminUrl, copyBtn));
+      }
 
 
       window.handleSingleClick = function(buttonElement) {
