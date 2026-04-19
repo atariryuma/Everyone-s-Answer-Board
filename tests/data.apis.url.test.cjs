@@ -843,3 +843,55 @@ test('getActiveFormInfo: default formTitle when absent from config', () => {
   const result = ctx.getActiveFormInfo(null);
   assert.equal(result.formTitle, 'フォーム');
 });
+
+// =====================================================================
+// getSheetNameFromGid
+// =====================================================================
+
+test('getSheetNameFromGid: returns sheet name matching gid', () => {
+  const mockSheets = [
+    { getName: () => 'Sheet1', getSheetId: () => 0 },
+    { getName: () => 'フォームの回答 1', getSheetId: () => 12345 },
+    { getName: () => 'Data', getSheetId: () => 67890 }
+  ];
+  const ctx = loadDataApisContext({
+    SpreadsheetApp: {
+      openById: () => ({ getSheets: () => mockSheets })
+    },
+    executeWithRetry: (fn) => fn()
+  });
+  assert.equal(ctx.getSheetNameFromGid('ss-1', '12345'), 'フォームの回答 1');
+  assert.equal(ctx.getSheetNameFromGid('ss-1', '67890'), 'Data');
+});
+
+test('getSheetNameFromGid: falls back to first sheet when gid not found', () => {
+  const mockSheets = [
+    { getName: () => 'FirstSheet', getSheetId: () => 0 },
+    { getName: () => 'SecondSheet', getSheetId: () => 100 }
+  ];
+  const ctx = loadDataApisContext({
+    SpreadsheetApp: {
+      openById: () => ({ getSheets: () => mockSheets })
+    },
+    executeWithRetry: (fn) => fn()
+  });
+  assert.equal(ctx.getSheetNameFromGid('ss-1', '999'), 'FirstSheet');
+});
+
+test('getSheetNameFromGid: returns "Sheet1" when openById throws', () => {
+  const ctx = loadDataApisContext({
+    SpreadsheetApp: { openById: () => { throw new Error('denied'); } },
+    executeWithRetry: (fn) => fn()
+  });
+  assert.equal(ctx.getSheetNameFromGid('ss-1', '0'), 'Sheet1');
+});
+
+test('getSheetNameFromGid: returns "Sheet1" when no sheets present', () => {
+  const ctx = loadDataApisContext({
+    SpreadsheetApp: {
+      openById: () => ({ getSheets: () => [] })
+    },
+    executeWithRetry: (fn) => fn()
+  });
+  assert.equal(ctx.getSheetNameFromGid('ss-1', '0'), 'Sheet1');
+});
