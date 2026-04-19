@@ -283,9 +283,14 @@
         this.showInfoModal(); // デジタルシティズンシップモーダル
 
         try {
-          await this.initializeFormButton();
-
-          await this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false });
+          // Run both fetches in parallel: the form-link button and the main
+          // board data are independent, so there's no reason to add the
+          // getActiveFormInfo round trip to the critical path before
+          // loadSheetData starts.
+          await Promise.all([
+            this.initializeFormButton(),
+            this.loadSheetData({ showLoading: false, isInitialLoad: true, bypassCache: false })
+          ]);
         } catch (error) {
           console.error('Data loading failed during initialization:', error);
           this.showInfoModal(); // Show modal even on error
@@ -5101,7 +5106,13 @@
 
       const formLinkBtn = document.getElementById('form-link-btn');
       if (formLinkBtn) {
-        if (formInfo && formInfo.shouldShow) {
+        // Why gate on https:// : formInfo.formUrl originates from the
+        //      admin-editable board config. escapeHtml / DOM assignment
+        //      doesn't neutralize javascript: URLs — setting .href with
+        //      such a value would still fire on click.
+        const isSafeFormUrl = formInfo && typeof formInfo.formUrl === 'string'
+          && /^https:\/\//i.test(formInfo.formUrl);
+        if (formInfo && formInfo.shouldShow && isSafeFormUrl) {
           formLinkBtn.href = formInfo.formUrl;
           formLinkBtn.classList.remove('hidden');
 
