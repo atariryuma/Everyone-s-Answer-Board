@@ -354,27 +354,16 @@ window.ErrorHandler = {
       }
     };
 
-    let debouncePromise = null;
+    let debounceTimerId = null;
     field.addEventListener('input', () => {
-      if (debouncePromise) {
-        debouncePromise.cancelled = true;
-      }
-
-      const createPromiseDelay = (ms) => new Promise(resolve => {
-        const start = Date.now();
-        const check = () => {
-          if (debouncePromise?.cancelled) return;
-          (Date.now() - start >= ms) ? resolve() : Promise.resolve().then(check);
-        };
-        check();
-      });
-
-      debouncePromise = createPromiseDelay(debounceDelay);
-      debouncePromise.then(() => {
-        if (!debouncePromise.cancelled) {
-          validate();
-        }
-      });
+      // setTimeout-based debounce. Previous microtask-recursion ran
+      // Promise.resolve().then(check) until elapsed — 100% CPU during
+      // every keystroke-to-validate delay.
+      if (debounceTimerId) clearTimeout(debounceTimerId);
+      debounceTimerId = setTimeout(() => {
+        debounceTimerId = null;
+        validate();
+      }, debounceDelay);
     });
 
     field.addEventListener('blur', validate);

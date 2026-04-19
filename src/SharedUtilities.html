@@ -375,44 +375,33 @@
           return;
         }
 
-        const createPromiseTimeout = (ms) => new Promise((_, reject) => {
-          const start = Date.now();
-          const check = () => {
-            if (Date.now() - start >= ms) {
-              reject(new Error(`タイムアウト: ${functionName || 'unknown'} (${timeout || 0}ms)`));
-            } else {
-              Promise.resolve().then(check);
-            }
-          };
-          check();
-        });
-
-        const timeoutPromise = createPromiseTimeout(timeout);
-        const timeoutId = Symbol('promise-timeout');
-
+        // setTimeout instead of microtask-recursion: avoid 100% CPU during
+        // the wait. See matching fix in verifyAuthentication() above.
         let completed = false;
+        const timeoutId = setTimeout(() => {
+          if (!completed) {
+            completed = true;
+            reject(new Error(`タイムアウト: ${functionName || 'unknown'} (${timeout || 0}ms)`));
+          }
+        }, timeout);
+
         google.script.run
           .withSuccessHandler((result) => {
             if (!completed) {
               completed = true;
+              clearTimeout(timeoutId);
               resolve(result);
             }
           })
           .withFailureHandler((error) => {
             if (!completed) {
               completed = true;
+              clearTimeout(timeoutId);
               console.error(`❌ [UnifiedDataLoader] ${functionName || 'unknown'} GAS実行エラー:`, error);
               reject(new Error(error.message || error.toString()));
             }
           })
         [functionName](...args);
-
-        timeoutPromise.catch((timeoutError) => {
-          if (!completed) {
-            completed = true;
-            reject(timeoutError);
-          }
-        });
       });
     }
 
@@ -589,17 +578,6 @@
       return div.innerHTML;
     }
 
-    sanitizeHtml(html) {
-      if (!html) return '';
-      const div = document.createElement('div');
-      div.innerHTML = html;
-
-      const scripts = div.querySelectorAll('script, object, embed, iframe, form');
-      scripts.forEach((script) => script.remove());
-
-      return div.innerHTML;
-    }
-
     isValidEmail(email) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return emailRegex.test(email);
@@ -765,25 +743,26 @@
 
     verifyAuthentication: function () {
       return new Promise((resolve, reject) => {
-        const createPromiseTimeout = (ms) => new Promise((_, timeoutReject) => {
-          const start = Date.now();
-          const check = () => {
-            if (Date.now() - start >= ms) {
-              timeoutReject(new Error('認証確認がタイムアウトしました'));
-            } else {
-              Promise.resolve().then(check);
-            }
-          };
-          check();
-        });
-
-        const timeoutPromise = createPromiseTimeout(10000);
         let completed = false;
+
+        // Why setTimeout instead of a microtask recursion loop: the previous
+        // implementation (`const check = () => Date.now() - start >= ms ?
+        // reject(...) : Promise.resolve().then(check)`) spun the microtask
+        // queue for up to 10 seconds, pinning the browser's JS thread at
+        // 100% and blocking rendering / other script.run callbacks. A timer
+        // yields to the event loop and costs ~zero CPU until it fires.
+        const timeoutId = setTimeout(() => {
+          if (!completed) {
+            completed = true;
+            reject(new Error('認証確認がタイムアウトしました'));
+          }
+        }, 10000);
 
         google.script.run
           .withSuccessHandler((result) => {
             if (!completed) {
               completed = true;
+              clearTimeout(timeoutId);
               if (result && result.authenticated && result.email) {
                 resolve(result);
               } else {
@@ -794,17 +773,11 @@
           .withFailureHandler((error) => {
             if (!completed) {
               completed = true;
+              clearTimeout(timeoutId);
               reject(error);
             }
           })
           .checkUserAuthentication();
-
-        timeoutPromise.catch((timeoutError) => {
-          if (!completed) {
-            completed = true;
-            reject(timeoutError);
-          }
-        });
       });
     },
 
