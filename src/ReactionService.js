@@ -42,17 +42,23 @@ function validateReactionPermissionWithPreloadedData(actorEmail, targetUser, con
  * @param {number} rowNumber - 行番号
  * @param {string} reactionType - リアクション種類
  * @param {string} actorEmail - 操作者メール
+ * @param {Array} [preloadedHeaders] - 呼び出し側がキャッシュ経由で取得済みのヘッダー。
+ *                                     省略時は互換性のためシートから直接取得する。
  * @returns {Object} 処理結果
  */
-function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
+function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, preloadedHeaders) {
   const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
 
   if (!reactionTypes.includes(reactionType)) {
     throw new Error('Invalid reaction type');
   }
 
-  const dataRange = sheet.getDataRange();
-  const [headers = []] = dataRange.getValues();
+  // Why: ヘッダーはセッション中ほぼ変化しないため、呼び出し側がキャッシュしたものを
+  //      渡してくれれば sheet.getDataRange().getValues() の全件読取を回避できる。
+  //      preloadedHeaders 未指定時は従来通りシートから読む（互換動作）。
+  const headers = Array.isArray(preloadedHeaders) && preloadedHeaders.length > 0
+    ? preloadedHeaders
+    : (sheet.getDataRange().getValues()[0] || []);
 
   if (!headers || headers.length === 0) {
     console.warn(`⚠️ processReactionDirect: Headers unavailable (likely due to API quota). Reaction feature temporarily disabled.`, {
@@ -164,11 +170,13 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail) {
  * ✅ Graceful Degradation: ヘッダー取得失敗時も継続動作
  * @param {Sheet} sheet - スプレッドシートオブジェクト
  * @param {number} rowNumber - 行番号
+ * @param {Array} [preloadedHeaders] - 呼び出し側がキャッシュ経由で取得済みのヘッダー。
  * @returns {Object} 処理結果
  */
-function processHighlightDirect(sheet, rowNumber) {
-  const dataRange = sheet.getDataRange();
-  const [headers = []] = dataRange.getValues();
+function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
+  const headers = Array.isArray(preloadedHeaders) && preloadedHeaders.length > 0
+    ? preloadedHeaders
+    : (sheet.getDataRange().getValues()[0] || []);
 
   if (!headers || headers.length === 0) {
     console.warn(`⚠️ processHighlightDirect: Headers unavailable (likely due to API quota). Highlight feature temporarily disabled.`, {
@@ -298,7 +306,8 @@ function addReaction(targetUserId, rowIndex, reactionType) {
     label: 'addReaction',
     openContext: 'reaction_processing',
     concurrentMessage: '同時リアクション処理中です。お待ちください。',
-    process: (sheet, rowNumber, actorEmail) => processReactionDirect(sheet, rowNumber, reactionType, actorEmail),
+    process: (sheet, rowNumber, actorEmail, preloadedHeaders) =>
+      processReactionDirect(sheet, rowNumber, reactionType, actorEmail, preloadedHeaders),
     formatSuccess: (result) => ({
       success: true,
       reactions: result.reactions,
@@ -323,7 +332,8 @@ function toggleHighlight(targetUserId, rowIndex) {
     label: 'toggleHighlight',
     openContext: 'highlight_processing',
     concurrentMessage: '同時ハイライト処理中です。お待ちください。',
-    process: (sheet, rowNumber) => processHighlightDirect(sheet, rowNumber),
+    process: (sheet, rowNumber, _actorEmail, preloadedHeaders) =>
+      processHighlightDirect(sheet, rowNumber, preloadedHeaders),
     formatSuccess: (result) => ({
       success: true,
       highlighted: result.highlighted,
@@ -394,6 +404,23 @@ function executeBoardRowOperation(options) {
     const sheet = dataAccess.spreadsheet.getSheetByName(config.sheetName);
     if (!sheet) return createErrorResponse('Target sheet not found');
 
+    // Load sheet headers outside the lock using the cached helper.
+    // Why: processReactionDirect / processHighlightDirect previously called
+    //      sheet.getDataRange().getValues() every invocation — that reads the
+    //      entire sheet just to get the header row. By resolving headers here
+    //      (via getSheetHeaders, 10-minute cache) we pay that cost at most
+    //      once per 10 minutes per sheet and keep the critical section lean.
+    let preloadedHeaders = null;
+    try {
+      if (typeof getSheetHeaders === 'function') {
+        const info = getSheetHeaders(sheet);
+        preloadedHeaders = info && info.headers ? info.headers : null;
+      }
+    } catch (headerError) {
+      // Fall back to process()'s built-in sheet read if the cache helper throws.
+      console.warn(`${label}: getSheetHeaders failed, falling back to inline read:`, headerError.message);
+    }
+
     const lockKey = `${lockKeyPrefix}_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
     if (cache.get(lockKey)) return createErrorResponse(concurrentMessage);
@@ -404,7 +431,7 @@ function executeBoardRowOperation(options) {
       if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
-      const result = process(sheet, rowNumber, actorEmail);
+      const result = process(sheet, rowNumber, actorEmail, preloadedHeaders);
       return formatSuccess(result);
     } finally {
       try { lock.releaseLock(); } catch (e) { console.warn(`${label}: Lock release failed:`, e.message); }

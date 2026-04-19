@@ -41,7 +41,21 @@ function createMockSheet({
       getValues: () => data.map((r) => r.slice())
     }),
     getLastRow: () => data.length,
-    getRange: () => ({ getValues: () => [], setValues: () => {} })
+    getLastColumn: () => (data[0] ? data[0].length : 0),
+    getRange: (row, col, numRows = 1, numCols = 1) => ({
+      getValues: () => {
+        const out = [];
+        for (let r = row - 1; r < row - 1 + numRows; r += 1) {
+          const rowArr = [];
+          for (let c = col - 1; c < col - 1 + numCols; c += 1) {
+            rowArr.push(data[r] ? (data[r][c] !== undefined ? data[r][c] : '') : '');
+          }
+          out.push(rowArr);
+        }
+        return out;
+      },
+      setValues: () => {}
+    })
   };
 }
 
@@ -151,7 +165,8 @@ test('getSheetHeaders: falls back to "unknown" id when sheet has no getParent', 
   const ctx = loadDataServiceContext({ cache });
   const sheet = {
     getName: () => 'Sheet1',
-    getDataRange: () => ({ getValues: () => [['A', 'B']] }),
+    getLastColumn: () => 2,
+    getRange: () => ({ getValues: () => [['A', 'B']] }),
     getLastRow: () => 1
   };
 
@@ -166,7 +181,8 @@ test('getSheetHeaders: empty sheet yields zero cols and empty headers', () => {
   const sheet = {
     getName: () => 'Empty',
     getParent: () => ({ getId: () => 'ss-1' }),
-    getDataRange: () => ({ getValues: () => [] }),
+    getLastColumn: () => 0,
+    getRange: () => ({ getValues: () => [[]] }),
     getLastRow: () => 0
   };
 

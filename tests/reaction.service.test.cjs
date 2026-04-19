@@ -573,6 +573,45 @@ test('addReaction: returns error when openSpreadsheet fails', () => {
   assert.equal(result.success, false);
 });
 
+test('addReaction: uses cached headers from getSheetHeaders and avoids per-call getDataRange', () => {
+  // Concrete headers from the "cache" — reactionType columns match these.
+  const cachedHeaders = ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT'];
+
+  // Sheet returns EMPTY headers via getDataRange to prove we're NOT using that path.
+  // If the new cached-header optimization works, this test still succeeds because
+  // processReactionDirect falls back to the preloadedHeaders.
+  let dataRangeCalls = 0;
+  const sheet = {
+    getName: () => 'Sheet1',
+    getParent: () => ({ getId: () => 'sheet-123' }),
+    getDataRange: () => { dataRangeCalls += 1; return { getValues: () => [[]] }; },
+    getRange: (row, col, numRows = 1, numCols = 1) => ({
+      getValues: () => {
+        const out = [];
+        for (let r = 0; r < numRows; r += 1) {
+          const rowArr = [];
+          for (let c = 0; c < numCols; c += 1) rowArr.push('');
+          out.push(rowArr);
+        }
+        return out;
+      },
+      setValues: () => {}
+    })
+  };
+
+  const ctx = loadReactionContext({
+    getSheetHeaders: () => ({ headers: cachedHeaders, lastCol: cachedHeaders.length }),
+    openSpreadsheet: () => ({
+      spreadsheet: { getSheetByName: () => sheet }
+    })
+  });
+
+  const result = ctx.addReaction('owner-1', 2, 'LIKE');
+
+  assert.equal(result.success, true, 'Should succeed using cached headers');
+  assert.equal(dataRangeCalls, 0, 'processReactionDirect must NOT call sheet.getDataRange when preloadedHeaders provided');
+});
+
 // =====================================================================
 // toggleHighlight — integration
 // =====================================================================

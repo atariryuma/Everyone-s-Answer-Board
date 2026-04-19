@@ -206,13 +206,15 @@ function getSheetHeaders(sheet) {
     }
   }
 
-  const dataRange = sheet.getDataRange();
-  const values = dataRange.getValues();
+  // Why: キャッシュミス時に sheet.getDataRange().getValues() で全件読むのは無駄。
+  //      ヘッダ行は常に1行目の1..lastColumn なので、そこだけ取得する。
+  //      getLastColumn() は寸法だけのメタ読みで安価。1000行のシートで数百ms削減。
+  const lastCol = sheet.getLastColumn();
+  const headers = lastCol > 0
+    ? (sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [])
+    : [];
 
-  const info = {
-    lastCol: values[0]?.length || 0,
-    headers: values[0] || []
-  };
+  const info = { lastCol, headers };
 
   try {
     cache.put(cacheKey, JSON.stringify(info), CACHE_DURATION.DATABASE_LONG);
