@@ -818,26 +818,6 @@
     }
   }
 
-  function sanitizeInput(input) {
-    if (!input || typeof input !== 'string') return '';
-    return input.replace(/[<>\"'&]/g, '').trim();
-  }
-
-  function sanitizeFormData(data) {
-    const sanitized = {};
-    for (const key in data) {
-      if (data.hasOwnProperty(key)) {
-        if (typeof data[key] === 'string') {
-          sanitized[key] = sanitizeInput(data[key]);
-        } else {
-          sanitized[key] = data[key];
-        }
-      }
-    }
-    return sanitized;
-  }
-
-
   // フォーム統一後は不要だが、後方互換性のため空関数として残す
   function loadSheets(spreadsheetId) {
     return Promise.resolve([]);
@@ -1049,15 +1029,6 @@
       const step = hasSpreadsheetConfig && hasColumnMapping ? 3 : (hasSpreadsheetConfig ? 2 : 1);
       updateProgress(step);
     }
-  }
-
-  function getFormInfoContainer() {
-    const urlMethodElement = document.getElementById('url-method');
-    const isUrlMethod = urlMethodElement && !urlMethodElement.classList.contains('hidden');
-    // URL方式: form-detection-info, ドロップダウン方式: form-info
-    return isUrlMethod ?
-      document.getElementById('form-detection-info') :
-      document.getElementById('form-info');
   }
 
   function updateFormInfo(formData, options = {}) {
