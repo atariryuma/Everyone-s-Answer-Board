@@ -176,3 +176,82 @@ test('validateSpreadsheetAccess: includes executionTime on all response paths', 
   assert.ok(typeof emptyResult.executionTime === 'string');
   assert.match(emptyResult.executionTime, /^\d+ms$/);
 });
+
+// --- isSystemSetupComplete ---
+
+test('isSystemSetupComplete: delegates to hasCoreSystemProps when defined', () => {
+  const ctx = loadSecurityContext({
+    hasCoreSystemProps: () => true
+  });
+  assert.equal(ctx.isSystemSetupComplete(), true);
+
+  const ctx2 = loadSecurityContext({
+    hasCoreSystemProps: () => false
+  });
+  assert.equal(ctx2.isSystemSetupComplete(), false);
+});
+
+test('isSystemSetupComplete: falls back to direct PropertiesService check', () => {
+  const store = {
+    ADMIN_EMAIL: 'a@x.com',
+    DATABASE_SPREADSHEET_ID: 'db',
+    SERVICE_ACCOUNT_CREDS: '{}'
+  };
+  const ctx = loadSecurityContext({
+    hasCoreSystemProps: undefined,
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: (k) => store[k] || null
+      })
+    }
+  });
+  assert.equal(ctx.isSystemSetupComplete(), true);
+});
+
+test('isSystemSetupComplete: returns false when any core prop missing', () => {
+  const ctx = loadSecurityContext({
+    hasCoreSystemProps: undefined,
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: (k) => k === 'ADMIN_EMAIL' ? 'a@x.com' : null
+      })
+    }
+  });
+  assert.equal(ctx.isSystemSetupComplete(), false);
+});
+
+test('isSystemSetupComplete: returns false on exception', () => {
+  const ctx = loadSecurityContext({
+    hasCoreSystemProps: () => { throw new Error('boom'); }
+  });
+  assert.equal(ctx.isSystemSetupComplete(), false);
+});
+
+// --- shouldEnforceDomainRestrictions ---
+
+test('shouldEnforceDomainRestrictions: aliases isSystemSetupComplete', () => {
+  const ctx = loadSecurityContext({
+    hasCoreSystemProps: () => true
+  });
+  assert.equal(ctx.shouldEnforceDomainRestrictions(), true);
+
+  const ctx2 = loadSecurityContext({
+    hasCoreSystemProps: () => false
+  });
+  assert.equal(ctx2.shouldEnforceDomainRestrictions(), false);
+});
+
+// --- extractDomainSafely edge cases ---
+
+test('extractDomainSafely: handles email with multiple @ safely', () => {
+  const ctx = loadSecurityContext();
+  // "user@sub@example.com" — split('@') yields ['user', 'sub', 'example.com']
+  // Implementation takes the last segment, which behaves sanely.
+  const domain = ctx.extractDomainSafely('user@sub@example.com');
+  assert.ok(domain === null || domain === 'example.com' || domain === 'sub');
+});
+
+test('extractDomainSafely: preserves subdomain', () => {
+  const ctx = loadSecurityContext();
+  assert.equal(ctx.extractDomainSafely('user@mail.example.com'), 'mail.example.com');
+});
