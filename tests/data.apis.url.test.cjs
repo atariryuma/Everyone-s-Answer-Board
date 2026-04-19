@@ -895,3 +895,119 @@ test('getSheetNameFromGid: returns "Sheet1" when no sheets present', () => {
   });
   assert.equal(ctx.getSheetNameFromGid('ss-1', '0'), 'Sheet1');
 });
+
+// =====================================================================
+// connectDataSource / processDataSourceOperations
+//
+// These call same-file functions (getColumnAnalysis, getFormInfoInternal),
+// so we monkey-patch the loaded context after construction rather than
+// via harness overrides — vm.runInContext's function hoisting would
+// otherwise clobber any overrides we pass in.
+// =====================================================================
+
+test('connectDataSource: rejects unauthenticated user', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => null
+  });
+  const result = ctx.connectDataSource('ss-1', 'Sheet1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /認証/);
+});
+
+test('connectDataSource: attempts domain-wide sharing but tolerates failure', () => {
+  let sharingAttempted = false;
+  let analysisCalled = false;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    setupDomainWideSharing: () => {
+      sharingAttempted = true;
+      throw new Error('sharing denied');
+    }
+  });
+  ctx.getColumnAnalysis = () => {
+    analysisCalled = true;
+    return { success: true, mapping: {}, headers: [] };
+  };
+  const result = ctx.connectDataSource('ss-1', 'Sheet1');
+  assert.equal(sharingAttempted, true);
+  assert.equal(analysisCalled, true, 'Sharing failure must not block the rest of the flow');
+  assert.equal(result.success, true);
+});
+
+test('connectDataSource: delegates to getColumnAnalysis when no batch operations', () => {
+  let capturedArgs = null;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    setupDomainWideSharing: () => {}
+  });
+  ctx.getColumnAnalysis = (ss, sheet) => {
+    capturedArgs = { ss, sheet };
+    return { success: true };
+  };
+  ctx.connectDataSource('my-ss', 'my-sheet');
+  assert.equal(capturedArgs.ss, 'my-ss');
+  assert.equal(capturedArgs.sheet, 'my-sheet');
+});
+
+test('connectDataSource: delegates to processDataSourceOperations when batch given', () => {
+  let columnCallCount = 0;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    setupDomainWideSharing: () => {}
+  });
+  ctx.getColumnAnalysis = () => {
+    columnCallCount += 1;
+    return { success: true, mapping: {}, headers: [] };
+  };
+  ctx.getFormInfoInternal = () => ({ formData: { formUrl: 'https://docs.google.com/forms/d/x' } });
+  const result = ctx.connectDataSource('ss-1', 'Sheet1', [
+    { type: 'validateAccess' },
+    { type: 'getFormInfo' },
+    { type: 'connectDataSource' }
+  ]);
+  assert.equal(result.success, true);
+  assert.equal(columnCallCount, 1, 'Column analysis should be cached across ops');
+  assert.ok(result.batchResults.validation);
+  assert.ok(result.batchResults.formInfo);
+});
+
+test('processDataSourceOperations: reports failure in validation branch', () => {
+  const ctx = loadDataApisContext();
+  ctx.getColumnAnalysis = () => ({ success: false, message: 'permission denied' });
+  const result = ctx.processDataSourceOperations('ss-1', 'Sheet1', [
+    { type: 'validateAccess' }
+  ]);
+  assert.equal(result.batchResults.validation.success, false);
+  assert.match(result.batchResults.validation.details.connectionError, /permission denied/);
+});
+
+test('processDataSourceOperations: marks overall success=false when connect op fails', () => {
+  const ctx = loadDataApisContext();
+  ctx.getColumnAnalysis = () => ({
+    success: false,
+    message: 'header integrity issue',
+    errorResponse: { message: 'header integrity issue' }
+  });
+  const result = ctx.processDataSourceOperations('ss-1', 'Sheet1', [
+    { type: 'connectDataSource' }
+  ]);
+  assert.equal(result.success, false);
+  assert.match(result.error, /header integrity issue/);
+});
+
+test('processDataSourceOperations: unknown op type is silently skipped', () => {
+  const ctx = loadDataApisContext();
+  ctx.getColumnAnalysis = () => ({ success: true });
+  const result = ctx.processDataSourceOperations('ss-1', 'Sheet1', [
+    { type: 'unknownOp' }
+  ]);
+  assert.equal(result.success, true);
+  assert.deepEqual({ ...result.batchResults }, {});
+});
+
+test('processDataSourceOperations: handles empty operations array', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.processDataSourceOperations('ss-1', 'Sheet1', []);
+  assert.equal(result.success, true);
+  assert.deepEqual({ ...result.batchResults }, {});
+});
