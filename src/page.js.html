@@ -4292,15 +4292,26 @@
       }
     }
     showInfoModal() {
+      // Already open — don't clobber lastFocusedElement with a focus that
+      // we ourselves grabbed on the previous call.
+      if (this.elements.infoModalContainer
+          && !this.elements.infoModalContainer.classList.contains('hidden')) {
+        return;
+      }
+
       this.state.lastFocusedElement = document.activeElement;
       this.elements.infoModalContainer.classList.remove('hidden');
       this.elements.infoModalContainer.classList.add('modal-fade');
       this.elements.infoModalCard.classList.add('modal-scale');
 
       // フォームURLがある場合は「フォームで回答」ボタンを表示
+      // Why gate on https:// : UNIFIED_CONFIG.formUrl flows from admin-editable
+      //      config. javascript: / data: values would fire on click if
+      //      assigned directly to .href, so validate before use.
       const formBtn = document.getElementById('infoModalFormBtn');
       const formUrl = window.UNIFIED_CONFIG?.formUrl;
-      if (formBtn && formUrl) {
+      const isSafeFormUrl = typeof formUrl === 'string' && /^https:\/\//i.test(formUrl);
+      if (formBtn && isSafeFormUrl) {
         formBtn.href = formUrl;
         formBtn.classList.remove('hidden');
       }
