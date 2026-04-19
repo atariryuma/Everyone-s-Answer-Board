@@ -422,3 +422,232 @@ test('getPublishedSheetData: classFilter="すべて" is converted to undefined',
   ctx.getPublishedSheetData('すべて', 'newest', false, 'u1');
   assert.equal(capturedOptions.classFilter, undefined);
 });
+
+// =====================================================================
+// getSheetList
+// =====================================================================
+
+test('getSheetList: rejects empty spreadsheetId', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.getSheetList('');
+  assert.equal(result.success, false);
+  assert.match(result.message, /required/i);
+});
+
+test('getSheetList: rejects unauthenticated user', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => null
+  });
+  const result = ctx.getSheetList('ss-1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /認証/);
+});
+
+test('getSheetList: returns error when openSpreadsheet throws', () => {
+  const ctx = loadDataApisContext({
+    openSpreadsheet: () => { throw new Error('no access'); }
+  });
+  const result = ctx.getSheetList('ss-1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /アクセスできません|設定されているか/);
+});
+
+test('getSheetList: returns error when dataAccess is null', () => {
+  const ctx = loadDataApisContext({
+    openSpreadsheet: () => null
+  });
+  const result = ctx.getSheetList('ss-1234567890');
+  assert.equal(result.success, false);
+});
+
+test('getSheetList: returns list of sheets with dimensions', () => {
+  const mockSheets = [
+    {
+      getName: () => 'Sheet1',
+      getSheetId: () => 0
+    },
+    {
+      getName: () => 'Responses',
+      getSheetId: () => 1
+    }
+  ];
+  const ctx = loadDataApisContext({
+    openSpreadsheet: () => ({ spreadsheet: { getSheets: () => mockSheets } }),
+    getSheetInfo: (sheet) => ({
+      lastRow: sheet.getName() === 'Sheet1' ? 10 : 5,
+      lastCol: 7,
+      headers: []
+    })
+  });
+  const result = ctx.getSheetList('ss-1');
+  assert.equal(result.success, true);
+  assert.equal(result.sheets.length, 2);
+  assert.equal(result.sheets[0].name, 'Sheet1');
+  assert.equal(result.sheets[0].rowCount, 10);
+  assert.equal(result.sheets[0].columnCount, 7);
+  assert.equal(result.sheets[1].name, 'Responses');
+  assert.equal(result.sheets[1].rowCount, 5);
+});
+
+// =====================================================================
+// getDataCount
+// =====================================================================
+
+test('getDataCount: returns auth error without session', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => null
+  });
+  const result = ctx.getDataCount(null, 'newest', false);
+  assert.match(result.error, /Authentication/);
+  assert.equal(result.count, 0);
+});
+
+test('getDataCount: returns user-not-found when email unknown', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'ghost@example.com',
+    findUserByEmail: () => null
+  });
+  const result = ctx.getDataCount(null, 'newest', false);
+  assert.match(result.error, /User not found/);
+  assert.equal(result.count, 0);
+});
+
+test('getDataCount: returns count and sheetName on success', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getUserSheetData: () => ({
+      success: true,
+      data: [{ id: 1 }, { id: 2 }, { id: 3 }],
+      sheetName: 'Sheet1'
+    })
+  });
+  const result = ctx.getDataCount(null, 'newest', false);
+  assert.equal(result.success, true);
+  assert.equal(result.count, 3);
+  assert.equal(result.sheetName, 'Sheet1');
+});
+
+test('getDataCount: returns 0 count when getUserSheetData fails', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getUserSheetData: () => ({ success: false, message: 'sheet gone' })
+  });
+  const result = ctx.getDataCount(null, 'newest', false);
+  assert.equal(result.count, 0);
+  assert.match(result.error, /sheet gone/);
+});
+
+// =====================================================================
+// getNotificationUpdate
+// =====================================================================
+
+test('getNotificationUpdate: rejects invalid request (no email or targetUserId)', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => null
+  });
+  assert.equal(ctx.getNotificationUpdate('u1', {}).success, false);
+
+  const ctx2 = loadDataApisContext({
+    getCurrentEmail: () => 'a@x.com'
+  });
+  assert.equal(ctx2.getNotificationUpdate(null, {}).success, false);
+});
+
+test('getNotificationUpdate: rejects unknown target user', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'a@x.com',
+    findUserById: () => null
+  });
+  const result = ctx.getNotificationUpdate('ghost', {});
+  assert.equal(result.success, false);
+});
+
+test('getNotificationUpdate: blocks non-admin non-owner on unpublished board', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'viewer@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: false }),
+    isAdministrator: () => false
+  });
+  const result = ctx.getNotificationUpdate('u1', {});
+  assert.equal(result.success, false);
+  assert.match(result.message, /Access denied/);
+});
+
+test('getNotificationUpdate: reports hasNewContent=false when no items newer than lastUpdateTime', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'viewer@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    getUserSheetData: () => ({
+      success: true,
+      data: [
+        { timestamp: '2026-04-18T10:00:00Z' },
+        { timestamp: '2026-04-18T11:00:00Z' }
+      ]
+    })
+  });
+  const result = ctx.getNotificationUpdate('u1', {
+    lastUpdateTime: '2026-04-19T00:00:00Z'
+  });
+  assert.equal(result.success, true);
+  assert.equal(result.hasNewContent, false);
+  assert.equal(result.newItemsCount, 0);
+});
+
+test('getNotificationUpdate: reports hasNewContent=true when items newer than lastUpdateTime', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'viewer@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    getUserSheetData: () => ({
+      success: true,
+      data: [
+        { timestamp: '2026-04-18T10:00:00Z' }, // older
+        { timestamp: '2026-04-19T12:00:00Z' }, // newer
+        { timestamp: '2026-04-19T13:00:00Z' }  // newer
+      ]
+    })
+  });
+  const result = ctx.getNotificationUpdate('u1', {
+    lastUpdateTime: '2026-04-19T00:00:00Z'
+  });
+  assert.equal(result.success, true);
+  assert.equal(result.hasNewContent, true);
+  assert.equal(result.newItemsCount, 2);
+});
+
+// =====================================================================
+// processFormUrlInput — URL validation (doesn't require FormApp)
+// =====================================================================
+
+test('processFormUrlInput: rejects non-string input', () => {
+  const ctx = loadDataApisContext();
+  assert.equal(ctx.processFormUrlInput(null).success, false);
+  assert.equal(ctx.processFormUrlInput(42).success, false);
+  assert.equal(ctx.processFormUrlInput('').success, false);
+});
+
+test('processFormUrlInput: rejects URL without /forms/d/ or forms.gle/', () => {
+  const ctx = loadDataApisContext();
+  assert.equal(ctx.processFormUrlInput('https://docs.google.com/spreadsheets/d/abc').success, false);
+  assert.equal(ctx.processFormUrlInput('https://example.com/path').success, false);
+});
+
+test('processFormUrlInput: accepts /forms/d/ and /forms.gle/ URLs', () => {
+  const ctx = loadDataApisContext({
+    FormApp: {
+      openByUrl: () => { throw new Error('dummy - we only test URL gate'); }
+    }
+  });
+  // These pass URL gate but fail at FormApp.openByUrl with a specific error
+  const r1 = ctx.processFormUrlInput('https://docs.google.com/forms/d/abc/viewform');
+  assert.equal(r1.success, false);
+  assert.match(r1.error, /アクセスできません/); // Got past URL gate, failed at FormApp
+
+  const r2 = ctx.processFormUrlInput('https://forms.gle/abc');
+  assert.equal(r2.success, false);
+  assert.match(r2.error, /アクセスできません/);
+});
