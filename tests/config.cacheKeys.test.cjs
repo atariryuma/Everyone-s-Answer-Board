@@ -331,3 +331,141 @@ test('calculateCompletionScore: fully configured scores high', () => {
   });
   assert.ok(score >= 50, `Expected high score for full config, got ${score}`);
 });
+
+// --- saveUserConfig ---
+
+function loadSaveContext(overrides = {}) {
+  return loadConfigContext({
+    findUserById: overrides.findUserById
+      || (() => ({ userId: 'u1', userEmail: 'owner@example.com', configJson: '{}' })),
+    updateUser: overrides.updateUser || (() => ({ success: true })),
+    validateConfig: overrides.validateConfig
+      || (() => ({ isValid: true, errors: [], sanitized: {} })),
+    validatePublishConfig: overrides.validatePublishConfig
+      || (() => ({ success: true, data: {}, errors: [] })),
+    clearConfigCache: overrides.clearConfigCache || (() => {}),
+    ...overrides
+  });
+}
+
+test('saveUserConfig: rejects invalid userId', () => {
+  const { context } = loadSaveContext();
+  assert.equal(context.saveUserConfig('', {}).success, false);
+  assert.equal(context.saveUserConfig(null, {}).success, false);
+  assert.equal(context.saveUserConfig(123, {}).success, false);
+  assert.equal(context.saveUserConfig('   ', {}).success, false);
+});
+
+test('saveUserConfig: rejects invalid config object', () => {
+  const { context } = loadSaveContext();
+  assert.equal(context.saveUserConfig('u1', null).success, false);
+  assert.equal(context.saveUserConfig('u1', 'not-an-object').success, false);
+  assert.equal(context.saveUserConfig('u1', 42).success, false);
+});
+
+test('saveUserConfig: rejects when user not found', () => {
+  const { context } = loadSaveContext({
+    findUserById: () => null
+  });
+  const result = context.saveUserConfig('ghost', { spreadsheetId: 'ss' });
+  assert.equal(result.success, false);
+  assert.match(result.message, /User not found/);
+});
+
+test('saveUserConfig: returns etag_mismatch when incoming etag differs', () => {
+  const { context } = loadSaveContext({
+    findUserById: () => ({
+      userId: 'u1',
+      userEmail: 'owner@example.com',
+      configJson: JSON.stringify({ etag: 'current-etag-v1' })
+    })
+  });
+  const result = context.saveUserConfig('u1', { etag: 'stale-etag-v0', spreadsheetId: 'ss' });
+  assert.equal(result.success, false);
+  assert.equal(result.error, 'etag_mismatch');
+  assert.ok(result.currentConfig);
+});
+
+test('saveUserConfig: proceeds when etag matches', () => {
+  let updateCalled = false;
+  const { context } = loadSaveContext({
+    findUserById: () => ({
+      userId: 'u1',
+      userEmail: 'owner@example.com',
+      configJson: JSON.stringify({ etag: 'v1' })
+    }),
+    updateUser: () => { updateCalled = true; return { success: true }; }
+  });
+  const result = context.saveUserConfig('u1', { etag: 'v1', spreadsheetId: 'ss' });
+  assert.equal(result.success, true);
+  assert.equal(updateCalled, true);
+});
+
+test('saveUserConfig: proceeds when etag absent (no etag enforcement)', () => {
+  let updateCalled = false;
+  const { context } = loadSaveContext({
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com', configJson: '{}' }),
+    updateUser: () => { updateCalled = true; return { success: true }; }
+  });
+  const result = context.saveUserConfig('u1', { spreadsheetId: 'ss' });
+  assert.equal(result.success, true);
+  assert.equal(updateCalled, true);
+});
+
+test('saveUserConfig: fresh etag is generated and stored', () => {
+  let capturedUpdate = null;
+  const { context } = loadSaveContext({
+    updateUser: (_id, fields) => { capturedUpdate = fields; return { success: true }; }
+  });
+  context.saveUserConfig('u1', { spreadsheetId: 'ss' });
+  assert.ok(capturedUpdate.configJson);
+  const stored = JSON.parse(capturedUpdate.configJson);
+  assert.ok(stored.etag);
+  assert.ok(stored.etag.length > 0);
+});
+
+test('saveUserConfig: validation errors are returned verbatim', () => {
+  const { context } = loadSaveContext({
+    validateConfig: () => ({ isValid: false, errors: ['bad answer column'], sanitized: {} })
+  });
+  const result = context.saveUserConfig('u1', { spreadsheetId: 'ss' });
+  assert.equal(result.success, false);
+  assert.ok(result.errors.includes('bad answer column'));
+});
+
+test('saveUserConfig: updateUser failure propagates', () => {
+  const { context } = loadSaveContext({
+    updateUser: () => ({ success: false, message: 'database write failed' })
+  });
+  const result = context.saveUserConfig('u1', { spreadsheetId: 'ss' });
+  assert.equal(result.success, false);
+  assert.match(result.message, /database write failed/);
+});
+
+test('saveUserConfig: clearConfigCache called on success', () => {
+  let cacheClearedFor = null;
+  const { context } = loadSaveContext();
+  // clearConfigCache lives in ConfigService.js; patch after load.
+  context.clearConfigCache = (id) => { cacheClearedFor = id; };
+  context.saveUserConfig('u1', { spreadsheetId: 'ss' });
+  assert.equal(cacheClearedFor, 'u1');
+});
+
+test('saveUserConfig: uses validatePublishConfig when options.isPublish', () => {
+  let publishValidatorUsed = false;
+  let regularValidatorUsed = false;
+  const { context } = loadSaveContext();
+  // validatePublishConfig / validateConfig are defined in ConfigService.js,
+  // so hoisting clobbers harness overrides. Patch post-load.
+  context.validatePublishConfig = () => {
+    publishValidatorUsed = true;
+    return { success: true, data: {} };
+  };
+  context.validateConfig = () => {
+    regularValidatorUsed = true;
+    return { isValid: true, sanitized: {} };
+  };
+  context.saveUserConfig('u1', { spreadsheetId: 'ss' }, { isPublish: true });
+  assert.equal(publishValidatorUsed, true);
+  assert.equal(regularValidatorUsed, false);
+});
