@@ -408,3 +408,74 @@ test('checkUserAuthentication: swallows getUserConfig exceptions and reports has
   assert.equal(result.success, true);
   assert.equal(result.hasValidConfig, false);
 });
+
+// =====================================================================
+// getBatchedUserConfig
+// =====================================================================
+
+test('getBatchedUserConfig: returns auth error without session', () => {
+  const ctx = loadUserApisContext({
+    getCurrentEmail: () => null
+  });
+  const result = ctx.getBatchedUserConfig();
+  assert.equal(result.success, false);
+  assert.equal(result.authenticated, false);
+  assert.ok(result.authError);
+});
+
+test('getBatchedUserConfig: returns domain error when ensureDomainAccess denies', () => {
+  const ctx = loadUserApisContext({
+    shouldEnforceDomainRestrictions: () => true,
+    validateDomainAccess: () => ({ allowed: false })
+  });
+  const result = ctx.getBatchedUserConfig();
+  assert.equal(result.success, false);
+  assert.equal(result.authenticated, true);
+  assert.match(result.error, /管理者と同一ドメイン/);
+});
+
+test('getBatchedUserConfig: returns user-not-found when lookup fails', () => {
+  const ctx = loadUserApisContext({
+    findUserByEmail: () => null
+  });
+  const result = ctx.getBatchedUserConfig();
+  assert.equal(result.success, false);
+  assert.equal(result.authenticated, true);
+  assert.ok(result.userError);
+});
+
+test('getBatchedUserConfig: returns user + config on success', () => {
+  const ctx = loadUserApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getUserConfig: () => ({ success: true, config: { spreadsheetId: 'ss-1' }, message: 'ok' })
+  });
+  const result = ctx.getBatchedUserConfig();
+  assert.equal(result.success, true);
+  assert.equal(result.user.userId, 'u1');
+  assert.equal(result.config.spreadsheetId, 'ss-1');
+  assert.equal(result.configSuccess, true);
+});
+
+test('getBatchedUserConfig: returns empty config when getUserConfig fails but user exists', () => {
+  const ctx = loadUserApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getUserConfig: () => ({ success: false, message: 'config corrupted' })
+  });
+  const result = ctx.getBatchedUserConfig();
+  assert.equal(result.success, true); // overall success unless config throws
+  assert.deepEqual({ ...result.config }, {});
+  assert.equal(result.configSuccess, false);
+  assert.match(result.configMessage, /config corrupted/);
+});
+
+test('getBatchedUserConfig: catches exceptions and returns structured error', () => {
+  const ctx = loadUserApisContext({
+    getCurrentEmail: () => { throw new Error('session service error'); }
+  });
+  const result = ctx.getBatchedUserConfig();
+  assert.equal(result.success, false);
+  assert.match(result.error, /session service error/);
+  assert.ok(result.exception);
+});
