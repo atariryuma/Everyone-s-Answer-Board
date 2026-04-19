@@ -3356,9 +3356,16 @@
 
       const recoveryResult = await this.performStagedRecovery(rowIndex, reaction, error);
 
-      if (!recoveryResult.success) {
-        console.error('❌ All recovery attempts failed:', recoveryResult.message);
+      // Recovery succeeded (cache reload or local restore restored a coherent
+      // state). Skip the scary error toast — the user's UI already matches
+      // reality again, and showing "リアクション更新エラーが発生しました" would
+      // confuse them into thinking the retry didn't work.
+      if (recoveryResult.success) {
+        console.log('✅ Recovery succeeded:', recoveryResult.method);
+        return;
       }
+
+      console.error('❌ All recovery attempts failed:', recoveryResult.message);
 
       let userMessage = 'リアクション更新エラーが発生しました';
       if (error.message.includes('timeout') || error.message.includes('タイムアウト')) {
