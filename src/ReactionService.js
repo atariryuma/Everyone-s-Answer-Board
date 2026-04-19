@@ -291,96 +291,22 @@ function extractHighlight(row, headers) {
  * @returns {Object} 処理結果
  */
 function addReaction(targetUserId, rowIndex, reactionType) {
-  const actorEmail = getCurrentEmail();
-
-  try {
-    const isAdmin = isAdministrator(actorEmail);
-    const preloadedAuth = { email: actorEmail, isAdmin };
-
-    const targetUser = findUserById(targetUserId, {
-      requestingUser: actorEmail,
-      preloadedAuth,
-      allowPublishedRead: true
-    });
-    if (!targetUser) {
-      return createErrorResponse('Target user not found');
-    }
-
-    const config = getConfigOrDefault(targetUserId, targetUser);
-    if (!config.spreadsheetId || !config.sheetName) {
-      return createErrorResponse('Board configuration incomplete');
-    }
-
-    if (!validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config)) {
-      return createErrorResponse('Access denied to target board');
-    }
-
-    const rowNumber = typeof rowIndex === 'string'
-      ? parseInt(rowIndex.replace('row_', ''), 10)
-      : parseInt(rowIndex, 10);
-
-    if (!rowNumber || rowNumber < 2) {
-      return createErrorResponse('Invalid row ID');
-    }
-
-    // Spreadsheetのオープンとシート取得は読取操作で競合しない。
-    // ロック保持時間を最小化するためクリティカルセクション外で実行する。
-    const dataAccess = openSpreadsheet(config.spreadsheetId, {
-      useServiceAccount: false,
-      context: 'reaction_processing'
-    });
-    if (!dataAccess) {
-      return createErrorResponse('Failed to access target spreadsheet');
-    }
-    const sheet = dataAccess.spreadsheet.getSheetByName(config.sheetName);
-    if (!sheet) {
-      return createErrorResponse('Target sheet not found');
-    }
-
-    const lockKey = `reaction_${config.spreadsheetId}_${rowNumber}`;
-    const cache = CacheService.getScriptCache();
-
-    if (cache.get(lockKey)) {
-      return createErrorResponse('同時リアクション処理中です。お待ちください。');
-    }
-
-    const lock = LockService.getScriptLock();
-
-    try {
-      cache.put(lockKey, actorEmail, LOCK_CACHE_TTL_SECONDS);
-
-      if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
-        return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
-      }
-
-      const result = processReactionDirect(sheet, rowNumber, reactionType, actorEmail);
-
-      return {
-        success: true,
-        reactions: result.reactions,
-        userReaction: result.userReaction,
-        action: result.action,
-        message: result.action === 'added' ? 'リアクションを追加しました' : 'リアクションを削除しました'
-      };
-
-    } finally {
-      try {
-        lock.releaseLock();
-      } catch (unlockError) {
-        console.warn('addReaction: Lock release failed:', unlockError.message);
-      }
-
-      try {
-        cache.remove(lockKey);
-      } catch (cacheError) {
-        console.warn('addReaction: Cache cleanup failed:', cacheError.message);
-      }
-    }
-
-  } catch (error) {
-    console.error('addReaction error:', error.message);
-    return createExceptionResponse(error);
-  }
+  return executeBoardRowOperation({
+    targetUserId,
+    rowIndex,
+    lockKeyPrefix: 'reaction',
+    label: 'addReaction',
+    openContext: 'reaction_processing',
+    concurrentMessage: '同時リアクション処理中です。お待ちください。',
+    process: (sheet, rowNumber, actorEmail) => processReactionDirect(sheet, rowNumber, reactionType, actorEmail),
+    formatSuccess: (result) => ({
+      success: true,
+      reactions: result.reactions,
+      userReaction: result.userReaction,
+      action: result.action,
+      message: result.action === 'added' ? 'リアクションを追加しました' : 'リアクションを削除しました'
+    })
+  });
 }
 
 /**
@@ -390,6 +316,47 @@ function addReaction(targetUserId, rowIndex, reactionType) {
  * @returns {Object} 処理結果
  */
 function toggleHighlight(targetUserId, rowIndex) {
+  return executeBoardRowOperation({
+    targetUserId,
+    rowIndex,
+    lockKeyPrefix: 'highlight',
+    label: 'toggleHighlight',
+    openContext: 'highlight_processing',
+    concurrentMessage: '同時ハイライト処理中です。お待ちください。',
+    process: (sheet, rowNumber) => processHighlightDirect(sheet, rowNumber),
+    formatSuccess: (result) => ({
+      success: true,
+      highlighted: result.highlighted,
+      message: result.highlighted ? 'ハイライトしました' : 'ハイライトを解除しました'
+    })
+  });
+}
+
+/**
+ * addReaction / toggleHighlight の共通実行フレーム。
+ *
+ * 1. 認証・ユーザー/設定/権限の検証
+ * 2. rowIndex パース
+ * 3. Spreadsheet をロック外でオープン（読取のみの重い処理を競合から外す）
+ * 4. CacheService による同時実行の早期検出
+ * 5. LockService.tryLock → process() → formatSuccess() → finally でロック/キャッシュ解放
+ *
+ * @param {Object} options
+ * @param {string} options.targetUserId - ボード所有者のuserId
+ * @param {number|string} options.rowIndex - 行番号または 'row_#' 形式
+ * @param {string} options.lockKeyPrefix - キャッシュキーのプレフィックス ('reaction' | 'highlight')
+ * @param {string} options.label - ログ/エラー文脈名（'addReaction' | 'toggleHighlight'）
+ * @param {string} options.openContext - openSpreadsheet の context 識別子
+ * @param {string} options.concurrentMessage - cache ヒット時に返すユーザー向けメッセージ
+ * @param {function(sheet, rowNumber, actorEmail): Object} options.process - クリティカルセクション内で実行する処理
+ * @param {function(result): Object} options.formatSuccess - process の戻り値から API レスポンスを組み立て
+ * @returns {Object} API レスポンス
+ */
+function executeBoardRowOperation(options) {
+  const {
+    targetUserId, rowIndex, lockKeyPrefix, label, openContext,
+    concurrentMessage, process, formatSuccess
+  } = options;
   const actorEmail = getCurrentEmail();
 
   try {
@@ -401,9 +368,7 @@ function toggleHighlight(targetUserId, rowIndex) {
       preloadedAuth,
       allowPublishedRead: true
     });
-    if (!targetUser) {
-      return createErrorResponse('Target user not found');
-    }
+    if (!targetUser) return createErrorResponse('Target user not found');
 
     const config = getConfigOrDefault(targetUserId, targetUser);
     if (!config.spreadsheetId || !config.sheetName) {
@@ -417,64 +382,36 @@ function toggleHighlight(targetUserId, rowIndex) {
     const rowNumber = typeof rowIndex === 'string'
       ? parseInt(rowIndex.replace('row_', ''), 10)
       : parseInt(rowIndex, 10);
+    if (!rowNumber || rowNumber < 2) return createErrorResponse('Invalid row ID');
 
-    if (!rowNumber || rowNumber < 2) {
-      return createErrorResponse('Invalid row ID');
-    }
-
-    // addReactionと同様、Spreadsheetのオープンはロック外に出して保持時間を最小化する。
+    // Spreadsheetのオープンとシート取得は読取操作で競合しない。
+    // ロック保持時間を最小化するためクリティカルセクション外で実行する。
     const dataAccess = openSpreadsheet(config.spreadsheetId, {
       useServiceAccount: false,
-      context: 'highlight_processing'
+      context: openContext
     });
-    if (!dataAccess) {
-      return createErrorResponse('Failed to access target spreadsheet');
-    }
+    if (!dataAccess) return createErrorResponse('Failed to access target spreadsheet');
     const sheet = dataAccess.spreadsheet.getSheetByName(config.sheetName);
-    if (!sheet) {
-      return createErrorResponse('Target sheet not found');
-    }
+    if (!sheet) return createErrorResponse('Target sheet not found');
 
-    const lockKey = `highlight_${config.spreadsheetId}_${rowNumber}`;
+    const lockKey = `${lockKeyPrefix}_${config.spreadsheetId}_${rowNumber}`;
     const cache = CacheService.getScriptCache();
-
-    if (cache.get(lockKey)) {
-      return createErrorResponse('同時ハイライト処理中です。お待ちください。');
-    }
+    if (cache.get(lockKey)) return createErrorResponse(concurrentMessage);
 
     const lock = LockService.getScriptLock();
-
     try {
       cache.put(lockKey, actorEmail, LOCK_CACHE_TTL_SECONDS);
-
       if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
-
-      const result = processHighlightDirect(sheet, rowNumber);
-
-      return {
-        success: true,
-        highlighted: result.highlighted,
-        message: result.highlighted ? 'ハイライトしました' : 'ハイライトを解除しました'
-      };
-
+      const result = process(sheet, rowNumber, actorEmail);
+      return formatSuccess(result);
     } finally {
-      try {
-        lock.releaseLock();
-      } catch (unlockError) {
-        console.warn('toggleHighlight: Lock release failed:', unlockError.message);
-      }
-
-      try {
-        cache.remove(lockKey);
-      } catch (cacheError) {
-        console.warn('toggleHighlight: Cache cleanup failed:', cacheError.message);
-      }
+      try { lock.releaseLock(); } catch (e) { console.warn(`${label}: Lock release failed:`, e.message); }
+      try { cache.remove(lockKey); } catch (e) { console.warn(`${label}: Cache cleanup failed:`, e.message); }
     }
-
   } catch (error) {
-    console.error('toggleHighlight error:', error.message);
+    console.error(`${label} error:`, error.message);
     return createExceptionResponse(error);
   }
 }
