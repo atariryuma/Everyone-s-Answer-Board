@@ -1018,7 +1018,11 @@
           if (this.polling.errorCount >= 3) {
             console.error('💥 通知ポーリング: 連続エラー上限に達したため5分間停止');
             this.stopSimplePolling();
-            setTimeout(() => {
+            // Capture the resume timer on polling state so stopSimplePolling
+            // during the cooldown can cancel it (otherwise a user navigating
+            // away or signing out would see polling resume 5 minutes later).
+            this.polling.resumeTimerId = setTimeout(() => {
+              this.polling.resumeTimerId = null;
               this.startSimplePolling();
             }, 300000);
             return;
@@ -1034,6 +1038,10 @@
       if (this.polling.timerId) {
         clearTimeout(this.polling.timerId);
         this.polling.timerId = null;
+      }
+      if (this.polling.resumeTimerId) {
+        clearTimeout(this.polling.resumeTimerId);
+        this.polling.resumeTimerId = null;
       }
     }
 
