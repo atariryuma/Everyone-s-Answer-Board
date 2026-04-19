@@ -314,3 +314,110 @@ test('runContainerAction: unknown action logs warning, does not throw', () => {
   // Should not throw
   instance.runContainerAction('totally-unknown', null);
 });
+
+// =====================================================================
+// simulateServerExclusiveReaction — optimistic update for mutual-exclusion
+// =====================================================================
+
+function makeReactionInstance(itemReactions) {
+  const { instance } = makeInstance();
+  // reactionTypes is set in the constructor; re-set it on the instance for isolation.
+  instance.reactionTypes = [
+    { key: 'LIKE' },
+    { key: 'UNDERSTAND' },
+    { key: 'CURIOUS' }
+  ];
+  const item = { rowIndex: 1, reactions: itemReactions || {} };
+  return { instance, item };
+}
+
+test('simulateServerExclusiveReaction: adds reaction when user had none', () => {
+  const { instance, item } = makeReactionInstance({
+    LIKE: { count: 3, reacted: false },
+    UNDERSTAND: { count: 1, reacted: false },
+    CURIOUS: { count: 0, reacted: false }
+  });
+
+  const result = instance.simulateServerExclusiveReaction(item, 'LIKE');
+  assert.equal(result.changed, true);
+  assert.equal(result.action, 'added');
+  assert.equal(result.userReaction, 'LIKE');
+  assert.equal(result.reactions.LIKE.count, 4);
+  assert.equal(result.reactions.LIKE.reacted, true);
+});
+
+test('simulateServerExclusiveReaction: toggles off when user clicks same reaction', () => {
+  const { instance, item } = makeReactionInstance({
+    LIKE: { count: 4, reacted: true },
+    UNDERSTAND: { count: 0, reacted: false },
+    CURIOUS: { count: 0, reacted: false }
+  });
+
+  const result = instance.simulateServerExclusiveReaction(item, 'LIKE');
+  assert.equal(result.action, 'removed');
+  assert.equal(result.userReaction, null);
+  assert.equal(result.reactions.LIKE.count, 3);
+  assert.equal(result.reactions.LIKE.reacted, false);
+});
+
+test('simulateServerExclusiveReaction: switches from one reaction to another', () => {
+  const { instance, item } = makeReactionInstance({
+    LIKE: { count: 5, reacted: true },
+    UNDERSTAND: { count: 2, reacted: false },
+    CURIOUS: { count: 1, reacted: false }
+  });
+
+  const result = instance.simulateServerExclusiveReaction(item, 'CURIOUS');
+  assert.equal(result.action, 'changed');
+  assert.equal(result.userReaction, 'CURIOUS');
+  // Old reaction decremented
+  assert.equal(result.reactions.LIKE.count, 4);
+  assert.equal(result.reactions.LIKE.reacted, false);
+  // New reaction incremented
+  assert.equal(result.reactions.CURIOUS.count, 2);
+  assert.equal(result.reactions.CURIOUS.reacted, true);
+});
+
+test('simulateServerExclusiveReaction: count never goes below zero on decrement', () => {
+  const { instance, item } = makeReactionInstance({
+    LIKE: { count: 0, reacted: true }, // edge: reacted but count=0 (corrupt state)
+    UNDERSTAND: { count: 0, reacted: false },
+    CURIOUS: { count: 0, reacted: false }
+  });
+
+  const result = instance.simulateServerExclusiveReaction(item, 'LIKE');
+  assert.equal(result.reactions.LIKE.count, 0); // Math.max(0, -1) = 0
+});
+
+test('simulateServerExclusiveReaction: initializes missing reaction types', () => {
+  const { instance } = makeReactionInstance();
+  const item = { rowIndex: 1, reactions: { LIKE: { count: 1, reacted: false } } };
+  // UNDERSTAND and CURIOUS are missing from the input
+
+  const result = instance.simulateServerExclusiveReaction(item, 'CURIOUS');
+  // CURIOUS should be initialized and then incremented
+  assert.equal(result.reactions.CURIOUS.count, 1);
+  assert.equal(result.reactions.CURIOUS.reacted, true);
+  assert.equal(result.reactions.UNDERSTAND.count, 0);
+});
+
+test('simulateServerExclusiveReaction: handles item with no reactions object', () => {
+  const { instance } = makeReactionInstance();
+  const item = { rowIndex: 1 };
+  const result = instance.simulateServerExclusiveReaction(item, 'LIKE');
+  assert.equal(result.reactions.LIKE.count, 1);
+  assert.equal(result.reactions.LIKE.reacted, true);
+});
+
+test('simulateServerExclusiveReaction: does not mutate input item.reactions', () => {
+  const input = { LIKE: { count: 5, reacted: false } };
+  const { instance } = makeReactionInstance();
+  const item = { rowIndex: 1, reactions: input };
+
+  instance.simulateServerExclusiveReaction(item, 'LIKE');
+  // The function writes to predictedReactions (a deep clone), so input must
+  // be untouched. If this ever regresses, optimistic UI would corrupt the
+  // canonical state before the server response arrives.
+  assert.equal(input.LIKE.count, 5);
+  assert.equal(input.LIKE.reacted, false);
+});
