@@ -524,3 +524,30 @@ test('enhanceError: accepts an error with falsy message, falls back to stringifi
   // and new Error(obj) coerces to string via toString()
   assert.match(e.message, /toString fallback/);
 });
+
+// =====================================================================
+// generateRequestId — unique request tracking identifier
+// =====================================================================
+
+test('generateRequestId: returns a string with the req_ prefix', () => {
+  const { instance } = makeInstance();
+  const id = instance.generateRequestId();
+  assert.equal(typeof id, 'string');
+  assert.ok(id.startsWith('req_'));
+});
+
+test('generateRequestId: produces unique IDs across rapid calls', () => {
+  const { instance } = makeInstance();
+  const ids = new Set();
+  for (let i = 0; i < 100; i += 1) {
+    ids.add(instance.generateRequestId());
+  }
+  assert.equal(ids.size, 100, 'All 100 generated IDs must be unique');
+});
+
+test('generateRequestId: structure is req_<timestamp36>_<random9>', () => {
+  const { instance } = makeInstance();
+  const id = instance.generateRequestId();
+  // req_ + at least one char + _ + 9 chars (substr(2, 9))
+  assert.match(id, /^req_[0-9a-z]+_[0-9a-z]{1,9}$/);
+});
