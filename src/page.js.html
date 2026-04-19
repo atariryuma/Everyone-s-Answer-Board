@@ -563,6 +563,16 @@
 
       this.handlers.onAnswersContainerClick = (e) => {
 
+        // Error/limited-mode screens rendered into answersContainer carry
+        // a data-action attribute rather than inline onclick="..." (keeps
+        // us out of CSP-unsafe territory and makes the handlers testable).
+        const actionEl = e.target.closest('[data-action]');
+        if (actionEl && this.elements.answersContainer.contains(actionEl)) {
+          e.stopPropagation();
+          this.runContainerAction(actionEl.dataset.action, actionEl);
+          return;
+        }
+
         const answerCard = e.target.closest('.answer-card');
 
         if (!answerCard || answerCard.classList.contains('hidden-card')) {
@@ -608,6 +618,22 @@
         this.eventDelegationSetup = true;
       } else {
         console.error('No answers container found for event delegation');
+      }
+    }
+
+    runContainerAction(action, _element) {
+      switch (action) {
+        case 'reload':
+          if (typeof window.safeReload === 'function') window.safeReload();
+          else window.location.reload();
+          return;
+        case 'retry-load':
+          if (typeof this.loadSheetData === 'function') {
+            this.loadSheetData({ bypassCache: true, isInitialLoad: true });
+          }
+          return;
+        default:
+          console.warn('runContainerAction: unknown action', action);
       }
     }
 
@@ -1266,7 +1292,7 @@
           <p class="mt-1 text-sm text-gray-300">一部の機能が制限されています。URLを確認してページを再読み込みしてください。</p>
           <div class="mt-6">
             <button
-              onclick="window.safeReload()"
+              data-action="reload"
               class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
             >
               ページを再読み込み
@@ -1298,7 +1324,7 @@
         <p class="mt-1 text-sm text-gray-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6">
           <button 
-            onclick="window.safeReload()" 
+            data-action="reload" 
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
             ページを再読み込み
@@ -1325,13 +1351,13 @@
         <p class="mt-1 text-sm text-gray-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6 space-x-3">
           <button 
-            onclick="window.safeReload()" 
+            data-action="reload" 
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600"
           >
             ページを再読み込み
           </button>
           <button 
-            onclick="window.studyQuestApp && window.studyQuestApp.loadSheetData({ bypassCache: true, isInitialLoad: true })" 
+            data-action="retry-load" 
             class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
           >
             再試行
@@ -1750,7 +1776,7 @@
         <p class="mt-2 text-xs text-gray-400">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
         <div class="mt-6 space-x-3">
           <button 
-            onclick="window.safeReload()" 
+            data-action="reload" 
             class="inline-flex items-center px-4 py-2 border border-gray-600 text-sm font-medium rounded-md text-gray-300 bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
           >
             <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2241,7 +2267,7 @@
         container.innerHTML = `
         <div class="text-center py-8 col-span-full">
           <p class="text-red-400">表示エラーが発生しました</p>
-          <button onclick="window.safeReload()" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded">
+          <button data-action="reload" class="mt-2 px-4 py-2 bg-blue-600 text-white rounded">
             再読み込み
           </button>
         </div>
