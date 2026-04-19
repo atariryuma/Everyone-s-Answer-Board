@@ -265,306 +265,16 @@ function openDatabase(options = {}) {
  * const dataAccess = openSpreadsheet(otherSpreadsheetId, { useServiceAccount: true });
  */
 function openSpreadsheet(spreadsheetId, options = {}) {
-
-  function openSpreadsheetViaServiceAccount(sheetId) {
-    try {
-      const credentials = getCachedProperty('SERVICE_ACCOUNT_CREDS');
-      if (!credentials) return null;
-
-      const serviceAccount = JSON.parse(credentials);
-
-      const now = Math.floor(Date.now() / 1000);
-      const payload = {
-        iss: serviceAccount.client_email,
-        scope: 'https://www.googleapis.com/auth/spreadsheets',
-        aud: 'https://oauth2.googleapis.com/token',
-        exp: now + 3600,
-        iat: now
-      };
-
-      const header = { alg: 'RS256', typ: 'JWT' };
-      const jwt = createJWT(header, payload, serviceAccount.private_key);
-
-      const tokenResponse = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        payload: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
-      });
-
-      const tokenData = JSON.parse(tokenResponse.getContentText());
-      if (!tokenData.access_token) return null;
-
-      return createServiceAccountSpreadsheetProxy(sheetId, tokenData.access_token);
-
-    } catch (error) {
-      console.error('openSpreadsheetViaServiceAccount error:', error.message);
-      return null;
-    }
-  }
-
-  function createJWT(header, payload, privateKey) {
-    const headerB64 = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=/g, '');
-    const payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=/g, '');
-    const signatureInput = `${headerB64}.${payloadB64}`;
-
-    const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
-    const signatureB64 = Utilities.base64EncodeWebSafe(signature).replace(/=/g, '');
-
-    return `${signatureInput}.${signatureB64}`;
-  }
-
-  function createServiceAccountSpreadsheetProxy(sheetId, accessToken) {
-    return {
-      getId: () => sheetId,
-      getName: () => {
-        try {
-          const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
-          const response = fetchSheetsAPIWithRetry(
-            `${baseUrl}?includeGridData=false&fields=properties.title`,
-            {
-              headers: { 'Authorization': `Bearer ${accessToken}` }
-            },
-            `getName(${sheetId.substring(0, 8)}...)`
-          );
-          const data = JSON.parse(response.getContentText());
-          return data.properties?.title || `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
-        } catch (error) {
-          console.warn('getName via API failed after retries:', error.message);
-          return `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
-        }
-      },
-      getSheetByName: (sheetName) => {
-        return createServiceAccountSheetProxy(sheetId, sheetName, accessToken);
-      },
-      getSheets: () => {
-        try {
-          const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
-          const response = fetchSheetsAPIWithRetry(
-            `${baseUrl}?includeGridData=false`,
-            {
-              headers: { 'Authorization': `Bearer ${accessToken}` }
-            },
-            `getSheets(${sheetId.substring(0, 8)}...)`
-          );
-
-          const data = JSON.parse(response.getContentText());
-          const sheets = data.sheets || [];
-
-          return sheets.map(sheetData => {
-            const properties = sheetData.properties || {};
-            return createServiceAccountSheetProxy(sheetId, properties.title || 'Sheet1', accessToken, {
-              sheetId: properties.sheetId,
-              rowCount: properties.gridProperties?.rowCount || 1000,
-              columnCount: properties.gridProperties?.columnCount || 26
-            });
-          });
-        } catch (error) {
-          console.warn('getSheets via API failed after retries:', error.message);
-          return [];
-        }
-      }
-    };
-  }
-
-  function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additionalInfo = {}) {
-    const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
-
-
-    let cachedDimensions = null;
-
-    function fetchDimensionsOnce() {
-      if (cachedDimensions) return cachedDimensions;
-
-      try {
-        const response = fetchSheetsAPIWithRetry(
-          `${baseUrl}?includeGridData=false&fields=sheets(properties(title,gridProperties))`,
-          {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          },
-          `fetchDimensions(${sheetName})`
-        );
-        const data = JSON.parse(response.getContentText());
-        const sheets = data.sheets || [];
-        const targetSheet = sheets.find(s => s.properties && s.properties.title === sheetName);
-
-        cachedDimensions = {
-          rowCount: targetSheet?.properties?.gridProperties?.rowCount || 1000,
-          columnCount: targetSheet?.properties?.gridProperties?.columnCount || 26
-        };
-
-        return cachedDimensions;
-      } catch (error) {
-        console.warn(`fetchDimensions failed for ${sheetName}:`, error.message);
-        return { rowCount: 1000, columnCount: 26 };
-      }
-    }
-
-    return {
-      getName: () => sheetName,
-      getSheetId: () => additionalInfo.sheetId || 0,
-      getLastRow: () => {
-        if (additionalInfo.rowCount) return additionalInfo.rowCount;
-
-        return fetchDimensionsOnce().rowCount;
-      },
-      getLastColumn: () => {
-        if (additionalInfo.columnCount) return additionalInfo.columnCount;
-
-        return fetchDimensionsOnce().columnCount;
-      },
-      getRange: (row, col, numRows, numCols) => {
-        const range = numRows && numCols
-          ? `${sheetName}!R${row}C${col}:R${row + numRows - 1}C${col + numCols - 1}`
-          : `${sheetName}!R${row}C${col}`;
-
-        return {
-          getValues: () => {
-            try {
-              const response = fetchSheetsAPIWithRetry(
-                `${baseUrl}/values/${range}`,
-                {
-                  headers: { 'Authorization': `Bearer ${accessToken}` }
-                },
-                `getRange.getValues(${range})`
-              );
-              const data = JSON.parse(response.getContentText());
-              return data.values || [];
-            } catch (error) {
-              console.warn('getValues via API failed after retries:', error.message);
-              return [];
-            }
-          },
-          setValue: (value) => {
-            try {
-              const payload = {
-                values: [[value]]
-              };
-              const response = fetchSheetsAPIWithRetry(
-                `${baseUrl}/values/${range}?valueInputOption=RAW`,
-                {
-                  method: 'PUT',
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  payload: JSON.stringify(payload)
-                },
-                `setValue(${range})`
-              );
-
-              return response;
-            } catch (error) {
-              console.warn('setValue via API failed after retries:', error.message);
-              throw error;
-            }
-          },
-          setValues: (values) => {
-            try {
-              const payload = {
-                values
-              };
-              const response = fetchSheetsAPIWithRetry(
-                `${baseUrl}/values/${range}?valueInputOption=RAW`,
-                {
-                  method: 'PUT',
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  payload: JSON.stringify(payload)
-                },
-                `setValues(${range})`
-              );
-
-              return response;
-            } catch (error) {
-              console.warn('setValues via API failed after retries:', error.message);
-              throw error;
-            }
-          }
-        };
-      },
-      getDataRange: () => {
-        return {
-          getValues: () => {
-            try {
-              const response = fetchSheetsAPIWithRetry(
-                `${baseUrl}/values/${sheetName}`,
-                {
-                  headers: { 'Authorization': `Bearer ${accessToken}` }
-                },
-                `getDataRange(${sheetName})`
-              );
-              const data = JSON.parse(response.getContentText());
-              return data.values || [];
-            } catch (error) {
-              console.warn('getDataRange via API failed after retries:', error.message);
-              return [];
-            }
-          },
-          setValues: (values) => {
-            try {
-              const payload = {
-                values
-              };
-              const response = fetchSheetsAPIWithRetry(
-                `${baseUrl}/values/${sheetName}?valueInputOption=RAW`,
-                {
-                  method: 'PUT',
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                    'Content-Type': 'application/json'
-                  },
-                  payload: JSON.stringify(payload)
-                },
-                `getDataRange.setValues(${sheetName})`
-              );
-
-              return response;
-            } catch (error) {
-              console.warn('getDataRange setValues via API failed after retries:', error.message);
-              throw error;
-            }
-          }
-        };
-      },
-      appendRow: (rowData) => {
-        try {
-          const payload = {
-            values: [rowData]
-          };
-          const response = fetchSheetsAPIWithRetry(
-            `${baseUrl}/values/${sheetName}:append?valueInputOption=RAW`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${accessToken}`,
-                'Content-Type': 'application/json'
-              },
-              payload: JSON.stringify(payload)
-            },
-            `appendRow(${sheetName})`
-          );
-
-          return response;
-        } catch (error) {
-          console.warn('appendRow via API failed after retries:', error.message);
-          throw error;
-        }
-      }
-    };
-  }
-
   try {
     if (!spreadsheetId || typeof spreadsheetId !== 'string') {
       console.warn('openSpreadsheet: Invalid spreadsheet ID');
       return null;
     }
 
-    // ✅ CRITICAL: サービスアカウントはDATABASE_SPREADSHEETのみ使用
+    // Why: サービスアカウントはDATABASE_SPREADSHEETのみに限定。
+    // ユーザーのシートに対するSA使用はセキュリティ上許可しない。
     const databaseId = getCachedProperty('DATABASE_SPREADSHEET_ID');
     const isDatabaseAccess = spreadsheetId === databaseId;
-
     const effectiveUseServiceAccount = isDatabaseAccess && options.useServiceAccount === true;
 
     const validation = validateServiceAccountUsage(spreadsheetId, effectiveUseServiceAccount, options.context || 'openSpreadsheet');
@@ -581,7 +291,6 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       if (!auth.isValid) {
         console.warn('openSpreadsheet: Service account requested but invalid credentials');
       }
-      // ✅ CRITICAL: サービスアカウント登録コードを削除
     }
 
     try {
@@ -608,7 +317,7 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       return null;
     }
 
-    const dataAccess = {
+    return {
       spreadsheet,
       auth: auth || { isValid: false },
       getSheet(sheetName) {
@@ -624,12 +333,289 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         }
       }
     };
-
-    return dataAccess;
   } catch (error) {
     console.error('openSpreadsheet error:', error.message);
     return null;
   }
+}
+
+// ---------------------------------------------------------------------
+// サービスアカウント経路のヘルパー群
+// openSpreadsheet内部からmodule-levelへ抽出（クロージャ未使用のため純粋な字句移動）。
+// デバッグ時のスタックトレース可読性とテスト可能性の向上が目的。
+// ---------------------------------------------------------------------
+
+function openSpreadsheetViaServiceAccount(sheetId) {
+  try {
+    const credentials = getCachedProperty('SERVICE_ACCOUNT_CREDS');
+    if (!credentials) return null;
+
+    const serviceAccount = JSON.parse(credentials);
+
+    const now = Math.floor(Date.now() / 1000);
+    const payload = {
+      iss: serviceAccount.client_email,
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      aud: 'https://oauth2.googleapis.com/token',
+      exp: now + 3600,
+      iat: now
+    };
+
+    const header = { alg: 'RS256', typ: 'JWT' };
+    const jwt = createServiceAccountJWT(header, payload, serviceAccount.private_key);
+
+    const tokenResponse = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      payload: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
+    });
+
+    const tokenData = JSON.parse(tokenResponse.getContentText());
+    if (!tokenData.access_token) return null;
+
+    return createServiceAccountSpreadsheetProxy(sheetId, tokenData.access_token);
+
+  } catch (error) {
+    console.error('openSpreadsheetViaServiceAccount error:', error.message);
+    return null;
+  }
+}
+
+function createServiceAccountJWT(header, payload, privateKey) {
+  const headerB64 = Utilities.base64EncodeWebSafe(JSON.stringify(header)).replace(/=/g, '');
+  const payloadB64 = Utilities.base64EncodeWebSafe(JSON.stringify(payload)).replace(/=/g, '');
+  const signatureInput = `${headerB64}.${payloadB64}`;
+
+  const signature = Utilities.computeRsaSha256Signature(signatureInput, privateKey);
+  const signatureB64 = Utilities.base64EncodeWebSafe(signature).replace(/=/g, '');
+
+  return `${signatureInput}.${signatureB64}`;
+}
+
+function createServiceAccountSpreadsheetProxy(sheetId, accessToken) {
+  return {
+    getId: () => sheetId,
+    getName: () => {
+      try {
+        const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+        const response = fetchSheetsAPIWithRetry(
+          `${baseUrl}?includeGridData=false&fields=properties.title`,
+          {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          },
+          `getName(${sheetId.substring(0, 8)}...)`
+        );
+        const data = JSON.parse(response.getContentText());
+        return data.properties?.title || `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
+      } catch (error) {
+        console.warn('getName via API failed after retries:', error.message);
+        return `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
+      }
+    },
+    getSheetByName: (sheetName) => {
+      return createServiceAccountSheetProxy(sheetId, sheetName, accessToken);
+    },
+    getSheets: () => {
+      try {
+        const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+        const response = fetchSheetsAPIWithRetry(
+          `${baseUrl}?includeGridData=false`,
+          {
+            headers: { 'Authorization': `Bearer ${accessToken}` }
+          },
+          `getSheets(${sheetId.substring(0, 8)}...)`
+        );
+
+        const data = JSON.parse(response.getContentText());
+        const sheets = data.sheets || [];
+
+        return sheets.map(sheetData => {
+          const properties = sheetData.properties || {};
+          return createServiceAccountSheetProxy(sheetId, properties.title || 'Sheet1', accessToken, {
+            sheetId: properties.sheetId,
+            rowCount: properties.gridProperties?.rowCount || 1000,
+            columnCount: properties.gridProperties?.columnCount || 26
+          });
+        });
+      } catch (error) {
+        console.warn('getSheets via API failed after retries:', error.message);
+        return [];
+      }
+    }
+  };
+}
+
+function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additionalInfo = {}) {
+  const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+  let cachedDimensions = null;
+
+  function fetchDimensionsOnce() {
+    if (cachedDimensions) return cachedDimensions;
+
+    try {
+      const response = fetchSheetsAPIWithRetry(
+        `${baseUrl}?includeGridData=false&fields=sheets(properties(title,gridProperties))`,
+        {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        },
+        `fetchDimensions(${sheetName})`
+      );
+      const data = JSON.parse(response.getContentText());
+      const sheets = data.sheets || [];
+      const targetSheet = sheets.find(s => s.properties && s.properties.title === sheetName);
+
+      cachedDimensions = {
+        rowCount: targetSheet?.properties?.gridProperties?.rowCount || 1000,
+        columnCount: targetSheet?.properties?.gridProperties?.columnCount || 26
+      };
+
+      return cachedDimensions;
+    } catch (error) {
+      console.warn(`fetchDimensions failed for ${sheetName}:`, error.message);
+      return { rowCount: 1000, columnCount: 26 };
+    }
+  }
+
+  return {
+    getName: () => sheetName,
+    getSheetId: () => additionalInfo.sheetId || 0,
+    getLastRow: () => {
+      if (additionalInfo.rowCount) return additionalInfo.rowCount;
+      return fetchDimensionsOnce().rowCount;
+    },
+    getLastColumn: () => {
+      if (additionalInfo.columnCount) return additionalInfo.columnCount;
+      return fetchDimensionsOnce().columnCount;
+    },
+    getRange: (row, col, numRows, numCols) => {
+      const range = numRows && numCols
+        ? `${sheetName}!R${row}C${col}:R${row + numRows - 1}C${col + numCols - 1}`
+        : `${sheetName}!R${row}C${col}`;
+
+      return {
+        getValues: () => {
+          try {
+            const response = fetchSheetsAPIWithRetry(
+              `${baseUrl}/values/${range}`,
+              {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+              },
+              `getRange.getValues(${range})`
+            );
+            const data = JSON.parse(response.getContentText());
+            return data.values || [];
+          } catch (error) {
+            console.warn('getValues via API failed after retries:', error.message);
+            return [];
+          }
+        },
+        setValue: (value) => {
+          try {
+            const payload = { values: [[value]] };
+            const response = fetchSheetsAPIWithRetry(
+              `${baseUrl}/values/${range}?valueInputOption=RAW`,
+              {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                payload: JSON.stringify(payload)
+              },
+              `setValue(${range})`
+            );
+            return response;
+          } catch (error) {
+            console.warn('setValue via API failed after retries:', error.message);
+            throw error;
+          }
+        },
+        setValues: (values) => {
+          try {
+            const payload = { values };
+            const response = fetchSheetsAPIWithRetry(
+              `${baseUrl}/values/${range}?valueInputOption=RAW`,
+              {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                payload: JSON.stringify(payload)
+              },
+              `setValues(${range})`
+            );
+            return response;
+          } catch (error) {
+            console.warn('setValues via API failed after retries:', error.message);
+            throw error;
+          }
+        }
+      };
+    },
+    getDataRange: () => {
+      return {
+        getValues: () => {
+          try {
+            const response = fetchSheetsAPIWithRetry(
+              `${baseUrl}/values/${sheetName}`,
+              {
+                headers: { 'Authorization': `Bearer ${accessToken}` }
+              },
+              `getDataRange(${sheetName})`
+            );
+            const data = JSON.parse(response.getContentText());
+            return data.values || [];
+          } catch (error) {
+            console.warn('getDataRange via API failed after retries:', error.message);
+            return [];
+          }
+        },
+        setValues: (values) => {
+          try {
+            const payload = { values };
+            const response = fetchSheetsAPIWithRetry(
+              `${baseUrl}/values/${sheetName}?valueInputOption=RAW`,
+              {
+                method: 'PUT',
+                headers: {
+                  'Authorization': `Bearer ${accessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                payload: JSON.stringify(payload)
+              },
+              `getDataRange.setValues(${sheetName})`
+            );
+            return response;
+          } catch (error) {
+            console.warn('getDataRange setValues via API failed after retries:', error.message);
+            throw error;
+          }
+        }
+      };
+    },
+    appendRow: (rowData) => {
+      try {
+        const payload = { values: [rowData] };
+        const response = fetchSheetsAPIWithRetry(
+          `${baseUrl}/values/${sheetName}:append?valueInputOption=RAW`,
+          {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            payload: JSON.stringify(payload)
+          },
+          `appendRow(${sheetName})`
+        );
+        return response;
+      } catch (error) {
+        console.warn('appendRow via API failed after retries:', error.message);
+        throw error;
+      }
+    }
+  };
 }
 
 
