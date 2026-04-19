@@ -45,57 +45,6 @@
 
     window.ICONS = ICONS;
 
-    class UnifiedCache {
-      constructor() {
-        this.data = new Map();
-        this.timestamps = new Map();
-      }
-
-      set(key, value, ttl = 300000) {
-        this.data.set(key, value);
-        this.timestamps.set(key, Date.now() + ttl);
-      }
-
-      get(key) {
-        if (!this.data.has(key)) return undefined;
-
-        const expiry = this.timestamps.get(key);
-        if (expiry && Date.now() > expiry) {
-          this.delete(key);
-          return undefined;
-        }
-
-        return this.data.get(key);
-      }
-
-      has(key) {
-        return this.get(key) !== undefined;
-      }
-
-      delete(key) {
-        this.data.delete(key);
-        this.timestamps.delete(key);
-      }
-
-      clear() {
-        this.data.clear();
-        this.timestamps.clear();
-      }
-
-      cleanup() {
-        const now = Date.now();
-        for (const [key, expiry] of this.timestamps.entries()) {
-          if (now > expiry) {
-            this.delete(key);
-          }
-        }
-      }
-
-      get size() {
-        return this.data.size;
-      }
-    }
-
     function getDynamicBatchSize(perf = {}) {
       const frameTime = perf.frameTime || 16;
       const perfLevel = window.getPerformanceLevel?.() || 'medium';
@@ -127,15 +76,26 @@
 
   <?!= include('SharedUtilities'); ?>
 
-  <script>
-    const __CONFIG_JSON__ = '<?= typeof configJSON !== "undefined" ? configJSON : "{}" ?>';
+  <!-- Bootstrap data lives in data-* attributes so `</script>` in configJSON
+       can't break out of a JS string literal. -->
+  <div id="page-bootstrap-data" hidden
+       data-config="<?= typeof configJSON !== 'undefined' ? configJSON : '{}' ?>"
+       data-mapping="<?= typeof mapping !== 'undefined' ? JSON.stringify(mapping) : '{}' ?>"
+       data-spreadsheet-id="<?= typeof spreadsheetId !== 'undefined' ? spreadsheetId : '' ?>"
+       data-sheet-name="<?= typeof sheetName !== 'undefined' ? sheetName : '' ?>"
+       data-user-id="<?= typeof userId !== 'undefined' ? userId : '' ?>"
+       data-editor-name="<?= typeof editorName !== 'undefined' ? editorName : '' ?>"
+       data-is-editor="<?= typeof isEditor !== 'undefined' ? isEditor : 'false' ?>"></div>
 
-    const __MAPPING__ = '<?= typeof mapping !== "undefined" ? JSON.stringify(mapping) : "{}" ?>';
-    const __SPREADSHEET_ID__ = '<?= typeof spreadsheetId !== "undefined" ? spreadsheetId : "" ?>';
-    const __SHEET_NAME__ = '<?= typeof sheetName !== "undefined" ? sheetName : "" ?>';
-    const __USER_ID__ = '<?= typeof userId !== "undefined" ? userId : "" ?>';
-    const __EDITOR_NAME__ = '<?= typeof editorName !== "undefined" ? editorName : "" ?>';
-    const __IS_EDITOR__ = '<?= typeof isEditor !== "undefined" ? isEditor : "false" ?>';
+  <script>
+    const __BOOTSTRAP__ = document.getElementById('page-bootstrap-data')?.dataset || {};
+    const __CONFIG_JSON__ = __BOOTSTRAP__.config || '{}';
+    const __MAPPING__ = __BOOTSTRAP__.mapping || '{}';
+    const __SPREADSHEET_ID__ = __BOOTSTRAP__.spreadsheetId || '';
+    const __SHEET_NAME__ = __BOOTSTRAP__.sheetName || '';
+    const __USER_ID__ = __BOOTSTRAP__.userId || '';
+    const __EDITOR_NAME__ = __BOOTSTRAP__.editorName || '';
+    const __IS_EDITOR__ = __BOOTSTRAP__.isEditor || 'false';
 
     window.SHEET_NAME = __SHEET_NAME__.startsWith('<') ? '' : __SHEET_NAME__;
     window.USER_ID = __USER_ID__.startsWith('<') ? '' : __USER_ID__;

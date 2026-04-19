@@ -693,14 +693,19 @@
 
 
 
-  // ページ読み込み時にベースURLをプリフェッチ（logout/reload用）
+  // Prefetched once on DOM-ready so logout/reload buttons can run synchronously
+  // inside the user's click event (google.script.run callbacks can't).
   var _cachedWebAppUrl = '';
-  try {
-    google.script.run
-      .withSuccessHandler(function(url) { if (url) _cachedWebAppUrl = url; })
-      .withFailureHandler(function() {})
-      .getWebAppUrl();
-  } catch (_) {}
+  window.onDOMReady(function () {
+    try {
+      if (typeof google !== 'undefined' && google.script?.run) {
+        google.script.run
+          .withSuccessHandler(function (url) { if (url) _cachedWebAppUrl = url; })
+          .withFailureHandler(function () {})
+          .getWebAppUrl();
+      }
+    } catch (_) { /* プリフェッチ失敗時はフォールバックで個別取得 */ }
+  });
 
   window.sharedUtilities.auth = {
     switchToAnotherAccount: function () {
@@ -1179,15 +1184,7 @@
       this.container.appendChild(notification);
 
       const duration = this.getDuration(type);
-      const startTime = Date.now();
-      const checkRemoval = () => {
-        if (Date.now() - startTime >= duration) {
-          this.remove(notification);
-        } else {
-          requestAnimationFrame(checkRemoval);
-        }
-      };
-      requestAnimationFrame(checkRemoval);
+      setTimeout(() => this.remove(notification), duration);
     }
 
     remove(notification) {

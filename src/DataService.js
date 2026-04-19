@@ -18,7 +18,7 @@
  * - ReactionService.gs（リアクション・ハイライト）
  */
 
-/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, extractFieldValueUnified, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty */
+/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, extractFieldValueUnified, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty */
 
 
 /**
@@ -100,8 +100,25 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
   }
 }
 
+/** Returns the index of the timestamp column, or -1 if not found. */
+function resolveTimestampIndex(headers) {
+  if (!Array.isArray(headers)) return -1;
+  for (let i = 0; i < headers.length; i++) {
+    const header = headers[i];
+    if (!header || typeof header !== 'string') continue;
+    const normalized = normalizeHeader(header);
+    if (normalized.includes('タイムスタンプ') ||
+        normalized.includes('timestamp') ||
+        normalized.includes('日時') ||
+        normalized.includes('日付')) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 /**
- * タイムスタンプ専用抽出関数（通知システム用）
+ * タイムスタンプ専用抽出関数（通知システム用 - 単発呼び出し）
  * @param {Array} row - データ行
  * @param {Array} headers - ヘッダー配列
  * @returns {string} タイムスタンプ値
@@ -142,26 +159,10 @@ function extractTimestampValue(row, headers) {
 
 /**
  * スプレッドシート接続とシート取得（GAS Best Practice: 単一責任）
- * ✅ CLAUDE.md準拠: preloadedUser優先使用でDB重複アクセス排除
  * @param {Object} config - 設定オブジェクト
- * @param {Object} context - アクセスコンテキスト（target user info for cross-user access）
  * @returns {Object} シート情報
  */
-function connectToSpreadsheetSheet(config, context = {}) {
-  // ✅ CRITICAL: ユーザーの回答ボードは同一ドメイン共有設定で対応
-  const currentEmail = getCurrentEmail();
-
-  const targetUser = context.preloadedUser || findUserBySpreadsheetId(config.spreadsheetId, {
-    preloadedAuth: context.preloadedAuth, // 認証情報を渡して重複認証回避
-    skipCache: false // キャッシュ活用
-  });
-
-  if (!targetUser) {
-    console.warn('connectToSpreadsheetSheet: Target user not found for spreadsheet', {
-      spreadsheetId: config.spreadsheetId ? `${config.spreadsheetId.substring(0, 8)}...` : 'undefined'
-    });
-  }
-
+function connectToSpreadsheetSheet(config) {
   const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
 
   if (!dataAccess || !dataAccess.spreadsheet) {
@@ -330,6 +331,18 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
   const totalDataRows = lastRow - 1;
   let consecutiveErrors = 0; // ✅ 連続エラーカウント（適応型バッチサイズ用）
 
+  // Headers don't change mid-batch, so resolve column indices once here
+  // rather than per-row (resolveColumnIndex runs a full header scan on misses).
+  const columnMapping = config.columnMapping || {};
+  const fieldIndices = {
+    answer: resolveColumnIndex(headers, 'answer', columnMapping).index,
+    reason: resolveColumnIndex(headers, 'reason', columnMapping).index,
+    class: resolveColumnIndex(headers, 'class', columnMapping).index,
+    name: resolveColumnIndex(headers, 'name', columnMapping).index,
+    email: resolveColumnIndex(headers, 'email', columnMapping).index
+  };
+  const tsIndex = resolveTimestampIndex(headers);
+
   for (let startRow = 2; startRow <= lastRow; ) {
     if (Date.now() - startTime > MAX_EXECUTION_TIME) {
       console.warn('DataService.processBatchData: 実行時間制限のため処理を中断', {
@@ -345,7 +358,7 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
 
     try {
       const batchRows = sheet.getRange(startRow, 1, batchSize, lastCol).getValues();
-      const batchProcessed = processRawDataBatch(batchRows, headers, config, options, startRow - 2, user);
+      const batchProcessed = processRawDataBatch(batchRows, headers, config, options, startRow - 2, user, fieldIndices, tsIndex);
 
       processedData = processedData.concat(batchProcessed);
       processedCount += batchSize;
@@ -402,11 +415,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
   const startTime = Date.now();
 
   try {
-    const { sheet } = connectToSpreadsheetSheet(config, {
-      targetUserEmail: user?.userEmail,
-      preloadedUser: user, // preloadedUserを渡してfindUserBySpreadsheetId重複回避（最重要）
-      preloadedAuth: options.preloadedAuth // 認証情報も渡して重複認証回避
-    });
+    const { sheet } = connectToSpreadsheetSheet(config);
 
     const { lastRow, lastCol, headers } = getSheetInfo(sheet);
 
@@ -436,46 +445,53 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
  * @param {Object} user - ユーザー情報
  * @returns {Array} 処理済みバッチデータ
  */
-function processRawDataBatch(batchRows, headers, config, options = {}, startOffset = 0, user = null) {
+function processRawDataBatch(batchRows, headers, config, options, startOffset, user, fieldIndices, tsIndex) {
   try {
-    const columnMapping = config.columnMapping || {};
     const processedBatch = [];
+    // Normalize empty/missing cells to null to match the prior
+    // extractFieldValueUnified contract (empty strings → value:null).
+    const getCell = (row, idx) => {
+      if (idx < 0 || idx >= row.length) return null;
+      const v = row[idx];
+      if (v === null || v === undefined) return null;
+      if (typeof v === 'string' && v.trim() === '') return null;
+      return v;
+    };
+
+    const viewerEmail = getCurrentEmail();
 
     batchRows.forEach((row, batchIndex) => {
       try {
         const globalIndex = startOffset + batchIndex;
 
-        const answerResult = extractFieldValueUnified(row, headers, 'answer', columnMapping);
-        const reasonResult = extractFieldValueUnified(row, headers, 'reason', columnMapping);
-        const classResult = extractFieldValueUnified(row, headers, 'class', columnMapping);
-        const nameResult = extractFieldValueUnified(row, headers, 'name', columnMapping);
-        const emailResult = extractFieldValueUnified(row, headers, 'email', columnMapping);
+        const answerValue = getCell(row, fieldIndices.answer);
+        const reasonValue = getCell(row, fieldIndices.reason);
+        const classValue = getCell(row, fieldIndices.class);
+        const nameValue = getCell(row, fieldIndices.name);
+        const emailValue = getCell(row, fieldIndices.email);
 
-        const answerValue = answerResult?.value;
-        const nameValue = nameResult?.value;
-
-        const tsValue = extractTimestampValue(row, headers) || '';
+        const tsValue = tsIndex >= 0 && tsIndex < row.length ? (row[tsIndex] || '') : '';
 
         const item = {
           id: `row_${globalIndex + 2}`,
           rowIndex: globalIndex + 2,
           timestamp: tsValue,
-          email: emailResult?.value || '',
+          email: emailValue || '',
 
           answer: answerValue || '',
           opinion: answerValue || '',
-          reason: reasonResult?.value || '',
-          class: classResult?.value || '',
+          reason: reasonValue || '',
+          class: classValue || '',
           name: nameValue || '',
 
           formattedTimestamp: formatTimestamp(tsValue),
           isEmpty: isEmptyRow(row),
 
-          reactions: extractReactions(row, headers, getCurrentEmail()),
+          reactions: extractReactions(row, headers, viewerEmail),
           highlight: extractHighlight(row, headers)
         };
 
-        if (!answerValue && !reasonResult?.value) {
+        if (!answerValue && !reasonValue) {
           return;
         }
 
@@ -628,15 +644,7 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
     }
 
     const isOwner = user.userEmail === currentEmail;
-    const isAdmin = (() => {
-      try {
-        const adminEmail = getCachedProperty('ADMIN_EMAIL');
-        return currentEmail?.toLowerCase() === adminEmail?.toLowerCase();
-      } catch (error) {
-        console.warn('Administrator check failed:', error);
-        return false;
-      }
-    })();
+    const isAdmin = isAdministrator(currentEmail);
 
     if (!isOwner && !isAdmin) {
       console.warn('deleteAnswerRow: Insufficient permissions:', { userId, currentEmail });

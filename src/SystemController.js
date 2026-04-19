@@ -1272,7 +1272,8 @@ function getFormInfo(spreadsheetId, sheetName) {
  */
 function checkCurrentPublicationStatus(targetUserId) {
   try {
-    const email = Session.getActiveUser().getEmail();
+    // getCurrentEmail honors the _apiKeyAdminEmail fallback used by adminApi.
+    const email = getCurrentEmail();
     let user = null;
     if (targetUserId) {
       user = findUserById(targetUserId, { requestingUser: email });

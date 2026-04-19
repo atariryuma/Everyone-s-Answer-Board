@@ -1343,6 +1343,10 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
  * @returns {Object} Delete operation result
  */
 function deleteUser(userId, reason = '', context = {}) {
+  // Matches create/updateUser concurrency contract: without the lock, a
+  // concurrent updateUser can land on a row index that delete just shifted.
+  const lock = LockService.getScriptLock();
+
   try {
     const currentEmail = getCurrentEmail();
     const isAdmin = isAdministrator(currentEmail);
@@ -1352,14 +1356,17 @@ function deleteUser(userId, reason = '', context = {}) {
       return { success: false, message: 'Insufficient permissions for user deletion' };
     }
 
-
-    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-    if (!dbId) {
-      console.warn('deleteUser: DATABASE_SPREADSHEET_ID not configured');
-      return { success: false, message: 'Database not configured' };
+    if (!lock.tryLock(10000)) {
+      console.warn('deleteUser: Lock timeout - concurrent user modification detected');
+      return { success: false, message: 'Concurrent modification in progress. Please retry.' };
     }
 
-    const spreadsheet = SpreadsheetApp.openById(dbId);
+    const spreadsheet = openDatabase();
+    if (!spreadsheet) {
+      console.warn('deleteUser: Database access failed');
+      return { success: false, message: 'Database access failed' };
+    }
+
     const sheet = spreadsheet.getSheetByName('users');
     if (!sheet) {
       console.warn('deleteUser: Users sheet not found');
@@ -1403,5 +1410,11 @@ function deleteUser(userId, reason = '', context = {}) {
   } catch (error) {
     console.error('deleteUser error:', error.message);
     return { success: false, message: error.message };
+  } finally {
+    try {
+      lock.releaseLock();
+    } catch (unlockError) {
+      console.warn('deleteUser: Lock release failed:', unlockError.message);
+    }
   }
 }

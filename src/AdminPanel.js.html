@@ -86,80 +86,6 @@
     }
   };
 
-  /**
-   * GAS関数呼び出しヘルパー - エラーハンドリングとリトライ機能付き
-   */
-  const GASHelper = {
-    retryCount: 0,
-    maxRetries: 3,
-
-    async callGAS(funcName, ...args) {
-      return new Promise((resolve, reject) => {
-        if (typeof google === 'undefined' || !google.script?.run) {
-          reject(new Error('Google Apps Script環境が利用できません'));
-          return;
-        }
-
-        google.script.run
-          .withSuccessHandler((result) => {
-            this.retryCount = 0;
-            resolve(result);
-          })
-          .withFailureHandler((error) => {
-            console.error(`GAS関数呼び出しエラー: ${funcName}`, error);
-
-            const isRetryable = this.isRetryableError(error);
-
-            if (isRetryable && this.retryCount < this.maxRetries) {
-              this.retryCount++;
-
-              createPromiseDelay(Math.pow(2, this.retryCount) * 1000).then(async () => {
-                try {
-                  const result = await this.callGAS(funcName, ...args);
-                  resolve(result);
-                } catch (retryError) {
-                  reject(retryError);
-                }
-              }).catch(reject);
-            } else {
-              this.retryCount = 0;
-              reject(this.normalizeError(error, funcName));
-            }
-          })
-        [funcName](...args);
-      });
-    },
-
-    isRetryableError(error) {
-      const errorString = String(error).toLowerCase();
-      const retryablePatterns = [
-        'timeout',
-        'network',
-        'connection',
-        'temporary',
-        'service unavailable',
-        'internal error'
-      ];
-
-      return retryablePatterns.some(pattern => errorString.includes(pattern));
-    },
-
-    normalizeError(error, funcName) {
-      if (error instanceof Error) {
-        return error;
-      }
-
-      const message = typeof error === 'string' ? error :
-        error?.message || '不明なエラーが発生しました';
-
-      const normalizedError = new Error(`${funcName}: ${message}`);
-      normalizedError.originalError = error;
-      normalizedError.functionName = funcName;
-
-      return normalizedError;
-    }
-  };
-
   let systemState = {
     loading: false,
     config: null,
@@ -3403,17 +3329,7 @@
               console.warn(`⚠️ 設定保存失敗 (試行 ${attempt}):`, result.message || result.error);
               if (attempt < maxRetries) {
                 const delay = Math.pow(2, attempt) * 1000;
-                new Promise(resolve => {
-                  const startTime = Date.now();
-                  const checkTime = () => {
-                    if (Date.now() - startTime >= delay) {
-                      resolve();
-                    } else {
-                      requestAnimationFrame(checkTime);
-                    }
-                  };
-                  checkTime();
-                }).then(attemptSave);
+                window.createPromiseDelay(delay).then(attemptSave);
               } else {
                 reject(new Error(result.message || result.error || '設定保存に失敗しました'));
               }

@@ -1054,9 +1054,14 @@ test('getColumnAnalysis: returns sheet-not-found when getSheet returns null', ()
 });
 
 test('getColumnAnalysis: returns headers and mapping on success', () => {
+  const headers = ['Q1', '理由', '名前'];
   const sheet = {
-    getDataRange: () => ({ getValues: () => [['Q1', '理由', '名前']] }),
-    getRange: () => ({ getValues: () => [] })
+    getLastRow: () => 1,
+    getLastColumn: () => headers.length,
+    getRange: (row, col, numRows, numCols) => ({
+      getValues: () => (numRows === 1 && row === 1 ? [headers] : [])
+    }),
+    getDataRange: () => ({ getValues: () => [headers] })
   };
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',

@@ -166,6 +166,8 @@
       const existingModal = document.getElementById('redirect-modal');
       if (existingModal) existingModal.remove();
 
+      const esc = (s) => window.sharedUtilities.security.escapeHtml(s || '');
+
       const modal = document.createElement('div');
       modal.id = 'redirect-modal';
       modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10002]';
@@ -176,8 +178,8 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
             </svg>
           </div>
-          <h3 class="text-xl font-bold text-white mb-2">${title}</h3>
-          <p class="text-gray-300 mb-6">${message}</p>
+          <h3 class="text-xl font-bold text-white mb-2">${esc(title)}</h3>
+          <p class="text-gray-300 mb-6">${esc(message)}</p>
           <button type="button" id="redirect-btn" class="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg">
             回答ボードを開く
           </button>

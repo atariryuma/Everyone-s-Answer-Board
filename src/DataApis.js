@@ -432,6 +432,33 @@ function getSheetList(spreadsheetId) {
 
 
 /**
+ * Shape the sheet-data result into the JSON-safe envelope the frontend expects.
+ * Date values (raw timestamps from Sheets) are converted to ISO strings;
+ * everything else is already JSON-serializable by construction.
+ */
+function buildSafePublishedDataResult(result, config) {
+  const displaySettings = (config && config.displaySettings) || DEFAULT_DISPLAY_SETTINGS;
+  const rows = Array.isArray(result.data) ? result.data : [];
+  const safeData = rows.map(item => {
+    if (typeof item !== 'object' || item === null) return item;
+    const cleaned = {};
+    for (const key in item) {
+      const v = item[key];
+      cleaned[key] = v instanceof Date ? v.toISOString() : v;
+    }
+    return cleaned;
+  });
+
+  return {
+    success: true,
+    data: safeData,
+    header: String(result.header || result.sheetName || '回答一覧'),
+    sheetName: String(result.sheetName || 'Sheet1'),
+    displaySettings
+  };
+}
+
+/**
  * 統合API: フロントエンド用データ取得（最適化版・クロスユーザー対応）
  * @param {string} classFilter - クラスフィルター
  * @param {string} sortOrder - ソート順
@@ -518,61 +545,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         };
       }
 
-      const finalResult = {
-        success: true,
-        data: result.data || [],
-        header: result.header || result.sheetName || '回答一覧',
-        sheetName: result.sheetName || 'Sheet1'
-      };
-
-      try {
-        JSON.stringify(finalResult);
-
-        const safeResult = {
-          success: true,
-          data: Array.isArray(finalResult.data) ? finalResult.data.map(item => {
-            if (typeof item === 'object' && item !== null) {
-              const cleaned = {};
-              for (const [key, value] of Object.entries(item)) {
-                if (value instanceof Date) {
-                  cleaned[key] = value.toISOString();
-                } else if (typeof value === 'object' && value !== null) {
-                  try {
-                    cleaned[key] = Array.isArray(value) ? [...value] : { ...value };
-                  } catch (e) {
-                    cleaned[key] = String(value);
-                  }
-                } else {
-                  cleaned[key] = value;
-                }
-              }
-              return cleaned;
-            }
-            return item;
-          }) : [],
-          header: String(finalResult.header || '回答一覧'),
-          sheetName: String(finalResult.sheetName || 'Sheet1'),
-          displaySettings: targetUserConfig.displaySettings || DEFAULT_DISPLAY_SETTINGS
-        };
-
-        return safeResult;
-
-      } catch (serializationError) {
-        console.error('getPublishedSheetData: Serialization failed', {
-          error: serializationError.message,
-          dataLength: finalResult.data?.length || 0,
-          headerType: typeof finalResult.header,
-          sheetNameType: typeof finalResult.sheetName
-        });
-
-        return {
-          success: true,
-          data: [],
-          header: '回答一覧（データ変換エラー）',
-          sheetName: 'Sheet1',
-          displaySettings: targetUserConfig.displaySettings || DEFAULT_DISPLAY_SETTINGS
-        };
-      }
+      return buildSafePublishedDataResult(result, targetUserConfig);
     }
 
     const user = findUserByEmail(viewerEmail, {
@@ -621,61 +594,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       };
     }
 
-    const finalResult = {
-      success: true,
-      data: result.data || [],
-      header: result.header || result.sheetName || '回答一覧',
-      sheetName: result.sheetName || 'Sheet1'
-    };
-
-    try {
-      const testSerialization = JSON.stringify(finalResult);
-
-      const safeResult = {
-        success: true,
-        data: Array.isArray(finalResult.data) ? finalResult.data.map(item => {
-          if (typeof item === 'object' && item !== null) {
-            const cleaned = {};
-            for (const [key, value] of Object.entries(item)) {
-              if (value instanceof Date) {
-                cleaned[key] = value.toISOString();
-              } else if (typeof value === 'object' && value !== null) {
-                try {
-                  cleaned[key] = Array.isArray(value) ? [...value] : { ...value };
-                } catch (e) {
-                  cleaned[key] = String(value);
-                }
-              } else {
-                cleaned[key] = value;
-              }
-            }
-            return cleaned;
-          }
-          return item;
-        }) : [],
-        header: String(finalResult.header || '回答一覧'),
-        sheetName: String(finalResult.sheetName || 'Sheet1'),
-        displaySettings: userConfig.displaySettings || DEFAULT_DISPLAY_SETTINGS
-      };
-
-      return safeResult;
-
-    } catch (serializationError) {
-      console.error('getPublishedSheetData: Serialization failed (self-access)', {
-        error: serializationError.message,
-        dataLength: finalResult.data?.length || 0,
-        headerType: typeof finalResult.header,
-        sheetNameType: typeof finalResult.sheetName
-      });
-
-      return {
-        success: true,
-        data: [],
-        header: '回答一覧（データ変換エラー）',
-        sheetName: 'Sheet1',
-        displaySettings: userConfig.displaySettings || DEFAULT_DISPLAY_SETTINGS
-      };
-    }
+    return buildSafePublishedDataResult(result, userConfig);
   } catch (error) {
     console.error('getPublishedSheetData: Exception caught', {
       error: error?.message || 'Unknown error',
@@ -972,18 +891,17 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
       return { success: false, message: 'Sheet not found' };
     }
 
-    const dataRange = sheet.getDataRange();
-    const values = dataRange.getValues();
-    const lastRow = values.length;
-    const lastCol = values[0]?.length || 0;
-    const headers = lastCol > 0 ? values[0] : [];
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    const headers = lastCol > 0
+      ? (sheet.getRange(1, 1, 1, lastCol).getValues()[0] || [])
+      : [];
 
     let sampleData = [];
     if (lastRow > 1 && lastCol > 0) {
       const sampleSize = Math.min(10, lastRow - 1);
       try {
-        const dataRange = sheet.getRange(2, 1, sampleSize, lastCol);
-        sampleData = dataRange.getValues();
+        sampleData = sheet.getRange(2, 1, sampleSize, lastCol).getValues();
       } catch (sampleError) {
         console.warn('getColumnAnalysis: サンプルデータ取得失敗:', sampleError.message);
         sampleData = [];
@@ -995,14 +913,10 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
     try {
       const columnSetupResult = setupReactionAndHighlightColumns(spreadsheetId, sheetName, headers);
       if (columnSetupResult.columnsAdded && columnSetupResult.columnsAdded.length > 0) {
-        const updatedSheet = SpreadsheetApp.openById(spreadsheetId).getSheetByName(sheetName);
-        const updatedValues = updatedSheet.getDataRange().getValues();
-        const updatedHeaders = updatedValues[0] || [];
-
         return {
           success: true,
-          sheet: updatedSheet,
-          headers: updatedHeaders,
+          sheet,
+          headers: [...headers, ...columnSetupResult.columnsAdded],
           data: [],
           mapping: diagnostics.recommendedMapping || {},
           confidence: diagnostics.confidence || {},

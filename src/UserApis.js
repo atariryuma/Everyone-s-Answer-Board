@@ -189,7 +189,9 @@ function processLoginAction() {
           // 管理者メールも自動更新
           const adminEmail = getCachedProperty('ADMIN_EMAIL');
           if (adminEmail && adminEmail.toLowerCase() === oldEmail.toLowerCase()) {
-            setCachedProperty('ADMIN_EMAIL', email);
+            // Store normalized: isAdministrator compares case-insensitively but
+            // other write sites (setupApp) persist the lowercased form.
+            setCachedProperty('ADMIN_EMAIL', email.toLowerCase());
             console.log('processLoginAction: ADMIN_EMAIL updated', { oldEmail, newEmail: email });
           }
         }

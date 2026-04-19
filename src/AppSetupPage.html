@@ -454,11 +454,21 @@
 
         const notification = document.createElement('div');
         notification.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${colors[type]}`;
-        notification.innerHTML = `
-                <div class="mr-3 text-2xl">${icon[type]}</div>
-                <div class="flex-1 text-sm">${message}</div>
-                <button type="button" class="ml-4 text-gray-400 hover:text-white text-xl leading-none" onclick="this.closest('.notification').remove()">✕</button>
-            `;
+        // Build via textContent so server-sourced messages can't inject HTML.
+        const iconDiv = document.createElement('div');
+        iconDiv.className = 'mr-3 text-2xl';
+        iconDiv.textContent = icon[type];
+        const msgDiv = document.createElement('div');
+        msgDiv.className = 'flex-1 text-sm';
+        msgDiv.textContent = message;
+        const closeBtn = document.createElement('button');
+        closeBtn.type = 'button';
+        closeBtn.className = 'ml-4 text-gray-400 hover:text-white text-xl leading-none';
+        closeBtn.textContent = '✕';
+        closeBtn.addEventListener('click', () => notification.remove());
+        notification.appendChild(iconDiv);
+        notification.appendChild(msgDiv);
+        notification.appendChild(closeBtn);
 
         notificationContainer.appendChild(notification);
 

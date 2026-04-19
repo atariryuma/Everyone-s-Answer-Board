@@ -33,7 +33,8 @@
  */
 function getCurrentUserInfo() {
   try {
-    const email = Session.getActiveUser().getEmail();
+    // getCurrentEmail honors the _apiKeyAdminEmail fallback used by adminApi.
+    const email = getCurrentEmail();
     if (!email) {
       console.warn('getCurrentUserInfo: 有効なセッションなし');
       return null;

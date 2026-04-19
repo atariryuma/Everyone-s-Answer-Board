@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, getConfigOrDefault, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, DEFAULT_DISPLAY_SETTINGS */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, getConfigOrDefault, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, setCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, DEFAULT_DISPLAY_SETTINGS */
 
 
 /**
@@ -477,7 +477,9 @@ function doPost(e) {
       if (!newKey) {
         return jsonResponse(createErrorResponse('apiKey must be a string of at least 16 characters', null, { error: 'INVALID_KEY_FORMAT' }));
       }
-      PropertiesService.getScriptProperties().setProperty('ADMIN_API_KEY', newKey);
+      // setCachedProperty also busts the 30s helpers.js memory cache so the very
+      // next adminApi call in this process sees the new key.
+      setCachedProperty('ADMIN_API_KEY', newKey);
       return jsonResponse(createSuccessResponse('ADMIN_API_KEY has been set', { configured: true }));
     }
 
@@ -491,9 +493,13 @@ function doPost(e) {
       if (!apiKey || !timingSafeEqual(apiKey, storedKey)) {
         return jsonResponse(createErrorResponse('Invalid API key', null, { error: 'INVALID_API_KEY' }));
       }
+      const adminParams = request.params === undefined ? {} : request.params;
+      if (!isPlainObject(adminParams)) {
+        return jsonResponse(createErrorResponse('params must be a JSON object', null, { error: 'INVALID_PARAMS' }));
+      }
       _apiKeyAdminEmail = getCachedProperty('ADMIN_EMAIL');
       try {
-        return jsonResponse(dispatchAdminOperation(request.operation, request.params || {}));
+        return jsonResponse(dispatchAdminOperation(request.operation, adminParams));
       } finally {
         _apiKeyAdminEmail = null;
       }

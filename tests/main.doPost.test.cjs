@@ -58,6 +58,15 @@ function loadMainContext(overrides = {}) {
 
   Object.assign(context, overrides);
 
+  // Stub setCachedProperty AFTER overrides so it reads the final PropertiesService.
+  if (!context.setCachedProperty) {
+    context.setCachedProperty = (key, value) => {
+      try {
+        context.PropertiesService.getScriptProperties().setProperty(key, value);
+      } catch (_) { /* stub best-effort */ }
+    };
+  }
+
   vm.createContext(context);
   const source = fs.readFileSync(path.resolve(__dirname, '../src/main.js'), 'utf8');
   vm.runInContext(source, context, { filename: 'main.js' });

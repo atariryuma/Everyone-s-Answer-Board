@@ -80,19 +80,15 @@ function toggleUserActiveStatus(targetUserId) {
       return createUserNotFoundError();
     }
 
-    const updatedUser = {
-      ...targetUser,
-      isActive: !targetUser.isActive,
-      lastModified: new Date().toISOString()
-    };
-
-    const result = updateUser(targetUserId, updatedUser);
+    // Diff-only update so concurrent configJson writes aren't clobbered.
+    const newIsActive = !targetUser.isActive;
+    const result = updateUser(targetUserId, { isActive: newIsActive });
     if (result.success) {
       return {
         success: true,
-        message: `ユーザー状態を${updatedUser.isActive ? 'アクティブ' : '非アクティブ'}に変更しました`,
+        message: `ユーザー状態を${newIsActive ? 'アクティブ' : '非アクティブ'}に変更しました`,
         userId: targetUserId,
-        newStatus: updatedUser.isActive,
+        newStatus: newIsActive,
         timestamp: new Date().toISOString()
       };
     } else {
@@ -339,11 +335,12 @@ function disableAppAccess(reason = 'システムメンテナンス') {
     if (!auth) return createAdminRequiredError();
     const currentEmail = auth.email;
 
-    const props = PropertiesService.getScriptProperties();
-    props.setProperty('APP_DISABLED', 'true');
-    props.setProperty('APP_DISABLED_REASON', reason);
-    props.setProperty('APP_DISABLED_BY', currentEmail);
-    props.setProperty('APP_DISABLED_AT', new Date().toISOString());
+    PropertiesService.getScriptProperties().setProperties({
+      APP_DISABLED: 'true',
+      APP_DISABLED_REASON: reason,
+      APP_DISABLED_BY: currentEmail,
+      APP_DISABLED_AT: new Date().toISOString()
+    });
 
     return createSuccessResponse('アプリケーションを停止しました', {
       reason,
