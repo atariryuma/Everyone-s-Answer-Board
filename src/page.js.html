@@ -1417,7 +1417,12 @@
 
         if (includeFormUrl) {
           const formUrl = await this.getFormUrlForEmptyState();
-          formLinkHtml = formUrl ?
+          // Why: escapeHtml only escapes <>&"; it does not neutralize
+          //      javascript: / data: URLs. Admins can in principle configure
+          //      a malicious formUrl via the board config, so gate on
+          //      https:// before interpolating into href.
+          const isSafeFormUrl = typeof formUrl === 'string' && /^https:\/\//i.test(formUrl);
+          formLinkHtml = isSafeFormUrl ?
             `<div class="mt-6">
             <a href="${window.sharedUtilities.security.escapeHtml(formUrl)}" target="_blank"
                class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors duration-200">
