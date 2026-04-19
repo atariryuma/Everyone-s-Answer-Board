@@ -96,7 +96,7 @@ function loadStudyQuestAppClass() {
 // Create a lightweight instance bypassing the full constructor side effects
 // (which would try to initialize polling, find DOM elements, etc.).
 function makeInstance(overrides = {}) {
-  const { StudyQuestApp, timers } = loadStudyQuestAppClass();
+  const { StudyQuestApp, ctx, timers } = loadStudyQuestAppClass();
   // Bypass the constructor by creating a plain object with StudyQuestApp's
   // prototype, then populating only the fields the methods under test need.
   const instance = Object.create(StudyQuestApp.prototype);
@@ -105,8 +105,9 @@ function makeInstance(overrides = {}) {
   instance.pendingReactions = new Map();
   instance.lastActivityTime = Date.now();
   instance.state = { userId: 'u1' };
+  instance.elements = { answersContainer: null };
   Object.assign(instance, overrides);
-  return { instance, timers };
+  return { instance, ctx, timers };
 }
 
 // =====================================================================
@@ -267,4 +268,49 @@ test('debounceReactionByRow: storing reactionKey allows identifying which reacti
 
   const stored = instance.reactionDebounceTimeouts.get('row_5');
   assert.equal(stored.reactionKey, 'row_5_UNDERSTAND');
+});
+
+// =====================================================================
+// runContainerAction — data-action delegation routing
+// =====================================================================
+
+test('runContainerAction: reload action calls window.safeReload when available', () => {
+  const { instance, ctx } = makeInstance();
+  let called = false;
+  ctx.window.safeReload = () => { called = true; };
+
+  instance.runContainerAction('reload', null);
+  assert.equal(called, true);
+});
+
+test('runContainerAction: reload falls back to location.reload when safeReload missing', () => {
+  const { instance, ctx } = makeInstance();
+  let locationReloadCalled = false;
+  ctx.window.safeReload = undefined;
+  ctx.window.location = { reload: () => { locationReloadCalled = true; } };
+
+  instance.runContainerAction('reload', null);
+  assert.equal(locationReloadCalled, true);
+});
+
+test('runContainerAction: retry-load calls loadSheetData with bypassCache + isInitialLoad', () => {
+  const { instance } = makeInstance();
+  let captured = null;
+  instance.loadSheetData = (options) => { captured = options; };
+
+  instance.runContainerAction('retry-load', null);
+  assert.deepEqual({ ...captured }, { bypassCache: true, isInitialLoad: true });
+});
+
+test('runContainerAction: retry-load is safe when loadSheetData is absent', () => {
+  const { instance } = makeInstance();
+  instance.loadSheetData = undefined;
+  // Should not throw
+  instance.runContainerAction('retry-load', null);
+});
+
+test('runContainerAction: unknown action logs warning, does not throw', () => {
+  const { instance } = makeInstance();
+  // Should not throw
+  instance.runContainerAction('totally-unknown', null);
 });
