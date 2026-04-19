@@ -1003,6 +1003,14 @@
     }
 
     getPollingInterval() {
+      // On consecutive errors, apply exponential backoff before the
+      // 3-error hard stop in schedulePollingCheck takes over. 30s → 60s
+      // keeps us from hammering getNotificationUpdate when the server is
+      // returning 429 or transient 500s.
+      if (this.polling.errorCount > 0) {
+        return Math.min(30000 * Math.pow(2, this.polling.errorCount - 1), 120000);
+      }
+
       const timeSinceActivity = Date.now() - this.lastActivityTime;
 
       if (timeSinceActivity < 60000) return 15000;      // 1分以内: 15秒
@@ -2832,11 +2840,23 @@
     }
 
     /**
-     * 🎯 CLAUDE.md準拠: 行単位デバウンシング処理（300ms）
+     * 行単位デバウンシング処理（300ms）
+     *
+     * Why store the reactionKey with the timeout: if the user clicks LIKE
+     * and then CURIOUS on the same row within 300ms, the LIKE debounce is
+     * superseded. Previously we only cleared the timeout but left the
+     * 'row_N_LIKE' entry in pendingReactions as an orphan, which the
+     * reactionKey-based guard at addReaction() would then treat as
+     * "already in flight" and silently ignore any future click on LIKE
+     * for that row. Cleaning up the superseded entry fixes that.
      */
     debounceReactionByRow(rowKey, rowIndex, reaction, reactionKey) {
-      if (this.reactionDebounceTimeouts.has(rowKey)) {
-        clearTimeout(this.reactionDebounceTimeouts.get(rowKey));
+      const previous = this.reactionDebounceTimeouts.get(rowKey);
+      if (previous) {
+        clearTimeout(previous.timeoutId);
+        if (previous.reactionKey && previous.reactionKey !== reactionKey) {
+          this.pendingReactions.delete(previous.reactionKey);
+        }
       }
 
       const timeoutId = setTimeout(async () => {
@@ -2855,7 +2875,7 @@
         }
       }, 300);
 
-      this.reactionDebounceTimeouts.set(rowKey, timeoutId);
+      this.reactionDebounceTimeouts.set(rowKey, { timeoutId, reactionKey });
     }
 
     /**
