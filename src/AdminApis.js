@@ -367,14 +367,17 @@ function enableAppAccess() {
 
     const props = PropertiesService.getScriptProperties();
 
-    const disabledReason = props.getProperty('APP_DISABLED_REASON') || '';
-    const disabledBy = props.getProperty('APP_DISABLED_BY') || '';
-    const disabledAt = props.getProperty('APP_DISABLED_AT') || '';
+    // Read all in one call, then mutate.
+    const all = props.getProperties();
+    const disabledReason = all.APP_DISABLED_REASON || '';
+    const disabledBy = all.APP_DISABLED_BY || '';
+    const disabledAt = all.APP_DISABLED_AT || '';
 
-    props.deleteProperty('APP_DISABLED');
-    props.deleteProperty('APP_DISABLED_REASON');
-    props.deleteProperty('APP_DISABLED_BY');
-    props.deleteProperty('APP_DISABLED_AT');
+    // PropertiesService has no deleteProperties() batch method, so individual
+    // calls are unavoidable, but skip the ones whose values are already absent.
+    ['APP_DISABLED', 'APP_DISABLED_REASON', 'APP_DISABLED_BY', 'APP_DISABLED_AT'].forEach((key) => {
+      if (all[key] !== undefined) props.deleteProperty(key);
+    });
 
     props.setProperty('APP_ENABLED_AT', new Date().toISOString());
 
@@ -401,25 +404,27 @@ function getAppAccessStatus() {
     const auth = requireAdmin();
     if (!auth) return createAdminRequiredError();
 
-    const props = PropertiesService.getScriptProperties();
-    const isDisabled = props.getProperty('APP_DISABLED') === 'true';
+    // Why: 6回の個別 getProperty() でなく 1 回の getProperties() で全取得。
+    // GAS の PropertiesService 呼出は 1 回あたり 50-100ms のため 500ms級の削減。
+    const all = PropertiesService.getScriptProperties().getProperties();
+    const isDisabled = all.APP_DISABLED === 'true';
 
     const status = {
       isDisabled,
       status: isDisabled ? 'disabled' : 'enabled',
-      adminEmail: props.getProperty('ADMIN_EMAIL') || '',
+      adminEmail: all.ADMIN_EMAIL || '',
       timestamp: new Date().toISOString()
     };
 
     if (isDisabled) {
       status.restriction = {
-        reason: props.getProperty('APP_DISABLED_REASON') || '',
-        disabledBy: props.getProperty('APP_DISABLED_BY') || '',
-        disabledAt: props.getProperty('APP_DISABLED_AT') || ''
+        reason: all.APP_DISABLED_REASON || '',
+        disabledBy: all.APP_DISABLED_BY || '',
+        disabledAt: all.APP_DISABLED_AT || ''
       };
     } else {
       status.lastEnabled = {
-        enabledAt: props.getProperty('APP_ENABLED_AT') || ''
+        enabledAt: all.APP_ENABLED_AT || ''
       };
     }
 

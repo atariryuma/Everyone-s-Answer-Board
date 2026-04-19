@@ -212,10 +212,11 @@ function doGet(e) {
           if (typeof hasCoreSystemProps === 'function') {
             showSetup = !hasCoreSystemProps();
           } else {
-            const props = PropertiesService.getScriptProperties();
-            const hasAdmin = !!props.getProperty('ADMIN_EMAIL');
-            const hasDb = !!props.getProperty('DATABASE_SPREADSHEET_ID');
-            const hasCreds = !!props.getProperty('SERVICE_ACCOUNT_CREDS');
+            // Fallback when SystemController hasn't loaded hasCoreSystemProps.
+            // Use getCachedProperty to avoid 3 PropertiesService calls per doGet.
+            const hasAdmin = !!getCachedProperty('ADMIN_EMAIL');
+            const hasDb = !!getCachedProperty('DATABASE_SPREADSHEET_ID');
+            const hasCreds = !!getCachedProperty('SERVICE_ACCOUNT_CREDS');
             showSetup = !(hasAdmin && hasDb && hasCreds);
           }
         } catch (e) {
