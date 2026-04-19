@@ -109,3 +109,70 @@ test('validateDomainAccess: no success field in return value', () => {
   const result = ctx.validateDomainAccess('user@example.com');
   assert.equal(result.success, undefined);
 });
+
+// --- validateSpreadsheetAccess ---
+
+test('validateSpreadsheetAccess: rejects empty spreadsheetId', () => {
+  const ctx = loadSecurityContext();
+  const result = ctx.validateSpreadsheetAccess('');
+  assert.equal(result.success, false);
+  assert.match(result.message, /スプレッドシート/);
+  assert.deepEqual([...result.sheets], []);
+});
+
+test('validateSpreadsheetAccess: rejects null spreadsheetId', () => {
+  const ctx = loadSecurityContext();
+  const result = ctx.validateSpreadsheetAccess(null);
+  assert.equal(result.success, false);
+});
+
+test('validateSpreadsheetAccess: returns error when openSpreadsheet throws', () => {
+  const ctx = loadSecurityContext({
+    openSpreadsheet: () => { throw new Error('access denied'); }
+  });
+  const result = ctx.validateSpreadsheetAccess('ss-1');
+  assert.equal(result.success, false);
+  assert.match(result.message, /アクセスに失敗/);
+  assert.equal(result.error, 'access denied');
+});
+
+test('validateSpreadsheetAccess: returns error when metadata read fails', () => {
+  const ctx = loadSecurityContext({
+    openSpreadsheet: () => ({
+      spreadsheet: {
+        getName: () => { throw new Error('permission denied'); },
+        getSheets: () => []
+      }
+    })
+  });
+  const result = ctx.validateSpreadsheetAccess('ss-1');
+  assert.equal(result.success, false);
+  assert.match(result.message, /情報の取得に失敗/);
+});
+
+test('validateSpreadsheetAccess: returns sheet list on success', () => {
+  const mockSpreadsheet = {
+    getName: () => 'My Board',
+    getSheets: () => [
+      { getName: () => 'Sheet1', getIndex: () => 0 },
+      { getName: () => 'Responses', getIndex: () => 1 }
+    ]
+  };
+  const ctx = loadSecurityContext({
+    openSpreadsheet: () => ({ spreadsheet: mockSpreadsheet })
+  });
+
+  const result = ctx.validateSpreadsheetAccess('ss-1');
+  assert.equal(result.success, true);
+  assert.equal(result.name, 'My Board');
+  assert.equal(result.sheets.length, 2);
+  assert.equal(result.sheets[0].name, 'Sheet1');
+  assert.equal(result.sheets[1].name, 'Responses');
+});
+
+test('validateSpreadsheetAccess: includes executionTime on all response paths', () => {
+  const ctx = loadSecurityContext();
+  const emptyResult = ctx.validateSpreadsheetAccess('');
+  assert.ok(typeof emptyResult.executionTime === 'string');
+  assert.match(emptyResult.executionTime, /^\d+ms$/);
+});
