@@ -1244,6 +1244,9 @@
       if (this.handlers.onDocumentClick) {
         document.removeEventListener('click', this.handlers.onDocumentClick);
       }
+      if (this.handlers.onActivityDetection) {
+        document.removeEventListener('click', this.handlers.onActivityDetection);
+      }
       if (this.visibilityObserver) {
         this.visibilityObserver.disconnect();
       }
