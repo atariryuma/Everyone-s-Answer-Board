@@ -1011,3 +1011,101 @@ test('processDataSourceOperations: handles empty operations array', () => {
   assert.equal(result.success, true);
   assert.deepEqual({ ...result.batchResults }, {});
 });
+
+// =====================================================================
+// getColumnAnalysis
+// =====================================================================
+
+test('getColumnAnalysis: rejects unauthenticated user', () => {
+  const ctx = loadDataApisContext({ getCurrentEmail: () => null });
+  const result = ctx.getColumnAnalysis('ss-1', 'Sheet1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /認証/);
+});
+
+test('getColumnAnalysis: returns error when openSpreadsheet returns null', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    openSpreadsheet: () => null
+  });
+  const result = ctx.getColumnAnalysis('ss-1', 'Sheet1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /アクセスできません/);
+});
+
+test('getColumnAnalysis: returns error when openSpreadsheet throws', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    openSpreadsheet: () => { throw new Error('denied'); }
+  });
+  const result = ctx.getColumnAnalysis('ss-1', 'Sheet1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /アクセス権がありません/);
+});
+
+test('getColumnAnalysis: returns sheet-not-found when getSheet returns null', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    openSpreadsheet: () => ({ getSheet: () => null })
+  });
+  const result = ctx.getColumnAnalysis('ss-1', 'Missing');
+  assert.equal(result.success, false);
+  assert.match(result.message, /Sheet not found/);
+});
+
+test('getColumnAnalysis: returns headers and mapping on success', () => {
+  const sheet = {
+    getDataRange: () => ({ getValues: () => [['Q1', '理由', '名前']] }),
+    getRange: () => ({ getValues: () => [] })
+  };
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    openSpreadsheet: () => ({ getSheet: () => sheet })
+  });
+  // Stub performIntegratedColumnDiagnostics via in-context patching to avoid
+  // requiring the real ColumnMappingService in this test.
+  ctx.performIntegratedColumnDiagnostics = () => ({
+    recommendedMapping: { answer: 0, reason: 1, name: 2 },
+    confidence: { answer: 90 }
+  });
+  // Suppress column-setup side effect path by forcing no columns added
+  ctx.setupReactionAndHighlightColumns = () => ({ columnsAdded: [] });
+
+  const result = ctx.getColumnAnalysis('ss-1', 'Sheet1');
+  assert.equal(result.success, true);
+  assert.equal(result.mapping.answer, 0);
+  assert.ok(result.headers.length === 3);
+});
+
+// =====================================================================
+// getFormInfoInternal
+// =====================================================================
+
+test('getFormInfoInternal: delegates to getFormInfo when present', () => {
+  let capturedArgs = null;
+  const ctx = loadDataApisContext();
+  ctx.getFormInfo = (ss, sheet) => {
+    capturedArgs = { ss, sheet };
+    return { success: true, formData: { formUrl: 'https://docs.google.com/forms/d/abc' } };
+  };
+  const result = ctx.getFormInfoInternal('ss-1', 'Sheet1');
+  assert.equal(result.success, true);
+  assert.equal(capturedArgs.ss, 'ss-1');
+  assert.equal(capturedArgs.sheet, 'Sheet1');
+});
+
+test('getFormInfoInternal: returns not-initialized error when getFormInfo missing', () => {
+  const ctx = loadDataApisContext();
+  ctx.getFormInfo = undefined;
+  const result = ctx.getFormInfoInternal('ss-1', 'Sheet1');
+  assert.equal(result.success, false);
+  assert.match(result.message, /初期化されていません/);
+});
+
+test('getFormInfoInternal: catches getFormInfo exception', () => {
+  const ctx = loadDataApisContext();
+  ctx.getFormInfo = () => { throw new Error('form api down'); };
+  const result = ctx.getFormInfoInternal('ss-1', 'Sheet1');
+  assert.equal(result.success, false);
+  assert.match(result.message, /form api down/);
+});
