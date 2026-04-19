@@ -171,3 +171,132 @@ test('extractSpreadsheetInfo: rejects URL lacking /spreadsheets/d/ prefix', () =
   const ctx = loadDataApisContext();
   assert.equal(ctx.extractSpreadsheetInfo('https://example.com/d/abc').success, false);
 });
+
+// =====================================================================
+// getBoardInfo
+// =====================================================================
+
+test('getBoardInfo: returns auth error when no email', () => {
+  const ctx = loadDataApisContext({ getCurrentEmail: () => null });
+  const result = ctx.getBoardInfo();
+  assert.equal(result.success, false);
+});
+
+test('getBoardInfo: returns user-not-found when lookup fails', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'nobody@example.com',
+    findUserByEmail: () => null
+  });
+  const result = ctx.getBoardInfo();
+  assert.equal(result.success, false);
+  assert.match(result.message, /User not found/);
+});
+
+test('getBoardInfo: includes isPublished, URLs, and lastUpdated', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com', lastModified: '2026-01-01' }),
+    getConfigOrDefault: () => ({ isPublished: true, publishedAt: '2026-04-19' }),
+    getQuestionText: () => '今日の感想は？',
+    getWebAppUrl: () => 'https://script.google.com/macros/s/abc/exec'
+  });
+
+  const result = ctx.getBoardInfo();
+  assert.equal(result.success, true);
+  assert.equal(result.isPublished, true);
+  assert.equal(result.questionText, '今日の感想は？');
+  assert.ok(result.urls.view.includes('userId=u1'));
+  assert.ok(result.urls.view.includes('mode=view'));
+  assert.ok(result.urls.admin.includes('mode=admin'));
+  assert.equal(result.lastUpdated, '2026-04-19');
+});
+
+test('getBoardInfo: lastUpdated falls back to user.lastModified when not published', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com', lastModified: '2026-01-01' }),
+    getConfigOrDefault: () => ({ isPublished: false }),
+    getWebAppUrl: () => 'https://x.example.com'
+  });
+  const result = ctx.getBoardInfo();
+  assert.equal(result.isPublished, false);
+  assert.equal(result.lastUpdated, '2026-01-01');
+});
+
+// =====================================================================
+// validateHeaderIntegrity
+// =====================================================================
+
+test('validateHeaderIntegrity: returns user-not-found without session or target', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => null,
+    findUserById: () => null,
+    findUserByEmail: () => null
+  });
+  const result = ctx.validateHeaderIntegrity(null);
+  assert.equal(result.success, false);
+});
+
+test('validateHeaderIntegrity: returns error when spreadsheet config incomplete', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: '', sheetName: '' })
+  });
+  const result = ctx.validateHeaderIntegrity('u1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /configuration incomplete/i);
+});
+
+test('validateHeaderIntegrity: returns error when target sheet not found', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Missing' }),
+    openSpreadsheet: () => ({ getSheet: () => null })
+  });
+  const result = ctx.validateHeaderIntegrity('u1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /Sheet not found/);
+});
+
+test('validateHeaderIntegrity: returns valid=true for healthy headers', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
+    openSpreadsheet: () => ({ getSheet: () => ({ name: 'Sheet1' }) }),
+    getSheetInfo: () => ({ headers: ['Q1', '理由', '名前', 'LIKE'], lastRow: 10, lastCol: 4 })
+  });
+  const result = ctx.validateHeaderIntegrity('u1');
+  assert.equal(result.success, true);
+  assert.equal(result.valid, true);
+  assert.equal(result.headerCount, 4);
+  assert.equal(result.emptyHeaderCount, 0);
+});
+
+test('validateHeaderIntegrity: reports empty-header count', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
+    openSpreadsheet: () => ({ getSheet: () => ({}) }),
+    getSheetInfo: () => ({ headers: ['Q1', '', '  ', 'LIKE'], lastRow: 2, lastCol: 4 })
+  });
+  const result = ctx.validateHeaderIntegrity('u1');
+  assert.equal(result.valid, true); // at least one non-empty header
+  assert.equal(result.emptyHeaderCount, 2);
+});
+
+test('validateHeaderIntegrity: returns valid=false when all headers are empty', () => {
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1' }),
+    openSpreadsheet: () => ({ getSheet: () => ({}) }),
+    getSheetInfo: () => ({ headers: ['', '  ', null], lastRow: 0, lastCol: 3 })
+  });
+  const result = ctx.validateHeaderIntegrity('u1');
+  assert.equal(result.success, false);
+  assert.equal(result.valid, false);
+});
