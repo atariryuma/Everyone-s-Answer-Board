@@ -29,6 +29,8 @@ function loadDataApisContext(overrides = {}) {
     CACHE_DURATION: { SHORT: 10, MEDIUM: 30, LONG: 300, DATABASE_LONG: 600, FORM_DATA: 30 },
     TIMEOUT_MS: { DEFAULT: 5000 },
     SYSTEM_LIMITS: {},
+    DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: true, theme: 'default', pageSize: 20 },
+    getBatchedAdminAuth: () => ({ success: true, authenticated: true, email: 'viewer@example.com', isAdmin: false }),
     getCachedProperty: () => null,
     saveToCacheWithSizeCheck: () => true,
     validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e) }),
@@ -299,4 +301,124 @@ test('validateHeaderIntegrity: returns valid=false when all headers are empty', 
   const result = ctx.validateHeaderIntegrity('u1');
   assert.equal(result.success, false);
   assert.equal(result.valid, false);
+});
+
+// =====================================================================
+// getPublishedSheetData — authorization decisions
+// =====================================================================
+
+function ctxWithAuth(overrides = {}) {
+  return loadDataApisContext({
+    getBatchedAdminAuth: () => ({
+      success: true,
+      authenticated: true,
+      email: 'viewer@example.com',
+      isAdmin: false
+    }),
+    getUserSheetData: () => ({
+      success: true,
+      data: [{ id: 1 }],
+      headers: ['Q1'],
+      sheetName: 'Sheet1',
+      header: '',
+      showDetails: true
+    }),
+    getQuestionText: () => '',
+    ...overrides
+  });
+}
+
+test('getPublishedSheetData: rejects unauthenticated viewer', () => {
+  const ctx = ctxWithAuth({
+    getBatchedAdminAuth: () => ({ success: false, authenticated: false })
+  });
+  const result = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /Authentication/);
+});
+
+test('getPublishedSheetData: rejects when target user not found', () => {
+  const ctx = ctxWithAuth({
+    findUserById: () => null
+  });
+  const result = ctx.getPublishedSheetData(null, 'newest', false, 'ghost');
+  assert.equal(result.success, false);
+  assert.match(result.error, /Target user/);
+});
+
+test('getPublishedSheetData: blocks non-admin non-owner viewer from unpublished board', () => {
+  let getUserSheetDataCalled = false;
+  const ctx = ctxWithAuth({
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: false }),
+    getUserSheetData: () => { getUserSheetDataCalled = true; return { success: true }; }
+  });
+  const result = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
+  assert.equal(result.success, false);
+  assert.match(result.error, /未公開/);
+  assert.equal(getUserSheetDataCalled, false, 'Must not fetch data for unauthorized viewer');
+});
+
+test('getPublishedSheetData: allows non-admin on a published board', () => {
+  const ctx = ctxWithAuth({
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: true })
+  });
+  const result = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
+  assert.equal(result.success, true);
+});
+
+test('getPublishedSheetData: allows owner to view their own unpublished board', () => {
+  const ctx = ctxWithAuth({
+    getBatchedAdminAuth: () => ({
+      success: true, authenticated: true,
+      email: 'owner@example.com', isAdmin: false
+    }),
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: false })
+  });
+  const result = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
+  assert.equal(result.success, true);
+});
+
+test('getPublishedSheetData: allows system admin regardless of publish state', () => {
+  const ctx = ctxWithAuth({
+    getBatchedAdminAuth: () => ({
+      success: true, authenticated: true,
+      email: 'admin@example.com', isAdmin: true
+    }),
+    findUserById: () => ({ userId: 'u1', userEmail: 'other@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: false })
+  });
+  const result = ctx.getPublishedSheetData(null, 'newest', false, 'u1');
+  assert.equal(result.success, true);
+});
+
+test('getPublishedSheetData: forwards classFilter and sortOrder to getUserSheetData', () => {
+  let capturedOptions = null;
+  const ctx = ctxWithAuth({
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: true }),
+    getUserSheetData: (_userId, options) => {
+      capturedOptions = options;
+      return { success: true, data: [], headers: [], sheetName: '' };
+    }
+  });
+  ctx.getPublishedSheetData('3-1', 'oldest', false, 'u1');
+  assert.equal(capturedOptions.classFilter, '3-1');
+  assert.equal(capturedOptions.sortBy, 'oldest');
+});
+
+test('getPublishedSheetData: classFilter="すべて" is converted to undefined', () => {
+  let capturedOptions = null;
+  const ctx = ctxWithAuth({
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss', sheetName: 'Sheet1', isPublished: true }),
+    getUserSheetData: (_userId, options) => {
+      capturedOptions = options;
+      return { success: true, data: [], headers: [], sheetName: '' };
+    }
+  });
+  ctx.getPublishedSheetData('すべて', 'newest', false, 'u1');
+  assert.equal(capturedOptions.classFilter, undefined);
 });
