@@ -243,3 +243,168 @@ test('processLoginAction: works gracefully when identity token is unavailable', 
   const result = ctx.processLoginAction();
   assert.equal(result.success, true);
 });
+
+// =====================================================================
+// ensureDomainAccess
+// =====================================================================
+
+test('ensureDomainAccess: returns allowed=true when enforcement disabled', () => {
+  const ctx = loadUserApisContext({
+    shouldEnforceDomainRestrictions: () => false
+  });
+  const result = ctx.ensureDomainAccess('user@anywhere.com');
+  assert.equal(result.allowed, true);
+});
+
+test('ensureDomainAccess: returns allowed=true when validateDomainAccess absent', () => {
+  const ctx = loadUserApisContext({
+    shouldEnforceDomainRestrictions: () => true,
+    validateDomainAccess: undefined
+  });
+  const result = ctx.ensureDomainAccess('user@anywhere.com');
+  assert.equal(result.allowed, true);
+});
+
+test('ensureDomainAccess: delegates to validateDomainAccess with permissive flags', () => {
+  let capturedOptions = null;
+  const ctx = loadUserApisContext({
+    shouldEnforceDomainRestrictions: () => true,
+    validateDomainAccess: (email, options) => {
+      capturedOptions = options;
+      return { allowed: true, reason: 'same_domain' };
+    }
+  });
+  const result = ctx.ensureDomainAccess('user@example.com');
+  assert.equal(result.allowed, true);
+  assert.equal(capturedOptions.allowIfAdminUnconfigured, true);
+  assert.equal(capturedOptions.allowIfEmailMissing, false);
+});
+
+test('ensureDomainAccess: propagates denial from validateDomainAccess', () => {
+  const ctx = loadUserApisContext({
+    shouldEnforceDomainRestrictions: () => true,
+    validateDomainAccess: () => ({ allowed: false, reason: 'domain_mismatch' })
+  });
+  const result = ctx.ensureDomainAccess('user@other.com');
+  assert.equal(result.allowed, false);
+});
+
+// =====================================================================
+// getConfig
+// =====================================================================
+
+test('getConfig: returns auth error when no email', () => {
+  const ctx = loadUserApisContext({
+    getCurrentEmail: () => null
+  });
+  const result = ctx.getConfig();
+  assert.equal(result.success, false);
+});
+
+test('getConfig: returns domain error when ensureDomainAccess denies', () => {
+  const ctx = loadUserApisContext({
+    shouldEnforceDomainRestrictions: () => true,
+    validateDomainAccess: () => ({ allowed: false })
+  });
+  const result = ctx.getConfig();
+  assert.equal(result.success, false);
+  assert.match(result.message, /管理者と同一ドメイン/);
+});
+
+test('getConfig: returns user-not-found when findUserByEmail returns null', () => {
+  const ctx = loadUserApisContext({
+    findUserByEmail: () => null
+  });
+  const result = ctx.getConfig();
+  assert.equal(result.success, false);
+  assert.match(result.message, /user not found/);
+});
+
+test('getConfig: returns config and userId on success', () => {
+  const ctx = loadUserApisContext({
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    getConfigOrDefault: () => ({ spreadsheetId: 'ss-1', sheetName: 'Sheet1' })
+  });
+  const result = ctx.getConfig();
+  assert.equal(result.success, true);
+  assert.equal(result.data.userId, 'u1');
+  assert.equal(result.data.config.spreadsheetId, 'ss-1');
+});
+
+// =====================================================================
+// checkUserAuthentication
+// =====================================================================
+
+test('checkUserAuthentication: returns unauthenticated when no email', () => {
+  const ctx = loadUserApisContext({
+    getCurrentEmail: () => null
+  });
+  const result = ctx.checkUserAuthentication();
+  assert.equal(result.success, false);
+  assert.equal(result.authenticated, false);
+});
+
+test('checkUserAuthentication: returns domain-restricted when ensureDomainAccess denies', () => {
+  const ctx = loadUserApisContext({
+    shouldEnforceDomainRestrictions: () => true,
+    validateDomainAccess: () => ({ allowed: false })
+  });
+  const result = ctx.checkUserAuthentication();
+  assert.equal(result.success, false);
+  assert.equal(result.authenticated, true); // session exists, just not allowed domain
+});
+
+test('checkUserAuthentication: reports authLevel=guest when user not in DB', () => {
+  const ctx = loadUserApisContext({
+    findUserByEmail: () => null
+  });
+  const result = ctx.checkUserAuthentication();
+  assert.equal(result.success, true);
+  assert.equal(result.authLevel, 'guest');
+  assert.equal(result.userExists, false);
+});
+
+test('checkUserAuthentication: reports authLevel=user when found in DB', () => {
+  const ctx = loadUserApisContext({
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' })
+  });
+  const result = ctx.checkUserAuthentication();
+  assert.equal(result.authLevel, 'user');
+  assert.equal(result.userId, 'u1');
+});
+
+test('checkUserAuthentication: reports authLevel=administrator for admins', () => {
+  const ctx = loadUserApisContext({
+    isAdministrator: () => true,
+    findUserByEmail: () => ({ userId: 'admin-id', userEmail: 'admin@example.com' })
+  });
+  const result = ctx.checkUserAuthentication();
+  assert.equal(result.authLevel, 'administrator');
+  assert.equal(result.isAdministrator, true);
+});
+
+test('checkUserAuthentication: hasValidConfig reflects getUserConfig result', () => {
+  const ctx = loadUserApisContext({
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    getUserConfig: () => ({ success: true, config: {} })
+  });
+  const ok = ctx.checkUserAuthentication();
+  assert.equal(ok.hasValidConfig, true);
+
+  const ctx2 = loadUserApisContext({
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    getUserConfig: () => ({ success: false })
+  });
+  const fail = ctx2.checkUserAuthentication();
+  assert.equal(fail.hasValidConfig, false);
+});
+
+test('checkUserAuthentication: swallows getUserConfig exceptions and reports hasValidConfig=false', () => {
+  const ctx = loadUserApisContext({
+    findUserByEmail: () => ({ userId: 'u1', userEmail: 'newmail@example.com' }),
+    getUserConfig: () => { throw new Error('config service down'); }
+  });
+  const result = ctx.checkUserAuthentication();
+  assert.equal(result.success, true);
+  assert.equal(result.hasValidConfig, false);
+});
