@@ -622,18 +622,34 @@
     setupPullToRefresh() {
       const indicator = document.getElementById('pull-to-refresh-indicator');
       const textEl = document.getElementById('pull-to-refresh-text');
-      if (!indicator || !textEl) return;
+      const body = document.getElementById('main-container');
+      if (!indicator || !textEl || !body) return;
 
-      const THRESHOLD_PX = 70;   // ここを超えて離すと発火
+      // Why: ネイティブ（iOS Safari / SNS アプリ）の引き下げ更新は、ボディそのものが
+      //      指に追随してラバーバンドで戻る体験が核。インジケーターだけ動かしてもボディが
+      //      静止していると「上から通知が出た」だけに感じて違和感が残る。ボディも
+      //      translateY させ、しきい値到達前は減衰倍率で抵抗を演出、release 時は CSS
+      //      transition の spring 風 easing で 0 に戻す。
+      const THRESHOLD_PX = 70;   // これを超えて離すと発火
       const MAX_PULL_PX = 120;   // ここ以上は伸びない（視覚上の上限）
+      const BODY_DAMP = 0.45;    // ボディの減衰倍率（1.0 だと指とぴったり同じ、0.45 で "重み" を感じる）
+
       let startY = null;
       let pulling = false;
       let triggered = false;
 
+      const setBodyOffset = (px) => {
+        body.style.transform = px > 0 ? `translate3d(0, ${px}px, 0)` : '';
+      };
+
       const reset = () => {
         indicator.style.transform = 'translate(-50%, -120%)';
-        indicator.classList.remove('active');
+        indicator.classList.remove('active', 'ready');
         textEl.textContent = '引き下げて更新';
+        // ボディは CSS transition で spring 風に 0 へ戻す
+        body.classList.add('ptr-releasing');
+        setBodyOffset(0);
+        setTimeout(() => body.classList.remove('ptr-releasing'), 400);
         startY = null;
         pulling = false;
         triggered = false;
@@ -646,6 +662,8 @@
         startY = e.touches[0].clientY;
         pulling = false;
         triggered = false;
+        // 引き下げ中は transition を切って指の追随をスムーズにする
+        body.classList.remove('ptr-releasing');
       };
 
       this.handlers.onPtrMove = (e) => {
@@ -655,19 +673,30 @@
           if (pulling) reset();
           return;
         }
-        // ユーザーが下向きに 8px 以上引っ張ったら pull 状態に入る。
+        // ブレ防止: 8px 未満はまだ pull 状態に入らない
         if (dy < 8) return;
         if ((window.scrollY || 0) > 0) { reset(); return; }
 
         pulling = true;
         const pull = Math.min(dy, MAX_PULL_PX);
-        const y = (pull / MAX_PULL_PX) * 100 - 120;
-        indicator.style.transform = `translate(-50%, ${y}%)`;
-        indicator.classList.add('active');
-        triggered = pull >= THRESHOLD_PX;
-        textEl.textContent = triggered ? '離して更新' : '引き下げて更新';
 
-        // native refresh（Chrome の下スクロール再読み込み）を抑止する。
+        // インジケーター: 画面外 -120% から 指追随で 0 付近まで
+        const indicatorY = (pull / MAX_PULL_PX) * 100 - 120;
+        indicator.style.transform = `translate(-50%, ${indicatorY}%)`;
+        indicator.classList.add('active');
+
+        // ボディ: 減衰付きで translateY。指の動きに連動してページ全体が引き下がる
+        setBodyOffset(pull * BODY_DAMP);
+
+        // しきい値到達で見た目を切り替え（触覚代替フィードバック）
+        const prevTriggered = triggered;
+        triggered = pull >= THRESHOLD_PX;
+        if (triggered !== prevTriggered) {
+          indicator.classList.toggle('ready', triggered);
+          textEl.textContent = triggered ? '離して更新' : '引き下げて更新';
+        }
+
+        // native refresh（Chrome の下スクロール再読み込み）を抑止
         if (e.cancelable) e.preventDefault();
       };
 
@@ -675,7 +704,11 @@
         if (!pulling) { reset(); return; }
         if (!triggered) { reset(); return; }
         textEl.textContent = '更新中...';
+        indicator.classList.remove('ready');
         indicator.style.transform = 'translate(-50%, 12px)';
+        // ローディング中は少しだけボディを下げたまま保持して "読み込んでいる感" を残す
+        body.classList.add('ptr-releasing');
+        setBodyOffset(24);
         try {
           await this.refreshContent();
         } finally {
@@ -683,7 +716,6 @@
         }
       };
 
-      // passive:false が必要（preventDefault するため）。start/end は passive で OK。
       document.addEventListener('touchstart', this.handlers.onPtrStart, { passive: true });
       document.addEventListener('touchmove', this.handlers.onPtrMove, { passive: false });
       document.addEventListener('touchend', this.handlers.onPtrEnd, { passive: true });

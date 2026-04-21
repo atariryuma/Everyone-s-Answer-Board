@@ -64,24 +64,27 @@ header.header-hidden {
   header { transition: none; }
 }
 
-/* Pull-to-refresh indicator: ページ最上部から引き下げ始めると出現。
-   閾値を超えて離すと refreshContent が走る。 */
+/* Pull-to-refresh indicator。
+   Why: 見た目を #newContentBanner と揃える（どちらも「上から降りてくる通知系 pill」）。
+        gradient + rounded-full + white text で視覚言語を統一する。 */
 #pull-to-refresh-indicator {
   position: fixed;
   top: 0;
   left: 50%;
   transform: translate(-50%, -120%);
   z-index: 70;
-  background: rgba(15, 23, 42, 0.92);
-  color: #e0f2fe;
-  border: 1px solid rgba(103, 232, 249, 0.4);
+  background: linear-gradient(to right, #2563eb, #7c3aed);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 9999px;
   padding: 0.5rem 1rem;
   font-size: 0.875rem;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+  font-weight: 500;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
   backdrop-filter: blur(8px);
   pointer-events: none;
-  transition: opacity 0.2s ease-out;
+  /* transform は JS が指に追随させるため transition から外す。opacity / border-color だけ CSS 側。 */
+  transition: opacity 0.2s ease-out, border-color 0.15s ease-out, box-shadow 0.15s ease-out;
   opacity: 0;
   display: flex;
   align-items: center;
@@ -90,19 +93,37 @@ header.header-hidden {
 #pull-to-refresh-indicator.active {
   opacity: 1;
 }
+#pull-to-refresh-indicator.ready {
+  /* しきい値到達の触覚フィードバック代替: ボーダーをハイライトして発火予告。 */
+  border-color: #fde047;           /* yellow-300 */
+  box-shadow: 0 10px 24px rgba(253, 224, 71, 0.45);
+}
 #pull-to-refresh-indicator .ptr-spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #67e8f9;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #ffffff;
   border-radius: 50%;
   animation: ptr-spin 0.8s linear infinite;
 }
 @keyframes ptr-spin {
   to { transform: rotate(360deg); }
 }
+
+/* 引き下げ中はボディが指に追随する（ラバーバンド効果）。
+   Why: インジケーターだけ動いてボディが静止していると「上から通知が出現した」だけに
+        感じられ、ネイティブアプリの引き下げ感が出ない。main-container を translateY
+        するだけで、指の動きと視覚が一致する。 */
+#main-container {
+  will-change: transform;
+}
+#main-container.ptr-releasing {
+  /* リリース時のみ spring 風 easing で 0 へ戻す。引き下げ中は JS が直接 transform 操作。 */
+  transition: transform 0.35s cubic-bezier(0.22, 1.35, 0.4, 1);
+}
 @media (prefers-reduced-motion: reduce) {
   #pull-to-refresh-indicator .ptr-spinner { animation: none; }
+  #main-container.ptr-releasing { transition: transform 0.1s linear; }
 }
 .answer-card { 
   transition: transform var(--animation-normal) var(--transition-easing),
