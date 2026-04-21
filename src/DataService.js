@@ -553,6 +553,21 @@ function applySortAndLimit(data, options = {}) {
         case 'name':
           sortedData.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
           break;
+        case 'score':
+          // Why: スコア順 = リアクション合計数の降順。ハイライトは最上位に固定し、
+          //      同点時は新着順でタイブレーク。以前 case 'score' が無かったため
+          //      default 分岐で newest にフォールバックしていた silent bug。
+          sortedData.sort((a, b) => {
+            const ah = a.highlight ? 1 : 0;
+            const bh = b.highlight ? 1 : 0;
+            if (ah !== bh) return bh - ah;
+            const score = (r) => (r?.LIKE?.count || 0) + (r?.UNDERSTAND?.count || 0) + (r?.CURIOUS?.count || 0);
+            const sa = score(a.reactions);
+            const sb = score(b.reactions);
+            if (sa !== sb) return sb - sa;
+            return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+          });
+          break;
         default:
           sortedData.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
       }
