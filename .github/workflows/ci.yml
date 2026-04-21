@@ -20,6 +20,16 @@ jobs:
           node-version: 20
           cache: npm
 
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Print toolchain versions
+        # Why: CI log exposes node + clasp version so a quiet clasp minor bump
+        #   that breaks our push/deploy flow is discoverable in history.
+        run: |
+          node --version
+          npx clasp --version
+
       - name: Check JavaScript syntax
         run: |
           errors=0

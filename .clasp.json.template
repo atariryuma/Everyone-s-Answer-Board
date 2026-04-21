@@ -13,6 +13,9 @@
     "src/ReactionService.js",
     "src/DataService.js",
     "src/SystemController.js",
+    "src/UserApis.js",
+    "src/AdminApis.js",
+    "src/DataApis.js",
     "src/main.js"
   ]
 }

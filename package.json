@@ -2,6 +2,9 @@
   "name": "everyone-s-answer-board",
   "version": "1.0.0",
   "description": "A collaborative answer board using Google Apps Script (GAS + clasp workflow)",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "pull": "clasp pull",
     "push": "clasp push",
@@ -9,6 +12,7 @@
     "logs": "clasp logs",
     "deploy": "clasp deploy",
     "deploy:prod": "node scripts/deploy-prod.js",
+    "deploy:list": "node scripts/deploy-list.js",
     "push:open": "node scripts/env-switch.js open npx clasp push --force",
     "deploy:open": "node scripts/env-switch.js open node scripts/deploy-prod.js --env open",
     "api": "node scripts/admin-api.js",
