@@ -55,7 +55,10 @@
       this.animationFrameId = null;
       this.idleCallbackId = null;
       this.domFragmentPool = [];
-      this.isLowPerformanceMode = true;
+      // Why: true で始めるとバグる（line 4715 の !this.isLowPerformanceMode が常に false で
+      //      optimizeForLowPerformance が絶対に走らない）。false で始めて detectLowPerformance
+      //      で適切に判定する。
+      this.isLowPerformanceMode = false;
 
 
       this.NOTIFICATION_ANIMATION = {
@@ -306,6 +309,10 @@
         this.adjustLayout();
         this.updateSortOptions();
         this.setupObservers();
+        // Why: OPS（電子黒板用の低スペック PC、Celeron 4c + 4GB + 統合 GPU が典型）
+        //      では backdrop-filter / box-shadow アニメーションが致命的にカクつく。
+        //      静的スペックでまず判定し、ボーダーラインなら FPS 監視で動的判定する。
+        this.detectLowPerformance();
 
 
         this.setupEditorState();
@@ -657,7 +664,9 @@
         textEl.textContent = '引き下げて更新';
         body.classList.add('ptr-releasing');
         setBodyOffset(0);
-        setTimeout(() => body.classList.remove('ptr-releasing'), 400);
+        setTimeout(() => {
+          body.classList.remove('ptr-releasing', 'ptr-pulling');
+        }, 400);
         startY = null;
         startX = null;
         pulling = false;
@@ -683,6 +692,8 @@
         triggered = false;
         directionLocked = false;
         body.classList.remove('ptr-releasing');
+        // ドラッグ中のみ will-change でレイヤー昇格。終わったら外して GPU メモリを解放。
+        body.classList.add('ptr-pulling');
       };
 
       this.handlers.onPtrMove = (e) => {
@@ -4701,8 +4712,45 @@
     }
 
 
+    /**
+     * 低スペック端末（OPS、古い電子黒板、低 RAM の Windows タブレット等）を検出して
+     * パフォーマンスモードに切り替える。
+     *
+     * 戦略:
+     *   1. 静的スペック（RAM / コア数）で明らかに低い端末は即座に low-perf へ
+     *   2. ボーダーラインは FPS 監視で動的判定（実際にカクついたら降格）
+     */
+    detectLowPerformance() {
+      const memory = typeof navigator !== 'undefined' ? navigator.deviceMemory : undefined;
+      const cores = typeof navigator !== 'undefined' ? navigator.hardwareConcurrency : undefined;
+
+      // OPS 相当（Celeron N4020 等）は 4 コア / 4GB が典型。
+      // 従来の「2 以下なら low」基準だと取りこぼしていた。4 以下の AND で絞る
+      // と、ただの低 RAM ラップトップは medium のまま扱える。
+      const staticLowEnd =
+        (typeof memory === 'number' && memory <= 4 && typeof cores === 'number' && cores <= 4) ||
+        (typeof memory === 'number' && memory <= 2) ||
+        (typeof cores === 'number' && cores <= 2);
+
+      if (staticLowEnd) {
+        this.enterLowPerformanceMode('static-detect');
+        return;
+      }
+
+      // 静的には普通だが実際はカクつく端末（GPU が弱い場合など）を FPS で捕まえる
+      this.setupPerformanceMonitoring();
+    }
+
+    enterLowPerformanceMode(reason) {
+      if (this.isLowPerformanceMode) return;
+      this.isLowPerformanceMode = true;
+      console.info('⚡ low-performance mode enabled:', reason);
+      this.optimizeForLowPerformance();
+    }
+
     setupPerformanceMonitoring() {
       let frameCount = 0;
+      let slowFrames = 0;
       let lastTime = performance.now();
 
       const measurePerformance = () => {
@@ -4711,69 +4759,68 @@
 
         if (frameCount > 0) {
           this.perf.frameTime = delta;
-
-          if (delta > getPerformanceBudget() && !this.isLowPerformanceMode) {
-            this.isLowPerformanceMode = true;
-            this.optimizeForLowPerformance();
+          // Why: 単発の遅延で切り替えると誤検知する。60 フレームのうち 10 フレーム以上
+          //      バジェット超過なら真にカクついている → low-perf へ。
+          if (delta > getPerformanceBudget()) slowFrames++;
+          if (slowFrames >= 10 && !this.isLowPerformanceMode) {
+            this.enterLowPerformanceMode('runtime-fps');
+            return; // 以降の測定不要
           }
         }
 
         lastTime = now;
         frameCount++;
-
-        if (frameCount < 60) { // Monitor first 60 frames
-          requestAnimationFrame(measurePerformance);
-        }
+        if (frameCount < 60) requestAnimationFrame(measurePerformance);
       };
-
       requestAnimationFrame(measurePerformance);
     }
 
     optimizeForLowPerformance() {
-
       document.documentElement.style.setProperty('--transition-duration', '0.1s');
       document.documentElement.style.setProperty('--animation-duration', '0.1s');
-      document.documentElement.style.setProperty('--backdrop-blur', '4px');
+      document.documentElement.style.setProperty('--backdrop-blur', '0px');
 
       const style = document.createElement('style');
       style.id = 'low-performance-optimizations';
+      // Why: OPS / 統合 GPU 端末で特に重いのは backdrop-filter（フレーム合成のたびに
+      //      blur 再計算）と box-shadow アニメーション。ヘッダーの scroll transition、
+      //      PTR の blur、new-card のパルス、will-change の永続昇格を一括で緩和する。
       style.textContent = `
-      /* Low-performance optimizations with appropriate specificity */
-      body.low-performance .glass-panel {
-        -webkit-backdrop-filter: blur(4px);
-        backdrop-filter: blur(4px);
-        background: var(--brand-surface);
-      }
-
-      /* Simplify hover effects for low-performance devices */
-      body.low-performance .answer-card:hover {
-        transform: none;
-        box-shadow: var(--shadow-sm);
-      }
-
-      body.low-performance .reaction-btn:hover {
-        transform: scale(1.02);
-      }
-
-      body.low-performance .game-btn:hover {
-        transform: translateY(-1px);
-      }
-
-      /* Remove will-change to reduce GPU usage */
-      body.low-performance * {
-        will-change: auto;
-      }
-
-      /* Simplify shadows */
-      body.low-performance .answer-card {
-        box-shadow: var(--shadow-sm);
-      }
-
-    `;
+        body.low-performance .glass-panel,
+        body.low-performance header,
+        body.low-performance #pull-to-refresh-indicator {
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
+          background: var(--brand-surface);
+        }
+        body.low-performance header {
+          transition: none;
+        }
+        body.low-performance #main-container {
+          will-change: auto;
+        }
+        body.low-performance #main-container.ptr-releasing {
+          transition: transform 0.15s linear;
+        }
+        body.low-performance .answer-card,
+        body.low-performance .answer-card:hover {
+          transform: none;
+          box-shadow: var(--shadow-sm);
+          transition: none;
+        }
+        body.low-performance .answer-card.new-card {
+          animation: none;
+        }
+        body.low-performance .reaction-btn:hover,
+        body.low-performance .game-btn:hover {
+          transform: none;
+        }
+        body.low-performance * {
+          will-change: auto;
+        }
+      `;
       document.head.appendChild(style);
-
       document.body.classList.add('low-performance');
-
     }
 
     setupObservers() {

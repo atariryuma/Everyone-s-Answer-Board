@@ -111,10 +111,9 @@ header.header-hidden {
 }
 
 /* 引き下げ中はボディが指に追随する（ラバーバンド効果）。
-   Why: インジケーターだけ動いてボディが静止していると「上から通知が出現した」だけに
-        感じられ、ネイティブアプリの引き下げ感が出ない。main-container を translateY
-        するだけで、指の動きと視覚が一致する。 */
-#main-container {
+   Why: will-change はレイヤー永久昇格で低スペック GPU にはメモリ圧迫要因。
+        ドラッグ中だけ .ptr-pulling を付けて昇格させ、終われば剥がす方式にする。 */
+#main-container.ptr-pulling {
   will-change: transform;
 }
 /* Why: iOS Safari は scrollY=0 で下に引くと native rubber-band を出す。
