@@ -117,6 +117,13 @@ header.header-hidden {
 #main-container {
   will-change: transform;
 }
+/* Why: iOS Safari は scrollY=0 で下に引くと native rubber-band を出す。
+   我々の JS と二重に動くので contain で native 側を抑止する。
+   overflow-anchor: none は、新着カードが入ったときの自動スクロール調整を防ぐ。 */
+html, body {
+  overscroll-behavior-y: contain;
+  overflow-anchor: none;
+}
 #main-container.ptr-releasing {
   /* リリース時のみ spring 風 easing で 0 へ戻す。引き下げ中は JS が直接 transform 操作。 */
   transition: transform 0.35s cubic-bezier(0.22, 1.35, 0.4, 1);

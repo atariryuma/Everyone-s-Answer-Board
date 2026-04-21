@@ -628,15 +628,24 @@
       // Why: ネイティブ（iOS Safari / SNS アプリ）の引き下げ更新は、ボディそのものが
       //      指に追随してラバーバンドで戻る体験が核。インジケーターだけ動かしてもボディが
       //      静止していると「上から通知が出た」だけに感じて違和感が残る。ボディも
-      //      translateY させ、しきい値到達前は減衰倍率で抵抗を演出、release 時は CSS
-      //      transition の spring 風 easing で 0 に戻す。
+      //      translateY させ、指数関数減衰で「引くほど重い」抵抗感を出し、release 時は
+      //      CSS transition の spring 風 easing で 0 に戻す。
       const THRESHOLD_PX = 70;   // これを超えて離すと発火
       const MAX_PULL_PX = 120;   // ここ以上は伸びない（視覚上の上限）
-      const BODY_DAMP = 0.45;    // ボディの減衰倍率（1.0 だと指とぴったり同じ、0.45 で "重み" を感じる）
+      const DIRECTIONAL_SLOP = 8; // 縦方向として認識する最小 dy（水平スワイプとの衝突回避）
+
+      // Why: 一定倍率だと引くほど軽く感じる。指数関数減衰 f(x) = MAX * (1 - e^(-x/MAX))
+      //      は x が小さいとほぼ線形、x が MAX に近づくと漸近して頭打ちになり、iOS の
+      //      ラバーバンドと同じ "重さが増す" 体感になる。
+      const dampedBodyOffset = (pull) => {
+        return MAX_PULL_PX * (1 - Math.exp(-pull / MAX_PULL_PX)) * 0.75;
+      };
 
       let startY = null;
+      let startX = null;
       let pulling = false;
       let triggered = false;
+      let directionLocked = false; // start 時点では縦横未判定、最初の数 px で確定する
 
       const setBodyOffset = (px) => {
         body.style.transform = px > 0 ? `translate3d(0, ${px}px, 0)` : '';
@@ -646,13 +655,22 @@
         indicator.style.transform = 'translate(-50%, -120%)';
         indicator.classList.remove('active', 'ready');
         textEl.textContent = '引き下げて更新';
-        // ボディは CSS transition で spring 風に 0 へ戻す
         body.classList.add('ptr-releasing');
         setBodyOffset(0);
         setTimeout(() => body.classList.remove('ptr-releasing'), 400);
         startY = null;
+        startX = null;
         pulling = false;
         triggered = false;
+        directionLocked = false;
+      };
+
+      const hapticPulse = () => {
+        // Why: しきい値到達で触覚フィードバックを出す。Android 実機と一部 iOS デバイスで
+        //      効く。非対応ブラウザは silent (undefined を返す) のでガードだけでよい。
+        if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
+          try { navigator.vibrate(10); } catch (_) { /* privacy mode: ignore */ }
+        }
       };
 
       this.handlers.onPtrStart = (e) => {
@@ -660,43 +678,56 @@
         if (this.state.isLoading) return;
         if (!e.touches || e.touches.length !== 1) return;
         startY = e.touches[0].clientY;
+        startX = e.touches[0].clientX;
         pulling = false;
         triggered = false;
-        // 引き下げ中は transition を切って指の追随をスムーズにする
+        directionLocked = false;
         body.classList.remove('ptr-releasing');
       };
 
       this.handlers.onPtrMove = (e) => {
         if (startY == null) return;
         const dy = e.touches[0].clientY - startY;
+        const dx = e.touches[0].clientX - startX;
+
+        // Why: 最初の数 px で縦/横を判定。横スワイプ（ブラウザの戻る操作や横スクロール）なら
+        //      以降 PTR は起動しない。これを入れないと斜めでも PTR が勝ってしまう。
+        if (!directionLocked) {
+          if (Math.abs(dy) < DIRECTIONAL_SLOP && Math.abs(dx) < DIRECTIONAL_SLOP) return;
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            // 横方向が支配的 → PTR をキャンセルして native スワイプに譲る
+            startY = null;
+            return;
+          }
+          directionLocked = true;
+        }
+
         if (dy <= 0) {
           if (pulling) reset();
           return;
         }
-        // ブレ防止: 8px 未満はまだ pull 状態に入らない
-        if (dy < 8) return;
         if ((window.scrollY || 0) > 0) { reset(); return; }
 
         pulling = true;
         const pull = Math.min(dy, MAX_PULL_PX);
 
-        // インジケーター: 画面外 -120% から 指追随で 0 付近まで
+        // インジケーター: 画面外 -120% から指追随で 0 付近まで
         const indicatorY = (pull / MAX_PULL_PX) * 100 - 120;
         indicator.style.transform = `translate(-50%, ${indicatorY}%)`;
         indicator.classList.add('active');
 
-        // ボディ: 減衰付きで translateY。指の動きに連動してページ全体が引き下がる
-        setBodyOffset(pull * BODY_DAMP);
+        // ボディ: 指数減衰で指に追随しつつ「重み」を演出
+        setBodyOffset(dampedBodyOffset(pull));
 
-        // しきい値到達で見た目を切り替え（触覚代替フィードバック）
+        // しきい値到達で触覚 + 見た目切り替え
         const prevTriggered = triggered;
         triggered = pull >= THRESHOLD_PX;
         if (triggered !== prevTriggered) {
           indicator.classList.toggle('ready', triggered);
           textEl.textContent = triggered ? '離して更新' : '引き下げて更新';
+          if (triggered) hapticPulse();
         }
 
-        // native refresh（Chrome の下スクロール再読み込み）を抑止
         if (e.cancelable) e.preventDefault();
       };
 
