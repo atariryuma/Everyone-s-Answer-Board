@@ -74,8 +74,7 @@ function signatureOf(message) {
     .substring(0, 200);
 }
 
-function fetchEntries(opts) {
-  const { env, remainingArgs: _remainingArgs } = parseEnvFromArgs(process.argv.slice(2));
+function fetchEntries(opts, env) {
   const config = getConfig(env);
   const token = getAccessToken(config.tokenName);
 
@@ -119,15 +118,16 @@ function renderDefault(entries, opts) {
 function renderSummary(entries, opts) {
   const groups = new Map();
   for (const e of entries) {
-    const key = `${e.severity}|${e.resource?.labels?.function_name || '?'}|${signatureOf(e.jsonPayload?.message)}`;
+    const func = e.resource?.labels?.function_name || '?';
+    const sig = signatureOf(e.jsonPayload?.message);
+    const key = `${e.severity}|${func}|${sig}`;
     const g = groups.get(key) || {
       severity: e.severity,
-      func: e.resource?.labels?.function_name || '?',
-      signature: signatureOf(e.jsonPayload?.message),
+      func,
+      signature: sig,
       count: 0,
       firstTs: e.timestamp,
       lastTs: e.timestamp,
-      sample: e.jsonPayload?.message || ''
     };
     g.count++;
     if (e.timestamp < g.firstTs) g.firstTs = e.timestamp;
@@ -150,9 +150,9 @@ function renderSummary(entries, opts) {
 }
 
 try {
-  const { remainingArgs } = parseEnvFromArgs(process.argv.slice(2));
+  const { env, remainingArgs } = parseEnvFromArgs(process.argv.slice(2));
   const opts = parseArgs(remainingArgs);
-  const entries = fetchEntries(opts);
+  const entries = fetchEntries(opts, env);
 
   if (opts.json) {
     console.log(JSON.stringify(entries, null, 2));
