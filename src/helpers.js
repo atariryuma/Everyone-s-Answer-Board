@@ -15,7 +15,6 @@
 
 /* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig */
 
-
 const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
 
@@ -131,10 +130,6 @@ function simpleHash(obj) {
   return keys.map(k => `${k}:${obj[k]}`).join('|');
 }
 
-
-
-
-
 /**
  * 標準化エラーレスポンス生成（拡張版）
  * @param {string} message - エラーメッセージ
@@ -177,7 +172,6 @@ function createSuccessResponse(message, data = null, extraFields = {}) {
 function createDataServiceErrorResponse(message, sheetName = '') {
   return createErrorResponse(message, [], { headers: [], sheetName });
 }
-
 
 /**
  * 認証エラーレスポンス

@@ -116,9 +116,7 @@
         isOnline: typeof navigator !== 'undefined' ? navigator.onLine !== false : true
       };
 
-
       this.lastActivityTime = Date.now();
-
 
       this.state.showCounts = window.showCounts;
       this.state.displayMode = window.displayMode;
@@ -154,7 +152,6 @@
         clearCache: () => this.runGas('clearActiveSheet', this.state.userId),
         validateData: () => this.validData()
       };
-
 
       this.initializeSimplePolling();
 
@@ -285,9 +282,7 @@
         //      静的スペックでまず判定し、ボーダーラインなら FPS 監視で動的判定する。
         this.detectLowPerformance();
 
-
         this.setupEditorState();
-
 
         this.setupMessageListeners();
 
@@ -297,7 +292,6 @@
         this.hideLoadingOverlay();
       }
     }
-
 
     /**
      * ✅ Restore form button display functionality
@@ -849,7 +843,6 @@
           const handleSuccess = (result) => {
             this.activeRequests--;
 
-
             if (!isStateChanging && result !== null && result !== undefined) {
               this.cache.set(cacheKey, result, StudyQuestApp.CONSTANTS.CACHE_TTL_MS);
             }
@@ -990,7 +983,6 @@
         this.elements.adminToggleBtn.classList.remove('hidden');
         this.elements.adminToggleBtn.removeAttribute('hidden');
 
-
         if (this.state.showAdminFeatures) {
           this.elements.adminToggleBtn.classList.remove('text-gray-400');
           this.elements.adminToggleBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
@@ -1021,7 +1013,6 @@
     handleError(error, type = 'general', showUser = false) {
 
       const errorMsg = error.message || error;
-
 
       console.error(`❌ ${type} error:`, errorMsg);
 
@@ -1065,7 +1056,6 @@
       }
     }
 
-
     showNewContentBanner(newItemsCount, filterState = null) {
       if (!this.elements.newContentBanner || !newItemsCount || newItemsCount <= 0) {
         return;
@@ -1094,7 +1084,6 @@
         this.elements.newContentBanner.setAttribute('aria-hidden', 'true');
       }, 300);
     }
-
 
     async refreshContent() {
       try {
@@ -1220,7 +1209,6 @@
       return 300000;                                     // 15分超: 5分
     }
 
-
     showNotification(message, type = 'info', options = {}) {
       if (window.notifications) {
         const duration = options.duration || 5000;
@@ -1229,7 +1217,6 @@
           window.notifications.info(message, duration);
       }
     }
-
 
     getMockData(funcName, ...args) {
       return new Promise((resolve) => {
@@ -1344,16 +1331,11 @@
       }
     }
 
-
-
-
     destroy() {
 
       this.stopSimplePolling();
 
-
       this.cleanup();
-
 
       if (this.elements.sizeSlider && this.handlers.onSizeSliderInput) {
         this.elements.sizeSlider.removeEventListener('input', this.handlers.onSizeSliderInput);
@@ -1444,7 +1426,6 @@
      * @returns {boolean} true if all prerequisites are met
      */
 
-
     /**
      * Display initialization error to user
      * @param {string} message - Error message to display
@@ -1504,7 +1485,6 @@
       </div>
     `;
     }
-
 
     showMinimalSkeleton() {
       const count = 2;
@@ -1640,13 +1620,11 @@
       const domCards = container.querySelectorAll('.answer-card');
       const dataLength = this.state.currentAnswers ? this.state.currentAnswers.length : 0;
 
-
       if (dataLength === 0 && domCards.length > 0) {
 
         await this.clearAllCardsForEmptyData();
 
         this.displayEmptyState();
-
 
       } else if (dataLength !== domCards.length) { // 数の不一致も不整合とみなす
 
@@ -1655,7 +1633,6 @@
       } else {
       }
     }
-
 
     async forceDataRefresh() {
 
@@ -1703,7 +1680,6 @@
         if (result.sheetName && typeof result.sheetName !== 'string') {
           return false;
         }
-
 
         return true;
       } catch (error) {
@@ -1967,8 +1943,6 @@
       return config.showLoading && !config.isInitialLoad;
     }
 
-
-
     async performDataLoad(config, oldAnswers) {
       try {
         const loadConfig = this.buildLoadConfiguration(config);
@@ -1992,7 +1966,6 @@
         this.state.currentAnswers = sortOrderValue === 'random'
           ? this.seededShuffle(responseData, this.state.randomSeed)
           : responseData;
-
 
         if (result.header && this.elements.headingLabel) {
           this.elements.headingLabel.textContent = result.header;
@@ -2028,7 +2001,6 @@
             sortOrder: 'newest'
           }
         : this.getCurrentFilterState();
-
 
       return {
         isInitialLoad,
@@ -2069,7 +2041,6 @@
 
       return params;
     }
-
 
     populateClassFilter(rows) {
       const classFilter = this.elements.classFilter;
@@ -2147,17 +2118,14 @@
       };
     }
 
-
     async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
       try {
         const newRows = this.state.currentAnswers;
-
 
         if (!newRows || newRows.length === 0) {
           await this.renderEmptyState();
           return;
         }
-
 
         this.prepareRenderingState(newRows);
 
@@ -2367,7 +2335,6 @@
         console.error('updateAnswerCard error:', error);
       }
     }
-
 
     updateCardReactions(card, data) {
 
@@ -2738,7 +2705,6 @@
         pendingRequest.retryCount = (pendingRequest.retryCount || 0) + 1;
       }
 
-
       try {
         this.clearCache({ includeReactions: true });
         await this.loadSheetData({ bypassCache: true, silent: true });
@@ -2762,8 +2728,6 @@
         originalError: error.message
       };
     }
-
-
 
     /**
      * Restore local reaction state as final fallback
@@ -2803,7 +2767,6 @@
 
       return { success: true, message: 'Local state restored successfully' };
     }
-
 
     /**
      * Simulate server-side exclusive reaction logic for optimistic updates
@@ -3072,8 +3035,6 @@
       }
     }
 
-
-
     notifyReactionComplete(reactionKey, result) {
       const listeners = this.reactionEventListeners.get(reactionKey);
       if (listeners && listeners.length > 0) {
@@ -3104,7 +3065,6 @@
       };
     }
 
-
     setReactionButtonsLoading(buttons, isLoading, requestId = null) {
       buttons.forEach(btn => {
         btn.disabled = isLoading;
@@ -3115,7 +3075,6 @@
             btn.setAttribute('data-request-id', requestId);
           }
 
-
         } else {
           btn.classList.remove('loading');
           btn.setAttribute('aria-busy', 'false');
@@ -3125,7 +3084,6 @@
         }
       });
     }
-
 
     async sendReactionToServer(rowIndex, reaction) {
       try {
@@ -3201,8 +3159,6 @@
       return validatedReactions;
     }
 
-
-
     async updateReactionUI(item, immediate = false) {
       const lastUpdateKey = `ui_update_${item.rowIndex}`;
       const currentStateHash = this.calculateStateHash(item);
@@ -3271,7 +3227,6 @@
       const userId = this.state?.userId || window.USER_ID;
       return `${base}_${userId}_${window.SHEET_NAME}`;
     }
-
 
     isFirstTimeBoardAccess() {
       try {
@@ -3374,8 +3329,6 @@
       }
       return a;
     }
-
-
 
     async handleReactionError(error, rowIndex, reaction) {
       console.error('リアクションエラーの詳細:', {
@@ -3529,7 +3482,6 @@
       }
     }
 
-
     calculateStateHash(item) {
       const state = {
         reactions: item.reactions,
@@ -3538,7 +3490,6 @@
       };
       return JSON.stringify(state);
     }
-
 
     /**
      * 削除確認モーダルを表示
@@ -3657,7 +3608,6 @@
           window.notifications.info('回答を削除中...', 2000);
         }
 
-
         const result = await new Promise((resolve, reject) => {
           google.script.run
             .withSuccessHandler(resolve)
@@ -3752,8 +3702,6 @@
       }
     }
 
-
-
     async toggleAdminMode() {
       if (this.elements.adminToggleBtn) {
         this.elements.adminToggleBtn.disabled = true;
@@ -3761,7 +3709,6 @@
 
       try {
         const enable = !this.state.showAdminFeatures;
-
 
         if (enable) {
           if (!this.state.isEditor || !window.hasAdminCapability) {
@@ -4003,7 +3950,6 @@
       redirectBtn.focus();
     }
 
-
     /**
      * リアクション状態をlocalStorageに保存
      * @param {number} rowIndex - 行インデックス
@@ -4085,7 +4031,6 @@
         return;
       }
 
-
       const reactionUpdates = [];
 
       itemsToUpdate.forEach(item => {
@@ -4128,7 +4073,6 @@
       }
     }
     showAnswerModal(rowIndex) {
-
 
       let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
 
@@ -4258,7 +4202,6 @@
       return result;
     }
 
-
     renderIcons() {
       if (this.elements.infoIconLike) {
         this.elements.infoIconLike.innerHTML = this.getIcon('hand-thumb-up');
@@ -4334,7 +4277,6 @@
       this.state.showScoreSort = window.showCounts;
       this.state.showPublishControls = window.showPublishControls;
     }
-
 
     /**
      * 低スペック端末（OPS、古い電子黒板、低 RAM の Windows タブレット等）を検出して
@@ -4612,7 +4554,6 @@
       }
     }
 
-
     /**
      * 理由テキストの堅牢化検証
      * @param {any} reason - 理由データ
@@ -4723,7 +4664,6 @@
      */
     async autoRecoverReasonFields() {
       try {
-
 
         await this.loadBoardData();
 

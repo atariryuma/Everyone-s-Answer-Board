@@ -32,7 +32,6 @@
 
 /* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
 
-
 /**
  * ユーザー専用フォルダを作成
  * 各ユーザーのマイドライブに「みんなの回答ボード」フォルダを作成
@@ -55,7 +54,6 @@ function createUserFolder() {
     return null;
   }
 }
-
 
 /**
  * 自分がオーナーのGoogleフォームを30件取得
@@ -430,7 +428,6 @@ function getSheetList(spreadsheetId) {
   }
 }
 
-
 /**
  * Shape the sheet-data result into the JSON-safe envelope the frontend expects.
  * Date values (raw timestamps from Sheets) are converted to ISO strings;
@@ -702,7 +699,6 @@ function getNotificationUpdate(targetUserId, options = {}) {
   }
 }
 
-
 /**
  * Connect to data source - API Gateway function for DataService
  * @param {string} spreadsheetId - スプレッドシートID
@@ -726,7 +722,6 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
     } catch (sharingError) {
       console.warn('connectDataSource: Domain-wide sharing setup failed (non-critical):', sharingError.message);
     }
-
 
     if (batchOperations && Array.isArray(batchOperations)) {
       return processDataSourceOperations(spreadsheetId, sheetName, batchOperations);
@@ -1093,7 +1088,6 @@ function isValidFormUrl(url) {
   }
 }
 
-
 /**
  * スプレッドシートURL解析 - GAS-Native Implementation
  * @param {string} fullUrl - 完全なスプレッドシートURL（gid含む）
@@ -1212,7 +1206,6 @@ function validateCompleteSpreadsheetUrl(fullUrl) {
     return errorResult;
   }
 }
-
 
 /**
  * Forms REST API を使用してメール収集設定を「確認済み（VERIFIED）」に設定

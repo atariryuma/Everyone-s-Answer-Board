@@ -14,7 +14,6 @@
 
 /* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, validateConfig, findUserByEmail, findUserById, findPublishedBoardOwner, findUserBySpreadsheetId, createUser, getAllUsers, updateUser, openSpreadsheet, getUserConfig, getConfigOrDefault, saveUserConfig, clearConfigCache, cleanConfigFields, getQuestionText, validateAccess, URL, UserService, CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, SYSTEM_LIMITS, SystemController, getViewerBoardData, performIntegratedColumnDiagnostics, generateRecommendedMapping, getFormInfo, enhanceConfigWithDynamicUrls, getCachedProperty, setCachedProperty, getSheetInfo, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, DEFAULT_DISPLAY_SETTINGS */
 
-
 /**
  * APIキー認証時にgetCurrentEmail()が管理者メールを返すためのコンテキスト
  * GASはシングルスレッドのため、グローバル変数で安全に管理できる
@@ -37,7 +36,6 @@ function getCurrentEmail() {
     return null;
   }
 }
-
 
 /**
  * Include HTML template
@@ -109,8 +107,6 @@ function createAccessRestrictedTemplate(email, isAppDisabled = false, message = 
   return template.evaluate().setTitle('回答ボード');
 }
 
-
-
 /**
  * Handle GET requests
  * @param {Object} e - Event object containing request parameters
@@ -141,7 +137,6 @@ function doGet(e) {
         return createAccessRestrictedTemplate(currentEmail, true);
       }
     }
-
 
     // セットアップ未完了なら自動でセットアップページへ
     if (mode !== 'setup') {
@@ -274,7 +269,6 @@ function doGet(e) {
 
           const baseUrl = getWebAppUrl();
           template.boardUrl = baseUrl ? `${baseUrl}?mode=view&userId=${targetUserId}` : '';
-
 
           return template.evaluate().setTitle('未公開');
         }
@@ -594,10 +588,6 @@ function doPost(e) {
   }
 }
 
-
-
-
-
 /**
  * 統一管理者認証関数（メイン実装）
  * 全システム共通の管理者権限チェック
@@ -622,11 +612,6 @@ function isAdministrator(email) {
     return false;
   }
 }
-
-
-
-
-
 
 /**
  * Secure GAS function caller - CLAUDE.md準拠セキュリティ強化版
@@ -751,7 +736,6 @@ function callGAS(functionName, options = {}, ...args) {
   }
 }
 
-
 /**
  * ✅ CLAUDE.md準拠: Batched viewer data retrieval for 70x performance improvement
  * Combines 4 individual API calls into single batch operation:
@@ -791,7 +775,6 @@ function getBatchedViewerData(targetUserId, currentEmail) {
     };
   }
 }
-
 
 /**
  * ✅ CLAUDE.md準拠: Batched admin data retrieval for 70x performance improvement
@@ -923,7 +906,6 @@ function getBatchedAdminAuth(options = {}) {
   }
 }
 
-
 /**
  * ✅ CLAUDE.md準拠: Exponential backoff retry for resilient operations
  * Generic retry function for operations that may fail due to network/quota issues
@@ -1033,5 +1015,4 @@ function isRetryableError(errorMessage) {
 
   return true;
 }
-
 

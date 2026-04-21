@@ -14,10 +14,6 @@
 const LOCK_TIMEOUT_MS = 10000;
 const LOCK_CACHE_TTL_SECONDS = 10;
 
-
-
-
-
 /**
  * 対象ボードに対する操作権限の検証（事前読み込みデータ版）
  *
@@ -56,7 +52,6 @@ function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
 
   return Boolean(config && config.isPublished);
 }
-
 
 /**
  * 🚀 GAS-Native直接リアクション処理
@@ -161,7 +156,6 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
     }
   }
 
-
   reactionTypes.forEach(type => {
     const col = reactionColumns[type];
     const users = updatedReactions[type];
@@ -237,10 +231,6 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
   };
 }
 
-
-
-
-
 /**
  * リアクション情報抽出
  * @param {Array} row - データ行
@@ -306,13 +296,6 @@ function extractHighlight(row, headers) {
     return false;
   }
 }
-
-
-
-
-
-
-
 
 /**
  * リアクション送信（マルチテナント対応・GAS-Native）

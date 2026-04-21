@@ -10,9 +10,6 @@
 
 /* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck */
 
-
-
-
 /**
  * Google Sheets APIの堅牢な呼び出しラッパー（クォータ制限対応）
  * ✅ 適応型バックオフ: 初回エラーは短い待機、連続エラー時は段階的延長
@@ -80,7 +77,6 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
     }
   );
 }
-
 
 /**
  * サービスアカウント認証情報を取得
@@ -622,9 +618,6 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
   };
 }
 
-
-
-
 /**
  * ユーザー検索の呼び出し元メールアドレスを解決
  * @param {Object} context - アクセスコンテキスト
@@ -1096,9 +1089,6 @@ function getAllUsers(options = {}, context = {}) {
   }
 }
 
-
-
-
 /**
  * データベースユーザーキャッシュをクリア（ユーザー作成・更新・削除時）
  * シンプルなバージョニング戦略でキャッシュを無効化
@@ -1164,7 +1154,6 @@ function updateUser(userId, updates, context = {}) {
       console.warn('updateUser: Lock timeout - concurrent update detected');
       return { success: false, message: 'Concurrent update in progress. Please retry.' };
     }
-
 
     const requestingUser = context.requestingUser || getCurrentEmail();
     const targetUser = findUserById(userId, {
@@ -1250,7 +1239,6 @@ function updateUser(userId, updates, context = {}) {
   }
 }
 
-
 /**
  * 閲覧者向けボードデータ取得（CLAUDE.md準拠 - 模範実装）
  *
@@ -1319,7 +1307,6 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       }
     }
 
-
     const allUsers = getAllUsers({ activeOnly: false }, { ...context, forceServiceAccount: true, preloadedAuth: context.preloadedAuth });
     if (!Array.isArray(allUsers)) {
       console.warn('findUserBySpreadsheetId: Failed to get users list');
@@ -1349,7 +1336,6 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
         continue;
       }
     }
-
 
     if (!skipCache) {
       try {

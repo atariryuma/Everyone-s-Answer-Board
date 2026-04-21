@@ -20,7 +20,6 @@
 
 /* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, extractFieldValueUnified, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty, FormApp */
 
-
 /**
  * ユーザーのスプレッドシートデータ取得
  * @param {string} userId - ユーザーID
@@ -470,10 +469,6 @@ function processRawDataBatch(batchRows, headers, config, options, startOffset, u
   }
 }
 
-
-
-
-
 /**
  * 空行判定（null安全）
  * @param {Array} row - データ行
@@ -573,7 +568,6 @@ function applySortAndLimit(data, options = {}) {
     return data; // エラー時は元データを返す
   }
 }
-
 
 /**
  * 回答行を削除（編集者権限必須）
