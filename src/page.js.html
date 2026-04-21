@@ -118,14 +118,16 @@
         initializationComplete: false,
         isInitializing: true,
         lastSeenTimestamp: this.loadLastSeenTimestamp(),
-        startTime: Date.now()
+        startTime: Date.now(),
+        // Why: ランダム順をセッション内で固定するためのシード。
+        //      sessionStorage に保存することで、タブを開いている間はポーリング等で
+        //      再フェッチしてもカードが跳ね回らない。タブを閉じれば新しい並びになる。
+        randomSeed: this.loadRandomSeed(),
+        isOnline: typeof navigator !== 'undefined' ? navigator.onLine !== false : true
       };
 
 
-      this.lastViewKey = null;
-      this.initialDataLoaded = false;
       this.lastActivityTime = Date.now();
-      this.hadInitialDataLoadFailure = false; // 初期データロード失敗フラグ
 
 
       this.state.showCounts = window.showCounts;
@@ -217,10 +219,6 @@
         }
       }
 
-
-      this.initialDataLoaded = false;
-      this.hadInitialDataLoadFailure = false;
-      this.lastViewKey = null;
 
       this.contentCheckInProgress = false;
 
@@ -471,20 +469,17 @@
       }
       this.handlers.onClassFilterChange = async () => {
         try {
-          const filterState = this.getCurrentFilterState();
+          this.persistClassFilter(this.elements.classFilter ? this.elements.classFilter.value : 'すべて');
           await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-
-          this.updateLastSeenTimestamp(); // フィルター変更時は現在時刻で基準更新
+          this.updateLastSeenTimestamp();
         } catch (error) {
           console.error('クラスフィルター変更時のデータ読み込みエラー:', error);
         }
       };
       this.handlers.onSortOrderChange = async () => {
         try {
-          const filterState = this.getCurrentFilterState();
           await this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-
-          this.updateLastSeenTimestamp(); // ソート変更時は現在時刻で基準更新
+          this.updateLastSeenTimestamp();
         } catch (error) {
           console.error('ソート順変更時のデータ読み込みエラー:', error);
         }
@@ -555,11 +550,144 @@
       };
       document.addEventListener('click', this.handlers.onActivityDetection, { passive: true });
 
+      // Why: オフラインからオンラインに戻ったとき、ポーリングの次回起動を待たず
+      //      即座にスケジュールし直す。生徒の Wi-Fi が不安定な場面で復帰が早い。
+      this.handlers.onOnline = () => {
+        this.state.isOnline = true;
+        if (this.state.initializationComplete && !this.polling.isActive) {
+          this.startSimplePolling();
+        }
+      };
+      this.handlers.onOffline = () => { this.state.isOnline = false; };
+      window.addEventListener('online', this.handlers.onOnline, { passive: true });
+      window.addEventListener('offline', this.handlers.onOffline, { passive: true });
+
+      this.setupScrollHeader();
+      this.setupPullToRefresh();
+
       if (this.state.initializationComplete && !this.polling.isActive) {
         this.startSimplePolling();
       }
 
       this.nonCriticalListenersSetup = true;
+    }
+
+    /**
+     * 下スクロールでヘッダーを隠し、上スクロールで復帰させる。
+     * Why: 回答カードを縦に多く見せる。連続スクロール時の小さな揺り戻しで
+     *      ヘッダーがパタパタしないよう、しきい値と方向の両方で判定する。
+     */
+    setupScrollHeader() {
+      const header = this.elements.header || document.getElementById('main-header');
+      if (!header) return;
+      this.elements.header = header;
+
+      const HIDE_AFTER_PX = 80;  // この距離以内は絶対に隠さない（最上部のブレ対策）
+      const DELTA_PX = 8;        // 方向変化とみなす最小差分
+
+      let lastY = window.scrollY || 0;
+      let ticking = false;
+
+      const update = () => {
+        ticking = false;
+        const y = window.scrollY || 0;
+        const delta = y - lastY;
+
+        if (y <= HIDE_AFTER_PX) {
+          header.classList.remove('header-hidden');
+        } else if (delta > DELTA_PX) {
+          header.classList.add('header-hidden');     // 下スクロール
+        } else if (delta < -DELTA_PX) {
+          header.classList.remove('header-hidden');  // 上スクロール
+        }
+        lastY = y;
+      };
+
+      this.handlers.onScrollHeader = () => {
+        if (!ticking) {
+          requestAnimationFrame(update);
+          ticking = true;
+        }
+      };
+      window.addEventListener('scroll', this.handlers.onScrollHeader, { passive: true });
+    }
+
+    /**
+     * モバイルの「引き下げて更新」ジェスチャー。
+     * Why: 通知バナー経由の更新は分かりにくい。標準的な SNS アプリと同じ
+     *      下方向プルで refreshContent を発火させて、触って覚えてもらう。
+     *      native scroll を阻害しないよう、scrollY===0 + 指が下向き移動の
+     *      条件を揃えたときだけ preventDefault する。
+     */
+    setupPullToRefresh() {
+      const indicator = document.getElementById('pull-to-refresh-indicator');
+      const textEl = document.getElementById('pull-to-refresh-text');
+      if (!indicator || !textEl) return;
+
+      const THRESHOLD_PX = 70;   // ここを超えて離すと発火
+      const MAX_PULL_PX = 120;   // ここ以上は伸びない（視覚上の上限）
+      let startY = null;
+      let pulling = false;
+      let triggered = false;
+
+      const reset = () => {
+        indicator.style.transform = 'translate(-50%, -120%)';
+        indicator.classList.remove('active');
+        textEl.textContent = '引き下げて更新';
+        startY = null;
+        pulling = false;
+        triggered = false;
+      };
+
+      this.handlers.onPtrStart = (e) => {
+        if ((window.scrollY || 0) > 0) return;
+        if (this.state.isLoading) return;
+        if (!e.touches || e.touches.length !== 1) return;
+        startY = e.touches[0].clientY;
+        pulling = false;
+        triggered = false;
+      };
+
+      this.handlers.onPtrMove = (e) => {
+        if (startY == null) return;
+        const dy = e.touches[0].clientY - startY;
+        if (dy <= 0) {
+          if (pulling) reset();
+          return;
+        }
+        // ユーザーが下向きに 8px 以上引っ張ったら pull 状態に入る。
+        if (dy < 8) return;
+        if ((window.scrollY || 0) > 0) { reset(); return; }
+
+        pulling = true;
+        const pull = Math.min(dy, MAX_PULL_PX);
+        const y = (pull / MAX_PULL_PX) * 100 - 120;
+        indicator.style.transform = `translate(-50%, ${y}%)`;
+        indicator.classList.add('active');
+        triggered = pull >= THRESHOLD_PX;
+        textEl.textContent = triggered ? '離して更新' : '引き下げて更新';
+
+        // native refresh（Chrome の下スクロール再読み込み）を抑止する。
+        if (e.cancelable) e.preventDefault();
+      };
+
+      this.handlers.onPtrEnd = async () => {
+        if (!pulling) { reset(); return; }
+        if (!triggered) { reset(); return; }
+        textEl.textContent = '更新中...';
+        indicator.style.transform = 'translate(-50%, 12px)';
+        try {
+          await this.refreshContent();
+        } finally {
+          setTimeout(reset, 250);
+        }
+      };
+
+      // passive:false が必要（preventDefault するため）。start/end は passive で OK。
+      document.addEventListener('touchstart', this.handlers.onPtrStart, { passive: true });
+      document.addEventListener('touchmove', this.handlers.onPtrMove, { passive: false });
+      document.addEventListener('touchend', this.handlers.onPtrEnd, { passive: true });
+      document.addEventListener('touchcancel', this.handlers.onPtrEnd, { passive: true });
     }
     /**
    * イベント委譲の設定（安定版の堅牢なロジックを採用）
@@ -893,26 +1021,6 @@
     }
 
 
-    async handleInitialContentLoad(currentViewKey) {
-      this.lastViewKey = currentViewKey;
-
-      if (this.hadInitialDataLoadFailure) {
-        this.updateLastSeenTimestamp();
-        return;
-      }
-
-      this.updateLastSeenTimestamp();
-      this.initialDataLoaded = true;
-
-    }
-
-    async handleViewChange(currentViewKey) {
-      this.lastViewKey = currentViewKey;
-      this.updateLastSeenTimestamp();
-      this.dismissNewContentBanner();
-    }
-
-
     showNewContentBanner(newItemsCount, filterState = null) {
       if (!this.elements.newContentBanner || !newItemsCount || newItemsCount <= 0) {
         return;
@@ -962,18 +1070,6 @@
       }
     }
 
-    async updateContent(isManualUpdate = false, preloadedTriggerResult = null) {
-      if (isManualUpdate) {
-        await this.refreshContent();
-      } else {
-        if (preloadedTriggerResult && preloadedTriggerResult.hasNewContent) {
-          const appliedFilterState = preloadedTriggerResult.appliedFilter || this.getCurrentFilterState();
-          this.showNewContentBanner(preloadedTriggerResult.newItemsCount, appliedFilterState);
-        }
-      }
-    }
-
-
     startSimplePolling() {
       if (this.polling.isActive) return;
 
@@ -991,6 +1087,14 @@
 
       this.polling.timerId = setTimeout(async () => {
         if (!this.polling.isActive) return;
+
+        // Why: Wi-Fi が不安定な教室環境では online=false が発生しやすい。
+        //      このとき fetch を叩いても必ずネットワークエラーになるだけ。
+        //      errorCount を進めず次の interval でリトライする（online 復帰で 'online' event が発火して即座に再開される）。
+        if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+          this.schedulePollingCheck();
+          return;
+        }
 
         try {
           const response = await this.runGas('getNotificationUpdate', this.state.userId, {
@@ -1263,6 +1367,19 @@
       }
       if (this.handlers.onActivityDetection) {
         document.removeEventListener('click', this.handlers.onActivityDetection);
+      }
+      if (this.handlers.onScrollHeader) {
+        window.removeEventListener('scroll', this.handlers.onScrollHeader);
+      }
+      if (this.handlers.onOnline) {
+        window.removeEventListener('online', this.handlers.onOnline);
+        window.removeEventListener('offline', this.handlers.onOffline);
+      }
+      if (this.handlers.onPtrStart) {
+        document.removeEventListener('touchstart', this.handlers.onPtrStart);
+        document.removeEventListener('touchmove', this.handlers.onPtrMove);
+        document.removeEventListener('touchend', this.handlers.onPtrEnd);
+        document.removeEventListener('touchcancel', this.handlers.onPtrEnd);
       }
       if (this.visibilityObserver) {
         this.visibilityObserver.disconnect();
@@ -1907,7 +2024,13 @@
 
         const responseData = result.data || [];
 
-        this.state.currentAnswers = responseData;
+        // Why: ランダム順選択中はサーバーは newest 順で返してくるので、
+        //      クライアント側で seeded shuffle して見た目を安定させる。
+        //      filter/sort 変更時は loadSheetData 経由で再評価されるのでここで一元処理。
+        const sortOrderValue = this.elements.sortOrder ? this.elements.sortOrder.value : 'newest';
+        this.state.currentAnswers = sortOrderValue === 'random'
+          ? this.seededShuffle(responseData, this.state.randomSeed)
+          : responseData;
 
 
         if (result.header && this.elements.headingLabel) {
@@ -1916,8 +2039,12 @@
 
         await this.renderBoard(false, loadConfig.isInitialLoad, oldAnswers);
 
+        // Why: 毎回 classFilter を再構築する。refreshContent 経由でデータ更新されたとき、
+        //      新しく現れたクラス（生徒が初めて投稿した）を選択肢に加えるため。
+        //      populateClassFilter は現在選択中のクラスを保持するので UX は壊れない。
+        this.populateClassFilter(this.state.currentAnswers);
+
         if (loadConfig.isInitialLoad) {
-          this.populateClassFilter(this.state.currentAnswers);
           // Why: 初回ロードで全件描画されているので、localStorage の前回値を残すと
           //      polling が既表示分を「新着」と誤検知する。基準を現在時刻にリセット。
           this.updateLastSeenTimestamp();
@@ -1930,9 +2057,16 @@
 
     buildLoadConfiguration(config) {
       const isInitialLoad = config.isInitialLoad;
-      const filterState = isInitialLoad ?
-        { rawClassFilter: 'すべて', classFilter: null, sortOrder: 'newest' } :
-        this.getCurrentFilterState();
+      // Why: 初回ロードでも sessionStorage に保存された前回のクラスフィルター選択を適用する。
+      //      これが無いと、DOM だけ前回選択が見えているのに表示データは全件という不一致になる。
+      const persistedClass = this.loadPersistedClassFilter();
+      const filterState = isInitialLoad
+        ? {
+            rawClassFilter: persistedClass,
+            classFilter: persistedClass === 'すべて' ? null : persistedClass,
+            sortOrder: 'newest'
+          }
+        : this.getCurrentFilterState();
 
 
       return {
@@ -2000,9 +2134,15 @@
 
     populateClassFilter(rows) {
       const classFilter = this.elements.classFilter;
+      if (!classFilter) return;
       const uniqueClasses = ['すべて', ...new Set(Array.isArray(rows) ? rows.map(r => r.class).filter(Boolean) : [])];
+      // Why: 優先順は「現在 DOM の値 > sessionStorage の前回値 > 'すべて'」。
+      //      これで (a) 通知更新時は選択を維持、(b) リロード直後は前回の絞り込みを復元、
+      //      (c) いずれの値も存在しないなら全件表示、の 3 シナリオをすべてカバーする。
+      //      選択していたクラスがデータから消えた場合は 'すべて' にフォールバック。
+      const desired = classFilter.value || this.loadPersistedClassFilter() || 'すべて';
       classFilter.innerHTML = uniqueClasses.map(c => '<option value="' + window.sharedUtilities.security.escapeHtml(c) + '">' + window.sharedUtilities.security.escapeHtml(c) + '</option>').join('');
-      classFilter.value = 'すべて';
+      classFilter.value = uniqueClasses.includes(desired) ? desired : 'すべて';
       classFilter.classList.remove('hidden');
     }
 
@@ -2156,11 +2296,9 @@
 
     renderDirectly(newRows, oldRows, container, existingMap) {
       const fragment = this.getReusableFragment();
-
-
-      let cardsCreated = 0;
-      let cardsReused = 0;
-      let cardsFailed = 0;
+      // Why: 初期ロード（oldRows 空）では全件が "new" なので pulse を全カードに
+      //      掛けると視覚的ノイズ。更新差分があるときだけ new-card マークを付ける。
+      const markNew = Array.isArray(oldRows) && oldRows.length > 0;
 
       newRows.forEach((row) => {
         const rowId = String(row.rowIndex);
@@ -2170,15 +2308,11 @@
         if (!card) {
           card = this.createAnswerCard(row);
           if (card) {
-            card.classList.add('new-card');
+            if (markNew) card.classList.add('new-card');
             fragment.appendChild(card);
-            cardsCreated++;
-          } else {
-            cardsFailed++;
           }
         } else if (this.shouldUpdateCard(row, oldData)) {
           this.updateAnswerCard(card, row, oldData);
-          cardsReused++;
         }
       });
 
@@ -2282,13 +2416,15 @@
 
     applyAnimations() {
       if (!this.elements.answersContainer) return;
-
-      const newCards =
-        this.elements.answersContainer.querySelectorAll('.new-card');
+      // Why: CSS の newCardPulse アニメーションは 2.5s 継続する。旧実装は RAF で即座に
+      //      クラスを剥がしていたため、実質アニメーションが走らなかった。animationend
+      //      を待ち、フォールバックで 3s 後にも確実に剥がして DOM を綺麗に保つ。
+      const newCards = this.elements.answersContainer.querySelectorAll('.new-card');
       newCards.forEach(card => {
-        requestAnimationFrame(() => {
-          card.classList.remove('new-card');
-        });
+        const cleanup = () => card.classList.remove('new-card');
+        const once = () => { card.removeEventListener('animationend', once); cleanup(); };
+        card.addEventListener('animationend', once, { once: true });
+        setTimeout(cleanup, 3000);
       });
     }
 
@@ -3329,12 +3465,9 @@
       try {
         const hasLastSeenTimestamp = localStorage.getItem(this.getScopedKey('lastSeenTimestamp')) !== null;
         const hasDiffCards = localStorage.getItem(this.getScopedKey('differentialCards')) !== null;
-        const hasInitialLoad = this.initialDataLoaded === true;
         const container = this.elements?.answersContainer;
         const hasDOMCards = container && container.querySelectorAll('.answer-card').length > 0;
-        const isFirstTime = !hasLastSeenTimestamp && !hasDiffCards && !hasInitialLoad && !hasDOMCards;
-
-        return isFirstTime;
+        return !hasLastSeenTimestamp && !hasDiffCards && !hasDOMCards;
       } catch (error) {
         console.warn('⚠️ 初回判定エラー:', error);
         return false;
@@ -3366,10 +3499,68 @@
 
     updateLastSeenTimestamp(timestamp = null) {
       const newTimestamp = timestamp || new Date().toISOString();
-      const oldTimestamp = this.state.lastSeenTimestamp;
-
       this.state.lastSeenTimestamp = newTimestamp;
       this.saveLastSeenTimestamp(newTimestamp);
+    }
+
+    /**
+     * Why: クラスフィルターの選択を sessionStorage で保存。ページリロードや
+     *      新しいタブで開いたときに前回の選択を自動復元する。
+     *      localStorage 採用でも良いが、授業中の一時的な絞り込みを次回も引きずると
+     *      混乱するので、タブ閉鎖で消える session スコープを選ぶ。
+     */
+    loadPersistedClassFilter() {
+      try {
+        return sessionStorage.getItem(this.getScopedKey('classFilter')) || 'すべて';
+      } catch (_) { return 'すべて'; }
+    }
+    persistClassFilter(value) {
+      try {
+        sessionStorage.setItem(this.getScopedKey('classFilter'), value);
+      } catch (_) { /* quota / privacy mode など: 無視して次回に委ねる */ }
+    }
+
+    /**
+     * Why: ランダム順のシードをセッション単位で固定。ポーリングで再取得するたびに
+     *      シャッフルされるとカードが跳ね回って読みづらいので、session 内では
+     *      同じ並びを維持する。タブを閉じれば次回は別の並びになる。
+     */
+    loadRandomSeed() {
+      try {
+        const key = 'studyquest-randomSeed';
+        let seed = sessionStorage.getItem(key);
+        if (!seed) {
+          seed = String(Date.now() ^ Math.floor(Math.random() * 0x7fffffff));
+          sessionStorage.setItem(key, seed);
+        }
+        return Number(seed) >>> 0;
+      } catch (_) {
+        return (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
+      }
+    }
+
+    /**
+     * seeded PRNG (mulberry32). ランダム順の表示に使う。
+     * Why: 同じ seed なら常に同じ並びになる。サーバー側では新着順で返ってくるので、
+     *      クライアントで決定的にシャッフルして見た目を安定させる。
+     */
+    seededShuffle(array, seed) {
+      const a = array.slice();
+      let s = seed >>> 0;
+      const rand = () => {
+        s |= 0; s = (s + 0x6D2B79F5) | 0;
+        let t = Math.imul(s ^ (s >>> 15), 1 | s);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+      };
+      // Why: rowIndex を seed にミックスしてから shuffle。同一 seed + 同一 rowIndex なら
+      //      位置が決定論的になるので、ポーリング再描画しても並びが維持される。
+      // Fisher-Yates
+      for (let i = a.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(rand() * (i + 1));
+        const tmp = a[i]; a[i] = a[j]; a[j] = tmp;
+      }
+      return a;
     }
 
 
@@ -4818,8 +5009,9 @@
 
         const card = this.createAnswerCard(item);
         if (card) {
-          card.classList.add('new-card');
-
+          // Why: この経路はスクロールで既存データを段階的に DOM に出す遅延ロード。
+          //      新規投稿ではないので pulse を当てない（ユーザーのスクロール先が
+          //      パタパタ光って見えるのを防ぐ）。
           this.virtualScrollState.renderedRowIndexes.add(rowIndexStr);
 
           if (this.visibilityObserver) {

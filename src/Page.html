@@ -161,6 +161,12 @@
   <!-- Notification Container for unified notification system -->
   <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
 
+  <!-- Pull-to-refresh indicator (モバイル向け。PC は新着バナー or ページ再読み込みで代用) -->
+  <div id="pull-to-refresh-indicator" role="status" aria-live="polite">
+    <span id="pull-to-refresh-icon" class="ptr-spinner" aria-hidden="true"></span>
+    <span id="pull-to-refresh-text">引き下げて更新</span>
+  </div>
+
   <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
     <!-- コンパクトヘッダー -->
     <header id="main-header" class="glass-panel rounded-xl p-3 mb-4 shadow-lg fade-in">

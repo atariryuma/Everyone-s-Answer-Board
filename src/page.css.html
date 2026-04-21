@@ -45,13 +45,64 @@
   outline-offset: 2px; 
   border-radius: var(--radius-lg); 
 }
-header { 
-  position: sticky; 
-  top: 0; 
-  z-index: var(--z-elevated); 
+header {
+  position: sticky;
+  top: 0;
+  z-index: var(--z-elevated);
   contain: layout;
   backdrop-filter: var(--glass-backdrop);
   -webkit-backdrop-filter: var(--glass-backdrop);
+  transition: transform 0.25s ease-out;
+  will-change: transform;
+}
+/* Why: 下スクロール時にヘッダーを隠して、回答カードの表示領域を最大化する。
+   上スクロールで戻すことで、並び替え・クラスフィルターへのアクセスも即座に復帰する。 */
+header.header-hidden {
+  transform: translateY(-110%);
+}
+@media (prefers-reduced-motion: reduce) {
+  header { transition: none; }
+}
+
+/* Pull-to-refresh indicator: ページ最上部から引き下げ始めると出現。
+   閾値を超えて離すと refreshContent が走る。 */
+#pull-to-refresh-indicator {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translate(-50%, -120%);
+  z-index: 70;
+  background: rgba(15, 23, 42, 0.92);
+  color: #e0f2fe;
+  border: 1px solid rgba(103, 232, 249, 0.4);
+  border-radius: 9999px;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+  backdrop-filter: blur(8px);
+  pointer-events: none;
+  transition: opacity 0.2s ease-out;
+  opacity: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+#pull-to-refresh-indicator.active {
+  opacity: 1;
+}
+#pull-to-refresh-indicator .ptr-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #67e8f9;
+  border-radius: 50%;
+  animation: ptr-spin 0.8s linear infinite;
+}
+@keyframes ptr-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  #pull-to-refresh-indicator .ptr-spinner { animation: none; }
 }
 .answer-card { 
   transition: transform var(--animation-normal) var(--transition-easing),
@@ -274,8 +325,19 @@ header {
     perspective: 1000px;
   }
 }
+/* Why: 更新で新しく追加された回答を 2.5 秒だけ pulse で強調する。教師や生徒が
+   「今届いた投稿」を一目で見つけられるようにする。初期ロード時は全件が new なので
+   クライアント側で add せず、refresh 経由でのみ付与する（performMainRendering 側で制御）。*/
 .answer-card.new-card {
-  animation: fadeIn 0.3s ease-out;
+  animation: newCardPulse 2.5s ease-out;
+}
+@keyframes newCardPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7); transform: translateY(4px); opacity: 0.6; }
+  15%  { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0.4); transform: translateY(0); opacity: 1; }
+  100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .answer-card.new-card { animation: none; }
 }
 .highlight-badge {
   position: absolute;
