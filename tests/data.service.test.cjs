@@ -79,7 +79,6 @@ function loadDataServiceContext(overrides = {}) {
     getUserConfig: () => ({ success: true, config: {} }),
     getConfigOrDefault: () => ({}),
     normalizeHeader: (h) => String(h || '').toLowerCase().trim(),
-    extractFieldValueUnified: () => '',
     extractReactions: () => ({}),
     extractHighlight: () => false,
     getQuestionText: () => '',

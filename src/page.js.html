@@ -955,28 +955,6 @@
 
       return enhancedError;
     }
-    async verifyEditorAsync() {
-      if (window.isEditor) {
-        this.state.isEditor = true;
-        this.updateAdminButtonUI();
-        this.updateEndPublicationButtonUI();
-        return;
-      }
-
-      let prevState;
-      try {
-        const authResult = await this.runGas('checkUserAuthentication');
-        const isAdmin = authResult && authResult.isAdministrator;
-        if (isAdmin) {
-          window.isEditor = true;
-          this.state.isEditor = true;
-          this.updateAdminButtonUI();
-          this.updateEndPublicationButtonUI();
-        }
-      } catch (e) {
-        console.error('Admin check failed', e);
-      }
-    }
 
     updateAdminButtonUI() {
       if (this.elements.adminToggleBtn && this.state.isEditor) {

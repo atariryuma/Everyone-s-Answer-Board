@@ -41,7 +41,6 @@ function loadDataApisContext(overrides = {}) {
     validateUrl: () => ({ isValid: true }),
     validateSpreadsheetId: () => true,
     normalizeHeader: (h) => String(h || '').toLowerCase().trim(),
-    extractFieldValueUnified: () => '',
     extractReactions: () => ({}),
     extractHighlight: () => false,
     formatTimestamp: (v) => String(v || ''),

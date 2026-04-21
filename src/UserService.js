@@ -63,36 +63,6 @@ function getGoogleIdFromToken() {
 }
 
 /**
- * 動的URL生成（spreadsheetUrl, appUrl等）
- * @param {Object} config - 設定オブジェクト
- * @returns {Object} URL付き設定オブジェクト
- */
-function generateDynamicUserUrls(config) {
-  try {
-    const enhanced = { ...config };
-
-    if (config.spreadsheetId && !config.spreadsheetUrl) {
-      if (config.spreadsheetId && typeof config.spreadsheetId === 'string') {
-        enhanced.spreadsheetUrl = `https://docs.google.com/spreadsheets/d/${config.spreadsheetId}/edit`;
-      }
-    }
-
-    if (config.isPublished && !config.appUrl) {
-      enhanced.appUrl = getWebAppUrl(); // eslint-disable-line no-undef
-    }
-
-    if (config.formUrl) {
-      enhanced.hasValidForm = validateUrl(config.formUrl)?.isValid || false;
-    }
-
-    return enhanced;
-  } catch (error) {
-    console.error('UserService.generateDynamicUrls: エラー', error.message);
-    return config; // フォールバック
-  }
-}
-
-/**
  * 管理者権限確認（フロントエンド互換性）
  * 統一認証システムのAdministrator権限をチェック
  * @returns {boolean} 管理者権限があるか
