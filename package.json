@@ -15,6 +15,10 @@
     "api:open": "node scripts/admin-api.js --env open",
     "logs:cloud": "node scripts/logs.js",
     "logs:open": "node scripts/logs.js --env open",
+    "logs:tail": "node scripts/logs.js --tail",
+    "logs:summary": "node scripts/logs.js --summary --hours 3 --limit 500 --severity WARNING",
+    "logs:errors": "node scripts/logs.js --summary --hours 24 --limit 1000 --severity ERROR",
+    "check": "npm test && node scripts/admin-api.js systemDiagnosis",
     "test": "node --test tests/*.test.cjs"
   },
   "repository": {
