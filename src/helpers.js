@@ -233,13 +233,29 @@ function requireAdmin() {
 }
 
 /**
- * getUserConfig結果からconfigを安全に取得
+ * getUserConfig 結果から config を安全に取得
+ *
+ * 失敗時は空オブジェクトを返す（caller が壊れないことを優先）が、
+ * 同時に WARN ログを出す。以前は silent failure で、今日の「生徒にフォームボタンが
+ * 出ない」バグのように「空 config が返って機能が無効化されている」事象を
+ * ログから追えなかった。
+ *
  * @param {string} userId - ユーザーID
- * @param {Object} user - ユーザーオブジェクト（省略可）
+ * @param {Object} [user] - 事前取得済みユーザー（findUserById 再実行を避けるため）
  * @returns {Object} config（失敗時は空オブジェクト）
  */
 function getConfigOrDefault(userId, user) {
   const result = getUserConfig(userId, user);
+  if (!result.success) {
+    // 生徒が他人のボードを見るときに findUserById が拒否されると message が来る。
+    // Why WARN not ERROR: 呼び出し元が empty config でも壊れない設計なので fatal ではない。
+    //                     ただし silent だとバグに気付けないので痕跡は残す。
+    console.warn('getConfigOrDefault: returning empty config', {
+      userId: userId ? `${String(userId).substring(0, 8)}***` : 'N/A',
+      reason: result.message || 'unknown',
+      hasPreloadedUser: !!user
+    });
+  }
   return result.success ? result.config : {};
 }
 

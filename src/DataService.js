@@ -18,7 +18,7 @@
  * - ReactionService.gs（リアクション・ハイライト）
  */
 
-/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, extractFieldValueUnified, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty */
+/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, extractFieldValueUnified, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty, FormApp */
 
 
 /**
@@ -81,22 +81,17 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
 
     return result;
   } catch (error) {
+    // Why: 失敗時の ERROR ログはここに集約する。下層は WARN or silent に降格済み。
     const executionTime = Date.now() - startTime;
-    console.error('DataService.getUserSheetData: 重大エラー', {
+    console.error('DataService.getUserSheetData: 失敗', {
       userId,
       error: error.message,
-      stack: error.stack ? `${error.stack.substring(0, 300)  }...` : 'No stack trace',
       executionTime: `${executionTime}ms`,
-      configSpreadsheetId: config?.spreadsheetId || 'undefined',
-      configSheetName: config?.sheetName || 'undefined',
-      userEmail: user?.userEmail || 'undefined',
-      optionsProvided: options ? Object.keys(options) : 'none',
-      timestamp: new Date().toISOString()
+      spreadsheetId: config?.spreadsheetId || 'undefined',
+      sheetName: config?.sheetName || 'undefined',
+      userEmail: user?.userEmail || 'undefined'
     });
-
-    const errorResponse = createDataServiceErrorResponse(`データ取得エラー: ${error.message}`);
-    console.error('DataService.getUserSheetData: エラーレスポンス作成', errorResponse);
-    return errorResponse;
+    return createDataServiceErrorResponse(`データ取得エラー: ${error.message}`);
   }
 }
 
@@ -166,12 +161,9 @@ function connectToSpreadsheetSheet(config) {
   const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
 
   if (!dataAccess || !dataAccess.spreadsheet) {
-    console.error('connectToSpreadsheetSheet: スプレッドシートアクセス失敗', {
-      spreadsheetId: config.spreadsheetId,
-      useServiceAccount: false,
-      hasDataAccess: !!dataAccess,
-      hint: '同一ドメイン内で編集可能に設定してください'
-    });
+    // Why: openSpreadsheet が既に WARN ログを出しているので二重ログしない。
+    //      ここでは throw だけ行い、最上位（getUserSheetData）の catch で
+    //      1 行にまとめて ERROR ログを出す。
     throw new Error(`スプレッドシートアクセスに失敗しました: ${config.spreadsheetId}`);
   }
 
@@ -344,14 +336,6 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
   const tsIndex = resolveTimestampIndex(headers);
 
   for (let startRow = 2; startRow <= lastRow; ) {
-    if (Date.now() - startTime > MAX_EXECUTION_TIME) {
-      console.warn('DataService.processBatchData: 実行時間制限のため処理を中断', {
-        processedRows: processedCount,
-        totalRows: totalDataRows
-      });
-      break;
-    }
-
     const currentBatchSize = getAdaptiveBatchSize(consecutiveErrors);
     const endRow = Math.min(startRow + currentBatchSize - 1, lastRow);
     const batchSize = endRow - startRow + 1;
@@ -363,8 +347,8 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
       processedData = processedData.concat(batchProcessed);
       processedCount += batchSize;
 
-      consecutiveErrors = 0; // ✅ 成功時はエラーカウントリセット
-      startRow += batchSize; // 次のバッチへ進む
+      consecutiveErrors = 0;
+      startRow += batchSize;
 
     } catch (batchError) {
       consecutiveErrors++;
@@ -380,6 +364,12 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
 
       if (errorMessage.includes('429') || errorMessage.includes('Quota exceeded') || errorMessage.includes('quota')) {
         const backoffMs = Math.min(1000 * Math.pow(2, consecutiveErrors), 8000);
+        // Why: sleep 込みで予算超過するなら、sleep すること自体がリソース浪費。
+        //      30 人同時ポーリング時、全員が 14s ブロックして script-runtime quota を圧迫する問題を防ぐ。
+        if (Date.now() - startTime + backoffMs > MAX_EXECUTION_TIME) {
+          console.warn('⚠️ API quota exceeded, skipping backoff (would exceed budget)');
+          break;
+        }
         console.warn(`⚠️ API quota exceeded, backing off ${backoffMs}ms (errors: ${consecutiveErrors})`);
         Utilities.sleep(backoffMs);
       }
@@ -389,6 +379,18 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
         console.warn(`⚠️ バッチスキップ: 行${startRow}-${endRow}（${isPermanent ? '永続エラー' : consecutiveErrors + '回連続エラー'}）`);
         startRow += batchSize;
       }
+    }
+
+    // Why: 時間チェックはバッチ試行の「後」に置く。以前は先頭に置いていたため、
+    //      setup（openSpreadsheet / getSheetInfo）に時間が取られると 1 行も処理せず
+    //      success:true, data:[] を返して「回答が 0 件」と誤表示していた。
+    //      少なくとも 1 バッチは必ず試行する。
+    if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+      console.warn('DataService.processBatchData: 実行時間制限のため処理を中断', {
+        processedRows: processedCount,
+        totalRows: totalDataRows
+      });
+      break;
     }
   }
 
@@ -414,25 +416,18 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
 function fetchSpreadsheetData(config, options = {}, user = null) {
   const startTime = Date.now();
 
-  try {
-    const { sheet } = connectToSpreadsheetSheet(config);
+  const { sheet } = connectToSpreadsheetSheet(config);
+  const { lastRow, lastCol, headers } = getSheetInfo(sheet);
+  const processedData = processBatchData(sheet, headers, lastRow, lastCol, config, options, user, startTime);
 
-    const { lastRow, lastCol, headers } = getSheetInfo(sheet);
-
-    const processedData = processBatchData(sheet, headers, lastRow, lastCol, config, options, user, startTime);
-
-    return {
-      success: true,
-      data: processedData,
-      headers,
-      sheetName: config.sheetName,
-      filteredRows: processedData.length,
-      executionTime: Date.now() - startTime
-    };
-  } catch (error) {
-    console.error('DataService.fetchSpreadsheetData: エラー', error.message);
-    throw error;
-  }
+  return {
+    success: true,
+    data: processedData,
+    headers,
+    sheetName: config.sheetName,
+    filteredRows: processedData.length,
+    executionTime: Date.now() - startTime
+  };
 }
 
 /**
@@ -683,6 +678,11 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
 
     sheet.deleteRows(rowIndex, 1);
 
+    // Why: sheet.deleteRows だけでは Google Forms のレスポンスストアには残り、
+    //      フォームの集計・再送信防止・回答編集 URL が実在する回答として扱われる。
+    //      未リンク・権限不足は致命的ではないので best-effort でシート削除は成功扱い。
+    deleteLinkedFormResponseByTimestamp(sheet, rowData[0]);
+
     const executionTime = Date.now() - startTime;
 
     return {
@@ -699,5 +699,53 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
       error: error.message
     });
     return createDataServiceErrorResponse(`削除エラー: ${error.message}`);
+  }
+}
+
+/**
+ * シートにリンクされたフォームから、指定タイムスタンプのレスポンスを削除する（best-effort）。
+ *
+ * Why timestamp match: シートの 1 列目にはフォーム送信時の timestamp が入り、
+ *   FormResponse.getTimestamp() と同じ値になる。ID 保持列を増やさずに突き合わせ可能。
+ *
+ * @param {Sheet} sheet
+ * @param {Date} rowTimestamp - sheet.getRange(...).getValues() 由来なので常に Date
+ * @returns {{success:boolean, message?:string}}
+ */
+function deleteLinkedFormResponseByTimestamp(sheet, rowTimestamp) {
+  const TOLERANCE_MS = 1000;
+  try {
+    const formUrl = sheet.getFormUrl();
+    if (!formUrl) {
+      return { success: false, message: 'no linked form' };
+    }
+
+    // Why instanceof だけだと vm context 跨ぎのテスト用 Date で false 判定されるため duck-typing。
+    //      production では sheet.getRange().getValues() は常に Date を返す。
+    const targetTime = rowTimestamp && typeof rowTimestamp.getTime === 'function'
+      ? rowTimestamp.getTime()
+      : NaN;
+    if (!Number.isFinite(targetTime)) {
+      return { success: false, message: 'invalid timestamp' };
+    }
+
+    const form = FormApp.openByUrl(formUrl);
+    // Why: 全件取得でなく target 以降に限定することで、長期運用フォーム（数千件）でも
+    //      1 件取れば済む。FormApp.getResponses(timestamp) は「timestamp 以降」を返す。
+    const responses = form.getResponses(new Date(targetTime - TOLERANCE_MS));
+    for (let i = 0; i < responses.length; i += 1) {
+      // Why: Sheet 側は秒精度、FormResponse 側はミリ秒精度のため完全一致しない。
+      const respTime = responses[i].getTimestamp().getTime();
+      if (Math.abs(respTime - targetTime) <= TOLERANCE_MS) {
+        form.deleteResponse(responses[i].getId());
+        return { success: true };
+      }
+    }
+    return { success: false, message: 'no matching form response' };
+  } catch (error) {
+    console.warn('deleteLinkedFormResponseByTimestamp: failed', {
+      error: error.message
+    });
+    return { success: false, message: error.message };
   }
 }

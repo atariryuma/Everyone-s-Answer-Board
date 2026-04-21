@@ -796,26 +796,18 @@
   }
 
   /* Modal System */
+  /* Why: background/color は呼び出し側の Tailwind クラス（bg-red-600 text-white 等）
+     を尊重するため設定しない。以前は UnifiedStyles が後読みされ Tailwind の
+     bg-red-600 / text-white を上書きしてボタンが半透明白背景+薄い前景色になり
+     「×ボタンが透明」と報告されていた。位置・形状のみ定義する。 */
   .modal-close-btn {
-    position: absolute;
-    top: 1rem;
-    right: 1rem;
-    background: rgba(255, 255, 255, 0.1);
     border: none;
     border-radius: 50%;
-    width: 32px;
-    height: 32px;
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     transition: all var(--transition-normal) var(--transition-easing);
-    color: var(--brand-text);
-  }
-
-  .modal-close-btn:hover {
-    background: rgba(255, 255, 255, 0.2);
-    transform: scale(1.1);
   }
 
   /* Progressive Disclosure */

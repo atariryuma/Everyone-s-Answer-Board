@@ -997,7 +997,16 @@
             lastUpdateTime: this.state.lastSeenTimestamp
           });
 
-          if (response.success && response.hasNewContent) {
+          // Why: 以前は response.success が false でも errorCount=0 にリセットしていたため、
+          //      サーバー側の「スプレッドシートアクセス拒否」のような継続的失敗が
+          //      永久にポーリングされ、大量の ERROR ログとサーバー時間を浪費していた。
+          //      失敗時は throw して下の catch 経路に載せ、3 回で 5 分停止する
+          //      既存の exponential backoff を効かせる。
+          if (!response || !response.success) {
+            throw new Error(response?.message || 'getNotificationUpdate failed');
+          }
+
+          if (response.hasNewContent) {
             this.showNewContentBanner(response.newItemsCount);
           }
 
@@ -1909,6 +1918,9 @@
 
         if (loadConfig.isInitialLoad) {
           this.populateClassFilter(this.state.currentAnswers);
+          // Why: 初回ロードで全件描画されているので、localStorage の前回値を残すと
+          //      polling が既表示分を「新着」と誤検知する。基準を現在時刻にリセット。
+          this.updateLastSeenTimestamp();
         }
 
       } catch (error) {

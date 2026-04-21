@@ -307,10 +307,14 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       }
     } catch (openError) {
-      console.error('openSpreadsheet: スプレッドシート接続失敗', {
+      // Why: 共有設定 or OAuth スコープ不足で頻発する既知の失敗パス。
+      //      ここで ERROR を吐くと呼び出し元（connectToSpreadsheetSheet /
+      //      getUserSheetData 等）も重ねて ERROR を吐き、1 リクエストで
+      //      4-5 行ログが出てしまう。最上位の呼び出し元が 1 行に集約する前提で
+      //      ここは WARN に降格し、詳細は top-level にまとめる。
+      console.warn('openSpreadsheet: スプレッドシート接続失敗', {
         spreadsheetId: `${spreadsheetId.substring(0, 20)}...`,
         error: openError.message,
-        stack: openError.stack ? `${openError.stack.substring(0, 200)}...` : 'No stack trace',
         useServiceAccount: options.useServiceAccount,
         hasAuth: !!auth
       });
@@ -752,16 +756,47 @@ function findUserByEmail(email, context = {}) {
 }
 
 /**
- * ユーザーIDでユーザーを検索（CLAUDE.md準拠 - Editor→Admin共有DB）
+ * ユーザーIDでユーザーを検索（strict: admin / 自分のみ許可）
+ *
+ * WRITE操作や管理者専用操作で使う。公開ボードを閲覧する生徒の経路では
+ * 代わりに {@link findPublishedBoardOwner} を使うこと。これを逆に使うと
+ * 生徒から null が返り、「config 取得失敗 → default config → formUrl 消失」
+ * のような silent failure が起きる（実際に発生した bug）。
+ *
  * @param {string} userId - ユーザーID
  * @param {Object} context - アクセスコンテキスト
- * @param {boolean} context.forceServiceAccount - サービスアカウント強制使用
- * @param {string} context.requestingUser - リクエストユーザー（デバッグ用）
+ * @param {string} context.requestingUser - リクエストユーザー（debug/権限判定用）
+ * @param {boolean} [context.allowPublishedRead] - 公開ボードなら非オーナーも許可
+ * @param {boolean} [context.forceServiceAccount] - サービスアカウント強制使用
  * @returns {Object|null} User object
  */
 function findUserById(userId, context = {}) {
   if (!userId) return null;
   return findUserByField('userId', userId, { ...context, cacheKeyPrefix: 'user_by_id', label: 'findUserById' });
+}
+
+/**
+ * 公開ボードのオーナーを viewer 視点で取得（admin / owner / 公開ボード閲覧者を許可）
+ *
+ * `getPublishedSheetData` / `getActiveFormInfo` / `getNotificationUpdate` など、
+ * 生徒が他人のボードを見る経路で使う。これを使うと `allowPublishedRead: true` を
+ * 渡し忘れる類の bug を根絶できる。
+ *
+ * WRITE 系や editor-only 操作では `findUserById` + 独自の editor gate を使うこと
+ * （例: deleteAnswerRow、toggleHighlight）。
+ *
+ * @param {string} userId - 対象ボードオーナーの userId
+ * @param {string} viewerEmail - 閲覧者のメールアドレス
+ * @param {Object} [extra] - 追加 context（preloadedAuth 等）
+ * @returns {Object|null}
+ */
+function findPublishedBoardOwner(userId, viewerEmail, extra = {}) {
+  if (!userId) return null;
+  return findUserById(userId, {
+    ...extra,
+    requestingUser: viewerEmail,
+    allowPublishedRead: true
+  });
 }
 
 /**
@@ -1237,10 +1272,7 @@ function updateUser(userId, updates, context = {}) {
  */
 function getViewerBoardData(targetUserId, viewerEmail) {
   try {
-    const targetUser = findUserById(targetUserId, {
-      requestingUser: viewerEmail,
-      allowPublishedRead: true
-    });
+    const targetUser = findPublishedBoardOwner(targetUserId, viewerEmail);
     if (!targetUser) {
       console.warn('getViewerBoardData: Target user not found:', targetUserId);
       return null;

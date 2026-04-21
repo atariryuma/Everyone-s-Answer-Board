@@ -81,6 +81,9 @@ function loadReactionContext(overrides = {}) {
     isAdministrator: (email) => email === 'admin@example.com',
     findUserBySpreadsheetId: () => null,
     findUserById: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' }),
+    // findPublishedBoardOwner は DatabaseCore の helper。テストでは findUserById と同等でよい。
+    findPublishedBoardOwner: (userId, viewerEmail, extra = {}) =>
+      (context.findUserById ? context.findUserById(userId, { ...extra, requestingUser: viewerEmail, allowPublishedRead: true }) : null),
     getUserConfig: () => ({ success: true, config: {} }),
     getConfigOrDefault: () => ({
       spreadsheetId: 'sheet-123',
@@ -370,12 +373,12 @@ test('extractHighlight: returns false when column missing', () => {
 });
 
 // =====================================================================
-// validateReactionPermissionWithPreloadedData
+// canActOnTargetBoard
 // =====================================================================
 
-test('validateReactionPermissionWithPreloadedData: admin always has permission', () => {
+test('canActOnTargetBoard: admin always has permission', () => {
   const ctx = loadReactionContext({ isAdministrator: (email) => email === 'admin@example.com' });
-  const ok = ctx.validateReactionPermissionWithPreloadedData(
+  const ok = ctx.canActOnTargetBoard(
     'admin@example.com',
     { userEmail: 'other@example.com' },
     { isPublished: false }
@@ -383,9 +386,9 @@ test('validateReactionPermissionWithPreloadedData: admin always has permission',
   assert.equal(ok, true);
 });
 
-test('validateReactionPermissionWithPreloadedData: board owner has permission on unpublished', () => {
+test('canActOnTargetBoard: board owner has permission on unpublished', () => {
   const ctx = loadReactionContext();
-  const ok = ctx.validateReactionPermissionWithPreloadedData(
+  const ok = ctx.canActOnTargetBoard(
     'owner@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: false }
@@ -393,9 +396,9 @@ test('validateReactionPermissionWithPreloadedData: board owner has permission on
   assert.equal(ok, true);
 });
 
-test('validateReactionPermissionWithPreloadedData: any user has permission on published', () => {
+test('canActOnTargetBoard: any user has permission on published (viewer op)', () => {
   const ctx = loadReactionContext();
-  const ok = ctx.validateReactionPermissionWithPreloadedData(
+  const ok = ctx.canActOnTargetBoard(
     'viewer@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: true }
@@ -403,9 +406,9 @@ test('validateReactionPermissionWithPreloadedData: any user has permission on pu
   assert.equal(ok, true);
 });
 
-test('validateReactionPermissionWithPreloadedData: non-owner blocked on unpublished', () => {
+test('canActOnTargetBoard: non-owner blocked on unpublished', () => {
   const ctx = loadReactionContext();
-  const ok = ctx.validateReactionPermissionWithPreloadedData(
+  const ok = ctx.canActOnTargetBoard(
     'viewer@example.com',
     { userEmail: 'owner@example.com' },
     { isPublished: false }
@@ -413,18 +416,56 @@ test('validateReactionPermissionWithPreloadedData: non-owner blocked on unpublis
   assert.equal(ok, false);
 });
 
-test('validateReactionPermissionWithPreloadedData: null actor → false', () => {
+test('canActOnTargetBoard: requireEditor blocks viewer on published (editor op)', () => {
+  const ctx = loadReactionContext();
+  const ok = ctx.canActOnTargetBoard(
+    'viewer@example.com',
+    { userEmail: 'owner@example.com' },
+    { isPublished: true },
+    { requireEditor: true }
+  );
+  assert.equal(ok, false, 'Highlight/editor操作は公開ボードの閲覧者でも拒否されるべき');
+});
+
+test('canActOnTargetBoard: requireEditor allows owner', () => {
+  const ctx = loadReactionContext();
+  const ok = ctx.canActOnTargetBoard(
+    'owner@example.com',
+    { userEmail: 'owner@example.com' },
+    { isPublished: true },
+    { requireEditor: true }
+  );
+  assert.equal(ok, true);
+});
+
+test('canActOnTargetBoard: requireEditor allows admin via preloaded isAdmin (perf path)', () => {
+  // isAdministrator を呼ばせない（preloaded を信用する）ことを検証
+  let calls = 0;
+  const ctx = loadReactionContext({
+    isAdministrator: () => { calls += 1; return false; }
+  });
+  const ok = ctx.canActOnTargetBoard(
+    'someone@example.com',
+    { userEmail: 'owner@example.com' },
+    { isPublished: false },
+    { requireEditor: true, isAdmin: true }
+  );
+  assert.equal(ok, true);
+  assert.equal(calls, 0, 'options.isAdmin=true の時に isAdministrator を再計算しないこと');
+});
+
+test('canActOnTargetBoard: null actor → false', () => {
   const ctx = loadReactionContext();
   assert.equal(
-    ctx.validateReactionPermissionWithPreloadedData(null, { userEmail: 'x' }, { isPublished: true }),
+    ctx.canActOnTargetBoard(null, { userEmail: 'x' }, { isPublished: true }),
     false
   );
 });
 
-test('validateReactionPermissionWithPreloadedData: null targetUser → false', () => {
+test('canActOnTargetBoard: null targetUser → false', () => {
   const ctx = loadReactionContext();
   assert.equal(
-    ctx.validateReactionPermissionWithPreloadedData('a@x.com', null, { isPublished: true }),
+    ctx.canActOnTargetBoard('a@x.com', null, { isPublished: true }),
     false
   );
 });
@@ -624,6 +665,11 @@ function buildToggleHighlightContext({ sheet, cache, lock, overrides = {} } = {}
   return loadReactionContext({
     cache: cache || createMockCache(),
     lock: lock || createMockLock(),
+    // toggleHighlight は editor-only なので、デフォルトでは actor を owner にして
+    // 権限チェックを通過させる。権限バグを検証したい個別テストは overrides で
+    // getCurrentEmail / findUserById を差し替える。
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'owner-1', userEmail: 'owner@example.com' }),
     openSpreadsheet: () => ({
       spreadsheet: { getSheetByName: (name) => (name === 'Sheet1' ? actualSheet : null) }
     }),
@@ -668,6 +714,71 @@ test('toggleHighlight: rejects unauthorized actor', () => {
   const result = ctx.toggleHighlight('owner-1', 2);
   assert.equal(result.success, false);
   assert.match(result.message, /Access denied/);
+});
+
+test('toggleHighlight: rejects published-board viewer (editor-only gate)', () => {
+  // Why: UI で highlight-btn を出していなくても、google.script.run で直接叩かれる
+  //      経路を塞ぐため、サーバー側で editor 判定が必須。以前は config.isPublished
+  //      だけで通してしまい生徒がハイライトを自由に操作できるバグがあった。
+  const sheet = createMockSheet({
+    headers: ['Q1', 'HIGHLIGHT'],
+    rows: [['answer-a', 'FALSE']]
+  });
+  const ctx = buildToggleHighlightContext({
+    sheet,
+    overrides: {
+      getCurrentEmail: () => 'student@example.com',
+      isAdministrator: () => false,
+      getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: true }),
+      findUserById: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
+    }
+  });
+  const result = ctx.toggleHighlight('owner-1', 2);
+  assert.equal(result.success, false);
+  assert.match(result.message, /Access denied/);
+  // シートに書き込みが発生していないこと
+  assert.equal(sheet._writes.length, 0, '権限エラー時はシートに書き込まない');
+  assert.equal(sheet._data[1][1], 'FALSE', '元の HIGHLIGHT 値が維持される');
+});
+
+test('toggleHighlight: allows board owner even on unpublished board', () => {
+  const sheet = createMockSheet({
+    headers: ['Q1', 'HIGHLIGHT'],
+    rows: [['answer-a', 'FALSE']]
+  });
+  const ctx = buildToggleHighlightContext({
+    sheet,
+    overrides: {
+      getCurrentEmail: () => 'teacher@example.com',
+      isAdministrator: () => false,
+      getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: false }),
+      findUserById: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
+    }
+  });
+  const result = ctx.toggleHighlight('owner-1', 2);
+  assert.equal(result.success, true);
+  assert.equal(sheet._data[1][1], 'TRUE');
+});
+
+test('addReaction: still allows published-board viewer (viewer op is open)', () => {
+  // Regression: editor-only 化を highlight だけに適用できていることを保証する。
+  // addReaction は requireEditor を渡さないので、公開ボード閲覧者は従来どおり許可。
+  const sheet = createMockSheet({
+    headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'],
+    rows: [['answer-a', '', '', '']]
+  });
+  const ctx = buildAddReactionContext({
+    sheet,
+    overrides: {
+      getCurrentEmail: () => 'student@example.com',
+      isAdministrator: () => false,
+      getConfigOrDefault: () => ({ spreadsheetId: 'x', sheetName: 'Sheet1', isPublished: true }),
+      findUserById: () => ({ userId: 'owner-1', userEmail: 'teacher@example.com' })
+    }
+  });
+  const result = ctx.addReaction('owner-1', 2, 'LIKE');
+  assert.equal(result.success, true);
+  assert.equal(result.reactions.LIKE.count, 1);
 });
 
 test('toggleHighlight: returns error on missing HIGHLIGHT column', () => {

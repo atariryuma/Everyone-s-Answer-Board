@@ -14,6 +14,10 @@ function loadDataApisContext(overrides = {}) {
     getCurrentEmail: () => 'actor@example.com',
     findUserByEmail: () => null,
     findUserById: () => null,
+    // DataApis.js は findPublishedBoardOwner 経由で公開ボード閲覧時の lookup を行うため、
+    // 上書きを尊重しつつ findUserById にデリゲートする。
+    findPublishedBoardOwner: (userId, viewerEmail, extra = {}) =>
+      (context.findUserById ? context.findUserById(userId, { ...extra, requestingUser: viewerEmail, allowPublishedRead: true }) : null),
     findUserBySpreadsheetId: () => null,
     getUserConfig: () => ({ success: true, config: {} }),
     getConfigOrDefault: () => ({}),

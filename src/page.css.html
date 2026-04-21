@@ -292,8 +292,11 @@ header {
   padding: 0;
   transition: transform 0.2s, opacity 0.2s;
 }
+/* Why: 0.3 は暗い背景のカード上ではほぼ不可視で、編集者がクリック対象と
+   認識できず「ハイライトができない」と報告されていた。0.65 まで上げて
+   存在を明示しつつ、active との差（1.0）でハイライト済みが一目で分かるようにする。 */
 button.highlight-badge {
-  opacity: 0.3;
+  opacity: 0.65;
 }
 button.highlight-badge.active {
   opacity: 1;

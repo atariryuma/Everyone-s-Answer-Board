@@ -445,3 +445,114 @@ test('getUserSheetData: uses preloadedUser and preloadedConfig without DB hits',
   assert.equal(findCalls, 0, 'findUserById must not be called when preloadedUser provided');
   assert.equal(configCalls, 0, 'getConfigOrDefault must not be called when preloadedConfig provided');
 });
+
+// =====================================================================
+// processBatchData: regression — at least one batch attempted
+// Ensures the 20s time-check does not short-circuit before any batch when
+// setup (connectToSpreadsheetSheet + getSheetInfo) consumed the budget.
+// =====================================================================
+
+test('processBatchData: processes first batch even when startTime is already past budget', () => {
+  const ctx = loadDataServiceContext({
+    resolveColumnIndex: (headers, type, mapping) => {
+      const explicit = mapping && typeof mapping[type] === 'number' ? mapping[type] : -1;
+      return { index: explicit };
+    }
+  });
+  const sheet = createMockSheet({
+    headers: ['Timestamp', 'Answer'],
+    rows: [
+      ['2026-04-21', 'first'],
+      ['2026-04-21', 'second'],
+      ['2026-04-21', 'third']
+    ]
+  });
+  // startTime が budget(20s) を超えた状態を模擬する。
+  // バグ前: 先頭で time-check に引っかかって 0 行で break する。
+  // 修正後: 少なくとも 1 バッチは試行されて全 3 行が処理される。
+  const staleStartTime = Date.now() - 30000;
+
+  const result = ctx.processBatchData(
+    sheet,
+    ['Timestamp', 'Answer'],
+    4, // lastRow (1 header + 3 data)
+    2, // lastCol
+    { columnMapping: { answer: 1 } },
+    {},
+    null,
+    staleStartTime
+  );
+
+  assert.equal(result.length, 3, 'すべてのデータ行が処理されるべき');
+});
+
+// =====================================================================
+// deleteLinkedFormResponseByTimestamp
+// =====================================================================
+
+test('deleteLinkedFormResponseByTimestamp: deletes response matching timestamp', () => {
+  const deletedIds = [];
+  const response = {
+    getTimestamp: () => new Date('2026-04-21T12:00:00.500Z'),
+    getId: () => 'resp-1'
+  };
+  const form = {
+    getResponses: () => [response],
+    deleteResponse: (id) => { deletedIds.push(id); }
+  };
+  const ctx = loadDataServiceContext({
+    FormApp: { openByUrl: () => form }
+  });
+  const sheet = {
+    getFormUrl: () => 'https://docs.google.com/forms/d/1ABC/edit'
+  };
+
+  // 1 秒以内の誤差は許容
+  const result = ctx.deleteLinkedFormResponseByTimestamp(sheet, new Date('2026-04-21T12:00:00.000Z'));
+
+  assert.equal(result.success, true);
+  assert.deepEqual(deletedIds, ['resp-1']);
+});
+
+test('deleteLinkedFormResponseByTimestamp: returns note when sheet has no linked form', () => {
+  const ctx = loadDataServiceContext({
+    FormApp: { openByUrl: () => { throw new Error('should not be called'); } }
+  });
+  const sheet = { getFormUrl: () => null };
+
+  const result = ctx.deleteLinkedFormResponseByTimestamp(sheet, new Date());
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'no linked form');
+});
+
+test('deleteLinkedFormResponseByTimestamp: returns note when no response matches timestamp', () => {
+  const form = {
+    getResponses: () => [{
+      getTimestamp: () => new Date('2020-01-01'),
+      getId: () => 'old-resp'
+    }],
+    deleteResponse: () => { throw new Error('should not delete mismatched response'); }
+  };
+  const ctx = loadDataServiceContext({
+    FormApp: { openByUrl: () => form }
+  });
+  const sheet = { getFormUrl: () => 'https://docs.google.com/forms/d/1X/edit' };
+
+  const result = ctx.deleteLinkedFormResponseByTimestamp(sheet, new Date('2026-04-21T12:00:00Z'));
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'no matching form response');
+});
+
+test('deleteLinkedFormResponseByTimestamp: swallows FormApp errors and reports note', () => {
+  const ctx = loadDataServiceContext({
+    FormApp: { openByUrl: () => { throw new Error('permission denied'); } }
+  });
+  const sheet = { getFormUrl: () => 'https://docs.google.com/forms/d/1X/edit' };
+
+  const result = ctx.deleteLinkedFormResponseByTimestamp(sheet, new Date());
+
+  assert.equal(result.success, false);
+  assert.equal(result.message, 'permission denied');
+});

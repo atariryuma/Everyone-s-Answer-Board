@@ -9,7 +9,7 @@
  * - 同一ドメイン共有設定によるアクセス管理
  */
 
-/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, getUserConfig, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
+/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
 
 const LOCK_TIMEOUT_MS = 10000;
 const LOCK_CACHE_TTL_SECONDS = 10;
@@ -19,19 +19,42 @@ const LOCK_CACHE_TTL_SECONDS = 10;
 
 
 /**
- * マルチテナント権限検証（事前読み込みデータ版）
- * ✅ CLAUDE.md準拠: DB呼び出しなしの権限チェックでパフォーマンス最適化
- * @param {string} actorEmail - 操作者
- * @param {Object} targetUser - 事前取得済みの対象ユーザー
- * @param {Object} config - 事前取得済みの設定
- * @returns {boolean} 権限があるかどうか
+ * 対象ボードに対する操作権限の検証（事前読み込みデータ版）
+ *
+ * 操作の性質で 2 種類の権限モデルを分離する:
+ *   - viewer 操作（addReaction 等）: admin | owner | 公開ボードの閲覧者
+ *   - editor 操作（toggleHighlight 等）: admin | owner のみ
+ *
+ * Why: 以前は両方とも「config.isPublished なら誰でも可」で、
+ *      UI 側で highlight-btn を隠しているだけだった。生徒が
+ *      google.script.run.toggleHighlight(...) を直接叩くと先生の
+ *      ハイライトを自由に切り替えられる security bug を塞ぐ。
+ *
+ * Perf: isAdmin を options.isAdmin で受け取れるようにして、呼び出し側で
+ *       既に計算済みの値を再利用する（isAdministrator のキャッシュヒットでも
+ *       関数コール自体を省ける）。
+ *
+ * @param {string} actorEmail
+ * @param {Object} targetUser
+ * @param {Object} config
+ * @param {Object} [options]
+ * @param {boolean} [options.requireEditor=false] editor 権限を要求するか
+ * @param {boolean} [options.isAdmin] 呼び出し側が計算済みの isAdmin（省略時は再計算）
+ * @returns {boolean}
  */
-function validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config) {
+function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
   if (!actorEmail || !targetUser) return false;
 
-  if (isAdministrator(actorEmail)) return true;
+  const isAdmin = typeof options.isAdmin === 'boolean'
+    ? options.isAdmin
+    : isAdministrator(actorEmail);
+  if (isAdmin) return true;
 
-  return config.isPublished || targetUser.userEmail === actorEmail;
+  if (targetUser.userEmail === actorEmail) return true;
+
+  if (options.requireEditor === true) return false;
+
+  return Boolean(config && config.isPublished);
 }
 
 
@@ -332,6 +355,10 @@ function toggleHighlight(targetUserId, rowIndex) {
     label: 'toggleHighlight',
     openContext: 'highlight_processing',
     concurrentMessage: '同時ハイライト処理中です。お待ちください。',
+    // Why: UI で highlight-btn を非エディターに出していないだけでは不十分。
+    //      google.script.run を直接呼ばれると生徒がハイライトを操作できるので、
+    //      サーバー側で editor 限定のゲートを張る。
+    requireEditor: true,
     process: (sheet, rowNumber, _actorEmail, preloadedHeaders) =>
       processHighlightDirect(sheet, rowNumber, preloadedHeaders),
     formatSuccess: (result) => ({
@@ -360,12 +387,13 @@ function toggleHighlight(targetUserId, rowIndex) {
  * @param {string} options.concurrentMessage - cache ヒット時に返すユーザー向けメッセージ
  * @param {function(sheet, rowNumber, actorEmail): Object} options.process - クリティカルセクション内で実行する処理
  * @param {function(result): Object} options.formatSuccess - process の戻り値から API レスポンスを組み立て
+ * @param {boolean} [options.requireEditor] editor 権限を要求する（true: ハイライト等の editor-only 操作）
  * @returns {Object} API レスポンス
  */
 function executeBoardRowOperation(options) {
   const {
     targetUserId, rowIndex, lockKeyPrefix, label, openContext,
-    concurrentMessage, process, formatSuccess
+    concurrentMessage, process, formatSuccess, requireEditor
   } = options;
   const actorEmail = getCurrentEmail();
 
@@ -373,11 +401,7 @@ function executeBoardRowOperation(options) {
     const isAdmin = isAdministrator(actorEmail);
     const preloadedAuth = { email: actorEmail, isAdmin };
 
-    const targetUser = findUserById(targetUserId, {
-      requestingUser: actorEmail,
-      preloadedAuth,
-      allowPublishedRead: true
-    });
+    const targetUser = findPublishedBoardOwner(targetUserId, actorEmail, { preloadedAuth });
     if (!targetUser) return createErrorResponse('Target user not found');
 
     const config = getConfigOrDefault(targetUserId, targetUser);
@@ -385,7 +409,10 @@ function executeBoardRowOperation(options) {
       return createErrorResponse('Board configuration incomplete');
     }
 
-    if (!validateReactionPermissionWithPreloadedData(actorEmail, targetUser, config)) {
+    if (!canActOnTargetBoard(actorEmail, targetUser, config, {
+      isAdmin,
+      requireEditor: requireEditor === true
+    })) {
       return createErrorResponse('Access denied to target board');
     }
 

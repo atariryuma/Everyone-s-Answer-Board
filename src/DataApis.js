@@ -30,7 +30,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
 
 
 /**
@@ -489,10 +489,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
     const { email: viewerEmail, isAdmin: isSystemAdmin } = adminAuth;
 
     if (targetUserId) {
-      const targetUser = findUserById(targetUserId, {
-        requestingUser: viewerEmail,
-        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin },
-        allowPublishedRead: true
+      const targetUser = findPublishedBoardOwner(targetUserId, viewerEmail, {
+        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
       });
       if (!targetUser) {
         console.error('getPublishedSheetData: Target user not found', { targetUserId, viewerEmail });
@@ -531,11 +529,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       const result = getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig);
 
       if (!result || !result.success) {
-        console.error('getPublishedSheetData: getUserSheetData failed', {
-          result,
-          error: result?.message || 'データ取得エラー',
-          totalTime: Date.now() - startTime
-        });
         return {
           success: false,
           error: result?.message || 'データ取得エラー',
@@ -580,11 +573,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
     const result = getUserSheetData(user.userId, options, user, userConfig);
 
     if (!result || !result.success) {
-      console.error('getPublishedSheetData: getUserSheetData failed (self-access)', {
-        result,
-        error: result?.message || 'データ取得エラー',
-        totalTime: Date.now() - startTime
-      });
       return {
         success: false,
         error: result?.message || 'データ取得エラー',
@@ -705,10 +693,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
       return { success: false, message: 'Invalid request' };
     }
 
-    const targetUser = findUserById(targetUserId, {
-      requestingUser: email,
-      allowPublishedRead: true
-    });
+    const targetUser = findPublishedBoardOwner(targetUserId, email);
     if (!targetUser) {
       return { success: false, message: 'User not found' };
     }
@@ -1082,7 +1067,11 @@ function getActiveFormInfo(userId) {
       targetUserId = currentUser.userId;
     }
 
-    const config = getConfigOrDefault(targetUserId);
+    // 生徒（non-editor, non-admin）でも公開ボードの formUrl を取得できるよう
+    // viewer-path helper を使う。findUserById を直接使うと allowPublishedRead:true を
+    // 渡し忘れて silent failure を起こしやすいので、この経路では helper 経由で統一。
+    const targetUser = findPublishedBoardOwner(targetUserId, currentEmail);
+    const config = getConfigOrDefault(targetUserId, targetUser);
 
     const hasFormUrl = !!(config.formUrl && config.formUrl.trim());
     const isValidUrl = hasFormUrl && isValidFormUrl(config.formUrl);
