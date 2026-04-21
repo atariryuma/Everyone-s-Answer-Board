@@ -4208,16 +4208,19 @@
     }
 
     updateSortOptions() {
-      if (this.elements.scoreOption) {
-        if (this.state.showScoreSort) {
-          this.elements.scoreOption.style.display = 'block';
-        } else {
-          this.elements.scoreOption.style.display = 'none';
-          const filterState = this.getCurrentFilterState();
-          if (filterState.sortOrder === 'score') {
-            this.elements.sortOrder.value = 'newest';
-          }
-        }
+      if (!this.elements.scoreOption) return;
+      // Why: highlight トグルと同じく、編集者（admin / own board）には常に見せる。
+      //      生徒にはリアクション数を隠していても、先生はスコアで盛り上がった意見を
+      //      素早く見つけたい授業運営ニーズがある。
+      const canSeeScore = this.state.showScoreSort || this.state.isEditor;
+      if (canSeeScore) {
+        this.elements.scoreOption.style.display = 'block';
+        return;
+      }
+      this.elements.scoreOption.style.display = 'none';
+      const filterState = this.getCurrentFilterState();
+      if (filterState.sortOrder === 'score') {
+        this.elements.sortOrder.value = 'newest';
       }
     }
     updateConfigFromGlobals() {
