@@ -35,66 +35,9 @@
     }
   );
 
-
-
-  /**
-   * DOM操作のヘルパー関数群 - AdminPanel版
-   */
-  const DOMHelpers = {
-    safeGetById(id, context = '') {
-      try {
-        const element = document.getElementById(id);
-        if (!element && context) {
-        }
-        return element;
-      } catch (error) {
-        console.error(`DOM要素取得エラー: ${id}`, error);
-        return null;
-      }
-    },
-
-    safeSetValue(id, value, property = 'value') {
-      const element = this.safeGetById(id, 'value setting');
-      if (element && property in element) {
-        element[property] = value;
-        return true;
-      }
-      return false;
-    },
-
-    safeGetValue(id, property = 'value', fallback = '') {
-      const element = this.safeGetById(id, 'value getting');
-      return (element && property in element) ? element[property] : fallback;
-    },
-
-    safeSetContent(id, content, method = 'textContent') {
-      const element = this.safeGetById(id, 'content setting');
-      if (element && method in element) {
-        element[method] = content;
-        return true;
-      }
-      return false;
-    },
-
-    safeAddEventListener(id, event, handler, options = {}) {
-      const element = this.safeGetById(id, 'event listener');
-      if (element && typeof handler === 'function') {
-        element.addEventListener(event, handler, options);
-        return true;
-      }
-      return false;
-    }
-  };
-
   let systemState = {
-    loading: false,
     config: null,
-    spreadsheetList: null,
-    sheetList: null,
     initialized: false,
-    currentSpreadsheetId: null,
-    currentSheetName: null,
-    userInfo: null,
     initializationStep: 'not started',
   };
 
@@ -109,17 +52,6 @@
       this.locks[key] = false;
     },
   };
-
-
-  function validateUrl(url) {
-    try {
-      const urlObj = new URL(url);
-      const validHosts = ['docs.google.com'];
-      return validHosts.includes(urlObj.hostname);
-    } catch {
-      return false;
-    }
-  }
 
   function isValidFormUrl(url) {
     if (!url || typeof url !== 'string') {
@@ -185,7 +117,6 @@
         systemState.config = { ...systemState.config, ...adminData.config };
 
         updateFooterDisplay(currentBoardInfo);
-
 
         if (adminData.userInfo.email) {
           document.getElementById('current-user-email').textContent = adminData.userInfo.email;
@@ -259,7 +190,6 @@
       })
       .markWelcomeSeen();
   }
-
 
   /**
    * Core panel initialization (no API calls)
@@ -490,7 +420,6 @@
 
   }
 
-
   async function initializeDropdowns() {
     const formSelect = document.getElementById('form-select');
     const formUrlInput = document.getElementById('form-url-input');
@@ -568,7 +497,6 @@
 
   }
 
-
   function setupChangeEvents() {
   }
 
@@ -631,17 +559,6 @@
     });
   }
 
-  // 後方互換性のため残す
-  function loadSpreadsheets() {
-    return loadForms();
-  }
-
-  function loadSpreadsheetList() {
-    loadForms();
-  }
-
-
-
   function getSpreadsheetFromUrl() {
     const urlParams = new URLSearchParams(window.location.search);
 
@@ -663,16 +580,6 @@
     }
 
     return null;
-  }
-
-
-  // フォーム統一後は不要だが、後方互換性のため空関数として残す
-  async function autoSelectSpreadsheet(spreadsheetId) {
-    return true;
-  }
-
-  async function autoSelectSheet(sheetName) {
-    return true;
   }
 
   function updatePanel(config) {
@@ -706,11 +613,11 @@
         }
       }
 
-      if (config.displayMode) {
-        const displayModeSelect = document.getElementById('display-mode');
-        if (displayModeSelect) {
-          displayModeSelect.value = config.displayMode;
-        }
+      // Why: config.displayMode はサーバ側で保存されず、canonical は displaySettings.showNames。
+      //      以前は config.displayMode を読んでいたため、admin-panel 再入場時に前回選択が復元されない silent bug があった。
+      const displayModeSelect = document.getElementById('display-mode');
+      if (displayModeSelect && config.displaySettings) {
+        displayModeSelect.value = config.displaySettings.showNames ? 'named' : 'anonymous';
       }
 
       // フォームURL表示を更新
@@ -738,15 +645,9 @@
         }
       }
 
-
     } catch (error) {
       console.error('❌ 設定反映エラー:', error.message);
     }
-  }
-
-  // フォーム統一後は不要だが、後方互換性のため空関数として残す
-  function loadSheets(spreadsheetId) {
-    return Promise.resolve([]);
   }
 
   async function getColumnAnalysis(spreadsheetId, sheetName) {
@@ -777,9 +678,6 @@
     }
   }
 
-
-
-
   function openManualGuide() {
     if (window.notifications) {
       window.notifications.info('📚 使い方ガイドを開いています...', 2000);
@@ -809,16 +707,13 @@
     const boardBtn = document.getElementById('open-board-btn');
     const statusDiv = document.getElementById('resource-status');
 
-
     const saveDraftBtn = document.getElementById('save-draft');
     const publishNowBtn = document.getElementById('publish-now');
-
 
     const hasColumnMapping = !!(config.columnMapping && Object.keys(config.columnMapping).length > 0);
     const hasSpreadsheetConfig = !!(config.spreadsheetId && config.sheetName);
     const isSetupComplete = config.setupStatus === 'completed' ||
       (hasSpreadsheetConfig && hasColumnMapping);
-
 
     if (saveDraftBtn) {
       if (hasSpreadsheetConfig) {
@@ -1011,8 +906,6 @@
   function displayFormInfo(formData, options = {}) {
     return updateFormInfo(formData, options);
   }
-
-
 
   function hideFormInfo() {
     const formInfo = document.getElementById('form-info');
@@ -1268,11 +1161,9 @@
       return null;
     }
 
-
     const normalizedData = formResult.formData || formResult;
     const confidence = normalizedData.detectionDetails?.confidence || 0;
     const hasFormUrl = !!normalizedData.formUrl;
-
 
     if (hasFormUrl) {
 
@@ -1312,7 +1203,6 @@
 
         window.__formIntegrationLatestResponse = normalizedResult;
 
-
         if (normalizedResult && normalizedResult.success && rawFormData && rawFormData.formUrl) {
           displayFormInfo(
             {
@@ -1339,7 +1229,6 @@
         const fallbackSuggestions = normalizedResult && Array.isArray(normalizedResult.suggestions)
           ? normalizedResult.suggestions
           : [];
-
 
         if (fallbackSuggestions.length > 0) {
           const formattedSuggestions = fallbackSuggestions.map((s) => `• ${s}`).join('\n');
@@ -1382,30 +1271,6 @@
       .getFormInfo(spreadsheetId, sheetName);
   }
 
-  function exportConfig() {
-    try {
-      if (!systemState.config) {
-        showError('設定データが利用できません');
-        return;
-      }
-
-      const config = systemState.config;
-      const dataStr = JSON.stringify(config, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-      const exportFileDefaultName = 'studyquest-config.json';
-
-      const linkElement = document.createElement('a');
-      linkElement.setAttribute('href', dataUri);
-      linkElement.setAttribute('download', exportFileDefaultName);
-      linkElement.click();
-
-      showSuccess('設定をエクスポートしました');
-    } catch (error) {
-      console.error('エクスポートエラー:', error);
-      showError('設定のエクスポートに失敗しました');
-    }
-  }
-
   function checkAdministratorAccess() {
     google.script.run
       .withSuccessHandler(function (isAdmin) {
@@ -1427,7 +1292,6 @@
       })
       .isAdmin();
   }
-
 
   /**
    * フォームURL自動解析（リアルタイム）
@@ -1537,15 +1401,6 @@
     }
   }
 
-  // 後方互換性のため残す
-  function showAutoDetectionInfo(urlInfo) {
-    // フォーム用に変換
-  }
-
-  function hideAutoDetectionInfo() {
-    hideFormDetectionInfo();
-  }
-
   /**
    * フォームURL検証 - processFormUrlInput API使用
    */
@@ -1614,7 +1469,6 @@
       })
       .processFormUrlInput(formUrl);
   }
-
 
   async function manualColumnAnalysis() {
     const spreadsheetId = getCurrentSpreadsheetId();
@@ -2024,7 +1878,6 @@
     });
   }
 
-
   function handleConnectionError(errorMessage, context) {
     console.error('Connection error details:', { errorMessage, context });
 
@@ -2033,7 +1886,6 @@
 
     if (context && context.validation && context.validation.details) {
       const validationDetails = context.validation.details;
-
 
       if (validationDetails.connectionVerified === false) {
         userMessage = 'フォームの回答先への接続に失敗しました。';
@@ -2082,7 +1934,6 @@
     showInfo('ドロップダウンを使用して手動で列を設定できます。');
   }
 
-
   function updateProgress(step) {
     const steps = document.querySelectorAll('.step');
     steps.forEach((stepEl, index) => {
@@ -2106,14 +1957,12 @@
     const confidence = result.confidence || {};
     const headers = result.headers || [];
 
-
     fillColumnDropdowns(headers, mapping, confidence);
     try {
       window.currentHeaders = headers;
     } catch (_) { }
 
     displayAIDetectionInfo(mapping, confidence);
-
 
     showSuccess('列設定を更新しました');
   }
@@ -2174,7 +2023,6 @@
     }
   }
 
-
   /**
    * シンプル競合チェック
    * @param {Object} mapping - AI検出マッピング
@@ -2199,7 +2047,6 @@
     }
     return false;
   }
-
 
   function setAIDetectionSelections(mapping, dropdowns, confidence = {}, headers = []) {
 
@@ -2280,7 +2127,6 @@
 
         showConfidenceBadge(columnType, columnConfidence, 'ai');
 
-
         detectedCount++;
       } else if (columnConfidence > 0) {
         const HIGH_PRECISION_THRESHOLDS = {
@@ -2315,7 +2161,6 @@
           attemptAlternativeDetection(columnType, dropdown, headers);
         }
 
-
         showConfidenceBadge(columnType, columnConfidence, badgeType);
       }
     });
@@ -2323,11 +2168,9 @@
     if (detectedCount > 0) {
       const maxConfidence = Math.max(...Object.values(confidence));
 
-
     } else if (totalConfidenceInfo.length > 0) {
       const maxConfidence = Math.max(...Object.values(confidence));
       const avgConfidence = Object.values(confidence).reduce((a, b) => a + b, 0) / Object.values(confidence).length;
-
 
     }
 
@@ -2338,7 +2181,6 @@
 
     updateCompletionStatus();
   }
-
 
   /**
    * 🔄 フォールバック検出試行
@@ -2485,7 +2327,6 @@
     showInfo(message, 5000);
   }
 
-
   /**
    * システム全体の列判定統合テスト実行
    */
@@ -2496,7 +2337,6 @@
     }
 
     try {
-
 
       const currentConfig = getConfig();
       const headers = window.currentHeaders || [];
@@ -2565,7 +2405,6 @@
 
       sampleData.push(testRow);
 
-
       return sampleData;
 
     } catch (error) {
@@ -2580,7 +2419,6 @@
    */
   function displayIntegratedTestResults(diagnostics) {
     try {
-
 
       let resultsPanel = document.getElementById('integrated-test-results');
       if (!resultsPanel) {
@@ -2806,9 +2644,6 @@
     }
   }
 
-
-
-
   function setupDropdownEventListeners(dropdowns) {
     Object.keys(dropdowns).forEach((columnType) => {
       const dropdown = dropdowns[columnType];
@@ -2971,7 +2806,6 @@
       document.querySelectorAll('.modern-select.has-manual-selection').length > 0;
     const hasAISelection = document.querySelectorAll('.modern-select.has-ai-selection').length > 0;
 
-
     const resetButton = document.getElementById('reset-to-ai');
     if (resetButton) {
       resetButton.style.display = hasManualSelection ? 'inline-block' : 'none';
@@ -3024,7 +2858,6 @@
     }
 
     window.setLoading(true, '処理中...');
-
 
     let headers = Array.isArray(window.currentHeaders) ? window.currentHeaders : [];
     if (!headers.length) {
@@ -3150,9 +2983,7 @@
       }
     }
 
-
   }
-
 
   /**
    * 列設定データの包括的検証
@@ -3361,7 +3192,6 @@
     });
   }
 
-
   function saveColumnConfig(spreadsheetId, sheetName, headers, columnMapping, confidence = {}) {
     if (!ClientMutex.acquire('saveColumnConfig')) {
       showInfo('列設定の保存処理を実行中です…');
@@ -3424,9 +3254,7 @@
         // フォーム情報は既にdatasetから取得済みなので、null化しない
       }
 
-
       if (!optimizedConfig.formUrl) {
-
 
         google.script.run
           .withSuccessHandler(function (formResult) {
@@ -3460,7 +3288,6 @@
         if (optimizedConfig.spreadsheetUrl) logData.spreadsheetUrl = optimizedConfig.spreadsheetUrl;
         if (optimizedConfig.formUrl) logData.formUrl = optimizedConfig.formUrl;
         if (optimizedConfig.formTitle) logData.formTitle = optimizedConfig.formTitle;
-
 
         google.script.run
           .withSuccessHandler(function (result) {
@@ -3697,14 +3524,11 @@
 
     function executePublish(publishConfig) {
 
-
       google.script.run
         .withSuccessHandler(function (result) {
           if (result.success) {
             showSuccess('回答ボードを公開しました！');
             updatePublishStatus('published');
-
-
 
             const updatedConfig = {
               ...systemState.config,
@@ -3781,7 +3605,6 @@
       return { formUrl: null, formTitle: null };
     }
   }
-
 
   function getDisplaySettings() {
     return {
@@ -3869,7 +3692,6 @@
     return match ? parseInt(match[1]) : badge.classList.contains('manual') ? 100 : 0;
   }
 
-
   function updatePublishStatus(status) {
     const badge = document.querySelector('.status-badge.unpublished') || document.querySelector('.status-badge.published');
     if (badge) {
@@ -3877,7 +3699,6 @@
       badge.textContent = status === 'published' ? '公開中' : '未公開';
     }
   }
-
 
   function updateConfigSummary(config) {
     if (!config) return;
@@ -3893,7 +3714,6 @@
         publishBadge.textContent = '未公開';
       }
     }
-
 
     const sheetnameElement = document.getElementById('current-sheetname');
     if (sheetnameElement) {
@@ -3927,9 +3747,7 @@
     }
   }
 
-
   let currentBoardInfo = null;
-
 
   function updateFooterDisplay(boardInfo) {
     const footer = document.getElementById('boardInfoFooter');
@@ -4032,7 +3850,6 @@
     }
     document.body.removeChild(textarea);
   }
-
 
   function openAnswerBoard() {
     // ユーザーのクリックイベント内でウィンドウを先に開く（ブロック防止）

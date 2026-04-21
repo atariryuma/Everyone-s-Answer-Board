@@ -15,9 +15,6 @@
 
 /* global */
 
-
-
-
 /**
  * タイムスタンプをフォーマット
  * @param {string|Date} timestamp - タイムスタンプ
@@ -37,20 +34,3 @@ function formatTimestamp(timestamp) {
   }
 }
 
-
-
-
-/**
- * HTMLエスケープ処理
- * @param {string} text - エスケープするテキスト
- * @returns {string} HTMLエスケープ済みテキスト
- */
-function htmlEncode(text) {
-  if (!text) return '';
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}

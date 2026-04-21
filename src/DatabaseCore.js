@@ -1240,43 +1240,6 @@ function updateUser(userId, updates, context = {}) {
 }
 
 /**
- * 閲覧者向けボードデータ取得（CLAUDE.md準拠 - 模範実装）
- *
- * 🎯 アクセス管理:
- * - DATABASE_SPREADSHEET: サービスアカウントで全員がアクセス（ユーザー一覧取得）
- * - ユーザーの回答ボード: 同一ドメイン共有設定（DOMAIN_WITH_LINK + EDIT）で全員がアクセス可能
- *
- * @param {string} targetUserId - 対象ユーザーのユニークID（UUID形式）
- * @param {string} viewerEmail - 閲覧者のメールアドレス（アクセス判定用）
- * @returns {Object|null} Board data with spreadsheet info, config, and sheets list, or null if error
- *
- * @example
- * // 自分のデータにアクセス（同一ドメイン共有設定）
- * const myData = getViewerBoardData(myUserId, myEmail);
- *
- * @example
- * // 他人のデータにアクセス（同一ドメイン共有設定）
- * const othersData = getViewerBoardData(otherUserId, myEmail);
- */
-function getViewerBoardData(targetUserId, viewerEmail) {
-  try {
-    const targetUser = findPublishedBoardOwner(targetUserId, viewerEmail);
-    if (!targetUser) {
-      console.warn('getViewerBoardData: Target user not found:', targetUserId);
-      return null;
-    }
-
-    return getUserSheetData(targetUser.userId, {
-      includeTimestamp: true,
-      requestingUser: viewerEmail
-    });
-  } catch (error) {
-    console.error('getViewerBoardData error:', error.message);
-    return null;
-  }
-}
-
-/**
  * SpreadsheetIDによるユーザー検索（configJSON-based）
  * Single Source of Truth - search by spreadsheetId in configJSON
  * @param {string} spreadsheetId - スプレッドシートID

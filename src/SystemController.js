@@ -4,7 +4,6 @@
 
 /* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS */
 
-
 /**
  * キャッシュ期間 (秒)
  */
@@ -61,7 +60,6 @@ const SYSTEM_LIMITS = {
   RADIX_DECIMAL: 10          // 10進数変換用基数
 };
 
-
 /**
  * グローバルスコープにシステム定数を設定
  * Zero-Dependency Architecture準拠
@@ -71,12 +69,9 @@ __rootSys.CACHE_DURATION = CACHE_DURATION;
 __rootSys.TIMEOUT_MS = TIMEOUT_MS;
 __rootSys.SLEEP_MS = SLEEP_MS;
 
-
 /**
  * Service Discovery for Zero-Dependency Architecture
  */
-
-
 
 /**
  * システム状態の強制リセット
@@ -113,7 +108,6 @@ function forceUrlSystemReset() {
       console.warn('[WARN] SystemController.forceUrlSystemReset: Cache clear error:', cacheError.message);
       cacheResults.push(`キャッシュクリア失敗: ${cacheError.message}`);
     }
-
 
     return {
       success: true,
@@ -326,7 +320,8 @@ function monitorSystem() {
     const metrics = {};
 
     try {
-      metrics.executionTime = new Date().toISOString();
+      // Why: 他の API は executionTime を "Nms" 文字列で返すため、ISO timestamp は別名で返す。
+      metrics.executedAt = new Date().toISOString();
       metrics.quotaStatus = 'MONITORING';
     } catch (error) {
       metrics.quotaStatus = 'ERROR';
@@ -582,7 +577,6 @@ function performAutoRepair() {
     };
   }
 }
-
 
 /**
  * アプリケーションの公開
@@ -1069,7 +1063,6 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
   }
 }
 
-
 /**
  * スプレッドシートへのアクセス権限を検証
  * main.gs:2065 から呼び出される（URL検証時）
@@ -1120,7 +1113,6 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
     };
   }
 }
-
 
 /**
  * フォーム情報を取得（実装関数）- 適応的アクセス対応版
@@ -1738,7 +1730,6 @@ function testDatabaseConnection() {
   }
 }
 
-
 /**
  * Setup application with system properties
  * @param {string} serviceAccountJson - Service account credentials
@@ -1881,48 +1872,6 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
  * @param {boolean} isPublished - Whether to publish the board
  * @returns {Object} Status update result
  */
-function setAppStatus(isPublished) {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
-
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return createUserNotFoundError();
-    }
-
-    const config = getConfigOrDefault(user.userId);
-
-    config.isPublished = Boolean(isPublished);
-    if (isPublished) {
-      if (!config.publishedAt) {
-        config.publishedAt = new Date().toISOString();
-      }
-    }
-    config.lastAccessedAt = new Date().toISOString();
-
-    const saveResult = saveUserConfig(user.userId, config, { forceUpdate: false });
-    if (!saveResult.success) {
-      return createErrorResponse(`Failed to update user configuration: ${saveResult.message || '詳細不明'}`);
-    }
-
-    return {
-      success: true,
-      isPublished: Boolean(isPublished),
-      status: isPublished ? 'published' : 'unpublished',
-      updatedBy: email,
-      userId: user.userId,
-      timestamp: new Date().toISOString()
-    };
-  } catch (error) {
-    console.error('setAppStatus error:', error.message);
-    return createExceptionResponse(error);
-  }
-}
-
-
 /**
  * データベーススプレッドシートをGASプロジェクトと同じフォルダに自動作成
  * @returns {Object} { success, spreadsheetId, message }
@@ -1974,6 +1923,5 @@ __rootSC.SystemController = {
   publishApp,
   getPerformanceMetrics,
   diagnosePerformance,
-  setupApp,
-  setAppStatus
+  setupApp
 };

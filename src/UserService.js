@@ -15,101 +15,14 @@
 
 /* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, findUserByGoogleId, openSpreadsheet, updateUser, getUserConfig, getConfigOrDefault, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse, ScriptApp, Utilities */
 
-
-
-
 /**
  * UserService - ゼロ依存アーキテクチャ
  * GAS-Nativeパターンによる直接APIアクセス
  * DB, CONSTANTS, PROPS_KEYS依存を排除
  */
 
-
-
 /**
- * 現在のユーザー情報取得（キャッシュ対応）
- * ✅ SECURITY: ユーザー固有キャッシュキーで個人情報隔離
- * @returns {Object|null} ユーザー情報オブジェクト
- */
-function getCurrentUserInfo() {
-  try {
-    // getCurrentEmail honors the _apiKeyAdminEmail fallback used by adminApi.
-    const email = getCurrentEmail();
-    if (!email) {
-      console.warn('getCurrentUserInfo: 有効なセッションなし');
-      return null;
-    }
-
-    const cacheKey = getUserInfoCacheKey(email);
-
-    const cache = CacheService.getScriptCache();
-    const cached = cache.get(cacheKey);
-    if (cached) {
-      // ✅ BUG FIX: キャッシュ破損時のJSON.parse例外を明示的に処理
-      try {
-        return JSON.parse(cached);
-      } catch (parseError) {
-        console.warn('getCurrentUserInfo: Cache parse failed, fetching fresh data:', parseError.message);
-        cache.remove(cacheKey);
-      }
-    }
-
-    const userInfo = findUserByEmail(email, { requestingUser: email });
-    if (!userInfo) {
-      return null;
-    }
-
-    const completeUserInfo = enrichUserInfo(userInfo);
-
-    cache.put(cacheKey, JSON.stringify(completeUserInfo), CACHE_DURATION.LONG);
-
-    return completeUserInfo;
-  } catch (error) {
-    console.error('UserService.getCurrentUserInfo: エラー', {
-      error: error.message,
-      stack: error.stack
-    });
-    return null;
-  }
-}
-
-/**
- * ユーザー情報を設定で拡張
- * @param {Object} userInfo - 基本ユーザー情報
- * @returns {Object} 拡張されたユーザー情報
- */
-function enrichUserInfo(userInfo) {
-  try {
-    if (!userInfo || !userInfo.userId) {
-      throw new Error('無効なユーザー情報');
-    }
-
-    const config = getConfigOrDefault(userInfo.userId);
-
-    const enrichedConfig = generateDynamicUserUrls(config);
-
-    return {
-      userId: userInfo.userId,
-      userEmail: userInfo.userEmail,
-      isActive: userInfo.isActive,
-      lastModified: userInfo.lastModified,
-      config: enrichedConfig,
-      userInfo: {
-        userId: userInfo.userId,
-        userEmail: userInfo.userEmail,
-        isActive: userInfo.isActive
-      }
-    };
-  } catch (error) {
-    console.error('UserService.enrichUserInfo: エラー', error.message);
-    return userInfo; // フォールバック
-  }
-}
-
-/**
- * ユーザー情報キャッシュキーを生成
- * @param {string} email
- * @returns {string}
+ * ユーザー情報キャッシュキーを生成（UserApis.js から参照される）
  */
 function getUserInfoCacheKey(email) {
   return `current_user_info_${email}`;
@@ -179,7 +92,6 @@ function generateDynamicUserUrls(config) {
   }
 }
 
-
 /**
  * 管理者権限確認（フロントエンド互換性）
  * 統一認証システムのAdministrator権限をチェック
@@ -239,129 +151,6 @@ function getUser(infoType = 'email') {
       success: false,
       message: error.message || 'User retrieval failed'
     };
-  }
-}
-
-/**
- * Reset authentication and clear all user session data
- * ✅ CLAUDE.md準拠: 包括的キャッシュクリア with 論理的破綻修正
- */
-function resetAuth() {
-  try {
-    const cache = CacheService.getScriptCache();
-    let clearedKeysCount = 0;
-    let clearConfigResult = null;
-
-    const currentEmail = getCurrentEmail();
-    const currentUser = currentEmail ? findUserByEmail(currentEmail, { requestingUser: currentEmail }) : null;
-    const userId = currentUser?.userId;
-
-    if (userId) {
-      try {
-        clearConfigCache(userId);
-        clearConfigResult = 'ConfigService cache cleared successfully';
-      } catch (configError) {
-        console.warn('resetAuth: ConfigService cache clear failed:', configError.message);
-        clearConfigResult = `ConfigService cache clear failed: ${configError.message}`;
-      }
-    }
-
-    // ✅ SECURITY NOTE: current_user_info はユーザー固有キー（current_user_info_${email}）に変更済み
-    const globalCacheKeysToRemove = [
-      'admin_auth_cache',
-      'session_data',
-      'system_diagnostic_cache',
-      'bulk_admin_data_cache'
-    ];
-
-    globalCacheKeysToRemove.forEach(key => {
-      try {
-        cache.remove(key);
-        clearedKeysCount++;
-      } catch (e) {
-        console.warn(`resetAuth: Failed to remove global cache key ${key}:`, e.message);
-      }
-    });
-
-    const userSpecificKeysCleared = [];
-    if (currentEmail) {
-      const emailBasedKeys = [
-        getUserInfoCacheKey(currentEmail),
-        `board_data_${currentEmail}`,
-        `user_data_${currentEmail}`,
-        `admin_panel_${currentEmail}`
-      ];
-
-      emailBasedKeys.forEach(key => {
-        try {
-          cache.remove(key);
-          userSpecificKeysCleared.push(key);
-          clearedKeysCount++;
-        } catch (e) {
-          console.warn(`resetAuth: Failed to remove email-based cache key ${key}:`, e.message);
-        }
-      });
-    }
-
-    if (userId) {
-      const userIdBasedKeys = [`user_config_${userId}`, ...getUserCacheKeys_(userId)];
-
-      userIdBasedKeys.forEach(key => {
-        try {
-          cache.remove(key);
-          userSpecificKeysCleared.push(key);
-          clearedKeysCount++;
-        } catch (e) {
-          console.warn(`resetAuth: Failed to remove userId-based cache key ${key}:`, e.message);
-        }
-      });
-    }
-
-    let reactionLocksCleared = 0;
-    if (userId) {
-      try {
-        const lockPatterns = [
-          `reaction_${userId}_`,
-          `highlight_${userId}_`
-        ];
-
-        for (let i = 0; i < SYSTEM_LIMITS.MAX_LOCK_ROWS; i++) { // 最大100行のロックをクリア
-          lockPatterns.forEach(pattern => {
-            try {
-              cache.remove(`${pattern}${i}`);
-              reactionLocksCleared++;
-            } catch (_) { /* individual key removal - ignore */ }
-          });
-        }
-      } catch (lockError) {
-        console.warn('resetAuth: Reaction lock clearing failed:', lockError.message);
-      }
-    }
-
-    const logDetails = {
-      currentUser: currentEmail ? `${currentEmail.substring(0, 8)}***@${currentEmail.split('@')[1]}` : 'N/A',
-      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
-      globalKeysCleared: globalCacheKeysToRemove.length,
-      userSpecificKeysCleared: userSpecificKeysCleared.length,
-      reactionLocksCleared,
-      configServiceResult: clearConfigResult,
-      totalKeysCleared: clearedKeysCount
-    };
-
-
-    return {
-      success: true,
-      message: 'Authentication and session data cleared successfully',
-      details: {
-        clearedKeys: clearedKeysCount,
-        userSpecificKeys: userSpecificKeysCleared.length,
-        reactionLocks: reactionLocksCleared,
-        configService: clearConfigResult ? 'success' : 'skipped'
-      }
-    };
-  } catch (error) {
-    console.error('resetAuth error:', error.message, error.stack);
-    return createExceptionResponse(error);
   }
 }
 

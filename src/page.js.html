@@ -328,15 +328,15 @@
      * Unified message listener setup
      */
     setupMessageListeners() {
-      window.addEventListener('message', (event) => {
-        this.handleMessage(event.data);
-      });
+      // Why: ハンドラ参照を保持しないと destroy() 時に removeEventListener できず、
+      //      SPA 的な再初期化や HMR で stale listener が累積するリークになる。
+      this.handlers.onWindowMessage = (event) => this.handleMessage(event.data);
+      window.addEventListener('message', this.handlers.onWindowMessage);
 
       if (typeof BroadcastChannel !== 'undefined') {
-        const channel = new BroadcastChannel('board-updates');
-        channel.addEventListener('message', (event) => {
-          this.handleMessage(event.data);
-        });
+        this.broadcastChannel = new BroadcastChannel('board-updates');
+        this.handlers.onBroadcastMessage = (event) => this.handleMessage(event.data);
+        this.broadcastChannel.addEventListener('message', this.handlers.onBroadcastMessage);
       }
     }
 
@@ -1262,7 +1262,7 @@
               });
             } else if (funcName === 'addReaction') {
               resolve({
-                status: 'ok',
+                success: true,
                 reactions: {
                   UNDERSTAND: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
                   LIKE: { count: Math.floor(Math.random() * 5), reacted: Math.random() < 0.5 },
@@ -1272,7 +1272,7 @@
             } else if (funcName === 'toggleHighlight') {
               const currentHighlight = args[2] === undefined ? false : !args[2];
               resolve({
-                status: 'ok',
+                success: true,
                 highlight: currentHighlight
               });
             } else if (funcName === 'checkAdmin' || funcName === 'isAdmin') {
@@ -1381,6 +1381,16 @@
       }
       if (this.handlers.onScrollHeader) {
         window.removeEventListener('scroll', this.handlers.onScrollHeader);
+      }
+      if (this.handlers.onWindowMessage) {
+        window.removeEventListener('message', this.handlers.onWindowMessage);
+      }
+      if (this.broadcastChannel) {
+        if (this.handlers.onBroadcastMessage) {
+          this.broadcastChannel.removeEventListener('message', this.handlers.onBroadcastMessage);
+        }
+        try { this.broadcastChannel.close(); } catch (_) {}
+        this.broadcastChannel = null;
       }
       if (this.handlers.onOnline) {
         window.removeEventListener('online', this.handlers.onOnline);
@@ -1663,12 +1673,6 @@
           return false;
         }
 
-        const hasStatusField = 'status' in result;
-
-        if (hasStatusField && result.status !== 'success') {
-          return false;
-        }
-
         if (!Array.isArray(result.data)) {
           return false;
         }
@@ -1699,11 +1703,6 @@
       }
       if (typeof result !== 'object') {
         return `レスポンスがオブジェクトではない (${typeof result})`;
-      }
-
-      const hasStatusField = 'status' in result;
-      if (hasStatusField && result.status !== 'success') {
-        return `ステータスが成功ではない (${result.status})`;
       }
 
       if (!('data' in result)) {
@@ -2098,13 +2097,6 @@
       } else if (totalReactions > 0) {
         element.classList.add('reaction-border-1');
       }
-    }
-
-    calculateReactionScore(reactions) {
-      if (!reactions) return 0;
-      return Object.values(reactions).reduce((total, reaction) => {
-        return total + (reaction?.count || 0);
-      }, 0);
     }
 
     getCurrentFilterState() {
@@ -3049,22 +3041,6 @@
       }
     }
 
-    getReactionButtonState(rowIndex, reaction) {
-      const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-      if (buttons.length === 0) return null;
-
-      const btn = buttons[0];
-      return {
-        reacted: btn.getAttribute('aria-pressed') === 'true',
-        count: parseInt(btn.querySelector('.count')?.textContent || '0'),
-        disabled: btn.disabled,
-        classes: btn.className,
-        visible: btn.style.display !== 'none',
-        computedStyle: getComputedStyle(btn),
-        timestamp: Date.now()
-      };
-    }
-
     setReactionButtonsLoading(buttons, isLoading, requestId = null) {
       buttons.forEach(btn => {
         btn.disabled = isLoading;
@@ -3093,8 +3069,7 @@
           throw new Error('サーバーからの応答がありません');
         }
 
-        const success = response.success === true || response.status === 'success';
-        if (!success) {
+        if (response.success !== true) {
           throw new Error(response.message || 'リアクション送信に失敗しました');
         }
 
@@ -3405,8 +3380,7 @@
 
           const response = await this.runGas('toggleHighlight', this.state.userId, numericRowIndex);
 
-          const ok = response && (response.success === true || response.status === 'success');
-          if (ok) {
+          if (response && response.success === true) {
             return response;
           } else {
             throw new Error(response?.message || 'ハイライトの処理に失敗しました');
@@ -4433,14 +4407,6 @@
           this.adjustLayout();
         }, 100));
         this.resizeObserver.observe(this.elements.answersContainer);
-      }
-    }
-
-    deferredRender(callback, priority = 'normal') {
-      if (this.isLowPerformanceMode) {
-        this.idleCallbackId = requestIdleCallback(callback, { timeout: getIdleTimeout() });
-      } else {
-        this.animationFrameId = requestAnimationFrame(callback);
       }
     }
 

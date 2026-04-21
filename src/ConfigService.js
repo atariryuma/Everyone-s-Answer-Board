@@ -15,13 +15,11 @@
 
 /* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo, DEFAULT_DISPLAY_SETTINGS */
 
-
 /**
  * ConfigService - ゼロ依存アーキテクチャ
  * GAS-Nativeパターンによる直接APIアクセス
  * PROPS_KEYS, DB依存を完全排除
  */
-
 
 /**
  * デフォルト設定取得
@@ -85,13 +83,16 @@ function repairNestedConfig(config, userId) {
 }
 
 /**
- * 必須フィールドの確保
- * @param {Object} config - 設定オブジェクト
- * @param {string} userId - ユーザーID
- * @returns {Object} 必須フィールド確保済み設定
+ * 必須フィールドの確保（残りのフィールドは保持する）
+ *
+ * Why: 以前は allowlist ベースで必須フィールドだけ残していたので、DB に保存されていた
+ *      formTitle / publishedAt / hasSeenWelcome / lastAccessedAt / etag / showDetails が
+ *      毎回のリード→ライト往復で silently 消えていた（critical data loss）。
+ *      スプレッド演算子で入力を保持し、必須フィールドだけ normalize する。
  */
 function ensureRequiredFields(config, userId) {
   return {
+    ...config,
     userId,
     setupStatus: config.setupStatus || 'pending',
     isPublished: Boolean(config.isPublished),
@@ -131,7 +132,6 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
 
   return enhanced;
 }
-
 
 /**
  * 公開専用設定検証（厳格版）
@@ -338,25 +338,6 @@ function clearConfigCache(userId) {
     CacheService.getScriptCache().removeAll(getUserCacheKeys_(userId));
   } catch (error) {
     console.warn('clearConfigCache: キャッシュクリアエラー', error.message);
-  }
-}
-
-/**
- * 全設定キャッシュクリア（特定ユーザー群用）
- */
-function clearAllConfigCache(userIds = []) {
-  try {
-    if (!Array.isArray(userIds) || userIds.length === 0) return;
-
-    const allKeys = userIds
-      .filter(id => typeof id === 'string' && id.trim())
-      .flatMap(getUserCacheKeys_);
-
-    if (allKeys.length > 0) {
-      CacheService.getScriptCache().removeAll(allKeys);
-    }
-  } catch (error) {
-    console.warn('clearAllConfigCache: エラー', error.message);
   }
 }
 
@@ -596,7 +577,6 @@ function saveUserConfig(userId, config, options = {}) {
 
     const cleanedConfig = cleanConfigFields(validation.data, options);
 
-
     if (!cleanedConfig.lastAccessedAt) {
       cleanedConfig.lastAccessedAt = new Date().toISOString();
     }
@@ -648,7 +628,6 @@ function saveUserConfig(userId, config, options = {}) {
   }
 }
 
-
 /**
  * 共通フィールドクリーンアップ - main.gs内の個別delete操作を統一
  * @param {Object} config - 設定オブジェクト
@@ -667,7 +646,6 @@ function cleanConfigFields(config, options = {}) {
     'isDraft',        // レガシーフィールド
     'questionText'    // 動的生成されるフィールド
   ];
-
 
   fieldsToRemove.forEach(field => {
     if (field in cleanedConfig) {

@@ -370,7 +370,6 @@ function validateFieldOrderLogic(mapping, confidence, headers) {
     }
   }
 
-
   return {
     mapping: validatedMapping,
     confidence: validatedConfidence,
@@ -456,37 +455,6 @@ function performIntegratedColumnDiagnostics(originalHeaders, options = {}) {
       recommendedMapping: {},
       confidence: {}
     };
-  }
-}
-
-/**
- * Extract field value from row data
- */
-function extractFieldValueUnified(row, originalHeaders, fieldType, columnMapping = {}, options = {}) {
-  try {
-    const result = resolveColumnIndex(originalHeaders, fieldType, columnMapping, options);
-
-    if (result.index !== -1 && row && result.index < row.length && row[result.index] !== undefined) {
-      const extractedValue = row[result.index];
-
-      if (extractedValue === null || extractedValue === undefined || String(extractedValue).trim() === '') {
-        return { value: null, index: -1, confidence: 0, method: 'empty_value' };
-      }
-
-
-      return {
-        value: extractedValue,
-        index: result.index,
-        confidence: result.confidence,
-        method: result.method
-      };
-    }
-
-    return { value: null, index: -1, confidence: 0, method: 'not_found' };
-
-  } catch (error) {
-    console.error(`extractFieldValueUnified error for ${fieldType}:`, error.message);
-    return { value: null, index: -1, confidence: 0, method: 'error', error: error.message };
   }
 }
 

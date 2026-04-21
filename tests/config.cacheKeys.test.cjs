@@ -84,34 +84,6 @@ test('clearConfigCache: removes 5 keys for user', () => {
   assert.ok(removedKeys.includes('config_user-1'));
 });
 
-// --- clearAllConfigCache ---
-
-test('clearAllConfigCache: removes keys for multiple users', () => {
-  const { context, removedKeys } = loadConfigContext();
-  context.clearAllConfigCache(['user-1', 'user-2']);
-  assert.equal(removedKeys.length, 10);
-  assert.ok(removedKeys.includes('config_user-1'));
-  assert.ok(removedKeys.includes('config_user-2'));
-});
-
-test('clearAllConfigCache: filters out non-string and empty ids', () => {
-  const { context, removedKeys } = loadConfigContext();
-  context.clearAllConfigCache(['user-1', '', null, 123, 'user-2']);
-  assert.equal(removedKeys.length, 10); // only user-1 and user-2
-});
-
-test('clearAllConfigCache: does nothing for empty array', () => {
-  const { context, removedKeys } = loadConfigContext();
-  context.clearAllConfigCache([]);
-  assert.equal(removedKeys.length, 0);
-});
-
-test('clearAllConfigCache: does nothing for all-invalid ids', () => {
-  const { context, removedKeys } = loadConfigContext();
-  context.clearAllConfigCache([null, '', 0]);
-  assert.equal(removedKeys.length, 0);
-});
-
 // --- sanitizeDisplaySettings ---
 
 test('sanitizeDisplaySettings: coerces booleans and enforces page size bounds', () => {
