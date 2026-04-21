@@ -432,14 +432,24 @@ function getSheetList(spreadsheetId) {
  * Shape the sheet-data result into the JSON-safe envelope the frontend expects.
  * Date values (raw timestamps from Sheets) are converted to ISO strings;
  * everything else is already JSON-serializable by construction.
+ *
+ * Why strip identity fields: showNames:false is meant to be anonymous, but the
+ * frontend only hides name/email in the UI — the payload still carried them,
+ * so any viewer could read peers' emails via DevTools. We now filter on the
+ * server so the wire never sees the identity when identity is not permitted.
+ * Admins and board owners always see everything (they can see raw sheet anyway).
  */
-function buildSafePublishedDataResult(result, config) {
+function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   const displaySettings = (config && config.displaySettings) || DEFAULT_DISPLAY_SETTINGS;
+  const includeIdentity = Boolean(
+    viewerContext.isAdmin || viewerContext.isOwnBoard || displaySettings.showNames
+  );
   const rows = Array.isArray(result.data) ? result.data : [];
   const safeData = rows.map(item => {
     if (typeof item !== 'object' || item === null) return item;
     const cleaned = {};
     for (const key in item) {
+      if (!includeIdentity && (key === 'email' || key === 'name')) continue;
       const v = item[key];
       cleaned[key] = v instanceof Date ? v.toISOString() : v;
     }
@@ -535,7 +545,10 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         };
       }
 
-      return buildSafePublishedDataResult(result, targetUserConfig);
+      return buildSafePublishedDataResult(result, targetUserConfig, {
+        isAdmin: isSystemAdmin,
+        isOwnBoard
+      });
     }
 
     const user = findUserByEmail(viewerEmail, {
@@ -579,7 +592,10 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       };
     }
 
-    return buildSafePublishedDataResult(result, userConfig);
+    return buildSafePublishedDataResult(result, userConfig, {
+      isAdmin: isSystemAdmin,
+      isOwnBoard: true
+    });
   } catch (error) {
     console.error('getPublishedSheetData: Exception caught', {
       error: error?.message || 'Unknown error',
@@ -910,12 +926,13 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
     ];
 
     const columnsToAdd = [];
-    const currentHeadersUpper = currentHeaders.map(h => String(h).toUpperCase());
+    // Why strict equality: processReactionDirect looks up reaction columns with
+    //   `header.trim() === 'UNDERSTAND'` etc. If this existence check is looser
+    //   (e.g. substring), the two sides disagree and reactions break silently.
+    const currentHeadersNormalized = currentHeaders.map(h => String(h || '').toUpperCase().trim());
 
     requiredColumns.forEach(columnName => {
-      const exists = currentHeadersUpper.some(header =>
-        header.includes(columnName.toUpperCase())
-      );
+      const exists = currentHeadersNormalized.includes(columnName);
 
       if (!exists) {
         columnsToAdd.push(columnName);

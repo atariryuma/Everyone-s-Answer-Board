@@ -436,16 +436,28 @@ function executeBoardRowOperation(options) {
     if (cache.get(lockKey)) return createErrorResponse(concurrentMessage);
 
     const lock = LockService.getScriptLock();
+    let lockAcquired = false;
+    let cachePlaced = false;
     try {
-      cache.put(lockKey, actorEmail, LOCK_CACHE_TTL_SECONDS);
+      // Why cache + LockService two-layer: cache は早期リジェクト用、LockService が真のガード。
+      //      tryLock が成功した時だけ cache を張り、finally もその時だけ片付ける。
+      //      以前は tryLock 失敗側でも cache.put→cache.remove していたため、失敗した B が
+      //      acquire 中の A の cache key を吹き飛ばして早期リジェクトを degrade させていた。
       if (!lock.tryLock(LOCK_TIMEOUT_MS)) {
         return createErrorResponse('同時処理中です。少し待ってから再度お試しください。');
       }
+      lockAcquired = true;
+      cache.put(lockKey, actorEmail, LOCK_CACHE_TTL_SECONDS);
+      cachePlaced = true;
       const result = process(sheet, rowNumber, actorEmail, preloadedHeaders);
       return formatSuccess(result);
     } finally {
-      try { lock.releaseLock(); } catch (e) { console.warn(`${label}: Lock release failed:`, e.message); }
-      try { cache.remove(lockKey); } catch (e) { console.warn(`${label}: Cache cleanup failed:`, e.message); }
+      if (lockAcquired) {
+        try { lock.releaseLock(); } catch (e) { console.warn(`${label}: Lock release failed:`, e.message); }
+      }
+      if (cachePlaced) {
+        try { cache.remove(lockKey); } catch (e) { console.warn(`${label}: Cache cleanup failed:`, e.message); }
+      }
     }
   } catch (error) {
     console.error(`${label} error:`, error.message);

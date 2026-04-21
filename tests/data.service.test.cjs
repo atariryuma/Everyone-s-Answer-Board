@@ -555,3 +555,48 @@ test('deleteLinkedFormResponseByTimestamp: swallows FormApp errors and reports n
   assert.equal(result.success, false);
   assert.equal(result.message, 'permission denied');
 });
+
+// =====================================================================
+// applySortAndLimit — sort and limit are applied independently
+// =====================================================================
+
+test('applySortAndLimit: applies limit even when sortBy is undefined', () => {
+  const ctx = loadDataServiceContext();
+  const data = Array.from({ length: 5 }, (_, i) => ({ id: i, timestamp: `2026-04-0${i + 1}` }));
+  const result = ctx.applySortAndLimit(data, { limit: 2 });
+  assert.equal(result.length, 2);
+});
+
+test('applySortAndLimit: no sortBy + no limit returns data unchanged', () => {
+  const ctx = loadDataServiceContext();
+  const data = [{ id: 1 }, { id: 2 }];
+  const result = ctx.applySortAndLimit(data, {});
+  const ids = Array.from(result, (r) => r.id);
+  assert.deepEqual(ids, [1, 2]);
+});
+
+test('applySortAndLimit: sortBy=score orders by highlight > reactionSum > timestamp', () => {
+  const ctx = loadDataServiceContext();
+  const data = [
+    { id: 'a', highlight: false, reactions: { LIKE: { count: 1 }, UNDERSTAND: { count: 0 }, CURIOUS: { count: 0 } }, timestamp: '2026-04-10' },
+    { id: 'b', highlight: false, reactions: { LIKE: { count: 3 }, UNDERSTAND: { count: 2 }, CURIOUS: { count: 0 } }, timestamp: '2026-04-05' },
+    { id: 'c', highlight: true,  reactions: { LIKE: { count: 0 }, UNDERSTAND: { count: 0 }, CURIOUS: { count: 0 } }, timestamp: '2026-04-01' },
+    { id: 'd', highlight: false, reactions: { LIKE: { count: 3 }, UNDERSTAND: { count: 2 }, CURIOUS: { count: 0 } }, timestamp: '2026-04-08' }
+  ];
+  const result = ctx.applySortAndLimit(data, { sortBy: 'score' });
+  // highlight first, then reactionSum desc (d > b by newer ts), then last remaining
+  const ids = Array.from(result, (r) => r.id);
+  assert.deepEqual(ids, ['c', 'd', 'b', 'a']);
+});
+
+test('applySortAndLimit: sortBy with limit both apply', () => {
+  const ctx = loadDataServiceContext();
+  const data = [
+    { id: 1, timestamp: '2026-04-01' },
+    { id: 2, timestamp: '2026-04-03' },
+    { id: 3, timestamp: '2026-04-02' }
+  ];
+  const result = ctx.applySortAndLimit(data, { sortBy: 'newest', limit: 2 });
+  const ids = Array.from(result, (r) => r.id);
+  assert.deepEqual(ids, [2, 3]); // newest-first then top 2
+});

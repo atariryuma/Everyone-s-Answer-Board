@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo, DEFAULT_DISPLAY_SETTINGS */
+/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty */
 
 /**
  * ConfigService - ゼロ依存アーキテクチャ
@@ -343,15 +343,20 @@ function clearConfigCache(userId) {
 
 /**
  * コアシステムプロパティ確認 - 3つの必須項目をすべてチェック
+ *
+ * Why cache: doGet のどのモードでも少なくとも 1 回呼ばれる hot path。
+ *   生の PropertiesService 読み取りを 3 回 + JSON.parse していたのを、
+ *   getCachedProperty (30s メモリキャッシュ) に乗せ替える。
+ *   setCachedProperty 経由の書き込みで個別キーは即 invalidation されるので、
+ *   セットアップ直後の false → true 反映も問題ない。
+ *
  * @returns {boolean} 3つすべて存在すれば true
  */
 function hasCoreSystemProps() {
   try {
-    const props = PropertiesService.getScriptProperties();
-
-    const adminEmail = props.getProperty('ADMIN_EMAIL');
-    const dbId = props.getProperty('DATABASE_SPREADSHEET_ID');
-    const creds = props.getProperty('SERVICE_ACCOUNT_CREDS');
+    const adminEmail = getCachedProperty('ADMIN_EMAIL');
+    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    const creds = getCachedProperty('SERVICE_ACCOUNT_CREDS');
 
     if (!adminEmail || !dbId || !creds) {
       console.warn('hasCoreSystemProps: 必須項目不足', {

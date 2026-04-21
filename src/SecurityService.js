@@ -119,7 +119,7 @@ function getDeployUserDomainInfo() {
     });
 
     return {
-      success: accessResult.success,
+      success: accessResult.allowed,
       domain: accessResult.userDomain,
       userEmail: email,
       userDomain: accessResult.userDomain,

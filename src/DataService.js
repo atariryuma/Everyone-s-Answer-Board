@@ -353,7 +353,10 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
 
   // ✅ BUG FIX: classFilterはshouldIncludeRow()で既に処理されているため、ここでの二重フィルタリングを削除
 
-  if (options.sortBy) {
+  // Why: applySortAndLimit は sortBy と limit を独立に適用する。以前はここで
+  //      `if (options.sortBy)` でガードしていたため、limit 単体を渡す caller が
+  //      silently 無視されていた。limit も sortBy も未指定なら関数内で no-op。
+  if (options.sortBy || options.limit) {
     processedData = applySortAndLimit(processedData, {
       sortBy: options.sortBy,
       limit: options.limit

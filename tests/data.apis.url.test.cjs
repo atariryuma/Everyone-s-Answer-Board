@@ -1067,3 +1067,162 @@ test('getFormInfoInternal: catches getFormInfo exception', () => {
   assert.equal(result.success, false);
   assert.match(result.message, /form api down/);
 });
+
+// =====================================================================
+// buildSafePublishedDataResult — privacy: identity fields must not leak
+// =====================================================================
+
+function buildRow(overrides = {}) {
+  return {
+    id: 'row_2',
+    rowIndex: 2,
+    answer: 'A',
+    opinion: 'A',
+    reason: 'because',
+    class: '1-1',
+    name: 'Student A',
+    email: 'student@example.com',
+    reactions: {},
+    highlight: false,
+    ...overrides
+  };
+}
+
+test('buildSafePublishedDataResult: strips email/name for student viewer when showNames=false', () => {
+  const ctx = loadDataApisContext();
+  const out = ctx.buildSafePublishedDataResult(
+    { data: [buildRow()], header: 'H', sheetName: 'S' },
+    { displaySettings: { showNames: false } },
+    { isAdmin: false, isOwnBoard: false }
+  );
+  assert.equal(out.data.length, 1);
+  assert.equal(out.data[0].email, undefined);
+  assert.equal(out.data[0].name, undefined);
+  // Non-identity fields survive
+  assert.equal(out.data[0].answer, 'A');
+  assert.equal(out.data[0].reason, 'because');
+});
+
+test('buildSafePublishedDataResult: keeps email/name for admin viewer', () => {
+  const ctx = loadDataApisContext();
+  const out = ctx.buildSafePublishedDataResult(
+    { data: [buildRow()], header: 'H', sheetName: 'S' },
+    { displaySettings: { showNames: false } },
+    { isAdmin: true, isOwnBoard: false }
+  );
+  assert.equal(out.data[0].email, 'student@example.com');
+  assert.equal(out.data[0].name, 'Student A');
+});
+
+test('buildSafePublishedDataResult: keeps email/name for board owner', () => {
+  const ctx = loadDataApisContext();
+  const out = ctx.buildSafePublishedDataResult(
+    { data: [buildRow()], header: 'H', sheetName: 'S' },
+    { displaySettings: { showNames: false } },
+    { isAdmin: false, isOwnBoard: true }
+  );
+  assert.equal(out.data[0].email, 'student@example.com');
+  assert.equal(out.data[0].name, 'Student A');
+});
+
+test('buildSafePublishedDataResult: keeps email/name when showNames=true (named mode)', () => {
+  const ctx = loadDataApisContext();
+  const out = ctx.buildSafePublishedDataResult(
+    { data: [buildRow()], header: 'H', sheetName: 'S' },
+    { displaySettings: { showNames: true } },
+    { isAdmin: false, isOwnBoard: false }
+  );
+  assert.equal(out.data[0].name, 'Student A');
+  assert.equal(out.data[0].email, 'student@example.com');
+});
+
+test('buildSafePublishedDataResult: default viewerContext (omitted) treated as non-privileged', () => {
+  const ctx = loadDataApisContext();
+  const out = ctx.buildSafePublishedDataResult(
+    { data: [buildRow()], header: 'H', sheetName: 'S' },
+    { displaySettings: { showNames: false } }
+  );
+  assert.equal(out.data[0].email, undefined);
+  assert.equal(out.data[0].name, undefined);
+});
+
+test('buildSafePublishedDataResult: converts Date timestamps to ISO strings', () => {
+  const ctx = loadDataApisContext();
+  // Why vm.runInContext: Date constructors differ across vm contexts, so
+  //   `v instanceof Date` inside the source (which uses the context's Date)
+  //   is false for a Date built out here. Build the Date inside the context.
+  const ts = vm.runInContext("new Date('2026-04-22T10:00:00Z')", ctx);
+  const out = ctx.buildSafePublishedDataResult(
+    { data: [buildRow({ timestamp: ts })], header: 'H', sheetName: 'S' },
+    { displaySettings: { showNames: true } },
+    { isAdmin: true }
+  );
+  assert.equal(out.data[0].timestamp, '2026-04-22T10:00:00.000Z');
+});
+
+// =====================================================================
+// setupReactionAndHighlightColumns — column detection is exact-match
+// =====================================================================
+
+test('setupReactionAndHighlightColumns: detects all four columns when present exactly', () => {
+  const sheet = {
+    getRange: () => ({ setValues: () => {}, setValue: () => {} })
+  };
+  const ctx = loadDataApisContext({
+    SpreadsheetApp: {
+      openById: () => ({ getSheetByName: () => sheet })
+    },
+    invalidateSheetHeadersCache: () => {}
+  });
+  const result = ctx.setupReactionAndHighlightColumns('ss-1', 'Sheet1',
+    ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT']
+  );
+  assert.equal(result.success, true);
+  assert.equal(result.columnsAdded.length, 0);
+  assert.equal(result.alreadyExists, 4);
+});
+
+test('setupReactionAndHighlightColumns: "UNDERSTANDING YOUR ANSWER" does NOT count as UNDERSTAND', () => {
+  // Why regression: a previous substring check (header.includes("UNDERSTAND"))
+  // treated a question header "UNDERSTANDING YOUR ANSWER" as if the UNDERSTAND
+  // column already existed, and skipped adding it. processReactionDirect then
+  // failed with "リアクション列が見つかりません" because it uses exact match.
+  const addedValues = [];
+  const sheet = {
+    getRange: () => ({
+      setValues: (vals) => { addedValues.push(...vals[0]); },
+      setValue: (v) => { addedValues.push(v); }
+    })
+  };
+  const ctx = loadDataApisContext({
+    SpreadsheetApp: {
+      openById: () => ({ getSheetByName: () => sheet })
+    },
+    getSheetInfo: () => ({ lastCol: 2, lastRow: 1, headers: [] }),
+    invalidateSheetHeadersCache: () => {}
+  });
+  const result = ctx.setupReactionAndHighlightColumns('ss-1', 'Sheet1',
+    ['Q1', 'UNDERSTANDING YOUR ANSWER']
+  );
+  assert.equal(result.success, true);
+  // All four reaction/highlight columns should be added because the header
+  // "UNDERSTANDING YOUR ANSWER" is not a strict match for UNDERSTAND.
+  const added = Array.from(addedValues);
+  assert.deepEqual(added, ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT']);
+});
+
+test('setupReactionAndHighlightColumns: detects lowercase/whitespace-padded headers', () => {
+  const sheet = {
+    getRange: () => ({ setValues: () => {}, setValue: () => {} })
+  };
+  const ctx = loadDataApisContext({
+    SpreadsheetApp: {
+      openById: () => ({ getSheetByName: () => sheet })
+    },
+    invalidateSheetHeadersCache: () => {}
+  });
+  const result = ctx.setupReactionAndHighlightColumns('ss-1', 'Sheet1',
+    ['Q1', '  understand ', 'Like', 'CURIOUS', ' highlight']
+  );
+  assert.equal(result.columnsAdded.length, 0);
+});

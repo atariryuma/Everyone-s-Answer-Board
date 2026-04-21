@@ -199,11 +199,16 @@ function createAdminRequiredError() {
 
 /**
  * 例外エラーレスポンス生成
+ *
  * @param {Error} error - エラーオブジェクト
+ * @param {string} [context] - 発生箇所を示す短い文脈名。メッセージ先頭に付く
+ *   （例: "アプリケーション停止処理: Spreadsheet not found"）。
  * @returns {Object} 例外エラーレスポンス
  */
-function createExceptionResponse(error) {
-  return createErrorResponse(error.message || 'Unknown error');
+function createExceptionResponse(error, context) {
+  const rawMessage = (error && error.message) || 'Unknown error';
+  const message = context ? `${context}: ${rawMessage}` : rawMessage;
+  return createErrorResponse(message);
 }
 
 /**
