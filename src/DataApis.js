@@ -604,46 +604,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 }
 
 /**
- * データカウント取得（フロントエンド整合性のため追加）
- * @param {string} classFilter - クラスフィルター
- * @param {string} sortOrder - ソート順
- * @param {boolean} adminMode - 管理者モード
- * @returns {Object} カウント情報
- */
-function getDataCount(classFilter, sortOrder, adminMode = false) {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return { error: 'Authentication required', count: 0 };
-    }
-
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return { error: 'User not found', count: 0 };
-    }
-
-    const result = getUserSheetData(user.userId, {
-      classFilter,
-      sortOrder,
-      adminMode
-    });
-
-    if (result.success && result.data) {
-      return {
-        success: true,
-        count: result.data.length,
-        sheetName: result.sheetName
-      };
-    }
-
-    return { error: result.message || 'Failed to get count', count: 0 };
-  } catch (error) {
-    console.error('getDataCount error:', error.message);
-    return { error: error.message, count: 0 };
-  }
-}
-
-/**
  * GAS-Native統一設定保存API
  * @param {Object} config - 設定オブジェクト
  * @param {Object} options - 保存オプション { isDraft: boolean }
@@ -706,9 +666,15 @@ function getNotificationUpdate(targetUserId, options = {}) {
       return { success: false, message: 'Access denied' };
     }
 
+    // Why: 'すべて' はサーバーにとっては null と同義。生のまま渡すとクラス名として
+      //      フィルタされて全件 0 にマッチしなくなる（getPublishedSheetData と同じ正規化）。
+    const classFilter = options.classFilter && options.classFilter !== 'すべて'
+      ? options.classFilter
+      : undefined;
+
     const userData = getUserSheetData(targetUserId, {
       includeTimestamp: true,
-      classFilter: options.classFilter,
+      classFilter,
       sortBy: options.sortOrder || 'newest',
       requestingUser: email,
       targetUserEmail: targetUser.userEmail
@@ -727,8 +693,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     return {
       success: true,
       hasNewContent: newItems.length > 0,
-      newItemsCount: newItems.length,
-      timestamp: new Date().toISOString()
+      newItemsCount: newItems.length
     };
 
   } catch (error) {

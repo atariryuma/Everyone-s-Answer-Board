@@ -423,20 +423,6 @@ test('simulateServerExclusiveReaction: does not mutate input item.reactions', ()
 });
 
 // =====================================================================
-// hasRecentActivity — simple activity gate
-// =====================================================================
-
-test('hasRecentActivity: true when lastActivityTime is recent', () => {
-  const { instance } = makeInstance({ lastActivityTime: Date.now() - 60000 });
-  assert.equal(instance.hasRecentActivity(), true);
-});
-
-test('hasRecentActivity: false when older than 5 minutes', () => {
-  const { instance } = makeInstance({ lastActivityTime: Date.now() - 400000 });
-  assert.equal(instance.hasRecentActivity(), false);
-});
-
-// =====================================================================
 // clearCache — option-gated cache clearing
 // =====================================================================
 

@@ -66,8 +66,6 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
 
     const result = fetchSpreadsheetData(config, options, user);
 
-    const executionTime = Date.now() - startTime;
-
     if (result.success) {
       const preloadedHeaders = result.headers;
       const questionText = getQuestionText(config, { targetUserEmail: user.userEmail }, preloadedHeaders);
@@ -110,46 +108,6 @@ function resolveTimestampIndex(headers) {
     }
   }
   return -1;
-}
-
-/**
- * タイムスタンプ専用抽出関数（通知システム用 - 単発呼び出し）
- * @param {Array} row - データ行
- * @param {Array} headers - ヘッダー配列
- * @returns {string} タイムスタンプ値
- */
-function extractTimestampValue(row, headers) {
-  try {
-    if (headers.length > 0 && row.length > 0) {
-      const [firstHeader] = headers;
-      if (firstHeader && typeof firstHeader === 'string') {
-        const normalizedFirst = normalizeHeader(firstHeader);
-        if (normalizedFirst.includes('タイムスタンプ') ||
-            normalizedFirst.includes('timestamp') ||
-            normalizedFirst.includes('日時')) {
-          return row[0] || '';
-        }
-      }
-    }
-
-    for (let i = 0; i < headers.length; i++) {
-      const header = headers[i];
-      if (header && typeof header === 'string') {
-        const normalized = normalizeHeader(header);
-        if (normalized.includes('タイムスタンプ') ||
-            normalized.includes('timestamp') ||
-            normalized.includes('日時') ||
-            normalized.includes('日付')) {
-          return row[i] || '';
-        }
-      }
-    }
-
-    return '';
-  } catch (error) {
-    console.warn('extractTimestampValue error:', error.message);
-    return '';
-  }
 }
 
 /**
@@ -424,9 +382,7 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
     success: true,
     data: processedData,
     headers,
-    sheetName: config.sheetName,
-    filteredRows: processedData.length,
-    executionTime: Date.now() - startTime
+    sheetName: config.sheetName
   };
 }
 
@@ -626,9 +582,7 @@ function applySortAndLimit(data, options = {}) {
  * @param {Object} options - オプション設定
  * @returns {Object} 削除結果
  */
-function deleteAnswerRow(userId, rowIndex, options = {}) {
-  const startTime = Date.now();
-
+function deleteAnswerRow(userId, rowIndex) {
   try {
     const currentEmail = getCurrentEmail();
     const user = findUserById(userId, { requestingUser: currentEmail });
@@ -683,13 +637,9 @@ function deleteAnswerRow(userId, rowIndex, options = {}) {
     //      未リンク・権限不足は致命的ではないので best-effort でシート削除は成功扱い。
     deleteLinkedFormResponseByTimestamp(sheet, rowData[0]);
 
-    const executionTime = Date.now() - startTime;
-
     return {
       success: true,
-      message: '回答を削除しました',
-      deletedRowIndex: rowIndex,
-      executionTime
+      message: '回答を削除しました'
     };
 
   } catch (error) {

@@ -494,56 +494,6 @@ test('getSheetList: returns list of sheets with dimensions', () => {
 });
 
 // =====================================================================
-// getDataCount
-// =====================================================================
-
-test('getDataCount: returns auth error without session', () => {
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => null
-  });
-  const result = ctx.getDataCount(null, 'newest', false);
-  assert.match(result.error, /Authentication/);
-  assert.equal(result.count, 0);
-});
-
-test('getDataCount: returns user-not-found when email unknown', () => {
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => 'ghost@example.com',
-    findUserByEmail: () => null
-  });
-  const result = ctx.getDataCount(null, 'newest', false);
-  assert.match(result.error, /User not found/);
-  assert.equal(result.count, 0);
-});
-
-test('getDataCount: returns count and sheetName on success', () => {
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    getUserSheetData: () => ({
-      success: true,
-      data: [{ id: 1 }, { id: 2 }, { id: 3 }],
-      sheetName: 'Sheet1'
-    })
-  });
-  const result = ctx.getDataCount(null, 'newest', false);
-  assert.equal(result.success, true);
-  assert.equal(result.count, 3);
-  assert.equal(result.sheetName, 'Sheet1');
-});
-
-test('getDataCount: returns 0 count when getUserSheetData fails', () => {
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    getUserSheetData: () => ({ success: false, message: 'sheet gone' })
-  });
-  const result = ctx.getDataCount(null, 'newest', false);
-  assert.equal(result.count, 0);
-  assert.match(result.error, /sheet gone/);
-});
-
-// =====================================================================
 // getNotificationUpdate
 // =====================================================================
 

@@ -47,27 +47,14 @@
       this.cache = new window.UnifiedCache();
       this.activeRequests = 0;
 
-      this.weakCache = new WeakMap();
       this.perf = { frameTime: 0, domOperations: 0 };
       this.visibilityObserver = null;
       this.resizeObserver = null;
-      this.deferredUpdates = new Set();
       this.animationFrameId = null;
       this.idleCallbackId = null;
       this.domFragmentPool = [];
-      // Why: true で始めるとバグる（line 4715 の !this.isLowPerformanceMode が常に false で
-      //      optimizeForLowPerformance が絶対に走らない）。false で始めて detectLowPerformance
-      //      で適切に判定する。
+      // Why: false で始めないと detectLowPerformance の判定が空回りする。
       this.isLowPerformanceMode = false;
-
-
-      this.NOTIFICATION_ANIMATION = {
-        DURATION_MS: 300,        // CSS 0.3s と同期
-        RETRY_BUFFER_MS: 20,     // リトライ用バッファ
-        get RETRY_DELAY_MS() {
-          return this.DURATION_MS + this.RETRY_BUFFER_MS;
-        }
-      };
 
       this.elements = {
         body: document.body,
@@ -142,12 +129,8 @@
       this.reactionDebounceTimeouts = new Map(); // 行単位デバウンシング用（300ms）
       this.reactionEventListeners = new Map(); // 処理完了通知用
 
-      this.retryDelayBase = 1000; // 1秒
-
-
       this.eventDelegationSetup = false;
       this.nonCriticalListenersSetup = false;
-      this.modalOperationPending = false;
       this.reactionTypes = [
         { key: 'LIKE', icon: 'hand-thumb-up' },
         { key: 'UNDERSTAND', icon: 'lightbulb' },
@@ -169,11 +152,7 @@
         toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex),
         checkAdmin: () => this.runGas('isAdmin'),
         clearCache: () => this.runGas('clearActiveSheet', this.state.userId),
-        validateData: () => this.validData(),
-        getDataCount: (classFilter, sortOrder, adminMode) => {
-          const rows = this.state.currentAnswers || [];
-          return { success: true, count: rows.length };
-        }
+        validateData: () => this.validData()
       };
 
 
@@ -214,18 +193,10 @@
             if (this.visibilityObserver) {
               this.visibilityObserver.unobserve(card);
             }
-            if (this.scrollObserver) {
-              this.scrollObserver.unobserve(card);
-            }
           });
           container.innerHTML = '';
         }
       }
-
-
-      this.contentCheckInProgress = false;
-
-
     }
 
     async executeWithRetry(operation, options = {}) {
@@ -1249,13 +1220,6 @@
       return 300000;                                     // 15分超: 5分
     }
 
-    hasRecentActivity() {
-      return (Date.now() - this.lastActivityTime) < 300000; // 5 minutes
-    }
-
-
-
-
 
     showNotification(message, type = 'info', options = {}) {
       if (window.notifications) {
@@ -1335,7 +1299,6 @@
         includeCache = true,
         includeDOMReferences = true,
         includeEventListeners = true,
-        includeVirtualScroll = true,
         includeDOMFragments = true
       } = options;
 
@@ -1370,14 +1333,6 @@
             });
           }
 
-        }
-
-        if (includeVirtualScroll && this.virtualScrollState?.renderedRowIndexes) {
-          const size = this.virtualScrollState.renderedRowIndexes.size;
-          if (size > 1000) {
-            this.virtualScrollState.renderedRowIndexes.clear();
-            this.virtualScrollState.renderedItems = 0;
-          }
         }
 
         if (includeDOMFragments && this.domFragmentPool) {
@@ -1479,12 +1434,9 @@
 
       this.eventDelegationSetup = false;
       this.nonCriticalListenersSetup = false;
-      this.modalOperationPending = false;
 
       this.cache.clear();
-      this.deferredUpdates.clear();
       this.domFragmentPool.length = 0;
-
     }
 
     /**
@@ -1492,36 +1444,6 @@
      * @returns {boolean} true if all prerequisites are met
      */
 
-    /**
-     * 制限機能モードを有効化
-     */
-    enableLimitedFunctionalityMode() {
-      this.isLimitedMode = true;
-
-      if (this.elements.answersContainer) {
-        this.elements.answersContainer.innerHTML = `
-        <div class="text-center py-16 px-6 col-span-full" data-limited-mode="true">
-          <svg class="mx-auto h-12 w-12 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-          <h3 class="mt-2 text-lg font-medium text-blue-400">制限機能モード</h3>
-          <p class="mt-1 text-sm text-gray-300">一部の機能が制限されています。URLを確認してページを再読み込みしてください。</p>
-          <div class="mt-6">
-            <button
-              data-action="reload"
-              class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
-            >
-              ページを再読み込み
-            </button>
-          </div>
-        </div>
-      `;
-      }
-
-      if (this.elements.headingLabel) {
-        this.elements.headingLabel.textContent = '制限機能モード';
-      }
-    }
 
     /**
      * Display initialization error to user
@@ -1689,14 +1611,6 @@
       this.manageEmptyState('show');
     }
 
-    removeEmptyState() {
-      this.manageEmptyState('remove');
-    }
-
-    safeDisplayEmptyState() {
-      this.manageEmptyState('show', { safeCheck: true });
-    }
-
     async clearAllCardsForEmptyData() {
       const isFirstTime = this.isFirstTimeBoardAccess();
 
@@ -1712,27 +1626,11 @@
             if (this.visibilityObserver) {
               this.visibilityObserver.unobserve(card);
             }
-            if (this.scrollObserver) {
-              this.scrollObserver.unobserve(card);
-            }
           });
-
           container.innerHTML = '';
-
           await new Promise(resolve => requestAnimationFrame(resolve));
         }
       }
-
-      if (this.virtualScrollState) {
-        this.virtualScrollState = {
-          renderedItems: 0,
-          totalItems: 0,
-          isLoading: false,
-          renderedRowIndexes: new Set(),
-          cardRegistry: new Map()
-        };
-      }
-
     }
 
     async validatePostLoadState() {
@@ -1757,17 +1655,6 @@
       } else {
       }
     }
-
-    hasRelevantLocalStorage() {
-      const userId = this.state?.userId || window.USER_ID;
-      const sheetName = window.SHEET_NAME;
-
-      return {
-        hasLastSeen: localStorage.getItem(`lastSeenTimestamp_${userId}_${sheetName}`) !== null,
-        hasDiffCards: localStorage.getItem(`differentialCards_${userId}_${sheetName}`) !== null
-      };
-    }
-
 
 
     async forceDataRefresh() {
@@ -2184,28 +2071,6 @@
     }
 
 
-    clearVirtualScrollingState() {
-      if (this.virtualScrollState) {
-        this.virtualScrollState = {
-          renderedItems: 0,
-          totalItems: 0,
-          isLoading: false,
-          renderedRowIndexes: new Set(),
-          cardRegistry: new Map()
-        };
-      }
-
-      if (this.scrollObserver) {
-        this.scrollObserver.disconnect();
-        this.scrollObserver = null;
-      }
-
-      if (this.visibilityObserver) {
-        this.visibilityObserver.disconnect();
-      }
-    }
-
-
     populateClassFilter(rows) {
       const classFilter = this.elements.classFilter;
       if (!classFilter) return;
@@ -2361,11 +2226,11 @@
 
       container.innerHTML = '';
 
-      if (newRows.length > window.RENDER_BATCH_SIZE) {
-        this.renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad);
-      } else {
-        this.renderDirectly(newRows, oldRows, container, existingMap);
-      }
+      // Why: 以前は newRows.length > RENDER_BATCH_SIZE で仮想スクロールに切り替えていたが、
+      //      続きを読み込む setupScrollObserver / loadMoreItems 経路がどこからも呼ばれず
+      //      視界外のカードが永久に出てこないデッドパスだった。教室規模（数十〜数百件）では
+      //      renderDirectly で全件出す方が速く確実。
+      this.renderDirectly(newRows, oldRows, container, existingMap);
     }
 
     renderDirectly(newRows, oldRows, container, existingMap) {
@@ -2383,68 +2248,6 @@
           card = this.createAnswerCard(row);
           if (card) {
             if (markNew) card.classList.add('new-card');
-            fragment.appendChild(card);
-          }
-        } else if (this.shouldUpdateCard(row, oldData)) {
-          this.updateAnswerCard(card, row, oldData);
-        }
-      });
-
-      if (fragment.children.length > 0) {
-        container.appendChild(fragment);
-      }
-    }
-
-    calculateVisibleRange(totalItems) {
-      const container = this.elements.answersContainer;
-      if (!container) {
-        return { startIndex: 0, endIndex: totalItems };
-      }
-
-      if (!container.offsetParent && container.offsetHeight === 0) {
-        requestAnimationFrame(() => {
-          const retryHeight = container.clientHeight;
-          if (retryHeight > 0) {
-          }
-        });
-        return { startIndex: 0, endIndex: totalItems };
-      }
-
-      const scrollTop = container.scrollTop;
-      const containerHeight = container.clientHeight;
-      const cardHeight = 150; // 仮のカードの高さ。実際のCSSに基づいて調整が必要。
-
-      let startIndex = 0;
-      let endIndex = totalItems;
-
-      if (containerHeight > 0) {
-        startIndex = Math.floor(scrollTop / cardHeight);
-        endIndex = Math.min(totalItems, Math.ceil((scrollTop + containerHeight) / cardHeight));
-      } else {
-        return { startIndex: 0, endIndex: totalItems };
-      }
-
-      return { startIndex, endIndex };
-    }
-
-    renderWithVirtualScrolling(newRows, oldRows, container, existingMap, isInitialLoad) {
-
-      if (isInitialLoad || this.state.currentAnswers.length === 0) {
-        this.clearVirtualScrollingState();
-      }
-
-      const fragment = this.getReusableFragment();
-      const visibleRange = this.calculateVisibleRange(newRows.length);
-      const visibleRows = newRows.slice(visibleRange.startIndex, visibleRange.endIndex);
-
-      visibleRows.forEach((row) => {
-        const rowId = String(row.rowIndex);
-        let card = existingMap.get(rowId);
-        const oldData = oldRows.find(r => r.rowIndex === row.rowIndex);
-
-        if (!card) {
-          card = this.createAnswerCard(row);
-          if (card) {
             fragment.appendChild(card);
           }
         } else if (this.shouldUpdateCard(row, oldData)) {
@@ -3082,6 +2885,14 @@
 
       this.setReactionButtonsLoading(buttons, true, requestId);
 
+      // Why: originalState は楽観更新の「前」に捕捉する必要がある。以前は
+      //      simulateServerExclusiveReaction で item.reactions を書き換えた後に
+      //      currentState を取っていたため、ロールバック時に楽観値をそのまま復元 → 差分が
+      //      効かずカウントが+1 ズレる現象が起きていた。
+      const originalState = item.reactions?.[reaction]
+        ? { count: item.reactions[reaction].count, reacted: item.reactions[reaction].reacted }
+        : { count: 0, reacted: false };
+
       const optimisticUpdate = this.simulateServerExclusiveReaction(item, reaction);
 
       if (optimisticUpdate.changed) {
@@ -3094,14 +2905,12 @@
         }
       }
 
-      const currentState = item.reactions?.[reaction] || { count: 0, reacted: false };
-
       this.pendingReactions.set(reactionKey, {
         requestId,
         rowIndex: numericRowIndex,
         reaction,
         timestamp: Date.now(),
-        originalState: currentState,
+        originalState,
         retryCount: 0
       });
 
@@ -3125,6 +2934,16 @@
         clearTimeout(previous.timeoutId);
         if (previous.reactionKey && previous.reactionKey !== reactionKey) {
           this.pendingReactions.delete(previous.reactionKey);
+          // Why: 300ms 以内に別のリアクションに切り替えた場合、前のリアクションは
+          //      サーバー送信されないまま消える。しかし setReactionButtonsLoading(..., true)
+          //      で disabled+.loading を付けたボタンはその後どこからも戻されず永久ロード中になる。
+          //      該当ボタンを探して明示的に解放する。
+          if (previous.reaction) {
+            const stale = document.querySelectorAll(
+              `[data-row-index="${rowIndex}"][data-reaction="${previous.reaction}"]`
+            );
+            if (stale.length > 0) this.setReactionButtonsLoading(stale, false);
+          }
         }
       }
 
@@ -3144,7 +2963,7 @@
         }
       }, 300);
 
-      this.reactionDebounceTimeouts.set(rowKey, { timeoutId, reactionKey });
+      this.reactionDebounceTimeouts.set(rowKey, { timeoutId, reactionKey, reaction });
     }
 
     /**
@@ -3266,87 +3085,6 @@
           }
         });
         this.reactionEventListeners.delete(reactionKey);
-      }
-    }
-
-    waitForReactionComplete(reactionKey, timeout = 5000) {
-      return new Promise((resolve, reject) => {
-        const timeoutPromise = this.createReactionTimeout(reactionKey, timeout, reject);
-
-        const listener = (result) => {
-          resolve(result);
-        };
-
-        if (!this.reactionEventListeners.has(reactionKey)) {
-          this.reactionEventListeners.set(reactionKey, []);
-        }
-        this.reactionEventListeners.get(reactionKey).push(listener);
-      });
-    }
-
-    async waitForReactionStateChange(rowIndex, reaction, initialState, timeoutMs = 3000, pollIntervalMs = 50) {
-      const startTime = Date.now();
-
-      const getReactionButtonState = () => {
-        const buttons = document.querySelectorAll(`[data-row-index="${rowIndex}"][data-reaction="${reaction}"]`);
-        if (buttons.length === 0) return null;
-
-        const btn = buttons[0];
-        return {
-          reacted: btn.getAttribute('aria-pressed') === 'true',
-          count: parseInt(btn.querySelector('.count')?.textContent || '0'),
-          disabled: btn.disabled,
-          classes: btn.className,
-          timestamp: Date.now()
-        };
-      };
-
-      const hasStateChanged = (current, initial) => {
-        if (!current || !initial) return false;
-        return current.reacted !== initial.reacted ||
-          current.count !== initial.count ||
-          current.disabled !== initial.disabled;
-      };
-
-      return new Promise((resolve, reject) => {
-        const poll = () => {
-          const currentTime = Date.now();
-          if (currentTime - startTime >= timeoutMs) {
-            reject(new Error(`State change timeout after ${timeoutMs}ms`));
-            return;
-          }
-
-          const currentState = getReactionButtonState();
-          if (hasStateChanged(currentState, initialState)) {
-            resolve({
-              initialState,
-              currentState,
-              changeDetectedAt: currentTime - startTime,
-              stateChanged: true
-            });
-            return;
-          }
-
-          this.scheduleNextPoll(poll, pollIntervalMs);
-        };
-
-        poll();
-      });
-    }
-
-    async waitForReactionUpdate(rowIndex, reaction, expectedChange = null, maxWaitMs = 3000) {
-      const reactionKey = `${rowIndex}-${reaction}`;
-
-      try {
-        const result = await this.waitForReactionComplete(reactionKey, maxWaitMs);
-        return result || { timeout: false, success: true };
-      } catch (error) {
-        console.warn(`⚠️ リアクション待機タイムアウト: ${reactionKey}`, error.message);
-        return {
-          error: error.message,
-          timeout: true,
-          success: false
-        };
       }
     }
 
@@ -3789,53 +3527,6 @@
       } catch (error) {
         console.error('ハイライト状態同期確認エラー:', error);
       }
-    }
-
-
-    async fixSyncIssues(healthCheckResult) {
-      if (!healthCheckResult.issues || healthCheckResult.issues.length === 0) {
-        return { fixed: 0, skipped: 0 };
-      }
-
-      let fixed = 0;
-      let skipped = 0;
-
-      for (const issue of healthCheckResult.issues) {
-        try {
-          switch (issue.type) {
-            case 'ui_data_inconsistency':
-              for (const inconsistency of issue.data) {
-                const item = this.state.currentAnswers.find(i => i.rowIndex === inconsistency.rowIndex);
-                if (item) {
-                  await this.applyUpdates([item]);
-                  fixed++;
-                }
-              }
-              break;
-
-            case 'data_staleness':
-              await this.forceDataRefresh();
-              fixed++;
-              break;
-
-            case 'cache_bloat':
-              if (this.cache && typeof this.cache.clear === 'function') {
-                this.cache.clear();
-                fixed++;
-              }
-              break;
-
-            default:
-              skipped++;
-              break;
-          }
-        } catch (fixError) {
-          console.error(`修復失敗 (${issue.type}):`, fixError);
-          skipped++;
-        }
-      }
-
-      return { fixed, skipped };
     }
 
 
@@ -4341,73 +4032,6 @@
       } catch (error) {
         console.warn('リアクション状態の保存に失敗:', error);
       }
-    }
-
-    /**
-     * localStorageからリアクション状態を読み込み
-     * @returns {object} 保存されたリアクション状態
-     */
-    loadReactionState() {
-      try {
-        const savedData = JSON.parse(localStorage.getItem(this.reactionStorageKey) || '{}');
-        return savedData;
-      } catch (error) {
-        console.warn('リアクション状態の読み込みに失敗:', error);
-        return {};
-      }
-    }
-
-    /**
-     * 保存されたリアクション状態を現在のデータに適用
-     * @param {array} answers - 回答データ配列
-     */
-    applyReactionState(answers) {
-      const savedReactions = this.loadReactionState();
-      let modified = false;
-
-      answers.forEach(answer => {
-        if (!savedReactions[answer.rowIndex]) {
-          savedReactions[answer.rowIndex] = {};
-        }
-        const savedReaction = savedReactions[answer.rowIndex];
-
-        if (answer.reactions) {
-          Object.keys(answer.reactions).forEach(reactionType => {
-            const info = answer.reactions[reactionType];
-            if (!info) return;
-
-            const serverReacted = !!info.reacted;
-            const localReacted = !!savedReaction[reactionType];
-
-            info.reacted = serverReacted;
-
-            if (serverReacted) {
-              if (!localReacted) {
-                if (!savedReactions[answer.rowIndex]) {
-                  savedReactions[answer.rowIndex] = {};
-                }
-                savedReactions[answer.rowIndex][reactionType] = {
-                  reacted: true,
-                  timestamp: new Date().toISOString()
-                };
-                modified = true;
-              }
-            } else if (localReacted) {
-              delete savedReaction[reactionType];
-              modified = true;
-            }
-
-            if (Object.keys(savedReaction).length === 0) {
-              delete savedReactions[answer.rowIndex];
-            }
-          });
-        }
-      });
-
-      if (modified) {
-        localStorage.setItem(this.reactionStorageKey, JSON.stringify(savedReactions));
-      }
-
     }
 
     updateModalReactionButtons(item) {
@@ -4985,276 +4609,6 @@
 
       if (this.domFragmentPool.length < 8) { // Increased optimal pool size
         this.domFragmentPool.push(fragment);
-      }
-    }
-
-    throttledUpdate(key, callback, delay = 100) {
-      if (this.deferredUpdates.has(key)) {
-        return;
-      }
-
-      this.deferredUpdates.add(key);
-      requestIdleCallback(() => {
-        callback();
-        this.deferredUpdates.delete(key);
-      }, { timeout: delay });
-    }
-
-
-
-    setupScrollObserver() {
-      if (!this.elements.answersContainer) {
-        return;
-      }
-
-      const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
-      if (cards.length === 0) {
-        return;
-      }
-
-      if (this.scrollObserver) {
-        this.scrollObserver.disconnect();
-      }
-
-      const debouncedScrollHandler = this.debounce((entries) => {
-        const intersectingEntry = entries.find(entry => entry.isIntersecting);
-        if (intersectingEntry) {
-          this.handleVirtualScroll(intersectingEntry.target);
-        }
-      }, 150); // 150ms debounce for scroll triggers to prevent rapid firing
-
-      this.scrollObserver = new IntersectionObserver(debouncedScrollHandler, {
-        root: null,
-        rootMargin: '300px', // Increased buffer for even smoother loading
-        threshold: 0.1
-      });
-
-      const observeCount = Math.min(3, cards.length); // Reduced to last 3 cards for better performance
-      const observedCards = [];
-
-      for (let i = cards.length - observeCount; i < cards.length; i++) {
-        if (cards[i] && cards[i].dataset.rowIndex) {
-          this.scrollObserver.observe(cards[i]);
-          observedCards.push(cards[i].dataset.rowIndex);
-        }
-      }
-    }
-
-    handleVirtualScroll(triggerElement) {
-      if (!triggerElement || !this.virtualScrollState) {
-        return;
-      }
-
-      if (this.virtualScrollState.isLoading) {
-        return;
-      }
-
-      const currentCards = this.elements.answersContainer.querySelectorAll('.answer-card');
-      const totalAvailable = this.state.currentAnswers.length;
-      const currentRendered = currentCards.length;
-
-      if (currentRendered < totalAvailable) {
-        this.loadMoreItems();
-      } else {
-        this.optimizeVisibleElements();
-      }
-    }
-
-    loadMoreItems() {
-      if (this.virtualScrollState.isLoading) {
-        return;
-      }
-
-      this.virtualScrollState.isLoading = true;
-
-      if (!this.virtualScrollState.renderedRowIndexes) {
-        this.virtualScrollState.renderedRowIndexes = new Set();
-        const existingCards = this.elements.answersContainer.querySelectorAll('.answer-card');
-        existingCards.forEach(card => {
-          if (card.dataset.rowIndex) {
-            this.virtualScrollState.renderedRowIndexes.add(card.dataset.rowIndex);
-          }
-        });
-      }
-
-      const dynamicBatchSize = getDynamicBatchSize(this.performanceMetrics);
-      const batchSize = this.isLowPerformanceMode ? Math.min(CHUNK_SIZE, dynamicBatchSize) : dynamicBatchSize;
-
-      const unrenderedItems = this.state.currentAnswers.filter(item =>
-        !this.virtualScrollState.renderedRowIndexes.has(String(item.rowIndex))
-      );
-
-      const remainingItems = unrenderedItems.slice(0, batchSize);
-
-      if (remainingItems.length === 0) {
-        this.virtualScrollState.isLoading = false;
-        return;
-      }
-
-      this.deferredRender(() => {
-        this.renderAdditionalItems(remainingItems);
-      });
-    }
-
-    renderAdditionalItems(items) {
-      if (!items || items.length === 0) {
-        this.virtualScrollState.isLoading = false;
-        return;
-      }
-
-      const fragment = this.getReusableFragment();
-      const changedItems = [];
-      let successfullyCreated = 0;
-
-      if (!this.virtualScrollState.renderedRowIndexes) {
-        this.virtualScrollState.renderedRowIndexes = new Set();
-      }
-
-      items.forEach((item) => {
-        const rowIndexStr = String(item.rowIndex);
-
-        if (this.virtualScrollState.renderedRowIndexes.has(rowIndexStr)) {
-          return;
-        }
-
-        const card = this.createAnswerCard(item);
-        if (card) {
-          // Why: この経路はスクロールで既存データを段階的に DOM に出す遅延ロード。
-          //      新規投稿ではないので pulse を当てない（ユーザーのスクロール先が
-          //      パタパタ光って見えるのを防ぐ）。
-          this.virtualScrollState.renderedRowIndexes.add(rowIndexStr);
-
-          if (this.visibilityObserver) {
-            this.visibilityObserver.observe(card);
-          }
-
-          const isLastFew = items.indexOf(item) >= items.length - 3;
-          if (isLastFew && this.scrollObserver) {
-            this.scrollObserver.observe(card);
-          }
-
-          fragment.appendChild(card);
-          changedItems.push(item);
-          successfullyCreated++;
-        } else {
-        }
-      });
-
-      if (fragment.children.length > 0) {
-        this.elements.answersContainer.appendChild(fragment);
-
-        this.virtualScrollState.renderedItems = this.elements.answersContainer.children.length;
-      } else {
-      }
-
-      if (changedItems.length > 0) {
-        this.deferredRender(() => this.applyUpdates(changedItems));
-      }
-
-      this.recycleFragment(fragment);
-
-      this.virtualScrollState.isLoading = false;
-
-      this.validateVirtualScrollState();
-    }
-
-    validateVirtualScrollState() {
-      if (!this.virtualScrollState || !this.virtualScrollState.renderedRowIndexes) {
-        return;
-      }
-
-      const domCards = this.elements.answersContainer.querySelectorAll('.answer-card');
-      const domRowIndexes = new Set();
-
-      domCards.forEach(card => {
-        if (card.dataset.rowIndex) {
-          domRowIndexes.add(card.dataset.rowIndex);
-        }
-      });
-
-      const trackedCount = this.virtualScrollState.renderedRowIndexes.size;
-      const domCount = domRowIndexes.size;
-      const totalAvailable = this.state.currentAnswers.length;
-
-      const missingInDOM = [...this.virtualScrollState.renderedRowIndexes].filter(x => !domRowIndexes.has(x));
-      const extraInDOM = [...domRowIndexes].filter(x => !this.virtualScrollState.renderedRowIndexes.has(x));
-
-      if (missingInDOM.length > 0 || extraInDOM.length > 0 || trackedCount !== domCount) {
-
-        this.virtualScrollState.renderedRowIndexes = domRowIndexes;
-        this.virtualScrollState.renderedItems = domCount;
-
-      }
-    }
-
-    optimizeVisibleElements() {
-      if (!this.elements.answersContainer || this.virtualScrollState.isLoading) {
-        return;
-      }
-
-      const cards = this.elements.answersContainer.querySelectorAll('.answer-card');
-      let hiddenCount = 0;
-      let restoredCount = 0;
-      const viewportHeight = window.innerHeight;
-      const hideThreshold = viewportHeight * 3; // Increased threshold for better UX
-
-      if (!this.virtualScrollState.hiddenCards) {
-        this.virtualScrollState.hiddenCards = new Set();
-      }
-
-      cards.forEach((card) => {
-        const rect = card.getBoundingClientRect();
-        const isInViewport = rect.top < viewportHeight && rect.bottom > 0;
-        const rowIndex = card.dataset.rowIndex;
-        const isCurrentlyHidden = this.virtualScrollState.hiddenCards.has(rowIndex);
-
-        if (!isInViewport && !isCurrentlyHidden) {
-          const distanceFromViewport = rect.top > viewportHeight
-            ? rect.top - viewportHeight  // Below viewport
-            : -rect.bottom;             // Above viewport
-
-          if (distanceFromViewport > hideThreshold) {
-            this.hideCard(card, rowIndex);
-            hiddenCount++;
-          }
-        } else if (isInViewport && isCurrentlyHidden) {
-          this.restoreCard(card, rowIndex);
-          restoredCount++;
-        }
-      });
-
-      if (hiddenCount > 0 || restoredCount > 0) {
-      }
-    }
-
-    hideCard(card, rowIndex) {
-      card.classList.add('hidden-card');
-      card.classList.remove('visible-card');
-      this.virtualScrollState.hiddenCards.add(rowIndex);
-
-      if (this.visibilityObserver) {
-        this.visibilityObserver.unobserve(card);
-      }
-      if (this.scrollObserver) {
-        this.scrollObserver.unobserve(card);
-      }
-    }
-
-    restoreCard(card, rowIndex) {
-      card.classList.remove('hidden-card');
-      card.classList.add('visible-card');
-      this.virtualScrollState.hiddenCards.delete(rowIndex);
-
-      if (this.visibilityObserver) {
-        this.visibilityObserver.observe(card);
-      }
-
-      const allCards = this.elements.answersContainer.querySelectorAll('.answer-card');
-      const cardIndex = Array.from(allCards).indexOf(card);
-      const isLastFew = cardIndex >= allCards.length - 3;
-
-      if (isLastFew && this.scrollObserver) {
-        this.scrollObserver.observe(card);
       }
     }
 
