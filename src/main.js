@@ -12,7 +12,7 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findPublishedBoardOwner, openSpreadsheet, getUserConfig, getConfigOrDefault, saveUserConfig, getCachedProperty, isAdministrator, enhanceConfigWithDynamicUrls, setupDomainWideSharing, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, SystemController */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, isAdministrator, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, SystemController */
 
 /**
  * APIキー認証時にgetCurrentEmail()が管理者メールを返すためのコンテキスト
@@ -614,13 +614,6 @@ function isAdministrator(email) {
 }
 
 /**
- * ✅ CLAUDE.md準拠: Batched viewer data retrieval for 70x performance improvement
- * Combines 4 individual API calls into single batch operation:
- * - findUserById
- * - getUserConfig
- * - isAdministrator
- * - getQuestionText
- *
  * @param {string} targetUserId - Target user ID
  * @param {string} currentEmail - Current viewer email
  * @returns {Object} Batched result with all required data
@@ -654,14 +647,6 @@ function getBatchedViewerData(targetUserId, currentEmail) {
 }
 
 /**
- * ✅ CLAUDE.md準拠: Batched admin data retrieval for 70x performance improvement
- * Combines 4 individual API calls into single batch operation:
- * - getCurrentEmail (session email)
- * - findUserById (target user validation)
- * - isAdministrator
- * - permission validation
- * - getUserConfig
- *
  * @param {string} targetUserId - Target user ID for admin access
  * @returns {Object} Batched result with all required admin data
  */

@@ -1255,7 +1255,8 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       return null;
     }
 
-    const cacheKey = `user_by_sheet_${spreadsheetId}`;
+    const cacheVersion = getCachedProperty('USER_CACHE_VERSION') || '0';
+    const cacheKey = `user_by_sheet_v${cacheVersion}_${spreadsheetId}`;
     const skipCache = context.skipCache || false;
 
     if (!skipCache) {
