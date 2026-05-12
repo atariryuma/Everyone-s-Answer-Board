@@ -47,7 +47,12 @@ function loadDatabaseContext(overrides = {}) {
     Session: {
       getActiveUser: () => ({ getEmail: () => overrides.currentEmail || 'actor@example.com' })
     },
-    validateEmail: (email) => typeof email === 'string' && /.+@.+/.test(email),
+    // Real validateEmail returns { isValid, sanitized, errors }; stub matches that shape.
+    validateEmail: (email) => ({
+      isValid: typeof email === 'string' && /.+@.+/.test(email),
+      sanitized: email,
+      errors: []
+    }),
     getCurrentEmail: overrides.getCurrentEmail || (() => overrides.currentEmail || 'actor@example.com'),
     isAdministrator: overrides.isAdministrator || (() => false),
     getUserConfig: () => ({ success: true, config: {} }),

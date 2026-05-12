@@ -1054,7 +1054,14 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
  */
 function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeaders = []) {
   try {
-    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    // Why openSpreadsheet (not bare SpreadsheetApp.openById): DatabaseCore.openSpreadsheet
+    //   は circuit breaker + service account fallback + retry を一括で提供する。直接呼びで
+    //   この envelope をバイパスすると、429 storm 時に簡単にロックアウトを引き起こす。
+    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
+    if (!dataAccess) {
+      throw new Error(`Cannot open spreadsheet ${spreadsheetId}`);
+    }
+    const { spreadsheet } = dataAccess;
     const sheet = spreadsheet.getSheetByName(sheetName);
 
     if (!sheet) {
@@ -1294,10 +1301,15 @@ function extractSpreadsheetInfo(fullUrl) {
  */
 function getSheetNameFromGid(spreadsheetId, gid) {
   try {
-    const spreadsheet = executeWithRetry(
-      () => SpreadsheetApp.openById(spreadsheetId),
-      { operationName: 'SpreadsheetApp.openById', maxRetries: 3 }
-    );
+    // Why openSpreadsheet (not bare SpreadsheetApp.openById + executeWithRetry):
+    //   openSpreadsheet がすでに retry / SA fallback / circuit-breaker を包含するので、
+    //   ここで二重に executeWithRetry を走らせるのは無駄かつ backoff が重複する。
+    // null fallback は 'Sheet1' (旧挙動互換): GAS の新規スプレッドシート既定名。
+    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
+    if (!dataAccess) {
+      return 'Sheet1';
+    }
+    const { spreadsheet } = dataAccess;
     const sheets = spreadsheet.getSheets();
 
     const sheetInfos = sheets.map(sheet => ({

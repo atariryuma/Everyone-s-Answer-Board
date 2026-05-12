@@ -13,7 +13,7 @@
  * - シンプルなユーティリティ関数群
  */
 
-/* global getColumnAnalysis, getFormInfo */
+/* global getColumnAnalysis, getFormInfo, SYSTEM_LIMITS */
 
 // Why module-level: validateConfig が boardMode を sanitize する際に使う enum。
 //   ConfigService.js:285 の VALID_BOARD_MODES とミラー。GAS single-global-scope で
@@ -398,7 +398,7 @@ function validateConfig(config) {
         showNames: Boolean(config.displaySettings.showNames),
         showReactions: Boolean(config.displaySettings.showReactions),
         theme: String(config.displaySettings.theme || 'default').substring(0, 50),
-        pageSize: Math.min(Math.max(Number(config.displaySettings.pageSize) || 20, 1), 100)
+        pageSize: Math.min(Math.max(Number(config.displaySettings.pageSize) || SYSTEM_LIMITS.DEFAULT_PAGE_SIZE, 1), SYSTEM_LIMITS.MAX_PAGE_SIZE)
       };
       // Why: 可視化モード設定。VALIDATOR_BOARD_MODES (module top) の enum のみ許可。
       //      ここで保持しないと、後段の ConfigService.sanitizeDisplaySettings は

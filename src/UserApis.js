@@ -87,6 +87,7 @@ function getBatchedUserConfig() {
       return {
         success: false,
         authenticated: false,
+        message: 'ユーザー認証が必要です',
         error: 'ユーザー認証が必要です',
         user: null,
         config: null,
@@ -99,6 +100,7 @@ function getBatchedUserConfig() {
       return {
         success: false,
         authenticated: true,
+        message: '管理者と同一ドメインのアカウントでアクセスしてください',
         error: '管理者と同一ドメインのアカウントでアクセスしてください',
         email,
         user: null,
@@ -111,6 +113,7 @@ function getBatchedUserConfig() {
       return {
         success: false,
         authenticated: true,
+        message: 'ユーザー情報が見つかりません',
         error: 'ユーザー情報が見つかりません',
         email,
         user: null,
@@ -137,6 +140,7 @@ function getBatchedUserConfig() {
     return {
       success: false,
       authenticated: false,
+      message: `ユーザー設定取得エラー: ${error.message}`,
       error: `ユーザー設定取得エラー: ${error.message}`,
       user: null,
       config: null,

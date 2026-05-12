@@ -51,7 +51,7 @@ function loadMainContext(overrides = {}, errorSink) {
     getUserSheetData: () => ({ rows: [] }),
     addReaction: () => ({ success: true }),
     toggleHighlight: () => ({ success: true }),
-    SystemController: { publishApp: () => ({ success: true }) },
+    publishApp: () => ({ success: true }),
     PropertiesService: {
       getScriptProperties: () => ({ getProperty: () => null, setProperty: () => {} })
     },

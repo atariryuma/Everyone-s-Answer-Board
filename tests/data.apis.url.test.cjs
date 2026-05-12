@@ -803,6 +803,8 @@ test('getActiveFormInfo: default formTitle when absent from config', () => {
 // getSheetNameFromGid
 // =====================================================================
 
+// Why: getSheetNameFromGid は openSpreadsheet 経由で circuit-breaker + SA fallback を使う。
+//   テストは openSpreadsheet をスタブし、{ spreadsheet: {getSheets: ...} } を返す形にする。
 test('getSheetNameFromGid: returns sheet name matching gid', () => {
   const mockSheets = [
     { getName: () => 'Sheet1', getSheetId: () => 0 },
@@ -810,10 +812,7 @@ test('getSheetNameFromGid: returns sheet name matching gid', () => {
     { getName: () => 'Data', getSheetId: () => 67890 }
   ];
   const ctx = loadDataApisContext({
-    SpreadsheetApp: {
-      openById: () => ({ getSheets: () => mockSheets })
-    },
-    executeWithRetry: (fn) => fn()
+    openSpreadsheet: () => ({ spreadsheet: { getSheets: () => mockSheets } })
   });
   assert.equal(ctx.getSheetNameFromGid('ss-1', '12345'), 'フォームの回答 1');
   assert.equal(ctx.getSheetNameFromGid('ss-1', '67890'), 'Data');
@@ -825,28 +824,22 @@ test('getSheetNameFromGid: falls back to first sheet when gid not found', () => 
     { getName: () => 'SecondSheet', getSheetId: () => 100 }
   ];
   const ctx = loadDataApisContext({
-    SpreadsheetApp: {
-      openById: () => ({ getSheets: () => mockSheets })
-    },
-    executeWithRetry: (fn) => fn()
+    openSpreadsheet: () => ({ spreadsheet: { getSheets: () => mockSheets } })
   });
   assert.equal(ctx.getSheetNameFromGid('ss-1', '999'), 'FirstSheet');
 });
 
-test('getSheetNameFromGid: returns "Sheet1" when openById throws', () => {
+test('getSheetNameFromGid: returns "Sheet1" when openSpreadsheet returns null', () => {
+  // 旧来は openById throw 経路だったが、今は openSpreadsheet が null を返すパスに統一
   const ctx = loadDataApisContext({
-    SpreadsheetApp: { openById: () => { throw new Error('denied'); } },
-    executeWithRetry: (fn) => fn()
+    openSpreadsheet: () => null
   });
   assert.equal(ctx.getSheetNameFromGid('ss-1', '0'), 'Sheet1');
 });
 
 test('getSheetNameFromGid: returns "Sheet1" when no sheets present', () => {
   const ctx = loadDataApisContext({
-    SpreadsheetApp: {
-      openById: () => ({ getSheets: () => [] })
-    },
-    executeWithRetry: (fn) => fn()
+    openSpreadsheet: () => ({ spreadsheet: { getSheets: () => [] } })
   });
   assert.equal(ctx.getSheetNameFromGid('ss-1', '0'), 'Sheet1');
 });
@@ -1171,9 +1164,7 @@ test('setupReactionAndHighlightColumns: detects all four columns when present ex
     getRange: () => ({ setValues: () => {}, setValue: () => {} })
   };
   const ctx = loadDataApisContext({
-    SpreadsheetApp: {
-      openById: () => ({ getSheetByName: () => sheet })
-    },
+    openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
     invalidateSheetHeadersCache: () => {}
   });
   const result = ctx.setupReactionAndHighlightColumns('ss-1', 'Sheet1',
@@ -1197,9 +1188,7 @@ test('setupReactionAndHighlightColumns: "UNDERSTANDING YOUR ANSWER" does NOT cou
     })
   };
   const ctx = loadDataApisContext({
-    SpreadsheetApp: {
-      openById: () => ({ getSheetByName: () => sheet })
-    },
+    openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
     getSheetInfo: () => ({ lastCol: 2, lastRow: 1, headers: [] }),
     invalidateSheetHeadersCache: () => {}
   });

@@ -45,7 +45,7 @@ function loadCtx(overrides = {}) {
     Utilities: { sleep: () => {}, base64EncodeWebSafe: (s) => Buffer.from(s).toString('base64'), computeRsaSha256Signature: () => new Uint8Array([1, 2, 3, 4]) },
     UrlFetchApp: { fetch: () => { throw new Error('not stubbed'); } },
     Session: { getActiveUser: () => ({ getEmail: () => 'a@example.com' }) },
-    validateEmail: (e) => typeof e === 'string' && /.+@.+/.test(e),
+    validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e), sanitized: e, errors: [] }),
     getCurrentEmail: () => 'a@example.com',
     isAdministrator: () => false,
     getUserConfig: () => ({ success: true, config: {} }),

@@ -8,7 +8,7 @@
  * - サービスアカウント使用時の安全な権限管理
  */
 
-/* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck */
+/* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS */
 
 /**
  * Google Sheets APIの堅牢な呼び出しラッパー（クォータ制限対応）
@@ -99,8 +99,7 @@ function getServiceAccount() {
       return { isValid: false, error: 'Invalid credentials' };
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(serviceAccount.client_email)) {
+    if (!validateEmail(serviceAccount.client_email).isValid) {
       console.warn('getServiceAccount: Invalid email format');
       return { isValid: false, error: 'Invalid email format' };
     }
@@ -942,12 +941,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     const defaultConfig = {
       setupStatus: 'pending',
       isPublished: false,
-      displaySettings: {
-        showNames: false,
-        showReactions: false,
-        theme: 'default',
-        pageSize: 20
-      },
+      displaySettings: { ...DEFAULT_DISPLAY_SETTINGS },
       ...initialConfig
     };
 

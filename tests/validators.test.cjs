@@ -8,6 +8,13 @@ function loadValidatorsContext(overrides = {}) {
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     URL,
+    // SYSTEM_LIMITS は SystemController.js でも定義されるが、validators.js は
+    // 別 vm context に単独でロードされるため、ここでミラーする必要がある。
+    SYSTEM_LIMITS: {
+      MAX_LOCK_ROWS: 100, PREVIEW_LENGTH: 50,
+      DEFAULT_PAGE_SIZE: 20, MAX_PAGE_SIZE: 100,
+      RADIX_DECIMAL: 10
+    },
     getColumnAnalysis: () => ({ success: true }),
     getFormInfo: () => ({ success: true }),
     ...overrides

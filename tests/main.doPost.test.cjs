@@ -44,9 +44,7 @@ function loadMainContext(overrides = {}) {
     getUserSheetData: () => ({ rows: [{ id: 1 }] }),
     addReaction: (userId, rowId, reactionType) => ({ success: true, userId, rowId, reactionType }),
     toggleHighlight: (userId, rowId) => ({ success: true, userId, rowId }),
-    SystemController: {
-      publishApp: (config) => ({ success: true, config })
-    },
+    publishApp: (config) => ({ success: true, config }),
     getCachedProperty: (key) => key === 'ADMIN_API_KEY' ? 'test-secret-key' : key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
     dispatchAdminOperation: (operation, params) => {
       if (operation === 'getUsers') return { success: true, users: [] };

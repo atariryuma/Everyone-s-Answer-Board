@@ -214,8 +214,12 @@
     }
 
     function validateSpreadsheetId(id) {
-      if (!id || id.length !== 44) {
-        throw new Error('スプレッドシートIDは44文字である必要があります');
+      // Why 40-50: backend src/validators.js validateSpreadsheetId と整合させる。
+      //   Google Drive のスプレッドシート ID は仕様上 44 が典型値だが 40-50 の範囲を取りうる。
+      //   以前ここは 44 固定だったため、45 文字の有効 ID をフロントだけ弾き backend に通る
+      //   設定が divergent になっていた。
+      if (!id || typeof id !== 'string' || id.length < 40 || id.length > 50) {
+        throw new Error('スプレッドシートIDは40〜50文字である必要があります');
       }
       if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
         throw new Error('スプレッドシートIDに無効な文字が含まれています');

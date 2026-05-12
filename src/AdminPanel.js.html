@@ -79,6 +79,12 @@
       systemState.initializationStep = 'batched initialization';
       await initializeBatchedAdminPanel();
 
+      // Why ここで prefetch: CLAUDE.md「top-level に google.script.run を置かない」ルールに
+      //   従い、以前 EOF の独立 IIFE で動かしていた prefetchAppSetupUrl() を init() 内へ移す。
+      //   初期化バッチが終わってからの非同期 prefetch なので、ユーザー操作の前に
+      //   appSetup URL が温まる挙動は維持される (await しない fire-and-forget)。
+      try { prefetchAppSetupUrl(); } catch (e) { console.warn('prefetchAppSetupUrl skipped:', e.message); }
+
       systemState.initializationStep = 'completed';
       systemState.initialized = true;
     } catch (error) {
@@ -4186,11 +4192,7 @@
       .getWebAppUrl();
   }
 
-  // ページ読み込み時にアプリ設定URLをプリフェッチ
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', prefetchAppSetupUrl);
-  } else {
-    prefetchAppSetupUrl();
-  }
+  // prefetchAppSetupUrl は init() 内で呼ばれる (上記参照)。EOF の top-level kickoff は
+  // CLAUDE.md「top-level google.script.run 禁止」ルールに違反するため削除。
 
 </script>

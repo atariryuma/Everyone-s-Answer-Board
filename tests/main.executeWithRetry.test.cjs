@@ -58,7 +58,7 @@ function loadMainCtx(overrides = {}) {
     hasCoreSystemProps: () => true,
     getQuestionText: () => '',
     getWebAppUrl: () => 'https://example.com',
-    SystemController: { publishApp: () => ({ success: true }) },
+    publishApp: () => ({ success: true }),
     __sleeps: sleeps
   };
   Object.assign(context, overrides);

@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS */
+/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS */
 
 /**
  * キャッシュ期間 (秒)
@@ -1770,7 +1770,7 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
     }
 
     const normalizedAdminEmail = String(adminEmail).trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedAdminEmail)) {
+    if (!validateEmail(normalizedAdminEmail).isValid) {
       return {
         success: false,
         message: '管理者メールアドレスの形式が不正です'
@@ -1924,18 +1924,8 @@ function createDatabase() {
   }
 }
 
-/**
- * SystemController統一インターフェース
- * main.gsからアクセス可能にするためのグローバルエクスポート
- */
-const __rootSC = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
-__rootSC.SystemController = {
-  getFormInfo,
-  checkCurrentPublicationStatus,
-  performAutoRepair,
-  forceUrlSystemReset,
-  publishApp,
-  getPerformanceMetrics,
-  diagnosePerformance,
-  setupApp
-};
+// Why: 以前は SystemController = { publishApp, ... } の namespace export を持っていたが、
+//   GAS は single global scope のため全関数が既にグローバルからアクセス可能。
+//   namespace は main.js の dispatch だけが使っており、しかも global function への
+//   フォールバック付きという矛盾した形だった。namespace 経由と直接呼び出しで二重メンテ
+//   になっていたので削除。テストは個別関数を直接 stub する。

@@ -52,6 +52,11 @@
       this.resizeObserver = null;
       this.animationFrameId = null;
       this.idleCallbackId = null;
+      // Why Set: applyAnimations は新着カードごとに 3s fallback timeout を仕掛けるが、
+      //   filter 切替で旧カードが DOM から消えても closure が card 参照を保持し続ける。
+      //   フィルタ高頻度切替時の memory pressure を抑えるため、destroy()/フィルタ変更で
+      //   一括クリアできるよう全タイムアウト ID を集合管理する。
+      this.animationCleanupTimeouts = new Set();
       this.domFragmentPool = [];
       // Why: false で始めないと detectLowPerformance の判定が空回りする。
       this.isLowPerformanceMode = false;
@@ -1396,6 +1401,12 @@
       if (this.idleCallbackId) {
         cancelIdleCallback(this.idleCallbackId);
       }
+      // Why: applyAnimations が積み上げた 3s fallback timeout の closure が card 参照を
+      //      保持しているので、destroy 時に全 clearTimeout する (フィルタ大量切替後の GC 援助)。
+      if (this.animationCleanupTimeouts && this.animationCleanupTimeouts.size > 0) {
+        for (const id of this.animationCleanupTimeouts) clearTimeout(id);
+        this.animationCleanupTimeouts.clear();
+      }
       if (this.elements.refreshContentBtn && this.handlers.onRefreshContentClick) {
         this.elements.refreshContentBtn.removeEventListener('click', this.handlers.onRefreshContentClick);
       }
@@ -2206,6 +2217,7 @@
         existingMap.set(card.dataset.rowIndex, card);
       });
 
+      // Why: newRows に無くなった行のカードを DOM から削除。
       existingMap.forEach((card, id) => {
         if (!newRows.some(r => String(r.rowIndex) === id)) {
           card.remove();
@@ -2213,16 +2225,24 @@
         }
       });
 
-      container.innerHTML = '';
+      // Why: 並び順を変える必要があるとき (= isLayoutChange / 初期ロード) のみ全クリア。
+      //   通常のポーリング更新では、既存カードは適切な位置に既に存在するので
+      //   container.innerHTML = '' で剥がして再 append するのは無駄。レイアウト
+      //   再計算 + GPU テクスチャ再生成が毎ポーリングで走り、Chromebook での polling
+      //   tick 中の描画ジャンクを引き起こしていた。差分更新でこれを回避。
+      const needsReorder = isLayoutChange || isInitialLoad;
+      if (needsReorder) {
+        container.innerHTML = '';
+      }
 
       // Why: 以前は newRows.length > RENDER_BATCH_SIZE で仮想スクロールに切り替えていたが、
       //      続きを読み込む setupScrollObserver / loadMoreItems 経路がどこからも呼ばれず
       //      視界外のカードが永久に出てこないデッドパスだった。教室規模（数十〜数百件）では
       //      renderDirectly で全件出す方が速く確実。
-      this.renderDirectly(newRows, oldRows, container, existingMap);
+      this.renderDirectly(newRows, oldRows, container, existingMap, needsReorder);
     }
 
-    renderDirectly(newRows, oldRows, container, existingMap) {
+    renderDirectly(newRows, oldRows, container, existingMap, needsReorder) {
       const fragment = this.getReusableFragment();
       // Why: 初期ロード（oldRows 空）では全件が "new" なので pulse を全カードに
       //      掛けると視覚的ノイズ。更新差分があるときだけ new-card マークを付ける。
@@ -2239,8 +2259,16 @@
             if (markNew) card.classList.add('new-card');
             fragment.appendChild(card);
           }
-        } else if (this.shouldUpdateCard(row, oldData)) {
-          this.updateAnswerCard(card, row, oldData);
+        } else {
+          if (this.shouldUpdateCard(row, oldData)) {
+            this.updateAnswerCard(card, row, oldData);
+          }
+          // Why needsReorder: container.innerHTML = '' で剥がした後は、既存カードも
+          //   fragment に再 append する必要がある。reorder 不要の場合はカードは DOM
+          //   に既にあるのでスキップ。
+          if (needsReorder) {
+            fragment.appendChild(card);
+          }
         }
       });
 
@@ -2285,12 +2313,22 @@
       // Why: CSS の newCardPulse アニメーションは 2.5s 継続する。旧実装は RAF で即座に
       //      クラスを剥がしていたため、実質アニメーションが走らなかった。animationend
       //      を待ち、フォールバックで 3s 後にも確実に剥がして DOM を綺麗に保つ。
+      // Why timeout tracking: フィルタ高頻度切替で旧カードが DOM 削除されても、
+      //      setTimeout の closure が card 参照を保持し続ける。集合管理して destroy() で
+      //      一括クリアし、bounded memory を保証する。
       const newCards = this.elements.answersContainer.querySelectorAll('.new-card');
       newCards.forEach(card => {
-        const cleanup = () => card.classList.remove('new-card');
-        const once = () => { card.removeEventListener('animationend', once); cleanup(); };
-        card.addEventListener('animationend', once, { once: true });
-        setTimeout(cleanup, 3000);
+        let timeoutId = null;
+        const cleanup = () => {
+          card.classList.remove('new-card');
+          if (timeoutId !== null) {
+            this.animationCleanupTimeouts.delete(timeoutId);
+            timeoutId = null;
+          }
+        };
+        card.addEventListener('animationend', cleanup, { once: true });
+        timeoutId = setTimeout(cleanup, 3000);
+        this.animationCleanupTimeouts.add(timeoutId);
       });
     }
 

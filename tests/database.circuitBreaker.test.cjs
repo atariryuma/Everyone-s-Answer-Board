@@ -65,7 +65,7 @@ function loadCtx(overrides = {}) {
       }
     },
     Session: { getActiveUser: () => ({ getEmail: () => 'a@example.com' }) },
-    validateEmail: (e) => typeof e === 'string' && /.+@.+/.test(e),
+    validateEmail: (e) => ({ isValid: typeof e === 'string' && /.+@.+/.test(e), sanitized: e, errors: [] }),
     getCurrentEmail: () => 'a@example.com',
     isAdministrator: () => false,
     getUserConfig: () => ({ success: true, config: {} }),
