@@ -462,3 +462,110 @@ test('createUserFolder: getOwner() が例外を投げても skip して次へ', 
   const folder = ctx.createUserFolder();
   assert.equal(folder, mine, 'should skip broken folder and pick the owned one');
 });
+
+// =====================================================================
+// createTemplateForm — failure paths (audit HIGH gap)
+// =====================================================================
+//
+// Why: 過去の audit で "happy path しかテストされていない" と HIGH 指定された範囲。
+//      FormApp.create / SpreadsheetApp.create が throw した場合、setFormEmailCollectionVerified_
+//      が失敗した場合、createUserFolder が null を返した場合の挙動を pin する。
+
+test('createTemplateForm: FormApp.create が throw すると {success:false, error:...} を返す', () => {
+  const ctx = loadCtx({
+    FormApp: {
+      create: () => { throw new Error('FormApp not available'); },
+      DestinationType: { SPREADSHEET: 'SPREADSHEET' }
+    }
+  });
+  const res = ctx.createTemplateForm('board');
+  assert.equal(res.success, false);
+  assert.match(res.error, /フォーム作成に失敗/);
+  assert.match(res.error, /FormApp not available/);
+});
+
+test('createTemplateForm: SpreadsheetApp.create が throw しても全体は {success:false} で安全に終わる', () => {
+  const ctx = loadCtx({
+    SpreadsheetApp: {
+      create: () => { throw new Error('Spreadsheet quota exceeded'); }
+    }
+  });
+  const res = ctx.createTemplateForm('numberline');
+  assert.equal(res.success, false);
+  assert.match(res.error, /フォーム作成に失敗/);
+});
+
+test('createTemplateForm: createUserFolder が null を返してもフォーム作成は成功し folderUrl は空', () => {
+  // moveFileToFolder_ は folder=null だと no-op、try-catch も無事通過する想定
+  const ctx = loadCtx({
+    DriveApp: {
+      // createUserFolder の内側で getOwner ループ → 一致無し → createFolder が null を返すケース
+      getFoldersByName: () => ({ hasNext: () => false, next: () => null }),
+      createFolder: () => null,
+      getFileById: (id) => makeFakeDriveFile(id, true),
+      getRootFolder: () => ({ removeFile: () => {} })
+    }
+  });
+  const res = ctx.createTemplateForm('matrix');
+  assert.equal(res.success, true);
+  assert.equal(res.folderUrl, '', 'no folder → folderUrl stays empty');
+  assert.equal(res.templateType, 'matrix');
+});
+
+test('createTemplateForm: setFormEmailCollectionVerified_ の REST 失敗は warning で続行', () => {
+  // UrlFetchApp.fetch が non-200 を返すケース。フォールバックで setCollectEmail(true) が
+  // 呼ばれることを確認。
+  const collectEmailCalls = [];
+  const ctx = loadCtx({
+    UrlFetchApp: {
+      fetch: () => ({ getResponseCode: () => 403, getContentText: () => 'forbidden' })
+    },
+    FormApp: {
+      create: (title) => {
+        const f = makeFakeForm();
+        f._title = title;
+        f.getTitle = () => title;
+        // setCollectEmail のスパイ
+        f.setCollectEmail = (b) => { collectEmailCalls.push(b); return f; };
+        ctx.__lastForm = f;
+        return f;
+      },
+      DestinationType: { SPREADSHEET: 'SPREADSHEET' },
+      // フォールバックで使う FormApp.openById
+      openById: (id) => {
+        if (ctx.__lastForm && ctx.__lastForm.getId() === id) return ctx.__lastForm;
+        return { setCollectEmail: (b) => { collectEmailCalls.push(b); } };
+      }
+    }
+  });
+
+  const res = ctx.createTemplateForm('board');
+  assert.equal(res.success, true, 'REST failure must not break template creation');
+  assert.deepEqual(Array.from(collectEmailCalls), [true],
+    'fallback setCollectEmail(true) should be called once');
+});
+
+test('createTemplateForm: UrlFetchApp.fetch が throw した場合もフォールバックして成功', () => {
+  const collectEmailCalls = [];
+  const ctx = loadCtx({
+    UrlFetchApp: {
+      fetch: () => { throw new Error('network down'); }
+    },
+    FormApp: {
+      create: (title) => {
+        const f = makeFakeForm();
+        f._title = title;
+        f.getTitle = () => title;
+        f.setCollectEmail = (b) => { collectEmailCalls.push(b); return f; };
+        ctx.__lastForm = f;
+        return f;
+      },
+      DestinationType: { SPREADSHEET: 'SPREADSHEET' },
+      openById: (id) => ({ setCollectEmail: (b) => { collectEmailCalls.push(b); } })
+    }
+  });
+
+  const res = ctx.createTemplateForm('board');
+  assert.equal(res.success, true);
+  assert.equal(collectEmailCalls.length, 1, 'fallback path executed');
+});
