@@ -213,7 +213,7 @@ function isValidWebAppUrl_(url) {
 function testSystemDiagnosis() {
   try {
 
-    const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
+    const adminAuth = getBatchedAdminAuth();
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
     }
@@ -312,7 +312,7 @@ function testSystemDiagnosis() {
 function monitorSystem() {
   try {
 
-    const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
+    const adminAuth = getBatchedAdminAuth();
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
     }
@@ -390,7 +390,7 @@ function monitorSystem() {
 function checkDataIntegrity() {
   try {
 
-    const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
+    const adminAuth = getBatchedAdminAuth();
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
     }
@@ -498,7 +498,7 @@ function checkDataIntegrity() {
 function performAutoRepair() {
   try {
 
-    const adminAuth = getBatchedAdminAuth(); // eslint-disable-line no-undef
+    const adminAuth = getBatchedAdminAuth();
     if (!adminAuth.success) {
       return adminAuth.authError || adminAuth.adminError || createAuthError();
     }
@@ -1093,7 +1093,7 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
     const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
-    const { spreadsheet, auth } = dataAccess;
+    const { spreadsheet } = dataAccess;
 
     const sheets = spreadsheet.getSheets();
 
@@ -1174,7 +1174,7 @@ function getFormInfo(spreadsheetId, sheetName) {
       };
     }
 
-    const { spreadsheet, accessMethod, auth, isOwner } = accessResult;
+    const { spreadsheet, accessMethod, isOwner } = accessResult;
 
     let spreadsheetName;
     try {
@@ -1426,9 +1426,6 @@ function getSystemPerformanceInfo() {
  */
 function collectApiMetrics(options = {}) {
   try {
-    const cache = CacheService.getScriptCache();
-    const metricsKey = 'perf_api_metrics';
-
     const apiStats = {
       totalCalls: 0,
       averageResponseTime: 0,

@@ -25,7 +25,7 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
   const cache = CacheService.getScriptCache();
   const CIRCUIT_BREAKER_KEY = 'circuit_breaker_state';
   const cachedState = cache.get(CIRCUIT_BREAKER_KEY);
-  let circuitState = cachedState ? JSON.parse(cachedState) : { consecutiveErrors: 0, circuitOpenUntil: 0 };
+  const circuitState = cachedState ? JSON.parse(cachedState) : { consecutiveErrors: 0, circuitOpenUntil: 0 };
 
   const now = Date.now();
   if (circuitState.circuitOpenUntil > now) {

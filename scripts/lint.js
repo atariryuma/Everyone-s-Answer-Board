@@ -119,6 +119,29 @@ function snippet(content, index, span = 80) {
   return line.length > span ? line.substring(0, span) + '...' : line;
 }
 
+/**
+ * Suppression コメントの判定。
+ *
+ *   <code> // lint-disable-line <rule-id>            ← 同じ行を suppress
+ *   <code> // lint-disable-line <rule-id> -- 理由    ← 同じ行を suppress (理由付き)
+ *   // lint-disable-next-line <rule-id>              ← 次の行を suppress
+ *   // lint-disable-next-line <rule-id> -- 理由      ← 次の行を suppress (理由付き)
+ *
+ * Why: ESLint 互換の suppress 表記。1 ファイル全体を無効化する手段は意図的に提供しない
+ *     (見落としやすいため)。理由 (`-- ...`) は強制ではないが、書くと grep 可能になる。
+ */
+function isSuppressed(content, finding) {
+  const lines = content.split('\n');
+  // 1-indexed line に合わせる
+  const sameLine = lines[finding.line - 1] || '';
+  const prevLine = lines[finding.line - 2] || '';
+
+  const sameLineRe = new RegExp(`//\\s*lint-disable-line\\s+${finding.rule}(\\s|$|;)`);
+  const prevLineRe = new RegExp(`//\\s*lint-disable-next-line\\s+${finding.rule}(\\s|$|;)`);
+
+  return sameLineRe.test(sameLine) || prevLineRe.test(prevLine);
+}
+
 function runLint(targets) {
   const findings = [];
   for (const file of targets) {
@@ -134,14 +157,17 @@ function runLint(targets) {
         pat.lastIndex = 0;
         let m;
         while ((m = pat.exec(content)) !== null) {
-          findings.push({
+          const candidate = {
             file: rel,
             line: findLineNumber(content, m.index),
             rule: rule.id,
             severity: rule.severity,
             message: rule.message,
             snippet: snippet(content, m.index).trim()
-          });
+          };
+          if (!isSuppressed(content, candidate)) {
+            findings.push(candidate);
+          }
           // 無限ループ防止（zero-width 対策）
           if (pat.lastIndex === m.index) pat.lastIndex++;
         }

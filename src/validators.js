@@ -13,7 +13,7 @@
  * - シンプルなユーティリティ関数群
  */
 
-/* global URL, getColumnAnalysis, getFormInfo */
+/* global getColumnAnalysis, getFormInfo */
 
 // Why module-level: validateConfig が boardMode を sanitize する際に使う enum。
 //   ConfigService.js:285 の VALID_BOARD_MODES とミラー。GAS single-global-scope で

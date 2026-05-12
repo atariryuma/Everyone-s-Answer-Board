@@ -12,13 +12,14 @@
  * - Simple, readable code
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, isAdministrator, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, SystemController */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, SystemController */
+// isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
  * APIキー認証時にgetCurrentEmail()が管理者メールを返すためのコンテキスト
  * GASはシングルスレッドのため、グローバル変数で安全に管理できる
  */
-var _apiKeyAdminEmail = null;
+let _apiKeyAdminEmail = null;
 
 /**
  * 現在のユーザーのメールアドレスを取得
@@ -458,6 +459,9 @@ function doPost(e) {
 
     // setupApiKey: 初回APIキー設定（キー未設定時のみ動作）
     if (action === 'setupApiKey') {
+      // Why direct PropertiesService (lint suppressed): 初回キー設定ゲートは stale cache が
+      //   二重設定の race を引き起こすので 30s memory cache をバイパスして必ず最新を読む。
+      // lint-disable-next-line no-direct-property-fetch
       const existingKey = PropertiesService.getScriptProperties().getProperty('ADMIN_API_KEY');
       if (existingKey) {
         return jsonResponse(createErrorResponse('ADMIN_API_KEY is already configured', null, { error: 'ALREADY_CONFIGURED' }));

@@ -148,13 +148,13 @@
           } else {
             showMessage(result.message || '再公開に失敗しました', 'error');
             button.disabled = false;
-            button.innerHTML = originalContent;
+            button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
           }
         })
         .withFailureHandler(function (error) {
           showMessage('再公開中にエラーが発生しました: ' + (error.message || error), 'error');
           button.disabled = false;
-          button.innerHTML = originalContent;
+          button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
         })
         .republishMyBoard();
     }

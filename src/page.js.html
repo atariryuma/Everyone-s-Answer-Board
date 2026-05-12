@@ -2642,7 +2642,7 @@
       if (nameHtml) {
         const nameContainer = document.createElement('div');
         nameContainer.className = 'name-container flex-shrink-0';
-        nameContainer.innerHTML = nameHtml;
+        nameContainer.innerHTML = nameHtml; // lint-disable-line no-inner-html-assignment-with-variable -- nameHtml は escapeHtml(displayName) を含むテンプレ文字列。security audit 確認済
         footerDiv.appendChild(nameContainer);
       }
 
@@ -2650,7 +2650,7 @@
       reactionsDiv.className = 'reaction-container flex items-center gap-1 flex-shrink-0';
       reactionsDiv.setAttribute('role', 'group');
       reactionsDiv.setAttribute('aria-label', '回答への反応');
-      reactionsDiv.innerHTML = reactionButtonsHtml;
+      reactionsDiv.innerHTML = reactionButtonsHtml; // lint-disable-line no-inner-html-assignment-with-variable -- 全補間が数値 (rowIndex/count) と enum (rt.key) のみ。security audit 確認済
       footerDiv.appendChild(reactionsDiv);
 
       fragment.appendChild(contentDiv);
@@ -3877,7 +3877,7 @@
 
             if (endPublicationBtn && originalButtonContent) {
               endPublicationBtn.disabled = false;
-              endPublicationBtn.innerHTML = originalButtonContent;
+              endPublicationBtn.innerHTML = originalButtonContent; // lint-disable-line no-inner-html-assignment-with-variable -- 同じボタンから取得した自分の innerHTML を復元するだけ
             }
           }
         })
@@ -3901,7 +3901,7 @@
 
           if (endPublicationBtn && originalButtonContent) {
             endPublicationBtn.disabled = false;
-            endPublicationBtn.innerHTML = originalButtonContent;
+            endPublicationBtn.innerHTML = originalButtonContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback の復元
           }
         })
         .clearActiveSheet(this.state.userId);
@@ -4094,7 +4094,7 @@
         modalHtml += '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
       }
 
-      this.elements.modalAnswer.innerHTML = modalHtml;
+      this.elements.modalAnswer.innerHTML = modalHtml; // lint-disable-line no-inner-html-assignment-with-variable -- data.opinion / data.reason は escapeHtml 済
       const showName = this.state.displayMode === 'named';
       let modalDisplayName = '';
 

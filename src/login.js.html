@@ -633,7 +633,7 @@
         </html>
       `;
 
-      document.body.innerHTML = successHtml;
+      document.body.innerHTML = successHtml; // lint-disable-line no-inner-html-assignment-with-variable -- safeMessage と safeAdminUrl は escapeHtml 済 + adminUrl は /^https:\/\//i.test() でガード
 
       // Bind the copy button after injection. adminUrl is held in the
       // closure (already validated as https above) rather than

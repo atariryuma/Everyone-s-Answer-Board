@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, URL, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty */
+/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty */
 
 /**
  * ConfigService - ゼロ依存アーキテクチャ
@@ -115,7 +115,7 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
   const enhanced = { ...baseConfig };
 
   try {
-    const webAppUrl = getWebAppUrl(); // eslint-disable-line no-undef
+    const webAppUrl = getWebAppUrl();
 
     enhanced.dynamicUrls = {
       webAppUrl: webAppUrl || '',
@@ -473,7 +473,6 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
         // ✅ CRITICAL: 同一ドメイン共有設定で対応（サービスアカウント不使用）
-        const currentEmail = getCurrentEmail();
         try {
           const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
           const { spreadsheet } = dataAccess;

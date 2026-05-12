@@ -19,7 +19,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, getConfigOrDefault, createUser, updateUser, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, ScriptApp, Utilities, CacheService, shouldEnforceDomainRestrictions, validateDomainAccess */
+/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, getConfigOrDefault, createUser, updateUser, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, shouldEnforceDomainRestrictions, validateDomainAccess */
 
 /**
  * ドメインアクセス検証（必要時のみ）
@@ -222,7 +222,7 @@ function processLoginAction() {
       }
     }
 
-    const baseUrl = getWebAppUrl(); // eslint-disable-line no-undef
+    const baseUrl = getWebAppUrl();
     if (!baseUrl) {
       return {
         success: false,

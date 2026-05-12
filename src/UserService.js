@@ -13,7 +13,7 @@
  * - グローバル副作用排除
  */
 
-/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, findUserByGoogleId, openSpreadsheet, updateUser, getUserConfig, getConfigOrDefault, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse, ScriptApp, Utilities */
+/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, findUserByGoogleId, openSpreadsheet, updateUser, getUserConfig, getConfigOrDefault, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse */
 
 /**
  * UserService - ゼロ依存アーキテクチャ

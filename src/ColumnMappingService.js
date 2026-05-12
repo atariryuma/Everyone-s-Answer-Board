@@ -119,8 +119,6 @@ function analyzeFieldRelationships(headers) {
   headers.forEach((header, index) => {
     if (!header || typeof header !== 'string') return;
 
-    const normalizedHeader = normalizeHeader(header);
-
     const answerScore = calculateBaseScore(header, 'answer', patterns.answer);
     if (answerScore > 60) {
       relationships.answerCandidates.push({ index, header, score: answerScore });

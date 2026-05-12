@@ -2674,7 +2674,7 @@
       }
 
       const resultsHTML = generateTestResultsHTML(diagnostics);
-      resultsPanel.innerHTML = resultsHTML;
+      resultsPanel.innerHTML = resultsHTML; // lint-disable-line no-inner-html-assignment-with-variable -- 全補間が escapeHtml() か Number() 経由。security audit 確認済
 
       resultsPanel.classList.remove('hidden');
 

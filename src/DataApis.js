@@ -30,7 +30,9 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash */
+// GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
+// は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
 /**
  * ユーザー専用フォルダを作成
@@ -429,7 +431,7 @@ function getBoardInfo() {
     const config = getConfigOrDefault(user.userId);
 
     const isPublished = Boolean(config.isPublished);
-    const baseUrl = getWebAppUrl(); // eslint-disable-line no-undef
+    const baseUrl = getWebAppUrl();
 
     return {
       success: true,
@@ -603,8 +605,6 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
   sortOrder = sortOrder || 'newest';
   adminMode = adminMode || false;
   targetUserId = targetUserId || null;
-
-  const startTime = Date.now();
 
   try {
     const adminAuth = getBatchedAdminAuth({ allowNonAdmin: true });

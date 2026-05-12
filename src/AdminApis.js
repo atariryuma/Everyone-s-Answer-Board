@@ -25,7 +25,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, PropertiesService */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -537,6 +537,9 @@ function dispatchAdminOperation(operation, params) {
       if (isProtectedPropertyKey(params.key)) {
         return createErrorResponse(`Property "${params.key}" is protected and cannot be read via admin API`, null, { error: 'PROTECTED_PROPERTY' });
       }
+      // Why direct read (lint suppressed): admin "view raw property" 用途。getCachedProperty
+      //   は 30s cache が挟まるため、admin が値を更新した直後に古い値が見える事故になる。
+      // lint-disable-next-line no-direct-property-fetch
       const value = PropertiesService.getScriptProperties().getProperty(params.key);
       return createSuccessResponse('Property retrieved', { key: params.key, value });
     }
