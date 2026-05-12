@@ -1795,11 +1795,15 @@
     showWarning('AI分析に問題が発生しました。基本的なヘッダー情報のみ取得します。', 5000);
 
     try {
+      // Why getColumnAnalysis (not getSheetHeaders): backend getSheetHeaders(sheet) takes
+      // a Sheet object, not (spreadsheetId, sheetName). getColumnAnalysis extracts headers
+      // directly from sheet.getRange even when downstream diagnostics fail, so it serves
+      // as the correct "spreadsheetId/sheetName → headers" endpoint for this fallback path.
       const basicResult = await new Promise((resolve, reject) => {
         google.script.run
           .withSuccessHandler(resolve)
           .withFailureHandler(reject)
-          .getSheetHeaders(spreadsheetId, sheetName); // 簡易ヘッダー取得API
+          .getColumnAnalysis(spreadsheetId, sheetName);
       });
 
       if (basicResult && basicResult.headers) {
@@ -2600,7 +2604,12 @@
           showError('統合診断中にエラーが発生しました');
           ClientMutex.release('runIntegratedColumnTest');
         })
-        .performIntegratedColumnDiagnostics(headers, columnMapping, sampleData);
+        // Why options bag (not positional): backend signature is
+        //   performIntegratedColumnDiagnostics(originalHeaders, options = {})
+        //   options.sampleData drives detectNumericScaleColumns. Passing positional
+        //   (headers, columnMapping, sampleData) silently dropped sampleData and made
+        //   numeric-scale detection return empty in the diagnostics panel.
+        .performIntegratedColumnDiagnostics(headers, { sampleData, currentMapping: columnMapping });
 
       showInfo('列判定システムの統合診断を実行中…', 3000);
 

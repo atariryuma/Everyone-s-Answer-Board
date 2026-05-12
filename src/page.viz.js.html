@@ -233,11 +233,16 @@
     answers.appendChild(stats);
 
     // SVG
+    // Why role="img" + aria-label: ビーズワーム/散布図は児童の位置プロットなのでスクリーン
+    // リーダーには静的画像として扱わせ、回答件数を要約として読み上げる。本文の児童名・
+    // コメントは vizTeacherPanel (下) の <ul> 経由で AT に届くので、SVG 自体は要約のみ。
     const svgNS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(svgNS, 'svg');
     svg.setAttribute('id', 'vizSvg');
     svg.setAttribute('class', 'viz-svg');
     svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', '児童の回答分布をプロットした図');
     answers.appendChild(svg);
 
     // 教師パネル

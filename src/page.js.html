@@ -4482,21 +4482,22 @@
       const { element, operation, data } = update;
       if (!element || !operation) return;
 
+      // Why: 'append'/'update' の HTML 文字列ブランチ (data.content / data.html → innerHTML)
+      //   はリポジトリ内に呼び出しが無いまま XSS sink になっていた。安全な代替として
+      //   'append' は data.node (Node 直接) / data.text (textNode)、'update' は data.text のみを残す。
+      //   呼び出しを追加する際は必ずこれらの安全な形を使うこと。
       switch (operation) {
         case 'append':
-          if (data && data.content) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = data.content;
-            while (tempDiv.firstChild) {
-              fragment.appendChild(tempDiv.firstChild);
-            }
+          if (data && data.node instanceof Node) {
+            fragment.appendChild(data.node);
+            element.appendChild(fragment);
+          } else if (data && typeof data.text === 'string') {
+            fragment.appendChild(document.createTextNode(data.text));
             element.appendChild(fragment);
           }
           break;
         case 'update':
-          if (data && data.html) {
-            element.innerHTML = data.html;
-          } else if (data && data.text) {
+          if (data && typeof data.text === 'string') {
             element.textContent = data.text;
           }
           break;

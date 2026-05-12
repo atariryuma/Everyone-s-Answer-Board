@@ -75,6 +75,11 @@
   </script>
 
   <?!= include('SharedUtilities'); ?>
+  <!-- Why: SharedErrorHandling は ClientErrorReporter を window.ErrorHandler に注入する。
+       これが無いと SharedUtilities 内の軽量フォールバック実装が使われ、
+       window.error / unhandledrejection が reportClientError 経由で Cloud Logging に
+       届かなくなる（最も閲覧頻度の高い View ページの可観測性が落ちる）。 -->
+  <?!= include('SharedErrorHandling'); ?>
 
   <!-- Bootstrap data lives in data-* attributes so `</script>` in configJSON
        can't break out of a JS string literal. -->

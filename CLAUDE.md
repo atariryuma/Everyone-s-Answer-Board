@@ -42,16 +42,36 @@ node --test tests/main.doPost.test.cjs   # Run a single test file
 コード変更後、本番で正しく動いているか確認するために使う。
 
 ```bash
+# システム / 監視
 npm run api -- systemDiagnosis      # システム診断（DB接続、設定、デプロイ状態）
 npm run api -- getAppStatus         # アプリ有効/無効状態
-npm run api -- getUsers             # 全ユーザー一覧と設定状態
+npm run api -- enableApp            # アプリを有効化
+npm run api -- disableApp           # 緊急停止（アプリ無効化）
 npm run api -- getLogs --limit 20   # セキュリティログ
 npm run api -- perfMetrics          # パフォーマンスメトリクス
 npm run api -- perfDiagnosis        # パフォーマンス診断と推奨事項
-npm run api -- listProperties       # Script Properties一覧（認証情報はマスク）
 npm run api -- cacheReset           # キャッシュ全クリア
 npm run api -- autoRepair           # 自動修復
+
+# ユーザー / ボード CRUD
+npm run api -- getUsers             # 全ユーザー一覧と設定状態
+npm run api -- findUser --email X   # メールでユーザー検索
+npm run api -- getUserConfig --userId X       # 個別 config の取得
+npm run api -- setUserConfig --userId X --patch '{...}'  # config パッチ適用
+npm run api -- bulkSetUserConfig --filter '{...}' --patch '{...}'  # 一括更新
+npm run api -- toggleUserActive --userId X    # アクティブ状態切替
+npm run api -- toggleUserBoard --userId X     # ボード公開状態切替
+npm run api -- exportConfigs        # 全 config のエクスポート
+npm run api -- runColumnAnalysis --userId X   # 列マッピング自動分析
+npm run api -- previewBoard --userId X        # 公開ボードのプレビュー
+
+# Script Properties
+npm run api -- listProperties       # Script Properties一覧（認証情報はマスク）
+npm run api -- getProperty --k NAME           # 個別 property 取得
+npm run api -- setProperty --k NAME --v VALUE # property 更新
 ```
+
+詳細・全オプション: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) §1-2
 
 **いつ使うか:**
 
@@ -69,14 +89,23 @@ npm run api -- autoRepair           # 自動修復
 GCPのCloud Logging APIからGASの実行ログを直接取得する。ブラウザ不要。
 
 ```bash
-npm run logs:cloud                            # 直近6hのWARNING以上
+npm run logs:cloud                            # 直近6h, WARNING以上 (自分の prodDeployId のみ)
 npm run logs:cloud -- --severity ERROR         # ERRORのみ
 npm run logs:cloud -- --severity INFO          # INFO以上（全ログ）
 npm run logs:cloud -- --hours 24 --limit 50    # 過去24時間、50件
 npm run logs:cloud -- --function doPost        # 特定関数のログ
 npm run logs:cloud -- --user 35t22             # 特定ユーザーのログ
 npm run logs:cloud -- --json                   # JSON形式で出力
+npm run logs:cloud -- --all-deployments        # 共有 GCP project の全アプリログ
+npm run logs:cloud -- --deployment <id>        # 特定 deployment_id にフィルタ
+npm run logs:cloud -- --summary                # メッセージシグネチャで集計
+npm run logs:cloud -- --brief                  # 1行/エントリ簡潔モード
+npm run logs:cloud -- --tail                   # 直近10分 ERROR のみ（デプロイ直後の確認）
 ```
+
+**デフォルトで自分の deployment に絞る**: 那覇市版の GCP project は別 GAS アプリ
+(students/events_202604) と同居しており、そちらの ERROR が紛れ込む。`config.prodDeployId` で
+事前フィルタするため、デフォルトでは自アプリのログのみ返る。全アプリ見たい場合は `--all-deployments`。
 
 **いつ使うか:**
 
@@ -146,7 +175,18 @@ HTML templates use `<?!= include('filename') ?>` for composition. Key patterns:
 
 ### Data Store
 
-Google Sheets as database via service account. `users` sheet stores user records; each user's board config is in a JSON `config` column.
+Google Sheets as database via service account. `users` sheet stores user records; each user's board config is in a JSON `configJson` column (see `src/SystemController.js` `USERS_SHEET_HEADERS`).
+
+### Visualization Modes (M1 / M2)
+
+`config.displaySettings.boardMode` で表示モードを切替:
+
+- `auto` (既定): numericX/Y の有無から自動判定
+- `board`: 従来の掲示板（カード一覧）— columnMapping に `answer` / `reason` 必須
+- `numberline` (M1): d3 ビーズワーム数直線 — `numericX` 必須
+- `matrix` (M2): 2軸散布図 — `numericX` + `numericY` 必須
+
+管理パネル「📝 Googleフォーム選択」の種別 select から、各モード用の Forms 構造を1クリックで生成可能（`createTemplateForm(templateType)`）。`numberline`/`matrix` 選択時は `boardMode` も自動セット。詳細仕様: [docs/SPEC_visualization_modes.md](docs/SPEC_visualization_modes.md)。
 
 ---
 

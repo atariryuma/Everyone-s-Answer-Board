@@ -15,7 +15,13 @@
 
 /* global URL, getColumnAnalysis, getFormInfo */
 
-
+// Why module-level: validateConfig が boardMode を sanitize する際に使う enum。
+//   ConfigService.js:285 の VALID_BOARD_MODES とミラー。GAS single-global-scope で
+//   実行時には ConfigService 側の定義と統合されるが、ユニットテストでは
+//   validators.js を単独で vm.runInContext するため、こちらにも宣言が必要。
+//   ⚠️ 値を変える際は ConfigService.js:285 も同時更新すること。
+//   詳細は docs/SPEC_visualization_modes.md §F-1 参照。
+const VALIDATOR_BOARD_MODES = Object.freeze(['auto', 'board', 'numberline', 'matrix']);
 
 
 /**
@@ -394,12 +400,11 @@ function validateConfig(config) {
         theme: String(config.displaySettings.theme || 'default').substring(0, 50),
         pageSize: Math.min(Math.max(Number(config.displaySettings.pageSize) || 20, 1), 100)
       };
-      // Why: 可視化モード設定。'auto'/'board'/'numberline'/'matrix' のみ許可。
+      // Why: 可視化モード設定。VALIDATOR_BOARD_MODES (module top) の enum のみ許可。
       //      ここで保持しないと、後段の ConfigService.sanitizeDisplaySettings は
       //      validateConfig が再構築した object を受け取るため永遠に boardMode が消える。
-      const VALID_BOARD_MODES = ['auto', 'board', 'numberline', 'matrix'];
       const mode = config.displaySettings.boardMode;
-      if (typeof mode === 'string' && VALID_BOARD_MODES.includes(mode)) {
+      if (typeof mode === 'string' && VALIDATOR_BOARD_MODES.includes(mode)) {
         sanitizedDS.boardMode = mode;
       }
       result.sanitized.displaySettings = sanitizedDS;

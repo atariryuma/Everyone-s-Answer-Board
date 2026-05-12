@@ -33,7 +33,7 @@ Everyone's Answer Boardは、Googleフォームの回答をリアルタイムで
 ### 前提条件
 
 - Google Workspace アカウント（組織管理者権限推奨）
-- Node.js 18以上
+- Node.js 20以上（package.json の `engines` と一致）
 - npm
 
 ### Step 1: リポジトリのクローンと依存関係のインストール
@@ -139,7 +139,7 @@ Everyone-s-Answer-Board/
 │   ├── *Service.js          # ビジネスロジック
 │   ├── *Apis.js             # API エンドポイント
 │   └── *.html               # フロントエンド
-├── tests/                    # ユニットテスト（85件）
+├── tests/                    # ユニットテスト（604件、node:test）
 ├── scripts/                  # CLIツール
 │   ├── admin-api.js         # 本番API操作
 │   ├── deploy-prod.js       # URL維持デプロイ
@@ -154,7 +154,7 @@ Everyone-s-Answer-Board/
 
 ```bash
 # 開発
-npm test                  # テスト実行（85件）
+npm test                  # テスト実行（604件、node:test）
 npm run push              # GASにコードをプッシュ
 npm run deploy:prod       # 本番デプロイ（URL維持、pushも含む）
 npm run deploy            # 新しいURLでデプロイ（テスト用）

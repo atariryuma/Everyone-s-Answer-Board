@@ -42,8 +42,9 @@
 ## 3. 機能要件
 
 ### F-1 表示モードの切替
-- `config.displaySettings.boardMode` を新規追加。値は `'board' | 'numberline' | 'matrix'`。
-- 既定値: `'board'`（既存挙動と完全互換）。
+- `config.displaySettings.boardMode` を新規追加。値は `'auto' | 'board' | 'numberline' | 'matrix'`。
+- 既定値: `'auto'`（`columnMapping.numericX/Y` の有無から自動判定。numericX/Y どちらも無ければ `'board'` に倒れるので既存挙動と完全互換）。
+- `'auto'` の解決ロジック (`src/DataApis.js` `buildSafePublishedDataResult`): numericX + numericY → `matrix` / numericX のみ → `numberline` / どちらも無し → `board`。
 - 管理画面で教師が選択。プレビューは保存後の View ページで確認。
 
 ### F-2 数値列の選択（M1: 1 列、M2: 2 列）

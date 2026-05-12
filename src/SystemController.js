@@ -579,9 +579,11 @@ function performAutoRepair() {
 }
 
 /**
- * アプリケーションの公開
- * @param {Object} publishConfig - 公開設定
- * @returns {Object} 公開結果
+ * publishApp の入力ペイロードを許可キーだけに絞り込み、etag 競合検出用の情報を返す。
+ * Why: doPost 経由で任意の config が渡ってくるため、ボード公開に関係のないキー
+ *      (内部状態、書き込み禁止フィールド等) を黙って捨てる。受理キーは allowedKeys
+ *      で明示し、それ以外は ignoredKeys として呼び出し元 (publishApp) でログに残す。
+ * @private
  */
 function sanitizePublishPayload_(publishConfig, currentConfig = {}) {
   const source = (publishConfig && typeof publishConfig === 'object' && !Array.isArray(publishConfig))
@@ -652,6 +654,21 @@ function sanitizePublishPayload_(publishConfig, currentConfig = {}) {
   return { config: sanitized, ignoredKeys };
 }
 
+/**
+ * アプリケーションを公開する（boardConfig をユーザー DB に保存し、etag を更新する）。
+ *
+ * Why etag 競合検出: 教師が複数タブで管理画面を開いて同時に「公開」を押した場合、
+ *   後から押した方が前の保存を上書きする race を防ぐ。クライアントは現在の etag を
+ *   送り、サーバ側で現状の etag と比較。一致しないとき "etag_conflict" を返す。
+ * Why CLAUDE.md "publishApp accepts only allowlisted fields with etag conflict detection"
+ *   というメンテナンスルールが定義されており、両方をここで担保する。
+ *
+ * @param {Object} publishConfig - クライアントから来た公開設定ペイロード。
+ *   spreadsheetId / sheetName / columnMapping / displaySettings / formUrl / formTitle /
+ *   showDetails / etag のいずれか。それ以外のキーは sanitizePublishPayload_ で破棄される。
+ * @returns {{success: boolean, message?: string, error?: string, etag?: string,
+ *   conflict?: boolean, currentEtag?: string}} 成功時 etag を含む、競合時 conflict:true。
+ */
 function publishApp(publishConfig) {
   try {
     const email = getCurrentEmail();
