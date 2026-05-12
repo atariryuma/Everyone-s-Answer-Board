@@ -114,6 +114,18 @@ function loadAdminContext(overrides = {}) {
       sheetName: 'フォームの回答 1',
       wasCreated: true
     }),
+    customizeForm: (id, schema) => {
+      if (!id) return { success: false, error: 'formId required' };
+      if (!schema || !Array.isArray(schema.questions)) return { success: false, error: 'schema.questions required' };
+      return {
+        success: true,
+        formId: id,
+        formUrl: 'https://docs.google.com/forms/d/' + id + '/viewform',
+        editUrl: 'https://docs.google.com/forms/d/' + id + '/edit',
+        title: schema.title || 'customized',
+        itemCount: schema.questions.length
+      };
+    },
     processFormUrlInput: (url) => {
       if (!url || !url.includes('/forms/')) {
         return { success: false, error: 'Invalid form URL' };
@@ -675,4 +687,47 @@ test('listProfiles: after save shows profile summary', () => {
   const byName = Object.fromEntries(res.data.profiles.map(p => [p.name, p]));
   assert.equal(byName['導入'].boardMode, 'pie');
   assert.equal(byName['展開'].boardMode, 'numberline');
+});
+
+// =====================================================================
+// customizeForm
+// =====================================================================
+
+test('customizeForm: rejects missing formId/formUrl', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('customizeForm', { schema: { questions: [] } });
+  assert.equal(res.success, false);
+});
+
+test('customizeForm: rejects missing schema', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('customizeForm', { formId: 'abc' });
+  assert.equal(res.success, false);
+});
+
+test('customizeForm: success with valid schema', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('customizeForm', {
+    formId: 'newForm123',
+    schema: {
+      title: '道徳: 議論',
+      questions: [
+        { type: 'list', title: 'クラス', choices: ['6年1組', '6年2組', '6年3組', '6年4組'] },
+        { type: 'text', title: '名前' },
+        { type: 'scale', title: 'あなたならどうする？', min: 1, max: 5, leftLabel: 'そのまま', rightLabel: '直す' },
+        { type: 'paragraph', title: '理由' }
+      ]
+    }
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.itemCount, 4);
+});
+
+test('customizeForm: accepts formUrl alternative', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('customizeForm', {
+    formUrl: 'https://docs.google.com/forms/d/xyz/edit',
+    schema: { questions: [{ type: 'text', title: 'Q1' }] }
+  });
+  assert.equal(res.success, true);
 });

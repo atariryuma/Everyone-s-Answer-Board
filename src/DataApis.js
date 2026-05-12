@@ -267,6 +267,129 @@ function createTemplateForm(templateType) {
 }
 
 /**
+ * 既存 Form の質問項目をスキーマで完全置換する。
+ *
+ * Why: CLI から授業用に Forms をカスタマイズしたい (4 クラス選択肢、線形尺度ラベル、
+ *   設問文の書換等)。createTemplateForm は固定テンプレなので、その後の編集を
+ *   automate する必要がある。
+ *
+ * 動作:
+ *   1. 既存アイテム全削除（spreadsheet との紐付けは保たれる）
+ *   2. schema.questions[] を順に addXxxItem() で再構築
+ *   3. 任意で form の title/description も更新
+ *
+ *   注意: 既に回答が入っている Forms に対して実行すると、Spreadsheet の列構造が変わるため
+ *   過去回答との対応が崩れる。新規作成直後（回答 0 件）の Forms に対してのみ使うべき。
+ *
+ * @param {string} formIdOrUrl - FormApp.openById|openByUrl 対応の id/URL
+ * @param {Object} schema - { title?, description?, questions: [...] }
+ *   各 question の shape:
+ *     { type: 'list'|'text'|'multipleChoice'|'scale'|'paragraph',
+ *       title: string, helpText?: string, required?: bool,
+ *       choices?: string[], min?: number, max?: number, leftLabel?, rightLabel? }
+ * @returns {Object} { success, formId, title, itemCount }
+ */
+function customizeForm(formIdOrUrl, schema) {
+  try {
+    if (!formIdOrUrl || typeof formIdOrUrl !== 'string') {
+      return { success: false, error: 'formId or formUrl is required' };
+    }
+    if (!schema || typeof schema !== 'object' || !Array.isArray(schema.questions)) {
+      return { success: false, error: 'schema.questions array is required' };
+    }
+    if (schema.questions.length > 40) {
+      // Why: 過大スキーマで Forms API limit に当たる前にガード（実用上 40 で十分）
+      return { success: false, error: 'too many questions (max 40)' };
+    }
+
+    let form;
+    try {
+      form = formIdOrUrl.startsWith('http')
+        ? FormApp.openByUrl(formIdOrUrl)
+        : FormApp.openById(formIdOrUrl);
+    } catch (e) {
+      return { success: false, error: 'Form を開けません: ' + e.message };
+    }
+
+    // 既存項目を削除（後ろから消すと index ずれない）
+    const existing = form.getItems();
+    for (let i = existing.length - 1; i >= 0; i--) {
+      try { form.deleteItem(existing[i]); } catch (_) { /* skip non-deletable */ }
+    }
+
+    // タイトル・説明
+    if (typeof schema.title === 'string' && schema.title.trim()) {
+      form.setTitle(schema.title.trim().substring(0, 200));
+    }
+    if (typeof schema.description === 'string') {
+      form.setDescription(schema.description.substring(0, 2000));
+    }
+
+    // 質問を順に追加
+    let added = 0;
+    for (const q of schema.questions) {
+      if (!q || typeof q !== 'object' || !q.type || !q.title) continue;
+      const title = String(q.title).substring(0, 200);
+      const required = q.required !== false; // default true
+      const helpText = q.helpText ? String(q.helpText).substring(0, 500) : '';
+      const choices = Array.isArray(q.choices) ? q.choices.map(c => String(c).substring(0, 200)).filter(Boolean) : [];
+
+      let item = null;
+      switch (q.type) {
+        case 'list':
+          item = form.addListItem();
+          if (choices.length) item.setChoiceValues(choices);
+          break;
+        case 'multipleChoice':
+          item = form.addMultipleChoiceItem();
+          if (choices.length) item.setChoiceValues(choices);
+          break;
+        case 'text':
+          item = form.addTextItem();
+          break;
+        case 'paragraph':
+          item = form.addParagraphTextItem();
+          break;
+        case 'scale': {
+          item = form.addScaleItem();
+          const min = Number.isFinite(q.min) ? q.min : 1;
+          const max = Number.isFinite(q.max) ? q.max : 5;
+          try { item.setBounds(min, max); } catch (e) {
+            // setBounds は max-min >= 1, max <= 10 等の制約あり。失敗時はデフォルト 1-5。
+            try { item.setBounds(1, 5); } catch (_) { /* give up */ }
+          }
+          const left = q.leftLabel ? String(q.leftLabel).substring(0, 100) : '';
+          const right = q.rightLabel ? String(q.rightLabel).substring(0, 100) : '';
+          if (left || right) item.setLabels(left, right);
+          break;
+        }
+        default:
+          continue; // unknown type → skip
+      }
+      if (!item) continue;
+
+      item.setTitle(title);
+      if (helpText) item.setHelpText(helpText);
+      try { item.setRequired(required); } catch (_) { /* not all items support setRequired */ }
+      added++;
+    }
+
+    return {
+      success: true,
+      formId: form.getId(),
+      formUrl: form.getPublishedUrl(),
+      editUrl: form.getEditUrl(),
+      title: form.getTitle(),
+      itemCount: added,
+      message: `${added} 問の質問を再構築しました`
+    };
+  } catch (error) {
+    console.error('customizeForm error:', error.message);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * フォームURLから回答ボード接続情報を取得
  * スプレッドシートがなければ新規作成してリンク
  * @param {string} formUrl - GoogleフォームURL

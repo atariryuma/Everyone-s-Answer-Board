@@ -25,7 +25,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, processFormUrlInput, getForms, isValidFormUrl, FormApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, FormApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -777,6 +777,18 @@ function dispatchAdminOperation(operation, params) {
         formProcessing: procResult,
         configSave: { success: saveResult.success, message: saveResult.message }
       });
+    }
+
+    case 'customizeForm': {
+      // 既存 Form の質問項目をスキーマで完全置換。
+      // CLI から授業用にカスタマイズしたいときに使う。回答 0 件の新規 Form 対象。
+      if (!params.formId && !params.formUrl) {
+        return createErrorResponse('formId or formUrl is required');
+      }
+      if (!params.schema || typeof params.schema !== 'object') {
+        return createErrorResponse('schema (object) is required');
+      }
+      return customizeForm(params.formId || params.formUrl, params.schema);
     }
 
     case 'createForm': {
