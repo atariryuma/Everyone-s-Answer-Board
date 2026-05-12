@@ -1110,9 +1110,19 @@
 
   /**
    * テンプレートフォームを作成
+   *
+   * templateType は select で選んだ種別を backend に渡す。
+   * - board (既存掲示板) / numberline (M1) / matrix (M2)
+   * Why: 可視化モードに合った Forms 構造（線形尺度フィールド）をテンプレート時点で
+   *      用意することで、教師が手動で項目を追加する手間を省く。
    */
   function createTemplateForm() {
     const btn = document.getElementById('create-template-form');
+    const typeSelect = document.getElementById('template-type-select');
+    const templateType = (typeSelect && typeSelect.value) || 'board';
+    const TEMPLATE_LABELS = { board: '掲示板', numberline: '数直線', matrix: 'マトリクス' };
+    const typeLabel = TEMPLATE_LABELS[templateType] || '掲示板';
+
     if (btn) {
       btn.disabled = true;
       btn.textContent = '作成中...';
@@ -1149,13 +1159,17 @@
         <body style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:white;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
           <div style="text-align:center;max-width:500px;padding:24px;">
             <div id="status-icon" style="font-size:48px;margin-bottom:16px;" class="spinner">⚙️</div>
-            <p id="status-text" style="font-size:20px;font-weight:bold;margin-bottom:24px;">テンプレートフォームを作成中...</p>
+            <p id="status-text" style="font-size:20px;font-weight:bold;margin-bottom:24px;">テンプレート（${typeLabel}）を作成中...</p>
 
             <div style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);border-radius:12px;padding:20px;text-align:left;margin-bottom:16px;">
               <p style="font-size:14px;color:#fbbf24;margin:0 0 12px 0;font-weight:bold;">⚠️ 編集が必要な項目</p>
               <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
                 <li><strong>クラス</strong> → 実際のクラス名に変更</li>
-                <li><strong>回答の選択肢</strong> → 質問に合った選択肢に変更</li>
+                ${templateType === 'board'
+                  ? '<li><strong>回答の選択肢</strong> → 質問に合った選択肢に変更</li>'
+                  : templateType === 'numberline'
+                    ? '<li><strong>立場の質問文・両端ラベル</strong> → 授業のテーマに合わせて変更</li>'
+                    : '<li><strong>X軸/Y軸の質問文・両端ラベル</strong> → 授業のテーマに合わせて変更</li>'}
               </ul>
             </div>
 
@@ -1164,6 +1178,8 @@
               <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
                 <li>名前（テキスト入力）</li>
                 <li>理由（長文入力）</li>
+                ${templateType === 'numberline' ? '<li>立場（1〜5の線形尺度）</li>' : ''}
+                ${templateType === 'matrix' ? '<li>X軸・Y軸（1〜5の線形尺度）</li>' : ''}
               </ul>
             </div>
 
@@ -1171,7 +1187,7 @@
               <p style="font-size:14px;color:#86efac;margin:0 0 12px 0;font-weight:bold;">✅ 次のステップ</p>
               <ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.9;color:#e2e8f0;">
                 <li>下のボタンでフォーム編集画面を開く</li>
-                <li>クラス名・回答の選択肢を編集</li>
+                <li>クラス名と${templateType === 'board' ? '回答の選択肢' : '軸ラベル'}を編集</li>
                 <li>管理パネルに戻り「<strong>🔍 検証して接続</strong>」をクリック</li>
                 <li>「<strong>今すぐ公開</strong>」で完了！</li>
               </ol>
@@ -1214,6 +1230,21 @@
             formSelect.dataset.sheetName = result.sheetName;
             formSelect.dataset.formTitle = result.formTitle;
             formSelect.dataset.formUrl = result.formUrl;
+          }
+
+          // Why: 数直線(M1)/マトリクス(M2) テンプレートを作ったら、公開設定の
+          //      boardMode セレクトをその種別に合わせて先回りで設定する。
+          //      board テンプレートは auto のままにしておく（線形尺度列が無いので結果は同じ）。
+          //      これで教師は「検証して接続」→「今すぐ公開」の 2 クリックで M1/M2 可視化に到達できる。
+          const boardModeSelect = document.getElementById('board-mode-select');
+          if (boardModeSelect && (result.templateType === 'numberline' || result.templateType === 'matrix')) {
+            boardModeSelect.value = result.templateType;
+            // change event を発火して関連 UI（numeric-mapping-container 等）を表示
+            try {
+              boardModeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            } catch (e) {
+              // 古いブラウザ向けフォールバック（非到達想定）
+            }
           }
 
           // 検出情報を表示（リンク付き）
@@ -1276,7 +1307,7 @@
         }
         showError(error.message || 'フォーム作成中にエラーが発生しました');
       })
-      .createTemplateForm();
+      .createTemplateForm(templateType);
   }
 
   function processFormDetectionResult(formResult) {

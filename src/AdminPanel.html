@@ -274,9 +274,25 @@
       <section class="card glass-panel rounded-xl p-6">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-semibold text-white">📝 Googleフォーム選択</h2>
-          <button id="create-template-form" class="btn btn-secondary text-sm" type="button">
-            ✨ テンプレート作成
-          </button>
+          <div class="flex items-center gap-2">
+            <!--
+              テンプレート種別: 可視化モード（M1/M2）連動。
+              - 掲示板: クラス/名前/回答(選択)/理由 — 既存
+              - 数直線(M1): 立場(線形尺度1-5) を含む
+              - マトリクス(M2): X軸/Y軸 の線形尺度を含む
+              詳細: docs/SPEC_visualization_modes.md
+            -->
+            <select id="template-type-select" class="modern-select text-sm"
+              style="width:auto;min-width:140px;padding:6px 10px;"
+              title="作成するテンプレートの種別">
+              <option value="board" selected>掲示板</option>
+              <option value="numberline">数直線 (M1)</option>
+              <option value="matrix">マトリクス (M2)</option>
+            </select>
+            <button id="create-template-form" class="btn btn-secondary text-sm" type="button">
+              ✨ テンプレート作成
+            </button>
+          </div>
         </div>
 
         <!-- データソース選択方式 -->

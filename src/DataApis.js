@@ -35,23 +35,58 @@
 /**
  * ユーザー専用フォルダを作成
  * 各ユーザーのマイドライブに「みんなの回答ボード」フォルダを作成
+ *
+ * Why owner-filter: getFoldersByName() は共有されてきた同名フォルダも返すため、
+ *   他人が共有した「みんなの回答ボード」が先にヒットすると新規ファイルがそこへ
+ *   流れ込みプライバシー事故になりうる。getOwner().getEmail() == 自分 を必須にする。
+ *
  * @returns {GoogleAppsScript.Drive.Folder|null} 作成/取得したフォルダ
  */
 function createUserFolder() {
   try {
     const folderName = 'みんなの回答ボード';
+    const myEmail = Session.getActiveUser().getEmail();
 
-    // フォルダを検索または作成
     const folders = DriveApp.getFoldersByName(folderName);
-    if (folders.hasNext()) {
-      return folders.next();
-    } else {
-      return DriveApp.createFolder(folderName);
+    while (folders.hasNext()) {
+      const f = folders.next();
+      try {
+        const owner = f.getOwner();
+        if (owner && owner.getEmail && owner.getEmail() === myEmail) {
+          return f;
+        }
+      } catch (ownerErr) {
+        // getOwner() は権限不足で失敗しうる（共有ドライブ等）。その場合は無視して次へ。
+      }
     }
+    return DriveApp.createFolder(folderName);
 
   } catch (e) {
     console.error('createUserFolder エラー:', e.message);
     return null;
+  }
+}
+
+/**
+ * ファイルを指定フォルダへ移動（Drive 単一親モデル準拠）
+ * Why: addFile/removeFile は multi-parent 時代の deprecated API。
+ *      moveTo() は2020年以降の正式 API で、ルートフォルダからの除外も自動で行う。
+ * @param {GoogleAppsScript.Drive.File} file
+ * @param {GoogleAppsScript.Drive.Folder} folder
+ * @private
+ */
+function moveFileToFolder_(file, folder) {
+  if (!file || !folder) return;
+  if (typeof file.moveTo === 'function') {
+    file.moveTo(folder);
+    return;
+  }
+  // 古い GAS 環境向けフォールバック（CI スタブ含む）
+  folder.addFile(file);
+  try {
+    DriveApp.getRootFolder().removeFile(file);
+  } catch (e) {
+    // 既に root に無いなら無視
   }
 }
 
@@ -82,20 +117,40 @@ function getForms() {
 
 /**
  * テンプレートフォームを作成
+ *
+ * templateType で生成されるフォームの形が変わる：
+ *   - 'board'      (既定): クラス / 名前 / 回答(選択肢) / 理由            — 既存掲示板モード
+ *   - 'numberline' (M1)  : クラス / 名前 / 立場(線形尺度1-5) / 理由       — 数直線可視化
+ *   - 'matrix'     (M2)  : クラス / 名前 / X軸(線形尺度) / Y軸(線形尺度) / 理由 — 散布図
+ *
+ * Why M1/M2 テンプレートを用意するか: detectNumericScaleColumns は実データから
+ *   線形尺度列を検出するが、空のフォームでは検出できないので教師に手動で
+ *   ScaleItem を追加させる手間が残る。テンプレート時点で M1/M2 用の構造を作れば
+ *   そのまま「✨ 自動判定」で boardMode=numberline/matrix に乗る。
+ *
  * ベストプラクティス: https://developers.google.com/apps-script/reference/forms/form
+ *
+ * @param {string} [templateType='board'] - 'board' | 'numberline' | 'matrix'
  * @returns {Object} 作成結果（フォームURL、スプレッドシートID等）
  */
-function createTemplateForm() {
+function createTemplateForm(templateType) {
   try {
     const currentEmail = getCurrentEmail();
     if (!currentEmail) {
       return { success: false, error: '認証が必要です' };
     }
 
+    const TEMPLATE_LABELS = {
+      board: '掲示板',
+      numberline: '数直線',
+      matrix: 'マトリクス'
+    };
+    const type = TEMPLATE_LABELS[templateType] ? templateType : 'board';
+
     // テンプレートフォーム作成（日時付きタイトル）
     const now = new Date();
     const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'M/d HH:mm');
-    const formTitle = `回答ボード ${dateStr}`;
+    const formTitle = `回答ボード [${TEMPLATE_LABELS[type]}] ${dateStr}`;
     const form = FormApp.create(formTitle);
 
     // Forms REST API で emailCollectionType を VERIFIED に設定
@@ -104,53 +159,78 @@ function createTemplateForm() {
     setFormEmailCollectionVerified_(form.getId());
 
     // 1人1回答制限（ログイン必須）
+    // M1/M2 では allowResubmit と組み合わせて「揺らぎ」追跡を行うため、
+    // 教師が後から無効化することを想定。テンプレート既定は1回答に揃える。
     form.setLimitOneResponsePerUser(true);
 
-    // 1. クラス選択（ドロップダウン - ListItem）
+    // 共通: クラス + 名前
     form.addListItem()
       .setTitle('クラス')
       .setRequired(true)
       .setHelpText('所属クラスを選択してください')
       .setChoiceValues(['クラス1', 'クラス2', 'クラス3', 'クラス4']);
-
-    // 2. 名前（短文 - TextItem）
     form.addTextItem()
       .setTitle('名前')
       .setRequired(true)
       .setHelpText('表示名を入力してください');
 
-    // 3. 回答（選択肢 - MultipleChoiceItem）
-    form.addMultipleChoiceItem()
-      .setTitle('回答')
-      .setRequired(true)
-      .setHelpText('回答を選択してください')
-      .setChoiceValues(['賛成', '反対', 'どちらでもない']);
-
-    // 4. 理由（長文 - ParagraphTextItem）
-    form.addParagraphTextItem()
-      .setTitle('理由')
-      .setRequired(true)
-      .setHelpText('選択した理由を詳しく記入してください');
+    // テンプレート別の本体項目
+    if (type === 'numberline') {
+      // M1: 立場（線形尺度 1〜5）+ 理由
+      form.addScaleItem()
+        .setTitle('立場')
+        .setRequired(true)
+        .setHelpText('あなたの考えに最も近い位置を選んでください')
+        .setBounds(1, 5)
+        .setLabels('そう思わない', 'とてもそう思う');
+      form.addParagraphTextItem()
+        .setTitle('理由')
+        .setRequired(true)
+        .setHelpText('その位置を選んだ理由を記入してください');
+    } else if (type === 'matrix') {
+      // M2: 2軸の線形尺度 + 理由
+      form.addScaleItem()
+        .setTitle('X軸（例: 効率）')
+        .setRequired(true)
+        .setHelpText('横軸の立場を選んでください')
+        .setBounds(1, 5)
+        .setLabels('低い', '高い');
+      form.addScaleItem()
+        .setTitle('Y軸（例: 倫理）')
+        .setRequired(true)
+        .setHelpText('縦軸の立場を選んでください')
+        .setBounds(1, 5)
+        .setLabels('低い', '高い');
+      form.addParagraphTextItem()
+        .setTitle('理由')
+        .setRequired(true)
+        .setHelpText('その位置を選んだ理由を記入してください');
+    } else {
+      // 'board': 既存挙動
+      form.addMultipleChoiceItem()
+        .setTitle('回答')
+        .setRequired(true)
+        .setHelpText('回答を選択してください')
+        .setChoiceValues(['賛成', '反対', 'どちらでもない']);
+      form.addParagraphTextItem()
+        .setTitle('理由')
+        .setRequired(true)
+        .setHelpText('選択した理由を詳しく記入してください');
+    }
 
     // 回答先スプレッドシートを作成してリンク
     const ss = SpreadsheetApp.create(formTitle + ' (回答)');
     form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
 
-    // ユーザー専用フォルダを作成してファイルを移動
+    // ユーザー専用フォルダを作成してファイルを移動（Drive 単一親モデル）
     let folder = null;
     let folderUrl = '';
     try {
       folder = createUserFolder();
       if (folder) {
         folderUrl = folder.getUrl();
-        // フォームをフォルダに移動
-        const formFile = DriveApp.getFileById(form.getId());
-        folder.addFile(formFile);
-        DriveApp.getRootFolder().removeFile(formFile);
-        // スプレッドシートをフォルダに移動
-        const ssFile = DriveApp.getFileById(ss.getId());
-        folder.addFile(ssFile);
-        DriveApp.getRootFolder().removeFile(ssFile);
+        moveFileToFolder_(DriveApp.getFileById(form.getId()), folder);
+        moveFileToFolder_(DriveApp.getFileById(ss.getId()), folder);
       }
     } catch (folderError) {
       console.warn('フォルダ作成/移動エラー（処理は続行）:', folderError.message);
@@ -162,13 +242,14 @@ function createTemplateForm() {
       editUrl: form.getEditUrl(),
       formId: form.getId(),
       formTitle: formTitle,
+      templateType: type,
       spreadsheetId: ss.getId(),
       spreadsheetUrl: ss.getUrl(),
       spreadsheetName: ss.getName(),
       sheetName: 'フォームの回答 1',
       folderUrl: folderUrl,
       wasCreated: true,
-      message: 'テンプレートフォームを作成しました'
+      message: `テンプレート（${TEMPLATE_LABELS[type]}）を作成しました`
     };
 
   } catch (error) {
