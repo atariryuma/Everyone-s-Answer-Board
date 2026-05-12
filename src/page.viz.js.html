@@ -28,11 +28,12 @@
 
   // ---------------------------------------------------------------------
   // CDN: d3 v7 のみ。d3-beeswarm プラグインは v7 非対応なので d3-force で代替。
-  // SharedSecurityHeaders.html の CSP で script-src に cdnjs.cloudflare.com が
-  // 既に許可されているため、cdnjs から取得する（CSP 変更不要）。
+  // 学校ネットワークで cdnjs が遅延・失敗するケースに備え jsdelivr もフォールバックとして
+  // 登録（CSP にも追加）。失敗してもエラー時に診断情報が Cloud Logging に送られる。
   // ---------------------------------------------------------------------
   const D3_CDN_URLS = [
-    'https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js'
+    'https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js',
+    'https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js'
   ];
 
   let d3LoadPromise = null;
