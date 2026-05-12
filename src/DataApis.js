@@ -374,26 +374,64 @@ function customizeForm(formIdOrUrl, schema) {
       added++;
     }
 
-    // Why: Form の質問構造を変えると Spreadsheet 列が増えるため、ヘッダーキャッシュ
-    //      （CACHE_DURATION.DATABASE_LONG = 10 分）を invalidate しないと、しばらく
-    //      ボード表示が「CURIOUS」等の旧列ヘッダーを返してしまう。リンク先の全シートで
-    //      cache を消す。
+    // Why: Form の items を deleteItem → 再 addItem しても Spreadsheet 上の旧列は
+    //      残り続け、新 items は別の新列として追加される。再 customize を繰り返すと
+    //      列が累積する pathological bug。
+    //
+    //      根本解消策: destination Spreadsheet を新規作成し直す。Form は新しい SS に
+    //      リンクされ、列は items の順序通りクリーンに構成される。旧 SS はトラッシュへ
+    //      移動（即削除でなく猶予を与える）。
+    //
+    //      ただし「既に回答が入っている SS を捨てる」のはデータロスにつながるので、
+    //      schema.resetDestination !== false（デフォルト true）のときのみ実行。
+    //      回答済みのフォームを customize するなら明示的に { resetDestination: false } を渡す。
+    let newSpreadsheetId = null;
+    let trashedOldSpreadsheetId = null;
+    const shouldReset = schema.resetDestination !== false;
+    if (shouldReset) {
+      try {
+        const oldDestId = form.getDestinationId();
+        // 旧 SS が空でない場合（既に回答あり）はリセットを諦めて警告
+        let hasResponses = false;
+        if (oldDestId) {
+          try {
+            const oldSs = SpreadsheetApp.openById(oldDestId);
+            const sheets = oldSs.getSheets();
+            for (const s of sheets) {
+              if (s.getLastRow() > 1) { hasResponses = true; break; }
+            }
+          } catch (_) { /* skip */ }
+        }
+        if (hasResponses) {
+          console.warn('customizeForm: skipped destination reset (responses exist in old spreadsheet)');
+        } else {
+          // 新 SS を作って再リンク。リンク前後でファイル所有者は CLI ユーザー（Form と同じ）。
+          const ssTitle = form.getTitle() + ' (回答)';
+          const newSs = SpreadsheetApp.create(ssTitle);
+          form.setDestination(FormApp.DestinationType.SPREADSHEET, newSs.getId());
+          newSpreadsheetId = newSs.getId();
+          // 旧 SS をトラッシュへ移動（即削除でなく Drive ゴミ箱経由で 30 日猶予）
+          if (oldDestId && oldDestId !== newSpreadsheetId) {
+            try {
+              DriveApp.getFileById(oldDestId).setTrashed(true);
+              trashedOldSpreadsheetId = oldDestId;
+            } catch (_) { /* trash 失敗は致命的でない */ }
+          }
+        }
+      } catch (e) {
+        console.warn('customizeForm: destination reset failed:', e.message);
+      }
+    }
+
+    // ヘッダーキャッシュ無効化（新 SS のキャッシュは未作成だが、安全のため旧キャッシュも消す）
     try {
-      const destId = form.getDestinationId();
+      const destId = newSpreadsheetId || form.getDestinationId();
       if (destId && typeof invalidateSheetHeadersCache === 'function') {
-        // よくある sheet 名を一括無効化（FormApp 既定 + 英語表記）
         ['フォームの回答 1', 'Form Responses 1', 'Sheet1'].forEach(sn => {
           try { invalidateSheetHeadersCache(destId, sn); } catch (_) {}
         });
-        // SpreadsheetApp で全シート名を取り、それぞれ invalidate
-        try {
-          const ss = SpreadsheetApp.openById(destId);
-          ss.getSheets().forEach(s => {
-            try { invalidateSheetHeadersCache(destId, s.getName()); } catch (_) {}
-          });
-        } catch (_) { /* SS access fail はキャッシュ無効化を諦めて続行 */ }
       }
-    } catch (_) { /* invalidate 失敗は致命的ではない */ }
+    } catch (_) {}
 
     return {
       success: true,
@@ -402,7 +440,9 @@ function customizeForm(formIdOrUrl, schema) {
       editUrl: form.getEditUrl(),
       title: form.getTitle(),
       itemCount: added,
-      message: `${added} 問の質問を再構築しました（ヘッダーキャッシュも無効化済み）`
+      newSpreadsheetId,
+      trashedOldSpreadsheetId,
+      message: `${added} 問の質問を再構築${newSpreadsheetId ? '・回答先 Spreadsheet を新規化' : ''}しました`
     };
   } catch (error) {
     console.error('customizeForm error:', error.message);
