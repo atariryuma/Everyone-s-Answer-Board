@@ -10,15 +10,22 @@
 ### 1-1. Cloud Logging（GAS 実行ログ + フロントエンドエラー）
 
 ```bash
-npm run logs:cloud                              # 直近 6h, WARNING 以上
+npm run logs:cloud                              # 直近 6h, WARNING 以上 (自分の prodDeployId のみ)
 npm run logs:cloud -- --severity ERROR --hours 24
 npm run logs:cloud -- --user naha-okinawa      # メアド断片でフィルタ
 npm run logs:cloud -- --function doPost        # 関数名でフィルタ
+npm run logs:cloud -- --all-deployments        # 共有 GCP project の全アプリログ
+npm run logs:cloud -- --deployment <id>        # 特定 deployment にフィルタ
 npm run logs:summary                           # シグネチャ別集計
 npm run logs:errors                            # 直近 24h ERROR 集計
 npm run logs:tail                              # 直近 10 分 ERROR
 npm run logs:open                              # open 環境用
 ```
+
+**デフォルトで自分の deployment に絞る**：那覇市版の GCP project には別 GAS アプリ
+（students/events_202604）が同居しており、その ERROR が紛れ込んでデバッグを阻害する。
+`config.prodDeployId` フィルタが既定でかかるので、自分のアプリのログだけが返る。
+共有プロジェクト全体を見たいときは `--all-deployments` を付与。
 
 **フロントエンドエラーも含む**：`window.error` / `unhandledrejection` / `ErrorHandler.logError`
 は `reportClientError` doPost アクション経由で Cloud Logging に流れる。
