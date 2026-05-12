@@ -700,12 +700,20 @@ function dispatchAdminOperation(operation, params) {
       if (!params.formUrl || typeof params.formUrl !== 'string') {
         return createErrorResponse('formUrl is required');
       }
-      // isValidFormUrl + (可能なら) FormApp.openByUrl の到達性チェック
-      const isValid = isValidFormUrl(params.formUrl);
-      if (!isValid) {
+      const trimmed = String(params.formUrl).trim();
+      // Why: isValidFormUrl は new URL() ベースで実装されており、GAS V8 で URL constructor が
+      //      期待通り動かないコンテキストがある（catch で false を返してしまう known issue）。
+      //      CLI 経路では canonical truth として「FormApp.openByUrl で開けるか？」を直接試す。
+      //      URL 形式は substring check で補助確認するのみ。
+      const looksLikeFormUrl =
+        trimmed.startsWith('https://') &&
+        (trimmed.includes('docs.google.com/forms/') || trimmed.includes('forms.gle/'));
+
+      if (!looksLikeFormUrl) {
         return createSuccessResponse('URL format check', {
-          formUrl: params.formUrl,
+          formUrl: trimmed,
           isValidFormUrl: false,
+          reachable: false,
           reason: 'Not a Google Forms URL pattern'
         });
       }
@@ -713,20 +721,20 @@ function dispatchAdminOperation(operation, params) {
       let formTitle = null;
       let destinationSpreadsheetId = null;
       try {
-        const form = FormApp.openByUrl(params.formUrl);
+        const form = FormApp.openByUrl(trimmed);
         reachable = true;
         formTitle = form.getTitle();
         destinationSpreadsheetId = form.getDestinationId() || null;
       } catch (e) {
         return createSuccessResponse('Form URL reachability check', {
-          formUrl: params.formUrl,
+          formUrl: trimmed,
           isValidFormUrl: true,
           reachable: false,
           reason: e.message
         });
       }
       return createSuccessResponse('Form URL validated', {
-        formUrl: params.formUrl,
+        formUrl: trimmed,
         isValidFormUrl: true,
         reachable,
         formTitle,
