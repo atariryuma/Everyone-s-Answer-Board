@@ -256,6 +256,21 @@ test('setUserConfig: publish option triggers isPublish save mode', () => {
   assert.equal(opts.isPublish, true);
 });
 
+test('setUserConfig: preserves boardMode through sanitization pipeline', () => {
+  // Why: 過去 validators.js:validateConfig が displaySettings を再構築する際に
+  //      boardMode を許可リストに含めず、永遠に削除されていた regression。
+  //      これを防ぐため、setUserConfig 経由で boardMode が wire まで生きることを検証。
+  const ctx = loadAdminContext();
+  ctx.dispatchAdminOperation('setUserConfig', {
+    userId: 'u1', patch: { displaySettings: { boardMode: 'numberline' } }
+  });
+  const saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.displaySettings.boardMode, 'numberline');
+});
+
+// (boardMode invalid-value rejection is tested at the validators.js layer in
+//  tests/validators.test.cjs, since saveUserConfig is stubbed at this layer.)
+
 // =====================================================================
 // bulkSetUserConfig
 // =====================================================================

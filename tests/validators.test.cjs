@@ -255,3 +255,42 @@ test('validateMapping: errors on negative answer index', () => {
   const r = ctx.validateMapping({ answer: -1 });
   assert.equal(r.isValid, false);
 });
+
+// =====================================================================
+// validateConfig: displaySettings boardMode pass-through
+// Why: validateConfig が displaySettings を再構築する際に boardMode を含めないと、
+//      後段のサニタイズで永遠に消える regression が発生する。これを防ぐ。
+// =====================================================================
+
+test('validateConfig: preserves boardMode "auto" in sanitized displaySettings', () => {
+  const ctx = loadValidatorsContext();
+  const r = ctx.validateConfig({ displaySettings: { boardMode: 'auto' } });
+  assert.equal(r.sanitized.displaySettings.boardMode, 'auto');
+});
+
+test('validateConfig: preserves boardMode "numberline"', () => {
+  const ctx = loadValidatorsContext();
+  const r = ctx.validateConfig({ displaySettings: { boardMode: 'numberline' } });
+  assert.equal(r.sanitized.displaySettings.boardMode, 'numberline');
+});
+
+test('validateConfig: preserves boardMode "matrix"', () => {
+  const ctx = loadValidatorsContext();
+  const r = ctx.validateConfig({ displaySettings: { boardMode: 'matrix' } });
+  assert.equal(r.sanitized.displaySettings.boardMode, 'matrix');
+});
+
+test('validateConfig: drops invalid boardMode silently', () => {
+  const ctx = loadValidatorsContext();
+  const r = ctx.validateConfig({ displaySettings: { boardMode: 'panic' } });
+  assert.equal(r.sanitized.displaySettings.boardMode, undefined);
+  // 他のフィールドは保持されること
+  assert.equal(r.sanitized.displaySettings.showNames, false);
+  assert.equal(r.sanitized.displaySettings.pageSize, 20);
+});
+
+test('validateConfig: drops boardMode when type wrong', () => {
+  const ctx = loadValidatorsContext();
+  const r = ctx.validateConfig({ displaySettings: { boardMode: 123 } });
+  assert.equal(r.sanitized.displaySettings.boardMode, undefined);
+});

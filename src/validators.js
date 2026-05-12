@@ -388,12 +388,21 @@ function validateConfig(config) {
     }
 
     if (config.displaySettings && typeof config.displaySettings === 'object') {
-      result.sanitized.displaySettings = {
+      const sanitizedDS = {
         showNames: Boolean(config.displaySettings.showNames),
         showReactions: Boolean(config.displaySettings.showReactions),
         theme: String(config.displaySettings.theme || 'default').substring(0, 50),
         pageSize: Math.min(Math.max(Number(config.displaySettings.pageSize) || 20, 1), 100)
       };
+      // Why: 可視化モード設定。'auto'/'board'/'numberline'/'matrix' のみ許可。
+      //      ここで保持しないと、後段の ConfigService.sanitizeDisplaySettings は
+      //      validateConfig が再構築した object を受け取るため永遠に boardMode が消える。
+      const VALID_BOARD_MODES = ['auto', 'board', 'numberline', 'matrix'];
+      const mode = config.displaySettings.boardMode;
+      if (typeof mode === 'string' && VALID_BOARD_MODES.includes(mode)) {
+        sanitizedDS.boardMode = mode;
+      }
+      result.sanitized.displaySettings = sanitizedDS;
     }
 
     const basicFields = ['userId', 'setupStatus', 'etag', 'lastAccessedAt'];
