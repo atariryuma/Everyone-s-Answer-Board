@@ -2291,6 +2291,19 @@
         return result;
       } catch (error) {
         console.error('❌ renderBoard: dispatcher error (mode=' + mode + '), falling back to cards:', error);
+        // Why: viz レンダラーが落ちた場合は Cloud Logging まで届けないと debug できない。
+        //      window.ErrorHandler 経由で reportClientError を呼び、サーバの
+        //      `[client/error]` ログに記録する。falling-back そのものは UX を壊さない。
+        try {
+          if (window.ErrorHandler && typeof window.ErrorHandler.logError === 'function') {
+            window.ErrorHandler.logError(error, 'renderBoard dispatcher (mode=' + mode + ')', {
+              filename: 'page.js.html',
+              boardMode: mode,
+              rowCount: (this.state && this.state.currentAnswers && this.state.currentAnswers.length) || 0,
+              d3Loaded: typeof window.d3 !== 'undefined'
+            });
+          }
+        } catch (_) { /* never break on telemetry */ }
         try {
           return await this.renderBoardCards(isLayoutChange, isInitialLoad, oldRows);
         } catch (fallbackError) {
