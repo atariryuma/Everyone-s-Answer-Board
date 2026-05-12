@@ -13,6 +13,10 @@
  *   --limit <N>                                            (default: 20)
  *   --function <name>                                      (e.g. doPost, getPublishedSheetData)
  *   --user <frag>                                          (メールの一部で絞り込み)
+ *   --all-deployments                                      (デフォルトは prodDeployId のみ。
+ *                                                           共有 GCP プロジェクトで別 GAS アプリと
+ *                                                           同居する場合のノイズ除去用)
+ *   --deployment <id>                                      (特定 deployment_id にフィルタ)
  *
  * Output modes:
  *   (default)      1行/エントリの読みやすい形式
@@ -30,6 +34,8 @@ function parseArgs(args) {
     hours: 6,
     user: null,
     func: null,
+    deployment: null,        // 明示指定 deployment_id（あればこちらが最優先）
+    allDeployments: false,   // true なら config.prodDeployId フィルタを外す
     json: false,
     brief: false,
     summary: false,
@@ -42,6 +48,8 @@ function parseArgs(args) {
       case '--hours': opts.hours = parseFloat(args[++i]); break;
       case '--user': opts.user = args[++i]; break;
       case '--function': opts.func = args[++i]; break;
+      case '--deployment': opts.deployment = args[++i]; break;
+      case '--all-deployments': opts.allDeployments = true; break;
       case '--json': opts.json = true; break;
       case '--brief': opts.brief = true; break;
       case '--summary': opts.summary = true; break;
@@ -82,6 +90,15 @@ function fetchEntries(opts, env) {
   let filter = `resource.type="app_script_function" severity>=${opts.severity} timestamp>="${cutoff}"`;
   if (opts.user) filter += ` jsonPayload.message=~"${opts.user.replace(/"/g, '\\"')}"`;
   if (opts.func) filter += ` resource.labels.function_name="${opts.func.replace(/"/g, '\\"')}"`;
+
+  // Why deployment filter: 共有 GCP プロジェクトで別の GAS アプリと同居している場合、
+  //   そちらのエラー（students/events 系の 429 storm 等）が大量に混ざって自分の app の
+  //   debug を阻害する。デフォルトは config の prodDeployId に絞る。
+  //   --deployment 明示指定があればそちら優先。--all-deployments で絞り解除。
+  const targetDeploy = opts.deployment || (opts.allDeployments ? null : config.prodDeployId);
+  if (targetDeploy) {
+    filter += ` labels."script.googleapis.com/deployment_id"="${targetDeploy.replace(/"/g, '\\"')}"`;
+  }
 
   const resp = postJSONSync('https://logging.googleapis.com/v2/entries:list', {
     resourceNames: [`projects/${config.gcpProjectId}`],
