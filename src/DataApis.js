@@ -664,6 +664,15 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     };
   }
 
+  // Why: 生徒の「📝 回答フォーム」ボタンを polling のたびに最新値に更新するため、
+  //      formUrl と formTitle を wire に載せる。profile 切替で active config の
+  //      formUrl が変わったとき、5 秒以内に生徒のボタンも切替わる（教師との同期）。
+  //      formUrl は config に元から保存されている情報なので追加のセキュリティリスクなし。
+  const formMeta = {
+    formUrl: (config && typeof config.formUrl === 'string') ? config.formUrl : '',
+    formTitle: (config && typeof config.formTitle === 'string') ? config.formTitle : ''
+  };
+
   return {
     success: true,
     data: safeData,
@@ -671,7 +680,8 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     sheetName: String(result.sheetName || 'Sheet1'),
     displaySettings: { ...displaySettings, boardMode: effectiveMode },
     axisConfig,
-    profiles: profileSummary
+    profiles: profileSummary,
+    formMeta
   };
 }
 

@@ -181,6 +181,36 @@
     text-anchor: middle;
   }
 
+  /* ボード切替トースト（生徒向け、profile 切替時に 5 秒表示） */
+  .board-switched-toast {
+    position: fixed;
+    top: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    z-index: 9999;
+    padding: 0.75rem 1.25rem;
+    background: rgba(56, 189, 248, 0.18);
+    border: 1px solid #38bdf8;
+    border-radius: 0.6rem;
+    color: #f1f5f9;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    max-width: 90vw;
+    text-align: center;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  .board-switched-toast strong { color: #38bdf8; }
+  .board-switched-toast span { color: #cbd5e1; font-size: 0.92rem; }
+  .board-switched-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
   /* Multi-board profile セレクタ（教師限定） */
   .viz-profile-selector {
     display: flex;

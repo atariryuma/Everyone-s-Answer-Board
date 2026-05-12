@@ -1318,6 +1318,60 @@
       }
     }
 
+    /**
+     * #form-link-btn を新しい formMeta で更新。各 loadSheetData の戻り値から呼ばれる。
+     *
+     * Why: 教師が profile 切替や formUrl 変更したときに、5秒のポーリング cycle で
+     *      生徒側のボタンも追従する。これがないと profile 切替で生徒は古い Forms を
+     *      指したまま「先生さっき言ったボードはどこ？」と混乱する。
+     *
+     *      セキュリティ: formUrl は config 由来でユーザー入力。javascript: スキーム
+     *      対策として `https://` 先頭の strict check を維持。
+     */
+    __updateFormLinkButton(formMeta) {
+      const btn = document.getElementById('form-link-btn');
+      if (!btn || !formMeta) return;
+      const url = formMeta.formUrl;
+      const title = formMeta.formTitle || '';
+      const safe = typeof url === 'string' && /^https:\/\//i.test(url);
+      if (!safe) {
+        btn.classList.add('hidden');
+        return;
+      }
+      // 値が同じなら何もしない（DOM 更新を最小化）
+      if (btn.href !== url) btn.href = url;
+      const span = btn.querySelector('span');
+      const labelText = title ? '📝 ' + title : '📝 回答フォーム';
+      if (span && span.textContent !== labelText) span.textContent = labelText;
+      btn.classList.remove('hidden');
+    }
+
+    /**
+     * 「新しいボードに切替わりました」トースト表示。
+     * 5秒で自動消滅。連続切替時は最新の通知に上書き。
+     *
+     * Why: 教師が profile 切替したとき、生徒の端末で表示が変わる前にトーストで予告する。
+     *      タイトル含めて表示するので「次は『振り返り』ボードだ」と認知できる。
+     */
+    __showBoardSwitchedToast(title) {
+      let toast = document.getElementById('boardSwitchedToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'boardSwitchedToast';
+        toast.className = 'board-switched-toast';
+        document.body.appendChild(toast);
+      }
+      const safeTitle = (window.sharedUtilities && window.sharedUtilities.security && window.sharedUtilities.security.escapeHtml)
+        ? window.sharedUtilities.security.escapeHtml(String(title || ''))
+        : String(title || '').replace(/</g, '&lt;');
+      toast.innerHTML = '🔄 <strong>新しいボードに切り替わりました</strong><br><span>「' + safeTitle + '」</span>';
+      toast.classList.add('visible');
+      clearTimeout(this.__toastTimer);
+      this.__toastTimer = setTimeout(() => {
+        toast.classList.remove('visible');
+      }, 5000);
+    }
+
     destroy() {
 
       this.stopSimplePolling();
@@ -1994,6 +2048,23 @@
         } else {
           this.state.profiles = [];
           this.state.activeProfile = null;
+        }
+
+        // Why: profile 切替 / 教師が formUrl 変更 → 生徒のボタンも即時更新（次の poll で）。
+        //      従来は init で 1 回だけ getActiveFormInfo を呼んでいたが、それでは
+        //      授業中に profile 切替されても生徒は古い Forms を指したまま。
+        //      polling のたびに wire の formMeta を反映することで同期される。
+        if (result.formMeta) {
+          // profile 切替検知: 生徒に「新しいボードに切替わりました」通知（5秒で自動消滅）
+          // Why: 教師が黒板で切替えても、生徒の小さい端末では変化に気づきにくい。
+          //      短いトーストで「新フォームに切替わった」ことを明示する。
+          const prevUrl = this.state.lastSeenFormUrl;
+          const newUrl = result.formMeta.formUrl || '';
+          if (prevUrl && newUrl && prevUrl !== newUrl) {
+            this.__showBoardSwitchedToast(result.formMeta.formTitle || '新しいボード');
+          }
+          this.state.lastSeenFormUrl = newUrl;
+          this.__updateFormLinkButton(result.formMeta);
         }
 
         if (result.header && this.elements.headingLabel) {

@@ -185,3 +185,82 @@ test('axisConfig: missing optional fields yield null safely', () => {
   assert.equal(result.axisConfig.matrixQuadrantLabels, null);
   assert.equal(result.axisConfig.allowResubmit, false);
 });
+
+// =====================================================================
+// formMeta — 生徒の「📝 回答フォーム」ボタン即時更新用
+// Why: profile 切替で active config.formUrl が変わる → 5秒以内に生徒のボタンも追従。
+// =====================================================================
+
+test('formMeta: returns formUrl + formTitle from active config', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      formUrl: 'https://docs.google.com/forms/d/abc/viewform',
+      formTitle: '導入アンケート'
+    },
+    {}
+  );
+  assert.ok(result.formMeta);
+  assert.equal(result.formMeta.formUrl, 'https://docs.google.com/forms/d/abc/viewform');
+  assert.equal(result.formMeta.formTitle, '導入アンケート');
+});
+
+test('formMeta: returns empty strings when config has no formUrl', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    { displaySettings: {}, columnMapping: {} },
+    {}
+  );
+  assert.ok(result.formMeta);
+  assert.equal(result.formMeta.formUrl, '');
+  assert.equal(result.formMeta.formTitle, '');
+});
+
+test('formMeta: rejects non-string formUrl (defensive)', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    { displaySettings: {}, columnMapping: {}, formUrl: { malicious: 'object' } },
+    {}
+  );
+  assert.equal(result.formMeta.formUrl, '');
+});
+
+// =====================================================================
+// profiles wire — 生徒画面でも profile 一覧と active 状態が見える
+// =====================================================================
+
+test('profiles wire: returns list when profiles configured', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      profiles: [
+        { name: '導入', formTitle: 'A', displaySettings: { boardMode: 'pie' } },
+        { name: '本時', formTitle: 'B', displaySettings: { boardMode: 'numberline' } }
+      ],
+      activeProfile: '本時'
+    },
+    {}
+  );
+  assert.ok(result.profiles);
+  assert.equal(result.profiles.active, '本時');
+  assert.equal(result.profiles.list.length, 2);
+  assert.equal(result.profiles.list[1].boardMode, 'numberline');
+});
+
+test('profiles wire: returns null when no profiles', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    { displaySettings: {}, columnMapping: {} },
+    {}
+  );
+  assert.equal(result.profiles, null);
+});
