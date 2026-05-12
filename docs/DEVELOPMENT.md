@@ -79,6 +79,13 @@ npm run api -- bulkSetUserConfig --filter '{"emailContains":"naha"}' --patch '..
 npm run api -- runColumnAnalysis --userId <uuid>           # 列マッピング自動検出
 npm run api -- previewBoard --userId <uuid>                # viewer 視点のサンプル
 
+# Form 操作 (v3)
+npm run api -- listMyForms                                  # 自分の Drive 内 Form を最大 30 件
+npm run api -- validateFormUrl --formUrl <URL>              # URL 形式 + 到達性チェック
+npm run api -- connectForm --userId <uuid> --formUrl <URL>  # 既存 Form を user に紐付け
+npm run api -- createForm --userId <uuid> --templateType board|numberline|matrix
+# templateType=numberline/matrix のときは boardMode も自動セット
+
 # JSON 引数の渡し方
 #   --patch '<json>'   : JSON-aware（自動パース）
 #   --filter '<json>'  : 同上

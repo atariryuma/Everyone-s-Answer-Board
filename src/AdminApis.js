@@ -25,7 +25,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, processFormUrlInput, getForms, isValidFormUrl, FormApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -678,6 +678,137 @@ function dispatchAdminOperation(operation, params) {
       }
       const sheetName = typeof params.sheetName === 'string' ? params.sheetName : 'フォームの回答 1';
       return getColumnAnalysis(params.spreadsheetId, sheetName);
+    }
+
+    // --- Form Operations ---
+    // Why: 教師が CLI から「テンプレート Form 作成 → ユーザー設定に紐付け」「既存 Form
+    //      URL を渡して config を一括セットアップ」「Drive 内の Form 一覧確認」を完結
+    //      できるようにする。frontend ボタン経由と同じヘルパー (createTemplateForm /
+    //      processFormUrlInput / getForms / isValidFormUrl) を再利用するので挙動は等価。
+    //
+    //      重要な制約: FormApp / DriveApp は GAS の executeAs: USER_ACCESSING 設定により
+    //      「webapp にアクセスしたユーザー」のコンテキストで動く。adminApi 経由でも
+    //      gcloud OAuth トークンの所有者が requester として認識されるので、結果として
+    //      その所有者の Drive に Form / Spreadsheet が作成される。
+    //      → 中先生が自分のアカウントで CLI を回す典型ケースでは正常に機能する。
+    case 'listMyForms': {
+      // 自分の Drive 内の Google Forms を最大 30 件返す（getForms の thin wrapper）
+      return getForms();
+    }
+
+    case 'validateFormUrl': {
+      if (!params.formUrl || typeof params.formUrl !== 'string') {
+        return createErrorResponse('formUrl is required');
+      }
+      // isValidFormUrl + (可能なら) FormApp.openByUrl の到達性チェック
+      const isValid = isValidFormUrl(params.formUrl);
+      if (!isValid) {
+        return createSuccessResponse('URL format check', {
+          formUrl: params.formUrl,
+          isValidFormUrl: false,
+          reason: 'Not a Google Forms URL pattern'
+        });
+      }
+      let reachable = false;
+      let formTitle = null;
+      let destinationSpreadsheetId = null;
+      try {
+        const form = FormApp.openByUrl(params.formUrl);
+        reachable = true;
+        formTitle = form.getTitle();
+        destinationSpreadsheetId = form.getDestinationId() || null;
+      } catch (e) {
+        return createSuccessResponse('Form URL reachability check', {
+          formUrl: params.formUrl,
+          isValidFormUrl: true,
+          reachable: false,
+          reason: e.message
+        });
+      }
+      return createSuccessResponse('Form URL validated', {
+        formUrl: params.formUrl,
+        isValidFormUrl: true,
+        reachable,
+        formTitle,
+        destinationSpreadsheetId
+      });
+    }
+
+    case 'connectForm': {
+      // Form URL を解決してユーザー config に紐付け。frontend の processFormUrlInput
+      // と同じパイプライン（spreadsheet 自動作成・回答シート検出も含む）。
+      // userId 省略時は requester (gcloud user) の userId に自動解決。
+      if (!params.formUrl || typeof params.formUrl !== 'string') {
+        return createErrorResponse('formUrl is required');
+      }
+      const targetUserId = (typeof params.userId === 'string' && params.userId) ? params.userId : null;
+      let user = null;
+      if (targetUserId) {
+        user = findUserById(targetUserId, { requestingUser: getCurrentEmail() });
+      } else {
+        const email = getCurrentEmail();
+        user = email ? findUserByEmail(email, { requestingUser: email }) : null;
+      }
+      if (!user) return createErrorResponse('User not found');
+
+      const procResult = processFormUrlInput(params.formUrl);
+      if (!procResult.success) return procResult;
+
+      // config に formUrl / formTitle / spreadsheetId / sheetName を反映
+      const patch = {
+        formUrl: procResult.formUrl || procResult.publishedUrl || params.formUrl,
+        formTitle: procResult.formTitle || '',
+        spreadsheetId: procResult.spreadsheetId || '',
+        sheetName: procResult.sheetName || 'フォームの回答 1'
+      };
+      const saveResult = applyConfigPatch_(user.userId, patch, { publish: false });
+      return createSuccessResponse('Form connected', {
+        userId: user.userId,
+        userEmail: user.userEmail,
+        applied: patch,
+        formProcessing: procResult,
+        configSave: { success: saveResult.success, message: saveResult.message }
+      });
+    }
+
+    case 'createForm': {
+      // テンプレート Form を作成して、指定ユーザー (または requester) の config に紐付け。
+      // templateType: 'board' | 'numberline' | 'matrix' (default: 'board')
+      const templateType = ['board', 'numberline', 'matrix'].includes(params.templateType)
+        ? params.templateType : 'board';
+      const targetUserId = (typeof params.userId === 'string' && params.userId) ? params.userId : null;
+      let user = null;
+      if (targetUserId) {
+        user = findUserById(targetUserId, { requestingUser: getCurrentEmail() });
+      } else {
+        const email = getCurrentEmail();
+        user = email ? findUserByEmail(email, { requestingUser: email }) : null;
+      }
+      if (!user) return createErrorResponse('User not found');
+
+      const createResult = createTemplateForm(templateType);
+      if (!createResult.success) return createResult;
+
+      // config に紐付け。numberline/matrix の場合は boardMode も auto / 明示モードに揃える。
+      const patch = {
+        formUrl: createResult.formUrl || '',
+        formTitle: createResult.formTitle || '',
+        spreadsheetId: createResult.spreadsheetId || '',
+        sheetName: createResult.sheetName || 'フォームの回答 1'
+      };
+      if (templateType === 'numberline' || templateType === 'matrix') {
+        patch.displaySettings = { boardMode: templateType };
+      }
+      const saveResult = applyConfigPatch_(user.userId, patch, { publish: false });
+
+      return createSuccessResponse('Form created and linked', {
+        userId: user.userId,
+        userEmail: user.userEmail,
+        templateType,
+        created: createResult,
+        applied: patch,
+        configSave: { success: saveResult.success, message: saveResult.message }
+      });
     }
 
     case 'previewBoard': {

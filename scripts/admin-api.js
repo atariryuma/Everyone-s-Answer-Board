@@ -47,6 +47,8 @@ const OPERATIONS = [
   'findUser', 'getUserConfig', 'exportConfigs',
   'setUserConfig', 'bulkSetUserConfig',
   'runColumnAnalysis', 'previewBoard',
+  // Form operations (v3)
+  'listMyForms', 'validateFormUrl', 'connectForm', 'createForm',
 ];
 
 /**

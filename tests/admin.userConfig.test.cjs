@@ -103,6 +103,42 @@ function loadAdminContext(overrides = {}) {
       axisConfig: { defaultMin: 1, defaultMax: 5 },
       data: [{ id: 'row_2', numericX: 3 }, { id: 'row_3', numericX: 4 }, { id: 'row_4', numericX: 5 }, { id: 'row_5', numericX: 2 }]
     }),
+    // Form-related stubs
+    getForms: () => ({ success: true, forms: [{ id: 'f1', name: 'Form1', url: 'https://docs.google.com/forms/d/f1/viewform' }] }),
+    createTemplateForm: (type) => ({
+      success: true,
+      formUrl: `https://docs.google.com/forms/d/new_${type || 'board'}/viewform`,
+      formTitle: `Template ${type || 'board'}`,
+      formId: `new_${type || 'board'}`,
+      spreadsheetId: `sheet_${type || 'board'}`,
+      sheetName: 'フォームの回答 1',
+      wasCreated: true
+    }),
+    processFormUrlInput: (url) => {
+      if (!url || !url.includes('/forms/')) {
+        return { success: false, error: 'Invalid form URL' };
+      }
+      return {
+        success: true,
+        formUrl: url,
+        formTitle: 'Existing Form',
+        formId: 'exf1',
+        spreadsheetId: 'exsheet1',
+        sheetName: 'フォームの回答 1',
+        wasCreated: false
+      };
+    },
+    isValidFormUrl: (url) => typeof url === 'string' && (url.includes('/forms/d/') || url.includes('forms.gle/')),
+    FormApp: {
+      openByUrl: (url) => {
+        if (!url.includes('/forms/')) throw new Error('Unreachable form');
+        return {
+          getTitle: () => 'Existing Form',
+          getId: () => 'exf1',
+          getDestinationId: () => 'exsheet1'
+        };
+      }
+    },
     // expose saved configs for assertions
     __savedConfigs: savedConfigs,
     ...overrides
@@ -366,4 +402,123 @@ test('previewBoard: requires userId', () => {
   const ctx = loadAdminContext();
   const res = ctx.dispatchAdminOperation('previewBoard', {});
   assert.equal(res.success, false);
+});
+
+// =====================================================================
+// Form operations (v3)
+// =====================================================================
+
+test('listMyForms: returns list of forms in caller Drive', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('listMyForms', {});
+  assert.equal(res.success, true);
+  assert.equal(res.forms.length, 1);
+  assert.equal(res.forms[0].id, 'f1');
+});
+
+test('validateFormUrl: rejects missing URL', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('validateFormUrl', {});
+  assert.equal(res.success, false);
+});
+
+test('validateFormUrl: detects non-form URL', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('validateFormUrl', {
+    formUrl: 'https://example.com/not-a-form'
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.data.isValidFormUrl, false);
+});
+
+test('validateFormUrl: confirms a reachable Form URL', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('validateFormUrl', {
+    formUrl: 'https://docs.google.com/forms/d/f1/viewform'
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.data.isValidFormUrl, true);
+  assert.equal(res.data.reachable, true);
+  assert.equal(res.data.formTitle, 'Existing Form');
+});
+
+test('connectForm: rejects missing formUrl', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('connectForm', { userId: 'u1' });
+  assert.equal(res.success, false);
+});
+
+test('connectForm: links existing form to user config', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('connectForm', {
+    userId: 'u2',
+    formUrl: 'https://docs.google.com/forms/d/f1/viewform'
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.data.userId, 'u2');
+  assert.equal(res.data.applied.formTitle, 'Existing Form');
+  assert.equal(res.data.applied.spreadsheetId, 'exsheet1');
+  // 実際に saveUserConfig が呼ばれて config に反映
+  const saved = ctx.__savedConfigs.get('u2').config;
+  assert.equal(saved.formUrl, 'https://docs.google.com/forms/d/f1/viewform');
+  assert.equal(saved.spreadsheetId, 'exsheet1');
+});
+
+test('connectForm: surfaces error when processFormUrlInput fails', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('connectForm', {
+    userId: 'u1',
+    formUrl: 'not-a-form-url'
+  });
+  assert.equal(res.success, false);
+});
+
+test('createForm: creates board template and links to user', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('createForm', { userId: 'u1' });
+  assert.equal(res.success, true);
+  assert.equal(res.data.templateType, 'board');
+  // 紐付け確認
+  const saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.formTitle, 'Template board');
+  assert.equal(saved.spreadsheetId, 'sheet_board');
+});
+
+test('createForm: numberline template also sets boardMode', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('createForm', {
+    userId: 'u1', templateType: 'numberline'
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.data.templateType, 'numberline');
+  const saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.displaySettings.boardMode, 'numberline');
+});
+
+test('createForm: matrix template also sets boardMode', () => {
+  const ctx = loadAdminContext();
+  ctx.dispatchAdminOperation('createForm', {
+    userId: 'u1', templateType: 'matrix'
+  });
+  const saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.displaySettings.boardMode, 'matrix');
+});
+
+test('createForm: invalid templateType falls back to board', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('createForm', {
+    userId: 'u1', templateType: 'INVALID'
+  });
+  assert.equal(res.success, true);
+  assert.equal(res.data.templateType, 'board');
+});
+
+test('createForm / connectForm: rejects unknown userId', () => {
+  const ctx = loadAdminContext();
+  const r1 = ctx.dispatchAdminOperation('createForm', { userId: 'NOPE' });
+  assert.equal(r1.success, false);
+  const r2 = ctx.dispatchAdminOperation('connectForm', {
+    userId: 'NOPE', formUrl: 'https://docs.google.com/forms/d/f1/viewform'
+  });
+  assert.equal(r2.success, false);
 });
