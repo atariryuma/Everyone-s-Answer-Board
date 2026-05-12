@@ -51,6 +51,8 @@ const OPERATIONS = [
   'listMyForms', 'validateFormUrl', 'connectForm', 'createForm', 'customizeForm',
   // Multi-board profiles (v4)
   'listProfiles', 'saveProfile', 'loadProfile', 'deleteProfile',
+  // Data ops (v5) — テストデータ投入専用
+  'appendRows',
 ];
 
 /**
@@ -71,7 +73,7 @@ function parseArgs(args) {
   const params = {};
   let outputPath = null;
 
-  const JSON_KEYS = new Set(['json', 'patch', 'filter', 'options', 'schema', 'snapshot']);
+  const JSON_KEYS = new Set(['json', 'patch', 'filter', 'options', 'schema', 'snapshot', 'rows']);
 
   for (let i = 1; i < args.length; i++) {
     const raw = args[i];

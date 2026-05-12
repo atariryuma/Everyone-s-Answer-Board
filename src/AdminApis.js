@@ -25,7 +25,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, FormApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, FormApp, SpreadsheetApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -948,6 +948,70 @@ function dispatchAdminOperation(operation, params) {
       // 削除した profile が active だったら activeProfile も解除
       if (cur.activeProfile === params.name) patch.activeProfile = null;
       return applyConfigPatch_(params.userId, patch, { publish: false });
+    }
+
+    case 'appendRows': {
+      // Why: テストデータ投入用。Spreadsheet に複数 row を一括 append。
+      //      Forms 経由ではなく直接書き込むので、本番運用では使わないこと。
+      //      授業前の動作確認・デモ・空状態回避でのみ使う。
+      //
+      //   セーフガード:
+      //   - 最大 500 row まで（巨大投入を防ぐ）
+      //   - first col が null/'' なら自動で now() タイムスタンプ
+      //   - 列数は既存ヘッダ幅に padding して整列
+      if (!params.spreadsheetId || typeof params.spreadsheetId !== 'string') {
+        return createErrorResponse('spreadsheetId is required');
+      }
+      if (!params.sheetName || typeof params.sheetName !== 'string') {
+        return createErrorResponse('sheetName is required');
+      }
+      if (!Array.isArray(params.rows) || params.rows.length === 0) {
+        return createErrorResponse('rows (non-empty array) is required');
+      }
+      if (params.rows.length > 500) {
+        return createErrorResponse('rows array too large (max 500)');
+      }
+      try {
+        const ss = SpreadsheetApp.openById(params.spreadsheetId);
+        const sheet = ss.getSheetByName(params.sheetName);
+        if (!sheet) return createErrorResponse(`Sheet "${params.sheetName}" not found`);
+
+        const now = new Date();
+        const lastCol = Math.max(1, sheet.getLastColumn());
+        const normalized = params.rows.map((row, idx) => {
+          if (!Array.isArray(row)) return null;
+          const r = row.slice();
+          // first column を timestamp として扱う：null/'' なら自動補完
+          if (r[0] === null || r[0] === undefined || r[0] === '') {
+            // Why: 1 秒ずらして並び順を安定化
+            r[0] = new Date(now.getTime() + idx * 1000);
+          }
+          return r;
+        }).filter(Boolean);
+
+        if (normalized.length === 0) {
+          return createErrorResponse('no valid rows after normalization');
+        }
+        const maxLen = Math.max(lastCol, ...normalized.map(r => r.length));
+        const padded = normalized.map(r => {
+          const out = r.slice();
+          while (out.length < maxLen) out.push('');
+          return out;
+        });
+
+        const startRow = sheet.getLastRow() + 1;
+        sheet.getRange(startRow, 1, padded.length, maxLen).setValues(padded);
+
+        return createSuccessResponse('Rows appended', {
+          spreadsheetId: params.spreadsheetId,
+          sheetName: params.sheetName,
+          appendedCount: padded.length,
+          startRow,
+          endRow: startRow + padded.length - 1
+        });
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
     }
 
     case 'previewBoard': {
