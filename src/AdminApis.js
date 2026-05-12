@@ -25,7 +25,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, PropertiesService */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, PropertiesService */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -566,7 +566,249 @@ function dispatchAdminOperation(operation, params) {
       return createSuccessResponse('Properties listed', { properties: masked });
     }
 
+    // --- User Config Operations ---
+    // Why: 既存の getUsers は users 行を返すだけで、config JSON が文字列のまま。
+    //      CLI から「ユーザー A の boardMode を numberline に」など個別操作するには
+    //      parsed config を返す/受け取る API が必要。
+    case 'findUser': {
+      if (!params.email || typeof params.email !== 'string') {
+        return createErrorResponse('email is required');
+      }
+      const user = findUserByEmail(String(params.email).trim(), { requestingUser: getCurrentEmail() });
+      if (!user) return createErrorResponse('User not found');
+      return createSuccessResponse('User found', { user: redactUserForApi_(user) });
+    }
+
+    case 'getUserConfig': {
+      if (!params.userId || typeof params.userId !== 'string') {
+        return createErrorResponse('userId is required');
+      }
+      const result = getUserConfig(params.userId);
+      if (!result.success) return createErrorResponse(result.message || 'getUserConfig failed');
+      return createSuccessResponse('Config retrieved', {
+        userId: params.userId,
+        config: result.config
+      });
+    }
+
+    case 'exportConfigs': {
+      // Why: 全ユーザーの config を JSON でダンプ。バックアップや別環境への移行、
+      //      差分管理、教師ごとの設定比較に使う。configJson 文字列をパース済みで返す。
+      const usersResult = getAdminUsers();
+      if (!usersResult.success) return usersResult;
+      const exported = (usersResult.data?.users || usersResult.users || []).map(u => {
+        let parsed = {};
+        try { parsed = u.configJson ? JSON.parse(u.configJson) : {}; } catch (_) { parsed = {}; }
+        return {
+          userId: u.userId,
+          userEmail: u.userEmail,
+          isActive: u.isActive,
+          createdAt: u.createdAt,
+          lastModified: u.lastModified,
+          config: parsed
+        };
+      });
+      return createSuccessResponse('Configs exported', {
+        count: exported.length,
+        exportedAt: new Date().toISOString(),
+        configs: exported
+      });
+    }
+
+    case 'setUserConfig': {
+      if (!params.userId || typeof params.userId !== 'string') {
+        return createErrorResponse('userId is required');
+      }
+      if (!params.patch || typeof params.patch !== 'object' || Array.isArray(params.patch)) {
+        return createErrorResponse('patch (object) is required');
+      }
+      return applyConfigPatch_(params.userId, params.patch, {
+        publish: Boolean(params.publish)
+      });
+    }
+
+    case 'bulkSetUserConfig': {
+      // 全ユーザーに同じ patch を適用。dryRun で影響範囲を見られる。
+      // Why: 「6 年全クラスに同じ軸ラベル一括展開」など、運用上の bulk 操作用。
+      if (!params.patch || typeof params.patch !== 'object' || Array.isArray(params.patch)) {
+        return createErrorResponse('patch (object) is required');
+      }
+      const dryRun = Boolean(params.dryRun);
+      const targetFilter = params.filter || {};
+      const usersResult = getAdminUsers();
+      if (!usersResult.success) return usersResult;
+      const users = usersResult.data?.users || usersResult.users || [];
+      const matched = users.filter(u => matchesUserFilter_(u, targetFilter));
+      if (dryRun) {
+        return createSuccessResponse('Dry run', {
+          matchedCount: matched.length,
+          totalUsers: users.length,
+          sample: matched.slice(0, 5).map(u => ({ userId: u.userId, userEmail: u.userEmail }))
+        });
+      }
+      const results = [];
+      for (const u of matched) {
+        const r = applyConfigPatch_(u.userId, params.patch, { publish: false });
+        results.push({ userId: u.userId, userEmail: u.userEmail, success: r.success, message: r.message });
+      }
+      const okCount = results.filter(r => r.success).length;
+      return createSuccessResponse(`bulkSetUserConfig: ${okCount}/${results.length} succeeded`, {
+        results,
+        appliedTo: okCount,
+        failedCount: results.length - okCount
+      });
+    }
+
+    case 'runColumnAnalysis': {
+      // Why: フロントのみで実行できた列分析を CLI からも実行可能に。
+      //      列マッピング自動検出 + numericScaleCandidates を CLI でレビューできる。
+      if (!params.spreadsheetId || typeof params.spreadsheetId !== 'string') {
+        // userId 指定なら、そのユーザーの config から取得
+        if (params.userId && typeof params.userId === 'string') {
+          const cfgRes = getUserConfig(params.userId);
+          if (!cfgRes.success || !cfgRes.config?.spreadsheetId) {
+            return createErrorResponse('User has no spreadsheet configured');
+          }
+          return getColumnAnalysis(cfgRes.config.spreadsheetId, cfgRes.config.sheetName);
+        }
+        return createErrorResponse('spreadsheetId or userId is required');
+      }
+      const sheetName = typeof params.sheetName === 'string' ? params.sheetName : 'フォームの回答 1';
+      return getColumnAnalysis(params.spreadsheetId, sheetName);
+    }
+
+    case 'previewBoard': {
+      // Why: 教師がボードを公開する前に「viewer から何が見えるか」を CLI で
+      //      確認できる（プライバシー設定通りに匿名化されているか等）。
+      if (!params.userId || typeof params.userId !== 'string') {
+        return createErrorResponse('userId is required');
+      }
+      // getPublishedSheetData は admin/owner 判定のため getBatchedAdminAuth を内部で使う。
+      // 本関数は API キー経路（既に admin と同等）なので、targetUserId を渡せば直接呼べる。
+      const result = getPublishedSheetData(
+        params.classFilter || null,
+        params.sortOrder || 'newest',
+        false,
+        params.userId
+      );
+      // 大きい data 配列は CLI で扱いにくいので、件数だけ返してサンプル 3 件を見せる
+      const trimmed = {
+        success: result.success,
+        header: result.header,
+        sheetName: result.sheetName,
+        displaySettings: result.displaySettings,
+        axisConfig: result.axisConfig,
+        dataCount: Array.isArray(result.data) ? result.data.length : 0,
+        sampleData: Array.isArray(result.data) ? result.data.slice(0, 3) : [],
+        error: result.error
+      };
+      return createSuccessResponse('Board preview', trimmed);
+    }
+
     default:
       return createErrorResponse(`Unknown operation: ${op}`, null, { error: 'UNKNOWN_OPERATION' });
   }
+}
+
+/**
+ * users 行から API レスポンス向けの安全な表現に整形（configJson 文字列をパース）。
+ * Why: getUsers は raw 行を返すが、CLI で扱いやすくパース済みオブジェクトに整形。
+ */
+function redactUserForApi_(user) {
+  if (!user || typeof user !== 'object') return user;
+  let config = null;
+  try { config = user.configJson ? JSON.parse(user.configJson) : null; } catch (_) {}
+  return {
+    userId: user.userId,
+    userEmail: user.userEmail,
+    googleId: user.googleId || null,
+    isActive: !!user.isActive,
+    createdAt: user.createdAt,
+    lastModified: user.lastModified,
+    config
+  };
+}
+
+/**
+ * ユーザーフィルタ判定。`bulkSetUserConfig` 用。
+ * Why: target を全件か一部に絞るシンプルな機構。複雑な条件は将来追加。
+ *   filter = { isActive: true, isPublished: false, emailContains: "naha" }
+ */
+function matchesUserFilter_(user, filter) {
+  if (!filter || typeof filter !== 'object') return true;
+  if (filter.isActive !== undefined && Boolean(user.isActive) !== Boolean(filter.isActive)) return false;
+  if (filter.emailContains && typeof filter.emailContains === 'string') {
+    if (!String(user.userEmail || '').toLowerCase().includes(filter.emailContains.toLowerCase())) return false;
+  }
+  if (filter.isPublished !== undefined) {
+    try {
+      const cfg = user.configJson ? JSON.parse(user.configJson) : {};
+      if (Boolean(cfg.isPublished) !== Boolean(filter.isPublished)) return false;
+    } catch (_) {
+      if (filter.isPublished) return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * 既存 config に patch を deep-merge して保存する。
+ *
+ * Why: CLI から `setUserConfig --patch '{"displaySettings":{"boardMode":"numberline"}}'`
+ *      で部分更新できるようにするための内部実装。深いマージで他フィールドを保持。
+ *
+ *      sanitize は saveUserConfig が validateAndSanitizeConfig 経由で行うので、
+ *      ここでは patch を merge するだけ。許可フィールドはバックエンドの sanitize
+ *      関数の allowlist が最終ゲート。
+ *
+ *      protected fields (userId/userEmail/etag) は明示的に削除。
+ */
+function applyConfigPatch_(userId, patch, options) {
+  if (!userId || typeof userId !== 'string') {
+    return createErrorResponse('userId is required');
+  }
+  const PROTECTED = ['userId', 'userEmail', 'googleId', 'createdAt', 'etag'];
+  // Clone & strip protected keys top-level
+  const safePatch = {};
+  for (const k of Object.keys(patch)) {
+    if (PROTECTED.includes(k)) continue;
+    safePatch[k] = patch[k];
+  }
+
+  // Load existing config
+  const cur = getUserConfig(userId);
+  if (!cur.success) return createErrorResponse(cur.message || 'getUserConfig failed');
+  const merged = deepMerge_(cur.config || {}, safePatch);
+  merged.userId = userId;
+
+  // Save through existing sanitizing pipeline (validateAndSanitizeConfig handles everything)
+  const saveOptions = options && options.publish ? { isPublish: true } : { isMainConfig: true };
+  const result = saveUserConfig(userId, merged, saveOptions);
+  return result;
+}
+
+/**
+ * Deep merge: target に source を mutate せずマージ。
+ * - plain object 同士は再帰
+ * - 配列は置換（merge しない）
+ * - source の null は target のキーを削除する明示シグナル
+ */
+function deepMerge_(target, source) {
+  if (target === null || typeof target !== 'object' || Array.isArray(target)) {
+    return source === undefined ? target : source;
+  }
+  const out = { ...target };
+  for (const k of Object.keys(source)) {
+    const v = source[k];
+    if (v === null) {
+      delete out[k];
+    } else if (Array.isArray(v)) {
+      out[k] = v.slice();
+    } else if (typeof v === 'object') {
+      out[k] = deepMerge_(target[k] || {}, v);
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
 }
