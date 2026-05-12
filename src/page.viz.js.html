@@ -980,6 +980,97 @@
   };
 
   /**
+   * 教師用モード切替バー。view 画面の上部に注入し、5 モードへの即時切替を提供。
+   *
+   * Why: 道徳 45 分授業中、管理画面に戻らず電子黒板の前で「導入(円グラフ) → 展開(数直線) →
+   *      終末(ワードランキング)」を切替えられるようにする。state.boardMode を更新して
+   *      renderBoard を一発呼ぶだけで完結。データ再読み込み不要（同一 spreadsheet）。
+   *
+   *      board モード（純粋な掲示板）にもバーは出す（教師が viz モードへ切替えたい時に必要）。
+   *      非教師（児童）には注入しない。
+   */
+  const MODE_BAR_ITEMS = [
+    { id: 'board',      label: '📋 掲示板',       desc: 'カード一覧' },
+    { id: 'numberline', label: '📏 数直線',       desc: 'M1 ポジショニング' },
+    { id: 'matrix',     label: '🎯 散布図',       desc: 'M2 2軸マトリクス' },
+    { id: 'wordcloud',  label: '🔠 ワードランキング', desc: 'M3 頻出語' },
+    { id: 'pie',        label: '🥧 円グラフ',     desc: 'M4 選択肢分布' }
+  ];
+
+  function isTeacher(app) {
+    // Why: page.js の state は isEditor / isAdminUser / showAdminFeatures フラグを持つ。
+    //      いずれかが true なら教師権限ありと判定。board mode（カード表示）でも常設するため
+    //      mode を問わずチェックする。
+    if (!app || !app.state) return false;
+    return Boolean(app.state.isEditor || app.state.isAdminUser || app.state.showAdminFeatures);
+  }
+
+  function injectModeBar(app) {
+    if (!isTeacher(app)) return;
+    if (document.getElementById('vizModeBar')) return; // すでに注入済み
+
+    // mode bar の挿入先: main-header の直下、答え一覧の上
+    const host = document.getElementById('main-header') || document.body;
+    const bar = document.createElement('div');
+    bar.id = 'vizModeBar';
+    bar.className = 'viz-mode-bar';
+    bar.setAttribute('role', 'toolbar');
+    bar.setAttribute('aria-label', '可視化モード切替');
+
+    const inner = MODE_BAR_ITEMS.map(item => {
+      return `<button type="button" class="viz-mode-btn" data-mode="${item.id}" title="${item.desc}">${item.label}</button>`;
+    }).join('');
+    bar.innerHTML = inner;
+
+    // ホスト末尾に追加
+    host.parentNode.insertBefore(bar, host.nextSibling);
+
+    bar.addEventListener('click', (e) => {
+      const btn = e.target.closest('.viz-mode-btn');
+      if (!btn) return;
+      const mode = btn.dataset.mode;
+      if (!mode) return;
+      app.__vizSetMode(mode);
+    });
+  }
+
+  function refreshModeBar(app) {
+    const bar = document.getElementById('vizModeBar');
+    if (!bar) return;
+    const cur = app.state.boardMode || 'board';
+    bar.querySelectorAll('.viz-mode-btn').forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.mode === cur);
+    });
+  }
+
+  /**
+   * Programmatic mode switch (called from mode bar click handler and URL handlers).
+   * @param {string} mode - 'board' | 'numberline' | 'matrix' | 'wordcloud' | 'pie'
+   */
+  StudyQuestApp.prototype.__vizSetMode = function (mode) {
+    if (!/^(board|numberline|matrix|wordcloud|pie)$/.test(mode)) return;
+    this.state.boardMode = mode;
+    // Why: タブ内で持続させる。polling 後の再描画でもユーザー選択を尊重。
+    try { sessionStorage.setItem('viz:teacherMode:v1', mode); } catch (_) {}
+    // 切替時は timeline 位置・compare モードをリセット（新モードでの誤動作回避）
+    this.state.vizTimelineIndex = null;
+    this.state.vizCompareMode = false;
+    // 同じデータで再描画
+    this.renderBoard(false, false, []);
+    refreshModeBar(this);
+  };
+
+  StudyQuestApp.prototype.__vizClearTeacherMode = function () {
+    try { sessionStorage.removeItem('viz:teacherMode:v1'); } catch (_) {}
+    if (this.state.serverBoardMode) {
+      this.__vizSetMode(this.state.serverBoardMode);
+    }
+  };
+
+  StudyQuestApp.prototype.__vizInjectModeBar = function () { injectModeBar(this); };
+  StudyQuestApp.prototype.__vizRefreshModeBar = function () { refreshModeBar(this); };
+
+  /**
    * タイムライン UI を viz container に注入。教師権限のみ表示。
    * Why: 終末フェーズで「議論経過とともに意見分布がどう動いたか」を再生し、
    *      児童に振り返りメタ認知を促す。シークバー操作で過去スナップショットから再描画。

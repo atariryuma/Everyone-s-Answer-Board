@@ -181,6 +181,54 @@
     text-anchor: middle;
   }
 
+  /* 教師用モード切替バー（道徳 45 分授業の即時切替用） */
+  .viz-mode-bar {
+    display: flex;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    padding: 0.6rem 0.8rem;
+    background: rgba(15, 23, 42, 0.75);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+    position: sticky;
+    top: 0;
+    z-index: 30;
+  }
+  .viz-mode-btn {
+    padding: 0.4rem 0.85rem;
+    border-radius: 0.45rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(30, 41, 59, 0.6);
+    color: var(--brand-text, #e2e8f0);
+    cursor: pointer;
+    font-size: 0.92rem;
+    font-weight: 500;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    white-space: nowrap;
+  }
+  .viz-mode-btn:hover {
+    background: rgba(56, 189, 248, 0.18);
+    border-color: rgba(56, 189, 248, 0.5);
+    transform: translateY(-1px);
+  }
+  .viz-mode-btn.active {
+    background: rgba(56, 189, 248, 0.35);
+    border-color: #38bdf8;
+    color: #fff;
+    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.6) inset;
+  }
+  body.projector-mode .viz-mode-bar {
+    padding: 0.8rem 1.2rem;
+    background: rgba(10, 14, 26, 0.92);
+  }
+  body.projector-mode .viz-mode-btn {
+    font-size: 1.1rem;
+    padding: 0.5rem 1.1rem;
+  }
+  @media (max-width: 640px) {
+    .viz-mode-bar { padding: 0.4rem 0.5rem; }
+    .viz-mode-btn { font-size: 0.82rem; padding: 0.3rem 0.6rem; }
+  }
+
   /* タイムライン + Before/After 操作パネル */
   .viz-controls {
     display: flex;

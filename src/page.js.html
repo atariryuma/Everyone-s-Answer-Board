@@ -1962,11 +1962,30 @@
         // Why: 可視化モード切替に必要なメタデータを state に保存。
         //      backend で 'auto' → 具体モードに解決済みなので、ここでは値を信用するだけ。
         //      axisConfig は M1/M2 で軸ラベル・象限ラベル・allowResubmit を描画する。
-        if (result.displaySettings && typeof result.displaySettings.boardMode === 'string') {
-          this.state.boardMode = result.displaySettings.boardMode;
-        } else {
-          this.state.boardMode = 'board';
-        }
+        const serverMode = (result.displaySettings && typeof result.displaySettings.boardMode === 'string')
+          ? result.displaySettings.boardMode
+          : 'board';
+
+        // Why: 道徳 45 分授業中にモードを切替えるため、教師は ?boardMode=X か
+        //      モード切替バーを使う。優先順は (1)ユーザー指定 (2)server解決値。
+        //      タブ内で sessionStorage に保持し、polling のたびにリセットされないようにする。
+        let overrideMode = null;
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const urlMode = params.get('boardMode');
+          if (urlMode && /^(auto|board|numberline|matrix|wordcloud|pie)$/.test(urlMode)) {
+            overrideMode = urlMode;
+          }
+          if (!overrideMode) {
+            const stored = sessionStorage.getItem('viz:teacherMode:v1');
+            if (stored && /^(auto|board|numberline|matrix|wordcloud|pie)$/.test(stored)) {
+              overrideMode = stored;
+            }
+          }
+        } catch (_) { /* sessionStorage 不可な環境では override 無効 */ }
+
+        this.state.boardMode = overrideMode || serverMode;
+        this.state.serverBoardMode = serverMode;
         this.state.axisConfig = result.axisConfig || null;
 
         if (result.header && this.elements.headingLabel) {
@@ -2172,6 +2191,10 @@
 
         // タイムライン位置が指定されていれば、その snapshot で描画
         const result = await runWithTimeline(renderOne);
+
+        // 教師用モード切替バーは全モード共通で注入（board モードでも viz への切替が可能）
+        if (typeof this.__vizInjectModeBar === 'function') this.__vizInjectModeBar();
+        if (typeof this.__vizRefreshModeBar === 'function') this.__vizRefreshModeBar();
 
         // viz モードでは UI 補助（コントロール注入 + state 更新）
         if (mode !== 'board') {
