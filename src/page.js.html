@@ -2677,12 +2677,18 @@
         });
       }
 
+      // Why: opinion/name は数値（線形尺度モード時の numericX 値 1-5）の場合があるが、
+      //      後段の .slice() / .substring() / escapeHtml() は string を前提とするので、
+      //      ここで必ず文字列に正規化する。これがないと renderBoardCards にフォールバック
+      //      した際に「TypeError: safeData.opinion.slice is not a function」で全カードが
+      //      createErrorCard に倒れる（道徳本時 numberline 用 Form で観測されたバグ）。
+      const toStr = (v) => (v === null || v === undefined) ? '' : String(v);
       return {
         rowIndex: data.rowIndex || 0,
-        opinion: data.opinion || '',
+        opinion: toStr(data.opinion),
         reason: this.validateReasonText(data.reason),
-        name: data.name || '',
-        email: data.email || '',
+        name: toStr(data.name),
+        email: toStr(data.email),
         reactions: data.reactions || {},
         highlight: Boolean(data.highlight)
       };
