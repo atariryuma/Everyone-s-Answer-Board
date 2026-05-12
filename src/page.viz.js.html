@@ -999,10 +999,20 @@
 
   function isTeacher(app) {
     // Why: page.js の state は isEditor / isAdminUser / showAdminFeatures フラグを持つ。
-    //      いずれかが true なら教師権限ありと判定。board mode（カード表示）でも常設するため
-    //      mode を問わずチェックする。
+    //      これに加えて以下も認める：
+    //       1. URL に ?teacher=1 が付いている（強制ON。テスト・代理閲覧用）
+    //       2. wire レスポンスに profiles が含まれている（サーバ側が「この閲覧者は
+    //          所有者/管理者」と判定して送ってきている）→ それを根拠にする
     if (!app || !app.state) return false;
-    return Boolean(app.state.isEditor || app.state.isAdminUser || app.state.showAdminFeatures);
+    if (app.state.isEditor || app.state.isAdminUser || app.state.showAdminFeatures) return true;
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('teacher') === '1' || params.get('admin') === '1') return true;
+    } catch (_) {}
+    // profiles 自体は誰でも見える（buildSafePublishedDataResult が全員に送る）ため、
+    // それを根拠に teacher 判定すると student にも UI が出てしまう。
+    // → profiles の存在は十分条件ではない。
+    return false;
   }
 
   function injectModeBar(app) {

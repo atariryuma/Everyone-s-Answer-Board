@@ -2041,6 +2041,12 @@
         this.state.boardMode = overrideMode || serverMode;
         this.state.serverBoardMode = serverMode;
         this.state.axisConfig = result.axisConfig || null;
+        // Why: server が判定した teacher フラグ (isOwnBoard || isAdmin) を尊重。
+        //      client の window.isEditor / state.isAdminUser は bootstrap 時の値で、
+        //      poll のたびにサーバ側の最新権限状態と整合させる。
+        if (result.viewerIsTeacher === true) {
+          this.state.isEditor = true;
+        }
         // multi-board: profile セレクタが使うメタ情報
         if (result.profiles && result.profiles.list) {
           this.state.profiles = result.profiles.list;

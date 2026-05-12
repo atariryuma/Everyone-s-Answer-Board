@@ -833,11 +833,13 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     defaultMax: 5
   };
 
-  // Why: multi-board の profile セレクタを view 画面で描画するために、profile name 一覧と
-  //      activeProfile を wire に乗せる。所有者/管理者のみ profile 一覧が見えるべきだが、
-  //      ここでは contextual に「name と表示用メタ」だけ送る（spreadsheetId 等の機密情報は除外）。
+  // Why: multi-board の profile セレクタは「所有者または管理者のみ」が操作可能。
+  //      students の wire には乗せない（混乱回避 + 内部設定の漏洩防止）。
+  //      また、これを client の isTeacher 判定の根拠にも使う（profiles 配列が wire に
+  //      含まれていれば、その閲覧者は teacher 権限）。
   let profileSummary = null;
-  if (config && Array.isArray(config.profiles) && config.profiles.length > 0) {
+  const isPrivilegedViewer = Boolean(viewerContext.isAdmin || viewerContext.isOwnBoard);
+  if (isPrivilegedViewer && config && Array.isArray(config.profiles) && config.profiles.length > 0) {
     profileSummary = {
       active: config.activeProfile || null,
       list: config.profiles.map(p => ({
@@ -847,6 +849,10 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
       }))
     };
   }
+
+  // viewer がティーチャー権限を持つかの最終フラグ。client 側で UI 表示判定に使う。
+  // server 側で判定する方が改ざんに強い（client の window.isEditor は信用しない）。
+  const viewerIsTeacher = isPrivilegedViewer;
 
   // Why: 生徒の「📝 回答フォーム」ボタンを polling のたびに最新値に更新するため、
   //      formUrl と formTitle を wire に載せる。profile 切替で active config の
@@ -865,7 +871,8 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     displaySettings: { ...displaySettings, boardMode: effectiveMode },
     axisConfig,
     profiles: profileSummary,
-    formMeta
+    formMeta,
+    viewerIsTeacher
   };
 }
 

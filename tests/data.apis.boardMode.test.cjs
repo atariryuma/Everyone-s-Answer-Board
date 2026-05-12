@@ -234,7 +234,7 @@ test('formMeta: rejects non-string formUrl (defensive)', () => {
 // profiles wire — 生徒画面でも profile 一覧と active 状態が見える
 // =====================================================================
 
-test('profiles wire: returns list when profiles configured', () => {
+test('profiles wire: returns list when profiles configured (privileged viewer)', () => {
   const ctx = loadDataApisContext();
   const result = ctx.buildSafePublishedDataResult(
     { data: [], header: '', sheetName: '' },
@@ -247,7 +247,7 @@ test('profiles wire: returns list when profiles configured', () => {
       ],
       activeProfile: '本時'
     },
-    {}
+    { isOwnBoard: true } // privileged
   );
   assert.ok(result.profiles);
   assert.equal(result.profiles.active, '本時');
@@ -263,4 +263,71 @@ test('profiles wire: returns null when no profiles', () => {
     {}
   );
   assert.equal(result.profiles, null);
+});
+
+// =====================================================================
+// viewerIsTeacher + profiles gating
+// Why: profiles の wire 露出は所有者/管理者のみ。student に漏らさない。
+// =====================================================================
+
+test('viewerIsTeacher: true when isOwnBoard', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    { displaySettings: {}, columnMapping: {} },
+    { isOwnBoard: true }
+  );
+  assert.equal(result.viewerIsTeacher, true);
+});
+
+test('viewerIsTeacher: true when isAdmin', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    { displaySettings: {}, columnMapping: {} },
+    { isAdmin: true }
+  );
+  assert.equal(result.viewerIsTeacher, true);
+});
+
+test('viewerIsTeacher: false for regular viewer (student)', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    { displaySettings: {}, columnMapping: {} },
+    {}
+  );
+  assert.equal(result.viewerIsTeacher, false);
+});
+
+test('profiles wire: NOT sent to non-privileged viewer (students)', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      profiles: [{ name: 'p1', formTitle: 'A' }],
+      activeProfile: 'p1'
+    },
+    {} // not own, not admin
+  );
+  // 生徒は profile 配列を知らない（漏洩防止）
+  assert.equal(result.profiles, null);
+});
+
+test('profiles wire: sent to owner', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      profiles: [{ name: 'p1', formTitle: 'A' }],
+      activeProfile: 'p1'
+    },
+    { isOwnBoard: true }
+  );
+  assert.ok(result.profiles);
+  assert.equal(result.profiles.list.length, 1);
 });
