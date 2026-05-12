@@ -2020,9 +2020,21 @@
           ? result.displaySettings.boardMode
           : 'board';
 
-        // Why: 道徳 45 分授業中にモードを切替えるため、教師は ?boardMode=X か
-        //      モード切替バーを使う。優先順は (1)ユーザー指定 (2)server解決値。
-        //      タブ内で sessionStorage に保持し、polling のたびにリセットされないようにする。
+        // Why: モード解決は profile を切り替えたタイミングを境界とする。activeProfile が
+        //      切り替わった瞬間は sessionStorage の override をクリアして server の値を採用。
+        //      これがないと「教師が profile を切替えたのに mode が前の sessionStorage 値で
+        //      上書きされる」silent bug が起きる。同一 profile 内では sessionStorage の値を
+        //      尊重して polling のたびにリセットされない。
+        const serverActiveProfile = (result.profiles && result.profiles.active) || null;
+        const lastSeenProfileKey = 'viz:lastActiveProfile:v1';
+        let lastSeenProfile = null;
+        try { lastSeenProfile = sessionStorage.getItem(lastSeenProfileKey); } catch (_) {}
+        if (serverActiveProfile !== lastSeenProfile) {
+          // profile が変わった → mode override をクリア
+          try { sessionStorage.removeItem('viz:teacherMode:v1'); } catch (_) {}
+          try { sessionStorage.setItem(lastSeenProfileKey, serverActiveProfile || ''); } catch (_) {}
+        }
+
         let overrideMode = null;
         try {
           const params = new URLSearchParams(window.location.search);
@@ -2040,6 +2052,19 @@
 
         this.state.boardMode = overrideMode || serverMode;
         this.state.serverBoardMode = serverMode;
+        // 診断ログ：本番でも 1 回だけ出力（dev console で確認用）
+        try {
+          if (!this._modeLogged || this._modeLogged !== this.state.boardMode) {
+            console.info('[viz] mode resolved:', {
+              chosen: this.state.boardMode,
+              server: serverMode,
+              override: overrideMode,
+              activeProfile: serverActiveProfile,
+              viewerIsTeacher: result.viewerIsTeacher
+            });
+            this._modeLogged = this.state.boardMode;
+          }
+        } catch (_) {}
         this.state.axisConfig = result.axisConfig || null;
         // Why: server が判定した teacher フラグ (isOwnBoard || isAdmin) を尊重。
         //      client の window.isEditor / state.isAdminUser は bootstrap 時の値で、
@@ -4973,6 +4998,12 @@
       }
     }
   }
+
+  // Why: ES6 の class 宣言は <script> トップレベルでも window に自動公開されない。
+  //      page.viz.js は window.StudyQuestApp.prototype に method を追加する設計なので、
+  //      ここで明示的に公開する。これがないと viz レンダラー（renderNumberLine 等）と
+  //      モード切替バー / profile セレクタが全て無効化される silent bug になる。
+  window.StudyQuestApp = StudyQuestApp;
 
   try {
     if (!window.studyQuestApp) {
