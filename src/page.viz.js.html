@@ -226,6 +226,7 @@
 
     // 統計バッジ
     const stats = document.createElement('div');
+    stats.id = 'vizStatsPills';
     stats.className = 'viz-stats';
     stats.innerHTML =
       '<span class="stat-pill" id="vizCountPill">0件</span>' +
@@ -388,8 +389,24 @@
         .attr('cx', (d) => xScale(d.numericX))
         .attr('cy', () => yCenter + 70);
 
+      // Why: 揺らぎを「円の大きさ」で可視化（道徳指導案準拠）。
+      //      同一児童の最初〜最新の移動距離 distance を radius に線形マップ。
+      //      distance=0 (揺れなし) → base radius 7、distance>=4 → max radius 14。
+      //      これにより教師が一目で「動いた児童」を判別できる。
+      const swings = this.vizComputeSwings(rows, 'numberline');
+      const swingByHash = new Map(swings.map(s => [s.emailHash, s.distance]));
+      const BASE_R = 7, MAX_R = 14;
+      const radiusFor = (d) => {
+        if (!d.data || !d.data.emailHash) return BASE_R;
+        const dist = swingByHash.get(d.data.emailHash) || 0;
+        // 数直線の最大移動距離 = max - min = 4 (1-5 scale)
+        const norm = Math.min(dist / 4, 1);
+        return BASE_R + (MAX_R - BASE_R) * norm;
+      };
+
       // 現在点（ビーズワーム配置）— force simulation で重なりを回避
-      const radius = 8;
+      // Why: collide の半径は最大想定値で確保しないと大きい点同士が重なる。
+      const COLLIDE_R = MAX_R + 1.5;
       // Why: d3.forceSimulation を 1 回 tick して final position を確定する。
       //      アニメーションは CSS の vizEnter で十分。data is static after each load。
       const nodes = current.map((r) => ({
@@ -401,18 +418,19 @@
       const sim = d3.forceSimulation(nodes)
         .force('x', d3.forceX((d) => d.targetX).strength(1))
         .force('y', d3.forceY(yCenter + 70).strength(0.18))
-        .force('collide', d3.forceCollide(radius + 1.5))
+        .force('collide', d3.forceCollide(COLLIDE_R))
         .stop();
       for (let i = 0; i < 120; i++) sim.tick();
 
       const dotJoin = g.selectAll('.viz-dot.current').data(nodes, (d) => d.data.rowIndex);
       dotJoin.exit().remove();
       const dotEnter = dotJoin.enter().append('circle')
-        .attr('class', 'viz-dot current enter')
-        .attr('r', radius);
+        .attr('class', 'viz-dot current enter');
       dotEnter.merge(dotJoin)
         .attr('cx', (d) => d.x)
         .attr('cy', (d) => d.y)
+        .attr('r', (d) => radiusFor(d))
+        .classed('swing-high', (d) => radiusFor(d) > BASE_R + 3)
         .on('mouseenter', (event, d) => showTooltip(event, d.data, this))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, this))
         .on('mouseleave', () => hideTooltip())
@@ -420,7 +438,6 @@
 
       // 統計 + 教師パネル
       updateStatsPills(this, current.length);
-      const swings = this.vizComputeSwings(rows, 'numberline');
       maybeRenderTeacherPanel(this, swings);
 
       // 件数バッジ（既存のヘッダ表示）も更新（updateAnswerCount は board モード前提）
@@ -548,6 +565,18 @@
         .attr('cx', (d) => d.x)
         .attr('cy', (d) => d.y);
 
+      // Why: M2 でも揺らぎを radius で可視化。Euclidean distance を radius にマップ。
+      //      M1 と違って 2 軸（1-5）の対角線最大は √(4²+4²) ≈ 5.66。
+      const swings = this.vizComputeSwings(rows, 'matrix');
+      const swingByHashM = new Map(swings.map(s => [s.emailHash, s.distance]));
+      const BASE_R_M = 7, MAX_R_M = 14;
+      const radiusForMatrix = (d) => {
+        if (!d.data || !d.data.emailHash) return BASE_R_M;
+        const dist = swingByHashM.get(d.data.emailHash) || 0;
+        const norm = Math.min(dist / 5.66, 1);
+        return BASE_R_M + (MAX_R_M - BASE_R_M) * norm;
+      };
+
       // 現在点
       const nodes = current.map((r) => ({
         x: xScale(r.numericX + jitter(r.rowIndex)),
@@ -557,18 +586,18 @@
       const dotJoin = g.selectAll('.viz-dot.current').data(nodes, (d) => d.data.rowIndex);
       dotJoin.exit().remove();
       const dotEnter = dotJoin.enter().append('circle')
-        .attr('class', 'viz-dot current enter')
-        .attr('r', 8);
+        .attr('class', 'viz-dot current enter');
       dotEnter.merge(dotJoin)
         .attr('cx', (d) => d.x)
         .attr('cy', (d) => d.y)
+        .attr('r', (d) => radiusForMatrix(d))
+        .classed('swing-high', (d) => radiusForMatrix(d) > BASE_R_M + 3)
         .on('mouseenter', (event, d) => showTooltip(event, d.data, this))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, this))
         .on('mouseleave', () => hideTooltip())
         .on('click', (event, d) => showTooltip(event, d.data, this));
 
       updateStatsPills(this, current.length);
-      const swings = this.vizComputeSwings(rows, 'matrix');
       maybeRenderTeacherPanel(this, swings);
 
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
@@ -579,6 +608,580 @@
       console.error('renderMatrix: failed', e);
       throw e;
     }
+  };
+
+  // ---------------------------------------------------------------------
+  // M3: ワードランキング（道徳指導案 終末・メタ認知）
+  // ---------------------------------------------------------------------
+
+  // 日本語ストップワード（頻出する助詞・接続詞・代名詞）
+  // Why: 完全な形態素解析は GAS で重い。コメントから「意味のある語」だけ残す近似戦略。
+  //      kuromoji 等を使わず、句読点と助詞ベースで十分実用的な頻度集計が得られる。
+  const STOPWORDS = new Set([
+    'の','に','は','を','が','と','で','も','や','へ','から','まで','よ','ね','な','か','だ','です','ます',
+    'です。','ます。','こと','もの','これ','それ','あれ','どれ','ここ','そこ','あそこ','どこ',
+    'する','した','して','なる','なった','なって','ある','あった','ない','なく','いる','いた','いて',
+    'とき','とき。','ため','よう','うえ','した。','する。','思う','思った','思います',
+    'the','a','an','is','are','was','were','this','that','it','of','to','for','in','on','and','or','but','i',
+    'こんにちは','ありがとう','よろしく',
+  ]);
+
+  function tokenizeJapanese(text) {
+    if (!text || typeof text !== 'string') return [];
+    // Why: 完全な形態素解析 (kuromoji 等) は GAS / フロント環境では重い。
+    //      代わりに「内容語 = 漢字/カタカナ/英数字の連続」を抽出する近似戦略を取る。
+    //      日本語の助詞・助動詞は基本ひらがなのみで、句読点と並んで自然な区切り役となる。
+    //      ひらがな単独の語（「思う」「ある」等）は STOPWORDS で個別に除外する。
+    //
+    //   例: 「AIは便利だ。責任を持つ。」
+    //     → 抽出: ["AI", "便利", "責任", "持"]
+    //     → STOPWORDS / 1 文字フィルタ後: ["AI", "便利", "責任"]
+    const RE_CONTENT = /[A-Za-z0-9_]+|[一-鿿々]+|[ァ-ヺー]+/g;
+    const tokens = [];
+    let m;
+    while ((m = RE_CONTENT.exec(text)) !== null) {
+      const t = m[0].trim();
+      if (!t) continue;
+      if (STOPWORDS.has(t.toLowerCase())) continue;
+      // 1 文字漢字も内容語として保持（"愛"、"夢" 等）。それ以外の 1 文字は除外。
+      if (t.length === 1 && !/[一-鿿々]/.test(t)) continue;
+      tokens.push(t);
+    }
+    return tokens;
+  }
+
+  /**
+   * 単語頻度を集計。M3 ワードランキング表示用。
+   * @param {Array} rows - currentAnswers
+   * @param {string} field - 集計対象列名（'reason' or 'answer'）
+   * @returns {Array<{word, count}>} desc sorted, max 25 件
+   */
+  function aggregateWords(rows, field) {
+    const counts = new Map();
+    for (const r of rows || []) {
+      const text = r && r[field];
+      if (!text) continue;
+      const tokens = tokenizeJapanese(String(text));
+      // 1 投稿内の重複はカウント 1（同じ児童が同じ語を 10 回書いても 1 票）
+      const seen = new Set();
+      for (const t of tokens) {
+        if (seen.has(t)) continue;
+        seen.add(t);
+        counts.set(t, (counts.get(t) || 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .map(([word, count]) => ({ word, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 25);
+  }
+
+  StudyQuestApp.prototype.renderWordRanking = async function (isInitialLoad, oldRows) {
+    try {
+      const d3 = await this.ensureD3Loaded();
+      const rows = this.state.currentAnswers || [];
+      const containerRefs = getOrCreateVizContainer(this);
+      if (!containerRefs) return;
+
+      // Why: reason 列がメインの自由記述。空なら answer にフォールバック。
+      const useField = rows.some(r => r.reason) ? 'reason' : 'answer';
+      const words = aggregateWords(rows, useField);
+
+      const svgEl = containerRefs.svg;
+      const bounds = svgEl.getBoundingClientRect();
+      const width = Math.max(320, bounds.width || 800);
+      const itemH = 28;
+      const margin = { top: 20, right: 80, bottom: 20, left: 110 };
+      const height = Math.max(120, margin.top + margin.bottom + words.length * itemH);
+      svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      const svg = d3.select(svgEl);
+      svg.selectAll('*').remove();
+
+      if (words.length === 0) {
+        // 空状態（記述が無い）
+        svg.append('text')
+          .attr('class', 'viz-axis-label')
+          .attr('x', width / 2).attr('y', height / 2)
+          .attr('text-anchor', 'middle')
+          .text('集計できる語がまだありません');
+        updateStatsPills(this, 0);
+        return;
+      }
+
+      const innerW = width - margin.left - margin.right;
+      const innerH = height - margin.top - margin.bottom;
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+      const maxCount = words[0].count;
+      const xScale = d3.scaleLinear().domain([0, maxCount]).range([0, innerW]);
+      const yScale = d3.scaleBand().domain(words.map(w => w.word)).range([0, innerH]).padding(0.25);
+
+      // バー
+      const bars = g.selectAll('.word-bar').data(words, d => d.word);
+      bars.exit().remove();
+      bars.enter().append('rect')
+        .attr('class', 'word-bar')
+        .merge(bars)
+        .attr('x', 0)
+        .attr('y', d => yScale(d.word))
+        .attr('width', d => xScale(d.count))
+        .attr('height', yScale.bandwidth())
+        .attr('rx', 3);
+
+      // 単語ラベル（左）
+      const labels = g.selectAll('.word-label').data(words, d => d.word);
+      labels.exit().remove();
+      labels.enter().append('text')
+        .attr('class', 'word-label')
+        .merge(labels)
+        .attr('x', -8)
+        .attr('y', d => yScale(d.word) + yScale.bandwidth() / 2)
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'end')
+        .text(d => d.word);
+
+      // 件数ラベル（右）
+      const counts = g.selectAll('.word-count').data(words, d => d.word);
+      counts.exit().remove();
+      counts.enter().append('text')
+        .attr('class', 'word-count')
+        .merge(counts)
+        .attr('x', d => xScale(d.count) + 6)
+        .attr('y', d => yScale(d.word) + yScale.bandwidth() / 2)
+        .attr('dy', '0.35em')
+        .text(d => d.count);
+
+      updateStatsPills(this, rows.length);
+      if (this.elements.answerCount && typeof this.getIcon === 'function') {
+        this.elements.answerCount.innerHTML =
+          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + rows.length + '件</span>';
+      }
+    } catch (e) {
+      console.error('renderWordRanking: failed', e);
+      throw e;
+    }
+  };
+
+  // expose for tests / debugging
+  StudyQuestApp.prototype.__tokenize = tokenizeJapanese;
+  StudyQuestApp.prototype.__aggregateWords = aggregateWords;
+
+  // ---------------------------------------------------------------------
+  // M4: 円グラフ（道徳指導案 導入・アンケート結果可視化）
+  // ---------------------------------------------------------------------
+
+  /**
+   * カテゴリ列の値を集計。'answer' 列がデフォルト。
+   * 空・null は除外、同一値は集計でまとめる。
+   */
+  function aggregateCategories(rows, field) {
+    const counts = new Map();
+    for (const r of rows || []) {
+      const v = r && r[field];
+      if (v === null || v === undefined || v === '') continue;
+      const key = String(v).trim();
+      if (!key) continue;
+      counts.set(key, (counts.get(key) || 0) + 1);
+    }
+    return [...counts.entries()]
+      .map(([label, count]) => ({ label, count }))
+      .sort((a, b) => b.count - a.count);
+  }
+
+  StudyQuestApp.prototype.renderPie = async function (isInitialLoad, oldRows) {
+    try {
+      const d3 = await this.ensureD3Loaded();
+      const rows = this.state.currentAnswers || [];
+      const containerRefs = getOrCreateVizContainer(this);
+      if (!containerRefs) return;
+
+      // 'answer' 列を優先（Forms の選択肢設問はここに入る）
+      const useField = rows.some(r => r.answer) ? 'answer' : 'reason';
+      const cats = aggregateCategories(rows, useField);
+      const total = cats.reduce((s, c) => s + c.count, 0);
+
+      const svgEl = containerRefs.svg;
+      const bounds = svgEl.getBoundingClientRect();
+      const width = Math.max(360, bounds.width || 800);
+      const height = Math.max(360, bounds.height || 480);
+      svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      const svg = d3.select(svgEl);
+      svg.selectAll('*').remove();
+
+      if (cats.length === 0) {
+        svg.append('text')
+          .attr('class', 'viz-axis-label')
+          .attr('x', width / 2).attr('y', height / 2)
+          .attr('text-anchor', 'middle')
+          .text('集計できる回答がまだありません');
+        updateStatsPills(this, 0);
+        return;
+      }
+
+      const radius = Math.min(width, height) / 2 - 60;
+      const g = svg.append('g').attr('transform', `translate(${width / 2},${height / 2})`);
+
+      // Why: d3 のカテゴリカル配色を使う。色覚多様性に配慮して d3.schemeTableau10 を採用
+      const palette = (d3.schemeTableau10 || d3.schemeCategory10 || []);
+      const colorFor = (i) => palette[i % palette.length] || '#38bdf8';
+
+      const pie = d3.pie().value(d => d.count).sort(null);
+      const arc = d3.arc().innerRadius(0).outerRadius(radius);
+      const labelArc = d3.arc().innerRadius(radius * 0.7).outerRadius(radius * 0.7);
+
+      const slices = pie(cats);
+      const arcs = g.selectAll('.pie-slice').data(slices, d => d.data.label);
+      arcs.exit().remove();
+      arcs.enter().append('path')
+        .attr('class', 'pie-slice')
+        .merge(arcs)
+        .attr('d', arc)
+        .attr('fill', (d, i) => colorFor(i))
+        .on('mouseenter', (event, d) => {
+          const item = { name: d.data.label, reason: `${d.data.count}件 (${Math.round(d.data.count / total * 100)}%)`, numericX: d.data.count };
+          showTooltip(event, item, this);
+        })
+        .on('mouseleave', () => hideTooltip());
+
+      // ラベル
+      const labels = g.selectAll('.pie-label').data(slices, d => d.data.label);
+      labels.exit().remove();
+      labels.enter().append('text')
+        .attr('class', 'pie-label')
+        .merge(labels)
+        .attr('transform', d => `translate(${labelArc.centroid(d)})`)
+        .attr('text-anchor', 'middle')
+        .text(d => {
+          const pct = Math.round(d.data.count / total * 100);
+          return pct >= 5 ? `${d.data.label} ${pct}%` : '';
+        });
+
+      // 中央の合計件数
+      g.append('text')
+        .attr('class', 'pie-center')
+        .attr('text-anchor', 'middle')
+        .attr('dy', '0.35em')
+        .text(`${total} 件`);
+
+      updateStatsPills(this, rows.length);
+      if (this.elements.answerCount && typeof this.getIcon === 'function') {
+        this.elements.answerCount.innerHTML =
+          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + rows.length + '件</span>';
+      }
+    } catch (e) {
+      console.error('renderPie: failed', e);
+      throw e;
+    }
+  };
+
+  StudyQuestApp.prototype.__aggregateCategories = aggregateCategories;
+
+  // ---------------------------------------------------------------------
+  // スナップショット基盤（F#2 変化の軌跡 / F#4 ビフォー・アフター 共用）
+  //
+  // Why: 道徳指導案の終末フェーズで「議論前後の意見変化」を見せるため、
+  //      授業中の意見分布を時系列で保持する。サーバ側に永続化せず、
+  //      タブ内 sessionStorage に保持（タブを閉じれば消える運用）。
+  //      最大 60 件・60 sec 間隔で sampling 後、5 sec ポーリングしてもストレージ膨張なし。
+  // ---------------------------------------------------------------------
+
+  const SNAPSHOT_KEY = 'viz:snapshots:v1';
+  const SNAPSHOT_BEFORE_KEY = 'viz:before:v1';
+  const SNAPSHOT_MAX = 60;
+  const SNAPSHOT_INTERVAL_MS = 60 * 1000; // 60秒に 1 件採取
+
+  function loadSnapshots() {
+    try {
+      const raw = sessionStorage.getItem(SNAPSHOT_KEY);
+      if (!raw) return [];
+      const arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (_) { return []; }
+  }
+  function saveSnapshots(arr) {
+    try { sessionStorage.setItem(SNAPSHOT_KEY, JSON.stringify(arr)); } catch (_) {}
+  }
+  function loadBeforeSnapshot() {
+    try {
+      const raw = sessionStorage.getItem(SNAPSHOT_BEFORE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (_) { return null; }
+  }
+  function saveBeforeSnapshot(snap) {
+    try {
+      if (snap === null) sessionStorage.removeItem(SNAPSHOT_BEFORE_KEY);
+      else sessionStorage.setItem(SNAPSHOT_BEFORE_KEY, JSON.stringify(snap));
+    } catch (_) {}
+  }
+
+  /**
+   * 現在の表示状態（currentAnswers + boardMode + axisConfig）から軽量スナップショットを構成。
+   * Why: rows 全体を保持するとサイズが膨らむので、画面再現に必要な最小フィールドのみ抽出。
+   */
+  function buildSnapshot(app) {
+    const rows = (app.state.currentAnswers || []).map(r => ({
+      rowIndex: r.rowIndex,
+      emailHash: r.emailHash || null,
+      class: r.class || '',
+      name: r.name || '',
+      answer: r.answer || '',
+      reason: r.reason || '',
+      numericX: typeof r.numericX === 'number' ? r.numericX : null,
+      numericY: typeof r.numericY === 'number' ? r.numericY : null,
+      timestamp: r.timestamp || null
+    }));
+    return {
+      capturedAt: Date.now(),
+      boardMode: app.state.boardMode || 'board',
+      axisConfig: app.state.axisConfig || null,
+      rows
+    };
+  }
+
+  /**
+   * loadSheetData 後に呼ぶ。前回採取から SNAPSHOT_INTERVAL_MS 以上経過していたら採取する。
+   * 採取後は最大 SNAPSHOT_MAX 件にトリム、sessionStorage に永続化。
+   */
+  StudyQuestApp.prototype.vizMaybeCaptureSnapshot = function () {
+    try {
+      const arr = loadSnapshots();
+      const now = Date.now();
+      const lastTs = arr.length ? arr[arr.length - 1].capturedAt : 0;
+      if (arr.length > 0 && (now - lastTs) < SNAPSHOT_INTERVAL_MS) return;
+      const snap = buildSnapshot(this);
+      arr.push(snap);
+      while (arr.length > SNAPSHOT_MAX) arr.shift();
+      saveSnapshots(arr);
+    } catch (e) { /* silent */ }
+  };
+
+  /**
+   * 「議論前」を捕獲（教師ボタン）。F#4 ビフォー・アフター用。
+   * 既に保存されていても上書き許可（議論の前段階を再設定可能）。
+   */
+  StudyQuestApp.prototype.vizCaptureBefore = function () {
+    const snap = buildSnapshot(this);
+    saveBeforeSnapshot(snap);
+    return snap.capturedAt;
+  };
+  StudyQuestApp.prototype.vizClearBefore = function () {
+    saveBeforeSnapshot(null);
+  };
+  StudyQuestApp.prototype.vizGetBefore = function () { return loadBeforeSnapshot(); };
+  StudyQuestApp.prototype.vizGetSnapshots = function () { return loadSnapshots(); };
+
+  StudyQuestApp.prototype.vizClearAllSnapshots = function () {
+    try {
+      sessionStorage.removeItem(SNAPSHOT_KEY);
+      sessionStorage.removeItem(SNAPSHOT_BEFORE_KEY);
+    } catch (_) {}
+  };
+
+  /**
+   * タイムライン UI を viz container に注入。教師権限のみ表示。
+   * Why: 終末フェーズで「議論経過とともに意見分布がどう動いたか」を再生し、
+   *      児童に振り返りメタ認知を促す。シークバー操作で過去スナップショットから再描画。
+   */
+  function injectVizControls(app) {
+    const answers = app.elements.answersContainer;
+    if (!answers) return;
+    let panel = document.getElementById('vizControls');
+    if (panel) return; // すでに注入済み
+
+    panel = document.createElement('div');
+    panel.id = 'vizControls';
+    panel.className = 'viz-controls';
+    panel.innerHTML = [
+      '<button type="button" id="vizCaptureBeforeBtn" class="viz-btn" title="議論前として現在の分布を保存">',
+      '  📌 議論前を記録',
+      '</button>',
+      '<button type="button" id="vizCompareToggleBtn" class="viz-btn" title="議論前と現在を2画面で対比">',
+      '  ⇄ 比較表示',
+      '</button>',
+      '<div class="viz-timeline">',
+      '  <label for="vizTimelineSlider" class="viz-timeline-label">変化の軌跡:</label>',
+      '  <input type="range" id="vizTimelineSlider" min="0" max="0" value="0" step="1" />',
+      '  <span id="vizTimelineLabel" class="viz-timeline-time">現在</span>',
+      '  <button type="button" id="vizTimelineNowBtn" class="viz-btn-small">現在に戻る</button>',
+      '</div>'
+    ].join('');
+    // stats の直後に挿入（DOM 上は答えコンテナ内・SVG の上）
+    const stats = document.getElementById('vizStatsPills') || null;
+    if (stats && stats.parentNode === answers) {
+      answers.insertBefore(panel, stats.nextSibling);
+    } else {
+      answers.appendChild(panel);
+    }
+
+    document.getElementById('vizCaptureBeforeBtn').addEventListener('click', () => {
+      const ts = app.vizCaptureBefore();
+      // 簡易告知
+      const btn = document.getElementById('vizCaptureBeforeBtn');
+      if (btn) { btn.classList.add('saved'); setTimeout(() => btn.classList.remove('saved'), 1500); }
+    });
+    document.getElementById('vizCompareToggleBtn').addEventListener('click', () => {
+      app.state.vizCompareMode = !app.state.vizCompareMode;
+      document.getElementById('vizCompareToggleBtn').classList.toggle('active', !!app.state.vizCompareMode);
+      app.renderBoard(false, false, []);
+    });
+    document.getElementById('vizTimelineSlider').addEventListener('input', (e) => {
+      const idx = Number(e.target.value);
+      app.state.vizTimelineIndex = idx;
+      const snaps = app.vizGetSnapshots();
+      const label = document.getElementById('vizTimelineLabel');
+      if (label) {
+        if (idx >= snaps.length) {
+          label.textContent = '現在';
+        } else {
+          const t = snaps[idx];
+          if (t) {
+            const d = new Date(t.capturedAt);
+            label.textContent = d.getHours().toString().padStart(2, '0') + ':' +
+                                d.getMinutes().toString().padStart(2, '0') + ':' +
+                                d.getSeconds().toString().padStart(2, '0');
+          }
+        }
+      }
+      app.renderBoard(false, false, []);
+    });
+    document.getElementById('vizTimelineNowBtn').addEventListener('click', () => {
+      app.state.vizTimelineIndex = null;
+      const slider = document.getElementById('vizTimelineSlider');
+      const snaps = app.vizGetSnapshots();
+      if (slider) slider.value = snaps.length;
+      const label = document.getElementById('vizTimelineLabel');
+      if (label) label.textContent = '現在';
+      app.renderBoard(false, false, []);
+    });
+  }
+
+  function refreshVizControlsState(app) {
+    const slider = document.getElementById('vizTimelineSlider');
+    if (!slider) return;
+    const snaps = app.vizGetSnapshots();
+    // 末尾位置 = 現在を意味する仮想インデックス。実 snapshot 数 + 1。
+    const max = snaps.length;
+    slider.max = String(max);
+    if (app.state.vizTimelineIndex == null) {
+      slider.value = String(max);
+      const label = document.getElementById('vizTimelineLabel');
+      if (label) label.textContent = '現在';
+    }
+    // 議論前ボタンの状態
+    const beforeBtn = document.getElementById('vizCaptureBeforeBtn');
+    if (beforeBtn) {
+      const has = !!app.vizGetBefore();
+      beforeBtn.classList.toggle('has-before', has);
+    }
+  }
+
+  // expose snapshot helpers for tests
+  StudyQuestApp.prototype.__vizSnapshotInternals = {
+    buildSnapshot: function (app) { return buildSnapshot(app); },
+    SNAPSHOT_MAX: SNAPSHOT_MAX,
+    SNAPSHOT_INTERVAL_MS: SNAPSHOT_INTERVAL_MS
+  };
+
+  // Why: タイムラインで過去 snapshot を選んでいるとき、その snapshot を
+  //      currentAnswers として swap してから既存 renderer を呼ぶ。
+  //      終わったら復元する。これでレンダリングロジックを変更せずタイムラインが効く。
+  function withTimelineSwap(app, fn) {
+    const idx = app.state.vizTimelineIndex;
+    if (idx == null) return fn();
+    const snaps = app.vizGetSnapshots();
+    if (idx < 0 || idx >= snaps.length) return fn();
+    const original = app.state.currentAnswers;
+    const originalAxis = app.state.axisConfig;
+    try {
+      app.state.currentAnswers = snaps[idx].rows;
+      app.state.axisConfig = snaps[idx].axisConfig;
+      return fn();
+    } finally {
+      app.state.currentAnswers = original;
+      app.state.axisConfig = originalAxis;
+    }
+  }
+
+  // 公開: dispatcher に統合（既存 renderBoard を wrap）
+  StudyQuestApp.prototype.__vizInjectControls = function () { injectVizControls(this); };
+  StudyQuestApp.prototype.__vizRefreshControls = function () { refreshVizControlsState(this); };
+  StudyQuestApp.prototype.__vizWithTimelineSwap = function (fn) { return withTimelineSwap(this, fn); };
+  StudyQuestApp.prototype.__vizGetBeforeSnapshot = function () { return loadBeforeSnapshot(); };
+
+  /**
+   * ビフォー・アフター 2 ペイン描画。
+   *
+   * Why: 道徳指導案 終末フェーズで「議論前と現在で意見がどう動いたか」を 1 画面で見せる。
+   *      実装は SVG を 2 つの container に分けず、currentAnswers を切り替えて
+   *      renderOne を 2 回呼ぶ "view-swap" 方式。各 renderer のロジックは変更なし。
+   */
+  StudyQuestApp.prototype.__vizRenderCompare = async function (renderOne, mode) {
+    const before = loadBeforeSnapshot();
+    if (!before) {
+      // before 未保存ならエラー出さずに普通の描画にフォールバック
+      return await renderOne();
+    }
+    const answers = this.elements.answersContainer;
+    if (!answers) return;
+
+    // 既存内容を一旦クリア、2 ペインのラッパを構築
+    answers.className = 'viz-container';
+    answers.innerHTML = '';
+    const wrap = document.createElement('div');
+    wrap.className = 'viz-compare-wrap';
+    const beforePane = document.createElement('div');
+    beforePane.className = 'viz-compare-pane';
+    const beforeDate = new Date(before.capturedAt);
+    const beforeTime = beforeDate.getHours().toString().padStart(2, '0') + ':' +
+                       beforeDate.getMinutes().toString().padStart(2, '0');
+    beforePane.innerHTML = `<h4>📌 議論前 (${beforeTime})</h4>`;
+    const beforeSvgHost = document.createElement('div');
+    beforeSvgHost.id = 'vizCompareLeftHost';
+    beforePane.appendChild(beforeSvgHost);
+
+    const afterPane = document.createElement('div');
+    afterPane.className = 'viz-compare-pane';
+    afterPane.innerHTML = '<h4>📊 現在</h4>';
+    const afterSvgHost = document.createElement('div');
+    afterSvgHost.id = 'vizCompareRightHost';
+    afterPane.appendChild(afterSvgHost);
+
+    wrap.appendChild(beforePane);
+    wrap.appendChild(afterPane);
+    answers.appendChild(wrap);
+
+    // Why: renderer は #vizSvg を作って書き込む実装。compare のため
+    //      左ペイン描画 → svg を beforeSvgHost に移動 → 右ペイン描画 → svg 残す、
+    //      という 2 段プロセスにする。getOrCreateVizContainer が毎回 SVG を作るので可能。
+    const originalAnswers = this.elements.answersContainer;
+
+    // Before pane: swap currentAnswers & axisConfig, render, move svg.
+    const savedRows = this.state.currentAnswers;
+    const savedAxis = this.state.axisConfig;
+    this.state.currentAnswers = before.rows;
+    this.state.axisConfig = before.axisConfig;
+    // 一時的に answersContainer を beforeSvgHost に向ける
+    this.elements.answersContainer = beforeSvgHost;
+    try {
+      await renderOne();
+    } catch (_) { /* keep going */ }
+    // 復元
+    this.elements.answersContainer = originalAnswers;
+    this.state.currentAnswers = savedRows;
+    this.state.axisConfig = savedAxis;
+
+    // After pane: 現在の rows で右側に描画
+    this.elements.answersContainer = afterSvgHost;
+    try {
+      await renderOne();
+    } catch (_) { /* keep going */ }
+    this.elements.answersContainer = originalAnswers;
+
+    // 比較モード用の controls 再構築
+    injectVizControls(this);
+    refreshVizControlsState(this);
   };
 
   // ---------------------------------------------------------------------

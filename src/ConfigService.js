@@ -282,7 +282,8 @@ function validateAndSanitizeConfig(config, userId) {
  */
 // Why: boardMode は表示モード切替の単一スイッチ。auto は自動判定（numericX/Y の有無で決定）。
 //      列が増減した時に教師が再設定する手間を省くため、デフォルトは auto。
-const VALID_BOARD_MODES = ['auto', 'board', 'numberline', 'matrix'];
+//      wordcloud (M3) と pie (M4) は教師が明示選択する用途特化モード。
+const VALID_BOARD_MODES = ['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie'];
 
 function sanitizeDisplaySettings(displaySettings) {
   const sanitized = {

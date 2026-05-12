@@ -1975,6 +1975,14 @@
 
         await this.renderBoard(false, loadConfig.isInitialLoad, oldAnswers);
 
+        // Why: viz モードのとき変化の軌跡用 snapshot を採取（60秒間隔で sampling）。
+        //      board モードでは不要。F#2 タイムライン / F#4 ビフォー・アフター の基盤。
+        if (this.state.boardMode && this.state.boardMode !== 'board' &&
+            typeof this.vizMaybeCaptureSnapshot === 'function') {
+          this.vizMaybeCaptureSnapshot();
+          if (typeof this.__vizRefreshControls === 'function') this.__vizRefreshControls();
+        }
+
         // Why: 毎回 classFilter を再構築する。refreshContent 経由でデータ更新されたとき、
         //      新しく現れたクラス（生徒が初めて投稿した）を選択肢に加えるため。
         //      populateClassFilter は現在選択中のクラスを保持するので UX は壊れない。
@@ -2126,14 +2134,51 @@
      */
     async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
       const mode = this.state && this.state.boardMode ? this.state.boardMode : 'board';
-      try {
+
+      // Why: タイムラインで過去 snapshot を選んでいるとき、currentAnswers を一時的に
+      //      過去の値に差し替えて renderer を呼び、終了後に元に戻す。各 renderer の
+      //      コードを変更せずに「時間旅行」を実現する低結合な実装。
+      const runWithTimeline = (fn) => {
+        if (typeof this.__vizWithTimelineSwap === 'function') {
+          return this.__vizWithTimelineSwap(fn);
+        }
+        return fn();
+      };
+
+      const renderOne = async () => {
         if (mode === 'numberline' && typeof this.renderNumberLine === 'function') {
           return await this.renderNumberLine(isInitialLoad, oldRows);
         }
         if (mode === 'matrix' && typeof this.renderMatrix === 'function') {
           return await this.renderMatrix(isInitialLoad, oldRows);
         }
+        if (mode === 'wordcloud' && typeof this.renderWordRanking === 'function') {
+          return await this.renderWordRanking(isInitialLoad, oldRows);
+        }
+        if (mode === 'pie' && typeof this.renderPie === 'function') {
+          return await this.renderPie(isInitialLoad, oldRows);
+        }
         return await this.renderBoardCards(isLayoutChange, isInitialLoad, oldRows);
+      };
+
+      try {
+        // Compare モード（議論前 ↔ 現在）: viz mode のときのみ 2 ペイン描画
+        if (this.state && this.state.vizCompareMode &&
+            mode !== 'board' &&
+            typeof this.__vizGetBeforeSnapshot === 'function' &&
+            this.__vizGetBeforeSnapshot()) {
+          return await this.__vizRenderCompare(renderOne, mode);
+        }
+
+        // タイムライン位置が指定されていれば、その snapshot で描画
+        const result = await runWithTimeline(renderOne);
+
+        // viz モードでは UI 補助（コントロール注入 + state 更新）
+        if (mode !== 'board') {
+          if (typeof this.__vizInjectControls === 'function') this.__vizInjectControls();
+          if (typeof this.__vizRefreshControls === 'function') this.__vizRefreshControls();
+        }
+        return result;
       } catch (error) {
         console.error('❌ renderBoard: dispatcher error (mode=' + mode + '), falling back to cards:', error);
         try {

@@ -55,6 +55,12 @@
     stroke: #fde047;
     stroke-width: 2.5;
   }
+  /* 揺らぎが大きい点（道徳指導案：意図的指名の素材） */
+  .viz-dot.swing-high {
+    fill: #fde047;
+    stroke: #f59e0b;
+    stroke-width: 2;
+  }
   /* 揺らぎ表示: 過去投稿のゴースト点 */
   .viz-dot.ghost {
     opacity: 0.28;
@@ -120,6 +126,51 @@
     margin-right: 0.4rem;
   }
 
+  /* M3 ワードランキング */
+  .word-bar {
+    fill: #38bdf8;
+    transition: fill 0.2s ease;
+  }
+  .word-bar:hover {
+    fill: #fde047;
+  }
+  .word-label {
+    fill: var(--brand-text, #e2e8f0);
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .word-count {
+    fill: var(--brand-text-muted, #94a3b8);
+    font-size: 0.85rem;
+  }
+
+  /* M4 円グラフ */
+  .pie-slice {
+    stroke: #0f172a;
+    stroke-width: 2;
+    cursor: pointer;
+    transition: opacity 0.18s ease;
+  }
+  .pie-slice:hover {
+    opacity: 0.85;
+  }
+  .pie-label {
+    fill: #f1f5f9;
+    font-size: 0.95rem;
+    font-weight: 600;
+    pointer-events: none;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+  }
+  .pie-center {
+    fill: var(--brand-text, #e2e8f0);
+    font-size: 1.4rem;
+    font-weight: 700;
+  }
+  body.projector-mode .pie-label { font-size: 1.5rem; }
+  body.projector-mode .pie-center { font-size: 2.2rem; }
+  body.projector-mode .word-label { font-size: 1.4rem; }
+  body.projector-mode .word-count { font-size: 1.2rem; }
+
   /* 分布ヒストグラム (M1 補助) */
   .viz-histogram rect {
     fill: rgba(56, 189, 248, 0.4);
@@ -128,6 +179,93 @@
     fill: var(--brand-text-muted, #94a3b8);
     font-size: 0.75rem;
     text-anchor: middle;
+  }
+
+  /* タイムライン + Before/After 操作パネル */
+  .viz-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    margin: 0.5rem 0 1rem;
+    padding: 0.6rem 0.8rem;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 0.6rem;
+  }
+  .viz-btn, .viz-btn-small {
+    padding: 0.35rem 0.7rem;
+    border-radius: 0.4rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(15, 23, 42, 0.7);
+    color: var(--brand-text, #e2e8f0);
+    cursor: pointer;
+    font-size: 0.88rem;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .viz-btn:hover, .viz-btn-small:hover {
+    background: rgba(56, 189, 248, 0.18);
+    border-color: rgba(56, 189, 248, 0.5);
+  }
+  .viz-btn.active {
+    background: rgba(56, 189, 248, 0.3);
+    border-color: #38bdf8;
+    color: #fff;
+  }
+  .viz-btn.has-before::before {
+    content: '✓ ';
+    color: #4ade80;
+  }
+  .viz-btn.saved {
+    background: rgba(74, 222, 128, 0.3);
+    border-color: #4ade80;
+  }
+  .viz-btn-small { padding: 0.25rem 0.5rem; font-size: 0.78rem; }
+  .viz-timeline {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 220px;
+  }
+  .viz-timeline-label {
+    color: var(--brand-text-muted, #94a3b8);
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  .viz-timeline-time {
+    min-width: 4.5rem;
+    text-align: center;
+    color: #fde047;
+    font-size: 0.85rem;
+    font-variant-numeric: tabular-nums;
+  }
+  #vizTimelineSlider {
+    flex: 1;
+    min-width: 100px;
+  }
+
+  /* Before/After 比較表示時のレイアウト */
+  .viz-compare-wrap {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    min-height: 50vh;
+  }
+  .viz-compare-pane {
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 0.5rem;
+    padding: 0.5rem;
+    background: rgba(15, 23, 42, 0.3);
+  }
+  .viz-compare-pane h4 {
+    margin: 0 0 0.5rem;
+    color: var(--brand-text-muted, #94a3b8);
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  @media (max-width: 768px) {
+    .viz-compare-wrap { grid-template-columns: 1fr; }
   }
 
   /* 統計バッジ（接続数・更新時刻） */

@@ -21,7 +21,7 @@
 //   validators.js を単独で vm.runInContext するため、こちらにも宣言が必要。
 //   ⚠️ 値を変える際は ConfigService.js:285 も同時更新すること。
 //   詳細は docs/SPEC_visualization_modes.md §F-1 参照。
-const VALIDATOR_BOARD_MODES = Object.freeze(['auto', 'board', 'numberline', 'matrix']);
+const VALIDATOR_BOARD_MODES = Object.freeze(['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie']);
 
 
 /**
