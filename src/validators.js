@@ -315,8 +315,14 @@ function validateMapping(columnMapping) {
       }
     }
 
-    const validColumns = Object.keys(actualMapping).filter(key => allColumns.includes(key));
-    const usedIndices = validColumns
+    // Why: numericX/numericY は「線形尺度値の数値解釈」を意味する仮想的な別軸で、
+    //      物理的には answer 列（または別列）と同じインデックスを指してよい。
+    //      例: 「立場」列 = answer(4) としても見れるし numericX(4) としても見れる。
+    //      この重複は意図的なので uniqueness チェックから除外する。
+    const DEDUP_EXEMPT = new Set(['numericX', 'numericY']);
+    const dedupColumns = Object.keys(actualMapping)
+      .filter(key => allColumns.includes(key) && !DEDUP_EXEMPT.has(key));
+    const usedIndices = dedupColumns
       .map(col => actualMapping[col])
       .filter(index => typeof index === 'number');
     const uniqueIndices = [...new Set(usedIndices)];

@@ -301,3 +301,29 @@ test('validateConfig: drops boardMode when type wrong', () => {
   const r = ctx.validateConfig({ displaySettings: { boardMode: 123 } });
   assert.equal(r.sanitized.displaySettings.boardMode, undefined);
 });
+
+// =====================================================================
+// validateMapping: numericX/Y overlap with answer is allowed
+// Why: 「立場」列を answer(4) かつ numericX(4) として参照するのは意図的な重複。
+//      これを「列インデックス重複」エラーにすると道徳指導案の設定が壊れる。
+// =====================================================================
+
+test('validateMapping: numericX same index as answer is OK', () => {
+  const ctx = loadValidatorsContext();
+  const r = ctx.validateMapping({ answer: 4, numericX: 4, reason: 5, class: 2, name: 3 });
+  assert.equal(r.isValid, true);
+  assert.equal(r.errors.length, 0);
+});
+
+test('validateMapping: numericY same index as numericX is OK (M2 1軸表示用法)', () => {
+  const ctx = loadValidatorsContext();
+  const r = ctx.validateMapping({ answer: 4, numericX: 5, numericY: 5 });
+  assert.equal(r.isValid, true);
+});
+
+test('validateMapping: answer/reason real duplicate still rejected', () => {
+  const ctx = loadValidatorsContext();
+  const r = ctx.validateMapping({ answer: 4, reason: 4 });
+  assert.equal(r.isValid, false);
+  assert.ok(r.errors.some(e => e.includes('重複')));
+});
