@@ -30,7 +30,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -374,6 +374,27 @@ function customizeForm(formIdOrUrl, schema) {
       added++;
     }
 
+    // Why: Form の質問構造を変えると Spreadsheet 列が増えるため、ヘッダーキャッシュ
+    //      （CACHE_DURATION.DATABASE_LONG = 10 分）を invalidate しないと、しばらく
+    //      ボード表示が「CURIOUS」等の旧列ヘッダーを返してしまう。リンク先の全シートで
+    //      cache を消す。
+    try {
+      const destId = form.getDestinationId();
+      if (destId && typeof invalidateSheetHeadersCache === 'function') {
+        // よくある sheet 名を一括無効化（FormApp 既定 + 英語表記）
+        ['フォームの回答 1', 'Form Responses 1', 'Sheet1'].forEach(sn => {
+          try { invalidateSheetHeadersCache(destId, sn); } catch (_) {}
+        });
+        // SpreadsheetApp で全シート名を取り、それぞれ invalidate
+        try {
+          const ss = SpreadsheetApp.openById(destId);
+          ss.getSheets().forEach(s => {
+            try { invalidateSheetHeadersCache(destId, s.getName()); } catch (_) {}
+          });
+        } catch (_) { /* SS access fail はキャッシュ無効化を諦めて続行 */ }
+      }
+    } catch (_) { /* invalidate 失敗は致命的ではない */ }
+
     return {
       success: true,
       formId: form.getId(),
@@ -381,7 +402,7 @@ function customizeForm(formIdOrUrl, schema) {
       editUrl: form.getEditUrl(),
       title: form.getTitle(),
       itemCount: added,
-      message: `${added} 問の質問を再構築しました`
+      message: `${added} 問の質問を再構築しました（ヘッダーキャッシュも無効化済み）`
     };
   } catch (error) {
     console.error('customizeForm error:', error.message);

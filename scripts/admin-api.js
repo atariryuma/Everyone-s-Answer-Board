@@ -71,7 +71,7 @@ function parseArgs(args) {
   const params = {};
   let outputPath = null;
 
-  const JSON_KEYS = new Set(['json', 'patch', 'filter', 'options']);
+  const JSON_KEYS = new Set(['json', 'patch', 'filter', 'options', 'schema', 'snapshot']);
 
   for (let i = 1; i < args.length; i++) {
     const raw = args[i];
