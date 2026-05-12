@@ -115,6 +115,27 @@ function getForms() {
   }
 }
 
+// Why: 線形尺度の範囲は detectNumericScaleColumns の判定（0-10 の整数, レンジ 1-9）と
+//      整合する必要がある。テンプレートと検出ロジックが乖離すると、テンプレートで作った
+//      M1/M2 フォームの数値列が auto モードで検出されない事故になる。
+const TEMPLATE_SCALE_MIN = 1;
+const TEMPLATE_SCALE_MAX = 5;
+
+const TEMPLATE_LABELS = Object.freeze({
+  board: '掲示板',
+  numberline: '数直線',
+  matrix: 'マトリクス'
+});
+
+function addScaleItemTo_(form, { title, helpText, lowLabel, highLabel }) {
+  form.addScaleItem()
+    .setTitle(title)
+    .setRequired(true)
+    .setHelpText(helpText)
+    .setBounds(TEMPLATE_SCALE_MIN, TEMPLATE_SCALE_MAX)
+    .setLabels(lowLabel, highLabel);
+}
+
 /**
  * テンプレートフォームを作成
  *
@@ -140,30 +161,22 @@ function createTemplateForm(templateType) {
       return { success: false, error: '認証が必要です' };
     }
 
-    const TEMPLATE_LABELS = {
-      board: '掲示板',
-      numberline: '数直線',
-      matrix: 'マトリクス'
-    };
     const type = TEMPLATE_LABELS[templateType] ? templateType : 'board';
 
-    // テンプレートフォーム作成（日時付きタイトル）
     const now = new Date();
     const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'M/d HH:mm');
     const formTitle = `回答ボード [${TEMPLATE_LABELS[type]}] ${dateStr}`;
     const form = FormApp.create(formTitle);
 
-    // Forms REST API で emailCollectionType を VERIFIED に設定
-    // Apps Script の setCollectEmail(true) では「回答者入力」モードになるため、REST APIを使用
-    // 参考: https://developers.google.com/forms/api/reference/rest/v1/forms/batchUpdate
+    // Why VERIFIED via REST: Apps Script の setCollectEmail(true) では「回答者入力」モード
+    // になりなりすまし可能。Forms REST API で emailCollectionType=VERIFIED を強制する。
+    // https://developers.google.com/forms/api/reference/rest/v1/forms/batchUpdate
     setFormEmailCollectionVerified_(form.getId());
 
-    // 1人1回答制限（ログイン必須）
-    // M1/M2 では allowResubmit と組み合わせて「揺らぎ」追跡を行うため、
-    // 教師が後から無効化することを想定。テンプレート既定は1回答に揃える。
+    // Why 1回答制限: M1/M2 で allowResubmit と組み合わせて「揺らぎ」追跡するため、
+    //   教師が後から無効化することを想定。テンプレート既定は安全側の 1 回答。
     form.setLimitOneResponsePerUser(true);
 
-    // 共通: クラス + 名前
     form.addListItem()
       .setTitle('クラス')
       .setRequired(true)
@@ -174,39 +187,35 @@ function createTemplateForm(templateType) {
       .setRequired(true)
       .setHelpText('表示名を入力してください');
 
-    // テンプレート別の本体項目
     if (type === 'numberline') {
-      // M1: 立場（線形尺度 1〜5）+ 理由
-      form.addScaleItem()
-        .setTitle('立場')
-        .setRequired(true)
-        .setHelpText('あなたの考えに最も近い位置を選んでください')
-        .setBounds(1, 5)
-        .setLabels('そう思わない', 'とてもそう思う');
+      addScaleItemTo_(form, {
+        title: '立場',
+        helpText: 'あなたの考えに最も近い位置を選んでください',
+        lowLabel: 'そう思わない',
+        highLabel: 'とてもそう思う'
+      });
       form.addParagraphTextItem()
         .setTitle('理由')
         .setRequired(true)
         .setHelpText('その位置を選んだ理由を記入してください');
     } else if (type === 'matrix') {
-      // M2: 2軸の線形尺度 + 理由
-      form.addScaleItem()
-        .setTitle('X軸（例: 効率）')
-        .setRequired(true)
-        .setHelpText('横軸の立場を選んでください')
-        .setBounds(1, 5)
-        .setLabels('低い', '高い');
-      form.addScaleItem()
-        .setTitle('Y軸（例: 倫理）')
-        .setRequired(true)
-        .setHelpText('縦軸の立場を選んでください')
-        .setBounds(1, 5)
-        .setLabels('低い', '高い');
+      addScaleItemTo_(form, {
+        title: 'X軸（例: 効率）',
+        helpText: '横軸の立場を選んでください',
+        lowLabel: '低い',
+        highLabel: '高い'
+      });
+      addScaleItemTo_(form, {
+        title: 'Y軸（例: 倫理）',
+        helpText: '縦軸の立場を選んでください',
+        lowLabel: '低い',
+        highLabel: '高い'
+      });
       form.addParagraphTextItem()
         .setTitle('理由')
         .setRequired(true)
         .setHelpText('その位置を選んだ理由を記入してください');
     } else {
-      // 'board': 既存挙動
       form.addMultipleChoiceItem()
         .setTitle('回答')
         .setRequired(true)
@@ -218,15 +227,12 @@ function createTemplateForm(templateType) {
         .setHelpText('選択した理由を詳しく記入してください');
     }
 
-    // 回答先スプレッドシートを作成してリンク
     const ss = SpreadsheetApp.create(formTitle + ' (回答)');
     form.setDestination(FormApp.DestinationType.SPREADSHEET, ss.getId());
 
-    // ユーザー専用フォルダを作成してファイルを移動（Drive 単一親モデル）
-    let folder = null;
     let folderUrl = '';
     try {
-      folder = createUserFolder();
+      const folder = createUserFolder();
       if (folder) {
         folderUrl = folder.getUrl();
         moveFileToFolder_(DriveApp.getFileById(form.getId()), folder);

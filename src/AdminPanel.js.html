@@ -1120,8 +1120,30 @@
     const btn = document.getElementById('create-template-form');
     const typeSelect = document.getElementById('template-type-select');
     const templateType = (typeSelect && typeSelect.value) || 'board';
-    const TEMPLATE_LABELS = { board: '掲示板', numberline: '数直線', matrix: 'マトリクス' };
-    const typeLabel = TEMPLATE_LABELS[templateType] || '掲示板';
+    // テンプレート種別ごとの表示テキスト集約。ローディング画面の文言が散らからないよう
+    // 1 か所にまとめる。backend の TEMPLATE_LABELS とは別 runtime なので意図的に重複。
+    const TEMPLATE_VIEW = {
+      board: {
+        label: '掲示板',
+        editLi: '<li><strong>回答の選択肢</strong> → 質問に合った選択肢に変更</li>',
+        extraUsableLi: '',
+        editStepTarget: '回答の選択肢'
+      },
+      numberline: {
+        label: '数直線',
+        editLi: '<li><strong>立場の質問文・両端ラベル</strong> → 授業のテーマに合わせて変更</li>',
+        extraUsableLi: '<li>立場（1〜5の線形尺度）</li>',
+        editStepTarget: '軸ラベル'
+      },
+      matrix: {
+        label: 'マトリクス',
+        editLi: '<li><strong>X軸/Y軸の質問文・両端ラベル</strong> → 授業のテーマに合わせて変更</li>',
+        extraUsableLi: '<li>X軸・Y軸（1〜5の線形尺度）</li>',
+        editStepTarget: '軸ラベル'
+      }
+    };
+    const view = TEMPLATE_VIEW[templateType] || TEMPLATE_VIEW.board;
+    const typeLabel = view.label;
 
     if (btn) {
       btn.disabled = true;
@@ -1165,11 +1187,7 @@
               <p style="font-size:14px;color:#fbbf24;margin:0 0 12px 0;font-weight:bold;">⚠️ 編集が必要な項目</p>
               <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
                 <li><strong>クラス</strong> → 実際のクラス名に変更</li>
-                ${templateType === 'board'
-                  ? '<li><strong>回答の選択肢</strong> → 質問に合った選択肢に変更</li>'
-                  : templateType === 'numberline'
-                    ? '<li><strong>立場の質問文・両端ラベル</strong> → 授業のテーマに合わせて変更</li>'
-                    : '<li><strong>X軸/Y軸の質問文・両端ラベル</strong> → 授業のテーマに合わせて変更</li>'}
+                ${view.editLi}
               </ul>
             </div>
 
@@ -1178,8 +1196,7 @@
               <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
                 <li>名前（テキスト入力）</li>
                 <li>理由（長文入力）</li>
-                ${templateType === 'numberline' ? '<li>立場（1〜5の線形尺度）</li>' : ''}
-                ${templateType === 'matrix' ? '<li>X軸・Y軸（1〜5の線形尺度）</li>' : ''}
+                ${view.extraUsableLi}
               </ul>
             </div>
 
@@ -1187,7 +1204,7 @@
               <p style="font-size:14px;color:#86efac;margin:0 0 12px 0;font-weight:bold;">✅ 次のステップ</p>
               <ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.9;color:#e2e8f0;">
                 <li>下のボタンでフォーム編集画面を開く</li>
-                <li>クラス名と${templateType === 'board' ? '回答の選択肢' : '軸ラベル'}を編集</li>
+                <li>クラス名と${view.editStepTarget}を編集</li>
                 <li>管理パネルに戻り「<strong>🔍 検証して接続</strong>」をクリック</li>
                 <li>「<strong>今すぐ公開</strong>」で完了！</li>
               </ol>
