@@ -1,0 +1,618 @@
+<script>
+/* =====================================================================
+ * page.viz.js — 可視化モード（M1 数直線 / M2 散布図）
+ *
+ * Why this file is separate:
+ *   - 既存 page.js.html は 4000+ 行で、viz 専用ロジックを混ぜると見通しが落ちる
+ *   - d3 は CDN 動的ロードする（依存追加 0、未使用ユーザーは読み込まない）
+ *   - StudyQuestApp.prototype に method を追加するパターンなので、
+ *     dispatcher（renderBoard）から typeof チェックで安全に呼べる
+ *
+ * Loaded after page.js so prototype mutation works.
+ * Top-level side effects forbidden (CLAUDE.md): すべて関数定義のみ。
+ *
+ * Public methods added to StudyQuestApp.prototype:
+ *   - ensureD3Loaded()       : d3 を遅延 CDN ロード
+ *   - renderNumberLine()     : M1 ビーズワーム
+ *   - renderMatrix()         : M2 散布図
+ *   - vizComputeSwings()     : 揺らぎ計算（教師ダッシュボード用）
+ *   - vizApplyProjectorMode(): URL クエリ ?display=projector のクラス付与
+ * ===================================================================== */
+(function () {
+  'use strict';
+
+  if (typeof window === 'undefined' || !window.StudyQuestApp) {
+    // page.js が未ロードなら何もしない（テスト環境等）
+    return;
+  }
+
+  // ---------------------------------------------------------------------
+  // CDN: d3 v7 のみ。d3-beeswarm プラグインは v7 非対応なので d3-force で代替。
+  // SharedSecurityHeaders.html の CSP で script-src に cdnjs.cloudflare.com が
+  // 既に許可されているため、cdnjs から取得する（CSP 変更不要）。
+  // ---------------------------------------------------------------------
+  const D3_CDN_URLS = [
+    'https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js'
+  ];
+
+  let d3LoadPromise = null;
+
+  StudyQuestApp.prototype.ensureD3Loaded = function () {
+    if (window.d3) return Promise.resolve(window.d3);
+    if (d3LoadPromise) return d3LoadPromise;
+
+    d3LoadPromise = new Promise((resolve, reject) => {
+      let attempt = 0;
+      const tryLoad = () => {
+        if (attempt >= D3_CDN_URLS.length) {
+          reject(new Error('d3 load failed from all CDN candidates'));
+          return;
+        }
+        const src = D3_CDN_URLS[attempt++];
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = () => {
+          if (window.d3) {
+            resolve(window.d3);
+          } else {
+            script.remove();
+            tryLoad();
+          }
+        };
+        script.onerror = () => {
+          script.remove();
+          tryLoad();
+        };
+        document.head.appendChild(script);
+      };
+      tryLoad();
+    });
+
+    return d3LoadPromise;
+  };
+
+  // ---------------------------------------------------------------------
+  // 共通ヘルパ
+  // ---------------------------------------------------------------------
+
+  /**
+   * 同一児童の再投稿を集約。allowResubmit=true のとき、emailHash 別に最新のみを
+   * "current"、それ以前を "ghost" として返す。
+   *
+   * Why: M1/M2 のキー機能は「揺らぎ」の可視化。同じ児童が議論を経て位置を変えた
+   *      ことを教師が見取るため、過去投稿を薄色でゴースト表示しつつ、現在位置を
+   *      強調する。allowResubmit=false なら全件 current（既存と同等の挙動）。
+   *
+   * timestamp は string/Date 両対応。Date.parse で安全に比較。
+   */
+  function groupByStudent(rows, allowResubmit) {
+    if (!Array.isArray(rows)) return { current: [], ghost: [] };
+    if (!allowResubmit) return { current: rows, ghost: [] };
+
+    const byHash = new Map();
+    rows.forEach((row) => {
+      const key = row.emailHash || ('row_' + row.rowIndex);
+      const ts = row.timestamp ? Date.parse(row.timestamp) || 0 : 0;
+      const tagged = { ...row, _ts: ts };
+      const existing = byHash.get(key);
+      if (!existing) {
+        byHash.set(key, [tagged]);
+      } else {
+        existing.push(tagged);
+      }
+    });
+
+    const current = [];
+    const ghost = [];
+    byHash.forEach((list) => {
+      list.sort((a, b) => b._ts - a._ts);
+      current.push(list[0]);
+      for (let i = 1; i < list.length; i++) ghost.push(list[i]);
+    });
+    return { current, ghost };
+  }
+
+  /**
+   * 揺らぎ計算: 同一 emailHash の最新と過去の差分（distance）を測定。
+   * Why: 教師ダッシュボードで「意見が大きく動いた児童」上位 N を提示するため。
+   *      M1 は |Δx|、M2 は √(Δx² + Δy²) のユークリッド距離。
+   */
+  StudyQuestApp.prototype.vizComputeSwings = function (rows, mode) {
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+
+    const byHash = new Map();
+    rows.forEach((row) => {
+      const key = row.emailHash;
+      if (!key) return; // emailHash が無い行（メアド収集 OFF）はスキップ
+      const ts = row.timestamp ? Date.parse(row.timestamp) || 0 : 0;
+      const x = (typeof row.numericX === 'number') ? row.numericX : null;
+      const y = (typeof row.numericY === 'number') ? row.numericY : null;
+      if (x === null) return;
+      const list = byHash.get(key) || [];
+      list.push({ ts, x, y, name: row.name || '', comment: row.reason || row.answer || '' });
+      byHash.set(key, list);
+    });
+
+    const swings = [];
+    byHash.forEach((list, key) => {
+      if (list.length < 2) return;
+      list.sort((a, b) => a.ts - b.ts);
+      const first = list[0];
+      const last = list[list.length - 1];
+      const dx = last.x - first.x;
+      const dy = (mode === 'matrix' && first.y !== null && last.y !== null) ? (last.y - first.y) : 0;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance === 0) return;
+      swings.push({
+        emailHash: key,
+        name: last.name,
+        comment: last.comment,
+        from: { x: first.x, y: first.y },
+        to:   { x: last.x,  y: last.y  },
+        distance,
+        count: list.length
+      });
+    });
+
+    swings.sort((a, b) => b.distance - a.distance);
+    return swings;
+  };
+
+  // ---------------------------------------------------------------------
+  // ツールチップ管理（M1/M2 共通）
+  // ---------------------------------------------------------------------
+
+  function ensureTooltip() {
+    let tip = document.getElementById('vizTooltip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'vizTooltip';
+      tip.className = 'viz-tooltip';
+      tip.setAttribute('role', 'tooltip');
+      document.body.appendChild(tip);
+    }
+    return tip;
+  }
+
+  function showTooltip(event, item, app) {
+    const tip = ensureTooltip();
+    // Why: item.name の有無 = 「サーバ側が showNames=true or 教師/本人」と判断して付与した結果。
+    //      フロント側で再判定する必要なし。name が空なら匿名表示。
+    const valueText = (item.numericY !== null && item.numericY !== undefined)
+      ? `(${item.numericX}, ${item.numericY})`
+      : `${item.numericX}`;
+    const headerText = item.name ? escapeForTooltip(item.name) : '匿名';
+    const commentText = escapeForTooltip(item.reason || item.answer || '');
+
+    tip.innerHTML =
+      `<div class="tooltip-meta">${headerText}${item.class ? ' / ' + escapeForTooltip(item.class) : ''}</div>` +
+      `<div><span class="tooltip-value">${valueText}</span>${commentText || '<em style="color:#94a3b8">（コメントなし）</em>'}</div>`;
+    tip.classList.add('visible');
+
+    // 画面端ぴったりにならないよう少しオフセット
+    const x = event.clientX + 14;
+    const y = event.clientY + 14;
+    const maxX = window.innerWidth - tip.offsetWidth - 8;
+    const maxY = window.innerHeight - tip.offsetHeight - 8;
+    tip.style.left = Math.min(x, Math.max(8, maxX)) + 'px';
+    tip.style.top = Math.min(y, Math.max(8, maxY)) + 'px';
+  }
+
+  function hideTooltip() {
+    const tip = document.getElementById('vizTooltip');
+    if (tip) tip.classList.remove('visible');
+  }
+
+  function escapeForTooltip(s) {
+    // SharedUtilities.html の escapeHtml があるならそれを使うべきだが、
+    // 名前空間が確実でないのでローカルに最小実装。
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ---------------------------------------------------------------------
+  // コンテナ初期化（既存 #answers を viz 用に再利用）
+  // ---------------------------------------------------------------------
+
+  function getOrCreateVizContainer(app) {
+    const answers = app.elements.answersContainer;
+    if (!answers) return null;
+
+    // 既存のカード残骸を完全クリア（renderBoardCards から戻った時のために）
+    answers.className = 'viz-container';
+    answers.innerHTML = '';
+
+    // 統計バッジ
+    const stats = document.createElement('div');
+    stats.className = 'viz-stats';
+    stats.innerHTML =
+      '<span class="stat-pill" id="vizCountPill">0件</span>' +
+      '<span class="stat-pill" id="vizUpdatedPill"></span>';
+    answers.appendChild(stats);
+
+    // SVG
+    const svgNS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(svgNS, 'svg');
+    svg.setAttribute('id', 'vizSvg');
+    svg.setAttribute('class', 'viz-svg');
+    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+    answers.appendChild(svg);
+
+    // 教師パネル
+    const teacherPanel = document.createElement('div');
+    teacherPanel.className = 'viz-teacher-panel';
+    teacherPanel.id = 'vizTeacherPanel';
+    teacherPanel.innerHTML = '<h3>気になる児童（意見が動いた順）</h3><ul id="vizSwingList"></ul>';
+    answers.appendChild(teacherPanel);
+
+    return { stats, svg, teacherPanel };
+  }
+
+  function updateStatsPills(app, count) {
+    const countEl = document.getElementById('vizCountPill');
+    const updatedEl = document.getElementById('vizUpdatedPill');
+    if (countEl) countEl.textContent = count + '件';
+    if (updatedEl) {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      updatedEl.textContent = '最終更新 ' + hh + ':' + mm;
+    }
+  }
+
+  function maybeRenderTeacherPanel(app, swings) {
+    const panel = document.getElementById('vizTeacherPanel');
+    if (!panel) return;
+    const list = document.getElementById('vizSwingList');
+    if (!list) return;
+
+    const showAdmin = Boolean(app.state.isEditor || app.state.showAdminFeatures);
+    if (!showAdmin || swings.length === 0) {
+      panel.classList.remove('active');
+      return;
+    }
+
+    const top = swings.slice(0, 5);
+    list.innerHTML = top.map((s) => {
+      const fromTo = (s.from.y !== null && s.to.y !== null)
+        ? `(${s.from.x},${s.from.y}) → (${s.to.x},${s.to.y})`
+        : `${s.from.x} → ${s.to.x}`;
+      const name = s.name ? escapeForTooltip(s.name) : '匿名(' + s.emailHash + ')';
+      const comment = s.comment ? '：' + escapeForTooltip(s.comment).substring(0, 60) : '';
+      return `<li><span class="swing-badge">Δ${s.distance.toFixed(1)}</span>${name} ${fromTo}${comment}</li>`;
+    }).join('');
+    panel.classList.add('active');
+  }
+
+  // ---------------------------------------------------------------------
+  // M1: 数直線ビーズワーム
+  // ---------------------------------------------------------------------
+
+  StudyQuestApp.prototype.renderNumberLine = async function (isInitialLoad, oldRows) {
+    try {
+      const d3 = await this.ensureD3Loaded();
+      const rows = (this.state.currentAnswers || []).filter((r) => typeof r.numericX === 'number');
+      const containerRefs = getOrCreateVizContainer(this);
+      if (!containerRefs) return;
+
+      const axis = this.state.axisConfig || {};
+      const allowResubmit = Boolean(axis.allowResubmit);
+      const { current, ghost } = groupByStudent(rows, allowResubmit);
+
+      // データ範囲：実データの min/max。空なら defaultMin/Max にフォールバック。
+      const xs = current.map((r) => r.numericX).concat(ghost.map((r) => r.numericX));
+      const dataMin = xs.length ? Math.min(...xs) : (axis.defaultMin || 1);
+      const dataMax = xs.length ? Math.max(...xs) : (axis.defaultMax || 5);
+      const min = Math.min(dataMin, axis.defaultMin || 1);
+      const max = Math.max(dataMax, axis.defaultMax || 5);
+
+      const svgEl = containerRefs.svg;
+      const bounds = svgEl.getBoundingClientRect();
+      const width = Math.max(320, bounds.width || 800);
+      const height = Math.max(280, bounds.height || 480);
+      svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      const svg = d3.select(svgEl);
+      svg.selectAll('*').remove();
+
+      const margin = { top: 40, right: 40, bottom: 80, left: 40 };
+      const innerW = width - margin.left - margin.right;
+      const innerH = height - margin.top - margin.bottom;
+      const yCenter = innerH / 2;
+
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+      const xScale = d3.scaleLinear().domain([min, max]).range([0, innerW]);
+
+      // 軸（連続）
+      const xAxis = d3.axisBottom(xScale)
+        .tickValues(d3.range(min, max + 1))
+        .tickFormat((d) => d);
+      g.append('g')
+        .attr('class', 'viz-axis')
+        .attr('transform', `translate(0, ${yCenter + 70})`)
+        .call(xAxis);
+
+      // 軸ラベル（min / max）
+      const xLabels = axis.xAxisLabels || {};
+      g.append('text').attr('class', 'viz-axis-label')
+        .attr('x', 0).attr('y', yCenter + 110)
+        .attr('text-anchor', 'start')
+        .text(xLabels.min || '');
+      g.append('text').attr('class', 'viz-axis-label')
+        .attr('x', innerW).attr('y', yCenter + 110)
+        .attr('text-anchor', 'end')
+        .text(xLabels.max || '');
+
+      // 中央水平線（数直線）
+      g.append('line')
+        .attr('x1', 0).attr('x2', innerW)
+        .attr('y1', yCenter + 70).attr('y2', yCenter + 70)
+        .attr('stroke', 'rgba(148,163,184,0.4)')
+        .attr('stroke-width', 1);
+
+      // ヒストグラム（補助）：ticks の各値ごとの件数
+      const counts = {};
+      xs.forEach((v) => { counts[v] = (counts[v] || 0) + 1; });
+      const maxCount = Math.max(1, ...Object.values(counts));
+      const tickStep = innerW / Math.max(1, (max - min));
+      const histH = 40;
+      const histG = g.append('g').attr('class', 'viz-histogram').attr('transform', `translate(0,${yCenter + 130})`);
+      for (let v = min; v <= max; v++) {
+        const c = counts[v] || 0;
+        const h = (c / maxCount) * histH;
+        histG.append('rect')
+          .attr('x', xScale(v) - tickStep * 0.3)
+          .attr('y', histH - h)
+          .attr('width', tickStep * 0.6)
+          .attr('height', h);
+        histG.append('text')
+          .attr('x', xScale(v))
+          .attr('y', histH + 14)
+          .text(String(c));
+      }
+
+      // ゴースト点（過去投稿）— enter/exit は単純な data join。揺らぎ追跡のため。
+      const ghostJoin = g.selectAll('.viz-dot.ghost').data(ghost, (d) => 'g_' + d.rowIndex);
+      ghostJoin.exit().remove();
+      ghostJoin.enter().append('circle')
+        .attr('class', 'viz-dot ghost')
+        .attr('r', 5)
+        .attr('cx', (d) => xScale(d.numericX))
+        .attr('cy', () => yCenter + 70);
+
+      // 現在点（ビーズワーム配置）— force simulation で重なりを回避
+      const radius = 8;
+      // Why: d3.forceSimulation を 1 回 tick して final position を確定する。
+      //      アニメーションは CSS の vizEnter で十分。data is static after each load。
+      const nodes = current.map((r) => ({
+        x: xScale(r.numericX),
+        y: yCenter + 70,
+        targetX: xScale(r.numericX),
+        data: r
+      }));
+      const sim = d3.forceSimulation(nodes)
+        .force('x', d3.forceX((d) => d.targetX).strength(1))
+        .force('y', d3.forceY(yCenter + 70).strength(0.18))
+        .force('collide', d3.forceCollide(radius + 1.5))
+        .stop();
+      for (let i = 0; i < 120; i++) sim.tick();
+
+      const dotJoin = g.selectAll('.viz-dot.current').data(nodes, (d) => d.data.rowIndex);
+      dotJoin.exit().remove();
+      const dotEnter = dotJoin.enter().append('circle')
+        .attr('class', 'viz-dot current enter')
+        .attr('r', radius);
+      dotEnter.merge(dotJoin)
+        .attr('cx', (d) => d.x)
+        .attr('cy', (d) => d.y)
+        .on('mouseenter', (event, d) => showTooltip(event, d.data, this))
+        .on('mousemove',  (event, d) => showTooltip(event, d.data, this))
+        .on('mouseleave', () => hideTooltip())
+        .on('click', (event, d) => showTooltip(event, d.data, this));
+
+      // 統計 + 教師パネル
+      updateStatsPills(this, current.length);
+      const swings = this.vizComputeSwings(rows, 'numberline');
+      maybeRenderTeacherPanel(this, swings);
+
+      // 件数バッジ（既存のヘッダ表示）も更新（updateAnswerCount は board モード前提）
+      if (this.elements.answerCount && typeof this.getIcon === 'function') {
+        this.elements.answerCount.innerHTML =
+          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + current.length + '件</span>';
+      }
+    } catch (e) {
+      console.error('renderNumberLine: failed', e);
+      throw e;
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // M2: 散布図（2x2 マトリクス）
+  // ---------------------------------------------------------------------
+
+  StudyQuestApp.prototype.renderMatrix = async function (isInitialLoad, oldRows) {
+    try {
+      const d3 = await this.ensureD3Loaded();
+      const rows = (this.state.currentAnswers || []).filter((r) =>
+        typeof r.numericX === 'number' && typeof r.numericY === 'number');
+      const containerRefs = getOrCreateVizContainer(this);
+      if (!containerRefs) return;
+
+      const axis = this.state.axisConfig || {};
+      const allowResubmit = Boolean(axis.allowResubmit);
+      const { current, ghost } = groupByStudent(rows, allowResubmit);
+
+      const all = current.concat(ghost);
+      const xs = all.map((r) => r.numericX);
+      const ys = all.map((r) => r.numericY);
+      const minX = xs.length ? Math.min(...xs, axis.defaultMin || 1) : (axis.defaultMin || 1);
+      const maxX = xs.length ? Math.max(...xs, axis.defaultMax || 5) : (axis.defaultMax || 5);
+      const minY = ys.length ? Math.min(...ys, axis.defaultMin || 1) : (axis.defaultMin || 1);
+      const maxY = ys.length ? Math.max(...ys, axis.defaultMax || 5) : (axis.defaultMax || 5);
+
+      const svgEl = containerRefs.svg;
+      const bounds = svgEl.getBoundingClientRect();
+      const width = Math.max(320, bounds.width || 800);
+      const height = Math.max(360, bounds.height || 560);
+      svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+
+      const svg = d3.select(svgEl);
+      svg.selectAll('*').remove();
+
+      const margin = { top: 24, right: 80, bottom: 60, left: 80 };
+      const innerW = width - margin.left - margin.right;
+      const innerH = height - margin.top - margin.bottom;
+      const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+      const xScale = d3.scaleLinear().domain([minX, maxX]).range([0, innerW]);
+      // Y は値が大きい=「高い」が上に来るよう反転
+      const yScale = d3.scaleLinear().domain([minY, maxY]).range([innerH, 0]);
+
+      // 4 象限の薄背景（X/Y 中央で分割）
+      const midX = xScale((minX + maxX) / 2);
+      const midY = yScale((minY + maxY) / 2);
+      g.append('rect').attr('class', 'viz-quadrant hh')
+        .attr('x', midX).attr('y', 0).attr('width', innerW - midX).attr('height', midY);
+      g.append('rect').attr('class', 'viz-quadrant lh')
+        .attr('x', 0).attr('y', 0).attr('width', midX).attr('height', midY);
+      g.append('rect').attr('class', 'viz-quadrant hl')
+        .attr('x', midX).attr('y', midY).attr('width', innerW - midX).attr('height', innerH - midY);
+      g.append('rect').attr('class', 'viz-quadrant ll')
+        .attr('x', 0).attr('y', midY).attr('width', midX).attr('height', innerH - midY);
+
+      // 象限ラベル（任意）
+      const q = axis.matrixQuadrantLabels || {};
+      const placeLabel = (text, x, y) => {
+        if (!text) return;
+        g.append('text').attr('class', 'viz-quadrant-label')
+          .attr('x', x).attr('y', y).text(text);
+      };
+      placeLabel(q.hh, midX + (innerW - midX) / 2, 24);
+      placeLabel(q.lh, midX / 2, 24);
+      placeLabel(q.hl, midX + (innerW - midX) / 2, innerH - 8);
+      placeLabel(q.ll, midX / 2, innerH - 8);
+
+      // 軸線（中央クロス）
+      g.append('line').attr('x1', midX).attr('x2', midX).attr('y1', 0).attr('y2', innerH)
+        .attr('stroke', 'rgba(148,163,184,0.4)');
+      g.append('line').attr('x1', 0).attr('x2', innerW).attr('y1', midY).attr('y2', midY)
+        .attr('stroke', 'rgba(148,163,184,0.4)');
+
+      // 外枠軸
+      g.append('g').attr('class', 'viz-axis').attr('transform', `translate(0,${innerH})`)
+        .call(d3.axisBottom(xScale).tickValues(d3.range(minX, maxX + 1)));
+      g.append('g').attr('class', 'viz-axis')
+        .call(d3.axisLeft(yScale).tickValues(d3.range(minY, maxY + 1)));
+
+      // 軸ラベル
+      const xL = axis.xAxisLabels || {};
+      const yL = axis.yAxisLabels || {};
+      g.append('text').attr('class', 'viz-axis-label')
+        .attr('x', 0).attr('y', innerH + 44).attr('text-anchor', 'start').text(xL.min || '');
+      g.append('text').attr('class', 'viz-axis-label')
+        .attr('x', innerW).attr('y', innerH + 44).attr('text-anchor', 'end').text(xL.max || '');
+      g.append('text').attr('class', 'viz-axis-label')
+        .attr('transform', `translate(-44,${innerH}) rotate(-90)`).attr('text-anchor', 'start')
+        .text(yL.min || '');
+      g.append('text').attr('class', 'viz-axis-label')
+        .attr('transform', `translate(-44,0) rotate(-90)`).attr('text-anchor', 'end')
+        .text(yL.max || '');
+
+      // ジッタ（同じ (x,y) に複数いるとき重ならないように小さなノイズ加算）
+      // Why: 1〜5 整数 × 1〜5 整数 では (3,3) に密集しがち。視覚的に区別できるよう
+      //      ±0.15 のランダムジッタを加える。rowIndex を seed にして安定化。
+      const jitter = (seed) => {
+        const s = Math.sin(seed * 1000) * 1000;
+        return ((s - Math.floor(s)) - 0.5) * 0.3;
+      };
+
+      // ゴースト点
+      const ghostNodes = ghost.map((r) => ({
+        x: xScale(r.numericX + jitter(r.rowIndex)),
+        y: yScale(r.numericY + jitter(r.rowIndex + 1)),
+        data: r
+      }));
+      const ghostJoin = g.selectAll('.viz-dot.ghost').data(ghostNodes, (d) => 'g_' + d.data.rowIndex);
+      ghostJoin.exit().remove();
+      ghostJoin.enter().append('circle')
+        .attr('class', 'viz-dot ghost')
+        .attr('r', 5)
+        .attr('cx', (d) => d.x)
+        .attr('cy', (d) => d.y);
+
+      // 現在点
+      const nodes = current.map((r) => ({
+        x: xScale(r.numericX + jitter(r.rowIndex)),
+        y: yScale(r.numericY + jitter(r.rowIndex + 1)),
+        data: r
+      }));
+      const dotJoin = g.selectAll('.viz-dot.current').data(nodes, (d) => d.data.rowIndex);
+      dotJoin.exit().remove();
+      const dotEnter = dotJoin.enter().append('circle')
+        .attr('class', 'viz-dot current enter')
+        .attr('r', 8);
+      dotEnter.merge(dotJoin)
+        .attr('cx', (d) => d.x)
+        .attr('cy', (d) => d.y)
+        .on('mouseenter', (event, d) => showTooltip(event, d.data, this))
+        .on('mousemove',  (event, d) => showTooltip(event, d.data, this))
+        .on('mouseleave', () => hideTooltip())
+        .on('click', (event, d) => showTooltip(event, d.data, this));
+
+      updateStatsPills(this, current.length);
+      const swings = this.vizComputeSwings(rows, 'matrix');
+      maybeRenderTeacherPanel(this, swings);
+
+      if (this.elements.answerCount && typeof this.getIcon === 'function') {
+        this.elements.answerCount.innerHTML =
+          this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + current.length + '件</span>';
+      }
+    } catch (e) {
+      console.error('renderMatrix: failed', e);
+      throw e;
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // Projector モード ?display=projector
+  // Why: 電子黒板向け大画面表示。教師端末は通常 view URL、プロジェクタは
+  //      ?display=projector で別タブで開く想定。両者は同じ Forms に向かう。
+  // ---------------------------------------------------------------------
+
+  StudyQuestApp.prototype.vizApplyProjectorMode = function () {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('display') === 'projector') {
+        document.body.classList.add('projector-mode');
+      }
+    } catch (e) {
+      // URL parse 失敗は無視
+    }
+  };
+
+  // 既存の init 完了タイミングで一度だけ適用（DOMContentLoaded 後の動作を想定）
+  // page.js の init が console-safe であることを前提に、CLAUDE.md の
+  // 「top-level side effects forbidden」原則に従い、即座に処理せず
+  // DOMContentLoaded で 1 回だけフラグ付与する。
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('display') === 'projector') {
+          document.body.classList.add('projector-mode');
+        }
+      } catch (e) {}
+    });
+  } else {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('display') === 'projector') {
+        document.body.classList.add('projector-mode');
+      }
+    } catch (e) {}
+  }
+})();
+</script>

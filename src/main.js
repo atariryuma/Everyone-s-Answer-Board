@@ -447,7 +447,7 @@ function doPost(e) {
     }
 
     const action = typeof request.action === 'string' ? request.action.trim() : '';
-    const allowedActions = ['getData', 'addReaction', 'toggleHighlight', 'refreshData', 'publishApp', 'adminApi', 'setupApiKey'];
+    const allowedActions = ['getData', 'addReaction', 'toggleHighlight', 'refreshData', 'publishApp', 'adminApi', 'setupApiKey', 'reportClientError'];
     if (!allowedActions.includes(action)) {
       return jsonResponse({
         success: false,
@@ -572,6 +572,14 @@ function doPost(e) {
           result = createExceptionResponse(error);
         }
         break;
+      case 'reportClientError':
+        // Why: フロントエンドの window.error / unhandledrejection / 明示報告を
+        //      Cloud Logging に流すための受け口。これ無しでは児童端末のフロント
+        //      エラーは CLI から完全に不可視。コードは intentionally permissive
+        //      （submitter は domainRestriction を通過した認証済みドメインユーザ）
+        //      でレート制限とサイズ制限を必ず適用。
+        result = handleClientErrorReport(email, request.payload);
+        break;
       default:
         result = createErrorResponse(action ? `Unknown action: ${action}` : 'Unknown action: 不明');
     }
@@ -585,6 +593,96 @@ function doPost(e) {
       success: false,
       message: 'リクエスト処理中にエラーが発生しました。再度お試しください。'
     });
+  }
+}
+
+/**
+ * Frontend error report receiver — drains client-side errors into Cloud Logging.
+ *
+ * Why: GAS Cloud Logging only captures server-side console.* calls. Errors thrown
+ *   inside page.js.html / AdminPanel.js.html otherwise live only in the browser's
+ *   DevTools console and are invisible to CLI debugging (`npm run logs:cloud`).
+ *   This handler logs structured client error info via console.error so it shows
+ *   up alongside backend logs.
+ *
+ * Limits applied (defense-in-depth, since the endpoint accepts client-controlled
+ * strings from any authenticated domain user):
+ *   - message ≤ 500 chars, stack ≤ 2000 chars, context fields ≤ 200 chars
+ *   - max 30 reports per 5 minutes per email (CacheService backed)
+ *   - level restricted to error / warn / log; anything else → error
+ *
+ * @param {string} email - submitter email (already auth-checked upstream)
+ * @param {Object} payload - { level, message, stack, source, line, col, context }
+ * @returns {Object} result envelope
+ */
+function handleClientErrorReport(email, payload) {
+  try {
+    // Why: doPost の isPlainObject は関数ローカル定数なので、ここからは参照不可。
+    //      重複を許容してでもこの関数の独立性を確保（main.js 単独 require のテストや
+    //      別ファイルからの直接呼び出しでも壊れない）。
+    const isObj = Boolean(payload) && typeof payload === 'object' && !Array.isArray(payload);
+    if (!isObj) {
+      return createErrorResponse('payload must be an object', null, { error: 'INVALID_PAYLOAD' });
+    }
+
+    // Rate limit per email (Cache TTL = 300s).
+    // Why: Cache rather than ScriptProperties to avoid write contention; a single
+    //      page bug could otherwise flood logs from every viewer simultaneously.
+    try {
+      const cache = CacheService.getScriptCache();
+      // 仮名化（メアドそのものはキーに入れない；ログ収集の incident で漏らさない）
+      const bucket = `cer_${Utilities.computeDigest(
+        Utilities.DigestAlgorithm.SHA_1, String(email || '')
+      ).slice(0, 4).map(b => (b & 0xff).toString(16).padStart(2, '0')).join('')}`;
+      const raw = cache.get(bucket);
+      const count = raw ? parseInt(raw, 10) || 0 : 0;
+      if (count >= 30) {
+        return createErrorResponse('rate limit exceeded', null, { error: 'RATE_LIMIT' });
+      }
+      cache.put(bucket, String(count + 1), 300);
+    } catch (cacheErr) {
+      // Cache 障害時はレート制限を諦めて続行（信頼性 > 制限）
+    }
+
+    const cap = (v, n) => {
+      if (v === null || v === undefined) return '';
+      return String(v).replace(/[\r\n\t]+/g, ' ').substring(0, n);
+    };
+
+    const level = ['error', 'warn', 'log', 'debug'].includes(payload.level) ? payload.level : 'error';
+    const message = cap(payload.message, 500);
+    const stack = cap(payload.stack, 2000);
+    const source = cap(payload.source, 200);
+    const lineNo = Number.isFinite(payload.line) ? payload.line : null;
+    const colNo = Number.isFinite(payload.col) ? payload.col : null;
+    const context = cap(payload.context, 200);
+    const url = cap(payload.url, 300);
+    const userAgent = cap(payload.userAgent, 200);
+
+    // Why: console.error にすることで Cloud Logging の severity が ERROR になり、
+    //      `npm run logs:cloud --severity ERROR` で即座に拾える。
+    //      `[client]` prefix で backend ログとの区別を可能にし、`signatureOf` の
+    //      集計でも別グループになる。
+    const tag = `[client/${level}]`;
+    const summary = `${tag} ${context ? '(' + context + ') ' : ''}${message}`;
+    const detail = {
+      reporter: email ? `${email.split('@')[0]}@***` : 'unknown',
+      url,
+      source,
+      line: lineNo,
+      col: colNo,
+      stack: stack || undefined,
+      userAgent
+    };
+
+    if (level === 'error') console.error(summary, detail);
+    else if (level === 'warn') console.warn(summary, detail);
+    else console.log(summary, detail);
+
+    return createSuccessResponse('reported', { accepted: true });
+  } catch (error) {
+    // 自分自身で例外を起こしたらサイレントで返す（ログループ回避）
+    return createErrorResponse('report handler error', null, { error: error && error.message });
   }
 }
 

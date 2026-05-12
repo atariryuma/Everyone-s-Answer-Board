@@ -286,7 +286,9 @@ function validateMapping(columnMapping) {
     }
 
     const requiredColumns = ['answer'];
-    const optionalColumns = ['reason', 'class', 'name'];
+    // Why: numericX/numericY は可視化モード（M1/M2）専用のオプション列指標。
+    //      未指定でも答え列が機能するので optional。重複検出と未知列警告の対象にも入れる。
+    const optionalColumns = ['reason', 'class', 'name', 'numericX', 'numericY'];
     const allColumns = [...requiredColumns, ...optionalColumns];
 
     for (const col of requiredColumns) {

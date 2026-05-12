@@ -84,6 +84,31 @@ npm run logs:cloud -- --json                   # JSON形式で出力
 - 特定ユーザーの問題 → `--user メールアドレスの一部` でフィルタ
 - デプロイ後の監視 → `--severity WARNING --hours 1` で直近の異常を確認
 
+**フロントエンドエラーも収集される**：`window.error` / `unhandledrejection` / `ErrorHandler.logError`
+は `reportClientError` doPost アクション経由で Cloud Logging に流れる（`[client/error]` プレフィックス）。
+`?debug=1` を付けると `console.log/warn` も収集（20件/セッション上限）。
+
+詳細・全 CLI ツール一覧：[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)
+
+---
+
+## Code Quality (lint / pre-commit)
+
+```bash
+npm run lint                # CLAUDE.md ルール違反検出（setTimeout/innerHTML+var/getValue ループ等）
+npm run lint:errors         # error severity のみ（CI 用）
+npm run lint:eslint         # ESLint（バグ予防レベル）
+npm run test:coverage       # node --test のカバレッジ
+```
+
+pre-commit hook 有効化（1 回のみ実行）：
+
+```bash
+git config core.hooksPath .githooks
+```
+
+これでコミット前に syntax + lint + test が自動実行されます。緊急時は `--no-verify`。
+
 ---
 
 ## Architecture

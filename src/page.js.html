@@ -113,7 +113,11 @@
         //      sessionStorage に保存することで、タブを開いている間はポーリング等で
         //      再フェッチしてもカードが跳ね回らない。タブを閉じれば新しい並びになる。
         randomSeed: this.loadRandomSeed(),
-        isOnline: typeof navigator !== 'undefined' ? navigator.onLine !== false : true
+        isOnline: typeof navigator !== 'undefined' ? navigator.onLine !== false : true,
+        // Why: 可視化モード（M1/M2）切替用の state。デフォルトは既存挙動の 'board'。
+        //      server の displaySettings.boardMode（auto→具体モード解決済み）で上書きされる。
+        boardMode: 'board',
+        axisConfig: null
       };
 
       this.lastActivityTime = Date.now();
@@ -1944,6 +1948,16 @@
           ? this.seededShuffle(responseData, this.state.randomSeed)
           : responseData;
 
+        // Why: 可視化モード切替に必要なメタデータを state に保存。
+        //      backend で 'auto' → 具体モードに解決済みなので、ここでは値を信用するだけ。
+        //      axisConfig は M1/M2 で軸ラベル・象限ラベル・allowResubmit を描画する。
+        if (result.displaySettings && typeof result.displaySettings.boardMode === 'string') {
+          this.state.boardMode = result.displaySettings.boardMode;
+        } else {
+          this.state.boardMode = 'board';
+        }
+        this.state.axisConfig = result.axisConfig || null;
+
         if (result.header && this.elements.headingLabel) {
           this.elements.headingLabel.textContent = result.header;
         }
@@ -2088,7 +2102,44 @@
       };
     }
 
+    /**
+     * Render dispatcher: branches by this.state.boardMode (set in performDataLoad
+     * from the server's resolved boardMode — 'auto' was already collapsed server-side).
+     *
+     * Why: visualization modes (M1 numberline / M2 matrix) share data ingestion and
+     *      polling with the existing card board. Splitting at render-time keeps the
+     *      data path single-source while letting renderers diverge freely.
+     *
+     * Fallback: if a viz renderer isn't loaded (page.viz.js missing or skipped) or
+     *      throws, we degrade to the card board so the page never goes blank.
+     */
     async renderBoard(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
+      const mode = this.state && this.state.boardMode ? this.state.boardMode : 'board';
+      try {
+        if (mode === 'numberline' && typeof this.renderNumberLine === 'function') {
+          return await this.renderNumberLine(isInitialLoad, oldRows);
+        }
+        if (mode === 'matrix' && typeof this.renderMatrix === 'function') {
+          return await this.renderMatrix(isInitialLoad, oldRows);
+        }
+        return await this.renderBoardCards(isLayoutChange, isInitialLoad, oldRows);
+      } catch (error) {
+        console.error('❌ renderBoard: dispatcher error (mode=' + mode + '), falling back to cards:', error);
+        try {
+          return await this.renderBoardCards(isLayoutChange, isInitialLoad, oldRows);
+        } catch (fallbackError) {
+          console.error('❌ renderBoard: fallback also failed:', fallbackError);
+          this.handleRenderingError(fallbackError);
+        }
+      }
+    }
+
+    /**
+     * Card-grid rendering (the original bulletin board mode).
+     * Was previously named renderBoard; renamed to make the dispatcher's branch
+     * explicit. Behaviour is unchanged.
+     */
+    async renderBoardCards(isLayoutChange = false, isInitialLoad = false, oldRows = []) {
       try {
         const newRows = this.state.currentAnswers;
 
@@ -2108,7 +2159,7 @@
         }, { timeout: 300 });
 
       } catch (error) {
-        console.error('❌ renderBoard: レンダリングエラー:', error);
+        console.error('❌ renderBoardCards: レンダリングエラー:', error);
         this.handleRenderingError(error);
       }
     }

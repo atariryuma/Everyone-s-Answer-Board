@@ -30,7 +30,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session */
 
 /**
  * ユーザー専用フォルダを作成
@@ -445,23 +445,61 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     viewerContext.isAdmin || viewerContext.isOwnBoard || displaySettings.showNames
   );
   const rows = Array.isArray(result.data) ? result.data : [];
+
+  // Why: 可視化モード（M1/M2）で同一児童の再投稿を「揺らぎ」として追跡するために
+  //      仮名化された emailHash を全モードで wire に乗せる。生メアドは showNames=false なら除去。
+  //      includeIdentity=true のときも emailHash は重複して載せるが、ペイロード増は <10B/row なので無視できる。
   const safeData = rows.map(item => {
     if (typeof item !== 'object' || item === null) return item;
     const cleaned = {};
+    const rawEmail = item.email;
     for (const key in item) {
       if (!includeIdentity && (key === 'email' || key === 'name')) continue;
       const v = item[key];
       cleaned[key] = v instanceof Date ? v.toISOString() : v;
     }
+    // emailHash は両モードで載せる（揺らぎ追跡のため）
+    if (typeof rawEmail === 'string' && rawEmail) {
+      cleaned.emailHash = emailToShortHash(rawEmail);
+    }
     return cleaned;
   });
+
+  // Why: boardMode='auto' のとき、columnMapping から最適モードを推論。
+  //      これでフロントは 'board'/'numberline'/'matrix' のいずれかを必ず受け取れる。
+  //      列構成が変わっても教師が再設定する必要がないようにする UX 配慮。
+  const columnMapping = (config && config.columnMapping) || {};
+  const hasNumericX = typeof columnMapping.numericX === 'number' && columnMapping.numericX >= 0;
+  const hasNumericY = typeof columnMapping.numericY === 'number' && columnMapping.numericY >= 0;
+  const rawMode = displaySettings.boardMode || 'auto';
+  let effectiveMode;
+  if (rawMode === 'auto') {
+    if (hasNumericX && hasNumericY) effectiveMode = 'matrix';
+    else if (hasNumericX) effectiveMode = 'numberline';
+    else effectiveMode = 'board';
+  } else {
+    effectiveMode = rawMode;
+  }
+
+  // 軸ラベル・象限ラベル・揺らぎ追跡フラグを wire に同梱
+  const axisConfig = {
+    xAxisLabels: (config && config.xAxisLabels) || null,
+    yAxisLabels: (config && config.yAxisLabels) || null,
+    matrixQuadrantLabels: (config && config.matrixQuadrantLabels) || null,
+    allowResubmit: Boolean(config && config.allowResubmit),
+    // 数値レンジは列マッピングからは取れないので、表示側でデータから推定。
+    // ただし min=1,max=5 の慣例値を default として送る（Forms 線形尺度の既定）。
+    defaultMin: 1,
+    defaultMax: 5
+  };
 
   return {
     success: true,
     data: safeData,
     header: String(result.header || result.sheetName || '回答一覧'),
     sheetName: String(result.sheetName || 'Sheet1'),
-    displaySettings
+    displaySettings: { ...displaySettings, boardMode: effectiveMode },
+    axisConfig
   };
 }
 
@@ -871,6 +909,22 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
 
     const diagnostics = performIntegratedColumnDiagnostics(headers, { sampleData });
 
+    // Why: 線形尺度（Forms「リニアスケール」）列が見つかれば、numericX/numericY として
+    //      自動的に mapping に含める。教師は明示設定なしで M1/M2 モードが使えるようになる。
+    //      候補が複数あるとき、信頼度上位 2 件を採用（matrix 用）。
+    //      欠落・低信頼の場合は何も設定せず、auto モードは 'board' にフォールバックする。
+    const mergedMapping = { ...(diagnostics.recommendedMapping || {}) };
+    const numericCandidates = Array.isArray(diagnostics.numericScaleCandidates)
+      ? diagnostics.numericScaleCandidates
+      : [];
+    const acceptedScales = numericCandidates.filter(c => c && typeof c.index === 'number' && c.confidence >= 80);
+    if (acceptedScales.length >= 1 && typeof mergedMapping.numericX !== 'number') {
+      mergedMapping.numericX = acceptedScales[0].index;
+    }
+    if (acceptedScales.length >= 2 && typeof mergedMapping.numericY !== 'number') {
+      mergedMapping.numericY = acceptedScales[1].index;
+    }
+
     try {
       const columnSetupResult = setupReactionAndHighlightColumns(spreadsheetId, sheetName, headers);
       if (columnSetupResult.columnsAdded && columnSetupResult.columnsAdded.length > 0) {
@@ -879,8 +933,9 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
           sheet,
           headers: [...headers, ...columnSetupResult.columnsAdded],
           data: [],
-          mapping: diagnostics.recommendedMapping || {},
+          mapping: mergedMapping,
           confidence: diagnostics.confidence || {},
+          numericScaleCandidates: numericCandidates,
           columnsAdded: columnSetupResult.columnsAdded
         };
       }
@@ -893,8 +948,9 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
       sheet,
       headers,
       data: [],
-      mapping: diagnostics.recommendedMapping || {},
-      confidence: diagnostics.confidence || {}
+      mapping: mergedMapping,
+      confidence: diagnostics.confidence || {},
+      numericScaleCandidates: numericCandidates
     };
   } catch (error) {
     console.error('getColumnAnalysis error:', error.message);

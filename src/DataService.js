@@ -283,12 +283,16 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
   // Headers don't change mid-batch, so resolve column indices once here
   // rather than per-row (resolveColumnIndex runs a full header scan on misses).
   const columnMapping = config.columnMapping || {};
+  // Why: numericX/Y はパターン検出がない（教師が手動 or detectNumericScaleColumns で選ぶ）。
+  //      columnMapping に明示インデックスがあるときだけ取り込む。-1 のとき item は null を入れる。
   const fieldIndices = {
     answer: resolveColumnIndex(headers, 'answer', columnMapping).index,
     reason: resolveColumnIndex(headers, 'reason', columnMapping).index,
     class: resolveColumnIndex(headers, 'class', columnMapping).index,
     name: resolveColumnIndex(headers, 'name', columnMapping).index,
-    email: resolveColumnIndex(headers, 'email', columnMapping).index
+    email: resolveColumnIndex(headers, 'email', columnMapping).index,
+    numericX: (typeof columnMapping.numericX === 'number' && columnMapping.numericX >= 0 && columnMapping.numericX < headers.length) ? columnMapping.numericX : -1,
+    numericY: (typeof columnMapping.numericY === 'number' && columnMapping.numericY >= 0 && columnMapping.numericY < headers.length) ? columnMapping.numericY : -1
   };
   const tsIndex = resolveTimestampIndex(headers);
 
@@ -423,6 +427,16 @@ function processRawDataBatch(batchRows, headers, config, options, startOffset, u
         const nameValue = getCell(row, fieldIndices.name);
         const emailValue = getCell(row, fieldIndices.email);
 
+        // Why: numericX/Y は Forms「線形尺度」を想定。整数として正規化、
+        //      非数値や空欄は null（描画側で除外判定に使う）。
+        const toScaleNumber = (raw) => {
+          if (raw === null || raw === undefined || raw === '') return null;
+          const n = typeof raw === 'number' ? raw : Number(String(raw).trim());
+          return Number.isFinite(n) ? n : null;
+        };
+        const numericXValue = fieldIndices.numericX >= 0 ? toScaleNumber(row[fieldIndices.numericX]) : null;
+        const numericYValue = fieldIndices.numericY >= 0 ? toScaleNumber(row[fieldIndices.numericY]) : null;
+
         const tsValue = tsIndex >= 0 && tsIndex < row.length ? (row[tsIndex] || '') : '';
 
         const item = {
@@ -436,6 +450,8 @@ function processRawDataBatch(batchRows, headers, config, options, startOffset, u
           reason: reasonValue || '',
           class: classValue || '',
           name: nameValue || '',
+          numericX: numericXValue,
+          numericY: numericYValue,
 
           formattedTimestamp: formatTimestamp(tsValue),
           isEmpty: isEmptyRow(row),
@@ -444,7 +460,11 @@ function processRawDataBatch(batchRows, headers, config, options, startOffset, u
           highlight: extractHighlight(row, headers)
         };
 
-        if (!answerValue && !reasonValue) {
+        // Why: answer/reason は board モードの必須コンテンツ。両方空ならスキップ。
+        //      ただし numericX/Y が入っているならビジュアル化対象として残す
+        //      （Forms 線形尺度のみで自由記述なし、もありうる）。
+        const hasNumeric = numericXValue !== null || numericYValue !== null;
+        if (!answerValue && !reasonValue && !hasNumeric) {
           return;
         }
 

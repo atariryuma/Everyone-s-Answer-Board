@@ -131,6 +131,11 @@
       initializeFooterUI();
       initializeEventListeners();
 
+      // Why: applyConfig が走らない（=保存済み config 無し）新規教師でも、
+      //      可視化モードの初期表示状態（auto = 数値マッピング/軸ラベル領域を見せる、
+      //      象限ラベルは隠す）を正しく適用するために 1 回呼ぶ。
+      try { updateVisualizationVisibility(); } catch (_) {}
+
       updateProgress(1);
 
       // 初回アクセス時のウェルカムモーダル表示
@@ -396,6 +401,18 @@
       });
     }
 
+    // Why: boardMode セレクトを変更したら、関連サブセクション（数値列マッピング・
+    //      軸ラベル・象限ラベル）の表示状態を即時更新する。保存ボタンを押さなくても
+    //      UI は反応する。
+    const boardModeSelect = document.getElementById('board-mode-select');
+    if (boardModeSelect) {
+      boardModeSelect.addEventListener('change', function () {
+        try { updateVisualizationVisibility(); } catch (e) {
+          console.warn('updateVisualizationVisibility failed:', e && e.message);
+        }
+      });
+    }
+
     const aiAnalyzeBtn = document.getElementById('ai-analyze-btn');
     if (aiAnalyzeBtn) {
       aiAnalyzeBtn.addEventListener('click', function () {
@@ -645,8 +662,115 @@
         }
       }
 
+      // Why: 可視化モードの保存済み値を UI に復元。
+      //      DOM 要素が存在しないテンプレート（旧版）でも null safe で進める。
+      applyVisualizationConfig(config);
+
     } catch (error) {
       console.error('❌ 設定反映エラー:', error.message);
+    }
+  }
+
+  /**
+   * 可視化モード関連の保存済み設定を UI に書き戻す。
+   * applyConfig から呼ばれる。DOM 不在時は no-op。
+   */
+  function applyVisualizationConfig(config) {
+    if (!config) return;
+
+    // 1) boardMode セレクト
+    const modeSelect = document.getElementById('board-mode-select');
+    if (modeSelect) {
+      const allowed = ['auto', 'board', 'numberline', 'matrix'];
+      const value = (config.displaySettings && allowed.includes(config.displaySettings.boardMode))
+        ? config.displaySettings.boardMode
+        : 'auto';
+      modeSelect.value = value;
+    }
+
+    // 2) 軸ラベル
+    const setText = (id, v) => {
+      const el = document.getElementById(id);
+      if (el) el.value = typeof v === 'string' ? v : '';
+    };
+    const x = config.xAxisLabels || {};
+    const y = config.yAxisLabels || {};
+    setText('x-min-label', x.min);
+    setText('x-max-label', x.max);
+    setText('y-min-label', y.min);
+    setText('y-max-label', y.max);
+
+    // 3) 4象限ラベル
+    const q = config.matrixQuadrantLabels || {};
+    setText('quadrant-hh-label', q.hh);
+    setText('quadrant-hl-label', q.hl);
+    setText('quadrant-lh-label', q.lh);
+    setText('quadrant-ll-label', q.ll);
+
+    // 4) 再投稿許可
+    const allowEl = document.getElementById('allow-resubmit');
+    if (allowEl) allowEl.checked = !!config.allowResubmit;
+
+    // 5) numericX/Y セレクトの値設定
+    //    （オプションは fillColumnDropdowns 経由で headers から再生成されるが、
+    //     その後にここで保存済み値を復元する）
+    const setSelect = (id, v) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const val = typeof v === 'number' ? String(v) : '';
+      // option が存在するかを軽くチェック（無ければ空のまま）
+      const exists = Array.from(el.options).some(o => o.value === val);
+      el.value = exists ? val : '';
+    };
+    const mapping = config.columnMapping || {};
+    setSelect('numeric-x-column-select', mapping.numericX);
+    setSelect('numeric-y-column-select', mapping.numericY);
+
+    // 6) UI 表示状態を mode に合わせて更新
+    updateVisualizationVisibility();
+  }
+
+  /**
+   * boardMode に応じて関連サブセクションの表示/非表示を切り替える。
+   * - auto       : 数値列マッピング + 軸ラベル（任意）。象限ラベル非表示。
+   * - board      : すべて非表示（掲示板モード）
+   * - numberline : 数値列マッピング X + 軸ラベル X。Y / 象限 は非表示
+   * - matrix     : X / Y 両方 + 軸ラベル両方 + 象限ラベル
+   *
+   * Why: 教師の認知負荷を下げる。matrix を選ばない限り 4 象限ラベル欄は見せない。
+   */
+  function updateVisualizationVisibility() {
+    const mode = document.getElementById('board-mode-select')?.value || 'auto';
+    const show = (id, on) => {
+      const el = document.getElementById(id);
+      if (el) el.classList.toggle('hidden', !on);
+    };
+
+    const isViz = mode === 'numberline' || mode === 'matrix' || mode === 'auto';
+    const isMatrix = mode === 'matrix';
+
+    show('numeric-mapping-container', isViz);
+    show('axis-labels-container', isViz);
+    show('numeric-y-mapping-row', isMatrix);
+    show('y-axis-label-row', isMatrix);
+    show('quadrant-labels-container', isMatrix);
+
+    const hint = document.getElementById('board-mode-hint');
+    if (hint) {
+      switch (mode) {
+        case 'auto':
+          hint.textContent = 'Forms「線形尺度」列の有無で自動判定（推奨）。';
+          break;
+        case 'board':
+          hint.textContent = '従来のカード一覧表示に固定します。';
+          break;
+        case 'numberline':
+          hint.textContent = '数直線（M1）で 1 軸の意見分布を可視化します。';
+          break;
+        case 'matrix':
+          hint.textContent = 'X×Y のマトリクス（M2）で 2 軸の散布を可視化します。';
+          break;
+      }
     }
   }
 
@@ -1536,6 +1660,15 @@
 
       fillColumnDropdowns(analysisResult.headers, analysisResult.mapping, analysisResult.confidence);
 
+      // Why: 線形尺度（Forms「リニアスケール」）列の検出結果をユーザに可視化。
+      //      mapping には auto-merged numericX/Y が既に入っているが、教師には
+      //      「どの列が候補と判定されたか」を見せて理解を促す。
+      displayNumericCandidates(analysisResult.numericScaleCandidates, analysisResult.headers);
+
+      // 可視化モード関連 UI を boardMode に応じて再表示。
+      // mapping が変わると auto モードの効果モードも変わるため、表示状態を更新する。
+      try { updateVisualizationVisibility(); } catch (_) {}
+
       displayAnalysisQualityReport(analysisResult, qualityCheck);
 
       updateCompletionStatus();
@@ -1986,11 +2119,21 @@
         reason: document.getElementById('reason-column-select'),
         class: document.getElementById('class-column-select'),
         name: document.getElementById('name-column-select'),
+        // Why: 可視化モード（M1/M2）用の数値列セレクトも同じ headers から構築する。
+        //      DOM 不在のテンプレートでも null safe（forEach 内で skip）。
+        numericX: document.getElementById('numeric-x-column-select'),
+        numericY: document.getElementById('numeric-y-column-select'),
       };
 
       const missingDropdowns = Object.keys(dropdowns).filter((key) => !dropdowns[key]);
       if (missingDropdowns.length > 0) {
       }
+
+      // Why: numericX/Y は「（自動判定）」を空 value のプレースホルダーとして使う。
+      //      他の必須列は「選択してください...」表示で UX を分ける。
+      const placeholderFor = (k) => (k === 'numericX' || k === 'numericY')
+        ? '<option value="">（自動判定 / 未使用）</option>'
+        : '<option value="">選択してください...</option>';
 
       Object.keys(dropdowns).forEach((columnType) => {
         const dropdown = dropdowns[columnType];
@@ -1999,7 +2142,7 @@
         }
 
         try {
-          dropdown.innerHTML = '<option value="">選択してください...</option>';
+          dropdown.innerHTML = placeholderFor(columnType);
 
           headers.forEach((header, index) => {
             if (header && header.trim()) {
@@ -2014,6 +2157,15 @@
         }
       });
 
+      // numericX/Y は AI Detection の対象外（patterns に無いため）。
+      // 既存 mapping に numericX/Y があれば、対応する dropdown に値をセット。
+      const presetIfNumber = (id, v) => {
+        const el = document.getElementById(id);
+        if (el && typeof v === 'number') el.value = String(v);
+      };
+      presetIfNumber('numeric-x-column-select', mapping.numericX);
+      presetIfNumber('numeric-y-column-select', mapping.numericY);
+
       setAIDetectionSelections(mapping, dropdowns, confidence, headers);
 
       setupDropdownEventListeners(dropdowns);
@@ -2021,6 +2173,45 @@
       console.error('fillColumnDropdowns エラー:', error);
       showError('ドロップダウンの設定に失敗しました: ' + error.message);
     }
+  }
+
+  /**
+   * Forms「線形尺度」列の自動検出結果を UI 上に表示する。
+   *
+   * Why: backend は detectNumericScaleColumns() で 1-N 整数の列を検出し、
+   *      上位 2 件を自動で numericX/Y にマージする。教師には「どの列が
+   *      候補として認識されたか」と「どの範囲（min-max）か」を見せて
+   *      理解と上書きの可能性を提供する。
+   *
+   * candidates が空ならパネルを隠す（情報過多回避）。
+   */
+  function displayNumericCandidates(candidates, headers) {
+    const panel = document.getElementById('numeric-candidates-info');
+    const list = document.getElementById('numeric-candidates-list');
+    if (!panel || !list) return;
+
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      panel.classList.add('hidden');
+      list.innerHTML = '';
+      return;
+    }
+
+    const colLabel = (idx) => {
+      if (idx < 26) return String.fromCharCode(65 + idx) + '列';
+      // 27+ は AA, AB... A1 表記で簡易対応
+      return String.fromCharCode(64 + Math.floor(idx / 26)) +
+             String.fromCharCode(65 + (idx % 26)) + '列';
+    };
+    const safe = (s) => String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    list.innerHTML = candidates.slice(0, 4).map((c, i) => {
+      const role = i === 0 ? 'X軸' : (i === 1 ? 'Y軸' : '候補');
+      const header = c.header || (Array.isArray(headers) ? headers[c.index] : '') || '';
+      return `<div>📏 <strong>${role}</strong>: ${colLabel(c.index)}「${safe(header)}」`
+           + ` (範囲 ${c.min}-${c.max}, 信頼度 ${c.confidence}%)</div>`;
+    }).join('');
+    panel.classList.remove('hidden');
   }
 
   /**
@@ -3607,10 +3798,44 @@
   }
 
   function getDisplaySettings() {
+    // Why: boardMode は backend で sanitizeDisplaySettings の allowlist 済み（VALID_BOARD_MODES）。
+    //      未設定なら 'auto' を返し、サーバが列マッピングを見て実モードに解決する。
+    const boardModeEl = document.getElementById('board-mode-select');
+    const boardMode = boardModeEl && boardModeEl.value ? boardModeEl.value : 'auto';
     return {
       showNames: document.getElementById('show-names')?.checked || false,
-      showReactions: document.getElementById('show-reactions')?.checked || false
+      showReactions: document.getElementById('show-reactions')?.checked || false,
+      boardMode
     };
+  }
+
+  /**
+   * 可視化モード関連のメタデータ（軸ラベル・象限ラベル・再投稿許可）を収集。
+   * Why: backend の sanitize は空オブジェクトを null として処理するので、
+   *      ここで「全項目空なら undefined」を返して config 容量を節約する。
+   *      入力欄が DOM に無い古い admin ページでも壊れないよう全て optional に取る。
+   */
+  function getVisualizationSettings() {
+    const readText = (id) => {
+      const el = document.getElementById(id);
+      return el && typeof el.value === 'string' ? el.value.trim() : '';
+    };
+    const xMin = readText('x-min-label');
+    const xMax = readText('x-max-label');
+    const yMin = readText('y-min-label');
+    const yMax = readText('y-max-label');
+    const qHH = readText('quadrant-hh-label');
+    const qHL = readText('quadrant-hl-label');
+    const qLH = readText('quadrant-lh-label');
+    const qLL = readText('quadrant-ll-label');
+    const allowResubmit = !!document.getElementById('allow-resubmit')?.checked;
+
+    const out = {};
+    if (xMin || xMax) out.xAxisLabels = { min: xMin, max: xMax };
+    if (yMin || yMax) out.yAxisLabels = { min: yMin, max: yMax };
+    if (qHH || qHL || qLH || qLL) out.matrixQuadrantLabels = { hh: qHH, hl: qHL, lh: qLH, ll: qLL };
+    out.allowResubmit = allowResubmit;
+    return out;
   }
 
   /**
@@ -3643,6 +3868,7 @@
 
     const formInfo = getCurrentFormInfoSafe();
     const columnMapping = getColumnMapping();
+    const vizSettings = getVisualizationSettings();
 
     return {
       spreadsheetId,
@@ -3651,6 +3877,9 @@
       formUrl: formInfo.formUrl,
       formTitle: formInfo.formTitle,
       columnMapping,
+      // Why: 可視化メタデータは spread して、未指定キーは含めない。
+      //      backend の validateAndSanitizeConfig が空文字を null に正規化する。
+      ...vizSettings,
       etag: (systemState?.config?.etag) || undefined,
     };
   }
@@ -3661,6 +3890,10 @@
       reason: document.getElementById('reason-column-select'),
       class: document.getElementById('class-column-select'),
       name: document.getElementById('name-column-select'),
+      // Why: numericX/Y は可視化モード（M1/M2）専用の任意列。
+      //      DOM 要素が存在しない古いページでも null safe。
+      numericX: document.getElementById('numeric-x-column-select'),
+      numericY: document.getElementById('numeric-y-column-select'),
     };
 
     const columnMapping = {};

@@ -270,3 +270,54 @@ function normalizeHeader(header) {
 /** デフォルト表示設定 */
 const DEFAULT_DISPLAY_SETTINGS = { showNames: false, showReactions: false, theme: 'default', pageSize: 20 };
 
+/**
+ * メールアドレスを salted SHA-1 で短縮ハッシュ化（仮名化）。
+ *
+ * Why: 可視化モード（M1/M2）で同一児童の再投稿を「揺らぎ」として追跡する目的。
+ *      送信先の wire ペイロードに生メアドを載せたくないので、不可逆な短縮IDに置換する。
+ *      salt は ScriptProperty に初回利用時に自動生成されるランダム値を使用。
+ *      4 bytes (8 hex chars) ≒ 約 43 億通り。クラス〜学年規模の児童識別には十分。
+ *
+ *      仮名化であって匿名化ではない（GDPR/個人情報保護法の用語）。
+ *      DB に元メアドは残るため、教師端末では同一児童の追跡が可能。
+ *      児童端末側に送る wire ペイロードは showNames=false なら名前/メアド除去 + emailHash のみ。
+ *
+ * @param {string} email - メールアドレス
+ * @returns {string|null} 8文字hex、入力空ならnull
+ */
+function emailToShortHash(email) {
+  if (!email || typeof email !== 'string') return null;
+  const trimmed = email.trim().toLowerCase();
+  if (!trimmed) return null;
+
+  let salt = getCachedProperty('EMAIL_HASH_SALT');
+  if (!salt) {
+    // Why: salt 未設定なら自動生成。スクリプト全体で 1 回だけ生成、以後同じ salt を使う。
+    //      乱数源は Utilities.getUuid()（GAS 提供の crypto-grade UUID）。
+    salt = Utilities.getUuid().replace(/-/g, '');
+    try {
+      setCachedProperty('EMAIL_HASH_SALT', salt);
+    } catch (e) {
+      console.warn('emailToShortHash: failed to persist salt, using ephemeral value:', e.message);
+    }
+  }
+
+  try {
+    const bytes = Utilities.computeDigest(
+      Utilities.DigestAlgorithm.SHA_1,
+      salt + ':' + trimmed,
+      Utilities.Charset.UTF_8
+    );
+    // 4 bytes → 8 hex chars
+    let hex = '';
+    for (let i = 0; i < 4; i++) {
+      const b = bytes[i] & 0xff;
+      hex += (b < 16 ? '0' : '') + b.toString(16);
+    }
+    return hex;
+  } catch (e) {
+    console.warn('emailToShortHash: digest error', e.message);
+    return null;
+  }
+}
+

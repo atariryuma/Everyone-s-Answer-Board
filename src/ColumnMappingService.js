@@ -436,12 +436,17 @@ function generateRecommendedMapping(headers, options = {}) {
 function performIntegratedColumnDiagnostics(originalHeaders, options = {}) {
   try {
     const result = generateRecommendedMapping(originalHeaders, options);
+    const numericScaleCandidates = detectNumericScaleColumns(
+      originalHeaders,
+      options.sampleData || []
+    );
 
     return {
       success: true,
       headers: originalHeaders,
       recommendedMapping: result.recommendedMapping,
       confidence: result.confidence,
+      numericScaleCandidates,
       aiAnalysis: result.analysis,
       timestamp: new Date().toISOString()
     };
@@ -453,8 +458,89 @@ function performIntegratedColumnDiagnostics(originalHeaders, options = {}) {
       error: error.message,
       headers: originalHeaders,
       recommendedMapping: {},
+      numericScaleCandidates: [],
       confidence: {}
     };
   }
+}
+
+/**
+ * Detect linear-scale numeric columns (Google Forms「線形尺度」).
+ *
+ * Why: M1 (number line) and M2 (matrix) modes need 1-2 numeric columns.
+ *      Google Forms linear scale stores integers 1..N in the column.
+ *      We detect by sampling actual data values, not by header pattern, because
+ *      teachers write questions in natural language and there's no reliable
+ *      header marker.
+ *
+ * @param {Array<string>} headers - All headers from the sheet
+ * @param {Array<Array>} sampleData - Rows of sample data (excluding header row)
+ * @returns {Array<{index, header, min, max, confidence, sampleCount}>}
+ *   Candidates sorted by confidence desc.
+ */
+function detectNumericScaleColumns(headers, sampleData) {
+  if (!Array.isArray(headers) || !Array.isArray(sampleData)) return [];
+
+  const systemPatterns = [
+    /^タイムスタンプ$/i, /^timestamp$/i, /^日時$/i, /^日付$/i,
+    /^UNDERSTAND$/i, /^LIKE$/i, /^CURIOUS$/i, /^HIGHLIGHT$/i,
+    /^理解$/i, /^いいね$/i, /^気になる$/i, /^ハイライト$/i,
+    /^_/
+  ];
+
+  const candidates = [];
+
+  for (let colIdx = 0; colIdx < headers.length; colIdx++) {
+    const header = headers[colIdx];
+    if (!header || typeof header !== 'string' || !header.trim()) continue;
+    if (systemPatterns.some(p => p.test(header.trim()))) continue;
+
+    // Collect non-empty cell values for this column
+    const values = [];
+    for (const row of sampleData) {
+      if (!Array.isArray(row)) continue;
+      const cell = row[colIdx];
+      if (cell === '' || cell == null) continue;
+      values.push(cell);
+    }
+    if (values.length < 2) continue;
+
+    // All must parse as integers in a small range (line ar scale = 1..10 typical)
+    let allValidInt = true;
+    const nums = [];
+    for (const v of values) {
+      const n = typeof v === 'number' ? v : Number(String(v).trim());
+      if (!Number.isFinite(n) || !Number.isInteger(n)) { allValidInt = false; break; }
+      if (n < 0 || n > 10) { allValidInt = false; break; }
+      nums.push(n);
+    }
+    if (!allValidInt) continue;
+
+    const min = Math.min(...nums);
+    const max = Math.max(...nums);
+    // Range too narrow (everyone same value) — likely not a scale being used.
+    if (max - min < 1) continue;
+    // Range very wide for "linear scale" — unlikely (would be free numeric).
+    if (max - min > 9) continue;
+
+    // Confidence: more samples + sensible 1-5 or 1-10 boundaries → higher.
+    let confidence = 60;
+    if (values.length >= 5) confidence += 10;
+    if (values.length >= 15) confidence += 10;
+    if (min === 1 && (max === 5 || max === 10)) confidence += 15;
+    if (min === 0 && (max === 4 || max === 10)) confidence += 10;
+
+    candidates.push({
+      index: colIdx,
+      header: header.trim(),
+      min,
+      max,
+      sampleCount: values.length,
+      confidence: Math.min(confidence, 95)
+    });
+  }
+
+  candidates.sort((a, b) => b.confidence - a.confidence);
+  return candidates;
 }
 

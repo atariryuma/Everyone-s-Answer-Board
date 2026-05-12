@@ -465,6 +465,101 @@
               </label>
             </div>
           </div>
+
+          <!--
+            可視化モード設定（M1 数直線 / M2 マトリクス散布図）
+            Why: 既定は 'auto' で、Forms「線形尺度」列の有無からサーバが自動判定。
+                 教師がモードを固定したい場合のみ明示選択する。
+                 numericX/Y は getColumnAnalysis が自動マッピング済みなので、
+                 通常は空欄でも動く（mapping を上書きする緊急用 UI）。
+          -->
+          <div id="visualization-section" class="mb-4 pt-4 border-t border-gray-700">
+            <h3 class="text-lg font-semibold text-white mb-2">📊 可視化モード（M1/M2）</h3>
+            <p class="text-xs text-gray-400 mb-3">Forms「線形尺度」を含むときは自動で数直線/散布図に切り替わります。</p>
+
+            <div class="form-group">
+              <label class="block text-sm font-medium text-gray-300 mb-2" for="board-mode-select">
+                表示モード
+              </label>
+              <select id="board-mode-select" class="modern-select">
+                <option value="auto">自動判定（推奨）</option>
+                <option value="board">掲示板</option>
+                <option value="numberline">数直線（M1）</option>
+                <option value="matrix">マトリクス（M2）</option>
+              </select>
+              <div class="text-xs text-gray-400 mt-1" id="board-mode-hint">
+                線形尺度列がなければ掲示板表示になります。
+              </div>
+            </div>
+
+            <!-- 検出された数値列の表示（情報のみ。getColumnAnalysis が numericScaleCandidates を返した時に表示） -->
+            <div id="numeric-candidates-info" class="hidden mt-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-blue-400">🔢</span>
+                <span class="text-sm font-medium text-blue-300">検出された数値列</span>
+              </div>
+              <div id="numeric-candidates-list" class="text-xs text-gray-300 space-y-1"></div>
+            </div>
+
+            <!-- 数値列の明示マッピング（auto/numberline/matrix で関連、board のときは非表示） -->
+            <div id="numeric-mapping-container" class="hidden space-y-3 mt-3">
+              <div class="form-group">
+                <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-x-column-select">
+                  X軸の数値列
+                </label>
+                <select id="numeric-x-column-select" data-column-type="numericX" class="modern-select">
+                  <option value="">（自動判定）</option>
+                </select>
+              </div>
+              <div id="numeric-y-mapping-row" class="form-group hidden">
+                <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-y-column-select">
+                  Y軸の数値列（マトリクス用）
+                </label>
+                <select id="numeric-y-column-select" data-column-type="numericY" class="modern-select">
+                  <option value="">（未使用）</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 軸ラベル（numberline/matrix で表示） -->
+            <div id="axis-labels-container" class="hidden space-y-3 mt-3">
+              <div class="form-group">
+                <label class="block text-sm font-medium text-gray-300 mb-2">X軸ラベル（両端）</label>
+                <div class="flex gap-2">
+                  <input type="text" id="x-min-label" class="modern-input flex-1" placeholder="例: そのまま使う" maxlength="40">
+                  <input type="text" id="x-max-label" class="modern-input flex-1" placeholder="例: 自分で直す" maxlength="40">
+                </div>
+              </div>
+              <div id="y-axis-label-row" class="form-group hidden">
+                <label class="block text-sm font-medium text-gray-300 mb-2">Y軸ラベル（両端、マトリクス用）</label>
+                <div class="flex gap-2">
+                  <input type="text" id="y-min-label" class="modern-input flex-1" placeholder="例: 低い" maxlength="40">
+                  <input type="text" id="y-max-label" class="modern-input flex-1" placeholder="例: 高い" maxlength="40">
+                </div>
+              </div>
+            </div>
+
+            <!-- 4 象限ラベル（matrix のみ） -->
+            <div id="quadrant-labels-container" class="hidden mt-3">
+              <label class="block text-sm font-medium text-gray-300 mb-2">4象限ラベル（任意）</label>
+              <div class="grid grid-cols-2 gap-2">
+                <input type="text" id="quadrant-lh-label" class="modern-input" placeholder="左上: じっくり" maxlength="40">
+                <input type="text" id="quadrant-hh-label" class="modern-input" placeholder="右上: 理想" maxlength="40">
+                <input type="text" id="quadrant-ll-label" class="modern-input" placeholder="左下: 停滞" maxlength="40">
+                <input type="text" id="quadrant-hl-label" class="modern-input" placeholder="右下: 時短重視" maxlength="40">
+              </div>
+            </div>
+
+            <!-- 揺らぎ追跡用：再投稿の許可 -->
+            <div class="toggle-group mt-3">
+              <label class="toggle-switch">
+                <input type="checkbox" id="allow-resubmit" />
+                <span class="slider"></span>
+                再投稿を許可（揺らぎを追跡）
+              </label>
+              <p class="text-xs text-gray-400 mt-1 ml-12">議論前後で意見が動いた児童を教師ダッシュボードで把握できます。</p>
+            </div>
+          </div>
         </div>
 
         <div class="action-buttons">

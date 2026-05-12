@@ -1,0 +1,230 @@
+<style>
+  /* =====================================================================
+   * Visualization mode styles (M1 number line / M2 matrix scatter)
+   *
+   * Why: 既存の card grid 用 CSS (page.css) と完全に分離。
+   *      .viz-container 内のスタイルは board モード時には適用されないので、
+   *      既存表示への影響ゼロ。
+   * ===================================================================== */
+
+  .viz-container {
+    position: relative;
+    width: 100%;
+    /* ヘッダ + フッタ分を控えた高さ。スマホでも横向きでまともに見えるよう min-height は控えめ。 */
+    min-height: 60vh;
+    padding: 1rem 0.5rem 2rem;
+    background: var(--brand-background, #0f172a);
+    color: var(--brand-text, #e2e8f0);
+    overflow: visible;
+  }
+
+  .viz-svg {
+    width: 100%;
+    height: 100%;
+    min-height: 55vh;
+    display: block;
+  }
+
+  /* 軸線 + ラベル */
+  .viz-axis line,
+  .viz-axis path {
+    stroke: rgba(148, 163, 184, 0.5);
+    stroke-width: 1;
+  }
+  .viz-axis text {
+    fill: var(--brand-text-muted, #94a3b8);
+    font-size: 0.9rem;
+  }
+
+  .viz-axis-label {
+    fill: var(--brand-text, #e2e8f0);
+    font-size: 1.05rem;
+    font-weight: 600;
+  }
+
+  /* データ点 */
+  .viz-dot {
+    cursor: pointer;
+    transition: r 120ms ease, stroke-width 120ms ease, opacity 200ms ease;
+    fill: #38bdf8;
+    stroke: #0f172a;
+    stroke-width: 1.2;
+    opacity: 0.92;
+  }
+  .viz-dot:hover {
+    stroke: #fde047;
+    stroke-width: 2.5;
+  }
+  /* 揺らぎ表示: 過去投稿のゴースト点 */
+  .viz-dot.ghost {
+    opacity: 0.28;
+    stroke-width: 0;
+  }
+  /* 新規追加直後の強調（フェードイン） */
+  .viz-dot.enter {
+    animation: vizEnter 600ms ease-out;
+  }
+  @keyframes vizEnter {
+    0%   { opacity: 0; r: 0; }
+    60%  { opacity: 1; r: 9; }
+    100% { opacity: 0.92; }
+  }
+
+  /* M2: 4 象限の薄背景 */
+  .viz-quadrant {
+    pointer-events: none;
+  }
+  .viz-quadrant.hh { fill: rgba(34, 197, 94, 0.08); }
+  .viz-quadrant.hl { fill: rgba(250, 204, 21, 0.07); }
+  .viz-quadrant.lh { fill: rgba(56, 189, 248, 0.07); }
+  .viz-quadrant.ll { fill: rgba(248, 113, 113, 0.07); }
+
+  .viz-quadrant-label {
+    fill: rgba(226, 232, 240, 0.45);
+    font-size: 1rem;
+    font-weight: 700;
+    pointer-events: none;
+    text-anchor: middle;
+  }
+
+  /* ホバー時のツールチップカード */
+  .viz-tooltip {
+    position: fixed;
+    z-index: 9999;
+    background: rgba(15, 23, 42, 0.95);
+    color: #f1f5f9;
+    border: 1px solid rgba(148, 163, 184, 0.4);
+    border-radius: 0.5rem;
+    padding: 0.6rem 0.8rem;
+    max-width: 22rem;
+    font-size: 0.92rem;
+    line-height: 1.45;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(4px);
+    transition: opacity 140ms ease, transform 140ms ease;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+  .viz-tooltip.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .viz-tooltip .tooltip-meta {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-bottom: 0.25rem;
+  }
+  .viz-tooltip .tooltip-value {
+    font-weight: 700;
+    color: #38bdf8;
+    margin-right: 0.4rem;
+  }
+
+  /* 分布ヒストグラム (M1 補助) */
+  .viz-histogram rect {
+    fill: rgba(56, 189, 248, 0.4);
+  }
+  .viz-histogram text {
+    fill: var(--brand-text-muted, #94a3b8);
+    font-size: 0.75rem;
+    text-anchor: middle;
+  }
+
+  /* 統計バッジ（接続数・更新時刻） */
+  .viz-stats {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+    font-size: 0.8rem;
+    color: var(--brand-text-muted, #94a3b8);
+    display: flex;
+    gap: 0.75rem;
+  }
+  .viz-stats .stat-pill {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 999px;
+    padding: 0.18rem 0.6rem;
+  }
+
+  /* 教師ダッシュボード「気になる児童」 */
+  .viz-teacher-panel {
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 0.6rem;
+    display: none; /* JS で showAdminFeatures のときだけ表示 */
+  }
+  .viz-teacher-panel.active { display: block; }
+  .viz-teacher-panel h3 {
+    font-size: 0.95rem;
+    color: #fde047;
+    margin-bottom: 0.5rem;
+  }
+  .viz-teacher-panel ul { list-style: none; padding: 0; margin: 0; }
+  .viz-teacher-panel li {
+    padding: 0.35rem 0;
+    border-bottom: 1px dashed rgba(148, 163, 184, 0.15);
+    font-size: 0.9rem;
+  }
+  .viz-teacher-panel li:last-child { border-bottom: 0; }
+  .viz-teacher-panel .swing-badge {
+    display: inline-block;
+    background: rgba(253, 224, 71, 0.2);
+    color: #fde047;
+    border-radius: 0.3rem;
+    padding: 0 0.4rem;
+    margin-right: 0.4rem;
+    font-weight: 700;
+    font-size: 0.78rem;
+  }
+
+  /* =====================================================================
+   * Projector mode (?display=projector) — 電子黒板向け大画面
+   * Why: 教室後方からも判読できる文字サイズ + 高コントラスト。
+   *      UI は最小限に削り、データ密度を最大化。
+   * ===================================================================== */
+  body.projector-mode {
+    background: #0a0e1a !important;
+  }
+  body.projector-mode header,
+  body.projector-mode #controlsFooter,
+  body.projector-mode .filter-section,
+  body.projector-mode #main-header {
+    display: none !important;
+  }
+  body.projector-mode .viz-container {
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+  body.projector-mode .viz-svg {
+    min-height: 88vh;
+  }
+  body.projector-mode .viz-axis text {
+    font-size: 1.4rem;
+  }
+  body.projector-mode .viz-axis-label {
+    font-size: 1.7rem;
+  }
+  body.projector-mode .viz-quadrant-label {
+    font-size: 2rem;
+  }
+  body.projector-mode .viz-dot {
+    /* d3 で radius を可変設定するので、CSS では基本値のみ */
+    stroke-width: 1.6;
+  }
+  body.projector-mode .viz-stats {
+    top: 1rem;
+    right: 1.5rem;
+    font-size: 1.1rem;
+  }
+
+  /* レスポンシブ: 小型端末（児童タブレット）向けの調整 */
+  @media (max-width: 640px) {
+    .viz-container { min-height: 70vh; padding: 0.5rem 0.25rem; }
+    .viz-axis text { font-size: 0.78rem; }
+    .viz-axis-label { font-size: 0.92rem; }
+    .viz-quadrant-label { font-size: 0.85rem; }
+  }
+</style>

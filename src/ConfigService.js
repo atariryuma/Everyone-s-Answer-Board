@@ -223,6 +223,23 @@ function validateAndSanitizeConfig(config, userId) {
       sanitized.columnMapping = sanitizeMapping(sanitized.columnMapping);
     }
 
+    // 可視化モード補助メタデータ。null を返す sanitize 関数で空オブジェクトを排除。
+    if ('xAxisLabels' in sanitized) {
+      const v = sanitizeAxisLabels(sanitized.xAxisLabels);
+      if (v) sanitized.xAxisLabels = v; else delete sanitized.xAxisLabels;
+    }
+    if ('yAxisLabels' in sanitized) {
+      const v = sanitizeAxisLabels(sanitized.yAxisLabels);
+      if (v) sanitized.yAxisLabels = v; else delete sanitized.yAxisLabels;
+    }
+    if ('matrixQuadrantLabels' in sanitized) {
+      const v = sanitizeQuadrantLabels(sanitized.matrixQuadrantLabels);
+      if (v) sanitized.matrixQuadrantLabels = v; else delete sanitized.matrixQuadrantLabels;
+    }
+    if ('allowResubmit' in sanitized) {
+      sanitized.allowResubmit = Boolean(sanitized.allowResubmit);
+    }
+
     try {
       const configSize = JSON.stringify(sanitized).length;
       if (configSize > 32000) {
@@ -263,13 +280,24 @@ function validateAndSanitizeConfig(config, userId) {
  * @param {Object} displaySettings - 表示設定
  * @returns {Object} サニタイズ済み表示設定
  */
+// Why: boardMode は表示モード切替の単一スイッチ。auto は自動判定（numericX/Y の有無で決定）。
+//      列が増減した時に教師が再設定する手間を省くため、デフォルトは auto。
+const VALID_BOARD_MODES = ['auto', 'board', 'numberline', 'matrix'];
+
 function sanitizeDisplaySettings(displaySettings) {
-  return {
+  const sanitized = {
     showNames: Boolean(displaySettings.showNames),
     showReactions: Boolean(displaySettings.showReactions),
     theme: String(displaySettings.theme || 'default').substring(0, SYSTEM_LIMITS.PREVIEW_LENGTH),
     pageSize: Math.min(Math.max(Number(displaySettings.pageSize) || SYSTEM_LIMITS.DEFAULT_PAGE_SIZE, 1), SYSTEM_LIMITS.MAX_PAGE_SIZE)
   };
+
+  const mode = displaySettings.boardMode;
+  if (typeof mode === 'string' && VALID_BOARD_MODES.includes(mode)) {
+    sanitized.boardMode = mode;
+  }
+
+  return sanitized;
 }
 
 /**
@@ -279,7 +307,9 @@ function sanitizeDisplaySettings(displaySettings) {
  */
 function sanitizeMapping(columnMapping) {
   const sanitized = {};
-  const validFields = ['answer', 'reason', 'class', 'name', 'timestamp', 'email'];
+  // Why: numericX/numericY は可視化モード用の数値列指標。
+  //      Forms「線形尺度」列を指す。answer/reason と独立して任意設定可能。
+  const validFields = ['answer', 'reason', 'class', 'name', 'timestamp', 'email', 'numericX', 'numericY'];
 
   validFields.forEach(field => {
     const index = columnMapping[field];
@@ -289,6 +319,33 @@ function sanitizeMapping(columnMapping) {
   });
 
   return sanitized;
+}
+
+/**
+ * 軸ラベル等の可視化メタデータをサニタイズ。
+ * Why: M1/M2 で「線形尺度」の両端ラベルを管理画面から手入力で持たせるため。
+ *      Forms から自動取得は API 非対応なので、保存可能な構造体として扱う。
+ */
+function sanitizeAxisLabels(input) {
+  if (!input || typeof input !== 'object') return null;
+  const cap = (v) => String(v == null ? '' : v).substring(0, 40);
+  const out = { min: cap(input.min), max: cap(input.max) };
+  if (!out.min && !out.max) return null;
+  return out;
+}
+
+function sanitizeQuadrantLabels(input) {
+  if (!input || typeof input !== 'object') return null;
+  const cap = (v) => String(v == null ? '' : v).substring(0, 40);
+  const out = {
+    hh: cap(input.hh),
+    hl: cap(input.hl),
+    lh: cap(input.lh),
+    ll: cap(input.ll)
+  };
+  // 全て空なら null を返す（DBに不要なノイズを残さない）
+  if (!out.hh && !out.hl && !out.lh && !out.ll) return null;
+  return out;
 }
 
 /**

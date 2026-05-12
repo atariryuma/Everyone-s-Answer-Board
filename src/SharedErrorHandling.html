@@ -91,6 +91,25 @@ window.ErrorHandler = {
     };
 
     console.error(`[Frontend ErrorHandler] ${context}:`, errorInfo);
+
+    // Why: フロントエラーをサーバに転送して Cloud Logging に集約。
+    //      これ無しでは CLI (npm run logs:cloud) から児童端末の問題が完全に不可視。
+    //      送信失敗してもローカル console.error は既に出ているので、Promise の
+    //      reject は握りつぶす（無限ループ防止）。
+    try {
+      const stack = (error && error.stack) ? String(error.stack) : '';
+      window.ClientErrorReporter && window.ClientErrorReporter.report({
+        level: 'error',
+        message: errorInfo.message,
+        stack,
+        source: additionalData.filename || '',
+        line: additionalData.lineno || null,
+        col: additionalData.colno || null,
+        context,
+        url: errorInfo.url,
+        userAgent: errorInfo.userAgent
+      });
+    } catch (_) { /* silent */ }
   },
 
   /**
@@ -398,6 +417,95 @@ window.ErrorHandler = {
   }
 };
 
+/**
+ * ClientErrorReporter — フロントエンドエラーをサーバへ送って Cloud Logging に集約。
+ *
+ * Why: バックエンドの reportClientError doPost アクションへ送信する薄いクライアント。
+ *      window.ErrorHandler.logError と window.error / unhandledrejection の
+ *      ハンドラから呼ばれる。サーバ側で console.error → Cloud Logging に流れる。
+ *
+ * 制限（防御的設計）:
+ *   - 同一シグネチャは 1 セッション 1 回（無限ループ防止）
+ *   - 1 セッション最大 20 件（暴走防止）
+ *   - 自分自身の送信失敗は黙殺（ループ防止）
+ *   - google.script.run が無い環境（テスト等）では no-op
+ */
+window.ClientErrorReporter = (function () {
+  var sentSignatures = new Set();
+  var sentCount = 0;
+  var MAX_PER_SESSION = 20;
+
+  function signatureOf(payload) {
+    var msg = (payload && payload.message) || '';
+    var src = (payload && payload.source) || '';
+    var line = (payload && payload.line) || '';
+    // URL のクエリパラメータ等を除いた pathname + 行番号 + メッセージ先頭で十分。
+    return [src.substring(0, 80), String(line), msg.substring(0, 120)].join('|');
+  }
+
+  function canSend() {
+    return typeof google !== 'undefined' &&
+           google && google.script && google.script.run &&
+           typeof google.script.run.withFailureHandler === 'function';
+  }
+
+  function report(payload) {
+    try {
+      if (!payload || typeof payload !== 'object') return;
+      if (sentCount >= MAX_PER_SESSION) return;
+      var sig = signatureOf(payload);
+      if (sentSignatures.has(sig)) return;
+      sentSignatures.add(sig);
+      sentCount++;
+
+      if (!canSend()) return;
+
+      // Why: doPost(reportClientError) を直接呼びたいが、google.script.run は
+      //      公開されたサーバ関数を呼ぶ I/F なので、サーバ側に reportClientError
+      //      関数を追加（main.js で global expose）して使う。
+      //      送信失敗（ネットワーク・unauth）は user 体験に影響しないので黙殺。
+      google.script.run
+        .withFailureHandler(function () { /* silent */ })
+        .withSuccessHandler(function () { /* silent */ })
+        .reportClientError(payload);
+    } catch (_) { /* silent */ }
+  }
+
+  // debug=1 のときフロントの console.log/warn も送る（オプトイン）
+  // Why: 教師が「子供の画面で何が起きた」を後追い調査するときの "trace mode"。
+  //      通常時は OFF（Cloud Logging を不要に汚さない）、URL に ?debug=1 が
+  //      付いているときだけ console を hook して送る。
+  function enableDebugConsoleCapture() {
+    try {
+      var params = new URLSearchParams(window.location.search);
+      if (params.get('debug') !== '1') return;
+    } catch (_) { return; }
+
+    ['log', 'warn'].forEach(function (level) {
+      var original = console[level];
+      console[level] = function () {
+        try {
+          // 第 1 引数を message、残りを context 化
+          var args = Array.prototype.slice.call(arguments);
+          var msg = args.map(function (a) {
+            try {
+              if (typeof a === 'string') return a;
+              if (a && a.message) return a.message;
+              return JSON.stringify(a);
+            } catch (_) { return String(a); }
+          }).join(' ').substring(0, 500);
+          report({ level: level, message: msg, context: 'debug-capture' });
+        } catch (_) { /* never break console */ }
+        return original.apply(console, arguments);
+      };
+    });
+    // 視覚的に分かるよう原 console.info で 1 回告知
+    try { console.info('[ClientErrorReporter] debug=1: console.log/warn → Cloud Logging に転送中'); } catch (_) {}
+  }
+
+  return { report: report, enableDebugConsoleCapture: enableDebugConsoleCapture };
+})();
+
 window.addEventListener('error', (event) => {
   window.ErrorHandler.logError(event.error, 'グローバルエラー', {
     filename: event.filename,
@@ -410,5 +518,8 @@ window.addEventListener('unhandledrejection', (event) => {
   window.ErrorHandler.logError(event.reason, '未処理Promise拒否');
   event.preventDefault(); // デフォルトのコンソールログを防ぐ
 });
+
+// ?debug=1 でフロント console.log/warn キャプチャを有効化（OFF 既定）
+try { window.ClientErrorReporter.enableDebugConsoleCapture(); } catch (_) {}
 
 </script>
