@@ -240,6 +240,20 @@ function validateAndSanitizeConfig(config, userId) {
       sanitized.allowResubmit = Boolean(sanitized.allowResubmit);
     }
 
+    // multi-board: profiles 配列とアクティブプロファイル名
+    // Why: 1 ユーザーが複数 Forms を切替えて使えるよう、設定スナップショットを保持。
+    //      profiles が空配列のときは config から完全に削除して JSON サイズを節約。
+    if ('profiles' in sanitized) {
+      const profs = sanitizeProfiles(sanitized.profiles);
+      if (profs.length > 0) sanitized.profiles = profs;
+      else delete sanitized.profiles;
+    }
+    if ('activeProfile' in sanitized) {
+      const name = typeof sanitized.activeProfile === 'string' ? sanitized.activeProfile.trim() : '';
+      if (name) sanitized.activeProfile = name.substring(0, 50);
+      else delete sanitized.activeProfile;
+    }
+
     try {
       const configSize = JSON.stringify(sanitized).length;
       if (configSize > 32000) {
@@ -346,6 +360,58 @@ function sanitizeQuadrantLabels(input) {
   };
   // 全て空なら null を返す（DBに不要なノイズを残さない）
   if (!out.hh && !out.hl && !out.lh && !out.ll) return null;
+  return out;
+}
+
+/**
+ * profiles 配列のサニタイズ。
+ *
+ * Why: multi-board のために 1 user の config 内に複数の「表示設定スナップショット」を
+ *      保持する。各 profile は active config と同じ形（formUrl/spreadsheetId/sheetName/
+ *      columnMapping/displaySettings + 軸ラベル等）の subset。
+ *
+ *   - 最大 10 profile（config サイズ膨張防止）
+ *   - 各 name は最大 50 char
+ *   - 既存の sanitize 関数を再利用してフィールド単位で正規化
+ *   - サポート外フィールドは silently drop
+ *
+ * @param {Array} input - profiles 候補配列
+ * @returns {Array} sanitized profiles（空配列なら caller で削除する）
+ */
+function sanitizeProfiles(input) {
+  if (!Array.isArray(input)) return [];
+  const MAX_PROFILES = 10;
+  const out = [];
+  for (const p of input) {
+    if (!p || typeof p !== 'object') continue;
+    const name = String(p.name == null ? '' : p.name).trim().substring(0, 50);
+    if (!name) continue; // name 必須
+
+    const cleaned = { name };
+    // データソース系（文字列）
+    if (typeof p.formUrl === 'string') cleaned.formUrl = p.formUrl.substring(0, 500);
+    if (typeof p.formTitle === 'string') cleaned.formTitle = p.formTitle.substring(0, 200);
+    if (typeof p.spreadsheetId === 'string') cleaned.spreadsheetId = p.spreadsheetId.substring(0, 100);
+    if (typeof p.sheetName === 'string') cleaned.sheetName = p.sheetName.substring(0, 100);
+    // 列マッピング・表示設定（既存 sanitize を再利用）
+    if (p.columnMapping && typeof p.columnMapping === 'object') {
+      cleaned.columnMapping = sanitizeMapping(p.columnMapping);
+    }
+    if (p.displaySettings && typeof p.displaySettings === 'object') {
+      cleaned.displaySettings = sanitizeDisplaySettings(p.displaySettings);
+    }
+    // 可視化メタデータ
+    const x = sanitizeAxisLabels(p.xAxisLabels);
+    if (x) cleaned.xAxisLabels = x;
+    const y = sanitizeAxisLabels(p.yAxisLabels);
+    if (y) cleaned.yAxisLabels = y;
+    const q = sanitizeQuadrantLabels(p.matrixQuadrantLabels);
+    if (q) cleaned.matrixQuadrantLabels = q;
+    if (typeof p.allowResubmit !== 'undefined') cleaned.allowResubmit = Boolean(p.allowResubmit);
+
+    out.push(cleaned);
+    if (out.length >= MAX_PROFILES) break;
+  }
   return out;
 }
 

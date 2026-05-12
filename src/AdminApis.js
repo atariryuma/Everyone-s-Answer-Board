@@ -819,6 +819,125 @@ function dispatchAdminOperation(operation, params) {
       });
     }
 
+    // --- Multi-board Profile Operations ---
+    // Why: 1 ユーザーが複数 Forms を切替えて使えるよう、設定スナップショットの
+    //      CRUD を CLI から実行可能にする。教師が「導入アンケート」「本時の議論」
+    //      「振り返り」と複数 board を事前に登録して、授業中に切替えるユースケース。
+    case 'listProfiles': {
+      if (!params.userId || typeof params.userId !== 'string') {
+        return createErrorResponse('userId is required');
+      }
+      const cfg = getUserConfig(params.userId);
+      if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
+      const profiles = Array.isArray(cfg.config && cfg.config.profiles) ? cfg.config.profiles : [];
+      return createSuccessResponse('Profiles listed', {
+        userId: params.userId,
+        activeProfile: (cfg.config && cfg.config.activeProfile) || null,
+        count: profiles.length,
+        profiles: profiles.map(p => ({
+          name: p.name,
+          formTitle: p.formTitle || '',
+          formUrl: p.formUrl || '',
+          spreadsheetId: p.spreadsheetId || '',
+          sheetName: p.sheetName || '',
+          boardMode: (p.displaySettings && p.displaySettings.boardMode) || 'auto'
+        }))
+      });
+    }
+
+    case 'saveProfile': {
+      // 現在の active 設定（または明示指定された設定）を profile として保存。
+      // 同名 profile があれば上書き。
+      if (!params.userId || typeof params.userId !== 'string') {
+        return createErrorResponse('userId is required');
+      }
+      if (!params.name || typeof params.name !== 'string') {
+        return createErrorResponse('name (profile name) is required');
+      }
+      const cfg = getUserConfig(params.userId);
+      if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
+      const cur = cfg.config || {};
+
+      // override が指定されていれば current の代わりにそれを保存
+      const src = (params.snapshot && typeof params.snapshot === 'object') ? params.snapshot : cur;
+
+      const newProfile = {
+        name: String(params.name).trim().substring(0, 50),
+        formUrl: src.formUrl || '',
+        formTitle: src.formTitle || '',
+        spreadsheetId: src.spreadsheetId || '',
+        sheetName: src.sheetName || '',
+        columnMapping: src.columnMapping || {},
+        displaySettings: src.displaySettings || {},
+        xAxisLabels: src.xAxisLabels || null,
+        yAxisLabels: src.yAxisLabels || null,
+        matrixQuadrantLabels: src.matrixQuadrantLabels || null,
+        allowResubmit: !!src.allowResubmit
+      };
+
+      const existing = Array.isArray(cur.profiles) ? cur.profiles.slice() : [];
+      const idx = existing.findIndex(p => p && p.name === newProfile.name);
+      if (idx >= 0) existing[idx] = newProfile;
+      else existing.push(newProfile);
+
+      return applyConfigPatch_(params.userId, { profiles: existing }, { publish: false });
+    }
+
+    case 'loadProfile': {
+      // 指定 profile を active 設定に適用して、activeProfile も更新。
+      if (!params.userId || typeof params.userId !== 'string') {
+        return createErrorResponse('userId is required');
+      }
+      if (!params.name || typeof params.name !== 'string') {
+        return createErrorResponse('name (profile name) is required');
+      }
+      const cfg = getUserConfig(params.userId);
+      if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
+      const cur = cfg.config || {};
+      const profiles = Array.isArray(cur.profiles) ? cur.profiles : [];
+      const p = profiles.find(x => x && x.name === params.name);
+      if (!p) return createErrorResponse(`Profile "${params.name}" not found`);
+
+      // profile の中身を active config の対応フィールドに反映
+      const patch = {
+        formUrl: p.formUrl || '',
+        formTitle: p.formTitle || '',
+        spreadsheetId: p.spreadsheetId || '',
+        sheetName: p.sheetName || '',
+        activeProfile: p.name
+      };
+      if (p.columnMapping) patch.columnMapping = p.columnMapping;
+      if (p.displaySettings) patch.displaySettings = p.displaySettings;
+      // 軸ラベル等は null も明示反映（前 profile の値を引きずらない）
+      patch.xAxisLabels = p.xAxisLabels || null;
+      patch.yAxisLabels = p.yAxisLabels || null;
+      patch.matrixQuadrantLabels = p.matrixQuadrantLabels || null;
+      patch.allowResubmit = !!p.allowResubmit;
+
+      return applyConfigPatch_(params.userId, patch, { publish: false });
+    }
+
+    case 'deleteProfile': {
+      if (!params.userId || typeof params.userId !== 'string') {
+        return createErrorResponse('userId is required');
+      }
+      if (!params.name || typeof params.name !== 'string') {
+        return createErrorResponse('name (profile name) is required');
+      }
+      const cfg = getUserConfig(params.userId);
+      if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
+      const cur = cfg.config || {};
+      const profiles = Array.isArray(cur.profiles) ? cur.profiles : [];
+      const remaining = profiles.filter(p => p && p.name !== params.name);
+      if (remaining.length === profiles.length) {
+        return createErrorResponse(`Profile "${params.name}" not found`);
+      }
+      const patch = { profiles: remaining };
+      // 削除した profile が active だったら activeProfile も解除
+      if (cur.activeProfile === params.name) patch.activeProfile = null;
+      return applyConfigPatch_(params.userId, patch, { publish: false });
+    }
+
     case 'previewBoard': {
       // Why: 教師がボードを公開する前に「viewer から何が見えるか」を CLI で
       //      確認できる（プライバシー設定通りに匿名化されているか等）。

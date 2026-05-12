@@ -181,6 +181,38 @@
     text-anchor: middle;
   }
 
+  /* Multi-board profile セレクタ（教師限定） */
+  .viz-profile-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.8rem;
+    background: rgba(15, 23, 42, 0.85);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.25);
+  }
+  .viz-profile-label {
+    color: var(--brand-text-muted, #94a3b8);
+    font-size: 0.88rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .viz-profile-select {
+    flex: 1;
+    max-width: 320px;
+    padding: 0.35rem 0.6rem;
+    border-radius: 0.4rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+    background: rgba(30, 41, 59, 0.6);
+    color: var(--brand-text, #e2e8f0);
+    font-size: 0.92rem;
+    cursor: pointer;
+  }
+  .viz-profile-select:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+  body.projector-mode .viz-profile-select { font-size: 1.1rem; padding: 0.5rem 0.85rem; }
+
   /* 教師用モード切替バー（道徳 45 分授業の即時切替用） */
   .viz-mode-bar {
     display: flex;

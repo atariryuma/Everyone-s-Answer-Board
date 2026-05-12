@@ -1987,6 +1987,14 @@
         this.state.boardMode = overrideMode || serverMode;
         this.state.serverBoardMode = serverMode;
         this.state.axisConfig = result.axisConfig || null;
+        // multi-board: profile セレクタが使うメタ情報
+        if (result.profiles && result.profiles.list) {
+          this.state.profiles = result.profiles.list;
+          this.state.activeProfile = result.profiles.active || null;
+        } else {
+          this.state.profiles = [];
+          this.state.activeProfile = null;
+        }
 
         if (result.header && this.elements.headingLabel) {
           this.elements.headingLabel.textContent = result.header;
@@ -2195,6 +2203,8 @@
         // 教師用モード切替バーは全モード共通で注入（board モードでも viz への切替が可能）
         if (typeof this.__vizInjectModeBar === 'function') this.__vizInjectModeBar();
         if (typeof this.__vizRefreshModeBar === 'function') this.__vizRefreshModeBar();
+        // multi-board profile セレクタ（2 件以上ある場合のみ表示される）
+        if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
 
         // viz モードでは UI 補助（コントロール注入 + state 更新）
         if (mode !== 'board') {

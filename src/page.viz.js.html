@@ -1071,6 +1071,104 @@
   StudyQuestApp.prototype.__vizRefreshModeBar = function () { refreshModeBar(this); };
 
   /**
+   * Profile セレクタ — multi-board の切替 UI（教師限定）。
+   *
+   * Why: 道徳科 45 分授業で「導入アンケート」「本時の議論」「振り返り」を別 Forms で
+   *      運用するケース。事前に admin/CLI から profiles を登録しておけば、view 画面で
+   *      ドロップダウン選択 → 自動 loadProfile → 再読み込みで切替完結。
+   *
+   *   - profiles 0 or 1 件のときは UI を表示しない（不要な画面ノイズ回避）
+   *   - profile change 時は google.script.run.adminLoadProfileForView を呼び、
+   *     成功したら再ロード（fetchSpreadsheetData が新 spreadsheetId で動く）。
+   *
+   * page.js の bootstrap で state.profiles / state.activeProfile が渡される前提。
+   */
+  function injectProfileSelector(app) {
+    if (!isTeacher(app)) return;
+    const profiles = (app.state && app.state.profiles) || [];
+    if (!Array.isArray(profiles) || profiles.length < 1) {
+      // 0/1 件なら selector を非表示
+      const existing = document.getElementById('vizProfileSelector');
+      if (existing) existing.remove();
+      return;
+    }
+    if (document.getElementById('vizProfileSelector')) return;
+
+    // mode bar の左隣に挿入
+    const modeBar = document.getElementById('vizModeBar');
+    const container = document.createElement('div');
+    container.id = 'vizProfileSelector';
+    container.className = 'viz-profile-selector';
+    container.innerHTML =
+      '<label class="viz-profile-label">📚 ボード:</label>' +
+      '<select id="vizProfileSelect" class="viz-profile-select" aria-label="ボード切替"></select>';
+    if (modeBar && modeBar.parentNode) {
+      modeBar.parentNode.insertBefore(container, modeBar);
+    } else {
+      const host = document.getElementById('main-header') || document.body;
+      host.parentNode.insertBefore(container, host.nextSibling);
+    }
+
+    const select = document.getElementById('vizProfileSelect');
+    const active = app.state.activeProfile || '';
+    const opts = ['<option value="">（選択してください）</option>'];
+    for (const p of profiles) {
+      const name = p && p.name ? String(p.name) : '';
+      if (!name) continue;
+      const sel = name === active ? ' selected' : '';
+      opts.push('<option value="' + escapeForTooltip(name) + '"' + sel + '>' + escapeForTooltip(name) + '</option>');
+    }
+    select.innerHTML = opts.join('');
+
+    select.addEventListener('change', () => {
+      const name = select.value;
+      if (!name) return;
+      app.__vizLoadProfile(name);
+    });
+  }
+
+  /**
+   * View 画面から profile を読み込む。サーバの adminLoadProfileForView 関数を介して
+   * config を実際に書き換え、loadSheetData を再実行する。
+   *
+   * Why: profile 切替は formUrl/spreadsheetId/columnMapping/boardMode の全てが入れ替わる
+   *      大きな変更なので、サーバ側で config を上書きしてから client が再フェッチする
+   *      のが整合性的に最も安全。
+   */
+  StudyQuestApp.prototype.__vizLoadProfile = function (name) {
+    if (!name) return;
+    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+
+    // UI: 切替中表示
+    const select = document.getElementById('vizProfileSelect');
+    if (select) select.disabled = true;
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        if (select) select.disabled = false;
+        if (res && res.success) {
+          // ロード成功 → データを再読み込み
+          if (typeof this.loadSheetData === 'function') {
+            this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+          } else {
+            window.location.reload();
+          }
+        } else {
+          console.error('Profile load failed:', res && res.message);
+          alert('プロファイルの読み込みに失敗しました: ' + (res && res.message || '不明なエラー'));
+        }
+      })
+      .withFailureHandler((err) => {
+        if (select) select.disabled = false;
+        console.error('Profile load network error:', err);
+        alert('プロファイルの切替に失敗しました');
+      })
+      .loadProfileForView(name);
+  };
+
+  StudyQuestApp.prototype.__vizInjectProfileSelector = function () { injectProfileSelector(this); };
+
+  /**
    * タイムライン UI を viz container に注入。教師権限のみ表示。
    * Why: 終末フェーズで「議論経過とともに意見分布がどう動いたか」を再生し、
    *      児童に振り返りメタ認知を促す。シークバー操作で過去スナップショットから再描画。

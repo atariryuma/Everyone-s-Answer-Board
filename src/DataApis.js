@@ -528,6 +528,73 @@ function getSheetList(spreadsheetId) {
  * server so the wire never sees the identity when identity is not permitted.
  * Admins and board owners always see everything (they can see raw sheet anyway).
  */
+/**
+ * View 画面から profile を切替えるためのエンドポイント。
+ *
+ * Why: 教師がビュー画面の profile セレクタを操作 → google.script.run.loadProfileForView →
+ *      該当ユーザーの config の profile を active に適用 → 200 OK で再ロードを促す。
+ *      adminApi 経路の loadProfile と異なり、こちらは Session ベースの認証で動く。
+ *      profile を切替えられるのは「自分のボード」または「管理者」のみ。
+ *
+ * @param {string} profileName
+ * @param {string} [targetUserId] - 省略時は requester 自身
+ * @returns {Object} { success, message, activeProfile }
+ */
+function loadProfileForView(profileName, targetUserId) {
+  try {
+    if (!profileName || typeof profileName !== 'string') {
+      return createErrorResponse('profileName is required');
+    }
+    const email = getCurrentEmail();
+    if (!email) return createAuthError();
+
+    // 対象 user 判定
+    let user;
+    if (targetUserId && typeof targetUserId === 'string') {
+      user = findUserById(targetUserId, { requestingUser: email });
+    } else {
+      user = findUserByEmail(email, { requestingUser: email });
+    }
+    if (!user) return createUserNotFoundError();
+
+    // 認可: 自分のボードか、管理者か
+    const isOwn = user.userEmail === email;
+    const isAdmin = isAdministrator(email);
+    if (!isOwn && !isAdmin) {
+      return createErrorResponse('権限がありません: 自分以外のボードのプロファイル切替は管理者のみ可能です');
+    }
+
+    const cfgRes = getUserConfig(user.userId, user);
+    if (!cfgRes.success) return createErrorResponse(cfgRes.message || 'config load failed');
+    const cur = cfgRes.config || {};
+    const profiles = Array.isArray(cur.profiles) ? cur.profiles : [];
+    const p = profiles.find(x => x && x.name === profileName);
+    if (!p) return createErrorResponse(`Profile "${profileName}" not found`);
+
+    // profile を active config に適用
+    const merged = { ...cur };
+    merged.formUrl = p.formUrl || '';
+    merged.formTitle = p.formTitle || '';
+    merged.spreadsheetId = p.spreadsheetId || '';
+    merged.sheetName = p.sheetName || '';
+    if (p.columnMapping) merged.columnMapping = p.columnMapping;
+    if (p.displaySettings) merged.displaySettings = p.displaySettings;
+    merged.xAxisLabels = p.xAxisLabels || null;
+    merged.yAxisLabels = p.yAxisLabels || null;
+    merged.matrixQuadrantLabels = p.matrixQuadrantLabels || null;
+    merged.allowResubmit = !!p.allowResubmit;
+    merged.activeProfile = p.name;
+    merged.userId = user.userId;
+
+    const saveRes = saveUserConfig(user.userId, merged, { isMainConfig: true });
+    if (!saveRes.success) return saveRes;
+    return createSuccessResponse('Profile loaded', { activeProfile: p.name });
+  } catch (error) {
+    console.error('loadProfileForView error:', error && error.message);
+    return createExceptionResponse(error);
+  }
+}
+
 function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   const displaySettings = (config && config.displaySettings) || DEFAULT_DISPLAY_SETTINGS;
   const includeIdentity = Boolean(
@@ -582,13 +649,29 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     defaultMax: 5
   };
 
+  // Why: multi-board の profile セレクタを view 画面で描画するために、profile name 一覧と
+  //      activeProfile を wire に乗せる。所有者/管理者のみ profile 一覧が見えるべきだが、
+  //      ここでは contextual に「name と表示用メタ」だけ送る（spreadsheetId 等の機密情報は除外）。
+  let profileSummary = null;
+  if (config && Array.isArray(config.profiles) && config.profiles.length > 0) {
+    profileSummary = {
+      active: config.activeProfile || null,
+      list: config.profiles.map(p => ({
+        name: p.name,
+        formTitle: p.formTitle || '',
+        boardMode: (p.displaySettings && p.displaySettings.boardMode) || 'auto'
+      }))
+    };
+  }
+
   return {
     success: true,
     data: safeData,
     header: String(result.header || result.sheetName || '回答一覧'),
     sheetName: String(result.sheetName || 'Sheet1'),
     displaySettings: { ...displaySettings, boardMode: effectiveMode },
-    axisConfig
+    axisConfig,
+    profiles: profileSummary
   };
 }
 

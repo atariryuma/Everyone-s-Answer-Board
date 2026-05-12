@@ -522,3 +522,157 @@ test('createForm / connectForm: rejects unknown userId', () => {
   });
   assert.equal(r2.success, false);
 });
+
+// =====================================================================
+// Multi-board profiles (v4)
+// =====================================================================
+
+test('listProfiles: returns empty list when none saved', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('listProfiles', { userId: 'u1' });
+  assert.equal(res.success, true);
+  assert.equal(res.data.count, 0);
+  assert.equal(res.data.activeProfile, null);
+});
+
+test('listProfiles: rejects missing userId', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('listProfiles', {});
+  assert.equal(res.success, false);
+});
+
+test('saveProfile: rejects missing name', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('saveProfile', { userId: 'u1' });
+  assert.equal(res.success, false);
+});
+
+test('saveProfile: snapshots current active config', () => {
+  const ctx = loadAdminContext();
+  // u1 の active は formUrl 等未設定だが columnMapping は { answer:3, reason:4 }
+  const res = ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1', name: '導入アンケート'
+  });
+  assert.equal(res.success, true);
+  const saved = ctx.__savedConfigs.get('u1').config;
+  assert.ok(Array.isArray(saved.profiles));
+  assert.equal(saved.profiles.length, 1);
+  assert.equal(saved.profiles[0].name, '導入アンケート');
+  assert.equal(saved.profiles[0].columnMapping.answer, 3);
+});
+
+test('saveProfile: same name overwrites existing profile', () => {
+  const ctx = loadAdminContext();
+  ctx.dispatchAdminOperation('saveProfile', { userId: 'u1', name: 'p1' });
+  ctx.dispatchAdminOperation('saveProfile', { userId: 'u1', name: 'p1' });
+  const saved = ctx.__savedConfigs.get('u1').config;
+  // 同名 2 回保存しても profile は 1 件
+  assert.equal(saved.profiles.length, 1);
+});
+
+test('saveProfile: snapshot override applies different data', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1',
+    name: '振り返り',
+    snapshot: {
+      formUrl: 'https://...../forms/diff/viewform',
+      spreadsheetId: 'diff-sheet',
+      sheetName: '別シート',
+      columnMapping: { answer: 1 },
+      displaySettings: { boardMode: 'wordcloud' }
+    }
+  });
+  assert.equal(res.success, true);
+  const saved = ctx.__savedConfigs.get('u1').config;
+  const p = saved.profiles[0];
+  assert.equal(p.formUrl, 'https://...../forms/diff/viewform');
+  assert.equal(p.spreadsheetId, 'diff-sheet');
+  assert.equal(p.displaySettings.boardMode, 'wordcloud');
+});
+
+test('loadProfile: applies snapshot to active config + sets activeProfile', () => {
+  const ctx = loadAdminContext();
+  // 先に保存
+  ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1',
+    name: '本時の議論',
+    snapshot: {
+      formUrl: 'https://forms.example.com/main',
+      spreadsheetId: 'main-sheet',
+      sheetName: 'メイン',
+      columnMapping: { answer: 5, reason: 6 },
+      displaySettings: { boardMode: 'numberline' },
+      xAxisLabels: { min: 'そのまま', max: '直す' }
+    }
+  });
+  // active に適用
+  const res = ctx.dispatchAdminOperation('loadProfile', {
+    userId: 'u1', name: '本時の議論'
+  });
+  assert.equal(res.success, true);
+  const saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.activeProfile, '本時の議論');
+  assert.equal(saved.formUrl, 'https://forms.example.com/main');
+  assert.equal(saved.spreadsheetId, 'main-sheet');
+  assert.equal(saved.sheetName, 'メイン');
+  assert.equal(saved.displaySettings.boardMode, 'numberline');
+  assert.equal(saved.xAxisLabels.min, 'そのまま');
+});
+
+test('loadProfile: rejects missing name or unknown profile', () => {
+  const ctx = loadAdminContext();
+  const r1 = ctx.dispatchAdminOperation('loadProfile', { userId: 'u1' });
+  assert.equal(r1.success, false);
+  const r2 = ctx.dispatchAdminOperation('loadProfile', { userId: 'u1', name: 'NOPE' });
+  assert.equal(r2.success, false);
+});
+
+test('deleteProfile: removes profile from list', () => {
+  const ctx = loadAdminContext();
+  ctx.dispatchAdminOperation('saveProfile', { userId: 'u1', name: 'p1' });
+  ctx.dispatchAdminOperation('saveProfile', { userId: 'u1', name: 'p2' });
+  const r = ctx.dispatchAdminOperation('deleteProfile', { userId: 'u1', name: 'p1' });
+  assert.equal(r.success, true);
+  const saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.profiles.length, 1);
+  assert.equal(saved.profiles[0].name, 'p2');
+});
+
+test('deleteProfile: clears activeProfile when deleting active one', () => {
+  const ctx = loadAdminContext();
+  ctx.dispatchAdminOperation('saveProfile', { userId: 'u1', name: 'p1' });
+  ctx.dispatchAdminOperation('loadProfile', { userId: 'u1', name: 'p1' });
+  let saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.activeProfile, 'p1');
+  ctx.dispatchAdminOperation('deleteProfile', { userId: 'u1', name: 'p1' });
+  saved = ctx.__savedConfigs.get('u1').config;
+  // activeProfile は削除（null か undefined）
+  assert.ok(!saved.activeProfile);
+});
+
+test('deleteProfile: rejects unknown profile name', () => {
+  const ctx = loadAdminContext();
+  const res = ctx.dispatchAdminOperation('deleteProfile', { userId: 'u1', name: 'NOPE' });
+  assert.equal(res.success, false);
+});
+
+test('listProfiles: after save shows profile summary', () => {
+  const ctx = loadAdminContext();
+  ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1',
+    name: '導入',
+    snapshot: { formTitle: 'タイトル A', displaySettings: { boardMode: 'pie' } }
+  });
+  ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1',
+    name: '展開',
+    snapshot: { formTitle: 'タイトル B', displaySettings: { boardMode: 'numberline' } }
+  });
+  const res = ctx.dispatchAdminOperation('listProfiles', { userId: 'u1' });
+  assert.equal(res.success, true);
+  assert.equal(res.data.count, 2);
+  const byName = Object.fromEntries(res.data.profiles.map(p => [p.name, p]));
+  assert.equal(byName['導入'].boardMode, 'pie');
+  assert.equal(byName['展開'].boardMode, 'numberline');
+});

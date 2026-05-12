@@ -49,6 +49,8 @@ const OPERATIONS = [
   'runColumnAnalysis', 'previewBoard',
   // Form operations (v3)
   'listMyForms', 'validateFormUrl', 'connectForm', 'createForm',
+  // Multi-board profiles (v4)
+  'listProfiles', 'saveProfile', 'loadProfile', 'deleteProfile',
 ];
 
 /**
