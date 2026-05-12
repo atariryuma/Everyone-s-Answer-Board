@@ -971,6 +971,10 @@ function dispatchAdminOperation(operation, params) {
         sheetName: result.sheetName,
         displaySettings: result.displaySettings,
         axisConfig: result.axisConfig,
+        // Why: CLI から profile / formMeta の状態確認をしたいケースが多い。
+        //      ペイロードに含めても軽量なので preview にも乗せる。
+        formMeta: result.formMeta || null,
+        profiles: result.profiles || null,
         dataCount: Array.isArray(result.data) ? result.data.length : 0,
         sampleData: Array.isArray(result.data) ? result.data.slice(0, 3) : [],
         error: result.error
