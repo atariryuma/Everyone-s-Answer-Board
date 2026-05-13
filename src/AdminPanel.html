@@ -60,35 +60,7 @@
     }
 
 
-    /* 進捗スタイルを簡素化 */
-    .setup-progress {
-      display: flex;
-      gap: 0.75rem;
-      margin-bottom: 1.5rem;
-    }
-
-    .step {
-      flex: 1;
-      text-align: center;
-      padding: 0.75rem;
-      border-radius: var(--radius-md);
-      font-size: 0.875rem;
-      font-weight: 500;
-      background: rgba(107, 114, 128, var(--alpha-subtle));
-      color: var(--brand-text);
-      transition: all var(--transition-normal);
-    }
-
-    .step.completed {
-      background: rgba(16, 185, 129, var(--alpha-light));
-      color: var(--status-success);
-    }
-
-    .step.current {
-      background: rgba(59, 130, 246, var(--alpha-light));
-      color: var(--status-info);
-      border: 2px solid rgba(59, 130, 246, var(--alpha-visible));
-    }
+    /* v2648 シンプル化: 旧 .setup-progress / .step CSS は削除（HTML 側で進捗バー撤廃） */
 
 
 
@@ -158,12 +130,6 @@
         align-items: flex-start;
         gap: 0.5rem;
       }
-
-      .setup-progress {
-        flex-direction: column;
-        gap: 0.5rem;
-      }
-
     }
 
     /* SharedUtilitiesのローディングシステムを使用 */
@@ -265,11 +231,7 @@
         </div>
       </header>
 
-      <!-- セットアップ進捗 -->
-      <div class="setup-progress">
-        <div class="step current">1. データソース設定</div>
-        <div class="step">2. 公開設定</div>
-      </div>
+      <!-- セットアップ進捗バーは静的で進捗を反映しなかったため削除 (v2648 シンプル化) -->
       <!-- データソース選択カード -->
       <section class="card glass-panel rounded-xl p-6">
         <div class="flex items-center justify-between mb-4">
@@ -365,17 +327,18 @@
       <section class="card glass-panel rounded-xl p-6">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-semibold text-white">📋 列設定</h2>
-          <button id="ai-analyze-btn" class="btn btn-secondary" type="button">
-            🤖 AI列判定
-          </button>
+          <!-- フォーム接続時に AI 判定が自動で走るので、UI は控えめな「↻ 再判定」リンクで十分 -->
         </div>
 
         <div class="column-dropdowns space-y-4 mb-4">
-          <!-- 回答列選択 -->
+          <!-- メイン質問列選択 (旧: 回答列) -->
+          <!-- v2659 ラベル中立化: 「回答列」は「答えがある」前提の固定スキーマだったが、
+               実際のフォームは複数質問のことも多く、機械的に answer/reason マッピングが
+               フィットしない。ラベルを質問ベースに改名して教師の認知負荷を下げる。 -->
           <div class="form-group">
             <label for="answer-column-select" class="block text-sm font-medium text-gray-300 mb-2">
-              💬 回答列:
-              <span class="text-xs text-gray-400 ml-2">(個別の回答内容が入っている列)</span>
+              💬 メイン質問列:
+              <span class="text-xs text-gray-400 ml-2">(カードに大きく表示する列／集計の対象列)</span>
             </label>
             <select id="answer-column-select" class="modern-select" data-column-type="answer">
               <option value="">選択してください...</option>
@@ -385,11 +348,11 @@
             </div>
           </div>
 
-          <!-- 理由列選択 -->
+          <!-- 補助質問列選択 (旧: 理由列) -->
           <div class="form-group">
             <label for="reason-column-select" class="block text-sm font-medium text-gray-300 mb-2">
-              📋 理由列:
-              <span class="text-xs text-gray-400 ml-2">(回答の理由・根拠が入っている列)</span>
+              📋 補助質問列:
+              <span class="text-xs text-gray-400 ml-2">(カード下部に小さく表示する列・任意)</span>
             </label>
             <select id="reason-column-select" class="modern-select" data-column-type="reason">
               <option value="">選択してください...</option>
@@ -429,9 +392,14 @@
 
         </div>
 
-        <!-- 設定完了状況表示 -->
-        <div class="text-sm text-gray-400 mb-4">
+        <!-- 設定完了状況表示 + AI 再判定 (inline) -->
+        <div class="text-sm text-gray-400 mb-4 flex items-center justify-between">
           <span id="completion-status">⚪ 設定状況: 0/4列完了</span>
+          <button id="ai-analyze-btn" type="button"
+            class="text-xs text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+            title="AI で列マッピングを再判定する（フォーム接続後に有効）">
+            ↻ 再判定
+          </button>
         </div>
 
         <!-- AI検出情報表示 -->
@@ -451,9 +419,7 @@
           <span class="text-xs text-yellow-300">✋ 手動で変更されました。AI判定に戻すには「AI判定に戻す」をクリック</span>
         </div>
 
-        <div class="action-buttons">
-          <button id="verify-mapping" class="btn btn-secondary" type="button">列マッピング検証</button>
-        </div>
+        <!-- 「列マッピング検証」ボタンは設定状況インジケータが自動更新するので削除 (v2648) -->
       </section>
 
       <!-- 表示設定カード -->
@@ -581,9 +547,29 @@
           </div>
         </div>
 
+        <!--
+          公開・保存ボタン (v2648 整理):
+            - 「💾 設定を保存」 = config + active profile を上書き保存（公開状態は変えない）
+            - 「📣 公開する / 🔒 公開を終了する」 = isPublished toggle（state に応じて文言切替）
+
+          legacy ID save-draft / publish-now / unpublishBoardBtn は handler 互換のため
+          hidden div の中に残置。新ボタンが wrapper として呼び出す。
+        -->
         <div class="action-buttons">
-          <button id="save-draft" class="btn btn-secondary" type="button">下書き保存</button>
-          <button id="publish-now" class="btn btn-primary" type="button">今すぐ公開</button>
+          <button id="save-config-changes" class="btn btn-secondary" type="button"
+            title="現在の設定を保存（公開状態は変更しません）">
+            💾 設定を保存
+          </button>
+          <button id="primary-publish-toggle" class="btn btn-primary" type="button"
+            title="ボードの公開状態を切り替える">
+            <span class="primary-publish-toggle-label">📣 公開する</span>
+          </button>
+        </div>
+
+        <!-- legacy buttons (handler 互換のため hidden 残置) -->
+        <div style="display:none;" aria-hidden="true">
+          <button id="save-draft" type="button">下書き保存</button>
+          <button id="publish-now" type="button">今すぐ公開</button>
         </div>
       </section>
     </div>
@@ -598,6 +584,12 @@
           <h3 class="text-lg font-semibold text-white">📋 現在の設定</h3>
           <span class="text-xs text-gray-400" id="profile-count-badge">--</span>
         </div>
+        <!--
+          v2648 シンプル化: 表示モード / 回答者名 / リアクション数 / シート名 は
+          左パネル「⚙️ 表示設定」と完全重複なので削除。
+          - legacy ID は hidden span として残置（updateConfigSummary 等の JS 互換維持）
+          公開状態 / アクティブ / 最終更新 だけが「右パネルでしか見えない情報」として残る。
+        -->
         <div class="config-summary">
           <div class="config-item">
             <span class="label">公開状態:</span>
@@ -608,25 +600,17 @@
             <span id="current-active-profile" class="text-sm text-gray-400">単一ボード</span>
           </div>
           <div class="config-item">
-            <span class="label">表示モード:</span>
-            <span id="current-board-mode" class="text-sm text-gray-300">auto</span>
-          </div>
-          <div class="config-item">
-            <span class="label">回答者名:</span>
-            <span id="current-show-names" class="text-sm text-gray-400">匿名</span>
-          </div>
-          <div class="config-item">
-            <span class="label">リアクション数:</span>
-            <span id="current-show-reactions" class="text-sm text-gray-400">非表示</span>
-          </div>
-          <div class="config-item">
-            <span class="label">シート名:</span>
-            <span id="current-sheetname" class="text-sm text-gray-400">未設定</span>
-          </div>
-          <div class="config-item">
             <span class="label">最終更新:</span>
             <span id="last-updated-time" class="text-sm text-gray-400">--:--</span>
           </div>
+        </div>
+
+        <!-- legacy 重複項目 (JS handler 互換のため hidden 残置) -->
+        <div style="display:none;" aria-hidden="true">
+          <span id="current-board-mode">auto</span>
+          <span id="current-show-names">匿名</span>
+          <span id="current-show-reactions">非表示</span>
+          <span id="current-sheetname">未設定</span>
         </div>
 
         <!-- 保存済みプロファイル一覧（切替・削除可） -->
@@ -654,17 +638,13 @@
         </div>
       </section>
 
-      <!-- ユーザー情報 -->
+      <!-- ユーザー情報 (v2648 シンプル化: ID 表示は教師が見ない情報なので削除) -->
       <div class="info-card glass-panel rounded-xl p-4">
         <h3 class="text-lg font-semibold text-white mb-3">👤 ユーザー情報</h3>
         <div class="space-y-3">
           <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
             <span class="text-gray-300">メールアドレス:</span>
             <span id="current-user-email" class="text-white">読み込み中...</span>
-          </div>
-          <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
-            <span class="text-gray-300">ユーザーID:</span>
-            <span id="current-user-id" class="text-gray-400">読み込み中...</span>
           </div>
           <div class="flex items-center justify-between p-3 bg-gray-800 rounded-lg">
             <span class="text-gray-300">アクション:</span>
@@ -674,6 +654,8 @@
             </button>
           </div>
         </div>
+        <!-- legacy: ユーザーID 表示要素は JS handler 互換のため hidden 残置 -->
+        <span id="current-user-id" style="display:none;" aria-hidden="true">--</span>
       </div>
 
       <!-- リソース -->

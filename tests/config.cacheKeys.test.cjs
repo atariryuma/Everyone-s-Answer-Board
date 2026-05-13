@@ -215,6 +215,21 @@ test('parseAndRepairConfig: malformed JSON falls back to default config', () => 
   assert.equal(config.isPublished, false);
 });
 
+test('parseAndRepairConfig: parse failure sets __parseFailed flag for callers to detect data corruption', () => {
+  const { context } = loadConfigContext();
+  const config = context.parseAndRepairConfig('{ unclosed', 'user-1');
+  // Why: silent data loss を防ぐため、parse 失敗は __parseFailed フラグで明示する。
+  //   呼び出し元はこれを見て「config 破損だから上書き save するな」等の判断ができる。
+  assert.equal(config.__parseFailed, true);
+  assert.ok(config.__parseError, 'error message should be attached');
+});
+
+test('parseAndRepairConfig: successful parse does NOT set __parseFailed', () => {
+  const { context } = loadConfigContext();
+  const config = context.parseAndRepairConfig(JSON.stringify({ isPublished: true }), 'user-1');
+  assert.equal(config.__parseFailed, undefined);
+});
+
 test('parseAndRepairConfig: empty string yields default config', () => {
   const { context } = loadConfigContext();
   const config = context.parseAndRepairConfig('', 'user-1');

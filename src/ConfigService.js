@@ -51,14 +51,22 @@ function parseAndRepairConfig(configJson, userId) {
 
     return ensureRequiredFields(repairedConfig, userId);
   } catch (parseError) {
-    console.warn('parseAndRepairConfig: JSON解析失敗 - デフォルト設定を使用', {
+    // Why: configJson の JSON.parse が失敗するのは「設定破損」「部分書込み」のいずれか。
+    //   silently default に戻すと、formUrl/spreadsheetId などの公開情報が消えるサイレントデータ
+    //   ロスにつながる。WARN ではなく ERROR レベルで明示し、parsed=null マーカーを付けて
+    //   呼び出し元が "復旧不能" と気付けるようにする。デフォルトは fallback として返すが、
+    //   __parseFailed フラグで「これは健全な config ではない」を伝播する。
+    console.error('parseAndRepairConfig: JSON解析失敗 - 設定破損の可能性', {
       operation: 'parseAndRepairConfig',
       userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
       configLength: configJson?.length || 0,
       error: parseError.message,
       stack: parseError.stack
     });
-    return getDefaultConfig(userId);
+    const fallback = getDefaultConfig(userId);
+    fallback.__parseFailed = true;
+    fallback.__parseError = parseError.message;
+    return fallback;
   }
 }
 
@@ -151,6 +159,13 @@ function validatePublishConfig(config, userId) {
 
     if (!config.spreadsheetId || typeof config.spreadsheetId !== 'string' || !config.spreadsheetId.trim()) {
       errors.push('公開にはスプレッドシートIDが必要です');
+    } else if (typeof validateSpreadsheetId === 'function') {
+      // Why: 旧実装は trim() しかチェックしておらず "x" でも通る。validators.js の正規パターン
+      //   (^[a-zA-Z0-9-_]{40,50}$) で publish 時の厳格検証を行い、不正 ID の混入を防ぐ。
+      const v = validateSpreadsheetId(config.spreadsheetId);
+      if (v && !v.isValid) {
+        errors.push('スプレッドシートID形式が不正です: ' + ((v.errors && v.errors[0]) || 'unknown'));
+      }
     }
 
     if (!config.sheetName || typeof config.sheetName !== 'string' || !config.sheetName.trim()) {
@@ -294,10 +309,12 @@ function validateAndSanitizeConfig(config, userId) {
  * @param {Object} displaySettings - 表示設定
  * @returns {Object} サニタイズ済み表示設定
  */
-// Why: boardMode は表示モード切替の単一スイッチ。auto は自動判定（numericX/Y の有無で決定）。
-//      列が増減した時に教師が再設定する手間を省くため、デフォルトは auto。
-//      wordcloud (M3) と pie (M4) は教師が明示選択する用途特化モード。
-const VALID_BOARD_MODES = ['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie'];
+// Why: boardMode の正規 enum 定義は validators.js の VALIDATOR_BOARD_MODES (single source of truth)。
+//   ここでは GAS の単一グローバルスコープでミラー参照する。値が divergent にならないよう
+//   validators.js が定義済の場合はそちらを尊重し、未定義のときだけ fallback で定義。
+const VALID_BOARD_MODES = (typeof VALIDATOR_BOARD_MODES !== 'undefined' && Array.isArray(VALIDATOR_BOARD_MODES))
+  ? VALIDATOR_BOARD_MODES
+  : ['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie'];
 
 function sanitizeDisplaySettings(displaySettings) {
   const sanitized = {
@@ -710,7 +727,13 @@ function saveUserConfig(userId, config, options = {}) {
     }
 
     const currentTime = new Date().toISOString();
-    cleanedConfig.etag = `${currentTime}_${Math.random().toString(36).substring(2, 15)}`;
+    // Why: Math.random() は予測可能で 2 つの同時 save が同 etag になる衝突リスクがある。
+    //   Utilities.getUuid() は GAS が提供する RFC 4122 v4 UUID で衝突確率 ~0。
+    //   フォーマット: `<ISO ts>_<uuid 12 文字>` (検索性 + 一意性の両立)。
+    const etagUuid = (typeof Utilities !== 'undefined' && Utilities.getUuid)
+      ? Utilities.getUuid().replace(/-/g, '').substring(0, 12)
+      : Math.random().toString(36).substring(2, 14);
+    cleanedConfig.etag = `${currentTime}_${etagUuid}`;
 
     const updateResult = updateUser(userId, {
       configJson: JSON.stringify(cleanedConfig)

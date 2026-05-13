@@ -55,6 +55,8 @@ const OPERATIONS = [
   'listProfiles', 'saveProfile', 'loadProfile', 'deleteProfile',
   // Data ops (v5) — テストデータ投入専用
   'appendRows', 'clearDataRows',
+  // Drive file rename (v5.1) — customizeForm 後の Drive file name 同期 etc.
+  'renameDriveFile',
   // Drive sharing (v6)
   'shareWithDomain',
   // SS sharing repair (v7) — SA editor 共有が抜けた既存 SS の遡及修復

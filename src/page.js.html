@@ -1132,7 +1132,38 @@
           }
 
           if (response.hasNewContent) {
-            this.showNewContentBanner(response.newItemsCount);
+            // Why: モード別の更新戦略。
+            //   - viz 系 (numberline / matrix / pie): リアルタイム可視化が教育価値の核心
+            //     ("いま誰が回答したか" を黒板で共有)。silent auto-reload で dot/slice を即時反映。
+            //   - board (掲示板): 児童が個別意見を精読中なので、自動更新は集中を奪う。バナー方式維持。
+            //   - wordcloud: 棒の順序が頻繁に変わると視覚疲労 → バナー方式で教師判断。
+            const mode = this.state.boardMode || 'board';
+            const autoUpdateModes = ['numberline', 'matrix', 'pie'];
+            if (autoUpdateModes.includes(mode)) {
+              if (typeof this.loadSheetData === 'function') {
+                this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
+              }
+            } else {
+              this.showNewContentBanner(response.newItemsCount);
+            }
+          }
+
+          // Why: 教師が profile 切替したとき、生徒の 5 秒 polling で即時に検知する。
+          //   getNotificationUpdate に formMeta/activeProfile を載せたので、ここで前回値と
+          //   比較して URL 変更があれば「新しいボードに切り替わりました」トースト + 自動再読込。
+          //   これがないと polling は新着投稿しか拾えず、profile 切替は気付かれない。
+          if (response.formMeta) {
+            const newUrl = response.formMeta.formUrl || '';
+            const prevUrl = this.state.lastSeenFormUrl || '';
+            if (prevUrl && newUrl && prevUrl !== newUrl) {
+              this.__showBoardSwitchedToast(response.formMeta.formTitle || '新しいボード');
+              // 自動でデータ再読込し、ボード本体も新 profile の中身に切替える
+              if (typeof this.loadSheetData === 'function') {
+                this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+              }
+            }
+            // 初回 polling や同一 URL の場合も lastSeenFormUrl は最新に追従させる
+            this.state.lastSeenFormUrl = newUrl;
           }
 
           this.polling.errorCount = 0;
@@ -1190,9 +1221,13 @@
 
       const timeSinceActivity = Date.now() - this.lastActivityTime;
 
-      if (timeSinceActivity < 60000) return 15000;      // 1分以内: 15秒
-      if (timeSinceActivity < 300000) return 30000;     // 5分以内: 30秒
-      if (timeSinceActivity < 900000) return 120000;    // 15分以内: 2分
+      // Why (授業テンポ優先): 道徳の 45 分授業で教師が profile 切替したとき、
+      //   生徒側で 15 秒以上待つと授業がもたつく。直近アクティブ (1 分以内) のときは
+      //   5 秒間隔で getNotificationUpdate を呼ぶ。アイドル時はバックオフ。
+      //   GAS quota は 1 ユーザー 90 sec/min なので、5 sec interval = 12 calls/min で余裕。
+      if (timeSinceActivity < 60000) return 5000;       // 1分以内: 5秒（授業中）
+      if (timeSinceActivity < 300000) return 15000;     // 5分以内: 15秒
+      if (timeSinceActivity < 900000) return 60000;     // 15分以内: 1分
       return 300000;                                     // 15分超: 5分
     }
 
@@ -2291,12 +2326,18 @@
       };
 
       try {
-        // Compare モード（議論前 ↔ 現在）: viz mode のときのみ 2 ペイン描画
-        if (this.state && this.state.vizCompareMode &&
-            mode !== 'board' &&
-            typeof this.__vizGetBeforeSnapshot === 'function' &&
-            this.__vizGetBeforeSnapshot()) {
-          return await this.__vizRenderCompare(renderOne, mode);
+        // Compare モード（左=過去 ↔ 右=現在）: viz mode のときのみ 2 ペイン描画。
+        // 入る条件 (どちらか満たせば左ペインに何かを出せる):
+        //   - 議論前 anchor が保存されている (loadBeforeSnapshot)、または
+        //   - timestamp 履歴 snapshot が 1 件以上ある (vizGetSnapshots)
+        // → __vizRenderCompare 内部で leftSource を 4 段階フォールバックで決定。
+        if (this.state && this.state.vizCompareMode && mode !== 'board' &&
+            typeof this.__vizRenderCompare === 'function') {
+          const hasBefore = typeof this.__vizGetBeforeSnapshot === 'function' && this.__vizGetBeforeSnapshot();
+          const hasSnaps = typeof this.vizGetSnapshots === 'function' && this.vizGetSnapshots().length > 0;
+          if (hasBefore || hasSnaps) {
+            return await this.__vizRenderCompare(renderOne, mode);
+          }
         }
 
         // タイムライン位置が指定されていれば、その snapshot で描画

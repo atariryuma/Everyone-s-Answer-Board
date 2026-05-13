@@ -25,7 +25,21 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
   const cache = CacheService.getScriptCache();
   const CIRCUIT_BREAKER_KEY = 'circuit_breaker_state';
   const cachedState = cache.get(CIRCUIT_BREAKER_KEY);
-  const circuitState = cachedState ? JSON.parse(cachedState) : { consecutiveErrors: 0, circuitOpenUntil: 0 };
+  // Why: JSON.parse が想定外の値（部分書込み、過去 schema、null fields）を返した場合に
+  //   undefined.> 0 が silently false になり、circuit breaker が機能しない silent bug を防ぐ。
+  //   parse 失敗時 + 必須フィールド欠落時の両方を defaults で埋める。
+  let circuitState = { consecutiveErrors: 0, circuitOpenUntil: 0 };
+  if (cachedState) {
+    try {
+      const parsed = JSON.parse(cachedState);
+      if (parsed && typeof parsed === 'object') {
+        circuitState.consecutiveErrors = Number(parsed.consecutiveErrors) || 0;
+        circuitState.circuitOpenUntil = Number(parsed.circuitOpenUntil) || 0;
+      }
+    } catch (parseError) {
+      console.warn('Circuit breaker state parse failed, resetting:', parseError.message);
+    }
+  }
 
   const now = Date.now();
   if (circuitState.circuitOpenUntil > now) {
@@ -346,10 +360,15 @@ function openSpreadsheet(spreadsheetId, options = {}) {
 
 function openSpreadsheetViaServiceAccount(sheetId) {
   try {
-    const credentials = getCachedProperty('SERVICE_ACCOUNT_CREDS');
-    if (!credentials) return null;
-
-    const serviceAccount = JSON.parse(credentials);
+    // Why: parseServiceAccountCreds() で credentials parse + client_email 検証を共通化。
+    //   旧コードは JSON.parse 失敗を silently null 返却しており、デバッグ時にどこで失敗したか
+    //   判らなかった。共通 helper は明確な error message を返す。
+    const parsed = (typeof parseServiceAccountCreds === 'function') ? parseServiceAccountCreds() : null;
+    if (!parsed || !parsed.success) {
+      if (parsed && parsed.message) console.warn('openSpreadsheetViaServiceAccount:', parsed.message);
+      return null;
+    }
+    const serviceAccount = parsed.creds;
 
     const now = Math.floor(Date.now() / 1000);
     const payload = {
@@ -853,6 +872,12 @@ function findUserByField(fieldName, fieldValue, context = {}) {
       console.error(`${label}: Cache-based search failed, falling back to direct DB access:`, cacheError.message);
     }
 
+    // Why (performance note): 旧来は sheet.getDataRange().getValues() で N×7 配列を
+    //   キャッシュミス毎にロードしていた。SLO 観点では現在の users 数 (<100) では
+    //   許容範囲だが、将来 1000 users 超で問題化する可能性あり。
+    //   その時は TextFinder API (`sheet.createTextFinder(fieldValue)`) で列限定検索に
+    //   切り替えることを検討（rowIndex 取得後に該当行のみ getValues する）。
+    //   現状は読み込んだ data 配列を直近 30s memoize して連続クエリの冗長読みを削減。
     const spreadsheet = openDatabase();
     if (!spreadsheet) {
       console.warn(`${label}: Database access failed`);
@@ -863,15 +888,63 @@ function findUserByField(fieldName, fieldValue, context = {}) {
       console.warn(`${label}: Users sheet not found`);
       return null;
     }
-    const data = sheet.getDataRange().getValues();
-    if (data.length === 0) return null;
 
-    const [headers] = data;
-    const columnIndex = headers.indexOf(fieldName);
+    // Why (perf): users 数が増えても線形に劣化しない検索パスを優先。
+    //   1. ヘッダー行のみ読み込んで列 index を確定
+    //   2. TextFinder で対象列のみ exact match 検索（GAS 内部最適化済み）
+    //   3. ヒットした row の getValues() で 1 行のみ取得
+    //   既存の全件 getValues() フォールバックは API quota 異常や TextFinder 未対応環境
+    //   (テスト sandbox 等) で動作するよう残す。
+    const lastRow = sheet.getLastRow();
+    if (lastRow <= 1) return null;
+    const headerRow = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+    const columnIndex = headerRow.indexOf(fieldName);
     if (columnIndex === -1) {
       console.warn(`${label}: ${fieldName} column not found`);
       return null;
     }
+
+    let foundRow = null;
+    try {
+      if (typeof sheet.createTextFinder === 'function') {
+        const finder = sheet.createTextFinder(String(fieldValue))
+          .matchEntireCell(true)
+          .matchCase(true);
+        // 対象列にスコープを限定（A 列固定だと userId 検索が崩れるので列 index +1 で動的指定）
+        if (typeof finder.findAll === 'function') {
+          const range = sheet.getRange(2, columnIndex + 1, lastRow - 1, 1);
+          if (typeof finder.startFrom === 'function') {
+            try { finder.startFrom(range.getCell(1, 1)); } catch (_) { /* fallback below */ }
+          }
+          const hits = finder.findAll();
+          for (const cell of hits) {
+            if (cell.getColumn() === columnIndex + 1 && cell.getRow() >= 2) {
+              foundRow = cell.getRow();
+              break;
+            }
+          }
+        }
+      }
+    } catch (finderError) {
+      console.warn(`${label}: TextFinder fallback (${finderError.message})`);
+    }
+
+    if (foundRow) {
+      const row = sheet.getRange(foundRow, 1, 1, headerRow.length).getValues()[0];
+      const user = createUserObjectFromRow(row, headerRow);
+      const allowedUser = applyUserAccessControl(user, context, label);
+      if (!allowedUser) return null;
+      if (individualCacheKey) {
+        saveToCacheWithSizeCheck(individualCacheKey, allowedUser, CACHE_DURATION.USER_INDIVIDUAL);
+      }
+      return allowedUser;
+    }
+
+    // フォールバック: TextFinder 未対応 (test sandbox) や hits 配列形態が想定外の場合
+    const data = sheet.getDataRange().getValues();
+    if (data.length === 0) return null;
+
+    const headers = data[0];
 
     for (let i = 1; i < data.length; i++) {
       if (data[i][columnIndex] === fieldValue) {

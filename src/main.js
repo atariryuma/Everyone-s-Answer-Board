@@ -368,6 +368,115 @@ function createRedirectTemplate(redirectPage, error) {
   }
 }
 
+// =====================================================================
+// doPost action handlers — 旧来 doPost 内の switch case を個別関数化。
+// 各 handler は (request, email?, ...) を受け取り、{success, message, ...} を返す純粋関数。
+// テスト容易性 + 認知負荷の低減のために抽出。
+// =====================================================================
+
+/**
+ * getData / refreshData ハンドラ — 公開ボードのデータ取得。
+ * @param {Object} request - doPost payload
+ * @param {string} email - 認証済 viewer email
+ * @param {string} action - 'getData' | 'refreshData' (ログ識別用)
+ * @returns {Object} response
+ */
+function doPostHandleGetData(request, email, action) {
+  const isObj = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+  if (request.options !== undefined && !isObj(request.options)) {
+    return createErrorResponse('Invalid options payload');
+  }
+  try {
+    const user = findUserByEmail(email, { requestingUser: email });
+    if (!user) {
+      return createUserNotFoundError();
+    }
+    return { success: true, data: getUserSheetData(user.userId, request.options || {}) };
+  } catch (error) {
+    console.error(`${action} error:`, error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * addReaction ハンドラ — 児童/教師のリアクション追加。
+ * @param {Object} request
+ * @returns {Object} response
+ */
+function doPostHandleAddReaction(request) {
+  if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
+    return createErrorResponse('Target user ID required for reaction');
+  }
+  if (!isValidRowIdPayload(request.rowId)) {
+    return createErrorResponse('Target row ID must be a positive integer or "row_<n>" string');
+  }
+  if (typeof request.reactionType !== 'string') {
+    return createErrorResponse('Reaction type required');
+  }
+  return addReaction(request.userId, request.rowId, request.reactionType);
+}
+
+/**
+ * toggleHighlight ハンドラ — 教師の注目マーク切替。
+ * @param {Object} request
+ * @returns {Object} response
+ */
+function doPostHandleToggleHighlight(request) {
+  if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
+    return createErrorResponse('Target user ID required for highlight');
+  }
+  if (!isValidRowIdPayload(request.rowId)) {
+    return createErrorResponse('Target row ID must be a positive integer or "row_<n>" string');
+  }
+  return toggleHighlight(request.userId, request.rowId);
+}
+
+/**
+ * publishApp ハンドラ — ボード公開（owner 認証は publishApp 内で行う）。
+ * @param {Object} request
+ * @param {Function} isPlainObject - doPost からの注入（重複定義回避）
+ * @returns {Object} response
+ */
+function doPostHandlePublishApp(request, isPlainObject) {
+  try {
+    if (!isPlainObject(request.config) || Object.keys(request.config).length === 0) {
+      return createErrorResponse('Publish config is required');
+    }
+    if (typeof publishApp === 'function') {
+      return publishApp(request.config);
+    }
+    return createErrorResponse('公開処理関数が見つかりません');
+  } catch (error) {
+    console.error('publishApp error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * rowId payload validator.
+ *   accepts: 42 / "42" / "row_42" (positive integer-bearing forms)
+ *   rejects: NaN / negative / 0 / non-integer string / null / undefined / object
+ *
+ * Why: addReaction / toggleHighlight の rowId は下流で parseInt(replace('row_', '')) されて
+ *   getRange(rowIndex, ...) に渡る。NaN が来ると Sheet API が黙って崩壊するので、doPost 層で reject。
+ *
+ * @param {*} rowId
+ * @returns {boolean}
+ */
+function isValidRowIdPayload(rowId) {
+  if (rowId === null || rowId === undefined) return false;
+  if (typeof rowId === 'number') {
+    return Number.isInteger(rowId) && rowId > 0;
+  }
+  if (typeof rowId === 'string') {
+    const cleaned = rowId.replace(/^row_/, '').trim();
+    if (!cleaned) return false;
+    const n = Number(cleaned);
+    return Number.isInteger(n) && n > 0;
+  }
+  return false;
+}
+
 /**
  * Handle POST requests
  * @param {Object} e - Event object containing POST data
@@ -448,6 +557,14 @@ function doPost(e) {
     }
 
     const action = typeof request.action === 'string' ? request.action.trim() : '';
+    // doPost allowlist — 追加時は (1) この配列に追加 (2) 下の switch case を追加
+    // (3) 各 case 内で request fields の input validation を必ず行うこと（CLAUDE.md より）。
+    //   - getData / refreshData : 公開ボードの閲覧（ドメイン認証のみ、API key 不要）
+    //   - addReaction / toggleHighlight : 児童/教師の interaction（rowId validate 必須）
+    //   - publishApp : ボード公開（owner 認証 + etag conflict 検出）
+    //   - adminApi : 管理者全 op（APIキー + timingSafeEqual 比較）
+    //   - setupApiKey : 初回 APIキー設定（一度だけ、管理者のみ）
+    //   - reportClientError : フロントエンドエラー → Cloud Logging へ
     const allowedActions = ['getData', 'addReaction', 'toggleHighlight', 'refreshData', 'publishApp', 'adminApi', 'setupApiKey', 'reportClientError'];
     if (!allowedActions.includes(action)) {
       return jsonResponse({
@@ -471,9 +588,14 @@ function doPost(e) {
       if (!setupEmail || !isAdministrator(setupEmail)) {
         return jsonResponse(createErrorResponse('Admin authentication required', null, { error: 'ADMIN_REQUIRED' }));
       }
-      const newKey = typeof request.apiKey === 'string' && request.apiKey.length >= 16 ? request.apiKey : null;
+      // Why: 旧実装は length >= 16 のみで空白埋め文字列 (e.g. 16 spaces) が通る silent
+      //   data quality bug。trim 後の effective length と「非空白文字を含む」を併用検証。
+      const rawKey = typeof request.apiKey === 'string' ? request.apiKey : '';
+      const trimmedKey = rawKey.trim();
+      const hasMeaningfulChars = trimmedKey.length >= 16 && /\S/.test(trimmedKey);
+      const newKey = hasMeaningfulChars ? rawKey : null;
       if (!newKey) {
-        return jsonResponse(createErrorResponse('apiKey must be a string of at least 16 characters', null, { error: 'INVALID_KEY_FORMAT' }));
+        return jsonResponse(createErrorResponse('apiKey must be a string of at least 16 non-whitespace characters', null, { error: 'INVALID_KEY_FORMAT' }));
       }
       // setCachedProperty also busts the 30s helpers.js memory cache so the very
       // next adminApi call in this process sees the new key.
@@ -517,69 +639,26 @@ function doPost(e) {
       });
     }
 
+    // Why: 旧来 200 行 switch を action handler に分割。各 handler は (request, email) を
+    //   受け取り result を返す純粋関数。テスト可読性 + 個別保守性が向上。
+    //   action allowlist のチェックは上で済んでいるので、ここに到達したら action は valid。
     let result;
     switch (action) {
       case 'getData':
-      case 'refreshData': {
-        if (request.options !== undefined && !isPlainObject(request.options)) {
-          result = createErrorResponse('Invalid options payload');
-          break;
-        }
-        try {
-          const user = findUserByEmail(email, { requestingUser: email });
-          if (!user) {
-            result = createUserNotFoundError();
-          } else {
-            result = { success: true, data: getUserSheetData(user.userId, request.options || {}) };
-          }
-        } catch (error) {
-          console.error(`${action} error:`, error.message);
-          result = createExceptionResponse(error);
-        }
+      case 'refreshData':
+        result = doPostHandleGetData(request, email, action);
         break;
-      }
       case 'addReaction':
-        if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
-          result = createErrorResponse('Target user ID required for reaction');
-        } else if (request.rowId === undefined || request.rowId === null) {
-          result = createErrorResponse('Target row ID required for reaction');
-        } else if (typeof request.reactionType !== 'string') {
-          result = createErrorResponse('Reaction type required');
-        } else {
-          result = addReaction(request.userId, request.rowId, request.reactionType);
-        }
+        result = doPostHandleAddReaction(request);
         break;
       case 'toggleHighlight':
-        if (!request.userId || typeof request.userId !== 'string' || !request.userId.trim()) {
-          result = createErrorResponse('Target user ID required for highlight');
-        } else if (request.rowId === undefined || request.rowId === null) {
-          result = createErrorResponse('Target row ID required for highlight');
-        } else {
-          result = toggleHighlight(request.userId, request.rowId);
-        }
+        result = doPostHandleToggleHighlight(request);
         break;
       case 'publishApp':
-        try {
-          if (!isPlainObject(request.config) || Object.keys(request.config).length === 0) {
-            result = createErrorResponse('Publish config is required');
-            break;
-          }
-          if (typeof publishApp === 'function') {
-            result = publishApp(request.config);
-          } else {
-            result = createErrorResponse('公開処理関数が見つかりません');
-          }
-        } catch (error) {
-          console.error('publishApp error:', error.message);
-          result = createExceptionResponse(error);
-        }
+        result = doPostHandlePublishApp(request, isPlainObject);
         break;
       case 'reportClientError':
-        // Why: フロントエンドの window.error / unhandledrejection / 明示報告を
-        //      Cloud Logging に流すための受け口。これ無しでは児童端末のフロント
-        //      エラーは CLI から完全に不可視。コードは intentionally permissive
-        //      （submitter は domainRestriction を通過した認証済みドメインユーザ）
-        //      でレート制限とサイズ制限を必ず適用。
+        // フロントエンドエラー → Cloud Logging（rate limit + size cap は内部適用）
         result = handleClientErrorReport(email, request.payload);
         break;
       default:
@@ -589,8 +668,14 @@ function doPost(e) {
     return jsonResponse(result);
 
   } catch (error) {
+    // Why: stack trace を保持して Cloud Logging に出すことで、CLI からエラー発生箇所を
+    //   即座に特定できる。クライアントへの応答メッセージは generic に保つ（情報漏洩防止）。
     const errorMessage = error && error.message ? error.message : '予期しないエラーが発生しました';
-    console.error('doPost error:', errorMessage);
+    console.error('doPost error:', {
+      message: errorMessage,
+      stack: error && error.stack ? error.stack.substring(0, 1000) : undefined,
+      timestamp: new Date().toISOString()
+    });
     return jsonResponse({
       success: false,
       message: 'リクエスト処理中にエラーが発生しました。再度お試しください。'
@@ -633,9 +718,12 @@ function handleClientErrorReport(email, payload) {
     try {
       const cache = CacheService.getScriptCache();
       // 仮名化（メアドそのものはキーに入れない；ログ収集の incident で漏らさない）
+      // Why: 旧実装は SHA-1 先頭 4 bytes (8 hex = 32 bit) で衝突確率が高く、別ユーザ間で
+      //   レート制限を共有してしまう可能性があった。64 bit (8 bytes = 16 hex) に拡大し、
+      //   2^32 倍の衝突耐性を持たせる。
       const bucket = `cer_${Utilities.computeDigest(
         Utilities.DigestAlgorithm.SHA_1, String(email || '')
-      ).slice(0, 4).map(b => (b & 0xff).toString(16).padStart(2, '0')).join('')}`;
+      ).slice(0, 8).map(b => (b & 0xff).toString(16).padStart(2, '0')).join('')}`;
       const raw = cache.get(bucket);
       const count = raw ? parseInt(raw, 10) || 0 : 0;
       if (count >= 30) {
@@ -667,8 +755,23 @@ function handleClientErrorReport(email, payload) {
     //      集計でも別グループになる。
     const tag = `[client/${level}]`;
     const summary = `${tag} ${context ? '(' + context + ') ' : ''}${message}`;
+    // Why (domain leak fix): 旧実装は `user@***` でドメイン部のみマスクしていたが、
+    //   local part をそのまま残すと naha-okinawa の児童 ID (例: t260781p) が
+    //   ログから個人特定可能だった。local part も短縮 SHA1 で完全仮名化する。
+    const anonReporter = (() => {
+      if (!email || typeof email !== 'string' || email.indexOf('@') < 0) return 'unknown';
+      try {
+        const hash = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_1, email)
+          .slice(0, 4)
+          .map(b => (b & 0xff).toString(16).padStart(2, '0'))
+          .join('');
+        return `anon-${hash}`;
+      } catch (_) {
+        return 'anon';
+      }
+    })();
     const detail = {
-      reporter: email ? `${email.split('@')[0]}@***` : 'unknown',
+      reporter: anonReporter,
       url,
       source,
       line: lineNo,

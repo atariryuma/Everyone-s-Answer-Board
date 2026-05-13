@@ -333,8 +333,21 @@ function customizeForm(formIdOrUrl, schema) {
     }
 
     // タイトル・説明
+    //
+    // Why: form.setTitle() は Forms 内部のタイトル（編集画面 / 回答画面に表示）を更新するが、
+    //   Drive 上のファイル名は別管理で setName を呼ばないと変わらない。AdminPanel の
+    //   「📋 一覧から選択」dropdown は DriveApp.getFiles() の name を表示するので、
+    //   ここで file の name も同期しないと「タイトルは【導入】... なのに dropdown には
+    //   "回答ボード [掲示板] 5/14 06:22" と出る」食い違いが起きる (2026-05-14 教師フィードバック)。
     if (typeof schema.title === 'string' && schema.title.trim()) {
-      form.setTitle(schema.title.trim().substring(0, 200));
+      const cleanTitle = schema.title.trim().substring(0, 200);
+      form.setTitle(cleanTitle);
+      try {
+        DriveApp.getFileById(form.getId()).setName(cleanTitle);
+      } catch (renameErr) {
+        // setName 失敗は致命的でない（権限不足等）。fall through して title だけ更新済の状態。
+        console.warn('customizeForm: Drive file rename failed:', renameErr.message);
+      }
     }
     if (typeof schema.description === 'string') {
       form.setDescription(schema.description.substring(0, 2000));
@@ -452,14 +465,21 @@ function customizeForm(formIdOrUrl, schema) {
     }
 
     // ヘッダーキャッシュ無効化（新 SS のキャッシュは未作成だが、安全のため旧キャッシュも消す）
+    // Why (fail-soft): cache invalidation 失敗は customizeForm 全体を止める理由にならない。
+    //   destination spreadsheet が trash 済 / アクセス権無し / cache 未初期化のいずれかが原因。
+    //   次回 fetch 時にどちらにせよ headers は実際の sheet から取り直されるので無害。
     try {
       const destId = newSpreadsheetId || form.getDestinationId();
       if (destId && typeof invalidateSheetHeadersCache === 'function') {
         ['フォームの回答 1', 'Form Responses 1', 'Sheet1'].forEach(sn => {
-          try { invalidateSheetHeadersCache(destId, sn); } catch (_) {}
+          try { invalidateSheetHeadersCache(destId, sn); } catch (cacheErr) {
+            // sheet 名違いは normal: 配列の他要素で当たる
+          }
         });
       }
-    } catch (_) {}
+    } catch (destErr) {
+      // form.getDestinationId() の失敗は珍しいが致命的でない
+    }
 
     return {
       success: true,
@@ -511,7 +531,21 @@ function processFormUrlInput(formUrl) {
     const publishedUrl = form.getPublishedUrl();
 
     // 3. 回答先スプレッドシートを検出
-    let spreadsheetId = form.getDestinationId();
+    //
+    // Why try-catch: form.getDestinationId() は destination 未設定時に null を返さず、
+    //   "フォームに応答先がありません。" という例外を投げる仕様 (Apps Script Forms API)。
+    //   この関数は !spreadsheetId 分岐で auto-create するつもりだったが、例外で外側 catch
+    //   に飛んでしまい「予期しないエラー」になる。教師が手動で作った Form は典型的に
+    //   destination が無いので、これがそのまま「教師が自分のフォームを使えない」根本バグ。
+    //   2026-05-14 v2657: 例外も spreadsheetId=null と同じ「未設定」扱いにして、
+    //   auto-create 経路に流す。
+    let spreadsheetId = null;
+    try {
+      spreadsheetId = form.getDestinationId();
+    } catch (noDestErr) {
+      // expected: "フォームに応答先がありません。" — 未設定なので auto-create に進む
+      spreadsheetId = null;
+    }
     let wasCreated = false;
     let spreadsheetUrl = '';
     let ss;
@@ -524,6 +558,20 @@ function processFormUrlInput(formUrl) {
         spreadsheetUrl = ss.getUrl();
         form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
         wasCreated = true;
+
+        // 新規 SS 共有設定（SA editor + ドメイン共有）— 生徒 view モード 403 防止。
+        //   Why: createTemplateForm / customizeForm の resetDestination 経路と同じ理由で、
+        //        ここでも applySpreadsheetSharingDefaults を呼ばないと viewer エラーになる。
+        //        2026-05-14 v2657 で追加（教師が手動で作った Form 経由の SS にも適用）。
+        try {
+          const ownerEmail = (typeof getCurrentEmail === 'function') ? getCurrentEmail() : '';
+          const sr = applySpreadsheetSharingDefaults(spreadsheetId, ownerEmail);
+          if (sr && sr.errors && sr.errors.length) {
+            console.warn('processFormUrlInput sharing warnings:', sr.errors.join(' / '));
+          }
+        } catch (sharingErr) {
+          console.warn('processFormUrlInput SS 共有設定エラー（処理は続行）:', sharingErr.message);
+        }
       } catch (e) {
         console.error('Spreadsheet creation error:', e.message);
         return { success: false, error: 'スプレッドシートの作成に失敗しました: ' + e.message };
@@ -1190,10 +1238,19 @@ function getNotificationUpdate(targetUserId, options = {}) {
       return itemTime > lastUpdate;
     });
 
+    // Why: 教師の profile 切替を生徒側 5 秒 polling で即時検知できるよう、
+    //   formMeta (formUrl + formTitle) と activeProfile を載せる。生徒は前回値と
+    //   比較して URL 変更を検知 → トースト + 自動データ再読込が走る。
+    //   これがないと polling は「新着投稿」しか拾えず、profile 切替は気付かれない。
     return {
       success: true,
       hasNewContent: newItems.length > 0,
-      newItemsCount: newItems.length
+      newItemsCount: newItems.length,
+      formMeta: {
+        formUrl: (targetConfig && typeof targetConfig.formUrl === 'string') ? targetConfig.formUrl : '',
+        formTitle: (targetConfig && typeof targetConfig.formTitle === 'string') ? targetConfig.formTitle : ''
+      },
+      activeProfile: (targetConfig && targetConfig.activeProfile) || null
     };
 
   } catch (error) {

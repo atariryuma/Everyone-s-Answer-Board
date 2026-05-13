@@ -701,7 +701,17 @@ function dispatchAdminOperation(operation, params) {
       if (!usersResult.success) return usersResult;
       const exported = (usersResult.data?.users || usersResult.users || []).map(u => {
         let parsed = {};
-        try { parsed = u.configJson ? JSON.parse(u.configJson) : {}; } catch (_) { parsed = {}; }
+        try {
+          parsed = u.configJson ? JSON.parse(u.configJson) : {};
+        } catch (parseErr) {
+          // Why: 設定破損ユーザーを admin が後追いできるよう、どの user の config parse が失敗したかを
+          //   ログに残す。空 {} で続行（exportConfigs 全体は止めない）。
+          console.warn('exportConfigs: configJson parse failed', {
+            userId: u.userId ? `${u.userId.substring(0, 8)}***` : 'N/A',
+            error: parseErr.message
+          });
+          parsed = {};
+        }
         return {
           userId: u.userId,
           userEmail: u.userEmail,
@@ -824,7 +834,15 @@ function dispatchAdminOperation(operation, params) {
         const form = FormApp.openByUrl(trimmed);
         reachable = true;
         formTitle = form.getTitle();
-        destinationSpreadsheetId = form.getDestinationId() || null;
+        // form.getDestinationId() は destination 未設定時に "フォームに応答先がありません。"
+        //   を throw する仕様なので、null と同じ扱いに変換する。
+        //   2026-05-14 v2657: 教師が destination 無しの Form を validateFormUrl で
+        //   調べたとき "reachable: false" と誤判定されるバグを修正。
+        try {
+          destinationSpreadsheetId = form.getDestinationId() || null;
+        } catch (_) {
+          destinationSpreadsheetId = null;
+        }
       } catch (e) {
         return createSuccessResponse('Form URL reachability check', {
           formUrl: trimmed,
@@ -1105,6 +1123,36 @@ function dispatchAdminOperation(operation, params) {
       }
     }
 
+    case 'renameDriveFile': {
+      // Drive 上のファイル名を変更する（Form / Spreadsheet どちらも file.setName で OK）。
+      // 主用途: customizeForm でタイトルを差し替えた既存 Form / SS の名前同期、
+      //        または手動命名済の SS を後から命名し直す等。
+      //
+      //   注意: form.setTitle() は Forms 内部タイトル、SpreadsheetApp.create(name) や
+      //         DriveApp.setName() は Drive 上の file name を別々に管理する。AdminPanel
+      //         「一覧から選択」dropdown は file name を表示するので、両者を揃える必要がある。
+      if (!params.fileId || typeof params.fileId !== 'string') {
+        return createErrorResponse('fileId is required');
+      }
+      if (!params.newName || typeof params.newName !== 'string' || !params.newName.trim()) {
+        return createErrorResponse('newName (non-empty string) is required');
+      }
+      try {
+        const file = DriveApp.getFileById(params.fileId);
+        const oldName = file.getName();
+        const cleanName = String(params.newName).trim().substring(0, 200);
+        file.setName(cleanName);
+        return createSuccessResponse('Drive file renamed', {
+          fileId: params.fileId,
+          oldName,
+          newName: cleanName,
+          mimeType: file.getMimeType()
+        });
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
     case 'appendRows': {
       // Why: テストデータ投入用。Spreadsheet に複数 row を一括 append。
       //      Forms 経由ではなく直接書き込むので、本番運用では使わないこと。
@@ -1136,10 +1184,18 @@ function dispatchAdminOperation(operation, params) {
         const normalized = params.rows.map((row, idx) => {
           if (!Array.isArray(row)) return null;
           const r = row.slice();
-          // first column を timestamp として扱う：null/'' なら自動補完
+          // first column を timestamp として扱う。
+          //   - null / '' / undefined : 1 秒ずらしの auto-timestamp で並び順を安定化
+          //   - string (ISO 8601 等) : Date オブジェクトに変換して Sheets に日付セルとして書く。
+          //     Why: Sheets はテキスト ISO 文字列を「日付セル」として認識しないため、
+          //          aggregator が new Date(r.timestamp) で NaN を出し buildHistoricalSnapshots が
+          //          空配列を返す。Date 化することでフォーム自動入力と同じ型にそろう。
+          //   - Date / number 等は素通し
           if (r[0] === null || r[0] === undefined || r[0] === '') {
-            // Why: 1 秒ずらして並び順を安定化
             r[0] = new Date(now.getTime() + idx * 1000);
+          } else if (typeof r[0] === 'string') {
+            const parsed = new Date(r[0]);
+            if (Number.isFinite(parsed.getTime())) r[0] = parsed;
           }
           return r;
         }).filter(Boolean);
@@ -1213,7 +1269,16 @@ function dispatchAdminOperation(operation, params) {
 function redactUserForApi_(user) {
   if (!user || typeof user !== 'object') return user;
   let config = null;
-  try { config = user.configJson ? JSON.parse(user.configJson) : null; } catch (_) {}
+  try {
+    config = user.configJson ? JSON.parse(user.configJson) : null;
+  } catch (parseErr) {
+    // Why: redactUserForApi_ は admin API レスポンスの一部。config parse 失敗は珍しい
+    //   が起きると config-derived fields が null になるので、トラブルシュートのために残す。
+    console.warn('redactUserForApi_: configJson parse failed', {
+      userId: user.userId ? `${String(user.userId).substring(0, 8)}***` : 'N/A',
+      error: parseErr.message
+    });
+  }
   return {
     userId: user.userId,
     userEmail: user.userEmail,

@@ -42,14 +42,24 @@ function validateEmail(email) {
       return result;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
+    const trimmed = email.trim();
+    // Why: RFC 5321 では local part 64 chars、domain 255 chars、合計 320 chars が上限。
+    //   3-char domain (例: "a@b.c") は formal RFC 上 valid だが Google Workspace では
+    //   通らないので、現実的に min 6 chars 全体で reject する（"a@b.cd" 以上を要求）。
+    //   上限は安全マージンで 254 (Sheets セル最大値を考慮)。
+    if (trimmed.length < 6 || trimmed.length > 254) {
+      result.errors.push('メールアドレスの長さが不正です (6〜254 文字)');
+      return result;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    if (!emailRegex.test(trimmed)) {
       result.errors.push('無効なメールアドレス形式です');
       return result;
     }
 
     result.isValid = true;
-    result.sanitized = email.trim().toLowerCase();
+    result.sanitized = trimmed.toLowerCase();
     return result;
   } catch (error) {
     result.errors.push('メール検証エラー');
@@ -260,6 +270,50 @@ function validateSpreadsheetId(spreadsheetId) {
 
     result.isValid = true;
     return result;
+}
+
+/**
+ * ISO 8601 / YYYY-MM-DD 形式日付検証
+ *
+ * Why: filter 用の dateFrom / dateTo を `new Date(input)` で寛容に parse すると
+ *   "2026-99-99" のような無効値が NaN として silently 通過してしまう。
+ *   厳密に正規表現 + Date オブジェクト検証で「文字列が形式正しい + 実在する日付」を保証。
+ *
+ * @param {string} dateStr - 検証対象の日付文字列
+ * @returns {{isValid: boolean, parsed?: Date, errors: string[]}}
+ */
+function validateDateFormat(dateStr) {
+  const result = { isValid: false, errors: [] };
+  if (!dateStr || typeof dateStr !== 'string') {
+    result.errors.push('日付文字列が必要です');
+    return result;
+  }
+  const trimmed = dateStr.trim();
+  // YYYY-MM-DD または YYYY-MM-DDTHH:MM:SS(Z) 形式を許容
+  const isoDateOnly = /^\d{4}-\d{2}-\d{2}$/;
+  const isoFull = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:?\d{2})?$/;
+  if (!isoDateOnly.test(trimmed) && !isoFull.test(trimmed)) {
+    result.errors.push('日付形式が不正です (YYYY-MM-DD または ISO 8601 形式)');
+    return result;
+  }
+  const parsed = new Date(trimmed);
+  if (isNaN(parsed.getTime())) {
+    result.errors.push('実在しない日付です: ' + trimmed);
+    return result;
+  }
+  // Why: JS は "2026-02-31" を silently "2026-03-03" にラップする寛容な仕様。
+  //   round-trip 検証で「入力 YYYY-MM-DD が parsed の年月日と一致する」ことを確認し、
+  //   実在しない日付を厳密に reject する。
+  if (isoDateOnly.test(trimmed)) {
+    const [y, m, d] = trimmed.split('-').map(Number);
+    if (parsed.getUTCFullYear() !== y || parsed.getUTCMonth() + 1 !== m || parsed.getUTCDate() !== d) {
+      result.errors.push('実在しない日付です: ' + trimmed);
+      return result;
+    }
+  }
+  result.isValid = true;
+  result.parsed = parsed;
+  return result;
 }
 
 /**

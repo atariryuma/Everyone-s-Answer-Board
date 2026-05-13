@@ -45,7 +45,8 @@
   /* データ点 */
   .viz-dot {
     cursor: pointer;
-    transition: r 120ms ease, stroke-width 120ms ease, opacity 200ms ease;
+    /* stroke-opacity も transition 対象に: リアクションリング (色枠) のフェードを滑らかに */
+    transition: r 120ms ease, stroke-width 120ms ease, stroke-opacity 120ms ease, opacity 200ms ease;
     fill: #38bdf8;
     stroke: #0f172a;
     stroke-width: 1.2;
@@ -54,6 +55,7 @@
   .viz-dot:hover {
     stroke: #fde047;
     stroke-width: 2.5;
+    stroke-opacity: 1;   /* hover 時はリングをはっきり出して判別しやすく */
   }
   /* 揺らぎが大きい点（道徳指導案：意図的指名の素材） */
   .viz-dot.swing-high {
@@ -61,10 +63,122 @@
     stroke: #f59e0b;
     stroke-width: 2;
   }
-  /* 揺らぎ表示: 過去投稿のゴースト点 */
+  /* 教師注目マーク（HIGHLIGHT）: 金縁 + 微発光。
+     Why: 教師が「みんなで考えたい」とマークした意見を viz でも一目で識別できるようにする。
+       同調圧力 (児童間リアクション) は subtle ring で抑制しているのに対し、
+       教師の意図的な促しは多面的視点の提示なので積極的に強調 OK（DCE 観点で安全）。
+     stroke は JS インライン style (#fbbf24) で priority 上書きするので、CSS は drop-shadow (glow) を担当。 */
+  .viz-dot.highlight {
+    filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.65));
+  }
+  body.projector-mode .viz-dot.highlight {
+    /* 電子黒板 / プロジェクタでも視認しやすいよう glow を強める */
+    filter: drop-shadow(0 0 7px rgba(251, 191, 36, 0.85));
+  }
+  /* ghost マーカー: 揺らぎ大 (swing-trace) で「過去位置」を示す薄色 dot。
+     groupByStudent は ghost を空配列にするので、画面に出るのは matrix renderer の
+     swing-trace ブロックが描画する .ghost.swing（vizComputeSwings 上位 N 人だけ）。 */
   .viz-dot.ghost {
-    opacity: 0.28;
-    stroke-width: 0;
+    opacity: 0.55;
+    stroke: #fde047;
+    stroke-width: 1.2;
+    stroke-dasharray: 2 2;
+    fill: #38bdf8;
+  }
+  /* dot 中央のリアクション数バッジ (matrix / numberline 共通)。
+     stroke 色 (緑/赤/紫) で「どのリアクションが多いか」、内部数字で「合計何件」を表現。 */
+  .viz-dot-label {
+    font-size: 10px;
+    font-weight: 700;
+    fill: #0f172a;                 /* dot 上に重ねるので暗色。stroke 黄色背景にも見える */
+    paint-order: stroke fill;
+    stroke: rgba(255, 255, 255, 0.9);
+    stroke-width: 2.5;
+  }
+  /* 比較モード ON 中で議論前未保存のとき、compare ボタンに「使えない」ヒント */
+  .viz-btn.compare-disabled {
+    opacity: 0.55;
+    cursor: help;
+  }
+
+  /* 行リストポップアップ (pie のカテゴリ / wordcloud の単語クリック時) */
+  .viz-rows-popup {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9000;
+    animation: vizPopupFadeIn 140ms ease;
+  }
+  @keyframes vizPopupFadeIn { from { opacity: 0; } to { opacity: 1; } }
+  .viz-rows-popup-card {
+    background: #1e293b;
+    color: #f1f5f9;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    width: min(92vw, 640px);
+    max-height: 85vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+  }
+  .viz-rows-popup-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #334155;
+    background: rgba(15, 23, 42, 0.4);
+  }
+  .viz-rows-popup-header h4 { margin: 0; font-size: 1rem; font-weight: 700; }
+  .viz-rows-popup-close {
+    background: transparent;
+    border: 0;
+    color: #cbd5e1;
+    cursor: pointer;
+    font-size: 1.6rem;
+    line-height: 1;
+    padding: 0 8px;
+  }
+  .viz-rows-popup-close:hover { color: #fff; }
+  .viz-rows-popup-body {
+    overflow-y: auto;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .viz-rows-popup-row {
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .viz-rows-popup-name {
+    font-size: 0.82rem;
+    color: #94a3b8;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+  .viz-rows-popup-reason {
+    font-size: 0.95rem;
+    line-height: 1.5;
+    margin-bottom: 8px;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  /* Popup 内のリアクションコンテナ。
+     ボタン本体は createReactionButtons() で生成された .reaction-btn を使うので
+     既存カードと同じスタイル (Tailwind 経由 + page.css の .reaction-btn) が
+     そのまま効く。ここでは並びのレイアウトだけ整える。 */
+  .viz-rows-popup-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
   }
   /* 新規追加直後の強調（フェードイン） */
   .viz-dot.enter {

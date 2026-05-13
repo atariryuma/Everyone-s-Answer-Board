@@ -81,7 +81,10 @@ __rootSys.SLEEP_MS = SLEEP_MS;
  */
 function forceUrlSystemReset() {
   try {
-    console.warn('システム強制リセットが実行されました');
+    // Why (log level): login.js.html:283 が **毎回のログイン**で呼ぶため、WARN として記録すると
+    //   1日数十回の WARN ノイズが Cloud Logging を埋め、本物のアラートが埋もれる。
+    //   定常動作なので INFO に降格 (旧版は 24h で 5件の WARN を吐いていた)。
+    console.log('システム強制リセットが実行されました');
 
     const cacheResults = [];
     try {

@@ -52,6 +52,26 @@ test('validateEmail: rejects malformed email strings', () => {
   assert.equal(ctx.validateEmail('user @example.com').isValid, false);
 });
 
+test('validateEmail: rejects too-short emails (< 6 chars)', () => {
+  const ctx = loadValidatorsContext();
+  // RFC formal だが現実的に拒否
+  assert.equal(ctx.validateEmail('a@b.c').isValid, false);
+  assert.equal(ctx.validateEmail('x@y').isValid, false);
+});
+
+test('validateEmail: rejects emails > 254 chars', () => {
+  const ctx = loadValidatorsContext();
+  const long = 'a'.repeat(250) + '@b.cd';
+  assert.equal(ctx.validateEmail(long).isValid, false);
+});
+
+test('validateEmail: rejects single-char domain TLD (a@b.c)', () => {
+  const ctx = loadValidatorsContext();
+  // 新規境界: TLD 2 chars 以上を要求
+  assert.equal(ctx.validateEmail('user@host.c').isValid, false);
+  assert.equal(ctx.validateEmail('user@host.cd').isValid, true);
+});
+
 // =====================================================================
 // validateUrl
 // =====================================================================
@@ -326,4 +346,40 @@ test('validateMapping: answer/reason real duplicate still rejected', () => {
   const r = ctx.validateMapping({ answer: 4, reason: 4 });
   assert.equal(r.isValid, false);
   assert.ok(r.errors.some(e => e.includes('重複')));
+});
+
+// =====================================================================
+// validateDateFormat
+// =====================================================================
+
+test('validateDateFormat: accepts YYYY-MM-DD', () => {
+  const ctx = loadValidatorsContext();
+  const r = ctx.validateDateFormat('2026-05-13');
+  assert.equal(r.isValid, true);
+  // vm sandbox の Date は host の instanceof と異なる class なので、形だけチェック
+  assert.ok(r.parsed && typeof r.parsed.getTime === 'function');
+});
+
+test('validateDateFormat: accepts ISO 8601 with time', () => {
+  const ctx = loadValidatorsContext();
+  assert.equal(ctx.validateDateFormat('2026-05-13T10:30:00Z').isValid, true);
+  assert.equal(ctx.validateDateFormat('2026-05-13T10:30:00.123Z').isValid, true);
+  assert.equal(ctx.validateDateFormat('2026-05-13T10:30:00+09:00').isValid, true);
+});
+
+test('validateDateFormat: rejects out-of-range month/day', () => {
+  const ctx = loadValidatorsContext();
+  // 形式は通るが Date が NaN になる
+  assert.equal(ctx.validateDateFormat('2026-13-01').isValid, false);  // month 13
+  assert.equal(ctx.validateDateFormat('2026-02-31').isValid, false);  // Feb 31
+});
+
+test('validateDateFormat: rejects malformed strings', () => {
+  const ctx = loadValidatorsContext();
+  assert.equal(ctx.validateDateFormat('').isValid, false);
+  assert.equal(ctx.validateDateFormat('not-a-date').isValid, false);
+  assert.equal(ctx.validateDateFormat('2026/05/13').isValid, false);  // slash
+  assert.equal(ctx.validateDateFormat('20260513').isValid, false);    // no separator
+  assert.equal(ctx.validateDateFormat(null).isValid, false);
+  assert.equal(ctx.validateDateFormat(20260513).isValid, false);      // number
 });

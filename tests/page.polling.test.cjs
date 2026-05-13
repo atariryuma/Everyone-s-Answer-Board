@@ -114,19 +114,19 @@ function makeInstance(overrides = {}) {
 // getPollingInterval — activity-based + error backoff
 // =====================================================================
 
-test('getPollingInterval: <1min of activity → 15s', () => {
+test('getPollingInterval: <1min of activity → 5s (授業中)', () => {
   const { instance } = makeInstance({ lastActivityTime: Date.now() });
+  assert.equal(instance.getPollingInterval(), 5000);
+});
+
+test('getPollingInterval: 1-5min → 15s', () => {
+  const { instance } = makeInstance({ lastActivityTime: Date.now() - 120000 });
   assert.equal(instance.getPollingInterval(), 15000);
 });
 
-test('getPollingInterval: 1-5min → 30s', () => {
-  const { instance } = makeInstance({ lastActivityTime: Date.now() - 120000 });
-  assert.equal(instance.getPollingInterval(), 30000);
-});
-
-test('getPollingInterval: 5-15min → 2min', () => {
+test('getPollingInterval: 5-15min → 1min', () => {
   const { instance } = makeInstance({ lastActivityTime: Date.now() - 600000 });
-  assert.equal(instance.getPollingInterval(), 120000);
+  assert.equal(instance.getPollingInterval(), 60000);
 });
 
 test('getPollingInterval: >15min → 5min', () => {

@@ -72,6 +72,71 @@
     init();
   }
 
+  // ============== v2648 シンプル化: 公開トグル / 設定保存 wrapper ==============
+  // Why: 旧「下書き保存」「今すぐ公開」「公開を終了」ボタン 3 つは役割が曖昧だったため、
+  //   左パネル末尾は「💾 設定を保存」+「📣 公開する/🔒 公開を終了する (state-aware)」の
+  //   2 ボタンに集約。内部では既存 save-draft / publish-now / unpublishBoardBtn を click
+  //   呼び出しするラッパーで、既存の保存・公開・終了ロジックは一切変更しない。
+
+  /**
+   * 「💾 設定を保存」ボタン → 既存 save-draft の wrapper。
+   * 公開状態は変えずに config + active profile を上書き保存。
+   */
+  function initSaveConfigWrapper() {
+    const btn = document.getElementById('save-config-changes');
+    const target = document.getElementById('save-draft');
+    if (!btn || !target) return;
+    btn.addEventListener('click', () => {
+      if (!target.disabled) target.click();
+    });
+  }
+
+  /**
+   * 「📣 公開する / 🔒 公開を終了する」トグルボタン → 状態に応じて
+   * publish-now or unpublishBoardBtn を click 呼び出し。
+   * 文言とスタイルは MutationObserver で app-publish-status に追従する。
+   */
+  function initPublishToggleWrapper() {
+    const btn = document.getElementById('primary-publish-toggle');
+    if (!btn) return;
+    const label = btn.querySelector('.primary-publish-toggle-label');
+    const srcPublish = document.getElementById('app-publish-status');
+    if (!label || !srcPublish) return;
+
+    const sync = () => {
+      const isPub = srcPublish.classList.contains('published') || /公開中/.test(srcPublish.textContent || '');
+      label.textContent = isPub ? '🔒 公開を終了する' : '📣 公開する';
+      btn.classList.toggle('btn-primary', !isPub);
+      btn.classList.toggle('btn-danger', isPub);
+      btn.dataset.publishState = isPub ? 'published' : 'unpublished';
+      btn.setAttribute('aria-pressed', String(isPub));
+      // 公開状態が変わったら「保存済みボード」リストの🟢公開中バッジも同期
+      try {
+        if (typeof renderProfileList === 'function') {
+          // 既存の active 状態を保ったまま再描画したい → loadProfileList で再フェッチ
+          if (typeof loadProfileList === 'function') loadProfileList();
+        }
+      } catch (_) {}
+    };
+
+    btn.addEventListener('click', () => {
+      const state = btn.dataset.publishState;
+      const target = state === 'published'
+        ? document.getElementById('unpublishBoardBtn')
+        : document.getElementById('publish-now');
+      if (target && !target.disabled) {
+        target.click();
+      } else {
+        console.warn('publish toggle: target not found or disabled, state=' + state);
+      }
+    });
+
+    new MutationObserver(sync).observe(srcPublish, {
+      childList: true, characterData: true, attributes: true, subtree: true
+    });
+    sync();
+  }
+
   async function init() {
     systemState.initializationStep = 'started';
 
@@ -84,6 +149,10 @@
       //   初期化バッチが終わってからの非同期 prefetch なので、ユーザー操作の前に
       //   appSetup URL が温まる挙動は維持される (await しない fire-and-forget)。
       try { prefetchAppSetupUrl(); } catch (e) { console.warn('prefetchAppSetupUrl skipped:', e.message); }
+
+      // v2648 シンプル化: 「💾 設定を保存」「📣 公開トグル」を旧 save-draft/publish-now/unpublishBoardBtn の wrapper として接続
+      try { initSaveConfigWrapper(); } catch (e) { console.warn('initSaveConfigWrapper skipped:', e.message); }
+      try { initPublishToggleWrapper(); } catch (e) { console.warn('initPublishToggleWrapper skipped:', e.message); }
 
       systemState.initializationStep = 'completed';
       systemState.initialized = true;
@@ -388,16 +457,9 @@
       });
     }
 
-    const verifyBtn = document.getElementById('verify-mapping');
-    if (verifyBtn) {
-      verifyBtn.addEventListener('click', function () {
-        if (window.sharedUtilities && window.sharedUtilities.debounce) {
-          window.sharedUtilities.debounce.debounce(() => verifyColumnMapping(), 'verify-mapping', 500);
-        } else {
-          verifyColumnMapping();
-        }
-      });
-    }
+    // v2648: 「列マッピング検証」ボタンは削除。設定状況インジケータが dropdown change で
+    //   自動更新するため。verifyColumnMapping 関数は他の path から再利用される可能性がある
+    //   ので関数本体は残置（dead-by-policy）。
 
     const saveDraftBtn = document.getElementById('save-draft');
     if (saveDraftBtn) {
@@ -788,10 +850,11 @@
           hint.textContent = 'X×Y のマトリクス（M2）で 2 軸の散布を可視化します。';
           break;
         case 'wordcloud':
-          hint.textContent = 'ワードランキング（M3）：理由列の頻出語を棒グラフで表示。授業終末のメタ認知に。';
+          // v2659: 「理由列」「回答列」固定表現を中立化。実装は補助質問列を優先、無ければメイン質問列にフォールバック。
+          hint.textContent = 'ワードランキング（M3）：自由記述列の頻出語を棒グラフで表示。授業終末のメタ認知に。';
           break;
         case 'pie':
-          hint.textContent = '円グラフ（M4）：回答列の選択肢分布を円グラフで表示。授業導入時の集計に。';
+          hint.textContent = '円グラフ（M4）：メイン質問列の選択肢分布を円グラフで表示。授業導入時の集計に。';
           break;
       }
     }
@@ -1926,11 +1989,7 @@
       statusElement.textContent = `${statusIcon} 必須: ${requiredCompleted}/${requiredColumns.length} オプション: ${optionalCompleted}/${optionalColumns.length}`;
     }
 
-    const verifyButton = document.getElementById('verify-mapping');
-    if (verifyButton) {
-      const isAnswerSet = document.getElementById('answer-column-select')?.value;
-      verifyButton.disabled = !isAnswerSet;
-    }
+    // v2648: verify-mapping ボタンを削除したため、その disabled 制御も不要
   }
 
   // フォーム統一後は不要だが、後方互換性のため空関数として残す
@@ -2049,6 +2108,34 @@
           } catch (analysisError) {
             console.warn('AI列判定エラー:', analysisError);
             showWarning('AI列判定に失敗しました。手動で設定するか「AI列判定」ボタンで再実行してください');
+          }
+        }
+        // ===== Auto-save profile (v2658) =====
+        //   Why: ユーザー要望 (2026-05-14) 「フォーム選択したらフォーム名で自動保存」。
+        //   フォーム接続成功時、同名 profile が _knownProfileNames に無ければフォーム名で
+        //   自動 saveProfile する。これで「フォームを切り替える → ボード設定が profile として
+        //   勝手に蓄積される」流れになり、教師が「保存」ボタンを押す手間が不要。
+        //   既存の「保存」ボタンは残してあるので、明示的に別名で保存したい場合も使える。
+        //
+        //   失敗時は silent (auto-save はベストエフォート、明示保存ボタンの fallback あり)。
+        if (formTitle && typeof formTitle === 'string') {
+          const autoProfileName = String(formTitle).trim().substring(0, 50);
+          if (autoProfileName && !_knownProfileNames.has(autoProfileName)) {
+            // optimistic add: 連続接続で同じ名前を 2 回 saveProfile しないよう、
+            //   即座に known set に追加。サーバ応答を待たない。
+            _knownProfileNames.add(autoProfileName);
+            google.script.run
+              .withSuccessHandler((res) => {
+                if (res && res.success) {
+                  showSuccess(`📋 プロファイル「${autoProfileName}」として自動保存しました`, 4000);
+                  if (typeof loadProfileList === 'function') loadProfileList();
+                }
+                // 失敗時は silent (set からも削除しない: 同 session 内の連打を防ぐ)
+              })
+              .withFailureHandler((err) => {
+                console.warn('auto-save profile failed (silent):', err && err.message);
+              })
+              .saveCurrentAsProfile(autoProfileName);
           }
         }
       } else {
@@ -3049,8 +3136,10 @@
 
     const details = [];
     const columnNames = {
-      answerer: '回答列',
-      reason: '理由列',
+      // v2659: ラベル中立化に合わせて AI 判定結果表示も改名。
+      //   internal key (answerer/reason) は backend スキーマ互換のため不変。
+      answerer: 'メイン質問列',
+      reason: '補助質問列',
       class: 'クラス列',
       name: '名前列',
     };
@@ -3619,11 +3708,23 @@
         };
       }
 
-      const columnMapping = getColumnMapping();
+      // v2649 バグ修正: UI dropdown が未選択（空）でも、既存 active config の columnMapping
+      //   を保持して上書きしないようにする。これで「表示設定だけ変えたい」「公開設定だけ変えたい」
+      //   というケースで、列マッピングの再選択を強要されない。
+      const uiMapping = getColumnMapping();
+      const existingMapping = (config && config.columnMapping) || {};
+      const columnMapping = { ...existingMapping };
+      // UI で値があれば（=明示的に dropdown を変更した）上書き
+      ['answer', 'reason', 'class', 'name', 'numericX', 'numericY'].forEach((key) => {
+        if (typeof uiMapping[key] === 'number') {
+          columnMapping[key] = uiMapping[key];
+        }
+      });
       if (!columnMapping.answer && columnMapping.answer !== 0) {
         return {
           config: null,
-          validationError: '回答列が設定されていません。列マッピングで回答列を設定してください。'
+          // v2659: ラベル中立化に合わせてエラー文言も改名
+          validationError: 'メイン質問列が設定されていません。列設定でメイン質問列を選択してください。'
         };
       }
 
@@ -3666,6 +3767,20 @@
         setupComplete: true,
         setupStatus: 'completed'
       };
+
+      // v2652 CRITICAL バグ修正: ConfigService.ensureRequiredFields は
+      //   `isPublished: Boolean(config.isPublished)` で強制セットするため、
+      //   フロントが isPublished を含めずに送ると Boolean(undefined)=false で
+      //   公開ボードが未公開化される (生徒が閲覧時「対象ユーザーが見つかりません」になる)。
+      //   systemState から既存の isPublished / publishedAt を継承して送る。
+      if (systemState && systemState.config) {
+        if (typeof systemState.config.isPublished === 'boolean') {
+          validatedConfig.isPublished = systemState.config.isPublished;
+        }
+        if (systemState.config.publishedAt && !validatedConfig.publishedAt) {
+          validatedConfig.publishedAt = systemState.config.publishedAt;
+        }
+      }
 
       return { config: validatedConfig, validationError: null };
 
@@ -3987,6 +4102,17 @@
       }
     });
 
+    // v2651 バグ修正: UI dropdown が空（=ユーザーが触っていない）場合、systemState の
+    //   既存 active config の columnMapping を fallback として使う。
+    //   これで「ヘッダー読み込み未完 / dropdown が初期状態」でも、表示設定や公開設定だけ
+    //   の保存ができるようになる（旧コードは UI 値だけ見て「未設定」エラー扱いだった）。
+    const existingMapping = (systemState && systemState.config && systemState.config.columnMapping) || {};
+    ['answer', 'reason', 'class', 'name', 'numericX', 'numericY'].forEach((key) => {
+      if (typeof columnMapping[key] !== 'number' && typeof existingMapping[key] === 'number') {
+        columnMapping[key] = existingMapping[key];
+      }
+    });
+
     return columnMapping;
   }
 
@@ -4118,7 +4244,21 @@
   // escapeHtml は SharedUtilities が IIFE で先に読み込む（AdminPanel.html の include 順固定）。
   const escapeProfileText = (s) => window.sharedUtilities.security.escapeHtml(s == null ? '' : String(s));
 
+  // 現在 active なボードが公開中かを判定 (v2648)
+  function isCurrentlyPublished() {
+    const el = document.getElementById('app-publish-status');
+    if (!el) return false;
+    return el.classList.contains('published') || /公開中/.test(el.textContent || '');
+  }
+
+  // 既知のプロファイル名集合 (auto-save の重複判定用)
+  //   loadProfileList → renderProfileList の経路で常に最新化される。
+  //   フォーム接続時の auto-save (v2658) は、ここに無い名前のときだけ saveCurrentAsProfile
+  //   を呼んで「同じフォームを何度選んでも 1 件だけ profile になる」を保証する。
+  let _knownProfileNames = new Set();
+
   function renderProfileList(profiles, activeProfile) {
+    _knownProfileNames = new Set((profiles || []).map(p => p && p.name).filter(Boolean));
     const container = document.getElementById('profile-list');
     const badge = document.getElementById('profile-count-badge');
     if (!container) return;
@@ -4134,17 +4274,25 @@
       return;
     }
 
+    const published = isCurrentlyPublished();
+
     container.innerHTML = profiles.map(p => {
       const isActive = p.name === activeProfile;
       const modeLabel = PROFILE_MODE_LABELS[p.boardMode] || p.boardMode || 'auto';
       const safeName = escapeProfileText(p.name);
       const safeTitle = escapeProfileText(p.formTitle || '');
-      // active 行はボタン群を「現在」表示に置換（読込ボタン不要、削除のみ）
-      const actions = isActive
-        ? '<span class="px-1.5 py-0.5 text-[10px] bg-cyan-700/40 text-cyan-200 rounded flex-shrink-0">現在</span>'
-        : '<button type="button" data-profile-action="load" data-profile-name="' + safeName + '"' +
+      // active 行: 公開中なら 🟢「公開中」バッジ、未公開なら「現在」バッジ。
+      // 非 active 行: 「📥 読込」ボタン。
+      let actions;
+      if (isActive) {
+        actions = published
+          ? '<span class="px-1.5 py-0.5 text-[10px] bg-emerald-600 text-white rounded flex-shrink-0" title="このボードが公開中">🟢 公開中</span>'
+          : '<span class="px-1.5 py-0.5 text-[10px] bg-cyan-700/40 text-cyan-200 rounded flex-shrink-0" title="現在編集中（未公開）">現在</span>';
+      } else {
+        actions = '<button type="button" data-profile-action="load" data-profile-name="' + safeName + '"' +
           ' class="px-1.5 py-0.5 text-[10px] bg-cyan-700 hover:bg-cyan-600 text-white rounded flex-shrink-0"' +
           ' title="このプロファイルを読み込む">📥</button>';
+      }
       const titleLine = safeTitle
         ? '<div class="text-[10px] text-gray-500 truncate" title="' + safeTitle + '">' + safeTitle + '</div>'
         : '';
@@ -4228,8 +4376,23 @@
       .withSuccessHandler((res) => {
         if (res && res.success) {
           setProfileActionStatus('プロファイルを読み込みました。画面を再読み込みします...', 'success');
-          // active config が書き換わったので AdminPanel の表示を再構築
-          setTimeout(() => window.location.reload(), 800);
+          // CRITICAL (v2648 バグ修正):
+          //   GAS web app は iframe sandbox 内で動くため `window.location.reload()` は
+          //   iframe 自体だけリロードして親フレームの AdminPanel ページが空白になる
+          //   (ユーザー報告: 「白ページから動かなくなる」)。`window.top.location.reload()`
+          //   で親ページ自体を確実に再読み込みする。同一オリジン例外時は href 再代入で fallback。
+          setTimeout(() => {
+            try {
+              if (window.top && window.top !== window) {
+                window.top.location.reload();
+              } else {
+                window.location.reload();
+              }
+            } catch (_) {
+              try { window.location.href = window.location.href; }
+              catch (__) { window.location.reload(); }
+            }
+          }, 600);
         } else {
           setProfileActionStatus(res && res.message ? res.message : '読み込みに失敗しました', 'error');
         }

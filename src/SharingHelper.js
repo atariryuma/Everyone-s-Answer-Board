@@ -45,6 +45,40 @@ function setupDomainWideSharing(spreadsheetId, ownerEmail) {
 }
 
 /**
+ * SERVICE_ACCOUNT_CREDS を parse して service account 情報を取得する shared helper。
+ *
+ * Why: JSON.parse(credentials) は DatabaseCore / SharingHelper / ConfigService の 4 ヶ所で
+ *   重複していた DRY 違反。1 ヶ所で型・必須フィールド検証して errors を一貫させる。
+ *   失敗時は throw せず {success:false, message} を返す（呼出元が分岐しやすい）。
+ *
+ * @returns {{success:boolean, creds?:Object, saEmail?:string, message?:string}}
+ *   - success: true 時に creds (parsed JSON) と saEmail (client_email) が利用可能
+ *   - success: false 時は message に原因
+ */
+function parseServiceAccountCreds() {
+  const credsJson = (typeof getCachedProperty === 'function')
+    ? getCachedProperty('SERVICE_ACCOUNT_CREDS')
+    : null;
+  if (!credsJson) {
+    return { success: false, message: 'SERVICE_ACCOUNT_CREDS not configured' };
+  }
+  let creds;
+  try {
+    creds = JSON.parse(credsJson);
+  } catch (parseError) {
+    return { success: false, message: 'Invalid SERVICE_ACCOUNT_CREDS JSON: ' + parseError.message };
+  }
+  if (!creds || typeof creds !== 'object') {
+    return { success: false, message: 'SERVICE_ACCOUNT_CREDS is not an object' };
+  }
+  const saEmail = typeof creds.client_email === 'string' ? creds.client_email : '';
+  if (!saEmail) {
+    return { success: false, message: 'client_email not found in SERVICE_ACCOUNT_CREDS' };
+  }
+  return { success: true, creds, saEmail };
+}
+
+/**
  * SERVICE_ACCOUNT_CREDS の client_email を SS の editor として追加する。
  *
  * Why: DatabaseCore は Sheets REST API + Service Account JWT で SS にアクセスする
@@ -60,24 +94,15 @@ function setupDomainWideSharing(spreadsheetId, ownerEmail) {
  */
 function addServiceAccountAsEditor(spreadsheetId) {
   try {
-    const credsJson = getCachedProperty('SERVICE_ACCOUNT_CREDS');
-    if (!credsJson) {
-      return { success: false, added: false, message: 'SERVICE_ACCOUNT_CREDS not configured' };
-    }
-    let saEmail = '';
-    try {
-      saEmail = (JSON.parse(credsJson) || {}).client_email || '';
-    } catch (parseError) {
-      return { success: false, added: false, message: 'Invalid SERVICE_ACCOUNT_CREDS JSON: ' + parseError.message };
-    }
-    if (!saEmail) {
-      return { success: false, added: false, message: 'client_email not found in SERVICE_ACCOUNT_CREDS' };
+    const parsed = parseServiceAccountCreds();
+    if (!parsed.success) {
+      return { success: false, added: false, message: parsed.message };
     }
 
     // addEditor は冪等（既存 editor に再追加しても no-op）。getEditors の pre-check は
     // 余分な RPC で getEditors 自体が ScriptError を投げるケースもあるため避ける。
-    SpreadsheetApp.openById(spreadsheetId).addEditor(saEmail);
-    return { success: true, added: true, saEmail, message: 'Service account added as editor' };
+    SpreadsheetApp.openById(spreadsheetId).addEditor(parsed.saEmail);
+    return { success: true, added: true, saEmail: parsed.saEmail, message: 'Service account added as editor' };
   } catch (error) {
     console.error('addServiceAccountAsEditor error:', error.message);
     return { success: false, added: false, message: error.message };

@@ -154,8 +154,8 @@ test('handleClientErrorReport: logs error-level to console.error', () => {
   assert.match(summary, /renderBoard/);
   assert.match(summary, /TypeError/);
   assert.equal(detail.line, 42);
-  // メアドはマスクされて記録される
-  assert.match(detail.reporter, /^user@\*\*\*$/);
+  // メアドはマスクされて記録される（local part も含めて完全仮名化: anon-XXXXXXXX）
+  assert.match(detail.reporter, /^anon-[0-9a-f]{8}$/);
 });
 
 test('handleClientErrorReport: warn level → console.warn', () => {

@@ -346,11 +346,17 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
     //      setup（openSpreadsheet / getSheetInfo）に時間が取られると 1 行も処理せず
     //      success:true, data:[] を返して「回答が 0 件」と誤表示していた。
     //      少なくとも 1 バッチは必ず試行する。
+    //
+    // Why (WARN 抑制): 全行処理済みで時間超過の場合は「中断」ではなく「完走後の時間超過」。
+    //      processedCount >= totalDataRows なら break するが WARN は出さない。
+    //      旧版は 42/42 完了時にも WARN を吐いて false-positive アラート扱いされていた。
     if (Date.now() - startTime > MAX_EXECUTION_TIME) {
-      console.warn('DataService.processBatchData: 実行時間制限のため処理を中断', {
-        processedRows: processedCount,
-        totalRows: totalDataRows
-      });
+      if (processedCount < totalDataRows) {
+        console.warn('DataService.processBatchData: 実行時間制限のため処理を中断', {
+          processedRows: processedCount,
+          totalRows: totalDataRows
+        });
+      }
       break;
     }
   }

@@ -257,3 +257,114 @@ test('doPost: adminApi forwards unknown operation error', () => {
   assert.equal(response.success, false);
   assert.equal(response.error, 'UNKNOWN_OPERATION');
 });
+
+// =====================================================================
+// isValidRowIdPayload — rowId payload validator
+// =====================================================================
+
+test('isValidRowIdPayload: accepts positive integers', () => {
+  const ctx = loadMainContext();
+  assert.equal(ctx.isValidRowIdPayload(42), true);
+  assert.equal(ctx.isValidRowIdPayload(1), true);
+  assert.equal(ctx.isValidRowIdPayload(99999), true);
+});
+
+test('isValidRowIdPayload: accepts numeric strings', () => {
+  const ctx = loadMainContext();
+  assert.equal(ctx.isValidRowIdPayload('42'), true);
+  assert.equal(ctx.isValidRowIdPayload('row_42'), true);
+});
+
+test('isValidRowIdPayload: rejects NaN / negative / zero', () => {
+  const ctx = loadMainContext();
+  assert.equal(ctx.isValidRowIdPayload(NaN), false);
+  assert.equal(ctx.isValidRowIdPayload(-1), false);
+  assert.equal(ctx.isValidRowIdPayload(0), false);
+  assert.equal(ctx.isValidRowIdPayload(1.5), false); // not integer
+});
+
+test('isValidRowIdPayload: rejects malformed strings', () => {
+  const ctx = loadMainContext();
+  assert.equal(ctx.isValidRowIdPayload('row_abc'), false);
+  assert.equal(ctx.isValidRowIdPayload('abc'), false);
+  assert.equal(ctx.isValidRowIdPayload('row_'), false);
+  assert.equal(ctx.isValidRowIdPayload(''), false);
+});
+
+test('isValidRowIdPayload: rejects null / undefined / objects', () => {
+  const ctx = loadMainContext();
+  assert.equal(ctx.isValidRowIdPayload(null), false);
+  assert.equal(ctx.isValidRowIdPayload(undefined), false);
+  assert.equal(ctx.isValidRowIdPayload({}), false);
+  assert.equal(ctx.isValidRowIdPayload([]), false);
+});
+
+test('addReaction action: rejects malformed rowId via isValidRowIdPayload', () => {
+  const context = loadMainContext();
+  const event = createPostEvent({
+    action: 'addReaction',
+    userId: 'user-2',
+    rowId: 'row_abc',
+    reactionType: 'LIKE'
+  });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+  assert.match(response.message, /positive integer/);
+});
+
+test('toggleHighlight action: rejects NaN rowId', () => {
+  const context = loadMainContext();
+  const event = createPostEvent({
+    action: 'toggleHighlight',
+    userId: 'user-2',
+    rowId: NaN
+  });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+});
+
+// =====================================================================
+// setupApiKey hardened validation
+// =====================================================================
+
+test('setupApiKey: rejects 16-space whitespace key (silent bypass fix)', () => {
+  const context = loadMainContext({
+    getCachedProperty: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: () => null,
+        setProperty: () => {}
+      })
+    }
+  });
+  const event = createPostEvent({
+    action: 'setupApiKey',
+    apiKey: '                ' // 16 spaces
+  });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, false);
+  assert.equal(response.error, 'INVALID_KEY_FORMAT');
+});
+
+test('setupApiKey: accepts valid 16-char key', () => {
+  let savedKey = null;
+  const context = loadMainContext({
+    getCachedProperty: (key) => key === 'ADMIN_EMAIL' ? 'admin@example.com' : null,
+    setCachedProperty: (k, v) => { if (k === 'ADMIN_API_KEY') savedKey = v; },
+    Session: { getActiveUser: () => ({ getEmail: () => 'admin@example.com' }) },
+    PropertiesService: {
+      getScriptProperties: () => ({
+        getProperty: () => null,
+        setProperty: () => {}
+      })
+    }
+  });
+  const event = createPostEvent({
+    action: 'setupApiKey',
+    apiKey: 'real-secret-key-1234'
+  });
+  const response = parseResponse(context.doPost(event));
+  assert.equal(response.success, true);
+  assert.equal(savedKey, 'real-secret-key-1234');
+});
