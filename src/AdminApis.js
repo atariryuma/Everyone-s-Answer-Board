@@ -334,14 +334,48 @@ function __deleteProfileCore(userId, name) {
     return createErrorResponse(`プロファイル「${name}」は存在しません`);
   }
   const patch = { profiles: remaining };
-  if (cur.activeProfile === name) patch.activeProfile = null;
+  const wasActive = cur.activeProfile === name;
+
+  // Why: active profile を削除すると top-level (formUrl/spreadsheetId/...) が
+  //   削除済 profile の値を指したまま残り、polling / getPublishedSheetData が
+  //   消えた spreadsheet を見にいって 403 を出し続ける。
+  //   ログ調査 (2026-05-14) で過去 spreadsheet `1tFgE7g…` / `1ikZ63cn…` への
+  //   403 が頻発していた根本原因はこれ。残った profile の先頭を新 active として
+  //   再 anchor、それも無ければ全クリア + activeProfile=null。
+  //   isPublished は触らない（公開ライフサイクルは 4 関数のみが扱う規約）が、
+  //   spreadsheetId が空になるので validatePublishConfig は次回 publish 試行で
+  //   reject される。
+  if (wasActive) {
+    if (remaining.length > 0) {
+      const next = remaining[0];
+      patch.activeProfile = next.name;
+      patch.formUrl = next.formUrl || '';
+      patch.formTitle = next.formTitle || '';
+      patch.spreadsheetId = next.spreadsheetId || '';
+      patch.sheetName = next.sheetName || '';
+      patch.columnMapping = next.columnMapping || {};
+      patch.displaySettings = next.displaySettings || (typeof DEFAULT_DISPLAY_SETTINGS !== 'undefined' ? DEFAULT_DISPLAY_SETTINGS : {});
+      patch.xAxisLabels = next.xAxisLabels || null;
+      patch.yAxisLabels = next.yAxisLabels || null;
+      patch.matrixQuadrantLabels = next.matrixQuadrantLabels || null;
+      patch.allowResubmit = !!next.allowResubmit;
+    } else {
+      patch.activeProfile = null;
+      patch.formUrl = '';
+      patch.formTitle = '';
+      patch.spreadsheetId = '';
+      patch.sheetName = '';
+      patch.columnMapping = {};
+    }
+  }
 
   const saveRes = applyConfigPatch_(userId, patch, { publish: false });
   if (!saveRes.success) return saveRes;
 
   return createSuccessResponse(`プロファイル「${name}」を削除しました`, {
     count: remaining.length,
-    remainingActive: cur.activeProfile === name ? null : cur.activeProfile
+    remainingActive: patch.activeProfile !== undefined ? patch.activeProfile : cur.activeProfile,
+    reAnchored: wasActive && remaining.length > 0
   });
 }
 
@@ -983,22 +1017,27 @@ function dispatchAdminOperation(operation, params) {
       if (!p) return createErrorResponse(`Profile "${params.name}" not found`);
 
       // profile の中身を active config の対応フィールドに反映
-      const patch = {
-        formUrl: p.formUrl || '',
-        formTitle: p.formTitle || '',
-        spreadsheetId: p.spreadsheetId || '',
-        sheetName: p.sheetName || '',
-        activeProfile: p.name
-      };
-      if (p.columnMapping) patch.columnMapping = p.columnMapping;
-      if (p.displaySettings) patch.displaySettings = p.displaySettings;
-      // 軸ラベル等は null も明示反映（前 profile の値を引きずらない）
-      patch.xAxisLabels = p.xAxisLabels || null;
-      patch.yAxisLabels = p.yAxisLabels || null;
-      patch.matrixQuadrantLabels = p.matrixQuadrantLabels || null;
-      patch.allowResubmit = !!p.allowResubmit;
+      //
+      // Why (完全置換セマンティクス): applyConfigPatch_ + deepMerge_ は plain object
+      //   を再帰マージするため、新 profile の columnMapping={} が「前 profile の
+      //   columnMapping を保持」と解釈されてしまう (matrix → wordcloud で numericX/Y
+      //   が居残る原因)。loadProfile は active 切替なので「完全置換」が正しい
+      //   セマンティクス。saveUserConfig を直接呼んで merged を渡す。
+      const merged = { ...cur };
+      merged.formUrl = p.formUrl || '';
+      merged.formTitle = p.formTitle || '';
+      merged.spreadsheetId = p.spreadsheetId || '';
+      merged.sheetName = p.sheetName || '';
+      merged.activeProfile = p.name;
+      merged.columnMapping = p.columnMapping || {};
+      merged.displaySettings = p.displaySettings || (typeof DEFAULT_DISPLAY_SETTINGS !== 'undefined' ? DEFAULT_DISPLAY_SETTINGS : {});
+      merged.xAxisLabels = p.xAxisLabels || null;
+      merged.yAxisLabels = p.yAxisLabels || null;
+      merged.matrixQuadrantLabels = p.matrixQuadrantLabels || null;
+      merged.allowResubmit = !!p.allowResubmit;
+      merged.userId = params.userId;
 
-      return applyConfigPatch_(params.userId, patch, { publish: false });
+      return saveUserConfig(params.userId, merged, { isMainConfig: true });
     }
 
     case 'deleteProfile': {

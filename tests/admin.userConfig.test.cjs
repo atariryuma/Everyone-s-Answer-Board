@@ -669,6 +669,112 @@ test('deleteProfile: rejects unknown profile name', () => {
   assert.equal(res.success, false);
 });
 
+test('deleteProfile: re-anchors active to remaining profile (orphan prevention)', () => {
+  const ctx = loadAdminContext();
+  ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1',
+    name: 'p1',
+    snapshot: {
+      formUrl: 'https://forms.example.com/p1',
+      formTitle: 'P1 タイトル',
+      spreadsheetId: 'sheet-p1',
+      sheetName: 'P1 シート',
+      columnMapping: { answer: 4, reason: 5 },
+      displaySettings: { boardMode: 'pie' }
+    }
+  });
+  ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1',
+    name: 'p2',
+    snapshot: {
+      formUrl: 'https://forms.example.com/p2',
+      formTitle: 'P2 タイトル',
+      spreadsheetId: 'sheet-p2',
+      sheetName: 'P2 シート',
+      columnMapping: { answer: 3 },
+      displaySettings: { boardMode: 'wordcloud' }
+    }
+  });
+  // active = p1
+  ctx.dispatchAdminOperation('loadProfile', { userId: 'u1', name: 'p1' });
+  let saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.activeProfile, 'p1');
+  assert.equal(saved.spreadsheetId, 'sheet-p1');
+
+  // active 削除: p2 に再 anchor されることを期待（旧 sheet-p1 が top-level に残らない）
+  const r = ctx.dispatchAdminOperation('deleteProfile', { userId: 'u1', name: 'p1' });
+  assert.equal(r.success, true);
+  assert.equal(r.data.reAnchored, true);
+  assert.equal(r.data.remainingActive, 'p2');
+
+  saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.activeProfile, 'p2');
+  assert.equal(saved.spreadsheetId, 'sheet-p2');
+  assert.equal(saved.formUrl, 'https://forms.example.com/p2');
+  assert.equal(saved.sheetName, 'P2 シート');
+  assert.equal(saved.displaySettings.boardMode, 'wordcloud');
+});
+
+test('deleteProfile: clears top-level form fields when deleting last profile (full orphan clear)', () => {
+  const ctx = loadAdminContext();
+  ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1',
+    name: 'only',
+    snapshot: {
+      formUrl: 'https://forms.example.com/only',
+      spreadsheetId: 'sheet-only',
+      sheetName: 'シート',
+      columnMapping: { answer: 4 }
+    }
+  });
+  ctx.dispatchAdminOperation('loadProfile', { userId: 'u1', name: 'only' });
+  let saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.spreadsheetId, 'sheet-only');
+
+  ctx.dispatchAdminOperation('deleteProfile', { userId: 'u1', name: 'only' });
+  saved = ctx.__savedConfigs.get('u1').config;
+  assert.ok(!saved.activeProfile);
+  assert.equal(saved.spreadsheetId, '');
+  assert.equal(saved.formUrl, '');
+  assert.equal(saved.sheetName, '');
+});
+
+test('loadProfile: clears prior columnMapping when new profile has none (null fallback)', () => {
+  const ctx = loadAdminContext();
+  // matrix profile: columnMapping に numericX/Y を含む
+  ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1',
+    name: 'matrix',
+    snapshot: {
+      formUrl: 'https://forms.example.com/matrix',
+      spreadsheetId: 'sheet-matrix',
+      columnMapping: { answer: 4, reason: 6, numericX: 4, numericY: 5 },
+      displaySettings: { boardMode: 'matrix' }
+    }
+  });
+  // wordcloud profile: columnMapping を持たない（空）
+  ctx.dispatchAdminOperation('saveProfile', {
+    userId: 'u1',
+    name: 'wc',
+    snapshot: {
+      formUrl: 'https://forms.example.com/wc',
+      spreadsheetId: 'sheet-wc',
+      displaySettings: { boardMode: 'wordcloud' }
+    }
+  });
+
+  ctx.dispatchAdminOperation('loadProfile', { userId: 'u1', name: 'matrix' });
+  let saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.columnMapping.numericX, 4);
+
+  // wc に切替: numericX/Y が消えるべき (前 matrix の値を引きずらない)
+  ctx.dispatchAdminOperation('loadProfile', { userId: 'u1', name: 'wc' });
+  saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.activeProfile, 'wc');
+  // columnMapping は空 (numericX が居残らない)
+  assert.ok(!saved.columnMapping || saved.columnMapping.numericX === undefined);
+});
+
 test('listProfiles: after save shows profile summary', () => {
   const ctx = loadAdminContext();
   ctx.dispatchAdminOperation('saveProfile', {

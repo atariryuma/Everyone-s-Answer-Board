@@ -726,6 +726,23 @@ function saveUserConfig(userId, config, options = {}) {
       cleanedConfig.lastAccessedAt = new Date().toISOString();
     }
 
+    // Why (orphan spreadsheetId 検出): top-level spreadsheetId が profiles のどれにも
+    //   一致しない場合、profile 削除や直接編集の残骸である可能性が高い。polling /
+    //   getPublishedSheetData が古い ID を見にいって 403 を出し続ける根本原因なので
+    //   WARN を出して気付けるようにする (削除はしない — 移行期間の互換性のため)。
+    //   activeProfile が空 (= profile 機能未使用) の場合はスキップ。
+    if (cleanedConfig.activeProfile && cleanedConfig.spreadsheetId && Array.isArray(cleanedConfig.profiles)) {
+      const inProfiles = cleanedConfig.profiles.some(p => p && p.spreadsheetId === cleanedConfig.spreadsheetId);
+      if (!inProfiles) {
+        console.warn('saveUserConfig: orphan spreadsheetId (top-level does not match any profile)', {
+          userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
+          topLevelSpreadsheetId: `${cleanedConfig.spreadsheetId.substring(0, 20)}...`,
+          activeProfile: cleanedConfig.activeProfile,
+          profileCount: cleanedConfig.profiles.length
+        });
+      }
+    }
+
     const currentTime = new Date().toISOString();
     // Why: Math.random() は予測可能で 2 つの同時 save が同 etag になる衝突リスクがある。
     //   Utilities.getUuid() は GAS が提供する RFC 4122 v4 UUID で衝突確率 ~0。

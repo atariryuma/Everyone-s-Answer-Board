@@ -832,13 +832,19 @@ function loadProfileForView(profileName, targetUserId) {
     if (!p) return createErrorResponse(`Profile "${profileName}" not found`);
 
     // profile を active config に適用
+    //
+    // Why (明示的 null fallback): profile に columnMapping / displaySettings が無い
+    //   場合、旧版は前 active 由来の値が top-level に残っていた。matrix →
+    //   wordcloud に切替えた時に columnMapping.numericX/Y が居残って表示崩れする
+    //   バグ防止のため、profile に無いキーは空オブジェクト or DEFAULT で明示上書き。
+    //   AdminApis.loadProfile 経路と semantics を揃える。
     const merged = { ...cur };
     merged.formUrl = p.formUrl || '';
     merged.formTitle = p.formTitle || '';
     merged.spreadsheetId = p.spreadsheetId || '';
     merged.sheetName = p.sheetName || '';
-    if (p.columnMapping) merged.columnMapping = p.columnMapping;
-    if (p.displaySettings) merged.displaySettings = p.displaySettings;
+    merged.columnMapping = p.columnMapping || {};
+    merged.displaySettings = p.displaySettings || (typeof DEFAULT_DISPLAY_SETTINGS !== 'undefined' ? DEFAULT_DISPLAY_SETTINGS : {});
     merged.xAxisLabels = p.xAxisLabels || null;
     merged.yAxisLabels = p.yAxisLabels || null;
     merged.matrixQuadrantLabels = p.matrixQuadrantLabels || null;
