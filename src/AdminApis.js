@@ -25,7 +25,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, FormApp, SpreadsheetApp, ScriptApp, UrlFetchApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, FormApp, SpreadsheetApp, ScriptApp, UrlFetchApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -100,56 +100,104 @@ function toggleUserActiveStatus(targetUserId) {
   }
 }
 
+// =====================================================================
+// 公開ライフサイクル: __applyPublishStateChange を通じて isPublished を書く 4 操作
+// （publishApp は SystemController.js 側）。詳細仕様: CLAUDE.md の同見出し節。
+// =====================================================================
+
 /**
- * Toggle user board publication status - admin only (for managing other users)
- * @param {string} targetUserId - Target user ID
- * @returns {Object} Toggle result
+ * 公開状態変更の統一ヘルパー。
+ * publishedAt のセマンティクスを「常に現在の状態を反映」に統一する。
+ *
+ * @param {string|null} targetUserId - 対象ユーザーID（null = 現在のユーザー）
+ * @param {boolean|'toggle'} newState - true=公開 / false=非公開 / 'toggle'=反転
+ * @param {Object} [options]
+ * @param {string} [options.sourceEtag] - 楽観ロック用 etag。指定時は不一致で reject
+ * @param {boolean} [options.requireAdmin] - true なら管理者以外は reject（toggleUserBoard 用）
+ * @returns {Object} { success, message, userId, isPublished, publishedAt, etag, redirectUrl }
  */
-function toggleUserBoardStatus(targetUserId) {
-  try {
-    const auth = requireAdmin();
-    if (!auth) return createAdminRequiredError();
-    const email = auth.email;
+function __applyPublishStateChange(targetUserId, newState, options = {}) {
+  const email = getCurrentEmail();
+  if (!email) return createAuthError();
 
-    const targetUser = findUserById(targetUserId, { requestingUser: email });
-    if (!targetUser) {
-      return createUserNotFoundError();
-    }
+  // 対象ユーザーの特定（指定があればそれ、なければ自分）
+  let targetUser = targetUserId ? findUserById(targetUserId, { requestingUser: email }) : null;
+  if (!targetUser) {
+    targetUser = findUserByEmail(email, { requestingUser: email });
+  }
+  if (!targetUser) return createUserNotFoundError();
 
-    let currentConfig = {};
-    try {
-      const configJsonStr = targetUser.configJson || '{}';
-      currentConfig = JSON.parse(configJsonStr);
-    } catch (error) {
-      console.error('toggleUserBoardStatus: Invalid configJson for user', targetUserId, ':', error.message);
-      currentConfig = {};
-    }
+  const isAdmin = isAdministrator(email);
+  const isOwnBoard = targetUser.userEmail === email;
 
-    const newIsPublished = !currentConfig.isPublished;
-    const updates = {};
+  if (options.requireAdmin && !isAdmin) {
+    return createErrorResponse('この操作には管理者権限が必要です');
+  }
+  if (!isAdmin && !isOwnBoard) {
+    return createErrorResponse('ボードの公開状態を変更する権限がありません');
+  }
 
-    const updatedConfig = { ...currentConfig };
-    updatedConfig.isPublished = newIsPublished;
-    if (newIsPublished && !updatedConfig.publishedAt) {
-      updatedConfig.publishedAt = new Date().toISOString();
-    }
-    updatedConfig.lastAccessedAt = new Date().toISOString();
+  // 第2引数で preloaded user を渡し、getUserConfig 内の findUserById 再実行を避ける。
+  const currentConfig = getConfigOrDefault(targetUser.userId, targetUser);
 
-    updates.configJson = JSON.stringify(updatedConfig);
-    updates.lastModified = new Date().toISOString();
-
-    const updateResult = updateUser(targetUserId, updates);
-    if (!updateResult.success) {
-      return createErrorResponse(`Failed to toggle board status: ${updateResult.message || '詳細不明'}`);
-    }
-
+  // 楽観ロック: 呼び出し側が sourceEtag を渡したときだけ厳格チェック
+  if (options.sourceEtag && currentConfig.etag && currentConfig.etag !== options.sourceEtag) {
     return {
-      success: true,
-      message: `ボードを${newIsPublished ? '公開' : '非公開'}に変更しました`,
-      userId: targetUserId,
-      boardPublished: newIsPublished,
-      timestamp: new Date().toISOString()
+      success: false,
+      error: 'etag_mismatch',
+      message: '設定が他の場所で更新されています。画面を再読み込みしてください。',
+      currentEtag: currentConfig.etag,
+      currentConfig
     };
+  }
+
+  // 目標状態の決定
+  const targetIsPublished = (newState === 'toggle')
+    ? !currentConfig.isPublished
+    : Boolean(newState);
+  const wasPublished = currentConfig.isPublished === true;
+  const now = new Date().toISOString();
+
+  const updatedConfig = { ...currentConfig };
+  updatedConfig.isPublished = targetIsPublished;
+  // publishedAt は「現在の状態の発生時刻」を反映。
+  // 公開中は now、非公開化時は null。これにより 4 関数間でセマンティクスが揃う。
+  updatedConfig.publishedAt = targetIsPublished ? now : null;
+  updatedConfig.lastAccessedAt = now;
+
+  const saveResult = saveUserConfig(targetUser.userId, updatedConfig);
+  if (!saveResult.success) {
+    return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
+  }
+
+  const redirectUrl = getWebAppUrl() + '?mode=view&userId=' + targetUser.userId;
+  return {
+    success: true,
+    message: targetIsPublished
+      ? (wasPublished ? 'ボードを再び公開しました' : 'ボードを公開しました')
+      : (wasPublished ? 'ボードの公開を終了しました' : 'ボードは既に公開されていません'),
+    userId: targetUser.userId,
+    isPublished: targetIsPublished,
+    boardPublished: targetIsPublished,  // back-compat alias
+    publishedAt: updatedConfig.publishedAt,
+    etag: saveResult.etag || null,
+    redirectUrl
+  };
+}
+
+/**
+ * 管理者が他ユーザーのボード公開状態を toggle する。
+ * @param {string} targetUserId - 対象ユーザーID（必須）
+ * @param {Object} [options] - { sourceEtag }
+ * @returns {Object} __applyPublishStateChange の戻り値
+ */
+function toggleUserBoardStatus(targetUserId, options = {}) {
+  try {
+    if (!targetUserId) return createErrorResponse('targetUserId is required');
+    return __applyPublishStateChange(targetUserId, 'toggle', {
+      sourceEtag: options.sourceEtag,
+      requireAdmin: true
+    });
   } catch (error) {
     console.error('toggleUserBoardStatus error:', error.message);
     return createExceptionResponse(error);
@@ -157,44 +205,13 @@ function toggleUserBoardStatus(targetUserId) {
 }
 
 /**
- * 自分のボードを再公開（所有者用のシンプル関数）
- * @returns {Object} Republish result
+ * 自分のボードを再公開（所有者用）。
+ * @param {Object} [options] - { sourceEtag }
+ * @returns {Object} __applyPublishStateChange の戻り値
  */
-function republishMyBoard() {
+function republishMyBoard(options = {}) {
   try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError('ユーザー認証が必要です');
-    }
-
-    const currentUser = findUserByEmail(email, { requestingUser: email });
-    if (!currentUser) {
-      return createUserNotFoundError('ユーザーが見つかりません');
-    }
-
-    const config = getConfigOrDefault(currentUser.userId);
-
-    config.isPublished = true;
-    config.publishedAt = new Date().toISOString();
-
-    const saveResult = saveUserConfig(currentUser.userId, config);
-    if (!saveResult.success) {
-      return {
-        success: false,
-        message: '設定の保存に失敗しました'
-      };
-    }
-
-    // リダイレクトURL（GAS iFrame対応）
-    const redirectUrl = getWebAppUrl() + '?mode=view&userId=' + currentUser.userId;
-
-    return {
-      success: true,
-      message: '回答ボードを再公開しました',
-      userId: currentUser.userId,
-      redirectUrl: redirectUrl
-    };
-
+    return __applyPublishStateChange(null, true, { sourceEtag: options.sourceEtag });
   } catch (error) {
     console.error('republishMyBoard error:', error.message);
     return createExceptionResponse(error);
@@ -202,59 +219,130 @@ function republishMyBoard() {
 }
 
 /**
- * Clear active sheet publication (set board to unpublished)
- * @param {string} targetUserId - 対象ユーザーID（省略時は現在のユーザー）
+ * ボードを非公開にする（所有者 or 管理者）。
+ * @param {string} [targetUserId] - 対象ユーザーID（省略時は自分）
+ * @param {Object} [options] - { sourceEtag }
+ * @returns {Object} __applyPublishStateChange の戻り値
+ */
+function unpublishBoard(targetUserId, options = {}) {
+  try {
+    return __applyPublishStateChange(targetUserId || null, false, { sourceEtag: options.sourceEtag });
+  } catch (error) {
+    console.error('unpublishBoard error:', error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
+ * @deprecated Use unpublishBoard() instead. Kept for back-compat with existing
+ *   client code (page.js endPublication / AdminPanel unpublishBoardBtn).
+ *   このエイリアスは v2700 以降で削除予定。新規コードは unpublishBoard を使うこと。
+ * @param {string} [targetUserId]
  * @returns {Object} 実行結果
  */
 function clearActiveSheet(targetUserId) {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return createAuthError();
-    }
+  return unpublishBoard(targetUserId);
+}
 
-    let targetUser = targetUserId ? findUserById(targetUserId, { requestingUser: email }) : null;
-    if (!targetUser) {
-      targetUser = findUserByEmail(email, { requestingUser: email });
-    }
+// =====================================================================
+// Profile (multi-board) shared core. AdminApis dispatcher cases と
+// DataApis のオーナー向けラッパーが共通で使う実装。
+// 直接呼ばず、必ず認可済みの userId を渡すこと。
+// =====================================================================
 
-    if (!targetUser) {
-      return createUserNotFoundError();
-    }
+function __listProfilesCore(userId) {
+  const cfg = getUserConfig(userId);
+  if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
+  const cur = cfg.config || {};
+  const profiles = Array.isArray(cur.profiles) ? cur.profiles : [];
+  return createSuccessResponse('Profiles listed', {
+    userId,
+    activeProfile: cur.activeProfile || null,
+    count: profiles.length,
+    profiles: profiles.map(p => ({
+      name: p.name,
+      formTitle: p.formTitle || '',
+      formUrl: p.formUrl || '',
+      spreadsheetId: p.spreadsheetId || '',
+      sheetName: p.sheetName || '',
+      boardMode: (p.displaySettings && p.displaySettings.boardMode) || 'auto'
+    }))
+  });
+}
 
-    const isAdmin = isAdministrator(email);
-    const isOwnBoard = targetUser.userEmail === email;
-
-    if (!isAdmin && !isOwnBoard) {
-      return createErrorResponse('ボードの非公開権限がありません');
-    }
-
-    const config = getConfigOrDefault(targetUser.userId);
-
-    const wasPublished = config.isPublished === true;
-    config.isPublished = false;
-    config.publishedAt = null;
-    config.lastAccessedAt = new Date().toISOString();
-
-    const saveResult = saveUserConfig(targetUser.userId, config, { forceUpdate: false });
-    if (!saveResult.success) {
-      return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
-    }
-
-    // リダイレクトURL（GAS iFrame対応 - viewモードでサーバー側が公開状態を判定）
-    const redirectUrl = getWebAppUrl() + '?mode=view&userId=' + targetUser.userId;
-
-    return {
-      success: true,
-      message: wasPublished ? 'ボードを非公開にしました' : 'ボードは既に非公開です',
-      boardPublished: false,
-      userId: targetUser.userId,
-      redirectUrl: redirectUrl
-    };
-  } catch (error) {
-    console.error('clearActiveSheet error:', error.message);
-    return createExceptionResponse(error);
+/**
+ * @param {string} userId
+ * @param {string} name
+ * @param {Object} [opts]
+ * @param {Object} [opts.snapshot] - 明示指定の保存元 config。省略時は現在の active config。
+ * @param {boolean} [opts.autoActivate=false] - 新規追加かつ active 未設定なら activate するか。
+ */
+function __saveProfileCore(userId, name, opts = {}) {
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return createErrorResponse('name (profile name) is required');
   }
+  const cleanName = String(name).trim().substring(0, 50);
+  const cfg = getUserConfig(userId);
+  if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
+  const cur = cfg.config || {};
+  const src = (opts.snapshot && typeof opts.snapshot === 'object') ? opts.snapshot : cur;
+
+  const newProfile = {
+    name: cleanName,
+    formUrl: src.formUrl || '',
+    formTitle: src.formTitle || '',
+    spreadsheetId: src.spreadsheetId || '',
+    sheetName: src.sheetName || '',
+    columnMapping: src.columnMapping || {},
+    displaySettings: src.displaySettings || {},
+    xAxisLabels: src.xAxisLabels || null,
+    yAxisLabels: src.yAxisLabels || null,
+    matrixQuadrantLabels: src.matrixQuadrantLabels || null,
+    allowResubmit: !!src.allowResubmit
+  };
+
+  const existing = Array.isArray(cur.profiles) ? cur.profiles.slice() : [];
+  const idx = existing.findIndex(p => p && p.name === cleanName);
+  const isUpdate = idx >= 0;
+  if (isUpdate) existing[idx] = newProfile;
+  else existing.push(newProfile);
+
+  const patch = { profiles: existing };
+  if (opts.autoActivate && !isUpdate && !cur.activeProfile) {
+    patch.activeProfile = cleanName;
+  }
+
+  const saveRes = applyConfigPatch_(userId, patch, { publish: false });
+  if (!saveRes.success) return saveRes;
+
+  return createSuccessResponse(
+    isUpdate ? `プロファイル「${cleanName}」を更新しました` : `プロファイル「${cleanName}」を保存しました`,
+    { profileName: cleanName, count: existing.length, isUpdate, etag: saveRes.etag || null }
+  );
+}
+
+function __deleteProfileCore(userId, name) {
+  if (!name || typeof name !== 'string') {
+    return createErrorResponse('name (profile name) is required');
+  }
+  const cfg = getUserConfig(userId);
+  if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
+  const cur = cfg.config || {};
+  const profiles = Array.isArray(cur.profiles) ? cur.profiles : [];
+  const remaining = profiles.filter(p => p && p.name !== name);
+  if (remaining.length === profiles.length) {
+    return createErrorResponse(`プロファイル「${name}」は存在しません`);
+  }
+  const patch = { profiles: remaining };
+  if (cur.activeProfile === name) patch.activeProfile = null;
+
+  const saveRes = applyConfigPatch_(userId, patch, { publish: false });
+  if (!saveRes.success) return saveRes;
+
+  return createSuccessResponse(`プロファイル「${name}」を削除しました`, {
+    count: remaining.length,
+    remainingActive: cur.activeProfile === name ? null : cur.activeProfile
+  });
 }
 
 /**
@@ -496,7 +584,19 @@ function dispatchAdminOperation(operation, params) {
       if (!params.targetUserId || typeof params.targetUserId !== 'string') {
         return createErrorResponse('targetUserId is required');
       }
-      return toggleUserBoardStatus(params.targetUserId);
+      return toggleUserBoardStatus(params.targetUserId, { sourceEtag: params.etag });
+
+    // --- Board Publish Lifecycle (unified ops) ---
+    // Why: CLI/Admin から個別操作を直接呼べるよう dispatcher 経由でも提供。
+    //   publishApp は config 差し替えを伴うため main.js の専用 case で別ルート。
+    case 'unpublishBoard':
+      return unpublishBoard(
+        typeof params.targetUserId === 'string' ? params.targetUserId : null,
+        { sourceEtag: params.etag }
+      );
+
+    case 'republishMyBoard':
+      return republishMyBoard({ sourceEtag: params.etag });
 
     // --- App Control ---
     case 'getLogs':
@@ -839,60 +939,14 @@ function dispatchAdminOperation(operation, params) {
       if (!params.userId || typeof params.userId !== 'string') {
         return createErrorResponse('userId is required');
       }
-      const cfg = getUserConfig(params.userId);
-      if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
-      const profiles = Array.isArray(cfg.config && cfg.config.profiles) ? cfg.config.profiles : [];
-      return createSuccessResponse('Profiles listed', {
-        userId: params.userId,
-        activeProfile: (cfg.config && cfg.config.activeProfile) || null,
-        count: profiles.length,
-        profiles: profiles.map(p => ({
-          name: p.name,
-          formTitle: p.formTitle || '',
-          formUrl: p.formUrl || '',
-          spreadsheetId: p.spreadsheetId || '',
-          sheetName: p.sheetName || '',
-          boardMode: (p.displaySettings && p.displaySettings.boardMode) || 'auto'
-        }))
-      });
+      return __listProfilesCore(params.userId);
     }
 
     case 'saveProfile': {
-      // 現在の active 設定（または明示指定された設定）を profile として保存。
-      // 同名 profile があれば上書き。
       if (!params.userId || typeof params.userId !== 'string') {
         return createErrorResponse('userId is required');
       }
-      if (!params.name || typeof params.name !== 'string') {
-        return createErrorResponse('name (profile name) is required');
-      }
-      const cfg = getUserConfig(params.userId);
-      if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
-      const cur = cfg.config || {};
-
-      // override が指定されていれば current の代わりにそれを保存
-      const src = (params.snapshot && typeof params.snapshot === 'object') ? params.snapshot : cur;
-
-      const newProfile = {
-        name: String(params.name).trim().substring(0, 50),
-        formUrl: src.formUrl || '',
-        formTitle: src.formTitle || '',
-        spreadsheetId: src.spreadsheetId || '',
-        sheetName: src.sheetName || '',
-        columnMapping: src.columnMapping || {},
-        displaySettings: src.displaySettings || {},
-        xAxisLabels: src.xAxisLabels || null,
-        yAxisLabels: src.yAxisLabels || null,
-        matrixQuadrantLabels: src.matrixQuadrantLabels || null,
-        allowResubmit: !!src.allowResubmit
-      };
-
-      const existing = Array.isArray(cur.profiles) ? cur.profiles.slice() : [];
-      const idx = existing.findIndex(p => p && p.name === newProfile.name);
-      if (idx >= 0) existing[idx] = newProfile;
-      else existing.push(newProfile);
-
-      return applyConfigPatch_(params.userId, { profiles: existing }, { publish: false });
+      return __saveProfileCore(params.userId, params.name, { snapshot: params.snapshot });
     }
 
     case 'loadProfile': {
@@ -933,21 +987,7 @@ function dispatchAdminOperation(operation, params) {
       if (!params.userId || typeof params.userId !== 'string') {
         return createErrorResponse('userId is required');
       }
-      if (!params.name || typeof params.name !== 'string') {
-        return createErrorResponse('name (profile name) is required');
-      }
-      const cfg = getUserConfig(params.userId);
-      if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
-      const cur = cfg.config || {};
-      const profiles = Array.isArray(cur.profiles) ? cur.profiles : [];
-      const remaining = profiles.filter(p => p && p.name !== params.name);
-      if (remaining.length === profiles.length) {
-        return createErrorResponse(`Profile "${params.name}" not found`);
-      }
-      const patch = { profiles: remaining };
-      // 削除した profile が active だったら activeProfile も解除
-      if (cur.activeProfile === params.name) patch.activeProfile = null;
-      return applyConfigPatch_(params.userId, patch, { publish: false });
+      return __deleteProfileCore(params.userId, params.name);
     }
 
     case 'shareWithDomain': {
@@ -993,6 +1033,39 @@ function dispatchAdminOperation(operation, params) {
           domain: params.domain,
           role,
           permission: JSON.parse(body)
+        });
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
+    case 'repairSpreadsheetSharing': {
+      // Why: createForm / customizeForm で過去に作成された SS のうち、
+      //   サービスアカウントが editor に入っていないものは DatabaseCore の Sheets API JWT
+      //   経路で 403 を返し、view モードの getPublishedSheetData が落ちる。
+      //   現在の createTemplateForm / customizeForm は applySpreadsheetSharingDefaults を
+      //   作成直後に呼ぶよう修正済みだが、修正前に作られた SS の遡及修復が必要。
+      //
+      //   呼び出し例:
+      //     npm run api -- repairSpreadsheetSharing --spreadsheetId <ID>
+      //     npm run api -- repairSpreadsheetSharing --spreadsheetId <ID> --ownerEmail teacher@example
+      //
+      //   ownerEmail を省略すると getCurrentEmail() を使用。ドメイン共有はスキップしたい
+      //   ローカルテスト用に、明示的に ownerEmail を渡せる。
+      if (!params.spreadsheetId || typeof params.spreadsheetId !== 'string') {
+        return createErrorResponse('spreadsheetId is required');
+      }
+      const ownerEmail = (typeof params.ownerEmail === 'string' && params.ownerEmail)
+        ? params.ownerEmail
+        : getCurrentEmail();
+      try {
+        const result = applySpreadsheetSharingDefaults(params.spreadsheetId, ownerEmail);
+        return createSuccessResponse('Spreadsheet sharing repaired', {
+          spreadsheetId: params.spreadsheetId,
+          ownerEmail,
+          saAdded: result.saAdded,
+          domainShared: result.domainShared,
+          errors: result.errors
         });
       } catch (e) {
         return createExceptionResponse(e);
@@ -1235,3 +1308,4 @@ function deepMerge_(target, source) {
   }
   return out;
 }
+

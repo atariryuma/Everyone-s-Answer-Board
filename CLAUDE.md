@@ -216,6 +216,34 @@ Google Sheets as database via service account. `users` sheet stores user records
 - `doPost` actions are allowlist-managed; adding an action requires adding its input validation simultaneously
 - Include order in HTML templates is fixed; changes to it require a standalone commit
 
+### Board Publish Lifecycle (single source of truth)
+
+`config.isPublished` / `config.publishedAt` を書き換えてよいのは以下 **4 関数のみ**。直接 saveUserConfig で書き換えてはいけない（DRY 違反 + テスト不可）：
+
+| 関数 | 場所 | 役割 |
+| ---- | ---- | ---- |
+| `publishApp(publishConfig)` | `SystemController.js` | 初回公開 / 設定差し替えを伴う公開（allowlist + etag 検証） |
+| `republishMyBoard(options?)` | `AdminApis.js` | 所有者が自分のボードを再び公開する（state のみ） |
+| `unpublishBoard(targetUserId?, options?)` | `AdminApis.js` | 所有者 or 管理者がボードの公開を終了する |
+| `toggleUserBoardStatus(targetUserId, options?)` | `AdminApis.js` | 管理者が他ユーザーのボード公開状態を toggle する |
+
+**`clearActiveSheet`** は `unpublishBoard` の deprecated alias（既存 client コードとの互換性のため残置）。新規実装では `unpublishBoard` を直接呼ぶこと。
+
+**統一不変条件**（`__applyPublishStateChange` で集約）：
+
+- `publishedAt` は「現在の状態の発生時刻」（公開中 = now / 非公開 = null）
+- `lastAccessedAt` は変更時に touch
+- `options.sourceEtag` を渡せば etag conflict 検出が有効化される（楽観ロック）
+- 認可: 自分のボード or 管理者（`requireAdmin: true` 指定時は管理者のみ）
+- 戻り値: `{ success, message, userId, isPublished, boardPublished, publishedAt, etag, redirectUrl }` で統一
+
+**UI 用語**：
+
+- アクション: 「公開する」「再び公開する」「公開を終了する」
+- 状態: 「公開中」「非公開」
+
+詳細仕様とテスト: `tests/admin.publishLifecycle.test.cjs`
+
 ---
 
 ## Testing

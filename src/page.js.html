@@ -4112,7 +4112,7 @@
         <svg class="w-3 h-3 animate-spin inline-block mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
         </svg>
-        公開終了中...
+        公開を終了中...
       `;
       }
 
@@ -4125,12 +4125,12 @@
 
             // GAS iFrameではコールバック内でwindow.openが動作しないため、
             // ユーザーがクリックするリダイレクトモーダルを表示
-            self.showRedirectModal('公開終了', '非公開ページへ移動します。', result.redirectUrl);
+            self.showRedirectModal('公開を終了しました', '非公開ページへ移動します。', result.redirectUrl);
           } else {
-            console.error('公開終了に失敗:', result);
+            console.error('公開を終了できませんでした:', result);
 
             if (window.notifications) {
-              window.notifications.error(result.message || '公開終了に失敗しました', 7000);
+              window.notifications.error(result.message || '公開を終了できませんでした', 7000);
             }
 
             if (endPublicationBtn && originalButtonContent) {
@@ -4140,9 +4140,9 @@
           }
         })
         .withFailureHandler(function (error) {
-          console.error('❌ 公開終了に失敗しました:', error);
+          console.error('❌ 公開を終了できませんでした:', error);
 
-          let errorMsg = '公開終了に失敗しました';
+          let errorMsg = '公開を終了できませんでした';
           if (error && error.message) {
             errorMsg += ': ' + error.message;
           } else if (typeof error === 'string') {
@@ -4162,7 +4162,7 @@
             endPublicationBtn.innerHTML = originalButtonContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback の復元
           }
         })
-        .clearActiveSheet(this.state.userId);
+        .unpublishBoard(this.state.userId);
     }
 
     /**
@@ -4170,45 +4170,20 @@
      * ユーザーがボタンをクリックすることで、ユーザーアクティベーション付きでリダイレクトできる
      */
     showRedirectModal(title, message, redirectUrl) {
-      // 既存のモーダルを削除
-      const existingModal = document.getElementById('redirect-modal');
-      if (existingModal) existingModal.remove();
-
-      const modal = document.createElement('div');
-      modal.id = 'redirect-modal';
-      modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10002]';
-      modal.innerHTML = `
-      <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4 text-center">
-        <div class="text-green-400 mb-4">
-          <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-          </svg>
-        </div>
-        <h3 class="text-xl font-bold text-white mb-2">${window.sharedUtilities.security.escapeHtml(title)}</h3>
-        <p class="text-gray-300 mb-6">${window.sharedUtilities.security.escapeHtml(message)}</p>
-        <button type="button" id="redirect-btn" class="w-full px-6 py-3 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg">
-          ページを更新する
-        </button>
-      </div>
-    `;
-
-      document.body.appendChild(modal);
-
-      const redirectBtn = document.getElementById('redirect-btn');
-      redirectBtn.addEventListener('click', function () {
-        // ユーザーアクティベーション付きでリダイレクト
-        if (redirectUrl) {
-          window.open(redirectUrl, '_top');
-        } else {
-          // フォールバック: 現在のURLを使用
-          const url = new URL(window.location.href);
-          url.hash = '';
-          window.open(url.toString(), '_top');
-        }
-      });
-
-      // ボタンにフォーカス
-      redirectBtn.focus();
+      // Why: 実装は SharedUtilities.html の window.showRedirectModal に集約済（重複排除）。
+      //  variant='cyan' / buttonLabel='ページを更新する' でこれまでの見た目を維持。
+      if (typeof window.showRedirectModal === 'function') {
+        window.showRedirectModal({
+          title,
+          message,
+          redirectUrl,
+          buttonLabel: 'ページを更新する',
+          variant: 'cyan'
+        });
+      } else if (redirectUrl) {
+        // SharedUtilities が未ロードの極端ケース fallback
+        window.open(redirectUrl, '_top');
+      }
     }
 
     /**
@@ -4415,6 +4390,20 @@
           && !this.elements.infoModalContainer.classList.contains('hidden')) {
         return;
       }
+
+      // Why: モーダルの内容は「リアクション (いいね/なるほど/もっと知りたい) のマナー説明」。
+      //  1) 教師は自分のボード準備中に毎回出されると邪魔 → 抑止
+      //  2) 児童でも、リアクション機能が OFF のボードでは説明する対象が無いので抑止
+      //     （数直線・散布図のみで意見投稿だけの授業など）
+      const isTeacher = window.isEditor || this.state.isEditor ||
+                        (window.UNIFIED_CONFIG && window.UNIFIED_CONFIG.isAdminUser) ||
+                        this.state.isAdminUser;
+      if (isTeacher) return;
+
+      const reactionsEnabled = !!(window.UNIFIED_CONFIG
+                                  && window.UNIFIED_CONFIG.displaySettings
+                                  && window.UNIFIED_CONFIG.displaySettings.showReactions);
+      if (!reactionsEnabled) return;
 
       this.state.lastFocusedElement = document.activeElement;
       this.elements.infoModalContainer.classList.remove('hidden');
@@ -5025,6 +5014,10 @@
   //      ここで明示的に公開する。これがないと viz レンダラー（renderNumberLine 等）と
   //      モード切替バー / profile セレクタが全て無効化される silent bug になる。
   window.StudyQuestApp = StudyQuestApp;
+  // page.viz.js から profile 切替後に form ボタンを強制リフレッシュするため公開。
+  // 通常は loadSheetData の formMeta 経由で更新されるが、ある種のキャッシュ
+  // パスで取りこぼすので、明示的に getActiveFormInfo を再呼出して同期する。
+  window.loadFormLink = loadFormLink;
 
   try {
     if (!window.studyQuestApp) {

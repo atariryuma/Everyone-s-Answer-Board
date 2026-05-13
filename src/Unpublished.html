@@ -66,7 +66,7 @@
       <!-- 再公開ボタン -->
       <button type="button" id="republish-btn" onclick="republishBoard()"
         class="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-2 focus:ring-green-400 focus:ring-offset-2 focus:ring-offset-gray-800">
-        <span role="img" aria-label="公開">🌟</span> 回答ボードを再公開
+        <span role="img" aria-label="公開">🌟</span> 回答ボードを再び公開する
       </button>
 
       <!-- 管理パネル遷移ボタン -->
@@ -137,69 +137,31 @@
 
       const originalContent = button.innerHTML;
       button.disabled = true;
-      button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 再公開中...';
+      button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 再び公開中...';
 
       google.script.run
         .withSuccessHandler(function (result) {
           if (result && result.success) {
-            // GAS iFrameではコールバック内でwindow.openが動作しないため、
-            // ユーザーがクリックするリダイレクトモーダルを表示
-            showRedirectModal('再公開完了', '公開ページへ移動します。', result.redirectUrl);
+            // SharedUtilities.html の共通モーダルを使う
+            window.showRedirectModal({
+              title: '再び公開しました',
+              message: '公開ページへ移動します。',
+              redirectUrl: result.redirectUrl,
+              buttonLabel: '回答ボードを開く',
+              variant: 'green'
+            });
           } else {
-            showMessage(result.message || '再公開に失敗しました', 'error');
+            showMessage(result.message || '再び公開できませんでした', 'error');
             button.disabled = false;
             button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
           }
         })
         .withFailureHandler(function (error) {
-          showMessage('再公開中にエラーが発生しました: ' + (error.message || error), 'error');
+          showMessage('再び公開する処理でエラーが発生しました: ' + (error.message || error), 'error');
           button.disabled = false;
           button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
         })
         .republishMyBoard();
-    }
-
-    /**
-     * リダイレクト用モーダルを表示（GAS iFrame対応）
-     */
-    function showRedirectModal(title, message, redirectUrl) {
-      const existingModal = document.getElementById('redirect-modal');
-      if (existingModal) existingModal.remove();
-
-      const esc = (s) => window.sharedUtilities.security.escapeHtml(s || '');
-
-      const modal = document.createElement('div');
-      modal.id = 'redirect-modal';
-      modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10002]';
-      modal.innerHTML = `
-        <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4 text-center">
-          <div class="text-green-400 mb-4">
-            <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
-          </div>
-          <h3 class="text-xl font-bold text-white mb-2">${esc(title)}</h3>
-          <p class="text-gray-300 mb-6">${esc(message)}</p>
-          <button type="button" id="redirect-btn" class="w-full px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg">
-            回答ボードを開く
-          </button>
-        </div>
-      `;
-
-      document.body.appendChild(modal);
-
-      const redirectBtn = document.getElementById('redirect-btn');
-      redirectBtn.addEventListener('click', function () {
-        if (redirectUrl) {
-          window.open(redirectUrl, '_top');
-        } else {
-          const url = new URL(window.location.href);
-          url.hash = '';
-          window.open(url.toString(), '_top');
-        }
-      });
-
-      redirectBtn.focus();
     }
 
     /**

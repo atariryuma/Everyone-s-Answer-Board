@@ -37,6 +37,8 @@ const { getAccessToken, postJSONSync, getConfig, parseEnvFromArgs } = require('.
 const OPERATIONS = [
   // user / app
   'getUsers', 'toggleUserActive', 'toggleUserBoard',
+  // Board publish lifecycle (unified)
+  'unpublishBoard', 'republishMyBoard',
   'getLogs', 'disableApp', 'enableApp', 'getAppStatus',
   // system
   'systemDiagnosis', 'autoRepair', 'cacheReset',
@@ -55,6 +57,8 @@ const OPERATIONS = [
   'appendRows', 'clearDataRows',
   // Drive sharing (v6)
   'shareWithDomain',
+  // SS sharing repair (v7) — SA editor 共有が抜けた既存 SS の遡及修復
+  'repairSpreadsheetSharing',
 ];
 
 /**

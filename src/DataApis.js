@@ -30,7 +30,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, setupDomainWideSharing, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, setupDomainWideSharing, applySpreadsheetSharingDefaults, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -244,6 +244,20 @@ function createTemplateForm(templateType) {
       console.warn('フォルダ作成/移動エラー（処理は続行）:', folderError.message);
     }
 
+    // SS 共有デフォルト適用：サービスアカウント editor + ドメイン共有。
+    // Why: サーバ側 DatabaseCore は Sheets REST API + Service Account JWT で SS を読む。
+    //   未共有のままだと view モードで `getPublishedSheetData` が 403 で落ちる。
+    //   作成直後に必ず適用し、教師の手動共有作業を不要にする。fail-soft。
+    let sharingResult = null;
+    try {
+      sharingResult = applySpreadsheetSharingDefaults(ss.getId(), currentEmail);
+      if (sharingResult && sharingResult.errors && sharingResult.errors.length) {
+        console.warn('createTemplateForm sharing warnings:', sharingResult.errors.join(' / '));
+      }
+    } catch (sharingError) {
+      console.warn('SS 共有設定エラー（処理は続行）:', sharingError.message);
+    }
+
     return {
       success: true,
       formUrl: form.getPublishedUrl(),
@@ -252,6 +266,7 @@ function createTemplateForm(templateType) {
       formTitle: formTitle,
       templateType: type,
       spreadsheetId: ss.getId(),
+      sharing: sharingResult,
       spreadsheetUrl: ss.getUrl(),
       spreadsheetName: ss.getName(),
       sheetName: 'フォームの回答 1',
@@ -410,6 +425,19 @@ function customizeForm(formIdOrUrl, schema) {
           const newSs = SpreadsheetApp.create(ssTitle);
           form.setDestination(FormApp.DestinationType.SPREADSHEET, newSs.getId());
           newSpreadsheetId = newSs.getId();
+
+          // 新 SS にも共有デフォルト適用（createTemplateForm と同じ理由）。
+          // ここを忘れると customizeForm 経由で再生成された SS だけ view が 403 で死ぬ。
+          try {
+            const ownerEmail = (typeof getCurrentEmail === 'function') ? getCurrentEmail() : '';
+            const sr = applySpreadsheetSharingDefaults(newSpreadsheetId, ownerEmail);
+            if (sr && sr.errors && sr.errors.length) {
+              console.warn('customizeForm sharing warnings:', sr.errors.join(' / '));
+            }
+          } catch (sharingError) {
+            console.warn('customizeForm SS 共有設定エラー（処理は続行）:', sharingError.message);
+          }
+
           // 旧 SS をトラッシュへ移動（即削除でなく Drive ゴミ箱経由で 30 日猶予）
           if (oldDestId && oldDestId !== newSpreadsheetId) {
             try {
@@ -775,6 +803,56 @@ function loadProfileForView(profileName, targetUserId) {
     return createSuccessResponse('Profile loaded', { activeProfile: p.name });
   } catch (error) {
     console.error('loadProfileForView error:', error && error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+// =====================================================================
+// Profile management for AdminPanel (owner-facing).
+// Why: 既存の listProfiles/saveProfile/deleteProfile は admin API 経由のみで、
+//   AdminPanel の owner が直接 google.script.run できなかった。Session 認証で
+//   「自分のボード」に限り profile CRUD できる薄いラッパーを用意する。
+//   実装は AdminApis.js の __listProfilesCore / __saveProfileCore /
+//   __deleteProfileCore に集約済み。ここでは認可（自分のボード限定）のみ担当。
+// =====================================================================
+
+function __resolveOwnUserId_() {
+  const email = getCurrentEmail();
+  if (!email) return { error: createAuthError() };
+  const user = findUserByEmail(email, { requestingUser: email });
+  if (!user) return { error: createUserNotFoundError() };
+  return { userId: user.userId };
+}
+
+function listMyProfiles() {
+  try {
+    const resolved = __resolveOwnUserId_();
+    if (resolved.error) return resolved.error;
+    return __listProfilesCore(resolved.userId);
+  } catch (error) {
+    console.error('listMyProfiles error:', error && error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+function saveCurrentAsProfile(name) {
+  try {
+    const resolved = __resolveOwnUserId_();
+    if (resolved.error) return resolved.error;
+    return __saveProfileCore(resolved.userId, name, { autoActivate: true });
+  } catch (error) {
+    console.error('saveCurrentAsProfile error:', error && error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+function deleteMyProfile(name) {
+  try {
+    const resolved = __resolveOwnUserId_();
+    if (resolved.error) return resolved.error;
+    return __deleteProfileCore(resolved.userId, name);
+  } catch (error) {
+    console.error('deleteMyProfile error:', error && error.message);
     return createExceptionResponse(error);
   }
 }
@@ -1712,3 +1790,4 @@ function setFormEmailCollectionVerified_(formId) {
     }
   }
 }
+

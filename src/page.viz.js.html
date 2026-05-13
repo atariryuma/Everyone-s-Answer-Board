@@ -200,12 +200,44 @@
     if (tip) tip.classList.remove('visible');
   }
 
+  // viz 要素 (dot / slice / bar) の外側をクリックしたら tooltip を消す。
+  // click は capture 段階で 1 度だけ document に登録。
+  if (typeof document !== 'undefined' && !document.__vizTooltipDocHandlerAttached) {
+    document.__vizTooltipDocHandlerAttached = true;
+    document.addEventListener('click', (e) => {
+      const target = e.target;
+      if (!target || !target.closest) return;
+      // viz 要素 or tooltip 自体の上なら触らない
+      if (target.closest('.viz-dot, .pie-slice, .word-bar, .viz-tooltip')) return;
+      hideTooltip();
+    });
+    // Esc キーでも消えるのが UX 的に自然
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') hideTooltip();
+    });
+  }
+
   function escapeForTooltip(s) {
     // SharedUtilities.html の escapeHtml があるならそれを使うべきだが、
     // 名前空間が確実でないのでローカルに最小実装。
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  /**
+   * SVG の幅 / viewBox を viewport にフィットさせる。matrix / pie / wordcloud
+   * など 2D viz 共通。height は header 控除後 78vh 相当。
+   * @returns {{width:number, height:number}}
+   */
+  function fitSvgToViewport(svgEl, minWidth) {
+    const bounds = svgEl.getBoundingClientRect();
+    const width = Math.max(minWidth, bounds.width || 800);
+    const targetH = Math.max(420, Math.round(window.innerHeight * 0.78));
+    const height = Math.max(targetH, bounds.height || targetH);
+    svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+    svgEl.style.height = height + 'px';
+    return { width, height };
   }
 
   // ---------------------------------------------------------------------
@@ -216,16 +248,25 @@
     const answers = app.elements.answersContainer;
     if (!answers) return null;
 
+    // Why: tooltip は body 直下に置いているため、mode 切替で SVG が消えても
+    //   leftover として残ることがある（click 直後に viewport 外へカーソルが
+    //   外れた、または mode 切替で hover 元の要素が消えた）。
+    //   container を作り直すタイミングで明示的にクリーンアップする。
+    hideTooltip();
+
     // 既存のカード残骸を完全クリア（renderBoardCards から戻った時のために）
     answers.className = 'viz-container';
     answers.innerHTML = '';
 
     // 統計バッジ
+    // Why (D): 件数は main-header の #answerCountText で既に出ているため、ここでは
+    //          更新時刻のみを表示して重複を解消する。countPill は DOM 上は残す
+    //          （updateStatsPills が参照するため）が、CSS で hidden 属性で隠す。
     const stats = document.createElement('div');
     stats.id = 'vizStatsPills';
     stats.className = 'viz-stats';
     stats.innerHTML =
-      '<span class="stat-pill" id="vizCountPill">0件</span>' +
+      '<span class="stat-pill" id="vizCountPill" hidden>0件</span>' +
       '<span class="stat-pill" id="vizUpdatedPill"></span>';
     answers.appendChild(stats);
 
@@ -473,10 +514,8 @@
       const maxY = ys.length ? Math.max(...ys, axis.defaultMax || 5) : (axis.defaultMax || 5);
 
       const svgEl = containerRefs.svg;
-      const bounds = svgEl.getBoundingClientRect();
-      const width = Math.max(320, bounds.width || 800);
-      const height = Math.max(360, bounds.height || 560);
-      svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      // 散布図は 2D なので viewport を縦いっぱい使う (78vh)。CSS min-height 55vh を上書き。
+      const { width, height } = fitSvgToViewport(svgEl, 320);
 
       const svg = d3.select(svgEl);
       svg.selectAll('*').remove();
@@ -801,10 +840,8 @@
       const total = cats.reduce((s, c) => s + c.count, 0);
 
       const svgEl = containerRefs.svg;
-      const bounds = svgEl.getBoundingClientRect();
-      const width = Math.max(360, bounds.width || 800);
-      const height = Math.max(360, bounds.height || 480);
-      svgEl.setAttribute('viewBox', `0 0 ${width} ${height}`);
+      // pie radius = Math.min(width, height) / 2 - 60 なので height を稼ぐと円も大きくなる。
+      const { width, height } = fitSvgToViewport(svgEl, 360);
 
       const svg = d3.select(svgEl);
       svg.selectAll('*').remove();
@@ -989,12 +1026,14 @@
    *      board モード（純粋な掲示板）にもバーは出す（教師が viz モードへ切替えたい時に必要）。
    *      非教師（児童）には注入しない。
    */
+  // Why: コンパクト化 — テキスト「数直線」ではなくアイコン + 短いラベルにして
+  //      ヘッダーに収まるようにする。tooltip で詳細名を提供。
   const MODE_BAR_ITEMS = [
-    { id: 'board',      label: '📋 掲示板',       desc: 'カード一覧' },
-    { id: 'numberline', label: '📏 数直線',       desc: 'M1 ポジショニング' },
-    { id: 'matrix',     label: '🎯 散布図',       desc: 'M2 2軸マトリクス' },
-    { id: 'wordcloud',  label: '🔠 ワードランキング', desc: 'M3 頻出語' },
-    { id: 'pie',        label: '🥧 円グラフ',     desc: 'M4 選択肢分布' }
+    { id: 'board',      label: '📋', text: '掲示板',  desc: '掲示板（カード一覧）' },
+    { id: 'numberline', label: '📏', text: '数直線',  desc: '数直線（ポジショニング）' },
+    { id: 'matrix',     label: '🎯', text: '散布図',  desc: '散布図（2軸マトリクス）' },
+    { id: 'wordcloud',  label: '🔠', text: 'ワード',  desc: 'ワードランキング（頻出語）' },
+    { id: 'pie',        label: '🥧', text: '円',     desc: '円グラフ（選択肢分布）' }
   ];
 
   function isTeacher(app) {
@@ -1015,42 +1054,113 @@
     return false;
   }
 
-  function injectModeBar(app) {
-    if (!isTeacher(app)) return;
-    if (document.getElementById('vizModeBar')) return; // すでに注入済み
+  /**
+   * 教師用ツールバー（profile pill 群 + 議論ツール）を #vizToolbarSlot（main-header 内）に注入。
+   * profile は 1 クリック切替の pill tab。{@link PROFILE_PILLS_MAX} を超える場合は select に fallback。
+   */
+  function ensureViewToolbar(app) {
+    if (!isTeacher(app)) return null;
+    const slot = document.getElementById('vizToolbarSlot');
+    if (!slot) return null;
+    let bar = document.getElementById('vizToolbar');
+    if (bar) return bar;
 
-    // mode bar の挿入先: main-header の直下、答え一覧の上
-    const host = document.getElementById('main-header') || document.body;
-    const bar = document.createElement('div');
-    bar.id = 'vizModeBar';
-    bar.className = 'viz-mode-bar';
-    bar.setAttribute('role', 'toolbar');
-    bar.setAttribute('aria-label', '可視化モード切替');
+    bar = document.createElement('div');
+    bar.id = 'vizToolbar';
+    bar.className = 'viz-toolbar';
+    bar.innerHTML = [
+      '<div class="viz-toolbar-left" id="vizProfilePills" role="tablist" aria-label="ボード切替">',
+      '</div>',
+      '<div class="viz-toolbar-center viz-controls" id="vizControls" role="toolbar" aria-label="授業ツール">',
+      '  <button type="button" id="vizCaptureBeforeBtn" class="viz-btn" title="議論前として現在の分布を保存">',
+      '    📌 議論前',
+      '  </button>',
+      '  <button type="button" id="vizCompareToggleBtn" class="viz-btn" title="議論前と現在を2画面で対比">',
+      '    ⇄ 比較',
+      '  </button>',
+      '  <div class="viz-timeline">',
+      '    <label for="vizTimelineSlider" class="viz-timeline-label">軌跡</label>',
+      '    <input type="range" id="vizTimelineSlider" min="0" max="0" value="0" step="1" />',
+      '    <span id="vizTimelineLabel" class="viz-timeline-time">現在</span>',
+      '    <button type="button" id="vizTimelineNowBtn" class="viz-btn-small" title="現在に戻る">↺</button>',
+      '  </div>',
+      '</div>'
+    ].join('');
+    slot.appendChild(bar);
 
-    const inner = MODE_BAR_ITEMS.map(item => {
-      return `<button type="button" class="viz-mode-btn" data-mode="${item.id}" title="${item.desc}">${item.label}</button>`;
-    }).join('');
-    bar.innerHTML = inner;
-
-    // ホスト末尾に追加
-    host.parentNode.insertBefore(bar, host.nextSibling);
-
-    bar.addEventListener('click', (e) => {
-      const btn = e.target.closest('.viz-mode-btn');
+    // profile pills の click handler は event delegation で 1 度だけ登録
+    document.getElementById('vizProfilePills').addEventListener('click', (e) => {
+      const btn = e.target.closest('.viz-profile-pill');
       if (!btn) return;
-      const mode = btn.dataset.mode;
-      if (!mode) return;
-      app.__vizSetMode(mode);
+      const name = btn.dataset.profile;
+      if (!name) return;
+      app.__vizLoadProfile(name);
     });
+    // select fallback の change ハンドラ (profile 5 個以上のとき)
+    document.getElementById('vizProfilePills').addEventListener('change', (e) => {
+      if (e.target.id !== 'vizProfileSelect') return;
+      const name = e.target.value;
+      if (!name) return;
+      app.__vizLoadProfile(name);
+    });
+
+    document.getElementById('vizCaptureBeforeBtn').addEventListener('click', () => {
+      app.vizCaptureBefore();
+      const btn = document.getElementById('vizCaptureBeforeBtn');
+      if (btn) { btn.classList.add('saved'); setTimeout(() => btn.classList.remove('saved'), 1500); }
+    });
+    document.getElementById('vizCompareToggleBtn').addEventListener('click', () => {
+      app.state.vizCompareMode = !app.state.vizCompareMode;
+      document.getElementById('vizCompareToggleBtn').classList.toggle('active', !!app.state.vizCompareMode);
+      app.renderBoard(false, false, []);
+    });
+    document.getElementById('vizTimelineSlider').addEventListener('input', (e) => {
+      const idx = Number(e.target.value);
+      // step=1 でもブラウザによっては同値で input が連発する。再描画は意味のある変化時のみ。
+      if (idx === app.state.vizTimelineIndex) return;
+      app.state.vizTimelineIndex = idx;
+      const snaps = app.vizGetSnapshots();
+      const label = document.getElementById('vizTimelineLabel');
+      if (label) {
+        if (idx >= snaps.length) {
+          label.textContent = '現在';
+        } else {
+          const t = snaps[idx];
+          if (t) {
+            const d = new Date(t.capturedAt);
+            label.textContent = d.getHours().toString().padStart(2, '0') + ':' +
+                                d.getMinutes().toString().padStart(2, '0');
+          }
+        }
+      }
+      app.renderBoard(false, false, []);
+    });
+    document.getElementById('vizTimelineNowBtn').addEventListener('click', () => {
+      app.state.vizTimelineIndex = null;
+      const slider = document.getElementById('vizTimelineSlider');
+      const snaps = app.vizGetSnapshots();
+      if (slider) slider.value = snaps.length;
+      const label = document.getElementById('vizTimelineLabel');
+      if (label) label.textContent = '現在';
+      app.renderBoard(false, false, []);
+    });
+
+    return bar;
   }
 
   function refreshModeBar(app) {
-    const bar = document.getElementById('vizModeBar');
-    if (!bar) return;
+    // mode 切替ボタン / ⚙️ は撤去済 (profile が boardMode を決める)。本関数は
+    // mode 連動 UI（議論ツール表示 / controlsFooter 表示）だけ担当する。
     const cur = app.state.boardMode || 'board';
-    bar.querySelectorAll('.viz-mode-btn').forEach(btn => {
-      btn.classList.toggle('active', btn.dataset.mode === cur);
-    });
+    // 議論ツール（議論前/比較/タイムライン）は viz mode 専用。
+    // board モードではカードに対して「揺らぎ」「比較」の概念が無いので非表示。
+    const controls = document.getElementById('vizControls');
+    if (controls) controls.style.display = (cur === 'board') ? 'none' : '';
+    // controlsFooter (画面下の「列数」スライダー) は board モード専用。
+    // viz モードではカードがないので意味不明なのと、viewport の下部を占有して
+    // SVG レイアウトとぶつかるので非表示にする。
+    const footer = document.getElementById('controlsFooter');
+    if (footer) footer.style.display = (cur === 'board') ? '' : 'none';
   }
 
   /**
@@ -1077,64 +1187,66 @@
     }
   };
 
-  StudyQuestApp.prototype.__vizInjectModeBar = function () { injectModeBar(this); };
+  StudyQuestApp.prototype.__vizInjectModeBar = function () { ensureViewToolbar(this); };
   StudyQuestApp.prototype.__vizRefreshModeBar = function () { refreshModeBar(this); };
 
   /**
    * Profile セレクタ — multi-board の切替 UI（教師限定）。
+   * 「導入アンケート」「本時の議論」「振り返り」のように 1 ユーザーが複数 Forms を
+   * 切替えて運用するケース向け。profiles 0 件の場合は UI を非表示にする。
+   * page.js bootstrap で state.profiles / state.activeProfile が渡される前提。
    *
-   * Why: 道徳科 45 分授業で「導入アンケート」「本時の議論」「振り返り」を別 Forms で
-   *      運用するケース。事前に admin/CLI から profiles を登録しておけば、view 画面で
-   *      ドロップダウン選択 → 自動 loadProfile → 再読み込みで切替完結。
-   *
-   *   - profiles 0 or 1 件のときは UI を表示しない（不要な画面ノイズ回避）
-   *   - profile change 時は google.script.run.adminLoadProfileForView を呼び、
-   *     成功したら再ロード（fetchSpreadsheetData が新 spreadsheetId で動く）。
-   *
-   * page.js の bootstrap で state.profiles / state.activeProfile が渡される前提。
+   * profile 数で UI を切替: PROFILE_PILLS_MAX 以下なら pill tab（1 クリック切替、視認性◎、
+   * 授業テンポに合う）、超えたら select fallback（横幅収容）。
    */
+  const PROFILE_PILLS_MAX = 4;
+
   function injectProfileSelector(app) {
     if (!isTeacher(app)) return;
     const profiles = (app.state && app.state.profiles) || [];
-    if (!Array.isArray(profiles) || profiles.length < 1) {
-      // 0/1 件なら selector を非表示
-      const existing = document.getElementById('vizProfileSelector');
-      if (existing) existing.remove();
+    const toolbar = ensureViewToolbar(app);
+    if (!toolbar) return;
+    const container = document.getElementById('vizProfilePills');
+    if (!container) return;
+
+    // profiles 0 件なら容器ごと非表示
+    container.style.display = profiles.length === 0 ? 'none' : '';
+    if (profiles.length === 0) {
+      container.innerHTML = '';
       return;
     }
-    if (document.getElementById('vizProfileSelector')) return;
 
-    // mode bar の左隣に挿入
-    const modeBar = document.getElementById('vizModeBar');
-    const container = document.createElement('div');
-    container.id = 'vizProfileSelector';
-    container.className = 'viz-profile-selector';
-    container.innerHTML =
-      '<label class="viz-profile-label">📚 ボード:</label>' +
-      '<select id="vizProfileSelect" class="viz-profile-select" aria-label="ボード切替"></select>';
-    if (modeBar && modeBar.parentNode) {
-      modeBar.parentNode.insertBefore(container, modeBar);
-    } else {
-      const host = document.getElementById('main-header') || document.body;
-      host.parentNode.insertBefore(container, host.nextSibling);
-    }
-
-    const select = document.getElementById('vizProfileSelect');
     const active = app.state.activeProfile || '';
-    const opts = ['<option value="">（選択してください）</option>'];
-    for (const p of profiles) {
-      const name = p && p.name ? String(p.name) : '';
-      if (!name) continue;
-      const sel = name === active ? ' selected' : '';
-      opts.push('<option value="' + escapeForTooltip(name) + '"' + sel + '>' + escapeForTooltip(name) + '</option>');
-    }
-    select.innerHTML = opts.join('');
 
-    select.addEventListener('change', () => {
-      const name = select.value;
-      if (!name) return;
-      app.__vizLoadProfile(name);
-    });
+    if (profiles.length <= PROFILE_PILLS_MAX) {
+      // pill tab レイアウト
+      const html = ['<div class="viz-profile-pills-row">'];
+      for (const p of profiles) {
+        const name = p && p.name ? String(p.name) : '';
+        if (!name) continue;
+        const isActive = name === active;
+        const safe = escapeForTooltip(name);
+        html.push(
+          '<button type="button" class="viz-profile-pill' + (isActive ? ' active' : '') +
+          '" role="tab" aria-selected="' + (isActive ? 'true' : 'false') +
+          '" data-profile="' + safe + '" title="' + safe + '">' + safe + '</button>'
+        );
+      }
+      html.push('</div>');
+      container.innerHTML = html.join('');
+    } else {
+      // select fallback
+      const opts = ['<option value="">📚 ボード...</option>'];
+      for (const p of profiles) {
+        const name = p && p.name ? String(p.name) : '';
+        if (!name) continue;
+        const sel = name === active ? ' selected' : '';
+        opts.push('<option value="' + escapeForTooltip(name) + '"' + sel + '>' + escapeForTooltip(name) + '</option>');
+      }
+      container.innerHTML =
+        '<select id="vizProfileSelect" class="viz-profile-select" aria-label="ボード切替" title="ボード（profile）切替">' +
+        opts.join('') + '</select>';
+    }
   }
 
   /**
@@ -1157,11 +1269,17 @@
       .withSuccessHandler((res) => {
         if (select) select.disabled = false;
         if (res && res.success) {
-          // ロード成功 → データを再読み込み
+          // ロード成功 → データ & form ボタン を両方再読み込み。
+          // Why (form ボタン重複呼出): loadSheetData の formMeta 経由でも更新される
+          // はずだが、ある種のキャッシュ経路で取りこぼすケースがある（user 報告）。
+          // getActiveFormInfo を明示的に呼ぶことで confidence を持って同期する。
           if (typeof this.loadSheetData === 'function') {
             this.loadSheetData({ bypassCache: true, isInitialLoad: false });
           } else {
             window.location.reload();
+          }
+          if (typeof window.loadFormLink === 'function') {
+            window.loadFormLink();
           }
         } else {
           console.error('Profile load failed:', res && res.message);
@@ -1177,84 +1295,6 @@
   };
 
   StudyQuestApp.prototype.__vizInjectProfileSelector = function () { injectProfileSelector(this); };
-
-  /**
-   * タイムライン UI を viz container に注入。教師権限のみ表示。
-   * Why: 終末フェーズで「議論経過とともに意見分布がどう動いたか」を再生し、
-   *      児童に振り返りメタ認知を促す。シークバー操作で過去スナップショットから再描画。
-   */
-  function injectVizControls(app) {
-    const answers = app.elements.answersContainer;
-    if (!answers) return;
-    let panel = document.getElementById('vizControls');
-    if (panel) return; // すでに注入済み
-
-    panel = document.createElement('div');
-    panel.id = 'vizControls';
-    panel.className = 'viz-controls';
-    panel.innerHTML = [
-      '<button type="button" id="vizCaptureBeforeBtn" class="viz-btn" title="議論前として現在の分布を保存">',
-      '  📌 議論前を記録',
-      '</button>',
-      '<button type="button" id="vizCompareToggleBtn" class="viz-btn" title="議論前と現在を2画面で対比">',
-      '  ⇄ 比較表示',
-      '</button>',
-      '<div class="viz-timeline">',
-      '  <label for="vizTimelineSlider" class="viz-timeline-label">変化の軌跡:</label>',
-      '  <input type="range" id="vizTimelineSlider" min="0" max="0" value="0" step="1" />',
-      '  <span id="vizTimelineLabel" class="viz-timeline-time">現在</span>',
-      '  <button type="button" id="vizTimelineNowBtn" class="viz-btn-small">現在に戻る</button>',
-      '</div>'
-    ].join('');
-    // stats の直後に挿入（DOM 上は答えコンテナ内・SVG の上）
-    const stats = document.getElementById('vizStatsPills') || null;
-    if (stats && stats.parentNode === answers) {
-      answers.insertBefore(panel, stats.nextSibling);
-    } else {
-      answers.appendChild(panel);
-    }
-
-    document.getElementById('vizCaptureBeforeBtn').addEventListener('click', () => {
-      const ts = app.vizCaptureBefore();
-      // 簡易告知
-      const btn = document.getElementById('vizCaptureBeforeBtn');
-      if (btn) { btn.classList.add('saved'); setTimeout(() => btn.classList.remove('saved'), 1500); }
-    });
-    document.getElementById('vizCompareToggleBtn').addEventListener('click', () => {
-      app.state.vizCompareMode = !app.state.vizCompareMode;
-      document.getElementById('vizCompareToggleBtn').classList.toggle('active', !!app.state.vizCompareMode);
-      app.renderBoard(false, false, []);
-    });
-    document.getElementById('vizTimelineSlider').addEventListener('input', (e) => {
-      const idx = Number(e.target.value);
-      app.state.vizTimelineIndex = idx;
-      const snaps = app.vizGetSnapshots();
-      const label = document.getElementById('vizTimelineLabel');
-      if (label) {
-        if (idx >= snaps.length) {
-          label.textContent = '現在';
-        } else {
-          const t = snaps[idx];
-          if (t) {
-            const d = new Date(t.capturedAt);
-            label.textContent = d.getHours().toString().padStart(2, '0') + ':' +
-                                d.getMinutes().toString().padStart(2, '0') + ':' +
-                                d.getSeconds().toString().padStart(2, '0');
-          }
-        }
-      }
-      app.renderBoard(false, false, []);
-    });
-    document.getElementById('vizTimelineNowBtn').addEventListener('click', () => {
-      app.state.vizTimelineIndex = null;
-      const slider = document.getElementById('vizTimelineSlider');
-      const snaps = app.vizGetSnapshots();
-      if (slider) slider.value = snaps.length;
-      const label = document.getElementById('vizTimelineLabel');
-      if (label) label.textContent = '現在';
-      app.renderBoard(false, false, []);
-    });
-  }
 
   function refreshVizControlsState(app) {
     const slider = document.getElementById('vizTimelineSlider');
@@ -1303,8 +1343,7 @@
     }
   }
 
-  // 公開: dispatcher に統合（既存 renderBoard を wrap）
-  StudyQuestApp.prototype.__vizInjectControls = function () { injectVizControls(this); };
+  StudyQuestApp.prototype.__vizInjectControls = function () { ensureViewToolbar(this); };
   StudyQuestApp.prototype.__vizRefreshControls = function () { refreshVizControlsState(this); };
   StudyQuestApp.prototype.__vizWithTimelineSwap = function (fn) { return withTimelineSwap(this, fn); };
   StudyQuestApp.prototype.__vizGetBeforeSnapshot = function () { return loadBeforeSnapshot(); };
@@ -1379,7 +1418,7 @@
     this.elements.answersContainer = originalAnswers;
 
     // 比較モード用の controls 再構築
-    injectVizControls(this);
+    ensureViewToolbar(this);
     refreshVizControlsState(this);
   };
 

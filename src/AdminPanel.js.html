@@ -142,6 +142,9 @@
       //      象限ラベルは隠す）を正しく適用するために 1 回呼ぶ。
       try { updateVisualizationVisibility(); } catch (_) {}
 
+      // プロファイル管理 UI を初期化（一覧表示 + イベントハンドラ）
+      try { initializeProfileManagementUI(); } catch (e) { console.warn('initializeProfileManagementUI failed:', e); }
+
       updateProgress(1);
 
       // 初回アクセス時のウェルカムモーダル表示
@@ -292,7 +295,7 @@
             google.script.run
               .withSuccessHandler(resolve)
               .withFailureHandler(reject)
-              .clearActiveSheet(window.UNIFIED_CONFIG.targetUserId);
+              .unpublishBoard(window.UNIFIED_CONFIG.targetUserId);
           });
 
           if (result.success) {
@@ -636,12 +639,9 @@
         }
       }
 
-      // Why: config.displayMode はサーバ側で保存されず、canonical は displaySettings.showNames。
-      //      以前は config.displayMode を読んでいたため、admin-panel 再入場時に前回選択が復元されない silent bug があった。
-      const displayModeSelect = document.getElementById('display-mode');
-      if (displayModeSelect && config.displaySettings) {
-        displayModeSelect.value = config.displaySettings.showNames ? 'named' : 'anonymous';
-      }
+      // Why (dead code 撤去): かつて #display-mode select が想定されていたが、現在 HTML には
+      //   存在しない（実装は show-names checkbox に一本化されている）。残しても無効コード。
+      //   showNames の復元は applyVisualizationConfig 内で行う（read/write 対称）。
 
       // フォームURL表示を更新
       const formUrlDisplay = document.getElementById('form-url');
@@ -716,6 +716,17 @@
     // 4) 再投稿許可
     const allowEl = document.getElementById('allow-resubmit');
     if (allowEl) allowEl.checked = !!config.allowResubmit;
+
+    // 4.5) 表示設定の checkbox 群（showNames / showReactions）
+    //   Why: getDisplaySettings() の save パスは checkbox を読むのに、これまで load パスで
+    //   復元していなかった。結果として「公開 → 管理パネル再表示 → checkbox 未チェック →
+    //   気付かず再公開 → 設定が OFF にリセット」という silent data loss が起きていた。
+    //   load 側でも明示的に復元することで、保存と読込の対称性を担保する。
+    const ds = config.displaySettings || {};
+    const showNamesEl = document.getElementById('show-names');
+    if (showNamesEl) showNamesEl.checked = !!ds.showNames;
+    const showReactionsEl = document.getElementById('show-reactions');
+    if (showReactionsEl) showReactionsEl.checked = !!ds.showReactions;
 
     // 5) numericX/Y セレクトの値設定
     //    （オプションは fillColumnDropdowns 経由で headers から再生成されるが、
@@ -4047,6 +4058,246 @@
         timeElement.className = 'text-sm text-gray-300';
       }
     }
+
+    // 教師が「現在の設定がどうなっているか」を 1 ヶ所で把握できるよう
+    // displaySettings / activeProfile / boardMode を summary に反映する。
+    const ds = config.displaySettings || {};
+
+    const boardModeEl = document.getElementById('current-board-mode');
+    if (boardModeEl) {
+      const mode = ds.boardMode || 'auto';
+      boardModeEl.textContent = PROFILE_MODE_LABELS[mode] || mode;
+      boardModeEl.className = 'text-sm text-white';
+    }
+
+    const showNamesEl = document.getElementById('current-show-names');
+    if (showNamesEl) {
+      showNamesEl.textContent = ds.showNames ? '実名表示' : '匿名';
+      showNamesEl.className = 'text-sm ' + (ds.showNames ? 'text-cyan-300' : 'text-gray-300');
+    }
+
+    const showReactionsEl = document.getElementById('current-show-reactions');
+    if (showReactionsEl) {
+      showReactionsEl.textContent = ds.showReactions ? '表示' : '非表示';
+      showReactionsEl.className = 'text-sm ' + (ds.showReactions ? 'text-cyan-300' : 'text-gray-300');
+    }
+
+    const activeProfileEl = document.getElementById('current-active-profile');
+    if (activeProfileEl) {
+      const profiles = Array.isArray(config.profiles) ? config.profiles : [];
+      const active = config.activeProfile;
+      if (active && profiles.length > 0) {
+        activeProfileEl.textContent = active + ' (' + profiles.length + ' boards)';
+        activeProfileEl.className = 'text-sm text-cyan-300';
+      } else {
+        activeProfileEl.textContent = '単一ボード';
+        activeProfileEl.className = 'text-sm text-gray-300';
+      }
+    }
+  }
+
+  // =====================================================================
+  // Profile management (multi-board)
+  // Why: 複数フォーム/モードを「プロファイル」として保存し、view 画面のタブで瞬時切替する。
+  //   これまで CLI (npm run api) からしか管理できなかった機能を AdminPanel で操作可能に。
+  // =====================================================================
+
+  const PROFILE_MODE_LABELS = {
+    auto: '自動判定', board: '掲示板', numberline: '数直線',
+    matrix: '散布図', wordcloud: 'ワードランキング', pie: '円グラフ'
+  };
+
+  function setProfileActionStatus(msg, type) {
+    const el = document.getElementById('profile-action-status');
+    if (!el) return;
+    el.textContent = msg || '';
+    const colors = { success: 'text-green-400', error: 'text-red-400', info: 'text-gray-400', warning: 'text-yellow-400' };
+    el.className = 'text-xs mt-1.5 min-h-[1rem] ' + (colors[type] || colors.info);
+  }
+
+  // escapeHtml は SharedUtilities が IIFE で先に読み込む（AdminPanel.html の include 順固定）。
+  const escapeProfileText = (s) => window.sharedUtilities.security.escapeHtml(s == null ? '' : String(s));
+
+  function renderProfileList(profiles, activeProfile) {
+    const container = document.getElementById('profile-list');
+    const badge = document.getElementById('profile-count-badge');
+    if (!container) return;
+
+    if (badge) {
+      badge.textContent = profiles.length === 0
+        ? 'プロファイル未登録'
+        : `${profiles.length} 件登録`;
+    }
+
+    if (profiles.length === 0) {
+      container.innerHTML = '<div class="text-xs text-gray-500 italic">未登録。下のフォームから保存できます。</div>';
+      return;
+    }
+
+    container.innerHTML = profiles.map(p => {
+      const isActive = p.name === activeProfile;
+      const modeLabel = PROFILE_MODE_LABELS[p.boardMode] || p.boardMode || 'auto';
+      const safeName = escapeProfileText(p.name);
+      const safeTitle = escapeProfileText(p.formTitle || '');
+      // active 行はボタン群を「現在」表示に置換（読込ボタン不要、削除のみ）
+      const actions = isActive
+        ? '<span class="px-1.5 py-0.5 text-[10px] bg-cyan-700/40 text-cyan-200 rounded flex-shrink-0">現在</span>'
+        : '<button type="button" data-profile-action="load" data-profile-name="' + safeName + '"' +
+          ' class="px-1.5 py-0.5 text-[10px] bg-cyan-700 hover:bg-cyan-600 text-white rounded flex-shrink-0"' +
+          ' title="このプロファイルを読み込む">📥</button>';
+      const titleLine = safeTitle
+        ? '<div class="text-[10px] text-gray-500 truncate" title="' + safeTitle + '">' + safeTitle + '</div>'
+        : '';
+      return [
+        '<div class="flex items-center gap-1 p-1.5 rounded border ',
+        isActive ? 'border-cyan-400/50 bg-cyan-900/20' : 'border-gray-700 bg-gray-800/40',
+        '">',
+        '  <div class="flex-1 min-w-0">',
+        '    <div class="text-xs font-semibold text-white truncate">',
+        safeName,
+        '      <span class="ml-1 text-[10px] text-gray-400">[' + modeLabel + ']</span>',
+        '    </div>',
+        titleLine,
+        '  </div>',
+        actions,
+        '  <button type="button" data-profile-action="delete" data-profile-name="' + safeName + '"',
+        '    class="px-1.5 py-0.5 text-[10px] bg-red-700/80 hover:bg-red-600 text-white rounded flex-shrink-0"',
+        '    title="このプロファイルを削除">🗑️</button>',
+        '</div>'
+      ].join('');
+    }).join('');
+  }
+
+  function loadProfileList() {
+    setProfileActionStatus('プロファイル一覧を取得中...', 'info');
+    google.script.run
+      .withSuccessHandler((res) => {
+        if (res && res.success && res.data) {
+          renderProfileList(res.data.profiles || [], res.data.activeProfile || null);
+          setProfileActionStatus('', 'info');
+        } else {
+          setProfileActionStatus(res && res.message ? res.message : 'プロファイル一覧取得に失敗しました', 'error');
+        }
+      })
+      .withFailureHandler((err) => {
+        setProfileActionStatus('プロファイル一覧取得エラー: ' + (err && err.message || err), 'error');
+      })
+      .listMyProfiles();
+  }
+
+  function handleProfileSave() {
+    const input = document.getElementById('new-profile-name');
+    if (!input) return;
+    const name = (input.value || '').trim();
+    if (!name) {
+      setProfileActionStatus('プロファイル名を入力してください', 'warning');
+      input.focus();
+      return;
+    }
+
+    const btn = document.getElementById('save-current-as-profile-btn');
+    if (btn) btn.disabled = true;
+    setProfileActionStatus('プロファイル「' + name + '」を保存中...', 'info');
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        if (btn) btn.disabled = false;
+        if (res && res.success) {
+          setProfileActionStatus(res.message || '保存しました', 'success');
+          input.value = '';
+          loadProfileList();
+        } else {
+          setProfileActionStatus(res && res.message ? res.message : '保存に失敗しました', 'error');
+        }
+      })
+      .withFailureHandler((err) => {
+        if (btn) btn.disabled = false;
+        setProfileActionStatus('保存エラー: ' + (err && err.message || err), 'error');
+      })
+      .saveCurrentAsProfile(name);
+  }
+
+  function handleProfileLoad(name) {
+    if (!name) return;
+    if (!confirm('プロファイル「' + name + '」を読み込みますか？\n\n現在の設定（フォーム/列マッピング/モード）はこのプロファイルの内容に置き換わります。')) {
+      return;
+    }
+    setProfileActionStatus('プロファイル「' + name + '」を読み込み中...', 'info');
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        if (res && res.success) {
+          setProfileActionStatus('プロファイルを読み込みました。画面を再読み込みします...', 'success');
+          // active config が書き換わったので AdminPanel の表示を再構築
+          setTimeout(() => window.location.reload(), 800);
+        } else {
+          setProfileActionStatus(res && res.message ? res.message : '読み込みに失敗しました', 'error');
+        }
+      })
+      .withFailureHandler((err) => {
+        setProfileActionStatus('読み込みエラー: ' + (err && err.message || err), 'error');
+      })
+      .loadProfileForView(name);
+  }
+
+  function handleProfileDelete(name) {
+    if (!name) return;
+    if (!confirm('プロファイル「' + name + '」を削除しますか？\n\nこの操作は取り消せません。')) {
+      return;
+    }
+    setProfileActionStatus('プロファイル「' + name + '」を削除中...', 'info');
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        if (res && res.success) {
+          setProfileActionStatus(res.message || '削除しました', 'success');
+          loadProfileList();
+        } else {
+          setProfileActionStatus(res && res.message ? res.message : '削除に失敗しました', 'error');
+        }
+      })
+      .withFailureHandler((err) => {
+        setProfileActionStatus('削除エラー: ' + (err && err.message || err), 'error');
+      })
+      .deleteMyProfile(name);
+  }
+
+  function initializeProfileManagementUI() {
+    // 一覧 click のイベント委譲（load / delete を 1 ヶ所で処理）
+    const list = document.getElementById('profile-list');
+    if (list && !list.__profileHandlerAttached) {
+      list.__profileHandlerAttached = true;
+      list.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-profile-action]');
+        if (!btn) return;
+        const action = btn.dataset.profileAction;
+        const name = btn.dataset.profileName;
+        if (action === 'load') handleProfileLoad(name);
+        else if (action === 'delete') handleProfileDelete(name);
+      });
+    }
+
+    // 保存ボタン
+    const saveBtn = document.getElementById('save-current-as-profile-btn');
+    if (saveBtn && !saveBtn.__handlerAttached) {
+      saveBtn.__handlerAttached = true;
+      saveBtn.addEventListener('click', handleProfileSave);
+    }
+
+    // Enter キーで保存
+    const nameInput = document.getElementById('new-profile-name');
+    if (nameInput && !nameInput.__handlerAttached) {
+      nameInput.__handlerAttached = true;
+      nameInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          handleProfileSave();
+        }
+      });
+    }
+
+    // 初回ロード
+    loadProfileList();
   }
 
   let currentBoardInfo = null;
