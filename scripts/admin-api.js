@@ -53,6 +53,8 @@ const OPERATIONS = [
   'listProfiles', 'saveProfile', 'loadProfile', 'deleteProfile',
   // Data ops (v5) — テストデータ投入専用
   'appendRows', 'clearDataRows',
+  // Drive sharing (v6)
+  'shareWithDomain',
 ];
 
 /**

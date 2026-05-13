@@ -25,7 +25,7 @@
  * 移動日: 2025-12-13
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, FormApp, SpreadsheetApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, FormApp, SpreadsheetApp, ScriptApp, UrlFetchApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -948,6 +948,55 @@ function dispatchAdminOperation(operation, params) {
       // 削除した profile が active だったら activeProfile も解除
       if (cur.activeProfile === params.name) patch.activeProfile = null;
       return applyConfigPatch_(params.userId, patch, { publish: false });
+    }
+
+    case 'shareWithDomain': {
+      // Drive REST API でファイル（Spreadsheet / Form）を指定ドメインに共有する。
+      //
+      // Why: CLI からテンプレート Form を作ると、ファイル所有者は CLI ユーザー
+      //      （gas-deploy-bot サービスアカウント等）になり、別ドメインの生徒・教師は
+      //      アクセスできない。これでドメイン全体（naha-okinawa.ed.jp 等）に
+      //      reader として共有することで access denied を解消する。
+      //
+      // 注意: Drive Advanced Service は使わず UrlFetchApp + REST API でアクセス。
+      //      auth/drive スコープが appsscript.json に必要（既に granted）。
+      if (!params.fileId || typeof params.fileId !== 'string') {
+        return createErrorResponse('fileId is required');
+      }
+      if (!params.domain || typeof params.domain !== 'string') {
+        return createErrorResponse('domain is required (e.g. "naha-okinawa.ed.jp")');
+      }
+      const role = ['reader', 'writer', 'commenter'].includes(params.role) ? params.role : 'reader';
+      try {
+        const token = ScriptApp.getOAuthToken();
+        const url = 'https://www.googleapis.com/drive/v3/files/' +
+                    encodeURIComponent(params.fileId) + '/permissions?supportsAllDrives=true';
+        const resp = UrlFetchApp.fetch(url, {
+          method: 'post',
+          contentType: 'application/json',
+          muteHttpExceptions: true,
+          headers: { Authorization: 'Bearer ' + token },
+          payload: JSON.stringify({
+            type: 'domain',
+            role: role,
+            domain: params.domain,
+            allowFileDiscovery: false  // Drive 検索結果には出さない（リンクを持つ人のみ）
+          })
+        });
+        const code = resp.getResponseCode();
+        const body = resp.getContentText();
+        if (code >= 400) {
+          return createErrorResponse('Drive API error ' + code + ': ' + body.substring(0, 300));
+        }
+        return createSuccessResponse('Shared with domain', {
+          fileId: params.fileId,
+          domain: params.domain,
+          role,
+          permission: JSON.parse(body)
+        });
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
     }
 
     case 'clearDataRows': {
