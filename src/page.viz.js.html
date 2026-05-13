@@ -26,6 +26,34 @@
     return;
   }
 
+  /**
+   * Viz レンダラの成功テレメトリ。各モードを初回描画したとき 1 回だけ Cloud Logging に
+   * 送る。CLI から `npm run logs:cloud --severity INFO` で全機能が動いていることを確認可能。
+   *
+   * Why: ログから「全機能が使えるか」を判定するため、サイレントな fallback を可視化する。
+   *      reportClientError の rate limit (30件/5min/email) を消費しないよう、初回のみ。
+   */
+  const _vizHeartbeatSeen = new Set();
+  function vizHeartbeat(mode, extra) {
+    try {
+      const key = String(mode || '?');
+      if (_vizHeartbeatSeen.has(key)) return;
+      _vizHeartbeatSeen.add(key);
+      if (window.ClientErrorReporter && typeof window.ClientErrorReporter.report === 'function') {
+        window.ClientErrorReporter.report({
+          level: 'log',
+          message: '[viz/heartbeat] ' + mode + ' rendered',
+          context: 'viz/' + mode,
+          url: window.location.href,
+          userAgent: navigator.userAgent.substring(0, 100),
+          // 軽量メタ（個人情報なし）
+          source: JSON.stringify(extra || {}).substring(0, 200)
+        });
+      }
+      try { console.info('[viz/heartbeat]', mode, extra || {}); } catch (_) {}
+    } catch (_) {}
+  }
+
   // ---------------------------------------------------------------------
   // CDN: d3 v7 のみ。d3-beeswarm プラグインは v7 非対応なので d3-force で代替。
   // 学校ネットワークで cdnjs が遅延・失敗するケースに備え jsdelivr もフォールバックとして
@@ -446,6 +474,7 @@
         this.elements.answerCount.innerHTML =
           this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + current.length + '件</span>';
       }
+      vizHeartbeat('numberline', { rowCount: rows.length, current: current.length, ghost: ghost.length });
     } catch (e) {
       console.error('renderNumberLine: failed', e);
       throw e;
@@ -605,6 +634,7 @@
         this.elements.answerCount.innerHTML =
           this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + current.length + '件</span>';
       }
+      vizHeartbeat('matrix', { rowCount: rows.length, current: current.length, ghost: ghost.length });
     } catch (e) {
       console.error('renderMatrix: failed', e);
       throw e;
@@ -758,6 +788,7 @@
         this.elements.answerCount.innerHTML =
           this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + rows.length + '件</span>';
       }
+      vizHeartbeat('wordcloud', { rowCount: rows.length, words: words.length });
     } catch (e) {
       console.error('renderWordRanking: failed', e);
       throw e;
@@ -871,6 +902,7 @@
         this.elements.answerCount.innerHTML =
           this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>' + rows.length + '件</span>';
       }
+      vizHeartbeat('pie', { rowCount: rows.length, categories: cats.length });
     } catch (e) {
       console.error('renderPie: failed', e);
       throw e;

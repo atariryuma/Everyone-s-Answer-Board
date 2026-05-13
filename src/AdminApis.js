@@ -950,6 +950,39 @@ function dispatchAdminOperation(operation, params) {
       return applyConfigPatch_(params.userId, patch, { publish: false });
     }
 
+    case 'clearDataRows': {
+      // データ行（2行目以降）を全削除して、ヘッダーだけ残す。
+      // appendRows と組み合わせて「テストデータをきれいに作り直す」用途。
+      // 本番運用では絶対に使わないこと（明示の確認フラグ params.confirm = "yes-i-mean-it" 必須）。
+      if (!params.spreadsheetId || typeof params.spreadsheetId !== 'string') {
+        return createErrorResponse('spreadsheetId is required');
+      }
+      if (!params.sheetName || typeof params.sheetName !== 'string') {
+        return createErrorResponse('sheetName is required');
+      }
+      if (params.confirm !== 'yes-i-mean-it') {
+        return createErrorResponse('confirm: "yes-i-mean-it" is required (safeguard against accidental data loss)');
+      }
+      try {
+        const ss = SpreadsheetApp.openById(params.spreadsheetId);
+        const sheet = ss.getSheetByName(params.sheetName);
+        if (!sheet) return createErrorResponse(`Sheet "${params.sheetName}" not found`);
+        const lastRow = sheet.getLastRow();
+        if (lastRow <= 1) {
+          return createSuccessResponse('No data rows to clear', { deletedCount: 0 });
+        }
+        // header (row 1) は残し、row 2 〜 lastRow を削除
+        sheet.deleteRows(2, lastRow - 1);
+        return createSuccessResponse('Data rows cleared', {
+          spreadsheetId: params.spreadsheetId,
+          sheetName: params.sheetName,
+          deletedCount: lastRow - 1
+        });
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
     case 'appendRows': {
       // Why: テストデータ投入用。Spreadsheet に複数 row を一括 append。
       //      Forms 経由ではなく直接書き込むので、本番運用では使わないこと。

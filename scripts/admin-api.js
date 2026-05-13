@@ -52,7 +52,7 @@ const OPERATIONS = [
   // Multi-board profiles (v4)
   'listProfiles', 'saveProfile', 'loadProfile', 'deleteProfile',
   // Data ops (v5) — テストデータ投入専用
-  'appendRows',
+  'appendRows', 'clearDataRows',
 ];
 
 /**

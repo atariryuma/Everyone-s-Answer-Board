@@ -2313,6 +2313,27 @@
           if (typeof this.__vizInjectControls === 'function') this.__vizInjectControls();
           if (typeof this.__vizRefreshControls === 'function') this.__vizRefreshControls();
         }
+
+        // Why: 初回描画成功を Cloud Logging に通知（mode/profile ごと 1 回のみ）。
+        //      CLI から「全機能が動いた」を確認するための telemetry。
+        try {
+          if (!this._renderedHeartbeats) this._renderedHeartbeats = new Set();
+          const beaconKey = (this.state.activeProfile || 'noprofile') + ':' + mode;
+          if (!this._renderedHeartbeats.has(beaconKey) &&
+              window.ClientErrorReporter && typeof window.ClientErrorReporter.report === 'function') {
+            this._renderedHeartbeats.add(beaconKey);
+            window.ClientErrorReporter.report({
+              level: 'log',
+              message: '[viz/dispatched] ' + mode + ' rendered',
+              context: 'dispatcher',
+              source: JSON.stringify({
+                profile: this.state.activeProfile || null,
+                rowCount: (this.state.currentAnswers || []).length,
+                viewerIsTeacher: this.state.isEditor === true
+              }).substring(0, 200)
+            });
+          }
+        } catch (_) {}
         return result;
       } catch (error) {
         console.error('❌ renderBoard: dispatcher error (mode=' + mode + '), falling back to cards:', error);
