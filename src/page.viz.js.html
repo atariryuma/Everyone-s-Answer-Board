@@ -55,50 +55,17 @@
   }
 
   // ---------------------------------------------------------------------
-  // CDN: d3 v7 のみ。d3-beeswarm プラグインは v7 非対応なので d3-force で代替。
-  // 学校ネットワークで cdnjs が遅延・失敗するケースに備え jsdelivr もフォールバックとして
-  // 登録（CSP にも追加）。失敗してもエラー時に診断情報が Cloud Logging に送られる。
+  // d3 v7 は src/d3.min.html で同梱しているため、すでに window.d3 が利用可能。
+  // 旧 CDN 動的ロード方式は Edge のトラッキング防止 / Chrome 拡張による
+  // HTMLScriptElement.src setter 干渉で「Assignment to constant variable」
+  // を引き起こす環境があったため、CDN 依存を完全に排除した。
+  //
+  // ensureD3Loaded() は後方互換のために残し、即座に解決する Promise を返す。
+  // window.d3 が無いことは通常起きないが、安全のため明示的に検査する。
   // ---------------------------------------------------------------------
-  const D3_CDN_URLS = [
-    'https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js',
-    'https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js'
-  ];
-
-  let d3LoadPromise = null;
-
   StudyQuestApp.prototype.ensureD3Loaded = function () {
     if (window.d3) return Promise.resolve(window.d3);
-    if (d3LoadPromise) return d3LoadPromise;
-
-    d3LoadPromise = new Promise((resolve, reject) => {
-      let attempt = 0;
-      const tryLoad = () => {
-        if (attempt >= D3_CDN_URLS.length) {
-          reject(new Error('d3 load failed from all CDN candidates'));
-          return;
-        }
-        const src = D3_CDN_URLS[attempt++];
-        const script = document.createElement('script');
-        script.src = src;
-        script.async = true;
-        script.onload = () => {
-          if (window.d3) {
-            resolve(window.d3);
-          } else {
-            script.remove();
-            tryLoad();
-          }
-        };
-        script.onerror = () => {
-          script.remove();
-          tryLoad();
-        };
-        document.head.appendChild(script);
-      };
-      tryLoad();
-    });
-
-    return d3LoadPromise;
+    return Promise.reject(new Error('d3 not bundled — src/d3.min.html include missing?'));
   };
 
   // ---------------------------------------------------------------------
