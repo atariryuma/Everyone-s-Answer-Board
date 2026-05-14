@@ -421,7 +421,6 @@
     background: rgba(56, 189, 248, 0.12);
     color: var(--brand-text, #e2e8f0);
   }
-  .viz-profile-pill.active,
   .viz-profile-pill.current.viewing,
   .viz-profile-pill.viewing {
     background: rgba(56, 189, 248, 0.35);
@@ -480,57 +479,7 @@
     .viz-profile-return { font-size: 0.78rem; padding: 0.22rem 0.45rem; }
   }
 
-  /* モード切替ボタン: アイコン + 短文（アイコンのみだと用途が分かりにくいため） */
-  .viz-mode-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.3rem;
-    padding: 0.3rem 0.6rem;
-    border-radius: 0.4rem;
-    border: 1px solid rgba(148, 163, 184, 0.3);
-    background: rgba(30, 41, 59, 0.6);
-    color: var(--brand-text, #e2e8f0);
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 500;
-    transition: background 0.15s, border-color 0.15s, transform 0.1s;
-    white-space: nowrap;
-  }
-  .viz-mode-btn .vmb-icon { font-size: 0.95rem; line-height: 1; }
-  .viz-mode-btn .vmb-text { font-size: 0.82rem; }
-  .viz-mode-btn:hover {
-    background: rgba(56, 189, 248, 0.18);
-    border-color: rgba(56, 189, 248, 0.5);
-    transform: translateY(-1px);
-  }
-  .viz-mode-btn.active {
-    background: rgba(56, 189, 248, 0.35);
-    border-color: #38bdf8;
-    color: #fff;
-    box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.6) inset;
-  }
-  .viz-icon-btn {
-    width: 2rem;
-    height: 2rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    border-radius: 0.4rem;
-    border: 1px solid rgba(148, 163, 184, 0.3);
-    background: rgba(30, 41, 59, 0.6);
-    color: var(--brand-text, #e2e8f0);
-    cursor: pointer;
-    font-size: 1rem;
-    transition: background 0.15s, border-color 0.15s;
-  }
-  .viz-icon-btn:hover { background: rgba(56, 189, 248, 0.18); border-color: rgba(56, 189, 248, 0.5); }
-  .viz-icon-btn.active { background: rgba(56, 189, 248, 0.35); border-color: #38bdf8; }
-
   body.projector-mode .viz-toolbar { padding: 0.6rem 1rem; background: rgba(10, 14, 26, 0.92); }
-  body.projector-mode .viz-mode-btn { font-size: 1rem; padding: 0.45rem 0.85rem; }
-  body.projector-mode .viz-mode-btn .vmb-text { font-size: 1rem; }
-  body.projector-mode .viz-icon-btn { width: 2.4rem; height: 2.4rem; font-size: 1.25rem; }
   /* v2680: 電子黒板 (projector-mode) で議論支援ツールを教室後ろからも視認可能に拡大。
      議論前 / 比較 / 軌跡 / リセット の全ボタンとラベルを大きめに。 */
   body.projector-mode .viz-btn { font-size: 1rem; padding: 0.5rem 0.9rem; }
@@ -542,8 +491,6 @@
 
   @media (max-width: 640px) {
     .viz-toolbar { padding: 0.3rem 0.4rem; gap: 0.3rem; }
-    .viz-mode-btn { font-size: 0.78rem; padding: 0.25rem 0.45rem; }
-    .viz-mode-btn .vmb-text { display: none; }    /* モバイルではアイコンのみで省スペース */
     .viz-profile-select { max-width: 140px; font-size: 0.82rem; }
   }
 
@@ -630,6 +577,74 @@
   }
   @media (max-width: 768px) {
     .viz-compare-wrap { grid-template-columns: 1fr; }
+  }
+
+  /* 比較モードのペイン内インラインカード (v2686)
+   *   旧設計 (フルスクリーンモーダル / ボトムドロワー) は overlay でチャート操作を
+   *   阻害したり位置調整が複雑だった。新設計は各ペインの末尾に小さなカードを
+   *   インライン表示し、構造的に「ペインに属する説明」として配置する。
+   *   - overlay ではないので chart のドットは常にクリック可能
+   *   - 各ペインは独立、左を見ながら右をクリックできる
+   *   - 閉じる × ボタンで個別にクリアできる */
+  .viz-pane-card {
+    margin-top: 0.5rem;
+    padding: 0.55rem 0.8rem 0.5rem;
+    background: rgba(15, 23, 42, 0.85);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 0.5rem;
+    position: relative;
+    font-size: 0.95rem;
+    line-height: 1.4;
+    color: var(--brand-text, #e2e8f0);
+  }
+  .viz-pane-card[hidden] { display: none; }
+  .viz-pane-card-name {
+    color: var(--brand-text-muted, #94a3b8);
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+    padding-right: 1.4rem;  /* close ボタンとの干渉防止 */
+  }
+  .viz-pane-card-text {
+    color: var(--brand-text, #e2e8f0);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .viz-pane-card-reason {
+    margin-top: 0.3rem;
+    color: rgba(226, 232, 240, 0.82);
+    font-size: 0.88rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .viz-pane-card-close {
+    position: absolute;
+    top: 0.3rem;
+    right: 0.4rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(220, 38, 38, 0.7);
+    border: 0;
+    border-radius: 50%;
+    color: white;
+    font-size: 0.95rem;
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+    transition: background-color 0.15s, transform 0.1s;
+  }
+  .viz-pane-card-close:hover {
+    background: rgba(220, 38, 38, 0.95);
+    transform: scale(1.08);
+  }
+  body.projector-mode .viz-pane-card {
+    font-size: 1.1rem;
+  }
+  body.projector-mode .viz-pane-card-text {
+    font-size: 1.15rem;
   }
 
   /* 象限キーワードパネル (matrix 専用)。「個・群・意味」三層の「意味」レイヤー。

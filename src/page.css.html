@@ -816,93 +816,21 @@ button.highlight-badge:hover {
     inset 0 0 20px rgba(192, 132, 252, 0.1) !important;
   position: relative;
 }
-/* 比較モード時: モーダルラッパを広げ、左右2カードを並べて表示
- *   非 compare 時は右カード hidden、wrapper max-w-5xl (Tailwind デフォルト)。
- *   compare 時は wrapper を広げて 2 カード並べる。各カードは 1/2 ずつ。
- */
-/* v2683: 比較モードのモーダルは画面下部のドロワー化。
- *   論理的破綻の修正: 旧フルスクリーンモーダルはチャートを覆ってしまい、
- *   「左右のドットを順にクリックして比較」という比較モード本来の操作が不可能だった。
- *   ドロワー化することで:
- *     - チャートが画面上半分に常に可視 + クリック可
- *     - モーダル内容は下半分に滞在、両側カード同時表示
- *     - container 自体は pointer-events:none で「クリック透過」、カードのみ反応
- *     - 暗幕 (backdrop) は撤廃 (チャート視認のため)
- */
-#answerModalContainer.modal-compare {
-  /* fixed inset-0 → fixed bottom 0 のみ。top は auto で高さ自由 */
-  top: auto;
-  align-items: stretch;
-  justify-content: stretch;
-  /* 暗幕撤廃 — チャートをユーザーが見える状態に */
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  /* container クリックは通過 → チャートのドットがクリック可能に */
-  pointer-events: none;
-  /* 下半分（45vh）にドロワー配置 */
-  max-height: 45vh;
-  padding: 0.5rem 0.75rem 0.75rem;
-  border-top: 1px solid rgba(148, 163, 184, 0.18);
-}
-/* container は pointer-events:none だが、子（wrapper/cards）は auto に戻して反応 */
-#answerModalContainer.modal-compare > * {
-  pointer-events: auto;
-}
-#answerModalContainer.modal-compare #answerModalWrapper {
-  /* 旧 max-w-5xl/7xl 撤廃、ドロワーは画面幅 fullを使う */
-  max-width: 100%;
-  width: 100%;
-  max-height: 100%;
-  align-items: stretch;
-}
-#answerModalContainer.modal-compare #answerModalCard,
-#answerModalContainer.modal-compare #answerModalCardRight {
-  flex: 1 1 0;
-  min-width: 0;
-  /* ドロワーは縦 45vh と狭いので padding/font-size を圧縮 */
-  max-height: 100%;
-  padding: 0.85rem 1rem;
-}
-/* ドロワー内の設問テキストはコンパクトに (元: 3xl-4xl、新: lg-xl) */
-#answerModalContainer.modal-compare #modalAnswer p,
-#answerModalContainer.modal-compare #modalAnswerRight p {
-  font-size: 1.15rem;
-  line-height: 1.4;
-}
-/* ドロワー内の名前リアクション行も圧縮 */
-#answerModalContainer.modal-compare #modalStudentName,
-#answerModalContainer.modal-compare #modalStudentNameRight {
-  font-size: 1.05rem;
-}
-
-/* ドロワー登場アニメーション (下からスライドイン)。
- *   通常モーダルの modalFade と同時付与されるが、より強い slide が優先される。 */
-@keyframes modalSlideUp {
-  0% { transform: translateY(100%); opacity: 0; }
-  100% { transform: translateY(0); opacity: 1; }
-}
-#answerModalContainer.modal-compare.modal-fade {
-  animation: modalSlideUp 0.25s ease-out;
-}
-
-/* 比較モードのサイドラベル (📌 議論前 / 📊 現在) */
+/* v2686: 比較モードはモーダル/ドロワーを使わず、各ペイン内にインライン
+ *   カードを表示する simpler 設計に変更。ドロワーは廃止。
+ *   旧モーダル class (.modal-compare 等) は単一モーダル時のみ使用するため
+ *   この CSS ブロックは撤廃。compareモードの cardスタイルは page.viz.css.html
+ *   側 (.viz-pane-card) に追加する。 */
 .modal-side-label {
   letter-spacing: 0.05em;
   flex-shrink: 0;
 }
-/* 反対側ドット待ちのプレースホルダー文言 */
 .modal-empty-placeholder {
   color: rgba(148, 163, 184, 0.7);
   font-size: 1.1rem;
   text-align: center;
   padding: 2rem 1rem;
   font-style: italic;
-}
-/* ドロワー内ではプレースホルダーもコンパクトに */
-#answerModalContainer.modal-compare .modal-empty-placeholder {
-  font-size: 0.95rem;
-  padding: 1rem 0.75rem;
 }
 /* .render-optimized class moved to UnifiedStyles.css.html for consistency */
 .modal-fade { animation: modalFade 0.2s ease-out; }

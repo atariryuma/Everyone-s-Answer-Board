@@ -2125,35 +2125,15 @@
           ? result.displaySettings.boardMode
           : 'board';
 
-        // Why: モード解決は profile を切り替えたタイミングを境界とする。activeProfile が
-        //      切り替わった瞬間は sessionStorage の override をクリアして server の値を採用。
-        //      これがないと「教師が profile を切替えたのに mode が前の sessionStorage 値で
-        //      上書きされる」silent bug が起きる。同一 profile 内では sessionStorage の値を
-        //      尊重して polling のたびにリセットされない。
-        const serverActiveProfile = (result.profiles && result.profiles.active) || null;
-        const lastSeenProfileKey = 'viz:lastActiveProfile:v1';
-        let lastSeenProfile = null;
-        try { lastSeenProfile = sessionStorage.getItem(lastSeenProfileKey); } catch (_) {}
-        if (serverActiveProfile !== lastSeenProfile) {
-          // profile が変わった → mode override をクリア
-          try { sessionStorage.removeItem('viz:teacherMode:v1'); } catch (_) {}
-          try { sessionStorage.setItem(lastSeenProfileKey, serverActiveProfile || ''); } catch (_) {}
-        }
-
+        // boardMode は profile (= server) が決める。teacher の手動 override 機構は撤去済。
+        //   ?boardMode=X URL パラメータだけは検証 / プレビュー用途で残す。
         let overrideMode = null;
         try {
-          const params = new URLSearchParams(window.location.search);
-          const urlMode = params.get('boardMode');
+          const urlMode = new URLSearchParams(window.location.search).get('boardMode');
           if (urlMode && /^(auto|board|numberline|matrix|wordcloud|pie)$/.test(urlMode)) {
             overrideMode = urlMode;
           }
-          if (!overrideMode) {
-            const stored = sessionStorage.getItem('viz:teacherMode:v1');
-            if (stored && /^(auto|board|numberline|matrix|wordcloud|pie)$/.test(stored)) {
-              overrideMode = stored;
-            }
-          }
-        } catch (_) { /* sessionStorage 不可な環境では override 無効 */ }
+        } catch (_) { /* URL parse 失敗時は server mode をそのまま使用 */ }
 
         this.state.boardMode = overrideMode || serverMode;
         this.state.serverBoardMode = serverMode;
@@ -2435,16 +2415,13 @@
         // タイムライン位置が指定されていれば、その snapshot で描画
         const result = await runWithTimeline(renderOne);
 
-        // 教師用モード切替バーは全モード共通で注入（board モードでも viz への切替が可能）
+        // toolbar (profile pills + 議論ツール) は冪等に再注入。inject → refresh の順で OK。
         if (typeof this.__vizInjectModeBar === 'function') this.__vizInjectModeBar();
         if (typeof this.__vizRefreshModeBar === 'function') this.__vizRefreshModeBar();
-        // multi-board profile セレクタ（2 件以上ある場合のみ表示される）
         if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
-
-        // viz モードでは UI 補助（コントロール注入 + state 更新）
-        if (mode !== 'board') {
-          if (typeof this.__vizInjectControls === 'function') this.__vizInjectControls();
-          if (typeof this.__vizRefreshControls === 'function') this.__vizRefreshControls();
+        // viz モード時のみ議論ツール (議論前 / 比較 / タイムライン) の state を再計算
+        if (mode !== 'board' && typeof this.__vizRefreshControls === 'function') {
+          this.__vizRefreshControls();
         }
 
         // Why: 初回描画成功を Cloud Logging に通知（mode/profile ごと 1 回のみ）。

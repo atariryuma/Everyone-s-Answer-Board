@@ -606,57 +606,6 @@ test('vizComputeSwings: M2 Euclidean distance', () => {
 });
 
 // =====================================================================
-// __vizSetMode: 授業中のモード即時切替（道徳 5 モード）
-// =====================================================================
-
-test('__vizSetMode: updates state.boardMode for valid mode', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const setMode = StudyQuestApp.prototype.__vizSetMode;
-  const fakeApp = {
-    state: { boardMode: 'board' },
-    renderBoard: () => {}
-  };
-  setMode.call(fakeApp, 'numberline');
-  assert.equal(fakeApp.state.boardMode, 'numberline');
-});
-
-test('__vizSetMode: silently rejects invalid mode (no state change)', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const setMode = StudyQuestApp.prototype.__vizSetMode;
-  const fakeApp = {
-    state: { boardMode: 'numberline' },
-    renderBoard: () => {}
-  };
-  setMode.call(fakeApp, 'INVALID');
-  assert.equal(fakeApp.state.boardMode, 'numberline');
-});
-
-test('__vizSetMode: resets timeline/compare on mode change', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const setMode = StudyQuestApp.prototype.__vizSetMode;
-  let renderCalled = false;
-  const fakeApp = {
-    state: { boardMode: 'numberline', vizTimelineIndex: 3, vizCompareMode: true },
-    renderBoard: () => { renderCalled = true; }
-  };
-  setMode.call(fakeApp, 'pie');
-  assert.equal(fakeApp.state.vizTimelineIndex, null);
-  assert.equal(fakeApp.state.vizCompareMode, false);
-  assert.equal(renderCalled, true);
-});
-
-test('__vizSetMode: accepts all 5 modes (board/numberline/matrix/wordcloud/pie)', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const setMode = StudyQuestApp.prototype.__vizSetMode;
-  const modes = ['board', 'numberline', 'matrix', 'wordcloud', 'pie'];
-  for (const m of modes) {
-    const fakeApp = { state: { boardMode: 'auto' }, renderBoard: () => {} };
-    setMode.call(fakeApp, m);
-    assert.equal(fakeApp.state.boardMode, m, `mode "${m}" should be accepted`);
-  }
-});
-
-// =====================================================================
 // __vizRenderCompare: dual-modal 対応のための左側ペイン情報保存 + side マーカー
 // =====================================================================
 
@@ -687,6 +636,8 @@ function loadVizContextForCompare(beforeSnapshot) {
       id: '',
       className: '',
       innerHTML: '',
+      hidden: false,
+      dataset: {},  // v2686: __vizRenderCompare が beforeCard.dataset.side を設定するため必要
       _attrs: {},
       _children: [],
       classList: { add: () => {}, remove: () => {}, toggle: () => {} },

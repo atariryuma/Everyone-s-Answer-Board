@@ -660,13 +660,17 @@
         .on('mouseleave', () => hideTooltip())
         .on('click', (event, d) => {
           hideTooltip();
-          if (typeof selfL.showAnswerModal === 'function') {
-            // 比較モード時、クリック元の data-viz-side ('left'/'right') を取り出して
-            // モーダル側でどちらのカードに描画するかを判定させる。通常モードは null。
-            const sideHost = event.target && event.target.closest
-              ? event.target.closest('[data-viz-side]') : null;
-            const side = sideHost ? sideHost.getAttribute('data-viz-side') : null;
-            selfL.showAnswerModal(d.data.rowIndex, side);
+          // v2686: 比較モードでは overlay モーダルではなくペイン内インラインカードに表示
+          //   (旧モーダル/ドロワーはチャート遮蔽問題を起こしていた)。
+          //   通常モードは従来通り showAnswerModal でフォーカス capture。
+          const sideHost = event.target && event.target.closest
+            ? event.target.closest('[data-viz-side]') : null;
+          const side = sideHost ? sideHost.getAttribute('data-viz-side') : null;
+          if (side && selfL.state && selfL.state.vizCompareMode
+              && typeof selfL.__showPaneCard === 'function') {
+            selfL.__showPaneCard(d.data.rowIndex, side);
+          } else if (typeof selfL.showAnswerModal === 'function') {
+            selfL.showAnswerModal(d.data.rowIndex);
           } else {
             showTooltip(event, d.data, selfL);
           }
@@ -923,16 +927,18 @@
         .on('mouseenter', (event, d) => showTooltip(event, d.data, self))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, self))
         .on('mouseleave', () => hideTooltip())
-        // クリック: tooltip を閉じてリアクション可能なモーダルを開く (既存資産活用)
+        // クリック: tooltip を閉じてカード表示
+        //   v2686: 比較モードならペイン内インラインカードへ、それ以外はモーダルへ。
         .on('click', (event, d) => {
           hideTooltip();
-          if (typeof self.showAnswerModal === 'function') {
-            // 比較モード時の左右ペイン判別。__vizRenderCompare 側で svg host に
-            // data-viz-side="left"/"right" を付与してあるので、ここで取り出して渡す。
-            const sideHost = event.target && event.target.closest
-              ? event.target.closest('[data-viz-side]') : null;
-            const side = sideHost ? sideHost.getAttribute('data-viz-side') : null;
-            self.showAnswerModal(d.data.rowIndex, side);
+          const sideHost = event.target && event.target.closest
+            ? event.target.closest('[data-viz-side]') : null;
+          const side = sideHost ? sideHost.getAttribute('data-viz-side') : null;
+          if (side && self.state && self.state.vizCompareMode
+              && typeof self.__showPaneCard === 'function') {
+            self.__showPaneCard(d.data.rowIndex, side);
+          } else if (typeof self.showAnswerModal === 'function') {
+            self.showAnswerModal(d.data.rowIndex);
           } else {
             showTooltip(event, d.data, self);  // フォールバック
           }
@@ -1668,26 +1674,6 @@
     } catch (_) {}
   };
 
-  /**
-   * 教師用モード切替バー。view 画面の上部に注入し、5 モードへの即時切替を提供。
-   *
-   * Why: 道徳 45 分授業中、管理画面に戻らず電子黒板の前で「導入(円グラフ) → 展開(数直線) →
-   *      終末(ワードランキング)」を切替えられるようにする。state.boardMode を更新して
-   *      renderBoard を一発呼ぶだけで完結。データ再読み込み不要（同一 spreadsheet）。
-   *
-   *      board モード（純粋な掲示板）にもバーは出す（教師が viz モードへ切替えたい時に必要）。
-   *      非教師（児童）には注入しない。
-   */
-  // Why: コンパクト化 — テキスト「数直線」ではなくアイコン + 短いラベルにして
-  //      ヘッダーに収まるようにする。tooltip で詳細名を提供。
-  const MODE_BAR_ITEMS = [
-    { id: 'board',      label: '📋', text: '掲示板',  desc: '掲示板（カード一覧）' },
-    { id: 'numberline', label: '📏', text: '数直線',  desc: '数直線（ポジショニング）' },
-    { id: 'matrix',     label: '🎯', text: '散布図',  desc: '散布図（2軸マトリクス）' },
-    { id: 'wordcloud',  label: '🔠', text: 'ワード',  desc: 'ワードランキング（頻出語）' },
-    { id: 'pie',        label: '🥧', text: '円',     desc: '円グラフ（選択肢分布）' }
-  ];
-
   function isTeacher(app) {
     // Why: page.js の state は isEditor / isAdminUser / showAdminFeatures フラグを持つ。
     //      これに加えて以下も認める：
@@ -1950,34 +1936,8 @@
     if (footer) footer.style.display = (cur === 'board') ? '' : 'none';
   }
 
-  /**
-   * Programmatic mode switch (called from mode bar click handler and URL handlers).
-   * @param {string} mode - 'board' | 'numberline' | 'matrix' | 'wordcloud' | 'pie'
-   */
-  StudyQuestApp.prototype.__vizSetMode = function (mode) {
-    if (!/^(board|numberline|matrix|wordcloud|pie)$/.test(mode)) return;
-    this.state.boardMode = mode;
-    // Why: タブ内で持続させる。polling 後の再描画でもユーザー選択を尊重。
-    try { sessionStorage.setItem('viz:teacherMode:v1', mode); } catch (_) {}
-    // 切替時は timeline 位置・compare モードをリセット（新モードでの誤動作回避）
-    this.state.vizTimelineIndex = null;
-    this.state.vizCompareMode = false;
-    // v2683: モード切替時にモーダルが開いていれば閉じる。
-    //   旧モード (matrix) で開いていたモーダルが新モード (numberline) でも残ると、
-    //   stale なドット情報を表示し続けて教師が混乱する。クリーンに閉じる。
-    if (typeof this.hideAnswerModal === 'function') this.hideAnswerModal();
-    // 同じデータで再描画
-    this.renderBoard(false, false, []);
-    refreshModeBar(this);
-  };
-
-  StudyQuestApp.prototype.__vizClearTeacherMode = function () {
-    try { sessionStorage.removeItem('viz:teacherMode:v1'); } catch (_) {}
-    if (this.state.serverBoardMode) {
-      this.__vizSetMode(this.state.serverBoardMode);
-    }
-  };
-
+  // mode 切替は profile 切替 (boardMode を server-resolved で決定) に統一済み。
+  //   旧 __vizSetMode / __vizClearTeacherMode / 'viz:teacherMode:v1' sessionStorage は撤去。
   StudyQuestApp.prototype.__vizInjectModeBar = function () { ensureViewToolbar(this); };
   StudyQuestApp.prototype.__vizRefreshModeBar = function () { refreshModeBar(this); };
 
@@ -2148,16 +2108,11 @@
     if (!name) return;
     if (typeof google === 'undefined' || !google.script || !google.script.run) return;
 
-    // CRITICAL: profile 切替前に session-scoped state を全 reset。
-    //   旧 profile の snapshot / 議論前 / timeline idx を新 profile に持ち込むと、
-    //   別 SS の snapshot をスライダーで表示する等の不整合が起きる。
-    //   __vizSetMode (mode 切替) は同等処理を行う - 整合のため両者を同じパターンに揃える。
+    // profile 切替前に session-scoped state を reset（旧 profile の snapshot を新 profile に
+    //   持ち込むと、別 SS の snapshot をスライダーで表示する等の不整合が起きるため）。
     try {
       sessionStorage.removeItem(SNAPSHOT_KEY);
       sessionStorage.removeItem(SNAPSHOT_BEFORE_KEY);
-      // teacher が手動 mode 切替した記録も profile 跨ぎでは捨てる
-      // (profile が boardMode を持つので override が再発するのを防ぐ)
-      sessionStorage.removeItem('viz:teacherMode:v1');
     } catch (_) {}
     this.state.vizTimelineIndex = null;
     this.state.vizCompareMode = false;
@@ -2428,7 +2383,8 @@
     return result;
   }
 
-  StudyQuestApp.prototype.__vizInjectControls = function () { ensureViewToolbar(this); };
+  // __vizInjectControls は __vizInjectModeBar と同じ ensureViewToolbar 呼び出しだったため撤去。
+  //   toolbar 注入は __vizInjectModeBar / __vizInjectProfileSelector が冪等に行う。
   StudyQuestApp.prototype.__vizRefreshControls = function () { refreshVizControlsState(this); };
   StudyQuestApp.prototype.__vizWithTimelineSwap = function (fn) { return withTimelineSwap(this, fn); };
   StudyQuestApp.prototype.__vizGetBeforeSnapshot = function () { return loadBeforeSnapshot(); };
@@ -2491,11 +2447,18 @@
     beforePane.innerHTML = `<h4>${leftLabel}</h4>`;
     const beforeSvgHost = document.createElement('div');
     beforeSvgHost.id = 'vizCompareLeftHost';
-    // モーダル側でクリック発火元のペインを判別するためのマーカ。
-    //   ドット click → event.target.closest('[data-viz-side]') で 'left'/'right' を取り出し、
-    //   showAnswerModal(rowIndex, side) に渡して該当カードへ表示する。
+    // ドット click → event.target.closest('[data-viz-side]') で 'left'/'right' を判別し、
+    //   ペイン末尾の .viz-pane-card にクリックしたドットの意見をインライン表示する。
     beforeSvgHost.setAttribute('data-viz-side', 'left');
     beforePane.appendChild(beforeSvgHost);
+    // 各ペインの末尾にインラインカード slot を準備 (v2686)。
+    //   旧設計のフルスクリーンモーダル/ドロワーを廃止し、ペイン内に「クリックしたドットの
+    //   意見」を直接表示。overlay ではないので、ユーザーは左を見ながら右をクリックできる。
+    const beforeCard = document.createElement('div');
+    beforeCard.className = 'viz-pane-card';
+    beforeCard.dataset.side = 'left';
+    beforeCard.hidden = true;
+    beforePane.appendChild(beforeCard);
 
     const afterPane = document.createElement('div');
     afterPane.className = 'viz-compare-pane';
@@ -2504,9 +2467,14 @@
     afterSvgHost.id = 'vizCompareRightHost';
     afterSvgHost.setAttribute('data-viz-side', 'right');
     afterPane.appendChild(afterSvgHost);
+    const afterCard = document.createElement('div');
+    afterCard.className = 'viz-pane-card';
+    afterCard.dataset.side = 'right';
+    afterCard.hidden = true;
+    afterPane.appendChild(afterCard);
 
     // 左側ドットのクリック → snapshot 内 row を参照する必要があるため、
-    //   leftSource (snapshot) と leftLabel を state に保存して showAnswerModal('left') から
+    //   leftSource (snapshot) と leftLabel を state に保存して __showPaneCard('left') から
     //   ルックアップ可能にする。右側は通常の currentAnswers でよい。
     this.state.vizCompareLeftSource = leftSource;
     this.state.vizCompareLeftLabel = leftLabel;
@@ -2538,6 +2506,56 @@
     this.elements.answersContainer = originalAnswers;
     ensureViewToolbar(this);
     refreshVizControlsState(this);
+  };
+
+  // 比較モードの「クリックしたドットの意見」をペイン末尾のカードにインライン表示。
+  //   v2686 で旧フルスクリーンモーダル/ドロワー方式を廃止し、各ペイン内で完結する
+  //   超シンプルな card-fill 方式に変更。overlay でないので chart のドットは常時
+  //   クリック可能 = 左を見ながら右をクリックして比較できる。
+  StudyQuestApp.prototype.__showPaneCard = function (rowIndex, side) {
+    if (side !== 'left' && side !== 'right') return;
+    const selector = '.viz-pane-card[data-side="' + side + '"]';
+    const card = document.querySelector(selector);
+    if (!card) return;
+
+    // データ取得: 左側は snapshot rows、右側は live currentAnswers。
+    let data;
+    if (side === 'left'
+        && this.state.vizCompareLeftSource
+        && Array.isArray(this.state.vizCompareLeftSource.rows)) {
+      data = this.state.vizCompareLeftSource.rows.find(r => r.rowIndex == rowIndex);
+    } else {
+      data = (this.state.currentAnswers || []).find(r => r.rowIndex == rowIndex);
+    }
+    if (!data) return;
+
+    const showName = this.state && this.state.displayMode === 'named';
+    let name = '匿名';
+    if (showName) {
+      if (data.name) name = data.name;
+      else if (data.email) name = data.email.split('@')[0];
+    }
+    const escape = (window.sharedUtilities && window.sharedUtilities.security
+                    && window.sharedUtilities.security.escapeHtml)
+                 || ((s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
+                       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+                     }[c])));
+    const opinion = escape(data.opinion || data.answer || '');
+    const reason = data.reason ? escape(data.reason) : '';
+    const reasonHtml = reason ? '<div class="viz-pane-card-reason">' + reason + '</div>' : '';
+    card.innerHTML =
+      '<button type="button" class="viz-pane-card-close" aria-label="このカードを閉じる">×</button>' +
+      '<div class="viz-pane-card-name">' + escape(name) + '</div>' +
+      '<div class="viz-pane-card-text">' + opinion + '</div>' +
+      reasonHtml; // lint-disable-line no-inner-html-assignment-with-variable -- 上記値は escapeHtml 済
+    card.hidden = false;
+    const closeBtn = card.querySelector('.viz-pane-card-close');
+    if (closeBtn) {
+      closeBtn.addEventListener('click', () => {
+        card.hidden = true;
+        card.innerHTML = '';
+      });
+    }
   };
 
   // ---------------------------------------------------------------------
