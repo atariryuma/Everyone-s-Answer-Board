@@ -813,30 +813,45 @@
         return BASE_R_M + (MAX_R_M - BASE_R_M) * norm;
       };
 
-      // 現在点：軸の整数値と完全一致させる + 重なりは forceCollide で押し戻し。
+      // 現在点：軸の整数値の近傍に寄せつつ、重なりは forceCollide で押し戻し。
       //
-      // Why (jitter 廃止): 旧版は ±0.15 のランダムジッタをデータ値に加算していたが、
-      //   軸の整数目盛（1/2/3/4/5）と dot 位置が一致せず「数値が下地と完全に一致して
-      //   いない」フィードバック (2026-05-14)。numberline と同じく forceSimulation で
-      //   targetX/targetY (= 整数位置) に強く寄せつつ、collide でのみ重なりを回避する
-      //   設計に統一。
-      const nodes = current.map((r) => ({
-        x: xScale(r.numericX),
-        y: yScale(r.numericY),
-        targetX: xScale(r.numericX),
-        targetY: yScale(r.numericY),
-        data: r
-      }));
-      // Why: collide 半径は MAX_R_M + 余白で固定。同位置に密集していなければ
-      //   forceX/Y が強く target に寄せて整数位置に張り付く。30 人クラスでも
-      //   120 tick で安定。
+      // Why (jitter 廃止 → 改修): 旧版は ±0.15 のランダムジッタをデータ値に加算
+      //   していたが、軸の整数目盛 (1/2/3/4/5) と dot 位置が一致せず「数値が下地と
+      //   完全に一致していない」フィードバック (2026-05-14) を受け、forceSimulation
+      //   ベース (strength 1 + 初期位置 = target) に切替。しかし完全に同座標の
+      //   ドット同士は forceCollide が「どの方向に押すか」判定できず重なったまま
+      //   残るバグが発生 (70 件中 ~30 件が見えない、2026-05-14 教師フィードバック)。
+      //
+      //   対策:
+      //   1. 初期位置に rowIndex seed の ±2px deterministic perturbation を加える。
+      //      simulation の初期だけずらすので、データ値 (numericX/Y) と軸の一致は
+      //      保たれる (collide が解消後は target 近傍に張り付く)。
+      //      seed 由来なので polling re-render で座標がブレない。
+      //   2. forceX/Y strength を 0.7 に下げ、collide が押し戻しきれるバランスに。
+      //   3. tick 数 120 → 200 で収束を安定化。
+      const seededOffset = (seed, salt) => {
+        const s = Math.sin(seed * 9301 + salt * 49297) * 233280;
+        return ((s - Math.floor(s)) - 0.5) * 4; // ±2px
+      };
+      const nodes = current.map((r) => {
+        const seed = (r.rowIndex || 0) + 1;
+        return {
+          x: xScale(r.numericX) + seededOffset(seed, 1),
+          y: yScale(r.numericY) + seededOffset(seed, 7919),
+          targetX: xScale(r.numericX),
+          targetY: yScale(r.numericY),
+          data: r
+        };
+      });
+      // collide 半径は MAX_R_M + 余白で固定。strength 0.7 + 200 tick で、
+      //   (3,3) に 10 件密集しても数珠状に散らばってかつ整数軸の近傍に張り付く。
       const COLLIDE_R_M = MAX_R_M + 1.5;
       const simM = d3.forceSimulation(nodes)
-        .force('x', d3.forceX((d) => d.targetX).strength(1))
-        .force('y', d3.forceY((d) => d.targetY).strength(1))
+        .force('x', d3.forceX((d) => d.targetX).strength(0.7))
+        .force('y', d3.forceY((d) => d.targetY).strength(0.7))
         .force('collide', d3.forceCollide(COLLIDE_R_M))
         .stop();
-      for (let i = 0; i < 120; i++) simM.tick();
+      for (let i = 0; i < 200; i++) simM.tick();
 
       // 揺らぎは「現在 dot の半径 + swing-high 黄色」で十分視覚化されているので、
       // 過去位置 ghost + 黄色 trace 線は採用せず（教師フィードバック 2026-05-13）。
