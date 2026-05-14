@@ -1023,7 +1023,12 @@
         empty.textContent = '（該当意見なし）';
         cell.appendChild(empty);
       } else {
-        const words = aggregateWords(cellRows, 'reason').slice(0, 3);
+        // 道徳的意見の象限 keyword として 1 文字漢字断片（「楽」「思」「間」「合」等）は
+        // 意味が読み取りにくいので除外。「気持」「真実」「期限」のような 2+ 文字の
+        // 内容語のみを top-3 として残す。これにより keyword の品質が大幅に向上する。
+        const words = aggregateWords(cellRows, 'reason')
+          .filter(w => w.word.length >= 2)
+          .slice(0, 3);
         if (words.length === 0) {
           const empty = document.createElement('div');
           empty.className = 'qs-empty';
@@ -1075,6 +1080,10 @@
     //      代わりに「内容語 = 漢字/カタカナ/英数字の連続」を抽出する近似戦略を取る。
     //      日本語の助詞・助動詞は基本ひらがなのみで、句読点と並んで自然な区切り役となる。
     //      ひらがな単独の語（「思う」「ある」等）は STOPWORDS で個別に除外する。
+    //
+    //   設計上の妥協: 「思いやり」「気に入る」のような末尾/橋渡しひらがな複合語は
+    //   particle (は/が/を/に) と形態的に区別できないため、断片 (「思」「気」「入」) として
+    //   抽出される。これらは renderQuadrantSummary 側で length >= 2 filter により除外。
     //
     //   例: 「AIは便利だ。責任を持つ。」
     //     → 抽出: ["AI", "便利", "責任", "持"]

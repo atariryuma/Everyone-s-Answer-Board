@@ -102,6 +102,36 @@ test('tokenizeJapanese: keeps katakana words', () => {
   assert.ok(words.includes('効率'));
 });
 
+test('renderQuadrantSummary: filters 1-char keyword fragments (v2668)', () => {
+  // Why: 「間に合う」「思いやり」のような複合語が tokenizer で「間/合/思」に分解されると、
+  //   1 文字漢字断片が頻出語として top に来てしまい、keyword の意味が読み取れない
+  //   (教師フィードバック 2026-05-14 v2667: 「#楽 #思 #間」が出る問題)。
+  //   象限パネル側で word.length >= 2 のみを keyword 対象とすることで、
+  //   「期限」「責任」「真実」のような 2+ 字内容語のみを top-3 に残す。
+  const { StudyQuestApp, makeElement } = loadVizContextForQuadrant();
+  const answers = makeElement('div');
+  // (5,5) hh 象限に多数の意見を集中させて keyword 抽出をテスト
+  const rows = [];
+  for (let i = 0; i < 5; i++) {
+    rows.push({ numericX: 5, numericY: 5, reason: '間に合うように責任を持つ。' });
+  }
+  // 上記 reason は tokenizer で「間」「合」「責任」「持」を生成する
+  // length >= 2 filter で「責任」のみ keyword に残る期待
+  StudyQuestApp.prototype.__renderQuadrantSummary(answers, rows, {});
+  const panel = answers.querySelector('#vizQuadrantSummary');
+  const trCell = panel._children.find(c => /qs-tr/.test(c.className));
+  const tags = trCell._children
+    .flatMap(c => c._children || [])
+    .filter(c => c.className === 'qs-tag')
+    .map(c => c.textContent);
+  // 「責任」は 2 字なので残る
+  assert.ok(tags.some(t => t.includes('責任')), `expected 責任 in tags: ${tags.join(',')}`);
+  // 「間」「合」「持」は 1 字なので除外される
+  assert.ok(!tags.some(t => t === '#間'), `should NOT include 1-char #間: ${tags.join(',')}`);
+  assert.ok(!tags.some(t => t === '#合'), `should NOT include 1-char #合: ${tags.join(',')}`);
+  assert.ok(!tags.some(t => t === '#持'), `should NOT include 1-char #持: ${tags.join(',')}`);
+});
+
 // =====================================================================
 // aggregateWords
 // =====================================================================
