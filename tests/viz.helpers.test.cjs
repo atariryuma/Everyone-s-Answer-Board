@@ -160,12 +160,15 @@ test('tokenizeJapanese: with TinySegmenter, captures common compound words (v267
   assert.ok(w1.includes('大事'), `should capture 大事: ${w1.join(',')}`);
   assert.ok(w1.includes('お楽しみ'), `should capture お楽しみ: ${w1.join(',')}`);
 
-  // 「頑張る」「誠実」「大切」も活用形のまま拾える
+  // 「誠実」「大切」「責任」「取り組む」など複合語/2+字漢字内容語が拾える
+  //   (「頑張って」は TinySegmenter で「頑張っ + て」に分割されるため、
+  //    「頑張っ」は v2672 の促音便フィルタで除外される。これは設計上の妥協で、
+  //    形態素解析の限界を露呈する例。)
   const w2 = tok('頑張って誠実に取り組む。大切な責任を持つ。');
-  assert.ok(w2.some(t => t.includes('頑張')), `should capture 頑張る/頑張: ${w2.join(',')}`);
   assert.ok(w2.includes('誠実'), `should capture 誠実: ${w2.join(',')}`);
   assert.ok(w2.includes('大切'), `should capture 大切: ${w2.join(',')}`);
   assert.ok(w2.includes('責任'), `should capture 責任: ${w2.join(',')}`);
+  assert.ok(w2.some(t => t.includes('取り組')), `should capture 取り組む or 取り組: ${w2.join(',')}`);
 
   // 純ひらがな短語 (3 文字以下) は除外される (助詞・助動詞の可能性が高い)
   const w3 = tok('これは とても 大切 です');
@@ -174,29 +177,37 @@ test('tokenizeJapanese: with TinySegmenter, captures common compound words (v267
   assert.ok(w3.includes('大切'), `should keep 大切: ${w3.join(',')}`);
 });
 
-test('tokenizeJapanese: filters verb-inflection fragments (v2671)', () => {
-  // Why: TinySegmenter は動詞活用の途中で切れることがあり、「合わ」「振り」「舞え」
-  //   のような漢字+活用末ひらがな 2 字断片が頻出語上位に紛れ込む。
-  //   末尾「い/え/わ/り/う」(動詞活用語末) で終わる 2 字 token を除外する。
-  //   名詞化接辞末「ち/み/く/さ/き」は残す。
+test('tokenizeJapanese: filters verb-inflection fragments (v2672)', () => {
+  // Why: TinySegmenter は動詞活用の途中で切れることがあり、活用形断片が頻出語
+  //   上位に紛れ込む。明確な活用シグナル（末尾「っ」: 促音便、末尾2字「い/え/わ/り/う/る/に/け」:
+  //   活用語末/助詞付き）を除外する。名詞化接辞末「ち/み/く/さ/き」は残す。
   const { StudyQuestApp } = loadVizContextWithSegmenter();
   const tok = StudyQuestApp.prototype.__tokenize;
 
-  // 動詞活用断片は除外される
-  const w1 = tok('期限に間に合わない。振る舞いを大切に。');
-  assert.ok(!w1.includes('合わ'), `should exclude 合わ fragment: ${w1.join(',')}`);
-  assert.ok(!w1.includes('振り'), `should exclude 振り fragment: ${w1.join(',')}`);
-  assert.ok(!w1.includes('舞え'), `should exclude 舞え fragment: ${w1.join(',')}`);
-  // 本体は残る
-  assert.ok(w1.includes('期限'), `should keep 期限: ${w1.join(',')}`);
-  assert.ok(w1.includes('大切'), `should keep 大切: ${w1.join(',')}`);
+  // 促音便連用形（末尾「っ」）は length 問わず除外
+  const w1 = tok('AIを使って間違ってしまった。思った通り。');
+  assert.ok(!w1.includes('使っ'), `should exclude 使っ: ${w1.join(',')}`);
+  assert.ok(!w1.includes('思っ'), `should exclude 思っ: ${w1.join(',')}`);
+  assert.ok(!w1.includes('間違っ'), `should exclude 間違っ: ${w1.join(',')}`);
+  assert.ok(w1.includes('AI'), `should keep AI: ${w1.join(',')}`);
+
+  // 動詞活用断片 + 助詞付き残り (2字)
+  const w2 = tok('期限に間に合わない。振る舞いを書け。形に残す。');
+  assert.ok(!w2.includes('合わ'), `should exclude 合わ: ${w2.join(',')}`);
+  assert.ok(!w2.includes('振る'), `should exclude 振る (verb end る): ${w2.join(',')}`);
+  assert.ok(!w2.includes('書け'), `should exclude 書け (imperative け): ${w2.join(',')}`);
+  assert.ok(!w2.includes('形に'), `should exclude 形に (particle に): ${w2.join(',')}`);
+  assert.ok(w2.includes('期限'), `should keep 期限: ${w2.join(',')}`);
 
   // 名詞化接辞末（ち/み/く/さ/き）は残す
-  const w2 = tok('望みを持ち、早く高さを動く');
-  // 「持ち」(漢字+ち) は名詞化接辞として残る (例外 whitelist)
-  // 「動き」(漢字+き) も同様 — ただし TinySegmenter の判定次第なので broad assert
-  assert.ok(w2.some(t => /[ちみくさき]/.test(t)) || w2.length > 0,
-    `should keep nominalized forms or have content: ${w2.join(',')}`);
+  const w3 = tok('望みを持ち、早く高さを動く');
+  assert.ok(w3.some(t => /[ちみくさき]/.test(t)) || w3.length > 0,
+    `should keep nominalized forms or have content: ${w3.join(',')}`);
+
+  // 長い活用形 (3字以上) は除外対象外で残る
+  const w4 = tok('楽しめる活動を考える。');
+  assert.ok(w4.includes('楽しめる'), `should keep 楽しめる (3+ char): ${w4.join(',')}`);
+  assert.ok(w4.includes('考える'), `should keep 考える (3+ char): ${w4.join(',')}`);
 });
 
 test('renderQuadrantSummary: filters 1-char keyword fragments (v2668)', () => {
