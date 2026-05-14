@@ -405,10 +405,9 @@
     //   して再描画するため、ここでは触らない。
     if (answers.classList.contains('viz-container')) {
       const existingSvg = answers.querySelector('svg#vizSvg');
-      const existingStats = answers.querySelector('#vizStatsPills');
       const existingPanel = answers.querySelector('#vizTeacherPanel');
-      if (existingSvg && existingStats && existingPanel) {
-        return { stats: existingStats, svg: existingSvg, teacherPanel: existingPanel };
+      if (existingSvg && existingPanel) {
+        return { svg: existingSvg, teacherPanel: existingPanel };
       }
     }
 
@@ -417,17 +416,10 @@
     answers.className = 'viz-container';
     answers.innerHTML = '';
 
-    // 統計バッジ
-    // Why (D): 件数は main-header の #answerCountText で既に出ているため、ここでは
-    //          更新時刻のみを表示して重複を解消する。countPill は DOM 上は残す
-    //          （updateStatsPills が参照するため）が、CSS で hidden 属性で隠す。
-    const stats = document.createElement('div');
-    stats.id = 'vizStatsPills';
-    stats.className = 'viz-stats';
-    stats.innerHTML =
-      '<span class="stat-pill" id="vizCountPill" hidden>0件</span>' +
-      '<span class="stat-pill" id="vizUpdatedPill"></span>';
-    answers.appendChild(stats);
+    // v2674: 統計バッジ (vizStatsPills) はヘッダー #lastUpdatedText に統合移管。
+    //   旧 #vizCountPill は #answerCount と重複していたため廃止。
+    //   旧 #vizUpdatedPill は board/viz の mode 横断で同位置 (header 右) に表示するため
+    //   ヘッダーへ移動。renderXxx 末尾の updateStatsPills 呼び出しはそのまま再利用できる。
 
     // SVG
     // Why role="img" + aria-label: ビーズワーム/散布図は児童の位置プロットなのでスクリーン
@@ -449,19 +441,19 @@
     teacherPanel.innerHTML = '<h3>気になる児童（意見が動いた順）</h3><ul id="vizSwingList"></ul>';
     answers.appendChild(teacherPanel);
 
-    return { stats, svg, teacherPanel };
+    return { svg, teacherPanel };
   }
 
-  function updateStatsPills(app, count) {
-    const countEl = document.getElementById('vizCountPill');
-    const updatedEl = document.getElementById('vizUpdatedPill');
-    if (countEl) countEl.textContent = count + '件';
-    if (updatedEl) {
-      const now = new Date();
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      updatedEl.textContent = '最終更新 ' + hh + ':' + mm;
-    }
+  // v2674: 「最終更新 HH:MM」をヘッダー右の #lastUpdatedText に表示。
+  //   旧 #vizUpdatedPill (chart 内オーバーレイ) と #vizCountPill (重複) は廃止。
+  //   board/viz mode 切替で位置が変わらず、最終更新タイミングが mode 横断で読める。
+  function updateStatsPills(_app, _count) {
+    const updatedEl = document.getElementById('lastUpdatedText');
+    if (!updatedEl) return;
+    const now = new Date();
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    updatedEl.textContent = '最終更新 ' + hh + ':' + mm;
   }
 
   function maybeRenderTeacherPanel(app, swings) {
@@ -1729,58 +1721,98 @@
   }
 
   /**
-   * 教師用ツールバー（profile pill 群 + 議論ツール）を #vizToolbarSlot（main-header 内）に注入。
-   * profile は 1 クリック切替の pill tab。{@link PROFILE_PILLS_MAX} を超える場合は select に fallback。
+   * v2674 リファクタ: profile pills と議論ツールを別 slot に分離注入。
+   *   - profile pills → #vizPhaseHost (header Row 1 中央、教師/生徒共通)
+   *   - 議論ツール (議論前/比較/軌跡)  → #vizToolbarSlot (header Row 3、教師専用)
    *
-   * Option B: 生徒に対しても pill 部分のみ注入する（議論ツールは隠す）。生徒は過去フェーズへの
-   *   read-only navigation だけが目的。
+   * 旧設計: 両方を #vizToolbarSlot 内の 1 つの #vizToolbar に詰めていた
+   * (横に長く視覚的に「タブ + 操作」が同列で混在)。
+   *
+   * 新設計: 役割を物理的に分離。pills は phase ナビゲーション (識別)、
+   *   tools は授業中の議論支援 (操作) として bar を分けることでセマンティクス明確化。
+   *
+   * Option B: 生徒に対しても pills は注入する (過去フェーズ閲覧用)。
+   *   tools 側は !teacher で skip。
    */
   function ensureViewToolbar(app) {
     const teacher = isTeacher(app);
     const studentPills = !teacher && shouldShowStudentPills(app);
     if (!teacher && !studentPills) return null;
-    const slot = document.getElementById('vizToolbarSlot');
-    if (!slot) return null;
-    let bar = document.getElementById('vizToolbar');
-    if (bar) {
-      // 既存 bar の生徒用クラスを最新の判定で更新（toolbar 後出し UI 出し分けに必要）
-      bar.classList.toggle('viz-toolbar--student', !teacher);
-      return bar;
+
+    // --- 1. profile pills bar を #vizPhaseHost に注入 (教師/生徒共通) ---
+    const phaseHost = document.getElementById('vizPhaseHost');
+    let pillsBar = document.getElementById('vizProfilePills');
+    if (!pillsBar && phaseHost) {
+      pillsBar = document.createElement('div');
+      pillsBar.id = 'vizProfilePills';
+      pillsBar.className = 'viz-toolbar-left';
+      pillsBar.setAttribute('role', 'tablist');
+      pillsBar.setAttribute('aria-label', 'ボード切替');
+      phaseHost.appendChild(pillsBar);
+    }
+    if (pillsBar) {
+      // student/teacher 切り替えクラス (CSS で過去 pill のアフォーダンス差を出す用)
+      pillsBar.classList.toggle('viz-toolbar--student', !teacher);
     }
 
-    bar = document.createElement('div');
-    bar.id = 'vizToolbar';
-    bar.className = 'viz-toolbar' + (teacher ? '' : ' viz-toolbar--student');
-    bar.innerHTML = [
-      '<div class="viz-toolbar-left" id="vizProfilePills" role="tablist" aria-label="ボード切替">',
-      '</div>',
-      '<div class="viz-toolbar-center viz-controls" id="vizControls" role="toolbar" aria-label="授業ツール">',
-      '  <button type="button" id="vizCaptureBeforeBtn" class="viz-btn" ' +
-      '          title="議論前として現在の分布を保存" aria-label="議論前として現在の分布を保存">',
-      '    📌 議論前',
-      '  </button>',
-      '  <button type="button" id="vizCompareToggleBtn" class="viz-btn" ' +
-      '          title="議論前と現在を2画面で対比" aria-label="議論前と現在を2画面で対比" ' +
-      '          aria-pressed="false">',
-      '    ⇄ 比較',
-      '  </button>',
-      '  <div class="viz-timeline">',
-      '    <label for="vizTimelineSlider" class="viz-timeline-label">軌跡</label>',
-      '    <input type="range" id="vizTimelineSlider" min="0" max="0" value="0" step="1" ' +
-      '           aria-label="軌跡タイムライン: 過去の分布を再生" />',
-      '    <span id="vizTimelineLabel" class="viz-timeline-time" aria-live="polite">現在</span>',
-      '    <button type="button" id="vizTimelineNowBtn" class="viz-btn-small" ' +
-      '            title="現在に戻る" aria-label="タイムラインを現在に戻す">↺</button>',
-      '  </div>',
-      '</div>'
-    ].join('');
-    slot.appendChild(bar);
+    // --- 2. 議論ツール bar を #vizToolbarSlot に注入 (教師のみ) ---
+    const toolsSlot = document.getElementById('vizToolbarSlot');
+    let toolsBar = document.getElementById('vizToolbar');
+    if (teacher && !toolsBar && toolsSlot) {
+      toolsBar = document.createElement('div');
+      toolsBar.id = 'vizToolbar';
+      toolsBar.className = 'viz-toolbar viz-controls';
+      toolsBar.setAttribute('role', 'toolbar');
+      toolsBar.setAttribute('aria-label', '議論支援ツール');
+      toolsBar.innerHTML = [
+        '<span class="viz-toolbar-section-label">議論支援</span>',
+        '<div class="viz-toolbar-center" id="vizControls">',
+        '  <button type="button" id="vizCaptureBeforeBtn" class="viz-btn" ' +
+        '          title="議論前として現在の分布を保存" aria-label="議論前として現在の分布を保存">',
+        '    📌 議論前',
+        '  </button>',
+        '  <button type="button" id="vizCompareToggleBtn" class="viz-btn" ' +
+        '          title="議論前と現在を2画面で対比" aria-label="議論前と現在を2画面で対比" ' +
+        '          aria-pressed="false">',
+        '    ⇄ 比較',
+        '  </button>',
+        '  <div class="viz-timeline">',
+        '    <label for="vizTimelineSlider" class="viz-timeline-label">軌跡</label>',
+        '    <input type="range" id="vizTimelineSlider" min="0" max="0" value="0" step="1" ' +
+        '           aria-label="軌跡タイムライン: 過去の分布を再生" />',
+        '    <span id="vizTimelineLabel" class="viz-timeline-time" aria-live="polite">現在</span>',
+        '    <button type="button" id="vizTimelineNowBtn" class="viz-btn-small" ' +
+        '            title="現在に戻る" aria-label="タイムラインを現在に戻す">↺</button>',
+        '  </div>',
+        '</div>'
+      ].join('');
+      toolsSlot.appendChild(toolsBar);
+    }
 
-    // profile pills の click handler は event delegation で 1 度だけ登録
-    // Why: teacher は active 切替 (config 書換) / student は past-phase 閲覧 (read-only) と
-    //   セマンティクスが違う。pill の data-action で振り分ける。
-    document.getElementById('vizProfilePills').addEventListener('click', (e) => {
-      // 「現在に戻る」ボタンは別途処理
+    // --- 3. event listeners は initialized フラグで 1 度だけ bind ---
+    if (pillsBar && !pillsBar.dataset.eventsBound) {
+      pillsBar.dataset.eventsBound = '1';
+      bindProfilePillsEvents(pillsBar, app);
+    }
+    if (toolsBar && !toolsBar.dataset.eventsBound) {
+      toolsBar.dataset.eventsBound = '1';
+      bindDiscussionToolsEvents(toolsBar, app);
+    }
+
+    // 互換性のため bar 相当 (pillsBar) を返す。旧コード呼び出し側は戻り値を使っていない。
+    return pillsBar || toolsBar || null;
+  }
+
+  // profile pills の click/change handler (旧 ensureViewToolbar 内インラインを切り出し)
+  function bindProfilePillsEvents(pillsBar, app) {
+    // profile pills の click handler は event delegation で 1 度だけ登録。
+    //   data-action の値で経路を厳密分岐:
+    //     'load-past' → 過去フェーズ読み込み (Option B プレビュー)
+    //     'switch'    → active を切替（教師が未来 profile を進めるとき）
+    //     なし (current pill) → 過去閲覧中なら現在に戻る、それ以外は no-op
+    //   default を 'switch' にフォールバックすると current pill click が誤って active
+    //   再書込を試行して「ユーザーが見つかりません」になる罠を回避する。
+    pillsBar.addEventListener('click', (e) => {
       const returnBtn = e.target.closest('.viz-profile-return');
       if (returnBtn) {
         if (typeof app.__vizReturnToCurrent === 'function') app.__vizReturnToCurrent();
@@ -1791,88 +1823,106 @@
       if (btn.disabled || btn.classList.contains('disabled')) return;
       const name = btn.dataset.profile;
       if (!name) return;
-      // data-action="load-past" → 過去フェーズ読み込み（student / または teacher が past click）
-      // それ以外 → active 切替（teacher 経路）
-      const action = btn.dataset.action || 'switch';
+      const action = btn.dataset.action;
+      if (!action) {
+        // current pill: 過去閲覧中なら戻る、それ以外は no-op (もう current)
+        if (app.state && app.state.viewingPastProfile &&
+            typeof app.__vizReturnToCurrent === 'function') {
+          app.__vizReturnToCurrent();
+        }
+        return;
+      }
       if (action === 'load-past') {
         if (typeof app.__vizLoadPastProfile === 'function') app.__vizLoadPastProfile(name);
-      } else {
+      } else if (action === 'switch') {
         app.__vizLoadProfile(name);
       }
     });
     // select fallback の change ハンドラ (profile 5 個以上のとき)
-    document.getElementById('vizProfilePills').addEventListener('change', (e) => {
+    pillsBar.addEventListener('change', (e) => {
       if (e.target.id !== 'vizProfileSelect') return;
       const name = e.target.value;
       if (!name) return;
       app.__vizLoadProfile(name);
     });
+  }
 
-    document.getElementById('vizCaptureBeforeBtn').addEventListener('click', () => {
-      app.vizCaptureBefore();
-      const btn = document.getElementById('vizCaptureBeforeBtn');
-      if (btn) { btn.classList.add('saved'); setTimeout(() => btn.classList.remove('saved'), 1500); }
-    });
-    document.getElementById('vizCompareToggleBtn').addEventListener('click', () => {
-      // 議論前スナップ未保存で比較 ON にしようとしても compareRender は普通の描画に
-      // フォールバックする (loadBeforeSnapshot null) ので、UI 上「active なのに見た目が
-      // 変わらない」状態になり教師が混乱する。事前ガードして警告。
-      if (!app.state.vizCompareMode && !app.vizGetBefore()) {
-        try { window.alert('「📌 議論前」を先に押して、議論開始時点の分布を保存してください。'); } catch (_) {}
-        return;
-      }
-      app.state.vizCompareMode = !app.state.vizCompareMode;
-      const compareBtnEl = document.getElementById('vizCompareToggleBtn');
-      compareBtnEl.classList.toggle('active', !!app.state.vizCompareMode);
-      compareBtnEl.setAttribute('aria-pressed', String(!!app.state.vizCompareMode));
-      // v2632: 比較モード中は timeline スライダーが「左ペインの時刻」を制御する。
-      //   旧仕様 (compare ON で timeline reset) は廃止。スライダー位置を保持したまま
-      //   左ペインがその時刻、右ペインが現在で描画される。
-      app.renderBoard(false, false, []);
-    });
-
+  // 議論ツール (議論前/比較/軌跡) の event listener を一括 bind。
+  // v2674: 旧 ensureViewToolbar インラインから切り出し、教師 only 注入時にのみ呼ばれる。
+  function bindDiscussionToolsEvents(toolsBar, app) {
+    const captureBtn = toolsBar.querySelector('#vizCaptureBeforeBtn');
+    if (captureBtn) {
+      captureBtn.addEventListener('click', () => {
+        app.vizCaptureBefore();
+        captureBtn.classList.add('saved');
+        setTimeout(() => captureBtn.classList.remove('saved'), 1500);
+      });
+    }
+    const compareBtn = toolsBar.querySelector('#vizCompareToggleBtn');
+    if (compareBtn) {
+      compareBtn.addEventListener('click', () => {
+        // 議論前スナップ未保存で比較 ON にしようとしても compareRender は普通の描画に
+        // フォールバックする (loadBeforeSnapshot null) ので、UI 上「active なのに見た目が
+        // 変わらない」状態になり教師が混乱する。事前ガードして警告。
+        if (!app.state.vizCompareMode && !app.vizGetBefore()) {
+          try { window.alert('「📌 議論前」を先に押して、議論開始時点の分布を保存してください。'); } catch (_) {}
+          return;
+        }
+        app.state.vizCompareMode = !app.state.vizCompareMode;
+        compareBtn.classList.toggle('active', !!app.state.vizCompareMode);
+        compareBtn.setAttribute('aria-pressed', String(!!app.state.vizCompareMode));
+        // v2632: 比較モード中は timeline スライダーが「左ペインの時刻」を制御する。
+        //   旧仕様 (compare ON で timeline reset) は廃止。スライダー位置を保持したまま
+        //   左ペインがその時刻、右ペインが現在で描画される。
+        app.renderBoard(false, false, []);
+      });
+    }
     // Timeline スライダー: rAF debounce で「ドラッグ中の連続 input → renderBoard 連発」を抑制。
     //   matrix モードでは 30+ ノードを redraw するため、無策だと 60fps で全描画が走り
     //   低スペック端末（Edge low-power mode 等）でカクつく。input 値は最新だけ採用。
     let _vizSliderRafId = null;
     let _vizSliderPendingIdx = null;
-    document.getElementById('vizTimelineSlider').addEventListener('input', (e) => {
-      _vizSliderPendingIdx = Number(e.target.value);
-      if (_vizSliderRafId !== null) return;  // 既に予約済み
-      _vizSliderRafId = window.requestAnimationFrame(() => {
-        _vizSliderRafId = null;
-        const idx = _vizSliderPendingIdx;
-        _vizSliderPendingIdx = null;
-        if (idx === app.state.vizTimelineIndex) return;
-        app.state.vizTimelineIndex = idx;
-        const snaps = app.vizGetSnapshots();
-        const label = document.getElementById('vizTimelineLabel');
-        if (label) {
-          if (idx >= snaps.length) {
-            label.textContent = '現在';
-          } else {
-            const t = snaps[idx];
-            if (t) {
-              const d = new Date(t.capturedAt);
-              label.textContent = d.getHours().toString().padStart(2, '0') + ':' +
-                                  d.getMinutes().toString().padStart(2, '0');
+    const slider = toolsBar.querySelector('#vizTimelineSlider');
+    if (slider) {
+      slider.addEventListener('input', (e) => {
+        _vizSliderPendingIdx = Number(e.target.value);
+        if (_vizSliderRafId !== null) return;
+        _vizSliderRafId = window.requestAnimationFrame(() => {
+          _vizSliderRafId = null;
+          const idx = _vizSliderPendingIdx;
+          _vizSliderPendingIdx = null;
+          if (idx === app.state.vizTimelineIndex) return;
+          app.state.vizTimelineIndex = idx;
+          const snaps = app.vizGetSnapshots();
+          const label = document.getElementById('vizTimelineLabel');
+          if (label) {
+            if (idx >= snaps.length) {
+              label.textContent = '現在';
+            } else {
+              const t = snaps[idx];
+              if (t) {
+                const d = new Date(t.capturedAt);
+                label.textContent = d.getHours().toString().padStart(2, '0') + ':' +
+                                    d.getMinutes().toString().padStart(2, '0');
+              }
             }
           }
-        }
+          app.renderBoard(false, false, []);
+        });
+      });
+    }
+    const nowBtn = toolsBar.querySelector('#vizTimelineNowBtn');
+    if (nowBtn) {
+      nowBtn.addEventListener('click', () => {
+        app.state.vizTimelineIndex = null;
+        const s = toolsBar.querySelector('#vizTimelineSlider');
+        const snaps = app.vizGetSnapshots();
+        if (s) s.value = snaps.length;
+        const label = toolsBar.querySelector('#vizTimelineLabel');
+        if (label) label.textContent = '現在';
         app.renderBoard(false, false, []);
       });
-    });
-    document.getElementById('vizTimelineNowBtn').addEventListener('click', () => {
-      app.state.vizTimelineIndex = null;
-      const slider = document.getElementById('vizTimelineSlider');
-      const snaps = app.vizGetSnapshots();
-      if (slider) slider.value = snaps.length;
-      const label = document.getElementById('vizTimelineLabel');
-      if (label) label.textContent = '現在';
-      app.renderBoard(false, false, []);
-    });
-
-    return bar;
+    }
   }
 
   function refreshModeBar(app) {
@@ -1881,8 +1931,9 @@
     const cur = app.state.boardMode || 'board';
     // 議論ツール（議論前/比較/タイムライン）は viz mode 専用。
     // board モードではカードに対して「揺らぎ」「比較」の概念が無いので非表示。
-    const controls = document.getElementById('vizControls');
-    if (controls) controls.style.display = (cur === 'board') ? 'none' : '';
+    // v2674: 「議論支援」section label を含む bar 全体を非表示にする (controls 単体ではない)。
+    const toolbar = document.getElementById('vizToolbar');
+    if (toolbar) toolbar.style.display = (cur === 'board') ? 'none' : '';
     // controlsFooter (画面下の「列数」スライダー) は board モード専用。
     // viz モードではカードがないので意味不明なのと、viewport の下部を占有して
     // SVG レイアウトとぶつかるので非表示にする。
@@ -1943,18 +1994,29 @@
     let activeName;
     let pastSet;       // teacher 用: 過去 active になった profile 名集合（教師には ✓ 付ける）
     if (teacher) {
+      // Why: teacher は state.profiles を root として表示。pastSet は studentProfileNav.history
+      //   から（teacher 視点では server が null で送ってくることもあるが、その場合 pastSet は空集合）。
+      //   過去 pill は preview semantics で load-past 経路（student と同じ）。未来 profile は
+      //   teacher だけが見える状態なので switch（新フェーズへの進行用）。
       const profiles = (app.state && app.state.profiles) || [];
       const navHist = (app.state.studentProfileNav && app.state.studentProfileNav.history) || [];
       pastSet = new Set(navHist.map(h => h && h.name).filter(Boolean));
       activeName = app.state.activeProfile || '';
-      pillEntries = profiles.map(p => ({
-        name: p && p.name ? String(p.name) : '',
-        formTitle: (p && p.formTitle) || '',
-        isCurrent: p && p.name === activeName,
-        isPast: pastSet.has(p && p.name) && p && p.name !== activeName,
-        deleted: false,
-        action: p && p.name === activeName ? null : 'switch'  // teacher は active 含めて全 click 可
-      })).filter(e => e.name);
+      const viewing = app.state.viewingPastProfile || null;
+      pillEntries = profiles.map(p => {
+        const name = p && p.name ? String(p.name) : '';
+        const isCurrent = name === activeName;
+        const isPast = pastSet.has(name) && !isCurrent;
+        return {
+          name,
+          formTitle: (p && p.formTitle) || '',
+          isCurrent,
+          isPast,
+          isViewing: viewing === name || (!viewing && isCurrent),
+          deleted: false,
+          action: isCurrent ? null : (isPast ? 'load-past' : 'switch')
+        };
+      }).filter(e => e.name);
     } else {
       const nav = app.state.studentProfileNav;
       const history = (nav && nav.history) || [];
@@ -1990,9 +2052,9 @@
     }
     container.style.display = '';
 
-    // 「現在に戻る」CTA: 生徒が過去フェーズ閲覧中のみ pill 列の末尾に出す。
-    //   teacher の場合は不要（teacher は active 切替で current を移動するため）。
-    const showReturnBtn = !teacher && !!app.state.viewingPastProfile &&
+    // 「現在に戻る」CTA: 過去フェーズプレビュー中なら teacher / student 両方に出す。
+    //   teacher も past pill click でプレビュー mode に入るので戻る手段が必要。
+    const showReturnBtn = !!app.state.viewingPastProfile &&
                           app.state.viewingPastProfile !== activeName;
 
     const useSelect = pillEntries.length > PROFILE_PILLS_MAX && teacher;
@@ -2114,7 +2176,10 @@
         console.error('Profile load network error:', err);
         alert('プロファイルの切替に失敗しました');
       })
-      .loadProfileForView(name);
+      // targetUserId を渡すことで、admin が他人ボードを操作するケースや、URL の userId と
+      //   現在の Session email が一致しないケース（複数 Google アカウント切替）でも、対象ボードを
+      //   一意に特定できる。サーバ側は targetUserId 経由で owner/admin の認可チェックを行う。
+      .loadProfileForView(name, this.state.userId);
   };
 
   StudyQuestApp.prototype.__vizInjectProfileSelector = function () { injectProfileSelector(this); };

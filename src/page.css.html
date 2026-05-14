@@ -6,6 +6,226 @@
  * ============================================================================= */
 
 /* =============================================================================
+ * Header redesign (v2674): Bento Grid 2-3 row layout
+ *   - Row 1: identity + phase pills + filters + admin actions (1行に集約)
+ *   - Row 2: 設問テキスト (中央配置で focus)
+ *   - Row 3: 編集者ツール (editor only, 空なら display:none)
+ *   - 横幅を grid template で明示配分し、無駄な空白を解消
+ *   - body.is-editor / .is-viewer で editor-only 要素を CSS で表示制御
+ * ============================================================================= */
+.eab-header {
+  padding: 0.6rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  margin-bottom: 0.75rem;
+}
+
+.eab-row {
+  width: 100%;
+}
+
+/* Row 1: identity / phase / filters / actions を 1 行に
+ *   grid template:
+ *     col1 auto       = identity pill (form link、未設定なら 0 幅)
+ *     col2 1fr        = phase host (中央伸縮、pills が並ぶ)
+ *     col3 auto       = filters (count + class + sort)
+ *     col4 auto       = actions (status + admin) */
+.eab-row-meta {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.25rem;
+}
+
+/* Identity (form link) */
+.eab-identity-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  background: rgba(56, 189, 248, 0.1);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  border-radius: 0.5rem;
+  color: #38bdf8;
+  font-size: 0.78rem;
+  font-weight: 500;
+  transition: background-color 0.15s, color 0.15s, transform 0.15s;
+  white-space: nowrap;
+}
+.eab-identity-pill:hover {
+  background: rgba(56, 189, 248, 0.2);
+  color: #67e8f9;
+}
+.eab-identity-pill:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.6);
+  outline-offset: 1px;
+}
+
+/* Phase pills container — JS が #vizProfilePills を中に注入 */
+.eab-phase-host {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* Filters group */
+.eab-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-shrink: 0;
+}
+.eab-count-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  background: rgba(31, 41, 55, 0.55);
+  border: 1px solid rgba(75, 85, 99, 0.45);
+  border-radius: 0.5rem;
+  color: #e5e7eb;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+.eab-select-wrap {
+  position: relative;
+  display: inline-block;
+}
+.eab-select {
+  background: rgba(55, 65, 81, 0.9);
+  border: 1px solid #4b5563;
+  border-radius: 0.5rem;
+  padding: 0.35rem 1.7rem 0.35rem 0.7rem;
+  font-size: 0.78rem;
+  color: #e5e7eb;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.eab-select:focus-visible {
+  outline: none;
+  border-color: rgba(56, 189, 248, 0.6);
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.25);
+}
+.eab-select-caret {
+  position: absolute;
+  right: 0.55rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+  pointer-events: none;
+}
+
+/* Actions group: status + admin */
+.eab-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+  justify-content: flex-end;
+}
+.eab-status {
+  color: var(--brand-text-muted, #94a3b8);
+  font-size: 0.7rem;
+  opacity: 0.72;
+  white-space: nowrap;
+}
+.eab-status:empty {
+  display: none;
+}
+.eab-icon-btn {
+  background: transparent;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 0.45rem;
+  padding: 0.3rem 0.4rem;
+  color: #94a3b8;
+  transition: background-color 0.15s, color 0.15s, transform 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.eab-icon-btn:hover {
+  background: rgba(56, 189, 248, 0.12);
+  color: #67e8f9;
+}
+.eab-icon-btn:focus-visible {
+  outline: 2px solid rgba(56, 189, 248, 0.6);
+  outline-offset: 1px;
+}
+.eab-end-pub-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem 0.7rem;
+  background: rgba(234, 88, 12, 0.9);
+  border-radius: 0.45rem;
+  color: white;
+  font-size: 0.75rem;
+  transition: background-color 0.15s;
+}
+.eab-end-pub-btn:hover {
+  background: rgb(194, 65, 12);
+}
+.eab-end-pub-btn:focus-visible {
+  outline: 2px solid rgba(234, 88, 12, 0.6);
+  outline-offset: 1px;
+}
+
+/* Row 2: 設問テキスト (中央配置、ピンクで focus) */
+.eab-row-question {
+  display: flex;
+  justify-content: center;
+  padding: 0.2rem 0 0.1rem;
+}
+.eab-question {
+  font-weight: 700;
+  line-height: 1.25;
+  font-size: 1.5rem;
+  text-align: center;
+  max-width: min(100%, 60rem);
+  margin: 0;
+}
+@media (min-width: 640px) { .eab-question { font-size: 1.65rem; } }
+@media (min-width: 768px) { .eab-question { font-size: 1.85rem; } }
+@media (min-width: 1024px) { .eab-question { font-size: 2.1rem; } }
+
+/* Row 3: editor tools — viz toolbar が ensureViewToolbar で注入。空なら非表示 */
+.eab-row-tools:empty {
+  display: none;
+}
+.eab-row-tools {
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+/* Editor-only visibility via body class:
+ *   設計: setupEditorState() で body.classList.toggle('is-editor', isEditor)。
+ *   editor-only / editor-only-row クラスを CSS で hidden 制御することで
+ *   従来の .hidden JS トグルを排除し、保守性向上。 */
+body:not(.is-editor) .editor-only,
+body:not(.is-editor) .editor-only-row {
+  display: none !important;
+}
+
+/* Mobile: Row 1 を縦積み (auto-flow) — タブ/フィルタが折り返さないように個別行に */
+@media (max-width: 768px) {
+  .eab-row-meta {
+    grid-template-columns: 1fr;
+    grid-auto-rows: auto;
+    gap: 0.4rem;
+  }
+  .eab-actions { justify-content: flex-end; }
+  .eab-filters { flex-wrap: wrap; }
+}
+
+
+
+/* =============================================================================
  * Page-specific Component Styles
  * ============================================================================= */
 

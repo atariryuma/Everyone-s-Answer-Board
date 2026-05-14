@@ -68,10 +68,11 @@
         sizeSlider: document.getElementById('sizeSlider'),
         sliderValue: document.getElementById('sliderValue'),
         headingLabel: document.getElementById('headingLabel'),
-        sheetNameText: document.getElementById('sheetNameText'),
         endPublicationBtn: document.getElementById('endPublicationBtn'),
         adminToggleBtn: document.getElementById('adminToggleBtn'),
         answerCount: document.getElementById('answerCount'),
+        // v2674: sheetNameText は未使用要素として削除済み。互換性のため null を保持。
+        sheetNameText: null,
         answerModalContainer: document.getElementById('answerModalContainer'),
         answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
         answerModalCard: document.getElementById('answerModalCard'),
@@ -326,16 +327,20 @@
      * ✅ CLAUDE.md準拠: Simplified editor state setup
      */
     setupEditorState() {
-      if (window.isEditor) {
-        this.state.isEditor = true;
-        if (this.elements.adminToggleBtn) {
+      // v2674: body class で editor/viewer 表示制御を統一。
+      //   editor-only / editor-only-row クラスは CSS で body:not(.is-editor) で
+      //   display:none となるため、JS の .hidden トグルが不要。
+      //   adminToggleBtn / endPublicationBtn / Row 3 ツールが自動的に隠れる。
+      const isEditor = !!window.isEditor;
+      this.state.isEditor = isEditor;
+      document.body.classList.toggle('is-editor', isEditor);
+      document.body.classList.toggle('is-viewer', !isEditor);
+      if (this.elements.adminToggleBtn) {
+        if (isEditor) {
           this.elements.adminToggleBtn.classList.remove('hidden');
           this.elements.adminToggleBtn.removeAttribute('hidden');
           this.elements.adminToggleBtn.style.display = '';
-        }
-      } else {
-        this.state.isEditor = false;
-        if (this.elements.adminToggleBtn) {
+        } else {
           this.elements.adminToggleBtn.classList.add('hidden');
           this.elements.adminToggleBtn.setAttribute('hidden', '');
           this.elements.adminToggleBtn.style.display = 'none';
@@ -2035,6 +2040,18 @@
         config.bypassCache = false;
       } else if (config.isInitialLoad && options.bypassCache === true) {
         config.bypassCache = true;
+      }
+
+      // Option B: 過去フェーズ閲覧中は、classFilter / sortOrder / refreshContent 等から
+      //   loadSheetData が呼ばれても「現在フェーズに戻る」のではなく「同じ過去フェーズで再フェッチ」
+      //   が UX 上正しい。viewingPastProfile を解除してから __vizLoadPastProfile に分岐し、新しい
+      //   filter / sort をサーバへ渡す。isInitialLoad は初回起動のときだけ通常経路へ。
+      if (!config.isInitialLoad && this.state && this.state.viewingPastProfile &&
+          typeof this.__vizLoadPastProfile === 'function') {
+        const name = this.state.viewingPastProfile;
+        this.state.viewingPastProfile = null;  // ガード解除 (同名 no-op をスキップして再フェッチ)
+        this.__vizLoadPastProfile(name);
+        return Promise.resolve();
       }
 
       if (this.state.isLoading && config.showLoading) {

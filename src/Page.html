@@ -174,80 +174,86 @@
   </div>
 
   <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
-    <!-- コンパクトヘッダー -->
-    <header id="main-header" class="glass-panel rounded-xl p-3 mb-4 shadow-lg fade-in">
-      <!-- 上部: フォームリンク + ドメイン情報（横並び） -->
-      <div class="flex items-center justify-between mb-3 text-xs">
-        <!-- フォームリンク（左側） -->
-        <a id="form-link-btn" href="#" target="_blank" class="group bg-cyan-500/10 border border-cyan-400/30 rounded-lg px-3 py-2 flex items-center gap-2 hover:bg-cyan-500/20 transition-all duration-200 text-cyan-400 hover:text-cyan-300 hidden focus:ring-2 focus:ring-cyan-400/50 focus:outline-none">
-          <svg class="w-3 h-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <!-- ヘッダー (v2674 再設計: 横幅を活用する Bento Grid 構造)
+         Row 1: identity + phase pills + filters + admin actions (1 行に集約)
+         Row 2: 設問テキスト (中央配置で focus)
+         Row 3: 編集者ツール (vizToolbarSlot に viz layer から注入、編集者のみ表示)
+         body.is-editor / .is-viewer クラスで editor-only 要素の表示を制御。 -->
+    <header id="main-header" class="eab-header glass-panel rounded-xl shadow-lg fade-in">
+      <!-- Row 1: identity + phase + filters + admin actions -->
+      <div class="eab-row eab-row-meta">
+        <!-- Identity: フォームリンク (formUrl 未設定なら hidden) -->
+        <a id="form-link-btn" href="#" target="_blank"
+           class="eab-identity-pill hidden"
+           title="Google フォームで回答する"
+           aria-label="Google フォームで回答する">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
           </svg>
-          <span class="font-medium text-sm">📝 回答フォーム</span>
+          <span class="eab-pill-text">📝 回答フォーム</span>
         </a>
-        
-        <!-- 管理モードボタンとドメイン情報（右側） -->
-        <div class="flex-shrink-0 flex items-center gap-2">
-          <!-- 管理モードボタン -->
-          <button type="button" id="adminToggleBtn" class="admin-toggle group text-xs text-gray-400 hover:text-cyan-400 transition-all duration-200 hidden whitespace-nowrap flex items-center gap-1 px-2 py-1.5 rounded-md hover:bg-cyan-500/10 focus:ring-2 focus:ring-cyan-400/50 focus:outline-none" hidden aria-label="管理者モード切り替え">
-            <svg class="w-3 h-3 transition-transform group-hover:rotate-45" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            </svg>
-          </button>
-          
-        </div>
-      </div>
-      
-      <!-- メイン部分: 問題タイトル + コントロール -->
-      <div class="flex flex-col lg:flex-row items-center gap-3">
-        <!-- 左: コントロール -->
-        <div class="flex items-center gap-3 text-xs">
-          <div id="answerCount" class="flex items-center gap-1.5 text-gray-200 bg-gray-800/50 rounded-lg px-2.5 py-1.5 border border-gray-600/40">
+
+        <!-- Phase pills: ensureViewToolbar (page.viz.js) がここに #vizProfilePills を注入 -->
+        <div id="vizPhaseHost" class="eab-phase-host" role="tablist" aria-label="フェーズ切替"></div>
+
+        <!-- Filters group: 件数 + クラスフィルタ + 並び順 -->
+        <div class="eab-filters">
+          <div id="answerCount" class="eab-count-pill" aria-live="polite">
             <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
             </svg>
             <span id="answerCountText" class="font-semibold">0件</span>
           </div>
-
-          <select id="classFilter" class="hidden text-xs bg-gray-700/90 border border-gray-600 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-cyan-400/50 focus:outline-none transition-all duration-200" title="クラスフィルター" aria-label="クラスフィルター"></select>
-
-          <div class="relative">
-            <select id="sortOrder" class="text-xs bg-gray-700/90 border border-gray-600 rounded-lg px-3 py-1.5 pr-8 appearance-none focus:ring-2 focus:ring-cyan-400/50 focus:outline-none transition-all duration-200 cursor-pointer" title="並び順" aria-label="並び順">
+          <select id="classFilter"
+                  class="eab-select hidden"
+                  title="クラスフィルター"
+                  aria-label="クラスフィルター"></select>
+          <div class="eab-select-wrap">
+            <select id="sortOrder"
+                    class="eab-select"
+                    title="並び順"
+                    aria-label="並び順">
               <option value="newest" selected>新着順</option>
               <option value="random">ランダム順</option>
               <option value="score" id="scoreOption" class="hidden">スコア順</option>
             </select>
-            <svg class="absolute right-2 top-1/2 transform -translate-y-1/2 w-3 h-3 text-gray-400 pointer-events-none transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="eab-select-caret w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
             </svg>
           </div>
         </div>
 
-        <!-- 中央: 問題タイトル（最大） -->
-        <div class="flex-grow text-center min-w-0">
-          <div id="headingLabel" class="text-xl sm:text-2xl md:text-3xl lg:text-4xl font-bold text-pink-400 leading-tight">
-            読み込み中...
-          </div>
-        </div>
-
-      <!-- Right Section: Info & Admin Controls -->
-      <div class="w-full lg:w-auto lg:min-w-[160px] text-right space-y-2">
-        <p id="sheetNameText" class="text-xs text-gray-300 h-4 truncate flex items-center justify-end gap-1">
-        </p>
-        <div class="flex justify-end gap-2 flex-wrap">
-          <button type="button" id="endPublicationBtn" class="admin-toggle group text-xs bg-orange-600/90 hover:bg-orange-700 text-white px-3 py-2 rounded-lg hidden whitespace-nowrap transition-all duration-200 flex items-center gap-1.5 focus:ring-2 focus:ring-orange-400/50 focus:outline-none shadow-sm" hidden aria-label="公開を終了する">
-            <svg class="w-3 h-3 transition-transform group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L5.636 5.636"></path>
+        <!-- Right group: 最終更新 + 編集者専用 admin actions -->
+        <div class="eab-actions">
+          <span id="lastUpdatedText" class="eab-status" aria-live="polite"></span>
+          <button type="button" id="adminToggleBtn"
+                  class="admin-toggle eab-icon-btn editor-only hidden"
+                  hidden aria-label="管理者モード切り替え">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            </svg>
+          </button>
+          <button type="button" id="endPublicationBtn"
+                  class="admin-toggle eab-end-pub-btn editor-only hidden"
+                  hidden aria-label="公開を終了する">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636"></path>
             </svg>
             <span class="font-medium">公開を終了</span>
           </button>
         </div>
       </div>
+
+      <!-- Row 2: 設問テキスト (focus content, ピンクで強調) -->
+      <div class="eab-row eab-row-question">
+        <h1 id="headingLabel" class="eab-question text-pink-400">読み込み中...</h1>
       </div>
-      <!-- Viz toolbar slot: page.viz.js が profile selector + mode tabs + ⚙️ をここに注入する。
-           main-header 内に置くことでタイトル直下にコンパクトに収まる。 -->
-      <div id="vizToolbarSlot" class="viz-toolbar-slot mt-2"></div>
+
+      <!-- Row 3: 編集者専用ツール (vizToolbarSlot, ensureViewToolbar が議論支援ツールを注入)
+           空の時は CSS で display:none。閲覧者では body:not(.is-editor) で全体非表示。 -->
+      <div id="vizToolbarSlot" class="eab-row eab-row-tools editor-only-row"></div>
+    </header>
     </header>
     <!-- 新着通知バナー -->
     <div id="newContentBanner" class="fixed top-20 left-1/2 z-[60] bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-xl backdrop-blur-sm hidden transition-all duration-300 ease-out hover:shadow-2xl focus-within:ring-2 focus-within:ring-blue-300/50 notification-banner-base" role="alert" aria-live="polite" aria-label="新着通知バナー">

@@ -353,24 +353,33 @@
    *      新しい .viz-toolbar は 1 行（モバイルでは折り返し）に統合する。
    * ===================================================================== */
   .viz-toolbar-slot { width: 100%; }
-  /* 生徒には toolbar が注入されないので、空のときは余白を出さない */
+  /* v2674: 議論ツール (Row 3) と phase pills (Row 1 内) を別 slot に分離。
+     toolbar 注入有無で空白が出ないよう :empty で非表示。 */
   .viz-toolbar-slot:empty { display: none; }
-  /* Why: 親 .glass-panel が既に半透明背景＋blur を持つので、ここでは独自背景を持たず
-     上端の border だけで「ヘッダー内のサブセクション」を示す。視覚ノイズを最小化。 */
+  /* 議論支援ツール bar (Row 3) — section label + 操作ボタン群を 1 行に
+     親 .glass-panel が背景＋blur を持つので、ここは透明＋上端 border のみ。 */
   .viz-toolbar {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    padding: 0.45rem 0.25rem 0.1rem;
-    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    gap: 0.6rem;
+    padding: 0.25rem 0;
     flex-wrap: wrap;
+  }
+  .viz-toolbar-section-label {
+    color: var(--brand-text-muted, #94a3b8);
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
   .viz-toolbar-left,
   .viz-toolbar-right { flex: 0 0 auto; }
   .viz-toolbar-center {
     flex: 1 1 auto;
     display: flex;
-    justify-content: center;
+    justify-content: flex-start;
+    align-items: center;
     gap: 0.3rem;
     flex-wrap: wrap;
   }
@@ -667,21 +676,10 @@
     .viz-quadrant-summary { grid-template-columns: 1fr; }
   }
 
-  /* 統計バッジ（接続数・更新時刻） */
+  /* v2674: 統計バッジ (vizStatsPills) は header の #lastUpdatedText に移管。
+     旧 .viz-stats / .stat-pill ルールは互換性のため残置 (他で参照される可能性) */
   .viz-stats {
-    position: absolute;
-    top: 0.5rem;
-    right: 0.75rem;
-    font-size: 0.8rem;
-    color: var(--brand-text-muted, #94a3b8);
-    display: flex;
-    gap: 0.75rem;
-  }
-  .viz-stats .stat-pill {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid rgba(148, 163, 184, 0.25);
-    border-radius: 999px;
-    padding: 0.18rem 0.6rem;
+    display: none;  /* 旧 DOM が残った場合の安全策 (現在は生成されない) */
   }
 
   /* 教師ダッシュボード「気になる児童」 */
@@ -751,10 +749,9 @@
     /* d3 で radius を可変設定するので、CSS では基本値のみ */
     stroke-width: 1.6;
   }
-  body.projector-mode .viz-stats {
-    top: 1rem;
-    right: 1.5rem;
-    font-size: 1.1rem;
+  body.projector-mode .eab-status {
+    font-size: 0.95rem;
+    opacity: 0.85;
   }
 
   /* レスポンシブ: 小型端末（児童タブレット）向けの調整 */
