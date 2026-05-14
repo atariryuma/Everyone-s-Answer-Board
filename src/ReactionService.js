@@ -96,21 +96,69 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
     };
   }
 
-  const reactionColumns = {};
+  // Why (lazy provisioning, 2026-05-14):
+  //   旧来は「列が無ければ throw → 教師にデータソース再接続を要求」する UX 破壊フロー。
+  //   ログ調査 (12h で 10+ 件の UNDERSTAND not found エラー) で「新規シートに対する初回
+  //   リアクションが必ず失敗」が判明。
+  //   修正: 不足している reaction 列をその場で append し、headers を更新して処理続行。
+  //   side-effect は新規列追加のみ（既存データには触れない）。冪等で何度呼んでも安全。
+  let reactionColumns = {};
+  let missingTypes = [];
 
   reactionTypes.forEach(type => {
     const colIndex = headers.findIndex(header => String(header).toUpperCase().trim() === type);
     if (colIndex === -1) {
-      console.error(`❌ processReactionDirect: Required reaction column '${type}' not found`, {
-        type,
-        availableHeaders: headers.map(h => String(h || '').trim()).filter(h => h).join(', '),
-        headerCount: headers.length,
-        systemColumns: ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT']
-      });
-      throw new Error(`リアクション列「${type}」が見つかりません。データソースを再接続してリアクション列を作成してください。`);
+      missingTypes.push(type);
+    } else {
+      reactionColumns[type] = colIndex + 1;
     }
-    reactionColumns[type] = colIndex + 1;
   });
+
+  // Why (scope): 「現在の操作に必要な列」だけを provision する。HIGHLIGHT は
+  //   processHighlightDirect 側で別途 lazy-provision するので、ここでは reaction 3 種のみ。
+  //   余計な provisioning は test の sheet._writes 期待値を壊し、生産現場でも不必要な書込み。
+  const missingForProvision = missingTypes.slice();
+
+  if (missingForProvision.length > 0) {
+    console.warn('processReactionDirect: lazy-provisioning reaction columns', {
+      missingForProvision,
+      currentHeaderCount: headers.length,
+      rowNumber
+    });
+    try {
+      // 既存最終列の右側に append（順序: UNDERSTAND, LIKE, CURIOUS, HIGHLIGHT）。
+      // setValues 1 回で済むよう一括書き込み。
+      const startCol = headers.length + 1;
+      sheet.getRange(1, startCol, 1, missingForProvision.length)
+           .setValues([missingForProvision]);
+      // headers 配列も同期更新（同じ関数内の以降のロジックが反映を見られるように）。
+      missingForProvision.forEach((name, i) => {
+        headers.push(name);
+        // この行内のロジックは reactionTypes (UNDERSTAND/LIKE/CURIOUS) のみ参照
+        if (reactionTypes.includes(name)) {
+          reactionColumns[name] = startCol + i;
+        }
+      });
+      // 不足解消したので missingTypes をクリア
+      missingTypes = missingTypes.filter(t => reactionColumns[t] === undefined);
+    } catch (provError) {
+      console.error('processReactionDirect: lazy provisioning failed', {
+        error: provError.message,
+        missingForProvision
+      });
+      // provisioning が失敗した場合のみ従来の throw に戻す
+      throw new Error(`リアクション列の追加に失敗しました: ${provError.message}`);
+    }
+  }
+
+  if (missingTypes.length > 0) {
+    // ここに来るのは provisioning 後にも reactionColumns に欠けがある異常ケースのみ
+    console.error('❌ processReactionDirect: missing reaction columns after provisioning', {
+      missingTypes,
+      availableHeaders: headers.map(h => String(h || '').trim()).filter(h => h).join(', ')
+    });
+    throw new Error(`リアクション列「${missingTypes[0]}」の作成に失敗しました。`);
+  }
 
   const columnIndexes = Object.values(reactionColumns);
   const minCol = Math.min(...columnIndexes);
@@ -206,15 +254,27 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
     };
   }
 
-  const highlightColIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
+  let highlightColIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
 
+  // Why (lazy provisioning): 旧来は throw して教師にデータソース再接続を強制していたが、
+  //   新規ボードで初回 HIGHLIGHT 押下時に必ず失敗する UX 破壊フロー。
+  //   processReactionDirect と同じ方針で missing column を sheet 末尾に append → 続行。
   if (highlightColIndex === -1) {
-    console.error(`❌ processHighlightDirect: Required HIGHLIGHT column not found`, {
-      availableHeaders: headers.map(h => String(h || '').trim()).filter(h => h).join(', '),
-      headerCount: headers.length,
-      systemColumns: ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT']
+    console.warn('processHighlightDirect: lazy-provisioning HIGHLIGHT column', {
+      currentHeaderCount: headers.length,
+      rowNumber
     });
-    throw new Error('ハイライト列「HIGHLIGHT」が見つかりません。データソースを再接続してハイライト列を作成してください。');
+    try {
+      const newCol = headers.length + 1;
+      sheet.getRange(1, newCol, 1, 1).setValues([['HIGHLIGHT']]);
+      headers.push('HIGHLIGHT');
+      highlightColIndex = newCol - 1;
+    } catch (provError) {
+      console.error('processHighlightDirect: lazy provisioning failed', {
+        error: provError.message
+      });
+      throw new Error(`ハイライト列の追加に失敗しました: ${provError.message}`);
+    }
   }
 
   const highlightCol = highlightColIndex + 1;

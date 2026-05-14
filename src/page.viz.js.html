@@ -397,7 +397,23 @@
     //   container を作り直すタイミングで明示的にクリーンアップする。
     hideTooltip();
 
-    // 既存のカード残骸を完全クリア（renderBoardCards から戻った時のために）
+    // Why (DOM 再利用): polling のたびに innerHTML='' で DOM を作り直すと、
+    //   scroll position / tooltip / 選択 state が全リセットされる
+    //   (教師フィードバック 2026-05-14「更新のたびにスクロール等がリセットされる」)。
+    //   既に viz-container として初期化済みなら、子要素を再利用して参照だけ返す。
+    //   SVG の中身は renderMatrix/numberline 側で `svg.selectAll('*').remove()`
+    //   して再描画するため、ここでは触らない。
+    if (answers.classList.contains('viz-container')) {
+      const existingSvg = answers.querySelector('svg#vizSvg');
+      const existingStats = answers.querySelector('#vizStatsPills');
+      const existingPanel = answers.querySelector('#vizTeacherPanel');
+      if (existingSvg && existingStats && existingPanel) {
+        return { stats: existingStats, svg: existingSvg, teacherPanel: existingPanel };
+      }
+    }
+
+    // 初回 or board mode → viz mode 切替時のみ DOM を再構築
+    //   (renderBoardCards が答えカードを答え container に詰めていたケースを含む)。
     answers.className = 'viz-container';
     answers.innerHTML = '';
 
@@ -776,14 +792,6 @@
         .attr('transform', `translate(-44,0) rotate(-90)`).attr('text-anchor', 'end')
         .text(yL.max || '');
 
-      // ジッタ（同じ (x,y) に複数いるとき重ならないように小さなノイズ加算）
-      // Why: 1〜5 整数 × 1〜5 整数 では (3,3) に密集しがち。視覚的に区別できるよう
-      //      ±0.15 のランダムジッタを加える。rowIndex を seed にして安定化。
-      const jitter = (seed) => {
-        const s = Math.sin(seed * 1000) * 1000;
-        return ((s - Math.floor(s)) - 0.5) * 0.3;
-      };
-
       // ghost 配列は groupByStudent が常に空 ([]) を返すので no-op。
       // 「揺らぎ大の子だけ」の限定 ghost + trace は下の swing-trace 描画で扱う。
       g.selectAll('.viz-dot.ghost').remove();
@@ -800,12 +808,30 @@
         return BASE_R_M + (MAX_R_M - BASE_R_M) * norm;
       };
 
-      // 現在点
+      // 現在点：軸の整数値と完全一致させる + 重なりは forceCollide で押し戻し。
+      //
+      // Why (jitter 廃止): 旧版は ±0.15 のランダムジッタをデータ値に加算していたが、
+      //   軸の整数目盛（1/2/3/4/5）と dot 位置が一致せず「数値が下地と完全に一致して
+      //   いない」フィードバック (2026-05-14)。numberline と同じく forceSimulation で
+      //   targetX/targetY (= 整数位置) に強く寄せつつ、collide でのみ重なりを回避する
+      //   設計に統一。
       const nodes = current.map((r) => ({
-        x: xScale(r.numericX + jitter(r.rowIndex)),
-        y: yScale(r.numericY + jitter(r.rowIndex + 1)),
+        x: xScale(r.numericX),
+        y: yScale(r.numericY),
+        targetX: xScale(r.numericX),
+        targetY: yScale(r.numericY),
         data: r
       }));
+      // Why: collide 半径は MAX_R_M + 余白で固定。同位置に密集していなければ
+      //   forceX/Y が強く target に寄せて整数位置に張り付く。30 人クラスでも
+      //   120 tick で安定。
+      const COLLIDE_R_M = MAX_R_M + 1.5;
+      const simM = d3.forceSimulation(nodes)
+        .force('x', d3.forceX((d) => d.targetX).strength(1))
+        .force('y', d3.forceY((d) => d.targetY).strength(1))
+        .force('collide', d3.forceCollide(COLLIDE_R_M))
+        .stop();
+      for (let i = 0; i < 120; i++) simM.tick();
 
       // 揺らぎは「現在 dot の半径 + swing-high 黄色」で十分視覚化されているので、
       // 過去位置 ghost + 黄色 trace 線は採用せず（教師フィードバック 2026-05-13）。

@@ -202,17 +202,19 @@ test('processReactionDirect: graceful degradation when headers unavailable', () 
   assert.match(result.message, /一時的/);
 });
 
-test('processReactionDirect: throws when reaction column is missing', () => {
+test('processReactionDirect: lazy-provisions missing reaction columns (new behavior)', () => {
+  // Why (2026-05-14): 旧来は throw して教師に再接続を要求していたが、
+  //   新規シートで初回リアクション必ず失敗の UX 破壊。lazy provisioning に変更。
   const ctx = loadReactionContext();
   const sheet = createMockSheet({
-    headers: ['Q1', 'UNDERSTAND', 'CURIOUS'], // no LIKE
+    headers: ['Q1', 'UNDERSTAND', 'CURIOUS'], // no LIKE / HIGHLIGHT
     rows: [['answer-a', '', '']]
   });
 
-  assert.throws(
-    () => ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com'),
-    /LIKE/
-  );
+  // 不足列が auto-append され、リアクションが成功する
+  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+  assert.equal(result.action, 'added');
+  assert.equal(result.reactions.LIKE.count, 1);
 });
 
 test('processReactionDirect: handles header case and whitespace', () => {
@@ -299,17 +301,17 @@ test('processHighlightDirect: graceful degradation on empty headers', () => {
   assert.match(result.message, /一時的/);
 });
 
-test('processHighlightDirect: throws when HIGHLIGHT column missing', () => {
+test('processHighlightDirect: lazy-provisions missing HIGHLIGHT column (new behavior)', () => {
+  // Why (2026-05-14): 旧来は throw、新規ボード初回 highlight 必ず失敗の UX 破壊。lazy provisioning に変更。
   const ctx = loadReactionContext();
   const sheet = createMockSheet({
     headers: ['Q1', 'UNDERSTAND'],
     rows: [['answer-a', '']]
   });
 
-  assert.throws(
-    () => ctx.processHighlightDirect(sheet, 2),
-    /HIGHLIGHT/
-  );
+  // 不足 HIGHLIGHT 列が auto-append され、トグルが成功する
+  const result = ctx.processHighlightDirect(sheet, 2);
+  assert.equal(result.highlighted, true);
 });
 
 // =====================================================================
@@ -517,10 +519,26 @@ test('addReaction: releases lock and removes cache key on success', () => {
 });
 
 test('addReaction: releases lock on processing error', () => {
+  // Why (2026-05-14): 旧版は「列欠落 throw」で error トリガーしていたが、
+  //   lazy-provisioning で missing 列は auto-append される。代わりに provisioning 自体が
+  //   失敗するケース (setValues throws) を error トリガーに使う。
   const sheet = createMockSheet({
-    headers: ['Q1', 'UNDERSTAND', 'CURIOUS'], // missing LIKE → throws in processReactionDirect
+    headers: ['Q1', 'UNDERSTAND', 'CURIOUS'], // missing LIKE → provisioning attempted
     rows: [['answer-a', '', '']]
   });
+  // setValues を強制失敗させて processReactionDirect 内の lazy-provisioning を失敗させる
+  const originalGetRange = sheet.getRange;
+  sheet.getRange = function (row, col, numRows, numCols) {
+    const range = originalGetRange.call(sheet, row, col, numRows, numCols);
+    if (row === 1 && numRows === 1) {
+      // header 書き込み (lazy provisioning) のみ失敗させる
+      const origSetValues = range.setValues;
+      range.setValues = () => { throw new Error('mocked provisioning failure'); };
+      // 復旧後に戻せるように本物の setValues も保持（実害ない）
+      range._origSetValues = origSetValues;
+    }
+    return range;
+  };
   const lock = createMockLock();
   const cache = createMockCache();
   const ctx = buildAddReactionContext({ sheet, cache, lock });
@@ -781,7 +799,9 @@ test('addReaction: still allows published-board viewer (viewer op is open)', () 
   assert.equal(result.reactions.LIKE.count, 1);
 });
 
-test('toggleHighlight: returns error on missing HIGHLIGHT column', () => {
+test('toggleHighlight: lazy-provisions missing HIGHLIGHT column (new behavior)', () => {
+  // Why (2026-05-14): 旧版は missing 列で error 返却。lazy provisioning に変更したので、
+  //   missing でも auto-append して成功する。lock も正しく解放される。
   const sheet = createMockSheet({
     headers: ['Q1', 'UNDERSTAND'],
     rows: [['answer-a', '']]
@@ -791,7 +811,7 @@ test('toggleHighlight: returns error on missing HIGHLIGHT column', () => {
 
   const result = ctx.toggleHighlight('owner-1', 2);
 
-  assert.equal(result.success, false);
+  assert.equal(result.success, true);
   assert.equal(lock.isHeld(), false);
 });
 
