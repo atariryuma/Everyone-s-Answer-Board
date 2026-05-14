@@ -601,3 +601,105 @@ test('loadSheetData: bypasses gate when viewingPastProfile not set', async () =>
   assert.equal(pastReloadCalled, false);
   assert.equal(loadStarted, true);
 });
+
+// =====================================================================
+// normalizeClassToken / populateClassFilter (Option B L1)
+// Why: profile 切替で dropdown が silent に 'すべて' に降格して、データが空になる
+//   不整合を解消。同一クラスの別表記（"6年1組" ↔ "1組"）は normalize で同一視。
+//   真に該当データがない場合だけ toast + auto-recover で 'すべて' に切替える。
+// =====================================================================
+
+test('normalizeClassToken: client-side mirror of server (string ↔ digit)', () => {
+  const { instance } = makeInstance();
+  assert.equal(instance.normalizeClassToken('1組'), '1');
+  assert.equal(instance.normalizeClassToken('6年1組'), '1');
+  assert.equal(instance.normalizeClassToken('11組'), '11');
+  assert.equal(instance.normalizeClassToken('特進'), '特進');
+  assert.equal(instance.normalizeClassToken(''), '');
+  assert.equal(instance.normalizeClassToken(null), '');
+});
+
+function makeFilterMock() {
+  let _value = '';
+  let _html = '';
+  return {
+    get value() { return _value; },
+    set value(v) { _value = v; },
+    get innerHTML() { return _html; },
+    set innerHTML(v) { _html = v; },
+    classList: { remove: () => {}, add: () => {} }
+  };
+}
+
+test('populateClassFilter: keeps previous selection when exact match exists', () => {
+  const { instance } = makeInstance();
+  const cf = makeFilterMock();
+  cf.value = '4組';
+  instance.elements = { classFilter: cf };
+  instance.loadPersistedClassFilter = () => '4組';
+  instance.persistClassFilter = () => {};
+  instance.showToast = () => {};
+  instance.loadSheetData = async () => {};
+
+  instance.populateClassFilter([{ class: '4組' }, { class: '5組' }]);
+  assert.equal(cf.value, '4組');
+});
+
+test('populateClassFilter: ALIAS — "6年1組" desired but new data has "1組" → adopts "1組"', () => {
+  // 真の同一クラスを別表記で持つ profile 跨ぎケース
+  const { instance } = makeInstance();
+  const cf = makeFilterMock();
+  cf.value = '6年1組';
+  let persisted = null;
+  let toasted = null;
+  let reloaded = false;
+  instance.elements = { classFilter: cf };
+  instance.loadPersistedClassFilter = () => '6年1組';
+  instance.persistClassFilter = (v) => { persisted = v; };
+  instance.showToast = (m) => { toasted = m; };
+  instance.loadSheetData = async () => { reloaded = true; };
+
+  instance.populateClassFilter([{ class: '1組' }, { class: '2組' }]);
+  assert.equal(cf.value, '1組', 'dropdown は新データの表記に揃う');
+  assert.equal(persisted, '1組', 'sessionStorage も同期');
+  assert.equal(toasted, null, '同一クラスの別表記なら toast 不要');
+});
+
+test('populateClassFilter: MISMATCH — "4組" desired but no 4組 anywhere → fallback + toast + auto-recover', async () => {
+  const { instance, timers } = makeInstance();
+  const cf = makeFilterMock();
+  cf.value = '4組';
+  let persisted = null;
+  let toasted = null;
+  let reloaded = false;
+  instance.elements = { classFilter: cf };
+  instance.loadPersistedClassFilter = () => '4組';
+  instance.persistClassFilter = (v) => { persisted = v; };
+  instance.showToast = (m) => { toasted = m; };
+  instance.loadSheetData = async () => { reloaded = true; };
+
+  instance.populateClassFilter([{ class: '1組' }, { class: '2組' }]);
+  assert.equal(cf.value, 'すべて', '別クラスなので "すべて" に降格');
+  assert.equal(persisted, 'すべて', 'sessionStorage も "すべて" に');
+  assert.match(toasted || '', /4組/, 'toast でユーザーに通知');
+
+  // setTimeout で deferred 登録された loadSheetData が timer に乗っていることを確認
+  // (実発火は別 task。timer の存在で間接確認)
+  assert.ok(timers.size >= 1, 'auto-recover refetch が予約されている');
+});
+
+test('populateClassFilter: no previous selection → silent default to すべて', () => {
+  const { instance } = makeInstance();
+  const cf = makeFilterMock();
+  cf.value = '';
+  let toasted = null;
+  instance.elements = { classFilter: cf };
+  instance.loadPersistedClassFilter = () => null;
+  instance.persistClassFilter = () => {};
+  instance.showToast = (m) => { toasted = m; };
+  instance.loadSheetData = async () => {};
+
+  instance.populateClassFilter([{ class: '1組' }, { class: '2組' }]);
+  assert.equal(cf.value, 'すべて');
+  assert.equal(toasted, null, '初期状態は toast 出さない');
+});

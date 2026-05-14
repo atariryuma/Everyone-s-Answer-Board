@@ -1,24 +1,13 @@
 /**
- * @fileoverview Data Formatting & Transformation
- *
- * 🎯 責任範囲:
- * - データの表示用フォーマット
- * - 型変換・データ変換
- * - レスポンス形式の統一
- * - 出力データの正規化
- *
- * 🔄 GAS Best Practices準拠:
- * - フラット関数構造 (Object.freeze削除)
- * - 直接的な関数エクスポート
- * - 簡素なユーティリティ関数群
+ * @fileoverview Data formatting helpers (timestamp formatting only — currently).
  */
 
 /* global */
 
 /**
- * タイムスタンプをフォーマット
- * @param {string|Date} timestamp - タイムスタンプ
- * @returns {string} フォーマット済みタイムスタンプ
+ * タイムスタンプを `yyyy/MM/dd HH:mm` で整形（不正値は '-'）
+ * @param {string|Date} timestamp
+ * @returns {string}
  */
 function formatTimestamp(timestamp) {
   try {

@@ -229,6 +229,14 @@ body:not(.is-editor) .editor-only,
 body:not(.is-editor) .editor-only-row {
   display: none !important;
 }
+/* Admin-mode-only visibility (v2680):
+ *   ⚙ クリックで toggleAdminMode が body.admin-mode を toggle する。
+ *   admin-mode-only 要素は管理モード ON 時のみ表示。
+ *   用途: 公開を終了など destructive action を、明示的に管理モードへ
+ *   入った教師にのみ表示することで、通常時の視覚ノイズと誤操作を削減。 */
+body:not(.admin-mode) .admin-mode-only {
+  display: none !important;
+}
 
 /* Mobile: Row 1 を縦積み (auto-flow) — タブ/フィルタが折り返さないように個別行に */
 @media (max-width: 768px) {

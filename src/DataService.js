@@ -518,6 +518,43 @@ function isEmptyRow(row) {
 }
 
 /**
+ * クラス値の正規化トークン: 末尾の「数字+組」だけ抽出。
+ *   "1組"     → "1"
+ *   "6年1組"  → "1"
+ *   "4-1組"   → "1"   (regex は最終的に直前の数字塊だけ拾う)
+ *   "11組"    → "11"
+ *   "特進"    → "特進" (fallback: 全体を trim して返す)
+ *
+ * @param {*} raw - クラス文字列または null
+ * @returns {string} 正規化済みトークン
+ */
+function normalizeClassToken(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (!s) return '';
+  const m = s.match(/(\d+)組$/);
+  return m ? m[1] : s;
+}
+
+/**
+ * classFilter とアイテムのクラス値のマッチング判定。
+ *
+ * Why: profile / Forms ごとに class カラムの表記が違う ("1組" vs "6年1組" vs "4-1組") ので、
+ *   正規化トークン同士の完全一致で判定する。両方向で対称、false positive なし。
+ *
+ * @param {*} itemClass - データ側のクラス値
+ * @param {*} filter - filter として渡された値
+ * @returns {boolean}
+ */
+function shouldMatchClassFilter(itemClass, filter) {
+  if (!filter) return true;
+  const itemNorm = normalizeClassToken(itemClass);
+  const filterNorm = normalizeClassToken(filter);
+  if (!itemNorm) return false;  // item.class 空ならフィルタは必ず外れる
+  if (!filterNorm) return false; // filter 正規化後に空（"組" 単体など）も外れる扱いで安全側に
+  return itemNorm === filterNorm;
+}
+
+/**
  * 行フィルタリング判定
  * @param {Object} item - データアイテム
  * @param {Object} options - フィルタリングオプション
@@ -548,22 +585,17 @@ function shouldIncludeRow(item, options = {}) {
 
     if (options.classFilter) {
       // Why (Option B 周辺で発見した実データ問題): profile / Forms ごとに class カラムの値表記が
-      //   異なるケースが現場で多発する (例: 本時="1組", 振り返り="6年1組", 導入="4組")。
-      //   dropdown ベースの完全一致だと profile を切替えた瞬間に 0 件マッチとなり、生徒の
-      //   「同じ class を継続して見たい」体験を壊す。
+      //   異なる現場ケース（本時="1組", 振り返り="6年1組", 導入="4組"）を吸収する。
       //
-      //   部分一致 (substring) で吸収する：
-      //     filter="1組"     → "1組" / "6年1組" / "4-1組" 全部マッチ
-      //     filter="6年1組"  → "6年1組" のみマッチ (完全一致は当然 substring も真)
-      //     filter="4組"     → "4組" / "6年4組" / "4-1組" マッチ
+      //   正規化アプローチ: 末尾の「数字+組」を抽出して比較。両方向で対称的に動作。
+      //     "1組"     → "1"
+      //     "6年1組"  → "1"   (filter="1組" ↔ data="6年1組" でも data="1組" ↔ filter="6年1組" でも match)
+      //     "11組"    → "11"  (filter "1組" と "11組" は区別される、false positive 排除)
+      //     "特進"    → "特進" (数字+組 でなければ素のまま、fallback で exact match)
       //
-      //   既知の副作用: filter="1組" が "11組" "21組" にも誤マッチする可能性。学校現場では
-      //   通常 1〜9組 程度なので実害ほぼなし。気になる場合は dropdown の選択肢を増やせば回避可能。
-      //   なお UI 側 populateClassFilter は引き続き unique 値で dropdown を構築するので、
-      //   ユーザーが見える選択肢は data の値そのまま。
-      const itemClass = String(item.class || '');
-      const filter = String(options.classFilter);
-      if (itemClass !== filter && itemClass.indexOf(filter) < 0) {
+      //   substring 方式 (v2678) は非対称 (filter="6年1組" + item="1組" で no-match) かつ
+      //   false positive (filter="1組" matches "11組") があったので、正規化方式に置き換え。
+      if (!shouldMatchClassFilter(item.class, options.classFilter)) {
         return false;
       }
     }
