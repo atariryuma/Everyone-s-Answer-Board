@@ -602,95 +602,21 @@ test('applySortAndLimit: sortBy with limit both apply', () => {
 });
 
 // =====================================================================
-// shouldIncludeRow: classFilter — 正規化マッチング
-// Why: profile / Forms ごとに class カラムの値表記が異なる現場ケース
-//   (本時="1組", 振り返り="6年1組", 導入="4組") を吸収する。
-//   末尾の「数字+組」を抽出して比較することで、表記揺れを吸収 + false positive を排除。
-//   substring 方式 (v2678) の非対称性 (filter="6年1組" + item="1組" で no-match) を解消。
+// shouldIncludeRow: classFilter は完全一致 (exact match)
+// 表記揺れ ("1組" vs "6年1組") は client 側で profile 切替時に classFilter を
+// 'すべて' にリセットすることで吸収する設計。サーバは余計な正規化をしない。
 // =====================================================================
 
-test('normalizeClassToken: "1組" → "1"', () => {
+test('shouldIncludeRow: classFilter matches exact value', () => {
   const ctx = loadDataServiceContext();
-  assert.equal(ctx.normalizeClassToken('1組'), '1');
-});
-
-test('normalizeClassToken: "6年1組" → "1" (trailing digits only)', () => {
-  const ctx = loadDataServiceContext();
-  assert.equal(ctx.normalizeClassToken('6年1組'), '1');
-});
-
-test('normalizeClassToken: "11組" → "11" (multi-digit preserved)', () => {
-  const ctx = loadDataServiceContext();
-  assert.equal(ctx.normalizeClassToken('11組'), '11');
-});
-
-test('normalizeClassToken: "特進" → "特進" (no 組 suffix, fallback)', () => {
-  const ctx = loadDataServiceContext();
-  assert.equal(ctx.normalizeClassToken('特進'), '特進');
-});
-
-test('normalizeClassToken: empty / null → ""', () => {
-  const ctx = loadDataServiceContext();
-  assert.equal(ctx.normalizeClassToken(''), '');
-  assert.equal(ctx.normalizeClassToken(null), '');
-  assert.equal(ctx.normalizeClassToken(undefined), '');
-});
-
-test('shouldIncludeRow: classFilter "1組" matches "1組" (exact, normalized)', () => {
-  const ctx = loadDataServiceContext();
-  const item = { class: '1組', answer: 'x' };
-  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '1組' }), true);
-});
-
-test('shouldIncludeRow: classFilter "1組" matches "6年1組" (cross-profile)', () => {
-  const ctx = loadDataServiceContext();
-  const item = { class: '6年1組', answer: 'x' };
-  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '1組' }), true);
-});
-
-test('shouldIncludeRow: classFilter "6年1組" matches "1組" (cross-profile, REVERSE direction)', () => {
-  // v2678 substring 方式の致命的バグだったケース
-  const ctx = loadDataServiceContext();
-  const item = { class: '1組', answer: 'x' };
-  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '6年1組' }), true);
-});
-
-test('shouldIncludeRow: classFilter "1組" does NOT match "11組" (false positive eliminated)', () => {
-  // v2678 substring 方式の false positive ケース
-  const ctx = loadDataServiceContext();
-  const item = { class: '11組', answer: 'x' };
-  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '1組' }), false);
-});
-
-test('shouldIncludeRow: classFilter "1組" does NOT match "21組"', () => {
-  const ctx = loadDataServiceContext();
-  const item = { class: '21組', answer: 'x' };
-  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '1組' }), false);
-});
-
-test('shouldIncludeRow: classFilter "4組" matches "6年4組" (cross-profile)', () => {
-  const ctx = loadDataServiceContext();
-  const item = { class: '6年4組', answer: 'x' };
+  const item = { class: '4組', answer: 'x' };
   assert.equal(ctx.shouldIncludeRow(item, { classFilter: '4組' }), true);
 });
 
-test('shouldIncludeRow: classFilter "4組" rejects "6年1組" (different class digit)', () => {
-  // ユーザー指摘の核心: substring 方式では NO match だった (正しい)。正規化方式でも NO match。
+test('shouldIncludeRow: classFilter rejects different value', () => {
   const ctx = loadDataServiceContext();
   const item = { class: '6年1組', answer: 'x' };
-  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '4組' }), false);
-});
-
-test('shouldIncludeRow: classFilter "特進" matches "特進" (non-numeric exact fallback)', () => {
-  const ctx = loadDataServiceContext();
-  const item = { class: '特進', answer: 'x' };
-  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '特進' }), true);
-});
-
-test('shouldIncludeRow: classFilter "特進A" rejects "特進" (different non-numeric)', () => {
-  const ctx = loadDataServiceContext();
-  const item = { class: '特進', answer: 'x' };
-  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '特進A' }), false);
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '1組' }), false);
 });
 
 test('shouldIncludeRow: no classFilter → always include', () => {
@@ -702,11 +628,5 @@ test('shouldIncludeRow: no classFilter → always include', () => {
 test('shouldIncludeRow: classFilter with empty item.class → no match', () => {
   const ctx = loadDataServiceContext();
   const item = { class: '', answer: 'x' };
-  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '4組' }), false);
-});
-
-test('shouldIncludeRow: classFilter with null item.class → no match', () => {
-  const ctx = loadDataServiceContext();
-  const item = { class: null, answer: 'x' };
   assert.equal(ctx.shouldIncludeRow(item, { classFilter: '4組' }), false);
 });

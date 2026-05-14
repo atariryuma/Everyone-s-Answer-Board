@@ -1,23 +1,16 @@
 /**
- * @fileoverview DatabaseCore - データベース操作の基盤
- *
- * 責任範囲:
- * - 基本的なデータベース操作（CRUD）
- * - ユーザー管理の基盤関数
- * - GAS-Native Architecture準拠（直接SpreadsheetApp使用）
- * - サービスアカウント使用時の安全な権限管理
+ * @fileoverview DatabaseCore - users シートの CRUD、Sheets API リトライ/サーキット
+ *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
 /* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS */
 
 /**
- * Google Sheets APIの堅牢な呼び出しラッパー（クォータ制限対応）
- * ✅ 適応型バックオフ: 初回エラーは短い待機、連続エラー時は段階的延長
- * ✅ サーキットブレーカー: 連続エラー時にAPI呼び出しを一時停止
- * @param {string} url - API URL
+ * Sheets API 呼び出しラッパー（適応型バックオフ + サーキットブレーカー）。
+ * @param {string} url
  * @param {Object} options - Fetch options
- * @param {string} operationName - Operation name for logging
- * @returns {Object} Response object
+ * @param {string} operationName - ログ用
+ * @returns {Object}
  */
 function fetchSheetsAPIWithRetry(url, options, operationName) {
   let retryCount = 0;
@@ -160,7 +153,7 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
       return { allowed: true, reason: 'Admin privileges' };
     }
 
-    // ✅ SECURITY GATE: 非管理者は公開済みボードのみアクセス許可
+    // SECURITY GATE: 非管理者は公開済みボードのみアクセス許可
     try {
       const cacheKey = `sa_validation_${spreadsheetId}`;
       const cached = CacheService.getScriptCache().get(cacheKey);

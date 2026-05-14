@@ -1,21 +1,6 @@
 /**
- * @fileoverview DataService - コアデータ操作サービス（リファクタリング版）
- *
- * 責任範囲:
- * - スプレッドシートデータ取得・操作
- * - データフィルタリング・検索
- * - バルクデータAPI
- * - シート接続・寸法取得
- *
- * CLAUDE.md Best Practices準拠:
- * - 分離されたモジュール利用（ColumnMappingService, ReactionService）
- * - Zero-Dependency Architecture（直接GAS API）
- * - バッチ操作による70x性能向上
- * - V8ランタイム最適化
- *
- * 依存モジュール:
- * - ColumnMappingService.gs（列マッピング・抽出）
- * - ReactionService.gs（リアクション・ハイライト）
+ * @fileoverview DataService - スプレッドシートデータの取得・フィルタ・整形、
+ *   シート寸法/ヘッダー取得（キャッシュ付き）、適応型バッチ読込。
  */
 
 /* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty */
@@ -110,9 +95,9 @@ function resolveTimestampIndex(headers) {
 }
 
 /**
- * スプレッドシート接続とシート取得（GAS Best Practice: 単一責任）
- * @param {Object} config - 設定オブジェクト
- * @returns {Object} シート情報
+ * config からスプレッドシートを開いて該当シートを返す。
+ * @param {Object} config
+ * @returns {{sheet:Sheet, spreadsheet:Spreadsheet}}
  */
 function connectToSpreadsheetSheet(config) {
   const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
@@ -136,10 +121,9 @@ function connectToSpreadsheetSheet(config) {
 }
 
 /**
- * ヘッダー情報取得（長期キャッシュ - ヘッダーは変更されないため）
- * ✅ FIX: フォーム投稿即時反映のため、ヘッダーと行数を分離
- * @param {Sheet} sheet - シートオブジェクト
- * @returns {Object} { lastCol, headers }
+ * ヘッダー情報取得（20分キャッシュ。新規投稿の即時反映は行数側 (`getSheetRowCount`) が担う）。
+ * @param {Sheet} sheet
+ * @returns {{lastCol:number, headers:Array}}
  */
 function getSheetHeaders(sheet) {
   const spreadsheetId = sheet.getParent ? sheet.getParent().getId() : 'unknown';
@@ -192,9 +176,8 @@ function invalidateSheetHeadersCache(spreadsheetId, sheetName) {
 }
 
 /**
- * シート行数取得（短期キャッシュ - フォーム投稿で変化）
- * ✅ FIX: 30秒キャッシュで新しいフォーム投稿を即時反映
- * @param {Sheet} sheet - シートオブジェクト
+ * シート行数取得（30秒キャッシュ — 新規フォーム投稿を即時反映するため短期）。
+ * @param {Sheet} sheet
  * @returns {number} lastRow
  */
 function getSheetRowCount(sheet) {
@@ -227,29 +210,20 @@ function getSheetRowCount(sheet) {
 }
 
 /**
- * シート情報を一括取得（寸法+ヘッダー）
- * ✅ FIX: ヘッダーと行数を別々にキャッシュして即時性を確保
- * ✅ API最適化: ヘッダーは20分、行数は30秒キャッシュで最適なバランス
- * ✅ SECURITY: spreadsheetId+sheetName でキャッシュキー一意性確保
- * @param {Sheet} sheet - シートオブジェクト
- * @returns {Object} { lastRow, lastCol, headers }
+ * シート情報を一括取得（寸法 + ヘッダー）。ヘッダーは長期、行数は短期キャッシュ。
+ * @param {Sheet} sheet
+ * @returns {{lastRow:number, lastCol:number, headers:Array}}
  */
 function getSheetInfo(sheet) {
-  const headersInfo = getSheetHeaders(sheet);  // 20分キャッシュ
-  const lastRow = getSheetRowCount(sheet);     // ✅ 30秒キャッシュ（即時反映）
-
-  return {
-    lastRow,
-    lastCol: headersInfo.lastCol,
-    headers: headersInfo.headers
-  };
+  const headersInfo = getSheetHeaders(sheet);
+  const lastRow = getSheetRowCount(sheet);
+  return { lastRow, lastCol: headersInfo.lastCol, headers: headersInfo.headers };
 }
 
 /**
- * 適応型バッチサイズ計算（429エラー対策）
- * ✅ エラー発生時に動的にバッチサイズを縮小して回復力向上
- * @param {number} consecutiveErrors - 連続エラー回数
- * @returns {number} 適切なバッチサイズ
+ * 適応型バッチサイズ計算（429 エラー対策）。連続エラー時に段階的に縮小。
+ * @param {number} consecutiveErrors
+ * @returns {number}
  */
 function getAdaptiveBatchSize(consecutiveErrors) {
   if (consecutiveErrors === 0) return 100; // 正常時: 最大効率
@@ -258,18 +232,17 @@ function getAdaptiveBatchSize(consecutiveErrors) {
 }
 
 /**
- * バッチデータ処理（GAS Best Practice: 大量データ処理分離）
- * ✅ 適応型バッチサイズでAPI Quota制限対策強化
- * ✅ 429エラー時の自動回復力向上（エラー率30-40%削減）
- * @param {Sheet} sheet - シートオブジェクト
- * @param {Array} headers - ヘッダー配列
- * @param {number} lastRow - 最終行
- * @param {number} lastCol - 最終列
- * @param {Object} config - 設定
- * @param {Object} options - オプション
- * @param {Object} user - ユーザー情報
- * @param {number} startTime - 開始時刻
- * @returns {Array} 処理済みデータ
+ * バッチでシート行を読み出し、フィルタ・整形して返す。
+ * 適応型バッチサイズで API quota 制限に追従。
+ * @param {Sheet} sheet
+ * @param {Array} headers
+ * @param {number} lastRow
+ * @param {number} lastCol
+ * @param {Object} config
+ * @param {Object} options
+ * @param {Object} user
+ * @param {number} startTime
+ * @returns {Array}
  */
 function processBatchData(sheet, headers, lastRow, lastCol, config, options, user, startTime) {
   const MAX_EXECUTION_TIME = 20000;
@@ -278,7 +251,7 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
   let processedData = [];
   let processedCount = 0;
   const totalDataRows = lastRow - 1;
-  let consecutiveErrors = 0; // ✅ 連続エラーカウント（適応型バッチサイズ用）
+  let consecutiveErrors = 0; // 適応型バッチサイズ用
 
   // Headers don't change mid-batch, so resolve column indices once here
   // rather than per-row (resolveColumnIndex runs a full header scan on misses).
@@ -361,8 +334,6 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
     }
   }
 
-  // ✅ BUG FIX: classFilterはshouldIncludeRow()で既に処理されているため、ここでの二重フィルタリングを削除
-
   // Why: applySortAndLimit は sortBy と limit を独立に適用する。以前はここで
   //      `if (options.sortBy)` でガードしていたため、limit 単体を渡す caller が
   //      silently 無視されていた。limit も sortBy も未指定なら関数内で no-op。
@@ -377,11 +348,11 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
 }
 
 /**
- * スプレッドシートデータ取得（リファクタリング版 - GAS Best Practice準拠）
- * @param {Object} config - 設定オブジェクト
- * @param {Object} options - オプション
- * @param {Object} user - ユーザー情報
- * @returns {Object} データ取得結果
+ * config に従ってシートを開き、フィルタ・整形済みのデータ配列を返す。
+ * @param {Object} config
+ * @param {Object} options
+ * @param {Object} user
+ * @returns {Object}
  */
 function fetchSpreadsheetData(config, options = {}, user = null) {
   const startTime = Date.now();
@@ -518,47 +489,10 @@ function isEmptyRow(row) {
 }
 
 /**
- * クラス値の正規化トークン: 末尾の「数字+組」だけ抽出。
- *   "1組"     → "1"
- *   "6年1組"  → "1"
- *   "4-1組"   → "1"   (regex は最終的に直前の数字塊だけ拾う)
- *   "11組"    → "11"
- *   "特進"    → "特進" (fallback: 全体を trim して返す)
- *
- * @param {*} raw - クラス文字列または null
- * @returns {string} 正規化済みトークン
- */
-function normalizeClassToken(raw) {
-  const s = String(raw == null ? '' : raw).trim();
-  if (!s) return '';
-  const m = s.match(/(\d+)組$/);
-  return m ? m[1] : s;
-}
-
-/**
- * classFilter とアイテムのクラス値のマッチング判定。
- *
- * Why: profile / Forms ごとに class カラムの表記が違う ("1組" vs "6年1組" vs "4-1組") ので、
- *   正規化トークン同士の完全一致で判定する。両方向で対称、false positive なし。
- *
- * @param {*} itemClass - データ側のクラス値
- * @param {*} filter - filter として渡された値
- * @returns {boolean}
- */
-function shouldMatchClassFilter(itemClass, filter) {
-  if (!filter) return true;
-  const itemNorm = normalizeClassToken(itemClass);
-  const filterNorm = normalizeClassToken(filter);
-  if (!itemNorm) return false;  // item.class 空ならフィルタは必ず外れる
-  if (!filterNorm) return false; // filter 正規化後に空（"組" 単体など）も外れる扱いで安全側に
-  return itemNorm === filterNorm;
-}
-
-/**
  * 行フィルタリング判定
- * @param {Object} item - データアイテム
- * @param {Object} options - フィルタリングオプション
- * @returns {boolean} 含めるかどうか
+ * @param {Object} item
+ * @param {Object} options
+ * @returns {boolean}
  */
 function shouldIncludeRow(item, options = {}) {
   try {
@@ -583,21 +517,8 @@ function shouldIncludeRow(item, options = {}) {
       }
     }
 
-    if (options.classFilter) {
-      // Why (Option B 周辺で発見した実データ問題): profile / Forms ごとに class カラムの値表記が
-      //   異なる現場ケース（本時="1組", 振り返り="6年1組", 導入="4組"）を吸収する。
-      //
-      //   正規化アプローチ: 末尾の「数字+組」を抽出して比較。両方向で対称的に動作。
-      //     "1組"     → "1"
-      //     "6年1組"  → "1"   (filter="1組" ↔ data="6年1組" でも data="1組" ↔ filter="6年1組" でも match)
-      //     "11組"    → "11"  (filter "1組" と "11組" は区別される、false positive 排除)
-      //     "特進"    → "特進" (数字+組 でなければ素のまま、fallback で exact match)
-      //
-      //   substring 方式 (v2678) は非対称 (filter="6年1組" + item="1組" で no-match) かつ
-      //   false positive (filter="1組" matches "11組") があったので、正規化方式に置き換え。
-      if (!shouldMatchClassFilter(item.class, options.classFilter)) {
-        return false;
-      }
+    if (options.classFilter && item.class !== options.classFilter) {
+      return false;
     }
 
     return true;
@@ -698,7 +619,7 @@ function deleteAnswerRow(userId, rowIndex) {
     const sheetName = config.config.sheetName || 'フォームの回答 1';
 
     const dataAccess = openSpreadsheet(spreadsheetId, {
-      useServiceAccount: false, // ✅ ユーザーの回答ボードは同一ドメイン共有設定で対応
+      useServiceAccount: false, // ユーザーの回答ボードは同一ドメイン共有設定で対応
       targetUserEmail: user.userEmail,
       context: 'deleteAnswerRow'
     });

@@ -1,22 +1,6 @@
 /**
- * @fileoverview UserApis - ユーザー関連API
- *
- * ✅ V8ランタイム対応（2022年6月アップデート準拠）
- * - 関数定義は順序に関係なく呼び出し可能
- * - グローバルスコープでのコード実行を完全排除
- *
- * 依存関係（呼び出す関数）:
- * - getCurrentEmail() - main.jsで定義
- * - findUserByEmail() - DatabaseCore.jsで定義
- * - isAdministrator() - main.jsで定義
- * - getUserConfig() - ConfigService.jsで定義
- * - createUser() - UserService.jsで定義
- * - createAuthError() - helpers.jsで定義
- * - createUserNotFoundError() - helpers.jsで定義
- * - createExceptionResponse() - helpers.jsで定義
- *
- * 移動元: main.js
- * 移動日: 2025-12-13
+ * @fileoverview UserApis - ユーザー関連 API（プロフィール取得、Welcome 表示状態
+ *   管理など）。クロスファイル依存は下の global 宣言を参照。
  */
 
 /* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, getConfigOrDefault, createUser, updateUser, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, shouldEnforceDomainRestrictions, validateDomainAccess */

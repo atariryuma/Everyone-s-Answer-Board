@@ -1,33 +1,7 @@
 /**
- * @fileoverview DataApis - データ操作専用API
- *
- * ✅ V8ランタイム対応（2022年6月アップデート準拠）
- * - 関数定義は順序に関係なく呼び出し可能
- * - グローバルスコープでのコード実行を完全排除
- *
- * 依存関係（呼び出す関数）:
- * - getCurrentEmail() - main.jsで定義
- * - findUserById() - DatabaseCore.jsで定義
- * - findUserByEmail() - DatabaseCore.jsで定義
- * - getUserConfig() - ConfigService.jsで定義
- * - saveUserConfig() - ConfigService.jsで定義
- * - openSpreadsheet() - DatabaseCore.jsで定義
- * - getSheetInfo() - SystemController.jsで定義
- * - getUserSheetData() - DataService.jsで定義
- * - getBatchedAdminAuth() - main.jsで定義
- * - getQuestionText() - DataService.jsで定義
- * - getFormInfo() - DataService.jsで定義
- * - performIntegratedColumnDiagnostics() - ColumnMappingService.jsで定義
- * - setupDomainWideSharing() - helpers.jsで定義
- * - validateAccess() - DataService.jsで定義
- * - executeWithRetry() - main.jsで定義
- * - createAuthError() - helpers.jsで定義
- * - createUserNotFoundError() - helpers.jsで定義
- * - createErrorResponse() - helpers.jsで定義
- * - createExceptionResponse() - helpers.jsで定義
- *
- * 移動元: main.js
- * 移動日: 2025-12-13
+ * @fileoverview DataApis - データ操作 API（公開ボードのデータ取得、列分析、
+ *   profile 切替、フォルダ作成、リアクションのバッチ取得など）。クロスファイルの
+ *   依存関係は下の global 宣言を参照。
  */
 
 /* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, setupDomainWideSharing, applySpreadsheetSharingDefaults, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash */
@@ -778,17 +752,6 @@ function getSheetList(spreadsheetId) {
 }
 
 /**
- * Shape the sheet-data result into the JSON-safe envelope the frontend expects.
- * Date values (raw timestamps from Sheets) are converted to ISO strings;
- * everything else is already JSON-serializable by construction.
- *
- * Why strip identity fields: showNames:false is meant to be anonymous, but the
- * frontend only hides name/email in the UI — the payload still carried them,
- * so any viewer could read peers' emails via DevTools. We now filter on the
- * server so the wire never sees the identity when identity is not permitted.
- * Admins and board owners always see everything (they can see raw sheet anyway).
- */
-/**
  * View 画面から profile を切替えるためのエンドポイント。
  *
  * Why: 教師がビュー画面の profile セレクタを操作 → google.script.run.loadProfileForView →
@@ -914,6 +877,17 @@ function deleteMyProfile(name) {
   }
 }
 
+/**
+ * Shape the sheet-data result into the JSON-safe envelope the frontend expects.
+ * Date values (raw timestamps from Sheets) are converted to ISO strings;
+ * everything else is already JSON-serializable by construction.
+ *
+ * Why strip identity fields: showNames:false is meant to be anonymous, but the
+ * frontend only hides name/email in the UI — the payload still carried them,
+ * so any viewer could read peers' emails via DevTools. We now filter on the
+ * server so the wire never sees the identity when identity is not permitted.
+ * Admins and board owners always see everything (they can see raw sheet anyway).
+ */
 function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   const displaySettings = (config && config.displaySettings) || DEFAULT_DISPLAY_SETTINGS;
   const includeIdentity = Boolean(

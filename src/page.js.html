@@ -2305,65 +2305,20 @@
       return params;
     }
 
-    /**
-     * クラス表記の正規化トークン（client 版）。server DataService.normalizeClassToken と同一規則。
-     * Why: profile 切替時に dropdown 選択値を保持するため。同一 GAS プロジェクト内でも client は
-     *   別 runtime なので server 関数を直接呼べず、最小ロジックを duplicate する。
-     */
-    normalizeClassToken(raw) {
-      const s = String(raw == null ? '' : raw).trim();
-      if (!s) return '';
-      const m = s.match(/(\d+)組$/);
-      return m ? m[1] : s;
-    }
-
     populateClassFilter(rows) {
       const classFilter = this.elements.classFilter;
       if (!classFilter) return;
       const escape = window.sharedUtilities.security.escapeHtml;
       const uniqueClasses = ['すべて', ...new Set(Array.isArray(rows) ? rows.map(r => r.class).filter(Boolean) : [])];
       // 優先順: 現在 DOM 値 > sessionStorage 前回値 > 'すべて'
+      // 選択していたクラスが新データに存在しなければ 'すべて' にフォールバック。
       const desired = classFilter.value || this.loadPersistedClassFilter() || 'すべて';
-
-      // 正規化マッチで「同一クラスの別表記」を許容する。例: desired='6年1組' で新データに '1組' が
-      //   あれば、両者は normalize で '1' に揃うので同じクラスとみなし、新データ側の表記を採用。
-      //   これがないと profile 切替のたびに dropdown が silent に 'すべて' に降格してしまい、
-      //   サーバ側 filter は元値で実行されたまま → 「dropdown 全件・データ空」の不整合状態になる。
-      let preserved = desired;
-      let mismatched = false;
-      if (desired !== 'すべて' && !uniqueClasses.includes(desired)) {
-        const normalizedDesired = this.normalizeClassToken(desired);
-        const alias = normalizedDesired
-          ? uniqueClasses.find(c => c !== 'すべて' && this.normalizeClassToken(c) === normalizedDesired)
-          : null;
-        if (alias) {
-          preserved = alias;
-        } else {
-          preserved = 'すべて';
-          mismatched = true;
-        }
-      }
-
       classFilter.innerHTML = uniqueClasses.map(c => '<option value="' + escape(c) + '">' + escape(c) + '</option>').join('');
-      classFilter.value = preserved;
+      classFilter.value = uniqueClasses.includes(desired) ? desired : 'すべて';
       classFilter.classList.remove('hidden');
-      // sessionStorage を新値に同期。これがないと次回 fetch も古い filter で空結果を引き続ける。
-      if (preserved !== desired && typeof this.persistClassFilter === 'function') {
-        this.persistClassFilter(preserved);
-      }
-
-      // mismatch: 該当データが本当にない → toast 告知 + 'すべて' で自動再取得して画面を埋める。
-      //   setTimeout で deferred するのは、現在の render パスから安全に loadSheetData を呼ぶため
-      //   (populateClassFilter は描画直前に呼ばれる)。
-      if (mismatched) {
-        if (typeof this.showToast === 'function') {
-          this.showToast('「' + desired + '」のデータがこのフェーズにありません — 全件表示に切替えます');
-        }
-        setTimeout(() => {
-          if (typeof this.loadSheetData === 'function') {
-            this.loadSheetData({ bypassCache: true, isInitialLoad: false, showLoading: false });
-          }
-        }, 0);
+      // 降格時は sessionStorage も同期。これがないと次回 fetch も古い filter で空結果を引き続ける。
+      if (classFilter.value !== desired && typeof this.persistClassFilter === 'function') {
+        this.persistClassFilter(classFilter.value);
       }
     }
 

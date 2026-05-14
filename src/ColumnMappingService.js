@@ -1,11 +1,6 @@
 /**
- * @fileoverview ColumnMappingService - High-Precision AI Column Detection (2025)
- *
- * 🎯 Design Principles:
- * - Direct pattern matching with statistical validation
- * - Efficient single-pass detection algorithm
- * - Optimized for educational forms and surveys
- * - Zero-dependency GAS-native implementation
+ * @fileoverview ColumnMappingService - フォームヘッダーから列役割を推定する
+ *   single-pass 検出器（パターンマッチ + 統計検証）。
  */
 
 /* global normalizeHeader */
@@ -235,7 +230,7 @@ function calculateScoreWithLogic(header, fieldType, patterns, index, relationshi
 function validateSampleData(sampleData, header, fieldType) {
   if (!sampleData || sampleData.length < 2) return 0;
 
-  // ✅ BUG FIX: 空ヘッダーの場合は検証をスキップ（全セルがマッチする問題を回避）
+  // 空ヘッダーは検証スキップ（キーワード "" だと全セルがマッチしてしまう）
   const headerKeyword = header ? String(header).split(' ')[0] : '';
   if (!headerKeyword || headerKeyword.trim() === '') return 0;
 

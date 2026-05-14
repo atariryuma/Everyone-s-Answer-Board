@@ -1,15 +1,6 @@
 /**
- * main.gs - Simplified Application Entry Points
- *
- * Responsibilities:
- * - HTTP request routing (doGet/doPost)
- * - Simple mode validation
- * - Template serving
- *
- * Following Google Apps Script Best Practices:
- * - Direct API calls (no abstraction layers)
- * - Minimal service calls
- * - Simple, readable code
+ * @fileoverview main - HTTP entry points (`doGet` / `doPost`)、認証ヘルパー、
+ *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
 /* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp */
@@ -22,10 +13,9 @@
 let _apiKeyAdminEmail = null;
 
 /**
- * 現在のユーザーのメールアドレスを取得
- * ✅ SECURITY: getActiveUser() のみ使用（getEffectiveUser() は権限昇格リスクあり）
- * APIキー認証コンテキスト中はADMIN_EMAILをフォールバックとして返す
- * @returns {string|null} ユーザーのメールアドレス、または認証されていない場合はnull
+ * 現在のユーザーのメールアドレスを取得。getActiveUser() のみ使用
+ * （getEffectiveUser() は権限昇格リスクあり）。API キー認証中は ADMIN_EMAIL を返す。
+ * @returns {string|null}
  */
 function getCurrentEmail() {
   if (_apiKeyAdminEmail) return _apiKeyAdminEmail;
@@ -326,9 +316,7 @@ function doGet(e) {
   }
 }
 
-/**
- * 🔐 統一認証システム用ヘルパー関数
- */
+// ─── Auth & redirect helpers ─────────────────────────────────────
 
 /**
  * リダイレクト用テンプレート作成
@@ -917,13 +905,9 @@ function getBatchedAdminData(targetUserId) {
 }
 
 /**
- * ✅ CLAUDE.md準拠: Batched admin authentication for 70x performance improvement
- * Combines 2 individual API calls into single batch operation:
- * - getCurrentEmail
- * - isAdministrator
- *
- * @param {Object} options - Additional options for admin auth
- * @returns {Object} Batched result with admin authentication status
+ * 管理者認証をバッチで行う（getCurrentEmail + isAdministrator を 1 回で）。
+ * @param {Object} [options]
+ * @returns {Object}
  */
 function getBatchedAdminAuth(options = {}) {
   try {
@@ -972,12 +956,10 @@ function getBatchedAdminAuth(options = {}) {
 }
 
 /**
- * ✅ CLAUDE.md準拠: Exponential backoff retry for resilient operations
- * Generic retry function for operations that may fail due to network/quota issues
- *
- * @param {Function} operation - Function to retry
- * @param {Object} options - Retry options
- * @returns {*} Result of successful operation
+ * 指数バックオフ付きリトライ。429 検出時はベース遅延を 2 倍に拡張。
+ * @param {Function} operation
+ * @param {Object} [options]
+ * @returns {*}
  */
 function executeWithRetry(operation, options = {}) {
   const maxRetries = options.maxRetries || 3;

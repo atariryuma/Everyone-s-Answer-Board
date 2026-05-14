@@ -60,18 +60,11 @@ const SYSTEM_LIMITS = {
   RADIX_DECIMAL: 10          // 10進数変換用基数
 };
 
-/**
- * グローバルスコープにシステム定数を設定
- * Zero-Dependency Architecture準拠
- */
+// グローバルスコープにシステム定数を公開（GAS の単一グローバルスコープ前提）。
 const __rootSys = (typeof globalThis !== 'undefined') ? globalThis : (typeof global !== 'undefined' ? global : this);
 __rootSys.CACHE_DURATION = CACHE_DURATION;
 __rootSys.TIMEOUT_MS = TIMEOUT_MS;
 __rootSys.SLEEP_MS = SLEEP_MS;
-
-/**
- * Service Discovery for Zero-Dependency Architecture
- */
 
 /**
  * システム状態の強制リセット
@@ -1084,14 +1077,9 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
 }
 
 /**
- * スプレッドシートへのアクセス権限を検証
- * main.gs:2065 から呼び出される（URL検証時）
- *
- * ✅ ユーザーの回答ボードへのアクセス検証
- * - 同一ドメイン共有設定により通常権限でアクセス
- *
- * @param {string} spreadsheetId - スプレッドシートID
- * @returns {Object} 検証結果
+ * スプレッドシートへのアクセス権限を検証（同一ドメイン共有設定で通常権限アクセス）。
+ * @param {string} spreadsheetId
+ * @returns {Object}
  */
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
@@ -1318,17 +1306,8 @@ function checkCurrentPublicationStatus(targetUserId) {
   }
 }
 
-/**
- * パフォーマンスメトリクス収集システム (GAS-Native Architecture準拠)
- * 軽量・非侵入的・プロダクション安全な監視機能
- *
- * 🎯 機能:
- * - API実行時間統計
- * - キャッシュ効率監視
- * - エラー発生率追跡
- * - バッチ処理効率測定
- * - メモリ効率推定
- */
+// ─── Performance metrics ─────────────────────────────────────────
+// API 実行時間 / キャッシュ効率 / エラー率 / バッチ処理 / メモリの軽量モニタ。
 
 /**
  * パフォーマンスメトリクスを収集・分析する
@@ -1884,11 +1863,6 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
   }
 }
 
-/**
- * Set application status (publish/unpublish board)
- * @param {boolean} isPublished - Whether to publish the board
- * @returns {Object} Status update result
- */
 /**
  * データベーススプレッドシートをGASプロジェクトと同じフォルダに自動作成
  * @returns {Object} { success, spreadsheetId, message }

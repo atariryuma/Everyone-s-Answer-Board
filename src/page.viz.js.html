@@ -2148,6 +2148,9 @@
     } catch (_) {}
     this.state.vizTimelineIndex = null;
     this.state.vizCompareMode = false;
+    // class filter も 'すべて' へ。profile ごとに class カラムの値が違う現場ケースで、
+    //   引きずると新 profile で空表示になるので明示的にリセットする。
+    resetClassFilterToAll(this);
     // UI 側も即時反映（loadSheetData 完了を待たず空状態を見せる）
     const sliderEl = document.getElementById('vizTimelineSlider');
     if (sliderEl) {
@@ -2215,6 +2218,23 @@
    *
    * @param {string} name - history に含まれる profile 名
    */
+  /**
+   * profile を切替える前に class filter を 'すべて' にリセットする共通処理。
+   *
+   * Why (シンプル化): profile ごとに class カラムの値が違う ("1組" vs "6年1組") 現場ケースで、
+   *   前 profile の filter を引きずると新 profile の dropdown に当該クラスが無く dropdown
+   *   が silent に 'すべて' に降格、しかし API は古い filter で空結果 → UX 不整合。
+   *   切替時に明示的に 'すべて' へ戻すことで「新 profile の全データから始める」状態を保証する。
+   */
+  function resetClassFilterToAll(app) {
+    if (app.elements && app.elements.classFilter) {
+      app.elements.classFilter.value = 'すべて';
+    }
+    if (typeof app.persistClassFilter === 'function') {
+      app.persistClassFilter('すべて');
+    }
+  }
+
   StudyQuestApp.prototype.__vizLoadPastProfile = function (name) {
     if (!name) return;
     if (typeof google === 'undefined' || !google.script || !google.script.run) return;
@@ -2227,10 +2247,9 @@
     } catch (_) {}
     this.state.vizTimelineIndex = null;
     this.state.vizCompareMode = false;
+    resetClassFilterToAll(this);
 
-    const filter = this.getCurrentFilterState ? this.getCurrentFilterState() : {};
-    const classFilter = filter.classFilter || null;
-    const sortOrder = filter.sortOrder || 'newest';
+    const sortOrder = (this.getCurrentFilterState ? this.getCurrentFilterState() : {}).sortOrder || 'newest';
     const self = this;
 
     // UI 即時反映（描画ペインに loading 文字を出す方法は loadSheetData 内）
@@ -2283,7 +2302,8 @@
         if (typeof self.showToast === 'function') self.showToast(msg);
         else { try { alert(msg); } catch (_) {} }
       })
-      .getPublishedSheetDataForProfile(this.state.userId, name, classFilter, sortOrder);
+      // classFilter は切替時に 'すべて' へリセット済みなので null を渡す（過去 profile の全件を見せる）。
+      .getPublishedSheetDataForProfile(this.state.userId, name, null, sortOrder);
   };
 
   /**
@@ -2292,6 +2312,8 @@
   StudyQuestApp.prototype.__vizReturnToCurrent = function () {
     if (!this.state.viewingPastProfile) return;
     this.state.viewingPastProfile = null;
+    // 過去フェーズで適用していた class filter は active に持ち込まない（同上の理由）。
+    resetClassFilterToAll(this);
     if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
     if (typeof this.loadSheetData === 'function') {
       this.loadSheetData({ bypassCache: true, isInitialLoad: false });

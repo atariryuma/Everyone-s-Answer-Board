@@ -1,28 +1,7 @@
 /**
- * @fileoverview AdminApis - 管理者専用API
- *
- * ✅ V8ランタイム対応（2022年6月アップデート準拠）
- * - 関数定義は順序に関係なく呼び出し可能
- * - グローバルスコープでのコード実行を完全排除
- *
- * 依存関係（呼び出す関数）:
- * - getCurrentEmail() - main.jsで定義
- * - isAdministrator() - main.jsで定義
- * - findUserById() - DatabaseCore.jsで定義
- * - findUserByEmail() - DatabaseCore.jsで定義
- * - getAllUsers() - DatabaseCore.jsで定義
- * - updateUser() - DatabaseCore.jsで定義
- * - getUserConfig() - ConfigService.jsで定義
- * - saveUserConfig() - ConfigService.jsで定義
- * - createAdminRequiredError() - helpers.jsで定義
- * - createAuthError() - helpers.jsで定義
- * - createUserNotFoundError() - helpers.jsで定義
- * - createErrorResponse() - helpers.jsで定義
- * - createSuccessResponse() - helpers.jsで定義
- * - createExceptionResponse() - helpers.jsで定義
- *
- * 移動元: main.js
- * 移動日: 2025-12-13
+ * @fileoverview AdminApis - 管理者 API（ユーザー一覧、フォーム作成、ボード
+ *   公開ライフサイクル、列マッピング診断など）。クロスファイル依存は下の
+ *   global 宣言を参照。
  */
 
 /* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, FormApp, SpreadsheetApp, ScriptApp, UrlFetchApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */

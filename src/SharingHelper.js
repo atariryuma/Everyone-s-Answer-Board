@@ -1,20 +1,15 @@
 /**
- * @fileoverview SharingHelper - スプレッドシート共有設定ヘルパー
- *
- * 🎯 責任範囲:
- * - 同一ドメイン内での共有設定
- * - サービスアカウント editor 追加（DatabaseCore Sheets API JWT 経路用）
- * - 新規 SS 作成直後の共有デフォルト一括適用
+ * @fileoverview SharingHelper - 同一ドメイン共有 + サービスアカウント editor 追加。
+ *   新規 SS 作成直後の共有デフォルト一括適用 (`applySpreadsheetSharingDefaults`)。
  */
 
 /* global SpreadsheetApp, DriveApp, getCachedProperty */
 
 /**
- * スプレッドシートを同一ドメイン内で編集可能に設定
- * ✅ CRITICAL: サービスアカウント不使用のための共有設定
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} ownerEmail - オーナーのメールアドレス
- * @returns {Object} 処理結果
+ * スプレッドシートを同一ドメイン内で編集可能に設定（サービスアカウント不使用経路用）。
+ * @param {string} spreadsheetId
+ * @param {string} ownerEmail
+ * @returns {Object}
  */
 function setupDomainWideSharing(spreadsheetId, ownerEmail) {
   const [, domain] = (ownerEmail || '').split('@');

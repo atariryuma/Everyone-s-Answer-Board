@@ -1,16 +1,6 @@
 /**
- * @fileoverview Helper Utilities
- *
- * 🎯 責任範囲:
- * - 列マッピング・インデックス操作
- * - データフォーマッティング
- * - 汎用ヘルパー関数
- * - 計算・変換ユーティリティ
- *
- * 🔄 GAS Best Practices準拠:
- * - フラット関数構造 (Object.freeze削除)
- * - 直接的な関数エクスポート
- * - 簡素なユーティリティ関数群
+ * @fileoverview 共通ヘルパー: PropertiesService キャッシュ、レスポンスビルダー、
+ *   認証ショートカット、emailToShortHash（仮名化）。
  */
 
 /* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig */
@@ -19,12 +9,9 @@ const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
 
 /**
- * PropertiesServiceのメモリキャッシュ付きアクセス（TTL + サイズ制限対応）
- * ✅ CLAUDE.md準拠: 30秒TTLで自動期限切れ
- * ✅ Google公式推奨: 頻繁アクセスする設定値はメモリにキャッシュ
- * ✅ メモリリーク対策: 最大50エントリ、LRU削除
- * @param {string} key - プロパティキー
- * @returns {string|null} プロパティ値
+ * PropertiesService のメモリキャッシュ付きアクセス（30秒 TTL / 最大 50 エントリ LRU）。
+ * @param {string} key
+ * @returns {string|null}
  */
 function getCachedProperty(key) {
   const now = Date.now();
@@ -47,11 +34,7 @@ function getCachedProperty(key) {
     delete RUNTIME_PROPERTIES_CACHE[oldestKey];
   }
 
-  RUNTIME_PROPERTIES_CACHE[key] = {
-    value,
-    timestamp: now,  // ✅ タイムスタンプ記録
-    lastAccess: now  // ✅ 最終アクセス時刻（LRU用）
-  };
+  RUNTIME_PROPERTIES_CACHE[key] = { value, timestamp: now, lastAccess: now };
   return value;
 }
 
@@ -94,14 +77,12 @@ function setCachedProperty(key, value) {
 }
 
 /**
- * CacheServiceにオブジェクトを保存（サイズチェック付き）
- * ✅ DRY原則: 重複コード削減
- * ✅ CacheServiceの制限（100KB）を自動チェック
- * @param {string} cacheKey - キャッシュキー
- * @param {Object} data - 保存するデータ
- * @param {number} ttl - TTL（秒）
- * @param {number} maxSize - 最大サイズ（バイト）、デフォルト100KB
- * @returns {boolean} 保存成功したらtrue
+ * CacheService に JSON を保存（CacheService の 100KB 制限を超える場合は false）。
+ * @param {string} cacheKey
+ * @param {Object} data
+ * @param {number} ttl - 秒
+ * @param {number} [maxSize=100000]
+ * @returns {boolean}
  */
 function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
   try {
@@ -119,10 +100,10 @@ function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
 }
 
 /**
- * オブジェクトをシンプルなハッシュ文字列に変換
- * ✅ API最適化: JSON.stringify()より約50%高速
- * @param {Object} obj - ハッシュ化するオブジェクト
- * @returns {string} ハッシュ文字列
+ * オブジェクトを `key:value|key:value` 形式の安価なハッシュ文字列に変換
+ * （JSON.stringify より約 50% 速い。安定キャッシュキー用途）。
+ * @param {Object} obj
+ * @returns {string}
  */
 function simpleHash(obj) {
   if (!obj || typeof obj !== 'object') return '';

@@ -1,25 +1,9 @@
 /**
- * @fileoverview UserService - 統一ユーザー管理サービス (遅延初期化対応)
- *
- * 責任範囲:
- * - ユーザー認証・セッション管理
- * - ユーザー情報の取得・更新
- * - 権限・アクセス制御
- * - ユーザーキャッシュ管理
- *
- * GAS Best Practices準拠:
- * - 遅延初期化パターン (各公開関数先頭でinit)
- * - ファイル読み込み順序非依存設計
- * - グローバル副作用排除
+ * @fileoverview UserService - 認証・現在ユーザー情報取得（getUser / isAdmin /
+ *   IDトークン由来の Google 不変 ID 取得）。
  */
 
 /* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, findUserByGoogleId, openSpreadsheet, updateUser, getUserConfig, getConfigOrDefault, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse */
-
-/**
- * UserService - ゼロ依存アーキテクチャ
- * GAS-Nativeパターンによる直接APIアクセス
- * DB, CONSTANTS, PROPS_KEYS依存を排除
- */
 
 /**
  * ユーザー情報キャッシュキーを生成（UserApis.js から参照される）
@@ -124,19 +108,3 @@ function getUser(infoType = 'email') {
   }
 }
 
-/**
- * メールアドレス検証（SecurityServiceに委譲）
- * @param {string} email - メールアドレス
- * @returns {Object} 検証結果
- */
-
-/**
- * フォームURL検証
- * @param {string} formUrl - フォームURL
- * @returns {boolean} 有効かどうか
- */
-
-/**
- * サービス状態診断
- * @returns {Object} 診断結果
- */

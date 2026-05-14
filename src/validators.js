@@ -1,16 +1,5 @@
 /**
- * @fileoverview Input Validation & Sanitization
- *
- * 🎯 責任範囲:
- * - 入力データの検証・サニタイズ
- * - セキュリティ関連バリデーション
- * - データ整合性チェック
- * - フォーマット検証
- *
- * 🔄 GAS Best Practices準拠:
- * - フラット関数構造 (Object.freeze削除)
- * - 直接的な関数エクスポート
- * - シンプルなユーティリティ関数群
+ * @fileoverview 入力検証・サニタイズ（email / URL / spreadsheet ID / config 等）。
  */
 
 /* global getColumnAnalysis, getFormInfo, SYSTEM_LIMITS */

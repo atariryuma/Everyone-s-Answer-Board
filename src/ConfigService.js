@@ -1,25 +1,9 @@
 /**
- * @fileoverview ConfigService - 統一設定管理サービス (遅延初期化対応)
- *
- * 責任範囲:
- * - configJSON の CRUD操作
- * - 設定検証・サニタイズ
- * - 動的設定生成（URL等）
- * - 設定マイグレーション
- *
- * GAS Best Practices準拠:
- * - 遅延初期化パターン (各公開関数先頭でinit)
- * - ファイル読み込み順序非依存設計
- * - グローバル副作用排除
+ * @fileoverview ConfigService - configJSON の CRUD / validation / sanitize /
+ *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
 /* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty */
-
-/**
- * ConfigService - ゼロ依存アーキテクチャ
- * GAS-Nativeパターンによる直接APIアクセス
- * PROPS_KEYS, DB依存を完全排除
- */
 
 /**
  * デフォルト設定取得
@@ -142,11 +126,10 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
 }
 
 /**
- * 公開専用設定検証（厳格版）
- * ✅ CRITICAL FIX: 公開時の必須フィールドを厳格に検証
- * @param {Object} config - 設定オブジェクト
- * @param {string} userId - ユーザーID
- * @returns {Object} 検証結果
+ * 公開時用の設定検証（必須フィールドを厳格にチェック）。
+ * @param {Object} config
+ * @param {string} userId
+ * @returns {Object}
  */
 function validatePublishConfig(config, userId) {
   try {
@@ -392,21 +375,6 @@ function sanitizeQuadrantLabels(input) {
 }
 
 /**
- * profiles 配列のサニタイズ。
- *
- * Why: multi-board のために 1 user の config 内に複数の「表示設定スナップショット」を
- *      保持する。各 profile は active config と同じ形（formUrl/spreadsheetId/sheetName/
- *      columnMapping/displaySettings + 軸ラベル等）の subset。
- *
- *   - 最大 10 profile（config サイズ膨張防止）
- *   - 各 name は最大 50 char
- *   - 既存の sanitize 関数を再利用してフィールド単位で正規化
- *   - サポート外フィールドは silently drop
- *
- * @param {Array} input - profiles 候補配列
- * @returns {Array} sanitized profiles（空配列なら caller で削除する）
- */
-/**
  * profileHistory のサニタイズ。
  *
  * Why: 生徒が過去フェーズを閲覧する Option B の根拠データ。entry は
@@ -438,6 +406,21 @@ function sanitizeProfileHistory(input) {
   return out;
 }
 
+/**
+ * profiles 配列のサニタイズ。
+ *
+ * Why: multi-board のために 1 user の config 内に複数の「表示設定スナップショット」を
+ *      保持する。各 profile は active config と同じ形（formUrl/spreadsheetId/sheetName/
+ *      columnMapping/displaySettings + 軸ラベル等）の subset。
+ *
+ *   - 最大 10 profile（config サイズ膨張防止）
+ *   - 各 name は最大 50 char
+ *   - 既存の sanitize 関数を再利用してフィールド単位で正規化
+ *   - サポート外フィールドは silently drop
+ *
+ * @param {Array} input - profiles 候補配列
+ * @returns {Array} sanitized profiles（空配列なら caller で削除する）
+ */
 function sanitizeProfiles(input) {
   if (!Array.isArray(input)) return [];
   const MAX_PROFILES = 10;
@@ -599,7 +582,7 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
 
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
-        // ✅ CRITICAL: 同一ドメイン共有設定で対応（サービスアカウント不使用）
+        // ユーザーの回答ボードは同一ドメイン共有設定で対応（サービスアカウント不使用）
         try {
           const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
           const { spreadsheet } = dataAccess;

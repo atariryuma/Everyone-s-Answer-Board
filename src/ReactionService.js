@@ -1,12 +1,6 @@
 /**
- * @fileoverview ReactionService - マルチテナント対応リアクション・ハイライト管理
- *
- * 🎯 GAS-Native Architecture:
- * - リアクション管理（UNDERSTAND, LIKE, CURIOUS）
- * - ハイライト機能
- * - マルチテナントセキュリティ
- * - 直接SpreadsheetApp操作（Zero-Dependency）
- * - 同一ドメイン共有設定によるアクセス管理
+ * @fileoverview ReactionService - リアクション (UNDERSTAND/LIKE/CURIOUS) と
+ *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
 /* global getCurrentEmail, findUserBySpreadsheetId, findUserById, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
@@ -54,15 +48,14 @@ function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
 }
 
 /**
- * 🚀 GAS-Native直接リアクション処理
- * ✅ Graceful Degradation: ヘッダー取得失敗時も継続動作
- * @param {Sheet} sheet - スプレッドシートオブジェクト
- * @param {number} rowNumber - 行番号
- * @param {string} reactionType - リアクション種類
- * @param {string} actorEmail - 操作者メール
- * @param {Array} [preloadedHeaders] - 呼び出し側がキャッシュ経由で取得済みのヘッダー。
- *                                     省略時は互換性のためシートから直接取得する。
- * @returns {Object} 処理結果
+ * リアクション処理。ヘッダー取得失敗時は graceful degradation
+ * （`unavailable` レスポンスを返してリアクション機能だけ一時無効化）。
+ * @param {Sheet} sheet
+ * @param {number} rowNumber
+ * @param {string} reactionType
+ * @param {string} actorEmail
+ * @param {Array} [preloadedHeaders] - 呼び出し側でキャッシュ済みなら渡す（再取得を回避）
+ * @returns {Object}
  */
 function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, preloadedHeaders) {
   const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
@@ -231,12 +224,11 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
 }
 
 /**
- * 🚀 GAS-Native直接ハイライト処理
- * ✅ Graceful Degradation: ヘッダー取得失敗時も継続動作
- * @param {Sheet} sheet - スプレッドシートオブジェクト
- * @param {number} rowNumber - 行番号
- * @param {Array} [preloadedHeaders] - 呼び出し側がキャッシュ経由で取得済みのヘッダー。
- * @returns {Object} 処理結果
+ * ハイライト処理。ヘッダー取得失敗時は graceful degradation。
+ * @param {Sheet} sheet
+ * @param {number} rowNumber
+ * @param {Array} [preloadedHeaders]
+ * @returns {Object}
  */
 function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
   const headers = Array.isArray(preloadedHeaders) && preloadedHeaders.length > 0
@@ -358,11 +350,11 @@ function extractHighlight(row, headers) {
 }
 
 /**
- * リアクション送信（マルチテナント対応・GAS-Native）
- * @param {string} targetUserId - 対象ユーザー（ボード所有者）ID
- * @param {number|string} rowIndex - 行番号または'row_#'
- * @param {string} reactionType - リアクション種類
- * @returns {Object} 処理結果
+ * リアクション送信（マルチテナント対応）。
+ * @param {string} targetUserId - ボード所有者の userId
+ * @param {number|string} rowIndex - 行番号または 'row_#'
+ * @param {string} reactionType
+ * @returns {Object}
  */
 function addReaction(targetUserId, rowIndex, reactionType) {
   return executeBoardRowOperation({
@@ -385,10 +377,10 @@ function addReaction(targetUserId, rowIndex, reactionType) {
 }
 
 /**
- * ハイライト切り替え（マルチテナント対応・GAS-Native）
- * @param {string} targetUserId - 対象ユーザー（ボード所有者）ID
- * @param {number|string} rowIndex - 行番号または'row_#'
- * @returns {Object} 処理結果
+ * ハイライト切り替え（マルチテナント対応）。
+ * @param {string} targetUserId - ボード所有者の userId
+ * @param {number|string} rowIndex - 行番号または 'row_#'
+ * @returns {Object}
  */
 function toggleHighlight(targetUserId, rowIndex) {
   return executeBoardRowOperation({
