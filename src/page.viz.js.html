@@ -1024,11 +1024,15 @@
         cell.appendChild(empty);
       } else {
         // 道徳的意見の象限 keyword として 1 文字漢字断片（「楽」「思」「間」「合」等）は
-        // 意味が読み取りにくいので除外。「気持」「真実」「期限」のような 2+ 文字の
-        // 内容語のみを top-3 として残す。これにより keyword の品質が大幅に向上する。
-        const words = aggregateWords(cellRows, 'reason')
-          .filter(w => w.word.length >= 2)
-          .slice(0, 3);
+        // 意味が読み取りにくいので原則除外。「気持」「真実」「期限」のような 2+ 文字の
+        // 内容語のみを top-3 として残すと keyword 品質が大幅に向上。
+        //
+        // ただし reason がひらがな主体（「楽したい」「早く」「終わりたい」等）の象限では
+        // 2+ 字 keyword が 0 件になりがち。完全に空表示にすると教師が「データが無い」
+        // と誤読する恐れがあるので、その場合のみ 1 字漢字フォールバックを許容。
+        const allWords = aggregateWords(cellRows, 'reason');
+        const longWords = allWords.filter(w => w.word.length >= 2).slice(0, 3);
+        const words = longWords.length > 0 ? longWords : allWords.slice(0, 3);
         if (words.length === 0) {
           const empty = document.createElement('div');
           empty.className = 'qs-empty';
@@ -1104,12 +1108,18 @@
 
   /**
    * 単語頻度を集計。M3 ワードランキング表示用。
+   *
+   * Case-insensitive aggregation: 「AI」と「ai」は同じ key として 1 つにまとめる。
+   *   表示形は最初に出現した原形を保持（通常は大文字「AI」）。
+   *   日本語語には影響なし（lower/upper の概念がないため key === word.toLowerCase()）。
+   *
    * @param {Array} rows - currentAnswers
    * @param {string} field - 集計対象列名（'reason' or 'answer'）
    * @returns {Array<{word, count}>} desc sorted, max 25 件
    */
   function aggregateWords(rows, field) {
     const counts = new Map();
+    const displayForm = new Map(); // key (lowercase) → first-seen original case
     for (const r of rows || []) {
       const text = r && r[field];
       if (!text) continue;
@@ -1117,13 +1127,15 @@
       // 1 投稿内の重複はカウント 1（同じ児童が同じ語を 10 回書いても 1 票）
       const seen = new Set();
       for (const t of tokens) {
-        if (seen.has(t)) continue;
-        seen.add(t);
-        counts.set(t, (counts.get(t) || 0) + 1);
+        const key = t.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        counts.set(key, (counts.get(key) || 0) + 1);
+        if (!displayForm.has(key)) displayForm.set(key, t);
       }
     }
     return [...counts.entries()]
-      .map(([word, count]) => ({ word, count }))
+      .map(([key, count]) => ({ word: displayForm.get(key) || key, count }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 25);
   }
