@@ -341,6 +341,9 @@
   <?!= include('page.js'); ?>
   <!-- d3 v7 をローカル同梱（CDN / iframe 内 tracking-prevention 干渉を回避） -->
   <?!= include('d3.min'); ?>
+  <!-- TinySegmenter 0.2: 日本語形態素分割 (~25KB)。page.viz.js より先に読む。
+       象限キーワード抽出で「気持ち」「お楽しみ」「頑張る」等を 1 語として捕捉。 -->
+  <?!= include('tinySegmenter'); ?>
   <?!= include('page.viz.js'); ?>
 </body>
 </html>

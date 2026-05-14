@@ -1078,28 +1078,55 @@
     'こんにちは','ありがとう','よろしく',
   ]);
 
+  // TinySegmenter インスタンスを singleton として保持 (初期化コストを 1 回に)。
+  //   include 順序で window.TinySegmenter が先に load されていれば使う。
+  //   tests や旧環境で未 load なら正規表現フォールバックに退化する。
+  let _segmenterInstance = null;
+  function getSegmenter() {
+    if (_segmenterInstance) return _segmenterInstance;
+    if (typeof TinySegmenter !== 'undefined') {
+      try { _segmenterInstance = new TinySegmenter(); } catch (_) { /* fallback */ }
+    } else if (typeof window !== 'undefined' && window.TinySegmenter) {
+      try { _segmenterInstance = new window.TinySegmenter(); } catch (_) {}
+    }
+    return _segmenterInstance;
+  }
+
   function tokenizeJapanese(text) {
     if (!text || typeof text !== 'string') return [];
-    // Why: 完全な形態素解析 (kuromoji 等) は GAS / フロント環境では重い。
-    //      代わりに「内容語 = 漢字/カタカナ/英数字の連続」を抽出する近似戦略を取る。
-    //      日本語の助詞・助動詞は基本ひらがなのみで、句読点と並んで自然な区切り役となる。
-    //      ひらがな単独の語（「思う」「ある」等）は STOPWORDS で個別に除外する。
+    // 形態素分割: TinySegmenter (~25KB, 辞書不要) で「気持ち」「頑張る」「お楽しみ」
+    //   「誠実」のような複合語/活用形を 1 トークンとして拾う。
+    //   未 load 環境（tests / 旧版）では漢字/カタカナ/英字連続の正規表現にフォールバック。
     //
-    //   設計上の妥協: 「思いやり」「気に入る」のような末尾/橋渡しひらがな複合語は
-    //   particle (は/が/を/に) と形態的に区別できないため、断片 (「思」「気」「入」) として
-    //   抽出される。これらは renderQuadrantSummary 側で length >= 2 filter により除外。
+    //   例: 「思いやりを持って真実を伝えたい。」
+    //     TinySegmenter: ["思い","やり","を","持っ","て","真実","を","伝え","たい","。"]
+    //     フィルタ後:    ["持っ", "真実", "伝え"]
     //
-    //   例: 「AIは便利だ。責任を持つ。」
-    //     → 抽出: ["AI", "便利", "責任", "持"]
-    //     → STOPWORDS / 1 文字フィルタ後: ["AI", "便利", "責任"]
-    const RE_CONTENT = /[A-Za-z0-9_]+|[一-鿿々]+|[ァ-ヺー]+/g;
+    //   設計上の限界: TinySegmenter は「思いやり」を「思い/やり」と分割してしまう
+    //     （統計モデル基準）。ただし「気持ち」「頑張る」など他の複合語は正しく拾える
+    //     ので、現状の正規表現アプローチより keyword の意味性は大幅向上。
+    let words;
+    const seg = getSegmenter();
+    if (seg) {
+      words = seg.segment(text);
+    } else {
+      const RE = /[A-Za-z0-9_]+|[一-鿿々]+|[ァ-ヺー]+/g;
+      words = [];
+      let m;
+      while ((m = RE.exec(text)) !== null) words.push(m[0]);
+    }
+
     const tokens = [];
-    let m;
-    while ((m = RE_CONTENT.exec(text)) !== null) {
-      const t = m[0].trim();
+    for (const w of words) {
+      const t = w.trim();
       if (!t) continue;
       if (STOPWORDS.has(t.toLowerCase())) continue;
-      // 1 文字漢字も内容語として保持（"愛"、"夢" 等）。それ以外の 1 文字は除外。
+      // 内容文字（英数/漢字/かな/カタカナ）を含まない記号・空白は除外
+      if (!/[A-Za-z0-9_一-鿿々ぁ-ゖァ-ヺー]/.test(t)) continue;
+      // 純ひらがな 3 文字以下は助詞・助動詞・接続詞の可能性が高い → 除外
+      //   「みんな」「みたい」のような 3 文字超の内容語は残す
+      if (/^[ぁ-ゖー]+$/.test(t) && t.length <= 3) continue;
+      // 1 文字でカタカナでも漢字でもない (記号や長音単独など) → 除外
       if (t.length === 1 && !/[一-鿿々]/.test(t)) continue;
       tokens.push(t);
     }

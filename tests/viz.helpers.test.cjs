@@ -102,6 +102,78 @@ test('tokenizeJapanese: keeps katakana words', () => {
   assert.ok(words.includes('効率'));
 });
 
+/**
+ * TinySegmenter を inject した状態で tokenizer を動かす用のローダー。
+ *   実環境は Page.html include 順序で window.TinySegmenter が先に置かれるが、
+ *   テストでは ../src/tinySegmenter.html を抽出して context に注入する。
+ */
+function loadVizContextWithSegmenter() {
+  const html = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
+  const segHtml = fs.readFileSync(path.resolve(__dirname, '../src/tinySegmenter.html'), 'utf8');
+  const m = html.match(/<script>([\s\S]*?)<\/script>/);
+  if (!m) throw new Error('Could not extract <script> from page.viz.js.html');
+  const segMatch = segHtml.match(/<script>([\s\S]*?)<\/script>/);
+  if (!segMatch) throw new Error('Could not extract <script> from tinySegmenter.html');
+
+  const StudyQuestApp = class StudyQuestApp {};
+  const context = {
+    console: { log: () => {}, warn: () => {}, error: () => {} },
+    window: { StudyQuestApp },
+    StudyQuestApp,
+    document: {
+      readyState: 'complete',
+      addEventListener: () => {},
+      getElementById: () => null,
+      createElement: () => ({ classList: { add: () => {}, remove: () => {}, toggle: () => {} }, addEventListener: () => {}, setAttribute: () => {}, appendChild: () => {}, style: {} }),
+      createElementNS: () => ({ setAttribute: () => {}, appendChild: () => {} }),
+      body: { classList: { add: () => {} } }
+    },
+    URLSearchParams: URLSearchParams,
+    Map, Set, Promise, JSON, Math, Number, Object, Array, String, Boolean, Date, RegExp,
+    Error, TypeError, parseInt, parseFloat, isNaN, isFinite,
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id)
+  };
+  context.window.location = { search: '' };
+  vm.createContext(context);
+  // Why: tinySegmenter.html の中身は IIFE 内で TinySegmenter 関数を定義する。
+  //   page.viz.js.html の IIFE が `typeof TinySegmenter` を見るので、
+  //   window.TinySegmenter / global TinySegmenter どちらも見える状態にする必要あり。
+  //   wrapper が `window.TinySegmenter = TinySegmenter` してくれるので、context.window
+  //   に注入され、page.viz.js が `typeof window.TinySegmenter !== 'undefined'` で検知できる。
+  vm.runInContext(segMatch[1], context, { filename: 'tinySegmenter.html' });
+  vm.runInContext(m[1], context, { filename: 'page.viz.js.html' });
+  return { context, StudyQuestApp };
+}
+
+test('tokenizeJapanese: with TinySegmenter, captures common compound words (v2670)', () => {
+  // Why: 純正規表現では「気持ち」「お楽しみ」「頑張る」「誠実」が断片化していた。
+  //   TinySegmenter を載せると統計分割により 1 トークンとして拾える。
+  //   ただし「思いやり」は TinySegmenter でも 「思い/やり」に分割される弱点が残る
+  //   （統計モデルの限界）。これは形態素解析でも完璧ではないことの実証。
+  const { StudyQuestApp } = loadVizContextWithSegmenter();
+  const tok = StudyQuestApp.prototype.__tokenize;
+
+  // 「気持ち」が 1 トークンとして拾える
+  const w1 = tok('お楽しみ会は大事、気持ちを忘れない。');
+  assert.ok(w1.includes('気持ち'), `should capture 気持ち: ${w1.join(',')}`);
+  assert.ok(w1.includes('大事'), `should capture 大事: ${w1.join(',')}`);
+  assert.ok(w1.includes('お楽しみ'), `should capture お楽しみ: ${w1.join(',')}`);
+
+  // 「頑張る」「誠実」「大切」も活用形のまま拾える
+  const w2 = tok('頑張って誠実に取り組む。大切な責任を持つ。');
+  assert.ok(w2.some(t => t.includes('頑張')), `should capture 頑張る/頑張: ${w2.join(',')}`);
+  assert.ok(w2.includes('誠実'), `should capture 誠実: ${w2.join(',')}`);
+  assert.ok(w2.includes('大切'), `should capture 大切: ${w2.join(',')}`);
+  assert.ok(w2.includes('責任'), `should capture 責任: ${w2.join(',')}`);
+
+  // 純ひらがな短語 (3 文字以下) は除外される (助詞・助動詞の可能性が高い)
+  const w3 = tok('これは とても 大切 です');
+  assert.ok(!w3.includes('これ'), `should exclude これ: ${w3.join(',')}`);
+  assert.ok(!w3.includes('は'), `should exclude particle は: ${w3.join(',')}`);
+  assert.ok(w3.includes('大切'), `should keep 大切: ${w3.join(',')}`);
+});
+
 test('renderQuadrantSummary: filters 1-char keyword fragments (v2668)', () => {
   // Why: 「間に合う」「思いやり」のような複合語が tokenizer で「間/合/思」に分解されると、
   //   1 文字漢字断片が頻出語として top に来てしまい、keyword の意味が読み取れない
