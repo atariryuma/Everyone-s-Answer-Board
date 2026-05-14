@@ -761,17 +761,44 @@
       g.append('rect').attr('class', 'viz-quadrant ll')
         .attr('x', 0).attr('y', midY).attr('width', midX).attr('height', innerH - midY);
 
-      // 象限ラベル（任意）
+      // 象限ラベル + 理由キーワード (v2673: 下部 HTML パネルから SVG 内統合に変更)
+      //   学習者が「ドットの位置 + 言葉の意味」を視線移動なしで一目把握できるよう、
+      //   各象限の上端/下端ラベル直下/直上に top-3 keyword を 1 行で配置。
+      //   anchor='top' → ラベルの下に配置 (hh/lh)
+      //   anchor='bottom' → ラベルの上に配置 (hl/ll)
       const q = axis.matrixQuadrantLabels || {};
-      const placeLabel = (text, x, y) => {
+      // バケット分け (renderQuadrantSummary と同じロジック)
+      const buckets = { hh: [], lh: [], hl: [], ll: [] };
+      for (const r of rows) {
+        if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
+        const xKey = r.numericX >= (minX + maxX) / 2 ? 'h' : 'l';
+        const yKey = r.numericY >= (minY + maxY) / 2 ? 'h' : 'l';
+        buckets[xKey + yKey].push(r);
+      }
+      const keywordsFor = (key) => {
+        const cellRows = buckets[key];
+        if (!cellRows.length) return [];
+        const allWords = aggregateWords(cellRows, 'reason');
+        const longWords = allWords.filter(w => w.word.length >= 2).slice(0, 3);
+        const top = longWords.length > 0 ? longWords : allWords.slice(0, 3);
+        return top.map(w => w.word);
+      };
+      const placeLabel = (text, x, y, key, anchor) => {
         if (!text) return;
         g.append('text').attr('class', 'viz-quadrant-label')
           .attr('x', x).attr('y', y).text(text);
+        const kws = keywordsFor(key);
+        if (kws.length > 0) {
+          const kwY = anchor === 'top' ? y + 22 : y - 22;
+          g.append('text').attr('class', 'viz-quadrant-keyword')
+            .attr('x', x).attr('y', kwY)
+            .text(kws.map(k => '#' + k).join('  '));
+        }
       };
-      placeLabel(q.hh, midX + (innerW - midX) / 2, 24);
-      placeLabel(q.lh, midX / 2, 24);
-      placeLabel(q.hl, midX + (innerW - midX) / 2, innerH - 8);
-      placeLabel(q.ll, midX / 2, innerH - 8);
+      placeLabel(q.hh, midX + (innerW - midX) / 2, 24, 'hh', 'top');
+      placeLabel(q.lh, midX / 2, 24, 'lh', 'top');
+      placeLabel(q.hl, midX + (innerW - midX) / 2, innerH - 8, 'hl', 'bottom');
+      placeLabel(q.ll, midX / 2, innerH - 8, 'll', 'bottom');
 
       // 軸線（中央クロス）
       g.append('line').attr('x1', midX).attr('x2', midX).attr('y1', 0).attr('y2', innerH)
@@ -937,10 +964,10 @@
 
       updateStatsPills(this, current.length);
       maybeRenderTeacherPanel(this, swings);
-      // Layer 2 (v2666): 4 象限ごとの理由キーワード top-3 を SVG 直下に表示。
-      //   「個・群・意味」三層レイヤーの「意味」レイヤー。同じ位置でも理由が違う
-      //   ことを言語化して見せ、道徳的価値観の多様性を前景化する。
-      renderQuadrantSummary(this.elements.answersContainer, current, axis);
+      // v2673: 象限キーワードは SVG 内の象限ラベル直下に統合済み。
+      //   学習者の視線移動を最小化するため、旧 HTML パネル (画面下部の 2x2 grid) は廃止。
+      //   過去の panel が残存している場合 (mode 切替などの中間状態) は除去。
+      removeQuadrantSummary(this.elements.answersContainer);
 
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
         this.elements.answerCount.innerHTML =

@@ -210,6 +210,24 @@
     pointer-events: none;
     text-anchor: middle;
   }
+  /* 象限ラベル直下/上の理由キーワード行
+   *   2026-05-14 v2673: 下部 HTML パネルから SVG 内ラベル統合に変更。
+   *   学習者が「ドットの位置 + 言葉の意味」を視線移動なしで把握できるように。
+   *   ラベルより一段薄く、フォントは少し小さく - 階層を表現。 */
+  .viz-quadrant-keyword {
+    fill: rgba(199, 210, 254, 0.7);
+    font-size: 0.85rem;
+    font-weight: 500;
+    pointer-events: none;
+    text-anchor: middle;
+    letter-spacing: 0.03em;
+  }
+  body.projector-mode .viz-quadrant-keyword {
+    font-size: 1.05rem;
+  }
+  @media (max-width: 768px) {
+    .viz-quadrant-keyword { font-size: 0.72rem; }
+  }
 
   /* ホバー時のツールチップカード */
   .viz-tooltip {
