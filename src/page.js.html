@@ -1406,6 +1406,10 @@
       const span = btn.querySelector('span');
       const labelText = title ? '📝 ' + title : '📝 回答フォーム';
       if (span && span.textContent !== labelText) span.textContent = labelText;
+      // v2678: ellipsis 表示時に full text を tooltip で確認できるよう title 属性に格納。
+      //   visible text と title 属性を同期させる (DOM 更新最小化のため変更時のみ)。
+      const tooltipText = title ? title : '回答フォーム';
+      if (btn.title !== tooltipText) btn.title = tooltipText;
       btn.classList.remove('hidden');
     }
 

@@ -53,6 +53,17 @@
   font-weight: 500;
   transition: background-color 0.15s, color 0.15s, transform 0.15s;
   white-space: nowrap;
+  /* v2678: 長いフォームタイトル (Forms 命名「【振り返り】... (道徳5/14 振り返り)」など)
+     がヘッダーを支配しないように省略表示。フルテキストは title 属性で tooltip 表示。 */
+  max-width: min(45ch, 35vw);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.eab-identity-pill > .eab-pill-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 .eab-identity-pill:hover {
   background: rgba(56, 189, 248, 0.2);
@@ -157,22 +168,29 @@
   outline: 2px solid rgba(56, 189, 248, 0.6);
   outline-offset: 1px;
 }
+/* v2678: 「公開を終了」は destructive アクションだが終了時にしか押さないため、
+   常時表示で flat orange だと頻繁な閲覧 UI で目立ちすぎる。
+   通常時は subtle (border + faded orange)、hover で saturate するパターンに。 */
 .eab-end-pub-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.4rem 0.7rem;
-  background: rgba(234, 88, 12, 0.9);
-  border-radius: 0.45rem;
-  color: white;
-  font-size: 0.75rem;
-  transition: background-color 0.15s;
+  gap: 0.3rem;
+  padding: 0.3rem 0.55rem;
+  background: rgba(234, 88, 12, 0.18);
+  border: 1px solid rgba(234, 88, 12, 0.55);
+  border-radius: 0.4rem;
+  color: #fdba74;
+  font-size: 0.73rem;
+  font-weight: 500;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s;
 }
 .eab-end-pub-btn:hover {
-  background: rgb(194, 65, 12);
+  background: rgba(234, 88, 12, 0.9);
+  border-color: rgba(234, 88, 12, 0.9);
+  color: #ffffff;
 }
 .eab-end-pub-btn:focus-visible {
-  outline: 2px solid rgba(234, 88, 12, 0.6);
+  outline: 2px solid rgba(234, 88, 12, 0.7);
   outline-offset: 1px;
 }
 

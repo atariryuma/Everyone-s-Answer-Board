@@ -2003,7 +2003,24 @@
       pastSet = new Set(navHist.map(h => h && h.name).filter(Boolean));
       activeName = app.state.activeProfile || '';
       const viewing = app.state.viewingPastProfile || null;
-      pillEntries = profiles.map(p => {
+
+      // v2678: teacher pills も viewer と同じ時系列順で表示する。
+      //   旧: profiles 配列 (config 編集順) をそのまま使うと「本時 → 導入 → 振り返り」
+      //   のような非時系列順になり、viewer の時系列順と不整合だった。
+      //   新: navHist (過去 active になった順 = 時系列) の順序を base にし、
+      //   未訪問 profile (まだ active にしていない future phase) は末尾に config 順で追加。
+      const histOrderMap = new Map();
+      navHist.forEach((h, i) => { if (h && h.name) histOrderMap.set(h.name, i); });
+      const orderedProfiles = [...profiles].sort((a, b) => {
+        const an = (a && a.name) || '';
+        const bn = (b && b.name) || '';
+        const ai = histOrderMap.has(an) ? histOrderMap.get(an) : Number.MAX_SAFE_INTEGER;
+        const bi = histOrderMap.has(bn) ? histOrderMap.get(bn) : Number.MAX_SAFE_INTEGER;
+        if (ai !== bi) return ai - bi;
+        // 同順位 (両方とも未訪問) なら元配列順を保つため index で安定 sort
+        return profiles.indexOf(a) - profiles.indexOf(b);
+      });
+      pillEntries = orderedProfiles.map(p => {
         const name = p && p.name ? String(p.name) : '';
         const isCurrent = name === activeName;
         const isPast = pastSet.has(name) && !isCurrent;
@@ -2306,10 +2323,13 @@
       // ラベル文言:
       //  - "比較中"     → vizCompareMode、左ペインが議論前 anchor or 最古 snapshot
       //  - "軌跡なし"   → snapshot 0 件 (hydrate 失敗 or rows[].timestamp 解釈不能)
-      //  - "現在 (Nコマ)" → 通常: スライダー左で過去、右で現在
+      //  - "現在"      → 通常: スライダー右端 = 現在の分布
+      //
+      // v2678: 「(Nコマ)」表記は 「コマ」 が直感的でなく cluttered なので削除。
+      //   スナップショット数はスライダーの max 属性で内部的に保持されており UI には不要。
       if (isCompare) label.textContent = '比較中（左=過去）';
       else if (noSnaps) label.textContent = '軌跡なし';
-      else label.textContent = '現在 (' + max + 'コマ)';
+      else label.textContent = '現在';
     }
 
     // 議論前ボタンの状態

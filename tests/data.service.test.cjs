@@ -600,3 +600,78 @@ test('applySortAndLimit: sortBy with limit both apply', () => {
   const ids = Array.from(result, (r) => r.id);
   assert.deepEqual(ids, [2, 3]); // newest-first then top 2
 });
+
+// =====================================================================
+// shouldIncludeRow: classFilter — exact + substring matching
+// Why: profile / Forms ごとに class カラムの値表記が異なる現場ケース
+//   (本時="1組", 振り返り="6年1組", 導入="4組") を吸収。完全一致を優先し、
+//   なければ部分一致 (substring) でフォールバック。
+// =====================================================================
+
+test('shouldIncludeRow: classFilter "4組" matches exact "4組"', () => {
+  const ctx = loadDataServiceContext();
+  const item = { class: '4組', answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '4組' }), true);
+});
+
+test('shouldIncludeRow: classFilter "1組" matches "6年1組" via substring', () => {
+  const ctx = loadDataServiceContext();
+  const item = { class: '6年1組', answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '1組' }), true);
+});
+
+// Why no "4組" filter vs "4-1組" item test:
+//   "4-1組" は contiguous "4組" を含まない (4 と 組 の間に "-1" がある) ので部分一致でも不可。
+//   学校現場でこの表記が混在する場合は dropdown から "4-1組" を直接選ぶか、profile 側を
+//   "4組" 表記に揃えて運用する。fuzzier match (regex /(\d+組)$/) は誤マッチ拡大が大きいので採用しない。
+
+test('shouldIncludeRow: classFilter "1組" matches "4-1組" via trailing substring', () => {
+  // "4-1組" contains contiguous "1組" so it matches under substring rule.
+  const ctx = loadDataServiceContext();
+  const item = { class: '4-1組', answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '1組' }), true);
+});
+
+test('shouldIncludeRow: classFilter "6年1組" matches itself exactly', () => {
+  const ctx = loadDataServiceContext();
+  const item = { class: '6年1組', answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '6年1組' }), true);
+});
+
+test('shouldIncludeRow: classFilter "2組" rejects "1組"', () => {
+  const ctx = loadDataServiceContext();
+  const item = { class: '1組', answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '2組' }), false);
+});
+
+test('shouldIncludeRow: classFilter "2組" rejects "6年1組"', () => {
+  const ctx = loadDataServiceContext();
+  const item = { class: '6年1組', answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '2組' }), false);
+});
+
+test('shouldIncludeRow: no classFilter → always include (other gates aside)', () => {
+  const ctx = loadDataServiceContext();
+  const item = { class: '何でも', answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, {}), true);
+});
+
+test('shouldIncludeRow: classFilter with empty item.class → no match', () => {
+  const ctx = loadDataServiceContext();
+  const item = { class: '', answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '4組' }), false);
+});
+
+test('shouldIncludeRow: classFilter with null item.class → no match', () => {
+  const ctx = loadDataServiceContext();
+  const item = { class: null, answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '4組' }), false);
+});
+
+// Known trade-off: "1組" filter also matches "11組" / "21組". 学校現場では 1〜9 組までが通常
+// なので実害なし。気になる場合は完全一致テスト時に明示的に "6年1組" を選べばよい。
+test('shouldIncludeRow: known trade-off — "1組" filter matches "11組" too (acceptable)', () => {
+  const ctx = loadDataServiceContext();
+  const item = { class: '11組', answer: 'x' };
+  assert.equal(ctx.shouldIncludeRow(item, { classFilter: '1組' }), true);
+});

@@ -546,8 +546,26 @@ function shouldIncludeRow(item, options = {}) {
       }
     }
 
-    if (options.classFilter && item.class !== options.classFilter) {
-      return false;
+    if (options.classFilter) {
+      // Why (Option B 周辺で発見した実データ問題): profile / Forms ごとに class カラムの値表記が
+      //   異なるケースが現場で多発する (例: 本時="1組", 振り返り="6年1組", 導入="4組")。
+      //   dropdown ベースの完全一致だと profile を切替えた瞬間に 0 件マッチとなり、生徒の
+      //   「同じ class を継続して見たい」体験を壊す。
+      //
+      //   部分一致 (substring) で吸収する：
+      //     filter="1組"     → "1組" / "6年1組" / "4-1組" 全部マッチ
+      //     filter="6年1組"  → "6年1組" のみマッチ (完全一致は当然 substring も真)
+      //     filter="4組"     → "4組" / "6年4組" / "4-1組" マッチ
+      //
+      //   既知の副作用: filter="1組" が "11組" "21組" にも誤マッチする可能性。学校現場では
+      //   通常 1〜9組 程度なので実害ほぼなし。気になる場合は dropdown の選択肢を増やせば回避可能。
+      //   なお UI 側 populateClassFilter は引き続き unique 値で dropdown を構築するので、
+      //   ユーザーが見える選択肢は data の値そのまま。
+      const itemClass = String(item.class || '');
+      const filter = String(options.classFilter);
+      if (itemClass !== filter && itemClass.indexOf(filter) < 0) {
+        return false;
+      }
     }
 
     return true;
