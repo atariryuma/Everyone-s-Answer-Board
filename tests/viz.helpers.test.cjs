@@ -685,7 +685,11 @@ function loadVizContextForCompare(beforeSnapshot) {
   return { context, StudyQuestApp, makeElement };
 }
 
-test('__vizRenderCompare: stores leftSource + side markers for modal lookup', async () => {
+test('__vizRenderCompare: renders before/after panes (v2688: dual modal feature removed)', async () => {
+  // v2688: 個別意見ペア比較機能 (dual modal / pane card) は道徳教育の自然な議論フローに
+  //   合わなかったため廃止。比較モードは「分布の左右並列表示」のみ提供する。
+  //   - 旧 vizCompareLeftSource / vizCompareLeftLabel / vizCompareRightLabel state は不要
+  //   - 旧 data-viz-side マーカーも不要 (click 元の判別が不要になったため)
   const beforeRows = [{ rowIndex: 7, opinion: '昔の意見' }];
   const beforeSnap = {
     capturedAt: new Date('2026-05-14T09:30:00').getTime(),
@@ -694,7 +698,6 @@ test('__vizRenderCompare: stores leftSource + side markers for modal lookup', as
   };
   const { StudyQuestApp, makeElement } = loadVizContextForCompare(beforeSnap);
 
-  // fake app: answersContainer は appendChild/innerHTML を持つ要素
   const answersContainer = makeElement('div');
   const app = new StudyQuestApp();
   app.state = {
@@ -710,27 +713,17 @@ test('__vizRenderCompare: stores leftSource + side markers for modal lookup', as
 
   await StudyQuestApp.prototype.__vizRenderCompare.call(app, renderOne, 'matrix');
 
-  // 左ペインの snapshot が後から showAnswerModal('left') からルックアップできるよう state に保存
-  assert.ok(app.state.vizCompareLeftSource, 'leftSource should be stored on state');
-  // sessionStorage 経由で deserialize されるので reference 比較ではなく構造比較
-  assert.deepEqual(app.state.vizCompareLeftSource.rows, beforeRows);
-  assert.ok(app.state.vizCompareLeftLabel, 'leftLabel should be stored on state');
-  assert.match(app.state.vizCompareLeftLabel, /議論前|⏱|📍/);
-  assert.equal(app.state.vizCompareRightLabel, '📊 現在');
-
   // renderOne が左右で 2 回呼ばれる
   assert.equal(renderCallCount, 2);
 
-  // wrap (1 child) → beforePane + afterPane が appendChild されている
+  // wrap → beforePane + afterPane の構造は維持
   assert.equal(answersContainer._children.length, 1);
   const wrap = answersContainer._children[0];
   assert.equal(wrap._children.length, 2);
   const [beforePane, afterPane] = wrap._children;
-  // 各 pane の最後の子が svg host で data-viz-side が付く
-  const leftHost = beforePane._children[0];
-  const rightHost = afterPane._children[0];
-  assert.equal(leftHost.getAttribute('data-viz-side'), 'left', 'left svg host must be tagged');
-  assert.equal(rightHost.getAttribute('data-viz-side'), 'right', 'right svg host must be tagged');
+  // 各 pane に svg host が含まれる
+  assert.ok(beforePane._children.length >= 1, 'beforePane should contain svg host');
+  assert.ok(afterPane._children.length >= 1, 'afterPane should contain svg host');
 });
 
 test('__vizRenderCompare: falls back to single render when no snapshot exists', async () => {

@@ -80,16 +80,7 @@
         modalStudentName: document.getElementById('modalStudentName'),
         modalReactionContainer: document.getElementById('modalReactions'),
         modalFooter: document.getElementById('modalFooter'),
-        modalSideLabel: document.getElementById('modalSideLabel'),
-        // 比較モード用 (matrix/numberline の比較表示時のみ使う右側カード)
-        //   通常モードは hidden、modal-compare クラスが container に付くと表示。
-        //   左ペインのドットクリック → 左カード、右ペインのドットクリック → 右カード。
-        answerModalCardRight: document.getElementById('answerModalCardRight'),
-        modalAnswerRight: document.getElementById('modalAnswerRight'),
-        modalStudentNameRight: document.getElementById('modalStudentNameRight'),
-        modalReactionContainerRight: document.getElementById('modalReactionsRight'),
-        modalFooterRight: document.getElementById('modalFooterRight'),
-        modalSideLabelRight: document.getElementById('modalSideLabelRight'),
+        // v2688: dual modal / pane card 廃止に伴い、右側カード参照は削除済。
         infoModalContainer: document.getElementById('infoModalContainer'),
         infoModalCard: document.getElementById('infoModalCard'),
         infoModalConfirmBtn: document.getElementById('infoModalConfirmBtn'),
@@ -462,11 +453,6 @@
       };
       if (this.elements.modalReactionContainer) {
         this.elements.modalReactionContainer.addEventListener('click', this.handlers.onModalReactionClick);
-      }
-      // 比較モード用: 右カードのリアクションコンテナにも同じハンドラを bind。
-      //   handler は data-row-index / data-reaction を見るだけなのでカード非依存で再利用 OK。
-      if (this.elements.modalReactionContainerRight) {
-        this.elements.modalReactionContainerRight.addEventListener('click', this.handlers.onModalReactionClick);
       }
       this.handlers.onClassFilterChange = async () => {
         try {
@@ -1482,9 +1468,6 @@
       }
       if (this.elements.modalReactionContainer && this.handlers.onModalReactionClick) {
         this.elements.modalReactionContainer.removeEventListener('click', this.handlers.onModalReactionClick);
-      }
-      if (this.elements.modalReactionContainerRight && this.handlers.onModalReactionClick) {
-        this.elements.modalReactionContainerRight.removeEventListener('click', this.handlers.onModalReactionClick);
       }
       if (this.elements.classFilter && this.handlers.onClassFilterChange) {
         this.elements.classFilter.removeEventListener('change', this.handlers.onClassFilterChange);
@@ -3561,11 +3544,14 @@
           }
 
           if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-            // 比較モード対応: 左右両カードのうち item.rowIndex を表示している側のみ更新。
-            // updateModalReactionButtons / __applyModalReactionStylesFor が内部で
-            // rowIndex 一致チェックを行うので、不一致のカードには副作用なし。
-            this.updateModalReactionButtons(item);
-            this.__applyModalReactionStylesFor(item);
+            // v2688: 単一モーダル時のみ存在。updateModalReactionButtons が内部で
+            // rowIndex 一致チェックを行うので不一致なら no-op。
+            const modalRowIndex = this.elements.modalReactionContainer
+              .querySelector('[data-row-index]')?.dataset.rowIndex;
+            if (modalRowIndex == item.rowIndex) {
+              this.updateModalReactionButtons(item);
+              this.applyReactionStyles(this.elements.answerModalCard, item);
+            }
           }
 
         } catch (error) {
@@ -3585,8 +3571,12 @@
             }
 
             if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-              this.updateModalReactionButtons(item);
-              this.__applyModalReactionStylesFor(item);
+              const modalRowIndex = this.elements.modalReactionContainer
+                .querySelector('[data-row-index]')?.dataset.rowIndex;
+              if (modalRowIndex == item.rowIndex) {
+                this.updateModalReactionButtons(item);
+                this.applyReactionStyles(this.elements.answerModalCard, item);
+              }
             }
 
             resolve();
@@ -4343,17 +4333,15 @@
       }
     }
 
-    // 指定 container 内のリアクションボタンを item の最新リアクションで更新。
-    //   container が item.rowIndex を表示していない場合は no-op。比較モードの左右両カードを
-    //   横断するためにヘルパ化。
-    __updateReactionButtonsIn(container, item) {
-      if (!container) return;
-      const containerRowIdx = container.querySelector('[data-row-index]')?.dataset.rowIndex;
+    // v2688: 単一モーダル版に簡素化。比較モード時の dual-card ロジックは廃止。
+    updateModalReactionButtons(item) {
+      if (!this.elements.modalReactionContainer) return;
+      const containerRowIdx = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
       if (containerRowIdx == null || containerRowIdx != item.rowIndex) return;
 
       this.reactionTypes.forEach(rt => {
         const info = item.reactions?.[rt.key] || { count: 0, reacted: false };
-        const modalBtn = container.querySelector(`[data-reaction="${rt.key}"]`);
+        const modalBtn = this.elements.modalReactionContainer.querySelector(`[data-reaction="${rt.key}"]`);
         if (!modalBtn) return;
 
         const countEl = modalBtn.querySelector('.reaction-count');
@@ -4378,29 +4366,6 @@
         const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count}件)` : ''}`;
         modalBtn.setAttribute('aria-label', ariaLabel);
       });
-    }
-    updateModalReactionButtons(item) {
-      // 比較モード時は左右両カードのうち item.rowIndex を表示している側を更新。
-      // 単一モード時は右コンテナが hidden で rowIndex 一致せず no-op になる。
-      this.__updateReactionButtonsIn(this.elements.modalReactionContainer, item);
-      this.__updateReactionButtonsIn(this.elements.modalReactionContainerRight, item);
-    }
-    // 比較モード対応: 該当 rowIndex を表示中のカードへ reaction-* / highlighted の装飾を適用
-    __applyModalReactionStylesFor(item) {
-      if (this.elements.modalReactionContainer) {
-        const leftIdx = this.elements.modalReactionContainer
-          .querySelector('[data-row-index]')?.dataset.rowIndex;
-        if (leftIdx == item.rowIndex) {
-          this.applyReactionStyles(this.elements.answerModalCard, item);
-        }
-      }
-      if (this.elements.modalReactionContainerRight) {
-        const rightIdx = this.elements.modalReactionContainerRight
-          .querySelector('[data-row-index]')?.dataset.rowIndex;
-        if (rightIdx == item.rowIndex) {
-          this.applyReactionStyles(this.elements.answerModalCardRight, item);
-        }
-      }
     }
     applyUpdates(items) {
       const itemsToUpdate = items.filter(item => {
@@ -4462,48 +4427,37 @@
         this.batchUpdateReactionButtons(reactionUpdates);
       }
     }
-    // 比較モード用: 反対側カードのフィールドを取得 (DRY)
-    __getModalSlot(side) {
-      if (side === 'right') {
-        return {
-          answerEl: this.elements.modalAnswerRight,
-          nameEl: this.elements.modalStudentNameRight,
-          reactionEl: this.elements.modalReactionContainerRight,
-          footerEl: this.elements.modalFooterRight,
-          cardEl: this.elements.answerModalCardRight
-        };
+    showAnswerModal(rowIndex) {
+      // v2688: 単一モーダルに戻した。比較モードでも個別意見は順次に1つずつ読む設計
+      // (「2 つを並べて比較」は道徳教育の自然な議論フローに無い操作)。
+      let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
+      if (!data && this.state.filteredData) {
+        data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
       }
-      return {
-        answerEl: this.elements.modalAnswer,
-        nameEl: this.elements.modalStudentName,
-        reactionEl: this.elements.modalReactionContainer,
-        footerEl: this.elements.modalFooter,
-        cardEl: this.elements.answerModalCard
-      };
-    }
-    // モーダルカードへのデータ反映 (共通)
-    //   既存 showAnswerModal 内のレンダリングを抽出。slot は __getModalSlot で取った要素群。
-    __renderModalSlot(slot, data, rowIndex) {
+      if (!data) return;
+
+      this.state.lastFocusedElement = document.activeElement;
       let modalHtml = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
+
       if (data.reason && data.reason.trim()) {
         modalHtml += '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
       }
-      slot.answerEl.innerHTML = modalHtml; // lint-disable-line no-inner-html-assignment-with-variable -- escapeHtml 済
-      // data-modal-row で「このスロットは埋まっている」マーカー。プレースホルダー判定に使う。
-      //   data-row-index ではなく独自名にする理由: applyUpdates() 内の
-      //   `document.querySelector('[data-row-index="X"]')` (answer-card 検索) と衝突するため。
-      slot.answerEl.dataset.modalRow = String(rowIndex);
 
+      this.elements.modalAnswer.innerHTML = modalHtml; // lint-disable-line no-inner-html-assignment-with-variable -- data.opinion / data.reason は escapeHtml 済
       const showName = this.state.displayMode === 'named';
       let modalDisplayName = '';
-      if (showName) {
-        if (data.name) modalDisplayName = data.name;
-        else if (data.email) modalDisplayName = data.email.split('@')[0];
-      }
-      slot.nameEl.textContent = modalDisplayName;
-      const footerBase = 'text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
-      slot.footerEl.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
 
+      if (showName) {
+        if (data.name) {
+          modalDisplayName = data.name;
+        } else if (data.email) {
+          modalDisplayName = data.email.split('@')[0];
+        }
+      }
+
+      this.elements.modalStudentName.textContent = modalDisplayName;
+      const footerBase = 'text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
+      this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
       const reactionButtonsHtml = this.reactionTypes.map(rt => {
         const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
         const cls = info.reacted ? 'reacted' : '';
@@ -4511,96 +4465,14 @@
         const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-gray-200">' + info.count + '</span>' : '';
         return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
       }).join('');
-      slot.reactionEl.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
-      this.applyReactionStyles(slot.cardEl, data);
-    }
-    // 比較モード時、反対側スロットがまだ埋まっていなければプレースホルダーを表示
-    __resetModalSlotAsEmpty(slot, hintLabel) {
-      delete slot.answerEl.dataset.modalRow;
-      const safeLabel = window.sharedUtilities.security.escapeHtml(hintLabel || '');
-      slot.answerEl.innerHTML = '<div class="modal-empty-placeholder">' + safeLabel + ' のドットをクリックすると<br>こちらに表示されます</div>'; // lint-disable-line no-inner-html-assignment-with-variable -- safeLabel は escape 済
-      slot.reactionEl.textContent = '';
-      slot.nameEl.textContent = '';
-      // リアクション装飾 (色・幅) もリセット
-      const reactionClasses = ['reaction-border-1','reaction-border-2','reaction-border-3',
-        'reaction-bg-like','reaction-bg-understand','reaction-bg-curious',
-        'reaction-bg-like-understand','reaction-bg-like-curious','reaction-bg-understand-curious',
-        'reaction-bg-like-understand-curious','highlighted'];
-      reactionClasses.forEach((cls) => slot.cardEl.classList.remove(cls));
-    }
-    showAnswerModal(rowIndex, side) {
-      // side: 'left' | 'right' | null
-      //   通常モード or 比較モード OFF → side は無視され単一カード描画
-      //   比較モード ON + side 指定 → 該当サイドのカードへ描画、反対側はプレースホルダー
-      const vizCompare = !!(this.state && this.state.vizCompareMode);
-      const useDualLayout = vizCompare && (side === 'left' || side === 'right');
-      const effectiveSide = useDualLayout ? side : 'left'; // 単一モード時は既存挙動互換で左カード
 
-      // データ取得: 左サイドは snapshot 内の rows、それ以外は live currentAnswers
-      let data;
-      if (useDualLayout && effectiveSide === 'left'
-          && this.state.vizCompareLeftSource
-          && Array.isArray(this.state.vizCompareLeftSource.rows)) {
-        data = this.state.vizCompareLeftSource.rows.find(r => r.rowIndex == rowIndex);
-      } else {
-        data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
-        if (!data && this.state.filteredData) {
-          data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
-        }
-      }
-      if (!data) return;
+      this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
 
-      // モーダルが新規オープン時のみ lastFocused 記録 (既に開いていれば保持)
-      if (this.elements.answerModalContainer.classList.contains('hidden')) {
-        this.state.lastFocusedElement = document.activeElement;
-      }
-
-      // レイアウト切替: dual / single
-      if (useDualLayout) {
-        this.elements.answerModalContainer.classList.add('modal-compare');
-        if (this.elements.answerModalCardRight) {
-          this.elements.answerModalCardRight.classList.remove('hidden');
-        }
-        if (this.elements.modalSideLabel) {
-          this.elements.modalSideLabel.textContent = this.state.vizCompareLeftLabel || '📌 議論前';
-          this.elements.modalSideLabel.classList.remove('hidden');
-        }
-        if (this.elements.modalSideLabelRight) {
-          this.elements.modalSideLabelRight.textContent = this.state.vizCompareRightLabel || '📊 現在';
-          this.elements.modalSideLabelRight.classList.remove('hidden');
-        }
-      } else {
-        this.elements.answerModalContainer.classList.remove('modal-compare');
-        if (this.elements.answerModalCardRight) {
-          this.elements.answerModalCardRight.classList.add('hidden');
-        }
-        if (this.elements.modalSideLabel) {
-          this.elements.modalSideLabel.classList.add('hidden');
-        }
-      }
-
-      // 描画対象スロット決定
-      const targetSlot = this.__getModalSlot(effectiveSide);
-      this.__renderModalSlot(targetSlot, data, rowIndex);
-
-      // 比較モード時、反対側が空ならプレースホルダー
-      if (useDualLayout) {
-        const otherSide = effectiveSide === 'right' ? 'left' : 'right';
-        const otherSlot = this.__getModalSlot(otherSide);
-        if (!otherSlot.answerEl.dataset.modalRow) {
-          const otherLabel = otherSide === 'right'
-            ? (this.state.vizCompareRightLabel || '📊 現在')
-            : (this.state.vizCompareLeftLabel || '📌 議論前');
-          this.__resetModalSlotAsEmpty(otherSlot, otherLabel);
-        }
-      }
+      this.applyReactionStyles(this.elements.answerModalCard, data);
 
       this.elements.answerModalContainer.classList.remove('hidden');
       this.elements.answerModalContainer.classList.add('modal-fade');
       this.elements.answerModalCard.classList.add('modal-scale');
-      if (useDualLayout && this.elements.answerModalCardRight) {
-        this.elements.answerModalCardRight.classList.add('modal-scale');
-      }
 
       this.elements.answerModalCloseBtn.focus();
     }
@@ -4615,37 +4487,13 @@
         return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
       }).join('');
 
-      // 比較モード時は left/right どちらに data.rowIndex が表示されているかを確認して
-      // 該当カードのリアクション/スタイルだけ更新。両方に表示されることはない設計
-      // (同じドットを左右からクリックしても、レイアウトが left/right で別物)。
-      const leftIdx = this.elements.modalReactionContainer
-        ?.querySelector('[data-row-index]')?.dataset.rowIndex;
-      if (leftIdx == data.rowIndex) {
-        this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
-        this.applyReactionStyles(this.elements.answerModalCard, data);
-      }
-      if (this.elements.modalReactionContainerRight) {
-        const rightIdx = this.elements.modalReactionContainerRight
-          .querySelector('[data-row-index]')?.dataset.rowIndex;
-        if (rightIdx == data.rowIndex) {
-          this.elements.modalReactionContainerRight.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
-          this.applyReactionStyles(this.elements.answerModalCardRight, data);
-        }
-      }
+      this.elements.modalReactionContainer.innerHTML = reactionButtonsHtml + this.createHighlightButton(data);
+      this.applyReactionStyles(this.elements.answerModalCard, data);
     }
     hideAnswerModal() {
       this.elements.answerModalContainer.classList.add('hidden');
       this.elements.answerModalContainer.classList.remove('modal-fade');
-      this.elements.answerModalContainer.classList.remove('modal-compare');
       this.elements.answerModalCard.classList.remove('modal-scale');
-      // 右カードもクリーンアップ: hidden に戻し、scale クラス・dataset を解除して
-      // 次回オープン時に「埋まっている」と誤判定されないようにする。
-      if (this.elements.answerModalCardRight) {
-        this.elements.answerModalCardRight.classList.remove('modal-scale');
-        this.elements.answerModalCardRight.classList.add('hidden');
-      }
-      if (this.elements.modalAnswer) delete this.elements.modalAnswer.dataset.modalRow;
-      if (this.elements.modalAnswerRight) delete this.elements.modalAnswerRight.dataset.modalRow;
       if (this.state.lastFocusedElement) {
         this.state.lastFocusedElement.focus();
       }

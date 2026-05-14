@@ -660,16 +660,8 @@
         .on('mouseleave', () => hideTooltip())
         .on('click', (event, d) => {
           hideTooltip();
-          // v2686: 比較モードでは overlay モーダルではなくペイン内インラインカードに表示
-          //   (旧モーダル/ドロワーはチャート遮蔽問題を起こしていた)。
-          //   通常モードは従来通り showAnswerModal でフォーカス capture。
-          const sideHost = event.target && event.target.closest
-            ? event.target.closest('[data-viz-side]') : null;
-          const side = sideHost ? sideHost.getAttribute('data-viz-side') : null;
-          if (side && selfL.state && selfL.state.vizCompareMode
-              && typeof selfL.__showPaneCard === 'function') {
-            selfL.__showPaneCard(d.data.rowIndex, side);
-          } else if (typeof selfL.showAnswerModal === 'function') {
+          // v2688: 単一モーダルに統一。比較モードでも個別意見は順次に1つずつ読む。
+          if (typeof selfL.showAnswerModal === 'function') {
             selfL.showAnswerModal(d.data.rowIndex);
           } else {
             showTooltip(event, d.data, selfL);
@@ -927,17 +919,10 @@
         .on('mouseenter', (event, d) => showTooltip(event, d.data, self))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, self))
         .on('mouseleave', () => hideTooltip())
-        // クリック: tooltip を閉じてカード表示
-        //   v2686: 比較モードならペイン内インラインカードへ、それ以外はモーダルへ。
+        // クリック: tooltip を閉じてモーダル表示 (v2688: 単一モーダルに統一)
         .on('click', (event, d) => {
           hideTooltip();
-          const sideHost = event.target && event.target.closest
-            ? event.target.closest('[data-viz-side]') : null;
-          const side = sideHost ? sideHost.getAttribute('data-viz-side') : null;
-          if (side && self.state && self.state.vizCompareMode
-              && typeof self.__showPaneCard === 'function') {
-            self.__showPaneCard(d.data.rowIndex, side);
-          } else if (typeof self.showAnswerModal === 'function') {
+          if (typeof self.showAnswerModal === 'function') {
             self.showAnswerModal(d.data.rowIndex);
           } else {
             showTooltip(event, d.data, self);  // フォールバック
@@ -2447,38 +2432,19 @@
     beforePane.innerHTML = `<h4>${leftLabel}</h4>`;
     const beforeSvgHost = document.createElement('div');
     beforeSvgHost.id = 'vizCompareLeftHost';
-    // ドット click → event.target.closest('[data-viz-side]') で 'left'/'right' を判別し、
-    //   ペイン末尾の .viz-pane-card にクリックしたドットの意見をインライン表示する。
-    beforeSvgHost.setAttribute('data-viz-side', 'left');
     beforePane.appendChild(beforeSvgHost);
-    // 各ペインの末尾にインラインカード slot を準備 (v2686)。
-    //   旧設計のフルスクリーンモーダル/ドロワーを廃止し、ペイン内に「クリックしたドットの
-    //   意見」を直接表示。overlay ではないので、ユーザーは左を見ながら右をクリックできる。
-    const beforeCard = document.createElement('div');
-    beforeCard.className = 'viz-pane-card';
-    beforeCard.dataset.side = 'left';
-    beforeCard.hidden = true;
-    beforePane.appendChild(beforeCard);
 
     const afterPane = document.createElement('div');
     afterPane.className = 'viz-compare-pane';
     afterPane.innerHTML = `<h4>${rightLabel}</h4>`;
     const afterSvgHost = document.createElement('div');
     afterSvgHost.id = 'vizCompareRightHost';
-    afterSvgHost.setAttribute('data-viz-side', 'right');
     afterPane.appendChild(afterSvgHost);
-    const afterCard = document.createElement('div');
-    afterCard.className = 'viz-pane-card';
-    afterCard.dataset.side = 'right';
-    afterCard.hidden = true;
-    afterPane.appendChild(afterCard);
 
-    // 左側ドットのクリック → snapshot 内 row を参照する必要があるため、
-    //   leftSource (snapshot) と leftLabel を state に保存して __showPaneCard('left') から
-    //   ルックアップ可能にする。右側は通常の currentAnswers でよい。
-    this.state.vizCompareLeftSource = leftSource;
-    this.state.vizCompareLeftLabel = leftLabel;
-    this.state.vizCompareRightLabel = rightLabel;
+    // v2688: 個別意見ペア比較機能は廃止。比較モードでは「分布の左右並列表示」のみ提供。
+    //   ドットクリックは単一モーダル経由で「順次に1つずつ意見を読む」のみ。
+    //   左側ドットクリックで snapshot 内データを表示する用途は無くなったので、
+    //   data-viz-side マーカーや vizCompareLeftSource state も不要に。
 
     wrap.appendChild(beforePane);
     wrap.appendChild(afterPane);
@@ -2508,55 +2474,10 @@
     refreshVizControlsState(this);
   };
 
-  // 比較モードの「クリックしたドットの意見」をペイン末尾のカードにインライン表示。
-  //   v2686 で旧フルスクリーンモーダル/ドロワー方式を廃止し、各ペイン内で完結する
-  //   超シンプルな card-fill 方式に変更。overlay でないので chart のドットは常時
-  //   クリック可能 = 左を見ながら右をクリックして比較できる。
-  StudyQuestApp.prototype.__showPaneCard = function (rowIndex, side) {
-    if (side !== 'left' && side !== 'right') return;
-    const selector = '.viz-pane-card[data-side="' + side + '"]';
-    const card = document.querySelector(selector);
-    if (!card) return;
-
-    // データ取得: 左側は snapshot rows、右側は live currentAnswers。
-    let data;
-    if (side === 'left'
-        && this.state.vizCompareLeftSource
-        && Array.isArray(this.state.vizCompareLeftSource.rows)) {
-      data = this.state.vizCompareLeftSource.rows.find(r => r.rowIndex == rowIndex);
-    } else {
-      data = (this.state.currentAnswers || []).find(r => r.rowIndex == rowIndex);
-    }
-    if (!data) return;
-
-    const showName = this.state && this.state.displayMode === 'named';
-    let name = '匿名';
-    if (showName) {
-      if (data.name) name = data.name;
-      else if (data.email) name = data.email.split('@')[0];
-    }
-    const escape = (window.sharedUtilities && window.sharedUtilities.security
-                    && window.sharedUtilities.security.escapeHtml)
-                 || ((s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({
-                       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-                     }[c])));
-    const opinion = escape(data.opinion || data.answer || '');
-    const reason = data.reason ? escape(data.reason) : '';
-    const reasonHtml = reason ? '<div class="viz-pane-card-reason">' + reason + '</div>' : '';
-    card.innerHTML =
-      '<button type="button" class="viz-pane-card-close" aria-label="このカードを閉じる">×</button>' +
-      '<div class="viz-pane-card-name">' + escape(name) + '</div>' +
-      '<div class="viz-pane-card-text">' + opinion + '</div>' +
-      reasonHtml; // lint-disable-line no-inner-html-assignment-with-variable -- 上記値は escapeHtml 済
-    card.hidden = false;
-    const closeBtn = card.querySelector('.viz-pane-card-close');
-    if (closeBtn) {
-      closeBtn.addEventListener('click', () => {
-        card.hidden = true;
-        card.innerHTML = '';
-      });
-    }
-  };
+  // v2688: __showPaneCard 廃止。比較モードでも単一モーダルで順次に意見を読む。
+  //   旧 dual modal / pane card / drawer は道徳教育の自然な議論フローに合わなかった
+  //   (「2 人の意見を並べて読み比べる」は授業で行われない操作)。
+  //   ドットクリック → showAnswerModal で十分。
 
   // ---------------------------------------------------------------------
   // Projector モード ?display=projector

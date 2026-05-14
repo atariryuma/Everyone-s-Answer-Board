@@ -579,73 +579,9 @@
     .viz-compare-wrap { grid-template-columns: 1fr; }
   }
 
-  /* 比較モードのペイン内インラインカード (v2686)
-   *   旧設計 (フルスクリーンモーダル / ボトムドロワー) は overlay でチャート操作を
-   *   阻害したり位置調整が複雑だった。新設計は各ペインの末尾に小さなカードを
-   *   インライン表示し、構造的に「ペインに属する説明」として配置する。
-   *   - overlay ではないので chart のドットは常にクリック可能
-   *   - 各ペインは独立、左を見ながら右をクリックできる
-   *   - 閉じる × ボタンで個別にクリアできる */
-  .viz-pane-card {
-    margin-top: 0.5rem;
-    padding: 0.55rem 0.8rem 0.5rem;
-    background: rgba(15, 23, 42, 0.85);
-    border: 1px solid rgba(148, 163, 184, 0.35);
-    border-radius: 0.5rem;
-    position: relative;
-    font-size: 0.95rem;
-    line-height: 1.4;
-    color: var(--brand-text, #e2e8f0);
-  }
-  .viz-pane-card[hidden] { display: none; }
-  .viz-pane-card-name {
-    color: var(--brand-text-muted, #94a3b8);
-    font-size: 0.78rem;
-    font-weight: 600;
-    margin-bottom: 0.25rem;
-    padding-right: 1.4rem;  /* close ボタンとの干渉防止 */
-  }
-  .viz-pane-card-text {
-    color: var(--brand-text, #e2e8f0);
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-  .viz-pane-card-reason {
-    margin-top: 0.3rem;
-    color: rgba(226, 232, 240, 0.82);
-    font-size: 0.88rem;
-    white-space: pre-wrap;
-    word-break: break-word;
-  }
-  .viz-pane-card-close {
-    position: absolute;
-    top: 0.3rem;
-    right: 0.4rem;
-    width: 1.5rem;
-    height: 1.5rem;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(220, 38, 38, 0.7);
-    border: 0;
-    border-radius: 50%;
-    color: white;
-    font-size: 0.95rem;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-    transition: background-color 0.15s, transform 0.1s;
-  }
-  .viz-pane-card-close:hover {
-    background: rgba(220, 38, 38, 0.95);
-    transform: scale(1.08);
-  }
-  body.projector-mode .viz-pane-card {
-    font-size: 1.1rem;
-  }
-  body.projector-mode .viz-pane-card-text {
-    font-size: 1.15rem;
-  }
+  /* v2688: .viz-pane-card 関連 (個別意見ペア比較用のペイン内インラインカード) は廃止。
+   *   道徳教育の自然な議論フローに合わなかった (「2 人の意見を並べて読む」は授業で
+   *   行われない)。比較モードでも単一モーダル経由で順次に意見を読む設計に統一。 */
 
   /* 象限キーワードパネル (matrix 専用)。「個・群・意味」三層の「意味」レイヤー。
    *   4 象限を 2x2 で並べ、各象限の reason から抽出した top-3 keyword を表示。

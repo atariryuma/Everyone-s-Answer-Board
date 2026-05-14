@@ -763,52 +763,42 @@ button.highlight-badge:hover {
   align-items: center;
   justify-content: center;
 }
-/* モーダルでのリアクション装飾 (左/右カード両方に効かせる) */
-#answerModalCard.reaction-border-1,
-#answerModalCardRight.reaction-border-1 { border-width: 3px !important; }
-#answerModalCard.reaction-border-2,
-#answerModalCardRight.reaction-border-2 { border-width: 4px !important; }
-#answerModalCard.reaction-border-3,
-#answerModalCardRight.reaction-border-3 { border-width: 5px !important; }
-/* モーダルでのリアクション背景色 */
-#answerModalCard.reaction-bg-like,
-#answerModalCardRight.reaction-bg-like {
+/* v2688: 単一モーダルに統一。dual-card / modal-compare / modal-side-label /
+ *   modal-empty-placeholder などの残骸 CSS は全て撤去 (廃止された feature)。
+ *   モーダルでのリアクション装飾は単一カードのみに適用。 */
+#answerModalCard.reaction-border-1 { border-width: 3px !important; }
+#answerModalCard.reaction-border-2 { border-width: 4px !important; }
+#answerModalCard.reaction-border-3 { border-width: 5px !important; }
+#answerModalCard.reaction-bg-like {
   border-color: #ef4444 !important;
   border-image: none !important;
 }
-#answerModalCard.reaction-bg-understand,
-#answerModalCardRight.reaction-bg-understand {
+#answerModalCard.reaction-bg-understand {
   border-color: #fbbf24 !important;
   border-image: none !important;
 }
-#answerModalCard.reaction-bg-curious,
-#answerModalCardRight.reaction-bg-curious {
+#answerModalCard.reaction-bg-curious {
   border-color: #10b981 !important;
   border-image: none !important;
 }
-#answerModalCard.reaction-bg-like-understand,
-#answerModalCardRight.reaction-bg-like-understand {
+#answerModalCard.reaction-bg-like-understand {
   border-image: linear-gradient(45deg, var(--brand-like), var(--brand-understand)) 1 !important;
   border-color: transparent !important;
 }
-#answerModalCard.reaction-bg-like-curious,
-#answerModalCardRight.reaction-bg-like-curious {
+#answerModalCard.reaction-bg-like-curious {
   border-image: linear-gradient(45deg, var(--brand-like), var(--brand-curious)) 1 !important;
   border-color: transparent !important;
 }
-#answerModalCard.reaction-bg-understand-curious,
-#answerModalCardRight.reaction-bg-understand-curious {
+#answerModalCard.reaction-bg-understand-curious {
   border-image: linear-gradient(45deg, var(--brand-understand), var(--brand-curious)) 1 !important;
   border-color: transparent !important;
 }
-#answerModalCard.reaction-bg-like-understand-curious,
-#answerModalCardRight.reaction-bg-like-understand-curious {
+#answerModalCard.reaction-bg-like-understand-curious {
   border-image: linear-gradient(45deg, var(--brand-like), var(--brand-understand), var(--brand-curious)) 1 !important;
   border-color: transparent !important;
 }
 /* モーダルでのハイライト装飾（リアクション装飾より後に配置で優先） */
-#answerModalCard.highlighted,
-#answerModalCardRight.highlighted {
+#answerModalCard.highlighted {
   border-image: linear-gradient(45deg, var(--brand-highlight), var(--brand-highlight-alt), var(--brand-highlight)) 1 !important;
   border-width: 4px !important;
   box-shadow:
@@ -816,23 +806,6 @@ button.highlight-badge:hover {
     inset 0 0 20px rgba(192, 132, 252, 0.1) !important;
   position: relative;
 }
-/* v2686: 比較モードはモーダル/ドロワーを使わず、各ペイン内にインライン
- *   カードを表示する simpler 設計に変更。ドロワーは廃止。
- *   旧モーダル class (.modal-compare 等) は単一モーダル時のみ使用するため
- *   この CSS ブロックは撤廃。compareモードの cardスタイルは page.viz.css.html
- *   側 (.viz-pane-card) に追加する。 */
-.modal-side-label {
-  letter-spacing: 0.05em;
-  flex-shrink: 0;
-}
-.modal-empty-placeholder {
-  color: rgba(148, 163, 184, 0.7);
-  font-size: 1.1rem;
-  text-align: center;
-  padding: 2rem 1rem;
-  font-style: italic;
-}
-/* .render-optimized class moved to UnifiedStyles.css.html for consistency */
 .modal-fade { animation: modalFade 0.2s ease-out; }
 .modal-scale { animation: modalScale 0.2s ease-out; }
 </style>
