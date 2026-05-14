@@ -661,3 +661,152 @@ test('__vizRenderCompare: falls back to single render when no snapshot exists', 
   assert.equal(called, 1);
   assert.equal(app.state.vizCompareMode, false);
 });
+
+// =====================================================================
+// __renderQuadrantSummary: 4 象限ごとの reason キーワード抽出
+// =====================================================================
+
+/**
+ * renderQuadrantSummary を呼べる最小限の context を作る。
+ *   - document.createElement: 子要素を配列に記録する mock element
+ *   - querySelector('#vizQuadrantSummary'): 動的に追加された panel を返す簡易検索
+ *   - querySelector('#vizTeacherPanel'): 常に null（テストでは存在しない）
+ * Why: __vizRenderCompare のテストと違い、こちらは document.querySelector を
+ *   answers コンテナの中で実装する必要がある（renderQuadrantSummary が
+ *   answers.querySelector('#vizQuadrantSummary') と answers.querySelector('#vizTeacherPanel')
+ *   を呼ぶため）。
+ */
+function loadVizContextForQuadrant() {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  const html = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
+  const m = html.match(/<script>([\s\S]*?)<\/script>/);
+  const source = m[1];
+  const StudyQuestApp = class StudyQuestApp {};
+
+  function makeElement(tag) {
+    const el = {
+      tagName: tag,
+      id: '',
+      className: '',
+      innerHTML: '',
+      textContent: '',
+      hidden: false,
+      _attrs: {},
+      _children: [],
+      classList: { add: () => {}, remove: () => {}, toggle: () => {}, contains: () => false },
+      style: {},
+      setAttribute(k, v) { this._attrs[k] = v; },
+      getAttribute(k) { return this._attrs[k]; },
+      appendChild(child) { this._children.push(child); return child; },
+      insertBefore(child, _ref) { this._children.push(child); return child; },
+      remove() { /* parent tracking 省略 */ },
+      addEventListener: () => {},
+      // 簡易 querySelector: id セレクタのみ対応
+      querySelector(sel) {
+        if (!sel.startsWith('#')) return null;
+        const id = sel.slice(1);
+        const walk = (node) => {
+          if (!node || !node._children) return null;
+          for (const c of node._children) {
+            if (c.id === id) return c;
+            const found = walk(c);
+            if (found) return found;
+          }
+          return null;
+        };
+        return walk(el);
+      }
+    };
+    return el;
+  }
+
+  const context = {
+    console: { log: () => {}, warn: () => {}, error: () => {} },
+    window: { StudyQuestApp },
+    StudyQuestApp,
+    sessionStorage: { getItem: () => null, setItem: () => {}, removeItem: () => {} },
+    document: {
+      readyState: 'complete',
+      addEventListener: () => {},
+      getElementById: () => null,
+      createElement: makeElement,
+      createElementNS: () => ({ setAttribute: () => {}, appendChild: () => {} }),
+      body: { classList: { add: () => {} } }
+    },
+    URLSearchParams,
+    Map, Set, Promise, JSON, Math, Number, Object, Array, String, Boolean, Date, RegExp,
+    Error, TypeError, parseInt, parseFloat, isNaN, isFinite,
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id)
+  };
+  context.window.location = { search: '' };
+  vm.createContext(context);
+  vm.runInContext(source, context, { filename: 'page.viz.js.html' });
+  return { context, StudyQuestApp, makeElement };
+}
+
+test('__renderQuadrantSummary: aggregates top-3 reason keywords per quadrant', () => {
+  const { StudyQuestApp, makeElement } = loadVizContextForQuadrant();
+  const answers = makeElement('div');
+
+  // (X >= 3, Y >= 3) = hh (top-right「真実と思いやり」)
+  // (X < 3, Y >= 3)  = lh (top-left「期限もみんなのため」)
+  // (X >= 3, Y < 3)  = hl (bottom-right「自分の作品にこだわる」)
+  // (X < 3, Y < 3)   = ll (bottom-left「効率優先・楽したい」)
+  const rows = [
+    { numericX: 5, numericY: 5, reason: '真実を伝えることが信頼につながる。誠実が大事' },
+    { numericX: 5, numericY: 4, reason: '相手を思いやる気持ち。真実と誠実を貫きたい' },
+    { numericX: 4, numericY: 5, reason: '真実と思いやりは両立できる' },
+    { numericX: 2, numericY: 5, reason: '締切も大事。みんなのために守る' },
+    { numericX: 4, numericY: 2, reason: '自分の作品にこだわりを持ちたい' },
+    { numericX: 5, numericY: 2, reason: '丁寧に作品を仕上げる責任' }
+  ];
+
+  StudyQuestApp.prototype.__renderQuadrantSummary(answers, rows, {
+    matrixQuadrantLabels: { hh: '真実と思いやり', lh: '期限もみんなのため', hl: '自分の作品にこだわる', ll: '効率優先・楽したい' }
+  });
+
+  const panel = answers.querySelector('#vizQuadrantSummary');
+  assert.ok(panel, 'panel should be created');
+  assert.equal(panel._children.length, 4, 'should have 4 cells (TL, TR, BL, BR)');
+
+  // 各セルの cls から象限を識別
+  const cellByCls = {};
+  for (const cell of panel._children) {
+    const m = cell.className.match(/qs-(tl|tr|bl|br)/);
+    if (m) cellByCls[m[1]] = cell;
+  }
+  assert.ok(cellByCls.tl, 'TL cell exists');
+  assert.ok(cellByCls.tr, 'TR cell exists');
+  assert.ok(cellByCls.bl, 'BL cell exists');
+  assert.ok(cellByCls.br, 'BR cell exists');
+
+  // TR (hh: 真実と思いやり) には 3 件 → 「真実」「信頼」「誠実」「思いやり」など出現
+  const trKeywords = cellByCls.tr._children
+    .flatMap(c => c._children || [])
+    .filter(c => c.className === 'qs-tag')
+    .map(c => c.textContent);
+  // 最低 1 つは reason 由来の意味語が tag になっている
+  assert.ok(trKeywords.length > 0, 'TR should have keywords');
+  // 「真実」は 3 件中 3 件で出現 → top-3 に入る
+  assert.ok(trKeywords.some(t => t.includes('真実')), `TR should include 真実 in tags: ${trKeywords.join(',')}`);
+
+  // BL (ll: 効率優先) には 0 件 → 「該当意見なし」placeholder
+  const blEmpty = cellByCls.bl._children.find(c => c.className === 'qs-empty');
+  assert.ok(blEmpty, 'BL should show empty placeholder');
+  assert.match(blEmpty.textContent, /該当意見なし/);
+});
+
+test('__renderQuadrantSummary: hides panel when no rows have numericX/Y', () => {
+  const { StudyQuestApp, makeElement } = loadVizContextForQuadrant();
+  const answers = makeElement('div');
+  StudyQuestApp.prototype.__renderQuadrantSummary(answers, [
+    { reason: '数値なし' },
+    { numericX: null, numericY: null, reason: '欠損' }
+  ], {});
+  const panel = answers.querySelector('#vizQuadrantSummary');
+  assert.ok(panel, 'panel created');
+  assert.equal(panel.hidden, true, 'panel hidden when no data');
+});

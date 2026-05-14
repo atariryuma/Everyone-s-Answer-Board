@@ -502,6 +502,8 @@
       const rows = (this.state.currentAnswers || []).filter((r) => typeof r.numericX === 'number');
       const containerRefs = getOrCreateVizContainer(this);
       if (!containerRefs) return;
+      // 前回 matrix から切り替わった時のため象限パネルを除去 (numberline では使わない)
+      removeQuadrantSummary(this.elements.answersContainer);
 
       const axis = this.state.axisConfig || {};
       const allowResubmit = Boolean(axis.allowResubmit);
@@ -803,9 +805,14 @@
 
       // Why: M2 でも揺らぎを radius で可視化。Euclidean distance を radius にマップ。
       //      M1 と違って 2 軸（1-5）の対角線最大は √(4²+4²) ≈ 5.66。
+      //
+      // Why (v2666 ドット縮小): 5×5 グリッドに 70 人超を載せると BASE=7/MAX=14 では
+      //   クラスタが「ブロブ化」して個別性が消えていた（教師フィードバック「間がない」）。
+      //   道徳教育の核心「個の声を埋もれさせない」DCE 観点で BASE=5/MAX=9 に縮小。
+      //   swing-high の存在感は MAX 9 でも保たれる（base の 1.8 倍）。
       const swings = this.vizComputeSwings(rows, 'matrix');
       const swingByHashM = new Map(swings.map(s => [s.emailHash, s.distance]));
-      const BASE_R_M = 7, MAX_R_M = 14;
+      const BASE_R_M = 5, MAX_R_M = 9;
       const radiusForMatrix = (d) => {
         if (!d.data || !d.data.emailHash) return BASE_R_M;
         const dist = swingByHashM.get(d.data.emailHash) || 0;
@@ -843,15 +850,16 @@
           data: r
         };
       });
-      // collide 半径は MAX_R_M + 余白で固定。strength 0.7 + 200 tick で、
-      //   (3,3) に 10 件密集しても数珠状に散らばってかつ整数軸の近傍に張り付く。
+      // collide 半径 + spread balance:
+      //   strength 0.5 + 250 tick で、(3,3) に 10 件密集しても十分に散らばる。
+      //   ドット縮小 (MAX 14→9) に合わせ collide も自然に小さくなり、間ができる。
       const COLLIDE_R_M = MAX_R_M + 1.5;
       const simM = d3.forceSimulation(nodes)
-        .force('x', d3.forceX((d) => d.targetX).strength(0.7))
-        .force('y', d3.forceY((d) => d.targetY).strength(0.7))
+        .force('x', d3.forceX((d) => d.targetX).strength(0.5))
+        .force('y', d3.forceY((d) => d.targetY).strength(0.5))
         .force('collide', d3.forceCollide(COLLIDE_R_M))
         .stop();
-      for (let i = 0; i < 200; i++) simM.tick();
+      for (let i = 0; i < 250; i++) simM.tick();
 
       // 揺らぎは「現在 dot の半径 + swing-high 黄色」で十分視覚化されているので、
       // 過去位置 ghost + 黄色 trace 線は採用せず（教師フィードバック 2026-05-13）。
@@ -929,6 +937,10 @@
 
       updateStatsPills(this, current.length);
       maybeRenderTeacherPanel(this, swings);
+      // Layer 2 (v2666): 4 象限ごとの理由キーワード top-3 を SVG 直下に表示。
+      //   「個・群・意味」三層レイヤーの「意味」レイヤー。同じ位置でも理由が違う
+      //   ことを言語化して見せ、道徳的価値観の多様性を前景化する。
+      renderQuadrantSummary(this.elements.answersContainer, current, axis);
 
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
         this.elements.answerCount.innerHTML =
@@ -940,6 +952,106 @@
       throw e;
     }
   };
+
+  // ---------------------------------------------------------------------
+  // 象限キーワードパネル（matrix 専用）
+  //   各象限 (hh/lh/hl/ll) に属する rows の reason を集計し、top-3 keyword を
+  //   2x2 グリッドで表示する。aggregateWords (M3 と同じ) を再利用。
+  //
+  // 道徳教育観点 (DCE):
+  //   - クラスタ毎の人数バッジは「多数派バイアス」を増幅するため出さず、
+  //     象限単位の「価値観グループ」として keyword で表現する
+  //   - N=1 の象限でもその 1 人の理由を keyword 化（少数意見の尊重）
+  //   - 「どこに何人いる」より「なぜそう思うか」を前景化
+  // ---------------------------------------------------------------------
+  function renderQuadrantSummary(answers, rows, axis) {
+    if (!answers) return;
+    let panel = answers.querySelector('#vizQuadrantSummary');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'vizQuadrantSummary';
+      panel.className = 'viz-quadrant-summary';
+      // teacherPanel の直前に挿入（順序: stats → svg → quadrant-summary → teacher-panel）
+      const tp = answers.querySelector('#vizTeacherPanel');
+      if (tp) answers.insertBefore(panel, tp);
+      else answers.appendChild(panel);
+    }
+    panel.innerHTML = '';
+
+    const xs = [], ys = [];
+    for (const r of rows) {
+      if (typeof r.numericX === 'number') xs.push(r.numericX);
+      if (typeof r.numericY === 'number') ys.push(r.numericY);
+    }
+    if (!xs.length || !ys.length) { panel.hidden = true; return; }
+    panel.hidden = false;
+
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minY = Math.min(...ys), maxY = Math.max(...ys);
+    const midX = (minX + maxX) / 2;
+    const midY = (minY + maxY) / 2;
+
+    const buckets = { hh: [], lh: [], hl: [], ll: [] };
+    for (const r of rows) {
+      if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
+      const xKey = r.numericX >= midX ? 'h' : 'l';
+      const yKey = r.numericY >= midY ? 'h' : 'l';
+      buckets[xKey + yKey].push(r);
+    }
+
+    const q = (axis && axis.matrixQuadrantLabels) || {};
+    // 表示順は画面の 2x2 (TL, TR, BL, BR) と一致させる
+    const cells = [
+      { key: 'lh', cls: 'qs-tl', label: q.lh || '左上' },
+      { key: 'hh', cls: 'qs-tr', label: q.hh || '右上' },
+      { key: 'll', cls: 'qs-bl', label: q.ll || '左下' },
+      { key: 'hl', cls: 'qs-br', label: q.hl || '右下' }
+    ];
+
+    for (const { key, cls, label } of cells) {
+      const cellRows = buckets[key];
+      const cell = document.createElement('div');
+      cell.className = 'qs-cell ' + cls;
+
+      const h4 = document.createElement('h4');
+      h4.textContent = '📍 ' + label;
+      cell.appendChild(h4);
+
+      if (cellRows.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'qs-empty';
+        empty.textContent = '（該当意見なし）';
+        cell.appendChild(empty);
+      } else {
+        const words = aggregateWords(cellRows, 'reason').slice(0, 3);
+        if (words.length === 0) {
+          const empty = document.createElement('div');
+          empty.className = 'qs-empty';
+          empty.textContent = '（理由が抽出できる語に当たらず）';
+          cell.appendChild(empty);
+        } else {
+          const wrap = document.createElement('div');
+          wrap.className = 'qs-keywords';
+          for (const w of words) {
+            const tag = document.createElement('span');
+            tag.className = 'qs-tag';
+            tag.textContent = '#' + w.word;
+            wrap.appendChild(tag);
+          }
+          cell.appendChild(wrap);
+        }
+      }
+      panel.appendChild(cell);
+    }
+  }
+  // matrix 以外の mode に切り替えたとき panel が残らないように。
+  function removeQuadrantSummary(answers) {
+    if (!answers) return;
+    const panel = answers.querySelector('#vizQuadrantSummary');
+    if (panel) panel.remove();
+  }
+  // テスト用に露出 (private helper の挙動を tests/viz.helpers.test.cjs で検証)
+  StudyQuestApp.prototype.__renderQuadrantSummary = renderQuadrantSummary;
 
   // ---------------------------------------------------------------------
   // M3: ワードランキング（道徳指導案 終末・メタ認知）
@@ -1013,6 +1125,7 @@
       const rows = this.state.currentAnswers || [];
       const containerRefs = getOrCreateVizContainer(this);
       if (!containerRefs) return;
+      removeQuadrantSummary(this.elements.answersContainer);
 
       // Why: reason 列がメインの自由記述。空なら answer にフォールバック。
       const useField = rows.some(r => r.reason) ? 'reason' : 'answer';
@@ -1139,6 +1252,7 @@
       const rows = this.state.currentAnswers || [];
       const containerRefs = getOrCreateVizContainer(this);
       if (!containerRefs) return;
+      removeQuadrantSummary(this.elements.answersContainer);
 
       // 'answer' 列を優先（Forms の選択肢設問はここに入る）
       const useField = rows.some(r => r.answer) ? 'answer' : 'reason';
@@ -1509,19 +1623,42 @@
   }
 
   /**
+   * Option B: 生徒 + studentProfileNav 有り（= history が 2 件以上、または past phase 中）の
+   * とき pill UI を見せるべきかの判定。
+   *
+   * Why: history が 1 件 (= 現在のみ) しか無いと過去 navigation の余地がないので UI を出す
+   *      意味がない。教師は別経路で常に表示。
+   */
+  function shouldShowStudentPills(app) {
+    if (!app || !app.state) return false;
+    const nav = app.state.studentProfileNav;
+    if (!nav || !Array.isArray(nav.history)) return false;
+    return nav.history.length >= 2 || !!app.state.viewingPastProfile;
+  }
+
+  /**
    * 教師用ツールバー（profile pill 群 + 議論ツール）を #vizToolbarSlot（main-header 内）に注入。
    * profile は 1 クリック切替の pill tab。{@link PROFILE_PILLS_MAX} を超える場合は select に fallback。
+   *
+   * Option B: 生徒に対しても pill 部分のみ注入する（議論ツールは隠す）。生徒は過去フェーズへの
+   *   read-only navigation だけが目的。
    */
   function ensureViewToolbar(app) {
-    if (!isTeacher(app)) return null;
+    const teacher = isTeacher(app);
+    const studentPills = !teacher && shouldShowStudentPills(app);
+    if (!teacher && !studentPills) return null;
     const slot = document.getElementById('vizToolbarSlot');
     if (!slot) return null;
     let bar = document.getElementById('vizToolbar');
-    if (bar) return bar;
+    if (bar) {
+      // 既存 bar の生徒用クラスを最新の判定で更新（toolbar 後出し UI 出し分けに必要）
+      bar.classList.toggle('viz-toolbar--student', !teacher);
+      return bar;
+    }
 
     bar = document.createElement('div');
     bar.id = 'vizToolbar';
-    bar.className = 'viz-toolbar';
+    bar.className = 'viz-toolbar' + (teacher ? '' : ' viz-toolbar--student');
     bar.innerHTML = [
       '<div class="viz-toolbar-left" id="vizProfilePills" role="tablist" aria-label="ボード切替">',
       '</div>',
@@ -1548,12 +1685,28 @@
     slot.appendChild(bar);
 
     // profile pills の click handler は event delegation で 1 度だけ登録
+    // Why: teacher は active 切替 (config 書換) / student は past-phase 閲覧 (read-only) と
+    //   セマンティクスが違う。pill の data-action で振り分ける。
     document.getElementById('vizProfilePills').addEventListener('click', (e) => {
+      // 「現在に戻る」ボタンは別途処理
+      const returnBtn = e.target.closest('.viz-profile-return');
+      if (returnBtn) {
+        if (typeof app.__vizReturnToCurrent === 'function') app.__vizReturnToCurrent();
+        return;
+      }
       const btn = e.target.closest('.viz-profile-pill');
       if (!btn) return;
+      if (btn.disabled || btn.classList.contains('disabled')) return;
       const name = btn.dataset.profile;
       if (!name) return;
-      app.__vizLoadProfile(name);
+      // data-action="load-past" → 過去フェーズ読み込み（student / または teacher が past click）
+      // それ以外 → active 切替（teacher 経路）
+      const action = btn.dataset.action || 'switch';
+      if (action === 'load-past') {
+        if (typeof app.__vizLoadPastProfile === 'function') app.__vizLoadPastProfile(name);
+      } else {
+        app.__vizLoadProfile(name);
+      }
     });
     // select fallback の change ハンドラ (profile 5 個以上のとき)
     document.getElementById('vizProfilePills').addEventListener('change', (e) => {
@@ -1684,46 +1837,114 @@
   const PROFILE_PILLS_MAX = 4;
 
   function injectProfileSelector(app) {
-    if (!isTeacher(app)) return;
-    const profiles = (app.state && app.state.profiles) || [];
+    const teacher = isTeacher(app);
+    const studentMode = !teacher && shouldShowStudentPills(app);
+    if (!teacher && !studentMode) return;
     const toolbar = ensureViewToolbar(app);
     if (!toolbar) return;
     const container = document.getElementById('vizProfilePills');
     if (!container) return;
 
-    // profiles 0 件なら容器ごと非表示
-    container.style.display = profiles.length === 0 ? 'none' : '';
-    if (profiles.length === 0) {
+    // 教師: app.state.profiles (full list)
+    // 生徒: app.state.studentProfileNav.history (過去 + 現在のみ)
+    let pillEntries;
+    let activeName;
+    let pastSet;       // teacher 用: 過去 active になった profile 名集合（教師には ✓ 付ける）
+    if (teacher) {
+      const profiles = (app.state && app.state.profiles) || [];
+      const navHist = (app.state.studentProfileNav && app.state.studentProfileNav.history) || [];
+      pastSet = new Set(navHist.map(h => h && h.name).filter(Boolean));
+      activeName = app.state.activeProfile || '';
+      pillEntries = profiles.map(p => ({
+        name: p && p.name ? String(p.name) : '',
+        formTitle: (p && p.formTitle) || '',
+        isCurrent: p && p.name === activeName,
+        isPast: pastSet.has(p && p.name) && p && p.name !== activeName,
+        deleted: false,
+        action: p && p.name === activeName ? null : 'switch'  // teacher は active 含めて全 click 可
+      })).filter(e => e.name);
+    } else {
+      const nav = app.state.studentProfileNav;
+      const history = (nav && nav.history) || [];
+      activeName = (nav && nav.active) || app.state.activeProfile || '';
+      const viewing = app.state.viewingPastProfile || null;
+      // 同名 history を末尾優先で dedup（同じ profile に何度も戻った場合の重複表示防止）
+      const seen = new Set();
+      const dedup = [];
+      for (let i = history.length - 1; i >= 0; i--) {
+        const h = history[i];
+        if (!h || !h.name || seen.has(h.name)) continue;
+        seen.add(h.name);
+        dedup.unshift(h);
+      }
+      pillEntries = dedup.map(h => {
+        const isCurrent = h.name === activeName;
+        return {
+          name: h.name,
+          formTitle: h.formTitle || '',
+          isCurrent,
+          isPast: !isCurrent,
+          isViewing: viewing === h.name || (!viewing && isCurrent),
+          deleted: !!h.deleted,
+          action: isCurrent ? null : 'load-past'
+        };
+      });
+    }
+
+    if (pillEntries.length === 0) {
+      container.style.display = 'none';
       container.innerHTML = '';
       return;
     }
+    container.style.display = '';
 
-    const active = app.state.activeProfile || '';
+    // 「現在に戻る」CTA: 生徒が過去フェーズ閲覧中のみ pill 列の末尾に出す。
+    //   teacher の場合は不要（teacher は active 切替で current を移動するため）。
+    const showReturnBtn = !teacher && !!app.state.viewingPastProfile &&
+                          app.state.viewingPastProfile !== activeName;
 
-    if (profiles.length <= PROFILE_PILLS_MAX) {
+    const useSelect = pillEntries.length > PROFILE_PILLS_MAX && teacher;
+
+    if (!useSelect) {
       // pill tab レイアウト
       const html = ['<div class="viz-profile-pills-row">'];
-      for (const p of profiles) {
-        const name = p && p.name ? String(p.name) : '';
-        if (!name) continue;
-        const isActive = name === active;
-        const safe = escapeForTooltip(name);
+      for (const e of pillEntries) {
+        const safe = escapeForTooltip(e.name);
+        const safeTitle = escapeForTooltip(e.formTitle || e.name);
+        const classes = ['viz-profile-pill'];
+        if (e.isCurrent) classes.push('current');
+        if (e.isPast) classes.push('past');
+        if (e.isViewing) classes.push('viewing');
+        if (e.deleted) classes.push('deleted');
+        const icon = e.isCurrent ? '<span class="viz-profile-pill__dot" aria-hidden="true">●</span> '
+                   : e.isPast ? '<span class="viz-profile-pill__check" aria-hidden="true">✓</span> '
+                   : '';
+        const ariaSel = e.isViewing ? 'true' : 'false';
+        const dataAction = e.action ? ' data-action="' + e.action + '"' : '';
+        const disabled = e.deleted ? ' disabled aria-disabled="true"' : '';
         html.push(
-          '<button type="button" class="viz-profile-pill' + (isActive ? ' active' : '') +
-          '" role="tab" aria-selected="' + (isActive ? 'true' : 'false') +
-          '" data-profile="' + safe + '" title="' + safe + '">' + safe + '</button>'
+          '<button type="button" class="' + classes.join(' ') +
+          '" role="tab" aria-selected="' + ariaSel +
+          '" data-profile="' + safe + '"' + dataAction + disabled +
+          ' title="' + safeTitle + (e.deleted ? '（このフェーズは削除済です）' : '') + '">' +
+          icon + safe + '</button>'
+        );
+      }
+      if (showReturnBtn) {
+        html.push(
+          '<button type="button" class="viz-profile-return" ' +
+          'title="現在のフェーズに戻る" aria-label="現在のフェーズに戻る">' +
+          '↺ 現在に戻る</button>'
         );
       }
       html.push('</div>');
       container.innerHTML = html.join('');
     } else {
-      // select fallback
+      // select fallback (teacher only)
       const opts = ['<option value="">📚 ボード...</option>'];
-      for (const p of profiles) {
-        const name = p && p.name ? String(p.name) : '';
-        if (!name) continue;
-        const sel = name === active ? ' selected' : '';
-        opts.push('<option value="' + escapeForTooltip(name) + '"' + sel + '>' + escapeForTooltip(name) + '</option>');
+      for (const e of pillEntries) {
+        const sel = e.isCurrent ? ' selected' : '';
+        opts.push('<option value="' + escapeForTooltip(e.name) + '"' + sel + '>' + escapeForTooltip(e.name) + '</option>');
       }
       container.innerHTML =
         '<select id="vizProfileSelect" class="viz-profile-select" aria-label="ボード切替" title="ボード（profile）切替">' +
@@ -1805,6 +2026,105 @@
   };
 
   StudyQuestApp.prototype.__vizInjectProfileSelector = function () { injectProfileSelector(this); };
+
+  /**
+   * Option B: 過去フェーズを read-only で閲覧する。
+   *
+   * Why: 生徒が「導入」「振り返り」など過去のフェーズで自分が書いた回答 / 全体の傾向を
+   *   後から確認できるようにする道徳ゴール（多面的思考・自己内省）の実装。
+   *   config を書き換えず、サーバの getPublishedSheetDataForProfile に snapshot を要求する。
+   *
+   *   read-only enforcement:
+   *     - state.viewingPastProfile に profile 名を立てる
+   *     - その間、reaction / highlight / submit は client 側で block + トースト表示
+   *     - polling は active profile の変化検知のみ継続（data 更新は新着検知の対象外）
+   *
+   * @param {string} name - history に含まれる profile 名
+   */
+  StudyQuestApp.prototype.__vizLoadPastProfile = function (name) {
+    if (!name) return;
+    if (typeof google === 'undefined' || !google.script || !google.script.run) return;
+    if (this.state.viewingPastProfile === name) return;  // no-op
+
+    // 切替時は viz session-scoped state を reset（current → past で snapshot 連続性が破綻するため）
+    try {
+      sessionStorage.removeItem(SNAPSHOT_KEY);
+      sessionStorage.removeItem(SNAPSHOT_BEFORE_KEY);
+    } catch (_) {}
+    this.state.vizTimelineIndex = null;
+    this.state.vizCompareMode = false;
+
+    const filter = this.getCurrentFilterState ? this.getCurrentFilterState() : {};
+    const classFilter = filter.classFilter || null;
+    const sortOrder = filter.sortOrder || 'newest';
+    const self = this;
+
+    // UI 即時反映（描画ペインに loading 文字を出す方法は loadSheetData 内）
+    self.state.viewingPastProfile = name;
+    if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
+
+    google.script.run
+      .withSuccessHandler((res) => {
+        if (!res || !res.success) {
+          // 失敗時は viewing を解除して toast。
+          self.state.viewingPastProfile = null;
+          if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
+          const msg = (res && (res.error || res.message)) || 'フェーズ読み込み失敗';
+          if (typeof self.showToast === 'function') self.showToast(msg);
+          else { try { alert(msg); } catch (_) {} }
+          return;
+        }
+        // 成功: result を loadSheetData が処理するのと同じ形なので state へ反映 + renderBoard。
+        //   ただし getPublishedSheetData 経由ではないので、自前で state を更新する。
+        try {
+          const rows = Array.isArray(res.data) ? res.data : [];
+          self.state.currentAnswers = rows;
+          self.state.viewingPastProfile = res.viewingPastProfile || name;
+          if (res.displaySettings && typeof res.displaySettings.boardMode === 'string') {
+            self.state.boardMode = res.displaySettings.boardMode;
+            self.state.serverBoardMode = res.displaySettings.boardMode;
+          }
+          if (res.axisConfig) self.state.axisConfig = res.axisConfig;
+          if (res.header && self.elements && self.elements.headingLabel) {
+            self.elements.headingLabel.textContent = res.header;
+          }
+          if (typeof self.populateClassFilter === 'function') {
+            self.populateClassFilter(rows);
+          }
+        } catch (uiError) {
+          console.warn('__vizLoadPastProfile: state update failed', uiError);
+        }
+        if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
+        if (typeof self.renderBoard === 'function') self.renderBoard(false, false, []);
+        // トースト「過去のフェーズを表示中（読み取り専用）」
+        if (typeof self.showToast === 'function') {
+          self.showToast('「' + name + '」を表示中（読み取り専用）');
+        }
+      })
+      .withFailureHandler((err) => {
+        self.state.viewingPastProfile = null;
+        if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
+        console.error('Past profile load network error:', err);
+        const msg = 'フェーズ読み込みに失敗しました';
+        if (typeof self.showToast === 'function') self.showToast(msg);
+        else { try { alert(msg); } catch (_) {} }
+      })
+      .getPublishedSheetDataForProfile(this.state.userId, name, classFilter, sortOrder);
+  };
+
+  /**
+   * Option B: 過去フェーズ閲覧から現在 (active) に戻る。
+   */
+  StudyQuestApp.prototype.__vizReturnToCurrent = function () {
+    if (!this.state.viewingPastProfile) return;
+    this.state.viewingPastProfile = null;
+    if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
+    if (typeof this.loadSheetData === 'function') {
+      this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+    } else {
+      window.location.reload();
+    }
+  };
 
   function refreshVizControlsState(app) {
     const slider = document.getElementById('vizTimelineSlider');

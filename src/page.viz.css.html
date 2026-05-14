@@ -42,15 +42,19 @@
     font-weight: 600;
   }
 
-  /* データ点 */
+  /* データ点
+   * 2026-05-14 v2666: 暗背景でドット同士の境界を分離するため stroke を白半透明に。
+   *   ドット縮小 (matrix BASE 7→5) と組み合わせて「クラスタがブロブ化」する問題を解消。
+   *   opacity 0.92 → 0.85 で重なりが色味で読めるように（透明度で密度を表現）。
+   *   リアクションリング (色 stroke) は JS インライン style で上書きされるので影響なし。 */
   .viz-dot {
     cursor: pointer;
     /* stroke-opacity も transition 対象に: リアクションリング (色枠) のフェードを滑らかに */
     transition: r 120ms ease, stroke-width 120ms ease, stroke-opacity 120ms ease, opacity 200ms ease;
     fill: #38bdf8;
-    stroke: #0f172a;
-    stroke-width: 1.2;
-    opacity: 0.92;
+    stroke: rgba(255, 255, 255, 0.55);
+    stroke-width: 1.3;
+    opacity: 0.85;
   }
   .viz-dot:hover {
     stroke: #fde047;
@@ -390,15 +394,63 @@
     background: rgba(56, 189, 248, 0.12);
     color: var(--brand-text, #e2e8f0);
   }
-  .viz-profile-pill.active {
+  .viz-profile-pill.active,
+  .viz-profile-pill.current.viewing,
+  .viz-profile-pill.viewing {
     background: rgba(56, 189, 248, 0.35);
     border-color: #38bdf8;
     color: #fff;
     box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.6) inset;
   }
+  /* Option B 状態スタイル
+     - current: 現在 active な profile（cyan 枠）
+     - past:    過去 active になった profile（淡 + ✓）— student の navigation target
+     - viewing: いま閲覧中（current か past いずれかと併用）
+     - deleted: 削除済 profile（クリック不可 + 取消線） */
+  .viz-profile-pill.current:not(.viewing) {
+    background: rgba(56, 189, 248, 0.2);
+    border-color: rgba(56, 189, 248, 0.7);
+    color: #f1f5f9;
+  }
+  .viz-profile-pill.past {
+    color: var(--brand-text-muted, #94a3b8);
+    opacity: 0.85;
+  }
+  .viz-profile-pill.past:hover { opacity: 1; }
+  .viz-profile-pill.deleted {
+    text-decoration: line-through;
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .viz-profile-pill__check { color: #10b981; font-size: 0.78em; margin-right: 0.1rem; }
+  .viz-profile-pill__dot { color: #38bdf8; font-size: 0.62em; vertical-align: middle; }
+
+  /* 「現在に戻る」CTA — 過去フェーズ閲覧中のみ pill 行末尾に表示 */
+  .viz-profile-return {
+    margin-left: 0.5rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 0.35rem;
+    border: 1px solid rgba(251, 191, 36, 0.6);
+    background: rgba(251, 191, 36, 0.18);
+    color: #fbbf24;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+    transition: background 0.15s, transform 0.1s;
+  }
+  .viz-profile-return:hover {
+    background: rgba(251, 191, 36, 0.3);
+    transform: translateY(-1px);
+  }
+
+  /* 生徒向け toolbar — 議論ツール / timeline は非表示（pills だけ） */
+  .viz-toolbar--student .viz-toolbar-center { display: none !important; }
+
   body.projector-mode .viz-profile-pill { font-size: 1.05rem; padding: 0.45rem 1rem; }
   @media (max-width: 640px) {
     .viz-profile-pill { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
+    .viz-profile-return { font-size: 0.78rem; padding: 0.22rem 0.45rem; }
   }
 
   /* モード切替ボタン: アイコン + 短文（アイコンのみだと用途が分かりにくいため） */
@@ -543,6 +595,58 @@
   }
   @media (max-width: 768px) {
     .viz-compare-wrap { grid-template-columns: 1fr; }
+  }
+
+  /* 象限キーワードパネル (matrix 専用)。「個・群・意味」三層の「意味」レイヤー。
+   *   4 象限を 2x2 で並べ、各象限の reason から抽出した top-3 keyword を表示。
+   *   人数バッジは多数派バイアスのため出さない（DCE 観点）。
+   *   2026-05-14 v2666 で導入。 */
+  .viz-quadrant-summary {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 0.5rem;
+    margin-top: 0.75rem;
+    padding: 0.25rem;
+  }
+  .viz-quadrant-summary[hidden] { display: none; }
+  .qs-cell {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.7rem;
+    background: rgba(15, 23, 42, 0.32);
+    min-height: 4rem;
+  }
+  .qs-cell h4 {
+    margin: 0 0 0.35rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--brand-text-muted, #94a3b8);
+    letter-spacing: 0.02em;
+  }
+  .qs-keywords {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+  }
+  .qs-tag {
+    background: rgba(99, 102, 241, 0.18);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: #c7d2fe;
+    border-radius: 999px;
+    padding: 0.12rem 0.55rem;
+    font-size: 0.82rem;
+    line-height: 1.3;
+  }
+  .qs-empty {
+    color: rgba(148, 163, 184, 0.55);
+    font-size: 0.78rem;
+    font-style: italic;
+  }
+  body.projector-mode .qs-cell h4 { font-size: 0.95rem; }
+  body.projector-mode .qs-tag { font-size: 1rem; padding: 0.15rem 0.7rem; }
+  @media (max-width: 768px) {
+    .viz-quadrant-summary { grid-template-columns: 1fr; }
   }
 
   /* 統計バッジ（接続数・更新時刻） */
