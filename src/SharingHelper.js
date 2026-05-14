@@ -17,13 +17,13 @@
  * @returns {Object} 処理結果
  */
 function setupDomainWideSharing(spreadsheetId, ownerEmail) {
+  const [, domain] = (ownerEmail || '').split('@');
+  if (!domain) {
+    throw new Error('Invalid email format');
+  }
+
   try {
     const file = DriveApp.getFileById(spreadsheetId);
-
-    const [, domain] = ownerEmail.split('@');
-    if (!domain) {
-      throw new Error('Invalid email format');
-    }
 
     const sharingAccess = file.getSharingAccess();
     const sharingPermission = file.getSharingPermission();
@@ -38,9 +38,45 @@ function setupDomainWideSharing(spreadsheetId, ownerEmail) {
 
     return { success: true, message: 'Domain-wide sharing configured' };
 
-  } catch (error) {
-    console.error('setupDomainWideSharing error:', error.message);
-    throw error;
+  } catch (driveAppError) {
+    // Why (fallback): Google Workspace のドメインポリシーで DOMAIN_WITH_LINK + EDIT が
+    //   禁じられているテナント（教育機関で多い）では DriveApp.setSharing が落ちる。
+    //   Drive REST API では type=domain + role=reader の細かい制御ができ、多くの場合
+    //   こちらは通る。fallback として REST API を試す（READER 権限のみ）。
+    //
+    //   ログ調査 (2026-05-14) で customizeForm 経由の新規 SS が student 環境で
+    //   403 を返す事象が複数回検出されたため、自動 fallback を組み込み。
+    console.warn('setupDomainWideSharing: DriveApp.setSharing failed, trying Drive REST API fallback:', driveAppError.message);
+    try {
+      const token = ScriptApp.getOAuthToken();
+      const url = 'https://www.googleapis.com/drive/v3/files/' +
+                  encodeURIComponent(spreadsheetId) + '/permissions?supportsAllDrives=true';
+      const resp = UrlFetchApp.fetch(url, {
+        method: 'post',
+        contentType: 'application/json',
+        muteHttpExceptions: true,
+        headers: { Authorization: 'Bearer ' + token },
+        payload: JSON.stringify({
+          type: 'domain',
+          role: 'reader',
+          domain,
+          allowFileDiscovery: false
+        })
+      });
+      const code = resp.getResponseCode();
+      if (code >= 400 && code !== 409) {  // 409 = already exists (idempotent)
+        const body = resp.getContentText().substring(0, 300);
+        throw new Error(`Drive REST API ${code}: ${body}`);
+      }
+      return { success: true, message: 'Domain-wide sharing configured via REST API fallback', fallback: true };
+    } catch (restError) {
+      console.error('setupDomainWideSharing: both DriveApp and REST API failed', {
+        driveApp: driveAppError.message,
+        rest: restError.message
+      });
+      // 元エラーを優先 (DriveApp 側のメッセージのほうが分かりやすい)
+      throw driveAppError;
+    }
   }
 }
 

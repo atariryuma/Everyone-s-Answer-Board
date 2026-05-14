@@ -517,3 +517,147 @@ test('__vizSetMode: accepts all 5 modes (board/numberline/matrix/wordcloud/pie)'
     assert.equal(fakeApp.state.boardMode, m, `mode "${m}" should be accepted`);
   }
 });
+
+// =====================================================================
+// __vizRenderCompare: dual-modal 対応のための左側ペイン情報保存 + side マーカー
+// =====================================================================
+
+/**
+ * 比較表示用にカスタム vm context を立ち上げる。
+ *   - sessionStorage に before-snapshot を仕込む
+ *   - document.createElement は呼び出しごとに固有 mock element を返す
+ *   - appendChild は子要素を配列に記録
+ *
+ * Why: ドット click handler 側で `event.target.closest('[data-viz-side]')` から
+ *   left/right を取り出してモーダルに表示する設計のため、__vizRenderCompare が
+ *   生成する svg host に data-viz-side が確実に付くこと、および
+ *   state.vizCompareLeftSource が showAnswerModal('left') から参照可能な状態で
+ *   保存されることを契約として固定する。
+ */
+function loadVizContextForCompare(beforeSnapshot) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const vm = require('node:vm');
+  const html = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
+  const m = html.match(/<script>([\s\S]*?)<\/script>/);
+  const source = m[1];
+  const StudyQuestApp = class StudyQuestApp {};
+
+  function makeElement(tag) {
+    return {
+      tagName: tag,
+      id: '',
+      className: '',
+      innerHTML: '',
+      _attrs: {},
+      _children: [],
+      classList: { add: () => {}, remove: () => {}, toggle: () => {} },
+      style: {},
+      setAttribute(k, v) { this._attrs[k] = v; },
+      getAttribute(k) { return this._attrs[k]; },
+      appendChild(child) { this._children.push(child); return child; },
+      addEventListener: () => {}
+    };
+  }
+
+  const sessionStore = {};
+  if (beforeSnapshot) {
+    // page.viz.js.html の SNAPSHOT_BEFORE_KEY と同期 (定数は closure 内で公開されないため
+    // 文字列直書き)。
+    sessionStore['viz:before:v1'] = JSON.stringify(beforeSnapshot);
+  }
+
+  const context = {
+    console: { log: () => {}, warn: () => {}, error: () => {} },
+    window: { StudyQuestApp },
+    StudyQuestApp,
+    sessionStorage: {
+      getItem: (k) => (k in sessionStore ? sessionStore[k] : null),
+      setItem: (k, v) => { sessionStore[k] = v; },
+      removeItem: (k) => { delete sessionStore[k]; }
+    },
+    document: {
+      readyState: 'complete',
+      addEventListener: () => {},
+      getElementById: () => null,
+      createElement: makeElement,
+      createElementNS: () => ({ setAttribute: () => {}, appendChild: () => {} }),
+      body: { classList: { add: () => {} } }
+    },
+    URLSearchParams,
+    Map, Set, Promise, JSON, Math, Number, Object, Array, String, Boolean, Date, RegExp,
+    Error, TypeError, parseInt, parseFloat, isNaN, isFinite,
+    setTimeout: (fn, ms) => setTimeout(fn, ms),
+    clearTimeout: (id) => clearTimeout(id)
+  };
+  context.window.location = { search: '' };
+  vm.createContext(context);
+  vm.runInContext(source, context, { filename: 'page.viz.js.html' });
+  return { context, StudyQuestApp, makeElement };
+}
+
+test('__vizRenderCompare: stores leftSource + side markers for modal lookup', async () => {
+  const beforeRows = [{ rowIndex: 7, opinion: '昔の意見' }];
+  const beforeSnap = {
+    capturedAt: new Date('2026-05-14T09:30:00').getTime(),
+    rows: beforeRows,
+    axisConfig: { tag: 'before-axis' }
+  };
+  const { StudyQuestApp, makeElement } = loadVizContextForCompare(beforeSnap);
+
+  // fake app: answersContainer は appendChild/innerHTML を持つ要素
+  const answersContainer = makeElement('div');
+  const app = new StudyQuestApp();
+  app.state = {
+    currentAnswers: [{ rowIndex: 9, opinion: '今の意見' }],
+    axisConfig: { tag: 'current-axis' },
+    vizTimelineIndex: null,
+    vizCompareMode: true
+  };
+  app.elements = { answersContainer };
+
+  let renderCallCount = 0;
+  const renderOne = async () => { renderCallCount += 1; };
+
+  await StudyQuestApp.prototype.__vizRenderCompare.call(app, renderOne, 'matrix');
+
+  // 左ペインの snapshot が後から showAnswerModal('left') からルックアップできるよう state に保存
+  assert.ok(app.state.vizCompareLeftSource, 'leftSource should be stored on state');
+  // sessionStorage 経由で deserialize されるので reference 比較ではなく構造比較
+  assert.deepEqual(app.state.vizCompareLeftSource.rows, beforeRows);
+  assert.ok(app.state.vizCompareLeftLabel, 'leftLabel should be stored on state');
+  assert.match(app.state.vizCompareLeftLabel, /議論前|⏱|📍/);
+  assert.equal(app.state.vizCompareRightLabel, '📊 現在');
+
+  // renderOne が左右で 2 回呼ばれる
+  assert.equal(renderCallCount, 2);
+
+  // wrap (1 child) → beforePane + afterPane が appendChild されている
+  assert.equal(answersContainer._children.length, 1);
+  const wrap = answersContainer._children[0];
+  assert.equal(wrap._children.length, 2);
+  const [beforePane, afterPane] = wrap._children;
+  // 各 pane の最後の子が svg host で data-viz-side が付く
+  const leftHost = beforePane._children[0];
+  const rightHost = afterPane._children[0];
+  assert.equal(leftHost.getAttribute('data-viz-side'), 'left', 'left svg host must be tagged');
+  assert.equal(rightHost.getAttribute('data-viz-side'), 'right', 'right svg host must be tagged');
+});
+
+test('__vizRenderCompare: falls back to single render when no snapshot exists', async () => {
+  const { StudyQuestApp, makeElement } = loadVizContextForCompare(null);
+  const answersContainer = makeElement('div');
+  const app = new StudyQuestApp();
+  app.state = {
+    currentAnswers: [{ rowIndex: 1 }],
+    axisConfig: null,
+    vizTimelineIndex: null,
+    vizCompareMode: true
+  };
+  app.elements = { answersContainer };
+  let called = 0;
+  await StudyQuestApp.prototype.__vizRenderCompare.call(app, async () => { called += 1; }, 'matrix');
+  // snapshot ゼロ件 → fallback で renderOne が 1 回呼ばれ、compare mode は OFF
+  assert.equal(called, 1);
+  assert.equal(app.state.vizCompareMode, false);
+});

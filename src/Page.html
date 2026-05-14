@@ -268,14 +268,27 @@
     <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 transition-all duration-300 ease-in-out" role="main" aria-live="polite" aria-label="回答一覧"></main>
   </div>
   <div id="answerModalContainer" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-all duration-300 ease-out" role="dialog" aria-modal="true">
-    <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative transition-all duration-300 ease-out" role="document" aria-labelledby="modalAnswer">
-      <button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 hover:bg-red-500 active:bg-red-700 rounded-full p-2 text-white hover:scale-110 active:scale-95 transition-all duration-200 z-10 focus:ring-2 focus:ring-red-400/50 focus:outline-none shadow-lg" aria-label="閉じる">
-        <span id="iconClose" class="w-6 h-6"></span>
-      </button>
-      <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"></div>
-      <div id="modalFooter" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
-        <div><span id="modalStudentName" class="font-bold text-2xl text-gray-200 hover:text-cyan-300 transition-colors duration-200"></span></div>
-        <div id="modalReactions" class="flex items-center gap-2"></div>
+    <!-- ラッパ: 通常モードは1カードのみ、比較モード時は modal-compare クラスが付き左右2カード表示 -->
+    <div id="answerModalWrapper" class="flex flex-col md:flex-row gap-4 w-full max-w-5xl items-stretch justify-center transition-all duration-300 ease-out">
+      <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full h-auto max-h-[85vh] relative transition-all duration-300 ease-out" role="document" aria-labelledby="modalAnswer">
+        <button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 hover:bg-red-500 active:bg-red-700 rounded-full p-2 text-white hover:scale-110 active:scale-95 transition-all duration-200 z-10 focus:ring-2 focus:ring-red-400/50 focus:outline-none shadow-lg" aria-label="閉じる">
+          <span id="iconClose" class="w-6 h-6"></span>
+        </button>
+        <div id="modalSideLabel" class="modal-side-label hidden text-cyan-300 text-sm font-semibold mb-2"></div>
+        <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"></div>
+        <div id="modalFooter" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
+          <div><span id="modalStudentName" class="font-bold text-2xl text-gray-200 hover:text-cyan-300 transition-colors duration-200"></span></div>
+          <div id="modalReactions" class="flex items-center gap-2"></div>
+        </div>
+      </div>
+      <!-- 比較モード用の右カード。通常モードは hidden、比較モード時に hidden を外して flex で表示 -->
+      <div id="answerModalCardRight" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full h-auto max-h-[85vh] relative transition-all duration-300 ease-out hidden" role="document" aria-labelledby="modalAnswerRight">
+        <div id="modalSideLabelRight" class="modal-side-label text-cyan-300 text-sm font-semibold mb-2"></div>
+        <div id="modalAnswerRight" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800"></div>
+        <div id="modalFooterRight" class="text-xs text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
+          <div><span id="modalStudentNameRight" class="font-bold text-2xl text-gray-200 hover:text-cyan-300 transition-colors duration-200"></span></div>
+          <div id="modalReactionsRight" class="flex items-center gap-2"></div>
+        </div>
       </div>
     </div>
   </div>

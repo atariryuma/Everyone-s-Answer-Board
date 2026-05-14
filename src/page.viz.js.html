@@ -667,7 +667,12 @@
         .on('click', (event, d) => {
           hideTooltip();
           if (typeof selfL.showAnswerModal === 'function') {
-            selfL.showAnswerModal(d.data.rowIndex);
+            // 比較モード時、クリック元の data-viz-side ('left'/'right') を取り出して
+            // モーダル側でどちらのカードに描画するかを判定させる。通常モードは null。
+            const sideHost = event.target && event.target.closest
+              ? event.target.closest('[data-viz-side]') : null;
+            const side = sideHost ? sideHost.getAttribute('data-viz-side') : null;
+            selfL.showAnswerModal(d.data.rowIndex, side);
           } else {
             showTooltip(event, d.data, selfL);
           }
@@ -880,7 +885,12 @@
         .on('click', (event, d) => {
           hideTooltip();
           if (typeof self.showAnswerModal === 'function') {
-            self.showAnswerModal(d.data.rowIndex);
+            // 比較モード時の左右ペイン判別。__vizRenderCompare 側で svg host に
+            // data-viz-side="left"/"right" を付与してあるので、ここで取り出して渡す。
+            const sideHost = event.target && event.target.closest
+              ? event.target.closest('[data-viz-side]') : null;
+            const side = sideHost ? sideHost.getAttribute('data-viz-side') : null;
+            self.showAnswerModal(d.data.rowIndex, side);
           } else {
             showTooltip(event, d.data, self);  // フォールバック
           }
@@ -1928,19 +1938,32 @@
     answers.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'viz-compare-wrap';
+    const rightLabel = '📊 現在';
     const beforePane = document.createElement('div');
     beforePane.className = 'viz-compare-pane';
     beforePane.innerHTML = `<h4>${leftLabel}</h4>`;
     const beforeSvgHost = document.createElement('div');
     beforeSvgHost.id = 'vizCompareLeftHost';
+    // モーダル側でクリック発火元のペインを判別するためのマーカ。
+    //   ドット click → event.target.closest('[data-viz-side]') で 'left'/'right' を取り出し、
+    //   showAnswerModal(rowIndex, side) に渡して該当カードへ表示する。
+    beforeSvgHost.setAttribute('data-viz-side', 'left');
     beforePane.appendChild(beforeSvgHost);
 
     const afterPane = document.createElement('div');
     afterPane.className = 'viz-compare-pane';
-    afterPane.innerHTML = '<h4>📊 現在</h4>';
+    afterPane.innerHTML = `<h4>${rightLabel}</h4>`;
     const afterSvgHost = document.createElement('div');
     afterSvgHost.id = 'vizCompareRightHost';
+    afterSvgHost.setAttribute('data-viz-side', 'right');
     afterPane.appendChild(afterSvgHost);
+
+    // 左側ドットのクリック → snapshot 内 row を参照する必要があるため、
+    //   leftSource (snapshot) と leftLabel を state に保存して showAnswerModal('left') から
+    //   ルックアップ可能にする。右側は通常の currentAnswers でよい。
+    this.state.vizCompareLeftSource = leftSource;
+    this.state.vizCompareLeftLabel = leftLabel;
+    this.state.vizCompareRightLabel = rightLabel;
 
     wrap.appendChild(beforePane);
     wrap.appendChild(afterPane);

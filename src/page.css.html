@@ -517,47 +517,83 @@ button.highlight-badge:hover {
   align-items: center;
   justify-content: center;
 }
-/* モーダルでのリアクション装飾 */
-#answerModalCard.reaction-border-1 { border-width: 3px !important; }
-#answerModalCard.reaction-border-2 { border-width: 4px !important; }
-#answerModalCard.reaction-border-3 { border-width: 5px !important; }
+/* モーダルでのリアクション装飾 (左/右カード両方に効かせる) */
+#answerModalCard.reaction-border-1,
+#answerModalCardRight.reaction-border-1 { border-width: 3px !important; }
+#answerModalCard.reaction-border-2,
+#answerModalCardRight.reaction-border-2 { border-width: 4px !important; }
+#answerModalCard.reaction-border-3,
+#answerModalCardRight.reaction-border-3 { border-width: 5px !important; }
 /* モーダルでのリアクション背景色 */
-#answerModalCard.reaction-bg-like { 
-  border-color: #ef4444 !important; 
+#answerModalCard.reaction-bg-like,
+#answerModalCardRight.reaction-bg-like {
+  border-color: #ef4444 !important;
   border-image: none !important;
 }
-#answerModalCard.reaction-bg-understand { 
-  border-color: #fbbf24 !important; 
+#answerModalCard.reaction-bg-understand,
+#answerModalCardRight.reaction-bg-understand {
+  border-color: #fbbf24 !important;
   border-image: none !important;
 }
-#answerModalCard.reaction-bg-curious { 
-  border-color: #10b981 !important; 
+#answerModalCard.reaction-bg-curious,
+#answerModalCardRight.reaction-bg-curious {
+  border-color: #10b981 !important;
   border-image: none !important;
 }
-#answerModalCard.reaction-bg-like-understand {
+#answerModalCard.reaction-bg-like-understand,
+#answerModalCardRight.reaction-bg-like-understand {
   border-image: linear-gradient(45deg, var(--brand-like), var(--brand-understand)) 1 !important;
   border-color: transparent !important;
 }
-#answerModalCard.reaction-bg-like-curious {
+#answerModalCard.reaction-bg-like-curious,
+#answerModalCardRight.reaction-bg-like-curious {
   border-image: linear-gradient(45deg, var(--brand-like), var(--brand-curious)) 1 !important;
   border-color: transparent !important;
 }
-#answerModalCard.reaction-bg-understand-curious {
+#answerModalCard.reaction-bg-understand-curious,
+#answerModalCardRight.reaction-bg-understand-curious {
   border-image: linear-gradient(45deg, var(--brand-understand), var(--brand-curious)) 1 !important;
   border-color: transparent !important;
 }
-#answerModalCard.reaction-bg-like-understand-curious {
+#answerModalCard.reaction-bg-like-understand-curious,
+#answerModalCardRight.reaction-bg-like-understand-curious {
   border-image: linear-gradient(45deg, var(--brand-like), var(--brand-understand), var(--brand-curious)) 1 !important;
   border-color: transparent !important;
 }
 /* モーダルでのハイライト装飾（リアクション装飾より後に配置で優先） */
-#answerModalCard.highlighted {
+#answerModalCard.highlighted,
+#answerModalCardRight.highlighted {
   border-image: linear-gradient(45deg, var(--brand-highlight), var(--brand-highlight-alt), var(--brand-highlight)) 1 !important;
   border-width: 4px !important;
   box-shadow:
     0 0 25px rgba(147, 51, 234, 0.6),
     inset 0 0 20px rgba(192, 132, 252, 0.1) !important;
   position: relative;
+}
+/* 比較モード時: モーダルラッパを広げ、左右2カードを並べて表示
+ *   非 compare 時は右カード hidden、wrapper max-w-5xl (Tailwind デフォルト)。
+ *   compare 時は wrapper を広げて 2 カード並べる。各カードは 1/2 ずつ。
+ */
+#answerModalContainer.modal-compare #answerModalWrapper {
+  max-width: 90rem; /* 1440px ≒ max-w-7xl 強化版 */
+}
+#answerModalContainer.modal-compare #answerModalCard,
+#answerModalContainer.modal-compare #answerModalCardRight {
+  flex: 1 1 0;
+  min-width: 0; /* flex item の overflow 抑止 */
+}
+/* 比較モードのサイドラベル (📌 議論前 / 📊 現在) */
+.modal-side-label {
+  letter-spacing: 0.05em;
+  flex-shrink: 0;
+}
+/* 反対側ドット待ちのプレースホルダー文言 */
+.modal-empty-placeholder {
+  color: rgba(148, 163, 184, 0.7);
+  font-size: 1.1rem;
+  text-align: center;
+  padding: 2rem 1rem;
+  font-style: italic;
 }
 /* .render-optimized class moved to UnifiedStyles.css.html for consistency */
 .modal-fade { animation: modalFade 0.2s ease-out; }
