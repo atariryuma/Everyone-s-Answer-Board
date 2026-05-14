@@ -1832,6 +1832,9 @@
         }
         return;
       }
+      // profile 切替アクション (pill click) では classFilter をリセットして「新 profile の全件」から
+      //   始める。同 profile 内の filter 変更 (loadSheetData gate 経由) には影響しない。
+      if (typeof resetClassFilterToAll === 'function') resetClassFilterToAll(app);
       if (action === 'load-past') {
         if (typeof app.__vizLoadPastProfile === 'function') app.__vizLoadPastProfile(name);
       } else if (action === 'switch') {
@@ -1843,6 +1846,7 @@
       if (e.target.id !== 'vizProfileSelect') return;
       const name = e.target.value;
       if (!name) return;
+      if (typeof resetClassFilterToAll === 'function') resetClassFilterToAll(app);
       app.__vizLoadProfile(name);
     });
   }
@@ -1871,6 +1875,11 @@
         app.state.vizCompareMode = !app.state.vizCompareMode;
         compareBtn.classList.toggle('active', !!app.state.vizCompareMode);
         compareBtn.setAttribute('aria-pressed', String(!!app.state.vizCompareMode));
+        // v2683: 比較トグル時にモーダルが開いていれば閉じる。
+        //   理由: ON → OFF 時は dual layout の右カードが宙ぶらりんで残り stale。
+        //   OFF → ON 時は full-screen モーダルがチャートを覆ったままドロワー化が
+        //   遅延する。いずれもクリーンに閉じてからレイアウト切替が安全。
+        if (typeof app.hideAnswerModal === 'function') app.hideAnswerModal();
         // v2632: 比較モード中は timeline スライダーが「左ペインの時刻」を制御する。
         //   旧仕様 (compare ON で timeline reset) は廃止。スライダー位置を保持したまま
         //   左ペインがその時刻、右ペインが現在で描画される。
@@ -1953,6 +1962,10 @@
     // 切替時は timeline 位置・compare モードをリセット（新モードでの誤動作回避）
     this.state.vizTimelineIndex = null;
     this.state.vizCompareMode = false;
+    // v2683: モード切替時にモーダルが開いていれば閉じる。
+    //   旧モード (matrix) で開いていたモーダルが新モード (numberline) でも残ると、
+    //   stale なドット情報を表示し続けて教師が混乱する。クリーンに閉じる。
+    if (typeof this.hideAnswerModal === 'function') this.hideAnswerModal();
     // 同じデータで再描画
     this.renderBoard(false, false, []);
     refreshModeBar(this);
@@ -2148,9 +2161,7 @@
     } catch (_) {}
     this.state.vizTimelineIndex = null;
     this.state.vizCompareMode = false;
-    // class filter も 'すべて' へ。profile ごとに class カラムの値が違う現場ケースで、
-    //   引きずると新 profile で空表示になるので明示的にリセットする。
-    resetClassFilterToAll(this);
+    // class filter リセットは caller (pill click handler) で実施済み。ここでは触らない。
     // UI 側も即時反映（loadSheetData 完了を待たず空状態を見せる）
     const sliderEl = document.getElementById('vizTimelineSlider');
     if (sliderEl) {
@@ -2247,9 +2258,12 @@
     } catch (_) {}
     this.state.vizTimelineIndex = null;
     this.state.vizCompareMode = false;
-    resetClassFilterToAll(this);
-
-    const sortOrder = (this.getCurrentFilterState ? this.getCurrentFilterState() : {}).sortOrder || 'newest';
+    // dropdown 現在値をそのまま採用する。pill click 経由なら caller が事前に
+    //   resetClassFilterToAll() で 'すべて' に戻しているし、loadSheetData gate 経由
+    //   (同 profile 内 filter 変更) なら新しい dropdown 値で fetch する。
+    const filter = this.getCurrentFilterState ? this.getCurrentFilterState() : {};
+    const classFilter = filter.classFilter || null;
+    const sortOrder = filter.sortOrder || 'newest';
     const self = this;
 
     // UI 即時反映（描画ペインに loading 文字を出す方法は loadSheetData 内）
@@ -2302,8 +2316,7 @@
         if (typeof self.showToast === 'function') self.showToast(msg);
         else { try { alert(msg); } catch (_) {} }
       })
-      // classFilter は切替時に 'すべて' へリセット済みなので null を渡す（過去 profile の全件を見せる）。
-      .getPublishedSheetDataForProfile(this.state.userId, name, null, sortOrder);
+      .getPublishedSheetDataForProfile(this.state.userId, name, classFilter, sortOrder);
   };
 
   /**

@@ -643,3 +643,18 @@ test('populateClassFilter: falls back to すべて when selection missing + sync
   assert.equal(cf.value, 'すべて');
   assert.equal(persisted, 'すべて', 'sessionStorage も同期されて次回 fetch も整合');
 });
+
+// Note: __vizLoadPastProfile の classFilter 引数渡しは page.viz.js.html 側で定義されており、
+//   テスト fixture (page.js.html のみロード) では prototype 上に存在しない。
+//   ソース文字列に対する static check で regression 防止する。
+test('__vizLoadPastProfile: source passes classFilter from getCurrentFilterState (static guard)', () => {
+  const src = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
+  // hard-code null bug の回帰防止: getPublishedSheetDataForProfile 呼び出し直前で classFilter を変数渡しすること。
+  // (`, null,` のパターンは hard-code null だった旧コード)
+  const callMatch = src.match(/getPublishedSheetDataForProfile\([^)]+\)/);
+  assert.ok(callMatch, 'getPublishedSheetDataForProfile 呼び出しが存在する');
+  // 引数のうち 3 番目 (classFilter 位置) が `null` の literal でないこと
+  // 形式: getPublishedSheetDataForProfile(userId, name, classFilter, sortOrder)
+  const args = callMatch[0].slice('getPublishedSheetDataForProfile('.length, -1).split(',').map(s => s.trim());
+  assert.notEqual(args[2], 'null', 'classFilter 引数を null hard-code してはいけない');
+});
