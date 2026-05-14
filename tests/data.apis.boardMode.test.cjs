@@ -331,3 +331,116 @@ test('profiles wire: sent to owner', () => {
   assert.ok(result.profiles);
   assert.equal(result.profiles.list.length, 1);
 });
+
+// =====================================================================
+// Option B: studentProfileNav — 生徒に過去フェーズ navigation を提供
+// Why: 教師の full profiles[] 漏洩は防ぎつつ、history に登録済の過去フェーズだけ
+//      生徒が振り返れるよう、別 wire (studentProfileNav) で history と current のみ送る。
+// =====================================================================
+
+test('studentProfileNav: sent to student when profileHistory has entries', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      profiles: [
+        { name: '導入', formTitle: 'イントロ' },
+        { name: '本時', formTitle: '討論' },
+        { name: '未来', formTitle: '振り返り' }  // history に無い = まだ active 化されていない
+      ],
+      activeProfile: '本時',
+      profileHistory: [
+        { name: '導入', activatedAt: '2026-05-14T01:00:00Z' },
+        { name: '本時', activatedAt: '2026-05-14T01:30:00Z' }
+      ]
+    },
+    {}  // student
+  );
+  assert.ok(result.studentProfileNav);
+  assert.equal(result.studentProfileNav.active, '本時');
+  assert.equal(result.studentProfileNav.history.length, 2);
+  // 未来 profile は漏らさない
+  const names = result.studentProfileNav.history.map(h => h.name);
+  assert.ok(!names.includes('未来'));
+  // formTitle は引かれてくる
+  assert.equal(result.studentProfileNav.history[0].formTitle, 'イントロ');
+});
+
+test('studentProfileNav: NOT sent to teacher (only profiles wire)', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      profiles: [{ name: '導入', formTitle: 'A' }],
+      activeProfile: '導入',
+      profileHistory: [{ name: '導入', activatedAt: '2026-05-14T01:00:00Z' }]
+    },
+    { isOwnBoard: true }
+  );
+  // teacher は profiles wire を使うので studentProfileNav は null
+  assert.equal(result.studentProfileNav, null);
+  assert.ok(result.profiles);
+});
+
+test('studentProfileNav: null when profileHistory empty', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      profiles: [{ name: 'p1', formTitle: 'A' }],
+      activeProfile: 'p1'
+    },
+    {}  // student
+  );
+  assert.equal(result.studentProfileNav, null);
+});
+
+test('studentProfileNav: marks deleted profile (in history but missing from profiles[])', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      profiles: [{ name: '本時', formTitle: 'B' }],   // 「導入」削除済
+      activeProfile: '本時',
+      profileHistory: [
+        { name: '導入', activatedAt: '2026-05-14T01:00:00Z' },
+        { name: '本時', activatedAt: '2026-05-14T01:30:00Z' }
+      ]
+    },
+    {}  // student
+  );
+  const entries = result.studentProfileNav.history;
+  const deletedEntry = entries.find(e => e.name === '導入');
+  assert.ok(deletedEntry);
+  assert.equal(deletedEntry.deleted, true);
+  const currentEntry = entries.find(e => e.name === '本時');
+  assert.equal(currentEntry.deleted, false);
+});
+
+test('viewingPastProfile: defaults to null when no override', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    { displaySettings: {}, columnMapping: {} },
+    { isOwnBoard: true }
+  );
+  assert.equal(result.viewingPastProfile, null);
+});
+
+test('viewingPastProfile: reflects viewerContext override (past-phase endpoint)', () => {
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    { displaySettings: {}, columnMapping: {} },
+    { isOwnBoard: false, viewingPastProfile: '導入' }
+  );
+  assert.equal(result.viewingPastProfile, '導入');
+});

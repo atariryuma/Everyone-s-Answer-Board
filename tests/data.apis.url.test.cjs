@@ -429,6 +429,138 @@ test('getPublishedSheetData: classFilter="すべて" is converted to undefined',
 });
 
 // =====================================================================
+// Option B: getPublishedSheetDataForProfile (past-phase read-only endpoint)
+// =====================================================================
+
+function ctxWithProfileHistory(profileHistory, profiles, overrides = {}) {
+  return ctxWithAuth({
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({
+      spreadsheetId: 'current-ss',
+      sheetName: 'Current',
+      isPublished: true,
+      activeProfile: '本時',
+      profiles,
+      profileHistory
+    }),
+    getUserSheetData: () => ({
+      success: true, data: [{ id: 1 }], headers: [], sheetName: 'Past', header: ''
+    }),
+    ...overrides
+  });
+}
+
+const SAMPLE_PROFILES = [
+  { name: '導入', formTitle: 'イントロ', spreadsheetId: 'past-ss', sheetName: 'Intro', columnMapping: {} },
+  { name: '本時', formTitle: '討論', spreadsheetId: 'current-ss', sheetName: 'Current', columnMapping: {} },
+  { name: '未来', formTitle: '振り返り', spreadsheetId: 'future-ss', sheetName: 'Future', columnMapping: {} }
+];
+const SAMPLE_HISTORY = [
+  { name: '導入', activatedAt: '2026-05-14T00:00:00Z' },
+  { name: '本時', activatedAt: '2026-05-14T01:00:00Z' }
+];
+
+test('getPublishedSheetDataForProfile: rejects missing targetUserId', () => {
+  const ctx = ctxWithProfileHistory(SAMPLE_HISTORY, SAMPLE_PROFILES);
+  const result = ctx.getPublishedSheetDataForProfile('', '導入');
+  assert.equal(result.success, false);
+  assert.match(result.error, /targetUserId/);
+});
+
+test('getPublishedSheetDataForProfile: rejects missing profileName', () => {
+  const ctx = ctxWithProfileHistory(SAMPLE_HISTORY, SAMPLE_PROFILES);
+  const result = ctx.getPublishedSheetDataForProfile('u1', '');
+  assert.equal(result.success, false);
+  assert.match(result.error, /profileName/);
+});
+
+test('getPublishedSheetDataForProfile: students cannot view future profile (not in history)', () => {
+  // viewer != owner & not admin → student
+  const ctx = ctxWithProfileHistory(SAMPLE_HISTORY, SAMPLE_PROFILES, {
+    getBatchedAdminAuth: () => ({
+      success: true, authenticated: true,
+      email: 'student@example.com', isAdmin: false
+    })
+  });
+  const result = ctx.getPublishedSheetDataForProfile('u1', '未来');
+  assert.equal(result.success, false);
+  assert.match(result.error, /公開/);
+});
+
+test('getPublishedSheetDataForProfile: students can view past profile (in history)', () => {
+  const ctx = ctxWithProfileHistory(SAMPLE_HISTORY, SAMPLE_PROFILES, {
+    getBatchedAdminAuth: () => ({
+      success: true, authenticated: true,
+      email: 'student@example.com', isAdmin: false
+    })
+  });
+  const result = ctx.getPublishedSheetDataForProfile('u1', '導入');
+  assert.equal(result.success, true);
+  assert.equal(result.viewingPastProfile, '導入');
+});
+
+test('getPublishedSheetDataForProfile: owner can view any profile (preview future)', () => {
+  // owner: history gate is bypassed
+  const ctx = ctxWithProfileHistory(SAMPLE_HISTORY, SAMPLE_PROFILES, {
+    getBatchedAdminAuth: () => ({
+      success: true, authenticated: true,
+      email: 'owner@example.com', isAdmin: false  // owner of the board
+    })
+  });
+  const result = ctx.getPublishedSheetDataForProfile('u1', '未来');
+  assert.equal(result.success, true);
+});
+
+test('getPublishedSheetDataForProfile: rejects when board unpublished and viewer not privileged', () => {
+  const ctx = ctxWithProfileHistory(SAMPLE_HISTORY, SAMPLE_PROFILES, {
+    getBatchedAdminAuth: () => ({
+      success: true, authenticated: true,
+      email: 'student@example.com', isAdmin: false
+    }),
+    getConfigOrDefault: () => ({
+      spreadsheetId: 'current-ss',
+      sheetName: 'Current',
+      isPublished: false,
+      activeProfile: '本時',
+      profiles: SAMPLE_PROFILES,
+      profileHistory: SAMPLE_HISTORY
+    })
+  });
+  const result = ctx.getPublishedSheetDataForProfile('u1', '導入');
+  assert.equal(result.success, false);
+  assert.match(result.error, /未公開/);
+});
+
+test('getPublishedSheetDataForProfile: synthesizes config from profile snapshot', () => {
+  let captured = null;
+  const ctx = ctxWithProfileHistory(SAMPLE_HISTORY, SAMPLE_PROFILES, {
+    getUserSheetData: (_uid, _opts, _user, cfg) => {
+      captured = cfg;
+      return { success: true, data: [], sheetName: 'Intro', headers: [], header: '' };
+    }
+  });
+  ctx.getPublishedSheetDataForProfile('u1', '導入');
+  assert.ok(captured);
+  // 過去 profile の SS を渡している（現在の SS ではない）
+  assert.equal(captured.spreadsheetId, 'past-ss');
+  assert.equal(captured.sheetName, 'Intro');
+});
+
+test('getPublishedSheetDataForProfile: rejects deleted profile (history hit, profiles miss)', () => {
+  const profiles = [
+    { name: '本時', spreadsheetId: 'current-ss', sheetName: 'Current' }
+  ];
+  const history = [
+    { name: '導入', activatedAt: '2026-05-14T00:00:00Z' },  // 削除済
+    { name: '本時', activatedAt: '2026-05-14T01:00:00Z' }
+  ];
+  const ctx = ctxWithProfileHistory(history, profiles);
+  const result = ctx.getPublishedSheetDataForProfile('u1', '導入');
+  assert.equal(result.success, false);
+  assert.match(result.error, /見つかりません|削除済/);
+});
+
+// =====================================================================
 // getSheetList
 // =====================================================================
 

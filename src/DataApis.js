@@ -851,6 +851,9 @@ function loadProfileForView(profileName, targetUserId) {
     merged.allowResubmit = !!p.allowResubmit;
     merged.activeProfile = p.name;
     merged.userId = user.userId;
+    // Option B: 生徒が過去フェーズを閲覧できるよう、active 切替を時系列で記録。
+    //   AdminApis.loadProfile 経路と同じ append helper を使う（重複なら no-op）。
+    merged.profileHistory = __appendProfileHistory_(cur.profileHistory, p.name);
 
     const saveRes = saveUserConfig(user.userId, merged, { isMainConfig: true });
     if (!saveRes.success) return saveRes;
@@ -982,6 +985,39 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     };
   }
 
+  // Option B: 生徒は過去フェーズだけは閲覧できるよう、profileHistory と current のみ
+  //   サブセット情報を wire に乗せる。未来 profile (history 未登録) は漏らさない。
+  //   teacher 用の full profileSummary は上記 isPrivilegedViewer 経路で送る。
+  //
+  // 構造: studentProfileNav = {
+  //   active: '現在の profile 名',
+  //   history: [{ name, activatedAt, formTitle }, ...]  // 末尾が最新
+  // }
+  // student client はこれだけで pill UI を組み立てる。formTitle は表示名として使う。
+  let studentProfileNav = null;
+  const rawHistory = (config && Array.isArray(config.profileHistory)) ? config.profileHistory : [];
+  if (!isPrivilegedViewer && rawHistory.length > 0 && Array.isArray(config && config.profiles)) {
+    // formTitle 補完: history は {name, activatedAt} だけ持つので profiles から表示名を引く。
+    //   削除済 profile (history に名前あるが profiles から消えた) は formTitle 空のまま渡す。
+    const profileByName = {};
+    for (const p of config.profiles) {
+      if (p && p.name) profileByName[p.name] = p;
+    }
+    studentProfileNav = {
+      active: config.activeProfile || null,
+      history: rawHistory.map(h => {
+        const meta = profileByName[h.name] || {};
+        return {
+          name: h.name,
+          activatedAt: h.activatedAt || '',
+          formTitle: meta.formTitle || '',
+          // 削除済 profile かどうか: students にロード不可と判定させるためのフラグ
+          deleted: !profileByName[h.name]
+        };
+      })
+    };
+  }
+
   // viewer がティーチャー権限を持つかの最終フラグ。client 側で UI 表示判定に使う。
   // server 側で判定する方が改ざんに強い（client の window.isEditor は信用しない）。
   const viewerIsTeacher = isPrivilegedViewer;
@@ -1003,8 +1039,13 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     displaySettings: { ...displaySettings, boardMode: effectiveMode },
     axisConfig,
     profiles: profileSummary,
+    studentProfileNav,
     formMeta,
-    viewerIsTeacher
+    viewerIsTeacher,
+    // viewingPastProfile: 過去フェーズ閲覧時のみ profile 名を入れる（caller が override）。
+    //   主経路 (getPublishedSheetData) では undefined のまま。
+    //   getPublishedSheetDataForProfile が結果を post-process して値を入れる。
+    viewingPastProfile: viewerContext.viewingPastProfile || null
   };
 }
 
@@ -1153,6 +1194,128 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       data: [],
       sheetName: '',
       header: '問題'
+    };
+  }
+}
+
+/**
+ * Option B: 生徒が過去フェーズ (profileHistory に登録済) を read-only で閲覧するための API。
+ *
+ * Why: getPublishedSheetData は active config だけを見る。教師が active を「振り返り」に
+ *   切替えてしまうと、生徒は「導入」での自分の答えを後から見直せない。
+ *   このエンドポイントは config を書き換えずに指定 profile snapshot を合成して読むだけ。
+ *
+ *   security model:
+ *     - 公開済ボード（または own/admin）でなければアクセス不可（getPublishedSheetData と同じ）
+ *     - profileName は profileHistory に含まれている必要あり（未来 profile / 削除済の名前漏れを防ぐ）
+ *     - 結果には viewingPastProfile=name を載せて client が read-only UI に切替えられるようにする
+ *
+ * @param {string} targetUserId
+ * @param {string} profileName
+ * @param {string} [classFilter]
+ * @param {string} [sortOrder]
+ * @returns {Object} buildSafePublishedDataResult 形式 + viewingPastProfile
+ */
+function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter, sortOrder) {
+  try {
+    if (!targetUserId || typeof targetUserId !== 'string') {
+      return { success: false, error: 'targetUserId is required', data: [] };
+    }
+    if (!profileName || typeof profileName !== 'string') {
+      return { success: false, error: 'profileName is required', data: [] };
+    }
+
+    const adminAuth = getBatchedAdminAuth({ allowNonAdmin: true });
+    if (!adminAuth.success || !adminAuth.authenticated) {
+      return { success: false, error: 'Authentication required', data: [] };
+    }
+    const { email: viewerEmail, isAdmin: isSystemAdmin } = adminAuth;
+
+    const targetUser = findPublishedBoardOwner(targetUserId, viewerEmail, {
+      preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
+    });
+    if (!targetUser) {
+      return { success: false, error: 'Target user not found', data: [] };
+    }
+
+    const targetConfig = getConfigOrDefault(targetUserId, targetUser);
+    const isOwnBoard = targetUser.userEmail === viewerEmail;
+    const isPublished = Boolean(targetConfig.isPublished);
+
+    if (!isSystemAdmin && !isOwnBoard && !isPublished) {
+      return { success: false, error: 'このボードは未公開です', data: [] };
+    }
+
+    // history gate: students (非 owner / 非 admin) は profileHistory にある名前のみ閲覧可。
+    //   owner/admin は profiles[] にあれば全部読めるようにする（preview 用途）。
+    const history = Array.isArray(targetConfig.profileHistory) ? targetConfig.profileHistory : [];
+    const inHistory = history.some(h => h && h.name === profileName);
+    const isPrivileged = isSystemAdmin || isOwnBoard;
+    if (!isPrivileged && !inHistory) {
+      return { success: false, error: 'このフェーズはまだ公開されていません', data: [] };
+    }
+
+    const profiles = Array.isArray(targetConfig.profiles) ? targetConfig.profiles : [];
+    const p = profiles.find(x => x && x.name === profileName);
+    if (!p) {
+      // history にはあるが profiles[] から消されているケース（削除済 profile）
+      return { success: false, error: '指定されたフェーズの設定が見つかりません（削除済の可能性）', data: [] };
+    }
+
+    if (!p.spreadsheetId) {
+      return { success: false, error: 'このフェーズはスプレッドシート未設定です', data: [] };
+    }
+
+    // 合成 config: profile snapshot のフィールドを active 形に詰め替える。loadProfileForView と同じ
+    //   semantics だが、こちらは「保存せず」一時的に getUserSheetData に渡すだけ。
+    const synthesized = {
+      ...targetConfig,  // isPublished / userId 等を継承
+      formUrl: p.formUrl || '',
+      formTitle: p.formTitle || '',
+      spreadsheetId: p.spreadsheetId,
+      sheetName: p.sheetName || '',
+      columnMapping: p.columnMapping || {},
+      displaySettings: p.displaySettings || (typeof DEFAULT_DISPLAY_SETTINGS !== 'undefined' ? DEFAULT_DISPLAY_SETTINGS : {}),
+      xAxisLabels: p.xAxisLabels || null,
+      yAxisLabels: p.yAxisLabels || null,
+      matrixQuadrantLabels: p.matrixQuadrantLabels || null,
+      allowResubmit: !!p.allowResubmit,
+      // 検索用の anchor。active のままにしておくと「viewingPastProfile=null かつ active も同じ」と
+      //   混乱するので、明示的に override する。
+      activeProfile: targetConfig.activeProfile || null
+    };
+
+    const options = {
+      classFilter: classFilter && classFilter !== 'すべて' ? classFilter : undefined,
+      sortBy: sortOrder || 'newest',
+      includeTimestamp: true,
+      adminMode: isSystemAdmin || isOwnBoard,
+      requestingUser: viewerEmail,
+      preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
+    };
+
+    const result = getUserSheetData(targetUserId, options, targetUser, synthesized);
+    if (!result || !result.success) {
+      return {
+        success: false,
+        error: result?.message || 'データ取得エラー',
+        data: [],
+        sheetName: result?.sheetName || '',
+        header: result?.header || '問題'
+      };
+    }
+
+    return buildSafePublishedDataResult(result, synthesized, {
+      isAdmin: isSystemAdmin,
+      isOwnBoard,
+      viewingPastProfile: profileName
+    });
+  } catch (error) {
+    console.error('getPublishedSheetDataForProfile error:', error && error.message);
+    return {
+      success: false,
+      error: (error && error.message) || 'データ取得エラー',
+      data: []
     };
   }
 }

@@ -250,6 +250,31 @@ function clearActiveSheet(targetUserId) {
 // 直接呼ばず、必ず認可済みの userId を渡すこと。
 // =====================================================================
 
+/**
+ * profileHistory に新しい active 切替を追記して返す純粋関数。
+ *
+ * Why (Option B): 生徒が過去フェーズを閲覧できるようにするため、教師が active を切替えるたびに
+ *   履歴を append する。3 つの切替経路 (loadProfile / loadProfileForView / __saveProfileCore
+ *   autoActivate) 全てで共通利用するため core helper として切り出し。
+ *
+ * 正規化ルール:
+ *   - 直前が同名なら no-op（重複防止: 同じ profile を 2 度連続 click した場合を吸収）
+ *   - 末尾が最新。古い entry は ConfigService の sanitizeProfileHistory が cap する。
+ *
+ * @param {Array} currentHistory - 既存 profileHistory（不在なら [] と等価）
+ * @param {string} profileName - 新たに active になった profile 名
+ * @returns {Array<{name:string, activatedAt:string}>} 追記後の配列（新配列。元は mutate しない）
+ */
+function __appendProfileHistory_(currentHistory, profileName) {
+  const hist = Array.isArray(currentHistory) ? currentHistory.slice() : [];
+  const cleanName = String(profileName == null ? '' : profileName).trim();
+  if (!cleanName) return hist;
+  const last = hist.length > 0 ? hist[hist.length - 1] : null;
+  if (last && last.name === cleanName) return hist;
+  hist.push({ name: cleanName, activatedAt: new Date().toISOString() });
+  return hist;
+}
+
 function __listProfilesCore(userId) {
   const cfg = getUserConfig(userId);
   if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
@@ -310,6 +335,9 @@ function __saveProfileCore(userId, name, opts = {}) {
   const patch = { profiles: existing };
   if (opts.autoActivate && !isUpdate && !cur.activeProfile) {
     patch.activeProfile = cleanName;
+    // Why: 初回 active 化なので history が空でも 1 件目として記録する。
+    //   生徒がこの profile を後で振り返れるよう、明示的に履歴 anchor を作る。
+    patch.profileHistory = __appendProfileHistory_(cur.profileHistory, cleanName);
   }
 
   const saveRes = applyConfigPatch_(userId, patch, { publish: false });
@@ -1036,6 +1064,8 @@ function dispatchAdminOperation(operation, params) {
       merged.matrixQuadrantLabels = p.matrixQuadrantLabels || null;
       merged.allowResubmit = !!p.allowResubmit;
       merged.userId = params.userId;
+      // Option B: 生徒が後で振り返れるよう、active 切替を時系列で記録。
+      merged.profileHistory = __appendProfileHistory_(cur.profileHistory, p.name);
 
       return saveUserConfig(params.userId, merged, { isMainConfig: true });
     }

@@ -1146,7 +1146,12 @@
             throw new Error(response?.message || 'getNotificationUpdate failed');
           }
 
-          if (response.hasNewContent) {
+          // Option B: 過去フェーズ閲覧中は polling 経由のデータ更新を止める。
+          //   生徒が過去フェーズを開いている間に teacher が新着で auto-reload すると、
+          //   学習の振り返りが強制中断される。formMeta による profile 切替検知も同様に skip。
+          const viewingPast = !!(this.state && this.state.viewingPastProfile);
+
+          if (response.hasNewContent && !viewingPast) {
             // Why: モード別の更新戦略。
             //   - viz 系 (numberline / matrix / pie): リアルタイム可視化が教育価値の核心
             //     ("いま誰が回答したか" を黒板で共有)。silent auto-reload で dot/slice を即時反映。
@@ -1167,7 +1172,7 @@
           //   getNotificationUpdate に formMeta/activeProfile を載せたので、ここで前回値と
           //   比較して URL 変更があれば「新しいボードに切り替わりました」トースト + 自動再読込。
           //   これがないと polling は新着投稿しか拾えず、profile 切替は気付かれない。
-          if (response.formMeta) {
+          if (response.formMeta && !viewingPast) {
             const newUrl = response.formMeta.formUrl || '';
             const prevUrl = this.state.lastSeenFormUrl || '';
             if (prevUrl && newUrl && prevUrl !== newUrl) {
@@ -1179,6 +1184,9 @@
             }
             // 初回 polling や同一 URL の場合も lastSeenFormUrl は最新に追従させる
             this.state.lastSeenFormUrl = newUrl;
+          } else if (response.formMeta && viewingPast) {
+            // 過去閲覧中は lastSeenFormUrl を更新するだけ（戻ったときに 2 度 toast しないように）
+            this.state.lastSeenFormUrl = response.formMeta.formUrl || this.state.lastSeenFormUrl || '';
           }
 
           this.polling.errorCount = 0;
@@ -1420,6 +1428,29 @@
       this.__toastTimer = setTimeout(() => {
         toast.classList.remove('visible');
       }, 5000);
+    }
+
+    /**
+     * 汎用トースト。__showBoardSwitchedToast と同じ DOM を流用して短いテキストを 3 秒表示。
+     * Option B (過去フェーズ閲覧、reaction guard 等) で client→user フィードバックに使用。
+     */
+    showToast(message) {
+      let toast = document.getElementById('boardSwitchedToast');
+      if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'boardSwitchedToast';
+        toast.className = 'board-switched-toast';
+        document.body.appendChild(toast);
+      }
+      const safe = (window.sharedUtilities && window.sharedUtilities.security && window.sharedUtilities.security.escapeHtml)
+        ? window.sharedUtilities.security.escapeHtml(String(message || ''))
+        : String(message || '').replace(/</g, '&lt;');
+      toast.innerHTML = '<span>' + safe + '</span>';
+      toast.classList.add('visible');
+      clearTimeout(this.__toastTimer);
+      this.__toastTimer = setTimeout(() => {
+        toast.classList.remove('visible');
+      }, 3000);
     }
 
     destroy() {
@@ -2132,6 +2163,25 @@
         } else {
           this.state.profiles = [];
           this.state.activeProfile = null;
+        }
+
+        // Option B: 生徒は studentProfileNav 経由で過去フェーズへ navigate できる。
+        //   teacher は state.profiles + state.activeProfile を見るのでこれは不要。
+        //   getPublishedSheetData が studentProfileNav を返したときだけ student として扱う。
+        if (result.studentProfileNav && Array.isArray(result.studentProfileNav.history)) {
+          this.state.studentProfileNav = result.studentProfileNav;
+          // student の active も同期しておく（pills の current 判定用）
+          if (!this.state.activeProfile && result.studentProfileNav.active) {
+            this.state.activeProfile = result.studentProfileNav.active;
+          }
+        } else if (!result.studentProfileNav) {
+          // 教師経路など studentProfileNav が来ない場合は state からも消す（一貫性）
+          this.state.studentProfileNav = null;
+        }
+        // 過去フェーズを閲覧中かのフラグ。getPublishedSheetData 経由なら null （= 現在）。
+        //   getPublishedSheetDataForProfile 経由でロードしたときだけ profile 名が入る。
+        if (typeof result.viewingPastProfile !== 'undefined') {
+          this.state.viewingPastProfile = result.viewingPastProfile || null;
         }
 
         // Why: profile 切替 / 教師が formUrl 変更 → 生徒のボタンも即時更新（次の poll で）。
@@ -3166,6 +3216,14 @@
      * 🚀 フェーズ2: デバウンシング方式リアクション処理（CLAUDE.md準拠最適化）
      */
     async addReaction(rowIndex, reaction) {
+      // Option B: 過去フェーズ閲覧中は read-only。リアクション送信を block + 短いトーストで案内。
+      //   サーバ側でも viewingPastProfile 状態は把握できないので client が gate するのが必須。
+      if (this.state && this.state.viewingPastProfile) {
+        if (typeof this.showToast === 'function') {
+          this.showToast('過去のフェーズを閲覧中はリアクションできません');
+        }
+        return;
+      }
       const numericRowIndex = parseInt(rowIndex, 10);
       const reactionKey = `${numericRowIndex}-${reaction}`;
       const rowKey = `row_${numericRowIndex}`; // 行単位のデバウンシング用
@@ -3686,6 +3744,14 @@
     }
 
     async handleHighlight(rowIndex) {
+      // Option B: 過去フェーズ閲覧中は read-only。教師の HIGHLIGHT も含めて block。
+      //   teacher 自身が過去を覗いている場合も、過去 SS への書込は意味が無いため。
+      if (this.state && this.state.viewingPastProfile) {
+        if (typeof this.showToast === 'function') {
+          this.showToast('過去のフェーズを閲覧中は操作できません');
+        }
+        return;
+      }
       const numericRowIndex = parseInt(rowIndex, 10);
       const highlightKey = `${numericRowIndex}-highlight`;
 

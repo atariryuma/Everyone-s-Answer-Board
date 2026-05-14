@@ -269,6 +269,17 @@ function validateAndSanitizeConfig(config, userId) {
       else delete sanitized.activeProfile;
     }
 
+    // profileHistory: 過去 active になった profile の時系列ログ。
+    // Why: 生徒が「導入 → 本時 → 振り返り」のような授業フェーズを後追いで確認できるよう、
+    //   active 切替のたびに append。students は profileHistory に含まれる profile のみ閲覧可。
+    //   profiles[] に存在しないが history には残っている (削除済 profile) ケースもありうるが、
+    //   閲覧用なので名前ベースで残しておく価値がある (削除済は client 側で薄くグレー表示)。
+    if ('profileHistory' in sanitized) {
+      const hist = sanitizeProfileHistory(sanitized.profileHistory);
+      if (hist.length > 0) sanitized.profileHistory = hist;
+      else delete sanitized.profileHistory;
+    }
+
     try {
       const configSize = JSON.stringify(sanitized).length;
       if (configSize > 32000) {
@@ -395,6 +406,38 @@ function sanitizeQuadrantLabels(input) {
  * @param {Array} input - profiles 候補配列
  * @returns {Array} sanitized profiles（空配列なら caller で削除する）
  */
+/**
+ * profileHistory のサニタイズ。
+ *
+ * Why: 生徒が過去フェーズを閲覧する Option B の根拠データ。entry は
+ *   `{ name: string, activatedAt: ISO8601 string }` の形を期待。最新が末尾。
+ *   無効 entry は捨て、最新 50 件のみ保持（古い順）。
+ *   activatedAt は client 側で時系列表示に使うため文字列のまま保存。
+ *
+ * @param {Array} input - profileHistory 候補
+ * @returns {Array<{name:string, activatedAt:string}>}
+ */
+function sanitizeProfileHistory(input) {
+  if (!Array.isArray(input)) return [];
+  const MAX_HISTORY = 50;
+  const out = [];
+  for (const e of input) {
+    if (!e || typeof e !== 'object') continue;
+    const name = String(e.name == null ? '' : e.name).trim().substring(0, 50);
+    if (!name) continue;
+    let activatedAt = '';
+    if (typeof e.activatedAt === 'string') {
+      activatedAt = e.activatedAt.substring(0, 40);
+    } else if (e.activatedAt instanceof Date) {
+      activatedAt = e.activatedAt.toISOString();
+    }
+    out.push({ name, activatedAt });
+  }
+  // 末尾を新しい側として MAX_HISTORY 件まで残す。
+  if (out.length > MAX_HISTORY) return out.slice(out.length - MAX_HISTORY);
+  return out;
+}
+
 function sanitizeProfiles(input) {
   if (!Array.isArray(input)) return [];
   const MAX_PROFILES = 10;
