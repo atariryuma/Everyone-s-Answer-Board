@@ -348,19 +348,21 @@ test('distinctiveKeywords: handles single-cell case (no others to contrast)', ()
 // =====================================================================
 
 test('contrastingPair: extracts distinctive word per side', () => {
-  // 純漢字 / カタカナ語のみで構築（segmenter なし regex フォールバックでも安定）。
+  // 各 side で 1 語が突出して頻出するように構築（タイブレークに依存しない）。
   const { StudyQuestApp } = loadVizContext();
   const fn = StudyQuestApp.prototype.__contrastingPair;
   const left = [
-    { reason: '効率を優先' },
-    { reason: '効率最優先' },
-    { reason: '効率重視' }
+    { reason: '効率を優先' },     // 効率 + 優先
+    { reason: '効率を大切に' },   // 効率 + 大切
+    { reason: '効率重視' }        // 効率重視
   ];
+  // → 効率 count=2 score=2、他の語は score=1 → 効率が圧勝
   const right = [
-    { reason: '誠実な対応' },
-    { reason: '誠実が一番' },
-    { reason: '誠実第一' }
+    { reason: '誠実な対応' },     // 誠実 + 対応
+    { reason: '誠実が一番' },     // 誠実 + 一番
+    { reason: '誠実第一' }        // 誠実第一
   ];
+  // → 誠実 count=2 score=2、他の語は score=1 → 誠実が圧勝
   const pair = fn(left, right, 'reason');
   assert.ok(pair, 'should return a pair');
   assert.equal(pair.left, '効率', `left should be 効率: ${JSON.stringify(pair)}`);

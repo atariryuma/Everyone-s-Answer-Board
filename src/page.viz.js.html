@@ -331,9 +331,10 @@
       list.sort((a, b) => a.ts - b.ts);
       const first = list[0];
       const last = list[list.length - 1];
-      const dx = last.x - first.x;
-      const dy = (mode === 'matrix' && first.y !== null && last.y !== null) ? (last.y - first.y) : 0;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const has2D = mode === 'matrix' && first.y !== null && last.y !== null;
+      const fy = has2D ? first.y : 0;
+      const ly = has2D ? last.y  : 0;
+      const distance = euclidean(first.x, fy, last.x, ly);
       if (distance === 0) return;
       swings.push({
         emailHash: key,
@@ -833,18 +834,20 @@
         const yKey = r.numericY >= (minY + maxY) / 2 ? 'h' : 'l';
         buckets[xKey + yKey].push(r);
       }
+      // 各象限の reason を 1 回ずつトークン化してキャッシュ。
+      //   旧: keywordsFor (4 cells) と contrastingPair (X 軸 / Y 軸) で同じ象限が
+      //       6 回トークン化されていた。96 row × 6 = 576 回の冗長 TinySegmenter 呼び出しを削減。
+      const cellMaps = {};
+      for (const k of QUADRANT_KEYS) cellMaps[k] = _countWords(buckets[k], 'reason');
+
       // TF-IDF 風の象限固有度で keyword を選ぶ（v2691）。
-      //   旧: 単純頻度の top-3 → 「みんな」「思う」など全象限頻出語が常に上位を占めた
-      //   新: distinctiveKeywords が「この象限だけで突出する語」を選ぶ
+      //   distinctiveKeywords が「この象限だけで突出する語」を選ぶ。
       // 道徳教育根拠: MEXT「一面的→多面的・多角的な見方」(2016 報告 p.10) — 象限の対比が明確に。
       const keywordsFor = (key) => {
-        const cellRows = buckets[key];
-        if (!cellRows.length) return [];
-        const otherKeys = ['hh', 'lh', 'hl', 'll'].filter((k) => k !== key);
-        const otherCells = otherKeys.map((k) => buckets[k]);
-        const distinctive = distinctiveKeywords(cellRows, otherCells, 'reason', 6);
-        // 2+ 字の内容語を優先（1 字漢字断片は意味が読み取りにくい）。
-        //   ただし全 keyword が 1 字なら fallback で 1 字も許容（v2668 と同じ扱い）。
+        if (!buckets[key].length) return [];
+        const otherMaps = QUADRANT_KEYS.filter((k) => k !== key).map((k) => cellMaps[k]);
+        const distinctive = distinctiveKeywords(cellMaps[key], otherMaps, 'reason', 6);
+        // 2+ 字の内容語を優先。全 keyword が 1 字なら fallback で 1 字も許容（v2668 と同じ）。
         const longWords = distinctive.filter((w) => w.word.length >= 2).slice(0, 3);
         const top = longWords.length > 0 ? longWords : distinctive.slice(0, 3);
         return top.map((w) => w.word);
@@ -951,22 +954,17 @@
         .attr('transform', `translate(-44,0) rotate(-90)`).attr('text-anchor', 'end')
         .text(yL.max || '');
 
-      // 対立軸サマリ（v2691）— 児童の言葉から自動的に「議論の軸」を命名する。
-      //   X 軸方向（左象限 vs 右象限）と Y 軸方向（下象限 vs 上象限）でそれぞれ対立語ペアを抽出。
-      //   タイトル下に出すと UI 増設になるので、SVG 内 X 軸ラベル中央に薄く差し込む。
-      // 道徳教育根拠: 学術会議「道理ある不一致 reasonable disagreement」(2020 報告 p.10) —
-      //   「対立する双方がそれなりの理由を持つ」状況を視覚化する。
-      //
-      // v2691 patch: 「気持ち が右にも上にも来る」(右上集中の意見) 重複表示を回避するため、
-      //   X 軸ペアを先に決め、Y 軸ペアは X で使った key を除外して算出する。
-      //   2 軸両方とも有効な対立を持っていれば 2 行、片方だけなら 1 行。
-      const leftRows = (buckets.lh || []).concat(buckets.ll || []);
-      const rightRows = (buckets.hh || []).concat(buckets.hl || []);
-      const upperRows = (buckets.lh || []).concat(buckets.hh || []);
-      const lowerRows = (buckets.ll || []).concat(buckets.hl || []);
-      const xPair = contrastingPair(leftRows, rightRows, 'reason');
+      // 対立軸サマリ（v2691）— 児童の言葉から「議論の軸」を自動命名する。
+      //   X 軸 (左 vs 右) と Y 軸 (下 vs 上) でそれぞれ対立語ペアを抽出。
+      //   X で使った key を Y 抽出時に除外して「気持ち が右にも上にも」重複表示を回避。
+      // 道徳教育根拠: 学術会議「道理ある不一致 reasonable disagreement」(2020 報告 p.10)。
+      const leftMap  = mergeWordMaps([cellMaps.lh, cellMaps.ll]);
+      const rightMap = mergeWordMaps([cellMaps.hh, cellMaps.hl]);
+      const upperMap = mergeWordMaps([cellMaps.lh, cellMaps.hh]);
+      const lowerMap = mergeWordMaps([cellMaps.ll, cellMaps.hl]);
+      const xPair = contrastingPair(leftMap, rightMap, 'reason');
       const xExclude = xPair ? new Set([xPair.leftKey, xPair.rightKey]) : new Set();
-      const yPair = contrastingPair(lowerRows, upperRows, 'reason', xExclude);
+      const yPair = contrastingPair(lowerMap, upperMap, 'reason', xExclude);
       const summaryParts = [];
       if (xPair) summaryParts.push('#' + xPair.left + ' ↔ #' + xPair.right);
       if (yPair) summaryParts.push('#' + yPair.left + ' ↔ #' + yPair.right);
@@ -1030,7 +1028,7 @@
       //     （教師意図 > 児童間人気 > 少数派マーカー > 既定）
       const loneVoiceHashes = (function () {
         const set = new Set();
-        for (const k of ['hh', 'lh', 'hl', 'll']) {
+        for (const k of QUADRANT_KEYS) {
           const cell = buckets[k] || [];
           if (cell.length === 1) {
             const r = cell[0];
@@ -1130,49 +1128,41 @@
         });
 
       // 議論前 → 現在 の意見の動きを矢印で重ね描き (v2691)。
-      //   state.vizShowDeltas が true で、議論前スナップ + 軸互換 のときだけ描画。
-      //   各児童 (emailHash 一致) について (fromX, fromY) → (toX, toY) を矢印で結ぶ。
-      //   動かなかった児童 (distance < 0.1) は computeMatrixDeltas が除外済み。
-      //
-      // 描画順: dot より後 → 矢印を最前面に。ただし dot click を妨げないよう pointer-events:none。
+      //   軸互換チェックで違うフォーム間 (pie ↔ matrix) の座標を結ぶ事故を防ぐ。
       // 道徳教育根拠: MEXT 2016 報告 p.10「自らの生活や考えを見直しているか」評価観点。
-      g.selectAll('.viz-arrow').remove();
-      g.selectAll('.viz-arrow-head').remove();
-      if (this.state && this.state.vizShowDeltas && typeof this.vizGetBefore === 'function') {
+      if (this.state.vizShowDeltas && typeof this.vizGetBefore === 'function') {
         const before = this.vizGetBefore();
         if (before && Array.isArray(before.rows)
             && arePhasesAxisCompatible(before.axisConfig, axis)) {
           const deltas = computeMatrixDeltas(before.rows, current);
-          // 矢印は dot より後に描き、最前面に。線は target dot の少し手前で止めて dot を覆わない。
+          const HEAD_LEN = 5;        // 矢頭 px 長
+          const TIP_INSET = 0.5;     // 先端を dot 縁から 0.5px 内側に置いて密着感を出す
           for (const d of deltas) {
             const x1 = xScale(d.fromX);
             const y1 = yScale(d.fromY);
             const x2 = xScale(d.toX);
             const y2 = yScale(d.toY);
-            const dx = x2 - x1, dy = y2 - y1;
-            const len = Math.sqrt(dx * dx + dy * dy) || 1;
-            // dot 半径 (BASE_R_M=5) ぶん手前で停止、矢頭描画用に余白を作る
-            const trim = BASE_R_M + 1;
-            const tx = x2 - (dx / len) * trim;
-            const ty = y2 - (dy / len) * trim;
-            // 大きく動いた児童 (Likert 距離 > 2) は major クラスで強調。教師が指名する素材。
+            const len = euclidean(x1, y1, x2, y2) || 1;
+            const ux = (x2 - x1) / len;       // 単位ベクトル (進行方向)
+            const uy = (y2 - y1) / len;
+            const px = -uy, py = ux;          // 法線ベクトル
+            // dot 半径 + 1px 手前で線を止め、矢頭描画用に余白を作る
+            const tx = x2 - ux * (BASE_R_M + 1);
+            const ty = y2 - uy * (BASE_R_M + 1);
+            // Likert 距離 > 2 = 強い意見変化 → 教師指名素材として強調
             const isMajor = d.distance > 2;
-            g.append('line').attr('class', 'viz-arrow' + (isMajor ? ' major' : ''))
+            const cls = isMajor ? ' major' : '';
+            g.append('line').attr('class', 'viz-arrow' + cls)
               .attr('x1', x1).attr('y1', y1).attr('x2', tx).attr('y2', ty);
-            // 矢頭: 三角形 (path) を直接描く。SVG marker は CSS から currentColor を読めない
-            //   環境があるため、polygon 直書きの方が confident に色を制御できる。
-            const HEAD = 5;
-            const ux = dx / len, uy = dy / len;          // 単位ベクトル (進行方向)
-            const px = -uy, py = ux;                     // 法線ベクトル
-            const tipX = x2 - ux * (BASE_R_M - 0.5);     // 矢頭先端は dot 縁ぴったり
-            const tipY = y2 - uy * (BASE_R_M - 0.5);
-            const baseX = tipX - ux * HEAD;
-            const baseY = tipY - uy * HEAD;
-            const leftX  = baseX + px * (HEAD * 0.5);
-            const leftY  = baseY + py * (HEAD * 0.5);
-            const rightX = baseX - px * (HEAD * 0.5);
-            const rightY = baseY - py * (HEAD * 0.5);
-            g.append('polygon').attr('class', 'viz-arrow-head' + (isMajor ? ' major' : ''))
+            // 矢頭は polygon 直書き。SVG marker は環境によって CSS currentColor を読めず色制御が不安定。
+            const tipX  = x2 - ux * (BASE_R_M - TIP_INSET);
+            const tipY  = y2 - uy * (BASE_R_M - TIP_INSET);
+            const baseX = tipX - ux * HEAD_LEN;
+            const baseY = tipY - uy * HEAD_LEN;
+            const half = HEAD_LEN * 0.5;
+            const leftX  = baseX + px * half, leftY  = baseY + py * half;
+            const rightX = baseX - px * half, rightY = baseY - py * half;
+            g.append('polygon').attr('class', 'viz-arrow-head' + cls)
               .attr('points', `${tipX},${tipY} ${leftX},${leftY} ${rightX},${rightY}`);
           }
         }
@@ -1418,35 +1408,13 @@
    * @param {string} field - 集計対象列名（'reason' or 'answer'）
    * @returns {Array<{word, count}>} desc sorted, max 25 件
    */
-  function aggregateWords(rows, field) {
-    const counts = new Map();
-    const displayForm = new Map(); // key (lowercase) → first-seen original case
-    for (const r of rows || []) {
-      const text = r && r[field];
-      if (!text) continue;
-      const tokens = tokenizeJapanese(String(text));
-      // 1 投稿内の重複はカウント 1（同じ児童が同じ語を 10 回書いても 1 票）
-      const seen = new Set();
-      for (const t of tokens) {
-        const key = t.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key);
-        counts.set(key, (counts.get(key) || 0) + 1);
-        if (!displayForm.has(key)) displayForm.set(key, t);
-      }
-    }
-    return [...counts.entries()]
-      .map(([key, count]) => ({ word: displayForm.get(key) || key, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 25);
-  }
-
   /**
-   * 行集合ごとに「key→投稿頻度」マップを返す（aggregateWords の Map 版・全件保持）。
-   *   key は lowercase。displayForm は別 Map で保持。集計内不変条件は aggregateWords と同じ
-   *   （1 投稿内の重複は 1 票）。distinctiveKeywords / contrastingPair の素材として使う。
+   * Tokenize all rows[].field once and accumulate { counts, displayForm } maps.
+   *   不変条件: 1 投稿内の同じ key（lowercase）はカウント 1（同じ児童が同じ語を
+   *   10 回書いても 1 票）。displayForm は最初に出現した原形を保持。
+   *   aggregateWords / buildWordCountMap / distinctiveKeywords / contrastingPair の共通基盤。
    */
-  function buildWordCountMap(rows, field) {
+  function _countWords(rows, field) {
     const counts = new Map();
     const displayForm = new Map();
     for (const r of rows || []) {
@@ -1463,6 +1431,49 @@
       }
     }
     return { counts, displayForm };
+  }
+
+  function aggregateWords(rows, field) {
+    const { counts, displayForm } = _countWords(rows, field);
+    return [...counts.entries()]
+      .map(([key, count]) => ({ word: displayForm.get(key) || key, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 25);
+  }
+
+  // distinctiveKeywords / contrastingPair が直接食べる形式。
+  const buildWordCountMap = _countWords;
+
+  /**
+   * 既に build 済の word-count map 群を 1 つにマージする（renderMatrix が 4 象限の
+   * cell map を作ってから「左右」「上下」軸サマリ用に組み合わせるための O(k) ヘルパ）。
+   * counts は単純加算（buckets は互いに排他なので二重カウントは起きない）。
+   * displayForm は first-seen wins。
+   */
+  function mergeWordMaps(maps) {
+    const counts = new Map();
+    const displayForm = new Map();
+    for (const m of maps) {
+      if (!m) continue;
+      for (const [k, c] of m.counts) counts.set(k, (counts.get(k) || 0) + c);
+      for (const [k, w] of m.displayForm) if (!displayForm.has(k)) displayForm.set(k, w);
+    }
+    return { counts, displayForm };
+  }
+
+  // distinctiveKeywords / contrastingPair の入力を「rows 配列 or 既存 word map」両対応に。
+  // renderMatrix が同じ象限 rows を 6 回トークン化していた hot-path を解消する。
+  function _toCountMap(input, field) {
+    return (input && input.counts instanceof Map) ? input : _countWords(input, field);
+  }
+
+  // 4 象限 + その派生集合 (X 軸左右 / Y 軸上下) を文字列キーで指す唯一の場所。
+  const QUADRANT_KEYS = ['hh', 'lh', 'hl', 'll'];
+
+  // 2D ユークリッド距離。vizComputeSwings / computeMatrixDeltas / 矢印 trim で共有。
+  function euclidean(ax, ay, bx, by) {
+    const dx = bx - ax, dy = by - ay;
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
   /**
@@ -1501,26 +1512,26 @@
    * @param {number} topN  返す語数（既定 3）
    * @returns {Array<{word: string, score: number, count: number}>}
    */
-  function distinctiveKeywords(thisCellRows, otherCellsRows, field, topN) {
+  function distinctiveKeywords(thisCellInput, otherCellsInput, field, topN) {
     const N = topN || 3;
-    if (!thisCellRows || thisCellRows.length === 0) return [];
-    const { counts: thisCounts, displayForm } = buildWordCountMap(thisCellRows, field);
-    const otherCountMaps = (otherCellsRows || []).map((rs) => buildWordCountMap(rs, field).counts);
+    const thisMap = _toCountMap(thisCellInput, field);
+    if (thisMap.counts.size === 0) return [];
+    const otherMaps = (otherCellsInput || []).map((x) => _toCountMap(x, field));
 
     const scored = [];
-    for (const [key, count] of thisCounts) {
+    for (const [key, count] of thisMap.counts) {
       // 他象限の平均出現数 (該当象限の rows.length 比ではなく投稿件数の生平均で十分。
       //   厳密 IDF にせず単純な差で十分なのは、象限間の rows 数が大きくは違わないため)
       let otherSum = 0;
-      for (const m of otherCountMaps) otherSum += (m.get(key) || 0);
-      const otherMean = otherCountMaps.length ? otherSum / otherCountMaps.length : 0;
+      for (const m of otherMaps) otherSum += (m.counts.get(key) || 0);
+      const otherMean = otherMaps.length ? otherSum / otherMaps.length : 0;
       const score = count - otherMean;
-      const word = displayForm.get(key) || key;
+      const word = thisMap.displayForm.get(key) || key;
       scored.push({ word, score, count, quality: keywordQuality(word) });
     }
     // score desc → quality desc（漢字優先）→ count desc → word.length desc
-    //   v2691 patch: 「かいぜんし」「ぶぶんしょ」のような hiragana 中途断片が top を占める
-    //   問題への対策。score が同じなら漢字含む語が勝つ。
+    //   v2691 patch: hiragana 中途断片（「かいぜんし」「ぶぶんしょ」）が top を占める
+    //   問題対策。score が同じなら漢字含む語が勝つ。
     scored.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       if (b.quality !== a.quality) return b.quality - a.quality;
@@ -1552,28 +1563,39 @@
    * @param {Set<string>} [excludeWords]  これらの key（lowercase）は候補から除外
    * @returns {{left: string, right: string, leftKey: string, rightKey: string} | null}
    */
-  function contrastingPair(leftRows, rightRows, field, excludeWords) {
-    if (!leftRows || !rightRows || leftRows.length === 0 || rightRows.length === 0) return null;
-    const exclude = excludeWords instanceof Set ? excludeWords : new Set();
-    const leftMap = buildWordCountMap(leftRows, field);
-    const rightMap = buildWordCountMap(rightRows, field);
+  function contrastingPair(leftInput, rightInput, field, excludeWords) {
+    const leftMap = _toCountMap(leftInput, field);
+    const rightMap = _toCountMap(rightInput, field);
+    if (leftMap.counts.size === 0 || rightMap.counts.size === 0) return null;
+    const exclude = excludeWords || new Set();
+
+    // [score, quality, count, length] をタプル比較する固定優先度。
+    //   distinctiveKeywords の sort と同じ序列で揃える（DRY）。
+    function rankTuple(score, quality, count, len) {
+      return [score, quality, count, len];
+    }
+    function tupleGreater(a, b) {
+      for (let i = 0; i < a.length; i++) {
+        if (a[i] !== b[i]) return a[i] > b[i];
+      }
+      return false;
+    }
 
     const pickBest = (sourceMap, otherMap) => {
       let best = null;
+      let bestRank = null;
       for (const [key, count] of sourceMap.counts) {
         if (exclude.has(key)) continue;
         const word = sourceMap.displayForm.get(key) || key;
-        // 1 文字断片は表示に値しない（keywordsFor と同じ基準）
-        if (word.length < 2) continue;
+        if (word.length < 2) continue;            // 1 文字断片は表示に値しない
         const otherCount = otherMap.counts.get(key) || 0;
         const score = count - otherCount;
         if (score <= 0) continue;
         const quality = keywordQuality(word);
-        if (!best
-            || score > best.score
-            || (score === best.score && quality > best.quality)
-            || (score === best.score && quality === best.quality && count > best.count)) {
+        const rank = rankTuple(score, quality, count, word.length);
+        if (!best || tupleGreater(rank, bestRank)) {
           best = { word, key, score, count, quality };
+          bestRank = rank;
         }
       }
       return best;
@@ -1648,9 +1670,7 @@
       seen.add(r.emailHash);
       const before = beforeByHash.get(r.emailHash);
       if (!before) continue;
-      const dx = r.numericX - before.numericX;
-      const dy = r.numericY - before.numericY;
-      const distance = Math.sqrt(dx * dx + dy * dy);
+      const distance = euclidean(before.numericX, before.numericY, r.numericX, r.numericY);
       if (distance < 0.1) continue;  // 動いていない
       out.push({
         emailHash: r.emailHash,
