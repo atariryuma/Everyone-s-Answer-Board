@@ -342,6 +342,42 @@
     filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.75));
   }
 
+  /* 議論前 → 現在 矢印 (v2691)。
+     淡い水色を既定とし、major (Likert 距離 > 2 = 強い意見変化) は amber で強調。
+     pointer-events: none で dot click を阻害しない。MEXT 評価観点
+     「自らの生活や考えを見直しているか」の証拠を視覚化。 */
+  .viz-arrow {
+    stroke: rgba(125, 211, 252, 0.55);  /* sky-300 alpha */
+    stroke-width: 1.4;
+    fill: none;
+    pointer-events: none;
+  }
+  .viz-arrow.major {
+    stroke: rgba(251, 191, 36, 0.85);   /* amber-400 — 大きく動いた児童 */
+    stroke-width: 2.0;
+  }
+  .viz-arrow-head {
+    fill: rgba(125, 211, 252, 0.65);
+    stroke: none;
+    pointer-events: none;
+  }
+  .viz-arrow-head.major {
+    fill: rgba(251, 191, 36, 0.9);
+  }
+  body.projector-mode .viz-arrow {
+    stroke-width: 1.8;
+    stroke: rgba(125, 211, 252, 0.7);
+  }
+  body.projector-mode .viz-arrow.major {
+    stroke-width: 2.6;
+  }
+  body.projector-mode .viz-arrow-head {
+    fill: rgba(125, 211, 252, 0.85);
+  }
+  body.projector-mode .viz-arrow-head.major {
+    fill: rgba(251, 191, 36, 1);
+  }
+
   /* =============================================================================
    * モーダル: 軸ラベル + プログレスバー (numberline / matrix の「数字だけ」問題を解消)
    *   左端 = min ラベル、右端 = max ラベル、ドットが値の位置を示す。

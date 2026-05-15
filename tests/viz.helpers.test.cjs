@@ -449,6 +449,118 @@ test('distinctiveKeywords: kanji-quality bias picks kanji over kana on tie (v269
 });
 
 // =====================================================================
+// arePhasesAxisCompatible (議論前 → 現在 矢印の安全ガード, v2691)
+// =====================================================================
+
+test('arePhasesAxisCompatible: same axis labels → true', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__arePhasesAxisCompatible;
+  const axis = {
+    xAxisLabels: { min: 'そのまま出す', max: '作り直す' },
+    yAxisLabels: { min: '楽しく早く', max: '読み手の気持ち' }
+  };
+  assert.equal(fn(axis, axis), true);
+  // deep clone でも true
+  const clone = JSON.parse(JSON.stringify(axis));
+  assert.equal(fn(axis, clone), true);
+});
+
+test('arePhasesAxisCompatible: different x label → false', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__arePhasesAxisCompatible;
+  const a = {
+    xAxisLabels: { min: 'そのまま出す', max: '作り直す' },
+    yAxisLabels: { min: '楽しく早く', max: '読み手の気持ち' }
+  };
+  const b = {
+    xAxisLabels: { min: '別の min', max: '作り直す' },
+    yAxisLabels: { min: '楽しく早く', max: '読み手の気持ち' }
+  };
+  assert.equal(fn(a, b), false);
+});
+
+test('arePhasesAxisCompatible: missing axis → false', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__arePhasesAxisCompatible;
+  assert.equal(fn(null, { xAxisLabels: {}, yAxisLabels: {} }), false);
+  assert.equal(fn({ xAxisLabels: {}, yAxisLabels: {} }, null), false);
+  assert.equal(fn(null, null), false);
+});
+
+// =====================================================================
+// computeMatrixDeltas (議論前 → 現在 の児童ごと意見移動, v2691)
+// =====================================================================
+
+test('computeMatrixDeltas: matches by emailHash, computes Euclidean distance', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__computeMatrixDeltas;
+  const before = [
+    { emailHash: 'a', numericX: 1, numericY: 1 },
+    { emailHash: 'b', numericX: 5, numericY: 5 },
+    { emailHash: 'c', numericX: 3, numericY: 3 }  // 動かない
+  ];
+  const current = [
+    { emailHash: 'a', numericX: 4, numericY: 5 },  // sqrt(9+16) = 5
+    { emailHash: 'b', numericX: 5, numericY: 5 },  // 動かない (除外)
+    { emailHash: 'c', numericX: 3, numericY: 3 },  // 動かない (除外)
+    { emailHash: 'd', numericX: 2, numericY: 2 }   // before 無し (除外)
+  ];
+  const deltas = fn(before, current);
+  assert.equal(deltas.length, 1, `should only return moved + matched: ${JSON.stringify(deltas)}`);
+  assert.equal(deltas[0].emailHash, 'a');
+  assert.equal(deltas[0].fromX, 1);
+  assert.equal(deltas[0].toX, 4);
+  assert.equal(deltas[0].distance, 5);
+});
+
+test('computeMatrixDeltas: sorted by distance desc (big movers first)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__computeMatrixDeltas;
+  const before = [
+    { emailHash: 'small', numericX: 3, numericY: 3 },
+    { emailHash: 'big',   numericX: 1, numericY: 1 },
+    { emailHash: 'mid',   numericX: 2, numericY: 2 }
+  ];
+  const current = [
+    { emailHash: 'small', numericX: 3, numericY: 3.5 },  // 0.5
+    { emailHash: 'big',   numericX: 5, numericY: 5 },    // sqrt(16+16) ~ 5.66
+    { emailHash: 'mid',   numericX: 4, numericY: 4 }     // sqrt(4+4) ~ 2.83
+  ];
+  const deltas = fn(before, current);
+  assert.equal(deltas.length, 3);
+  assert.equal(deltas[0].emailHash, 'big');
+  assert.equal(deltas[1].emailHash, 'mid');
+  assert.equal(deltas[2].emailHash, 'small');
+});
+
+test('computeMatrixDeltas: ignores rows without emailHash or numeric values', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__computeMatrixDeltas;
+  const before = [
+    { emailHash: null, numericX: 1, numericY: 1 },        // anonymous (除外)
+    { emailHash: 'a', numericX: null, numericY: 1 },      // 数値欠損
+    { emailHash: 'b', numericX: 1, numericY: 1 }
+  ];
+  const current = [
+    { emailHash: 'a', numericX: 5, numericY: 5 },
+    { emailHash: 'b', numericX: 5, numericY: 5 }
+  ];
+  const deltas = fn(before, current);
+  // 'a' は before に有効データ無し → 除外。'b' のみ delta が出る
+  assert.equal(deltas.length, 1);
+  assert.equal(deltas[0].emailHash, 'b');
+});
+
+test('computeMatrixDeltas: handles empty / malformed input', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__computeMatrixDeltas;
+  assert.equal(fn([], []).length, 0);
+  assert.equal(fn(null, []).length, 0);
+  assert.equal(fn([], null).length, 0);
+  assert.equal(fn(undefined, undefined).length, 0);
+});
+
+// =====================================================================
 // aggregateCategories
 // =====================================================================
 

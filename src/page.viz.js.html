@@ -1129,6 +1129,55 @@
           }
         });
 
+      // 議論前 → 現在 の意見の動きを矢印で重ね描き (v2691)。
+      //   state.vizShowDeltas が true で、議論前スナップ + 軸互換 のときだけ描画。
+      //   各児童 (emailHash 一致) について (fromX, fromY) → (toX, toY) を矢印で結ぶ。
+      //   動かなかった児童 (distance < 0.1) は computeMatrixDeltas が除外済み。
+      //
+      // 描画順: dot より後 → 矢印を最前面に。ただし dot click を妨げないよう pointer-events:none。
+      // 道徳教育根拠: MEXT 2016 報告 p.10「自らの生活や考えを見直しているか」評価観点。
+      g.selectAll('.viz-arrow').remove();
+      g.selectAll('.viz-arrow-head').remove();
+      if (this.state && this.state.vizShowDeltas && typeof this.vizGetBefore === 'function') {
+        const before = this.vizGetBefore();
+        if (before && Array.isArray(before.rows)
+            && arePhasesAxisCompatible(before.axisConfig, axis)) {
+          const deltas = computeMatrixDeltas(before.rows, current);
+          // 矢印は dot より後に描き、最前面に。線は target dot の少し手前で止めて dot を覆わない。
+          for (const d of deltas) {
+            const x1 = xScale(d.fromX);
+            const y1 = yScale(d.fromY);
+            const x2 = xScale(d.toX);
+            const y2 = yScale(d.toY);
+            const dx = x2 - x1, dy = y2 - y1;
+            const len = Math.sqrt(dx * dx + dy * dy) || 1;
+            // dot 半径 (BASE_R_M=5) ぶん手前で停止、矢頭描画用に余白を作る
+            const trim = BASE_R_M + 1;
+            const tx = x2 - (dx / len) * trim;
+            const ty = y2 - (dy / len) * trim;
+            // 大きく動いた児童 (Likert 距離 > 2) は major クラスで強調。教師が指名する素材。
+            const isMajor = d.distance > 2;
+            g.append('line').attr('class', 'viz-arrow' + (isMajor ? ' major' : ''))
+              .attr('x1', x1).attr('y1', y1).attr('x2', tx).attr('y2', ty);
+            // 矢頭: 三角形 (path) を直接描く。SVG marker は CSS から currentColor を読めない
+            //   環境があるため、polygon 直書きの方が confident に色を制御できる。
+            const HEAD = 5;
+            const ux = dx / len, uy = dy / len;          // 単位ベクトル (進行方向)
+            const px = -uy, py = ux;                     // 法線ベクトル
+            const tipX = x2 - ux * (BASE_R_M - 0.5);     // 矢頭先端は dot 縁ぴったり
+            const tipY = y2 - uy * (BASE_R_M - 0.5);
+            const baseX = tipX - ux * HEAD;
+            const baseY = tipY - uy * HEAD;
+            const leftX  = baseX + px * (HEAD * 0.5);
+            const leftY  = baseY + py * (HEAD * 0.5);
+            const rightX = baseX - px * (HEAD * 0.5);
+            const rightY = baseY - py * (HEAD * 0.5);
+            g.append('polygon').attr('class', 'viz-arrow-head' + (isMajor ? ' major' : ''))
+              .attr('points', `${tipX},${tipY} ${leftX},${leftY} ${rightX},${rightY}`);
+          }
+        }
+      }
+
       // dot 中央のリアクション数バッジ。
       //   AdminPanel 設定「リアクション数を表示」(state.showCounts) を尊重。
       //   非表示設定でも stroke 色 (リング) は出るので「人気の有無」は分かる。
@@ -1539,6 +1588,82 @@
     };
   }
 
+  /**
+   * 2 つの axis 設定が「同じ座標系を表すか」を判定する。
+   *
+   * 「議論前 → 現在」矢印を描くには (numericX, numericY) が **同じ意味の座標** を
+   *   指している必要がある。具体的には Likert 軸の min/max ラベルが完全一致していること。
+   *   違うフォーム（導入アンケート pie ↔ 本時 matrix）や軸ラベル変更があった場合に
+   *   座標を結んでしまうと誤った可視化になる。
+   *
+   *   profile 切替 / 軸ラベル編集 / boardMode 変更を跨いで矢印を抑止するためのガード。
+   *
+   * @param {Object|null} a axisConfig 1
+   * @param {Object|null} b axisConfig 2
+   * @returns {boolean}
+   */
+  function arePhasesAxisCompatible(a, b) {
+    if (!a || !b) return false;
+    const ax = a.xAxisLabels || {};
+    const bx = b.xAxisLabels || {};
+    const ay = a.yAxisLabels || {};
+    const by = b.yAxisLabels || {};
+    return (ax.min || '') === (bx.min || '')
+        && (ax.max || '') === (bx.max || '')
+        && (ay.min || '') === (by.min || '')
+        && (ay.max || '') === (by.max || '');
+  }
+
+  /**
+   * 「議論前」rows と「現在」rows を emailHash で照合し、移動した児童の delta を返す。
+   *
+   *   each entry: { emailHash, fromX, fromY, toX, toY, distance, fromRow, toRow }
+   *   - 同じ emailHash が両方にある児童だけ対象
+   *   - 動かなかった児童 (distance < epsilon) は除外（矢印が点になる無意味なケース）
+   *   - epsilon = 0.1 は「Likert スケール 1-5 で 0.1 = 2% 未満」= 実質同じ位置
+   *
+   * 道徳教育観点（MEXT 2016 報告 p.10）：
+   *   「自らの生活や考えを見直している」評価観点の証拠データ。
+   *   「議論を経て立場が動いた児童」を教師が即座に発見できる。
+   *
+   * @param {Array} beforeRows
+   * @param {Array} currentRows
+   * @returns {Array<Object>} 距離降順
+   */
+  function computeMatrixDeltas(beforeRows, currentRows) {
+    if (!Array.isArray(beforeRows) || !Array.isArray(currentRows)) return [];
+    const beforeByHash = new Map();
+    for (const r of beforeRows) {
+      if (!r || !r.emailHash) continue;
+      if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
+      // 同 hash で複数 row があれば最後（=最新）のものを採用
+      beforeByHash.set(r.emailHash, r);
+    }
+    const out = [];
+    const seen = new Set();
+    for (const r of currentRows) {
+      if (!r || !r.emailHash) continue;
+      if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
+      if (seen.has(r.emailHash)) continue;  // current 側でも 1 hash = 1 entry に正規化
+      seen.add(r.emailHash);
+      const before = beforeByHash.get(r.emailHash);
+      if (!before) continue;
+      const dx = r.numericX - before.numericX;
+      const dy = r.numericY - before.numericY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+      if (distance < 0.1) continue;  // 動いていない
+      out.push({
+        emailHash: r.emailHash,
+        fromX: before.numericX, fromY: before.numericY,
+        toX: r.numericX,         toY: r.numericY,
+        distance,
+        fromRow: before, toRow: r
+      });
+    }
+    out.sort((a, b) => b.distance - a.distance);
+    return out;
+  }
+
   StudyQuestApp.prototype.renderWordRanking = async function (isInitialLoad, oldRows) {
     try {
       const d3 = await this.ensureD3Loaded();
@@ -1645,6 +1770,8 @@
   StudyQuestApp.prototype.__aggregateWords = aggregateWords;
   StudyQuestApp.prototype.__distinctiveKeywords = distinctiveKeywords;
   StudyQuestApp.prototype.__contrastingPair = contrastingPair;
+  StudyQuestApp.prototype.__arePhasesAxisCompatible = arePhasesAxisCompatible;
+  StudyQuestApp.prototype.__computeMatrixDeltas = computeMatrixDeltas;
 
   // ---------------------------------------------------------------------
   // M4: 円グラフ（道徳指導案 導入・アンケート結果可視化）
@@ -2080,6 +2207,12 @@
         '          aria-pressed="false">',
         '    ⇄ 比較',
         '  </button>',
+        '  <button type="button" id="vizDeltaToggleBtn" class="viz-btn" ' +
+        '          title="議論前→現在の意見の動きを矢印で表示 (matrix モードのみ)" ' +
+        '          aria-label="議論前→現在の意見の動きを矢印で表示" ' +
+        '          aria-pressed="false">',
+        '    → 動き',
+        '  </button>',
         '  <div class="viz-timeline">',
         '    <label for="vizTimelineSlider" class="viz-timeline-label">軌跡</label>',
         '    <input type="range" id="vizTimelineSlider" min="0" max="0" value="0" step="1" ' +
@@ -2184,6 +2317,41 @@
         // モーダルが開いていれば閉じる: stale な右カード残置 / 切替遅延を避ける。
         if (typeof app.hideAnswerModal === 'function') app.hideAnswerModal();
         // 比較モード中: timeline スライダーが「左ペインの時刻」を制御する設計。
+        app.renderBoard(false, false, []);
+      });
+    }
+
+    // 「→ 動き」: 議論前 → 現在 の同一児童の dot 移動を矢印で重ね描き (v2691)。
+    //   compare モードと違って overlay 形式なので、現在の画面構造を保ったまま追加情報を出せる。
+    //   ガード:
+    //     1. 議論前スナップが必要 (compare と同じ)
+    //     2. matrix モードでのみ動作 (numericX/Y が無い mode では無意味)
+    //     3. axisConfig が互換 (xAxisLabels.min/max + yAxisLabels.min/max 完全一致)
+    //   3 は profile 切替後にも安全 — 違うフォーム間の座標を結ばない。
+    const deltaBtn = toolsBar.querySelector('#vizDeltaToggleBtn');
+    if (deltaBtn) {
+      deltaBtn.addEventListener('click', () => {
+        if (!app.state.vizShowDeltas) {
+          const before = app.vizGetBefore();
+          if (!before) {
+            try { window.alert('「📌 議論前」を先に押して、議論開始時点の分布を保存してください。'); } catch (_) {}
+            return;
+          }
+          if (app.state.boardMode !== 'matrix') {
+            try { window.alert('意見の動き矢印は matrix モード（散布図）でのみ表示できます。'); } catch (_) {}
+            return;
+          }
+          if (!arePhasesAxisCompatible(before.axisConfig, app.state.axisConfig)) {
+            try {
+              window.alert('議論前スナップと現在で軸が異なるため、矢印を描けません。\n' +
+                '同じ問い（同じ X/Y 軸ラベル）の間でのみ動きを可視化できます。');
+            } catch (_) {}
+            return;
+          }
+        }
+        app.state.vizShowDeltas = !app.state.vizShowDeltas;
+        deltaBtn.classList.toggle('active', !!app.state.vizShowDeltas);
+        deltaBtn.setAttribute('aria-pressed', String(!!app.state.vizShowDeltas));
         app.renderBoard(false, false, []);
       });
     }
@@ -2431,6 +2599,7 @@
     } catch (_) {}
     this.state.vizTimelineIndex = null;
     this.state.vizCompareMode = false;
+    this.state.vizShowDeltas = false;  // 別 profile では before snapshot が無効
     // class filter リセットは caller (pill click handler) で実施済み。ここでは触らない。
     // UI 側も即時反映（loadSheetData 完了を待たず空状態を見せる）
     const sliderEl = document.getElementById('vizTimelineSlider');
@@ -2517,6 +2686,7 @@
     } catch (_) {}
     this.state.vizTimelineIndex = null;
     this.state.vizCompareMode = false;
+    this.state.vizShowDeltas = false;  // 別 profile では before snapshot が無効
     // dropdown 現在値をそのまま採用する。pill click 経由なら caller が事前に
     //   resetClassFilterToAll() で 'すべて' に戻しているし、loadSheetData gate 経由
     //   (同 profile 内 filter 変更) なら新しい dropdown 値で fetch する。
