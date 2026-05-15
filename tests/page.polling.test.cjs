@@ -658,3 +658,60 @@ test('__vizLoadPastProfile: source passes classFilter from getCurrentFilterState
   const args = callMatch[0].slice('getPublishedSheetDataForProfile('.length, -1).split(',').map(s => s.trim());
   assert.notEqual(args[2], 'null', 'classFilter 引数を null hard-code してはいけない');
 });
+
+// =====================================================================
+// updateDisplaySettingsFromAPI: profile 切替時の UNIFIED_CONFIG 同期
+// Why: 管理モード ON/OFF が profile 跨ぎで正しく動くため、admin mode 中でも
+//   UNIFIED_CONFIG.displaySettings は常に最新値で同期される必要がある。
+//   旧コードは admin mode 中に早期 return して UNIFIED_CONFIG が bootstrap 時の値で
+//   stale → 管理モード OFF にしたとき初期 profile の設定に戻ってしまうバグだった。
+// =====================================================================
+
+test('updateDisplaySettingsFromAPI: 通常モード時は globals + UNIFIED_CONFIG を両方更新', () => {
+  const { instance, ctx } = makeInstance();
+  ctx.window.UNIFIED_CONFIG = { displaySettings: { showNames: false, showReactions: false } };
+  ctx.window.showAdminFeatures = false;
+  ctx.window.showCounts = false;
+  ctx.window.displayMode = 'anonymous';
+  instance.state = { showCounts: false, displayMode: 'anonymous' };
+  instance.clearCache = () => {};
+  instance.renderWithCurrentData = () => {};
+
+  instance.updateDisplaySettingsFromAPI({ showNames: true, showReactions: true });
+
+  assert.equal(ctx.window.UNIFIED_CONFIG.displaySettings.showNames, true);
+  assert.equal(ctx.window.UNIFIED_CONFIG.displaySettings.showReactions, true);
+  assert.equal(ctx.window.showCounts, true);
+  assert.equal(ctx.window.displayMode, 'named');
+});
+
+test('updateDisplaySettingsFromAPI: admin mode 中も UNIFIED_CONFIG は同期するが globals は触らない', () => {
+  // Regression: admin mode 中に profile 切替 → updateDisplaySettingsFromAPI 早期 return →
+  //   UNIFIED_CONFIG stale → admin OFF で初期値に戻る、というバグの修正テスト。
+  const { instance, ctx } = makeInstance();
+  ctx.window.UNIFIED_CONFIG = { displaySettings: { showNames: false, showReactions: false } };
+  ctx.window.showAdminFeatures = true;        // admin mode 中
+  ctx.window.showCounts = true;               // admin forced
+  ctx.window.displayMode = 'named';           // admin forced
+  instance.state = { showCounts: true, displayMode: 'named' };
+  instance.clearCache = () => {};
+  instance.renderWithCurrentData = () => {};
+
+  instance.updateDisplaySettingsFromAPI({ showNames: true, showReactions: true });
+
+  // UNIFIED_CONFIG は最新値に同期される (将来 admin OFF にしたとき参照されるため)
+  assert.equal(ctx.window.UNIFIED_CONFIG.displaySettings.showNames, true);
+  assert.equal(ctx.window.UNIFIED_CONFIG.displaySettings.showReactions, true);
+  // 表示用 globals は admin forced 値のまま (触らない)
+  assert.equal(ctx.window.showCounts, true);
+  assert.equal(ctx.window.displayMode, 'named');
+});
+
+test('updateDisplaySettingsFromAPI: 無効入力は何もしない', () => {
+  const { instance, ctx } = makeInstance();
+  ctx.window.UNIFIED_CONFIG = { displaySettings: { showNames: false } };
+  instance.updateDisplaySettingsFromAPI(null);
+  instance.updateDisplaySettingsFromAPI(undefined);
+  instance.updateDisplaySettingsFromAPI('not-object');
+  assert.equal(ctx.window.UNIFIED_CONFIG.displaySettings.showNames, false, '不変');
+});

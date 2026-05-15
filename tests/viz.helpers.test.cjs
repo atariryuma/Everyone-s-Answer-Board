@@ -19,8 +19,12 @@ const vm = require('node:vm');
  *      追加する構造なので、それを偽装する。
  */
 
+// 1 度だけ読んで全テストで使い回す。
+const VIZ_HTML = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
+const SEGMENTER_HTML = fs.readFileSync(path.resolve(__dirname, '../src/tinySegmenter.html'), 'utf8');
+
 function loadVizContext() {
-  const html = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
+  const html = VIZ_HTML;
   // <script>...</script> ブロックを抽出
   const m = html.match(/<script>([\s\S]*?)<\/script>/);
   if (!m) throw new Error('Could not extract <script> from page.viz.js.html');
@@ -108,8 +112,8 @@ test('tokenizeJapanese: keeps katakana words', () => {
  *   テストでは ../src/tinySegmenter.html を抽出して context に注入する。
  */
 function loadVizContextWithSegmenter() {
-  const html = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
-  const segHtml = fs.readFileSync(path.resolve(__dirname, '../src/tinySegmenter.html'), 'utf8');
+  const html = VIZ_HTML;
+  const segHtml = SEGMENTER_HTML;
   const m = html.match(/<script>([\s\S]*?)<\/script>/);
   if (!m) throw new Error('Could not extract <script> from page.viz.js.html');
   const segMatch = segHtml.match(/<script>([\s\S]*?)<\/script>/);
@@ -322,88 +326,48 @@ test('aggregateCategories: trims whitespace', () => {
 });
 
 // =====================================================================
-// buildSnapshot (via __vizSnapshotInternals)
+// buildHistoricalSnapshots (投稿列順 + delta encoding)
+// 各 row が 1 step。snapshot.addedRow がその step で追加 / 上書きされた 1 件。
+// 累積状態の再構成は withTimelineSwap が担当（snapshots[0..idx] を畳む）。
 // =====================================================================
 
-test('buildSnapshot: captures minimal row fields and metadata', () => {
+test('SNAPSHOT_MAX sanity', () => {
   const { StudyQuestApp } = loadVizContext();
   const sn = StudyQuestApp.prototype.__vizSnapshotInternals;
-  const fakeApp = {
-    state: {
-      boardMode: 'numberline',
-      axisConfig: { defaultMin: 1, defaultMax: 5 },
-      currentAnswers: [
-        { rowIndex: 2, emailHash: 'h1', class: '5-1', name: '太郎', answer: 'はい', reason: 'なぜなら', numericX: 4, numericY: null, timestamp: '2026-05-12' },
-        { rowIndex: 3, emailHash: 'h2', class: '5-1', name: '花子', answer: 'いいえ', reason: '違う', numericX: 2, numericY: 3, timestamp: '2026-05-12' }
-      ]
-    }
-  };
-  const snap = sn.buildSnapshot(fakeApp);
-  assert.equal(snap.boardMode, 'numberline');
-  assert.equal(snap.axisConfig.defaultMin, 1);
-  assert.equal(snap.rows.length, 2);
-  assert.equal(snap.rows[0].emailHash, 'h1');
-  assert.equal(snap.rows[0].numericX, 4);
-  assert.equal(snap.rows[1].numericY, 3);
-  assert.ok(typeof snap.capturedAt === 'number');
+  assert.ok(sn.SNAPSHOT_MAX > 0 && sn.SNAPSHOT_MAX <= 1000, 'cap is reasonable');
 });
 
-test('buildSnapshot: emits null for missing numericX/Y', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const sn = StudyQuestApp.prototype.__vizSnapshotInternals;
-  const fakeApp = { state: { currentAnswers: [{ rowIndex: 2, answer: 'x' }] } };
-  const snap = sn.buildSnapshot(fakeApp);
-  assert.equal(snap.rows[0].numericX, null);
-  assert.equal(snap.rows[0].numericY, null);
-});
-
-test('SNAPSHOT_MAX / INTERVAL_MS sanity', () => {
-  const { StudyQuestApp } = loadVizContext();
-  const sn = StudyQuestApp.prototype.__vizSnapshotInternals;
-  assert.ok(sn.SNAPSHOT_MAX > 0 && sn.SNAPSHOT_MAX <= 200, 'cap is reasonable');
-  assert.ok(sn.SNAPSHOT_INTERVAL_MS >= 10000, 'interval >= 10s');
-});
-
-// =====================================================================
-// buildHistoricalSnapshots (SS timestamp-based timeline replay)
-// =====================================================================
-
-test('buildHistoricalSnapshots: groups rows by INTERVAL buckets and tracks latest per email', () => {
+test('buildHistoricalSnapshots: 1 row = 1 snapshot, sorted by timestamp', () => {
   const { StudyQuestApp } = loadVizContext();
   const sn = StudyQuestApp.prototype.__vizSnapshotInternals;
   const rows = [
-    { rowIndex: 1, emailHash: 'a', timestamp: '2026-05-14T01:00:00Z', numericX: 1, numericY: 1, reason: 'init A' },
-    { rowIndex: 2, emailHash: 'b', timestamp: '2026-05-14T01:00:30Z', numericX: 5, numericY: 5, reason: 'init B' },
+    { rowIndex: 2, emailHash: 'b', timestamp: '2026-05-14T01:00:30Z', numericX: 5, numericY: 5 },
+    { rowIndex: 1, emailHash: 'a', timestamp: '2026-05-14T01:00:00Z', numericX: 1, numericY: 1 },
     { rowIndex: 3, emailHash: 'a', timestamp: '2026-05-14T01:05:00Z', numericX: 4, numericY: 4, reason: 'revote A' }
   ];
   const snaps = sn.buildHistoricalSnapshots(rows, 'matrix', { defaultMin: 1, defaultMax: 5 });
-  // 60s バケットで 01:00 〜 01:05+ → 少なくとも 5 バケット以上
-  assert.ok(snaps.length >= 5, `expected >=5 buckets, got ${snaps.length}`);
-  // 最初のバケットは a=1,1 / b=5,5 (両方初期投票)
-  const first = snaps[0];
-  assert.equal(first.rows.length, 2);
-  assert.equal(first.boardMode, 'matrix');
-  // 最後のバケットは a が re-vote 後の値、b は変わらず
-  const last = snaps[snaps.length - 1];
-  const aRow = last.rows.find(r => r.emailHash === 'a');
-  const bRow = last.rows.find(r => r.emailHash === 'b');
-  assert.equal(aRow.numericX, 4);
-  assert.equal(aRow.numericY, 4);
-  assert.equal(aRow.reason, 'revote A');
-  assert.equal(bRow.numericX, 5);
+  assert.equal(snaps.length, 3);
+  // 時系列昇順
+  assert.equal(snaps[0].addedRow.emailHash, 'a');
+  assert.equal(snaps[1].addedRow.emailHash, 'b');
+  assert.equal(snaps[2].addedRow.emailHash, 'a');
+  // 3 番目は revote
+  assert.equal(snaps[2].addedRow.reason, 'revote A');
+  // boardMode / axisConfig が各 snapshot に同梱
+  assert.equal(snaps[0].boardMode, 'matrix');
+  assert.equal(snaps[2].axisConfig.defaultMax, 5);
+  // latestTimestamp は実 SS timestamp の ms
+  assert.equal(snaps[0].latestTimestamp, new Date('2026-05-14T01:00:00Z').getTime());
 });
 
 test('buildHistoricalSnapshots: returns [] when no row has parseable timestamp', () => {
   const { StudyQuestApp } = loadVizContext();
   const sn = StudyQuestApp.prototype.__vizSnapshotInternals;
-  // timestamp 欠落 / 不正
   const rows = [
     { rowIndex: 1, emailHash: 'a', numericX: 1 },
     { rowIndex: 2, emailHash: 'b', timestamp: 'not-a-date', numericX: 2 }
   ];
   const snaps = sn.buildHistoricalSnapshots(rows, 'matrix', null);
-  // vm context の Array は外の Array と prototype が異なるため deepEqual は使えない。
-  // length=0 のチェックで「空配列」を確認する。
   assert.equal(snaps.length, 0);
 });
 
@@ -411,22 +375,23 @@ test('buildHistoricalSnapshots: trims to SNAPSHOT_MAX (oldest dropped)', () => {
   const { StudyQuestApp } = loadVizContext();
   const sn = StudyQuestApp.prototype.__vizSnapshotInternals;
   const startMs = new Date('2026-05-14T01:00:00Z').getTime();
-  // SNAPSHOT_MAX より多くのバケットを発生させるため、それぞれ INTERVAL を空けた row を生成
   const count = sn.SNAPSHOT_MAX + 10;
   const rows = [];
   for (let i = 0; i < count; i++) {
     rows.push({
       rowIndex: i,
       emailHash: 'u' + i,
-      timestamp: new Date(startMs + i * sn.SNAPSHOT_INTERVAL_MS).toISOString(),
+      timestamp: new Date(startMs + i * 1000).toISOString(),  // 1 秒間隔
       numericX: 3
     });
   }
   const snaps = sn.buildHistoricalSnapshots(rows, 'matrix', null);
-  assert.ok(snaps.length <= sn.SNAPSHOT_MAX, `got ${snaps.length}, cap ${sn.SNAPSHOT_MAX}`);
+  assert.equal(snaps.length, sn.SNAPSHOT_MAX, 'capped to SNAPSHOT_MAX');
+  // 古い方が切り捨てられ、末尾は最新 row
+  assert.equal(snaps[snaps.length - 1].addedRow.emailHash, 'u' + (count - 1));
 });
 
-test('buildHistoricalSnapshots: rows without emailHash use rowIndex as key', () => {
+test('buildHistoricalSnapshots: rows without emailHash still get a step (use rowIndex key)', () => {
   const { StudyQuestApp } = loadVizContext();
   const sn = StudyQuestApp.prototype.__vizSnapshotInternals;
   const rows = [
@@ -434,9 +399,9 @@ test('buildHistoricalSnapshots: rows without emailHash use rowIndex as key', () 
     { rowIndex: 11, emailHash: null, timestamp: '2026-05-14T01:00:30Z', numericX: 3 }
   ];
   const snaps = sn.buildHistoricalSnapshots(rows, 'matrix', null);
-  assert.ok(snaps.length >= 1);
-  // 異なる rowIndex は別マーカーとして残る
-  assert.equal(snaps[snaps.length - 1].rows.length, 2);
+  assert.equal(snaps.length, 2);
+  assert.equal(snaps[0].addedRow.rowIndex, 10);
+  assert.equal(snaps[1].addedRow.rowIndex, 11);
 });
 
 // =====================================================================
@@ -454,20 +419,24 @@ function makeFakeApp(StudyQuestApp, { vizTimelineIndex, snapshots }) {
   return app;
 }
 
+// 投稿列順 delta encoding 移行後: snapshots は {addedRow, axisConfig} の配列。
+// withTimelineSwap は snapshots[0..idx] を畳んで latestByKey を再構成 → currentAnswers に
+// セットする。snapshot.rows を直接読まないことに注意。
+function deltaSnap(addedRow, axisConfig) {
+  return { latestTimestamp: 1, boardMode: 'matrix', axisConfig: axisConfig || null, addedRow };
+}
+
 test('withTimelineSwap: async fn keeps swap until Promise resolves', async () => {
   const { StudyQuestApp } = loadVizContext();
-  const swappedRows = [{ rowIndex: 999, marker: 'SWAPPED' }];
   const app = makeFakeApp(StudyQuestApp, {
     vizTimelineIndex: 0,
-    snapshots: [{ capturedAt: 1, rows: swappedRows, axisConfig: { tag: 'swap' } }]
+    snapshots: [deltaSnap({ rowIndex: 999, emailHash: 'X', marker: 'SWAPPED' }, { tag: 'swap' })]
   });
   const original = app.state.currentAnswers;
 
   let observedDuringFn = null;
   let observedAxisDuringFn = null;
   await app.__vizWithTimelineSwap(async () => {
-    // 50ms 待ってから currentAnswers を観測。旧コードはこの時点で既に
-    // restore されていたため observedDuringFn = original になっていた (regression)。
     await new Promise((r) => setTimeout(r, 50));
     observedDuringFn = app.state.currentAnswers;
     observedAxisDuringFn = app.state.axisConfig;
@@ -476,8 +445,9 @@ test('withTimelineSwap: async fn keeps swap until Promise resolves', async () =>
   // async 完了後に restore されている
   assert.equal(app.state.currentAnswers, original);
   assert.equal(app.state.axisConfig.tag, 'orig');
-  // fn 実行中は swap が維持されていた (これが async/await race fix の本体)
-  assert.equal(observedDuringFn, swappedRows);
+  // fn 実行中は swap が維持されていた (async/await race fix)
+  assert.equal(observedDuringFn.length, 1);
+  assert.equal(observedDuringFn[0].rowIndex, 999);
   assert.equal(observedAxisDuringFn.tag, 'swap');
 });
 
@@ -490,10 +460,9 @@ test('withTimelineSwap: vizTimelineIndex==null short-circuits without swap', () 
 
 test('withTimelineSwap: out-of-range idx falls back to fn() without swap', () => {
   const { StudyQuestApp } = loadVizContext();
-  const swapped = [{ rowIndex: 999 }];
   const app = makeFakeApp(StudyQuestApp, {
-    vizTimelineIndex: 99,  // length=1 の snapshots に対して out-of-range
-    snapshots: [{ capturedAt: 1, rows: swapped, axisConfig: null }]
+    vizTimelineIndex: 99,
+    snapshots: [deltaSnap({ rowIndex: 999, emailHash: 'X' })]
   });
   const original = app.state.currentAnswers;
   let observed;
@@ -503,10 +472,9 @@ test('withTimelineSwap: out-of-range idx falls back to fn() without swap', () =>
 
 test('withTimelineSwap: sync exception restores state before rethrow', () => {
   const { StudyQuestApp } = loadVizContext();
-  const swapped = [{ rowIndex: 999 }];
   const app = makeFakeApp(StudyQuestApp, {
     vizTimelineIndex: 0,
-    snapshots: [{ capturedAt: 1, rows: swapped, axisConfig: null }]
+    snapshots: [deltaSnap({ rowIndex: 999, emailHash: 'X' })]
   });
   const original = app.state.currentAnswers;
   assert.throws(() => {
@@ -517,10 +485,9 @@ test('withTimelineSwap: sync exception restores state before rethrow', () => {
 
 test('withTimelineSwap: async rejection restores state', async () => {
   const { StudyQuestApp } = loadVizContext();
-  const swapped = [{ rowIndex: 999 }];
   const app = makeFakeApp(StudyQuestApp, {
     vizTimelineIndex: 0,
-    snapshots: [{ capturedAt: 1, rows: swapped, axisConfig: null }]
+    snapshots: [deltaSnap({ rowIndex: 999, emailHash: 'X' })]
   });
   const original = app.state.currentAnswers;
   await assert.rejects(
@@ -533,25 +500,43 @@ test('withTimelineSwap: async rejection restores state', async () => {
   assert.equal(app.state.currentAnswers, original, 'restored after async reject');
 });
 
+test('withTimelineSwap: accumulates snapshots[0..idx] (delta semantics)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const app = makeFakeApp(StudyQuestApp, {
+    vizTimelineIndex: 2,
+    snapshots: [
+      deltaSnap({ rowIndex: 1, emailHash: 'a', numericX: 1 }),
+      deltaSnap({ rowIndex: 2, emailHash: 'b', numericX: 2 }),
+      deltaSnap({ rowIndex: 3, emailHash: 'a', numericX: 5 })  // a の再投稿 → 上書き
+    ]
+  });
+  let observed;
+  app.__vizWithTimelineSwap(() => { observed = app.state.currentAnswers; });
+  // idx=2 まで累積 → a (最新), b の 2 件
+  assert.equal(observed.length, 2);
+  const a = observed.find(r => r.emailHash === 'a');
+  const b = observed.find(r => r.emailHash === 'b');
+  assert.equal(a.numericX, 5, 'a は最新の再投稿で上書き');
+  assert.equal(b.numericX, 2);
+});
+
 // =====================================================================
 // groupByStudent (post-simplification: ghost is always [])
 // =====================================================================
 
-test('groupByStudent: allowResubmit=false returns rows as-is, ghost empty', () => {
+test('buildHistoricalSnapshots: 同一 emailHash の再投稿は同じ delta step として残る', () => {
+  // 削除前: groupByStudent 経由テスト。
+  // 移行後: snapshots は delta 形式なので、両 step とも addedRow を保持する。
+  //   累積は withTimelineSwap が行う（test 「accumulates snapshots[0..idx]」が担当）。
   const { StudyQuestApp } = loadVizContext();
-  // groupByStudent は inner function で直接 expose されていないため、
-  // renderMatrix / renderNumberLine 経由でしかテストできない部分もあるが、
-  // ここでは ghost が常に空という契約を __vizSnapshotInternals 経由で間接確認。
   const sn = StudyQuestApp.prototype.__vizSnapshotInternals;
-  // buildHistoricalSnapshots は groupByStudent を経由しないが、ghost 廃止は
-  // build 出力には影響しないことを確認 (各バケット rows に ghost 列が混じらない)
   const rows = [
     { rowIndex: 1, emailHash: 'a', timestamp: '2026-05-14T01:00:00Z', numericX: 1, numericY: 1 },
     { rowIndex: 2, emailHash: 'a', timestamp: '2026-05-14T01:05:00Z', numericX: 5, numericY: 5 }
   ];
   const snaps = sn.buildHistoricalSnapshots(rows, 'matrix', null);
-  // 同一 emailHash の最新だけが残る = bucket 末で 1 件のみ
-  assert.equal(snaps[snaps.length - 1].rows.length, 1);
+  assert.equal(snaps.length, 2, '再投稿も独立 step として記録');
+  assert.equal(snaps[1].addedRow.numericX, 5);
 });
 
 // =====================================================================
@@ -622,10 +607,7 @@ test('vizComputeSwings: M2 Euclidean distance', () => {
  *   保存されることを契約として固定する。
  */
 function loadVizContextForCompare(beforeSnapshot) {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const vm = require('node:vm');
-  const html = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
+  const html = VIZ_HTML;
   const m = html.match(/<script>([\s\S]*?)<\/script>/);
   const source = m[1];
   const StudyQuestApp = class StudyQuestApp {};
@@ -738,10 +720,45 @@ test('__vizRenderCompare: falls back to single render when no snapshot exists', 
   };
   app.elements = { answersContainer };
   let called = 0;
+  app.showToast = () => {};  // Fix 2: toast 通知が呼ばれる
   await StudyQuestApp.prototype.__vizRenderCompare.call(app, async () => { called += 1; }, 'matrix');
   // snapshot ゼロ件 → fallback で renderOne が 1 回呼ばれ、compare mode は OFF
   assert.equal(called, 1);
   assert.equal(app.state.vizCompareMode, false);
+});
+
+test('getOrCreateVizContainer: 比較解除時に viz-compare-wrap が残っていれば強制再構築 (regression)', () => {
+  // Why: 比較モードが answers コンテナを 2 ペイン構造にしたあと、比較を解除して通常レンダラー
+  //   が走っても、'viz-container' クラスは残るので reuse 経路に入ってしまっていた。
+  //   querySelector('svg#vizSvg') は左ペイン内の svg を返すため、画面は 2 ペインのまま
+  //   左だけ再描画される ("解除できない"症状)。.viz-compare-wrap の存在チェックで強制再構築。
+  const src = VIZ_HTML;
+  const fnStart = src.indexOf('function getOrCreateVizContainer');
+  assert.ok(fnStart > 0);
+  // function 本体内に .viz-compare-wrap への参照があり、条件分岐に使われていること。
+  const fnSrc = src.slice(fnStart, fnStart + 3000);
+  assert.match(fnSrc, /viz-compare-wrap/, '.viz-compare-wrap の guard が必要');
+});
+
+test('__vizRenderCompare: snapshot 0 件 + before 未保存 → toast + button OFF + fallback (Fix 2)', async () => {
+  // Why: 旧コードは silent に vizCompareMode=false にして普通描画していた → ユーザーが
+  //   「比較中」ボタン押したのに画面は変わらず混乱。
+  //   Fix 2: toast で理由を告知 + button の aria-pressed/active を明示的に剥がす。
+  const { StudyQuestApp, makeElement } = loadVizContextForCompare(null);
+  const answersContainer = makeElement('div');
+  const app = new StudyQuestApp();
+  app.state = {
+    currentAnswers: [{ rowIndex: 1 }],
+    axisConfig: null,
+    vizTimelineIndex: null,
+    vizCompareMode: true
+  };
+  app.elements = { answersContainer };
+  let toastMsg = null;
+  app.showToast = (m) => { toastMsg = m; };
+  await StudyQuestApp.prototype.__vizRenderCompare.call(app, async () => {}, 'matrix');
+  assert.equal(app.state.vizCompareMode, false, 'compareMode は OFF に降格');
+  assert.match(toastMsg || '', /議論前|投稿/, 'toast でユーザーに理由を伝える');
 });
 
 // =====================================================================
@@ -759,10 +776,7 @@ test('__vizRenderCompare: falls back to single render when no snapshot exists', 
  *   を呼ぶため）。
  */
 function loadVizContextForQuadrant() {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const vm = require('node:vm');
-  const html = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
+  const html = VIZ_HTML;
   const m = html.match(/<script>([\s\S]*?)<\/script>/);
   const source = m[1];
   const StudyQuestApp = class StudyQuestApp {};

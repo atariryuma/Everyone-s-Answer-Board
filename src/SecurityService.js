@@ -8,7 +8,7 @@
  * - Service Account管理
  */
 
-/* global openSpreadsheet, getCurrentEmail, getCachedProperty, hasCoreSystemProps */
+/* global getCurrentEmail, getCachedProperty, hasCoreSystemProps */
 
 /**
  * 安全にメールアドレスからドメインを抽出する

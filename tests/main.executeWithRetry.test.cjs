@@ -16,6 +16,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 // vm.Script を 1 度だけ parse して使い回す（テスト数増えても parse コスト一定）。
 const MAIN_SOURCE = fs.readFileSync(path.resolve(__dirname, '../src/main.js'), 'utf8');
@@ -34,12 +35,7 @@ function loadMainCtx(overrides = {}) {
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => null, setProperty: () => {} }) },
     CacheService: { getScriptCache: () => ({ get: () => null, put: () => {}, remove: () => {} }) },
     LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) },
-    createSuccessResponse: () => ({ success: true }),
-    createErrorResponse: (m) => ({ success: false, message: m }),
-    createAuthError: () => ({ success: false }),
-    createUserNotFoundError: () => ({ success: false }),
-    createExceptionResponse: (e) => ({ success: false, message: e.message }),
-    createAdminRequiredError: () => ({ success: false }),
+    ...gasResponseStubs(),
     findUserByEmail: () => null,
     findUserById: () => null,
     findPublishedBoardOwner: () => null,

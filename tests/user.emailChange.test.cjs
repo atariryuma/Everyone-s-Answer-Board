@@ -3,12 +3,14 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('path');
 const vm = require('vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 // --- getGoogleIdFromToken tests ---
 
 function loadUserServiceContext(overrides = {}) {
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
+    ...gasResponseStubs(),
     validateUrl: () => ({ isValid: true }),
     validateEmail: (e) => ({ isValid: !!e && e.includes('@') }),
     getCurrentEmail: () => 'user@example.com',
@@ -22,7 +24,6 @@ function loadUserServiceContext(overrides = {}) {
     CACHE_DURATION: { LONG: 600, USER_INDIVIDUAL: 300 },
     clearConfigCache: () => {},
     SYSTEM_LIMITS: { MAX_USERS: 100 },
-    createExceptionResponse: (e) => ({ success: false, message: e.message }),
     CacheService: { getScriptCache: () => ({ get: () => null, put: () => {}, remove: () => {} }) },
     ScriptApp: { getIdentityToken: () => null },
     Utilities: {
@@ -83,6 +84,7 @@ test('getGoogleIdFromToken: handles malformed JWT gracefully', () => {
 function loadUserApisContext(overrides = {}) {
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
+    ...gasResponseStubs(),
     getCurrentEmail: () => 'newmail@example.com',
     findUserByEmail: () => null,
     findUserByGoogleId: () => null,
@@ -99,9 +101,6 @@ function loadUserApisContext(overrides = {}) {
     getCachedProperty: () => null,
     setCachedProperty: () => {},
     getWebAppUrl: () => 'https://script.google.com/app',
-    createAuthError: () => ({ success: false, message: 'auth required' }),
-    createUserNotFoundError: () => ({ success: false, message: 'user not found' }),
-    createExceptionResponse: (e) => ({ success: false, message: e.message }),
     ScriptApp: { getIdentityToken: () => null },
     Utilities: {},
     shouldEnforceDomainRestrictions: () => false,
@@ -317,7 +316,7 @@ test('getConfig: returns user-not-found when findUserByEmail returns null', () =
   });
   const result = ctx.getConfig();
   assert.equal(result.success, false);
-  assert.match(result.message, /user not found/);
+  assert.match(result.message, /見つかりません/);
 });
 
 test('getConfig: returns config and userId on success', () => {
@@ -409,73 +408,3 @@ test('checkUserAuthentication: swallows getUserConfig exceptions and reports has
   assert.equal(result.hasValidConfig, false);
 });
 
-// =====================================================================
-// getBatchedUserConfig
-// =====================================================================
-
-test('getBatchedUserConfig: returns auth error without session', () => {
-  const ctx = loadUserApisContext({
-    getCurrentEmail: () => null
-  });
-  const result = ctx.getBatchedUserConfig();
-  assert.equal(result.success, false);
-  assert.equal(result.authenticated, false);
-  assert.ok(result.authError);
-});
-
-test('getBatchedUserConfig: returns domain error when ensureDomainAccess denies', () => {
-  const ctx = loadUserApisContext({
-    shouldEnforceDomainRestrictions: () => true,
-    validateDomainAccess: () => ({ allowed: false })
-  });
-  const result = ctx.getBatchedUserConfig();
-  assert.equal(result.success, false);
-  assert.equal(result.authenticated, true);
-  assert.match(result.error, /管理者と同一ドメイン/);
-});
-
-test('getBatchedUserConfig: returns user-not-found when lookup fails', () => {
-  const ctx = loadUserApisContext({
-    findUserByEmail: () => null
-  });
-  const result = ctx.getBatchedUserConfig();
-  assert.equal(result.success, false);
-  assert.equal(result.authenticated, true);
-  assert.ok(result.userError);
-});
-
-test('getBatchedUserConfig: returns user + config on success', () => {
-  const ctx = loadUserApisContext({
-    getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    getUserConfig: () => ({ success: true, config: { spreadsheetId: 'ss-1' }, message: 'ok' })
-  });
-  const result = ctx.getBatchedUserConfig();
-  assert.equal(result.success, true);
-  assert.equal(result.user.userId, 'u1');
-  assert.equal(result.config.spreadsheetId, 'ss-1');
-  assert.equal(result.configSuccess, true);
-});
-
-test('getBatchedUserConfig: returns empty config when getUserConfig fails but user exists', () => {
-  const ctx = loadUserApisContext({
-    getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
-    getUserConfig: () => ({ success: false, message: 'config corrupted' })
-  });
-  const result = ctx.getBatchedUserConfig();
-  assert.equal(result.success, true); // overall success unless config throws
-  assert.deepEqual({ ...result.config }, {});
-  assert.equal(result.configSuccess, false);
-  assert.match(result.configMessage, /config corrupted/);
-});
-
-test('getBatchedUserConfig: catches exceptions and returns structured error', () => {
-  const ctx = loadUserApisContext({
-    getCurrentEmail: () => { throw new Error('session service error'); }
-  });
-  const result = ctx.getBatchedUserConfig();
-  assert.equal(result.success, false);
-  assert.match(result.error, /session service error/);
-  assert.ok(result.exception);
-});

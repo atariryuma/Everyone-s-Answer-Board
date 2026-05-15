@@ -3,22 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
-
-function createContentServiceStub() {
-  return {
-    MimeType: { JSON: 'application/json' },
-    createTextOutput(body) {
-      return {
-        body,
-        mimeType: null,
-        setMimeType(mimeType) {
-          this.mimeType = mimeType;
-          return this;
-        }
-      };
-    }
-  };
-}
+const { gasResponseStubs, createContentServiceStub } = require('./_helpers.cjs');
 
 function loadMainContext(overrides = {}) {
   const context = {
@@ -28,12 +13,7 @@ function loadMainContext(overrides = {}) {
       error: () => {}
     },
     ContentService: createContentServiceStub(),
-    createSuccessResponse: (message, data, extra) => ({ success: true, message, ...(data && { data }), ...extra }),
-    createAuthError: () => ({ success: false, message: 'auth required' }),
-    createUserNotFoundError: () => ({ success: false, message: 'user not found' }),
-    createErrorResponse: (message, data, extra) => ({ success: false, message, error: message, ...extra }),
-    createExceptionResponse: (error) => ({ success: false, message: error.message, error: error.message }),
-    createAdminRequiredError: () => ({ success: false, message: 'admin required' }),
+    ...gasResponseStubs(),
     Session: {
       getActiveUser: () => ({
         getEmail: () => 'teacher@example.com'

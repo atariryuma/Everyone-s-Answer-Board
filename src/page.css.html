@@ -6,11 +6,10 @@
  * ============================================================================= */
 
 /* =============================================================================
- * Header redesign (v2674): Bento Grid 2-3 row layout
- *   - Row 1: identity + phase pills + filters + admin actions (1行に集約)
+ * Header: Bento Grid 2-3 row layout
+ *   - Row 1: identity + phase pills + filters + admin actions
  *   - Row 2: 設問テキスト (中央配置で focus)
  *   - Row 3: 編集者ツール (editor only, 空なら display:none)
- *   - 横幅を grid template で明示配分し、無駄な空白を解消
  *   - body.is-editor / .is-viewer で editor-only 要素を CSS で表示制御
  * ============================================================================= */
 .eab-header {
@@ -53,8 +52,7 @@
   font-weight: 500;
   transition: background-color 0.15s, color 0.15s, transform 0.15s;
   white-space: nowrap;
-  /* v2678: 長いフォームタイトル (Forms 命名「【振り返り】... (道徳5/14 振り返り)」など)
-     がヘッダーを支配しないように省略表示。フルテキストは title 属性で tooltip 表示。 */
+  /* 長いフォームタイトルがヘッダーを支配しないように省略 (フルテキストは title 属性で tooltip)。 */
   max-width: min(45ch, 35vw);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -168,9 +166,8 @@
   outline: 2px solid rgba(56, 189, 248, 0.6);
   outline-offset: 1px;
 }
-/* v2678: 「公開を終了」は destructive アクションだが終了時にしか押さないため、
-   常時表示で flat orange だと頻繁な閲覧 UI で目立ちすぎる。
-   通常時は subtle (border + faded orange)、hover で saturate するパターンに。 */
+/* 「公開を終了」は destructive アクション。常時 flat orange だと閲覧 UI で目立ちすぎるので、
+   通常時は subtle (border + faded orange)、hover で saturate するパターン。 */
 .eab-end-pub-btn {
   display: inline-flex;
   align-items: center;
@@ -229,11 +226,9 @@ body:not(.is-editor) .editor-only,
 body:not(.is-editor) .editor-only-row {
   display: none !important;
 }
-/* Admin-mode-only visibility (v2680):
+/* Admin-mode-only visibility:
  *   ⚙ クリックで toggleAdminMode が body.admin-mode を toggle する。
- *   admin-mode-only 要素は管理モード ON 時のみ表示。
- *   用途: 公開を終了など destructive action を、明示的に管理モードへ
- *   入った教師にのみ表示することで、通常時の視覚ノイズと誤操作を削減。 */
+ *   .admin-mode-only 要素は管理モード ON 時のみ表示 (destructive action のための二段階確認)。 */
 body:not(.admin-mode) .admin-mode-only {
   display: none !important;
 }
@@ -763,9 +758,7 @@ button.highlight-badge:hover {
   align-items: center;
   justify-content: center;
 }
-/* v2688: 単一モーダルに統一。dual-card / modal-compare / modal-side-label /
- *   modal-empty-placeholder などの残骸 CSS は全て撤去 (廃止された feature)。
- *   モーダルでのリアクション装飾は単一カードのみに適用。 */
+/* モーダルでのリアクション装飾は単一カードのみに適用 (dual-card 機能は廃止)。 */
 #answerModalCard.reaction-border-1 { border-width: 3px !important; }
 #answerModalCard.reaction-border-2 { border-width: 4px !important; }
 #answerModalCard.reaction-border-3 { border-width: 5px !important; }

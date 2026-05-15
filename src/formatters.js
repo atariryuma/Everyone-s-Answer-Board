@@ -2,13 +2,7 @@
  * @fileoverview Data formatting helpers (timestamp formatting only — currently).
  */
 
-/* global */
-
-/**
- * タイムスタンプを `yyyy/MM/dd HH:mm` で整形（不正値は '-'）
- * @param {string|Date} timestamp
- * @returns {string}
- */
+// タイムスタンプを `yyyy/MM/dd HH:mm` で整形（不正値は '-'）。
 function formatTimestamp(timestamp) {
   try {
     if (!timestamp) return '-';

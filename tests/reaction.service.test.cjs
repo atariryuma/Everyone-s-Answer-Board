@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 function createMockSheet({ headers = [], rows = [], name = 'Sheet1' } = {}) {
   const data = [headers.slice(), ...rows.map((r) => r.slice())];
@@ -75,8 +76,7 @@ function loadReactionContext(overrides = {}) {
     LockService: { getScriptLock: () => lock },
     CACHE_DURATION: { MEDIUM: 30 },
     SYSTEM_LIMITS: {},
-    createErrorResponse: (message, data, extra) => ({ success: false, message, ...extra }),
-    createExceptionResponse: (error) => ({ success: false, message: error.message, error: error.message }),
+    ...gasResponseStubs(),
     getCurrentEmail: () => 'actor@example.com',
     isAdministrator: (email) => email === 'admin@example.com',
     findUserBySpreadsheetId: () => null,

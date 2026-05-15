@@ -3,14 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 function loadDataApisContext(overrides = {}) {
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     URL,
-    createErrorResponse: (message) => ({ success: false, message }),
-    createExceptionResponse: (error) => ({ success: false, message: error.message }),
-    createSuccessResponse: (message, data) => ({ success: true, message, ...(data && { data }) }),
+    ...gasResponseStubs(),
     getCurrentEmail: () => 'actor@example.com',
     findUserByEmail: () => null,
     findUserById: () => null,
@@ -117,117 +116,6 @@ test('isValidFormUrl: rejects malformed URL strings', () => {
   const ctx = loadDataApisContext();
   assert.equal(ctx.isValidFormUrl('not a url'), false);
   assert.equal(ctx.isValidFormUrl('https://'), false);
-});
-
-// =====================================================================
-// extractSpreadsheetInfo
-// =====================================================================
-
-test('extractSpreadsheetInfo: parses spreadsheet ID and gid', () => {
-  const ctx = loadDataApisContext();
-  const result = ctx.extractSpreadsheetInfo(
-    'https://docs.google.com/spreadsheets/d/1abc_XYZ-123/edit#gid=456'
-  );
-  assert.equal(result.success, true);
-  assert.equal(result.spreadsheetId, '1abc_XYZ-123');
-  assert.equal(result.gid, '456');
-});
-
-test('extractSpreadsheetInfo: defaults gid to "0" when missing', () => {
-  const ctx = loadDataApisContext();
-  const result = ctx.extractSpreadsheetInfo(
-    'https://docs.google.com/spreadsheets/d/abc123/edit'
-  );
-  assert.equal(result.success, true);
-  assert.equal(result.spreadsheetId, 'abc123');
-  assert.equal(result.gid, '0');
-});
-
-test('extractSpreadsheetInfo: handles gid after & separator', () => {
-  const ctx = loadDataApisContext();
-  const result = ctx.extractSpreadsheetInfo(
-    'https://docs.google.com/spreadsheets/d/xyz/edit?foo=bar&gid=789'
-  );
-  assert.equal(result.success, true);
-  assert.equal(result.gid, '789');
-});
-
-test('extractSpreadsheetInfo: rejects non-spreadsheet URLs', () => {
-  const ctx = loadDataApisContext();
-  const result = ctx.extractSpreadsheetInfo('https://docs.google.com/forms/d/abc');
-  assert.equal(result.success, false);
-});
-
-test('extractSpreadsheetInfo: rejects null/empty/non-string', () => {
-  const ctx = loadDataApisContext();
-  assert.equal(ctx.extractSpreadsheetInfo(null).success, false);
-  assert.equal(ctx.extractSpreadsheetInfo('').success, false);
-  assert.equal(ctx.extractSpreadsheetInfo(42).success, false);
-});
-
-test('extractSpreadsheetInfo: extracts only alphanumeric IDs with hyphens/underscores', () => {
-  const ctx = loadDataApisContext();
-  // Valid ID chars include a-zA-Z0-9_-
-  const result = ctx.extractSpreadsheetInfo(
-    'https://docs.google.com/spreadsheets/d/1A-B_c-2DE/edit'
-  );
-  assert.equal(result.spreadsheetId, '1A-B_c-2DE');
-});
-
-test('extractSpreadsheetInfo: rejects URL lacking /spreadsheets/d/ prefix', () => {
-  const ctx = loadDataApisContext();
-  assert.equal(ctx.extractSpreadsheetInfo('https://example.com/d/abc').success, false);
-});
-
-// =====================================================================
-// getBoardInfo
-// =====================================================================
-
-test('getBoardInfo: returns auth error when no email', () => {
-  const ctx = loadDataApisContext({ getCurrentEmail: () => null });
-  const result = ctx.getBoardInfo();
-  assert.equal(result.success, false);
-});
-
-test('getBoardInfo: returns user-not-found when lookup fails', () => {
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => 'nobody@example.com',
-    findUserByEmail: () => null
-  });
-  const result = ctx.getBoardInfo();
-  assert.equal(result.success, false);
-  assert.match(result.message, /User not found/);
-});
-
-test('getBoardInfo: includes isPublished, URLs, and lastUpdated', () => {
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com', lastModified: '2026-01-01' }),
-    getConfigOrDefault: () => ({ isPublished: true, publishedAt: '2026-04-19' }),
-    getQuestionText: () => '今日の感想は？',
-    getWebAppUrl: () => 'https://script.google.com/macros/s/abc/exec'
-  });
-
-  const result = ctx.getBoardInfo();
-  assert.equal(result.success, true);
-  assert.equal(result.isPublished, true);
-  assert.equal(result.questionText, '今日の感想は？');
-  assert.ok(result.urls.view.includes('userId=u1'));
-  assert.ok(result.urls.view.includes('mode=view'));
-  assert.ok(result.urls.admin.includes('mode=admin'));
-  assert.equal(result.lastUpdated, '2026-04-19');
-});
-
-test('getBoardInfo: lastUpdated falls back to user.lastModified when not published', () => {
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => 'owner@example.com',
-    findUserByEmail: () => ({ userId: 'u1', userEmail: 'owner@example.com', lastModified: '2026-01-01' }),
-    getConfigOrDefault: () => ({ isPublished: false }),
-    getWebAppUrl: () => 'https://x.example.com'
-  });
-  const result = ctx.getBoardInfo();
-  assert.equal(result.isPublished, false);
-  assert.equal(result.lastUpdated, '2026-01-01');
 });
 
 // =====================================================================
@@ -561,72 +449,6 @@ test('getPublishedSheetDataForProfile: rejects deleted profile (history hit, pro
 });
 
 // =====================================================================
-// getSheetList
-// =====================================================================
-
-test('getSheetList: rejects empty spreadsheetId', () => {
-  const ctx = loadDataApisContext();
-  const result = ctx.getSheetList('');
-  assert.equal(result.success, false);
-  assert.match(result.message, /required/i);
-});
-
-test('getSheetList: rejects unauthenticated user', () => {
-  const ctx = loadDataApisContext({
-    getCurrentEmail: () => null
-  });
-  const result = ctx.getSheetList('ss-1');
-  assert.equal(result.success, false);
-  assert.match(result.error, /認証/);
-});
-
-test('getSheetList: returns error when openSpreadsheet throws', () => {
-  const ctx = loadDataApisContext({
-    openSpreadsheet: () => { throw new Error('no access'); }
-  });
-  const result = ctx.getSheetList('ss-1');
-  assert.equal(result.success, false);
-  assert.match(result.error, /アクセスできません|設定されているか/);
-});
-
-test('getSheetList: returns error when dataAccess is null', () => {
-  const ctx = loadDataApisContext({
-    openSpreadsheet: () => null
-  });
-  const result = ctx.getSheetList('ss-1234567890');
-  assert.equal(result.success, false);
-});
-
-test('getSheetList: returns list of sheets with dimensions', () => {
-  const mockSheets = [
-    {
-      getName: () => 'Sheet1',
-      getSheetId: () => 0
-    },
-    {
-      getName: () => 'Responses',
-      getSheetId: () => 1
-    }
-  ];
-  const ctx = loadDataApisContext({
-    openSpreadsheet: () => ({ spreadsheet: { getSheets: () => mockSheets } }),
-    getSheetInfo: (sheet) => ({
-      lastRow: sheet.getName() === 'Sheet1' ? 10 : 5,
-      lastCol: 7,
-      headers: []
-    })
-  });
-  const result = ctx.getSheetList('ss-1');
-  assert.equal(result.success, true);
-  assert.equal(result.sheets.length, 2);
-  assert.equal(result.sheets[0].name, 'Sheet1');
-  assert.equal(result.sheets[0].rowCount, 10);
-  assert.equal(result.sheets[0].columnCount, 7);
-  assert.equal(result.sheets[1].name, 'Responses');
-  assert.equal(result.sheets[1].rowCount, 5);
-});
-
-// =====================================================================
 // getNotificationUpdate
 // =====================================================================
 
@@ -932,51 +754,6 @@ test('getActiveFormInfo: default formTitle when absent from config', () => {
 });
 
 // =====================================================================
-// getSheetNameFromGid
-// =====================================================================
-
-// Why: getSheetNameFromGid は openSpreadsheet 経由で circuit-breaker + SA fallback を使う。
-//   テストは openSpreadsheet をスタブし、{ spreadsheet: {getSheets: ...} } を返す形にする。
-test('getSheetNameFromGid: returns sheet name matching gid', () => {
-  const mockSheets = [
-    { getName: () => 'Sheet1', getSheetId: () => 0 },
-    { getName: () => 'フォームの回答 1', getSheetId: () => 12345 },
-    { getName: () => 'Data', getSheetId: () => 67890 }
-  ];
-  const ctx = loadDataApisContext({
-    openSpreadsheet: () => ({ spreadsheet: { getSheets: () => mockSheets } })
-  });
-  assert.equal(ctx.getSheetNameFromGid('ss-1', '12345'), 'フォームの回答 1');
-  assert.equal(ctx.getSheetNameFromGid('ss-1', '67890'), 'Data');
-});
-
-test('getSheetNameFromGid: falls back to first sheet when gid not found', () => {
-  const mockSheets = [
-    { getName: () => 'FirstSheet', getSheetId: () => 0 },
-    { getName: () => 'SecondSheet', getSheetId: () => 100 }
-  ];
-  const ctx = loadDataApisContext({
-    openSpreadsheet: () => ({ spreadsheet: { getSheets: () => mockSheets } })
-  });
-  assert.equal(ctx.getSheetNameFromGid('ss-1', '999'), 'FirstSheet');
-});
-
-test('getSheetNameFromGid: returns "Sheet1" when openSpreadsheet returns null', () => {
-  // 旧来は openById throw 経路だったが、今は openSpreadsheet が null を返すパスに統一
-  const ctx = loadDataApisContext({
-    openSpreadsheet: () => null
-  });
-  assert.equal(ctx.getSheetNameFromGid('ss-1', '0'), 'Sheet1');
-});
-
-test('getSheetNameFromGid: returns "Sheet1" when no sheets present', () => {
-  const ctx = loadDataApisContext({
-    openSpreadsheet: () => ({ spreadsheet: { getSheets: () => [] } })
-  });
-  assert.equal(ctx.getSheetNameFromGid('ss-1', '0'), 'Sheet1');
-});
-
-// =====================================================================
 // connectDataSource / processDataSourceOperations
 //
 // These call same-file functions (getColumnAnalysis, getFormInfoInternal),
@@ -1039,7 +816,7 @@ test('connectDataSource: delegates to processDataSourceOperations when batch giv
     columnCallCount += 1;
     return { success: true, mapping: {}, headers: [] };
   };
-  ctx.getFormInfoInternal = () => ({ formData: { formUrl: 'https://docs.google.com/forms/d/x' } });
+  ctx.getFormInfo = () => ({ formData: { formUrl: 'https://docs.google.com/forms/d/x' } });
   const result = ctx.connectDataSource('ss-1', 'Sheet1', [
     { type: 'validateAccess' },
     { type: 'getFormInfo' },
@@ -1160,39 +937,6 @@ test('getColumnAnalysis: returns headers and mapping on success', () => {
   assert.equal(result.success, true);
   assert.equal(result.mapping.answer, 0);
   assert.ok(result.headers.length === 3);
-});
-
-// =====================================================================
-// getFormInfoInternal
-// =====================================================================
-
-test('getFormInfoInternal: delegates to getFormInfo when present', () => {
-  let capturedArgs = null;
-  const ctx = loadDataApisContext();
-  ctx.getFormInfo = (ss, sheet) => {
-    capturedArgs = { ss, sheet };
-    return { success: true, formData: { formUrl: 'https://docs.google.com/forms/d/abc' } };
-  };
-  const result = ctx.getFormInfoInternal('ss-1', 'Sheet1');
-  assert.equal(result.success, true);
-  assert.equal(capturedArgs.ss, 'ss-1');
-  assert.equal(capturedArgs.sheet, 'Sheet1');
-});
-
-test('getFormInfoInternal: returns not-initialized error when getFormInfo missing', () => {
-  const ctx = loadDataApisContext();
-  ctx.getFormInfo = undefined;
-  const result = ctx.getFormInfoInternal('ss-1', 'Sheet1');
-  assert.equal(result.success, false);
-  assert.match(result.message, /初期化されていません/);
-});
-
-test('getFormInfoInternal: catches getFormInfo exception', () => {
-  const ctx = loadDataApisContext();
-  ctx.getFormInfo = () => { throw new Error('form api down'); };
-  const result = ctx.getFormInfoInternal('ss-1', 'Sheet1');
-  assert.equal(result.success, false);
-  assert.match(result.message, /form api down/);
 });
 
 // =====================================================================

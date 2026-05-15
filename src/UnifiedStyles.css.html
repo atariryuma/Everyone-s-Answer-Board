@@ -4,6 +4,34 @@
    Based on AdminPanel.html with additional styles from all HTML files
    ============================================================================= */
 
+  /* =============================================================================
+   * Button "busy" 共通スタイル — ButtonBusyManager.withBusy が toggle する class
+   * pointer-events: none で連打を物理的に止め、疑似要素でスピナーを右端に出す。
+   * ============================================================================= */
+  .btn-busy {
+    opacity: 0.7;
+    cursor: progress;
+    position: relative;
+    pointer-events: none;
+    padding-right: calc(1.5em + 0.5rem); /* スピナー分の右余白を確保 */
+  }
+  .btn-busy::after {
+    content: "";
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    width: 0.95em;
+    height: 0.95em;
+    margin-top: -0.5em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: btn-busy-spin 0.6s linear infinite;
+  }
+  @keyframes btn-busy-spin {
+    to { transform: rotate(360deg); }
+  }
+
   /* CSS Variables - Comprehensive Color and Design System */
   :root {
     /* =============================================================================
@@ -1479,5 +1507,704 @@
     font-weight: 500;
     color: rgba(156, 163, 175, 1);
     font-size: 0.875rem;
+  }
+
+  /* `<details>` summary の default triangle を消し、回転式の小さな三角で代替する。 */
+  .admin-collapsible > summary {
+    list-style: none;
+    outline: none;
+    transition: color 0.15s ease;
+  }
+  .admin-collapsible > summary::-webkit-details-marker { display: none; }
+  .admin-collapsible > summary::before {
+    content: "▸ ";
+    display: inline-block;
+    transition: transform 0.15s ease;
+    margin-right: 0.25em;
+    color: inherit;
+  }
+  .admin-collapsible[open] > summary::before {
+    transform: rotate(90deg);
+  }
+
+  /* Lesson Workspace: inline takeover mode で main workspace を hide。
+     既定で wizard / Runner は非表示、body class が付いた時だけ表示する。
+     HTML の hidden 属性は使わない (CSS 上書き不可で blank screen の原因になる)。
+     admin-container 外に出しているので margin を独自に持たせて status-header と整列。 */
+  #lesson-workspace,
+  #lesson-runner {
+    display: none;
+    margin: var(--space-4);
+  }
+  body.mode-create-lesson #lesson-workspace { display: block; }
+  body.mode-run-lesson #lesson-runner { display: block; }
+  body.mode-create-lesson [data-normal-mode],
+  body.mode-run-lesson [data-normal-mode] { display: none; }
+
+  /* ----- Class chip picker (wizard step 1) ----- */
+  .class-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+  .class-chip-row-inline { margin-bottom: 0; }
+  .class-chip-row-selected {
+    min-height: 2.5rem;
+    padding: 0.5rem;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px dashed rgba(148, 163, 184, 0.3);
+    border-radius: 0.5rem;
+  }
+  .class-chip-row-known {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .class-chip-empty {
+    color: rgba(148, 163, 184, 0.6);
+    font-size: 0.85rem;
+    font-style: italic;
+  }
+  .class-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 9999px;
+    background: rgba(59, 130, 246, 0.18);
+    border: 1px solid rgba(96, 165, 250, 0.45);
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    cursor: default;
+  }
+  .class-chip-known {
+    background: rgba(100, 116, 139, 0.18);
+    border-color: rgba(148, 163, 184, 0.35);
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .class-chip-known:hover {
+    background: rgba(59, 130, 246, 0.18);
+    border-color: rgba(96, 165, 250, 0.45);
+    color: #fff;
+  }
+  .class-chip-remove {
+    background: none;
+    border: none;
+    color: rgba(148, 163, 184, 0.8);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 0.15rem;
+  }
+  .class-chip-remove:hover { color: #f87171; }
+  .class-preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+  }
+  .class-preset-label {
+    font-size: 0.8rem;
+    color: rgba(148, 163, 184, 0.9);
+  }
+  .btn-class-preset {
+    padding: 0.25rem 0.65rem;
+    border-radius: 0.4rem;
+    background: rgba(30, 41, 59, 0.7);
+    border: 1px solid rgba(71, 85, 105, 0.6);
+    color: #cbd5e1;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .btn-class-preset:hover {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(96, 165, 250, 0.5);
+    color: #fff;
+  }
+  .btn-class-preset.active {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: rgba(96, 165, 250, 0.7);
+    color: #fff;
+  }
+  .class-custom-add summary {
+    cursor: pointer;
+    color: rgba(148, 163, 184, 0.9);
+    font-size: 0.85rem;
+    padding: 0.3rem 0;
+  }
+  .class-custom-add[open] summary { color: #cbd5e1; }
+
+  /* Wizard progress dots (Stripe 風) */
+  .lesson-step-dot {
+    display: inline-block;
+    width: 1.5rem; height: 1.5rem;
+    text-align: center; line-height: 1.5rem;
+    border-radius: 9999px;
+    color: rgba(148, 163, 184, 0.5);
+    font-size: 0.85rem;
+  }
+  .lesson-step-dot.active {
+    color: rgba(34, 211, 238, 0.95);
+    font-weight: bold;
+  }
+  .lesson-step[hidden] { display: none; }
+
+  /* Phase card (Wizard Step 2 / Runner) */
+  .lesson-phase-card {
+    background: rgba(30, 41, 59, 0.55);
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 0.6rem;
+    padding: 0.85rem 1rem;
+    min-width: 180px;
+    transition: border-color 0.15s ease, background 0.15s ease;
+  }
+  .lesson-phase-card.active {
+    border-color: rgba(34, 211, 238, 0.7);
+    background: rgba(8, 145, 178, 0.18);
+  }
+  .lesson-phase-card.completed {
+    opacity: 0.7;
+    border-color: rgba(34, 197, 94, 0.45);
+  }
+  .lesson-phase-card .phase-number {
+    font-size: 0.7rem; color: rgba(148, 163, 184, 0.8); font-weight: bold;
+  }
+  .lesson-phase-card .phase-name { font-size: 1rem; color: white; margin: 0.2rem 0; }
+  .lesson-phase-card .phase-meta { font-size: 0.75rem; color: rgba(148, 163, 184, 0.7); }
+
+  /* Phase card 編集モード (Wizard Step 2) */
+  .phase-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .phase-delete-btn {
+    background: none;
+    border: none;
+    color: rgba(148, 163, 184, 0.7);
+    font-size: 1.2rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0.3rem;
+    border-radius: 0.3rem;
+    transition: color 0.15s ease, background 0.15s ease;
+  }
+  .phase-delete-btn:hover {
+    color: #f87171;
+    background: rgba(248, 113, 113, 0.1);
+  }
+  .phase-field {
+    margin-bottom: 0.6rem;
+  }
+  .phase-field:last-child { margin-bottom: 0; }
+  .phase-label {
+    display: block;
+    font-size: 0.72rem;
+    color: rgba(148, 163, 184, 0.85);
+    margin-bottom: 0.2rem;
+  }
+  .phase-add-wrap {
+    grid-column: 1 / -1;
+    text-align: center;
+    margin-top: 0.5rem;
+  }
+  .phase-add-btn {
+    padding: 0.6rem 1.4rem;
+    background: rgba(34, 211, 238, 0.12);
+    border: 1px dashed rgba(34, 211, 238, 0.5);
+    border-radius: 0.5rem;
+    color: rgb(165, 243, 252);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .phase-add-btn:hover {
+    background: rgba(34, 211, 238, 0.2);
+    border-color: rgba(34, 211, 238, 0.8);
+    color: #fff;
+  }
+
+  /* Phase preview & detail UI (Wizard Step 2) */
+  .phase-preview {
+    margin-bottom: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    background: rgba(8, 145, 178, 0.1);
+    border: 1px solid rgba(34, 211, 238, 0.25);
+    border-radius: 0.4rem;
+    font-size: 0.8rem;
+    color: rgba(229, 231, 235, 0.9);
+  }
+  .phase-preview-numberline {
+    display: flex; align-items: center; gap: 0.4rem; justify-content: space-between;
+  }
+  .phase-preview-track {
+    flex: 1; text-align: center; color: rgba(34, 211, 238, 0.8); letter-spacing: -2px;
+  }
+  .phase-preview-end {
+    color: rgba(165, 243, 252, 0.9);
+    max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .phase-preview-matrix {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 0.2rem 0.4rem;
+    align-items: center;
+    font-size: 0.7rem;
+  }
+  .matrix-y-high { grid-column: 2; color: rgba(165, 243, 252, 0.85); }
+  .matrix-grid {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    width: 100%; aspect-ratio: 1;
+    max-height: 50px;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 0.2rem;
+    overflow: hidden;
+  }
+  .matrix-quad {
+    border: 1px solid rgba(34, 211, 238, 0.18);
+  }
+  .matrix-x-axis { grid-column: 2; color: rgba(165, 243, 252, 0.85); }
+  .matrix-y-low { grid-column: 2; color: rgba(165, 243, 252, 0.85); }
+  .phase-preview-pie,
+  .phase-preview-board {
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  .phase-preview-icon { font-size: 1.1rem; }
+  .phase-preview-text {
+    color: rgba(229, 231, 235, 0.85);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1;
+  }
+
+  .phase-detail {
+    margin-top: 0.5rem;
+    background: rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(71, 85, 105, 0.4);
+    border-radius: 0.4rem;
+    padding: 0.4rem 0.6rem;
+  }
+  .phase-detail summary {
+    cursor: pointer;
+    color: rgba(165, 243, 252, 0.85);
+    font-size: 0.75rem;
+    padding: 0.15rem 0;
+    list-style: none;
+  }
+  .phase-detail summary::before { content: '▸ '; color: rgba(148, 163, 184, 0.7); }
+  .phase-detail[open] summary::before { content: '▾ '; color: rgba(34, 211, 238, 0.8); }
+  .phase-detail-grid {
+    display: flex; gap: 0.4rem; align-items: center; margin-top: 0.4rem;
+  }
+  .phase-detail-row {
+    display: flex; gap: 0.4rem; align-items: center; margin-top: 0.4rem;
+  }
+  .phase-detail-tag {
+    font-size: 0.75rem; color: rgba(148, 163, 184, 0.85);
+    min-width: 1.5rem;
+  }
+  .phase-detail-sep {
+    color: rgba(148, 163, 184, 0.7); font-size: 0.9rem;
+  }
+  .phase-detail-grid input,
+  .phase-detail-row input {
+    flex: 1; min-width: 0; padding: 0.3rem 0.5rem; font-size: 0.85rem;
+  }
+  .phase-choice-list {
+    margin-top: 0.4rem;
+    display: flex; flex-direction: column; gap: 0.3rem;
+  }
+  .phase-choice-row {
+    display: flex; gap: 0.3rem; align-items: center;
+  }
+  .phase-choice-row input {
+    flex: 1; padding: 0.3rem 0.5rem; font-size: 0.85rem;
+  }
+  .phase-choice-del {
+    background: none; border: none;
+    color: rgba(148, 163, 184, 0.7);
+    font-size: 1rem; cursor: pointer; padding: 0 0.3rem;
+  }
+  .phase-choice-del:hover { color: #f87171; }
+  .phase-choice-add {
+    align-self: flex-start;
+    padding: 0.25rem 0.7rem;
+    background: rgba(34, 211, 238, 0.1);
+    border: 1px dashed rgba(34, 211, 238, 0.4);
+    border-radius: 0.3rem;
+    color: rgba(165, 243, 252, 0.9);
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .phase-choice-add:hover {
+    background: rgba(34, 211, 238, 0.2);
+  }
+
+  /* Lesson template picker (dropdown menu on 🎒 新しい授業を作る ▾) */
+  .lesson-template-picker {
+    position: relative;
+  }
+  .lesson-template-picker > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .lesson-template-picker > summary::-webkit-details-marker { display: none; }
+  .lesson-template-menu {
+    position: absolute;
+    right: 0; top: 100%;
+    margin-top: 0.4rem;
+    width: 280px;
+    background: rgba(15, 23, 42, 0.98);
+    border: 1px solid rgba(96, 165, 250, 0.5);
+    border-radius: 0.5rem;
+    padding: 0.4rem;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+    z-index: 100;
+  }
+  .lesson-template-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    text-align: left;
+    padding: 0.55rem 0.7rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.4rem;
+    color: #e2e8f0;
+    cursor: pointer;
+    margin-bottom: 0.25rem;
+    transition: all 0.15s ease;
+  }
+  .lesson-template-item:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(96, 165, 250, 0.45);
+  }
+  .lesson-template-label {
+    font-size: 0.92rem; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .lesson-template-desc {
+    font-size: 0.75rem;
+    color: rgba(148, 163, 184, 0.85);
+    margin-top: 0.15rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .lesson-template-phase-count {
+    color: rgba(165, 243, 252, 0.8);
+    margin-left: 0.3rem;
+  }
+  .lesson-template-loading {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.85rem;
+    color: rgba(148, 163, 184, 0.7);
+    font-style: italic;
+  }
+
+  /* ===== Profile more menu (保存済みボード行の ⋯ ボタン) ===== */
+  .profile-more-menu {
+    position: relative;
+  }
+  .profile-more-menu > summary {
+    list-style: none;
+    cursor: pointer;
+    padding: 0.05rem 0.4rem;
+    border-radius: 0.25rem;
+    color: rgba(148, 163, 184, 0.9);
+    font-size: 1rem;
+    line-height: 1;
+    user-select: none;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+  .profile-more-menu > summary::-webkit-details-marker { display: none; }
+  .profile-more-menu > summary:hover {
+    background: rgba(148, 163, 184, 0.18);
+    color: #fff;
+  }
+  .profile-more-list {
+    position: absolute;
+    right: 0; top: 100%;
+    margin-top: 0.25rem;
+    min-width: 160px;
+    background: rgba(15, 23, 42, 0.98);
+    border: 1px solid rgba(96, 165, 250, 0.4);
+    border-radius: 0.4rem;
+    padding: 0.25rem;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+    z-index: 50;
+  }
+  .profile-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.4rem 0.6rem;
+    background: transparent;
+    border: none;
+    border-radius: 0.25rem;
+    color: #e2e8f0;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: background 0.12s ease;
+  }
+  .profile-menu-item:hover { background: rgba(59, 130, 246, 0.18); }
+  .profile-menu-item-danger { color: rgb(248, 113, 113); }
+  .profile-menu-item-danger:hover { background: rgba(248, 113, 113, 0.18); color: #fff; }
+
+  /* ===== Phase 追加 dropdown (Wizard Step 2) ===== */
+  .phase-add-picker {
+    position: relative;
+    display: inline-block;
+  }
+  .phase-add-picker > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .phase-add-picker > summary::-webkit-details-marker { display: none; }
+  .phase-add-menu {
+    position: absolute;
+    left: 50%; top: 100%;
+    transform: translateX(-50%);
+    margin-top: 0.4rem;
+    min-width: 220px;
+    background: rgba(15, 23, 42, 0.98);
+    border: 1px solid rgba(34, 211, 238, 0.5);
+    border-radius: 0.5rem;
+    padding: 0.35rem;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+    z-index: 50;
+  }
+  .phase-add-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.5rem 0.7rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.35rem;
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .phase-add-menu-item:hover {
+    background: rgba(34, 211, 238, 0.15);
+    border-color: rgba(34, 211, 238, 0.4);
+  }
+
+  /* ===== テンプレフォーム作成 dropdown ===== */
+  .template-form-picker {
+    position: relative;
+    display: inline-block;
+  }
+  .template-form-picker > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .template-form-picker > summary::-webkit-details-marker { display: none; }
+  .template-form-menu {
+    position: absolute;
+    left: 0; top: 100%;
+    margin-top: 0.4rem;
+    min-width: 280px;
+    background: rgba(15, 23, 42, 0.98);
+    border: 1px solid rgba(96, 165, 250, 0.5);
+    border-radius: 0.5rem;
+    padding: 0.4rem;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+    z-index: 50;
+  }
+  .template-form-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    text-align: left;
+    padding: 0.5rem 0.7rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.35rem;
+    color: #e2e8f0;
+    cursor: pointer;
+    margin-bottom: 0.2rem;
+    transition: all 0.12s ease;
+  }
+  .template-form-item:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(96, 165, 250, 0.45);
+  }
+  .template-form-label { font-size: 0.9rem; font-weight: 600; }
+  .template-form-desc {
+    font-size: 0.72rem;
+    color: rgba(148, 163, 184, 0.85);
+    margin-top: 0.1rem;
+  }
+
+  /* Step 3 confirm: phase 詳細リスト */
+  .confirm-phase-list {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .confirm-phase-row {
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+    padding: 0.5rem 0.7rem;
+    background: rgba(30, 41, 59, 0.5);
+    border: 1px solid rgba(71, 85, 105, 0.4);
+    border-radius: 0.4rem;
+    font-size: 0.85rem;
+  }
+  .confirm-phase-idx {
+    color: rgba(165, 243, 252, 0.85);
+    font-weight: 600;
+    min-width: 5.5rem;
+    font-size: 0.78rem;
+  }
+  .confirm-phase-body {
+    flex: 1;
+    color: rgba(229, 231, 235, 0.92);
+    line-height: 1.5;
+  }
+  .confirm-phase-q { color: rgba(148, 163, 184, 0.95); font-size: 0.82rem; }
+  .confirm-phase-detail { color: rgba(165, 243, 252, 0.7); font-size: 0.78rem; }
+
+  .confirm-warnings-wrap { margin-top: 0.7rem; }
+  .confirm-warnings {
+    margin: 0; padding-left: 0; list-style: none;
+    background: rgba(245, 158, 11, 0.12);
+    border: 1px solid rgba(245, 158, 11, 0.4);
+    border-radius: 0.4rem;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.82rem;
+    color: rgb(254, 215, 170);
+  }
+  .confirm-warnings li { margin: 0.15rem 0; }
+  .confirm-ok {
+    margin: 0;
+    padding: 0.5rem 0.7rem;
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid rgba(34, 197, 94, 0.3);
+    border-radius: 0.4rem;
+    color: rgb(187, 247, 208);
+    font-size: 0.82rem;
+  }
+
+  /* lesson.start エラー時の retry box */
+  .lesson-start-error-box {
+    margin-top: 0.7rem;
+    padding: 0.7rem 1rem;
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.45);
+    border-radius: 0.5rem;
+  }
+  .lesson-start-error-title {
+    font-weight: 600; color: rgb(254, 202, 202);
+    font-size: 0.92rem;
+  }
+  .lesson-start-error-detail {
+    font-size: 0.82rem;
+    color: rgba(254, 226, 226, 0.92);
+    margin-top: 0.25rem;
+  }
+  .lesson-start-error-progress {
+    font-size: 0.82rem;
+    color: rgba(187, 247, 208, 0.9);
+    margin-top: 0.35rem;
+  }
+
+  /* Lesson hero card (AdminPanel 上部の primary entry point)。
+     accent border + 微 gradient で「ここから始める」と視覚的に誘導する。 */
+  .lesson-hero-card {
+    border: 1px solid rgba(34, 211, 238, 0.35);
+    background: linear-gradient(135deg, rgba(8, 145, 178, 0.12), rgba(34, 211, 238, 0.04));
+  }
+  .lesson-hero-card h2 { color: rgba(207, 250, 254, 1); }
+
+  /* 個別ボードモードへの divider (二者択一を明示) */
+  .section-group-divider {
+    display: flex; align-items: center;
+    margin: 1.25rem 0 0.75rem;
+    gap: 0.75rem;
+  }
+  .section-group-divider::before,
+  .section-group-divider::after {
+    content: ""; flex: 1;
+    border-top: 1px solid rgba(148, 163, 184, 0.2);
+  }
+  .section-group-label {
+    font-size: 0.8rem;
+    color: rgba(148, 163, 184, 0.7);
+    white-space: nowrap;
+  }
+
+  /* Step number badge: 個別ボード authoring の ① ② ③ を視覚的に番号化。
+     セットアップ順序が教師に伝わるようにする (Hick's Law: 選択肢を減らし順番で誘導)。 */
+  .step-number {
+    display: inline-block;
+    min-width: 1.5rem; height: 1.5rem;
+    line-height: 1.5rem; text-align: center;
+    background: rgba(148, 163, 184, 0.15);
+    border-radius: 50%;
+    font-size: 0.9rem;
+    margin-right: 0.4rem;
+    color: rgba(207, 232, 252, 0.95);
+  }
+
+  /* フォーム連携の代替経路ブロック (details 内、2 つを区切る薄い背景) */
+  .form-alternative-block {
+    padding: 0.75rem;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 0.4rem;
+  }
+
+  /* Lesson review banner (Phase 2): Page.html 上部に固定表示 */
+  #lesson-review-banner.hidden { display: none; }
+  #lesson-review-banner {
+    position: sticky; top: 0; z-index: 9999;
+    background: linear-gradient(90deg, rgba(8,145,178,0.95), rgba(34,211,238,0.75));
+    color: white; padding: 0.5rem 1rem;
+    border-bottom: 1px solid rgba(34,211,238,0.6);
+    font-size: 0.9rem;
+  }
+  #lesson-review-banner .lesson-review-banner-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  #lesson-review-banner .lesson-review-readonly {
+    margin-left: auto;
+    font-size: 0.75rem;
+    background: rgba(255,255,255,0.2);
+    padding: 0.15rem 0.6rem; border-radius: 9999px;
+  }
+
+  /* Lesson list (過去レッスン一覧) */
+  #lesson-list li {
+    padding: 0.6rem 0.8rem;
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 0.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    transition: background 0.1s ease;
+  }
+  #lesson-list li:hover { background: rgba(15, 23, 42, 0.8); }
+  #lesson-list .lesson-state-badge {
+    font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 9999px;
+    background: rgba(148, 163, 184, 0.2); color: rgba(226, 232, 240, 0.85);
+  }
+  #lesson-list .lesson-state-badge.state-active {
+    background: rgba(34, 211, 238, 0.3); color: rgba(207, 250, 254, 1);
+  }
+  #lesson-list .lesson-state-badge.state-completed {
+    background: rgba(34, 197, 94, 0.2); color: rgba(187, 247, 208, 1);
   }
 </style>

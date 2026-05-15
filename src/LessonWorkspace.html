@@ -1,0 +1,162 @@
+<!-- =====================================================================
+  Lesson Workspace: 作成 wizard + 実行中 Runner。
+  Hero list (常時表示) は AdminPanel.html の main-editor 先頭にインライン配置。
+  Wizard / Runner は body.mode-create-lesson / mode-run-lesson で全画面 takeover。
+===================================================================== -->
+
+<!-- ============== Wizard (作成画面、body.mode-create-lesson 時に表示) ============== -->
+<section id="lesson-workspace" class="card glass-panel rounded-xl p-6">
+  <header class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-semibold text-white">📋 新しい授業を作る</h2>
+    <button type="button" class="btn btn-secondary text-sm"
+      onclick="exitLessonCreateMode()" title="作成途中の内容は draft として保存されます">
+      ← 設定に戻る
+    </button>
+  </header>
+
+  <!-- Progress dots (Stripe 風) -->
+  <div class="flex items-center gap-2 mb-6">
+    <span class="lesson-step-dot active" data-step="1" title="基本情報">●</span>
+    <span class="text-gray-600">━</span>
+    <span class="lesson-step-dot" data-step="2" title="フェーズ設計">○</span>
+    <span class="text-gray-600">━</span>
+    <span class="lesson-step-dot" data-step="3" title="確認">○</span>
+    <span class="ml-auto text-xs text-gray-400" id="lesson-autosave-indicator"></span>
+  </div>
+
+  <!-- Step 1: 基本情報 -->
+  <div class="lesson-step" data-step="1">
+    <div class="form-group">
+      <label for="lesson-name" class="block text-sm font-medium text-gray-300 mb-2">
+        レッスン名:
+      </label>
+      <input type="text" id="lesson-name" class="modern-input" data-autosave
+        data-lesson-field="name"
+        placeholder="例: 5/15 道徳「友だち」 5年3組" maxlength="100" />
+    </div>
+
+    <div class="form-group">
+      <label class="block text-sm font-medium text-gray-300 mb-2">
+        対象クラス: <span class="text-xs text-gray-400">(クリックで選択)</span>
+      </label>
+
+      <!-- 選択済みクラス chips (削除可) -->
+      <div id="lesson-class-selected" class="class-chip-row class-chip-row-selected" aria-live="polite">
+        <span class="class-chip-empty">まだ選択されていません</span>
+      </div>
+
+      <!-- 学年プリセット: 1年〜6年, 中1〜中3, 高1〜高3 -->
+      <div class="class-preset-row">
+        <span class="class-preset-label">学年から追加:</span>
+        <button type="button" class="btn-class-preset" data-grade="1">1年</button>
+        <button type="button" class="btn-class-preset" data-grade="2">2年</button>
+        <button type="button" class="btn-class-preset" data-grade="3">3年</button>
+        <button type="button" class="btn-class-preset" data-grade="4">4年</button>
+        <button type="button" class="btn-class-preset" data-grade="5">5年</button>
+        <button type="button" class="btn-class-preset" data-grade="6">6年</button>
+      </div>
+
+      <!-- 学年クリック後に出る組プリセット (1-6組) -->
+      <div id="lesson-class-grade-expand" class="class-chip-row" hidden></div>
+
+      <!-- 過去レッスンで使ったクラス候補 -->
+      <div class="class-chip-row class-chip-row-known" id="lesson-class-known-wrap" hidden>
+        <span class="class-preset-label">以前使ったクラス:</span>
+        <div id="lesson-class-known" class="class-chip-row class-chip-row-inline"></div>
+      </div>
+
+      <!-- カスタム追加 (chip にないクラスのみ) -->
+      <details class="class-custom-add">
+        <summary>+ 他のクラスを追加</summary>
+        <div class="flex gap-2 mt-2">
+          <input type="text" id="lesson-class-custom-input" class="modern-input flex-1"
+            placeholder="例: 5-A, 特別支援, A組" maxlength="40" />
+          <button type="button" id="lesson-class-custom-btn" class="btn btn-secondary">追加</button>
+        </div>
+      </details>
+
+      <!-- バックエンド同期用 hidden field (autosave 経路を共有) -->
+      <input type="hidden" id="lesson-classes" data-autosave data-lesson-field="classes" value="" />
+
+      <p class="text-xs text-gray-400 mt-2">
+        1 つの Form を全クラスで共有し、生徒は所属クラスを Form 内で選びます。
+      </p>
+    </div>
+
+    <div class="flex justify-end gap-2 mt-4">
+      <button type="button" class="btn btn-primary" onclick="lessonGoToStep(2)">
+        次へ →
+      </button>
+    </div>
+  </div>
+
+  <!-- Step 2: フェーズ設計 -->
+  <div class="lesson-step" data-step="2" hidden>
+    <p class="text-sm text-gray-300 mb-3">
+      📚 各フェーズの <strong class="text-cyan-300">名前 / 形式 / 質問</strong> を編集できます。フェーズは <strong>追加・削除</strong> も可能です (1〜5 個)。
+    </p>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-3" id="lesson-phase-cards">
+      <!-- JS が生成 -->
+    </div>
+
+    <div class="flex justify-between gap-2 mt-4">
+      <button type="button" class="btn btn-secondary" onclick="lessonGoToStep(1)">← 戻る</button>
+      <button type="button" class="btn btn-primary" onclick="lessonGoToStep(3)">次へ →</button>
+    </div>
+  </div>
+
+  <!-- Step 3: 確認 -->
+  <div class="lesson-step" data-step="3" hidden>
+    <div class="bg-gray-800 rounded-lg p-4 mb-4">
+      <h3 class="text-sm font-semibold text-cyan-300 mb-2">この内容で授業を開始します</h3>
+      <ul class="text-sm text-gray-300 space-y-1 mb-3">
+        <li>📝 <span id="lesson-summary-phase-count">3</span> 個の Google Form を自動生成 (各フェーズ用)</li>
+        <li>🎯 対象クラス: <span id="lesson-summary-classes" class="text-cyan-200">-</span></li>
+        <li>🔗 Spreadsheet 連携 + 共有設定も自動で完了</li>
+      </ul>
+      <h4 class="text-xs font-semibold text-gray-400 mt-3 mb-2">フェーズ詳細</h4>
+      <ol id="lesson-summary-phase-list" class="confirm-phase-list"></ol>
+      <div id="lesson-summary-warnings" class="confirm-warnings-wrap"></div>
+    </div>
+
+    <!-- partial failure 発生時にここに「再試行」UI を出す -->
+    <div id="lesson-start-error" class="lesson-start-error" hidden></div>
+
+    <div class="flex justify-between gap-2 mt-4">
+      <button type="button" class="btn btn-secondary" onclick="lessonGoToStep(2)">← 戻る</button>
+      <button type="button" id="lesson-start-btn" class="btn btn-primary"
+        onclick="lessonStartNow()">
+        🎬 すべて作成して開始
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ============== Runner (実行中、body.mode-run-lesson 時に表示) ============== -->
+<section id="lesson-runner" class="card glass-panel rounded-xl p-6">
+  <header class="flex items-center justify-between mb-4">
+    <h2 class="text-xl font-semibold text-white inline-flex items-center gap-2">
+      🎬 <span id="lesson-runner-name">授業中</span>
+    </h2>
+  </header>
+
+  <!-- フェーズカード横並び -->
+  <div class="flex items-center gap-3 mb-4 overflow-x-auto" id="lesson-runner-phases">
+    <!-- JS が動的生成 -->
+  </div>
+
+  <div class="flex items-center gap-2">
+    <button type="button" id="lesson-prev-btn" class="btn btn-secondary"
+      onclick="lessonAdvance('previous')">⏪ 戻す</button>
+    <button type="button" id="lesson-next-btn" class="btn btn-primary"
+      onclick="lessonAdvance('next')">▶ 次のフェーズへ</button>
+    <span class="ml-auto"></span>
+    <button type="button" class="btn btn-danger"
+      onclick="lessonEnd()">⏹ 授業終了</button>
+  </div>
+
+  <p class="text-xs text-gray-400 mt-3">
+    「⏹ 授業終了」で全 Form の受付を締切り、振り返り用にアーカイブします。
+  </p>
+</section>

@@ -55,6 +55,29 @@
   }
 
   // ---------------------------------------------------------------------
+  // 4 象限ラベルを解決する。axis.matrixQuadrantLabels が明示指定されていればそれを優先、
+  //   空の象限は xAxisLabels / yAxisLabels から「<xLabel>×<yLabel>」形式で自動組立する。
+  //   教師が軸ラベルだけ書けば 4 象限が自動で意味を持つ。
+  function __resolveQuadrantLabels(axisCfg) {
+    const explicit = (axisCfg && axisCfg.matrixQuadrantLabels) || {};
+    const xL = (axisCfg && axisCfg.xAxisLabels) || {};
+    const yL = (axisCfg && axisCfg.yAxisLabels) || {};
+    const xLow = xL.min || '', xHigh = xL.max || '';
+    const yLow = yL.min || '', yHigh = yL.max || '';
+    const combine = (xPart, yPart) => {
+      if (!xPart && !yPart) return '';
+      if (xPart && yPart) return xPart + '×' + yPart;
+      return xPart || yPart;
+    };
+    return {
+      hh: explicit.hh || combine(xHigh, yHigh),
+      lh: explicit.lh || combine(xLow, yHigh),
+      hl: explicit.hl || combine(xHigh, yLow),
+      ll: explicit.ll || combine(xLow, yLow)
+    };
+  }
+
+  // ---------------------------------------------------------------------
   // d3 v7 は src/d3.min.html で同梱しているため、すでに window.d3 が利用可能。
   // 旧 CDN 動的ロード方式は Edge のトラッキング防止 / Chrome 拡張による
   // HTMLScriptElement.src setter 干渉で「Assignment to constant variable」
@@ -150,24 +173,42 @@
 
     const safeTitle = escapeForTooltip(title);
 
-    // 各行のリアクションボタンを「カードと完全に同じ生成器」で作る。
-    //   - 色: text-yellow-500 / text-red-500 / text-green-500
-    //   - SVG アイコン (絵文字ではなく)
-    //   - state.showCounts で数字表示の有無
-    //   - aria-pressed / .reacted クラス
+    // matrix モードでは各意見にその「立場 (象限名)」を chip で併記。
+    //   同じキーワード popup を全象限から集めるので、「同じ言葉が違う立場で使われている」発見が
+    //   chip の色違いで visible になり、道徳的な多面性教育の核を担う。
+    const axisCfg = (app.state && app.state.axisConfig) || {};
+    const quadrantLabels = __resolveQuadrantLabels(axisCfg);
+    const defaultMin = typeof axisCfg.defaultMin === 'number' ? axisCfg.defaultMin : 1;
+    const defaultMax = typeof axisCfg.defaultMax === 'number' ? axisCfg.defaultMax : 5;
+    const quadrantMid = (defaultMin + defaultMax) / 2;
+    const quadrantOf = (r) => {
+      if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') return '';
+      const xKey = r.numericX >= quadrantMid ? 'h' : 'l';
+      const yKey = r.numericY >= quadrantMid ? 'h' : 'l';
+      return quadrantLabels[xKey + yKey] || '';
+    };
+
+    // displayMode 連動: profile.displaySettings.showNames=false → state.displayMode='anonymous'
+    //   のとき、popup 内でも名前を出さない。教師 view (isOwnBoard/isAdmin) でも管理モード OFF
+    //   なら同様に匿名扱い (showAnswerModal / renderBoardCards と整合)。
+    const isNamed = (app.state && app.state.displayMode === 'named');
+
+    // 各行のリアクションボタンを「カードと完全に同じ生成器」で作る (色 / SVG / showCounts / aria)。
     const canMakeBtns = typeof app.createReactionButtons === 'function';
     const cards = rows.map((r) => {
-      const name = escapeForTooltip(r.name || '匿名');
+      const displayName = isNamed
+        ? escapeForTooltip(r.name || (r.email ? r.email.split('@')[0] : '') || '匿名')
+        : '匿名';
       const text = escapeForTooltip(r.reason || r.answer || '(本文なし)');
-      // createReactionButtons は safeData 形式を要求 (rowIndex / reactions)
-      const safeData = {
-        rowIndex: r.rowIndex,
-        reactions: r.reactions || {}
-      };
+      const quadrantName = quadrantOf(r);
+      const chipHtml = quadrantName
+        ? '<span class="viz-rows-popup-chip">📍 ' + escapeForTooltip(quadrantName) + '</span>'
+        : '';
+      const safeData = { rowIndex: r.rowIndex, reactions: r.reactions || {} };
       const reactionBtns = canMakeBtns ? app.createReactionButtons(safeData) : '';
       return [
-        '<div class="viz-rows-popup-row" data-row-index="' + r.rowIndex + '">',
-        '  <div class="viz-rows-popup-name">', name, '</div>',
+        '<div class="viz-rows-popup-row" data-row-index="' + r.rowIndex + '" tabindex="0" role="button" aria-label="意見の詳細を表示">',
+        '  <div class="viz-rows-popup-name">', displayName, chipHtml, '</div>',
         '  <div class="viz-rows-popup-reason">', text, '</div>',
         '  <div class="viz-rows-popup-actions reaction-container">', reactionBtns, '</div>',
         '</div>'
@@ -195,29 +236,54 @@
         close();
         return;
       }
-      // カードと完全に同じハンドラ: .reaction-btn / data-row-index / data-reaction
-      // (page.js line 772-776 と整合)
+      // リアクションボタン: 既存ロジック (楽観 UI + 即時 toggle)
       const reactionBtn = e.target.closest('.reaction-btn');
-      if (!reactionBtn || reactionBtn.disabled) return;
-      const rowIdx = Number(reactionBtn.dataset.rowIndex);
-      const type = reactionBtn.dataset.reaction;
-      if (!rowIdx || !type) return;
-      if (typeof app.addReaction !== 'function') return;
+      if (reactionBtn) {
+        if (reactionBtn.disabled) return;
+        const rowIdx = Number(reactionBtn.dataset.rowIndex);
+        const type = reactionBtn.dataset.reaction;
+        if (!rowIdx || !type) return;
+        if (typeof app.addReaction !== 'function') return;
 
-      // 楽観 UI: カードと同じく即時 toggle
-      //   - reaction-count span のテキストを +/- 1
-      //   - .reacted クラス + aria-pressed をトグル
-      //   サーバ反映で次回 render が真値で上書きする
-      const wasReacted = reactionBtn.classList.contains('reacted');
-      const countSpan = reactionBtn.querySelector('.reaction-count');
-      if (countSpan) {
-        const cur = Number(countSpan.textContent || '0');
-        countSpan.textContent = String(Math.max(0, cur + (wasReacted ? -1 : 1)));
+        const wasReacted = reactionBtn.classList.contains('reacted');
+        const countSpan = reactionBtn.querySelector('.reaction-count');
+        if (countSpan) {
+          const cur = Number(countSpan.textContent || '0');
+          countSpan.textContent = String(Math.max(0, cur + (wasReacted ? -1 : 1)));
+        }
+        reactionBtn.classList.toggle('reacted', !wasReacted);
+        reactionBtn.setAttribute('aria-pressed', String(!wasReacted));
+
+        app.addReaction(rowIdx, type);
+        return;
       }
-      reactionBtn.classList.toggle('reacted', !wasReacted);
-      reactionBtn.setAttribute('aria-pressed', String(!wasReacted));
 
-      app.addReaction(rowIdx, type);
+      // reaction-container 内の padding/隙間 click は popup を閉じない (誤動作防止)。
+      if (e.target.closest('.viz-rows-popup-actions')) return;
+
+      // 行 (reaction 以外の領域) click → 詳細モーダルを開く。
+      //   popup は閉じる: 「一覧 → 個別意見の精読」という UX フローを直線化。
+      const row = e.target.closest('.viz-rows-popup-row');
+      if (row && typeof app.showAnswerModal === 'function') {
+        const rowIdx = Number(row.dataset.rowIndex);
+        if (rowIdx) {
+          close();
+          app.showAnswerModal(rowIdx);
+        }
+      }
+    });
+
+    // キーボード操作: 行に focus 時 Enter / Space で詳細モーダルを開く
+    popup.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const row = e.target.closest('.viz-rows-popup-row');
+      if (!row) return;
+      e.preventDefault();
+      const rowIdx = Number(row.dataset.rowIndex);
+      if (rowIdx && typeof app.showAnswerModal === 'function') {
+        close();
+        app.showAnswerModal(rowIdx);
+      }
     });
   }
 
@@ -361,8 +427,10 @@
   }
 
   function escapeForTooltip(s) {
-    // SharedUtilities.html の escapeHtml があるならそれを使うべきだが、
-    // 名前空間が確実でないのでローカルに最小実装。
+    const su = window.sharedUtilities;
+    if (su && su.security && typeof su.security.escapeHtml === 'function') {
+      return su.security.escapeHtml(s == null ? '' : String(s));
+    }
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -403,7 +471,12 @@
     //   既に viz-container として初期化済みなら、子要素を再利用して参照だけ返す。
     //   SVG の中身は renderMatrix/numberline 側で `svg.selectAll('*').remove()`
     //   して再描画するため、ここでは触らない。
-    if (answers.classList.contains('viz-container')) {
+    //
+    //   ただし比較モード描画後 (`.viz-compare-wrap` が子要素として残る) は強制再構築。
+    //   そうしないと比較解除後も 2 ペイン構造の中で querySelector が「最初の svg」を
+    //   返して左ペインだけが再描画され、教師は「解除されない」と感じる。
+    if (answers.classList.contains('viz-container') &&
+        !answers.querySelector('.viz-compare-wrap')) {
       const existingSvg = answers.querySelector('svg#vizSvg');
       const existingPanel = answers.querySelector('#vizTeacherPanel');
       if (existingSvg && existingPanel) {
@@ -415,11 +488,6 @@
     //   (renderBoardCards が答えカードを答え container に詰めていたケースを含む)。
     answers.className = 'viz-container';
     answers.innerHTML = '';
-
-    // v2674: 統計バッジ (vizStatsPills) はヘッダー #lastUpdatedText に統合移管。
-    //   旧 #vizCountPill は #answerCount と重複していたため廃止。
-    //   旧 #vizUpdatedPill は board/viz の mode 横断で同位置 (header 右) に表示するため
-    //   ヘッダーへ移動。renderXxx 末尾の updateStatsPills 呼び出しはそのまま再利用できる。
 
     // SVG
     // Why role="img" + aria-label: ビーズワーム/散布図は児童の位置プロットなのでスクリーン
@@ -444,9 +512,7 @@
     return { svg, teacherPanel };
   }
 
-  // v2674: 「最終更新 HH:MM」をヘッダー右の #lastUpdatedText に表示。
-  //   旧 #vizUpdatedPill (chart 内オーバーレイ) と #vizCountPill (重複) は廃止。
-  //   board/viz mode 切替で位置が変わらず、最終更新タイミングが mode 横断で読める。
+  // 「最終更新 HH:MM」をヘッダー右の #lastUpdatedText に表示。
   function updateStatsPills(_app, _count) {
     const updatedEl = document.getElementById('lastUpdatedText');
     if (!updatedEl) return;
@@ -633,7 +699,6 @@
         // SVG presentation attribute (attr) は外部 CSS より specificity が低いため、
         //   .viz-dot { stroke: #0f172a } に上書きされて画面には出ない。
         //   インライン style (style) なら specificity 1000 相当で確実に勝てる。
-        //   2026-05-14 v2654: attr → style に変更してリアクション色を実際に反映。
         //
         //   priority: HIGHLIGHT (教師注目) > REACTION (児童間人気) > none
         //   教師が意図的に「みんな見て」した意見は金縁でリアクションリングより目立たせる。
@@ -660,7 +725,6 @@
         .on('mouseleave', () => hideTooltip())
         .on('click', (event, d) => {
           hideTooltip();
-          // v2688: 単一モーダルに統一。比較モードでも個別意見は順次に1つずつ読む。
           if (typeof selfL.showAnswerModal === 'function') {
             selfL.showAnswerModal(d.data.rowIndex);
           } else {
@@ -749,12 +813,9 @@
       g.append('rect').attr('class', 'viz-quadrant ll')
         .attr('x', 0).attr('y', midY).attr('width', midX).attr('height', innerH - midY);
 
-      // 象限ラベル + 理由キーワード (v2673: 下部 HTML パネルから SVG 内統合に変更)
-      //   学習者が「ドットの位置 + 言葉の意味」を視線移動なしで一目把握できるよう、
-      //   各象限の上端/下端ラベル直下/直上に top-3 keyword を 1 行で配置。
-      //   anchor='top' → ラベルの下に配置 (hh/lh)
-      //   anchor='bottom' → ラベルの上に配置 (hl/ll)
-      const q = axis.matrixQuadrantLabels || {};
+      // 象限ラベル + 理由キーワードを SVG 内に配置 (「ドット位置 + 言葉の意味」を視線移動なしで把握)。
+      //   anchor='top' → ラベルの下に配置 (hh/lh) / anchor='bottom' → ラベルの上に配置 (hl/ll)。
+      const q = __resolveQuadrantLabels(axis);
       // バケット分け (renderQuadrantSummary と同じロジック)
       const buckets = { hh: [], lh: [], hl: [], ll: [] };
       for (const r of rows) {
@@ -771,6 +832,19 @@
         const top = longWords.length > 0 ? longWords : allWords.slice(0, 3);
         return top.map(w => w.word);
       };
+      // 各 keyword を click 可能にして「その語を含む全意見」一覧 popup を開く。
+      //   多面性教育の観点: クリック象限だけでなく全象限の reason を対象にする
+      //   → 「同じ言葉が違う立場で使われている」発見を最大化する。
+      const selfM = this;
+      const openKeywordPopup = (keyword) => {
+        const allRows = (selfM.state.currentAnswers || []);
+        // reason に keyword を含む行を抽出 (時系列順を維持 = 序列を作らない)
+        const matched = allRows.filter(r => {
+          const reason = String(r.reason || '');
+          return reason.indexOf(keyword) >= 0;
+        });
+        showRowsPopup(selfM, '「' + keyword + '」を含む回答 (' + matched.length + '件)', matched);
+      };
       const placeLabel = (text, x, y, key, anchor) => {
         if (!text) return;
         g.append('text').attr('class', 'viz-quadrant-label')
@@ -778,9 +852,35 @@
         const kws = keywordsFor(key);
         if (kws.length > 0) {
           const kwY = anchor === 'top' ? y + 22 : y - 22;
-          g.append('text').attr('class', 'viz-quadrant-keyword')
-            .attr('x', x).attr('y', kwY)
-            .text(kws.map(k => '#' + k).join('  '));
+          const kwLine = g.append('text').attr('class', 'viz-quadrant-keyword')
+            .attr('x', x).attr('y', kwY);
+          // 各キーワードを <tspan> で分けて、それぞれ click handler を attach
+          kws.forEach((k, idx) => {
+            const tspan = kwLine.append('tspan')
+              .attr('class', 'viz-quadrant-keyword-pill')
+              .text('#' + k)
+              .on('click', (event) => {
+                if (event && typeof event.stopPropagation === 'function') event.stopPropagation();
+                openKeywordPopup(k);
+              });
+            // 視覚区切り
+            if (idx < kws.length - 1) {
+              kwLine.append('tspan').text('  ');
+            }
+            // a11y: keyboard 操作のため tabindex / role
+            const node = tspan.node();
+            if (node) {
+              node.setAttribute('role', 'button');
+              node.setAttribute('tabindex', '0');
+              node.setAttribute('aria-label', k + ' を含む回答を一覧表示');
+              node.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  openKeywordPopup(k);
+                }
+              });
+            }
+          });
         }
       };
       placeLabel(q.hh, midX + (innerW - midX) / 2, 24, 'hh', 'top');
@@ -818,13 +918,8 @@
       // 「揺らぎ大の子だけ」の限定 ghost + trace は下の swing-trace 描画で扱う。
       g.selectAll('.viz-dot.ghost').remove();
 
-      // Why: M2 でも揺らぎを radius で可視化。Euclidean distance を radius にマップ。
-      //      M1 と違って 2 軸（1-5）の対角線最大は √(4²+4²) ≈ 5.66。
-      //
-      // Why (v2666 ドット縮小): 5×5 グリッドに 70 人超を載せると BASE=7/MAX=14 では
-      //   クラスタが「ブロブ化」して個別性が消えていた（教師フィードバック「間がない」）。
-      //   道徳教育の核心「個の声を埋もれさせない」DCE 観点で BASE=5/MAX=9 に縮小。
-      //   swing-high の存在感は MAX 9 でも保たれる（base の 1.8 倍）。
+      // M2 でも揺らぎを radius で可視化。2 軸 (1-5) の対角線最大は √(4²+4²) ≈ 5.66。
+      // ドット半径は「ブロブ化」を避けるため意図的に小さめ (BASE=5, MAX=9)。
       const swings = this.vizComputeSwings(rows, 'matrix');
       const swingByHashM = new Map(swings.map(s => [s.emailHash, s.distance]));
       const BASE_R_M = 5, MAX_R_M = 9;
@@ -900,9 +995,8 @@
         //   priority: HIGHLIGHT (教師注目) > REACTION (児童間人気) > none
         //   教師の意図的な「注目」は同調圧力ではないので 3.0px / 不透明で強調 OK。
         //
-        //   重要: SVG では `.attr()` は presentation attribute (specificity 0) で、
+        //   重要: SVG の `.attr()` は presentation attribute (specificity 0) で
         //   外部 CSS (.viz-dot { stroke: #0f172a }) に負ける。インライン style なら勝てる。
-        //   2026-05-14 v2654: attr → style に変更して実際に画面に出るように修正。
         .style('stroke', (d) => {
           if (d.data && d.data.highlight) return '#fbbf24'; // amber-400 (gold)
           const t = topReactionType(d.data);
@@ -919,7 +1013,7 @@
         .on('mouseenter', (event, d) => showTooltip(event, d.data, self))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, self))
         .on('mouseleave', () => hideTooltip())
-        // クリック: tooltip を閉じてモーダル表示 (v2688: 単一モーダルに統一)
+        // クリック: tooltip を閉じてモーダル表示
         .on('click', (event, d) => {
           hideTooltip();
           if (typeof self.showAnswerModal === 'function') {
@@ -947,9 +1041,7 @@
 
       updateStatsPills(this, current.length);
       maybeRenderTeacherPanel(this, swings);
-      // v2673: 象限キーワードは SVG 内の象限ラベル直下に統合済み。
-      //   学習者の視線移動を最小化するため、旧 HTML パネル (画面下部の 2x2 grid) は廃止。
-      //   過去の panel が残存している場合 (mode 切替などの中間状態) は除去。
+      // 象限キーワードは SVG 内に統合済 (旧 HTML パネルは廃止)。mode 切替で残存する panel は除去。
       removeQuadrantSummary(this.elements.answersContainer);
 
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
@@ -1431,10 +1523,9 @@
   //      最大 60 件・60 sec 間隔で sampling 後、5 sec ポーリングしてもストレージ膨張なし。
   // ---------------------------------------------------------------------
 
-  const SNAPSHOT_KEY = 'viz:snapshots:v1';
+  const SNAPSHOT_KEY = 'viz:snapshots:v2';        // v1 と非互換 (delta encoding に変更)
   const SNAPSHOT_BEFORE_KEY = 'viz:before:v1';
-  const SNAPSHOT_MAX = 60;
-  const SNAPSHOT_INTERVAL_MS = 60 * 1000; // 60秒に 1 件採取
+  const SNAPSHOT_MAX = 500;                       // 1 投稿 = 1 step、500 件で 100KB 程度
 
   function loadSnapshots() {
     try {
@@ -1461,49 +1552,23 @@
   }
 
   /**
-   * 現在の表示状態（currentAnswers + boardMode + axisConfig）から軽量スナップショットを構成。
-   * Why: rows 全体を保持するとサイズが膨らむので、画面再現に必要な最小フィールドのみ抽出。
-   */
-  function buildSnapshot(app) {
-    const rows = (app.state.currentAnswers || []).map(r => ({
-      rowIndex: r.rowIndex,
-      emailHash: r.emailHash || null,
-      class: r.class || '',
-      name: r.name || '',
-      answer: r.answer || '',
-      reason: r.reason || '',
-      numericX: typeof r.numericX === 'number' ? r.numericX : null,
-      numericY: typeof r.numericY === 'number' ? r.numericY : null,
-      timestamp: r.timestamp || null
-    }));
-    return {
-      capturedAt: Date.now(),
-      boardMode: app.state.boardMode || 'board',
-      axisConfig: app.state.axisConfig || null,
-      rows
-    };
-  }
-
-  /**
-   * SS の rows[].timestamp を時系列ソートし、SNAPSHOT_INTERVAL_MS バケットで
-   * 「各 emailHash の最新マーカー位置」を捉えた snapshot 配列を返す。
+   * SS の rows[].timestamp を時系列ソートし、**1 投稿 = 1 step** の delta encoding で返す。
    *
-   * Why: 既存 vizMaybeCaptureSnapshot は「教師がブラウザを開いている間」しか
-   *   採取しないため、デモ・リハーサル・授業中の途中参加（再ロード）で
-   *   timeline が空になる。SS には submit 時の timestamp 列があるので、
-   *   それを使えば「授業開始時からの自分のマーカー位置とコメントの変化」
-   *   (PDF p.5 終末部の意図) を初回ロード時から timeline に再現できる。
+   * 各 snapshot は { timestamp, latestTimestamp, boardMode, axisConfig, addedRow } の薄い構造。
+   *   - addedRow: その step で追加 / 上書きされた 1 件
+   *   - 再構成は withTimelineSwap が snapshots[0..idx] を畳んで currentAnswers を生成
    *
-   *   バケット末時刻を capturedAt に採用する（バケット内の最新 row を含めた
-   *   状態 = そのバケット境界時点の状態）。emailHash がない row は rowIndex
-   *   で代用してバケットに残し、表示崩れを避ける。
+   * Why: 60 秒バケット方式は「同分内の連続投稿が見えない」「snapshot.rows[] が肥大化」の
+   *   両方を抱えていた。delta 形式に変えることで「投稿が積み重なる瞬間」を 1 step 単位で
+   *   追え、メモリ使用量も rows.length に比例する軽量サイズに収まる。
    *
-   *   返り値は時系列昇順、最大 SNAPSHOT_MAX 件（古いバケットを切り捨てる）。
+   * SS timestamp が無い row は無視。timestamp 列が完全に欠落する form は timeline 機能が
+   * 自動的に disabled (snapshots=0) になる。
    *
    * @param {Array} rows app.state.currentAnswers と同じ形式
    * @param {string} boardMode 現在の boardMode
    * @param {Object|null} axisConfig 現在の axisConfig
-   * @returns {Array} snapshot 配列
+   * @returns {Array} snapshot 配列 (時系列昇順、最大 SNAPSHOT_MAX 件)
    */
   function buildHistoricalSnapshots(rows, boardMode, axisConfig) {
     if (!Array.isArray(rows) || rows.length === 0) return [];
@@ -1518,22 +1583,14 @@
       .sort((a, b) => a.ms - b.ms);
     if (dated.length === 0) return [];
 
-    const bucketMs = SNAPSHOT_INTERVAL_MS;
-    const startMs = dated[0].ms;
-    const endMs = dated[dated.length - 1].ms;
-
-    const keyOf = r => (r.emailHash || ('row#' + r.rowIndex));
-    const latestByKey = {};
-    const snapshots = [];
-    let cursor = 0;
-    let bucketEnd = Math.floor(startMs / bucketMs) * bucketMs + bucketMs;
-    // 最後の row を含むバケット境界まで進める（end-inclusive で最終 snapshot を保証）。
-    const stopMs = endMs + bucketMs;
-
-    while (bucketEnd <= stopMs) {
-      while (cursor < dated.length && dated[cursor].ms < bucketEnd) {
-        const r = dated[cursor].row;
-        latestByKey[keyOf(r)] = {
+    const snapshots = dated.map(d => {
+      const r = d.row;
+      return {
+        // 表示用: 実 SS timestamp (= 投稿時刻)
+        latestTimestamp: d.ms,
+        boardMode: boardMode || 'board',
+        axisConfig: axisConfig || null,
+        addedRow: {
           rowIndex: r.rowIndex,
           emailHash: r.emailHash || null,
           class: r.class || '',
@@ -1543,17 +1600,11 @@
           numericX: typeof r.numericX === 'number' ? r.numericX : null,
           numericY: typeof r.numericY === 'number' ? r.numericY : null,
           timestamp: r.timestamp || null
-        };
-        cursor++;
-      }
-      snapshots.push({
-        capturedAt: bucketEnd,
-        boardMode: boardMode || 'board',
-        axisConfig: axisConfig || null,
-        rows: Object.values(latestByKey)
-      });
-      bucketEnd += bucketMs;
-    }
+        }
+      };
+    });
+
+    // 古い投稿を切り捨てる上限。授業 45 分で実用上 500 件は超えない想定。
     return snapshots.slice(-SNAPSHOT_MAX);
   }
 
@@ -1588,6 +1639,52 @@
     try { console.info('[viz/snap] ' + msg); } catch (_) {}
   }
 
+  /**
+   * Lesson review (Phase 2): reviewLesson.snapshots[] を delta-encoded 形式に flatten して
+   *   sessionStorage に書き込む。これで既存の timeline スライダー / 比較モードがそのまま動く。
+   *
+   *   各 phase の rows を timestamp 昇順で並べ、{addedRow, latestTimestamp, boardMode, axisConfig,
+   *   phaseBoundary?, phaseName?} の薄い entry に変換。phase 先頭の entry に phaseBoundary フラグを
+   *   付けることで、将来 timeline UI が phase 区切りラベルを描けるようにする。
+   *
+   * @param {Object} reviewLesson - lessonJson (snapshots/phases を含む)
+   * @returns {number} 書き込んだ entry 数
+   */
+  function hydrateSnapshotsFromReviewLesson(reviewLesson) {
+    if (!reviewLesson || !Array.isArray(reviewLesson.snapshots)) return 0;
+    const flat = [];
+    const sortedPhases = reviewLesson.snapshots
+      .slice()
+      .sort((a, b) => Number(a.phaseIndex) - Number(b.phaseIndex));
+
+    sortedPhases.forEach((snap) => {
+      const rows = Array.isArray(snap.rows) ? snap.rows : [];
+      const sorted = rows
+        .slice()
+        .map(r => ({ row: r, ts: r && r.timestamp ? new Date(r.timestamp).getTime() : 0 }))
+        .sort((a, b) => a.ts - b.ts);
+      sorted.forEach((entry, idx) => {
+        flat.push({
+          addedRow: entry.row,
+          latestTimestamp: entry.row && entry.row.timestamp ? entry.row.timestamp : snap.capturedAt,
+          boardMode: snap.boardMode || 'auto',
+          axisConfig: snap.displaySettings || {},
+          phaseBoundary: idx === 0,
+          phaseIndex: snap.phaseIndex,
+          phaseName: snap.phaseName
+        });
+      });
+    });
+
+    if (flat.length === 0) return 0;
+    saveSnapshots(flat);
+    return flat.length;
+  }
+  // 外部 (page.js init) から呼び出せるよう公開。
+  StudyQuestApp.prototype.__vizHydrateReview = function (reviewLesson) {
+    return hydrateSnapshotsFromReviewLesson(reviewLesson);
+  };
+
   StudyQuestApp.prototype.vizMaybeCaptureSnapshot = function () {
     try {
       const rows = this.state.currentAnswers || [];
@@ -1602,47 +1699,36 @@
         this.state.boardMode,
         this.state.axisConfig
       );
-      vizSnapLog('historical buckets=' + historical.length);
-
-      if (historical.length > 0) {
-        // historical-first hydrate: 毎回 SS timestamp で再構築して上書き。
-        // 既存 sessionStorage に historical の最終時刻より新しい sampling
-        // (リアルタイム追加された snapshot) があれば末尾に保持する。
-        const arr = loadSnapshots();
-        const histLastTs = historical[historical.length - 1].capturedAt;
-        const newer = arr.filter(s => s && typeof s.capturedAt === 'number' && s.capturedAt > histLastTs);
-        const merged = historical.concat(newer);
-        while (merged.length > SNAPSHOT_MAX) merged.shift();
-        saveSnapshots(merged);
-        return;
-      }
-
-      // rows に timestamp が無い (board モード等)・既存ロジック維持: 60 秒ごとに現在状態を append
-      const arr = loadSnapshots();
-      const now = Date.now();
-      const lastTs = arr.length ? arr[arr.length - 1].capturedAt : 0;
-      if (arr.length > 0 && (now - lastTs) < SNAPSHOT_INTERVAL_MS) {
-        try { console.info('[viz/snap] skip: within INTERVAL'); } catch (_) {}
-        return;
-      }
-      const snap = buildSnapshot(this);
-      arr.push(snap);
-      while (arr.length > SNAPSHOT_MAX) arr.shift();
-      saveSnapshots(arr);
-      try { console.info('[viz/snap] live sampled, total=' + arr.length); } catch (_) {}
+      vizSnapLog('historical steps=' + historical.length);
+      // 毎回 SS timestamp ベースで再構築して上書き (delta encoding なのでマージは不要)。
+      saveSnapshots(historical);
     } catch (e) {
-      // Why: 旧コードは silent catch だったため、snapshots:0 の原因が見えなかった。
-      //   error をログするだけで bubble させない（既存挙動 = ボード描画は止めない）。
       try { console.error('[viz/snap] EXCEPTION', e && e.message, e); } catch (_) {}
     }
   };
 
   /**
    * 「議論前」を捕獲（教師ボタン）。F#4 ビフォー・アフター用。
-   * 既に保存されていても上書き許可（議論の前段階を再設定可能）。
+   * 議論前は「現在の全体状態」を anchor として残す full snapshot (delta ではない)。
    */
   StudyQuestApp.prototype.vizCaptureBefore = function () {
-    const snap = buildSnapshot(this);
+    const rows = (this.state.currentAnswers || []).map(r => ({
+      rowIndex: r.rowIndex,
+      emailHash: r.emailHash || null,
+      class: r.class || '',
+      name: r.name || '',
+      answer: r.answer || '',
+      reason: r.reason || '',
+      numericX: typeof r.numericX === 'number' ? r.numericX : null,
+      numericY: typeof r.numericY === 'number' ? r.numericY : null,
+      timestamp: r.timestamp || null
+    }));
+    const snap = {
+      capturedAt: Date.now(),
+      boardMode: this.state.boardMode || 'board',
+      axisConfig: this.state.axisConfig || null,
+      rows
+    };
     saveBeforeSnapshot(snap);
     return snap.capturedAt;
   };
@@ -1692,18 +1778,10 @@
   }
 
   /**
-   * v2674 リファクタ: profile pills と議論ツールを別 slot に分離注入。
-   *   - profile pills → #vizPhaseHost (header Row 1 中央、教師/生徒共通)
-   *   - 議論ツール (議論前/比較/軌跡)  → #vizToolbarSlot (header Row 3、教師専用)
-   *
-   * 旧設計: 両方を #vizToolbarSlot 内の 1 つの #vizToolbar に詰めていた
-   * (横に長く視覚的に「タブ + 操作」が同列で混在)。
-   *
-   * 新設計: 役割を物理的に分離。pills は phase ナビゲーション (識別)、
-   *   tools は授業中の議論支援 (操作) として bar を分けることでセマンティクス明確化。
-   *
-   * Option B: 生徒に対しても pills は注入する (過去フェーズ閲覧用)。
-   *   tools 側は !teacher で skip。
+   * profile pills と議論ツールを別 slot に分離注入。
+   *   - profile pills → #vizPhaseHost (header Row 1、教師/生徒共通、過去フェーズ閲覧用)
+   *   - 議論ツール (議論前/比較/軌跡) → #vizToolbarSlot (header Row 3、教師専用)
+   * 役割を物理的に分離: pills = phase 識別、tools = 授業中の議論操作。
    */
   function ensureViewToolbar(app) {
     const teacher = isTeacher(app);
@@ -1822,15 +1900,17 @@
     });
   }
 
-  // 議論ツール (議論前/比較/軌跡) の event listener を一括 bind。
-  // v2674: 旧 ensureViewToolbar インラインから切り出し、教師 only 注入時にのみ呼ばれる。
+  // 議論ツール (議論前/比較/軌跡) の event listener を一括 bind (教師注入時のみ呼ばれる)。
+  // CSS .saved アニメーション持続時間と一致させる (短いと残光が消える、長いと連打しづらい)。
+  const CAPTURE_FLASH_MS = 1500;
+
   function bindDiscussionToolsEvents(toolsBar, app) {
     const captureBtn = toolsBar.querySelector('#vizCaptureBeforeBtn');
     if (captureBtn) {
       captureBtn.addEventListener('click', () => {
         app.vizCaptureBefore();
         captureBtn.classList.add('saved');
-        setTimeout(() => captureBtn.classList.remove('saved'), 1500);
+        setTimeout(() => captureBtn.classList.remove('saved'), CAPTURE_FLASH_MS);
       });
     }
     const compareBtn = toolsBar.querySelector('#vizCompareToggleBtn');
@@ -1846,14 +1926,9 @@
         app.state.vizCompareMode = !app.state.vizCompareMode;
         compareBtn.classList.toggle('active', !!app.state.vizCompareMode);
         compareBtn.setAttribute('aria-pressed', String(!!app.state.vizCompareMode));
-        // v2683: 比較トグル時にモーダルが開いていれば閉じる。
-        //   理由: ON → OFF 時は dual layout の右カードが宙ぶらりんで残り stale。
-        //   OFF → ON 時は full-screen モーダルがチャートを覆ったままドロワー化が
-        //   遅延する。いずれもクリーンに閉じてからレイアウト切替が安全。
+        // モーダルが開いていれば閉じる: stale な右カード残置 / 切替遅延を避ける。
         if (typeof app.hideAnswerModal === 'function') app.hideAnswerModal();
-        // v2632: 比較モード中は timeline スライダーが「左ペインの時刻」を制御する。
-        //   旧仕様 (compare ON で timeline reset) は廃止。スライダー位置を保持したまま
-        //   左ペインがその時刻、右ペインが現在で描画される。
+        // 比較モード中: timeline スライダーが「左ペインの時刻」を制御する設計。
         app.renderBoard(false, false, []);
       });
     }
@@ -1881,7 +1956,9 @@
             } else {
               const t = snaps[idx];
               if (t) {
-                const d = new Date(t.capturedAt);
+                // 表示は実 SS 投稿の最新時刻 (latestTimestamp) を優先。なければ bucket 境界。
+                const tsMs = t.latestTimestamp || t.capturedAt;
+                const d = new Date(tsMs);
                 label.textContent = d.getHours().toString().padStart(2, '0') + ':' +
                                     d.getMinutes().toString().padStart(2, '0');
               }
@@ -1910,8 +1987,7 @@
     // mode 連動 UI（議論ツール表示 / controlsFooter 表示）だけ担当する。
     const cur = app.state.boardMode || 'board';
     // 議論ツール（議論前/比較/タイムライン）は viz mode 専用。
-    // board モードではカードに対して「揺らぎ」「比較」の概念が無いので非表示。
-    // v2674: 「議論支援」section label を含む bar 全体を非表示にする (controls 単体ではない)。
+    // board モードではカードに対して「揺らぎ」「比較」の概念が無いので bar 全体を非表示。
     const toolbar = document.getElementById('vizToolbar');
     if (toolbar) toolbar.style.display = (cur === 'board') ? 'none' : '';
     // controlsFooter (画面下の「列数」スライダー) は board モード専用。
@@ -1952,21 +2028,20 @@
     let activeName;
     let pastSet;       // teacher 用: 過去 active になった profile 名集合（教師には ✓ 付ける）
     if (teacher) {
-      // Why: teacher は state.profiles を root として表示。pastSet は studentProfileNav.history
-      //   から（teacher 視点では server が null で送ってくることもあるが、その場合 pastSet は空集合）。
-      //   過去 pill は preview semantics で load-past 経路（student と同じ）。未来 profile は
-      //   teacher だけが見える状態なので switch（新フェーズへの進行用）。
+      // Why: teacher は state.profiles を root として表示。pastSet は state.profileHistory
+      //   (server の profileSummary.history) から構築。過去 pill は preview semantics で
+      //   load-past 経路（student と同じ）、未来 profile は switch（新フェーズへの進行用）。
       const profiles = (app.state && app.state.profiles) || [];
-      const navHist = (app.state.studentProfileNav && app.state.studentProfileNav.history) || [];
+      const navHist = (app.state && Array.isArray(app.state.profileHistory))
+        ? app.state.profileHistory
+        : [];
       pastSet = new Set(navHist.map(h => h && h.name).filter(Boolean));
       activeName = app.state.activeProfile || '';
       const viewing = app.state.viewingPastProfile || null;
 
-      // v2678: teacher pills も viewer と同じ時系列順で表示する。
-      //   旧: profiles 配列 (config 編集順) をそのまま使うと「本時 → 導入 → 振り返り」
-      //   のような非時系列順になり、viewer の時系列順と不整合だった。
-      //   新: navHist (過去 active になった順 = 時系列) の順序を base にし、
-      //   未訪問 profile (まだ active にしていない future phase) は末尾に config 順で追加。
+      // teacher pills も viewer と同じ時系列順で表示する。
+      //   navHist (過去 active になった順 = 時系列) を base にし、
+      //   未訪問 profile (future phase) は末尾に config 順で追加。
       const histOrderMap = new Map();
       navHist.forEach((h, i) => { if (h && h.name) histOrderMap.set(h.name, i); });
       const orderedProfiles = [...profiles].sort((a, b) => {
@@ -2131,6 +2206,9 @@
           // getActiveFormInfo を明示的に呼ぶことで confidence を持って同期する。
           if (typeof this.loadSheetData === 'function') {
             this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+          } else if (typeof window.safeReload === 'function') {
+            // iframe-aware reload (cached webapp URL に _top で navigate)。
+            window.safeReload({ keepParams: ['mode', 'userId'] });
           } else {
             window.location.reload();
           }
@@ -2155,20 +2233,6 @@
 
   StudyQuestApp.prototype.__vizInjectProfileSelector = function () { injectProfileSelector(this); };
 
-  /**
-   * Option B: 過去フェーズを read-only で閲覧する。
-   *
-   * Why: 生徒が「導入」「振り返り」など過去のフェーズで自分が書いた回答 / 全体の傾向を
-   *   後から確認できるようにする道徳ゴール（多面的思考・自己内省）の実装。
-   *   config を書き換えず、サーバの getPublishedSheetDataForProfile に snapshot を要求する。
-   *
-   *   read-only enforcement:
-   *     - state.viewingPastProfile に profile 名を立てる
-   *     - その間、reaction / highlight / submit は client 側で block + トースト表示
-   *     - polling は active profile の変化検知のみ継続（data 更新は新着検知の対象外）
-   *
-   * @param {string} name - history に含まれる profile 名
-   */
   /**
    * profile を切替える前に class filter を 'すべて' にリセットする共通処理。
    *
@@ -2270,6 +2334,8 @@
     if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
     if (typeof this.loadSheetData === 'function') {
       this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+    } else if (typeof window.safeReload === 'function') {
+      window.safeReload({ keepParams: ['mode', 'userId'] });
     } else {
       window.location.reload();
     }
@@ -2283,9 +2349,7 @@
     slider.max = String(max);
 
     // disabled 条件: snapshot 0 件のときのみ。
-    // 比較モード中もスライダーは active のまま（左ペインを動かすため）。
-    // v2632 改修: 比較モードでは「左=スライダー位置の snapshot、右=現在」となるため、
-    //   スライダーを動かすと左ペインだけが時刻に応じて変化する仕様に変更。
+    // 比較モード中もスライダーは active (動かすと左ペインだけ時刻に応じて変化)。
     const isCompare = !!app.state.vizCompareMode;
     const noSnaps = (max === 0);
     slider.disabled = noSnaps;
@@ -2299,9 +2363,6 @@
       //  - "比較中"     → vizCompareMode、左ペインが議論前 anchor or 最古 snapshot
       //  - "軌跡なし"   → snapshot 0 件 (hydrate 失敗 or rows[].timestamp 解釈不能)
       //  - "現在"      → 通常: スライダー右端 = 現在の分布
-      //
-      // v2678: 「(Nコマ)」表記は 「コマ」 が直感的でなく cluttered なので削除。
-      //   スナップショット数はスライダーの max 属性で内部的に保持されており UI には不要。
       if (isCompare) label.textContent = '比較中（左=過去）';
       else if (noSnaps) label.textContent = '軌跡なし';
       else label.textContent = '現在';
@@ -2324,10 +2385,8 @@
 
   // expose snapshot helpers for tests
   StudyQuestApp.prototype.__vizSnapshotInternals = {
-    buildSnapshot: function (app) { return buildSnapshot(app); },
     buildHistoricalSnapshots: buildHistoricalSnapshots,
-    SNAPSHOT_MAX: SNAPSHOT_MAX,
-    SNAPSHOT_INTERVAL_MS: SNAPSHOT_INTERVAL_MS
+    SNAPSHOT_MAX: SNAPSHOT_MAX
   };
 
   // Why: タイムラインで過去 snapshot を選んでいるとき、その snapshot を
@@ -2340,14 +2399,28 @@
   //   await Promise.resolve(...).then(...).finally(...) パターンで Promise の
   //   resolve まで swap を維持する。同期 fn (例: テスト時) も Promise.resolve で
   //   同じパスを通せる。
+  // 同一 emailHash の再投稿は最新で上書き。snapshots[0..idx] を累積して rows を再構成。
+  function accumulateRowsUpTo(snaps, idx) {
+    const latestByKey = {};
+    for (let i = 0; i <= idx; i++) {
+      const r = snaps[i] && snaps[i].addedRow;
+      if (!r) continue;
+      latestByKey[r.emailHash || ('row#' + r.rowIndex)] = r;
+    }
+    return Object.values(latestByKey);
+  }
+
   function withTimelineSwap(app, fn) {
     const idx = app.state.vizTimelineIndex;
     if (idx == null) return fn();
     const snaps = app.vizGetSnapshots();
     if (idx < 0 || idx >= snaps.length) return fn();
+
+    const rebuiltRows = accumulateRowsUpTo(snaps, idx);
+
     const original = app.state.currentAnswers;
     const originalAxis = app.state.axisConfig;
-    app.state.currentAnswers = snaps[idx].rows;
+    app.state.currentAnswers = rebuiltRows;
     app.state.axisConfig = snaps[idx].axisConfig;
     const restore = () => {
       app.state.currentAnswers = original;
@@ -2377,7 +2450,7 @@
   /**
    * ビフォー・アフター 2 ペイン描画。
    *
-   * 設計（v2632 改修）:
+   * 設計:
    *   - 右ペイン = 常に「現在」（最新 currentAnswers）
    *   - 左ペイン = タイムラインスライダーが指す snapshot:
    *      1. vizTimelineIndex がセットされている → snapshots[idx] を使う
@@ -2394,6 +2467,12 @@
     const answers = this.elements.answersContainer;
     if (!answers) return;
 
+    const fmtHhMm = (ms) => {
+      const d = new Date(ms);
+      return d.getHours().toString().padStart(2, '0') + ':' +
+             d.getMinutes().toString().padStart(2, '0');
+    };
+
     // 左ペインに表示する snapshot を決定。
     const before = loadBeforeSnapshot();
     const snaps = loadSnapshots();
@@ -2401,23 +2480,36 @@
     let leftLabel = '';
     const idx = this.state.vizTimelineIndex;
     if (typeof idx === 'number' && idx >= 0 && idx < snaps.length) {
-      leftSource = snaps[idx];
-      const d = new Date(leftSource.capturedAt);
-      leftLabel = '⏱ ' + d.getHours().toString().padStart(2, '0') + ':' +
-                  d.getMinutes().toString().padStart(2, '0');
+      // slider 操作中: delta 累積で「idx 時点までの状態」を再構成
+      leftSource = {
+        rows: accumulateRowsUpTo(snaps, idx),
+        axisConfig: snaps[idx].axisConfig
+      };
+      leftLabel = '⏱ ' + fmtHhMm(snaps[idx].latestTimestamp);
     } else if (before) {
+      // 議論前 anchor (full snapshot): rows / capturedAt をそのまま読める
       leftSource = before;
-      const d = new Date(before.capturedAt);
-      leftLabel = '📌 議論前 (' + d.getHours().toString().padStart(2, '0') + ':' +
-                  d.getMinutes().toString().padStart(2, '0') + ')';
+      leftLabel = '📌 議論前 (' + fmtHhMm(before.capturedAt) + ')';
     } else if (snaps.length > 0) {
-      leftSource = snaps[0];
-      const d = new Date(leftSource.capturedAt);
-      leftLabel = '📍 開始時 (' + d.getHours().toString().padStart(2, '0') + ':' +
-                  d.getMinutes().toString().padStart(2, '0') + ')';
+      // fallback: 「議論前」未保存 → 最初の投稿だけを左に出す
+      leftSource = {
+        rows: accumulateRowsUpTo(snaps, 0),
+        axisConfig: snaps[0].axisConfig
+      };
+      leftLabel = '📍 最初の投稿 (' + fmtHhMm(snaps[0].latestTimestamp) + ')';
     } else {
-      // snapshot 0 件 + 議論前未保存 → 比較不能。compareMode を OFF にして通常描画。
+      // snapshot 0 件 + 議論前未保存 → 比較不能。compareMode を OFF にしてユーザーに通知。
       this.state.vizCompareMode = false;
+      // ボタンの aria-pressed / active クラスも同期 (refreshVizControlsState 任せでは
+      // 次の render を待つ必要があり、ボタンが「押されたまま」に見える)
+      const compareBtn = document.getElementById('vizCompareToggleBtn');
+      if (compareBtn) {
+        compareBtn.classList.remove('active');
+        compareBtn.setAttribute('aria-pressed', 'false');
+      }
+      if (typeof this.showToast === 'function') {
+        this.showToast('比較するには「📌 議論前」を先に押すか、投稿が蓄積するまで待ってください');
+      }
       return await renderOne();
     }
 
@@ -2441,10 +2533,7 @@
     afterSvgHost.id = 'vizCompareRightHost';
     afterPane.appendChild(afterSvgHost);
 
-    // v2688: 個別意見ペア比較機能は廃止。比較モードでは「分布の左右並列表示」のみ提供。
-    //   ドットクリックは単一モーダル経由で「順次に1つずつ意見を読む」のみ。
-    //   左側ドットクリックで snapshot 内データを表示する用途は無くなったので、
-    //   data-viz-side マーカーや vizCompareLeftSource state も不要に。
+    // 比較モード: 分布の左右並列表示のみ。ドットクリックは単一モーダルで順次表示。
 
     wrap.appendChild(beforePane);
     wrap.appendChild(afterPane);
@@ -2474,10 +2563,6 @@
     refreshVizControlsState(this);
   };
 
-  // v2688: __showPaneCard 廃止。比較モードでも単一モーダルで順次に意見を読む。
-  //   旧 dual modal / pane card / drawer は道徳教育の自然な議論フローに合わなかった
-  //   (「2 人の意見を並べて読み比べる」は授業で行われない操作)。
-  //   ドットクリック → showAnswerModal で十分。
 
   // ---------------------------------------------------------------------
   // Projector モード ?display=projector
@@ -2507,7 +2592,7 @@
         if (params.get('display') === 'projector') {
           document.body.classList.add('projector-mode');
         }
-      } catch (e) {}
+      } catch (_) {}
     });
   } else {
     try {
@@ -2515,7 +2600,7 @@
       if (params.get('display') === 'projector') {
         document.body.classList.add('projector-mode');
       }
-    } catch (e) {}
+    } catch (_) {}
   }
 })();
 </script>

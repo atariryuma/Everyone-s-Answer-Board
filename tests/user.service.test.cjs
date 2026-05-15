@@ -22,6 +22,7 @@ function loadUserServiceContext(overrides = {}) {
 
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
+    logError_: () => {},
     CacheService: { getScriptCache: () => cache },
     CACHE_DURATION: { LONG: 300 },
     SYSTEM_LIMITS: { MAX_LOCK_ROWS: 100 },

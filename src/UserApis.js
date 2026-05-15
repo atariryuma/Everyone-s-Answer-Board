@@ -41,7 +41,7 @@ function getConfig() {
     if (!domainAccess.allowed) {
       return {
         success: false,
-        message: '管理者と同一ドメインのアカウントでアクセスしてください'
+        message: '管理者と同一ドメインのアカウントでアクセスしてください。'
       };
     }
 
@@ -54,85 +54,10 @@ function getConfig() {
 
     return { success: true, data: { config, userId: user.userId } };
   } catch (error) {
-    console.error('getConfig error:', error.message);
+    logError_('getConfig', error);
     return createExceptionResponse(error);
   }
 }
-
-/**
- * Batched user configuration retrieval
- * Batch operation: Get email, user, and config in single coordinated call
- * @returns {Object} Batched result with email, user, and config
- */
-function getBatchedUserConfig() {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      return {
-        success: false,
-        authenticated: false,
-        message: 'ユーザー認証が必要です',
-        error: 'ユーザー認証が必要です',
-        user: null,
-        config: null,
-        authError: createAuthError()
-      };
-    }
-
-    const domainAccess = ensureDomainAccess(email);
-    if (!domainAccess.allowed) {
-      return {
-        success: false,
-        authenticated: true,
-        message: '管理者と同一ドメインのアカウントでアクセスしてください',
-        error: '管理者と同一ドメインのアカウントでアクセスしてください',
-        email,
-        user: null,
-        config: null
-      };
-    }
-
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      return {
-        success: false,
-        authenticated: true,
-        message: 'ユーザー情報が見つかりません',
-        error: 'ユーザー情報が見つかりません',
-        email,
-        user: null,
-        config: null,
-        userError: createUserNotFoundError()
-      };
-    }
-
-    const configResult = getUserConfig(user.userId);
-    const config = configResult.success ? configResult.config : {};
-
-    return {
-      success: true,
-      authenticated: true,
-      email,
-      user,
-      config,
-      configSuccess: configResult.success,
-      configMessage: configResult.message || 'Configuration retrieved successfully'
-    };
-
-  } catch (error) {
-    console.error('getBatchedUserConfig error:', error.message);
-    return {
-      success: false,
-      authenticated: false,
-      message: `ユーザー設定取得エラー: ${error.message}`,
-      error: `ユーザー設定取得エラー: ${error.message}`,
-      user: null,
-      config: null,
-      exception: createExceptionResponse(error)
-    };
-  }
-}
-
 
 /**
  * Process login action - handles user login flow
@@ -238,7 +163,7 @@ function processLoginAction() {
       }
     };
   } catch (error) {
-    console.error('processLoginAction error:', error.message);
+    logError_('processLoginAction', error);
     return {
       success: false,
       message: `Login failed: ${error.message || '詳細不明'}`
@@ -267,7 +192,7 @@ function checkUserAuthentication() {
       return {
         success: false,
         authenticated: true,
-        message: '管理者と同一ドメインのアカウントでアクセスしてください',
+        message: '管理者と同一ドメインのアカウントでアクセスしてください。',
         timestamp: new Date().toISOString()
       };
     }
@@ -304,7 +229,7 @@ function checkUserAuthentication() {
     };
 
   } catch (error) {
-    console.error('checkUserAuthentication error:', error.message);
+    logError_('checkUserAuthentication', error);
     return {
       success: false,
       authenticated: false,

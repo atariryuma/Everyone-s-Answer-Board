@@ -3,7 +3,7 @@
  *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
-/* global getCurrentEmail, findUserById, updateUser, validateEmail, CACHE_DURATION, TIMEOUT_MS, SYSTEM_LIMITS, validateConfig, validateUrl, createErrorResponse, validateSpreadsheetId, findUserByEmail, findUserBySpreadsheetId, openSpreadsheet, UserService, isAdministrator, SLEEP_MS, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty */
+/* global getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty */
 
 /**
  * デフォルト設定取得
@@ -125,12 +125,7 @@ function enhanceConfigWithDynamicUrls(baseConfig, userId) {
   return enhanced;
 }
 
-/**
- * 公開時用の設定検証（必須フィールドを厳格にチェック）。
- * @param {Object} config
- * @param {string} userId
- * @returns {Object}
- */
+// 公開時用の設定検証（必須フィールドを厳格にチェック）。
 function validatePublishConfig(config, userId) {
   try {
     const baseValidation = validateAndSanitizeConfig(config, userId);
@@ -265,7 +260,7 @@ function validateAndSanitizeConfig(config, userId) {
 
     try {
       const configSize = JSON.stringify(sanitized).length;
-      if (configSize > 32000) {
+      if (configSize > SYSTEM_LIMITS.CONFIG_JSON_MAX_CHARS) {
         errors.push('設定データが大きすぎます（32KB制限）');
       }
     } catch (sizeCheckError) {

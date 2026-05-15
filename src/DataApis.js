@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getQuestionText, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, setupDomainWideSharing, applySpreadsheetSharingDefaults, validateAccess, executeWithRetry, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, setupDomainWideSharing, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -86,7 +86,7 @@ function getForms() {
 
     return { success: true, forms };
   } catch (error) {
-    console.error('getForms error:', error.message);
+    logError_('getForms', error);
     return { success: false, error: error.message, forms: [] };
   }
 }
@@ -100,7 +100,8 @@ const TEMPLATE_SCALE_MAX = 5;
 const TEMPLATE_LABELS = Object.freeze({
   board: '掲示板',
   numberline: '数直線',
-  matrix: 'マトリクス'
+  matrix: 'マトリクス',
+  pie: '円グラフ'
 });
 
 function addScaleItemTo_(form, { title, helpText, lowLabel, highLabel }) {
@@ -130,14 +131,24 @@ function addScaleItemTo_(form, { title, helpText, lowLabel, highLabel }) {
  * @param {string} [templateType='board'] - 'board' | 'numberline' | 'matrix'
  * @returns {Object} 作成結果（フォームURL、スプレッドシートID等）
  */
-function createTemplateForm(templateType) {
+function createTemplateForm(templateType, templateOptions) {
   try {
     const currentEmail = getCurrentEmail();
-    if (!currentEmail) {
-      return { success: false, error: '認証が必要です' };
-    }
+    if (!currentEmail) return createAuthError();
 
     const type = TEMPLATE_LABELS[templateType] ? templateType : 'board';
+    const opts = (templateOptions && typeof templateOptions === 'object') ? templateOptions : {};
+    const safeStr = (v, fallback, max) => {
+      const s = String(v == null ? '' : v).trim().slice(0, max || 40);
+      return s || fallback;
+    };
+    const safeChoices = (arr, fallback) => {
+      if (!Array.isArray(arr)) return fallback;
+      const cleaned = arr.map((c) => String(c == null ? '' : c).trim().slice(0, 40)).filter(Boolean);
+      // 多肢選択は最低 2 / 最大 8。範囲外は fallback。
+      if (cleaned.length < 2 || cleaned.length > 8) return fallback;
+      return cleaned;
+    };
 
     const now = new Date();
     const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'M/d HH:mm');
@@ -165,10 +176,10 @@ function createTemplateForm(templateType) {
 
     if (type === 'numberline') {
       addScaleItemTo_(form, {
-        title: '立場',
+        title: safeStr(opts.scaleTitle, '立場'),
         helpText: 'あなたの考えに最も近い位置を選んでください',
-        lowLabel: 'そう思わない',
-        highLabel: 'とてもそう思う'
+        lowLabel: safeStr(opts.lowLabel, 'そう思わない'),
+        highLabel: safeStr(opts.highLabel, 'とてもそう思う')
       });
       form.addParagraphTextItem()
         .setTitle('理由')
@@ -176,27 +187,37 @@ function createTemplateForm(templateType) {
         .setHelpText('その位置を選んだ理由を記入してください');
     } else if (type === 'matrix') {
       addScaleItemTo_(form, {
-        title: 'X軸（例: 効率）',
+        title: safeStr(opts.xTitle, 'X軸'),
         helpText: '横軸の立場を選んでください',
-        lowLabel: '低い',
-        highLabel: '高い'
+        lowLabel: safeStr(opts.xLow, '低い'),
+        highLabel: safeStr(opts.xHigh, '高い')
       });
       addScaleItemTo_(form, {
-        title: 'Y軸（例: 倫理）',
+        title: safeStr(opts.yTitle, 'Y軸'),
         helpText: '縦軸の立場を選んでください',
-        lowLabel: '低い',
-        highLabel: '高い'
+        lowLabel: safeStr(opts.yLow, '低い'),
+        highLabel: safeStr(opts.yHigh, '高い')
       });
       form.addParagraphTextItem()
         .setTitle('理由')
         .setRequired(true)
         .setHelpText('その位置を選んだ理由を記入してください');
+    } else if (type === 'pie') {
+      form.addMultipleChoiceItem()
+        .setTitle('あなたの選択')
+        .setRequired(true)
+        .setHelpText('選択肢から 1 つ選んでください')
+        .setChoiceValues(safeChoices(opts.choices, ['A', 'B', 'どちらとも言えない']));
+      form.addParagraphTextItem()
+        .setTitle('理由')
+        .setRequired(true)
+        .setHelpText('その選択肢を選んだ理由を記入してください');
     } else {
       form.addMultipleChoiceItem()
         .setTitle('回答')
         .setRequired(true)
         .setHelpText('回答を選択してください')
-        .setChoiceValues(['賛成', '反対', 'どちらでもない']);
+        .setChoiceValues(safeChoices(opts.choices, ['賛成', '反対', 'どちらでもない']));
       form.addParagraphTextItem()
         .setTitle('理由')
         .setRequired(true)
@@ -250,7 +271,7 @@ function createTemplateForm(templateType) {
     };
 
   } catch (error) {
-    console.error('createTemplateForm error:', error.message);
+    logError_('createTemplateForm', error);
     return { success: false, error: 'フォーム作成に失敗しました: ' + error.message };
   }
 }
@@ -467,7 +488,7 @@ function customizeForm(formIdOrUrl, schema) {
       message: `${added} 問の質問を再構築${newSpreadsheetId ? '・回答先 Spreadsheet を新規化' : ''}しました`
     };
   } catch (error) {
-    console.error('customizeForm error:', error.message);
+    logError_('customizeForm', error);
     return { success: false, error: error.message };
   }
 }
@@ -508,11 +529,8 @@ function processFormUrlInput(formUrl) {
     //
     // Why try-catch: form.getDestinationId() は destination 未設定時に null を返さず、
     //   "フォームに応答先がありません。" という例外を投げる仕様 (Apps Script Forms API)。
-    //   この関数は !spreadsheetId 分岐で auto-create するつもりだったが、例外で外側 catch
-    //   に飛んでしまい「予期しないエラー」になる。教師が手動で作った Form は典型的に
-    //   destination が無いので、これがそのまま「教師が自分のフォームを使えない」根本バグ。
-    //   2026-05-14 v2657: 例外も spreadsheetId=null と同じ「未設定」扱いにして、
-    //   auto-create 経路に流す。
+    //   教師が手動で作った Form は典型的に destination が無いので、例外も null と同等扱いにして
+    //   下の !spreadsheetId 分岐で auto-create に流す。
     let spreadsheetId = null;
     try {
       spreadsheetId = form.getDestinationId();
@@ -533,10 +551,8 @@ function processFormUrlInput(formUrl) {
         form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
         wasCreated = true;
 
-        // 新規 SS 共有設定（SA editor + ドメイン共有）— 生徒 view モード 403 防止。
-        //   Why: createTemplateForm / customizeForm の resetDestination 経路と同じ理由で、
-        //        ここでも applySpreadsheetSharingDefaults を呼ばないと viewer エラーになる。
-        //        2026-05-14 v2657 で追加（教師が手動で作った Form 経由の SS にも適用）。
+        // 新規 SS 共有設定 (SA editor + ドメイン共有) — 生徒 view モード 403 防止。
+        //   createTemplateForm / customizeForm 経路と同じ。Sharing が無いと viewer 403。
         try {
           const ownerEmail = (typeof getCurrentEmail === 'function') ? getCurrentEmail() : '';
           const sr = applySpreadsheetSharingDefaults(spreadsheetId, ownerEmail);
@@ -583,7 +599,7 @@ function processFormUrlInput(formUrl) {
     };
 
   } catch (error) {
-    console.error('processFormUrlInput error:', error.message);
+    logError_('processFormUrlInput', error);
     return { success: false, error: '予期しないエラーが発生しました' };
   }
 }
@@ -639,115 +655,8 @@ function validateHeaderIntegrity(targetUserId) {
       error: valid ? null : 'ヘッダー情報が不完全です'
     };
   } catch (error) {
-    console.error('validateHeaderIntegrity error:', error.message);
+    logError_('validateHeaderIntegrity', error);
     return createExceptionResponse(error);
-  }
-}
-
-/**
- * Get board info - simplified name
- * @returns {Object} ボード情報
- */
-function getBoardInfo() {
-  try {
-    const email = getCurrentEmail();
-    if (!email) {
-      console.error('Authentication failed');
-      return createAuthError();
-    }
-
-    const user = findUserByEmail(email, { requestingUser: email });
-    if (!user) {
-      console.error('User not found:', email);
-      return { success: false, message: 'User not found' };
-    }
-
-    const config = getConfigOrDefault(user.userId);
-
-    const isPublished = Boolean(config.isPublished);
-    const baseUrl = getWebAppUrl();
-
-    return {
-      success: true,
-      isPublished,
-      questionText: getQuestionText(config, { targetUserEmail: user.userEmail }),
-      urls: {
-        view: `${baseUrl}?mode=view&userId=${user.userId}`,
-        admin: `${baseUrl}?mode=admin&userId=${user.userId}`
-      },
-      lastUpdated: config.publishedAt || user.lastModified
-    };
-  } catch (error) {
-    console.error('getBoardInfo ERROR:', error.message);
-    return createExceptionResponse(error);
-  }
-}
-
-/**
- * Get sheet list for spreadsheet - simplified name
- * @param {string} spreadsheetId - スプレッドシートID
- * @returns {Object} シート一覧
- */
-function getSheetList(spreadsheetId) {
-  try {
-    if (!spreadsheetId) {
-      return createErrorResponse('Spreadsheet ID required');
-    }
-
-    const currentEmail = getCurrentEmail();
-    if (!currentEmail) {
-      console.warn('getSheetList: Unauthenticated access attempt');
-      return {
-        success: false,
-        error: 'ユーザー認証が必要です'
-      };
-    }
-
-    let dataAccess = null;
-
-    try {
-      dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
-    } catch (accessError) {
-      console.warn('getSheetList: Spreadsheet access failed:', accessError.message);
-      return {
-        success: false,
-        error: 'スプレッドシートにアクセスできません。同一ドメイン内で編集可能に設定されているか確認してください。'
-      };
-    }
-
-    if (!dataAccess || !dataAccess.spreadsheet) {
-      console.warn('getSheetList: Failed to access spreadsheet:', `${spreadsheetId.substring(0, 8)}***`);
-      return {
-        success: false,
-        error: 'スプレッドシートを開くことができませんでした。同一ドメイン内で編集可能に設定されているか確認してください。'
-      };
-    }
-
-    const { spreadsheet } = dataAccess;
-    const sheets = spreadsheet.getSheets();
-
-    const sheetList = sheets.map(sheet => {
-      const { lastRow, lastCol } = getSheetInfo(sheet);
-      return {
-        name: sheet.getName(),
-        id: sheet.getSheetId(),
-        rowCount: lastRow,
-        columnCount: lastCol
-      };
-    });
-
-    return {
-      success: true,
-      sheets: sheetList,
-      accessMethod: 'normal_permissions'
-    };
-  } catch (error) {
-    console.error('getSheetList error:', error.message);
-    return {
-      success: false,
-      error: `シート一覧取得エラー: ${error.message}`,
-      details: error.stack
-    };
   }
 }
 
@@ -794,29 +703,14 @@ function loadProfileForView(profileName, targetUserId) {
     const p = profiles.find(x => x && x.name === profileName);
     if (!p) return createErrorResponse(`Profile "${profileName}" not found`);
 
-    // profile を active config に適用
-    //
-    // Why (明示的 null fallback): profile に columnMapping / displaySettings が無い
-    //   場合、旧版は前 active 由来の値が top-level に残っていた。matrix →
-    //   wordcloud に切替えた時に columnMapping.numericX/Y が居残って表示崩れする
-    //   バグ防止のため、profile に無いキーは空オブジェクト or DEFAULT で明示上書き。
-    //   AdminApis.loadProfile 経路と semantics を揃える。
-    const merged = { ...cur };
-    merged.formUrl = p.formUrl || '';
-    merged.formTitle = p.formTitle || '';
-    merged.spreadsheetId = p.spreadsheetId || '';
-    merged.sheetName = p.sheetName || '';
-    merged.columnMapping = p.columnMapping || {};
-    merged.displaySettings = p.displaySettings || (typeof DEFAULT_DISPLAY_SETTINGS !== 'undefined' ? DEFAULT_DISPLAY_SETTINGS : {});
-    merged.xAxisLabels = p.xAxisLabels || null;
-    merged.yAxisLabels = p.yAxisLabels || null;
-    merged.matrixQuadrantLabels = p.matrixQuadrantLabels || null;
-    merged.allowResubmit = !!p.allowResubmit;
-    merged.activeProfile = p.name;
-    merged.userId = user.userId;
-    // Option B: 生徒が過去フェーズを閲覧できるよう、active 切替を時系列で記録。
-    //   AdminApis.loadProfile 経路と同じ append helper を使う（重複なら no-op）。
-    merged.profileHistory = __appendProfileHistory_(cur.profileHistory, p.name);
+    // Why (完全置換): matrix → wordcloud に切替えた時に旧 columnMapping.numericX/Y が
+    //   居残るのを防ぐため、profile に無いキーは __applyProfileToConfig_ で明示上書き。
+    const merged = {
+      ...__applyProfileToConfig_(cur, p),
+      activeProfile: p.name,
+      userId: user.userId,
+      profileHistory: __appendProfileHistory_(cur.profileHistory, p.name)
+    };
 
     const saveRes = saveUserConfig(user.userId, merged, { isMainConfig: true });
     if (!saveRes.success) return saveRes;
@@ -949,13 +843,18 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   let profileSummary = null;
   const isPrivilegedViewer = Boolean(viewerContext.isAdmin || viewerContext.isOwnBoard);
   if (isPrivilegedViewer && config && Array.isArray(config.profiles) && config.profiles.length > 0) {
+    // history も teacher に同梱して、pill 上の ✓ (= 過去 active 経験あり) 表示の根拠にする。
+    const teacherHistory = Array.isArray(config.profileHistory)
+      ? config.profileHistory.map(h => ({ name: h.name, activatedAt: h.activatedAt || '' }))
+      : [];
     profileSummary = {
       active: config.activeProfile || null,
       list: config.profiles.map(p => ({
         name: p.name,
         formTitle: p.formTitle || '',
         boardMode: (p.displaySettings && p.displaySettings.boardMode) || 'auto'
-      }))
+      })),
+      history: teacherHistory
     };
   }
 
@@ -1307,13 +1206,13 @@ function saveConfig(config, options = {}) {
     const userEmail = getCurrentEmail();
 
     if (!userEmail) {
-      return { success: false, message: 'ユーザー認証が必要です' };
+      return createAuthError();
     }
 
     const user = findUserByEmail(userEmail, { requestingUser: userEmail });
 
     if (!user) {
-      return { success: false, message: 'ユーザーが見つかりません' };
+      return createUserNotFoundError();
     }
 
     const saveOptions = options.isDraft ?
@@ -1397,7 +1296,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     };
 
   } catch (error) {
-    console.error('getNotificationUpdate error:', error.message);
+    logError_('getNotificationUpdate', error);
     return { success: false, message: error.message };
   }
 }
@@ -1414,10 +1313,7 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
     const email = getCurrentEmail();
     if (!email) {
       console.warn('connectDataSource: Unauthenticated access attempt');
-      return {
-        success: false,
-        error: 'ユーザー認証が必要です'
-      };
+      return createAuthError();
     }
 
     try {
@@ -1433,7 +1329,7 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
     return getColumnAnalysis(spreadsheetId, sheetName);
 
   } catch (error) {
-    console.error('connectDataSource error:', error.message);
+    logError_('connectDataSource', error);
     return createExceptionResponse(error);
   }
 }
@@ -1470,7 +1366,7 @@ function processDataSourceOperations(spreadsheetId, sheetName, operations) {
           };
           break;
         case 'getFormInfo':
-          results.batchResults.formInfo = getFormInfoInternal(spreadsheetId, sheetName);
+          results.batchResults.formInfo = getFormInfo(spreadsheetId, sheetName);
           break;
         case 'connectDataSource': {
           if (!columnAnalysisResult) {
@@ -1494,7 +1390,7 @@ function processDataSourceOperations(spreadsheetId, sheetName, operations) {
 
     return results;
   } catch (error) {
-    console.error('processDataSourceOperations error:', error.message);
+    logError_('processDataSourceOperations', error);
     return createExceptionResponse(error);
   }
 }
@@ -1510,10 +1406,7 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
     const email = getCurrentEmail();
     if (!email) {
       console.warn('getColumnAnalysis: Unauthenticated access attempt');
-      return {
-        success: false,
-        error: 'ユーザー認証が必要です'
-      };
+      return createAuthError();
     }
 
     let dataAccess;
@@ -1602,7 +1495,7 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
       numericScaleCandidates: numericCandidates
     };
   } catch (error) {
-    console.error('getColumnAnalysis error:', error.message);
+    logError_('getColumnAnalysis', error);
     return createExceptionResponse(error);
   }
 }
@@ -1688,37 +1581,11 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
     };
 
   } catch (error) {
-    console.error('setupReactionAndHighlightColumns error:', error.message);
+    logError_('setupReactionAndHighlightColumns', error);
     return {
       success: false,
       error: error.message,
       columnsAdded: []
-    };
-  }
-}
-
-/**
- * フォーム情報取得（バッチ処理用）
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} sheetName - シート名
- * @returns {Object} フォーム情報
- */
-function getFormInfoInternal(spreadsheetId, sheetName) {
-  try {
-    if (typeof getFormInfo === 'function') {
-      return getFormInfo(spreadsheetId, sheetName);
-    } else {
-      return {
-        success: false,
-        message: 'getFormInfo関数が初期化されていません'
-      };
-    }
-  } catch (error) {
-    const errorMessage = error && error.message ? error.message : '予期しないエラーが発生しました';
-    console.error('getFormInfoInternal error:', errorMessage);
-    return {
-      success: false,
-      message: errorMessage
     };
   }
 }
@@ -1814,130 +1681,6 @@ function isValidFormUrl(url) {
     return isValidHost;
   } catch {
     return false;
-  }
-}
-
-/**
- * スプレッドシートURL解析 - GAS-Native Implementation
- * @param {string} fullUrl - 完全なスプレッドシートURL（gid含む）
- * @returns {Object} 解析結果 {spreadsheetId, gid}
- */
-function extractSpreadsheetInfo(fullUrl) {
-  try {
-    if (!fullUrl || typeof fullUrl !== 'string') {
-      return {
-        success: false,
-        message: 'Invalid URL provided'
-      };
-    }
-
-    const spreadsheetIdMatch = fullUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    const gidMatch = fullUrl.match(/[#&]gid=(\d+)/);
-
-    if (!spreadsheetIdMatch) {
-      return {
-        success: false,
-        message: 'Invalid Google Sheets URL format'
-      };
-    }
-
-    return {
-      success: true,
-      spreadsheetId: spreadsheetIdMatch[1],
-      gid: gidMatch ? gidMatch[1] : '0'
-    };
-  } catch (error) {
-    console.error('extractSpreadsheetInfo error:', error.message);
-    return {
-      success: false,
-      message: `URL parsing error: ${error.message}`
-    };
-  }
-}
-
-/**
- * GIDからシート名取得 - Zero-Dependency + Batch Operations
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} gid - シートGID
- * @returns {string} シート名
- */
-function getSheetNameFromGid(spreadsheetId, gid) {
-  try {
-    // Why openSpreadsheet (not bare SpreadsheetApp.openById + executeWithRetry):
-    //   openSpreadsheet がすでに retry / SA fallback / circuit-breaker を包含するので、
-    //   ここで二重に executeWithRetry を走らせるのは無駄かつ backoff が重複する。
-    // null fallback は 'Sheet1' (旧挙動互換): GAS の新規スプレッドシート既定名。
-    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
-    if (!dataAccess) {
-      return 'Sheet1';
-    }
-    const { spreadsheet } = dataAccess;
-    const sheets = spreadsheet.getSheets();
-
-    const sheetInfos = sheets.map(sheet => ({
-      name: sheet.getName(),
-      gid: sheet.getSheetId().toString()
-    }));
-
-    const targetSheet = sheetInfos.find(info => info.gid === gid);
-    const resultName = targetSheet ? targetSheet.name : sheetInfos[0]?.name || 'Sheet1';
-
-    return resultName;
-
-  } catch (error) {
-    console.error('getSheetNameFromGid error:', error.message);
-    return 'Sheet1';
-  }
-}
-
-/**
- * 完全URL統合検証 - 既存API活用 + Performance最適化
- * @param {string} fullUrl - 完全なスプレッドシートURL
- * @returns {Object} 統合検証結果
- */
-function validateCompleteSpreadsheetUrl(fullUrl) {
-  const started = Date.now();
-  try {
-    const parseResult = extractSpreadsheetInfo(fullUrl);
-    if (!parseResult.success) {
-      return parseResult;
-    }
-
-    const { spreadsheetId, gid } = parseResult;
-    const sheetName = getSheetNameFromGid(spreadsheetId, gid);
-    const accessResult = validateAccess(spreadsheetId, true);
-
-    const formResult = typeof getFormInfo === 'function' ?
-      getFormInfo(spreadsheetId, sheetName) :
-      { success: false, message: 'getFormInfo関数が初期化されていません' };
-
-    const result = {
-      success: true,
-      spreadsheetId,
-      gid,
-      sheetName,
-      hasAccess: accessResult.success,
-      accessInfo: {
-        spreadsheetName: accessResult.spreadsheetName,
-        sheets: accessResult.sheets || []
-      },
-      formInfo: formResult,
-      readyToConnect: accessResult.success && sheetName,
-      executionTime: `${Date.now() - started}ms`
-    };
-
-    return result;
-
-  } catch (error) {
-    const errorResult = {
-      success: false,
-      message: `Complete validation error: ${error.message}`,
-      error: error.message,
-      executionTime: `${Date.now() - started}ms`
-    };
-
-    console.error('validateCompleteSpreadsheetUrl ERROR:', errorResult);
-    return errorResult;
   }
 }
 

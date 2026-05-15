@@ -3,12 +3,14 @@
  *   シート寸法/ヘッダー取得（キャッシュ付き）、適応型バッチ読込。
  */
 
-/* global formatTimestamp, createErrorResponse, createExceptionResponse, getQuestionText, findUserByEmail, findUserById, findUserBySpreadsheetId, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, getCachedProperty */
+/* global formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse */
 
 /**
  * ユーザーのスプレッドシートデータ取得
  * @param {string} userId - ユーザーID
- * @param {Object} options - 取得オプション
+ * @param {Object} [options] - 取得オプション
+ * @param {Object} [preloadedUser] - 既に取得済みの user (batch 呼び出しで重複 lookup を防ぐ)
+ * @param {Object} [preloadedConfig] - 既に取得済みの config
  * @returns {Object} レスポンスオブジェクト
  */
 function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedConfig = null) {
@@ -220,11 +222,7 @@ function getSheetInfo(sheet) {
   return { lastRow, lastCol: headersInfo.lastCol, headers: headersInfo.headers };
 }
 
-/**
- * 適応型バッチサイズ計算（429 エラー対策）。連続エラー時に段階的に縮小。
- * @param {number} consecutiveErrors
- * @returns {number}
- */
+// 適応型バッチサイズ (429 対策)。連続エラー時に段階的に縮小。
 function getAdaptiveBatchSize(consecutiveErrors) {
   if (consecutiveErrors === 0) return 100; // 正常時: 最大効率
   if (consecutiveErrors === 1) return 70;  // 1回エラー: 30%削減
@@ -242,16 +240,19 @@ function getAdaptiveBatchSize(consecutiveErrors) {
  * @param {Object} options
  * @param {Object} user
  * @param {number} startTime
- * @returns {Array}
  */
-function processBatchData(sheet, headers, lastRow, lastCol, config, options, user, startTime) {
+/**
+ * @param {Object} ctx - {sheet, headers, lastRow, lastCol, config, options, user, startTime}
+ */
+function processBatchData(ctx) {
+  const { sheet, headers, lastRow, lastCol, config, options, user, startTime } = ctx;
   const MAX_EXECUTION_TIME = 20000;
   const MAX_CONSECUTIVE_ERRORS = 3;
 
   let processedData = [];
   let processedCount = 0;
   const totalDataRows = lastRow - 1;
-  let consecutiveErrors = 0; // 適応型バッチサイズ用
+  let consecutiveErrors = 0;
 
   // Headers don't change mid-batch, so resolve column indices once here
   // rather than per-row (resolveColumnIndex runs a full header scan on misses).
@@ -276,9 +277,14 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
 
     try {
       const batchRows = sheet.getRange(startRow, 1, batchSize, lastCol).getValues();
-      const batchProcessed = processRawDataBatch(batchRows, headers, config, options, startRow - 2, user, fieldIndices, tsIndex);
+      const batchProcessed = processRawDataBatch({
+        batchRows, headers, options,
+        startOffset: startRow - 2,
+        fieldIndices, tsIndex
+      });
 
-      processedData = processedData.concat(batchProcessed);
+      // push(...batchProcessed) は in-place で O(n)。concat は新 array を毎回作るので O(n²)。
+      for (let i = 0; i < batchProcessed.length; i++) processedData.push(batchProcessed[i]);
       processedCount += batchSize;
 
       consecutiveErrors = 0;
@@ -352,14 +358,13 @@ function processBatchData(sheet, headers, lastRow, lastCol, config, options, use
  * @param {Object} config
  * @param {Object} options
  * @param {Object} user
- * @returns {Object}
  */
 function fetchSpreadsheetData(config, options = {}, user = null) {
   const startTime = Date.now();
 
   const { sheet } = connectToSpreadsheetSheet(config);
   const { lastRow, lastCol, headers } = getSheetInfo(sheet);
-  const processedData = processBatchData(sheet, headers, lastRow, lastCol, config, options, user, startTime);
+  const processedData = processBatchData({ sheet, headers, lastRow, lastCol, config, options, user, startTime });
 
   return {
     success: true,
@@ -370,16 +375,12 @@ function fetchSpreadsheetData(config, options = {}, user = null) {
 }
 
 /**
- * バッチ処理用データ変換（メモリ効率重視）
- * @param {Array} batchRows - バッチデータ行
- * @param {Array} headers - ヘッダー配列
- * @param {Object} config - 設定
- * @param {Object} options - 処理オプション
- * @param {number} startOffset - 開始オフセット（行番号計算用）
- * @param {Object} user - ユーザー情報
+ * バッチ処理用データ変換（メモリ効率重視）。
+ * @param {Object} ctx - {batchRows, headers, options, startOffset, fieldIndices, tsIndex}
  * @returns {Array} 処理済みバッチデータ
  */
-function processRawDataBatch(batchRows, headers, config, options, startOffset, user, fieldIndices, tsIndex) {
+function processRawDataBatch(ctx) {
+  const { batchRows, headers, options, startOffset, fieldIndices, tsIndex } = ctx;
   try {
     const processedBatch = [];
     // Normalize empty/missing cells to null to match the prior
@@ -488,12 +489,7 @@ function isEmptyRow(row) {
   });
 }
 
-/**
- * 行フィルタリング判定
- * @param {Object} item
- * @param {Object} options
- * @returns {boolean}
- */
+// 行フィルタリング判定
 function shouldIncludeRow(item, options = {}) {
   try {
     if (options.excludeEmpty !== false && item.isEmpty) {
@@ -589,7 +585,6 @@ function applySortAndLimit(data, options = {}) {
  * 回答行を削除（編集者権限必須）
  * @param {string} userId - ユーザーID
  * @param {number} rowIndex - 削除対象の行インデックス（1-based, ヘッダー含む）
- * @param {Object} options - オプション設定
  * @returns {Object} 削除結果
  */
 function deleteAnswerRow(userId, rowIndex) {

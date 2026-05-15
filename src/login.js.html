@@ -5,6 +5,8 @@
     if (loginBtn) {
       loginBtn.disabled = disabled;
       loginBtn.textContent = text;
+      // disabled=true のときスピナーを表示。OAuth 起動中に複数 click 防止。
+      loginBtn.classList.toggle('btn-busy', !!disabled);
     }
   }
 
@@ -344,6 +346,12 @@
   }
 
     window.switchAccount = function() {
+      const btn = document.getElementById('switch-account-btn');
+      // 連打抑制: アカウント切替 OAuth が複数飛ばないように。target='_top' なので
+      // 物理的には 1 page しか開かないが、複数 click で auth 状態が乱れるのを防ぐ。
+      if (btn && window.sharedUtilities?.buttons && !window.sharedUtilities.buttons.navOnce(btn)) {
+        return;
+      }
       const url = cachedLoginUrl || window.location.href;
       window.open(
         'https://accounts.google.com/AccountChooser?continue=' + encodeURIComponent(url),

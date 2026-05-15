@@ -33,6 +33,7 @@ function loadCtx(overrides = {}) {
 
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
+    logError_: () => {},
     CacheService: { getScriptCache: () => cache },
     CACHE_DURATION: { SHORT: 10, MEDIUM: 30, FORM_DATA: 30, LONG: 300, DATABASE_LONG: 600, USER_INDIVIDUAL: 900, EXTRA_LONG: 3600 },
     TIMEOUT_MS: { DEFAULT: 5000 },

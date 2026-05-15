@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('path');
 const vm = require('vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 /**
  * Tests for new adminApi operations: findUser, getUserConfig, exportConfigs,
@@ -47,12 +48,7 @@ function loadAdminContext(overrides = {}) {
 
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
-    createErrorResponse: (msg, data, extra) => ({ success: false, message: msg, error: msg, ...extra }),
-    createSuccessResponse: (msg, data) => ({ success: true, message: msg, ...(data && { data }) }),
-    createAdminRequiredError: () => ({ success: false, message: 'admin required' }),
-    createAuthError: () => ({ success: false, message: 'auth required' }),
-    createUserNotFoundError: () => ({ success: false, message: 'user not found' }),
-    createExceptionResponse: (e) => ({ success: false, message: e.message }),
+    ...gasResponseStubs(),
     getCurrentEmail: () => 'admin@example.com',
     isAdministrator: () => true,
     findUserByEmail: (email) => baseUsers.find(u => u.userEmail === email) || null,
@@ -211,13 +207,10 @@ test('getUserConfig: missing userId rejects', () => {
 // =====================================================================
 
 test('exportConfigs: returns all users with parsed config', () => {
-  const ctx = loadAdminContext({
-    // getAdminUsers が getAllUsers と異なる API シェイプを返すケースに対応するための stub
-  });
-  // getAdminUsers 内部関数も同 file 内なので、まずは現実の returns に近い形を直接 stub
+  const ctx = loadAdminContext();
   ctx.getAdminUsers = () => ({
     success: true,
-    data: { users: ctx.getAllUsers() }
+    users: ctx.getAllUsers()
   });
 
   const res = ctx.dispatchAdminOperation('exportConfigs', {});
@@ -325,7 +318,7 @@ test('setUserConfig: preserves boardMode through sanitization pipeline', () => {
 
 test('bulkSetUserConfig: dryRun returns matched count without writes', () => {
   const ctx = loadAdminContext();
-  ctx.getAdminUsers = () => ({ success: true, data: { users: ctx.getAllUsers() } });
+  ctx.getAdminUsers = () => ({ success: true, users: ctx.getAllUsers() });
   const res = ctx.dispatchAdminOperation('bulkSetUserConfig', {
     patch: { allowResubmit: true },
     dryRun: true
@@ -338,7 +331,7 @@ test('bulkSetUserConfig: dryRun returns matched count without writes', () => {
 
 test('bulkSetUserConfig: filter isPublished=false matches subset', () => {
   const ctx = loadAdminContext();
-  ctx.getAdminUsers = () => ({ success: true, data: { users: ctx.getAllUsers() } });
+  ctx.getAdminUsers = () => ({ success: true, users: ctx.getAllUsers() });
   const res = ctx.dispatchAdminOperation('bulkSetUserConfig', {
     patch: { allowResubmit: true },
     filter: { isPublished: false },
@@ -350,7 +343,7 @@ test('bulkSetUserConfig: filter isPublished=false matches subset', () => {
 
 test('bulkSetUserConfig: applies patch to matched users', () => {
   const ctx = loadAdminContext();
-  ctx.getAdminUsers = () => ({ success: true, data: { users: ctx.getAllUsers() } });
+  ctx.getAdminUsers = () => ({ success: true, users: ctx.getAllUsers() });
   const res = ctx.dispatchAdminOperation('bulkSetUserConfig', {
     patch: { allowResubmit: true },
     filter: { emailContains: 'a@' }

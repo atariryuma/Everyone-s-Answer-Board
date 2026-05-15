@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gasResponseStubs, createContentServiceStub } = require('./_helpers.cjs');
 
 /**
  * Tests for the reportClientError doPost action and handleClientErrorReport handler.
@@ -10,22 +11,6 @@ const vm = require('node:vm');
  * Why: フロントエラーを Cloud Logging に流す唯一の入口なので、
  *      validation・rate-limit・truncation・xss-safe な logging を確実にする。
  */
-
-function createContentServiceStub() {
-  return {
-    MimeType: { JSON: 'application/json' },
-    createTextOutput(body) {
-      return {
-        body,
-        mimeType: null,
-        setMimeType(mimeType) {
-          this.mimeType = mimeType;
-          return this;
-        }
-      };
-    }
-  };
-}
 
 function loadMainContext(overrides = {}, errorSink) {
   // 引数の errorSink が console.error の呼び出しを蓄積するなら、ログ内容を検証可能。
@@ -37,12 +22,7 @@ function loadMainContext(overrides = {}, errorSink) {
       error: (...args) => logs.error.push(args)
     },
     ContentService: createContentServiceStub(),
-    createSuccessResponse: (message, data, extra) => ({ success: true, message, ...(data && { data }), ...extra }),
-    createAuthError: () => ({ success: false, message: 'auth required' }),
-    createUserNotFoundError: () => ({ success: false, message: 'user not found' }),
-    createErrorResponse: (message, data, extra) => ({ success: false, message, error: message, ...extra }),
-    createExceptionResponse: (error) => ({ success: false, message: error.message, error: error.message }),
-    createAdminRequiredError: () => ({ success: false, message: 'admin required' }),
+    ...gasResponseStubs(),
     Session: {
       getActiveUser: () => ({ getEmail: () => 'student@example.com' })
     },

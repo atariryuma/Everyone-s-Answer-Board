@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global getCurrentEmail, findUserBySpreadsheetId, findUserById, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, CACHE_DURATION, SYSTEM_LIMITS, isAdministrator */
+/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator */
 
 const LOCK_TIMEOUT_MS = 10000;
 const LOCK_CACHE_TTL_SECONDS = 10;
@@ -30,7 +30,6 @@ const LOCK_CACHE_TTL_SECONDS = 10;
  * @param {Object} [options]
  * @param {boolean} [options.requireEditor=false] editor 権限を要求するか
  * @param {boolean} [options.isAdmin] 呼び出し側が計算済みの isAdmin（省略時は再計算）
- * @returns {boolean}
  */
 function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
   if (!actorEmail || !targetUser) return false;
@@ -55,7 +54,6 @@ function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
  * @param {string} reactionType
  * @param {string} actorEmail
  * @param {Array} [preloadedHeaders] - 呼び出し側でキャッシュ済みなら渡す（再取得を回避）
- * @returns {Object}
  */
 function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, preloadedHeaders) {
   const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
@@ -95,7 +93,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
   //   リアクションが必ず失敗」が判明。
   //   修正: 不足している reaction 列をその場で append し、headers を更新して処理続行。
   //   side-effect は新規列追加のみ（既存データには触れない）。冪等で何度呼んでも安全。
-  let reactionColumns = {};
+  const reactionColumns = {};
   let missingTypes = [];
 
   reactionTypes.forEach(type => {
@@ -228,7 +226,6 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
  * @param {Sheet} sheet
  * @param {number} rowNumber
  * @param {Array} [preloadedHeaders]
- * @returns {Object}
  */
 function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
   const headers = Array.isArray(preloadedHeaders) && preloadedHeaders.length > 0
@@ -354,7 +351,6 @@ function extractHighlight(row, headers) {
  * @param {string} targetUserId - ボード所有者の userId
  * @param {number|string} rowIndex - 行番号または 'row_#'
  * @param {string} reactionType
- * @returns {Object}
  */
 function addReaction(targetUserId, rowIndex, reactionType) {
   return executeBoardRowOperation({
@@ -380,7 +376,6 @@ function addReaction(targetUserId, rowIndex, reactionType) {
  * ハイライト切り替え（マルチテナント対応）。
  * @param {string} targetUserId - ボード所有者の userId
  * @param {number|string} rowIndex - 行番号または 'row_#'
- * @returns {Object}
  */
 function toggleHighlight(targetUserId, rowIndex) {
   return executeBoardRowOperation({

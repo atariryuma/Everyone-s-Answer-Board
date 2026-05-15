@@ -348,38 +348,3 @@ test('validateMapping: answer/reason real duplicate still rejected', () => {
   assert.ok(r.errors.some(e => e.includes('重複')));
 });
 
-// =====================================================================
-// validateDateFormat
-// =====================================================================
-
-test('validateDateFormat: accepts YYYY-MM-DD', () => {
-  const ctx = loadValidatorsContext();
-  const r = ctx.validateDateFormat('2026-05-13');
-  assert.equal(r.isValid, true);
-  // vm sandbox の Date は host の instanceof と異なる class なので、形だけチェック
-  assert.ok(r.parsed && typeof r.parsed.getTime === 'function');
-});
-
-test('validateDateFormat: accepts ISO 8601 with time', () => {
-  const ctx = loadValidatorsContext();
-  assert.equal(ctx.validateDateFormat('2026-05-13T10:30:00Z').isValid, true);
-  assert.equal(ctx.validateDateFormat('2026-05-13T10:30:00.123Z').isValid, true);
-  assert.equal(ctx.validateDateFormat('2026-05-13T10:30:00+09:00').isValid, true);
-});
-
-test('validateDateFormat: rejects out-of-range month/day', () => {
-  const ctx = loadValidatorsContext();
-  // 形式は通るが Date が NaN になる
-  assert.equal(ctx.validateDateFormat('2026-13-01').isValid, false);  // month 13
-  assert.equal(ctx.validateDateFormat('2026-02-31').isValid, false);  // Feb 31
-});
-
-test('validateDateFormat: rejects malformed strings', () => {
-  const ctx = loadValidatorsContext();
-  assert.equal(ctx.validateDateFormat('').isValid, false);
-  assert.equal(ctx.validateDateFormat('not-a-date').isValid, false);
-  assert.equal(ctx.validateDateFormat('2026/05/13').isValid, false);  // slash
-  assert.equal(ctx.validateDateFormat('20260513').isValid, false);    // no separator
-  assert.equal(ctx.validateDateFormat(null).isValid, false);
-  assert.equal(ctx.validateDateFormat(20260513).isValid, false);      // number
-});

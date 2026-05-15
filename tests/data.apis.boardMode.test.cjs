@@ -3,14 +3,13 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 function loadDataApisContext(overrides = {}) {
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     URL,
-    createErrorResponse: (message) => ({ success: false, message }),
-    createExceptionResponse: (error) => ({ success: false, message: error.message }),
-    createSuccessResponse: (message, data) => ({ success: true, message, ...(data && { data }) }),
+    ...gasResponseStubs(),
     getCurrentEmail: () => 'actor@example.com',
     findUserByEmail: () => null,
     findUserById: () => null,

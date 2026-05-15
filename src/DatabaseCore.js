@@ -3,14 +3,13 @@
  *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
-/* global validateEmail, CACHE_DURATION, TIMEOUT_MS, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS */
 
 /**
  * Sheets API 呼び出しラッパー（適応型バックオフ + サーキットブレーカー）。
  * @param {string} url
  * @param {Object} options - Fetch options
  * @param {string} operationName - ログ用
- * @returns {Object}
  */
 function fetchSheetsAPIWithRetry(url, options, operationName) {
   let retryCount = 0;
@@ -21,7 +20,7 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
   // Why: JSON.parse が想定外の値（部分書込み、過去 schema、null fields）を返した場合に
   //   undefined.> 0 が silently false になり、circuit breaker が機能しない silent bug を防ぐ。
   //   parse 失敗時 + 必須フィールド欠落時の両方を defaults で埋める。
-  let circuitState = { consecutiveErrors: 0, circuitOpenUntil: 0 };
+  const circuitState = { consecutiveErrors: 0, circuitOpenUntil: 0 };
   if (cachedState) {
     try {
       const parsed = JSON.parse(cachedState);
@@ -242,7 +241,7 @@ function openDatabase(options = {}) {
 
     return dataAccess?.spreadsheet || null;
   } catch (error) {
-    console.error('openDatabase error:', error.message);
+    logError_('openDatabase', error);
     return null;
   }
 }
@@ -340,7 +339,7 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       }
     };
   } catch (error) {
-    console.error('openSpreadsheet error:', error.message);
+    logError_('openSpreadsheet', error);
     return null;
   }
 }
@@ -387,7 +386,7 @@ function openSpreadsheetViaServiceAccount(sheetId) {
     return createServiceAccountSpreadsheetProxy(sheetId, tokenData.access_token);
 
   } catch (error) {
-    console.error('openSpreadsheetViaServiceAccount error:', error.message);
+    logError_('openSpreadsheetViaServiceAccount', error);
     return null;
   }
 }
@@ -792,7 +791,6 @@ function findUserById(userId, context = {}) {
  * @param {string} userId - 対象ボードオーナーの userId
  * @param {string} viewerEmail - 閲覧者のメールアドレス
  * @param {Object} [extra] - 追加 context（preloadedAuth 等）
- * @returns {Object|null}
  */
 function findPublishedBoardOwner(userId, viewerEmail, extra = {}) {
   if (!userId) return null;
@@ -1052,7 +1050,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     return user;
 
   } catch (error) {
-    console.error('createUser error:', error.message);
+    logError_('createUser', error);
     return null;
   } finally {
     try {
@@ -1144,7 +1142,7 @@ function getAllUsers(options = {}, context = {}) {
 
     return users;
   } catch (error) {
-    console.error('getAllUsers error:', error.message);
+    logError_('getAllUsers', error);
     return [];
   }
 }
@@ -1288,7 +1286,7 @@ function updateUser(userId, updates, context = {}) {
     console.warn('updateUser: User not found:', userId);
     return { success: false, message: 'User not found' };
   } catch (error) {
-    console.error('updateUser error:', error.message);
+    logError_('updateUser', error);
     return { success: false, message: error.message || 'Unknown error occurred' };
   } finally {
     try {
@@ -1372,7 +1370,7 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
 
     return null;
   } catch (error) {
-    console.error('findUserBySpreadsheetId error:', error.message);
+    logError_('findUserBySpreadsheetId', error);
     return null;
   }
 }
@@ -1450,7 +1448,7 @@ function deleteUser(userId, reason = '', context = {}) {
       reason: reason || 'No reason provided'
     };
   } catch (error) {
-    console.error('deleteUser error:', error.message);
+    logError_('deleteUser', error);
     return { success: false, message: error.message };
   } finally {
     try {

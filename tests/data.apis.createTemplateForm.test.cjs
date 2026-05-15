@@ -12,6 +12,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 // Why module-scope cache: 10 tests × loadCtx() = 10 disk reads + 10 parses of a ~1400-line
 //   file. vm.Script はコンパイル結果を保持するので、runInContext で再利用すれば
@@ -124,9 +125,7 @@ function loadCtx(overrides = {}) {
   const ctx = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     URL,
-    createErrorResponse: (m) => ({ success: false, message: m }),
-    createExceptionResponse: (e) => ({ success: false, message: e.message }),
-    createSuccessResponse: (m, data) => ({ success: true, message: m, ...(data && { data }) }),
+    ...gasResponseStubs(),
     getCurrentEmail: () => myEmail,
     findUserByEmail: () => null,
     findUserById: () => null,

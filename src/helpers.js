@@ -3,16 +3,12 @@
  *   認証ショートカット、emailToShortHash（仮名化）。
  */
 
-/* global CACHE_DURATION, TIMEOUT_MS, SLEEP_MS, PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig */
+/* global PROPERTY_CACHE_TTL, getCurrentEmail, isAdministrator, getUserConfig */
 
 const RUNTIME_PROPERTIES_CACHE = {};
 const MAX_CACHE_SIZE = 50; // 最大キャッシュエントリ数
 
-/**
- * PropertiesService のメモリキャッシュ付きアクセス（30秒 TTL / 最大 50 エントリ LRU）。
- * @param {string} key
- * @returns {string|null}
- */
+// PropertiesService のメモリキャッシュ付きアクセス（30秒 TTL / 最大 50 エントリ LRU）。
 function getCachedProperty(key) {
   const now = Date.now();
   const cached = RUNTIME_PROPERTIES_CACHE[key];
@@ -82,7 +78,6 @@ function setCachedProperty(key, value) {
  * @param {Object} data
  * @param {number} ttl - 秒
  * @param {number} [maxSize=100000]
- * @returns {boolean}
  */
 function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
   try {
@@ -99,12 +94,7 @@ function saveToCacheWithSizeCheck(cacheKey, data, ttl, maxSize = 100000) {
   }
 }
 
-/**
- * オブジェクトを `key:value|key:value` 形式の安価なハッシュ文字列に変換
- * （JSON.stringify より約 50% 速い。安定キャッシュキー用途）。
- * @param {Object} obj
- * @returns {string}
- */
+// オブジェクトを `key:value|key:value` 形式に変換 (JSON.stringify より約 50% 速い、cache key 用)。
 function simpleHash(obj) {
   if (!obj || typeof obj !== 'object') return '';
   const keys = Object.keys(obj).sort();
@@ -190,6 +180,11 @@ function createExceptionResponse(error, context) {
   const rawMessage = (error && error.message) || 'Unknown error';
   const message = context ? `${context}: ${rawMessage}` : rawMessage;
   return createErrorResponse(message);
+}
+
+// 共通エラーログ。`logError_('funcName', error)` の繰り返しを集約。
+function logError_(funcName, error) {
+  console.error(funcName + ' error:', error && error.message ? error.message : error);
 }
 
 /**

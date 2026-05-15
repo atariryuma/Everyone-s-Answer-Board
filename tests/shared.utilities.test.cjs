@@ -61,8 +61,27 @@ function loadSharedUtilities() {
     DebounceManager: vm.runInContext('DebounceManager', ctx),
     ThrottleManager: vm.runInContext('ThrottleManager', ctx),
     SecurityUtilities: vm.runInContext('SecurityUtilities', ctx),
+    ButtonBusyManager: vm.runInContext('ButtonBusyManager', ctx),
     timers,
     ctx
+  };
+}
+
+function makeBtnMock() {
+  const dataset = {};
+  let textContent = '元の文字';
+  const classes = new Set();
+  return {
+    disabled: false,
+    get textContent() { return textContent; },
+    set textContent(v) { textContent = v; },
+    dataset,
+    classList: {
+      add: (c) => classes.add(c),
+      remove: (c) => classes.delete(c),
+      contains: (c) => classes.has(c),
+      _has: classes
+    }
   };
 }
 
@@ -184,4 +203,94 @@ test('SecurityUtilities.isValidEmail: rejects malformed addresses', () => {
   assert.equal(s.isValidEmail('user@'), false);
   assert.equal(s.isValidEmail('user @example.com'), false);
   assert.equal(s.isValidEmail(''), false);
+});
+
+// =====================================================================
+// ButtonBusyManager — 全ページのボタン共通の処理中 UX
+// =====================================================================
+
+test('ButtonBusyManager.withBusy: disabled + busy class + 処理後復元', async () => {
+  const { ButtonBusyManager } = loadSharedUtilities();
+  const mgr = new ButtonBusyManager();
+  const btn = makeBtnMock();
+  let inside = null;
+  await mgr.withBusy(btn, async () => {
+    inside = { disabled: btn.disabled, busy: btn.classList.contains('btn-busy') };
+    await Promise.resolve();
+  });
+  // 処理中: disabled + btn-busy class
+  assert.equal(inside.disabled, true);
+  assert.equal(inside.busy, true);
+  // 処理後: 復元
+  assert.equal(btn.disabled, false);
+  assert.equal(btn.classList.contains('btn-busy'), false);
+});
+
+test('ButtonBusyManager.withBusy: 連打抑制 (実行中の重複 click は skip)', async () => {
+  const { ButtonBusyManager } = loadSharedUtilities();
+  const mgr = new ButtonBusyManager();
+  const btn = makeBtnMock();
+  let count = 0;
+  // 1 回目: 50ms 待つ実行
+  const p1 = mgr.withBusy(btn, async () => {
+    count += 1;
+    await new Promise(r => setTimeout(r, 50));
+  });
+  // すぐ 2 回目: 1 回目が完了する前 → skip されて undefined
+  const p2 = mgr.withBusy(btn, async () => { count += 1; });
+  const r2 = await p2;
+  await p1;
+  assert.equal(count, 1, '2 回目は実行されない');
+  assert.equal(r2, undefined);
+});
+
+test('ButtonBusyManager.withBusy: busyText 指定でラベル一時置換 + 復元', async () => {
+  const { ButtonBusyManager } = loadSharedUtilities();
+  const mgr = new ButtonBusyManager();
+  const btn = makeBtnMock();
+  btn.textContent = '保存';
+  let insideText = null;
+  await mgr.withBusy(btn, async () => {
+    insideText = btn.textContent;
+  }, { busyText: '保存中…' });
+  assert.equal(insideText, '保存中…');
+  assert.equal(btn.textContent, '保存');
+});
+
+test('ButtonBusyManager.withBusy: 例外時も状態は復元される', async () => {
+  const { ButtonBusyManager } = loadSharedUtilities();
+  const mgr = new ButtonBusyManager();
+  const btn = makeBtnMock();
+  await assert.rejects(
+    mgr.withBusy(btn, async () => { throw new Error('fail'); }),
+    /fail/
+  );
+  assert.equal(btn.disabled, false);
+  assert.equal(btn.classList.contains('btn-busy'), false);
+});
+
+test('ButtonBusyManager.navOnce: ms 内の連続呼出は false 返却 (タブ重複防止)', () => {
+  const { ButtonBusyManager } = loadSharedUtilities();
+  const mgr = new ButtonBusyManager();
+  const btn = makeBtnMock();
+  assert.equal(mgr.navOnce(btn, 500), true);
+  assert.equal(mgr.navOnce(btn, 500), false, 'すぐの 2 回目は false');
+});
+
+test('ButtonBusyManager.navOnce: ms 経過後は再び true (gate 解除)', async () => {
+  const { ButtonBusyManager } = loadSharedUtilities();
+  const mgr = new ButtonBusyManager();
+  const btn = makeBtnMock();
+  assert.equal(mgr.navOnce(btn, 30), true);
+  await new Promise(r => setTimeout(r, 40));
+  assert.equal(mgr.navOnce(btn, 30), true, '30ms 後は通る');
+});
+
+test('ButtonBusyManager.withBusy: null btn の場合は asyncFn だけ実行', async () => {
+  const { ButtonBusyManager } = loadSharedUtilities();
+  const mgr = new ButtonBusyManager();
+  let executed = false;
+  const result = await mgr.withBusy(null, async () => { executed = true; return 42; });
+  assert.equal(executed, true);
+  assert.equal(result, 42);
 });

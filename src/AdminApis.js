@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, FormApp, SpreadsheetApp, ScriptApp, UrlFetchApp, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __maybeAutoArchiveLesson_, logError_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -14,6 +14,13 @@
 const PROTECTED_PROPERTY_SUBSTRINGS = ['KEY', 'CREDS', 'SECRET', 'TOKEN', 'PASSWORD'];
 const PROTECTED_PROPERTY_EXACT_KEYS = ['ADMIN_EMAIL', 'DATABASE_SPREADSHEET_ID'];
 
+// Magic-number elimination (Clean Code: replace literal numbers with named constants).
+const PROFILE_NAME_MAX_LEN = 50;              // saveProfile: profile name 最大長
+const SHEET_NAME_MAX_LEN = 200;               // Forms / Sheets で実用的に許容される sheet 名長
+const DRIVE_ERROR_BODY_PREVIEW_LEN = 300;     // Drive API エラーレスポンスのログ表示文字数
+const MAX_BULK_INSERT_ROWS = 500;             // bulkInsertRows API 1 回あたりの最大行数
+const PROTECTED_PROPERTY_MIN_LENGTH = 4;      // Property name の最低長 (短すぎる input を reject)
+
 function isProtectedPropertyKey(key) {
   if (typeof key !== 'string' || !key) return false;
   const upper = key.toUpperCase();
@@ -22,12 +29,7 @@ function isProtectedPropertyKey(key) {
 }
 
 
-/**
- * Get users - simplified name for admin panel
- * @param {Object} _options - Options (reserved for future use)
- * @returns {Object} User list result
- */
-function getAdminUsers(_options = {}) {
+function getAdminUsers() {
   try {
     const auth = requireAdmin();
     if (!auth) return createAdminRequiredError();
@@ -38,7 +40,7 @@ function getAdminUsers(_options = {}) {
       users: users || []
     };
   } catch (error) {
-    console.error('getAdminUsers error:', error.message);
+    logError_('getAdminUsers', error);
     return createExceptionResponse(error);
   }
 }
@@ -74,7 +76,7 @@ function toggleUserActiveStatus(targetUserId) {
       return createErrorResponse('ユーザー状態の更新に失敗しました');
     }
   } catch (error) {
-    console.error('toggleUserActiveStatus error:', error.message);
+    logError_('toggleUserActiveStatus', error);
     return createExceptionResponse(error);
   }
 }
@@ -144,6 +146,16 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   updatedConfig.publishedAt = targetIsPublished ? now : null;
   updatedConfig.lastAccessedAt = now;
 
+  // unpublishBoard 経由で呼ばれて、かつ lesson の auto-archive 条件を満たすなら
+  //   この同じ save で endLesson + marker クリアを inline 実行 (一貫性のため同 write 内)。
+  if (!targetIsPublished && options.triggerLessonAutoArchive && currentConfig.currentLessonStartedAt) {
+    const archiveResult = __maybeAutoArchiveLesson_(targetUser, currentConfig);
+    if (archiveResult.archived) {
+      updatedConfig.currentLessonStartedAt = null;
+      updatedConfig.activeLessonId = null;
+    }
+  }
+
   const saveResult = saveUserConfig(targetUser.userId, updatedConfig);
   if (!saveResult.success) {
     return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
@@ -178,7 +190,7 @@ function toggleUserBoardStatus(targetUserId, options = {}) {
       requireAdmin: true
     });
   } catch (error) {
-    console.error('toggleUserBoardStatus error:', error.message);
+    logError_('toggleUserBoardStatus', error);
     return createExceptionResponse(error);
   }
 }
@@ -192,7 +204,7 @@ function republishMyBoard(options = {}) {
   try {
     return __applyPublishStateChange(null, true, { sourceEtag: options.sourceEtag });
   } catch (error) {
-    console.error('republishMyBoard error:', error.message);
+    logError_('republishMyBoard', error);
     return createExceptionResponse(error);
   }
 }
@@ -205,17 +217,20 @@ function republishMyBoard(options = {}) {
  */
 function unpublishBoard(targetUserId, options = {}) {
   try {
-    return __applyPublishStateChange(targetUserId || null, false, { sourceEtag: options.sourceEtag });
+    return __applyPublishStateChange(targetUserId || null, false, {
+      sourceEtag: options.sourceEtag,
+      // unpublish 時 = 教師の「授業終了」意思表示。lesson auto-archive を同 save で実行する。
+      triggerLessonAutoArchive: options.triggerLessonAutoArchive !== false
+    });
   } catch (error) {
-    console.error('unpublishBoard error:', error.message);
+    logError_('unpublishBoard', error);
     return createExceptionResponse(error);
   }
 }
 
 /**
- * @deprecated Use unpublishBoard() instead. Kept for back-compat with existing
- *   client code (page.js endPublication / AdminPanel unpublishBoardBtn).
- *   このエイリアスは v2700 以降で削除予定。新規コードは unpublishBoard を使うこと。
+ * @deprecated Use unpublishBoard() — kept for back-compat with page.js endPublication と
+ *   AdminPanel unpublishBoardBtn の click ハンドラ。新規コードは unpublishBoard を直接呼ぶ。
  * @param {string} [targetUserId]
  * @returns {Object} 実行結果
  */
@@ -254,6 +269,40 @@ function __appendProfileHistory_(currentHistory, profileName) {
   return hist;
 }
 
+function __extractProfileFields_(src) {
+  return {
+    formUrl: src.formUrl || '',
+    formTitle: src.formTitle || '',
+    spreadsheetId: src.spreadsheetId || '',
+    sheetName: src.sheetName || '',
+    columnMapping: src.columnMapping || {},
+    displaySettings: src.displaySettings || {},
+    xAxisLabels: src.xAxisLabels || null,
+    yAxisLabels: src.yAxisLabels || null,
+    matrixQuadrantLabels: src.matrixQuadrantLabels || null,
+    allowResubmit: !!src.allowResubmit
+  };
+}
+
+// Why: displaySettings が profile に無いときは DEFAULT で埋める。空 {} を渡すと
+//   matrix→wordcloud 切替時に旧 columnMapping.numericX/Y が残って空ボードになる。
+function __applyProfileToConfig_(currentConfig, profile) {
+  const defaultDisplay = typeof DEFAULT_DISPLAY_SETTINGS !== 'undefined' ? DEFAULT_DISPLAY_SETTINGS : {};
+  return {
+    ...currentConfig,
+    formUrl: profile.formUrl || '',
+    formTitle: profile.formTitle || '',
+    spreadsheetId: profile.spreadsheetId || '',
+    sheetName: profile.sheetName || '',
+    columnMapping: profile.columnMapping || {},
+    displaySettings: profile.displaySettings || defaultDisplay,
+    xAxisLabels: profile.xAxisLabels || null,
+    yAxisLabels: profile.yAxisLabels || null,
+    matrixQuadrantLabels: profile.matrixQuadrantLabels || null,
+    allowResubmit: !!profile.allowResubmit
+  };
+}
+
 function __listProfilesCore(userId) {
   const cfg = getUserConfig(userId);
   if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
@@ -285,25 +334,13 @@ function __saveProfileCore(userId, name, opts = {}) {
   if (!name || typeof name !== 'string' || !name.trim()) {
     return createErrorResponse('name (profile name) is required');
   }
-  const cleanName = String(name).trim().substring(0, 50);
+  const cleanName = String(name).trim().substring(0, PROFILE_NAME_MAX_LEN);
   const cfg = getUserConfig(userId);
   if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
   const cur = cfg.config || {};
   const src = (opts.snapshot && typeof opts.snapshot === 'object') ? opts.snapshot : cur;
 
-  const newProfile = {
-    name: cleanName,
-    formUrl: src.formUrl || '',
-    formTitle: src.formTitle || '',
-    spreadsheetId: src.spreadsheetId || '',
-    sheetName: src.sheetName || '',
-    columnMapping: src.columnMapping || {},
-    displaySettings: src.displaySettings || {},
-    xAxisLabels: src.xAxisLabels || null,
-    yAxisLabels: src.yAxisLabels || null,
-    matrixQuadrantLabels: src.matrixQuadrantLabels || null,
-    allowResubmit: !!src.allowResubmit
-  };
+  const newProfile = { name: cleanName, ...__extractProfileFields_(src) };
 
   const existing = Array.isArray(cur.profiles) ? cur.profiles.slice() : [];
   const idx = existing.findIndex(p => p && p.name === cleanName);
@@ -355,17 +392,7 @@ function __deleteProfileCore(userId, name) {
   if (wasActive) {
     if (remaining.length > 0) {
       const next = remaining[0];
-      patch.activeProfile = next.name;
-      patch.formUrl = next.formUrl || '';
-      patch.formTitle = next.formTitle || '';
-      patch.spreadsheetId = next.spreadsheetId || '';
-      patch.sheetName = next.sheetName || '';
-      patch.columnMapping = next.columnMapping || {};
-      patch.displaySettings = next.displaySettings || (typeof DEFAULT_DISPLAY_SETTINGS !== 'undefined' ? DEFAULT_DISPLAY_SETTINGS : {});
-      patch.xAxisLabels = next.xAxisLabels || null;
-      patch.yAxisLabels = next.yAxisLabels || null;
-      patch.matrixQuadrantLabels = next.matrixQuadrantLabels || null;
-      patch.allowResubmit = !!next.allowResubmit;
+      Object.assign(patch, __applyProfileToConfig_({}, next), { activeProfile: next.name });
     } else {
       patch.activeProfile = null;
       patch.formUrl = '';
@@ -386,17 +413,12 @@ function __deleteProfileCore(userId, name) {
   });
 }
 
-/**
- * Get logs - simplified name
- * @param {Object} _options - Options (reserved for future use)
- * @returns {Object} Logs result
- */
-function getLogs(_options = {}) {
+function getLogs(options = {}) {
   try {
     const auth = requireAdmin();
     if (!auth) return createAdminRequiredError();
 
-    const limit = Math.max(1, Math.min(Number(_options.limit || 50), 200));
+    const limit = Math.max(1, Math.min(Number(options.limit || 50), 200));
     const props = PropertiesService.getScriptProperties().getProperties();
     const logKeys = Object.keys(props)
       .filter(key => key.startsWith('security_log_'))
@@ -432,7 +454,7 @@ function getLogs(_options = {}) {
       message: logs.length > 0 ? 'セキュリティログを取得しました' : 'セキュリティログはありません'
     };
   } catch (error) {
-    console.error('getLogs error:', error.message);
+    logError_('getLogs', error);
     return createExceptionResponse(error);
   }
 }
@@ -448,7 +470,7 @@ function checkAppAccessRestriction() {
     const appDisabled = props.getProperty('APP_DISABLED');
     return appDisabled === 'true';
   } catch (error) {
-    console.error('checkAppAccessRestriction error:', error.message);
+    logError_('checkAppAccessRestriction', error);
     return false;
   }
 }
@@ -477,7 +499,7 @@ function disableAppAccess(reason = 'システムメンテナンス') {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('disableAppAccess error:', error.message);
+    logError_('disableAppAccess', error);
     return createExceptionResponse(error, 'アプリケーション停止処理');
   }
 }
@@ -516,7 +538,7 @@ function enableAppAccess() {
       timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('enableAppAccess error:', error.message);
+    logError_('enableAppAccess', error);
     return createExceptionResponse(error, 'アプリケーション再開処理');
   }
 }
@@ -556,7 +578,7 @@ function getAppAccessStatus() {
 
     return createSuccessResponse('アクセス制限状態を取得しました', status);
   } catch (error) {
-    console.error('getAppAccessStatus error:', error.message);
+    logError_('getAppAccessStatus', error);
     return createExceptionResponse(error, 'アクセス制限状態取得処理');
   }
 }
@@ -569,7 +591,7 @@ function markWelcomeSeen() {
   try {
     const email = getCurrentEmail();
     if (!email) {
-      return createAuthError('ユーザー認証が必要です');
+      return createAuthError();
     }
 
     const currentUser = findUserByEmail(email, { requestingUser: email });
@@ -591,7 +613,7 @@ function markWelcomeSeen() {
       hasSeenWelcome: true
     });
   } catch (error) {
-    console.error('markWelcomeSeen error:', error.message);
+    logError_('markWelcomeSeen', error);
     return createExceptionResponse(error);
   }
 }
@@ -608,6 +630,21 @@ function dispatchAdminOperation(operation, params) {
     return createErrorResponse('operation is required', null, { error: 'MISSING_OPERATION' });
   }
 
+  // case ブランチ冒頭の param 検証を一行に圧縮するためのヘルパー。
+  //   `const e = reqStr('userId'); if (e) return e;` の形で使う。
+  const reqStr = (key, label) => {
+    if (!params[key] || typeof params[key] !== 'string') {
+      return createErrorResponse((label || key) + ' is required');
+    }
+    return null;
+  };
+  const reqObj = (key, label) => {
+    if (!isPlainObject(params[key])) {
+      return createErrorResponse((label || (key + ' (object)')) + ' is required');
+    }
+    return null;
+  };
+
   const op = operation.trim();
 
   switch (op) {
@@ -616,15 +653,11 @@ function dispatchAdminOperation(operation, params) {
       return getAdminUsers();
 
     case 'toggleUserActive':
-      if (!params.targetUserId || typeof params.targetUserId !== 'string') {
-        return createErrorResponse('targetUserId is required');
-      }
+      { const e = reqStr('targetUserId'); if (e) return e; }
       return toggleUserActiveStatus(params.targetUserId);
 
     case 'toggleUserBoard':
-      if (!params.targetUserId || typeof params.targetUserId !== 'string') {
-        return createErrorResponse('targetUserId is required');
-      }
+      { const e = reqStr('targetUserId'); if (e) return e; }
       return toggleUserBoardStatus(params.targetUserId, { sourceEtag: params.etag });
 
     // --- Board Publish Lifecycle (unified ops) ---
@@ -672,9 +705,7 @@ function dispatchAdminOperation(operation, params) {
 
     // --- Property Management ---
     case 'getProperty': {
-      if (!params.key || typeof params.key !== 'string') {
-        return createErrorResponse('key is required');
-      }
+      { const e = reqStr('key'); if (e) return e; }
       if (isProtectedPropertyKey(params.key)) {
         return createErrorResponse(`Property "${params.key}" is protected and cannot be read via admin API`, null, { error: 'PROTECTED_PROPERTY' });
       }
@@ -686,9 +717,7 @@ function dispatchAdminOperation(operation, params) {
     }
 
     case 'setProperty': {
-      if (!params.key || typeof params.key !== 'string') {
-        return createErrorResponse('key is required');
-      }
+      { const e = reqStr('key'); if (e) return e; }
       if (typeof params.value !== 'string') {
         return createErrorResponse('value must be a string');
       }
@@ -715,18 +744,14 @@ function dispatchAdminOperation(operation, params) {
     //      CLI から「ユーザー A の boardMode を numberline に」など個別操作するには
     //      parsed config を返す/受け取る API が必要。
     case 'findUser': {
-      if (!params.email || typeof params.email !== 'string') {
-        return createErrorResponse('email is required');
-      }
+      { const e = reqStr('email'); if (e) return e; }
       const user = findUserByEmail(String(params.email).trim(), { requestingUser: getCurrentEmail() });
       if (!user) return createErrorResponse('User not found');
       return createSuccessResponse('User found', { user: redactUserForApi_(user) });
     }
 
     case 'getUserConfig': {
-      if (!params.userId || typeof params.userId !== 'string') {
-        return createErrorResponse('userId is required');
-      }
+      { const e = reqStr('userId'); if (e) return e; }
       const result = getUserConfig(params.userId);
       if (!result.success) return createErrorResponse(result.message || 'getUserConfig failed');
       return createSuccessResponse('Config retrieved', {
@@ -740,7 +765,7 @@ function dispatchAdminOperation(operation, params) {
       //      差分管理、教師ごとの設定比較に使う。configJson 文字列をパース済みで返す。
       const usersResult = getAdminUsers();
       if (!usersResult.success) return usersResult;
-      const exported = (usersResult.data?.users || usersResult.users || []).map(u => {
+      const exported = (usersResult.users || []).map(u => {
         let parsed = {};
         try {
           parsed = u.configJson ? JSON.parse(u.configJson) : {};
@@ -770,12 +795,8 @@ function dispatchAdminOperation(operation, params) {
     }
 
     case 'setUserConfig': {
-      if (!params.userId || typeof params.userId !== 'string') {
-        return createErrorResponse('userId is required');
-      }
-      if (!params.patch || typeof params.patch !== 'object' || Array.isArray(params.patch)) {
-        return createErrorResponse('patch (object) is required');
-      }
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqObj('patch'); if (e) return e; }
       return applyConfigPatch_(params.userId, params.patch, {
         publish: Boolean(params.publish)
       });
@@ -784,14 +805,12 @@ function dispatchAdminOperation(operation, params) {
     case 'bulkSetUserConfig': {
       // 全ユーザーに同じ patch を適用。dryRun で影響範囲を見られる。
       // Why: 「6 年全クラスに同じ軸ラベル一括展開」など、運用上の bulk 操作用。
-      if (!params.patch || typeof params.patch !== 'object' || Array.isArray(params.patch)) {
-        return createErrorResponse('patch (object) is required');
-      }
+      { const e = reqObj('patch'); if (e) return e; }
       const dryRun = Boolean(params.dryRun);
       const targetFilter = params.filter || {};
       const usersResult = getAdminUsers();
       if (!usersResult.success) return usersResult;
-      const users = usersResult.data?.users || usersResult.users || [];
+      const users = usersResult.users || [];
       const matched = users.filter(u => matchesUserFilter_(u, targetFilter));
       if (dryRun) {
         return createSuccessResponse('Dry run', {
@@ -848,9 +867,7 @@ function dispatchAdminOperation(operation, params) {
     }
 
     case 'validateFormUrl': {
-      if (!params.formUrl || typeof params.formUrl !== 'string') {
-        return createErrorResponse('formUrl is required');
-      }
+      { const e = reqStr('formUrl'); if (e) return e; }
       const trimmed = String(params.formUrl).trim();
       // Why: isValidFormUrl は new URL() ベースで実装されており、GAS V8 で URL constructor が
       //      期待通り動かないコンテキストがある（catch で false を返してしまう known issue）。
@@ -875,10 +892,8 @@ function dispatchAdminOperation(operation, params) {
         const form = FormApp.openByUrl(trimmed);
         reachable = true;
         formTitle = form.getTitle();
-        // form.getDestinationId() は destination 未設定時に "フォームに応答先がありません。"
-        //   を throw する仕様なので、null と同じ扱いに変換する。
-        //   2026-05-14 v2657: 教師が destination 無しの Form を validateFormUrl で
-        //   調べたとき "reachable: false" と誤判定されるバグを修正。
+        // Why: form.getDestinationId() は destination 未設定時に "フォームに応答先がありません。"
+        //   を throw する仕様なので、null と同じ扱いに変換する (誤って reachable=false 判定するのを防ぐ)。
         try {
           destinationSpreadsheetId = form.getDestinationId() || null;
         } catch (_) {
@@ -905,9 +920,7 @@ function dispatchAdminOperation(operation, params) {
       // Form URL を解決してユーザー config に紐付け。frontend の processFormUrlInput
       // と同じパイプライン（spreadsheet 自動作成・回答シート検出も含む）。
       // userId 省略時は requester (gcloud user) の userId に自動解決。
-      if (!params.formUrl || typeof params.formUrl !== 'string') {
-        return createErrorResponse('formUrl is required');
-      }
+      { const e = reqStr('formUrl'); if (e) return e; }
       const targetUserId = (typeof params.userId === 'string' && params.userId) ? params.userId : null;
       let user = null;
       if (targetUserId) {
@@ -944,16 +957,13 @@ function dispatchAdminOperation(operation, params) {
       if (!params.formId && !params.formUrl) {
         return createErrorResponse('formId or formUrl is required');
       }
-      if (!params.schema || typeof params.schema !== 'object') {
-        return createErrorResponse('schema (object) is required');
-      }
+      { const e = reqObj('schema'); if (e) return e; }
       return customizeForm(params.formId || params.formUrl, params.schema);
     }
 
     case 'createForm': {
-      // テンプレート Form を作成して、指定ユーザー (または requester) の config に紐付け。
-      // templateType: 'board' | 'numberline' | 'matrix' (default: 'board')
-      const templateType = ['board', 'numberline', 'matrix'].includes(params.templateType)
+      // templateType: 'board' | 'numberline' | 'matrix' | 'pie' (default: 'board')
+      const templateType = ['board', 'numberline', 'matrix', 'pie'].includes(params.templateType)
         ? params.templateType : 'board';
       const targetUserId = (typeof params.userId === 'string' && params.userId) ? params.userId : null;
       let user = null;
@@ -965,7 +975,7 @@ function dispatchAdminOperation(operation, params) {
       }
       if (!user) return createErrorResponse('User not found');
 
-      const createResult = createTemplateForm(templateType);
+      const createResult = createTemplateForm(templateType, params.templateOptions || {});
       if (!createResult.success) return createResult;
 
       // config に紐付け。numberline/matrix の場合は boardMode も auto / 明示モードに揃える。
@@ -975,7 +985,7 @@ function dispatchAdminOperation(operation, params) {
         spreadsheetId: createResult.spreadsheetId || '',
         sheetName: createResult.sheetName || 'フォームの回答 1'
       };
-      if (templateType === 'numberline' || templateType === 'matrix') {
+      if (templateType === 'numberline' || templateType === 'matrix' || templateType === 'pie') {
         patch.displaySettings = { boardMode: templateType };
       }
       const saveResult = applyConfigPatch_(user.userId, patch, { publish: false });
@@ -995,27 +1005,19 @@ function dispatchAdminOperation(operation, params) {
     //      CRUD を CLI から実行可能にする。教師が「導入アンケート」「本時の議論」
     //      「振り返り」と複数 board を事前に登録して、授業中に切替えるユースケース。
     case 'listProfiles': {
-      if (!params.userId || typeof params.userId !== 'string') {
-        return createErrorResponse('userId is required');
-      }
+      { const e = reqStr('userId'); if (e) return e; }
       return __listProfilesCore(params.userId);
     }
 
     case 'saveProfile': {
-      if (!params.userId || typeof params.userId !== 'string') {
-        return createErrorResponse('userId is required');
-      }
+      { const e = reqStr('userId'); if (e) return e; }
       return __saveProfileCore(params.userId, params.name, { snapshot: params.snapshot });
     }
 
     case 'loadProfile': {
       // 指定 profile を active 設定に適用して、activeProfile も更新。
-      if (!params.userId || typeof params.userId !== 'string') {
-        return createErrorResponse('userId is required');
-      }
-      if (!params.name || typeof params.name !== 'string') {
-        return createErrorResponse('name (profile name) is required');
-      }
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('name', 'name (profile name)'); if (e) return e; }
       const cfg = getUserConfig(params.userId);
       if (!cfg.success) return createErrorResponse(cfg.message || 'getUserConfig failed');
       const cur = cfg.config || {};
@@ -1023,36 +1025,22 @@ function dispatchAdminOperation(operation, params) {
       const p = profiles.find(x => x && x.name === params.name);
       if (!p) return createErrorResponse(`Profile "${params.name}" not found`);
 
-      // profile の中身を active config の対応フィールドに反映
-      //
       // Why (完全置換セマンティクス): applyConfigPatch_ + deepMerge_ は plain object
       //   を再帰マージするため、新 profile の columnMapping={} が「前 profile の
-      //   columnMapping を保持」と解釈されてしまう (matrix → wordcloud で numericX/Y
-      //   が居残る原因)。loadProfile は active 切替なので「完全置換」が正しい
-      //   セマンティクス。saveUserConfig を直接呼んで merged を渡す。
-      const merged = { ...cur };
-      merged.formUrl = p.formUrl || '';
-      merged.formTitle = p.formTitle || '';
-      merged.spreadsheetId = p.spreadsheetId || '';
-      merged.sheetName = p.sheetName || '';
-      merged.activeProfile = p.name;
-      merged.columnMapping = p.columnMapping || {};
-      merged.displaySettings = p.displaySettings || (typeof DEFAULT_DISPLAY_SETTINGS !== 'undefined' ? DEFAULT_DISPLAY_SETTINGS : {});
-      merged.xAxisLabels = p.xAxisLabels || null;
-      merged.yAxisLabels = p.yAxisLabels || null;
-      merged.matrixQuadrantLabels = p.matrixQuadrantLabels || null;
-      merged.allowResubmit = !!p.allowResubmit;
-      merged.userId = params.userId;
-      // Option B: 生徒が後で振り返れるよう、active 切替を時系列で記録。
-      merged.profileHistory = __appendProfileHistory_(cur.profileHistory, p.name);
+      //   columnMapping を保持」と解釈されてしまう。loadProfile は active 切替なので
+      //   完全置換が正しい。saveUserConfig を直接呼んで merged を渡す。
+      const merged = {
+        ...__applyProfileToConfig_(cur, p),
+        activeProfile: p.name,
+        userId: params.userId,
+        profileHistory: __appendProfileHistory_(cur.profileHistory, p.name)
+      };
 
       return saveUserConfig(params.userId, merged, { isMainConfig: true });
     }
 
     case 'deleteProfile': {
-      if (!params.userId || typeof params.userId !== 'string') {
-        return createErrorResponse('userId is required');
-      }
+      { const e = reqStr('userId'); if (e) return e; }
       return __deleteProfileCore(params.userId, params.name);
     }
 
@@ -1066,12 +1054,8 @@ function dispatchAdminOperation(operation, params) {
       //
       // 注意: Drive Advanced Service は使わず UrlFetchApp + REST API でアクセス。
       //      auth/drive スコープが appsscript.json に必要（既に granted）。
-      if (!params.fileId || typeof params.fileId !== 'string') {
-        return createErrorResponse('fileId is required');
-      }
-      if (!params.domain || typeof params.domain !== 'string') {
-        return createErrorResponse('domain is required (e.g. "naha-okinawa.ed.jp")');
-      }
+      { const e = reqStr('fileId'); if (e) return e; }
+      { const e = reqStr('domain', 'domain (e.g. "naha-okinawa.ed.jp")'); if (e) return e; }
       const role = ['reader', 'writer', 'commenter'].includes(params.role) ? params.role : 'reader';
       try {
         const token = ScriptApp.getOAuthToken();
@@ -1092,7 +1076,7 @@ function dispatchAdminOperation(operation, params) {
         const code = resp.getResponseCode();
         const body = resp.getContentText();
         if (code >= 400) {
-          return createErrorResponse('Drive API error ' + code + ': ' + body.substring(0, 300));
+          return createErrorResponse('Drive API error ' + code + ': ' + body.substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN));
         }
         return createSuccessResponse('Shared with domain', {
           fileId: params.fileId,
@@ -1118,9 +1102,7 @@ function dispatchAdminOperation(operation, params) {
       //
       //   ownerEmail を省略すると getCurrentEmail() を使用。ドメイン共有はスキップしたい
       //   ローカルテスト用に、明示的に ownerEmail を渡せる。
-      if (!params.spreadsheetId || typeof params.spreadsheetId !== 'string') {
-        return createErrorResponse('spreadsheetId is required');
-      }
+      { const e = reqStr('spreadsheetId'); if (e) return e; }
       const ownerEmail = (typeof params.ownerEmail === 'string' && params.ownerEmail)
         ? params.ownerEmail
         : getCurrentEmail();
@@ -1142,12 +1124,8 @@ function dispatchAdminOperation(operation, params) {
       // データ行（2行目以降）を全削除して、ヘッダーだけ残す。
       // appendRows と組み合わせて「テストデータをきれいに作り直す」用途。
       // 本番運用では絶対に使わないこと（明示の確認フラグ params.confirm = "yes-i-mean-it" 必須）。
-      if (!params.spreadsheetId || typeof params.spreadsheetId !== 'string') {
-        return createErrorResponse('spreadsheetId is required');
-      }
-      if (!params.sheetName || typeof params.sheetName !== 'string') {
-        return createErrorResponse('sheetName is required');
-      }
+      { const e = reqStr('spreadsheetId'); if (e) return e; }
+      { const e = reqStr('sheetName'); if (e) return e; }
       if (params.confirm !== 'yes-i-mean-it') {
         return createErrorResponse('confirm: "yes-i-mean-it" is required (safeguard against accidental data loss)');
       }
@@ -1179,16 +1157,14 @@ function dispatchAdminOperation(operation, params) {
       //   注意: form.setTitle() は Forms 内部タイトル、SpreadsheetApp.create(name) や
       //         DriveApp.setName() は Drive 上の file name を別々に管理する。AdminPanel
       //         「一覧から選択」dropdown は file name を表示するので、両者を揃える必要がある。
-      if (!params.fileId || typeof params.fileId !== 'string') {
-        return createErrorResponse('fileId is required');
-      }
+      { const e = reqStr('fileId'); if (e) return e; }
       if (!params.newName || typeof params.newName !== 'string' || !params.newName.trim()) {
         return createErrorResponse('newName (non-empty string) is required');
       }
       try {
         const file = DriveApp.getFileById(params.fileId);
         const oldName = file.getName();
-        const cleanName = String(params.newName).trim().substring(0, 200);
+        const cleanName = String(params.newName).trim().substring(0, SHEET_NAME_MAX_LEN);
         file.setName(cleanName);
         return createSuccessResponse('Drive file renamed', {
           fileId: params.fileId,
@@ -1210,17 +1186,13 @@ function dispatchAdminOperation(operation, params) {
       //   - 最大 500 row まで（巨大投入を防ぐ）
       //   - first col が null/'' なら自動で now() タイムスタンプ
       //   - 列数は既存ヘッダ幅に padding して整列
-      if (!params.spreadsheetId || typeof params.spreadsheetId !== 'string') {
-        return createErrorResponse('spreadsheetId is required');
-      }
-      if (!params.sheetName || typeof params.sheetName !== 'string') {
-        return createErrorResponse('sheetName is required');
-      }
+      { const e = reqStr('spreadsheetId'); if (e) return e; }
+      { const e = reqStr('sheetName'); if (e) return e; }
       if (!Array.isArray(params.rows) || params.rows.length === 0) {
         return createErrorResponse('rows (non-empty array) is required');
       }
-      if (params.rows.length > 500) {
-        return createErrorResponse('rows array too large (max 500)');
+      if (params.rows.length > MAX_BULK_INSERT_ROWS) {
+        return createErrorResponse(`rows array too large (max ${MAX_BULK_INSERT_ROWS})`);
       }
       try {
         const ss = SpreadsheetApp.openById(params.spreadsheetId);
@@ -1276,9 +1248,7 @@ function dispatchAdminOperation(operation, params) {
     case 'previewBoard': {
       // Why: 教師がボードを公開する前に「viewer から何が見えるか」を CLI で
       //      確認できる（プライバシー設定通りに匿名化されているか等）。
-      if (!params.userId || typeof params.userId !== 'string') {
-        return createErrorResponse('userId is required');
-      }
+      { const e = reqStr('userId'); if (e) return e; }
       // getPublishedSheetData は admin/owner 判定のため getBatchedAdminAuth を内部で使う。
       // 本関数は API キー経路（既に admin と同等）なので、targetUserId を渡せば直接呼べる。
       const result = getPublishedSheetData(
@@ -1303,6 +1273,109 @@ function dispatchAdminOperation(operation, params) {
         error: result.error
       };
       return createSuccessResponse('Board preview', trimmed);
+    }
+
+    case 'exportBoardData': {
+      // 実践報告書 / 授業記録の作成用に、ボード公開済みの全件データを CLI から取得する。
+      //   - profileName を渡せば「過去 phase」も読める（getPublishedSheetDataForProfile 経由）
+      //   - 個人情報保護のため、デフォルトで `name` フィールドを除外する（stripName=false で残す）
+      //   - reactions / emailHash / highlight / id / rowIndex は report 用には不要なので削ぎ落とす
+      { const e = reqStr('userId'); if (e) return e; }
+      const profileName = typeof params.profileName === 'string' && params.profileName ? params.profileName : null;
+      const stripName = params.stripName !== false; // default true
+      const result = profileName
+        ? getPublishedSheetDataForProfile(params.userId, profileName, params.classFilter || null, params.sortOrder || 'newest')
+        : getPublishedSheetData(params.classFilter || null, params.sortOrder || 'newest', false, params.userId);
+      const rows = Array.isArray(result.data) ? result.data : [];
+      const slim = rows.map(r => {
+        const out = {
+          rowIndex: r.rowIndex,
+          timestamp: r.formattedTimestamp || r.timestamp || '',
+          class: r.class || '',
+          answer: r.answer,
+          reason: r.reason,
+          numericX: r.numericX,
+          numericY: r.numericY
+        };
+        if (!stripName) out.name = r.name || '';
+        return out;
+      });
+      return createSuccessResponse('Board data export', {
+        success: result.success,
+        header: result.header || '',
+        sheetName: result.sheetName || '',
+        boardMode: result?.displaySettings?.boardMode || null,
+        axisConfig: result.axisConfig || null,
+        profile: profileName,
+        rowCount: slim.length,
+        stripName,
+        data: slim,
+        error: result.error
+      });
+    }
+
+    // --- Lessons (lesson archive + workspace) ---
+    case 'lesson.create': {
+      { const e = reqStr('userId'); if (e) return e; }
+      return createLessonDraft(params.userId, params.name, params.template);
+    }
+    case 'lesson.updateDraft': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      { const e = reqStr('fieldPath'); if (e) return e; }
+      return updateLessonDraft(params.userId, params.lessonId, params.fieldPath, params.value, params.expectedEtag);
+    }
+    case 'lesson.start': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      return startLesson(params.userId, params.lessonId);
+    }
+    case 'lesson.advance': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      { const e = reqStr('direction'); if (e) return e; }
+      return advanceLessonPhase(params.userId, params.lessonId, params.direction);
+    }
+    case 'lesson.end': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      return endLesson(params.userId, params.lessonId);
+    }
+    case 'lesson.list': {
+      { const e = reqStr('userId'); if (e) return e; }
+      return listLessons(params.userId);
+    }
+    case 'lesson.knownClasses': {
+      { const e = reqStr('userId'); if (e) return e; }
+      return getKnownClassesForUser(params.userId);
+    }
+    case 'lesson.review': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      return getLessonForReview(params.userId, params.lessonId);
+    }
+    case 'lesson.delete': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      return deleteLesson(params.userId, params.lessonId);
+    }
+    case 'lesson.duplicate': {
+      { const e = reqStr('userId'); if (e) return e; }
+      { const e = reqStr('lessonId'); if (e) return e; }
+      return duplicateLesson(params.userId, params.lessonId, params.options || {});
+    }
+    case 'lesson.templates': {
+      return listLessonTemplates();
+    }
+    case 'lesson.importFromProfiles': {
+      // 既存 profiles[] (= plain profile 構成) を「過去授業の lesson 記録」として
+      //   lessons シートに取り込む。lesson 機能 (Phase 1+2) 導入以前に運用していた授業を
+      //   履歴に残すための一方向 import。詳細は LessonService.importLessonFromProfiles の jsdoc。
+      { const e = reqStr('userId'); if (e) return e; }
+      return importLessonFromProfiles(params.userId, {
+        name: params.name,
+        includeSnapshots: params.includeSnapshots !== false && params.includeSnapshots !== 'false'
+      });
     }
 
     default:

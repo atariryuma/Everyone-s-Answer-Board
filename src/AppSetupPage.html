@@ -504,9 +504,20 @@
       function loadUserList() {
         const loadingDiv = document.getElementById('user-loading');
         const contentDiv = document.getElementById('user-table-content');
+        const refreshBtn = document.getElementById('refresh-users-btn');
 
         loadingDiv.classList.remove('hidden');
         contentDiv.classList.add('hidden');
+        if (refreshBtn) {
+          refreshBtn.disabled = true;
+          refreshBtn.classList.add('btn-busy');
+        }
+        const restoreBtn = () => {
+          if (refreshBtn) {
+            refreshBtn.disabled = false;
+            refreshBtn.classList.remove('btn-busy');
+          }
+        };
 
         google.script.run
           .withSuccessHandler((result) => {
@@ -517,10 +528,12 @@
               showMessage('ユーザー情報を取得できません', 'error');
             }
             loadingDiv.classList.add('hidden');
+            restoreBtn();
           })
           .withFailureHandler((error) => {
             showMessage('ユーザー情報の取得に失敗しました', 'error');
             loadingDiv.classList.add('hidden');
+            restoreBtn();
           })
           .getAdminUsers();
       }
@@ -549,7 +562,7 @@
               try {
                 const config = JSON.parse(user.configJson || '{}');
                 boardPublished = config.isPublished === true;
-              } catch (e) {}
+              } catch (_) {}
 
               const boardBadge = boardPublished
                 ? '<span class="px-2 py-1 bg-purple-600 text-purple-100 rounded-full text-xs">公開中</span>'
@@ -630,7 +643,13 @@
 
         const confirmBtn = document.getElementById('confirm-delete-btn');
         confirmBtn.disabled = true;
+        confirmBtn.classList.add('btn-busy');
         confirmBtn.textContent = '削除中...';
+        const restoreDelete = () => {
+          confirmBtn.disabled = false;
+          confirmBtn.classList.remove('btn-busy');
+          confirmBtn.textContent = '削除実行';
+        };
 
         google.script.run
           .withSuccessHandler((result) => {
@@ -641,13 +660,11 @@
             } else {
               showMessage('削除に失敗しました', 'error');
             }
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = '削除実行';
+            restoreDelete();
           })
           .withFailureHandler((error) => {
             showMessage('削除に失敗しました', 'error');
-            confirmBtn.disabled = false;
-            confirmBtn.textContent = '削除実行';
+            restoreDelete();
           })
           .deleteUser(userToDelete.userId, reason);
       }
@@ -691,8 +708,15 @@
         const resultsDiv = document.getElementById('diagnostic-results');
         const outputElement = document.getElementById('diagnostic-output');
 
+        // btn-busy class でスピナー表示 (統一)。disabled は連打抑制。
         button.disabled = true;
+        button.classList.add('btn-busy');
         button.textContent = progressMessage;
+        const restore = () => {
+          button.disabled = false;
+          button.classList.remove('btn-busy');
+          button.textContent = originalText;
+        };
 
         outputElement.textContent = '実行中...';
         resultsDiv.classList.remove('hidden');
@@ -702,9 +726,7 @@
         google.script.run
           .withSuccessHandler((result) => {
             showDiagnosticResult(result, functionName);
-
-            button.disabled = false;
-            button.textContent = originalText;
+            restore();
           })
           .withFailureHandler((error) => {
             outputElement.textContent = `エラーが発生しました:\n${error.message || error}`;
@@ -712,9 +734,7 @@
               `❌ ${functionName} でエラーが発生しました: ${error.message || error}`,
               'error'
             );
-
-            button.disabled = false;
-            button.textContent = originalText;
+            restore();
           })
           [functionName]();
       }
@@ -788,7 +808,7 @@
           try {
             const config = JSON.parse(user.configJson || '{}');
             if (config.isPublished === true) publishedBoards++;
-          } catch (e) {}
+          } catch (_) {}
 
           const lastActivity = new Date(user.lastModified || user.createdAt);
           if (lastActivity > yesterday) recentActivity++;
@@ -921,7 +941,13 @@
 
         const button = document.getElementById('disable-app-btn');
         button.disabled = true;
+        button.classList.add('btn-busy');
         button.textContent = '停止中...';
+        const restoreDisable = () => {
+          button.disabled = false;
+          button.classList.remove('btn-busy');
+          button.textContent = '🚫 アプリケーションを停止';
+        };
 
         google.script.run
           .withSuccessHandler(function(result) {
@@ -932,14 +958,12 @@
             } else {
               showMessage('❌ アプリケーション停止に失敗しました', 'error');
             }
-            button.disabled = false;
-            button.textContent = '🚫 アプリケーションを停止';
+            restoreDisable();
           })
           .withFailureHandler(function(error) {
             console.error('アプリ停止エラー:', error);
             showMessage('❌ アプリケーション停止でエラーが発生しました', 'error');
-            button.disabled = false;
-            button.textContent = '🚫 アプリケーションを停止';
+            restoreDisable();
           })
           .disableAppAccess(reason);
       }
@@ -950,7 +974,13 @@
 
         const button = document.getElementById('enable-app-btn');
         button.disabled = true;
+        button.classList.add('btn-busy');
         button.textContent = '再開中...';
+        const restoreEnable = () => {
+          button.disabled = false;
+          button.classList.remove('btn-busy');
+          button.textContent = '✅ アプリケーションを再開';
+        };
 
         google.script.run
           .withSuccessHandler(function(result) {
@@ -960,14 +990,12 @@
             } else {
               showMessage('❌ アプリケーション再開に失敗しました', 'error');
             }
-            button.disabled = false;
-            button.textContent = '✅ アプリケーションを再開';
+            restoreEnable();
           })
           .withFailureHandler(function(error) {
             console.error('アプリ再開エラー:', error);
             showMessage('❌ アプリケーション再開でエラーが発生しました', 'error');
-            button.disabled = false;
-            button.textContent = '✅ アプリケーションを再開';
+            restoreEnable();
           })
           .enableAppAccess();
       }

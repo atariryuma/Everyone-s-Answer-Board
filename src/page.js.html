@@ -71,7 +71,7 @@
         endPublicationBtn: document.getElementById('endPublicationBtn'),
         adminToggleBtn: document.getElementById('adminToggleBtn'),
         answerCount: document.getElementById('answerCount'),
-        // v2674: sheetNameText は未使用要素として削除済み。互換性のため null を保持。
+        // 互換性 (legacy 参照) のため null を保持。実 DOM は廃止済。
         sheetNameText: null,
         answerModalContainer: document.getElementById('answerModalContainer'),
         answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
@@ -80,7 +80,6 @@
         modalStudentName: document.getElementById('modalStudentName'),
         modalReactionContainer: document.getElementById('modalReactions'),
         modalFooter: document.getElementById('modalFooter'),
-        // v2688: dual modal / pane card 廃止に伴い、右側カード参照は削除済。
         infoModalContainer: document.getElementById('infoModalContainer'),
         infoModalCard: document.getElementById('infoModalCard'),
         infoModalConfirmBtn: document.getElementById('infoModalConfirmBtn'),
@@ -258,9 +257,39 @@
         this.optimizeForLowPerformance();
 
         this.state.isAdminUser = window.UNIFIED_CONFIG?.isAdminUser || false;
+        // Phase 2 lesson archive: review mode の検出 + read-only state。
+        //   isReviewMode が立っていれば polling を止め、reactions / highlight は no-op に。
+        this.state.isReviewMode = Boolean(window.UNIFIED_CONFIG?.isReviewMode);
+        this.state.reviewLesson = window.UNIFIED_CONFIG?.reviewLesson || null;
+
+        // Phase 2 lesson review: snapshots を delta-encoded 形式に hydrate して sessionStorage に書く。
+        //   これで既存の viz timeline スライダー / 比較モードが live polling 無しで動く。
+        if (this.state.isReviewMode && this.state.reviewLesson && typeof this.__vizHydrateReview === 'function') {
+          try {
+            const hydratedCount = this.__vizHydrateReview(this.state.reviewLesson);
+            console.info(`[lesson/review] hydrated ${hydratedCount} snapshot entries`);
+          } catch (hydrateErr) {
+            console.warn('[lesson/review] hydration failed:', hydrateErr && hydrateErr.message);
+          }
+          // 振り返り banner を表示。lesson name は server side の reviewLesson.name から。
+          const banner = document.getElementById('lesson-review-banner');
+          const nameEl = document.getElementById('lesson-review-name');
+          if (banner) banner.classList.remove('hidden');
+          if (nameEl) nameEl.textContent = (this.state.reviewLesson.name || '無題');
+        }
 
         this.renderIcons(); // 静的アイコンの即座読み込み（モーダル内のアイコンを含む）
         this.showInfoModal(); // デジタルシティズンシップモーダル
+
+        // form-link-btn は <a target="_blank">。連打で複数タブが開かないよう capture click で gate。
+        const formLinkAnchor = document.getElementById('form-link-btn');
+        if (formLinkAnchor && window.sharedUtilities?.buttons) {
+          formLinkAnchor.addEventListener('click', (e) => {
+            if (!window.sharedUtilities.buttons.navOnce(formLinkAnchor)) {
+              e.preventDefault();
+            }
+          });
+        }
 
         try {
           // Run both fetches in parallel: the form-link button and the main
@@ -318,10 +347,8 @@
      * ✅ CLAUDE.md準拠: Simplified editor state setup
      */
     setupEditorState() {
-      // v2674: body class で editor/viewer 表示制御を統一。
-      //   editor-only / editor-only-row クラスは CSS で body:not(.is-editor) で
-      //   display:none となるため、JS の .hidden トグルが不要。
-      //   adminToggleBtn / endPublicationBtn / Row 3 ツールが自動的に隠れる。
+      // body class で editor/viewer 表示制御を統一。.editor-only クラスが CSS で
+      //   body:not(.is-editor) のとき display:none になるので JS の hidden トグルは不要。
       const isEditor = !!window.isEditor;
       this.state.isEditor = isEditor;
       document.body.classList.toggle('is-editor', isEditor);
@@ -490,14 +517,22 @@
       }
 
       if (this.elements.refreshContentBtn) {
+        const refreshBtn = this.elements.refreshContentBtn;
         this.handlers.onRefreshContentClick = async () => {
-          try {
-            await this.refreshContent();
-          } catch (error) {
-            console.error('コンテンツ更新エラー:', error);
+          // withBusy: 連打抑制 + spinner。refreshContent 自体は短時間処理だが、
+          //   遅延ネットワーク下で 2 回以上呼ばれると banner state が破綻するため gate。
+          const busy = window.sharedUtilities?.buttons;
+          if (busy) {
+            await busy.withBusy(refreshBtn, async () => {
+              try { await this.refreshContent(); }
+              catch (e) { console.error('コンテンツ更新エラー:', e); }
+            });
+          } else {
+            try { await this.refreshContent(); }
+            catch (e) { console.error('コンテンツ更新エラー:', e); }
           }
         };
-        this.elements.refreshContentBtn.addEventListener('click', this.handlers.onRefreshContentClick);
+        refreshBtn.addEventListener('click', this.handlers.onRefreshContentClick);
       }
       if (this.elements.dismissBannerBtn) {
         this.handlers.onDismissBannerClick = () => this.dismissNewContentBanner();
@@ -620,6 +655,7 @@
       const THRESHOLD_PX = 70;   // これを超えて離すと発火
       const MAX_PULL_PX = 120;   // ここ以上は伸びない（視覚上の上限）
       const DIRECTIONAL_SLOP = 8; // 縦方向として認識する最小 dy（水平スワイプとの衝突回避）
+      const RELEASE_RESET_MS = 250; // refresh 完了から「ローディング感」を残す追加表示時間
 
       // Why: 一定倍率だと引くほど軽く感じる。指数関数減衰 f(x) = MAX * (1 - e^(-x/MAX))
       //      は x が小さいとほぼ線形、x が MAX に近づくと漸近して頭打ちになり、iOS の
@@ -734,7 +770,7 @@
         try {
           await this.refreshContent();
         } finally {
-          setTimeout(reset, 250);
+          setTimeout(reset, RELEASE_RESET_MS);
         }
       };
 
@@ -1099,6 +1135,8 @@
 
     startSimplePolling() {
       if (this.polling.isActive) return;
+      // Phase 2 lesson review: 振り返り画面は frozen snapshot を見ているので polling 不要 + 有害。
+      if (this.state && this.state.isReviewMode) return;
 
       this.polling.isActive = true;
       this.polling.errorCount = 0;
@@ -1392,8 +1430,7 @@
       const span = btn.querySelector('span');
       const labelText = title ? '📝 ' + title : '📝 回答フォーム';
       if (span && span.textContent !== labelText) span.textContent = labelText;
-      // v2678: ellipsis 表示時に full text を tooltip で確認できるよう title 属性に格納。
-      //   visible text と title 属性を同期させる (DOM 更新最小化のため変更時のみ)。
+      // ellipsis 表示時の full text 確認用に title 属性に格納 (変更時のみ更新で DOM 触らない)。
       const tooltipText = title ? title : '回答フォーム';
       if (btn.title !== tooltipText) btn.title = tooltipText;
       btn.classList.remove('hidden');
@@ -2144,9 +2181,12 @@
         if (result.profiles && result.profiles.list) {
           this.state.profiles = result.profiles.list;
           this.state.activeProfile = result.profiles.active || null;
+          // teacher pill の「✓ 過去 active 経験あり」表示に使う。server profileSummary に同梱。
+          this.state.profileHistory = Array.isArray(result.profiles.history) ? result.profiles.history : [];
         } else {
           this.state.profiles = [];
           this.state.activeProfile = null;
+          this.state.profileHistory = [];
         }
 
         // Option B: 生徒は studentProfileNav 経由で過去フェーズへ navigate できる。
@@ -2617,12 +2657,10 @@
 
     applyAnimations() {
       if (!this.elements.answersContainer) return;
-      // Why: CSS の newCardPulse アニメーションは 2.5s 継続する。旧実装は RAF で即座に
-      //      クラスを剥がしていたため、実質アニメーションが走らなかった。animationend
-      //      を待ち、フォールバックで 3s 後にも確実に剥がして DOM を綺麗に保つ。
-      // Why timeout tracking: フィルタ高頻度切替で旧カードが DOM 削除されても、
-      //      setTimeout の closure が card 参照を保持し続ける。集合管理して destroy() で
-      //      一括クリアし、bounded memory を保証する。
+      // Why: CSS newCardPulse は 2.5s 継続。animationend を待ち、上限 NEW_CARD_FALLBACK_MS
+      //      で確実に剥がして DOM を綺麗に保つ。setTimeout 集合は destroy() で一括クリア
+      //      してフィルタ高頻度切替時の bounded memory を保証する。
+      const NEW_CARD_FALLBACK_MS = 3000;
       const newCards = this.elements.answersContainer.querySelectorAll('.new-card');
       newCards.forEach(card => {
         let timeoutId = null;
@@ -2634,7 +2672,7 @@
           }
         };
         card.addEventListener('animationend', cleanup, { once: true });
-        timeoutId = setTimeout(cleanup, 3000);
+        timeoutId = setTimeout(cleanup, NEW_CARD_FALLBACK_MS);
         this.animationCleanupTimeouts.add(timeoutId);
       });
     }
@@ -3200,11 +3238,11 @@
      * 🚀 フェーズ2: デバウンシング方式リアクション処理（CLAUDE.md準拠最適化）
      */
     async addReaction(rowIndex, reaction) {
-      // Option B: 過去フェーズ閲覧中は read-only。リアクション送信を block + 短いトーストで案内。
-      //   サーバ側でも viewingPastProfile 状態は把握できないので client が gate するのが必須。
-      if (this.state && this.state.viewingPastProfile) {
+      // Option B / Phase 2 lesson review: 過去状態を閲覧中は read-only。
+      //   サーバ側でも判別できないので client が gate するのが必須。
+      if (this.state && (this.state.viewingPastProfile || this.state.isReviewMode)) {
         if (typeof this.showToast === 'function') {
-          this.showToast('過去のフェーズを閲覧中はリアクションできません');
+          this.showToast(this.state.isReviewMode ? '振り返り中はリアクションできません' : '過去のフェーズを閲覧中はリアクションできません');
         }
         return;
       }
@@ -3544,8 +3582,7 @@
           }
 
           if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-            // v2688: 単一モーダル時のみ存在。updateModalReactionButtons が内部で
-            // rowIndex 一致チェックを行うので不一致なら no-op。
+            // updateModalReactionButtons 内で rowIndex 一致チェックするので不一致なら no-op。
             const modalRowIndex = this.elements.modalReactionContainer
               .querySelector('[data-row-index]')?.dataset.rowIndex;
             if (modalRowIndex == item.rowIndex) {
@@ -3735,11 +3772,10 @@
     }
 
     async handleHighlight(rowIndex) {
-      // Option B: 過去フェーズ閲覧中は read-only。教師の HIGHLIGHT も含めて block。
-      //   teacher 自身が過去を覗いている場合も、過去 SS への書込は意味が無いため。
-      if (this.state && this.state.viewingPastProfile) {
+      // Option B / Phase 2 lesson review: 過去状態閲覧中は read-only。
+      if (this.state && (this.state.viewingPastProfile || this.state.isReviewMode)) {
         if (typeof this.showToast === 'function') {
-          this.showToast('過去のフェーズを閲覧中は操作できません');
+          this.showToast(this.state.isReviewMode ? '振り返り中は操作できません' : '過去のフェーズを閲覧中は操作できません');
         }
         return;
       }
@@ -4105,13 +4141,10 @@
         }
 
         window.showAdminFeatures = enable;
-        window.showHighlightToggle = enable;
 
-        // v2680: 「管理モード」ON 時のみ表示するアクションを CSS で制御。
-        //   body.admin-mode を toggle して `.admin-mode-only` 要素を出し入れ。
-        //   公開を終了 (destructive) を通常表示から外し、二段階確認パターンを構築:
-        //     ⚙ click → 確認モーダル → 管理モード ON → 公開を終了 ボタン表示
-        //   電子黒板で children が destructive action を視線に入れずに済む。
+        // body.admin-mode を toggle して `.admin-mode-only` 要素を CSS で出し入れ。
+        //   destructive action (公開を終了) は通常表示から外し、⚙ → 確認 → 管理モード ON
+        //   の二段階で開く (電子黒板で生徒視線に destructive ボタンを入れないため)。
         document.body.classList.toggle('admin-mode', enable);
 
         if (enable) {
@@ -4125,7 +4158,6 @@
         }
 
         window.isStudentMode = !enable;
-        window.showScoreSort = window.showCounts;
 
         this.updateConfigFromGlobals();
 
@@ -4333,7 +4365,6 @@
       }
     }
 
-    // v2688: 単一モーダル版に簡素化。比較モード時の dual-card ロジックは廃止。
     updateModalReactionButtons(item) {
       if (!this.elements.modalReactionContainer) return;
       const containerRowIdx = this.elements.modalReactionContainer.querySelector('[data-row-index]')?.dataset.rowIndex;
@@ -4427,9 +4458,74 @@
         this.batchUpdateReactionButtons(reactionUpdates);
       }
     }
+    /**
+     * matrix / numberline モードのモーダル上部に「軸ラベル + プログレスバー」を描く。
+     *
+     * Why: opinion 列が線形尺度 (1〜5 の数値) のとき、生の数字だけだと「5 が何の 5 か」が
+     *   読み取れない。axisConfig.xAxisLabels (min/max) と numericX を組合せて、
+     *     [そのまま出す] ━━━━━━●  [作り直す] (5/5)
+     *   のように「立場の表明」として可視化する。matrix なら 2 軸 + 象限名併記。
+     *
+     * @param {Object} data 1 行分のデータ
+     * @returns {string|null} HTML or null (該当モードでなければ null → caller がテキスト表示する)
+     */
+    __renderModalAxisBars(data) {
+      const mode = this.state.boardMode;
+      const isMatrix = mode === 'matrix';
+      const isNumberline = mode === 'numberline';
+      if (!isMatrix && !isNumberline) return null;
+      const axis = this.state.axisConfig || {};
+      const escape = window.sharedUtilities.security.escapeHtml;
+
+      const defaultMin = typeof axis.defaultMin === 'number' ? axis.defaultMin : 1;
+      const defaultMax = typeof axis.defaultMax === 'number' ? axis.defaultMax : 5;
+
+      const renderBar = (labels, value) => {
+        if (typeof value !== 'number' || !isFinite(value)) return '';
+        const minLabel = (labels && labels.min) ? String(labels.min) : '';
+        const maxLabel = (labels && labels.max) ? String(labels.max) : '';
+        // どちらのラベルも無ければ「数字だけのバー」になって意味が薄いので表示しない
+        if (!minLabel && !maxLabel) return '';
+        const pct = Math.max(0, Math.min(100,
+          ((value - defaultMin) / (defaultMax - defaultMin)) * 100));
+        // 数値は行の右端で独立表示。ドットの右隣にラベルが来てもはみ出さず、
+        //   全行で表示位置が一定 (= 視線で 5/5 を縦に追える)。
+        return ''
+          + '<div class="modal-axis-row" role="img" aria-label="' + escape(minLabel) + ' から ' + escape(maxLabel) + ' のうち ' + value + '/' + defaultMax + '">'
+          +   '<span class="modal-axis-label-min">' + escape(minLabel) + '</span>'
+          +   '<span class="modal-axis-track">'
+          +     '<span class="modal-axis-dot" style="left:' + pct.toFixed(1) + '%"></span>'
+          +   '</span>'
+          +   '<span class="modal-axis-label-max">' + escape(maxLabel) + '</span>'
+          +   '<span class="modal-axis-value" aria-hidden="true">' + value + '/' + defaultMax + '</span>'
+          + '</div>';
+      };
+
+      let html = '';
+      const xBar = renderBar(axis.xAxisLabels, data.numericX);
+      html += xBar;
+      if (isMatrix) {
+        const yBar = renderBar(axis.yAxisLabels, data.numericY);
+        html += yBar;
+
+        // 象限ラベル: matrix のみ。numericX/Y が中央より上/下で象限を決定。
+        const q = axis.matrixQuadrantLabels || {};
+        if (typeof data.numericX === 'number' && typeof data.numericY === 'number') {
+          const mid = (defaultMin + defaultMax) / 2;
+          const xKey = data.numericX >= mid ? 'h' : 'l';
+          const yKey = data.numericY >= mid ? 'h' : 'l';
+          const quadrantName = q[xKey + yKey];
+          if (quadrantName) {
+            html += '<div class="modal-axis-quadrant">📍 この立場は<strong>「' + escape(quadrantName) + '」</strong></div>';
+          }
+        }
+      }
+      // 全バー無し (= ラベル未設定) なら null を返して fallback させる
+      if (!html) return null;
+      return '<div class="modal-axis-block">' + html + '</div>';
+    }
+
     showAnswerModal(rowIndex) {
-      // v2688: 単一モーダルに戻した。比較モードでも個別意見は順次に1つずつ読む設計
-      // (「2 つを並べて比較」は道徳教育の自然な議論フローに無い操作)。
       let data = this.state.currentAnswers.find(r => r.rowIndex == rowIndex);
       if (!data && this.state.filteredData) {
         data = this.state.filteredData.find(r => r.rowIndex == rowIndex);
@@ -4437,13 +4533,24 @@
       if (!data) return;
 
       this.state.lastFocusedElement = document.activeElement;
-      let modalHtml = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
-
-      if (data.reason && data.reason.trim()) {
-        modalHtml += '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
+      // numberline / matrix では opinion が数値 1〜5 だけになり「5 が何の 5 か」が伝わらない。
+      //   軸ラベル付きプログレスバーを最上部に表示して立場を視覚化する。
+      //   axisConfig / numericX が無い board / wordcloud / pie では従来通りテキスト表示。
+      const axisBarHtml = this.__renderModalAxisBars(data);
+      let modalHtml;
+      if (axisBarHtml) {
+        modalHtml = axisBarHtml;
+        if (data.reason && data.reason.trim()) {
+          modalHtml += '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6 leading-relaxed">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
+        }
+      } else {
+        modalHtml = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
+        if (data.reason && data.reason.trim()) {
+          modalHtml += '<p class="text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
+        }
       }
 
-      this.elements.modalAnswer.innerHTML = modalHtml; // lint-disable-line no-inner-html-assignment-with-variable -- data.opinion / data.reason は escapeHtml 済
+      this.elements.modalAnswer.innerHTML = modalHtml; // lint-disable-line no-inner-html-assignment-with-variable -- すべて escapeHtml 済
       const showName = this.state.displayMode === 'named';
       let modalDisplayName = '';
 
@@ -4641,11 +4748,9 @@
       this.state.showCounts = window.showCounts;
       this.state.displayMode = window.displayMode;
       this.state.showAdminFeatures = window.showAdminFeatures;
-      this.state.showHighlightToggle = this.state.showAdminFeatures;
       this.state.showScoreSort = window.showCounts;
-      this.state.showPublishControls = window.showPublishControls;
-      // v2680: 管理モード ON 時のみ表示する要素 (.admin-mode-only) を CSS で gate するため、
-      //   全経路 (toggleAdminMode 以外も含む) で body.admin-mode を一貫させる。
+      // 管理モード ON 時のみ表示する要素 (.admin-mode-only) を CSS でゲートするため、
+      //   toggleAdminMode 以外の経路でも body.admin-mode を必ず同期させる。
       document.body.classList.toggle('admin-mode', !!this.state.showAdminFeatures);
     }
 
@@ -5038,14 +5143,28 @@
 
     /**
      * 🔧 API応答からdisplaySettingsを動的更新
-     * @param {Object} newDisplaySettings - 新しい表示設定
+     *
+     * Why (profile 跨ぎ整合性): 管理モード OFF パスと loadFormLink 等が
+     *   `UNIFIED_CONFIG.displaySettings` を「現在 active profile の値」として参照する。
+     *   admin mode ON 中も含めて毎回 server 値で同期しておかないと、bootstrap 時の値が
+     *   stale なまま残り、profile 切替後の管理モード OFF で「最初の profile の設定」に
+     *   戻ってしまう。表示用 globals (showCounts / displayMode) は admin mode 中は
+     *   forced 値で固定するため、return ガードはその更新だけに適用。
+     *
+     * @param {Object} newDisplaySettings - 新しい表示設定 (server 由来)
      */
     updateDisplaySettingsFromAPI(newDisplaySettings) {
       if (!newDisplaySettings || typeof newDisplaySettings !== 'object') {
         return;
       }
 
+      // UNIFIED_CONFIG は admin mode 中でも常に最新の profile 設定で同期する。
+      if (window.UNIFIED_CONFIG) {
+        window.UNIFIED_CONFIG.displaySettings = newDisplaySettings;
+      }
+
       if (window.showAdminFeatures) {
+        // admin mode 中は表示用 globals は強制値で固定（toggleAdminMode が制御）。
         return;
       }
 

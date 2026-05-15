@@ -20,6 +20,15 @@
  *   npm run api -- runColumnAnalysis --userId <uuid>
  *   npm run api -- previewBoard --userId <uuid>
  *
+ *   # Lesson workspace (Phase 1+2)
+ *   npm run api -- lesson.list --userId <uuid>
+ *   npm run api -- lesson.create --userId <uuid> --name "5/15 テスト" --template doutoku-3phase
+ *   npm run api -- lesson.updateDraft --userId <uuid> --lessonId <id> --fieldPath classes --value '["5-1","5-2"]'
+ *   npm run api -- lesson.start --userId <uuid> --lessonId <id>
+ *   npm run api -- lesson.advance --userId <uuid> --lessonId <id> --direction next
+ *   npm run api -- lesson.end --userId <uuid> --lessonId <id>
+ *   npm run api -- lesson.review --userId <uuid> --lessonId <id>
+ *
  * Flag types:
  *   --key value           : 文字列。数値文字列は数値化される
  *   --key=value           : 同上、= 区切り
@@ -48,7 +57,7 @@ const OPERATIONS = [
   // user config (v2)
   'findUser', 'getUserConfig', 'exportConfigs',
   'setUserConfig', 'bulkSetUserConfig',
-  'runColumnAnalysis', 'previewBoard',
+  'runColumnAnalysis', 'previewBoard', 'exportBoardData',
   // Form operations (v3)
   'listMyForms', 'validateFormUrl', 'connectForm', 'createForm', 'customizeForm',
   // Multi-board profiles (v4)
@@ -61,6 +70,12 @@ const OPERATIONS = [
   'shareWithDomain',
   // SS sharing repair (v7) — SA editor 共有が抜けた既存 SS の遡及修復
   'repairSpreadsheetSharing',
+  // Lesson workspace (Phase 1+2) — wizard / runner / replay / archive
+  'lesson.create', 'lesson.updateDraft', 'lesson.start',
+  'lesson.advance', 'lesson.end',
+  'lesson.list', 'lesson.review', 'lesson.delete',
+  'lesson.duplicate', 'lesson.templates', 'lesson.knownClasses',
+  'lesson.importFromProfiles',
 ];
 
 /**
@@ -82,6 +97,9 @@ function parseArgs(args) {
   let outputPath = null;
 
   const JSON_KEYS = new Set(['json', 'patch', 'filter', 'options', 'schema', 'snapshot', 'rows']);
+  // value は lesson.updateDraft の汎用引数。JSON parse 試行 → 失敗時は raw string fallback
+  //   (`--value '["5-1"]'` で array、`--value foo` で string が両方扱える)。
+  const JSON_OR_STRING_KEYS = new Set(['value']);
 
   for (let i = 1; i < args.length; i++) {
     const raw = args[i];
@@ -128,6 +146,13 @@ function parseArgs(args) {
       continue;
     }
 
+    if (JSON_OR_STRING_KEYS.has(key) && typeof value === 'string') {
+      // JSON 試行 → 失敗 (素の文字列) なら raw string でセット。
+      try { params[key] = JSON.parse(value); }
+      catch (_) { params[key] = value; }
+      continue;
+    }
+
     // boolean flags: dryRun / publish / verbose
     if (typeof value === 'boolean') {
       params[key] = value;
@@ -159,6 +184,16 @@ if (!remainingArgs[0] || remainingArgs[0] === '--help' || remainingArgs[0] === '
   console.log("  npm run api -- setUserConfig --userId <uuid> --patch '{\"displaySettings\":{\"boardMode\":\"numberline\"}}'");
   console.log("  npm run api -- exportConfigs --output configs.json");
   console.log("  npm run api -- bulkSetUserConfig --filter '{\"isPublished\":false}' --patch '{\"allowResubmit\":true}' --dryRun");
+  console.log('\nLesson workspace (Phase 1+2):');
+  console.log("  npm run api -- lesson.list --userId <uuid>");
+  console.log("  npm run api -- lesson.create --userId <uuid> --name '5/15 道徳テスト' --template doutoku-3phase");
+  console.log("  npm run api -- lesson.updateDraft --userId <uuid> --lessonId <id> --fieldPath classes --value '[\"5-1\",\"5-2\"]'");
+  console.log("  npm run api -- lesson.updateDraft --userId <uuid> --lessonId <id> --fieldPath name --value 新タイトル");
+  console.log("  npm run api -- lesson.start --userId <uuid> --lessonId <id>");
+  console.log("  npm run api -- lesson.advance --userId <uuid> --lessonId <id> --direction next");
+  console.log("  npm run api -- lesson.end --userId <uuid> --lessonId <id>");
+  console.log("  npm run api -- lesson.review --userId <uuid> --lessonId <id>     # full payload");
+  console.log("  npm run api -- lesson.delete --userId <uuid> --lessonId <id>");
   process.exit(0);
 }
 

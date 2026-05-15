@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -12,18 +12,15 @@
  */
 let _apiKeyAdminEmail = null;
 
-/**
- * 現在のユーザーのメールアドレスを取得。getActiveUser() のみ使用
- * （getEffectiveUser() は権限昇格リスクあり）。API キー認証中は ADMIN_EMAIL を返す。
- * @returns {string|null}
- */
+// 現在ユーザーのメール。getActiveUser() のみ (getEffectiveUser() は権限昇格リスク)。
+//   API キー認証中は ADMIN_EMAIL を返す。
 function getCurrentEmail() {
   if (_apiKeyAdminEmail) return _apiKeyAdminEmail;
   try {
     const email = Session.getActiveUser().getEmail();
     return email || null;
   } catch (error) {
-    console.error('getCurrentEmail error:', error.message);
+    logError_('getCurrentEmail', error);
     return null;
   }
 }
@@ -137,168 +134,8 @@ function doGet(e) {
       }
     }
 
-    switch (mode) {
-      case 'login': {
-        return HtmlService.createTemplateFromFile('LoginPage.html').evaluate().setTitle('ログイン');
-      }
-
-      case 'manual': {
-        return HtmlService.createTemplateFromFile('TeacherManual.html').evaluate().setTitle('使い方ガイド');
-      }
-
-      case 'admin': {
-        if (!currentEmail) {
-          return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。トップページに戻ってログインしてください。');
-        }
-
-        const targetUserId = params.userId;
-        if (!targetUserId) {
-          return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。ログインページからやり直してください。');
-        }
-
-        const adminData = getBatchedAdminData(targetUserId);
-        if (!adminData.success) {
-          return createRedirectTemplate('ErrorBoundary.html', adminData.error || 'このページへのアクセス権限がありません。');
-        }
-
-        const { email, user, config } = adminData;
-        const isAdmin = isAdministrator(email);
-
-        const enhancedConfig = enhanceConfigWithDynamicUrls(config, user.userId);
-
-        const template = HtmlService.createTemplateFromFile('AdminPanel.html');
-        template.userEmail = email;
-        template.userId = user.userId;
-        template.accessLevel = isAdmin ? 'administrator' : 'editor';
-        template.userInfo = user;
-        template.configJSON = JSON.stringify({
-          userId: user.userId,
-          userEmail: email,
-          spreadsheetId: config.spreadsheetId || '',
-          sheetName: config.sheetName || '',
-          isPublished: Boolean(config.isPublished),
-          isEditor: true, // 管理者・編集ユーザーは常にエディター権限
-          isAdminUser: isAdmin,
-          isOwnBoard: true,
-          formUrl: config.formUrl || '',
-          formTitle: config.formTitle || '',
-          showDetails: config.showDetails !== false,
-          setupStatus: config.setupStatus || 'pending',
-          displaySettings: config.displaySettings || {},
-          columnMapping: config.columnMapping || {},
-          dynamicUrls: enhancedConfig.dynamicUrls || {}
-        });
-
-        return template.evaluate().setTitle('管理');
-      }
-
-      case 'setup': {
-        let showSetup = false;
-        try {
-          if (typeof hasCoreSystemProps === 'function') {
-            showSetup = !hasCoreSystemProps();
-          } else {
-            // Fallback when SystemController hasn't loaded hasCoreSystemProps.
-            // Use getCachedProperty to avoid 3 PropertiesService calls per doGet.
-            const hasAdmin = !!getCachedProperty('ADMIN_EMAIL');
-            const hasDb = !!getCachedProperty('DATABASE_SPREADSHEET_ID');
-            const hasCreds = !!getCachedProperty('SERVICE_ACCOUNT_CREDS');
-            showSetup = !(hasAdmin && hasDb && hasCreds);
-          }
-        } catch (e) {
-          showSetup = true;
-        }
-
-        if (showSetup) {
-          return HtmlService.createTemplateFromFile('SetupPage.html').evaluate().setTitle('初期設定');
-        } else {
-          return createAccessRestrictedTemplate(currentEmail);
-        }
-      }
-
-      case 'appSetup': {
-        if (!currentEmail || !isAdministrator(currentEmail)) {
-          return createRedirectTemplate('ErrorBoundary.html', 'このページへのアクセス権限がありません。');
-        }
-
-        let userIdParam = params.userId || '';
-        if (!userIdParam) {
-          const adminUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
-          if (adminUser) userIdParam = adminUser.userId;
-        }
-
-        const template = HtmlService.createTemplateFromFile('AppSetupPage.html');
-        template.userIdParam = userIdParam;
-
-        return template.evaluate().setTitle('システム設定');
-      }
-
-      case 'view': {
-        if (!currentEmail) {
-          return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。トップページに戻ってログインしてください。');
-        }
-
-        const targetUserId = params.userId;
-        if (!targetUserId) {
-          return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。ログインページからやり直してください。');
-        }
-
-        const viewerData = getBatchedViewerData(targetUserId, currentEmail);
-        if (!viewerData.success) {
-          return createRedirectTemplate('ErrorBoundary.html', viewerData.error || '対象のボードが見つかりません。URLを確認してください。');
-        }
-
-        const { targetUser, config, isAdminUser } = viewerData;
-        const isOwnBoard = currentEmail === targetUser.userEmail;
-        const isPublished = Boolean(config.isPublished);
-
-        if (!isPublished) {
-          const template = HtmlService.createTemplateFromFile('Unpublished.html');
-          template.isEditor = isAdminUser || isOwnBoard; // 表示内容制御
-          template.editorName = targetUser.userName || targetUser.userEmail || '';
-          template.userId = targetUserId; // 管理パネル遷移用
-
-          const baseUrl = getWebAppUrl();
-          template.boardUrl = baseUrl ? `${baseUrl}?mode=view&userId=${targetUserId}` : '';
-
-          return template.evaluate().setTitle('未公開');
-        }
-
-        const template = HtmlService.createTemplateFromFile('Page.html');
-        template.userId = targetUserId;
-        template.userEmail = targetUser.userEmail;
-        template.questionText = '読み込み中...';
-        template.boardTitle = targetUser.userEmail || '回答ボード';
-
-        const isEditor = isAdminUser || isOwnBoard;
-        template.isEditor = isEditor;
-        template.isAdminUser = isAdminUser;
-        template.isOwnBoard = isOwnBoard;
-
-        template.sheetName = config.sheetName;
-        template.configJSON = JSON.stringify({
-          userId: targetUserId,
-          userEmail: targetUser.userEmail,
-          spreadsheetId: config.spreadsheetId || '',
-          sheetName: config.sheetName,
-          questionText: '読み込み中...',
-          isPublished: Boolean(config.isPublished),
-          isEditor,
-          isAdminUser,
-          isOwnBoard,
-          formUrl: config.formUrl || '',
-          showDetails: config.showDetails !== false,
-          displaySettings: config.displaySettings || DEFAULT_DISPLAY_SETTINGS
-        });
-
-        return template.evaluate().setTitle('回答ボード');
-      }
-
-      case 'main':
-      default: {
-        return createAccessRestrictedTemplate(currentEmail);
-      }
-    }
+    const handler = DO_GET_HANDLERS[mode] || handleMainMode_;
+    return handler(params, currentEmail);
   } catch (error) {
     console.error('doGet error:', {
       message: error.message,
@@ -315,6 +152,204 @@ function doGet(e) {
     return errorTemplate.evaluate().setTitle('エラー');
   }
 }
+
+// ─── doGet mode handlers ─────────────────────────────────────
+// Why: doGet を 1 ハンドラ = 1 mode の薄い dispatcher にする。
+//   元の switch (~200 行) を Clean Code "Replace Conditional with Polymorphism" で table-driven 化。
+
+function handleLoginMode_() {
+  return HtmlService.createTemplateFromFile('LoginPage.html').evaluate().setTitle('ログイン');
+}
+
+function handleManualMode_() {
+  return HtmlService.createTemplateFromFile('TeacherManual.html').evaluate().setTitle('使い方ガイド');
+}
+
+function handleAdminMode_(params, currentEmail) {
+  if (!currentEmail) {
+    return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。トップページに戻ってログインしてください。');
+  }
+  const targetUserId = params.userId;
+  if (!targetUserId) {
+    return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。ログインページからやり直してください。');
+  }
+  const adminData = getBatchedAdminData(targetUserId);
+  if (!adminData.success) {
+    return createRedirectTemplate('ErrorBoundary.html', adminData.error || 'このページへのアクセス権限がありません。');
+  }
+
+  const { email, user, config } = adminData;
+  const isAdmin = isAdministrator(email);
+  const enhancedConfig = enhanceConfigWithDynamicUrls(config, user.userId);
+
+  const template = HtmlService.createTemplateFromFile('AdminPanel.html');
+  template.userEmail = email;
+  template.userId = user.userId;
+  template.accessLevel = isAdmin ? 'administrator' : 'editor';
+  template.userInfo = user;
+  template.configJSON = JSON.stringify({
+    userId: user.userId,
+    userEmail: email,
+    spreadsheetId: config.spreadsheetId || '',
+    sheetName: config.sheetName || '',
+    isPublished: Boolean(config.isPublished),
+    isEditor: true,
+    isAdminUser: isAdmin,
+    isOwnBoard: true,
+    formUrl: config.formUrl || '',
+    formTitle: config.formTitle || '',
+    showDetails: config.showDetails !== false,
+    setupStatus: config.setupStatus || 'pending',
+    displaySettings: config.displaySettings || {},
+    columnMapping: config.columnMapping || {},
+    dynamicUrls: enhancedConfig.dynamicUrls || {}
+  });
+  return template.evaluate().setTitle('管理');
+}
+
+function handleSetupMode_(params, currentEmail) {
+  let showSetup = false;
+  try {
+    if (typeof hasCoreSystemProps === 'function') {
+      showSetup = !hasCoreSystemProps();
+    } else {
+      // hasCoreSystemProps が未ロードの fallback。getCachedProperty で 3 回の Property fetch をまとめる。
+      const hasAdmin = !!getCachedProperty('ADMIN_EMAIL');
+      const hasDb = !!getCachedProperty('DATABASE_SPREADSHEET_ID');
+      const hasCreds = !!getCachedProperty('SERVICE_ACCOUNT_CREDS');
+      showSetup = !(hasAdmin && hasDb && hasCreds);
+    }
+  } catch (_) {
+    showSetup = true;
+  }
+  if (showSetup) {
+    return HtmlService.createTemplateFromFile('SetupPage.html').evaluate().setTitle('初期設定');
+  }
+  return createAccessRestrictedTemplate(currentEmail);
+}
+
+function handleAppSetupMode_(params, currentEmail) {
+  if (!currentEmail || !isAdministrator(currentEmail)) {
+    return createRedirectTemplate('ErrorBoundary.html', 'このページへのアクセス権限がありません。');
+  }
+  let userIdParam = params.userId || '';
+  if (!userIdParam) {
+    const adminUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
+    if (adminUser) userIdParam = adminUser.userId;
+  }
+  const template = HtmlService.createTemplateFromFile('AppSetupPage.html');
+  template.userIdParam = userIdParam;
+  return template.evaluate().setTitle('システム設定');
+}
+
+function handleViewMode_(params, currentEmail) {
+  if (!currentEmail) {
+    return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。トップページに戻ってログインしてください。');
+  }
+  const targetUserId = params.userId;
+  if (!targetUserId) {
+    return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません。ログインページからやり直してください。');
+  }
+  const viewerData = getBatchedViewerData(targetUserId, currentEmail);
+  if (!viewerData.success) {
+    return createRedirectTemplate('ErrorBoundary.html', viewerData.error || '対象のボードが見つかりません。URLを確認してください。');
+  }
+
+  const { targetUser, config, isAdminUser } = viewerData;
+  const isOwnBoard = currentEmail === targetUser.userEmail;
+  const isPublished = Boolean(config.isPublished);
+
+  if (!isPublished) {
+    const template = HtmlService.createTemplateFromFile('Unpublished.html');
+    template.isEditor = isAdminUser || isOwnBoard;
+    template.editorName = targetUser.userName || targetUser.userEmail || '';
+    template.userId = targetUserId;
+    const baseUrl = getWebAppUrl();
+    template.boardUrl = baseUrl ? `${baseUrl}?mode=view&userId=${targetUserId}` : '';
+    return template.evaluate().setTitle('未公開');
+  }
+
+  const isEditor = isAdminUser || isOwnBoard;
+  const template = HtmlService.createTemplateFromFile('Page.html');
+  template.userId = targetUserId;
+  template.userEmail = targetUser.userEmail;
+  template.questionText = '読み込み中...';
+  template.boardTitle = targetUser.userEmail || '回答ボード';
+  template.isEditor = isEditor;
+  template.isAdminUser = isAdminUser;
+  template.isOwnBoard = isOwnBoard;
+  template.sheetName = config.sheetName;
+  template.configJSON = JSON.stringify({
+    userId: targetUserId,
+    userEmail: targetUser.userEmail,
+    spreadsheetId: config.spreadsheetId || '',
+    sheetName: config.sheetName,
+    questionText: '読み込み中...',
+    isPublished: Boolean(config.isPublished),
+    isEditor,
+    isAdminUser,
+    isOwnBoard,
+    formUrl: config.formUrl || '',
+    showDetails: config.showDetails !== false,
+    displaySettings: config.displaySettings || DEFAULT_DISPLAY_SETTINGS
+  });
+  return template.evaluate().setTitle('回答ボード');
+}
+
+function handleReviewMode_(params, currentEmail) {
+  // Lesson 振り返り (read-only)。owner / admin のみ可、生徒からは 403。
+  if (!currentEmail) {
+    return createRedirectTemplate('ErrorBoundary.html', 'ログインが必要です。');
+  }
+  const targetUserId = params.userId;
+  const lessonId = params.lessonId;
+  if (!targetUserId || !lessonId) {
+    return createRedirectTemplate('ErrorBoundary.html', 'URLが正しくありません (userId / lessonId が必要)。');
+  }
+  const reviewResult = getLessonForReview(targetUserId, lessonId);
+  if (!reviewResult.success) {
+    return createRedirectTemplate('ErrorBoundary.html', reviewResult.message || 'レッスンを開けませんでした。');
+  }
+  const lesson = reviewResult.data.lesson;
+  const template = HtmlService.createTemplateFromFile('Page.html');
+  template.userId = targetUserId;
+  template.userEmail = currentEmail;
+  template.questionText = '振り返り: ' + (lesson.name || '');
+  template.boardTitle = '📖 振り返り: ' + (lesson.name || '');
+  template.isEditor = true;
+  template.isAdminUser = isAdministrator(currentEmail);
+  template.isOwnBoard = true;
+  template.sheetName = (lesson.lessonJson && lesson.lessonJson.phases && lesson.lessonJson.phases[0] && lesson.lessonJson.phases[0].sheetName) || '';
+  template.configJSON = JSON.stringify({
+    userId: targetUserId,
+    userEmail: currentEmail,
+    spreadsheetId: '',
+    sheetName: '',
+    questionText: '振り返り: ' + (lesson.name || ''),
+    isPublished: false,
+    isEditor: true,
+    isAdminUser: template.isAdminUser,
+    isOwnBoard: true,
+    isReviewMode: true,
+    reviewLesson: lesson
+  });
+  return template.evaluate().setTitle('振り返り: ' + (lesson.name || ''));
+}
+
+function handleMainMode_(params, currentEmail) {
+  return createAccessRestrictedTemplate(currentEmail);
+}
+
+const DO_GET_HANDLERS = {
+  login: handleLoginMode_,
+  manual: handleManualMode_,
+  admin: handleAdminMode_,
+  setup: handleSetupMode_,
+  appSetup: handleAppSetupMode_,
+  view: handleViewMode_,
+  review: handleReviewMode_,
+  main: handleMainMode_
+};
 
 // ─── Auth & redirect helpers ─────────────────────────────────────
 
@@ -362,6 +397,8 @@ function createRedirectTemplate(redirectPage, error) {
 // テスト容易性 + 認知負荷の低減のために抽出。
 // =====================================================================
 
+const isPlainObject = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+
 /**
  * getData / refreshData ハンドラ — 公開ボードのデータ取得。
  * @param {Object} request - doPost payload
@@ -370,8 +407,7 @@ function createRedirectTemplate(redirectPage, error) {
  * @returns {Object} response
  */
 function doPostHandleGetData(request, email, action) {
-  const isObj = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
-  if (request.options !== undefined && !isObj(request.options)) {
+  if (request.options !== undefined && !isPlainObject(request.options)) {
     return createErrorResponse('Invalid options payload');
   }
   try {
@@ -421,21 +457,15 @@ function doPostHandleToggleHighlight(request) {
 
 /**
  * publishApp ハンドラ — ボード公開（owner 認証は publishApp 内で行う）。
- * @param {Object} request
- * @param {Function} isPlainObject - doPost からの注入（重複定義回避）
- * @returns {Object} response
  */
-function doPostHandlePublishApp(request, isPlainObject) {
+function doPostHandlePublishApp(request) {
   try {
     if (!isPlainObject(request.config) || Object.keys(request.config).length === 0) {
       return createErrorResponse('Publish config is required');
     }
-    if (typeof publishApp === 'function') {
-      return publishApp(request.config);
-    }
-    return createErrorResponse('公開処理関数が見つかりません');
+    return publishApp(request.config);
   } catch (error) {
-    console.error('publishApp error:', error.message);
+    logError_('publishApp', error);
     return createExceptionResponse(error);
   }
 }
@@ -449,7 +479,6 @@ function doPostHandlePublishApp(request, isPlainObject) {
  *   getRange(rowIndex, ...) に渡る。NaN が来ると Sheet API が黙って崩壊するので、doPost 層で reject。
  *
  * @param {*} rowId
- * @returns {boolean}
  */
 function isValidRowIdPayload(rowId) {
   if (rowId === null || rowId === undefined) return false;
@@ -473,8 +502,6 @@ function isValidRowIdPayload(rowId) {
 function doPost(e) {
   const jsonResponse = (payload) => ContentService.createTextOutput(JSON.stringify(payload))
     .setMimeType(ContentService.MimeType.JSON);
-
-  const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
   const isJsonContentType = (contentType) => {
     if (!contentType || typeof contentType !== 'string') {
@@ -564,53 +591,11 @@ function doPost(e) {
 
     // setupApiKey: 初回APIキー設定（キー未設定時のみ動作）
     if (action === 'setupApiKey') {
-      // Why direct PropertiesService (lint suppressed): 初回キー設定ゲートは stale cache が
-      //   二重設定の race を引き起こすので 30s memory cache をバイパスして必ず最新を読む。
-      // lint-disable-next-line no-direct-property-fetch
-      const existingKey = PropertiesService.getScriptProperties().getProperty('ADMIN_API_KEY');
-      if (existingKey) {
-        return jsonResponse(createErrorResponse('ADMIN_API_KEY is already configured', null, { error: 'ALREADY_CONFIGURED' }));
-      }
-      // 初回設定は管理者のみ許可
-      const setupEmail = getCurrentEmail();
-      if (!setupEmail || !isAdministrator(setupEmail)) {
-        return jsonResponse(createErrorResponse('Admin authentication required', null, { error: 'ADMIN_REQUIRED' }));
-      }
-      // Why: 旧実装は length >= 16 のみで空白埋め文字列 (e.g. 16 spaces) が通る silent
-      //   data quality bug。trim 後の effective length と「非空白文字を含む」を併用検証。
-      const rawKey = typeof request.apiKey === 'string' ? request.apiKey : '';
-      const trimmedKey = rawKey.trim();
-      const hasMeaningfulChars = trimmedKey.length >= 16 && /\S/.test(trimmedKey);
-      const newKey = hasMeaningfulChars ? rawKey : null;
-      if (!newKey) {
-        return jsonResponse(createErrorResponse('apiKey must be a string of at least 16 non-whitespace characters', null, { error: 'INVALID_KEY_FORMAT' }));
-      }
-      // setCachedProperty also busts the 30s helpers.js memory cache so the very
-      // next adminApi call in this process sees the new key.
-      setCachedProperty('ADMIN_API_KEY', newKey);
-      return jsonResponse(createSuccessResponse('ADMIN_API_KEY has been set', { configured: true }));
+      return jsonResponse(handleSetupApiKeyAction_(request));
     }
 
-    // adminApi: APIキー認証（Session不要 → AIエージェントからアクセス可能）
     if (action === 'adminApi') {
-      const apiKey = typeof request.apiKey === 'string' ? request.apiKey : '';
-      const storedKey = getCachedProperty('ADMIN_API_KEY');
-      if (!storedKey) {
-        return jsonResponse(createErrorResponse('ADMIN_API_KEY is not configured. Use setupApiKey action first.', null, { error: 'API_KEY_NOT_CONFIGURED' }));
-      }
-      if (!apiKey || !timingSafeEqual(apiKey, storedKey)) {
-        return jsonResponse(createErrorResponse('Invalid API key', null, { error: 'INVALID_API_KEY' }));
-      }
-      const adminParams = request.params === undefined ? {} : request.params;
-      if (!isPlainObject(adminParams)) {
-        return jsonResponse(createErrorResponse('params must be a JSON object', null, { error: 'INVALID_PARAMS' }));
-      }
-      _apiKeyAdminEmail = getCachedProperty('ADMIN_EMAIL');
-      try {
-        return jsonResponse(dispatchAdminOperation(request.operation, adminParams));
-      } finally {
-        _apiKeyAdminEmail = null;
-      }
+      return jsonResponse(handleAdminApiAction_(request));
     }
 
     const email = getCurrentEmail();
@@ -627,31 +612,12 @@ function doPost(e) {
       });
     }
 
-    // Why: 旧来 200 行 switch を action handler に分割。各 handler は (request, email) を
-    //   受け取り result を返す純粋関数。テスト可読性 + 個別保守性が向上。
-    //   action allowlist のチェックは上で済んでいるので、ここに到達したら action は valid。
-    let result;
-    switch (action) {
-      case 'getData':
-      case 'refreshData':
-        result = doPostHandleGetData(request, email, action);
-        break;
-      case 'addReaction':
-        result = doPostHandleAddReaction(request);
-        break;
-      case 'toggleHighlight':
-        result = doPostHandleToggleHighlight(request);
-        break;
-      case 'publishApp':
-        result = doPostHandlePublishApp(request, isPlainObject);
-        break;
-      case 'reportClientError':
-        // フロントエンドエラー → Cloud Logging（rate limit + size cap は内部適用）
-        result = handleClientErrorReport(email, request.payload);
-        break;
-      default:
-        result = createErrorResponse(action ? `Unknown action: ${action}` : 'Unknown action: 不明');
-    }
+    // action handler は table-driven dispatch (DO_POST_ACTION_HANDLERS)。
+    //   各 handler は (request, email, action) を受け取り result を返す純粋関数。
+    const actionHandler = DO_POST_ACTION_HANDLERS[action];
+    const result = actionHandler
+      ? actionHandler(request, email, action)
+      : createErrorResponse(action ? `Unknown action: ${action}` : 'Unknown action: 不明');
 
     return jsonResponse(result);
 
@@ -670,6 +636,66 @@ function doPost(e) {
     });
   }
 }
+
+// ─── doPost action handlers + dispatch table ─────────────────────────────────────
+
+// setupApiKey: 初回 ADMIN_API_KEY 設定ゲート。管理者のみ、既存キーがあれば reject。
+function handleSetupApiKeyAction_(request) {
+  // Why direct PropertiesService (lint suppressed): 初回キー設定ゲートは stale cache が
+  //   二重設定の race を引き起こすので 30s memory cache をバイパスして必ず最新を読む。
+  // lint-disable-next-line no-direct-property-fetch
+  const existingKey = PropertiesService.getScriptProperties().getProperty('ADMIN_API_KEY');
+  if (existingKey) {
+    return createErrorResponse('ADMIN_API_KEY is already configured', null, { error: 'ALREADY_CONFIGURED' });
+  }
+  const setupEmail = getCurrentEmail();
+  if (!setupEmail || !isAdministrator(setupEmail)) {
+    return createErrorResponse('Admin authentication required', null, { error: 'ADMIN_REQUIRED' });
+  }
+  // Why: length >= 16 だけだと空白埋め文字列 (16 spaces) が通る silent data quality bug。
+  //   trim 後の effective length と「非空白文字を含む」を併用検証。
+  const rawKey = typeof request.apiKey === 'string' ? request.apiKey : '';
+  const trimmedKey = rawKey.trim();
+  const hasMeaningfulChars = trimmedKey.length >= 16 && /\S/.test(trimmedKey);
+  if (!hasMeaningfulChars) {
+    return createErrorResponse('apiKey must be a string of at least 16 non-whitespace characters', null, { error: 'INVALID_KEY_FORMAT' });
+  }
+  // setCachedProperty also busts the 30s helpers.js memory cache so the very
+  // next adminApi call in this process sees the new key.
+  setCachedProperty('ADMIN_API_KEY', rawKey);
+  return createSuccessResponse('ADMIN_API_KEY has been set', { configured: true });
+}
+
+// adminApi: APIキー認証 (Session 不要 → AI エージェントからアクセス可能)
+function handleAdminApiAction_(request) {
+  const apiKey = typeof request.apiKey === 'string' ? request.apiKey : '';
+  const storedKey = getCachedProperty('ADMIN_API_KEY');
+  if (!storedKey) {
+    return createErrorResponse('ADMIN_API_KEY is not configured. Use setupApiKey action first.', null, { error: 'API_KEY_NOT_CONFIGURED' });
+  }
+  if (!apiKey || !timingSafeEqual(apiKey, storedKey)) {
+    return createErrorResponse('Invalid API key', null, { error: 'INVALID_API_KEY' });
+  }
+  const adminParams = request.params === undefined ? {} : request.params;
+  if (!isPlainObject(adminParams)) {
+    return createErrorResponse('params must be a JSON object', null, { error: 'INVALID_PARAMS' });
+  }
+  _apiKeyAdminEmail = getCachedProperty('ADMIN_EMAIL');
+  try {
+    return dispatchAdminOperation(request.operation, adminParams);
+  } finally {
+    _apiKeyAdminEmail = null;
+  }
+}
+
+const DO_POST_ACTION_HANDLERS = {
+  getData: (req, email, action) => doPostHandleGetData(req, email, action),
+  refreshData: (req, email, action) => doPostHandleGetData(req, email, action),
+  addReaction: (req) => doPostHandleAddReaction(req),
+  toggleHighlight: (req) => doPostHandleToggleHighlight(req),
+  publishApp: (req) => doPostHandlePublishApp(req),
+  reportClientError: (req, email) => handleClientErrorReport(email, req.payload)
+};
 
 /**
  * Frontend error report receiver — drains client-side errors into Cloud Logging.
@@ -692,11 +718,7 @@ function doPost(e) {
  */
 function handleClientErrorReport(email, payload) {
   try {
-    // Why: doPost の isPlainObject は関数ローカル定数なので、ここからは参照不可。
-    //      重複を許容してでもこの関数の独立性を確保（main.js 単独 require のテストや
-    //      別ファイルからの直接呼び出しでも壊れない）。
-    const isObj = Boolean(payload) && typeof payload === 'object' && !Array.isArray(payload);
-    if (!isObj) {
+    if (!isPlainObject(payload)) {
       return createErrorResponse('payload must be an object', null, { error: 'INVALID_PAYLOAD' });
     }
 
@@ -829,7 +851,7 @@ function getBatchedViewerData(targetUserId, currentEmail) {
     };
 
   } catch (error) {
-    console.error('getBatchedViewerData error:', error.message);
+    logError_('getBatchedViewerData', error);
     return {
       success: false,
       error: `データ取得エラー: ${error.message}`
@@ -845,7 +867,7 @@ function getBatchedAdminData(targetUserId) {
   try {
     const currentEmail = getCurrentEmail();
     if (!currentEmail) {
-      return { success: false, error: 'ユーザー認証が必要です' };
+      return createAuthError();
     }
 
     const isAdmin = isAdministrator(currentEmail);
@@ -896,7 +918,7 @@ function getBatchedAdminData(targetUserId) {
     };
 
   } catch (error) {
-    console.error('getBatchedAdminData error:', error.message);
+    logError_('getBatchedAdminData', error);
     return {
       success: false,
       error: `管理者データ取得エラー: ${error.message}`
@@ -907,7 +929,6 @@ function getBatchedAdminData(targetUserId) {
 /**
  * 管理者認証をバッチで行う（getCurrentEmail + isAdministrator を 1 回で）。
  * @param {Object} [options]
- * @returns {Object}
  */
 function getBatchedAdminAuth(options = {}) {
   try {
@@ -944,7 +965,7 @@ function getBatchedAdminAuth(options = {}) {
     };
 
   } catch (error) {
-    console.error('getBatchedAdminAuth error:', error.message);
+    logError_('getBatchedAdminAuth', error);
     return {
       success: false,
       authenticated: false,
@@ -959,7 +980,6 @@ function getBatchedAdminAuth(options = {}) {
  * 指数バックオフ付きリトライ。429 検出時はベース遅延を 2 倍に拡張。
  * @param {Function} operation
  * @param {Object} [options]
- * @returns {*}
  */
 function executeWithRetry(operation, options = {}) {
   const maxRetries = options.maxRetries || 3;

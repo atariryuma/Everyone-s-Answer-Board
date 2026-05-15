@@ -10,16 +10,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('path');
 const vm = require('vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 function loadAdminContext(overrides = {}) {
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
-    createErrorResponse: (msg) => ({ success: false, message: msg }),
-    createSuccessResponse: (msg, data) => ({ success: true, message: msg, ...(data || {}) }),
-    createAdminRequiredError: () => ({ success: false, message: 'admin required' }),
-    createAuthError: () => ({ success: false, message: 'auth required' }),
-    createUserNotFoundError: () => ({ success: false, message: 'user not found' }),
-    createExceptionResponse: (e) => ({ success: false, message: e.message }),
+    ...gasResponseStubs(),
     getCurrentEmail: () => 'admin@example.com',
     isAdministrator: () => true,
     findUserByEmail: () => ({ userId: 'u1', userEmail: 'admin@example.com' }),

@@ -3,13 +3,12 @@
  *   新規 SS 作成直後の共有デフォルト一括適用 (`applySpreadsheetSharingDefaults`)。
  */
 
-/* global SpreadsheetApp, DriveApp, getCachedProperty */
+/* global getCachedProperty */
 
 /**
  * スプレッドシートを同一ドメイン内で編集可能に設定（サービスアカウント不使用経路用）。
  * @param {string} spreadsheetId
  * @param {string} ownerEmail
- * @returns {Object}
  */
 function setupDomainWideSharing(spreadsheetId, ownerEmail) {
   const [, domain] = (ownerEmail || '').split('@');
@@ -135,7 +134,7 @@ function addServiceAccountAsEditor(spreadsheetId) {
     SpreadsheetApp.openById(spreadsheetId).addEditor(parsed.saEmail);
     return { success: true, added: true, saEmail: parsed.saEmail, message: 'Service account added as editor' };
   } catch (error) {
-    console.error('addServiceAccountAsEditor error:', error.message);
+    logError_('addServiceAccountAsEditor', error);
     return { success: false, added: false, message: error.message };
   }
 }

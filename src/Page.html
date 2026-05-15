@@ -167,18 +167,26 @@
   <!-- Notification Container for unified notification system -->
   <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
 
+  <!-- Lesson Review banner (Phase 2): isReviewMode のときだけ JS が表示 -->
+  <div id="lesson-review-banner" class="hidden">
+    <div class="lesson-review-banner-inner">
+      📖 振り返り中: <span id="lesson-review-name">-</span>
+      <span class="lesson-review-readonly">読み取り専用</span>
+    </div>
+  </div>
+
   <!-- Pull-to-refresh indicator (モバイル向け。PC は新着バナー or ページ再読み込みで代用) -->
   <div id="pull-to-refresh-indicator" role="status" aria-live="polite">
-    <span id="pull-to-refresh-icon" class="ptr-spinner" aria-hidden="true"></span>
+    <span class="ptr-spinner" aria-hidden="true"></span>
     <span id="pull-to-refresh-text">引き下げて更新</span>
   </div>
 
   <div id="main-container" class="w-full mx-auto px-4 pt-4 pb-4 md:px-6 md:pt-6 md:pb-6">
-    <!-- ヘッダー (v2674 再設計: 横幅を活用する Bento Grid 構造)
-         Row 1: identity + phase pills + filters + admin actions (1 行に集約)
+    <!-- ヘッダー: Bento Grid 構造
+         Row 1: identity + phase pills + filters + admin actions
          Row 2: 設問テキスト (中央配置で focus)
-         Row 3: 編集者ツール (vizToolbarSlot に viz layer から注入、編集者のみ表示)
-         body.is-editor / .is-viewer クラスで editor-only 要素の表示を制御。 -->
+         Row 3: 編集者ツール (viz layer が vizToolbarSlot に注入、編集者のみ表示)
+         body.is-editor / .is-viewer クラスで editor-only 要素を CSS 制御。 -->
     <header id="main-header" class="eab-header glass-panel rounded-xl shadow-lg fade-in">
       <!-- Row 1: identity + phase + filters + admin actions -->
       <div class="eab-row eab-row-meta">
@@ -202,7 +210,7 @@
             <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
             </svg>
-            <span id="answerCountText" class="font-semibold">0件</span>
+            <span class="font-semibold">0件</span>
           </div>
           <select id="classFilter"
                   class="eab-select hidden"
@@ -274,10 +282,6 @@
     <main id="answers" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 transition-all duration-300 ease-in-out" role="main" aria-live="polite" aria-label="回答一覧"></main>
   </div>
   <div id="answerModalContainer" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden transition-all duration-300 ease-out" role="dialog" aria-modal="true">
-    <!-- v2688: 単一モーダルに戻す。
-         旧 dual modal / pane card / drawer は道徳教育の自然な議論フローに合わなかった
-         (「2 人の意見を並べて読み比べる」は授業で行われない操作)。
-         比較モードでも「順次にモーダルで一人ずつ意見を読む」で十分。 -->
     <div id="answerModalCard" class="glass-panel rounded-xl p-6 flex flex-col shadow-2xl border-2 border-cyan-400/80 w-full max-w-5xl h-auto max-h-[85vh] relative transition-all duration-300 ease-out" role="document" aria-labelledby="modalAnswer">
       <button type="button" id="answerModalCloseBtn" class="modal-close-btn bg-red-600 hover:bg-red-500 active:bg-red-700 rounded-full p-2 text-white hover:scale-110 active:scale-95 transition-all duration-200 z-10 focus:ring-2 focus:ring-red-400/50 focus:outline-none shadow-lg" aria-label="閉じる">
         <span id="iconClose" class="w-6 h-6"></span>

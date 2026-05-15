@@ -3,7 +3,7 @@
  *   IDトークン由来の Google 不変 ID 取得）。
  */
 
-/* global validateUrl, validateEmail, getCurrentEmail, findUserByEmail, findUserById, findUserByGoogleId, openSpreadsheet, updateUser, getUserConfig, getConfigOrDefault, isAdministrator, CACHE_DURATION, clearConfigCache, SYSTEM_LIMITS, createExceptionResponse */
+/* global getCurrentEmail, findUserByEmail, isAdministrator */
 
 /**
  * ユーザー情報キャッシュキーを生成（UserApis.js から参照される）
@@ -41,7 +41,7 @@ function getGoogleIdFromToken() {
     // プレフィックス付きで返す（スプレッドシートの数値自動変換による精度損失を防止）
     return { googleId: 'gid_' + payload.sub, email: payload.email || null };
   } catch (error) {
-    console.error('getGoogleIdFromToken error:', error.message);
+    logError_('getGoogleIdFromToken', error);
     return null;
   }
 }
@@ -59,7 +59,7 @@ function isAdmin() {
     }
     return isAdministrator(email);
   } catch (error) {
-    console.error('isAdmin error:', error.message);
+    logError_('isAdmin', error);
     return false;
   }
 }
@@ -100,7 +100,7 @@ function getUser(infoType = 'email') {
       message: `Unsupported infoType: ${infoType}`
     };
   } catch (error) {
-    console.error('getUser error:', error.message);
+    logError_('getUser', error);
     return {
       success: false,
       message: error.message || 'User retrieval failed'

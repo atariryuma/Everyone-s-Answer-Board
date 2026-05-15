@@ -2,7 +2,7 @@
  * @fileoverview 入力検証・サニタイズ（email / URL / spreadsheet ID / config 等）。
  */
 
-/* global getColumnAnalysis, getFormInfo, SYSTEM_LIMITS */
+/* global SYSTEM_LIMITS */
 
 // Why module-level: validateConfig が boardMode を sanitize する際に使う enum。
 //   ConfigService.js:285 の VALID_BOARD_MODES とミラー。GAS single-global-scope で
@@ -262,50 +262,6 @@ function validateSpreadsheetId(spreadsheetId) {
 }
 
 /**
- * ISO 8601 / YYYY-MM-DD 形式日付検証
- *
- * Why: filter 用の dateFrom / dateTo を `new Date(input)` で寛容に parse すると
- *   "2026-99-99" のような無効値が NaN として silently 通過してしまう。
- *   厳密に正規表現 + Date オブジェクト検証で「文字列が形式正しい + 実在する日付」を保証。
- *
- * @param {string} dateStr - 検証対象の日付文字列
- * @returns {{isValid: boolean, parsed?: Date, errors: string[]}}
- */
-function validateDateFormat(dateStr) {
-  const result = { isValid: false, errors: [] };
-  if (!dateStr || typeof dateStr !== 'string') {
-    result.errors.push('日付文字列が必要です');
-    return result;
-  }
-  const trimmed = dateStr.trim();
-  // YYYY-MM-DD または YYYY-MM-DDTHH:MM:SS(Z) 形式を許容
-  const isoDateOnly = /^\d{4}-\d{2}-\d{2}$/;
-  const isoFull = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d{1,3})?)?(Z|[+-]\d{2}:?\d{2})?$/;
-  if (!isoDateOnly.test(trimmed) && !isoFull.test(trimmed)) {
-    result.errors.push('日付形式が不正です (YYYY-MM-DD または ISO 8601 形式)');
-    return result;
-  }
-  const parsed = new Date(trimmed);
-  if (isNaN(parsed.getTime())) {
-    result.errors.push('実在しない日付です: ' + trimmed);
-    return result;
-  }
-  // Why: JS は "2026-02-31" を silently "2026-03-03" にラップする寛容な仕様。
-  //   round-trip 検証で「入力 YYYY-MM-DD が parsed の年月日と一致する」ことを確認し、
-  //   実在しない日付を厳密に reject する。
-  if (isoDateOnly.test(trimmed)) {
-    const [y, m, d] = trimmed.split('-').map(Number);
-    if (parsed.getUTCFullYear() !== y || parsed.getUTCMonth() + 1 !== m || parsed.getUTCDate() !== d) {
-      result.errors.push('実在しない日付です: ' + trimmed);
-      return result;
-    }
-  }
-  result.isValid = true;
-  result.parsed = parsed;
-  return result;
-}
-
-/**
  * 列マッピング検証
  * @param {Object} columnMapping - 列マッピング
  * @returns {Object} 検証結果
@@ -467,7 +423,7 @@ function validateConfig(config) {
     });
 
     const configSize = JSON.stringify(result.sanitized).length;
-    if (configSize > 32000) {
+    if (configSize > SYSTEM_LIMITS.CONFIG_JSON_MAX_CHARS) {
       result.errors.push('設定データが大きすぎます（32KB制限）');
     }
 

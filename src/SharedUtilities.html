@@ -276,6 +276,9 @@
       this.retryAttempts = new Map();
       this.maxRetries = 3;
       this.defaultTimeout = 30000;
+      // Long-running sessions (admin panel) accumulate distinct cache keys per
+      //   JSON.stringify(args) suffix. Cap to bound memory; LRU via insertion order.
+      this.cacheMaxSize = 50;
     }
 
     /**
@@ -316,6 +319,10 @@
         const result = await this.executeGASCall(functionName, timeout, ...args);
 
         if (cache && result) {
+          if (this.cache.size >= this.cacheMaxSize) {
+            const oldestKey = this.cache.keys().next().value;
+            if (oldestKey !== undefined) this.cache.delete(oldestKey);
+          }
           this.cache.set(finalCacheKey, {
             data: result,
             timestamp: Date.now()
@@ -471,14 +478,6 @@
   }
 
   window.unifiedDataLoader = new UnifiedDataLoader();
-
-  window.loadData = (functionName, options, ...args) =>
-    window.unifiedDataLoader.loadData(functionName, options, ...args);
-
-  window.loadBatchData = (requests) =>
-    window.unifiedDataLoader.loadBatchData(requests);
-
-
 
   class ErrorHandler {
     constructor() {
@@ -705,6 +704,62 @@
     redirectBtn.focus();
   };
 
+  /**
+   * ButtonBusyManager — ボタン共通の「処理中」UX を一元化する。
+   *
+   * 採用基準 (各ページのボタン監査 2026-05-14 で確定):
+   *   - withBusy: サーバ通信を伴う長時間処理用。連打抑制 + spinner + disable + text 置換 +
+   *     finally で復元。同一 btn の重複呼出は即時 resolve せずに skip (undefined return)。
+   *   - navOnce:  新タブ open や外部リンク用。ms 内の重複 click を拒否 (タブ重複防止)。
+   *     UI は無効化しない (ユーザーが視覚的に変化を感じない方が自然なため)。
+   *
+   * 戦略外 (=触らない):
+   *   - reaction-btn / highlight-btn は `setReactionButtonsLoading` で既に optimistic UI 対応済
+   *   - modal close / dismiss / timeline now は副作用ゼロなので装飾不要
+   */
+  class ButtonBusyManager {
+    async withBusy(btn, asyncFn, opts) {
+      const options = opts || {};
+      if (typeof btn === 'string') btn = document.getElementById(btn);
+      if (!btn || typeof asyncFn !== 'function') {
+        return typeof asyncFn === 'function' ? await asyncFn() : undefined;
+      }
+      // 連打抑制: 既に処理中なら skip
+      if (btn.dataset.busy === '1') return undefined;
+      btn.dataset.busy = '1';
+      const wasDisabled = btn.disabled;
+      const originalLabel = btn.dataset.originalLabel || btn.textContent;
+      btn.disabled = true;
+      btn.classList.add('btn-busy');
+      if (options.busyText) {
+        btn.dataset.originalLabel = originalLabel;
+        btn.textContent = options.busyText;
+      }
+      try {
+        return await asyncFn();
+      } finally {
+        delete btn.dataset.busy;
+        btn.disabled = wasDisabled;
+        btn.classList.remove('btn-busy');
+        if (options.busyText && btn.dataset.originalLabel) {
+          btn.textContent = btn.dataset.originalLabel;
+          delete btn.dataset.originalLabel;
+        }
+      }
+    }
+
+    navOnce(btn, ms) {
+      const guardMs = typeof ms === 'number' ? ms : 800;
+      if (typeof btn === 'string') btn = document.getElementById(btn);
+      if (!btn) return true;
+      const last = Number(btn.dataset.lastNavMs || 0);
+      const now = Date.now();
+      if (last && (now - last) < guardMs) return false;
+      btn.dataset.lastNavMs = String(now);
+      return true;
+    }
+  }
+
   window.sharedUtilities = {
     debounce: new DebounceManager(),
     throttle: new ThrottleManager(),
@@ -713,26 +768,10 @@
     loading: new LoadingManager(),
     security: new SecurityUtilities(),
     privacy: PrivacyLogger,
+    buttons: new ButtonBusyManager()
   };
 
   window.sharedUtilities.errors.setupGlobalErrorHandling();
-
-  window.debounce = (func, delay, key = 'default') => {
-    if (window.sharedUtilities && window.sharedUtilities.debounce) {
-      window.sharedUtilities.debounce.debounce(func, key, delay);
-    } else {
-      window.createPromiseDelay(delay).then(func).catch(() => {
-      });
-    }
-  };
-
-  window.throttle = (func, delay, key = 'default') => {
-    if (window.sharedUtilities && window.sharedUtilities.throttle) {
-      window.sharedUtilities.throttle.throttle(func, key, delay);
-    } else {
-      func();
-    }
-  };
 
   if (!window.UnifiedCache) {
     window.UnifiedCache = Cache;
@@ -1352,15 +1391,6 @@
     return window.getPerformanceConstants().PERFORMANCE_BUDGET;
   };
 
-  window.getChunkSize = function () {
-    return window.getPerformanceConstants().CHUNK_SIZE;
-  };
-
-  window.getIdleTimeout = function () {
-    return window.getPerformanceConstants().IDLE_TIMEOUT;
-  };
-
-
   /**
    * 統一UNIFIED_CONFIG構築関数 - CLAUDE.md準拠
    * @param {Object} CONFIG - パース済みconfigJSON
@@ -1389,38 +1419,6 @@
       displaySettings: CONFIG.displaySettings || { showNames: false, showReactions: false },
       columnMapping: CONFIG.columnMapping || {}
     };
-  };
-
-
-  /**
-   * シンプルエラー表示関数
-   * 開発者が問題を特定できる最小限の情報を中央モーダルで表示
-   */
-  window.showSimpleError = function (message) {
-    if (!message) return;
-
-    const existingModal = document.getElementById('simple-error-modal');
-    if (existingModal) existingModal.remove();
-
-    const modalHTML = `
-      <div class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" id="simple-error-modal">
-        <div class="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 text-white">
-          <div class="flex items-center mb-4">
-            <span class="text-2xl mr-3">❌</span>
-            <h3 class="text-lg font-semibold">エラーが発生しました</h3>
-          </div>
-          <p class="text-gray-300 mb-6">${message}</p>
-          <div class="text-right">
-            <button onclick="document.getElementById('simple-error-modal').remove()"
-                    class="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded text-white">
-              OK
-            </button>
-          </div>
-        </div>
-      </div>
-    `;
-
-    document.body.insertAdjacentHTML('beforeend', modalHTML);
   };
 
 

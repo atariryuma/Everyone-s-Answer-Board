@@ -42,11 +42,9 @@
     font-weight: 600;
   }
 
-  /* データ点
-   * 2026-05-14 v2666: 暗背景でドット同士の境界を分離するため stroke を白半透明に。
-   *   ドット縮小 (matrix BASE 7→5) と組み合わせて「クラスタがブロブ化」する問題を解消。
-   *   opacity 0.92 → 0.85 で重なりが色味で読めるように（透明度で密度を表現）。
-   *   リアクションリング (色 stroke) は JS インライン style で上書きされるので影響なし。 */
+  /* データ点。暗背景でドット同士の境界を分離するため stroke は白半透明。
+   *   opacity 0.85 で重なりを色味で読める (密度を透明度で表現)。
+   *   リアクションリング (色 stroke) は JS インライン style で上書きされる。 */
   .viz-dot {
     cursor: pointer;
     /* stroke-opacity も transition 対象に: リアクションリング (色枠) のフェードを滑らかに */
@@ -160,6 +158,28 @@
     border: 1px solid #334155;
     border-radius: 6px;
     padding: 10px 12px;
+    cursor: pointer;
+    transition: background 0.12s ease, border-color 0.12s ease;
+  }
+  .viz-rows-popup-row:hover,
+  .viz-rows-popup-row:focus {
+    background: rgba(56, 189, 248, 0.08);
+    border-color: rgba(56, 189, 248, 0.45);
+    outline: none;
+  }
+  /* 象限 chip: matrix の意見一覧で「この意見はどの立場から来たか」を示す。
+     keyword popup を全象限から集めるので、chip 色違いで「同じ言葉が違う立場で」を visualize。 */
+  .viz-rows-popup-chip {
+    display: inline-block;
+    margin-left: 0.5rem;
+    font-size: 0.72rem;
+    color: #8be9fd;
+    background: rgba(56, 189, 248, 0.1);
+    border: 1px solid rgba(56, 189, 248, 0.3);
+    padding: 0.1rem 0.4rem;
+    border-radius: 0.3rem;
+    font-weight: 600;
+    vertical-align: middle;
   }
   .viz-rows-popup-name {
     font-size: 0.82rem;
@@ -210,10 +230,8 @@
     pointer-events: none;
     text-anchor: middle;
   }
-  /* 象限ラベル直下/上の理由キーワード行
-   *   2026-05-14 v2673: 下部 HTML パネルから SVG 内ラベル統合に変更。
-   *   学習者が「ドットの位置 + 言葉の意味」を視線移動なしで把握できるように。
-   *   ラベルより一段薄く、フォントは少し小さく - 階層を表現。 */
+  /* 象限ラベル直下/上の理由キーワード行 (SVG 内統合配置)。
+   *   ラベルより一段薄く、フォントを小さく - 階層を表現。 */
   .viz-quadrant-keyword {
     fill: rgba(199, 210, 254, 0.7);
     font-size: 0.85rem;
@@ -221,6 +239,18 @@
     pointer-events: none;
     text-anchor: middle;
     letter-spacing: 0.03em;
+  }
+  /* 個別キーワード (tspan) は click 可能。hover で fill 変更 + cursor pointer。
+     pointer-events: auto で親 <text> の pointer-events: none を上書き。 */
+  .viz-quadrant-keyword-pill {
+    pointer-events: auto;
+    cursor: pointer;
+    transition: fill 0.15s ease;
+  }
+  .viz-quadrant-keyword-pill:hover,
+  .viz-quadrant-keyword-pill:focus {
+    fill: #fde047;
+    outline: none;
   }
   body.projector-mode .viz-quadrant-keyword {
     font-size: 1.05rem;
@@ -261,6 +291,92 @@
     color: #38bdf8;
     margin-right: 0.4rem;
   }
+
+  /* =============================================================================
+   * モーダル: 軸ラベル + プログレスバー (numberline / matrix の「数字だけ」問題を解消)
+   *   左端 = min ラベル、右端 = max ラベル、ドットが値の位置を示す。
+   *   matrix は X/Y 2 本 + 象限名。教師の指導案を学習者に伝える視覚化。
+   * ============================================================================= */
+  .modal-axis-block {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-bottom: 0.5rem;
+  }
+  .modal-axis-row {
+    display: grid;
+    /* 構成: [min ラベル][bar][max ラベル][値]。bar を 3fr に拡大して立場の幅を強調しつつ、
+       右端の value 列は auto で 5/5 表示を固定位置に置く (視線で縦に追える)。 */
+    grid-template-columns: minmax(0, 1fr) 3fr minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 1.05rem;
+    color: var(--brand-text, #e2e8f0);
+  }
+  .modal-axis-label-min {
+    text-align: right;
+    color: var(--brand-text-muted, #94a3b8);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .modal-axis-label-max {
+    text-align: left;
+    color: var(--brand-text-muted, #94a3b8);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .modal-axis-track {
+    position: relative;
+    height: 0.7rem;  /* ドット (1.4rem) との比率を整える */
+    /* 単色 track: 「左 → 右 = 弱 → 強」誤読を避けるため、立場の対極は同等扱い。 */
+    background: rgba(148, 163, 184, 0.25);
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+  }
+  .modal-axis-dot {
+    position: absolute;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    background: #fde047;
+    border: 2px solid #f59e0b;
+    box-shadow: 0 0 8px rgba(253, 224, 71, 0.65);
+  }
+  /* 行右端の値表示 (5/5)。全行で位置が固定なので視線で縦に値を比較できる。 */
+  .modal-axis-value {
+    font-variant-numeric: tabular-nums;
+    color: #fde047;
+    font-weight: 700;
+    font-size: 0.95rem;
+    white-space: nowrap;
+  }
+  .modal-axis-quadrant {
+    /* 教師の指導意図の核心 = 立場の道徳的意味。少し大きめで主役感を出す。
+       highlight モーダル枠 (紫) と独立した色系にして視覚階層を保つため cyan 系に。
+       (emoji 📍 自体の色は CSS color で確実に変えられないので、ここでは text 色だけ管理) */
+    font-size: 1.15rem;
+    color: #8be9fd;
+    font-weight: 600;
+    text-align: center;
+    padding: 0.4rem 0.6rem;
+    background: rgba(56, 189, 248, 0.08);
+    border-radius: 0.4rem;
+    border: 1px solid rgba(56, 189, 248, 0.3);
+  }
+  @media (max-width: 640px) {
+    .modal-axis-row { font-size: 0.85rem; gap: 0.4rem; }
+    .modal-axis-track { height: 0.45rem; }
+    .modal-axis-dot { width: 0.9rem; height: 0.9rem; }
+  }
+  body.projector-mode .modal-axis-row { font-size: 1.3rem; }
+  body.projector-mode .modal-axis-value { font-size: 1.15rem; }
+  body.projector-mode .modal-axis-quadrant { font-size: 1.2rem; }
 
   /* M3 ワードランキング */
   .word-bar {
@@ -353,8 +469,7 @@
    *      新しい .viz-toolbar は 1 行（モバイルでは折り返し）に統合する。
    * ===================================================================== */
   .viz-toolbar-slot { width: 100%; }
-  /* v2674: 議論ツール (Row 3) と phase pills (Row 1 内) を別 slot に分離。
-     toolbar 注入有無で空白が出ないよう :empty で非表示。 */
+  /* 議論ツール (Row 3) と phase pills (Row 1) を別 slot に。注入なしで空白が出ないよう :empty で非表示。 */
   .viz-toolbar-slot:empty { display: none; }
   /* 議論支援ツール bar (Row 3) — section label + 操作ボタン群を 1 行に
      親 .glass-panel が背景＋blur を持つので、ここは透明＋上端 border のみ。 */
@@ -480,8 +595,7 @@
   }
 
   body.projector-mode .viz-toolbar { padding: 0.6rem 1rem; background: rgba(10, 14, 26, 0.92); }
-  /* v2680: 電子黒板 (projector-mode) で議論支援ツールを教室後ろからも視認可能に拡大。
-     議論前 / 比較 / 軌跡 / リセット の全ボタンとラベルを大きめに。 */
+  /* 電子黒板 (projector-mode): 議論支援ツールを教室後ろからも視認可能なサイズに拡大。 */
   body.projector-mode .viz-btn { font-size: 1rem; padding: 0.5rem 0.9rem; }
   body.projector-mode .viz-btn-small { font-size: 0.95rem; padding: 0.4rem 0.7rem; }
   body.projector-mode .viz-timeline-label,
@@ -533,11 +647,13 @@
     border-color: #4ade80;
   }
   .viz-btn-small { padding: 0.25rem 0.5rem; font-size: 0.78rem; }
+  /* Timeline は toolbar の主役なので、横を広く取って軌跡を読み取りやすく。 */
   .viz-timeline {
     display: flex;
     align-items: center;
     gap: 0.4rem;
-    min-width: 200px;
+    flex: 1 1 auto;
+    min-width: 360px;
   }
   .viz-timeline-label {
     color: var(--brand-text-muted, #94a3b8);
@@ -552,9 +668,12 @@
     font-variant-numeric: tabular-nums;
   }
   #vizTimelineSlider {
-    flex: 1;
-    min-width: 100px;
+    flex: 1 1 auto;
+    min-width: 240px;
+    width: 100%;
   }
+  /* toolbar 中央 group も timeline に幅を譲るため自身が flex 伸縮可 */
+  .viz-toolbar-center { flex: 1 1 auto; }
 
   /* Before/After 比較表示時のレイアウト */
   .viz-compare-wrap {
@@ -579,14 +698,9 @@
     .viz-compare-wrap { grid-template-columns: 1fr; }
   }
 
-  /* v2688: .viz-pane-card 関連 (個別意見ペア比較用のペイン内インラインカード) は廃止。
-   *   道徳教育の自然な議論フローに合わなかった (「2 人の意見を並べて読む」は授業で
-   *   行われない)。比較モードでも単一モーダル経由で順次に意見を読む設計に統一。 */
-
   /* 象限キーワードパネル (matrix 専用)。「個・群・意味」三層の「意味」レイヤー。
-   *   4 象限を 2x2 で並べ、各象限の reason から抽出した top-3 keyword を表示。
-   *   人数バッジは多数派バイアスのため出さない（DCE 観点）。
-   *   2026-05-14 v2666 で導入。 */
+   *   4 象限を 2x2 で並べ、各象限の reason から top-3 keyword を表示。
+   *   人数バッジは多数派バイアスのため出さない（DCE 観点）。 */
   .viz-quadrant-summary {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -635,11 +749,9 @@
     .viz-quadrant-summary { grid-template-columns: 1fr; }
   }
 
-  /* v2674: 統計バッジ (vizStatsPills) は header の #lastUpdatedText に移管。
-     旧 .viz-stats / .stat-pill ルールは互換性のため残置 (他で参照される可能性) */
-  .viz-stats {
-    display: none;  /* 旧 DOM が残った場合の安全策 (現在は生成されない) */
-  }
+  /* 旧 .viz-stats / .stat-pill (vizStatsPills は #lastUpdatedText に移管済み)。
+     互換性のため残置: 旧 DOM が残っても見えないようにする。 */
+  .viz-stats { display: none; }
 
   /* 教師ダッシュボード「気になる児童」 */
   .viz-teacher-panel {

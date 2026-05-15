@@ -164,8 +164,15 @@
     function createDatabaseAuto() {
       const btn = document.getElementById('create-db-btn');
       const input = document.getElementById('database-id');
+      // btn-busy class でスピナーを表示。テキスト置換と disabled は既存維持。
       btn.disabled = true;
+      btn.classList.add('btn-busy');
       btn.textContent = '作成中…';
+      const restore = () => {
+        btn.disabled = false;
+        btn.classList.remove('btn-busy');
+        btn.textContent = '自動作成';
+      };
 
       google.script.run
         .withSuccessHandler(function(result) {
@@ -175,13 +182,11 @@
           } else {
             showMessage(result.message, 'error');
           }
-          btn.disabled = false;
-          btn.textContent = '自動作成';
+          restore();
         })
         .withFailureHandler(function(error) {
           showMessage('データベース作成に失敗しました: ' + error.message, 'error');
-          btn.disabled = false;
-          btn.textContent = '自動作成';
+          restore();
         })
         .createDatabase();
     }

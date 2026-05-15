@@ -85,7 +85,7 @@ function detectColumn(headers, fieldType, options = {}) {
   headers.forEach((header, index) => {
     if (!header || typeof header !== 'string') return;
 
-    const score = calculateScoreWithLogic(header, fieldType, patterns, index, fieldRelationships, options);
+    const score = calculateScoreWithLogic({ header, fieldType, patterns, index, relationships: fieldRelationships, options });
 
     if (score > bestMatch.confidence) {
       bestMatch = {
@@ -178,9 +178,12 @@ function calculateBaseScore(header, fieldType, patterns) {
 }
 
 /**
- * Calculate header score with logical field ordering constraints
+ * Calculate header score with logical field ordering constraints.
+ * @param {Object} ctx - {header, fieldType, patterns, index, relationships, options}
  */
-function calculateScoreWithLogic(header, fieldType, patterns, index, relationships, options = {}) {
+function calculateScoreWithLogic(ctx) {
+  const { header, fieldType, patterns, index, relationships } = ctx;
+  const options = ctx.options || {};
   const normalizedHeader = normalizeHeader(header);
   const baseScore = calculateBaseScore(header, fieldType, patterns);
 
@@ -413,7 +416,7 @@ function generateRecommendedMapping(headers, options = {}) {
     };
 
   } catch (error) {
-    console.error('generateRecommendedMapping error:', error.message);
+    logError_('generateRecommendedMapping', error);
     return {
       recommendedMapping: {},
       confidence: {},
@@ -445,7 +448,7 @@ function performIntegratedColumnDiagnostics(originalHeaders, options = {}) {
     };
 
   } catch (error) {
-    console.error('performIntegratedColumnDiagnostics error:', error.message);
+    logError_('performIntegratedColumnDiagnostics', error);
     return {
       success: false,
       error: error.message,

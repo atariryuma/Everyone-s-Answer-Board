@@ -19,35 +19,11 @@
   <style>
     /* AdminPanel専用スタイル */
 
-    .admin-container {
-      display: grid;
-      grid-template-columns: 2fr 1fr;
-      gap: var(--space-4);
-      min-height: 100vh;
-      padding: var(--space-4);
-    }
-
-    .main-editor {
-      padding: 1.5rem;
-    }
-
-    .info-panel {
-      padding: var(--space-4);
-      overflow-y: auto;
-    }
-
-    .card {
-      margin-bottom: var(--space-4);
-    }
-
-    .info-card {
-      margin-bottom: var(--space-3, 0.75rem);
-    }
-
-    /* ステータスヘッダー */
+    /* ステータスヘッダーは admin-container の外に置く full-width banner。
+       padding は admin-container と揃えて視覚的に統合感を出す。 */
     .status-header {
+      margin: var(--space-4) var(--space-4) 0;
       padding: 1rem 1.5rem;
-      margin-bottom: var(--space-4);
       display: flex;
       justify-content: space-between;
       align-items: center;
@@ -59,8 +35,33 @@
       font-weight: 700;
     }
 
+    .admin-container {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: var(--space-4);
+      min-height: calc(100vh - 4rem);  /* status-header 分を引いた残り高さ */
+      padding: var(--space-4);
+      align-items: start;  /* 左右列が異なる高さでも top で揃える */
+    }
 
-    /* v2648 シンプル化: 旧 .setup-progress / .step CSS は削除（HTML 側で進捗バー撤廃） */
+    /* 左右列で padding を揃えて、最初のカードが同じ y 座標から始まる */
+    .main-editor,
+    .info-panel {
+      padding: 0;  /* admin-container の padding と各 card の margin-bottom で十分 */
+    }
+
+    .info-panel {
+      overflow-y: auto;
+    }
+
+    .card {
+      margin-bottom: var(--space-4);
+    }
+
+    .info-card {
+      margin-bottom: var(--space-3, 0.75rem);
+    }
+
 
 
 
@@ -217,130 +218,188 @@
   </div>
 
 
-  <div class="admin-container">
+  <!-- ステータスヘッダー: page-level banner として全幅で配置。
+       grid 内に閉じ込めると左右列の top alignment が崩れるため、admin-container の外に出す。
+       wizard / Runner takeover 時も visible に残し、ユーザーが AdminPanel コンテキストを
+       見失わないようにする (data-normal-mode を付けない)。 -->
+  <header class="status-header glass-panel rounded-xl">
+    <h1 class="text-cyan-400 font-bold">みんなの回答ボード 設定</h1>
+    <div class="flex items-center gap-3">
+      <button type="button" class="btn btn-secondary" onclick="openManualGuide()"
+        title="PC初心者向けの使い方ガイドを開きます">
+        📚 使い方ガイド
+      </button>
+    </div>
+  </header>
+
+  <!-- data-normal-mode: body.mode-create-lesson / body.mode-run-lesson 時に CSS で非表示。
+       これで wizard / Runner が main workspace を takeover する。 -->
+  <div class="admin-container" data-normal-mode>
     <!-- 左パネル: メインエディタ -->
     <div class="main-editor">
-      <!-- ステータスヘッダー -->
-      <header class="status-header glass-panel rounded-xl">
-        <h1 class="text-cyan-400 font-bold">みんなの回答ボード 設定</h1>
-        <div class="flex items-center gap-3">
-          <button id="manual-guide-btn" type="button" class="btn btn-secondary" onclick="openManualGuide()"
-            title="PC初心者向けの使い方ガイドを開きます">
-            📚 使い方ガイド
-          </button>
-        </div>
-      </header>
-
-      <!-- セットアップ進捗バーは静的で進捗を反映しなかったため削除 (v2648 シンプル化) -->
-      <!-- データソース選択カード -->
-      <section class="card glass-panel rounded-xl p-6">
-        <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold text-white">📝 Googleフォーム選択</h2>
-          <div class="flex items-center gap-2">
-            <!--
-              テンプレート種別: 可視化モード（M1/M2）連動。
-              - 掲示板: クラス/名前/回答(選択)/理由 — 既存
-              - 数直線(M1): 立場(線形尺度1-5) を含む
-              - マトリクス(M2): X軸/Y軸 の線形尺度を含む
-              詳細: docs/SPEC_visualization_modes.md
-            -->
-            <select id="template-type-select" class="modern-select text-sm"
-              style="width:auto;min-width:140px;padding:6px 10px;"
-              title="作成するテンプレートの種別"
-              aria-label="作成するテンプレートの種別（掲示板・数直線・マトリクス）">
-              <option value="board" selected>掲示板</option>
-              <option value="numberline">数直線 (M1)</option>
-              <option value="matrix">マトリクス (M2)</option>
-            </select>
-            <button id="create-template-form" class="btn btn-secondary text-sm" type="button">
-              ✨ テンプレート作成
-            </button>
-          </div>
-        </div>
-
-        <!-- データソース選択方式 -->
-        <div class="mb-6">
-          <div class="flex gap-4 mb-4">
-            <label class="flex items-center cursor-pointer">
-              <input type="radio" name="source-method" value="url" checked class="mr-2" id="method-url" />
-              <span class="text-gray-300">🔗 URL直接入力</span>
-            </label>
-            <label class="flex items-center cursor-pointer">
-              <input type="radio" name="source-method" value="dropdown" class="mr-2" id="method-dropdown" />
-              <span class="text-gray-300">📋 一覧から選択</span>
-            </label>
-          </div>
-        </div>
-
-        <!-- URL直接入力方式 -->
-        <div id="url-method" class="space-y-4">
-          <div class="form-group">
-            <label for="form-url-input"
-              class="block text-sm font-medium text-gray-300 mb-2">GoogleフォームURL:</label>
-            <input type="url" id="form-url-input" class="modern-input"
-              placeholder="https://docs.google.com/forms/d/.../edit"
-              oninput="autoAnalyzeFormUrl(this.value)" />
-            <div class="text-xs text-gray-400 mt-1" id="url-validation-message">
-              💡 GoogleフォームのURLを貼り付けてください
+      <!-- =========================================================
+        🎒 レッスン Hero (primary entry point)
+        Why: 複数フェーズの授業を一括管理する新しい主導線。情報設計上
+        「授業 = 設定+データ+履歴の単位」で、下の個別ボード設定より
+        上位概念。ヘッダー直下に大きく置いて発見性を確保する。
+      ========================================================= -->
+      <section class="card glass-panel rounded-xl p-6 lesson-hero-card">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-xl font-semibold text-white inline-flex items-center gap-2">
+            🎒 レッスン
+            <span id="lesson-list-count" class="text-xs text-gray-400 font-normal">(0)</span>
+          </h2>
+          <details class="lesson-template-picker">
+            <summary class="btn btn-primary">🎒 新しい授業を作る ▾</summary>
+            <div class="lesson-template-menu" id="lesson-template-menu">
+              <p class="lesson-template-loading">テンプレートを読み込み中…</p>
             </div>
-
-            <!-- フォーム検出情報表示 -->
-            <div id="form-detection-info" class="hidden mt-3 p-3 bg-violet-900/30 border border-violet-500/30 rounded-lg">
-              <div class="text-sm text-violet-300">
-                <div class="mb-1">📝 フォーム: <a id="detected-form-link" href="#" target="_blank" class="font-medium text-violet-200 hover:text-white underline">-</a></div>
-                <div>📊 回答先: <a id="detected-spreadsheet-link" href="#" target="_blank" class="font-medium text-violet-200 hover:text-white underline">-</a></div>
-              </div>
-            </div>
-          </div>
-          <div class="action-buttons">
-            <button id="url-validate" class="btn btn-primary" type="button">🔍 検証して接続</button>
-          </div>
+          </details>
         </div>
-
-        <!-- 一覧選択方式 -->
-        <div id="dropdown-method" class="space-y-4 hidden">
-          <div class="form-group">
-            <label for="form-select" class="block text-sm font-medium text-gray-300 mb-2">Googleフォーム:</label>
-            <select id="form-select" class="modern-select">
-              <option value="">-- クリックして読み込み --</option>
-            </select>
-          </div>
-          <!-- フォーム選択後の情報表示 -->
-          <div id="form-info" class="form-info hidden">
-            <div class="bg-violet-900/30 border border-violet-500/30 rounded-lg p-4 mt-2">
-              <div class="text-sm text-violet-300">
-                <div class="mb-1">📝 フォーム: <span id="form-title" class="font-medium">-</span></div>
-                <div class="mb-1">📊 回答先: <span id="form-spreadsheet-status" class="font-medium">-</span></div>
-                <div>
-                  <a id="form-url" href="#" target="_blank" class="text-blue-400 hover:underline text-xs">フォームを開く</a>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="action-buttons">
-            <button id="refresh-data" class="btn btn-secondary" type="button">🔄 更新</button>
-          </div>
-        </div>
+        <p class="text-xs text-gray-400 mb-3">
+          複数フェーズ (導入 → 本時 → 振り返り) を 1 つの授業として作成・記録できます。
+          終了時に自動保存され、後日振り返り画面で時系列再生が可能です。
+        </p>
+        <ul id="lesson-list" class="space-y-2 text-sm">
+          <li class="text-gray-500 italic">読み込み中…</li>
+        </ul>
       </section>
 
-      <!-- 列マッピングカード -->
+      <!-- ========================================================
+        Zone B: 個別ボード (単発の Form 単位で運用する従来パス)。
+        レッスン (Zone A) との二者択一を divider で明示。さらに ① ② ③ で
+        セットアップ順序を視覚化し、教師が「何を順に決めるか」を迷わない。
+
+        将来拡張時の置き場ガイドライン:
+          - 新 lesson テンプレート → Zone A wizard step 1 (LessonWorkspace.html)
+          - PDF/Slides export → lesson review 画面に統合
+          - クロスレッスン分析 → 別 mode (?mode=analytics) で全画面
+          - Zone B には個別ボード固有の項目しか追加しない
+      ======================================================== -->
+      <div class="section-group-divider">
+        <span class="section-group-label">— または個別ボードを設定 —</span>
+      </div>
+
+      <!-- ① フォーム連携: URL paste を primary、新規作成/一覧は代替経路として 1 details に集約 -->
       <section class="card glass-panel rounded-xl p-6">
         <div class="flex items-center justify-between mb-4">
-          <h2 class="text-xl font-semibold text-white">📋 列設定</h2>
-          <!-- フォーム接続時に AI 判定が自動で走るので、UI は控えめな「↻ 再判定」リンクで十分 -->
+          <h2 class="text-xl font-semibold text-white">
+            <span class="step-number">①</span> フォームを連携
+          </h2>
+        </div>
+
+        <!-- Primary: URL paste — 最も頻度の高い経路を visible に -->
+        <div class="form-group">
+          <label for="form-url-input"
+            class="block text-sm font-medium text-gray-300 mb-2">GoogleフォームのURL:</label>
+          <input type="url" id="form-url-input" class="modern-input"
+            placeholder="https://docs.google.com/forms/d/.../edit"
+            oninput="autoAnalyzeFormUrl(this.value)" />
+          <div class="text-xs text-gray-400 mt-1" id="url-validation-message">
+            💡 URL を貼り付けると自動で接続します
+          </div>
+
+          <!-- 検出情報の inline 表示 -->
+          <div id="form-detection-info" class="hidden mt-3 p-3 bg-violet-900/30 border border-violet-500/30 rounded-lg">
+            <div class="text-sm text-violet-300">
+              <div class="mb-1">📝 フォーム: <a id="detected-form-link" href="#" target="_blank" class="font-medium text-violet-200 hover:text-white underline">-</a></div>
+              <div>📊 回答先: <a id="detected-spreadsheet-link" href="#" target="_blank" class="font-medium text-violet-200 hover:text-white underline">-</a></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- legacy: 旧 UI と handler 互換のため hidden 残置 -->
+        <div style="display:none;" aria-hidden="true">
+          <input type="radio" name="source-method" value="url" checked id="method-url" />
+          <input type="radio" name="source-method" value="dropdown" id="method-dropdown" />
+          <button id="url-validate" type="button">🔍 検証して接続</button>
+        </div>
+
+        <!-- 代替経路: 新規作成 / 一覧から選ぶ を 1 つの details に集約 (二択であることを明示) -->
+        <details class="mt-4 admin-collapsible">
+          <summary class="cursor-pointer text-sm text-gray-400 hover:text-gray-200 select-none py-1">
+            🔧 他の方法 (フォームが手元にない / 一覧から選ぶ)
+          </summary>
+          <div class="mt-3 pl-4 border-l-2 border-gray-700 space-y-5">
+
+            <!-- 代替 a: テンプレートから新規作成 -->
+            <div class="form-alternative-block">
+              <h3 class="text-sm font-semibold text-cyan-300 mb-2">✨ 新しく作る</h3>
+              <p class="text-xs text-gray-400 mb-3">種別に合った Google フォーム + 回答先スプレッドシートを自動生成します。</p>
+              <details class="template-form-picker">
+                <summary class="btn btn-secondary text-sm">✨ テンプレートを作成 ▾</summary>
+                <div class="template-form-menu" id="template-form-menu">
+                  <button type="button" class="template-form-item" data-template-create="board">
+                    <span class="template-form-label">📝 シンプル掲示板</span>
+                    <span class="template-form-desc">回答を一覧表示</span>
+                  </button>
+                  <button type="button" class="template-form-item" data-template-create="numberline">
+                    <span class="template-form-label">📊 数直線</span>
+                    <span class="template-form-desc">1〜5 で立場を可視化</span>
+                  </button>
+                  <button type="button" class="template-form-item" data-template-create="matrix">
+                    <span class="template-form-label">🎯 マトリクス</span>
+                    <span class="template-form-desc">2 軸の散布図</span>
+                  </button>
+                  <button type="button" class="template-form-item" data-template-create="pie">
+                    <span class="template-form-label">🥧 円グラフ</span>
+                    <span class="template-form-desc">選択肢 + 理由</span>
+                  </button>
+                </div>
+              </details>
+              <!-- legacy: 既存ハンドラ互換のため hidden で残す (select の value を読む箇所がある) -->
+              <select id="template-type-select" style="display:none;" aria-hidden="true" tabindex="-1">
+                <option value="board" selected>board</option>
+                <option value="numberline">numberline</option>
+                <option value="matrix">matrix</option>
+                <option value="pie">pie</option>
+              </select>
+              <button id="create-template-form" type="button" style="display:none;" aria-hidden="true" tabindex="-1"></button>
+            </div>
+
+            <!-- 代替 b: 既存フォーム一覧から選択 -->
+            <div class="form-alternative-block">
+              <h3 class="text-sm font-semibold text-gray-300 mb-2">📋 既存のフォーム一覧から選ぶ</h3>
+              <div id="dropdown-method" class="space-y-3">
+                <select id="form-select" class="modern-select"
+                  aria-label="既存の Google フォーム一覧から選択">
+                  <option value="">-- クリックして読み込み --</option>
+                </select>
+                <div id="form-info" class="form-info hidden">
+                  <div class="bg-violet-900/30 border border-violet-500/30 rounded-lg p-3">
+                    <div class="text-sm text-violet-300">
+                      <div class="mb-1">📝 <span id="form-title" class="font-medium">-</span></div>
+                      <div class="mb-1">📊 <span id="form-spreadsheet-status" class="font-medium">-</span></div>
+                      <div><a id="form-url" href="#" target="_blank" class="text-blue-400 hover:underline text-xs">フォームを開く</a></div>
+                    </div>
+                  </div>
+                </div>
+                <button id="refresh-data" class="btn btn-secondary text-sm" type="button">🔄 一覧を更新</button>
+              </div>
+            </div>
+
+          </div>
+        </details>
+      </section>
+
+      <!-- ② 列設定: フォーム接続時に AI 判定が自動で走るので、UI は controllled disclosure -->
+      <section class="card glass-panel rounded-xl p-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-xl font-semibold text-white">
+            <span class="step-number">②</span> 列設定
+          </h2>
         </div>
 
         <div class="column-dropdowns space-y-4 mb-4">
-          <!-- メイン質問列選択 (旧: 回答列) -->
-          <!-- v2659 ラベル中立化: 「回答列」は「答えがある」前提の固定スキーマだったが、
-               実際のフォームは複数質問のことも多く、機械的に answer/reason マッピングが
-               フィットしない。ラベルを質問ベースに改名して教師の認知負荷を下げる。 -->
+          <!-- メイン質問列選択。「回答列」ではなく質問ベースのラベルを使う:
+               実際のフォームは複数質問のケースが多く、機械的な answer/reason マッピングが
+               フィットしないため、教師にとってわかりやすい表現にする。 -->
           <div class="form-group">
             <label for="answer-column-select" class="block text-sm font-medium text-gray-300 mb-2">
               💬 メイン質問列:
               <span class="text-xs text-gray-400 ml-2">(カードに大きく表示する列／集計の対象列)</span>
             </label>
-            <select id="answer-column-select" class="modern-select" data-column-type="answer">
+            <select id="answer-column-select" class="modern-select" data-autosave>
               <option value="">選択してください...</option>
             </select>
             <div id="answer-confidence" class="text-xs mt-1 hidden">
@@ -354,7 +413,7 @@
               📋 補助質問列:
               <span class="text-xs text-gray-400 ml-2">(カード下部に小さく表示する列・任意)</span>
             </label>
-            <select id="reason-column-select" class="modern-select" data-column-type="reason">
+            <select id="reason-column-select" class="modern-select" data-autosave>
               <option value="">選択してください...</option>
             </select>
             <div id="reason-confidence" class="text-xs mt-1 hidden">
@@ -368,7 +427,7 @@
               🏫 クラス列:
               <span class="text-xs text-gray-400 ml-2">(所属クラス情報が入っている列)</span>
             </label>
-            <select id="class-column-select" class="modern-select" data-column-type="class">
+            <select id="class-column-select" class="modern-select" data-autosave>
               <option value="">選択してください...</option>
             </select>
             <div id="class-confidence" class="text-xs mt-1 hidden">
@@ -382,7 +441,7 @@
               👤 名前列:
               <span class="text-xs text-gray-400 ml-2">(回答者の名前が入っている列)</span>
             </label>
-            <select id="name-column-select" class="modern-select" data-column-type="name">
+            <select id="name-column-select" class="modern-select" data-autosave>
               <option value="">選択してください...</option>
             </select>
             <div id="name-confidence" class="text-xs mt-1 hidden">
@@ -411,7 +470,6 @@
               ↩ AI判定に戻す
             </button>
           </div>
-          <div id="ai-detection-details" class="text-xs text-gray-300 space-y-1"></div>
         </div>
 
         <!-- 手動変更通知 -->
@@ -419,12 +477,13 @@
           <span class="text-xs text-yellow-300">✋ 手動で変更されました。AI判定に戻すには「AI判定に戻す」をクリック</span>
         </div>
 
-        <!-- 「列マッピング検証」ボタンは設定状況インジケータが自動更新するので削除 (v2648) -->
       </section>
 
-      <!-- 表示設定カード -->
+      <!-- ③ 表示設定 + 公開ボタン: 個別ボード authoring の最終ステップ -->
       <section class="card glass-panel rounded-xl p-6">
-        <h2 class="text-xl font-semibold text-white mb-4">⚙️ 表示設定</h2>
+        <h2 class="text-xl font-semibold text-white mb-4">
+          <span class="step-number">③</span> 表示と公開
+        </h2>
         <div class="space-y-4">
           <!-- 表示設定（心理的安全性重視でデフォルトOFF） -->
           <div class="mb-4">
@@ -437,126 +496,120 @@
             </div>
             <div class="toggle-group">
               <label class="toggle-switch">
-                <input type="checkbox" id="show-names" />
+                <input type="checkbox" id="show-names" data-autosave />
                 <span class="slider"></span>
                 回答者名を表示
               </label>
               <label class="toggle-switch">
-                <input type="checkbox" id="show-reactions" />
+                <input type="checkbox" id="show-reactions" data-autosave />
                 <span class="slider"></span>
                 リアクション数を表示
               </label>
             </div>
           </div>
 
-          <!--
-            可視化モード設定（M1 数直線 / M2 マトリクス散布図）
-            Why: 既定は 'auto' で、Forms「線形尺度」列の有無からサーバが自動判定。
-                 教師がモードを固定したい場合のみ明示選択する。
-                 numericX/Y は getColumnAnalysis が自動マッピング済みなので、
-                 通常は空欄でも動く（mapping を上書きする緊急用 UI）。
-          -->
-          <div id="visualization-section" class="mb-4 pt-4 border-t border-gray-700">
-            <h3 class="text-lg font-semibold text-white mb-2">📊 可視化モード（M1/M2）</h3>
-            <p class="text-xs text-gray-400 mb-3">Forms「線形尺度」を含むときは自動で数直線/散布図に切り替わります。</p>
+          <!-- 可視化モード設定（M1 数直線 / M2 マトリクス散布図）。既定 'auto' でサーバ自動判定。 -->
+          <details id="visualization-section" class="mb-4 pt-4 border-t border-gray-700 admin-collapsible">
+            <summary class="cursor-pointer text-sm text-gray-300 hover:text-white select-none py-1">
+              📊 表示方法を細かく調整（通常は不要）
+            </summary>
+            <div class="mt-3 pl-4 border-l-2 border-gray-700">
+              <p class="text-xs text-gray-400 mb-3">通常は「自動判定」のままで OK。Forms に「線形尺度」が含まれていれば数直線/散布図に自動で切り替わります。</p>
 
-            <div class="form-group">
-              <label class="block text-sm font-medium text-gray-300 mb-2" for="board-mode-select">
-                表示モード
-              </label>
-              <select id="board-mode-select" class="modern-select">
-                <option value="auto">自動判定（推奨）</option>
-                <option value="board">掲示板</option>
-                <option value="numberline">数直線（M1）</option>
-                <option value="matrix">マトリクス（M2）</option>
-                <option value="wordcloud">ワードランキング（M3・終末用）</option>
-                <option value="pie">円グラフ（M4・導入用）</option>
-              </select>
-              <div class="text-xs text-gray-400 mt-1" id="board-mode-hint">
-                線形尺度列がなければ掲示板表示になります。
-              </div>
-            </div>
-
-            <!-- 検出された数値列の表示（情報のみ。getColumnAnalysis が numericScaleCandidates を返した時に表示） -->
-            <div id="numeric-candidates-info" class="hidden mt-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-blue-400">🔢</span>
-                <span class="text-sm font-medium text-blue-300">検出された数値列</span>
-              </div>
-              <div id="numeric-candidates-list" class="text-xs text-gray-300 space-y-1"></div>
-            </div>
-
-            <!-- 数値列の明示マッピング（auto/numberline/matrix で関連、board のときは非表示） -->
-            <div id="numeric-mapping-container" class="hidden space-y-3 mt-3">
               <div class="form-group">
-                <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-x-column-select">
-                  X軸の数値列
+                <label class="block text-sm font-medium text-gray-300 mb-2" for="board-mode-select">
+                  表示モード
                 </label>
-                <select id="numeric-x-column-select" data-column-type="numericX" class="modern-select">
-                  <option value="">（自動判定）</option>
+                <select id="board-mode-select" class="modern-select" data-autosave>
+                  <option value="auto">自動判定（推奨）</option>
+                  <option value="board">掲示板</option>
+                  <option value="numberline">数直線（M1）</option>
+                  <option value="matrix">マトリクス（M2）</option>
+                  <option value="wordcloud">ワードランキング（M3・終末用）</option>
+                  <option value="pie">円グラフ（M4・導入用）</option>
                 </select>
-              </div>
-              <div id="numeric-y-mapping-row" class="form-group hidden">
-                <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-y-column-select">
-                  Y軸の数値列（マトリクス用）
-                </label>
-                <select id="numeric-y-column-select" data-column-type="numericY" class="modern-select">
-                  <option value="">（未使用）</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- 軸ラベル（numberline/matrix で表示） -->
-            <div id="axis-labels-container" class="hidden space-y-3 mt-3">
-              <div class="form-group">
-                <label class="block text-sm font-medium text-gray-300 mb-2">X軸ラベル（両端）</label>
-                <div class="flex gap-2">
-                  <input type="text" id="x-min-label" class="modern-input flex-1" placeholder="例: そのまま使う" maxlength="40">
-                  <input type="text" id="x-max-label" class="modern-input flex-1" placeholder="例: 自分で直す" maxlength="40">
+                <div class="text-xs text-gray-400 mt-1" id="board-mode-hint">
+                  線形尺度列がなければ掲示板表示になります。
                 </div>
               </div>
-              <div id="y-axis-label-row" class="form-group hidden">
-                <label class="block text-sm font-medium text-gray-300 mb-2">Y軸ラベル（両端、マトリクス用）</label>
-                <div class="flex gap-2">
-                  <input type="text" id="y-min-label" class="modern-input flex-1" placeholder="例: 低い" maxlength="40">
-                  <input type="text" id="y-max-label" class="modern-input flex-1" placeholder="例: 高い" maxlength="40">
+
+              <!-- 検出された数値列の表示（情報のみ。getColumnAnalysis が numericScaleCandidates を返した時に表示） -->
+              <div id="numeric-candidates-info" class="hidden mt-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class="text-blue-400">🔢</span>
+                  <span class="text-sm font-medium text-blue-300">検出された数値列</span>
+                </div>
+                <div id="numeric-candidates-list" class="text-xs text-gray-300 space-y-1"></div>
+              </div>
+
+              <!-- 数値列の明示マッピング（auto/numberline/matrix で関連、board のときは非表示） -->
+              <div id="numeric-mapping-container" class="hidden space-y-3 mt-3">
+                <div class="form-group">
+                  <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-x-column-select">
+                    X軸の数値列
+                  </label>
+                  <select id="numeric-x-column-select" class="modern-select" data-autosave>
+                    <option value="">（自動判定）</option>
+                  </select>
+                </div>
+                <div id="numeric-y-mapping-row" class="form-group hidden">
+                  <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-y-column-select">
+                    Y軸の数値列（マトリクス用）
+                  </label>
+                  <select id="numeric-y-column-select" class="modern-select" data-autosave>
+                    <option value="">（未使用）</option>
+                  </select>
                 </div>
               </div>
-            </div>
 
-            <!-- 4 象限ラベル（matrix のみ） -->
-            <div id="quadrant-labels-container" class="hidden mt-3">
-              <label class="block text-sm font-medium text-gray-300 mb-2">4象限ラベル（任意）</label>
-              <div class="grid grid-cols-2 gap-2">
-                <input type="text" id="quadrant-lh-label" class="modern-input" placeholder="左上: じっくり" maxlength="40">
-                <input type="text" id="quadrant-hh-label" class="modern-input" placeholder="右上: 理想" maxlength="40">
-                <input type="text" id="quadrant-ll-label" class="modern-input" placeholder="左下: 停滞" maxlength="40">
-                <input type="text" id="quadrant-hl-label" class="modern-input" placeholder="右下: 時短重視" maxlength="40">
+              <!-- 軸ラベル（numberline/matrix で表示） -->
+              <div id="axis-labels-container" class="hidden space-y-3 mt-3">
+                <div class="form-group">
+                  <label class="block text-sm font-medium text-gray-300 mb-2">X軸ラベル（両端）</label>
+                  <div class="flex gap-2">
+                    <input type="text" id="x-min-label" class="modern-input flex-1" placeholder="例: そのまま使う" maxlength="40" data-autosave>
+                    <input type="text" id="x-max-label" class="modern-input flex-1" placeholder="例: 自分で直す" maxlength="40" data-autosave>
+                  </div>
+                </div>
+                <div id="y-axis-label-row" class="form-group hidden">
+                  <label class="block text-sm font-medium text-gray-300 mb-2">Y軸ラベル（両端、マトリクス用）</label>
+                  <div class="flex gap-2">
+                    <input type="text" id="y-min-label" class="modern-input flex-1" placeholder="例: 低い" maxlength="40" data-autosave>
+                    <input type="text" id="y-max-label" class="modern-input flex-1" placeholder="例: 高い" maxlength="40" data-autosave>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 4 象限ラベル（matrix のみ） -->
+              <div id="quadrant-labels-container" class="hidden mt-3">
+                <label class="block text-sm font-medium text-gray-300 mb-2">4象限ラベル（任意）</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <input type="text" id="quadrant-lh-label" class="modern-input" placeholder="左上: じっくり" maxlength="40" data-autosave>
+                  <input type="text" id="quadrant-hh-label" class="modern-input" placeholder="右上: 理想" maxlength="40" data-autosave>
+                  <input type="text" id="quadrant-ll-label" class="modern-input" placeholder="左下: 停滞" maxlength="40" data-autosave>
+                  <input type="text" id="quadrant-hl-label" class="modern-input" placeholder="右下: 時短重視" maxlength="40" data-autosave>
+                </div>
+              </div>
+
+              <!-- 揺らぎ追跡用：再投稿の許可 -->
+              <div class="toggle-group mt-3">
+                <label class="toggle-switch">
+                  <input type="checkbox" id="allow-resubmit" data-autosave />
+                  <span class="slider"></span>
+                  再投稿を許可（揺らぎを追跡）
+                </label>
+                <p class="text-xs text-gray-400 mt-1 ml-12">議論前後で意見が動いた児童を教師ダッシュボードで把握できます。</p>
               </div>
             </div>
-
-            <!-- 揺らぎ追跡用：再投稿の許可 -->
-            <div class="toggle-group mt-3">
-              <label class="toggle-switch">
-                <input type="checkbox" id="allow-resubmit" />
-                <span class="slider"></span>
-                再投稿を許可（揺らぎを追跡）
-              </label>
-              <p class="text-xs text-gray-400 mt-1 ml-12">議論前後で意見が動いた児童を教師ダッシュボードで把握できます。</p>
-            </div>
-          </div>
+          </details>
         </div>
 
-        <!--
-          公開・保存ボタン (v2648 整理):
-            - 「💾 設定を保存」 = config + active profile を上書き保存（公開状態は変えない）
-            - 「📣 公開する / 🔒 公開を終了する」 = isPublished toggle（state に応じて文言切替）
-
-          legacy ID save-draft / publish-now / unpublishBoardBtn は handler 互換のため
-          hidden div の中に残置。新ボタンが wrapper として呼び出す。
-        -->
-        <div class="action-buttons">
-          <button id="save-config-changes" class="btn btn-secondary" type="button"
+        <!-- 公開トグル。設定は自動保存 (#autosave-status で進行表示)。legacy ID は下の hidden div に残置。 -->
+        <div class="action-buttons items-center" style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;">
+          <span id="autosave-status" class="text-xs text-gray-500" aria-live="polite" title="入力すると自動保存されます"></span>
+          <button id="save-config-changes" type="button"
+            style="display:none;"
+            aria-hidden="true"
             title="現在の設定を保存（公開状態は変更しません）">
             💾 設定を保存
           </button>
@@ -584,12 +637,8 @@
           <h3 class="text-lg font-semibold text-white">📋 現在の設定</h3>
           <span class="text-xs text-gray-400" id="profile-count-badge">--</span>
         </div>
-        <!--
-          v2648 シンプル化: 表示モード / 回答者名 / リアクション数 / シート名 は
-          左パネル「⚙️ 表示設定」と完全重複なので削除。
-          - legacy ID は hidden span として残置（updateConfigSummary 等の JS 互換維持）
-          公開状態 / アクティブ / 最終更新 だけが「右パネルでしか見えない情報」として残る。
-        -->
+        <!-- 表示モード/回答者名/リアクション数/シート名は左パネル「表示設定」と重複のため非表示。
+             legacy ID は hidden span として残置 (updateConfigSummary 等の JS 互換維持)。 -->
         <div class="config-summary">
           <div class="config-item">
             <span class="label">公開状態:</span>
@@ -623,22 +672,25 @@
           </div>
         </div>
 
-        <!-- 現在の設定をプロファイルとして保存 -->
-        <div class="mt-3 pt-3 border-t border-gray-700">
-          <div class="flex items-center gap-1.5">
-            <input type="text" id="new-profile-name" placeholder="プロファイル名"
+        <details class="mt-3 pt-3 border-t border-gray-700 admin-collapsible">
+          <summary class="cursor-pointer text-xs text-gray-400 hover:text-gray-200 select-none py-1">
+            📋 現在のボードを別名で複製（用途を分けたい時）
+          </summary>
+          <div class="flex items-center gap-1.5 mt-2">
+            <input type="text" id="new-profile-name" placeholder="例: 振り返り用"
               class="flex-1 min-w-0 px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white text-xs focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"
               maxlength="50" />
             <button id="save-current-as-profile-btn" type="button"
               class="px-2 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-semibold transition-all focus:ring-2 focus:ring-cyan-400/50 focus:outline-none whitespace-nowrap">
-              💾 保存
+              複製
             </button>
           </div>
           <div id="profile-action-status" class="text-xs text-gray-400 mt-1.5 min-h-[1rem]"></div>
-        </div>
+          <p class="text-xs text-gray-500 mt-1">通常はフォーム接続時に自動保存されます。</p>
+        </details>
       </section>
 
-      <!-- ユーザー情報 (v2648 シンプル化: ID 表示は教師が見ない情報なので削除) -->
+      <!-- ユーザー情報 -->
       <div class="info-card glass-panel rounded-xl p-4">
         <h3 class="text-lg font-semibold text-white mb-3">👤 ユーザー情報</h3>
         <div class="space-y-3">
@@ -707,6 +759,10 @@
       </section>
     </div>
   </div>
+
+  <!-- Lesson Workspace: 作成 wizard + Runner (admin-container 外に置いて全画面 takeover)。
+       Hero list は main-editor 内にインライン配置済。 -->
+  <?!= include('LessonWorkspace'); ?>
 
 
   <!-- 現在のボード情報フッター -->

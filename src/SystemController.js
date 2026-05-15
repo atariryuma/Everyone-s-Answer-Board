@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global UserService, ConfigService, getCurrentEmail, createErrorResponse, createUserNotFoundError, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, findUserById, openSpreadsheet, updateUser, getSpreadsheetList, getUserConfig, saveUserConfig, getServiceAccount, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS */
+/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, installLessonTriggers */
 
 /**
  * キャッシュ期間 (秒)
@@ -18,6 +18,11 @@ const CACHE_DURATION = {
 };
 
 const USERS_SHEET_HEADERS = ['userId', 'userEmail', 'googleId', 'isActive', 'configJson', 'lastModified', 'createdAt'];
+
+// lessons シート: lesson archive (draft → active → completed)。schemaVersion と sizeBytes は
+//   JSON blob から外出し → 将来の migration 抽出 / quota 集計を blob parse なしで可能にする。
+//   etag は 2 タブ同時編集の optimistic lock 用。
+const LESSONS_SHEET_HEADERS = ['lessonId', 'userId', 'name', 'state', 'createdAt', 'startedAt', 'endedAt', 'schemaVersion', 'sizeBytes', 'etag', 'lessonJson'];
 
 /**
  * プロパティキャッシュTTL (ミリ秒)
@@ -53,11 +58,12 @@ const SLEEP_MS = {
  * システム制限値
  */
 const SYSTEM_LIMITS = {
-  MAX_LOCK_ROWS: 100,        // ロッククリア最大行数
-  PREVIEW_LENGTH: 50,        // プレビュー表示文字数
-  DEFAULT_PAGE_SIZE: 20,     // デフォルトページサイズ
-  MAX_PAGE_SIZE: 100,        // 最大ページサイズ
-  RADIX_DECIMAL: 10          // 10進数変換用基数
+  MAX_LOCK_ROWS: 100,             // ロッククリア最大行数
+  PREVIEW_LENGTH: 50,             // プレビュー表示文字数
+  DEFAULT_PAGE_SIZE: 20,          // デフォルトページサイズ
+  MAX_PAGE_SIZE: 100,             // 最大ページサイズ
+  RADIX_DECIMAL: 10,              // 10進数変換用基数
+  CONFIG_JSON_MAX_CHARS: 32000    // configJson セル文字数上限 (Sheets cell 50000 char に対する safety margin)
 };
 
 // グローバルスコープにシステム定数を公開（GAS の単一グローバルスコープ前提）。
@@ -296,7 +302,7 @@ function testSystemDiagnosis() {
     };
 
   } catch (error) {
-    console.error('testSystemDiagnosis error:', error.message);
+    logError_('testSystemDiagnosis', error);
     return createExceptionResponse(error, 'System diagnosis failed');
   }
 }
@@ -374,7 +380,7 @@ function monitorSystem() {
     };
 
   } catch (error) {
-    console.error('monitorSystem error:', error.message);
+    logError_('monitorSystem', error);
     return createExceptionResponse(error, 'System monitoring failed');
   }
 }
@@ -480,7 +486,7 @@ function checkDataIntegrity() {
     };
 
   } catch (error) {
-    console.error('checkDataIntegrity error:', error.message);
+    logError_('checkDataIntegrity', error);
     return createExceptionResponse(error, 'Data integrity check failed');
   }
 }
@@ -671,7 +677,7 @@ function publishApp(publishConfig) {
 
     if (!email) {
       console.error('publishApp: User authentication failed');
-      return { success: false, message: 'ユーザー認証が必要です' };
+      return createAuthError();
     }
 
     if (!publishConfig || typeof publishConfig !== 'object' || Array.isArray(publishConfig)) {
@@ -734,6 +740,14 @@ function publishApp(publishConfig) {
       lastModified: publishedAt
     };
 
+    // Why: lesson 駆動の publish (activeLessonId 付き) のときだけ「授業開始時刻」を記録。
+    //   この marker は unpublishBoard 経由の auto-archive 判定 (経過時間 5min 以上か) と
+    //   23:00 cron sweep の両方で使われる。republishMyBoard では touch しない (= 同一授業の
+    //   再公開で timer が reset されるのを防ぐ)。
+    if (updatedConfig.activeLessonId) {
+      updatedConfig.currentLessonStartedAt = publishedAt;
+    }
+
     const saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
 
     if (!saveResult.success) {
@@ -772,29 +786,6 @@ function publishApp(publishConfig) {
 }
 
 /**
- * 🔧 CLAUDE.md準拠: Self vs Cross-user Spreadsheet Access
- * CLAUDE.md Security Pattern: Context-aware service account usage
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {Object} context - アクセスコンテキスト
- * @returns {Object} {spreadsheet, accessMethod, auth, isOwner}
- */
-function getSpreadsheetAdaptive(spreadsheetId) {
-  try {
-    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
-
-    return {
-      spreadsheet: dataAccess.spreadsheet,
-      accessMethod: 'normal_permissions',
-      auth: dataAccess.auth,
-      isOwner: true
-    };
-  } catch (error) {
-    const errorMessage = error && error.message ? error.message : '詳細不明';
-    throw new Error(`スプレッドシートアクセス失敗: ${errorMessage}`);
-  }
-}
-
-/**
  * 多層フォーム検出システム
  * @param {Object} spreadsheet - スプレッドシートオブジェクト
  * @param {Object} sheet - シートオブジェクト
@@ -811,6 +802,22 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
     details: []
   };
 
+  // FormApp.openByUrl でタイトル取得し、失敗時は fallback。
+  const resolveTitle = (formUrl) => {
+    try {
+      results.formTitle = FormApp.openByUrl(formUrl).getTitle();
+      results.details.push('FormApp.openByUrl()でタイトル取得');
+    } catch (titleError) {
+      console.warn('FormApp.openByUrl failed:', titleError.message);
+      results.formTitle = generateFormTitle(sheetName, spreadsheet.getName());
+      results.details.push('FormApp権限エラー - フォールバックタイトル使用');
+    }
+  };
+  // `<prefix>: <err.message>` を push、err.message が無ければ「: 詳細不明」。
+  const pushErrDetail = (prefix, err) => {
+    results.details.push(err && err.message ? `${prefix}: ${err.message}` : `${prefix}: 詳細不明`);
+  };
+
   if (isOwner) {
     try {
       if (typeof sheet.getFormUrl === 'function') {
@@ -820,16 +827,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
           results.confidence = 95;
           results.detectionMethod = 'sheet_api';
           results.details.push('Sheet.getFormUrl()で検出');
-
-          try {
-            const form = FormApp.openByUrl(formUrl);
-            results.formTitle = form.getTitle();
-            results.details.push('FormApp.openByUrl()でタイトル取得');
-          } catch (titleError) {
-            console.warn('FormApp.openByUrl failed:', titleError.message);
-            results.formTitle = generateFormTitle(sheetName, spreadsheet.getName());
-            results.details.push('FormApp権限エラー - フォールバックタイトル使用');
-          }
+          resolveTitle(formUrl);
           return results;
         }
       }
@@ -841,22 +839,13 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
           results.confidence = 85;
           results.detectionMethod = 'spreadsheet_api';
           results.details.push('SpreadsheetApp.getFormUrl()で検出');
-
-          try {
-            const form = FormApp.openByUrl(formUrl);
-            results.formTitle = form.getTitle();
-            results.details.push('FormApp.openByUrl()でタイトル取得');
-          } catch (titleError) {
-            console.warn('FormApp.openByUrl failed:', titleError.message);
-            results.formTitle = generateFormTitle(sheetName, spreadsheet.getName());
-            results.details.push('FormApp権限エラー - フォールバックタイトル使用');
-          }
+          resolveTitle(formUrl);
           return results;
         }
       }
     } catch (apiError) {
       console.warn('detectFormConnection: API検出失敗:', apiError.message);
-      results.details.push(apiError && apiError.message ? `API検出失敗: ${apiError.message}` : 'API検出失敗: 詳細不明');
+      pushErrDetail('API検出失敗', apiError);
     }
   }
 
@@ -874,7 +863,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
       }
     } catch (driveError) {
       console.warn('detectFormConnection: Drive API検索失敗:', driveError.message);
-      results.details.push(driveError && driveError.message ? `Drive API検索失敗: ${driveError.message}` : 'Drive API検索失敗: 詳細不明');
+      pushErrDetail('Drive API検索失敗', driveError);
     }
   }
 
@@ -890,7 +879,7 @@ function detectFormConnection(spreadsheet, sheet, sheetName, isOwner) {
     }
   } catch (headerError) {
     console.warn('detectFormConnection: ヘッダー解析失敗:', headerError.message);
-    results.details.push(headerError && headerError.message ? `ヘッダー解析失敗: ${headerError.message}` : 'ヘッダー解析失敗: 詳細不明');
+    pushErrDetail('ヘッダー解析失敗', headerError);
   }
 
   const sheetNameAnalysis = analyzeSheetName(sheetName);
@@ -1079,7 +1068,7 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
 /**
  * スプレッドシートへのアクセス権限を検証（同一ドメイン共有設定で通常権限アクセス）。
  * @param {string} spreadsheetId
- * @returns {Object}
+ * @param {boolean} [autoAddEditor=true] - true 時、必要なら共有デフォルトを自動付与する
  */
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
@@ -1132,178 +1121,107 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
  */
 function getFormInfo(spreadsheetId, sheetName) {
   const startTime = new Date().toISOString();
-
   try {
     if (!spreadsheetId || !sheetName) {
-      return {
-        success: false,
-        status: 'INVALID_ARGUMENTS',
-        message: 'スプレッドシートIDとシート名を指定してください。',
-        formData: {
-          formUrl: null,
-          formTitle: sheetName || 'フォーム',
-          spreadsheetName: '',
-          sheetName
-        }
-      };
+      return __formInfoFailure_('INVALID_ARGUMENTS', 'スプレッドシートIDとシート名を指定してください。', { sheetName });
     }
-
-    const accessResult = getSpreadsheetAdaptive(spreadsheetId);
-    if (!accessResult.spreadsheet) {
-      return {
-        success: false,
-        status: 'SPREADSHEET_NOT_FOUND',
-        message: 'スプレッドシートにアクセスできませんでした。',
-        formData: {
-          formUrl: null,
-          formTitle: sheetName || 'フォーム',
-          spreadsheetName: '',
-          sheetName
-        },
-        accessMethod: accessResult.accessMethod,
-        error: accessResult.error
-      };
-    }
-
-    const { spreadsheet, accessMethod, isOwner } = accessResult;
-
-    let spreadsheetName;
-    try {
-      spreadsheetName = spreadsheet.getName();
-    } catch (error) {
-      console.warn('getFormInfoImpl: getName() failed, using fallback:', error.message);
-      spreadsheetName = `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
-    }
-
-    const sheet = spreadsheet.getSheetByName(sheetName);
-    if (!sheet) {
-      return {
-        success: false,
-        status: 'SHEET_NOT_FOUND',
-        message: `シート「${sheetName}」が見つかりません。`,
-        formData: {
-          formUrl: null,
-          formTitle: sheetName,
-          spreadsheetName,
-          sheetName
-        },
-        accessMethod
-      };
-    }
-
-    const formDetectionResult = detectFormConnection(spreadsheet, sheet, sheetName, isOwner);
-
-    const formData = {
-      formUrl: formDetectionResult.formUrl || null,
-      formTitle: formDetectionResult.formTitle || sheetName,
-      spreadsheetName,
-      sheetName,
-      detectionDetails: {
-        method: formDetectionResult.detectionMethod,
-        confidence: formDetectionResult.confidence,
-        accessMethod,
-        timestamp: new Date().toISOString()
-      }
-    };
-
-    if (formDetectionResult.formUrl) {
-      return {
-        success: true,
-        status: 'FORM_LINK_FOUND',
-        message: `フォーム連携を確認しました (${formDetectionResult.detectionMethod})`,
-        formData,
-        timestamp: new Date().toISOString(),
-        requestContext: {
-          spreadsheetId,
-          sheetName,
-          accessMethod
-        }
-      };
-    } else {
-      const isHighConfidence = formDetectionResult.confidence >= 70;
-      return {
-        success: isHighConfidence,
-        status: isHighConfidence ? 'FORM_DETECTED_NO_URL' : 'FORM_NOT_LINKED',
-        message: isHighConfidence ?
-          'フォーム連携パターンを検出（URL取得不可）' :
-          'フォーム連携が確認できませんでした',
-        reason: isHighConfidence ? 'FORM_DETECTED_NO_URL' : 'FORM_NOT_LINKED',
-        formData,
-        suggestions: formDetectionResult.suggestions || [
-          'Googleフォームの「回答の行き先」を開き、対象のシートにリンクしてください',
-          'フォーム作成者に連携状況を確認してください',
-          'シート名に「回答」「フォーム」等の文字列が含まれている場合、フォーム連携パターンとして評価されます'
-        ],
-        analysisResults: formDetectionResult.analysisResults
-      };
-    }
-
+    const access = __resolveFormInfoSpreadsheet_(spreadsheetId, sheetName);
+    if (!access.ok) return access.error;
+    return __buildFormInfoResult_(access, spreadsheetId, sheetName);
   } catch (error) {
-    const endTime = new Date().toISOString();
     console.error('=== getFormInfoImpl ERROR ===', {
       startTime,
-      endTime,
+      endTime: new Date().toISOString(),
       spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 12)}***` : 'N/A',
       sheetName,
       error: error.message,
       stack: error.stack
     });
-
-    return {
-      success: false,
-      status: 'UNKNOWN_ERROR',
-      message: 'フォーム情報の取得に失敗しました。',
-      error: error.message,
-      formData: {
-        formUrl: null,
-        formTitle: sheetName || 'フォーム',
-        spreadsheetName: '',
-        sheetName
-      }
-    };
+    return __formInfoFailure_('UNKNOWN_ERROR', 'フォーム情報の取得に失敗しました。', { sheetName, error: error.message });
   }
 }
 
-/**
- * 現在の公開状態を確認
- * AdminPanel.js.html から呼び出される
- *
- * @returns {Object} 公開状態情報
- */
-function checkCurrentPublicationStatus(targetUserId) {
-  try {
-    // getCurrentEmail honors the _apiKeyAdminEmail fallback used by adminApi.
-    const email = getCurrentEmail();
-    let user = null;
-    if (targetUserId) {
-      user = findUserById(targetUserId, { requestingUser: email });
+// getFormInfo の失敗 envelope を統一生成。
+function __formInfoFailure_(status, message, opts) {
+  opts = opts || {};
+  const result = {
+    success: false,
+    status,
+    message,
+    formData: {
+      formUrl: null,
+      formTitle: opts.sheetName || 'フォーム',
+      spreadsheetName: opts.spreadsheetName || '',
+      sheetName: opts.sheetName || ''
     }
+  };
+  if (opts.accessMethod) result.accessMethod = opts.accessMethod;
+  if (opts.error) result.error = opts.error;
+  return result;
+}
 
-    if (!user && email) {
-      user = findUserByEmail(email, { requestingUser: email });
-    }
-
-    if (!user) {
-      console.error('❌ User not found');
-      return createUserNotFoundError();
-    }
-
-    const config = getConfigOrDefault(user.userId);
-
-    const result = {
-      success: true,
-      published: config.isPublished === true,
-      publishedAt: config.publishedAt || null,
-      lastModified: user.lastModified || null,
-      hasDataSource: Boolean(config.spreadsheetId && config.sheetName),
-      userId: user.userId
-    };
-
-    return result;
-  } catch (error) {
-    console.error('❌ checkCurrentPublicationStatus ERROR:', error.message);
-    return createExceptionResponse(error);
+// Spreadsheet / sheet の解決 + アクセス権チェック。
+function __resolveFormInfoSpreadsheet_(spreadsheetId, sheetName) {
+  const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
+  if (!dataAccess || !dataAccess.spreadsheet) {
+    return { ok: false, error: __formInfoFailure_('SPREADSHEET_NOT_FOUND', 'スプレッドシートにアクセスできませんでした。', { sheetName, accessMethod: 'normal_permissions' }) };
   }
+  const { spreadsheet } = dataAccess;
+  let spreadsheetName;
+  try { spreadsheetName = spreadsheet.getName(); }
+  catch (error) {
+    console.warn('getFormInfoImpl: getName() failed, using fallback:', error.message);
+    spreadsheetName = `スプレッドシート (ID: ${spreadsheetId.substring(0, 8)}...)`;
+  }
+  const sheet = spreadsheet.getSheetByName(sheetName);
+  if (!sheet) {
+    return { ok: false, error: __formInfoFailure_('SHEET_NOT_FOUND', `シート「${sheetName}」が見つかりません。`, { sheetName, spreadsheetName, accessMethod: 'normal_permissions' }) };
+  }
+  return { ok: true, spreadsheet, sheet, spreadsheetName };
+}
+
+// 検出結果から成功/失敗 envelope を組み立て。
+function __buildFormInfoResult_(access, spreadsheetId, sheetName) {
+  const { spreadsheet, sheet, spreadsheetName } = access;
+  const accessMethod = 'normal_permissions';
+  const detection = detectFormConnection(spreadsheet, sheet, sheetName, true);
+  const formData = {
+    formUrl: detection.formUrl || null,
+    formTitle: detection.formTitle || sheetName,
+    spreadsheetName,
+    sheetName,
+    detectionDetails: {
+      method: detection.detectionMethod,
+      confidence: detection.confidence,
+      accessMethod,
+      timestamp: new Date().toISOString()
+    }
+  };
+
+  if (detection.formUrl) {
+    return {
+      success: true,
+      status: 'FORM_LINK_FOUND',
+      message: `フォーム連携を確認しました (${detection.detectionMethod})`,
+      formData,
+      timestamp: new Date().toISOString(),
+      requestContext: { spreadsheetId, sheetName, accessMethod }
+    };
+  }
+  const isHighConfidence = detection.confidence >= 70;
+  return {
+    success: isHighConfidence,
+    status: isHighConfidence ? 'FORM_DETECTED_NO_URL' : 'FORM_NOT_LINKED',
+    message: isHighConfidence ? 'フォーム連携パターンを検出（URL取得不可）' : 'フォーム連携が確認できませんでした',
+    reason: isHighConfidence ? 'FORM_DETECTED_NO_URL' : 'FORM_NOT_LINKED',
+    formData,
+    suggestions: detection.suggestions || [
+      'Googleフォームの「回答の行き先」を開き、対象のシートにリンクしてください',
+      'フォーム作成者に連携状況を確認してください',
+      'シート名に「回答」「フォーム」等の文字列が含まれている場合、フォーム連携パターンとして評価されます'
+    ],
+    analysisResults: detection.analysisResults
+  };
 }
 
 // ─── Performance metrics ─────────────────────────────────────────
@@ -1336,13 +1254,13 @@ function getPerformanceMetrics(category = 'all', options = {}) {
     };
 
     if (category === 'all' || category === 'api') {
-      metrics.categories.api = collectApiMetrics(options);
+      metrics.categories.api = collectApiMetrics();
     }
     if (category === 'all' || category === 'cache') {
-      metrics.categories.cache = collectCacheMetrics(options);
+      metrics.categories.cache = collectCacheMetrics();
     }
     if (category === 'all' || category === 'batch') {
-      metrics.categories.batch = collectBatchMetrics(options);
+      metrics.categories.batch = collectBatchMetrics();
     }
     if (category === 'all' || category === 'error') {
       metrics.categories.error = collectErrorMetrics(options);
@@ -1403,10 +1321,9 @@ function getSystemPerformanceInfo() {
 
 /**
  * API実行メトリクスを収集
- * @param {Object} options - 収集オプション
  * @returns {Object} API実行統計
  */
-function collectApiMetrics(options = {}) {
+function collectApiMetrics() {
   try {
     const apiStats = {
       totalCalls: 0,
@@ -1445,10 +1362,9 @@ function collectApiMetrics(options = {}) {
 
 /**
  * キャッシュ効率メトリクスを収集
- * @param {Object} options - 収集オプション
  * @returns {Object} キャッシュ統計
  */
-function collectCacheMetrics(options = {}) {
+function collectCacheMetrics() {
   try {
     const cache = CacheService.getScriptCache();
 
@@ -1495,10 +1411,9 @@ function collectCacheMetrics(options = {}) {
 
 /**
  * バッチ処理効率メトリクスを収集
- * @param {Object} options - 収集オプション
  * @returns {Object} バッチ処理統計
  */
-function collectBatchMetrics(options = {}) {
+function collectBatchMetrics() {
   try {
     const batchStats = {
       batchProcessingEnabled: true,
@@ -1718,7 +1633,7 @@ function testDatabaseConnection() {
     };
 
   } catch (error) {
-    console.error('testDatabaseConnection error:', error.message);
+    logError_('testDatabaseConnection', error);
     return {
       success: false,
       message: `データベース接続エラー: ${error.message}`
@@ -1736,131 +1651,126 @@ function testDatabaseConnection() {
  */
 function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
   try {
-    if (!serviceAccountJson || !databaseId || !adminEmail) {
-      return {
-        success: false,
-        message: '必須パラメータが不足しています'
-      };
-    }
+    const validation = __validateSetupInputs_(serviceAccountJson, databaseId, adminEmail);
+    if (!validation.ok) return validation.error;
+    const { currentEmail, normalizedAdminEmail, parsedCredentials, trimmedDatabaseId } = validation;
 
-    const currentEmail = getCurrentEmail();
-    if (!currentEmail) {
-      return {
-        success: false,
-        message: 'セットアップ実行者の認証が必要です'
-      };
-    }
+    const auth = __checkSetupAuth_(currentEmail, normalizedAdminEmail);
+    if (!auth.ok) return auth.error;
 
-    const normalizedAdminEmail = String(adminEmail).trim().toLowerCase();
-    if (!validateEmail(normalizedAdminEmail).isValid) {
-      return {
-        success: false,
-        message: '管理者メールアドレスの形式が不正です'
-      };
-    }
-
-    if (!/^[a-zA-Z0-9-_]{40,60}$/.test(String(databaseId).trim())) {
-      return {
-        success: false,
-        message: 'データベーススプレッドシートIDの形式が不正です'
-      };
-    }
-
-    let parsedCredentials;
-    try {
-      parsedCredentials = JSON.parse(serviceAccountJson);
-    } catch (jsonError) {
-      return {
-        success: false,
-        message: `サービスアカウントJSONの解析に失敗しました: ${jsonError.message}`
-      };
-    }
-
-    const requiredCredFields = ['type', 'project_id', 'private_key', 'client_email'];
-    const missingCredFields = requiredCredFields.filter(field => !parsedCredentials[field]);
-    if (missingCredFields.length > 0) {
-      return {
-        success: false,
-        message: `サービスアカウントJSONに必須項目が不足しています: ${missingCredFields.join(', ')}`
-      };
-    }
-
-    const alreadyConfigured = (typeof hasCoreSystemProps === 'function')
-      ? hasCoreSystemProps()
-      : false;
-
-    if (alreadyConfigured) {
-      if (!isAdministrator(currentEmail)) {
-        return createAdminRequiredError();
-      }
-
-      if (typeof validateDomainAccess === 'function') {
-        const domainCheck = validateDomainAccess(currentEmail, {
-          allowIfAdminUnconfigured: false,
-          allowIfEmailMissing: false
-        });
-        if (!domainCheck.allowed) {
-          return {
-            success: false,
-            message: '管理者と同一ドメインのアカウントでセットアップを実行してください'
-          };
-        }
-      }
-    } else if (currentEmail.toLowerCase() !== normalizedAdminEmail) {
-      return {
-        success: false,
-        message: '初回セットアップは入力した管理者メールアドレス本人で実行してください'
-      };
-    }
-
-    setCachedProperty('DATABASE_SPREADSHEET_ID', String(databaseId).trim());
-    setCachedProperty('ADMIN_EMAIL', normalizedAdminEmail);
-    setCachedProperty('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
-
-    if (googleClientId) {
-      setCachedProperty('GOOGLE_CLIENT_ID', googleClientId);
-    }
-
-    // DB初期化: SA共有 + usersシート作成（全てユーザー権限で実行）
-    try {
-      const trimmedId = String(databaseId).trim();
-      const ss = SpreadsheetApp.openById(trimmedId);
-
-      // サービスアカウントを編集者として自動共有
-      const saEmail = parsedCredentials.client_email;
-      const editors = ss.getEditors().map(e => e.getEmail().toLowerCase());
-      if (!editors.includes(saEmail.toLowerCase())) {
-        ss.addEditor(saEmail);
-        console.log('setupApp: Added service account as editor:', saEmail);
-      }
-
-      // usersシートがなければ自動作成
-      let usersSheet = ss.getSheetByName('users');
-      if (!usersSheet) {
-        usersSheet = ss.insertSheet('users');
-        usersSheet.appendRow(USERS_SHEET_HEADERS);
-        console.log('setupApp: Created users sheet with headers');
-      } else if (usersSheet.getLastRow() === 0) {
-        usersSheet.appendRow(USERS_SHEET_HEADERS);
-        console.log('setupApp: Added headers to empty users sheet');
-      }
-    } catch (dbError) {
-      console.warn('setupApp: Database initialization failed:', dbError.message);
-    }
+    __persistSetupProperties_(trimmedDatabaseId, normalizedAdminEmail, serviceAccountJson, googleClientId);
+    __ensureDatabaseSheets_(trimmedDatabaseId, parsedCredentials);
+    __installLessonTriggersIfAvailable_();
 
     return {
       success: true,
       message: 'Application setup completed successfully',
       data: {
-        databaseId: String(databaseId).trim(),
+        databaseId: trimmedDatabaseId,
         adminEmail: normalizedAdminEmail,
         googleClientId: googleClientId || null
       }
     };
   } catch (error) {
-    console.error('setupApplication error:', error.message);
+    logError_('setupApplication', error);
     return createExceptionResponse(error);
   }
+}
+
+// 入力チェック + パース (validateEmail + databaseId 形式 + JSON parse + 必須キー検査)。
+function __validateSetupInputs_(serviceAccountJson, databaseId, adminEmail) {
+  const fail = (message) => ({ ok: false, error: { success: false, message } });
+
+  if (!serviceAccountJson || !databaseId || !adminEmail) {
+    return fail('必須パラメータが不足しています');
+  }
+  const currentEmail = getCurrentEmail();
+  if (!currentEmail) return fail('セットアップ実行者の認証が必要です');
+
+  const normalizedAdminEmail = String(adminEmail).trim().toLowerCase();
+  if (!validateEmail(normalizedAdminEmail).isValid) {
+    return fail('管理者メールアドレスの形式が不正です');
+  }
+
+  const trimmedDatabaseId = String(databaseId).trim();
+  if (!/^[a-zA-Z0-9-_]{40,60}$/.test(trimmedDatabaseId)) {
+    return fail('データベーススプレッドシートIDの形式が不正です');
+  }
+
+  let parsedCredentials;
+  try { parsedCredentials = JSON.parse(serviceAccountJson); }
+  catch (jsonError) { return fail(`サービスアカウントJSONの解析に失敗しました: ${jsonError.message}`); }
+
+  const requiredCredFields = ['type', 'project_id', 'private_key', 'client_email'];
+  const missing = requiredCredFields.filter(field => !parsedCredentials[field]);
+  if (missing.length > 0) {
+    return fail(`サービスアカウントJSONに必須項目が不足しています: ${missing.join(', ')}`);
+  }
+
+  return { ok: true, currentEmail, normalizedAdminEmail, parsedCredentials, trimmedDatabaseId };
+}
+
+// 既設定なら admin + domain チェック、初回なら入力 admin 本人実行を検証。
+function __checkSetupAuth_(currentEmail, normalizedAdminEmail) {
+  const fail = (message) => ({ ok: false, error: { success: false, message } });
+  const alreadyConfigured = (typeof hasCoreSystemProps === 'function') ? hasCoreSystemProps() : false;
+
+  if (alreadyConfigured) {
+    if (!isAdministrator(currentEmail)) return { ok: false, error: createAdminRequiredError() };
+    if (typeof validateDomainAccess === 'function') {
+      const domainCheck = validateDomainAccess(currentEmail, {
+        allowIfAdminUnconfigured: false,
+        allowIfEmailMissing: false
+      });
+      if (!domainCheck.allowed) {
+        return fail('管理者と同一ドメインのアカウントでセットアップを実行してください');
+      }
+    }
+  } else if (currentEmail.toLowerCase() !== normalizedAdminEmail) {
+    return fail('初回セットアップは入力した管理者メールアドレス本人で実行してください');
+  }
+  return { ok: true };
+}
+
+function __persistSetupProperties_(trimmedDatabaseId, normalizedAdminEmail, serviceAccountJson, googleClientId) {
+  setCachedProperty('DATABASE_SPREADSHEET_ID', trimmedDatabaseId);
+  setCachedProperty('ADMIN_EMAIL', normalizedAdminEmail);
+  setCachedProperty('SERVICE_ACCOUNT_CREDS', serviceAccountJson);
+  if (googleClientId) setCachedProperty('GOOGLE_CLIENT_ID', googleClientId);
+}
+
+// SA を editor として共有 + users / lessons シートを idempotent にセットアップ。
+function __ensureDatabaseSheets_(trimmedDatabaseId, parsedCredentials) {
+  try {
+    const ss = SpreadsheetApp.openById(trimmedDatabaseId);
+    const saEmail = parsedCredentials.client_email;
+    const editors = ss.getEditors().map(e => e.getEmail().toLowerCase());
+    if (!editors.includes(saEmail.toLowerCase())) {
+      ss.addEditor(saEmail);
+      console.log('setupApp: Added service account as editor:', saEmail);
+    }
+    __ensureSheetWithHeaders_(ss, 'users', USERS_SHEET_HEADERS);
+    __ensureSheetWithHeaders_(ss, 'lessons', LESSONS_SHEET_HEADERS);
+  } catch (dbError) {
+    console.warn('setupApp: Database initialization failed:', dbError.message);
+  }
+}
+
+function __ensureSheetWithHeaders_(ss, sheetName, headers) {
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    sheet.appendRow(headers);
+    console.log(`setupApp: Created ${sheetName} sheet with headers`);
+  } else if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+    console.log(`setupApp: Added headers to empty ${sheetName} sheet`);
+  }
+}
+
+function __installLessonTriggersIfAvailable_() {
+  try { installLessonTriggers(); }
+  catch (triggerErr) { console.warn('setupApp: installLessonTriggers failed:', triggerErr.message); }
 }
 
 /**
@@ -1870,9 +1780,7 @@ function setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId) {
 function createDatabase() {
   try {
     const email = getCurrentEmail();
-    if (!email) {
-      return { success: false, message: '認証が必要です' };
-    }
+    if (!email) return createAuthError();
 
     // GASプロジェクトの親フォルダを取得
     const scriptId = ScriptApp.getScriptId();
@@ -1886,6 +1794,10 @@ function createDatabase() {
     sheet.setName('users');
     sheet.appendRow(USERS_SHEET_HEADERS);
 
+    // lessons シート (lesson archive 用) も同時に作成
+    const lessonsSheet = ss.insertSheet('lessons');
+    lessonsSheet.appendRow(LESSONS_SHEET_HEADERS);
+
     if (folder) {
       DriveApp.getFileById(ss.getId()).moveTo(folder);
     }
@@ -1896,7 +1808,7 @@ function createDatabase() {
       message: 'データベースを作成しました'
     };
   } catch (error) {
-    console.error('createDatabase error:', error.message);
+    logError_('createDatabase', error);
     return { success: false, message: `作成に失敗しました: ${error.message}` };
   }
 }

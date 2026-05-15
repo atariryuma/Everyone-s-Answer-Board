@@ -17,6 +17,7 @@ function loadDoGetContext(overrides = {}) {
   const templates = [];
   const context = {
     console: { log: () => {}, warn: () => {}, error: () => {} },
+    logError_: () => {},
     HtmlService: {
       createTemplateFromFile: (name) => {
         templates.push(name);

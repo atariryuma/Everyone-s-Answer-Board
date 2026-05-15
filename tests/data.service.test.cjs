@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { gasResponseStubs } = require('./_helpers.cjs');
 
 function createMockCache(initial = {}) {
   const store = new Map(Object.entries(initial));
@@ -66,11 +67,7 @@ function loadDataServiceContext(overrides = {}) {
     console: { log: () => {}, warn: () => {}, error: () => {} },
     CacheService: { getScriptCache: () => cache },
     CACHE_DURATION: { DATABASE_LONG: 600, FORM_DATA: 30 },
-    createErrorResponse: (message, data, extra) => ({ success: false, message, ...extra }),
-    createExceptionResponse: (error) => ({ success: false, message: error.message }),
-    createDataServiceErrorResponse: (message, sheetName = '') => ({
-      success: false, message, data: [], headers: [], sheetName
-    }),
+    ...gasResponseStubs(),
     getCurrentEmail: () => 'actor@example.com',
     findUserByEmail: () => null,
     findUserById: () => null,
@@ -471,16 +468,16 @@ test('processBatchData: processes first batch even when startTime is already pas
   // 修正後: 少なくとも 1 バッチは試行されて全 3 行が処理される。
   const staleStartTime = Date.now() - 30000;
 
-  const result = ctx.processBatchData(
+  const result = ctx.processBatchData({
     sheet,
-    ['Timestamp', 'Answer'],
-    4, // lastRow (1 header + 3 data)
-    2, // lastCol
-    { columnMapping: { answer: 1 } },
-    {},
-    null,
-    staleStartTime
-  );
+    headers: ['Timestamp', 'Answer'],
+    lastRow: 4,
+    lastCol: 2,
+    config: { columnMapping: { answer: 1 } },
+    options: {},
+    user: null,
+    startTime: staleStartTime
+  });
 
   assert.equal(result.length, 3, 'すべてのデータ行が処理されるべき');
 });
