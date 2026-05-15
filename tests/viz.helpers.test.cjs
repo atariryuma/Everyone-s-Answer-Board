@@ -285,6 +285,106 @@ test('aggregateWords: caps at 25 entries', () => {
 });
 
 // =====================================================================
+// distinctiveKeywords (TF-IDF 風象限固有度, v2691)
+// =====================================================================
+
+test('distinctiveKeywords: prefers words distinctive to this cell over globally frequent', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__distinctiveKeywords;
+  // 「みんな」は全象限頻出、「真実」「誠実」はこの象限固有
+  const thisCell = [
+    { reason: 'みんなのために真実を伝える' },
+    { reason: '真実は大切、誠実が信頼を作る' },
+    { reason: 'みんなに対して誠実でいたい' }
+  ];
+  const other1 = [
+    { reason: 'みんなで効率的に進める' },
+    { reason: 'みんなの時間を尊重する' }
+  ];
+  const other2 = [
+    { reason: 'みんなが楽しめるのが大事' }
+  ];
+  const other3 = [{ reason: 'みんなに合わせる' }];
+  const result = fn(thisCell, [other1, other2, other3], 'reason', 3);
+  const words = result.map(r => r.word);
+  // 「真実」「誠実」が top に来る (他象限ゼロ出現で score 高い)
+  // 「みんな」は他象限でも頻出なので score が下がる
+  assert.ok(words.includes('真実'), `should include 真実: ${words.join(',')}`);
+  assert.ok(words.includes('誠実'), `should include 誠実: ${words.join(',')}`);
+  // 「みんな」は score が下がるので少なくとも上位 3 位以内には来ない期待
+  // (3 件 - 平均 4/3 ≒ 1.67 なので、score=1.33。真実 3-0=3, 誠実 2-0=2 が勝つ)
+  const minnaIndex = words.indexOf('みんな');
+  if (minnaIndex >= 0) {
+    const distinctIndex = Math.min(words.indexOf('真実'), words.indexOf('誠実'));
+    assert.ok(distinctIndex < minnaIndex, `distinctive words should outrank みんな: ${words.join(',')}`);
+  }
+});
+
+test('distinctiveKeywords: returns [] for empty input', () => {
+  // Why length check ではなく deepEqual を使わない: vm context 跨ぎで Array prototype が
+  //   異なるため deepStrictEqual が reference-equal を要求して失敗する。
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__distinctiveKeywords;
+  assert.equal(fn([], [[], [], []], 'reason').length, 0);
+  assert.equal(fn(null, [[], [], []], 'reason').length, 0);
+});
+
+test('distinctiveKeywords: handles single-cell case (no others to contrast)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__distinctiveKeywords;
+  // 他象限がすべて空 → score = count - 0 = count なので top 頻度語が並ぶ
+  const result = fn(
+    [{ reason: '責任を持つ。責任は重要。効率も大事。' }, { reason: '責任が一番' }],
+    [[], [], []],
+    'reason',
+    3
+  );
+  const words = result.map(r => r.word);
+  assert.ok(words.includes('責任'), `should include 責任: ${words.join(',')}`);
+});
+
+// =====================================================================
+// contrastingPair (X 軸 / Y 軸方向の対立語ペア抽出, v2691)
+// =====================================================================
+
+test('contrastingPair: extracts distinctive word per side', () => {
+  // 純漢字 / カタカナ語のみで構築（segmenter なし regex フォールバックでも安定）。
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__contrastingPair;
+  const left = [
+    { reason: '効率を優先' },
+    { reason: '効率最優先' },
+    { reason: '効率重視' }
+  ];
+  const right = [
+    { reason: '誠実な対応' },
+    { reason: '誠実が一番' },
+    { reason: '誠実第一' }
+  ];
+  const pair = fn(left, right, 'reason');
+  assert.ok(pair, 'should return a pair');
+  assert.equal(pair.left, '効率', `left should be 効率: ${JSON.stringify(pair)}`);
+  assert.equal(pair.right, '誠実', `right should be 誠実: ${JSON.stringify(pair)}`);
+});
+
+test('contrastingPair: returns null when one side empty', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__contrastingPair;
+  assert.equal(fn([], [{ reason: '責任' }], 'reason'), null);
+  assert.equal(fn([{ reason: '責任' }], [], 'reason'), null);
+});
+
+test('contrastingPair: returns null when no word is distinctive (full overlap)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__contrastingPair;
+  // 両側とも同じ語のみ → score <= 0 になるはず
+  const same = [{ reason: '責任' }, { reason: '責任' }];
+  const result = fn(same, same, 'reason');
+  // どちらの語も「left も right も同数」なので score=0、bestLeft/Right とも null になり pair は null
+  assert.equal(result, null);
+});
+
+// =====================================================================
 // aggregateCategories
 // =====================================================================
 

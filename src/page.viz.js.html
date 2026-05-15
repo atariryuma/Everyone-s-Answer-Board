@@ -366,7 +366,7 @@
     return tip;
   }
 
-  function showTooltip(event, item, app) {
+  function showTooltip(event, item, app, sameCoordCount) {
     const tip = ensureTooltip();
     // Why: カード実装 (page.js createNameDisplay) と同じ振舞いに揃える。
     //   サーバは isOwnBoard=true なら name を含めて送るが、教師端末でも「管理モード OFF」のときは
@@ -390,9 +390,18 @@
     }
     const commentText = escapeForTooltip(item.reason || item.answer || '');
 
+    // 同座標カウント (v2691): matrix / numberline で同じ Likert 整数値に N 名いる事実を明示。
+    //   forceCollide で散らばって見えるドット塊が「実は全員同じ値」と読めるようにする
+    //   （数学的 honesty: 偽 variance の誤読を防ぐ）。
+    //   sameCoordCount が 2 以上で、かつ本人を含む合計なら「ほか N-1 名」と表示。
+    const sameCoordText = (typeof sameCoordCount === 'number' && sameCoordCount >= 2)
+      ? `<div class="tooltip-samecoord">同じ ${valueText} に ほか ${sameCoordCount - 1} 名</div>`
+      : '';
+
     tip.innerHTML =
       `<div class="tooltip-meta">${headerText}${item.class ? ' / ' + escapeForTooltip(item.class) : ''}</div>` +
-      `<div><span class="tooltip-value">${valueText}</span>${commentText || '<em style="color:#94a3b8">（コメントなし）</em>'}</div>`;
+      `<div><span class="tooltip-value">${valueText}</span>${commentText || '<em style="color:#94a3b8">（コメントなし）</em>'}</div>` +
+      sameCoordText;
     tip.classList.add('visible');
 
     // 画面端ぴったりにならないよう少しオフセット
@@ -824,13 +833,21 @@
         const yKey = r.numericY >= (minY + maxY) / 2 ? 'h' : 'l';
         buckets[xKey + yKey].push(r);
       }
+      // TF-IDF 風の象限固有度で keyword を選ぶ（v2691）。
+      //   旧: 単純頻度の top-3 → 「みんな」「思う」など全象限頻出語が常に上位を占めた
+      //   新: distinctiveKeywords が「この象限だけで突出する語」を選ぶ
+      // 道徳教育根拠: MEXT「一面的→多面的・多角的な見方」(2016 報告 p.10) — 象限の対比が明確に。
       const keywordsFor = (key) => {
         const cellRows = buckets[key];
         if (!cellRows.length) return [];
-        const allWords = aggregateWords(cellRows, 'reason');
-        const longWords = allWords.filter(w => w.word.length >= 2).slice(0, 3);
-        const top = longWords.length > 0 ? longWords : allWords.slice(0, 3);
-        return top.map(w => w.word);
+        const otherKeys = ['hh', 'lh', 'hl', 'll'].filter((k) => k !== key);
+        const otherCells = otherKeys.map((k) => buckets[k]);
+        const distinctive = distinctiveKeywords(cellRows, otherCells, 'reason', 6);
+        // 2+ 字の内容語を優先（1 字漢字断片は意味が読み取りにくい）。
+        //   ただし全 keyword が 1 字なら fallback で 1 字も許容（v2668 と同じ扱い）。
+        const longWords = distinctive.filter((w) => w.word.length >= 2).slice(0, 3);
+        const top = longWords.length > 0 ? longWords : distinctive.slice(0, 3);
+        return top.map((w) => w.word);
       };
       // 各 keyword を click 可能にして「その語を含む全意見」一覧 popup を開く。
       //   多面性教育の観点: クリック象限だけでなく全象限の reason を対象にする
@@ -888,6 +905,26 @@
       placeLabel(q.hl, midX + (innerW - midX) / 2, innerH - 8, 'hl', 'bottom');
       placeLabel(q.ll, midX / 2, innerH - 8, 'll', 'bottom');
 
+      // 整数セル格子線（v2691）— Likert 整数値ごとに薄い grid を引き、
+      //   ドット集塊が「同じセルに集まっている」ことを視覚的に明示する。
+      //   forceCollide によるジッターが「偽 variance」を示唆する読み違いを緩和。
+      //   中央クロス線より薄く（0.15）描いて軸線との競合を避ける。
+      const gridStroke = 'rgba(148,163,184,0.15)';
+      for (let v = Math.ceil(minX); v <= Math.floor(maxX); v++) {
+        const x = xScale(v);
+        if (Math.abs(x - midX) < 1) continue; // 中央クロスと重複しない
+        g.append('line').attr('class', 'viz-grid')
+          .attr('x1', x).attr('x2', x).attr('y1', 0).attr('y2', innerH)
+          .attr('stroke', gridStroke);
+      }
+      for (let v = Math.ceil(minY); v <= Math.floor(maxY); v++) {
+        const y = yScale(v);
+        if (Math.abs(y - midY) < 1) continue;
+        g.append('line').attr('class', 'viz-grid')
+          .attr('x1', 0).attr('x2', innerW).attr('y1', y).attr('y2', y)
+          .attr('stroke', gridStroke);
+      }
+
       // 軸線（中央クロス）
       g.append('line').attr('x1', midX).attr('x2', midX).attr('y1', 0).attr('y2', innerH)
         .attr('stroke', 'rgba(148,163,184,0.4)');
@@ -913,6 +950,26 @@
       g.append('text').attr('class', 'viz-axis-label')
         .attr('transform', `translate(-44,0) rotate(-90)`).attr('text-anchor', 'end')
         .text(yL.max || '');
+
+      // 対立軸サマリ（v2691）— 児童の言葉から自動的に「議論の軸」を命名する。
+      //   X 軸方向（左象限 vs 右象限）と Y 軸方向（下象限 vs 上象限）でそれぞれ対立語ペアを抽出。
+      //   タイトル下に出すと UI 増設になるので、SVG 内 X 軸ラベル中央に薄く差し込む。
+      // 道徳教育根拠: 学術会議「道理ある不一致 reasonable disagreement」(2020 報告 p.10) —
+      //   「対立する双方がそれなりの理由を持つ」状況を視覚化する。
+      const leftRows = (buckets.lh || []).concat(buckets.ll || []);
+      const rightRows = (buckets.hh || []).concat(buckets.hl || []);
+      const upperRows = (buckets.lh || []).concat(buckets.hh || []);
+      const lowerRows = (buckets.ll || []).concat(buckets.hl || []);
+      const xPair = contrastingPair(leftRows, rightRows, 'reason');
+      const yPair = contrastingPair(lowerRows, upperRows, 'reason');
+      const summaryParts = [];
+      if (xPair) summaryParts.push('#' + xPair.left + ' ↔ #' + xPair.right);
+      if (yPair) summaryParts.push('#' + yPair.left + ' ↔ #' + yPair.right);
+      if (summaryParts.length > 0) {
+        g.append('text').attr('class', 'viz-contrast-summary')
+          .attr('x', innerW / 2).attr('y', innerH + 44).attr('text-anchor', 'middle')
+          .text('議論の対立軸:  ' + summaryParts.join('   |   '));
+      }
 
       // ghost 配列は groupByStudent が常に空 ([]) を返すので no-op。
       // 「揺らぎ大の子だけ」の限定 ghost + trace は下の swing-trace 描画で扱う。
@@ -960,6 +1017,48 @@
           data: r
         };
       });
+      // マイノリティ（象限内 1 票だけの意見）の emailHash 集合を計算（v2691）。
+      //   道徳教育根拠: 学術会議 2020 報告 p.14「マジョリティがマイノリティに同調を強要する
+      //   ことはしばしば生じてしまう」「多様な意見が出されるやり方が中心とならなければ
+      //   多様性という状態からは全く遠くなる」— 1 票の意見こそ授業で取り上げるべき素材。
+      //   stroke 優先度: highlight > reaction > lone-voice > none
+      //     （教師意図 > 児童間人気 > 少数派マーカー > 既定）
+      const loneVoiceHashes = (function () {
+        const set = new Set();
+        for (const k of ['hh', 'lh', 'hl', 'll']) {
+          const cell = buckets[k] || [];
+          if (cell.length === 1) {
+            const r = cell[0];
+            if (r && r.emailHash) set.add(r.emailHash);
+            else if (r && typeof r.rowIndex === 'number') set.add('rowIndex:' + r.rowIndex);
+          }
+        }
+        return set;
+      })();
+      const isLoneVoice = (d) => {
+        if (!d || !d.data) return false;
+        if (d.data.emailHash) return loneVoiceHashes.has(d.data.emailHash);
+        if (typeof d.data.rowIndex === 'number') return loneVoiceHashes.has('rowIndex:' + d.data.rowIndex);
+        return false;
+      };
+
+      // 同 Likert 座標 (整数 X,Y) のドット人数を事前計算（v2691, hover tooltip 用）。
+      //   forceCollide で散らばって見えるドット塊の本当の人数を hover で確認できるように。
+      const sameCoordCounts = (function () {
+        const m = new Map();
+        for (const r of current) {
+          if (typeof r.numericX !== 'number' || typeof r.numericY !== 'number') continue;
+          const key = Math.round(r.numericX) + ',' + Math.round(r.numericY);
+          m.set(key, (m.get(key) || 0) + 1);
+        }
+        return m;
+      })();
+      const sameCoordOf = (item) => {
+        if (!item || typeof item.numericX !== 'number' || typeof item.numericY !== 'number') return 0;
+        const key = Math.round(item.numericX) + ',' + Math.round(item.numericY);
+        return sameCoordCounts.get(key) || 0;
+      };
+
       // collide 半径 + spread balance:
       //   strength 0.5 + 250 tick で、(3,3) に 10 件密集しても十分に散らばる。
       //   ドット縮小 (MAX 14→9) に合わせ collide も自然に小さくなり、間ができる。
@@ -987,13 +1086,15 @@
         .attr('r', (d) => radiusForMatrix(d))
         .classed('swing-high', (d) => radiusForMatrix(d) > BASE_R_M + 3)
         .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
+        .classed('lone-voice', (d) => isLoneVoice(d))
         // リアクション可視化: 最頻 type の色で stroke を上書き (反応 0 なら CSS 既定)
         //   細く・淡く (2.0px / opacity 0.85): 散布図の主役は「位置 = 立場」。
         //   リング (人気) はあくまで補助情報なので、教師がチラ見できる強度に抑える。
         //   道徳教育 / DCE レビュー (2026-05-14) で「多数派 = 正解」シグナルの過剰化を避ける調整。
         //
-        //   priority: HIGHLIGHT (教師注目) > REACTION (児童間人気) > none
+        //   priority: HIGHLIGHT (教師注目) > REACTION (児童間人気) > LONE-VOICE (少数派) > none
         //   教師の意図的な「注目」は同調圧力ではないので 3.0px / 不透明で強調 OK。
+        //   lone-voice は CSS で drop-shadow を付け、stroke は触らない（reaction ring と共存）
         //
         //   重要: SVG の `.attr()` は presentation attribute (specificity 0) で
         //   外部 CSS (.viz-dot { stroke: #0f172a }) に負ける。インライン style なら勝てる。
@@ -1010,8 +1111,8 @@
           if (d.data && d.data.highlight) return 1.0;
           return topReactionType(d.data) ? 0.85 : null;
         })
-        .on('mouseenter', (event, d) => showTooltip(event, d.data, self))
-        .on('mousemove',  (event, d) => showTooltip(event, d.data, self))
+        .on('mouseenter', (event, d) => showTooltip(event, d.data, self, sameCoordOf(d.data)))
+        .on('mousemove',  (event, d) => showTooltip(event, d.data, self, sameCoordOf(d.data)))
         .on('mouseleave', () => hideTooltip())
         // クリック: tooltip を閉じてモーダル表示
         .on('click', (event, d) => {
@@ -1019,7 +1120,7 @@
           if (typeof self.showAnswerModal === 'function') {
             self.showAnswerModal(d.data.rowIndex);
           } else {
-            showTooltip(event, d.data, self);  // フォールバック
+            showTooltip(event, d.data, self, sameCoordOf(d.data));  // フォールバック
           }
         });
 
@@ -1286,6 +1387,122 @@
       .slice(0, 25);
   }
 
+  /**
+   * 行集合ごとに「key→投稿頻度」マップを返す（aggregateWords の Map 版・全件保持）。
+   *   key は lowercase。displayForm は別 Map で保持。集計内不変条件は aggregateWords と同じ
+   *   （1 投稿内の重複は 1 票）。distinctiveKeywords / contrastingPair の素材として使う。
+   */
+  function buildWordCountMap(rows, field) {
+    const counts = new Map();
+    const displayForm = new Map();
+    for (const r of rows || []) {
+      const text = r && r[field];
+      if (!text) continue;
+      const tokens = tokenizeJapanese(String(text));
+      const seen = new Set();
+      for (const t of tokens) {
+        const key = t.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        counts.set(key, (counts.get(key) || 0) + 1);
+        if (!displayForm.has(key)) displayForm.set(key, t);
+      }
+    }
+    return { counts, displayForm };
+  }
+
+  /**
+   * TF-IDF 風の象限固有度スコアで top-N keyword を返す。
+   *
+   * 旧 keywordsFor は単純な aggregateWords(thisCell).slice(0,3) だったため、
+   *   全象限頻出語（「みんな」「思う」等）が常に上位を占め、象限の対比が弱まっていた。
+   *   このヘルパーは「**この象限だけで突出して頻出する語**」を選ぶ：
+   *
+   *     score(w) = freq_in_this(w) - mean(freq_in_others(w))
+   *
+   *   ただし freq_in_this(w) === 1（1 票だけ）の語は scoring から除外しない（少数派保護）が
+   *   タイブレークで頻度の高い語を優先する。
+   *
+   * 道徳教育観点（MEXT「一面的→多面的・多角的な見方」）：
+   *   象限ラベルが「他象限と何が違うか」を端的に示すと、児童が「立場が変わると語彙も変わる」
+   *   と気付ける。
+   *
+   * @param {Array} thisCellRows  対象象限の rows
+   * @param {Array<Array>} otherCellsRows  他 3 象限それぞれの rows 配列
+   * @param {string} field  集計対象列名（'reason' or 'answer'）
+   * @param {number} topN  返す語数（既定 3）
+   * @returns {Array<{word: string, score: number, count: number}>}
+   */
+  function distinctiveKeywords(thisCellRows, otherCellsRows, field, topN) {
+    const N = topN || 3;
+    if (!thisCellRows || thisCellRows.length === 0) return [];
+    const { counts: thisCounts, displayForm } = buildWordCountMap(thisCellRows, field);
+    const otherCountMaps = (otherCellsRows || []).map((rs) => buildWordCountMap(rs, field).counts);
+
+    const scored = [];
+    for (const [key, count] of thisCounts) {
+      // 他象限の平均出現数 (該当象限の rows.length 比ではなく投稿件数の生平均で十分。
+      //   厳密 IDF にせず単純な差で十分なのは、象限間の rows 数が大きくは違わないため)
+      let otherSum = 0;
+      for (const m of otherCountMaps) otherSum += (m.get(key) || 0);
+      const otherMean = otherCountMaps.length ? otherSum / otherCountMaps.length : 0;
+      const score = count - otherMean;
+      scored.push({ word: displayForm.get(key) || key, score, count });
+    }
+    // score desc → tiebreak: count desc → word.length desc（長語=具体的で優先）
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.count !== a.count) return b.count - a.count;
+      return b.word.length - a.word.length;
+    });
+    return scored.slice(0, N);
+  }
+
+  /**
+   * 2 つの行集合（軸の左 vs 右、上 vs 下）から「対立する代表語」を 1 ペア返す。
+   *
+   *   leftRows 側で固有度（左頻度 - 右頻度）が最大の語と、
+   *   rightRows 側で固有度（右頻度 - 左頻度）が最大の語を、それぞれ 1 つずつ。
+   *   両方とも score > 0 のときだけペアを返す（弱い対立はノイズ）。
+   *
+   * 道徳教育観点（学術会議「道理ある不一致 reasonable disagreement」）：
+   *   「対立する双方がそれなりの理由を持つ」状況を、児童の言葉から自動的に命名する。
+   *   タイトル下の 1 行サマリ「議論の対立軸: 〇〇 ↔ 〇〇」に使う。
+   *
+   * @param {Array} leftRows
+   * @param {Array} rightRows
+   * @param {string} field
+   * @returns {{left: string, right: string} | null}
+   */
+  function contrastingPair(leftRows, rightRows, field) {
+    if (!leftRows || !rightRows || leftRows.length === 0 || rightRows.length === 0) return null;
+    const leftMap = buildWordCountMap(leftRows, field);
+    const rightMap = buildWordCountMap(rightRows, field);
+
+    let bestLeft = null;
+    for (const [key, count] of leftMap.counts) {
+      const r = rightMap.counts.get(key) || 0;
+      const score = count - r;
+      if (score <= 0) continue;
+      if (!bestLeft || score > bestLeft.score ||
+          (score === bestLeft.score && count > bestLeft.count)) {
+        bestLeft = { word: leftMap.displayForm.get(key) || key, score, count };
+      }
+    }
+    let bestRight = null;
+    for (const [key, count] of rightMap.counts) {
+      const l = leftMap.counts.get(key) || 0;
+      const score = count - l;
+      if (score <= 0) continue;
+      if (!bestRight || score > bestRight.score ||
+          (score === bestRight.score && count > bestRight.count)) {
+        bestRight = { word: rightMap.displayForm.get(key) || key, score, count };
+      }
+    }
+    if (!bestLeft || !bestRight) return null;
+    return { left: bestLeft.word, right: bestRight.word };
+  }
+
   StudyQuestApp.prototype.renderWordRanking = async function (isInitialLoad, oldRows) {
     try {
       const d3 = await this.ensureD3Loaded();
@@ -1390,6 +1607,8 @@
   // expose for tests / debugging
   StudyQuestApp.prototype.__tokenize = tokenizeJapanese;
   StudyQuestApp.prototype.__aggregateWords = aggregateWords;
+  StudyQuestApp.prototype.__distinctiveKeywords = distinctiveKeywords;
+  StudyQuestApp.prototype.__contrastingPair = contrastingPair;
 
   // ---------------------------------------------------------------------
   // M4: 円グラフ（道徳指導案 導入・アンケート結果可視化）

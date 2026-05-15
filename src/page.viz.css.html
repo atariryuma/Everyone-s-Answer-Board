@@ -291,6 +291,56 @@
     color: #38bdf8;
     margin-right: 0.4rem;
   }
+  /* 同座標カウント: forceCollide で散らばって見えるドット塊の本当の人数を伝える行。
+     主たる回答テキストと視覚的に分離するため上に薄い区切り線。 */
+  .viz-tooltip .tooltip-samecoord {
+    margin-top: 0.5rem;
+    padding-top: 0.4rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.25);
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-style: italic;
+  }
+
+  /* 対立軸 1 行サマリ (X 軸ラベルと同列に薄く差し込み)。
+     色とサイズを軸ラベルより一段抑えて、視線を軸ラベル → 対立軸 → ドットの順に誘導。
+     学術会議「道理ある不一致」の可視化用 (v2691)。 */
+  .viz-contrast-summary {
+    fill: rgba(199, 210, 254, 0.55);
+    font-size: 0.85rem;
+    font-weight: 500;
+    pointer-events: none;
+    letter-spacing: 0.02em;
+  }
+  body.projector-mode .viz-contrast-summary {
+    font-size: 1rem;
+    fill: rgba(199, 210, 254, 0.7);
+  }
+  @media (max-width: 768px) {
+    .viz-contrast-summary { font-size: 0.7rem; }
+  }
+
+  /* 整数セル境界の薄い grid line: ドット塊が「同じ Likert セルにまとまっている」と読める
+     ようにする補助線。pointer-events:none でクリックを邪魔しない (v2691)。 */
+  .viz-grid {
+    pointer-events: none;
+  }
+
+  /* 孤立意見 (lone-voice): 象限内 1 票だけの意見に control-tower 的な金色ハロー。
+     学術会議 2020 報告 p.14「マジョリティのマイノリティへの同調強要」回避用 (v2691)。
+     highlight (教師注目, drop-shadow 0 0 4-7px rgba(251,191,36,0.65)) より淡く、
+     1 票でも「ここに 1 つあるよ」と教師が即座に発見できる程度の glow。
+     stroke は触らず drop-shadow のみで実現するので、reaction ring 色とも共存する。 */
+  .viz-dot.lone-voice {
+    filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.45));
+  }
+  body.projector-mode .viz-dot.lone-voice {
+    filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.6));
+  }
+  /* lone-voice + highlight 同時: highlight 側の drop-shadow を優先 (cascade で後者が勝つ) */
+  .viz-dot.highlight.lone-voice {
+    filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.75));
+  }
 
   /* =============================================================================
    * モーダル: 軸ラベル + プログレスバー (numberline / matrix の「数字だけ」問題を解消)
