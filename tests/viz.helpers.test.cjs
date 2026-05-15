@@ -384,6 +384,70 @@ test('contrastingPair: returns null when no word is distinctive (full overlap)',
   assert.equal(result, null);
 });
 
+test('contrastingPair: filters out 1-char fragment tokens (v2691 patch)', () => {
+  // 「間に合う」のような複合語が tokenizer で「間」「合」断片に切れたとき、
+  //   対立軸ラベル「#間 ↔ #何」のような無意味な 1 字対立が出る問題への対策。
+  //   1 字キーは contrastingPair から除外する。
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__contrastingPair;
+  // left に「間」(1字) と「効率」(2字) を入れ、両方 score>0。1字は除外され「効率」が選ばれる期待
+  const left = [{ reason: '間 効率' }, { reason: '間 効率' }, { reason: '間 効率' }];
+  const right = [{ reason: '何 誠実' }, { reason: '何 誠実' }, { reason: '何 誠実' }];
+  const pair = fn(left, right, 'reason');
+  assert.ok(pair, 'should return a pair');
+  assert.notEqual(pair.left, '間', `1-char fragment should be excluded from left: ${JSON.stringify(pair)}`);
+  assert.notEqual(pair.right, '何', `1-char fragment should be excluded from right: ${JSON.stringify(pair)}`);
+  assert.equal(pair.left, '効率');
+  assert.equal(pair.right, '誠実');
+});
+
+test('contrastingPair: kanji-quality bias picks kanji over kana when scores tie (v2691 patch)', () => {
+  // 「かいぜんし」(5字 hiragana 中途断片) と「改善」(2字 漢字) が同 score で並んだ場合、
+  //   漢字優先で「改善」が選ばれることをテスト。
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__contrastingPair;
+  // かいぜんし は 5 字 hiragana（≤3 字フィルタを通る）。
+  //   左に「かいぜんし」「改善」両方を 2 件ずつ入れ、右にはどちらも 0 件。
+  //   両方とも score=2-0=2 で同じ → quality 比較で「改善」(quality=2) が「かいぜんし」(quality=1) に勝つ。
+  const left = [
+    { reason: 'かいぜんし 改善' },
+    { reason: 'かいぜんし 改善' }
+  ];
+  const right = [{ reason: '誠実' }, { reason: '誠実' }];
+  const pair = fn(left, right, 'reason');
+  assert.ok(pair, 'should return a pair');
+  assert.equal(pair.left, '改善', `kanji should beat hiragana on tie: ${JSON.stringify(pair)}`);
+});
+
+test('contrastingPair: excludeWords removes candidate from both sides (v2691 patch)', () => {
+  // X 軸で「気持ち」が選ばれたあと、Y 軸で同じ「気持ち」が再選されないように
+  //   excludeWords (Set of lowercase keys) を渡せる。重複表示の回避用。
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__contrastingPair;
+  const left = [{ reason: '気持 効率' }, { reason: '気持 効率' }];
+  const right = [{ reason: '気持 誠実' }, { reason: '気持 誠実' }];
+  // exclude 無し: 「効率」 vs 「誠実」が出る (気持 は両側にあって score=0 → 自動除外)
+  const pair1 = fn(left, right, 'reason');
+  assert.ok(pair1);
+  // exclude=効率: 別の語が出るはず → left は何も残らないので null
+  const pair2 = fn(left, right, 'reason', new Set(['効率', '誠実']));
+  assert.equal(pair2, null, `excluded all viable words: ${JSON.stringify(pair2)}`);
+});
+
+test('distinctiveKeywords: kanji-quality bias picks kanji over kana on tie (v2691 patch)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__distinctiveKeywords;
+  // この象限に「かいぜんし」と「改善」が同数、他象限ゼロ → score 同点
+  const thisCell = [
+    { reason: 'かいぜんし 改善' },
+    { reason: 'かいぜんし 改善' },
+    { reason: 'かいぜんし 改善' }
+  ];
+  const result = fn(thisCell, [[], [], []], 'reason', 2);
+  const words = result.map(r => r.word);
+  assert.equal(words[0], '改善', `kanji should be top: ${words.join(',')}`);
+});
+
 // =====================================================================
 // aggregateCategories
 // =====================================================================

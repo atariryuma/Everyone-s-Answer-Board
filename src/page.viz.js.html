@@ -956,12 +956,17 @@
       //   タイトル下に出すと UI 増設になるので、SVG 内 X 軸ラベル中央に薄く差し込む。
       // 道徳教育根拠: 学術会議「道理ある不一致 reasonable disagreement」(2020 報告 p.10) —
       //   「対立する双方がそれなりの理由を持つ」状況を視覚化する。
+      //
+      // v2691 patch: 「気持ち が右にも上にも来る」(右上集中の意見) 重複表示を回避するため、
+      //   X 軸ペアを先に決め、Y 軸ペアは X で使った key を除外して算出する。
+      //   2 軸両方とも有効な対立を持っていれば 2 行、片方だけなら 1 行。
       const leftRows = (buckets.lh || []).concat(buckets.ll || []);
       const rightRows = (buckets.hh || []).concat(buckets.hl || []);
       const upperRows = (buckets.lh || []).concat(buckets.hh || []);
       const lowerRows = (buckets.ll || []).concat(buckets.hl || []);
       const xPair = contrastingPair(leftRows, rightRows, 'reason');
-      const yPair = contrastingPair(lowerRows, upperRows, 'reason');
+      const xExclude = xPair ? new Set([xPair.leftKey, xPair.rightKey]) : new Set();
+      const yPair = contrastingPair(lowerRows, upperRows, 'reason', xExclude);
       const summaryParts = [];
       if (xPair) summaryParts.push('#' + xPair.left + ' ↔ #' + xPair.right);
       if (yPair) summaryParts.push('#' + yPair.left + ' ↔ #' + yPair.right);
@@ -1412,6 +1417,20 @@
   }
 
   /**
+   * keyword の「読みやすさ品質」を 0/1/2 で返す（v2691 patch）。
+   *   2 = 漢字を含む語（最も意味が読みやすい: 「真実」「気持ち」「効率」）
+   *   1 = 漢字なし 2 字以上（カタカナ語含む: 「AI」「ポスター」「みんな」）
+   *   0 = 1 字（基本的に断片: 「間」「何」— 表示には不適）
+   * sort で score と count に並ぶ第 2 キーとして使う。soft preference なので、
+   *   score が圧倒的に高い純ひらがな語は依然として勝てる。
+   */
+  function keywordQuality(word) {
+    if (!word || word.length < 2) return 0;
+    if (/[一-鿿々]/.test(word)) return 2;
+    return 1;
+  }
+
+  /**
    * TF-IDF 風の象限固有度スコアで top-N keyword を返す。
    *
    * 旧 keywordsFor は単純な aggregateWords(thisCell).slice(0,3) だったため、
@@ -1447,11 +1466,15 @@
       for (const m of otherCountMaps) otherSum += (m.get(key) || 0);
       const otherMean = otherCountMaps.length ? otherSum / otherCountMaps.length : 0;
       const score = count - otherMean;
-      scored.push({ word: displayForm.get(key) || key, score, count });
+      const word = displayForm.get(key) || key;
+      scored.push({ word, score, count, quality: keywordQuality(word) });
     }
-    // score desc → tiebreak: count desc → word.length desc（長語=具体的で優先）
+    // score desc → quality desc（漢字優先）→ count desc → word.length desc
+    //   v2691 patch: 「かいぜんし」「ぶぶんしょ」のような hiragana 中途断片が top を占める
+    //   問題への対策。score が同じなら漢字含む語が勝つ。
     scored.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
+      if (b.quality !== a.quality) return b.quality - a.quality;
       if (b.count !== a.count) return b.count - a.count;
       return b.word.length - a.word.length;
     });
@@ -1465,6 +1488,11 @@
    *   rightRows 側で固有度（右頻度 - 左頻度）が最大の語を、それぞれ 1 つずつ。
    *   両方とも score > 0 のときだけペアを返す（弱い対立はノイズ）。
    *
+   * v2691 patch:
+   *   - 1 文字断片（「間」「何」のような切れ端）を除外
+   *   - 同 score なら漢字含有語を優先（quality bias）
+   *   - excludeWords に渡された語は候補から除外（X/Y 軸間で重複した語を後段で消すため）
+   *
    * 道徳教育観点（学術会議「道理ある不一致 reasonable disagreement」）：
    *   「対立する双方がそれなりの理由を持つ」状況を、児童の言葉から自動的に命名する。
    *   タイトル下の 1 行サマリ「議論の対立軸: 〇〇 ↔ 〇〇」に使う。
@@ -1472,35 +1500,43 @@
    * @param {Array} leftRows
    * @param {Array} rightRows
    * @param {string} field
-   * @returns {{left: string, right: string} | null}
+   * @param {Set<string>} [excludeWords]  これらの key（lowercase）は候補から除外
+   * @returns {{left: string, right: string, leftKey: string, rightKey: string} | null}
    */
-  function contrastingPair(leftRows, rightRows, field) {
+  function contrastingPair(leftRows, rightRows, field, excludeWords) {
     if (!leftRows || !rightRows || leftRows.length === 0 || rightRows.length === 0) return null;
+    const exclude = excludeWords instanceof Set ? excludeWords : new Set();
     const leftMap = buildWordCountMap(leftRows, field);
     const rightMap = buildWordCountMap(rightRows, field);
 
-    let bestLeft = null;
-    for (const [key, count] of leftMap.counts) {
-      const r = rightMap.counts.get(key) || 0;
-      const score = count - r;
-      if (score <= 0) continue;
-      if (!bestLeft || score > bestLeft.score ||
-          (score === bestLeft.score && count > bestLeft.count)) {
-        bestLeft = { word: leftMap.displayForm.get(key) || key, score, count };
+    const pickBest = (sourceMap, otherMap) => {
+      let best = null;
+      for (const [key, count] of sourceMap.counts) {
+        if (exclude.has(key)) continue;
+        const word = sourceMap.displayForm.get(key) || key;
+        // 1 文字断片は表示に値しない（keywordsFor と同じ基準）
+        if (word.length < 2) continue;
+        const otherCount = otherMap.counts.get(key) || 0;
+        const score = count - otherCount;
+        if (score <= 0) continue;
+        const quality = keywordQuality(word);
+        if (!best
+            || score > best.score
+            || (score === best.score && quality > best.quality)
+            || (score === best.score && quality === best.quality && count > best.count)) {
+          best = { word, key, score, count, quality };
+        }
       }
-    }
-    let bestRight = null;
-    for (const [key, count] of rightMap.counts) {
-      const l = leftMap.counts.get(key) || 0;
-      const score = count - l;
-      if (score <= 0) continue;
-      if (!bestRight || score > bestRight.score ||
-          (score === bestRight.score && count > bestRight.count)) {
-        bestRight = { word: rightMap.displayForm.get(key) || key, score, count };
-      }
-    }
+      return best;
+    };
+
+    const bestLeft = pickBest(leftMap, rightMap);
+    const bestRight = pickBest(rightMap, leftMap);
     if (!bestLeft || !bestRight) return null;
-    return { left: bestLeft.word, right: bestRight.word };
+    return {
+      left: bestLeft.word, leftKey: bestLeft.key,
+      right: bestRight.word, rightKey: bestRight.key
+    };
   }
 
   StudyQuestApp.prototype.renderWordRanking = async function (isInitialLoad, oldRows) {
