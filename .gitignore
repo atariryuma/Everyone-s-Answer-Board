@@ -42,6 +42,9 @@ scripts/config.*.json
 
 # Claude Code local settings (per-machine permissions)
 .claude/settings.local.json
+# Claude Code runtime artifacts (lock / state generated at runtime; not source)
+.claude/*.lock
+.claude/scheduled_tasks.json
 
 # Optional: Keep .clasp.json.template for reference
 !.clasp.json.template
