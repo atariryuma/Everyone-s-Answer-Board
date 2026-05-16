@@ -554,9 +554,6 @@
    * Why: 旧 .viz-profile-selector / .viz-mode-bar は別行で 2 段になっていた。
    *      新しい .viz-toolbar は 1 行（モバイルでは折り返し）に統合する。
    * ===================================================================== */
-  .viz-toolbar-slot { width: 100%; }
-  /* 議論ツール (Row 3) と phase pills (Row 1) を別 slot に。注入なしで空白が出ないよう :empty で非表示。 */
-  .viz-toolbar-slot:empty { display: none; }
   /* 議論支援ツール bar (Row 3) — section label + 操作ボタン群を 1 行に
      親 .glass-panel が背景＋blur を持つので、ここは透明＋上端 border のみ。 */
   .viz-toolbar {
@@ -574,8 +571,7 @@
     white-space: nowrap;
     flex-shrink: 0;
   }
-  .viz-toolbar-left,
-  .viz-toolbar-right { flex: 0 0 auto; }
+  .viz-toolbar-left { flex: 0 0 auto; }
   .viz-toolbar-center {
     flex: 1 1 auto;
     display: flex;
@@ -834,10 +830,6 @@
   @media (max-width: 768px) {
     .viz-quadrant-summary { grid-template-columns: 1fr; }
   }
-
-  /* 旧 .viz-stats / .stat-pill (vizStatsPills は #lastUpdatedText に移管済み)。
-     互換性のため残置: 旧 DOM が残っても見えないようにする。 */
-  .viz-stats { display: none; }
 
   /* 教師ダッシュボード「気になる児童」 */
   .viz-teacher-panel {

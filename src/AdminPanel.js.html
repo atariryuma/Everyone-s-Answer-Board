@@ -2794,6 +2794,16 @@
       return;
     }
 
+    // Why cancel pending autosave: publish 直後に 900ms 前のキー入力で trigger された
+    //   autosave が遅延 fire すると、stale etag/publishedAt で server に send され
+    //   "⚠ 保存失敗" toast や race を引き起こす (Profile lifecycle audit #c)。
+    try {
+      if (window.sharedUtilities && window.sharedUtilities.debounce
+          && typeof window.sharedUtilities.debounce.clear === 'function') {
+        window.sharedUtilities.debounce.clear('auto-save-draft');
+      }
+    } catch (_) { /* best effort */ }
+
     try {
       const { config, validationError } = getValidatedConfig();
       if (validationError) {
@@ -3275,6 +3285,16 @@
         Promise.resolve(opts.afterSuccess ? opts.afterSuccess(res) : null)
           .then(() => { if (typeof loadProfileList === 'function') loadProfileList(); })
           .catch((err) => console.warn('afterSuccess error:', err && err.message));
+      } else if (res && res.error === 'etag_mismatch') {
+        // Profile lifecycle audit recommendation #2: 別 tab で更新されていた場合、
+        //   黙って失敗するのではなく config を fresh で再読込し、ユーザーに「再操作してね」と
+        //   案内する (auto-retry はせず明示再操作 = 意図しない上書きを避ける)。
+        setProfileActionStatus('他のタブで更新されました。最新の状態を読み込み直しました。', 'warning');
+        if (typeof loadAndApplyCurrentConfig === 'function') {
+          loadAndApplyCurrentConfig({ silent: true });
+        } else {
+          loadProfileList();
+        }
       } else {
         setProfileActionStatus((res && res.message) || opts.failureMsg, 'error');
         loadProfileList();
@@ -4709,7 +4729,7 @@
 
     // すべての lesson save を 1 本の Promise チェーンに直列化する。
     //   field 別の debounce key だと、name と phases が ~同時に fire したとき同じ etag を
-    //   見て送信 → 2 番目が ETAG_MISMATCH で落ちる。saveQueue で順次実行することで
+    //   見て送信 → 2 番目が etag_mismatch で落ちる。saveQueue で順次実行することで
     //   後続の save は必ず直前の save 完了後の最新 etag を読む。
     let saveQueue = Promise.resolve();
     let pendingFields = {}; // fieldPath → 最新 value (debounce-fire 時の snapshot)
@@ -4735,7 +4755,7 @@
               currentLessonEtag = res.data.lesson.etag;
               if (indicator) indicator.textContent = '✓ 自動保存';
               renderConfirmStep(res.data.lesson.lessonJson);
-            } else if (res && res.error === 'ETAG_MISMATCH') {
+            } else if (res && res.error === 'etag_mismatch') {
               // 直列化していれば原則発生しないが、念のため refetch & 1 回 retry。
               gasRun('lesson.review', { userId, lessonId: currentLessonId }).then((r2) => {
                 if (r2 && r2.success) {

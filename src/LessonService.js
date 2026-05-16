@@ -193,9 +193,12 @@ function __updateLessonRow_(lessonId, patch, expectedEtag) {
     const found = __findLessonById_(lessonId);
     if (!found) return { success: false, error: 'LESSON_NOT_FOUND', message: 'lesson not found' };
     if (expectedEtag && found.lesson.etag && found.lesson.etag !== expectedEtag) {
+      // Why lowercase: ConfigService.saveUserConfig / AdminApis.__applyPublishStateChange と
+      //   同じ 'etag_mismatch' code に統一。frontend (AdminPanel.js.html) も 1 種類の
+      //   コードのみ判定すれば良い (Error envelope audit recommendation #2)。
       return {
         success: false,
-        error: 'ETAG_MISMATCH',
+        error: 'etag_mismatch',
         message: '別タブで lesson が更新されています。再読込してください。',
         currentEtag: found.lesson.etag
       };
@@ -1322,7 +1325,14 @@ function advanceLessonPhase(userId, lessonId, direction) {
     lessonJson.profileTransitions.push({ ts: new Date().toISOString(), from: fromIdx, to: toIdx });
 
     const result = __updateLessonRow_(lessonId, { lessonJson });
-    if (!result.success) return createErrorResponse(result.message || result.error);
+    if (!result.success) {
+      // Why error preservation: __updateLessonRow_ は 'etag_mismatch' を error フィールドで返す。
+      //   旧来は createErrorResponse(message || error) のみで wrap し error code を捨てて
+      //   いたため、frontend の auto-retry-on-mismatch ロジックが triggers されなかった
+      //   (Error envelope audit F4)。
+      return createErrorResponse(result.message || result.error, null,
+        result.error ? { error: result.error, currentEtag: result.currentEtag } : null);
+    }
     return createSuccessResponse(`フェーズ ${toIdx + 1}: ${target.name} に切替えました`, {
       lesson: result.lesson,
       activePhaseIndex: toIdx
@@ -1366,7 +1376,11 @@ function endLesson(userId, lessonId) {
       endedAt,
       lessonJson
     });
-    if (!result.success) return createErrorResponse(result.message || result.error);
+    if (!result.success) {
+      // Why: etag_mismatch などの error code を捨てず propagate (Error envelope audit F4)
+      return createErrorResponse(result.message || result.error, null,
+        result.error ? { error: result.error, currentEtag: result.currentEtag } : null);
+    }
     return createSuccessResponse('lesson を終了しました。振り返り画面でいつでも再生できます。', {
       lesson: result.lesson,
       reviewUrl: '?mode=review&lessonId=' + encodeURIComponent(lessonId)
