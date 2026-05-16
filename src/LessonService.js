@@ -287,29 +287,38 @@ function __requireLessonOwner_(userId, lessonId) {
 // ----- Lesson テンプレート (Phase 1 は 1 種類固定) -----
 
 // 児童・教師どちらが画面を見ても自然な命名にする。
-// 出典: 田村学「カリキュラム・マネジメント」(探究3段階) / 文科省・社会科学習指導要領 (つかむ・しらべる・まとめる) /
-//       道徳科学習指導要領 (導入・展開・終末)。formTemplate は数直線/マトリクスが「立場の揺らぎ」を最も可視化できる。
+//
+// 設計指針 (2026-05-16 更新):
+//   - phase 名は「教師の指導案語」ではなく「児童が黒板で見る語」に揃える。
+//     例: 「本時」「導入」「終末」(指導案語) → 「めあて」「みんなで考える」「ふりかえり」(児童語)。
+//   - 道徳科学習指導要領も「めあて」「振り返り」を板書に出すことを推奨 (光村図書 / 沖縄県教委)。
+//   - このアプリは道徳に限らず全教科 (国語/算数/社会/外国語/総合等) で使われる前提なので、
+//     "定番" テンプレは教科ニュートラルにする (旧「道徳・定番」→「授業の定番」)。
+//   - 内部 key (doutoku-3phase) は backward-compat のため残置 (UI には出ない slug)。
+//
+// 出典: 田村学「カリキュラム・マネジメント」(探究3段階) / 光村図書 道徳 Q&A「めあてと振り返り」/
+//       沖縄県教委 R4「めあて・振り返り」資料 / 文科省 特別の教科 道徳編。
 const LESSON_TEMPLATES = {
-  'doutoku-3phase': {
-    label: '道徳・定番',
-    description: '導入 → 本時 → 振り返り',
+  'doutoku-3phase': {  // 旧名残置 (= "standard-3phase" 相当)。tests / 既存 lessonJson との互換のため。
+    label: '授業の定番（3段階）',
+    description: 'めあて → みんなで考える → ふりかえり',
     phases: [
-      { name: '導入', formTemplate: 'numberline', question: 'あなたの立場は？' },
-      { name: '本時', formTemplate: 'matrix', question: 'なぜそう考えますか？' },
-      { name: '振り返り', formTemplate: 'numberline', question: '議論を経て、あなたの立場は？' }
+      { name: 'めあて', formTemplate: 'numberline', question: 'いまの自分の考えは？' },
+      { name: 'みんなで考える', formTemplate: 'matrix', question: 'なぜそう思った？' },
+      { name: 'ふりかえり', formTemplate: 'numberline', question: '話し合って、いまの考えは？' }
     ]
   },
   'kid-3phase': {
-    label: '児童向け',
-    description: 'はじめの考え → みんなで考える → ふりかえり',
+    label: '低学年向け',
+    description: 'いまの考え → みんなで話す → これからの考え',
     phases: [
-      { name: 'はじめの考え', formTemplate: 'numberline', question: 'いまの考えは？' },
-      { name: 'みんなで考える', formTemplate: 'matrix', question: 'どうしてそう思った？' },
-      { name: 'ふりかえり', formTemplate: 'numberline', question: 'はなしあって、いまの考えは？' }
+      { name: 'いまの考え', formTemplate: 'numberline', question: 'いまの考えは？' },
+      { name: 'みんなで話す', formTemplate: 'matrix', question: 'どうしてそう思った？' },
+      { name: 'これからの考え', formTemplate: 'numberline', question: 'はなしあって、いまの考えは？' }
     ]
   },
   'inquiry-3phase': {
-    label: '探究 (田村モデル)',
+    label: '探究（田村モデル）',
     description: '出会う → ふかめる → つなげる',
     phases: [
       { name: '出会う', formTemplate: 'pie', question: 'まずどっちだと思う？' },
@@ -318,7 +327,7 @@ const LESSON_TEMPLATES = {
     ]
   },
   'before-after-2phase': {
-    label: '議論前後 (2 段階)',
+    label: '議論前後（2段階）',
     description: '議論のまえ → 議論のあと',
     phases: [
       { name: '議論のまえ', formTemplate: 'numberline', question: 'いまのあなたの立場は？' },
@@ -625,8 +634,39 @@ function __extractFormPublishedId_(formUrl) {
   return m ? m[1] : '';
 }
 
-// 取り込みた snapshot 群から unique class 名を昇順で抽出。
-//   wizard の getKnownClassesForUser が将来的に補完候補に使えるよう、classes 列にも保存する。
+// ボード行を「実践報告書 / 過去授業 archive 用」の slim row に整形する。
+//   個人特定可能フィールド (name / email / emailHash / reactions / highlight / opinion / id) は除外。
+//   `includeName: true` で名前列も残せる (校内資料用)。
+//   exportBoardData (AdminApis.js) と __buildImportSnapshotRows_ で共用。
+function __projectBoardRowForExport_(row, options) {
+  const includeName = options && options.includeName === true;
+  const out = {
+    rowIndex: row.rowIndex,
+    timestamp: row.formattedTimestamp || row.timestamp || '',
+    class: row.class || '',
+    answer: row.answer,
+    reason: row.reason,
+    numericX: row.numericX,
+    numericY: row.numericY
+  };
+  if (includeName) out.name = row.name || '';
+  return out;
+}
+
+// answer / reason を cap 文字に切り詰める。row を mutate し、切り詰めたかを返す。
+function __truncateRowAnswerReason_(r, cap) {
+  let truncated = false;
+  if (typeof r.answer === 'string' && r.answer.length > cap) {
+    r.answer = r.answer.slice(0, cap) + '…';
+    truncated = true;
+  }
+  if (typeof r.reason === 'string' && r.reason.length > cap) {
+    r.reason = r.reason.slice(0, cap) + '…';
+    truncated = true;
+  }
+  return truncated;
+}
+
 function __extractClassesFromSnapshots_(snapshots) {
   const seen = new Set();
   (snapshots || []).forEach((s) => {
@@ -640,91 +680,90 @@ function __extractClassesFromSnapshots_(snapshots) {
 // 1 phase 分の rows を privacy-stripped + budget-truncated な snapshot rows に整形。
 //   __captureSnapshot_ と budget は揃える (LESSON_PHASE_SNAPSHOT_BUDGET_BYTES)。
 function __buildImportSnapshotRows_(rawRows) {
-  const slim = (rawRows || []).map((r) => ({
-    rowIndex: r.rowIndex,
-    timestamp: r.formattedTimestamp || r.timestamp || '',
-    class: r.class || '',
-    answer: r.answer,
-    reason: r.reason,
-    numericX: r.numericX,
-    numericY: r.numericY
-    // intentionally drop: name, email, emailHash, reactions, highlight, opinion, id
-  }));
+  const slim = (rawRows || []).map(r => __projectBoardRowForExport_(r));
   let total = 0;
   let truncated = false;
   for (let i = 0; i < slim.length; i++) {
     const r = slim[i];
     let sz = JSON.stringify(r).length;
     if (total + sz > LESSON_PHASE_SNAPSHOT_BUDGET_BYTES) {
-      if (typeof r.answer === 'string' && r.answer.length > 40) {
-        r.answer = r.answer.slice(0, 60) + '…';
+      if (__truncateRowAnswerReason_(r, 60)) {
+        truncated = true;
+        sz = JSON.stringify(r).length;
       }
-      if (typeof r.reason === 'string' && r.reason.length > 40) {
-        r.reason = r.reason.slice(0, 60) + '…';
-      }
-      truncated = true;
-      sz = JSON.stringify(r).length;
     }
     total += sz;
   }
   return { rows: slim, truncated };
 }
 
+const LESSON_SHRINK_STAGES = Object.freeze({
+  CAP80: 'cap80',
+  CAP40: 'cap40',
+  ROW_DROP: 'rowDrop',
+  META_ONLY: 'metaOnly'
+});
+
 // lessonJson 全体が LESSON_JSON_MAX_BYTES を超えていたら snapshots を段階的に縮めて収める。
 //   段階: ① answer/reason 80 char cap → ② 40 char cap → ③ 末尾から行を間引き → ④ snapshots 空。
 //   Why: 振り返り wordcloud のように 1 行 200-700 char で cell 上限 (50000) 超過するケースを救う。
-//
-// SHRINK_BUFFER は呼び出し側が shrink 後に meta.shrinkStage 等を書き足すための headroom。
-//   呼び出し側で書き足してから再 measure すると数十 byte 戻るため、target を厳しく取る。
-const LESSON_SHRINK_BUFFER_BYTES = 200;
+// 結果は lessonJson を mutate し、shrink した場合は `meta.shrinkStage` を直接書き込む
+//   (caller は単に呼ぶだけでよく、後から meta を書き戻す必要なし)。
+// パフォーマンス: row drop は per-snapshot サイズキャッシュで `JSON.stringify(snapshot)` を 1 iter / 1 回に。
+//   全件 stringify は cap 段階と初回 measure のみ。
 function __shrinkLessonJsonToFit_(lessonJson) {
-  const TARGET = LESSON_JSON_MAX_BYTES - LESSON_SHRINK_BUFFER_BYTES;
   const measure = () => JSON.stringify(lessonJson || {}).length;
-  if (measure() <= TARGET) return { shrunk: false, finalSize: measure() };
+  if (measure() <= LESSON_JSON_MAX_BYTES) return { shrunk: false };
 
   const snapshots = (lessonJson && Array.isArray(lessonJson.snapshots)) ? lessonJson.snapshots : [];
-  if (snapshots.length === 0) return { shrunk: false, finalSize: measure() };
+  if (snapshots.length === 0) return { shrunk: false };
+  if (!lessonJson.meta) lessonJson.meta = {};
 
-  const truncateRowsToCap = (cap) => {
+  const truncateAllRowsToCap = (cap) => {
     snapshots.forEach((s) => {
       (s.rows || []).forEach((r) => {
-        if (typeof r.answer === 'string' && r.answer.length > cap) {
-          r.answer = r.answer.slice(0, cap) + '…';
-          s.truncated = true;
-        }
-        if (typeof r.reason === 'string' && r.reason.length > cap) {
-          r.reason = r.reason.slice(0, cap) + '…';
-          s.truncated = true;
-        }
+        if (__truncateRowAnswerReason_(r, cap)) s.truncated = true;
       });
     });
   };
 
-  truncateRowsToCap(80);
-  if (measure() <= TARGET) return { shrunk: true, finalSize: measure(), stage: 'cap80' };
+  truncateAllRowsToCap(80);
+  if (measure() <= LESSON_JSON_MAX_BYTES) {
+    lessonJson.meta.shrinkStage = LESSON_SHRINK_STAGES.CAP80;
+    return { shrunk: true };
+  }
 
-  truncateRowsToCap(40);
-  if (measure() <= TARGET) return { shrunk: true, finalSize: measure(), stage: 'cap40' };
+  truncateAllRowsToCap(40);
+  if (measure() <= LESSON_JSON_MAX_BYTES) {
+    lessonJson.meta.shrinkStage = LESSON_SHRINK_STAGES.CAP40;
+    return { shrunk: true };
+  }
 
-  // 大きい phase から末尾を 1 行ずつ pop (新しい順 = 残すのは古い順)。truncated + droppedRows を記録。
-  let guard = 1000;
-  while (measure() > TARGET && guard-- > 0) {
+  const snapshotSizes = snapshots.map(s => JSON.stringify(s).length);
+  let totalSize = measure();
+  let guard = 5000;
+  while (totalSize > LESSON_JSON_MAX_BYTES && guard-- > 0) {
     let biggestIdx = -1;
     let biggestSize = -1;
-    snapshots.forEach((s, i) => {
-      const sz = JSON.stringify(s).length;
-      if (sz > biggestSize && (s.rows || []).length > 0) {
-        biggestSize = sz;
+    for (let i = 0; i < snapshots.length; i++) {
+      if ((snapshots[i].rows || []).length > 0 && snapshotSizes[i] > biggestSize) {
+        biggestSize = snapshotSizes[i];
         biggestIdx = i;
       }
-    });
+    }
     if (biggestIdx < 0) break;
     const target = snapshots[biggestIdx];
-    target.droppedRows = (target.droppedRows || 0) + 1;
     target.rows.pop();
+    target.droppedRows = (target.droppedRows || 0) + 1;
     target.truncated = true;
+    const newSize = JSON.stringify(target).length;
+    totalSize -= (snapshotSizes[biggestIdx] - newSize);
+    snapshotSizes[biggestIdx] = newSize;
   }
-  if (measure() <= TARGET) return { shrunk: true, finalSize: measure(), stage: 'rowDrop' };
+  if (totalSize <= LESSON_JSON_MAX_BYTES) {
+    lessonJson.meta.shrinkStage = LESSON_SHRINK_STAGES.ROW_DROP;
+    return { shrunk: true };
+  }
 
   snapshots.forEach((s) => {
     s.droppedRows = (s.rowCount || 0);
@@ -732,7 +771,8 @@ function __shrinkLessonJsonToFit_(lessonJson) {
     s.truncated = true;
     s.reason = (s.reason ? s.reason + ';' : '') + 'OVERSIZE_SHRINK';
   });
-  return { shrunk: true, finalSize: measure(), stage: 'metaOnly' };
+  lessonJson.meta.shrinkStage = LESSON_SHRINK_STAGES.META_ONLY;
+  return { shrunk: true };
 }
 
 /**
@@ -801,7 +841,6 @@ function importLessonFromProfiles(userId, options) {
       prev = idx;
     }
 
-    // snapshots: 各 phase のデータを取得 (privacy strip)
     const snapshots = phases.map((ph, idx) => {
       const base = {
         phaseIndex: idx,
@@ -860,11 +899,8 @@ function importLessonFromProfiles(userId, options) {
 
     // セルサイズ上限 (50000 char) に収まるまで snapshots を段階的に縮める。
     //   原本データは元 spreadsheet に残るので、ここでは「過去授業の概形」を保てれば十分。
+    //   shrink 関数自身が lessonJson.meta.shrinkStage を書き込むので caller は意識不要。
     const shrinkInfo = __shrinkLessonJsonToFit_(lessonJson);
-    if (shrinkInfo.shrunk) {
-      lessonJson.meta.shrinkStage = shrinkInfo.stage;
-      lessonJson.meta.shrunkSize = shrinkInfo.finalSize;
-    }
 
     const record = {
       lessonId,
@@ -884,8 +920,8 @@ function importLessonFromProfiles(userId, options) {
     return createSuccessResponse('lesson を過去授業として記録しました', {
       lesson: written,
       shrunk: shrinkInfo.shrunk,
-      shrinkStage: shrinkInfo.stage || null,
-      sizeBytes: shrinkInfo.finalSize
+      shrinkStage: lessonJson.meta.shrinkStage || null,
+      sizeBytes: written.sizeBytes
     });
   } catch (error) {
     logError_('importLessonFromProfiles', error);
@@ -956,6 +992,11 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
     if (opts.xLow || opts.xHigh) displaySettings.xAxisLabels = { min: opts.xLow || '', max: opts.xHigh || '' };
     if (opts.yLow || opts.yHigh) displaySettings.yAxisLabels = { min: opts.yLow || '', max: opts.yHigh || '' };
   }
+  // 揺らぎ追跡: phase or lesson レベルの allowResubmit を config.allowResubmit に反映する。
+  //   これで board frontend (page.viz.js) が ghost dot / swing trace を描画する。
+  const phaseAllowResubmit = opts.allowResubmit;
+  const lessonAllowResubmit = Boolean(lessonJson && lessonJson.allowResubmit);
+  const allowResubmit = phaseAllowResubmit != null ? Boolean(phaseAllowResubmit) : lessonAllowResubmit;
   return {
     formUrl: phase.formUrl,
     spreadsheetId: phase.spreadsheetId,
@@ -963,6 +1004,7 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
     formTitle: (lessonJson && lessonJson.name) || phase.name,
     columnMapping: phase.columnMapping || {},
     displaySettings,
+    allowResubmit,
     activeLessonId: lessonId
   };
 }
@@ -1102,11 +1144,30 @@ function startLesson(userId, lessonId) {
 
     try {
       // Form 生成ループ (i=0..N-1)
+      //   templateOptions には UI の wizard で教師が入力した値を 100% 流す:
+      //     - lessonName + phaseName: Form タイトル "<lesson> / <phase>" に
+      //     - question: Form 全体の description に + scaleTitle / choiceTitle の fallback
+      //     - classChoices: クラス選択肢 (lesson.classes そのまま)
+      //     - lowLabel/highLabel/xLow/xHigh/yLow/yHigh: 線形尺度の両端ラベル
+      //     - choices: pie/board の選択肢
+      const lessonName = (found && found.lesson && found.lesson.name) || '';
+      const sharedClasses = (lessonJson && Array.isArray(lessonJson.classes)) ? lessonJson.classes : [];
+      // 揺らぎ追跡: lesson レベルの allowResubmit を全 phase に適用 (議論前後の意見変化を取りたい)。
+      //   phase 個別に templateOptions.allowResubmit があればそれを優先。
+      const lessonAllowResubmit = Boolean(lessonJson && lessonJson.allowResubmit);
       for (let i = 0; i < phases.length; i++) {
         const phase = phases[i];
         if (phase.formId) continue; // resume: 既に作成済みは skip
 
-        const formResult = createTemplateForm(phase.formTemplate, phase.templateOptions || {});
+        const phaseAllowResubmit = phase.templateOptions && phase.templateOptions.allowResubmit;
+        const formOpts = Object.assign({}, phase.templateOptions || {}, {
+          lessonName,
+          phaseName: phase.name || '',
+          question: phase.question || '',
+          classChoices: sharedClasses,
+          allowResubmit: phaseAllowResubmit != null ? Boolean(phaseAllowResubmit) : lessonAllowResubmit
+        });
+        const formResult = createTemplateForm(phase.formTemplate, formOpts);
         if (!formResult || !formResult.success) {
           // Partial failure: ここまでの進捗を draft のまま保存して resumable に。
           __updateLessonRow_(lessonId, { lessonJson });

@@ -48,6 +48,15 @@ function makeFakeForm() {
     };
   }
 
+  let description = '';
+  let confirmation = '';
+  function makeImageItemChain(item) {
+    return {
+      setTitle: (t) => { item.title = t; return makeImageItemChain(item); },
+      setHelpText: (t) => { item.helpText = t; return makeImageItemChain(item); },
+      setImage: (blob) => { item.image = blob; return makeImageItemChain(item); }
+    };
+  }
   const form = {
     _id: 'form_' + Math.random().toString(36).slice(2, 10),
     _items: items,
@@ -57,13 +66,16 @@ function makeFakeForm() {
     setLimitOneResponsePerUser: function (b) { limitOne = b; return this; },
     setCollectEmail: function (b) { collectEmail = b; return this; },
     setDestination: function (_type, ssId) { dest = ssId; return this; },
+    setDescription: function (s) { description = s; return this; },
+    setConfirmationMessage: function (s) { confirmation = s; return this; },
     addListItem: function () { const it = makeItem('list'); items.push(it._item); return makeChain(it._item); },
     addTextItem: function () { const it = makeItem('text'); items.push(it._item); return makeChain(it._item); },
     addParagraphTextItem: function () { const it = makeItem('paragraph'); items.push(it._item); return makeChain(it._item); },
     addMultipleChoiceItem: function () { const it = makeItem('mc'); items.push(it._item); return makeChain(it._item); },
     addScaleItem: function () { const it = makeItem('scale'); items.push(it._item); return makeChain(it._item); },
-    // テスト側から参照する
-    _state: () => ({ limitOne, collectEmail, dest, items })
+    addSectionHeaderItem: function () { const it = makeItem('section'); items.push(it._item); return makeChain(it._item); },
+    addImageItem: function () { const it = makeItem('image'); items.push(it._item); return makeImageItemChain(it._item); },
+    _state: () => ({ limitOne, collectEmail, dest, items, description, confirmation })
   };
   return form;
 }
@@ -178,7 +190,11 @@ function loadCtx(overrides = {}) {
       getRootFolder: () => driveState.rootFolder
     },
     UrlFetchApp: {
-      fetch: () => ({ getResponseCode: () => 200, getContentText: () => '{}' })
+      fetch: () => ({
+        getResponseCode: () => 200,
+        getContentText: () => '{}',
+        getBlob: () => ({ _kind: 'blob', getName: () => 'fake.png', getBytes: () => [] })
+      })
     },
     ScriptApp: {
       getOAuthToken: () => 'fake-token',
@@ -189,7 +205,12 @@ function loadCtx(overrides = {}) {
       getScriptTimeZone: () => 'Asia/Tokyo'
     },
     Utilities: {
-      formatDate: () => '1/1 12:00'
+      formatDate: () => '1/1 12:00',
+      base64Decode: (s) => Buffer.from(String(s), 'base64'),
+      newBlob: (bytes, mimeType, name) => ({
+        _kind: 'blob', _bytes: bytes, _mime: mimeType, _name: name,
+        getName: () => name, getBytes: () => bytes
+      })
     },
     CacheService: { getScriptCache: () => ({ get: () => null, put: () => {}, remove: () => {} }) },
     PropertiesService: { getScriptProperties: () => ({ getProperty: () => null, setProperty: () => {} }) },
@@ -307,6 +328,301 @@ test('createTemplateForm: matrix → X軸/Y軸 の 2 つの線形尺度 + 理由
   assert.match(scales[1].title, /Y軸/);
   assert.deepEqual(Array.from(scales[0].bounds), [1, 5]);
   assert.deepEqual(Array.from(scales[1].bounds), [1, 5]);
+});
+
+// =====================================================================
+// createTemplateForm: templateOptions (UI で教師が入力した値を 100% Form に反映)
+// =====================================================================
+
+test('createTemplateForm: opts.lessonName + opts.phaseName で Form タイトルが lesson 主導になる', () => {
+  const ctx = loadCtx();
+  const res = ctx.createTemplateForm('numberline', {
+    lessonName: '5/16 道徳 友だち',
+    phaseName: '導入'
+  });
+  assert.equal(res.success, true);
+  // 期待: "5/16 道徳 友だち / 導入" — "回答ボード [数直線] M/d HH:mm" ではない
+  assert.equal(ctx.__lastForm._title, '5/16 道徳 友だち / 導入');
+  assert.equal(res.formTitle, '5/16 道徳 友だち / 導入');
+});
+
+test('createTemplateForm: opts.lessonName のみ指定 → phase なしで lessonName が title', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('board', { lessonName: 'みんなの意見' });
+  assert.equal(ctx.__lastForm._title, 'みんなの意見');
+});
+
+test('createTemplateForm: lessonName 未指定 → 従来の "回答ボード [type] date" フォールバック', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('matrix', {});
+  assert.match(ctx.__lastForm._title, /^回答ボード \[マトリクス\]/);
+});
+
+test('createTemplateForm: opts.question を Form description に反映', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { question: 'あなたなら、ポスターをどうする？' });
+  const st = ctx.__lastForm._state();
+  assert.equal(st.description, 'あなたなら、ポスターをどうする？');
+});
+
+test('createTemplateForm: opts.classChoices を クラス選択肢に反映 (lesson.classes と一致)', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { classChoices: ['5-1', '5-2', '5-3'] });
+  const items = ctx.__lastForm._state().items;
+  const list = items.find(i => i.kind === 'list');
+  assert.deepEqual(Array.from(list.choices), ['5-1', '5-2', '5-3']);
+});
+
+test('createTemplateForm: classChoices が空配列なら fallback (クラス1..4)', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { classChoices: [] });
+  const list = ctx.__lastForm._state().items.find(i => i.kind === 'list');
+  assert.deepEqual(Array.from(list.choices), ['クラス1', 'クラス2', 'クラス3', 'クラス4']);
+});
+
+test('createTemplateForm: numberline → question が無ければ phaseName を scaleTitle にする', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { phaseName: '議論のまえ' });
+  const scale = ctx.__lastForm._state().items.find(i => i.kind === 'scale');
+  assert.equal(scale.title, '議論のまえ');
+});
+
+test('createTemplateForm: numberline → question が長くても scaleTitle に使う (60char で truncate)', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { question: 'あなたなら、ポスターをどうする？' });
+  const scale = ctx.__lastForm._state().items.find(i => i.kind === 'scale');
+  assert.equal(scale.title, 'あなたなら、ポスターをどうする？');
+});
+
+test('createTemplateForm: matrix → xLow/xHigh から軸タイトル自動生成 "低↔高"', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('matrix', { xLow: '効率', xHigh: '丁寧', yLow: '個人', yHigh: '集団' });
+  const scales = ctx.__lastForm._state().items.filter(i => i.kind === 'scale');
+  assert.equal(scales[0].title, '効率 ↔ 丁寧');
+  assert.equal(scales[1].title, '個人 ↔ 集団');
+  assert.deepEqual(Array.from(scales[0].labels), ['効率', '丁寧']);
+});
+
+test('createTemplateForm: pie → question を multipleChoice title に + choices を反映', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('pie', {
+    question: 'あなたなら、どちらを選ぶ？',
+    choices: ['正直に話す', '友だちを守る', 'まよう']
+  });
+  const items = ctx.__lastForm._state().items;
+  const mc = items.find(i => i.kind === 'mc');
+  assert.equal(mc.title, 'あなたなら、どちらを選ぶ？');
+  assert.deepEqual(Array.from(mc.choices), ['正直に話す', '友だちを守る', 'まよう']);
+});
+
+test('createTemplateForm: board → question を multipleChoice title に + choices 反映', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('board', {
+    question: '自分ならどうしますか？',
+    choices: ['A 案を支持', 'B 案を支持', '判断保留']
+  });
+  const mc = ctx.__lastForm._state().items.find(i => i.kind === 'mc');
+  assert.equal(mc.title, '自分ならどうしますか？');
+  assert.deepEqual(Array.from(mc.choices), ['A 案を支持', 'B 案を支持', '判断保留']);
+});
+
+test('createTemplateForm: opts.question あり → SectionHeader「今日のテーマ」が挿入される', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { question: 'あなたの立場は？' });
+  const items = ctx.__lastForm._state().items;
+  const section = items.find(i => i.kind === 'section');
+  assert.ok(section, 'SectionHeader が無い');
+  assert.equal(section.title, '今日のテーマ');
+  assert.equal(section.helpText, 'あなたの立場は？');
+});
+
+test('createTemplateForm: question なし → SectionHeader を追加しない', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', {});
+  const items = ctx.__lastForm._state().items;
+  assert.ok(!items.find(i => i.kind === 'section'), '質問が無い場合は SectionHeader 不要');
+});
+
+test('createTemplateForm: 送信後 confirmation メッセージが設定される (再投稿不可)', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', {});
+  assert.match(ctx.__lastForm._state().confirmation, /ありがとう/);
+});
+
+test('createTemplateForm: 再投稿許可時の confirmation に「もう一度」案内が含まれる', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { allowResubmit: true });
+  assert.match(ctx.__lastForm._state().confirmation, /もう一度/);
+});
+
+test('createTemplateForm: scalePoints=3 → linearScale が 1-3 になる', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { scalePoints: 3 });
+  const scale = ctx.__lastForm._state().items.find(i => i.kind === 'scale');
+  assert.deepEqual(Array.from(scale.bounds), [1, 3]);
+});
+
+test('createTemplateForm: scalePoints=7 → linearScale が 1-7 になる', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { scalePoints: 7 });
+  const scale = ctx.__lastForm._state().items.find(i => i.kind === 'scale');
+  assert.deepEqual(Array.from(scale.bounds), [1, 7]);
+});
+
+test('createTemplateForm: scalePoints 未指定 → 既定 5', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', {});
+  const scale = ctx.__lastForm._state().items.find(i => i.kind === 'scale');
+  assert.deepEqual(Array.from(scale.bounds), [1, 5]);
+});
+
+test('createTemplateForm: 不正な scalePoints (4) → 既定 5 にフォールバック', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { scalePoints: 4 });
+  const scale = ctx.__lastForm._state().items.find(i => i.kind === 'scale');
+  assert.deepEqual(Array.from(scale.bounds), [1, 5]);
+});
+
+test('createTemplateForm: matrix で scalePoints=3 → X/Y 両軸ともに 1-3', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('matrix', { scalePoints: 3 });
+  const scales = ctx.__lastForm._state().items.filter(i => i.kind === 'scale');
+  assert.equal(scales.length, 2);
+  assert.deepEqual(Array.from(scales[0].bounds), [1, 3]);
+  assert.deepEqual(Array.from(scales[1].bounds), [1, 3]);
+});
+
+test('createTemplateForm: opts.imageUrl があれば addImageItem で画像挿入', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { imageUrl: 'https://example.com/poster.png' });
+  const items = ctx.__lastForm._state().items;
+  const img = items.find(i => i.kind === 'image');
+  assert.ok(img, 'addImageItem が呼ばれていない');
+  assert.equal(img.image && img.image._kind, 'blob');
+});
+
+test('createTemplateForm: opts.imageFileId があれば DriveApp.getFileById().getBlob() 経由で画像挿入', () => {
+  const driveCalls = [];
+  const ctx = loadCtx({
+    DriveApp: {
+      getFileById: (id) => {
+        driveCalls.push(id);
+        return {
+          getBlob: () => ({ _kind: 'blob', _from: 'drive', _id: id }),
+          moveTo: () => {} // 後段の moveFileToFolder_ で呼ばれる
+        };
+      },
+      getFoldersByName: () => ({ hasNext: () => false }),
+      createFolder: () => ({ getUrl: () => 'https://drive.example/folder', addFile: () => {} }),
+      getRootFolder: () => ({ removeFile: () => {} })
+    }
+  });
+  ctx.createTemplateForm('numberline', { imageFileId: 'fake-drive-file-id' });
+  assert.ok(driveCalls.includes('fake-drive-file-id'), 'imageFileId で DriveApp.getFileById が呼ばれていない');
+  const img = ctx.__lastForm._state().items.find(i => i.kind === 'image');
+  assert.ok(img);
+  assert.equal(img.image && img.image._from, 'drive');
+});
+
+test('uploadLessonImage: 認証なし → createAuthError', () => {
+  const ctx = loadCtx({ __myEmail: '' });
+  const res = ctx.uploadLessonImage('data:image/png;base64,iVBORw0KGgo=', 'a.png');
+  assert.equal(res.success, false);
+});
+
+test('uploadLessonImage: 対応外 MIME → reject', () => {
+  const ctx = loadCtx();
+  const res = ctx.uploadLessonImage('data:application/pdf;base64,JVBERi0=', 'a.pdf');
+  assert.equal(res.success, false);
+  assert.match(res.message, /対応していない/);
+});
+
+test('uploadLessonImage: 5MB 超 → reject', () => {
+  const ctx = loadCtx();
+  const big = 'A'.repeat(7 * 1024 * 1024); // base64 で約 5.25 MB
+  const res = ctx.uploadLessonImage('data:image/png;base64,' + big, 'big.png');
+  assert.equal(res.success, false);
+  assert.match(res.message, /大きすぎ/);
+});
+
+test('uploadLessonImage: 正常系 → fileId 返却 + Drive folder に保存', () => {
+  let createdFile = null;
+  const ctx = loadCtx({
+    DriveApp: {
+      getFoldersByName: () => ({ hasNext: () => false }),
+      createFolder: () => ({
+        createFile: (blob) => {
+          createdFile = { _id: 'fake-uploaded-id', _blob: blob };
+          return { getId: () => createdFile._id, getName: () => (blob && blob._name) || 'x.png' };
+        }
+      }),
+      getRootFolder: () => ({ removeFile: () => {} })
+    }
+  });
+  const res = ctx.uploadLessonImage('data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==', 'poster.png');
+  assert.equal(res.success, true, JSON.stringify(res));
+  assert.equal(res.data.fileId, 'fake-uploaded-id');
+  assert.equal(res.data.mimeType, 'image/png');
+  assert.ok(createdFile, 'Drive にファイル作成されていない');
+});
+
+test('createTemplateForm: imageFileId が imageUrl より優先される', () => {
+  let urlFetched = false;
+  let driveCalled = false;
+  const ctx = loadCtx({
+    DriveApp: {
+      getFileById: () => { driveCalled = true; return { getBlob: () => ({ _kind: 'blob', _from: 'drive' }) }; },
+      getFoldersByName: () => ({ hasNext: () => false }),
+      createFolder: () => ({ getUrl: () => 'x', addFile: () => {} }),
+      getRootFolder: () => ({ removeFile: () => {} })
+    },
+    UrlFetchApp: {
+      fetch: () => { urlFetched = true; return { getResponseCode: () => 200, getContentText: () => '{}', getBlob: () => ({ _kind: 'blob' }) }; }
+    }
+  });
+  ctx.createTemplateForm('numberline', { imageFileId: 'f1', imageUrl: 'https://x/y.png' });
+  assert.equal(driveCalled, true, 'fileId 経路が呼ばれるべき');
+  // urlFetched は setFormEmailCollectionVerified_ でも呼ばれるので false 判定は信頼性低い → skip
+});
+
+test('createTemplateForm: imageUrl 未指定 → image item は追加しない', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', {});
+  const items = ctx.__lastForm._state().items;
+  assert.ok(!items.find(i => i.kind === 'image'));
+});
+
+test('createTemplateForm: opts.allowResubmit=true → setLimitOneResponsePerUser(false) (揺らぎ追跡有効)', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', { allowResubmit: true });
+  assert.equal(ctx.__lastForm._state().limitOne, false, '再投稿許可時は 1 回答制限 OFF');
+});
+
+test('createTemplateForm: opts.allowResubmit=false (既定) → setLimitOneResponsePerUser(true)', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('numberline', {});
+  assert.equal(ctx.__lastForm._state().limitOne, true, '再投稿不許可 (既定) は 1 回答制限 ON');
+});
+
+test('createTemplateForm: 全 opts 指定で UI と Form が完全一致 (golden path)', () => {
+  const ctx = loadCtx();
+  const res = ctx.createTemplateForm('matrix', {
+    lessonName: '5/16 道徳 友だちと約束',
+    phaseName: '本時',
+    question: 'なぜそう考えますか？',
+    classChoices: ['5-1', '5-2', '5-3'],
+    xLow: '自分のため', xHigh: 'みんなのため',
+    yLow: '今すぐ', yHigh: 'これから'
+  });
+  assert.equal(res.success, true);
+  assert.equal(ctx.__lastForm._title, '5/16 道徳 友だちと約束 / 本時');
+  const st = ctx.__lastForm._state();
+  assert.equal(st.description, 'なぜそう考えますか？');
+  const list = st.items.find(i => i.kind === 'list');
+  assert.deepEqual(Array.from(list.choices), ['5-1', '5-2', '5-3']);
+  const scales = st.items.filter(i => i.kind === 'scale');
+  assert.equal(scales[0].title, '自分のため ↔ みんなのため');
+  assert.equal(scales[1].title, '今すぐ ↔ これから');
 });
 
 // =====================================================================

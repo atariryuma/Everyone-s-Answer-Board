@@ -747,9 +747,32 @@
     setText('quadrant-lh-label', q.lh);
     setText('quadrant-ll-label', q.ll);
 
-    // 4) 再投稿許可
+    // 4) 再投稿許可: checkbox の状態を反映 + toggle 時に live Form の
+    //    setLimitOneResponsePerUser を同期する (config だけ更新しても Form 側が
+    //    1 回答制限のままだと「揺らぎ」追跡が実体としては不可能なため)。
     const allowEl = document.getElementById('allow-resubmit');
-    if (allowEl) allowEl.checked = !!config.allowResubmit;
+    if (allowEl) {
+      allowEl.checked = !!config.allowResubmit;
+      if (!allowEl.__formSyncAttached) {
+        allowEl.__formSyncAttached = true;
+        allowEl.addEventListener('change', () => {
+          const formId = (window.UNIFIED_CONFIG && (window.UNIFIED_CONFIG.formId || window.UNIFIED_CONFIG.activeFormId)) || '';
+          const formUrl = (window.UNIFIED_CONFIG && window.UNIFIED_CONFIG.formUrl) || '';
+          const target = formId || formUrl;
+          if (!target) return; // Form 未連携時は config 保存のみで OK (新規 Form 作成時に反映される)
+          google.script.run
+            .withSuccessHandler((res) => {
+              if (res && res.success) {
+                setAutoSaveStatus('✓ Form 設定も更新しました', 'success');
+              } else {
+                setAutoSaveStatus('⚠ Form 設定の更新に失敗', 'error');
+              }
+            })
+            .withFailureHandler(() => setAutoSaveStatus('⚠ Form 設定の更新に失敗', 'error'))
+            .setFormAllowResubmit(target, allowEl.checked);
+        });
+      }
+    }
 
     // 4.5) 表示設定の checkbox 群（showNames / showReactions）
     //   Why: getDisplaySettings() の save パスは checkbox を読むのに、これまで load パスで
@@ -3606,9 +3629,6 @@
       });
     }
 
-    // クリックイベント委譲 (ul 全体で受ける)。
-    //   long-running なものは withBusy で button に spinner を出して連打抑制。
-    //   open (新タブ / mode 切替) は navOnce で 800ms ガード + 視覚的には変えない。
     const busyBtns = () => window.sharedUtilities && window.sharedUtilities.buttons;
     document.addEventListener('click', (event) => {
       const openTarget = event.target.closest('[data-lesson-open]');
@@ -3962,16 +3982,23 @@
     }
 
     // formTemplate ごとの templateOptions 既定値。renderPhaseCards / 形式変更時に呼ぶ。
+    const SCALE_POINTS_ALLOWED = [3, 5, 7];
+    const SCALE_POINTS_HINT = { 3: '低学年', 5: '既定', 7: '高学年' };
+
     function normalizeTemplateOptions(opts, formTemplate) {
       const o = (opts && typeof opts === 'object') ? Object.assign({}, opts) : {};
+      // 共通: 画像 URL + スケール粒度 (numberline / matrix 用)
+      if (typeof o.imageUrl !== 'string') o.imageUrl = '';
       if (formTemplate === 'numberline') {
         if (typeof o.lowLabel !== 'string') o.lowLabel = 'そう思わない';
         if (typeof o.highLabel !== 'string') o.highLabel = 'とてもそう思う';
+        if (!SCALE_POINTS_ALLOWED.includes(o.scalePoints)) o.scalePoints = 5;
       } else if (formTemplate === 'matrix') {
         if (typeof o.xLow !== 'string') o.xLow = '低い';
         if (typeof o.xHigh !== 'string') o.xHigh = '高い';
         if (typeof o.yLow !== 'string') o.yLow = '低い';
         if (typeof o.yHigh !== 'string') o.yHigh = '高い';
+        if (!SCALE_POINTS_ALLOWED.includes(o.scalePoints)) o.scalePoints = 5;
       } else if (formTemplate === 'pie' || formTemplate === 'board') {
         if (!Array.isArray(o.choices) || o.choices.length < 2) {
           o.choices = formTemplate === 'pie'
@@ -4090,6 +4117,52 @@
       );
     }
 
+    // 共通: 画像入力 (drop / pick / paste) + スケール粒度 (numberline/matrix のみ)
+    function renderPhaseCommonOptions(p, i, hasScale) {
+      const esc = window.sharedUtilities.security.escapeHtml;
+      const o = p.templateOptions || {};
+      const hasImage = Boolean(o.imageFileId || o.imageDataUrl);
+      const previewSrc = o.imageDataUrl || ''; // upload 直後はローカル data URL でプレビュー
+      const imageBlock = (
+        '<details class="phase-detail"' + (hasImage ? ' open' : '') + '>' +
+          '<summary>🖼 教材画像 (任意)</summary>' +
+          '<div class="phase-image-zone" data-phase-image-zone data-phase-index="' + i + '" tabindex="0" ' +
+            'aria-label="画像をドラッグ&ドロップ、ペースト、またはクリックして選択">' +
+            (hasImage
+              ? ('<div class="phase-image-preview">' +
+                  (previewSrc ? '<img src="' + esc(previewSrc) + '" alt="教材プレビュー" />' : '<span>🖼 画像登録済</span>') +
+                  '<button type="button" class="phase-image-clear" data-phase-action="image-clear" data-phase-index="' + i + '">× 削除</button>' +
+                '</div>')
+              : ('<div class="phase-image-hint">' +
+                  '<span class="phase-image-hint-icon">📂</span>' +
+                  '<span class="phase-image-hint-text">画像をここにドロップ / クリックして選択 / Cmd+V でペースト</span>' +
+                '</div>')
+            ) +
+            '<input type="file" accept="image/*" class="phase-image-file" data-phase-image-file data-phase-index="' + i + '" />' +
+          '</div>' +
+          '<p class="phase-image-note text-xs text-gray-400 mt-1">png / jpeg / gif / webp、5MB まで</p>' +
+        '</details>'
+      );
+      if (!hasScale) return imageBlock;
+      const pts = SCALE_POINTS_ALLOWED.includes(o.scalePoints) ? o.scalePoints : 5;
+      const scaleBlock = (
+        '<details class="phase-detail">' +
+          '<summary>📏 スケールの段階 (' + pts + ')</summary>' +
+          '<div class="phase-scale-grid">' +
+            SCALE_POINTS_ALLOWED.map((n) => (
+              '<label class="phase-scale-opt">' +
+                '<input type="radio" name="phase-scale-' + i + '" data-phase-opt="scalePoints" data-phase-index="' + i +
+                  '" value="' + n + '"' + (pts === n ? ' checked' : '') + ' />' +
+                ' ' + n + ' 段階' +
+                ' <span class="phase-scale-hint">(' + (SCALE_POINTS_HINT[n] || '') + ')</span>' +
+              '</label>'
+            )).join('') +
+          '</div>' +
+        '</details>'
+      );
+      return imageBlock + scaleBlock;
+    }
+
     // 形式ごとの詳細編集 (軸ラベル / 選択肢)。
     function renderPhaseDetailFields(p, i) {
       const esc = window.sharedUtilities.security.escapeHtml;
@@ -4105,7 +4178,8 @@
               '<input type="text" class="modern-input text-sm" data-phase-opt="highLabel" data-phase-index="' + i +
                 '" value="' + esc(o.highLabel || '') + '" maxlength="20" placeholder="例: 賛成" />' +
             '</div>' +
-          '</details>'
+          '</details>' +
+          renderPhaseCommonOptions(p, i, true)
         );
       }
       if (p.formTemplate === 'matrix') {
@@ -4126,7 +4200,8 @@
               '<input type="text" class="modern-input text-sm" data-phase-opt="yHigh" data-phase-index="' + i +
                 '" value="' + esc(o.yHigh || '') + '" maxlength="20" placeholder="例: 倫理↑" />' +
             '</div>' +
-          '</details>'
+          '</details>' +
+          renderPhaseCommonOptions(p, i, true)
         );
       }
       if (p.formTemplate === 'pie' || p.formTemplate === 'board') {
@@ -4147,10 +4222,25 @@
           '<details class="phase-detail" open>' +
             '<summary>選択肢 (' + choices.length + ' つ)</summary>' +
             '<div class="phase-choice-list">' + items + addBtn + '</div>' +
-          '</details>'
+          '</details>' +
+          renderPhaseCommonOptions(p, i, false)
         );
       }
-      return '';
+      return renderPhaseCommonOptions(p, i, false);
+    }
+
+    // 保存時に config に残してはいけない巨大プレビューデータ。
+    //   imageDataUrl は base64 (最大 ~6.7MB) でローカル preview 用のみ。fileId が真値。
+    //   lessonJson の 45000 char 上限を一発で吹き飛ばすので必ず strip する。
+    const PHASE_PREVIEW_ONLY_KEYS = ['imageDataUrl'];
+    function stripPreviewKeys(templateOptions) {
+      if (!templateOptions || typeof templateOptions !== 'object') return templateOptions;
+      const clean = {};
+      Object.keys(templateOptions).forEach((k) => {
+        if (PHASE_PREVIEW_ONLY_KEYS.indexOf(k) >= 0) return;
+        clean[k] = templateOptions[k];
+      });
+      return clean;
     }
 
     function savePhasesNow() {
@@ -4167,7 +4257,7 @@
         name: p.name,
         formTemplate: p.formTemplate,
         question: p.question,
-        templateOptions: p.templateOptions || {}
+        templateOptions: stripPreviewKeys(p.templateOptions)
       }));
       scheduleLessonFieldSave(hidden);
     }
@@ -4225,14 +4315,35 @@
 
     document.addEventListener('change', (e) => {
       const el = e.target;
-      if (!el || !el.dataset || el.dataset.phaseField !== 'formTemplate') return;
-      const idx = Number(el.dataset.phaseIndex);
-      if (!currentPhases[idx]) return;
-      currentPhases[idx].formTemplate = el.value;
-      // 形式が変わったら templateOptions を新しい形式の既定で再正規化 (前の値を残しても害なし)
-      currentPhases[idx].templateOptions = normalizeTemplateOptions(currentPhases[idx].templateOptions, el.value);
-      renderPhaseCardsInner(); // 詳細フィールドが入れ替わるので全再描画
-      savePhasesNow();
+      if (!el || !el.dataset) return;
+      // 1) 形式変更
+      if (el.dataset.phaseField === 'formTemplate') {
+        const idx = Number(el.dataset.phaseIndex);
+        if (!currentPhases[idx]) return;
+        currentPhases[idx].formTemplate = el.value;
+        currentPhases[idx].templateOptions = normalizeTemplateOptions(currentPhases[idx].templateOptions, el.value);
+        renderPhaseCardsInner();
+        savePhasesNow();
+        return;
+      }
+      // 2) scalePoints radio (3/5/7 段階切替)
+      //   radio の checked 状態はブラウザが自動更新、summary テキストだけ in-place で書き換える。
+      //   フル再描画すると base64 imageDataUrl まで再シリアライズするので避ける。
+      if (el.dataset.phaseOpt === 'scalePoints' && el.type === 'radio') {
+        const idx = Number(el.dataset.phaseIndex);
+        if (!currentPhases[idx]) return;
+        currentPhases[idx].templateOptions = currentPhases[idx].templateOptions || {};
+        currentPhases[idx].templateOptions.scalePoints = Number(el.value);
+        const card = document.querySelectorAll('.lesson-phase-card')[idx];
+        if (card) {
+          card.querySelectorAll('.phase-detail summary').forEach((s) => {
+            if (/スケールの段階/.test(s.textContent)) {
+              s.textContent = '📏 スケールの段階 (' + el.value + ')';
+            }
+          });
+        }
+        savePhasesNow();
+      }
     });
 
     document.addEventListener('click', (e) => {
@@ -4272,6 +4383,112 @@
         opts.choices.splice(ci, 1);
         renderPhaseCardsInner();
         savePhasesNow();
+      } else if (action === 'image-clear') {
+        currentPhases[idx].templateOptions = currentPhases[idx].templateOptions || {};
+        delete currentPhases[idx].templateOptions.imageFileId;
+        delete currentPhases[idx].templateOptions.imageDataUrl;
+        delete currentPhases[idx].templateOptions.imageUrl;
+        renderPhaseCardsInner();
+        savePhasesNow();
+      }
+    });
+
+    // ----- 画像入力: drop / file picker / paste 統合 -----
+    //   1. drop zone へ画像ドロップ
+    //   2. zone クリック → hidden <input type="file"> 開く
+    //   3. zone フォーカス時に Cmd+V でクリップボードからペースト
+    //   どれも同じ flow: File → readAsDataURL → gasRun('lesson.uploadImage') → fileId 保存
+    const IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+    function uploadPhaseImage(idx, file) {
+      if (!file || !/^image\//.test(file.type)) return;
+      if (file.size > IMAGE_MAX_BYTES) {
+        setAutoSaveStatus('⚠ 画像サイズが 5MB を超えています', 'error');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result;
+        currentPhases[idx].templateOptions = currentPhases[idx].templateOptions || {};
+        // Optimistic preview: render once with dataUrl visible.
+        //   成功時は再 render 不要 (preview は既に DOM 上)、fileId だけ追加して save。
+        //   imageDataUrl は config 保存時に stripPreviewKeys で除外される (lessonJson 肥大化防止)。
+        currentPhases[idx].templateOptions.imageDataUrl = dataUrl;
+        renderPhaseCardsInner();
+        setAutoSaveStatus('画像アップロード中…', 'info');
+        gasRun('uploadLessonImage', { imageData: dataUrl, filename: file.name || '' })
+          .then((res) => {
+            if (res && res.success) {
+              currentPhases[idx].templateOptions.imageFileId = res.data.fileId;
+              setAutoSaveStatus('✓ 画像を Drive に保存しました', 'success');
+              savePhasesNow();
+            } else {
+              setAutoSaveStatus('⚠ 画像アップロード失敗: ' + ((res && res.message) || 'unknown'), 'error');
+              delete currentPhases[idx].templateOptions.imageDataUrl;
+              renderPhaseCardsInner();
+            }
+          })
+          .catch((err) => {
+            setAutoSaveStatus('⚠ 画像アップロード失敗: ' + (err && err.message || err), 'error');
+            delete currentPhases[idx].templateOptions.imageDataUrl;
+            renderPhaseCardsInner();
+          });
+      };
+      reader.readAsDataURL(file);
+    }
+    // file picker (input change)
+    document.addEventListener('change', (e) => {
+      const el = e.target;
+      if (!el || !el.dataset || !('phaseImageFile' in el.dataset)) return;
+      const idx = Number(el.dataset.phaseIndex);
+      if (!Number.isNaN(idx) && el.files && el.files[0]) {
+        uploadPhaseImage(idx, el.files[0]);
+      }
+    });
+    // drop zone click → trigger file input
+    // drag / drop
+    document.addEventListener('click', (e) => {
+      const zone = e.target && e.target.closest && e.target.closest('[data-phase-image-zone]');
+      if (!zone) return;
+      // クリアボタン or プレビュー img などのクリックは除外
+      if (e.target.closest('[data-phase-action="image-clear"]')) return;
+      const fileInput = zone.querySelector('[data-phase-image-file]');
+      if (fileInput) fileInput.click();
+    });
+    document.addEventListener('dragover', (e) => {
+      const zone = e.target && e.target.closest && e.target.closest('[data-phase-image-zone]');
+      if (!zone) return;
+      e.preventDefault();
+      zone.classList.add('drag-hover');
+    });
+    document.addEventListener('dragleave', (e) => {
+      const zone = e.target && e.target.closest && e.target.closest('[data-phase-image-zone]');
+      if (zone) zone.classList.remove('drag-hover');
+    });
+    document.addEventListener('drop', (e) => {
+      const zone = e.target && e.target.closest && e.target.closest('[data-phase-image-zone]');
+      if (!zone) return;
+      e.preventDefault();
+      zone.classList.remove('drag-hover');
+      const idx = Number(zone.dataset.phaseIndex);
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (!Number.isNaN(idx) && file) uploadPhaseImage(idx, file);
+    });
+    // paste (drop zone がフォーカス時のみ反応)
+    document.addEventListener('paste', (e) => {
+      const active = document.activeElement;
+      if (!active || !active.dataset || !('phaseImageZone' in active.dataset)) return;
+      const idx = Number(active.dataset.phaseIndex);
+      const items = e.clipboardData && e.clipboardData.items;
+      if (!items) return;
+      for (let k = 0; k < items.length; k++) {
+        if (items[k].kind === 'file' && /^image\//.test(items[k].type)) {
+          const file = items[k].getAsFile();
+          if (file && !Number.isNaN(idx)) {
+            e.preventDefault();
+            uploadPhaseImage(idx, file);
+            return;
+          }
+        }
       }
     });
 

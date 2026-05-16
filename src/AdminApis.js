@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __maybeAutoArchiveLesson_, logError_ */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, logError_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -961,6 +961,18 @@ function dispatchAdminOperation(operation, params) {
       return customizeForm(params.formId || params.formUrl, params.schema);
     }
 
+    case 'setFormAllowResubmit': {
+      if (!params.formId && !params.formUrl) {
+        return createErrorResponse('formId or formUrl is required');
+      }
+      return setFormAllowResubmit(params.formId || params.formUrl, Boolean(params.allowResubmit));
+    }
+
+    case 'uploadLessonImage': {
+      { const e = reqStr('imageData'); if (e) return e; }
+      return uploadLessonImage(params.imageData, params.filename || '');
+    }
+
     case 'createForm': {
       // templateType: 'board' | 'numberline' | 'matrix' | 'pie' (default: 'board')
       const templateType = ['board', 'numberline', 'matrix', 'pie'].includes(params.templateType)
@@ -1287,19 +1299,7 @@ function dispatchAdminOperation(operation, params) {
         ? getPublishedSheetDataForProfile(params.userId, profileName, params.classFilter || null, params.sortOrder || 'newest')
         : getPublishedSheetData(params.classFilter || null, params.sortOrder || 'newest', false, params.userId);
       const rows = Array.isArray(result.data) ? result.data : [];
-      const slim = rows.map(r => {
-        const out = {
-          rowIndex: r.rowIndex,
-          timestamp: r.formattedTimestamp || r.timestamp || '',
-          class: r.class || '',
-          answer: r.answer,
-          reason: r.reason,
-          numericX: r.numericX,
-          numericY: r.numericY
-        };
-        if (!stripName) out.name = r.name || '';
-        return out;
-      });
+      const slim = rows.map(r => __projectBoardRowForExport_(r, { includeName: !stripName }));
       return createSuccessResponse('Board data export', {
         success: result.success,
         header: result.header || '',

@@ -18,6 +18,70 @@
  *
  * @returns {GoogleAppsScript.Drive.Folder|null} 作成/取得したフォルダ
  */
+// 教材画像 (Form 添付用) のサイズ・形式ガード。
+//   Drive にアップロード後に form.addImageItem で埋め込むので、
+//   過大ファイルは reject (児童端末の通信負荷 + Forms 表示崩れ防止)。
+const LESSON_IMAGE_MAX_BYTES = 5 * 1024 * 1024;  // 5 MB
+const LESSON_IMAGE_ALLOWED_MIMES = Object.freeze({
+  'image/png': 'png', 'image/jpeg': 'jpg', 'image/jpg': 'jpg',
+  'image/gif': 'gif', 'image/webp': 'webp'
+});
+
+/**
+ * 教材画像をユーザー Drive フォルダに保存し、後で Form 添付に使う fileId を返す。
+ *   フロント (wizard) から drag&drop / file picker / paste で取得した画像を base64 で受け取り、
+ *   Blob にデコードしてユーザーの Drive folder に保存する。教師は URL を一切意識しない。
+ *
+ * @param {string} base64Data - "data:image/png;base64,xxxx" 形式の data URL or 純粋な base64
+ * @param {string} [filename] - 任意のファイル名 (省略時 image-<timestamp>.<ext>)
+ * @returns {Object} { success, fileId, fileName, mimeType, size }
+ */
+function uploadLessonImage(base64Data, filename) {
+  try {
+    const email = getCurrentEmail();
+    if (!email) return createAuthError();
+    if (typeof base64Data !== 'string' || base64Data.length === 0) {
+      return createErrorResponse('画像データが指定されていません');
+    }
+    // data URL prefix を剥がして MIME / payload を分離
+    let mimeType = '';
+    let payload = base64Data;
+    const dataUrlMatch = base64Data.match(/^data:([\w\/\-+.]+);base64,(.+)$/);
+    if (dataUrlMatch) {
+      mimeType = dataUrlMatch[1].toLowerCase();
+      payload = dataUrlMatch[2];
+    }
+    if (!mimeType || !LESSON_IMAGE_ALLOWED_MIMES[mimeType]) {
+      return createErrorResponse('対応していない画像形式です (png/jpeg/gif/webp のみ)');
+    }
+    // base64 のおおよそのサイズ (4 文字 → 3 bytes)
+    const approxBytes = Math.floor(payload.length * 3 / 4);
+    if (approxBytes > LESSON_IMAGE_MAX_BYTES) {
+      return createErrorResponse(`画像サイズが大きすぎます (${Math.round(approxBytes / 1024 / 1024)} MB) — 5 MB 以下にしてください`);
+    }
+    const bytes = Utilities.base64Decode(payload);
+    const ext = LESSON_IMAGE_ALLOWED_MIMES[mimeType];
+    // 許可文字: ASCII 英数記号 + Hiragana/Katakana/CJK Ideographs。
+    //   範囲は ぁ (ぁ) から 鿿 (CJK 末端)。ASCII 制御文字や全角空白は除外。
+    const safeName = (typeof filename === 'string' && filename.trim())
+      ? filename.trim().slice(0, 80).replace(/[^a-zA-Z0-9._\-ぁ-鿿]/g, '_')
+      : ('image-' + Date.now() + '.' + ext);
+    const blob = Utilities.newBlob(bytes, mimeType, safeName);
+    const folder = createUserFolder();
+    if (!folder) return createErrorResponse('Drive フォルダ作成に失敗しました');
+    const file = folder.createFile(blob);
+    return createSuccessResponse('uploaded', {
+      fileId: file.getId(),
+      fileName: file.getName(),
+      mimeType,
+      size: approxBytes
+    });
+  } catch (error) {
+    logError_('uploadLessonImage', error);
+    return createExceptionResponse(error);
+  }
+}
+
 function createUserFolder() {
   try {
     const folderName = 'みんなの回答ボード';
@@ -96,6 +160,12 @@ function getForms() {
 //      M1/M2 フォームの数値列が auto モードで検出されない事故になる。
 const TEMPLATE_SCALE_MIN = 1;
 const TEMPLATE_SCALE_MAX = 5;
+// 児童の学年に合わせて選べる粒度 (Forms LinearScale の max は 1〜10、min は 0〜1)。
+//   3 = 低学年向け (賛成 / どちらでもない / 反対)
+//   5 = 既定 (中学年〜)
+//   7 = 高学年向け (細かい揺らぎを表現)
+const TEMPLATE_SCALE_POINTS_ALLOWED = Object.freeze([3, 5, 7]);
+const TEMPLATE_SCALE_POINTS_DEFAULT = 5;
 
 const TEMPLATE_LABELS = Object.freeze({
   board: '掲示板',
@@ -104,12 +174,14 @@ const TEMPLATE_LABELS = Object.freeze({
   pie: '円グラフ'
 });
 
-function addScaleItemTo_(form, { title, helpText, lowLabel, highLabel }) {
+function addScaleItemTo_(form, { title, helpText, lowLabel, highLabel, scalePoints }) {
+  const points = TEMPLATE_SCALE_POINTS_ALLOWED.includes(scalePoints)
+    ? scalePoints : TEMPLATE_SCALE_POINTS_DEFAULT;
   form.addScaleItem()
     .setTitle(title)
     .setRequired(true)
     .setHelpText(helpText)
-    .setBounds(TEMPLATE_SCALE_MIN, TEMPLATE_SCALE_MAX)
+    .setBounds(TEMPLATE_SCALE_MIN, points)
     .setLabels(lowLabel, highLabel);
 }
 
@@ -142,86 +214,175 @@ function createTemplateForm(templateType, templateOptions) {
       const s = String(v == null ? '' : v).trim().slice(0, max || 40);
       return s || fallback;
     };
+    // choices: 多肢選択用 (2〜8)。class 用には maxLength を上げた専用版を別途用意。
     const safeChoices = (arr, fallback) => {
       if (!Array.isArray(arr)) return fallback;
       const cleaned = arr.map((c) => String(c == null ? '' : c).trim().slice(0, 40)).filter(Boolean);
-      // 多肢選択は最低 2 / 最大 8。範囲外は fallback。
       if (cleaned.length < 2 || cleaned.length > 8) return fallback;
       return cleaned;
     };
+    // クラス選択肢: 1 件以上 (1 クラスでも有効) / 最大 30 (学年×組で現実的に上限)。
+    const safeClassChoices = (arr, fallback) => {
+      if (!Array.isArray(arr)) return fallback;
+      const cleaned = arr.map((c) => String(c == null ? '' : c).trim().slice(0, 30)).filter(Boolean);
+      if (cleaned.length < 1 || cleaned.length > 30) return fallback;
+      return cleaned;
+    };
 
-    const now = new Date();
-    const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'M/d HH:mm');
-    const formTitle = `回答ボード [${TEMPLATE_LABELS[type]}] ${dateStr}`;
+    // ----- タイトル: UI で指定された lesson 名 / phase 名を最優先 -----
+    //   児童が Form 一覧で「何の Form か」を即判別できるようにするため、
+    //   従来の "回答ボード [type] M/d HH:mm" は lessonName 未指定時のみ。
+    const lessonName = safeStr(opts.lessonName, '', 60);
+    const phaseName = safeStr(opts.phaseName, '', 30);
+    let formTitle;
+    if (lessonName && phaseName && lessonName !== phaseName) {
+      formTitle = `${lessonName} / ${phaseName}`;
+    } else if (lessonName) {
+      formTitle = lessonName;
+    } else if (phaseName) {
+      formTitle = phaseName;
+    } else {
+      const now = new Date();
+      const dateStr = Utilities.formatDate(now, Session.getScriptTimeZone(), 'M/d HH:mm');
+      formTitle = `回答ボード [${TEMPLATE_LABELS[type]}] ${dateStr}`;
+    }
     const form = FormApp.create(formTitle);
+
+    // ----- フォーム全体の description: 教師が wizard で入れた question を出す -----
+    //   児童は Form の冒頭にここを読む。テーマや問いを最初に提示できる。
+    const question = safeStr(opts.question, '', 200);
+    if (question) {
+      try { form.setDescription(question); } catch (descErr) { logError_('createTemplateForm:setDescription', descErr); }
+    }
 
     // Why VERIFIED via REST: Apps Script の setCollectEmail(true) では「回答者入力」モード
     // になりなりすまし可能。Forms REST API で emailCollectionType=VERIFIED を強制する。
-    // https://developers.google.com/forms/api/reference/rest/v1/forms/batchUpdate
     setFormEmailCollectionVerified_(form.getId());
 
-    // Why 1回答制限: M1/M2 で allowResubmit と組み合わせて「揺らぎ」追跡するため、
-    //   教師が後から無効化することを想定。テンプレート既定は安全側の 1 回答。
-    form.setLimitOneResponsePerUser(true);
+    // 1 回答制限: opts.allowResubmit=true なら OFF (揺らぎ追跡が有効)、それ以外は ON (既定)。
+    //   UI の「再投稿を許可（揺らぎを追跡）」チェックボックスを反映。
+    //   注: UI で後から allowResubmit を toggle した場合は Form 側を別経路で更新する必要がある。
+    form.setLimitOneResponsePerUser(!opts.allowResubmit);
 
+    // ----- クラス選択肢: UI で教師が選んだ classes を反映 -----
+    //   児童は自分の所属クラスを Form 内で選ぶので、教師指定の一覧と完全一致させる。
+    const classChoices = safeClassChoices(opts.classChoices, ['クラス1', 'クラス2', 'クラス3', 'クラス4']);
     form.addListItem()
       .setTitle('クラス')
       .setRequired(true)
-      .setHelpText('所属クラスを選択してください')
-      .setChoiceValues(['クラス1', 'クラス2', 'クラス3', 'クラス4']);
+      .setHelpText('自分のクラスを選んでください')
+      .setChoiceValues(classChoices);
     form.addTextItem()
       .setTitle('名前')
       .setRequired(true)
-      .setHelpText('表示名を入力してください');
+      .setHelpText('名前を入力してください');
+
+    // ----- 視覚区切り: ここから「今日のテーマ」セクション -----
+    //   教師の問い (question) があれば SectionHeader として強調する。
+    //   児童は description より SectionHeader title の方をスキャンしやすい (Forms の視覚階層)。
+    if (question) {
+      try {
+        form.addSectionHeaderItem()
+          .setTitle('今日のテーマ')
+          .setHelpText(question);
+      } catch (sectionErr) {
+        logError_('createTemplateForm:addSectionHeaderItem', sectionErr);
+      }
+    }
+
+    // ----- 教材画像: Drive fileId 経由 (推奨) または URL fetch (legacy) -----
+    //   優先: opts.imageFileId (uploadLessonImage が返す Drive file ID)。
+    //   フォールバック: opts.imageUrl (旧パス)。失敗は warning で fail-soft。
+    //   児童は教材タブを行き来せずに Form 内で問題と画像を一緒に見られる。
+    const imageFileId = safeStr(opts.imageFileId, '', 80);
+    const imageUrl = safeStr(opts.imageUrl, '', 1024);
+    if (imageFileId || imageUrl) {
+      try {
+        let blob = null;
+        if (imageFileId) {
+          blob = DriveApp.getFileById(imageFileId).getBlob();
+        } else {
+          blob = UrlFetchApp.fetch(imageUrl, { muteHttpExceptions: true }).getBlob();
+        }
+        const imgItem = form.addImageItem().setImage(blob);
+        if (typeof imgItem.setTitle === 'function') imgItem.setTitle('教材');
+      } catch (imgErr) {
+        logError_('createTemplateForm:addImageItem', imgErr);
+        console.warn('Form 画像埋め込みに失敗 (処理は続行):', imgErr && imgErr.message);
+      }
+    }
+
+    const scalePoints = TEMPLATE_SCALE_POINTS_ALLOWED.includes(opts.scalePoints)
+      ? opts.scalePoints : TEMPLATE_SCALE_POINTS_DEFAULT;
 
     if (type === 'numberline') {
+      // scaleTitle は質問文 (UI の phase.question) を優先。短ければそのまま、長ければ phase 名にフォールバック。
+      const numberlineTitle = safeStr(opts.scaleTitle, question || phaseName || '立場', 60);
       addScaleItemTo_(form, {
-        title: safeStr(opts.scaleTitle, '立場'),
-        helpText: 'あなたの考えに最も近い位置を選んでください',
+        title: numberlineTitle,
+        helpText: 'あなたの考えにいちばん近いところを選んでください',
         lowLabel: safeStr(opts.lowLabel, 'そう思わない'),
-        highLabel: safeStr(opts.highLabel, 'とてもそう思う')
+        highLabel: safeStr(opts.highLabel, 'とてもそう思う'),
+        scalePoints
       });
       form.addParagraphTextItem()
         .setTitle('理由')
         .setRequired(true)
-        .setHelpText('その位置を選んだ理由を記入してください');
+        .setHelpText('そこを選んだ理由を書いてください');
     } else if (type === 'matrix') {
+      // matrix は X / Y 2 軸が両方必要。各軸 title は教師指定 (xTitle/yTitle) を尊重し、
+      //   空なら lowLabel↔highLabel から自動生成 (例: "効率↓↔効率↑")。
+      const xAuto = (opts.xLow || opts.xHigh) ? `${safeStr(opts.xLow, '低い', 20)} ↔ ${safeStr(opts.xHigh, '高い', 20)}` : 'X軸';
+      const yAuto = (opts.yLow || opts.yHigh) ? `${safeStr(opts.yLow, '低い', 20)} ↔ ${safeStr(opts.yHigh, '高い', 20)}` : 'Y軸';
       addScaleItemTo_(form, {
-        title: safeStr(opts.xTitle, 'X軸'),
-        helpText: '横軸の立場を選んでください',
+        title: safeStr(opts.xTitle, xAuto, 60),
+        helpText: '横の軸であなたの考えにいちばん近いところを選んでください',
         lowLabel: safeStr(opts.xLow, '低い'),
-        highLabel: safeStr(opts.xHigh, '高い')
+        highLabel: safeStr(opts.xHigh, '高い'),
+        scalePoints
       });
       addScaleItemTo_(form, {
-        title: safeStr(opts.yTitle, 'Y軸'),
-        helpText: '縦軸の立場を選んでください',
+        title: safeStr(opts.yTitle, yAuto, 60),
+        helpText: '縦の軸であなたの考えにいちばん近いところを選んでください',
         lowLabel: safeStr(opts.yLow, '低い'),
-        highLabel: safeStr(opts.yHigh, '高い')
+        highLabel: safeStr(opts.yHigh, '高い'),
+        scalePoints
       });
       form.addParagraphTextItem()
         .setTitle('理由')
         .setRequired(true)
-        .setHelpText('その位置を選んだ理由を記入してください');
+        .setHelpText('そこを選んだ理由を書いてください');
     } else if (type === 'pie') {
       form.addMultipleChoiceItem()
-        .setTitle('あなたの選択')
+        .setTitle(safeStr(opts.choiceTitle, question || phaseName || 'あなたの選択', 60))
         .setRequired(true)
         .setHelpText('選択肢から 1 つ選んでください')
         .setChoiceValues(safeChoices(opts.choices, ['A', 'B', 'どちらとも言えない']));
       form.addParagraphTextItem()
         .setTitle('理由')
         .setRequired(true)
-        .setHelpText('その選択肢を選んだ理由を記入してください');
+        .setHelpText('そう選んだ理由を書いてください');
     } else {
+      // board (掲示板)
       form.addMultipleChoiceItem()
-        .setTitle('回答')
+        .setTitle(safeStr(opts.choiceTitle, question || phaseName || '回答', 60))
         .setRequired(true)
-        .setHelpText('回答を選択してください')
+        .setHelpText('選択肢から 1 つ選んでください')
         .setChoiceValues(safeChoices(opts.choices, ['賛成', '反対', 'どちらでもない']));
       form.addParagraphTextItem()
         .setTitle('理由')
         .setRequired(true)
-        .setHelpText('選択した理由を詳しく記入してください');
+        .setHelpText('選んだ理由を書いてください');
+    }
+
+    // ----- 送信後の確認メッセージ: 児童に達成感を与え、再投稿可否も伝える -----
+    try {
+      const confirmation = opts.allowResubmit
+        ? 'ありがとう！意見が届いたよ。\nもう一度考えが変わったら、また回答できるよ。'
+        : 'ありがとう！意見が届いたよ。';
+      form.setConfirmationMessage(confirmation);
+    } catch (confErr) {
+      logError_('createTemplateForm:setConfirmationMessage', confErr);
     }
 
     const ss = SpreadsheetApp.create(formTitle + ' (回答)');
@@ -299,6 +460,46 @@ function createTemplateForm(templateType, templateOptions) {
  *       choices?: string[], min?: number, max?: number, leftLabel?, rightLabel? }
  * @returns {Object} { success, formId, title, itemCount }
  */
+/**
+ * 既存 Form の「1 回答制限」を toggle する。
+ *   再投稿許可 (= allowResubmit=true) なら setLimitOneResponsePerUser(false)。
+ *   AdminPanel の「再投稿を許可（揺らぎを追跡）」チェックボックスから呼ばれる。
+ *   Why 別関数: customizeForm は項目全削除を伴う破壊的 API。設定の 1 bit だけ
+ *     触りたいケースでは使わない。回答が既に入っている Form でも安全に呼べる。
+ * @param {string} formIdOrUrl
+ * @param {boolean} allowResubmit
+ * @returns {Object} { success, formId, allowResubmit }
+ */
+// formId / formUrl どちらでも開く共通ヘルパー。
+//   失敗時は throw (呼び出し側で createErrorResponse に変換)。
+function __openFormByIdOrUrl_(formIdOrUrl) {
+  return formIdOrUrl.startsWith('http')
+    ? FormApp.openByUrl(formIdOrUrl)
+    : FormApp.openById(formIdOrUrl);
+}
+
+function setFormAllowResubmit(formIdOrUrl, allowResubmit) {
+  try {
+    if (!formIdOrUrl || typeof formIdOrUrl !== 'string') {
+      return createErrorResponse('formId or formUrl is required');
+    }
+    let form;
+    try {
+      form = __openFormByIdOrUrl_(formIdOrUrl);
+    } catch (e) {
+      return createErrorResponse('Form を開けません: ' + e.message);
+    }
+    form.setLimitOneResponsePerUser(!allowResubmit);
+    return createSuccessResponse('updated', {
+      formId: form.getId(),
+      allowResubmit: Boolean(allowResubmit)
+    });
+  } catch (error) {
+    logError_('setFormAllowResubmit', error);
+    return createExceptionResponse(error);
+  }
+}
+
 function customizeForm(formIdOrUrl, schema) {
   try {
     if (!formIdOrUrl || typeof formIdOrUrl !== 'string') {
@@ -314,9 +515,7 @@ function customizeForm(formIdOrUrl, schema) {
 
     let form;
     try {
-      form = formIdOrUrl.startsWith('http')
-        ? FormApp.openByUrl(formIdOrUrl)
-        : FormApp.openById(formIdOrUrl);
+      form = __openFormByIdOrUrl_(formIdOrUrl);
     } catch (e) {
       return { success: false, error: 'Form を開けません: ' + e.message };
     }

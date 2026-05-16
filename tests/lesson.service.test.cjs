@@ -258,6 +258,70 @@ test('startLesson: templateOptions が createTemplateForm に渡る (numberline 
   assert.equal(formCreations[0].templateOptions.highLabel, '賛成');
 });
 
+test('startLesson: lessonJson.allowResubmit が全 phase に伝播 + displaySettings にも反映', () => {
+  const { context, formCreations, configPatches } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '揺らぎ追跡レッスン', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+  context.updateLessonDraft('u1', lessonId, 'allowResubmit', true);
+  context.updateLessonDraft('u1', lessonId, 'phases', [
+    { name: '導入', formTemplate: 'numberline', question: 'いまの考えは？',
+      templateOptions: { lowLabel: '反対', highLabel: '賛成' } }
+  ]);
+  const res = context.startLesson('u1', lessonId);
+  assert.equal(res.success, true, JSON.stringify(res));
+  // createTemplateForm に allowResubmit=true が渡る
+  assert.equal(formCreations[0].templateOptions.allowResubmit, true);
+  // config.allowResubmit にも反映 (board の ghost dot レンダリング条件)
+  assert.equal(configPatches[0].patch.allowResubmit, true);
+});
+
+test('startLesson: lessonName / phaseName / question / classChoices が createTemplateForm に流れる (UI ⇄ Form 100% 一致)', () => {
+  const { context, formCreations } = loadLessonContext();
+  const created = context.createLessonDraft('u1', '5/16 道徳 友だち', 'doutoku-3phase');
+  const lessonId = created.data.lesson.lessonId;
+  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1', '5-2', '5-3']);
+  context.updateLessonDraft('u1', lessonId, 'phases', [
+    {
+      name: '導入', formTemplate: 'numberline',
+      question: 'あなたの立場は？',
+      templateOptions: { lowLabel: '反対', highLabel: '賛成' }
+    },
+    {
+      name: '本時', formTemplate: 'matrix',
+      question: 'なぜそう考えますか？',
+      templateOptions: { xLow: '自分', xHigh: 'みんな', yLow: '今', yHigh: '将来' }
+    },
+    {
+      name: '振り返り', formTemplate: 'pie',
+      question: 'いまどう感じる？',
+      templateOptions: { choices: ['納得', '迷い', '反対'] }
+    }
+  ]);
+  const res = context.startLesson('u1', lessonId);
+  assert.equal(res.success, true, JSON.stringify(res));
+
+  // Phase 0: numberline
+  assert.equal(formCreations[0].templateOptions.lessonName, '5/16 道徳 友だち');
+  assert.equal(formCreations[0].templateOptions.phaseName, '導入');
+  assert.equal(formCreations[0].templateOptions.question, 'あなたの立場は？');
+  assert.deepEqual(Array.from(formCreations[0].templateOptions.classChoices), ['5-1', '5-2', '5-3']);
+  assert.equal(formCreations[0].templateOptions.lowLabel, '反対');
+
+  // Phase 1: matrix (同じ lesson / classes が全 phase で共有される)
+  assert.equal(formCreations[1].templateOptions.lessonName, '5/16 道徳 友だち');
+  assert.equal(formCreations[1].templateOptions.phaseName, '本時');
+  assert.equal(formCreations[1].templateOptions.question, 'なぜそう考えますか？');
+  assert.deepEqual(Array.from(formCreations[1].templateOptions.classChoices), ['5-1', '5-2', '5-3']);
+  assert.equal(formCreations[1].templateOptions.xLow, '自分');
+  assert.equal(formCreations[1].templateOptions.yHigh, '将来');
+
+  // Phase 2: pie (choices も伝わる)
+  assert.equal(formCreations[2].templateType, 'pie');
+  assert.equal(formCreations[2].templateOptions.question, 'いまどう感じる？');
+  assert.deepEqual(Array.from(formCreations[2].templateOptions.choices), ['納得', '迷い', '反対']);
+});
+
 test('startLesson: numberline の templateOptions が displaySettings.xAxisLabels に反映される', () => {
   const { context, configPatches } = loadLessonContext();
   const created = context.createLessonDraft('u1', 'L', 'doutoku-3phase');
@@ -344,16 +408,19 @@ test('listLessonTemplates: 全テンプレート (4 種) が返る', () => {
   const keys = Array.from(res.data.templates).map(t => t.key).sort();
   assert.deepEqual(keys, ['before-after-2phase', 'doutoku-3phase', 'inquiry-3phase', 'kid-3phase']);
   const kid = Array.from(res.data.templates).find(t => t.key === 'kid-3phase');
-  assert.ok(kid && kid.label.includes('児童'));
+  // 2026-05-16: ラベルを「低学年向け」に変更 (旧「児童向け」)。教科ニュートラル化と整合。
+  assert.ok(kid && kid.label.includes('低学年'));
   assert.equal(kid.phaseCount, 3);
 });
 
-test('createLessonDraft: kid-3phase テンプレで作成すると児童向けフェーズ名になる', () => {
+test('createLessonDraft: kid-3phase テンプレで作成すると低学年向けフェーズ名になる', () => {
   const { context } = loadLessonContext();
   const res = context.createLessonDraft('u1', 'k1', 'kid-3phase');
   assert.equal(res.success, true);
   const names = Array.from(res.data.lesson.lessonJson.phases).map(p => p.name);
-  assert.deepEqual(names, ['はじめの考え', 'みんなで考える', 'ふりかえり']);
+  // 2026-05-16: 児童向けphase名を「いまの考え→みんなで話す→これからの考え」に変更
+  //   (「考えがどう変わったか」が伝わる表現)。
+  assert.deepEqual(names, ['いまの考え', 'みんなで話す', 'これからの考え']);
 });
 
 test('duplicateLesson: 完了レッスンを複製すると draft 状態 + Form 情報は空 + (コピー) suffix', () => {
