@@ -461,20 +461,12 @@
           </button>
         </div>
 
-        <!-- 自動推定の情報表示 -->
-        <div id="ai-detection-info" class="hidden mb-4 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-          <div class="flex items-center gap-2 mb-2">
-            <span class="text-blue-400">🤖</span>
-            <span class="text-sm font-medium text-blue-300">自動推定の結果</span>
-            <button id="reset-to-ai" class="text-xs text-blue-400 hover:text-blue-300 ml-auto hidden" type="button">
-              ↩ 自動推定に戻す
-            </button>
-          </div>
-        </div>
-
-        <!-- 手動変更通知 -->
-        <div id="manual-override-info" class="hidden mb-4 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded-lg">
-          <span class="text-xs text-yellow-300">✋ 手動で変更されました。「↩ 自動推定に戻す」をクリックで元に戻せます。</span>
+        <!-- 手動変更通知 + 自動推定に戻すボタン (見出しだけの装飾は廃止 / 動作するボタンを併設) -->
+        <div id="manual-override-info" class="hidden mb-4 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded-lg flex items-center justify-between gap-2">
+          <span class="text-xs text-yellow-300">✋ 手動で変更されました。</span>
+          <button id="reset-to-ai" class="text-xs text-blue-300 hover:text-blue-200 underline-offset-2 hover:underline transition-colors flex-shrink-0" type="button">
+            ↩ 自動推定に戻す
+          </button>
         </div>
 
       </section>

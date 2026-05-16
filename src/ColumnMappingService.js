@@ -40,10 +40,13 @@ const __ROLE_PATTERNS = {
     exact: ['回答', 'answer'],
     keywords: ['回答', '答え', 'answer', '意見', '考え', '感想', 'コメント'],
     // 「質問らしさ」を表すパターン群。フォーム作成者が自由記述で書いた質問文を answer 列として捕捉する。
+    // 末尾の ？/? と「どう...する」「なぜ」「何」も含める (児童向けフォームで頻出)。
     questionPatterns: [
       /どう.*思い?.*ますか/i, /.*と思い?.*ますか/i,
       /.*書きましょう/i, /.*述べ/i, /.*説明して/i,
       /.*気づいたこと/i, /.*観察して/i,
+      /.*どう.*(する|します)/, /.*なぜ/, /.*何を/, /.*何が/,
+      /[？?]\s*$/,   // ヘッダー末尾の質問符 (児童向けフォームの自由質問)
       /what.*do you think/i, /how.*do you feel/i, /explain.*your/i
     ],
     regex: /(回答|答え|answer|意見|考え)/i
@@ -292,17 +295,26 @@ function inferColumnRoles(headers, sampleData = [], options = {}) {
     };
   });
 
-  // 役割×列 のスコア候補 (score > 0 のみ)
+  // 役割×列 のスコア候補
+  // Why: L1 (ヘッダー) で 0 でも L2 (データ形状) が役割を支持するなら候補化する。
+  //      例:「あなたなら、ポスターをどうする？」は L1 辞書に該当しないが、データが
+  //      medium/long-text であれば answer 候補として 40 + L2 を base に拾う。
+  //      L1>0 時は最大 95、L1=0 (L2 のみ) 時は最大 60 で「弱い推定」を表現する。
   const scoresByRole = {};
   for (const role of roles) {
     const cands = [];
     for (const col of columns) {
       if (col.isSystem) continue;
       const headerScore = __headerPatternScore(col.header, role);
-      if (headerScore <= 0) continue;
-      const composite = Math.max(0, Math.min(95,
-        headerScore + __dataTypeBoost(col.stats, role) + __boardModeBoost(role, boardMode)
-      ));
+      const dataBoost = __dataTypeBoost(col.stats, role);
+      const modeBoost = __boardModeBoost(role, boardMode);
+      let composite = 0;
+      if (headerScore > 0) {
+        composite = Math.max(0, Math.min(95, headerScore + dataBoost + modeBoost));
+      } else if (dataBoost > 0) {
+        // L1 miss + L2 hit: 弱い候補 (上限 60)
+        composite = Math.max(0, Math.min(60, 40 + dataBoost + modeBoost));
+      }
       if (composite > 0) cands.push({ index: col.index, score: composite });
     }
     cands.sort((a, b) => b.score - a.score);

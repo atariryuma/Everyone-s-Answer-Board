@@ -1077,14 +1077,14 @@
 
     if (canAnalyze) {
       aiAnalyzeBtn.disabled = false;
-      aiAnalyzeBtn.textContent = '🤖 AI列判定';
+      aiAnalyzeBtn.textContent = '🤖 自動推定';
       aiAnalyzeBtn.classList.remove('opacity-50');
     } else {
       aiAnalyzeBtn.disabled = true;
       if (!hasSpreadsheetConfig) {
-        aiAnalyzeBtn.textContent = '🤖 AI列判定（データソース接続が必要）';
+        aiAnalyzeBtn.textContent = '🤖 自動推定（データソース接続が必要）';
       } else {
-        aiAnalyzeBtn.textContent = '🤖 AI列判定（ヘッダー取得が必要）';
+        aiAnalyzeBtn.textContent = '🤖 自動推定（ヘッダー取得が必要）';
       }
       aiAnalyzeBtn.classList.add('opacity-50');
     }
@@ -1448,7 +1448,7 @@
 
           // フォーム編集後に手動で接続してもらうため、自動接続は行わない
           // 理由: ユーザーがフォームの質問を編集すると列構造が変わるため、
-          // 編集完了後に接続（AI列判定）を行う必要がある
+          // 編集完了後に接続（自動推定）を行う必要がある
           showInfo('フォーム編集後、「🔍 検証して接続」ボタンをクリックしてください', 5000);
         } else {
           // エラー時はローディング画面を閉じる
@@ -1690,7 +1690,7 @@
 
     try {
       window.setLoading(true, '処理中...');
-      showInfo('AI列判定実行中...', 3000);
+      showInfo('自動推定実行中...', 3000);
 
       await performColumnAnalysis(spreadsheetId, sheetName);
 
@@ -1703,11 +1703,11 @@
         needsProgress: true
       });
 
-      showSuccess('AI列判定完了！設定を確認してください');
+      showSuccess('自動推定完了！設定を確認してください');
       try { scheduleAutoSave(); } catch (_) {}
     } catch (error) {
-      console.error('手動AI列判定エラー:', error);
-      showError('AI列判定に失敗しました。接続を確認して再試行してください');
+      console.error('手動自動推定エラー:', error);
+      showError('自動推定に失敗しました。接続を確認して再試行してください');
     } finally {
       window.setLoading(false);
     }
@@ -1732,7 +1732,7 @@
           return performColumnAnalysis(spreadsheetId, sheetName, retryCount + 1);
         } else {
           console.error('🚫 最大リトライ回数に到達、品質不足の結果を使用');
-          showWarning('AI分析の精度が期待値を下回りましたが、利用可能な結果を表示します', 5000);
+          showWarning('自動推定の精度が期待値を下回りましたが、利用可能な結果を表示します', 5000);
         }
       }
 
@@ -1830,7 +1830,7 @@
    * 🆘 緊急フォールバック処理
    */
   async function attemptEmergencyFallback(spreadsheetId, sheetName) {
-    showWarning('AI分析に問題が発生しました。基本的なヘッダー情報のみ取得します。', 5000);
+    showWarning('自動推定に問題が発生しました。基本的なヘッダー情報のみ取得します。', 5000);
 
     try {
       // Why getColumnAnalysis (not getSheetHeaders): backend getSheetHeaders(sheet) takes
@@ -1846,7 +1846,7 @@
 
       if (basicResult && basicResult.headers) {
         fillColumnDropdowns(basicResult.headers, {}, {});
-        showWarning('手動で列を設定してください。AI分析は利用できませんでした。', 8000);
+        showWarning('手動で列を設定してください。自動推定は利用できませんでした。', 8000);
       }
 
     } catch (basicError) {
@@ -1995,11 +1995,11 @@
             needsProgress: true
           });
 
-          showSuccess('接続とAI列判定が完了しました！');
+          showSuccess('接続と自動推定が完了しました！');
           // programmatic な fillColumnDropdowns では change が発火しないので明示 schedule する
           try { scheduleAutoSave(); } catch (_) {}
         } else {
-          showInfo('AI列判定実行中...', 3000);
+          showInfo('自動推定実行中...', 3000);
           try {
             await performColumnAnalysis(spreadsheetId, sheetName);
 
@@ -2013,11 +2013,11 @@
               formTitle
             });
 
-            showSuccess('AI列判定完了！設定を確認してください');
+            showSuccess('自動推定完了！設定を確認してください');
             try { scheduleAutoSave(); } catch (_) {}
           } catch (analysisError) {
-            console.warn('AI列判定エラー:', analysisError);
-            showWarning('AI列判定に失敗しました。手動で設定するか「AI列判定」ボタンで再実行してください');
+            console.warn('自動推定エラー:', analysisError);
+            showWarning('自動推定に失敗しました。手動で設定するか「自動推定」ボタンで再実行してください');
           }
         }
         // フォーム名で profile を自動保存。同 session の連打を防ぐため _knownProfileNames でガード。
@@ -2258,7 +2258,7 @@
 
   /**
    * シンプル競合チェック
-   * @param {Object} mapping - AI検出マッピング
+   * @param {Object} mapping - 自動推定マッピング
    * @param {Object} dropdowns - ドロップダウン要素
    * @returns {boolean} 競合があるかどうか
    */
@@ -2316,13 +2316,10 @@
       };
       __applyAIDetectionForColumn_(ctx);
     });
-
-    const aiInfo = document.getElementById('ai-detection-info');
-    if (aiInfo) aiInfo.classList.remove('hidden');
     updateCompletionStatus();
   }
 
-  // 1 つの dropdown に対する AI 検出結果適用 (match / 信頼度別 fallback の分岐)。
+  // 1 つの dropdown に対する自動推定結果の適用。
   function __applyAIDetectionForColumn_(ctx) {
     const { columnType, dropdown, actualMapping, confidence, key } = ctx;
     const selectedIndex = (key && actualMapping[key] !== null && actualMapping[key] !== undefined)
@@ -2335,7 +2332,9 @@
     if (selectedIndex !== null) {
       dropdown.value = selectedIndex;
       dropdown.classList.add('has-ai-selection');
-      showConfidenceBadge(columnType, columnConfidence, 'ai');
+      // Why: savedMapping は存在するが backend が再推定できないヘッダー (児童独自の質問文等) では
+      //      confidence=0 になる。「自動推定 0%」と出すのは紛らわしいので「保存済み」と表示する。
+      showConfidenceBadge(columnType, columnConfidence, columnConfidence > 0 ? 'ai' : 'saved');
       return;
     }
     if (columnConfidence > 0) {
@@ -2437,6 +2436,10 @@
       case 'manual':
         badgeClass = 'manual';
         badgeText = '✋ 手動設定';
+        break;
+      case 'saved':
+        badgeClass = 'manual';
+        badgeText = '📌 保存済み';
         break;
       case 'ai':
         badgeClass = 'high';

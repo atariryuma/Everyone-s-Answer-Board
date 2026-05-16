@@ -37,6 +37,31 @@ test('inferColumnRoles: L1 only — standard Japanese form (no sample data)', ()
   assert.equal(r.mapping.reason, 5);
 });
 
+test('inferColumnRoles: L1 — question mark and natural-language question patterns detected as answer', () => {
+  const ctx = loadCtx();
+  // 児童向けフォームでよくある自由記述質問。「回答」「答え」のような明示キーワードは含まれない。
+  const headers1 = ['ts', 'クラス', '名前', 'あなたなら、ポスターをどうする？'];
+  const r1 = ctx.inferColumnRoles(headers1);
+  assert.equal(r1.mapping.answer, 3, 'question mark in header should map to answer');
+
+  const headers2 = ['ts', '名前', 'なぜそう思いますか'];
+  const r2 = ctx.inferColumnRoles(headers2);
+  assert.equal(r2.mapping.answer, 2, 'なぜ pattern should map to answer');
+});
+
+test('inferColumnRoles: L1=0 + L2=long-text fallback (weak inference, capped at 60)', () => {
+  const ctx = loadCtx();
+  // ヘッダーが完全に無関係でも、データが長文なら answer 候補に拾われる
+  const headers = ['ts', '名前', '入力欄'];
+  const sample = [
+    ['t', 'A', 'なぜならば、実験結果から重要な傾向が読み取れて議論の余地があるためです。']
+  ];
+  const r = ctx.inferColumnRoles(headers, sample);
+  assert.equal(r.mapping.answer, 2);
+  // L1=0 + L2 fallback は信頼度 <= 60 (弱い推定であることを表現)
+  assert.ok(r.confidence.answer <= 60, `weak inference should be ≤60, got ${r.confidence.answer}`);
+});
+
 test('inferColumnRoles: L1 — system columns (timestamp/reactions) are excluded', () => {
   const ctx = loadCtx();
   const headers = ['タイムスタンプ', 'UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT', '回答'];
