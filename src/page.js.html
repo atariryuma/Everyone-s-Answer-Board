@@ -275,6 +275,8 @@
           const nameEl = document.getElementById('lesson-review-name');
           if (banner) banner.classList.remove('hidden');
           if (nameEl) nameEl.textContent = (this.state.reviewLesson.name || '無題');
+          // Heading は最終 phase の question を初期値に (banner=固定文脈 / heading=動的内容 の役割分離)。
+          if (typeof this.__updateReviewHeading === 'function') this.__updateReviewHeading(null);
         }
 
         this.renderIcons(); // 静的アイコンの即座読み込み（モーダル内のアイコンを含む）

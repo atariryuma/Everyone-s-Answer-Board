@@ -1184,3 +1184,80 @@ test('__renderQuadrantSummary: hides panel when no rows have numericX/Y', () => 
   assert.ok(panel, 'panel created');
   assert.equal(panel.hidden, true, 'panel hidden when no data');
 });
+
+// =====================================================================
+// __updateReviewHeading (v2776): review mode で heading を該当 phase の question に更新
+// =====================================================================
+
+test('__updateReviewHeading: timelineIdx=null → 最終 phase の question を heading に設定', () => {
+  const { StudyQuestApp } = loadVizContext();
+  let headingText = '';
+  const app = {
+    state: {
+      isReviewMode: true,
+      reviewLesson: {
+        phases: [
+          { name: 'p1', question: '最初の問い' },
+          { name: 'p2', question: '深める問い' },
+          { name: 'p3', question: '最後の問い' }
+        ]
+      }
+    },
+    elements: { headingLabel: { set textContent(v) { headingText = v; }, get textContent() { return headingText; } } },
+    vizGetSnapshots: () => []
+  };
+  StudyQuestApp.prototype.__updateReviewHeading.call(app, null);
+  assert.equal(headingText, '最後の問い');
+});
+
+test('__updateReviewHeading: timelineIdx=specific snapshot → 該当 phase の question', () => {
+  const { StudyQuestApp } = loadVizContext();
+  let headingText = '';
+  const app = {
+    state: {
+      isReviewMode: true,
+      reviewLesson: {
+        phases: [
+          { name: 'p1', question: '最初の問い' },
+          { name: 'p2', question: '深める問い' }
+        ]
+      }
+    },
+    elements: { headingLabel: { set textContent(v) { headingText = v; }, get textContent() { return headingText; } } },
+    vizGetSnapshots: () => [
+      { phaseIndex: 0 },
+      { phaseIndex: 0 },
+      { phaseIndex: 1 },
+      { phaseIndex: 1 }
+    ]
+  };
+  StudyQuestApp.prototype.__updateReviewHeading.call(app, 2);
+  assert.equal(headingText, '深める問い');
+});
+
+test('__updateReviewHeading: review mode でないときは no-op', () => {
+  const { StudyQuestApp } = loadVizContext();
+  let headingText = 'unchanged';
+  const app = {
+    state: { isReviewMode: false, reviewLesson: { phases: [{ name: 'p1', question: 'q1' }] } },
+    elements: { headingLabel: { set textContent(v) { headingText = v; }, get textContent() { return headingText; } } },
+    vizGetSnapshots: () => []
+  };
+  StudyQuestApp.prototype.__updateReviewHeading.call(app, null);
+  assert.equal(headingText, 'unchanged');
+});
+
+test('__updateReviewHeading: question が無ければ name を fallback に使う', () => {
+  const { StudyQuestApp } = loadVizContext();
+  let headingText = '';
+  const app = {
+    state: {
+      isReviewMode: true,
+      reviewLesson: { phases: [{ name: 'フォールバック名' }] }  // question undefined
+    },
+    elements: { headingLabel: { set textContent(v) { headingText = v; }, get textContent() { return headingText; } } },
+    vizGetSnapshots: () => []
+  };
+  StudyQuestApp.prototype.__updateReviewHeading.call(app, null);
+  assert.equal(headingText, 'フォールバック名');
+});

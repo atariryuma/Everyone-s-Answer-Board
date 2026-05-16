@@ -2087,6 +2087,46 @@
     return hydrateSnapshotsFromReviewLesson(reviewLesson);
   };
 
+  /**
+   * Review mode 専用: timeline スライダー位置に応じて heading をその phase の question に更新。
+   *
+   * Why: review mode の heading に「レッスン名」を出すと #lesson-review-banner と重複し、
+   *   かつ phase を移動しても heading が変わらないので「いま何の問いを見ているか」が分からない。
+   *   reviewLesson.phases[i].question (= 元の formTitle) を slider 位置に応じて出すと、
+   *   役割分離 (banner=固定文脈 / heading=動的内容) が綺麗になる。
+   *
+   * 呼び出し元:
+   *   - init hydrate 直後 (page.js init): idx=null → 最後の phase を初期表示
+   *   - slider input ハンドラ: idx=current slider value
+   *   - 「↺ 現在」ボタン: idx=null → 最終 phase
+   *
+   * @param {number|null} timelineIdx - vizTimelineIndex (null = 全データ累積 = 最終 phase)
+   */
+  StudyQuestApp.prototype.__updateReviewHeading = function (timelineIdx) {
+    if (!this.state || !this.state.isReviewMode) return;
+    const lesson = this.state.reviewLesson;
+    if (!lesson || !Array.isArray(lesson.phases) || lesson.phases.length === 0) return;
+    const headingEl = this.elements && this.elements.headingLabel;
+    if (!headingEl) return;
+
+    let phaseIdx;
+    if (typeof timelineIdx === 'number' && timelineIdx >= 0) {
+      const snaps = this.vizGetSnapshots ? this.vizGetSnapshots() : [];
+      if (timelineIdx < snaps.length && snaps[timelineIdx]) {
+        phaseIdx = Number(snaps[timelineIdx].phaseIndex);
+      } else {
+        // slider が末尾 (= 現在) を指している
+        phaseIdx = lesson.phases.length - 1;
+      }
+    } else {
+      phaseIdx = lesson.phases.length - 1;
+    }
+    if (!Number.isFinite(phaseIdx) || phaseIdx < 0 || phaseIdx >= lesson.phases.length) return;
+    const phase = lesson.phases[phaseIdx];
+    const text = (phase && (phase.question || phase.name)) || '';
+    if (text) headingEl.textContent = text;
+  };
+
   StudyQuestApp.prototype.vizMaybeCaptureSnapshot = function () {
     try {
       const rows = this.state.currentAnswers || [];
@@ -2392,6 +2432,8 @@
           if (idx === app.state.vizTimelineIndex) return;
           app.state.vizTimelineIndex = idx;
           const snaps = app.vizGetSnapshots();
+          // Review mode: heading を該当 phase の question に追従させる
+          if (typeof app.__updateReviewHeading === 'function') app.__updateReviewHeading(idx);
           const label = document.getElementById('vizTimelineLabel');
           if (label) {
             if (idx >= snaps.length) {
@@ -2420,6 +2462,8 @@
         if (s) s.value = snaps.length;
         const label = toolsBar.querySelector('#vizTimelineLabel');
         if (label) label.textContent = '現在';
+        // Review mode: heading を最終 phase に戻す
+        if (typeof app.__updateReviewHeading === 'function') app.__updateReviewHeading(null);
         app.renderBoard(false, false, []);
       });
     }
