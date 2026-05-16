@@ -555,17 +555,21 @@ test('startLesson: idempotent - 既に formId があるフェーズは skip', ()
 });
 
 test('startLesson: LockService が busy なら LESSON_BUSY', () => {
-  const ctxBundle = loadLessonContext({
-    LockService: {
-      getScriptLock: () => ({
-        tryLock: () => false,
-        releaseLock: () => {}
-      })
-    }
-  });
+  // Setup phase: default (lock-succeeds) context so createLessonDraft / updateLessonDraft succeed.
+  // Then swap LockService to busy stub before startLesson — both __updateLessonRow_ (lesson sheet)
+  // and startLesson の lock の両方が busy 扱いになるが、startLesson の lock check が先に動くので
+  // LESSON_BUSY が返る。
+  const ctxBundle = loadLessonContext();
   const created = ctxBundle.context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
   const lessonId = created.data.lesson.lessonId;
   ctxBundle.context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
+
+  ctxBundle.context.LockService = {
+    getScriptLock: () => ({
+      tryLock: () => false,
+      releaseLock: () => {}
+    })
+  };
 
   const res = ctxBundle.context.startLesson('u1', lessonId);
   assert.equal(res.success, false);

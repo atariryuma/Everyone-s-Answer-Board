@@ -37,10 +37,9 @@ function loadAdminContext(overrides = {}) {
     getWebAppUrl: () => 'https://example.com/exec',
     findUserById: (id) => users.find(u => u.userId === id),
     findUserByEmail: (email) => users.find(u => u.userEmail === email),
-    getConfigOrDefault: (userId) => savedConfigs[userId] || { isPublished: false, publishedAt: null },
-    // Why getUserConfig stub: __applyPublishStateChange now uses getUserConfig (not
-    //   getConfigOrDefault) on the save path to detect 429/cache-miss and refuse the
-    //   destructive overwrite. Tests must provide a success envelope to mirror live code.
+    // Why getUserConfig (not getConfigOrDefault): __applyPublishStateChange uses
+    //   getUserConfig envelope to detect 429/cache-miss and refuse destructive overwrite.
+    //   (旧 getConfigOrDefault stub は v2757 で不要に。)
     getUserConfig: (userId) => ({
       success: true,
       config: savedConfigs[userId] || { isPublished: false, publishedAt: null }

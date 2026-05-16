@@ -69,9 +69,15 @@ function __lessonColumns_(sheet) {
 function __rowToLesson_(row, cols) {
   const lessonJsonRaw = row[cols.lessonJson];
   let lessonJson = {};
+  let parseError = null;
   try { lessonJson = lessonJsonRaw ? JSON.parse(lessonJsonRaw) : {}; }
   catch (parseErr) {
+    // Why parseError exposure: 旧コードは parse 失敗を {} で隠していたため、callers が
+    //   その lesson を save-back すると corrupted-but-recoverable な lessonJson を {} で
+    //   全上書きする data-loss 経路があった。parseError を露出させ、上位の __updateLessonRow_
+    //   等が「parse 失敗 lesson は save しない」判定を入れられるようにする。
     logError_('__rowToLesson_:parseLessonJson', parseErr);
+    parseError = parseErr.message || String(parseErr);
     lessonJson = {};
   }
   return {
@@ -85,7 +91,8 @@ function __rowToLesson_(row, cols) {
     schemaVersion: Number(row[cols.schemaVersion]) || LESSON_SCHEMA_VERSION,
     sizeBytes: Number(row[cols.sizeBytes]) || 0,
     etag: row[cols.etag] || null,
-    lessonJson
+    lessonJson,
+    parseError
   };
 }
 
@@ -167,37 +174,57 @@ function __createLessonRow_(record) {
 // 既存 row を patch。patch は {state?, name?, startedAt?, endedAt?, lessonJson?}。
 //   batch write: 1 setValues 呼び出しで完結 (CLAUDE.md batch ルール)。
 //   lessonJson 含む patch なら etag / sizeBytes も更新、そうでないなら lessonJson 列は触らず etag のみ。
+//
+//   Why LockService: 旧コードは read-modify-write を unlocked で行っていたため、
+//   advanceLessonPhase / endLesson / updateLessonDraft の同時クリックで write が lost
+//   する data-loss race があった。LockService.getDocumentLock() で lessons sheet 全体を
+//   serialize する (細粒度 lock は LessonId 単位の lock service が無いため避ける)。
 function __updateLessonRow_(lessonId, patch, expectedEtag) {
-  const found = __findLessonById_(lessonId);
-  if (!found) return { success: false, error: 'LESSON_NOT_FOUND', message: 'lesson not found' };
-  if (expectedEtag && found.lesson.etag && found.lesson.etag !== expectedEtag) {
-    return {
-      success: false,
-      error: 'ETAG_MISMATCH',
-      message: '別タブで lesson が更新されています。再読込してください。',
-      currentEtag: found.lesson.etag
+  // ScriptLock (script-wide) for serializing all lesson sheet writes.
+  // GAS LockService doesn't support per-key locking, so script-wide is the only option.
+  const lock = LockService.getScriptLock();
+  let locked = false;
+  try {
+    locked = lock.tryLock(5000);
+    if (!locked) {
+      return { success: false, error: 'LOCK_TIMEOUT', message: '別の処理が実行中です。少し待ってから再試行してください。' };
+    }
+
+    const found = __findLessonById_(lessonId);
+    if (!found) return { success: false, error: 'LESSON_NOT_FOUND', message: 'lesson not found' };
+    if (expectedEtag && found.lesson.etag && found.lesson.etag !== expectedEtag) {
+      return {
+        success: false,
+        error: 'ETAG_MISMATCH',
+        message: '別タブで lesson が更新されています。再読込してください。',
+        currentEtag: found.lesson.etag
+      };
+    }
+    const { sheet, cols, rowIndex } = found;
+    const lessonJson = patch.lessonJson !== undefined ? patch.lessonJson : found.lesson.lessonJson;
+    const serialized = __serializeLessonJson_(lessonJson);
+
+    const merged = {
+      lessonId: found.lesson.lessonId,
+      userId: found.lesson.userId,
+      name: patch.name !== undefined ? patch.name : found.lesson.name,
+      state: patch.state !== undefined ? patch.state : found.lesson.state,
+      createdAt: found.lesson.createdAt,
+      startedAt: patch.startedAt !== undefined ? patch.startedAt : found.lesson.startedAt,
+      endedAt: patch.endedAt !== undefined ? patch.endedAt : found.lesson.endedAt
     };
+    const row = __buildLessonRow_(merged, cols, serialized);
+    sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
+
+    return {
+      success: true,
+      lesson: { ...found.lesson, ...patch, lessonJson, sizeBytes: serialized.sizeBytes, etag: serialized.etag }
+    };
+  } finally {
+    if (locked) {
+      try { lock.releaseLock(); } catch (e) { console.warn('__updateLessonRow_ releaseLock failed:', e.message); }
+    }
   }
-  const { sheet, cols, rowIndex } = found;
-  const lessonJson = patch.lessonJson !== undefined ? patch.lessonJson : found.lesson.lessonJson;
-  const serialized = __serializeLessonJson_(lessonJson);
-
-  const merged = {
-    lessonId: found.lesson.lessonId,
-    userId: found.lesson.userId,
-    name: patch.name !== undefined ? patch.name : found.lesson.name,
-    state: patch.state !== undefined ? patch.state : found.lesson.state,
-    createdAt: found.lesson.createdAt,
-    startedAt: patch.startedAt !== undefined ? patch.startedAt : found.lesson.startedAt,
-    endedAt: patch.endedAt !== undefined ? patch.endedAt : found.lesson.endedAt
-  };
-  const row = __buildLessonRow_(merged, cols, serialized);
-  sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
-
-  return {
-    success: true,
-    lesson: { ...found.lesson, ...patch, lessonJson, sizeBytes: serialized.sizeBytes, etag: serialized.etag }
-  };
 }
 
 function __listLessonsForUser_(userId, options = {}) {
@@ -261,7 +288,10 @@ function __deleteLessonRow_(lessonId) {
   }
 }
 
-// ----- Authorization: owner-only (管理者は listLessons の allUsers のみ可) -----
+// ----- Authorization: owner OR admin -----
+// Why admin allowed: listLessons / getKnownClassesForUser など他の lesson read ops は
+//   admin に許可しているのに、advance / end / delete / updateDraft だけ admin 拒否すると
+//   admin API 経由のサポート操作 (生徒の質問対応や授業データ修復) ができない。SSOT で揃える。
 
 function __requireLessonOwner_(userId, lessonId) {
   const email = getCurrentEmail();
@@ -270,18 +300,19 @@ function __requireLessonOwner_(userId, lessonId) {
   const callerUser = findUserByEmail(email, { requestingUser: email });
   if (!callerUser) return { error: createUserNotFoundError() };
 
-  if (callerUser.userId !== userId) {
+  const isAdmin = isAdministrator(email);
+  if (!isAdmin && callerUser.userId !== userId) {
     return { error: createErrorResponse('他ユーザーの lesson にはアクセスできません') };
   }
 
-  if (!lessonId) return { callerUser };
+  if (!lessonId) return { callerUser, isAdmin };
 
   const found = __findLessonById_(lessonId);
   if (!found) return { error: createErrorResponse('lesson が見つかりません') };
   if (found.lesson.userId !== userId) {
     return { error: createErrorResponse('lesson の所有者が一致しません') };
   }
-  return { callerUser, found };
+  return { callerUser, found, isAdmin };
 }
 
 // ----- Lesson テンプレート (Phase 1 は 1 種類固定) -----

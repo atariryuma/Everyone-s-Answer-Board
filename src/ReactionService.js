@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator */
+/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache */
 
 const LOCK_TIMEOUT_MS = 10000;
 const LOCK_CACHE_TTL_SECONDS = 10;
@@ -111,35 +111,60 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
   const missingForProvision = missingTypes.slice();
 
   if (missingForProvision.length > 0) {
-    console.warn('processReactionDirect: lazy-provisioning reaction columns', {
-      missingForProvision,
-      currentHeaderCount: headers.length,
-      rowNumber
+    // Why fresh header re-read: 呼び出し側 (executeBoardRowOperation) は preloadedHeaders
+    // を 10 分 cache から取得していて、別スレッドが直前に provisioning 済みでも
+    // cache が stale だと「missing」と誤判定し、重複列を append してしまう。
+    // LockService 取得後にここを通るが、cache 上の headers は別途古いままなので
+    // sheet から fresh に読み直して「本当に missing か」を再確認する。
+    const freshHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+    const reallyMissing = [];
+    missingForProvision.forEach(type => {
+      const freshIdx = freshHeaders.findIndex(h => String(h).toUpperCase().trim() === type);
+      if (freshIdx === -1) {
+        reallyMissing.push(type);
+      } else {
+        // 直前の thread が既に provision 済 → 既存列を使う
+        reactionColumns[type] = freshIdx + 1;
+        // local headers にも反映 (以降のロジックのため)
+        while (headers.length <= freshIdx) headers.push('');
+        headers[freshIdx] = type;
+      }
     });
-    try {
-      // 既存最終列の右側に append（順序: UNDERSTAND, LIKE, CURIOUS, HIGHLIGHT）。
-      // setValues 1 回で済むよう一括書き込み。
-      const startCol = headers.length + 1;
-      sheet.getRange(1, startCol, 1, missingForProvision.length)
-           .setValues([missingForProvision]);
-      // headers 配列も同期更新（同じ関数内の以降のロジックが反映を見られるように）。
-      missingForProvision.forEach((name, i) => {
-        headers.push(name);
-        // この行内のロジックは reactionTypes (UNDERSTAND/LIKE/CURIOUS) のみ参照
-        if (reactionTypes.includes(name)) {
-          reactionColumns[name] = startCol + i;
+
+    if (reallyMissing.length > 0) {
+      console.warn('processReactionDirect: lazy-provisioning reaction columns', {
+        reallyMissing,
+        currentHeaderCount: freshHeaders.length,
+        rowNumber
+      });
+      try {
+        // 既存最終列の右側に append。setValues 1 回で済むよう一括書き込み。
+        const startCol = freshHeaders.length + 1;
+        sheet.getRange(1, startCol, 1, reallyMissing.length)
+             .setValues([reallyMissing]);
+        // headers 配列も同期更新（同じ関数内の以降のロジックが反映を見られるように）
+        reallyMissing.forEach((name, i) => {
+          while (headers.length < startCol + i) headers.push('');
+          headers.push(name);
+          if (reactionTypes.includes(name)) {
+            reactionColumns[name] = startCol + i;
+          }
+        });
+        // ヘッダー cache を invalidate (他の concurrent callers が stale を見ないように)
+        if (typeof invalidateSheetHeadersCache === 'function') {
+          try { invalidateSheetHeadersCache(sheet.getParent().getId(), sheet.getName()); }
+          catch (_) { /* best effort */ }
         }
-      });
-      // 不足解消したので missingTypes をクリア
-      missingTypes = missingTypes.filter(t => reactionColumns[t] === undefined);
-    } catch (provError) {
-      console.error('processReactionDirect: lazy provisioning failed', {
-        error: provError.message,
-        missingForProvision
-      });
-      // provisioning が失敗した場合のみ従来の throw に戻す
-      throw new Error(`リアクション列の追加に失敗しました: ${provError.message}`);
+      } catch (provError) {
+        console.error('processReactionDirect: lazy provisioning failed', {
+          error: provError.message,
+          reallyMissing
+        });
+        throw new Error(`リアクション列の追加に失敗しました: ${provError.message}`);
+      }
     }
+    // 不足解消したので missingTypes をクリア
+    missingTypes = missingTypes.filter(t => reactionColumns[t] === undefined);
   }
 
   if (missingTypes.length > 0) {

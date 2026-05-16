@@ -572,9 +572,12 @@
   class SecurityUtilities {
     escapeHtml(text) {
       if (!text) return '';
+      // Why: div.innerHTML から得る出力は <, >, &, " はエスケープするが、ブラウザ実装に
+      //      よっては ' を素通しする。HTML 属性値を build するときに `id='${escapeHtml(x)}'`
+      //      のようなテンプレートが他箇所にあるため、' を明示的に &#39; に置換して XSS を防ぐ。
       const div = document.createElement('div');
       div.textContent = text;
-      return div.innerHTML;
+      return div.innerHTML.replace(/'/g, '&#39;');
     }
 
     isValidEmail(email) {

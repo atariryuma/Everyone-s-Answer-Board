@@ -36,6 +36,8 @@ function createMockSheet({ headers = [], rows = [], name = 'Sheet1' } = {}) {
     getName: () => name,
     getDataRange: () => makeRange(1, 1, data.length, data[0] ? data[0].length : 0),
     getRange: (row, col, numRows = 1, numCols = 1) => makeRange(row, col, numRows, numCols),
+    getLastColumn: () => (data[0] ? data[0].length : 0),
+    getParent: () => ({ getId: () => 'mock-ss-id' }),
     _data: data,
     _writes: writes
   };
