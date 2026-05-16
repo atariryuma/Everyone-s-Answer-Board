@@ -42,6 +42,22 @@ function loadDataApisContext(overrides = {}) {
     getQuestionText: () => '',
     createDataServiceErrorResponse: (message) => ({ success: false, message }),
     isAdministrator: () => false,
+    // v2773: read-time cross-ref filter — default stub は sanitizer 本物と同じ規約
+    //   (profiles[] に無い name は drop)。テストで orphan を含めたい場合は overrides で
+    //   pass-through stub を渡す (v2772 既存テスト互換)。
+    sanitizeProfileHistory: (history, profiles) => {
+      if (!Array.isArray(history)) return [];
+      const validNames = (Array.isArray(profiles) && profiles.length > 0)
+        ? new Set(profiles.filter(p => p && p.name).map(p => p.name))
+        : null;
+      const out = [];
+      for (const h of history) {
+        if (!h || typeof h !== 'object' || !h.name) continue;
+        if (validNames && !validNames.has(h.name)) continue;
+        out.push({ name: h.name, activatedAt: h.activatedAt || '' });
+      }
+      return out;
+    },
     ...overrides
   };
   vm.createContext(context);
@@ -398,6 +414,57 @@ test('studentProfileNav: null when profileHistory empty', () => {
     {}  // student
   );
   assert.equal(result.studentProfileNav, null);
+});
+
+test('studentProfileNav: read-time cross-ref drops orphan history (v2773)', () => {
+  // /goal「根本的な構造を正しく」: storage に古い orphan history が残っていても、
+  //   read-time の sanitizeProfileHistory(history, profiles) で wire 直前に
+  //   profiles[] に無い name は drop する (defense in depth)。
+  //   v2772 sanitizer は save-time のみで lazy なので、ここで二重に保証する。
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      profiles: [
+        { name: 'alive-A', formTitle: 'A' },
+        { name: 'alive-B', formTitle: 'B' }
+      ],
+      activeProfile: 'alive-B',
+      profileHistory: [
+        { name: 'alive-A', activatedAt: '2026-05-14T01:00:00Z' },
+        { name: 'orphan-X', activatedAt: '2026-05-14T01:15:00Z' },  // 削除済 → drop
+        { name: 'alive-B', activatedAt: '2026-05-14T01:30:00Z' }
+      ]
+    },
+    {}  // student
+  );
+  const names = result.studentProfileNav.history.map(h => h.name);
+  assert.deepEqual(names, ['alive-A', 'alive-B'], 'orphan-X は read-time で drop される');
+});
+
+test('profileSummary (teacher): read-time cross-ref drops orphan history (v2773)', () => {
+  // teacher にも同じ規約: profileSummary.history も sanitizeProfileHistory 経由で出す。
+  //   pill ✓ 表示の根拠なので、orphan を残すと teacher も削除済 pill を踏む。
+  const ctx = loadDataApisContext();
+  const result = ctx.buildSafePublishedDataResult(
+    { data: [], header: '', sheetName: '' },
+    {
+      displaySettings: {},
+      columnMapping: {},
+      profiles: [{ name: 'alive', formTitle: 'A' }],
+      activeProfile: 'alive',
+      profileHistory: [
+        { name: 'alive', activatedAt: '2026-05-14T01:00:00Z' },
+        { name: 'orphan', activatedAt: '2026-05-14T01:15:00Z' }
+      ]
+    },
+    { isOwnBoard: true }
+  );
+  assert.ok(result.profiles);
+  const names = result.profiles.history.map(h => h.name);
+  assert.deepEqual(names, ['alive'], 'teacher 側も orphan を drop');
 });
 
 test('studentProfileNav: passes through history entries without deleted flag (v2772)', () => {

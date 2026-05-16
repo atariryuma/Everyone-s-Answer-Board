@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, setupDomainWideSharing, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, setupDomainWideSharing, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -1088,13 +1088,18 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   //      students の wire には乗せない（混乱回避 + 内部設定の漏洩防止）。
   //      また、これを client の isTeacher 判定の根拠にも使う（profiles 配列が wire に
   //      含まれていれば、その閲覧者は teacher 権限）。
+  //
+  // v2773: read-time にも cross-ref filter を適用 (defense in depth)。
+  //   sanitizeProfileHistory は save-time にしか走らない (lazy) ため、storage に既存の
+  //   orphan history が残っていると次回保存まで client に流れていた。
+  //   sanitizeProfileHistory(history, profiles) で常に正規化してから wire に乗せる。
+  //   これで「保存されるまで orphan pill が消えない」問題が構造的に解消する。
   let profileSummary = null;
   const isPrivilegedViewer = Boolean(viewerContext.isAdmin || viewerContext.isOwnBoard);
+  const cleanHistory = (typeof sanitizeProfileHistory === 'function' && config)
+    ? sanitizeProfileHistory(config.profileHistory, config.profiles)
+    : [];
   if (isPrivilegedViewer && config && Array.isArray(config.profiles) && config.profiles.length > 0) {
-    // history も teacher に同梱して、pill 上の ✓ (= 過去 active 経験あり) 表示の根拠にする。
-    const teacherHistory = Array.isArray(config.profileHistory)
-      ? config.profileHistory.map(h => ({ name: h.name, activatedAt: h.activatedAt || '' }))
-      : [];
     profileSummary = {
       active: config.activeProfile || null,
       list: config.profiles.map(p => ({
@@ -1102,32 +1107,23 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
         formTitle: p.formTitle || '',
         boardMode: (p.displaySettings && p.displaySettings.boardMode) || 'auto'
       })),
-      history: teacherHistory
+      history: cleanHistory.map(h => ({ name: h.name, activatedAt: h.activatedAt || '' }))
     };
   }
 
   // Option B: 生徒は過去フェーズだけは閲覧できるよう、profileHistory と current のみ
   //   サブセット情報を wire に乗せる。未来 profile (history 未登録) は漏らさない。
   //   teacher 用の full profileSummary は上記 isPrivilegedViewer 経路で送る。
-  //
-  // 構造: studentProfileNav = {
-  //   active: '現在の profile 名',
-  //   history: [{ name, activatedAt, formTitle }, ...]  // 末尾が最新
-  // }
-  // student client はこれだけで pill UI を組み立てる。formTitle は表示名として使う。
-  // v2772 で sanitizeProfileHistory の cross-ref により profileHistory には必ず profiles[] と
-  // 整合する name しか入らなくなった (orphan は sanitize 時点で drop される)。
-  // よって以前の `deleted` flag は不要 (常に false になるため client 側分岐ごと削除)。
+  //   cleanHistory (sanitizeProfileHistory 通過後) を使うので orphan は届かない。
   let studentProfileNav = null;
-  const rawHistory = (config && Array.isArray(config.profileHistory)) ? config.profileHistory : [];
-  if (!isPrivilegedViewer && rawHistory.length > 0 && Array.isArray(config && config.profiles)) {
+  if (!isPrivilegedViewer && cleanHistory.length > 0 && config && Array.isArray(config.profiles)) {
     const profileByName = {};
     for (const p of config.profiles) {
       if (p && p.name) profileByName[p.name] = p;
     }
     studentProfileNav = {
       active: config.activeProfile || null,
-      history: rawHistory.map(h => {
+      history: cleanHistory.map(h => {
         const meta = profileByName[h.name] || {};
         return {
           name: h.name,
