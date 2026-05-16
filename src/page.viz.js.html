@@ -2507,7 +2507,11 @@
           isPast,
           isViewing: viewing === name || (!viewing && isCurrent),
           deleted: false,
-          action: isCurrent ? null : (isPast ? 'load-past' : 'switch')
+          // Why teacher は常に 'switch': タブ click = active 切替が教師の直感的 mental model
+          //   (過去 phase でも preview ではなく実 activate)。「↻ 現在に戻る」が出る困惑を解消。
+          //   read-only review は AdminPanel のレッスン振り返り画面で行う。
+          //   生徒 (else 経路) は権限が無いので従来通り 'load-past' (preview-only)。
+          action: isCurrent ? null : 'switch'
         };
       }).filter(e => e.name);
     } else {
