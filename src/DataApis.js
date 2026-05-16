@@ -1115,11 +1115,12 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   //   history: [{ name, activatedAt, formTitle }, ...]  // 末尾が最新
   // }
   // student client はこれだけで pill UI を組み立てる。formTitle は表示名として使う。
+  // v2772 で sanitizeProfileHistory の cross-ref により profileHistory には必ず profiles[] と
+  // 整合する name しか入らなくなった (orphan は sanitize 時点で drop される)。
+  // よって以前の `deleted` flag は不要 (常に false になるため client 側分岐ごと削除)。
   let studentProfileNav = null;
   const rawHistory = (config && Array.isArray(config.profileHistory)) ? config.profileHistory : [];
   if (!isPrivilegedViewer && rawHistory.length > 0 && Array.isArray(config && config.profiles)) {
-    // formTitle 補完: history は {name, activatedAt} だけ持つので profiles から表示名を引く。
-    //   削除済 profile (history に名前あるが profiles から消えた) は formTitle 空のまま渡す。
     const profileByName = {};
     for (const p of config.profiles) {
       if (p && p.name) profileByName[p.name] = p;
@@ -1131,9 +1132,7 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
         return {
           name: h.name,
           activatedAt: h.activatedAt || '',
-          formTitle: meta.formTitle || '',
-          // 削除済 profile かどうか: students にロード不可と判定させるためのフラグ
-          deleted: !profileByName[h.name]
+          formTitle: meta.formTitle || ''
         };
       })
     };

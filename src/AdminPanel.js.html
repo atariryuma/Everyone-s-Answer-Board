@@ -960,27 +960,63 @@
     }
   }
 
+  /**
+   * 外部公開 WebApp URL を構築するための SSoT helper (v2772 追加)。
+   *
+   * Why: GAS の HTML は script.googleusercontent.com の sandbox iframe 内で実行されるため、
+   *   `window.location.origin + pathname` を取ると iframe URL
+   *   (例: https://n-xxxxx.script.googleusercontent.com/userCodeAppPanel) になる。
+   *   これに `?mode=...` を付けても外部から到達できず 404。
+   *   親 frame の本物の URL は `getWebAppUrl()` を server で呼ばないと取得できない。
+   *
+   *   各 callsite で個別に `window.location` 系を呼ぶと罠を踏み続けるので、必ずこの helper
+   *   経由でビルドする。`_cachedWebAppUrl` を優先、未取得時は同期 fetch + callback。
+   *
+   * @param {string} mode - `?mode=` の値 (review / manual / appSetup / view 等)
+   * @param {Object} [params] - 追加クエリパラメータ {key: value}
+   * @param {Function} onReady - URL 取得後に呼ぶコールバック (url が引数)
+   * @param {Function} [onError] - 取得失敗時のコールバック
+   */
+  function buildWebAppUrl(mode, params, onReady, onError) {
+    const buildQuery = (base) => {
+      const qs = ['mode=' + encodeURIComponent(mode)];
+      if (params && typeof params === 'object') {
+        Object.keys(params).forEach(k => {
+          if (params[k] !== undefined && params[k] !== null && params[k] !== '') {
+            qs.push(encodeURIComponent(k) + '=' + encodeURIComponent(String(params[k])));
+          }
+        });
+      }
+      return base + '?' + qs.join('&');
+    };
+    if (_cachedWebAppUrl) {
+      try { onReady(buildQuery(_cachedWebAppUrl)); } catch (e) { console.warn('buildWebAppUrl onReady error:', e && e.message); }
+      return;
+    }
+    google.script.run
+      .withSuccessHandler(function (webAppUrl) {
+        if (webAppUrl) {
+          _cachedWebAppUrl = webAppUrl;
+          try { onReady(buildQuery(webAppUrl)); } catch (e) { console.warn('buildWebAppUrl onReady error:', e && e.message); }
+        } else if (typeof onError === 'function') {
+          onError(new Error('WebApp URL not available'));
+        }
+      })
+      .withFailureHandler(function (err) {
+        console.warn('buildWebAppUrl fetch failed:', err && err.message);
+        if (typeof onError === 'function') onError(err);
+      })
+      .getWebAppUrl();
+  }
+
   function openManualGuide() {
     if (window.notifications) {
       window.notifications.info('📚 使い方ガイドを開いています...', 2000);
     }
-
-    // プリフェッチ済みURLがあれば即座に開く（ユーザーのクリックイベント内）
-    const manualUrl = _cachedWebAppUrl
-      ? _cachedWebAppUrl + '?mode=manual'
-      : null;
-    if (manualUrl) {
-      window.open(manualUrl, '_blank');
-    } else {
-      google.script.run
-        .withSuccessHandler(function (webAppUrl) {
-          if (webAppUrl) window.open(webAppUrl + '?mode=manual', '_blank');
-        })
-        .withFailureHandler(function () {
-          if (window.notifications) window.notifications.error('使い方ガイドを開けませんでした。', 3000);
-        })
-        .getWebAppUrl();
-    }
+    buildWebAppUrl('manual', null,
+      (url) => { window.open(url, '_blank'); },
+      () => { if (window.notifications) window.notifications.error('使い方ガイドを開けませんでした。', 3000); }
+    );
   }
 
   function updateResourceButtons(config) {
@@ -3587,29 +3623,17 @@
   }
 
   /**
-   * アプリ設定URLをプリフェッチ（GAS iFrame対応）
-   * ページ読み込み時に呼び出され、リンクのhrefを設定
+   * アプリ設定 URL をプリフェッチして a[href] にセット。
+   * v2772: buildWebAppUrl helper 経由に統一 (個別 `getWebAppUrl` 呼び出しを廃止)。
    */
   function prefetchAppSetupUrl() {
     const appSetupBtn = document.getElementById('app-setup-btn');
     if (!appSetupBtn) return;
-
-    const targetUserId = window.UNIFIED_CONFIG?.targetUserId;
-
-    google.script.run
-      .withSuccessHandler(function (webAppUrl) {
-        // 無効なURLパターンを検証（OAuth初期化中のURL）
-        if (!webAppUrl || webAppUrl.includes('userCodeAppPanel') || !webAppUrl.includes('/exec')) {
-          return;
-        }
-
-        const appSetupUrl = webAppUrl + '?mode=appSetup' + (targetUserId ? '&userId=' + targetUserId : '');
-        appSetupBtn.href = appSetupUrl;
-      })
-      .withFailureHandler(function (error) {
-        console.error('アプリ設定URL取得エラー:', error);
-      })
-      .getWebAppUrl();
+    const targetUserId = window.UNIFIED_CONFIG && window.UNIFIED_CONFIG.targetUserId;
+    buildWebAppUrl('appSetup', targetUserId ? { userId: targetUserId } : null,
+      (url) => { appSetupBtn.href = url; },
+      (err) => { console.warn('アプリ設定URL取得エラー:', err && err.message); }
+    );
   }
 
   // prefetchAppSetupUrl は init() 内で呼ばれる (上記参照)。EOF の top-level kickoff は
@@ -3700,8 +3724,13 @@
         const lessonId = openTarget.dataset.lessonOpen;
         const state = openTarget.dataset.lessonState;
         if (state === 'completed') {
-          const baseUrl = window.location.origin + window.location.pathname;
-          window.open(baseUrl + '?mode=review&lessonId=' + encodeURIComponent(lessonId) + '&userId=' + encodeURIComponent(userId), '_blank');
+          // Why buildWebAppUrl: 旧コード `window.location.origin + pathname` は GAS sandbox
+          //   iframe の URL (script.googleusercontent.com/userCodeAppPanel) を返すため、
+          //   `?mode=review` を付けても 404。必ず外部公開 URL (= _cachedWebAppUrl) を使う。
+          buildWebAppUrl('review', { lessonId, userId },
+            (url) => { window.open(url, '_blank'); },
+            () => { if (window.showError) window.showError('振り返り画面を開けませんでした'); }
+          );
           return;
         }
         if (state === 'active') {

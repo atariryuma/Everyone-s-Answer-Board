@@ -2506,7 +2506,6 @@
           isCurrent,
           isPast,
           isViewing: viewing === name || (!viewing && isCurrent),
-          deleted: false,
           // Why teacher は常に 'switch': タブ click = active 切替が教師の直感的 mental model
           //   (過去 phase でも preview ではなく実 activate)。「↻ 現在に戻る」が出る困惑を解消。
           //   read-only review は AdminPanel のレッスン振り返り画面で行う。
@@ -2536,7 +2535,6 @@
           isCurrent,
           isPast: !isCurrent,
           isViewing: viewing === h.name || (!viewing && isCurrent),
-          deleted: !!h.deleted,
           action: isCurrent ? null : 'load-past'
         };
       });
@@ -2558,6 +2556,9 @@
 
     if (!useSelect) {
       // pill tab レイアウト
+      // Why no deleted handling (v2772): sanitizeProfileHistory が profiles[] と cross-ref する
+      //   ようになったため、orphan history (削除済 profile) は server 到達前に drop されている。
+      //   よって client での `deleted` 分岐は不要 (常に false になるので削除済)。
       const html = ['<div class="viz-profile-pills-row">'];
       for (const e of pillEntries) {
         const safe = escapeForTooltip(e.name);
@@ -2566,18 +2567,16 @@
         if (e.isCurrent) classes.push('current');
         if (e.isPast) classes.push('past');
         if (e.isViewing) classes.push('viewing');
-        if (e.deleted) classes.push('deleted');
         const icon = e.isCurrent ? '<span class="viz-profile-pill__dot" aria-hidden="true">●</span> '
                    : e.isPast ? '<span class="viz-profile-pill__check" aria-hidden="true">✓</span> '
                    : '';
         const ariaSel = e.isViewing ? 'true' : 'false';
         const dataAction = e.action ? ' data-action="' + e.action + '"' : '';
-        const disabled = e.deleted ? ' disabled aria-disabled="true"' : '';
         html.push(
           '<button type="button" class="' + classes.join(' ') +
           '" role="tab" aria-selected="' + ariaSel +
-          '" data-profile="' + safe + '"' + dataAction + disabled +
-          ' title="' + safeTitle + (e.deleted ? '（このフェーズは削除済です）' : '') + '">' +
+          '" data-profile="' + safe + '"' + dataAction +
+          ' title="' + safeTitle + '">' +
           icon + safe + '</button>'
         );
       }

@@ -143,6 +143,34 @@ test('sanitizeProfileHistory: caps to MAX_HISTORY=50, keeps newest', () => {
   assert.equal(result[49].name, 'p74');
 });
 
+test('sanitizeProfileHistory: cross-ref filter — orphan (profiles[] にない名前) を drop (v2772)', () => {
+  // /goal「根本的な構造を正しく」: history は profiles[] のサブセットという不変条件を強制。
+  // 削除済 profile が orphan として残り client で strikethrough 表示される問題を sanitize 層で塞ぐ。
+  const ctx = loadConfigCtx();
+  const profiles = [
+    { name: 'alive-A' },
+    { name: 'alive-B' }
+  ];
+  const result = ctx.sanitizeProfileHistory([
+    { name: 'alive-A', activatedAt: '2026-05-01' },
+    { name: 'orphan-X', activatedAt: '2026-05-02' },  // profiles[] にない → drop
+    { name: 'alive-B', activatedAt: '2026-05-03' },
+    { name: 'orphan-Y', activatedAt: '2026-05-04' }   // 同じく drop
+  ], profiles);
+  assert.equal(result.length, 2);
+  assert.equal(result[0].name, 'alive-A');
+  assert.equal(result[1].name, 'alive-B');
+});
+
+test('sanitizeProfileHistory: sanitizedProfiles undefined のとき cross-ref skip (後方互換)', () => {
+  const ctx = loadConfigCtx();
+  // profiles を渡さない呼び出しでは全 entry が残る (テスト用 / 段階移行用 escape hatch)
+  const result = ctx.sanitizeProfileHistory([
+    { name: 'whatever', activatedAt: '2026-01-01' }
+  ]);
+  assert.equal(result.length, 1);
+});
+
 test('sanitizeProfileHistory: drops invalid activatedAt to empty string', () => {
   // Date conversion path can't be tested across vm realms (instanceof Date fails
   // for outer-realm Date inside vm context). Verify string-only path instead.

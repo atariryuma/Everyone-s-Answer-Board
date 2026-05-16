@@ -629,7 +629,7 @@
      - current: 現在 active な profile（cyan 枠）
      - past:    過去 active になった profile（淡 + ✓）— student の navigation target
      - viewing: いま閲覧中（current か past いずれかと併用）
-     - deleted: 削除済 profile（クリック不可 + 取消線） */
+     - (v2772 で .deleted 状態は廃止: sanitizeProfileHistory cross-ref で orphan は server 側で drop) */
   .viz-profile-pill.current:not(.viewing) {
     background: rgba(56, 189, 248, 0.2);
     border-color: rgba(56, 189, 248, 0.7);
@@ -640,11 +640,6 @@
     opacity: 0.85;
   }
   .viz-profile-pill.past:hover { opacity: 1; }
-  .viz-profile-pill.deleted {
-    text-decoration: line-through;
-    opacity: 0.45;
-    cursor: not-allowed;
-  }
   .viz-profile-pill__check { color: #10b981; font-size: 0.78em; margin-right: 0.1rem; }
   .viz-profile-pill__dot { color: #38bdf8; font-size: 0.62em; vertical-align: middle; }
 

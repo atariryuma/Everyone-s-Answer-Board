@@ -400,28 +400,31 @@ test('studentProfileNav: null when profileHistory empty', () => {
   assert.equal(result.studentProfileNav, null);
 });
 
-test('studentProfileNav: marks deleted profile (in history but missing from profiles[])', () => {
+test('studentProfileNav: passes through history entries without deleted flag (v2772)', () => {
+  // /goal「根本的な構造を正しく」: deleted flag は廃止。orphan は sanitizeProfileHistory
+  //   (上流) で server 到達前に drop されるため、buildSafePublishedDataResult 内では
+  //   常に「profiles[] に存在する name のみ」を仮定して history を pass-through できる。
+  //   この test は cross-ref を bypass した状態 (テスト用直接呼び出し) で
+  //   buildSafePublishedDataResult が deleted flag を付けないことだけを assert する。
   const ctx = loadDataApisContext();
   const result = ctx.buildSafePublishedDataResult(
     { data: [], header: '', sheetName: '' },
     {
       displaySettings: {},
       columnMapping: {},
-      profiles: [{ name: '本時', formTitle: 'B' }],   // 「導入」削除済
+      profiles: [{ name: '本時', formTitle: 'B' }],
       activeProfile: '本時',
       profileHistory: [
-        { name: '導入', activatedAt: '2026-05-14T01:00:00Z' },
         { name: '本時', activatedAt: '2026-05-14T01:30:00Z' }
       ]
     },
     {}  // student
   );
   const entries = result.studentProfileNav.history;
-  const deletedEntry = entries.find(e => e.name === '導入');
-  assert.ok(deletedEntry);
-  assert.equal(deletedEntry.deleted, true);
-  const currentEntry = entries.find(e => e.name === '本時');
-  assert.equal(currentEntry.deleted, false);
+  assert.equal(entries.length, 1);
+  const entry = entries[0];
+  assert.equal(entry.name, '本時');
+  assert.equal('deleted' in entry, false, 'deleted flag は wire に乗せない (v2772 で廃止)');
 });
 
 test('viewingPastProfile: defaults to null when no override', () => {

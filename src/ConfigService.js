@@ -247,13 +247,14 @@ function validateAndSanitizeConfig(config, userId) {
       else delete sanitized.activeProfile;
     }
 
-    // profileHistory: 過去 active になった profile の時系列ログ。
-    // Why: 生徒が「導入 → 本時 → 振り返り」のような授業フェーズを後追いで確認できるよう、
-    //   active 切替のたびに append。students は profileHistory に含まれる profile のみ閲覧可。
-    //   profiles[] に存在しないが history には残っている (削除済 profile) ケースもありうるが、
-    //   閲覧用なので名前ベースで残しておく価値がある (削除済は client 側で薄くグレー表示)。
+    // profileHistory: navigable な過去 phase の時系列ログ。
+    // Why cross-ref (v2772 で再定義): profiles[] に存在しない orphan を許容すると、
+    //   削除済 profile が strikethrough で client に残り続け UX 混乱を起こしていた。
+    //   sanitizeProfileHistory に sanitized.profiles を渡し cross-ref filter させることで、
+    //   delete / rename / 直編集 すべての mutation で自動的に同期する (SSoT)。
+    //   実行順序が大事: 上の sanitizeProfiles 完了後の sanitized.profiles を参照する。
     if ('profileHistory' in sanitized) {
-      const hist = sanitizeProfileHistory(sanitized.profileHistory);
+      const hist = sanitizeProfileHistory(sanitized.profileHistory, sanitized.profiles);
       if (hist.length > 0) sanitized.profileHistory = hist;
       else delete sanitized.profileHistory;
     }
@@ -393,14 +394,25 @@ function sanitizeQuadrantLabels(input) {
  * @param {Array} input - profileHistory 候補
  * @returns {Array<{name:string, activatedAt:string}>}
  */
-function sanitizeProfileHistory(input) {
+function sanitizeProfileHistory(input, sanitizedProfiles) {
   if (!Array.isArray(input)) return [];
   const MAX_HISTORY = 50;
+
+  // Why cross-ref: profileHistory は「現在 navigable な過去 phase の時系列ログ」と再定義。
+  //   profiles[] に存在しない (= 削除済) 名前は orphan として drop する。
+  //   これで delete / rename / 直編集 すべてで自動的に history が同期する
+  //   (各 mutation 経路で個別に history を更新する必要がなくなる、SSoT)。
+  //   sanitizedProfiles が undefined のときは cross-ref を skip (後方互換 / test 用)。
+  const validNames = (Array.isArray(sanitizedProfiles) && sanitizedProfiles.length > 0)
+    ? new Set(sanitizedProfiles.filter(p => p && p.name).map(p => String(p.name).trim()))
+    : null;
+
   const out = [];
   for (const e of input) {
     if (!e || typeof e !== 'object') continue;
     const name = String(e.name == null ? '' : e.name).trim().substring(0, 50);
     if (!name) continue;
+    if (validNames && !validNames.has(name)) continue;  // orphan: drop
     let activatedAt = '';
     if (typeof e.activatedAt === 'string') {
       activatedAt = e.activatedAt.substring(0, 40);
