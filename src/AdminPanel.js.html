@@ -3656,6 +3656,15 @@
         }
         const lessons = (res.data && res.data.lessons) || [];
         if (countEl) countEl.textContent = `(${lessons.length})`;
+        // Why first-time hint: 「初見ユーザーは empty-state を first-onboarding として読む」(UX 研究結果)。
+        //   lessons / profiles 両方とも 0 件のときだけ「ここから始めよう」hint を出す。
+        //   1 つでも作ったら自然と非表示 (= 卒業条件)。
+        const hintEl = document.getElementById('first-time-hint');
+        if (hintEl) {
+          const hasAnyProfile = !!(systemState && systemState.config && Array.isArray(systemState.config.profiles) && systemState.config.profiles.length > 0);
+          const isFirstTime = lessons.length === 0 && !hasAnyProfile;
+          hintEl.classList.toggle('hidden', !isFirstTime);
+        }
         if (lessons.length === 0) {
           listEl.innerHTML = '<li class="text-gray-500 italic">まだレッスンがありません。「🎒 新しい授業を作る」から始めましょう。</li>';
           return;

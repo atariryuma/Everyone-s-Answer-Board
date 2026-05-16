@@ -226,7 +226,7 @@
     <h1 class="text-cyan-400 font-bold">みんなの回答ボード 設定</h1>
     <div class="flex items-center gap-3">
       <button type="button" class="btn btn-secondary" onclick="openManualGuide()"
-        title="PC初心者向けの使い方ガイドを開きます">
+        title="使い方ガイド (はじめての方は 3 分で始められる手順を確認できます)">
         📚 使い方ガイド
       </button>
     </div>
@@ -263,6 +263,20 @@
         <ul id="lesson-list" class="space-y-2 text-sm">
           <li class="text-gray-500 italic">読み込み中…</li>
         </ul>
+
+        <!-- 初回ユーザー向け empty-state hint
+             AdminPanel.js.html: loadLessonList が lessons.length === 0 のとき
+             #first-time-hint の hidden を外す。1 度でも授業を作ったら出ない。 -->
+        <div id="first-time-hint" class="hidden mt-4 p-3 rounded-lg"
+             style="background: rgba(34, 211, 238, 0.08); border: 1px dashed rgba(34, 211, 238, 0.4);">
+          <p class="text-sm text-cyan-200 mb-1">
+            <strong>👋 初めての方へ:</strong> 上の <span class="font-semibold">「🎒 新しい授業を作る」</span> を押すと、テンプレートから 3 分で始められます。
+          </p>
+          <p class="text-xs text-gray-400">
+            すでに Google フォームがある場合は、下の「フォームを連携」に URL を貼り付けるだけでも OK。
+            詳しい使い方は右上の <strong>📚 使い方ガイド</strong> から。
+          </p>
+        </div>
       </section>
 
       <!-- ========================================================

@@ -5,1120 +5,434 @@
     <base target="_top" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <?!= include('SharedSecurityHeaders'); ?>
-    <title>みんなの回答ボード - 完全操作マニュアル</title>
+    <title>みんなの回答ボード - 使い方ガイド</title>
 
     <?!= include('SharedTailwindConfig'); ?>
     <?!= include('UnifiedStyles.css'); ?>
 
     <style>
-      .step-number {
-        background: linear-gradient(135deg, #00d4ff, #0099cc);
-        color: white;
-        width: 2.5rem;
-        height: 2.5rem;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 1.1rem;
-        margin-right: 1rem;
+      /* マニュアル専用: 読みやすい線幅 + 段落間隔。本文中心の最小スタイル */
+      .manual-wrap { max-width: 56rem; margin: 0 auto; padding: 2rem 1rem 6rem; }
+      .manual-h1 { font-size: 2rem; font-weight: 700; color: #67e8f9; margin-bottom: 0.5rem; }
+      .manual-h2 { font-size: 1.5rem; font-weight: 600; color: #fff;
+                   margin: 2.5rem 0 1rem; padding-bottom: 0.5rem;
+                   border-bottom: 1px solid rgba(103, 232, 249, 0.3); }
+      .manual-h3 { font-size: 1.1rem; font-weight: 600; color: #a5f3fc; margin: 1.5rem 0 0.5rem; }
+      .manual-p  { color: rgba(229, 231, 235, 0.9); line-height: 1.75; margin-bottom: 0.75rem; }
+      .manual-p code { background: rgba(15, 23, 42, 0.6); padding: 0.1rem 0.4rem;
+                       border-radius: 0.25rem; color: #fde68a; font-size: 0.95em; }
+
+      .step-card {
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid rgba(103, 232, 249, 0.25);
+        border-radius: 0.75rem;
+        padding: 1.25rem;
+        margin: 0.75rem 0;
+        display: flex; gap: 0.75rem;
+      }
+      .step-num {
         flex-shrink: 0;
+        width: 2rem; height: 2rem;
+        background: linear-gradient(135deg, #67e8f9, #06b6d4);
+        color: #0f172a;
+        border-radius: 9999px;
+        display: flex; align-items: center; justify-content: center;
+        font-weight: 700;
       }
+      .step-body { flex: 1; }
+      .step-body h4 { color: #fff; font-weight: 600; margin-bottom: 0.25rem; }
+      .step-body p { color: rgba(229, 231, 235, 0.85); font-size: 0.92rem; margin: 0; line-height: 1.6; }
+      .step-body p + p { margin-top: 0.4rem; }
 
-      .manual-section {
-        margin-bottom: 2rem;
-      }
-
-      .feature-card {
-        background: rgba(0, 212, 255, 0.1);
-        border: 1px solid rgba(0, 212, 255, 0.3);
-        border-radius: 12px;
-        padding: 1.5rem;
-        margin-bottom: 1rem;
-        transition: all 0.3s ease;
-      }
-
-      .feature-card:hover {
-        background: rgba(0, 212, 255, 0.15);
-        border-color: rgba(0, 212, 255, 0.5);
-        transform: translateY(-2px);
-      }
-
-      .instruction-box {
-        background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(0, 153, 204, 0.1));
-        border-left: 4px solid #00d4ff;
-        padding: 1.5rem;
-        margin: 1rem 0;
-        border-radius: 0 12px 12px 0;
-      }
-
-      .warning-box {
-        background: rgba(255, 193, 7, 0.15);
-        border: 1px solid rgba(255, 193, 7, 0.4);
-        border-radius: 8px;
-        padding: 1.25rem;
-        margin: 1rem 0;
-      }
-
-      .tip-box {
-        background: rgba(40, 167, 69, 0.15);
-        border: 1px solid rgba(40, 167, 69, 0.4);
-        border-radius: 8px;
-        padding: 1.25rem;
-        margin: 1rem 0;
-      }
-
-      .info-box {
-        background: rgba(0, 123, 255, 0.15);
-        border: 1px solid rgba(0, 123, 255, 0.4);
-        border-radius: 8px;
-        padding: 1.25rem;
-        margin: 1rem 0;
-      }
-
-      .quick-nav {
-        position: sticky;
-        top: 1rem;
-        z-index: 10;
-        background: rgba(0, 0, 0, 0.8);
-        backdrop-filter: blur(10px);
-        border-radius: 12px;
+      .mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+                   gap: 0.75rem; margin: 1rem 0; }
+      .mode-card {
+        background: rgba(15, 23, 42, 0.5);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 0.5rem;
         padding: 1rem;
-        margin-bottom: 2rem;
       }
+      .mode-card .icon { font-size: 1.5rem; }
+      .mode-card .title { font-weight: 600; color: #fff; margin: 0.25rem 0; }
+      .mode-card .desc { font-size: 0.85rem; color: rgba(229, 231, 235, 0.7); line-height: 1.5; }
+      .mode-card .when { font-size: 0.78rem; color: #67e8f9; margin-top: 0.5rem; }
 
-      .quick-nav a {
-        display: block;
-        color: #00d4ff;
-        text-decoration: none;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        transition: all 0.3s ease;
+      .callout {
+        border-radius: 0.5rem;
+        padding: 0.9rem 1.1rem;
+        margin: 1rem 0;
+        line-height: 1.6;
       }
+      .callout.tip    { background: rgba(34, 197, 94, 0.1);  border-left: 3px solid #22c55e; color: #bbf7d0; }
+      .callout.warn   { background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; color: #fde68a; }
+      .callout.info   { background: rgba(59, 130, 246, 0.1); border-left: 3px solid #3b82f6; color: #bfdbfe; }
+      .callout strong { color: #fff; }
 
-      .quick-nav a:hover {
-        color: #ffffff;
-        padding-left: 1rem;
+      .toc { position: sticky; top: 1rem;
+             background: rgba(15, 23, 42, 0.7);
+             backdrop-filter: blur(10px);
+             border: 1px solid rgba(103, 232, 249, 0.2);
+             border-radius: 0.75rem;
+             padding: 1rem; }
+      .toc h4 { color: #fff; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem; }
+      .toc a {
+        display: block; color: #a5f3fc; text-decoration: none;
+        padding: 0.3rem 0; font-size: 0.88rem;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        transition: color 0.15s ease, padding-left 0.15s ease;
       }
+      .toc a:last-child { border-bottom: none; }
+      .toc a:hover { color: #fff; padding-left: 0.5rem; }
 
-      .quick-nav a:last-child {
-        border-bottom: none;
+      .faq details {
+        background: rgba(15, 23, 42, 0.4);
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        border-radius: 0.5rem;
+        padding: 0.7rem 1rem;
+        margin-bottom: 0.5rem;
       }
-
-      .figure-box {
-        background: rgba(0, 0, 0, 0.3);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 8px;
-        padding: 1rem;
-        margin: 1.5rem 0;
-        text-align: center;
-      }
-
-      .highlight-text {
-        background: linear-gradient(135deg, #00d4ff, #0099cc);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        font-weight: bold;
-      }
+      .faq summary { cursor: pointer; font-weight: 600; color: #a5f3fc; padding: 0.2rem 0; }
+      .faq details[open] summary { color: #fff; }
+      .faq .answer { color: rgba(229, 231, 235, 0.85); margin-top: 0.5rem;
+                     line-height: 1.6; font-size: 0.92rem; }
     </style>
   </head>
-
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">
-    <div id="loading-overlay" class="loading-overlay page-specific hidden">
-      <div class="loading-content">
-        <div class="loading-spinner"></div>
-        <div class="loading-message">読み込み中...</div>
+    <div class="manual-wrap">
+
+      <header class="text-center mb-8">
+        <h1 class="manual-h1">📚 みんなの回答ボード — 使い方ガイド</h1>
+        <p class="manual-p">児童の回答を集めて、クラスで共有・可視化する授業支援ツール。</p>
+      </header>
+
+      <div class="flex flex-col md:flex-row gap-6">
+
+        <!-- 目次 (sticky sidebar on desktop) -->
+        <aside class="md:w-56 md:flex-shrink-0">
+          <nav class="toc">
+            <h4>📖 目次</h4>
+            <a href="#start">🚀 はじめての授業 (3分)</a>
+            <a href="#modes">📊 4 つの可視化モード</a>
+            <a href="#columns">⚙️ 列設定とは？</a>
+            <a href="#publish">📣 公開と URL 共有</a>
+            <a href="#reactions">⭐ 反応・ハイライト</a>
+            <a href="#lessons">🎒 レッスン (複数フェーズ)</a>
+            <a href="#profiles">📋 プロファイル (複数ボード)</a>
+            <a href="#privacy">🔒 プライバシー設定</a>
+            <a href="#troubleshooting">🆘 困ったとき</a>
+          </nav>
+        </aside>
+
+        <!-- 本文 -->
+        <main class="flex-1 min-w-0">
+
+          <!-- §1 はじめての授業 -->
+          <section id="start">
+            <h2 class="manual-h2">🚀 はじめての授業 (3 分)</h2>
+            <p class="manual-p">
+              いちばん簡単な始め方は、<strong>🎒 新しい授業を作る</strong> ボタンからテンプレートを 1 つ選ぶことです。
+              フォームと回答先スプレッドシートが自動で作成され、すぐに使い始められます。
+            </p>
+
+            <div class="step-card">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <h4>管理パネルを開く</h4>
+                <p>学校から共有された URL にアクセスし、Google アカウントでログインしてください。
+                  初回は「Google スプレッドシートへのアクセスを許可」と表示されるので「許可」を押します。</p>
+              </div>
+            </div>
+
+            <div class="step-card">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <h4>「🎒 新しい授業を作る」をクリック</h4>
+                <p>画面上部の <strong>🎒 レッスン</strong> セクションでボタンを押すと、テンプレートが選べます。
+                  「シンプル掲示板」「数直線」「マトリクス」「ワードランキング」「円グラフ」から授業の形式に合うものを選んでください。
+                  詳しくは下の <a href="#modes" class="text-cyan-400 underline">📊 4 つの可視化モード</a> を参照。</p>
+              </div>
+            </div>
+
+            <div class="step-card">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <h4>授業を開始 → 公開</h4>
+                <p>授業名・クラス・質問文を確認したら「授業を開始」。
+                  自動でフォームが作成され、列マッピングが推定されます。
+                  最後に「📣 公開する」を押すと、児童が回答ボードを見られるようになります。</p>
+              </div>
+            </div>
+
+            <div class="callout tip">
+              <strong>💡 すでに Google フォームがある場合：</strong>
+              レッスン機能を使わず、フォーム URL を「フォームを連携」欄に貼り付けるだけでも始められます。
+              自動で接続され、列も自動推定されます。
+            </div>
+          </section>
+
+          <!-- §2 4 つの可視化モード -->
+          <section id="modes">
+            <h2 class="manual-h2">📊 4 つの可視化モード</h2>
+            <p class="manual-p">
+              授業の目的に合わせて、回答の見せ方を選べます。テンプレートから作ると自動で適切なモードが設定されます。
+            </p>
+
+            <div class="mode-grid">
+              <div class="mode-card">
+                <div class="icon">📝</div>
+                <div class="title">掲示板</div>
+                <div class="desc">回答を一覧表示。各カードに「いいね」「気になる」などのリアクションが付けられる。</div>
+                <div class="when">👉 自由記述の意見交換に</div>
+              </div>
+              <div class="mode-card">
+                <div class="icon">🥧</div>
+                <div class="title">円グラフ</div>
+                <div class="desc">選択肢の集計を円グラフで表示。多数派・少数派が一目で分かる。</div>
+                <div class="when">👉 導入アンケート / 賛否を取る場面に</div>
+              </div>
+              <div class="mode-card">
+                <div class="icon">📊</div>
+                <div class="title">ワードランキング</div>
+                <div class="desc">自由記述から頻出語を抽出し、頻度順に棒グラフで表示。</div>
+                <div class="when">👉 振り返り / 学んだことの集約に</div>
+              </div>
+              <div class="mode-card">
+                <div class="icon">📏</div>
+                <div class="title">数直線 (1 軸)</div>
+                <div class="desc">1〜5 の値で立場を可視化。同じ位置に複数人が集まる様子が見える。</div>
+                <div class="when">👉 賛成/反対 など 1 つの軸の意見分布に</div>
+              </div>
+              <div class="mode-card">
+                <div class="icon">🎯</div>
+                <div class="title">マトリクス (2 軸)</div>
+                <div class="desc">X・Y 2 軸の散布図。考えの背景や 2 つの価値の重み付けを比較できる。</div>
+                <div class="when">👉 道徳 / 判断の根拠を可視化したい場面に</div>
+              </div>
+              <div class="mode-card">
+                <div class="icon">🔄</div>
+                <div class="title">自動判定 (既定)</div>
+                <div class="desc">フォームに「線形尺度」列があれば数直線/散布図、無ければ掲示板に自動切替。</div>
+                <div class="when">👉 とりあえず始めたいときに</div>
+              </div>
+            </div>
+
+            <div class="callout info">
+              <strong>モード切替：</strong>管理パネル ③「表示と公開」セクションの <code>📊 表示方法を細かく調整</code> を開くと、
+              モードを手動で変更できます。
+            </div>
+          </section>
+
+          <!-- §3 列設定 -->
+          <section id="columns">
+            <h2 class="manual-h2">⚙️ 列設定とは？</h2>
+            <p class="manual-p">
+              スプレッドシートの「どの列」に「どんなデータ」が入っているかをアプリに教える設定です。
+              フォームから自動作成した場合は、ほぼすべて自動推定されます。
+            </p>
+
+            <h3 class="manual-h3">必須の列 (モード別に違う)</h3>
+            <p class="manual-p">
+              赤い <strong>【必須】</strong> ラベルが付いている列は必ず設定が必要です:
+            </p>
+            <ul class="manual-p list-disc list-inside">
+              <li><strong>掲示板 / 円グラフ / ワードランキング:</strong> 💬 メイン質問列 (回答が入る列)</li>
+              <li><strong>数直線:</strong> 📏 X軸の数値列 (1〜5 等の整数列)</li>
+              <li><strong>マトリクス:</strong> 📏 X軸 + 📐 Y軸 の 2 つの数値列</li>
+            </ul>
+
+            <h3 class="manual-h3">任意の列</h3>
+            <p class="manual-p">
+              <strong>📋 補助/理由列・🏫 クラス列・👤 名前列</strong> は任意です。
+              設定するとホバー時の補助表示やクラス別フィルタが使えます。
+              不要なら空のままで OK。
+            </p>
+
+            <div class="callout tip">
+              <strong>🎯 自動推定とは:</strong>
+              列のヘッダー (質問文) と実データの形 (数値か文字か、長さ等) から、アプリが最適な役割を提案します。
+              「自動推定 95%」のように表示され、信頼度が高ければそのまま使えます。
+              間違っていれば手動で選び直してください。
+            </div>
+          </section>
+
+          <!-- §4 公開 -->
+          <section id="publish">
+            <h2 class="manual-h2">📣 公開と URL 共有</h2>
+            <p class="manual-p">
+              すべての必須列が緑色 (🟢) になったら、画面下部の <strong>📣 公開する</strong> を押します。
+              児童に共有する URL は <strong>📋 URLコピー</strong> ボタンで取得できます。
+            </p>
+
+            <h3 class="manual-h3">児童への URL 共有方法</h3>
+            <ul class="manual-p list-disc list-inside">
+              <li>Google Classroom に投稿</li>
+              <li>板書 / QR コード化して掲示 (QR コード生成は別ツールで)</li>
+              <li>授業用スライドに貼り付け</li>
+            </ul>
+
+            <div class="callout warn">
+              <strong>⚠ ドメイン制限:</strong>
+              児童は学校ドメインの Google アカウントでログインする必要があります。
+              個人 Gmail からはアクセスできません (心理的安全性のため)。
+            </div>
+          </section>
+
+          <!-- §5 反応 -->
+          <section id="reactions">
+            <h2 class="manual-h2">⭐ 反応・ハイライト</h2>
+            <p class="manual-p">
+              児童は他の児童の回答に「👍 いいね」「💡 なるほど」「❓ 気になる」の 3 種類のリアクションを付けられます。
+              先生は ⭐ ボタンで重要な回答をハイライトできます (児童画面では枠が光ります)。
+            </p>
+
+            <div class="callout info">
+              <strong>初期設定はリアクション数 非表示:</strong>
+              心理的安全性のため、リアクション数は既定で児童には見えません。
+              授業の場面に応じて「リアクション数を表示」をオンにできます (管理パネル ③ セクション)。
+            </div>
+          </section>
+
+          <!-- §6 レッスン -->
+          <section id="lessons">
+            <h2 class="manual-h2">🎒 レッスン (複数フェーズ授業)</h2>
+            <p class="manual-p">
+              1 つの授業を「導入 → 本時 → 振り返り」のように複数フェーズに分けて記録できます。
+              フェーズを切り替えると、児童画面の質問も自動で切り替わります。
+              授業終了後、各フェーズの回答が時系列で保存され、後日「振り返り画面」で再生できます。
+            </p>
+
+            <div class="step-card">
+              <div class="step-num">1</div>
+              <div class="step-body">
+                <h4>授業を作成</h4>
+                <p>「🎒 新しい授業を作る」→ テンプレート選択 → クラス・各フェーズの質問文を入力。</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-num">2</div>
+              <div class="step-body">
+                <h4>授業を実行</h4>
+                <p>「授業を開始」を押すとフェーズ 1 のフォームが自動公開。「▶ 次のフェーズ」で切替えていきます。</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-num">3</div>
+              <div class="step-body">
+                <h4>授業を終了 → 振り返り</h4>
+                <p>「終了」を押すと全フェーズの回答が記録されます。「📊 振り返り」から後日いつでも時系列再生できます。</p>
+              </div>
+            </div>
+          </section>
+
+          <!-- §7 プロファイル -->
+          <section id="profiles">
+            <h2 class="manual-h2">📋 プロファイル (複数ボード)</h2>
+            <p class="manual-p">
+              1 つのユーザーアカウントで複数の回答ボードを切り替えて使えます。
+              例: 「5年1組 国語」「5年1組 道徳」「6年2組 算数」を別々のプロファイルとして保存。
+            </p>
+
+            <h3 class="manual-h3">プロファイルの操作</h3>
+            <ul class="manual-p list-disc list-inside">
+              <li><strong>保存:</strong> 管理パネル下部の「💾 [プロファイル名] に保存」</li>
+              <li><strong>切替:</strong> 右パネル「保存済みボード」一覧の 📥 アイコン</li>
+              <li><strong>名前変更:</strong> 一覧の名前部分をダブルクリック</li>
+              <li><strong>削除:</strong> 一覧の 🗑 アイコン</li>
+              <li><strong>別名で保存:</strong> 「📋 別名で保存」を展開してプロファイル名を入力</li>
+            </ul>
+
+            <div class="callout tip">
+              <strong>💡 入力は自動保存:</strong>
+              設定変更は約 1 秒後に自動保存されます。明示的な保存ボタンは不要です。
+            </div>
+          </section>
+
+          <!-- §8 プライバシー -->
+          <section id="privacy">
+            <h2 class="manual-h2">🔒 プライバシー設定</h2>
+            <p class="manual-p">
+              既定では児童のプライバシーを最大限保護する設定になっています:
+            </p>
+            <ul class="manual-p list-disc list-inside">
+              <li><strong>👤 回答者名を表示:</strong> OFF (匿名表示)</li>
+              <li><strong>📊 リアクション数を表示:</strong> OFF</li>
+              <li><strong>🔒 ドメイン制限:</strong> 学校アカウントのみアクセス可</li>
+            </ul>
+
+            <div class="callout warn">
+              <strong>⚠ 公開後に名前を ON にした場合:</strong>
+              既に投稿された匿名の回答も実名で表示されます。事前に児童と合意した方針で運用してください。
+            </div>
+          </section>
+
+          <!-- §9 トラブル -->
+          <section id="troubleshooting">
+            <h2 class="manual-h2">🆘 困ったとき</h2>
+            <div class="faq">
+              <details>
+                <summary>フォーム URL を貼ったが「接続できません」と出る</summary>
+                <p class="answer">
+                  Google フォームの<strong>編集用 URL</strong> (末尾が <code>/edit</code>) を使ってください。
+                  回答用 URL (末尾が <code>/viewform</code>) は接続できません。
+                </p>
+              </details>
+
+              <details>
+                <summary>列設定で「必須: 0/2」のままで公開できない</summary>
+                <p class="answer">
+                  選んだ表示モードが必要とする列が設定されていません。
+                  例: マトリクスモードなら X軸・Y軸の数値列が両方必要。
+                  ラベルの【必須】を確認してください。
+                </p>
+              </details>
+
+              <details>
+                <summary>児童が「公開されていません」と表示される</summary>
+                <p class="answer">
+                  管理パネル下部の <strong>📣 公開する</strong> を押し、ボタンが「🟢 公開中」に変わっていることを確認してください。
+                  また、児童が学校ドメインの Google アカウントでログインしているか確認してください。
+                </p>
+              </details>
+
+              <details>
+                <summary>自動推定の信頼度が低い (50% 以下)</summary>
+                <p class="answer">
+                  ヘッダー (質問文) に「回答」「理由」「クラス」などのキーワードが含まれていないと低く出ます。
+                  低くても保存マッピングが優先されますが、手動で正しい列を選んでください。
+                </p>
+              </details>
+
+              <details>
+                <summary>授業を再公開したい (一度終了した後)</summary>
+                <p class="answer">
+                  右パネル「保存済みボード」の対象プロファイルを 📥 で開き、「📣 公開する」を再度押してください。
+                  公開状態は明示操作でのみ変わります。
+                </p>
+              </details>
+
+              <details>
+                <summary>意図しない列が dropdown に表示される</summary>
+                <p class="answer">
+                  タイムスタンプ、UNDERSTAND/LIKE/CURIOUS/HIGHLIGHT などのシステム列は自動的に除外されます。
+                  それ以外の余計な列が出る場合はスプレッドシートのヘッダーを確認してください。
+                </p>
+              </details>
+
+              <details>
+                <summary>1 ヶ月以上前の授業データを見たい</summary>
+                <p class="answer">
+                  終了済みのレッスンは「📊 振り返り」画面からアクセスできます。回答データはスプレッドシートに保存され続けるため、Drive から直接開くこともできます。
+                </p>
+              </details>
+            </div>
+
+            <p class="manual-p mt-6">
+              他の質問は学校 IT 担当者または管理者へお問い合わせください。
+            </p>
+          </section>
+
+        </main>
       </div>
     </div>
-
-    <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
-
-    <div class="max-w-7xl mx-auto px-4 py-6 md:px-6">
-      <div class="flex gap-6">
-        <!-- サイドナビゲーション -->
-        <div class="w-64 flex-shrink-0">
-          <div class="quick-nav">
-            <h4 class="text-white font-bold mb-3">📖 目次</h4>
-            <a href="#overview">📋 はじめに</a>
-            <a href="#quick-start">⚡ クイックスタート</a>
-            <a href="#setup-detail">🔧 詳細セットアップ</a>
-            <a href="#daily-usage">📊 日常操作</a>
-            <a href="#admin-features">⚙️ 管理者機能</a>
-            <a href="#sharing">👥 生徒との共有</a>
-            <a href="#troubleshooting">🆘 トラブル対応</a>
-            <a href="#advanced">🎓 活用のコツ</a>
-          </div>
-        </div>
-
-        <!-- メインコンテンツ -->
-        <div class="flex-1">
-          <!-- ヘッダー -->
-          <div class="text-center mb-10">
-            <h1 class="text-5xl font-bold text-cyan-400 mb-4">📚 みんなの回答ボード</h1>
-            <h2 class="text-2xl text-white mb-4">完全操作マニュアル【先生向け】</h2>
-            <p class="text-gray-300 text-lg">生徒の回答をリアルタイムで共有・反応できる授業支援ツール</p>
-          </div>
-
-          <!-- はじめに -->
-          <div id="overview" class="manual-section glass-panel rounded-xl p-8">
-            <h3 class="text-3xl font-bold text-white mb-6 flex items-center border-b border-cyan-400/30 pb-4">
-              <span class="mr-4">📋</span>はじめに
-            </h3>
-
-            <div class="space-y-6">
-              <p class="text-gray-300 leading-relaxed text-lg">
-                <strong class="highlight-text">ようこそ！</strong>「みんなの回答ボード」は、授業で生徒の意見や回答を集めて、クラス全体で見ることができるツールです。普段パソコンをあまり使わない先生でも簡単に使えるよう作られています。Googleフォームで生徒から回答を集めて、その内容をクラス全体で見たり、お互いに「いいね！」などの反応をつけたりして、みんなで意見を共有する楽しい授業ができます。
-              </p>
-
-              <div class="grid md:grid-cols-3 gap-4">
-                <div class="feature-card">
-                  <h4 class="text-cyan-400 font-bold text-lg mb-3 flex items-center">
-                    <span class="mr-2">🚀</span>簡単セットアップ
-                  </h4>
-                  <p class="text-gray-300 text-sm">いつものGoogleアカウントでログインして、回答が入ったスプレッドシートをつなげるだけ。3分程度で使い始められます</p>
-                </div>
-
-                <div class="feature-card">
-                  <h4 class="text-cyan-400 font-bold text-lg mb-3 flex items-center">
-                    <span class="mr-2">👥</span>リアルタイム共有
-                  </h4>
-                  <p class="text-gray-300 text-sm">生徒が回答を送信すると、すぐに画面に表示されて、クラス全体でみんなの意見を見ることができます</p>
-                </div>
-
-                <div class="feature-card">
-                  <h4 class="text-cyan-400 font-bold text-lg mb-3 flex items-center">
-                    <span class="mr-2">⭐</span>管理機能
-                  </h4>
-                  <p class="text-gray-300 text-sm">特にいい回答に星マークをつけたり、不適切な回答を削除したりして、授業に合わせて画面を調整できます</p>
-                </div>
-              </div>
-
-              <div class="tip-box">
-                <h4 class="text-green-400 font-bold mb-3 flex items-center">
-                  <span class="mr-2">💡</span>このマニュアルの使い方
-                </h4>
-                <p class="text-green-300 leading-relaxed">
-                  初めて使用される場合は「クイックスタート」から始めてください。詳細な設定方法は「詳細セットアップ」をご覧ください。日々の授業での使用方法は「日常操作」セクションで説明しています。左側の目次から必要な部分に直接ジャンプできます。
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <!-- クイックスタート -->
-          <div id="quick-start" class="manual-section glass-panel rounded-xl p-8">
-            <h3 class="text-3xl font-bold text-white mb-6 flex items-center border-b border-cyan-400/30 pb-4">
-              <span class="mr-4">⚡</span>3分クイックスタート
-            </h3>
-
-            <div class="grid md:grid-cols-3 gap-6 mb-8">
-              <div class="feature-card">
-                <div class="flex items-center mb-4">
-                  <div class="step-number">1</div>
-                  <h4 class="text-white font-bold text-lg">ログイン</h4>
-                </div>
-                <p class="text-gray-300 mb-3">学校から教えてもらったアドレス（URL）をクリックして、いつものGoogleアカウントでログイン</p>
-                <div class="info-box">
-                  <p class="text-blue-300 text-sm">✓ 学校ドメインのアカウント推奨</p>
-                </div>
-              </div>
-
-              <div class="feature-card">
-                <div class="flex items-center mb-4">
-                  <div class="step-number">2</div>
-                  <h4 class="text-white font-bold text-lg">シート接続</h4>
-                </div>
-                <p class="text-gray-300 mb-3">生徒の回答が保存されているGoogleスプレッドシートをつなげる</p>
-                <div class="info-box">
-                  <p class="text-blue-300 text-sm">✓ アドレスをコピーして貼り付けるか、一覧から選ぶ</p>
-                </div>
-              </div>
-
-              <div class="feature-card">
-                <div class="flex items-center mb-4">
-                  <div class="step-number">3</div>
-                  <h4 class="text-white font-bold text-lg">公開</h4>
-                </div>
-                <p class="text-gray-300 mb-3">「今すぐ公開」ボタンを押して生徒が見られるようにする</p>
-                <div class="info-box">
-                  <p class="text-blue-300 text-sm">✓ 生徒に教えるアドレスは画面下部でコピーできます</p>
-                </div>
-              </div>
-            </div>
-
-            <div class="tip-box">
-              <h4 class="text-green-400 font-bold mb-3">💡 最も簡単な始め方</h4>
-              <p class="text-green-300 leading-relaxed">
-                <strong>Googleフォーム</strong>で質問を作成し、生徒に回答してもらってください。フォームから自動生成されるスプレッドシートをそのまま回答ボードに接続するのが一番簡単で確実な方法です。フォームのタイトルや質問文は自動で回答ボードのタイトルとして表示されます。
-              </p>
-            </div>
-          </div>
-
-          <!-- 詳細セットアップ -->
-          <div id="setup-detail" class="manual-section glass-panel rounded-xl p-8">
-            <h3 class="text-3xl font-bold text-white mb-6 flex items-center border-b border-cyan-400/30 pb-4">
-              <span class="mr-4">🔧</span>詳細セットアップガイド
-            </h3>
-
-            <div class="space-y-8">
-              <!-- ステップ1: ログイン -->
-              <div>
-                <div class="flex items-start mb-6">
-                  <div class="step-number">1</div>
-                  <div class="flex-1">
-                    <h4 class="text-white font-bold text-xl mb-4">アプリへのログイン</h4>
-                    <p class="text-gray-300 leading-relaxed mb-4">
-                      学校から教えてもらった回答ボードのアドレス（URL）をクリックしてください。ページが開いたら、画面に表示される指示に従って、いつも使っている<span class="highlight-text">Googleアカウント</span>でログインしてください。
-                    </p>
-
-                    <div class="instruction-box">
-                      <h5 class="text-cyan-400 font-semibold mb-3">詳細な手順：</h5>
-                      <ol class="text-gray-300 space-y-2 list-decimal list-inside">
-                        <li>インターネットで回答ボードのアドレスを開く</li>
-                        <li>「ログイン」ボタンをクリック</li>
-                        <li>Googleアカウント選択画面で学校のアカウントを選ぶ</li>
-                        <li>「スプレッドシートへのアクセスを許可」と表示されたら「許可」をクリック</li>
-                        <li>みんなの回答ボードの初回セットアップ画面が表示</li>
-                      </ol>
-                    </div>
-
-                    <div class="warning-box">
-                      <h5 class="text-yellow-400 font-semibold mb-2">⚠️ 重要な注意点</h5>
-                      <p class="text-yellow-300 text-sm">
-                        初めて利用する際には「Googleスプレッドシートへのアクセスを許可してください」等のメッセージが表示されることがありますが、これは回答ボードがスプレッドシートのデータを読み書きするために必要な権限です。<strong>必ず「許可」</strong>して先に進んでください。
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- ステップ2: スプレッドシート接続 -->
-              <div>
-                <div class="flex items-start mb-6">
-                  <div class="step-number">2</div>
-                  <div class="flex-1">
-                    <h4 class="text-white font-bold text-xl mb-4">回答用スプレッドシートの接続</h4>
-                    <p class="text-gray-300 leading-relaxed mb-4">
-                      生徒の回答が保存されている<span class="highlight-text">Googleスプレッドシート</span>をアプリにつなげます。セットアップ画面で、どのスプレッドシートを使うかを選ぶ画面が表示されます。
-                    </p>
-
-                    <div class="grid md:grid-cols-2 gap-6 mb-6">
-                      <div class="instruction-box">
-                        <h5 class="text-cyan-400 font-semibold mb-3">方法1: テンプレートから作成（推奨）</h5>
-                        <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                          <li>「✨ テンプレート作成」ボタンをクリック</li>
-                          <li>フォームとスプレッドシートが自動作成される</li>
-                          <li>フォーム編集画面でクラス名・回答の選択肢を編集</li>
-                          <li>管理パネルに戻り「🔍 検証して接続」をクリック</li>
-                          <li>「今すぐ公開」で完了！</li>
-                        </ol>
-                      </div>
-
-                      <div class="instruction-box">
-                        <h5 class="text-cyan-400 font-semibold mb-3">方法2: URLを直接入力</h5>
-                        <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                          <li>対象のGoogleフォームを<strong>編集画面</strong>で開く</li>
-                          <li>アドレスバーのURLを全選択してコピー（<code>/edit</code>で終わるURL）</li>
-                          <li>ウィザードの入力欄に貼り付け</li>
-                          <li>「🔍 検証して接続」ボタンをクリック</li>
-                          <li>「今すぐ公開」で完了！</li>
-                        </ol>
-                        <p class="text-yellow-300 text-xs mt-2">※ 回答用URL（/viewform）ではなく、編集用URL（/edit）を使用してください</p>
-                      </div>
-
-                      <div class="instruction-box">
-                        <h5 class="text-cyan-400 font-semibold mb-3">方法3: 一覧から選択</h5>
-                        <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                          <li>「📋 一覧から選択」タブをクリック</li>
-                          <li>Googleドライブの一覧が表示されるまで待機</li>
-                          <li>目的のフォームを選択して接続</li>
-                          <li>「今すぐ公開」で完了！</li>
-                        </ol>
-                      </div>
-                    </div>
-
-                    <div class="tip-box">
-                      <h5 class="text-green-400 font-semibold mb-2">💡 推奨設定</h5>
-                      <p class="text-green-300 text-sm leading-relaxed">
-                        Googleフォームで作った質問の回答が自動で保存されたスプレッドシートを使うのがおすすめです。フォームを使うと、質問のタイトルなどが自動で読み取られて、設定がとても簡単になります。また、生徒も「📝 回答フォーム」ボタンから直接回答できるようになります。
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- ステップ3: 列設定 -->
-              <div>
-                <div class="flex items-start mb-6">
-                  <div class="step-number">3</div>
-                  <div class="flex-1">
-                    <h4 class="text-white font-bold text-xl mb-4">回答列の設定（列マッピング）</h4>
-                    <p class="text-gray-300 leading-relaxed mb-4">
-                      スプレッドシートをつなげると、次はそのシートのどの列（縦の並び）に何のデータが入っているかを教える画面になります。これは回答ボードが正しく情報を表示するために大切な設定です。
-                    </p>
-
-                    <div class="grid md:grid-cols-2 gap-6 mb-6">
-                      <div class="instruction-box">
-                        <h5 class="text-cyan-400 font-semibold mb-3">設定する列の種類：</h5>
-                        <ul class="text-gray-300 space-y-2 text-sm">
-                          <li><strong>💬 回答列：</strong>生徒の実際の回答文章が入っている列（必須）</li>
-                          <li><strong>📋 理由列：</strong>回答の理由や説明が入っている列（あれば設定）</li>
-                          <li><strong>🏫 クラス列：</strong>クラス名や学級が入っている列（あれば設定）</li>
-                          <li><strong>👤 名前列：</strong>生徒の名前が入っている列（あれば設定）</li>
-                        </ul>
-                      </div>
-
-                      <div class="instruction-box">
-                        <h5 class="text-cyan-400 font-semibold mb-3">設定手順：</h5>
-                        <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                          <li>各項目のプルダウンメニューを開く</li>
-                          <li>適切な列名を選択</li>
-                          <li>該当しない項目は「未選択」のまま</li>
-                          <li>「自動列判定」で自動推測も可能</li>
-                          <li>「設定を確認」で最終チェック</li>
-                        </ol>
-                      </div>
-                    </div>
-
-                    <div class="warning-box">
-                      <h5 class="text-yellow-400 font-semibold mb-2">⚠️ 列設定の注意点</h5>
-                      <ul class="text-yellow-300 text-sm space-y-1">
-                        <li>• <strong>回答列は必須</strong>です。必ず生徒の主要な回答が入っている列を選択してください</li>
-                        <li>• 理由列、クラス列、名前列は任意です。該当する情報がない場合は無理に選ぶ必要はありません</li>
-                        <li>• 自動列判定機能を使うと、列名から自動的に適切な列を推測してくれます</li>
-                        <li>• 間違って設定した場合は、後から管理画面で変更できます</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- ステップ4: 公開設定 -->
-              <div>
-                <div class="flex items-start mb-6">
-                  <div class="step-number">4</div>
-                  <div class="flex-1">
-                    <h4 class="text-white font-bold text-xl mb-4">ボードの公開と表示設定</h4>
-                    <p class="text-gray-300 leading-relaxed mb-4">
-                      列の設定が完了したら、いよいよ回答ボードを公開します。公開前に、生徒にどのような情報を表示するかを設定できます。
-                    </p>
-
-                    <div class="grid md:grid-cols-2 gap-6 mb-6">
-                      <div class="instruction-box">
-                        <h5 class="text-cyan-400 font-semibold mb-3">表示オプション：</h5>
-                        <ul class="text-gray-300 space-y-3 text-sm">
-                          <li>
-                            <strong>👤 回答者名を表示：</strong><br>
-                            ON時：生徒の名前が回答と一緒に表示<br>
-                            <span class="text-gray-400">（デフォルト：OFF＝匿名表示）</span>
-                          </li>
-                          <li>
-                            <strong>📊 リアクション数を表示：</strong><br>
-                            ON時：各回答に付いたリアクションの数を公開<br>
-                            <span class="text-gray-400">（デフォルト：OFF＝非表示）</span>
-                          </li>
-                        </ul>
-                      </div>
-
-                      <div class="instruction-box">
-                        <h5 class="text-cyan-400 font-semibold mb-3">公開手順：</h5>
-                        <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                          <li>表示オプションを確認・調整</li>
-                          <li>「📊 ボードを開く」でプレビュー確認</li>
-                          <li>「今すぐ公開」ボタンをクリック</li>
-                          <li>ステータスが「公開中」に変わることを確認</li>
-                          <li>フッターの「📋 URLコピー」で生徒用リンクを取得</li>
-                        </ol>
-                      </div>
-                    </div>
-
-                    <div class="tip-box">
-                      <h5 class="text-green-400 font-semibold mb-2">💡 プライバシー配慮</h5>
-                      <p class="text-green-300 text-sm leading-relaxed">
-                        初期設定では生徒のプライバシーに配慮して、名前とリアクション数は表示されません。授業の目的や生徒の年齢に応じて適切に設定してください。匿名表示により、生徒がより自由に意見を表現できる環境を作ることができます。
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="figure-box">
-              <h4 class="text-blue-400 font-semibold mb-3">📊 設定完了後の画面イメージ</h4>
-              <p class="text-gray-300 text-sm">
-                セットアップが完了すると、管理画面に「公開中」ステータスが表示されます。フッター部分に「📋 URLコピー」「📊 ボードを開く」「🔒 公開終了」ボタンが表示され、生徒用URLの取得・実際のボード確認・公開終了操作ができます。この状態で生徒は回答ボードを閲覧し、リアクションを付けることができるようになります。
-              </p>
-            </div>
-          </div>
-
-          <!-- 日常操作 -->
-          <div id="daily-usage" class="manual-section glass-panel rounded-xl p-8">
-            <h3 class="text-3xl font-bold text-white mb-6 flex items-center border-b border-cyan-400/30 pb-4">
-              <span class="mr-4">📊</span>日常操作ガイド
-            </h3>
-
-            <div class="space-y-8">
-              <!-- 回答ボードの見方 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">📋 回答ボードの見方</h4>
-                <p class="text-gray-300 leading-relaxed mb-4">
-                  生徒用URLにアクセスすると、公開された「みんなの回答ボード」が表示されます。先生自身も生徒用URLから実際の見え方を確認できます。
-                </p>
-
-                <div class="grid md:grid-cols-2 gap-6 mb-6">
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">画面構成の説明：</h5>
-                    <ul class="text-gray-300 space-y-2 text-sm">
-                      <li><strong>ヘッダー上段左：</strong>📝 回答フォームリンク（フォーム連携時）</li>
-                      <li><strong>ヘッダー上段右：</strong>⚙️ 管理モードボタン（先生のみ表示）</li>
-                      <li><strong>ヘッダー中段左：</strong>回答数、クラスフィルター、並び順選択</li>
-                      <li><strong>ヘッダー中段中央：</strong>質問タイトル</li>
-                      <li><strong>ヘッダー中段右：</strong>公開終了ボタン（先生のみ表示）</li>
-                      <li><strong>メイン：</strong>回答カード一覧（グリッド表示）</li>
-                      <li><strong>フッター：</strong>カード表示列数スライダー</li>
-                    </ul>
-                  </div>
-
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">操作パネルの機能：</h5>
-                    <ul class="text-gray-300 space-y-2 text-sm">
-                      <li><strong>📝 回答フォーム：</strong>生徒がここからGoogleフォームへ（フォーム連携時のみ表示）</li>
-                      <li><strong>🏫 クラスフィルター：</strong>特定のクラスの回答のみ表示（クラス列設定時のみ表示）</li>
-                      <li><strong>🔄 並び順：</strong>新着順・ランダム順から選択</li>
-                      <li><strong>📊 サイズスライダー：</strong>回答カードの表示列数を2〜6列で調整</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div class="info-box">
-                  <h5 class="text-blue-400 font-semibold mb-2">👁️ 先生と生徒の見え方の違い</h5>
-                  <p class="text-blue-300 text-sm leading-relaxed">
-                    先生（ボードのオーナー）がログインして閲覧している場合、画面右上に「公開終了」ボタンや管理画面へのリンクが表示されますが、生徒には表示されません。また、先生には各回答カード右上に⭐ハイライトボタンが表示されます。🗑️削除ボタンは管理モードで表示されます。
-                  </p>
-                </div>
-              </div>
-
-              <!-- リアクション機能 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">💙 リアクション（反応）機能</h4>
-                <p class="text-gray-300 leading-relaxed mb-4">
-                  生徒は他の人の回答を読んで、3種類のリアクションで反応を示すことができます。
-                </p>
-
-                <div class="grid md:grid-cols-3 gap-4 mb-6">
-                  <div class="feature-card">
-                    <h5 class="text-white font-semibold mb-2 flex items-center">
-                      <span class="mr-2">👍</span>いいね！
-                    </h5>
-                    <p class="text-gray-300 text-sm">すてきだと思ったときに押すリアクション。サムアップアイコンで表示されます。</p>
-                  </div>
-
-                  <div class="feature-card">
-                    <h5 class="text-white font-semibold mb-2 flex items-center">
-                      <span class="mr-2">💡</span>なるほど！
-                    </h5>
-                    <p class="text-gray-300 text-sm">参考になったときに押すリアクション。電球アイコンで表示されます。</p>
-                  </div>
-
-                  <div class="feature-card">
-                    <h5 class="text-white font-semibold mb-2 flex items-center">
-                      <span class="mr-2">🔍</span>もっと知りたい！
-                    </h5>
-                    <p class="text-gray-300 text-sm">もっと知りたいときに押すリアクション。虫めがねプラスアイコンで表示されます。</p>
-                  </div>
-                </div>
-
-                <div class="instruction-box">
-                  <h5 class="text-cyan-400 font-semibold mb-3">リアクションのルール：</h5>
-                  <ul class="text-gray-300 space-y-2 text-sm">
-                    <li>• 各回答に対して<strong>一人一回</strong>リアクションできます</li>
-                    <li>• 同じボタンをもう一度押すとリアクションを取り消せます</li>
-                    <li>• 複数の種類のリアクションを同時に付けることも可能です</li>
-                    <li>• リアクション数の表示は先生の設定により変更できます</li>
-                  </ul>
-                </div>
-              </div>
-
-              <!-- 新着通知 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">🔔 新着回答の通知</h4>
-                <p class="text-gray-300 leading-relaxed mb-4">
-                  授業中に新しい回答が投稿されると、リアルタイムで通知されます。
-                </p>
-
-                <div class="instruction-box">
-                  <h5 class="text-cyan-400 font-semibold mb-3">通知の仕組み：</h5>
-                  <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                    <li>生徒がGoogleフォームで回答を送信</li>
-                    <li>数秒後に画面上部に「📋 新しい意見が投稿されました」バナーが表示</li>
-                    <li>「更新して表示」ボタンをクリック</li>
-                    <li>最新の回答を含む一覧が表示される</li>
-                    <li>バナーは一定時間後に自動で消える</li>
-                  </ol>
-                </div>
-
-                <div class="tip-box">
-                  <h5 class="text-green-400 font-semibold mb-2">💡 授業での活用方法</h5>
-                  <p class="text-green-300 text-sm leading-relaxed">
-                    新着通知を活用して、「また新しい意見が来ましたね」「今度はどんな考えでしょうか」などと生徒の関心を引きつけ、継続的な参加を促すことができます。通知が来たタイミングで更新し、新しい回答をクラス全体で確認する流れを作ると効果的です。
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 管理者機能 -->
-          <div id="admin-features" class="manual-section glass-panel rounded-xl p-8">
-            <h3 class="text-3xl font-bold text-white mb-6 flex items-center border-b border-cyan-400/30 pb-4">
-              <span class="mr-4">⚙️</span>管理者機能（先生専用）
-            </h3>
-
-            <div class="warning-box mb-6">
-              <h4 class="text-yellow-400 font-bold mb-2">🔒 管理者権限について</h4>
-              <p class="text-yellow-300">
-                以下の機能は先生（ボードのオーナーまたは管理者）のみが使用できます。生徒には表示されません。管理機能を使用するには、ログイン後に管理画面にアクセスしてください。
-              </p>
-            </div>
-
-            <div class="space-y-8">
-              <!-- 管理画面へのアクセス -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">🔧 管理画面へのアクセス</h4>
-                <div class="instruction-box">
-                  <h5 class="text-cyan-400 font-semibold mb-3">アクセス方法：</h5>
-                  <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                    <li>ログイン後、自分のボードの「管理画面」リンクをクリック</li>
-                    <li>または、回答ボード画面のヘッダーにある⚙️歯車アイコンをクリック</li>
-                    <li>管理画面では、データソース設定、列マッピング、表示設定などを変更可能</li>
-                    <li>回答ボード表示中は、ボード所有者・管理者に各回答カードの右上に⭐ハイライトボタンが表示されます（管理モード不要）</li>
-                  </ol>
-                </div>
-              </div>
-
-              <!-- ハイライト機能 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">⭐ ハイライト機能</h4>
-                <p class="text-gray-300 leading-relaxed mb-4">
-                  特にクラスで取り上げたい優れた回答やユニークな意見をハイライト（注目表示）としてマークできます。
-                </p>
-
-                <div class="grid md:grid-cols-2 gap-6 mb-6">
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">ハイライトの付け方：</h5>
-                    <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                      <li>回答ボードにボード所有者または管理者としてアクセス</li>
-                      <li>注目させたい回答カードを見つける</li>
-                      <li>カード右上の⭐星形ボタンをクリック（管理モード不要）</li>
-                      <li>星が黄色に変わり、カードがハイライト表示されることを確認</li>
-                      <li>取り消す場合は再度⭐ボタンをクリック</li>
-                    </ol>
-                  </div>
-
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">効果的な活用方法：</h5>
-                    <ul class="text-gray-300 space-y-2 text-sm">
-                      <li>• 模範回答や創意工夫のある回答をマーク</li>
-                      <li>• 議論のきっかけとなる意見をハイライト</li>
-                      <li>• 授業のまとめで取り上げたい回答を事前にマーク</li>
-                      <li>• 多様な視点を示す回答を複数ハイライト</li>
-                    </ul>
-                  </div>
-                </div>
-
-                <div class="tip-box">
-                  <h5 class="text-green-400 font-semibold mb-2">💡 授業での使い方例</h5>
-                  <p class="text-green-300 text-sm leading-relaxed">
-                    「星が付いている回答に注目してください」「この金色に光っている回答、とても興味深い視点ですね」など、ハイライト機能を使って生徒の注意を特定の回答に向けることで、効果的な授業進行ができます。
-                  </p>
-                </div>
-              </div>
-
-              <!-- 回答削除機能 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">🗑️ 回答削除機能</h4>
-                <p class="text-gray-300 leading-relaxed mb-4">
-                  不適切な内容や個人情報が含まれる回答、授業に関係のない投稿などを削除できます。
-                </p>
-
-                <div class="warning-box mb-6">
-                  <h5 class="text-red-400 font-semibold mb-2">⚠️ 削除機能の重要な注意事項</h5>
-                  <ul class="text-red-300 text-sm space-y-1">
-                    <li>• 削除された回答は<strong>復元できません</strong></li>
-                    <li>• Googleスプレッドシートからも<strong>完全に削除</strong>されます</li>
-                    <li>• 削除前に内容を十分確認してください</li>
-                    <li>• 教育的配慮を持って慎重に使用してください</li>
-                  </ul>
-                </div>
-
-                <div class="grid md:grid-cols-2 gap-6 mb-6">
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">削除手順：</h5>
-                    <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                      <li>回答ボードに管理者としてアクセス</li>
-                      <li>削除したい回答カードを確認</li>
-                      <li>カード上の🗑️ゴミ箱アイコンをクリック</li>
-                      <li>確認ダイアログで「削除する」をクリック</li>
-                      <li>回答がボードとスプレッドシートから削除される</li>
-                    </ol>
-                  </div>
-
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">削除すべき回答の例：</h5>
-                    <ul class="text-gray-300 space-y-2 text-sm">
-                      <li>• 個人情報（本名、住所、電話番号など）が含まれる投稿</li>
-                      <li>• 不適切な言葉や表現を含む回答</li>
-                      <li>• 授業内容と全く関係のない投稿</li>
-                      <li>• 他の生徒を傷つける可能性のある内容</li>
-                      <li>• 明らかないたずらや意味のない投稿</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 表示設定の変更 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">👁️ 表示設定の変更</h4>
-                <p class="text-gray-300 leading-relaxed mb-4">
-                  公開後も、生徒名やリアクション数の表示設定を変更できます。
-                </p>
-
-                <div class="instruction-box">
-                  <h5 class="text-cyan-400 font-semibold mb-3">設定変更手順：</h5>
-                  <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                    <li>管理画面にアクセス</li>
-                    <li>「表示設定」セクションを確認</li>
-                    <li>「回答者名を表示」「リアクション数を表示」のトグルスイッチを調整</li>
-                    <li>「今すぐ公開」ボタンをクリックして設定を反映</li>
-                    <li>回答ボードに反映されることを確認</li>
-                  </ol>
-                </div>
-
-                <div class="tip-box">
-                  <h5 class="text-green-400 font-semibold mb-2">💡 状況に応じた設定変更</h5>
-                  <p class="text-green-300 text-sm leading-relaxed">
-                    授業の進行に応じて設定を変更できます。例えば、最初は匿名で自由な意見収集を行い、後半でより深い議論をする際に名前を表示するなど、段階的な公開設定が可能です。
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 生徒との共有 -->
-          <div id="sharing" class="manual-section glass-panel rounded-xl p-8">
-            <h3 class="text-3xl font-bold text-white mb-6 flex items-center border-b border-cyan-400/30 pb-4">
-              <span class="mr-4">👥</span>生徒との共有方法
-            </h3>
-
-            <div class="space-y-8">
-              <!-- URL共有 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">📋 生徒用URLの共有</h4>
-                <p class="text-gray-300 leading-relaxed mb-4">
-                  ボードを公開したら、生徒がアクセスできるようにURLを共有します。
-                </p>
-
-                <div class="instruction-box mb-6">
-                  <h5 class="text-cyan-400 font-semibold mb-3">URL共有の手順：</h5>
-                  <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                    <li>回答ボード公開後、管理画面下部のフッターを確認</li>
-                    <li>「📋 URLコピー」ボタンをクリック</li>
-                    <li>クリップボードに生徒用URLがコピーされる</li>
-                    <li>メール、チャット、オンライン掲示板などに貼り付け</li>
-                    <li>生徒に「このリンクから回答ボードを見てください」と案内</li>
-                  </ol>
-                </div>
-
-                <div class="feature-card">
-                  <h5 class="text-cyan-400 font-semibold mb-3">🔗 URLの特徴</h5>
-                  <ul class="text-gray-300 space-y-2 text-sm">
-                    <li><strong>固定リンク：</strong>一度発行されたURLは変わりません</li>
-                    <li><strong>再利用可能：</strong>次の授業でも同じURLを使用できます</li>
-                    <li><strong>ブックマーク推奨：</strong>生徒にブックマーク保存を推奨</li>
-                    <li><strong>直接アクセス：</strong>QRコード化してプロジェクターに投影も可能</li>
-                  </ul>
-                </div>
-              </div>
-
-              <!-- フォーム連携 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">📝 回答フォームとの連携</h4>
-                <p class="text-gray-300 leading-relaxed mb-4">
-                  Googleフォームを使用している場合、生徒は回答ボードから直接フォームにアクセスできます。
-                </p>
-
-                <div class="grid md:grid-cols-2 gap-6 mb-6">
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">フォーム連携の流れ：</h5>
-                    <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                      <li>生徒が回答ボードURLにアクセス</li>
-                      <li>ヘッダー左上の「📝 回答フォーム」リンクを確認</li>
-                      <li>リンクをクリックしてGoogleフォームを開く</li>
-                      <li>フォームで回答を入力・送信</li>
-                      <li>数秒後に回答ボードに反映</li>
-                    </ol>
-                  </div>
-
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">生徒への説明例：</h5>
-                    <div class="text-gray-300 text-sm">
-                      <p class="mb-2"><strong>「みなさん、こちらのリンクにアクセスしてください」</strong></p>
-                      <p class="mb-2">「ページが開いたら、左上の『📝 回答フォーム』を押してください」</p>
-                      <p class="mb-2">「フォームに回答を入力して送信すると、みんなの画面に表示されます」</p>
-                      <p>「送信後は、他の人の回答も見てリアクションしてみましょう」</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- アクセス権限 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">🔐 生徒のアクセス権限</h4>
-                <div class="info-box mb-6">
-                  <h5 class="text-blue-400 font-semibold mb-2">ログイン要件</h5>
-                  <p class="text-blue-300 text-sm leading-relaxed">
-                    生徒がボードを閲覧するには、Googleアカウントでのログインが必要です。学校発行のアカウント使用を推奨し、そのほうが安全で学校ドメイン内の利用であることが画面上にも表示されます。
-                  </p>
-                </div>
-
-                <div class="grid md:grid-cols-2 gap-6">
-                  <div class="feature-card">
-                    <h5 class="text-green-400 font-semibold mb-2">🏫 学校ドメインアカウント</h5>
-                    <ul class="text-gray-300 text-sm space-y-1">
-                      <li>• ヘッダーに「学校ドメイン」と緑色で表示</li>
-                      <li>• セキュリティが高く推奨</li>
-                      <li>• 学校のポリシーに準拠</li>
-                      <li>• 管理しやすい</li>
-                    </ul>
-                  </div>
-
-                  <div class="feature-card">
-                    <h5 class="text-yellow-400 font-semibold mb-2">🌐 外部アカウント</h5>
-                    <ul class="text-gray-300 text-sm space-y-1">
-                      <li>• ヘッダーに「外部アクセス」と表示</li>
-                      <li>• 閲覧とリアクションは可能</li>
-                      <li>• 可能な限り学校アカウント使用を推奨</li>
-                      <li>• セキュリティ上の考慮が必要</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- トラブルシューティング -->
-          <div id="troubleshooting" class="manual-section glass-panel rounded-xl p-8">
-            <h3 class="text-3xl font-bold text-white mb-6 flex items-center border-b border-cyan-400/30 pb-4">
-              <span class="mr-4">🆘</span>トラブルシューティング
-            </h3>
-
-            <div class="space-y-4">
-              <details class="bg-gray-800/30 rounded-lg p-4 cursor-pointer hover:bg-gray-800/50 transition-all">
-                <summary class="text-cyan-400 font-semibold text-lg">❌ 回答ボードに何も表示されない</summary>
-                <div class="mt-4 text-gray-300">
-                  <h5 class="font-semibold mb-2">原因と解決方法：</h5>
-                  <ol class="list-decimal list-inside space-y-2 text-sm">
-                    <li><strong>公開状態の確認：</strong>管理画面で「公開中」になっているか確認し、未公開の場合は「今すぐ公開」をクリック</li>
-                    <li><strong>データの確認：</strong>接続したスプレッドシートに実際に回答データが入っているか確認</li>
-                    <li><strong>列設定の確認：</strong>回答列が正しく設定されているか、列マッピング画面で再確認</li>
-                    <li><strong>権限の確認：</strong>スプレッドシートの共有設定で、アプリがアクセスできる権限があるか確認</li>
-                  </ol>
-                </div>
-              </details>
-
-              <details class="bg-gray-800/30 rounded-lg p-4 cursor-pointer hover:bg-gray-800/50 transition-all">
-                <summary class="text-cyan-400 font-semibold text-lg">🚫 生徒が回答ボードにアクセスできない</summary>
-                <div class="mt-4 text-gray-300">
-                  <h5 class="font-semibold mb-2">チェックポイント：</h5>
-                  <ol class="list-decimal list-inside space-y-2 text-sm">
-                    <li><strong>URL確認：</strong>共有したURLが正確で、コピー時に文字が欠けていないか確認</li>
-                    <li><strong>ログイン状況：</strong>生徒が適切なGoogleアカウントでログインしているか確認</li>
-                    <li><strong>学校アカウント：</strong>可能な限り学校発行のGoogleアカウントを使用するよう指導</li>
-                    <li><strong>ブラウザ確認：</strong>古いブラウザや互換モードでないか確認、Chrome/Firefox/Safari等の最新版を推奨</li>
-                    <li><strong>ネットワーク：</strong>学校のネットワーク制限により外部サイトへのアクセスが制限されていないか確認</li>
-                  </ol>
-                </div>
-              </details>
-
-              <details class="bg-gray-800/30 rounded-lg p-4 cursor-pointer hover:bg-gray-800/50 transition-all">
-                <summary class="text-cyan-400 font-semibold text-lg">📝 生徒が回答フォームにアクセスできない</summary>
-                <div class="mt-4 text-gray-300">
-                  <h5 class="font-semibold mb-2">解決手順：</h5>
-                  <ol class="list-decimal list-inside space-y-2 text-sm">
-                    <li><strong>フォーム設定確認：</strong>Googleフォームの共有設定を確認し、「リンクを知っている全員」または「組織内の全員」に設定</li>
-                    <li><strong>権限設定：</strong>学校ドメイン限定の場合、生徒も同じドメインのアカウントでログインしている必要があります</li>
-                    <li><strong>フォームステータス：</strong>Googleフォームが「回答を受け付けています」の状態になっているか確認</li>
-                    <li><strong>直接リンク配布：</strong>回答ボードのボタンが機能しない場合、フォームのURLを直接配布</li>
-                  </ol>
-                </div>
-              </details>
-
-              <details class="bg-gray-800/30 rounded-lg p-4 cursor-pointer hover:bg-gray-800/50 transition-all">
-                <summary class="text-cyan-400 font-semibold text-lg">🔄 リアクションが反映されない・遅い</summary>
-                <div class="mt-4 text-gray-300">
-                  <h5 class="font-semibold mb-2">対処方法：</h5>
-                  <ol class="list-decimal list-inside space-y-2 text-sm">
-                    <li><strong>ページ更新：</strong>ブラウザの更新ボタンまたはF5キーでページを再読み込み</li>
-                    <li><strong>ネットワーク確認：</strong>インターネット接続が安定しているか確認</li>
-                    <li><strong>ブラウザキャッシュ：</strong>ブラウザのキャッシュとCookieをクリア</li>
-                    <li><strong>時間をおいて再試行：</strong>システムの負荷により遅延する場合があるため、少し時間をおいて再試行</li>
-                    <li><strong>別ブラウザで確認：</strong>問題が継続する場合、別のブラウザで同じ操作を試行</li>
-                  </ol>
-                </div>
-              </details>
-
-              <details class="bg-gray-800/30 rounded-lg p-4 cursor-pointer hover:bg-gray-800/50 transition-all">
-                <summary class="text-cyan-400 font-semibold text-lg">📊 スプレッドシートのデータが乱れた</summary>
-                <div class="mt-4 text-gray-300">
-                  <div class="warning-box mb-3">
-                    <h5 class="text-red-400 font-semibold mb-2">⚠️ 重要な注意事項</h5>
-                    <p class="text-red-300 text-sm">
-                      <strong>LIKE、UNDERSTAND、CURIOUS、HIGHLIGHT</strong>などの列は、システムが自動で追加する重要な列です。これらを削除すると回答ボードが正常に動作しなくなります。
-                    </p>
-                  </div>
-                  <h5 class="font-semibold mb-2">安全な整理方法：</h5>
-                  <ol class="list-decimal list-inside space-y-2 text-sm">
-                    <li><strong>バックアップ作成：</strong>整理前にスプレッドシートのコピーを作成</li>
-                    <li><strong>システム列の保護：</strong>LIKE、UNDERSTAND、CURIOUS、HIGHLIGHTなどの列は削除・移動禁止</li>
-                    <li><strong>データ追加：</strong>新しい列の追加は問題ありません</li>
-                    <li><strong>行の整理：</strong>回答行の削除は可能ですが、ヘッダー行（1行目）は保護</li>
-                    <li><strong>復旧方法：</strong>システム列を削除してしまった場合、管理画面から列設定を再実行</li>
-                  </ol>
-                </div>
-              </details>
-
-              <details class="bg-gray-800/30 rounded-lg p-4 cursor-pointer hover:bg-gray-800/50 transition-all">
-                <summary class="text-cyan-400 font-semibold text-lg">🔧 設定を変更したい</summary>
-                <div class="mt-4 text-gray-300">
-                  <h5 class="font-semibold mb-2">設定変更の手順：</h5>
-                  <ol class="list-decimal list-inside space-y-2 text-sm">
-                    <li><strong>管理画面アクセス：</strong>ログイン後、自分のボードの管理画面にアクセス</li>
-                    <li><strong>接続変更：</strong>別のスプレッドシートに変更したい場合、新しいURLで再接続</li>
-                    <li><strong>列設定変更：</strong>列マッピングを変更したい場合、列設定画面で再設定</li>
-                    <li><strong>表示設定変更：</strong>名前表示やリアクション数の表示はトグルスイッチで変更可能</li>
-                    <li><strong>設定保存：</strong>変更後は「下書き保存」または「今すぐ公開」ボタンをクリック</li>
-                  </ol>
-                </div>
-              </details>
-
-              <details class="bg-gray-800/30 rounded-lg p-4 cursor-pointer hover:bg-gray-800/50 transition-all">
-                <summary class="text-cyan-400 font-semibold text-lg">❓ その他の問題・質問</summary>
-                <div class="mt-4 text-gray-300">
-                  <h5 class="font-semibold mb-2">サポート情報：</h5>
-                  <ul class="space-y-2 text-sm">
-                    <li><strong>ログアウト：</strong>管理画面右上の「ログアウト」ボタンからサインアウト可能</li>
-                    <li><strong>システム管理者への連絡：</strong>技術的な不具合がある場合は、学校のシステム管理者にお問い合わせください</li>
-                    <li><strong>ブラウザ推奨環境：</strong>Chrome、Firefox、Safari、Edgeの最新版を推奨</li>
-                    <li><strong>セッション管理：</strong>長時間使用しない場合、自動でログアウトされることがあります</li>
-                  </ul>
-                </div>
-              </details>
-            </div>
-          </div>
-
-          <!-- 活用のコツ -->
-          <div id="advanced" class="manual-section glass-panel rounded-xl p-8">
-            <h3 class="text-3xl font-bold text-white mb-6 flex items-center border-b border-cyan-400/30 pb-4">
-              <span class="mr-4">🎓</span>効果的な活用のコツ
-            </h3>
-
-            <div class="space-y-8">
-              <!-- 授業の流れ -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">📚 授業での効果的な使い方</h4>
-                <div class="grid md:grid-cols-3 gap-6">
-                  <div class="feature-card">
-                    <h5 class="text-green-400 font-semibold mb-3">📝 事前準備段階</h5>
-                    <ul class="text-gray-300 text-sm space-y-2">
-                      <li>• Googleフォームで質問を作成</li>
-                      <li>• 回答ボードのセットアップ</li>
-                      <li>• 生徒用URLの配布</li>
-                      <li>• 匿名設定の検討</li>
-                    </ul>
-                  </div>
-
-                  <div class="feature-card">
-                    <h5 class="text-blue-400 font-semibold mb-3">👥 授業中の活用</h5>
-                    <ul class="text-gray-300 text-sm space-y-2">
-                      <li>• 回答収集の時間を設定</li>
-                      <li>• 新着通知で参加を促進</li>
-                      <li>• ハイライト機能で注目回答をマーク</li>
-                      <li>• リアクション機能で相互評価</li>
-                    </ul>
-                  </div>
-
-                  <div class="feature-card">
-                    <h5 class="text-purple-400 font-semibold mb-3">📊 授業後の活用</h5>
-                    <ul class="text-gray-300 text-sm space-y-2">
-                      <li>• スプレッドシートでデータ分析</li>
-                      <li>• 次回授業の準備に活用</li>
-                      <li>• 評価の参考データとして活用</li>
-                      <li>• 保護者との面談資料に活用</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-
-              <!-- セッション管理 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">🔄 セッション管理のベストプラクティス</h4>
-                <div class="grid md:grid-cols-2 gap-6 mb-6">
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">授業終了時（公開終了）：</h5>
-                    <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                      <li>回答ボード画面の右上「公開終了」または管理画面フッター「🔒 公開終了」をクリック</li>
-                      <li>確認ダイアログで「OK」を選択</li>
-                      <li>ボードが未公開状態になり、生徒は閲覧できなくなります</li>
-                      <li>次回使用時は管理画面から再度「今すぐ公開」で公開可能</li>
-                    </ol>
-                  </div>
-                  <div class="instruction-box">
-                    <h5 class="text-cyan-400 font-semibold mb-3">次の授業への準備：</h5>
-                    <ol class="text-gray-300 space-y-2 list-decimal list-inside text-sm">
-                      <li>同じスプレッドシートを使い続ける場合は、そのまま継続利用可能</li>
-                      <li>新しい質問用に別のスプレッドシートを使う場合は、管理画面でデータソースを変更</li>
-                      <li>生徒用URLは固定なので、毎回同じリンクを案内できます</li>
-                    </ol>
-                  </div>
-                </div>
-
-                <div class="tip-box">
-                  <h5 class="text-green-400 font-semibold mb-2">💡 継続使用のメリット</h5>
-                  <p class="text-green-300 text-sm leading-relaxed">
-                    生徒用URLは固定なので、一度教えれば毎回同じリンクを使用できます。生徒にブックマーク保存を推奨し、「いつもの回答ボード」として定着させることで、スムーズな授業運営が可能になります。
-                  </p>
-                </div>
-              </div>
-
-              <!-- 応用的な使い方 -->
-              <div>
-                <h4 class="text-xl text-cyan-400 font-semibold mb-4">🌟 応用的な活用例</h4>
-                <div class="space-y-4">
-                  <div class="feature-card">
-                    <h5 class="text-cyan-400 font-semibold mb-3">🗳️ 授業内投票・アンケート</h5>
-                    <p class="text-gray-300 text-sm mb-2">複数の選択肢から選んでもらう形式の質問で、クラス全体の意見分布を可視化</p>
-                    <p class="text-gray-400 text-xs">例：「今日の授業で最も興味深かった内容は？」</p>
-                  </div>
-
-                  <div class="feature-card">
-                    <h5 class="text-cyan-400 font-semibold mb-3">💭 ブレインストーミング</h5>
-                    <p class="text-gray-300 text-sm mb-2">自由なアイデア出しで、匿名性を活かした創造的な発想を促進</p>
-                    <p class="text-gray-400 text-xs">例：「この問題を解決するアイデアを自由に書いてください」</p>
-                  </div>
-
-                  <div class="feature-card">
-                    <h5 class="text-cyan-400 font-semibold mb-3">🔄 振り返り活動</h5>
-                    <p class="text-gray-300 text-sm mb-2">授業の最後に学習内容の振り返りを共有し、学習の定着を図る</p>
-                    <p class="text-gray-400 text-xs">例：「今日学んだことを一言で表すと？」</p>
-                  </div>
-
-                  <div class="feature-card">
-                    <h5 class="text-cyan-400 font-semibold mb-3">🤝 相互評価活動</h5>
-                    <p class="text-gray-300 text-sm mb-2">リアクション機能を活用して、生徒同士で回答を評価し合う活動</p>
-                    <p class="text-gray-400 text-xs">例：「他の人の回答で『なるほど！』と思ったものにリアクションしよう」</p>
-                  </div>
-                </div>
-              </div>
-
-              <!-- まとめ -->
-              <div class="text-center">
-                <div class="instruction-box">
-                  <h4 class="text-white font-bold text-xl mb-4">🎯 成功のための重要ポイント</h4>
-                  <div class="grid md:grid-cols-2 gap-6 text-left">
-                    <div>
-                      <h5 class="text-cyan-400 font-semibold mb-2">技術面のポイント：</h5>
-                      <ul class="text-gray-300 text-sm space-y-1">
-                        <li>• 事前のテスト実行を推奨</li>
-                        <li>• 生徒のアカウント設定確認</li>
-                        <li>• ネットワーク環境の事前チェック</li>
-                        <li>• バックアップとしての代替手段準備</li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h5 class="text-cyan-400 font-semibold mb-2">教育面のポイント：</h5>
-                      <ul class="text-gray-300 text-sm space-y-1">
-                        <li>• 明確な質問設計</li>
-                        <li>• 適切な匿名性の設定</li>
-                        <li>• 生徒への丁寧な操作説明</li>
-                        <li>• 回答に対する建設的なフィードバック</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                <p class="text-gray-400 text-lg mt-8">
-                  <strong class="highlight-text">みんなの回答ボード</strong>を活用して、活発で創造的な学びの場を作り上げてください！
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <?!= include('SharedUtilities'); ?>
-
-    <script>
-      document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        anchor.addEventListener('click', function (e) {
-          e.preventDefault();
-          const target = document.querySelector(this.getAttribute('href'));
-          if (target) {
-            target.scrollIntoView({
-              behavior: 'smooth',
-              block: 'start'
-            });
-          }
-        });
-      });
-
-      document.querySelectorAll('details').forEach(detail => {
-        detail.addEventListener('toggle', function() {
-          if (this.open) {
-            this.style.background = 'rgba(0, 212, 255, 0.1)';
-            this.style.borderColor = 'rgba(0, 212, 255, 0.5)';
-          } else {
-            this.style.background = 'rgba(107, 114, 128, 0.3)';
-            this.style.borderColor = 'rgba(255, 255, 255, 0.2)';
-          }
-        });
-      });
-
-      if (window.matchMedia) {
-        const mediaQuery = window.matchMedia('print');
-        mediaQuery.addListener(function(mq) {
-          if (mq.matches) {
-            document.body.style.background = 'white';
-            document.body.style.color = 'black';
-            document.querySelector('.quick-nav').style.display = 'none';
-          }
-        });
-      }
-
-      const sections = document.querySelectorAll('[id]');
-      const navLinks = document.querySelectorAll('.quick-nav a');
-
-      function updateActiveNav() {
-        let current = '';
-        sections.forEach(section => {
-          const sectionTop = section.offsetTop;
-          const sectionHeight = section.clientHeight;
-          if (window.pageYOffset >= sectionTop - 100) {
-            current = section.getAttribute('id');
-          }
-        });
-
-        navLinks.forEach(link => {
-          link.style.color = '#00d4ff';
-          link.style.paddingLeft = '0';
-          if (link.getAttribute('href').slice(1) === current) {
-            link.style.color = '#ffffff';
-            link.style.paddingLeft = '1rem';
-          }
-        });
-      }
-
-      window.addEventListener('scroll', updateActiveNav);
-    </script>
   </body>
 </html>
