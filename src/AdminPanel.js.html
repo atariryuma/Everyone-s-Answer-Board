@@ -976,8 +976,10 @@
    * @param {Object} [params] - 追加クエリパラメータ {key: value}
    * @param {Function} onReady - URL 取得後に呼ぶコールバック (url が引数)
    * @param {Function} [onError] - 取得失敗時のコールバック
+   *
+   * Note: `_cachedWebAppUrl` は SharedUtilities.html で `var` 宣言済の共有グローバル。
+   *   ここで let / var 再宣言すると SyntaxError で AdminPanel 全 script が停止する (v2774 regression)。
    */
-  let _cachedWebAppUrl = '';
   function buildWebAppUrl(mode, params, onReady, onError) {
     const buildQuery = (base) => {
       const qs = ['mode=' + encodeURIComponent(mode)];
