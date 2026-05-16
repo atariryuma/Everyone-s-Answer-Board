@@ -97,7 +97,7 @@ function parseArgs(args) {
   const params = {};
   let outputPath = null;
 
-  const JSON_KEYS = new Set(['json', 'patch', 'filter', 'options', 'schema', 'snapshot', 'rows']);
+  const JSON_KEYS = new Set(['json', 'patch', 'filter', 'options', 'templateOptions', 'schema', 'snapshot', 'rows']);
   // value は lesson.updateDraft の汎用引数。JSON parse 試行 → 失敗時は raw string fallback
   //   (`--value '["5-1"]'` で array、`--value foo` で string が両方扱える)。
   const JSON_OR_STRING_KEYS = new Set(['value']);

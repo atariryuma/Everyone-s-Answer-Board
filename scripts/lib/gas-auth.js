@@ -145,14 +145,14 @@ function requestJSON(method, url, body, token) {
     'if token: headers["Authorization"] = "Bearer " + token',
     `req = urllib.request.Request(${JSON.stringify(url)}, data=payload if payload else None, headers=headers, method=${JSON.stringify(method.toUpperCase())})`,
     'try:',
-    '    resp = urllib.request.urlopen(req, timeout=30)',
+    '    resp = urllib.request.urlopen(req, timeout=120)',
     '    print(resp.read().decode())',
     'except urllib.error.HTTPError as e:',
     '    print(json.dumps({"success":False,"error":"HTTP "+str(e.code),"body":e.read().decode()[:500]}))',
   ].join('\n'), { mode: 0o600 });
 
   try {
-    const result = execFileSync('python3', [scriptFile], { encoding: 'utf8', timeout: 30000 }).trim();
+    const result = execFileSync('python3', [scriptFile], { encoding: 'utf8', timeout: 130000 }).trim();
     try { return JSON.parse(result); } catch (e) {
       throw new Error(`Invalid JSON response: ${result.substring(0, 200)}`);
     }

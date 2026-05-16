@@ -2275,6 +2275,19 @@
         if (typeof app.__vizReturnToCurrent === 'function') app.__vizReturnToCurrent();
         return;
       }
+      // Why activate CTA: 教師が viewer の過去 phase プレビューから直接 activeProfile を
+      //   切替えるためのボタン (AdminPanel に行かなくて済む)。data-profile から対象名を取得。
+      const activateBtn = e.target.closest('.viz-profile-activate');
+      if (activateBtn) {
+        const name = activateBtn.dataset.profile;
+        if (name && typeof app.__vizLoadProfile === 'function') {
+          if (confirm(`「${name}」を現在のアクティブにします。\n児童は次回ボードを開くとこのフェーズが表示されます。続行しますか？`)) {
+            if (typeof resetClassFilterToAll === 'function') resetClassFilterToAll(app);
+            app.__vizLoadProfile(name);
+          }
+        }
+        return;
+      }
       const btn = e.target.closest('.viz-profile-pill');
       if (!btn) return;
       if (btn.disabled || btn.classList.contains('disabled')) return;
@@ -2583,6 +2596,19 @@
           'title="現在のフェーズに戻る" aria-label="現在のフェーズに戻る">' +
           '↺ 現在に戻る</button>'
         );
+        // Why teacher だけ表示: 教師は過去 profile preview から「再びアクティブに戻す」
+        //   操作が必要なケースがある (e.g. 議論前の状態に巻き戻して再投稿させる)。
+        //   AdminPanel に行かなくても viewer から直接 activate できるよう CTA を追加。
+        //   生徒には不要 (というか権限がない)。
+        if (teacher && app.state.viewingPastProfile) {
+          html.push(
+            '<button type="button" class="viz-profile-activate" ' +
+            'data-profile="' + escapeForTooltip(app.state.viewingPastProfile) + '" ' +
+            'title="このフェーズを現在のアクティブに切替" ' +
+            'aria-label="このフェーズをアクティブにする">' +
+            '📌 アクティブにする</button>'
+          );
+        }
       }
       html.push('</div>');
       container.innerHTML = html.join('');
