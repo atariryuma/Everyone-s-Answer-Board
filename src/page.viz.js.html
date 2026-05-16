@@ -2472,8 +2472,8 @@
     let pastSet;       // teacher 用: 過去 active になった profile 名集合（教師には ✓ 付ける）
     if (teacher) {
       // Why: teacher は state.profiles を root として表示。pastSet は state.profileHistory
-      //   (server の profileSummary.history) から構築。過去 pill は preview semantics で
-      //   load-past 経路（student と同じ）、未来 profile は switch（新フェーズへの進行用）。
+      //   (server の profileSummary.history) から構築し、過去 active 経験を ✓ で示す。
+      //   pill click は v2771 で「常に switch (active 切替)」に統一済 (詳細は下の action 行参照)。
       const profiles = (app.state && app.state.profiles) || [];
       const navHist = (app.state && Array.isArray(app.state.profileHistory))
         ? app.state.profileHistory

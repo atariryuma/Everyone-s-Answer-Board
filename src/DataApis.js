@@ -1364,14 +1364,18 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
 
     // history gate: students (非 owner / 非 admin) は profileHistory にある名前のみ閲覧可。
     //   owner/admin は profiles[] にあれば全部読めるようにする（preview 用途）。
-    const history = Array.isArray(targetConfig.profileHistory) ? targetConfig.profileHistory : [];
+    // v2774: buildSafePublishedDataResult と同じく sanitizeProfileHistory 経由で参照する。
+    //   storage に古い orphan が残っていても、ここで cross-ref 通過後の history のみ gate に使う。
+    const profiles = Array.isArray(targetConfig.profiles) ? targetConfig.profiles : [];
+    const history = (typeof sanitizeProfileHistory === 'function')
+      ? sanitizeProfileHistory(targetConfig.profileHistory, profiles)
+      : (Array.isArray(targetConfig.profileHistory) ? targetConfig.profileHistory : []);
     const inHistory = history.some(h => h && h.name === profileName);
     const isPrivileged = isSystemAdmin || isOwnBoard;
     if (!isPrivileged && !inHistory) {
       return { success: false, error: 'このフェーズはまだ公開されていません', data: [] };
     }
 
-    const profiles = Array.isArray(targetConfig.profiles) ? targetConfig.profiles : [];
     const p = profiles.find(x => x && x.name === profileName);
     if (!p) {
       // history にはあるが profiles[] から消されているケース（削除済 profile）

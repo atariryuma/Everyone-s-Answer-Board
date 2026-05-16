@@ -977,6 +977,7 @@
    * @param {Function} onReady - URL 取得後に呼ぶコールバック (url が引数)
    * @param {Function} [onError] - 取得失敗時のコールバック
    */
+  let _cachedWebAppUrl = '';
   function buildWebAppUrl(mode, params, onReady, onError) {
     const buildQuery = (base) => {
       const qs = ['mode=' + encodeURIComponent(mode)];
@@ -3284,7 +3285,6 @@
       .withSuccessHandler((res) => {
         if (res && res.success && res.data) {
           renderProfileList(res.data.profiles || [], res.data.activeProfile || null);
-          updateActiveProfileEditBar(res.data.activeProfile || null);
           setProfileActionStatus('', 'info');
         } else {
           setProfileActionStatus(res && res.message ? res.message : 'プロファイル一覧取得に失敗しました', 'error');
@@ -3295,10 +3295,6 @@
       })
       .listMyProfiles();
   }
-
-  // 旧 editBar の代替: active row に 💾 ボタンが描画されるので別 widget 不要。
-  //   関数は呼び出し互換のため残置 (将来 row 描画と分離したいときの hook)。
-  function updateActiveProfileEditBar(_activeProfile) { /* no-op */ }
 
   // =====================================================================
   // Profile CRUD 統一ハンドラ
