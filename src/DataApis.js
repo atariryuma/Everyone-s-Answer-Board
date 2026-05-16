@@ -965,6 +965,61 @@ function deleteMyProfile(name) {
 }
 
 /**
+ * プロファイル名を変更する (UI: 名前 double-click → 編集 → Enter)。
+ *   - profile entry の name フィールドを置換
+ *   - config.activeProfile が一致すれば追従
+ *   - config.profileHistory の oldName entries を newName に migrate
+ *   - 同名 (newName) が既に存在すれば reject (collision)
+ *
+ * @param {string} oldName
+ * @param {string} newName
+ * @returns {Object} { success, message, newName }
+ */
+function renameMyProfile(oldName, newName) {
+  try {
+    if (!oldName || typeof oldName !== 'string') {
+      return createErrorResponse('oldName is required');
+    }
+    if (!newName || typeof newName !== 'string') {
+      return createErrorResponse('newName is required');
+    }
+    const cleanNew = newName.trim().slice(0, 50);
+    if (!cleanNew) return createErrorResponse('新しい名前を入力してください');
+    if (cleanNew === oldName) {
+      return createSuccessResponse('変更なし', { newName: cleanNew });
+    }
+    const resolved = __resolveOwnUserId_();
+    if (resolved.error) return resolved.error;
+
+    const cfgRes = getUserConfig(resolved.userId);
+    if (!cfgRes.success) return createErrorResponse(cfgRes.message || 'getUserConfig failed');
+    const cur = cfgRes.config || {};
+    const profiles = Array.isArray(cur.profiles) ? cur.profiles.slice() : [];
+    const idx = profiles.findIndex(p => p && p.name === oldName);
+    if (idx < 0) return createErrorResponse(`プロファイル「${oldName}」が見つかりません`);
+    if (profiles.some(p => p && p.name === cleanNew)) {
+      return createErrorResponse(`プロファイル「${cleanNew}」は既に存在します`);
+    }
+    profiles[idx] = Object.assign({}, profiles[idx], { name: cleanNew });
+
+    const patch = { profiles };
+    if (cur.activeProfile === oldName) patch.activeProfile = cleanNew;
+    if (Array.isArray(cur.profileHistory)) {
+      patch.profileHistory = cur.profileHistory.map(entry => {
+        if (entry && entry.name === oldName) return Object.assign({}, entry, { name: cleanNew });
+        return entry;
+      });
+    }
+    const saveRes = applyConfigPatch_(resolved.userId, patch, { publish: false });
+    if (!saveRes.success) return saveRes;
+    return createSuccessResponse(`プロファイル名を「${cleanNew}」に変更しました`, { newName: cleanNew });
+  } catch (error) {
+    console.error('renameMyProfile error:', error && error.message);
+    return createExceptionResponse(error);
+  }
+}
+
+/**
  * Shape the sheet-data result into the JSON-safe envelope the frontend expects.
  * Date values (raw timestamps from Sheets) are converted to ISO strings;
  * everything else is already JSON-serializable by construction.
@@ -1590,11 +1645,18 @@ function processDataSourceOperations(spreadsheetId, sheetName, operations) {
 
 /**
  * 列分析 - API Gateway実装（既存サービス活用）
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {string} sheetName - シート名
+ *
+ * inferColumnRoles (L1 ヘッダーパターン + L2 データ形状 + L3 表示モード) で
+ * 役割マッピングと numericX/Y を 1 パスで推論する。boardMode はユーザー設定から
+ * 取得して L3 bias を効かせる。
+ *
+ * @param {string} spreadsheetId
+ * @param {string} sheetName
+ * @param {Object} [options]
+ * @param {string} [options.boardMode='auto'] - 表示モード (auto/board/pie/numberline/matrix/wordcloud)
  * @returns {Object} 列分析結果
  */
-function getColumnAnalysis(spreadsheetId, sheetName) {
+function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
   try {
     const email = getCurrentEmail();
     if (!email) {
@@ -1642,37 +1704,34 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
       }
     }
 
-    const diagnostics = performIntegratedColumnDiagnostics(headers, { sampleData });
+    const boardMode = options.boardMode || 'auto';
+    const diagnostics = performIntegratedColumnDiagnostics(headers, { sampleData, boardMode });
 
     // Why: 線形尺度（Forms「リニアスケール」）列が見つかれば、numericX/numericY として
     //      自動的に mapping に含める。教師は明示設定なしで M1/M2 モードが使えるようになる。
-    //      候補が複数あるとき、信頼度上位 2 件を採用（matrix 用）。
     //      欠落・低信頼の場合は何も設定せず、auto モードは 'board' にフォールバックする。
     const mergedMapping = { ...(diagnostics.recommendedMapping || {}) };
+    const mergedConfidence = { ...(diagnostics.confidence || {}) };
     const numericCandidates = Array.isArray(diagnostics.numericScaleCandidates)
       ? diagnostics.numericScaleCandidates
       : [];
     const acceptedScales = numericCandidates.filter(c => c && typeof c.index === 'number' && c.confidence >= 80);
     if (acceptedScales.length >= 1 && typeof mergedMapping.numericX !== 'number') {
       mergedMapping.numericX = acceptedScales[0].index;
+      mergedConfidence.numericX = acceptedScales[0].confidence;
     }
     if (acceptedScales.length >= 2 && typeof mergedMapping.numericY !== 'number') {
       mergedMapping.numericY = acceptedScales[1].index;
+      mergedConfidence.numericY = acceptedScales[1].confidence;
     }
 
+    let resultHeaders = headers;
+    let columnsAdded = [];
     try {
       const columnSetupResult = setupReactionAndHighlightColumns(spreadsheetId, sheetName, headers);
       if (columnSetupResult.columnsAdded && columnSetupResult.columnsAdded.length > 0) {
-        return {
-          success: true,
-          sheet,
-          headers: [...headers, ...columnSetupResult.columnsAdded],
-          data: [],
-          mapping: mergedMapping,
-          confidence: diagnostics.confidence || {},
-          numericScaleCandidates: numericCandidates,
-          columnsAdded: columnSetupResult.columnsAdded
-        };
+        columnsAdded = columnSetupResult.columnsAdded;
+        resultHeaders = [...headers, ...columnsAdded];
       }
     } catch (columnError) {
       console.warn('getColumnAnalysis: Column setup failed:', columnError.message);
@@ -1681,11 +1740,13 @@ function getColumnAnalysis(spreadsheetId, sheetName) {
     return {
       success: true,
       sheet,
-      headers,
+      headers: resultHeaders,
       data: [],
       mapping: mergedMapping,
-      confidence: diagnostics.confidence || {},
-      numericScaleCandidates: numericCandidates
+      confidence: mergedConfidence,
+      numericScaleCandidates: numericCandidates,
+      columnIntelligence: diagnostics.columnIntelligence || [],
+      columnsAdded
     };
   } catch (error) {
     logError_('getColumnAnalysis', error);

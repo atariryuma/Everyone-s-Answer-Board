@@ -1,41 +1,448 @@
 /**
- * @fileoverview ColumnMappingService - フォームヘッダーから列役割を推定する
- *   single-pass 検出器（パターンマッチ + 統計検証）。
+ * @fileoverview ColumnMappingService - フォームヘッダー + サンプルデータから列役割を推論する。
+ *
+ * 統合スコアリング (L1 + L2 + L3):
+ *   L1 Header pattern: ヘッダー文字列 vs 役割辞書 (exact/keywords/questionPatterns/regex)
+ *   L2 Data shape:     サンプル値の型・分布から役割を補強
+ *                      (integer 1..N → numericScale, email format → email,
+ *                       avg length → answer/reason vs name/class)
+ *   L3 Board mode:     表示モードが要求する役割への bias (pie → answer 重視 等)
+ *
+ * 制約:
+ *   - answer は reason より前にあるべき (sequential)
+ *   - 1 列 = 1 役割 (greedy / 高スコア優先で衝突解消)
+ *
+ * Entry points:
+ *   inferColumnRoles(headers, sampleData, options)        ← 統合分析 (内部 + 直接呼び)
+ *   performIntegratedColumnDiagnostics(headers, options)  ← getColumnAnalysis 用
+ *   detectNumericScaleColumns(headers, sampleData)        ← 線形尺度のみ (互換)
+ *   resolveColumnIndex(headers, fieldType, mapping)       ← 行処理 hot path (DataService)
+ *   filterSystemColumns(headers)                          ← UI / テスト互換
+ *   generateRecommendedMapping(headers, options)          ← テスト互換
+ *   analyzeFieldRelationships / detectColumn / validateFieldOrderLogic ← deprecated 互換
  */
 
-/* global normalizeHeader */
+/* global normalizeHeader, logError_ */
+
+// =====================================================================
+// 辞書 (L1)
+// =====================================================================
+
+const __SYSTEM_HEADER_PATTERNS = [
+  /^タイムスタンプ$/i, /^timestamp$/i, /^日時$/i, /^日付$/i,
+  /^UNDERSTAND$/i, /^LIKE$/i, /^CURIOUS$/i, /^HIGHLIGHT$/i,
+  /^理解$/i, /^いいね$/i, /^気になる$/i, /^ハイライト$/i,
+  /^_/
+];
+
+const __ROLE_PATTERNS = {
+  answer: {
+    exact: ['回答', 'answer'],
+    keywords: ['回答', '答え', 'answer', '意見', '考え', '感想', 'コメント'],
+    // 「質問らしさ」を表すパターン群。フォーム作成者が自由記述で書いた質問文を answer 列として捕捉する。
+    questionPatterns: [
+      /どう.*思い?.*ますか/i, /.*と思い?.*ますか/i,
+      /.*書きましょう/i, /.*述べ/i, /.*説明して/i,
+      /.*気づいたこと/i, /.*観察して/i,
+      /what.*do you think/i, /how.*do you feel/i, /explain.*your/i
+    ],
+    regex: /(回答|答え|answer|意見|考え)/i
+  },
+  reason: {
+    exact: ['理由', 'reason'],
+    keywords: ['理由', 'reason', 'なぜ', 'どうして', '根拠', '原因'],
+    regex: /(理由|根拠|reason|なぜ|どうして)/i
+  },
+  name: {
+    exact: ['名前', 'name'],
+    keywords: ['名前', 'name', '氏名', 'お名前'],
+    regex: /(名前|氏名|name)/i
+  },
+  class: {
+    exact: ['クラス', 'class'],
+    keywords: ['クラス', 'class', '組', '学年'],
+    regex: /(クラス|class|組)/i
+  },
+  email: {
+    exact: ['メール', 'email'],
+    keywords: ['メール', 'email', 'mail', 'アドレス'],
+    regex: /(メール|email|mail|アドレス)/i
+  }
+};
+
+const __DEFAULT_ROLES = ['answer', 'reason', 'email', 'name', 'class'];
+// 優先度: answer/reason が割り当てを先に取り、email > name > class で衝突を解消する。
+const __ROLE_PRIORITY = { answer: 10, reason: 8, email: 6, name: 4, class: 2 };
+
+// =====================================================================
+// system column filtering
+// =====================================================================
+
+function __isSystemHeader(header) {
+  if (!header || typeof header !== 'string') return true;
+  const trimmed = header.trim();
+  if (!trimmed) return true;
+  return __SYSTEM_HEADER_PATTERNS.some(p => p.test(trimmed));
+}
+
+function filterSystemColumns(headers) {
+  const cleanHeaders = [];
+  const indexMap = [];
+  if (!Array.isArray(headers)) return { cleanHeaders, indexMap };
+  for (let i = 0; i < headers.length; i++) {
+    const h = headers[i];
+    if (!h || typeof h !== 'string') continue;
+    if (!h.trim()) continue;
+    if (__SYSTEM_HEADER_PATTERNS.some(p => p.test(h.trim()))) continue;
+    cleanHeaders.push(h);
+    indexMap.push(i);
+  }
+  return { cleanHeaders, indexMap };
+}
+
+// =====================================================================
+// L1: ヘッダーパターンスコア (0..95)
+// =====================================================================
+
+function __headerPatternScore(header, role) {
+  const patterns = __ROLE_PATTERNS[role];
+  if (!patterns || !header || typeof header !== 'string') return 0;
+  const normalized = normalizeHeader(header);
+  let score = 0;
+
+  if (patterns.exact.some(k => normalized === k.toLowerCase())) score = 95;
+  if (patterns.keywords.some(k => normalized.includes(k.toLowerCase()))) score = Math.max(score, 90);
+  if (role === 'answer' && patterns.questionPatterns) {
+    if (patterns.questionPatterns.some(p => p.test(header))) score = Math.max(score, 87);
+  }
+  if (patterns.regex.test(header)) score = Math.max(score, 85);
+  return score;
+}
+
+// =====================================================================
+// L2: サンプルデータの形状分析
+// =====================================================================
+
+const __EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * Main column detection engine - optimized for precision and efficiency
- * @param {Array} headers - Header array
- * @param {string} fieldType - Field type to detect
- * @param {Object} columnMapping - Existing mapping (takes priority)
- * @param {Object} options - Detection options
- * @returns {Object} { index: number, confidence: number, method: string }
+ * 列の非空サンプル値から型・分布を抽出する。
+ * Why: dataType を 1 回計算しておけば、複数役割への boost 判定で再走査不要。
+ */
+function __analyzeColumnData(values) {
+  const stats = {
+    sampleCount: 0,
+    dataType: 'empty',
+    allInteger: false,
+    integerMin: Infinity, integerMax: -Infinity,
+    emailRatio: 0,
+    avgLength: 0, maxLength: 0,
+    cardinality: 0
+  };
+  if (!Array.isArray(values)) return stats;
+
+  const nonEmpty = [];
+  for (const v of values) {
+    if (v === '' || v == null) continue;
+    nonEmpty.push(v);
+  }
+  if (nonEmpty.length === 0) return stats;
+  stats.sampleCount = nonEmpty.length;
+
+  let intCount = 0;
+  let emailCount = 0;
+  let lenSum = 0;
+  const unique = new Set();
+
+  for (const v of nonEmpty) {
+    const str = String(v).trim();
+    const n = typeof v === 'number' ? v : Number(str);
+    if (Number.isFinite(n) && Number.isInteger(n) && n >= -100 && n <= 100) {
+      intCount++;
+      if (n < stats.integerMin) stats.integerMin = n;
+      if (n > stats.integerMax) stats.integerMax = n;
+    }
+    if (__EMAIL_REGEX.test(str)) emailCount++;
+    lenSum += str.length;
+    if (str.length > stats.maxLength) stats.maxLength = str.length;
+    unique.add(str);
+  }
+
+  stats.allInteger = (intCount === nonEmpty.length);
+  stats.emailRatio = emailCount / nonEmpty.length;
+  stats.avgLength = lenSum / nonEmpty.length;
+  stats.cardinality = unique.size;
+
+  // dataType 判定. integer-scale は範囲 1..9 の整数列のみ採用。
+  if (stats.allInteger && stats.sampleCount >= 2
+      && stats.integerMax - stats.integerMin >= 1
+      && stats.integerMax - stats.integerMin <= 9) {
+    stats.dataType = 'integer-scale';
+  } else if (stats.emailRatio >= 0.7) {
+    stats.dataType = 'email';
+  } else if (stats.avgLength >= 20) {
+    stats.dataType = 'long-text';
+  } else if (stats.avgLength <= 8) {
+    stats.dataType = 'short-text';
+  } else {
+    stats.dataType = 'medium-text';
+  }
+  return stats;
+}
+
+/**
+ * データ形状から役割への boost / penalty を返す (-15..+15)。
+ * Why: L1 だけだと「同名 keyword が複数列に出る」「短文 vs 長文の区別」ができない。
+ *      実データの dataType と組み合わせて衝突を解消する。
+ */
+function __dataTypeBoost(stats, role) {
+  if (!stats || stats.sampleCount === 0) return 0;
+  const t = stats.dataType;
+  switch (role) {
+    case 'email':
+      if (t === 'email') return 15;
+      if (stats.emailRatio > 0) return 0;
+      return -10;
+    case 'answer':
+      if (t === 'long-text') return 8;
+      if (t === 'medium-text') return 3;
+      if (t === 'integer-scale' || t === 'email') return -15;
+      return 0;
+    case 'reason':
+      if (t === 'long-text') return 6;
+      if (t === 'medium-text') return 3;
+      if (t === 'integer-scale' || t === 'email') return -15;
+      return 0;
+    case 'name':
+      if (t === 'short-text' && stats.avgLength <= 8) return 8;
+      if (t === 'email' || t === 'integer-scale') return -15;
+      return 0;
+    case 'class':
+      if (t === 'short-text' && stats.avgLength <= 10) return 5;
+      // クラスは値数が少ない (1-1, 1-2, …) ことが多い → 低カーディナリティを軽く後押し。
+      if (stats.cardinality > 0 && stats.cardinality <= 10 && stats.sampleCount >= 5) return 5;
+      if (t === 'integer-scale') return -10;
+      return 0;
+    default:
+      return 0;
+  }
+}
+
+// =====================================================================
+// L3: 表示モード bias
+// =====================================================================
+
+function __boardModeBoost(role, boardMode) {
+  // numericX/Y は numericScaleCandidates 経由で別系統に確定するので、ここでは扱わない。
+  // 表示モードによる「主軸となる役割」への弱い bias のみ。
+  switch (boardMode) {
+    case 'pie':
+    case 'wordcloud':
+      return role === 'answer' ? 5 : 0;
+    case 'numberline':
+    case 'matrix':
+    case 'board':
+    case 'auto':
+    default:
+      return 0;
+  }
+}
+
+// =====================================================================
+// 統合: inferColumnRoles
+// =====================================================================
+
+/**
+ * ヘッダー + サンプルデータから役割マッピングを推論する。
+ *
+ * @param {Array<string>} headers
+ * @param {Array<Array>} sampleData - 2D 配列 (ヘッダー除く)
+ * @param {Object} [options]
+ * @param {string} [options.boardMode='auto']
+ * @param {Array<string>} [options.fields]
+ * @param {Object} [options.existingMapping] - 既存マッピング (固定)
+ * @param {boolean} [options.includeNumericScale=true] - numericX/Y を mapping に含めるか
+ * @returns {{ mapping, confidence, columns, numericScaleCandidates }}
+ */
+function inferColumnRoles(headers, sampleData = [], options = {}) {
+  const roles = (options.fields && options.fields.length) ? options.fields : __DEFAULT_ROLES;
+  const boardMode = options.boardMode || 'auto';
+  const existingMapping = options.existingMapping || {};
+  const includeNumericScale = options.includeNumericScale !== false;
+
+  if (!Array.isArray(headers) || headers.length === 0) {
+    return { mapping: {}, confidence: {}, columns: [], numericScaleCandidates: [] };
+  }
+
+  // 各列のサンプル統計を 1 回計算しキャッシュ
+  const columns = headers.map((header, index) => {
+    const isSystem = __isSystemHeader(header);
+    const values = [];
+    if (!isSystem && Array.isArray(sampleData)) {
+      for (const row of sampleData) {
+        if (Array.isArray(row)) values.push(row[index]);
+      }
+    }
+    return {
+      index, header,
+      isSystem,
+      stats: __analyzeColumnData(values),
+      role: null,
+      confidence: 0
+    };
+  });
+
+  // 役割×列 のスコア候補 (score > 0 のみ)
+  const scoresByRole = {};
+  for (const role of roles) {
+    const cands = [];
+    for (const col of columns) {
+      if (col.isSystem) continue;
+      const headerScore = __headerPatternScore(col.header, role);
+      if (headerScore <= 0) continue;
+      const composite = Math.max(0, Math.min(95,
+        headerScore + __dataTypeBoost(col.stats, role) + __boardModeBoost(role, boardMode)
+      ));
+      if (composite > 0) cands.push({ index: col.index, score: composite });
+    }
+    cands.sort((a, b) => b.score - a.score);
+    scoresByRole[role] = cands;
+  }
+
+  // 既存マッピング適用 (固定 / 信頼度 100)
+  const mapping = {};
+  const confidence = {};
+  const usedIndices = new Set();
+  for (const role of roles) {
+    const fixedIdx = existingMapping[role];
+    if (typeof fixedIdx === 'number' && fixedIdx >= 0 && fixedIdx < headers.length) {
+      mapping[role] = fixedIdx;
+      confidence[role] = 100;
+      usedIndices.add(fixedIdx);
+    }
+  }
+
+  // Greedy 割当 (役割優先度順)
+  const remaining = roles
+    .filter(r => mapping[r] === undefined)
+    .sort((a, b) => (__ROLE_PRIORITY[b] || 0) - (__ROLE_PRIORITY[a] || 0));
+
+  for (const role of remaining) {
+    for (const cand of scoresByRole[role]) {
+      if (usedIndices.has(cand.index)) continue;
+      // answer-before-reason 制約: reason は answer より後の列でなければならない
+      if (role === 'reason' && typeof mapping.answer === 'number' && cand.index <= mapping.answer) continue;
+      if (role === 'answer' && typeof mapping.reason === 'number' && cand.index >= mapping.reason) continue;
+      mapping[role] = cand.index;
+      confidence[role] = cand.score;
+      usedIndices.add(cand.index);
+      break;
+    }
+  }
+
+  // 線形尺度候補 (L2 で integer-scale 判定された列)
+  const numericScaleCandidates = __collectNumericScaleCandidates(columns);
+
+  // numericX/Y を mapping に自動マージ (Greedy で未割当 + 信頼度 >= 80)
+  if (includeNumericScale) {
+    if (numericScaleCandidates.length >= 1
+        && typeof mapping.numericX !== 'number'
+        && numericScaleCandidates[0].confidence >= 80) {
+      mapping.numericX = numericScaleCandidates[0].index;
+      confidence.numericX = numericScaleCandidates[0].confidence;
+    }
+    if (numericScaleCandidates.length >= 2
+        && typeof mapping.numericY !== 'number'
+        && numericScaleCandidates[1].confidence >= 80) {
+      mapping.numericY = numericScaleCandidates[1].index;
+      confidence.numericY = numericScaleCandidates[1].confidence;
+    }
+  }
+
+  // 列情報に役割を埋め込む (UI 表示用)
+  for (const role of Object.keys(mapping)) {
+    const col = columns.find(c => c.index === mapping[role]);
+    if (col) {
+      col.role = role;
+      col.confidence = confidence[role];
+    }
+  }
+
+  return { mapping, confidence, columns, numericScaleCandidates };
+}
+
+// =====================================================================
+// 線形尺度検出 (公開 + 内部共用)
+// =====================================================================
+
+function __collectNumericScaleCandidates(columns) {
+  const candidates = [];
+  for (const col of columns) {
+    if (col.isSystem) continue;
+    const s = col.stats;
+    if (!s || s.dataType !== 'integer-scale') continue;
+    const min = s.integerMin;
+    const max = s.integerMax;
+
+    let conf = 60;
+    if (s.sampleCount >= 5) conf += 10;
+    if (s.sampleCount >= 15) conf += 10;
+    if (min === 1 && (max === 5 || max === 10)) conf += 15;
+    if (min === 0 && (max === 4 || max === 10)) conf += 10;
+
+    candidates.push({
+      index: col.index,
+      header: col.header.trim(),
+      min, max,
+      sampleCount: s.sampleCount,
+      confidence: Math.min(conf, 95)
+    });
+  }
+  candidates.sort((a, b) => b.confidence - a.confidence);
+  return candidates;
+}
+
+function detectNumericScaleColumns(headers, sampleData) {
+  if (!Array.isArray(headers) || !Array.isArray(sampleData)) return [];
+  const columns = headers.map((header, index) => {
+    const isSystem = __isSystemHeader(header);
+    const values = [];
+    if (!isSystem) {
+      for (const row of sampleData) {
+        if (Array.isArray(row)) values.push(row[index]);
+      }
+    }
+    return { index, header, isSystem, stats: __analyzeColumnData(values) };
+  });
+  return __collectNumericScaleCandidates(columns);
+}
+
+// =====================================================================
+// 旧 API: backward-compat wrappers
+// =====================================================================
+
+/**
+ * 行処理 hot path 用の単一役割解決。columnMapping が指定されていればそれを返す軽量パス。
  */
 function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}) {
   try {
-    if (columnMapping && columnMapping[fieldType] !== undefined) {
-      const mappedIndex = columnMapping[fieldType];
-      if (typeof mappedIndex === 'number' && mappedIndex >= 0 && mappedIndex < headers.length) {
-        return { index: mappedIndex, confidence: 100, method: 'existing_mapping' };
-      }
+    if (columnMapping && typeof columnMapping[fieldType] === 'number'
+        && columnMapping[fieldType] >= 0 && columnMapping[fieldType] < headers.length) {
+      return { index: columnMapping[fieldType], confidence: 100, method: 'existing_mapping' };
     }
 
     const { cleanHeaders, indexMap } = filterSystemColumns(headers);
-    if (cleanHeaders.length === 0) {
-      return { index: -1, confidence: 0, method: 'no_valid_headers' };
+    if (cleanHeaders.length === 0) return { index: -1, confidence: 0, method: 'no_valid_headers' };
+    if (!__ROLE_PATTERNS[fieldType]) return { index: -1, confidence: 0, method: 'unknown_field' };
+
+    let bestIdx = -1, bestScore = 0;
+    for (let i = 0; i < cleanHeaders.length; i++) {
+      const score = __headerPatternScore(cleanHeaders[i], fieldType);
+      if (score > bestScore) { bestScore = score; bestIdx = i; }
     }
-
-    const detection = detectColumn(cleanHeaders, fieldType, options);
-    const originalIndex = detection.index !== -1 ? indexMap[detection.index] : -1;
-
-    return {
-      index: originalIndex,
-      confidence: detection.confidence,
-      method: detection.method
-    };
-
+    return bestIdx === -1
+      ? { index: -1, confidence: 0, method: 'no_match' }
+      : { index: indexMap[bestIdx], confidence: Math.min(bestScore, 95), method: 'pattern_match' };
   } catch (error) {
     console.error(`resolveColumnIndex error for ${fieldType}:`, error.message);
     return { index: -1, confidence: 0, method: 'error', error: error.message };
@@ -43,412 +450,174 @@ function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}
 }
 
 /**
- * Filter out system columns that should not be detected
+ * @deprecated inferColumnRoles に統合。テスト互換のため最小実装を残置。
  */
-function filterSystemColumns(headers) {
-  const systemPatterns = [
-    /^タイムスタンプ$/i, /^timestamp$/i, /^日時$/i, /^日付$/i,
-    /^UNDERSTAND$/i, /^LIKE$/i, /^CURIOUS$/i, /^HIGHLIGHT$/i,
-    /^理解$/i, /^いいね$/i, /^気になる$/i, /^ハイライト$/i,
-    /^_/  // Internal columns
-  ];
-
-  const cleanHeaders = [];
-  const indexMap = [];
-
-  headers.forEach((header, originalIndex) => {
-    if (header && typeof header === 'string' && header.trim()) {
-      const isSystem = systemPatterns.some(pattern => pattern.test(header.trim()));
-      if (!isSystem) {
-        cleanHeaders.push(header);
-        indexMap.push(originalIndex);
-      }
-    }
-  });
-
-  return { cleanHeaders, indexMap };
-}
-
-/**
- * Enhanced column detection with logical field ordering
- */
-function detectColumn(headers, fieldType, options = {}) {
-  const patterns = getFieldPatterns()[fieldType];
-  if (!patterns) {
-    return { index: -1, confidence: 0, method: 'unknown_field' };
+function detectColumn(headers, fieldType, _options = {}) {
+  if (!__ROLE_PATTERNS[fieldType]) return { index: -1, confidence: 0, method: 'unknown_field' };
+  let bestIdx = -1, bestScore = 0;
+  for (let i = 0; i < headers.length; i++) {
+    const score = __headerPatternScore(headers[i], fieldType);
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
   }
-
-  const fieldRelationships = analyzeFieldRelationships(headers);
-
-  let bestMatch = { index: -1, confidence: 0, method: 'no_match' };
-
-  headers.forEach((header, index) => {
-    if (!header || typeof header !== 'string') return;
-
-    const score = calculateScoreWithLogic({ header, fieldType, patterns, index, relationships: fieldRelationships, options });
-
-    if (score > bestMatch.confidence) {
-      bestMatch = {
-        index,
-        confidence: Math.min(score, 95),
-        method: 'pattern_match_with_logic'
-      };
-    }
-  });
-
-  return bestMatch;
+  return bestIdx === -1
+    ? { index: -1, confidence: 0, method: 'no_match' }
+    : { index: bestIdx, confidence: Math.min(bestScore, 95), method: 'pattern_match_with_logic' };
 }
 
 /**
- * Analyze field relationships and logical constraints across all headers
+ * @deprecated inferColumnRoles に統合。テスト互換のため候補抽出のみ実装。
  */
 function analyzeFieldRelationships(headers) {
-  const relationships = {
-    answerCandidates: [],
-    reasonCandidates: [],
-    answerReasonPairs: []
-  };
-
-  const patterns = getFieldPatterns();
-
+  const rels = { answerCandidates: [], reasonCandidates: [], answerReasonPairs: [] };
+  if (!Array.isArray(headers)) return rels;
   headers.forEach((header, index) => {
     if (!header || typeof header !== 'string') return;
-
-    const answerScore = calculateBaseScore(header, 'answer', patterns.answer);
-    if (answerScore > 60) {
-      relationships.answerCandidates.push({ index, header, score: answerScore });
-    }
-
-    const reasonScore = calculateBaseScore(header, 'reason', patterns.reason);
-    if (reasonScore > 60) {
-      relationships.reasonCandidates.push({ index, header, score: reasonScore });
-    }
+    const a = __headerPatternScore(header, 'answer');
+    if (a > 60) rels.answerCandidates.push({ index, header, score: a });
+    const r = __headerPatternScore(header, 'reason');
+    if (r > 60) rels.reasonCandidates.push({ index, header, score: r });
   });
-
-  relationships.answerCandidates.forEach(answer => {
-    relationships.reasonCandidates.forEach(reason => {
-      if (answer.index < reason.index) { // Answer comes before reason (logical)
-        relationships.answerReasonPairs.push({
-          answerIndex: answer.index,
-          reasonIndex: reason.index,
-          logicalOrder: true,
-          confidence: (answer.score + reason.score) / 2
+  rels.answerCandidates.forEach(a => {
+    rels.reasonCandidates.forEach(r => {
+      if (a.index < r.index) {
+        rels.answerReasonPairs.push({
+          answerIndex: a.index, reasonIndex: r.index,
+          logicalOrder: true, confidence: (a.score + r.score) / 2
         });
       }
     });
   });
-
-  return relationships;
+  return rels;
 }
 
 /**
- * Calculate base score without positional logic (for relationship analysis)
- */
-function calculateBaseScore(header, fieldType, patterns) {
-  const normalizedHeader = normalizeHeader(header);
-  let maxScore = 0;
-
-  if (patterns.exact && patterns.exact.some(keyword => normalizedHeader === keyword.toLowerCase())) {
-    maxScore = 95;
-  }
-
-  if (patterns.keywords) {
-    for (const keyword of patterns.keywords) {
-      if (normalizedHeader.includes(keyword.toLowerCase())) {
-        maxScore = Math.max(maxScore, 90);
-        break;
-      }
-    }
-  }
-
-  if (fieldType === 'answer' && patterns.questionPatterns) {
-    for (const pattern of patterns.questionPatterns) {
-      if (pattern.test(header)) {
-        maxScore = Math.max(maxScore, 87);
-        break;
-      }
-    }
-  }
-
-  if (patterns.regex && patterns.regex.test(header)) {
-    maxScore = Math.max(maxScore, 85);
-  }
-
-  return maxScore;
-}
-
-/**
- * Calculate header score with logical field ordering constraints.
- * @param {Object} ctx - {header, fieldType, patterns, index, relationships, options}
- */
-function calculateScoreWithLogic(ctx) {
-  const { header, fieldType, patterns, index, relationships } = ctx;
-  const options = ctx.options || {};
-  const normalizedHeader = normalizeHeader(header);
-  const baseScore = calculateBaseScore(header, fieldType, patterns);
-
-  let logicalBonus = 0;
-  let logicalPenalty = 0;
-
-  if (fieldType === 'answer') {
-    const hasReasonAfter = relationships.reasonCandidates.some(reason => reason.index > index);
-    if (hasReasonAfter && baseScore > 70) {
-      logicalBonus = 8; // Significant boost for logical answer placement
-    }
-
-    const isInLogicalPair = relationships.answerReasonPairs.some(pair => pair.answerIndex === index);
-    if (isInLogicalPair) {
-      logicalBonus += 5; // Additional boost for confirmed logical pairs
-    }
-  }
-
-  if (fieldType === 'reason') {
-    const hasAnswerBefore = relationships.answerCandidates.some(answer => answer.index < index);
-    if (!hasAnswerBefore && baseScore > 70) {
-      logicalPenalty = 15; // Strong penalty for illogical reason placement
-    }
-
-    if (hasAnswerBefore) {
-      logicalBonus = 5; // Moderate boost for logical reason placement
-    }
-
-    const isInLogicalPair = relationships.answerReasonPairs.some(pair => pair.reasonIndex === index);
-    if (isInLogicalPair) {
-      logicalBonus += 3; // Additional boost for confirmed logical pairs
-    }
-  }
-
-  let sampleBonus = 0;
-  if (options.sampleData && options.sampleData.length > 0 && baseScore > 0) {
-    sampleBonus = validateSampleData(options.sampleData, normalizedHeader, fieldType);
-  }
-
-  const finalScore = Math.min(baseScore + logicalBonus + sampleBonus - logicalPenalty, 95);
-  return Math.max(finalScore, 0); // Ensure score doesn't go negative
-}
-
-/**
- * Validate sample data for field type consistency
- */
-function validateSampleData(sampleData, header, fieldType) {
-  if (!sampleData || sampleData.length < 2) return 0;
-
-  // 空ヘッダーは検証スキップ（キーワード "" だと全セルがマッチしてしまう）
-  const headerKeyword = header ? String(header).split(' ')[0] : '';
-  if (!headerKeyword || headerKeyword.trim() === '') return 0;
-
-  const columnValues = sampleData.slice(0, Math.min(5, sampleData.length))
-    .map(row => row.find(cell => String(cell || '').toLowerCase().includes(headerKeyword.toLowerCase())))
-    .filter(val => val != null && String(val).trim());
-
-  if (columnValues.length === 0) return 0;
-
-  const validators = {
-    email: val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(val)),
-    answer: val => String(val).length > 5 && String(val).length < 1000,
-    reason: val => String(val).length > 3 && String(val).length < 500,
-    name: val => String(val).length > 0 && String(val).length < 100 && !/[@.]/.test(String(val)),
-    class: val => /^[0-9一-九\w-]+$/.test(String(val)) && String(val).length < 20
-  };
-
-  const validator = validators[fieldType];
-  if (!validator) return 0;
-
-  const validCount = columnValues.filter(validator).length;
-  const validationRatio = validCount / columnValues.length;
-
-  return validationRatio > 0.7 ? 5 : 0;
-}
-
-/**
- * Streamlined field patterns focused on high precision detection
- */
-function getFieldPatterns() {
-  return {
-    answer: {
-      exact: ['回答', 'answer'],
-      keywords: ['回答', '答え', 'answer', '意見', '考え', '感想', 'コメント'],
-      questionPatterns: [
-        /どう.*思い?.*ますか/i,
-        /.*と思い?.*ますか/i,
-        /.*書きましょう/i,
-        /.*述べ/i,
-        /.*説明して/i,
-        /.*気づいたこと/i,
-        /.*観察して/i,
-        /what.*do you think/i,
-        /how.*do you feel/i,
-        /explain.*your/i
-      ],
-      regex: /(回答|答え|answer|意見|考え)/i
-    },
-    reason: {
-      exact: ['理由', 'reason'],
-      keywords: ['理由', 'reason', 'なぜ', 'どうして', '根拠', '原因'],
-      regex: /(理由|根拠|reason|なぜ|どうして)/i
-    },
-    name: {
-      exact: ['名前', 'name'],
-      keywords: ['名前', 'name', '氏名', 'お名前'],
-      regex: /(名前|氏名|name)/i
-    },
-    class: {
-      exact: ['クラス', 'class'],
-      keywords: ['クラス', 'class', '組', '学年'],
-      regex: /(クラス|class|組)/i
-    },
-    email: {
-      exact: ['メール', 'email'],
-      keywords: ['メール', 'email', 'mail', 'アドレス'],
-      regex: /(メール|email|mail|アドレス)/i
-    }
-  };
-}
-
-/**
- * Validate and correct field ordering logic in final mapping
+ * @deprecated inferColumnRoles 内の constraint 解決で代替。テスト互換のため残置。
  */
 function validateFieldOrderLogic(mapping, confidence, headers) {
   const validatedMapping = { ...mapping };
   const validatedConfidence = { ...confidence };
-  const validation = {
-    checks: [],
-    corrections: [],
-    warnings: []
-  };
-
-  if (validatedMapping.answer !== undefined && validatedMapping.reason !== undefined) {
-    const answerIndex = validatedMapping.answer;
-    const reasonIndex = validatedMapping.reason;
-
-    validation.checks.push({
-      rule: 'answer_before_reason',
-      answerIndex,
-      reasonIndex,
-      logical: answerIndex < reasonIndex
-    });
-
-    if (reasonIndex < answerIndex) {
-      const answerHeader = headers[answerIndex];
-      const reasonHeader = headers[reasonIndex];
-
-      if (validatedConfidence.reason < validatedConfidence.answer - 10) {
-        delete validatedMapping.reason;
-        delete validatedConfidence.reason;
-        validation.corrections.push({
-          action: 'removed_illogical_reason',
-          field: 'reason',
-          index: reasonIndex,
-          header: reasonHeader,
-          reason: 'Reason field appears before answer field with low confidence'
-        });
-      } else if (validatedConfidence.answer < validatedConfidence.reason - 10) {
-        const answerAsReasonScore = calculateBaseScore(answerHeader, 'reason', getFieldPatterns().reason);
-        if (answerAsReasonScore > validatedConfidence.answer - 20) {
-          validation.warnings.push({
-            warning: 'potential_field_swap',
-            message: 'Answer field may actually be a reason field',
-            answerIndex,
-            reasonIndex,
-            suggestion: 'Manual review recommended'
-          });
-        }
-      } else {
-        validation.corrections.push({
-          action: 'preserved_logical_order',
-          message: 'Maintained answer before reason despite close confidence scores',
-          answerIndex,
-          reasonIndex
-        });
-      }
-    } else {
-      validation.checks[validation.checks.length - 1].status = 'passed';
-    }
+  const validation = { checks: [], corrections: [], warnings: [] };
+  if (validatedMapping.answer === undefined || validatedMapping.reason === undefined) {
+    return { mapping: validatedMapping, confidence: validatedConfidence, validation };
   }
 
-  return {
-    mapping: validatedMapping,
-    confidence: validatedConfidence,
-    validation
-  };
+  const a = validatedMapping.answer;
+  const r = validatedMapping.reason;
+  validation.checks.push({ rule: 'answer_before_reason', answerIndex: a, reasonIndex: r, logical: a < r });
+
+  if (r >= a) {
+    validation.checks[validation.checks.length - 1].status = 'passed';
+    return { mapping: validatedMapping, confidence: validatedConfidence, validation };
+  }
+
+  const aConf = validatedConfidence.answer || 0;
+  const rConf = validatedConfidence.reason || 0;
+  if (rConf < aConf - 10) {
+    delete validatedMapping.reason;
+    delete validatedConfidence.reason;
+    validation.corrections.push({
+      action: 'removed_illogical_reason', field: 'reason',
+      index: r, header: headers[r],
+      reason: 'Reason field appears before answer field with low confidence'
+    });
+  } else if (aConf < rConf - 10) {
+    const answerAsReasonScore = __headerPatternScore(headers[a], 'reason');
+    if (answerAsReasonScore > aConf - 20) {
+      validation.warnings.push({
+        warning: 'potential_field_swap',
+        message: 'Answer field may actually be a reason field',
+        answerIndex: a, reasonIndex: r, suggestion: 'Manual review recommended'
+      });
+    }
+  } else {
+    validation.corrections.push({
+      action: 'preserved_logical_order',
+      message: 'Maintained answer before reason despite close confidence scores',
+      answerIndex: a, reasonIndex: r
+    });
+  }
+  return { mapping: validatedMapping, confidence: validatedConfidence, validation };
 }
 
 /**
- * Generate recommended column mapping with high precision
+ * 互換: numericX/Y を含まない「主役割のみ」マッピングを返す。
  */
 function generateRecommendedMapping(headers, options = {}) {
   try {
-    const targetFields = options.fields || ['answer', 'reason', 'class', 'name', 'email'];
-    const mapping = {};
-    const confidence = {};
-    const usedIndices = new Set();
-
-    const sortedFields = targetFields.sort((a, b) => {
-      const priority = { answer: 10, reason: 8, email: 6, name: 4, class: 2 };
-      return (priority[b] || 0) - (priority[a] || 0);
+    const fields = options.fields || __DEFAULT_ROLES;
+    const inferred = inferColumnRoles(headers, options.sampleData || [], {
+      fields,
+      boardMode: options.boardMode || 'auto',
+      includeNumericScale: false
     });
-
-    for (const fieldType of sortedFields) {
-      const result = resolveColumnIndex(headers, fieldType, {}, options);
-
-      if (result.index !== -1 && !usedIndices.has(result.index)) {
-        mapping[fieldType] = result.index;
-        confidence[fieldType] = result.confidence;
-        usedIndices.add(result.index);
+    const recommendedMapping = {};
+    const conf = {};
+    for (const r of fields) {
+      if (typeof inferred.mapping[r] === 'number') {
+        recommendedMapping[r] = inferred.mapping[r];
+        conf[r] = inferred.confidence[r];
       }
     }
-
-    const validatedMapping = validateFieldOrderLogic(mapping, confidence, headers);
-
-    const avgConfidence = Object.keys(validatedMapping.mapping).length > 0 ?
-      Math.round(Object.values(validatedMapping.confidence).reduce((sum, c) => sum + c, 0) / Object.keys(validatedMapping.mapping).length) : 0;
-
+    const resolvedCount = Object.keys(recommendedMapping).length;
+    const overallScore = resolvedCount > 0
+      ? Math.round(Object.values(conf).reduce((s, c) => s + c, 0) / resolvedCount)
+      : 0;
     return {
-      recommendedMapping: validatedMapping.mapping,
-      confidence: validatedMapping.confidence,
-      analysis: {
-        resolvedFields: Object.keys(validatedMapping.mapping).length,
-        totalFields: targetFields.length,
-        overallScore: avgConfidence,
-        logicalValidation: validatedMapping.validation
-      },
+      recommendedMapping,
+      confidence: conf,
+      analysis: { resolvedFields: resolvedCount, totalFields: fields.length, overallScore },
       success: true
     };
-
   } catch (error) {
-    logError_('generateRecommendedMapping', error);
-    return {
-      recommendedMapping: {},
-      confidence: {},
-      analysis: { error: error.message },
-      success: false
-    };
+    if (typeof logError_ === 'function') logError_('generateRecommendedMapping', error);
+    return { recommendedMapping: {}, confidence: {}, analysis: { error: error.message }, success: false };
   }
 }
 
 /**
- * Integrated column diagnostics for frontend
+ * getColumnAnalysis から呼ばれる統合分析。numericX/Y は recommendedMapping に
+ * 含めず、numericScaleCandidates として並列に返す (呼び元で別途マージ可能)。
  */
 function performIntegratedColumnDiagnostics(originalHeaders, options = {}) {
   try {
-    const result = generateRecommendedMapping(originalHeaders, options);
-    const numericScaleCandidates = detectNumericScaleColumns(
-      originalHeaders,
-      options.sampleData || []
-    );
+    const inferred = inferColumnRoles(originalHeaders, options.sampleData || [], {
+      fields: options.fields || __DEFAULT_ROLES,
+      boardMode: options.boardMode || 'auto',
+      includeNumericScale: false
+    });
+    const recommendedMapping = {};
+    const conf = {};
+    for (const r of __DEFAULT_ROLES) {
+      if (typeof inferred.mapping[r] === 'number') {
+        recommendedMapping[r] = inferred.mapping[r];
+        conf[r] = inferred.confidence[r];
+      }
+    }
+    const resolvedCount = Object.keys(recommendedMapping).length;
+    const overallScore = resolvedCount > 0
+      ? Math.round(Object.values(conf).reduce((s, c) => s + c, 0) / resolvedCount)
+      : 0;
 
     return {
       success: true,
       headers: originalHeaders,
-      recommendedMapping: result.recommendedMapping,
-      confidence: result.confidence,
-      numericScaleCandidates,
-      aiAnalysis: result.analysis,
+      recommendedMapping,
+      confidence: conf,
+      numericScaleCandidates: inferred.numericScaleCandidates,
+      columnIntelligence: inferred.columns.map(c => ({
+        index: c.index, header: c.header,
+        role: c.role, confidence: c.confidence,
+        dataType: c.stats.dataType
+      })),
+      aiAnalysis: {
+        resolvedFields: resolvedCount,
+        totalFields: __DEFAULT_ROLES.length,
+        overallScore
+      },
       timestamp: new Date().toISOString()
     };
-
   } catch (error) {
-    logError_('performIntegratedColumnDiagnostics', error);
+    if (typeof logError_ === 'function') logError_('performIntegratedColumnDiagnostics', error);
     return {
       success: false,
       error: error.message,
@@ -459,84 +628,3 @@ function performIntegratedColumnDiagnostics(originalHeaders, options = {}) {
     };
   }
 }
-
-/**
- * Detect linear-scale numeric columns (Google Forms「線形尺度」).
- *
- * Why: M1 (number line) and M2 (matrix) modes need 1-2 numeric columns.
- *      Google Forms linear scale stores integers 1..N in the column.
- *      We detect by sampling actual data values, not by header pattern, because
- *      teachers write questions in natural language and there's no reliable
- *      header marker.
- *
- * @param {Array<string>} headers - All headers from the sheet
- * @param {Array<Array>} sampleData - Rows of sample data (excluding header row)
- * @returns {Array<{index, header, min, max, confidence, sampleCount}>}
- *   Candidates sorted by confidence desc.
- */
-function detectNumericScaleColumns(headers, sampleData) {
-  if (!Array.isArray(headers) || !Array.isArray(sampleData)) return [];
-
-  const systemPatterns = [
-    /^タイムスタンプ$/i, /^timestamp$/i, /^日時$/i, /^日付$/i,
-    /^UNDERSTAND$/i, /^LIKE$/i, /^CURIOUS$/i, /^HIGHLIGHT$/i,
-    /^理解$/i, /^いいね$/i, /^気になる$/i, /^ハイライト$/i,
-    /^_/
-  ];
-
-  const candidates = [];
-
-  for (let colIdx = 0; colIdx < headers.length; colIdx++) {
-    const header = headers[colIdx];
-    if (!header || typeof header !== 'string' || !header.trim()) continue;
-    if (systemPatterns.some(p => p.test(header.trim()))) continue;
-
-    // Collect non-empty cell values for this column
-    const values = [];
-    for (const row of sampleData) {
-      if (!Array.isArray(row)) continue;
-      const cell = row[colIdx];
-      if (cell === '' || cell == null) continue;
-      values.push(cell);
-    }
-    if (values.length < 2) continue;
-
-    // All must parse as integers in a small range (line ar scale = 1..10 typical)
-    let allValidInt = true;
-    const nums = [];
-    for (const v of values) {
-      const n = typeof v === 'number' ? v : Number(String(v).trim());
-      if (!Number.isFinite(n) || !Number.isInteger(n)) { allValidInt = false; break; }
-      if (n < 0 || n > 10) { allValidInt = false; break; }
-      nums.push(n);
-    }
-    if (!allValidInt) continue;
-
-    const min = Math.min(...nums);
-    const max = Math.max(...nums);
-    // Range too narrow (everyone same value) — likely not a scale being used.
-    if (max - min < 1) continue;
-    // Range very wide for "linear scale" — unlikely (would be free numeric).
-    if (max - min > 9) continue;
-
-    // Confidence: more samples + sensible 1-5 or 1-10 boundaries → higher.
-    let confidence = 60;
-    if (values.length >= 5) confidence += 10;
-    if (values.length >= 15) confidence += 10;
-    if (min === 1 && (max === 5 || max === 10)) confidence += 15;
-    if (min === 0 && (max === 4 || max === 10)) confidence += 10;
-
-    candidates.push({
-      index: colIdx,
-      header: header.trim(),
-      min,
-      max,
-      sampleCount: values.length,
-      confidence: Math.min(confidence, 95)
-    });
-  }
-
-  candidates.sort((a, b) => b.confidence - a.confidence);
-  return candidates;
-}
-
