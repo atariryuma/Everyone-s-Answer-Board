@@ -667,29 +667,6 @@
     transform: translateY(-1px);
   }
 
-  /* 「アクティブにする」CTA — 教師が viewer から直接 activeProfile を切替えるボタン。
-     return ボタンの隣に並ぶように同じスタイル基調で、cyan 系で「進める/切替」感を出す。 */
-  .viz-profile-activate {
-    margin-left: 0.4rem;
-    padding: 0.3rem 0.7rem;
-    border-radius: 0.35rem;
-    border: 1px solid rgba(34, 211, 238, 0.6);
-    background: rgba(34, 211, 238, 0.18);
-    color: #67e8f9;
-    cursor: pointer;
-    font-size: 0.85rem;
-    font-weight: 600;
-    white-space: nowrap;
-    transition: background 0.15s, transform 0.1s;
-  }
-  .viz-profile-activate:hover {
-    background: rgba(34, 211, 238, 0.32);
-    transform: translateY(-1px);
-  }
-  @media (max-width: 640px) {
-    .viz-profile-activate { font-size: 0.78rem; padding: 0.22rem 0.45rem; }
-  }
-
   /* 生徒向け toolbar — 議論ツール / timeline は非表示（pills だけ） */
   .viz-toolbar--student .viz-toolbar-center { display: none !important; }
 
