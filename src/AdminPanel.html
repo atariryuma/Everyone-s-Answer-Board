@@ -397,6 +397,38 @@
             </div>
           </div>
 
+          <!-- 数値列の明示マッピング (matrix/numberline/auto で表示).
+               UX 優先度: matrix/numberline では answer が hide されるので、numericX/Y が
+               「最初の必須列」になる。任意列 (reason/class/name) より上に配置することで
+               「必須を先に決める」自然な flow を維持する。 -->
+          <div id="numeric-mapping-container" class="hidden space-y-4">
+            <div id="numeric-candidates-info" class="hidden p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-blue-400">🔢</span>
+                <span class="text-sm font-medium text-blue-300">検出された数値列</span>
+              </div>
+              <div id="numeric-candidates-list" class="text-xs text-gray-300 space-y-1"></div>
+            </div>
+            <div class="form-group" id="numericX-column-row">
+              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-x-column-select"></label>
+              <select id="numeric-x-column-select" class="modern-select" data-autosave>
+                <option value="">（自動判定）</option>
+              </select>
+              <div id="numericX-confidence" class="text-xs mt-1 hidden">
+                <span class="confidence-badge"></span>
+              </div>
+            </div>
+            <div id="numeric-y-mapping-row" class="form-group hidden">
+              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-y-column-select"></label>
+              <select id="numeric-y-column-select" class="modern-select" data-autosave>
+                <option value="">（未使用）</option>
+              </select>
+              <div id="numericY-confidence" class="text-xs mt-1 hidden">
+                <span class="confidence-badge"></span>
+              </div>
+            </div>
+          </div>
+
           <div class="form-group" id="reason-column-row">
             <label for="reason-column-select" class="block text-sm font-medium text-gray-300 mb-2"></label>
             <select id="reason-column-select" class="modern-select" data-autosave>
@@ -424,36 +456,6 @@
             </select>
             <div id="name-confidence" class="text-xs mt-1 hidden">
               <span class="confidence-badge"></span>
-            </div>
-          </div>
-
-          <!-- 数値列の明示マッピング (matrix/numberline/auto で表示).
-               以前は ③「表示と公開」<details> の中に埋もれて教師が見落としていたため ② に昇格。 -->
-          <div id="numeric-mapping-container" class="hidden space-y-4 pt-3 border-t border-gray-700 mt-2">
-            <div id="numeric-candidates-info" class="hidden p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-              <div class="flex items-center gap-2 mb-1">
-                <span class="text-blue-400">🔢</span>
-                <span class="text-sm font-medium text-blue-300">検出された数値列</span>
-              </div>
-              <div id="numeric-candidates-list" class="text-xs text-gray-300 space-y-1"></div>
-            </div>
-            <div class="form-group" id="numericX-column-row">
-              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-x-column-select"></label>
-              <select id="numeric-x-column-select" class="modern-select" data-autosave>
-                <option value="">（自動判定）</option>
-              </select>
-              <div id="numericX-confidence" class="text-xs mt-1 hidden">
-                <span class="confidence-badge"></span>
-              </div>
-            </div>
-            <div id="numeric-y-mapping-row" class="form-group hidden">
-              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-y-column-select"></label>
-              <select id="numeric-y-column-select" class="modern-select" data-autosave>
-                <option value="">（未使用）</option>
-              </select>
-              <div id="numericY-confidence" class="text-xs mt-1 hidden">
-                <span class="confidence-badge"></span>
-              </div>
             </div>
           </div>
 
