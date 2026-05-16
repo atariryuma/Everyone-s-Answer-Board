@@ -24,15 +24,20 @@ function loadSystemControllerContext(overrides = {}) {
     }),
     DEFAULT_DISPLAY_SETTINGS: { showNames: false, showReactions: false, theme: 'default', pageSize: 20 },
     saveUserConfig: () => ({ success: true, etag: 'etag-2', config: {} }),
-    sanitizeDisplaySettings: (settings) => ({
-      showNames: Boolean(settings.showNames),
-      showReactions: Boolean(settings.showReactions),
-      theme: String(settings.theme || 'default'),
-      pageSize: Number(settings.pageSize || 20)
-    }),
+    sanitizeDisplaySettings: (settings) => {
+      const result = {
+        showNames: Boolean(settings.showNames),
+        showReactions: Boolean(settings.showReactions),
+        theme: String(settings.theme || 'default'),
+        pageSize: Number(settings.pageSize || 20)
+      };
+      // matrix/numberline 公開検証 (v2760) で必要なので boardMode を pass-through
+      if (settings.boardMode) result.boardMode = settings.boardMode;
+      return result;
+    },
     sanitizeMapping: (mapping) => {
       const sanitized = {};
-      ['answer', 'reason', 'class', 'name', 'timestamp', 'email'].forEach((key) => {
+      ['answer', 'reason', 'class', 'name', 'timestamp', 'email', 'numericX', 'numericY'].forEach((key) => {
         const value = mapping[key];
         if (typeof value === 'number' && value >= 0) sanitized[key] = value;
       });
@@ -119,7 +124,10 @@ test('publishApp: allowlist fields only and save with publish flags', () => {
   });
 });
 
-test('publishApp: answer column is required', () => {
+test('publishApp: answer column is required (board mode)', () => {
+  // Why "board mode": v2760 で publishApp の required-column 検証はモード対応に。
+  //   matrix → numericX/Y, numberline → numericX, それ以外 → answer。テスト名と
+  //   メッセージマッチを mode-aware の表現に統一。
   const context = loadSystemControllerContext();
   const result = context.publishApp({
     spreadsheetId: 'spreadsheet-id',
@@ -129,7 +137,46 @@ test('publishApp: answer column is required', () => {
   });
 
   assert.equal(result.success, false);
-  assert.match(result.message, /answer/);
+  assert.match(result.message, /メイン質問列/);
+});
+
+test('publishApp: matrix mode requires numericX + numericY (not answer)', () => {
+  // Edge case audit #1 + #2 (v2760): 旧コードは answer 列必須で matrix mode ユーザーが
+  //   publish できなかった。matrix では numericX/Y を必須にして、answer は不要にする。
+  const ctx = loadSystemControllerContext();
+  const result = ctx.publishApp({
+    spreadsheetId: 'ss-1',
+    sheetName: 'フォームの回答 1',
+    columnMapping: { numericX: 2, numericY: 3, reason: 4 },
+    displaySettings: { boardMode: 'matrix' },
+    etag: 'etag-1'
+  });
+  assert.equal(result.success, true, JSON.stringify(result));
+});
+
+test('publishApp: matrix mode rejects when numericY missing', () => {
+  const ctx = loadSystemControllerContext();
+  const result = ctx.publishApp({
+    spreadsheetId: 'ss-1',
+    sheetName: 'フォームの回答 1',
+    columnMapping: { numericX: 2, reason: 4 },
+    displaySettings: { boardMode: 'matrix' },
+    etag: 'etag-1'
+  });
+  assert.equal(result.success, false);
+  assert.match(result.message, /Y軸/);
+});
+
+test('publishApp: numberline mode requires numericX only', () => {
+  const ctx = loadSystemControllerContext();
+  const result = ctx.publishApp({
+    spreadsheetId: 'ss-1',
+    sheetName: 'フォームの回答 1',
+    columnMapping: { numericX: 2, reason: 4 },
+    displaySettings: { boardMode: 'numberline' },
+    etag: 'etag-1'
+  });
+  assert.equal(result.success, true, JSON.stringify(result));
 });
 
 // =====================================================================

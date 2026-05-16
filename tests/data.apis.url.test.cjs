@@ -1057,21 +1057,25 @@ test('setupReactionAndHighlightColumns: "UNDERSTANDING YOUR ANSWER" does NOT cou
   // column already existed, and skipped adding it. processReactionDirect then
   // failed with "リアクション列が見つかりません" because it uses exact match.
   const addedValues = [];
+  const sheetHeaders = ['Q1', 'UNDERSTANDING YOUR ANSWER'];
   const sheet = {
+    // Why getLastColumn / getValues for header re-read: v2760 で lock 取得後に fresh re-read
+    //   する double-add 防止ロジックが入った。test mock も headers を返す必要がある。
+    getLastColumn: () => sheetHeaders.length,
     getRange: () => ({
       setValues: (vals) => { addedValues.push(...vals[0]); },
-      setValue: (v) => { addedValues.push(v); }
+      setValue: (v) => { addedValues.push(v); },
+      getValues: () => [sheetHeaders]
     })
   };
   const ctx = loadDataApisContext({
     openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
     getSheetInfo: () => ({ lastCol: 2, lastRow: 1, headers: [] }),
-    invalidateSheetHeadersCache: () => {}
+    invalidateSheetHeadersCache: () => {},
+    LockService: { getScriptLock: () => ({ tryLock: () => true, releaseLock: () => {} }) }
   });
-  const result = ctx.setupReactionAndHighlightColumns('ss-1', 'Sheet1',
-    ['Q1', 'UNDERSTANDING YOUR ANSWER']
-  );
-  assert.equal(result.success, true);
+  const result = ctx.setupReactionAndHighlightColumns('ss-1', 'Sheet1', sheetHeaders);
+  assert.equal(result.success, true, JSON.stringify(result));
   // All four reaction/highlight columns should be added because the header
   // "UNDERSTANDING YOUR ANSWER" is not a strict match for UNDERSTAND.
   const added = Array.from(addedValues);

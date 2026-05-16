@@ -305,10 +305,23 @@ const VALID_BOARD_MODES = (typeof VALIDATOR_BOARD_MODES !== 'undefined' && Array
   ? VALIDATOR_BOARD_MODES
   : ['auto', 'board', 'numberline', 'matrix', 'wordcloud', 'pie'];
 
+// Why __strictBool: Boolean("false") は truthy 評価で true を返すため、文字列で
+//   永続化された display setting (旧クライアント or migration 経由) が読込時に privacy
+//   regression を引き起こす ("匿名" だったはずのボードが "実名表示" に化ける) 危険があった。
+//   許容: true literal / "true" / "1" / 1 を真とし、それ以外は false に倒す。
+function __strictBool(v) {
+  if (v === true || v === 1) return true;
+  if (typeof v === 'string') {
+    const lower = v.trim().toLowerCase();
+    return lower === 'true' || lower === '1';
+  }
+  return false;
+}
+
 function sanitizeDisplaySettings(displaySettings) {
   const sanitized = {
-    showNames: Boolean(displaySettings.showNames),
-    showReactions: Boolean(displaySettings.showReactions),
+    showNames: __strictBool(displaySettings.showNames),
+    showReactions: __strictBool(displaySettings.showReactions),
     theme: String(displaySettings.theme || 'default').substring(0, SYSTEM_LIMITS.PREVIEW_LENGTH),
     pageSize: Math.min(Math.max(Number(displaySettings.pageSize) || SYSTEM_LIMITS.DEFAULT_PAGE_SIZE, 1), SYSTEM_LIMITS.MAX_PAGE_SIZE)
   };

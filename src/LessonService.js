@@ -270,11 +270,22 @@ function __listLessonsForUser_(userId, options = {}) {
 }
 
 function __deleteLessonRow_(lessonId) {
-  const found = __findLessonById_(lessonId);
-  if (!found) return { success: false, error: 'LESSON_NOT_FOUND' };
-  // Why: SA proxy は deleteRow を持たない。admin は DB シートの editor 共有を受けているので
-  //   SpreadsheetApp 経由で直接削除する。
+  // Why ScriptLock: deleteRow は行 index を shift する。同時に動いている __updateLessonRow_
+  //   は事前に findLessonById_ で取得した rowIndex を保持しているので、その index に対する
+  //   setValues が「別の lesson 行」を書き換える data-loss を起こす。__updateLessonRow_ と
+  //   同じ getScriptLock() で serialize する。
+  const lock = LockService.getScriptLock();
+  let locked = false;
   try {
+    locked = lock.tryLock(5000);
+    if (!locked) {
+      return { success: false, error: 'LOCK_TIMEOUT', message: '別の処理が実行中です。少し待ってから再試行してください。' };
+    }
+
+    const found = __findLessonById_(lessonId);
+    if (!found) return { success: false, error: 'LESSON_NOT_FOUND' };
+    // Why: SA proxy は deleteRow を持たない。admin は DB シートの editor 共有を受けているので
+    //   SpreadsheetApp 経由で直接削除する。
     const dbId = typeof getCachedProperty === 'function' ? getCachedProperty('DATABASE_SPREADSHEET_ID') : null;
     if (!dbId) return { success: false, error: 'DATABASE_NOT_CONFIGURED' };
     const ss = SpreadsheetApp.openById(dbId);
@@ -285,6 +296,10 @@ function __deleteLessonRow_(lessonId) {
   } catch (error) {
     logError_('__deleteLessonRow_', error);
     return { success: false, error: 'DELETE_FAILED', message: error && error.message };
+  } finally {
+    if (locked) {
+      try { lock.releaseLock(); } catch (e) { console.warn('__deleteLessonRow_ releaseLock failed:', e.message); }
+    }
   }
 }
 

@@ -471,7 +471,7 @@ test('duplicateLesson: 他ユーザーのレッスンは複製不可', () => {
   assert.equal(dup.success, false);
 });
 
-test('getKnownClassesForUser: 過去レッスンの classes を unique で集約 (新しい順)', () => {
+test('getKnownClassesForUser: 過去レッスンの classes を unique で集約', () => {
   const { context } = loadLessonContext();
   const a = context.createLessonDraft('u1', 'L1', 'doutoku-3phase');
   context.updateLessonDraft('u1', a.data.lesson.lessonId, 'classes', ['5-1', '5-2']);
@@ -480,7 +480,10 @@ test('getKnownClassesForUser: 過去レッスンの classes を unique で集約
 
   const res = context.getKnownClassesForUser('u1');
   assert.equal(res.success, true, JSON.stringify(res));
-  // dedup + 新しい (= b は後で作られたので createdAt 降順で先) → 6-3, 5-2 が先頭
+  // Why sort(): test 内で createLessonDraft が同一 ms に呼ばれると createdAt が同値となり、
+  //   「新しい順」の決定はできない (実装の sort は stable で挿入順を維持するが、それは
+  //   "新しい順" を保証しない)。dedup と set-membership のみ検証。
+  //   順序の本番動作は __listLessonsForUser_ の sort に任せる (異なる ms なら正しく動く)。
   const got = Array.from(res.data.classes).slice().sort();
   assert.deepEqual(got, ['5-1', '5-2', '6-3']);
 });

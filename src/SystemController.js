@@ -722,12 +722,26 @@ function publishApp(publishConfig) {
     }
 
     if (Object.keys(safePublishConfig.columnMapping).length === 0) {
-      return { success: false, message: '列マッピングが空です。少なくとも回答列を設定してください' };
+      return { success: false, message: '列マッピングが空です。少なくとも回答列または数値列を設定してください' };
     }
 
-    const answerColumn = safePublishConfig.columnMapping.answer;
-    if (answerColumn === undefined || answerColumn === null || (typeof answerColumn === 'number' && answerColumn < 0)) {
-      return { success: false, message: '回答列（answer）が設定されていません' };
+    // matrix/numberline モードでは answer は numericX を兼ねる (AdminPanel.js.html
+    // getColumnMapping が自動的に answer=numericX をセット)。ここで answer のみ厳格に
+    // 要求すると matrix/numberline ユーザーの publish が壊れる (Edge case audit #1)。
+    // - matrix / numberline: numericX 必須 (Y は matrix のみ必須)
+    // - それ以外: answer 必須
+    const boardMode = (safePublishConfig.displaySettings && safePublishConfig.displaySettings.boardMode)
+      || (currentConfig.displaySettings && currentConfig.displaySettings.boardMode)
+      || 'auto';
+    const colMap = safePublishConfig.columnMapping;
+    const hasValidIndex = (k) => typeof colMap[k] === 'number' && colMap[k] >= 0;
+    if (boardMode === 'matrix') {
+      if (!hasValidIndex('numericX')) return { success: false, message: 'X軸の数値列が設定されていません' };
+      if (!hasValidIndex('numericY')) return { success: false, message: 'Y軸の数値列が設定されていません' };
+    } else if (boardMode === 'numberline') {
+      if (!hasValidIndex('numericX')) return { success: false, message: 'X軸の数値列が設定されていません' };
+    } else {
+      if (!hasValidIndex('answer')) return { success: false, message: 'メイン質問列が設定されていません' };
     }
 
     if (currentConfig.etag && !safePublishConfig.etag) {

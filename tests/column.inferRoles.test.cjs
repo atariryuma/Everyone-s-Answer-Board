@@ -154,13 +154,21 @@ test('inferColumnRoles: existingMapping fixes role to specified index (confidenc
 // L3: BoardMode ヒント
 // =====================================================================
 
-test('inferColumnRoles: L3 — pie mode boosts answer role', () => {
+test('inferColumnRoles: L3 — pie mode boosts answer score (measurable diff vs board mode)', () => {
   const ctx = loadCtx();
-  const headers = ['ts', '回答'];
-  const r = ctx.inferColumnRoles(headers, [], { boardMode: 'pie' });
-  assert.equal(r.mapping.answer, 1);
-  // pie mode で +5 bias → 95 cap (元 95 で同じだが、threshold 比較で違いが出るケースで意味)
-  assert.ok(r.confidence.answer >= 90);
+  // L1 で 87 点 (questionPattern 一致だが exact/keyword は外れる) のヘッダーを使い、
+  // L3 boost +5 が実際に反映されているか確認する。
+  // 旧テストは '回答' (L1=95 exact match で cap に張り付き) で L3 の +5 が打ち消されていた。
+  const headers = ['ts', '実験について気づいたことを書きましょう'];
+  const pieResult = ctx.inferColumnRoles(headers, [], { boardMode: 'pie' });
+  const boardResult = ctx.inferColumnRoles(headers, [], { boardMode: 'board' });
+  assert.equal(pieResult.mapping.answer, 1);
+  assert.equal(boardResult.mapping.answer, 1);
+  // pie で +5 boost、board で +0 → pie の confidence は厳密に高いはず
+  assert.ok(
+    pieResult.confidence.answer > boardResult.confidence.answer,
+    `pie (${pieResult.confidence.answer}) should be > board (${boardResult.confidence.answer})`
+  );
 });
 
 // =====================================================================

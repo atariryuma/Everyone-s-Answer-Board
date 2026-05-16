@@ -41,21 +41,22 @@ test('detectNumericScaleColumns: detects a 1-5 linear scale column', () => {
 
 test('detectNumericScaleColumns: detects two scale columns for matrix mode (sorted by confidence)', () => {
   const ctx = loadCtx();
-  const headers = ['ts', '効率', '倫理'];
-  const sample = [
-    ['2026', 1, 5],
-    ['2026', 2, 4],
-    ['2026', 3, 3],
-    ['2026', 4, 2],
-    ['2026', 5, 1],
-    ['2026', 1, 1]
-  ];
+  // 1 列目はサンプル多数 (1-5 frequent boundary)、2 列目はサンプル少なめ。
+  // confidence: 多サンプル + 1-5 perfect boundary > 少サンプル → sorted で多サンプル列が先頭。
+  const headers = ['ts', 'multiSampleA', 'sparseB'];
+  const sample = [];
+  for (let i = 0; i < 20; i++) sample.push(['2026', (i % 5) + 1, null]);
+  sample.push(['2026', null, 1]);
+  sample.push(['2026', null, 5]);
+
   const result = ctx.detectNumericScaleColumns(headers, sample);
   assert.equal(result.length, 2);
-  // どちらも 1-5 で同等。VM realm 越境のため deepEqual ではなく値比較。
-  const indices = result.map(r => r.index).sort((a, b) => a - b);
-  assert.equal(indices[0], 1);
-  assert.equal(indices[1], 2);
+  // 確実な「multiSample が先頭、sparse が後ろ」順を直接確認 (sort で潰さない)。
+  // 旧テストは indices.sort() していて順序回帰を検出できなかった (test quality audit #14)。
+  assert.equal(result[0].index, 1, 'index 1 (multiSample) should be first by confidence');
+  assert.equal(result[1].index, 2, 'index 2 (sparse) should be second by confidence');
+  assert.ok(result[0].confidence > result[1].confidence,
+    `confidence descending: ${result[0].confidence} > ${result[1].confidence}`);
 });
 
 test('detectNumericScaleColumns: skips system columns (timestamp, reactions, highlight)', () => {

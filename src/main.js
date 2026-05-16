@@ -259,6 +259,19 @@ function handleViewMode_(params, currentEmail) {
   const isOwnBoard = currentEmail === targetUser.userEmail;
   const isPublished = Boolean(config.isPublished);
 
+  // Why isActive check: 管理者がユーザーを「無効化」(isActive=false) しても、本人の
+  //   board が isPublished=true のままなら domain user は依然として viewable だった
+  //   (Edge case audit #8 / handleViewMode_ ACL gap)。disable は「公開を強制終了する」
+  //   意図なので、isActive=false は admin/owner 以外には未公開として扱う。
+  if (targetUser.isActive === false && !isAdminUser && !isOwnBoard) {
+    const template = HtmlService.createTemplateFromFile('Unpublished.html');
+    template.isEditor = false;
+    template.editorName = '';
+    template.userId = targetUserId;
+    template.boardUrl = '';
+    return template.evaluate().setTitle('未公開');
+  }
+
   if (!isPublished) {
     const template = HtmlService.createTemplateFromFile('Unpublished.html');
     template.isEditor = isAdminUser || isOwnBoard;

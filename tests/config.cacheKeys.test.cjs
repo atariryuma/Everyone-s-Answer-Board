@@ -86,18 +86,28 @@ test('clearConfigCache: removes 5 keys for user', () => {
 
 // --- sanitizeDisplaySettings ---
 
-test('sanitizeDisplaySettings: coerces booleans and enforces page size bounds', () => {
+test('sanitizeDisplaySettings: coerces booleans (strict) and enforces page size bounds', () => {
+  // Why strict (v2760): Boolean('false') は truthy 評価で true を返し、privacy regression
+  //   ("匿名" boardが "実名表示" 化け) を起こす。__strictBool は true/"true"/"1"/1 のみ真。
   const { context } = loadConfigContext();
   const result = context.sanitizeDisplaySettings({
-    showNames: 'truthy-string',
-    showReactions: 0,
+    showNames: 'true',
+    showReactions: 'false',
     theme: 'dark',
     pageSize: 200
   });
   assert.equal(result.showNames, true);
-  assert.equal(result.showReactions, false);
+  assert.equal(result.showReactions, false, 'string "false" must coerce to false (privacy)');
   assert.equal(result.theme, 'dark');
   assert.equal(result.pageSize, 100); // MAX_PAGE_SIZE cap
+});
+
+test('sanitizeDisplaySettings: privacy-safe — "false" string does NOT flip showNames to true', () => {
+  // Edge case audit #5 (v2760).
+  const { context } = loadConfigContext();
+  const result = context.sanitizeDisplaySettings({ showNames: 'false', showReactions: 'no' });
+  assert.equal(result.showNames, false);
+  assert.equal(result.showReactions, false);
 });
 
 test('sanitizeDisplaySettings: clamps pageSize below minimum to 1', () => {

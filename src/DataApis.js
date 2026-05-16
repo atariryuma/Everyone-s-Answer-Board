@@ -1775,6 +1775,24 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
       };
     }
 
+    // Why ScriptLock: 2 つの concurrent getColumnAnalysis 呼び出しが同じ「missing」を見て
+    //   両方とも provision を試みると、両方が `lastCol+1` の同一 startCol で setValues を
+    //   実行し片方が上書きされる (UNDERSTAND/LIKE/CURIOUS が 4 列なのに 5+4=9 列追加される
+    //   等の data-loss / 順序ずれ)。script-wide で serialize。
+    const lock = LockService.getScriptLock();
+    let locked = false;
+    try {
+      locked = lock.tryLock(5000);
+      if (!locked) {
+        // 失敗時は「短時間待ってリトライ」を促す。教師が「再度試す」が一般的。
+        return {
+          success: false,
+          error: 'LOCK_TIMEOUT',
+          message: 'リアクション列の追加処理が並行実行中です。少し待ってから再度お試しください。',
+          columnsAdded: []
+        };
+      }
+
     // Why openSpreadsheet (not bare SpreadsheetApp.openById): DatabaseCore.openSpreadsheet
     //   は circuit breaker + service account fallback + retry を一括で提供する。直接呼びで
     //   この envelope をバイパスすると、429 storm 時に簡単にロックアウトを引き起こす。
@@ -1789,6 +1807,20 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
       throw new Error(`Sheet '${sheetName}' not found`);
     }
 
+    // Lock 取得後に「本当に missing か」を fresh で再確認。先行 thread がすでに append
+    // 済みなら今回は no-op で返す (double-add 防止)。
+    const freshHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0] || [];
+    const freshNormalized = freshHeaders.map(h => String(h || '').toUpperCase().trim());
+    const reallyMissing = columnsToAdd.filter(c => !freshNormalized.includes(c));
+    if (reallyMissing.length === 0) {
+      return {
+        success: true,
+        columnsAdded: [],
+        totalColumns: requiredColumns.length,
+        alreadyExists: requiredColumns.length
+      };
+    }
+
     const columnsAdded = [];
 
     {
@@ -1797,13 +1829,13 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
       try {
         // バッチ処理: 全カラムを一度に追加（パフォーマンス最適化）
         const startCol = lastCol + 1;
-        const values = [columnsToAdd]; // 2D配列（1行 × n列）
-        sheet.getRange(1, startCol, 1, columnsToAdd.length).setValues(values);
-        columnsAdded.push(...columnsToAdd);
+        const values = [reallyMissing]; // 2D配列（1行 × n列）
+        sheet.getRange(1, startCol, 1, reallyMissing.length).setValues(values);
+        columnsAdded.push(...reallyMissing);
       } catch (colError) {
         console.error(`setupReactionAndHighlightColumns: Failed to add columns:`, colError.message);
         // フォールバック: 個別追加を試行
-        columnsToAdd.forEach((columnName, index) => {
+        reallyMissing.forEach((columnName, index) => {
           try {
             sheet.getRange(1, lastCol + index + 1).setValue(columnName);
             columnsAdded.push(columnName);
@@ -1822,9 +1854,14 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
       success: true,
       columnsAdded,
       totalColumns: requiredColumns.length,
-      alreadyExists: requiredColumns.length - columnsToAdd.length
+      alreadyExists: requiredColumns.length - reallyMissing.length
     };
 
+    } finally {
+      if (locked) {
+        try { lock.releaseLock(); } catch (e) { console.warn('setupReactionAndHighlightColumns releaseLock failed:', e.message); }
+      }
+    }
   } catch (error) {
     logError_('setupReactionAndHighlightColumns', error);
     return {
