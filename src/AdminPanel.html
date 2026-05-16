@@ -390,16 +390,12 @@
           </h2>
         </div>
 
+        <!-- 列設定 dropdowns. label は JS の applyColumnModeLabels が一元的に上書きするので
+             ここでは <label> を空にし、初期ハイドレ前のチラ見えを防止。
+             matrix/numberline で answer-column-row, pie で reason-column-row が hide される。 -->
         <div class="column-dropdowns space-y-4 mb-4">
-          <!-- メイン質問列選択。「回答列」ではなく質問ベースのラベルを使う:
-               実際のフォームは複数質問のケースが多く、機械的な answer/reason マッピングが
-               フィットしないため、教師にとってわかりやすい表現にする。
-               matrix/numberline モードでは X軸の数値列が answer を兼ねるので隠す。 -->
           <div class="form-group" id="answer-column-row">
-            <label for="answer-column-select" class="block text-sm font-medium text-gray-300 mb-2">
-              💬 メイン質問列:
-              <span class="text-xs text-gray-400 ml-2">(カードに大きく表示する列／集計の対象列)</span>
-            </label>
+            <label for="answer-column-select" class="block text-sm font-medium text-gray-300 mb-2"></label>
             <select id="answer-column-select" class="modern-select" data-autosave>
               <option value="">選択してください...</option>
             </select>
@@ -408,12 +404,8 @@
             </div>
           </div>
 
-          <!-- 補助質問列選択 (旧: 理由列). pie モードでは非表示 (集計に reason を使わないため) -->
           <div class="form-group" id="reason-column-row">
-            <label for="reason-column-select" class="block text-sm font-medium text-gray-300 mb-2">
-              📋 補助質問列:
-              <span class="text-xs text-gray-400 ml-2">(カード下部に小さく表示する列・任意)</span>
-            </label>
+            <label for="reason-column-select" class="block text-sm font-medium text-gray-300 mb-2"></label>
             <select id="reason-column-select" class="modern-select" data-autosave>
               <option value="">選択してください...</option>
             </select>
@@ -422,12 +414,8 @@
             </div>
           </div>
 
-          <!-- クラス列選択 -->
-          <div class="form-group">
-            <label for="class-column-select" class="block text-sm font-medium text-gray-300 mb-2">
-              🏫 クラス列:
-              <span class="text-xs text-gray-400 ml-2">(所属クラス情報が入っている列)</span>
-            </label>
+          <div class="form-group" id="class-column-row">
+            <label for="class-column-select" class="block text-sm font-medium text-gray-300 mb-2"></label>
             <select id="class-column-select" class="modern-select" data-autosave>
               <option value="">選択してください...</option>
             </select>
@@ -436,12 +424,8 @@
             </div>
           </div>
 
-          <!-- 名前列選択 -->
-          <div class="form-group">
-            <label for="name-column-select" class="block text-sm font-medium text-gray-300 mb-2">
-              👤 名前列:
-              <span class="text-xs text-gray-400 ml-2">(回答者の名前が入っている列)</span>
-            </label>
+          <div class="form-group" id="name-column-row">
+            <label for="name-column-select" class="block text-sm font-medium text-gray-300 mb-2"></label>
             <select id="name-column-select" class="modern-select" data-autosave>
               <option value="">選択してください...</option>
             </select>
@@ -450,11 +434,9 @@
             </div>
           </div>
 
-          <!-- 数値列の明示マッピング. matrix/numberline/auto で表示。
-               Why ② 列設定に昇格: matrix/numberline モードでは必須なのに、
-               以前は ③「表示と公開」の <details> の中に埋もれていた (教師が見落とす)。 -->
+          <!-- 数値列の明示マッピング (matrix/numberline/auto で表示).
+               以前は ③「表示と公開」<details> の中に埋もれて教師が見落としていたため ② に昇格。 -->
           <div id="numeric-mapping-container" class="hidden space-y-4 pt-3 border-t border-gray-700 mt-2">
-            <!-- 検出された数値列の情報パネル -->
             <div id="numeric-candidates-info" class="hidden p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
               <div class="flex items-center gap-2 mb-1">
                 <span class="text-blue-400">🔢</span>
@@ -462,21 +444,14 @@
               </div>
               <div id="numeric-candidates-list" class="text-xs text-gray-300 space-y-1"></div>
             </div>
-
-            <div class="form-group">
-              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-x-column-select">
-                📏 X軸の数値列:
-                <span class="text-xs text-gray-400 ml-2">(数直線・散布図で必須)</span>
-              </label>
+            <div class="form-group" id="numericX-column-row">
+              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-x-column-select"></label>
               <select id="numeric-x-column-select" class="modern-select" data-autosave>
                 <option value="">（自動判定）</option>
               </select>
             </div>
             <div id="numeric-y-mapping-row" class="form-group hidden">
-              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-y-column-select">
-                📐 Y軸の数値列:
-                <span class="text-xs text-gray-400 ml-2">(散布図で必須)</span>
-              </label>
+              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-y-column-select"></label>
               <select id="numeric-y-column-select" class="modern-select" data-autosave>
                 <option value="">（未使用）</option>
               </select>
@@ -487,7 +462,8 @@
 
         <!-- 設定完了状況表示 + 再推定 (inline) -->
         <div class="text-sm text-gray-400 mb-4 flex items-center justify-between">
-          <span id="completion-status">⚪ 設定状況: 0/4列完了</span>
+          <!-- updateCompletionStatus が mode 別に上書きする (matrix=2必須, pie=1必須 等) -->
+          <span id="completion-status">⚪ 設定状況: 読み込み中...</span>
           <button id="ai-analyze-btn" type="button"
             class="text-xs text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
             title="列マッピングを再推定する（フォーム接続後に有効）">

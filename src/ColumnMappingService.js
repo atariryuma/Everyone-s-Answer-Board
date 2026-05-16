@@ -17,9 +17,7 @@
  *   performIntegratedColumnDiagnostics(headers, options)  ← getColumnAnalysis 用
  *   detectNumericScaleColumns(headers, sampleData)        ← 線形尺度のみ (互換)
  *   resolveColumnIndex(headers, fieldType, mapping)       ← 行処理 hot path (DataService)
- *   filterSystemColumns(headers)                          ← UI / テスト互換
- *   generateRecommendedMapping(headers, options)          ← テスト互換
- *   analyzeFieldRelationships / detectColumn / validateFieldOrderLogic ← deprecated 互換
+ *   filterSystemColumns(headers)                          ← resolveColumnIndex 内部 + テスト
  */
 
 /* global normalizeHeader, logError_ */
@@ -462,144 +460,29 @@ function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}
 }
 
 /**
- * @deprecated inferColumnRoles に統合。テスト互換のため最小実装を残置。
- */
-function detectColumn(headers, fieldType, _options = {}) {
-  if (!__ROLE_PATTERNS[fieldType]) return { index: -1, confidence: 0, method: 'unknown_field' };
-  let bestIdx = -1, bestScore = 0;
-  for (let i = 0; i < headers.length; i++) {
-    const score = __headerPatternScore(headers[i], fieldType);
-    if (score > bestScore) { bestScore = score; bestIdx = i; }
-  }
-  return bestIdx === -1
-    ? { index: -1, confidence: 0, method: 'no_match' }
-    : { index: bestIdx, confidence: Math.min(bestScore, 95), method: 'pattern_match_with_logic' };
-}
-
-/**
- * @deprecated inferColumnRoles に統合。テスト互換のため候補抽出のみ実装。
- */
-function analyzeFieldRelationships(headers) {
-  const rels = { answerCandidates: [], reasonCandidates: [], answerReasonPairs: [] };
-  if (!Array.isArray(headers)) return rels;
-  headers.forEach((header, index) => {
-    if (!header || typeof header !== 'string') return;
-    const a = __headerPatternScore(header, 'answer');
-    if (a > 60) rels.answerCandidates.push({ index, header, score: a });
-    const r = __headerPatternScore(header, 'reason');
-    if (r > 60) rels.reasonCandidates.push({ index, header, score: r });
-  });
-  rels.answerCandidates.forEach(a => {
-    rels.reasonCandidates.forEach(r => {
-      if (a.index < r.index) {
-        rels.answerReasonPairs.push({
-          answerIndex: a.index, reasonIndex: r.index,
-          logicalOrder: true, confidence: (a.score + r.score) / 2
-        });
-      }
-    });
-  });
-  return rels;
-}
-
-/**
- * @deprecated inferColumnRoles 内の constraint 解決で代替。テスト互換のため残置。
- */
-function validateFieldOrderLogic(mapping, confidence, headers) {
-  const validatedMapping = { ...mapping };
-  const validatedConfidence = { ...confidence };
-  const validation = { checks: [], corrections: [], warnings: [] };
-  if (validatedMapping.answer === undefined || validatedMapping.reason === undefined) {
-    return { mapping: validatedMapping, confidence: validatedConfidence, validation };
-  }
-
-  const a = validatedMapping.answer;
-  const r = validatedMapping.reason;
-  validation.checks.push({ rule: 'answer_before_reason', answerIndex: a, reasonIndex: r, logical: a < r });
-
-  if (r >= a) {
-    validation.checks[validation.checks.length - 1].status = 'passed';
-    return { mapping: validatedMapping, confidence: validatedConfidence, validation };
-  }
-
-  const aConf = validatedConfidence.answer || 0;
-  const rConf = validatedConfidence.reason || 0;
-  if (rConf < aConf - 10) {
-    delete validatedMapping.reason;
-    delete validatedConfidence.reason;
-    validation.corrections.push({
-      action: 'removed_illogical_reason', field: 'reason',
-      index: r, header: headers[r],
-      reason: 'Reason field appears before answer field with low confidence'
-    });
-  } else if (aConf < rConf - 10) {
-    const answerAsReasonScore = __headerPatternScore(headers[a], 'reason');
-    if (answerAsReasonScore > aConf - 20) {
-      validation.warnings.push({
-        warning: 'potential_field_swap',
-        message: 'Answer field may actually be a reason field',
-        answerIndex: a, reasonIndex: r, suggestion: 'Manual review recommended'
-      });
-    }
-  } else {
-    validation.corrections.push({
-      action: 'preserved_logical_order',
-      message: 'Maintained answer before reason despite close confidence scores',
-      answerIndex: a, reasonIndex: r
-    });
-  }
-  return { mapping: validatedMapping, confidence: validatedConfidence, validation };
-}
-
-/**
- * 互換: numericX/Y を含まない「主役割のみ」マッピングを返す。
- */
-function generateRecommendedMapping(headers, options = {}) {
-  try {
-    const fields = options.fields || __DEFAULT_ROLES;
-    const inferred = inferColumnRoles(headers, options.sampleData || [], {
-      fields,
-      boardMode: options.boardMode || 'auto',
-      includeNumericScale: false
-    });
-    const recommendedMapping = {};
-    const conf = {};
-    for (const r of fields) {
-      if (typeof inferred.mapping[r] === 'number') {
-        recommendedMapping[r] = inferred.mapping[r];
-        conf[r] = inferred.confidence[r];
-      }
-    }
-    const resolvedCount = Object.keys(recommendedMapping).length;
-    const overallScore = resolvedCount > 0
-      ? Math.round(Object.values(conf).reduce((s, c) => s + c, 0) / resolvedCount)
-      : 0;
-    return {
-      recommendedMapping,
-      confidence: conf,
-      analysis: { resolvedFields: resolvedCount, totalFields: fields.length, overallScore },
-      success: true
-    };
-  } catch (error) {
-    if (typeof logError_ === 'function') logError_('generateRecommendedMapping', error);
-    return { recommendedMapping: {}, confidence: {}, analysis: { error: error.message }, success: false };
-  }
-}
-
-/**
- * getColumnAnalysis から呼ばれる統合分析。numericX/Y は recommendedMapping に
- * 含めず、numericScaleCandidates として並列に返す (呼び元で別途マージ可能)。
+ * getColumnAnalysis から呼ばれる統合分析。
+ *
+ * @param {Array<string>} originalHeaders
+ * @param {Object} [options]
+ * @param {Array<Array>} [options.sampleData]
+ * @param {string} [options.boardMode]
+ * @param {boolean} [options.includeNumericScale=false] - true で numericX/Y も
+ *        recommendedMapping に含める (旧 API 互換のためデフォルト false)。
  */
 function performIntegratedColumnDiagnostics(originalHeaders, options = {}) {
   try {
+    const includeNumericScale = options.includeNumericScale === true;
     const inferred = inferColumnRoles(originalHeaders, options.sampleData || [], {
       fields: options.fields || __DEFAULT_ROLES,
       boardMode: options.boardMode || 'auto',
-      includeNumericScale: false
+      includeNumericScale
     });
     const recommendedMapping = {};
     const conf = {};
-    for (const r of __DEFAULT_ROLES) {
+    const keys = includeNumericScale
+      ? [...__DEFAULT_ROLES, 'numericX', 'numericY']
+      : __DEFAULT_ROLES;
+    for (const r of keys) {
       if (typeof inferred.mapping[r] === 'number') {
         recommendedMapping[r] = inferred.mapping[r];
         conf[r] = inferred.confidence[r];

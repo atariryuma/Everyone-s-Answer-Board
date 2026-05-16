@@ -1705,25 +1705,17 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
     }
 
     const boardMode = options.boardMode || 'auto';
-    const diagnostics = performIntegratedColumnDiagnostics(headers, { sampleData, boardMode });
-
-    // Why: 線形尺度（Forms「リニアスケール」）列が見つかれば、numericX/numericY として
-    //      自動的に mapping に含める。教師は明示設定なしで M1/M2 モードが使えるようになる。
-    //      欠落・低信頼の場合は何も設定せず、auto モードは 'board' にフォールバックする。
+    // includeNumericScale: true で線形尺度 (Forms「リニアスケール」) を mapping に取り込む。
+    // 教師は明示設定なしで M1/M2 モードが使える。低信頼/欠落の場合は mapping に numericX/Y が
+    // 入らないだけで auto モードは 'board' に fallback。
+    const diagnostics = performIntegratedColumnDiagnostics(headers, {
+      sampleData, boardMode, includeNumericScale: true
+    });
     const mergedMapping = { ...(diagnostics.recommendedMapping || {}) };
     const mergedConfidence = { ...(diagnostics.confidence || {}) };
     const numericCandidates = Array.isArray(diagnostics.numericScaleCandidates)
       ? diagnostics.numericScaleCandidates
       : [];
-    const acceptedScales = numericCandidates.filter(c => c && typeof c.index === 'number' && c.confidence >= 80);
-    if (acceptedScales.length >= 1 && typeof mergedMapping.numericX !== 'number') {
-      mergedMapping.numericX = acceptedScales[0].index;
-      mergedConfidence.numericX = acceptedScales[0].confidence;
-    }
-    if (acceptedScales.length >= 2 && typeof mergedMapping.numericY !== 'number') {
-      mergedMapping.numericY = acceptedScales[1].index;
-      mergedConfidence.numericY = acceptedScales[1].confidence;
-    }
 
     let resultHeaders = headers;
     let columnsAdded = [];
@@ -1763,6 +1755,26 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
  */
 function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeaders = []) {
   try {
+    const requiredColumns = ['UNDERSTAND', 'LIKE', 'CURIOUS', 'HIGHLIGHT'];
+
+    // Why strict equality: processReactionDirect looks up reaction columns with
+    //   `header.trim() === 'UNDERSTAND'` etc. If this existence check is looser
+    //   (e.g. substring), the two sides disagree and reactions break silently.
+    const currentHeadersNormalized = currentHeaders.map(h => String(h || '').toUpperCase().trim());
+    const columnsToAdd = requiredColumns.filter(c => !currentHeadersNormalized.includes(c));
+
+    // Why short-circuit before open: getColumnAnalysis 開示時はすでに spreadsheet を 1 回開いている。
+    //   columnsToAdd=0 (リアクション列が全て存在する典型ケース) なら、2 回目の open は無駄。
+    //   429 リスクと ~200-500ms の往復を回避する。
+    if (columnsToAdd.length === 0) {
+      return {
+        success: true,
+        columnsAdded: [],
+        totalColumns: requiredColumns.length,
+        alreadyExists: requiredColumns.length
+      };
+    }
+
     // Why openSpreadsheet (not bare SpreadsheetApp.openById): DatabaseCore.openSpreadsheet
     //   は circuit breaker + service account fallback + retry を一括で提供する。直接呼びで
     //   この envelope をバイパスすると、429 storm 時に簡単にロックアウトを引き起こす。
@@ -1777,30 +1789,9 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
       throw new Error(`Sheet '${sheetName}' not found`);
     }
 
-    const requiredColumns = [
-      'UNDERSTAND',
-      'LIKE',
-      'CURIOUS',
-      'HIGHLIGHT'
-    ];
-
-    const columnsToAdd = [];
-    // Why strict equality: processReactionDirect looks up reaction columns with
-    //   `header.trim() === 'UNDERSTAND'` etc. If this existence check is looser
-    //   (e.g. substring), the two sides disagree and reactions break silently.
-    const currentHeadersNormalized = currentHeaders.map(h => String(h || '').toUpperCase().trim());
-
-    requiredColumns.forEach(columnName => {
-      const exists = currentHeadersNormalized.includes(columnName);
-
-      if (!exists) {
-        columnsToAdd.push(columnName);
-      }
-    });
-
     const columnsAdded = [];
 
-    if (columnsToAdd.length > 0) {
+    {
       const { lastCol } = getSheetInfo(sheet);
 
       try {

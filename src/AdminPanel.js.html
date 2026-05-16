@@ -882,26 +882,27 @@
       if (el) el.classList.toggle('hidden', !on);
     };
 
-    const isViz = mode === 'numberline' || mode === 'matrix' || mode === 'auto';
     const isMatrix = mode === 'matrix';
-    const hasAxis = mode === 'numberline' || mode === 'matrix' || mode === 'auto';
-    // matrix / numberline では X軸の数値列 = メイン質問列 (同じ列の数値表現と文字表現)。
-    // dropdown を 2 つ見せると教師が「同じ列を 2 回設定？」と混乱するので answer を隠す。
-    // 保存時に getColumnMapping が numericX を answer にコピーする。
-    const hideAnswerDropdown = mode === 'matrix' || mode === 'numberline';
+    const isViz = isMatrix || mode === 'numberline' || mode === 'auto';
+    const config = COLUMN_MODE_CONFIG[mode] || COLUMN_MODE_CONFIG.auto;
 
-    show('answer-column-row', !hideAnswerDropdown);
-    show('reason-column-row', mode !== 'pie');
-    show('numeric-mapping-container', isViz);
+    // 列 row の表示/非表示は COLUMN_MODE_CONFIG[mode] の key 有無で完全駆動。
+    // 例: pie は { answer, class, name } のみ → reason / numericX/Y を hide。
+    //     matrix は { numericX, numericY, reason, class, name } → answer を hide。
+    Object.keys(COLUMN_SELECT_IDS).forEach(key => {
+      show(`${key}-column-row`, !!config[key]);
+    });
+
+    // 数値列まわりは numericX の row 制御に加えコンテナ自体も切替 (区切り線 + 検出パネル含む)
+    show('numeric-mapping-container', !!config.numericX || !!config.numericY);
+    // 軸ラベル / 象限ラベル / 揺らぎ追跡 = 表示モード固有のサブ設定
     show('axis-labels-container', isViz);
     show('numeric-y-mapping-row', isMatrix || mode === 'auto');
     show('y-axis-label-row', isMatrix);
     show('quadrant-labels-container', isMatrix);
-    show('allow-resubmit-row', hasAxis);
+    show('allow-resubmit-row', isViz);
 
-    // ラベル + 必須/任意 をモード別に反映
     applyColumnModeLabels(mode);
-    // 完了カウンタも mode 連動 (matrix=必須 2/2 等)
     if (typeof updateCompletionStatus === 'function') {
       try { updateCompletionStatus(); } catch (_) {}
     }
@@ -1803,32 +1804,33 @@
 
   /**
    * 🔍 分析結果品質検証
+   *
+   * Why mode-aware: 現在の表示モード (COLUMN_MODE_CONFIG) から「必須列」を抽出する。
+   *   matrix なら numericX/Y、pie なら answer のみ、と動的に変化させる。
+   *   旧コード ['answer','name','class'] は board モード前提で他モードと矛盾していた。
    */
   function validateAnalysisResult(result) {
     if (!result || !result.success) {
       return { isValid: false, reason: 'API呼び出し失敗' };
     }
-
     const mapping = result.mapping || {};
     const confidence = result.confidence || {};
+    const mode = (document.getElementById('board-mode-select') || {}).value || 'auto';
+    const cfg = COLUMN_MODE_CONFIG[mode] || COLUMN_MODE_CONFIG.auto;
+    const requiredFields = Object.keys(cfg).filter(k => cfg[k].required);
 
-    const requiredFields = ['answer', 'name', 'class'];
     const detectedCount = requiredFields.filter(field =>
       mapping[field] !== undefined && confidence[field] > 30
     ).length;
-
     const avgConfidence = Object.values(confidence).length > 0
       ? Object.values(confidence).reduce((sum, c) => sum + c, 0) / Object.values(confidence).length
       : 0;
 
-    const minDetectedFields = 2; // 最低2フィールド検出
-    const minAvgConfidence = 40; // 平均40%以上
-
-    const isValid = detectedCount >= minDetectedFields && avgConfidence >= minAvgConfidence;
+    const isValid = detectedCount >= requiredFields.length && avgConfidence >= 40;
 
     return {
       isValid,
-      reason: !isValid ? `検出フィールド不足: ${detectedCount}/${requiredFields.length}, 平均信頼度: ${avgConfidence.toFixed(1)}%` : 'OK',
+      reason: !isValid ? `必須列検出: ${detectedCount}/${requiredFields.length}, 平均信頼度: ${avgConfidence.toFixed(1)}%` : 'OK',
       detectedCount,
       avgConfidence
     };
@@ -2170,6 +2172,19 @@
     numericX: 'numeric-x-column-select',
     numericY: 'numeric-y-column-select'
   };
+
+  // 列 dropdown 要素を一括取得する単一の入口。
+  // Why: 旧コードでは {answer:..., reason:...} の literal を 4 箇所で書いており、
+  //      numericX/Y を忘れる (resetToAIDetection が軸を reset しないバグ等) ことが起きた。
+  //      COLUMN_SELECT_IDS を唯一の出典として全部の dropdown を取得する。
+  function __getAllColumnDropdowns() {
+    const result = {};
+    Object.keys(COLUMN_SELECT_IDS).forEach(key => {
+      const el = document.getElementById(COLUMN_SELECT_IDS[key]);
+      if (el) result[key] = el;
+    });
+    return result;
+  }
   const COLUMN_MODE_CONFIG = {
     board: {
       answer:   { label: '💬 メイン質問列', hint: 'カードに大きく表示する列／集計の対象列', required: true },
@@ -2266,20 +2281,9 @@
         confidence = {};
       }
 
-      const dropdowns = {
-        answer: document.getElementById('answer-column-select'),
-        reason: document.getElementById('reason-column-select'),
-        class: document.getElementById('class-column-select'),
-        name: document.getElementById('name-column-select'),
-        // Why: 可視化モード（M1/M2）用の数値列セレクトも同じ headers から構築する。
-        //      DOM 不在のテンプレートでも null safe（forEach 内で skip）。
-        numericX: document.getElementById('numeric-x-column-select'),
-        numericY: document.getElementById('numeric-y-column-select'),
-      };
-
-      const missingDropdowns = Object.keys(dropdowns).filter((key) => !dropdowns[key]);
-      if (missingDropdowns.length > 0) {
-      }
+      // Why: 可視化モード（M1/M2）用の数値列セレクトも同じ headers から構築する。
+      //      DOM 不在のテンプレートでも null safe（forEach 内で skip）。
+      const dropdowns = __getAllColumnDropdowns();
 
       // Why: numericX/Y は「（自動判定）」を空 value のプレースホルダーとして使う。
       //      他の必須列は「選択してください...」表示で UX を分ける。
@@ -2369,103 +2373,57 @@
     panel.classList.remove('hidden');
   }
 
-  /**
-   * シンプル競合チェック
-   * @param {Object} mapping - 自動推定マッピング
-   * @param {Object} dropdowns - ドロップダウン要素
-   * @returns {boolean} 競合があるかどうか
-   */
-  function checkSimpleConflicts(mapping, dropdowns) {
-    if (!mapping || !dropdowns) return false;
-
-    const actualMapping = mapping?.mapping || mapping || {};
-
-    for (const fieldType of Object.keys(dropdowns)) {
-      const dropdown = dropdowns[fieldType];
-      if (!dropdown) continue;
-
-      const hasAI = actualMapping[fieldType] !== undefined;
-      const hasManual = dropdown.value && dropdown.value !== '';
-
-      if (hasAI && hasManual && actualMapping[fieldType] !== parseInt(dropdown.value)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  // backend のフィールド名 (内部 key)。columnType (UI 上の dropdown id 接頭辞) と 1:1。
-  const AI_MAPPING_KEYS_BY_COLUMN = {
-    answer: 'answer', reason: 'reason', class: 'class', name: 'name',
-    timestamp: 'timestamp', email: 'email',
-    understand: 'understand', like: 'like', curious: 'curious',
-    highlight: 'HIGHLIGHT'
-  };
   // 列ごとの「高信頼度」閾値。種別ごとにマッチ特性が異なるため個別設定。
-  const AI_HIGH_PRECISION_THRESHOLDS = {
-    answer: 75,   // 複雑質問文 - ハイブリッドシステム
-    reason: 70,   // 理由説明文 - セマンティック強化
-    name: 80,     // 単純識別子
-    class: 85,    // 明確パターン
-    email: 90     // フォーマット固定
+  // - 必須列 (answer): 低めの閾値で「自動推定で OK」と表示しやすく
+  // - 識別子列 (name): 表記揺れがあるためやや高め
+  // - パターン列 (class): 明確なため高め
+  const COLUMN_CONFIDENCE_THRESHOLDS = {
+    answer: 75,
+    reason: 70,
+    name: 80,
+    class: 85
   };
 
   function setAIDetectionSelections(mapping, dropdowns, confidence = {}, headers = []) {
     if (!mapping || typeof mapping !== 'object') return;
-    const actualMapping = mapping;
-    const hasValidMapping = Object.keys(actualMapping).length > 0;
+    const hasValidMapping = Object.keys(mapping).length > 0;
     const hasConfidenceData = Object.keys(confidence || {}).length > 0;
     if (!hasValidMapping && !hasConfidenceData) return;
 
-    checkSimpleConflicts(mapping, dropdowns);
     window.currentAIMapping = mapping;
 
     Object.keys(dropdowns).forEach((columnType) => {
       const dropdown = dropdowns[columnType];
       if (!dropdown) return;
-      const ctx = {
-        columnType, dropdown, actualMapping, confidence, headers,
-        key: AI_MAPPING_KEYS_BY_COLUMN[columnType]
-      };
-      __applyAIDetectionForColumn_(ctx);
+      __applyAutoDetectionForColumn({ columnType, dropdown, mapping, confidence });
     });
     updateCompletionStatus();
   }
 
   // 1 つの dropdown に対する自動推定結果の適用。
-  function __applyAIDetectionForColumn_(ctx) {
-    const { columnType, dropdown, actualMapping, confidence, key } = ctx;
-    const selectedIndex = (key && actualMapping[key] !== null && actualMapping[key] !== undefined)
-      ? actualMapping[key]
+  // Why: columnType と backend mapping key は 1:1 (answer/reason/class/name/numericX/numericY)。
+  //      mapping[columnType] が undefined ならその列は推定できなかった = badge スキップ。
+  function __applyAutoDetectionForColumn({ columnType, dropdown, mapping, confidence }) {
+    const selectedIndex = (mapping[columnType] !== null && mapping[columnType] !== undefined)
+      ? mapping[columnType]
       : null;
-    const columnConfidence = (key && confidence && confidence[key] !== undefined)
-      ? confidence[key]
+    const columnConfidence = (confidence && confidence[columnType] !== undefined)
+      ? confidence[columnType]
       : 0;
 
     if (selectedIndex !== null) {
       dropdown.value = selectedIndex;
       dropdown.classList.add('has-ai-selection');
       // Why: savedMapping は存在するが backend が再推定できないヘッダー (児童独自の質問文等) では
-      //      confidence=0 になる。「自動推定 0%」と出すのは紛らわしいので「保存済み」と表示する。
+      //      confidence=0 になる。「自動推定 0%」と出すのは紛らわしいので「保存済み」と表示。
       showConfidenceBadge(columnType, columnConfidence, columnConfidence > 0 ? 'ai' : 'saved');
       return;
     }
     if (columnConfidence > 0) {
-      const { badgeType } = __resolveConfidenceBadge_(ctx, columnConfidence);
+      const threshold = COLUMN_CONFIDENCE_THRESHOLDS[columnType] || 75;
+      const badgeType = columnConfidence >= threshold ? 'candidate' : 'low-confidence';
       showConfidenceBadge(columnType, columnConfidence, badgeType);
     }
-  }
-
-  // 信頼度に応じて badge 種別を決定。
-  // Why: 旧コードはフロントで再パターンマッチして候補を補完していたが、現在は
-  //      backend の inferColumnRoles (L1+L2+L3) が確定マッピングを返すため不要。
-  //      badge 表示のみに簡略化。
-  function __resolveConfidenceBadge_(ctx, columnConfidence) {
-    const threshold = AI_HIGH_PRECISION_THRESHOLDS[ctx.columnType] || 75;
-    if (columnConfidence >= threshold) return { badgeType: 'candidate' };
-    if (columnConfidence >= 50) return { badgeType: 'fallback-candidate' };
-    if (columnConfidence >= 30) return { badgeType: 'low-confidence' };
-    return { badgeType: 'very-low' };
   }
 
   function setupDropdownEventListeners(dropdowns) {
@@ -2521,60 +2479,25 @@
     }
   }
 
-  const AI_CONFIDENCE_THRESHOLDS = {
-    answer: 45,              // 必須列: 閾値を下げて設定しやすく
-    reason: 60,              // オプション列: 品質維持のため閾値上げ
-    name: 65, class: 65      // オプション列: 明確な列種別
-  };
-
   function showConfidenceBadge(columnType, confidence, type) {
-    if (!columnType || typeof confidence !== 'number' || !type) {
-      return;
-    }
+    if (!columnType || typeof confidence !== 'number' || !type) return;
 
     const confidenceDiv = document.getElementById(`${columnType}-confidence`);
-    if (!confidenceDiv) {
-      return;
-    }
-
+    if (!confidenceDiv) return;
     const badge = confidenceDiv.querySelector('.confidence-badge');
-    if (!badge) {
-      return;
-    }
+    if (!badge) return;
 
     let badgeClass = '';
     let badgeText = '';
+    const pct = Math.round(confidence);
 
     switch (type) {
-      case 'manual':
-        badgeClass = 'manual';
-        badgeText = '✋ 手動設定';
-        break;
-      case 'saved':
-        badgeClass = 'manual';
-        badgeText = '📌 保存済み';
-        break;
-      case 'ai':
-        badgeClass = 'high';
-        badgeText = `🎯 自動推定 ${Math.round(confidence)}%`;
-        break;
-      case 'candidate':
-        badgeClass = 'candidate';
-        badgeText = `🔍 候補 ${Math.round(confidence)}%`;
-        break;
-      case 'low-confidence':
-        badgeClass = 'low';
-        badgeText = `📊 検討中 ${Math.round(confidence)}%`;
-        break;
-      default: {
-        const threshold = AI_CONFIDENCE_THRESHOLDS[columnType] || 55;
-        const roundedConfidence = Math.round(confidence);
-        badgeClass = confidence >= threshold
-          ? 'high'
-          : (confidence >= Math.max(threshold * 0.7, 20) ? 'medium' : 'low');
-        badgeText = `🤖 自動推定 ${roundedConfidence}%`;
-        break;
-      }
+      case 'manual':       badgeClass = 'manual'; badgeText = '✋ 手動設定'; break;
+      case 'saved':        badgeClass = 'manual'; badgeText = '📌 保存済み'; break;
+      case 'ai':           badgeClass = 'high'; badgeText = `🎯 自動推定 ${pct}%`; break;
+      case 'candidate':    badgeClass = 'candidate'; badgeText = `🔍 候補 ${pct}%`; break;
+      case 'low-confidence': badgeClass = 'low'; badgeText = `📊 検討中 ${pct}%`; break;
+      default:             badgeClass = 'low'; badgeText = `🤖 自動推定 ${pct}%`;
     }
 
     badge.className = `confidence-badge ${badgeClass}`;
@@ -2601,19 +2524,13 @@
   }
 
   function resetToAIDetection() {
-
     if (!window.currentAIMapping) {
       showError('自動推定データがありません');
       return;
     }
-
-    const dropdowns = {
-      answer: document.getElementById('answer-column-select'),
-      reason: document.getElementById('reason-column-select'),
-      class: document.getElementById('class-column-select'),
-      name: document.getElementById('name-column-select'),
-    };
-
+    // __getAllColumnDropdowns で numericX/Y も含めた全 dropdown を取得 (旧コードは
+    // numericX/Y を忘れていたので reset 後も matrix/numberline の軸が手動値のままになっていた)。
+    const dropdowns = __getAllColumnDropdowns();
     setAIDetectionSelections(window.currentAIMapping, dropdowns, {}, window.currentHeaders || []);
 
     const manualInfo = document.getElementById('manual-override-info');
@@ -3121,22 +3038,11 @@
   }
 
   function getColumnMapping() {
-    const dropdowns = {
-      answer: document.getElementById('answer-column-select'),
-      reason: document.getElementById('reason-column-select'),
-      class: document.getElementById('class-column-select'),
-      name: document.getElementById('name-column-select'),
-      // Why: numericX/Y は可視化モード（M1/M2）専用の任意列。
-      //      DOM 要素が存在しない古いページでも null safe。
-      numericX: document.getElementById('numeric-x-column-select'),
-      numericY: document.getElementById('numeric-y-column-select'),
-    };
-
+    const dropdowns = __getAllColumnDropdowns();
     const columnMapping = {};
 
     Object.keys(dropdowns).forEach((columnType) => {
       const dropdown = dropdowns[columnType];
-      if (!dropdown) return;
       const selectedValue = dropdown.value;
       if (selectedValue !== '') {
         columnMapping[columnType] = parseInt(selectedValue);
@@ -3146,7 +3052,7 @@
     // Why: UI dropdown が空のとき systemState の columnMapping を fallback。
     //   「ヘッダー読み込み未完 / dropdown 初期状態」でも表示・公開設定の保存を可能にする。
     const existingMapping = (systemState && systemState.config && systemState.config.columnMapping) || {};
-    ['answer', 'reason', 'class', 'name', 'numericX', 'numericY'].forEach((key) => {
+    Object.keys(COLUMN_SELECT_IDS).forEach((key) => {
       if (typeof columnMapping[key] !== 'number' && typeof existingMapping[key] === 'number') {
         columnMapping[key] = existingMapping[key];
       }
