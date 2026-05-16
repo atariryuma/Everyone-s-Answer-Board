@@ -159,10 +159,14 @@
             <div class="step-card">
               <div class="step-num">3</div>
               <div class="step-body">
-                <h4>授業を開始 → 公開</h4>
-                <p>授業名・クラス・質問文を確認したら <strong>「🎬 すべて作成して開始」</strong> を押します。
-                  自動でフォームが作成され、列マッピングが推定されます。
-                  最後に <strong>「📣 公開する」</strong> を押すと、児童が回答ボードを見られるようになります。</p>
+                <h4>3 ステップのウィザードで授業を作成</h4>
+                <p>
+                  <strong>① 基本情報</strong> (授業名・対象クラス)
+                  → <strong>② フェーズ設計</strong> (各フェーズの名前 / 形式 / 質問 / 1〜5 個)
+                  → <strong>③ 確認</strong> の 3 ステップ。
+                </p>
+                <p>最後の確認画面で <strong>「🎬 すべて作成して開始」</strong> を押すと、各フェーズの Google フォームと回答先スプレッドシートが自動作成され、列マッピングが推定されて授業が開始されます。
+                  そのまま画面下部の <strong>「📣 公開する」</strong> を押せば、児童が回答ボードを見られるようになります。</p>
               </div>
             </div>
 
@@ -341,18 +345,27 @@
               例: 「5年1組 国語」「5年1組 道徳」「6年2組 算数」を別々のプロファイルとして保存。
             </p>
 
+            <h3 class="manual-h3">右パネル「📚 保存済みボード」の見方</h3>
+            <p class="manual-p">
+              現在編集中の行には水色の枠と次のバッジが表示されます:
+            </p>
+            <ul class="manual-p list-disc list-inside">
+              <li><strong>🟢 公開中</strong> — このボードが児童に公開されている</li>
+              <li><strong>「現在」</strong> — 編集中だが未公開</li>
+            </ul>
+
             <h3 class="manual-h3">プロファイルの操作</h3>
             <ul class="manual-p list-disc list-inside">
-              <li><strong>保存:</strong> 管理パネル下部の「💾 [プロファイル名] に保存」</li>
-              <li><strong>切替:</strong> 右パネル「保存済みボード」一覧の 📥 アイコン</li>
+              <li><strong>保存:</strong> 管理パネル下部の「💾 [プロファイル名] に保存」(現在のプロファイルに上書き)</li>
+              <li><strong>切替:</strong> 一覧の <strong>📥</strong> アイコン (非アクティブ行のみ)</li>
               <li><strong>名前変更:</strong> 一覧の名前部分をダブルクリック</li>
-              <li><strong>削除:</strong> 一覧の 🗑 アイコン</li>
-              <li><strong>別名で保存:</strong> 「📋 別名で保存」を展開してプロファイル名を入力</li>
+              <li><strong>削除:</strong> 一覧の <strong>🗑</strong> アイコン</li>
+              <li><strong>別名で保存:</strong> 「📋 別名で保存」を展開してプロファイル名を入力 → 新規保存</li>
             </ul>
 
             <div class="callout tip">
               <strong>💡 入力は自動保存:</strong>
-              設定変更は約 1 秒後に自動保存されます。明示的な保存ボタンは不要です。
+              設定変更は約 1 秒後に自動保存されます。明示的な保存ボタンは不要です (プロファイルへの保存は別操作)。
             </div>
           </section>
 
@@ -432,6 +445,30 @@
                 <p class="answer">
                   終了済みのレッスンは画面上部「🎒 レッスン」一覧の <strong>「振り返り」</strong> ボタンから時系列再生できます。
                   回答データはスプレッドシートに保存され続けるため、Drive から直接開くこともできます。
+                </p>
+              </details>
+
+              <details>
+                <summary>児童に見せる前に自分で表示を確認したい</summary>
+                <p class="answer">
+                  公開すると画面下部に「現在の回答ボード」のフッターが現れ、<strong>「📊 ボードを開く」</strong> ボタンで自分のブラウザで実画面を確認できます。
+                  リアクションやハイライトも実際に操作して試せます。
+                </p>
+              </details>
+
+              <details>
+                <summary>スプレッドシートはどこに保存されている？</summary>
+                <p class="answer">
+                  右パネル「📚 リソース」の <strong>「📊 スプレッドシートを開く」</strong> ボタンから直接開けます。
+                  Google Drive の「マイドライブ」配下に「みんなの回答ボード」フォルダが自動作成され、フォーム本体と回答先スプレッドシートが一緒に整理されます。
+                </p>
+              </details>
+
+              <details>
+                <summary>複数クラスで同じフォームを使い分けたい</summary>
+                <p class="answer">
+                  レッスン作成時に <strong>対象クラス</strong> を複数選ぶと、1 つのフォームを全クラスで共有できます (児童が回答時にクラスを選択)。
+                  クラス別に集計したいときは、ボード画面のクラスフィルタで切り替えられます。
                 </p>
               </details>
             </div>
