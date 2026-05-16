@@ -885,7 +885,12 @@
     const isViz = mode === 'numberline' || mode === 'matrix' || mode === 'auto';
     const isMatrix = mode === 'matrix';
     const hasAxis = mode === 'numberline' || mode === 'matrix' || mode === 'auto';
+    // matrix / numberline では X軸の数値列 = メイン質問列 (同じ列の数値表現と文字表現)。
+    // dropdown を 2 つ見せると教師が「同じ列を 2 回設定？」と混乱するので answer を隠す。
+    // 保存時に getColumnMapping が numericX を answer にコピーする。
+    const hideAnswerDropdown = mode === 'matrix' || mode === 'numberline';
 
+    show('answer-column-row', !hideAnswerDropdown);
     show('reason-column-row', mode !== 'pie');
     show('numeric-mapping-container', isViz);
     show('axis-labels-container', isViz);
@@ -893,6 +898,13 @@
     show('y-axis-label-row', isMatrix);
     show('quadrant-labels-container', isMatrix);
     show('allow-resubmit-row', hasAxis);
+
+    // ラベル + 必須/任意 をモード別に反映
+    applyColumnModeLabels(mode);
+    // 完了カウンタも mode 連動 (matrix=必須 2/2 等)
+    if (typeof updateCompletionStatus === 'function') {
+      try { updateCompletionStatus(); } catch (_) {}
+    }
 
     const hint = document.getElementById('board-mode-hint');
     if (hint) {
@@ -1917,32 +1929,29 @@
   }
 
   function updateCompletionStatus() {
-    const requiredColumns = ['answer']; // 必須列：回答列のみ
-    const optionalColumns = ['reason', 'class', 'name']; // オプション列
+    // モード別の必須/任意セットを COLUMN_MODE_CONFIG から動的に取得。
+    // 例: matrix なら必須=numericX/Y の 2 つ。pie なら必須=answer の 1 つ。
+    const mode = (document.getElementById('board-mode-select') || {}).value || 'auto';
+    const config = COLUMN_MODE_CONFIG[mode] || COLUMN_MODE_CONFIG.auto;
+    const keys = Object.keys(config);
+    const required = keys.filter(k => config[k].required);
+    const optional = keys.filter(k => !config[k].required);
 
-    let requiredCompleted = 0;
-    requiredColumns.forEach(type => {
-      const select = document.getElementById(`${type}-column-select`);
-      if (select && select.value) {
-        requiredCompleted++;
-      }
-    });
-
-    let optionalCompleted = 0;
-    optionalColumns.forEach(type => {
-      const select = document.getElementById(`${type}-column-select`);
-      if (select && select.value) {
-        optionalCompleted++;
-      }
-    });
+    const isFilled = (key) => {
+      const select = document.getElementById(COLUMN_SELECT_IDS[key]);
+      return !!(select && select.value);
+    };
+    const requiredCompleted = required.filter(isFilled).length;
+    const optionalCompleted = optional.filter(isFilled).length;
 
     const statusElement = document.getElementById('completion-status');
     if (statusElement) {
-      const isRequiredComplete = requiredCompleted === requiredColumns.length;
-      const statusIcon = isRequiredComplete ? (optionalCompleted === optionalColumns.length ? '🟢' : '🟡') : '⚪';
-      statusElement.textContent = `${statusIcon} 必須: ${requiredCompleted}/${requiredColumns.length} オプション: ${optionalCompleted}/${optionalColumns.length}`;
+      const isRequiredComplete = required.length === 0 || requiredCompleted === required.length;
+      const statusIcon = isRequiredComplete
+        ? (optional.length === 0 || optionalCompleted === optional.length ? '🟢' : '🟡')
+        : '⚪';
+      statusElement.textContent = `${statusIcon} 必須: ${requiredCompleted}/${required.length} 任意: ${optionalCompleted}/${optional.length}`;
     }
-
   }
 
   async function connectToDataSource() {
@@ -2151,6 +2160,79 @@
     });
   }
 
+  // モード別に「どの列が必須/任意/非表示か」 + ラベルの動的差し替え定義。
+  // /goal 由来の最適 UI 設計: モードによって質問列の意味が違うので label/required も切替。
+  const COLUMN_SELECT_IDS = {
+    answer: 'answer-column-select',
+    reason: 'reason-column-select',
+    class: 'class-column-select',
+    name: 'name-column-select',
+    numericX: 'numeric-x-column-select',
+    numericY: 'numeric-y-column-select'
+  };
+  const COLUMN_MODE_CONFIG = {
+    board: {
+      answer:   { label: '💬 メイン質問列', hint: 'カードに大きく表示する列／集計の対象列', required: true },
+      reason:   { label: '📋 補助質問列', hint: 'カード下部に小さく表示する列', required: false },
+      class:    { label: '🏫 クラス列', hint: '所属クラス情報が入っている列', required: false },
+      name:     { label: '👤 名前列', hint: '回答者の名前が入っている列', required: false }
+    },
+    pie: {
+      answer:   { label: '🥧 集計する選択肢列', hint: '円グラフで集計する選択肢', required: true },
+      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタに使用', required: false },
+      name:     { label: '👤 名前列', hint: '個別追跡用', required: false }
+    },
+    wordcloud: {
+      answer:   { label: '💭 自由記述列', hint: 'ワードランキングで集計する自由記述', required: true },
+      reason:   { label: '📋 補足列', hint: 'ホバー時表示用', required: false },
+      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタに使用', required: false },
+      name:     { label: '👤 名前列', hint: '個別追跡用', required: false }
+    },
+    numberline: {
+      numericX: { label: '📏 X軸の数値列', hint: '数直線上の位置 (1〜5 等)', required: true },
+      reason:   { label: '📋 理由列', hint: 'ホバー時表示用', required: false },
+      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタ', required: false },
+      name:     { label: '👤 名前列', hint: '個別追跡用', required: false }
+    },
+    matrix: {
+      numericX: { label: '📏 X軸の数値列', hint: '横軸の数値', required: true },
+      numericY: { label: '📐 Y軸の数値列', hint: '縦軸の数値', required: true },
+      reason:   { label: '📋 理由列', hint: 'ホバー時表示用', required: false },
+      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタ', required: false },
+      name:     { label: '👤 名前列', hint: '個別追跡用', required: false }
+    },
+    auto: {
+      answer:   { label: '💬 メイン質問列', hint: 'モードに応じて自動判定', required: true },
+      reason:   { label: '📋 補助質問列', hint: 'カード下部や補足表示で使用', required: false },
+      class:    { label: '🏫 クラス列', hint: 'クラス別フィルタ', required: false },
+      name:     { label: '👤 名前列', hint: '個別追跡用', required: false },
+      numericX: { label: '📏 X軸の数値列', hint: '数直線/散布図で使用', required: false },
+      numericY: { label: '📐 Y軸の数値列', hint: '散布図で使用', required: false }
+    }
+  };
+
+  /**
+   * モード別に dropdown のラベル + 必須/任意 を反映する。
+   * Why: 「メイン質問列」は board では大きく表示する列、pie では選択肢集計列、
+   *      matrix では X軸の数値、と意味が変わる。教師には「最終的に何になるか」が
+   *      ラベルで分かることが大事 (内部 key は固定でも UI は動的)。
+   */
+  function applyColumnModeLabels(mode) {
+    const config = COLUMN_MODE_CONFIG[mode] || COLUMN_MODE_CONFIG.auto;
+    Object.keys(COLUMN_SELECT_IDS).forEach(key => {
+      const selectId = COLUMN_SELECT_IDS[key];
+      const labelEl = document.querySelector('label[for="' + selectId + '"]');
+      const def = config[key];
+      if (!labelEl || !def) return;
+      while (labelEl.firstChild) labelEl.removeChild(labelEl.firstChild);
+      labelEl.appendChild(document.createTextNode(def.label + ': '));
+      const hintSpan = document.createElement('span');
+      hintSpan.className = 'text-xs ml-2 ' + (def.required ? 'text-red-300' : 'text-gray-400');
+      hintSpan.textContent = (def.required ? '【必須】 ' : '(任意) ') + def.hint;
+      labelEl.appendChild(hintSpan);
+    });
+  }
+
   // backend ColumnMappingService.__SYSTEM_HEADER_PATTERNS と同じセット。frontend では
   // dropdown から除外するために使う (タイムスタンプ + UNDERSTAND/LIKE/CURIOUS/HIGHLIGHT
   // などはどの役割にも該当しない管理列)。
@@ -2173,6 +2255,9 @@
       if (!Array.isArray(headers) || headers.length === 0) {
         return;
       }
+      // Why: updateAIAnalyzeButtonState / resetToAIDetection 等が window.currentHeaders を
+      //      参照する。fillColumnDropdowns は全 entry path で必ず呼ばれるので、ここで一元化。
+      window.currentHeaders = headers;
 
       if (!mapping || typeof mapping !== 'object') {
         mapping = {};
@@ -3066,6 +3151,13 @@
         columnMapping[key] = existingMapping[key];
       }
     });
+
+    // matrix / numberline では answer dropdown を hide しているため、numericX を answer にコピー。
+    // viz code は answer をホバー時のラベル等で使うので、空にすると tooltip が崩れる。
+    const mode = (document.getElementById('board-mode-select') || {}).value || 'auto';
+    if ((mode === 'matrix' || mode === 'numberline') && typeof columnMapping.numericX === 'number') {
+      columnMapping.answer = columnMapping.numericX;
+    }
 
     return columnMapping;
   }

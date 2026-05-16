@@ -393,8 +393,9 @@
         <div class="column-dropdowns space-y-4 mb-4">
           <!-- メイン質問列選択。「回答列」ではなく質問ベースのラベルを使う:
                実際のフォームは複数質問のケースが多く、機械的な answer/reason マッピングが
-               フィットしないため、教師にとってわかりやすい表現にする。 -->
-          <div class="form-group">
+               フィットしないため、教師にとってわかりやすい表現にする。
+               matrix/numberline モードでは X軸の数値列が answer を兼ねるので隠す。 -->
+          <div class="form-group" id="answer-column-row">
             <label for="answer-column-select" class="block text-sm font-medium text-gray-300 mb-2">
               💬 メイン質問列:
               <span class="text-xs text-gray-400 ml-2">(カードに大きく表示する列／集計の対象列)</span>
