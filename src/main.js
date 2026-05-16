@@ -716,6 +716,28 @@ const DO_POST_ACTION_HANDLERS = {
  * @param {Object} payload - { level, message, stack, source, line, col, context }
  * @returns {Object} result envelope
  */
+/**
+ * Frontend orchestration entry point — google.script.run.reportClientError(payload) から呼ばれる。
+ *
+ * Why: SharedErrorHandling.html は google.script.run.reportClientError(...) を直叩きする。
+ *   google.script.run はトップレベル関数しか呼べないため、グローバルとして expose する必要が
+ *   ある。doPost action='reportClientError' とは別パス (window.error / unhandledrejection
+ *   の捕捉時に doPost を経由しない軽量パス)。
+ *
+ *   この wrapper が無いと、フロントエンドからの error report は silently fail して
+ *   Cloud Logging には届かなくなる ([client/error] prefix が無い = CLAUDE.md の
+ *   「フロントエンドエラーも収集される」が破綻)。
+ */
+function reportClientError(payload) {
+  try {
+    const email = getCurrentEmail();
+    return handleClientErrorReport(email, payload);
+  } catch (error) {
+    // Silent: client error reporter 自体の失敗で client 体験を壊さない。
+    return createErrorResponse('reportClientError internal error', null, { error: 'REPORT_FAILED' });
+  }
+}
+
 function handleClientErrorReport(email, payload) {
   try {
     if (!isPlainObject(payload)) {

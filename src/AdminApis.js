@@ -11,7 +11,7 @@
 // APIキー漏洩時のブラスト半径を最小化する目的で、
 // 認証情報系（substring match）と、攻撃者に差し替えられるとサービス乗っ取り/
 // 偽DBへの誘導が可能になる基幹キーを明示的にブロックする。
-const PROTECTED_PROPERTY_SUBSTRINGS = ['KEY', 'CREDS', 'SECRET', 'TOKEN', 'PASSWORD'];
+const PROTECTED_PROPERTY_SUBSTRINGS = ['KEY', 'CREDS', 'SECRET', 'TOKEN', 'PASSWORD', 'SALT'];
 const PROTECTED_PROPERTY_EXACT_KEYS = ['ADMIN_EMAIL', 'DATABASE_SPREADSHEET_ID'];
 
 // Magic-number elimination (Clean Code: replace literal numbers with named constants).
@@ -118,8 +118,15 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
     return createErrorResponse('ボードの公開状態を変更する権限がありません');
   }
 
-  // 第2引数で preloaded user を渡し、getUserConfig 内の findUserById 再実行を避ける。
-  const currentConfig = getConfigOrDefault(targetUser.userId, targetUser);
+  // Why getUserConfig (not getConfigOrDefault): saveUserConfig 前の read で「failure を empty
+  //   {} で隠す」は危険。findUserById が 429/cache miss を返すと {} になり、それを spread して
+  //   saveUserConfig するとユーザーの profile/columnMapping/displaySettings を空で全上書きする
+  //   (data-loss バグ)。getConfigOrDefault は read-only 用途のみで使う。
+  const cfgResult = getUserConfig(targetUser.userId, targetUser);
+  if (!cfgResult || !cfgResult.success) {
+    return createErrorResponse(`設定の取得に失敗しました: ${(cfgResult && cfgResult.message) || '詳細不明'}`);
+  }
+  const currentConfig = cfgResult.config;
 
   // 楽観ロック: 呼び出し側が sourceEtag を渡したときだけ厳格チェック
   if (options.sourceEtag && currentConfig.etag && currentConfig.etag !== options.sourceEtag) {
@@ -599,8 +606,13 @@ function markWelcomeSeen() {
       return createUserNotFoundError('ユーザーが見つかりません');
     }
 
-    const config = getConfigOrDefault(currentUser.userId);
-
+    // Why getUserConfig (not getConfigOrDefault): markWelcomeSeen は save パス。空 {} で
+    //   全上書きすると profile/columnMapping を吹き飛ばす。read 失敗時は中断する。
+    const cfgResult = getUserConfig(currentUser.userId);
+    if (!cfgResult || !cfgResult.success) {
+      return createErrorResponse(`設定の取得に失敗しました: ${(cfgResult && cfgResult.message) || '詳細不明'}`);
+    }
+    const config = cfgResult.config;
     config.hasSeenWelcome = true;
 
     const saveResult = saveUserConfig(currentUser.userId, config);
@@ -625,9 +637,34 @@ function markWelcomeSeen() {
  * @param {Object} params - パラメータ
  * @returns {Object} 操作結果
  */
+// frontend (google.script.run) から call できる「ユーザースコープ」ops の allowlist。
+// これらの handler は内部で userId と caller の一致を verify するので admin でなくても呼べる。
+// 上記以外のすべての op は admin 認証を要求する (API キー経路 = getCurrentEmail が
+// ADMIN_EMAIL を返す経由でパス、フロントエンドからの直叩きは reject)。
+const __FRONTEND_USER_DISPATCH_OPS = Object.freeze(new Set([
+  'lesson.list', 'lesson.create', 'lesson.delete', 'lesson.duplicate',
+  'lesson.templates', 'lesson.review', 'lesson.updateDraft',
+  'lesson.start', 'lesson.advance', 'lesson.end', 'lesson.knownClasses',
+  'uploadLessonImage'
+]));
+
 function dispatchAdminOperation(operation, params) {
   if (!operation || typeof operation !== 'string') {
     return createErrorResponse('operation is required', null, { error: 'MISSING_OPERATION' });
+  }
+
+  const op = operation.trim();
+
+  // Why entry-level admin gate: dispatchAdminOperation は google.script.run 経由でも
+  //   呼ばれる (AdminPanel lesson UI の gasRun ヘルパー)。frontend からの直叩きで
+  //   setProperty / appendRows / previewBoard 等の admin-only op が呼ばれると
+  //   privilege escalation になる。API キー経路では _apiKeyAdminEmail が立っていて
+  //   getCurrentEmail() = ADMIN_EMAIL となり isAdministrator が true を返すので
+  //   この gate を通過できる。
+  if (!__FRONTEND_USER_DISPATCH_OPS.has(op)) {
+    if (!isAdministrator(getCurrentEmail())) {
+      return createAdminRequiredError();
+    }
   }
 
   // case ブランチ冒頭の param 検証を一行に圧縮するためのヘルパー。
@@ -644,8 +681,6 @@ function dispatchAdminOperation(operation, params) {
     }
     return null;
   };
-
-  const op = operation.trim();
 
   switch (op) {
     // --- User Management ---

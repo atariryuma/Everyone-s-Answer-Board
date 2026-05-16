@@ -60,6 +60,7 @@ const OPERATIONS = [
   'runColumnAnalysis', 'previewBoard', 'exportBoardData',
   // Form operations (v3)
   'listMyForms', 'validateFormUrl', 'connectForm', 'createForm', 'customizeForm',
+  'setFormAllowResubmit', 'uploadLessonImage',
   // Multi-board profiles (v4)
   'listProfiles', 'saveProfile', 'loadProfile', 'deleteProfile',
   // Data ops (v5) — テストデータ投入専用

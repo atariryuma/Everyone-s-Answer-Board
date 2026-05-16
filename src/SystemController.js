@@ -690,7 +690,16 @@ function publishApp(publishConfig) {
       return { success: false, message: 'ユーザーが見つかりません' };
     }
 
-    const currentConfig = getConfigOrDefault(user.userId);
+    // Why getUserConfig (not getConfigOrDefault): publish は save パス。getConfigOrDefault は
+    //   findUserById の 429/cache miss で {} を返し、updatedConfig が現在の profile/
+    //   columnMapping を含まない最小オブジェクトになって saveUserConfig が全上書きする
+    //   data-loss バグになる。さらに currentConfig.etag が undefined になるので楽観ロック
+    //   (line 724) もスキップされ二重 publish が race する。
+    const cfgRes = getUserConfig(user.userId, user);
+    if (!cfgRes || !cfgRes.success) {
+      return { success: false, message: `設定の取得に失敗しました: ${(cfgRes && cfgRes.message) || '詳細不明'}` };
+    }
+    const currentConfig = cfgRes.config;
     const { config: safePublishConfig, ignoredKeys } = sanitizePublishPayload_(publishConfig, currentConfig);
 
     if (ignoredKeys.length > 0) {

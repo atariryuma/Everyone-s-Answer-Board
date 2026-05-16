@@ -428,7 +428,7 @@ function detectNumericScaleColumns(headers, sampleData) {
 }
 
 // =====================================================================
-// 旧 API: backward-compat wrappers
+// 行処理 hot path: 単一役割解決 (DataService から per-field 呼び出し)
 // =====================================================================
 
 /**
