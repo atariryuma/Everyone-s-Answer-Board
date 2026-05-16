@@ -1927,6 +1927,121 @@
     text-align: center;
   }
 
+  /* 「+ もっと細かく」 で集約する任意拡張ブロック */
+  .phase-extra-details > summary {
+    color: rgba(165, 243, 252, 0.85);
+    font-size: 0.78rem;
+  }
+  .phase-extra-badges {
+    margin-left: 0.4rem;
+    font-size: 0.7rem;
+    color: rgba(34, 211, 238, 0.9);
+    padding: 0.05rem 0.4rem;
+    background: rgba(34, 211, 238, 0.12);
+    border-radius: 0.3rem;
+  }
+  .phase-extra-list {
+    display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.5rem;
+  }
+  .phase-extra-section {
+    background: rgba(15, 23, 42, 0.35);
+    border: 1px solid rgba(71, 85, 105, 0.3);
+    border-radius: 0.4rem;
+    padding: 0.5rem 0.6rem;
+  }
+  .phase-extra-label {
+    font-size: 0.78rem;
+    color: rgba(165, 243, 252, 0.85);
+    margin-bottom: 0.35rem;
+  }
+
+  /* プレビュー上のラベル「📺 生徒に見える形:」: 「ここが結果」を明示 */
+  .phase-preview-label {
+    font-size: 0.78rem;
+    color: rgba(165, 243, 252, 0.95);
+    font-weight: 600;
+    margin: 0.85rem 0 0.35rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed rgba(71, 85, 105, 0.4);
+  }
+
+  /* 「その他」 toggle */
+  .phase-choice-other {
+    display: flex; align-items: center; gap: 0.4rem;
+    margin-top: 0.5rem;
+    font-size: 0.78rem;
+    color: rgba(229, 231, 235, 0.9);
+    cursor: pointer;
+  }
+  .phase-choice-other input[type="checkbox"] { cursor: pointer; }
+
+  /* board preview: サンプルカード */
+  .phase-preview-sample-card {
+    background: rgba(30, 41, 59, 0.6);
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    border-radius: 0.4rem;
+    padding: 0.45rem 0.55rem;
+    font-size: 0.72rem;
+  }
+  .sample-card-name {
+    font-size: 0.65rem;
+    color: rgba(148, 163, 184, 0.85);
+    margin-bottom: 0.15rem;
+  }
+  .sample-card-answer {
+    color: rgba(165, 243, 252, 0.95);
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+  }
+  .sample-card-reason {
+    color: rgba(229, 231, 235, 0.85);
+    font-size: 0.7rem;
+    line-height: 1.3;
+  }
+  .phase-preview-board-hint {
+    margin-top: 0.3rem;
+    font-size: 0.65rem;
+    color: rgba(148, 163, 184, 0.7);
+    text-align: center;
+  }
+
+  /* pie preview: SVG 円グラフ + 凡例 */
+  .phase-preview-pie {
+    display: flex !important; align-items: center; gap: 0.6rem;
+  }
+  .phase-preview-pie-svg {
+    width: 36px; height: 36px; flex-shrink: 0;
+  }
+  .phase-preview-pie-list {
+    display: flex; flex-direction: column; gap: 0.15rem;
+    font-size: 0.7rem;
+    color: rgba(229, 231, 235, 0.92);
+  }
+  .phase-preview-pie-item {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+  }
+  .phase-preview-pie-dot {
+    width: 0.55rem; height: 0.55rem; border-radius: 50%;
+    display: inline-block;
+  }
+  .phase-preview-pie-dot-0 { background: #60a5fa; }
+  .phase-preview-pie-dot-1 { background: #34d399; }
+  .phase-preview-pie-dot-2 { background: #fbbf24; }
+  .phase-preview-pie-dot-3 { background: #f87171; }
+
+  /* matrix preview: サンプル点 (児童 A, B) */
+  .matrix-quad { position: relative; }
+  .matrix-sample-dot {
+    position: absolute;
+    width: 1.1rem; height: 1.1rem;
+    background: rgba(96, 165, 250, 0.85);
+    border-radius: 50%;
+    color: #fff;
+    font-size: 0.55rem; line-height: 1.1rem;
+    text-align: center; font-weight: 700;
+    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.5);
+  }
+
   /* Lesson template picker (dropdown menu on 🎒 新しい授業を作る ▾) */
   .lesson-template-picker {
     position: relative;

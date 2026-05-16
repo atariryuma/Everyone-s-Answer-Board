@@ -44,7 +44,8 @@ function makeFakeForm() {
       setHelpText: (t) => { item.helpText = t; return makeChain(item); },
       setChoiceValues: (v) => { item.choices = v.slice(); return makeChain(item); },
       setBounds: (lo, hi) => { item.bounds = [lo, hi]; return makeChain(item); },
-      setLabels: (lo, hi) => { item.labels = [lo, hi]; return makeChain(item); }
+      setLabels: (lo, hi) => { item.labels = [lo, hi]; return makeChain(item); },
+      showOtherOption: (b) => { item.showOther = b; return makeChain(item); }
     };
   }
 
@@ -401,6 +402,27 @@ test('createTemplateForm: matrix → xLow/xHigh から軸タイトル自動生�
   assert.equal(scales[0].title, '効率 ↔ 丁寧');
   assert.equal(scales[1].title, '個人 ↔ 集団');
   assert.deepEqual(Array.from(scales[0].labels), ['効率', '丁寧']);
+});
+
+test('createTemplateForm: pie で includeOther=true → showOtherOption(true) が呼ばれる', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('pie', { choices: ['A', 'B'], includeOther: true });
+  const mc = ctx.__lastForm._state().items.find(i => i.kind === 'mc');
+  assert.equal(mc.showOther, true);
+});
+
+test('createTemplateForm: pie で includeOther なし → showOtherOption は呼ばれない', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('pie', { choices: ['A', 'B'] });
+  const mc = ctx.__lastForm._state().items.find(i => i.kind === 'mc');
+  assert.notEqual(mc.showOther, true);
+});
+
+test('createTemplateForm: board で includeOther=true → showOtherOption(true)', () => {
+  const ctx = loadCtx();
+  ctx.createTemplateForm('board', { choices: ['賛成', '反対'], includeOther: true });
+  const mc = ctx.__lastForm._state().items.find(i => i.kind === 'mc');
+  assert.equal(mc.showOther, true);
 });
 
 test('createTemplateForm: pie → question を multipleChoice title に + choices を反映', () => {

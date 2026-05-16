@@ -352,27 +352,21 @@ function createTemplateForm(templateType, templateOptions) {
         .setTitle('理由')
         .setRequired(true)
         .setHelpText('そこを選んだ理由を書いてください');
-    } else if (type === 'pie') {
-      form.addMultipleChoiceItem()
-        .setTitle(safeStr(opts.choiceTitle, question || phaseName || 'あなたの選択', 60))
+    } else if (type === 'pie' || type === 'board') {
+      // pie/board は構造同一 (多肢選択 + 理由)。違いは default title / choices / 理由 helpText のみ。
+      const isPie = type === 'pie';
+      const item = form.addMultipleChoiceItem()
+        .setTitle(safeStr(opts.choiceTitle, question || phaseName || (isPie ? 'あなたの選択' : '回答'), 60))
         .setRequired(true)
         .setHelpText('選択肢から 1 つ選んでください')
-        .setChoiceValues(safeChoices(opts.choices, ['A', 'B', 'どちらとも言えない']));
+        .setChoiceValues(safeChoices(opts.choices, isPie ? ['A', 'B', 'どちらとも言えない'] : ['賛成', '反対', 'どちらでもない']));
+      if (opts.includeOther && typeof item.showOtherOption === 'function') {
+        item.showOtherOption(true);
+      }
       form.addParagraphTextItem()
         .setTitle('理由')
         .setRequired(true)
-        .setHelpText('そう選んだ理由を書いてください');
-    } else {
-      // board (掲示板)
-      form.addMultipleChoiceItem()
-        .setTitle(safeStr(opts.choiceTitle, question || phaseName || '回答', 60))
-        .setRequired(true)
-        .setHelpText('選択肢から 1 つ選んでください')
-        .setChoiceValues(safeChoices(opts.choices, ['賛成', '反対', 'どちらでもない']));
-      form.addParagraphTextItem()
-        .setTitle('理由')
-        .setRequired(true)
-        .setHelpText('選んだ理由を書いてください');
+        .setHelpText(isPie ? 'そう選んだ理由を書いてください' : '選んだ理由を書いてください');
     }
 
     // ----- 送信後の確認メッセージ: 児童に達成感を与え、再投稿可否も伝える -----

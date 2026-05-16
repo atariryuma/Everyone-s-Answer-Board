@@ -4028,7 +4028,6 @@
               '<span class="phase-number">フェーズ ' + (i + 1) + '</span>' +
               deleteBtn +
             '</div>' +
-            renderPhasePreview(p) +
             '<div class="phase-field">' +
               '<label class="phase-label">フェーズ名:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-field="name" data-phase-index="' + i +
@@ -4046,6 +4045,10 @@
                 '" value="' + esc(p.question) + '" maxlength="200" placeholder="生徒に問いかける文" />' +
             '</div>' +
             renderPhaseDetailFields(p, i) +
+            // プレビューは「設定の結果として何が見えるか」を示すので、設定 UI の後に置く
+            '<div class="phase-preview-label">📺 生徒に見える形:</div>' +
+            renderPhasePreview(p) +
+            renderPhaseCommonOptions(p, i) +
           '</div>'
         );
       }).join('');
@@ -4084,12 +4087,18 @@
       if (p.formTemplate === 'matrix') {
         const xl = esc(o.xLow || '低'), xh = esc(o.xHigh || '高');
         const yl = esc(o.yLow || '低'), yh = esc(o.yHigh || '高');
+        // ボード上に出る散布点を 2 個サンプル配置 (児童 A は右上、児童 B は左下) して
+        //   軸の意味と「点が動く範囲」を直感させる。
         return (
           '<div class="phase-preview phase-preview-matrix">' +
             '<div class="matrix-y-high">' + yh + ' ↑</div>' +
             '<div class="matrix-grid">' +
-              '<span class="matrix-quad q1"></span><span class="matrix-quad q2"></span>' +
-              '<span class="matrix-quad q3"></span><span class="matrix-quad q4"></span>' +
+              '<span class="matrix-quad q1"></span><span class="matrix-quad q2">' +
+                '<span class="matrix-sample-dot" style="top:25%;right:20%;">A</span>' +
+              '</span>' +
+              '<span class="matrix-quad q3">' +
+                '<span class="matrix-sample-dot" style="bottom:20%;left:25%;">B</span>' +
+              '</span><span class="matrix-quad q4"></span>' +
             '</div>' +
             '<div class="matrix-x-axis">' + xl + ' ← X → ' + xh + '</div>' +
             '<div class="matrix-y-low">↓ ' + yl + '</div>' +
@@ -4098,34 +4107,83 @@
       }
       if (p.formTemplate === 'pie') {
         const choices = Array.isArray(o.choices) ? o.choices : [];
+        // 円グラフの占有率は均等分配の見た目で「N 等分される」感を出す。
         return (
           '<div class="phase-preview phase-preview-pie">' +
-            '<span class="phase-preview-icon">◐</span>' +
-            '<span class="phase-preview-text">' + choices.length + ' 択 (' +
-              choices.slice(0, 3).map(c => esc(c)).join(' / ') +
-              (choices.length > 3 ? ' …' : '') +
-            ')</span>' +
+            '<svg viewBox="0 0 40 40" class="phase-preview-pie-svg" aria-hidden="true">' +
+              pieSliceSvgPaths(choices.length) +
+            '</svg>' +
+            '<div class="phase-preview-pie-list">' +
+              choices.slice(0, 3).map((c, k) => (
+                '<span class="phase-preview-pie-item">' +
+                  '<span class="phase-preview-pie-dot phase-preview-pie-dot-' + (k % 4) + '"></span>' +
+                  esc(c) +
+                '</span>'
+              )).join('') +
+              (choices.length > 3 ? '<span class="phase-preview-pie-item">…</span>' : '') +
+              (o.includeOther ? '<span class="phase-preview-pie-item">+ その他</span>' : '') +
+            '</div>' +
           '</div>'
         );
       }
-      // board
+      // board: サンプルカード 1 枚を見せて「カード形式で答えが並ぶ」を直感させる
+      const sampleChoice = (Array.isArray(o.choices) && o.choices[0]) || '賛成';
       return (
         '<div class="phase-preview phase-preview-board">' +
-          '<span class="phase-preview-icon">📝</span>' +
-          '<span class="phase-preview-text">回答カードを一覧表示</span>' +
+          '<div class="phase-preview-sample-card">' +
+            '<div class="sample-card-name">5-1 山田さん</div>' +
+            '<div class="sample-card-answer">' + esc(sampleChoice) + '</div>' +
+            '<div class="sample-card-reason">理由: みんなで考えたい話題だから…</div>' +
+          '</div>' +
+          '<div class="phase-preview-board-hint">… のような回答カードが児童の数だけ並ぶ</div>' +
         '</div>'
       );
     }
 
+    // 円グラフ preview の N 等分 SVG paths を生成。N=1 は 1 slice で埋める、N>=2 は均等分割。
+    //   呼び出し側は choices.length を渡すので 2〜6 が実用範囲。1 は防御的に許可、上限 6 でクランプ。
+    function pieSliceSvgPaths(n) {
+      n = Math.max(1, Math.min(6, n));
+      const cx = 20, cy = 20, r = 18;
+      const colors = ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#fb923c'];
+      if (n === 1) {
+        return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="' + colors[0] + '" opacity="0.8" />';
+      }
+      const slices = [];
+      for (let k = 0; k < n; k++) {
+        const a1 = (k / n) * 2 * Math.PI - Math.PI / 2;
+        const a2 = ((k + 1) / n) * 2 * Math.PI - Math.PI / 2;
+        const x1 = cx + r * Math.cos(a1), y1 = cy + r * Math.sin(a1);
+        const x2 = cx + r * Math.cos(a2), y2 = cy + r * Math.sin(a2);
+        const large = a2 - a1 > Math.PI ? 1 : 0;
+        slices.push(
+          '<path d="M' + cx + ',' + cy + ' L' + x1.toFixed(2) + ',' + y1.toFixed(2) +
+          ' A' + r + ',' + r + ' 0 ' + large + ',1 ' + x2.toFixed(2) + ',' + y2.toFixed(2) + ' Z"' +
+          ' fill="' + colors[k % colors.length] + '" opacity="0.8" />'
+        );
+      }
+      return slices.join('');
+    }
+
     // 共通: 画像入力 (drop / pick / paste) + スケール粒度 (numberline/matrix のみ)
-    function renderPhaseCommonOptions(p, i, hasScale) {
+    function hasScaleForTemplate(formTemplate) {
+      return formTemplate === 'numberline' || formTemplate === 'matrix';
+    }
+
+    // 任意拡張: 教材画像 + スケール粒度。形式詳細と区別するため「+ もっと細かく」で集約。
+    //   画像が既に設定済なら details を open で出して preview を即見せる。
+    function renderPhaseCommonOptions(p, i) {
       const esc = window.sharedUtilities.security.escapeHtml;
       const o = p.templateOptions || {};
+      const hasScale = hasScaleForTemplate(p.formTemplate);
       const hasImage = Boolean(o.imageFileId || o.imageDataUrl);
-      const previewSrc = o.imageDataUrl || ''; // upload 直後はローカル data URL でプレビュー
+      const previewSrc = o.imageDataUrl || '';
+      const pts = hasScale
+        ? (SCALE_POINTS_ALLOWED.includes(o.scalePoints) ? o.scalePoints : 5)
+        : null;
       const imageBlock = (
-        '<details class="phase-detail"' + (hasImage ? ' open' : '') + '>' +
-          '<summary>🖼 教材画像 (任意)</summary>' +
+        '<div class="phase-extra-section">' +
+          '<div class="phase-extra-label">🖼 教材画像 (任意)</div>' +
           '<div class="phase-image-zone" data-phase-image-zone data-phase-index="' + i + '" tabindex="0" ' +
             'aria-label="画像をドラッグ&ドロップ、ペースト、またはクリックして選択">' +
             (hasImage
@@ -4141,29 +4199,43 @@
             '<input type="file" accept="image/*" class="phase-image-file" data-phase-image-file data-phase-index="' + i + '" />' +
           '</div>' +
           '<p class="phase-image-note text-xs text-gray-400 mt-1">png / jpeg / gif / webp、5MB まで</p>' +
+        '</div>'
+      );
+      let scaleBlock = '';
+      if (hasScale) {
+        scaleBlock = (
+          '<div class="phase-extra-section">' +
+            '<div class="phase-extra-label">📏 スケールの段階 (' + pts + ')</div>' +
+            '<div class="phase-scale-grid">' +
+              SCALE_POINTS_ALLOWED.map((n) => (
+                '<label class="phase-scale-opt">' +
+                  '<input type="radio" name="phase-scale-' + i + '" data-phase-opt="scalePoints" data-phase-index="' + i +
+                    '" value="' + n + '"' + (pts === n ? ' checked' : '') + ' />' +
+                  ' ' + n + ' 段階' +
+                  ' <span class="phase-scale-hint">(' + (SCALE_POINTS_HINT[n] || '') + ')</span>' +
+                '</label>'
+              )).join('') +
+            '</div>' +
+          '</div>'
+        );
+      }
+      // 画像が登録済なら open、それ以外は閉じる (画面ノイズ削減)。
+      // summary に状態バッジを出すことで、閉じた状態でも「何が設定済か」が一目でわかる。
+      const badges = [];
+      if (hasImage) badges.push('🖼 画像あり');
+      if (hasScale && pts !== 5) badges.push('📏 ' + pts + '段階');
+      const summaryText = '＋ もっと細かく (任意)' +
+        (badges.length ? ' <span class="phase-extra-badges">' + badges.join(' / ') + '</span>' : '');
+      return (
+        '<details class="phase-detail phase-extra-details"' + (hasImage ? ' open' : '') + '>' +
+          '<summary>' + summaryText + '</summary>' +
+          '<div class="phase-extra-list">' + imageBlock + scaleBlock + '</div>' +
         '</details>'
       );
-      if (!hasScale) return imageBlock;
-      const pts = SCALE_POINTS_ALLOWED.includes(o.scalePoints) ? o.scalePoints : 5;
-      const scaleBlock = (
-        '<details class="phase-detail">' +
-          '<summary>📏 スケールの段階 (' + pts + ')</summary>' +
-          '<div class="phase-scale-grid">' +
-            SCALE_POINTS_ALLOWED.map((n) => (
-              '<label class="phase-scale-opt">' +
-                '<input type="radio" name="phase-scale-' + i + '" data-phase-opt="scalePoints" data-phase-index="' + i +
-                  '" value="' + n + '"' + (pts === n ? ' checked' : '') + ' />' +
-                ' ' + n + ' 段階' +
-                ' <span class="phase-scale-hint">(' + (SCALE_POINTS_HINT[n] || '') + ')</span>' +
-              '</label>'
-            )).join('') +
-          '</div>' +
-        '</details>'
-      );
-      return imageBlock + scaleBlock;
     }
 
     // 形式ごとの詳細編集 (軸ラベル / 選択肢)。
+    //   renderPhaseCommonOptions は呼び出し側で別途出すので、ここでは形式固有の field のみ。
     function renderPhaseDetailFields(p, i) {
       const esc = window.sharedUtilities.security.escapeHtml;
       const o = p.templateOptions || {};
@@ -4171,41 +4243,43 @@
         return (
           '<details class="phase-detail" open>' +
             '<summary>軸の両端ラベル</summary>' +
-            '<div class="phase-detail-grid">' +
+            '<div class="phase-detail-row">' +
+              '<label class="phase-detail-tag">軸:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="lowLabel" data-phase-index="' + i +
                 '" value="' + esc(o.lowLabel || '') + '" maxlength="20" placeholder="例: 反対" />' +
               '<span class="phase-detail-sep">↔</span>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="highLabel" data-phase-index="' + i +
                 '" value="' + esc(o.highLabel || '') + '" maxlength="20" placeholder="例: 賛成" />' +
             '</div>' +
-          '</details>' +
-          renderPhaseCommonOptions(p, i, true)
+          '</details>'
         );
       }
       if (p.formTemplate === 'matrix') {
         return (
           '<details class="phase-detail" open>' +
             '<summary>X 軸 / Y 軸ラベル</summary>' +
-            '<div class="phase-detail-row"><label class="phase-detail-tag">X:</label>' +
+            '<div class="phase-detail-row">' +
+              '<label class="phase-detail-tag">X:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="xLow" data-phase-index="' + i +
                 '" value="' + esc(o.xLow || '') + '" maxlength="20" placeholder="例: 効率↓" />' +
               '<span class="phase-detail-sep">↔</span>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="xHigh" data-phase-index="' + i +
                 '" value="' + esc(o.xHigh || '') + '" maxlength="20" placeholder="例: 効率↑" />' +
             '</div>' +
-            '<div class="phase-detail-row"><label class="phase-detail-tag">Y:</label>' +
+            '<div class="phase-detail-row">' +
+              '<label class="phase-detail-tag">Y:</label>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="yLow" data-phase-index="' + i +
                 '" value="' + esc(o.yLow || '') + '" maxlength="20" placeholder="例: 倫理↓" />' +
               '<span class="phase-detail-sep">↔</span>' +
               '<input type="text" class="modern-input text-sm" data-phase-opt="yHigh" data-phase-index="' + i +
                 '" value="' + esc(o.yHigh || '') + '" maxlength="20" placeholder="例: 倫理↑" />' +
             '</div>' +
-          '</details>' +
-          renderPhaseCommonOptions(p, i, true)
+          '</details>'
         );
       }
       if (p.formTemplate === 'pie' || p.formTemplate === 'board') {
         const choices = Array.isArray(o.choices) ? o.choices : [];
+        const includeOther = Boolean(o.includeOther);
         const items = choices.map((c, j) => (
           '<div class="phase-choice-row">' +
             '<input type="text" class="modern-input text-sm" data-phase-choice="' + j + '" data-phase-index="' + i +
@@ -4218,15 +4292,23 @@
         const addBtn = choices.length < 6
           ? '<button type="button" class="phase-choice-add" data-phase-action="choice-add" data-phase-index="' + i + '">＋ 選択肢</button>'
           : '<p class="text-xs text-gray-400">最大 6 つまで</p>';
+        // 「その他」(児童が自由記述で回答できる Forms 標準オプション)
+        const otherToggle = (
+          '<label class="phase-choice-other">' +
+            '<input type="checkbox" data-phase-opt-bool="includeOther" data-phase-index="' + i +
+              '"' + (includeOther ? ' checked' : '') + ' />' +
+            ' 「その他」(児童が自由に書ける) を加える' +
+          '</label>'
+        );
         return (
           '<details class="phase-detail" open>' +
-            '<summary>選択肢 (' + choices.length + ' つ)</summary>' +
+            '<summary>選択肢 (' + choices.length + (includeOther ? ' + その他' : '') + ' つ)</summary>' +
             '<div class="phase-choice-list">' + items + addBtn + '</div>' +
-          '</details>' +
-          renderPhaseCommonOptions(p, i, false)
+            otherToggle +
+          '</details>'
         );
       }
-      return renderPhaseCommonOptions(p, i, false);
+      return '';
     }
 
     // 保存時に config に残してはいけない巨大プレビューデータ。
@@ -4323,6 +4405,31 @@
         currentPhases[idx].formTemplate = el.value;
         currentPhases[idx].templateOptions = normalizeTemplateOptions(currentPhases[idx].templateOptions, el.value);
         renderPhaseCardsInner();
+        savePhasesNow();
+        return;
+      }
+      // 2.5) bool checkbox (includeOther 等)
+      //   全再描画すると base64 imageDataUrl の再シリアライズや caret 飛びが発生するので、
+      //   preview + summary 文言だけ in-place で書き換える。
+      if (el.dataset.phaseOptBool && el.type === 'checkbox') {
+        const idx = Number(el.dataset.phaseIndex);
+        if (!currentPhases[idx]) return;
+        currentPhases[idx].templateOptions = currentPhases[idx].templateOptions || {};
+        currentPhases[idx].templateOptions[el.dataset.phaseOptBool] = el.checked;
+        // 選択肢 summary に「その他」表記を反映
+        if (el.dataset.phaseOptBool === 'includeOther') {
+          const card = document.querySelectorAll('.lesson-phase-card')[idx];
+          if (card) {
+            card.querySelectorAll('.phase-detail summary').forEach((s) => {
+              const t = s.textContent || '';
+              if (/^選択肢/.test(t)) {
+                const choices = (currentPhases[idx].templateOptions.choices || []).length;
+                s.textContent = '選択肢 (' + choices + (el.checked ? ' + その他' : '') + ' つ)';
+              }
+            });
+          }
+        }
+        refreshPhasePreviewOnly(idx);
         savePhasesNow();
         return;
       }
