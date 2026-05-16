@@ -2142,6 +2142,22 @@
     });
   }
 
+  // backend ColumnMappingService.__SYSTEM_HEADER_PATTERNS と同じセット。frontend では
+  // dropdown から除外するために使う (タイムスタンプ + UNDERSTAND/LIKE/CURIOUS/HIGHLIGHT
+  // などはどの役割にも該当しない管理列)。
+  const __SYSTEM_COLUMN_PATTERNS = [
+    /^タイムスタンプ$/i, /^timestamp$/i, /^日時$/i, /^日付$/i,
+    /^UNDERSTAND$/i, /^LIKE$/i, /^CURIOUS$/i, /^HIGHLIGHT$/i,
+    /^理解$/i, /^いいね$/i, /^気になる$/i, /^ハイライト$/i,
+    /^_/
+  ];
+  function __isSystemColumnHeader(header) {
+    if (!header || typeof header !== 'string') return false;
+    const trimmed = header.trim();
+    if (!trimmed) return false;
+    return __SYSTEM_COLUMN_PATTERNS.some(p => p.test(trimmed));
+  }
+
   function fillColumnDropdowns(headers, mapping, confidence = {}) {
 
     try {
@@ -2187,12 +2203,15 @@
           dropdown.innerHTML = placeholderFor(columnType);
 
           headers.forEach((header, index) => {
-            if (header && header.trim()) {
-              const option = document.createElement('option');
-              option.value = index;
-              option.textContent = `${String.fromCharCode(65 + index)}列: ${header}`;
-              dropdown.appendChild(option);
-            }
+            if (!header || !header.trim()) return;
+            // システム列 (タイムスタンプ + リアクション + HIGHLIGHT + _internal) は
+            // どの役割にも該当しないので dropdown に出さない。
+            // 同じ regex を backend (__SYSTEM_HEADER_PATTERNS) と同期しておく。
+            if (__isSystemColumnHeader(header)) return;
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = `${String.fromCharCode(65 + index)}列: ${header}`;
+            dropdown.appendChild(option);
           });
         } catch (error) {
           console.error(`${columnType}ドロップダウンの設定エラー:`, error);
