@@ -407,8 +407,8 @@
             </div>
           </div>
 
-          <!-- 補助質問列選択 (旧: 理由列) -->
-          <div class="form-group">
+          <!-- 補助質問列選択 (旧: 理由列). pie モードでは非表示 (集計に reason を使わないため) -->
+          <div class="form-group" id="reason-column-row">
             <label for="reason-column-select" class="block text-sm font-medium text-gray-300 mb-2">
               📋 補助質問列:
               <span class="text-xs text-gray-400 ml-2">(カード下部に小さく表示する列・任意)</span>
@@ -446,6 +446,39 @@
             </select>
             <div id="name-confidence" class="text-xs mt-1 hidden">
               <span class="confidence-badge"></span>
+            </div>
+          </div>
+
+          <!-- 数値列の明示マッピング. matrix/numberline/auto で表示。
+               Why ② 列設定に昇格: matrix/numberline モードでは必須なのに、
+               以前は ③「表示と公開」の <details> の中に埋もれていた (教師が見落とす)。 -->
+          <div id="numeric-mapping-container" class="hidden space-y-4 pt-3 border-t border-gray-700 mt-2">
+            <!-- 検出された数値列の情報パネル -->
+            <div id="numeric-candidates-info" class="hidden p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+              <div class="flex items-center gap-2 mb-1">
+                <span class="text-blue-400">🔢</span>
+                <span class="text-sm font-medium text-blue-300">検出された数値列</span>
+              </div>
+              <div id="numeric-candidates-list" class="text-xs text-gray-300 space-y-1"></div>
+            </div>
+
+            <div class="form-group">
+              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-x-column-select">
+                📏 X軸の数値列:
+                <span class="text-xs text-gray-400 ml-2">(数直線・散布図で必須)</span>
+              </label>
+              <select id="numeric-x-column-select" class="modern-select" data-autosave>
+                <option value="">（自動判定）</option>
+              </select>
+            </div>
+            <div id="numeric-y-mapping-row" class="form-group hidden">
+              <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-y-column-select">
+                📐 Y軸の数値列:
+                <span class="text-xs text-gray-400 ml-2">(散布図で必須)</span>
+              </label>
+              <select id="numeric-y-column-select" class="modern-select" data-autosave>
+                <option value="">（未使用）</option>
+              </select>
             </div>
           </div>
 
@@ -525,34 +558,8 @@
                 </div>
               </div>
 
-              <!-- 検出された数値列の表示（情報のみ。getColumnAnalysis が numericScaleCandidates を返した時に表示） -->
-              <div id="numeric-candidates-info" class="hidden mt-3 p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
-                <div class="flex items-center gap-2 mb-1">
-                  <span class="text-blue-400">🔢</span>
-                  <span class="text-sm font-medium text-blue-300">検出された数値列</span>
-                </div>
-                <div id="numeric-candidates-list" class="text-xs text-gray-300 space-y-1"></div>
-              </div>
-
-              <!-- 数値列の明示マッピング（auto/numberline/matrix で関連、board のときは非表示） -->
-              <div id="numeric-mapping-container" class="hidden space-y-3 mt-3">
-                <div class="form-group">
-                  <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-x-column-select">
-                    X軸の数値列
-                  </label>
-                  <select id="numeric-x-column-select" class="modern-select" data-autosave>
-                    <option value="">（自動判定）</option>
-                  </select>
-                </div>
-                <div id="numeric-y-mapping-row" class="form-group hidden">
-                  <label class="block text-sm font-medium text-gray-300 mb-2" for="numeric-y-column-select">
-                    Y軸の数値列（マトリクス用）
-                  </label>
-                  <select id="numeric-y-column-select" class="modern-select" data-autosave>
-                    <option value="">（未使用）</option>
-                  </select>
-                </div>
-              </div>
+              <!-- 数値列マッピング (numericX/Y) と検出パネルは ② 列設定に移動。
+                   ここに残すと「データソース設定」と「表示設定」が混在して教師が混乱するため。 -->
 
               <!-- 軸ラベル（numberline/matrix で表示） -->
               <div id="axis-labels-container" class="hidden space-y-3 mt-3">
@@ -583,8 +590,9 @@
                 </div>
               </div>
 
-              <!-- 揺らぎ追跡用：再投稿の許可 -->
-              <div class="toggle-group mt-3">
+              <!-- 揺らぎ追跡用：再投稿の許可。numberline/matrix/auto のみ表示
+                   (board/pie/wordcloud では「揺らぎ」を表示する軸が無いので隠す) -->
+              <div id="allow-resubmit-row" class="toggle-group mt-3 hidden">
                 <label class="toggle-switch">
                   <input type="checkbox" id="allow-resubmit" data-autosave />
                   <span class="slider"></span>

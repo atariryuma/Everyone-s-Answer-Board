@@ -861,13 +861,19 @@
   }
 
   /**
-   * boardMode に応じて関連サブセクションの表示/非表示を切り替える。
-   * - auto       : 数値列マッピング + 軸ラベル（任意）。象限ラベル非表示。
-   * - board      : すべて非表示（掲示板モード）
-   * - numberline : 数値列マッピング X + 軸ラベル X。Y / 象限 は非表示
-   * - matrix     : X / Y 両方 + 軸ラベル両方 + 象限ラベル
+   * boardMode に応じてサブセクションを表示/非表示する。
    *
-   * Why: 教師の認知負荷を下げる。matrix を選ばない限り 4 象限ラベル欄は見せない。
+   * | mode       | answer | reason | class | name | numericX | numericY | axis-X | axis-Y | 象限 | resubmit |
+   * |------------|--------|--------|-------|------|----------|----------|--------|--------|------|----------|
+   * | board      |   ✅   |   ✅   |  ✅   |  ✅  |    –     |    –     |   –    |   –    |  –   |    –     |
+   * | pie        |   ✅   |   –    |  ✅   |  ✅  |    –     |    –     |   –    |   –    |  –   |    –     |
+   * | wordcloud  |   ✅   |   ✅   |  ✅   |  ✅  |    –     |    –     |   –    |   –    |  –   |    –     |
+   * | numberline |   ✅   |   ✅   |  ✅   |  ✅  |    ✅    |    –     |   ✅   |   –    |  –   |    ✅    |
+   * | matrix     |   ✅   |   ✅   |  ✅   |  ✅  |    ✅    |    ✅    |   ✅   |   ✅   |  ✅  |    ✅    |
+   * | auto       |   ✅   |   ✅   |  ✅   |  ✅  |    ✅    |    ✅    |   ✅   |   ✅   |  –   |    ✅    |
+   *
+   * answer/class/name は全モード必須。reason は pie のみ hide (集計用途で使われないため)。
+   * numericX/Y は viz モード (numberline/matrix/auto) のみ。allow-resubmit は軸あるモードのみ。
    */
   function updateVisualizationVisibility() {
     const mode = document.getElementById('board-mode-select')?.value || 'auto';
@@ -878,12 +884,15 @@
 
     const isViz = mode === 'numberline' || mode === 'matrix' || mode === 'auto';
     const isMatrix = mode === 'matrix';
+    const hasAxis = mode === 'numberline' || mode === 'matrix' || mode === 'auto';
 
+    show('reason-column-row', mode !== 'pie');
     show('numeric-mapping-container', isViz);
     show('axis-labels-container', isViz);
-    show('numeric-y-mapping-row', isMatrix);
+    show('numeric-y-mapping-row', isMatrix || mode === 'auto');
     show('y-axis-label-row', isMatrix);
     show('quadrant-labels-container', isMatrix);
+    show('allow-resubmit-row', hasAxis);
 
     const hint = document.getElementById('board-mode-hint');
     if (hint) {
