@@ -50,7 +50,7 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
       };
     }
 
-    const result = fetchSpreadsheetData(config, options, user);
+    const result = fetchSpreadsheetData(config, options);
 
     if (result.success) {
       const preloadedHeaders = result.headers;
@@ -242,10 +242,10 @@ function getAdaptiveBatchSize(consecutiveErrors) {
  * @param {number} startTime
  */
 /**
- * @param {Object} ctx - {sheet, headers, lastRow, lastCol, config, options, user, startTime}
+ * @param {Object} ctx - {sheet, headers, lastRow, lastCol, config, options, startTime}
  */
 function processBatchData(ctx) {
-  const { sheet, headers, lastRow, lastCol, config, options, user, startTime } = ctx;
+  const { sheet, headers, lastRow, lastCol, config, options, startTime } = ctx;
   const MAX_EXECUTION_TIME = 20000;
   const MAX_CONSECUTIVE_ERRORS = 3;
 
@@ -357,14 +357,13 @@ function processBatchData(ctx) {
  * config に従ってシートを開き、フィルタ・整形済みのデータ配列を返す。
  * @param {Object} config
  * @param {Object} options
- * @param {Object} user
  */
-function fetchSpreadsheetData(config, options = {}, user = null) {
+function fetchSpreadsheetData(config, options = {}) {
   const startTime = Date.now();
 
   const { sheet } = connectToSpreadsheetSheet(config);
   const { lastRow, lastCol, headers } = getSheetInfo(sheet);
-  const processedData = processBatchData({ sheet, headers, lastRow, lastCol, config, options, user, startTime });
+  const processedData = processBatchData({ sheet, headers, lastRow, lastCol, config, options, startTime });
 
   return {
     success: true,
