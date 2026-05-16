@@ -30,20 +30,17 @@ const ADMIN_JS = fs.readFileSync(
 // HTML 側: UI 簡素化の不変条件
 // ─────────────────────────────────────────────────────────────────────────
 
-test('AdminPanel: 「🔍 検証して接続」ボタンは hidden block 内のみ (常時表示なし)', () => {
-  // legacy 残置の hidden div には button が存在してよいが、それ以外には無いこと。
-  // HTML を hidden div で切り分けて、可視ブロック側にボタン id="url-validate" が
-  // 含まれていないことを確認する。
-  const visibleSections = ADMIN_HTML.replace(
-    /<div\s+style="display:none;"[\s\S]*?<\/div>/g,
-    ''
+test('AdminPanel: legacy #url-validate / source-method radio は完全削除 (v2757)', () => {
+  // 「🔍 検証して接続」ボタンは autoAnalyzeFormUrl の debounced auto-validate に
+  // 置換済みで、明示ボタンは UI 上不要。hidden 残置ですらコードベースに残さない。
+  assert.ok(
+    !/id="url-validate"/.test(ADMIN_HTML),
+    'legacy #url-validate は完全に削除されているはず'
   );
   assert.ok(
-    !/id="url-validate"/.test(visibleSections),
-    '可視ブロックに #url-validate が残っている (削除されていない)'
+    !/name="source-method"/.test(ADMIN_HTML),
+    'legacy source-method radio は完全に削除されているはず'
   );
-  // legacy hidden は残っていてよい
-  assert.match(ADMIN_HTML, /id="url-validate"/, 'legacy hidden #url-validate は残置されているはず');
 });
 
 test('AdminPanel: 表示モード/軸ラベルは <details> で畳まれている', () => {

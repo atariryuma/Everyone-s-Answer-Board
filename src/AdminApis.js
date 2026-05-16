@@ -235,16 +235,6 @@ function unpublishBoard(targetUserId, options = {}) {
   }
 }
 
-/**
- * @deprecated Use unpublishBoard() — kept for back-compat with page.js endPublication と
- *   AdminPanel unpublishBoardBtn の click ハンドラ。新規コードは unpublishBoard を直接呼ぶ。
- * @param {string} [targetUserId]
- * @returns {Object} 実行結果
- */
-function clearActiveSheet(targetUserId) {
-  return unpublishBoard(targetUserId);
-}
-
 // =====================================================================
 // Profile (multi-board) shared core. AdminApis dispatcher cases と
 // DataApis のオーナー向けラッパーが共通で使う実装。

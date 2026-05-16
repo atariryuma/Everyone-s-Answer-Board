@@ -424,19 +424,6 @@
   }
 
   /**
-   * データソース選択方式の切り替え
-   * @param {string} method - 'url' または 'dropdown'
-   */
-  function toggleSourceMethod(method) {
-    if (method === 'dropdown') {
-      const formSelect = document.getElementById('form-select');
-      if (formSelect && formSelect.children.length <= 1) {
-        loadForms();
-      }
-    }
-  }
-
-  /**
    * ✅ CLAUDE.md準拠: Event listeners initialization (moved from duplicate DOMContentLoaded)
    */
   // dropdown 系 details の click-outside auto-close。
@@ -473,12 +460,6 @@
   }, true);
 
   function initializeEventListeners() {
-    document.querySelectorAll('input[name="source-method"]').forEach((radio) => {
-      radio.addEventListener('change', function () {
-        toggleSourceMethod(this.value);
-      });
-    });
-
     // フォーム選択時の処理
     const formSelect = document.getElementById('form-select');
     if (formSelect) {
@@ -499,13 +480,6 @@
         loadForms().catch(error => {
           console.warn('フォーム一覧の読み込みに失敗:', error);
         });
-      });
-    }
-
-    const urlValidateBtn = document.getElementById('url-validate');
-    if (urlValidateBtn) {
-      urlValidateBtn.addEventListener('click', function () {
-        validateCompleteUrl();
       });
     }
 

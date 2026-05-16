@@ -246,20 +246,6 @@ test('all 3 lifecycle helpers return unified shape with publishedAt + isPublishe
 });
 
 // =====================================================================
-// clearActiveSheet alias は unpublishBoard と等価
-// =====================================================================
-
-test('clearActiveSheet: behaves identically to unpublishBoard (back-compat alias)', () => {
-  const ctx = loadAdminContext();
-  ctx.__savedConfigs['owner1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
-
-  const result = ctx.clearActiveSheet('owner1');
-  assert.equal(result.success, true);
-  assert.equal(result.isPublished, false);
-  assert.equal(result.publishedAt, null);
-});
-
-// =====================================================================
 // dispatcher 経由でも同じ動作になること
 // =====================================================================
 

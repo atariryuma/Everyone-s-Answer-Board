@@ -227,8 +227,6 @@ Google Sheets as database via service account. `users` sheet stores user records
 | `unpublishBoard(targetUserId?, options?)` | `AdminApis.js` | 所有者 or 管理者がボードの公開を終了する |
 | `toggleUserBoardStatus(targetUserId, options?)` | `AdminApis.js` | 管理者が他ユーザーのボード公開状態を toggle する |
 
-**`clearActiveSheet`** は `unpublishBoard` の deprecated alias（既存 client コードとの互換性のため残置）。新規実装では `unpublishBoard` を直接呼ぶこと。
-
 **統一不変条件**（`__applyPublishStateChange` で集約）：
 
 - `publishedAt` は「現在の状態の発生時刻」（公開中 = now / 非公開 = null）

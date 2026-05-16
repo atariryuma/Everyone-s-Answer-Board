@@ -159,7 +159,7 @@
         addReaction: (rowIndex, reaction, sheetName) => this.runGas('addReaction', this.state.userId, rowIndex, reaction),
         toggleHighlight: (rowIndex, sheetName) => this.runGas('toggleHighlight', this.state.userId, rowIndex),
         checkAdmin: () => this.runGas('isAdmin'),
-        clearCache: () => this.runGas('clearActiveSheet', this.state.userId),
+        clearCache: () => this.runGas('unpublishBoard', this.state.userId),
         validateData: () => this.validData()
       };
 
