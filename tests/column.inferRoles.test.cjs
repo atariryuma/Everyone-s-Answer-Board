@@ -37,6 +37,25 @@ test('inferColumnRoles: L1 only — standard Japanese form (no sample data)', ()
   assert.equal(r.mapping.reason, 5);
 });
 
+test('inferColumnRoles: L1 — 振り返り系自由記述パターンを answer として検出 (v2764)', () => {
+  // 実フォーム由来の question: 「今日の学習で、心に残ったこと・学んだこと・これからやってみたいことを
+  //   自分の言葉で書いてください」を 48% (medium-text fallback) ではなく
+  //   L1 patterns で正しく拾えるか。書いてください / 学んだこと / 心に残った を追加した。
+  const ctx = loadCtx();
+  const headers = ['ts', '名前', '今日の学習で、心に残ったこと・学んだこと・書いてください'];
+  const r = ctx.inferColumnRoles(headers);
+  assert.equal(r.mapping.answer, 2);
+  assert.ok(r.confidence.answer >= 85,
+    `振り返り question pattern should match L1 (>=85), got ${r.confidence.answer}`);
+});
+
+test('inferColumnRoles: L1 — 「書こう」「書いて」末尾パターンを answer として検出', () => {
+  const ctx = loadCtx();
+  // 児童向けフォーム頻出: 命令形末尾 (書こう / 書いて)
+  assert.equal(ctx.inferColumnRoles(['ts', '理由を書こう']).mapping.answer, 1);
+  assert.equal(ctx.inferColumnRoles(['ts', 'なぜそう思ったか書いて']).mapping.answer, 1);
+});
+
 test('inferColumnRoles: L1 — question mark and natural-language question patterns detected as answer', () => {
   const ctx = loadCtx();
   // 児童向けフォームでよくある自由記述質問。「回答」「答え」のような明示キーワードは含まれない。

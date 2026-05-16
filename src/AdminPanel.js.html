@@ -2387,11 +2387,18 @@
 
     if (selectedIndex !== null) {
       dropdown.value = selectedIndex;
-      dropdown.classList.add('has-ai-selection');
-      // Why: savedMapping は存在するが backend が再推定できないヘッダー (児童独自の質問文等) では
-      //      confidence=0 になる。「自動推定 0%」と出すのは紛らわしいので「保存済み」と表示。
-      showConfidenceBadge(columnType, columnConfidence, columnConfidence > 0 ? 'ai' : 'saved');
-      return;
+      // Why dropdown.value 再確認: savedMapping の index が現在の headers に存在しない場合
+      //   (system 列除外で消えた / 列が削除された / 範囲外) は dropdown.value が "" のまま。
+      //   その状態で badge を出すと「保存済み」と表示されながら値が空という矛盾 UX になる。
+      if (dropdown.value !== String(selectedIndex)) {
+        // Option not found — fall through to normal "no selection" handling
+      } else {
+        dropdown.classList.add('has-ai-selection');
+        // Why: savedMapping は存在するが backend が再推定できないヘッダー (児童独自の質問文等) では
+        //      confidence=0 になる。「自動推定 0%」と出すのは紛らわしいので「保存済み」と表示。
+        showConfidenceBadge(columnType, columnConfidence, columnConfidence > 0 ? 'ai' : 'saved');
+        return;
+      }
     }
     if (columnConfidence > 0) {
       const threshold = COLUMN_CONFIDENCE_THRESHOLDS[columnType] || 75;
