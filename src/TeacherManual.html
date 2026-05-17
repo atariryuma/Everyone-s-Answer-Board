@@ -113,6 +113,7 @@
             <h4>📖 目次</h4>
             <a href="#start">🚀 はじめての授業 (3分)</a>
             <a href="#modes">📊 可視化モード</a>
+            <a href="#discussion-tools">🎙️ 議論支援ツール</a>
             <a href="#columns">⚙️ 列設定とは？</a>
             <a href="#publish">📣 公開と URL 共有</a>
             <a href="#reactions">⭐ 反応・ハイライト</a>
@@ -190,7 +191,7 @@
               <div class="mode-card">
                 <div class="icon">📝</div>
                 <div class="title">掲示板</div>
-                <div class="desc">回答を一覧表示。各カードに「いいね」「気になる」などのリアクションが付けられる。</div>
+                <div class="desc">回答を一覧表示。各カードに「いいね！」「なるほど！」「もっと知りたい！」のリアクションが付けられる。</div>
                 <div class="when">👉 自由記述の意見交換に</div>
               </div>
               <div class="mode-card">
@@ -231,7 +232,59 @@
             </div>
           </section>
 
-          <!-- §3 列設定 -->
+          <!-- §3 議論支援ツール -->
+          <section id="discussion-tools">
+            <h2 class="manual-h2">🎙️ 議論支援ツール</h2>
+            <p class="manual-p">
+              児童画面の上部に出るツールバーで、議論の進行を支援できます。すべて<strong>教師が意図的に押したときだけ</strong>動くので、
+              児童に「いつ何を見せるか」は先生が制御できます。
+            </p>
+
+            <div class="step-card">
+              <div class="step-num">📌</div>
+              <div class="step-body">
+                <h4>議論前</h4>
+                <p>議論を始める前に押すと、その時点の分布をスナップショットとして保存します。
+                  あとで「⇄ 比較」や「→ 動き」を使うときの基準点になります。</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-num">⇄</div>
+              <div class="step-body">
+                <h4>比較</h4>
+                <p>議論前と現在を左右 2 画面で並べて見せます。
+                  「クラス全体としてどう変わったか」を集団的に把握するのに向いています。</p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-num">→</div>
+              <div class="step-body">
+                <h4>動き <span class="text-sm text-slate-400">(マトリクス専用)</span></h4>
+                <p>議論前 → 現在 の動きを軌跡 (細い線) で重ね描きします。1.5 秒のアニメーションで「動きが起きた」を直感的に伝えます。
+                  <strong>クリック</strong>で再生、<strong>Shift+クリック</strong>で OFF。</p>
+                <p class="text-sm text-slate-400 mt-2">
+                  💡 動きが小さい児童・動かなかった児童は軌跡が無いだけで、「考えを保持した」も等価な学びとして扱う設計です。
+                  「大きく動いた = 正解」という見方にならないよう、強調色は使っていません。
+                </p>
+              </div>
+            </div>
+            <div class="step-card">
+              <div class="step-num">⏱</div>
+              <div class="step-body">
+                <h4>軌跡スライダー</h4>
+                <p>1 投稿 = 1 ステップ単位で過去の任意時点を再生できます。
+                  「どの瞬間に意見が動いたか」を時系列で振り返るのに使います。「↺ 現在」ボタンで最新に戻ります。</p>
+              </div>
+            </div>
+
+            <div class="callout info">
+              <strong>使う順番の目安：</strong>
+              授業冒頭で <code>📌 議論前</code> を押す → 議論 → <code>→ 動き</code> または <code>⇄ 比較</code> で振り返り。
+              プロファイル切替や軸ラベル変更で議論前スナップは自動でリセットされます (違うフォーム間の座標を結ばない安全弁)。
+            </div>
+          </section>
+
+          <!-- §4 列設定 -->
           <section id="columns">
             <h2 class="manual-h2">⚙️ 列設定とは？</h2>
             <p class="manual-p">
