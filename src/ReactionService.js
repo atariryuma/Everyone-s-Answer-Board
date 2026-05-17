@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache */
+/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_ */
 
 const LOCK_TIMEOUT_MS = 10000;
 const LOCK_CACHE_TTL_SECONDS = 10;
@@ -478,8 +478,8 @@ function executeBoardRowOperation(options) {
 
     // Spreadsheetのオープンとシート取得は読取操作で競合しない。
     // ロック保持時間を最小化するためクリティカルセクション外で実行する。
+    // accessMode 自動判定: owner = openById、viewer/admin = SA pool 経由。
     const dataAccess = openSpreadsheet(config.spreadsheetId, {
-      useServiceAccount: false,
       context: openContext
     });
     if (!dataAccess) return createErrorResponse('Failed to access target spreadsheet');
@@ -522,6 +522,10 @@ function executeBoardRowOperation(options) {
       cache.put(lockKey, actorEmail, LOCK_CACHE_TTL_SECONDS);
       cachePlaced = true;
       const result = process(sheet, rowNumber, actorEmail, preloadedHeaders);
+      // board data cache を即時 stale 化 (viewer の次 polling で fresh fetch)。
+      if (typeof bumpBoardDataVersion_ === 'function') {
+        try { bumpBoardDataVersion_(targetUserId); } catch (_) { /* ignore */ }
+      }
       return formatSuccess(result);
     } finally {
       if (lockAcquired) {

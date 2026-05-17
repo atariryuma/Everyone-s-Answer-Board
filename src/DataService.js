@@ -102,7 +102,8 @@ function resolveTimestampIndex(headers) {
  * @returns {{sheet:Sheet, spreadsheet:Spreadsheet}}
  */
 function connectToSpreadsheetSheet(config) {
-  const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
+  // accessMode は openSpreadsheet が自動判定 (owner なら openById、 viewer なら SA pool)。
+  const dataAccess = openSpreadsheet(config.spreadsheetId, { context: 'connectToSpreadsheetSheet' });
 
   if (!dataAccess || !dataAccess.spreadsheet) {
     // Why: openSpreadsheet が既に WARN ログを出しているので二重ログしない。
@@ -612,8 +613,8 @@ function deleteAnswerRow(userId, rowIndex) {
     const {spreadsheetId} = config.config;
     const sheetName = config.config.sheetName || 'フォームの回答 1';
 
+    // accessMode は openSpreadsheet が自動判定 (owner = openById, viewer/admin = SA pool)。
     const dataAccess = openSpreadsheet(spreadsheetId, {
-      useServiceAccount: false, // ユーザーの回答ボードは同一ドメイン共有設定で対応
       targetUserEmail: user.userEmail,
       context: 'deleteAnswerRow'
     });

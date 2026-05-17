@@ -1,178 +1,105 @@
 /**
- * @fileoverview SharingHelper - 同一ドメイン共有 + サービスアカウント editor 追加。
- *   新規 SS 作成直後の共有デフォルト一括適用 (`applySpreadsheetSharingDefaults`)。
+ * @fileoverview SharingHelper - スプレッドシート共有設定 (SA-only モデル)。
+ *
+ * 通常 Google Form と同等のセキュリティモデル: 回答 SS は owner と SA pool だけがアクセス可能。
+ * viewer (生徒) は GAS Web App 経由でのみ board を見る (SA proxy 経由)。 viewer の Drive には
+ * 表示されず、 viewer が SS を直接編集することも不可。
+ *
+ * 旧 domain-wide sharing (`DOMAIN_WITH_LINK + EDIT`) は廃止 (v2782 refactor)。
+ * 既存ボードの cleanup は `migrateBoardSharing` admin API で実施。
  */
 
-/* global getCachedProperty */
+/* global getCachedProperty, logError_, getAllServiceAccounts_, parseServiceAccountCredsSoft_, invalidateSaCache_ */
 
 /**
- * スプレッドシートを同一ドメイン内で編集可能に設定（サービスアカウント不使用経路用）。
+ * SA pool の全 SA を SS の editor として追加する (冪等)。
+ *
+ * Why: DatabaseCore の Sheets REST API + JWT 経路は SA が editor でない SS で 403。
+ *   pool 内の任意の SA が pick されるので、 全員を editor 登録しておかないと「pick された SA
+ *   が共有漏れで verify 失敗 → 次の SA に fallback」のコストが毎回発生する。
+ *
  * @param {string} spreadsheetId
- * @param {string} ownerEmail
+ * @returns {{success:boolean, added:string[], errors:string[]}}
  */
-function setupDomainWideSharing(spreadsheetId, ownerEmail) {
-  const [, domain] = (ownerEmail || '').split('@');
-  if (!domain) {
-    throw new Error('Invalid email format');
-  }
-
+function addServiceAccountsAsEditors(spreadsheetId) {
+  const result = { success: false, added: [], errors: [] };
   try {
-    const file = DriveApp.getFileById(spreadsheetId);
-
-    const sharingAccess = file.getSharingAccess();
-    const sharingPermission = file.getSharingPermission();
-
-    if (sharingAccess === DriveApp.Access.DOMAIN || sharingAccess === DriveApp.Access.DOMAIN_WITH_LINK) {
-      if (sharingPermission === DriveApp.Permission.EDIT) {
-        return { success: true, message: 'Already configured' };
+    const pool = (typeof getAllServiceAccounts_ === 'function') ? getAllServiceAccounts_() : [];
+    if (pool.length === 0) {
+      result.errors.push('SA pool not configured');
+      return result;
+    }
+    const ss = SpreadsheetApp.openById(spreadsheetId);
+    for (let i = 0; i < pool.length; i++) {
+      const sa = pool[i];
+      try {
+        // addEditor は冪等 (既存 editor に再追加しても no-op)。 getEditors の pre-check は
+        // 余分な RPC で getEditors 自体が ScriptError を投げるケースもあるため省略。
+        ss.addEditor(sa.client_email);
+        result.added.push(sa.client_email);
+        // 過去の 'no' verify cache を吹き飛ばす (今回 add で OK になる可能性が高い)。
+        if (typeof invalidateSaCache_ === 'function') {
+          invalidateSaCache_(spreadsheetId, sa.client_email);
+        }
+      } catch (err) {
+        result.errors.push(`${sa.client_email}: ${err.message}`);
       }
     }
-
-    file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.EDIT);
-
-    return { success: true, message: 'Domain-wide sharing configured' };
-
-  } catch (driveAppError) {
-    // Why (fallback): Google Workspace のドメインポリシーで DOMAIN_WITH_LINK + EDIT が
-    //   禁じられているテナント（教育機関で多い）では DriveApp.setSharing が落ちる。
-    //   Drive REST API では type=domain + role=reader の細かい制御ができ、多くの場合
-    //   こちらは通る。fallback として REST API を試す（READER 権限のみ）。
-    //
-    //   ログ調査 (2026-05-14) で customizeForm 経由の新規 SS が student 環境で
-    //   403 を返す事象が複数回検出されたため、自動 fallback を組み込み。
-    console.warn('setupDomainWideSharing: DriveApp.setSharing failed, trying Drive REST API fallback:', driveAppError.message);
-    try {
-      const token = ScriptApp.getOAuthToken();
-      const url = 'https://www.googleapis.com/drive/v3/files/' +
-                  encodeURIComponent(spreadsheetId) + '/permissions?supportsAllDrives=true';
-      const resp = UrlFetchApp.fetch(url, {
-        method: 'post',
-        contentType: 'application/json',
-        muteHttpExceptions: true,
-        headers: { Authorization: 'Bearer ' + token },
-        payload: JSON.stringify({
-          type: 'domain',
-          role: 'reader',
-          domain,
-          allowFileDiscovery: false
-        })
-      });
-      const code = resp.getResponseCode();
-      if (code >= 400 && code !== 409) {  // 409 = already exists (idempotent)
-        const body = resp.getContentText().substring(0, 300);
-        throw new Error(`Drive REST API ${code}: ${body}`);
-      }
-      return { success: true, message: 'Domain-wide sharing configured via REST API fallback', fallback: true };
-    } catch (restError) {
-      console.error('setupDomainWideSharing: both DriveApp and REST API failed', {
-        driveApp: driveAppError.message,
-        rest: restError.message
-      });
-      // 元エラーを優先 (DriveApp 側のメッセージのほうが分かりやすい)
-      throw driveAppError;
-    }
+    result.success = result.added.length > 0;
+    return result;
+  } catch (err) {
+    if (typeof logError_ === 'function') logError_('addServiceAccountsAsEditors', err);
+    else console.error('addServiceAccountsAsEditors:', err && err.message);
+    result.errors.push(err && err.message ? err.message : String(err));
+    return result;
   }
 }
 
 /**
- * SERVICE_ACCOUNT_CREDS を parse して service account 情報を取得する shared helper。
- *
- * Why: JSON.parse(credentials) は DatabaseCore / SharingHelper / ConfigService の 4 ヶ所で
- *   重複していた DRY 違反。1 ヶ所で型・必須フィールド検証して errors を一貫させる。
- *   失敗時は throw せず {success:false, message} を返す（呼出元が分岐しやすい）。
- *
- * @returns {{success:boolean, creds?:Object, saEmail?:string, message?:string}}
- *   - success: true 時に creds (parsed JSON) と saEmail (client_email) が利用可能
- *   - success: false 時は message に原因
- */
-function parseServiceAccountCreds() {
-  const credsJson = (typeof getCachedProperty === 'function')
-    ? getCachedProperty('SERVICE_ACCOUNT_CREDS')
-    : null;
-  if (!credsJson) {
-    return { success: false, message: 'SERVICE_ACCOUNT_CREDS not configured' };
-  }
-  let creds;
-  try {
-    creds = JSON.parse(credsJson);
-  } catch (parseError) {
-    return { success: false, message: 'Invalid SERVICE_ACCOUNT_CREDS JSON: ' + parseError.message };
-  }
-  if (!creds || typeof creds !== 'object') {
-    return { success: false, message: 'SERVICE_ACCOUNT_CREDS is not an object' };
-  }
-  const saEmail = typeof creds.client_email === 'string' ? creds.client_email : '';
-  if (!saEmail) {
-    return { success: false, message: 'client_email not found in SERVICE_ACCOUNT_CREDS' };
-  }
-  return { success: true, creds, saEmail };
-}
-
-/**
- * SERVICE_ACCOUNT_CREDS の client_email を SS の editor として追加する。
- *
- * Why: DatabaseCore は Sheets REST API + Service Account JWT で SS にアクセスする
- *   (`SpreadsheetApp.openById()` ではない)。サービスアカウントが editor でない SS は
- *   403 を返し、`getPublishedSheetData` が
- *   「リクエストされたドキュメントにアクセスする権限がありません」で落ちる。
- *
- *   createTemplateForm / customizeForm が新規 SS を作るたびに必ず呼ぶこと。
- *   既存 SS の遡及修復は AdminApis.repairSpreadsheetSharing op から本関数を呼ぶ。
- *
- * @param {string} spreadsheetId
- * @returns {{success:boolean, added:boolean, saEmail?:string, message?:string}}
+ * 後方互換 wrapper: primary SA だけを editor 追加する旧 API。
+ * 新規コードは `addServiceAccountsAsEditors` を使うこと。
+ * @deprecated
  */
 function addServiceAccountAsEditor(spreadsheetId) {
   try {
-    const parsed = parseServiceAccountCreds();
-    if (!parsed.success) {
-      return { success: false, added: false, message: parsed.message };
+    const pool = (typeof getAllServiceAccounts_ === 'function') ? getAllServiceAccounts_() : [];
+    if (pool.length === 0) {
+      return { success: false, added: false, message: 'SA pool not configured' };
     }
-
-    // addEditor は冪等（既存 editor に再追加しても no-op）。getEditors の pre-check は
-    // 余分な RPC で getEditors 自体が ScriptError を投げるケースもあるため避ける。
-    SpreadsheetApp.openById(spreadsheetId).addEditor(parsed.saEmail);
-    return { success: true, added: true, saEmail: parsed.saEmail, message: 'Service account added as editor' };
+    const primary = pool[0];
+    SpreadsheetApp.openById(spreadsheetId).addEditor(primary.client_email);
+    if (typeof invalidateSaCache_ === 'function') {
+      invalidateSaCache_(spreadsheetId, primary.client_email);
+    }
+    return { success: true, added: true, saEmail: primary.client_email, message: 'Service account added as editor' };
   } catch (error) {
-    logError_('addServiceAccountAsEditor', error);
+    if (typeof logError_ === 'function') logError_('addServiceAccountAsEditor', error);
     return { success: false, added: false, message: error.message };
   }
 }
 
 /**
  * 新規作成 SS に共有デフォルトを一括適用する。
- *   1) サービスアカウントを editor 追加（必須 — 未設定だと view が 403）
- *   2) ownerEmail のドメインへ DOMAIN_WITH_LINK + EDIT を設定（任意 — 失敗してもサーバ動作は保たれる）
+ *   SA pool 全員を editor 追加 (必須 — 未設定だと viewer 経路が 403)。
  *
- * Why: createTemplateForm と customizeForm の resetDestination 経路で同じ処理が必要なため
- *   1 関数にまとめる。両ステップとも fail-soft（throw せず errors[] に詰めて返す）にして、
- *   呼び出し元のメインフローを止めない。
+ * v2782 で domain-wide sharing は廃止。 viewer の Drive にボード SS が表示されない・
+ * viewer が SS を直接編集不可、 という通常 Form 相当のセキュリティモデルに統一。
  *
  * @param {string} spreadsheetId
- * @param {string} ownerEmail - 通常は getCurrentEmail()（フォーム作成者）
- * @returns {{saAdded:boolean, domainShared:boolean, errors:string[]}}
+ * @param {string} [ownerEmail] - 後方互換用 (現在は未使用)
+ * @returns {{saAdded:boolean, saEmails:string[], errors:string[]}}
  */
 function applySpreadsheetSharingDefaults(spreadsheetId, ownerEmail) {
-  const result = { saAdded: false, domainShared: false, errors: [] };
-
+  // ownerEmail は domain-share 時代の引数。 v2782+ では使わないが、 旧 caller 互換のため残す。
+  void ownerEmail;
+  const result = { saAdded: false, saEmails: [], errors: [] };
   try {
-    const sa = addServiceAccountAsEditor(spreadsheetId);
+    const sa = addServiceAccountsAsEditors(spreadsheetId);
     result.saAdded = !!(sa && sa.success);
-    if (sa && !sa.success && sa.message) result.errors.push('SA: ' + sa.message);
+    result.saEmails = (sa && sa.added) || [];
+    if (sa && sa.errors && sa.errors.length) result.errors.push(...sa.errors.map((e) => 'SA: ' + e));
   } catch (saError) {
     result.errors.push('SA: ' + saError.message);
   }
-
-  if (ownerEmail && typeof ownerEmail === 'string' && ownerEmail.indexOf('@') > 0) {
-    try {
-      const dom = setupDomainWideSharing(spreadsheetId, ownerEmail);
-      result.domainShared = !!(dom && dom.success);
-    } catch (domError) {
-      // setupDomainWideSharing は throw する設計。fail-soft で吸収。
-      result.errors.push('Domain: ' + domError.message);
-    }
-  }
-
   return result;
 }
-

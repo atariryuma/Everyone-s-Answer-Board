@@ -10,7 +10,7 @@
         HIGHLIGHT_RATE_LIMIT_MS: isLowEndDevice ? 800 : 500,
         CACHE_TTL_MS: perfLevel === 'high' ? 2000 : perfLevel === 'low' ? 500 : 1000,
         RETRY_DELAY_MS: perfLevel === 'low' ? 3000 : 2000,
-        POLLING_INTERVAL_MS: perfLevel === 'high' ? 3000 : perfLevel === 'low' ? 8000 : 5000,
+        POLLING_INTERVAL_MS: perfLevel === 'high' ? 5000 : perfLevel === 'low' ? 12000 : 8000,
         INIT_TIMEOUT_MS: isLowEndDevice ? 45000 : 30000
       };
     }

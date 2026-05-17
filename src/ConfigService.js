@@ -602,9 +602,9 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
 
     if (typeof answerIndex === 'number' && config?.spreadsheetId && config?.sheetName) {
       try {
-        // ユーザーの回答ボードは同一ドメイン共有設定で対応（サービスアカウント不使用）
+        // accessMode 自動判定: owner = openById、viewer/admin = SA pool 経由。
         try {
-          const dataAccess = openSpreadsheet(config.spreadsheetId, { useServiceAccount: false });
+          const dataAccess = openSpreadsheet(config.spreadsheetId, { context: 'configService.questionText' });
           const { spreadsheet } = dataAccess;
           const sheet = spreadsheet.getSheetByName(config.sheetName);
           if (sheet) {

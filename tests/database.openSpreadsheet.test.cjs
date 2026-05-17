@@ -155,22 +155,57 @@ test('openSpreadsheet: getSheet returns null when getSheetByName throws', () => 
 // openSpreadsheet — service account gating (validateServiceAccountUsage)
 // =====================================================================
 
-test('openSpreadsheet: useServiceAccount=true on non-DB sheet without admin falls through to SpreadsheetApp', () => {
-  // Non-admin user requesting SA access on a non-database spreadsheet.
-  // validateServiceAccountUsage checks cache, and if no cached validation, calls findUserBySpreadsheetId.
-  // We stub that to return a published board — SA access is still not the database id,
-  // so effectiveUseServiceAccount becomes false (gated by spreadsheetId === databaseId check).
-  const mockSpreadsheet = { id: 'user-sheet', getSheetByName: () => null };
+test('openSpreadsheet: non-DB sheet without owner/admin is denied (unpublished board)', () => {
+  // v2782+: 非 admin & 非 owner で未公開ボードへの SA アクセスは validation で deny される。
   const ctx = loadDatabaseContext({
     propsStore: { DATABASE_SPREADSHEET_ID: 'db-id-123' },
-    SpreadsheetApp: { openById: () => mockSpreadsheet },
+    SpreadsheetApp: { openById: () => ({ id: 'user-sheet' }) },
     isAdministrator: () => false
   });
+  // vm.runInContext で source の関数宣言が override を上書きするため、 load 後に再設定。
+  ctx.findUserBySpreadsheetId = () => ({ userId: 'u1', userEmail: 'owner@example.com' });
+  ctx.getUserConfig = () => ({ success: true, config: { isPublished: false } });
 
   const result = ctx.openSpreadsheet('different-sheet-id', { useServiceAccount: true });
 
-  assert.ok(result, 'openSpreadsheet should still succeed via SpreadsheetApp fallback');
+  assert.equal(result, null, 'unpublished cross-user access must be denied');
+});
+
+test('openSpreadsheet: non-DB sheet for owner uses own access (openById)', () => {
+  // v2782+: owner が自分の board にアクセス → accessMode='own' → openById (own OAuth) を使う。
+  const mockSpreadsheet = { id: 'owner-sheet', getSheetByName: () => null };
+  const ctx = loadDatabaseContext({
+    propsStore: { DATABASE_SPREADSHEET_ID: 'db-id-123' },
+    SpreadsheetApp: { openById: () => mockSpreadsheet },
+    isAdministrator: () => false,
+    currentEmail: 'owner@example.com'
+  });
+  ctx.findUserBySpreadsheetId = () => ({ userId: 'u1', userEmail: 'owner@example.com' });
+
+  const result = ctx.openSpreadsheet('owner-sheet-id', { useServiceAccount: true });
+
+  assert.ok(result, 'owner access should succeed via openById');
   assert.equal(result.spreadsheet, mockSpreadsheet);
+  assert.equal(result.accessMode, 'own');
+});
+
+test('openSpreadsheet: non-DB sheet for viewer on published board uses SA pool path', () => {
+  // v2782+: 公開 board への非 owner 非 admin アクセス → accessMode='sa'。
+  // SA pool 未設定なら openById fallback。
+  const mockSpreadsheet = { id: 'viewer-sheet', getSheetByName: () => null };
+  const ctx = loadDatabaseContext({
+    propsStore: { DATABASE_SPREADSHEET_ID: 'db-id-123' },
+    SpreadsheetApp: { openById: () => mockSpreadsheet },
+    isAdministrator: () => false,
+    currentEmail: 'viewer@example.com'
+  });
+  ctx.findUserBySpreadsheetId = () => ({ userId: 'u1', userEmail: 'owner@example.com' });
+  ctx.getUserConfig = () => ({ success: true, config: { isPublished: true } });
+
+  const result = ctx.openSpreadsheet('different-sheet-id', { useServiceAccount: true });
+
+  assert.ok(result, 'viewer access on published board should succeed');
+  assert.equal(result.accessMode, 'sa');
 });
 
 test('openSpreadsheet: matching DB id + useServiceAccount=true falls through to SpreadsheetApp when no credentials', () => {
@@ -276,13 +311,18 @@ test('validateServiceAccountUsage: database spreadsheet id always allowed', () =
   assert.equal(result.allowed, true);
 });
 
-test('validateServiceAccountUsage: admin allowed on any sheet', () => {
+test('validateServiceAccountUsage: admin allowed on any sheet (cross-user via SA)', () => {
+  // v2782+: admin が他人のボードにアクセスするときは accessMode='sa'。
+  // 自分が owner のときは 'own' に上書きされる (owner check が admin より優先)。
   const ctx = loadDatabaseContext({
     propsStore: { DATABASE_SPREADSHEET_ID: 'db-id' },
-    isAdministrator: () => true
+    isAdministrator: () => true,
+    currentEmail: 'admin@example.com'
   });
+  ctx.findUserBySpreadsheetId = () => ({ userId: 'u1', userEmail: 'someone-else@example.com' });
   const result = ctx.validateServiceAccountUsage('other-sheet', true);
   assert.equal(result.allowed, true);
+  assert.equal(result.accessMode, 'sa');
 });
 
 // =====================================================================

@@ -1095,7 +1095,7 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
  */
 function validateAccess(spreadsheetId, autoAddEditor = true) {
   try {
-    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
+    const dataAccess = openSpreadsheet(spreadsheetId, { context: 'systemController' });
     const { spreadsheet } = dataAccess;
 
     const sheets = spreadsheet.getSheets();
@@ -1185,7 +1185,7 @@ function __formInfoFailure_(status, message, opts) {
 
 // Spreadsheet / sheet の解決 + アクセス権チェック。
 function __resolveFormInfoSpreadsheet_(spreadsheetId, sheetName) {
-  const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
+  const dataAccess = openSpreadsheet(spreadsheetId, { context: 'systemController' });
   if (!dataAccess || !dataAccess.spreadsheet) {
     return { ok: false, error: __formInfoFailure_('SPREADSHEET_NOT_FOUND', 'スプレッドシートにアクセスできませんでした。', { sheetName, accessMethod: 'normal_permissions' }) };
   }

@@ -6,20 +6,28 @@
 /* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS */
 
 /**
- * Sheets API 呼び出しラッパー（適応型バックオフ + サーキットブレーカー）。
+ * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
+ *
+ * `saEmail` と `authResolver` を渡すと、 retry 時に元 SA が cooling 中なら別 SA の token に
+ * 詰め替えて非 cooling SA で retry を続ける (auto failover)。 これがないと closure 固定
+ * された accessToken が同じ quota 焼け SA に再突入して失敗する。
+ *
  * @param {string} url
- * @param {Object} options - Fetch options
- * @param {string} operationName - ログ用
+ * @param {Object} options - UrlFetchApp.fetch オプション (Authorization header 含む)
+ * @param {string} [operationName] - ログ識別
+ * @param {string} [saEmail] - 初回 SA の client_email (cooldown 登録 + failover trigger)
+ * @param {Function} [authResolver] - retry 時に新 SA を解決する closure
  */
-function fetchSheetsAPIWithRetry(url, options, operationName) {
+function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResolver) {
   let retryCount = 0;
+  let currentOptions = options;
+  let currentSaEmail = saEmail || null;
 
   const cache = CacheService.getScriptCache();
   const CIRCUIT_BREAKER_KEY = 'circuit_breaker_state';
   const cachedState = cache.get(CIRCUIT_BREAKER_KEY);
-  // Why: JSON.parse が想定外の値（部分書込み、過去 schema、null fields）を返した場合に
-  //   undefined.> 0 が silently false になり、circuit breaker が機能しない silent bug を防ぐ。
-  //   parse 失敗時 + 必須フィールド欠落時の両方を defaults で埋める。
+  // Why: JSON.parse が想定外の値 (部分書込み、過去 schema、null fields) を返した場合に
+  //   undefined > 0 が silently false になり、 circuit breaker が機能しない silent bug を防ぐ。
   const circuitState = { consecutiveErrors: 0, circuitOpenUntil: 0 };
   if (cachedState) {
     try {
@@ -41,22 +49,38 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
 
   return executeWithRetry(
     () => {
-      const response = UrlFetchApp.fetch(url, options);
+      // retry 時、 元 SA が cooling なら resolver で別 SA の token に詰め替える。 これがないと
+      // closure 固定された accessToken が同じ quota 焼け SA に再突入して「failed after 2 attempts」
+      // で user-facing fail になる。
+      if (authResolver && retryCount > 0 && currentSaEmail && isServiceAccountCoolingDown_(currentSaEmail)) {
+        try {
+          const fresh = authResolver();
+          if (fresh && fresh.token && fresh.saEmail && fresh.saEmail !== currentSaEmail) {
+            const newHeaders = Object.assign({}, currentOptions.headers || {}, { Authorization: 'Bearer ' + fresh.token });
+            currentOptions = Object.assign({}, currentOptions, { headers: newHeaders });
+            console.warn(`↪ ${operationName || 'SheetsAPI'}: switching SA ${currentSaEmail} → ${fresh.saEmail} (retry ${retryCount})`);
+            currentSaEmail = fresh.saEmail;
+          }
+        } catch (_) { /* resolver 失敗は飲んで元 SA で retry */ }
+      }
 
-      if (response.getResponseCode() === 429) {
+      const response = UrlFetchApp.fetch(url, currentOptions);
+      const code = response.getResponseCode();
+
+      if (code === 429) {
+        // GAS 6 分制限内に収めるため inner sleep は 15/30/45/60s で cap。 当該 SA を 30s cooldown
+        // に入れて後続 request は別 SA に逃がす (auto failover)。
+        if (currentSaEmail) markServiceAccountCoolingDown_(currentSaEmail);
         const backoffTime = Math.min(15000 + (retryCount * 15000), 60000);
-        console.warn(`⚠️ 429 Quota exceeded for ${operationName || 'Sheets API'}, waiting ${backoffTime}ms (retry: ${retryCount})`);
+        console.warn(`⚠️ 429 ${operationName || 'SheetsAPI'}${currentSaEmail ? ' [' + currentSaEmail + ']' : ''}: wait ${backoffTime}ms (retry ${retryCount})`);
 
         circuitState.consecutiveErrors++;
-
         if (circuitState.consecutiveErrors >= 7) {
-          // 段階的バックオフ: 7回=30s, 10回=60s, 15回+=120s
           const lockoutMs = circuitState.consecutiveErrors >= 15 ? 120000
             : circuitState.consecutiveErrors >= 10 ? 60000 : 30000;
           circuitState.circuitOpenUntil = now + lockoutMs;
           console.error(`Circuit breaker activated: ${circuitState.consecutiveErrors} errors. Paused for ${lockoutMs / 1000}s.`);
         }
-
         cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 120);
 
         Utilities.sleep(backoffTime);
@@ -64,9 +88,9 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
         throw new Error('Quota exceeded (429), retry with adaptive backoff');
       }
 
-      if (response.getResponseCode() !== 200) {
+      if (code !== 200) {
         const errorText = response.getContentText();
-        throw new Error(`API returned ${response.getResponseCode()}: ${errorText}`);
+        throw new Error(`API returned ${code}: ${errorText}`);
       }
 
       circuitState.consecutiveErrors = 0;
@@ -84,43 +108,180 @@ function fetchSheetsAPIWithRetry(url, options, operationName) {
   );
 }
 
+/*
+ * Service Account pool (round-robin, with cooldown).
+ *
+ * Sheets API quota は SA 1 個あたり 300 read/min。 200-700 人同時アクセスでは単一 SA で焼ける
+ * ため、 SERVICE_ACCOUNT_CREDS (primary) に加え SERVICE_ACCOUNT_CREDS_2..10 を Script Properties
+ * に並べて N 倍化する。 200 人で 2-3 個、 500-700 人で 4-5 個推奨。 10 個以上は admin 監視が
+ * 煩雑になるだけで実効効果は頭打ち。
+ *
+ * 設計の核:
+ *  - **round-robin** (`pickServiceAccount_`): ScriptCache の共有 counter `sa_rr_counter` を
+ *    pool.length で割って次 SA を pick。 heavy user (admin/教師の連投) も pool 全体に均等
+ *    分散される。 user-affinity hash 方式だと heavy user が固定 SA を焼く事故が起きる。
+ *  - **cooldown** (`markServiceAccountCoolingDown_`): 429 を喰った SA を 30s 除外。 同 user が
+ *    同 SA で 429 を再現する無駄を防ぐ。 全 SA cooling 時は full pool で round-robin (止める
+ *    より retry のほうがマシ)。
+ *  - **2 段 token cache** (`getServiceAccountAccessToken_`): in-memory + ScriptCache 50min。
+ *    SA 切替時の JWT 交換 overhead を実質ゼロに。
+ *  - **per-SA verify cache** (`verifyServiceAccountAccess_`): 1 SA だけ DB 共有漏れがあっても
+ *    pool 全体は機能継続。
+ */
+const SERVICE_ACCOUNT_POOL_MAX_ = 10;
+const SA_COOLDOWN_TTL_SEC = 30;
+const SA_TOKEN_TTL_SEC_ = 50 * 60;
+const SA_VERIFY_TTL_OK_SEC_ = 600;
+const SA_VERIFY_TTL_NO_SEC_ = 120;
+
+function serviceAccountPoolSlotKey_(n) {
+  return n === 1 ? 'SERVICE_ACCOUNT_CREDS' : ('SERVICE_ACCOUNT_CREDS_' + n);
+}
+
 /**
- * サービスアカウント認証情報を取得
- * @returns {Object} Service account info with isValid flag
+ * SA JSON を soft parse する (壊れていたら null。 throw しない)。
+ * pool loader 側は「壊れてる SA は無視して次へ」が正しい挙動。
+ * @param {string} raw - JSON 文字列
+ * @returns {Object|null} parsed SA or null
+ */
+function parseServiceAccountCredsSoft_(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  try {
+    const sa = JSON.parse(raw);
+    if (!sa || typeof sa !== 'object') return null;
+    if (!sa.client_email || !sa.private_key || !sa.type) return null;
+    if (!validateEmail(sa.client_email).isValid) return null;
+    if (typeof sa.private_key !== 'string' ||
+        (sa.private_key.indexOf('BEGIN PRIVATE KEY') === -1 &&
+         sa.private_key.indexOf('BEGIN RSA PRIVATE KEY') === -1)) {
+      return null;
+    }
+    return sa;
+  } catch (_) {
+    return null;
+  }
+}
+
+/**
+ * 設定されている SA を全て返す (primary + secondaries, validate 済)。
+ * @returns {Object[]} array of SA objects (empty if none configured)
+ */
+function getAllServiceAccounts_() {
+  const out = [];
+  for (let n = 1; n <= SERVICE_ACCOUNT_POOL_MAX_; n++) {
+    const sa = parseServiceAccountCredsSoft_(getCachedProperty(serviceAccountPoolSlotKey_(n)));
+    if (sa) out.push(sa);
+  }
+  return out;
+}
+
+/** SA pick 回数を 5 分窓カウンタに記録 (admin 可視化用)。 */
+function recordSaPick_(saEmail) {
+  if (!saEmail || typeof CacheService === 'undefined') return;
+  try {
+    const cache = CacheService.getScriptCache();
+    const key = 'sa_pick:' + saEmail;
+    const cur = Number(cache.get(key) || 0);
+    cache.put(key, String(cur + 1), 300);
+  } catch (_) { /* ignore */ }
+}
+
+/** 429 を喰った SA を short-term cooldown (30s) に入れる。 */
+function markServiceAccountCoolingDown_(saEmail) {
+  if (!saEmail || typeof CacheService === 'undefined') return;
+  try { CacheService.getScriptCache().put('sa_cooldown:' + saEmail, '1', SA_COOLDOWN_TTL_SEC); }
+  catch (_) { /* ignore */ }
+}
+
+function isServiceAccountCoolingDown_(saEmail) {
+  if (!saEmail || typeof CacheService === 'undefined') return false;
+  try { return Boolean(CacheService.getScriptCache().get('sa_cooldown:' + saEmail)); }
+  catch (_) { return false; }
+}
+
+/**
+ * リクエストごとに SA を 1 個 round-robin で pick する。 cooldown 中の SA は候補から除外。
+ * 全 SA cooling 時は full pool で round-robin (degrade して止まらないことを優先)。
+ * pool.length === 0 のとき null を返す (caller は openById fallback)。
+ *
+ * Why round-robin: heavy user (admin/教師) が同 SA に張り付いて quota 焼け、 という現象を
+ * 防ぐ。 user-hash affinity だと bucket 偏りで pool 利用率が 21/44/35% など歪み、 1 SA が
+ * 集中砲火を受ける。 共有 counter を pool.length で mod すれば完全均等分散。 SA token cache
+ * (50 分) は per-SA で warm 維持されるので、 SA 切替コストは ~0 (cache hit のみ)。
+ *
+ * @returns {Object|null} picked SA or null
+ */
+function pickServiceAccount_() {
+  const fullPool = getAllServiceAccounts_();
+  if (fullPool.length === 0) return null;
+  if (fullPool.length === 1) {
+    recordSaPick_(fullPool[0].client_email);
+    return fullPool[0];
+  }
+  let pool = fullPool.filter(sa => !isServiceAccountCoolingDown_(sa.client_email));
+  if (pool.length === 0) pool = fullPool;
+  let idx;
+  try {
+    if (typeof CacheService !== 'undefined') {
+      const cache = CacheService.getScriptCache();
+      const RR_KEY = 'sa_rr_counter';
+      const cur = Number(cache.get(RR_KEY) || 0);
+      idx = cur % pool.length;
+      cache.put(RR_KEY, String((cur + 1) % 1000000), 600);
+    } else {
+      idx = Math.floor(Math.random() * pool.length);
+    }
+  } catch (_) {
+    idx = Math.floor(Math.random() * pool.length);
+  }
+  const picked = pool[idx];
+  recordSaPick_(picked.client_email);
+  return picked;
+}
+
+/**
+ * SA pool の直近 5 分使用回数を返す。 admin が「全 SA に分散しているか」を可視化する用。
+ * @returns {Object} { success, windowSec, total, coolingCount, pool: [{ clientEmail, picks, cooling }] }
+ */
+function getServiceAccountUsage() {
+  const pool = getAllServiceAccounts_();
+  if (typeof CacheService === 'undefined') {
+    return { success: true, windowSec: 300, cooldownTtlSec: SA_COOLDOWN_TTL_SEC, total: 0, coolingCount: 0, pool: [] };
+  }
+  const cache = CacheService.getScriptCache();
+  const usage = pool.map((sa) => {
+    let count = 0; let cooling = false;
+    try { count = Number(cache.get('sa_pick:' + sa.client_email) || 0); } catch (_) {}
+    try { cooling = Boolean(cache.get('sa_cooldown:' + sa.client_email)); } catch (_) {}
+    return { clientEmail: sa.client_email, picks: count, cooling };
+  });
+  return {
+    success: true,
+    windowSec: 300,
+    cooldownTtlSec: SA_COOLDOWN_TTL_SEC,
+    total: usage.reduce((acc, u) => acc + u.picks, 0),
+    coolingCount: usage.filter(u => u.cooling).length,
+    pool: usage
+  };
+}
+
+/**
+ * サービスアカウント認証情報を取得 (primary slot のメタ + pool 全体のサマリ)。
+ * @returns {Object} { isValid, email?, type?, poolSize?, pool?: email[] }
  */
 function getServiceAccount() {
   try {
-    const credentials = getCachedProperty('SERVICE_ACCOUNT_CREDS');
-    if (!credentials || typeof credentials !== 'string') {
+    const pool = getAllServiceAccounts_();
+    if (pool.length === 0) {
       return { isValid: false, error: 'No credentials found' };
     }
-
-    const serviceAccount = JSON.parse(credentials);
-
-    const requiredFields = ['client_email', 'private_key', 'type'];
-    const missingFields = requiredFields.filter(field => !serviceAccount[field]);
-
-    if (missingFields.length > 0) {
-      console.warn('getServiceAccount: Missing required fields');
-      return { isValid: false, error: 'Invalid credentials' };
-    }
-
-    if (!validateEmail(serviceAccount.client_email).isValid) {
-      console.warn('getServiceAccount: Invalid email format');
-      return { isValid: false, error: 'Invalid email format' };
-    }
-
-    if (typeof serviceAccount.private_key !== 'string' ||
-        (!serviceAccount.private_key.includes('BEGIN RSA PRIVATE KEY') &&
-         !serviceAccount.private_key.includes('BEGIN PRIVATE KEY'))) {
-      console.warn('getServiceAccount: Invalid private key format');
-      return { isValid: false, error: 'Invalid private key format' };
-    }
-
+    const primary = pool[0];
     return {
       isValid: true,
-      email: serviceAccount.client_email,
-      type: serviceAccount.type
+      email: primary.client_email,
+      type: primary.type,
+      poolSize: pool.length,
+      pool: pool.map((s) => s.client_email)
     };
   } catch (error) {
     console.warn('getServiceAccount: Invalid credentials format');
@@ -129,77 +290,473 @@ function getServiceAccount() {
 }
 
 /**
- * サービスアカウント使用の妥当性を検証（CLAUDE.md準拠 - Security Gate強化版）
- * @param {string} spreadsheetId - スプレッドシートID
- * @param {boolean} useServiceAccount - サービスアカウント使用フラグ
- * @param {string} context - 使用コンテキスト（ログ用）
- * @returns {Object} {allowed: boolean, reason: string} Validation result
+ * SA access token を 2 段 cache (in-memory + ScriptCache) で 50 分保持。
+ *
+ * 段構成:
+ *   1. in-memory (`saTokenCache_`): 同一 V8 instance の warm reuse 内で fastest hit
+ *   2. ScriptCache: 全 invocation 共有。 cold start (新 instance) でも JWT 交換 1 回で済む。
+ *      200 人朝の会の最初の数十人で N 重複 JWT 交換が発生する事故を防ぐ。
+ */
+const saTokenCache_ = Object.create(null);
+
+function getServiceAccountAccessToken_(sa) {
+  if (!sa || !sa.client_email || !sa.private_key) return null;
+  const cacheKey = sa.client_email;
+  const now = Date.now();
+
+  // Tier 1: in-memory
+  const memo = saTokenCache_[cacheKey];
+  if (memo && memo.expiresAt > now) return memo.token;
+
+  // Tier 2: ScriptCache
+  const scriptCache = (typeof CacheService !== 'undefined' && CacheService.getScriptCache)
+    ? CacheService.getScriptCache() : null;
+  const scriptCacheKey = 'sa_token:' + cacheKey;
+  if (scriptCache) {
+    try {
+      const cached = scriptCache.get(scriptCacheKey);
+      if (cached) {
+        saTokenCache_[cacheKey] = { token: cached, expiresAt: now + SA_TOKEN_TTL_SEC_ * 1000 };
+        return cached;
+      }
+    } catch (_) { /* ignore */ }
+  }
+
+  // JWT exchange
+  const nowSec = Math.floor(now / 1000);
+  const jwt = createServiceAccountJWT(
+    { alg: 'RS256', typ: 'JWT' },
+    {
+      iss: sa.client_email,
+      scope: 'https://www.googleapis.com/auth/spreadsheets',
+      aud: 'https://oauth2.googleapis.com/token',
+      exp: nowSec + 3600,
+      iat: nowSec
+    },
+    sa.private_key
+  );
+  try {
+    const tokenResp = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      payload: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+      muteHttpExceptions: true
+    });
+    const tokenData = JSON.parse(tokenResp.getContentText());
+    if (!tokenData.access_token) {
+      console.warn('SA token exchange failed:', tokenData.error_description || tokenData.error);
+      return null;
+    }
+    saTokenCache_[cacheKey] = { token: tokenData.access_token, expiresAt: now + SA_TOKEN_TTL_SEC_ * 1000 };
+    if (scriptCache) {
+      try { scriptCache.put(scriptCacheKey, tokenData.access_token, SA_TOKEN_TTL_SEC_); } catch (_) {}
+    }
+    return tokenData.access_token;
+  } catch (err) {
+    console.warn('SA token exchange exception:', err && err.message);
+    return null;
+  }
+}
+
+/**
+ * SA が実際にスプレッドシートにアクセスできるか per-SA で 1 回検証 (10 分 ok cache, 2 分 no cache)。
+ * 未共有 (403) の SA は次の候補に skip → 1 個だけ共有漏れがあっても pool 全体が機能継続。
+ * 429/5xx は transient なので cache しない (焼くと全 SA path が一斉に封鎖される)。
+ */
+function verifyServiceAccountAccess_(sheetId, accessToken, saEmail) {
+  if (!sheetId || !accessToken) return false;
+  const cacheKey = 'sa_access:' + sheetId + ':' + (saEmail || 'unknown');
+  let cache = null;
+  try { cache = CacheService.getScriptCache(); } catch (_) {}
+  if (cache) {
+    try {
+      const cached = cache.get(cacheKey);
+      if (cached === 'ok') return true;
+      if (cached === 'no') return false;
+    } catch (_) {}
+  }
+  try {
+    const resp = UrlFetchApp.fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}?includeGridData=false&fields=properties.title`,
+      { headers: { Authorization: `Bearer ${accessToken}` }, muteHttpExceptions: true }
+    );
+    const code = resp.getResponseCode();
+    const ok = code === 200;
+    const isTransient = code === 429 || (code >= 500 && code < 600);
+    if (cache) {
+      try {
+        if (ok) cache.put(cacheKey, 'ok', SA_VERIFY_TTL_OK_SEC_);
+        else if (!isTransient) cache.put(cacheKey, 'no', SA_VERIFY_TTL_NO_SEC_);
+      } catch (_) {}
+    }
+    if (!ok) {
+      console.warn('SA access verify failed for', sheetId.substring(0, 8) + '...',
+        'code=' + code, isTransient ? '(transient, no cache)' : '');
+    }
+    return ok;
+  } catch (err) {
+    console.warn('SA access verify exception:', err && err.message);
+    return false;
+  }
+}
+
+/**
+ * proxy が保持する SA を「動的解決」する closure を作る。
+ *  - 通常: 初回 pick した SA をそのまま使う (token cache 再利用)
+ *  - 初回 SA が cooldown 中: pool から非 cooling SA を 1 個再 pick + token を取得し直す
+ *  - 非 cooling SA 無し (全 pool cooling): 初回 SA に戻す (完全停止より retry のほうがマシ)
+ *
+ * これにより同 session 内で 429 を踏んだ瞬間に別 SA に逃げられる。 旧実装は proxy が初回 token
+ * を closure 固定していたため、 同 session が同 SA に張り付いて quota 焼け retry を繰り返す
+ * 事故が起きていた。
+ */
+function makeProxyAuthResolver_(sheetId, initialToken, initialSaEmail) {
+  return function currentAuth() {
+    if (!initialSaEmail || !isServiceAccountCoolingDown_(initialSaEmail)) {
+      return { token: initialToken, saEmail: initialSaEmail };
+    }
+    const fresh = pickServiceAccount_();
+    if (!fresh || fresh.client_email === initialSaEmail) {
+      return { token: initialToken, saEmail: initialSaEmail };
+    }
+    if (isServiceAccountCoolingDown_(fresh.client_email)) {
+      return { token: initialToken, saEmail: initialSaEmail };
+    }
+    const freshToken = getServiceAccountAccessToken_(fresh);
+    if (!freshToken) return { token: initialToken, saEmail: initialSaEmail };
+    return { token: freshToken, saEmail: fresh.client_email };
+  };
+}
+
+/** SA 1 個の token + access キャッシュをまとめて invalidate (新規登録 / 再 verify 時に呼ぶ)。 */
+function invalidateSaCache_(spreadsheetId, clientEmail) {
+  if (typeof CacheService === 'undefined') return;
+  try {
+    const cache = CacheService.getScriptCache();
+    if (spreadsheetId && clientEmail) cache.remove('sa_access:' + spreadsheetId + ':' + clientEmail);
+    if (clientEmail) {
+      cache.remove('sa_token:' + clientEmail);
+      delete saTokenCache_[clientEmail];
+    }
+  } catch (_) { /* ignore */ }
+}
+
+// ---------------------------------------------------------------------
+// SA pool 管理 (admin UI 用)
+// ---------------------------------------------------------------------
+
+/** SA pool 全スロットをメタ情報のみで返す (private_key は含めない)。 */
+function listServiceAccountPool() {
+  const slots = [];
+  for (let n = 1; n <= SERVICE_ACCOUNT_POOL_MAX_; n++) {
+    const key = serviceAccountPoolSlotKey_(n);
+    const raw = getCachedProperty(key);
+    if (!raw) continue;
+    const sa = parseServiceAccountCredsSoft_(raw);
+    if (sa) {
+      slots.push({
+        slot: key,
+        index: n,
+        role: n === 1 ? 'primary' : 'secondary',
+        clientEmail: sa.client_email,
+        projectId: sa.project_id || null,
+        privateKeyId: sa.private_key_id ? (sa.private_key_id.slice(0, 8) + '…') : null,
+        valid: true
+      });
+    } else {
+      slots.push({
+        slot: key,
+        index: n,
+        role: n === 1 ? 'primary' : 'secondary',
+        clientEmail: null,
+        valid: false,
+        error: 'parse-failed'
+      });
+    }
+  }
+  return {
+    success: true,
+    poolSize: slots.filter((s) => s.valid).length,
+    maxSize: SERVICE_ACCOUNT_POOL_MAX_,
+    slots
+  };
+}
+
+/**
+ * SA JSON を pool に追加。 空きスロットを自動選択。 同 client_email の重複は拒否。
+ * DB editor 共有 → token 取得 → access verify を一括実行 (UI は verified を見る)。
+ */
+function addServiceAccountToPool(saJsonString) {
+  try {
+    const sa = parseServiceAccountCredsSoft_(saJsonString);
+    if (!sa) return { success: false, error: 'INVALID_SA_JSON', message: 'SA JSON の形式が不正です' };
+
+    const existing = getAllServiceAccounts_();
+    for (let i = 0; i < existing.length; i++) {
+      if (existing[i].client_email === sa.client_email) {
+        return { success: false, error: 'ALREADY_REGISTERED',
+          message: `${sa.client_email} は既に pool に登録されています` };
+      }
+    }
+
+    let targetSlot = null;
+    let targetIndex = null;
+    for (let n = 1; n <= SERVICE_ACCOUNT_POOL_MAX_; n++) {
+      const key = serviceAccountPoolSlotKey_(n);
+      if (!getCachedProperty(key)) { targetSlot = key; targetIndex = n; break; }
+    }
+    if (!targetSlot) {
+      return { success: false, error: 'POOL_FULL',
+        message: `pool は上限 (${SERVICE_ACCOUNT_POOL_MAX_} 個) に達しています` };
+    }
+
+    PropertiesService.getScriptProperties().setProperty(targetSlot, String(saJsonString));
+    clearPropertyCache(targetSlot);
+
+    // DB 共有 + verify (fail-soft)
+    let shared = false;
+    let shareError = null;
+    let shareHint = null;
+    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    try {
+      if (dbId && typeof DriveApp !== 'undefined') {
+        DriveApp.getFileById(dbId).addEditor(sa.client_email);
+        shared = true;
+      }
+    } catch (err) {
+      shareError = (err && err.message) || String(err);
+      const msg = String(shareError).toLowerCase();
+      if (msg.indexOf('does not have permission') !== -1 || msg.indexOf('権限がありません') !== -1) {
+        shareHint = 'GAS 実行ユーザが DB のオーナー/編集者ではありません。 手動で DB を ' + sa.client_email + ' に編集者共有してください。';
+      } else if (msg.indexOf('rate') !== -1 || msg.indexOf('429') !== -1 || msg.indexOf('quota') !== -1) {
+        shareHint = 'Drive API quota 一時上限。 30 秒後に「再 verify」 を押してください。';
+      } else {
+        shareHint = '自動共有失敗。 必要なら DB を ' + sa.client_email + ' に編集者共有してください。';
+      }
+    }
+
+    let verified = false;
+    let verifyError = null;
+    try {
+      if (dbId) {
+        invalidateSaCache_(dbId, sa.client_email);
+        const accessToken = getServiceAccountAccessToken_(sa);
+        if (!accessToken) {
+          verifyError = 'token 取得失敗 (private_key 不正 / IAM API 未有効化)';
+        } else {
+          verified = verifyServiceAccountAccess_(dbId, accessToken, sa.client_email);
+          if (!verified) verifyError = '共有反映待ち or DB アクセス不可';
+        }
+      }
+    } catch (err) {
+      verifyError = (err && err.message) || String(err);
+    }
+
+    return {
+      success: true,
+      slot: targetSlot,
+      index: targetIndex,
+      clientEmail: sa.client_email,
+      shared,
+      shareError,
+      shareHint,
+      verified,
+      verifyError
+    };
+  } catch (err) {
+    logError_('addServiceAccountToPool', err);
+    return { success: false, error: 'EXCEPTION', message: (err && err.message) || String(err) };
+  }
+}
+
+/** 複数 SA JSON を一括登録 (改行区切り or `}\n{` 連結 or array)。 */
+function addServiceAccountsToPoolBatch(jsonInputs) {
+  let arr;
+  if (Array.isArray(jsonInputs)) {
+    arr = jsonInputs.map(String);
+  } else {
+    const s = String(jsonInputs || '');
+    arr = s.split(/}\s*{/).map((chunk, i, all) => {
+      let c = chunk;
+      if (i > 0) c = '{' + c;
+      if (i < all.length - 1) c += '}';
+      return c.trim();
+    }).filter(Boolean);
+  }
+  const results = [];
+  for (let i = 0; i < arr.length; i++) {
+    results.push(addServiceAccountToPool(arr[i]));
+  }
+  const verifiedCount = results.filter((r) => r && r.success && r.verified).length;
+  const registeredCount = results.filter((r) => r && r.success).length;
+  return {
+    success: registeredCount > 0,
+    total: results.length,
+    registered: registeredCount,
+    verified: verifiedCount,
+    results
+  };
+}
+
+/** admin の「再 verify」 ボタン用。 共有反映待ちで verified=false だった SA を再確認。 */
+function reverifyServiceAccountInPool(slotKey) {
+  try {
+    const key = String(slotKey || '');
+    if (!/^SERVICE_ACCOUNT_CREDS(_\d+)?$/.test(key)) {
+      return { success: false, error: 'INVALID_SLOT', message: '不正なスロット: ' + key };
+    }
+    const raw = getCachedProperty(key);
+    if (!raw) return { success: false, error: 'NOT_FOUND', message: key + ' は登録されていません' };
+    const sa = parseServiceAccountCredsSoft_(raw);
+    if (!sa) return { success: false, error: 'INVALID_SA_JSON', message: 'SA JSON が壊れています' };
+    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    if (!dbId) return { success: false, error: 'DB_NOT_CONFIGURED' };
+    invalidateSaCache_(dbId, sa.client_email);
+    const accessToken = getServiceAccountAccessToken_(sa);
+    if (!accessToken) return { success: true, verified: false, error: 'TOKEN_FAILED' };
+    const verified = verifyServiceAccountAccess_(dbId, accessToken, sa.client_email);
+    return { success: true, verified, clientEmail: sa.client_email };
+  } catch (err) {
+    return { success: false, error: 'EXCEPTION', message: (err && err.message) || String(err) };
+  }
+}
+
+/**
+ * Secondary slot の SA を削除。 primary は削除不可 (差替は setupApp 経由)。
+ * GCP 側の key revoke は別途 (誤削除からの復旧の余地を残す)。
+ */
+function removeServiceAccountFromPool(slotKey) {
+  try {
+    const key = String(slotKey || '');
+    if (key === 'SERVICE_ACCOUNT_CREDS') {
+      return { success: false, error: 'PRIMARY_LOCKED',
+        message: 'primary (SERVICE_ACCOUNT_CREDS) は UI から削除できません。 セットアップ画面から差替えてください' };
+    }
+    if (!/^SERVICE_ACCOUNT_CREDS_(\d+)$/.test(key)) {
+      return { success: false, error: 'INVALID_SLOT', message: `不正なスロット: ${key}` };
+    }
+    const n = Number(key.split('_').pop());
+    if (!(n >= 2 && n <= SERVICE_ACCOUNT_POOL_MAX_)) {
+      return { success: false, error: 'INVALID_SLOT', message: `範囲外スロット: ${key}` };
+    }
+    const existing = getCachedProperty(key);
+    if (!existing) {
+      return { success: false, error: 'NOT_FOUND', message: `${key} は登録されていません` };
+    }
+    const sa = parseServiceAccountCredsSoft_(existing);
+    PropertiesService.getScriptProperties().deleteProperty(key);
+    clearPropertyCache(key);
+    if (sa && sa.client_email) {
+      const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+      invalidateSaCache_(dbId, sa.client_email);
+    }
+    return { success: true, slot: key, removed: true };
+  } catch (err) {
+    logError_('removeServiceAccountFromPool', err);
+    return { success: false, error: 'EXCEPTION', message: (err && err.message) || String(err) };
+  }
+}
+
+/**
+ * SS アクセスの妥当性と最適経路を判定する Security Gate + Router。
+ *
+ * 新セキュリティモデル (通常 Google Form 同等):
+ *  - viewer は board SS への直接権限を持たない → SA pool 経由
+ *  - owner は自分の SS のオーナー権限を持つ → openById 直接 (SA pool quota を節約)
+ *  - admin は cross-user 操作 → SA pool
+ *
+ * 戻り値の `accessMode`:
+ *   - `'own'` : caller が SS の owner、 SpreadsheetApp.openById で直接アクセス推奨
+ *   - `'sa'`  : SA pool 経由でアクセス (admin / viewer)
+ *   - `'denied'` (allowed=false のときのみ): アクセス不可
+ *
+ * 許可マトリクス:
+ *   | caller         | DB sheet | own board | 他人の公開 board | 他人の非公開 board |
+ *   |----------------|----------|-----------|------------------|--------------------|
+ *   | admin          | sa       | own       | sa               | sa                 |
+ *   | owner          | sa       | own       | sa               | denied             |
+ *   | viewer (生徒)  | sa       | —         | sa               | denied             |
+ *
+ * @param {string} spreadsheetId
+ * @param {boolean} useServiceAccount - false で強制 own モード (互換用)
+ * @param {string} context - ログ識別用
+ * @returns {{allowed:boolean, reason:string, accessMode:('own'|'sa'|'denied')}}
  */
 function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context = 'unknown') {
   try {
-    const currentEmail = getCurrentEmail();
-    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-
     if (!useServiceAccount) {
-      return { allowed: true, reason: 'Normal permissions requested' };
+      return { allowed: true, reason: 'Direct access (legacy flag)', accessMode: 'own' };
     }
 
+    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
     if (spreadsheetId === dbId) {
-      return { allowed: true, reason: 'DATABASE_SPREADSHEET_ID is shared resource' };
+      return { allowed: true, reason: 'DATABASE_SPREADSHEET_ID (shared resource)', accessMode: 'sa' };
     }
 
-    if (isAdministrator(currentEmail)) {
-      return { allowed: true, reason: 'Admin privileges' };
-    }
+    const currentEmail = getCurrentEmail();
 
-    // SECURITY GATE: 非管理者は公開済みボードのみアクセス許可
-    try {
-      const cacheKey = `sa_validation_${spreadsheetId}`;
-      const cached = CacheService.getScriptCache().get(cacheKey);
-
-      if (cached) {
-        const validation = JSON.parse(cached);
-        return {
-          allowed: validation.isPublished,
-          reason: validation.isPublished ? 'Public board access (cached)' : 'Board not published (cached)'
-        };
-      }
-
-      const targetUser = findUserBySpreadsheetId(spreadsheetId, { skipCache: true });
-
-      if (!targetUser) {
-        console.warn('SA_VALIDATION: Target user not found for spreadsheet:', spreadsheetId.substring(0, 8));
-        return { allowed: false, reason: 'Target user not found' };
-      }
-
-      const configResult = getUserConfig(targetUser.userId);
-      const isPublished = configResult.success && configResult.config.isPublished;
-
+    // 短期 cache (60s) で重複 DB lookup を抑制。 cache key に caller email を含めることで
+    // 同じ SS でも owner / viewer で別キャッシュ。
+    const cacheKey = `sa_validation_${spreadsheetId}_${currentEmail || 'anon'}`;
+    let cache = null;
+    try { cache = CacheService.getScriptCache(); } catch (_) {}
+    if (cache) {
       try {
-        CacheService.getScriptCache().put(cacheKey, JSON.stringify({ isPublished }), 60);
-      } catch (cacheError) {
-        console.warn('SA_VALIDATION: Cache write failed:', cacheError.message);
-      }
-
-      if (!isPublished) {
-        console.warn('SA_VALIDATION: Non-admin user attempting to access unpublished board:', {
-          currentEmail: currentEmail ? `${currentEmail.split('@')[0]}@***` : 'unknown',
-          spreadsheetId: spreadsheetId.substring(0, 8),
-          context
-        });
-        return { allowed: false, reason: 'Board not published' };
-      }
-
-      return { allowed: true, reason: 'Public board access' };
-
-    } catch (validationError) {
-      console.error('SA_VALIDATION: Security check failed:', validationError.message);
-      return { allowed: false, reason: 'Security validation error' };
+        const cached = cache.get(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          return {
+            allowed: Boolean(parsed.allowed),
+            reason: parsed.reason,
+            accessMode: parsed.accessMode || (parsed.allowed ? 'sa' : 'denied')
+          };
+        }
+      } catch (_) { /* fall through */ }
     }
 
+    const targetUser = findUserBySpreadsheetId(spreadsheetId, { skipCache: true });
+    if (!targetUser) {
+      console.warn('SA_VALIDATION: Target user not found for spreadsheet:', spreadsheetId.substring(0, 8));
+      const result = { allowed: false, reason: 'Target user not found', accessMode: 'denied' };
+      if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
+      return result;
+    }
+
+    const isOwner = Boolean(targetUser.userEmail && currentEmail && targetUser.userEmail === currentEmail);
+    if (isOwner) {
+      // 編集者は自分の SS のオーナー権限を持つ → openById で直接アクセス。
+      // SA pool quota を viewer の閲覧トラフィックに温存できる。
+      const result = { allowed: true, reason: 'Own board (direct access)', accessMode: 'own' };
+      if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
+      return result;
+    }
+
+    // admin は他人のボードに cross-user アクセスする必要があるので SA pool 経由。
+    if (isAdministrator(currentEmail)) {
+      const result = { allowed: true, reason: 'Admin privileges (cross-user)', accessMode: 'sa' };
+      if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
+      return result;
+    }
+
+    const configResult = getUserConfig(targetUser.userId);
+    const isPublished = Boolean(configResult && configResult.success && configResult.config && configResult.config.isPublished);
+    const result = isPublished
+      ? { allowed: true, reason: 'Public board access', accessMode: 'sa' }
+      : { allowed: false, reason: 'Board not published', accessMode: 'denied' };
+
+    if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
+
+    if (!isPublished) {
+      console.warn('SA_VALIDATION: Non-owner access to unpublished board:', {
+        currentEmail: currentEmail ? `${currentEmail.split('@')[0]}@***` : 'unknown',
+        spreadsheetId: spreadsheetId.substring(0, 8),
+        context
+      });
+    }
+    return result;
   } catch (error) {
     console.error('SA_VALIDATION: Validation failed:', error.message);
-    return { allowed: false, reason: 'Validation error' };
+    return { allowed: false, reason: 'Validation error', accessMode: 'denied' };
   }
 }
 
@@ -247,23 +804,21 @@ function openDatabase(options = {}) {
 }
 
 /**
- * 任意のスプレッドシートを開く（CLAUDE.md準拠 - 条件付きサービスアカウント）
+ * 任意のスプレッドシートを開く。 アクセス経路は caller の役割で自動判定。
  *
- * Service account usage is restricted to CROSS-USER ACCESS ONLY.
- * Implements proper permission control and logging.
+ * 経路の自動振り分け (`validateServiceAccountUsage` の `accessMode` で決まる):
+ *  - **owner (editor)** が自分の SS を読む → `SpreadsheetApp.openById` (own OAuth, SA quota 不要)
+ *  - **viewer (生徒)** / **admin** が cross-user アクセス → SA pool 経由
+ *  - **DB sheet** はどの caller でも SA pool 経由 (共有資源)
  *
- * @param {string} spreadsheetId - Google スプレッドシートのユニークID
- * @param {Object} options - オプション設定オブジェクト
- * @param {boolean} options.useServiceAccount - クロスユーザーアクセス時のみtrueに設定
- * @returns {Object|null} { spreadsheet, auth, getSheet() } object or null if failed
+ * 旧設計の domain-wide sharing は廃止。 viewer の Drive にボード SS が表示されない、
+ * viewer が SS を直接編集できない、 という通常 Google Form 相当のセキュリティを実現する。
  *
- * @example
- * // 自分のスプレッドシートにアクセス（通常権限）
- * const dataAccess = openSpreadsheet(mySpreadsheetId, { useServiceAccount: false });
- *
- * @example
- * // 他人のスプレッドシートにアクセス（サービスアカウント）
- * const dataAccess = openSpreadsheet(otherSpreadsheetId, { useServiceAccount: true });
+ * @param {string} spreadsheetId
+ * @param {Object} [options]
+ * @param {boolean} [options.useServiceAccount=true] - false 明示で強制 own モード (互換用)
+ * @param {string} [options.context] - ログ識別用
+ * @returns {{spreadsheet, auth, getSheet}|null}
  */
 function openSpreadsheet(spreadsheetId, options = {}) {
   try {
@@ -272,35 +827,31 @@ function openSpreadsheet(spreadsheetId, options = {}) {
       return null;
     }
 
-    // Why: サービスアカウントはDATABASE_SPREADSHEETのみに限定。
-    // ユーザーのシートに対するSA使用はセキュリティ上許可しない。
-    const databaseId = getCachedProperty('DATABASE_SPREADSHEET_ID');
-    const isDatabaseAccess = spreadsheetId === databaseId;
-    const effectiveUseServiceAccount = isDatabaseAccess && options.useServiceAccount === true;
+    const useServiceAccount = options.useServiceAccount !== false;
 
-    const validation = validateServiceAccountUsage(spreadsheetId, effectiveUseServiceAccount, options.context || 'openSpreadsheet');
+    const validation = validateServiceAccountUsage(
+      spreadsheetId, useServiceAccount, options.context || 'openSpreadsheet'
+    );
     if (!validation.allowed) {
-      console.warn('openSpreadsheet: Service account usage denied:', validation.reason);
+      console.warn('openSpreadsheet: access denied:', validation.reason);
       return null;
     }
 
+    // accessMode: 'own' → openById (owner's OAuth), 'sa' → SA pool
+    const useSaPath = validation.accessMode === 'sa';
     let spreadsheet = null;
     let auth = null;
 
-    if (effectiveUseServiceAccount) {
-      auth = getServiceAccount();
-      if (!auth.isValid) {
-        console.warn('openSpreadsheet: Service account requested but invalid credentials');
-      }
-    }
-
     try {
-      if (effectiveUseServiceAccount && auth && auth.isValid) {
-        spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
+      if (useSaPath) {
+        auth = getServiceAccount();
+        if (auth.isValid) {
+          spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
+        }
         if (!spreadsheet) {
-          console.error('openSpreadsheet: サービスアカウント接続失敗、通常アクセスにフォールバック', {
-            spreadsheetId: `${spreadsheetId.substring(0, 20)}...`,
-            authEmail: auth.email
+          // SA pool 全滅 → openById fallback (deploy 主の権限で動く; 完全停止より良い)。
+          console.warn('openSpreadsheet: SA pool failed, falling back to openById', {
+            spreadsheetId: `${spreadsheetId.substring(0, 20)}...`
           });
           spreadsheet = SpreadsheetApp.openById(spreadsheetId);
         }
@@ -308,15 +859,11 @@ function openSpreadsheet(spreadsheetId, options = {}) {
         spreadsheet = SpreadsheetApp.openById(spreadsheetId);
       }
     } catch (openError) {
-      // Why: 共有設定 or OAuth スコープ不足で頻発する既知の失敗パス。
-      //      ここで ERROR を吐くと呼び出し元（connectToSpreadsheetSheet /
-      //      getUserSheetData 等）も重ねて ERROR を吐き、1 リクエストで
-      //      4-5 行ログが出てしまう。最上位の呼び出し元が 1 行に集約する前提で
-      //      ここは WARN に降格し、詳細は top-level にまとめる。
+      // 呼出元 (getUserSheetData 等) が 1 行 ERROR に集約する前提で WARN に降格。
       console.warn('openSpreadsheet: スプレッドシート接続失敗', {
         spreadsheetId: `${spreadsheetId.substring(0, 20)}...`,
         error: openError.message,
-        useServiceAccount: options.useServiceAccount,
+        accessMode: validation.accessMode,
         hasAuth: !!auth
       });
       return null;
@@ -325,6 +872,7 @@ function openSpreadsheet(spreadsheetId, options = {}) {
     return {
       spreadsheet,
       auth: auth || { isValid: false },
+      accessMode: validation.accessMode,
       getSheet(sheetName) {
         if (!sheetName) {
           console.warn('openSpreadsheet.getSheet: Sheet name required');
@@ -350,41 +898,29 @@ function openSpreadsheet(spreadsheetId, options = {}) {
 // デバッグ時のスタックトレース可読性とテスト可能性の向上が目的。
 // ---------------------------------------------------------------------
 
+/**
+ * SA pool から 1 個 pick → token 取得 → access verify → proxy 化。
+ * verify で落ちた SA は次の候補に順次 fallback (1 個だけ DB に未共有でも継続)。
+ * @param {string} sheetId
+ * @returns {Object|null} SS proxy or null
+ */
 function openSpreadsheetViaServiceAccount(sheetId) {
   try {
-    // Why: parseServiceAccountCreds() で credentials parse + client_email 検証を共通化。
-    //   旧コードは JSON.parse 失敗を silently null 返却しており、デバッグ時にどこで失敗したか
-    //   判らなかった。共通 helper は明確な error message を返す。
-    const parsed = (typeof parseServiceAccountCreds === 'function') ? parseServiceAccountCreds() : null;
-    if (!parsed || !parsed.success) {
-      if (parsed && parsed.message) console.warn('openSpreadsheetViaServiceAccount:', parsed.message);
-      return null;
+    const pool = getAllServiceAccounts_();
+    if (pool.length === 0) return null;
+
+    const preferred = pickServiceAccount_();
+    const startIdx = preferred ? pool.indexOf(preferred) : 0;
+    const baseIdx = startIdx >= 0 ? startIdx : 0;
+
+    for (let step = 0; step < pool.length; step++) {
+      const sa = pool[(baseIdx + step) % pool.length];
+      const accessToken = getServiceAccountAccessToken_(sa);
+      if (!accessToken) continue;
+      if (!verifyServiceAccountAccess_(sheetId, accessToken, sa.client_email)) continue;
+      return createServiceAccountSpreadsheetProxy(sheetId, accessToken, sa.client_email);
     }
-    const serviceAccount = parsed.creds;
-
-    const now = Math.floor(Date.now() / 1000);
-    const payload = {
-      iss: serviceAccount.client_email,
-      scope: 'https://www.googleapis.com/auth/spreadsheets',
-      aud: 'https://oauth2.googleapis.com/token',
-      exp: now + 3600,
-      iat: now
-    };
-
-    const header = { alg: 'RS256', typ: 'JWT' };
-    const jwt = createServiceAccountJWT(header, payload, serviceAccount.private_key);
-
-    const tokenResponse = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      payload: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`
-    });
-
-    const tokenData = JSON.parse(tokenResponse.getContentText());
-    if (!tokenData.access_token) return null;
-
-    return createServiceAccountSpreadsheetProxy(sheetId, tokenData.access_token);
-
+    return null;
   } catch (error) {
     logError_('openSpreadsheetViaServiceAccount', error);
     return null;
@@ -402,18 +938,22 @@ function createServiceAccountJWT(header, payload, privateKey) {
   return `${signatureInput}.${signatureB64}`;
 }
 
-function createServiceAccountSpreadsheetProxy(sheetId, accessToken) {
+function createServiceAccountSpreadsheetProxy(sheetId, accessToken, saEmail) {
+  const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+  // resolveAuth: proxy が hot path で「現 SA が cooling なら別 SA に逃げる」を解決する closure。
+  // SS / Sheet proxy 群はこれを共有することで session 中の 429 burst を回避する。
+  const resolveAuth = makeProxyAuthResolver_(sheetId, accessToken, saEmail);
+
   return {
     getId: () => sheetId,
     getName: () => {
       try {
-        const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+        const auth = resolveAuth();
         const response = fetchSheetsAPIWithRetry(
           `${baseUrl}?includeGridData=false&fields=properties.title`,
-          {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          },
-          `getName(${sheetId.substring(0, 8)}...)`
+          { headers: { 'Authorization': `Bearer ${auth.token}` } },
+          `getName(${sheetId.substring(0, 8)}...)`,
+          auth.saEmail, resolveAuth
         );
         const data = JSON.parse(response.getContentText());
         return data.properties?.title || `スプレッドシート (ID: ${sheetId.substring(0, 8)}...)`;
@@ -423,29 +963,27 @@ function createServiceAccountSpreadsheetProxy(sheetId, accessToken) {
       }
     },
     getSheetByName: (sheetName) => {
-      return createServiceAccountSheetProxy(sheetId, sheetName, accessToken);
+      const auth = resolveAuth();
+      return createServiceAccountSheetProxy(sheetId, sheetName, auth.token, {}, auth.saEmail, resolveAuth);
     },
     getSheets: () => {
       try {
-        const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+        const auth = resolveAuth();
         const response = fetchSheetsAPIWithRetry(
           `${baseUrl}?includeGridData=false`,
-          {
-            headers: { 'Authorization': `Bearer ${accessToken}` }
-          },
-          `getSheets(${sheetId.substring(0, 8)}...)`
+          { headers: { 'Authorization': `Bearer ${auth.token}` } },
+          `getSheets(${sheetId.substring(0, 8)}...)`,
+          auth.saEmail, resolveAuth
         );
-
         const data = JSON.parse(response.getContentText());
         const sheets = data.sheets || [];
-
-        return sheets.map(sheetData => {
+        return sheets.map((sheetData) => {
           const properties = sheetData.properties || {};
-          return createServiceAccountSheetProxy(sheetId, properties.title || 'Sheet1', accessToken, {
+          return createServiceAccountSheetProxy(sheetId, properties.title || 'Sheet1', auth.token, {
             sheetId: properties.sheetId,
             rowCount: properties.gridProperties?.rowCount || 1000,
             columnCount: properties.gridProperties?.columnCount || 26
-          });
+          }, auth.saEmail, resolveAuth);
         });
       } catch (error) {
         console.warn('getSheets via API failed after retries:', error.message);
@@ -455,30 +993,30 @@ function createServiceAccountSpreadsheetProxy(sheetId, accessToken) {
   };
 }
 
-function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additionalInfo = {}) {
+function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additionalInfo = {}, saEmail, parentResolveAuth) {
   const baseUrl = `https://sheets.googleapis.com/v4/spreadsheets/${sheetId}`;
+  // parent から渡された resolver を使い回せば、 cooldown 解決が連鎖して同 session 内で
+  // 429 burst を回避できる。 旧 API 互換のため parent 未指定時は自前 resolver を作る。
+  const resolveAuth = parentResolveAuth || makeProxyAuthResolver_(sheetId, accessToken, saEmail);
   let cachedDimensions = null;
 
   function fetchDimensionsOnce() {
     if (cachedDimensions) return cachedDimensions;
-
     try {
+      const auth = resolveAuth();
       const response = fetchSheetsAPIWithRetry(
         `${baseUrl}?includeGridData=false&fields=sheets(properties(title,gridProperties))`,
-        {
-          headers: { 'Authorization': `Bearer ${accessToken}` }
-        },
-        `fetchDimensions(${sheetName})`
+        { headers: { 'Authorization': `Bearer ${auth.token}` } },
+        `fetchDimensions(${sheetName})`,
+        auth.saEmail, resolveAuth
       );
       const data = JSON.parse(response.getContentText());
       const sheets = data.sheets || [];
-      const targetSheet = sheets.find(s => s.properties && s.properties.title === sheetName);
-
+      const targetSheet = sheets.find((s) => s.properties && s.properties.title === sheetName);
       cachedDimensions = {
         rowCount: targetSheet?.properties?.gridProperties?.rowCount || 1000,
         columnCount: targetSheet?.properties?.gridProperties?.columnCount || 26
       };
-
       return cachedDimensions;
     } catch (error) {
       console.warn(`fetchDimensions failed for ${sheetName}:`, error.message);
@@ -505,12 +1043,12 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
       return {
         getValues: () => {
           try {
+            const auth = resolveAuth();
             const response = fetchSheetsAPIWithRetry(
               `${baseUrl}/values/${range}`,
-              {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-              },
-              `getRange.getValues(${range})`
+              { headers: { 'Authorization': `Bearer ${auth.token}` } },
+              `getRange.getValues(${range})`,
+              auth.saEmail, resolveAuth
             );
             const data = JSON.parse(response.getContentText());
             return data.values || [];
@@ -521,20 +1059,18 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
         },
         setValue: (value) => {
           try {
+            const auth = resolveAuth();
             const payload = { values: [[value]] };
-            const response = fetchSheetsAPIWithRetry(
+            return fetchSheetsAPIWithRetry(
               `${baseUrl}/values/${range}?valueInputOption=RAW`,
               {
                 method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
                 payload: JSON.stringify(payload)
               },
-              `setValue(${range})`
+              `setValue(${range})`,
+              auth.saEmail, resolveAuth
             );
-            return response;
           } catch (error) {
             console.warn('setValue via API failed after retries:', error.message);
             throw error;
@@ -542,20 +1078,18 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
         },
         setValues: (values) => {
           try {
+            const auth = resolveAuth();
             const payload = { values };
-            const response = fetchSheetsAPIWithRetry(
+            return fetchSheetsAPIWithRetry(
               `${baseUrl}/values/${range}?valueInputOption=RAW`,
               {
                 method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
                 payload: JSON.stringify(payload)
               },
-              `setValues(${range})`
+              `setValues(${range})`,
+              auth.saEmail, resolveAuth
             );
-            return response;
           } catch (error) {
             console.warn('setValues via API failed after retries:', error.message);
             throw error;
@@ -567,12 +1101,12 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
       return {
         getValues: () => {
           try {
+            const auth = resolveAuth();
             const response = fetchSheetsAPIWithRetry(
               `${baseUrl}/values/${sheetName}`,
-              {
-                headers: { 'Authorization': `Bearer ${accessToken}` }
-              },
-              `getDataRange(${sheetName})`
+              { headers: { 'Authorization': `Bearer ${auth.token}` } },
+              `getDataRange(${sheetName})`,
+              auth.saEmail, resolveAuth
             );
             const data = JSON.parse(response.getContentText());
             return data.values || [];
@@ -583,20 +1117,18 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
         },
         setValues: (values) => {
           try {
+            const auth = resolveAuth();
             const payload = { values };
-            const response = fetchSheetsAPIWithRetry(
+            return fetchSheetsAPIWithRetry(
               `${baseUrl}/values/${sheetName}?valueInputOption=RAW`,
               {
                 method: 'PUT',
-                headers: {
-                  'Authorization': `Bearer ${accessToken}`,
-                  'Content-Type': 'application/json'
-                },
+                headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
                 payload: JSON.stringify(payload)
               },
-              `getDataRange.setValues(${sheetName})`
+              `getDataRange.setValues(${sheetName})`,
+              auth.saEmail, resolveAuth
             );
-            return response;
           } catch (error) {
             console.warn('getDataRange setValues via API failed after retries:', error.message);
             throw error;
@@ -606,20 +1138,18 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
     },
     appendRow: (rowData) => {
       try {
+        const auth = resolveAuth();
         const payload = { values: [rowData] };
-        const response = fetchSheetsAPIWithRetry(
+        return fetchSheetsAPIWithRetry(
           `${baseUrl}/values/${sheetName}:append?valueInputOption=RAW`,
           {
             method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${accessToken}`,
-              'Content-Type': 'application/json'
-            },
+            headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
             payload: JSON.stringify(payload)
           },
-          `appendRow(${sheetName})`
+          `appendRow(${sheetName})`,
+          auth.saEmail, resolveAuth
         );
-        return response;
       } catch (error) {
         console.warn('appendRow via API failed after retries:', error.message);
         throw error;

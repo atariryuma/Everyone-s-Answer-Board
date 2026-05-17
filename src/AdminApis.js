@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, logError_ */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, logError_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -1081,77 +1081,114 @@ function dispatchAdminOperation(operation, params) {
       return __deleteProfileCore(params.userId, params.name);
     }
 
-    case 'shareWithDomain': {
-      // Drive REST API でファイル（Spreadsheet / Form）を指定ドメインに共有する。
-      //
-      // Why: CLI からテンプレート Form を作ると、ファイル所有者は CLI ユーザー
-      //      （gas-deploy-bot サービスアカウント等）になり、別ドメインの生徒・教師は
-      //      アクセスできない。これでドメイン全体（naha-okinawa.ed.jp 等）に
-      //      reader として共有することで access denied を解消する。
-      //
-      // 注意: Drive Advanced Service は使わず UrlFetchApp + REST API でアクセス。
-      //      auth/drive スコープが appsscript.json に必要（既に granted）。
-      { const e = reqStr('fileId'); if (e) return e; }
-      { const e = reqStr('domain', 'domain (e.g. "naha-okinawa.ed.jp")'); if (e) return e; }
-      const role = ['reader', 'writer', 'commenter'].includes(params.role) ? params.role : 'reader';
+    case 'repairSpreadsheetSharing': {
+      // SA pool 全員を editor として追加する遡及修復 (v2782 以前作成の SS や、 後から SA を
+      // pool 追加した場合に必要)。
+      //   npm run api -- repairSpreadsheetSharing --spreadsheetId <ID>
+      { const e = reqStr('spreadsheetId'); if (e) return e; }
       try {
-        const token = ScriptApp.getOAuthToken();
-        const url = 'https://www.googleapis.com/drive/v3/files/' +
-                    encodeURIComponent(params.fileId) + '/permissions?supportsAllDrives=true';
-        const resp = UrlFetchApp.fetch(url, {
-          method: 'post',
-          contentType: 'application/json',
-          muteHttpExceptions: true,
-          headers: { Authorization: 'Bearer ' + token },
-          payload: JSON.stringify({
-            type: 'domain',
-            role: role,
-            domain: params.domain,
-            allowFileDiscovery: false  // Drive 検索結果には出さない（リンクを持つ人のみ）
-          })
-        });
-        const code = resp.getResponseCode();
-        const body = resp.getContentText();
-        if (code >= 400) {
-          return createErrorResponse('Drive API error ' + code + ': ' + body.substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN));
-        }
-        return createSuccessResponse('Shared with domain', {
-          fileId: params.fileId,
-          domain: params.domain,
-          role,
-          permission: JSON.parse(body)
+        const result = applySpreadsheetSharingDefaults(params.spreadsheetId);
+        return createSuccessResponse('Spreadsheet sharing repaired', {
+          spreadsheetId: params.spreadsheetId,
+          saAdded: result.saAdded,
+          saEmails: result.saEmails || [],
+          errors: result.errors
         });
       } catch (e) {
         return createExceptionResponse(e);
       }
     }
 
-    case 'repairSpreadsheetSharing': {
-      // Why: createForm / customizeForm で過去に作成された SS のうち、
-      //   サービスアカウントが editor に入っていないものは DatabaseCore の Sheets API JWT
-      //   経路で 403 を返し、view モードの getPublishedSheetData が落ちる。
-      //   現在の createTemplateForm / customizeForm は applySpreadsheetSharingDefaults を
-      //   作成直後に呼ぶよう修正済みだが、修正前に作られた SS の遡及修復が必要。
-      //
-      //   呼び出し例:
-      //     npm run api -- repairSpreadsheetSharing --spreadsheetId <ID>
-      //     npm run api -- repairSpreadsheetSharing --spreadsheetId <ID> --ownerEmail teacher@example
-      //
-      //   ownerEmail を省略すると getCurrentEmail() を使用。ドメイン共有はスキップしたい
-      //   ローカルテスト用に、明示的に ownerEmail を渡せる。
-      { const e = reqStr('spreadsheetId'); if (e) return e; }
-      const ownerEmail = (typeof params.ownerEmail === 'string' && params.ownerEmail)
-        ? params.ownerEmail
-        : getCurrentEmail();
+    // ===== SA pool 管理 (v2782+) =====
+    case 'listServiceAccountPool': {
       try {
-        const result = applySpreadsheetSharingDefaults(params.spreadsheetId, ownerEmail);
-        return createSuccessResponse('Spreadsheet sharing repaired', {
-          spreadsheetId: params.spreadsheetId,
-          ownerEmail,
-          saAdded: result.saAdded,
-          domainShared: result.domainShared,
-          errors: result.errors
-        });
+        return (typeof listServiceAccountPool === 'function')
+          ? listServiceAccountPool()
+          : createErrorResponse('listServiceAccountPool not available');
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
+    case 'getServiceAccountUsage': {
+      try {
+        return (typeof getServiceAccountUsage === 'function')
+          ? getServiceAccountUsage()
+          : createErrorResponse('getServiceAccountUsage not available');
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
+    case 'addServiceAccountToPool': {
+      // 1 個の SA JSON を pool に登録。 戻り値の verified を見て UI に反映する。
+      //   npm run api -- addServiceAccountToPool --json '<SA JSON>'
+      { const e = reqStr('json'); if (e) return e; }
+      try {
+        if (typeof addServiceAccountToPool !== 'function') {
+          return createErrorResponse('addServiceAccountToPool not available');
+        }
+        return addServiceAccountToPool(params.json);
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
+    case 'addServiceAccountsToPoolBatch': {
+      // 複数 SA JSON を一括登録 (改行区切り or `}\n{` 連結 or array)。
+      const inputs = params.inputs || params.json;
+      if (!inputs) return createErrorResponse('inputs (string or array) is required');
+      try {
+        if (typeof addServiceAccountsToPoolBatch !== 'function') {
+          return createErrorResponse('addServiceAccountsToPoolBatch not available');
+        }
+        return addServiceAccountsToPoolBatch(inputs);
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
+    case 'reverifyServiceAccountInPool': {
+      // 共有反映待ちで verified=false だった SA を再確認。
+      const slot = params.slot || params.slotKey;
+      if (!slot) return createErrorResponse('slot (e.g. "SERVICE_ACCOUNT_CREDS_2") is required');
+      try {
+        if (typeof reverifyServiceAccountInPool !== 'function') {
+          return createErrorResponse('reverifyServiceAccountInPool not available');
+        }
+        return reverifyServiceAccountInPool(slot);
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
+    case 'removeServiceAccountFromPool': {
+      // Secondary slot の SA を削除 (primary は別経路で差替)。
+      const slot = params.slot || params.slotKey;
+      if (!slot) return createErrorResponse('slot (e.g. "SERVICE_ACCOUNT_CREDS_2") is required');
+      try {
+        if (typeof removeServiceAccountFromPool !== 'function') {
+          return createErrorResponse('removeServiceAccountFromPool not available');
+        }
+        return removeServiceAccountFromPool(slot);
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
+    case 'migrateBoardSharing': {
+      // v2782 以前作成のボード SS を一括クリーンアップする。
+      //   1) SA pool 全員を editor として追加 (board が SA pool 経由で動くようにする)
+      //   2) DOMAIN_WITH_LINK 共有を revoke (Drive bleed を解消)
+      // dryRun=true で実際の変更なしに対象 SS のリストだけ確認可能。
+      //   npm run api -- migrateBoardSharing --dryRun true
+      //   npm run api -- migrateBoardSharing
+      const dryRun = params.dryRun === true || params.dryRun === 'true';
+      try {
+        if (typeof migrateBoardSharing !== 'function') {
+          return createErrorResponse('migrateBoardSharing not available');
+        }
+        return migrateBoardSharing({ dryRun });
       } catch (e) {
         return createExceptionResponse(e);
       }
@@ -1573,5 +1610,161 @@ function deepMerge_(target, source) {
     }
   }
   return out;
+}
+
+// =========================================================================
+// migrateBoardSharing - v2782 以前作成ボードの共有設定一括クリーンアップ
+// =========================================================================
+
+/**
+ * 全 users.config の spreadsheetId を走査し、 以下を一括適用する:
+ *   1. SA pool 全員を editor として追加 (board が SA pool 経由で動くようにする)
+ *   2. DOMAIN_WITH_LINK / DOMAIN 共有を revoke (Drive bleed と直接編集を解消)
+ *
+ * 冪等。 何度呼んでも安全。 各 SS の処理は fail-soft (1 つの SS で失敗しても他を続行)。
+ *
+ * @param {Object} [options]
+ * @param {boolean} [options.dryRun=false] - true なら共有変更なし、 対象 SS リストのみ返す
+ * @returns {Object} 結果サマリ
+ */
+function migrateBoardSharing(options = {}) {
+  const dryRun = options.dryRun === true;
+
+  const ssIds = collectAllBoardSpreadsheetIds_();
+  if (ssIds.length === 0) {
+    return createSuccessResponse('No board spreadsheets found', { total: 0, processed: [], dryRun });
+  }
+
+  const processed = [];
+  let saAddedCount = 0;
+  let domainRevokedCount = 0;
+  let errorCount = 0;
+
+  for (const ssId of ssIds) {
+    const entry = { spreadsheetId: ssId, saEmails: [], domainRevoked: false, errors: [] };
+
+    if (dryRun) {
+      processed.push(entry);
+      continue;
+    }
+
+    // 1) SA pool 全員を editor 追加
+    try {
+      const shareResult = applySpreadsheetSharingDefaults(ssId);
+      entry.saEmails = (shareResult && shareResult.saEmails) || [];
+      if (shareResult && shareResult.errors && shareResult.errors.length) {
+        entry.errors.push(...shareResult.errors);
+      }
+      if (entry.saEmails.length > 0) saAddedCount++;
+    } catch (shareError) {
+      entry.errors.push('SA share: ' + (shareError.message || shareError));
+    }
+
+    // 2) DOMAIN_WITH_LINK / DOMAIN 共有を revoke
+    try {
+      const revoked = revokeDomainSharing_(ssId);
+      if (revoked.success) {
+        entry.domainRevoked = true;
+        if (revoked.changed) domainRevokedCount++;
+      } else if (revoked.error) {
+        entry.errors.push('Revoke: ' + revoked.error);
+      }
+    } catch (revokeError) {
+      entry.errors.push('Revoke: ' + (revokeError.message || revokeError));
+    }
+
+    if (entry.errors.length > 0) errorCount++;
+    processed.push(entry);
+  }
+
+  return createSuccessResponse(
+    dryRun ? `Dry run: ${ssIds.length} board SS would be processed` : `${ssIds.length} board SS processed`,
+    { total: ssIds.length, saAddedCount, domainRevokedCount, errorCount, dryRun, processed }
+  );
+}
+
+/**
+ * 全 users.config から board の spreadsheetId を抽出 (重複除去)。
+ * config.spreadsheetId と config.profiles[].spreadsheetId の両方を走査。
+ */
+function collectAllBoardSpreadsheetIds_() {
+  const ids = new Set();
+  try {
+    const users = (typeof getAllUsers === 'function') ? getAllUsers() : [];
+    for (const u of users) {
+      if (!u || !u.configJson) continue;
+      let cfg = null;
+      try { cfg = JSON.parse(u.configJson); } catch (_) { continue; }
+      if (cfg.spreadsheetId && typeof cfg.spreadsheetId === 'string') ids.add(cfg.spreadsheetId);
+      if (Array.isArray(cfg.profiles)) {
+        for (const p of cfg.profiles) {
+          if (p && p.spreadsheetId && typeof p.spreadsheetId === 'string') ids.add(p.spreadsheetId);
+        }
+      }
+    }
+  } catch (err) {
+    logError_('collectAllBoardSpreadsheetIds_', err);
+  }
+  return Array.from(ids);
+}
+
+/**
+ * SS の DOMAIN_WITH_LINK / DOMAIN 共有を revoke する。
+ *   - 既に PRIVATE なら no-op (changed=false)
+ *   - 通常 setSharing で PRIVATE に戻す。 失敗時は Drive REST API で domain permission を削除
+ *
+ * @returns {{success:boolean, changed:boolean, error?:string}}
+ */
+function revokeDomainSharing_(spreadsheetId) {
+  try {
+    const file = DriveApp.getFileById(spreadsheetId);
+    const access = file.getSharingAccess();
+
+    if (access === DriveApp.Access.PRIVATE) {
+      return { success: true, changed: false };
+    }
+
+    try {
+      file.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+      return { success: true, changed: true };
+    } catch (_setSharingError) {
+      // Workspace ポリシーで setSharing が落ちる場合は Drive REST API で domain permission を
+      // 直接削除する fallback。
+      const token = ScriptApp.getOAuthToken();
+      const listUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(spreadsheetId) +
+        '/permissions?fields=permissions(id,type,role,domain)&supportsAllDrives=true';
+      const listResp = UrlFetchApp.fetch(listUrl, {
+        method: 'get',
+        headers: { Authorization: 'Bearer ' + token },
+        muteHttpExceptions: true
+      });
+      if (listResp.getResponseCode() !== 200) {
+        return { success: false, changed: false,
+          error: `Drive list permissions ${listResp.getResponseCode()}: ${listResp.getContentText().substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN)}` };
+      }
+      const data = JSON.parse(listResp.getContentText());
+      const perms = Array.isArray(data.permissions) ? data.permissions : [];
+      const domainPerms = perms.filter((p) => p.type === 'domain');
+      let changed = false;
+      for (const p of domainPerms) {
+        const delUrl = 'https://www.googleapis.com/drive/v3/files/' + encodeURIComponent(spreadsheetId) +
+          '/permissions/' + encodeURIComponent(p.id) + '?supportsAllDrives=true';
+        const delResp = UrlFetchApp.fetch(delUrl, {
+          method: 'delete',
+          headers: { Authorization: 'Bearer ' + token },
+          muteHttpExceptions: true
+        });
+        const code = delResp.getResponseCode();
+        if (code >= 200 && code < 300) { changed = true; }
+        else if (code !== 404) {
+          return { success: false, changed,
+            error: `Drive delete permission ${code}: ${delResp.getContentText().substring(0, DRIVE_ERROR_BODY_PREVIEW_LEN)}` };
+        }
+      }
+      return { success: true, changed };
+    }
+  } catch (err) {
+    return { success: false, changed: false, error: err.message || String(err) };
+  }
 }
 

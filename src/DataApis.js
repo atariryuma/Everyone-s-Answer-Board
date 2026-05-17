@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, setupDomainWideSharing, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -823,10 +823,8 @@ function validateHeaderIntegrity(targetUserId) {
       };
     }
 
-    const dataAccess = openSpreadsheet(config.spreadsheetId, {
-      useServiceAccount: false
-    });
-    const sheet = dataAccess.getSheet(config.sheetName);
+    const dataAccess = openSpreadsheet(config.spreadsheetId, { context: 'dataApis.config' });
+    const sheet = dataAccess && dataAccess.getSheet ? dataAccess.getSheet(config.sheetName) : null;
     if (!sheet) {
       return {
         success: false,
@@ -1165,6 +1163,72 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   };
 }
 
+// =========================================================================
+// board data cache (viewer 経路の SA トラフィック削減)
+// =========================================================================
+//
+// 設計:
+//   - viewer (= 非 admin 非 owner) の getPublishedSheetData 結果を 10 秒 cache
+//   - reaction/highlight write 時に bumpBoardDataVersion_ で version をインクリメント
+//     → 旧 version の cache key は即 stale (実質 invalidation)
+//   - owner/admin はキャッシュせず (編集中の即時反映を優先)
+//   - viewer のフィルタ/ソート違いは別 key で保存
+//
+// 効果: 700 viewer × 5s polling = 8400 req/min を ~700-800 req/min まで削減 (~10x)。
+
+const BOARD_DATA_CACHE_TTL_SEC = 10;
+
+function getBoardDataVersion_(userId) {
+  if (typeof CacheService === 'undefined') return '0';
+  try {
+    const cache = CacheService.getScriptCache();
+    return String(cache.get('board_data_ver:' + userId) || '0');
+  } catch (_) { return '0'; }
+}
+
+function bumpBoardDataVersion_(userId) {
+  if (!userId || typeof CacheService === 'undefined') return;
+  try {
+    const cache = CacheService.getScriptCache();
+    const cur = Number(cache.get('board_data_ver:' + userId) || 0);
+    cache.put('board_data_ver:' + userId, String(cur + 1), 3600);
+  } catch (_) { /* ignore */ }
+}
+
+function boardDataCacheKey_(userId, options) {
+  const ver = getBoardDataVersion_(userId);
+  const filter = options.classFilter || '_';
+  const sort = options.sortBy || 'newest';
+  return `board_data:${userId}:${ver}:${filter}:${sort}`;
+}
+
+function withBoardDataCache_(userId, options, loader) {
+  if (typeof CacheService === 'undefined') return loader();
+  let cache = null;
+  try { cache = CacheService.getScriptCache(); } catch (_) {}
+  if (!cache) return loader();
+
+  const key = boardDataCacheKey_(userId, options);
+  try {
+    const cached = cache.get(key);
+    if (cached) {
+      try { return JSON.parse(cached); } catch (_) { /* fall through to fresh fetch */ }
+    }
+  } catch (_) { /* ignore */ }
+
+  const fresh = loader();
+  if (fresh && fresh.success) {
+    try {
+      const json = JSON.stringify(fresh);
+      // ScriptCache の 100KB / value 制限超を防ぐ。 巨大ボードは cache せず素通し。
+      if (json.length < 95 * 1024) {
+        cache.put(key, json, BOARD_DATA_CACHE_TTL_SEC);
+      }
+    } catch (_) { /* size check failed; skip cache */ }
+  }
+  return fresh;
+}
+
 /**
  * 統合API: フロントエンド用データ取得（最適化版・クロスユーザー対応）
  * @param {string} classFilter - クラスフィルター
@@ -1231,7 +1295,17 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
       };
 
-      const result = getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig);
+      // viewer (= 非 admin かつ 非 owner) のみ board data を 10s 短期 cache。
+      // 700 viewer × 5s polling = 8400 req/min を ~700-800 req/min まで圧縮する。
+      // owner/admin はキャッシュせず (編集中の即時反映が必要)。 reaction/highlight write 後は
+      // bumpBoardDataVersion_ で version が増え、 旧 cache key は自動 stale。
+      const isViewerOnly = !isSystemAdmin && !isOwnBoard;
+      const cacheableResult = isViewerOnly
+        ? withBoardDataCache_(targetUser.userId, options, () =>
+            getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig))
+        : getUserSheetData(targetUser.userId, options, targetUser, targetUserConfig);
+
+      const result = cacheableResult;
 
       if (!result || !result.success) {
         return {
@@ -1563,10 +1637,11 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
       return createAuthError();
     }
 
+    // SA pool 全員を editor 追加して board の cross-user 経路 (viewer/admin) を有効化。
     try {
-      setupDomainWideSharing(spreadsheetId, email);
+      applySpreadsheetSharingDefaults(spreadsheetId, email);
     } catch (sharingError) {
-      console.warn('connectDataSource: Domain-wide sharing setup failed (non-critical):', sharingError.message);
+      console.warn('connectDataSource: SA sharing setup failed (non-critical):', sharingError.message);
     }
 
     if (batchOperations && Array.isArray(batchOperations)) {
@@ -1665,18 +1740,18 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
 
     let dataAccess;
     try {
-      dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
+      dataAccess = openSpreadsheet(spreadsheetId, { context: 'getColumnAnalysis' });
       if (!dataAccess) {
         return {
           success: false,
-          error: 'スプレッドシートにアクセスできません。同一ドメイン内で編集可能に設定されているか確認してください。'
+          error: 'スプレッドシートにアクセスできません。 管理者の場合は「再 verify」 を試すか、 設定を確認してください。'
         };
       }
     } catch (accessError) {
       console.warn('getColumnAnalysis: Spreadsheet access failed for user:', `${email.split('@')[0]}@***`, accessError.message);
       return {
         success: false,
-        error: 'スプレッドシートにアクセス権がありません。同一ドメイン内で編集可能に設定されているか確認してください。'
+        error: 'スプレッドシートにアクセス権がありません。 管理者の場合は SA pool の状態を確認してください。'
       };
     }
 
@@ -1792,10 +1867,10 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
         };
       }
 
-    // Why openSpreadsheet (not bare SpreadsheetApp.openById): DatabaseCore.openSpreadsheet
-    //   は circuit breaker + service account fallback + retry を一括で提供する。直接呼びで
-    //   この envelope をバイパスすると、429 storm 時に簡単にロックアウトを引き起こす。
-    const dataAccess = openSpreadsheet(spreadsheetId, { useServiceAccount: false });
+    // Why openSpreadsheet (not bare SpreadsheetApp.openById): DatabaseCore.openSpreadsheet は
+    //   circuit breaker + SA pool failover + retry を一括で提供する。 直接呼びで envelope を
+    //   バイパスすると 429 storm 時に簡単にロックアウトする。
+    const dataAccess = openSpreadsheet(spreadsheetId, { context: 'addReactionColumns' });
     if (!dataAccess) {
       throw new Error(`Cannot open spreadsheet ${spreadsheetId}`);
     }

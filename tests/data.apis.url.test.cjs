@@ -771,12 +771,13 @@ test('connectDataSource: rejects unauthenticated user', () => {
   assert.match(result.error, /認証/);
 });
 
-test('connectDataSource: attempts domain-wide sharing but tolerates failure', () => {
+test('connectDataSource: applies SA pool sharing defaults but tolerates failure', () => {
+  // v2782+: domain-wide sharing was replaced by SA pool editor add.
   let sharingAttempted = false;
   let analysisCalled = false;
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    setupDomainWideSharing: () => {
+    applySpreadsheetSharingDefaults: () => {
       sharingAttempted = true;
       throw new Error('sharing denied');
     }
@@ -795,7 +796,7 @@ test('connectDataSource: delegates to getColumnAnalysis when no batch operations
   let capturedArgs = null;
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    setupDomainWideSharing: () => {}
+    applySpreadsheetSharingDefaults: () => ({ saAdded: true, saEmails: [], errors: [] })
   });
   ctx.getColumnAnalysis = (ss, sheet) => {
     capturedArgs = { ss, sheet };
@@ -810,7 +811,7 @@ test('connectDataSource: delegates to processDataSourceOperations when batch giv
   let columnCallCount = 0;
   const ctx = loadDataApisContext({
     getCurrentEmail: () => 'owner@example.com',
-    setupDomainWideSharing: () => {}
+    applySpreadsheetSharingDefaults: () => ({ saAdded: true, saEmails: [], errors: [] })
   });
   ctx.getColumnAnalysis = () => {
     columnCallCount += 1;
