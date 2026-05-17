@@ -1174,8 +1174,13 @@ function dispatchAdminOperation(operation, params) {
         if (lastRow <= 1) {
           return createSuccessResponse('No data rows to clear', { deletedCount: 0 });
         }
-        // header (row 1) は残し、row 2 〜 lastRow を削除
-        sheet.deleteRows(2, lastRow - 1);
+        // Why clearContent (not deleteRows): Sheets は「sheet に行が 1 つも残らない」
+        //   deleteRows を拒否し「固定されていない行をすべて削除することはできません」
+        //   エラーになる (ヘッダー 1 行 + データ 100 行を deleteRows(2, 100) しても起こる)。
+        //   clearContent で内容だけ消せば getLastRow() は 1 に戻り、appendRows が row 2
+        //   から書ける。Reaction 列等の lazy provisioning ヘッダーも保持される。
+        const lastCol = Math.max(1, sheet.getLastColumn());
+        sheet.getRange(2, 1, lastRow - 1, lastCol).clearContent();
         return createSuccessResponse('Data rows cleared', {
           spreadsheetId: params.spreadsheetId,
           sheetName: params.sheetName,
