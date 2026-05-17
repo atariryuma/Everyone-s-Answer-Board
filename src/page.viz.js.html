@@ -1127,43 +1127,52 @@
           }
         });
 
-      // 議論前 → 現在 の意見の動きを矢印で重ね描き (v2691)。
-      //   軸互換チェックで違うフォーム間 (pie ↔ matrix) の座標を結ぶ事故を防ぐ。
-      // 道徳教育根拠: MEXT 2016 報告 p.10「自らの生活や考えを見直しているか」評価観点。
+      // 議論前 → 現在 の意見の動きを ghost trail で表示 (v2777 で矢印から再設計)。
+      //   研究根拠:
+      //     - Heer & Robertson 2007 "Animated Transitions in Statistical Data Graphics":
+      //       motion は preattentive attribute、trajectory history は認知負荷を下げる
+      //     - FlowingData "Ghost Trails": fade した経路で時間の方向感を出す
+      //   道徳科の配慮:
+      //     - distance による強調 (旧 amber major) を廃止 → 「動いた=正解」バイアス回避
+      //     - 矢頭を廃止 → 「到着点が正解」感を抑え、現在位置の dot 自体が「いまここ」を示す
+      //     - 動かなかった児童は trail が無いだけ (= 等価に「保持」を表現)
+      //   アニメーション:
+      //     - toggle ON のときだけ `_deltaAnimateOnce` で 1.5s の stroke-dashoffset 演出
+      //     - その後の再描画 (timeline スライダー等) では trail は静止表示
       if (this.state.vizShowDeltas && typeof this.vizGetBefore === 'function') {
         const before = this.vizGetBefore();
         if (before && Array.isArray(before.rows)
             && arePhasesAxisCompatible(before.axisConfig, axis)) {
           const deltas = computeMatrixDeltas(before.rows, current);
-          const HEAD_LEN = 5;        // 矢頭 px 長
-          const TIP_INSET = 0.5;     // 先端を dot 縁から 0.5px 内側に置いて密着感を出す
+          const shouldAnimate = !!this.state._deltaAnimateOnce;
+          this.state._deltaAnimateOnce = false;  // 1 回消費
+
+          // emailHash → node の lookup を作って trail の終点を「実 dot 中心 (force-sim 後)」に合わせる。
+          //   xScale(d.toX) ではなく n.x を使うので、jitter された実描画位置と完全一致する。
+          const nodeByHash = new Map();
+          for (const n of nodes) {
+            if (n && n.data && n.data.emailHash) nodeByHash.set(n.data.emailHash, n);
+          }
           for (const d of deltas) {
+            const n = nodeByHash.get(d.emailHash);
+            if (!n) continue;  // 現在ボードに dot が無い (匿名化等)
             const x1 = xScale(d.fromX);
             const y1 = yScale(d.fromY);
-            const x2 = xScale(d.toX);
-            const y2 = yScale(d.toY);
-            const len = euclidean(x1, y1, x2, y2) || 1;
-            const ux = (x2 - x1) / len;       // 単位ベクトル (進行方向)
-            const uy = (y2 - y1) / len;
-            const px = -uy, py = ux;          // 法線ベクトル
-            // dot 半径 + 1px 手前で線を止め、矢頭描画用に余白を作る
-            const tx = x2 - ux * (BASE_R_M + 1);
-            const ty = y2 - uy * (BASE_R_M + 1);
-            // Likert 距離 > 2 = 強い意見変化 → 教師指名素材として強調
-            const isMajor = d.distance > 2;
-            const cls = isMajor ? ' major' : '';
-            g.append('line').attr('class', 'viz-arrow' + cls)
-              .attr('x1', x1).attr('y1', y1).attr('x2', tx).attr('y2', ty);
-            // 矢頭は polygon 直書き。SVG marker は環境によって CSS currentColor を読めず色制御が不安定。
-            const tipX  = x2 - ux * (BASE_R_M - TIP_INSET);
-            const tipY  = y2 - uy * (BASE_R_M - TIP_INSET);
-            const baseX = tipX - ux * HEAD_LEN;
-            const baseY = tipY - uy * HEAD_LEN;
-            const half = HEAD_LEN * 0.5;
-            const leftX  = baseX + px * half, leftY  = baseY + py * half;
-            const rightX = baseX - px * half, rightY = baseY - py * half;
-            g.append('polygon').attr('class', 'viz-arrow-head' + cls)
-              .attr('points', `${tipX},${tipY} ${leftX},${leftY} ${rightX},${rightY}`);
+            const x2 = n.x;
+            const y2 = n.y;
+            const trail = g.append('path')
+              .attr('class', 'viz-trail')
+              .attr('d', `M ${x1} ${y1} L ${x2} ${y2}`);
+            if (shouldAnimate) {
+              const len = Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)) || 1;
+              trail
+                .attr('stroke-dasharray', len)
+                .attr('stroke-dashoffset', len)
+                .transition()
+                .duration(1500)
+                .ease(d3.easeCubicOut)
+                .attr('stroke-dashoffset', 0);
+            }
           }
         }
       }
@@ -2268,8 +2277,8 @@
         '    ⇄ 比較',
         '  </button>',
         '  <button type="button" id="vizDeltaToggleBtn" class="viz-btn" ' +
-        '          title="議論前→現在の意見の動きを矢印で表示 (matrix モードのみ)" ' +
-        '          aria-label="議論前→現在の意見の動きを矢印で表示" ' +
+        '          title="議論前→現在の動きを軌跡で表示 (matrix のみ / クリックで再生 / Shift+クリックでOFF)" ' +
+        '          aria-label="議論前から現在への意見の動きを軌跡で表示" ' +
         '          aria-pressed="false">',
         '    → 動き',
         '  </button>',
@@ -2381,16 +2390,22 @@
       });
     }
 
-    // 「→ 動き」: 議論前 → 現在 の同一児童の dot 移動を矢印で重ね描き (v2691)。
+    // 「→ 動き」: 議論前 → 現在 の動きを ghost trail で表示 (v2691, v2777 で再設計)。
     //   compare モードと違って overlay 形式なので、現在の画面構造を保ったまま追加情報を出せる。
     //   ガード:
     //     1. 議論前スナップが必要 (compare と同じ)
     //     2. matrix モードでのみ動作 (numericX/Y が無い mode では無意味)
     //     3. axisConfig が互換 (xAxisLabels.min/max + yAxisLabels.min/max 完全一致)
     //   3 は profile 切替後にも安全 — 違うフォーム間の座標を結ばない。
+    //
+    //   トグル動作 (v2777):
+    //     - OFF → ON: ガード通過 → ON + 1.5s trail growth animation
+    //     - ON → ON (もう一度 click): replay (animation を再生、ON 状態維持)
+    //     - ON → OFF: shift-click で OFF (再生繰り返し中の誤クリックで消えない)
+    //     - 通常の trails 消去は profile 切替 / 議論前 snapshot 削除で自動
     const deltaBtn = toolsBar.querySelector('#vizDeltaToggleBtn');
     if (deltaBtn) {
-      deltaBtn.addEventListener('click', () => {
+      deltaBtn.addEventListener('click', (ev) => {
         if (!app.state.vizShowDeltas) {
           const before = app.vizGetBefore();
           if (!before) {
@@ -2398,18 +2413,27 @@
             return;
           }
           if (app.state.boardMode !== 'matrix') {
-            try { window.alert('意見の動き矢印は matrix モード（散布図）でのみ表示できます。'); } catch (_) {}
+            try { window.alert('意見の動きは matrix モード（散布図）でのみ表示できます。'); } catch (_) {}
             return;
           }
           if (!arePhasesAxisCompatible(before.axisConfig, app.state.axisConfig)) {
             try {
-              window.alert('議論前スナップと現在で軸が異なるため、矢印を描けません。\n' +
+              window.alert('議論前スナップと現在で軸が異なるため、動きを描けません。\n' +
                 '同じ問い（同じ X/Y 軸ラベル）の間でのみ動きを可視化できます。');
             } catch (_) {}
             return;
           }
+          // OFF → ON: 状態切替 + アニメーション再生
+          app.state.vizShowDeltas = true;
+          app.state._deltaAnimateOnce = true;
+        } else if (ev && ev.shiftKey) {
+          // ON 中の Shift+click: OFF
+          app.state.vizShowDeltas = false;
+          app.state._deltaAnimateOnce = false;
+        } else {
+          // ON 中の通常 click: replay (状態維持で animation 再生)
+          app.state._deltaAnimateOnce = true;
         }
-        app.state.vizShowDeltas = !app.state.vizShowDeltas;
         deltaBtn.classList.toggle('active', !!app.state.vizShowDeltas);
         deltaBtn.setAttribute('aria-pressed', String(!!app.state.vizShowDeltas));
         app.renderBoard(false, false, []);

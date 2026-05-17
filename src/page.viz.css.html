@@ -342,40 +342,28 @@
     filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.75));
   }
 
-  /* 議論前 → 現在 矢印 (v2691)。
-     淡い水色を既定とし、major (Likert 距離 > 2 = 強い意見変化) は amber で強調。
-     pointer-events: none で dot click を阻害しない。MEXT 評価観点
-     「自らの生活や考えを見直しているか」の証拠を視覚化。 */
-  .viz-arrow {
-    stroke: rgba(125, 211, 252, 0.55);  /* sky-300 alpha */
-    stroke-width: 1.4;
+  /* 議論前 → 現在 の動き軌跡 (v2777 で矢印 overlay から ghost trail に再設計)。
+     研究根拠:
+       - Heer & Robertson 2007 "Animated Transitions in Statistical Data Graphics":
+         trajectory history が認知負荷を下げる
+       - FlowingData "Ghost Trails": 過去の経路を fade 表示して時間の方向感を出す
+       - 道徳科 評価観: 「動いた=正解」バイアスを避けるため amber 強調・矢頭は廃止
+     設計:
+       - 全 trail 同色・同太さ (距離による強調なし)
+       - 低 opacity (0.32) で「補助情報」感を出す
+       - pointer-events: none で dot click を阻害しない
+       - stroke-linecap: round で trail の両端を柔らかく
+   */
+  .viz-trail {
+    stroke: rgba(125, 211, 252, 0.32);  /* sky-300 ハーフトーン */
+    stroke-width: 1.3;
+    stroke-linecap: round;
     fill: none;
     pointer-events: none;
   }
-  .viz-arrow.major {
-    stroke: rgba(251, 191, 36, 0.85);   /* amber-400 — 大きく動いた児童 */
-    stroke-width: 2.0;
-  }
-  .viz-arrow-head {
-    fill: rgba(125, 211, 252, 0.65);
-    stroke: none;
-    pointer-events: none;
-  }
-  .viz-arrow-head.major {
-    fill: rgba(251, 191, 36, 0.9);
-  }
-  body.projector-mode .viz-arrow {
+  body.projector-mode .viz-trail {
+    stroke: rgba(125, 211, 252, 0.55);
     stroke-width: 1.8;
-    stroke: rgba(125, 211, 252, 0.7);
-  }
-  body.projector-mode .viz-arrow.major {
-    stroke-width: 2.6;
-  }
-  body.projector-mode .viz-arrow-head {
-    fill: rgba(125, 211, 252, 0.85);
-  }
-  body.projector-mode .viz-arrow-head.major {
-    fill: rgba(251, 191, 36, 1);
   }
 
   /* =============================================================================
