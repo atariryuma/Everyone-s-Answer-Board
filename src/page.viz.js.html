@@ -742,8 +742,11 @@
           }
         });
 
-      // dot 中央のリアクション数バッジ
-      const reactedNodes = nodes.filter((n) => totalReactions(n.data) > 0);
+      // dot 中央のリアクション数バッジ (v2782 で showCounts ガードを追加して matrix と挙動を統一)。
+      //   AdminPanel 設定「リアクション数を表示」(state.showCounts) を尊重する。
+      //   非表示設定でも stroke 色 (リング) は残るので「人気の有無」は分かる。
+      const showCounts = !!(this.state && this.state.showCounts);
+      const reactedNodes = showCounts ? nodes.filter((n) => totalReactions(n.data) > 0) : [];
       const labelJoin = g.selectAll('.viz-dot-label').data(reactedNodes, (d) => 'l_' + d.data.rowIndex);
       labelJoin.exit().remove();
       labelJoin.enter().append('text')
@@ -1876,10 +1879,13 @@
         .attr('fill', (d, i) => colorFor(i))
         .style('cursor', 'pointer')
         .on('mouseenter', (event, d) => {
-          // tooltip にカテゴリ全体のリアクション数も含める (見ただけで人気が分かる)
+          // tooltip にカテゴリ全体のリアクション数も含める (見ただけで人気が分かる)。
+          //   v2782: state.showCounts を尊重 (numberline/matrix の dot バッジと同じ規約)。
+          //   showCounts=false なら反応数 suffix は出さない (リアクション数非表示設定の徹底)。
           const matched = (selfP.state.currentAnswers || []).filter(r => String(r[useField] || '').trim() === d.data.label);
-          const totalReact = matched.reduce((s, r) => s + totalReactions(r), 0);
-          const reactSuffix = totalReact > 0 ? ` · 反応 ${totalReact}` : '';
+          const showCounts = !!(selfP.state && selfP.state.showCounts);
+          const totalReact = showCounts ? matched.reduce((s, r) => s + totalReactions(r), 0) : 0;
+          const reactSuffix = (showCounts && totalReact > 0) ? ` · 反応 ${totalReact}` : '';
           const item = { name: d.data.label, reason: `${d.data.count}件 (${Math.round(d.data.count / total * 100)}%)${reactSuffix}`, numericX: d.data.count };
           showTooltip(event, item, selfP);
         })
