@@ -1185,6 +1185,16 @@ function dispatchAdminOperation(operation, params) {
         const oldHeader = String(cell.getValue() || '');
         const cleanHeader = String(params.newHeader).trim().substring(0, 200);
         cell.setValue(cleanHeader);
+        // Why: SHEET_HEADERS は 10 分 TTL でキャッシュされる (SystemController.DATABASE_LONG)。
+        //   invalidate しないと getQuestionText が古い「回答」を返し続け、headingLabel が
+        //   更新されない (CLAUDE.md: setupColumns 時は明示的に invalidate せよ規約と同じ)。
+        try {
+          if (typeof invalidateSheetHeadersCache === 'function') {
+            invalidateSheetHeadersCache(params.spreadsheetId, params.sheetName);
+          }
+        } catch (cacheErr) {
+          console.warn('setSheetHeader: cache invalidate failed', cacheErr.message);
+        }
         return createSuccessResponse('Header updated', {
           spreadsheetId: params.spreadsheetId,
           sheetName: params.sheetName,
