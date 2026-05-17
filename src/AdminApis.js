@@ -1157,6 +1157,46 @@ function dispatchAdminOperation(operation, params) {
       }
     }
 
+    case 'setSheetHeader': {
+      // header 行 (row 1) の任意セルを書き換え。
+      //   Why: createTemplateForm のデフォルト設問タイトル (「回答」「理由」等) は汎用的すぎて
+      //        ボード上の headingLabel ("eab-question") が意味不明になる。授業ごとに
+      //        「あなたが手品師なら、どちらを選ぶ？」のような具体的な問いに差し替えたい。
+      //   Form item 側 (setTitle) は触らないので、既存 100+ 件の回答に影響しない。
+      //   columnIndex は 0-based (admin api / columnMapping と一致)。
+      { const e = reqStr('spreadsheetId'); if (e) return e; }
+      { const e = reqStr('sheetName'); if (e) return e; }
+      if (typeof params.columnIndex !== 'number' || !Number.isInteger(params.columnIndex) || params.columnIndex < 0) {
+        return createErrorResponse('columnIndex (non-negative integer, 0-based) is required');
+      }
+      if (typeof params.newHeader !== 'string' || !params.newHeader.trim()) {
+        return createErrorResponse('newHeader (non-empty string) is required');
+      }
+      try {
+        const ss = SpreadsheetApp.openById(params.spreadsheetId);
+        const sheet = ss.getSheetByName(params.sheetName);
+        if (!sheet) return createErrorResponse(`Sheet "${params.sheetName}" not found`);
+        const colNum = params.columnIndex + 1;
+        const lastCol = sheet.getLastColumn();
+        if (colNum > lastCol) {
+          return createErrorResponse(`columnIndex ${params.columnIndex} is out of range (lastColumn=${lastCol - 1})`);
+        }
+        const cell = sheet.getRange(1, colNum);
+        const oldHeader = String(cell.getValue() || '');
+        const cleanHeader = String(params.newHeader).trim().substring(0, 200);
+        cell.setValue(cleanHeader);
+        return createSuccessResponse('Header updated', {
+          spreadsheetId: params.spreadsheetId,
+          sheetName: params.sheetName,
+          columnIndex: params.columnIndex,
+          oldHeader,
+          newHeader: cleanHeader
+        });
+      } catch (e) {
+        return createExceptionResponse(e);
+      }
+    }
+
     case 'clearDataRows': {
       // データ行（2行目以降）を全削除して、ヘッダーだけ残す。
       // appendRows と組み合わせて「テストデータをきれいに作り直す」用途。

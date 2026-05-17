@@ -64,7 +64,7 @@ const OPERATIONS = [
   // Multi-board profiles (v4)
   'listProfiles', 'saveProfile', 'loadProfile', 'deleteProfile',
   // Data ops (v5) — テストデータ投入専用
-  'appendRows', 'clearDataRows',
+  'appendRows', 'clearDataRows', 'setSheetHeader',
   // Drive file rename (v5.1) — customizeForm 後の Drive file name 同期 etc.
   'renameDriveFile',
   // Drive sharing (v6)
