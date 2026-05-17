@@ -1164,7 +1164,7 @@
               .attr('class', 'viz-trail')
               .attr('d', `M ${x1} ${y1} L ${x2} ${y2}`);
             if (shouldAnimate) {
-              const len = Math.sqrt((x2 - x1) * (x2 - x1) + (y2 - y1) * (y2 - y1)) || 1;
+              const len = euclidean(x1, y1, x2, y2) || 1;
               trail
                 .attr('stroke-dasharray', len)
                 .attr('stroke-dashoffset', len)
@@ -2405,7 +2405,7 @@
     //     - 通常の trails 消去は profile 切替 / 議論前 snapshot 削除で自動
     const deltaBtn = toolsBar.querySelector('#vizDeltaToggleBtn');
     if (deltaBtn) {
-      deltaBtn.addEventListener('click', (ev) => {
+      deltaBtn.addEventListener('click', (event) => {
         if (!app.state.vizShowDeltas) {
           const before = app.vizGetBefore();
           if (!before) {
@@ -2423,15 +2423,12 @@
             } catch (_) {}
             return;
           }
-          // OFF → ON: 状態切替 + アニメーション再生
           app.state.vizShowDeltas = true;
           app.state._deltaAnimateOnce = true;
-        } else if (ev && ev.shiftKey) {
-          // ON 中の Shift+click: OFF
+        } else if (event && event.shiftKey) {
           app.state.vizShowDeltas = false;
           app.state._deltaAnimateOnce = false;
         } else {
-          // ON 中の通常 click: replay (状態維持で animation 再生)
           app.state._deltaAnimateOnce = true;
         }
         deltaBtn.classList.toggle('active', !!app.state.vizShowDeltas);
