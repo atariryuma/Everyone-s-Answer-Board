@@ -1203,16 +1203,53 @@ function __resolveFormInfoSpreadsheet_(spreadsheetId, sheetName) {
   return { ok: true, spreadsheet, sheet, spreadsheetName };
 }
 
+/**
+ * Form の ScaleItem (線形尺度) メタデータを抽出する。
+ *
+ * Why: 管理パネルの「X軸ラベル / Y軸ラベル」入力欄は元々 100% 手入力だったが、
+ *   ScaleItem.setLabels で createTemplateForm が既に書き込んでいるので、
+ *   読み戻して空欄を自動補完できる (UX: 教師の手数を 4 入力 → 0 に削減)。
+ *
+ * 順序の意味: items[0] = 1番目の ScaleItem → numericX 軸候補
+ *            items[1] = 2番目の ScaleItem → numericY 軸候補 (matrix のみ)
+ *
+ * @param {string} formUrl - 開ける Form の URL
+ * @returns {Array<{leftLabel:string,rightLabel:string,lowerBound:number,upperBound:number,title:string}>|null}
+ *   形式は AdminPanel client が直接 consume する。失敗時は null。
+ */
+function __extractFormScaleItems_(formUrl) {
+  if (!formUrl || typeof FormApp === 'undefined' || !FormApp.openByUrl) return null;
+  try {
+    const form = FormApp.openByUrl(formUrl);
+    const items = form.getItems(FormApp.ItemType.SCALE);
+    return items.map((item) => {
+      const scale = item.asScaleItem();
+      return {
+        title: item.getTitle() || '',
+        leftLabel: scale.getLeftLabel() || '',
+        rightLabel: scale.getRightLabel() || '',
+        lowerBound: scale.getLowerBound(),
+        upperBound: scale.getUpperBound()
+      };
+    });
+  } catch (e) {
+    console.warn('__extractFormScaleItems_ failed:', e && e.message);
+    return null;
+  }
+}
+
 // 検出結果から成功/失敗 envelope を組み立て。
 function __buildFormInfoResult_(access, spreadsheetId, sheetName) {
   const { spreadsheet, sheet, spreadsheetName } = access;
   const accessMethod = 'normal_permissions';
   const detection = detectFormConnection(spreadsheet, sheet, sheetName, true);
+  const scaleItems = detection.formUrl ? __extractFormScaleItems_(detection.formUrl) : null;
   const formData = {
     formUrl: detection.formUrl || null,
     formTitle: detection.formTitle || sheetName,
     spreadsheetName,
     sheetName,
+    scaleItems: scaleItems || [],
     detectionDetails: {
       method: detection.detectionMethod,
       confidence: detection.confidence,

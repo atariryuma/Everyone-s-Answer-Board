@@ -554,19 +554,25 @@
                    ここに残すと「データソース設定」と「表示設定」が混在して教師が混乱するため。 -->
 
               <!-- 軸ラベル（numberline/matrix で表示） -->
+              <!-- v2780: placeholder はフォーム連携時に ScaleItem ラベルから自動上書きされる
+                   (applyAxisLabelPlaceholdersFromFormInfo)。
+                   ここの "例:" 表記はフォーム未連携時のみ見える汎用 fallback。 -->
               <div id="axis-labels-container" class="hidden space-y-3 mt-3">
+                <p class="text-xs text-slate-400 mb-2">
+                  💡 フォームの「線形尺度」項目に書いたラベルが自動で入ります。空欄なら自動補完、書き換えれば優先されます。
+                </p>
                 <div class="form-group">
                   <label class="block text-sm font-medium text-gray-300 mb-2">X軸ラベル（両端）</label>
                   <div class="flex gap-2">
-                    <input type="text" id="x-min-label" class="modern-input flex-1" placeholder="例: そのまま使う" maxlength="40" data-autosave>
-                    <input type="text" id="x-max-label" class="modern-input flex-1" placeholder="例: 自分で直す" maxlength="40" data-autosave>
+                    <input type="text" id="x-min-label" class="modern-input flex-1" placeholder="例: そう思わない" maxlength="40" data-autosave>
+                    <input type="text" id="x-max-label" class="modern-input flex-1" placeholder="例: とてもそう思う" maxlength="40" data-autosave>
                   </div>
                 </div>
                 <div id="y-axis-label-row" class="form-group hidden">
                   <label class="block text-sm font-medium text-gray-300 mb-2">Y軸ラベル（両端、マトリクス用）</label>
                   <div class="flex gap-2">
-                    <input type="text" id="y-min-label" class="modern-input flex-1" placeholder="例: 低い" maxlength="40" data-autosave>
-                    <input type="text" id="y-max-label" class="modern-input flex-1" placeholder="例: 高い" maxlength="40" data-autosave>
+                    <input type="text" id="y-min-label" class="modern-input flex-1" placeholder="例: そう思わない" maxlength="40" data-autosave>
+                    <input type="text" id="y-max-label" class="modern-input flex-1" placeholder="例: とてもそう思う" maxlength="40" data-autosave>
                   </div>
                 </div>
               </div>

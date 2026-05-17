@@ -769,6 +769,10 @@
     setText('x-max-label', x.max);
     setText('y-min-label', y.min);
     setText('y-max-label', y.max);
+    // 軸ラベル placeholder を ScaleItem 由来の値で動的に上書き (v2780)。
+    //   getCurrentFormInfoSafe() が systemState から最新の formInfo を返すので、
+    //   ボード復元時にも plceholder としてフォームの値が見えるようになる。
+    try { applyAxisLabelPlaceholdersFromFormInfo(getCurrentFormInfoSafe()); } catch (_) {}
 
     // 3) 4象限ラベル
     const q = config.matrixQuadrantLabels || {};
@@ -2015,6 +2019,10 @@
         const formUrl = formInfo?.formUrl || null;
         const formTitle = formInfo?.formTitle || null;
 
+        // 軸ラベル自動補完 (v2780): ScaleItem.{getLeftLabel,getRightLabel} を空欄入力に差し込む。
+        //   既存ユーザーの手入力値は壊さない (空欄のみ補完)。
+        try { autofillAxisLabelsFromFormInfo(formInfo); } catch (_) { /* best effort */ }
+
         if (result.headers && result.mapping) {
           fillColumnDropdowns(result.headers, result.mapping, result.confidence);
 
@@ -2788,6 +2796,7 @@
 
               systemState.config = { ...systemState.config, ...config };
               updateResourceButtons(systemState.config);
+              try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
             }
             executeDraftSave(config);
           })
@@ -2869,6 +2878,7 @@
 
               systemState.config = { ...systemState.config, ...config };
               updateResourceButtons(systemState.config);
+              try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
             }
             executePublish(config);
           })
@@ -2951,11 +2961,85 @@
     try {
       return {
         formUrl: getCurrentDataSourceField('formUrl'),
-        formTitle: getCurrentDataSourceField('formTitle')
+        formTitle: getCurrentDataSourceField('formTitle'),
+        scaleItems: (systemState && Array.isArray(systemState.lastFormScaleItems))
+          ? systemState.lastFormScaleItems
+          : []
       };
     } catch (error) {
       console.warn('getCurrentFormInfoSafe error:', error.message);
-      return { formUrl: null, formTitle: null };
+      return { formUrl: null, formTitle: null, scaleItems: [] };
+    }
+  }
+
+  /**
+   * Form の ScaleItem ラベルを軸ラベル入力欄に「placeholder」として表示する。
+   *
+   * Why: 教師がフォーム連携した瞬間、空欄の placeholder が「例: 低い / 高い」(汎用) から
+   *   実フォームの ScaleItem ラベル (例: 「そのまま使う / 自分で直す」) に切り替わる。
+   *   値そのものは触らないので、教師が既に手入力した文字列は保護される。
+   *
+   * placeholder 戦略を採用した理由:
+   *   - 既存ユーザーの手入力が消えない (空欄補完よりも厳格な保護)
+   *   - 教師は input の中身を見るより先に「placeholder の薄い文字」を読む → 自然に
+   *     「ああフォームにこう書いてあるんだ」と認知でき、自分の言葉で書き換えたいときは
+   *     上書き入力するだけ
+   *   - フォーム側のラベル変更が反映される (連携した瞬間に最新値が出る)
+   */
+  function applyAxisLabelPlaceholdersFromFormInfo(formInfo) {
+    if (!formInfo || !Array.isArray(formInfo.scaleItems) || formInfo.scaleItems.length === 0) return;
+    const items = formInfo.scaleItems;
+    const setPh = (id, v) => {
+      const el = document.getElementById(id);
+      if (el && typeof v === 'string' && v.trim()) el.placeholder = v;
+    };
+    if (items[0]) {
+      setPh('x-min-label', items[0].leftLabel);
+      setPh('x-max-label', items[0].rightLabel);
+    }
+    if (items[1]) {
+      setPh('y-min-label', items[1].leftLabel);
+      setPh('y-max-label', items[1].rightLabel);
+    }
+  }
+
+  /**
+   * フォーム連携直後に呼ばれる: ScaleItem ラベルで空欄の軸ラベル入力欄を埋める。
+   *
+   * Why 空欄補完: 教師の手入力 (空でない既存値) は絶対に上書きしない。
+   *   空のフィールドだけ ScaleItem 由来の値で埋めて、そのまま autosave に乗せる。
+   *   placeholder 設定 (applyAxisLabelPlaceholdersFromFormInfo) も並行で行うので、
+   *   将来教師が空欄に戻したときも形式値が見える。
+   */
+  function autofillAxisLabelsFromFormInfo(formInfo) {
+    if (!formInfo) return;
+    // scaleItems を systemState にキャッシュ (config 再 render 時の placeholder 復元用)
+    if (Array.isArray(formInfo.scaleItems)) {
+      systemState.lastFormScaleItems = formInfo.scaleItems;
+    }
+    applyAxisLabelPlaceholdersFromFormInfo(formInfo);
+
+    const items = Array.isArray(formInfo.scaleItems) ? formInfo.scaleItems : [];
+    if (items.length === 0) return;
+
+    let filled = 0;
+    const fillEmpty = (id, v) => {
+      const el = document.getElementById(id);
+      if (!el || el.value || typeof v !== 'string' || !v.trim()) return;
+      el.value = v;
+      filled++;
+    };
+    if (items[0]) {
+      fillEmpty('x-min-label', items[0].leftLabel);
+      fillEmpty('x-max-label', items[0].rightLabel);
+    }
+    if (items[1]) {
+      fillEmpty('y-min-label', items[1].leftLabel);
+      fillEmpty('y-max-label', items[1].rightLabel);
+    }
+    if (filled > 0) {
+      try { showInfo('🧭 軸ラベルをフォームから自動取得しました', 4000); } catch (_) {}
+      try { scheduleAutoSave(); } catch (_) {}
     }
   }
 
