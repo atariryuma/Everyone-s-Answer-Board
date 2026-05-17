@@ -738,8 +738,10 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
       return result;
     }
 
-    const configResult = getUserConfig(targetUser.userId);
-    const isPublished = Boolean(configResult && configResult.success && configResult.config && configResult.config.isPublished);
+    // 公開状態の判定。 `getUserConfig` 経由だと findUserById が viewer のアクセス制御で deny
+    // するチキン&エッグ問題があるため、 既に取得済の `targetUser.configJson` を直接 parse する。
+    // (`findUserBySpreadsheetId` は admin 経路で取得しており、 configJson は信頼できる)
+    const isPublished = isUserBoardPublished(targetUser);
     const result = isPublished
       ? { allowed: true, reason: 'Public board access', accessMode: 'sa' }
       : { allowed: false, reason: 'Board not published', accessMode: 'denied' };
