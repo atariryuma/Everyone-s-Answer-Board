@@ -763,55 +763,11 @@
             onclick="window.open('https://classroom.google.com', '_blank')">
             🎓 Googleクラスルームを開く
           </button>
-          <!-- システム管理者用ボタン -->
+          <!-- システム管理者用ボタン (アプリ設定で SA pool 管理 / システム診断等が可能) -->
           <a id="app-setup-btn" target="_top" class="link-btn w-full text-center block" style="display: none;">
             ⚙️ アプリ設定
           </a>
         </div>
-      </section>
-
-      <!-- システム管理者専用: SA pool 管理 (700 人規模運用時のスケール) -->
-      <section id="sa-pool-section" class="info-card glass-panel rounded-xl p-4" style="display: none;">
-        <details class="admin-collapsible">
-          <summary class="cursor-pointer text-lg font-semibold text-white select-none flex items-center gap-2">
-            <span>🔐 SA pool</span>
-            <span id="sa-pool-summary" class="text-xs text-gray-400 font-normal">読み込み中...</span>
-          </summary>
-          <div class="mt-3 space-y-3">
-            <div class="text-xs text-gray-400 leading-relaxed">
-              ボード SS への cross-user アクセス (生徒の閲覧 / 管理者の管理) を担う Service Account の pool。
-              700 人規模で 3-5 個推奨。 GCP Console で SA JSON を発行 → 下に貼り付け。
-            </div>
-            <div id="sa-pool-list" class="space-y-1.5 text-xs"></div>
-            <div class="flex flex-wrap gap-2 mt-2">
-              <button id="sa-pool-refresh-btn" type="button"
-                class="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors">
-                🔄 一覧を更新
-              </button>
-              <button id="sa-pool-usage-btn" type="button"
-                class="px-2.5 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded transition-colors">
-                📊 使用状況
-              </button>
-              <button id="sa-pool-migrate-btn" type="button"
-                class="px-2.5 py-1 bg-amber-700 hover:bg-amber-600 text-white text-xs rounded transition-colors"
-                title="既存ボードに SA pool 全員を editor 追加 + 旧 domain 共有を revoke">
-                🧹 既存ボードを cleanup
-              </button>
-            </div>
-            <details class="mt-2">
-              <summary class="cursor-pointer text-xs text-gray-400 hover:text-gray-200 select-none py-1">
-                ＋ SA JSON を追加
-              </summary>
-              <textarea id="sa-pool-add-input" rows="6" placeholder='{"type":"service_account", "client_email":"...", "private_key":"..."}'
-                class="w-full mt-2 px-2 py-1.5 bg-gray-800 border border-gray-600 rounded text-white text-xs font-mono focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"></textarea>
-              <button id="sa-pool-add-btn" type="button"
-                class="mt-1.5 px-2.5 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-xs rounded transition-colors">
-                pool に追加
-              </button>
-            </details>
-            <div id="sa-pool-status" class="text-xs text-gray-300 mt-2 min-h-[1rem]"></div>
-          </div>
-        </details>
       </section>
     </div>
   </div>

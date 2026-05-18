@@ -302,6 +302,60 @@
         </div>
       </div>
 
+      <!-- SA pool 管理セクション (v2782+) -->
+      <div class="glass-panel rounded-xl p-6 mb-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-xl font-semibold text-white">🔐 SA pool 管理</h2>
+            <p class="text-sm text-gray-400">
+              ボード SS への cross-user アクセスを担う Service Account の pool。 700 人規模で 3-5 個推奨。
+            </p>
+          </div>
+          <div id="sa-pool-summary" class="text-sm text-gray-300">読み込み中...</div>
+        </div>
+
+        <div class="space-y-3">
+          <div id="sa-pool-list" class="space-y-2"></div>
+
+          <div class="flex flex-wrap gap-2">
+            <button type="button" id="sa-pool-refresh-btn"
+              class="btn bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg text-sm">
+              🔄 一覧を更新
+            </button>
+            <button type="button" id="sa-pool-usage-btn"
+              class="btn bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-sm">
+              📊 使用状況
+            </button>
+            <button type="button" id="sa-pool-migrate-btn"
+              class="btn bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-lg text-sm"
+              title="既存ボード全件に SA pool 全員を editor 追加 + 旧 domain 共有を revoke">
+              🧹 既存ボードを cleanup
+            </button>
+          </div>
+
+          <details class="bg-gray-800 rounded-lg">
+            <summary class="p-3 cursor-pointer text-gray-300 hover:text-white text-sm select-none">
+              ＋ SA JSON を追加 (GCP Console で発行)
+            </summary>
+            <div class="p-4 pt-0">
+              <p class="text-xs text-gray-400 mb-2">
+                GCP Console (IAM &amp; Admin → Service Accounts) で SA を新規作成、 JSON キーをダウンロードして全文貼り付け。
+                登録時に DB editor 共有 + verify が自動実行されます。
+              </p>
+              <textarea id="sa-pool-add-input" rows="6"
+                placeholder='{"type":"service_account", "client_email":"...", "private_key":"..."}'
+                class="w-full px-3 py-2 bg-gray-900 border border-gray-600 rounded text-white text-xs font-mono focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"></textarea>
+              <button type="button" id="sa-pool-add-btn"
+                class="mt-2 btn bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded-lg text-sm">
+                pool に追加
+              </button>
+            </div>
+          </details>
+
+          <div id="sa-pool-status" class="text-sm text-gray-300 whitespace-pre-wrap min-h-[1.5rem] p-2 bg-gray-900/30 rounded"></div>
+        </div>
+      </div>
+
       <!-- ユーザー管理セクション -->
       <div class="glass-panel rounded-xl p-6 mb-6">
         <h2 class="text-xl font-semibold text-white mb-4">👥 ユーザー管理</h2>
@@ -1040,11 +1094,165 @@
           });
       }
 
+      // ===========================================================================
+      // SA pool 管理 (v2782+)
+      // 700 人スケール運用時、 GCP Console で SA を追加発行 → ここで pool に登録 → 既存
+      // ボードに展開 (cleanup) する。 system admin 専用画面なので別途 isAdmin gate は不要
+      // (このページ自体が admin のみアクセス可能)。
+      // ===========================================================================
+      function saPool_callAdmin(operation, params) {
+        return new Promise(function(resolve, reject) {
+          google.script.run
+            .withSuccessHandler(resolve)
+            .withFailureHandler(reject)
+            .dispatchAdminOperation(operation, params || {});
+        });
+      }
+      function saPool_setStatus(msg, isError) {
+        var el = document.getElementById('sa-pool-status');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.style.color = isError ? '#fca5a5' : '#86efac';
+      }
+      function saPool_escape(s) {
+        return String(s == null ? '' : s)
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+      function saPool_refresh() {
+        saPool_setStatus('一覧取得中...');
+        saPool_callAdmin('listServiceAccountPool').then(function(result) {
+          var summary = document.getElementById('sa-pool-summary');
+          var listEl = document.getElementById('sa-pool-list');
+          if (!result || !result.success) {
+            saPool_setStatus('一覧取得失敗: ' + (result && result.message), true);
+            return;
+          }
+          var slots = result.slots || [];
+          summary.textContent = slots.length + ' / ' + (result.maxSize || 10) + ' slot';
+          if (!slots.length) {
+            listEl.innerHTML = '<div class="text-gray-500 text-sm">(pool が空です。 まず primary SA を Setup 画面から登録してください)</div>';
+          } else {
+            listEl.innerHTML = slots.map(function(s) {
+              var roleColor = s.role === 'primary' ? 'text-cyan-400' : 'text-gray-400';
+              var emailShort = (s.clientEmail || '(invalid)').split('@')[0];
+              var removeBtn = s.role === 'primary'
+                ? ''
+                : '<button data-sa-remove="' + saPool_escape(s.slot) + '" class="ml-2 px-2 py-1 bg-red-700 hover:bg-red-600 text-white text-xs rounded">削除</button>';
+              return '<div class="flex items-center gap-2 p-2 bg-gray-800 rounded text-sm">'
+                + '<span class="text-gray-500 w-8">[' + saPool_escape(s.index) + ']</span>'
+                + '<span class="' + roleColor + ' w-20">' + saPool_escape(s.role) + '</span>'
+                + '<span class="text-white font-mono truncate flex-1" title="' + saPool_escape(s.clientEmail || '(invalid)') + '">'
+                + saPool_escape(emailShort) + '</span>'
+                + '<button data-sa-reverify="' + saPool_escape(s.slot) + '" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded">再 verify</button>'
+                + removeBtn
+                + '</div>';
+            }).join('');
+          }
+          saPool_setStatus('');
+        }).catch(function(err) {
+          saPool_setStatus('エラー: ' + (err && err.message), true);
+        });
+      }
+      function saPool_showUsage() {
+        saPool_setStatus('使用状況取得中...');
+        saPool_callAdmin('getServiceAccountUsage').then(function(result) {
+          if (!result || !result.success) {
+            saPool_setStatus('使用状況取得失敗', true);
+            return;
+          }
+          var lines = (result.pool || []).map(function(u) {
+            return '  ' + u.clientEmail.split('@')[0] + ': ' + u.picks + ' 回 / 5分'
+              + (u.cooling ? ' (cooling!)' : '');
+          });
+          saPool_setStatus('直近 5分: 計 ' + result.total + ' 回, cooling ' + result.coolingCount + ' 個\n'
+            + lines.join('\n'));
+        }).catch(function(err) {
+          saPool_setStatus('エラー: ' + (err && err.message), true);
+        });
+      }
+      function saPool_add() {
+        var input = document.getElementById('sa-pool-add-input');
+        var json = (input && input.value || '').trim();
+        if (!json) { saPool_setStatus('SA JSON を貼り付けてください', true); return; }
+        saPool_setStatus('SA 登録 + DB 共有 + verify 実行中... (10-30秒)');
+        saPool_callAdmin('addServiceAccountToPool', { json: json }).then(function(result) {
+          if (!result || !result.success) {
+            saPool_setStatus('登録失敗: ' + (result && result.message), true);
+            return;
+          }
+          var msg = '登録完了: ' + result.clientEmail + ' (' + result.slot + '). verified=' + result.verified;
+          if (result.verifyError) msg += ', verify error: ' + result.verifyError;
+          if (result.migrationHint) msg += '\n' + result.migrationHint;
+          saPool_setStatus(msg);
+          if (input) input.value = '';
+          saPool_refresh();
+        }).catch(function(err) {
+          saPool_setStatus('エラー: ' + (err && err.message), true);
+        });
+      }
+      function saPool_migrate() {
+        if (!confirm('既存ボード全件に SA pool 全員を editor 追加し、 旧ドメイン共有を revoke します。\n冪等のため何度実行しても安全。\n\n実行しますか?')) return;
+        saPool_setStatus('migration 実行中... (ボード数 × 数秒)');
+        saPool_callAdmin('migrateBoardSharing', {}).then(function(result) {
+          if (!result || !result.success) {
+            saPool_setStatus('migration 失敗: ' + (result && result.message), true);
+            return;
+          }
+          var d = result.data || {};
+          saPool_setStatus('migration 完了: total=' + d.total + ', SA 追加=' + d.saAddedCount
+            + ', domain revoke=' + d.domainRevokedCount + ', error=' + d.errorCount);
+        }).catch(function(err) {
+          saPool_setStatus('エラー: ' + (err && err.message), true);
+        });
+      }
+      function saPool_reverify(slot) {
+        saPool_setStatus(slot + ' を再 verify 中...');
+        saPool_callAdmin('reverifyServiceAccountInPool', { slot: slot }).then(function(result) {
+          saPool_setStatus(slot + ': verified=' + (result && result.verified)
+            + (result && result.error ? ', ' + result.error : ''));
+        }).catch(function(err) {
+          saPool_setStatus('エラー: ' + (err && err.message), true);
+        });
+      }
+      function saPool_remove(slot) {
+        if (!confirm(slot + ' を pool から削除しますか? (GCP 側の SA key は別途 revoke が必要)')) return;
+        saPool_setStatus(slot + ' を削除中...');
+        saPool_callAdmin('removeServiceAccountFromPool', { slot: slot }).then(function(result) {
+          if (result && result.success) {
+            saPool_setStatus(slot + ' を削除しました');
+            saPool_refresh();
+          } else {
+            saPool_setStatus('削除失敗: ' + (result && result.message), true);
+          }
+        }).catch(function(err) {
+          saPool_setStatus('エラー: ' + (err && err.message), true);
+        });
+      }
+
       document.addEventListener('DOMContentLoaded', function() {
         loadUserList();
         loadSystemStats();
         updateAppControlStatus();
         loadLoginUrl();
+
+        // SA pool buttons
+        var refreshBtn = document.getElementById('sa-pool-refresh-btn');
+        if (refreshBtn) refreshBtn.addEventListener('click', saPool_refresh);
+        var usageBtn = document.getElementById('sa-pool-usage-btn');
+        if (usageBtn) usageBtn.addEventListener('click', saPool_showUsage);
+        var migrateBtn = document.getElementById('sa-pool-migrate-btn');
+        if (migrateBtn) migrateBtn.addEventListener('click', saPool_migrate);
+        var addBtn = document.getElementById('sa-pool-add-btn');
+        if (addBtn) addBtn.addEventListener('click', saPool_add);
+        // delegated handler for dynamic re-verify / remove buttons
+        var listEl = document.getElementById('sa-pool-list');
+        if (listEl) listEl.addEventListener('click', function(e) {
+          var t = e.target;
+          if (t && t.dataset && t.dataset.saReverify) saPool_reverify(t.dataset.saReverify);
+          else if (t && t.dataset && t.dataset.saRemove) saPool_remove(t.dataset.saRemove);
+        });
+        saPool_refresh();
       });
     </script>
 
