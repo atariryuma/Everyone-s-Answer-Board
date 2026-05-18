@@ -2710,9 +2710,11 @@
     const beforeBtnEl = document.getElementById('vizCaptureBeforeBtn');
     if (beforeBtnEl) beforeBtnEl.classList.remove('has-before', 'saved');
 
-    // UI: 切替中表示
+    // UI: 切替中フィードバック (即時)。 中央バナーで「○○ に切替中…」 を表示することで
+    // pill click → 数秒の沈黙、 を防ぐ (生徒の「効いてる?」 不安を解消)。
     const select = document.getElementById('vizProfileSelect');
     if (select) select.disabled = true;
+    if (typeof this.showToast === 'function') this.showToast('「' + name + '」 に切替中…');
 
     google.script.run
       .withSuccessHandler((res) => {
@@ -2732,6 +2734,10 @@
           }
           if (typeof window.loadFormLink === 'function') {
             window.loadFormLink();
+          }
+          // 成功通知も右上トーストに統一 (エラーと同位置で操作-結果のペアが明示される)。
+          if (typeof this.showNotification === 'function') {
+            this.showNotification('「' + name + '」 に切替えました', 'success');
           }
         } else {
           console.error('Profile load failed:', res && res.message);
@@ -2793,9 +2799,10 @@
     const sortOrder = filter.sortOrder || 'newest';
     const self = this;
 
-    // UI 即時反映（描画ペインに loading 文字を出す方法は loadSheetData 内）
+    // UI 即時反映 (loading フィードバック + 描画ペインに loading 文字)。
     self.state.viewingPastProfile = name;
     if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
+    if (typeof self.showToast === 'function') self.showToast('「' + name + '」 を読み込み中…');
 
     google.script.run
       .withSuccessHandler((res) => {

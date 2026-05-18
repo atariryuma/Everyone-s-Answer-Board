@@ -9,7 +9,7 @@
  * 既存ボードの cleanup は `migrateBoardSharing` admin API で実施。
  */
 
-/* global getCachedProperty, logError_, getAllServiceAccounts_, parseServiceAccountCredsSoft_, invalidateSaCache_ */
+/* global logError_, getAllServiceAccounts_, invalidateSaCache_ */
 
 /**
  * SA pool の全 SA を SS の editor として追加する (冪等)。
