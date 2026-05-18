@@ -170,10 +170,51 @@ main.js (doGet/doPost routing, auth)
 
 - **Apis files** group endpoints by domain (AdminApis, UserApis, DataApis)
 - **Service files** contain pure business logic (ConfigService, DataService, UserService, ReactionService)
-- **DatabaseCore.js**: All spreadsheet reads/writes, includes circuit breaker pattern and `executeWithRetry` for transient failures
+- **DatabaseCore.js**: All spreadsheet I/O, SA pool (round-robin + cooldown + 2-tier token cache), circuit breaker, `executeWithRetry`
+- **SharingHelper.js**: SS 共有設定 (SA pool 全員を editor 追加; v2782+ 旧 domain-wide sharing は廃止)
 - **SystemController.js**: System diagnostics, performance monitoring, deployment management (`publishApp` with etag conflict detection)
 - **helpers.js**: Response builders (`createSuccessResponse`, `createErrorResponse`), `getCachedProperty` (30s TTL cache for PropertiesService)
 - **validators.js**: All input validation functions
+
+### SA Pool アーキテクチャ (v2782+)
+
+「通常 Google Form 同等」 セキュリティモデル (viewer は SS 直接権限なし, Drive 非表示)。
+ボード SS への cross-user アクセス (生徒の閲覧 / 管理者の管理) を **SA pool** が担う。
+
+**アクセスモード自動振り分け** (`validateServiceAccountUsage` → `accessMode`):
+
+| Caller | DB | own board | 他人公開 | 他人非公開 |
+| ------ | -- | --------- | -------- | ---------- |
+| **owner (editor)** | sa | **own (openById)** | sa | denied |
+| **admin** | sa | **own** | sa | sa |
+| **viewer (生徒)** | sa | — | sa | denied |
+
+owner は own OAuth で SA quota 節約。 viewer / admin の cross-user のみ SA pool 経由。
+
+**SA pool 設計** ([DatabaseCore.js](src/DatabaseCore.js)):
+
+- **round-robin** (`pickServiceAccount_`): ScriptCache 共有 counter `sa_rr_counter` で完全均等分散
+- **30s cooldown**: 429 喰った SA は除外 → auto failover
+- **2 段 token cache** (`getServiceAccountAccessToken_`): in-memory + ScriptCache 50min
+- **per-SA per-sheet verify cache** (`verifyServiceAccountAccess_`): 10min ok / 2min no (transient は焼かない)
+- **authResolver closure** (`makeProxyAuthResolver_`): proxy hot path で SA 動的切替
+
+**per-row CAS lock** (v2785, [ReactionService.js](src/ReactionService.js)):
+
+- 旧: `LockService.getScriptLock()` を process() 全体で保持 → 全 board が serialize する 700人 burst の bottleneck
+- 新: ScriptLock は ~5-10ms の critical section (cache check+put) のみ。 異 row 同士は完全並列
+- throughput ~5 → ~200 req/sec, 40x 向上
+
+**board data cache** (v2783, [DataApis.js](src/DataApis.js)):
+
+- viewer の `getPublishedSheetData` 結果を 10s ScriptCache
+- reaction/highlight write 時に `bumpBoardDataVersion_` で即時 stale
+- 700 viewer × 8s polling = 5,250 req/min → ~700 req/min (~8x 削減)
+
+**sa_validation cache 即時 invalidate** (v2785):
+
+- `__applyPublishStateChange` で `invalidateSaValidationCache_` を呼び、 該当 SS の cache version を bump
+- unpublish 直後の 60秒 access leak を解消
 
 ### Frontend
 
