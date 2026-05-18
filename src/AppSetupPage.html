@@ -38,8 +38,6 @@
       ></div>
     </div>
 
-    <!-- Notification Container -->
-    <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
     <div class="max-w-6xl mx-auto p-6">
       <!-- ヘッダー -->
       <div class="text-center mb-6">
@@ -482,63 +480,7 @@
 
       function showMessage(message, type = 'info', duration = 5000) {
         if (window.notifications) {
-          window.notifications.showMessage(message, type, duration);
-          return;
-        }
-
-        const notificationContainer = document.getElementById('notification-container');
-        if (!notificationContainer) {
-          console.error('Notification container not found!');
-          return;
-        }
-
-        const colors = {
-          success: 'bg-green-600/20 border-green-500/50 text-green-100',
-          error: 'bg-red-600/20 border-red-500/50 text-red-100',
-          warning: 'bg-yellow-600/20 border-yellow-500/50 text-yellow-100',
-          info: 'bg-blue-600/20 border-blue-500/50 text-blue-100',
-        };
-
-        const icon = {
-          success: '✅',
-          error: '❌',
-          warning: '⚠️',
-          info: 'ℹ️',
-        };
-
-        const notification = document.createElement('div');
-        notification.className = `notification glass-panel rounded-lg p-4 border shadow-lg flex items-center transition-all duration-300 ease-out transform translate-x-full opacity-0 ${colors[type]}`;
-        // Build via textContent so server-sourced messages can't inject HTML.
-        const iconDiv = document.createElement('div');
-        iconDiv.className = 'mr-3 text-2xl';
-        iconDiv.textContent = icon[type];
-        const msgDiv = document.createElement('div');
-        msgDiv.className = 'flex-1 text-sm';
-        msgDiv.textContent = message;
-        const closeBtn = document.createElement('button');
-        closeBtn.type = 'button';
-        closeBtn.className = 'ml-4 text-gray-400 hover:text-white text-xl leading-none';
-        closeBtn.textContent = '✕';
-        closeBtn.addEventListener('click', () => notification.remove());
-        notification.appendChild(iconDiv);
-        notification.appendChild(msgDiv);
-        notification.appendChild(closeBtn);
-
-        notificationContainer.appendChild(notification);
-
-        requestIdleCallback(() => {
-          notification.classList.remove('translate-x-full', 'opacity-0');
-          notification.classList.add('translate-x-0', 'opacity-100');
-        }, { timeout: 10 });
-
-        if (duration > 0) {
-          const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-          createPromiseDelay(duration).then(() => {
-            notification.classList.remove('translate-x-0', 'opacity-100');
-            notification.classList.add('translate-x-full', 'opacity-0');
-            notification.addEventListener('transitionend', () => notification.remove());
-          });
+          window.notifications.showMessage(message, type, { duration });
         }
       }
 

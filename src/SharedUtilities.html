@@ -1232,107 +1232,139 @@
   // WARNING SUPPRESSION は先頭のIIFE内で定義済みのため、ここでは不要
 
 
+  /**
+   * 通知システム（唯一の真実）。
+   *
+   * 全ページの通知はここを通る。 旧来の ad-hoc DOM (page.js.html の `__showBoardSwitchedToast` /
+   * `showToast`, AppSetupPage の fallback 60行 DOM, Unpublished/SetupPage の local wrapper) は
+   * 全て廃止し、 ここの `success/error/warning/info` (右上トースト) と `banner` (中央上バナー) に
+   * 集約。
+   *
+   * API:
+   *   notifications.success(msg, opts?)   // 右上トースト
+   *   notifications.error(msg, opts?)
+   *   notifications.warning(msg, opts?)
+   *   notifications.info(msg, opts?)
+   *   notifications.banner(msg, opts?)    // 中央上バナー (profile 切替 / 過去フェーズ閲覧 等)
+   *   notifications.showMessage(msg, type, opts?)
+   *
+   * opts:
+   *   { duration?: number, html?: string }
+   *   - duration: 0 で永続。 未指定は type 別デフォルト (success/info=3s, warning=4s, error=5s, banner=3s)
+   *   - html:    リッチ表示用 (XSS 注意 — 呼び出し側で escape 必須)
+   *
+   * 後方互換: opts が number の場合は `{ duration: number }` として扱う (旧 API)。
+   */
   class NotificationSystem {
     constructor() {
       this.container = null;
+      this.bannerEl = null;
+      this.bannerTimer = null;
     }
 
-    createContainer() {
-      if (this.container) return;
+    _normalizeOpts(opts) {
+      if (typeof opts === 'number') return { duration: opts };
+      return opts || {};
+    }
 
+    _ensureContainer() {
+      if (this.container && this.container.isConnected) return;
       this.container = document.createElement('div');
-      this.container.style.cssText = `
-        position: fixed;
-        top: var(--space-5);
-        right: var(--space-5);
-        z-index: var(--z-notification);
-        pointer-events: none;
-      `;
-
-      if (document.body) {
-        document.body.appendChild(this.container);
-      }
+      this.container.style.cssText =
+        'position:fixed;top:var(--space-5);right:var(--space-5);' +
+        'z-index:var(--z-notification);pointer-events:none;';
+      if (document.body) document.body.appendChild(this.container);
     }
 
-    showMessage(message, type = 'info') {
+    showMessage(message, type = 'info', opts) {
       if (!message) return;
+      const options = this._normalizeOpts(opts);
+      this._ensureContainer();
 
-      this.createContainer();
+      const el = document.createElement('div');
+      el.style.cssText =
+        'background:' + this._color(type) + ';color:white;' +
+        'padding:var(--space-3) var(--space-4);border-radius:var(--radius-md);' +
+        'margin-bottom:var(--space-2);box-shadow:var(--shadow-md);' +
+        'pointer-events:auto;cursor:pointer;font-size:14px;max-width:350px;' +
+        'word-wrap:break-word;animation:fadeInFromRight .4s ease-out forwards;' +
+        'will-change:transform,opacity;';
+      el.textContent = this._icon(type) + ' ' + message;
+      el.onclick = () => this._remove(el);
+      this.container.appendChild(el);
 
-      const notification = document.createElement('div');
-      notification.style.cssText = `
-        background: ${this.getColor(type)};
-        color: white;
-        padding: var(--space-3) var(--space-4);
-        border-radius: var(--radius-md);
-        margin-bottom: var(--space-2);
-        box-shadow: var(--shadow-md);
-        pointer-events: auto;
-        cursor: pointer;
-        font-size: 14px;
-        max-width: 350px;
-        word-wrap: break-word;
-        animation: fadeInFromRight 0.4s ease-out forwards;
-        will-change: transform, opacity;
-      `;
-
-      notification.textContent = `${this.getIcon(type)} ${message}`;
-      notification.onclick = () => this.remove(notification);
-
-      this.container.appendChild(notification);
-
-      const duration = this.getDuration(type);
-      setTimeout(() => this.remove(notification), duration);
+      const duration = (typeof options.duration === 'number') ? options.duration : this._defaultDuration(type);
+      if (duration > 0) setTimeout(() => this._remove(el), duration);
     }
 
-    remove(notification) {
-      if (notification && notification.parentNode) {
-        notification.style.animation = 'fadeOut 0.3s ease-out forwards';
-        notification.style.willChange = 'transform, opacity';
+    success(message, opts) { this.showMessage(message, 'success', opts); }
+    error(message, opts)   { this.showMessage(message, 'error', opts); }
+    warning(message, opts) { this.showMessage(message, 'warning', opts); }
+    info(message, opts)    { this.showMessage(message, 'info', opts); }
 
-        setTimeout(() => {
-          if (notification && notification.parentNode) {
-            notification.remove();
-          }
-        }, 300);
+    /**
+     * 中央上のバナー (旧 `.board-switched-toast`)。
+     * 1 つだけ表示され、 連続呼び出し時は最新の通知に上書き。
+     */
+    banner(message, opts) {
+      if (!message) return;
+      const options = this._normalizeOpts(opts);
+      if (!this.bannerEl || !this.bannerEl.isConnected) {
+        const el = document.createElement('div');
+        el.id = 'globalBanner';
+        el.className = 'board-switched-toast';
+        document.body.appendChild(el);
+        this.bannerEl = el;
+      }
+      if (options.html) {
+        this.bannerEl.innerHTML = options.html; // lint-disable-line no-inner-html-assignment-with-variable -- 呼び出し側で escapeHtml 必須 (banner API 契約)
+      } else {
+        this.bannerEl.textContent = String(message);
+      }
+      this.bannerEl.classList.add('visible');
+      clearTimeout(this.bannerTimer);
+      const duration = (typeof options.duration === 'number') ? options.duration : 3000;
+      if (duration > 0) {
+        this.bannerTimer = setTimeout(() => {
+          if (this.bannerEl) this.bannerEl.classList.remove('visible');
+        }, duration);
       }
     }
 
-    success(message) { this.showMessage(message, 'success'); }
-    error(message) { this.showMessage(message, 'error'); }
-    warning(message) { this.showMessage(message, 'warning'); }
-    info(message) { this.showMessage(message, 'info'); }
+    _remove(el) {
+      if (!el || !el.parentNode) return;
+      el.style.animation = 'fadeOut .3s ease-out forwards';
+      el.style.willChange = 'transform,opacity';
+      setTimeout(() => { if (el.parentNode) el.remove(); }, 300);
+    }
 
-    getColor(type) {
-      const colors = {
+    _color(type) {
+      return ({
         success: 'var(--status-success)',
         error: 'var(--status-error)',
         warning: 'var(--status-warning)',
         info: 'var(--status-info)'
-      };
-      return colors[type] || colors.info;
+      })[type] || 'var(--status-info)';
     }
 
-    getIcon(type) {
-      const icons = { success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' };
-      return icons[type] || icons.info;
+    _icon(type) {
+      return ({ success: '✅', error: '❌', warning: '⚠️', info: 'ℹ️' })[type] || 'ℹ️';
     }
 
-    getDuration(type) {
-      const durations = { success: 3000, error: 5000, warning: 4000, info: 3000 };
-      return durations[type] || 3000;
+    _defaultDuration(type) {
+      return ({ success: 3000, error: 5000, warning: 4000, info: 3000 })[type] || 3000;
     }
-
-
   }
 
   window.notifications = new NotificationSystem();
 
-  window.showMessage = (message, type) => window.notifications.showMessage(message, type);
-  window.showSuccess = (message) => window.notifications.showMessage(message, 'success');
-  window.showError = (message) => window.notifications.showMessage(message, 'error');
-  window.showWarning = (message) => window.notifications.showMessage(message, 'warning');
-  window.showInfo = (message) => window.notifications.showMessage(message, 'info');
+  // 互換性のため module-level convenience を残す (引数は同じ)。
+  window.showMessage = (message, type, opts) => window.notifications.showMessage(message, type, opts);
+  window.showSuccess = (message, opts) => window.notifications.success(message, opts);
+  window.showError   = (message, opts) => window.notifications.error(message, opts);
+  window.showWarning = (message, opts) => window.notifications.warning(message, opts);
+  window.showInfo    = (message, opts) => window.notifications.info(message, opts);
+  window.showBanner  = (message, opts) => window.notifications.banner(message, opts);
 
 
 

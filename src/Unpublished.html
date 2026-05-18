@@ -34,8 +34,6 @@
     <div class="global-spinner"></div>
   </div>
 
-  <!-- Notification Container for unified notification system -->
-  <div id="notification-container" class="fixed top-4 right-4 z-[10000] space-y-2"></div>
   <div class="w-full max-w-2xl mx-auto px-4 py-8">
     <? if (typeof isEditor !== 'undefined' && isEditor) { ?>
     <!-- 編集者用: 再公開セクション -->
@@ -121,12 +119,7 @@
     }
 
     function showMessage(message, type = 'info') {
-      if (window.notifications) {
-        const durations = { success: 4000, error: 7000, warning: 6000, info: 5000 };
-        window.notifications.showMessage(message, type, durations[type] || 5000);
-      } else {
-        console.warn('Notification system not available:', type, message);
-      }
+      if (window.notifications) window.notifications.showMessage(message, type);
     }
 
     function republishBoard() {

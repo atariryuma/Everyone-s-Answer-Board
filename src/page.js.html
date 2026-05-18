@@ -1285,12 +1285,9 @@
     }
 
     showNotification(message, type = 'info', options = {}) {
-      if (window.notifications) {
-        const duration = options.duration || 5000;
-        window.notifications[type] ?
-          window.notifications[type](message, duration) :
-          window.notifications.info(message, duration);
-      }
+      if (!window.notifications) return;
+      const fn = window.notifications[type] || window.notifications.info;
+      fn.call(window.notifications, message, options);
     }
 
     getMockData(funcName, ...args) {
@@ -1438,52 +1435,27 @@
     }
 
     /**
-     * 「新しいボードに切替わりました」トースト表示。
-     * 5秒で自動消滅。連続切替時は最新の通知に上書き。
-     *
-     * Why: 教師が profile 切替したとき、生徒の端末で表示が変わる前にトーストで予告する。
-     *      タイトル含めて表示するので「次は『振り返り』ボードだ」と認知できる。
+     * 「新しいボードに切替わりました」中央上バナー。
+     * 教師が profile 切替したとき、生徒の小さい端末でも気付けるよう表示。
      */
     __showBoardSwitchedToast(title) {
-      let toast = document.getElementById('boardSwitchedToast');
-      if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'boardSwitchedToast';
-        toast.className = 'board-switched-toast';
-        document.body.appendChild(toast);
-      }
       const safeTitle = (window.sharedUtilities && window.sharedUtilities.security && window.sharedUtilities.security.escapeHtml)
         ? window.sharedUtilities.security.escapeHtml(String(title || ''))
         : String(title || '').replace(/</g, '&lt;');
-      toast.innerHTML = '🔄 <strong>新しいボードに切り替わりました</strong><br><span>「' + safeTitle + '」</span>';
-      toast.classList.add('visible');
-      clearTimeout(this.__toastTimer);
-      this.__toastTimer = setTimeout(() => {
-        toast.classList.remove('visible');
-      }, 5000);
+      if (!window.notifications) return;
+      window.notifications.banner('', {
+        html: '🔄 <strong>新しいボードに切り替わりました</strong><br><span>「' + safeTitle + '」</span>',
+        duration: 5000,
+      });
     }
 
     /**
-     * 汎用トースト。__showBoardSwitchedToast と同じ DOM を流用して短いテキストを 3 秒表示。
+     * 汎用の中央上トースト (短いテキスト 3 秒)。
      * Option B (過去フェーズ閲覧、reaction guard 等) で client→user フィードバックに使用。
      */
     showToast(message) {
-      let toast = document.getElementById('boardSwitchedToast');
-      if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'boardSwitchedToast';
-        toast.className = 'board-switched-toast';
-        document.body.appendChild(toast);
-      }
-      const safe = (window.sharedUtilities && window.sharedUtilities.security && window.sharedUtilities.security.escapeHtml)
-        ? window.sharedUtilities.security.escapeHtml(String(message || ''))
-        : String(message || '').replace(/</g, '&lt;');
-      toast.innerHTML = '<span>' + safe + '</span>';
-      toast.classList.add('visible');
-      clearTimeout(this.__toastTimer);
-      this.__toastTimer = setTimeout(() => {
-        toast.classList.remove('visible');
-      }, 3000);
+      if (!window.notifications) return;
+      window.notifications.banner(String(message || ''));
     }
 
     destroy() {
