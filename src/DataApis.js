@@ -698,9 +698,8 @@ function processFormUrlInput(formUrl) {
       return { success: false, error: 'GoogleフォームのURLを入力してください' };
     }
 
-    // フォームURL形式チェック
-    const isFormUrl = formUrl.includes('/forms/d/') || formUrl.includes('forms.gle/');
-    if (!isFormUrl) {
+    // フォームURL形式チェック (canonical: isValidFormUrl — protocol/host/path 完全チェック)
+    if (!isValidFormUrl(formUrl)) {
       return { success: false, error: 'GoogleフォームのURLを入力してください' };
     }
 

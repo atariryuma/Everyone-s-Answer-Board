@@ -54,34 +54,6 @@
       console.warn('Unhandled promise rejection:', event.reason);
     });
 
-    const originalCreateElement = document.createElement;
-    document.createElement = function (tagName) {
-      const element = originalCreateElement.call(this, tagName);
-
-      if (tagName.toLowerCase() === 'script') {
-        const originalSrc = element.src;
-        Object.defineProperty(element, 'src', {
-          get() {
-            return originalSrc;
-          },
-          set(value) {
-
-            if (value.includes('tailwindcss') || value.includes('cdn.')) {
-              element.addEventListener('load', () => {
-              });
-
-              element.addEventListener('error', (e) => {
-                console.error('❌ External script failed to load:', value, e);
-              });
-            }
-
-            originalSrc = value;
-          },
-        });
-      }
-
-      return element;
-    };
   })();
 
 

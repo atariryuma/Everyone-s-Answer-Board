@@ -155,34 +155,28 @@
   <script>
     let setupInProgress = false;
 
-    function createDatabaseAuto() {
+    async function createDatabaseAuto() {
       const btn = document.getElementById('create-db-btn');
       const input = document.getElementById('database-id');
       // btn-busy class でスピナーを表示。テキスト置換と disabled は既存維持。
       btn.disabled = true;
       btn.classList.add('btn-busy');
       btn.textContent = '作成中…';
-      const restore = () => {
+      try {
+        const result = await runServer('createDatabase');
+        if (result && result.success) {
+          input.value = result.spreadsheetId;
+          showMessage(result.message, 'success');
+        } else {
+          showMessage((result && result.message) || 'データベース作成に失敗しました', 'error');
+        }
+      } catch (error) {
+        showMessage('データベース作成に失敗しました: ' + error.message, 'error');
+      } finally {
         btn.disabled = false;
         btn.classList.remove('btn-busy');
         btn.textContent = '自動作成';
-      };
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            input.value = result.spreadsheetId;
-            showMessage(result.message, 'success');
-          } else {
-            showMessage(result.message, 'error');
-          }
-          restore();
-        })
-        .withFailureHandler(function(error) {
-          showMessage('データベース作成に失敗しました: ' + error.message, 'error');
-          restore();
-        })
-        .createDatabase();
+      }
     }
 
     function showMessage(message, type = 'info') {
@@ -251,25 +245,20 @@
           throw new Error('有効なメールアドレスを入力してください');
         }
 
-        await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler((result) => {
-              if (result && result.success) {
-                showMessage(`セットアップが正常に完了しました！管理者: ${adminEmail}`, 'success');
-                document.getElementById('test-section').classList.remove('hidden');
-              } else {
-                showMessage(result?.message || 'セットアップに失敗しました', 'error');
-              }
-              resolve(result);
-            })
-            .withFailureHandler((error) => {
-              showMessage('セットアップに失敗しました: ' + error.message, 'error');
-              reject(error);
-            })
-            .setupApp(serviceAccountJson, databaseId, adminEmail, googleClientId);
-        });
+        try {
+          const result = await runServer('setupApp', serviceAccountJson, databaseId, adminEmail, googleClientId);
+          if (result && result.success) {
+            showMessage(`セットアップが正常に完了しました！管理者: ${adminEmail}`, 'success');
+            document.getElementById('test-section').classList.remove('hidden');
+          } else {
+            showMessage((result && result.message) || 'セットアップに失敗しました', 'error');
+          }
+        } catch (error) {
+          showMessage('セットアップに失敗しました: ' + error.message, 'error');
+        }
       } catch (error) {
-        // withFailureHandler で既にエラー表示済み
+        // validateJSON / validateSpreadsheetId など同期エラーは showMessage 未実行のためここで表示
+        showMessage(error.message || 'セットアップに失敗しました', 'error');
       } finally {
         setupBtn.disabled = false;
         setupText.style.display = 'inline';
@@ -278,23 +267,19 @@
       }
     });
 
-    document.getElementById('test-btn').addEventListener('click', function () {
-      this.disabled = true;
-      this.innerHTML =
-        '<div class="spinner-small mx-auto"></div>';
-
-      google.script.run
-        .withSuccessHandler((result) => {
-          showMessage(`${result.message}`, result.success ? 'success' : 'warning');
-          this.disabled = false;
-          this.innerHTML = '🔍 システムテスト実行';
-        })
-        .withFailureHandler((error) => {
-          showMessage('システム診断の実行に失敗しました', 'error');
-          this.disabled = false;
-          this.innerHTML = '🔍 システムテスト実行';
-        })
-        .testSystemDiagnosis();
+    document.getElementById('test-btn').addEventListener('click', async function () {
+      const btn = this;
+      btn.disabled = true;
+      btn.innerHTML = '<div class="spinner-small mx-auto"></div>';
+      try {
+        const result = await runServer('testSystemDiagnosis');
+        showMessage(`${result.message}`, result.success ? 'success' : 'warning');
+      } catch (_) {
+        showMessage('システム診断の実行に失敗しました', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🔍 システムテスト実行';
+      }
     });
 
     document.getElementById('service-account-json').addEventListener('blur', function () {
@@ -333,25 +318,22 @@
       }
     });
 
-    function prefetchAppUrl() {
+    async function prefetchAppUrl() {
       const btn = document.getElementById('start-studyquest-btn');
       if (!btn) return;
-
-      google.script.run
-        .withSuccessHandler(function (url) {
-          if (!url || url.includes('userCodeAppPanel') || !url.includes('/exec')) {
-            btn.textContent = '初期化中...再読み込みしてください';
-            return;
-          }
-          btn.href = url + '?mode=login';
-          btn.textContent = 'みんなの回答ボードを開始';
-          btn.classList.remove('pointer-events-none', 'from-gray-600', 'to-gray-600', 'text-gray-400');
-          btn.classList.add('from-purple-600', 'to-pink-600', 'hover:from-purple-700', 'hover:to-pink-700', 'text-white');
-        })
-        .withFailureHandler(function () {
-          btn.textContent = 'URL取得失敗 — 再読み込みしてください';
-        })
-        .getWebAppUrl();
+      try {
+        const url = await runServer('getWebAppUrl');
+        if (!url || url.includes('userCodeAppPanel') || !url.includes('/exec')) {
+          btn.textContent = '初期化中...再読み込みしてください';
+          return;
+        }
+        btn.href = url + '?mode=login';
+        btn.textContent = 'みんなの回答ボードを開始';
+        btn.classList.remove('pointer-events-none', 'from-gray-600', 'to-gray-600', 'text-gray-400');
+        btn.classList.add('from-purple-600', 'to-pink-600', 'hover:from-purple-700', 'hover:to-pink-700', 'text-white');
+      } catch (_) {
+        btn.textContent = 'URL取得失敗 — 再読み込みしてください';
+      }
     }
 
     async function initializeDomainInfo() {
@@ -359,33 +341,23 @@
       window.sharedUtilities.displayDomainInfo(info);
     }
 
-    window.addEventListener('load', function () {
+    window.addEventListener('load', async function () {
       initializeDomainInfo(); // ドメイン情報初期化
       prefetchAppUrl(); // アプリURLプリフェッチ
 
       const adminEmailField = document.getElementById('admin-email');
-      if (adminEmailField && !adminEmailField.value) {
-        google.script.run
-          .withSuccessHandler(function (result) {
-            if (result.success && result.email) {
-              adminEmailField.value = result.email;
-              adminEmailField.style.borderColor = '#10b981'; // 緑色の境界線
-            } else {
-              showMessage(
-                '⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。',
-                'warning'
-              );
-            }
-          })
-          .withFailureHandler(function (error) {
-            console.warn('Failed to get current user email:', error);
-            showMessage(
-              '⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。',
-              'warning'
-            );
-          })
-          .getUser('full');
+      if (!adminEmailField || adminEmailField.value) return;
+      try {
+        const result = await runServer('getUser', 'full');
+        if (result && result.success && result.email) {
+          adminEmailField.value = result.email;
+          adminEmailField.style.borderColor = '#10b981';
+          return;
+        }
+      } catch (error) {
+        console.warn('Failed to get current user email:', error);
       }
+      showMessage('⚠️ ユーザーメールの自動取得に失敗しました。手動で入力してください。', 'warning');
     });
   </script>
 

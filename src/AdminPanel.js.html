@@ -10,8 +10,6 @@
     __USER_ID__ = '';
   }
 
-  let CONFIG = {};
-
   // フォーム検証成功 → 自動接続の前にメッセージを読ませる短い遅延。
   const AUTO_CONNECT_DELAY_MS = 300;
 
@@ -295,22 +293,15 @@
    * ウェルカムモーダルを既読にする（サーバー側保存）
    */
   function markWelcomeSeenOnServer() {
-    google.script.run
-      .withSuccessHandler((result) => {
-        if (result.success) {
-          console.log('Welcome seen flag saved');
-          // ローカル状態も更新
-          if (systemState.config) {
-            systemState.config.hasSeenWelcome = true;
-          }
-        } else {
-          console.warn('Failed to save welcome seen flag:', result.message);
-        }
-      })
-      .withFailureHandler((error) => {
-        console.error('markWelcomeSeen error:', error);
-      })
-      .markWelcomeSeen();
+    runServer('markWelcomeSeen').then((result) => {
+      if (result && result.success) {
+        if (systemState.config) systemState.config.hasSeenWelcome = true;
+      } else {
+        console.warn('Failed to save welcome seen flag:', result && result.message);
+      }
+    }, (error) => {
+      console.error('markWelcomeSeen error:', error);
+    });
   }
 
   /**
@@ -343,38 +334,28 @@
   }
 
   // 管理パネル初期化時の board / config / publish status を一括取得 (個別 API 呼び出し回避)。
-  function loadBatchedAdminData() {
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler((adminData) => {
-          if (adminData.success) {
-            const isPublished = Boolean(adminData.config?.isPublished);
-            const userInfo = {
-              email: adminData.user?.userEmail || '',
-              userId: adminData.user?.userId || null,
-              createdAt: adminData.user?.createdAt || null,
-              lastModified: adminData.user?.lastModified || null
-            };
-            const boardInfo = {
-              isPublished: isPublished,
-              questionText: adminData.questionText || '回答ボード',
-              userEmail: adminData.user?.userEmail || '',
-              spreadsheetId: adminData.config?.spreadsheetId || '',
-              sheetName: adminData.config?.sheetName || '',
-              lastUpdated: adminData.config?.lastModified,
-              urls: adminData.config?.urls || null
-            };
-            const config = {
-              ...adminData.config
-            };
-            resolve({ userInfo, boardInfo, config });
-          } else {
-            reject(new Error(adminData.error || 'Failed to load admin data'));
-          }
-        })
-        .withFailureHandler(reject)
-        .getBatchedAdminData(window.UNIFIED_CONFIG.targetUserId);
-    });
+  async function loadBatchedAdminData() {
+    const adminData = await runServer('getBatchedAdminData', window.UNIFIED_CONFIG.targetUserId);
+    if (!(adminData && adminData.success)) {
+      throw new Error((adminData && adminData.error) || 'Failed to load admin data');
+    }
+    const isPublished = Boolean(adminData.config?.isPublished);
+    const userInfo = {
+      email: adminData.user?.userEmail || '',
+      userId: adminData.user?.userId || null,
+      createdAt: adminData.user?.createdAt || null,
+      lastModified: adminData.user?.lastModified || null
+    };
+    const boardInfo = {
+      isPublished,
+      questionText: adminData.questionText || '回答ボード',
+      userEmail: adminData.user?.userEmail || '',
+      spreadsheetId: adminData.config?.spreadsheetId || '',
+      sheetName: adminData.config?.sheetName || '',
+      lastUpdated: adminData.config?.lastModified,
+      urls: adminData.config?.urls || null
+    };
+    return { userInfo, boardInfo, config: { ...adminData.config } };
   }
 
   /**
@@ -389,27 +370,22 @@
           return;
         }
 
-        if (!confirm('このボードを非公開にしますか？\n学生はボードにアクセスできなくなります。')) {
-          return;
-        }
+        const ok = await window.modals.confirm(
+          'このボードを非公開にしますか？\n学生はボードにアクセスできなくなります。',
+          { title: 'ボードの公開を終了', variant: 'danger', okLabel: '非公開にする' }
+        );
+        if (!ok) return;
 
         try {
           window.setLoading(true, 'ボードを非公開にしています...');
-
-          const result = await new Promise((resolve, reject) => {
-            google.script.run
-              .withSuccessHandler(resolve)
-              .withFailureHandler(reject)
-              .unpublishBoard(window.UNIFIED_CONFIG.targetUserId);
-          });
-
-          if (result.success) {
+          const result = await runServer('unpublishBoard', window.UNIFIED_CONFIG.targetUserId);
+          if (result && result.success) {
             showSuccess(result.message || 'ボードを非公開にしました');
             systemState.config.isPublished = false;
             updatePublishStatus('unpublished');
             updateFooterDisplay({ ...currentBoardInfo, isPublished: false });
           } else {
-            showError(result.message || result.error || 'ボードの非公開に失敗しました');
+            showError((result && (result.message || result.error)) || 'ボードの非公開に失敗しました');
           }
         } catch (error) {
           console.error('公開終了エラー:', error);
@@ -553,56 +529,49 @@
   /**
    * Googleフォーム一覧を読み込む
    */
-  function loadForms() {
-    return new Promise((resolve, reject) => {
-      const select = document.getElementById('form-select');
-      if (!select) {
-        reject(new Error('form-select element not found'));
-        return;
-      }
+  async function loadForms() {
+    const select = document.getElementById('form-select');
+    if (!select) throw new Error('form-select element not found');
 
-      select.innerHTML = '<option value="">読み込み中...</option>';
-      setPartialLoading(true, 'Googleフォーム一覧を読み込み中...');
+    select.innerHTML = '<option value="">読み込み中...</option>';
+    setPartialLoading(true, 'Googleフォーム一覧を読み込み中...');
 
-      google.script.run
-        .withSuccessHandler(function (result) {
-          setPartialLoading(false);
+    let result;
+    try {
+      result = await runServer('getForms');
+    } catch (error) {
+      select.innerHTML = '<option value="">読み込みエラー</option>';
+      setPartialLoading(false);
+      console.error('📝 getForms通信エラー:', error);
+      throw new Error('フォーム一覧の読み込みに失敗しました: ' + error.message);
+    }
+    setPartialLoading(false);
 
-          if (!result || result.success === false) {
-            select.innerHTML = '<option value="">読み込みエラー</option>';
-            reject(new Error(result?.error || 'フォーム一覧の取得に失敗しました'));
-            return;
-          }
+    if (!result || result.success === false) {
+      select.innerHTML = '<option value="">読み込みエラー</option>';
+      throw new Error((result && result.error) || 'フォーム一覧の取得に失敗しました');
+    }
 
-          const forms = result.forms || [];
-          select.innerHTML = '<option value="">フォームを選択...</option>';
+    const forms = result.forms || [];
+    select.innerHTML = '<option value="">フォームを選択...</option>';
 
-          if (forms.length > 0) {
-            forms.forEach((form) => {
-              const option = document.createElement('option');
-              option.value = form.url; // URLを値として保持
-              option.textContent = form.name;
-              option.dataset.formId = form.id;
-              select.appendChild(option);
-            });
-          } else {
-            const noDataOption = document.createElement('option');
-            noDataOption.value = '';
-            noDataOption.textContent = 'あなたが所有するフォームはありません';
-            noDataOption.disabled = true;
-            select.appendChild(noDataOption);
-          }
+    if (forms.length > 0) {
+      forms.forEach((form) => {
+        const option = document.createElement('option');
+        option.value = form.url; // URLを値として保持
+        option.textContent = form.name;
+        option.dataset.formId = form.id;
+        select.appendChild(option);
+      });
+    } else {
+      const noDataOption = document.createElement('option');
+      noDataOption.value = '';
+      noDataOption.textContent = 'あなたが所有するフォームはありません';
+      noDataOption.disabled = true;
+      select.appendChild(noDataOption);
+    }
 
-          resolve(forms);
-        })
-        .withFailureHandler(function (error) {
-          select.innerHTML = '<option value="">読み込みエラー</option>';
-          setPartialLoading(false);
-          console.error('📝 getForms通信エラー:', error);
-          reject(new Error('フォーム一覧の読み込みに失敗しました: ' + error.message));
-        })
-        .getForms();
-    });
+    return forms;
   }
 
   function getSpreadsheetFromUrl() {
@@ -794,16 +763,10 @@
           const formUrl = (window.UNIFIED_CONFIG && window.UNIFIED_CONFIG.formUrl) || '';
           const target = formId || formUrl;
           if (!target) return; // Form 未連携時は config 保存のみで OK (新規 Form 作成時に反映される)
-          google.script.run
-            .withSuccessHandler((res) => {
-              if (res && res.success) {
-                setAutoSaveStatus('✓ Form 設定も更新しました', 'success');
-              } else {
-                setAutoSaveStatus('⚠ Form 設定の更新に失敗', 'error');
-              }
-            })
-            .withFailureHandler(() => setAutoSaveStatus('⚠ Form 設定の更新に失敗', 'error'))
-            .setFormAllowResubmit(target, allowEl.checked);
+          runServer('setFormAllowResubmit', target, allowEl.checked).then((res) => {
+            if (res && res.success) setAutoSaveStatus('✓ Form 設定も更新しました', 'success');
+            else setAutoSaveStatus('⚠ Form 設定の更新に失敗', 'error');
+          }, () => setAutoSaveStatus('⚠ Form 設定の更新に失敗', 'error'));
         });
       }
     }
@@ -938,29 +901,16 @@
 
   async function getColumnAnalysis(spreadsheetId, sheetName) {
     const gateKey = `getColumnAnalysis_${spreadsheetId}_${sheetName}`;
-
     if (!ClientMutex.acquire(gateKey)) {
       return { success: false, error: 'Analysis already in progress' };
     }
-
     try {
-      return new Promise((resolve, reject) => {
-
-        google.script.run
-          .withSuccessHandler(function (result) {
-            ClientMutex.release(gateKey);
-            resolve(result);
-          })
-          .withFailureHandler(function (error) {
-            console.error('❌ getColumnAnalysis direct error:', error);
-            ClientMutex.release(gateKey);
-            reject(error);
-          })
-          .getColumnAnalysis(spreadsheetId, sheetName);
-      });
+      return await runServer('getColumnAnalysis', spreadsheetId, sheetName);
     } catch (error) {
-      ClientMutex.release(gateKey);
+      console.error('❌ getColumnAnalysis direct error:', error);
       throw error;
+    } finally {
+      ClientMutex.release(gateKey);
     }
   }
 
@@ -1000,20 +950,17 @@
       try { onReady(buildQuery(_cachedWebAppUrl)); } catch (e) { console.warn('buildWebAppUrl onReady error:', e && e.message); }
       return;
     }
-    google.script.run
-      .withSuccessHandler(function (webAppUrl) {
-        if (webAppUrl) {
-          _cachedWebAppUrl = webAppUrl;
-          try { onReady(buildQuery(webAppUrl)); } catch (e) { console.warn('buildWebAppUrl onReady error:', e && e.message); }
-        } else if (typeof onError === 'function') {
-          onError(new Error('WebApp URL not available'));
-        }
-      })
-      .withFailureHandler(function (err) {
-        console.warn('buildWebAppUrl fetch failed:', err && err.message);
-        if (typeof onError === 'function') onError(err);
-      })
-      .getWebAppUrl();
+    runServer('getWebAppUrl').then((webAppUrl) => {
+      if (webAppUrl) {
+        _cachedWebAppUrl = webAppUrl;
+        try { onReady(buildQuery(webAppUrl)); } catch (e) { console.warn('buildWebAppUrl onReady error:', e && e.message); }
+      } else if (typeof onError === 'function') {
+        onError(new Error('WebApp URL not available'));
+      }
+    }, (err) => {
+      console.warn('buildWebAppUrl fetch failed:', err && err.message);
+      if (typeof onError === 'function') onError(err);
+    });
   }
 
   function openManualGuide() {
@@ -1223,7 +1170,7 @@
    * ドロップダウンから選択されたフォームを検証
    * @param {string} formUrl - フォームURL
    */
-  function validateFormFromDropdown(formUrl) {
+  async function validateFormFromDropdown(formUrl) {
     const formSelect = document.getElementById('form-select');
     const formInfo = document.getElementById('form-info');
     const formTitle = document.getElementById('form-title');
@@ -1242,48 +1189,46 @@
       if (formSpreadsheetStatus) formSpreadsheetStatus.textContent = '-';
     }
 
-    google.script.run
-      .withSuccessHandler(function (result) {
-        if (result.success) {
-          // フォーム情報を表示
-          if (formTitle) formTitle.textContent = result.formTitle;
-          if (formSpreadsheetStatus) {
-            formSpreadsheetStatus.textContent = result.wasCreated
-              ? '新規作成しました'
-              : result.sheetName;
-          }
-          if (formUrlLink) {
-            formUrlLink.href = result.formUrl;
-            formUrlLink.textContent = 'フォームを開く';
-          }
-          formInfo?.classList.remove('hidden');
+    let result;
+    try {
+      result = await runServer('processFormUrlInput', formUrl);
+    } catch (error) {
+      if (formTitle) formTitle.textContent = 'エラー';
+      if (formSpreadsheetStatus) formSpreadsheetStatus.textContent = error.message;
+      showError(error.message || '検証エラーが発生しました');
+      return;
+    }
 
-          // データを保持
-          if (formSelect) {
-            formSelect.dataset.spreadsheetId = result.spreadsheetId;
-            formSelect.dataset.sheetName = result.sheetName;
-            formSelect.dataset.formTitle = result.formTitle;
-            formSelect.dataset.formUrl = result.formUrl;
-          }
+    if (!(result && result.success)) {
+      if (formTitle) formTitle.textContent = 'エラー';
+      if (formSpreadsheetStatus) formSpreadsheetStatus.textContent = (result && result.error) || '検証に失敗しました';
+      showError((result && result.error) || '検証に失敗しました');
+      return;
+    }
 
-          if (result.wasCreated) {
-            showSuccess('回答先スプレッドシートを作成しました');
-          }
+    // フォーム情報を表示
+    if (formTitle) formTitle.textContent = result.formTitle;
+    if (formSpreadsheetStatus) {
+      formSpreadsheetStatus.textContent = result.wasCreated ? '新規作成しました' : result.sheetName;
+    }
+    if (formUrlLink) {
+      formUrlLink.href = result.formUrl;
+      formUrlLink.textContent = 'フォームを開く';
+    }
+    formInfo?.classList.remove('hidden');
 
-          // 検証完了表示を読ませる短い遅延の後に自動接続
-          setTimeout(() => connectToDataSource(), AUTO_CONNECT_DELAY_MS);
-        } else {
-          if (formTitle) formTitle.textContent = 'エラー';
-          if (formSpreadsheetStatus) formSpreadsheetStatus.textContent = result.error || '検証に失敗しました';
-          showError(result.error || '検証に失敗しました');
-        }
-      })
-      .withFailureHandler(function (error) {
-        if (formTitle) formTitle.textContent = 'エラー';
-        if (formSpreadsheetStatus) formSpreadsheetStatus.textContent = error.message;
-        showError(error.message || '検証エラーが発生しました');
-      })
-      .processFormUrlInput(formUrl);
+    // データを保持
+    if (formSelect) {
+      formSelect.dataset.spreadsheetId = result.spreadsheetId;
+      formSelect.dataset.sheetName = result.sheetName;
+      formSelect.dataset.formTitle = result.formTitle;
+      formSelect.dataset.formUrl = result.formUrl;
+    }
+
+    if (result.wasCreated) showSuccess('回答先スプレッドシートを作成しました');
+
+    // 検証完了表示を読ませる短い遅延の後に自動接続
+    setTimeout(() => connectToDataSource(), AUTO_CONNECT_DELAY_MS);
   }
 
   /**
@@ -1398,128 +1343,107 @@
       `);
     }
 
-    google.script.run
-      .withSuccessHandler(function (result) {
-        if (btn) {
-          btn.disabled = false;
-          btn.classList.remove('btn-busy');
-          btn.textContent = '✨ テンプレート作成';
-        }
+    runServer('createTemplateForm', templateType).then((result) => {
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove('btn-busy');
+        btn.textContent = '✨ テンプレート作成';
+      }
 
-        if (result.success) {
-          showSuccess(result.message || 'テンプレートフォームを作成しました');
-
-          // URL入力欄にフォームURLと接続情報をセット
-          // ユーザーが「🔍 検証して接続」をクリックした際に使用される
-          const formUrlInput = document.getElementById('form-url-input');
-          if (formUrlInput) {
-            formUrlInput.value = result.editUrl;
-            formUrlInput.dataset.spreadsheetId = result.spreadsheetId;
-            formUrlInput.dataset.sheetName = result.sheetName;
-            formUrlInput.dataset.formTitle = result.formTitle;
-            formUrlInput.dataset.formUrl = result.formUrl;
-          }
-
-          // フォーム選択データも保持（後方互換性）
-          const formSelect = document.getElementById('form-select');
-          if (formSelect) {
-            formSelect.dataset.spreadsheetId = result.spreadsheetId;
-            formSelect.dataset.sheetName = result.sheetName;
-            formSelect.dataset.formTitle = result.formTitle;
-            formSelect.dataset.formUrl = result.formUrl;
-          }
-
-          // Why: 数直線(M1)/マトリクス(M2) テンプレートを作ったら、公開設定の
-          //      boardMode セレクトをその種別に合わせて先回りで設定する。
-          //      board テンプレートは auto のままにしておく（線形尺度列が無いので結果は同じ）。
-          //      これで教師は「検証して接続」→「今すぐ公開」の 2 クリックで M1/M2 可視化に到達できる。
-          const boardModeSelect = document.getElementById('board-mode-select');
-          if (boardModeSelect && (result.templateType === 'numberline' || result.templateType === 'matrix' || result.templateType === 'pie')) {
-            boardModeSelect.value = result.templateType;
-            // change event を発火して関連 UI（numeric-mapping-container 等）を表示
-            try {
-              boardModeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-            } catch (e) {
-              // 古いブラウザ向けフォールバック（非到達想定）
-            }
-          }
-
-          // 検出情報を表示（リンク付き）
-          const detectionInfo = document.getElementById('form-detection-info');
-          const detectedFormLink = document.getElementById('detected-form-link');
-          const detectedSpreadsheetLink = document.getElementById('detected-spreadsheet-link');
-          if (detectionInfo) detectionInfo.classList.remove('hidden');
-          if (detectedFormLink) {
-            detectedFormLink.textContent = result.formTitle;
-            detectedFormLink.href = result.editUrl || '#';
-          }
-          if (detectedSpreadsheetLink) {
-            detectedSpreadsheetLink.textContent = result.spreadsheetName || result.sheetName || 'スプレッドシート';
-            detectedSpreadsheetLink.href = result.spreadsheetUrl || '#';
-          }
-
-          // 作成完了後、ボタンを表示してユーザーのクリックで遷移
-          if (result.editUrl && newWindow && !newWindow.closed) {
-            try {
-              const doc = newWindow.document;
-              const statusIcon = doc.getElementById('status-icon');
-              const statusText = doc.getElementById('status-text');
-              const openFormBtn = doc.getElementById('open-form-btn');
-
-              if (statusIcon) {
-                statusIcon.textContent = '✅';
-                statusIcon.classList.remove('spinner');
-              }
-              if (statusText) {
-                statusText.textContent = 'フォームの作成が完了しました！';
-              }
-              if (openFormBtn) {
-                openFormBtn.style.display = 'inline-block';
-                openFormBtn.onclick = function() {
-                  newWindow.location.href = result.editUrl;
-                };
-              }
-            } catch (e) {
-              // フォールバック: 直接遷移
-              newWindow.location.href = result.editUrl;
-            }
-          }
-
-          // フォーム編集後に手動で接続してもらうため、自動接続は行わない
-          // 理由: ユーザーがフォームの質問を編集すると列構造が変わるため、
-          // 編集完了後に接続（自動推定）を行う必要がある
-          showInfo('フォーム編集後、「🔍 検証して接続」ボタンをクリックしてください', 5000);
-        } else {
-          // エラー時はローディング画面を閉じる
-          if (newWindow && !newWindow.closed) newWindow.close();
-          showError(result.error || 'フォーム作成に失敗しました');
-        }
-      })
-      .withFailureHandler(function (error) {
+      if (!(result && result.success)) {
         // エラー時はローディング画面を閉じる
         if (newWindow && !newWindow.closed) newWindow.close();
-        if (btn) {
-          btn.disabled = false;
-          btn.classList.remove('btn-busy');
-          btn.textContent = '✨ テンプレート作成';
+        showError((result && result.error) || 'フォーム作成に失敗しました');
+        return;
+      }
+
+      showSuccess(result.message || 'テンプレートフォームを作成しました');
+
+      // URL入力欄にフォームURLと接続情報をセット
+      // ユーザーが「🔍 検証して接続」をクリックした際に使用される
+      const formUrlInput = document.getElementById('form-url-input');
+      if (formUrlInput) {
+        formUrlInput.value = result.editUrl;
+        formUrlInput.dataset.spreadsheetId = result.spreadsheetId;
+        formUrlInput.dataset.sheetName = result.sheetName;
+        formUrlInput.dataset.formTitle = result.formTitle;
+        formUrlInput.dataset.formUrl = result.formUrl;
+      }
+
+      // フォーム選択データも保持（後方互換性）
+      const formSelect = document.getElementById('form-select');
+      if (formSelect) {
+        formSelect.dataset.spreadsheetId = result.spreadsheetId;
+        formSelect.dataset.sheetName = result.sheetName;
+        formSelect.dataset.formTitle = result.formTitle;
+        formSelect.dataset.formUrl = result.formUrl;
+      }
+
+      // Why: 数直線(M1)/マトリクス(M2) テンプレートを作ったら、公開設定の
+      //      boardMode セレクトをその種別に合わせて先回りで設定する。
+      const boardModeSelect = document.getElementById('board-mode-select');
+      if (boardModeSelect && (result.templateType === 'numberline' || result.templateType === 'matrix' || result.templateType === 'pie')) {
+        boardModeSelect.value = result.templateType;
+        try { boardModeSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+      }
+
+      // 検出情報を表示（リンク付き）
+      const detectionInfo = document.getElementById('form-detection-info');
+      const detectedFormLink = document.getElementById('detected-form-link');
+      const detectedSpreadsheetLink = document.getElementById('detected-spreadsheet-link');
+      if (detectionInfo) detectionInfo.classList.remove('hidden');
+      if (detectedFormLink) {
+        detectedFormLink.textContent = result.formTitle;
+        detectedFormLink.href = result.editUrl || '#';
+      }
+      if (detectedSpreadsheetLink) {
+        detectedSpreadsheetLink.textContent = result.spreadsheetName || result.sheetName || 'スプレッドシート';
+        detectedSpreadsheetLink.href = result.spreadsheetUrl || '#';
+      }
+
+      // 作成完了後、ボタンを表示してユーザーのクリックで遷移
+      if (result.editUrl && newWindow && !newWindow.closed) {
+        try {
+          const doc = newWindow.document;
+          const statusIcon = doc.getElementById('status-icon');
+          const statusText = doc.getElementById('status-text');
+          const openFormBtn = doc.getElementById('open-form-btn');
+          if (statusIcon) { statusIcon.textContent = '✅'; statusIcon.classList.remove('spinner'); }
+          if (statusText) statusText.textContent = 'フォームの作成が完了しました！';
+          if (openFormBtn) {
+            openFormBtn.style.display = 'inline-block';
+            openFormBtn.onclick = () => { newWindow.location.href = result.editUrl; };
+          }
+        } catch (e) {
+          newWindow.location.href = result.editUrl;
         }
-        showError(error.message || 'フォーム作成中にエラーが発生しました');
-      })
-      .createTemplateForm(templateType);
+      }
+
+      // フォーム編集後に手動で接続してもらうため、自動接続は行わない
+      // 理由: ユーザーがフォームの質問を編集すると列構造が変わるため、
+      // 編集完了後に接続（自動推定）を行う必要がある
+      showInfo('フォーム編集後、「🔍 検証して接続」ボタンをクリックしてください', 5000);
+    }, (error) => {
+      // エラー時はローディング画面を閉じる
+      if (newWindow && !newWindow.closed) newWindow.close();
+      if (btn) {
+        btn.disabled = false;
+        btn.classList.remove('btn-busy');
+        btn.textContent = '✨ テンプレート作成';
+      }
+      showError(error.message || 'フォーム作成中にエラーが発生しました');
+    });
   }
 
   function checkAdministratorAccess() {
-    google.script.run
-      .withSuccessHandler(function (isAdmin) {
-        const appSetupBtn = document.getElementById('app-setup-btn');
-        if (appSetupBtn) appSetupBtn.style.display = isAdmin ? 'block' : 'none';
-      })
-      .withFailureHandler(function (error) {
-        console.warn('システム管理者確認エラー:', error);
-        const appSetupBtn = document.getElementById('app-setup-btn');
-        if (appSetupBtn) appSetupBtn.style.display = 'none';
-      })
-      .isAdmin();
+    runServer('isAdmin').then((isAdmin) => {
+      const appSetupBtn = document.getElementById('app-setup-btn');
+      if (appSetupBtn) appSetupBtn.style.display = isAdmin ? 'block' : 'none';
+    }, (error) => {
+      console.warn('システム管理者確認エラー:', error);
+      const appSetupBtn = document.getElementById('app-setup-btn');
+      if (appSetupBtn) appSetupBtn.style.display = 'none';
+    });
   }
 
   /**
@@ -1664,50 +1588,44 @@
       validateBtn.classList.add('btn-busy');
     }
 
-    google.script.run
-      .withSuccessHandler(function (result) {
-        if (validateBtn) {
-          validateBtn.disabled = false;
-          validateBtn.classList.remove('btn-busy');
-        }
+    runServer('processFormUrlInput', formUrl).then((result) => {
+      if (validateBtn) {
+        validateBtn.disabled = false;
+        validateBtn.classList.remove('btn-busy');
+      }
 
-        if (result.success) {
-          // フォーム情報を表示
-          showFormDetectionInfo(result);
+      if (!(result && result.success)) {
+        hideFormDetectionInfo();
+        // 自動検証経路ではトーストを出さず、メッセージ欄だけに留める (URL 入力途中で
+        // server が一時的に失敗するケースで連続トーストが鬱陶しくならないように)。
+        updateUrlValidationMessage('⚠ ' + ((result && result.error) || '検証に失敗しました'), 'error');
+        return;
+      }
 
-          // データを保持
-          urlInput.dataset.spreadsheetId = result.spreadsheetId;
-          urlInput.dataset.sheetName = result.sheetName;
-          urlInput.dataset.formTitle = result.formTitle;
-          urlInput.dataset.formUrl = result.formUrl;
-          // 同一 URL の再検証を抑止 (autoAnalyzeFormUrl が dataset.lastValidatedUrl を見て skip)
-          urlInput.dataset.lastValidatedUrl = formUrl;
+      // フォーム情報を表示
+      showFormDetectionInfo(result);
 
-          // メッセージ表示
-          if (result.wasCreated) {
-            showSuccess('回答先スプレッドシートを作成しました');
-          }
+      // データを保持
+      urlInput.dataset.spreadsheetId = result.spreadsheetId;
+      urlInput.dataset.sheetName = result.sheetName;
+      urlInput.dataset.formTitle = result.formTitle;
+      urlInput.dataset.formUrl = result.formUrl;
+      // 同一 URL の再検証を抑止 (autoAnalyzeFormUrl が dataset.lastValidatedUrl を見て skip)
+      urlInput.dataset.lastValidatedUrl = formUrl;
 
-          updateUrlValidationMessage('✓ 接続しました', 'success');
+      if (result.wasCreated) showSuccess('回答先スプレッドシートを作成しました');
+      updateUrlValidationMessage('✓ 接続しました', 'success');
 
-          // 検証完了表示を読ませる短い遅延の後に自動接続
-          setTimeout(() => connectToDataSource(), AUTO_CONNECT_DELAY_MS);
-        } else {
-          hideFormDetectionInfo();
-          // 自動検証経路ではトーストを出さず、メッセージ欄だけに留める (URL 入力途中で
-          // server が一時的に失敗するケースで連続トーストが鬱陶しくならないように)。
-          updateUrlValidationMessage('⚠ ' + (result.error || '検証に失敗しました'), 'error');
-        }
-      })
-      .withFailureHandler(function (error) {
-        if (validateBtn) {
-          validateBtn.disabled = false;
-          validateBtn.classList.remove('btn-busy');
-        }
-        console.error('❌ processFormUrlInput error:', error);
-        updateUrlValidationMessage('⚠ ' + (error && error.message || 'エラーが発生しました'), 'error');
-      })
-      .processFormUrlInput(formUrl);
+      // 検証完了表示を読ませる短い遅延の後に自動接続
+      setTimeout(() => connectToDataSource(), AUTO_CONNECT_DELAY_MS);
+    }, (error) => {
+      if (validateBtn) {
+        validateBtn.disabled = false;
+        validateBtn.classList.remove('btn-busy');
+      }
+      console.error('❌ processFormUrlInput error:', error);
+      updateUrlValidationMessage('⚠ ' + ((error && error.message) || 'エラーが発生しました'), 'error');
+    });
   }
 
   async function manualColumnAnalysis() {
@@ -1869,12 +1787,7 @@
       // a Sheet object, not (spreadsheetId, sheetName). getColumnAnalysis extracts headers
       // directly from sheet.getRange even when downstream diagnostics fail, so it serves
       // as the correct "spreadsheetId/sheetName → headers" endpoint for this fallback path.
-      const basicResult = await new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(reject)
-          .getColumnAnalysis(spreadsheetId, sheetName);
-      });
+      const basicResult = await runServer('getColumnAnalysis', spreadsheetId, sheetName);
 
       if (basicResult && basicResult.headers) {
         fillColumnDropdowns(basicResult.headers, {}, {});
@@ -2058,18 +1971,15 @@
           const autoProfileName = String(formTitle).trim().substring(0, 50);
           if (autoProfileName && !_knownProfileNames.has(autoProfileName)) {
             _knownProfileNames.add(autoProfileName);
-            google.script.run
-              .withSuccessHandler((res) => {
-                if (res && res.success) {
-                  showSuccess(`📋 プロファイル「${autoProfileName}」として自動保存しました`, 4000);
-                  if (typeof loadProfileList === 'function') loadProfileList();
-                }
-                // 失敗時は silent (set からも削除しない: 同 session 内の連打を防ぐ)
-              })
-              .withFailureHandler((err) => {
-                console.warn('auto-save profile failed (silent):', err && err.message);
-              })
-              .saveCurrentAsProfile(autoProfileName);
+            runServer('saveCurrentAsProfile', autoProfileName).then((res) => {
+              if (res && res.success) {
+                showSuccess(`📋 プロファイル「${autoProfileName}」として自動保存しました`, 4000);
+                if (typeof loadProfileList === 'function') loadProfileList();
+              }
+              // 失敗時は silent (set からも削除しない: 同 session 内の連打を防ぐ)
+            }, (err) => {
+              console.warn('auto-save profile failed (silent):', err && err.message);
+            });
           }
         }
       } else {
@@ -2099,12 +2009,7 @@
       throw new Error('All operations must have the same spreadsheetId and sheetName');
     }
 
-    return new Promise((resolve, reject) => {
-      google.script.run
-        .withSuccessHandler(resolve)
-        .withFailureHandler(reject)
-        .connectDataSource(firstOp.spreadsheetId, firstOp.sheetName, operations);
-    });
+    return runServer('connectDataSource', firstOp.spreadsheetId, firstOp.sheetName, operations);
   }
 
   function handleConnectionError(errorMessage, context) {
@@ -2780,23 +2685,19 @@
       if (!silent) window.setLoading(true, '設定を保存中...');
 
       if (!config.formUrl && config.spreadsheetId && config.sheetName) {
-        google.script.run
-          .withSuccessHandler(function (formResult) {
-            if (formResult.success && formResult.formData && formResult.formData.formUrl) {
-              config.formUrl = formResult.formData.formUrl;
-              config.formTitle = formResult.formData.formTitle;
-
-              systemState.config = { ...systemState.config, ...config };
-              updateResourceButtons(systemState.config);
-              try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
-            }
-            executeDraftSave(config);
-          })
-          .withFailureHandler(function (error) {
-            console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
-            executeDraftSave(config);
-          })
-          .getFormInfo(config.spreadsheetId, config.sheetName);
+        runServer('getFormInfo', config.spreadsheetId, config.sheetName).then((formResult) => {
+          if (formResult && formResult.success && formResult.formData && formResult.formData.formUrl) {
+            config.formUrl = formResult.formData.formUrl;
+            config.formTitle = formResult.formData.formTitle;
+            systemState.config = { ...systemState.config, ...config };
+            updateResourceButtons(systemState.config);
+            try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
+          }
+          executeDraftSave(config);
+        }, (error) => {
+          console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
+          executeDraftSave(config);
+        });
       } else {
         executeDraftSave(config);
       }
@@ -2808,30 +2709,25 @@
     }
 
     function executeDraftSave(finalConfig) {
-      google.script.run
-        .withSuccessHandler(function (result) {
-          if (result.success) {
-            if (!silent) showSuccess('下書きを保存しました');
-
-            systemState.config = { ...systemState.config, ...result.config };
-            updateResourceButtons(systemState.config);
-            updateConfigSummary(systemState.config);
-
-            if (result.etag || result.config?.etag) {
-              systemState.config.etag = result.etag || result.config.etag;
-            }
-            finish(true);
-          } else {
-            if (!silent) showError(result.message || result.error || '設定の保存に失敗しました');
-            finish(false);
+      runServer('saveConfig', finalConfig, { isDraft: true }).then((result) => {
+        if (result && result.success) {
+          if (!silent) showSuccess('下書きを保存しました');
+          systemState.config = { ...systemState.config, ...result.config };
+          updateResourceButtons(systemState.config);
+          updateConfigSummary(systemState.config);
+          if (result.etag || result.config?.etag) {
+            systemState.config.etag = result.etag || result.config.etag;
           }
-        })
-        .withFailureHandler(function (error) {
-          console.error('保存エラー:', error);
-          if (!silent) showError('下書きの保存に失敗しました');
+          finish(true);
+        } else {
+          if (!silent) showError((result && (result.message || result.error)) || '設定の保存に失敗しました');
           finish(false);
-        })
-        .saveConfig(finalConfig, { isDraft: true });
+        }
+      }, (error) => {
+        console.error('保存エラー:', error);
+        if (!silent) showError('下書きの保存に失敗しました');
+        finish(false);
+      });
     }
   }
 
@@ -2862,23 +2758,19 @@
       window.setLoading(true, '回答ボードを公開中...');
 
       if (!config.formUrl && config.spreadsheetId && config.sheetName) {
-        google.script.run
-          .withSuccessHandler(function (formResult) {
-            if (formResult.success && formResult.formData && formResult.formData.formUrl) {
-              config.formUrl = formResult.formData.formUrl;
-              config.formTitle = formResult.formData.formTitle;
-
-              systemState.config = { ...systemState.config, ...config };
-              updateResourceButtons(systemState.config);
-              try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
-            }
-            executePublish(config);
-          })
-          .withFailureHandler(function (error) {
-            console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
-            executePublish(config);
-          })
-          .getFormInfo(config.spreadsheetId, config.sheetName);
+        runServer('getFormInfo', config.spreadsheetId, config.sheetName).then((formResult) => {
+          if (formResult && formResult.success && formResult.formData && formResult.formData.formUrl) {
+            config.formUrl = formResult.formData.formUrl;
+            config.formTitle = formResult.formData.formTitle;
+            systemState.config = { ...systemState.config, ...config };
+            updateResourceButtons(systemState.config);
+            try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
+          }
+          executePublish(config);
+        }, (error) => {
+          console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
+          executePublish(config);
+        });
       } else {
         executePublish(config);
       }
@@ -2890,62 +2782,46 @@
     }
 
     function executePublish(publishConfig) {
-
-      google.script.run
-        .withSuccessHandler(function (result) {
-          if (result.success) {
-            showSuccess('回答ボードを公開しました！');
-            updatePublishStatus('published');
-
-            const updatedConfig = {
-              ...systemState.config,
-              isPublished: true,
-              publishedAt: result.publishedAt || new Date().toISOString(),
-              setupComplete: true
-            };
-
-            systemState.config = updatedConfig;
-
-            updateResourceButtons(systemState.config);
-            updateConfigSummary(systemState.config);
-
-            if (result.etag || result.config?.etag) {
-              systemState.config.etag = result.etag || result.config.etag;
-            }
-
-            (async () => {
-              try {
-                const adminData = await loadBatchedAdminData();
-                if (adminData && adminData.boardInfo) {
-                  currentBoardInfo = adminData.boardInfo;
-                  updateFooterDisplay(adminData.boardInfo);
-                }
-              } catch (error) {
-                console.warn('Footer refresh failed:', error);
-              }
-            })();
-          } else {
-            if (result.error === 'etag_mismatch') {
-              showInfo('設定が他で更新されました。画面を更新してから再度公開してください。');
-              if (typeof loadAndApplyCurrentConfig === 'function') {
-                loadAndApplyCurrentConfig();
-              }
-            } else {
-              showError(result.message || result.error || '回答ボードの公開に失敗しました');
-            }
+      runServer('publishApp', publishConfig).then((result) => {
+        if (result && result.success) {
+          showSuccess('回答ボードを公開しました！');
+          updatePublishStatus('published');
+          systemState.config = {
+            ...systemState.config,
+            isPublished: true,
+            publishedAt: result.publishedAt || new Date().toISOString(),
+            setupComplete: true
+          };
+          updateResourceButtons(systemState.config);
+          updateConfigSummary(systemState.config);
+          if (result.etag || result.config?.etag) {
+            systemState.config.etag = result.etag || result.config.etag;
           }
-          window.setLoading(false);
-          ClientMutex.release('publishApp');
-        })
-        .withFailureHandler(function (error) {
-          console.error('公開エラー:', error);
-          showError(
-            '回答ボードの公開に失敗しました。データソースが正しく設定されているか確認してください。'
-          );
-          window.setLoading(false);
-          ClientMutex.release('publishApp');
-        })
-        .publishApp(publishConfig);
+          (async () => {
+            try {
+              const adminData = await loadBatchedAdminData();
+              if (adminData && adminData.boardInfo) {
+                currentBoardInfo = adminData.boardInfo;
+                updateFooterDisplay(adminData.boardInfo);
+              }
+            } catch (error) {
+              console.warn('Footer refresh failed:', error);
+            }
+          })();
+        } else if (result && result.error === 'etag_mismatch') {
+          showInfo('設定が他で更新されました。画面を更新してから再度公開してください。');
+          if (typeof loadAndApplyCurrentConfig === 'function') loadAndApplyCurrentConfig();
+        } else {
+          showError((result && (result.message || result.error)) || '回答ボードの公開に失敗しました');
+        }
+        window.setLoading(false);
+        ClientMutex.release('publishApp');
+      }, (error) => {
+        console.error('公開エラー:', error);
+        showError('回答ボードの公開に失敗しました。データソースが正しく設定されているか確認してください。');
+        window.setLoading(false);
+        ClientMutex.release('publishApp');
+      });
     }
   }
 
@@ -3359,19 +3235,16 @@
 
   function loadProfileList() {
     setProfileActionStatus('プロファイル一覧を取得中...', 'info');
-    google.script.run
-      .withSuccessHandler((res) => {
-        if (res && res.success && res.data) {
-          renderProfileList(res.data.profiles || [], res.data.activeProfile || null);
-          setProfileActionStatus('', 'info');
-        } else {
-          setProfileActionStatus(res && res.message ? res.message : 'プロファイル一覧取得に失敗しました', 'error');
-        }
-      })
-      .withFailureHandler((err) => {
-        setProfileActionStatus('プロファイル一覧取得エラー: ' + (err && err.message || err), 'error');
-      })
-      .listMyProfiles();
+    runServer('listMyProfiles').then((res) => {
+      if (res && res.success && res.data) {
+        renderProfileList(res.data.profiles || [], res.data.activeProfile || null);
+        setProfileActionStatus('', 'info');
+      } else {
+        setProfileActionStatus(res && res.message ? res.message : 'プロファイル一覧取得に失敗しました', 'error');
+      }
+    }, (err) => {
+      setProfileActionStatus('プロファイル一覧取得エラー: ' + ((err && err.message) || err), 'error');
+    });
   }
 
   // =====================================================================
@@ -3387,21 +3260,20 @@
    * @param {string} opts.failureMsg     - 失敗時の fallback 文言
    * @param {Object} [opts.btn]          - 連打抑制用の button 要素
    * @param {Function} [opts.afterSuccess] - 成功時に追加で実行する async 関数 (in-place refresh 等)
-   * @param {Function} opts.invoke       - google.script.run.X(...) を返す関数
+   * @param {Function} opts.invoke       - Promise を返す関数 (例: () => runServer('foo', arg))
    */
-  function runProfileOp(opts) {
+  async function runProfileOp(opts) {
     setProfileActionStatus(opts.busyMsg, 'info');
     if (opts.btn) { opts.btn.disabled = true; opts.btn.classList.add('btn-busy'); }
-    const restoreBtn = () => {
-      if (opts.btn) { opts.btn.disabled = false; opts.btn.classList.remove('btn-busy'); }
-    };
-    const onSuccess = (res) => {
-      restoreBtn();
+    try {
+      const res = await opts.invoke();
       if (res && res.success) {
         setProfileActionStatus((res.message || opts.successMsg), 'success');
-        Promise.resolve(opts.afterSuccess ? opts.afterSuccess(res) : null)
-          .then(() => { if (typeof loadProfileList === 'function') loadProfileList(); })
-          .catch((err) => console.warn('afterSuccess error:', err && err.message));
+        if (opts.afterSuccess) {
+          try { await opts.afterSuccess(res); }
+          catch (err) { console.warn('afterSuccess error:', err && err.message); }
+        }
+        if (typeof loadProfileList === 'function') loadProfileList();
       } else if (res && res.error === 'etag_mismatch') {
         // Profile lifecycle audit recommendation #2: 別 tab で更新されていた場合、
         //   黙って失敗するのではなく config を fresh で再読込し、ユーザーに「再操作してね」と
@@ -3416,13 +3288,12 @@
         setProfileActionStatus((res && res.message) || opts.failureMsg, 'error');
         loadProfileList();
       }
-    };
-    const onFailure = (err) => {
-      restoreBtn();
-      setProfileActionStatus(opts.failureMsg + ': ' + (err && err.message || err), 'error');
+    } catch (err) {
+      setProfileActionStatus(opts.failureMsg + ': ' + ((err && err.message) || err), 'error');
       loadProfileList();
-    };
-    opts.invoke(onSuccess, onFailure);
+    } finally {
+      if (opts.btn) { opts.btn.disabled = false; opts.btn.classList.remove('btn-busy'); }
+    }
   }
 
   // 切替 (📥): non-destructive。reload は使わず in-place で左パネルを再ハイドレートする。
@@ -3436,7 +3307,7 @@
       busyMsg: 'プロファイル「' + name + '」を読み込み中...',
       successMsg: 'プロファイル「' + name + '」に切り替えました',
       failureMsg: '読み込みに失敗しました',
-      invoke: (ok, ng) => google.script.run.withSuccessHandler(ok).withFailureHandler(ng).loadProfileForView(name),
+      invoke: () => runServer('loadProfileForView', name),
       afterSuccess: async () => {
         // 設定再フェッチ → applyConfig + 列マッピング dropdown 復元
         await loadAndApplyCurrentConfig({ silent: true });
@@ -3445,14 +3316,18 @@
   }
 
   // 削除 (🗑): 取り消せないので confirm あり
-  function handleProfileDelete(name) {
+  async function handleProfileDelete(name) {
     if (!name) return;
-    if (!confirm('プロファイル「' + name + '」を削除しますか？\n\nこの操作は取り消せません。')) return;
+    const ok = await window.modals.confirm(
+      'プロファイル「' + name + '」を削除しますか？\n\nこの操作は取り消せません。',
+      { title: 'プロファイル削除', variant: 'danger', okLabel: '削除' }
+    );
+    if (!ok) return;
     runProfileOp({
       busyMsg: 'プロファイル「' + name + '」を削除中...',
       successMsg: '削除しました',
       failureMsg: '削除に失敗しました',
-      invoke: (ok, ng) => google.script.run.withSuccessHandler(ok).withFailureHandler(ng).deleteMyProfile(name)
+      invoke: () => runServer('deleteMyProfile', name)
     });
   }
 
@@ -3470,7 +3345,7 @@
       successMsg: 'プロファイルを更新しました',
       failureMsg: '更新に失敗しました',
       btn,
-      invoke: (ok, ng) => google.script.run.withSuccessHandler(ok).withFailureHandler(ng).saveCurrentAsProfile(name)
+      invoke: () => runServer('saveCurrentAsProfile', name)
     });
   }
 
@@ -3489,12 +3364,10 @@
       successMsg: '保存しました',
       failureMsg: '保存に失敗しました',
       btn: document.getElementById('save-current-as-profile-btn'),
-      invoke: (ok, ng) => {
-        const onOk = (res) => {
-          if (res && res.success) input.value = ''; // クリア (成功時のみ)
-          ok(res);
-        };
-        return google.script.run.withSuccessHandler(onOk).withFailureHandler(ng).saveCurrentAsProfile(name);
+      invoke: async () => {
+        const res = await runServer('saveCurrentAsProfile', name);
+        if (res && res.success) input.value = ''; // クリア (成功時のみ)
+        return res;
       }
     });
   }
@@ -3518,7 +3391,7 @@
         busyMsg: 'プロファイル名を変更中...',
         successMsg: '名前を変更しました',
         failureMsg: '名前変更に失敗しました',
-        invoke: (ok, ng) => google.script.run.withSuccessHandler(ok).withFailureHandler(ng).renameMyProfile(oldName, newName)
+        invoke: () => runServer('renameMyProfile', oldName, newName)
       });
     };
     input.addEventListener('keydown', (e) => {
@@ -3727,12 +3600,7 @@
     const userId = (window.UNIFIED_CONFIG && (window.UNIFIED_CONFIG.targetUserId || window.UNIFIED_CONFIG.userId)) || '';
 
     function gasRun(operation, params) {
-      return new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler(reject)
-          .dispatchAdminOperation(operation, params);
-      });
+      return runServer('dispatchAdminOperation', operation, params);
     }
 
     // ---------- Lesson list (常時表示の一覧) ----------

@@ -17,11 +17,8 @@
 
       setLoginButtonState(true, '読み込み中');
 
-      // リダイレクト用URLをプリフェッチ
-      google.script.run
-        .withSuccessHandler(function(url) { if (url) cachedLoginUrl = url + '?mode=login'; })
-        .withFailureHandler(function() {})
-        .getWebAppUrl();
+      // リダイレクト用URLをプリフェッチ (失敗時は cachedLoginUrl 未設定のまま fallback パスへ)
+      runServer('getWebAppUrl').then(function(url) { if (url) cachedLoginUrl = url + '?mode=login'; }, function() {});
 
       const loginBtn = document.getElementById('login-btn');
       const userEmailDisplay = document.getElementById('user-email-display');
@@ -155,43 +152,39 @@
   }
 
 
-  const processUnifiedLogin = () => {
-      return new Promise((resolve, reject) => {
-        google.script.run
-          .withSuccessHandler((response) => {
-            if (!response || !response.success) {
-              const errorMsg = response?.message || 'ログイン処理に失敗しました';
-              userEmailDisplay.textContent = errorMsg;
-              userEmailDisplay.classList.add('text-red-400');
-              reject(new Error(errorMsg));
-              return;
-            }
+  const processUnifiedLogin = async () => {
+      let response;
+      try {
+        response = await runServer('processLoginAction');
+      } catch (error) {
+        userEmailDisplay.textContent = `エラー: ${error.message}`;
+        userEmailDisplay.classList.add('text-red-400');
+        setLoginButtonState(false);
+        throw error;
+      }
 
-            const adminUrl =
-              response.adminUrl ||
-              response.redirectUrl ||
-              response.appUrl ||
-              response.url ||
-              '';
+      if (!response || !response.success) {
+        const errorMsg = response?.message || 'ログイン処理に失敗しました';
+        userEmailDisplay.textContent = errorMsg;
+        userEmailDisplay.classList.add('text-red-400');
+        throw new Error(errorMsg);
+      }
 
-            if (typeof adminUrl === 'string' && adminUrl.trim().length > 0) {
-              showAdminPanelRedirect(adminUrl, response.message);
-            } else {
-              console.error('processUnifiedLogin: 管理URLが返されませんでした', response);
-              userEmailDisplay.textContent = 'ログインは成功しましたが、管理URLが見つかりません。管理者に連絡してください。';
-              userEmailDisplay.classList.add('text-yellow-400');
-              setLoginButtonState(false);
-            }
-            resolve();
-          })
-          .withFailureHandler((error) => {
-            userEmailDisplay.textContent = `エラー: ${error.message}`;
-            userEmailDisplay.classList.add('text-red-400');
-            setLoginButtonState(false);
-            reject(error);
-          })
-          .processLoginAction();
-      });
+      const adminUrl =
+        response.adminUrl ||
+        response.redirectUrl ||
+        response.appUrl ||
+        response.url ||
+        '';
+
+      if (typeof adminUrl === 'string' && adminUrl.trim().length > 0) {
+        showAdminPanelRedirect(adminUrl, response.message);
+      } else {
+        console.error('processUnifiedLogin: 管理URLが返されませんでした', response);
+        userEmailDisplay.textContent = 'ログインは成功しましたが、管理URLが見つかりません。管理者に連絡してください。';
+        userEmailDisplay.classList.add('text-yellow-400');
+        setLoginButtonState(false);
+      }
     };
 
 
@@ -203,58 +196,48 @@
       userEmailDisplay.dataset.emailSet = '';
     };
 
-    const displayCurrentUserEmail = () => {
+    const displayCurrentUserEmail = async () => {
       const userEmailDisplay = document.getElementById('user-email-display');
       if (!userEmailDisplay) {
         console.error('❌ userEmailDisplay element not found');
         return;
       }
+      userEmailDisplay.textContent = '🔄 アカウント情報を確認中...';
 
+      let email;
       try {
-        userEmailDisplay.textContent = '🔄 アカウント情報を確認中...';
-
-        google.script.run
-          .withSuccessHandler((email) => {
-            if (email && typeof email === 'string') {
-              const emailText = `📧 ${email}`;
-              userEmailDisplay.textContent = emailText;
-              userEmailDisplay.classList.remove('text-red-400', 'text-yellow-400');
-              userEmailDisplay.classList.add('text-blue-400');
-
-              userEmailDisplay.dataset.emailSet = 'true';
-
-              const emailProtector = setInterval(() => {
-                if (userEmailDisplay.dataset.emailSet === 'true' &&
-                    userEmailDisplay.textContent !== emailText) {
-                  userEmailDisplay.textContent = emailText;
-                  userEmailDisplay.classList.remove('text-red-400', 'text-yellow-400');
-                  userEmailDisplay.classList.add('text-blue-400');
-                }
-              }, 800);
-
-    
-
-              createPromiseDelay(5000).then(() => clearInterval(emailProtector)).catch(() => {
-              });
-
-              setLoginButtonState(false);
-
-            } else {
-              setEmailDisplayDefault();
-              setLoginButtonState(false);
-            }
-          })
-          .withFailureHandler((error) => {
-            console.warn('Email fetch failed:', error.message);
-            setEmailDisplayDefault();
-            setLoginButtonState(false);
-          })
-          .getCurrentEmail();
+        email = await runServer('getCurrentEmail');
       } catch (error) {
-        console.error('DisplayCurrentUserEmail error:', error);
+        console.warn('Email fetch failed:', error.message);
         setEmailDisplayDefault();
         setLoginButtonState(false);
+        return;
       }
+
+      if (!(email && typeof email === 'string')) {
+        setEmailDisplayDefault();
+        setLoginButtonState(false);
+        return;
+      }
+
+      const emailText = `📧 ${email}`;
+      userEmailDisplay.textContent = emailText;
+      userEmailDisplay.classList.remove('text-red-400', 'text-yellow-400');
+      userEmailDisplay.classList.add('text-blue-400');
+      userEmailDisplay.dataset.emailSet = 'true';
+
+      const emailProtector = setInterval(() => {
+        if (userEmailDisplay.dataset.emailSet === 'true' &&
+            userEmailDisplay.textContent !== emailText) {
+          userEmailDisplay.textContent = emailText;
+          userEmailDisplay.classList.remove('text-red-400', 'text-yellow-400');
+          userEmailDisplay.classList.add('text-blue-400');
+        }
+      }, 800);
+
+      createPromiseDelay(5000).then(() => clearInterval(emailProtector)).catch(() => {});
+
+      setLoginButtonState(false);
     };
 
     const handleLoginError = (err) => {
@@ -270,23 +253,20 @@
       setLoginButtonState(false);
     };
 
-    const handleLogin = () => {
+    const handleLogin = async () => {
       try {
         setLoginButtonState(true, '処理中…');
-
-        google.script.run
-          .withSuccessHandler(() => {
-            processUnifiedLogin().catch(handleLoginError);
-          })
-          .withFailureHandler((error) => {
-            console.warn('URL system reset failed:', error);
-            processUnifiedLogin().catch(handleLoginError);
-          })
-          .forceUrlSystemReset();
+        // forceUrlSystemReset の成否に関わらず processUnifiedLogin に進む (失敗時のみ warn)
+        try {
+          await runServer('forceUrlSystemReset');
+        } catch (error) {
+          console.warn('URL system reset failed:', error);
+        }
+        processUnifiedLogin().catch(handleLoginError);
       } catch (err) {
         console.error('Login function error:', err);
         userEmailDisplay.textContent = 'ログイン処理エラー';
-      setLoginButtonState(false);
+        setLoginButtonState(false);
       }
     };
 
@@ -325,14 +305,8 @@
       if (!google?.script?.run?.getDeployUserDomainInfo) {
         return { isValidDomain: true, domain: 'unknown' };
       }
-
       try {
-        return await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .getDeployUserDomainInfo();
-        });
+        return await runServer('getDeployUserDomainInfo');
       } catch (error) {
         console.error('Domain info fetch failed:', error);
         return { error: true };

@@ -497,7 +497,7 @@
       let userToDelete = null;
 
 
-      function loadUserList() {
+      async function loadUserList() {
         const loadingDiv = document.getElementById('user-loading');
         const contentDiv = document.getElementById('user-table-content');
         const refreshBtn = document.getElementById('refresh-users-btn');
@@ -508,30 +508,23 @@
           refreshBtn.disabled = true;
           refreshBtn.classList.add('btn-busy');
         }
-        const restoreBtn = () => {
+        try {
+          const result = await runServer('getAdminUsers');
+          if (result && result.success === true) {
+            currentUserList = result.users;
+            displayUserList(result.users);
+          } else {
+            showMessage('ユーザー情報を取得できません', 'error');
+          }
+        } catch (_) {
+          showMessage('ユーザー情報の取得に失敗しました', 'error');
+        } finally {
+          loadingDiv.classList.add('hidden');
           if (refreshBtn) {
             refreshBtn.disabled = false;
             refreshBtn.classList.remove('btn-busy');
           }
-        };
-
-        google.script.run
-          .withSuccessHandler((result) => {
-            if (result.success === true) {
-              currentUserList = result.users;
-              displayUserList(result.users);
-            } else {
-              showMessage('ユーザー情報を取得できません', 'error');
-            }
-            loadingDiv.classList.add('hidden');
-            restoreBtn();
-          })
-          .withFailureHandler((error) => {
-            showMessage('ユーザー情報の取得に失敗しました', 'error');
-            loadingDiv.classList.add('hidden');
-            restoreBtn();
-          })
-          .getAdminUsers();
+        }
       }
 
       function displayUserList(users) {
@@ -628,7 +621,7 @@
         document.getElementById('delete-modal').classList.add('hidden');
       }
 
-      function confirmDeletion() {
+      async function confirmDeletion() {
         if (!userToDelete) return;
 
         const reason = document.getElementById('deletion-reason').value.trim();
@@ -641,28 +634,22 @@
         confirmBtn.disabled = true;
         confirmBtn.classList.add('btn-busy');
         confirmBtn.textContent = '削除中...';
-        const restoreDelete = () => {
+        try {
+          const result = await runServer('deleteUser', userToDelete.userId, reason);
+          if (result && result.success) {
+            showMessage('ユーザーを削除しました', 'success');
+            cancelDeletion();
+            loadUserList();
+          } else {
+            showMessage('削除に失敗しました', 'error');
+          }
+        } catch (_) {
+          showMessage('削除に失敗しました', 'error');
+        } finally {
           confirmBtn.disabled = false;
           confirmBtn.classList.remove('btn-busy');
           confirmBtn.textContent = '削除実行';
-        };
-
-        google.script.run
-          .withSuccessHandler((result) => {
-            if (result && result.success) {
-              showMessage('ユーザーを削除しました', 'success');
-              cancelDeletion();
-              loadUserList(); // ユーザー一覧を再読み込み
-            } else {
-              showMessage('削除に失敗しました', 'error');
-            }
-            restoreDelete();
-          })
-          .withFailureHandler((error) => {
-            showMessage('削除に失敗しました', 'error');
-            restoreDelete();
-          })
-          .deleteUser(userToDelete.userId, reason);
+        }
       }
 
 
@@ -699,7 +686,7 @@
         );
       }
 
-      function executeSystemFunction(buttonId, progressMessage, functionName, originalText) {
+      async function executeSystemFunction(buttonId, progressMessage, functionName, originalText) {
         const button = document.getElementById(buttonId);
         const resultsDiv = document.getElementById('diagnostic-results');
         const outputElement = document.getElementById('diagnostic-output');
@@ -708,31 +695,21 @@
         button.disabled = true;
         button.classList.add('btn-busy');
         button.textContent = progressMessage;
-        const restore = () => {
+        outputElement.textContent = '実行中...';
+        resultsDiv.classList.remove('hidden');
+        showMessage(progressMessage, 'info');
+
+        try {
+          const result = await runServer(functionName);
+          showDiagnosticResult(result, functionName);
+        } catch (error) {
+          outputElement.textContent = `エラーが発生しました:\n${error.message || error}`;
+          showMessage(`❌ ${functionName} でエラーが発生しました: ${error.message || error}`, 'error');
+        } finally {
           button.disabled = false;
           button.classList.remove('btn-busy');
           button.textContent = originalText;
-        };
-
-        outputElement.textContent = '実行中...';
-        resultsDiv.classList.remove('hidden');
-
-        showMessage(progressMessage, 'info');
-
-        google.script.run
-          .withSuccessHandler((result) => {
-            showDiagnosticResult(result, functionName);
-            restore();
-          })
-          .withFailureHandler((error) => {
-            outputElement.textContent = `エラーが発生しました:\n${error.message || error}`;
-            showMessage(
-              `❌ ${functionName} でエラーが発生しました: ${error.message || error}`,
-              'error'
-            );
-            restore();
-          })
-          [functionName]();
+        }
       }
 
 
@@ -779,17 +756,15 @@
           });
       }
 
-      function loadSystemStats() {
-        google.script.run
-          .withSuccessHandler(function(users) {
-            if (users && users.success && users.users) {
-              displaySystemStats(users.users);
-            }
-          })
-          .withFailureHandler(function(error) {
-            console.error('統計取得エラー:', error);
-          })
-          .getAdminUsers();
+      async function loadSystemStats() {
+        try {
+          const users = await runServer('getAdminUsers');
+          if (users && users.success && users.users) {
+            displaySystemStats(users.users);
+          }
+        } catch (error) {
+          console.error('統計取得エラー:', error);
+        }
       }
 
       function displaySystemStats(users) {
@@ -801,10 +776,8 @@
         const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
         users.forEach(user => {
-          try {
-            const config = JSON.parse(user.configJson || '{}');
-            if (config.isPublished === true) publishedBoards++;
-          } catch (_) {}
+          const config = window.safeJsonParse(user.configJson, {});
+          if (config.isPublished === true) publishedBoards++;
 
           const lastActivity = new Date(user.lastModified || user.createdAt);
           if (lastActivity > yesterday) recentActivity++;
@@ -816,199 +789,179 @@
         document.getElementById('recent-activity').textContent = recentActivity;
       }
 
-      function toggleUserStatus(userId) {
-        const confirmMessage = 'ユーザーの状態を切り替えますか？';
-        if (!confirm(confirmMessage)) return;
-
-        google.script.run
-          .withSuccessHandler(function(result) {
-            if (result && result.success) {
-              loadUserList();
-              loadSystemStats();
-            } else {
-              showMessage('状態変更に失敗しました', 'error');
-            }
-          })
-          .withFailureHandler(function(error) {
+      async function toggleUserStatus(userId) {
+        const ok = await window.modals.confirm('ユーザーの状態を切り替えますか？', { title: 'ユーザー状態' });
+        if (!ok) return;
+        try {
+          const result = await runServer('toggleUserActiveStatus', userId);
+          if (result && result.success) {
+            loadUserList();
+            loadSystemStats();
+          } else {
             showMessage('状態変更に失敗しました', 'error');
-          })
-          .toggleUserActiveStatus(userId);
+          }
+        } catch (_) {
+          showMessage('状態変更に失敗しました', 'error');
+        }
       }
 
-      function toggleUserBoard(userId) {
-        const confirmMessage = 'このユーザーのボード公開状態を切り替えますか？';
-        if (!confirm(confirmMessage)) return;
-
-        google.script.run
-          .withSuccessHandler(function(result) {
-            if (result && result.success) {
-              loadUserList();
-              loadSystemStats();
-            } else {
-              showMessage('ボード状態変更に失敗しました', 'error');
-            }
-          })
-          .withFailureHandler(function(error) {
-            showMessage('状態変更に失敗しました', 'error');
-          })
-          .toggleUserBoardStatus(userId);
+      async function toggleUserBoard(userId) {
+        const ok = await window.modals.confirm('このユーザーのボード公開状態を切り替えますか？', { title: 'ボード公開状態' });
+        if (!ok) return;
+        try {
+          const result = await runServer('toggleUserBoardStatus', userId);
+          if (result && result.success) {
+            loadUserList();
+            loadSystemStats();
+          } else {
+            showMessage('ボード状態変更に失敗しました', 'error');
+          }
+        } catch (_) {
+          showMessage('状態変更に失敗しました', 'error');
+        }
       }
 
 
-      function updateAppControlStatus() {
-        google.script.run
-          .withSuccessHandler(function(result) {
-            if (result && result.success && result.data) {
-              const data = result.data;
-              const isDisabled = data.isDisabled;
+      async function updateAppControlStatus() {
+        let result;
+        try {
+          result = await runServer('getAppAccessStatus');
+        } catch (error) {
+          console.error('アプリ制御状態取得エラー:', error);
+          showMessage('アプリ制御状態の取得に失敗しました', 'error');
+          return;
+        }
+        if (!(result && result.success && result.data)) {
+          showMessage('アプリ制御状態の取得に失敗しました', 'error');
+          return;
+        }
+        const data = result.data;
+        const isDisabled = data.isDisabled;
 
-              const currentStatus = document.getElementById('current-status');
-              const currentAdmin = document.getElementById('current-admin');
-              const lastUpdated = document.getElementById('last-updated');
+        const currentStatus = document.getElementById('current-status');
+        const currentAdmin = document.getElementById('current-admin');
+        const lastUpdated = document.getElementById('last-updated');
 
-              if (isDisabled) {
-                currentStatus.innerHTML = '<span class="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">🚫 停止中</span>';
-              } else {
-                currentStatus.innerHTML = '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">✅ 運用中</span>';
-              }
+        if (isDisabled) {
+          currentStatus.innerHTML = '<span class="bg-red-500 text-white px-3 py-1 rounded-full text-sm font-medium">🚫 停止中</span>';
+        } else {
+          currentStatus.innerHTML = '<span class="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">✅ 運用中</span>';
+        }
 
-              currentAdmin.textContent = data.adminEmail || currentAdmin.textContent;
+        currentAdmin.textContent = data.adminEmail || currentAdmin.textContent;
 
-              let updateTime = data.timestamp;
-              if (data.restriction && data.restriction.disabledAt) {
-                updateTime = data.restriction.disabledAt;
-              } else if (data.lastEnabled && data.lastEnabled.enabledAt) {
-                updateTime = data.lastEnabled.enabledAt;
-              }
+        let updateTime = data.timestamp;
+        if (data.restriction && data.restriction.disabledAt) {
+          updateTime = data.restriction.disabledAt;
+        } else if (data.lastEnabled && data.lastEnabled.enabledAt) {
+          updateTime = data.lastEnabled.enabledAt;
+        }
+        lastUpdated.textContent = updateTime
+          ? new Date(updateTime).toLocaleString('ja-JP')
+          : new Date().toLocaleString('ja-JP');
 
-              if (updateTime) {
-                lastUpdated.textContent = new Date(updateTime).toLocaleString('ja-JP');
-              } else {
-                lastUpdated.textContent = new Date().toLocaleString('ja-JP');
-              }
+        const statusIndicator = document.getElementById('app-status-indicator');
+        const statusText = document.getElementById('app-status-text');
+        const disableBtn = document.getElementById('disable-app-btn');
+        const enableBtn = document.getElementById('enable-app-btn');
+        const restrictionInfo = document.getElementById('restriction-info');
 
-              const statusIndicator = document.getElementById('app-status-indicator');
-              const statusText = document.getElementById('app-status-text');
-              const disableBtn = document.getElementById('disable-app-btn');
-              const enableBtn = document.getElementById('enable-app-btn');
-              const restrictionInfo = document.getElementById('restriction-info');
+        if (isDisabled) {
+          statusIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
+          statusText.textContent = '停止中';
+          statusText.className = 'text-sm text-red-400';
+          disableBtn.disabled = true;
+          enableBtn.disabled = false;
 
-              if (isDisabled) {
-                statusIndicator.className = 'w-3 h-3 rounded-full bg-red-500';
-                statusText.textContent = '停止中';
-                statusText.className = 'text-sm text-red-400';
-                disableBtn.disabled = true;
-                enableBtn.disabled = false;
-
-                if (data.restriction) {
-                  document.getElementById('restriction-reason').textContent =
-                    data.restriction.reason || 'システムメンテナンス';
-                  document.getElementById('restriction-by').textContent =
-                    data.restriction.disabledBy || '-';
-                  document.getElementById('restriction-at').textContent =
-                    data.restriction.disabledAt ? new Date(data.restriction.disabledAt).toLocaleString('ja-JP') : '-';
-                  restrictionInfo.classList.remove('hidden');
-                }
-              } else {
-                statusIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
-                statusText.textContent = '運用中';
-                statusText.className = 'text-sm text-green-400';
-                disableBtn.disabled = false;
-                enableBtn.disabled = true;
-                restrictionInfo.classList.add('hidden');
-              }
-            } else {
-              showMessage('アプリ制御状態の取得に失敗しました', 'error');
-            }
-          })
-          .withFailureHandler(function(error) {
-            console.error('アプリ制御状態取得エラー:', error);
-            showMessage('アプリ制御状態の取得に失敗しました', 'error');
-          })
-          .getAppAccessStatus();
+          if (data.restriction) {
+            document.getElementById('restriction-reason').textContent =
+              data.restriction.reason || 'システムメンテナンス';
+            document.getElementById('restriction-by').textContent =
+              data.restriction.disabledBy || '-';
+            document.getElementById('restriction-at').textContent =
+              data.restriction.disabledAt ? new Date(data.restriction.disabledAt).toLocaleString('ja-JP') : '-';
+            restrictionInfo.classList.remove('hidden');
+          }
+        } else {
+          statusIndicator.className = 'w-3 h-3 rounded-full bg-green-500';
+          statusText.textContent = '運用中';
+          statusText.className = 'text-sm text-green-400';
+          disableBtn.disabled = false;
+          enableBtn.disabled = true;
+          restrictionInfo.classList.add('hidden');
+        }
       }
 
-      function disableApp() {
+      async function disableApp() {
         const reasonInput = document.getElementById('disable-reason');
         const reason = reasonInput.value.trim() || 'システムメンテナンス';
 
-        const confirmMessage = `アプリケーションを停止します。\n理由: ${reason}\n\n全ユーザーがアクセスできなくなります。続行しますか？`;
-        if (!confirm(confirmMessage)) return;
+        const ok = await window.modals.confirm(
+          `アプリケーションを停止します。\n理由: ${reason}\n\n全ユーザーがアクセスできなくなります。続行しますか？`,
+          { title: 'アプリ停止', variant: 'danger', okLabel: '停止する' }
+        );
+        if (!ok) return;
 
         const button = document.getElementById('disable-app-btn');
         button.disabled = true;
         button.classList.add('btn-busy');
         button.textContent = '停止中...';
-        const restoreDisable = () => {
+        try {
+          const result = await runServer('disableAppAccess', reason);
+          if (result && result.success) {
+            showMessage('✅ アプリケーションを停止しました', 'success');
+            reasonInput.value = '';
+            updateAppControlStatus();
+          } else {
+            showMessage('❌ アプリケーション停止に失敗しました', 'error');
+          }
+        } catch (error) {
+          console.error('アプリ停止エラー:', error);
+          showMessage('❌ アプリケーション停止でエラーが発生しました', 'error');
+        } finally {
           button.disabled = false;
           button.classList.remove('btn-busy');
           button.textContent = '🚫 アプリケーションを停止';
-        };
-
-        google.script.run
-          .withSuccessHandler(function(result) {
-            if (result && result.success) {
-              showMessage('✅ アプリケーションを停止しました', 'success');
-              reasonInput.value = ''; // 入力をクリア
-              updateAppControlStatus(); // ステータスを更新（📊現在のステータス も含む）
-            } else {
-              showMessage('❌ アプリケーション停止に失敗しました', 'error');
-            }
-            restoreDisable();
-          })
-          .withFailureHandler(function(error) {
-            console.error('アプリ停止エラー:', error);
-            showMessage('❌ アプリケーション停止でエラーが発生しました', 'error');
-            restoreDisable();
-          })
-          .disableAppAccess(reason);
+        }
       }
 
-      function enableApp() {
-        const confirmMessage = 'アプリケーションを再開します。\n全ユーザーがアクセス可能になります。続行しますか？';
-        if (!confirm(confirmMessage)) return;
+      async function enableApp() {
+        const ok = await window.modals.confirm(
+          'アプリケーションを再開します。\n全ユーザーがアクセス可能になります。続行しますか？',
+          { title: 'アプリ再開', variant: 'success', okLabel: '再開する' }
+        );
+        if (!ok) return;
 
         const button = document.getElementById('enable-app-btn');
         button.disabled = true;
         button.classList.add('btn-busy');
         button.textContent = '再開中...';
-        const restoreEnable = () => {
+        try {
+          const result = await runServer('enableAppAccess');
+          if (result && result.success) {
+            showMessage('✅ アプリケーションを再開しました', 'success');
+            updateAppControlStatus();
+          } else {
+            showMessage('❌ アプリケーション再開に失敗しました', 'error');
+          }
+        } catch (error) {
+          console.error('アプリ再開エラー:', error);
+          showMessage('❌ アプリケーション再開でエラーが発生しました', 'error');
+        } finally {
           button.disabled = false;
           button.classList.remove('btn-busy');
           button.textContent = '✅ アプリケーションを再開';
-        };
-
-        google.script.run
-          .withSuccessHandler(function(result) {
-            if (result && result.success) {
-              showMessage('✅ アプリケーションを再開しました', 'success');
-              updateAppControlStatus(); // ステータスを更新（📊現在のステータス も含む）
-            } else {
-              showMessage('❌ アプリケーション再開に失敗しました', 'error');
-            }
-            restoreEnable();
-          })
-          .withFailureHandler(function(error) {
-            console.error('アプリ再開エラー:', error);
-            showMessage('❌ アプリケーション再開でエラーが発生しました', 'error');
-            restoreEnable();
-          })
-          .enableAppAccess();
+        }
       }
 
-      function loadLoginUrl() {
-        google.script.run
-          .withSuccessHandler(function(url) {
-            if (url) {
-              const loginUrl = url + '?mode=login';
-              document.getElementById('login-url').value = loginUrl;
-            }
-          })
-          .withFailureHandler(function(error) {
-            document.getElementById('login-url').value = 'URL取得エラー';
-            console.error('ログインURL取得エラー:', error);
-          })
-          .getWebAppUrl();
+      async function loadLoginUrl() {
+        try {
+          const url = await runServer('getWebAppUrl');
+          if (url) document.getElementById('login-url').value = url + '?mode=login';
+        } catch (error) {
+          document.getElementById('login-url').value = 'URL取得エラー';
+          console.error('ログインURL取得エラー:', error);
+        }
       }
 
       function copyLoginUrl() {
@@ -1043,12 +996,7 @@
       // (このページ自体が admin のみアクセス可能)。
       // ===========================================================================
       function saPool_callAdmin(operation, params) {
-        return new Promise(function(resolve, reject) {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .dispatchAdminOperation(operation, params || {});
-        });
+        return runServer('dispatchAdminOperation', operation, params || {});
       }
       function saPool_setStatus(msg, isError) {
         var el = document.getElementById('sa-pool-status');

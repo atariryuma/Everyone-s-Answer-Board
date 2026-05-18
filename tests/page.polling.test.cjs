@@ -650,12 +650,13 @@ test('populateClassFilter: falls back to すべて when selection missing + sync
 test('__vizLoadPastProfile: source passes classFilter from getCurrentFilterState (static guard)', () => {
   const src = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
   // hard-code null bug の回帰防止: getPublishedSheetDataForProfile 呼び出し直前で classFilter を変数渡しすること。
-  // (`, null,` のパターンは hard-code null だった旧コード)
-  const callMatch = src.match(/getPublishedSheetDataForProfile\([^)]+\)/);
-  assert.ok(callMatch, 'getPublishedSheetDataForProfile 呼び出しが存在する');
-  // 引数のうち 3 番目 (classFilter 位置) が `null` の literal でないこと
-  // 形式: getPublishedSheetDataForProfile(userId, name, classFilter, sortOrder)
-  const args = callMatch[0].slice('getPublishedSheetDataForProfile('.length, -1).split(',').map(s => s.trim());
+  // v2796: google.script.run 直呼び出しから runServer wrapper に migrate。 形式:
+  //   runServer('getPublishedSheetDataForProfile', userId, name, classFilter, sortOrder)
+  const callMatch = src.match(/runServer\('getPublishedSheetDataForProfile'[^)]+\)/);
+  assert.ok(callMatch, 'runServer("getPublishedSheetDataForProfile", ...) 呼び出しが存在する');
+  // 引数のうち 4 番目 (classFilter 位置) が `null` の literal でないこと
+  // 形式: runServer('getPublishedSheetDataForProfile', userId, name, classFilter, sortOrder)
+  const args = callMatch[0].slice("runServer('getPublishedSheetDataForProfile',".length, -1).split(',').map(s => s.trim());
   assert.notEqual(args[2], 'null', 'classFilter 引数を null hard-code してはいけない');
 });
 

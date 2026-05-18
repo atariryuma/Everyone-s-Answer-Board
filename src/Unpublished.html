@@ -122,7 +122,7 @@
       if (window.notifications) window.notifications.showMessage(message, type);
     }
 
-    function republishBoard() {
+    async function republishBoard() {
       const button = document.getElementById('republish-btn');
       if (!button) return;
 
@@ -130,66 +130,63 @@
       button.disabled = true;
       button.innerHTML = '<span role="img" aria-label="読み込み中">⏳</span> 再び公開中...';
 
-      google.script.run
-        .withSuccessHandler(function (result) {
-          if (result && result.success) {
-            // SharedUtilities.html の共通モーダルを使う
-            window.showRedirectModal({
-              title: '再び公開しました',
-              message: '公開ページへ移動します。',
-              redirectUrl: result.redirectUrl,
-              buttonLabel: '回答ボードを開く',
-              variant: 'green'
-            });
-          } else {
-            showMessage(result.message || '再び公開できませんでした', 'error');
-            button.disabled = false;
-            button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
-          }
-        })
-        .withFailureHandler(function (error) {
-          showMessage('再び公開する処理でエラーが発生しました: ' + (error.message || error), 'error');
+      try {
+        const result = await runServer('republishMyBoard');
+        if (result && result.success) {
+          window.showRedirectModal({
+            title: '再び公開しました',
+            message: '公開ページへ移動します。',
+            redirectUrl: result.redirectUrl,
+            buttonLabel: '回答ボードを開く',
+            variant: 'green'
+          });
+        } else {
+          showMessage((result && result.message) || '再び公開できませんでした', 'error');
           button.disabled = false;
           button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
-        })
-        .republishMyBoard();
+        }
+      } catch (error) {
+        showMessage('再び公開する処理でエラーが発生しました: ' + (error.message || error), 'error');
+        button.disabled = false;
+        button.innerHTML = originalContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback を復元するだけ
+      }
     }
 
     /**
      * ページ読み込み時にURLをプリフェッチ（GAS iFrame対応）
      */
-    function prefetchNavigationUrls() {
+    async function prefetchNavigationUrls() {
       const userId = '<?= typeof userId !== "undefined" ? userId : "" ?>';
       const adminBtn = document.getElementById('admin-panel-btn');
       const refreshBtn = document.getElementById('refresh-btn');
 
-      google.script.run
-        .withSuccessHandler(function (webAppUrl) {
-          // 無効なURLパターンを検証（OAuth初期化中のURL）
-          if (!webAppUrl || webAppUrl.includes('userCodeAppPanel') || !webAppUrl.includes('/exec')) {
-            console.warn('prefetchNavigationUrls: Invalid URL detected, skipping link setup');
-            return;
-          }
+      let webAppUrl;
+      try {
+        webAppUrl = await runServer('getWebAppUrl');
+      } catch (error) {
+        console.error('URL prefetch failed:', error);
+        return;
+      }
 
-          if (userId) {
-            if (adminBtn) {
-              adminBtn.href = webAppUrl + '?mode=admin&userId=' + userId;
-              adminBtn.textContent = '⚙️ 管理パネルを開く';
-              adminBtn.classList.remove('pointer-events-none', 'text-gray-500');
-              adminBtn.classList.add('hover:bg-gray-600', 'text-gray-200');
-            }
-            if (refreshBtn) {
-              refreshBtn.href = webAppUrl + '?mode=view&userId=' + userId;
-              refreshBtn.textContent = '更新';
-              refreshBtn.classList.remove('pointer-events-none', 'bg-gray-600', 'text-gray-400');
-              refreshBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'text-white');
-            }
-          }
-        })
-        .withFailureHandler(function (error) {
-          console.error('URL prefetch failed:', error);
-        })
-        .getWebAppUrl();
+      // 無効なURLパターンを検証（OAuth初期化中のURL）
+      if (!webAppUrl || webAppUrl.includes('userCodeAppPanel') || !webAppUrl.includes('/exec')) {
+        console.warn('prefetchNavigationUrls: Invalid URL detected, skipping link setup');
+        return;
+      }
+      if (!userId) return;
+
+      if (adminBtn) {
+        adminBtn.href = webAppUrl + '?mode=admin&userId=' + userId;
+        adminBtn.textContent = '⚙️ 管理パネルを開く';
+        adminBtn.classList.remove('pointer-events-none', 'text-gray-500');
+        adminBtn.classList.add('hover:bg-gray-600', 'text-gray-200');
+      }
+      if (refreshBtn) {
+        refreshBtn.href = webAppUrl + '?mode=view&userId=' + userId;
+        refreshBtn.textContent = '更新';
+        refreshBtn.classList.remove('pointer-events-none', 'bg-gray-600', 'text-gray-400');
+        refreshBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'text-white');
+      }
     }
 
     // ページ読み込み時にURLをプリフェッチ

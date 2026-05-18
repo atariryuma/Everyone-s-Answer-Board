@@ -2675,7 +2675,7 @@
    *      大きな変更なので、サーバ側で config を上書きしてから client が再フェッチする
    *      のが整合性的に最も安全。
    */
-  StudyQuestApp.prototype.__vizLoadProfile = function (name) {
+  StudyQuestApp.prototype.__vizLoadProfile = async function (name) {
     if (!name) return;
     if (typeof google === 'undefined' || !google.script || !google.script.run) return;
 
@@ -2710,50 +2710,52 @@
     if (select) select.disabled = true;
     if (typeof this.showToast === 'function') this.showToast('「' + name + '」 に切替中…');
 
-    google.script.run
-      .withSuccessHandler((res) => {
-        if (select) select.disabled = false;
-        if (res && res.success) {
-          // ロード成功 → データ & form ボタン を両方再読み込み。
-          // Why (form ボタン重複呼出): loadSheetData の formMeta 経由でも更新される
-          // はずだが、ある種のキャッシュ経路で取りこぼすケースがある（user 報告）。
-          // getActiveFormInfo を明示的に呼ぶことで confidence を持って同期する。
-          // 自発的切替なので、 loadSheetData 内の「新しいボードに切替わりました」 中央バナーを
-          // 1 回 suppress (右上 success トーストと重複しないよう)。
-          this.state.__suppressBoardSwitchToast = true;
-          if (typeof this.loadSheetData === 'function') {
-            this.loadSheetData({ bypassCache: true, isInitialLoad: false });
-          } else if (typeof window.safeReload === 'function') {
-            // iframe-aware reload (cached webapp URL に _top で navigate)。
-            window.safeReload({ keepParams: ['mode', 'userId'] });
-          } else {
-            window.location.reload();
-          }
-          if (typeof window.loadFormLink === 'function') {
-            window.loadFormLink();
-          }
-          // 成功通知も右上トーストに統一 (エラーと同位置で操作-結果のペアが明示される)。
-          if (typeof this.showNotification === 'function') {
-            this.showNotification('「' + name + '」 に切替えました', 'success');
-          }
-        } else {
-          console.error('Profile load failed:', res && res.message);
-          const msg = 'プロファイルの読み込みに失敗しました: ' + ((res && res.message) || '不明なエラー');
-          if (typeof this.showNotification === 'function') this.showNotification(msg, 'error');
-          else if (typeof this.showToast === 'function') this.showToast(msg);
-        }
-      })
-      .withFailureHandler((err) => {
-        if (select) select.disabled = false;
-        console.error('Profile load network error:', err);
-        const msg = 'プロファイルの切替に失敗しました';
-        if (typeof this.showNotification === 'function') this.showNotification(msg, 'error');
-        else if (typeof this.showToast === 'function') this.showToast(msg);
-      })
+    let res;
+    try {
       // targetUserId を渡すことで、admin が他人ボードを操作するケースや、URL の userId と
       //   現在の Session email が一致しないケース（複数 Google アカウント切替）でも、対象ボードを
       //   一意に特定できる。サーバ側は targetUserId 経由で owner/admin の認可チェックを行う。
-      .loadProfileForView(name, this.state.userId);
+      res = await runServer('loadProfileForView', name, this.state.userId);
+    } catch (err) {
+      if (select) select.disabled = false;
+      console.error('Profile load network error:', err);
+      const msg = 'プロファイルの切替に失敗しました';
+      if (typeof this.showNotification === 'function') this.showNotification(msg, 'error');
+      else if (typeof this.showToast === 'function') this.showToast(msg);
+      return;
+    }
+
+    if (select) select.disabled = false;
+    if (!(res && res.success)) {
+      console.error('Profile load failed:', res && res.message);
+      const msg = 'プロファイルの読み込みに失敗しました: ' + ((res && res.message) || '不明なエラー');
+      if (typeof this.showNotification === 'function') this.showNotification(msg, 'error');
+      else if (typeof this.showToast === 'function') this.showToast(msg);
+      return;
+    }
+
+    // ロード成功 → データ & form ボタン を両方再読み込み。
+    // Why (form ボタン重複呼出): loadSheetData の formMeta 経由でも更新される
+    // はずだが、ある種のキャッシュ経路で取りこぼすケースがある（user 報告）。
+    // getActiveFormInfo を明示的に呼ぶことで confidence を持って同期する。
+    // 自発的切替なので、 loadSheetData 内の「新しいボードに切替わりました」 中央バナーを
+    // 1 回 suppress (右上 success トーストと重複しないよう)。
+    this.state.__suppressBoardSwitchToast = true;
+    if (typeof this.loadSheetData === 'function') {
+      this.loadSheetData({ bypassCache: true, isInitialLoad: false });
+    } else if (typeof window.safeReload === 'function') {
+      // iframe-aware reload (cached webapp URL に _top で navigate)。
+      window.safeReload({ keepParams: ['mode', 'userId'] });
+    } else {
+      window.location.reload();
+    }
+    if (typeof window.loadFormLink === 'function') {
+      window.loadFormLink();
+    }
+    // 成功通知も右上トーストに統一 (エラーと同位置で操作-結果のペアが明示される)。
+    if (typeof this.showNotification === 'function') {
+      this.showNotification('「' + name + '」 に切替えました', 'success');
+    }
   };
 
   StudyQuestApp.prototype.__vizInjectProfileSelector = function () { injectProfileSelector(this); };
@@ -2775,7 +2777,7 @@
     }
   }
 
-  StudyQuestApp.prototype.__vizLoadPastProfile = function (name) {
+  StudyQuestApp.prototype.__vizLoadPastProfile = async function (name) {
     if (!name) return;
     if (typeof google === 'undefined' || !google.script || !google.script.run) return;
     if (this.state.viewingPastProfile === name) return;  // no-op
@@ -2794,60 +2796,61 @@
     const filter = this.getCurrentFilterState ? this.getCurrentFilterState() : {};
     const classFilter = filter.classFilter || null;
     const sortOrder = filter.sortOrder || 'newest';
-    const self = this;
 
     // UI 即時反映 (loading フィードバック + 描画ペインに loading 文字)。
-    self.state.viewingPastProfile = name;
-    if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
-    if (typeof self.showToast === 'function') self.showToast('「' + name + '」 を読み込み中…');
+    this.state.viewingPastProfile = name;
+    if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
+    if (typeof this.showToast === 'function') this.showToast('「' + name + '」 を読み込み中…');
 
-    google.script.run
-      .withSuccessHandler((res) => {
-        if (!res || !res.success) {
-          // 失敗時は viewing を解除して 統一エラー通知 (showNotification = 右上トースト)。
-          self.state.viewingPastProfile = null;
-          if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
-          const msg = (res && (res.error || res.message)) || 'フェーズ読み込み失敗';
-          if (typeof self.showNotification === 'function') self.showNotification(msg, 'error');
-          else if (typeof self.showToast === 'function') self.showToast(msg);
-          return;
-        }
-        // 成功: result を loadSheetData が処理するのと同じ形なので state へ反映 + renderBoard。
-        //   ただし getPublishedSheetData 経由ではないので、自前で state を更新する。
-        try {
-          const rows = Array.isArray(res.data) ? res.data : [];
-          self.state.currentAnswers = rows;
-          self.state.viewingPastProfile = res.viewingPastProfile || name;
-          if (res.displaySettings && typeof res.displaySettings.boardMode === 'string') {
-            self.state.boardMode = res.displaySettings.boardMode;
-            self.state.serverBoardMode = res.displaySettings.boardMode;
-          }
-          if (res.axisConfig) self.state.axisConfig = res.axisConfig;
-          if (res.header && self.elements && self.elements.headingLabel) {
-            self.elements.headingLabel.textContent = res.header;
-          }
-          if (typeof self.populateClassFilter === 'function') {
-            self.populateClassFilter(rows);
-          }
-        } catch (uiError) {
-          console.warn('__vizLoadPastProfile: state update failed', uiError);
-        }
-        if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
-        if (typeof self.renderBoard === 'function') self.renderBoard(false, false, []);
-        // トースト「過去のフェーズを表示中（読み取り専用）」
-        if (typeof self.showToast === 'function') {
-          self.showToast('「' + name + '」を表示中（読み取り専用）');
-        }
-      })
-      .withFailureHandler((err) => {
-        self.state.viewingPastProfile = null;
-        if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
-        console.error('Past profile load network error:', err);
-        const msg = 'フェーズ読み込みに失敗しました';
-        if (typeof self.showNotification === 'function') self.showNotification(msg, 'error');
-        else if (typeof self.showToast === 'function') self.showToast(msg);
-      })
-      .getPublishedSheetDataForProfile(this.state.userId, name, classFilter, sortOrder);
+    let res;
+    try {
+      res = await runServer('getPublishedSheetDataForProfile', this.state.userId, name, classFilter, sortOrder);
+    } catch (err) {
+      this.state.viewingPastProfile = null;
+      if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
+      console.error('Past profile load network error:', err);
+      const msg = 'フェーズ読み込みに失敗しました';
+      if (typeof this.showNotification === 'function') this.showNotification(msg, 'error');
+      else if (typeof this.showToast === 'function') this.showToast(msg);
+      return;
+    }
+
+    if (!res || !res.success) {
+      // 失敗時は viewing を解除して 統一エラー通知 (showNotification = 右上トースト)。
+      this.state.viewingPastProfile = null;
+      if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
+      const msg = (res && (res.error || res.message)) || 'フェーズ読み込み失敗';
+      if (typeof this.showNotification === 'function') this.showNotification(msg, 'error');
+      else if (typeof this.showToast === 'function') this.showToast(msg);
+      return;
+    }
+
+    // 成功: result を loadSheetData が処理するのと同じ形なので state へ反映 + renderBoard。
+    //   ただし getPublishedSheetData 経由ではないので、自前で state を更新する。
+    try {
+      const rows = Array.isArray(res.data) ? res.data : [];
+      this.state.currentAnswers = rows;
+      this.state.viewingPastProfile = res.viewingPastProfile || name;
+      if (res.displaySettings && typeof res.displaySettings.boardMode === 'string') {
+        this.state.boardMode = res.displaySettings.boardMode;
+        this.state.serverBoardMode = res.displaySettings.boardMode;
+      }
+      if (res.axisConfig) this.state.axisConfig = res.axisConfig;
+      if (res.header && this.elements && this.elements.headingLabel) {
+        this.elements.headingLabel.textContent = res.header;
+      }
+      if (typeof this.populateClassFilter === 'function') {
+        this.populateClassFilter(rows);
+      }
+    } catch (uiError) {
+      console.warn('__vizLoadPastProfile: state update failed', uiError);
+    }
+    if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
+    if (typeof this.renderBoard === 'function') this.renderBoard(false, false, []);
+    // トースト「過去のフェーズを表示中（読み取り専用）」
+    if (typeof this.showToast === 'function') {
+      this.showToast('「' + name + '」を表示中（読み取り専用）');
+    }
   };
 
   /**

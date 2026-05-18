@@ -71,8 +71,6 @@
         endPublicationBtn: document.getElementById('endPublicationBtn'),
         adminToggleBtn: document.getElementById('adminToggleBtn'),
         answerCount: document.getElementById('answerCount'),
-        // 互換性 (legacy 参照) のため null を保持。実 DOM は廃止済。
-        sheetNameText: null,
         answerModalContainer: document.getElementById('answerModalContainer'),
         answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
         answerModalCard: document.getElementById('answerModalCard'),
@@ -3993,12 +3991,7 @@
           window.notifications.info('回答を削除中...', 2000);
         }
 
-        const result = await new Promise((resolve, reject) => {
-          google.script.run
-            .withSuccessHandler(resolve)
-            .withFailureHandler(reject)
-            .deleteAnswerRow(this.state.userId, parseInt(rowIndex));
-        });
+        const result = await runServer('deleteAnswerRow', this.state.userId, parseInt(rowIndex));
 
         if (result.success) {
           if (window.notifications) {
@@ -4243,53 +4236,34 @@
       `;
       }
 
-      const self = this;
-
-      google.script.run
-        .withSuccessHandler(function (result) {
-          if (result && result.success) {
-            self.clearCache({ includeReactions: true, includeLocalStorage: true });
-
-            // GAS iFrameではコールバック内でwindow.openが動作しないため、
-            // ユーザーがクリックするリダイレクトモーダルを表示
-            self.showRedirectModal('公開を終了しました', '非公開ページへ移動します。', result.redirectUrl);
-          } else {
-            console.error('公開を終了できませんでした:', result);
-
-            if (window.notifications) {
-              window.notifications.error(result.message || '公開を終了できませんでした', 7000);
-            }
-
-            if (endPublicationBtn && originalButtonContent) {
-              endPublicationBtn.disabled = false;
-              endPublicationBtn.innerHTML = originalButtonContent; // lint-disable-line no-inner-html-assignment-with-variable -- 同じボタンから取得した自分の innerHTML を復元するだけ
-            }
-          }
-        })
-        .withFailureHandler(function (error) {
-          console.error('❌ 公開を終了できませんでした:', error);
-
-          let errorMsg = '公開を終了できませんでした';
-          if (error && error.message) {
-            errorMsg += ': ' + error.message;
-          } else if (typeof error === 'string') {
-            errorMsg += ': ' + error;
-          }
-
-          if (window.sharedModals) {
-            window.sharedModals.showAlert('エラー', errorMsg, 'error');
-          } else if (window.notifications) {
-            window.notifications.error(errorMsg, 7000);
-          } else {
-            alert(errorMsg);
-          }
-
-          if (endPublicationBtn && originalButtonContent) {
-            endPublicationBtn.disabled = false;
-            endPublicationBtn.innerHTML = originalButtonContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback の復元
-          }
-        })
-        .unpublishBoard(this.state.userId);
+      runServer('unpublishBoard', this.state.userId).then((result) => {
+        if (result && result.success) {
+          this.clearCache({ includeReactions: true, includeLocalStorage: true });
+          // GAS iFrameではコールバック内でwindow.openが動作しないため、
+          // ユーザーがクリックするリダイレクトモーダルを表示
+          this.showRedirectModal('公開を終了しました', '非公開ページへ移動します。', result.redirectUrl);
+          return;
+        }
+        console.error('公開を終了できませんでした:', result);
+        if (window.notifications) {
+          window.notifications.error((result && result.message) || '公開を終了できませんでした', 7000);
+        }
+        if (endPublicationBtn && originalButtonContent) {
+          endPublicationBtn.disabled = false;
+          endPublicationBtn.innerHTML = originalButtonContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback の復元
+        }
+      }).catch((error) => {
+        console.error('❌ 公開を終了できませんでした:', error);
+        let errorMsg = '公開を終了できませんでした';
+        if (error && error.message) errorMsg += ': ' + error.message;
+        else if (typeof error === 'string') errorMsg += ': ' + error;
+        if (window.notifications) window.notifications.error(errorMsg, 7000);
+        else alert(errorMsg);
+        if (endPublicationBtn && originalButtonContent) {
+          endPublicationBtn.disabled = false;
+          endPublicationBtn.innerHTML = originalButtonContent; // lint-disable-line no-inner-html-assignment-with-variable -- 自身の readback の復元
+        }
+      });
     }
 
     /**
@@ -5180,20 +5154,12 @@
    */
   async function loadFormLink() {
     try {
-      const formInfo = await new Promise((resolve, reject) => {
-        if (!google?.script?.run?.getActiveFormInfo) {
-          resolve(null);
-          return;
-        }
-
-        google.script.run
-          .withSuccessHandler(resolve)
-          .withFailureHandler((error) => {
-            console.warn('getActiveFormInfo failed:', error);
-            resolve(null);
-          })
-          .getActiveFormInfo(window.UNIFIED_CONFIG?.userId);
-      });
+      let formInfo = null;
+      try {
+        formInfo = await runServer('getActiveFormInfo', window.UNIFIED_CONFIG?.userId);
+      } catch (error) {
+        console.warn('getActiveFormInfo failed:', error);
+      }
 
       const formLinkBtn = document.getElementById('form-link-btn');
       if (formLinkBtn) {

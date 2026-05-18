@@ -93,29 +93,26 @@
         el.classList.add('from-cyan-600', 'to-blue-600', 'hover:from-cyan-700', 'hover:to-blue-700', 'text-white', 'hover:bg-gray-600', 'shadow-lg');
       }
 
-      document.addEventListener('DOMContentLoaded', function() {
-        google.script.run
-          .withSuccessHandler(function(webAppUrl) {
-            enableLink(document.getElementById('admin-login-link'), webAppUrl + '?mode=login', 'ログイン');
-            enableLink(document.getElementById('editor-login-link'), webAppUrl + '?mode=login', 'ログインしてはじめる');
+      document.addEventListener('DOMContentLoaded', async function() {
+        let webAppUrl;
+        try {
+          webAppUrl = await runServer('getWebAppUrl');
+        } catch (_) {
+          // URL取得失敗時はボタンをエラー表示のまま
+          return;
+        }
+        enableLink(document.getElementById('admin-login-link'), webAppUrl + '?mode=login', 'ログイン');
+        enableLink(document.getElementById('editor-login-link'), webAppUrl + '?mode=login', 'ログインしてはじめる');
 
-            var appSetupLink = document.getElementById('app-setup-link');
-            if (appSetupLink) {
-              google.script.run
-                .withSuccessHandler(function(userInfo) {
-                  var userId = (userInfo && userInfo.userId) ? userInfo.userId : '';
-                  enableLink(appSetupLink, webAppUrl + '?mode=appSetup' + (userId ? '&userId=' + userId : ''), 'アプリ設定');
-                })
-                .withFailureHandler(function() {
-                  enableLink(appSetupLink, webAppUrl + '?mode=appSetup', 'アプリ設定');
-                })
-                .getUser('full');
-            }
-          })
-          .withFailureHandler(function() {
-            // URL取得失敗時はボタンをエラー表示のまま
-          })
-          .getWebAppUrl();
+        const appSetupLink = document.getElementById('app-setup-link');
+        if (!appSetupLink) return;
+        try {
+          const userInfo = await runServer('getUser', 'full');
+          const userId = (userInfo && userInfo.userId) ? userInfo.userId : '';
+          enableLink(appSetupLink, webAppUrl + '?mode=appSetup' + (userId ? '&userId=' + userId : ''), 'アプリ設定');
+        } catch (_) {
+          enableLink(appSetupLink, webAppUrl + '?mode=appSetup', 'アプリ設定');
+        }
       });
     </script>
   </body>
