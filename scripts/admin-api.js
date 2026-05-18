@@ -67,10 +67,13 @@ const OPERATIONS = [
   'appendRows', 'clearDataRows', 'setSheetHeader',
   // Drive file rename (v5.1) — customizeForm 後の Drive file name 同期 etc.
   'renameDriveFile',
-  // Drive sharing (v6)
-  'shareWithDomain',
   // SS sharing repair (v7) — SA editor 共有が抜けた既存 SS の遡及修復
   'repairSpreadsheetSharing',
+  // SA pool management (v8 / v2782+) — 700 人スケール時の SA 拡張運用
+  'listServiceAccountPool', 'getServiceAccountUsage',
+  'addServiceAccountToPool', 'addServiceAccountsToPoolBatch',
+  'reverifyServiceAccountInPool', 'removeServiceAccountFromPool',
+  'migrateBoardSharing',
   // Lesson workspace (Phase 1+2) — wizard / runner / replay / archive
   'lesson.create', 'lesson.updateDraft', 'lesson.start',
   'lesson.advance', 'lesson.end',
