@@ -167,6 +167,53 @@ function checkThemeManager() {
   return { has, ok: missing.length === 0, missing };
 }
 
+// =====================================================================
+// 11. themeManager と Tailwind の class 整合性
+//     themeManager が body に付与する class が Tailwind の darkMode 設定と一致するか。
+//     不整合だと dark: variant が永久に発動せず、 chart 白背景バグになる
+//     (2026-05-19 user 報告の根本原因)。
+// =====================================================================
+function checkClassSyncWithTailwind() {
+  const su = fs.readFileSync(path.join(SRC_DIR, 'SharedUtilities.html'), 'utf8');
+  const tw = fs.readFileSync(path.join(SRC_DIR, 'SharedTailwindConfig.html'), 'utf8');
+
+  // themeManager.apply が body に追加する class 名を抽出
+  const themeMgrAddsDark = /classList\.add\(\s*['"]dark['"]/.test(su);
+  const themeMgrAddsLight = /classList\.add\(\s*['"]light['"]/.test(su);
+  const themeMgrAddsThemeDark = /classList\.add\(['"]theme-['"]\s*\+\s*resolved\)|classList\.add\(['"]theme-dark['"]/.test(su);
+
+  // Tailwind darkMode 設定: 'class' (= .dark), ['class', '.X'], 'selector'
+  const tailwindMode = (() => {
+    const m1 = tw.match(/darkMode\s*:\s*['"]class['"]/);
+    if (m1) return 'class-default';  // looks for .dark
+    const m2 = tw.match(/darkMode\s*:\s*\[\s*['"]class['"]\s*,\s*['"]([^'"]+)['"]\s*\]/);
+    if (m2) return `class-custom:${m2[1]}`;
+    return 'none';
+  })();
+
+  // 整合性判定
+  let ok = false;
+  let reason = '';
+  if (tailwindMode === 'class-default') {
+    // Tailwind は .dark を探す → themeManager は .dark を追加すべき
+    ok = themeMgrAddsDark;
+    reason = ok
+      ? "Tailwind darkMode:'class' + themeManager .dark class 同期 ✓"
+      : "Tailwind darkMode:'class' は .dark を探すが themeManager が .dark を付与していない (dark: variant 発動せず)";
+  } else if (tailwindMode.startsWith('class-custom:')) {
+    const selector = tailwindMode.slice('class-custom:'.length).replace(/^\./, '');
+    const re = new RegExp(`classList\\.add\\(['"]${selector}['"]`);
+    ok = re.test(su);
+    reason = ok
+      ? `Tailwind darkMode:[class, .${selector}] + themeManager 同期 ✓`
+      : `Tailwind は .${selector} を探すが themeManager が付与していない`;
+  } else {
+    reason = 'Tailwind darkMode が未設定';
+  }
+
+  return { ok, reason, themeMgrAddsDark, themeMgrAddsLight, themeMgrAddsThemeDark, tailwindMode };
+}
+
 const tm = checkThemeManager();
 record(
   '8. themeManager API',
@@ -174,6 +221,15 @@ record(
   tm.ok,
   tm.ok ? '9 機能完備 (get/set/toggle/subscribe/init/mountToggle/autoMql/storageKey/api)' :
     `欠落: ${tm.missing.join(', ')}`
+);
+
+// 8b. Tailwind class 同期 (chart 白背景バグの根本原因チェック)
+const sync = checkClassSyncWithTailwind();
+record(
+  '8b. Tailwind/themeManager class 同期',
+  10,
+  sync.ok,
+  sync.reason
 );
 
 // =====================================================================

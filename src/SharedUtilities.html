@@ -882,8 +882,21 @@
     function apply(value) {
       const resolved = resolve(value);
       if (!document.body) return resolved;
+      // theme-dark / theme-light: CSS 変数オーバーライド用 (UnifiedStyles の body.theme-light セレクタ)
       document.body.classList.remove('theme-dark', 'theme-light');
       document.body.classList.add('theme-' + resolved);
+      // dark / light: Tailwind の darkMode:'class' が探すクラス (`.dark` で dark: variant 発動)
+      //   この同期がないと bg-white dark:bg-gray-800 が常に light 側のみ適用される深刻なバグになる
+      //   (2026-05-19 user 報告の chart 白背景問題の根本原因)。
+      document.documentElement.classList.remove('dark', 'light');
+      document.body.classList.remove('dark', 'light');
+      if (resolved === 'dark') {
+        document.documentElement.classList.add('dark');
+        document.body.classList.add('dark');
+      } else {
+        document.documentElement.classList.add('light');
+        document.body.classList.add('light');
+      }
       try { document.documentElement.setAttribute('data-theme', resolved); } catch (_) {}
       subscribers.forEach((fn) => { try { fn(resolved, value); } catch (_) {} });
       return resolved;

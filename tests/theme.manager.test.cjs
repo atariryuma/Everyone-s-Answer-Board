@@ -110,14 +110,22 @@ test('themeManager: set("light") で localStorage と body class が更新され
   assert.strictEqual(storage['app-theme'], 'light');
   assert.ok(ctx.document.body._classes.has('theme-light'));
   assert.ok(!ctx.document.body._classes.has('theme-dark'));
+  // Tailwind dark: variant 用の class も同期されているか (light なら .light、 .dark ではない)
+  assert.ok(ctx.document.body._classes.has('light'));
+  assert.ok(!ctx.document.body._classes.has('dark'));
+  assert.ok(ctx.document.documentElement._classes.has('light'));
   assert.strictEqual(ctx.document.documentElement['data-theme'], 'light');
 });
 
-test('themeManager: set("dark") で body class が theme-dark になる', () => {
+test('themeManager: set("dark") で body class が theme-dark + dark になる', () => {
   const { ctx } = setupSandbox({ initialTheme: 'light' });
   ctx.window.themeManager.set('dark');
   assert.ok(ctx.document.body._classes.has('theme-dark'));
   assert.ok(!ctx.document.body._classes.has('theme-light'));
+  // Tailwind dark: variant 発動用 .dark クラス併用 (修正の核)
+  assert.ok(ctx.document.body._classes.has('dark'));
+  assert.ok(!ctx.document.body._classes.has('light'));
+  assert.ok(ctx.document.documentElement._classes.has('dark'));
 });
 
 test('themeManager: toggle() で dark ↔ light 反転', () => {
