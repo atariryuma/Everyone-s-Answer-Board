@@ -3833,20 +3833,24 @@
       }
       const dupTarget = event.target.closest('[data-lesson-duplicate]');
       if (dupTarget) {
-        const copyClasses = confirm('このレッスンを「テンプレ」として新規作成します。\n\n対象クラスも引き継ぎますか？\n(OK = クラスも複製 / キャンセル = フェーズだけ複製)');
-        const task = () => gasRun('lesson.duplicate', {
-          userId, lessonId: dupTarget.dataset.lessonDuplicate, options: { copyClasses }
-        }).then((res) => {
-          if (res && res.success) {
-            // 複製後の draft をすぐ wizard で開く
-            window.showSuccess('複製しました。続けて編集できます。');
-            openLessonWizard(res.data.lesson.lessonId, res.data.lesson);
-          } else {
-            window.showError((res && res.message) || '複製失敗');
-          }
+        window.modals.confirm(
+          'このレッスンを「テンプレ」として新規作成します。\n\n対象クラスも引き継ぎますか？\n(OK = クラスも複製 / キャンセル = フェーズだけ複製)',
+          { title: '授業の複製', okLabel: 'クラスも複製', cancelLabel: 'フェーズだけ' }
+        ).then((copyClasses) => {
+          const task = () => gasRun('lesson.duplicate', {
+            userId, lessonId: dupTarget.dataset.lessonDuplicate, options: { copyClasses }
+          }).then((res) => {
+            if (res && res.success) {
+              // 複製後の draft をすぐ wizard で開く
+              window.showSuccess('複製しました。続けて編集できます。');
+              openLessonWizard(res.data.lesson.lessonId, res.data.lesson);
+            } else {
+              window.showError((res && res.message) || '複製失敗');
+            }
+          });
+          if (busyBtns()) busyBtns().withBusy(dupTarget, task, { busyText: '複製中...' });
+          else task();
         });
-        if (busyBtns()) busyBtns().withBusy(dupTarget, task, { busyText: '複製中...' });
-        else task();
       }
     });
 

@@ -708,6 +708,74 @@
   };
 
   /**
+   * window.modals.confirm/alert — ネイティブ confirm()/alert() の代替。
+   *
+   * Why: native confirm/alert はモバイルブラウザで OS native スタイルになり、 アプリ全体の
+   *   グラスパネル UI と不一致。 さらに iframe 環境では同期ブロックを嫌う browser もある。
+   * Promise を返すので `await modals.confirm('続けますか?')` で使える。
+   *
+   * @param {string} message
+   * @param {Object} [opts] - { title?, okLabel?, cancelLabel?, variant? }
+   *   variant: 'default' (cyan) | 'danger' (red) | 'success' (green)
+   * @returns {Promise<boolean>}  confirm: OK で true / cancel または backdrop click で false。
+   *                              alert: 常に true。
+   */
+  window.modals = {
+    _build(opts) {
+      const esc = (s) => window.sharedUtilities.security.escapeHtml(s || '');
+      const variant = (opts && opts.variant) || 'default';
+      const okClasses = {
+        default: 'from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700',
+        danger:  'from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700',
+        success: 'from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700',
+      }[variant] || 'from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700';
+
+      const existing = document.getElementById('app-modal');
+      if (existing) existing.remove();
+
+      const modal = document.createElement('div');
+      modal.id = 'app-modal';
+      modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10002]';
+      const title = opts && opts.title ? `<h3 class="text-lg font-bold text-white mb-3">${esc(opts.title)}</h3>` : '';
+      const cancelBtn = (opts && opts.kind === 'confirm')
+        ? `<button type="button" id="app-modal-cancel" class="flex-1 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors">${esc((opts && opts.cancelLabel) || 'キャンセル')}</button>`
+        : '';
+      const okLabel = (opts && opts.okLabel) || (opts && opts.kind === 'confirm' ? 'OK' : 'わかった');
+      modal.innerHTML = `
+        <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
+          ${title}
+          <p class="text-gray-200 mb-5 whitespace-pre-wrap">${esc(opts && opts.message)}</p>
+          <div class="flex gap-3">
+            ${cancelBtn}
+            <button type="button" id="app-modal-ok" class="flex-1 px-4 py-2.5 bg-gradient-to-r ${okClasses} text-white rounded-lg font-semibold transition-all">${esc(okLabel)}</button>
+          </div>
+        </div>
+      `;
+      document.body.appendChild(modal);
+      return modal;
+    },
+    confirm(message, opts) {
+      return new Promise((resolve) => {
+        const modal = this._build({ ...(opts || {}), message, kind: 'confirm' });
+        const cleanup = (result) => { modal.remove(); resolve(result); };
+        modal.querySelector('#app-modal-ok').addEventListener('click', () => cleanup(true));
+        modal.querySelector('#app-modal-cancel').addEventListener('click', () => cleanup(false));
+        modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(false); });
+        modal.querySelector('#app-modal-ok').focus();
+      });
+    },
+    alert(message, opts) {
+      return new Promise((resolve) => {
+        const modal = this._build({ ...(opts || {}), message, kind: 'alert' });
+        const cleanup = () => { modal.remove(); resolve(true); };
+        modal.querySelector('#app-modal-ok').addEventListener('click', cleanup);
+        modal.addEventListener('click', (e) => { if (e.target === modal) cleanup(); });
+        modal.querySelector('#app-modal-ok').focus();
+      });
+    },
+  };
+
+  /**
    * ButtonBusyManager — ボタン共通の「処理中」UX を一元化する。
    *
    * 採用基準 (各ページのボタン監査 2026-05-14 で確定):
@@ -785,6 +853,51 @@
       document.addEventListener('DOMContentLoaded', callback);
     } else {
       callback();
+    }
+  };
+
+  /**
+   * google.script.run の Promise wrapper。
+   *
+   * 旧: 10 HTML ファイル / ~194 call sites で withSuccessHandler/withFailureHandler を手書きしていた。
+   *     エラー処理がファイルごとにバラバラ (silent log / banner / modal が混在)。
+   * 新: `await runServer('funcName', arg1, arg2)` で統一。 失敗時は Error throw、 呼び出し側で
+   *     try/catch するか .catch する。
+   *
+   * @param {string} funcName  サーバ関数名 (allowlist された doPost action ではなく、 GAS 関数名)
+   * @param {...*}   args      サーバ関数に渡す引数
+   * @returns {Promise<*>}
+   */
+  window.runServer = function (funcName, ...args) {
+    return new Promise((resolve, reject) => {
+      if (typeof google === 'undefined' || !google.script || !google.script.run) {
+        reject(new Error('google.script.run is not available (preview or stand-alone)'));
+        return;
+      }
+      const fn = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler((err) => {
+          reject(err instanceof Error ? err : new Error(err && err.message ? err.message : String(err)));
+        })[funcName];
+      if (typeof fn !== 'function') {
+        reject(new Error('Unknown server function: ' + funcName));
+        return;
+      }
+      fn.apply(null, args);
+    });
+  };
+
+  /**
+   * 安全な JSON.parse。 parse 失敗時は fallback を返す (例外 throw しない)。
+   * 7 ファイル / ~73 行で散在する JSON.parse(...) の silent failure を排除する。
+   */
+  window.safeJsonParse = function (text, fallback = null) {
+    if (text == null || text === '') return fallback;
+    if (typeof text === 'object') return text;
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      return fallback;
     }
   };
 

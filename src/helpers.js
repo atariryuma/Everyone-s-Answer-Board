@@ -200,6 +200,27 @@ function logError_(funcName, error) {
 }
 
 /**
+ * 安全な JSON.parse。 parse 失敗時は fallback を返す (例外 throw しない)。
+ *
+ * Why: configJson / SA creds / cache 読み戻し など、 信頼できない文字列を parse する箇所で
+ *   try/catch を毎回書くのは冗長。 fallback を明示する形に統一する。
+ * 既存 35 箇所の JSON.parse は try/catch で十分にガードされているので強制 migration はしない。
+ *
+ * @param {string|*} text
+ * @param {*} fallback - parse 失敗時に返す値 (既定: null)
+ * @returns {*}
+ */
+function safeJsonParse_(text, fallback) {
+  if (text == null || text === '') return (fallback === undefined ? null : fallback);
+  if (typeof text === 'object') return text;
+  try {
+    return JSON.parse(text);
+  } catch (_) {
+    return (fallback === undefined ? null : fallback);
+  }
+}
+
+/**
  * 認証チェック: メール取得 + 管理者判定を一括実行
  * @returns {{email: string, isAdmin: boolean}|null} 認証情報、未認証時はnull
  */

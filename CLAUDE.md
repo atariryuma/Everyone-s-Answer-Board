@@ -228,6 +228,30 @@ HTML templates use `<?!= include('filename') ?>` for composition. Key patterns:
 - Top-level side effects forbidden - `google.script.run`, DOM manipulation, and auto-timers must be inside `init()` only
 - Include order is fixed; changes require a standalone commit
 
+### Canonical Frontend APIs (Use these, don't reinvent)
+
+新規コードを書くときは以下の集約 API を使う。ad-hoc DOM 操作や native `confirm/alert` を新規に書かない。
+
+| 用途 | API | 場所 |
+| ---- | --- | ---- |
+| 右上トースト (success/error/warning/info) | `notifications.success/error/warning/info(msg, opts?)` | [SharedUtilities.html](src/SharedUtilities.html) |
+| 中央上バナー (ボード切替予告等) | `notifications.banner(msg, { html?, duration? })` | 同上 |
+| 確認 / アラートモーダル | `await modals.confirm(msg, opts?)` / `await modals.alert(msg)` | 同上 |
+| リダイレクトモーダル (公開遷移用) | `showRedirectModal({ title, message, redirectUrl, variant? })` | 同上 |
+| サーバ呼び出し (Promise) | `await runServer('funcName', arg1, arg2)` | 同上 |
+| 安全な JSON parse (fallback 返却) | `safeJsonParse(text, fallback)` | 同上 |
+| HTML escape | `sharedUtilities.security.escapeHtml(s)` | 同上 |
+| ローディングオーバーレイ | `setLoading(true, msg)` / `setLoading(false)` | 同上 |
+| デバウンス (key 共有可) | `sharedUtilities.debounce.debounce(fn, key, delayMs)` | 同上 |
+| ボタンの処理中 UX | `sharedUtilities.buttons.withBusy(btn, asyncFn, { busyText })` | 同上 |
+
+**禁止 / 非推奨パターン:**
+
+- 新規の右上トースト DOM、中央バナー DOM、`#notification-container` を手書きしない (上記 API に集約)
+- 新規の native `confirm()` / `alert()` (緊急 fallback 用途を除く) → `modals.confirm/alert` を使う
+- `withSuccessHandler/withFailureHandler` の手書きチェーン → `runServer(...)` を使う
+- `JSON.parse(...)` を try/catch なしで呼ぶ → `safeJsonParse(...)` を使う
+
 ### Data Store
 
 Google Sheets as database via service account. `users` sheet stores user records; each user's board config is in a JSON `configJson` column (see `src/SystemController.js` `USERS_SHEET_HEADERS`).
