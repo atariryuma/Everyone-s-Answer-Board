@@ -30,7 +30,8 @@
     "lint:eslint": "eslint src/*.js",
     "theme:audit": "node scripts/theme-audit.js",
     "theme:contrast": "node scripts/theme-contrast.js",
-    "theme:check": "node scripts/theme-audit.js && node scripts/theme-contrast.js"
+    "theme:check": "node scripts/theme-audit.js && node scripts/theme-contrast.js",
+    "theme:verify": "node scripts/theme-verify.js"
   },
   "repository": {
     "type": "git",
