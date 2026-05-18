@@ -31,6 +31,11 @@
     stroke: rgba(148, 163, 184, 0.5);
     stroke-width: 1;
   }
+  /* Light mode: slate-400 50% → slate-500 80% (slate-50 bg で軸線を見やすく) */
+  body.theme-light .viz-axis line,
+  body.theme-light .viz-axis path {
+    stroke: rgba(100, 116, 139, 0.8);
+  }
   .viz-axis text {
     fill: var(--theme-text-muted);
     font-size: 0.9rem;
@@ -226,6 +231,11 @@
   .viz-quadrant.hl { fill: rgba(250, 204, 21, 0.07); }
   .viz-quadrant.lh { fill: rgba(56, 189, 248, 0.07); }
   .viz-quadrant.ll { fill: rgba(248, 113, 113, 0.07); }
+  /* Light mode: slate-50 上では 7-8% は薄すぎて消えるので倍程度に上げる (依然 subtle) */
+  body.theme-light .viz-quadrant.hh { fill: rgba(22, 163, 74, 0.14); }
+  body.theme-light .viz-quadrant.hl { fill: rgba(202, 138, 4, 0.13); }
+  body.theme-light .viz-quadrant.lh { fill: rgba(14, 116, 144, 0.13); }
+  body.theme-light .viz-quadrant.ll { fill: rgba(220, 38, 38, 0.12); }
 
   .viz-quadrant-label {
     fill: rgba(226, 232, 240, 0.45);
@@ -233,6 +243,10 @@
     font-weight: 700;
     pointer-events: none;
     text-anchor: middle;
+  }
+  /* Light mode: slate-200 45% → slate-700 (slate-50 bg で WCAG AA 確保) */
+  body.theme-light .viz-quadrant-label {
+    fill: rgba(51, 65, 85, 0.85);
   }
   /* 象限ラベル直下/上の理由キーワード行 (SVG 内統合配置)。
    *   ラベルより一段薄く、フォントを小さく - 階層を表現。 */
@@ -243,6 +257,10 @@
     pointer-events: none;
     text-anchor: middle;
     letter-spacing: 0.03em;
+  }
+  /* Light mode: indigo-200 70% → indigo-700 (slate-50 bg で AA 確保) */
+  body.theme-light .viz-quadrant-keyword {
+    fill: rgba(55, 48, 163, 0.85);
   }
   /* 個別キーワード (tspan) は click 可能。hover で fill 変更 + cursor pointer。
      pointer-events: auto で親 <text> の pointer-events: none を上書き。 */
@@ -319,9 +337,16 @@
     pointer-events: none;
     letter-spacing: 0.02em;
   }
+  /* Light mode: indigo-200 55% → indigo-700 (slate-50 bg で AA 確保) */
+  body.theme-light .viz-contrast-summary {
+    fill: rgba(55, 48, 163, 0.75);
+  }
   body.projector-mode .viz-contrast-summary {
     font-size: 1rem;
     fill: rgba(199, 210, 254, 0.7);
+  }
+  body.theme-light.projector-mode .viz-contrast-summary {
+    fill: rgba(55, 48, 163, 0.9);
   }
   @media (max-width: 768px) {
     .viz-contrast-summary { font-size: 0.7rem; }
@@ -557,6 +582,11 @@
     font-size: 0.88rem;
     cursor: pointer;
   }
+  /* Light mode: slate-800 70% → 白カード (theme-bg-elevated) で自然に */
+  body.theme-light .viz-profile-select {
+    background: var(--theme-bg-elevated);
+    border-color: var(--theme-border-normal);
+  }
   .viz-profile-select:disabled { opacity: 0.5; cursor: wait; }
   body.projector-mode .viz-profile-select { font-size: 1.05rem; padding: 0.45rem 0.8rem; max-width: 280px; }
 
@@ -568,6 +598,11 @@
     background: rgba(15, 23, 42, 0.5);
     border-radius: 0.45rem;
     border: 1px solid rgba(148, 163, 184, 0.2);
+  }
+  /* Light mode: slate-900 50% → 薄い slate trough で pill 群の輪郭を保ちつつ自然に */
+  body.theme-light .viz-profile-pills-row {
+    background: rgba(241, 245, 249, 0.85);
+    border-color: var(--theme-border-subtle);
   }
   .viz-profile-pill {
     padding: 0.3rem 0.7rem;
@@ -673,6 +708,12 @@
     white-space: nowrap;
     transition: background 0.15s, border-color 0.15s;
   }
+  /* Light mode: slate-800 60% → 白カード (theme-bg-elevated) で議論ツール button を明るく */
+  body.theme-light .viz-btn,
+  body.theme-light .viz-btn-small {
+    background: var(--theme-bg-elevated);
+    border-color: var(--theme-border-normal);
+  }
   .viz-btn:hover, .viz-btn-small:hover {
     background: rgba(56, 189, 248, 0.18);
     border-color: rgba(56, 189, 248, 0.5);
@@ -731,6 +772,11 @@
     border-radius: 0.5rem;
     padding: 0.5rem;
     background: rgba(15, 23, 42, 0.3);
+  }
+  /* Light mode: slate-900 30% → 薄い slate (slate-100 風) で 2 ペイン区切りを保つ */
+  body.theme-light .viz-compare-pane {
+    background: rgba(241, 245, 249, 0.6);
+    border-color: var(--theme-border-subtle);
   }
   .viz-compare-pane h4 {
     margin: 0 0 0.5rem;
