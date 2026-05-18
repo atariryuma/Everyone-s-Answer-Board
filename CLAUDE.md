@@ -219,6 +219,63 @@ owner は own OAuth で SA quota 節約。 viewer / admin の cross-user のみ 
 - `__applyPublishStateChange` で `invalidateSaValidationCache_` を呼び、 該当 SS の cache version を bump
 - unpublish 直後の 60秒 access leak を解消
 
+### Theme / Color アーキテクチャ (v2800+)
+
+ダークモード既定 + ライトモード移行準備済。 全 CSS は **semantic theme token** 経由で記述する。
+
+**3 種類のカラートークン**:
+
+| カテゴリ | 例 | テーマ切替 | 用途 |
+| -------- | -- | --------- | ---- |
+| `--theme-*` | `--theme-bg-base`, `--theme-text-primary`, `--theme-border-subtle` | **書き換わる** | 文脈依存の色 (背景・テキスト・境界線・オーバーレイ) |
+| `--brand-*` | `--brand-primary`, `--brand-like`, `--brand-curious` | 不変 | ブランドアイデンティティ (アプリ色・リアクション色) |
+| `--status-*` | `--status-success`, `--status-error`, `--status-warning` | 不変 | システムフィードバック色 |
+
+**Semantic theme tokens (`--theme-*`)** — 詳細は [UnifiedStyles.css.html](src/UnifiedStyles.css.html) `:root` ブロック:
+
+- 背景: `--theme-bg-base` / `--theme-bg-surface` / `--theme-bg-elevated` / `--theme-bg-overlay`
+- テキスト: `--theme-text-primary` / `--theme-text-secondary` / `--theme-text-muted` / `--theme-text-inverse`
+- 境界線: `--theme-border-subtle` / `--theme-border-normal` / `--theme-border-strong`
+- 半透明: `--theme-overlay-white-05/10/20/30` / `--theme-overlay-black-20/60/90` / `--theme-overlay-surface-glass`
+- インジケーター: `--theme-spinner` / `--theme-accent-cyan` / `--theme-accent-cyan-soft`
+
+**ライトモード適用** ([UnifiedStyles.css.html](src/UnifiedStyles.css.html)):
+
+```css
+body.theme-light, :root[data-theme="light"] {
+  --theme-bg-base: #f8fafc;
+  --theme-text-primary: #1e293b;
+  /* ... 全 token を上書き */
+}
+```
+
+**Tailwind 統合** ([SharedTailwindConfig.html](src/SharedTailwindConfig.html)):
+
+- `darkMode: 'class'` 設定済 (body の `theme-dark`/`theme-light` クラスに応答)
+- `theme.extend.colors` で CSS 変数を Tailwind utility class に公開済
+- 例: `class="bg-theme-base text-theme-primary border-theme-subtle"` で書ける
+- 既存 `bg-gray-800` 等のハードコード Tailwind class は **段階的に** `bg-theme-surface` 等へ移行
+
+**themeManager API** ([SharedUtilities.html](src/SharedUtilities.html)):
+
+```js
+themeManager.get()          // 'dark' | 'light' | 'auto' (現在 localStorage 値)
+themeManager.resolved()     // 'dark' | 'light' (auto なら OS 反映後)
+themeManager.set('light')   // 切替 + 永続化 (localStorage 'app-theme')
+themeManager.toggle()       // dark ↔ light
+themeManager.subscribe(fn)  // 切替時 callback (unsub 関数を返す)
+```
+
+- SharedUtilities ロード時に `init()` が自動実行 (FOUC 防止)。 body に `theme-dark`/`theme-light` クラスを付与。
+- `auto` モードでは `@media (prefers-color-scheme)` の変化を監視し追従。
+
+**新規 CSS を書く時の Do/Don't**:
+
+- ✅ **Do**: `color: var(--theme-text-primary)` / `background: var(--theme-bg-surface)` / `border: 1px solid var(--theme-border-subtle)`
+- ✅ **Do**: brand identity / status は `var(--brand-like)` / `var(--status-success)` (theme 非依存)
+- ❌ **Don't**: ハードコード hex/rgba (`color: #94a3b8` / `background: rgba(255,255,255,0.1)`)
+- ❌ **Don't**: 旧 `--brand-text-muted` (定義不在、 fallback `#94a3b8` で動いていた) → 必ず `--theme-text-muted` を使う
+
 ### Cache アーキテクチャ (3 層、 意図的分離)
 
 3 つの層はそれぞれ異なる用途。 統合 facade を作らない (semantic clarity を失う + cost 非対称性が見えなくなる)。

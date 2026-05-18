@@ -13,8 +13,8 @@
     /* ヘッダ + フッタ分を控えた高さ。スマホでも横向きでまともに見えるよう min-height は控えめ。 */
     min-height: 60vh;
     padding: 1rem 0.5rem 2rem;
-    background: var(--brand-background, #0f172a);
-    color: var(--brand-text, #e2e8f0);
+    background: var(--theme-bg-base);
+    color: var(--theme-text-primary);
     overflow: visible;
   }
 
@@ -32,12 +32,12 @@
     stroke-width: 1;
   }
   .viz-axis text {
-    fill: var(--brand-text-muted, #94a3b8);
+    fill: var(--theme-text-muted);
     font-size: 0.9rem;
   }
 
   .viz-axis-label {
-    fill: var(--brand-text, #e2e8f0);
+    fill: var(--theme-text-primary);
     font-size: 1.05rem;
     font-weight: 600;
   }
@@ -49,20 +49,20 @@
     cursor: pointer;
     /* stroke-opacity も transition 対象に: リアクションリング (色枠) のフェードを滑らかに */
     transition: r 120ms ease, stroke-width 120ms ease, stroke-opacity 120ms ease, opacity 200ms ease;
-    fill: #38bdf8;
-    stroke: rgba(255, 255, 255, 0.55);
+    fill: var(--theme-accent-cyan);
+    stroke: rgba(255, 255, 255, 0.55);  /* viz dot 境界線、 dark/light で半透明白を維持 */
     stroke-width: 1.3;
     opacity: 0.85;
   }
   .viz-dot:hover {
-    stroke: #fde047;
+    stroke: #fde047;  /* yellow-300 hover (brand feedback color) */
     stroke-width: 2.5;
     stroke-opacity: 1;   /* hover 時はリングをはっきり出して判別しやすく */
   }
   /* 揺らぎが大きい点（道徳指導案：意図的指名の素材） */
   .viz-dot.swing-high {
-    fill: #fde047;
-    stroke: #f59e0b;
+    fill: #fde047;  /* yellow-300 */
+    stroke: var(--status-warning);
     stroke-width: 2;
   }
   /* 教師注目マーク（HIGHLIGHT）: 金縁 + 微発光。
@@ -82,17 +82,17 @@
      swing-trace ブロックが描画する .ghost.swing（vizComputeSwings 上位 N 人だけ）。 */
   .viz-dot.ghost {
     opacity: 0.55;
-    stroke: #fde047;
+    stroke: #fde047;  /* yellow-300 */
     stroke-width: 1.2;
     stroke-dasharray: 2 2;
-    fill: #38bdf8;
+    fill: var(--theme-accent-cyan);
   }
   /* dot 中央のリアクション数バッジ (matrix / numberline 共通)。
      stroke 色 (緑/赤/紫) で「どのリアクションが多いか」、内部数字で「合計何件」を表現。 */
   .viz-dot-label {
     font-size: 10px;
     font-weight: 700;
-    fill: #0f172a;                 /* dot 上に重ねるので暗色。stroke 黄色背景にも見える */
+    fill: var(--theme-text-inverse);  /* dot 上に重ねるので背景と反転色 */
     paint-order: stroke fill;
     stroke: rgba(255, 255, 255, 0.9);
     stroke-width: 2.5;
@@ -116,9 +116,9 @@
   }
   @keyframes vizPopupFadeIn { from { opacity: 0; } to { opacity: 1; } }
   .viz-rows-popup-card {
-    background: #1e293b;
-    color: #f1f5f9;
-    border: 1px solid #334155;
+    background: var(--theme-bg-elevated);
+    color: var(--theme-text-primary);
+    border: 1px solid var(--theme-border-normal);
     border-radius: 10px;
     width: min(92vw, 640px);
     max-height: 85vh;
@@ -132,20 +132,20 @@
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    border-bottom: 1px solid #334155;
-    background: rgba(15, 23, 42, 0.4);
+    border-bottom: 1px solid var(--theme-border-normal);
+    background: var(--theme-overlay-black-20);
   }
   .viz-rows-popup-header h4 { margin: 0; font-size: 1rem; font-weight: 700; }
   .viz-rows-popup-close {
     background: transparent;
     border: 0;
-    color: #cbd5e1;
+    color: var(--theme-text-secondary);
     cursor: pointer;
     font-size: 1.6rem;
     line-height: 1;
     padding: 0 8px;
   }
-  .viz-rows-popup-close:hover { color: #fff; }
+  .viz-rows-popup-close:hover { color: var(--theme-text-primary); }
   .viz-rows-popup-body {
     overflow-y: auto;
     padding: 12px;
@@ -154,8 +154,8 @@
     gap: 8px;
   }
   .viz-rows-popup-row {
-    background: rgba(15, 23, 42, 0.6);
-    border: 1px solid #334155;
+    background: var(--theme-overlay-black-60);
+    border: 1px solid var(--theme-border-normal);
     border-radius: 6px;
     padding: 10px 12px;
     cursor: pointer;
@@ -163,7 +163,7 @@
   }
   .viz-rows-popup-row:hover,
   .viz-rows-popup-row:focus {
-    background: rgba(56, 189, 248, 0.08);
+    background: rgba(56, 189, 248, 0.08);  /* accent-cyan の薄め */
     border-color: rgba(56, 189, 248, 0.45);
     outline: none;
   }
@@ -173,8 +173,8 @@
     display: inline-block;
     margin-left: 0.5rem;
     font-size: 0.72rem;
-    color: #8be9fd;
-    background: rgba(56, 189, 248, 0.1);
+    color: var(--brand-accent-light);
+    background: rgba(56, 189, 248, 0.1);  /* accent-cyan の薄め */
     border: 1px solid rgba(56, 189, 248, 0.3);
     padding: 0.1rem 0.4rem;
     border-radius: 0.3rem;
@@ -183,7 +183,7 @@
   }
   .viz-rows-popup-name {
     font-size: 0.82rem;
-    color: #94a3b8;
+    color: var(--theme-text-muted);
     font-weight: 600;
     margin-bottom: 4px;
   }
@@ -249,7 +249,7 @@
   }
   .viz-quadrant-keyword-pill:hover,
   .viz-quadrant-keyword-pill:focus {
-    fill: #fde047;
+    fill: #fde047;  /* yellow-300 hover feedback */
     outline: none;
   }
   body.projector-mode .viz-quadrant-keyword {
@@ -263,9 +263,9 @@
   .viz-tooltip {
     position: fixed;
     z-index: 9999;
-    background: rgba(15, 23, 42, 0.95);
-    color: #f1f5f9;
-    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: var(--theme-bg-elevated);
+    color: var(--theme-text-primary);
+    border: 1px solid var(--theme-border-normal);
     border-radius: 0.5rem;
     padding: 0.6rem 0.8rem;
     max-width: 22rem;
@@ -283,12 +283,12 @@
   }
   .viz-tooltip .tooltip-meta {
     font-size: 0.75rem;
-    color: #94a3b8;
+    color: var(--theme-text-muted);
     margin-bottom: 0.25rem;
   }
   .viz-tooltip .tooltip-value {
     font-weight: 700;
-    color: #38bdf8;
+    color: var(--theme-accent-cyan);
     margin-right: 0.4rem;
   }
   /* 同座標カウント: forceCollide で散らばって見えるドット塊の本当の人数を伝える行。
@@ -296,9 +296,9 @@
   .viz-tooltip .tooltip-samecoord {
     margin-top: 0.5rem;
     padding-top: 0.4rem;
-    border-top: 1px solid rgba(148, 163, 184, 0.25);
+    border-top: 1px solid var(--theme-border-subtle);
     font-size: 0.72rem;
-    color: #94a3b8;
+    color: var(--theme-text-muted);
     font-style: italic;
   }
 
@@ -385,11 +385,11 @@
     align-items: center;
     gap: 0.8rem;
     font-size: 1.05rem;
-    color: var(--brand-text, #e2e8f0);
+    color: var(--theme-text-primary);
   }
   .modal-axis-label-min {
     text-align: right;
-    color: var(--brand-text-muted, #94a3b8);
+    color: var(--theme-text-muted);
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
@@ -397,7 +397,7 @@
   }
   .modal-axis-label-max {
     text-align: left;
-    color: var(--brand-text-muted, #94a3b8);
+    color: var(--theme-text-muted);
     font-weight: 500;
     white-space: nowrap;
     overflow: hidden;
@@ -418,14 +418,14 @@
     width: 1.4rem;
     height: 1.4rem;
     border-radius: 50%;
-    background: #fde047;
-    border: 2px solid #f59e0b;
+    background: #fde047;  /* yellow-300 (highlight dot) */
+    border: 2px solid var(--status-warning);
     box-shadow: 0 0 8px rgba(253, 224, 71, 0.65);
   }
   /* 行右端の値表示 (5/5)。全行で位置が固定なので視線で縦に値を比較できる。 */
   .modal-axis-value {
     font-variant-numeric: tabular-nums;
-    color: #fde047;
+    color: #fde047;  /* yellow-300 brand emphasis */
     font-weight: 700;
     font-size: 0.95rem;
     white-space: nowrap;
@@ -435,7 +435,7 @@
        highlight モーダル枠 (紫) と独立した色系にして視覚階層を保つため cyan 系に。
        (emoji 📍 自体の色は CSS color で確実に変えられないので、ここでは text 色だけ管理) */
     font-size: 1.15rem;
-    color: #8be9fd;
+    color: var(--brand-accent-light);
     font-weight: 600;
     text-align: center;
     padding: 0.4rem 0.6rem;
@@ -454,25 +454,25 @@
 
   /* M3 ワードランキング */
   .word-bar {
-    fill: #38bdf8;
+    fill: var(--theme-accent-cyan);
     transition: fill 0.2s ease;
   }
   .word-bar:hover {
-    fill: #fde047;
+    fill: #fde047;  /* yellow-300 hover */
   }
   .word-label {
-    fill: var(--brand-text, #e2e8f0);
+    fill: var(--theme-text-primary);
     font-size: 0.95rem;
     font-weight: 600;
   }
   .word-count {
-    fill: var(--brand-text-muted, #94a3b8);
+    fill: var(--theme-text-muted);
     font-size: 0.85rem;
   }
 
   /* M4 円グラフ */
   .pie-slice {
-    stroke: #0f172a;
+    stroke: var(--theme-bg-base);  /* slice 間の境界線 = 背景同色 */
     stroke-width: 2;
     cursor: pointer;
     transition: opacity 0.18s ease;
@@ -481,14 +481,14 @@
     opacity: 0.85;
   }
   .pie-label {
-    fill: #f1f5f9;
+    fill: var(--theme-text-primary);
     font-size: 0.95rem;
     font-weight: 600;
     pointer-events: none;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
   .pie-center {
-    fill: var(--brand-text, #e2e8f0);
+    fill: var(--theme-text-primary);
     font-size: 1.4rem;
     font-weight: 700;
   }
@@ -499,10 +499,10 @@
 
   /* 分布ヒストグラム (M1 補助) */
   .viz-histogram rect {
-    fill: rgba(56, 189, 248, 0.4);
+    fill: rgba(56, 189, 248, 0.4);  /* accent-cyan 半透明 */
   }
   .viz-histogram text {
-    fill: var(--brand-text-muted, #94a3b8);
+    fill: var(--theme-text-muted);
     font-size: 0.75rem;
     text-anchor: middle;
   }
@@ -524,7 +524,7 @@
     flex-wrap: wrap;
   }
   .viz-toolbar-section-label {
-    color: var(--brand-text-muted, #94a3b8);
+    color: var(--theme-text-muted);
     font-size: 0.78rem;
     font-weight: 600;
     letter-spacing: 0.04em;
@@ -546,7 +546,7 @@
     border-radius: 0.4rem;
     border: 1px solid rgba(148, 163, 184, 0.3);
     background: rgba(30, 41, 59, 0.7);
-    color: var(--brand-text, #e2e8f0);
+    color: var(--theme-text-primary);
     font-size: 0.88rem;
     cursor: pointer;
   }
@@ -567,7 +567,7 @@
     border-radius: 0.35rem;
     border: 1px solid transparent;
     background: transparent;
-    color: var(--brand-text-muted, #94a3b8);
+    color: var(--theme-text-muted);
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 500;
@@ -576,13 +576,13 @@
   }
   .viz-profile-pill:hover {
     background: rgba(56, 189, 248, 0.12);
-    color: var(--brand-text, #e2e8f0);
+    color: var(--theme-text-primary);
   }
   .viz-profile-pill.current.viewing,
   .viz-profile-pill.viewing {
     background: rgba(56, 189, 248, 0.35);
-    border-color: #38bdf8;
-    color: #fff;
+    border-color: var(--theme-accent-cyan);
+    color: #fff;  /* 強調 cyan 上の白テキスト (theme 非依存) */
     box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.6) inset;
   }
   /* Option B 状態スタイル
@@ -593,15 +593,15 @@
   .viz-profile-pill.current:not(.viewing) {
     background: rgba(56, 189, 248, 0.2);
     border-color: rgba(56, 189, 248, 0.7);
-    color: #f1f5f9;
+    color: var(--theme-text-primary);
   }
   .viz-profile-pill.past {
-    color: var(--brand-text-muted, #94a3b8);
+    color: var(--theme-text-muted);
     opacity: 0.85;
   }
   .viz-profile-pill.past:hover { opacity: 1; }
-  .viz-profile-pill__check { color: #10b981; font-size: 0.78em; margin-right: 0.1rem; }
-  .viz-profile-pill__dot { color: #38bdf8; font-size: 0.62em; vertical-align: middle; }
+  .viz-profile-pill__check { color: var(--brand-curious); font-size: 0.78em; margin-right: 0.1rem; }
+  .viz-profile-pill__dot { color: var(--theme-accent-cyan); font-size: 0.62em; vertical-align: middle; }
 
   /* 「現在に戻る」CTA — 過去フェーズ閲覧中のみ pill 行末尾に表示 */
   .viz-profile-return {
@@ -610,7 +610,7 @@
     border-radius: 0.35rem;
     border: 1px solid rgba(251, 191, 36, 0.6);
     background: rgba(251, 191, 36, 0.18);
-    color: #fbbf24;
+    color: var(--brand-understand);  /* amber 強調 */
     cursor: pointer;
     font-size: 0.85rem;
     font-weight: 600;
@@ -660,7 +660,7 @@
     border-radius: 0.4rem;
     border: 1px solid rgba(148, 163, 184, 0.3);
     background: rgba(30, 41, 59, 0.6);
-    color: var(--brand-text, #e2e8f0);
+    color: var(--theme-text-primary);
     cursor: pointer;
     font-size: 0.82rem;
     white-space: nowrap;
@@ -672,16 +672,16 @@
   }
   .viz-btn.active {
     background: rgba(56, 189, 248, 0.3);
-    border-color: #38bdf8;
-    color: #fff;
+    border-color: var(--theme-accent-cyan);
+    color: #fff;  /* active cyan 上の白 (theme 非依存) */
   }
   .viz-btn.has-before::before {
     content: '✓ ';
-    color: #4ade80;
+    color: #4ade80;  /* green-400 確認マーク */
   }
   .viz-btn.saved {
     background: rgba(74, 222, 128, 0.3);
-    border-color: #4ade80;
+    border-color: #4ade80;  /* green-400 (brand identity for saved state) */
   }
   .viz-btn-small { padding: 0.25rem 0.5rem; font-size: 0.78rem; }
   /* Timeline は toolbar の主役なので、横を広く取って軌跡を読み取りやすく。 */
@@ -693,7 +693,7 @@
     min-width: 360px;
   }
   .viz-timeline-label {
-    color: var(--brand-text-muted, #94a3b8);
+    color: var(--theme-text-muted);
     font-size: 0.82rem;
     white-space: nowrap;
   }
@@ -727,7 +727,7 @@
   }
   .viz-compare-pane h4 {
     margin: 0 0 0.5rem;
-    color: var(--brand-text-muted, #94a3b8);
+    color: var(--theme-text-muted);
     font-size: 0.9rem;
     font-weight: 600;
   }
@@ -758,7 +758,7 @@
     margin: 0 0 0.35rem;
     font-size: 0.78rem;
     font-weight: 600;
-    color: var(--brand-text-muted, #94a3b8);
+    color: var(--theme-text-muted);
     letter-spacing: 0.02em;
   }
   .qs-keywords {

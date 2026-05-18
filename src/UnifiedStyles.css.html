@@ -36,6 +36,12 @@
   :root {
     /* =============================================================================
      * Brand & Core Colors - Primary Design System
+     *
+     * Theme architecture (v2800+):
+     *   - `--brand-*` はブランドアイデンティティ (theme で書き換えない不変色)。
+     *   - `--theme-*` (下記) が semantic token で、 ライト/ダーク切替時に書き換える対象。
+     *   - 新規 CSS は `--theme-*` を使うこと。 ハードコード hex / rgba は禁止。
+     *   - `--brand-background` 等の旧 alias は段階的に `--theme-bg-base` 等に migrate 中。
      * ============================================================================= */
     --brand-primary: #3b82f6;
     --brand-primary-secondary: #1d4ed8;
@@ -45,6 +51,51 @@
     --brand-surface: rgba(26, 27, 38, 0.7);
     --brand-text: #c0caf5;
     --brand-border: rgba(255, 255, 255, 0.1);
+
+    /* =============================================================================
+     * Semantic Theme Tokens (DARK = default, theme で書き換える対象)
+     *
+     * 命名規約:
+     *   --theme-bg-*       背景色 (base, surface, elevated, overlay)
+     *   --theme-text-*     テキスト色 (primary, secondary, muted, inverse)
+     *   --theme-border-*   境界線色 (subtle, normal, strong)
+     *   --theme-overlay-*  半透明オーバーレイ (white-XX, black-XX, surface-glass)
+     *   --theme-spinner    スピナー色 (loading インジケーター)
+     *
+     * 注意: brand identity ( --brand-primary 等) は不変。 status / reaction も不変。
+     *   テーマ切替で書き換わるのは「文脈依存の色」 (背景・テキスト・境界線・装飾) のみ。
+     * ============================================================================= */
+    /* 背景レイヤー (奥 → 手前) */
+    --theme-bg-base: #1a1b26;                          /* body 直接背景 */
+    --theme-bg-surface: rgba(26, 27, 38, 0.7);         /* glass-panel, card 等 */
+    --theme-bg-elevated: rgba(26, 27, 38, 0.95);       /* modal, dropdown 等 */
+    --theme-bg-overlay: rgba(0, 0, 0, 0.8);            /* modal backdrop */
+
+    /* テキスト階層 */
+    --theme-text-primary: #c0caf5;                     /* 通常本文 */
+    --theme-text-secondary: #cbd5e1;                   /* やや弱 */
+    --theme-text-muted: #94a3b8;                       /* キャプション・補助 */
+    --theme-text-inverse: #1a1b26;                     /* light area 上の暗色テキスト */
+
+    /* 境界線 */
+    --theme-border-subtle: rgba(255, 255, 255, 0.1);   /* 既存 --brand-border と同値 */
+    --theme-border-normal: rgba(255, 255, 255, 0.2);   /* glass-panel:hover 等で多用 */
+    --theme-border-strong: rgba(255, 255, 255, 0.3);   /* spinner border, high-contrast */
+
+    /* 半透明オーバーレイ (dark 前提の rgba(255,255,255,*) / rgba(0,0,0,*) を集約) */
+    --theme-overlay-white-10: rgba(255, 255, 255, 0.1);   /* shimmer 等 */
+    --theme-overlay-white-20: rgba(255, 255, 255, 0.2);   /* hover 境界線 */
+    --theme-overlay-white-30: rgba(255, 255, 255, 0.3);   /* spinner border */
+    --theme-overlay-black-20: rgba(0, 0, 0, 0.2);         /* card shadow base */
+    --theme-overlay-black-60: rgba(0, 0, 0, 0.6);         /* heavy shadow */
+    --theme-overlay-black-90: rgba(0, 0, 0, 0.9);         /* modal backdrop strong */
+    --theme-overlay-surface-glass: rgba(16, 17, 28, 0.95); /* loading-content 不透明背景 */
+
+    /* viz / インジケーター */
+    --theme-spinner: #67e8f9;                          /* bright cyan, loading spinner */
+    --theme-accent-cyan: #38bdf8;                      /* notification banner / viz-profile-pill 境界線 */
+    --theme-accent-cyan-soft: rgba(56, 189, 248, 0.18); /* banner 背景の薄い cyan */
+    --theme-overlay-white-05: rgba(255, 255, 255, 0.05); /* input 背景の極薄 */
 
     /* =============================================================================
      * Status Colors - System Feedback
@@ -186,12 +237,58 @@
     --backdrop-blur: 12px;
   }
 
+  /* =============================================================================
+   * Light Theme Override (v2800+) - 適用方法:
+   *   1. body に `theme-light` クラス付与 (themeManager.set('light'))
+   *   2. または html に [data-theme="light"] 属性
+   *   3. または (将来) `@media (prefers-color-scheme: light)` 自動適用
+   *
+   * Why class-based (not media-query default): 教師がプロジェクター投影時など
+   *   明示的に切替えたい運用がある。 OS 設定追従は opt-in (themeManager の auto モード)。
+   *
+   * Light theme の値は **placeholder**。 実際の light mode 実装時に色を調整する。
+   * ============================================================================= */
+  body.theme-light,
+  :root[data-theme="light"] {
+    /* 背景レイヤー */
+    --theme-bg-base: #f8fafc;                          /* slate-50 (placeholder) */
+    --theme-bg-surface: rgba(255, 255, 255, 0.85);     /* white surface */
+    --theme-bg-elevated: rgba(255, 255, 255, 0.95);
+    --theme-bg-overlay: rgba(15, 23, 42, 0.4);
+
+    /* テキスト階層 */
+    --theme-text-primary: #1e293b;                     /* slate-800 */
+    --theme-text-secondary: #475569;                   /* slate-600 */
+    --theme-text-muted: #64748b;                       /* slate-500 */
+    --theme-text-inverse: #f8fafc;
+
+    /* 境界線 */
+    --theme-border-subtle: rgba(15, 23, 42, 0.1);
+    --theme-border-normal: rgba(15, 23, 42, 0.2);
+    --theme-border-strong: rgba(15, 23, 42, 0.3);
+
+    /* 半透明オーバーレイ (light 用に black-overlay は反転) */
+    --theme-overlay-white-05: rgba(15, 23, 42, 0.04);
+    --theme-overlay-white-10: rgba(15, 23, 42, 0.06);
+    --theme-overlay-white-20: rgba(15, 23, 42, 0.1);
+    --theme-overlay-white-30: rgba(15, 23, 42, 0.15);
+    --theme-overlay-black-20: rgba(15, 23, 42, 0.1);
+    --theme-overlay-black-60: rgba(15, 23, 42, 0.25);
+    --theme-overlay-black-90: rgba(15, 23, 42, 0.5);
+    --theme-overlay-surface-glass: rgba(255, 255, 255, 0.95);
+
+    /* インジケーター / アクセント (light の cyan はやや濃く) */
+    --theme-spinner: #0284c7;                          /* sky-600 */
+    --theme-accent-cyan: #0284c7;
+    --theme-accent-cyan-soft: rgba(56, 189, 248, 0.12);
+  }
+
   /* Base Styles - Unified body element */
   body {
     margin: 0;
     padding: 0;
-    color: var(--brand-text);
-    background: var(--brand-background);
+    color: var(--theme-text-primary);
+    background: var(--theme-bg-base);
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', 'Inter', sans-serif;
     min-height: 100vh;
     display: flex;
@@ -202,7 +299,7 @@
 
   /* Glass Panel Effects */
   .glass-panel {
-    background: var(--brand-surface);
+    background: var(--theme-bg-surface);
     -webkit-backdrop-filter: var(--glass-backdrop);
     backdrop-filter: var(--glass-backdrop);
     border: var(--border-primary);
@@ -211,7 +308,7 @@
   }
 
   .glass-panel:hover {
-    border-color: rgba(255, 255, 255, 0.2);
+    border-color: var(--theme-border-normal);
     will-change: border-color;
   }
 
@@ -254,7 +351,7 @@
     width: 0;
     height: 0;
     border-radius: 50%;
-    background: rgba(255, 255, 255, var(--alpha-medium));
+    background: var(--theme-overlay-white-30);  /* btn:active ripple */
     transition: all var(--animation-normal) var(--transition-easing);
     transform: translate(-50%, -50%);
     z-index: 0;
@@ -295,9 +392,9 @@
   }
 
   .btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: var(--brand-text);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: var(--theme-overlay-white-10);
+    color: var(--theme-text-primary);
+    border: 1px solid var(--theme-border-normal);
   }
 
   .btn-danger {
@@ -309,7 +406,7 @@
     background: var(--google-blue);
     color: white;
     font-weight: 700;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid var(--theme-border-normal);
   }
 
   .btn-success {
@@ -341,19 +438,19 @@
     font-weight: 700;
     text-transform: uppercase;
     letter-spacing: 0.05em;
-    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 0 var(--theme-overlay-black-20);
     transition: all 0.1s ease;
     border: 2px solid transparent;
   }
 
   .game-btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 5px 0 rgba(0, 0, 0, 0.2);
+    box-shadow: 0 5px 0 var(--theme-overlay-black-20);
   }
 
   .game-btn:active {
     transform: translateY(2px);
-    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 0 var(--theme-overlay-black-20);
   }
 
   /* CTA Button with Shimmer Effect */
@@ -391,7 +488,7 @@
   .answer-card:hover {
     transform: var(--card-hover-transform);
     box-shadow: var(--shadow-lg);
-    border-color: rgba(255, 255, 255, 0.2);
+    border-color: var(--theme-border-normal);
     will-change: transform;
   }
 
@@ -434,7 +531,7 @@
   .feature-card:hover {
     transform: translateY(-4px);
     box-shadow: var(--shadow-lg);
-    border-color: rgba(255, 255, 255, 0.2);
+    border-color: var(--theme-border-normal);
     will-change: transform;
   }
 
@@ -446,9 +543,9 @@
   .skeleton {
     background: linear-gradient(
       90deg,
-      rgba(255, 255, 255, 0.1) 25%,
-      rgba(255, 255, 255, 0.2) 50%,
-      rgba(255, 255, 255, 0.1) 75%
+      var(--theme-overlay-white-10) 25%,
+      var(--theme-overlay-white-20) 50%,
+      var(--theme-overlay-white-10) 75%
     );
     background-size: 200% 100%;
     animation: skeleton-loading 1.5s infinite;
@@ -506,20 +603,19 @@
 
   /* Content container for all loading elements */
   .loading-content {
-    color: #ffffff; /* white for better readability */
+    color: var(--theme-text-primary);
     text-align: center;
     padding: 2rem;
     max-width: 400px;
-    background: rgba(16, 17, 28, 0.95); /* Much darker and more opaque background */
+    background: var(--theme-overlay-surface-glass);
     border-radius: 1rem;
-    border: 1px solid rgba(139, 233, 253, 0.2);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
+    border: 1px solid rgba(139, 233, 253, 0.2);  /* brand-accent-light の薄め (loading 専用) */
+    box-shadow: 0 12px 40px var(--theme-overlay-black-60);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 1rem;
-    /* Add backdrop filter to prevent glass-panel bleed-through */
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
   }
@@ -548,8 +644,8 @@
   .global-spinner {
     width: 60px;
     height: 60px;
-    border: 6px solid rgba(255, 255, 255, 0.3);
-    border-top: 6px solid #67e8f9; /* bright cyan */
+    border: 6px solid var(--theme-border-strong);
+    border-top: 6px solid var(--theme-spinner);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     margin-bottom: 1.5rem;
@@ -563,7 +659,7 @@
   }
   /* Variant: Modal, for critical blocking actions */
   .loading-overlay.modal {
-    background-color: rgba(0, 0, 0, 0.9);
+    background-color: var(--theme-overlay-black-90);
     z-index: var(--z-notification);
   }
 
@@ -571,8 +667,8 @@
   .spinner {
     width: 24px;
     height: 24px;
-    border: 3px solid rgba(255, 255, 255, 0.3);
-    border-top: 3px solid #67e8f9; /* bright cyan */
+    border: 3px solid var(--theme-border-strong);
+    border-top: 3px solid var(--theme-spinner);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
@@ -580,8 +676,8 @@
   .spinner-small {
     width: 16px;
     height: 16px;
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-top: 2px solid #67e8f9; /* bright cyan */
+    border: 2px solid var(--theme-border-strong);
+    border-top: 2px solid var(--theme-spinner);
     border-radius: 50%;
     animation: spin 1s linear infinite;
   }
@@ -589,8 +685,8 @@
   .loading-spinner {
     width: 32px;
     height: 32px;
-    border: 4px solid rgba(139, 233, 253, 0.3);
-    border-top: 4px solid #67e8f9; /* bright cyan */
+    border: 4px solid rgba(139, 233, 253, 0.3);  /* spinner-accent: brand-accent-light alpha */
+    border-top: 4px solid var(--theme-spinner);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     flex-shrink: 0;
@@ -599,8 +695,8 @@
   .spinner-xs {
     width: 20px;
     height: 20px;
-    border: 2px solid rgba(139, 233, 253, 0.3);
-    border-top: 2px solid #67e8f9; /* bright cyan */
+    border: 2px solid rgba(139, 233, 253, 0.3);  /* spinner-accent: brand-accent-light alpha */
+    border-top: 2px solid var(--theme-spinner);
     border-radius: 50%;
     animation: spin 1s linear infinite;
     display: inline-block;
@@ -617,7 +713,7 @@
     bottom: 100%;
     left: 50%;
     transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.9);
+    background: var(--theme-overlay-black-90);
     color: white;
     padding: 6px 10px;
     border-radius: 6px;
@@ -770,10 +866,10 @@
     transform: translateX(-50%) translateY(-20px);
     z-index: var(--z-notification);
     padding: 0.75rem 1.25rem;
-    background: rgba(56, 189, 248, 0.18);
-    border: 1px solid #38bdf8;
+    background: var(--theme-accent-cyan-soft);
+    border: 1px solid var(--theme-accent-cyan);
     border-radius: 0.6rem;
-    color: #f1f5f9;
+    color: var(--theme-text-primary);
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
     backdrop-filter: blur(8px);
     -webkit-backdrop-filter: blur(8px);
@@ -785,8 +881,8 @@
     font-size: 1rem;
     line-height: 1.4;
   }
-  .board-switched-toast strong { color: #38bdf8; }
-  .board-switched-toast span { color: #cbd5e1; font-size: 0.92rem; }
+  .board-switched-toast strong { color: var(--theme-accent-cyan); }
+  .board-switched-toast span { color: var(--theme-text-secondary); font-size: 0.92rem; }
   .board-switched-toast.visible {
     opacity: 1;
     transform: translateX(-50%) translateY(0);
@@ -1057,10 +1153,10 @@
   .modern-input {
     width: 100%;
     padding: 0.875rem 1rem;
-    background: rgba(255, 255, 255, 0.05);
+    background: var(--theme-overlay-white-05);
     border: var(--border-primary);
     border-radius: 0.75rem;
-    color: var(--brand-text);
+    color: var(--theme-text-primary);
     transition: all var(--transition-normal) var(--transition-easing);
     font-size: 16px;
     min-height: 44px;
@@ -1069,16 +1165,16 @@
   .modern-input:focus {
     outline: none;
     border-color: var(--brand-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);  /* primary halo (brand identity) */
+    background: var(--theme-overlay-white-10);
   }
 
   .modern-input:hover {
-    border-color: rgba(255, 255, 255, 0.3);
+    border-color: var(--theme-border-strong);
   }
 
   .modern-input::placeholder {
-    color: rgba(192, 202, 245, 0.5);
+    color: var(--theme-text-muted);
   }
 
   /* Toggle Switches */
@@ -2124,7 +2220,7 @@
   #lesson-review-banner .lesson-review-readonly {
     margin-left: auto;
     font-size: 0.75rem;
-    background: rgba(255,255,255,0.2);
+    background: var(--theme-overlay-white-20);
     padding: 0.15rem 0.6rem; border-radius: 9999px;
   }
 

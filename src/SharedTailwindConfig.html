@@ -10,6 +10,44 @@
         mode: 'jit',
         corePlugins: { preflight: false },
         devtools: !isProduction,
+        // v2800+ ライトモード移行準備:
+        //   darkMode: 'class' で body の .theme-dark / .theme-light クラスに応答。
+        //   既存コードは body.theme-light が存在しないので dark-class 想定の dark:bg-* 等は無効。
+        //   light モード本格実装時に body class を切替えて適用していく。
+        darkMode: 'class',
+        theme: {
+          extend: {
+            // CSS 変数経由のテーマ色を Tailwind utility class として公開。
+            // 使い方: `class="bg-theme-base text-theme-primary border-theme-subtle"` 等。
+            //   `:root` の `--theme-*` を書き換えれば全 utility が追従する。
+            colors: {
+              'theme-base': 'var(--theme-bg-base)',
+              'theme-surface': 'var(--theme-bg-surface)',
+              'theme-elevated': 'var(--theme-bg-elevated)',
+              'theme-overlay': 'var(--theme-bg-overlay)',
+              'theme-text': 'var(--theme-text-primary)',
+              'theme-text-secondary': 'var(--theme-text-secondary)',
+              'theme-text-muted': 'var(--theme-text-muted)',
+              'theme-text-inverse': 'var(--theme-text-inverse)',
+              'theme-border': 'var(--theme-border-subtle)',
+              'theme-border-normal': 'var(--theme-border-normal)',
+              'theme-border-strong': 'var(--theme-border-strong)',
+              'theme-spinner': 'var(--theme-spinner)',
+              'theme-accent-cyan': 'var(--theme-accent-cyan)',
+              // brand identity (theme 不変)
+              'brand-primary': 'var(--brand-primary)',
+              'brand-accent': 'var(--brand-accent)',
+              'brand-like': 'var(--brand-like)',
+              'brand-understand': 'var(--brand-understand)',
+              'brand-curious': 'var(--brand-curious)',
+              'brand-highlight': 'var(--brand-highlight)',
+              'status-success': 'var(--status-success)',
+              'status-error': 'var(--status-error)',
+              'status-warning': 'var(--status-warning)',
+              'status-info': 'var(--status-info)',
+            }
+          }
+        },
         ...(isProduction && {
           important: true,
           purge: { enabled: true },

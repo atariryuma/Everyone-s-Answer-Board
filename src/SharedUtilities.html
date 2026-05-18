@@ -829,6 +829,106 @@
   };
 
   /**
+   * window.themeManager — テーマ (dark/light/auto) の取得・設定・永続化。
+   *
+   * v2800+ ライトモード移行準備。 現在は dark がデフォルト + light placeholder のみ。
+   * 実際の light mode 採用は別フェーズで CSS の light placeholder を本番値に書き換えてから。
+   *
+   * 設計:
+   *   - 値は localStorage('app-theme') に保存 ('dark' | 'light' | 'auto')。
+   *   - 'auto' = OS の prefers-color-scheme に追従。
+   *   - 適用は body に 'theme-dark' / 'theme-light' クラスを付与。
+   *   - 初期化は init() を SharedUtilities ロード時に自動呼出 (FOUC 防止のため早期実行)。
+   *
+   * 使い方:
+   *   themeManager.get()          // 'dark' | 'light' | 'auto'
+   *   themeManager.resolved()     // 'dark' | 'light' (auto なら OS 反映)
+   *   themeManager.set('light')   // 切替 + 永続化
+   *   themeManager.toggle()       // dark ↔ light トグル
+   *   themeManager.subscribe(fn)  // 切替時コールバック
+   */
+  (function setupThemeManager() {
+    const STORAGE_KEY = 'app-theme';
+    const VALID = ['dark', 'light', 'auto'];
+    const subscribers = new Set();
+    let mqlListener = null;
+
+    function readStorage() {
+      try {
+        const v = localStorage.getItem(STORAGE_KEY);
+        return VALID.includes(v) ? v : 'dark';  // default dark (= 既存動作維持)
+      } catch (_) {
+        return 'dark';
+      }
+    }
+
+    function writeStorage(value) {
+      try { localStorage.setItem(STORAGE_KEY, value); } catch (_) {}
+    }
+
+    function osPrefersDark() {
+      try {
+        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      } catch (_) { return true; }
+    }
+
+    function resolve(value) {
+      if (value === 'auto') return osPrefersDark() ? 'dark' : 'light';
+      return value;
+    }
+
+    function apply(value) {
+      const resolved = resolve(value);
+      if (!document.body) return resolved;
+      document.body.classList.remove('theme-dark', 'theme-light');
+      document.body.classList.add('theme-' + resolved);
+      try { document.documentElement.setAttribute('data-theme', resolved); } catch (_) {}
+      subscribers.forEach((fn) => { try { fn(resolved, value); } catch (_) {} });
+      return resolved;
+    }
+
+    function attachAutoListener() {
+      if (mqlListener) return;
+      try {
+        const mql = window.matchMedia('(prefers-color-scheme: dark)');
+        mqlListener = () => { if (readStorage() === 'auto') apply('auto'); };
+        if (mql.addEventListener) mql.addEventListener('change', mqlListener);
+        else if (mql.addListener) mql.addListener(mqlListener);
+      } catch (_) { /* ignore */ }
+    }
+
+    window.themeManager = {
+      get() { return readStorage(); },
+      resolved() { return resolve(readStorage()); },
+      set(value) {
+        if (!VALID.includes(value)) value = 'dark';
+        writeStorage(value);
+        return apply(value);
+      },
+      toggle() {
+        const cur = resolve(readStorage());
+        return this.set(cur === 'dark' ? 'light' : 'dark');
+      },
+      subscribe(fn) {
+        if (typeof fn === 'function') subscribers.add(fn);
+        return () => subscribers.delete(fn);
+      },
+      init() {
+        // body が無いタイミング (head 読込中) も想定して onDOMReady 経由でも呼ばれる
+        apply(readStorage());
+        attachAutoListener();
+      }
+    };
+
+    // 早期初期化: body が既にあれば即適用 (FOUC 防止)。 無ければ DOMReady で。
+    if (document.body) {
+      window.themeManager.init();
+    } else {
+      window.onDOMReady(() => window.themeManager.init());
+    }
+  })();
+
+  /**
    * google.script.run の Promise wrapper。
    *
    * 旧: 10 HTML ファイル / ~194 call sites で withSuccessHandler/withFailureHandler を手書きしていた。
