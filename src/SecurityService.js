@@ -1,11 +1,11 @@
 /**
- * @fileoverview SecurityService - 統一セキュリティサービス
+ * @fileoverview SecurityService - ドメイン制限 (組織内ドメインのみアクセス可) の判定。
+ *   - extractDomainSafely / isSystemSetupComplete / shouldEnforceDomainRestrictions
+ *   - validateDomainAccess (admin ドメインと一致するかチェック)
+ *   - getDeployUserDomainInfo (LoginPage の domain badge 用)
  *
- * 責任範囲:
- * - 認証・認可管理
- * - 入力検証・サニタイズ
- * - セキュリティ監査・ログ
- * - Service Account管理
+ * 入力検証は validators.js、 認可は main.js requireAdmin / DatabaseCore.js access control、
+ * SA pool 管理は DatabaseCore.js に分離されている (混同しないこと)。
  */
 
 /* global getCurrentEmail, getCachedProperty, hasCoreSystemProps, logError_ */

@@ -1,4 +1,21 @@
 <script>
+  /* =====================================================================
+   * page.js — 生徒・教師向け回答ボードのメインクラス (StudyQuestApp)
+   *
+   * 責任範囲:
+   *   - ボードデータ取得・描画 (mode=view / review)
+   *   - リアクション・ハイライト UI (debounce + optimistic update)
+   *   - クラスフィルタ / ソート / カードサイズスライダー
+   *   - ポーリング (新着検知) + 増分マージ
+   *   - 公開終了ボタン (owner のみ)
+   *   - mode 切替 (board / numberline / matrix / pie / wordcloud / auto)
+   *
+   * gasRun (line ~921): cache + retry + withUserObject + null guard を組み込んだ
+   *   コア API wrapper。 runServer より高機能なので、 page.js 内では gasRun を使う。
+   *   ボード関連以外の単発 API 呼び出し (deleteAnswerRow 等) は runServer を直接使う。
+   *
+   * 可視化モードの実装は別ファイル: page.viz.js.html (prototype 拡張)。
+   * ===================================================================== */
 
   class StudyQuestApp {
     static get CONSTANTS() {

@@ -1,4 +1,22 @@
 <script>
+  /* =====================================================================
+   * AdminPanel.js — 教師向け管理パネル (mode=admin)
+   *
+   * 責任範囲:
+   *   - Form 連携 (一覧選択 / URL 入力 / テンプレート Form 自動生成)
+   *   - 列マッピング (自動推定 inferColumnRoles + 手動調整)
+   *   - 公開 / 非公開 / 再公開 (etag 楽観ロック)
+   *   - プロファイル CRUD (切替 / 保存 / 削除 / リネーム / 自動保存)
+   *   - ボード設定 (boardMode / 軸ラベル / 象限ラベル / showNames / showReactions)
+   *   - レッスン機能 (wizard / 開始 / 進行 / 終了 / 振り返り)
+   *
+   * gasRun (helper): dispatchAdminOperation を runServer 経由で呼ぶ wrapper。
+   *   admin API 全 50+ operation はこの 1 経路に集約。
+   * runProfileOp: profile CRUD の共通 UX (busy / status / etag retry) を集約。
+   *
+   * 通信は全て runServer (CLAUDE.md canonical API)。 native confirm/alert は使わず
+   * modals.confirm / modals.alert を使う。 通知は notifications.X 経由のみ。
+   * ===================================================================== */
   let __USER_ID__ = '';
 
   try {

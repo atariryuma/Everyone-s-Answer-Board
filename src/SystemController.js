@@ -1,5 +1,14 @@
 /**
- * @fileoverview SystemController - System management and setup functions
+ * @fileoverview SystemController - システム管理・診断・公開ライフサイクル。
+ *   - URL システム: forceUrlSystemReset, getWebAppUrl (6h cache + saved fallback)
+ *   - 診断・監視: testSystemDiagnosis, monitorSystem, checkDataIntegrity, performAutoRepair
+ *   - パフォーマンス: getPerformanceMetrics, diagnosePerformance, collectXxxMetrics
+ *   - 公開: publishApp (allowlist + etag 楽観ロック + lesson active marker)
+ *   - フォーム連携: validateAccess, getFormInfo, detectFormConnection, searchFormsByDrive
+ *   - 初期セットアップ: setupApp, testDatabaseConnection
+ *
+ * 公開状態の書き換えはここの publishApp と AdminApis.js の 3 関数 (republishMyBoard /
+ * unpublishBoard / toggleUserBoardStatus) のみ。 __applyPublishStateChange に集約。
  */
 
 /* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, installLessonTriggers, logError_ */

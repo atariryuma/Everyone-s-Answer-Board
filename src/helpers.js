@@ -236,23 +236,14 @@ function safeJsonParse_(text, fallback) {
 }
 
 /**
- * 認証チェック: メール取得 + 管理者判定を一括実行
- * @returns {{email: string, isAdmin: boolean}|null} 認証情報、未認証時はnull
- */
-function requireAuth() {
-  const email = getCurrentEmail();
-  if (!email) return null;
-  return { email, isAdmin: isAdministrator(email) };
-}
-
-/**
- * 管理者チェック: 未認証またはadminでなければnull
- * @returns {{email: string}|null} 管理者メール、権限不足時はnull
+ * 管理者チェック: 未認証または admin でなければ null。
+ * @returns {{email: string, isAdmin: boolean}|null}
  */
 function requireAdmin() {
-  const auth = requireAuth();
-  if (!auth || !auth.isAdmin) return null;
-  return auth;
+  const email = getCurrentEmail();
+  if (!email) return null;
+  if (!isAdministrator(email)) return null;
+  return { email, isAdmin: true };
 }
 
 /**

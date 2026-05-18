@@ -1,4 +1,17 @@
 <script>
+  /* =====================================================================
+   * login.js — ログイン画面 (mode=login)
+   *
+   * 責任範囲:
+   *   - Session 認証 (Google アカウント検出 + 表示)
+   *   - 管理パネル遷移 (processLoginAction → adminUrl 生成)
+   *   - ドメインバッジ表示 (組織ドメイン一致を視覚化)
+   *   - アカウント切替 (AccountChooser 経由)
+   *   - 成功画面レンダリング失敗時の last-resort fallback (native confirm)
+   *
+   * 全 GAS 呼び出しは runServer 経由。 唯一の例外: 成功画面が失敗した直後の
+   * confirm() (modal system 自体も信頼できない最終 fallback)。
+   * ===================================================================== */
 
   function setLoginButtonState(disabled, text = 'はじめる') {
     const loginBtn = document.getElementById('login-btn');
