@@ -137,8 +137,7 @@ function doGet(e) {
     const handler = DO_GET_HANDLERS[mode] || handleMainMode_;
     return handler(params, currentEmail);
   } catch (error) {
-    console.error('doGet error:', {
-      message: error.message,
+    logError_('doGet', error, {
       stack: error.stack,
       mode: e.parameter?.mode,
       userId: e.parameter?.userId && typeof e.parameter.userId === 'string' ? `${e.parameter.userId.substring(0, 8)}***` : 'N/A'
@@ -397,7 +396,7 @@ function createRedirectTemplate(redirectPage, error) {
     const title = redirectPage === 'ErrorBoundary.html' ? 'エラー' : '回答ボード';
     return template.evaluate().setTitle(title);
   } catch (templateError) {
-    console.error('createRedirectTemplate error:', templateError.message);
+    logError_('createRedirectTemplate', templateError);
     const fallbackTemplate = HtmlService.createTemplateFromFile('ErrorBoundary.html');
     fallbackTemplate.title = 'システムエラー';
     fallbackTemplate.message = 'ページの表示中にエラーが発生しました。';
@@ -433,7 +432,7 @@ function doPostHandleGetData(request, email, action) {
     }
     return { success: true, data: getUserSheetData(user.userId, request.options || {}) };
   } catch (error) {
-    console.error(`${action} error:`, error.message);
+    logError_(action, error);
     return createExceptionResponse(error);
   }
 }
@@ -567,8 +566,7 @@ function doPost(e) {
     try {
       request = JSON.parse(postData);
     } catch (parseError) {
-      console.error('doPost: Invalid JSON received:', {
-        error: parseError.message,
+      logError_('doPost.JSON.parse', parseError, {
         dataLength: postData ? postData.length : 0,
         dataPreview: postData ? postData.substring(0, 100) : 'N/A'
       });
@@ -641,8 +639,7 @@ function doPost(e) {
     // Why: stack trace を保持して Cloud Logging に出すことで、CLI からエラー発生箇所を
     //   即座に特定できる。クライアントへの応答メッセージは generic に保つ（情報漏洩防止）。
     const errorMessage = error && error.message ? error.message : '予期しないエラーが発生しました';
-    console.error('doPost error:', {
-      message: errorMessage,
+    logError_('doPost', error, {
       stack: error && error.stack ? error.stack.substring(0, 1000) : undefined,
       timestamp: new Date().toISOString()
     });
@@ -859,7 +856,7 @@ function isAdministrator(email) {
 
     return email.toLowerCase() === adminEmail.toLowerCase();
   } catch (error) {
-    console.error('[ERROR] main.isAdministrator:', error.message);
+    logError_('main.isAdministrator', error);
     return false;
   }
 }
@@ -1066,8 +1063,7 @@ function executeWithRetry(operation, options = {}) {
     }
   }
 
-  const finalError = lastError && lastError.message ? lastError.message : 'Unknown error';
-  console.error(`${operationName}: Failed after ${retryCount} attempts: ${finalError}`);
+  logError_(operationName, lastError || new Error('Unknown error'), { retryCount });
   throw lastError || new Error(`${operationName} failed after ${retryCount} attempts`);
 }
 

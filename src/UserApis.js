@@ -3,7 +3,7 @@
  *   管理など）。クロスファイル依存は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, getConfigOrDefault, createUser, updateUser, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, shouldEnforceDomainRestrictions, validateDomainAccess */
+/* global getCurrentEmail, findUserByEmail, findUserByGoogleId, isAdministrator, getUserConfig, getConfigOrDefault, createUser, updateUser, getGoogleIdFromToken, getUserInfoCacheKey, getCachedProperty, setCachedProperty, createAuthError, createUserNotFoundError, createExceptionResponse, shouldEnforceDomainRestrictions, validateDomainAccess, logError_ */
 
 /**
  * ドメインアクセス検証（必要時のみ）
@@ -127,7 +127,7 @@ function processLoginAction() {
     if (!user) {
       user = createUser(email, {}, { googleId });
       if (!user) {
-        console.error('processLoginAction: createUser failed for', email);
+        logError_('processLoginAction.createUser', new Error('createUser returned null'), { email });
         return {
           success: false,
           message: 'ユーザー登録に失敗しました。しばらくしてから再度お試しください。'

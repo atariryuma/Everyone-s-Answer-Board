@@ -2,7 +2,7 @@
  * @fileoverview SystemController - System management and setup functions
  */
 
-/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, installLessonTriggers */
+/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, installLessonTriggers, logError_ */
 
 /**
  * キャッシュ期間 (秒)
@@ -120,7 +120,7 @@ function forceUrlSystemReset() {
     };
 
   } catch (error) {
-    console.error('[ERROR] SystemController.forceUrlSystemReset:', error && error.message ? error.message : 'System reset error');
+    logError_('SystemController.forceUrlSystemReset', error);
     return {
       success: false,
       message: error && error.message ? error.message : '詳細不明'
@@ -181,7 +181,7 @@ function getWebAppUrl() {
     _webAppUrlCache = { url, expiresAt: now + WEB_APP_URL_CACHE_TTL_MS };
     return url;
   } catch (error) {
-    console.error('[ERROR] getWebAppUrl:', error.message || 'Web app URL error');
+    logError_('getWebAppUrl', error);
     return '';
   }
 }
@@ -572,7 +572,7 @@ function performAutoRepair() {
     };
 
   } catch (error) {
-    console.error('[ERROR] SystemController.performAutoRepair:', error.message || 'Auto repair error');
+    logError_('SystemController.performAutoRepair', error);
     return {
       success: false,
       message: error.message || '自動修復エラー'
@@ -676,7 +676,7 @@ function publishApp(publishConfig) {
     const email = getCurrentEmail();
 
     if (!email) {
-      console.error('publishApp: User authentication failed');
+      logError_('publishApp', new Error('User authentication failed'));
       return createAuthError();
     }
 
@@ -686,7 +686,7 @@ function publishApp(publishConfig) {
 
     const user = findUserByEmail(email, { requestingUser: email });
     if (!user) {
-      console.error('publishApp: User not found:', email);
+      logError_('publishApp', new Error('User not found'), { email });
       return { success: false, message: 'ユーザーが見つかりません' };
     }
 
@@ -774,7 +774,7 @@ function publishApp(publishConfig) {
     const saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
 
     if (!saveResult.success) {
-      console.error('publishApp: saveUserConfig failed:', saveResult.message);
+      logError_('publishApp.saveUserConfig', new Error(saveResult.message || 'save failed'));
       return {
         success: false,
         message: saveResult.message || '公開設定の保存に失敗しました',
@@ -793,13 +793,11 @@ function publishApp(publishConfig) {
     };
 
   } catch (error) {
-    console.error('❌ publishApp ERROR:', {
-      error: error.message,
+    logError_('publishApp', error, {
       spreadsheetId: publishConfig?.spreadsheetId,
       sheetName: publishConfig?.sheetName,
       userEmail: getCurrentEmail()
     });
-
     return {
       success: false,
       message: error.message,
@@ -1083,7 +1081,7 @@ function searchFormsByDrive(spreadsheetId, sheetName) {
     return { formUrl: null, formTitle: null };
 
   } catch (error) {
-    console.error('searchFormsByDrive: Drive API検索エラー:', error.message);
+    logError_('searchFormsByDrive', error);
     throw error;
   }
 }
@@ -1125,7 +1123,7 @@ function validateAccess(spreadsheetId, autoAddEditor = true) {
 
     return result;
   } catch (error) {
-    console.error('AdminController.validateAccess エラー:', error.message);
+    logError_('AdminController.validateAccess', error);
     return {
       success: false,
       message: error.message,
@@ -1152,12 +1150,11 @@ function getFormInfo(spreadsheetId, sheetName) {
     if (!access.ok) return access.error;
     return __buildFormInfoResult_(access, spreadsheetId, sheetName);
   } catch (error) {
-    console.error('=== getFormInfoImpl ERROR ===', {
+    logError_('getFormInfoImpl', error, {
       startTime,
       endTime: new Date().toISOString(),
       spreadsheetId: spreadsheetId ? `${spreadsheetId.substring(0, 12)}***` : 'N/A',
       sheetName,
-      error: error.message,
       stack: error.stack
     });
     return __formInfoFailure_('UNKNOWN_ERROR', 'フォーム情報の取得に失敗しました。', { sheetName, error: error.message });
@@ -1339,7 +1336,7 @@ function getPerformanceMetrics(category = 'all', options = {}) {
     };
 
   } catch (error) {
-    console.error('getPerformanceMetrics エラー:', error.message);
+    logError_('getPerformanceMetrics', error);
     return {
       success: false,
       error: error.message,
@@ -1645,7 +1642,7 @@ function diagnosePerformance(options = {}) {
     };
 
   } catch (error) {
-    console.error('diagnosePerformance エラー:', error.message);
+    logError_('diagnosePerformance', error);
     return {
       success: false,
       error: error.message,

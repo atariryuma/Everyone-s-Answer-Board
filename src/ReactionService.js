@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_ */
+/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, logError_ */
 
 const ROW_LOCK_TTL_SECONDS = 10;
 const ROW_LOCK_ACQUIRE_TIMEOUT_MS = 800;  // ScriptLock critical section の最大待機時間
@@ -187,10 +187,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
           catch (_) { /* best effort */ }
         }
       } catch (provError) {
-        console.error('processReactionDirect: lazy provisioning failed', {
-          error: provError.message,
-          reallyMissing
-        });
+        logError_('processReactionDirect.provisioning', provError, { reallyMissing });
         throw new Error(`リアクション列の追加に失敗しました: ${provError.message}`);
       }
     }
@@ -200,7 +197,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
 
   if (missingTypes.length > 0) {
     // ここに来るのは provisioning 後にも reactionColumns に欠けがある異常ケースのみ
-    console.error('❌ processReactionDirect: missing reaction columns after provisioning', {
+    logError_('processReactionDirect', new Error('missing reaction columns after provisioning'), {
       missingTypes,
       availableHeaders: headers.map(h => String(h || '').trim()).filter(h => h).join(', ')
     });
@@ -315,9 +312,7 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
       headers.push('HIGHLIGHT');
       highlightColIndex = newCol - 1;
     } catch (provError) {
-      console.error('processHighlightDirect: lazy provisioning failed', {
-        error: provError.message
-      });
+      logError_('processHighlightDirect.provisioning', provError);
       throw new Error(`ハイライト列の追加に失敗しました: ${provError.message}`);
     }
   }
@@ -567,7 +562,7 @@ function executeBoardRowOperation(options) {
       try { cache.remove(lockKey); } catch (e) { console.warn(`${label}: Cache cleanup failed:`, e.message); }
     }
   } catch (error) {
-    console.error(`${label} error:`, error.message);
+    logError_(label, error);
     return createExceptionResponse(error);
   }
 }

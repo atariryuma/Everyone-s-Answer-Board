@@ -3,7 +3,7 @@
  *   シート寸法/ヘッダー取得（キャッシュ付き）、適応型バッチ読込。
  */
 
-/* global formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse */
+/* global formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_ */
 
 /**
  * ユーザーのスプレッドシートデータ取得
@@ -23,7 +23,7 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
 
     user = preloadedUser || findUserById(userId, { requestingUser: getCurrentEmail() });
     if (!user) {
-      console.error('DataService.getUserSheetData: ユーザーが見つかりません', { userId });
+      logError_('DataService.getUserSheetData', new Error('ユーザーが見つかりません'), { userId });
       return {
         success: false,
         message: 'ユーザーが見つかりません',
@@ -67,9 +67,8 @@ function getUserSheetData(userId, options = {}, preloadedUser = null, preloadedC
   } catch (error) {
     // Why: 失敗時の ERROR ログはここに集約する。下層は WARN or silent に降格済み。
     const executionTime = Date.now() - startTime;
-    console.error('DataService.getUserSheetData: 失敗', {
+    logError_('DataService.getUserSheetData', error, {
       userId,
-      error: error.message,
       executionTime: `${executionTime}ms`,
       spreadsheetId: config?.spreadsheetId || 'undefined',
       sheetName: config?.sheetName || 'undefined',
@@ -293,12 +292,9 @@ function processBatchData(ctx) {
 
     } catch (batchError) {
       consecutiveErrors++;
-
-      const errorMessage = batchError && batchError.message ? batchError.message : 'エラー詳細不明';
-      console.error('DataService.processBatchData: バッチ処理エラー', {
+      logError_('DataService.processBatchData', batchError, {
         startRow,
         endRow,
-        error: errorMessage,
         consecutiveErrors,
         nextBatchSize: getAdaptiveBatchSize(consecutiveErrors)
       });
@@ -465,7 +461,7 @@ function processRawDataBatch(ctx) {
 
     return processedBatch;
   } catch (error) {
-    console.error('DataService.processRawDataBatch: エラー', error.message);
+    logError_('DataService.processRawDataBatch', error);
     return [];
   }
 }
@@ -576,7 +572,7 @@ function applySortAndLimit(data, options = {}) {
 
     return sortedData;
   } catch (error) {
-    console.error('DataService.applySortAndLimit: エラー', error.message);
+    logError_('DataService.applySortAndLimit', error);
     return data; // エラー時は元データを返す
   }
 }
@@ -593,7 +589,7 @@ function deleteAnswerRow(userId, rowIndex) {
     const user = findUserById(userId, { requestingUser: currentEmail });
 
     if (!user) {
-      console.error('deleteAnswerRow: User not found:', userId);
+      logError_('deleteAnswerRow', new Error('User not found'), { userId });
       return createDataServiceErrorResponse('ユーザーが見つかりません');
     }
 
@@ -648,11 +644,7 @@ function deleteAnswerRow(userId, rowIndex) {
     };
 
   } catch (error) {
-    console.error('deleteAnswerRow error:', {
-      userId,
-      rowIndex,
-      error: error.message
-    });
+    logError_('deleteAnswerRow', error, { userId, rowIndex });
     return createDataServiceErrorResponse(`削除エラー: ${error.message}`);
   }
 }

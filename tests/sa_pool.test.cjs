@@ -71,6 +71,12 @@ function loadCtx(overrides = {}) {
     simpleHash: (s) => String(s).length,
     saveToCacheWithSizeCheck: (k, data) => { cache.put(k, JSON.stringify(data)); return true; },
     logError_: () => {},
+    safeJsonParse_: (text, fallback) => {
+      const fb = (fallback === undefined ? null : fallback);
+      if (text == null || text === '') return fb;
+      if (typeof text === 'object') return text;
+      try { return JSON.parse(text); } catch (_) { return fb; }
+    },
     ...overrides
   };
   vm.createContext(context);

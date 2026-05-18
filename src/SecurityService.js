@@ -8,7 +8,7 @@
  * - Service Account管理
  */
 
-/* global getCurrentEmail, getCachedProperty, hasCoreSystemProps */
+/* global getCurrentEmail, getCachedProperty, hasCoreSystemProps, logError_ */
 
 /**
  * 安全にメールアドレスからドメインを抽出する
@@ -130,7 +130,7 @@ function getDeployUserDomainInfo() {
       timestamp: new Date().toISOString()
     };
   } catch (error) {
-    console.error('SecurityService.getDeployUserDomainInfo ERROR:', error.message);
+    logError_('SecurityService.getDeployUserDomainInfo', error);
     return {
       success: false,
       message: error.message,

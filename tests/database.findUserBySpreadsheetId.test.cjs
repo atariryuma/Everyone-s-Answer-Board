@@ -55,6 +55,13 @@ function loadCtx(overrides = {}) {
     clearPropertyCache: () => {},
     simpleHash: (s) => String(s).length,
     saveToCacheWithSizeCheck: (k, data) => { cache.put(k, JSON.stringify(data)); return true; },
+    safeJsonParse_: (text, fallback) => {
+      const fb = (fallback === undefined ? null : fallback);
+      if (text == null || text === '') return fb;
+      if (typeof text === 'object') return text;
+      try { return JSON.parse(text); } catch (_) { return fb; }
+    },
+    logError_: () => {},
     __cache: cache,
     __propsStore: propsStore
   };

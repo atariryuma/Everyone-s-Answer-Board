@@ -194,9 +194,24 @@ function createExceptionResponse(error, context) {
   return createErrorResponse(message);
 }
 
-// 共通エラーログ。`logError_('funcName', error)` の繰り返しを集約。
-function logError_(funcName, error) {
-  console.error(funcName + ' error:', error && error.message ? error.message : error);
+/**
+ * 共通エラーログ。 `console.error('funcName: msg', err.message)` の繰り返しを集約。
+ *
+ * @param {string} funcName  - 発生関数の名前 (Cloud Logging 検索用 prefix)
+ * @param {Error|*} error    - Error オブジェクト or 値 (.message があれば抽出)
+ * @param {Object} [context] - 追加の構造化コンテキスト (userId, configLength 等)
+ *
+ * Why context: 旧コードは `console.error('foo failed:', err.message, { ... })` で
+ *   構造化ログを書いていたが、 prefix 形式がバラバラ。 全 catch を logError_ に
+ *   移すために context を第 3 引数で受ける形に拡張 (2026-05-18 v2797)。
+ */
+function logError_(funcName, error, context) {
+  const msg = (error && error.message) ? error.message : error;
+  if (context !== undefined) {
+    console.error(funcName + ' error:', msg, context);
+  } else {
+    console.error(funcName + ' error:', msg);
+  }
 }
 
 /**

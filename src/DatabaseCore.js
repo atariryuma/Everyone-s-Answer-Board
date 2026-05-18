@@ -3,7 +3,7 @@
  *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_ */
 
 /**
  * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
@@ -452,10 +452,10 @@ function getAllBoardSpreadsheetIds() {
     const ids = new Set();
     for (const u of users) {
       if (!u || !u.configJson) continue;
-      let cfg = null;
-      try { cfg = JSON.parse(u.configJson); } catch (_) { continue; }
-      if (cfg && cfg.spreadsheetId && typeof cfg.spreadsheetId === 'string') ids.add(cfg.spreadsheetId);
-      if (Array.isArray(cfg && cfg.profiles)) {
+      const cfg = safeJsonParse_(u.configJson, null);
+      if (!cfg) continue;
+      if (cfg.spreadsheetId && typeof cfg.spreadsheetId === 'string') ids.add(cfg.spreadsheetId);
+      if (Array.isArray(cfg.profiles)) {
         for (const p of cfg.profiles) {
           if (p && p.spreadsheetId && typeof p.spreadsheetId === 'string') ids.add(p.spreadsheetId);
         }
@@ -826,7 +826,7 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
     }
     return cacheAndReturn({ allowed: true, reason: 'Public board access', accessMode: 'sa' });
   } catch (error) {
-    console.error('SA_VALIDATION: Validation failed:', error.message);
+    logError_('SA_VALIDATION', error);
     return { allowed: false, reason: 'Validation error', accessMode: 'denied' };
   }
 }
@@ -859,10 +859,7 @@ function openDatabase(options = {}) {
         const fallbackSpreadsheet = SpreadsheetApp.openById(dbId);
         return fallbackSpreadsheet;
       } catch (fallbackError) {
-        console.error('openDatabase: Both Sheets API and SpreadsheetApp.openById failed:', {
-          sheetsApiError: 'Failed via openSpreadsheet',
-          fallbackError: fallbackError.message
-        });
+        logError_('openDatabase', fallbackError, { sheetsApiError: 'Failed via openSpreadsheet' });
         return null;
       }
     }
@@ -1240,7 +1237,7 @@ function resolveRequestingUser(context = {}) {
   try {
     return getCurrentEmail();
   } catch (error) {
-    console.error('resolveRequestingUser: getCurrentEmail failed:', error.message);
+    logError_('resolveRequestingUser', error);
     return null;
   }
 }
@@ -1439,7 +1436,7 @@ function findUserByField(fieldName, fieldValue, context = {}) {
           return applyUserAccessControl(cachedUser, context, label);
         }
       } catch (individualCacheError) {
-        console.error(`${label}: Individual cache read failed:`, individualCacheError.message);
+        logError_(label + '.individualCache', individualCacheError);
       }
     }
 
@@ -1460,7 +1457,7 @@ function findUserByField(fieldName, fieldValue, context = {}) {
         }
       }
     } catch (cacheError) {
-      console.error(`${label}: Cache-based search failed, falling back to direct DB access:`, cacheError.message);
+      logError_(label + '.cacheSearch', cacheError);
     }
 
     // Why (performance note): 旧来は sheet.getDataRange().getValues() で N×7 配列を
@@ -1551,7 +1548,7 @@ function findUserByField(fieldName, fieldValue, context = {}) {
 
     return null;
   } catch (error) {
-    console.error(`${label} error:`, error.message);
+    logError_(label, error);
     return null;
   }
 }
@@ -1629,7 +1626,7 @@ function createUser(email, initialConfig = {}, context = {}) {
     setCol('lastModified', now);
 
     if (sheet.getLastRow() >= 10000) {
-      console.error('createUser: Users sheet at capacity');
+      logError_('createUser', new Error('Users sheet at capacity'));
       return null;
     }
 
@@ -1695,7 +1692,7 @@ function getAllUsers(options = {}, context = {}) {
           return JSON.parse(cached);
         }
       } catch (cacheError) {
-        console.error('getAllUsers: Cache read failed:', cacheError.message);
+        logError_('getAllUsers.cacheRead', cacheError);
       }
     }
 
@@ -1723,12 +1720,8 @@ function getAllUsers(options = {}, context = {}) {
 
       if (options.activeOnly && !user.isActive) continue;
       if (options.publishedOnly) {
-        try {
-          const config = JSON.parse(user.configJson || '{}');
-          if (!config.isPublished) continue;
-        } catch (parseError) {
-          continue;
-        }
+        const config = safeJsonParse_(user.configJson, null);
+        if (!config || !config.isPublished) continue;
       }
 
       users.push(user);
@@ -1761,7 +1754,7 @@ function clearDatabaseUserCache() {
 
     clearPropertyCache('USER_CACHE_VERSION');
   } catch (error) {
-    console.error('clearDatabaseUserCache: Failed to clear cache:', error.message);
+    logError_('clearDatabaseUserCache', error);
   }
 }
 

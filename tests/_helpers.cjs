@@ -26,7 +26,14 @@ function gasResponseStubs() {
     createExceptionResponse: (error) => createErrorResponse(error && error.message ? error.message : 'Unknown error'),
     createDataServiceErrorResponse: (message, sheetName = '') => createErrorResponse(message, [], { headers: [], sheetName }),
     isPlainObject: (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v),
-    logError_: () => {} // src/helpers.js の共通エラーログ。test では silent。
+    logError_: () => {}, // src/helpers.js の共通エラーログ。test では silent。
+    // safeJsonParse_: src/helpers.js の本物実装と同じ contract (null/空/object pass-through、 catch で fallback)。
+    safeJsonParse_: (text, fallback) => {
+      const fb = (fallback === undefined ? null : fallback);
+      if (text == null || text === '') return fb;
+      if (typeof text === 'object') return text;
+      try { return JSON.parse(text); } catch (_) { return fb; }
+    }
   };
 }
 

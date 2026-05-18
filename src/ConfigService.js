@@ -3,7 +3,7 @@
  *   動的 URL 生成 / profiles・profileHistory のサニタイズ。
  */
 
-/* global getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty */
+/* global getCurrentEmail, findUserById, updateUser, SYSTEM_LIMITS, validateConfig, validateSpreadsheetId, openSpreadsheet, getSheetInfo, DEFAULT_DISPLAY_SETTINGS, getCachedProperty, logError_ */
 
 /**
  * デフォルト設定取得
@@ -173,7 +173,7 @@ function validatePublishConfig(config, userId) {
     return baseValidation;
 
   } catch (error) {
-    console.error('validatePublishConfig: エラー', error.message);
+    logError_('validatePublishConfig', error);
     return {
       success: false,
       message: '公開設定検証中にエラーが発生しました',
@@ -285,7 +285,7 @@ function validateAndSanitizeConfig(config, userId) {
     };
 
   } catch (error) {
-    console.error('validateAndSanitizeConfig: エラー', error.message);
+    logError_('validateAndSanitizeConfig', error);
     return {
       success: false,
       message: '設定検証中にエラーが発生しました',
@@ -567,7 +567,7 @@ function hasCoreSystemProps() {
 
     return true;
   } catch (error) {
-    console.error('hasCoreSystemProps: エラー', error.message);
+    logError_('hasCoreSystemProps', error);
     return false;
   }
 }
@@ -630,7 +630,7 @@ function getQuestionText(config, context = {}, preloadedHeaders = null) {
 
     return 'Everyone\'s Answer Board';
   } catch (error) {
-    console.error('❌ getQuestionText ERROR:', error.message);
+    logError_('getQuestionText', error);
     return 'Everyone\'s Answer Board';
   }
 }
@@ -683,11 +683,9 @@ function getUserConfig(userId, preloadedUser = null) {
     };
 
   } catch (error) {
-    console.error('getUserConfig error:', {
-      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
-      error: error.message
+    logError_('getUserConfig', error, {
+      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A'
     });
-
     return {
       success: false,
       config: getDefaultConfig(userId),
@@ -830,11 +828,9 @@ function saveUserConfig(userId, config, options = {}) {
     };
 
   } catch (error) {
-    console.error('saveUserConfig error:', {
-      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A',
-      error: error.message
+    logError_('saveUserConfig', error, {
+      userId: userId ? `${userId.substring(0, 8)}***` : 'N/A'
     });
-
     return {
       success: false,
       message: error && error.message ? `Config save error: ${error.message}` : 'Config save error: 詳細不明'

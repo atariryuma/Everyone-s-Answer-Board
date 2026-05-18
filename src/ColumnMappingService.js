@@ -456,7 +456,7 @@ function resolveColumnIndex(headers, fieldType, columnMapping = {}, options = {}
       ? { index: -1, confidence: 0, method: 'no_match' }
       : { index: indexMap[bestIdx], confidence: Math.min(bestScore, 95), method: 'pattern_match' };
   } catch (error) {
-    console.error(`resolveColumnIndex error for ${fieldType}:`, error.message);
+    logError_('resolveColumnIndex', error, { fieldType });
     return { index: -1, confidence: 0, method: 'error', error: error.message };
   }
 }

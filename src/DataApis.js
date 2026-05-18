@@ -4,7 +4,7 @@
  *   依存関係は下の global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, findPublishedBoardOwner, getUserConfig, getConfigOrDefault, DEFAULT_DISPLAY_SETTINGS, saveUserConfig, openSpreadsheet, getSheetInfo, getUserSheetData, getBatchedAdminAuth, getFormInfo, invalidateSheetHeadersCache, performIntegratedColumnDiagnostics, applySpreadsheetSharingDefaults, validateAccess, createAuthError, createUserNotFoundError, createErrorResponse, createExceptionResponse, emailToShortHash, sanitizeProfileHistory, safeJsonParse_ */
 // GAS built-ins (DriveApp, SpreadsheetApp, ScriptApp, URL, FormApp, UrlFetchApp, Utilities, Session)
 // は eslint.config.js の globals に登録済み — ここで再宣言しない。
 
@@ -102,7 +102,7 @@ function createUserFolder() {
     return DriveApp.createFolder(folderName);
 
   } catch (e) {
-    console.error('createUserFolder エラー:', e.message);
+    logError_('createUserFolder', e);
     return null;
   }
 }
@@ -708,7 +708,7 @@ function processFormUrlInput(formUrl) {
     try {
       form = FormApp.openByUrl(formUrl);
     } catch (e) {
-      console.error('connectDataSource: FormApp.openByUrl failed:', e.message);
+      logError_('connectDataSource.FormApp.openByUrl', e);
       return { success: false, error: `フォームにアクセスできません: ${e.message}` };
     }
 
@@ -752,7 +752,7 @@ function processFormUrlInput(formUrl) {
           console.warn('processFormUrlInput SS 共有設定エラー（処理は続行）:', sharingErr.message);
         }
       } catch (e) {
-        console.error('Spreadsheet creation error:', e.message);
+        logError_('connectDataSource.SpreadsheetApp.create', e);
         return { success: false, error: 'スプレッドシートの作成に失敗しました: ' + e.message };
       }
     } else {
@@ -760,7 +760,7 @@ function processFormUrlInput(formUrl) {
         ss = SpreadsheetApp.openById(spreadsheetId);
         spreadsheetUrl = ss.getUrl();
       } catch (e) {
-        console.error('connectDataSource: SpreadsheetApp.openById failed:', e.message);
+        logError_('connectDataSource.SpreadsheetApp.openById', e);
         return { success: false, error: `回答先スプレッドシートにアクセスできません: ${e.message}` };
       }
       // 既存 SS 取込み時にも SA pool 全員を editor 追加。 これがないと viewer 経路 (SA pool) で
@@ -913,7 +913,7 @@ function loadProfileForView(profileName, targetUserId) {
     if (!saveRes.success) return saveRes;
     return createSuccessResponse('Profile loaded', { activeProfile: p.name });
   } catch (error) {
-    console.error('loadProfileForView error:', error && error.message);
+    logError_('loadProfileForView', error);
     return createExceptionResponse(error);
   }
 }
@@ -941,7 +941,7 @@ function listMyProfiles() {
     if (resolved.error) return resolved.error;
     return __listProfilesCore(resolved.userId);
   } catch (error) {
-    console.error('listMyProfiles error:', error && error.message);
+    logError_('listMyProfiles', error);
     return createExceptionResponse(error);
   }
 }
@@ -952,7 +952,7 @@ function saveCurrentAsProfile(name) {
     if (resolved.error) return resolved.error;
     return __saveProfileCore(resolved.userId, name, { autoActivate: true });
   } catch (error) {
-    console.error('saveCurrentAsProfile error:', error && error.message);
+    logError_('saveCurrentAsProfile', error);
     return createExceptionResponse(error);
   }
 }
@@ -963,7 +963,7 @@ function deleteMyProfile(name) {
     if (resolved.error) return resolved.error;
     return __deleteProfileCore(resolved.userId, name);
   } catch (error) {
-    console.error('deleteMyProfile error:', error && error.message);
+    logError_('deleteMyProfile', error);
     return createExceptionResponse(error);
   }
 }
@@ -1018,7 +1018,7 @@ function renameMyProfile(oldName, newName) {
     if (!saveRes.success) return saveRes;
     return createSuccessResponse(`プロファイル名を「${cleanNew}」に変更しました`, { newName: cleanNew });
   } catch (error) {
-    console.error('renameMyProfile error:', error && error.message);
+    logError_('renameMyProfile', error);
     return createExceptionResponse(error);
   }
 }
@@ -1227,7 +1227,8 @@ function withBoardDataCache_(userId, options, loader) {
   try {
     const cached = cache.get(key);
     if (cached) {
-      try { return JSON.parse(cached); } catch (_) { /* fall through to fresh fetch */ }
+      const parsed = safeJsonParse_(cached, null);
+      if (parsed) return parsed;
     }
   } catch (_) { /* ignore */ }
 
@@ -1272,7 +1273,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
         preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
       });
       if (!targetUser) {
-        console.error('getPublishedSheetData: Target user not found', { targetUserId, viewerEmail });
+        logError_('getPublishedSheetData', new Error('Target user not found'), { targetUserId, viewerEmail });
         return {
           success: false,
           error: 'Target user not found',
@@ -1341,7 +1342,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
     });
 
     if (!user) {
-      console.error('getPublishedSheetData: User not found (self-access)', { viewerEmail });
+      logError_('getPublishedSheetData', new Error('User not found (self-access)'), { viewerEmail });
       return {
         success: false,
         error: 'User not found',
@@ -1379,13 +1380,8 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       isOwnBoard: true
     });
   } catch (error) {
-    console.error('getPublishedSheetData: Exception caught', {
-      error: error?.message || 'Unknown error',
-      stack: error?.stack,
-      classFilter,
-      sortOrder,
-      adminMode,
-      targetUserId,
+    logError_('getPublishedSheetData', error, {
+      stack: error?.stack, classFilter, sortOrder, adminMode, targetUserId,
       timestamp: new Date().toISOString()
     });
     return {
@@ -1515,7 +1511,7 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
       viewingPastProfile: profileName
     });
   } catch (error) {
-    console.error('getPublishedSheetDataForProfile error:', error && error.message);
+    logError_('getPublishedSheetDataForProfile', error);
     return {
       success: false,
       error: (error && error.message) || 'データ取得エラー',
@@ -1556,7 +1552,7 @@ function saveConfig(config, options = {}) {
 
   } catch (error) {
     const duration = Date.now() - startTime;
-    console.error(`saveConfig: ERROR after ${duration}ms - ${error.message || 'Operation error'}`);
+    logError_('saveConfig', error, { durationMs: duration });
     return { success: false, message: error.message || 'エラーが発生しました' };
   }
 }
@@ -1917,14 +1913,14 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
         sheet.getRange(1, startCol, 1, reallyMissing.length).setValues(values);
         columnsAdded.push(...reallyMissing);
       } catch (colError) {
-        console.error(`setupReactionAndHighlightColumns: Failed to add columns:`, colError.message);
+        logError_('setupReactionAndHighlightColumns.batchAdd', colError);
         // フォールバック: 個別追加を試行
         reallyMissing.forEach((columnName, index) => {
           try {
             sheet.getRange(1, lastCol + index + 1).setValue(columnName);
             columnsAdded.push(columnName);
           } catch (individualError) {
-            console.error(`setupReactionAndHighlightColumns: Failed to add column '${columnName}':`, individualError.message);
+            logError_('setupReactionAndHighlightColumns.individualAdd', individualError, { columnName });
           }
         });
       }
@@ -1965,7 +1961,7 @@ function getActiveFormInfo(userId) {
   try {
     const currentEmail = getCurrentEmail();
     if (!currentEmail) {
-      console.error('Authentication failed');
+      logError_('getActiveFormInfo', new Error('Authentication required'));
       return {
         success: false,
         message: 'Authentication required',
@@ -1978,7 +1974,7 @@ function getActiveFormInfo(userId) {
     if (!targetUserId) {
       const currentUser = findUserByEmail(currentEmail, { requestingUser: currentEmail });
       if (!currentUser) {
-        console.error('Current user not found:', currentEmail);
+        logError_('getActiveFormInfo', new Error('Current user not found'), { currentEmail });
         return {
           success: false,
           message: 'User not found',
@@ -2009,7 +2005,7 @@ function getActiveFormInfo(userId) {
         'No form URL configured'
     };
   } catch (error) {
-    console.error('getActiveFormInfo ERROR:', error.message);
+    logError_('getActiveFormInfo', error);
     return {
       success: false,
       shouldShow: false,
@@ -2095,7 +2091,7 @@ function setFormEmailCollectionVerified_(formId) {
       const form = FormApp.openById(formId);
       form.setCollectEmail(true);
     } catch (fallbackError) {
-      console.error('フォールバックも失敗:', fallbackError.message);
+      logError_('setEmailCollection.fallback', fallbackError);
     }
   }
 }

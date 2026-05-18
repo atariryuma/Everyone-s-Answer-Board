@@ -219,6 +219,22 @@ owner は own OAuth で SA quota 節約。 viewer / admin の cross-user のみ 
 - `__applyPublishStateChange` で `invalidateSaValidationCache_` を呼び、 該当 SS の cache version を bump
 - unpublish 直後の 60秒 access leak を解消
 
+### Cache アーキテクチャ (3 層、 意図的分離)
+
+3 つの層はそれぞれ異なる用途。 統合 facade を作らない (semantic clarity を失う + cost 非対称性が見えなくなる)。
+
+| 層 | TTL | 用途 | 注意 |
+| -- | --- | ---- | ---- |
+| `getCachedProperty(key)` | 30s in-memory LRU (50 件) | **頻繁に読む config** (ADMIN_EMAIL, DATABASE_SPREADSHEET_ID, SA creds 等) | write は必ず `setCachedProperty` 経由 (in-memory 即時 invalidate)。 PropertiesService 直読みより 50-100ms 速い |
+| `CacheService.getScriptCache()` | 最大 6h、 100KB/value | **作業データ** (board data, user objects, SA tokens, rate-limit counter, 429 cooldown) | size overrun は silent fail。 必ず `saveToCacheWithSizeCheck()` 経由 |
+| `PropertiesService` | 永続 (no TTL) | **永続的システム設定 / 秘密情報** (SA creds JSON, ADMIN_API_KEY, DATABASE_SPREADSHEET_ID, ADMIN_EMAIL) | hot path で直読みすると 50-100ms/call。 `getCachedProperty` 経由を推奨。 例外: `handleSetupApiKeyAction_` 初回ゲートは 30s stale race 回避のため直読み (`main.js:660` 参照) |
+
+**判断フロー (新規 cache を書く時):**
+
+1. 永続 secret / 設定 → `PropertiesService.setProperty` (direct write) + 読みは `getCachedProperty`
+2. ボード data / 計算結果 / token 等 (30s〜6h で再計算可) → `CacheService` + `saveToCacheWithSizeCheck`
+3. すでに `getCachedProperty` で 30s memoize される config への参照 → 何もしない (透過的)
+
 ### Frontend
 
 HTML templates use `<?!= include('filename') ?>` for composition. Key patterns:

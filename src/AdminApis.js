@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, logError_ */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, logError_, safeJsonParse_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -1561,12 +1561,9 @@ function matchesUserFilter_(user, filter) {
     if (!String(user.userEmail || '').toLowerCase().includes(filter.emailContains.toLowerCase())) return false;
   }
   if (filter.isPublished !== undefined) {
-    try {
-      const cfg = user.configJson ? JSON.parse(user.configJson) : {};
-      if (Boolean(cfg.isPublished) !== Boolean(filter.isPublished)) return false;
-    } catch (_) {
-      if (filter.isPublished) return false;
-    }
+    const cfg = safeJsonParse_(user.configJson, null);
+    if (!cfg) return !filter.isPublished;  // parse 不能 = unpublished 扱い
+    if (Boolean(cfg.isPublished) !== Boolean(filter.isPublished)) return false;
   }
   return true;
 }

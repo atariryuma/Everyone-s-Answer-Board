@@ -48,8 +48,7 @@ function addServiceAccountsAsEditors(spreadsheetId) {
     result.success = result.added.length > 0;
     return result;
   } catch (err) {
-    if (typeof logError_ === 'function') logError_('addServiceAccountsAsEditors', err);
-    else console.error('addServiceAccountsAsEditors:', err && err.message);
+    logError_('addServiceAccountsAsEditors', err);
     result.errors.push(err && err.message ? err.message : String(err));
     return result;
   }
