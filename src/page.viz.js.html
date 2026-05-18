@@ -2735,13 +2735,17 @@
           }
         } else {
           console.error('Profile load failed:', res && res.message);
-          alert('プロファイルの読み込みに失敗しました: ' + (res && res.message || '不明なエラー'));
+          const msg = 'プロファイルの読み込みに失敗しました: ' + ((res && res.message) || '不明なエラー');
+          if (typeof this.showNotification === 'function') this.showNotification(msg, 'error');
+          else if (typeof this.showToast === 'function') this.showToast(msg);
         }
       })
       .withFailureHandler((err) => {
         if (select) select.disabled = false;
         console.error('Profile load network error:', err);
-        alert('プロファイルの切替に失敗しました');
+        const msg = 'プロファイルの切替に失敗しました';
+        if (typeof this.showNotification === 'function') this.showNotification(msg, 'error');
+        else if (typeof this.showToast === 'function') this.showToast(msg);
       })
       // targetUserId を渡すことで、admin が他人ボードを操作するケースや、URL の userId と
       //   現在の Session email が一致しないケース（複数 Google アカウント切替）でも、対象ボードを
@@ -2796,12 +2800,12 @@
     google.script.run
       .withSuccessHandler((res) => {
         if (!res || !res.success) {
-          // 失敗時は viewing を解除して toast。
+          // 失敗時は viewing を解除して 統一エラー通知 (showNotification = 右上トースト)。
           self.state.viewingPastProfile = null;
           if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
           const msg = (res && (res.error || res.message)) || 'フェーズ読み込み失敗';
-          if (typeof self.showToast === 'function') self.showToast(msg);
-          else { try { alert(msg); } catch (_) {} }
+          if (typeof self.showNotification === 'function') self.showNotification(msg, 'error');
+          else if (typeof self.showToast === 'function') self.showToast(msg);
           return;
         }
         // 成功: result を loadSheetData が処理するのと同じ形なので state へ反映 + renderBoard。
@@ -2836,8 +2840,8 @@
         if (typeof self.__vizInjectProfileSelector === 'function') self.__vizInjectProfileSelector();
         console.error('Past profile load network error:', err);
         const msg = 'フェーズ読み込みに失敗しました';
-        if (typeof self.showToast === 'function') self.showToast(msg);
-        else { try { alert(msg); } catch (_) {} }
+        if (typeof self.showNotification === 'function') self.showNotification(msg, 'error');
+        else if (typeof self.showToast === 'function') self.showToast(msg);
       })
       .getPublishedSheetDataForProfile(this.state.userId, name, classFilter, sortOrder);
   };

@@ -1935,13 +1935,19 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       return null;
     }
 
+    // Top-level config.spreadsheetId と config.profiles[].spreadsheetId の両方を走査。
+    // profile 切替時 (生徒が「導入アンケート」 等のタブをクリック) は active と異なる SS ID が
+    // 渡されるため、 top-level だけでは「Target user not found」 になり viewer が deny される。
     for (const user of allUsers) {
       try {
         const configJson = user.configJson || '{}';
         const config = JSON.parse(configJson);
 
-        if (config.spreadsheetId === spreadsheetId) {
+        const matchesTop = config.spreadsheetId === spreadsheetId;
+        const matchesProfile = !matchesTop && Array.isArray(config.profiles) &&
+          config.profiles.some((p) => p && p.spreadsheetId === spreadsheetId);
 
+        if (matchesTop || matchesProfile) {
           if (!skipCache) {
             try {
               const cacheTtl = context.cacheTtl || 600; // デフォルト10分（600秒）
