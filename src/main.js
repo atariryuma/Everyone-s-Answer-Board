@@ -638,7 +638,6 @@ function doPost(e) {
   } catch (error) {
     // Why: stack trace を保持して Cloud Logging に出すことで、CLI からエラー発生箇所を
     //   即座に特定できる。クライアントへの応答メッセージは generic に保つ（情報漏洩防止）。
-    const errorMessage = error && error.message ? error.message : '予期しないエラーが発生しました';
     logError_('doPost', error, {
       stack: error && error.stack ? error.stack.substring(0, 1000) : undefined,
       timestamp: new Date().toISOString()

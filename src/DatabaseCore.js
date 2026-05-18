@@ -788,9 +788,19 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
       } catch (_) { /* fall through */ }
     }
 
-    // 結果保存 helper — 4 分岐の `cache.put(cacheKey, JSON.stringify(result), 60)` 重複を集約。
+    // 結果保存 helper — 4 分岐の cache.put 重複を集約。
+    // Why (deny は短い TTL): allow 結果は publish 状態変化時に invalidateSaValidationCache_
+    //   で proactive bump されるが、 deny 結果 (「Target user not found」「Board not
+    //   published」) は SS 自体が user config に追加されただけでは bump が走らない。
+    //   deny を 60s cache すると profile 追加 / 設定修正後も「アクセス不可」 が 1 分続く
+    //   ため、 deny は 5s に短縮 (allow は従来通り 60s)。
     const cacheAndReturn = (result) => {
-      if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
+      if (cache) {
+        try {
+          const ttl = result.allowed ? 60 : 5;
+          cache.put(cacheKey, JSON.stringify(result), ttl);
+        } catch (_) {}
+      }
       return result;
     };
 
@@ -1958,10 +1968,13 @@ function findUserBySpreadsheetId(spreadsheetId, context = {}) {
       }
     }
 
+    // Why (negative cache 5s): 旧版は 60s null cache で「Target user not found」 が
+    //   1 分間ハマる事故を起こしていた (profile 切替 transient + getAllUsers stale fetch)。
+    //   stale SS URL の防御目的なら 5s で十分 (polling ~ 8s なので次回ヒット時に再判定)。
+    //   USER_CACHE_VERSION bump で proactive invalidation も働くが、 fallback として TTL も短縮。
     if (!skipCache) {
       try {
-        const notFoundTtl = 60; // 60秒
-        CacheService.getScriptCache().put(cacheKey, JSON.stringify(null), notFoundTtl);
+        CacheService.getScriptCache().put(cacheKey, JSON.stringify(null), 5);
       } catch (cacheError) {
         console.warn('findUserBySpreadsheetId: Cache write failed for not found result:', cacheError.message);
       }
