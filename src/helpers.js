@@ -102,6 +102,18 @@ function simpleHash(obj) {
 }
 
 /**
+ * 純粋データの deep clone (JSON で表現できる object/array のみ)。
+ * GAS V8 では structuredClone 未サポートのため、 JSON 経路を helper に集約する。
+ *
+ * 注意: function / Date / undefined / Set / Map / 循環参照は除去/変換される。
+ * lesson JSON / config JSON のような plain data 専用。
+ */
+function deepClone(value) {
+  if (value === null || value === undefined) return value;
+  return JSON.parse(JSON.stringify(value));
+}
+
+/**
  * 標準化エラーレスポンス生成（拡張版）
  * @param {string} message - エラーメッセージ
  * @param {*} data - 追加データ

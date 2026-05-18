@@ -788,48 +788,43 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
       } catch (_) { /* fall through */ }
     }
 
+    // 結果保存 helper — 4 分岐の `cache.put(cacheKey, JSON.stringify(result), 60)` 重複を集約。
+    const cacheAndReturn = (result) => {
+      if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
+      return result;
+    };
+
     const targetUser = findUserBySpreadsheetId(spreadsheetId, { skipCache: true });
     if (!targetUser) {
       console.warn('SA_VALIDATION: Target user not found for spreadsheet:', spreadsheetId.substring(0, 8));
-      const result = { allowed: false, reason: 'Target user not found', accessMode: 'denied' };
-      if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
-      return result;
+      return cacheAndReturn({ allowed: false, reason: 'Target user not found', accessMode: 'denied' });
     }
 
     const isOwner = Boolean(targetUser.userEmail && currentEmail && targetUser.userEmail === currentEmail);
     if (isOwner) {
       // 編集者は自分の SS のオーナー権限を持つ → openById で直接アクセス。
       // SA pool quota を viewer の閲覧トラフィックに温存できる。
-      const result = { allowed: true, reason: 'Own board (direct access)', accessMode: 'own' };
-      if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
-      return result;
+      return cacheAndReturn({ allowed: true, reason: 'Own board (direct access)', accessMode: 'own' });
     }
 
     // admin は他人のボードに cross-user アクセスする必要があるので SA pool 経由。
     if (isAdministrator(currentEmail)) {
-      const result = { allowed: true, reason: 'Admin privileges (cross-user)', accessMode: 'sa' };
-      if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
-      return result;
+      return cacheAndReturn({ allowed: true, reason: 'Admin privileges (cross-user)', accessMode: 'sa' });
     }
 
     // 公開状態の判定。 `getUserConfig` 経由だと findUserById が viewer のアクセス制御で deny
     // するチキン&エッグ問題があるため、 既に取得済の `targetUser.configJson` を直接 parse する。
     // (`findUserBySpreadsheetId` は admin 経路で取得しており、 configJson は信頼できる)
     const isPublished = isUserBoardPublished(targetUser);
-    const result = isPublished
-      ? { allowed: true, reason: 'Public board access', accessMode: 'sa' }
-      : { allowed: false, reason: 'Board not published', accessMode: 'denied' };
-
-    if (cache) { try { cache.put(cacheKey, JSON.stringify(result), 60); } catch (_) {} }
-
     if (!isPublished) {
       console.warn('SA_VALIDATION: Non-owner access to unpublished board:', {
         currentEmail: currentEmail ? `${currentEmail.split('@')[0]}@***` : 'unknown',
         spreadsheetId: spreadsheetId.substring(0, 8),
         context
       });
+      return cacheAndReturn({ allowed: false, reason: 'Board not published', accessMode: 'denied' });
     }
-    return result;
+    return cacheAndReturn({ allowed: true, reason: 'Public board access', accessMode: 'sa' });
   } catch (error) {
     console.error('SA_VALIDATION: Validation failed:', error.message);
     return { allowed: false, reason: 'Validation error', accessMode: 'denied' };

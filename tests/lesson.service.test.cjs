@@ -103,6 +103,8 @@ function loadLessonContext(overrides = {}) {
       openById: () => ({ getSheetByName: (name) => name === 'lessons' ? lessonsSheet : null })
     },
     LESSONS_SHEET_HEADERS: ['lessonId', 'userId', 'name', 'state', 'createdAt', 'startedAt', 'endedAt', 'schemaVersion', 'sizeBytes', 'etag', 'lessonJson'],
+    // helpers.js の deepClone を test 環境にも提供 (LessonService が依存)。
+    deepClone: (v) => (v === null || v === undefined) ? v : JSON.parse(JSON.stringify(v)),
     getCachedProperty: (k) => k === 'DATABASE_SPREADSHEET_ID' ? 'db-id' : null,
     getCurrentEmail: () => 'teacher@example.com',
     isAdministrator: (email) => email === 'admin@example.com',

@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, getCurrentEmail, isAdministrator, findUserByEmail, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, LESSONS_SHEET_HEADERS, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, logError_ */
+/* global openDatabase, getCurrentEmail, isAdministrator, findUserByEmail, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, LESSONS_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, logError_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -480,7 +480,7 @@ function updateLessonDraft(userId, lessonId, fieldPath, value, expectedEtag) {
       : found.lesson.name;
     const lessonJson = isNameField
       ? { ...found.lesson.lessonJson }
-      : JSON.parse(JSON.stringify(found.lesson.lessonJson || {}));
+      : deepClone(found.lesson.lessonJson || {});
     if (!isNameField) __setByPath_(lessonJson, fieldPath, value);
 
     // Why: IME 入力中など、同じ値が複数回送られてくるケースがある。
@@ -601,7 +601,7 @@ function duplicateLesson(userId, sourceLessonId, options) {
       formTemplate: p.formTemplate,
       question: p.question,
       // templateOptions (軸ラベル / 選択肢) は教師の意図そのものなので必ず引き継ぐ
-      templateOptions: p.templateOptions ? JSON.parse(JSON.stringify(p.templateOptions)) : {},
+      templateOptions: p.templateOptions ? deepClone(p.templateOptions) : {},
       // 以下は「新しい Form を作る」ために必ず空にする
       formId: '', formUrl: '', spreadsheetId: '', sheetName: '',
       columnMapping: {}, displaySettings: {}
@@ -1092,7 +1092,7 @@ function __captureSnapshot_(userId, lessonJson, phaseIdx) {
     return baseSnapshot;
   }
 
-  const frozen = JSON.parse(JSON.stringify(rawRows));
+  const frozen = deepClone(rawRows);
   let total = 0;
   let truncated = false;
   for (let i = 0; i < frozen.length; i++) {
@@ -1160,7 +1160,7 @@ function startLesson(userId, lessonId) {
       return createErrorResponse('FORBIDDEN_STATE: lesson の状態が draft でないため開始できません');
     }
 
-    const lessonJson = JSON.parse(JSON.stringify(found.lesson.lessonJson || {}));
+    const lessonJson = deepClone(found.lesson.lessonJson || {});
     const phases = Array.isArray(lessonJson.phases) ? lessonJson.phases : [];
 
     // Pre-flight 検証
@@ -1297,7 +1297,7 @@ function advanceLessonPhase(userId, lessonId, direction) {
     }
 
     const dir = direction === 'previous' ? 'previous' : 'next';
-    const lessonJson = JSON.parse(JSON.stringify(found.lesson.lessonJson || {}));
+    const lessonJson = deepClone(found.lesson.lessonJson || {});
     const phases = lessonJson.phases || [];
     const fromIdx = __activePhaseIndex_(lessonJson);
     const toIdx = dir === 'next' ? fromIdx + 1 : fromIdx - 1;
@@ -1359,7 +1359,7 @@ function endLesson(userId, lessonId) {
       return createErrorResponse('FORBIDDEN_STATE: lesson が active でないため終了できません');
     }
 
-    const lessonJson = JSON.parse(JSON.stringify(found.lesson.lessonJson || {}));
+    const lessonJson = deepClone(found.lesson.lessonJson || {});
     const phases = lessonJson.phases || [];
 
     // 全 phase Form を close (締切)
