@@ -93,10 +93,15 @@ function setupSandbox({ initialTheme = null, prefersDark = true, hasBody = true 
   return { ctx, storage, mqlSubscribers: subscribers };
 }
 
-test('themeManager: default は dark (localStorage 未設定時)', () => {
-  const { ctx } = setupSandbox({ initialTheme: null });
-  assert.strictEqual(ctx.window.themeManager.get(), 'dark');
-  assert.strictEqual(ctx.window.themeManager.resolved(), 'dark');
+test('themeManager: default は auto (localStorage 未設定時、 OS 追従)', () => {
+  // OS が dark (prefersDark: true default)
+  const ctx1 = setupSandbox({ initialTheme: null, prefersDark: true }).ctx;
+  assert.strictEqual(ctx1.window.themeManager.get(), 'auto');
+  assert.strictEqual(ctx1.window.themeManager.resolved(), 'dark');
+  // OS が light
+  const ctx2 = setupSandbox({ initialTheme: null, prefersDark: false }).ctx;
+  assert.strictEqual(ctx2.window.themeManager.get(), 'auto');
+  assert.strictEqual(ctx2.window.themeManager.resolved(), 'light');
 });
 
 test('themeManager: set("light") で localStorage と body class が更新される', () => {
@@ -155,16 +160,16 @@ test('themeManager: subscribe コールバックが set/toggle で呼ばれる',
   assert.strictEqual(calls.length, 2);  // unsub 後は呼ばれない
 });
 
-test('themeManager: 不正な値は dark に正規化', () => {
+test('themeManager: 不正な値は auto に正規化', () => {
   const { ctx } = setupSandbox();
   ctx.window.themeManager.set('invalid-theme');
-  assert.strictEqual(ctx.window.themeManager.get(), 'dark');
+  assert.strictEqual(ctx.window.themeManager.get(), 'auto');
 });
 
-test('themeManager: localStorage が壊れていても dark default に落ちる', () => {
+test('themeManager: localStorage が壊れていても auto default に落ちる', () => {
   const { ctx } = setupSandbox({ initialTheme: 'corrupted-value' });
-  // 'corrupted-value' は VALID に含まれない → dark
-  assert.strictEqual(ctx.window.themeManager.get(), 'dark');
+  // 'corrupted-value' は VALID に含まれない → auto
+  assert.strictEqual(ctx.window.themeManager.get(), 'auto');
 });
 
 test('themeManager: mountToggle が button を append + クリックで toggle', () => {

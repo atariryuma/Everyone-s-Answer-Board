@@ -179,6 +179,31 @@
     });
   }
 
+  /**
+   * テーマ選択 (dark/light/auto) の AdminPanel UI を初期化する。
+   *   theme-select dropdown を themeManager と双方向 sync する。
+   *   localStorage で永続化される設定なので、 user config (configJson) には保存しない。
+   *   per-device 設定として位置付け (投影端末で light、 個人端末で dark など)。
+   */
+  function initThemeSelect() {
+    const select = document.getElementById('theme-select');
+    if (!select || !window.themeManager) return;
+
+    // 現在の theme を select に反映 (init 時のみ)
+    select.value = window.themeManager.get();
+
+    // ユーザー操作で変更されたら themeManager.set() で永続化 + body class 切替
+    select.addEventListener('change', () => {
+      window.themeManager.set(select.value);
+    });
+
+    // 他の経路 (view ヘッダーの sun/moon toggle 等) で変更された場合に追従
+    window.themeManager.subscribe((resolved, raw) => {
+      // raw は localStorage 値 ('dark' | 'light' | 'auto')
+      if (select.value !== raw) select.value = raw;
+    });
+  }
+
   async function init() {
     systemState.initializationStep = 'started';
 
@@ -194,6 +219,7 @@
 
       try { initSaveConfigWrapper(); } catch (e) { console.warn('initSaveConfigWrapper skipped:', e.message); }
       try { initPublishToggleWrapper(); } catch (e) { console.warn('initPublishToggleWrapper skipped:', e.message); }
+      try { initThemeSelect(); } catch (e) { console.warn('initThemeSelect skipped:', e.message); }
 
       systemState.initializationStep = 'completed';
       systemState.initialized = true;

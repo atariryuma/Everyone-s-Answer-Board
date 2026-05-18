@@ -523,6 +523,18 @@
                 リアクション数を表示
               </label>
             </div>
+            <!-- テーマ選択: 投影中に教室の明るさで切替えたい教師向け。
+                 view ヘッダーにも sun/moon ボタンを置いているが、 ここでは
+                 「明示的な 3 択 (Dark/Light/Auto)」 で詳細制御可能。 -->
+            <div class="mt-3 flex items-center gap-2 text-sm">
+              <label for="theme-select" class="text-slate-700 dark:text-gray-300">🎨 テーマ:</label>
+              <select id="theme-select" class="modern-select" style="flex: 0 0 auto; min-width: 140px;">
+                <option value="auto">自動 (OS追従)</option>
+                <option value="dark">ダーク</option>
+                <option value="light">ライト</option>
+              </select>
+              <span class="text-xs text-slate-600 dark:text-gray-400">教室の明るさに合わせて</span>
+            </div>
           </div>
 
           <!-- 可視化モード設定（M1 数直線 / M2 マトリクス散布図）。既定 'auto' でサーバ自動判定。 -->

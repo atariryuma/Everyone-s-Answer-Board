@@ -856,9 +856,11 @@
     function readStorage() {
       try {
         const v = localStorage.getItem(STORAGE_KEY);
-        return VALID.includes(v) ? v : 'dark';  // default dark (= 既存動作維持)
+        // default 'auto': OS の prefers-color-scheme に追従 (light/dark どちらも自動)。
+        //   既存ユーザー (storage 未設定) も auto に乗る (OS が dark なら dark のまま)。
+        return VALID.includes(v) ? v : 'auto';
       } catch (_) {
-        return 'dark';
+        return 'auto';
       }
     }
 
@@ -901,7 +903,7 @@
       get() { return readStorage(); },
       resolved() { return resolve(readStorage()); },
       set(value) {
-        if (!VALID.includes(value)) value = 'dark';
+        if (!VALID.includes(value)) value = 'auto';
         writeStorage(value);
         return apply(value);
       },

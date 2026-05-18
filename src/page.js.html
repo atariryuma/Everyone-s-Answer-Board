@@ -87,6 +87,7 @@
         headingLabel: document.getElementById('headingLabel'),
         endPublicationBtn: document.getElementById('endPublicationBtn'),
         adminToggleBtn: document.getElementById('adminToggleBtn'),
+        themeToggleHost: document.getElementById('themeToggleHost'),
         answerCount: document.getElementById('answerCount'),
         answerModalContainer: document.getElementById('answerModalContainer'),
         answerModalCloseBtn: document.getElementById('answerModalCloseBtn'),
@@ -269,6 +270,13 @@
         this.setupCriticalElements();
         this.showMinimalSkeleton();
         this.optimizeForLowPerformance();
+
+        // テーマ切替トグル: 投影中の教師が教室の明るさに応じて切替えられるよう
+        //   sort/filter 行末尾 (eab-actions 内) に sun/moon アイコンボタンを mount。
+        //   themeManager は SharedUtilities でロード時に init 済み (FOUC 防止)。
+        if (this.elements.themeToggleHost && window.themeManager) {
+          window.themeManager.mountToggle(this.elements.themeToggleHost);
+        }
 
         this.state.isAdminUser = window.UNIFIED_CONFIG?.isAdminUser || false;
         // Phase 2 lesson archive: review mode の検出 + read-only state。

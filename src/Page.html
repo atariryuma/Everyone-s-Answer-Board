@@ -228,9 +228,11 @@
           </div>
         </div>
 
-        <!-- Right group: 最終更新 + 編集者専用 admin actions -->
+        <!-- Right group: 最終更新 + テーマ切替 + 編集者専用 admin actions -->
         <div class="eab-actions">
           <span id="lastUpdatedText" class="eab-status" aria-live="polite"></span>
+          <!-- Theme toggle (themeManager.mountToggle が SVG button を注入) -->
+          <span id="themeToggleHost" class="theme-toggle-host"></span>
           <button type="button" id="adminToggleBtn"
                   class="admin-toggle eab-icon-btn editor-only hidden"
                   hidden aria-label="管理者モード切り替え">
