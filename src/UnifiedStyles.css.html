@@ -37,20 +37,23 @@
     /* =============================================================================
      * Brand & Core Colors - Primary Design System
      *
-     * Theme architecture (v2800+):
-     *   - `--brand-*` はブランドアイデンティティ (theme で書き換えない不変色)。
-     *   - `--theme-*` (下記) が semantic token で、 ライト/ダーク切替時に書き換える対象。
-     *   - 新規 CSS は `--theme-*` を使うこと。 ハードコード hex / rgba は禁止。
-     *   - `--brand-background` 等の旧 alias は段階的に `--theme-bg-base` 等に migrate 中。
+     * Theme architecture (v2800+, v2804 で alias 化):
+     *   - `--brand-primary/-accent/-like/-understand/-curious/-highlight` 等の純粋な
+     *     brand identity 色は theme 不変 (ダーク/ライト両方で同じ色相)。
+     *   - `--brand-background/-surface/-text/-border` は当初「不変」と分類していたが、
+     *     これらは文脈依存色 (背景/前景) であり theme 切替の対象。 v2804 で `--theme-*` の
+     *     エイリアスに変更し、 全 17+ 箇所の inline style / media query が自動 theme 追従。
      * ============================================================================= */
     --brand-primary: #3b82f6;
     --brand-primary-secondary: #1d4ed8;
     --brand-accent: #fbbf24;
     --brand-accent-light: #8be9fd;
-    --brand-background: #1a1b26;
-    --brand-surface: rgba(26, 27, 38, 0.7);
-    --brand-text: #c0caf5;
-    --brand-border: rgba(255, 255, 255, 0.1);
+    /* v2804: 旧名 --brand-background/-surface/-text/-border を --theme-* のエイリアスに変更。
+       既存の `body style="background: var(--brand-background)"` 等が theme 切替に追従するようになる。 */
+    --brand-background: var(--theme-bg-base);
+    --brand-surface: var(--theme-bg-surface);
+    --brand-text: var(--theme-text-primary);
+    --brand-border: var(--theme-border-subtle);
 
     /* =============================================================================
      * Semantic Theme Tokens (DARK = default, theme で書き換える対象)

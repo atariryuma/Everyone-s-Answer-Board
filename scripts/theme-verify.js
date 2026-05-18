@@ -232,6 +232,39 @@ record(
   sync.reason
 );
 
+// 8c. brand-background/-surface/-text/-border が theme-aware (v2804 root cause チェック)
+//   これらの旧変数を直接参照している inline style や CSS が theme 切替時に dark 固定になる
+//   バグ (2026-05-19 user 報告) の再発防止。 :root で --theme-* のエイリアスになっているか検証。
+function checkBrandAliasing() {
+  const css = fs.readFileSync(path.join(SRC_DIR, 'UnifiedStyles.css.html'), 'utf8');
+  const rootBody = (css.match(/:root\s*\{[\s\S]*?\}\s*(?=\n|$)/) || [''])[0];
+  // 各 brand-* alias が var(--theme-*) を参照しているか
+  const aliases = {
+    '--brand-background': /--brand-background\s*:\s*var\(--theme-bg-base\)/,
+    '--brand-surface': /--brand-surface\s*:\s*var\(--theme-bg-surface\)/,
+    '--brand-text': /--brand-text\s*:\s*var\(--theme-text-primary\)/,
+    '--brand-border': /--brand-border\s*:\s*var\(--theme-border-subtle\)/,
+  };
+  const missing = Object.entries(aliases)
+    .filter(([, re]) => !re.test(rootBody))
+    .map(([name]) => name);
+  return {
+    ok: missing.length === 0,
+    missing,
+    reason: missing.length === 0
+      ? '4 alias 完備 (--brand-background/-surface/-text/-border → --theme-*)'
+      : `エイリアス化されていない brand 変数: ${missing.join(', ')} (theme 切替に追従しない)`,
+  };
+}
+
+const alias = checkBrandAliasing();
+record(
+  '8c. brand-* → theme-* alias',
+  10,
+  alias.ok,
+  alias.reason
+);
+
 // =====================================================================
 // 9. UI mount 点
 // =====================================================================
