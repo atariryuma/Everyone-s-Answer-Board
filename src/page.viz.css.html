@@ -50,7 +50,7 @@
     /* stroke-opacity も transition 対象に: リアクションリング (色枠) のフェードを滑らかに */
     transition: r 120ms ease, stroke-width 120ms ease, stroke-opacity 120ms ease, opacity 200ms ease;
     fill: var(--theme-accent-cyan);
-    stroke: rgba(255, 255, 255, 0.55);  /* viz dot 境界線、 dark/light で半透明白を維持 */
+    stroke: rgba(255, 255, 255, 0.55);  /* theme:exempt - cyan dot 上の白縁取り (separator) */
     stroke-width: 1.3;
     opacity: 0.85;
   }
@@ -94,7 +94,7 @@
     font-weight: 700;
     fill: var(--theme-text-inverse);  /* dot 上に重ねるので背景と反転色 */
     paint-order: stroke fill;
-    stroke: rgba(255, 255, 255, 0.9);
+    stroke: rgba(255, 255, 255, 0.9);  /* theme:exempt - colored dot 上の白ハロー (badge separator) */
     stroke-width: 2.5;
   }
   /* 比較モード ON 中で議論前未保存のとき、compare ボタンに「使えない」ヒント */
@@ -107,7 +107,7 @@
   .viz-rows-popup {
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.55);
+    background: var(--theme-bg-overlay);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -152,6 +152,10 @@
     display: flex;
     flex-direction: column;
     gap: 8px;
+  }
+  .viz-rows-popup-empty {
+    text-align: center;
+    color: var(--theme-text-muted);
   }
   .viz-rows-popup-row {
     background: var(--theme-overlay-black-60);
@@ -290,6 +294,9 @@
     font-weight: 700;
     color: var(--theme-accent-cyan);
     margin-right: 0.4rem;
+  }
+  .viz-tooltip .tooltip-empty {
+    color: var(--theme-text-muted);
   }
   /* 同座標カウント: forceCollide で散らばって見えるドット塊の本当の人数を伝える行。
      主たる回答テキストと視覚的に分離するため上に薄い区切り線。 */

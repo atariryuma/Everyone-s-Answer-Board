@@ -159,8 +159,8 @@
         <!-- ヘッダー -->
         <div class="text-center mb-8">
           <h1 class="text-4xl font-bold text-cyan-400 mb-2">🎓 みんなの回答ボード</h1>
-          <p class="text-xl text-gray-300">ログイン</p>
-          <p class="text-sm text-gray-400 mt-2">
+          <p class="text-xl text-slate-700 dark:text-gray-300">ログイン</p>
+          <p class="text-sm text-slate-600 dark:text-gray-400 mt-2">
             新規ユーザーは自動登録、既存ユーザーは管理パネルへ自動遷移
           </p>
         </div>
@@ -240,8 +240,8 @@
 
         <!-- アカウント情報 -->
         <div class="glass-panel rounded-xl p-6 mb-6">
-          <h2 class="text-lg font-semibold text-white mb-4">📧 使用するアカウント</h2>
-          <div class="p-3 bg-gray-800 rounded-lg">
+          <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">📧 使用するアカウント</h2>
+          <div class="p-3 bg-white dark:bg-gray-800 rounded-lg">
             <div class="text-cyan-400 font-medium" id="user-email-display">
               ユーザー情報を取得中...
             </div>
@@ -272,7 +272,7 @@
             <button
               type="button"
               onclick="showSecurityModal()"
-              class="text-xs text-gray-500 hover:text-gray-400 underline transition-colors duration-200"
+              class="text-xs text-slate-500 dark:text-gray-500 hover:text-gray-400 underline transition-colors duration-200"
             >
               セキュリティ仕様について
             </button>
@@ -290,28 +290,28 @@
         class="glass-panel rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto transition-transform duration-300"
       >
         <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-semibold text-white">🔒 セキュリティ仕様</h3>
-          <button type="button" onclick="closeSecurityModal()" class="text-gray-400 hover:text-white text-2xl">
+          <h3 class="text-xl font-semibold text-slate-900 dark:text-white">🔒 セキュリティ仕様</h3>
+          <button type="button" onclick="closeSecurityModal()" class="text-slate-600 dark:text-gray-400 hover:text-white text-2xl">
             ✕
           </button>
         </div>
 
-        <div class="space-y-4 text-sm text-gray-300">
-          <div class="bg-gray-800 p-4 rounded-lg">
+        <div class="space-y-4 text-sm text-slate-700 dark:text-gray-300">
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg">
             <h4 class="font-medium text-cyan-400 mb-2">🏢 ドメイン制限</h4>
             <p>
               このシステムは<strong>管理者と同一ドメイン</strong>のユーザーのみアクセス可能です。組織外からのアクセスは制限されています。
             </p>
           </div>
 
-          <div class="bg-gray-800 p-4 rounded-lg">
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg">
             <h4 class="font-medium text-cyan-400 mb-2">🔐 認証システム</h4>
             <p>
               Google Workspace認証（Session.getActiveUser()）を使用しており、組織のセキュリティポリシーに準拠しています。
             </p>
           </div>
 
-          <div class="bg-gray-800 p-4 rounded-lg">
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg">
             <h4 class="font-medium text-cyan-400 mb-2">🛡️ データ保護</h4>
             <ul class="list-disc list-inside space-y-1">
               <li>Content Security Policy (CSP) による外部リソース制限</li>
@@ -321,21 +321,21 @@
             </ul>
           </div>
 
-          <div class="bg-gray-800 p-4 rounded-lg">
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg">
             <h4 class="font-medium text-cyan-400 mb-2">👥 アクセス制御</h4>
             <p>
               マルチテナント環境での権限分離により、ユーザーは自分のデータのみアクセス可能です。管理者権限は適切に分離されています。
             </p>
           </div>
 
-          <div class="bg-gray-800 p-4 rounded-lg">
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg">
             <h4 class="font-medium text-cyan-400 mb-2">📝 監査ログ</h4>
             <p>
               重要度の高いセキュリティイベントは監査ログに記録され、追跡と分析が可能です。
             </p>
           </div>
 
-          <div class="bg-gray-800 p-4 rounded-lg">
+          <div class="bg-white dark:bg-gray-800 p-4 rounded-lg">
             <h4 class="font-medium text-cyan-400 mb-2">⚙️ システム設計</h4>
             <p>
               Google Apps
@@ -347,7 +347,7 @@
         <div class="mt-6 text-center">
           <button
             onclick="closeSecurityModal()"
-            class="btn btn-secondary text-white py-2 px-6 rounded-lg"
+            class="btn btn-secondary text-slate-900 dark:text-white py-2 px-6 rounded-lg"
           >
             閉じる
           </button>

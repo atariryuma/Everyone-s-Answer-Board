@@ -221,7 +221,7 @@
       '    <h4>', safeTitle, '</h4>',
       '    <button type="button" class="viz-rows-popup-close" aria-label="閉じる">×</button>',
       '  </div>',
-      '  <div class="viz-rows-popup-body">', cards || '<p style="text-align:center;color:#94a3b8">該当する回答がありません</p>', '</div>',
+      '  <div class="viz-rows-popup-body">', cards || '<p class="viz-rows-popup-empty">該当する回答がありません</p>', '</div>',
       '</div>'
     ].join('');
     document.body.appendChild(popup);
@@ -401,7 +401,7 @@
 
     tip.innerHTML =
       `<div class="tooltip-meta">${headerText}${item.class ? ' / ' + escapeForTooltip(item.class) : ''}</div>` +
-      `<div><span class="tooltip-value">${valueText}</span>${commentText || '<em style="color:#94a3b8">（コメントなし）</em>'}</div>` +
+      `<div><span class="tooltip-value">${valueText}</span>${commentText || '<em class="tooltip-empty">（コメントなし）</em>'}</div>` +
       sameCoordText;
     tip.classList.add('visible');
 

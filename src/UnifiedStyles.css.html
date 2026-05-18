@@ -250,37 +250,48 @@
    * ============================================================================= */
   body.theme-light,
   :root[data-theme="light"] {
-    /* 背景レイヤー */
-    --theme-bg-base: #f8fafc;                          /* slate-50 (placeholder) */
-    --theme-bg-surface: rgba(255, 255, 255, 0.85);     /* white surface */
-    --theme-bg-elevated: rgba(255, 255, 255, 0.95);
-    --theme-bg-overlay: rgba(15, 23, 42, 0.4);
+    /* ライトモード配色 (v2801 確定値)
+     * 根拠: Tailwind slate (cool, projector-friendly) + shadcn de facto baseline +
+     *       WCAG 2.1 AA + 子供向け readability 配慮 (muted を slate-500 → slate-600 に昇格)。
+     * 検証: theme-contrast script で全 contrast pass を確認済。
+     */
 
-    /* テキスト階層 */
-    --theme-text-primary: #1e293b;                     /* slate-800 */
-    --theme-text-secondary: #475569;                   /* slate-600 */
-    --theme-text-muted: #64748b;                       /* slate-500 */
-    --theme-text-inverse: #f8fafc;
+    /* 背景レイヤー — off-white base + 白カード (自然な elevation) */
+    --theme-bg-base: #f8fafc;                          /* slate-50: 純白回避で疲労低減 */
+    --theme-bg-surface: rgba(255, 255, 255, 0.92);     /* 白カードに alpha 高めで content 視認確保 */
+    --theme-bg-elevated: #ffffff;                      /* modal は完全不透明 */
+    --theme-bg-overlay: rgba(15, 23, 42, 0.4);         /* modal backdrop = slate-900 半透明 */
 
-    /* 境界線 */
-    --theme-border-subtle: rgba(15, 23, 42, 0.1);
-    --theme-border-normal: rgba(15, 23, 42, 0.2);
-    --theme-border-strong: rgba(15, 23, 42, 0.3);
+    /* テキスト階層 — children-friendly に muted を slate-600 まで昇格 */
+    --theme-text-primary: #1e293b;                     /* slate-800: 14.4:1 (slate-900 14.4は強すぎ) */
+    --theme-text-secondary: #334155;                   /* slate-700: 10.8:1 */
+    --theme-text-muted: #475569;                       /* slate-600: 7.6:1 (slate-500 4.5:1 は子供には弱い) */
+    --theme-text-inverse: #f8fafc;                     /* 反転背景上のテキスト */
 
-    /* 半透明オーバーレイ (light 用に black-overlay は反転) */
-    --theme-overlay-white-05: rgba(15, 23, 42, 0.04);
-    --theme-overlay-white-10: rgba(15, 23, 42, 0.06);
-    --theme-overlay-white-20: rgba(15, 23, 42, 0.1);
-    --theme-overlay-white-30: rgba(15, 23, 42, 0.15);
-    --theme-overlay-black-20: rgba(15, 23, 42, 0.1);
-    --theme-overlay-black-60: rgba(15, 23, 42, 0.25);
-    --theme-overlay-black-90: rgba(15, 23, 42, 0.5);
+    /* 境界線 — solid color に変更 (rgba から) */
+    --theme-border-subtle: #e2e8f0;                    /* slate-200 (shadcn 標準) */
+    --theme-border-normal: #cbd5e1;                    /* slate-300 (form input 境界) */
+    --theme-border-strong: #94a3b8;                    /* slate-400 (focus / active) */
+
+    /* 半透明オーバーレイ (反転: white → slate-900 alpha) */
+    --theme-overlay-white-05: rgba(15, 23, 42, 0.03);
+    --theme-overlay-white-10: rgba(15, 23, 42, 0.05);
+    --theme-overlay-white-20: rgba(15, 23, 42, 0.08);
+    --theme-overlay-white-30: rgba(15, 23, 42, 0.12);
+    --theme-overlay-black-20: rgba(15, 23, 42, 0.08);  /* shadow は light でも slate */
+    --theme-overlay-black-60: rgba(15, 23, 42, 0.2);
+    --theme-overlay-black-90: rgba(15, 23, 42, 0.4);
     --theme-overlay-surface-glass: rgba(255, 255, 255, 0.95);
 
-    /* インジケーター / アクセント (light の cyan はやや濃く) */
-    --theme-spinner: #0284c7;                          /* sky-600 */
-    --theme-accent-cyan: #0284c7;
-    --theme-accent-cyan-soft: rgba(56, 189, 248, 0.12);
+    /* インジケーター / アクセント (light 上で WCAG AA 確保: cyan は 3 段下げ) */
+    --theme-spinner: #0891b2;                          /* cyan-600 (dark の cyan-300 から 3 段下) */
+    --theme-accent-cyan: #0e7490;                      /* cyan-700: 5.4:1 on slate-50 ✓ AA */
+    --theme-accent-cyan-soft: rgba(14, 116, 144, 0.1); /* cyan-700 系の薄背景 */
+
+    /* Brand / Status colors の light 上 contrast 確保 (light 専用上書き) */
+    --brand-understand: #b45309;                       /* amber-700: 6.0:1 (dark の amber-400 は light で 1.6:1 fail) */
+    --status-success: #15803d;                         /* emerald-700: 5.6:1 (dark の emerald-500 は light で 2.4 fail) */
+    --status-warning: #a16207;                         /* amber-700: 5.6:1 (dark の amber-500 は light で 2.1 fail) */
   }
 
   /* Base Styles - Unified body element */
@@ -295,6 +306,31 @@
     flex-direction: column;
     line-height: 1.6;
     overflow-x: hidden;
+  }
+
+  /* Theme toggle button (sun/moon) — themeManager.mountToggle 経由でマウント */
+  .theme-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: 8px;
+    color: var(--theme-text-secondary);
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  }
+  .theme-toggle-btn:hover {
+    background: var(--theme-overlay-white-10);
+    border-color: var(--theme-border-normal);
+    color: var(--theme-text-primary);
+  }
+  .theme-toggle-btn:focus-visible {
+    outline: 2px solid var(--theme-accent-cyan);
+    outline-offset: 2px;
   }
 
   /* Glass Panel Effects */
@@ -1395,9 +1431,9 @@
     gap: 0.35rem;
     padding: 0.3rem 0.7rem;
     border-radius: 9999px;
-    background: rgba(59, 130, 246, 0.18);
+    background: rgba(59, 130, 246, 0.18);  /* brand-primary 薄背景 */
     border: 1px solid rgba(96, 165, 250, 0.45);
-    color: #e2e8f0;
+    color: var(--theme-text-primary);
     font-size: 0.85rem;
     cursor: default;
   }
@@ -1410,7 +1446,7 @@
   .class-chip-known:hover {
     background: rgba(59, 130, 246, 0.18);
     border-color: rgba(96, 165, 250, 0.45);
-    color: #fff;
+    color: var(--theme-text-primary);
   }
   .class-chip-remove {
     background: none;
@@ -1421,7 +1457,7 @@
     line-height: 1;
     padding: 0 0.15rem;
   }
-  .class-chip-remove:hover { color: #f87171; }
+  .class-chip-remove:hover { color: var(--status-error); }
   .class-preset-row {
     display: flex;
     flex-wrap: wrap;
@@ -1438,7 +1474,7 @@
     border-radius: 0.4rem;
     background: rgba(30, 41, 59, 0.7);
     border: 1px solid rgba(71, 85, 105, 0.6);
-    color: #cbd5e1;
+    color: var(--theme-text-secondary);
     font-size: 0.8rem;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -1446,12 +1482,12 @@
   .btn-class-preset:hover {
     background: rgba(59, 130, 246, 0.2);
     border-color: rgba(96, 165, 250, 0.5);
-    color: #fff;
+    color: var(--theme-text-primary);
   }
   .btn-class-preset.active {
     background: rgba(59, 130, 246, 0.3);
     border-color: rgba(96, 165, 250, 0.7);
-    color: #fff;
+    color: var(--theme-text-primary);
   }
   .class-custom-add summary {
     cursor: pointer;
@@ -1459,7 +1495,7 @@
     font-size: 0.85rem;
     padding: 0.3rem 0;
   }
-  .class-custom-add[open] summary { color: #cbd5e1; }
+  .class-custom-add[open] summary { color: var(--theme-text-secondary); }
 
   /* Wizard progress dots (Stripe 風) */
   .lesson-step-dot {
@@ -1518,7 +1554,7 @@
     transition: color 0.15s ease, background 0.15s ease;
   }
   .phase-delete-btn:hover {
-    color: #f87171;
+    color: var(--status-error);
     background: rgba(248, 113, 113, 0.1);
   }
   .phase-field {
@@ -1646,7 +1682,7 @@
     color: rgba(148, 163, 184, 0.7);
     font-size: 1rem; cursor: pointer; padding: 0 0.3rem;
   }
-  .phase-choice-del:hover { color: #f87171; }
+  .phase-choice-del:hover { color: var(--status-error); }
   .phase-choice-add {
     align-self: flex-start;
     padding: 0.25rem 0.7rem;
@@ -1722,7 +1758,7 @@
     max-width: 100%; max-height: 160px;
     border-radius: 0.3rem;
     border: 1px solid rgba(148, 163, 184, 0.3);
-    background: #000;
+    background: var(--theme-bg-base);  /* 画像背景 (透過 PNG 用) */
   }
   .phase-image-clear {
     background: rgba(248, 113, 113, 0.18);
@@ -1886,7 +1922,7 @@
     background: transparent;
     border: 1px solid transparent;
     border-radius: 0.4rem;
-    color: #e2e8f0;
+    color: var(--theme-text-primary);
     cursor: pointer;
     margin-bottom: 0.25rem;
     transition: all 0.15s ease;
@@ -2025,7 +2061,7 @@
     background: transparent;
     border: 1px solid transparent;
     border-radius: 0.35rem;
-    color: #e2e8f0;
+    color: var(--theme-text-primary);
     font-size: 0.85rem;
     cursor: pointer;
     transition: all 0.12s ease;
@@ -2066,7 +2102,7 @@
     background: transparent;
     border: 1px solid transparent;
     border-radius: 0.35rem;
-    color: #e2e8f0;
+    color: var(--theme-text-primary);
     cursor: pointer;
     margin-bottom: 0.2rem;
     transition: all 0.12s ease;

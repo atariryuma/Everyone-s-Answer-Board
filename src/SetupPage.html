@@ -20,26 +20,26 @@
     <!-- ヘッダー -->
     <div class="text-center mb-6">
       <h1 class="text-4xl font-bold text-cyan-400 mb-2">📚 みんなの回答ボード</h1>
-      <p class="text-xl text-gray-300">初回セットアップ</p>
-      <p class="text-sm text-gray-400 mt-2">システムを使用開始するための設定を行います</p>
+      <p class="text-xl text-slate-700 dark:text-gray-300">初回セットアップ</p>
+      <p class="text-sm text-slate-600 dark:text-gray-400 mt-2">システムを使用開始するための設定を行います</p>
     </div>
 
 
     <!-- セットアップフォーム -->
     <div class="glass-panel rounded-xl p-6 mb-6">
-      <h2 class="text-xl font-semibold text-white mb-4">🔧 システム設定</h2>
+      <h2 class="text-xl font-semibold text-slate-900 dark:text-white mb-4">🔧 システム設定</h2>
 
       <form id="setup-form" class="space-y-6">
         <!-- サービスアカウントJSON -->
         <div>
-          <label for="service-account-json" class="block text-sm font-medium text-gray-300 mb-2">
+          <label for="service-account-json" class="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
             🔑 サービスアカウントJSONキー
           </label>
           <textarea id="service-account-json" name="serviceAccountJson" rows="8"
-            class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 font-mono text-xs resize-vertical focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+            class="w-full p-3 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-lg text-slate-900 dark:text-gray-100 font-mono text-xs resize-vertical focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
             placeholder='{"type": "service_account", "project_id": "...", "private_key_id": "...", ...}'
             required></textarea>
-          <p class="text-xs text-gray-400 mt-1">
+          <p class="text-xs text-slate-600 dark:text-gray-400 mt-1">
             Google Cloud
             ConsoleからダウンロードしたサービスアカウントのJSONファイルの内容を貼り付けてください
           </p>
@@ -47,53 +47,53 @@
 
         <!-- データベーススプレッドシートID -->
         <div>
-          <label for="database-id" class="block text-sm font-medium text-gray-300 mb-2">
+          <label for="database-id" class="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
             📊 データベーススプレッドシートID
           </label>
           <div class="flex gap-2">
             <input type="text" id="database-id" name="databaseId"
-              class="flex-1 p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+              class="flex-1 p-3 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-lg text-slate-900 dark:text-gray-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
               placeholder="1BcD3fGhIjKlMnOpQrStUvWxYz0123456789ABCDEFGH" pattern="[a-zA-Z0-9_\-]{44}" maxlength="44"
               required />
             <button type="button" id="create-db-btn" onclick="createDatabaseAuto()"
-              class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium rounded-lg whitespace-nowrap transition-colors">
+              class="px-4 py-3 bg-emerald-600 hover:bg-emerald-700 text-slate-900 dark:text-white text-sm font-medium rounded-lg whitespace-nowrap transition-colors">
               自動作成
             </button>
           </div>
-          <p class="text-xs text-gray-400 mt-1">
+          <p class="text-xs text-slate-600 dark:text-gray-400 mt-1">
             既存のスプレッドシートIDを入力するか、「自動作成」でGASと同じフォルダに新規作成できます
           </p>
         </div>
 
         <!-- 管理者メールアドレス -->
         <div>
-          <label for="admin-email" class="block text-sm font-medium text-gray-300 mb-2">
+          <label for="admin-email" class="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
             👤 管理者メールアドレス
           </label>
           <input type="email" id="admin-email" name="adminEmail"
-            class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+            class="w-full p-3 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-lg text-slate-900 dark:text-gray-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
             placeholder="admin@example.com" required />
-          <p class="text-xs text-gray-400 mt-1">
+          <p class="text-xs text-slate-600 dark:text-gray-400 mt-1">
             システム管理者のメールアドレスを入力してください
           </p>
         </div>
 
         <!-- Google Client ID（オプション） -->
         <div>
-          <label for="google-client-id" class="block text-sm font-medium text-gray-300 mb-2">
-            🔐 Google Client ID <span class="text-gray-500">(オプション)</span>
+          <label for="google-client-id" class="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2">
+            🔐 Google Client ID <span class="text-slate-500 dark:text-gray-500">(オプション)</span>
           </label>
           <input type="text" id="google-client-id" name="googleClientId"
-            class="w-full p-3 bg-gray-800 border border-gray-600 rounded-lg text-gray-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+            class="w-full p-3 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-lg text-slate-900 dark:text-gray-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
             placeholder="123456789012-abcdefghijklmnopqrstuvwxyz123456.apps.googleusercontent.com" />
-          <p class="text-xs text-gray-400 mt-1">
+          <p class="text-xs text-slate-600 dark:text-gray-400 mt-1">
             Google認証を使用する場合は、OAuth 2.0クライアントIDを入力してください
           </p>
         </div>
 
         <!-- セットアップボタン -->
         <button type="submit" id="setup-btn"
-          class="w-full btn bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-white font-bold py-3 px-6 rounded-lg">
+          class="w-full btn bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-700 hover:to-blue-700 text-slate-900 dark:text-white font-bold py-3 px-6 rounded-lg">
           <span id="setup-text">🚀 セットアップを開始</span>
           <div id="setup-spinner" class="spinner-xs mx-auto hidden"></div>
         </button>
@@ -102,17 +102,17 @@
 
     <!-- テストセクション（セットアップ後に表示） -->
     <div id="test-section" class="glass-panel rounded-xl p-6 hidden">
-      <h3 class="text-lg font-semibold text-white mb-4">✅ セットアップ完了</h3>
-      <p class="text-gray-300 mb-4">
+      <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">✅ セットアップ完了</h3>
+      <p class="text-slate-700 dark:text-gray-300 mb-4">
         セットアップが正常に完了しました。システムの動作確認を行えます。
       </p>
       <button type="button" id="test-btn"
-        class="btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-bold py-2 px-4 rounded-lg">
+        class="btn bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-slate-900 dark:text-white font-bold py-2 px-4 rounded-lg">
         🔍 システムテスト実行
       </button>
       <div class="mt-4">
         <a id="start-studyquest-btn" target="_top"
-          class="inline-block btn bg-gradient-to-r from-gray-600 to-gray-600 text-gray-400 font-bold py-2 px-4 rounded-lg text-center pointer-events-none">
+          class="inline-block btn bg-gradient-to-r from-gray-600 to-gray-600 text-slate-600 dark:text-gray-400 font-bold py-2 px-4 rounded-lg text-center pointer-events-none">
           読み込み中...
         </a>
       </div>
@@ -120,13 +120,13 @@
 
     <!-- ヘルプセクション -->
     <div class="glass-panel rounded-xl p-6">
-      <h3 class="text-lg font-semibold text-white mb-4">❓ セットアップでお困りの場合</h3>
-      <div class="space-y-3 text-sm text-gray-300">
+      <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">❓ セットアップでお困りの場合</h3>
+      <div class="space-y-3 text-sm text-slate-700 dark:text-gray-300">
         <details class="cursor-pointer">
           <summary class="font-medium text-cyan-400 hover:text-cyan-300">
             サービスアカウントJSONの取得方法
           </summary>
-          <div class="mt-2 pl-4 text-gray-400">
+          <div class="mt-2 pl-4 text-slate-600 dark:text-gray-400">
             <ol class="list-decimal list-inside space-y-1">
               <li>Google Cloud Consoleにアクセス</li>
               <li>プロジェクトを選択または作成</li>
@@ -140,7 +140,7 @@
           <summary class="font-medium text-cyan-400 hover:text-cyan-300">
             スプレッドシートIDの取得方法
           </summary>
-          <div class="mt-2 pl-4 text-gray-400">
+          <div class="mt-2 pl-4 text-slate-600 dark:text-gray-400">
             <ol class="list-decimal list-inside space-y-1">
               <li>Google Sheetsで新しいスプレッドシートを作成</li>
               <li>URLから44文字のIDをコピー（/d/の後の部分）</li>
@@ -329,8 +329,8 @@
         }
         btn.href = url + '?mode=login';
         btn.textContent = 'みんなの回答ボードを開始';
-        btn.classList.remove('pointer-events-none', 'from-gray-600', 'to-gray-600', 'text-gray-400');
-        btn.classList.add('from-purple-600', 'to-pink-600', 'hover:from-purple-700', 'hover:to-pink-700', 'text-white');
+        btn.classList.remove('pointer-events-none', 'from-gray-600', 'to-gray-600', 'text-slate-600', 'dark:text-gray-400');
+        btn.classList.add('from-purple-600', 'to-pink-600', 'hover:from-purple-700', 'hover:to-pink-700', 'text-slate-900', 'dark:text-white');
       } catch (_) {
         btn.textContent = 'URL取得失敗 — 再読み込みしてください';
       }

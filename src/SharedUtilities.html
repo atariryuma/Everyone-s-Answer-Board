@@ -657,8 +657,8 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
         </div>
-        <h3 class="text-xl font-bold text-white mb-2">${esc(title)}</h3>
-        <p class="text-gray-300 mb-6">${esc(message)}</p>
+        <h3 class="text-xl font-bold text-slate-900 dark:text-white mb-2">${esc(title)}</h3>
+        <p class="text-slate-700 dark:text-gray-300 mb-6">${esc(message)}</p>
         <button type="button" id="redirect-btn" class="w-full px-6 py-3 bg-gradient-to-r ${colorClasses} text-white rounded-lg font-semibold text-base transition-all transform hover:scale-105 shadow-lg">
           ${esc(buttonLabel)}
         </button>
@@ -708,15 +708,15 @@
       const modal = document.createElement('div');
       modal.id = 'app-modal';
       modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10002]';
-      const title = opts && opts.title ? `<h3 class="text-lg font-bold text-white mb-3">${esc(opts.title)}</h3>` : '';
+      const title = opts && opts.title ? `<h3 class="text-lg font-bold text-slate-900 dark:text-white mb-3">${esc(opts.title)}</h3>` : '';
       const cancelBtn = (opts && opts.kind === 'confirm')
-        ? `<button type="button" id="app-modal-cancel" class="flex-1 px-4 py-2.5 bg-gray-700 hover:bg-gray-600 text-white rounded-lg font-semibold transition-colors">${esc((opts && opts.cancelLabel) || 'キャンセル')}</button>`
+        ? `<button type="button" id="app-modal-cancel" class="flex-1 px-4 py-2.5 bg-slate-50 dark:bg-gray-700 hover:bg-gray-600 text-slate-900 dark:text-white rounded-lg font-semibold transition-colors">${esc((opts && opts.cancelLabel) || 'キャンセル')}</button>`
         : '';
       const okLabel = (opts && opts.okLabel) || (opts && opts.kind === 'confirm' ? 'OK' : 'わかった');
       modal.innerHTML = `
         <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
           ${title}
-          <p class="text-gray-200 mb-5 whitespace-pre-wrap">${esc(opts && opts.message)}</p>
+          <p class="text-slate-800 dark:text-gray-200 mb-5 whitespace-pre-wrap">${esc(opts && opts.message)}</p>
           <div class="flex gap-3">
             ${cancelBtn}
             <button type="button" id="app-modal-ok" class="flex-1 px-4 py-2.5 bg-gradient-to-r ${okClasses} text-white rounded-lg font-semibold transition-all">${esc(okLabel)}</button>
@@ -926,6 +926,44 @@
     } else {
       window.onDOMReady(() => window.themeManager.init());
     }
+
+    /**
+     * テーマ切替トグルボタン (sun/moon icon) を任意のコンテナに append する helper。
+     *
+     * 使い方:
+     *   themeManager.mountToggle(document.getElementById('header-actions'))
+     *
+     * - dark 時に sun icon (light モードへ切替予告)
+     * - light 時に moon icon (dark モードへ切替予告)
+     * - クリックで themeManager.toggle()
+     * - aria-label / tabindex / focus ring 完備
+     */
+    window.themeManager.mountToggle = function (container) {
+      if (!container) return null;
+      if (container.querySelector('.theme-toggle-btn')) {
+        return container.querySelector('.theme-toggle-btn');
+      }
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'theme-toggle-btn';
+      btn.setAttribute('aria-label', 'テーマ切替 (ダーク/ライト)');
+      btn.title = 'テーマ切替 (ダーク/ライト)';
+      const renderIcon = () => {
+        const cur = window.themeManager.resolved();
+        if (cur === 'dark') {
+          // sun icon (currently dark → 押すと light)
+          btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+        } else {
+          // moon icon (currently light → 押すと dark)
+          btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
+        }
+      };
+      btn.addEventListener('click', () => window.themeManager.toggle());
+      window.themeManager.subscribe(renderIcon);
+      renderIcon();
+      container.appendChild(btn);
+      return btn;
+    };
   })();
 
   /**
@@ -1094,9 +1132,9 @@
           });
 
       container.innerHTML = `
-        <div class="bg-gray-800 rounded-lg p-4 mb-4">
-          <p class="text-sm text-gray-400 mb-1">認証済みアカウント:</p>
-          <p class="text-white font-semibold">${safeEmail}</p>
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 mb-4">
+          <p class="text-sm text-slate-600 dark:text-gray-400 mb-1">認証済みアカウント:</p>
+          <p class="text-slate-900 dark:text-white font-semibold">${safeEmail}</p>
         </div>
         ${showSwitchOption
           ? `

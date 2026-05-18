@@ -166,3 +166,51 @@ test('themeManager: localStorage が壊れていても dark default に落ちる
   // 'corrupted-value' は VALID に含まれない → dark
   assert.strictEqual(ctx.window.themeManager.get(), 'dark');
 });
+
+test('themeManager: mountToggle が button を append + クリックで toggle', () => {
+  const { ctx } = setupSandbox();
+  // mountToggle 用に簡易 container を作る
+  const appendedChildren = [];
+  const container = {
+    querySelector: () => null,
+    appendChild: (el) => { appendedChildren.push(el); return el; },
+  };
+  // document.createElement('button') の mock — btn 自身を返してそのまま inspect
+  let createdBtn = null;
+  ctx.document.createElement = (tag) => {
+    if (tag !== 'button') return { _classes: new Set(), classList: { add: () => {}, remove: () => {} } };
+    const btn = {
+      type: '',
+      className: '',
+      title: '',
+      innerHTML: '',
+      _attrs: {},
+      _listeners: [],
+      setAttribute(k, v) { this._attrs[k] = v; },
+      addEventListener(ev, cb) { this._listeners.push({ ev, cb }); },
+    };
+    createdBtn = btn;
+    return btn;
+  };
+
+  const result = ctx.window.themeManager.mountToggle(container);
+  assert.ok(result, 'mountToggle が button を返す');
+  assert.strictEqual(appendedChildren.length, 1, 'container に append される');
+  assert.strictEqual(createdBtn.type, 'button');
+  assert.ok(createdBtn._attrs['aria-label'], 'aria-label が付与される');
+  // dark テーマ → sun icon (<circle> が含まれる)
+  assert.ok(createdBtn.innerHTML.includes('<circle'), 'dark テーマでは sun icon');
+
+  // click handler を取り出して実行
+  const clickHandler = createdBtn._listeners.find(l => l.ev === 'click');
+  assert.ok(clickHandler, 'click listener が登録される');
+  clickHandler.cb();
+  assert.strictEqual(ctx.window.themeManager.get(), 'light');
+  // light に切替後、 icon が moon (<path>) に
+  assert.ok(createdBtn.innerHTML.includes('<path'), 'light テーマでは moon icon');
+});
+
+test('themeManager: mountToggle は container 無しなら null', () => {
+  const { ctx } = setupSandbox();
+  assert.strictEqual(ctx.window.themeManager.mountToggle(null), null);
+});

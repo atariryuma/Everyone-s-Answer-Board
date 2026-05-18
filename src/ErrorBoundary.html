@@ -31,8 +31,8 @@
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans min-h-screen flex items-center justify-center p-4">
     <div class="max-w-lg w-full text-center space-y-6">
       <div class="text-5xl" role="img" aria-label="警告">&#x26A0;&#xFE0F;</div>
-      <h1 class="text-2xl font-bold text-gray-100"><?= title || 'エラーが発生しました' ?></h1>
-      <p class="text-gray-300 leading-relaxed">
+      <h1 class="text-2xl font-bold text-slate-900 dark:text-gray-100"><?= title || 'エラーが発生しました' ?></h1>
+      <p class="text-slate-700 dark:text-gray-300 leading-relaxed">
         <?= message || 'システムエラーが発生しました。管理者にお問い合わせください。' ?>
       </p>
 
@@ -40,7 +40,7 @@
         <button type="button" class="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="safeReload()">
           再読み込み
         </button>
-        <button type="button" class="px-5 py-2.5 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="goToTop()">
+        <button type="button" class="px-5 py-2.5 bg-slate-50 dark:bg-gray-700 hover:bg-gray-600 text-slate-800 dark:text-gray-200 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed" onclick="goToTop()">
           トップページに戻る
         </button>
       </div>
@@ -48,7 +48,7 @@
       <p class="text-xs text-yellow-400">URLの取得に失敗しました。ブラウザの戻るボタンまたはリロードをお試しください。</p>
       <? } ?>
 
-      <p class="text-xs text-gray-500 pt-4"><?= new Date().toLocaleString('ja-JP') ?></p>
+      <p class="text-xs text-slate-500 dark:text-gray-500 pt-4"><?= new Date().toLocaleString('ja-JP') ?></p>
     </div>
   </body>
 </html>

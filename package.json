@@ -27,7 +27,10 @@
     "test:coverage": "node scripts/test-coverage.js",
     "lint": "node scripts/lint.js",
     "lint:errors": "node scripts/lint.js --severity error",
-    "lint:eslint": "eslint src/*.js"
+    "lint:eslint": "eslint src/*.js",
+    "theme:audit": "node scripts/theme-audit.js",
+    "theme:contrast": "node scripts/theme-contrast.js",
+    "theme:check": "node scripts/theme-audit.js && node scripts/theme-contrast.js"
   },
   "repository": {
     "type": "git",
