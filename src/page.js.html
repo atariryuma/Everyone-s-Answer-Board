@@ -2214,12 +2214,17 @@
         //      授業中に profile 切替されても生徒は古い Forms を指したまま。
         //      polling のたびに wire の formMeta を反映することで同期される。
         if (result.formMeta) {
-          // profile 切替検知: 生徒に「新しいボードに切替わりました」通知（5秒で自動消滅）
+          // profile 切替検知: 生徒に「新しいボードに切替わりました」通知（5秒で自動消滅）。
           // Why: 教師が黒板で切替えても、生徒の小さい端末では変化に気づきにくい。
           //      短いトーストで「新フォームに切替わった」ことを明示する。
+          // ただし viewer 自身が pill click で switch した直後は、 すでに右上トースト
+          //  「切替えました」 が出ているため、 ここで中央バナーを重ねると 3 メッセージ
+          //   pile-up になる。 __suppressBoardSwitchToast 1-shot flag で抑制する。
           const prevUrl = this.state.lastSeenFormUrl;
           const newUrl = result.formMeta.formUrl || '';
-          if (prevUrl && newUrl && prevUrl !== newUrl) {
+          if (this.state.__suppressBoardSwitchToast) {
+            this.state.__suppressBoardSwitchToast = false;  // consume 1 回
+          } else if (prevUrl && newUrl && prevUrl !== newUrl) {
             this.__showBoardSwitchedToast(result.formMeta.formTitle || '新しいボード');
           }
           this.state.lastSeenFormUrl = newUrl;

@@ -2724,6 +2724,9 @@
           // Why (form ボタン重複呼出): loadSheetData の formMeta 経由でも更新される
           // はずだが、ある種のキャッシュ経路で取りこぼすケースがある（user 報告）。
           // getActiveFormInfo を明示的に呼ぶことで confidence を持って同期する。
+          // 自発的切替なので、 loadSheetData 内の「新しいボードに切替わりました」 中央バナーを
+          // 1 回 suppress (右上 success トーストと重複しないよう)。
+          this.state.__suppressBoardSwitchToast = true;
           if (typeof this.loadSheetData === 'function') {
             this.loadSheetData({ bypassCache: true, isInitialLoad: false });
           } else if (typeof window.safeReload === 'function') {
