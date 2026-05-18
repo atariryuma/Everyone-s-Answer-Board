@@ -168,6 +168,17 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
     return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
   }
 
+  // sa_validation cache (60s TTL) に古い公開状態が残ると、 unpublish 直後の viewer が
+  // 60 秒間 access できてしまう (security leak + UX bad)。 該当 SS の cache を即時 invalidate。
+  if (currentConfig.spreadsheetId) {
+    invalidateSaValidationCache_(currentConfig.spreadsheetId);
+  }
+  if (Array.isArray(currentConfig.profiles)) {
+    for (const p of currentConfig.profiles) {
+      if (p && p.spreadsheetId) invalidateSaValidationCache_(p.spreadsheetId);
+    }
+  }
+
   const redirectUrl = getWebAppUrl() + '?mode=view&userId=' + targetUser.userId;
   return {
     success: true,

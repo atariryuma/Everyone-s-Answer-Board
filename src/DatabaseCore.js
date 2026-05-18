@@ -428,6 +428,48 @@ function makeProxyAuthResolver_(sheetId, initialToken, initialSaEmail) {
   };
 }
 
+/** users DB の configJson を全走査して board SS 数を概算 (migration hint 用)。 */
+function countBoardSpreadsheets_() {
+  try {
+    if (typeof getAllUsers !== 'function') return 0;
+    const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
+    if (!Array.isArray(users)) return 0;
+    const ids = new Set();
+    for (const u of users) {
+      if (!u || !u.configJson) continue;
+      let cfg = null;
+      try { cfg = JSON.parse(u.configJson); } catch (_) { continue; }
+      if (cfg && cfg.spreadsheetId) ids.add(cfg.spreadsheetId);
+      if (Array.isArray(cfg && cfg.profiles)) {
+        for (const p of cfg.profiles) {
+          if (p && p.spreadsheetId) ids.add(p.spreadsheetId);
+        }
+      }
+    }
+    return ids.size;
+  } catch (_) { return 0; }
+}
+
+/**
+ * 公開状態変更時に呼ぶ。 sa_validation cache (`validateServiceAccountUsage` の 60s 短期 cache)
+ * を該当 SS について全 viewer 分まとめて invalidate。 これがないと unpublish 直後 60 秒間
+ * viewer がアクセスできる security leak が残る。
+ *
+ * ScriptCache には wildcard delete がないため、 version counter を bump する方式で実装する。
+ * `sa_validation_*` cache key 側にこの version を含めれば、 bump 後は旧 key が全 stale になる。
+ */
+function invalidateSaValidationCache_(spreadsheetId) {
+  if (!spreadsheetId || typeof CacheService === 'undefined') return;
+  try {
+    const cache = CacheService.getScriptCache();
+    // `validateServiceAccountUsage` 内で email キーを含む全 viewer entry を一括 stale 化したい。
+    // wildcard 不可なので、 ssId 単位の version counter を持って cache key に組み込む方式に変更。
+    const key = 'sa_validation_ver:' + spreadsheetId;
+    const cur = Number(cache.get(key) || 0);
+    cache.put(key, String(cur + 1), 3600);
+  } catch (_) { /* ignore */ }
+}
+
 /** SA 1 個の token + access キャッシュをまとめて invalidate (新規登録 / 再 verify 時に呼ぶ)。 */
 function invalidateSaCache_(spreadsheetId, clientEmail) {
   if (typeof CacheService === 'undefined') return;
@@ -552,6 +594,10 @@ function addServiceAccountToPool(saJsonString) {
       verifyError = (err && err.message) || String(err);
     }
 
+    // 新 SA を board SS にも展開しないと、 pool 拡張効果が出ない (新 SA は全 board で verify
+    // 失敗 → primary SA に round-robin が偏る)。 admin に migrateBoardSharing 実行を促す。
+    const boardsToMigrate = countBoardSpreadsheets_();
+
     return {
       success: true,
       slot: targetSlot,
@@ -561,7 +607,11 @@ function addServiceAccountToPool(saJsonString) {
       shareError,
       shareHint,
       verified,
-      verifyError
+      verifyError,
+      boardsToMigrate,
+      migrationHint: boardsToMigrate > 0
+        ? `${boardsToMigrate} 個の既存 board に新 SA を editor 追加するため "migrateBoardSharing" を実行してください`
+        : null
     };
   } catch (err) {
     logError_('addServiceAccountToPool', err);
@@ -696,10 +746,16 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
     const currentEmail = getCurrentEmail();
 
     // 短期 cache (60s) で重複 DB lookup を抑制。 cache key に caller email を含めることで
-    // 同じ SS でも owner / viewer で別キャッシュ。
-    const cacheKey = `sa_validation_${spreadsheetId}_${currentEmail || 'anon'}`;
+    // 同じ SS でも owner / viewer で別キャッシュ。 version counter (`sa_validation_ver:{ssId}`)
+    // を組み込むことで、 publish 状態変更時に invalidateSaValidationCache_ から bump → 旧 key
+    // が全 viewer 分一括 stale 化される。
     let cache = null;
     try { cache = CacheService.getScriptCache(); } catch (_) {}
+    let validationVer = '0';
+    if (cache) {
+      try { validationVer = String(cache.get('sa_validation_ver:' + spreadsheetId) || '0'); } catch (_) {}
+    }
+    const cacheKey = `sa_validation_v${validationVer}_${spreadsheetId}_${currentEmail || 'anon'}`;
     if (cache) {
       try {
         const cached = cache.get(cacheKey);
