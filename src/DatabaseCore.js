@@ -887,14 +887,13 @@ function openDatabase(options = {}) {
  *  - **viewer (生徒)** / **admin** が cross-user アクセス → SA pool 経由
  *  - **DB sheet** はどの caller でも SA pool 経由 (共有資源)
  *
- * 旧設計の domain-wide sharing は廃止。 viewer の Drive にボード SS が表示されない、
- * viewer が SS を直接編集できない、 という通常 Google Form 相当のセキュリティを実現する。
+ * v2782+ で旧 domain-wide sharing 経路は廃止し、 通常 Google Form 相当のセキュリティ
+ * (viewer の Drive 非表示 + 直接編集不可) に統一。
  *
  * @param {string} spreadsheetId
  * @param {Object} [options]
- * @param {boolean} [options.useServiceAccount=true] - false 明示で強制 own モード (互換用)
  * @param {string} [options.context] - ログ識別用
- * @returns {{spreadsheet, auth, getSheet}|null}
+ * @returns {{spreadsheet, auth, accessMode, getSheet}|null}
  */
 function openSpreadsheet(spreadsheetId, options = {}) {
   try {

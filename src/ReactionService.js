@@ -548,6 +548,15 @@ function executeBoardRowOperation(options) {
     if (!acquired) return createErrorResponse(concurrentMessage);
 
     try {
+      // Race protection: lock acquire 中に教師が unpublish した可能性がある。 lock 取得後
+      // に publish 状態を再確認し、 viewer (= non-admin non-owner) からの write を再度 gate。
+      // owner/admin は publish 状態に関わらず編集可能 (canActOnTargetBoard と同じ判定基準)。
+      if (!isAdmin && targetUser.userEmail !== actorEmail) {
+        const refreshedUser = findPublishedBoardOwner(targetUserId, actorEmail, { preloadedAuth });
+        if (!refreshedUser) {
+          return createErrorResponse('ボードの公開が終了しました');
+        }
+      }
       const result = process(sheet, rowNumber, actorEmail, preloadedHeaders);
       // board data cache を即時 stale 化 (viewer の次 polling で fresh fetch)。
       if (typeof bumpBoardDataVersion_ === 'function') {

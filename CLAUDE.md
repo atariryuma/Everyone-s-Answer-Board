@@ -80,6 +80,9 @@ npm run api -- removeServiceAccountFromPool --slot SERVICE_ACCOUNT_CREDS_2  # se
 npm run api -- repairSpreadsheetSharing --spreadsheetId <ID>  # 1 SS に SA pool 全員 editor 追加
 npm run api -- migrateBoardSharing --dryRun true   # 既存ボード一括 cleanup の dry run
 npm run api -- migrateBoardSharing                 # 全ボードに SA pool editor 追加 + domain 共有 revoke
+
+# 負荷検証 (CI 対象外、 手動)
+node scripts/load-test-concurrent.js --n 30 --op previewBoard  # N 並列 API call で SA pool / 429 を検証
 ```
 
 詳細・全オプション: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) §1-2

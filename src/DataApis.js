@@ -764,6 +764,16 @@ function processFormUrlInput(formUrl) {
         console.error('connectDataSource: SpreadsheetApp.openById failed:', e.message);
         return { success: false, error: `回答先スプレッドシートにアクセスできません: ${e.message}` };
       }
+      // 既存 SS 取込み時にも SA pool 全員を editor 追加。 これがないと viewer 経路 (SA pool) で
+      // 403 になるが、 教師の手作業 Form 取込みは「動いて当然」 期待なので fail-soft で続行。
+      try {
+        const sr = applySpreadsheetSharingDefaults(spreadsheetId);
+        if (sr && sr.errors && sr.errors.length) {
+          console.warn('processFormUrlInput existing-SS sharing warnings:', sr.errors.join(' / '));
+        }
+      } catch (sharingErr) {
+        console.warn('processFormUrlInput existing-SS 共有設定エラー（処理は続行）:', sharingErr.message);
+      }
     }
 
     // 5. 回答シート名を特定（新規作成時は「シート1」、既存は回答シート）
@@ -1178,11 +1188,17 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
 // 自分のリアクションが「TTL 待ち」 で消えない。
 const BOARD_DATA_CACHE_TTL_SEC = 12;
 
+// Board cache key prefixes (集約。 hardcoded string を排除して typo 防止)。
+const BOARD_CACHE_KEYS_ = {
+  DATA: 'board_data:',       // viewer ごとの board read 結果 (key: ssId + version + filter + sort)
+  DATA_VERSION: 'board_data_ver:'  // ボード単位の cache invalidator (key: userId)
+};
+
 function getBoardDataVersion_(userId) {
   if (typeof CacheService === 'undefined') return '0';
   try {
     const cache = CacheService.getScriptCache();
-    return String(cache.get('board_data_ver:' + userId) || '0');
+    return String(cache.get(BOARD_CACHE_KEYS_.DATA_VERSION + userId) || '0');
   } catch (_) { return '0'; }
 }
 
@@ -1190,8 +1206,8 @@ function bumpBoardDataVersion_(userId) {
   if (!userId || typeof CacheService === 'undefined') return;
   try {
     const cache = CacheService.getScriptCache();
-    const cur = Number(cache.get('board_data_ver:' + userId) || 0);
-    cache.put('board_data_ver:' + userId, String(cur + 1), 3600);
+    const cur = Number(cache.get(BOARD_CACHE_KEYS_.DATA_VERSION + userId) || 0);
+    cache.put(BOARD_CACHE_KEYS_.DATA_VERSION + userId, String(cur + 1), 3600);
   } catch (_) { /* ignore */ }
 }
 
@@ -1199,7 +1215,7 @@ function boardDataCacheKey_(userId, options) {
   const ver = getBoardDataVersion_(userId);
   const filter = options.classFilter || '_';
   const sort = options.sortBy || 'newest';
-  return `board_data:${userId}:${ver}:${filter}:${sort}`;
+  return `${BOARD_CACHE_KEYS_.DATA}${userId}:${ver}:${filter}:${sort}`;
 }
 
 function withBoardDataCache_(userId, options, loader) {

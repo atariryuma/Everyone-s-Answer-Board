@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, logError_ */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, logError_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -168,9 +168,10 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
     return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
   }
 
-  // sa_validation cache (60s TTL) に古い公開状態が残ると、 unpublish 直後の viewer が
-  // 60 秒間 access できてしまう (security leak + UX bad)。 状態が実際に変わったときのみ bump
-  // (publish 状態が変わらない toggle no-op で 100+ viewer 全員の cache を捨てないため)。
+  // 2 階層の cache を即時 stale 化:
+  //   1. sa_validation cache (60s TTL): 未公開ボードへの SA pool access を即 block
+  //   2. board data cache (12s TTL): viewer の polling が見ている stale data を即更新
+  // 状態が実際に変わったときのみ bump (toggle no-op で 100+ viewer の cache を捨てないため)。
   if (wasPublished !== targetIsPublished) {
     if (currentConfig.spreadsheetId) {
       invalidateSaValidationCache_(currentConfig.spreadsheetId);
@@ -179,6 +180,12 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
       for (const p of currentConfig.profiles) {
         if (p && p.spreadsheetId) invalidateSaValidationCache_(p.spreadsheetId);
       }
+    }
+    // board data cache は userId 単位 (= ボード単位)。 全 profile / 全 filter / 全 sort が
+    // 1 度の bump で stale 化される。 typeof check は GAS multi-file env で同名関数が別ファイル
+    // (DataApis.js) にあり、 test 単独 load 時に未定義の場合を吸収する。
+    if (typeof bumpBoardDataVersion_ === 'function') {
+      try { bumpBoardDataVersion_(targetUser.userId); } catch (_) { /* ignore */ }
     }
   }
 
@@ -1644,7 +1651,7 @@ function deepMerge_(target, source) {
 function migrateBoardSharing(options = {}) {
   const dryRun = options.dryRun === true;
 
-  const ssIds = collectAllBoardSpreadsheetIds_();
+  const ssIds = getAllBoardSpreadsheetIds();
   if (ssIds.length === 0) {
     return createSuccessResponse('No board spreadsheets found', { total: 0, processed: [], dryRun });
   }
@@ -1695,11 +1702,6 @@ function migrateBoardSharing(options = {}) {
     dryRun ? `Dry run: ${ssIds.length} board SS would be processed` : `${ssIds.length} board SS processed`,
     { total: ssIds.length, saAddedCount, domainRevokedCount, errorCount, dryRun, processed }
   );
-}
-
-/** 全 users.config から board spreadsheetId を重複除去で抽出 (DatabaseCore に統合済 helper)。 */
-function collectAllBoardSpreadsheetIds_() {
-  return (typeof getAllBoardSpreadsheetIds === 'function') ? getAllBoardSpreadsheetIds() : [];
 }
 
 /**
