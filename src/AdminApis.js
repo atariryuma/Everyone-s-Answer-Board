@@ -169,13 +169,16 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   }
 
   // sa_validation cache (60s TTL) に古い公開状態が残ると、 unpublish 直後の viewer が
-  // 60 秒間 access できてしまう (security leak + UX bad)。 該当 SS の cache を即時 invalidate。
-  if (currentConfig.spreadsheetId) {
-    invalidateSaValidationCache_(currentConfig.spreadsheetId);
-  }
-  if (Array.isArray(currentConfig.profiles)) {
-    for (const p of currentConfig.profiles) {
-      if (p && p.spreadsheetId) invalidateSaValidationCache_(p.spreadsheetId);
+  // 60 秒間 access できてしまう (security leak + UX bad)。 状態が実際に変わったときのみ bump
+  // (publish 状態が変わらない toggle no-op で 100+ viewer 全員の cache を捨てないため)。
+  if (wasPublished !== targetIsPublished) {
+    if (currentConfig.spreadsheetId) {
+      invalidateSaValidationCache_(currentConfig.spreadsheetId);
+    }
+    if (Array.isArray(currentConfig.profiles)) {
+      for (const p of currentConfig.profiles) {
+        if (p && p.spreadsheetId) invalidateSaValidationCache_(p.spreadsheetId);
+      }
     }
   }
 
@@ -1694,29 +1697,9 @@ function migrateBoardSharing(options = {}) {
   );
 }
 
-/**
- * 全 users.config から board の spreadsheetId を抽出 (重複除去)。
- * config.spreadsheetId と config.profiles[].spreadsheetId の両方を走査。
- */
+/** 全 users.config から board spreadsheetId を重複除去で抽出 (DatabaseCore に統合済 helper)。 */
 function collectAllBoardSpreadsheetIds_() {
-  const ids = new Set();
-  try {
-    const users = (typeof getAllUsers === 'function') ? getAllUsers() : [];
-    for (const u of users) {
-      if (!u || !u.configJson) continue;
-      let cfg = null;
-      try { cfg = JSON.parse(u.configJson); } catch (_) { continue; }
-      if (cfg.spreadsheetId && typeof cfg.spreadsheetId === 'string') ids.add(cfg.spreadsheetId);
-      if (Array.isArray(cfg.profiles)) {
-        for (const p of cfg.profiles) {
-          if (p && p.spreadsheetId && typeof p.spreadsheetId === 'string') ids.add(p.spreadsheetId);
-        }
-      }
-    }
-  } catch (err) {
-    logError_('collectAllBoardSpreadsheetIds_', err);
-  }
-  return Array.from(ids);
+  return (typeof getAllBoardSpreadsheetIds === 'function') ? getAllBoardSpreadsheetIds() : [];
 }
 
 /**

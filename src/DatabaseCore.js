@@ -134,6 +134,17 @@ const SA_TOKEN_TTL_SEC_ = 50 * 60;
 const SA_VERIFY_TTL_OK_SEC_ = 600;
 const SA_VERIFY_TTL_NO_SEC_ = 120;
 
+// Cache key prefixes (集約。 scattered string literal を排除)。
+const SA_CACHE_KEYS_ = {
+  TOKEN: 'sa_token:',          // SA access token (per client_email, 50min TTL)
+  ACCESS: 'sa_access:',         // SS x SA verify result (per ssId+saEmail, 10min ok / 2min no)
+  COOLDOWN: 'sa_cooldown:',     // 429 後の cooldown フラグ (per client_email, 30s TTL)
+  PICK_COUNTER: 'sa_pick:',     // admin 可視化用 pick 回数 (per client_email, 5min TTL)
+  RR_COUNTER: 'sa_rr_counter',  // round-robin 共有 counter
+  VALIDATION_VER: 'sa_validation_ver:', // SS publish 状態変更時の cache invalidator
+  VALIDATION: 'sa_validation_'  // validation 結果 cache (key includes ver + ssId + email)
+};
+
 function serviceAccountPoolSlotKey_(n) {
   return n === 1 ? 'SERVICE_ACCOUNT_CREDS' : ('SERVICE_ACCOUNT_CREDS_' + n);
 }
@@ -180,7 +191,7 @@ function recordSaPick_(saEmail) {
   if (!saEmail || typeof CacheService === 'undefined') return;
   try {
     const cache = CacheService.getScriptCache();
-    const key = 'sa_pick:' + saEmail;
+    const key = SA_CACHE_KEYS_.PICK_COUNTER + saEmail;
     const cur = Number(cache.get(key) || 0);
     cache.put(key, String(cur + 1), 300);
   } catch (_) { /* ignore */ }
@@ -189,13 +200,13 @@ function recordSaPick_(saEmail) {
 /** 429 を喰った SA を short-term cooldown (30s) に入れる。 */
 function markServiceAccountCoolingDown_(saEmail) {
   if (!saEmail || typeof CacheService === 'undefined') return;
-  try { CacheService.getScriptCache().put('sa_cooldown:' + saEmail, '1', SA_COOLDOWN_TTL_SEC); }
+  try { CacheService.getScriptCache().put(SA_CACHE_KEYS_.COOLDOWN + saEmail, '1', SA_COOLDOWN_TTL_SEC); }
   catch (_) { /* ignore */ }
 }
 
 function isServiceAccountCoolingDown_(saEmail) {
   if (!saEmail || typeof CacheService === 'undefined') return false;
-  try { return Boolean(CacheService.getScriptCache().get('sa_cooldown:' + saEmail)); }
+  try { return Boolean(CacheService.getScriptCache().get(SA_CACHE_KEYS_.COOLDOWN + saEmail)); }
   catch (_) { return false; }
 }
 
@@ -224,7 +235,7 @@ function pickServiceAccount_() {
   try {
     if (typeof CacheService !== 'undefined') {
       const cache = CacheService.getScriptCache();
-      const RR_KEY = 'sa_rr_counter';
+      const RR_KEY = SA_CACHE_KEYS_.RR_COUNTER;
       const cur = Number(cache.get(RR_KEY) || 0);
       idx = cur % pool.length;
       cache.put(RR_KEY, String((cur + 1) % 1000000), 600);
@@ -311,7 +322,7 @@ function getServiceAccountAccessToken_(sa) {
   // Tier 2: ScriptCache
   const scriptCache = (typeof CacheService !== 'undefined' && CacheService.getScriptCache)
     ? CacheService.getScriptCache() : null;
-  const scriptCacheKey = 'sa_token:' + cacheKey;
+  const scriptCacheKey = SA_CACHE_KEYS_.TOKEN + cacheKey;
   if (scriptCache) {
     try {
       const cached = scriptCache.get(scriptCacheKey);
@@ -365,7 +376,7 @@ function getServiceAccountAccessToken_(sa) {
  */
 function verifyServiceAccountAccess_(sheetId, accessToken, saEmail) {
   if (!sheetId || !accessToken) return false;
-  const cacheKey = 'sa_access:' + sheetId + ':' + (saEmail || 'unknown');
+  const cacheKey = SA_CACHE_KEYS_.ACCESS + sheetId + ':' + (saEmail || 'unknown');
   let cache = null;
   try { cache = CacheService.getScriptCache(); } catch (_) {}
   if (cache) {
@@ -428,26 +439,33 @@ function makeProxyAuthResolver_(sheetId, initialToken, initialSaEmail) {
   };
 }
 
-/** users DB の configJson を全走査して board SS 数を概算 (migration hint 用)。 */
-function countBoardSpreadsheets_() {
+/**
+ * 全 users.config から board の spreadsheetId を抽出 (重複除去)。
+ * 旧 countBoardSpreadsheets_ (DatabaseCore) / collectAllBoardSpreadsheetIds_ (AdminApis) の統合。
+ * @returns {string[]}
+ */
+function getAllBoardSpreadsheetIds() {
   try {
-    if (typeof getAllUsers !== 'function') return 0;
+    if (typeof getAllUsers !== 'function') return [];
     const users = getAllUsers({ activeOnly: false }, { forceServiceAccount: true });
-    if (!Array.isArray(users)) return 0;
+    if (!Array.isArray(users)) return [];
     const ids = new Set();
     for (const u of users) {
       if (!u || !u.configJson) continue;
       let cfg = null;
       try { cfg = JSON.parse(u.configJson); } catch (_) { continue; }
-      if (cfg && cfg.spreadsheetId) ids.add(cfg.spreadsheetId);
+      if (cfg && cfg.spreadsheetId && typeof cfg.spreadsheetId === 'string') ids.add(cfg.spreadsheetId);
       if (Array.isArray(cfg && cfg.profiles)) {
         for (const p of cfg.profiles) {
-          if (p && p.spreadsheetId) ids.add(p.spreadsheetId);
+          if (p && p.spreadsheetId && typeof p.spreadsheetId === 'string') ids.add(p.spreadsheetId);
         }
       }
     }
-    return ids.size;
-  } catch (_) { return 0; }
+    return Array.from(ids);
+  } catch (err) {
+    if (typeof logError_ === 'function') logError_('getAllBoardSpreadsheetIds', err);
+    return [];
+  }
 }
 
 /**
@@ -464,7 +482,7 @@ function invalidateSaValidationCache_(spreadsheetId) {
     const cache = CacheService.getScriptCache();
     // `validateServiceAccountUsage` 内で email キーを含む全 viewer entry を一括 stale 化したい。
     // wildcard 不可なので、 ssId 単位の version counter を持って cache key に組み込む方式に変更。
-    const key = 'sa_validation_ver:' + spreadsheetId;
+    const key = SA_CACHE_KEYS_.VALIDATION_VER + spreadsheetId;
     const cur = Number(cache.get(key) || 0);
     cache.put(key, String(cur + 1), 3600);
   } catch (_) { /* ignore */ }
@@ -475,9 +493,9 @@ function invalidateSaCache_(spreadsheetId, clientEmail) {
   if (typeof CacheService === 'undefined') return;
   try {
     const cache = CacheService.getScriptCache();
-    if (spreadsheetId && clientEmail) cache.remove('sa_access:' + spreadsheetId + ':' + clientEmail);
+    if (spreadsheetId && clientEmail) cache.remove(SA_CACHE_KEYS_.ACCESS + spreadsheetId + ':' + clientEmail);
     if (clientEmail) {
-      cache.remove('sa_token:' + clientEmail);
+      cache.remove(SA_CACHE_KEYS_.TOKEN + clientEmail);
       delete saTokenCache_[clientEmail];
     }
   } catch (_) { /* ignore */ }
@@ -596,7 +614,7 @@ function addServiceAccountToPool(saJsonString) {
 
     // 新 SA を board SS にも展開しないと、 pool 拡張効果が出ない (新 SA は全 board で verify
     // 失敗 → primary SA に round-robin が偏る)。 admin に migrateBoardSharing 実行を促す。
-    const boardsToMigrate = countBoardSpreadsheets_();
+    const boardsToMigrate = getAllBoardSpreadsheetIds().length;
 
     return {
       success: true,
@@ -753,7 +771,7 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
     try { cache = CacheService.getScriptCache(); } catch (_) {}
     let validationVer = '0';
     if (cache) {
-      try { validationVer = String(cache.get('sa_validation_ver:' + spreadsheetId) || '0'); } catch (_) {}
+      try { validationVer = String(cache.get(SA_CACHE_KEYS_.VALIDATION_VER + spreadsheetId) || '0'); } catch (_) {}
     }
     const cacheKey = `sa_validation_v${validationVer}_${spreadsheetId}_${currentEmail || 'anon'}`;
     if (cache) {

@@ -56,42 +56,16 @@ function addServiceAccountsAsEditors(spreadsheetId) {
 }
 
 /**
- * 後方互換 wrapper: primary SA だけを editor 追加する旧 API。
- * 新規コードは `addServiceAccountsAsEditors` を使うこと。
- * @deprecated
- */
-function addServiceAccountAsEditor(spreadsheetId) {
-  try {
-    const pool = (typeof getAllServiceAccounts_ === 'function') ? getAllServiceAccounts_() : [];
-    if (pool.length === 0) {
-      return { success: false, added: false, message: 'SA pool not configured' };
-    }
-    const primary = pool[0];
-    SpreadsheetApp.openById(spreadsheetId).addEditor(primary.client_email);
-    if (typeof invalidateSaCache_ === 'function') {
-      invalidateSaCache_(spreadsheetId, primary.client_email);
-    }
-    return { success: true, added: true, saEmail: primary.client_email, message: 'Service account added as editor' };
-  } catch (error) {
-    if (typeof logError_ === 'function') logError_('addServiceAccountAsEditor', error);
-    return { success: false, added: false, message: error.message };
-  }
-}
-
-/**
- * 新規作成 SS に共有デフォルトを一括適用する。
- *   SA pool 全員を editor 追加 (必須 — 未設定だと viewer 経路が 403)。
+ * 新規作成 SS に共有デフォルトを一括適用する。 SA pool 全員を editor 追加 (未設定だと
+ * viewer 経路が 403)。
  *
  * v2782 で domain-wide sharing は廃止。 viewer の Drive にボード SS が表示されない・
  * viewer が SS を直接編集不可、 という通常 Form 相当のセキュリティモデルに統一。
  *
  * @param {string} spreadsheetId
- * @param {string} [ownerEmail] - 後方互換用 (現在は未使用)
  * @returns {{saAdded:boolean, saEmails:string[], errors:string[]}}
  */
-function applySpreadsheetSharingDefaults(spreadsheetId, ownerEmail) {
-  // ownerEmail は domain-share 時代の引数。 v2782+ では使わないが、 旧 caller 互換のため残す。
-  void ownerEmail;
+function applySpreadsheetSharingDefaults(spreadsheetId) {
   const result = { saAdded: false, saEmails: [], errors: [] };
   try {
     const sa = addServiceAccountsAsEditors(spreadsheetId);

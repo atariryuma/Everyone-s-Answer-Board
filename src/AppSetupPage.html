@@ -1114,14 +1114,10 @@
         el.textContent = msg || '';
         el.style.color = isError ? '#fca5a5' : '#86efac';
       }
-      function saPool_escape(s) {
-        return String(s == null ? '' : s)
-          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
-      }
       function saPool_refresh() {
         saPool_setStatus('一覧取得中...');
         saPool_callAdmin('listServiceAccountPool').then(function(result) {
+          var esc = window.sharedUtilities.security.escapeHtml;
           var summary = document.getElementById('sa-pool-summary');
           var listEl = document.getElementById('sa-pool-list');
           if (!result || !result.success) {
@@ -1138,13 +1134,13 @@
               var emailShort = (s.clientEmail || '(invalid)').split('@')[0];
               var removeBtn = s.role === 'primary'
                 ? ''
-                : '<button data-sa-remove="' + saPool_escape(s.slot) + '" class="ml-2 px-2 py-1 bg-red-700 hover:bg-red-600 text-white text-xs rounded">削除</button>';
+                : '<button data-sa-remove="' + esc(s.slot) + '" class="ml-2 px-2 py-1 bg-red-700 hover:bg-red-600 text-white text-xs rounded">削除</button>';
               return '<div class="flex items-center gap-2 p-2 bg-gray-800 rounded text-sm">'
-                + '<span class="text-gray-500 w-8">[' + saPool_escape(s.index) + ']</span>'
-                + '<span class="' + roleColor + ' w-20">' + saPool_escape(s.role) + '</span>'
-                + '<span class="text-white font-mono truncate flex-1" title="' + saPool_escape(s.clientEmail || '(invalid)') + '">'
-                + saPool_escape(emailShort) + '</span>'
-                + '<button data-sa-reverify="' + saPool_escape(s.slot) + '" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded">再 verify</button>'
+                + '<span class="text-gray-500 w-8">[' + esc(s.index) + ']</span>'
+                + '<span class="' + roleColor + ' w-20">' + esc(s.role) + '</span>'
+                + '<span class="text-white font-mono truncate flex-1" title="' + esc(s.clientEmail || '(invalid)') + '">'
+                + esc(emailShort) + '</span>'
+                + '<button data-sa-reverify="' + esc(s.slot) + '" class="px-2 py-1 bg-gray-700 hover:bg-gray-600 text-white text-xs rounded">再 verify</button>'
                 + removeBtn
                 + '</div>';
             }).join('');

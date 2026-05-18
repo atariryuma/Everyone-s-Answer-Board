@@ -87,22 +87,6 @@ test('addServiceAccountsAsEditors: returns error when pool is empty', () => {
   assert.match(result.errors.join(' '), /SA pool not configured/);
 });
 
-test('addServiceAccountAsEditor (legacy wrapper): adds only primary SA', () => {
-  const { context, editorAdds } = loadSharingHelperContext({
-    pool: [
-      { client_email: 'primary@example.iam', private_key: 'k', type: 'service_account' },
-      { client_email: 'secondary@example.iam', private_key: 'k', type: 'service_account' }
-    ]
-  });
-
-  const result = context.addServiceAccountAsEditor('ss-1');
-
-  assert.equal(result.success, true);
-  assert.equal(result.added, true);
-  assert.equal(result.saEmail, 'primary@example.iam');
-  assert.deepEqual(editorAdds, ['primary@example.iam']);
-});
-
 test('applySpreadsheetSharingDefaults: returns saEmails (no domainShared field)', () => {
   const { context } = loadSharingHelperContext({
     pool: [

@@ -400,7 +400,7 @@ function createTemplateForm(templateType, templateOptions) {
     //   作成直後に必ず適用し、教師の手動共有作業を不要にする。fail-soft。
     let sharingResult = null;
     try {
-      sharingResult = applySpreadsheetSharingDefaults(ss.getId(), currentEmail);
+      sharingResult = applySpreadsheetSharingDefaults(ss.getId());
       if (sharingResult && sharingResult.errors && sharingResult.errors.length) {
         console.warn('createTemplateForm sharing warnings:', sharingResult.errors.join(' / '));
       }
@@ -627,11 +627,10 @@ function customizeForm(formIdOrUrl, schema) {
           form.setDestination(FormApp.DestinationType.SPREADSHEET, newSs.getId());
           newSpreadsheetId = newSs.getId();
 
-          // 新 SS にも共有デフォルト適用（createTemplateForm と同じ理由）。
+          // 新 SS にも共有デフォルト適用 (createTemplateForm と同じ理由)。
           // ここを忘れると customizeForm 経由で再生成された SS だけ view が 403 で死ぬ。
           try {
-            const ownerEmail = (typeof getCurrentEmail === 'function') ? getCurrentEmail() : '';
-            const sr = applySpreadsheetSharingDefaults(newSpreadsheetId, ownerEmail);
+            const sr = applySpreadsheetSharingDefaults(newSpreadsheetId);
             if (sr && sr.errors && sr.errors.length) {
               console.warn('customizeForm sharing warnings:', sr.errors.join(' / '));
             }
@@ -744,11 +743,9 @@ function processFormUrlInput(formUrl) {
         form.setDestination(FormApp.DestinationType.SPREADSHEET, spreadsheetId);
         wasCreated = true;
 
-        // 新規 SS 共有設定 (SA editor + ドメイン共有) — 生徒 view モード 403 防止。
-        //   createTemplateForm / customizeForm 経路と同じ。Sharing が無いと viewer 403。
+        // 新規 SS 共有設定 (SA pool 全員を editor 追加) — viewer 経路の 403 防止。
         try {
-          const ownerEmail = (typeof getCurrentEmail === 'function') ? getCurrentEmail() : '';
-          const sr = applySpreadsheetSharingDefaults(spreadsheetId, ownerEmail);
+          const sr = applySpreadsheetSharingDefaults(spreadsheetId);
           if (sr && sr.errors && sr.errors.length) {
             console.warn('processFormUrlInput sharing warnings:', sr.errors.join(' / '));
           }
@@ -1176,7 +1173,10 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
 //
 // 効果: 700 viewer × 5s polling = 8400 req/min を ~700-800 req/min まで削減 (~10x)。
 
-const BOARD_DATA_CACHE_TTL_SEC = 10;
+// 12 秒は polling 8 秒 (page.js.html) と整合させて、 1 polling 周期で最低 1 回は cache hit
+// するよう設計。 viewer reaction の bumpBoardDataVersion_ で即時 invalidate されるので、
+// 自分のリアクションが「TTL 待ち」 で消えない。
+const BOARD_DATA_CACHE_TTL_SEC = 12;
 
 function getBoardDataVersion_(userId) {
   if (typeof CacheService === 'undefined') return '0';
@@ -1218,13 +1218,8 @@ function withBoardDataCache_(userId, options, loader) {
 
   const fresh = loader();
   if (fresh && fresh.success) {
-    try {
-      const json = JSON.stringify(fresh);
-      // ScriptCache の 100KB / value 制限超を防ぐ。 巨大ボードは cache せず素通し。
-      if (json.length < 95 * 1024) {
-        cache.put(key, json, BOARD_DATA_CACHE_TTL_SEC);
-      }
-    } catch (_) { /* size check failed; skip cache */ }
+    // ScriptCache の 100KB / value 制限超を防ぐのは helpers.js saveToCacheWithSizeCheck に集約。
+    saveToCacheWithSizeCheck(key, fresh, BOARD_DATA_CACHE_TTL_SEC);
   }
   return fresh;
 }
@@ -1639,7 +1634,7 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
 
     // SA pool 全員を editor 追加して board の cross-user 経路 (viewer/admin) を有効化。
     try {
-      applySpreadsheetSharingDefaults(spreadsheetId, email);
+      applySpreadsheetSharingDefaults(spreadsheetId);
     } catch (sharingError) {
       console.warn('connectDataSource: SA sharing setup failed (non-critical):', sharingError.message);
     }
