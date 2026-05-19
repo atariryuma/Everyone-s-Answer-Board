@@ -726,7 +726,7 @@
         } else {
           formUrlDisplay.textContent = '未設定';
           formUrlDisplay.href = '#';
-          formUrlDisplay.className = 'text-sm text-slate-700 dark:text-slate-300';
+          formUrlDisplay.className = 'text-sm text-theme-secondary';
         }
       }
 
@@ -734,10 +734,10 @@
       if (formTitleDisplay) {
         if (config.formTitle) {
           formTitleDisplay.textContent = config.formTitle;
-          formTitleDisplay.className = 'text-sm text-slate-900 dark:text-white';
+          formTitleDisplay.className = 'text-sm text-theme';
         } else {
           formTitleDisplay.textContent = '未設定';
-          formTitleDisplay.className = 'text-sm text-slate-700 dark:text-slate-300';
+          formTitleDisplay.className = 'text-sm text-theme-secondary';
         }
       }
 
@@ -1181,12 +1181,12 @@
         if (safeData.formUrl) {
           urlElement.textContent = 'フォームを開く';
           urlElement.href = safeData.formUrl;
-          urlElement.classList.remove('text-slate-500', 'dark:text-slate-500');
+          urlElement.classList.remove('text-theme-muted');
           urlElement.classList.add('text-blue-400');
         } else {
           urlElement.textContent = '未連携';
           urlElement.href = '#';
-          urlElement.classList.add('text-slate-500', 'dark:text-slate-500');
+          urlElement.classList.add('text-theme-muted');
           urlElement.classList.remove('text-blue-400');
         }
       }
@@ -1566,7 +1566,7 @@
       } else if (type === 'error') {
         messageEl.className += 'text-red-400';
       } else {
-        messageEl.className += 'text-slate-600 dark:text-slate-400';
+        messageEl.className += 'text-theme-muted';
       }
     }
   }
@@ -2206,7 +2206,7 @@
       while (labelEl.firstChild) labelEl.removeChild(labelEl.firstChild);
       labelEl.appendChild(document.createTextNode(def.label + ': '));
       const hintSpan = document.createElement('span');
-      hintSpan.className = 'text-xs ml-2 ' + (def.required ? 'text-red-300' : 'text-slate-600 dark:text-slate-400');
+      hintSpan.className = 'text-xs ml-2 ' + (def.required ? 'text-red-300' : 'text-theme-muted');
       hintSpan.textContent = (def.required ? '【必須】 ' : '(任意) ') + def.hint;
       labelEl.appendChild(hintSpan);
     });
@@ -2692,7 +2692,7 @@
       level === 'success' ? 'text-green-400'
       : level === 'warning' ? 'text-yellow-400'
       : level === 'error' ? 'text-red-400'
-      : 'text-slate-500 dark:text-slate-500'
+      : 'text-theme-muted'
     );
     if (el.textContent === next && el.className === cls) return;
     el.textContent = next;
@@ -3124,10 +3124,10 @@
       const sheetName = config.sheetName;
       if (sheetName) {
         sheetnameElement.textContent = sheetName;
-        sheetnameElement.className = 'text-sm text-slate-900 dark:text-white';
+        sheetnameElement.className = 'text-sm text-theme';
       } else {
         sheetnameElement.textContent = '未設定';
-        sheetnameElement.className = 'text-sm text-slate-700 dark:text-slate-300';
+        sheetnameElement.className = 'text-sm text-theme-secondary';
       }
     }
 
@@ -3143,10 +3143,10 @@
           hour: '2-digit',
           minute: '2-digit',
         });
-        timeElement.className = 'text-sm text-slate-900 dark:text-white';
+        timeElement.className = 'text-sm text-theme';
       } else {
         timeElement.textContent = '--:--';
-        timeElement.className = 'text-sm text-slate-700 dark:text-slate-300';
+        timeElement.className = 'text-sm text-theme-secondary';
       }
     }
 
@@ -3158,19 +3158,19 @@
     if (boardModeEl) {
       const mode = ds.boardMode || 'auto';
       boardModeEl.textContent = PROFILE_MODE_LABELS[mode] || mode;
-      boardModeEl.className = 'text-sm text-slate-900 dark:text-white';
+      boardModeEl.className = 'text-sm text-theme';
     }
 
     const showNamesEl = document.getElementById('current-show-names');
     if (showNamesEl) {
       showNamesEl.textContent = ds.showNames ? '実名表示' : '匿名';
-      showNamesEl.className = 'text-sm ' + (ds.showNames ? 'text-cyan-300' : 'text-slate-700 dark:text-slate-300');
+      showNamesEl.className = 'text-sm ' + (ds.showNames ? 'text-cyan-300' : 'text-theme-secondary');
     }
 
     const showReactionsEl = document.getElementById('current-show-reactions');
     if (showReactionsEl) {
       showReactionsEl.textContent = ds.showReactions ? '表示' : '非表示';
-      showReactionsEl.className = 'text-sm ' + (ds.showReactions ? 'text-cyan-300' : 'text-slate-700 dark:text-slate-300');
+      showReactionsEl.className = 'text-sm ' + (ds.showReactions ? 'text-cyan-300' : 'text-theme-secondary');
     }
 
     const activeProfileEl = document.getElementById('current-active-profile');
@@ -3182,7 +3182,7 @@
         activeProfileEl.className = 'text-sm text-cyan-300';
       } else {
         activeProfileEl.textContent = '単一ボード';
-        activeProfileEl.className = 'text-sm text-slate-700 dark:text-slate-300';
+        activeProfileEl.className = 'text-sm text-theme-secondary';
       }
     }
   }
@@ -3202,7 +3202,7 @@
     const el = document.getElementById('profile-action-status');
     if (!el) return;
     el.textContent = msg || '';
-    const colors = { success: 'text-green-400', error: 'text-red-400', info: 'text-slate-600 dark:text-slate-400', warning: 'text-yellow-400' };
+    const colors = { success: 'text-green-400', error: 'text-red-400', info: 'text-theme-muted', warning: 'text-yellow-400' };
     el.className = 'text-xs mt-1.5 min-h-[1rem] ' + (colors[type] || colors.info);
   }
 
@@ -3231,7 +3231,7 @@
     }
 
     if (profiles.length === 0) {
-      container.innerHTML = '<div class="text-xs text-slate-500 dark:text-slate-500 italic">未登録。下のフォームから保存できます。</div>';
+      container.innerHTML = '<div class="text-xs text-theme-muted italic">未登録。下のフォームから保存できます。</div>';
       return;
     }
 
@@ -3258,16 +3258,16 @@
         : '';
       const deleteIcon = '<button type="button" class="profile-icon-btn profile-icon-delete" data-profile-action="delete" data-profile-name="' + safeName + '" title="削除">🗑</button>';
       const titleLine = safeTitle
-        ? '<div class="text-[10px] text-slate-500 dark:text-slate-500 truncate" title="' + safeTitle + '">' + safeTitle + '</div>'
+        ? '<div class="text-[10px] text-theme-muted truncate" title="' + safeTitle + '">' + safeTitle + '</div>'
         : '';
       return [
         '<div class="profile-row flex items-center gap-1 p-1.5 rounded border ',
-        isActive ? 'border-cyan-400/50 bg-cyan-900/20' : 'border-slate-300 dark:border-slate-700 bg-gray-800/40',
+        isActive ? 'border-cyan-400/50 bg-cyan-900/20' : 'border-theme-normal bg-slate-800/40',
         '" data-profile-row="' + safeName + '">',
         '  <div class="flex-1 min-w-0">',
-        '    <div class="text-xs font-semibold text-slate-900 dark:text-white truncate profile-name" data-profile-rename="' + safeName + '" title="ダブルクリックで名前を変更">',
+        '    <div class="text-xs font-semibold text-theme truncate profile-name" data-profile-rename="' + safeName + '" title="ダブルクリックで名前を変更">',
         safeName,
-        '      <span class="ml-1 text-[10px] text-slate-600 dark:text-slate-400">[' + modeLabel + ']</span>',
+        '      <span class="ml-1 text-[10px] text-theme-muted">[' + modeLabel + ']</span>',
         '    </div>',
         titleLine,
         '  </div>',
@@ -3655,7 +3655,7 @@
       const countEl = document.getElementById('lesson-list-count');
       if (!listEl) return;
       if (!userId) {
-        listEl.innerHTML = '<li class="text-red-700 dark:text-red-400">userId 未取得 (画面再読み込みが必要)</li>';
+        listEl.innerHTML = '<li class="text-theme-status-error">userId 未取得 (画面再読み込みが必要)</li>';
         return;
       }
       gasRun('lesson.list', { userId }).then((res) => {
@@ -3663,7 +3663,7 @@
           const msg = (res && (res.message || res.error)) || '不明なエラー';
           // 詳細を console + 画面の両方に出す (Cloud Logging にも client/error として届く)。
           console.error('[lesson.list] backend rejected:', msg, res);
-          listEl.innerHTML = `<li class="text-red-700 dark:text-red-400">読み込み失敗: ${window.sharedUtilities.security.escapeHtml(String(msg))}</li>`;
+          listEl.innerHTML = `<li class="text-theme-status-error">読み込み失敗: ${window.sharedUtilities.security.escapeHtml(String(msg))}</li>`;
           return;
         }
         const lessons = (res.data && res.data.lessons) || [];
@@ -3678,7 +3678,7 @@
           hintEl.classList.toggle('hidden', !isFirstTime);
         }
         if (lessons.length === 0) {
-          listEl.innerHTML = '<li class="text-slate-500 dark:text-slate-500 italic">まだレッスンがありません。「🎒 新しい授業を作る」から始めましょう。</li>';
+          listEl.innerHTML = '<li class="text-theme-muted italic">まだレッスンがありません。「🎒 新しい授業を作る」から始めましょう。</li>';
           return;
         }
         listEl.innerHTML = lessons.map(l => {
@@ -3691,7 +3691,7 @@
                        : '編集';
           return `<li>
             <span class="lesson-state-badge state-${l.state}">${stateLabel}</span>
-            <span class="flex-1">${safeName} <span class="text-slate-500 dark:text-slate-500 text-xs ml-1">${dateStr}</span></span>
+            <span class="flex-1">${safeName} <span class="text-theme-muted text-xs ml-1">${dateStr}</span></span>
             <button class="btn btn-secondary text-xs" data-lesson-open="${safeId}" data-lesson-state="${l.state}">${action}</button>
             <button class="btn btn-secondary text-xs" data-lesson-duplicate="${safeId}" title="このレッスンをテンプレとして複製">📋 複製</button>
             <button class="btn btn-secondary text-xs" data-lesson-delete="${safeId}" title="削除">🗑</button>
@@ -3700,7 +3700,7 @@
       }).catch((err) => {
         const msg = (err && err.message) || String(err);
         console.error('[lesson.list] network error:', msg, err);
-        listEl.innerHTML = `<li class="text-red-700 dark:text-red-400">読み込みエラー: ${window.sharedUtilities.security.escapeHtml(msg)}</li>`;
+        listEl.innerHTML = `<li class="text-theme-status-error">読み込みエラー: ${window.sharedUtilities.security.escapeHtml(msg)}</li>`;
       });
     }
 
@@ -3813,7 +3813,7 @@
       if (lessonTemplatesCache) return; // 既に描画済み
       gasRun('lesson.templates', {}).then((res) => {
         if (!res || !res.success) {
-          menu.innerHTML = '<p class="lesson-template-loading text-red-700 dark:text-red-400">読み込み失敗</p>';
+          menu.innerHTML = '<p class="lesson-template-loading text-theme-status-error">読み込み失敗</p>';
           return;
         }
         lessonTemplatesCache = res.data.templates || [];
@@ -3826,7 +3826,7 @@
           '</button>'
         )).join('');
       }).catch((err) => {
-        menu.innerHTML = '<p class="lesson-template-loading text-red-700 dark:text-red-400">' +
+        menu.innerHTML = '<p class="lesson-template-loading text-theme-status-error">' +
           window.sharedUtilities.security.escapeHtml((err && err.message) || String(err)) + '</p>';
       });
     }
@@ -4149,7 +4149,7 @@
             '</div>' +
           '</details>'
         )
-        : '<p class="text-xs text-slate-600 dark:text-slate-400 text-center">フェーズは最大 ' + PHASE_MAX + ' 個までです</p>';
+        : '<p class="text-xs text-theme-muted text-center">フェーズは最大 ' + PHASE_MAX + ' 個までです</p>';
       container.innerHTML = cards + '<div class="phase-add-wrap">' + addBtn + '</div>';
     }
 
@@ -4282,7 +4282,7 @@
             ) +
             '<input type="file" accept="image/*" class="phase-image-file" data-phase-image-file data-phase-index="' + i + '" />' +
           '</div>' +
-          '<p class="phase-image-note text-xs text-slate-600 dark:text-slate-400 mt-1">png / jpeg / gif / webp、5MB まで</p>' +
+          '<p class="phase-image-note text-xs text-theme-muted mt-1">png / jpeg / gif / webp、5MB まで</p>' +
         '</div>'
       );
       let scaleBlock = '';
@@ -4375,7 +4375,7 @@
         )).join('');
         const addBtn = choices.length < 6
           ? '<button type="button" class="phase-choice-add" data-phase-action="choice-add" data-phase-index="' + i + '">＋ 選択肢</button>'
-          : '<p class="text-xs text-slate-600 dark:text-slate-400">最大 6 つまで</p>';
+          : '<p class="text-xs text-theme-muted">最大 6 つまで</p>';
         // 「その他」(児童が自由記述で回答できる Forms 標準オプション)
         const otherToggle = (
           '<label class="phase-choice-other">' +

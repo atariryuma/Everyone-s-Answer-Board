@@ -251,6 +251,60 @@ function countFontSizes() {
 const fs1 = countFontSizes();
 check(`25. font-size Tailwind scale 準拠率 ≥ 90%`, fs1.ratio >= 0.9, `${fs1.std}/${fs1.total} (${(fs1.ratio * 100).toFixed(1)}%)`);
 
+// 27. Orphan dark: utility (light counterpart 無し) = 0
+//   ※ paired は受容、 orphan のみ問題 (light mode で何も適用されない潜在バグ)
+function countOrphanDark() {
+  let orphans = 0;
+  const CLASS_RE = /class=(["'])([^"']+)\1/g;
+  for (const f of HTML_FILES) {
+    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    let m;
+    while ((m = CLASS_RE.exec(text)) !== null) {
+      const classes = m[2].split(/\s+/);
+      for (const cls of classes) {
+        if (!cls.startsWith('dark:')) continue;
+        const pc = cls.match(/^dark:([a-z-]+)-([a-z]+)-\d+/);
+        if (!pc) continue;
+        const [, prop, color] = pc;
+        const hasPair = classes.some(c => c !== cls && !c.startsWith('dark:') &&
+                                          new RegExp(`^${prop}-${color}-`).test(c));
+        if (!hasPair) orphans++;
+      }
+    }
+  }
+  return orphans;
+}
+const orphans = countOrphanDark();
+check('27. Orphan dark: utility = 0 (paired のみ受容)', orphans === 0, `${orphans} 件 orphan`);
+
+// 28. gray/slate 色相混在 = 0 (Tokyo Night は青寄り → slate ファミリーに統一)
+function countGraySlateMix() {
+  let mix = 0;
+  for (const f of HTML_FILES) {
+    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const grayMatches = text.match(/(?<!dark:)(text|bg|border)-gray-\d+|dark:(text|bg|border)-gray-\d+/g) || [];
+    mix += grayMatches.length;
+  }
+  return mix;
+}
+const grayMix = countGraySlateMix();
+check('28. gray/slate ファミリー混在 = 0', grayMix === 0, `${grayMix} 件 gray (slate に統一すべき)`);
+
+// 29. Theme token utility 利用率 (consolidation 健全性)
+function countConsolidation() {
+  let themeUtility = 0, darkPair = 0;
+  for (const f of HTML_FILES) {
+    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    themeUtility += (text.match(/\b(bg|text|border)-theme[-a-z]*/g) || []).length;
+    darkPair += (text.match(/\bdark:(bg|text|border)-/g) || []).length;
+  }
+  const total = themeUtility + darkPair;
+  const ratio = total > 0 ? themeUtility / total : 1;
+  return { themeUtility, darkPair, ratio };
+}
+const cons = countConsolidation();
+check('29. Theme utility 利用率 ≥ 80%', cons.ratio >= 0.8, `${cons.themeUtility} theme / ${cons.darkPair} dark: pair = ${(cons.ratio*100).toFixed(1)}%`);
+
 // 26. border-radius の Tailwind スケール準拠率 ≥ 80%
 function countRadii() {
   const files = ['UnifiedStyles.css.html', 'page.css.html', 'page.viz.css.html'];

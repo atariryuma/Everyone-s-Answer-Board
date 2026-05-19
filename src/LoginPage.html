@@ -160,9 +160,9 @@
       <div class="login-container glass-panel rounded-2xl p-8">
         <!-- ヘッダー -->
         <div class="text-center mb-8">
-          <h1 class="text-4xl font-bold text-cyan-700 dark:text-cyan-400 mb-2">🎓 みんなの回答ボード</h1>
-          <p class="text-xl text-slate-700 dark:text-slate-300">ログイン</p>
-          <p class="text-sm text-slate-600 dark:text-slate-400 mt-2">
+          <h1 class="text-4xl font-bold text-theme-accent-cyan mb-2">🎓 みんなの回答ボード</h1>
+          <p class="text-xl text-theme-secondary">ログイン</p>
+          <p class="text-sm text-theme-muted mt-2">
             新規ユーザーは自動登録、既存ユーザーは管理パネルへ自動遷移
           </p>
         </div>
@@ -176,7 +176,7 @@
           >
             <div class="flex items-center gap-2">
               <svg
-                class="w-5 h-5 text-green-700 dark:text-green-400 flex-shrink-0"
+                class="w-5 h-5 text-theme-status-success flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -189,10 +189,10 @@
                 ></path>
               </svg>
               <div>
-                <div class="text-green-700 dark:text-green-400 font-semibold text-sm" id="header-domain-match-text">
+                <div class="text-theme-status-success font-semibold text-sm" id="header-domain-match-text">
                   G Suite ドメイン
                 </div>
-                <div class="text-green-800 dark:text-green-200 text-xs">セキュアアクセス有効</div>
+                <div class="text-theme-status-success text-xs">セキュアアクセス有効</div>
               </div>
             </div>
           </div>
@@ -204,7 +204,7 @@
           >
             <div class="flex items-center gap-2">
               <svg
-                class="w-5 h-5 text-yellow-700 dark:text-yellow-400 flex-shrink-0"
+                class="w-5 h-5 text-theme-status-warning flex-shrink-0"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -217,10 +217,10 @@
                 ></path>
               </svg>
               <div>
-                <div class="text-yellow-700 dark:text-yellow-300 font-semibold text-sm" id="header-domain-mismatch-text">
+                <div class="text-theme-status-warning font-semibold text-sm" id="header-domain-mismatch-text">
                   ドメイン不一致
                 </div>
-                <div class="text-yellow-800 dark:text-yellow-100 text-xs">アクセス制限あり</div>
+                <div class="text-theme-status-warning text-xs">アクセス制限あり</div>
               </div>
             </div>
           </div>
@@ -233,8 +233,8 @@
             <div class="flex items-center gap-2">
               <div class="w-3 h-3 bg-blue-400 rounded-full animate-pulse flex-shrink-0"></div>
               <div>
-                <div class="text-blue-700 dark:text-blue-400 font-semibold text-sm">ドメイン確認中</div>
-                <div class="text-blue-800 dark:text-blue-200 text-xs">セットアップ中</div>
+                <div class="text-theme-status-info font-semibold text-sm">ドメイン確認中</div>
+                <div class="text-theme-status-info text-xs">セットアップ中</div>
               </div>
             </div>
           </div>
@@ -242,9 +242,9 @@
 
         <!-- アカウント情報 -->
         <div class="glass-panel rounded-xl p-6 mb-6">
-          <h2 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">📧 使用するアカウント</h2>
-          <div class="p-3 bg-white dark:bg-slate-800 rounded-lg">
-            <div class="text-cyan-700 dark:text-cyan-400 font-medium" id="user-email-display">
+          <h2 class="text-lg font-semibold text-theme mb-4">📧 使用するアカウント</h2>
+          <div class="p-3 bg-theme-surface rounded-lg">
+            <div class="text-theme-accent-cyan font-medium" id="user-email-display">
               ユーザー情報を取得中...
             </div>
           </div>
@@ -266,7 +266,7 @@
               type="button"
               id="switch-account-btn"
               onclick="switchAccount()"
-              class="text-sm text-cyan-700 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 underline"
+              class="text-sm text-theme-accent-cyan hover:text-cyan-700 dark:hover:text-cyan-300 underline"
             >
               別のアカウントでログイン
             </button>
@@ -274,7 +274,7 @@
             <button
               type="button"
               onclick="showSecurityModal()"
-              class="text-xs text-slate-500 dark:text-slate-500 hover:text-gray-400 underline transition-colors duration-200"
+              class="text-xs text-theme-muted hover:text-slate-400 underline transition-colors duration-200"
             >
               セキュリティ仕様について
             </button>
@@ -292,29 +292,29 @@
         class="glass-panel rounded-xl p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto transition-transform duration-300"
       >
         <div class="flex justify-between items-center mb-4">
-          <h3 class="text-xl font-semibold text-slate-900 dark:text-white">🔒 セキュリティ仕様</h3>
-          <button type="button" onclick="closeSecurityModal()" class="text-slate-600 dark:text-slate-400 hover:text-white text-2xl">
+          <h3 class="text-xl font-semibold text-theme">🔒 セキュリティ仕様</h3>
+          <button type="button" onclick="closeSecurityModal()" class="text-theme-muted hover:text-white text-2xl">
             ✕
           </button>
         </div>
 
-        <div class="space-y-4 text-sm text-slate-700 dark:text-slate-300">
-          <div class="bg-white dark:bg-slate-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-700 dark:text-cyan-400 mb-2">🏢 ドメイン制限</h4>
+        <div class="space-y-4 text-sm text-theme-secondary">
+          <div class="bg-theme-surface p-4 rounded-lg">
+            <h4 class="font-medium text-theme-accent-cyan mb-2">🏢 ドメイン制限</h4>
             <p>
               このシステムは<strong>管理者と同一ドメイン</strong>のユーザーのみアクセス可能です。組織外からのアクセスは制限されています。
             </p>
           </div>
 
-          <div class="bg-white dark:bg-slate-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-700 dark:text-cyan-400 mb-2">🔐 認証システム</h4>
+          <div class="bg-theme-surface p-4 rounded-lg">
+            <h4 class="font-medium text-theme-accent-cyan mb-2">🔐 認証システム</h4>
             <p>
               Google Workspace認証（Session.getActiveUser()）を使用しており、組織のセキュリティポリシーに準拠しています。
             </p>
           </div>
 
-          <div class="bg-white dark:bg-slate-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-700 dark:text-cyan-400 mb-2">🛡️ データ保護</h4>
+          <div class="bg-theme-surface p-4 rounded-lg">
+            <h4 class="font-medium text-theme-accent-cyan mb-2">🛡️ データ保護</h4>
             <ul class="list-disc list-inside space-y-1">
               <li>Content Security Policy (CSP) による外部リソース制限</li>
               <li>X-Content-Type-Options: nosniff による MIME タイプ保護</li>
@@ -323,22 +323,22 @@
             </ul>
           </div>
 
-          <div class="bg-white dark:bg-slate-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-700 dark:text-cyan-400 mb-2">👥 アクセス制御</h4>
+          <div class="bg-theme-surface p-4 rounded-lg">
+            <h4 class="font-medium text-theme-accent-cyan mb-2">👥 アクセス制御</h4>
             <p>
               マルチテナント環境での権限分離により、ユーザーは自分のデータのみアクセス可能です。管理者権限は適切に分離されています。
             </p>
           </div>
 
-          <div class="bg-white dark:bg-slate-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-700 dark:text-cyan-400 mb-2">📝 監査ログ</h4>
+          <div class="bg-theme-surface p-4 rounded-lg">
+            <h4 class="font-medium text-theme-accent-cyan mb-2">📝 監査ログ</h4>
             <p>
               重要度の高いセキュリティイベントは監査ログに記録され、追跡と分析が可能です。
             </p>
           </div>
 
-          <div class="bg-white dark:bg-slate-800 p-4 rounded-lg">
-            <h4 class="font-medium text-cyan-700 dark:text-cyan-400 mb-2">⚙️ システム設計</h4>
+          <div class="bg-theme-surface p-4 rounded-lg">
+            <h4 class="font-medium text-theme-accent-cyan mb-2">⚙️ システム設計</h4>
             <p>
               Google Apps
               Script環境での実行により、Googleのインフラストラクチャのセキュリティ基準を活用しています。
@@ -349,7 +349,7 @@
         <div class="mt-6 text-center">
           <button
             onclick="closeSecurityModal()"
-            class="btn btn-secondary text-slate-900 dark:text-white py-2 px-6 rounded-lg"
+            class="btn btn-secondary text-theme py-2 px-6 rounded-lg"
           >
             閉じる
           </button>

@@ -112,6 +112,14 @@
     --theme-accent-cyan-soft: rgba(56, 189, 248, 0.18); /* banner 背景の薄い cyan */
     --theme-overlay-white-05: rgba(255, 255, 255, 0.05); /* input 背景の極薄 */
 
+    /* Status text colors (両モード対応 contrast 確保)
+     * 旧 text-theme-status-error 等の Tailwind pair を 1 token に統一。
+     * HTML class は `text-theme-status-error` 等で両モード対応 */
+    --theme-status-error-text: #f87171;                /* red-400 — dark 5:1 / light 4.4:1 */
+    --theme-status-success-text: #4ade80;              /* green-400 — dark 7:1 / light 2.6:1 (要 light override) */
+    --theme-status-warning-text: #fbbf24;              /* yellow-400 — dark 11:1 / light 1.8:1 (要 light override) */
+    --theme-status-info-text: #60a5fa;                 /* blue-400 — dark 6:1 / light 3:1 (要 light override) */
+
     /* Card / Panel tier (v2816: solid colors で 3 階層 elevation を明示)
      * 旧 alpha 値は bg 変更時に composite が予測不能だったため solid 化。
      *   --theme-card-1 = bg-surface と同 (level 1 elevation)
@@ -354,6 +362,12 @@
     --theme-card-1: rgba(248, 250, 252, 0.7);          /* slate-50 70% — bg-base とほぼ同色 + 微 elevation */
     --theme-card-2: rgba(241, 245, 249, 0.6);          /* slate-100 60% — 中 elevation */
     --theme-card-3: #ffffff;                           /* 完全白で popup を明示 */
+
+    /* Status text — light mode 上で AA 確保のため濃い shade に override */
+    --theme-status-error-text: #b91c1c;                /* red-700: 6.6:1 on white */
+    --theme-status-success-text: #15803d;              /* green-700: 5.7:1 */
+    --theme-status-warning-text: #b45309;              /* amber-700: 6.6:1 */
+    --theme-status-info-text: #1d4ed8;                 /* blue-700: 7.8:1 */
 
     /* Brand / Status colors の light 上 contrast 確保 (light 専用上書き) */
     --brand-understand: #b45309;                       /* amber-700: 6.0:1 (dark の amber-400 は light で 1.6:1 fail) */
