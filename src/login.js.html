@@ -708,7 +708,7 @@
             console.error('Clipboard API failed:', error);
             const messageElement = document.createElement('span');
             messageElement.textContent = ' (手動でコピーしてください)';
-            messageElement.style.color = 'orange';
+            messageElement.style.color = 'var(--status-warning)';
             buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
   
 
@@ -719,7 +719,7 @@
         const messageElement = document.createElement('span');
         messageElement.textContent =
           ' (ブラウザがコピーをサポートしていません。手動でコピーしてください)';
-        messageElement.style.color = 'orange';
+        messageElement.style.color = 'var(--status-warning)';
         buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
         createPromiseDelay(5000).then(() => messageElement.remove());
       }
@@ -727,7 +727,7 @@
       console.error('copyUrlToClipboard error:', error);
       const messageElement = document.createElement('span');
       messageElement.textContent = ' (コピー中にエラーが発生しました)';
-      messageElement.style.color = 'red';
+      messageElement.style.color = 'var(--status-error)';
       buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
       createPromiseDelay(5000).then(() => messageElement.remove());
     }

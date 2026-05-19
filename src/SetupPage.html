@@ -288,10 +288,10 @@
       try {
         if (this.value.trim()) {
           validateJSON(this.value.trim());
-          this.style.borderColor = 'var(--brand-success, #10b981)';
+          this.style.borderColor = 'var(--status-success)';
         }
       } catch (e) {
-        this.style.borderColor = 'var(--brand-error, #ef4444)';
+        this.style.borderColor = 'var(--status-error)';
       }
     });
 
@@ -299,10 +299,10 @@
       try {
         if (this.value.trim()) {
           validateSpreadsheetId(this.value.trim());
-          this.style.borderColor = 'var(--brand-success, #10b981)';
+          this.style.borderColor = 'var(--status-success)';
         }
       } catch (e) {
-        this.style.borderColor = 'var(--brand-error, #ef4444)';
+        this.style.borderColor = 'var(--status-error)';
       }
     });
 
@@ -313,10 +313,10 @@
           if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
             throw new Error('有効なメールアドレスを入力してください');
           }
-          this.style.borderColor = 'var(--brand-success, #10b981)';
+          this.style.borderColor = 'var(--status-success)';
         }
       } catch (e) {
-        this.style.borderColor = 'var(--brand-error, #ef4444)';
+        this.style.borderColor = 'var(--status-error)';
       }
     });
 
