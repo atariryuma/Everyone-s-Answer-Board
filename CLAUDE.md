@@ -219,18 +219,20 @@ owner は own OAuth で SA quota 節約。 viewer / admin の cross-user のみ 
 - `__applyPublishStateChange` で `invalidateSaValidationCache_` を呼び、 該当 SS の cache version を bump
 - unpublish 直後の 60秒 access leak を解消
 
-### Theme / Color アーキテクチャ (v2800+, v2815 パレット業界標準化)
+### Theme / Color アーキテクチャ (v2800+, v2816 hybrid palette)
 
 ダークモード既定 + ライトモード移行準備済。 全 CSS は **semantic theme token** 経由で記述する。
 
-**パレット設計哲学 (v2815+)**: 業界定番 「2 階層 elevation」 (GitHub / Linear / Stripe / shadcn / Material) 採用。
+**パレット設計哲学 (v2816+)**: Tokyo Night atmospheric dark + 業界定番 light の hybrid。
 
 | 層 | Dark | Light | 用途 |
 | ---- | ---- | ----- | ---- |
-| `--theme-bg-base` | `#0f172a` slate-900 | `#f1f5f9` slate-100 | ページ最奥 (少しトーン落とし) |
-| `--theme-bg-surface` | `#1e293b` slate-800 | `#ffffff` 純白 | カード・panel (page bg から明確に浮く) |
-| `--theme-bg-elevated` | `#334155` slate-700 | `#ffffff` 純白 + shadow | modal・popover |
-| `--theme-text-primary` | `#f1f5f9` slate-100 | `#0f172a` slate-900 | 本文 (16:1 AAA) |
+| `--theme-bg-base` | `#1a1b26` Tokyo Night | `#f1f5f9` slate-100 | ページ最奥 |
+| `--theme-bg-surface` | `#252738` (+1 step) | `#ffffff` 純白 | カード・panel (page bg から明確に浮く) |
+| `--theme-bg-elevated` | `#2e3046` (+2 step) | `#ffffff` 純白 + shadow | modal・popover |
+| `--theme-text-primary` | `#e2e8f0` slate-200 (12:1 AAA) | `#0f172a` slate-900 (16:1 AAA) | 本文 |
+
+**設計判断**: dark mode は **Tokyo Night の atmospheric warmth** を base に維持しつつ、 surface / elevated を **solid colors で明示的に lighter step** (旧 alpha 値廃止)。 light mode は **GitHub/Linear/Stripe 方式**の off-white page + 純白カード。
 
 **色を変更したいとき** (例: 「もう少し warm な印象」 「アクセントを purple に」):
 
