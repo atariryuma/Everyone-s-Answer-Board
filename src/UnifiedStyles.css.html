@@ -753,7 +753,7 @@
     max-width: 400px;
     background: var(--theme-overlay-surface-glass);
     border-radius: 1rem;
-    border: 1px solid rgba(139, 233, 253, 0.2);  /* brand-accent-light の薄め (loading 専用) */
+    border: 1px solid var(--theme-accent-cyan-soft);  /* brand-accent-light の薄め (loading 専用) */
     box-shadow: 0 12px 40px var(--theme-overlay-black-60);
     display: flex;
     flex-direction: column;
@@ -829,7 +829,7 @@
   .loading-spinner {
     width: 32px;
     height: 32px;
-    border: 4px solid rgba(139, 233, 253, 0.3);  /* spinner-accent: brand-accent-light alpha */
+    border: 4px solid var(--theme-border-strong);  /* spinner-accent: brand-accent-light alpha */
     border-top: 4px solid var(--theme-spinner);
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -839,7 +839,7 @@
   .spinner-xs {
     width: 20px;
     height: 20px;
-    border: 2px solid rgba(139, 233, 253, 0.3);  /* spinner-accent: brand-accent-light alpha */
+    border: 2px solid var(--theme-border-strong);  /* spinner-accent: brand-accent-light alpha */
     border-top: 2px solid var(--theme-spinner);
     border-radius: 50%;
     animation: spin 1s linear infinite;
@@ -881,6 +881,7 @@
 
   .card-hover:hover {
     transform: translate3d(0, -2px, 0);
+    /* theme:exempt - brand cyan glow (両モード同色 accent) */
     box-shadow: 0 8px 25px rgba(139, 233, 253, 0.15);
     will-change: transform;
   }
