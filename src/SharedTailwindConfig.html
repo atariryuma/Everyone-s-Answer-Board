@@ -21,35 +21,51 @@
             // 使い方: `class="bg-theme-base text-theme-primary border-theme-subtle"` 等。
             //   `:root` の `--theme-*` を書き換えれば全 utility が追従する。
             colors: {
-              'theme-base': 'var(--theme-bg-base)',
-              'theme-surface': 'var(--theme-bg-surface)',
-              'theme-elevated': 'var(--theme-bg-elevated)',
-              'theme-overlay': 'var(--theme-bg-overlay)',
-              'theme-text': 'var(--theme-text-primary)',
-              'theme-text-secondary': 'var(--theme-text-secondary)',
-              'theme-text-muted': 'var(--theme-text-muted)',
-              'theme-text-inverse': 'var(--theme-text-inverse)',
-              'theme-border': 'var(--theme-border-subtle)',
-              'theme-border-normal': 'var(--theme-border-normal)',
-              'theme-border-strong': 'var(--theme-border-strong)',
-              'theme-spinner': 'var(--theme-spinner)',
-              'theme-accent-cyan': 'var(--theme-accent-cyan)',
-              // status text (両モード対応 — text-X-700 dark:text-X-400 pair の統一先)
-              'theme-status-error': 'var(--theme-status-error-text)',
-              'theme-status-success': 'var(--theme-status-success-text)',
-              'theme-status-warning': 'var(--theme-status-warning-text)',
-              'theme-status-info': 'var(--theme-status-info-text)',
+              // shadcn 風 nested theme palette — Tailwind 公式パターン
+              //   `text-theme`            → theme.DEFAULT (= --theme-text-primary)
+              //   `text-theme-muted`      → theme.muted (= --theme-text-muted)
+              //   `bg-theme-surface`      → theme.surface (= --theme-bg-surface)
+              //   `border-theme-normal`   → theme.normal (= --theme-border-normal)
+              //   `text-theme-status-error` → theme.status-error
+              //   1 トークン変えれば 全 utility class が追従。
+              theme: {
+                DEFAULT: 'var(--theme-text-primary)',
+                primary: 'var(--theme-text-primary)',
+                secondary: 'var(--theme-text-secondary)',
+                muted: 'var(--theme-text-muted)',
+                inverse: 'var(--theme-text-inverse)',
+                base: 'var(--theme-bg-base)',
+                surface: 'var(--theme-bg-surface)',
+                elevated: 'var(--theme-bg-elevated)',
+                overlay: 'var(--theme-bg-overlay)',
+                subtle: 'var(--theme-border-subtle)',
+                normal: 'var(--theme-border-normal)',
+                strong: 'var(--theme-border-strong)',
+                spinner: 'var(--theme-spinner)',
+                'accent-cyan': 'var(--theme-accent-cyan)',
+                'card-1': 'var(--theme-card-1)',
+                'card-2': 'var(--theme-card-2)',
+                'card-3': 'var(--theme-card-3)',
+                'status-error': 'var(--theme-status-error-text)',
+                'status-success': 'var(--theme-status-success-text)',
+                'status-warning': 'var(--theme-status-warning-text)',
+                'status-info': 'var(--theme-status-info-text)',
+              },
               // brand identity (theme 不変)
-              'brand-primary': 'var(--brand-primary)',
-              'brand-accent': 'var(--brand-accent)',
-              'brand-like': 'var(--brand-like)',
-              'brand-understand': 'var(--brand-understand)',
-              'brand-curious': 'var(--brand-curious)',
-              'brand-highlight': 'var(--brand-highlight)',
-              'status-success': 'var(--status-success)',
-              'status-error': 'var(--status-error)',
-              'status-warning': 'var(--status-warning)',
-              'status-info': 'var(--status-info)',
+              brand: {
+                primary: 'var(--brand-primary)',
+                accent: 'var(--brand-accent)',
+                like: 'var(--brand-like)',
+                understand: 'var(--brand-understand)',
+                curious: 'var(--brand-curious)',
+                highlight: 'var(--brand-highlight)',
+              },
+              status: {
+                success: 'var(--status-success)',
+                error: 'var(--status-error)',
+                warning: 'var(--status-warning)',
+                info: 'var(--status-info)',
+              },
             }
           }
         },

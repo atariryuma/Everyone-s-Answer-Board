@@ -290,6 +290,54 @@ function countGraySlateMix() {
 const grayMix = countGraySlateMix();
 check('28. gray/slate ファミリー混在 = 0', grayMix === 0, `${grayMix} 件 gray (slate に統一すべき)`);
 
+// 30. Tailwind utility ↔ config 整合性 (no-op class 検出)
+//   HTML で使われている theme- utility が Tailwind config (nested colors) に存在するか
+function checkUtilityConfigConsistency() {
+  const tw = fs.readFileSync(path.join(SRC, 'SharedTailwindConfig.html'), 'utf8');
+  // nested theme: { DEFAULT, primary, ... } から key を抽出
+  const themeMatch = tw.match(/theme:\s*\{([\s\S]*?)\n\s*\},\s*\n\s*\/\//);
+  const themeKeys = new Set(['theme']);  // text-theme = DEFAULT
+  if (themeMatch) {
+    const keyRe = /^\s*['"]?([a-zA-Z][\w-]*)['"]?\s*:/gm;
+    let m;
+    while ((m = keyRe.exec(themeMatch[1])) !== null) {
+      const k = m[1];
+      if (k === 'DEFAULT') themeKeys.add('theme');
+      else themeKeys.add(`theme-${k}`);
+    }
+  }
+  // brand / status keys
+  const brandMatch = tw.match(/brand:\s*\{([\s\S]*?)\}/);
+  if (brandMatch) {
+    let m, re = /^\s*['"]?([a-zA-Z][\w-]*)['"]?\s*:/gm;
+    while ((m = re.exec(brandMatch[1])) !== null) themeKeys.add(`brand-${m[1]}`);
+  }
+  const statusMatch = tw.match(/status:\s*\{([\s\S]*?)\}/);
+  if (statusMatch) {
+    let m, re = /^\s*['"]?([a-zA-Z][\w-]*)['"]?\s*:/gm;
+    while ((m = re.exec(statusMatch[1])) !== null) themeKeys.add(`status-${m[1]}`);
+  }
+
+  // HTML で使われている theme-/brand-/status- utility が config key にあるか
+  let noop = 0;
+  const noopExamples = [];
+  for (const f of HTML_FILES) {
+    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const utilRe = /\b(?:text|bg|border|ring|from|to|via|divide|placeholder|outline|fill|stroke)-(theme(?:-[a-z][\w-]*)?|brand-[a-z][\w-]*|status-[a-z][\w-]*)\b/g;
+    let m;
+    while ((m = utilRe.exec(text)) !== null) {
+      if (!themeKeys.has(m[1])) {
+        noop++;
+        if (noopExamples.length < 3) noopExamples.push(`${f}: ${m[0]}`);
+      }
+    }
+  }
+  return { noop, examples: noopExamples, validKeys: themeKeys.size };
+}
+const consistency = checkUtilityConfigConsistency();
+check('30. Tailwind utility ↔ config 整合性 (no-op 検出)', consistency.noop === 0,
+  consistency.noop === 0 ? `${consistency.validKeys} valid keys, 0 no-op` : `${consistency.noop} no-op utility (例: ${consistency.examples.join(', ')})`);
+
 // 29. Theme token utility 利用率 (consolidation 健全性)
 function countConsolidation() {
   let themeUtility = 0, darkPair = 0;
