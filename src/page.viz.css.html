@@ -469,16 +469,15 @@
   }
   .modal-axis-quadrant {
     /* 教師の指導意図の核心 = 立場の道徳的意味。少し大きめで主役感を出す。
-       highlight モーダル枠 (紫) と独立した色系にして視覚階層を保つため cyan 系に。
-       (emoji 📍 自体の色は CSS color で確実に変えられないので、ここでは text 色だけ管理) */
+       両モードで明瞭な hierarchy を出すため accent-cyan token + alpha 強化。 */
     font-size: 1.125rem;
-    color: var(--brand-accent-light);
-    font-weight: 600;
+    color: var(--theme-accent-cyan);
+    font-weight: 700;
     text-align: center;
-    padding: 0.4rem 0.6rem;
-    background: rgba(56, 189, 248, 0.08);
+    padding: 0.5rem 0.7rem;
+    background: var(--theme-accent-cyan-soft);
     border-radius: 0.5rem;
-    border: 1px solid rgba(56, 189, 248, 0.3);
+    border: 1px solid var(--theme-accent-cyan);
   }
   @media (max-width: 640px) {
     .modal-axis-row { font-size: 0.875rem; gap: 0.4rem; }

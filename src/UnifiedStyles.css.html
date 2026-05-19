@@ -72,17 +72,25 @@
        ベストプラクティス (2026 業界標準): https://natebal.com/best-practices-for-dark-mode/ */
     color-scheme: dark;
 
-    /* 背景レイヤー (奥 → 手前) */
-    --theme-bg-base: #1a1b26;                          /* body 直接背景 */
-    --theme-bg-surface: rgba(26, 27, 38, 0.7);         /* glass-panel, card 等 */
-    --theme-bg-elevated: rgba(26, 27, 38, 0.95);       /* modal, dropdown 等 */
-    --theme-bg-overlay: rgba(0, 0, 0, 0.8);            /* modal backdrop */
+    /* 背景レイヤー (奥 → 手前)
+     * 設計思想 (v2815+): 業界定番「2 階層 elevation」(GitHub/Stripe/Linear/shadcn 方式)
+     *   - bg-base    = ページ最奥背景 (少しトーン落とし)
+     *   - bg-surface = カード / panel (1 段明るく、 ページ bg と視覚的に分離)
+     *   - bg-elevated = modal / popover (最も elevated、 strong shadow と組合せ)
+     * 例: dark mode で bg-base #0f172a (slate-900) → bg-surface #1e293b (slate-800)
+     *     light mode で bg-base #f1f5f9 (slate-100) → bg-surface #ffffff (純白カード)
+     * 結果: カード / panel が ページ bg から明確に浮き上がる視覚階層を確立。 */
+    --theme-bg-base: #0f172a;                          /* slate-900 — ページ最奥 (1a1b26 から slate-900 に変更で contrast 強化) */
+    --theme-bg-surface: #1e293b;                       /* slate-800 — カード / panel 不透明 (旧 70% alpha は backdrop ぼやけ問題で廃止) */
+    --theme-bg-elevated: #334155;                      /* slate-700 — modal / popover (slate-800 上で更に elevation) */
+    --theme-bg-overlay: rgba(0, 0, 0, 0.75);           /* modal backdrop (slightly 軽め) */
 
-    /* テキスト階層 */
-    --theme-text-primary: #c0caf5;                     /* 通常本文 */
-    --theme-text-secondary: #cbd5e1;                   /* やや弱 */
-    --theme-text-muted: #94a3b8;                       /* キャプション・補助 */
-    --theme-text-inverse: #1a1b26;                     /* light area 上の暗色テキスト */
+    /* テキスト階層 (v2815+: c0caf5 Tokyo Night → slate ベース for better readability)
+     * 業界平均より少し brighter にして 読書時の eye strain を抑える */
+    --theme-text-primary: #f1f5f9;                     /* slate-100 — 本文 (旧 #c0caf5 Tokyo Night より crisper) */
+    --theme-text-secondary: #cbd5e1;                   /* slate-300 — やや弱 */
+    --theme-text-muted: #94a3b8;                       /* slate-400 — キャプション・補助 (AAA 6.6:1) */
+    --theme-text-inverse: #0f172a;                     /* light area 上の暗色テキスト */
 
     /* 境界線 */
     --theme-border-subtle: rgba(255, 255, 255, 0.1);   /* 既存 --brand-border と同値 */
@@ -306,17 +314,21 @@
      * 検証: theme-contrast script で全 contrast pass を確認済。
      */
 
-    /* 背景レイヤー — off-white base + 白カード (自然な elevation) */
-    --theme-bg-base: #f8fafc;                          /* slate-50: 純白回避で疲労低減 */
-    --theme-bg-surface: rgba(255, 255, 255, 0.92);     /* 白カードに alpha 高めで content 視認確保 */
-    --theme-bg-elevated: #ffffff;                      /* modal は完全不透明 */
+    /* 背景レイヤー (v2815+: 業界定番 「カード on off-white bg」パターン)
+     * 旧: bg-base #f8fafc (slate-50) + bg-surface rgba(255,255,255,0.92) → 両方 near-white で
+     *     カードとページ bg が同化して "全部白" な印象。 user 指摘 「しろすぎない?」 の原因。
+     * 新: bg-base #f1f5f9 (slate-100) → bg-surface #ffffff (純白カード)
+     *     GitHub / Linear / Stripe / shadcn-default と同じ 「ページbg < カード」階層を確立。 */
+    --theme-bg-base: #f1f5f9;                          /* slate-100 — page bg (旧 slate-50 から trim) */
+    --theme-bg-surface: #ffffff;                       /* 純白カード — ページ bg より明確に浮く */
+    --theme-bg-elevated: #ffffff;                      /* modal も純白 + shadow で elevation */
     --theme-bg-overlay: rgba(15, 23, 42, 0.4);         /* modal backdrop = slate-900 半透明 */
 
     /* テキスト階層 — children-friendly に muted を slate-600 まで昇格 */
-    --theme-text-primary: #1e293b;                     /* slate-800: 14.4:1 (slate-900 14.4は強すぎ) */
+    --theme-text-primary: #0f172a;                     /* slate-900: 16:1 (より crisp に) */
     --theme-text-secondary: #334155;                   /* slate-700: 10.8:1 */
     --theme-text-muted: #475569;                       /* slate-600: 7.6:1 (slate-500 4.5:1 は子供には弱い) */
-    --theme-text-inverse: #f8fafc;                     /* 反転背景上のテキスト */
+    --theme-text-inverse: #f1f5f9;                     /* 反転背景上のテキスト */
 
     /* 境界線 — solid color に変更 (rgba から) */
     --theme-border-subtle: #e2e8f0;                    /* slate-200 (shadcn 標準) */
@@ -413,9 +425,12 @@
     outline-offset: 2px;
   }
 
-  /* Glass Panel Effects */
+  /* Glass Panel Effects (v2815+: card elevation を border + shadow で明示)
+   * dark: bg-surface slate-800 で page bg slate-900 から浮く
+   * light: 純白カード on slate-100 page bg、 さらに shadow で elevation 確立 */
   .glass-panel {
     background: var(--theme-bg-surface);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
     -webkit-backdrop-filter: var(--glass-backdrop);
     backdrop-filter: var(--glass-backdrop);
     border: var(--border-primary);

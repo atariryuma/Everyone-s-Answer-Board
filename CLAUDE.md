@@ -219,9 +219,36 @@ owner は own OAuth で SA quota 節約。 viewer / admin の cross-user のみ 
 - `__applyPublishStateChange` で `invalidateSaValidationCache_` を呼び、 該当 SS の cache version を bump
 - unpublish 直後の 60秒 access leak を解消
 
-### Theme / Color アーキテクチャ (v2800+)
+### Theme / Color アーキテクチャ (v2800+, v2815 パレット業界標準化)
 
 ダークモード既定 + ライトモード移行準備済。 全 CSS は **semantic theme token** 経由で記述する。
+
+**パレット設計哲学 (v2815+)**: 業界定番 「2 階層 elevation」 (GitHub / Linear / Stripe / shadcn / Material) 採用。
+
+| 層 | Dark | Light | 用途 |
+| ---- | ---- | ----- | ---- |
+| `--theme-bg-base` | `#0f172a` slate-900 | `#f1f5f9` slate-100 | ページ最奥 (少しトーン落とし) |
+| `--theme-bg-surface` | `#1e293b` slate-800 | `#ffffff` 純白 | カード・panel (page bg から明確に浮く) |
+| `--theme-bg-elevated` | `#334155` slate-700 | `#ffffff` 純白 + shadow | modal・popover |
+| `--theme-text-primary` | `#f1f5f9` slate-100 | `#0f172a` slate-900 | 本文 (16:1 AAA) |
+
+**色を変更したいとき** (例: 「もう少し warm な印象」 「アクセントを purple に」):
+
+1. [UnifiedStyles.css.html](src/UnifiedStyles.css.html) の `:root` (dark) と `body.theme-light` (light) の `--theme-bg-base` / `--theme-text-primary` 等を書き換えるだけ
+2. 他の CSS / HTML は全部 `var(--theme-*)` 参照なので **token を 1 箇所変えるだけで全体反映**
+3. `npm run theme:contrast` で WCAG AA を機械検証
+4. `npm run theme:perfect` で 26 軸 ゲート確認
+
+例: warm な light mode に変更する場合
+
+```css
+body.theme-light {
+  --theme-bg-base: #fafaf9;  /* stone-50 (warm beige) */
+  --theme-bg-surface: #fffdf8; /* warm off-white */
+}
+```
+
+これだけで全カード・全テキスト・全 modal が warm tone になる。
 
 **3 種類のカラートークン**:
 
