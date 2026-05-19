@@ -38,12 +38,12 @@
   }
   .viz-axis text {
     fill: var(--theme-text-muted);
-    font-size: 0.9rem;
+    font-size: 0.875rem;
   }
 
   .viz-axis-label {
     fill: var(--theme-text-primary);
-    font-size: 1.05rem;
+    font-size: 1.125rem;
     font-weight: 600;
   }
 
@@ -124,7 +124,7 @@
     background: var(--theme-bg-elevated);
     color: var(--theme-text-primary);
     border: 1px solid var(--theme-border-normal);
-    border-radius: 10px;
+    border-radius: 0.625rem;
     width: min(92vw, 640px);
     max-height: 85vh;
     overflow: hidden;
@@ -146,7 +146,7 @@
     border: 0;
     color: var(--theme-text-secondary);
     cursor: pointer;
-    font-size: 1.6rem;
+    font-size: 1.5rem;
     line-height: 1;
     padding: 0 8px;
   }
@@ -165,7 +165,7 @@
   .viz-rows-popup-row {
     background: var(--theme-overlay-black-60);
     border: 1px solid var(--theme-border-normal);
-    border-radius: 6px;
+    border-radius: 0.375rem;
     padding: 10px 12px;
     cursor: pointer;
     transition: background 0.12s ease, border-color 0.12s ease;
@@ -181,23 +181,23 @@
   .viz-rows-popup-chip {
     display: inline-block;
     margin-left: 0.5rem;
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     color: var(--brand-accent-light);
     background: rgba(56, 189, 248, 0.1);  /* accent-cyan の薄め */
     border: 1px solid rgba(56, 189, 248, 0.3);
     padding: 0.1rem 0.4rem;
-    border-radius: 0.3rem;
+    border-radius: 0.5rem;
     font-weight: 600;
     vertical-align: middle;
   }
   .viz-rows-popup-name {
-    font-size: 0.82rem;
+    font-size: 0.875rem;
     color: var(--theme-text-muted);
     font-weight: 600;
     margin-bottom: 4px;
   }
   .viz-rows-popup-reason {
-    font-size: 0.95rem;
+    font-size: 1rem;
     line-height: 1.5;
     margin-bottom: 8px;
     white-space: pre-wrap;
@@ -252,7 +252,7 @@
    *   ラベルより一段薄く、フォントを小さく - 階層を表現。 */
   .viz-quadrant-keyword {
     fill: rgba(199, 210, 254, 0.7);
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     font-weight: 500;
     pointer-events: none;
     text-anchor: middle;
@@ -275,10 +275,10 @@
     outline: none;
   }
   body.projector-mode .viz-quadrant-keyword {
-    font-size: 1.05rem;
+    font-size: 1.125rem;
   }
   @media (max-width: 768px) {
-    .viz-quadrant-keyword { font-size: 0.72rem; }
+    .viz-quadrant-keyword { font-size: 0.75rem; }
   }
 
   /* ホバー時のツールチップカード */
@@ -291,7 +291,7 @@
     border-radius: 0.5rem;
     padding: 0.6rem 0.8rem;
     max-width: 22rem;
-    font-size: 0.92rem;
+    font-size: 0.875rem;
     line-height: 1.45;
     pointer-events: none;
     opacity: 0;
@@ -322,7 +322,7 @@
     margin-top: 0.5rem;
     padding-top: 0.4rem;
     border-top: 1px solid var(--theme-border-subtle);
-    font-size: 0.72rem;
+    font-size: 0.75rem;
     color: var(--theme-text-muted);
     font-style: italic;
   }
@@ -332,7 +332,7 @@
      学術会議「道理ある不一致」の可視化用 (v2691)。 */
   .viz-contrast-summary {
     fill: rgba(199, 210, 254, 0.55);
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     font-weight: 500;
     pointer-events: none;
     letter-spacing: 0.02em;
@@ -349,7 +349,7 @@
     fill: rgba(55, 48, 163, 0.9);
   }
   @media (max-width: 768px) {
-    .viz-contrast-summary { font-size: 0.7rem; }
+    .viz-contrast-summary { font-size: 0.75rem; }
   }
 
   /* 整数セル境界の薄い grid line: ドット塊が「同じ Likert セルにまとまっている」と読める
@@ -416,7 +416,7 @@
     grid-template-columns: minmax(0, 1fr) 3fr minmax(0, 1fr) auto;
     align-items: center;
     gap: 0.8rem;
-    font-size: 1.05rem;
+    font-size: 1.125rem;
     color: var(--theme-text-primary);
   }
   .modal-axis-label-min {
@@ -440,7 +440,7 @@
     height: 0.7rem;  /* ドット (1.4rem) との比率を整える */
     /* 単色 track: 「左 → 右 = 弱 → 強」誤読を避けるため、立場の対極は同等扱い。 */
     background: var(--theme-border-subtle);
-    border-radius: 999px;
+    border-radius: 9999px;
     border: 1px solid var(--theme-border-subtle);
   }
   .modal-axis-dot {
@@ -459,30 +459,30 @@
     font-variant-numeric: tabular-nums;
     color: #fde047;  /* yellow-300 brand emphasis */
     font-weight: 700;
-    font-size: 0.95rem;
+    font-size: 1rem;
     white-space: nowrap;
   }
   .modal-axis-quadrant {
     /* 教師の指導意図の核心 = 立場の道徳的意味。少し大きめで主役感を出す。
        highlight モーダル枠 (紫) と独立した色系にして視覚階層を保つため cyan 系に。
        (emoji 📍 自体の色は CSS color で確実に変えられないので、ここでは text 色だけ管理) */
-    font-size: 1.15rem;
+    font-size: 1.125rem;
     color: var(--brand-accent-light);
     font-weight: 600;
     text-align: center;
     padding: 0.4rem 0.6rem;
     background: rgba(56, 189, 248, 0.08);
-    border-radius: 0.4rem;
+    border-radius: 0.5rem;
     border: 1px solid rgba(56, 189, 248, 0.3);
   }
   @media (max-width: 640px) {
-    .modal-axis-row { font-size: 0.85rem; gap: 0.4rem; }
+    .modal-axis-row { font-size: 0.875rem; gap: 0.4rem; }
     .modal-axis-track { height: 0.45rem; }
     .modal-axis-dot { width: 0.9rem; height: 0.9rem; }
   }
-  body.projector-mode .modal-axis-row { font-size: 1.3rem; }
-  body.projector-mode .modal-axis-value { font-size: 1.15rem; }
-  body.projector-mode .modal-axis-quadrant { font-size: 1.2rem; }
+  body.projector-mode .modal-axis-row { font-size: 1.25rem; }
+  body.projector-mode .modal-axis-value { font-size: 1.125rem; }
+  body.projector-mode .modal-axis-quadrant { font-size: 1.25rem; }
 
   /* M3 ワードランキング */
   .word-bar {
@@ -494,12 +494,12 @@
   }
   .word-label {
     fill: var(--theme-text-primary);
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 600;
   }
   .word-count {
     fill: var(--theme-text-muted);
-    font-size: 0.85rem;
+    font-size: 0.875rem;
   }
 
   /* M4 円グラフ */
@@ -514,20 +514,20 @@
   }
   .pie-label {
     fill: var(--theme-text-primary);
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 600;
     pointer-events: none;
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
   .pie-center {
     fill: var(--theme-text-primary);
-    font-size: 1.4rem;
+    font-size: 1.5rem;
     font-weight: 700;
   }
   body.projector-mode .pie-label { font-size: 1.5rem; }
   body.projector-mode .pie-center { font-size: 2.2rem; }
-  body.projector-mode .word-label { font-size: 1.4rem; }
-  body.projector-mode .word-count { font-size: 1.2rem; }
+  body.projector-mode .word-label { font-size: 1.5rem; }
+  body.projector-mode .word-count { font-size: 1.25rem; }
 
   /* 分布ヒストグラム (M1 補助) */
   .viz-histogram rect {
@@ -557,7 +557,7 @@
   }
   .viz-toolbar-section-label {
     color: var(--theme-text-muted);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     font-weight: 600;
     letter-spacing: 0.04em;
     white-space: nowrap;
@@ -575,11 +575,11 @@
   .viz-profile-select {
     max-width: 200px;
     padding: 0.3rem 0.55rem;
-    border-radius: 0.4rem;
+    border-radius: 0.5rem;
     border: 1px solid var(--theme-border-subtle);
     background: var(--theme-card-1);
     color: var(--theme-text-primary);
-    font-size: 0.88rem;
+    font-size: 0.875rem;
     cursor: pointer;
   }
   /* Light mode: slate-800 70% → 白カード (theme-bg-elevated) で自然に */
@@ -588,7 +588,7 @@
     border-color: var(--theme-border-normal);
   }
   .viz-profile-select:disabled { opacity: 0.5; cursor: wait; }
-  body.projector-mode .viz-profile-select { font-size: 1.05rem; padding: 0.45rem 0.8rem; max-width: 280px; }
+  body.projector-mode .viz-profile-select { font-size: 1.125rem; padding: 0.45rem 0.8rem; max-width: 280px; }
 
   /* Profile pills (4 個以下のとき) — 授業のテンポに合わせて 1 クリック切替 */
   .viz-profile-pills-row {
@@ -596,7 +596,7 @@
     gap: 0.25rem;
     padding: 0.2rem;
     background: var(--theme-card-2);
-    border-radius: 0.45rem;
+    border-radius: 0.5rem;
     border: 1px solid var(--theme-border-subtle);
   }
   /* Light mode: slate-900 50% → 薄い slate trough で pill 群の輪郭を保ちつつ自然に */
@@ -606,12 +606,12 @@
   }
   .viz-profile-pill {
     padding: 0.3rem 0.7rem;
-    border-radius: 0.35rem;
+    border-radius: 0.5rem;
     border: 1px solid transparent;
     background: transparent;
     color: var(--theme-text-muted);
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     font-weight: 500;
     white-space: nowrap;
     transition: background 0.15s, color 0.15s, border-color 0.15s;
@@ -649,12 +649,12 @@
   .viz-profile-return {
     margin-left: 0.5rem;
     padding: 0.3rem 0.7rem;
-    border-radius: 0.35rem;
+    border-radius: 0.5rem;
     border: 1px solid rgba(251, 191, 36, 0.6);
     background: rgba(251, 191, 36, 0.18);
     color: var(--brand-understand);  /* amber 強調 */
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     font-weight: 600;
     white-space: nowrap;
     transition: background 0.15s, transform 0.1s;
@@ -667,16 +667,16 @@
   /* 生徒向け toolbar — 議論ツール / timeline は非表示（pills だけ） */
   .viz-toolbar--student .viz-toolbar-center { display: none !important; }
 
-  body.projector-mode .viz-profile-pill { font-size: 1.05rem; padding: 0.45rem 1rem; }
+  body.projector-mode .viz-profile-pill { font-size: 1.125rem; padding: 0.45rem 1rem; }
   @media (max-width: 640px) {
-    .viz-profile-pill { font-size: 0.78rem; padding: 0.25rem 0.5rem; }
-    .viz-profile-return { font-size: 0.78rem; padding: 0.22rem 0.45rem; }
+    .viz-profile-pill { font-size: 0.75rem; padding: 0.25rem 0.5rem; }
+    .viz-profile-return { font-size: 0.75rem; padding: 0.22rem 0.45rem; }
   }
 
   body.projector-mode .viz-toolbar { padding: 0.6rem 1rem; background: rgba(10, 14, 26, 0.92); }
   /* 電子黒板 (projector-mode): 議論支援ツールを教室後ろからも視認可能なサイズに拡大。 */
   body.projector-mode .viz-btn { font-size: 1rem; padding: 0.5rem 0.9rem; }
-  body.projector-mode .viz-btn-small { font-size: 0.95rem; padding: 0.4rem 0.7rem; }
+  body.projector-mode .viz-btn-small { font-size: 1rem; padding: 0.4rem 0.7rem; }
   body.projector-mode .viz-timeline-label,
   body.projector-mode .viz-timeline-time { font-size: 1rem; }
   body.projector-mode .viz-timeline { min-width: 280px; }
@@ -684,7 +684,7 @@
 
   @media (max-width: 640px) {
     .viz-toolbar { padding: 0.3rem 0.4rem; gap: 0.3rem; }
-    .viz-profile-select { max-width: 140px; font-size: 0.82rem; }
+    .viz-profile-select { max-width: 140px; font-size: 0.875rem; }
   }
 
   /* 議論ツール（議論前 / 比較 / タイムライン）は toolbar 中央に inline 配置。
@@ -699,12 +699,12 @@
   }
   .viz-btn, .viz-btn-small {
     padding: 0.3rem 0.6rem;
-    border-radius: 0.4rem;
+    border-radius: 0.5rem;
     border: 1px solid var(--theme-border-subtle);
     background: var(--theme-card-1);
     color: var(--theme-text-primary);
     cursor: pointer;
-    font-size: 0.82rem;
+    font-size: 0.875rem;
     white-space: nowrap;
     transition: background 0.15s, border-color 0.15s;
   }
@@ -731,7 +731,7 @@
     background: rgba(74, 222, 128, 0.3);
     border-color: #4ade80;  /* green-400 (brand identity for saved state) */
   }
-  .viz-btn-small { padding: 0.25rem 0.5rem; font-size: 0.78rem; }
+  .viz-btn-small { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
   /* Timeline は toolbar の主役なので、横を広く取って軌跡を読み取りやすく。 */
   .viz-timeline {
     display: flex;
@@ -742,14 +742,14 @@
   }
   .viz-timeline-label {
     color: var(--theme-text-muted);
-    font-size: 0.82rem;
+    font-size: 0.875rem;
     white-space: nowrap;
   }
   .viz-timeline-time {
     min-width: 4.5rem;
     text-align: center;
     color: #fde047;
-    font-size: 0.85rem;
+    font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
   }
   #vizTimelineSlider {
@@ -781,7 +781,7 @@
   .viz-compare-pane h4 {
     margin: 0 0 0.5rem;
     color: var(--theme-text-muted);
-    font-size: 0.9rem;
+    font-size: 0.875rem;
     font-weight: 600;
   }
   @media (max-width: 768px) {
@@ -809,7 +809,7 @@
   }
   .qs-cell h4 {
     margin: 0 0 0.35rem;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     font-weight: 600;
     color: var(--theme-text-muted);
     letter-spacing: 0.02em;
@@ -823,17 +823,17 @@
     background: rgba(99, 102, 241, 0.18);
     border: 1px solid rgba(99, 102, 241, 0.35);
     color: #c7d2fe;
-    border-radius: 999px;
+    border-radius: 9999px;
     padding: 0.12rem 0.55rem;
-    font-size: 0.82rem;
+    font-size: 0.875rem;
     line-height: 1.3;
   }
   .qs-empty {
     color: var(--theme-border-strong);
-    font-size: 0.78rem;
+    font-size: 0.75rem;
     font-style: italic;
   }
-  body.projector-mode .qs-cell h4 { font-size: 0.95rem; }
+  body.projector-mode .qs-cell h4 { font-size: 1rem; }
   body.projector-mode .qs-tag { font-size: 1rem; padding: 0.15rem 0.7rem; }
   @media (max-width: 768px) {
     .viz-quadrant-summary { grid-template-columns: 1fr; }
@@ -845,12 +845,12 @@
     padding: 0.85rem 1rem;
     background: var(--theme-card-1);
     border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.6rem;
+    border-radius: 0.75rem;
     display: none; /* JS で showAdminFeatures のときだけ表示 */
   }
   .viz-teacher-panel.active { display: block; }
   .viz-teacher-panel h3 {
-    font-size: 0.95rem;
+    font-size: 1rem;
     color: #fde047;
     margin-bottom: 0.5rem;
   }
@@ -858,18 +858,18 @@
   .viz-teacher-panel li {
     padding: 0.35rem 0;
     border-bottom: 1px dashed var(--theme-overlay-white-10);
-    font-size: 0.9rem;
+    font-size: 0.875rem;
   }
   .viz-teacher-panel li:last-child { border-bottom: 0; }
   .viz-teacher-panel .swing-badge {
     display: inline-block;
     background: rgba(253, 224, 71, 0.2);
     color: #fde047;
-    border-radius: 0.3rem;
+    border-radius: 0.5rem;
     padding: 0 0.4rem;
     margin-right: 0.4rem;
     font-weight: 700;
-    font-size: 0.78rem;
+    font-size: 0.75rem;
   }
 
   /* =====================================================================
@@ -894,10 +894,10 @@
     min-height: 88vh;
   }
   body.projector-mode .viz-axis text {
-    font-size: 1.4rem;
+    font-size: 1.5rem;
   }
   body.projector-mode .viz-axis-label {
-    font-size: 1.7rem;
+    font-size: 1.875rem;
   }
   body.projector-mode .viz-quadrant-label {
     font-size: 2rem;
@@ -907,15 +907,15 @@
     stroke-width: 1.6;
   }
   body.projector-mode .eab-status {
-    font-size: 0.95rem;
+    font-size: 1rem;
     opacity: 0.85;
   }
 
   /* レスポンシブ: 小型端末（児童タブレット）向けの調整 */
   @media (max-width: 640px) {
     .viz-container { min-height: 70vh; padding: 0.5rem 0.25rem; }
-    .viz-axis text { font-size: 0.78rem; }
-    .viz-axis-label { font-size: 0.92rem; }
-    .viz-quadrant-label { font-size: 0.85rem; }
+    .viz-axis text { font-size: 0.75rem; }
+    .viz-axis-label { font-size: 0.875rem; }
+    .viz-quadrant-label { font-size: 0.875rem; }
   }
 </style>

@@ -224,6 +224,52 @@ const hasTransition = /body\s*\{[\s\S]*?transition:[\s\S]*?background-color[\s\S
 const hasReducedMotion = /prefers-reduced-motion[\s\S]*?body[\s\S]*?transition:\s*none/.test(us);
 check('23. Theme transition + reduced-motion 配慮', hasTransition && hasReducedMotion, `transition=${hasTransition}, reduced=${hasReducedMotion}`);
 
+// 24. Typography token system 定義済 (--font-size-xs..4xl + weight + leading)
+const fontTokens = ['--font-size-xs', '--font-size-sm', '--font-size-base', '--font-size-lg',
+                    '--font-size-xl', '--font-size-2xl', '--font-size-3xl', '--font-size-4xl',
+                    '--font-weight-normal', '--font-weight-medium', '--font-weight-semibold', '--font-weight-bold',
+                    '--leading-tight', '--leading-normal', '--leading-relaxed'];
+const missingFont = fontTokens.filter(t => !us.includes(t + ':'));
+check('24. Typography token (size/weight/leading) 定義', missingFont.length === 0, missingFont.length ? `missing: ${missingFont.join(',')}` : `${fontTokens.length}/${fontTokens.length}`);
+
+// 25. font-size の Tailwind スケール準拠率 ≥ 90% (Tailwind の text-xs/sm/base/lg/xl/2xl/3xl/4xl に近接)
+function countFontSizes() {
+  const files = ['UnifiedStyles.css.html', 'page.css.html', 'page.viz.css.html'];
+  const STD = new Set(['0.75rem', '0.875rem', '1rem', '1.125rem', '1.25rem', '1.5rem', '1.875rem', '2.25rem']);
+  let std = 0, total = 0;
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const cleaned = text.replace(/\/\*[\s\S]*?\*\//g, '');
+    const matches = cleaned.matchAll(/font-size:\s*([0-9.]+(?:rem|px|em))/g);
+    for (const m of matches) {
+      total++;
+      if (STD.has(m[1])) std++;
+    }
+  }
+  return { std, total, ratio: total ? std / total : 0 };
+}
+const fs1 = countFontSizes();
+check(`25. font-size Tailwind scale 準拠率 ≥ 90%`, fs1.ratio >= 0.9, `${fs1.std}/${fs1.total} (${(fs1.ratio * 100).toFixed(1)}%)`);
+
+// 26. border-radius の Tailwind スケール準拠率 ≥ 80%
+function countRadii() {
+  const files = ['UnifiedStyles.css.html', 'page.css.html', 'page.viz.css.html'];
+  const STD = new Set(['0.25rem', '0.5rem', '0.75rem', '1rem', '1.5rem', '9999px', '50%']);
+  let std = 0, total = 0;
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const cleaned = text.replace(/\/\*[\s\S]*?\*\//g, '');
+    const matches = cleaned.matchAll(/border-radius:\s*([0-9.]+(?:rem|px|%))/g);
+    for (const m of matches) {
+      total++;
+      if (STD.has(m[1])) std++;
+    }
+  }
+  return { std, total, ratio: total ? std / total : 0 };
+}
+const r1 = countRadii();
+check(`26. border-radius Tailwind scale 準拠率 ≥ 80%`, r1.ratio >= 0.8, `${r1.std}/${r1.total} (${(r1.ratio * 100).toFixed(1)}%)`);
+
 // 出力
 console.log('\n══════════════════════════════════════════════════════════════════');
 console.log('  Theme Perfect — 20 軸 完璧度ゲート');

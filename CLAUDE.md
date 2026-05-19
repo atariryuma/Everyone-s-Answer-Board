@@ -231,6 +231,19 @@ owner は own OAuth で SA quota 節約。 viewer / admin の cross-user のみ 
 | `--brand-*` | `--brand-primary`, `--brand-like`, `--brand-curious` | 不変 | ブランドアイデンティティ (アプリ色・リアクション色) |
 | `--status-*` | `--status-success`, `--status-error`, `--status-warning` | 不変 | システムフィードバック色 |
 
+**UI primitive token (v2812+)** — color 以外も Tailwind scale 統一:
+
+- Typography: `--font-size-{xs,sm,base,lg,xl,2xl,3xl,4xl}` = Tailwind text-xs..4xl と完全一致
+- Font weight: `--font-weight-{normal,medium,semibold,bold}` = 400/500/600/700
+- Line height: `--leading-{tight,snug,normal,relaxed,loose}` = 1.25/1.375/1.5/1.625/1.75
+- Spacing: `--space-{0,1,2,3,4,5,6,8,10,12,16,20}` = Tailwind p-/m- スケール
+- Radius: `--radius-{none,sm,md,lg,xl,full}` = 0/0.25/0.5/0.75/1rem/9999px
+- Shadow: `--shadow-{sm,md,lg}` = 影レイヤー 3 段
+- Transition: `--transition-{fast,normal,slow}` = 0.1/0.2/0.3s
+- Z-index: `--z-{base,content,elevated,overlay,dropdown,modal,notification,tooltip,critical}` = 0..9999 9 段
+
+非標準値は段階的に最近接 token へ移行 (CLI: [scripts/theme-normalize-typography.js](scripts/theme-normalize-typography.js))。
+
 **Semantic theme tokens (`--theme-*`)** — 詳細は [UnifiedStyles.css.html](src/UnifiedStyles.css.html) `:root` ブロック:
 
 - 背景: `--theme-bg-base` / `--theme-bg-surface` / `--theme-bg-elevated` / `--theme-bg-overlay`
