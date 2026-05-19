@@ -1037,11 +1037,11 @@
         this.elements.adminToggleBtn.removeAttribute('hidden');
 
         if (this.state.showAdminFeatures) {
-          this.elements.adminToggleBtn.classList.remove('text-slate-600', 'dark:text-gray-400');
+          this.elements.adminToggleBtn.classList.remove('text-slate-600', 'dark:text-slate-400');
           this.elements.adminToggleBtn.classList.add('bg-cyan-600', 'hover:bg-cyan-700', 'text-slate-900', 'dark:text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
         } else {
           this.elements.adminToggleBtn.classList.remove('bg-cyan-600', 'hover:bg-cyan-700', 'text-slate-900', 'dark:text-white', 'shadow-lg', 'ring-2', 'ring-cyan-400/50');
-          this.elements.adminToggleBtn.classList.add('text-slate-600', 'dark:text-gray-400');
+          this.elements.adminToggleBtn.classList.add('text-slate-600', 'dark:text-slate-400');
         }
       } else {
         if (this.elements.adminToggleBtn) {
@@ -1606,11 +1606,11 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <h3 class="mt-2 text-lg font-medium text-red-700 dark:text-red-400">初期化エラー</h3>
-        <p class="mt-1 text-sm text-slate-700 dark:text-gray-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
+        <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6">
           <button 
             data-action="reload" 
-            class="inline-flex items-center px-4 py-2 border border-slate-300 dark:border-gray-600 text-sm font-medium rounded-md text-slate-700 dark:text-gray-300 bg-slate-50 dark:bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            class="inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500"
           >
             ページを再読み込み
           </button>
@@ -1633,11 +1633,11 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
         <h3 class="mt-2 text-lg font-medium text-yellow-700 dark:text-yellow-400">データ読み込みエラー</h3>
-        <p class="mt-1 text-sm text-slate-700 dark:text-gray-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
+        <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6 space-x-3">
           <button 
             data-action="reload" 
-            class="inline-flex items-center px-4 py-2 border border-slate-300 dark:border-gray-600 text-sm font-medium rounded-md text-slate-700 dark:text-gray-300 bg-slate-50 dark:bg-gray-700 hover:bg-gray-600"
+            class="inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-gray-600"
           >
             ページを再読み込み
           </button>
@@ -1716,16 +1716,16 @@
               回答フォームに記入する
             </a>
           </div>` :
-            `<div class="mt-4"><p class="text-sm text-slate-700 dark:text-gray-300">回答フォームの準備中です...</p></div>`;
+            `<div class="mt-4"><p class="text-sm text-slate-700 dark:text-slate-300">回答フォームの準備中です...</p></div>`;
         }
 
         container.innerHTML = `
         <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
-          <svg class="mx-auto h-12 w-12 text-slate-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <svg class="mx-auto h-12 w-12 text-slate-600 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
           <h3 class="mt-2 text-lg font-medium text-slate-900 dark:text-white">まだ回答がありません</h3>
-          <p class="mt-1 text-sm text-slate-700 dark:text-gray-300">あなたが最初の回答者になってディスカッションを始めましょう！</p>
+          <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">あなたが最初の回答者になってディスカッションを始めましょう！</p>
           ${formLinkHtml}
         </div>
       `;
@@ -1733,11 +1733,11 @@
         console.warn('⚠️ フォームURL取得エラー:', error);
         container.innerHTML = `
         <div class="text-center py-16 px-6 col-span-full" data-empty-state="true">
-          <svg class="mx-auto h-12 w-12 text-slate-600 dark:text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+          <svg class="mx-auto h-12 w-12 text-slate-600 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
           <h3 class="mt-2 text-lg font-medium text-slate-900 dark:text-white">まだ回答がありません</h3>
-          <p class="mt-1 text-sm text-slate-700 dark:text-gray-300">あなたが最初の回答者になってディスカッションを始めましょう！</p>
+          <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">あなたが最初の回答者になってディスカッションを始めましょう！</p>
         </div>
       `;
       }
@@ -1984,13 +1984,13 @@
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
         <h3 class="mt-2 text-lg font-medium text-red-700 dark:text-red-400">${isUserNotFoundError ? 'ユーザー情報が見つかりません' : 'アクセスエラー'}</h3>
-        <p class="mt-1 text-sm text-slate-700 dark:text-gray-300">${isUserNotFoundError ?
+        <p class="mt-1 text-sm text-slate-700 dark:text-slate-300">${isUserNotFoundError ?
           'この回答ボードは存在しないか、アクセス権限が不正です' :
           'この回答ボードにアクセスする権限がありません'}</p>
         ${isUserNotFoundError ? `
         <div class="mt-4 p-4 bg-blue-100 dark:bg-blue-900/20 border border-blue-500/50 rounded-lg text-left max-w-md mx-auto">
           <h4 class="text-sm font-medium text-blue-700 dark:text-blue-400 mb-2">🔍 考えられる原因：</h4>
-          <ul class="text-xs text-slate-600 dark:text-gray-400 space-y-1">
+          <ul class="text-xs text-slate-600 dark:text-slate-400 space-y-1">
             <li>• URLのユーザーIDが無効または期限切れ</li>
             <li>• ボードが削除されたか非アクティブ化された</li>
             <li>• データベース接続に一時的な問題</li>
@@ -2000,7 +2000,7 @@
         </div>
         <div class="mt-4 p-4 bg-green-100 dark:bg-green-900/20 border border-green-500/50 rounded-lg text-left max-w-md mx-auto">
           <h4 class="text-sm font-medium text-green-700 dark:text-green-400 mb-2">💡 解決方法：</h4>
-          <ul class="text-xs text-slate-600 dark:text-gray-400 space-y-1">
+          <ul class="text-xs text-slate-600 dark:text-slate-400 space-y-1">
             <li>• まずページを再読み込みしてみる</li>
             <li>• 正しいボードURLを管理者に確認</li>
             <li>• 5-10分待ってから再度アクセス</li>
@@ -2010,13 +2010,13 @@
         </div>
         <div class="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-500/50 rounded-lg text-left max-w-md mx-auto">
           <h4 class="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-2">🛠️ 自動修復：</h4>
-          <p class="text-xs text-slate-600 dark:text-gray-400">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
+          <p class="text-xs text-slate-600 dark:text-slate-400">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
         </div>` : ''}
-        <p class="mt-2 text-xs text-slate-600 dark:text-gray-400">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
+        <p class="mt-2 text-xs text-slate-600 dark:text-slate-400">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
         <div class="mt-6 space-x-3">
           <button 
             data-action="reload" 
-            class="inline-flex items-center px-4 py-2 border border-slate-300 dark:border-gray-600 text-sm font-medium rounded-md text-slate-700 dark:text-gray-300 bg-slate-50 dark:bg-gray-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
+            class="inline-flex items-center px-4 py-2 border border-slate-300 dark:border-slate-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-slate-50 dark:bg-slate-700 hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 focus:ring-offset-gray-800"
           >
             <svg class="-ml-1 mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -2967,11 +2967,11 @@
       }
 
       const nameHtml = showName && displayName ?
-        `<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-700 dark:text-cyan-300 bg-white dark:bg-gray-800/50 px-2 py-1 rounded border border-cyan-400">${window.sharedUtilities.security.escapeHtml(displayName)}</span></div>` : '';
+        `<div class="name-display flex-shrink-0 mr-2"><span class="font-bold text-sm text-cyan-700 dark:text-cyan-300 bg-white dark:bg-slate-800/50 px-2 py-1 rounded border border-cyan-400">${window.sharedUtilities.security.escapeHtml(displayName)}</span></div>` : '';
 
       const containerClass = nameHtml ?
-        'text-xs text-slate-600 dark:text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' :
-        'text-xs text-slate-600 dark:text-gray-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
+        'text-xs text-slate-600 dark:text-slate-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex flex-col sm:flex-row justify-between items-start sm:items-center gap-y-1 min-h-[2rem]' :
+        'text-xs text-slate-600 dark:text-slate-400 pt-3 border-t-2 border-cyan-400/80 border-dashed flex justify-end items-center';
 
       return { nameHtml, containerClass };
     }
@@ -2982,7 +2982,7 @@
           const info = safeData.reactions && safeData.reactions[rt.key] ? safeData.reactions[rt.key] : { count: 0, reacted: false };
           const cls = info.reacted ? 'reacted' : '';
           const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-          const countSpan = this.state.showCounts ? `<span class="reaction-count font-bold text-lg text-slate-800 dark:text-gray-200" aria-hidden="true">${info.count || 0}</span>` : '';
+          const countSpan = this.state.showCounts ? `<span class="reaction-count font-bold text-lg text-slate-800 dark:text-slate-200" aria-hidden="true">${info.count || 0}</span>` : '';
           const reactionNames = { 'LIKE': 'いいね！', 'UNDERSTAND': 'なるほど！', 'CURIOUS': 'もっと知りたい！' };
           const reactionName = reactionNames[rt.key] || rt.key;
           const ariaLabel = `${reactionName}${info.reacted ? 'を取り消す' : 'する'}${this.state.showCounts ? ` (現在${info.count || 0}件)` : ''}`;
@@ -3021,7 +3021,7 @@
 
       if (safeData.reason && safeData.reason.trim()) {
         const reasonText = document.createElement('p');
-        reasonText.className = 'text-slate-900 dark:text-gray-100 whitespace-pre-wrap break-words mt-4';
+        reasonText.className = 'text-slate-900 dark:text-slate-100 whitespace-pre-wrap break-words mt-4';
         reasonText.textContent = safeData.reason;
         contentDiv.appendChild(reasonText);
       }
@@ -3089,7 +3089,7 @@
     createSkeletonCard() {
       const card = document.createElement('div');
       card.className = 'answer-card glass-panel rounded-xl p-4 opacity-50 skeleton';
-      card.innerHTML = '<div class="h-20 w-full rounded bg-slate-200 dark:bg-gray-500/20 mb-4"></div><div class="h-4 w-3/4 rounded bg-slate-200 dark:bg-gray-500/15"></div>';
+      card.innerHTML = '<div class="h-20 w-full rounded bg-slate-200 dark:bg-slate-500/20 mb-4"></div><div class="h-4 w-3/4 rounded bg-slate-200 dark:bg-slate-500/15"></div>';
       return card;
     }
 
@@ -3946,10 +3946,10 @@
             <h3 class="text-xl font-semibold text-slate-900 dark:text-white">回答を削除しますか？</h3>
           </div>
 
-          <div class="bg-white dark:bg-gray-800 rounded-lg p-4 mb-6">
-            <p class="text-slate-700 dark:text-gray-300 text-sm mb-2">削除対象の回答:</p>
+          <div class="bg-white dark:bg-slate-800 rounded-lg p-4 mb-6">
+            <p class="text-slate-700 dark:text-slate-300 text-sm mb-2">削除対象の回答:</p>
             <p class="text-cyan-700 dark:text-cyan-300 font-medium">${window.sharedUtilities.security.escapeHtml(answerData.opinion.substring(0, 100))}${answerData.opinion.length > 100 ? '...' : ''}</p>
-            ${answerData.name ? `<p class="text-slate-600 dark:text-gray-400 text-xs mt-2">回答者: ${window.sharedUtilities.security.escapeHtml(answerData.name)}</p>` : ''}
+            ${answerData.name ? `<p class="text-slate-600 dark:text-slate-400 text-xs mt-2">回答者: ${window.sharedUtilities.security.escapeHtml(answerData.name)}</p>` : ''}
           </div>
 
           <div class="bg-red-100 dark:bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-6">
@@ -3959,7 +3959,7 @@
           </div>
 
           <div class="flex gap-3">
-            <button type="button" class="flex-1 btn bg-slate-100 dark:bg-gray-600 hover:bg-gray-700 text-slate-900 dark:text-white py-2 px-4 rounded-lg cancel-btn">
+            <button type="button" class="flex-1 btn bg-slate-100 dark:bg-slate-600 hover:bg-gray-700 text-slate-900 dark:text-white py-2 px-4 rounded-lg cancel-btn">
               キャンセル
             </button>
             <button type="button" class="flex-1 btn bg-red-600 hover:bg-red-700 text-slate-900 dark:text-white py-2 px-4 rounded-lg confirm-btn">
@@ -4183,7 +4183,7 @@
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
         modal.innerHTML = `
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
           <div class="flex items-center mb-4">
             <div class="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
               <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -4191,17 +4191,17 @@
               </svg>
             </div>
             <div class="ml-4">
-              <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">管理モードに切り替えますか？</h3>
+              <h3 class="text-lg font-medium text-gray-900 dark:text-slate-100">管理モードに切り替えますか？</h3>
             </div>
           </div>
           <div class="mb-6">
-            <p class="text-sm text-slate-400 dark:text-gray-600">
+            <p class="text-sm text-slate-400 dark:text-slate-600">
               管理モードでは、<strong>生徒の名前とリアクション数が表示</strong>されます。<br>
               画面共有時などは十分注意してください。
             </p>
           </div>
           <div class="flex justify-end space-x-3">
-            <button type="button" class="cancel-btn px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
+            <button type="button" class="cancel-btn px-4 py-2 text-sm font-medium text-gray-700 dark:text-slate-300 bg-gray-100 dark:bg-slate-700 border border-gray-300 dark:border-slate-600 rounded-md hover:bg-gray-200 dark:hover:bg-slate-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500">
               キャンセル
             </button>
             <button type="button" class="confirm-btn px-4 py-2 text-sm font-medium text-slate-900 dark:text-white bg-orange-600 border border-transparent rounded-md hover:bg-orange-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500">
@@ -4518,12 +4518,12 @@
       if (axisBarHtml) {
         modalHtml = axisBarHtml;
         if (data.reason && data.reason.trim()) {
-          modalHtml += '<p class="text-slate-800 dark:text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6 leading-relaxed">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
+          modalHtml += '<p class="text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6 leading-relaxed">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
         }
       } else {
         modalHtml = '<p class="text-cyan-800 dark:text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
         if (data.reason && data.reason.trim()) {
-          modalHtml += '<p class="text-slate-800 dark:text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
+          modalHtml += '<p class="text-slate-800 dark:text-slate-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
         }
       }
 
@@ -4540,13 +4540,13 @@
       }
 
       this.elements.modalStudentName.textContent = modalDisplayName;
-      const footerBase = 'text-xs text-slate-600 dark:text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
+      const footerBase = 'text-xs text-slate-600 dark:text-slate-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex';
       this.elements.modalFooter.className = footerBase + (showName ? ' justify-between items-center' : ' justify-end items-center');
       const reactionButtonsHtml = this.reactionTypes.map(rt => {
         const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
         const cls = info.reacted ? 'reacted' : '';
         const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-slate-800 dark:text-gray-200">' + info.count + '</span>' : '';
+        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-slate-800 dark:text-slate-200">' + info.count + '</span>' : '';
         return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
       }).join('');
 
@@ -4567,7 +4567,7 @@
         const info = data.reactions?.[rt.key] || { count: 0, reacted: false };
         const cls = info.reacted ? 'reacted' : '';
         const colorClass = rt.key === 'LIKE' ? 'text-red-500' : rt.key === 'UNDERSTAND' ? 'text-yellow-500' : 'text-green-500';
-        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-slate-800 dark:text-gray-200">' + info.count + '</span>' : '';
+        const countSpan = this.state.showCounts ? '<span class="reaction-count font-bold text-2xl text-slate-800 dark:text-slate-200">' + info.count + '</span>' : '';
         return '<button type="button" class="reaction-btn like-btn flex items-center gap-1.5 ' + colorClass + ' ' + cls + '" ' + 'data-row-index="' + data.rowIndex + '" data-reaction="' + rt.key + '" aria-label="' + rt.key + '">' + this.getIcon(rt.icon, 'w-5 h-5', info.reacted) + countSpan + '</button>';
       }).join('');
 

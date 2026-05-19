@@ -33,7 +33,7 @@
   <body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">
     <div
       id="loading-overlay"
-      class="fixed inset-0 bg-slate-100 dark:bg-gray-900 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
+      class="fixed inset-0 bg-slate-100 dark:bg-slate-900 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
     >
       <div
         class="global-spinner"
@@ -44,8 +44,8 @@
       <!-- ヘッダー -->
       <div class="text-center mb-6">
         <h1 class="text-4xl font-bold text-cyan-700 dark:text-cyan-400 mb-2">⚙️ みんなの回答ボード アプリ設定</h1>
-        <p class="text-xl text-slate-700 dark:text-gray-300">アプリケーションの運用設定を管理します</p>
-        <p class="text-sm text-slate-600 dark:text-gray-400 mt-2">
+        <p class="text-xl text-slate-700 dark:text-slate-300">アプリケーションの運用設定を管理します</p>
+        <p class="text-sm text-slate-600 dark:text-slate-400 mt-2">
           このページでアプリの有効/無効を切り替えることができます
         </p>
       </div>
@@ -55,9 +55,9 @@
       <div class="glass-panel rounded-xl p-6 mb-6">
         <h2 class="text-xl font-semibold text-slate-900 dark:text-white mb-4">📊 現在のステータス</h2>
         <div id="status-display" class="space-y-3">
-          <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+          <div class="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg">
             <div class="flex items-center">
-              <span class="text-slate-700 dark:text-gray-300 mr-3">アプリ状態:</span>
+              <span class="text-slate-700 dark:text-slate-300 mr-3">アプリ状態:</span>
               <span id="current-status" class="px-3 py-1 rounded-full text-sm font-medium">
                 <span
                   class="spinner-small mr-2"
@@ -66,16 +66,16 @@
               </span>
             </div>
           </div>
-          <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+          <div class="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg">
             <div class="flex items-center">
-              <span class="text-slate-700 dark:text-gray-300 mr-3">管理者:</span>
+              <span class="text-slate-700 dark:text-slate-300 mr-3">管理者:</span>
               <span id="current-admin" class="text-slate-900 dark:text-white">読み込み中...</span>
             </div>
           </div>
-          <div class="flex items-center justify-between p-3 bg-white dark:bg-gray-800 rounded-lg">
+          <div class="flex items-center justify-between p-3 bg-white dark:bg-slate-800 rounded-lg">
             <div class="flex items-center">
-              <span class="text-slate-700 dark:text-gray-300 mr-3">最終更新:</span>
-              <span id="last-updated" class="text-slate-600 dark:text-gray-400">読み込み中...</span>
+              <span class="text-slate-700 dark:text-slate-300 mr-3">最終更新:</span>
+              <span id="last-updated" class="text-slate-600 dark:text-slate-400">読み込み中...</span>
             </div>
           </div>
         </div>
@@ -84,19 +84,19 @@
       <!-- ユーザー配布用URL -->
       <div class="glass-panel rounded-xl p-6 mb-6">
         <h2 class="text-xl font-semibold text-slate-900 dark:text-white mb-4">🔗 ユーザー配布用URL</h2>
-        <p class="text-sm text-slate-600 dark:text-gray-400 mb-4">
+        <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">
           ボード編集者となるユーザーに以下のログインURLを配布してください
         </p>
 
-        <div class="bg-white dark:bg-gray-800 rounded-lg p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-lg p-4">
           <div class="flex items-center justify-between gap-3">
             <div class="flex-1 min-w-0">
-              <label class="block text-xs text-slate-600 dark:text-gray-400 mb-1">ログインURL</label>
+              <label class="block text-xs text-slate-600 dark:text-slate-400 mb-1">ログインURL</label>
               <input
                 type="text"
                 id="login-url"
                 readonly
-                class="w-full px-3 py-2 bg-slate-100 dark:bg-gray-900 text-cyan-700 dark:text-cyan-400 rounded border border-slate-300 dark:border-gray-600 text-sm font-mono truncate"
+                class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 text-cyan-700 dark:text-cyan-400 rounded border border-slate-300 dark:border-slate-600 text-sm font-mono truncate"
                 value="読み込み中..."
               />
             </div>
@@ -108,7 +108,7 @@
               📋 コピー
             </button>
           </div>
-          <p class="text-xs text-slate-500 dark:text-gray-500 mt-2">
+          <p class="text-xs text-slate-500 dark:text-slate-500 mt-2">
             ※ このURLにアクセスすると、組織内ユーザーはGoogleアカウントでログインし、自分のボードを編集できます
           </p>
         </div>
@@ -119,19 +119,19 @@
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="text-2xl font-semibold text-slate-900 dark:text-white">🔒 アプリケーション制御</h2>
-            <p class="text-slate-600 dark:text-gray-400">アプリケーション全体のアクセス制御を管理します</p>
+            <p class="text-slate-600 dark:text-slate-400">アプリケーション全体のアクセス制御を管理します</p>
           </div>
           <div class="flex items-center space-x-2">
-            <div id="app-status-indicator" class="w-3 h-3 rounded-full bg-slate-200 dark:bg-gray-500"></div>
-            <span id="app-status-text" class="text-sm text-slate-600 dark:text-gray-400">状態確認中...</span>
+            <div id="app-status-indicator" class="w-3 h-3 rounded-full bg-slate-200 dark:bg-slate-500"></div>
+            <span id="app-status-text" class="text-sm text-slate-600 dark:text-slate-400">状態確認中...</span>
           </div>
         </div>
 
         <!-- アプリ制御ボタン -->
         <div class="grid md:grid-cols-2 gap-4 mb-6">
-          <div class="p-4 bg-white dark:bg-gray-800 rounded-lg">
+          <div class="p-4 bg-white dark:bg-slate-800 rounded-lg">
             <h3 class="text-lg font-medium text-red-700 dark:text-red-400 mb-3">🚫 アプリケーション停止</h3>
-            <p class="text-sm text-slate-600 dark:text-gray-400 mb-4">
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">
               全ユーザーのアクセスを停止します。管理者のみアクセス可能になります。
             </p>
             <div class="space-y-3">
@@ -139,7 +139,7 @@
                 type="text"
                 id="disable-reason"
                 placeholder="停止理由（例：システムメンテナンス）"
-                class="w-full px-3 py-2 bg-slate-50 dark:bg-gray-700 text-slate-900 dark:text-white rounded border border-slate-300 dark:border-gray-600 focus:border-red-500 focus:outline-none text-sm"
+                class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-white rounded border border-slate-300 dark:border-slate-600 focus:border-red-500 focus:outline-none text-sm"
               />
               <button
                 id="disable-app-btn"
@@ -151,9 +151,9 @@
             </div>
           </div>
 
-          <div class="p-4 bg-white dark:bg-gray-800 rounded-lg">
+          <div class="p-4 bg-white dark:bg-slate-800 rounded-lg">
             <h3 class="text-lg font-medium text-green-700 dark:text-green-400 mb-3">✅ アプリケーション再開</h3>
-            <p class="text-sm text-slate-600 dark:text-gray-400 mb-4">
+            <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">
               停止中のアプリケーションを再開し、全ユーザーがアクセス可能にします。
             </p>
             <div class="pt-8">
@@ -171,7 +171,7 @@
         <!-- 現在の制限情報表示 -->
         <div id="restriction-info" class="hidden p-4 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-500/30 rounded-lg">
           <h4 class="text-md font-medium text-red-700 dark:text-red-400 mb-2">⚠️ 現在のアクセス制限</h4>
-          <div class="text-sm text-slate-700 dark:text-gray-300 space-y-1">
+          <div class="text-sm text-slate-700 dark:text-slate-300 space-y-1">
             <div>理由: <span id="restriction-reason">-</span></div>
             <div>停止者: <span id="restriction-by">-</span></div>
             <div>停止日時: <span id="restriction-at">-</span></div>
@@ -184,7 +184,7 @@
         <div class="flex items-center justify-between mb-6">
           <div>
             <h2 class="text-2xl font-semibold text-slate-900 dark:text-white">📊 システム統計</h2>
-            <p class="text-slate-600 dark:text-gray-400">登録ユーザーの概要情報</p>
+            <p class="text-slate-600 dark:text-slate-400">登録ユーザーの概要情報</p>
           </div>
           <button onclick="loadSystemStats()" class="btn bg-blue-600 hover:bg-blue-700 text-slate-900 dark:text-white px-4 py-2 rounded-lg text-sm">
             🔄 更新
@@ -192,21 +192,21 @@
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
+          <div class="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
             <div class="text-2xl font-bold text-blue-700 dark:text-blue-400" id="total-users">-</div>
-            <div class="text-sm text-slate-600 dark:text-gray-400">総ユーザー数</div>
+            <div class="text-sm text-slate-600 dark:text-slate-400">総ユーザー数</div>
           </div>
-          <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
+          <div class="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
             <div class="text-2xl font-bold text-green-700 dark:text-green-400" id="active-users">-</div>
-            <div class="text-sm text-slate-600 dark:text-gray-400">アクティブユーザー</div>
+            <div class="text-sm text-slate-600 dark:text-slate-400">アクティブユーザー</div>
           </div>
-          <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
+          <div class="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
             <div class="text-2xl font-bold text-purple-700 dark:text-purple-400" id="published-boards">-</div>
-            <div class="text-sm text-slate-600 dark:text-gray-400">公開ボード数</div>
+            <div class="text-sm text-slate-600 dark:text-slate-400">公開ボード数</div>
           </div>
-          <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
+          <div class="bg-white dark:bg-slate-800 rounded-lg p-4 text-center">
             <div class="text-2xl font-bold text-yellow-700 dark:text-yellow-400" id="recent-activity">-</div>
-            <div class="text-sm text-slate-600 dark:text-gray-400">24時間以内の活動</div>
+            <div class="text-sm text-slate-600 dark:text-slate-400">24時間以内の活動</div>
           </div>
         </div>
       </div>
@@ -214,7 +214,7 @@
       <!-- システム診断・監視セクション -->
       <div class="glass-panel rounded-xl p-6 mb-6">
         <h2 class="text-xl font-semibold text-slate-900 dark:text-white mb-4">🔍 システム診断・監視</h2>
-        <p class="text-sm text-slate-600 dark:text-gray-400 mb-4">システムの健全性確認と問題解決のためのツールです</p>
+        <p class="text-sm text-slate-600 dark:text-slate-400 mb-4">システムの健全性確認と問題解決のためのツールです</p>
 
         <div class="space-y-4">
           <!-- 基本診断（よく使う機能） -->
@@ -222,11 +222,11 @@
             <div class="flex items-center justify-between mb-3">
               <div>
                 <h3 class="text-lg font-medium text-blue-700 dark:text-blue-400">🩺 基本診断</h3>
-                <p class="text-sm text-slate-600 dark:text-gray-400">まずはこちらを実行してください</p>
+                <p class="text-sm text-slate-600 dark:text-slate-400">まずはこちらを実行してください</p>
               </div>
               <span class="px-2 py-1 bg-blue-600/30 text-blue-700 dark:text-blue-300 rounded text-xs">推奨</span>
             </div>
-            <p class="text-sm text-slate-700 dark:text-gray-300 mb-4">
+            <p class="text-sm text-slate-700 dark:text-slate-300 mb-4">
               システムの基本的な健全性（DB接続・設定・権限）を確認します。問題が見つかった場合は自動修復をお試しください。
             </p>
             <div class="flex gap-3">
@@ -250,14 +250,14 @@
           </div>
 
           <!-- 詳細診断（折りたたみ） -->
-          <details class="bg-white dark:bg-gray-800 rounded-lg">
-            <summary class="p-4 cursor-pointer text-slate-700 dark:text-gray-300 hover:text-white">
+          <details class="bg-white dark:bg-slate-800 rounded-lg">
+            <summary class="p-4 cursor-pointer text-slate-700 dark:text-slate-300 hover:text-white">
               🔬 詳細診断ツール（クリックで展開）
             </summary>
             <div class="p-4 pt-0 grid md:grid-cols-2 gap-4">
-              <div class="p-4 bg-slate-100 dark:bg-gray-700/50 rounded-lg">
+              <div class="p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg">
                 <h4 class="text-md font-medium text-purple-700 dark:text-purple-400 mb-2">📈 システム監視</h4>
-                <p class="text-xs text-slate-600 dark:text-gray-400 mb-3">リソース使用状況・実行ログ・エラー率を確認</p>
+                <p class="text-xs text-slate-600 dark:text-slate-400 mb-3">リソース使用状況・実行ログ・エラー率を確認</p>
                 <button
                   type="button"
                   id="run-monitoring-btn"
@@ -268,9 +268,9 @@
                 </button>
               </div>
 
-              <div class="p-4 bg-slate-100 dark:bg-gray-700/50 rounded-lg">
+              <div class="p-4 bg-slate-100 dark:bg-slate-700/50 rounded-lg">
                 <h4 class="text-md font-medium text-green-700 dark:text-green-400 mb-2">✅ データ整合性</h4>
-                <p class="text-xs text-slate-600 dark:text-gray-400 mb-3">ユーザーデータ・設定の整合性を詳細チェック</p>
+                <p class="text-xs text-slate-600 dark:text-slate-400 mb-3">ユーザーデータ・設定の整合性を詳細チェック</p>
                 <button
                   type="button"
                   id="run-integrity-btn"
@@ -290,13 +290,13 @@
               <button
                 type="button"
                 onclick="copyDiagnosticResult()"
-                class="btn bg-slate-100 dark:bg-gray-600 hover:bg-gray-700 text-slate-900 dark:text-white py-1 px-3 rounded text-sm flex items-center gap-2"
+                class="btn bg-slate-100 dark:bg-slate-600 hover:bg-gray-700 text-slate-900 dark:text-white py-1 px-3 rounded text-sm flex items-center gap-2"
               >
                 📋 コピー
               </button>
             </div>
-            <div class="bg-slate-100 dark:bg-gray-900 rounded-lg p-4 max-h-96 overflow-y-auto">
-              <pre id="diagnostic-output" class="text-sm text-slate-700 dark:text-gray-300 whitespace-pre-wrap"></pre>
+            <div class="bg-slate-100 dark:bg-slate-900 rounded-lg p-4 max-h-96 overflow-y-auto">
+              <pre id="diagnostic-output" class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap"></pre>
             </div>
           </div>
         </div>
@@ -307,11 +307,11 @@
         <div class="flex items-center justify-between mb-4">
           <div>
             <h2 class="text-xl font-semibold text-slate-900 dark:text-white">🔐 SA pool 管理</h2>
-            <p class="text-sm text-slate-600 dark:text-gray-400">
+            <p class="text-sm text-slate-600 dark:text-slate-400">
               ボード SS への cross-user アクセスを担う Service Account の pool。 700 人規模で 3-5 個推奨。
             </p>
           </div>
-          <div id="sa-pool-summary" class="text-sm text-slate-700 dark:text-gray-300">読み込み中...</div>
+          <div id="sa-pool-summary" class="text-sm text-slate-700 dark:text-slate-300">読み込み中...</div>
         </div>
 
         <div class="space-y-3">
@@ -333,18 +333,18 @@
             </button>
           </div>
 
-          <details class="bg-white dark:bg-gray-800 rounded-lg">
-            <summary class="p-3 cursor-pointer text-slate-700 dark:text-gray-300 hover:text-white text-sm select-none">
+          <details class="bg-white dark:bg-slate-800 rounded-lg">
+            <summary class="p-3 cursor-pointer text-slate-700 dark:text-slate-300 hover:text-white text-sm select-none">
               ＋ SA JSON を追加 (GCP Console で発行)
             </summary>
             <div class="p-4 pt-0">
-              <p class="text-xs text-slate-600 dark:text-gray-400 mb-2">
+              <p class="text-xs text-slate-600 dark:text-slate-400 mb-2">
                 GCP Console (IAM &amp; Admin → Service Accounts) で SA を新規作成、 JSON キーをダウンロードして全文貼り付け。
                 登録時に DB editor 共有 + verify が自動実行されます。
               </p>
               <textarea id="sa-pool-add-input" rows="6"
                 placeholder='{"type":"service_account", "client_email":"...", "private_key":"..."}'
-                class="w-full px-3 py-2 bg-slate-100 dark:bg-gray-900 border border-slate-300 dark:border-gray-600 rounded text-slate-900 dark:text-white text-xs font-mono focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"></textarea>
+                class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-900 border border-slate-300 dark:border-slate-600 rounded text-slate-900 dark:text-white text-xs font-mono focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"></textarea>
               <button type="button" id="sa-pool-add-btn"
                 class="mt-2 btn bg-cyan-600 hover:bg-cyan-700 text-slate-900 dark:text-white px-4 py-2 rounded-lg text-sm">
                 pool に追加
@@ -352,7 +352,7 @@
             </div>
           </details>
 
-          <div id="sa-pool-status" class="text-sm text-slate-700 dark:text-gray-300 whitespace-pre-wrap min-h-[1.5rem] p-2 bg-slate-100 dark:bg-gray-900/30 rounded"></div>
+          <div id="sa-pool-status" class="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap min-h-[1.5rem] p-2 bg-slate-100 dark:bg-slate-900/30 rounded"></div>
         </div>
       </div>
 
@@ -377,8 +377,8 @@
               </div>
             </div>
 
-            <div id="user-table-wrapper" class="bg-white dark:bg-gray-800 rounded-lg overflow-hidden">
-              <div id="user-loading" class="p-8 text-center text-slate-600 dark:text-gray-400">
+            <div id="user-table-wrapper" class="bg-white dark:bg-slate-800 rounded-lg overflow-hidden">
+              <div id="user-loading" class="p-8 text-center text-slate-600 dark:text-slate-400">
                 <div
                   class="spinner mx-auto mb-2"
                 ></div>
@@ -386,21 +386,21 @@
               </div>
               <div id="user-table-content" class="hidden overflow-x-auto">
                 <table class="w-full min-w-[640px]">
-                  <thead class="bg-slate-100 dark:bg-gray-900">
+                  <thead class="bg-slate-100 dark:bg-slate-900">
                     <tr>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-gray-300">
+                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">
                         メールアドレス
                       </th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-gray-300">登録日</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-gray-300">ユーザー状態</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-gray-300">ボード状態</th>
-                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-gray-300">
+                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">登録日</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">ユーザー状態</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">ボード状態</th>
+                      <th class="px-4 py-3 text-left text-sm font-medium text-slate-700 dark:text-slate-300">
                         最終アクセス
                       </th>
-                      <th class="px-4 py-3 text-center text-sm font-medium text-slate-700 dark:text-gray-300">操作</th>
+                      <th class="px-4 py-3 text-center text-sm font-medium text-slate-700 dark:text-slate-300">操作</th>
                     </tr>
                   </thead>
-                  <tbody id="user-table-body" class="divide-y divide-slate-200 dark:divide-gray-700"></tbody>
+                  <tbody id="user-table-body" class="divide-y divide-slate-200 dark:divide-slate-700"></tbody>
                 </table>
               </div>
             </div>
@@ -430,25 +430,25 @@
         <h3 class="text-xl font-semibold text-slate-900 dark:text-white mb-4">⚠️ ユーザーアカウント削除</h3>
 
         <div class="mb-4">
-          <p class="text-slate-700 dark:text-gray-300 mb-2">以下のユーザーを削除しますか？</p>
-          <div class="bg-white dark:bg-gray-800 p-3 rounded-lg">
+          <p class="text-slate-700 dark:text-slate-300 mb-2">以下のユーザーを削除しますか？</p>
+          <div class="bg-white dark:bg-slate-800 p-3 rounded-lg">
             <p class="text-cyan-700 dark:text-cyan-400 font-medium" id="delete-user-email"></p>
-            <p class="text-sm text-slate-600 dark:text-gray-400" id="delete-user-id"></p>
+            <p class="text-sm text-slate-600 dark:text-slate-400" id="delete-user-id"></p>
           </div>
         </div>
 
         <div class="mb-4">
-          <label class="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2"
+          <label class="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2"
             >削除理由 <span class="text-red-700 dark:text-red-400">*</span></label
           >
           <textarea
             id="deletion-reason"
-            class="w-full p-3 bg-white dark:bg-gray-800 border border-slate-300 dark:border-gray-600 rounded-lg text-slate-900 dark:text-white resize-none"
+            class="w-full p-3 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white resize-none"
             rows="3"
             placeholder="削除理由を入力してください（必須）"
             required
           ></textarea>
-          <p class="text-xs text-slate-600 dark:text-gray-400 mt-1">この情報は監査ログに記録されます</p>
+          <p class="text-xs text-slate-600 dark:text-slate-400 mt-1">この情報は監査ログに記録されます</p>
         </div>
 
         <div class="bg-red-100 dark:bg-red-900/20 border border-red-500/50 p-3 rounded-lg mb-4">
@@ -461,7 +461,7 @@
           <button
             type="button"
             onclick="cancelDeletion()"
-            class="flex-1 btn bg-slate-100 dark:bg-gray-600 hover:bg-gray-700 text-slate-900 dark:text-white py-2 px-4 rounded-lg"
+            class="flex-1 btn bg-slate-100 dark:bg-slate-600 hover:bg-gray-700 text-slate-900 dark:text-white py-2 px-4 rounded-lg"
           >
             キャンセル
           </button>
@@ -536,7 +536,7 @@
         if (users.length === 0) {
           tableBody.innerHTML = `
                     <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-slate-600 dark:text-gray-400">
+                        <td colspan="5" class="px-4 py-8 text-center text-slate-600 dark:text-slate-400">
                             登録ユーザーが見つかりません
                         </td>
                     </tr>
@@ -557,7 +557,7 @@
 
               const boardBadge = boardPublished
                 ? '<span class="px-2 py-1 bg-purple-600 text-purple-800 dark:text-purple-100 rounded-full text-xs">公開中</span>'
-                : '<span class="px-2 py-1 bg-slate-100 dark:bg-gray-600 text-slate-900 dark:text-gray-100 rounded-full text-xs">非公開</span>';
+                : '<span class="px-2 py-1 bg-slate-100 dark:bg-slate-600 text-slate-900 dark:text-slate-100 rounded-full text-xs">非公開</span>';
 
               const registrationDate = user.createdAt
                 ? new Date(user.createdAt).toLocaleDateString('ja-JP')
@@ -570,10 +570,10 @@
               return `
                         <tr class="hover:bg-gray-700/50">
                             <td class="px-4 py-3 text-sm text-slate-900 dark:text-white">${window.sharedUtilities.security.escapeHtml(user.userEmail || 'N/A')}</td>
-                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-gray-300">${window.sharedUtilities.security.escapeHtml(registrationDate)}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">${window.sharedUtilities.security.escapeHtml(registrationDate)}</td>
                             <td class="px-4 py-3">${statusBadge}</td>
                             <td class="px-4 py-3">${boardBadge}</td>
-                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-gray-300">${window.sharedUtilities.security.escapeHtml(lastAccess)}</td>
+                            <td class="px-4 py-3 text-sm text-slate-700 dark:text-slate-300">${window.sharedUtilities.security.escapeHtml(lastAccess)}</td>
                             <td class="px-4 py-3 text-center">
                                 <div class="flex gap-1 justify-center">
                                     <button
@@ -586,7 +586,7 @@
                                     <button
                                         data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         onclick="toggleUserBoard(this.dataset.userId)"
-                                        class="btn ${boardPublished ? 'bg-slate-100 dark:bg-gray-600 hover:bg-gray-700' : 'bg-purple-600 hover:bg-purple-700'} text-slate-900 dark:text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
+                                        class="btn ${boardPublished ? 'bg-slate-100 dark:bg-slate-600 hover:bg-gray-700' : 'bg-purple-600 hover:bg-purple-700'} text-slate-900 dark:text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
                                         title="${boardPublished ? 'ボードを非公開に' : 'ボードを公開に'}">
                                         ${boardPublished ? '非公開' : '公開'}
                                     </button>
@@ -1020,20 +1020,20 @@
           var slots = result.slots || [];
           summary.textContent = slots.length + ' / ' + (result.maxSize || 10) + ' slot';
           if (!slots.length) {
-            listEl.innerHTML = '<div class="text-slate-500 dark:text-gray-500 text-sm">(pool が空です。 まず primary SA を Setup 画面から登録してください)</div>';
+            listEl.innerHTML = '<div class="text-slate-500 dark:text-slate-500 text-sm">(pool が空です。 まず primary SA を Setup 画面から登録してください)</div>';
           } else {
             listEl.innerHTML = slots.map(function(s) {
-              var roleColor = s.role === 'primary' ? 'text-cyan-400' : 'text-slate-600 dark:text-gray-400';
+              var roleColor = s.role === 'primary' ? 'text-cyan-400' : 'text-slate-600 dark:text-slate-400';
               var emailShort = (s.clientEmail || '(invalid)').split('@')[0];
               var removeBtn = s.role === 'primary'
                 ? ''
                 : '<button data-sa-remove="' + esc(s.slot) + '" class="ml-2 px-2 py-1 bg-red-700 hover:bg-red-600 text-slate-900 dark:text-white text-xs rounded">削除</button>';
-              return '<div class="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded text-sm">'
-                + '<span class="text-slate-500 dark:text-gray-500 w-8">[' + esc(s.index) + ']</span>'
+              return '<div class="flex items-center gap-2 p-2 bg-white dark:bg-slate-800 rounded text-sm">'
+                + '<span class="text-slate-500 dark:text-slate-500 w-8">[' + esc(s.index) + ']</span>'
                 + '<span class="' + roleColor + ' w-20">' + esc(s.role) + '</span>'
                 + '<span class="text-slate-900 dark:text-white font-mono truncate flex-1" title="' + esc(s.clientEmail || '(invalid)') + '">'
                 + esc(emailShort) + '</span>'
-                + '<button data-sa-reverify="' + esc(s.slot) + '" class="px-2 py-1 bg-slate-50 dark:bg-gray-700 hover:bg-gray-600 text-slate-900 dark:text-white text-xs rounded">再 verify</button>'
+                + '<button data-sa-reverify="' + esc(s.slot) + '" class="px-2 py-1 bg-slate-50 dark:bg-slate-700 hover:bg-gray-600 text-slate-900 dark:text-white text-xs rounded">再 verify</button>'
                 + removeBtn
                 + '</div>';
             }).join('');
