@@ -1,27 +1,27 @@
-<!--
-  SharedThemeBoot.html — FOUC (Flash of Unstyled Content) 防止 + `color-scheme` 設定。
-
-  Why: themeManager (SharedUtilities) は body 末尾で読まれることが多いので、
-    head パース時に theme class を <html> に当てないと、 light モード保存ユーザに
-    一瞬 dark 背景がフラッシュして見える。 paint 前に同期で実行する必要がある。
-
-  使い方: <head> 内、 <?!= include('SharedTailwindConfig'); ?> の **後** で:
-    <?!= include('SharedThemeBoot'); ?>
-
-  仕様:
-    - localStorage 'app-theme' を読む (dark / light / auto)。 invalid なら auto。
-    - auto は (prefers-color-scheme: dark) で resolve。
-    - <html> に `theme-dark`/`theme-light` クラス、 `dark`/`light` クラス、
-      `data-theme` 属性、 `color-scheme` CSS プロパティ を即時付与。
-    - body はまだ存在しないので、 themeManager.init() (後で実行される) が
-      body にも同 class を貼る。 paint で見えるのは <html> 側だけなので OK。
-
-  ベストプラクティス参考:
-    - https://github.com/AVGVSTVS96/astro-fouc-killer
-    - https://notanumber.in/blog/fixing-react-dark-mode-flickering
-    - https://natebal.com/best-practices-for-dark-mode/
--->
 <script>
+  // SharedThemeBoot — FOUC (Flash of Unstyled Content) 防止 + color-scheme 設定。
+  //
+  // Why: themeManager (SharedUtilities) は body 末尾で読まれることが多いので、
+  //   head パース時に theme class を <html> に当てないと、 light モード保存ユーザに
+  //   一瞬 dark 背景がフラッシュして見える。 paint 前に同期で実行する必要がある。
+  //
+  // 使い方: 各ページ <head> 内 SharedTailwindConfig include の直後に
+  //   include('SharedThemeBoot') する。 GAS template engine 競合回避のため
+  //   サンプル include タグは ここに書かない (コメント内でも engine が parse する)。
+  //
+  // 仕様:
+  //   - localStorage 'app-theme' を読む (dark / light / auto)。 invalid なら auto。
+  //   - auto は (prefers-color-scheme: dark) で resolve。
+  //   - <html> に theme-dark/theme-light + dark/light クラス、 data-theme 属性、
+  //     color-scheme CSS プロパティ を即時付与。
+  //   - body はまだ存在しないので、 themeManager.init() (後で実行される) が
+  //     body にも同 class を貼る。 paint で見えるのは <html> 側だけなので OK。
+  //
+  // ベストプラクティス参考:
+  //   - https://github.com/AVGVSTVS96/astro-fouc-killer
+  //   - https://notanumber.in/blog/fixing-react-dark-mode-flickering
+  //   - https://natebal.com/best-practices-for-dark-mode/
+
   (function () {
     try {
       var saved = null;
