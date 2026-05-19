@@ -135,12 +135,26 @@ function resolveVar(tokens, name, depth = 0) {
 //  Hardcoded color スキャン
 // ─────────────────────────────────────────────────────────────
 
-const CSS_FILES = [
+// 全ての <style> ブロック を持つ HTML を対象に — 漏れ無くスキャンする
+const SCAN_FILES = [
   'UnifiedStyles.css.html',
   'page.css.html',
   'page.viz.css.html',
-  'SetupPage.css.html',
+  'AdminPanel.html',
+  'AdminPanel.js.html',
+  'AccessRestricted.html',
+  'LoginPage.html',
+  'login.js.html',
+  'TeacherManual.html',
+  'Unpublished.html',
+  'AppSetupPage.html',
+  'ErrorBoundary.html',
+  'LessonWorkspace.html',
+  'SetupPage.html',
+  'SharedErrorHandling.html',
+  'SharedUtilities.html',
 ];
+const CSS_FILES = SCAN_FILES;  // 互換用エイリアス
 
 const HEX_RE = /#[0-9a-fA-F]{3,8}\b/g;
 const RGBA_RE = /rgba?\([^)]+\)/g;
@@ -159,11 +173,128 @@ const EXEMPT_COLORS = new Set([
   '#fff', '#ffffff', '#fff0', '#000', '#000000',
 ]);
 
+// 色を意味カテゴリに分類:
+//   - shadow:        rgba(0,0,0,X) / rgba(255,255,255,X) — 両モード安全な影/光
+//   - brand:         brand identity の RGB を alpha < 1 で被せた accent overlay (両モード OK)
+//   - theme-bleed:   slate/gray の中間 RGB 単色 (light mode で broken の可能性高い)
+//   - other:         未分類 (要確認)
+const BRAND_RGB = [
+  [56, 189, 248],   // sky-400 / accent cyan
+  [34, 211, 238],   // cyan-400
+  [139, 233, 253],  // accent-light cyan
+  [125, 211, 252],  // sky-300
+  [103, 232, 249],  // cyan-300
+  [251, 191, 36],   // amber-400 / understand
+  [245, 158, 11],   // amber-500
+  [253, 224, 71],   // yellow-300
+  [34, 197, 94],    // green-500 / curious
+  [16, 185, 129],   // emerald-500 / success
+  [248, 113, 113],  // red-400
+  [239, 68, 68],    // red-500 / error
+  [220, 38, 38],    // red-600
+  [225, 29, 72],    // rose-600 / like
+  [168, 85, 247],   // purple-500 / highlight
+  [147, 51, 234],   // purple-600
+  [192, 132, 252],  // purple-300
+  [59, 130, 246],   // blue-500 / primary
+  [96, 165, 250],   // blue-400
+  [139, 92, 246],   // violet-500
+  [6, 182, 212],    // cyan-600
+  [202, 138, 4],    // yellow-700
+  [22, 163, 74],    // green-600
+  [14, 116, 144],   // cyan-700
+  [55, 48, 163],    // indigo-800
+  [199, 210, 254],  // indigo-200
+  [234, 88, 12],    // orange-600
+];
+// slate/gray のニュートラル RGB — alpha 持ち solid bg は theme-bleed の疑い高
+const NEUTRAL_RGB = [
+  [148, 163, 184],  // slate-400
+  [100, 116, 139],  // slate-500
+  [71, 85, 105],    // slate-600
+  [51, 65, 85],     // slate-700
+  [30, 41, 59],     // slate-800
+  [15, 23, 42],     // slate-900
+  [26, 27, 38],     // tokyo-night base
+  [107, 114, 128],  // gray-500
+  [156, 163, 175],  // gray-400
+  [209, 213, 219],  // gray-300
+  [55, 65, 81],     // gray-700
+  [75, 85, 99],     // gray-600
+  [17, 24, 39],     // gray-900
+  [241, 245, 249],  // slate-100
+  [226, 232, 240],  // slate-200
+];
+
+function classifyColor(colorStr) {
+  const m = colorStr.match(/(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (!m) {
+    // hex
+    const hexMatch = colorStr.match(/#([0-9a-fA-F]{3,8})/);
+    if (!hexMatch) return 'other';
+    let h = hexMatch[1];
+    if (h.length === 3) h = h.split('').map(c => c + c).join('');
+    if (h.length !== 6) return 'other';
+    const r = parseInt(h.slice(0, 2), 16);
+    const g = parseInt(h.slice(2, 4), 16);
+    const b = parseInt(h.slice(4, 6), 16);
+    return classifyRGB(r, g, b);
+  }
+  return classifyRGB(+m[1], +m[2], +m[3]);
+}
+function rgbDistance(a, b) {
+  return Math.sqrt((a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2);
+}
+function classifyRGB(r, g, b) {
+  if ((r < 20 && g < 20 && b < 20) || (r > 240 && g > 240 && b > 240)) return 'shadow';
+  for (const c of BRAND_RGB) if (rgbDistance([r,g,b], c) < 12) return 'brand';
+  for (const c of NEUTRAL_RGB) if (rgbDistance([r,g,b], c) < 12) return 'theme-bleed';
+  return 'other';
+}
+
 function scanHardcoded(filePath) {
   const text = fs.readFileSync(filePath, 'utf8');
   const lines = text.split('\n');
   const findings = [];
+  // theme:exempt-block-start .. -block-end の範囲を計算
+  const exemptRanges = [];
+  let blockStart = -1;
   lines.forEach((line, idx) => {
+    if (/theme:exempt-block-start|document\.write\(/i.test(line)) {
+      if (blockStart === -1) blockStart = idx;
+    }
+    if (blockStart !== -1 && /theme:exempt-block-end|`\);/.test(line)) {
+      exemptRanges.push([blockStart, idx]);
+      blockStart = -1;
+    }
+  });
+  // :root { ... } / body.theme-light { ... } ブロック内も exempt (token override の中身は値そのもの)
+  const SELECTOR_PATTERNS = [/:root\s*\{/g, /body\.theme-light[^{]*\{/g, /:root\[data-theme="light"\]\s*\{/g];
+  for (const re of SELECTOR_PATTERNS) {
+    re.lastIndex = 0;
+    let m;
+    while ((m = re.exec(text)) !== null) {
+      const start = m.index;
+      let depth = 0, i = start;
+      while (i < text.length) {
+        if (text[i] === '{') depth++;
+        else if (text[i] === '}') {
+          depth--;
+          if (depth === 0) {
+            const startLine = text.slice(0, start).split('\n').length - 1;
+            const endLine = text.slice(0, i + 1).split('\n').length - 1;
+            exemptRanges.push([startLine, endLine]);
+            break;
+          }
+        }
+        i++;
+      }
+    }
+  }
+  const inExemptBlock = (idx) => exemptRanges.some(([s, e]) => idx >= s && idx <= e);
+
+  lines.forEach((line, idx) => {
+    if (inExemptBlock(idx)) return;
     // theme:exempt コメント付き行はスキップ
     if (/theme:exempt/i.test(line)) return;
     // CSS 変数定義行 (`--xxx: value;`) はスキップ — token 自身は分析対象
@@ -175,7 +306,8 @@ function scanHardcoded(filePath) {
     [...hexMatches, ...rgbaMatches].forEach(color => {
       const norm = color.toLowerCase();
       if (EXEMPT_COLORS.has(norm)) return;
-      findings.push({ file: path.basename(filePath), line: idx + 1, color, context: stripped.trim().slice(0, 100) });
+      const category = classifyColor(color);
+      findings.push({ file: path.basename(filePath), line: idx + 1, color, category, context: stripped.trim().slice(0, 100) });
     });
   });
   return findings;
@@ -282,18 +414,24 @@ function main() {
 
   if (FLAG_UNCOVERED) {
     console.log('\n=== Uncovered hardcoded colors (light theme で override が無い) ===\n');
-    let total = 0;
+    let total = 0, bleed = 0;
     for (const [file, list] of Object.entries(findingsByFile)) {
       const un = list.filter(x => !x.covered);
       if (un.length === 0) continue;
-      console.log(`◆ ${file}  (${un.length} 件)`);
-      un.slice(0, 30).forEach(x => {
-        console.log(`  L${String(x.line).padStart(4)}  ${x.color.padEnd(28)} .${x.cls || '?'}`);
+      const byCat = { 'theme-bleed': [], 'brand': [], 'shadow': [], 'other': [] };
+      un.forEach(x => byCat[x.category || 'other'].push(x));
+      console.log(`◆ ${file}  (${un.length} 件: bleed=${byCat['theme-bleed'].length}, brand=${byCat['brand'].length}, shadow=${byCat['shadow'].length}, other=${byCat['other'].length})`);
+      // bleed (actionable) を全件表示、 brand/shadow は件数のみ
+      byCat['theme-bleed'].forEach(x => {
+        console.log(`  ⚠ L${String(x.line).padStart(4)} BLEED ${x.color.padEnd(28)} .${x.cls || '?'}`);
       });
-      if (un.length > 30) console.log(`  ... and ${un.length - 30} more`);
+      byCat['other'].slice(0, 10).forEach(x => {
+        console.log(`  ? L${String(x.line).padStart(4)} OTHER ${x.color.padEnd(28)} .${x.cls || '?'}`);
+      });
       total += un.length;
+      bleed += byCat['theme-bleed'].length;
     }
-    console.log(`\n合計 uncovered: ${total} 件`);
+    console.log(`\n合計 uncovered: ${total} 件 (うち actionable theme-bleed: ${bleed} 件)`);
     return;
   }
 

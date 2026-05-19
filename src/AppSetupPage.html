@@ -1002,7 +1002,8 @@
         var el = document.getElementById('sa-pool-status');
         if (!el) return;
         el.textContent = msg || '';
-        el.style.color = isError ? '#fca5a5' : '#86efac';
+        // status コードのみ、 error は赤系 / 成功は緑系 — 両モード共通 brand-status の薄色
+        el.style.color = isError ? 'var(--status-error)' : 'var(--status-success)';
       }
       function saPool_refresh() {
         saPool_setStatus('一覧取得中...');

@@ -28,7 +28,7 @@
   /* 軸線 + ラベル */
   .viz-axis line,
   .viz-axis path {
-    stroke: rgba(148, 163, 184, 0.5);
+    stroke: var(--theme-border-strong);
     stroke-width: 1;
   }
   /* Light mode: slate-400 50% → slate-500 80% (slate-50 bg で軸線を見やすく) */
@@ -439,9 +439,9 @@
     position: relative;
     height: 0.7rem;  /* ドット (1.4rem) との比率を整える */
     /* 単色 track: 「左 → 右 = 弱 → 強」誤読を避けるため、立場の対極は同等扱い。 */
-    background: rgba(148, 163, 184, 0.25);
+    background: var(--theme-border-subtle);
     border-radius: 999px;
-    border: 1px solid rgba(148, 163, 184, 0.3);
+    border: 1px solid var(--theme-border-subtle);
   }
   .modal-axis-dot {
     position: absolute;
@@ -576,7 +576,7 @@
     max-width: 200px;
     padding: 0.3rem 0.55rem;
     border-radius: 0.4rem;
-    border: 1px solid rgba(148, 163, 184, 0.3);
+    border: 1px solid var(--theme-border-subtle);
     background: var(--theme-card-1);
     color: var(--theme-text-primary);
     font-size: 0.88rem;
@@ -597,7 +597,7 @@
     padding: 0.2rem;
     background: var(--theme-card-2);
     border-radius: 0.45rem;
-    border: 1px solid rgba(148, 163, 184, 0.2);
+    border: 1px solid var(--theme-border-subtle);
   }
   /* Light mode: slate-900 50% → 薄い slate trough で pill 群の輪郭を保ちつつ自然に */
   body.theme-light .viz-profile-pills-row {
@@ -700,7 +700,7 @@
   .viz-btn, .viz-btn-small {
     padding: 0.3rem 0.6rem;
     border-radius: 0.4rem;
-    border: 1px solid rgba(148, 163, 184, 0.3);
+    border: 1px solid var(--theme-border-subtle);
     background: var(--theme-card-1);
     color: var(--theme-text-primary);
     cursor: pointer;
@@ -768,7 +768,7 @@
     min-height: 50vh;
   }
   .viz-compare-pane {
-    border: 1px solid rgba(148, 163, 184, 0.25);
+    border: 1px solid var(--theme-border-subtle);
     border-radius: 0.5rem;
     padding: 0.5rem;
     background: rgba(15, 23, 42, 0.3);
@@ -801,7 +801,7 @@
   }
   .viz-quadrant-summary[hidden] { display: none; }
   .qs-cell {
-    border: 1px solid rgba(148, 163, 184, 0.18);
+    border: 1px solid var(--theme-border-subtle);
     border-radius: 0.5rem;
     padding: 0.5rem 0.7rem;
     background: var(--theme-card-2);
@@ -829,7 +829,7 @@
     line-height: 1.3;
   }
   .qs-empty {
-    color: rgba(148, 163, 184, 0.55);
+    color: var(--theme-border-strong);
     font-size: 0.78rem;
     font-style: italic;
   }
@@ -844,7 +844,7 @@
     margin-top: 1rem;
     padding: 0.85rem 1rem;
     background: var(--theme-card-1);
-    border: 1px solid rgba(148, 163, 184, 0.25);
+    border: 1px solid var(--theme-border-subtle);
     border-radius: 0.6rem;
     display: none; /* JS で showAdminFeatures のときだけ表示 */
   }
@@ -857,7 +857,7 @@
   .viz-teacher-panel ul { list-style: none; padding: 0; margin: 0; }
   .viz-teacher-panel li {
     padding: 0.35rem 0;
-    border-bottom: 1px dashed rgba(148, 163, 184, 0.15);
+    border-bottom: 1px dashed var(--theme-overlay-white-10);
     font-size: 0.9rem;
   }
   .viz-teacher-panel li:last-child { border-bottom: 0; }

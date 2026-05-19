@@ -420,6 +420,8 @@
 
       setLoginButtonState(false);
 
+      // theme:exempt-block-start — Login 成功時の transient popup ウィンドウ全体。
+      //   親 theme 非継承。 常時 dark brand gradient で一貫した login 体験を維持。
       const successHtml = `
         <!DOCTYPE html>
         <html>
@@ -627,6 +629,7 @@
         </body>
         </html>
       `;
+      // theme:exempt-block-end
 
       document.body.innerHTML = successHtml; // lint-disable-line no-inner-html-assignment-with-variable -- safeMessage と safeAdminUrl は escapeHtml 済 + adminUrl は /^https:\/\//i.test() でガード
 
@@ -671,6 +674,7 @@
         linkElement.href = adminUrl;
         linkElement.target = '_top';
         linkElement.textContent = '管理パネルを開く';
+        // theme:exempt — fallback ボタン (popup ブロック時)、 brand-success green を維持
         linkElement.style.cssText =
           'display:block;padding:20px;background:#4CAF50;color:white;text-align:center;text-decoration:none;margin:20px;border-radius:5px;';
         document.body.innerHTML = '';

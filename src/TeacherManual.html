@@ -11,20 +11,21 @@
     <?!= include('UnifiedStyles.css'); ?>
 
     <style>
-      /* マニュアル専用: 読みやすい線幅 + 段落間隔。本文中心の最小スタイル */
+      /* マニュアル専用: 読みやすい線幅 + 段落間隔。本文中心の最小スタイル
+         (v2807: 全 hardcoded color を theme token 経由に変更しライト/ダーク対応) */
       .manual-wrap { max-width: 56rem; margin: 0 auto; padding: 2rem 1rem 6rem; }
-      .manual-h1 { font-size: 2rem; font-weight: 700; color: #67e8f9; margin-bottom: 0.5rem; }
-      .manual-h2 { font-size: 1.5rem; font-weight: 600; color: #fff;
+      .manual-h1 { font-size: 2rem; font-weight: 700; color: var(--theme-accent-cyan); margin-bottom: 0.5rem; }
+      .manual-h2 { font-size: 1.5rem; font-weight: 600; color: var(--theme-text-primary);
                    margin: 2.5rem 0 1rem; padding-bottom: 0.5rem;
-                   border-bottom: 1px solid rgba(103, 232, 249, 0.3); }
-      .manual-h3 { font-size: 1.1rem; font-weight: 600; color: #a5f3fc; margin: 1.5rem 0 0.5rem; }
-      .manual-p  { color: rgba(229, 231, 235, 0.9); line-height: 1.75; margin-bottom: 0.75rem; }
-      .manual-p code { background: rgba(15, 23, 42, 0.6); padding: 0.1rem 0.4rem;
-                       border-radius: 0.25rem; color: #fde68a; font-size: 0.95em; }
+                   border-bottom: 1px solid var(--theme-border-subtle); }
+      .manual-h3 { font-size: 1.1rem; font-weight: 600; color: var(--theme-accent-cyan); margin: 1.5rem 0 0.5rem; }
+      .manual-p  { color: var(--theme-text-secondary); line-height: 1.75; margin-bottom: 0.75rem; }
+      .manual-p code { background: var(--theme-card-2); padding: 0.1rem 0.4rem;
+                       border-radius: 0.25rem; color: var(--brand-understand); font-size: 0.95em; }
 
       .step-card {
-        background: rgba(15, 23, 42, 0.5);
-        border: 1px solid rgba(103, 232, 249, 0.25);
+        background: var(--theme-card-1);
+        border: 1px solid var(--theme-border-subtle);
         border-radius: 0.75rem;
         padding: 1.25rem;
         margin: 0.75rem 0;
@@ -33,29 +34,29 @@
       .step-num {
         flex-shrink: 0;
         width: 2rem; height: 2rem;
-        background: linear-gradient(135deg, #67e8f9, #06b6d4);
-        color: #0f172a;
+        background: linear-gradient(135deg, #67e8f9, #06b6d4);  /* theme:exempt - brand cyan gradient */
+        color: #0f172a;  /* theme:exempt - 番号バッジ (常に明るい cyan 上の暗色) */
         border-radius: 9999px;
         display: flex; align-items: center; justify-content: center;
         font-weight: 700;
       }
       .step-body { flex: 1; }
-      .step-body h4 { color: #fff; font-weight: 600; margin-bottom: 0.25rem; }
-      .step-body p { color: rgba(229, 231, 235, 0.85); font-size: 0.92rem; margin: 0; line-height: 1.6; }
+      .step-body h4 { color: var(--theme-text-primary); font-weight: 600; margin-bottom: 0.25rem; }
+      .step-body p { color: var(--theme-text-secondary); font-size: 0.92rem; margin: 0; line-height: 1.6; }
       .step-body p + p { margin-top: 0.4rem; }
 
       .mode-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
                    gap: 0.75rem; margin: 1rem 0; }
       .mode-card {
-        background: rgba(15, 23, 42, 0.5);
-        border: 1px solid rgba(148, 163, 184, 0.25);
+        background: var(--theme-card-1);
+        border: 1px solid var(--theme-border-subtle);
         border-radius: 0.5rem;
         padding: 1rem;
       }
       .mode-card .icon { font-size: 1.5rem; }
-      .mode-card .title { font-weight: 600; color: #fff; margin: 0.25rem 0; }
-      .mode-card .desc { font-size: 0.85rem; color: rgba(229, 231, 235, 0.7); line-height: 1.5; }
-      .mode-card .when { font-size: 0.78rem; color: #67e8f9; margin-top: 0.5rem; }
+      .mode-card .title { font-weight: 600; color: var(--theme-text-primary); margin: 0.25rem 0; }
+      .mode-card .desc { font-size: 0.85rem; color: var(--theme-text-muted); line-height: 1.5; }
+      .mode-card .when { font-size: 0.78rem; color: var(--theme-accent-cyan); margin-top: 0.5rem; }
 
       .callout {
         border-radius: 0.5rem;
@@ -63,37 +64,38 @@
         margin: 1rem 0;
         line-height: 1.6;
       }
-      .callout.tip    { background: rgba(34, 197, 94, 0.1);  border-left: 3px solid #22c55e; color: #bbf7d0; }
-      .callout.warn   { background: rgba(245, 158, 11, 0.1); border-left: 3px solid #f59e0b; color: #fde68a; }
-      .callout.info   { background: rgba(59, 130, 246, 0.1); border-left: 3px solid #3b82f6; color: #bfdbfe; }
-      .callout strong { color: #fff; }
+      /* tip/warn/info: brand status の薄背景 + 強調 border。色は両モード対応 token */
+      .callout.tip    { background: rgba(34, 197, 94, 0.12);  border-left: 3px solid var(--status-success); color: var(--theme-text-secondary); }
+      .callout.warn   { background: rgba(245, 158, 11, 0.12); border-left: 3px solid var(--status-warning); color: var(--theme-text-secondary); }
+      .callout.info   { background: rgba(59, 130, 246, 0.12); border-left: 3px solid var(--brand-primary);  color: var(--theme-text-secondary); }
+      .callout strong { color: var(--theme-text-primary); }
 
       .toc { position: sticky; top: 1rem;
-             background: rgba(15, 23, 42, 0.7);
+             background: var(--theme-card-2);
              backdrop-filter: blur(10px);
-             border: 1px solid rgba(103, 232, 249, 0.2);
+             border: 1px solid var(--theme-border-subtle);
              border-radius: 0.75rem;
              padding: 1rem; }
-      .toc h4 { color: #fff; font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem; }
+      .toc h4 { color: var(--theme-text-primary); font-weight: 600; margin-bottom: 0.5rem; font-size: 0.95rem; }
       .toc a {
-        display: block; color: #a5f3fc; text-decoration: none;
+        display: block; color: var(--theme-accent-cyan); text-decoration: none;
         padding: 0.3rem 0; font-size: 0.88rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        border-bottom: 1px solid var(--theme-overlay-white-05);
         transition: color 0.15s ease, padding-left 0.15s ease;
       }
       .toc a:last-child { border-bottom: none; }
-      .toc a:hover { color: #fff; padding-left: 0.5rem; }
+      .toc a:hover { color: var(--theme-text-primary); padding-left: 0.5rem; }
 
       .faq details {
-        background: rgba(15, 23, 42, 0.4);
-        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: var(--theme-card-2);
+        border: 1px solid var(--theme-border-subtle);
         border-radius: 0.5rem;
         padding: 0.7rem 1rem;
         margin-bottom: 0.5rem;
       }
-      .faq summary { cursor: pointer; font-weight: 600; color: #a5f3fc; padding: 0.2rem 0; }
-      .faq details[open] summary { color: #fff; }
-      .faq .answer { color: rgba(229, 231, 235, 0.85); margin-top: 0.5rem;
+      .faq summary { cursor: pointer; font-weight: 600; color: var(--theme-accent-cyan); padding: 0.2rem 0; }
+      .faq details[open] summary { color: var(--theme-text-primary); }
+      .faq .answer { color: var(--theme-text-secondary); margin-top: 0.5rem;
                      line-height: 1.6; font-size: 0.92rem; }
     </style>
   </head>

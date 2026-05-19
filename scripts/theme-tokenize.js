@@ -53,6 +53,30 @@ const REPLACEMENTS = [
   ['rgba(71, 85, 105, 0.6)',  'var(--theme-border-normal)', 'slate-600 60% → border-normal'],
   ['rgba(71, 85, 105, 0.4)',  'var(--theme-border-subtle)', 'slate-600 40% → border-subtle'],
   ['rgba(71, 85, 105, 0.3)',  'var(--theme-border-subtle)', 'slate-600 30% → border-subtle'],
+  // muted text / divider (slate-400 alpha — light mode で2.5:1 fail AA)
+  ['rgba(148, 163, 184, 0.9)',  'var(--theme-text-muted)',    'slate-400 90% → text-muted'],
+  ['rgba(148, 163, 184, 0.85)', 'var(--theme-text-muted)',    'slate-400 85% → text-muted'],
+  ['rgba(148, 163, 184, 0.8)',  'var(--theme-text-muted)',    'slate-400 80% → text-muted'],
+  ['rgba(148, 163, 184, 0.75)', 'var(--theme-text-muted)',    'slate-400 75% → text-muted'],
+  ['rgba(148, 163, 184, 0.7)',  'var(--theme-text-muted)',    'slate-400 70% → text-muted'],
+  ['rgba(148, 163, 184, 0.55)', 'var(--theme-border-strong)', 'slate-400 55% → border-strong'],
+  ['rgba(148, 163, 184, 0.5)',  'var(--theme-border-strong)', 'slate-400 50% → border-strong'],
+  ['rgba(148, 163, 184, 0.4)',  'var(--theme-border-normal)', 'slate-400 40% → border-normal'],
+  ['rgba(148, 163, 184, 0.35)', 'var(--theme-border-normal)', 'slate-400 35% → border-normal'],
+  ['rgba(148, 163, 184, 0.3)',  'var(--theme-border-subtle)', 'slate-400 30% → border-subtle'],
+  ['rgba(148, 163, 184, 0.25)', 'var(--theme-border-subtle)', 'slate-400 25% → border-subtle'],
+  ['rgba(148, 163, 184, 0.2)',  'var(--theme-border-subtle)', 'slate-400 20% → border-subtle'],
+  ['rgba(148, 163, 184, 0.18)', 'var(--theme-border-subtle)', 'slate-400 18% → border-subtle'],
+  ['rgba(148, 163, 184, 0.15)', 'var(--theme-overlay-white-10)', 'slate-400 15% → overlay-white-10'],
+  ['rgba(148, 163, 184, 0.12)', 'var(--theme-overlay-white-10)', 'slate-400 12% → overlay-white-10'],
+  // body text alpha (gray-200 — light mode で invisible on white)
+  ['rgba(229, 231, 235, 0.92)', 'var(--theme-text-primary)',   'gray-200 92% → text-primary'],
+  ['rgba(229, 231, 235, 0.9)',  'var(--theme-text-primary)',   'gray-200 90% → text-primary'],
+  ['rgba(229, 231, 235, 0.85)', 'var(--theme-text-secondary)', 'gray-200 85% → text-secondary'],
+  // slate-100/200 — light mode で broken (slate-100 alpha は light の bg と同化)
+  ['rgba(226, 232, 240, 0.85)', 'var(--theme-bg-elevated)',    'slate-200 85% → bg-elevated'],
+  // slate-900 もっと深い alpha (Lesson UI 用)
+  ['rgba(15, 23, 42, 0.4)',     'var(--theme-card-2)',         'slate-900 40% → card-2'],
 ];
 
 // :root / body.theme-light ブロック内のオフセット範囲を計算 (置換除外)
