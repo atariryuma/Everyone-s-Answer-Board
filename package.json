@@ -35,7 +35,10 @@
     "theme:matrix": "node scripts/theme-matrix.js",
     "theme:uncovered": "node scripts/theme-matrix.js --uncovered",
     "theme:tokenize": "node scripts/theme-tokenize.js",
-    "theme:tokenize:dry": "node scripts/theme-tokenize.js --dry-run"
+    "theme:tokenize:dry": "node scripts/theme-tokenize.js --dry-run",
+    "theme:pair": "node scripts/theme-pair-tailwind.js",
+    "theme:pair:dry": "node scripts/theme-pair-tailwind.js --dry-run",
+    "theme:perfect": "node scripts/theme-perfect.js"
   },
   "repository": {
     "type": "git",

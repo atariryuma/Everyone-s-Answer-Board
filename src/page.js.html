@@ -1988,7 +1988,7 @@
           'この回答ボードは存在しないか、アクセス権限が不正です' :
           'この回答ボードにアクセスする権限がありません'}</p>
         ${isUserNotFoundError ? `
-        <div class="mt-4 p-4 bg-blue-100/20 dark:bg-blue-900/20 border border-blue-500/50 rounded-lg text-left max-w-md mx-auto">
+        <div class="mt-4 p-4 bg-blue-100 dark:bg-blue-900/20 border border-blue-500/50 rounded-lg text-left max-w-md mx-auto">
           <h4 class="text-sm font-medium text-blue-700 dark:text-blue-400 mb-2">🔍 考えられる原因：</h4>
           <ul class="text-xs text-slate-600 dark:text-gray-400 space-y-1">
             <li>• URLのユーザーIDが無効または期限切れ</li>
@@ -1998,7 +1998,7 @@
             <li>• ブラウザのセッション情報が破損</li>
           </ul>
         </div>
-        <div class="mt-4 p-4 bg-green-100/20 dark:bg-green-900/20 border border-green-500/50 rounded-lg text-left max-w-md mx-auto">
+        <div class="mt-4 p-4 bg-green-100 dark:bg-green-900/20 border border-green-500/50 rounded-lg text-left max-w-md mx-auto">
           <h4 class="text-sm font-medium text-green-700 dark:text-green-400 mb-2">💡 解決方法：</h4>
           <ul class="text-xs text-slate-600 dark:text-gray-400 space-y-1">
             <li>• まずページを再読み込みしてみる</li>
@@ -2008,7 +2008,7 @@
             <li>• 新しい回答ボードを作成する</li>
           </ul>
         </div>
-        <div class="mt-4 p-3 bg-yellow-100/20 dark:bg-yellow-900/20 border border-yellow-500/50 rounded-lg text-left max-w-md mx-auto">
+        <div class="mt-4 p-3 bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-500/50 rounded-lg text-left max-w-md mx-auto">
           <h4 class="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-2">🛠️ 自動修復：</h4>
           <p class="text-xs text-slate-600 dark:text-gray-400">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
         </div>` : ''}
@@ -3952,7 +3952,7 @@
             ${answerData.name ? `<p class="text-slate-600 dark:text-gray-400 text-xs mt-2">回答者: ${window.sharedUtilities.security.escapeHtml(answerData.name)}</p>` : ''}
           </div>
 
-          <div class="bg-red-100/20 dark:bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-6">
+          <div class="bg-red-100 dark:bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-6">
             <p class="text-red-800 dark:text-red-200 text-sm">
               ⚠️ この操作は取り消せません。スプレッドシートから該当の行が完全に削除されます。
             </p>
