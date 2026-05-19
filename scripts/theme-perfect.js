@@ -141,11 +141,13 @@ const hasDarkMode = /darkMode:\s*['"]class['"]/.test(tw);
 const hasThemeColors = /theme-bg-base|theme-text-primary/.test(tw);
 check('12. Tailwind darkMode + theme tokens 公開', hasDarkMode && hasThemeColors, `darkMode=${hasDarkMode}, tokens=${hasThemeColors}`);
 
-// 13. apply() で .dark + .light + theme-{dark,light} を body/html 両方に
-const hasDarkClass = /classList\.add\('dark'\)/.test(su);
-const hasLightClass = /classList\.add\('light'\)/.test(su);
-const hasThemeDark = /classList\.add\('theme-' \+ resolved\)/.test(su);
-check('13. apply() でクラス同期 (.dark/.light/.theme-*)', hasDarkClass && hasLightClass && hasThemeDark, `dark=${hasDarkClass}, light=${hasLightClass}, theme-*=${hasThemeDark}`);
+// 13. apply() で .dark + .light + theme-{dark,light} を html/body に
+// v2810+: 統一形 classList.add(resolved, 'theme-' + resolved) を採用
+const hasResolved = /classList\.add\(resolved,\s*'theme-'\s*\+\s*resolved\)/.test(su)
+  || (/classList\.add\(.{0,30}'dark'/.test(su) && /classList\.add\(.{0,30}'light'/.test(su));
+const hasThemeClass = /classList\.add\(.{0,30}'theme-'\s*\+\s*resolved\)/.test(su) || /classList\.add\('theme-dark'/.test(su);
+const hasColorScheme = /style\.colorScheme/.test(su);
+check('13. apply() で .dark/.light/.theme-* + colorScheme 同期', hasResolved && hasThemeClass && hasColorScheme, `resolved=${hasResolved}, theme-class=${hasThemeClass}, colorScheme=${hasColorScheme}`);
 
 // 14. brand-* → theme-* alias (UnifiedStyles)
 const us = fs.readFileSync(path.join(SRC, 'UnifiedStyles.css.html'), 'utf8');
@@ -198,6 +200,29 @@ check('19. page.viz light override ≥ 9 件', lightOverrideCount >= 9, `${light
 const claudemd = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8');
 const hasFlow = /theme:matrix.*theme:uncovered.*theme:tokenize/s.test(claudemd) || /theme-card-1.*theme-card-2.*theme-card-3/s.test(claudemd);
 check('20. CLAUDE.md にメンテナンスフロー記載', hasFlow, hasFlow ? '✓' : '✗');
+
+// 21. color-scheme CSS property (両モード定義済)
+const hasCsRoot = /:root\s*\{[\s\S]*?color-scheme:\s*dark/.test(us);
+const hasCsLight = /body\.theme-light[\s\S]{0,2000}?color-scheme:\s*light/.test(us);
+check('21. color-scheme CSS property (dark+light)', hasCsRoot && hasCsLight, `root=${hasCsRoot}, light=${hasCsLight}`);
+
+// 22. FOUC 防止: SharedThemeBoot.html 存在 + 全 theme-aware ページに include
+const bootExists = fs.existsSync(path.join(SRC, 'SharedThemeBoot.html'));
+const PAGES_NEEDING_BOOT = ['Page', 'AdminPanel', 'LoginPage', 'AppSetupPage', 'SetupPage',
+                            'TeacherManual', 'Unpublished', 'AccessRestricted', 'ErrorBoundary'];
+let bootMissing = 0;
+for (const p of PAGES_NEEDING_BOOT) {
+  const fp = path.join(SRC, `${p}.html`);
+  if (!fs.existsSync(fp)) continue;
+  const t = fs.readFileSync(fp, 'utf8');
+  if (!/SharedThemeBoot/.test(t)) bootMissing++;
+}
+check('22. FOUC 防止 SharedThemeBoot 全ページ include', bootExists && bootMissing === 0, `boot=${bootExists}, missing=${bootMissing}`);
+
+// 23. Theme 切替 smooth transition (body に transition: background-color color)
+const hasTransition = /body\s*\{[\s\S]*?transition:[\s\S]*?background-color[\s\S]*?color/.test(us);
+const hasReducedMotion = /prefers-reduced-motion[\s\S]*?body[\s\S]*?transition:\s*none/.test(us);
+check('23. Theme transition + reduced-motion 配慮', hasTransition && hasReducedMotion, `transition=${hasTransition}, reduced=${hasReducedMotion}`);
 
 // 出力
 console.log('\n══════════════════════════════════════════════════════════════════');

@@ -71,6 +71,8 @@
   
   <!-- Shared TailwindCSS Configuration -->
   <?!= include('SharedTailwindConfig'); ?>
+  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
+  <?!= include('SharedThemeBoot'); ?>
   <script>
   </script>
 

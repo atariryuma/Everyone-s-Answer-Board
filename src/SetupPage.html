@@ -10,6 +10,8 @@
   <title>みんなの回答ボード - セットアップ</title>
 
   <?!= include('SharedTailwindConfig'); ?>
+  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
+  <?!= include('SharedThemeBoot'); ?>
 
   <!-- Shared Styles and Utilities -->
   <?!= include('UnifiedStyles.css'); ?>

@@ -881,23 +881,24 @@
 
     function apply(value) {
       const resolved = resolve(value);
-      if (!document.body) return resolved;
-      // theme-dark / theme-light: CSS 変数オーバーライド用 (UnifiedStyles の body.theme-light セレクタ)
-      document.body.classList.remove('theme-dark', 'theme-light');
-      document.body.classList.add('theme-' + resolved);
-      // dark / light: Tailwind の darkMode:'class' が探すクラス (`.dark` で dark: variant 発動)
-      //   この同期がないと bg-white dark:bg-gray-800 が常に light 側のみ適用される深刻なバグになる
-      //   (2026-05-19 user 報告の chart 白背景問題の根本原因)。
-      document.documentElement.classList.remove('dark', 'light');
-      document.body.classList.remove('dark', 'light');
-      if (resolved === 'dark') {
-        document.documentElement.classList.add('dark');
-        document.body.classList.add('dark');
-      } else {
-        document.documentElement.classList.add('light');
-        document.body.classList.add('light');
+      const html = document.documentElement;
+      // <html> root: FOUC 防止 boot script と整合する完全 sync
+      // - theme-dark/theme-light: CSS 変数オーバーライド (UnifiedStyles body.theme-light / html.theme-light)
+      // - dark/light: Tailwind darkMode:'class' 用
+      // - data-theme: 属性セレクタ用
+      // - colorScheme: ネイティブ scrollbar / form 追従 (2026 業界標準ベストプラクティス)
+      if (html && html.classList) {
+        html.classList.remove('dark', 'light', 'theme-dark', 'theme-light');
+        html.classList.add(resolved, 'theme-' + resolved);
+        try { html.setAttribute('data-theme', resolved); } catch (_) {}
+        try { if (html.style) html.style.colorScheme = resolved; } catch (_) {}
       }
-      try { document.documentElement.setAttribute('data-theme', resolved); } catch (_) {}
+
+      // body も同期 (body.theme-light selector が要求)
+      if (document.body) {
+        document.body.classList.remove('theme-dark', 'theme-light', 'dark', 'light');
+        document.body.classList.add('theme-' + resolved, resolved);
+      }
       subscribers.forEach((fn) => { try { fn(resolved, value); } catch (_) {} });
       return resolved;
     }

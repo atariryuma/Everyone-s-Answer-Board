@@ -7,6 +7,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <?!= include('SharedSecurityHeaders'); ?>
     <?!= include('SharedTailwindConfig'); ?>
+  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
+  <?!= include('SharedThemeBoot'); ?>
     <?!= include('UnifiedStyles.css'); ?>
     <style>
       .fade-in { animation: fadeIn 0.6s ease-out; }

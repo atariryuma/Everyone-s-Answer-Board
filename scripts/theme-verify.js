@@ -177,10 +177,13 @@ function checkClassSyncWithTailwind() {
   const su = fs.readFileSync(path.join(SRC_DIR, 'SharedUtilities.html'), 'utf8');
   const tw = fs.readFileSync(path.join(SRC_DIR, 'SharedTailwindConfig.html'), 'utf8');
 
-  // themeManager.apply が body に追加する class 名を抽出
-  const themeMgrAddsDark = /classList\.add\(\s*['"]dark['"]/.test(su);
-  const themeMgrAddsLight = /classList\.add\(\s*['"]light['"]/.test(su);
-  const themeMgrAddsThemeDark = /classList\.add\(['"]theme-['"]\s*\+\s*resolved\)|classList\.add\(['"]theme-dark['"]/.test(su);
+  // themeManager.apply が html/body に追加する class 名を抽出
+  // v2810+ 統一: classList.add(resolved, 'theme-' + resolved) — resolved は 'dark'/'light' 変数
+  const themeMgrAddsDark = /classList\.add\(\s*['"]dark['"]/.test(su)
+    || /classList\.add\(resolved\b/.test(su);
+  const themeMgrAddsLight = /classList\.add\(\s*['"]light['"]/.test(su)
+    || /classList\.add\(resolved\b/.test(su);
+  const themeMgrAddsThemeDark = /classList\.add\(['"]theme-['"]\s*\+\s*resolved\)|classList\.add\(['"]theme-dark['"]|classList\.add\(resolved,\s*['"]theme-['"]\s*\+\s*resolved\)/.test(su);
 
   // Tailwind darkMode 設定: 'class' (= .dark), ['class', '.X'], 'selector'
   const tailwindMode = (() => {

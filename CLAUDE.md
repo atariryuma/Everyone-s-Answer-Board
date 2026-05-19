@@ -257,6 +257,13 @@ body.theme-light, :root[data-theme="light"] {
 - 例: `class="bg-theme-base text-theme-primary border-theme-subtle"` で書ける
 - 既存 `bg-gray-800` 等のハードコード Tailwind class は **段階的に** `bg-theme-surface` 等へ移行
 
+**FOUC 防止 + color-scheme + transition** (v2810 業界標準 ベストプラクティス導入):
+
+- [SharedThemeBoot.html](src/SharedThemeBoot.html): `<head>` 内で paint 前に `<html>` へ theme class + `color-scheme` を同期付与 → ライト保存ユーザがダーク背景フラッシュを見ない
+- `color-scheme: dark` / `color-scheme: light`: ネイティブ scrollbar / form 部品 / canvas を OS dark/light モード追従させる (Tailwind/shadcn 標準)
+- body の `transition: background-color 200ms, color 200ms`: テーマ切替時に主要要素 (`.glass-panel`, `.answer-card`, `.modern-select`, `.eab-*` 等) がスムーズに色変化 + `prefers-reduced-motion` で OFF
+- 参考: [natebal.com Best Practices](https://natebal.com/best-practices-for-dark-mode/), [shadcn dark mode](https://ui.shadcn.com/docs/dark-mode), [astro-fouc-killer](https://github.com/AVGVSTVS96/astro-fouc-killer)
+
 **themeManager API** ([SharedUtilities.html](src/SharedUtilities.html)):
 
 ```js

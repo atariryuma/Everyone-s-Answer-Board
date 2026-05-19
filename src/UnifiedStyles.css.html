@@ -68,6 +68,10 @@
      * 注意: brand identity ( --brand-primary 等) は不変。 status / reaction も不変。
      *   テーマ切替で書き換わるのは「文脈依存の色」 (背景・テキスト・境界線・装飾) のみ。
      * ============================================================================= */
+    /* color-scheme: ネイティブ scrollbar / form 部品 / canvas を OS dark テーマに追従させる。
+       ベストプラクティス (2026 業界標準): https://natebal.com/best-practices-for-dark-mode/ */
+    color-scheme: dark;
+
     /* 背景レイヤー (奥 → 手前) */
     --theme-bg-base: #1a1b26;                          /* body 直接背景 */
     --theme-bg-surface: rgba(26, 27, 38, 0.7);         /* glass-panel, card 等 */
@@ -262,7 +266,11 @@
    * Light theme の値は **placeholder**。 実際の light mode 実装時に色を調整する。
    * ============================================================================= */
   body.theme-light,
-  :root[data-theme="light"] {
+  :root[data-theme="light"],
+  html.theme-light {
+    /* light mode native UI (scrollbar / form 部品) も追従 */
+    color-scheme: light;
+
     /* ライトモード配色 (v2801 確定値)
      * 根拠: Tailwind slate (cool, projector-friendly) + shadcn de facto baseline +
      *       WCAG 2.1 AA + 子供向け readability 配慮 (muted を slate-500 → slate-600 に昇格)。
@@ -324,6 +332,30 @@
     flex-direction: column;
     line-height: 1.6;
     overflow-x: hidden;
+    /* Theme 切替時にスムーズに色変化させる (200ms ease)。 業界標準パターン。
+       transition は元々あった他要素 (button hover, glass-panel 等) を上書きしないよう
+       background-color / color / border-color のみに限定 */
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  /* Theme-aware 主要 surface 要素も滑らかに切替 — visual jank を最小化 */
+  .glass-panel,
+  .answer-card,
+  .modern-select,
+  .modern-input,
+  .viz-container,
+  .eab-header,
+  .eab-count-pill,
+  .eab-select {
+    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  }
+  /* 高速 hover / interactive 系には transition を 200ms 適用するとモタつくので除外
+     (元々の hover transition が短い 150ms を保持) */
+  @media (prefers-reduced-motion: reduce) {
+    body, .glass-panel, .answer-card, .modern-select, .modern-input,
+    .viz-container, .eab-header, .eab-count-pill, .eab-select {
+      transition: none;
+    }
   }
 
   /* Theme toggle button (sun/moon) — themeManager.mountToggle 経由でマウント */

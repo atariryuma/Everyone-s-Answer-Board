@@ -12,6 +12,8 @@
 
     <!-- GAS推奨: CSS読み込みはhead内に集約 -->
     <?!= include('SharedTailwindConfig'); ?>
+  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
+  <?!= include('SharedThemeBoot'); ?>
     <?!= include('UnifiedStyles.css'); ?>
 
     <style>

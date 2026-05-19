@@ -8,6 +8,8 @@
     <title>みんなの回答ボード - 使い方ガイド</title>
 
     <?!= include('SharedTailwindConfig'); ?>
+  <!-- FOUC 防止: paint 前に <html> へ theme class + color-scheme を設定 -->
+  <?!= include('SharedThemeBoot'); ?>
     <?!= include('UnifiedStyles.css'); ?>
 
     <style>

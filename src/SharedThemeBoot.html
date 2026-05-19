@@ -1,0 +1,44 @@
+<!--
+  SharedThemeBoot.html — FOUC (Flash of Unstyled Content) 防止 + `color-scheme` 設定。
+
+  Why: themeManager (SharedUtilities) は body 末尾で読まれることが多いので、
+    head パース時に theme class を <html> に当てないと、 light モード保存ユーザに
+    一瞬 dark 背景がフラッシュして見える。 paint 前に同期で実行する必要がある。
+
+  使い方: <head> 内、 <?!= include('SharedTailwindConfig'); ?> の **後** で:
+    <?!= include('SharedThemeBoot'); ?>
+
+  仕様:
+    - localStorage 'app-theme' を読む (dark / light / auto)。 invalid なら auto。
+    - auto は (prefers-color-scheme: dark) で resolve。
+    - <html> に `theme-dark`/`theme-light` クラス、 `dark`/`light` クラス、
+      `data-theme` 属性、 `color-scheme` CSS プロパティ を即時付与。
+    - body はまだ存在しないので、 themeManager.init() (後で実行される) が
+      body にも同 class を貼る。 paint で見えるのは <html> 側だけなので OK。
+
+  ベストプラクティス参考:
+    - https://github.com/AVGVSTVS96/astro-fouc-killer
+    - https://notanumber.in/blog/fixing-react-dark-mode-flickering
+    - https://natebal.com/best-practices-for-dark-mode/
+-->
+<script>
+  (function () {
+    try {
+      var saved = null;
+      try { saved = localStorage.getItem('app-theme'); } catch (_) {}
+      var VALID = ['dark', 'light', 'auto'];
+      var theme = (saved && VALID.indexOf(saved) >= 0) ? saved : 'auto';
+      var resolved = theme;
+      if (theme === 'auto') {
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        resolved = prefersDark ? 'dark' : 'light';
+      }
+      var html = document.documentElement;
+      html.classList.remove('dark', 'light', 'theme-dark', 'theme-light');
+      html.classList.add(resolved, 'theme-' + resolved);
+      html.setAttribute('data-theme', resolved);
+      // color-scheme: ネイティブ scrollbar / form control / canvas を theme 追従させる
+      html.style.colorScheme = resolved;
+    } catch (e) { /* never break page load */ }
+  })();
+</script>
