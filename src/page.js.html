@@ -1605,7 +1605,7 @@
         <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
-        <h3 class="mt-2 text-lg font-medium text-red-400">初期化エラー</h3>
+        <h3 class="mt-2 text-lg font-medium text-red-700 dark:text-red-400">初期化エラー</h3>
         <p class="mt-1 text-sm text-slate-700 dark:text-gray-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6">
           <button 
@@ -1632,7 +1632,7 @@
         <svg class="mx-auto h-12 w-12 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
-        <h3 class="mt-2 text-lg font-medium text-yellow-400">データ読み込みエラー</h3>
+        <h3 class="mt-2 text-lg font-medium text-yellow-700 dark:text-yellow-400">データ読み込みエラー</h3>
         <p class="mt-1 text-sm text-slate-700 dark:text-gray-300">${window.sharedUtilities.security.escapeHtml(message)}</p>
         <div class="mt-6 space-x-3">
           <button 
@@ -1643,7 +1643,7 @@
           </button>
           <button 
             data-action="retry-load" 
-            class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-300 bg-blue-700 hover:bg-blue-600"
+            class="inline-flex items-center px-4 py-2 border border-blue-600 text-sm font-medium rounded-md text-blue-700 dark:text-blue-300 bg-blue-700 hover:bg-blue-600"
           >
             再試行
           </button>
@@ -1983,13 +1983,13 @@
         <svg class="mx-auto h-12 w-12 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L5.08 16.5c-.77.833.192 2.5 1.732 2.5z" />
         </svg>
-        <h3 class="mt-2 text-lg font-medium text-red-400">${isUserNotFoundError ? 'ユーザー情報が見つかりません' : 'アクセスエラー'}</h3>
+        <h3 class="mt-2 text-lg font-medium text-red-700 dark:text-red-400">${isUserNotFoundError ? 'ユーザー情報が見つかりません' : 'アクセスエラー'}</h3>
         <p class="mt-1 text-sm text-slate-700 dark:text-gray-300">${isUserNotFoundError ?
           'この回答ボードは存在しないか、アクセス権限が不正です' :
           'この回答ボードにアクセスする権限がありません'}</p>
         ${isUserNotFoundError ? `
-        <div class="mt-4 p-4 bg-blue-900/20 border border-blue-500/50 rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-blue-400 mb-2">🔍 考えられる原因：</h4>
+        <div class="mt-4 p-4 bg-blue-100/20 dark:bg-blue-900/20 border border-blue-500/50 rounded-lg text-left max-w-md mx-auto">
+          <h4 class="text-sm font-medium text-blue-700 dark:text-blue-400 mb-2">🔍 考えられる原因：</h4>
           <ul class="text-xs text-slate-600 dark:text-gray-400 space-y-1">
             <li>• URLのユーザーIDが無効または期限切れ</li>
             <li>• ボードが削除されたか非アクティブ化された</li>
@@ -1998,8 +1998,8 @@
             <li>• ブラウザのセッション情報が破損</li>
           </ul>
         </div>
-        <div class="mt-4 p-4 bg-green-900/20 border border-green-500/50 rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-green-400 mb-2">💡 解決方法：</h4>
+        <div class="mt-4 p-4 bg-green-100/20 dark:bg-green-900/20 border border-green-500/50 rounded-lg text-left max-w-md mx-auto">
+          <h4 class="text-sm font-medium text-green-700 dark:text-green-400 mb-2">💡 解決方法：</h4>
           <ul class="text-xs text-slate-600 dark:text-gray-400 space-y-1">
             <li>• まずページを再読み込みしてみる</li>
             <li>• 正しいボードURLを管理者に確認</li>
@@ -2008,8 +2008,8 @@
             <li>• 新しい回答ボードを作成する</li>
           </ul>
         </div>
-        <div class="mt-4 p-3 bg-yellow-900/20 border border-yellow-500/50 rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-yellow-400 mb-2">🛠️ 自動修復：</h4>
+        <div class="mt-4 p-3 bg-yellow-100/20 dark:bg-yellow-900/20 border border-yellow-500/50 rounded-lg text-left max-w-md mx-auto">
+          <h4 class="text-sm font-medium text-yellow-700 dark:text-yellow-400 mb-2">🛠️ 自動修復：</h4>
           <p class="text-xs text-slate-600 dark:text-gray-400">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
         </div>` : ''}
         <p class="mt-2 text-xs text-slate-600 dark:text-gray-400">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
@@ -2685,7 +2685,7 @@
         const container = this.elements.answersContainer;
         container.innerHTML = `
         <div class="text-center py-8 col-span-full">
-          <p class="text-red-400">表示エラーが発生しました</p>
+          <p class="text-red-700 dark:text-red-400">表示エラーが発生しました</p>
           <button data-action="reload" class="mt-2 px-4 py-2 bg-blue-600 text-slate-900 dark:text-white rounded">
             再読み込み
           </button>
@@ -2927,7 +2927,7 @@
 
       const cls = safeData.highlight ? 'reacted' : '';
       const highlightAriaLabel = safeData.highlight ? 'ハイライトを解除する' : 'ハイライトする';
-      return `<button type="button" class="highlight-btn like-btn text-yellow-400 ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${safeData.highlight}" data-row-index="${safeData.rowIndex}">${this.getIcon('star', 'w-5 h-5', safeData.highlight)}</button>`;
+      return `<button type="button" class="highlight-btn like-btn text-yellow-700 dark:text-yellow-400 ${cls}" aria-label="${highlightAriaLabel}" aria-pressed="${safeData.highlight}" data-row-index="${safeData.rowIndex}">${this.getIcon('star', 'w-5 h-5', safeData.highlight)}</button>`;
     }
 
     createHighlightToggle(safeData) {
@@ -3074,9 +3074,9 @@
         const errorCard = document.createElement('div');
         errorCard.className = 'answer-card glass-panel rounded-xl p-4 border-2 border-red-400/50 bg-red-900/20';
         errorCard.innerHTML = `
-        <div class="text-red-300 text-center">
+        <div class="text-red-700 dark:text-red-300 text-center">
           <div class="mb-2">⚠️ カード表示エラー</div>
-          <div class="text-xs text-red-400">データ処理中に問題が発生しました</div>
+          <div class="text-xs text-red-700 dark:text-red-400">データ処理中に問題が発生しました</div>
         </div>
       `;
         return errorCard;
@@ -3938,7 +3938,7 @@
         modal.innerHTML = `
         <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4 animate-scale-up">
           <div class="flex items-center gap-3 mb-4">
-            <div class="text-red-400">
+            <div class="text-red-700 dark:text-red-400">
               <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
               </svg>
@@ -3948,12 +3948,12 @@
 
           <div class="bg-white dark:bg-gray-800 rounded-lg p-4 mb-6">
             <p class="text-slate-700 dark:text-gray-300 text-sm mb-2">削除対象の回答:</p>
-            <p class="text-cyan-300 font-medium">${window.sharedUtilities.security.escapeHtml(answerData.opinion.substring(0, 100))}${answerData.opinion.length > 100 ? '...' : ''}</p>
+            <p class="text-cyan-700 dark:text-cyan-300 font-medium">${window.sharedUtilities.security.escapeHtml(answerData.opinion.substring(0, 100))}${answerData.opinion.length > 100 ? '...' : ''}</p>
             ${answerData.name ? `<p class="text-slate-600 dark:text-gray-400 text-xs mt-2">回答者: ${window.sharedUtilities.security.escapeHtml(answerData.name)}</p>` : ''}
           </div>
 
-          <div class="bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-6">
-            <p class="text-red-200 text-sm">
+          <div class="bg-red-100/20 dark:bg-red-900/20 border border-red-500/50 rounded-lg p-3 mb-6">
+            <p class="text-red-800 dark:text-red-200 text-sm">
               ⚠️ この操作は取り消せません。スプレッドシートから該当の行が完全に削除されます。
             </p>
           </div>
@@ -4521,7 +4521,7 @@
           modalHtml += '<p class="text-slate-800 dark:text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6 leading-relaxed">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
         }
       } else {
-        modalHtml = '<p class="text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
+        modalHtml = '<p class="text-cyan-800 dark:text-cyan-200 whitespace-pre-wrap break-words text-3xl md:text-4xl font-bold leading-tight">' + window.sharedUtilities.security.escapeHtml(data.opinion || '') + '</p>';
         if (data.reason && data.reason.trim()) {
           modalHtml += '<p class="text-slate-800 dark:text-gray-200 whitespace-pre-wrap break-words text-2xl md:text-3xl mt-6">' + window.sharedUtilities.security.escapeHtml(data.reason) + '</p>';
         }
@@ -5247,7 +5247,7 @@
     const container = document.getElementById('answers');
     if (container) {
       const msg = window.sharedUtilities.security.escapeHtml(error.message || '');
-      container.innerHTML = '<div class="text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
+      container.innerHTML = '<div class="text-red-700 dark:text-red-400 p-4">アプリケーションの初期化に失敗しました: ' + msg + '</div>';
     }
   }
 

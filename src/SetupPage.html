@@ -19,7 +19,7 @@
   <div class="max-w-2xl mx-auto">
     <!-- ヘッダー -->
     <div class="text-center mb-6">
-      <h1 class="text-4xl font-bold text-cyan-400 mb-2">📚 みんなの回答ボード</h1>
+      <h1 class="text-4xl font-bold text-cyan-700 dark:text-cyan-400 mb-2">📚 みんなの回答ボード</h1>
       <p class="text-xl text-slate-700 dark:text-gray-300">初回セットアップ</p>
       <p class="text-sm text-slate-600 dark:text-gray-400 mt-2">システムを使用開始するための設定を行います</p>
     </div>
@@ -123,7 +123,7 @@
       <h3 class="text-lg font-semibold text-slate-900 dark:text-white mb-4">❓ セットアップでお困りの場合</h3>
       <div class="space-y-3 text-sm text-slate-700 dark:text-gray-300">
         <details class="cursor-pointer">
-          <summary class="font-medium text-cyan-400 hover:text-cyan-300">
+          <summary class="font-medium text-cyan-700 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300">
             サービスアカウントJSONの取得方法
           </summary>
           <div class="mt-2 pl-4 text-slate-600 dark:text-gray-400">
@@ -137,7 +137,7 @@
           </div>
         </details>
         <details class="cursor-pointer">
-          <summary class="font-medium text-cyan-400 hover:text-cyan-300">
+          <summary class="font-medium text-cyan-700 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300">
             スプレッドシートIDの取得方法
           </summary>
           <div class="mt-2 pl-4 text-slate-600 dark:text-gray-400">
@@ -351,7 +351,7 @@
         const result = await runServer('getUser', 'full');
         if (result && result.success && result.email) {
           adminEmailField.value = result.email;
-          adminEmailField.style.borderColor = '#10b981';
+          adminEmailField.style.borderColor = 'var(--status-success)';
           return;
         }
       } catch (error) {

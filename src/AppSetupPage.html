@@ -41,7 +41,7 @@
     <div class="max-w-6xl mx-auto p-6">
       <!-- ヘッダー -->
       <div class="text-center mb-6">
-        <h1 class="text-4xl font-bold text-cyan-400 mb-2">⚙️ みんなの回答ボード アプリ設定</h1>
+        <h1 class="text-4xl font-bold text-cyan-700 dark:text-cyan-400 mb-2">⚙️ みんなの回答ボード アプリ設定</h1>
         <p class="text-xl text-slate-700 dark:text-gray-300">アプリケーションの運用設定を管理します</p>
         <p class="text-sm text-slate-600 dark:text-gray-400 mt-2">
           このページでアプリの有効/無効を切り替えることができます
@@ -94,7 +94,7 @@
                 type="text"
                 id="login-url"
                 readonly
-                class="w-full px-3 py-2 bg-slate-100 dark:bg-gray-900 text-cyan-400 rounded border border-slate-300 dark:border-gray-600 text-sm font-mono truncate"
+                class="w-full px-3 py-2 bg-slate-100 dark:bg-gray-900 text-cyan-700 dark:text-cyan-400 rounded border border-slate-300 dark:border-gray-600 text-sm font-mono truncate"
                 value="読み込み中..."
               />
             </div>
@@ -128,7 +128,7 @@
         <!-- アプリ制御ボタン -->
         <div class="grid md:grid-cols-2 gap-4 mb-6">
           <div class="p-4 bg-white dark:bg-gray-800 rounded-lg">
-            <h3 class="text-lg font-medium text-red-400 mb-3">🚫 アプリケーション停止</h3>
+            <h3 class="text-lg font-medium text-red-700 dark:text-red-400 mb-3">🚫 アプリケーション停止</h3>
             <p class="text-sm text-slate-600 dark:text-gray-400 mb-4">
               全ユーザーのアクセスを停止します。管理者のみアクセス可能になります。
             </p>
@@ -150,7 +150,7 @@
           </div>
 
           <div class="p-4 bg-white dark:bg-gray-800 rounded-lg">
-            <h3 class="text-lg font-medium text-green-400 mb-3">✅ アプリケーション再開</h3>
+            <h3 class="text-lg font-medium text-green-700 dark:text-green-400 mb-3">✅ アプリケーション再開</h3>
             <p class="text-sm text-slate-600 dark:text-gray-400 mb-4">
               停止中のアプリケーションを再開し、全ユーザーがアクセス可能にします。
             </p>
@@ -167,8 +167,8 @@
         </div>
 
         <!-- 現在の制限情報表示 -->
-        <div id="restriction-info" class="hidden p-4 bg-red-900/20 border border-red-500/30 rounded-lg">
-          <h4 class="text-md font-medium text-red-400 mb-2">⚠️ 現在のアクセス制限</h4>
+        <div id="restriction-info" class="hidden p-4 bg-red-100/20 dark:bg-red-900/20 border border-red-300/30 dark:border-red-500/30 rounded-lg">
+          <h4 class="text-md font-medium text-red-700 dark:text-red-400 mb-2">⚠️ 現在のアクセス制限</h4>
           <div class="text-sm text-slate-700 dark:text-gray-300 space-y-1">
             <div>理由: <span id="restriction-reason">-</span></div>
             <div>停止者: <span id="restriction-by">-</span></div>
@@ -191,19 +191,19 @@
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
-            <div class="text-2xl font-bold text-blue-400" id="total-users">-</div>
+            <div class="text-2xl font-bold text-blue-700 dark:text-blue-400" id="total-users">-</div>
             <div class="text-sm text-slate-600 dark:text-gray-400">総ユーザー数</div>
           </div>
           <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
-            <div class="text-2xl font-bold text-green-400" id="active-users">-</div>
+            <div class="text-2xl font-bold text-green-700 dark:text-green-400" id="active-users">-</div>
             <div class="text-sm text-slate-600 dark:text-gray-400">アクティブユーザー</div>
           </div>
           <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
-            <div class="text-2xl font-bold text-purple-400" id="published-boards">-</div>
+            <div class="text-2xl font-bold text-purple-700 dark:text-purple-400" id="published-boards">-</div>
             <div class="text-sm text-slate-600 dark:text-gray-400">公開ボード数</div>
           </div>
           <div class="bg-white dark:bg-gray-800 rounded-lg p-4 text-center">
-            <div class="text-2xl font-bold text-yellow-400" id="recent-activity">-</div>
+            <div class="text-2xl font-bold text-yellow-700 dark:text-yellow-400" id="recent-activity">-</div>
             <div class="text-sm text-slate-600 dark:text-gray-400">24時間以内の活動</div>
           </div>
         </div>
@@ -216,13 +216,13 @@
 
         <div class="space-y-4">
           <!-- 基本診断（よく使う機能） -->
-          <div class="p-4 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+          <div class="p-4 bg-blue-100/20 dark:bg-blue-900/20 border border-blue-300/30 dark:border-blue-500/30 rounded-lg">
             <div class="flex items-center justify-between mb-3">
               <div>
-                <h3 class="text-lg font-medium text-blue-400">🩺 基本診断</h3>
+                <h3 class="text-lg font-medium text-blue-700 dark:text-blue-400">🩺 基本診断</h3>
                 <p class="text-sm text-slate-600 dark:text-gray-400">まずはこちらを実行してください</p>
               </div>
-              <span class="px-2 py-1 bg-blue-600/30 text-blue-300 rounded text-xs">推奨</span>
+              <span class="px-2 py-1 bg-blue-600/30 text-blue-700 dark:text-blue-300 rounded text-xs">推奨</span>
             </div>
             <p class="text-sm text-slate-700 dark:text-gray-300 mb-4">
               システムの基本的な健全性（DB接続・設定・権限）を確認します。問題が見つかった場合は自動修復をお試しください。
@@ -254,7 +254,7 @@
             </summary>
             <div class="p-4 pt-0 grid md:grid-cols-2 gap-4">
               <div class="p-4 bg-slate-100 dark:bg-gray-700/50 rounded-lg">
-                <h4 class="text-md font-medium text-purple-400 mb-2">📈 システム監視</h4>
+                <h4 class="text-md font-medium text-purple-700 dark:text-purple-400 mb-2">📈 システム監視</h4>
                 <p class="text-xs text-slate-600 dark:text-gray-400 mb-3">リソース使用状況・実行ログ・エラー率を確認</p>
                 <button
                   type="button"
@@ -267,7 +267,7 @@
               </div>
 
               <div class="p-4 bg-slate-100 dark:bg-gray-700/50 rounded-lg">
-                <h4 class="text-md font-medium text-green-400 mb-2">✅ データ整合性</h4>
+                <h4 class="text-md font-medium text-green-700 dark:text-green-400 mb-2">✅ データ整合性</h4>
                 <p class="text-xs text-slate-600 dark:text-gray-400 mb-3">ユーザーデータ・設定の整合性を詳細チェック</p>
                 <button
                   type="button"
@@ -430,14 +430,14 @@
         <div class="mb-4">
           <p class="text-slate-700 dark:text-gray-300 mb-2">以下のユーザーを削除しますか？</p>
           <div class="bg-white dark:bg-gray-800 p-3 rounded-lg">
-            <p class="text-cyan-400 font-medium" id="delete-user-email"></p>
+            <p class="text-cyan-700 dark:text-cyan-400 font-medium" id="delete-user-email"></p>
             <p class="text-sm text-slate-600 dark:text-gray-400" id="delete-user-id"></p>
           </div>
         </div>
 
         <div class="mb-4">
           <label class="block text-sm font-medium text-slate-700 dark:text-gray-300 mb-2"
-            >削除理由 <span class="text-red-400">*</span></label
+            >削除理由 <span class="text-red-700 dark:text-red-400">*</span></label
           >
           <textarea
             id="deletion-reason"
@@ -449,8 +449,8 @@
           <p class="text-xs text-slate-600 dark:text-gray-400 mt-1">この情報は監査ログに記録されます</p>
         </div>
 
-        <div class="bg-red-900/20 border border-red-500/50 p-3 rounded-lg mb-4">
-          <p class="text-red-100 text-sm">
+        <div class="bg-red-100/20 dark:bg-red-900/20 border border-red-500/50 p-3 rounded-lg mb-4">
+          <p class="text-red-800 dark:text-red-100 text-sm">
             ⚠️ この操作は取り消せません。ユーザーのデータが完全に削除されます。
           </p>
         </div>
@@ -544,8 +544,8 @@
             .map((user) => {
               const isActive = user.isActive === true;
               const statusBadge = isActive
-                ? '<span class="px-2 py-1 bg-green-600 text-green-100 rounded-full text-xs">アクティブ</span>'
-                : '<span class="px-2 py-1 bg-red-600 text-red-100 rounded-full text-xs">非アクティブ</span>';
+                ? '<span class="px-2 py-1 bg-green-600 text-green-800 dark:text-green-100 rounded-full text-xs">アクティブ</span>'
+                : '<span class="px-2 py-1 bg-red-600 text-red-800 dark:text-red-100 rounded-full text-xs">非アクティブ</span>';
 
               let boardPublished = false;
               try {
@@ -554,7 +554,7 @@
               } catch (_) {}
 
               const boardBadge = boardPublished
-                ? '<span class="px-2 py-1 bg-purple-600 text-purple-100 rounded-full text-xs">公開中</span>'
+                ? '<span class="px-2 py-1 bg-purple-600 text-purple-800 dark:text-purple-100 rounded-full text-xs">公開中</span>'
                 : '<span class="px-2 py-1 bg-slate-100 dark:bg-gray-600 text-slate-900 dark:text-gray-100 rounded-full text-xs">非公開</span>';
 
               const registrationDate = user.createdAt

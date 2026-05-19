@@ -224,7 +224,7 @@
        wizard / Runner takeover 時も visible に残し、ユーザーが AdminPanel コンテキストを
        見失わないようにする (data-normal-mode を付けない)。 -->
   <header class="status-header glass-panel rounded-xl">
-    <h1 class="text-cyan-400 font-bold">みんなの回答ボード 設定</h1>
+    <h1 class="text-cyan-700 dark:text-cyan-400 font-bold">みんなの回答ボード 設定</h1>
     <div class="flex items-center gap-3">
       <button type="button" class="btn btn-secondary" onclick="openManualGuide()"
         title="使い方ガイド (はじめての方は 3 分で始められる手順を確認できます)">
@@ -270,7 +270,7 @@
              #first-time-hint の hidden を外す。1 度でも授業を作ったら出ない。 -->
         <div id="first-time-hint" class="hidden mt-4 p-3 rounded-lg"
              style="background: rgba(34, 211, 238, 0.08); border: 1px dashed rgba(34, 211, 238, 0.4);">
-          <p class="text-sm text-cyan-200 mb-1">
+          <p class="text-sm text-cyan-800 dark:text-cyan-200 mb-1">
             <strong>👋 初めての方へ:</strong> 上の <span class="font-semibold">「🎒 新しい授業を作る」</span> を押すと、テンプレートから 3 分で始められます。
           </p>
           <p class="text-xs text-slate-600 dark:text-gray-400">
@@ -315,10 +315,10 @@
           </div>
 
           <!-- 検出情報の inline 表示 -->
-          <div id="form-detection-info" class="hidden mt-3 p-3 bg-violet-900/30 border border-violet-500/30 rounded-lg">
-            <div class="text-sm text-violet-300">
-              <div class="mb-1">📝 フォーム: <a id="detected-form-link" href="#" target="_blank" class="font-medium text-violet-200 hover:text-white underline">-</a></div>
-              <div>📊 回答先: <a id="detected-spreadsheet-link" href="#" target="_blank" class="font-medium text-violet-200 hover:text-white underline">-</a></div>
+          <div id="form-detection-info" class="hidden mt-3 p-3 bg-violet-100/30 dark:bg-violet-900/30 border border-violet-300/30 dark:border-violet-500/30 rounded-lg">
+            <div class="text-sm text-violet-700 dark:text-violet-300">
+              <div class="mb-1">📝 フォーム: <a id="detected-form-link" href="#" target="_blank" class="font-medium text-violet-800 dark:text-violet-200 hover:text-white underline">-</a></div>
+              <div>📊 回答先: <a id="detected-spreadsheet-link" href="#" target="_blank" class="font-medium text-violet-800 dark:text-violet-200 hover:text-white underline">-</a></div>
             </div>
           </div>
         </div>
@@ -332,7 +332,7 @@
 
             <!-- 代替 a: テンプレートから新規作成 -->
             <div class="form-alternative-block">
-              <h3 class="text-sm font-semibold text-cyan-300 mb-2">✨ 新しく作る</h3>
+              <h3 class="text-sm font-semibold text-cyan-700 dark:text-cyan-300 mb-2">✨ 新しく作る</h3>
               <p class="text-xs text-slate-600 dark:text-gray-400 mb-3">種別に合った Google フォーム + 回答先スプレッドシートを自動生成します。</p>
               <details class="template-form-picker">
                 <summary class="btn btn-secondary text-sm">✨ テンプレートを作成 ▾</summary>
@@ -374,11 +374,11 @@
                   <option value="">-- クリックして読み込み --</option>
                 </select>
                 <div id="form-info" class="form-info hidden">
-                  <div class="bg-violet-900/30 border border-violet-500/30 rounded-lg p-3">
-                    <div class="text-sm text-violet-300">
+                  <div class="bg-violet-100/30 dark:bg-violet-900/30 border border-violet-300/30 dark:border-violet-500/30 rounded-lg p-3">
+                    <div class="text-sm text-violet-700 dark:text-violet-300">
                       <div class="mb-1">📝 <span id="form-title" class="font-medium">-</span></div>
                       <div class="mb-1">📊 <span id="form-spreadsheet-status" class="font-medium">-</span></div>
-                      <div><a id="form-url" href="#" target="_blank" class="text-blue-400 hover:underline text-xs">フォームを開く</a></div>
+                      <div><a id="form-url" href="#" target="_blank" class="text-blue-700 dark:text-blue-400 hover:underline text-xs">フォームを開く</a></div>
                     </div>
                   </div>
                 </div>
@@ -417,10 +417,10 @@
                「最初の必須列」になる。任意列 (reason/class/name) より上に配置することで
                「必須を先に決める」自然な flow を維持する。 -->
           <div id="numeric-mapping-container" class="hidden space-y-4">
-            <div id="numeric-candidates-info" class="hidden p-3 bg-blue-900/20 border border-blue-500/30 rounded-lg">
+            <div id="numeric-candidates-info" class="hidden p-3 bg-blue-100/20 dark:bg-blue-900/20 border border-blue-300/30 dark:border-blue-500/30 rounded-lg">
               <div class="flex items-center gap-2 mb-1">
-                <span class="text-blue-400">🔢</span>
-                <span class="text-sm font-medium text-blue-300">検出された数値列</span>
+                <span class="text-blue-700 dark:text-blue-400">🔢</span>
+                <span class="text-sm font-medium text-blue-700 dark:text-blue-300">検出された数値列</span>
               </div>
               <div id="numeric-candidates-list" class="text-xs text-slate-700 dark:text-gray-300 space-y-1"></div>
             </div>
@@ -481,16 +481,16 @@
           <!-- updateCompletionStatus が mode 別に上書きする (matrix=2必須, pie=1必須 等) -->
           <span id="completion-status">⚪ 設定状況: 読み込み中...</span>
           <button id="ai-analyze-btn" type="button"
-            class="text-xs text-cyan-400 hover:text-cyan-300 underline-offset-2 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
+            class="text-xs text-cyan-700 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 underline-offset-2 hover:underline transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:no-underline"
             title="列マッピングを再推定する（フォーム接続後に有効）">
             ↻ 再推定
           </button>
         </div>
 
         <!-- 手動変更通知 + 自動推定に戻すボタン (見出しだけの装飾は廃止 / 動作するボタンを併設) -->
-        <div id="manual-override-info" class="hidden mb-4 p-2 bg-yellow-900/20 border border-yellow-500/30 rounded-lg flex items-center justify-between gap-2">
-          <span class="text-xs text-yellow-300">✋ 手動で変更されました。</span>
-          <button id="reset-to-ai" class="text-xs text-blue-300 hover:text-blue-200 underline-offset-2 hover:underline transition-colors flex-shrink-0" type="button">
+        <div id="manual-override-info" class="hidden mb-4 p-2 bg-yellow-100/20 dark:bg-yellow-900/20 border border-yellow-300/30 dark:border-yellow-500/30 rounded-lg flex items-center justify-between gap-2">
+          <span class="text-xs text-yellow-700 dark:text-yellow-300">✋ 手動で変更されました。</span>
+          <button id="reset-to-ai" class="text-xs text-blue-700 dark:text-blue-300 hover:text-blue-800 dark:hover:text-blue-200 underline-offset-2 hover:underline transition-colors flex-shrink-0" type="button">
             ↩ 自動推定に戻す
           </button>
         </div>
@@ -505,12 +505,12 @@
         <div class="space-y-4">
           <!-- 表示設定（心理的安全性重視でデフォルトOFF） -->
           <div class="mb-4">
-            <div class="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 mb-4">
+            <div class="bg-yellow-100/20 dark:bg-yellow-900/20 border border-yellow-300/30 dark:border-yellow-500/30 rounded-lg p-3 mb-4">
               <div class="flex items-center gap-2 mb-1">
-                <span class="text-yellow-400">🔒</span>
-                <span class="text-sm font-medium text-yellow-300">心理的安全性への配慮</span>
+                <span class="text-yellow-700 dark:text-yellow-400">🔒</span>
+                <span class="text-sm font-medium text-yellow-700 dark:text-yellow-300">心理的安全性への配慮</span>
               </div>
-              <p class="text-xs text-yellow-200">初期設定では回答者のプライバシーを保護しています。必要に応じて表示設定を調整してください。</p>
+              <p class="text-xs text-yellow-800 dark:text-yellow-200">初期設定では回答者のプライバシーを保護しています。必要に応じて表示設定を調整してください。</p>
             </div>
             <div class="toggle-group">
               <label class="toggle-switch">
@@ -797,7 +797,7 @@
         <!-- 左側：問題文表示 -->
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-2 mb-1">
-            <span class="text-yellow-400">📝</span>
+            <span class="text-yellow-700 dark:text-yellow-400">📝</span>
             <span class="text-xs text-slate-600 dark:text-gray-400">現在の回答ボード</span>
           </div>
           <div id="currentQuestionText" class="text-slate-900 dark:text-white font-medium truncate">

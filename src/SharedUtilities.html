@@ -652,7 +652,7 @@
     modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10002]';
     modal.innerHTML = `
       <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4 text-center">
-        <div class="text-green-400 mb-4">
+        <div class="text-green-700 dark:text-green-400 mb-4">
           <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
           </svg>
@@ -1154,7 +1154,7 @@
         ${showSwitchOption
           ? `
         <div class="text-right">
-          <button type="button" onclick="window.sharedUtilities.auth.switchToAnotherAccount()" class="text-cyan-400 hover:text-cyan-300 hover:underline text-sm">
+          <button type="button" onclick="window.sharedUtilities.auth.switchToAnotherAccount()" class="text-cyan-700 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 hover:underline text-sm">
             別のアカウントでログイン
           </button>
         </div>`

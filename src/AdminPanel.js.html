@@ -3654,7 +3654,7 @@
       const countEl = document.getElementById('lesson-list-count');
       if (!listEl) return;
       if (!userId) {
-        listEl.innerHTML = '<li class="text-red-400">userId 未取得 (画面再読み込みが必要)</li>';
+        listEl.innerHTML = '<li class="text-red-700 dark:text-red-400">userId 未取得 (画面再読み込みが必要)</li>';
         return;
       }
       gasRun('lesson.list', { userId }).then((res) => {
@@ -3662,7 +3662,7 @@
           const msg = (res && (res.message || res.error)) || '不明なエラー';
           // 詳細を console + 画面の両方に出す (Cloud Logging にも client/error として届く)。
           console.error('[lesson.list] backend rejected:', msg, res);
-          listEl.innerHTML = `<li class="text-red-400">読み込み失敗: ${window.sharedUtilities.security.escapeHtml(String(msg))}</li>`;
+          listEl.innerHTML = `<li class="text-red-700 dark:text-red-400">読み込み失敗: ${window.sharedUtilities.security.escapeHtml(String(msg))}</li>`;
           return;
         }
         const lessons = (res.data && res.data.lessons) || [];
@@ -3699,7 +3699,7 @@
       }).catch((err) => {
         const msg = (err && err.message) || String(err);
         console.error('[lesson.list] network error:', msg, err);
-        listEl.innerHTML = `<li class="text-red-400">読み込みエラー: ${window.sharedUtilities.security.escapeHtml(msg)}</li>`;
+        listEl.innerHTML = `<li class="text-red-700 dark:text-red-400">読み込みエラー: ${window.sharedUtilities.security.escapeHtml(msg)}</li>`;
       });
     }
 
@@ -3812,7 +3812,7 @@
       if (lessonTemplatesCache) return; // 既に描画済み
       gasRun('lesson.templates', {}).then((res) => {
         if (!res || !res.success) {
-          menu.innerHTML = '<p class="lesson-template-loading text-red-400">読み込み失敗</p>';
+          menu.innerHTML = '<p class="lesson-template-loading text-red-700 dark:text-red-400">読み込み失敗</p>';
           return;
         }
         lessonTemplatesCache = res.data.templates || [];
@@ -3825,7 +3825,7 @@
           '</button>'
         )).join('');
       }).catch((err) => {
-        menu.innerHTML = '<p class="lesson-template-loading text-red-400">' +
+        menu.innerHTML = '<p class="lesson-template-loading text-red-700 dark:text-red-400">' +
           window.sharedUtilities.security.escapeHtml((err && err.message) || String(err)) + '</p>';
       });
     }

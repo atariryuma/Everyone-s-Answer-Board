@@ -38,7 +38,7 @@
     <? if (typeof isEditor !== 'undefined' && isEditor) { ?>
     <!-- 編集者用: 再公開セクション -->
     <div class="glass-panel rounded-xl p-6 md:p-8 shadow-2xl">
-      <h1 class="text-2xl md:text-3xl font-bold mb-3 text-yellow-300">回答ボード管理</h1>
+      <h1 class="text-2xl md:text-3xl font-bold mb-3 text-yellow-700 dark:text-yellow-300">回答ボード管理</h1>
       <p class="text-slate-600 dark:text-gray-400 mb-5">回答ボードは現在非公開状態です</p>
 
       <? if (typeof editorName !== 'undefined' && editorName) { ?>
@@ -77,7 +77,7 @@
     <? } else { ?>
     <!-- 閲覧者用: 準備中メッセージ -->
     <div class="glass-panel rounded-xl p-8 shadow-2xl">
-      <h1 class="text-4xl font-bold mb-4 text-yellow-300">現在は準備中です</h1>
+      <h1 class="text-4xl font-bold mb-4 text-yellow-700 dark:text-yellow-300">現在は準備中です</h1>
       <p class="text-slate-600 dark:text-gray-400 mb-4">先生が回答ボードを設定中です。しばらくお待ちください。</p>
 
       <? if (typeof editorName !== 'undefined' && editorName) { ?>

@@ -204,7 +204,7 @@
         <!-- Filters group: 件数 + クラスフィルタ + 並び順 -->
         <div class="eab-filters">
           <div id="answerCount" class="eab-count-pill" aria-live="polite">
-            <svg class="w-3.5 h-3.5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg class="w-3.5 h-3.5 text-blue-700 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
             </svg>
             <span class="font-semibold">0件</span>
@@ -264,7 +264,7 @@
     <!-- 新着通知バナー -->
     <div id="newContentBanner" class="fixed top-20 left-1/2 z-[60] bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-full shadow-xl backdrop-blur-sm hidden transition-all duration-300 ease-out hover:shadow-2xl focus-within:ring-2 focus-within:ring-blue-300/50 notification-banner-base" role="alert" aria-live="polite" aria-label="新着通知バナー">
       <div class="flex items-center gap-3">
-        <span id="newContentIcon" class="w-5 h-5 animate-pulse text-yellow-200" aria-hidden="true">📋</span>
+        <span id="newContentIcon" class="w-5 h-5 animate-pulse text-yellow-800 dark:text-yellow-200" aria-hidden="true">📋</span>
         <span id="newContentText" class="font-medium text-slate-900 dark:text-white">新しい意見が投稿されました</span>
         <button type="button" id="refreshContentBtn" class="bg-white/20 hover:bg-white/30 active:bg-white/40 px-3 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 hover:scale-105 active:scale-95 focus:ring-2 focus:ring-white/50 focus:outline-none" aria-label="新しいコンテンツを更新して表示">
           更新して表示
@@ -286,7 +286,7 @@
       </button>
       <div id="modalAnswer" class="flex-grow min-h-[200px] mb-4 overflow-y-auto pr-4 scrollbar-thin scrollbar-thumb-slate-400 scrollbar-track-slate-200 dark:scrollbar-thumb-gray-600 dark:scrollbar-track-gray-800"></div>
       <div id="modalFooter" class="text-xs text-slate-600 dark:text-gray-400 pt-4 border-t-2 border-dashed border-cyan-400/80 flex justify-between items-center">
-        <div><span id="modalStudentName" class="font-bold text-2xl text-slate-800 dark:text-gray-200 hover:text-cyan-300 transition-colors duration-200"></span></div>
+        <div><span id="modalStudentName" class="font-bold text-2xl text-slate-800 dark:text-gray-200 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors duration-200"></span></div>
         <div id="modalReactions" class="flex items-center gap-2"></div>
       </div>
     </div>
@@ -301,9 +301,9 @@
               <span class="text-lg" role="img" aria-label="教育アイコン">📚</span>
             </div>
             <div>
-              <p class="text-base font-bold text-green-200 mb-3">デジタル・シティズンシップって何だろう？</p>
-              <p class="text-sm text-green-100 leading-relaxed">
-                <span class="text-green-200 font-semibold">デジタル・シティズンシップ</span>とは、オンラインで<span class="text-green-200 font-semibold">思いやりを持って行動する</span>ことです。みんなの回答ボードでも、友だちの意見を尊重し、<span class="text-green-200 font-semibold">多様な考え方を大切に</span>しましょう。
+              <p class="text-base font-bold text-green-800 dark:text-green-200 mb-3">デジタル・シティズンシップって何だろう？</p>
+              <p class="text-sm text-green-800 dark:text-green-100 leading-relaxed">
+                <span class="text-green-800 dark:text-green-200 font-semibold">デジタル・シティズンシップ</span>とは、オンラインで<span class="text-green-800 dark:text-green-200 font-semibold">思いやりを持って行動する</span>ことです。みんなの回答ボードでも、友だちの意見を尊重し、<span class="text-green-800 dark:text-green-200 font-semibold">多様な考え方を大切に</span>しましょう。
               </p>
             </div>
           </div>
@@ -311,11 +311,11 @@
 
         <p>みんなの意見を気持ちよく共有するために、リアクションのしかたをおぼえよう！</p>
         <ul class="space-y-3">
-          <li class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-200/60 dark:hover:bg-gray-800/30 transition-colors duration-200"><span id="infoIconLike" class="w-5 h-5 text-red-400 flex-shrink-0"></span><span class="text-slate-800 dark:text-gray-200">いいね！：すてきだと思ったときに押そう</span></li>
-          <li class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-200/60 dark:hover:bg-gray-800/30 transition-colors duration-200"><span id="infoIconUnderstand" class="w-5 h-5 text-yellow-400 flex-shrink-0"></span><span class="text-slate-800 dark:text-gray-200">なるほど！：参考になったときに押そう</span></li>
-          <li class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-200/60 dark:hover:bg-gray-800/30 transition-colors duration-200"><span id="infoIconCurious" class="w-5 h-5 text-green-400 flex-shrink-0"></span><span class="text-slate-800 dark:text-gray-200">もっと知りたい！：もっと知りたいときに押そう</span></li>
+          <li class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-200/60 dark:hover:bg-gray-800/30 transition-colors duration-200"><span id="infoIconLike" class="w-5 h-5 text-red-700 dark:text-red-400 flex-shrink-0"></span><span class="text-slate-800 dark:text-gray-200">いいね！：すてきだと思ったときに押そう</span></li>
+          <li class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-200/60 dark:hover:bg-gray-800/30 transition-colors duration-200"><span id="infoIconUnderstand" class="w-5 h-5 text-yellow-700 dark:text-yellow-400 flex-shrink-0"></span><span class="text-slate-800 dark:text-gray-200">なるほど！：参考になったときに押そう</span></li>
+          <li class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-200/60 dark:hover:bg-gray-800/30 transition-colors duration-200"><span id="infoIconCurious" class="w-5 h-5 text-green-700 dark:text-green-400 flex-shrink-0"></span><span class="text-slate-800 dark:text-gray-200">もっと知りたい！：もっと知りたいときに押そう</span></li>
         </ul>
-        <p class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-200/60 dark:hover:bg-gray-800/30 transition-colors duration-200"><span id="infoIconHighlight" class="w-5 h-5 text-purple-400 flex-shrink-0"></span><span class="text-slate-800 dark:text-gray-200">先生が注目してほしい意見につけています</span></p>
+        <p class="flex items-center gap-3 p-2 rounded-lg hover:bg-slate-200/60 dark:hover:bg-gray-800/30 transition-colors duration-200"><span id="infoIconHighlight" class="w-5 h-5 text-purple-700 dark:text-purple-400 flex-shrink-0"></span><span class="text-slate-800 dark:text-gray-200">先生が注目してほしい意見につけています</span></p>
 
         <div class="text-center mt-6 flex flex-col sm:flex-row items-center justify-center gap-3">
           <button type="button" id="infoModalConfirmBtn" disabled class="px-6 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 disabled:bg-gray-500 disabled:cursor-not-allowed disabled:opacity-60 text-white rounded-lg font-semibold transition-all duration-200 hover:scale-105 active:scale-95 disabled:hover:scale-100 focus:ring-2 focus:ring-blue-400/50 focus:outline-none shadow-lg">わかった</button>
@@ -332,7 +332,7 @@
     <div class="glass-panel max-w-md mx-auto rounded-xl p-3 flex items-center justify-center gap-3 pointer-events-auto shadow-lg hover:shadow-xl transition-all duration-300">
       <input type="range" id="sizeSlider" min="2" max="6" value="4" class="w-1/2 rounded-lg appearance-none cursor-pointer focus:ring-2 focus:ring-cyan-400/50 focus:outline-none slider-thumb" aria-label="表示列数の変更">
       <div class="flex items-center gap-2">
-        <span id="sliderValue" class="font-bold text-lg text-cyan-300 min-w-[1rem] text-center">4</span>
+        <span id="sliderValue" class="font-bold text-lg text-cyan-700 dark:text-cyan-300 min-w-[1rem] text-center">4</span>
         <span id="iconGrid" class="w-4 h-4 text-slate-600 dark:text-gray-400"></span>
       </div>
     </div>
