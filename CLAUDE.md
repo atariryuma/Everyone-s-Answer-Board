@@ -234,6 +234,7 @@ owner は own OAuth で SA quota 節約。 viewer / admin の cross-user のみ 
 **Semantic theme tokens (`--theme-*`)** — 詳細は [UnifiedStyles.css.html](src/UnifiedStyles.css.html) `:root` ブロック:
 
 - 背景: `--theme-bg-base` / `--theme-bg-surface` / `--theme-bg-elevated` / `--theme-bg-overlay`
+- カード階層 (v2806+): `--theme-card-1` (軽い elevation) / `--theme-card-2` (deeper) / `--theme-card-3` (solid panel)
 - テキスト: `--theme-text-primary` / `--theme-text-secondary` / `--theme-text-muted` / `--theme-text-inverse`
 - 境界線: `--theme-border-subtle` / `--theme-border-normal` / `--theme-border-strong`
 - 半透明: `--theme-overlay-white-05/10/20/30` / `--theme-overlay-black-20/60/90` / `--theme-overlay-surface-glass`
@@ -275,6 +276,30 @@ themeManager.subscribe(fn)  // 切替時 callback (unsub 関数を返す)
 - ✅ **Do**: brand identity / status は `var(--brand-like)` / `var(--status-success)` (theme 非依存)
 - ❌ **Don't**: ハードコード hex/rgba (`color: #94a3b8` / `background: rgba(255,255,255,0.1)`)
 - ❌ **Don't**: 旧 `--brand-text-muted` (定義不在、 fallback `#94a3b8` で動いていた) → 必ず `--theme-text-muted` を使う
+
+**保守用 CLI** (色トラブル / リファクタの起点):
+
+```bash
+npm run theme:matrix      # 全 token (dark/light 値) + 主要 contrast マトリクス + hardcoded 集計
+npm run theme:uncovered   # body.theme-light 上書きの無い hardcoded を一覧 (修正 worklist)
+npm run theme:tokenize:dry # slate/gray rgba を token に置換するプレビュー
+npm run theme:tokenize    # 実行 (テスト + theme:contrast で検証推奨)
+npm run theme:contrast    # WCAG AA 全 pair 検証 (≥4.5 本文 / ≥3 アイコン)
+npm run theme:verify      # 統合ゲート: 12 軸 / 120 点満点 / CI 用
+```
+
+`theme:matrix` の出力ロジック:
+
+- token 抽出: `:root { }` と `body.theme-light { }` を AST 風に解析、 var(--x) 参照は再帰解決
+- contrast: 12 種類の text/accent/status × 3 種類の bg = 72 pair を alpha-blend 後計算
+- hardcoded スキャン: brand-identity (cyan/amber/purple/etc.) と `theme:exempt` コメントは exempt
+
+**色を追加 / 変更したいとき**:
+
+1. 既存 token で済むなら使う (基本ルート)
+2. 新しい semantic 階層が必要なら `:root` + `body.theme-light` の両方に追加 (片方だけだと bleed)
+3. brand identity (アプリ色・リアクション色) なら theme 非依存で OK (両モード同色のまま)
+4. 完了したら `npm run theme:matrix` で全 pair の contrast を確認 → AA fail があれば調整
 
 ### Cache アーキテクチャ (3 層、 意図的分離)
 

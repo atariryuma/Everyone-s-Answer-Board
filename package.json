@@ -31,7 +31,11 @@
     "theme:audit": "node scripts/theme-audit.js",
     "theme:contrast": "node scripts/theme-contrast.js",
     "theme:check": "node scripts/theme-audit.js && node scripts/theme-contrast.js",
-    "theme:verify": "node scripts/theme-verify.js"
+    "theme:verify": "node scripts/theme-verify.js",
+    "theme:matrix": "node scripts/theme-matrix.js",
+    "theme:uncovered": "node scripts/theme-matrix.js --uncovered",
+    "theme:tokenize": "node scripts/theme-tokenize.js",
+    "theme:tokenize:dry": "node scripts/theme-tokenize.js --dry-run"
   },
   "repository": {
     "type": "git",

@@ -100,6 +100,16 @@
     --theme-accent-cyan-soft: rgba(56, 189, 248, 0.18); /* banner 背景の薄い cyan */
     --theme-overlay-white-05: rgba(255, 255, 255, 0.05); /* input 背景の極薄 */
 
+    /* Card / Panel tier (bg-base 上に重ねる card 背景の階層)
+     *   --theme-card-1 = 軽い elevation (lesson-phase-card, btn-class-preset, viz-btn 等)
+     *   --theme-card-2 = 中程度 elevation (collapsible 内側、nested panel)
+     *   --theme-card-3 = 深い elevation (popup, listbox 等 elevated 完全不透明)
+     * theme-bg-surface との違い: bg-surface は backdrop-filter 前提の半透明 hero card 用。
+     *   card-1〜3 は filter 不要の simple panel 用 (lesson workspace で多用)。 */
+    --theme-card-1: rgba(30, 41, 59, 0.55);            /* slate-800 55% (dark default) */
+    --theme-card-2: rgba(15, 23, 42, 0.4);             /* slate-900 40% (dark default) */
+    --theme-card-3: rgba(15, 23, 42, 0.95);            /* slate-900 95% (dark default) */
+
     /* =============================================================================
      * Status Colors - System Feedback
      * ============================================================================= */
@@ -290,6 +300,11 @@
     --theme-spinner: #0891b2;                          /* cyan-600 (dark の cyan-300 から 3 段下) */
     --theme-accent-cyan: #0e7490;                      /* cyan-700: 5.4:1 on slate-50 ✓ AA */
     --theme-accent-cyan-soft: rgba(14, 116, 144, 0.1); /* cyan-700 系の薄背景 */
+
+    /* Card tier (light): off-white slate で軽い elevation を表現 */
+    --theme-card-1: rgba(241, 245, 249, 0.85);         /* slate-100 ベース */
+    --theme-card-2: rgba(226, 232, 240, 0.7);          /* slate-200 ベース */
+    --theme-card-3: #ffffff;                           /* 完全白で popup を明示 */
 
     /* Brand / Status colors の light 上 contrast 確保 (light 専用上書き) */
     --brand-understand: #b45309;                       /* amber-700: 6.0:1 (dark の amber-400 は light で 1.6:1 fail) */
@@ -1060,11 +1075,16 @@
     }
   }
 
-  /* High contrast mode support */
+  /* High contrast mode support — テーマに応じて border/text を強化 */
   @media (prefers-contrast: high) {
     :root {
-      --brand-border: rgba(255, 255, 255, 0.3);
-      --brand-text: #ffffff;
+      --theme-border-subtle: rgba(255, 255, 255, 0.3);
+      --theme-text-primary: #ffffff;
+    }
+    body.theme-light,
+    :root[data-theme="light"] {
+      --theme-border-subtle: #475569;  /* slate-600 で境界線をはっきり */
+      --theme-text-primary: #000000;
     }
   }
 
@@ -1083,7 +1103,7 @@
       /* Performance optimization for low-end devices */
       -webkit-backdrop-filter: none;
       backdrop-filter: none;
-      background: rgba(26, 27, 38, 0.95);
+      background: var(--theme-bg-elevated);
     }
 
     .responsive-grid {
@@ -1160,14 +1180,14 @@
     margin-bottom: 1rem;
   }
 
-  /* Modern Select Styling */
+  /* Modern Select Styling — admin form 共通の select 要素 */
   .modern-select {
     width: 100%;
     padding: 0.75rem;
-    background: rgba(55, 65, 81, 0.8);
-    border: 1px solid rgba(75, 85, 99, 0.5);
+    background: var(--theme-bg-elevated);
+    border: 1px solid var(--theme-border-normal);
     border-radius: 0.5rem;
-    color: white;
+    color: var(--theme-text-primary);
     font-size: 0.875rem;
     transition: all 0.2s;
   }
@@ -1228,7 +1248,7 @@
     align-items: center;
     gap: 0.75rem;
     cursor: pointer;
-    color: rgba(209, 213, 219, 1);
+    color: var(--theme-text-secondary);
   }
 
   .toggle-switch input {
@@ -1238,7 +1258,7 @@
   .slider {
     width: 44px;
     height: 24px;
-    background: rgba(107, 114, 128, 0.5);
+    background: var(--theme-border-strong);
     border-radius: 12px;
     position: relative;
     transition: all 0.3s;
@@ -1250,11 +1270,12 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: white;
+    /* iOS 風 toggle knob: 両モードで白 (track 上の浮き感を shadow で表現) */
+    background: #ffffff;  /* theme:exempt — iOS-style toggle knob */
     top: 2px;
     left: 2px;
     transition: all 0.3s;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 1px 3px var(--theme-overlay-black-20);
   }
 
   .toggle-switch input:checked + .slider {
@@ -1330,10 +1351,10 @@
     margin-top: 1rem;
   }
 
-  /* Link Buttons */
+  /* Link Buttons — brand primary blue (両モード視認確保) */
   .link-btn {
     background: rgba(59, 130, 246, 0.2);
-    color: rgba(96, 165, 250, 1);
+    color: var(--brand-primary);
     padding: 0.5rem 1rem;
     border-radius: 0.5rem;
     text-decoration: none;
@@ -1348,15 +1369,15 @@
     background: rgba(59, 130, 246, 0.3);
   }
 
-  /* Config Item Styling */
+  /* Config Item Styling — admin panel の設定 1 行表示 */
   .config-item {
     display: flex;
     justify-content: space-between;
     align-items: center;
     padding: 0.75rem;
-    background: rgba(55, 65, 81, 0.8);
+    background: var(--theme-bg-surface);
     border-radius: 0.5rem;
-    color: rgba(209, 213, 219, 1);
+    color: var(--theme-text-secondary);
   }
 
   .config-summary {
@@ -1367,7 +1388,7 @@
 
   .label {
     font-weight: 500;
-    color: rgba(156, 163, 175, 1);
+    color: var(--theme-text-muted);
     font-size: 0.875rem;
   }
 
@@ -1415,8 +1436,8 @@
   .class-chip-row-selected {
     min-height: 2.5rem;
     padding: 0.5rem;
-    background: rgba(15, 23, 42, 0.4);
-    border: 1px dashed rgba(148, 163, 184, 0.3);
+    background: var(--theme-overlay-white-05);
+    border: 1px dashed var(--theme-border-normal);
     border-radius: 0.5rem;
   }
   .class-chip-row-known {
@@ -1475,8 +1496,8 @@
   .btn-class-preset {
     padding: 0.25rem 0.65rem;
     border-radius: 0.4rem;
-    background: rgba(30, 41, 59, 0.7);
-    border: 1px solid rgba(71, 85, 105, 0.6);
+    background: var(--theme-card-1);
+    border: 1px solid var(--theme-border-normal);
     color: var(--theme-text-secondary);
     font-size: 0.8rem;
     cursor: pointer;
@@ -1517,7 +1538,7 @@
 
   /* Phase card (Wizard Step 2 / Runner) */
   .lesson-phase-card {
-    background: rgba(30, 41, 59, 0.55);
+    background: var(--theme-card-1);
     border: 1px solid rgba(148, 163, 184, 0.25);
     border-radius: 0.6rem;
     padding: 0.85rem 1rem;
@@ -1644,7 +1665,7 @@
   .phase-detail {
     margin-top: 0.5rem;
     background: rgba(15, 23, 42, 0.4);
-    border: 1px solid rgba(71, 85, 105, 0.4);
+    border: 1px solid var(--theme-border-subtle);
     border-radius: 0.4rem;
     padding: 0.4rem 0.6rem;
   }
@@ -1708,8 +1729,8 @@
   .phase-scale-opt {
     display: inline-flex; align-items: center; gap: 0.3rem;
     padding: 0.25rem 0.55rem;
-    background: rgba(15, 23, 42, 0.5);
-    border: 1px solid rgba(71, 85, 105, 0.4);
+    background: var(--theme-card-2);
+    border: 1px solid var(--theme-border-subtle);
     border-radius: 0.3rem;
     font-size: 0.78rem;
     color: rgba(229, 231, 235, 0.92);
@@ -1729,7 +1750,7 @@
     position: relative;
     margin-top: 0.4rem;
     padding: 0.7rem;
-    background: rgba(15, 23, 42, 0.5);
+    background: var(--theme-card-2);
     border: 1.5px dashed rgba(96, 165, 250, 0.45);
     border-radius: 0.5rem;
     cursor: pointer;
@@ -1797,8 +1818,8 @@
     display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.5rem;
   }
   .phase-extra-section {
-    background: rgba(15, 23, 42, 0.35);
-    border: 1px solid rgba(71, 85, 105, 0.3);
+    background: var(--theme-card-2);
+    border: 1px solid var(--theme-border-subtle);
     border-radius: 0.4rem;
     padding: 0.5rem 0.6rem;
   }
@@ -1815,7 +1836,7 @@
     font-weight: 600;
     margin: 0.85rem 0 0.35rem;
     padding-top: 0.5rem;
-    border-top: 1px dashed rgba(71, 85, 105, 0.4);
+    border-top: 1px dashed var(--theme-border-subtle);
   }
 
   /* 「その他」 toggle */
@@ -1830,7 +1851,7 @@
 
   /* board preview: サンプルカード */
   .phase-preview-sample-card {
-    background: rgba(30, 41, 59, 0.6);
+    background: var(--theme-card-1);
     border: 1px solid rgba(96, 165, 250, 0.35);
     border-radius: 0.4rem;
     padding: 0.45rem 0.55rem;
@@ -1892,7 +1913,7 @@
     color: #fff;
     font-size: 0.55rem; line-height: 1.1rem;
     text-align: center; font-weight: 700;
-    box-shadow: 0 0 0 1px rgba(15, 23, 42, 0.5);
+    box-shadow: 0 0 0 1px var(--theme-card-2);
   }
 
   /* Lesson template picker (dropdown menu on 🎒 新しい授業を作る ▾) */
@@ -1909,7 +1930,7 @@
     right: 0; top: 100%;
     margin-top: 0.4rem;
     width: 280px;
-    background: rgba(15, 23, 42, 0.98);
+    background: var(--theme-card-3);
     border: 1px solid rgba(96, 165, 250, 0.5);
     border-radius: 0.5rem;
     padding: 0.4rem;
@@ -2012,7 +2033,7 @@
   }
   .profile-rename-input {
     width: 100%;
-    background: rgba(15, 23, 42, 0.9);
+    background: var(--theme-card-3);
     border: 1px solid rgba(96, 165, 250, 0.6);
     border-radius: 0.2rem;
     color: #fff;
@@ -2049,7 +2070,7 @@
     transform: translateX(-50%);
     margin-top: 0.4rem;
     min-width: 220px;
-    background: rgba(15, 23, 42, 0.98);
+    background: var(--theme-card-3);
     border: 1px solid rgba(34, 211, 238, 0.5);
     border-radius: 0.5rem;
     padding: 0.35rem;
@@ -2089,7 +2110,7 @@
     left: 0; top: 100%;
     margin-top: 0.4rem;
     min-width: 280px;
-    background: rgba(15, 23, 42, 0.98);
+    background: var(--theme-card-3);
     border: 1px solid rgba(96, 165, 250, 0.5);
     border-radius: 0.5rem;
     padding: 0.4rem;
@@ -2135,8 +2156,8 @@
     gap: 0.7rem;
     align-items: flex-start;
     padding: 0.5rem 0.7rem;
-    background: rgba(30, 41, 59, 0.5);
-    border: 1px solid rgba(71, 85, 105, 0.4);
+    background: var(--theme-card-1);
+    border: 1px solid var(--theme-border-subtle);
     border-radius: 0.4rem;
     font-size: 0.85rem;
   }
@@ -2266,14 +2287,14 @@
   /* Lesson list (過去レッスン一覧) */
   #lesson-list li {
     padding: 0.6rem 0.8rem;
-    background: rgba(15, 23, 42, 0.5);
+    background: var(--theme-card-2);
     border-radius: 0.4rem;
     display: flex;
     align-items: center;
     gap: 0.6rem;
     transition: background 0.1s ease;
   }
-  #lesson-list li:hover { background: rgba(15, 23, 42, 0.8); }
+  #lesson-list li:hover { background: var(--theme-card-3); }
   #lesson-list .lesson-state-badge {
     font-size: 0.7rem; padding: 0.1rem 0.5rem; border-radius: 9999px;
     background: rgba(148, 163, 184, 0.2); color: rgba(226, 232, 240, 0.85);
