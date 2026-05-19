@@ -37,14 +37,19 @@
     stroke: rgba(100, 116, 139, 0.8);
   }
   .viz-axis text {
-    fill: var(--theme-text-muted);
+    fill: var(--theme-text-secondary);  /* muted → secondary で軸数字を明瞭に */
     font-size: 0.875rem;
+    font-weight: 500;
   }
 
   .viz-axis-label {
     fill: var(--theme-text-primary);
     font-size: 1.125rem;
-    font-weight: 600;
+    font-weight: 700;  /* 600 → 700 で軸の主タイトルを強く */
+  }
+  /* Light mode は viz-axis-label を slate-900 で限りなく濃く (white bg 上で hierarchy 明示) */
+  body.theme-light .viz-axis-label {
+    fill: #0f172a;
   }
 
   /* データ点。暗背景でドット同士の境界を分離するため stroke は白半透明。

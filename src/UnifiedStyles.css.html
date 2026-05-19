@@ -338,9 +338,10 @@
     --theme-accent-cyan: #0e7490;                      /* cyan-700: 5.4:1 on slate-50 ✓ AA */
     --theme-accent-cyan-soft: rgba(14, 116, 144, 0.1); /* cyan-700 系の薄背景 */
 
-    /* Card tier (light): off-white slate で軽い elevation を表現 */
-    --theme-card-1: rgba(241, 245, 249, 0.85);         /* slate-100 ベース */
-    --theme-card-2: rgba(226, 232, 240, 0.7);          /* slate-200 ベース */
+    /* Card tier (light): white 系で軽い elevation。 slate-200 だと visual に "dark bar" と
+       誤認されるので slate-50/100 をベースに alpha を弱めて hierarchy を出す。 */
+    --theme-card-1: rgba(248, 250, 252, 0.7);          /* slate-50 70% — bg-base とほぼ同色 + 微 elevation */
+    --theme-card-2: rgba(241, 245, 249, 0.6);          /* slate-100 60% — 中 elevation */
     --theme-card-3: #ffffff;                           /* 完全白で popup を明示 */
 
     /* Brand / Status colors の light 上 contrast 確保 (light 専用上書き) */
@@ -1241,16 +1242,28 @@
     margin-bottom: 1rem;
   }
 
-  /* Modern Select Styling — admin form 共通の select 要素 */
+  /* Modern Select Styling — admin form 共通の select 要素
+     CRITICAL: appearance: none を必ず付ける。 これが無いとブラウザの native widget が
+     OS dark mode を強制継承し、 light mode でも濃紺 bg + 白文字で rendered される
+     (2026-05-19 user screenshot で確認済みのバグ)。 chevron は custom SVG で描画。 */
   .modern-select {
     width: 100%;
-    padding: 0.75rem;
+    padding: 0.75rem 2.25rem 0.75rem 0.875rem;  /* 右に chevron 分の余白 */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
     background: var(--theme-bg-elevated);
+    /* chevron: theme-aware SVG (currentColor 風)、 light/dark で自動切替 */
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%2394a3b8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 12px 12px;
     border: 1px solid var(--theme-border-normal);
     border-radius: 0.5rem;
     color: var(--theme-text-primary);
     font-size: 0.875rem;
     transition: all 0.2s;
+    cursor: pointer;
   }
 
   .modern-select:focus {
@@ -1690,7 +1703,7 @@
     flex: 1; text-align: center; color: rgba(34, 211, 238, 0.8); letter-spacing: -2px;
   }
   .phase-preview-end {
-    color: rgba(165, 243, 252, 0.9);
+    color: var(--theme-accent-cyan);
     max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
   }
   .phase-preview-matrix {
@@ -1701,7 +1714,7 @@
     align-items: center;
     font-size: 0.75rem;
   }
-  .matrix-y-high { grid-column: 2; color: rgba(165, 243, 252, 0.85); }
+  .matrix-y-high { grid-column: 2; color: var(--theme-accent-cyan); }
   .matrix-grid {
     grid-column: 2;
     display: grid;
@@ -1716,8 +1729,8 @@
   .matrix-quad {
     border: 1px solid rgba(34, 211, 238, 0.18);
   }
-  .matrix-x-axis { grid-column: 2; color: rgba(165, 243, 252, 0.85); }
-  .matrix-y-low { grid-column: 2; color: rgba(165, 243, 252, 0.85); }
+  .matrix-x-axis { grid-column: 2; color: var(--theme-accent-cyan); }
+  .matrix-y-low { grid-column: 2; color: var(--theme-accent-cyan); }
   .phase-preview-pie,
   .phase-preview-board {
     display: flex; align-items: center; gap: 0.5rem;
@@ -1732,7 +1745,7 @@
   }
   .phase-detail summary {
     cursor: pointer;
-    color: rgba(165, 243, 252, 0.85);
+    color: var(--theme-accent-cyan);
     font-size: 0.75rem;
     padding: 0.15rem 0;
     list-style: none;
@@ -1774,7 +1787,7 @@
     background: rgba(34, 211, 238, 0.1);
     border: 1px dashed rgba(34, 211, 238, 0.4);
     border-radius: 0.5rem;
-    color: rgba(165, 243, 252, 0.9);
+    color: var(--theme-accent-cyan);
     font-size: 0.75rem;
     cursor: pointer;
   }
@@ -1830,7 +1843,7 @@
   }
   .phase-image-hint {
     display: flex; align-items: center; gap: 0.5rem; justify-content: center;
-    color: rgba(165, 243, 252, 0.85);
+    color: var(--theme-accent-cyan);
     font-size: 0.875rem;
     text-align: center;
     padding: 0.4rem;
@@ -1864,7 +1877,7 @@
 
   /* 「+ もっと細かく」 で集約する任意拡張ブロック */
   .phase-extra-details > summary {
-    color: rgba(165, 243, 252, 0.85);
+    color: var(--theme-accent-cyan);
     font-size: 0.75rem;
   }
   .phase-extra-badges {
@@ -1886,14 +1899,14 @@
   }
   .phase-extra-label {
     font-size: 0.75rem;
-    color: rgba(165, 243, 252, 0.85);
+    color: var(--theme-accent-cyan);
     margin-bottom: 0.35rem;
   }
 
   /* プレビュー上のラベル「📺 生徒に見える形:」: 「ここが結果」を明示 */
   .phase-preview-label {
     font-size: 0.75rem;
-    color: rgba(165, 243, 252, 0.95);
+    color: var(--theme-accent-cyan);
     font-weight: 600;
     margin: 0.85rem 0 0.35rem;
     padding-top: 0.5rem;
@@ -1924,7 +1937,7 @@
     margin-bottom: 0.15rem;
   }
   .sample-card-answer {
-    color: rgba(165, 243, 252, 0.95);
+    color: var(--theme-accent-cyan);
     font-weight: 600;
     margin-bottom: 0.15rem;
   }
@@ -2027,7 +2040,7 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
   .lesson-template-phase-count {
-    color: rgba(165, 243, 252, 0.8);
+    color: var(--theme-accent-cyan);
     margin-left: 0.3rem;
   }
   .lesson-template-loading {
@@ -2223,7 +2236,7 @@
     font-size: 0.875rem;
   }
   .confirm-phase-idx {
-    color: rgba(165, 243, 252, 0.85);
+    color: var(--theme-accent-cyan);
     font-weight: 600;
     min-width: 5.5rem;
     font-size: 0.75rem;
@@ -2234,7 +2247,7 @@
     line-height: 1.5;
   }
   .confirm-phase-q { color: var(--theme-text-muted); font-size: 0.875rem; }
-  .confirm-phase-detail { color: rgba(165, 243, 252, 0.7); font-size: 0.75rem; }
+  .confirm-phase-detail { color: var(--theme-accent-cyan); font-size: 0.75rem; }
 
   .confirm-warnings-wrap { margin-top: 0.7rem; }
   .confirm-warnings {
@@ -2286,7 +2299,13 @@
     border: 1px solid rgba(34, 211, 238, 0.35);
     background: linear-gradient(135deg, rgba(8, 145, 178, 0.12), rgba(34, 211, 238, 0.04));
   }
-  .lesson-hero-card h2 { color: rgba(207, 250, 254, 1); }
+  .lesson-hero-card h2 { color: var(--theme-accent-cyan); }  /* dark mode: cyan-100 pale */
+  /* Light mode: cyan-100 は white bg で消えるので cyan-800 で hierarchy 確保 */
+  body.theme-light .lesson-hero-card h2 { color: #155e75; }  /* cyan-800 */
+  body.theme-light .lesson-hero-card {
+    border-color: rgba(14, 116, 144, 0.3);
+    background: linear-gradient(135deg, rgba(14, 116, 144, 0.06), rgba(34, 211, 238, 0.03));
+  }
 
   /* 個別ボードモードへの divider (二者択一を明示) */
   .section-group-divider {
@@ -2361,9 +2380,16 @@
     background: var(--theme-border-subtle); color: var(--theme-bg-elevated);
   }
   #lesson-list .lesson-state-badge.state-active {
-    background: rgba(34, 211, 238, 0.3); color: rgba(207, 250, 254, 1);
+    background: rgba(34, 211, 238, 0.3); color: var(--theme-accent-cyan);
   }
   #lesson-list .lesson-state-badge.state-completed {
     background: rgba(34, 197, 94, 0.2); color: rgba(187, 247, 208, 1);
+  }
+  /* Light mode: badge text を濃い brand 色に — pale 色は white bg で消える */
+  body.theme-light #lesson-list .lesson-state-badge.state-active {
+    background: rgba(14, 116, 144, 0.18); color: #0e7490;  /* cyan-700 */
+  }
+  body.theme-light #lesson-list .lesson-state-badge.state-completed {
+    background: rgba(21, 128, 61, 0.18); color: #15803d;  /* emerald-700 */
   }
 </style>
