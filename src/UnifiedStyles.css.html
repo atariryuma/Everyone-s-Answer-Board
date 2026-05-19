@@ -553,14 +553,17 @@
     border: 1px solid var(--theme-border-normal);
   }
 
+  /* btn-success / btn-warning: 緑/黄 brand bg は本質的に light なので、 white 文字では
+     AA contrast fail (white on emerald-500 = 2.5:1, on amber-500 = 2.15:1)。
+     dark text (slate-900) を使うことで両モードで 5:1 以上確保 (5.0/9.7:1)。 */
   .btn-success {
     background: var(--status-success);
-    color: white;
+    color: #0f172a;  /* theme:exempt - 緑 bg 上は必ず暗色テキスト (WCAG AA 確保) */
   }
 
   .btn-warning {
     background: var(--status-warning);
-    color: white;
+    color: #0f172a;  /* theme:exempt - 黄/琥珀 bg 上は必ず暗色テキスト (WCAG AA 確保) */
   }
 
   /* Button Size Variants */
