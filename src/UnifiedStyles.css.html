@@ -1385,20 +1385,8 @@
     box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
   }
 
-  /* Size modifier: compact (toolbar/header の inline select 用) — v2836+
-     旧 .eab-select / .viz-profile-select はこの modifier に統合。 */
-  .modern-select-sm {
-    width: auto;
-    padding: 0.35rem 1.7rem 0.35rem 0.7rem;
-    font-size: 0.75rem;
-    border-radius: 0.5rem;
-  }
-  .modern-select-md {
-    width: auto;
-    padding: 0.3rem 1.7rem 0.3rem 0.55rem;
-    font-size: 0.875rem;
-    border-radius: 0.5rem;
-  }
+  /* .modern-select-sm / -md は v2840 で削除 — 実 migration 無く YAGNI 違反だった。
+     必要時に .eab-select / .viz-profile-select の rule を直接整理する方が筋。 */
 
   /* Modern Input Styling - modern-selectと統一デザイン */
   .modern-input {
@@ -1579,23 +1567,7 @@
     justify-content: space-between;
     align-items: center;
   }
-  /* .box-active: cyan accent 強調 (現在選択中 / 公開中 等) */
-  .box-active {
-    background: rgba(56, 189, 248, 0.12);  /* cyan-400 12% — theme-aware accent */
-    border-color: var(--theme-accent-cyan);
-  }
-
-  /* .config-item は legacy 互換のため .box + .box-row の alias として残す */
-  .config-item {
-    background: var(--theme-card-1);
-    border: 1px solid var(--theme-border-subtle);
-    border-radius: 0.5rem;
-    padding: 0.75rem;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    color: var(--theme-text-secondary);
-  }
+  /* .box-active / .config-item は v2840 で削除 — .box .box-row primitive へ統合済 */
 
   .config-summary {
     display: flex;

@@ -660,15 +660,15 @@
         <!-- 表示モード/回答者名/リアクション数/シート名は左パネル「表示設定」と重複のため非表示。
              legacy ID は hidden span として残置 (updateConfigSummary 等の JS 互換維持)。 -->
         <div class="config-summary">
-          <div class="config-item">
+          <div class="box box-row">
             <span class="label">公開状態:</span>
             <span id="app-publish-status" class="status-badge unpublished">未公開</span>
           </div>
-          <div class="config-item">
+          <div class="box box-row">
             <span class="label">アクティブ:</span>
             <span id="current-active-profile" class="text-sm text-theme-muted">単一ボード</span>
           </div>
-          <div class="config-item">
+          <div class="box box-row">
             <span class="label">最終更新:</span>
             <span id="last-updated-time" class="text-sm text-theme-muted">--:--</span>
           </div>
