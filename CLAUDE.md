@@ -350,6 +350,32 @@ npm run theme:verify      # 統合ゲート: 12 軸 / 120 点満点 / CI 用
 3. brand identity (アプリ色・リアクション色) なら theme 非依存で OK (両モード同色のまま)
 4. 完了したら `npm run theme:matrix` で全 pair の contrast を確認 → AA fail があれば調整
 
+**Semantic Primitives (v2836-v2841) — 新規 UI はこれを使う**:
+
+旧来は `class="glass-panel rounded-xl p-6 max-w-md w-full mx-4"` のような Tailwind utility
+chain を毎回繰り返していたが、 v2836-v2841 で semantic primitive に統合。 新規 UI は以下を
+使い、 既存の inline chain は新規追加しない。
+
+| primitive | 用途 | 旧パターン |
+| --------- | ---- | --------- |
+| `.card` | 縦積みコンテンツ単位 (設定パネル等) | `class="card glass-panel rounded-xl p-6"` (3 重 alias) |
+| `.card-compact` | padding を縮めた card | `class="info-card glass-panel rounded-xl p-4"` |
+| `.card-hero` | primary entry point (cyan gradient + accent border) | `class="card glass-panel rounded-xl p-6 lesson-hero-card"` |
+| `.modal-card` | 確認 dialog (max-w-md デフォルト) | `class="glass-panel rounded-xl p-6 max-w-md w-full mx-4"` |
+| `.modal-card-md` | form modal (max-w-2xl) | `+ max-w-2xl` |
+| `.modal-card-lg` | content modal (max-w-5xl) | `+ max-w-5xl` |
+| `.modal-card-prominent` | 強調モーダル (cyan border + shadow-2xl) | `+ shadow-2xl border-2 border-cyan-400/80` |
+| `.box` / `.box-row` | 親 card 内の step-up inner box (single source of truth) | `.config-item` 旧 alias |
+
+これらは [UnifiedStyles.css.html](src/UnifiedStyles.css.html) 内の "Card Primitives" / "Modal
+Primitives" / "INNER BOX" セクションに定義。 token (`--theme-bg-surface`, `--radius-xl`,
+`--space-6` 等) ベースで書かれているので色/spacing 変更は token を変えれば全 primitive に伝播する。
+
+**Theme bug 防止 token (v2837+)**:
+
+- `--theme-bg-elevated-hover`: `bg-theme-elevated` 系 button の hover 用 (旧 `hover:bg-slate-700`
+  hardcode → light mode で破綻していたバグを解消)。 Tailwind utility: `hover:bg-theme-elevated-hover`
+
 ### Cache アーキテクチャ (3 層、 意図的分離)
 
 3 つの層はそれぞれ異なる用途。 統合 facade を作らない (semantic clarity を失う + cost 非対称性が見えなくなる)。
