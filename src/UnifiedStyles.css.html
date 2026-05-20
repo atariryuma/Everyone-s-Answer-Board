@@ -120,14 +120,15 @@
     --theme-status-warning-text: #fbbf24;              /* yellow-400 — dark 11:1 / light 1.8:1 (要 light override) */
     --theme-status-info-text: #60a5fa;                 /* blue-400 — dark 6:1 / light 3:1 (要 light override) */
 
-    /* Card / Panel tier (v2816: solid colors で 3 階層 elevation を明示)
-     * 旧 alpha 値は bg 変更時に composite が予測不能だったため solid 化。
-     *   --theme-card-1 = bg-surface と同 (level 1 elevation)
-     *   --theme-card-2 = bg-elevated と同 (level 2 elevation)
-     *   --theme-card-3 = 最も明るい (level 3, popup over modal 等) */
-    --theme-card-1: #252738;                           /* = bg-surface, 1 step elevation */
-    --theme-card-2: #2e3046;                           /* = bg-elevated, 2 step elevation */
-    --theme-card-3: #38394e;                           /* 3 step elevation (popup over modal) */
+    /* Card / Panel tier (v2828: 親 card 内の inner box step elevation 明示)
+     *   bg-surface (card 外側) = #252738 (1 step up from base)
+     *   --theme-card-1 (inner box step UP from surface) = #2e3046 (2 step up)
+     *   --theme-card-2 (deeper nested) = #38394e (3 step up)
+     *   --theme-card-3 (highest, popup) = #42445b (4 step up)
+     * v2827 までは card-1 = bg-surface で同色 → 親 card 内の inner row が見えない bug。 */
+    --theme-card-1: #2e3046;                           /* 2 step elevation (inner row visible) */
+    --theme-card-2: #38394e;                           /* 3 step elevation (deeper nest) */
+    --theme-card-3: #42445b;                           /* 4 step elevation (popup over modal) */
 
     /* =============================================================================
      * Status Colors - System Feedback
@@ -357,11 +358,13 @@
     --theme-accent-cyan: #0e7490;                      /* cyan-700: 5.4:1 on slate-50 ✓ AA */
     --theme-accent-cyan-soft: rgba(14, 116, 144, 0.1); /* cyan-700 系の薄背景 */
 
-    /* Card tier (light): white 系で軽い elevation。 slate-200 だと visual に "dark bar" と
-       誤認されるので slate-50/100 をベースに alpha を弱めて hierarchy を出す。 */
-    --theme-card-1: rgba(248, 250, 252, 0.7);          /* slate-50 70% — bg-base とほぼ同色 + 微 elevation */
-    --theme-card-2: rgba(241, 245, 249, 0.6);          /* slate-100 60% — 中 elevation */
-    --theme-card-3: #ffffff;                           /* 完全白で popup を明示 */
+    /* Card tier (light v2828): 白カード内の inner box が見える step elevation
+       - card-1: slate-50 #f8fafc (白カードよりわずかに濃く inner box 明示)
+       - card-2: slate-100 #f1f5f9 (より深い nest)
+       - card-3: slate-200 #e2e8f0 (popup over modal 等の最深 nest) */
+    --theme-card-1: #f8fafc;                           /* slate-50 solid — 白カード内 1 step */
+    --theme-card-2: #f1f5f9;                           /* slate-100 — 2 step */
+    --theme-card-3: #e2e8f0;                           /* slate-200 — 3 step (popup) */
 
     /* Status text — light mode 上で AA 確保のため濃い shade に override */
     --theme-status-error-text: #b91c1c;                /* red-700: 6.6:1 on white */
