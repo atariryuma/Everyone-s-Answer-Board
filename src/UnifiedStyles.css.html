@@ -671,26 +671,6 @@
     will-change: auto;
   }
 
-  /* Feature Cards */
-  .feature-card {
-    background: var(--theme-bg-surface);
-    border: var(--border-primary);
-    border-radius: 1rem;
-    padding: 1.5rem;
-    transition: all var(--transition-normal) var(--transition-easing);
-  }
-
-  .feature-card:hover {
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
-    border-color: var(--theme-border-normal);
-    will-change: transform;
-  }
-
-  .feature-card:not(:hover) {
-    will-change: auto;
-  }
-
   /* Loading skeleton (used by Page.html skeleton-card) */
   .skeleton {
     background: linear-gradient(
@@ -880,22 +860,6 @@
 
   .tooltip:hover::after {
     opacity: 1;
-  }
-
-  /* Card Hover Effects */
-  .card-hover {
-    transition: all var(--animation-normal) var(--transition-easing);
-  }
-
-  .card-hover:hover {
-    transform: translate3d(0, -2px, 0);
-    /* theme:exempt - brand cyan glow (両モード同色 accent) */
-    box-shadow: 0 8px 25px rgba(139, 233, 253, 0.15);
-    will-change: transform;
-  }
-
-  .card-hover:not(:hover) {
-    will-change: auto;
   }
 
   /* ============================================================
@@ -1271,11 +1235,6 @@
       background: var(--theme-bg-elevated);
     }
 
-    .responsive-grid {
-      grid-template-columns: 1fr;
-      gap: 1rem;
-    }
-
     .answer-card {
       padding: 1rem;
     }
@@ -1283,28 +1242,6 @@
     .reaction-btn {
       padding: 0.5rem 0.75rem;
       font-size: 0.875rem;
-    }
-  }
-
-  @media (min-width: 640px) /* sm breakpoint */ {
-    .responsive-grid {
-      gap: 1.5rem;
-      padding: 1.5rem;
-    }
-  }
-
-  @media (min-width: 768px) {
-    .responsive-grid {
-      grid-template-columns: 1fr 1fr;
-      gap: 2rem;
-    }
-  }
-
-  @media (min-width: 1024px) /* lg breakpoint */ {
-    .responsive-grid {
-      grid-template-columns: 2fr 1fr;
-      gap: 2rem;
-      padding: 2rem;
     }
   }
 
@@ -1318,13 +1255,6 @@
 
 
 
-
-  /* Large screen optimizations */
-  @media (min-width: 1280px) /* xl breakpoint - unified to Tailwind */ {
-    .responsive-grid {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
 
   /* Accessibility support - prefers-reduced-motion (btn:disabled only) */
   @media (prefers-reduced-motion: reduce) {
