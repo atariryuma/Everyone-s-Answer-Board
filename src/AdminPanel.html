@@ -332,7 +332,7 @@
 
         <!-- 代替経路: 新規作成 / 一覧から選ぶ を 1 つの details に集約 (二択であることを明示) -->
         <details class="mt-4 admin-collapsible">
-          <summary class="cursor-pointer text-sm text-theme-muted hover:text-slate-200 select-none py-1">
+          <summary class="cursor-pointer text-sm text-theme-muted hover:text-theme select-none py-1">
             🔧 他の方法 (フォームが手元にない / 一覧から選ぶ)
           </summary>
           <div class="mt-3 pl-4 border-l-2 border-theme-normal space-y-5">
@@ -706,7 +706,7 @@
         </div>
 
         <details class="mt-3 pt-3 border-t border-theme-normal admin-collapsible">
-          <summary class="cursor-pointer text-xs text-theme-muted hover:text-slate-200 select-none py-1">
+          <summary class="cursor-pointer text-xs text-theme-muted hover:text-theme select-none py-1">
             📋 別名で保存（新しいプロファイルを作る）
           </summary>
           <div class="flex items-center gap-1.5 mt-2">
@@ -714,7 +714,7 @@
               class="flex-1 min-w-0 px-2 py-1.5 bg-theme-surface border border-theme-normal rounded text-theme text-xs focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"
               maxlength="50" />
             <button id="save-current-as-profile-btn" type="button"
-              class="px-2 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-theme rounded text-xs font-semibold transition-all focus:ring-2 focus:ring-cyan-400/50 focus:outline-none whitespace-nowrap">
+              class="px-2 py-1.5 bg-cyan-600 hover:bg-cyan-700 text-white rounded text-xs font-semibold transition-all focus:ring-2 focus:ring-cyan-400/50 focus:outline-none whitespace-nowrap">
               新規保存
             </button>
           </div>
@@ -726,11 +726,11 @@
       <div class="info-card glass-panel rounded-xl p-4">
         <h3 class="text-lg font-semibold text-theme mb-3">👤 ユーザー情報</h3>
         <div class="space-y-3">
-          <div class="flex items-center justify-between p-3 bg-theme-surface rounded-lg">
+          <div class="flex items-center justify-between p-3 bg-theme-card-1 rounded-lg">
             <span class="text-theme-secondary">メールアドレス:</span>
             <span id="current-user-email" class="text-theme">読み込み中...</span>
           </div>
-          <div class="flex items-center justify-between p-3 bg-theme-surface rounded-lg">
+          <div class="flex items-center justify-between p-3 bg-theme-card-1 rounded-lg">
             <span class="text-theme-secondary">アクション:</span>
             <button onclick="window.sharedUtilities.auth.logout()" type="button"
               class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors">
@@ -747,14 +747,14 @@
         <h3 class="text-lg font-semibold text-theme mb-3">📚 リソース</h3>
         <div class="resource-buttons space-y-2">
           <button id="open-spreadsheet-btn"
-            class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-theme rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-500 hover:to-green-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled type="button">
             <span>📊</span>
             <span>スプレッドシートを開く</span>
           </button>
 
           <button id="open-form-btn"
-            class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-theme rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            class="resource-btn w-full px-3 py-2 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white rounded-lg transition-all duration-200 flex items-center justify-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             disabled type="button">
             <span>📝</span>
             <span>フォームを開く</span>
