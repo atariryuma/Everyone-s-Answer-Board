@@ -398,6 +398,18 @@
     transition: background-color 200ms ease, color 200ms ease;
   }
 
+  /* v2842: form elements (button/input/select/textarea) は browser UA stylesheet で
+     system font になり body font を継承しない quirk があるため、 global に inherit を
+     強制する。 Tailwind preflight 相当 (modern-normalize と同等)。 これが無いと
+     ブラウザ font 設定が button text に反映される (user 報告 v2841)。
+     font-size/line-height も併せて inherit させ、 body の `line-height: 1.6` を form
+     全体に伝播。 */
+  button, input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+  }
+
   /* Theme-aware 主要 surface 要素も滑らかに切替 — visual jank を最小化 */
   .glass-panel,
   .answer-card,
