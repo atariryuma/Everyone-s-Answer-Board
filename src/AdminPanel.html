@@ -56,13 +56,8 @@
       overflow-y: auto;
     }
 
-    .card {
-      margin-bottom: var(--space-4);
-    }
-
-    .info-card {
-      margin-bottom: var(--space-3, 0.75rem);
-    }
+    /* card / info-card / lesson-hero-card 旧 alias マーカー は UnifiedStyles の
+       .card / .card-compact / .card-hero primitive に統合 (v2836)。 */
 
 
 
@@ -252,7 +247,7 @@
         「授業 = 設定+データ+履歴の単位」で、下の個別ボード設定より
         上位概念。ヘッダー直下に大きく置いて発見性を確保する。
       ========================================================= -->
-      <section class="card glass-panel rounded-xl p-6 lesson-hero-card">
+      <section class="card card-hero">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-xl font-semibold text-theme inline-flex items-center gap-2">
             🎒 レッスン
@@ -303,7 +298,7 @@
       </div>
 
       <!-- ① フォーム連携: URL paste を primary、新規作成/一覧は代替経路として 1 details に集約 -->
-      <section class="card glass-panel rounded-xl p-6">
+      <section class="card">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-semibold text-theme">
             <span class="step-number">①</span> フォームを連携
@@ -398,7 +393,7 @@
       </section>
 
       <!-- ② 列設定: フォーム接続時に自動推定が走るので、UI は controlled disclosure -->
-      <section class="card glass-panel rounded-xl p-6">
+      <section class="card">
         <div class="flex items-center justify-between mb-4">
           <h2 class="text-xl font-semibold text-theme">
             <span class="step-number">②</span> 列設定
@@ -505,7 +500,7 @@
       </section>
 
       <!-- ③ 表示設定 + 公開ボタン: 個別ボード authoring の最終ステップ -->
-      <section class="card glass-panel rounded-xl p-6">
+      <section class="card">
         <h2 class="text-xl font-semibold text-theme mb-4">
           <span class="step-number">③</span> 表示と公開
         </h2>
@@ -657,7 +652,7 @@
       <!-- 現在の設定 + プロファイル管理（統合パネル）
            Why: 「現在の設定（active）」と「保存済みプロファイル一覧」は表裏一体の情報。
                 別パネルで分けると認知負荷が高いので、1 つの info-card に集約する。 -->
-      <section class="info-card glass-panel rounded-xl p-4">
+      <section class="card card-compact">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-lg font-semibold text-theme">📋 現在の設定</h3>
           <span class="text-xs text-theme-muted" id="profile-count-badge">--</span>
@@ -723,7 +718,7 @@
       </section>
 
       <!-- ユーザー情報 -->
-      <div class="info-card glass-panel rounded-xl p-4">
+      <div class="card card-compact">
         <h3 class="text-lg font-semibold text-theme mb-3">👤 ユーザー情報</h3>
         <div class="space-y-3">
           <div class="flex items-center justify-between p-3 box">
@@ -743,7 +738,7 @@
       </div>
 
       <!-- リソース -->
-      <section class="info-card glass-panel rounded-xl p-4">
+      <section class="card card-compact">
         <h3 class="text-lg font-semibold text-theme mb-3">📚 リソース</h3>
         <div class="resource-buttons space-y-2">
           <button id="open-spreadsheet-btn"
@@ -768,7 +763,7 @@
       </section>
 
       <!-- クイックアクション -->
-      <section class="info-card glass-panel rounded-xl p-4">
+      <section class="card card-compact">
         <h3 class="text-lg font-semibold text-theme mb-3">⚡ クイックアクション</h3>
         <div class="space-y-3">
           <button class="link-btn w-full text-center" type="button"

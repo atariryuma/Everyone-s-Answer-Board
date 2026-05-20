@@ -896,6 +896,45 @@
     will-change: auto;
   }
 
+  /* ============================================================
+   * Card Primitives (v2836+)
+   * 旧パターン: <section class="card glass-panel rounded-xl p-6"> — 3 重 alias
+   *   .card は margin-bottom のみ、 glass-panel が bg/border/radius/shadow、
+   *   rounded-xl は glass-panel.border-radius:1rem と重複、 p-6 は padding hardcode。
+   * 新パターン: <section class="card"> または <section class="card card-compact">。
+   *   .card 単体で bg + border + radius + shadow + padding + margin を提供。
+   *   なぜ .glass-panel と分けるか: glass-panel は modal/header/hero 等 padding が
+   *   文脈依存のところでも使うので、 「コンテンツカード」 とは semantic を分離する。
+   *   .card は 「上下に積まれるコンテンツの 1 単位」 を表す。
+   * 既存の .glass-panel 単体使用 (modal 等) は影響を受けない。 */
+  .card {
+    background: var(--theme-bg-surface);
+    border: var(--border-primary);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    margin-bottom: var(--space-4);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    transition: all var(--transition-normal) var(--transition-easing);
+  }
+
+  /* compact: padding を縮めた card (情報密度の高い設定パネル等)。 旧 .info-card 相当。 */
+  .card-compact {
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+
+  /* hero: primary entry point として強調する card (gradient + cyan border)。 旧 .lesson-hero-card 相当。 */
+  .card-hero {
+    border-color: rgba(34, 211, 238, 0.35);
+    background: linear-gradient(135deg, rgba(8, 145, 178, 0.12), rgba(34, 211, 238, 0.04));
+  }
+  .card-hero h2 { color: var(--theme-accent-cyan); }
+  body.theme-light .card-hero h2 { color: #155e75; }  /* cyan-800 — light で hierarchy 確保 */
+  body.theme-light .card-hero {
+    border-color: rgba(14, 116, 144, 0.3);
+    background: linear-gradient(135deg, rgba(14, 116, 144, 0.06), rgba(34, 211, 238, 0.03));
+  }
+
   /* Message System */
   .message {
     padding: 1rem;
@@ -1315,6 +1354,21 @@
   .modern-select.has-manual-selection {
     border-color: rgba(168, 85, 247, 0.6);
     box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.2);
+  }
+
+  /* Size modifier: compact (toolbar/header の inline select 用) — v2836+
+     旧 .eab-select / .viz-profile-select はこの modifier に統合。 */
+  .modern-select-sm {
+    width: auto;
+    padding: 0.35rem 1.7rem 0.35rem 0.7rem;
+    font-size: 0.75rem;
+    border-radius: 0.5rem;
+  }
+  .modern-select-md {
+    width: auto;
+    padding: 0.3rem 1.7rem 0.3rem 0.55rem;
+    font-size: 0.875rem;
+    border-radius: 0.5rem;
   }
 
   /* Modern Input Styling - modern-selectと統一デザイン */
@@ -2353,19 +2407,7 @@
     margin-top: 0.35rem;
   }
 
-  /* Lesson hero card (AdminPanel 上部の primary entry point)。
-     accent border + 微 gradient で「ここから始める」と視覚的に誘導する。 */
-  .lesson-hero-card {
-    border: 1px solid rgba(34, 211, 238, 0.35);
-    background: linear-gradient(135deg, rgba(8, 145, 178, 0.12), rgba(34, 211, 238, 0.04));
-  }
-  .lesson-hero-card h2 { color: var(--theme-accent-cyan); }  /* dark mode: cyan-100 pale */
-  /* Light mode: cyan-100 は white bg で消えるので cyan-800 で hierarchy 確保 */
-  body.theme-light .lesson-hero-card h2 { color: #155e75; }  /* cyan-800 */
-  body.theme-light .lesson-hero-card {
-    border-color: rgba(14, 116, 144, 0.3);
-    background: linear-gradient(135deg, rgba(14, 116, 144, 0.06), rgba(34, 211, 238, 0.03));
-  }
+  /* .lesson-hero-card は .card-hero に統合 (v2836)。 旧名は AdminPanel.html migration 済。 */
 
   /* 個別ボードモードへの divider (二者択一を明示) */
   .section-group-divider {
