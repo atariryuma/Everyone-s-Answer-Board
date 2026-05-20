@@ -55,7 +55,7 @@
       <div class="glass-panel rounded-xl p-6 mb-6">
         <h2 class="text-xl font-semibold text-theme mb-4">📊 現在のステータス</h2>
         <div id="status-display" class="space-y-3">
-          <div class="flex items-center justify-between p-3 bg-theme-surface rounded-lg">
+          <div class="flex items-center justify-between p-3 bg-theme-card-1 rounded-lg">
             <div class="flex items-center">
               <span class="text-theme-secondary mr-3">アプリ状態:</span>
               <span id="current-status" class="px-3 py-1 rounded-full text-sm font-medium">
@@ -66,13 +66,13 @@
               </span>
             </div>
           </div>
-          <div class="flex items-center justify-between p-3 bg-theme-surface rounded-lg">
+          <div class="flex items-center justify-between p-3 bg-theme-card-1 rounded-lg">
             <div class="flex items-center">
               <span class="text-theme-secondary mr-3">管理者:</span>
               <span id="current-admin" class="text-theme">読み込み中...</span>
             </div>
           </div>
-          <div class="flex items-center justify-between p-3 bg-theme-surface rounded-lg">
+          <div class="flex items-center justify-between p-3 bg-theme-card-1 rounded-lg">
             <div class="flex items-center">
               <span class="text-theme-secondary mr-3">最終更新:</span>
               <span id="last-updated" class="text-theme-muted">読み込み中...</span>
@@ -88,7 +88,7 @@
           ボード編集者となるユーザーに以下のログインURLを配布してください
         </p>
 
-        <div class="bg-theme-surface rounded-lg p-4">
+        <div class="bg-theme-card-1 rounded-lg p-4">
           <div class="flex items-center justify-between gap-3">
             <div class="flex-1 min-w-0">
               <label class="block text-xs text-theme-muted mb-1">ログインURL</label>
@@ -129,7 +129,7 @@
 
         <!-- アプリ制御ボタン -->
         <div class="grid md:grid-cols-2 gap-4 mb-6">
-          <div class="p-4 bg-theme-surface rounded-lg">
+          <div class="p-4 bg-theme-card-1 rounded-lg">
             <h3 class="text-lg font-medium text-theme-status-error mb-3">🚫 アプリケーション停止</h3>
             <p class="text-sm text-theme-muted mb-4">
               全ユーザーのアクセスを停止します。管理者のみアクセス可能になります。
@@ -151,7 +151,7 @@
             </div>
           </div>
 
-          <div class="p-4 bg-theme-surface rounded-lg">
+          <div class="p-4 bg-theme-card-1 rounded-lg">
             <h3 class="text-lg font-medium text-theme-status-success mb-3">✅ アプリケーション再開</h3>
             <p class="text-sm text-theme-muted mb-4">
               停止中のアプリケーションを再開し、全ユーザーがアクセス可能にします。
@@ -192,19 +192,19 @@
         </div>
 
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div class="bg-theme-surface rounded-lg p-4 text-center">
+          <div class="bg-theme-card-1 rounded-lg p-4 text-center">
             <div class="text-2xl font-bold text-theme-status-info" id="total-users">-</div>
             <div class="text-sm text-theme-muted">総ユーザー数</div>
           </div>
-          <div class="bg-theme-surface rounded-lg p-4 text-center">
+          <div class="bg-theme-card-1 rounded-lg p-4 text-center">
             <div class="text-2xl font-bold text-theme-status-success" id="active-users">-</div>
             <div class="text-sm text-theme-muted">アクティブユーザー</div>
           </div>
-          <div class="bg-theme-surface rounded-lg p-4 text-center">
+          <div class="bg-theme-card-1 rounded-lg p-4 text-center">
             <div class="text-2xl font-bold text-purple-700 dark:text-purple-400" id="published-boards">-</div>
             <div class="text-sm text-theme-muted">公開ボード数</div>
           </div>
-          <div class="bg-theme-surface rounded-lg p-4 text-center">
+          <div class="bg-theme-card-1 rounded-lg p-4 text-center">
             <div class="text-2xl font-bold text-theme-status-warning" id="recent-activity">-</div>
             <div class="text-sm text-theme-muted">24時間以内の活動</div>
           </div>
@@ -250,7 +250,7 @@
           </div>
 
           <!-- 詳細診断（折りたたみ） -->
-          <details class="bg-theme-surface rounded-lg">
+          <details class="bg-theme-card-1 rounded-lg">
             <summary class="p-4 cursor-pointer text-theme-secondary hover:text-white">
               🔬 詳細診断ツール（クリックで展開）
             </summary>
@@ -333,7 +333,7 @@
             </button>
           </div>
 
-          <details class="bg-theme-surface rounded-lg">
+          <details class="bg-theme-card-1 rounded-lg">
             <summary class="p-3 cursor-pointer text-theme-secondary hover:text-white text-sm select-none">
               ＋ SA JSON を追加 (GCP Console で発行)
             </summary>
@@ -377,7 +377,7 @@
               </div>
             </div>
 
-            <div id="user-table-wrapper" class="bg-theme-surface rounded-lg overflow-hidden">
+            <div id="user-table-wrapper" class="bg-theme-card-1 rounded-lg overflow-hidden">
               <div id="user-loading" class="p-8 text-center text-theme-muted">
                 <div
                   class="spinner mx-auto mb-2"
@@ -431,7 +431,7 @@
 
         <div class="mb-4">
           <p class="text-theme-secondary mb-2">以下のユーザーを削除しますか？</p>
-          <div class="bg-theme-surface p-3 rounded-lg">
+          <div class="bg-theme-card-1 p-3 rounded-lg">
             <p class="text-theme-accent-cyan font-medium" id="delete-user-email"></p>
             <p class="text-sm text-theme-muted" id="delete-user-id"></p>
           </div>
@@ -443,7 +443,7 @@
           >
           <textarea
             id="deletion-reason"
-            class="w-full p-3 bg-theme-surface border border-theme-normal rounded-lg text-theme resize-none"
+            class="w-full p-3 bg-theme-card-1 border border-theme-normal rounded-lg text-theme resize-none"
             rows="3"
             placeholder="削除理由を入力してください（必須）"
             required
@@ -1028,7 +1028,7 @@
               var removeBtn = s.role === 'primary'
                 ? ''
                 : '<button data-sa-remove="' + esc(s.slot) + '" class="ml-2 px-2 py-1 bg-red-700 hover:bg-red-600 text-white text-xs rounded">削除</button>';
-              return '<div class="flex items-center gap-2 p-2 bg-theme-surface rounded text-sm">'
+              return '<div class="flex items-center gap-2 p-2 bg-theme-card-1 rounded text-sm">'
                 + '<span class="text-theme-muted w-8">[' + esc(s.index) + ']</span>'
                 + '<span class="' + roleColor + ' w-20">' + esc(s.role) + '</span>'
                 + '<span class="text-theme font-mono truncate flex-1" title="' + esc(s.clientEmail || '(invalid)') + '">'
