@@ -290,7 +290,7 @@
               <button
                 type="button"
                 onclick="copyDiagnosticResult()"
-                class="btn bg-theme-elevated hover:bg-slate-700 text-theme py-1 px-3 rounded text-sm flex items-center gap-2"
+                class="btn bg-theme-elevated hover:bg-theme-elevated-hover text-theme py-1 px-3 rounded text-sm flex items-center gap-2"
               >
                 📋 コピー
               </button>
@@ -461,7 +461,7 @@
           <button
             type="button"
             onclick="cancelDeletion()"
-            class="flex-1 btn bg-theme-elevated hover:bg-slate-700 text-theme py-2 px-4 rounded-lg"
+            class="flex-1 btn bg-theme-elevated hover:bg-theme-elevated-hover text-theme py-2 px-4 rounded-lg"
           >
             キャンセル
           </button>
@@ -568,7 +568,7 @@
                 : '不明';
 
               return `
-                        <tr class="hover:bg-slate-700/50">
+                        <tr class="hover:bg-theme-elevated-hover">
                             <td class="px-4 py-3 text-sm text-theme">${window.sharedUtilities.security.escapeHtml(user.userEmail || 'N/A')}</td>
                             <td class="px-4 py-3 text-sm text-theme-secondary">${window.sharedUtilities.security.escapeHtml(registrationDate)}</td>
                             <td class="px-4 py-3">${statusBadge}</td>
@@ -586,7 +586,7 @@
                                     <button
                                         data-user-id="${window.sharedUtilities.security.escapeHtml(user.userId)}"
                                         onclick="toggleUserBoard(this.dataset.userId)"
-                                        class="btn ${boardPublished ? 'bg-theme-elevated hover:bg-slate-700' : 'bg-purple-600 hover:bg-purple-700'} text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
+                                        class="btn ${boardPublished ? 'bg-theme-elevated hover:bg-theme-elevated-hover' : 'bg-purple-600 hover:bg-purple-700'} text-white px-2 py-1 rounded text-xs min-w-[3.5rem] text-center"
                                         title="${boardPublished ? 'ボードを非公開に' : 'ボードを公開に'}">
                                         ${boardPublished ? '非公開' : '公開'}
                                     </button>
@@ -1033,7 +1033,7 @@
                 + '<span class="' + roleColor + ' w-20">' + esc(s.role) + '</span>'
                 + '<span class="text-theme font-mono truncate flex-1" title="' + esc(s.clientEmail || '(invalid)') + '">'
                 + esc(emailShort) + '</span>'
-                + '<button data-sa-reverify="' + esc(s.slot) + '" class="px-2 py-1 bg-theme-elevated hover:bg-slate-600 text-theme text-xs rounded">再 verify</button>'
+                + '<button data-sa-reverify="' + esc(s.slot) + '" class="px-2 py-1 bg-theme-elevated hover:bg-theme-elevated-hover text-theme text-xs rounded">再 verify</button>'
                 + removeBtn
                 + '</div>';
             }).join('');

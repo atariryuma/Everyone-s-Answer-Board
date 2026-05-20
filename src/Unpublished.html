@@ -54,7 +54,7 @@
         <p class="text-sm text-theme-muted mb-2">生徒用URL:</p>
         <div class="flex gap-2">
           <input type="text" id="board-url" readonly value="<?= typeof boardUrl !== 'undefined' ? boardUrl : '' ?>"
-            class="flex-1 p-2 bg-theme-elevated border border-theme-strong rounded text-sm cursor-pointer hover:bg-slate-500 focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"
+            class="flex-1 p-2 bg-theme-elevated border border-theme-strong rounded text-sm cursor-pointer hover:bg-theme-elevated-hover focus:ring-2 focus:ring-cyan-400/50 focus:outline-none"
             onclick="this.select()" aria-label="生徒用URL" title="クリックしてURLを選択" />
           <button type="button" onclick="copyBoardUrl()"
             class="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded text-sm">
@@ -181,7 +181,7 @@
         adminBtn.href = webAppUrl + '?mode=admin&userId=' + userId;
         adminBtn.textContent = '⚙️ 管理パネルを開く';
         adminBtn.classList.remove('pointer-events-none', 'text-theme-muted');
-        adminBtn.classList.add('hover:bg-slate-600', 'text-theme');
+        adminBtn.classList.add('hover:bg-theme-elevated-hover', 'text-theme');
       }
       if (refreshBtn) {
         refreshBtn.href = webAppUrl + '?mode=view&userId=' + userId;

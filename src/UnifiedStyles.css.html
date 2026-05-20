@@ -83,6 +83,7 @@
     --theme-bg-base: #1a1b26;                          /* Tokyo Night base — atmospheric warm dark */
     --theme-bg-surface: #252738;                       /* 1 step lighter solid (v2815 #1e293b より Tokyo Night 寄り) */
     --theme-bg-elevated: #2e3046;                      /* 2 step lighter (modal/popup) */
+    --theme-bg-elevated-hover: #3a3d52;                /* elevated の hover state (v2837+) */
     --theme-bg-overlay: rgba(0, 0, 0, 0.75);           /* modal backdrop */
 
     /* テキスト階層 (v2816: c0caf5 と #f1f5f9 の中間 #e2e8f0 でバランス)
@@ -329,7 +330,8 @@
      *     GitHub / Linear / Stripe / shadcn-default と同じ 「ページbg < カード」階層を確立。 */
     --theme-bg-base: #f1f5f9;                          /* slate-100 — page bg (旧 slate-50 から trim) */
     --theme-bg-surface: #ffffff;                       /* 純白カード — ページ bg より明確に浮く */
-    --theme-bg-elevated: #ffffff;                      /* modal も純白 + shadow で elevation */
+    --theme-bg-elevated: #ffffff;                      /* modal も純白 + shadow */
+    --theme-bg-elevated-hover: #f1f5f9;                /* slate-100 — hover */
     --theme-bg-overlay: rgba(15, 23, 42, 0.4);         /* modal backdrop = slate-900 半透明 */
 
     /* テキスト階層 — children-friendly に muted を slate-600 まで昇格 */
