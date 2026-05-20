@@ -937,6 +937,33 @@
     background: linear-gradient(135deg, rgba(14, 116, 144, 0.06), rgba(34, 211, 238, 0.03));
   }
 
+  /* ============================================================
+   * Modal Primitives (v2839+)
+   * 旧パターン: <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
+   *   = 6 utility 重複 (modal 9 箇所で repeat)。
+   * 新パターン: <div class="modal-card"> または <div class="modal-card modal-card-lg">。
+   *   .modal-card 単体で modal の全レイアウト (bg/border/radius/padding/max-width/margin) を提供。
+   * 用途別: modal-card-sm (確認 dialog) / modal-card-md (form modal) / modal-card-lg (content modal)。
+   * .modal-card-prominent: 答え modal 等の primary content modal 用 cyan accent。 */
+  .modal-card {
+    background: var(--theme-bg-surface);
+    border: var(--border-primary);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    width: 100%;
+    max-width: 28rem;  /* デフォルト = max-w-md (確認 dialog 想定) */
+    margin: 0 var(--space-4);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    -webkit-backdrop-filter: var(--glass-backdrop);
+    backdrop-filter: var(--glass-backdrop);
+  }
+  .modal-card-md { max-width: 42rem; }   /* max-w-2xl */
+  .modal-card-lg { max-width: 64rem; }   /* max-w-5xl */
+  .modal-card-prominent {
+    border: 2px solid rgba(34, 211, 238, 0.8);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+
   /* Message System */
   .message {
     padding: 1rem;

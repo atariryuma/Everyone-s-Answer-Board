@@ -651,7 +651,7 @@
     modal.id = 'redirect-modal';
     modal.className = 'fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[10002]';
     modal.innerHTML = `
-      <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4 text-center">
+      <div class="modal-card text-center">
         <div class="text-theme-status-success mb-4">
           <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -714,7 +714,7 @@
         : '';
       const okLabel = (opts && opts.okLabel) || (opts && opts.kind === 'confirm' ? 'OK' : 'わかった');
       modal.innerHTML = `
-        <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4">
+        <div class="modal-card">
           ${title}
           <p class="text-theme mb-5 whitespace-pre-wrap">${esc(opts && opts.message)}</p>
           <div class="flex gap-3">
