@@ -39,6 +39,20 @@
       html.setAttribute('data-theme', resolved);
       // color-scheme: ネイティブ scrollbar / form control / canvas を theme 追従させる
       html.style.colorScheme = resolved;
+
+      // mobile browser chrome 色を theme 連動 (OS 自動切替に依存しない)
+      //   theme-color meta を JS で動的更新。 ブラウザは meta の color を mobile chrome
+      //   (上部 address bar 等) に反映する。 element 自体は paint より先に存在する必要なし。
+      try {
+        var THEME_BAR_COLORS = { dark: '#1a1b26', light: '#f1f5f9' };  // theme:exempt - mobile chrome bar 用
+        var metaTC = document.querySelector('meta[name="theme-color"]');
+        if (!metaTC) {
+          metaTC = document.createElement('meta');
+          metaTC.setAttribute('name', 'theme-color');
+          document.head && document.head.appendChild(metaTC);
+        }
+        metaTC.setAttribute('content', THEME_BAR_COLORS[resolved]);
+      } catch (_) {}
     } catch (e) { /* never break page load */ }
   })();
 </script>

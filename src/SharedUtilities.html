@@ -899,6 +899,19 @@
         document.body.classList.remove('theme-dark', 'theme-light', 'dark', 'light');
         document.body.classList.add('theme-' + resolved, resolved);
       }
+
+      // mobile browser chrome bar 色を theme 連動更新 (OS auto-switching に依存しない)
+      try {
+        const THEME_BAR_COLORS = { dark: '#1a1b26', light: '#f1f5f9' };  // theme:exempt - mobile chrome bar 用 brand color
+        let metaTC = document.querySelector('meta[name="theme-color"]');
+        if (!metaTC) {
+          metaTC = document.createElement('meta');
+          metaTC.setAttribute('name', 'theme-color');
+          document.head && document.head.appendChild(metaTC);
+        }
+        metaTC.setAttribute('content', THEME_BAR_COLORS[resolved]);
+      } catch (_) {}
+
       subscribers.forEach((fn) => { try { fn(resolved, value); } catch (_) {} });
       return resolved;
     }
