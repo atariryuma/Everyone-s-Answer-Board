@@ -114,7 +114,7 @@
       </button>
       <div class="mt-4">
         <a id="start-studyquest-btn" target="_top"
-          class="inline-block btn bg-gradient-to-r from-slate-600 to-slate-600 text-theme-muted font-bold py-2 px-4 rounded-lg text-center pointer-events-none">
+          class="inline-block btn bg-theme-card-3 text-theme-muted font-bold py-2 px-4 rounded-lg text-center pointer-events-none">
           読み込み中...
         </a>
       </div>
@@ -331,8 +331,8 @@
         }
         btn.href = url + '?mode=login';
         btn.textContent = 'みんなの回答ボードを開始';
-        btn.classList.remove('pointer-events-none', 'from-slate-600', 'to-slate-600', 'text-theme-muted');
-        btn.classList.add('from-purple-600', 'to-pink-600', 'hover:from-purple-700', 'hover:to-pink-700', 'text-slate-900', 'dark:text-white');
+        btn.classList.remove('pointer-events-none', 'bg-theme-card-3', 'text-theme-muted');
+        btn.classList.add('bg-gradient-to-r', 'from-purple-600', 'to-pink-600', 'hover:from-purple-700', 'hover:to-pink-700', 'text-slate-900', 'dark:text-white');
       } catch (_) {
         btn.textContent = 'URL取得失敗 — 再読み込みしてください';
       }

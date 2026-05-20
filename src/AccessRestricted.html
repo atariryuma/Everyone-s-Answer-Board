@@ -58,7 +58,7 @@
         <!-- 管理者 -->
         <div class="space-y-3">
           <a id="admin-login-link" target="_top"
-            class="block w-full px-6 py-3 bg-gradient-to-r from-slate-600 to-slate-600 text-theme-muted font-semibold rounded-xl text-center pointer-events-none">
+            class="block w-full px-6 py-3 bg-theme-card-3 text-theme-muted font-semibold rounded-xl text-center pointer-events-none">
             読み込み中...
           </a>
           <a id="app-setup-link" target="_top"
@@ -70,7 +70,7 @@
         <? } else if (typeof isRegisteredUser !== 'undefined' && isRegisteredUser) { ?>
         <!-- 登録済みユーザー -->
         <a id="editor-login-link" target="_top"
-          class="block w-full px-6 py-3 bg-gradient-to-r from-slate-600 to-slate-600 text-theme-muted font-semibold rounded-xl text-center pointer-events-none">
+          class="block w-full px-6 py-3 bg-theme-card-3 text-theme-muted font-semibold rounded-xl text-center pointer-events-none">
           読み込み中...
         </a>
         <? } ?>
@@ -91,8 +91,8 @@
         if (!el) return;
         el.href = href;
         el.textContent = text;
-        el.classList.remove('pointer-events-none', 'from-slate-600', 'to-slate-600', 'text-theme-muted', 'text-theme-muted');
-        el.classList.add('from-cyan-600', 'to-blue-600', 'hover:from-cyan-700', 'hover:to-blue-700', 'text-slate-900', 'dark:text-white', 'shadow-lg');
+        el.classList.remove('pointer-events-none', 'bg-theme-card-3', 'text-theme-muted');
+        el.classList.add('bg-gradient-to-r', 'from-cyan-600', 'to-blue-600', 'hover:from-cyan-700', 'hover:to-blue-700', 'text-slate-900', 'dark:text-white', 'shadow-lg');
       }
 
       document.addEventListener('DOMContentLoaded', async function() {
