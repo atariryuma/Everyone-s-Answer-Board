@@ -148,7 +148,7 @@
 
     #boardInfoFooter .glass-panel {
       /* フッター専用のガラス調スタイル - CSS変数統一 */
-      background: var(--brand-surface);
+      background: var(--theme-bg-surface);
       border: var(--border-primary);
       -webkit-backdrop-filter: var(--glass-backdrop);
       backdrop-filter: var(--glass-backdrop);
@@ -217,7 +217,7 @@
   </style>
 </head>
 
-<body style="background: var(--brand-background); color: var(--brand-text);" class="font-sans">
+<body style="background: var(--theme-bg-base); color: var(--theme-text-primary);" class="font-sans">
   <div id="loading-overlay" class="fixed inset-0 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
     style="background-color: var(--brand-background-overlay, rgba(16, 17, 28, 0.9));">
     <div class="flex flex-col items-center gap-4">
@@ -726,11 +726,11 @@
       <div class="info-card glass-panel rounded-xl p-4">
         <h3 class="text-lg font-semibold text-theme mb-3">👤 ユーザー情報</h3>
         <div class="space-y-3">
-          <div class="flex items-center justify-between p-3 bg-theme-card-1 border border-theme-subtle rounded-lg">
+          <div class="flex items-center justify-between p-3 box">
             <span class="text-theme-secondary">メールアドレス:</span>
             <span id="current-user-email" class="text-theme">読み込み中...</span>
           </div>
-          <div class="flex items-center justify-between p-3 bg-theme-card-1 border border-theme-subtle rounded-lg">
+          <div class="flex items-center justify-between p-3 box">
             <span class="text-theme-secondary">アクション:</span>
             <button onclick="window.sharedUtilities.auth.logout()" type="button"
               class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-sm transition-colors">

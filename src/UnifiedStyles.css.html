@@ -49,7 +49,7 @@
     --brand-accent: #fbbf24;
     --brand-accent-light: #8be9fd;
     /* v2804: 旧名 --brand-background/-surface/-text/-border を --theme-* のエイリアスに変更。
-       既存の `body style="background: var(--brand-background)"` 等が theme 切替に追従するようになる。 */
+       既存の `body style="background: var(--theme-bg-base)"` 等が theme 切替に追従するようになる。 */
     --brand-background: var(--theme-bg-base);
     --brand-surface: var(--theme-bg-surface);
     --brand-text: var(--theme-text-primary);
@@ -246,7 +246,7 @@
     --border-width-heavy: 4px;
 
     --border-style: solid;
-    --border-primary: var(--border-width-thin) var(--border-style) var(--brand-border);
+    --border-primary: var(--border-width-thin) var(--border-style) var(--theme-border-subtle);
     --border-accent: var(--border-width-normal) var(--border-style) var(--brand-primary);
     --border-status-error: var(--border-width-thin) var(--border-style) var(--status-error);
     --border-status-success: var(--border-width-thin) var(--border-style) var(--status-success);
@@ -626,7 +626,7 @@
     --card-padding: 1.5rem;
     --card-transition: all var(--transition-normal) var(--transition-easing);
 
-    background: var(--brand-surface);
+    background: var(--theme-bg-surface);
     border: var(--border-primary);
     border-radius: var(--card-border-radius);
     padding: var(--card-padding);
@@ -671,7 +671,7 @@
 
   /* Feature Cards */
   .feature-card {
-    background: var(--brand-surface);
+    background: var(--theme-bg-surface);
     border: var(--border-primary);
     border-radius: 1rem;
     padding: 1.5rem;
@@ -1479,15 +1479,38 @@
   }
 
   /* Config Item Styling — admin panel の設定 1 行表示 */
-  /* 親 glass-panel (bg-surface) 内の inner row — card-1 + border で確実に視認 */
-  .config-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.75rem;
+  /* ╔══════════════════════════════════════════════════════════════════════╗
+     ║ INNER BOX — 親 card 内の "step elevation" box (single source of truth) ║
+     ║ 使い方: <div class="box">...</div> で 親 card より明確に浮く inner box  ║
+     ║ 色変更時: --theme-card-1 token を 1 行変えれば全 .box に反映              ║
+     ╚══════════════════════════════════════════════════════════════════════╝ */
+  .box {
     background: var(--theme-card-1);
     border: 1px solid var(--theme-border-subtle);
     border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+  /* .box-row: flex 横並び の inner box (label + value) */
+  .box-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  /* .box-active: cyan accent 強調 (現在選択中 / 公開中 等) */
+  .box-active {
+    background: rgba(56, 189, 248, 0.12);  /* cyan-400 12% — theme-aware accent */
+    border-color: var(--theme-accent-cyan);
+  }
+
+  /* .config-item は legacy 互換のため .box + .box-row の alias として残す */
+  .config-item {
+    background: var(--theme-card-1);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     color: var(--theme-text-secondary);
   }
 
