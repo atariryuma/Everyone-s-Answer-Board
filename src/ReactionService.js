@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, logError_ */
+/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_ */
 
 const ROW_LOCK_TTL_SECONDS = 10;
 const ROW_LOCK_ACQUIRE_TIMEOUT_MS = 800;  // ScriptLock critical section の最大待機時間
@@ -71,6 +71,14 @@ function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
   if (isAdmin) return true;
 
   if (targetUser.userEmail === actorEmail) return true;
+
+  // v2855+: ボード SS の editor 共有者 (共同教師) は owner と同じ進行操作 (highlight /
+  //   リアクション編集) ができる。 owner / admin の高頻度パスを先に評価しているので
+  //   Drive API 呼び出しは true な collaborator のときだけ発生する。
+  if (typeof isBoardCollaborator === 'function'
+      && isBoardCollaborator(targetUser, actorEmail)) {
+    return true;
+  }
 
   if (options.requireEditor === true) return false;
 

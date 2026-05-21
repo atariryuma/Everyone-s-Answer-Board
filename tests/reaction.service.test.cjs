@@ -442,6 +442,34 @@ test('canActOnTargetBoard: requireEditor allows owner', () => {
   assert.equal(ok, true);
 });
 
+test('canActOnTargetBoard: collaborator (SS editor) allowed on requireEditor (v2855)', () => {
+  // ボード SS の editor として共有された共同教師は highlight/unpublish 等の editor 操作を実行可能。
+  const ctx = loadReactionContext({
+    isBoardCollaborator: (targetUser, email) => email === 'collab@example.com'
+  });
+  const ok = ctx.canActOnTargetBoard(
+    'collab@example.com',
+    { userEmail: 'owner@example.com' },
+    { isPublished: true },
+    { requireEditor: true }
+  );
+  assert.equal(ok, true);
+});
+
+test('canActOnTargetBoard: non-collaborator viewer still blocked on requireEditor', () => {
+  // SS editor として登録されていない viewer は requireEditor を pass しない。
+  const ctx = loadReactionContext({
+    isBoardCollaborator: () => false
+  });
+  const ok = ctx.canActOnTargetBoard(
+    'viewer@example.com',
+    { userEmail: 'owner@example.com' },
+    { isPublished: true },
+    { requireEditor: true }
+  );
+  assert.equal(ok, false);
+});
+
 test('canActOnTargetBoard: requireEditor allows admin via preloaded isAdmin (perf path)', () => {
   // isAdministrator を呼ばせない（preloaded を信用する）ことを検証
   let calls = 0;

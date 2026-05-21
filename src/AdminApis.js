@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, logError_, safeJsonParse_ */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -114,8 +114,18 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   if (options.requireAdmin && !isAdmin) {
     return createErrorResponse('この操作には管理者権限が必要です');
   }
+  // v2855+: collaborator (ボード SS の editor) は unpublish (緊急停止) のみ許可。
+  //   publish 再開や toggle は owner / admin のみ — 「閉じる方向」 だけ collaborator OK。
+  let isCollaborator = false;
   if (!isAdmin && !isOwnBoard) {
-    return createErrorResponse('ボードの公開状態を変更する権限がありません');
+    const isUnpublishingOnly = (newState === false)
+      && typeof isBoardCollaborator === 'function'
+      && isBoardCollaborator(targetUser, email);
+    if (isUnpublishingOnly) {
+      isCollaborator = true;
+    } else {
+      return createErrorResponse('ボードの公開状態を変更する権限がありません');
+    }
   }
 
   // Why getUserConfig (not getConfigOrDefault): saveUserConfig 前の read で「failure を empty

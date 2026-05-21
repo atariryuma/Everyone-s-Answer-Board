@@ -3,7 +3,7 @@
  *   isAdministrator、レトライ/バッチ認証ユーティリティ。
  */
 
-/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview */
+/* global createErrorResponse, createSuccessResponse, createAuthError, createUserNotFoundError, createAdminRequiredError, createExceptionResponse, hasCoreSystemProps, getUserSheetData, addReaction, toggleHighlight, findUserByEmail, findUserById, findPublishedBoardOwner, getConfigOrDefault, getCachedProperty, enhanceConfigWithDynamicUrls, shouldEnforceDomainRestrictions, validateDomainAccess, dispatchAdminOperation, timingSafeEqual, setCachedProperty, getQuestionText, getWebAppUrl, publishApp, getLessonForReview, isBoardCollaborator */
 // isAdministrator は本ファイル内で関数として定義されているため /* global */ には載せない。
 
 /**
@@ -281,7 +281,12 @@ function handleViewMode_(params, currentEmail) {
     return template.evaluate().setTitle('未公開');
   }
 
-  const isEditor = isAdminUser || isOwnBoard;
+  // v2855+: ボード SS の editor (writer/owner) として共有された共同教師は collaborator として
+  //   owner と同じ「進行操作」 (highlight / unpublish / リアクション削除) を実行可能。
+  //   ボード設定変更や lesson 編集は引き続き owner / admin 専用 (AccessControl.js 参照)。
+  const isCollaborator = !isAdminUser && !isOwnBoard
+    && (typeof isBoardCollaborator === 'function' && isBoardCollaborator(targetUser, currentEmail));
+  const isEditor = isAdminUser || isOwnBoard || isCollaborator;
   const template = HtmlService.createTemplateFromFile('Page.html');
   template.userId = targetUserId;
   template.userEmail = targetUser.userEmail;
@@ -290,6 +295,7 @@ function handleViewMode_(params, currentEmail) {
   template.isEditor = isEditor;
   template.isAdminUser = isAdminUser;
   template.isOwnBoard = isOwnBoard;
+  template.isCollaborator = isCollaborator;
   template.sheetName = config.sheetName;
   template.configJSON = JSON.stringify({
     userId: targetUserId,
@@ -301,6 +307,7 @@ function handleViewMode_(params, currentEmail) {
     isEditor,
     isAdminUser,
     isOwnBoard,
+    isCollaborator,
     formUrl: config.formUrl || '',
     showDetails: config.showDetails !== false,
     displaySettings: config.displaySettings || DEFAULT_DISPLAY_SETTINGS

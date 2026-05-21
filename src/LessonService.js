@@ -4,7 +4,7 @@
  *   owner-only auth (管理者は listLessons のみ全件取得可)。
  */
 
-/* global openDatabase, getCurrentEmail, isAdministrator, findUserByEmail, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, LESSONS_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, logError_ */
+/* global openDatabase, getCurrentEmail, isAdministrator, findUserByEmail, findUserById, createTemplateForm, applyConfigPatch_, getPublishedSheetData, getPublishedSheetDataForProfile, getAllUsers, getConfigOrDefault, getCachedProperty, LESSONS_SHEET_HEADERS, deepClone, createSuccessResponse, createErrorResponse, createExceptionResponse, createUserNotFoundError, createAuthError, isBoardCollaborator, logError_ */
 
 // schemaVersion を bump するときは migration 計画を必ず書く。Phase 1 = 1。
 const LESSON_SCHEMA_VERSION = 1;
@@ -306,12 +306,16 @@ function __deleteLessonRow_(lessonId) {
   }
 }
 
-// ----- Authorization: owner OR admin -----
+// ----- Authorization: owner OR admin (write) / owner OR admin OR collaborator (read) -----
 // Why admin allowed: listLessons / getKnownClassesForUser など他の lesson read ops は
 //   admin に許可しているのに、advance / end / delete / updateDraft だけ admin 拒否すると
 //   admin API 経由のサポート操作 (生徒の質問対応や授業データ修復) ができない。SSOT で揃える。
+// Why collaborator (v2855+): ボード SS の editor として共有された共同教師は read 用途
+//   (getLessonForReview 等) なら lesson を閲覧してよい。 write 用途 (advance/end/delete/
+//   updateDraft) は引き続き owner / admin のみ — allowCollaborator=true で明示的に opt-in。
 
-function __requireLessonOwner_(userId, lessonId) {
+function __requireLessonOwner_(userId, lessonId, options) {
+  const allowCollaborator = !!(options && options.allowCollaborator);
   const email = getCurrentEmail();
   if (!email) return { error: createAuthError() };
 
@@ -319,18 +323,28 @@ function __requireLessonOwner_(userId, lessonId) {
   if (!callerUser) return { error: createUserNotFoundError() };
 
   const isAdmin = isAdministrator(email);
+  let isCollaborator = false;
   if (!isAdmin && callerUser.userId !== userId) {
-    return { error: createErrorResponse('他ユーザーの lesson にはアクセスできません') };
+    if (allowCollaborator) {
+      const targetUser = (typeof findUserById === 'function') ? findUserById(userId) : null;
+      if (targetUser && typeof isBoardCollaborator === 'function'
+          && isBoardCollaborator(targetUser, email)) {
+        isCollaborator = true;
+      }
+    }
+    if (!isCollaborator) {
+      return { error: createErrorResponse('他ユーザーの lesson にはアクセスできません') };
+    }
   }
 
-  if (!lessonId) return { callerUser, isAdmin };
+  if (!lessonId) return { callerUser, isAdmin, isCollaborator };
 
   const found = __findLessonById_(lessonId);
   if (!found) return { error: createErrorResponse('lesson が見つかりません') };
   if (found.lesson.userId !== userId) {
     return { error: createErrorResponse('lesson の所有者が一致しません') };
   }
-  return { callerUser, found, isAdmin };
+  return { callerUser, found, isAdmin, isCollaborator };
 }
 
 // ----- Lesson テンプレート (Phase 1 は 1 種類固定) -----
@@ -571,7 +585,8 @@ function getKnownClassesForUser(userId) {
 
 function getLessonForReview(userId, lessonId) {
   try {
-    const auth = __requireLessonOwner_(userId, lessonId);
+    // read 用途なので collaborator (ボード SS editor) にも許可 (v2855+)。
+    const auth = __requireLessonOwner_(userId, lessonId, { allowCollaborator: true });
     if (auth.error) return auth.error;
     // active / completed どちらも review 可。draft は wizard で開く方が自然。
     return createSuccessResponse('loaded', { lesson: auth.found.lesson });
