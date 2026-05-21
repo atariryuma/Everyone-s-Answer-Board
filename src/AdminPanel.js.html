@@ -3274,8 +3274,12 @@
         ? '<button type="button" class="profile-icon-btn profile-icon-load" data-profile-action="load" data-profile-name="' + safeName + '" title="このプロファイルに切替">📥</button>'
         : '';
       const deleteIcon = '<button type="button" class="profile-icon-btn profile-icon-delete" data-profile-action="delete" data-profile-name="' + safeName + '" title="削除">🗑</button>';
+      // active 行は opaque vibrant pale cyan bg なので、 default text (slate-200) では contrast 不足
+      //   → text-on-soft (cyan-900) に切り替え。 v2854 で他 status box と統一。
+      const textCls = isActive ? 'text-theme-status-accent-text-on-soft' : 'text-theme';
+      const mutedCls = isActive ? 'text-theme-status-accent-text-on-soft opacity-70' : 'text-theme-muted';
       const titleLine = safeTitle
-        ? '<div class="text-[10px] text-theme-muted truncate" title="' + safeTitle + '">' + safeTitle + '</div>'
+        ? '<div class="text-[10px] ' + mutedCls + ' truncate" title="' + safeTitle + '">' + safeTitle + '</div>'
         : '';
       return [
         '<div class="profile-row flex items-center gap-1 p-1.5 rounded border ',
@@ -3283,9 +3287,9 @@
         isActive ? 'border-theme-status-accent-strong bg-theme-status-accent-soft' : 'border-theme-subtle bg-theme-card-1',
         '" data-profile-row="' + safeName + '">',
         '  <div class="flex-1 min-w-0">',
-        '    <div class="text-xs font-semibold text-theme truncate profile-name" data-profile-rename="' + safeName + '" title="ダブルクリックで名前を変更">',
+        '    <div class="text-xs font-semibold ' + textCls + ' truncate profile-name" data-profile-rename="' + safeName + '" title="ダブルクリックで名前を変更">',
         safeName,
-        '      <span class="ml-1 text-[10px] text-theme-muted">[' + modeLabel + ']</span>',
+        '      <span class="ml-1 text-[10px] ' + mutedCls + '">[' + modeLabel + ']</span>',
         '    </div>',
         titleLine,
         '  </div>',

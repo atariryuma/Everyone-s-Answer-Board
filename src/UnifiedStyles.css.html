@@ -81,10 +81,11 @@
     --theme-text-muted: #94a3b8;                       /* slate-400 — キャプション・補助 (AAA 6.6:1) */
     --theme-text-inverse: #1a1b26;                     /* light area 上の暗色テキスト */
 
-    /* 境界線 */
-    --theme-border-subtle: rgba(255, 255, 255, 0.15);   /* 既存 --brand-border と同値 */
-    --theme-border-normal: rgba(255, 255, 255, 0.2);   /* glass-panel:hover 等で多用 */
-    --theme-border-strong: rgba(255, 255, 255, 0.3);   /* spinner border, high-contrast */
+    /* 境界線 — v2854: alpha を 0.15→0.10 に薄め、 status box の色付き border (vibrant strong) と
+       「白枠 = 装飾、 色枠 = 意味あり」 の視覚階層を明確化。 */
+    --theme-border-subtle: rgba(255, 255, 255, 0.10);   /* 一般 card / panel の subtle 装飾枠 */
+    --theme-border-normal: rgba(255, 255, 255, 0.18);   /* glass-panel:hover 等で多用 */
+    --theme-border-strong: rgba(255, 255, 255, 0.28);   /* spinner border, high-contrast */
 
     /* 半透明オーバーレイ (dark 前提の rgba(255,255,255,*) / rgba(0,0,0,*) を集約) */
     --theme-overlay-white-10: rgba(255, 255, 255, 0.1);   /* shimmer 等 */
@@ -130,7 +131,7 @@
     --theme-status-warning-strong: #fde047;  /* yellow-300 */
     --theme-status-info-soft: #dbeafe;       /* blue-100 */
     --theme-status-info-strong: #93c5fd;     /* blue-300 */
-    --theme-status-accent-soft: rgba(34, 211, 238, 0.18);  /* cyan-400 18% — active state (medium tint, default text 読める) */
+    --theme-status-accent-soft: #cffafe;     /* cyan-100 opaque — 他 status-X-soft と統一 (v2854) */
     --theme-status-accent-strong: #22d3ee;   /* cyan-400 — visible accent border */
     --theme-status-detection-soft: #ede9fe;  /* violet-100 — form detection */
     --theme-status-detection-strong: #c4b5fd;/* violet-300 */
@@ -450,7 +451,7 @@
     /* pink / highlight-text / accent / cyan-hover は light で contrast 確保のため override */
     --theme-accent-pink: #be185d;            /* pink-700 — light 7.5:1 */
     --theme-status-highlight-text: #7e22ce;  /* purple-700 — light 5.4:1 */
-    --theme-status-accent-soft: rgba(14, 116, 144, 0.10);
+    --theme-status-accent-soft: #cffafe;     /* cyan-100 opaque — 他 status-X-soft と統一 (v2854) */
     --theme-status-accent-strong: #0e7490;
 
     /* Scrollbar (light) */
