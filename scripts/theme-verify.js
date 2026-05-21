@@ -26,6 +26,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { checkBrandAliasResidue } = require('./lib/brand-alias-check');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC_DIR = path.join(ROOT, 'src');
@@ -235,37 +236,16 @@ record(
   sync.reason
 );
 
-// 8c. brand-background/-surface/-text/-border が theme-aware (v2804 root cause チェック)
-//   これらの旧変数を直接参照している inline style や CSS が theme 切替時に dark 固定になる
-//   バグ (2026-05-19 user 報告) の再発防止。 :root で --theme-* のエイリアスになっているか検証。
-function checkBrandAliasing() {
-  const css = fs.readFileSync(path.join(SRC_DIR, 'UnifiedStyles.css.html'), 'utf8');
-  const rootBody = (css.match(/:root\s*\{[\s\S]*?\}\s*(?=\n|$)/) || [''])[0];
-  // 各 brand-* alias が var(--theme-*) を参照しているか
-  const aliases = {
-    '--brand-background': /--brand-background\s*:\s*var\(--theme-bg-base\)/,
-    '--brand-surface': /--brand-surface\s*:\s*var\(--theme-bg-surface\)/,
-    '--brand-text': /--brand-text\s*:\s*var\(--theme-text-primary\)/,
-    '--brand-border': /--brand-border\s*:\s*var\(--theme-border-subtle\)/,
-  };
-  const missing = Object.entries(aliases)
-    .filter(([, re]) => !re.test(rootBody))
-    .map(([name]) => name);
-  return {
-    ok: missing.length === 0,
-    missing,
-    reason: missing.length === 0
-      ? '4 alias 完備 (--brand-background/-surface/-text/-border → --theme-*)'
-      : `エイリアス化されていない brand 変数: ${missing.join(', ')} (theme 切替に追従しない)`,
-  };
-}
-
-const alias = checkBrandAliasing();
+// 8c. v2849+: brand-{background,surface,text,border} alias 廃止チェック (共通ヘルパー)。
+//   theme-perfect (axis 14) と同じロジックを scripts/lib/brand-alias-check で共有。
+const alias = checkBrandAliasResidue({ srcDir: SRC_DIR });
 record(
-  '8c. brand-* → theme-* alias',
+  '8c. brand alias 不在 (--theme-* 直参照)',
   10,
-  alias.ok,
-  alias.reason
+  alias.aliasFree,
+  alias.aliasFree
+    ? 'alias 廃止済 (--theme-* 直参照に統一, 0 件残存)'
+    : `alias 残存: def=${alias.hasDef}, usage in ${alias.usageFiles.join(', ') || 'none'}`
 );
 
 // =====================================================================

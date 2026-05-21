@@ -23,6 +23,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
+const { checkBrandAliasResidue } = require('./lib/brand-alias-check');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'src');
@@ -31,6 +32,19 @@ const checks = [];
 function check(name, ok, detail) { checks.push({ name, ok, detail }); }
 
 const HTML_FILES = fs.readdirSync(SRC).filter(f => f.endsWith('.html') || f.endsWith('.js'));
+const FILE_SET = new Set(HTML_FILES);
+
+// SRC ファイル content を最初のアクセス時にだけ読む。 13 軸が同じファイルを独立 read
+// していたのを 1 回に集約 (~25 reads × 13 ≈ 300 syscall → 25 syscall)。
+const FILE_CACHE = new Map();
+function readSrc(name) {
+  let v = FILE_CACHE.get(name);
+  if (v === undefined) {
+    v = fs.readFileSync(path.join(SRC, name), 'utf8');
+    FILE_CACHE.set(name, v);
+  }
+  return v;
+}
 
 // 1. theme-matrix actionable theme-bleed = 0
 const matrix = spawnSync('node', ['scripts/theme-matrix.js', '--uncovered'], { cwd: ROOT, encoding: 'utf8' });
@@ -48,7 +62,7 @@ check('2. Tailwind unpaired auto-fixable = 0', pairCount === 0, `${pairCount} �
 let inlineHex = 0;
 const STYLE_RE = /style=(["'])([^"']*?(?:#[0-9a-fA-F]{3,8}|rgba?\([^)]+\))[^"']*?)\1/g;
 for (const f of HTML_FILES) {
-  const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+  const text = readSrc(f);
   // exempt-block-start .. -block-end の char range を計算
   const blockRanges = [];
   const startRe = /theme:exempt-block-start/g;
@@ -79,7 +93,7 @@ check('3. Inline style hardcoded = 0', inlineHex === 0, `${inlineHex} 件 inline
 // 4. JS-side .style.X = '#xxx'
 let jsAssign = 0;
 for (const f of HTML_FILES) {
-  const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+  const text = readSrc(f);
   const matches = text.match(/\.style\.(?:color|background\w*|borderColor|fill|stroke)\s*=\s*['"](?:#[0-9a-fA-F]{3,8}|rgba?\()/g) || [];
   for (const m of matches) {
     const idx = text.indexOf(m);
@@ -93,7 +107,7 @@ check('4. JS-side .style hardcoded = 0', jsAssign === 0, `${jsAssign} 件`);
 // 5. SVG fill="#xxx" / stroke="#xxx" attribute (not currentColor)
 let svgHex = 0;
 for (const f of HTML_FILES) {
-  const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+  const text = readSrc(f);
   const matches = text.match(/(?:fill|stroke)="#[0-9a-fA-F]{3,8}"/g) || [];
   svgHex += matches.length;
 }
@@ -120,13 +134,13 @@ check('8. Unit tests 957+ PASS', testsPass, `pass=${passMatch?passMatch[1]:'?'},
 // 9. body.theme-light 上書きを CSS / HTML <style> で持つファイル数
 let lightOverrideFiles = 0;
 for (const f of HTML_FILES) {
-  const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+  const text = readSrc(f);
   if (/body\.theme-light\b/.test(text)) lightOverrideFiles++;
 }
 check('9. body.theme-light override 定義あり', lightOverrideFiles >= 2, `${lightOverrideFiles} ファイル (UnifiedStyles + page.viz)`);
 
 // 10. themeManager API export 完全 (get/set/toggle/subscribe/init/mountToggle)
-const su = fs.readFileSync(path.join(SRC, 'SharedUtilities.html'), 'utf8');
+const su = readSrc('SharedUtilities.html');
 const apiBits = ['get(', 'set(', 'toggle(', 'subscribe(', 'init(', 'mountToggle(', 'resolved('];
 const missing = apiBits.filter(b => !su.includes(b));
 check('10. themeManager 全 API 実装', missing.length === 0, missing.length ? `missing: ${missing.join(',')}` : '7/7');
@@ -136,7 +150,7 @@ const hasPersist = /['"]app-theme['"]/.test(su);
 check('11. localStorage \'app-theme\' 永続化', hasPersist, hasPersist ? '✓' : '✗');
 
 // 12. Tailwind darkMode:'class' + theme.extend.colors
-const tw = fs.readFileSync(path.join(SRC, 'SharedTailwindConfig.html'), 'utf8');
+const tw = readSrc('SharedTailwindConfig.html');
 const hasDarkMode = /darkMode:\s*['"]class['"]/.test(tw);
 const hasThemeColors = /theme-bg-base|theme-text-primary/.test(tw);
 check('12. Tailwind darkMode + theme tokens 公開', hasDarkMode && hasThemeColors, `darkMode=${hasDarkMode}, tokens=${hasThemeColors}`);
@@ -149,10 +163,13 @@ const hasThemeClass = /classList\.add\(.{0,30}'theme-'\s*\+\s*resolved\)/.test(s
 const hasColorScheme = /style\.colorScheme/.test(su);
 check('13. apply() で .dark/.light/.theme-* + colorScheme 同期', hasResolved && hasThemeClass && hasColorScheme, `resolved=${hasResolved}, theme-class=${hasThemeClass}, colorScheme=${hasColorScheme}`);
 
-// 14. brand-* → theme-* alias (UnifiedStyles)
-const us = fs.readFileSync(path.join(SRC, 'UnifiedStyles.css.html'), 'utf8');
-const brandAlias = /--brand-background:\s*var\(--theme-bg-base\)/.test(us);
-check('14. --brand-* → --theme-* alias 完備', brandAlias, brandAlias ? '✓' : '✗');
+// 14. v2849+: --brand-{background,surface,text,border} alias 廃止チェック (共通ヘルパー)。
+//     theme-verify (axis 8c) と同じロジックを scripts/lib/brand-alias-check で共有。
+const us = readSrc('UnifiedStyles.css.html');  // 後続 axis 15/16/21/23/24 で再利用
+const aliasRes = checkBrandAliasResidue({ srcDir: SRC, htmlFiles: HTML_FILES, reader: readSrc });
+check('14. brand alias 不在 (--theme-* 直参照に統一)',
+  aliasRes.aliasFree,
+  aliasRes.aliasFree ? '✓ 0 件' : `def=${aliasRes.hasDef}, usage=${aliasRes.usageFiles.join(',')}`);
 
 // 15. card tier tokens 完備 (--theme-card-1/2/3 が dark + light 両方に)
 const darkCardDef = /:root\s*\{[\s\S]*?--theme-card-1:[\s\S]*?--theme-card-2:[\s\S]*?--theme-card-3:[\s\S]*?\}/m.test(us);
@@ -167,7 +184,7 @@ check('16. prefers-contrast:high override dark+light', hcDark && hcLight, `dark=
 // 17. theme-color meta tag に theme:exempt or theme-aware — same line exempt comment も対応
 let untaggedMeta = 0;
 for (const f of HTML_FILES) {
-  const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+  const text = readSrc(f);
   const lines = text.split('\n');
   for (const line of lines) {
     if (/<meta name="theme-color"/i.test(line)) {
@@ -180,7 +197,7 @@ check('17. <meta theme-color> 全部 exempt 明示', untaggedMeta === 0, `${unta
 // 18. document.write popup に exempt-block マーカー
 let unmarkedPopups = 0;
 for (const f of HTML_FILES) {
-  const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+  const text = readSrc(f);
   const writes = text.match(/(?:document\.write\(|=\s*`[\s\S]{0,500}?<!DOCTYPE html>)/g) || [];
   // 各 popup の周辺 500 chars に exempt-block-start があるか
   for (const m of writes) {
@@ -192,7 +209,7 @@ for (const f of HTML_FILES) {
 check('18. document.write popup 全部 exempt-block 化', unmarkedPopups === 0, `${unmarkedPopups} 件 unmarked`);
 
 // 19. viz CSS body.theme-light override 数 ≥ 9 (quadrant-label/keyword/contrast/axis/4*quadrants 等)
-const vizCss = fs.readFileSync(path.join(SRC, 'page.viz.css.html'), 'utf8');
+const vizCss = readSrc('page.viz.css.html');
 const lightOverrideCount = (vizCss.match(/body\.theme-light\s+\./g) || []).length;
 check('19. page.viz light override ≥ 9 件', lightOverrideCount >= 9, `${lightOverrideCount} 件`);
 
@@ -207,15 +224,14 @@ const hasCsLight = /body\.theme-light[\s\S]{0,2000}?color-scheme:\s*light/.test(
 check('21. color-scheme CSS property (dark+light)', hasCsRoot && hasCsLight, `root=${hasCsRoot}, light=${hasCsLight}`);
 
 // 22. FOUC 防止: SharedThemeBoot.html 存在 + 全 theme-aware ページに include
-const bootExists = fs.existsSync(path.join(SRC, 'SharedThemeBoot.html'));
+const bootExists = FILE_SET.has('SharedThemeBoot.html');
 const PAGES_NEEDING_BOOT = ['Page', 'AdminPanel', 'LoginPage', 'AppSetupPage', 'SetupPage',
                             'TeacherManual', 'Unpublished', 'AccessRestricted', 'ErrorBoundary'];
 let bootMissing = 0;
 for (const p of PAGES_NEEDING_BOOT) {
-  const fp = path.join(SRC, `${p}.html`);
-  if (!fs.existsSync(fp)) continue;
-  const t = fs.readFileSync(fp, 'utf8');
-  if (!/SharedThemeBoot/.test(t)) bootMissing++;
+  const name = `${p}.html`;
+  if (!FILE_SET.has(name)) continue;
+  if (!/SharedThemeBoot/.test(readSrc(name))) bootMissing++;
 }
 check('22. FOUC 防止 SharedThemeBoot 全ページ include', bootExists && bootMissing === 0, `boot=${bootExists}, missing=${bootMissing}`);
 
@@ -238,7 +254,7 @@ function countFontSizes() {
   const STD = new Set(['0.75rem', '0.875rem', '1rem', '1.125rem', '1.25rem', '1.5rem', '1.875rem', '2.25rem']);
   let std = 0, total = 0;
   for (const f of files) {
-    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const text = readSrc(f);
     const cleaned = text.replace(/\/\*[\s\S]*?\*\//g, '');
     const matches = cleaned.matchAll(/font-size:\s*([0-9.]+(?:rem|px|em))/g);
     for (const m of matches) {
@@ -257,7 +273,7 @@ function countOrphanDark() {
   let orphans = 0;
   const CLASS_RE = /class=(["'])([^"']+)\1/g;
   for (const f of HTML_FILES) {
-    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const text = readSrc(f);
     let m;
     while ((m = CLASS_RE.exec(text)) !== null) {
       const classes = m[2].split(/\s+/);
@@ -285,7 +301,7 @@ function countAnyDarkPrefix() {
   let n = 0;
   for (const f of HTML_FILES) {
     if (f === 'SharedThemeBoot.html' || f === 'SharedTailwindConfig.html') continue;
-    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const text = readSrc(f);
     // dark: の使用 (class="..." 内 or classList.add 内のみ)
     const matches = text.match(/\bdark:[a-z]+[-:][a-zA-Z0-9/_-]+/g) || [];
     n += matches.length;
@@ -299,7 +315,7 @@ check('27b. Tailwind dark: prefix 全廃 = 0 (theme token に統一)', anyDark =
 function countGraySlateMix() {
   let mix = 0;
   for (const f of HTML_FILES) {
-    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const text = readSrc(f);
     const grayMatches = text.match(/(?<!dark:)(text|bg|border)-gray-\d+|dark:(text|bg|border)-gray-\d+/g) || [];
     mix += grayMatches.length;
   }
@@ -311,7 +327,7 @@ check('28. gray/slate ファミリー混在 = 0', grayMix === 0, `${grayMix} 件
 // 30. Tailwind utility ↔ config 整合性 (no-op class 検出)
 //   HTML で使われている theme- utility が Tailwind config (nested colors) に存在するか
 function checkUtilityConfigConsistency() {
-  const tw = fs.readFileSync(path.join(SRC, 'SharedTailwindConfig.html'), 'utf8');
+  const tw = readSrc('SharedTailwindConfig.html');
   // nested theme: { DEFAULT, primary, ... } から key を抽出
   const themeMatch = tw.match(/theme:\s*\{([\s\S]*?)\n\s*\},\s*\n\s*\/\//);
   const themeKeys = new Set(['theme']);  // text-theme = DEFAULT
@@ -340,7 +356,7 @@ function checkUtilityConfigConsistency() {
   let noop = 0;
   const noopExamples = [];
   for (const f of HTML_FILES) {
-    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const text = readSrc(f);
     const utilRe = /\b(?:text|bg|border|ring|from|to|via|divide|placeholder|outline|fill|stroke)-(theme(?:-[a-z][\w-]*)?|brand-[a-z][\w-]*|status-[a-z][\w-]*)\b/g;
     let m;
     while ((m = utilRe.exec(text)) !== null) {
@@ -360,7 +376,7 @@ check('30. Tailwind utility ↔ config 整合性 (no-op 検出)', consistency.no
 function countConsolidation() {
   let themeUtility = 0, darkPair = 0;
   for (const f of HTML_FILES) {
-    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const text = readSrc(f);
     themeUtility += (text.match(/\b(bg|text|border)-theme[-a-z]*/g) || []).length;
     darkPair += (text.match(/\bdark:(bg|text|border)-/g) || []).length;
   }
@@ -377,7 +393,7 @@ function countRadii() {
   const STD = new Set(['0.25rem', '0.5rem', '0.75rem', '1rem', '1.5rem', '9999px', '50%']);
   let std = 0, total = 0;
   for (const f of files) {
-    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    const text = readSrc(f);
     const cleaned = text.replace(/\/\*[\s\S]*?\*\//g, '');
     const matches = cleaned.matchAll(/border-radius:\s*([0-9.]+(?:rem|px|%))/g);
     for (const m of matches) {
@@ -389,6 +405,48 @@ function countRadii() {
 }
 const r1 = countRadii();
 check(`26. border-radius Tailwind scale 準拠率 ≥ 80%`, r1.ratio >= 0.8, `${r1.std}/${r1.total} (${(r1.ratio * 100).toFixed(1)}%)`);
+
+// 31. Primary token rgba hardcoded = 0 (v2849+: color-mix() 経由に統一)
+//   主要 brand/accent 色の半透明利用はすべて `color-mix(in srgb, var(--xxx) N%, transparent)` 経由。
+//   token 1 箇所変えれば全 alpha variant + 全 light/dark variant が自動追従。
+//   exempt: token 定義行 / `theme:exempt` 注釈 / login.js.html (standalone popup) /
+//           `var(--token, rgba(...))` fallback (defensive, allowed)。
+const PRIMARY_RGBA_TARGETS = [
+  { re: /rgba\(56,\s*189,\s*248/,  alt: '--theme-accent-cyan' },         // sky-400
+  { re: /rgba\(59,\s*130,\s*246/,  alt: '--brand-primary' },             // blue-500
+  { re: /rgba\(34,\s*211,\s*238/,  alt: '--theme-accent-cyan-strong' },  // cyan-400
+  { re: /rgba\(8,\s*145,\s*178/,   alt: '--theme-accent-cyan-deep' },    // cyan-600
+  { re: /rgba\(96,\s*165,\s*250/,  alt: '--brand-primary-light' },       // blue-400
+  { re: /rgba\(103,\s*232,\s*249/, alt: '--theme-accent-cyan-hover' },   // cyan-300
+];
+// standalone popup window で書かれており theme system を持たない (window 外なので
+// CSS 変数が定義されていない)。 axis 31 のスキャン対象外。
+const RGBA_EXEMPT_FILES = new Set(['login.js.html']);
+
+function countPrimaryRgbaHardcoded() {
+  const violations = [];
+  for (const f of HTML_FILES) {
+    if (RGBA_EXEMPT_FILES.has(f)) continue;
+    const lines = readSrc(f).split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (/^\s*--(?:theme|brand)-/.test(line)) continue;
+      if (/theme:exempt/.test(line)) continue;
+      if (/var\(--[a-z0-9-]+,\s*rgba/.test(line)) continue;  // defensive fallback OK
+      if (/^\s*\*/.test(line)) continue;                      // CSS multi-line comment continuation
+      for (const t of PRIMARY_RGBA_TARGETS) {
+        if (t.re.test(line)) violations.push(`${f}:${i+1} → ${t.alt}`);
+      }
+    }
+  }
+  return violations;
+}
+const primaryRgba = countPrimaryRgbaHardcoded();
+check('31. Primary token rgba hardcoded = 0 (color-mix 統一)',
+  primaryRgba.length === 0,
+  primaryRgba.length === 0
+    ? '✓ 0 件 (color-mix 経由に統一)'
+    : `${primaryRgba.length} 件 残存 (例: ${primaryRgba.slice(0,3).join(', ')})`);
 
 // 出力
 console.log('\n══════════════════════════════════════════════════════════════════');

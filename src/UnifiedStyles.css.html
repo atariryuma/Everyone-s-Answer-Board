@@ -35,25 +35,13 @@
   /* CSS Variables - Comprehensive Color and Design System */
   :root {
     /* =============================================================================
-     * Brand & Core Colors - Primary Design System
-     *
-     * Theme architecture (v2800+, v2804 で alias 化):
-     *   - `--brand-primary/-accent/-like/-understand/-curious/-highlight` 等の純粋な
-     *     brand identity 色は theme 不変 (ダーク/ライト両方で同じ色相)。
-     *   - `--brand-background/-surface/-text/-border` は当初「不変」と分類していたが、
-     *     これらは文脈依存色 (背景/前景) であり theme 切替の対象。 v2804 で `--theme-*` の
-     *     エイリアスに変更し、 全 17+ 箇所の inline style / media query が自動 theme 追従。
+     * Brand identity colors — theme 不変 (dark/light 両方で同じ色相)
+     * 文脈依存の背景・前景・境界は --theme-* を直接使う ( alias 廃止 v2849)
      * ============================================================================= */
     --brand-primary: #3b82f6;
     --brand-primary-secondary: #1d4ed8;
     --brand-accent: #fbbf24;
     --brand-accent-light: #8be9fd;
-    /* v2804: 旧名 --brand-background/-surface/-text/-border を --theme-* のエイリアスに変更。
-       既存の `body style="background: var(--theme-bg-base)"` 等が theme 切替に追従するようになる。 */
-    --brand-background: var(--theme-bg-base);
-    --brand-surface: var(--theme-bg-surface);
-    --brand-text: var(--theme-text-primary);
-    --brand-border: var(--theme-border-subtle);
 
     /* =============================================================================
      * Semantic Theme Tokens (DARK = default, theme で書き換える対象)
@@ -167,6 +155,17 @@
 
     /* Link hover (cyan accent の hover 状態) */
     --theme-accent-cyan-hover: #67e8f9;                /* cyan-300 (brighter than --theme-accent-cyan) */
+
+    /* Cyan accent — 役割別の追加段 (v2849+)
+     * sky-400 (--theme-accent-cyan) より強い tonal punch を必要とする箇所 (lesson card,
+     * viz dot, btn-active) と、 hero gradient の deeper cyan を意味別に分離。
+     * 旧来 rgba(34,211,238) / rgba(8,145,178) 等の hardcoded を color-mix 経由に統一。 */
+    --theme-accent-cyan-strong: #22d3ee;               /* cyan-400 — 強調 (lesson card, viz, button active) */
+    --theme-accent-cyan-deep: #0891b2;                 /* cyan-600 — gradient base, compare pane */
+
+    /* Brand primary の brighter variant (v2849+) — class chip / template item border 等で
+     * primary より明るい blue が必要な箇所。 brand identity なので両モード不変。 */
+    --brand-primary-light: #60a5fa;                    /* blue-400 — brighter primary */
 
     /* =============================================================================
      * Status Colors - System Feedback
@@ -316,12 +315,13 @@
     /* =============================================================================
      * Animation & Transform System - Standardized Values
      * ============================================================================= */
-    --transition-fast: 0.1s;
-    --transition-normal: 0.2s;
-    --transition-slow: 0.3s;
+    --transition-fast: 0.1s;                       /* instant tactile (game-btn active 等) */
+    --transition-quick: var(--animation-fast);     /* 0.15s — animation-fast と統一 (hover/micro) */
+    --transition-normal: 0.2s;                     /* 標準 (button hover, card lift) */
+    --transition-slow: 0.3s;                       /* modal / page transition */
     --transition-easing: ease-out;
 
-    --animation-fast: 0.15s;
+    --animation-fast: 0.15s;                       /* fade-in / entry — transition-quick の base */
     --animation-normal: 0.3s;
     --animation-slow: 0.5s;
 
@@ -451,6 +451,10 @@
 
     /* Link hover (cyan accent の hover 状態) - light mode は さらに濃く */
     --theme-accent-cyan-hover: #155e75;                /* cyan-800 */
+
+    /* Cyan accent 役割別 (v2849+) — light 上 contrast 確保のため 1-2 段濃い */
+    --theme-accent-cyan-strong: #0891b2;               /* cyan-600 — light 上の強調 */
+    --theme-accent-cyan-deep: #0e7490;                 /* cyan-700 — light 上の最深 */
   }
 
   /* Base Styles - Unified body element */
@@ -523,7 +527,7 @@
     border-radius: 0.5rem;
     color: var(--theme-text-secondary);
     cursor: pointer;
-    transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+    transition: background var(--transition-quick) ease, color var(--transition-quick) ease, border-color var(--transition-quick) ease;
   }
   .theme-toggle-btn:hover {
     background: var(--theme-overlay-white-10);
@@ -683,7 +687,7 @@
     text-transform: uppercase;
     letter-spacing: 0.05em;
     box-shadow: 0 4px 0 var(--theme-overlay-black-20);
-    transition: all 0.1s ease;
+    transition: all var(--transition-fast) ease;
     border: 2px solid transparent;
   }
 
@@ -751,7 +755,7 @@
   /* Admin Toggle - Subtle button for administrators only */
   .admin-toggle {
     font-size: 0.75rem;
-    transition: all 0.2s ease;
+    transition: all var(--transition-normal) ease;
   }
 
   .admin-toggle:hover {
@@ -983,14 +987,14 @@
 
   /* hero: primary entry point として強調する card (gradient + cyan border)。 旧 .lesson-hero-card 相当。 */
   .card-hero {
-    border-color: rgba(34, 211, 238, 0.35);
-    background: linear-gradient(135deg, rgba(8, 145, 178, 0.12), rgba(34, 211, 238, 0.04));
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 35%, transparent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--theme-accent-cyan-deep) 12%, transparent), color-mix(in srgb, var(--theme-accent-cyan-strong) 4%, transparent));
   }
   .card-hero h2 { color: var(--theme-accent-cyan); }
   body.theme-light .card-hero h2 { color: #155e75; }  /* cyan-800 — light で hierarchy 確保 */
   body.theme-light .card-hero {
     border-color: rgba(14, 116, 144, 0.3);
-    background: linear-gradient(135deg, rgba(14, 116, 144, 0.06), rgba(34, 211, 238, 0.03));
+    background: linear-gradient(135deg, rgba(14, 116, 144, 0.06), color-mix(in srgb, var(--theme-accent-cyan-strong) 3%, transparent));
   }
 
   /* ============================================================
@@ -1016,7 +1020,7 @@
   .modal-card-md { max-width: 42rem; }   /* max-w-2xl */
   .modal-card-lg { max-width: 64rem; }   /* max-w-5xl */
   .modal-card-prominent {
-    border: 2px solid rgba(34, 211, 238, 0.8);
+    border: 2px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent);
     box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   }
 
@@ -1150,7 +1154,7 @@
     -webkit-backdrop-filter: blur(8px);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition: opacity var(--transition-slow) ease, transform var(--transition-slow) ease;
     max-width: 90vw;
     text-align: center;
     font-size: 1rem;
@@ -1387,19 +1391,19 @@
     border-radius: 0.5rem;
     color: var(--theme-text-primary);
     font-size: 0.875rem;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
     cursor: pointer;
   }
 
   .modern-select:focus {
     outline: none;
-    border-color: rgba(59, 130, 246, 0.8);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    border-color: color-mix(in srgb, var(--brand-primary) 80%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 20%, transparent);
   }
 
   .modern-select.has-ai-selection {
-    border-color: rgba(59, 130, 246, 0.6);
-    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+    border-color: color-mix(in srgb, var(--brand-primary) 60%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 20%, transparent);
   }
 
   .modern-select.has-manual-selection {
@@ -1426,7 +1430,7 @@
   .modern-input:focus {
     outline: none;
     border-color: var(--brand-primary);
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);  /* primary halo (brand identity) */
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 10%, transparent);  /* primary halo (brand identity) */
     background: var(--theme-overlay-white-10);
   }
 
@@ -1463,7 +1467,7 @@
     background: var(--theme-border-strong);
     border-radius: 0.75rem;
     position: relative;
-    transition: all 0.3s;
+    transition: all var(--transition-slow);
   }
 
   .slider:before {
@@ -1476,12 +1480,12 @@
     background: #ffffff;  /* theme:exempt — iOS-style toggle knob */
     top: 2px;
     left: 2px;
-    transition: all 0.3s;
+    transition: all var(--transition-slow);
     box-shadow: 0 1px 3px var(--theme-overlay-black-20);
   }
 
   .toggle-switch input:checked + .slider {
-    background: rgba(59, 130, 246, 0.8);
+    background: color-mix(in srgb, var(--brand-primary) 80%, transparent);
   }
 
   .toggle-switch input:checked + .slider:before {
@@ -1555,20 +1559,20 @@
 
   /* Link Buttons — brand primary blue (両モード視認確保) */
   .link-btn {
-    background: rgba(59, 130, 246, 0.2);
+    background: color-mix(in srgb, var(--brand-primary) 20%, transparent);
     color: var(--brand-primary);
     padding: 0.5rem 1rem;
     border-radius: 0.5rem;
     text-decoration: none;
     font-size: 0.875rem;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
     display: inline-block;
     text-align: center;
   }
 
   .link-btn:hover {
-    background: rgba(59, 130, 246, 0.3);
+    background: color-mix(in srgb, var(--brand-primary) 30%, transparent);
   }
 
   /* Config Item Styling — admin panel の設定 1 行表示 */
@@ -1607,13 +1611,13 @@
   .admin-collapsible > summary {
     list-style: none;
     outline: none;
-    transition: color 0.15s ease;
+    transition: color var(--transition-quick) ease;
   }
   .admin-collapsible > summary::-webkit-details-marker { display: none; }
   .admin-collapsible > summary::before {
     content: "▸ ";
     display: inline-block;
-    transition: transform 0.15s ease;
+    transition: transform var(--transition-quick) ease;
     margin-right: 0.25em;
     color: inherit;
   }
@@ -1666,8 +1670,8 @@
     gap: 0.35rem;
     padding: 0.3rem 0.7rem;
     border-radius: 9999px;
-    background: rgba(59, 130, 246, 0.18);  /* brand-primary 薄背景 */
-    border: 1px solid rgba(96, 165, 250, 0.45);
+    background: color-mix(in srgb, var(--brand-primary) 18%, transparent);  /* brand-primary 薄背景 */
+    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
     color: var(--theme-text-primary);
     font-size: 0.875rem;
     cursor: default;
@@ -1676,11 +1680,11 @@
     background: var(--theme-overlay-white-10);
     border-color: var(--theme-border-normal);
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--transition-quick) ease;
   }
   .class-chip-known:hover {
-    background: rgba(59, 130, 246, 0.18);
-    border-color: rgba(96, 165, 250, 0.45);
+    background: color-mix(in srgb, var(--brand-primary) 18%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
     color: var(--theme-text-primary);
   }
   .class-chip-remove {
@@ -1712,16 +1716,16 @@
     color: var(--theme-text-secondary);
     font-size: 0.875rem;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--transition-quick) ease;
   }
   .btn-class-preset:hover {
-    background: rgba(59, 130, 246, 0.2);
-    border-color: rgba(96, 165, 250, 0.5);
+    background: color-mix(in srgb, var(--brand-primary) 20%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
     color: var(--theme-text-primary);
   }
   .btn-class-preset.active {
-    background: rgba(59, 130, 246, 0.3);
-    border-color: rgba(96, 165, 250, 0.7);
+    background: color-mix(in srgb, var(--brand-primary) 30%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 70%, transparent);
     color: var(--theme-text-primary);
   }
   .class-custom-add summary {
@@ -1742,7 +1746,7 @@
     font-size: 0.875rem;
   }
   .lesson-step-dot.active {
-    color: rgba(34, 211, 238, 0.95);
+    color: color-mix(in srgb, var(--theme-accent-cyan-strong) 95%, transparent);
     font-weight: bold;
   }
   .lesson-step[hidden] { display: none; }
@@ -1754,11 +1758,11 @@
     border-radius: 0.75rem;
     padding: 0.85rem 1rem;
     min-width: 180px;
-    transition: border-color 0.15s ease, background 0.15s ease;
+    transition: border-color var(--transition-quick) ease, background var(--transition-quick) ease;
   }
   .lesson-phase-card.active {
-    border-color: rgba(34, 211, 238, 0.7);
-    background: rgba(8, 145, 178, 0.18);
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 70%, transparent);
+    background: color-mix(in srgb, var(--theme-accent-cyan-deep) 18%, transparent);
   }
   .lesson-phase-card.completed {
     opacity: 0.7;
@@ -1786,7 +1790,7 @@
     cursor: pointer;
     padding: 0 0.3rem;
     border-radius: 0.5rem;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: color var(--transition-quick) ease, background var(--transition-quick) ease;
   }
   .phase-delete-btn:hover {
     color: var(--status-error);
@@ -1809,17 +1813,17 @@
   }
   .phase-add-btn {
     padding: 0.6rem 1.4rem;
-    background: rgba(34, 211, 238, 0.12);
-    border: 1px dashed rgba(34, 211, 238, 0.5);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 12%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--theme-accent-cyan-strong) 50%, transparent);
     border-radius: 0.5rem;
     color: var(--theme-accent-cyan);
     font-size: 0.875rem;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--transition-quick) ease;
   }
   .phase-add-btn:hover {
-    background: rgba(34, 211, 238, 0.2);
-    border-color: rgba(34, 211, 238, 0.8);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 20%, transparent);
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent);
     color: #fff;
   }
 
@@ -1827,8 +1831,8 @@
   .phase-preview {
     margin-bottom: 0.6rem;
     padding: 0.5rem 0.6rem;
-    background: rgba(8, 145, 178, 0.1);
-    border: 1px solid rgba(34, 211, 238, 0.25);
+    background: color-mix(in srgb, var(--theme-accent-cyan-deep) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 25%, transparent);
     border-radius: 0.5rem;
     font-size: 0.875rem;
     color: var(--theme-text-primary);
@@ -1837,7 +1841,7 @@
     display: flex; align-items: center; gap: 0.4rem; justify-content: space-between;
   }
   .phase-preview-track {
-    flex: 1; text-align: center; color: rgba(34, 211, 238, 0.8); letter-spacing: -2px;
+    flex: 1; text-align: center; color: color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent); letter-spacing: -2px;
   }
   .phase-preview-end {
     color: var(--theme-accent-cyan);
@@ -1864,7 +1868,7 @@
     overflow: hidden;
   }
   .matrix-quad {
-    border: 1px solid rgba(34, 211, 238, 0.18);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 18%, transparent);
   }
   .matrix-x-axis { grid-column: 2; color: var(--theme-accent-cyan); }
   .matrix-y-low { grid-column: 2; color: var(--theme-accent-cyan); }
@@ -1888,7 +1892,7 @@
     list-style: none;
   }
   .phase-detail summary::before { content: '▸ '; color: var(--theme-text-muted); }
-  .phase-detail[open] summary::before { content: '▾ '; color: rgba(34, 211, 238, 0.8); }
+  .phase-detail[open] summary::before { content: '▾ '; color: color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent); }
   .phase-detail-row {
     display: flex; gap: 0.4rem; align-items: center; margin-top: 0.4rem;
   }
@@ -1921,15 +1925,15 @@
   .phase-choice-add {
     align-self: flex-start;
     padding: 0.25rem 0.7rem;
-    background: rgba(34, 211, 238, 0.1);
-    border: 1px dashed rgba(34, 211, 238, 0.4);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 10%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--theme-accent-cyan-strong) 40%, transparent);
     border-radius: 0.5rem;
     color: var(--theme-accent-cyan);
     font-size: 0.75rem;
     cursor: pointer;
   }
   .phase-choice-add:hover {
-    background: rgba(34, 211, 238, 0.2);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 20%, transparent);
   }
 
   /* Phase scale picker (3 / 5 / 7 段階の radio 群) */
@@ -1948,7 +1952,7 @@
     cursor: pointer;
   }
   .phase-scale-opt:hover {
-    border-color: rgba(96, 165, 250, 0.5);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
   }
   .phase-scale-opt input[type="radio"] { margin: 0; cursor: pointer; }
   .phase-scale-hint {
@@ -1962,18 +1966,18 @@
     margin-top: 0.4rem;
     padding: 0.7rem;
     background: var(--theme-card-2);
-    border: 1.5px dashed rgba(96, 165, 250, 0.45);
+    border: 1.5px dashed color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
     border-radius: 0.5rem;
     cursor: pointer;
-    transition: all 0.15s ease;
+    transition: all var(--transition-quick) ease;
     min-height: 80px;
     outline: none;
   }
   .phase-image-zone:hover,
   .phase-image-zone:focus,
   .phase-image-zone.drag-hover {
-    background: rgba(34, 211, 238, 0.08);
-    border-color: rgba(34, 211, 238, 0.7);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 8%, transparent);
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 70%, transparent);
   }
   .phase-image-zone .phase-image-file {
     display: none;
@@ -2020,9 +2024,9 @@
   .phase-extra-badges {
     margin-left: 0.4rem;
     font-size: 0.75rem;
-    color: rgba(34, 211, 238, 0.9);
+    color: color-mix(in srgb, var(--theme-accent-cyan-strong) 90%, transparent);
     padding: 0.05rem 0.4rem;
-    background: rgba(34, 211, 238, 0.12);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 12%, transparent);
     border-radius: 0.5rem;
   }
   .phase-extra-list {
@@ -2063,7 +2067,7 @@
   /* board preview: サンプルカード */
   .phase-preview-sample-card {
     background: var(--theme-card-1);
-    border: 1px solid rgba(96, 165, 250, 0.35);
+    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 35%, transparent);
     border-radius: 0.5rem;
     padding: 0.45rem 0.55rem;
     font-size: 0.75rem;
@@ -2119,7 +2123,7 @@
   .matrix-sample-dot {
     position: absolute;
     width: 1.1rem; height: 1.1rem;
-    background: rgba(96, 165, 250, 0.85);
+    background: color-mix(in srgb, var(--brand-primary-light) 85%, transparent);
     border-radius: 50%;
     color: var(--theme-text-primary);
     font-size: 0.55rem; line-height: 1.1rem;
@@ -2142,7 +2146,7 @@
     margin-top: 0.4rem;
     width: 280px;
     background: var(--theme-card-3);
-    border: 1px solid rgba(96, 165, 250, 0.5);
+    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
     border-radius: 0.5rem;
     padding: 0.4rem;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
@@ -2160,11 +2164,11 @@
     color: var(--theme-text-primary);
     cursor: pointer;
     margin-bottom: 0.25rem;
-    transition: all 0.15s ease;
+    transition: all var(--transition-quick) ease;
   }
   .lesson-template-item:hover {
-    background: rgba(59, 130, 246, 0.15);
-    border-color: rgba(96, 165, 250, 0.45);
+    background: color-mix(in srgb, var(--brand-primary) 15%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
   }
   .lesson-template-label {
     font-size: 0.875rem; font-weight: 600;
@@ -2196,7 +2200,7 @@
     line-height: 1.2;
   }
   .profile-badge-active {
-    background: rgba(8, 145, 178, 0.4);
+    background: color-mix(in srgb, var(--theme-accent-cyan-deep) 40%, transparent);
     color: var(--theme-accent-cyan);
   }
   .profile-badge-published {
@@ -2211,12 +2215,12 @@
     padding: 0.15rem 0.4rem;
     font-size: 0.875rem;
     cursor: pointer;
-    transition: all 0.12s ease;
+    transition: all var(--transition-fast) ease;
     flex-shrink: 0;
   }
   .profile-icon-load:hover {
-    background: rgba(59, 130, 246, 0.25);
-    border-color: rgba(96, 165, 250, 0.45);
+    background: color-mix(in srgb, var(--brand-primary) 25%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
     color: #fff;
   }
   .profile-icon-delete {
@@ -2229,8 +2233,8 @@
   }
   /* ロード中の行を highlight */
   .profile-row.profile-row-loading {
-    background: rgba(59, 130, 246, 0.15) !important;
-    border-color: rgba(96, 165, 250, 0.6) !important;
+    background: color-mix(in srgb, var(--brand-primary) 15%, transparent) !important;
+    border-color: color-mix(in srgb, var(--brand-primary-light) 60%, transparent) !important;
     opacity: 0.7;
     pointer-events: none;
   }
@@ -2245,7 +2249,7 @@
   .profile-rename-input {
     width: 100%;
     background: var(--theme-card-3);
-    border: 1px solid rgba(96, 165, 250, 0.6);
+    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 60%, transparent);
     border-radius: 0.25rem;
     color: var(--theme-text-primary);
     font-size: 0.75rem;
@@ -2255,13 +2259,13 @@
 
   /* 💾 更新ボタン (active row のみ表示) */
   .profile-icon-update {
-    background: rgba(34, 211, 238, 0.18);
-    border-color: rgba(34, 211, 238, 0.45);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 18%, transparent);
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 45%, transparent);
     color: var(--theme-accent-cyan);
   }
   .profile-icon-update:hover {
-    background: rgba(34, 211, 238, 0.4);
-    border-color: rgba(34, 211, 238, 0.7);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 40%, transparent);
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 70%, transparent);
     color: #fff;
   }
 
@@ -2282,7 +2286,7 @@
     margin-top: 0.4rem;
     min-width: 220px;
     background: var(--theme-card-3);
-    border: 1px solid rgba(34, 211, 238, 0.5);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 50%, transparent);
     border-radius: 0.5rem;
     padding: 0.35rem;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
@@ -2299,11 +2303,11 @@
     color: var(--theme-text-primary);
     font-size: 0.875rem;
     cursor: pointer;
-    transition: all 0.12s ease;
+    transition: all var(--transition-fast) ease;
   }
   .phase-add-menu-item:hover {
-    background: rgba(34, 211, 238, 0.15);
-    border-color: rgba(34, 211, 238, 0.4);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 15%, transparent);
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 40%, transparent);
   }
 
   /* ===== テンプレフォーム作成 dropdown ===== */
@@ -2322,7 +2326,7 @@
     margin-top: 0.4rem;
     min-width: 280px;
     background: var(--theme-card-3);
-    border: 1px solid rgba(96, 165, 250, 0.5);
+    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
     border-radius: 0.5rem;
     padding: 0.4rem;
     box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
@@ -2340,11 +2344,11 @@
     color: var(--theme-text-primary);
     cursor: pointer;
     margin-bottom: 0.2rem;
-    transition: all 0.12s ease;
+    transition: all var(--transition-fast) ease;
   }
   .template-form-item:hover {
-    background: rgba(59, 130, 246, 0.15);
-    border-color: rgba(96, 165, 250, 0.45);
+    background: color-mix(in srgb, var(--brand-primary) 15%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
   }
   .template-form-label { font-size: 0.875rem; font-weight: 600; }
   .template-form-desc {
@@ -2473,9 +2477,9 @@
   #lesson-review-banner.hidden { display: none; }
   #lesson-review-banner {
     position: sticky; top: 0; z-index: 9999;
-    background: linear-gradient(90deg, rgba(8,145,178,0.95), rgba(34,211,238,0.75));
+    background: linear-gradient(90deg, color-mix(in srgb, var(--theme-accent-cyan-deep) 95%, transparent), color-mix(in srgb, var(--theme-accent-cyan-strong) 75%, transparent));
     color: var(--theme-text-primary); padding: 0.5rem 1rem;
-    border-bottom: 1px solid rgba(34,211,238,0.6);
+    border-bottom: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 60%, transparent);
     font-size: 0.875rem;
   }
   #lesson-review-banner .lesson-review-banner-inner {
@@ -2497,7 +2501,7 @@
     display: flex;
     align-items: center;
     gap: 0.6rem;
-    transition: background 0.1s ease;
+    transition: background var(--transition-fast) ease;
   }
   #lesson-list li:hover { background: var(--theme-card-3); }
   #lesson-list .lesson-state-badge {
@@ -2505,7 +2509,7 @@
     background: var(--theme-border-subtle); color: var(--theme-bg-elevated);
   }
   #lesson-list .lesson-state-badge.state-active {
-    background: rgba(34, 211, 238, 0.3); color: var(--theme-accent-cyan);
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 30%, transparent); color: var(--theme-accent-cyan);
   }
   #lesson-list .lesson-state-badge.state-completed {
     background: rgba(34, 197, 94, 0.2); color: rgba(187, 247, 208, 1);
