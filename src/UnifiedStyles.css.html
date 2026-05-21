@@ -2533,4 +2533,48 @@
   body.theme-light #lesson-list .lesson-state-badge.state-completed {
     background: color-mix(in srgb, var(--status-success) 18%, transparent); color: #15803d;  /* emerald-700 */
   }
+
+  /* =============================================================================
+   * Status feedback utility — defensive CSS rules (v2853+)
+   *
+   * Why: Tailwind CDN JIT が nested theme key (`theme.status-X-{soft,strong,text-on-soft}`)
+   *   から utility class を生成し損ねるケースが production で観測された (心理的安全性 box
+   *   が dark のまま表示される drift)。 Tailwind 経由と CSS rule を冗長化することで、
+   *   utility が失敗しても確実に色が出る defensive layer。
+   *
+   * HTML 側は `class="bg-theme-status-warning-soft border border-theme-status-warning-strong"`
+   *   のような Tailwind class をそのまま使い続ける (semantic で読みやすい)。
+   *   token を変更したいときは `--theme-status-*` の値を 1 箇所変えるだけで全箇所に反映。
+   * ============================================================================= */
+  .bg-theme-status-success-soft     { background: var(--theme-status-success-soft); }
+  .bg-theme-status-error-soft       { background: var(--theme-status-error-soft); }
+  .bg-theme-status-warning-soft     { background: var(--theme-status-warning-soft); }
+  .bg-theme-status-info-soft        { background: var(--theme-status-info-soft); }
+  .bg-theme-status-accent-soft      { background: var(--theme-status-accent-soft); }
+  .bg-theme-status-detection-soft   { background: var(--theme-status-detection-soft); }
+  .bg-theme-status-highlight-soft   { background: var(--theme-status-highlight-soft); }
+
+  .border-theme-status-success-strong   { border-color: var(--theme-status-success-strong); }
+  .border-theme-status-error-strong     { border-color: var(--theme-status-error-strong); }
+  .border-theme-status-warning-strong   { border-color: var(--theme-status-warning-strong); }
+  .border-theme-status-info-strong      { border-color: var(--theme-status-info-strong); }
+  .border-theme-status-accent-strong    { border-color: var(--theme-status-accent-strong); }
+  .border-theme-status-detection-strong { border-color: var(--theme-status-detection-strong); }
+  .border-theme-status-highlight-strong { border-color: var(--theme-status-highlight-strong); }
+
+  .text-theme-status-success-text-on-soft { color: var(--theme-status-success-text-on-soft); }
+  .text-theme-status-error-text-on-soft   { color: var(--theme-status-error-text-on-soft); }
+  .text-theme-status-warning-text-on-soft { color: var(--theme-status-warning-text-on-soft); }
+  .text-theme-status-info-text-on-soft    { color: var(--theme-status-info-text-on-soft); }
+  .text-theme-status-accent-text-on-soft  { color: var(--theme-status-accent-text-on-soft); }
+
+  .text-theme-status-success     { color: var(--theme-status-success-text); }
+  .text-theme-status-error       { color: var(--theme-status-error-text); }
+  .text-theme-status-warning     { color: var(--theme-status-warning-text); }
+  .text-theme-status-info        { color: var(--theme-status-info-text); }
+  .text-theme-status-detection   { color: var(--theme-status-detection-text); }
+  .text-theme-status-highlight   { color: var(--theme-status-highlight-text); }
+
+  /* お題見出し用 pink accent も同様に defensive fallback */
+  .text-theme-accent-pink        { color: var(--theme-accent-pink); }
 </style>
