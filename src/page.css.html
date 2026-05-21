@@ -204,6 +204,9 @@
   text-align: center;
   max-width: min(100%, 60rem);
   margin: 0;
+  /* お題見出しは brand cyan とは別系統の強調色 (pink) で「問い」 を視覚的に区別。
+     Tailwind utility `text-theme-accent-pink` も Page.html で重複指定済 (defensive)。 */
+  color: var(--theme-accent-pink);
 }
 @media (min-width: 640px) { .eab-question { font-size: 1.5rem; } }
 @media (min-width: 768px) { .eab-question { font-size: 1.875rem; } }
