@@ -67,21 +67,7 @@
                 warning: 'var(--status-warning)',
                 info: 'var(--status-info)',
               },
-            },
-            // Tailwind default の font-sans は `ui-sans-serif, system-ui, sans-serif, ...`
-            // で始まる。 production の `important: true` と組み合わせて body の
-            // font-family CSS を上書きするため、 `system-ui` がブラウザの
-            // フォント設定 (chrome://settings/fonts 等) をそのまま反映してしまい、
-            // 「ボタン以外の text も browser font に化ける」 現象が発生していた (v2842 user 報告)。
-            // 解決: explicit な -apple-system / Segoe UI / Roboto stack に override する。
-            // これで body.font-sans が browser-font に左右されなくなる。
-            fontFamily: {
-              sans: [
-                '-apple-system', 'BlinkMacSystemFont',
-                "'Segoe UI'", 'Roboto', "'Google Sans'", "'Inter'",
-                'sans-serif',
-              ],
-            },
+            }
           }
         },
         ...(isProduction && {
