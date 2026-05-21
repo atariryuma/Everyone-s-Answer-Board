@@ -81,11 +81,11 @@
        教師の意図的な促しは多面的視点の提示なので積極的に強調 OK（DCE 観点で安全）。
      stroke は JS インライン style (#fbbf24) で priority 上書きするので、CSS は drop-shadow (glow) を担当。 */
   .viz-dot.highlight {
-    filter: drop-shadow(0 0 4px rgba(251, 191, 36, 0.65));
+    filter: drop-shadow(0 0 4px color-mix(in srgb, var(--brand-accent) 65%, transparent));
   }
   body.projector-mode .viz-dot.highlight {
     /* 電子黒板 / プロジェクタでも視認しやすいよう glow を強める */
-    filter: drop-shadow(0 0 7px rgba(251, 191, 36, 0.85));
+    filter: drop-shadow(0 0 7px color-mix(in srgb, var(--brand-accent) 85%, transparent));
   }
   /* ghost マーカー: 揺らぎ大 (swing-trace) で「過去位置」を示す薄色 dot。
      groupByStudent は ghost を空配列にするので、画面に出るのは matrix renderer の
@@ -232,14 +232,14 @@
   .viz-quadrant {
     pointer-events: none;
   }
-  .viz-quadrant.hh { fill: rgba(34, 197, 94, 0.08); }
+  .viz-quadrant.hh { fill: color-mix(in srgb, var(--status-success) 8%, transparent); }
   .viz-quadrant.hl { fill: rgba(250, 204, 21, 0.07); }
   .viz-quadrant.lh { fill: color-mix(in srgb, var(--theme-accent-cyan) 7%, transparent); }
-  .viz-quadrant.ll { fill: rgba(248, 113, 113, 0.07); }
+  .viz-quadrant.ll { fill: color-mix(in srgb, var(--status-error) 7%, transparent); }
   /* Light mode: slate-50 上では 7-8% は薄すぎて消えるので倍程度に上げる (依然 subtle) */
   body.theme-light .viz-quadrant.hh { fill: rgba(22, 163, 74, 0.14); }
   body.theme-light .viz-quadrant.hl { fill: rgba(202, 138, 4, 0.13); }
-  body.theme-light .viz-quadrant.lh { fill: rgba(14, 116, 144, 0.13); }
+  body.theme-light .viz-quadrant.lh { fill: color-mix(in srgb, var(--theme-accent-cyan-deep) 13%, transparent); }
   body.theme-light .viz-quadrant.ll { fill: rgba(220, 38, 38, 0.12); }
 
   .viz-quadrant-label {
@@ -365,18 +365,18 @@
 
   /* 孤立意見 (lone-voice): 象限内 1 票だけの意見に control-tower 的な金色ハロー。
      学術会議 2020 報告 p.14「マジョリティのマイノリティへの同調強要」回避用 (v2691)。
-     highlight (教師注目, drop-shadow 0 0 4-7px rgba(251,191,36,0.65)) より淡く、
+     highlight (教師注目, drop-shadow 0 0 4-7px color-mix(in srgb, var(--brand-accent) 65%, transparent)) より淡く、
      1 票でも「ここに 1 つあるよ」と教師が即座に発見できる程度の glow。
      stroke は触らず drop-shadow のみで実現するので、reaction ring 色とも共存する。 */
   .viz-dot.lone-voice {
-    filter: drop-shadow(0 0 3px rgba(251, 191, 36, 0.45));
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--brand-accent) 45%, transparent));
   }
   body.projector-mode .viz-dot.lone-voice {
-    filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.6));
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--brand-accent) 60%, transparent));
   }
   /* lone-voice + highlight 同時: highlight 側の drop-shadow を優先 (cascade で後者が勝つ) */
   .viz-dot.highlight.lone-voice {
-    filter: drop-shadow(0 0 5px rgba(251, 191, 36, 0.75));
+    filter: drop-shadow(0 0 5px color-mix(in srgb, var(--brand-accent) 75%, transparent));
   }
 
   /* 議論前 → 現在 の動き軌跡 (v2777 で矢印 overlay から ghost trail に再設計)。
@@ -457,7 +457,7 @@
     border-radius: 50%;
     background: #fde047;  /* yellow-300 (highlight dot) */
     border: 2px solid var(--status-warning);
-    box-shadow: 0 0 8px rgba(253, 224, 71, 0.65);
+    box-shadow: 0 0 8px color-mix(in srgb, var(--theme-status-warning-strong) 65%, transparent);
   }
   /* 行右端の値表示 (5/5)。全行で位置が固定なので視線で縦に値を比較できる。 */
   .modal-axis-value {
@@ -603,9 +603,9 @@
     border-radius: 0.5rem;
     border: 1px solid var(--theme-border-subtle);
   }
-  /* Light mode: slate-900 50% → 薄い slate trough で pill 群の輪郭を保ちつつ自然に */
+  /* Light mode: slate-100 風 trough で pill 群の輪郭を保ちつつ自然に */
   body.theme-light .viz-profile-pills-row {
-    background: rgba(241, 245, 249, 0.85);
+    background: color-mix(in srgb, var(--theme-bg-base) 85%, transparent);
     border-color: var(--theme-border-subtle);
   }
   .viz-profile-pill {
@@ -654,8 +654,8 @@
     margin-left: 0.5rem;
     padding: 0.3rem 0.7rem;
     border-radius: 0.5rem;
-    border: 1px solid rgba(251, 191, 36, 0.6);
-    background: rgba(251, 191, 36, 0.18);
+    border: 1px solid color-mix(in srgb, var(--brand-accent) 60%, transparent);
+    background: color-mix(in srgb, var(--brand-accent) 18%, transparent);
     color: var(--brand-understand);  /* amber 強調 */
     cursor: pointer;
     font-size: 0.875rem;
@@ -664,7 +664,7 @@
     transition: background var(--transition-quick), transform var(--transition-fast);
   }
   .viz-profile-return:hover {
-    background: rgba(251, 191, 36, 0.3);
+    background: color-mix(in srgb, var(--brand-accent) 30%, transparent);
     transform: translateY(-1px);
   }
 
@@ -677,7 +677,7 @@
     .viz-profile-return { font-size: 0.75rem; padding: 0.22rem 0.45rem; }
   }
 
-  body.projector-mode .viz-toolbar { padding: 0.6rem 1rem; background: rgba(10, 14, 26, 0.92); }
+  body.projector-mode .viz-toolbar { padding: 0.6rem 1rem; background: rgba(10, 14, 26, 0.92); /* theme:exempt - projector-mode 強制 dark */ }
   /* 電子黒板 (projector-mode): 議論支援ツールを教室後ろからも視認可能なサイズに拡大。 */
   body.projector-mode .viz-btn { font-size: 1rem; padding: 0.5rem 0.9rem; }
   body.projector-mode .viz-btn-small { font-size: 1rem; padding: 0.4rem 0.7rem; }
@@ -732,7 +732,7 @@
     color: #4ade80;  /* green-400 確認マーク */
   }
   .viz-btn.saved {
-    background: rgba(74, 222, 128, 0.3);
+    background: color-mix(in srgb, var(--status-success) 30%, transparent);
     border-color: #4ade80;  /* green-400 (brand identity for saved state) */
   }
   .viz-btn-small { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
@@ -775,11 +775,11 @@
     border: 1px solid var(--theme-border-subtle);
     border-radius: 0.5rem;
     padding: 0.5rem;
-    background: rgba(15, 23, 42, 0.3);
+    background: color-mix(in srgb, var(--theme-bg-base) 30%, transparent);
   }
-  /* Light mode: slate-900 30% → 薄い slate (slate-100 風) で 2 ペイン区切りを保つ */
+  /* Light mode: theme-bg-base 60% で 2 ペイン区切りを保つ (dark/light 自動追従) */
   body.theme-light .viz-compare-pane {
-    background: rgba(241, 245, 249, 0.6);
+    background: color-mix(in srgb, var(--theme-bg-base) 60%, transparent);
     border-color: var(--theme-border-subtle);
   }
   .viz-compare-pane h4 {
@@ -824,8 +824,8 @@
     gap: 0.3rem;
   }
   .qs-tag {
-    background: rgba(99, 102, 241, 0.18);
-    border: 1px solid rgba(99, 102, 241, 0.35);
+    background: color-mix(in srgb, var(--theme-accent-indigo) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-indigo) 35%, transparent);
     color: var(--theme-accent-cyan);
     border-radius: 9999px;
     padding: 0.12rem 0.55rem;
@@ -867,7 +867,7 @@
   .viz-teacher-panel li:last-child { border-bottom: 0; }
   .viz-teacher-panel .swing-badge {
     display: inline-block;
-    background: rgba(253, 224, 71, 0.2);
+    background: color-mix(in srgb, var(--theme-status-warning-strong) 20%, transparent);
     color: #fde047;
     border-radius: 0.5rem;
     padding: 0 0.4rem;

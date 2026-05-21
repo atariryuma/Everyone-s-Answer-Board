@@ -406,18 +406,41 @@ function countRadii() {
 const r1 = countRadii();
 check(`26. border-radius Tailwind scale 準拠率 ≥ 80%`, r1.ratio >= 0.8, `${r1.std}/${r1.total} (${(r1.ratio * 100).toFixed(1)}%)`);
 
-// 31. Primary token rgba hardcoded = 0 (v2849+: color-mix() 経由に統一)
-//   主要 brand/accent 色の半透明利用はすべて `color-mix(in srgb, var(--xxx) N%, transparent)` 経由。
+// 31. Status + Accent token rgba hardcoded = 0 (v2851+: color-mix() 経由に統一)
+//   status feedback / brand accent / cyan-blue family の半透明利用はすべて
+//   `color-mix(in srgb, var(--xxx) N%, transparent)` 経由。
 //   token 1 箇所変えれば全 alpha variant + 全 light/dark variant が自動追従。
+//   v2849 で cyan/blue 6 系列、 v2851 で status (success/warning/error/purple) +
+//   destructive/indigo を追加し計 22 系列 を network。
 //   exempt: token 定義行 / `theme:exempt` 注釈 / login.js.html (standalone popup) /
 //           `var(--token, rgba(...))` fallback (defensive, allowed)。
 const PRIMARY_RGBA_TARGETS = [
+  // cyan / blue 系 (v2849-v2850)
   { re: /rgba\(56,\s*189,\s*248/,  alt: '--theme-accent-cyan' },         // sky-400
   { re: /rgba\(59,\s*130,\s*246/,  alt: '--brand-primary' },             // blue-500
   { re: /rgba\(34,\s*211,\s*238/,  alt: '--theme-accent-cyan-strong' },  // cyan-400
   { re: /rgba\(8,\s*145,\s*178/,   alt: '--theme-accent-cyan-deep' },    // cyan-600
   { re: /rgba\(96,\s*165,\s*250/,  alt: '--brand-primary-light' },       // blue-400
   { re: /rgba\(103,\s*232,\s*249/, alt: '--theme-accent-cyan-hover' },   // cyan-300
+  { re: /rgba\(14,\s*116,\s*144/,  alt: '--theme-accent-cyan-deep' },    // cyan-700 (light value)
+  { re: /rgba\(139,\s*233,\s*253/, alt: '--brand-accent-light' },        // light cyan
+  // status feedback box (v2851 — bg + border ペアで token 化)
+  { re: /rgba\(34,\s*197,\s*94/,   alt: '--status-success' },            // green-500
+  { re: /rgba\(16,\s*185,\s*129/,  alt: '--status-success' },            // emerald-500
+  { re: /rgba\(187,\s*247,\s*208/, alt: '--status-success' },            // green-200
+  { re: /rgba\(21,\s*128,\s*61/,   alt: '--status-success' },            // emerald-700 (light)
+  { re: /rgba\(74,\s*222,\s*128/,  alt: '--status-success' },            // green-400
+  { re: /rgba\(245,\s*158,\s*11/,  alt: '--status-warning' },            // amber-500
+  { re: /rgba\(251,\s*191,\s*36/,  alt: '--brand-accent' },              // amber-400
+  { re: /rgba\(253,\s*224,\s*71/,  alt: '--theme-status-warning-strong' }, // yellow-300
+  { re: /rgba\(239,\s*68,\s*68/,   alt: '--status-error' },              // red-500
+  { re: /rgba\(248,\s*113,\s*113/, alt: '--status-error' },              // red-400
+  { re: /rgba\(168,\s*85,\s*247/,  alt: '--brand-highlight' },           // purple-500
+  { re: /rgba\(147,\s*51,\s*234/,  alt: '--brand-highlight' },           // purple-600
+  { re: /rgba\(192,\s*132,\s*252/, alt: '--brand-highlight-alt' },       // purple-400
+  // accent: destructive / indigo (v2851 — 新規追加 token)
+  { re: /rgba\(234,\s*88,\s*12/,   alt: '--theme-accent-destructive' },  // orange-600
+  { re: /rgba\(99,\s*102,\s*241/,  alt: '--theme-accent-indigo' },       // indigo-500
 ];
 // standalone popup window で書かれており theme system を持たない (window 外なので
 // CSS 変数が定義されていない)。 axis 31 のスキャン対象外。
@@ -442,7 +465,7 @@ function countPrimaryRgbaHardcoded() {
   return violations;
 }
 const primaryRgba = countPrimaryRgbaHardcoded();
-check('31. Primary token rgba hardcoded = 0 (color-mix 統一)',
+check('31. Status + Accent rgba hardcoded = 0 (color-mix 統一)',
   primaryRgba.length === 0,
   primaryRgba.length === 0
     ? '✓ 0 件 (color-mix 経由に統一)'

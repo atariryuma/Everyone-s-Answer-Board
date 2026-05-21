@@ -1361,7 +1361,7 @@
               transition: all var(--transition-normal);
               display: none;
             }
-            .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99,102,241,0.4); }
+            .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px color-mix(in srgb, var(--theme-accent-indigo) 40%, transparent); }
           </style>
         </head>
         <body style="background:linear-gradient(135deg,#1a1a2e 0%,#16213e 100%);color:white;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -1369,7 +1369,7 @@
             <div id="status-icon" style="font-size:48px;margin-bottom:16px;" class="spinner">⚙️</div>
             <p id="status-text" style="font-size:20px;font-weight:bold;margin-bottom:24px;">テンプレート（${typeLabel}）を作成中...</p>
 
-            <div style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);border-radius: 0.75rem;padding:20px;text-align:left;margin-bottom:16px;">
+            <div style="background:color-mix(in srgb, var(--brand-accent) 15%, transparent);border:1px solid color-mix(in srgb, var(--brand-accent) 30%, transparent);border-radius: 0.75rem;padding:20px;text-align:left;margin-bottom:16px;">
               <p style="font-size:14px;color:#fbbf24;margin:0 0 12px 0;font-weight:bold;">⚠️ 編集が必要な項目</p>
               <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
                 <li><strong>クラス</strong> → 実際のクラス名に変更</li>
@@ -1386,7 +1386,7 @@
               </ul>
             </div>
 
-            <div style="background:rgba(34,197,94,0.2);border:1px solid rgba(34,197,94,0.3);border-radius: 0.75rem;padding:20px;text-align:left;">
+            <div style="background:color-mix(in srgb, var(--status-success) 20%, transparent);border:1px solid color-mix(in srgb, var(--status-success) 30%, transparent);border-radius: 0.75rem;padding:20px;text-align:left;">
               <p style="font-size:14px;color:#86efac;margin:0 0 12px 0;font-weight:bold;">✅ 次のステップ</p>
               <ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.9;color:#e2e8f0;">
                 <li>下のボタンでフォーム編集画面を開く</li>

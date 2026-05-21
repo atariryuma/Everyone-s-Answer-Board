@@ -173,8 +173,8 @@
   align-items: center;
   gap: 0.3rem;
   padding: 0.3rem 0.55rem;
-  background: rgba(234, 88, 12, 0.18);
-  border: 1px solid rgba(234, 88, 12, 0.55);
+  background: color-mix(in srgb, var(--theme-accent-destructive) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--theme-accent-destructive) 55%, transparent);
   border-radius: 0.5rem;
   color: #fdba74;
   font-size: 0.75rem;
@@ -182,12 +182,12 @@
   transition: background-color var(--transition-quick), color var(--transition-quick), border-color var(--transition-quick);
 }
 .eab-end-pub-btn:hover {
-  background: rgba(234, 88, 12, 0.9);
-  border-color: rgba(234, 88, 12, 0.9);
+  background: color-mix(in srgb, var(--theme-accent-destructive) 90%, transparent);
+  border-color: color-mix(in srgb, var(--theme-accent-destructive) 90%, transparent);
   color: #ffffff;
 }
 .eab-end-pub-btn:focus-visible {
-  outline: 2px solid rgba(234, 88, 12, 0.7);
+  outline: 2px solid color-mix(in srgb, var(--theme-accent-destructive) 70%, transparent);
   outline-offset: 1px;
 }
 
@@ -336,7 +336,7 @@ header.header-hidden {
 #pull-to-refresh-indicator.ready {
   /* しきい値到達の触覚フィードバック代替: ボーダーをハイライトして発火予告。 */
   border-color: #fde047;           /* yellow-300 */
-  box-shadow: 0 10px 24px rgba(253, 224, 71, 0.45);
+  box-shadow: 0 10px 24px color-mix(in srgb, var(--theme-status-warning-strong) 45%, transparent);
 }
 #pull-to-refresh-indicator .ptr-spinner {
   width: 14px;
@@ -383,9 +383,9 @@ html, body {
   border-image: linear-gradient(45deg, var(--brand-highlight), var(--brand-highlight-alt), var(--brand-highlight)) 1 !important;
   border-width: 4px !important;
   box-shadow:
-    0 0 25px rgba(147, 51, 234, 0.6),
-    inset 0 0 20px rgba(192, 132, 252, 0.1),
-    0 8px 32px rgba(147, 51, 234, 0.2);
+    0 0 25px color-mix(in srgb, var(--brand-highlight) 60%, transparent),
+    inset 0 0 20px color-mix(in srgb, var(--brand-highlight-alt) 10%, transparent),
+    0 8px 32px color-mix(in srgb, var(--brand-highlight) 20%, transparent);
   transform: scale(1.02);
   position: relative;
 }
@@ -452,7 +452,7 @@ html, body {
   backdrop-filter: blur(8px);
 }
 .admin-toggle:hover {
-  background-color: rgba(139, 233, 253, 0.1);
+  background-color: color-mix(in srgb, var(--brand-accent-light) 10%, transparent);
 }
 /* Spinner definition moved to UnifiedStyles.css.html - use .spinner-medium for 40px spinner */
 
@@ -559,9 +559,9 @@ html, body {
   animation: newCardPulse 2.5s ease-out;
 }
 @keyframes newCardPulse {
-  0%   { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7); transform: translateY(4px); opacity: 0.6; }
-  15%  { box-shadow: 0 0 0 8px rgba(251, 191, 36, 0.4); transform: translateY(0); opacity: 1; }
-  100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0); }
+  0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-accent) 70%, transparent); transform: translateY(4px); opacity: 0.6; }
+  15%  { box-shadow: 0 0 0 8px color-mix(in srgb, var(--brand-accent) 40%, transparent); transform: translateY(0); opacity: 1; }
+  100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--brand-accent) 0%, transparent); }
 }
 @media (prefers-reduced-motion: reduce) {
   .answer-card.new-card { animation: none; }
@@ -677,12 +677,12 @@ button.highlight-badge:hover {
   padding: 2px;
 }
 .highlight-btn:hover {
-  background: rgba(251, 191, 36, 0.15);
+  background: color-mix(in srgb, var(--brand-accent) 15%, transparent);
   transform: scale(1.1);
 }
 .highlight-btn.reacted {
   color: var(--brand-accent);
-  text-shadow: 0 0 8px rgba(251, 191, 36, 0.6);
+  text-shadow: 0 0 8px color-mix(in srgb, var(--brand-accent) 60%, transparent);
 }
 
 /* ✅ Removed conflicting CSS rules that override SVG replacement logic */
@@ -794,8 +794,8 @@ button.highlight-badge:hover {
   border-image: linear-gradient(45deg, var(--brand-highlight), var(--brand-highlight-alt), var(--brand-highlight)) 1 !important;
   border-width: 4px !important;
   box-shadow:
-    0 0 25px rgba(147, 51, 234, 0.6),
-    inset 0 0 20px rgba(192, 132, 252, 0.1) !important;
+    0 0 25px color-mix(in srgb, var(--brand-highlight) 60%, transparent),
+    inset 0 0 20px color-mix(in srgb, var(--brand-highlight-alt) 10%, transparent) !important;
   position: relative;
 }
 .modal-fade { animation: modalFade var(--animation-normal) ease-out; }

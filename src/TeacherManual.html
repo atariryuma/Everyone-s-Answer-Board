@@ -67,8 +67,8 @@
         line-height: 1.6;
       }
       /* tip/warn/info: brand status の薄背景 + 強調 border。色は両モード対応 token */
-      .callout.tip    { background: rgba(34, 197, 94, 0.12);  border-left: 3px solid var(--status-success); color: var(--theme-text-secondary); }
-      .callout.warn   { background: rgba(245, 158, 11, 0.12); border-left: 3px solid var(--status-warning); color: var(--theme-text-secondary); }
+      .callout.tip    { background: color-mix(in srgb, var(--status-success) 12%, transparent);  border-left: 3px solid var(--status-success); color: var(--theme-text-secondary); }
+      .callout.warn   { background: color-mix(in srgb, var(--status-warning) 12%, transparent); border-left: 3px solid var(--status-warning); color: var(--theme-text-secondary); }
       .callout.info   { background: color-mix(in srgb, var(--brand-primary) 12%, transparent); border-left: 3px solid var(--brand-primary);  color: var(--theme-text-secondary); }
       .callout strong { color: var(--theme-text-primary); }
 
