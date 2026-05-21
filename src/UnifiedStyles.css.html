@@ -386,7 +386,14 @@
     padding: 0;
     color: var(--theme-text-primary);
     background: var(--theme-bg-base);
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', 'Inter', sans-serif;
+    /* Stack 設計 (v2846):
+     *   1-6: 欧文 - macOS (-apple-system) / Windows (Segoe UI) / Android (Roboto) / brand fallback
+     *   7-10: 和文 - macOS (Hiragino Sans) / Win10+ (Yu Gothic) / Win7+ (Meiryo)
+     *   11: 最終 fallback (browser configured sans-serif)
+     * 欧文・和文を OS 標準で固定することで、 ユーザの browser font 設定 (chrome://settings/fonts)
+     * の影響を実質排除。 web font 不要なので network request / FOUC 無し。 */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', 'Inter',
+                 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
     min-height: 100vh;
     display: flex;
     flex-direction: column;
