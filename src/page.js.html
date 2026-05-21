@@ -1989,8 +1989,8 @@
           'この回答ボードにアクセスする権限がありません'}</p>
         ${isUserNotFoundError ? `
         <div class="mt-4 p-4 bg-theme-status-info-soft border border-theme-status-info-strong rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-theme-status-info mb-2">🔍 考えられる原因：</h4>
-          <ul class="text-xs text-theme-muted space-y-1">
+          <h4 class="text-sm font-medium text-theme-status-info-text-on-soft mb-2">🔍 考えられる原因：</h4>
+          <ul class="text-xs text-theme-status-info-text-on-soft opacity-90 space-y-1">
             <li>• URLのユーザーIDが無効または期限切れ</li>
             <li>• ボードが削除されたか非アクティブ化された</li>
             <li>• データベース接続に一時的な問題</li>
@@ -1999,8 +1999,8 @@
           </ul>
         </div>
         <div class="mt-4 p-4 bg-theme-status-success-soft border border-theme-status-success-strong rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-theme-status-success mb-2">💡 解決方法：</h4>
-          <ul class="text-xs text-theme-muted space-y-1">
+          <h4 class="text-sm font-medium text-theme-status-success-text-on-soft mb-2">💡 解決方法：</h4>
+          <ul class="text-xs text-theme-status-success-text-on-soft opacity-90 space-y-1">
             <li>• まずページを再読み込みしてみる</li>
             <li>• 正しいボードURLを管理者に確認</li>
             <li>• 5-10分待ってから再度アクセス</li>
@@ -2009,8 +2009,8 @@
           </ul>
         </div>
         <div class="mt-4 p-3 bg-theme-status-warning-soft border border-theme-status-warning-strong rounded-lg text-left max-w-md mx-auto">
-          <h4 class="text-sm font-medium text-theme-status-warning mb-2">🛠️ 自動修復：</h4>
-          <p class="text-xs text-theme-muted">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
+          <h4 class="text-sm font-medium text-theme-status-warning-text-on-soft mb-2">🛠️ 自動修復：</h4>
+          <p class="text-xs text-theme-status-warning-text-on-soft opacity-90">システムは自動的に問題の修復を試行しています。数分後に再度アクセスすると解決している可能性があります。</p>
         </div>` : ''}
         <p class="mt-2 text-xs text-theme-muted">エラー詳細: ${window.sharedUtilities.security.escapeHtml(errorMessage)}</p>
         <div class="mt-6 space-x-3">

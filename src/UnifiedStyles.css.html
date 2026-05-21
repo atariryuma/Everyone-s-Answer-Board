@@ -131,24 +131,35 @@
     --theme-card-2: #454860;                           /* +6% lum — deeper nest */
     --theme-card-3: #50546c;                           /* +8% lum — popup over modal */
 
-    /* Status feedback box bg / border (v2847+ — System B `dark:` prefix を廃止して
-     * theme token に統一)。 -soft = box bg (低彩度), -strong = border (高彩度)。 */
-    --theme-status-success-soft: rgba(34, 197, 94, 0.10);   /* emerald-500 10% */
-    --theme-status-success-strong: rgba(34, 197, 94, 0.35); /* emerald-500 35% */
-    --theme-status-error-soft: rgba(239, 68, 68, 0.10);     /* red-500 10% */
-    --theme-status-error-strong: rgba(239, 68, 68, 0.35);   /* red-500 35% */
-    --theme-status-warning-soft: rgba(245, 158, 11, 0.10);  /* amber-500 10% */
-    --theme-status-warning-strong: rgba(245, 158, 11, 0.35);/* amber-500 35% */
-    --theme-status-info-soft: rgba(59, 130, 246, 0.10);     /* blue-500 10% */
-    --theme-status-info-strong: rgba(59, 130, 246, 0.35);   /* blue-500 35% */
-    --theme-status-accent-soft: rgba(34, 211, 238, 0.10);   /* cyan-400 10% — active state */
-    --theme-status-accent-strong: rgba(34, 211, 238, 0.45); /* cyan-400 45% */
-    --theme-status-detection-soft: rgba(167, 139, 250, 0.12); /* violet-400 12% — form detection */
-    --theme-status-detection-strong: rgba(167, 139, 250, 0.35);
-    --theme-status-detection-text: #c4b5fd;                 /* violet-300 — dark mode 用 */
-    --theme-status-highlight-soft: rgba(168, 85, 247, 0.10); /* purple-500 10% — teacher highlight */
-    --theme-status-highlight-strong: rgba(168, 85, 247, 0.40);
-    --theme-status-highlight-text: #c084fc;                 /* purple-400 — dark mode 用 */
+    /* Status feedback box bg / border (v2848+ — vibrant pale shades で 「色のあるラベル」
+     * 効果を出す。 dark page bg 上で明るく浮かぶことで visual punch を確保。
+     * 旧 v2847 の rgba 低 alpha 版だと色が消えて視認性が弱かった (user 報告)。 */
+    --theme-status-success-soft: #dcfce7;    /* green-100 */
+    --theme-status-success-strong: #86efac;  /* green-300 — border */
+    --theme-status-error-soft: #fee2e2;      /* red-100 */
+    --theme-status-error-strong: #fca5a5;    /* red-300 */
+    --theme-status-warning-soft: #fef9c3;    /* yellow-100 */
+    --theme-status-warning-strong: #fde047;  /* yellow-300 */
+    --theme-status-info-soft: #dbeafe;       /* blue-100 */
+    --theme-status-info-strong: #93c5fd;     /* blue-300 */
+    --theme-status-accent-soft: rgba(34, 211, 238, 0.18);  /* cyan-400 18% — active state (medium tint, default text 読める) */
+    --theme-status-accent-strong: #22d3ee;   /* cyan-400 — visible accent border */
+    --theme-status-detection-soft: #ede9fe;  /* violet-100 — form detection */
+    --theme-status-detection-strong: #c4b5fd;/* violet-300 */
+    --theme-status-detection-text: #4c1d95;  /* violet-900 — text on vibrant violet-soft bg */
+    --theme-status-highlight-soft: #f3e8ff;  /* purple-100 — teacher highlight */
+    --theme-status-highlight-strong: #d8b4fe;/* purple-300 */
+    --theme-status-highlight-text: #c084fc;  /* purple-400 — vibrant label/icon on dark page bg */
+
+    /* Text on vibrant -soft bg (dark text for AA contrast on pale bg, 両モード共通) */
+    --theme-status-success-text-on-soft: #14532d;  /* green-900 */
+    --theme-status-error-text-on-soft: #7f1d1d;    /* red-900 */
+    --theme-status-warning-text-on-soft: #713f12;  /* yellow-900 */
+    --theme-status-info-text-on-soft: #1e3a8a;     /* blue-900 */
+    --theme-status-accent-text-on-soft: #164e63;   /* cyan-900 */
+
+    /* Pink accent (お題見出し用 — brand cyan とは別系統の強調色) */
+    --theme-accent-pink: #f472b6;            /* pink-400 — vibrant on dark bg */
 
     /* Scrollbar (Page.html answer modal で使う) */
     --theme-scrollbar-thumb: rgba(255, 255, 255, 0.20);
@@ -405,23 +416,34 @@
     --status-success: #15803d;                         /* emerald-700: 5.6:1 (dark の emerald-500 は light で 2.4 fail) */
     --status-warning: #a16207;                         /* amber-700: 5.6:1 (dark の amber-500 は light for 2.1 fail) */
 
-    /* Status feedback box - light mode override (alpha 上げて白 bg 上でも visible) */
-    --theme-status-success-soft: rgba(21, 128, 61, 0.08);
-    --theme-status-success-strong: rgba(21, 128, 61, 0.35);
-    --theme-status-error-soft: rgba(220, 38, 38, 0.08);
-    --theme-status-error-strong: rgba(220, 38, 38, 0.35);
-    --theme-status-warning-soft: rgba(217, 119, 6, 0.10);
-    --theme-status-warning-strong: rgba(217, 119, 6, 0.40);
-    --theme-status-info-soft: rgba(37, 99, 235, 0.08);
-    --theme-status-info-strong: rgba(37, 99, 235, 0.35);
-    --theme-status-accent-soft: rgba(14, 116, 144, 0.08);
-    --theme-status-accent-strong: rgba(14, 116, 144, 0.40);
-    --theme-status-detection-soft: rgba(109, 40, 217, 0.08);
-    --theme-status-detection-strong: rgba(109, 40, 217, 0.35);
-    --theme-status-detection-text: #6d28d9;            /* violet-700 — light 5.4:1 */
-    --theme-status-highlight-soft: rgba(126, 34, 206, 0.08);
-    --theme-status-highlight-strong: rgba(126, 34, 206, 0.35);
-    --theme-status-highlight-text: #7e22ce;            /* purple-700 — light 5.4:1 */
+    /* Status feedback box - light mode は dark と同じ vibrant pale shade で OK
+     * (white bg 上で pale tint として visible)。 値を redeclare してtheme audit を通す。 */
+    --theme-status-success-soft: #dcfce7;
+    --theme-status-success-strong: #86efac;
+    --theme-status-error-soft: #fee2e2;
+    --theme-status-error-strong: #fca5a5;
+    --theme-status-warning-soft: #fef9c3;
+    --theme-status-warning-strong: #fde047;
+    --theme-status-info-soft: #dbeafe;
+    --theme-status-info-strong: #93c5fd;
+    --theme-status-detection-soft: #ede9fe;
+    --theme-status-detection-strong: #c4b5fd;
+    --theme-status-detection-text: #4c1d95;
+    --theme-status-highlight-soft: #f3e8ff;
+    --theme-status-highlight-strong: #d8b4fe;
+
+    /* -text-on-soft 系は両モード dark text 共通 */
+    --theme-status-success-text-on-soft: #14532d;
+    --theme-status-error-text-on-soft: #7f1d1d;
+    --theme-status-warning-text-on-soft: #713f12;
+    --theme-status-info-text-on-soft: #1e3a8a;
+    --theme-status-accent-text-on-soft: #164e63;
+
+    /* pink / highlight-text / accent / cyan-hover は light で contrast 確保のため override */
+    --theme-accent-pink: #be185d;            /* pink-700 — light 7.5:1 */
+    --theme-status-highlight-text: #7e22ce;  /* purple-700 — light 5.4:1 */
+    --theme-status-accent-soft: rgba(14, 116, 144, 0.10);
+    --theme-status-accent-strong: #0e7490;
 
     /* Scrollbar (light) */
     --theme-scrollbar-thumb: rgba(15, 23, 42, 0.25);
