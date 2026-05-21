@@ -125,7 +125,7 @@
       <h3 class="text-lg font-semibold text-theme mb-4">❓ セットアップでお困りの場合</h3>
       <div class="space-y-3 text-sm text-theme-secondary">
         <details class="cursor-pointer">
-          <summary class="font-medium text-theme-accent-cyan hover:text-cyan-700 dark:hover:text-cyan-300">
+          <summary class="font-medium text-theme-accent-cyan hover:text-theme-accent-cyan-hover">
             サービスアカウントJSONの取得方法
           </summary>
           <div class="mt-2 pl-4 text-theme-muted">
@@ -139,7 +139,7 @@
           </div>
         </details>
         <details class="cursor-pointer">
-          <summary class="font-medium text-theme-accent-cyan hover:text-cyan-700 dark:hover:text-cyan-300">
+          <summary class="font-medium text-theme-accent-cyan hover:text-theme-accent-cyan-hover">
             スプレッドシートIDの取得方法
           </summary>
           <div class="mt-2 pl-4 text-theme-muted">
@@ -332,7 +332,7 @@
         btn.href = url + '?mode=login';
         btn.textContent = 'みんなの回答ボードを開始';
         btn.classList.remove('pointer-events-none', 'bg-theme-card-3', 'text-theme-muted');
-        btn.classList.add('bg-gradient-to-r', 'from-purple-600', 'to-pink-600', 'hover:from-purple-700', 'hover:to-pink-700', 'text-slate-900', 'dark:text-white');
+        btn.classList.add('bg-gradient-to-r', 'from-purple-600', 'to-pink-600', 'hover:from-purple-700', 'hover:to-pink-700', 'text-white');
       } catch (_) {
         btn.textContent = 'URL取得失敗 — 再読み込みしてください';
       }

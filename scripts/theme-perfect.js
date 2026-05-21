@@ -277,6 +277,24 @@ function countOrphanDark() {
 const orphans = countOrphanDark();
 check('27. Orphan dark: utility = 0 (paired のみ受容)', orphans === 0, `${orphans} 件 orphan`);
 
+// 27b. Tailwind dark: prefix 全廃 (v2847+ — semantic theme token に統一)
+//   paired であっても dark:bg-X-N00 系 / dark:hover: 系は使わない方針。
+//   light/dark variation は --theme-* token / body.theme-light で表現する。
+//   SharedTailwindConfig (darkMode 設定の説明 comment) は除外。
+function countAnyDarkPrefix() {
+  let n = 0;
+  for (const f of HTML_FILES) {
+    if (f === 'SharedThemeBoot.html' || f === 'SharedTailwindConfig.html') continue;
+    const text = fs.readFileSync(path.join(SRC, f), 'utf8');
+    // dark: の使用 (class="..." 内 or classList.add 内のみ)
+    const matches = text.match(/\bdark:[a-z]+[-:][a-zA-Z0-9/_-]+/g) || [];
+    n += matches.length;
+  }
+  return n;
+}
+const anyDark = countAnyDarkPrefix();
+check('27b. Tailwind dark: prefix 全廃 = 0 (theme token に統一)', anyDark === 0, `${anyDark} 件残存 (semantic theme token に置換せよ)`);
+
 // 28. gray/slate 色相混在 = 0 (Tokyo Night は青寄り → slate ファミリーに統一)
 function countGraySlateMix() {
   let mix = 0;

@@ -131,6 +131,32 @@
     --theme-card-2: #454860;                           /* +6% lum — deeper nest */
     --theme-card-3: #50546c;                           /* +8% lum — popup over modal */
 
+    /* Status feedback box bg / border (v2847+ — System B `dark:` prefix を廃止して
+     * theme token に統一)。 -soft = box bg (低彩度), -strong = border (高彩度)。 */
+    --theme-status-success-soft: rgba(34, 197, 94, 0.10);   /* emerald-500 10% */
+    --theme-status-success-strong: rgba(34, 197, 94, 0.35); /* emerald-500 35% */
+    --theme-status-error-soft: rgba(239, 68, 68, 0.10);     /* red-500 10% */
+    --theme-status-error-strong: rgba(239, 68, 68, 0.35);   /* red-500 35% */
+    --theme-status-warning-soft: rgba(245, 158, 11, 0.10);  /* amber-500 10% */
+    --theme-status-warning-strong: rgba(245, 158, 11, 0.35);/* amber-500 35% */
+    --theme-status-info-soft: rgba(59, 130, 246, 0.10);     /* blue-500 10% */
+    --theme-status-info-strong: rgba(59, 130, 246, 0.35);   /* blue-500 35% */
+    --theme-status-accent-soft: rgba(34, 211, 238, 0.10);   /* cyan-400 10% — active state */
+    --theme-status-accent-strong: rgba(34, 211, 238, 0.45); /* cyan-400 45% */
+    --theme-status-detection-soft: rgba(167, 139, 250, 0.12); /* violet-400 12% — form detection */
+    --theme-status-detection-strong: rgba(167, 139, 250, 0.35);
+    --theme-status-detection-text: #c4b5fd;                 /* violet-300 — dark mode 用 */
+    --theme-status-highlight-soft: rgba(168, 85, 247, 0.10); /* purple-500 10% — teacher highlight */
+    --theme-status-highlight-strong: rgba(168, 85, 247, 0.40);
+    --theme-status-highlight-text: #c084fc;                 /* purple-400 — dark mode 用 */
+
+    /* Scrollbar (Page.html answer modal で使う) */
+    --theme-scrollbar-thumb: rgba(255, 255, 255, 0.20);
+    --theme-scrollbar-track: rgba(255, 255, 255, 0.05);
+
+    /* Link hover (cyan accent の hover 状態) */
+    --theme-accent-cyan-hover: #67e8f9;                /* cyan-300 (brighter than --theme-accent-cyan) */
+
     /* =============================================================================
      * Status Colors - System Feedback
      * ============================================================================= */
@@ -377,7 +403,32 @@
     /* Brand / Status colors の light 上 contrast 確保 (light 専用上書き) */
     --brand-understand: #b45309;                       /* amber-700: 6.0:1 (dark の amber-400 は light で 1.6:1 fail) */
     --status-success: #15803d;                         /* emerald-700: 5.6:1 (dark の emerald-500 は light で 2.4 fail) */
-    --status-warning: #a16207;                         /* amber-700: 5.6:1 (dark の amber-500 は light で 2.1 fail) */
+    --status-warning: #a16207;                         /* amber-700: 5.6:1 (dark の amber-500 は light for 2.1 fail) */
+
+    /* Status feedback box - light mode override (alpha 上げて白 bg 上でも visible) */
+    --theme-status-success-soft: rgba(21, 128, 61, 0.08);
+    --theme-status-success-strong: rgba(21, 128, 61, 0.35);
+    --theme-status-error-soft: rgba(220, 38, 38, 0.08);
+    --theme-status-error-strong: rgba(220, 38, 38, 0.35);
+    --theme-status-warning-soft: rgba(217, 119, 6, 0.10);
+    --theme-status-warning-strong: rgba(217, 119, 6, 0.40);
+    --theme-status-info-soft: rgba(37, 99, 235, 0.08);
+    --theme-status-info-strong: rgba(37, 99, 235, 0.35);
+    --theme-status-accent-soft: rgba(14, 116, 144, 0.08);
+    --theme-status-accent-strong: rgba(14, 116, 144, 0.40);
+    --theme-status-detection-soft: rgba(109, 40, 217, 0.08);
+    --theme-status-detection-strong: rgba(109, 40, 217, 0.35);
+    --theme-status-detection-text: #6d28d9;            /* violet-700 — light 5.4:1 */
+    --theme-status-highlight-soft: rgba(126, 34, 206, 0.08);
+    --theme-status-highlight-strong: rgba(126, 34, 206, 0.35);
+    --theme-status-highlight-text: #7e22ce;            /* purple-700 — light 5.4:1 */
+
+    /* Scrollbar (light) */
+    --theme-scrollbar-thumb: rgba(15, 23, 42, 0.25);
+    --theme-scrollbar-track: rgba(15, 23, 42, 0.05);
+
+    /* Link hover (cyan accent の hover 状態) - light mode は さらに濃く */
+    --theme-accent-cyan-hover: #155e75;                /* cyan-800 */
   }
 
   /* Base Styles - Unified body element */

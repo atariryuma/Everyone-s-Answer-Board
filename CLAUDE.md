@@ -376,6 +376,28 @@ Primitives" / "INNER BOX" セクションに定義。 token (`--theme-bg-surface
 - `--theme-bg-elevated-hover`: `bg-theme-elevated` 系 button の hover 用 (旧 `hover:bg-slate-700`
   hardcode → light mode で破綻していたバグを解消)。 Tailwind utility: `hover:bg-theme-elevated-hover`
 
+**Status feedback box token (v2847+) — 旧 `dark:` prefix を全廃**:
+
+旧来 `bg-yellow-100 dark:bg-yellow-900/20 border-yellow-300 dark:border-yellow-500/30` の
+ような Tailwind `dark:` paired shade を使っていたが、 `darkMode: 'class'` 動作の
+脆弱性 / light/dark 色のペアリング不一致 / theme tokens (`--theme-*`) との二重系統に
+よる構造的バグ (light mode で `bg-yellow-100` が出続ける等) が複数発生したため全廃。
+
+| status | bg (Tailwind utility) | border (Tailwind utility) | 用途 |
+| ------ | --------------------- | -------------------------- | ---- |
+| success | `bg-theme-status-success-soft` | `border-theme-status-success-strong` | 成功通知 box |
+| error | `bg-theme-status-error-soft` | `border-theme-status-error-strong` | エラー / 削除確認 box |
+| warning | `bg-theme-status-warning-soft` | `border-theme-status-warning-strong` | 警告 / 心理的安全性 box |
+| info | `bg-theme-status-info-soft` | `border-theme-status-info-strong` | 情報通知 box |
+| accent (cyan) | `bg-theme-status-accent-soft` | `border-theme-status-accent-strong` | active 状態 (公開中 row 等) |
+| detection (violet) | `bg-theme-status-detection-soft` | `border-theme-status-detection-strong` | フォーム自動検出通知 |
+
+対応 text token: `text-theme-status-{success,error,warning,info,detection,highlight}`
+
+**Rule (CI で機械検証)**: HTML / JS で **Tailwind `dark:` prefix は使用禁止**。
+`theme:perfect` axis 27b が 0 件であることを確認。 light/dark variation は必ず
+`--theme-*` token + `body.theme-light` で表現する。
+
 ### Cache アーキテクチャ (3 層、 意図的分離)
 
 3 つの層はそれぞれ異なる用途。 統合 facade を作らない (semantic clarity を失う + cost 非対称性が見えなくなる)。

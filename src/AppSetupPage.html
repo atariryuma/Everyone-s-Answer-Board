@@ -169,7 +169,7 @@
         </div>
 
         <!-- 現在の制限情報表示 -->
-        <div id="restriction-info" class="hidden p-4 bg-red-100 dark:bg-red-900/20 border border-red-300 dark:border-red-500/30 rounded-lg">
+        <div id="restriction-info" class="hidden p-4 bg-theme-status-error-soft border border-theme-status-error-strong rounded-lg">
           <h4 class="text-md font-medium text-theme-status-error mb-2">⚠️ 現在のアクセス制限</h4>
           <div class="text-sm text-theme-secondary space-y-1">
             <div>理由: <span id="restriction-reason">-</span></div>
@@ -201,7 +201,7 @@
             <div class="text-sm text-theme-muted">アクティブユーザー</div>
           </div>
           <div class="bg-theme-card-1 rounded-lg p-4 text-center">
-            <div class="text-2xl font-bold text-purple-700 dark:text-purple-400" id="published-boards">-</div>
+            <div class="text-2xl font-bold text-theme-status-highlight" id="published-boards">-</div>
             <div class="text-sm text-theme-muted">公開ボード数</div>
           </div>
           <div class="bg-theme-card-1 rounded-lg p-4 text-center">
@@ -218,7 +218,7 @@
 
         <div class="space-y-4">
           <!-- 基本診断（よく使う機能） -->
-          <div class="p-4 bg-blue-100 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-500/30 rounded-lg">
+          <div class="p-4 bg-theme-status-info-soft border border-theme-status-info-strong rounded-lg">
             <div class="flex items-center justify-between mb-3">
               <div>
                 <h3 class="text-lg font-medium text-theme-status-info">🩺 基本診断</h3>
@@ -256,7 +256,7 @@
             </summary>
             <div class="p-4 pt-0 grid md:grid-cols-2 gap-4">
               <div class="p-4 bg-theme-card-2 rounded-lg">
-                <h4 class="text-md font-medium text-purple-700 dark:text-purple-400 mb-2">📈 システム監視</h4>
+                <h4 class="text-md font-medium text-theme-status-highlight mb-2">📈 システム監視</h4>
                 <p class="text-xs text-theme-muted mb-3">リソース使用状況・実行ログ・エラー率を確認</p>
                 <button
                   type="button"
@@ -451,8 +451,8 @@
           <p class="text-xs text-theme-muted mt-1">この情報は監査ログに記録されます</p>
         </div>
 
-        <div class="bg-red-100 dark:bg-red-900/20 border border-red-500/50 p-3 rounded-lg mb-4">
-          <p class="text-red-800 dark:text-red-100 text-sm">
+        <div class="bg-theme-status-error-soft border border-theme-status-error-strong p-3 rounded-lg mb-4">
+          <p class="text-theme-status-error text-sm">
             ⚠️ この操作は取り消せません。ユーザーのデータが完全に削除されます。
           </p>
         </div>
@@ -547,7 +547,7 @@
               const isActive = user.isActive === true;
               const statusBadge = isActive
                 ? '<span class="px-2 py-1 bg-green-600 text-theme-status-success rounded-full text-xs">アクティブ</span>'
-                : '<span class="px-2 py-1 bg-red-600 text-red-800 dark:text-red-100 rounded-full text-xs">非アクティブ</span>';
+                : '<span class="px-2 py-1 bg-red-600 text-theme-status-error rounded-full text-xs">非アクティブ</span>';
 
               let boardPublished = false;
               try {
@@ -556,7 +556,7 @@
               } catch (_) {}
 
               const boardBadge = boardPublished
-                ? '<span class="px-2 py-1 bg-purple-600 text-purple-800 dark:text-purple-100 rounded-full text-xs">公開中</span>'
+                ? '<span class="px-2 py-1 bg-purple-600 text-theme-status-highlight rounded-full text-xs">公開中</span>'
                 : '<span class="px-2 py-1 bg-theme-elevated text-theme rounded-full text-xs">非公開</span>';
 
               const registrationDate = user.createdAt
