@@ -483,6 +483,23 @@
     // フォーム選択時の処理
     const formSelect = document.getElementById('form-select');
     if (formSelect) {
+      // Lazy load: select を最初に開く / focus する時に一覧をロード。
+      // 旧来は「🔄 一覧を更新」 ボタンを押さないと選択肢が出ず、 select 自体を
+      // クリックしても 「-- クリックして読み込み --」 placeholder のままだった (user 報告)。
+      let formsLoaded = false;
+      const lazyLoadForms = () => {
+        if (formsLoaded) return;
+        formsLoaded = true;
+        loadForms().catch((error) => {
+          formsLoaded = false;  // 失敗時は再試行できるよう reset
+          console.warn('フォーム一覧の自動読み込み失敗:', error);
+        });
+      };
+      // mousedown: クリック直前に発火 (option 表示の前にロード完了させる)
+      // focus: keyboard tab navigation 対応
+      formSelect.addEventListener('mousedown', lazyLoadForms, { once: false });
+      formSelect.addEventListener('focus', lazyLoadForms, { once: false });
+
       formSelect.addEventListener('change', function () {
         const formUrl = this.value;
         if (formUrl) {
