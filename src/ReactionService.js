@@ -72,15 +72,13 @@ function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
 
   if (targetUser.userEmail === actorEmail) return true;
 
-  // v2855+: ボード SS の editor 共有者 (共同教師) は owner と同じ進行操作 (highlight /
-  //   リアクション編集) ができる。 owner / admin の高頻度パスを先に評価しているので
-  //   Drive API 呼び出しは true な collaborator のときだけ発生する。
-  if (typeof isBoardCollaborator === 'function'
-      && isBoardCollaborator(targetUser, actorEmail)) {
-    return true;
+  // v2856+: collaborator check は editor 操作 (highlight 等) でのみ実行。
+  //   viewer の通常リアクション (requireEditor!==true) では published flag だけで判定。
+  //   これで 700 生徒 × polling の hot path で無駄な Drive API trigger を回避。
+  if (options.requireEditor === true) {
+    return typeof isBoardCollaborator === 'function'
+      && isBoardCollaborator(targetUser, actorEmail);
   }
-
-  if (options.requireEditor === true) return false;
 
   return Boolean(config && config.isPublished);
 }

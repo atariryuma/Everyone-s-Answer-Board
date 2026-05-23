@@ -201,6 +201,38 @@ test('unpublishBoard: rejects non-admin attempting to unpublish other user', () 
   assert.match(result.message, /権限/);
 });
 
+// v2855+: ボード SS の editor 共有者 (collaborator) は unpublish (緊急停止) のみ許可。
+//   publish / toggle は引き続き owner / admin のみ。
+test('unpublishBoard: collaborator (SS editor) can unpublish other user board', () => {
+  const ctx = loadAdminContext({
+    isAdministrator: () => false,
+    getCurrentEmail: () => 'collab@example.com',
+    findUserByEmail: () => null,
+    isBoardCollaborator: (user, email) => email === 'collab@example.com'
+  });
+  ctx.__savedConfigs['owner1'] = { isPublished: true, publishedAt: '2020-01-01T00:00:00.000Z' };
+
+  const result = ctx.unpublishBoard('owner1');
+  assert.equal(result.success, true);
+  assert.equal(result.isPublished, false);
+  assert.equal(result.publishedAt, null);
+});
+
+test('republishMyBoard: collaborator CANNOT publish other user board (write op blocked)', () => {
+  const ctx = loadAdminContext({
+    isAdministrator: () => false,
+    getCurrentEmail: () => 'collab@example.com',
+    findUserByEmail: () => null,
+    isBoardCollaborator: (user, email) => email === 'collab@example.com'
+  });
+  ctx.__savedConfigs['owner1'] = { isPublished: false, publishedAt: null };
+
+  // republishMyBoard は自分のボードに対する操作なので、collaborator は other user に対しては
+  // findUserByEmail (caller resolution) で fail → user not found
+  const result = ctx.republishMyBoard();
+  assert.equal(result.success, false);
+});
+
 test('toggleUserBoardStatus: rejects non-admin caller', () => {
   const ctx = loadAdminContext({
     isAdministrator: () => false,
