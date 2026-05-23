@@ -7,7 +7,7 @@
 #   1. node --check で構文エラー検出（fast, 1s 未満）
 #   2. ESLint で no-redeclare/no-undef 等のバグパターン検出
 #   3. CLAUDE.md カスタム lint で error severity 違反検出
-#   4. npm test で 566 ユニットテスト
+#   4. npm test で全ユニットテスト
 #
 # 全部失敗なしで進む。1 つでも error なら commit 中止。
 
