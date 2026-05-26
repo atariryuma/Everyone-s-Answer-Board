@@ -559,3 +559,15 @@ Set via GAS editor or SetupPage:
 | owner (= 自分のボード) | `openById` (own OAuth) |
 | viewer / admin (= cross-user) | SA pool (round-robin + 30s cooldown) |
 | DB sheet | SA pool (常に) |
+
+---
+
+## 兄弟プロジェクト (StudyQuest との連携)
+
+「みんなの回答ボード」 = 集合可視化の場、 一方「[StudyQuest](file:///Users/ryuma/slide_generator)」 (= slide_generator) は個別マイプラン学習 (3 touch 構造) の場。 両者は **データだけで疎結合に連携**:
+
+- 連携責任: **StudyQuest 側に Answer Board Bridge 機能を実装** (回答ボード側はゼロ変更)
+- 設計詳細: [StudyQuest docs/answerboard-bridge.md](file:///Users/ryuma/slide_generator/docs/answerboard-bridge.md)
+- 動作: StudyQuest タッチ 3 (ふりかえり) → prefilled Google Form URL 生成 → 回答ボード Form に submit → matrix/wordcloud で集合可視化
+- 文献的根拠: 個別最適な学びの継続困難 5 大要因 (教師負担集中・実践知の継承困難・進度差対応・学力低下・標準化テンション) → アプリは「1 単元 8 時間中 7-10% だけ介入」 の minimum viable 個別最適を堅持
+- 回答ボード側で新規 API / OAuth scope 追加なし。 Google Form の prefilled URL (`?usp=pp_url&entry.XXX=...`) が連携プロトコル
