@@ -146,6 +146,7 @@
     --theme-status-warning-text-on-soft: #713f12;  /* yellow-900 */
     --theme-status-info-text-on-soft: #1e3a8a;     /* blue-900 */
     --theme-status-accent-text-on-soft: #164e63;   /* cyan-900 */
+    --theme-status-highlight-text-on-soft: #581c87; /* purple-900 — confidence-badge.manual 用 (v2858) */
 
     /* Pink accent (お題見出し用 — brand cyan とは別系統の強調色) */
     --theme-accent-pink: #f472b6;            /* pink-400 — vibrant on dark bg */
@@ -446,6 +447,7 @@
     --theme-status-error-text-on-soft: #7f1d1d;
     --theme-status-warning-text-on-soft: #713f12;
     --theme-status-info-text-on-soft: #1e3a8a;
+    --theme-status-highlight-text-on-soft: #581c87;
     --theme-status-accent-text-on-soft: #164e63;
 
     /* pink / highlight-text / accent / cyan-hover は light で contrast 確保のため override */
@@ -1513,19 +1515,25 @@
     font-weight: 500;
   }
 
+  /* v2858: bg と text を同 token で書くと light mode で contrast 不足 (= 「非公開」 等の
+     文字が見えない bug)。 vibrant pale opaque + dark text-on-soft + vibrant strong border の
+     v2848+ pattern に統一して両モード AA 確保。 */
   .status-badge.unpublished {
-    background: color-mix(in srgb, var(--status-warning) 20%, transparent);
-    color: color-mix(in srgb, var(--status-warning) 100%, transparent);
+    background: var(--theme-status-warning-soft);
+    color: var(--theme-status-warning-text-on-soft);
+    border: 1px solid var(--theme-status-warning-strong);
   }
 
   .status-badge.published {
-    background: color-mix(in srgb, var(--status-success) 20%, transparent);
-    color: color-mix(in srgb, var(--status-success) 100%, transparent);
+    background: var(--theme-status-success-soft);
+    color: var(--theme-status-success-text-on-soft);
+    border: 1px solid var(--theme-status-success-strong);
   }
 
   .status-badge.error {
-    background: color-mix(in srgb, var(--status-error) 20%, transparent);
-    color: color-mix(in srgb, var(--status-error) 100%, transparent);
+    background: var(--theme-status-error-soft);
+    color: var(--theme-status-error-text-on-soft);
+    border: 1px solid var(--theme-status-error-strong);
   }
 
   /* Confidence Badges */
@@ -1540,27 +1548,27 @@
   }
 
   .confidence-badge.high {
-    background: color-mix(in srgb, var(--status-success) 20%, transparent);
-    color: color-mix(in srgb, var(--status-success) 100%, transparent);
-    border: 1px solid color-mix(in srgb, var(--status-success) 30%, transparent);
+    background: var(--theme-status-success-soft);
+    color: var(--theme-status-success-text-on-soft);
+    border: 1px solid var(--theme-status-success-strong);
   }
 
   .confidence-badge.medium {
-    background: color-mix(in srgb, var(--status-warning) 20%, transparent);
-    color: color-mix(in srgb, var(--status-warning) 100%, transparent);
-    border: 1px solid color-mix(in srgb, var(--status-warning) 30%, transparent);
+    background: var(--theme-status-warning-soft);
+    color: var(--theme-status-warning-text-on-soft);
+    border: 1px solid var(--theme-status-warning-strong);
   }
 
   .confidence-badge.low {
-    background: color-mix(in srgb, var(--status-error) 20%, transparent);
-    color: color-mix(in srgb, var(--status-error) 100%, transparent);
-    border: 1px solid color-mix(in srgb, var(--status-error) 30%, transparent);
+    background: var(--theme-status-error-soft);
+    color: var(--theme-status-error-text-on-soft);
+    border: 1px solid var(--theme-status-error-strong);
   }
 
   .confidence-badge.manual {
-    background: color-mix(in srgb, var(--brand-highlight) 20%, transparent);
-    color: color-mix(in srgb, var(--brand-highlight) 100%, transparent);
-    border: 1px solid color-mix(in srgb, var(--brand-highlight) 30%, transparent);
+    background: var(--theme-status-highlight-soft);
+    color: var(--theme-status-highlight-text-on-soft);
+    border: 1px solid var(--theme-status-highlight-strong);
   }
 
   /* Action Button Groups */
@@ -2522,18 +2530,13 @@
     background: var(--theme-border-subtle); color: var(--theme-bg-elevated);
   }
   #lesson-list .lesson-state-badge.state-active {
-    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 30%, transparent); color: var(--theme-accent-cyan);
+    background: var(--theme-status-accent-soft); color: var(--theme-status-accent-text-on-soft);
   }
   #lesson-list .lesson-state-badge.state-completed {
-    background: color-mix(in srgb, var(--status-success) 20%, transparent); color: color-mix(in srgb, var(--status-success) 100%, transparent);
+    background: var(--theme-status-success-soft); color: var(--theme-status-success-text-on-soft);
   }
-  /* Light mode: badge text を濃い brand 色に — pale 色は white bg で消える */
-  body.theme-light #lesson-list .lesson-state-badge.state-active {
-    background: color-mix(in srgb, var(--theme-accent-cyan-deep) 18%, transparent); color: #0e7490;  /* cyan-700 */
-  }
-  body.theme-light #lesson-list .lesson-state-badge.state-completed {
-    background: color-mix(in srgb, var(--status-success) 18%, transparent); color: #15803d;  /* emerald-700 */
-  }
+  /* state-active は cyan accent-soft (opaque vibrant pale) + cyan-900 text で両モード AA。
+     state-completed は status-success-soft で自動切替されるので light override 不要。 */
 
   /* =============================================================================
    * Status feedback utility — defensive CSS rules (v2853+)
