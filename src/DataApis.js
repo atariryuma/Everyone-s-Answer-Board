@@ -1207,6 +1207,13 @@ function getBoardDataVersion_(userId) {
   } catch (_) { return '0'; }
 }
 
+// email は大文字小文字を区別しない。 owner 判定 (isOwnBoard) で case 差により所有者を
+// viewer と誤判定 → 非公開ボードで誤って deny するのを防ぐ。 DatabaseCore の
+// validateServiceAccountUsage と同じ正規化基準で揃える。
+function sameEmail_(a, b) {
+  return String(a || '').toLowerCase().trim() === String(b || '').toLowerCase().trim();
+}
+
 function bumpBoardDataVersion_(userId) {
   if (!userId || typeof CacheService === 'undefined') return;
   try {
@@ -1290,7 +1297,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
       }
 
       const targetUserConfig = getConfigOrDefault(targetUserId, targetUser);
-      const isOwnBoard = targetUser.userEmail === viewerEmail;
+      const isOwnBoard = sameEmail_(targetUser.userEmail, viewerEmail);
       const isPublished = Boolean(targetUserConfig.isPublished);
 
       if (!isSystemAdmin && !isOwnBoard && !isPublished) {
@@ -1441,7 +1448,7 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
     }
 
     const targetConfig = getConfigOrDefault(targetUserId, targetUser);
-    const isOwnBoard = targetUser.userEmail === viewerEmail;
+    const isOwnBoard = sameEmail_(targetUser.userEmail, viewerEmail);
     const isPublished = Boolean(targetConfig.isPublished);
 
     if (!isSystemAdmin && !isOwnBoard && !isPublished) {

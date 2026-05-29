@@ -58,6 +58,19 @@ function loadDataApisContext(overrides = {}) {
 }
 
 // =====================================================================
+// sameEmail_ (owner 判定の case-insensitive email 比較)
+// =====================================================================
+
+test('sameEmail_: case/whitespace を無視して一致 (owner 誤判定防止)', () => {
+  const ctx = loadDataApisContext();
+  assert.equal(ctx.sameEmail_('User@Naha-Okinawa.ed.jp', 'user@naha-okinawa.ed.jp'), true);
+  assert.equal(ctx.sameEmail_('  teacher@x.jp ', 'teacher@x.jp'), true);
+  assert.equal(ctx.sameEmail_('a@x.jp', 'b@x.jp'), false);
+  assert.equal(ctx.sameEmail_(null, ''), true);     // 両方空相当
+  assert.equal(ctx.sameEmail_('a@x.jp', null), false);
+});
+
+// =====================================================================
 // isValidFormUrl
 // =====================================================================
 
