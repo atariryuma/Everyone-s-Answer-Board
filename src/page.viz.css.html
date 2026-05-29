@@ -507,7 +507,7 @@
   /* 行右端の値表示 (5/5)。全行で位置が固定なので視線で縦に値を比較できる。 */
   .modal-axis-value {
     font-variant-numeric: tabular-nums;
-    color: #fde047;  /* yellow-300 brand emphasis */
+    color: var(--theme-text-emphasis);  /* dark=yellow-300 / light=amber-700 (白modalで可読) */
     font-weight: 700;
     font-size: 1rem;
     white-space: nowrap;
@@ -673,7 +673,9 @@
   .viz-profile-pill.viewing {
     background: color-mix(in srgb, var(--theme-accent-cyan) 35%, transparent);
     border-color: var(--theme-accent-cyan);
-    color: #fff;  /* 強調 cyan 上の白テキスト (theme 非依存) */
+    /* 背景は半透明 cyan tint なので light mode では淡くなる。 固定 #fff だと白文字が
+       消えるため theme-text-primary を継承 (dark=明 / light=暗 で両モード可読)。 */
+    color: var(--theme-text-primary);
     box-shadow: 0 0 0 1px color-mix(in srgb, var(--theme-accent-cyan) 60%, transparent) inset;
   }
   /* Option B 状態スタイル
@@ -770,15 +772,17 @@
   .viz-btn.active {
     background: color-mix(in srgb, var(--theme-accent-cyan) 30%, transparent);
     border-color: var(--theme-accent-cyan);
-    color: #fff;  /* active cyan 上の白 (theme 非依存) */
+    /* 背景は半透明 cyan tint。 light mode では淡くなるので固定 #fff だと「比較」「動き」を
+       押したとき文字が背景に同化して消える。 theme-text-primary 継承で両モード可読に。 */
+    color: var(--theme-text-primary);
   }
   .viz-btn.has-before::before {
     content: '✓ ';
-    color: #4ade80;  /* green-400 確認マーク */
+    color: var(--theme-text-confirm);  /* green: light では darker green に切替 */
   }
   .viz-btn.saved {
     background: color-mix(in srgb, var(--status-success) 30%, transparent);
-    border-color: #4ade80;  /* green-400 (brand identity for saved state) */
+    border-color: var(--theme-text-confirm);
   }
   .viz-btn-small { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
   /* Timeline は toolbar の主役なので、横を広く取って軌跡を読み取りやすく。 */
@@ -797,7 +801,7 @@
   .viz-timeline-time {
     min-width: 4.5rem;
     text-align: center;
-    color: #fde047;
+    color: var(--theme-text-emphasis);  /* light では amber-700。 比較/動き 時の時刻表示が消えないように */
     font-size: 0.875rem;
     font-variant-numeric: tabular-nums;
   }
@@ -900,7 +904,7 @@
   .viz-teacher-panel.active { display: block; }
   .viz-teacher-panel h3 {
     font-size: 1rem;
-    color: #fde047;
+    color: var(--theme-text-emphasis);
     margin-bottom: 0.5rem;
   }
   /* 意見変容サマリ（Deliberative Polling）— 記述的トーン。 theme token で light 対応。 */
@@ -924,7 +928,7 @@
   .viz-teacher-panel .swing-badge {
     display: inline-block;
     background: color-mix(in srgb, var(--theme-status-warning-strong) 20%, transparent);
-    color: #fde047;
+    color: var(--theme-text-emphasis);
     border-radius: 0.5rem;
     padding: 0 0.4rem;
     margin-right: 0.4rem;
