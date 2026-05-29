@@ -11,8 +11,11 @@
 // APIキー漏洩時のブラスト半径を最小化する目的で、
 // 認証情報系（substring match）と、攻撃者に差し替えられるとサービス乗っ取り/
 // 偽DBへの誘導が可能になる基幹キーを明示的にブロックする。
-const PROTECTED_PROPERTY_SUBSTRINGS = ['KEY', 'CREDS', 'SECRET', 'TOKEN', 'PASSWORD', 'SALT'];
-const PROTECTED_PROPERTY_EXACT_KEYS = ['ADMIN_EMAIL', 'DATABASE_SPREADSHEET_ID'];
+// 'APP_DISABLED' substring は緊急停止フラグとその監査メタ (APP_DISABLED_REASON/BY/AT) を
+//   一括ブロックする。 これらは enableApp/disableApp の専用 op (監査証跡付き) でのみ変更させ、
+//   generic setProperty による証跡バイパスを防ぐ。
+const PROTECTED_PROPERTY_SUBSTRINGS = ['KEY', 'CREDS', 'SECRET', 'TOKEN', 'PASSWORD', 'SALT', 'APP_DISABLED'];
+const PROTECTED_PROPERTY_EXACT_KEYS = ['ADMIN_EMAIL', 'DATABASE_SPREADSHEET_ID', 'DEPLOYED_WEB_APP_URL'];
 
 // Magic-number elimination (Clean Code: replace literal numbers with named constants).
 const PROFILE_NAME_MAX_LEN = 50;              // saveProfile: profile name 最大長
@@ -26,6 +29,26 @@ function isProtectedPropertyKey(key) {
   const upper = key.toUpperCase();
   if (PROTECTED_PROPERTY_EXACT_KEYS.includes(upper)) return true;
   return PROTECTED_PROPERTY_SUBSTRINGS.some((s) => upper.includes(s));
+}
+
+/**
+ * 破壊的 admin op (setSheetHeader/clearDataRows/appendRows) が任意の spreadsheetId を
+ * 受け取り、 deploy 主の OAuth で読み書きできてしまう blast radius を絞る。
+ * app 管理下のボード SS、 または DB SS のみ許可する。
+ * @returns {Object|null} 不許可なら error response、 許可なら null
+ */
+function assertManagedSpreadsheet_(spreadsheetId) {
+  try {
+    const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+    if (dbId && spreadsheetId === dbId) return null;
+    const boardIds = (typeof getAllBoardSpreadsheetIds === 'function') ? getAllBoardSpreadsheetIds() : [];
+    if (Array.isArray(boardIds) && boardIds.indexOf(spreadsheetId) !== -1) return null;
+    return createErrorResponse('指定された spreadsheetId は app 管理下のボードではありません (操作を拒否)');
+  } catch (err) {
+    logError_('assertManagedSpreadsheet_', err);
+    // 検証自体が失敗したら安全側 (拒否) に倒す
+    return createErrorResponse('spreadsheetId の検証に失敗しました');
+  }
 }
 
 
@@ -788,8 +811,9 @@ function dispatchAdminOperation(operation, params) {
       const allProps = PropertiesService.getScriptProperties().getProperties();
       const masked = {};
       for (const [k, v] of Object.entries(allProps)) {
+        // 文字数も出さない (secret の長さは brute-force/形式推測のヒントになる)。
         masked[k] = isProtectedPropertyKey(k)
-          ? `***${v.length}chars***`
+          ? '***redacted***'
           : v;
       }
       return createSuccessResponse('Properties listed', { properties: masked });
@@ -1104,7 +1128,13 @@ function dispatchAdminOperation(operation, params) {
         profileHistory: __appendProfileHistory_(cur.profileHistory, p.name)
       };
 
-      return saveUserConfig(params.userId, merged, { isMainConfig: true });
+      const saveRes = saveUserConfig(params.userId, merged, { isMainConfig: true });
+      // profile 切替で board data が変わるので viewer cache を即時 stale 化
+      // (cache key に activeProfile が含まれないため bump しないと旧データが残る)。
+      if (saveRes.success && typeof bumpBoardDataVersion_ === 'function') {
+        try { bumpBoardDataVersion_(params.userId); } catch (_) { /* ignore */ }
+      }
+      return saveRes;
     }
 
     case 'deleteProfile': {
@@ -1240,6 +1270,7 @@ function dispatchAdminOperation(operation, params) {
       if (typeof params.newHeader !== 'string' || !params.newHeader.trim()) {
         return createErrorResponse('newHeader (non-empty string) is required');
       }
+      { const denied = assertManagedSpreadsheet_(params.spreadsheetId); if (denied) return denied; }
       try {
         const ss = SpreadsheetApp.openById(params.spreadsheetId);
         const sheet = ss.getSheetByName(params.sheetName);
@@ -1284,6 +1315,7 @@ function dispatchAdminOperation(operation, params) {
       if (params.confirm !== 'yes-i-mean-it') {
         return createErrorResponse('confirm: "yes-i-mean-it" is required (safeguard against accidental data loss)');
       }
+      { const denied = assertManagedSpreadsheet_(params.spreadsheetId); if (denied) return denied; }
       try {
         const ss = SpreadsheetApp.openById(params.spreadsheetId);
         const sheet = ss.getSheetByName(params.sheetName);
@@ -1354,6 +1386,7 @@ function dispatchAdminOperation(operation, params) {
       if (params.rows.length > MAX_BULK_INSERT_ROWS) {
         return createErrorResponse(`rows array too large (max ${MAX_BULK_INSERT_ROWS})`);
       }
+      { const denied = assertManagedSpreadsheet_(params.spreadsheetId); if (denied) return denied; }
       try {
         const ss = SpreadsheetApp.openById(params.spreadsheetId);
         const sheet = ss.getSheetByName(params.sheetName);

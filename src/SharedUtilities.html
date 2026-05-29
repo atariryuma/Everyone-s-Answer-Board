@@ -64,29 +64,34 @@
     }
 
     debounce(func, key, delay = 1000) {
-      if (this.timers.has(key)) {
-        this.timers.delete(key);
-      }
+      // 既存の保留中タイマーは確実に clearTimeout する。 旧実装は map から削除するだけで
+      // 下層の setTimeout を残し、 高速連打中に orphan タイマーが溜まっていた。
+      const prev = this.timers.get(key);
+      if (prev && prev.timeoutId) clearTimeout(prev.timeoutId);
+      this.timers.delete(key);
 
-      const createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
-      const debouncePromise = createPromiseDelay(delay).then(() => {
-        if (this.timers.get(key) === debouncePromise) {
-          func();
+      const entry = {};
+      entry.timeoutId = setTimeout(() => {
+        // 自分が最新の entry のときだけ実行 (supersede されていたら no-op)。
+        if (this.timers.get(key) === entry) {
           this.timers.delete(key);
+          try { func(); } catch (_) { /* swallow: caller responsibility */ }
         }
-      }).catch(() => {
-        this.timers.delete(key);
-      });
+      }, delay);
 
-      this.timers.set(key, debouncePromise);
+      this.timers.set(key, entry);
     }
 
     clear(key) {
+      const entry = this.timers.get(key);
+      if (entry && entry.timeoutId) clearTimeout(entry.timeoutId);
       this.timers.delete(key);
     }
 
     clearAll() {
+      this.timers.forEach((entry) => {
+        if (entry && entry.timeoutId) clearTimeout(entry.timeoutId);
+      });
       this.timers.clear();
     }
   }

@@ -344,6 +344,44 @@ test('distinctiveKeywords: handles single-cell case (no others to contrast)', ()
 });
 
 // =====================================================================
+// consensusKeywords (立場を越えた共通語 = bridging, Pol.is 原則)
+// =====================================================================
+
+test('consensusKeywords: surfaces words shared across most groups (high coverage)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__consensusKeywords;
+  // 「友情」は全 4 群に登場（coverage=4）= 共通の足場。
+  // 各群固有の語（真実/効率/楽しい/協力）は coverage=1 で拾われない。
+  const g1 = [{ reason: '友情を大切に、真実を伝える' }];
+  const g2 = [{ reason: '友情のため効率を上げる' }];
+  const g3 = [{ reason: '友情があれば楽しい' }];
+  const g4 = [{ reason: '友情は協力から生まれる' }];
+  const result = fn([g1, g2, g3, g4], 'reason', 2, { minCoverageRatio: 0.75 });
+  const words = result.map((r) => r.word);
+  assert.ok(words.includes('友情'), `共通語 友情 を含むべき: ${words.join(',')}`);
+  // 1 群しか出ない固有語は除外される
+  assert.ok(!words.includes('真実'), `固有語 真実 は共通語に含めない: ${words.join(',')}`);
+});
+
+test('consensusKeywords: respects exclude set (対立軸で使った語は除外)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__consensusKeywords;
+  const g1 = [{ reason: '責任と自由は両立する' }];
+  const g2 = [{ reason: '責任を持てば自由になる' }];
+  // 「責任」は両群に出るが exclude に入れたら出さない
+  const result = fn([g1, g2], 'reason', 3, { minCoverageRatio: 0.75, exclude: new Set(['責任']) });
+  const words = result.map((r) => r.word);
+  assert.ok(!words.includes('責任'), `exclude された 責任 は出さない: ${words.join(',')}`);
+});
+
+test('consensusKeywords: returns [] when fewer than 2 non-empty groups', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.__consensusKeywords;
+  assert.equal(fn([], 'reason').length, 0);
+  assert.equal(fn([[{ reason: '友情が大事' }], []], 'reason').length, 0); // 非空は 1 群のみ
+});
+
+// =====================================================================
 // contrastingPair (X 軸 / Y 軸方向の対立語ペア抽出, v2691)
 // =====================================================================
 
@@ -866,6 +904,49 @@ test('vizComputeSwings: M2 Euclidean distance', () => {
   assert.equal(swings.length, 1);
   // sqrt(3² + 4²) = 5
   assert.equal(swings[0].distance, 5);
+});
+
+// =====================================================================
+// vizComputeOpinionShift (意見変容: 収束/分散, Deliberative Polling)
+// =====================================================================
+
+test('vizComputeOpinionShift: detects convergence (spread shrinks first→last)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.vizComputeOpinionShift;
+  // h1 は 1→3, h2 は 5→3: 最初は両端(spread 大)、最後は中央に集合(spread 0) = 収束
+  const rows = [
+    { emailHash: 'h1', timestamp: '2026-05-12T01:00:00Z', numericX: 1 },
+    { emailHash: 'h1', timestamp: '2026-05-12T02:00:00Z', numericX: 3 },
+    { emailHash: 'h2', timestamp: '2026-05-12T01:00:00Z', numericX: 5 },
+    { emailHash: 'h2', timestamp: '2026-05-12T02:00:00Z', numericX: 3 }
+  ];
+  const shift = fn.call({}, rows, 'numberline');
+  assert.ok(shift, 'shift should be computed');
+  assert.equal(shift.trend, 'converged', `expected converged, got ${shift.trend}`);
+  assert.ok(shift.after < shift.before, 'after spread < before spread');
+  assert.equal(shift.movedCount, 2);
+});
+
+test('vizComputeOpinionShift: detects divergence (spread grows first→last)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.vizComputeOpinionShift;
+  // h1 は 3→1, h2 は 3→5: 最初は中央(spread 0)、最後は両端(spread 大) = 分散
+  const rows = [
+    { emailHash: 'h1', timestamp: '2026-05-12T01:00:00Z', numericX: 3 },
+    { emailHash: 'h1', timestamp: '2026-05-12T02:00:00Z', numericX: 1 },
+    { emailHash: 'h2', timestamp: '2026-05-12T01:00:00Z', numericX: 3 },
+    { emailHash: 'h2', timestamp: '2026-05-12T02:00:00Z', numericX: 5 }
+  ];
+  const shift = fn.call({}, rows, 'numberline');
+  assert.equal(shift.trend, 'diverged', `expected diverged, got ${shift.trend}`);
+  assert.ok(shift.after > shift.before, 'after spread > before spread');
+});
+
+test('vizComputeOpinionShift: returns null with fewer than 2 students', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const fn = StudyQuestApp.prototype.vizComputeOpinionShift;
+  assert.equal(fn.call({}, [{ emailHash: 'h1', timestamp: '2026-05-12T01:00:00Z', numericX: 1 }], 'numberline'), null);
+  assert.equal(fn.call({}, [], 'numberline'), null);
 });
 
 // =====================================================================

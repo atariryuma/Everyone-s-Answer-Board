@@ -93,10 +93,14 @@ function __hasEditorPermissionViaDrive_(fileId, emailNorm) {
 }
 
 function __emailHash_(email) {
-  let h = 0;
-  for (let i = 0; i < email.length; i++) {
-    h = ((h << 5) - h) + email.charCodeAt(i);
-    h |= 0;
+  // SHA-256 を使う。 旧実装は 32bit 非暗号ハッシュで、 衝突する 2 メールが
+  // 同じ collab cache key を共有し「他人の editor 判定 '1'」を継承する認可リスクがあった。
+  // cache key は 250 文字まで許容されるので 64 桁 hex でも余裕。
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, String(email), Utilities.Charset.UTF_8);
+  let hex = '';
+  for (let i = 0; i < bytes.length; i++) {
+    // byte は -128..127 なので 0xFF マスクして 2 桁 hex に正規化
+    hex += ('0' + (bytes[i] & 0xff).toString(16)).slice(-2);
   }
-  return Math.abs(h).toString(36);
+  return hex;
 }

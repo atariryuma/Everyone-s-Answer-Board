@@ -309,11 +309,28 @@ function emailToShortHash(email) {
   if (!salt) {
     // Why: salt 未設定なら自動生成。スクリプト全体で 1 回だけ生成、以後同じ salt を使う。
     //      乱数源は Utilities.getUuid()（GAS 提供の crypto-grade UUID）。
-    salt = Utilities.getUuid().replace(/-/g, '');
+    // Race 対策: 初回同時呼び出しが各々別 salt を生成して last-write-wins すると、
+    //   loser request の hash が将来の hash と一致せず同一生徒が 2 identity に割れる。
+    //   ScriptLock + lock 内再読みで「最初に生成した salt」を全員が共有するよう直列化する。
+    let lock = null;
     try {
-      setCachedProperty('EMAIL_HASH_SALT', salt);
-    } catch (e) {
-      console.warn('emailToShortHash: failed to persist salt, using ephemeral value:', e.message);
+      lock = LockService.getScriptLock();
+      lock.waitLock(5000);
+    } catch (lockErr) {
+      lock = null; // lock 取れなくても下で生成は試みる (劣化動作)
+    }
+    try {
+      salt = getCachedProperty('EMAIL_HASH_SALT'); // lock 取得中に他 request が確定済みかも
+      if (!salt) {
+        salt = Utilities.getUuid().replace(/-/g, '');
+        try {
+          setCachedProperty('EMAIL_HASH_SALT', salt);
+        } catch (e) {
+          console.warn('emailToShortHash: failed to persist salt, using ephemeral value:', e.message);
+        }
+      }
+    } finally {
+      if (lock) { try { lock.releaseLock(); } catch (_) { /* ignore */ } }
     }
   }
 

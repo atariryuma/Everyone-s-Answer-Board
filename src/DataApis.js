@@ -911,6 +911,12 @@ function loadProfileForView(profileName, targetUserId) {
 
     const saveRes = saveUserConfig(user.userId, merged, { isMainConfig: true });
     if (!saveRes.success) return saveRes;
+    // profile 切替で board の spreadsheetId / columnMapping が変わるので、 viewer 向け
+    // board data cache を即時 stale 化する。 これを忘れると最大 TTL 分 viewer が
+    // 旧プロファイルのデータを読み続ける (cache key に activeProfile が含まれないため)。
+    if (typeof bumpBoardDataVersion_ === 'function') {
+      try { bumpBoardDataVersion_(user.userId); } catch (_) { /* ignore */ }
+    }
     return createSuccessResponse('Profile loaded', { activeProfile: p.name });
   } catch (error) {
     logError_('loadProfileForView', error);

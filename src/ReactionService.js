@@ -5,7 +5,12 @@
 
 /* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_ */
 
-const ROW_LOCK_TTL_SECONDS = 10;
+// TTL は process() (sheet read→modify→write の RMW) の最悪ケースより長く取る。
+// 旧値 10s は、 process 内の Sheets API が 429 backoff (最大 ~60s) を踏むと lock が
+// 自然失効し、 同 row への並行 write が両方通って read-modify-write が lost する穴があった。
+// 35s は通常 process(~200ms-2s)+1 retry を十分カバーしつつ、 6 分で execution が kill
+// された場合でも遠からず自動失効する妥協点。
+const ROW_LOCK_TTL_SECONDS = 35;
 const ROW_LOCK_ACQUIRE_TIMEOUT_MS = 800;  // ScriptLock critical section の最大待機時間
 
 /**
@@ -254,16 +259,19 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
     }
   }
 
+  // reaction セルのみを個別に write する。
+  // 旧実装は minCol..maxCol の span を 1 回の setValues で書き戻していたため、 reaction 列が
+  // 非連続 (教師が手動で列を並べ替え、 間に name/class 等が挟まる) だと、 read 時点の
+  // 中間列の stale 値で上書きし、 その間に走った非 reaction 経路の更新を飲み込む恐れがあった。
+  // 個別 write なら reaction 3 列以外には一切触れない (最大 3 RPC、 row lock 下で十分軽量)。
   reactionTypes.forEach(type => {
     const col = reactionColumns[type];
     const users = updatedReactions[type];
     const serialized = Array.isArray(users) && users.length > 0
       ? users.filter(email => email && email.trim().length > 0).join('|')
       : '';
-    rowData[col - minCol] = serialized;
+    sheet.getRange(rowNumber, col).setValue(serialized);
   });
-
-  sheet.getRange(rowNumber, minCol, 1, maxCol - minCol + 1).setValues([rowData]);
 
   const reactions = {};
   reactionTypes.forEach(type => {

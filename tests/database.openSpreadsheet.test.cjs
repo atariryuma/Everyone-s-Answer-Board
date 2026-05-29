@@ -196,12 +196,14 @@ test('openSpreadsheet: non-DB sheet for owner uses own access (openById)', () =>
   assert.equal(result.accessMode, 'own');
 });
 
-test('openSpreadsheet: non-DB sheet for viewer on published board uses SA pool path', () => {
+test('openSpreadsheet: non-DB user board refuses owner openById fallback when SA pool unavailable', () => {
   // v2782+: 公開 board への非 owner 非 admin アクセス → accessMode='sa'。
-  // SA pool 未設定なら openById fallback。
+  // セキュリティ: SA pool 全滅時に user board を deploy 主の openById で読むのは
+  // 「viewer は board SS に直接権限を持たない」モデルを破る fail-open。
+  // user board (= DB id と異なる SS) では owner fallback を拒否し null を返す。
   const mockSpreadsheet = { id: 'viewer-sheet', getSheetByName: () => null };
   const ctx = loadDatabaseContext({
-    propsStore: { DATABASE_SPREADSHEET_ID: 'db-id-123' },
+    propsStore: { DATABASE_SPREADSHEET_ID: 'db-id-123' }, // SERVICE_ACCOUNT_CREDS absent → SA pool unavailable
     SpreadsheetApp: { openById: () => mockSpreadsheet },
     isAdministrator: () => false,
     currentEmail: 'viewer@example.com'
@@ -211,8 +213,7 @@ test('openSpreadsheet: non-DB sheet for viewer on published board uses SA pool p
 
   const result = ctx.openSpreadsheet('different-sheet-id', { useServiceAccount: true });
 
-  assert.ok(result, 'viewer access on published board should succeed');
-  assert.equal(result.accessMode, 'sa');
+  assert.equal(result, null, 'user board access must NOT fall back to owner openById when SA pool is down');
 });
 
 test('openSpreadsheet: matching DB id + useServiceAccount=true falls through to SpreadsheetApp when no credentials', () => {

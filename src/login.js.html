@@ -166,20 +166,27 @@
 
 
   const processUnifiedLogin = async () => {
+      // userEmailDisplay はこの関数スコープには無いので必ずローカルで取得する。
+      // 省くと成功パスは動くが全エラーパスが ReferenceError で握りつぶされる。
+      const userEmailDisplay = document.getElementById('user-email-display');
       let response;
       try {
         response = await runServer('processLoginAction');
       } catch (error) {
-        userEmailDisplay.textContent = `エラー: ${error.message}`;
-        userEmailDisplay.classList.add('text-red-400');
+        if (userEmailDisplay) {
+          userEmailDisplay.textContent = `エラー: ${error.message}`;
+          userEmailDisplay.classList.add('text-red-400');
+        }
         setLoginButtonState(false);
         throw error;
       }
 
       if (!response || !response.success) {
         const errorMsg = response?.message || 'ログイン処理に失敗しました';
-        userEmailDisplay.textContent = errorMsg;
-        userEmailDisplay.classList.add('text-red-400');
+        if (userEmailDisplay) {
+          userEmailDisplay.textContent = errorMsg;
+          userEmailDisplay.classList.add('text-red-400');
+        }
         throw new Error(errorMsg);
       }
 
@@ -194,8 +201,10 @@
         showAdminPanelRedirect(adminUrl, response.message);
       } else {
         console.error('processUnifiedLogin: 管理URLが返されませんでした', response);
-        userEmailDisplay.textContent = 'ログインは成功しましたが、管理URLが見つかりません。管理者に連絡してください。';
-        userEmailDisplay.classList.add('text-yellow-400');
+        if (userEmailDisplay) {
+          userEmailDisplay.textContent = 'ログインは成功しましたが、管理URLが見つかりません。管理者に連絡してください。';
+          userEmailDisplay.classList.add('text-yellow-400');
+        }
         setLoginButtonState(false);
       }
     };
@@ -259,7 +268,8 @@
       const displayMessage = err?.message ||
                             (typeof err === 'string' ? err : 'ログイン処理エラーが発生しました');
 
-      if (!userEmailDisplay.dataset.emailSet) {
+      const userEmailDisplay = document.getElementById('user-email-display');
+      if (userEmailDisplay && !userEmailDisplay.dataset.emailSet) {
         userEmailDisplay.textContent = displayMessage;
         userEmailDisplay.classList.add('text-red-400');
       }
@@ -278,7 +288,8 @@
         processUnifiedLogin().catch(handleLoginError);
       } catch (err) {
         console.error('Login function error:', err);
-        userEmailDisplay.textContent = 'ログイン処理エラー';
+        const userEmailDisplay = document.getElementById('user-email-display');
+        if (userEmailDisplay) userEmailDisplay.textContent = 'ログイン処理エラー';
         setLoginButtonState(false);
       }
     };

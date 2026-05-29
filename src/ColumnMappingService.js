@@ -334,6 +334,31 @@ function inferColumnRoles(headers, sampleData = [], options = {}) {
     }
   }
 
+  // answer / reason ペアの先行最適化。
+  // Why: answer は優先度が高く greedy だと先に高スコア列を取るが、 その列が reason 候補
+  //   より後ろだと「answer-before-reason 制約」 で reason が行き場を失い未割当になる
+  //   (理由→意見 の順に並んだフォーム等)。 両者が未固定のときは制約 (answerIdx < reasonIdx)
+  //   を満たす組合せでスコア合計が最大のペアを先に確定させ、 reason の取りこぼしを防ぐ。
+  if (mapping.answer === undefined && mapping.reason === undefined
+      && Array.isArray(scoresByRole.answer) && Array.isArray(scoresByRole.reason)) {
+    let best = null;
+    for (const a of scoresByRole.answer) {
+      if (usedIndices.has(a.index)) continue;
+      for (const r of scoresByRole.reason) {
+        if (usedIndices.has(r.index) || r.index === a.index) continue;
+        if (a.index >= r.index) continue; // answer は reason より前
+        const sum = a.score + r.score;
+        if (!best || sum > best.sum) {
+          best = { aIdx: a.index, aScore: a.score, rIdx: r.index, rScore: r.score, sum };
+        }
+      }
+    }
+    if (best) {
+      mapping.answer = best.aIdx; confidence.answer = best.aScore; usedIndices.add(best.aIdx);
+      mapping.reason = best.rIdx; confidence.reason = best.rScore; usedIndices.add(best.rIdx);
+    }
+  }
+
   // Greedy 割当 (役割優先度順)
   const remaining = roles
     .filter(r => mapping[r] === undefined)

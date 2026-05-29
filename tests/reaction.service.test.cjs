@@ -29,6 +29,13 @@ function createMockSheet({ headers = [], rows = [], name = 'Sheet1' } = {}) {
           data[row - 1 + r][col - 1 + c] = values[r][c];
         }
       }
+    },
+    // 単一セル書込み (ReactionService は reaction 列を個別 setValue する。
+    // span setValues で中間列を stale 上書きしないため)。
+    setValue(value) {
+      writes.push({ row, col, numRows: 1, numCols: 1, values: [[value]] });
+      if (!data[row - 1]) data[row - 1] = [];
+      data[row - 1][col - 1] = value;
     }
   });
 
@@ -122,8 +129,12 @@ test('processReactionDirect: adds LIKE when user has no prior reaction', () => {
   assert.equal(result.reactions.LIKE.count, 1);
   assert.equal(result.reactions.LIKE.reacted, true);
   assert.equal(result.reactions.UNDERSTAND.count, 0);
-  assert.equal(sheet._writes.length, 1);
-  assert.equal(sheet._writes[0].values[0][1], 'actor@example.com'); // LIKE column (offset from minCol=2)
+  // reaction 3 列を個別 setValue する (span setValues 廃止: 非連続列で中間列を stale 上書きしないため)
+  assert.equal(sheet._writes.length, 3);
+  assert.equal(sheet._data[1][2], 'actor@example.com'); // LIKE column (0-based index 2)
+  assert.equal(sheet._data[1][1], ''); // UNDERSTAND 未変更
+  assert.equal(sheet._data[1][3], ''); // CURIOUS 未変更
+  assert.equal(sheet._data[1][0], 'answer-a'); // 非 reaction 列 (Q1) は触らない
 });
 
 test('processReactionDirect: removes LIKE when user toggles same reaction', () => {
@@ -534,7 +545,7 @@ test('addReaction: happy path returns success and writes to sheet', () => {
   assert.equal(result.success, true);
   assert.equal(result.action, 'added');
   assert.equal(result.reactions.LIKE.count, 1);
-  assert.equal(sheet._writes.length, 1);
+  assert.equal(sheet._writes.length, 3); // reaction 3 列を個別 write
 });
 
 test('addReaction: releases lock and removes cache key on success', () => {
@@ -684,7 +695,8 @@ test('addReaction: uses cached headers from getSheetHeaders and avoids per-call 
         }
         return out;
       },
-      setValues: () => {}
+      setValues: () => {},
+      setValue: () => {}
     })
   };
 

@@ -482,6 +482,45 @@ test('processBatchData: processes first batch even when startTime is already pas
   assert.equal(result.length, 3, 'すべてのデータ行が処理されるべき');
 });
 
+test('processBatchData: batch read error is handled gracefully (regression: errorMessage ReferenceError)', () => {
+  // 旧バグ: catch (batchError) 内で未宣言の errorMessage を参照し ReferenceError を再 throw。
+  //   429 backoff / 永続エラースキップが死に、 最初のバッチ失敗でデータ取得全体が落ちていた。
+  const ctx = loadDataServiceContext({
+    resolveColumnIndex: (headers, type, mapping) => {
+      const explicit = mapping && typeof mapping[type] === 'number' ? mapping[type] : -1;
+      return { index: explicit };
+    }
+  });
+  // データ読み込み (getRange().getValues()) が永続エラーを投げる sheet。
+  const throwingSheet = {
+    getName: () => 'Sheet1',
+    getParent: () => ({ getId: () => 'ss-err' }),
+    getLastRow: () => 4,
+    getLastColumn: () => 2,
+    getRange: () => ({
+      getValues: () => { throw new Error('Sheet not found'); },
+      setValues: () => {}
+    })
+  };
+
+  let result;
+  assert.doesNotThrow(() => {
+    result = ctx.processBatchData({
+      sheet: throwingSheet,
+      headers: ['Timestamp', 'Answer'],
+      lastRow: 4,
+      lastCol: 2,
+      config: { columnMapping: { answer: 1 } },
+      options: {},
+      user: null,
+      startTime: Date.now()
+    });
+  }, 'catch ブロックが ReferenceError を投げてはいけない');
+
+  assert.ok(Array.isArray(result), 'graceful degradation で配列を返すべき');
+  assert.equal(result.length, 0, '読めなかったバッチはスキップされ 0 行になる');
+});
+
 // =====================================================================
 // deleteLinkedFormResponseByTimestamp
 // =====================================================================

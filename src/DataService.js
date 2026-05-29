@@ -292,6 +292,9 @@ function processBatchData(ctx) {
 
     } catch (batchError) {
       consecutiveErrors++;
+      // batchError から message 文字列を取り出す。これを忘れると catch 自身が
+      // ReferenceError を投げ、429 backoff / 永続エラースキップが一切動かなくなる。
+      const errorMessage = batchError && batchError.message ? batchError.message : String(batchError);
       logError_('DataService.processBatchData', batchError, {
         startRow,
         endRow,

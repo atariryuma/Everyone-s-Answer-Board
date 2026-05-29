@@ -121,6 +121,16 @@
   // Why: page.js の createReactionButtons と同じ Tailwind カラーに揃える
   //   (UNDERSTAND=yellow / LIKE=red / CURIOUS=green)。AdminPanel と既存カード UI に
   //   そのまま準じることで、教師・児童どちらの目線でも色のセマンティクスが統一される。
+  // ───────────────────────────────────────────────────────────────────
+  // 設計ガードレール（研究根拠・変更時は必ず読むこと）:
+  //   ドットの色は **意見の中身（reaction / highlight / lone-voice）** だけで決める。
+  //   クラスや属性で **色分けしない**。 集団(クラス)ごとに色を割り当てて隣に並べると、
+  //   集団間のギャップが強調され社会的同調・分極化を誘発することが実証されている
+  //   （IEEE VIS 2023 "Polarizing Political Polls": 非党派的な集約の方が分極化が小さい）。
+  //   classFilter は「1 クラスに絞って注目する」単一フィルタであり、 クラスを横並びで
+  //   比較する UI ではない（= 中立的な集約）。 この原則を崩す変更（クラス別カラー、
+  //   クラス対比ビュー等）は導入しないこと。
+  // ───────────────────────────────────────────────────────────────────
   const REACTION_TYPES = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
   const REACTION_COLORS = {
     UNDERSTAND: '#eab308',  // text-yellow-500 (なるほど！)
@@ -309,26 +319,37 @@
    * Why: 教師ダッシュボードで「意見が大きく動いた児童」上位 N を提示するため。
    *      M1 は |Δx|、M2 は √(Δx² + Δy²) のユークリッド距離。
    */
-  StudyQuestApp.prototype.vizComputeSwings = function (rows, mode) {
-    if (!Array.isArray(rows) || rows.length === 0) return [];
-
+  /**
+   * 児童(emailHash)ごとの回答イベントを ts 昇順の配列で返す共有集計。
+   *   vizComputeSwings（揺らぎ）と vizComputeOpinionShift（収束/分散）が共有する。
+   *   emailHash が無い行（メアド収集 OFF）と numericX が無い行はスキップ。
+   * @returns {Map<string, Array<{ts:number,x:number,y:(number|null),name:string,comment:string}>>}
+   */
+  function groupStudentEvents(rows) {
     const byHash = new Map();
-    rows.forEach((row) => {
+    (rows || []).forEach((row) => {
       const key = row.emailHash;
-      if (!key) return; // emailHash が無い行（メアド収集 OFF）はスキップ
-      const ts = row.timestamp ? Date.parse(row.timestamp) || 0 : 0;
+      if (!key) return;
       const x = (typeof row.numericX === 'number') ? row.numericX : null;
-      const y = (typeof row.numericY === 'number') ? row.numericY : null;
       if (x === null) return;
+      const ts = row.timestamp ? Date.parse(row.timestamp) || 0 : 0;
+      const y = (typeof row.numericY === 'number') ? row.numericY : null;
       const list = byHash.get(key) || [];
       list.push({ ts, x, y, name: row.name || '', comment: row.reason || row.answer || '' });
       byHash.set(key, list);
     });
+    byHash.forEach((list) => list.sort((a, b) => a.ts - b.ts));
+    return byHash;
+  }
+
+  StudyQuestApp.prototype.vizComputeSwings = function (rows, mode) {
+    if (!Array.isArray(rows) || rows.length === 0) return [];
+
+    const byHash = groupStudentEvents(rows);
 
     const swings = [];
     byHash.forEach((list, key) => {
       if (list.length < 2) return;
-      list.sort((a, b) => a.ts - b.ts);
       const first = list[0];
       const last = list[list.length - 1];
       const has2D = mode === 'matrix' && first.y !== null && last.y !== null;
@@ -349,6 +370,62 @@
 
     swings.sort((a, b) => b.distance - a.distance);
     return swings;
+  };
+
+  /**
+   * 意見変容サマリ（熟議型世論調査 Deliberative Polling, Fishkin）。
+   *   児童ごとの「最初の位置」と「最新の位置」のコホート全体のばらつき(標準偏差)を比較し、
+   *   議論を経て意見が **収束(ばらつき減)** したか **分散(ばらつき増)** したかを測る。
+   *
+   * 重要な設計判断（多数派バイアス回避）:
+   *   - これは **教師端末のみ** に出す分析であり、 児童には見せない（「クラスは収束した」を
+   *     児童に示すと同調圧力 = conformity を生む。 IEEE VIS 2023 / 同調研究）。
+   *   - 文言は **記述的**（ばらつきが小さく/大きくなった）であり評価的（良い/悪い）にしない。
+   *     収束も分散もどちらも正当な熟議の帰結（道理ある不一致 reasonable disagreement）。
+   *
+   * @returns {{before:number, after:number, delta:number, trend:string, movedCount:number, total:number}|null}
+   */
+  StudyQuestApp.prototype.vizComputeOpinionShift = function (rows, mode) {
+    if (!Array.isArray(rows) || rows.length === 0) return null;
+    const has2D = mode === 'matrix';
+    const byHash = groupStudentEvents(rows);
+
+    const firsts = [];
+    const lasts = [];
+    let movedCount = 0;
+    byHash.forEach((list) => {
+      const first = list[0];
+      const last = list[list.length - 1];
+      firsts.push(first);
+      lasts.push(last);
+      if (list.length >= 2) {
+        const fy = has2D && first.y !== null ? first.y : 0;
+        const ly = has2D && last.y !== null ? last.y : 0;
+        if (euclidean(first.x, fy, last.x, ly) > 0.001) movedCount += 1;
+      }
+    });
+    if (firsts.length < 2) return null; // 2 名未満では「ばらつき」を語れない
+
+    const stdev = (vals) => {
+      const n = vals.length;
+      const mean = vals.reduce((s, v) => s + v, 0) / n;
+      const variance = vals.reduce((s, v) => s + (v - mean) * (v - mean), 0) / n;
+      return Math.sqrt(variance);
+    };
+    const spreadOf = (arr) => {
+      const sx = stdev(arr.map((p) => p.x));
+      if (!has2D) return sx;
+      const sy = stdev(arr.map((p) => (p.y === null ? 0 : p.y)));
+      return Math.sqrt(sx * sx + sy * sy);
+    };
+    const before = spreadOf(firsts);
+    const after = spreadOf(lasts);
+    const delta = after - before;
+    // 閾値 0.15 (Likert 1-5 で約 3-4%) 未満は「ほぼ変化なし」とする
+    let trend = 'stable';
+    if (delta < -0.15) trend = 'converged';
+    else if (delta > 0.15) trend = 'diverged';
+    return { before, after, delta, trend, movedCount, total: firsts.length };
   };
 
   // ---------------------------------------------------------------------
@@ -510,7 +587,9 @@
     const teacherPanel = document.createElement('div');
     teacherPanel.className = 'viz-teacher-panel';
     teacherPanel.id = 'vizTeacherPanel';
-    teacherPanel.innerHTML = '<h3>気になる児童（意見が動いた順）</h3><ul id="vizSwingList"></ul>';
+    teacherPanel.innerHTML = '<h3>気になる児童（意見が動いた順）</h3>'
+      + '<div id="vizOpinionShift" class="viz-opinion-shift"></div>'
+      + '<ul id="vizSwingList"></ul>';
     answers.appendChild(teacherPanel);
 
     return { svg, teacherPanel };
@@ -526,7 +605,7 @@
     updatedEl.textContent = '最終更新 ' + hh + ':' + mm;
   }
 
-  function maybeRenderTeacherPanel(app, swings) {
+  function maybeRenderTeacherPanel(app, swings, rows, mode) {
     const panel = document.getElementById('vizTeacherPanel');
     if (!panel) return;
     const list = document.getElementById('vizSwingList');
@@ -536,8 +615,35 @@
     //   displayMode に合わせる（管理モード OFF のときは匿名 + emailHash で識別）。
     //   カード実装と同じ振舞い。
     const showAdmin = Boolean(app.state.showAdminFeatures);
+
+    // 意見変容サマリ（教師のみ・記述的）。 swings が空でも shift は出し得るので先に処理。
+    //   shift が非 null なら必ず showAdmin（上の三項で保証）なので hasShift だけ見れば足りる。
+    const shiftEl = document.getElementById('vizOpinionShift');
+    const shift = showAdmin ? app.vizComputeOpinionShift(rows || [], mode) : null;
+    if (shiftEl) {
+      if (shift) {
+        const b = shift.before.toFixed(1);
+        const a = shift.after.toFixed(1);
+        let msg;
+        if (shift.trend === 'converged') {
+          msg = `議論を経て、意見のばらつきは小さくなりました（${b} → ${a}）。`;
+        } else if (shift.trend === 'diverged') {
+          msg = `議論を経て、意見のばらつきは大きくなりました（${b} → ${a}）。`;
+        } else {
+          msg = `意見のばらつきはほぼ変わりませんでした（${b} → ${a}）。`;
+        }
+        shiftEl.textContent = `${msg} ${shift.movedCount}名が立場を動かしました。`;
+        shiftEl.style.display = '';
+      } else {
+        shiftEl.textContent = '';
+        shiftEl.style.display = 'none';
+      }
+    }
+
     if (!showAdmin || swings.length === 0) {
-      panel.classList.remove('active');
+      // shift だけ出る場合があるので、 swing が無くても shift があれば panel は見せる。
+      panel.classList.toggle('active', Boolean(shift));
+      list.innerHTML = '';
       return;
     }
 
@@ -548,7 +654,9 @@
         ? `(${s.from.x},${s.from.y}) → (${s.to.x},${s.to.y})`
         : `${s.from.x} → ${s.to.x}`;
       const name = (showName && s.name) ? escapeForTooltip(s.name) : '匿名(' + s.emailHash + ')';
-      const comment = s.comment ? '：' + escapeForTooltip(s.comment).substring(0, 60) : '';
+      // raw を先に切ってから escape する。 escape 後に substring すると "&amp;" を
+      //   "&am" のように entity 途中で切る恐れがある。
+      const comment = s.comment ? '：' + escapeForTooltip(String(s.comment).substring(0, 60)) : '';
       return `<li><span class="swing-badge">Δ${s.distance.toFixed(1)}</span>${name} ${fromTo}${comment}</li>`;
     }).join('');
     panel.classList.add('active');
@@ -754,7 +862,7 @@
 
       // 統計 + 教師パネル
       updateStatsPills(this, current.length);
-      maybeRenderTeacherPanel(this, swings);
+      maybeRenderTeacherPanel(this, swings, rows, 'numberline');
 
       // 件数バッジ（既存のヘッダ表示）も更新（updateAnswerCount は board モード前提）
       if (this.elements.answerCount && typeof this.getIcon === 'function') {
@@ -799,7 +907,8 @@
       const svg = d3.select(svgEl);
       svg.selectAll('*').remove();
 
-      const margin = { top: 24, right: 80, bottom: 60, left: 80 };
+      // bottom は対立軸サマリ + 共通の足場(consensus) の 2 行分を確保 (60 → 84)。
+      const margin = { top: 24, right: 80, bottom: 84, left: 80 };
       const innerW = width - margin.left - margin.right;
       const innerH = height - margin.top - margin.bottom;
       const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -866,6 +975,16 @@
         if (!text) return;
         g.append('text').attr('class', 'viz-quadrant-label')
           .attr('x', x).attr('y', y).text(text);
+        // Empty Chair（"The Empty Chair", 欠けている視点の提示）—
+        //   誰も意見を置いていない象限を「まだ誰もいない視点」として控えめに示す。
+        //   多様な視点を促し「孤立した学び」を防ぐ(中教審 2021)。 強調はしない (muted hint)。
+        if (rows.length > 0 && !buckets[key].length) {
+          const hintY = anchor === 'top' ? y + 22 : y - 22;
+          g.append('text').attr('class', 'viz-empty-chair-hint')
+            .attr('x', x).attr('y', hintY)
+            .text('まだ誰もいない視点');
+          return;
+        }
         const kws = keywordsFor(key);
         if (kws.length > 0) {
           const kwY = anchor === 'top' ? y + 22 : y - 22;
@@ -969,6 +1088,23 @@
         g.append('text').attr('class', 'viz-contrast-summary')
           .attr('x', innerW / 2).attr('y', innerH + 44).attr('text-anchor', 'middle')
           .text('議論の対立軸:  ' + summaryParts.join('   |   '));
+      }
+
+      // 共通の足場（consensus / bridging）— 対立軸の「補集合」を 1 行で示す。
+      //   立場を越えて多くの象限で共有される語 = 協働の入口。 対立軸で使った語は除外して
+      //   「分断点」と「共通点」が視覚的に別物だと分かるようにする。
+      // 道徳教育根拠: 中教審答申(2021)「多様な他者と協働し新たな見方に出会う」/ Pol.is bridging。
+      //   多数派の人数ではなく coverage(立場の広がり) で選ぶので多数派バイアスを生まない。
+      const contrastKeys = new Set();
+      if (xPair) { contrastKeys.add(xPair.leftKey); contrastKeys.add(xPair.rightKey); }
+      if (yPair) { contrastKeys.add(yPair.leftKey); contrastKeys.add(yPair.rightKey); }
+      const consensus = consensusKeywords(
+        QUADRANT_KEYS.map((k) => cellMaps[k]), 'reason', 2, { minCoverageRatio: 0.75, exclude: contrastKeys }
+      );
+      if (consensus.length > 0) {
+        g.append('text').attr('class', 'viz-consensus-summary')
+          .attr('x', innerW / 2).attr('y', innerH + 62).attr('text-anchor', 'middle')
+          .text('立場を越えた共通の言葉:  ' + consensus.map((c) => '#' + c.word).join('   '));
       }
 
       // ghost 配列は groupByStudent が常に空 ([]) を返すので no-op。
@@ -1191,7 +1327,7 @@
         .text((d) => totalReactions(d.data));
 
       updateStatsPills(this, current.length);
-      maybeRenderTeacherPanel(this, swings);
+      maybeRenderTeacherPanel(this, swings, rows, 'matrix');
       // 象限キーワードは SVG 内に統合済 (旧 HTML パネルは廃止)。mode 切替で残存する panel は除去。
       removeQuadrantSummary(this.elements.answersContainer);
 
@@ -1617,6 +1753,65 @@
   }
 
   /**
+   * 「立場を越えて共通して使われる語」= 協働の足場(common ground)を返す。
+   *
+   *   distinctiveKeywords / contrastingPair が「象限ごとに固有な語」= 分断点を示すのに対し、
+   *   consensusKeywords は逆に「多くの象限/グループにまたがって現れる語」= bridging を示す。
+   *
+   *     coverage(w) = w が出現する非空グループの数
+   *
+   *   選定は **多数派の人数ではなく「立場の広がり(span)」** で行う。 これが核心:
+   *   人数で選ぶと「多数派 = 正解」シグナルになり同調・分極化を生む(IEEE VIS 2023)。
+   *   coverage で選べば、 少人数でも複数の立場で共有される語が拾われ、 多数派バイアスを避けつつ
+   *   「対立する双方が実は同じ言葉を使っている」という協働の入口を提示できる。
+   *
+   * 学術 / 道徳教育根拠:
+   *   - 中教審答申(2021)「協働的な学び = 多様な他者と協働し新たな見方に出会う」の足場
+   *   - Pol.is / vTaiwan「両サイドに響く考えだけが prominence を得る」bridging 原則
+   *
+   * @param {Array} cellInputs  各グループ(象限/半分)の rows 配列 or 既存 word map
+   * @param {string} field  集計対象列名（'reason' 等）。 入力が word map のときは無視。
+   * @param {number} [topN=2]
+   * @param {Object} [opts] { minCoverageRatio=0.75, exclude=Set<key> }
+   * @returns {Array<{word:string, coverage:number, count:number}>}
+   */
+  function consensusKeywords(cellInputs, field, topN, opts) {
+    const N = topN || 2;
+    const maps = (cellInputs || [])
+      .map((x) => _toCountMap(x, field))
+      .filter((m) => m && m.counts && m.counts.size > 0);
+    const groupCount = maps.length;
+    if (groupCount < 2) return []; // 2 群以上ないと「またがる」概念が成立しない
+    const minRatio = (opts && typeof opts.minCoverageRatio === 'number') ? opts.minCoverageRatio : 0.75;
+    const exclude = (opts && opts.exclude instanceof Set) ? opts.exclude : new Set();
+    const minCoverage = Math.max(2, Math.ceil(groupCount * minRatio));
+
+    // total counts と displayForm は mergeWordMaps が作る（counts 加算 + first-seen 表示形）。
+    //   coverage（= 出現した群数。 counts とは別物）だけ別途数える。
+    const merged = mergeWordMaps(maps);
+    const coverage = new Map();
+    for (const m of maps) {
+      for (const k of m.counts.keys()) coverage.set(k, (coverage.get(k) || 0) + 1);
+    }
+
+    const scored = [];
+    for (const [k, cov] of coverage) {
+      if (cov < minCoverage || exclude.has(k)) continue;
+      const word = merged.displayForm.get(k) || k;
+      if (word.length < 2) continue; // 1 字断片は表示に値しない
+      scored.push({ word, coverage: cov, count: merged.counts.get(k) || 0, quality: keywordQuality(word) });
+    }
+    // coverage desc(広く共有)→ quality desc(漢字優先)→ count desc → length desc
+    scored.sort((a, b) => {
+      if (b.coverage !== a.coverage) return b.coverage - a.coverage;
+      if (b.quality !== a.quality) return b.quality - a.quality;
+      if (b.count !== a.count) return b.count - a.count;
+      return b.word.length - a.word.length;
+    });
+    return scored.slice(0, N);
+  }
+
+  /**
    * 2 つの axis 設定が「同じ座標系を表すか」を判定する。
    *
    * 「議論前 → 現在」矢印を描くには (numericX, numericY) が **同じ意味の座標** を
@@ -1796,8 +1991,10 @@
   StudyQuestApp.prototype.__aggregateWords = aggregateWords;
   StudyQuestApp.prototype.__distinctiveKeywords = distinctiveKeywords;
   StudyQuestApp.prototype.__contrastingPair = contrastingPair;
+  StudyQuestApp.prototype.__consensusKeywords = consensusKeywords;
   StudyQuestApp.prototype.__arePhasesAxisCompatible = arePhasesAxisCompatible;
   StudyQuestApp.prototype.__computeMatrixDeltas = computeMatrixDeltas;
+  // vizComputeOpinionShift は prototype method として既に定義済 (test から直接呼べる)。
 
   // ---------------------------------------------------------------------
   // M4: 円グラフ（道徳指導案 導入・アンケート結果可視化）

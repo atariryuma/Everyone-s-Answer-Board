@@ -1845,7 +1845,8 @@
   .phase-add-btn:hover {
     background: color-mix(in srgb, var(--theme-accent-cyan-strong) 20%, transparent);
     border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent);
-    color: #fff;
+    /* color は base の var(--theme-accent-cyan) を継承。 旧 color:#fff は light mode の
+       淡いシアン地で白文字が消えていた (theme bug)。 */
   }
 
   /* Phase preview & detail UI (Wizard Step 2) */
@@ -2242,7 +2243,7 @@
   .profile-icon-load:hover {
     background: color-mix(in srgb, var(--brand-primary) 25%, transparent);
     border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
-    color: #fff;
+    /* color:#fff 廃止 (light mode で淡 brand 地に白文字が消える)。 base 色を継承。 */
   }
   .profile-icon-delete {
     color: color-mix(in srgb, var(--status-error) 85%, transparent);
@@ -2250,7 +2251,7 @@
   .profile-icon-delete:hover {
     background: color-mix(in srgb, var(--status-error) 20%, transparent);
     border-color: color-mix(in srgb, var(--status-error) 45%, transparent);
-    color: #fff;
+    /* color:#fff 廃止 (light mode で淡赤地に白文字が消える)。 base の status-error を継承。 */
   }
   /* ロード中の行を highlight */
   .profile-row.profile-row-loading {
@@ -2287,7 +2288,7 @@
   .profile-icon-update:hover {
     background: color-mix(in srgb, var(--theme-accent-cyan-strong) 40%, transparent);
     border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 70%, transparent);
-    color: #fff;
+    /* color:#fff 廃止 (light mode で淡シアン地に白文字が消える)。 base の accent-cyan を継承。 */
   }
 
   /* ===== Phase 追加 dropdown (Wizard Step 2) ===== */

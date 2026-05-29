@@ -151,10 +151,10 @@ test('dispatch: listProperties masks sensitive keys', () => {
   assert.equal(result.success, true);
   // Non-sensitive key: shown as-is
   assert.equal(result.data.properties['APP_NAME'], 'test');
-  // Sensitive key (contains KEY): must be fully masked, not contain actual value
+  // Sensitive key (contains KEY): must be fully masked, not contain actual value or its length
   const masked = result.data.properties['ADMIN_API_KEY'];
   assert.ok(masked.startsWith('***'), 'Should start with ***');
-  assert.ok(masked.includes('chars'), 'Should indicate character count');
+  assert.ok(!/\d/.test(masked), 'Must NOT leak the secret length (no digits in the mask)');
   assert.ok(!masked.includes('secret123'), 'Must not contain actual value');
 });
 
@@ -236,23 +236,50 @@ test('dispatch: setProperty allows non-protected keys', () => {
       })
     }
   });
-  const result = ctx.dispatchAdminOperation('setProperty', { key: 'APP_DISABLED', value: 'false' });
+  const result = ctx.dispatchAdminOperation('setProperty', { key: 'APP_NAME', value: 'みんなの回答ボード' });
   assert.equal(result.success, true);
-  assert.deepEqual(captured, { k: 'APP_DISABLED', v: 'false' });
+  assert.deepEqual(captured, { k: 'APP_NAME', v: 'みんなの回答ボード' });
 });
 
 test('dispatch: getProperty allows non-protected keys', () => {
   const ctx = loadAdminContext({
     PropertiesService: {
       getScriptProperties: () => ({
-        getProperty: (k) => k === 'APP_DISABLED' ? 'true' : null,
+        getProperty: (k) => k === 'APP_NAME' ? 'test_value' : null,
         setProperty: () => {},
         deleteProperty: () => {},
         getProperties: () => ({})
       })
     }
   });
-  const result = ctx.dispatchAdminOperation('getProperty', { key: 'APP_DISABLED' });
+  const result = ctx.dispatchAdminOperation('getProperty', { key: 'APP_NAME' });
   assert.equal(result.success, true);
-  assert.equal(result.data.value, 'true');
+  assert.equal(result.data.value, 'test_value');
+});
+
+// APP_DISABLED (緊急停止フラグ) と DEPLOYED_WEB_APP_URL は generic setProperty/getProperty では
+// 操作させない。 enableApp/disableApp の専用 op (監査証跡付き) でのみ変更させ、 証跡バイパスを防ぐ。
+['APP_DISABLED', 'APP_DISABLED_REASON', 'APP_DISABLED_BY', 'APP_DISABLED_AT', 'DEPLOYED_WEB_APP_URL'].forEach((opKey) => {
+  test(`dispatch: setProperty rejects operational control key ${opKey}`, () => {
+    let setCalls = 0;
+    const ctx = loadAdminContext({
+      PropertiesService: {
+        getScriptProperties: () => ({
+          getProperty: () => null,
+          setProperty: () => { setCalls += 1; },
+          deleteProperty: () => {},
+          getProperties: () => ({})
+        })
+      }
+    });
+    const result = ctx.dispatchAdminOperation('setProperty', { key: opKey, value: 'x' });
+    assert.equal(result.success, false);
+    assert.equal(setCalls, 0, 'setProperty must not be called for operational control keys');
+  });
+
+  test(`dispatch: getProperty rejects operational control key ${opKey}`, () => {
+    const ctx = loadAdminContext();
+    const result = ctx.dispatchAdminOperation('getProperty', { key: opKey });
+    assert.equal(result.success, false);
+  });
 });

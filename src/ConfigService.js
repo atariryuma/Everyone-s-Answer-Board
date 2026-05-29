@@ -205,8 +205,19 @@ function validateAndSanitizeConfig(config, userId) {
       errors.push('無効なユーザーID形式');
     }
 
-    // 既存設定フィールドを保持しつつ、検証済みフィールドで上書きする
+    // 既存設定フィールドを保持しつつ、検証済みフィールドで上書きする。
+    // Why spread: allowlist 化すると過去に formTitle/publishedAt/etag 等が read→write 往復で
+    //   silently 消える data loss を起こしたため、未知の正規フィールドは保持する方針。
     const sanitized = { ...config, ...validationResult.sanitized };
+
+    // ただし「永続化してはいけないキー」だけは明示的に剥がす:
+    //   - prototype 汚染ベクタ (__proto__ / constructor / prototype)
+    //   - parse 失敗マーカー (__parseFailed/__parseError: 実行時のみ意味を持つ)
+    //   - 計算で都度生成される派生データ (dynamicUrls: 保存すると stale URL が残る)
+    // これにより spread の data-loss 安全性を保ちつつ未知キー素通しの面を絞る。
+    const TRANSIENT_OR_DANGEROUS_KEYS = ['__proto__', 'constructor', 'prototype', '__parseFailed', '__parseError', 'dynamicUrls'];
+    TRANSIENT_OR_DANGEROUS_KEYS.forEach((k) => { delete sanitized[k]; });
+
     sanitized.userId = userId;
 
     if (sanitized.displaySettings) {
@@ -751,6 +762,20 @@ function saveUserConfig(userId, config, options = {}) {
           console.warn('saveUserConfig: Current config parse error for ETag validation:', parseError.message);
         }
       }
+    } else if (user.configJson) {
+      // etag を渡さない save は楽観ロックをスキップする (last-write-wins)。 既存 config が
+      // etag を持つのに etag 無しで上書きする = 別タブ/別 request の編集を黙って飲み込む
+      // 可能性がある。 silent lost-update を観測可能にするため WARN を残す
+      // (hard reject はしない: profile/lesson 等 etag を渡さない正当な内部 caller が多数あるため)。
+      try {
+        const currentConfig = JSON.parse(user.configJson);
+        if (currentConfig && currentConfig.etag) {
+          console.warn('saveUserConfig: etag-less overwrite of an etag-bearing config (optimistic lock skipped)', {
+            userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
+            currentETag: currentConfig.etag
+          });
+        }
+      } catch (_) { /* parse 失敗は etag 検証外の通常 save で扱う */ }
     }
 
     const validation = options.isPublish

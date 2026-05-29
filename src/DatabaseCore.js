@@ -810,7 +810,10 @@ function validateServiceAccountUsage(spreadsheetId, useServiceAccount, context =
       return cacheAndReturn({ allowed: false, reason: 'Target user not found', accessMode: 'denied' });
     }
 
-    const isOwner = Boolean(targetUser.userEmail && currentEmail && targetUser.userEmail === currentEmail);
+    // email は大文字小文字を区別しないので正規化して比較する。 isBoardCollaborator と揃え、
+    // 保存値と session 値の case 差で owner を viewer と誤判定 (非公開ボードで誤 deny) するのを防ぐ。
+    const normEmail = (e) => String(e || '').toLowerCase().trim();
+    const isOwner = Boolean(targetUser.userEmail && currentEmail && normEmail(targetUser.userEmail) === normEmail(currentEmail));
     if (isOwner) {
       // 編集者は自分の SS のオーナー権限を持つ → openById で直接アクセス。
       // SA pool quota を viewer の閲覧トラフィックに温存できる。
@@ -926,11 +929,22 @@ function openSpreadsheet(spreadsheetId, options = {}) {
           spreadsheet = openSpreadsheetViaServiceAccount(spreadsheetId);
         }
         if (!spreadsheet) {
-          // SA pool 全滅 → openById fallback (deploy 主の権限で動く; 完全停止より良い)。
-          console.warn('openSpreadsheet: SA pool failed, falling back to openById', {
-            spreadsheetId: `${spreadsheetId.substring(0, 20)}...`
-          });
-          spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+          // SA pool 全滅時の openById fallback は DB スプレッドシートに限定する。
+          // user board に deploy 主を editor 追加していない (SA pool のみ) ので、
+          // user board への openById は元々失敗するだけ。 ここで明示的に絞ることで
+          // 「viewer は board SS に直接権限を持たない」セキュリティモデルを保証する。
+          const dbId = getCachedProperty('DATABASE_SPREADSHEET_ID');
+          if (dbId && spreadsheetId === dbId) {
+            console.warn('openSpreadsheet: SA pool failed, falling back to openById (DB sheet only)', {
+              spreadsheetId: `${spreadsheetId.substring(0, 20)}...`
+            });
+            spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+          } else {
+            console.warn('openSpreadsheet: SA pool failed for user board, refusing owner fallback', {
+              spreadsheetId: `${spreadsheetId.substring(0, 20)}...`
+            });
+            return null;
+          }
         }
       } else {
         spreadsheet = SpreadsheetApp.openById(spreadsheetId);

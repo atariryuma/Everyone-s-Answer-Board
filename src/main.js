@@ -1036,17 +1036,24 @@ function executeWithRetry(operation, options = {}) {
       if (retryCount > 0) {
         const errorMessage = lastError && lastError.message ? lastError.message : '';
 
-        const is429Error = errorMessage.includes('429') || errorMessage.includes('Quota exceeded');
-        const baseDelay = is429Error ? initialDelay * 2 : initialDelay;
+        // operation 側が既に adaptive backoff (= inner Utilities.sleep) を済ませている場合は
+        // ここで二重に sleep しない。 二重 backoff は 429 storm 時に inner(最大60s)+outer(最大20s)
+        // が積み上がり GAS 6 分実行制限を踏み抜く原因になっていた。
+        const alreadyBackedOff = errorMessage.includes('adaptive backoff');
 
-        const delay = Math.min(
-          baseDelay * Math.pow(2, retryCount - 1),
-          maxDelay
-        );
-        if (retryCount === 1 || retryCount === maxRetries - 1) {
-          console.warn(`${operationName}: Retry ${retryCount}/${maxRetries - 1} after ${delay}ms delay${is429Error ? ' (429 quota)' : ''}`);
+        if (!alreadyBackedOff) {
+          const is429Error = errorMessage.includes('429') || errorMessage.includes('Quota exceeded');
+          const baseDelay = is429Error ? initialDelay * 2 : initialDelay;
+
+          const delay = Math.min(
+            baseDelay * Math.pow(2, retryCount - 1),
+            maxDelay
+          );
+          if (retryCount === 1 || retryCount === maxRetries - 1) {
+            console.warn(`${operationName}: Retry ${retryCount}/${maxRetries - 1} after ${delay}ms delay${is429Error ? ' (429 quota)' : ''}`);
+          }
+          Utilities.sleep(delay);
         }
-        Utilities.sleep(delay);
       }
 
       return operation();

@@ -1322,23 +1322,17 @@ function advanceLessonPhase(userId, lessonId, direction) {
 
     // Why: 移行 *前* に outgoing phase の rows を freeze する。順序を逆にすると
     //   user config が次 phase の columnMapping を指した状態で capture することになり、
-    //   replay が破綻する。capture → Form 切替 → config 切替 の順を維持。
+    //   replay が破綻する。capture は config 切替より前 (= 現状 fromIdx) で行う。
     __upsertSnapshot_(lessonJson, __captureSnapshot_(userId, lessonJson, fromIdx));
-
-    // 現フェーズ Form を close、次フェーズ Form を open。
-    __setFormAcceptingResponses_(phases[fromIdx].formId, false);
-    __setFormAcceptingResponses_(phases[toIdx].formId, true);
-
-    // user config を次フェーズに切替 (board が即座に新フェーズに対応)
-    const target = phases[toIdx];
-    const patchResult = applyConfigPatch_(userId, __buildPhaseConfigPatch_(target, lessonJson, lessonId), { publish: false });
-    if (!patchResult.success) {
-      return createErrorResponse(`フェーズ切替に失敗しました: ${patchResult.message || 'unknown'}`);
-    }
 
     lessonJson.profileTransitions = lessonJson.profileTransitions || [];
     lessonJson.profileTransitions.push({ ts: new Date().toISOString(), from: fromIdx, to: toIdx });
 
+    // Why この順序: lesson row (= 「今どのフェーズか」 の真実) を etag 検証付きで *先に* 確定する。
+    //   旧実装は Form/config を先に切替えてから row write していたため、 最後の write が
+    //   etag_mismatch で失敗すると「config は次 phase・lessonJson は前 phase」 の不整合が残り
+    //   __activePhaseIndex_ がズレた。 row write を concurrency gate にし、 成功後に
+    //   *冪等な* 副作用 (Form open/close, config patch — 二重適用しても無害) を適用する。
     const result = __updateLessonRow_(lessonId, { lessonJson });
     if (!result.success) {
       // Why error preservation: __updateLessonRow_ は 'etag_mismatch' を error フィールドで返す。
@@ -1348,6 +1342,18 @@ function advanceLessonPhase(userId, lessonId, direction) {
       return createErrorResponse(result.message || result.error, null,
         result.error ? { error: result.error, currentEtag: result.currentEtag } : null);
     }
+
+    // 現フェーズ Form を close、次フェーズ Form を open (冪等)。
+    __setFormAcceptingResponses_(phases[fromIdx].formId, false);
+    __setFormAcceptingResponses_(phases[toIdx].formId, true);
+
+    // user config を次フェーズに切替 (board が即座に新フェーズに対応; 冪等)
+    const target = phases[toIdx];
+    const patchResult = applyConfigPatch_(userId, __buildPhaseConfigPatch_(target, lessonJson, lessonId), { publish: false });
+    if (!patchResult.success) {
+      return createErrorResponse(`フェーズ切替に失敗しました: ${patchResult.message || 'unknown'}`);
+    }
+
     return createSuccessResponse(`フェーズ ${toIdx + 1}: ${target.name} に切替えました`, {
       lesson: result.lesson,
       activePhaseIndex: toIdx
