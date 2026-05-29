@@ -587,9 +587,17 @@
     const teacherPanel = document.createElement('div');
     teacherPanel.className = 'viz-teacher-panel';
     teacherPanel.id = 'vizTeacherPanel';
-    teacherPanel.innerHTML = '<h3>気になる児童（意見が動いた順）</h3>'
-      + '<div id="vizOpinionShift" class="viz-opinion-shift"></div>'
-      + '<ul id="vizSwingList"></ul>';
+    teacherPanel.innerHTML =
+        '<div id="vizOpinionShift" class="viz-opinion-shift"></div>'
+      + '<div class="viz-panel-section" id="vizReasonSeedsSection" style="display:none">'
+      +   '<h3>議論のたねになる声<span class="viz-panel-sub">（各立場から・教師用）</span></h3>'
+      +   '<p class="viz-panel-hint">人気順ではありません。立場ごとに「理由を述べている声」を手がかりとして1つずつ。読み上げる声は先生が選びます。</p>'
+      +   '<ul id="vizReasonSeeds"></ul>'
+      + '</div>'
+      + '<div class="viz-panel-section" id="vizSwingSection" style="display:none">'
+      +   '<h3>気になる児童<span class="viz-panel-sub">（意見が動いた順）</span></h3>'
+      +   '<ul id="vizSwingList"></ul>'
+      + '</div>';
     answers.appendChild(teacherPanel);
 
     return { svg, teacherPanel };
@@ -608,16 +616,13 @@
   function maybeRenderTeacherPanel(app, swings, rows, mode) {
     const panel = document.getElementById('vizTeacherPanel');
     if (!panel) return;
-    const list = document.getElementById('vizSwingList');
-    if (!list) return;
 
-    // Why: 「気になる児童」パネル自体は教師端末のみ。ただし表示する name は
-    //   displayMode に合わせる（管理モード OFF のときは匿名 + emailHash で識別）。
-    //   カード実装と同じ振舞い。
+    // Why: パネルは教師端末のみ。表示する name は displayMode に合わせる
+    //   （管理モード OFF のときは匿名 + emailHash で識別）。 カード実装と同じ振舞い。
     const showAdmin = Boolean(app.state.showAdminFeatures);
+    const showName = app.state.displayMode === 'named';
 
-    // 意見変容サマリ（教師のみ・記述的）。 swings が空でも shift は出し得るので先に処理。
-    //   shift が非 null なら必ず showAdmin（上の三項で保証）なので hasShift だけ見れば足りる。
+    // (1) 意見変容サマリ（教師のみ・記述的）。 swings が空でも shift は出し得る。
     const shiftEl = document.getElementById('vizOpinionShift');
     const shift = showAdmin ? app.vizComputeOpinionShift(rows || [], mode) : null;
     if (shiftEl) {
@@ -640,26 +645,60 @@
       }
     }
 
-    if (!showAdmin || swings.length === 0) {
-      // shift だけ出る場合があるので、 swing が無くても shift があれば panel は見せる。
-      panel.classList.toggle('active', Boolean(shift));
-      list.innerHTML = '';
-      return;
+    // (2) 議論のたねになる声（教師のみ・各立場から1件・記述的）。
+    //   人気順ではなく position coverage で選ぶ（多数派バイアス回避）。 swing と違い
+    //   再投稿不要なので単一投稿のボードでも機能する = 最も広く使える教師ヒント。
+    const seedsEl = document.getElementById('vizReasonSeeds');
+    let seeds = [];
+    if (showAdmin) {
+      const groups = buildPositionGroups(rows || [], mode, app.state.axisConfig);
+      seeds = representativeReasons(groups, { perBucket: 1, field: 'reason', minLen: 6 });
+    }
+    if (seedsEl) {
+      const section = document.getElementById('vizReasonSeedsSection');
+      if (seeds.length) {
+        seedsEl.innerHTML = seeds.map((s) => {
+          const who = (showName && s.name) ? escapeForTooltip(s.name)
+                    : (s.emailHash ? '匿名(' + s.emailHash + ')' : '匿名');
+          // raw を先に切ってから escape する（entity 途中切り防止）。
+          const stance = s.label
+            ? '<span class="viz-seed-stance">' + escapeForTooltip(String(s.label).substring(0, 24)) + '</span>'
+            : '';
+          const reason = escapeForTooltip(String(s.reason).substring(0, 120));
+          return '<li>' + stance + '<span class="viz-seed-who">' + who + '</span>「' + reason + '」</li>';
+        }).join('');
+        if (section) section.style.display = '';
+      } else {
+        seedsEl.innerHTML = '';
+        if (section) section.style.display = 'none';
+      }
     }
 
-    const showName = app.state.displayMode === 'named';
-    const top = swings.slice(0, 5);
-    list.innerHTML = top.map((s) => {
-      const fromTo = (s.from.y !== null && s.to.y !== null)
-        ? `(${s.from.x},${s.from.y}) → (${s.to.x},${s.to.y})`
-        : `${s.from.x} → ${s.to.x}`;
-      const name = (showName && s.name) ? escapeForTooltip(s.name) : '匿名(' + s.emailHash + ')';
-      // raw を先に切ってから escape する。 escape 後に substring すると "&amp;" を
-      //   "&am" のように entity 途中で切る恐れがある。
-      const comment = s.comment ? '：' + escapeForTooltip(String(s.comment).substring(0, 60)) : '';
-      return `<li><span class="swing-badge">Δ${s.distance.toFixed(1)}</span>${name} ${fromTo}${comment}</li>`;
-    }).join('');
-    panel.classList.add('active');
+    // (3) 気になる児童（意見が動いた順）。 swing は再投稿許可 + 複数投稿が前提。
+    const list = document.getElementById('vizSwingList');
+    const swingSection = document.getElementById('vizSwingSection');
+    const hasSwings = showAdmin && swings.length > 0;
+    if (list) {
+      if (hasSwings) {
+        const top = swings.slice(0, 5);
+        list.innerHTML = top.map((s) => {
+          const fromTo = (s.from.y !== null && s.to.y !== null)
+            ? `(${s.from.x},${s.from.y}) → (${s.to.x},${s.to.y})`
+            : `${s.from.x} → ${s.to.x}`;
+          const name = (showName && s.name) ? escapeForTooltip(s.name) : '匿名(' + s.emailHash + ')';
+          // raw を先に切ってから escape する（"&amp;" を entity 途中で切らないため）。
+          const comment = s.comment ? '：' + escapeForTooltip(String(s.comment).substring(0, 60)) : '';
+          return `<li><span class="swing-badge">Δ${s.distance.toFixed(1)}</span>${name} ${fromTo}${comment}</li>`;
+        }).join('');
+        if (swingSection) swingSection.style.display = '';
+      } else {
+        list.innerHTML = '';
+        if (swingSection) swingSection.style.display = 'none';
+      }
+    }
+
+    // パネルは shift / seeds / swing のいずれかがあれば表示。
+    panel.classList.toggle('active', Boolean(shift) || seeds.length > 0 || hasSwings);
   }
 
   // ---------------------------------------------------------------------
@@ -1811,6 +1850,135 @@
     return scored.slice(0, N);
   }
 
+  // ---------------------------------------------------------------------
+  // 議論のたねになる声 (representative reasons) — 教師が熟議で読み上げる候補を
+  //   「各立場から 1 件ずつ」拾う。 [[viz-major-update-research-grounded]] の延長。
+  //
+  // 設計ガードレール（多数派バイアス回避・研究根拠・変更時は必ず読むこと）:
+  //   - 選定は **立場(group)ごとに 1 件ずつ** = position coverage。 人気(reaction)・
+  //     頻度・多数派では絶対に選ばない。 少数の立場も等しく 1 席を得る（少数意見の保全）。
+  //     consensusKeywords が coverage で選ぶのと同じ原理（人数で選ばない）。
+  //   - group 内の優先は「**理由を述べているか(hasJustification)**」という *記述的* な観察。
+  //     良い/悪いの評価ではなく「理由づけの言語が含まれるか」だけを見る。 これは道徳科が
+  //     重視する「理由を挙げて多面的・多角的に考える」過程そのもの (MEXT 2016 報告 p.10)。
+  //   - **教師端末のみ**に出す。 児童に「模範回答」として示すと同調圧力になる
+  //     (opinion-shift と同じ teacher-only 原則)。 読み上げる声は最終的に教師が選ぶ。
+  //
+  // 学術根拠:
+  //   - Stanford HCOMP 2024 (arXiv:2408.11936 "Estimating Contribution Quality…"):
+  //     集団の意見変容は「理由づけのある主張の selective uptake」で起きる
+  //     (justification quality が効き、 novelty 単独では効かない)。 教師が理由づけのある
+  //     声を拾って議論にかけることが熟議の駆動力になる、という知見を反映。
+  //   - Pol.is: クラスタごとの代表的発言を surface（人気ではなく代表性）。
+  // ---------------------------------------------------------------------
+
+  // 「理由を述べている」ことの *記述的* 検出（良し悪しの評価ではない）。
+  //   日本語の理由・因果・例示の接続表現が含まれるかを部分一致で見る軽量ヒューリスティック
+  //   (形態素解析に依らない)。 過検出は許容: これは「読み上げ候補」の弱い優先度付けにすぎず、
+  //   外れても fallback（その立場で最も実質的な理由）が選ばれるだけで害がない。
+  //   既知の過検出: 「わからない」が 'から' に部分一致する等。 弱い tiebreak なので無視可能。
+  const JUSTIFICATION_MARKERS = [
+    'なぜなら', '理由は', 'というのも', 'だって',
+    'だから', 'ので', 'から', 'ため', 'ゆえ',
+    'したがって', 'よって', 'そのため', 'それで',
+    'たとえば', '例えば', '具体的に', 'おかげ', 'せいで'
+  ];
+  function hasJustification(text) {
+    if (!text) return false;
+    const s = String(text);
+    return JUSTIFICATION_MARKERS.some((m) => s.indexOf(m) >= 0);
+  }
+
+  /**
+   * rows を「立場(position) のグループ」に分割する。
+   *   matrix: 4 象限 (hh/lh/hl/ll)。 ラベルは __resolveQuadrantLabels。
+   *   numberline: 2 極 (low/high)。 中点で二分し、 ラベルは xAxisLabels.min/max（= 軸の両端の名前）。
+   *     1D で「対立軸」を表す最も自然な構造は両極なので、 ここを立場グループとする。
+   *   バケット境界は renderMatrix / renderNumberLine と整合（>= mid を high 側）。
+   * @returns {Array<{key:string, label:string, rows:Array}>}
+   */
+  function buildPositionGroups(rows, mode, axisCfg) {
+    const cfg = axisCfg || {};
+    const dMin = typeof cfg.defaultMin === 'number' ? cfg.defaultMin : 1;
+    const dMax = typeof cfg.defaultMax === 'number' ? cfg.defaultMax : 5;
+    if (mode === 'matrix') {
+      const valid = (rows || []).filter((r) => typeof r.numericX === 'number' && typeof r.numericY === 'number');
+      const xs = valid.map((r) => r.numericX);
+      const ys = valid.map((r) => r.numericY);
+      const minX = xs.length ? Math.min(...xs, dMin) : dMin;
+      const maxX = xs.length ? Math.max(...xs, dMax) : dMax;
+      const minY = ys.length ? Math.min(...ys, dMin) : dMin;
+      const maxY = ys.length ? Math.max(...ys, dMax) : dMax;
+      const midX = (minX + maxX) / 2;
+      const midY = (minY + maxY) / 2;
+      const q = __resolveQuadrantLabels(cfg);
+      const buckets = { hh: [], lh: [], hl: [], ll: [] };
+      for (const r of valid) {
+        const xk = r.numericX >= midX ? 'h' : 'l';
+        const yk = r.numericY >= midY ? 'h' : 'l';
+        buckets[xk + yk].push(r);
+      }
+      return ['hh', 'lh', 'hl', 'll'].map((k) => ({ key: k, label: q[k] || '', rows: buckets[k] }));
+    }
+    // numberline: low / high の 2 極
+    const valid = (rows || []).filter((r) => typeof r.numericX === 'number');
+    const xs = valid.map((r) => r.numericX);
+    const minX = xs.length ? Math.min(...xs, dMin) : dMin;
+    const maxX = xs.length ? Math.max(...xs, dMax) : dMax;
+    const mid = (minX + maxX) / 2;
+    const xL = cfg.xAxisLabels || {};
+    const lowRows = [];
+    const highRows = [];
+    for (const r of valid) {
+      (r.numericX >= mid ? highRows : lowRows).push(r);
+    }
+    return [
+      { key: 'low', label: xL.min || '', rows: lowRows },
+      { key: 'high', label: xL.max || '', rows: highRows }
+    ];
+  }
+
+  /**
+   * 各立場グループから「議論のたねになる声」を選ぶ（上のガードレール参照）。
+   * @param {Array<{key,label,rows}>} groups buildPositionGroups の戻り値
+   * @param {Object} [opts] { perBucket=1, field='reason', minLen=6 }
+   * @returns {Array<{key,label,reason,name,emailHash,numericX,numericY,hasJustification}>}
+   */
+  function representativeReasons(groups, opts) {
+    const perBucket = (opts && opts.perBucket) || 1;
+    const field = (opts && opts.field) || 'reason';
+    const minLen = (opts && typeof opts.minLen === 'number') ? opts.minLen : 6;
+    const out = [];
+    for (const grp of (groups || [])) {
+      const cands = (grp.rows || [])
+        .map((r) => ({ row: r, text: String((r && r[field]) || '').trim() }))
+        .filter((c) => c.text.length >= minLen);
+      if (!cands.length) continue;
+      // justification 有(1) > 無(0) を最優先 → 同点は理由の情報量(長さ)を弱い tiebreak →
+      //   最後に rowIndex で決定的に（毎 render 同じ声が選ばれ、 教師の認知が安定する）。
+      cands.sort((a, b) => {
+        const ja = hasJustification(a.text) ? 1 : 0;
+        const jb = hasJustification(b.text) ? 1 : 0;
+        if (ja !== jb) return jb - ja;
+        if (a.text.length !== b.text.length) return b.text.length - a.text.length;
+        return (a.row.rowIndex || 0) - (b.row.rowIndex || 0);
+      });
+      for (const c of cands.slice(0, perBucket)) {
+        out.push({
+          key: grp.key,
+          label: grp.label,
+          reason: c.text,
+          name: c.row.name || '',
+          emailHash: c.row.emailHash || '',
+          numericX: typeof c.row.numericX === 'number' ? c.row.numericX : null,
+          numericY: typeof c.row.numericY === 'number' ? c.row.numericY : null,
+          hasJustification: hasJustification(c.text)
+        });
+      }
+    }
+    return out;
+  }
+
   /**
    * 2 つの axis 設定が「同じ座標系を表すか」を判定する。
    *
@@ -1992,6 +2160,9 @@
   StudyQuestApp.prototype.__distinctiveKeywords = distinctiveKeywords;
   StudyQuestApp.prototype.__contrastingPair = contrastingPair;
   StudyQuestApp.prototype.__consensusKeywords = consensusKeywords;
+  StudyQuestApp.prototype.__hasJustification = hasJustification;
+  StudyQuestApp.prototype.__buildPositionGroups = buildPositionGroups;
+  StudyQuestApp.prototype.__representativeReasons = representativeReasons;
   StudyQuestApp.prototype.__arePhasesAxisCompatible = arePhasesAxisCompatible;
   StudyQuestApp.prototype.__computeMatrixDeltas = computeMatrixDeltas;
   // vizComputeOpinionShift は prototype method として既に定義済 (test から直接呼べる)。

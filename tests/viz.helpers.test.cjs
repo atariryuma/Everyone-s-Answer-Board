@@ -950,6 +950,108 @@ test('vizComputeOpinionShift: returns null with fewer than 2 students', () => {
 });
 
 // =====================================================================
+// 議論のたねになる声 (hasJustification / buildPositionGroups / representativeReasons)
+//   研究根拠: Stanford HCOMP 2024 (arXiv:2408.11936) — 集団の意見変容は
+//   「理由づけのある主張の selective uptake」で起きる。 教師が各立場から理由づけの
+//   ある声を 1 つずつ拾う（人気順ではなく position coverage）ための純粋関数群。
+// =====================================================================
+
+test('hasJustification: detects Japanese reasoning/causal markers (descriptive, not evaluative)', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const h = StudyQuestApp.prototype.__hasJustification;
+  assert.equal(h('みんなが使うから、そのままでいい'), true);   // から
+  assert.equal(h('なぜなら時間がないのだ'), true);              // なぜなら
+  assert.equal(h('急いでいるので直さない'), true);               // ので
+  assert.equal(h('相手のためを思って直す'), true);               // ため
+  assert.equal(h('たとえば締め切りが近いとき'), true);           // たとえば
+  assert.equal(h('そのまま使う'), false);                        // marker なし
+  assert.equal(h(''), false);
+  assert.equal(h(null), false);
+});
+
+test('buildPositionGroups: numberline splits into two poles labeled by axis ends', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const build = StudyQuestApp.prototype.__buildPositionGroups;
+  const rows = [
+    { rowIndex: 1, numericX: 1, reason: 'a' },
+    { rowIndex: 2, numericX: 2, reason: 'b' },
+    { rowIndex: 3, numericX: 5, reason: 'c' }
+  ];
+  const axis = { defaultMin: 1, defaultMax: 5, xAxisLabels: { min: 'そのまま', max: '直す' } };
+  const groups = build(rows, 'numberline', axis);
+  assert.equal(groups.length, 2);
+  assert.equal(groups[0].key, 'low');
+  assert.equal(groups[0].label, 'そのまま');
+  assert.equal(groups[1].key, 'high');
+  assert.equal(groups[1].label, '直す');
+  assert.equal(groups[0].rows.length, 2); // x=1,2 (< mid 3)
+  assert.equal(groups[1].rows.length, 1); // x=5 (>= mid 3)
+});
+
+test('buildPositionGroups: matrix splits into four quadrants, skips rows missing numericY', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const build = StudyQuestApp.prototype.__buildPositionGroups;
+  const rows = [
+    { rowIndex: 1, numericX: 5, numericY: 5, reason: 'hh' },
+    { rowIndex: 2, numericX: 1, numericY: 5, reason: 'lh' },
+    { rowIndex: 3, numericX: 5, numericY: 1, reason: 'hl' },
+    { rowIndex: 4, numericX: 1, numericY: 1, reason: 'll' },
+    { rowIndex: 5, numericX: 3, reason: 'no-y' } // numericY 無し → 除外
+  ];
+  const groups = build(rows, 'matrix', { defaultMin: 1, defaultMax: 5 });
+  assert.equal(groups.length, 4);
+  const byKey = Object.fromEntries(groups.map((g) => [g.key, g.rows.length]));
+  assert.deepEqual(byKey, { hh: 1, lh: 1, hl: 1, ll: 1 });
+});
+
+test('representativeReasons: prefers a reason that states a reason, one per stance', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const rep = StudyQuestApp.prototype.__representativeReasons;
+  const groups = [
+    { key: 'low', label: 'そのまま', rows: [
+      { rowIndex: 1, numericX: 1, reason: 'そのままがいいです' },             // marker なし
+      { rowIndex: 2, numericX: 2, reason: '時間がないからそのままにする' }     // から → justification
+    ] },
+    { key: 'high', label: '直す', rows: [
+      { rowIndex: 3, numericX: 5, reason: '自分で直したいです' }              // marker なし
+    ] }
+  ];
+  const out = rep(groups, { perBucket: 1, field: 'reason', minLen: 4 });
+  assert.equal(out.length, 2);                                  // 占有された立場ごとに 1 件
+  assert.equal(out[0].key, 'low');
+  assert.equal(out[0].reason, '時間がないからそのままにする');   // 理由づけのある声が選ばれる
+  assert.equal(out[0].hasJustification, true);
+  assert.equal(out[1].key, 'high');
+});
+
+test('representativeReasons: never selects by popularity — minority stance gets equal seat', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const rep = StudyQuestApp.prototype.__representativeReasons;
+  // low 立場は 5 人、 high 立場は 1 人。 それでも各立場 1 席ずつ（人数で重み付けしない）。
+  const groups = [
+    { key: 'low', label: 'A', rows: Array.from({ length: 5 }, (_, i) => ({ rowIndex: i + 1, reason: 'みんなと同じでいい' + i })) },
+    { key: 'high', label: 'B', rows: [{ rowIndex: 9, reason: '少数だけど直したい立場です' }] }
+  ];
+  const out = rep(groups, { perBucket: 1, minLen: 4 });
+  assert.equal(out.length, 2);
+  assert.equal(out.filter((s) => s.key === 'low').length, 1);
+  assert.equal(out.filter((s) => s.key === 'high').length, 1);
+});
+
+test('representativeReasons: skips empty/too-short reasons and handles empty input', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const rep = StudyQuestApp.prototype.__representativeReasons;
+  const groups = [
+    { key: 'low', label: 'A', rows: [{ rowIndex: 1, reason: '' }, { rowIndex: 2, reason: 'うん' }] }, // 空 / 短すぎ
+    { key: 'high', label: 'B', rows: [] }
+  ];
+  assert.equal(rep(groups, { perBucket: 1, minLen: 6 }).length, 0);
+  // cross-realm（vm context）配列なので length で検証（deepStrictEqual は prototype 同一性を見る）
+  assert.equal(rep([], {}).length, 0);
+  assert.equal(rep(null, {}).length, 0);
+});
+
+// =====================================================================
 // __vizRenderCompare: dual-modal 対応のための左側ペイン情報保存 + side マーカー
 // =====================================================================
 

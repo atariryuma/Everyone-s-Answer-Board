@@ -940,6 +940,38 @@
     font-size: 0.75rem;
   }
 
+  /* 教師パネル内のセクション分割（議論のたね / 気になる児童）と補足文言 */
+  .viz-panel-section { margin-top: 0.7rem; }
+  .viz-panel-section:first-of-type { margin-top: 0; }
+  .viz-panel-sub {
+    font-size: var(--font-size-xs);
+    font-weight: 400;
+    color: var(--theme-text-muted);
+    margin-left: 0.35rem;
+  }
+  .viz-panel-hint {
+    font-size: var(--font-size-xs);
+    color: var(--theme-text-muted);
+    margin: 0 0 0.45rem;
+    line-height: 1.45;
+  }
+  /* 議論のたねになる声 — 各立場の代表的な理由（教師用ヒント・人気順ではない） */
+  .viz-seed-stance {
+    display: inline-block;
+    background: color-mix(in srgb, var(--theme-accent-cyan) 18%, transparent);
+    color: var(--theme-text-emphasis);
+    border-radius: 0.5rem;
+    padding: 0 0.4rem;
+    margin-right: 0.4rem;
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+  }
+  .viz-seed-who {
+    color: var(--theme-text-secondary);
+    font-weight: 600;
+    margin-right: 0.15rem;
+  }
+
   /* =====================================================================
    * Projector mode (?display=projector) — 電子黒板向け大画面
    * Why: 教室後方からも判読できる文字サイズ + 高コントラスト。
