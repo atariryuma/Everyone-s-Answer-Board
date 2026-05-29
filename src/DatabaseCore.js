@@ -3,7 +3,7 @@
  *   ブレーカー、Service Account JWT による安全なアクセス基盤。
  */
 
-/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_ */
+/* global validateEmail, CACHE_DURATION, getCurrentEmail, isAdministrator, getUserConfig, executeWithRetry, getCachedProperty, clearPropertyCache, simpleHash, saveToCacheWithSizeCheck, DEFAULT_DISPLAY_SETTINGS, safeJsonParse_, logError_, sameEmail_ */
 
 /**
  * Sheets API 呼び出しラッパー (適応型 backoff + circuit breaker + SA pool failover)。
@@ -78,7 +78,11 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
         if (circuitState.consecutiveErrors >= 7) {
           const lockoutMs = circuitState.consecutiveErrors >= 15 ? 120000
             : circuitState.consecutiveErrors >= 10 ? 60000 : 30000;
-          circuitState.circuitOpenUntil = now + lockoutMs;
+          // Date.now() を再取得する。 関数冒頭の `now` は executeWithRetry 突入前の値で、
+          // ここに到達する頃には 429 backoff の Utilities.sleep (最大 ~60s×複数 retry) が
+          // 経過済。 stale な `now` で計算するとロックアウトが実質ほぼ即時失効し、 quota
+          // 回復のための circuit pause が機能しない。
+          circuitState.circuitOpenUntil = Date.now() + lockoutMs;
           console.error(`Circuit breaker activated: ${circuitState.consecutiveErrors} errors. Paused for ${lockoutMs / 1000}s.`);
         }
         cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 120);
@@ -327,8 +331,29 @@ function getServiceAccountAccessToken_(sa) {
     try {
       const cached = scriptCache.get(scriptCacheKey);
       if (cached) {
-        saTokenCache_[cacheKey] = { token: cached, expiresAt: now + SA_TOKEN_TTL_SEC_ * 1000 };
-        return cached;
+        // ScriptCache 値は {t: token, e: 絶対期限epochMs}。 in-memory expiresAt は **保存済の
+        //   絶対期限** で cap する。 旧実装は read 時刻 + 50min を入れていたため、 ScriptCache に
+        //   49 分前から載っていた token を read すると in-memory が「あと 50 分有効」と誤認し、
+        //   OAuth token の実寿命 60 分を超えて期限切れ token を配り 401 を招いていた
+        //   (401 は 429 でないため SA failover も走らない)。
+        let token = cached;
+        let absExpiry = now + SA_TOKEN_TTL_SEC_ * 1000; // legacy plain-string fallback
+        try {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.t) {
+            token = parsed.t;
+            absExpiry = Number(parsed.e) || absExpiry;
+          } else {
+            // 旧形式 (plain token 文字列): 真の発行時刻が不明なため短命に倒して安全側へ。
+            absExpiry = now + 60 * 1000;
+          }
+        } catch (_) {
+          absExpiry = now + 60 * 1000;
+        }
+        if (absExpiry > now) {
+          saTokenCache_[cacheKey] = { token, expiresAt: absExpiry };
+          return token;
+        }
       }
     } catch (_) { /* ignore */ }
   }
@@ -358,9 +383,17 @@ function getServiceAccountAccessToken_(sa) {
       console.warn('SA token exchange failed:', tokenData.error_description || tokenData.error);
       return null;
     }
-    saTokenCache_[cacheKey] = { token: tokenData.access_token, expiresAt: now + SA_TOKEN_TTL_SEC_ * 1000 };
+    // OAuth token の実寿命 (expires_in, 通常 3599s)。 安全マージン 5 分を引いた絶対期限を
+    //   両 tier で共有し、 read 時に in-memory が実寿命を超えて延命しないようにする。
+    const lifetimeSec = Number(tokenData.expires_in) > 0 ? Number(tokenData.expires_in) : 3600;
+    const absExpiry = now + Math.max(0, (lifetimeSec - 300)) * 1000;
+    // ScriptCache TTL は in-memory cap (=token 実寿命) と従来の 50min の小さい方。
+    const scriptTtlSec = Math.min(SA_TOKEN_TTL_SEC_, Math.max(60, lifetimeSec - 300));
+    saTokenCache_[cacheKey] = { token: tokenData.access_token, expiresAt: absExpiry };
     if (scriptCache) {
-      try { scriptCache.put(scriptCacheKey, tokenData.access_token, SA_TOKEN_TTL_SEC_); } catch (_) {}
+      try {
+        scriptCache.put(scriptCacheKey, JSON.stringify({ t: tokenData.access_token, e: absExpiry }), scriptTtlSec);
+      } catch (_) {}
     }
     return tokenData.access_token;
   } catch (err) {
@@ -1329,7 +1362,7 @@ function canAccessTargetUser(targetUser, context = {}) {
     return true;
   }
 
-  if (targetUser.userEmail === requestingUser) {
+  if (sameEmail_(targetUser.userEmail, requestingUser)) {
     return true;
   }
 

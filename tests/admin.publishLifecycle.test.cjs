@@ -158,6 +158,26 @@ test('toggleUserBoardStatus: rejects with etag_mismatch when sourceEtag differs'
   assert.equal(result.error, 'etag_mismatch');
 });
 
+test('sourceEtag 未指定でも saveUserConfig の etag_mismatch を surface する (RMW窓の並行更新)', () => {
+  // sourceEtag を渡さない caller でも、 read(L158)→save の間に別 writer が config を
+  //   変えていれば saveUserConfig が継承 etag で conflict を返す。 これを汎用エラーに
+  //   埋もれさせず構造化して返すこと (publishApp と対称)。
+  const ctx = loadAdminContext({
+    saveUserConfig: () => ({
+      success: false,
+      error: 'etag_mismatch',
+      message: 'Configuration has been modified by another user',
+      currentConfig: { isPublished: true, etag: 'newer_etag' }
+    })
+  });
+  ctx.__savedConfigs['owner1'] = { isPublished: true, publishedAt: null, etag: 'read_etag' };
+
+  const result = ctx.unpublishBoard('owner1'); // sourceEtag 無し
+  assert.equal(result.success, false);
+  assert.equal(result.error, 'etag_mismatch');
+  assert.equal(result.currentEtag, 'newer_etag');
+});
+
 test('unpublishBoard: succeeds when sourceEtag matches', () => {
   const ctx = loadAdminContext();
   ctx.__savedConfigs['owner1'] = {

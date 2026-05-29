@@ -41,7 +41,11 @@ function validateEmail(email) {
       return result;
     }
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+    // 各セグメントを区切り直し、 連続ドット (a@b..co) / 先頭末尾ドット (.a@b.com / a@.com /
+    //   a@b.com.) を拒否する。 local は dot 区切りの非空セグメント、 domain は 1 つ以上の
+    //   サブドメイン + TLD(2 文字以上)。 旧 /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/ は `[^\s@]+` が
+    //   `..` や先頭/末尾ドットを素通ししていた。
+    const emailRegex = /^[^\s@.]+(?:\.[^\s@.]+)*@[^\s@.]+(?:\.[^\s@.]+)*\.[^\s@.]{2,}$/;
     if (!emailRegex.test(trimmed)) {
       result.errors.push('無効なメールアドレス形式です');
       return result;
@@ -214,11 +218,20 @@ function validateText(text, options = {}) {
 
     if (!allowNewlines) {
       sanitized = sanitized.replace(/[\r\n]/g, ' ');
+      // 改行なしモードは全空白を 1 つに圧縮。
+      sanitized = sanitized.replace(/\s+/g, ' ').trim();
     } else {
-      sanitized = sanitized.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+      // 改行を保持するモード。 旧実装は直後の \s+→space で保持したはずの \n を潰しており
+      //   allowNewlines が事実上 no-op だった。 行内の連続空白のみ圧縮し、 改行は維持する
+      //   (過剰な空行は 2 連までに抑制)。
+      sanitized = sanitized
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n')
+        .replace(/[ \t]+/g, ' ')
+        .replace(/[ \t]*\n[ \t]*/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
     }
-
-    sanitized = sanitized.replace(/\s+/g, ' ').trim();
 
     result.isValid = true;
     result.sanitized = sanitized;

@@ -686,11 +686,18 @@ function getUserConfig(userId, preloadedUser = null) {
 
     const config = parseAndRepairConfig(user.configJson, userId);
 
+    // __parseFailed = JSON 破損で default に fallback した状態。 read は success:true で
+    //   default を返して graceful degradation するが、 write 経路がこの default を保存すると
+    //   破損だが復旧可能だった原本を上書きしてしまう。 envelope に corrupted を surface し、
+    //   applyConfigPatch_ / __applyPublishStateChange が上書きを拒否できるようにする。
     return {
       success: true,
       config,
+      corrupted: Boolean(config && config.__parseFailed),
       userId,
-      message: 'Config loaded successfully'
+      message: config && config.__parseFailed
+        ? 'Config corrupted (parse failed); returning defaults'
+        : 'Config loaded successfully'
     };
 
   } catch (error) {

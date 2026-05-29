@@ -24,13 +24,17 @@
  *
  * 効率:
  *   - SA pool 経由で Drive REST API permissions.list を 1 回 fetch
- *   - 結果は ScriptCache に 10 min cache (per file × per email hash)
+ *   - 結果は ScriptCache に cache (per file × per email hash)
+ *   - 付与 ('1') は短命 (2 min): editor 共有を revoke しても権限残存が最大 2 分で消える
+ *     (collaborator は unpublish 等の権限を持つため、 revoke 後の stale grant 窓を短く保つ)
+ *   - 拒否 ('0') は長命 (10 min): 誤って権限が増えることはないので Drive API 削減を優先
  *   - owner / admin 判定は呼び出し側で先に行うこと (Drive API 呼び出し回避)
  */
 
 /* global UrlFetchApp, CacheService, pickServiceAccount_, getServiceAccountAccessToken_, getUserConfig, logError_ */
 
-const COLLABORATOR_CACHE_TTL_SEC = 600;
+const COLLABORATOR_CACHE_TTL_OK_SEC = 120;
+const COLLABORATOR_CACHE_TTL_NO_SEC = 600;
 
 /**
  * targetUser のボード SS に viewerEmail が editor / owner 権限を持つか。
@@ -88,7 +92,7 @@ function __hasEditorPermissionViaDrive_(fileId, emailNorm) {
   } catch (e) {
     if (typeof logError_ === 'function') logError_('isBoardCollaborator/drive', e);
   }
-  cache.put(key, ok ? '1' : '0', COLLABORATOR_CACHE_TTL_SEC);
+  cache.put(key, ok ? '1' : '0', ok ? COLLABORATOR_CACHE_TTL_OK_SEC : COLLABORATOR_CACHE_TTL_NO_SEC);
   return ok;
 }
 

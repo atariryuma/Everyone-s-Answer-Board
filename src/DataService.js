@@ -3,7 +3,7 @@
  *   シート寸法/ヘッダー取得（キャッシュ付き）、適応型バッチ読込。
  */
 
-/* global formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_ */
+/* global formatTimestamp, getQuestionText, findUserById, openSpreadsheet, getUserConfig, getConfigOrDefault, normalizeHeader, CACHE_DURATION, getCurrentEmail, isAdministrator, resolveColumnIndex, extractReactions, extractHighlight, createDataServiceErrorResponse, logError_, sameEmail_ */
 
 /**
  * ユーザーのスプレッドシートデータ取得
@@ -580,13 +580,28 @@ function applySortAndLimit(data, options = {}) {
   }
 }
 
+// timestamp 値を比較可能な正規形に揃える。 sheet cell は Date object、 client から戻る
+//   値は google.script.run の JSON 化で ISO 文字列になるため、 両者を epoch ms 文字列に
+//   正規化して同一瞬間かを判定する。 日付として解釈できない値はそのまま trim 比較。
+function toComparableTimestamp_(v) {
+  if (v === null || v === undefined || v === '') return '';
+  if (v instanceof Date) return String(v.getTime());
+  const d = new Date(v);
+  if (!isNaN(d.getTime())) return String(d.getTime());
+  return String(v).trim();
+}
+
 /**
  * 回答行を削除（編集者権限必須）
  * @param {string} userId - ユーザーID
  * @param {number} rowIndex - 削除対象の行インデックス（1-based, ヘッダー含む）
+ * @param {string} [expectedTimestamp] - 削除対象として client が想定する行の timestamp。
+ *   指定時、 削除直前に実シートの当該行 timestamp (列A) と照合し、 不一致なら abort する。
+ *   deleteRows は後続行を 1 行ずつ繰り上げるため、 古い snapshot に基づく rowIndex で
+ *   別の生徒の回答を誤削除する race を防ぐ (identity verification)。
  * @returns {Object} 削除結果
  */
-function deleteAnswerRow(userId, rowIndex) {
+function deleteAnswerRow(userId, rowIndex, expectedTimestamp) {
   try {
     const currentEmail = getCurrentEmail();
     const user = findUserById(userId, { requestingUser: currentEmail });
@@ -596,7 +611,7 @@ function deleteAnswerRow(userId, rowIndex) {
       return createDataServiceErrorResponse('ユーザーが見つかりません');
     }
 
-    const isOwner = user.userEmail === currentEmail;
+    const isOwner = sameEmail_(user.userEmail, currentEmail);
     const isAdmin = isAdministrator(currentEmail);
 
     if (!isOwner && !isAdmin) {
@@ -627,12 +642,27 @@ function deleteAnswerRow(userId, rowIndex) {
       return createDataServiceErrorResponse(`シート「${sheetName}」が見つかりません`);
     }
 
-    const { lastRow, lastCol } = getSheetInfo(sheet);
+    // bounds は **fresh** な getLastRow() で取る。 getSheetInfo の lastRow は
+    //   getSheetRowCount の 30s cache 由来で、 新規投稿直後は stale になりうるため。
+    const { lastCol } = getSheetInfo(sheet);
+    const lastRow = sheet.getLastRow();
     if (rowIndex < 2 || rowIndex > lastRow) {
       return createDataServiceErrorResponse('無効な行番号です');
     }
 
     const [rowData] = sheet.getRange(rowIndex, 1, 1, lastCol).getValues();
+
+    // identity verification: client が想定した行と実シートの行が一致するか timestamp (列A) で確認。
+    //   不一致 = snapshot 以降に行が削除/挿入され index がずれた = 別の回答を指している。
+    //   誤削除を防ぐため abort し、 画面更新を促す。
+    if (expectedTimestamp !== undefined && expectedTimestamp !== null && expectedTimestamp !== '') {
+      const actual = toComparableTimestamp_(rowData[0]);
+      const expected = toComparableTimestamp_(expectedTimestamp);
+      if (actual && expected && actual !== expected) {
+        console.warn('deleteAnswerRow: timestamp mismatch (row shifted?)', { userId, rowIndex });
+        return createDataServiceErrorResponse('対象の回答が変更されています。画面を更新してからもう一度お試しください。');
+      }
+    }
 
     sheet.deleteRows(rowIndex, 1);
 

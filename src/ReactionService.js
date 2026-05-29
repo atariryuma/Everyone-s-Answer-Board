@@ -3,7 +3,7 @@
  *   ハイライト機能。viewer/editor で権限分離（canActOnTargetBoard）。
  */
 
-/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_ */
+/* global getCurrentEmail, findPublishedBoardOwner, getConfigOrDefault, openSpreadsheet, createErrorResponse, createExceptionResponse, isAdministrator, invalidateSheetHeadersCache, bumpBoardDataVersion_, isBoardCollaborator, logError_, sameEmail_ */
 
 // TTL は process() (sheet read→modify→write の RMW) の最悪ケースより長く取る。
 // 旧値 10s は、 process 内の Sheets API が 429 backoff (最大 ~60s) を踏むと lock が
@@ -75,7 +75,7 @@ function canActOnTargetBoard(actorEmail, targetUser, config, options = {}) {
     : isAdministrator(actorEmail);
   if (isAdmin) return true;
 
-  if (targetUser.userEmail === actorEmail) return true;
+  if (sameEmail_(targetUser.userEmail, actorEmail)) return true;
 
   // v2856+: collaborator check は editor 操作 (highlight 等) でのみ実行。
   //   viewer の通常リアクション (requireEditor!==true) では published flag だけで判定。
@@ -560,7 +560,7 @@ function executeBoardRowOperation(options) {
       // Race protection: lock acquire 中に教師が unpublish した可能性がある。 lock 取得後
       // に publish 状態を再確認し、 viewer (= non-admin non-owner) からの write を再度 gate。
       // owner/admin は publish 状態に関わらず編集可能 (canActOnTargetBoard と同じ判定基準)。
-      if (!isAdmin && targetUser.userEmail !== actorEmail) {
+      if (!isAdmin && !sameEmail_(targetUser.userEmail, actorEmail)) {
         const refreshedUser = findPublishedBoardOwner(targetUserId, actorEmail, { preloadedAuth });
         if (!refreshedUser) {
           return createErrorResponse('ボードの公開が終了しました');

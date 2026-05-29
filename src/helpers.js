@@ -125,7 +125,8 @@ function createErrorResponse(message, data = null, extraFields = {}) {
     success: false,
     message,
     error: message,
-    ...(data && { data }),
+    // data:0 / '' / false を落とさず、 明示指定 (null/undefined 以外) なら含める。
+    ...(data !== null && data !== undefined ? { data } : {}),
     ...extraFields
   };
 }
@@ -141,7 +142,8 @@ function createSuccessResponse(message, data = null, extraFields = {}) {
   return {
     success: true,
     message,
-    ...(data && { data }),
+    // data:0 / '' / false を落とさず、 明示指定 (null/undefined 以外) なら含める。
+    ...(data !== null && data !== undefined ? { data } : {}),
     ...extraFields
   };
 }

@@ -887,7 +887,7 @@ function loadProfileForView(profileName, targetUserId) {
     if (!user) return createUserNotFoundError();
 
     // 認可: 自分のボードか、管理者か
-    const isOwn = user.userEmail === email;
+    const isOwn = sameEmail_(user.userEmail, email);
     const isAdmin = isAdministrator(email);
     if (!isOwn && !isAdmin) {
       return createErrorResponse('権限がありません: 自分以外のボードのプロファイル切替は管理者のみ可能です');
@@ -1589,7 +1589,7 @@ function getNotificationUpdate(targetUserId, options = {}) {
     }
 
     const targetConfig = getConfigOrDefault(targetUser.userId, targetUser);
-    const isOwnBoard = targetUser.userEmail === email;
+    const isOwnBoard = sameEmail_(targetUser.userEmail, email);
     const isAdmin = isAdministrator(email);
 
     if (!isAdmin && !isOwnBoard && !targetConfig.isPublished) {
@@ -1642,6 +1642,33 @@ function getNotificationUpdate(targetUserId, options = {}) {
 }
 
 /**
+ * 呼び出し元が当該スプレッドシートへの正当なアクセス権を持つか検証する。
+ *
+ * Web app は executeAs=USER_ACCESSING で動作するため、 SpreadsheetApp は **呼び出し元自身の
+ * OAuth** で実行される。 呼び出し元が自分の権限で openById できる = その SS への正当な
+ * アクセス権を Drive 上で持っている。 開けなければ別人の SS。
+ *
+ * これがないと、 setup 系エンドポイント (getColumnAnalysis / connectDataSource) に任意の
+ * spreadsheetId を渡すだけで、 (1) 他人の公開ボード SS のヘッダ + サンプル 10 行 (email 列含む
+ * 生データ) を SA pool 経由で読める、 (2) SA pool editor 共有を勝手に適用できる、 という
+ * 情報漏えい / 副作用が起きる。 admin は他ユーザーの SS を扱う正当な必要があるため例外。
+ *
+ * @param {string} spreadsheetId
+ * @returns {boolean}
+ */
+function callerCanAccessSpreadsheet_(spreadsheetId) {
+  if (!spreadsheetId || typeof spreadsheetId !== 'string') return false;
+  try {
+    if (typeof SpreadsheetApp === 'undefined' || typeof SpreadsheetApp.openById !== 'function') {
+      return false;
+    }
+    return Boolean(SpreadsheetApp.openById(spreadsheetId));
+  } catch (_) {
+    return false;
+  }
+}
+
+/**
  * Connect to data source - API Gateway function for DataService
  * @param {string} spreadsheetId - スプレッドシートID
  * @param {string} sheetName - シート名
@@ -1654,6 +1681,13 @@ function connectDataSource(spreadsheetId, sheetName, batchOperations = null) {
     if (!email) {
       console.warn('connectDataSource: Unauthenticated access attempt');
       return createAuthError();
+    }
+
+    // 所有者検証: 呼び出し元が自分の OAuth で開けない SS への接続は拒否 (admin は例外)。
+    //   これで他人の SS への SA 共有強制適用 / サンプルデータ読み取りを防ぐ。
+    if (!isAdministrator(email) && !callerCanAccessSpreadsheet_(spreadsheetId)) {
+      console.warn('connectDataSource: caller lacks access to spreadsheet:', `${email.split('@')[0]}@***`);
+      return createErrorResponse('このスプレッドシートにアクセスする権限がありません');
     }
 
     // SA pool 全員を editor 追加して board の cross-user 経路 (viewer/admin) を有効化。
@@ -1755,6 +1789,13 @@ function getColumnAnalysis(spreadsheetId, sheetName, options = {}) {
     if (!email) {
       console.warn('getColumnAnalysis: Unauthenticated access attempt');
       return createAuthError();
+    }
+
+    // 所有者検証: 列分析は setup/owner 操作。 任意 SS の生サンプル (email 列含む) を
+    //   非所有者が SA pool 経由で読めてしまう穴を塞ぐ。 admin は cross-user 分析が正当。
+    if (!isAdministrator(email) && !callerCanAccessSpreadsheet_(spreadsheetId)) {
+      console.warn('getColumnAnalysis: caller lacks access to spreadsheet:', `${email.split('@')[0]}@***`);
+      return createErrorResponse('このスプレッドシートにアクセスする権限がありません');
     }
 
     let dataAccess;

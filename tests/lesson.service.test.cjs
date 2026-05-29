@@ -324,7 +324,7 @@ test('startLesson: lessonName / phaseName / question / classChoices が createTe
   assert.deepEqual(Array.from(formCreations[2].templateOptions.choices), ['納得', '迷い', '反対']);
 });
 
-test('startLesson: numberline の templateOptions が displaySettings.xAxisLabels に反映される', () => {
+test('startLesson: numberline の templateOptions が config トップレベル xAxisLabels に反映される', () => {
   const { context, configPatches } = loadLessonContext();
   const created = context.createLessonDraft('u1', 'L', 'doutoku-3phase');
   const lessonId = created.data.lesson.lessonId;
@@ -337,9 +337,12 @@ test('startLesson: numberline の templateOptions が displaySettings.xAxisLabel
   ]);
   const res = context.startLesson('u1', lessonId);
   assert.equal(res.success, true);
-  const labels = configPatches[0].patch.displaySettings.xAxisLabels;
-  assert.equal(labels.min, '反対');
-  assert.equal(labels.max, '賛成');
+  // 軸ラベルは canonical なトップレベルに格納される (旧 nested displaySettings.xAxisLabels は
+  //   sanitizeDisplaySettings の allowlist で保存往復ごとに落ちていたため修正済)。
+  const patch = configPatches[0].patch;
+  assert.equal(patch.displaySettings.xAxisLabels, undefined, 'nested には残さない');
+  assert.equal(patch.xAxisLabels.min, '反対');
+  assert.equal(patch.xAxisLabels.max, '賛成');
 });
 
 test('startLesson: pie テンプレートのフェーズ → displaySettings.boardMode=pie で applyConfigPatch_', () => {

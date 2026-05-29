@@ -666,3 +666,85 @@ test('shouldIncludeRow: classFilter with empty item.class → no match', () => {
   const item = { class: '', answer: 'x' };
   assert.equal(ctx.shouldIncludeRow(item, { classFilter: '4組' }), false);
 });
+
+// =====================================================================
+// deleteAnswerRow — identity verification (timestamp 照合で誤削除防止)
+// =====================================================================
+
+function loadDeleteContext(rows) {
+  const deleted = [];
+  const data = [['Timestamp', 'Q1'], ...rows.map((r) => r.slice())];
+  const sheet = {
+    getName: () => 'Sheet1',
+    getParent: () => ({ getId: () => 'ss-1' }),
+    getLastRow: () => data.length,
+    getLastColumn: () => 2,
+    getRange: (row, col, numRows = 1, numCols = 1) => ({
+      getValues: () => {
+        const out = [];
+        for (let r = row - 1; r < row - 1 + numRows; r += 1) {
+          const rowArr = [];
+          for (let c = col - 1; c < col - 1 + numCols; c += 1) {
+            rowArr.push(data[r] ? (data[r][c] !== undefined ? data[r][c] : '') : '');
+          }
+          out.push(rowArr);
+        }
+        return out;
+      }
+    }),
+    deleteRows: (start, count) => { deleted.push({ start, count }); data.splice(start - 1, count); }
+    // getFormUrl 無し → deleteLinkedFormResponseByTimestamp は graceful に no-op
+  };
+  const ctx = loadDataServiceContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'Owner@Example.com' }), // 大小違い → sameEmail_ で owner 判定
+    isAdministrator: () => false,
+    getUserConfig: () => ({ success: true, config: { spreadsheetId: 'ss-1', sheetName: 'Sheet1' } }),
+    openSpreadsheet: () => ({ spreadsheet: { getSheetByName: () => sheet } }),
+    getCachedProperty: () => null
+  });
+  return { ctx, deleted, data };
+}
+
+test('deleteAnswerRow: case-違い owner でも削除できる (sameEmail_ 判定)', () => {
+  const { ctx, deleted } = loadDeleteContext([
+    [new Date('2026-05-01T00:00:00Z'), 'a'],
+    [new Date('2026-05-02T00:00:00Z'), 'b']
+  ]);
+  const res = ctx.deleteAnswerRow('u1', 2);
+  assert.equal(res.success, true);
+  assert.equal(deleted.length, 1);
+  assert.deepEqual(deleted[0], { start: 2, count: 1 });
+});
+
+test('deleteAnswerRow: timestamp 一致なら削除実行', () => {
+  const { ctx, deleted } = loadDeleteContext([
+    [new Date('2026-05-01T00:00:00Z'), 'a'],
+    [new Date('2026-05-02T00:00:00Z'), 'b']
+  ]);
+  // client は ISO 文字列で渡す (google.script.run の JSON 化を模す)
+  const res = ctx.deleteAnswerRow('u1', 3, '2026-05-02T00:00:00.000Z');
+  assert.equal(res.success, true);
+  assert.equal(deleted.length, 1);
+  assert.deepEqual(deleted[0], { start: 3, count: 1 });
+});
+
+test('deleteAnswerRow: timestamp 不一致なら abort (行ずれ誤削除防止)', () => {
+  const { ctx, deleted } = loadDeleteContext([
+    [new Date('2026-05-01T00:00:00Z'), 'a'],
+    [new Date('2026-05-02T00:00:00Z'), 'b']
+  ]);
+  // 行2 は実際には 2026-05-01 だが、 client は別行 (2026-05-02) のつもりで rowIndex=2 を指定
+  const res = ctx.deleteAnswerRow('u1', 2, '2026-05-02T00:00:00.000Z');
+  assert.equal(res.success, false);
+  assert.equal(deleted.length, 0, '不一致時は deleteRows を呼ばない');
+});
+
+test('deleteAnswerRow: expectedTimestamp 未指定なら従来通り削除 (後方互換)', () => {
+  const { ctx, deleted } = loadDeleteContext([
+    [new Date('2026-05-01T00:00:00Z'), 'a']
+  ]);
+  const res = ctx.deleteAnswerRow('u1', 2);
+  assert.equal(res.success, true);
+  assert.equal(deleted.length, 1);
+});

@@ -4,7 +4,7 @@
  *   global 宣言を参照。
  */
 
-/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_ */
+/* global getCurrentEmail, isAdministrator, findUserById, findUserByEmail, getAllUsers, updateUser, getUserConfig, saveUserConfig, getColumnAnalysis, getPublishedSheetData, getPublishedSheetDataForProfile, createTemplateForm, customizeForm, setFormAllowResubmit, uploadLessonImage, processFormUrlInput, getForms, isValidFormUrl, applySpreadsheetSharingDefaults, listServiceAccountPool, getServiceAccountUsage, addServiceAccountToPool, addServiceAccountsToPoolBatch, reverifyServiceAccountInPool, removeServiceAccountFromPool, bumpBoardDataVersion_, createAdminRequiredError, createAuthError, createUserNotFoundError, createErrorResponse, createSuccessResponse, createExceptionResponse, requireAdmin, getConfigOrDefault, isPlainObject, createLessonDraft, updateLessonDraft, startLesson, advanceLessonPhase, endLesson, listLessons, getLessonForReview, deleteLesson, getKnownClassesForUser, duplicateLesson, listLessonTemplates, importLessonFromProfiles, __projectBoardRowForExport_, __maybeAutoArchiveLesson_, isBoardCollaborator, logError_, safeJsonParse_, sameEmail_ */
 
 
 // Admin API経由での読み書きから保護する Script Properties キー。
@@ -132,7 +132,7 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   if (!targetUser) return createUserNotFoundError();
 
   const isAdmin = isAdministrator(email);
-  const isOwnBoard = targetUser.userEmail === email;
+  const isOwnBoard = sameEmail_(targetUser.userEmail, email);
 
   if (options.requireAdmin && !isAdmin) {
     return createErrorResponse('この操作には管理者権限が必要です');
@@ -158,6 +158,11 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   const cfgResult = getUserConfig(targetUser.userId, targetUser);
   if (!cfgResult || !cfgResult.success) {
     return createErrorResponse(`設定の取得に失敗しました: ${(cfgResult && cfgResult.message) || '詳細不明'}`);
+  }
+  // 破損 config への publish 状態 write は {...currentConfig} で default を保存し原本を
+  //   失うため中止する。
+  if (cfgResult.corrupted) {
+    return createErrorResponse('設定データが破損しているため公開状態を変更できません。設定の復旧が必要です。');
   }
   const currentConfig = cfgResult.config;
 
@@ -196,8 +201,21 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
     }
   }
 
+  // saveUserConfig は updatedConfig が継承した currentConfig.etag で楽観ロックを行う
+  //   (read=L158 と save の間に別 writer が config を変えていれば etag_mismatch)。
+  //   この conflict を汎用エラーに埋もれさせず、 publishApp と同じく構造化して surface し、
+  //   フロントが再読み込みを促せるようにする (caller に sourceEtag を強制せず非破壊で対称化)。
   const saveResult = saveUserConfig(targetUser.userId, updatedConfig);
   if (!saveResult.success) {
+    if (saveResult.error === 'etag_mismatch') {
+      return {
+        success: false,
+        error: 'etag_mismatch',
+        message: '設定が他の場所で更新されています。画面を再読み込みしてください。',
+        currentEtag: (saveResult.currentConfig && saveResult.currentConfig.etag) || null,
+        currentConfig: saveResult.currentConfig
+      };
+    }
     return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
   }
 
@@ -1022,6 +1040,16 @@ function dispatchAdminOperation(operation, params) {
         sheetName: procResult.sheetName || 'フォームの回答 1'
       };
       const saveResult = applyConfigPatch_(user.userId, patch, { publish: false });
+      // config 保存が失敗したら全体を失敗として返す。 旧実装は top-level success:true で
+      //   失敗を nested configSave に埋もれさせており、 .success を見る CLI が「接続済」と
+      //   誤認していた。
+      if (!saveResult.success) {
+        return createErrorResponse(`Form の config 保存に失敗しました: ${saveResult.message || '詳細不明'}`, {
+          userId: user.userId,
+          applied: patch,
+          formProcessing: procResult
+        });
+      }
       return createSuccessResponse('Form connected', {
         userId: user.userId,
         userEmail: user.userEmail,
@@ -1081,7 +1109,16 @@ function dispatchAdminOperation(operation, params) {
         patch.displaySettings = { boardMode: templateType };
       }
       const saveResult = applyConfigPatch_(user.userId, patch, { publish: false });
-
+      // Form は作成済だが config 保存が失敗した場合は全体を失敗として返す (created は同梱して
+      //   作成済 Form URL を呼び出し側に残す)。 top-level success に保存結果を反映する。
+      if (!saveResult.success) {
+        return createErrorResponse(`Form は作成しましたが config 保存に失敗しました: ${saveResult.message || '詳細不明'}`, {
+          userId: user.userId,
+          templateType,
+          created: createResult,
+          applied: patch
+        });
+      }
       return createSuccessResponse('Form created and linked', {
         userId: user.userId,
         userEmail: user.userEmail,
@@ -1638,6 +1675,11 @@ function applyConfigPatch_(userId, patch, options) {
   // Load existing config
   const cur = getUserConfig(userId);
   if (!cur.success) return createErrorResponse(cur.message || 'getUserConfig failed');
+  // 破損 config (parse 失敗で default fallback) への patch は復旧可能な原本を default で
+  //   上書きしてしまうため中止する。
+  if (cur.corrupted) {
+    return createErrorResponse('設定データが破損しているため上書きを中止しました。設定の復旧が必要です。');
+  }
   const merged = deepMerge_(cur.config || {}, safePatch);
   merged.userId = userId;
 

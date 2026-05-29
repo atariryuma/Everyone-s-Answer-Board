@@ -1047,21 +1047,31 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
   if (!displaySettings.boardMode) {
     displaySettings.boardMode = __templateToBoardMode_(phase.formTemplate);
   }
-  // numberline: 左右ラベルを xAxisLabels に格納 (board frontend が読む key)
+  // 軸ラベルは config の **トップレベル** (xAxisLabels / yAxisLabels) に格納する。
+  //   これが canonical location: DataApis.getPublishedSheetData の axisConfig、
+  //   ConfigService.validateAndSanitizeConfig、 sanitizeProfiles はいずれもトップレベルを参照する。
+  //   旧実装は displaySettings.xAxisLabels (nested) に入れていたが、 sanitizeDisplaySettings の
+  //   allowlist (showNames/showReactions/theme/pageSize/boardMode) で保存往復ごとに silently
+  //   落ち、 board frontend に届かなかった (M1/M2 軸ラベル消失バグ)。
+  //   nested で明示指定された legacy phase 互換のため baseDisplay からも拾う。
+  let xAxisLabels = baseDisplay.xAxisLabels || null;
+  let yAxisLabels = baseDisplay.yAxisLabels || null;
   if (phase.formTemplate === 'numberline' && (opts.lowLabel || opts.highLabel)) {
-    displaySettings.xAxisLabels = { min: opts.lowLabel || '', max: opts.highLabel || '' };
+    xAxisLabels = { min: opts.lowLabel || '', max: opts.highLabel || '' };
   }
-  // matrix: X / Y 両軸のラベル
   if (phase.formTemplate === 'matrix') {
-    if (opts.xLow || opts.xHigh) displaySettings.xAxisLabels = { min: opts.xLow || '', max: opts.xHigh || '' };
-    if (opts.yLow || opts.yHigh) displaySettings.yAxisLabels = { min: opts.yLow || '', max: opts.yHigh || '' };
+    if (opts.xLow || opts.xHigh) xAxisLabels = { min: opts.xLow || '', max: opts.xHigh || '' };
+    if (opts.yLow || opts.yHigh) yAxisLabels = { min: opts.yLow || '', max: opts.yHigh || '' };
   }
+  // nested に残すと sanitizeDisplaySettings が落とすだけで mismatch の温床になるため除去。
+  delete displaySettings.xAxisLabels;
+  delete displaySettings.yAxisLabels;
   // 揺らぎ追跡: phase or lesson レベルの allowResubmit を config.allowResubmit に反映する。
   //   これで board frontend (page.viz.js) が ghost dot / swing trace を描画する。
   const phaseAllowResubmit = opts.allowResubmit;
   const lessonAllowResubmit = Boolean(lessonJson && lessonJson.allowResubmit);
   const allowResubmit = phaseAllowResubmit != null ? Boolean(phaseAllowResubmit) : lessonAllowResubmit;
-  return {
+  const patch = {
     formUrl: phase.formUrl,
     spreadsheetId: phase.spreadsheetId,
     sheetName: phase.sheetName,
@@ -1071,6 +1081,9 @@ function __buildPhaseConfigPatch_(phase, lessonJson, lessonId) {
     allowResubmit,
     activeLessonId: lessonId
   };
+  if (xAxisLabels) patch.xAxisLabels = xAxisLabels;
+  if (yAxisLabels) patch.yAxisLabels = yAxisLabels;
+  return patch;
 }
 
 // Phase boundary で「その時点の rows + reactions + columnMapping」を freeze。

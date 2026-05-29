@@ -40,6 +40,7 @@ function loadReactionCtx(overrides = {}) {
     isAdministrator: () => false,
     invalidateSheetHeadersCache: () => {},
     bumpBoardDataVersion_: () => {},
+    sameEmail_: (a, b) => String(a || '').toLowerCase().trim() === String(b || '').toLowerCase().trim(),
     ...overrides
   };
   vm.createContext(context);

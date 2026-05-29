@@ -22,7 +22,9 @@ function loadDataApisContext(overrides = {}) {
     getConfigOrDefault: () => ({}),
     saveUserConfig: () => ({ success: true }),
     openSpreadsheet: () => null,
-    SpreadsheetApp: { openById: () => { throw new Error('not stubbed'); } },
+    // 既定では openById 成功 = 呼び出し元が当該 SS へアクセス権を持つ (owner 想定)。
+    //   アクセス権なしを検証するテストは openById を throw する stub で上書きする。
+    SpreadsheetApp: { openById: () => ({ getSheetByName: () => null, getName: () => 'mock-ss' }) },
     UrlFetchApp: { fetch: () => { throw new Error('not stubbed'); } },
     ScriptApp: { getService: () => ({ getUrl: () => 'https://script.google.com/x' }) },
     Session: { getActiveUser: () => ({ getEmail: () => 'actor@example.com' }) },
@@ -784,6 +786,19 @@ test('connectDataSource: rejects unauthenticated user', () => {
   assert.match(result.error, /認証/);
 });
 
+test('connectDataSource: 非所有者は SA 共有適用前に拒否 (副作用なし)', () => {
+  let sharingAttempted = false;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'stranger@example.com',
+    isAdministrator: () => false,
+    SpreadsheetApp: { openById: () => { throw new Error('PERMISSION_DENIED'); } },
+    applySpreadsheetSharingDefaults: () => { sharingAttempted = true; }
+  });
+  const result = ctx.connectDataSource('someone-elses-ss', 'Sheet1');
+  assert.equal(result.success, false);
+  assert.equal(sharingAttempted, false, '権限チェックで弾き SA 共有を適用しない');
+});
+
 test('connectDataSource: applies SA pool sharing defaults but tolerates failure', () => {
   // v2782+: domain-wide sharing was replaced by SA pool editor add.
   let sharingAttempted = false;
@@ -892,6 +907,39 @@ test('getColumnAnalysis: rejects unauthenticated user', () => {
   const result = ctx.getColumnAnalysis('ss-1', 'Sheet1');
   assert.equal(result.success, false);
   assert.match(result.error, /認証/);
+});
+
+test('getColumnAnalysis: 非所有者 (openById 失敗) かつ非adminは拒否', () => {
+  let openSpreadsheetCalled = false;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'stranger@example.com',
+    isAdministrator: () => false,
+    SpreadsheetApp: { openById: () => { throw new Error('PERMISSION_DENIED'); } },
+    openSpreadsheet: () => { openSpreadsheetCalled = true; return null; }
+  });
+  const result = ctx.getColumnAnalysis('someone-elses-ss', 'Sheet1');
+  assert.equal(result.success, false);
+  assert.match(result.message || result.error || '', /権限/);
+  assert.equal(openSpreadsheetCalled, false, '権限チェックで弾き SA pool 読み取りに到達しない');
+});
+
+test('getColumnAnalysis: admin は openById 不可でも許可 (cross-user 分析)', () => {
+  const sheet = {
+    getLastRow: () => 1,
+    getLastColumn: () => 1,
+    getRange: () => ({ getValues: () => [['Q1']] }),
+    getDataRange: () => ({ getValues: () => [['Q1']] })
+  };
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'admin@example.com',
+    isAdministrator: () => true,
+    SpreadsheetApp: { openById: () => { throw new Error('PERMISSION_DENIED'); } },
+    openSpreadsheet: () => ({ getSheet: () => sheet })
+  });
+  ctx.performIntegratedColumnDiagnostics = () => ({ recommendedMapping: { answer: 0 }, confidence: {} });
+  ctx.setupReactionAndHighlightColumns = () => ({ columnsAdded: [] });
+  const result = ctx.getColumnAnalysis('any-ss', 'Sheet1');
+  assert.equal(result.success, true);
 });
 
 test('getColumnAnalysis: returns error when openSpreadsheet returns null', () => {

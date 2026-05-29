@@ -11,7 +11,7 @@
  * unpublishBoard / toggleUserBoardStatus) のみ。 __applyPublishStateChange に集約。
  */
 
-/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, installLessonTriggers, logError_ */
+/* global getCurrentEmail, createExceptionResponse, createAuthError, createAdminRequiredError, findUserByEmail, openSpreadsheet, getUserConfig, saveUserConfig, isAdministrator, getAllUsers, openDatabase, getCachedProperty, setCachedProperty, getSheetInfo, hasCoreSystemProps, validateDomainAccess, validateEmail, sanitizeDisplaySettings, sanitizeMapping, getConfigOrDefault, installLessonTriggers, logError_, clearDatabaseUserCache, clearPropertyCache */
 
 /**
  * キャッシュ期間 (秒)
@@ -87,6 +87,52 @@ __rootSys.SLEEP_MS = SLEEP_MS;
  *
  * @returns {Object} リセット結果
  */
+/**
+ * 全体キャッシュ無効化（cacheReset / autoRepair 共通）。
+ *
+ * GAS の CacheService.remove(key) は完全一致キーのみ削除し、 prefix/wildcard 削除が無い。
+ * 旧実装は `cache.remove('user_cache_')` のように prefix 文字列を渡しており、 実キー
+ * (`user_cache_<id>` 等) が動的なため **1 件も消えていなかった** (no-op なのに success を返す)。
+ *
+ * 本実装は version-bump 方式で「全体を一括無効化できる」cache 層を実際に invalidate する:
+ *   - clearDatabaseUserCache(): USER_CACHE_VERSION を bump → 全 user cache エントリを一括失効
+ *   - clearPropertyCache(): in-memory PropertiesService LRU を全消去
+ *   - _webAppUrlCache: in-memory web app URL cache をリセット
+ *
+ * 注: board data cache (per-user, 10s TTL) / SA token (50min) / SA validation cache
+ *     (per-SS) は key が動的に分散しており列挙削除できないが、 いずれも短 TTL で自然失効
+ *     するため、 ここでの一括 invalidate 対象外とする（次回 polling/呼び出しで再生成）。
+ *
+ * @returns {string[]} 実行した invalidate アクションの説明（呼び出し側の actions 表示用）
+ */
+function invalidateGlobalCaches_() {
+  const results = [];
+  try {
+    if (typeof clearDatabaseUserCache === 'function') {
+      clearDatabaseUserCache();
+      results.push('ユーザーキャッシュ無効化 (USER_CACHE_VERSION bump)');
+    }
+  } catch (e) {
+    results.push(`ユーザーキャッシュ無効化失敗: ${e && e.message ? e.message : 'Unknown error'}`);
+  }
+  try {
+    if (typeof clearPropertyCache === 'function') {
+      clearPropertyCache();
+      results.push('プロパティメモリキャッシュ全消去');
+    }
+  } catch (e) {
+    results.push(`プロパティキャッシュ消去失敗: ${e && e.message ? e.message : 'Unknown error'}`);
+  }
+  try {
+    _webAppUrlCache = { url: null, expiresAt: 0 };
+    results.push('WebアプリURLキャッシュリセット');
+  } catch (e) {
+    results.push(`URLキャッシュリセット失敗: ${e && e.message ? e.message : 'Unknown error'}`);
+  }
+  results.push('短TTLキャッシュ (board data 10s / SA token 50min) は自然失効に委譲');
+  return results;
+}
+
 function forceUrlSystemReset() {
   try {
     // Why (log level): login.js.html:283 が **毎回のログイン**で呼ぶため、WARN として記録すると
@@ -94,31 +140,7 @@ function forceUrlSystemReset() {
     //   定常動作なので INFO に降格 (旧版は 24h で 5件の WARN を吐いていた)。
     console.log('システム強制リセットが実行されました');
 
-    const cacheResults = [];
-    try {
-      const cache = CacheService.getScriptCache();
-      if (cache) {
-        const keysToRemove = [
-          'user_cache_',
-          'config_cache_',
-          'sheet_cache_',
-          'url_cache_',
-          'auth_cache_',
-          'system_cache_'
-        ];
-
-        keysToRemove.forEach(keyPrefix => {
-          try { cache.remove(keyPrefix); } catch (_) { /* ignore */ }
-        });
-
-        cacheResults.push('主要キャッシュクリア完了');
-      } else {
-        cacheResults.push('キャッシュサービスが利用できません');
-      }
-    } catch (cacheError) {
-      console.warn('[WARN] SystemController.forceUrlSystemReset: Cache clear error:', cacheError.message);
-      cacheResults.push(`キャッシュクリア失敗: ${cacheError.message}`);
-    }
+    const cacheResults = invalidateGlobalCaches_();
 
     return {
       success: true,
@@ -524,20 +546,10 @@ function performAutoRepair() {
     let actionCount = 0;
 
     try {
-      const cache = CacheService.getScriptCache();
-      if (cache) {
-        // removeAll() は削除するキーの配列が必要
-        // 既知のキャッシュキーをクリアする
-        const knownCacheKeys = [
-          'config_cache',
-          'user_cache',
-          'db_connection_status',
-          'system_status'
-        ];
-        cache.removeAll(knownCacheKeys);
-        repairResults.actions.push('キャッシュクリア実行');
-        actionCount++;
-      }
+      // version-bump 方式で実効的に invalidate (旧 cache.removeAll([prefix]) は no-op だった)。
+      const cacheActions = invalidateGlobalCaches_();
+      cacheActions.forEach(a => repairResults.actions.push(a));
+      actionCount += cacheActions.length;
     } catch (cacheError) {
       repairResults.warnings.push(`キャッシュクリア失敗: ${cacheError.message || 'Unknown error'}`);
     }

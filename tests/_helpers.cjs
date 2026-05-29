@@ -8,13 +8,13 @@ function gasResponseStubs() {
     success: false,
     message,
     error: message,
-    ...(data && { data }),
+    ...(data !== null && data !== undefined ? { data } : {}),
     ...extraFields
   });
   const createSuccessResponse = (message, data = null, extraFields = {}) => ({
     success: true,
     message,
-    ...(data && { data }),
+    ...(data !== null && data !== undefined ? { data } : {}),
     ...extraFields
   });
   return {
@@ -26,6 +26,10 @@ function gasResponseStubs() {
     createExceptionResponse: (error) => createErrorResponse(error && error.message ? error.message : 'Unknown error'),
     createDataServiceErrorResponse: (message, sheetName = '') => createErrorResponse(message, [], { headers: [], sheetName }),
     isPlainObject: (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v),
+    // sameEmail_: src/DataApis.js の case-insensitive email 比較。owner 判定で大小差により
+    //   所有者を viewer と誤判定するのを防ぐ。他ファイル (ReactionService/DataService/DatabaseCore)
+    //   が global 参照するため stub を共有注入する。
+    sameEmail_: (a, b) => String(a || '').toLowerCase().trim() === String(b || '').toLowerCase().trim(),
     logError_: () => {}, // src/helpers.js の共通エラーログ。test では silent。
     // safeJsonParse_: src/helpers.js の本物実装と同じ contract (null/空/object pass-through、 catch で fallback)。
     safeJsonParse_: (text, fallback) => {

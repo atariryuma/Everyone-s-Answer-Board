@@ -3916,7 +3916,9 @@
 
         const confirmed = await this.showDeleteConfirmationModal(answerData);
         if (confirmed) {
-          await this.deleteAnswer(rowIndex);
+          // identity verification 用に timestamp を渡す。 サーバ側で実シートの当該行と
+          //   照合し、 index ずれによる誤削除を防ぐ。
+          await this.deleteAnswer(rowIndex, answerData.timestamp);
         }
       } catch (error) {
         console.error('削除確認処理エラー:', error);
@@ -4009,14 +4011,15 @@
     /**
      * 回答を削除する
      * @param {string} rowIndex - 削除対象の行インデックス
+     * @param {string} [expectedTimestamp] - 対象行の timestamp（サーバの identity verification 用）
      */
-    async deleteAnswer(rowIndex) {
+    async deleteAnswer(rowIndex, expectedTimestamp) {
       try {
         if (window.notifications) {
           window.notifications.info('回答を削除中...', 2000);
         }
 
-        const result = await runServer('deleteAnswerRow', this.state.userId, parseInt(rowIndex));
+        const result = await runServer('deleteAnswerRow', this.state.userId, parseInt(rowIndex), expectedTimestamp);
 
         if (result.success) {
           if (window.notifications) {
