@@ -403,6 +403,16 @@ test('previewBoard: returns trimmed result (sample only, no full data)', () => {
   assert.equal(res.data.displaySettings.boardMode, 'numberline');
 });
 
+test('previewBoard: --limit raises the sample cap (default stays 3)', () => {
+  const ctx = loadAdminContext();
+  // limit 未指定は従来通り 3 件
+  assert.equal(ctx.dispatchAdminOperation('previewBoard', { userId: 'u1' }).data.sampleData.length, 3);
+  // limit 指定で dataCount(=4) まで取れる
+  assert.equal(ctx.dispatchAdminOperation('previewBoard', { userId: 'u1', limit: 4 }).data.sampleData.length, 4);
+  // limit 1 は 1 件
+  assert.equal(ctx.dispatchAdminOperation('previewBoard', { userId: 'u1', limit: 1 }).data.sampleData.length, 1);
+});
+
 test('previewBoard: requires userId', () => {
   const ctx = loadAdminContext();
   const res = ctx.dispatchAdminOperation('previewBoard', {});

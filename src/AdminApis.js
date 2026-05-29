@@ -1499,7 +1499,10 @@ function dispatchAdminOperation(operation, params) {
         formMeta: result.formMeta || null,
         profiles: result.profiles || null,
         dataCount: Array.isArray(result.data) ? result.data.length : 0,
-        sampleData: Array.isArray(result.data) ? result.data.slice(0, 3) : [],
+        // 既定 3 件。 検証等で多めに見たいときは --limit で最大 200 件まで。
+        sampleData: Array.isArray(result.data)
+          ? result.data.slice(0, Math.max(1, Math.min(Number(params.limit) || 3, 200)))
+          : [],
         error: result.error
       };
       return createSuccessResponse('Board preview', trimmed);
