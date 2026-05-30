@@ -956,15 +956,25 @@ test('vizComputeOpinionShift: returns null with fewer than 2 students', () => {
 //   ある声を 1 つずつ拾う（人気順ではなく position coverage）ための純粋関数群。
 // =====================================================================
 
-test('hasJustification: detects Japanese reasoning/causal markers (descriptive, not evaluative)', () => {
+test('hasJustification: detects reasoning forms; ignores temporal から (real-data calibrated 2026-05-30)', () => {
   const { StudyQuestApp } = loadVizContext();
   const h = StudyQuestApp.prototype.__hasJustification;
-  assert.equal(h('みんなが使うから、そのままでいい'), true);   // から
+  // 因果・理由
+  assert.equal(h('みんなが使うから、そのままでいい'), true);   // 因果の から
   assert.equal(h('なぜなら時間がないのだ'), true);              // なぜなら
   assert.equal(h('急いでいるので直さない'), true);               // ので
   assert.equal(h('相手のためを思って直す'), true);               // ため
-  assert.equal(h('たとえば締め切りが近いとき'), true);           // たとえば
-  assert.equal(h('そのまま使う'), false);                        // marker なし
+  // 譲歩・対比（両面を weigh する = 多面的・多角的な reasoning。 実データで主に効く層）
+  assert.equal(h('夢を追いつつ、約束も忘れない'), true);         // つつ
+  assert.equal(h('夢は大事だけど、約束も意識する'), true);       // だけど
+  assert.equal(h('両方大切。でも今は約束を選ぶ'), true);         // でも / 両方
+  assert.equal(h('どちらも捨てがたい思いがある'), true);         // どちらも
+  // 素朴な言い切り = reasoning が文に見えない
+  assert.equal(h('そのまま使う'), false);
+  assert.equal(h('最初の感覚は正しかったと確信'), false);
+  // 時間的な「から」は理由ではない（誤検出回帰防止）
+  assert.equal(h('明日からの自分に生かしたい'), false);
+  assert.equal(h('これから考えていきたい'), false);
   assert.equal(h(''), false);
   assert.equal(h(null), false);
 });
