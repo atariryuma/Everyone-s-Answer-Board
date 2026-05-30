@@ -84,6 +84,17 @@ function signatureOf(message) {
 
 function fetchEntries(opts, env) {
   const config = getConfig(env);
+  // gcpProjectId が空だと resourceNames が "projects/" になり、 Cloud Logging が
+  //   message なしのエラーを返して "API error: undefined" という分かりにくい失敗になる。
+  //   ここで明示的に弾き、 設定箇所と取得方法を案内する。
+  if (!config.gcpProjectId) {
+    throw new Error(
+      `gcpProjectId が scripts/config${env ? '.' + env : ''}.json で空です。\n` +
+      `  Cloud Logging はこの値なしでは動きません。\n` +
+      `  GAS エディタ → プロジェクトの設定 → Google Cloud Platform (GCP) プロジェクト で\n` +
+      `  プロジェクト ID を確認し、 当該 config の "gcpProjectId" に設定してください。`
+    );
+  }
   const token = getAccessToken(config.tokenName);
 
   const cutoff = new Date(Date.now() - opts.hours * 3600000).toISOString();
@@ -107,7 +118,11 @@ function fetchEntries(opts, env) {
     pageSize: opts.limit
   }, token);
 
-  if (resp.error) throw new Error(`Cloud Logging API error: ${resp.error.message}`);
+  if (resp.error) {
+    // API が message を欠く形のエラーを返すことがあるので JSON 全体に fallback する。
+    const detail = resp.error.message || JSON.stringify(resp.error);
+    throw new Error(`Cloud Logging API error: ${detail}`);
+  }
   return resp.entries || [];
 }
 
