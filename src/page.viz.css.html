@@ -906,6 +906,12 @@
     display: none; /* JS で showAdminFeatures のときだけ表示 */
   }
   .viz-teacher-panel.active { display: block; }
+  /* 電子黒板(projector)には教師パネルを **絶対に出さない**。 これは教師の手元端末用の
+   * private 分析（気になる児童 / 議論のたね / 意見変容）であり、 児童全員に投影されると
+   * 「模範回答」や収束情報が見えて同調圧力になる（teacher-only / 多数派バイアス回避の核心原則）。
+   * .active より優先させるため !important。 */
+  body.projector-mode .viz-teacher-panel,
+  body.projector-mode .viz-teacher-panel.active { display: none !important; }
   .viz-teacher-panel h3 {
     font-size: 1rem;
     color: var(--theme-text-emphasis);

@@ -968,6 +968,13 @@ test('reactionDash: CVD redundant encoding — distinct dash pattern per reactio
   assert.equal(dash('UNKNOWN'), null);
 });
 
+test('projector mode hides the teacher panel (privacy: no private analysis on the projected board)', () => {
+  // 教師パネル（議論のたね / 気になる児童 / 意見変容）は教師の手元端末用。 電子黒板に
+  //   投影されると児童全員に「模範回答」や収束情報が見え同調圧力になる → projector で必ず隠す。
+  const css = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.css.html'), 'utf8');
+  assert.match(css, /body\.projector-mode\s+\.viz-teacher-panel[^{]*\{[^}]*display:\s*none/);
+});
+
 test('hasJustification: detects reasoning forms; ignores temporal から (real-data calibrated 2026-05-30)', () => {
   const { StudyQuestApp } = loadVizContext();
   const h = StudyQuestApp.prototype.__hasJustification;
