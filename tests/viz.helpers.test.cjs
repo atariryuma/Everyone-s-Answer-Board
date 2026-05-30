@@ -956,6 +956,18 @@ test('vizComputeOpinionShift: returns null with fewer than 2 students', () => {
 //   ある声を 1 つずつ拾う（人気順ではなく position coverage）ための純粋関数群。
 // =====================================================================
 
+test('reactionDash: CVD redundant encoding — distinct dash pattern per reaction type', () => {
+  const { StudyQuestApp } = loadVizContext();
+  const dash = StudyQuestApp.prototype.__reactionDash;
+  // LIKE(赤) と CURIOUS(緑) は赤緑色覚で同色化するので、 必ず別パターンであること
+  assert.notEqual(dash('LIKE'), dash('CURIOUS'));
+  assert.equal(dash('LIKE'), '5,3');       // 長破線
+  assert.equal(dash('CURIOUS'), '1.5,2');  // 短破線
+  assert.equal(dash('UNDERSTAND'), null);  // 実線（黄は単独で判別可）
+  assert.equal(dash(null), null);
+  assert.equal(dash('UNKNOWN'), null);
+});
+
 test('hasJustification: detects reasoning forms; ignores temporal から (real-data calibrated 2026-05-30)', () => {
   const { StudyQuestApp } = loadVizContext();
   const h = StudyQuestApp.prototype.__hasJustification;

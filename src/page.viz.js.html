@@ -137,6 +137,20 @@
     LIKE:       '#ef4444',  // text-red-500    (いいね！)
     CURIOUS:    '#22c55e'   // text-green-500  (もっと知りたい！)
   };
+  // CVD（色覚多様性）対応の冗長符号化（v2861）:
+  //   リング色だけだと LIKE(赤) と CURIOUS(緑) が **赤緑色覚（男子の約 8%）に区別不能**。
+  //   そこでリアクション種別ごとに stroke の破線パターンも変え、「色 + 線パターン」の二重符号化に
+  //   する（WCAG 2.1 / Color Universal Design のセオリー: "色だけに頼らずパターン/ラベルでも区別")。
+  //   電子黒板に投影された dot を色覚に依らず読み分けられる。 highlight(金) は太線で既に判別可能なので
+  //   実線のまま。 色そのもの(REACTION_COLORS)はブランド統一のため変えない（ボタン/カードと一致）。
+  const REACTION_DASH = {
+    UNDERSTAND: null,    // 実線 (なるほど)
+    LIKE:       '5,3',   // 長破線 (いいね)
+    CURIOUS:    '1.5,2'  // 短破線・点線風 (もっと知りたい)
+  };
+  function reactionDash(type) {
+    return (type && REACTION_DASH[type]) || null;
+  }
 
   function totalReactions(row) {
     if (!row || !row.reactions) return 0;
@@ -871,6 +885,11 @@
           if (d.data && d.data.highlight) return 1.0;
           return topReactionType(d.data) ? 0.85 : null;
         })
+        // CVD 冗長符号化: 種別ごとに破線パターンを変える（色 + 形）。 highlight は実線。
+        .style('stroke-dasharray', (d) => {
+          if (d.data && d.data.highlight) return null;
+          return reactionDash(topReactionType(d.data));
+        })
         .on('mouseenter', (event, d) => showTooltip(event, d.data, selfL))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, selfL))
         .on('mouseleave', () => hideTooltip())
@@ -1285,6 +1304,11 @@
         .style('stroke-opacity', (d) => {
           if (d.data && d.data.highlight) return 1.0;
           return topReactionType(d.data) ? 0.85 : null;
+        })
+        // CVD 冗長符号化: 種別ごとに破線パターンを変える（色 + 形）。 highlight は実線。
+        .style('stroke-dasharray', (d) => {
+          if (d.data && d.data.highlight) return null;
+          return reactionDash(topReactionType(d.data));
         })
         .on('mouseenter', (event, d) => showTooltip(event, d.data, self, sameCoordOf(d.data)))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, self, sameCoordOf(d.data)))
@@ -2174,6 +2198,7 @@
   StudyQuestApp.prototype.__hasJustification = hasJustification;
   StudyQuestApp.prototype.__buildPositionGroups = buildPositionGroups;
   StudyQuestApp.prototype.__representativeReasons = representativeReasons;
+  StudyQuestApp.prototype.__reactionDash = reactionDash;
   StudyQuestApp.prototype.__arePhasesAxisCompatible = arePhasesAxisCompatible;
   StudyQuestApp.prototype.__computeMatrixDeltas = computeMatrixDeltas;
   // vizComputeOpinionShift は prototype method として既に定義済 (test から直接呼べる)。
