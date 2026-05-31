@@ -792,7 +792,9 @@ function publishApp(publishConfig) {
       updatedConfig.currentLessonStartedAt = publishedAt;
     }
 
-    const saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true });
+    // __allowPublishStateWrite: publishApp は publish 状態を書き換える正規経路 (4 関数の 1 つ)。
+    //   saveUserConfig の publish-state ガードを通過させる。
+    const saveResult = saveUserConfig(user.userId, updatedConfig, { isPublish: true, __allowPublishStateWrite: true });
 
     if (!saveResult.success) {
       logError_('publishApp.saveUserConfig', new Error(saveResult.message || 'save failed'));
@@ -802,6 +804,24 @@ function publishApp(publishConfig) {
         error: saveResult.error || null,
         currentConfig: saveResult.currentConfig || null
       };
+    }
+
+    // publish 遷移時の cache 即時 stale 化 (v2865: __applyPublishStateChange とパリティ)。
+    //   saveUserConfig が primary spreadsheetId の sa_validation cache は既に消すが、
+    //   (1) profile 分の sa_validation と (2) board data version bump はここで明示する。
+    //   再公開 (unpublish→republish) 時に viewer が stale/空データを見るのを防ぐ。
+    if (updatedConfig.spreadsheetId && typeof invalidateSaValidationCache_ === 'function') {
+      try { invalidateSaValidationCache_(updatedConfig.spreadsheetId); } catch (_) { /* ignore */ }
+    }
+    if (Array.isArray(updatedConfig.profiles) && typeof invalidateSaValidationCache_ === 'function') {
+      for (const p of updatedConfig.profiles) {
+        if (p && p.spreadsheetId) {
+          try { invalidateSaValidationCache_(p.spreadsheetId); } catch (_) { /* ignore */ }
+        }
+      }
+    }
+    if (typeof bumpBoardDataVersion_ === 'function') {
+      try { bumpBoardDataVersion_(user.userId); } catch (_) { /* ignore */ }
     }
 
     return {

@@ -157,6 +157,27 @@ test('inferColumnRoles: constraint — answer always before reason', () => {
   assert.equal(r.mapping.reason, undefined);
 });
 
+test('inferColumnRoles: M7 — reason-prompt が先でも genuine answer (questionPattern) が answer を取る', () => {
+  // Why (M7): "なぜそう思った？" は reason keyword なぜ を含み answer の questionPattern とも重なる。
+  //   それより後ろに answer 固有でない自由記述質問があるとき、 旧実装は先頭の理由列を answer に
+  //   固定しがちだった。 相互排他ペナルティで理由列の answer スコアを下げ、 後続の純粋な質問列を
+  //   answer に取らせる。
+  const ctx = loadCtx();
+  const headers = ['ts', 'なぜそう思った？', 'あなたはどうしますか'];
+  const r = ctx.inferColumnRoles(headers);
+  assert.equal(r.mapping.answer, 2, 'genuine question column (idx2) should win answer over the reason-prompt (idx1)');
+});
+
+test('inferColumnRoles: M7 — answer 固有 keyword を含むヘッダーはペナルティ対象外', () => {
+  // "意見とその理由" は answer keyword (意見) を含むため、 reason keyword (理由) があっても
+  //   answer スコアは下がらない。
+  const ctx = loadCtx();
+  const headers = ['ts', '名前', 'あなたの意見とその理由'];
+  const r = ctx.inferColumnRoles(headers);
+  assert.equal(r.mapping.answer, 2);
+  assert.ok(r.confidence.answer >= 85, `answer keyword present → no penalty, got ${r.confidence.answer}`);
+});
+
 // =====================================================================
 // existingMapping fix
 // =====================================================================

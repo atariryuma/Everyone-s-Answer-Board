@@ -220,6 +220,13 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
   const maxCol = Math.max(...columnIndexes);
   const [rowData = []] = sheet.getRange(rowNumber, minCol, 1, maxCol - minCol + 1).getValues();
 
+  // Why (v2865 / M1): email identity は case-insensitive (sameEmail_ と同じ規約)。 旧実装は
+  //   完全一致 (includes/===) だったため、 stored cell に別 case の綴りが混入すると同一ユーザーを
+  //   別人扱いし、 (a) count 二重化 (b) 自分の reaction を外せない、 という vote 破損を起こした。
+  //   membership/removal/add/reacted を正規化比較に統一し、 保存も canonical (小文字) に揃える。
+  const normEmail_ = (e) => String(e == null ? '' : e).trim().toLowerCase();
+  const actorNorm = normEmail_(actorEmail);
+
   const currentReactions = {};
   const updatedReactions = {};
   let userCurrentReaction = null;
@@ -234,7 +241,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
 
     currentReactions[type] = users;
 
-    if (users.includes(actorEmail)) {
+    if (users.some(u => normEmail_(u) === actorNorm)) {
       userCurrentReaction = type;
     }
   });
@@ -247,15 +254,17 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
   });
 
   if (userCurrentReaction === reactionType) {
-    updatedReactions[reactionType] = updatedReactions[reactionType].filter(u => u !== actorEmail);
+    // 別 case の重複も含めて actor の全エントリを除去。
+    updatedReactions[reactionType] = updatedReactions[reactionType].filter(u => normEmail_(u) !== actorNorm);
     action = 'removed';
     newUserReaction = null;
   } else {
     if (userCurrentReaction) {
-      updatedReactions[userCurrentReaction] = updatedReactions[userCurrentReaction].filter(u => u !== actorEmail);
+      updatedReactions[userCurrentReaction] = updatedReactions[userCurrentReaction].filter(u => normEmail_(u) !== actorNorm);
     }
-    if (!updatedReactions[reactionType].includes(actorEmail)) {
-      updatedReactions[reactionType].push(actorEmail);
+    if (!updatedReactions[reactionType].some(u => normEmail_(u) === actorNorm)) {
+      // canonical (正規化済) で保存し、 以後の case 揺れを断つ。
+      updatedReactions[reactionType].push(actorNorm);
     }
   }
 
@@ -277,7 +286,7 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
   reactionTypes.forEach(type => {
     reactions[type] = {
       count: updatedReactions[type].length,
-      reacted: updatedReactions[type].includes(actorEmail)
+      reacted: updatedReactions[type].some(u => normEmail_(u) === actorNorm)
     };
   });
 
@@ -346,13 +355,34 @@ function processHighlightDirect(sheet, rowNumber, preloadedHeaders) {
 }
 
 /**
+ * ヘッダー行から reaction / highlight 列のインデックスを 1 パスで解決する。
+ *
+ * Why (v2865 / M2): extractReactions/extractHighlight は列位置が batch 中不変なのに行ごとに
+ *   headers.findIndex を 4 回 (UNDERSTAND/LIKE/CURIOUS/HIGHLIGHT) 走らせ、 700 row × 700 viewer の
+ *   hot path で純粋に無駄だった。 batch の冒頭で 1 度だけ解決し、 各行へ index を渡す。
+ *
+ * @param {Array} headers
+ * @returns {{UNDERSTAND:number, LIKE:number, CURIOUS:number, HIGHLIGHT:number}} 見つからない列は -1
+ */
+function resolveReactionColumns_(headers) {
+  const map = { UNDERSTAND: -1, LIKE: -1, CURIOUS: -1, HIGHLIGHT: -1 };
+  if (!Array.isArray(headers)) return map;
+  for (let i = 0; i < headers.length; i++) {
+    const h = String(headers[i] == null ? '' : headers[i]).toUpperCase().trim();
+    if (h in map && map[h] === -1) map[h] = i;
+  }
+  return map;
+}
+
+/**
  * リアクション情報抽出
  * @param {Array} row - データ行
  * @param {Array} headers - ヘッダー行
  * @param {string} userEmail - ユーザーメール（オプション）
+ * @param {Object} [precomputedIndices] - {UNDERSTAND,LIKE,CURIOUS} 列 index。未指定なら header 走査。
  * @returns {Object} リアクション情報
  */
-function extractReactions(row, headers, userEmail = null) {
+function extractReactions(row, headers, userEmail = null, precomputedIndices = null) {
   try {
     const reactions = {
       UNDERSTAND: { count: 0, reacted: false },
@@ -361,9 +391,13 @@ function extractReactions(row, headers, userEmail = null) {
     };
 
     const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
+    // email identity は case-insensitive (sameEmail_ と同じ規約 / M1)。
+    const viewerNorm = userEmail ? String(userEmail).trim().toLowerCase() : null;
 
     reactionTypes.forEach(reactionType => {
-      const columnIndex = headers.findIndex(header => String(header).toUpperCase().trim() === reactionType);
+      const columnIndex = (precomputedIndices && typeof precomputedIndices[reactionType] === 'number')
+        ? precomputedIndices[reactionType]
+        : headers.findIndex(header => String(header).toUpperCase().trim() === reactionType);
 
       if (columnIndex !== -1) {
         const cellValue = row[columnIndex] || '';
@@ -373,7 +407,7 @@ function extractReactions(row, headers, userEmail = null) {
 
         reactions[reactionType] = {
           count: reactionUsers.length,
-          reacted: userEmail ? reactionUsers.includes(userEmail) : false
+          reacted: viewerNorm ? reactionUsers.some(u => String(u).trim().toLowerCase() === viewerNorm) : false
         };
       }
     });
@@ -393,11 +427,14 @@ function extractReactions(row, headers, userEmail = null) {
  * ハイライト情報抽出
  * @param {Array} row - データ行
  * @param {Array} headers - ヘッダー行
+ * @param {number} [precomputedIndex] - HIGHLIGHT 列 index。未指定なら header 走査。
  * @returns {boolean} ハイライト状態
  */
-function extractHighlight(row, headers) {
+function extractHighlight(row, headers, precomputedIndex = null) {
   try {
-    const columnIndex = headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
+    const columnIndex = (typeof precomputedIndex === 'number')
+      ? precomputedIndex
+      : headers.findIndex(header => String(header).toUpperCase().trim() === 'HIGHLIGHT');
 
     if (columnIndex !== -1) {
       const value = String(row[columnIndex] || '').toUpperCase();

@@ -2775,7 +2775,9 @@
 
               const rt = this.reactionTypes.find(r => r.key === update.reaction);
               const svgEl = btn.querySelector('svg');
-              if (svgEl && rt) {
+              // SVG は reacted (solid/outline) でしか変化しない。 状態が実際に変わったときだけ
+              //   outerHTML を差替し、 毎 poll の全 reparse churn を避ける (700 viewer hot path)。
+              if (svgEl && rt && btn.classList.contains('reacted') !== update.reacted) {
                 const newIcon = this.getIcon(rt.icon, 'w-5 h-5', update.reacted);
                 svgEl.outerHTML = newIcon;
               }
@@ -4226,8 +4228,13 @@
       });
     }
 
-    endPublication() {
-      if (!confirm('公開を終了しますか？生徒は回答ボードにアクセスできなくなります。')) {
+    async endPublication() {
+      // canonical API: native confirm() ではなく modals.confirm (CLAUDE.md)。 破壊的操作なので danger。
+      const ok = (window.modals && typeof window.modals.confirm === 'function')
+        ? await window.modals.confirm('公開を終了しますか？生徒は回答ボードにアクセスできなくなります。',
+            { title: '公開を終了', variant: 'danger', okLabel: '公開を終了する' })
+        : confirm('公開を終了しますか？生徒は回答ボードにアクセスできなくなります。');
+      if (!ok) {
         return;
       }
 
@@ -4341,7 +4348,8 @@
         }
 
         const svgEl = modalBtn.querySelector('svg');
-        if (svgEl) {
+        // reacted (solid/outline) が変わったときだけ差替 (毎更新の reparse churn 回避)。
+        if (svgEl && modalBtn.classList.contains('reacted') !== info.reacted) {
           const newIcon = this.getIcon(rt.icon, 'w-5 h-5', info.reacted);
           svgEl.outerHTML = newIcon;
         }

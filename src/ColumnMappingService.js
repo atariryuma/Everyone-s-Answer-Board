@@ -114,11 +114,25 @@ function __headerPatternScore(header, role) {
   let score = 0;
 
   if (patterns.exact.some(k => normalized === k.toLowerCase())) score = 95;
-  if (patterns.keywords.some(k => normalized.includes(k.toLowerCase()))) score = Math.max(score, 90);
+  const hasOwnKeyword = patterns.keywords.some(k => normalized.includes(k.toLowerCase()));
+  if (hasOwnKeyword) score = Math.max(score, 90);
   if (role === 'answer' && patterns.questionPatterns) {
     if (patterns.questionPatterns.some(p => p.test(header))) score = Math.max(score, 87);
   }
   if (patterns.regex.test(header)) score = Math.max(score, 85);
+
+  // Why (v2865 / M7): answer の questionPatterns / regex (例 /.*なぜ/) は reason の keyword
+  //   (なぜ/どうして/理由/根拠/原因) と語彙が重なる。 ヘッダーが reason の distinctive keyword に
+  //   当たり、 かつ answer 固有 keyword (回答/答え/意見/考え 等) を含まないなら、 それは「理由」列の
+  //   可能性が高い。 answer スコアを reason keyword(90) より十分下げ (=55)、 理由列が誤って answer に
+  //   固定されるのを防ぐ (相互排他)。 exact 一致(95)・answer 固有 keyword(90) は確実なので維持。
+  //   55 に残すのは、 自由記述が 1 列だけのフォーム (例「理由を書こう」のみ) で answer が
+  //   未割当にならないようにするため (greedy で唯一候補なら拾える)。
+  if (role === 'answer' && score > 55 && score < 95 && !hasOwnKeyword) {
+    const reasonKeywords = __ROLE_PATTERNS.reason.keywords;
+    const hasReasonKeyword = reasonKeywords.some(k => normalized.includes(k.toLowerCase()));
+    if (hasReasonKeyword) score = 55;
+  }
   return score;
 }
 

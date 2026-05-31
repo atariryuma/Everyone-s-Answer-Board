@@ -95,7 +95,10 @@ function loadCtx(overrides = {}) {
 // happy path: 200 OK で circuit state はクリア
 // =====================================================================
 
-test('fetchSheetsAPIWithRetry: 200 OK 成功で circuitState は consecutiveErrors=0 にリセット', () => {
+test('fetchSheetsAPIWithRetry: 200 OK 成功で consecutiveErrors を 1 だけ減衰させる (M3 decay)', () => {
+  // Why (M3): 旧実装は success で hard-reset (=0) していたが、 部分 storm で並行する
+  //   任意の 1 成功が global counter を 0 に戻す race で breaker が閾値 7 に到達できなかった。
+  //   decay (= -1) なら net error pressure が蓄積する。
   const cache = makeCache({
     circuit_breaker_state: JSON.stringify({ consecutiveErrors: 5, circuitOpenUntil: 0 })
   });
@@ -108,8 +111,70 @@ test('fetchSheetsAPIWithRetry: 200 OK 成功で circuitState は consecutiveErro
   assert.equal(resp.getResponseCode(), 200);
 
   const state = JSON.parse(cache._store.get('circuit_breaker_state'));
-  assert.equal(state.consecutiveErrors, 0, 'success resets error counter');
+  assert.equal(state.consecutiveErrors, 4, 'success decays error counter by 1 (not hard reset)');
   assert.equal(state.circuitOpenUntil, 0);
+});
+
+test('fetchSheetsAPIWithRetry: success decay は 0 未満にならない (clamp)', () => {
+  const cache = makeCache({
+    circuit_breaker_state: JSON.stringify({ consecutiveErrors: 0, circuitOpenUntil: 0 })
+  });
+  const ctx = loadCtx({ cache, fetchSequence: [makeResponse(200, '{}')] });
+  ctx.fetchSheetsAPIWithRetry('https://x/api', { method: 'get' }, 'TestOp');
+  const state = JSON.parse(cache._store.get('circuit_breaker_state'));
+  assert.equal(state.consecutiveErrors, 0, 'decay clamps at 0');
+});
+
+// =====================================================================
+// H3: 非冪等 write (:append) は 5xx / network 断で retry させない (重複行防止)
+// =====================================================================
+
+test('fetchSheetsAPIWithRetry: idempotent=false + 5xx は "non-idempotent" マーカー付きで throw', () => {
+  const ctx = loadCtx({
+    fetchSequence: [makeResponse(500, 'backend error')],
+    executeWithRetry: (fn) => fn()  // single attempt
+  });
+  assert.throws(
+    () => ctx.fetchSheetsAPIWithRetry('https://x/api', { method: 'post' }, 'appendRow', 'sa@x', null, { idempotent: false }),
+    /non-idempotent/
+  );
+});
+
+test('fetchSheetsAPIWithRetry: idempotent=false + network throw も "non-idempotent" で throw', () => {
+  const ctx = loadCtx({
+    fetchSequence: [new Error('Connection reset')],
+    executeWithRetry: (fn) => fn()
+  });
+  assert.throws(
+    () => ctx.fetchSheetsAPIWithRetry('https://x/api', { method: 'post' }, 'appendRow', 'sa@x', null, { idempotent: false }),
+    /non-idempotent/
+  );
+});
+
+test('fetchSheetsAPIWithRetry: idempotent (default) + 5xx は通常の "API returned" エラー (retryable)', () => {
+  const ctx = loadCtx({
+    fetchSequence: [makeResponse(503, 'service unavailable')],
+    executeWithRetry: (fn) => fn()
+  });
+  assert.throws(
+    () => ctx.fetchSheetsAPIWithRetry('https://x/api', { method: 'get' }, 'getValues'),
+    (err) => /API returned 503/.test(err.message) && !/non-idempotent/.test(err.message)
+  );
+});
+
+test('fetchSheetsAPIWithRetry: idempotent=false でも 429 は retry 可能 (quota=未実行で安全)', () => {
+  // 429 は確実に reject (=未実行) なので append でも retry してよい。 message に "non-idempotent"
+  //   を含めず、 従来の "Quota exceeded (429)" を維持することで isRetryableError が retry を許す。
+  const cache = makeCache();
+  const ctx = loadCtx({
+    cache,
+    fetchSequence: [makeResponse(429, 'rate limited')],
+    executeWithRetry: (fn) => fn()
+  });
+  assert.throws(
+    () => ctx.fetchSheetsAPIWithRetry('https://x/api', { method: 'post' }, 'appendRow', 'sa@x', null, { idempotent: false }),
+    (err) => /Quota exceeded \(429\)/.test(err.message) && !/non-idempotent/.test(err.message)
+  );
 });
 
 // =====================================================================
@@ -138,9 +203,10 @@ test('fetchSheetsAPIWithRetry: 期限切れ circuit (circuitOpenUntil < now) は
 
   const resp = ctx.fetchSheetsAPIWithRetry('https://x/api', { method: 'get' }, 'TestOp');
   assert.equal(resp.getResponseCode(), 200);
-  // 成功で counter リセット
+  // 成功で counter は decay (7 → 6)。 circuitOpenUntil は 0 にクリアされ再開を許可。
   const state = JSON.parse(cache._store.get('circuit_breaker_state'));
-  assert.equal(state.consecutiveErrors, 0);
+  assert.equal(state.consecutiveErrors, 6);
+  assert.equal(state.circuitOpenUntil, 0);
 });
 
 // =====================================================================

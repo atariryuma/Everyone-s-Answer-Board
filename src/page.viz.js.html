@@ -258,7 +258,13 @@
   // ---------------------------------------------------------------------
   function showRowsPopup(app, title, rows) {
     let popup = document.getElementById('vizRowsPopup');
-    if (popup) popup.remove();
+    if (popup) {
+      // 再オープン時は前回の document keydown listener を必ず外してから remove する。
+      //   旧実装は remove() のみで onKey が document に残り、 keyword/slice を連打するたびに
+      //   detached popup を閉じ込めた dead listener が蓄積していた (長時間 projector 運用でリーク)。
+      if (typeof popup.__onKey === 'function') document.removeEventListener('keydown', popup.__onKey);
+      popup.remove();
+    }
 
     popup = document.createElement('div');
     popup.id = 'vizRowsPopup';
@@ -324,6 +330,7 @@
 
     const close = () => { popup.remove(); document.removeEventListener('keydown', onKey); };
     const onKey = (e) => { if (e.key === 'Escape') close(); };
+    popup.__onKey = onKey;  // 次回 re-open 時に外せるよう element に保持 (リーク防止)
     document.addEventListener('keydown', onKey);
 
     popup.addEventListener('click', (e) => {

@@ -91,6 +91,15 @@ test('isRetryableError: permission / not found / authentication failed はリト
   assert.equal(isRetryableError('Authentication failed'), false);
 });
 
+test('isRetryableError: 非冪等 write (:append) の失敗はリトライしない (H3)', () => {
+  // Why: :append は非冪等。5xx/network 断は commit 済か判定不能で、盲目 retry は重複行を生む。
+  //   fetchSheetsAPIWithRetry が idempotent=false のとき "non-idempotent" を含むメッセージを
+  //   throw し、それを non-retryable にすることで executeWithRetry の再実行を止める。
+  const { isRetryableError } = loadMainCtx();
+  assert.equal(isRetryableError('non-idempotent write failed (no retry): API returned 503: backend error'), false);
+  assert.equal(isRetryableError('non-idempotent write aborted (no retry): connection reset'), false);
+});
+
 test('isRetryableError: 非string / falsy 入力は false', () => {
   const { isRetryableError } = loadMainCtx();
   assert.equal(isRetryableError(null), false);
@@ -120,6 +129,58 @@ test('isRetryableError: 大文字小文字を区別しない', () => {
   const { isRetryableError } = loadMainCtx();
   assert.equal(isRetryableError('PERMISSION DENIED'), false);
   assert.equal(isRetryableError('Quota Exceeded'), true);
+});
+
+// =====================================================================
+// evaluateDomainRestriction — fail-closed after setup (M6)
+// =====================================================================
+
+test('evaluateDomainRestriction: setup 未完了 (enforce 不要) は通す (fail-open)', () => {
+  const { evaluateDomainRestriction } = loadMainCtx({
+    shouldEnforceDomainRestrictions: () => false
+  });
+  const r = evaluateDomainRestriction('x@out.com');
+  assert.equal(r.allowed, true);
+  assert.equal(r.reason, 'setup_incomplete');
+});
+
+test('evaluateDomainRestriction: enforce 必要 + validateDomainAccess が throw → deny (fail-closed M6)', () => {
+  const { evaluateDomainRestriction } = loadMainCtx({
+    shouldEnforceDomainRestrictions: () => true,
+    validateDomainAccess: () => { throw new Error('transient cache error'); }
+  });
+  const r = evaluateDomainRestriction('x@out.com');
+  assert.equal(r.allowed, false, 'enforcement confirmed → exception must fail closed');
+  assert.equal(r.reason, 'validation_error');
+});
+
+test('evaluateDomainRestriction: validator 不在 → 通す (コード未読込はランタイム事象でない)', () => {
+  // validator が単一グローバルスコープに無い = アプリ全体未読込であり、 M6 (transient 例外の
+  //   fail-closed) の対象外。 従来どおり fail-open。
+  const { evaluateDomainRestriction } = loadMainCtx({
+    shouldEnforceDomainRestrictions: () => true,
+    validateDomainAccess: undefined
+  });
+  const r = evaluateDomainRestriction('x@out.com');
+  assert.equal(r.allowed, true);
+  assert.equal(r.reason, 'validator_missing');
+});
+
+test('evaluateDomainRestriction: enforcement 判定自体が throw → 状態不明なので通す (可用性優先)', () => {
+  const { evaluateDomainRestriction } = loadMainCtx({
+    shouldEnforceDomainRestrictions: () => { throw new Error('cannot determine setup state'); }
+  });
+  const r = evaluateDomainRestriction('x@out.com');
+  assert.equal(r.allowed, true, 'unknown enforcement state stays fail-open to avoid setup lockout');
+});
+
+test('evaluateDomainRestriction: enforce 必要 + validateDomainAccess が allowed を返せばそれを尊重', () => {
+  const { evaluateDomainRestriction } = loadMainCtx({
+    shouldEnforceDomainRestrictions: () => true,
+    validateDomainAccess: (email) => ({ allowed: /@in\.com$/.test(email), reason: 'checked' })
+  });
+  assert.equal(evaluateDomainRestriction('teacher@in.com').allowed, true);
+  assert.equal(evaluateDomainRestriction('x@out.com').allowed, false);
 });
 
 // =====================================================================

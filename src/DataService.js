@@ -269,6 +269,11 @@ function processBatchData(ctx) {
     numericY: (typeof columnMapping.numericY === 'number' && columnMapping.numericY >= 0 && columnMapping.numericY < headers.length) ? columnMapping.numericY : -1
   };
   const tsIndex = resolveTimestampIndex(headers);
+  // reaction/highlight 列も batch 中不変。 1 度だけ解決して全行へ渡す (M2)。 typeof guard は
+  //   GAS single-file test load 時に ReactionService 未読込でも落ちないように (extract* は別途 stub)。
+  const reactionIndices = (typeof resolveReactionColumns_ === 'function')
+    ? resolveReactionColumns_(headers)
+    : null;
 
   for (let startRow = 2; startRow <= lastRow; ) {
     const currentBatchSize = getAdaptiveBatchSize(consecutiveErrors);
@@ -280,7 +285,7 @@ function processBatchData(ctx) {
       const batchProcessed = processRawDataBatch({
         batchRows, headers, options,
         startOffset: startRow - 2,
-        fieldIndices, tsIndex
+        fieldIndices, tsIndex, reactionIndices
       });
 
       // push(...batchProcessed) は in-place で O(n)。concat は新 array を毎回作るので O(n²)。
@@ -375,11 +380,11 @@ function fetchSpreadsheetData(config, options = {}) {
 
 /**
  * バッチ処理用データ変換（メモリ効率重視）。
- * @param {Object} ctx - {batchRows, headers, options, startOffset, fieldIndices, tsIndex}
+ * @param {Object} ctx - {batchRows, headers, options, startOffset, fieldIndices, tsIndex, reactionIndices}
  * @returns {Array} 処理済みバッチデータ
  */
 function processRawDataBatch(ctx) {
-  const { batchRows, headers, options, startOffset, fieldIndices, tsIndex } = ctx;
+  const { batchRows, headers, options, startOffset, fieldIndices, tsIndex, reactionIndices } = ctx;
   try {
     const processedBatch = [];
     // Normalize empty/missing cells to null to match the prior
@@ -433,8 +438,8 @@ function processRawDataBatch(ctx) {
           formattedTimestamp: formatTimestamp(tsValue),
           isEmpty: isEmptyRow(row),
 
-          reactions: extractReactions(row, headers, viewerEmail),
-          highlight: extractHighlight(row, headers)
+          reactions: extractReactions(row, headers, viewerEmail, reactionIndices),
+          highlight: extractHighlight(row, headers, reactionIndices ? reactionIndices.HIGHLIGHT : null)
         };
 
         // Why: answer/reason は board モードの必須コンテンツ。両方空ならスキップ。

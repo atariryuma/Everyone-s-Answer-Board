@@ -798,6 +798,27 @@ function saveUserConfig(userId, config, options = {}) {
 
     const cleanedConfig = cleanConfigFields(validation.data, options);
 
+    // Why (publish lifecycle single-source-of-truth, v2865): config.isPublished / publishedAt は
+    //   __applyPublishStateChange と publishApp の 2 経路だけが書き換えてよい (CLAUDE.md の不変条件)。
+    //   それ以外の save (frontend autosave / applyConfigPatch_ / profile 切替 / markWelcomeSeen 等) が
+    //   stale な isPublished を運んできても、ここで現在永続化されている値で強制上書きし「公開状態は
+    //   変えない」を保証する。strip ではなく現値で上書きするのは、 field を消すと
+    //   isUserBoardPublished が false 化して意図せぬ非公開バグになるため (data-loss 回避)。
+    //   公開状態を変える正規経路は必ず options.__allowPublishStateWrite を付けて呼ぶ。
+    if (!options.__allowPublishStateWrite) {
+      let persistedPublished;
+      let persistedPublishedAt;
+      if (user.configJson) {
+        try {
+          const persisted = JSON.parse(user.configJson);
+          persistedPublished = persisted.isPublished;
+          persistedPublishedAt = persisted.publishedAt;
+        } catch (_) { /* parse 失敗時は下の default (未公開) に委ねる */ }
+      }
+      cleanedConfig.isPublished = persistedPublished === true;
+      cleanedConfig.publishedAt = (persistedPublished === true) ? (persistedPublishedAt || null) : null;
+    }
+
     if (!cleanedConfig.lastAccessedAt) {
       cleanedConfig.lastAccessedAt = new Date().toISOString();
     }

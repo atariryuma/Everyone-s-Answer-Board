@@ -18,10 +18,16 @@
  * @param {string} [saEmail] - 初回 SA の client_email (cooldown 登録 + failover trigger)
  * @param {Function} [authResolver] - retry 時に新 SA を解決する closure
  */
-function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResolver) {
+function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResolver, fetchOpts) {
   let retryCount = 0;
   let currentOptions = options;
   let currentSaEmail = saEmail || null;
+  // Why (v2865 / H3): :append のような非冪等 POST は、 5xx / network 断が「サーバー commit 後に
+  //   応答が失われた」のか「未実行」なのか判定不能。 retry すると重複行を生む。 429 だけは
+  //   quota で確実に reject (=未実行) なので retry 安全。 idempotent=false のとき非 429 エラーを
+  //   non-retryable にして executeWithRetry の再実行を止める。 PUT (setValues) は範囲上書きで
+  //   冪等なので default (idempotent=true) のまま。
+  const idempotent = !(fetchOpts && fetchOpts.idempotent === false);
 
   const cache = CacheService.getScriptCache();
   const CIRCUIT_BREAKER_KEY = 'circuit_breaker_state';
@@ -64,7 +70,16 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
         } catch (_) { /* resolver 失敗は飲んで元 SA で retry */ }
       }
 
-      const response = UrlFetchApp.fetch(url, currentOptions);
+      let response;
+      try {
+        response = UrlFetchApp.fetch(url, currentOptions);
+      } catch (fetchError) {
+        // 非冪等 write が network/socket で落ちた場合、 commit 済か判定不能 → retry 禁止。
+        if (!idempotent) {
+          throw new Error(`non-idempotent write aborted (no retry): ${fetchError && fetchError.message ? fetchError.message : fetchError}`);
+        }
+        throw fetchError;
+      }
       const code = response.getResponseCode();
 
       if (code === 429) {
@@ -94,10 +109,19 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
 
       if (code !== 200) {
         const errorText = response.getContentText();
+        // 非冪等 write の 5xx 等は commit 済の可能性があるため retry させない。
+        if (!idempotent) {
+          throw new Error(`non-idempotent write failed (no retry): API returned ${code}: ${errorText}`);
+        }
         throw new Error(`API returned ${code}: ${errorText}`);
       }
 
-      circuitState.consecutiveErrors = 0;
+      // 成功時は hard-reset せず 1 だけ減衰させる (v2865 / M3)。 700 viewer の部分 storm では
+      //   429 と 200 が interleave するため、 hard-reset (=0) だと「並行する任意の 1 成功が
+      //   global counter を 0 に戻す」 race で閾値 7 に到達できず breaker が機能しなかった。
+      //   decay 方式なら net error pressure が蓄積し、 真の quota 枯渇でのみ開く。 単発の
+      //   transient は数回の成功で自然解消する。 (counter は「連続」 ではなく net pressure の意味)
+      circuitState.consecutiveErrors = Math.max(0, circuitState.consecutiveErrors - 1);
       circuitState.circuitOpenUntil = 0;
       cache.put(CIRCUIT_BREAKER_KEY, JSON.stringify(circuitState), 60);
 
@@ -122,8 +146,11 @@ function fetchSheetsAPIWithRetry(url, options, operationName, saEmail, authResol
  *
  * 設計の核:
  *  - **round-robin** (`pickServiceAccount_`): ScriptCache の共有 counter `sa_rr_counter` を
- *    pool.length で割って次 SA を pick。 heavy user (admin/教師の連投) も pool 全体に均等
- *    分散される。 user-affinity hash 方式だと heavy user が固定 SA を焼く事故が起きる。
+ *    pool.length で割って次 SA を pick。 heavy user (admin/教師の連投) も pool 全体に分散される。
+ *    user-affinity hash 方式だと heavy user が固定 SA を焼く事故が起きる。
+ *    注意: ScriptCache の get→put は非アトミックなので、 同時刻の burst では複数 invocation が
+ *    同じ counter を読んで同 SA を選ぶ衝突が起こりうる (= 完全均等は保証しない)。 ただし
+ *    cooldown が焼けた SA を 30s 除外するため、 偏りは自己修正される。
  *  - **cooldown** (`markServiceAccountCoolingDown_`): 429 を喰った SA を 30s 除外。 同 user が
  *    同 SA で 429 を再現する無駄を防ぐ。 全 SA cooling 時は full pool で round-robin (止める
  *    より retry のほうがマシ)。
@@ -1255,7 +1282,8 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
             payload: JSON.stringify(payload)
           },
           `appendRow(${sheetName})`,
-          auth.saEmail, resolveAuth
+          auth.saEmail, resolveAuth,
+          { idempotent: false }  // :append は非冪等 — 5xx/network での盲目 retry は重複行を生む
         );
       } catch (error) {
         console.warn('appendRow via API failed after retries:', error.message);

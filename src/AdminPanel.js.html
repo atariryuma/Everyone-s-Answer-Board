@@ -31,6 +31,14 @@
   // フォーム検証成功 → 自動接続の前にメッセージを読ませる短い遅延。
   const AUTO_CONNECT_DELAY_MS = 300;
 
+  // Why (v2865 / M5): .href に代入する URL は必ず https スキームに限定する。 escapeHtml では
+  //   javascript:/data: スキームを無毒化できず、 サーバー往復してきた URL でも click 時に発火
+  //   しうる。 page.js は全 URL 代入前にこの gate を敷いており、 AdminPanel も揃える。
+  //   非 https は '#' に落とす (リンクは無害化、 表示テキストは別途設定済)。
+  function safeHttpsHref_(url) {
+    return (typeof url === 'string' && /^https:\/\//i.test(url)) ? url : '#';
+  }
+
   function getUrlParameterUserId() {
     try {
       const urlParams = new URLSearchParams(window.location.search);
@@ -741,7 +749,7 @@
       if (formUrlDisplay) {
         if (config.formUrl) {
           formUrlDisplay.textContent = 'フォームを開く';
-          formUrlDisplay.href = config.formUrl;
+          formUrlDisplay.href = safeHttpsHref_(config.formUrl);
           formUrlDisplay.className = 'text-blue-400 hover:underline text-xs';
         } else {
           formUrlDisplay.textContent = '未設定';
@@ -1177,11 +1185,11 @@
 
       if (formLink) {
         formLink.textContent = safeData.formTitle || 'フォーム情報なし';
-        formLink.href = safeData.editUrl || safeData.formUrl || '#';
+        formLink.href = safeHttpsHref_(safeData.editUrl || safeData.formUrl);
       }
       if (spreadsheetLink) {
         spreadsheetLink.textContent = safeData.spreadsheetName || safeData.sheetName || '検出済み';
-        spreadsheetLink.href = safeData.spreadsheetUrl || '#';
+        spreadsheetLink.href = safeHttpsHref_(safeData.spreadsheetUrl);
       }
       if (container) {
         container.classList.remove('hidden');
@@ -1200,7 +1208,7 @@
       if (urlElement) {
         if (safeData.formUrl) {
           urlElement.textContent = 'フォームを開く';
-          urlElement.href = safeData.formUrl;
+          urlElement.href = safeHttpsHref_(safeData.formUrl);
           urlElement.classList.remove('text-theme-muted');
           urlElement.classList.add('text-blue-400');
         } else {
@@ -1276,7 +1284,7 @@
       formSpreadsheetStatus.textContent = result.wasCreated ? '新規作成しました' : result.sheetName;
     }
     if (formUrlLink) {
-      formUrlLink.href = result.formUrl;
+      formUrlLink.href = safeHttpsHref_(result.formUrl);
       formUrlLink.textContent = 'フォームを開く';
     }
     formInfo?.classList.remove('hidden');
@@ -1460,11 +1468,11 @@
       if (detectionInfo) detectionInfo.classList.remove('hidden');
       if (detectedFormLink) {
         detectedFormLink.textContent = result.formTitle;
-        detectedFormLink.href = result.editUrl || '#';
+        detectedFormLink.href = safeHttpsHref_(result.editUrl);
       }
       if (detectedSpreadsheetLink) {
         detectedSpreadsheetLink.textContent = result.spreadsheetName || result.sheetName || 'スプレッドシート';
-        detectedSpreadsheetLink.href = result.spreadsheetUrl || '#';
+        detectedSpreadsheetLink.href = safeHttpsHref_(result.spreadsheetUrl);
       }
 
       // 作成完了後、ボタンを表示してユーザーのクリックで遷移
@@ -1478,10 +1486,10 @@
           if (statusText) statusText.textContent = 'フォームの作成が完了しました！';
           if (openFormBtn) {
             openFormBtn.style.display = 'inline-block';
-            openFormBtn.onclick = () => { newWindow.location.href = result.editUrl; };
+            openFormBtn.onclick = () => { newWindow.location.href = safeHttpsHref_(result.editUrl); };
           }
         } catch (e) {
-          newWindow.location.href = result.editUrl;
+          newWindow.location.href = safeHttpsHref_(result.editUrl);
         }
       }
 
@@ -1602,11 +1610,11 @@
 
     if (container && formLink && spreadsheetLink) {
       formLink.textContent = formData.formTitle || '-';
-      formLink.href = formData.editUrl || formData.formUrl || '#';
+      formLink.href = safeHttpsHref_(formData.editUrl || formData.formUrl);
 
       // スプレッドシート名を優先表示（なければシート名）
       spreadsheetLink.textContent = formData.spreadsheetName || formData.sheetName || 'スプレッドシート';
-      spreadsheetLink.href = formData.spreadsheetUrl || '#';
+      spreadsheetLink.href = safeHttpsHref_(formData.spreadsheetUrl);
 
       container.classList.remove('hidden');
     }
@@ -3624,7 +3632,7 @@
     if (!appSetupBtn) return;
     const targetUserId = window.UNIFIED_CONFIG && window.UNIFIED_CONFIG.targetUserId;
     buildWebAppUrl('appSetup', targetUserId ? { userId: targetUserId } : null,
-      (url) => { appSetupBtn.href = url; },
+      (url) => { appSetupBtn.href = safeHttpsHref_(url); },
       (err) => { console.warn('アプリ設定URL取得エラー:', err && err.message); }
     );
   }
@@ -3732,17 +3740,23 @@
       }
       const delTarget = event.target.closest('[data-lesson-delete]');
       if (delTarget) {
-        if (!confirm('このレッスンを削除しますか？')) return;
-        const task = () => gasRun('lesson.delete', { userId, lessonId: delTarget.dataset.lessonDelete }).then((res) => {
-          if (res && res.success) {
-            window.showSuccess('レッスンを削除しました');
-            loadLessonList();
-          } else {
-            window.showError((res && res.message) || '削除失敗');
-          }
+        // canonical API: modals.confirm (native confirm 廃止)。 破壊的操作なので danger。
+        //   handler を async 化せず dupTarget と同じ Promise パターンで扱う。
+        window.modals.confirm('このレッスンを削除しますか？',
+          { title: 'レッスンを削除', variant: 'danger', okLabel: '削除する' }
+        ).then((ok) => {
+          if (!ok) return;
+          const task = () => gasRun('lesson.delete', { userId, lessonId: delTarget.dataset.lessonDelete }).then((res) => {
+            if (res && res.success) {
+              window.showSuccess('レッスンを削除しました');
+              loadLessonList();
+            } else {
+              window.showError((res && res.message) || '削除失敗');
+            }
+          });
+          if (busyBtns()) busyBtns().withBusy(delTarget, task, { busyText: '削除中...' });
+          else task();
         });
-        if (busyBtns()) busyBtns().withBusy(delTarget, task, { busyText: '削除中...' });
-        else task();
         return;
       }
       const dupTarget = event.target.closest('[data-lesson-duplicate]');
@@ -4952,21 +4966,26 @@
 
     function lessonEnd() {
       if (!currentLessonId) return;
-      if (!confirm('授業を終了して保存しますか？保存後は振り返り画面で再生できます。')) return;
-      // lesson-end ボタンは LessonWorkspace.html の hidden 要素から呼ばれるので
-      //   click event から探さず、global overlay で待機表示する (snapshot 化に時間がかかる)。
-      window.setLoading(true, '授業を保存中...');
-      gasRun('lesson.end', { userId, lessonId: currentLessonId }).then((res) => {
-        window.setLoading(false);
-        if (res && res.success) {
-          window.showSuccess('授業を保存しました。レッスン一覧から振り返り画面を開けます。');
-          exitLessonCreateMode();
-        } else {
-          window.showError((res && res.message) || '終了失敗');
-        }
-      }).catch((err) => {
-        window.setLoading(false);
-        window.showError((err && err.message) || '終了失敗');
+      // canonical API: modals.confirm (native confirm 廃止)。 Promise パターンで async 化を回避。
+      window.modals.confirm('授業を終了して保存しますか？保存後は振り返り画面で再生できます。',
+        { title: '授業を終了', okLabel: '終了して保存' }
+      ).then((ok) => {
+        if (!ok) return;
+        // lesson-end ボタンは LessonWorkspace.html の hidden 要素から呼ばれるので
+        //   click event から探さず、global overlay で待機表示する (snapshot 化に時間がかかる)。
+        window.setLoading(true, '授業を保存中...');
+        return gasRun('lesson.end', { userId, lessonId: currentLessonId }).then((res) => {
+          window.setLoading(false);
+          if (res && res.success) {
+            window.showSuccess('授業を保存しました。レッスン一覧から振り返り画面を開けます。');
+            exitLessonCreateMode();
+          } else {
+            window.showError((res && res.message) || '終了失敗');
+          }
+        }).catch((err) => {
+          window.setLoading(false);
+          window.showError((err && err.message) || '終了失敗');
+        });
       });
     }
     window.lessonEnd = lessonEnd;

@@ -40,6 +40,12 @@ function include(filename) {
  * @returns {Object} 検証結果
  */
 function evaluateDomainRestriction(email) {
+  // Why (v2865 / M6): ドメイン制限は組織境界の最終ゲート。 enforce が必要と確定した後の
+  //   例外 / validator 欠落で fail-open すると、 transient な失敗だけで domain 外ユーザーを
+  //   通してしまう。 enforcement が確定した時点以降は fail-closed (deny) にする。
+  //   ただし enforcement 判定 (shouldEnforceDomainRestrictions) 自体が落ちた = 状態不明の
+  //   場合のみ、 setup 中の lockout を避けるため従来どおり可用性優先で fail-open に倒す。
+  let enforcementConfirmed = false;
   try {
     const mustEnforce = (typeof shouldEnforceDomainRestrictions === 'function')
       ? shouldEnforceDomainRestrictions()
@@ -52,14 +58,17 @@ function evaluateDomainRestriction(email) {
         message: 'Domain restriction skipped during setup'
       };
     }
-
     if (typeof validateDomainAccess !== 'function') {
+      // validator 不在は単一グローバルスコープでは「コード未読込」= アプリ全体が壊れている状態で
+      //   あり、 runtime のセキュリティ事象ではない。 ここは従来どおり通す (M6 の対象外)。
       return {
         allowed: true,
         reason: 'validator_missing',
         message: 'Domain validator not available'
       };
     }
+
+    enforcementConfirmed = true;  // validator が実在し enforce 必要 → ここ以降の例外は fail-closed
 
     return validateDomainAccess(email, {
       allowIfAdminUnconfigured: true,
@@ -68,7 +77,7 @@ function evaluateDomainRestriction(email) {
   } catch (error) {
     console.warn('evaluateDomainRestriction failed:', error.message);
     return {
-      allowed: true,
+      allowed: !enforcementConfirmed,  // enforce 確定済なら deny、 状態不明なら従来どおり通す
       reason: 'validation_error',
       message: error.message
     };
@@ -1110,7 +1119,9 @@ function isRetryableError(errorMessage) {
     'invalid',
     'malformed',
     'access denied',
-    'authentication failed'
+    'authentication failed',
+    // 非冪等 write (例: :append) の失敗。 commit 済か判定不能なため retry すると重複を生む (H3)。
+    'non-idempotent'
   ];
 
   const lowerMessage = errorMessage.toLowerCase();

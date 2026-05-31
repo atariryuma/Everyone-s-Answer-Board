@@ -297,6 +297,19 @@ test('setUserConfig: publish option triggers isPublish save mode', () => {
   assert.equal(opts.isPublish, true);
 });
 
+test('setUserConfig: cannot flip publish state via patch (isPublished/publishedAt stripped)', () => {
+  // Why (v2865): publish lifecycle は 4 関数だけが書き換えてよい。applyConfigPatch_ の PROTECTED で
+  //   isPublished/publishedAt を除外し、deepMerge_ が cur.config の現値を保持することで、
+  //   admin patch 経由の publish 状態書き換え (lifecycle bypass) を塞ぐ。u1 は published 状態。
+  const ctx = loadAdminContext();
+  ctx.dispatchAdminOperation('setUserConfig', {
+    userId: 'u1', patch: { isPublished: false, publishedAt: null, allowResubmit: true }
+  });
+  const saved = ctx.__savedConfigs.get('u1').config;
+  assert.equal(saved.isPublished, true, 'publish state must not change via setUserConfig patch');
+  assert.equal(saved.allowResubmit, true, 'non-protected fields still apply');
+});
+
 test('setUserConfig: preserves boardMode through sanitization pipeline', () => {
   // Why: 過去 validators.js:validateConfig が displaySettings を再構築する際に
   //      boardMode を許可リストに含めず、永遠に削除されていた regression。

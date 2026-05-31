@@ -543,6 +543,62 @@ test('getNotificationUpdate: reports hasNewContent=true when items newer than la
   assert.equal(result.newItemsCount, 2);
 });
 
+test('getNotificationUpdate: viewer reuses board-data cache (no getUserSheetData on cache hit)', () => {
+  // Why (v2865/H2): viewer は getPublishedSheetData と同一 cache entry を共有し、毎 poll の
+  //   無キャッシュ全読を避ける。cache hit 時は getUserSheetData (loader) を呼ばないこと。
+  let loaderCalls = 0;
+  const cachedPayload = JSON.stringify({
+    success: true,
+    data: [
+      { timestamp: '2026-04-18T10:00:00Z' }, // older than lastUpdate
+      { timestamp: '2026-04-19T12:00:00Z' }  // newer
+    ]
+  });
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'viewer@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    isAdministrator: () => false,
+    safeJsonParse_: (s, fb) => { try { return JSON.parse(s); } catch (_) { return fb; } },
+    CacheService: {
+      getScriptCache: () => ({
+        // board_data: で始まる data key だけ cached payload を返す。version key は null (=0)。
+        get: (k) => (typeof k === 'string' && k.indexOf('board_data:') === 0) ? cachedPayload : null,
+        put: () => {},
+        remove: () => {}
+      })
+    },
+    getUserSheetData: () => { loaderCalls++; return { success: true, data: [] }; }
+  });
+  const result = ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-04-19T00:00:00Z' });
+  assert.equal(result.success, true);
+  assert.equal(loaderCalls, 0, 'cache hit must avoid getUserSheetData (no extra SA read)');
+  assert.equal(result.hasNewContent, true);
+  assert.equal(result.newItemsCount, 1);
+});
+
+test('getNotificationUpdate: owner is NOT cached (reads fresh for immediate edit reflection)', () => {
+  let loaderCalls = 0;
+  const ctx = loadDataApisContext({
+    getCurrentEmail: () => 'owner@example.com',
+    findUserById: () => ({ userId: 'u1', userEmail: 'owner@example.com' }),
+    getConfigOrDefault: () => ({ isPublished: true }),
+    isAdministrator: () => false,
+    safeJsonParse_: (s, fb) => { try { return JSON.parse(s); } catch (_) { return fb; } },
+    CacheService: {
+      getScriptCache: () => ({
+        get: (k) => (typeof k === 'string' && k.indexOf('board_data:') === 0)
+          ? JSON.stringify({ success: true, data: [{ timestamp: '2030-01-01T00:00:00Z' }] })
+          : null,
+        put: () => {}, remove: () => {}
+      })
+    },
+    getUserSheetData: () => { loaderCalls++; return { success: true, data: [] }; }
+  });
+  ctx.getNotificationUpdate('u1', { lastUpdateTime: '2026-04-19T00:00:00Z' });
+  assert.equal(loaderCalls, 1, 'owner must bypass cache and read fresh');
+});
+
 // =====================================================================
 // processFormUrlInput — URL validation (doesn't require FormApp)
 // =====================================================================

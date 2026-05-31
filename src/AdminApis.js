@@ -214,7 +214,9 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   //   (read=L158 と save の間に別 writer が config を変えていれば etag_mismatch)。
   //   この conflict を汎用エラーに埋もれさせず、 publishApp と同じく構造化して surface し、
   //   フロントが再読み込みを促せるようにする (caller に sourceEtag を強制せず非破壊で対称化)。
-  const saveResult = saveUserConfig(targetUser.userId, updatedConfig);
+  // __allowPublishStateWrite: この関数は publish 状態を書き換える正規経路の 1 つ。
+  //   saveUserConfig の publish-state ガードを通過させる (CLAUDE.md の 4 関数不変条件)。
+  const saveResult = saveUserConfig(targetUser.userId, updatedConfig, { __allowPublishStateWrite: true });
   if (!saveResult.success) {
     if (saveResult.error === 'etag_mismatch') {
       return {
@@ -1662,7 +1664,10 @@ function applyConfigPatch_(userId, patch, options) {
   if (!userId || typeof userId !== 'string') {
     return createErrorResponse('userId is required');
   }
-  const PROTECTED = ['userId', 'userEmail', 'googleId', 'createdAt', 'etag'];
+  // isPublished/publishedAt は publish lifecycle (4 関数) だけが書き換えてよいので patch から除外。
+  //   deepMerge_ が cur.config 側の現値を保持するため data-loss なし。最終 backstop は
+  //   saveUserConfig の __allowPublishStateWrite ガード。
+  const PROTECTED = ['userId', 'userEmail', 'googleId', 'createdAt', 'etag', 'isPublished', 'publishedAt'];
   // Clone & strip protected keys top-level
   const safePatch = {};
   for (const k of Object.keys(patch)) {

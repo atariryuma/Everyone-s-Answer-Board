@@ -1266,6 +1266,25 @@ function withBoardDataCache_(userId, options, loader) {
 }
 
 /**
+ * 公開ボード閲覧系エンドポイント (getPublishedSheetData / getNotificationUpdate) が共有する
+ *   認可プリアンブル。 owner 解決 + config 取得 + 公開ゲートを 1 箇所に集約し、 endpoint 間の
+ *   微妙な分岐差 (preloadedAuth 漏れ・公開判定漏れ等) を構造的に防ぐ (v2865 / DRY)。
+ *   各 endpoint は ok=false の reason を見て自前の error envelope を組む。
+ * @param {string} targetUserId
+ * @param {string} email - 呼び出し元 (viewer) email
+ * @param {boolean} isAdmin - システム管理者か (事前計算済を渡す)
+ * @returns {{ok:true, targetUser:Object, config:Object, isOwnBoard:boolean} | {ok:false, reason:('not_found'|'denied')}}
+ */
+function resolveViewerBoardAccess_(targetUserId, email, isAdmin) {
+  const targetUser = findPublishedBoardOwner(targetUserId, email, { preloadedAuth: { email, isAdmin } });
+  if (!targetUser) return { ok: false, reason: 'not_found' };
+  const config = getConfigOrDefault(targetUser.userId, targetUser);
+  const isOwnBoard = sameEmail_(targetUser.userEmail, email);
+  if (!isAdmin && !isOwnBoard && !config.isPublished) return { ok: false, reason: 'denied' };
+  return { ok: true, targetUser, config, isOwnBoard };
+}
+
+/**
  * 統合API: フロントエンド用データ取得（最適化版・クロスユーザー対応）
  * @param {string} classFilter - クラスフィルター
  * @param {string} sortOrder - ソート順
@@ -1294,33 +1313,15 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
     const { email: viewerEmail, isAdmin: isSystemAdmin } = adminAuth;
 
     if (targetUserId) {
-      const targetUser = findPublishedBoardOwner(targetUserId, viewerEmail, {
-        preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
-      });
-      if (!targetUser) {
-        logError_('getPublishedSheetData', new Error('Target user not found'), { targetUserId, viewerEmail });
-        return {
-          success: false,
-          error: 'Target user not found',
-          data: [],
-          sheetName: '',
-          header: 'ユーザーエラー'
-        };
+      const access = resolveViewerBoardAccess_(targetUserId, viewerEmail, isSystemAdmin);
+      if (!access.ok) {
+        if (access.reason === 'not_found') {
+          logError_('getPublishedSheetData', new Error('Target user not found'), { targetUserId, viewerEmail });
+          return { success: false, error: 'Target user not found', data: [], sheetName: '', header: 'ユーザーエラー' };
+        }
+        return { success: false, error: 'このボードは未公開です', data: [], sheetName: '', header: '未公開' };
       }
-
-      const targetUserConfig = getConfigOrDefault(targetUserId, targetUser);
-      const isOwnBoard = sameEmail_(targetUser.userEmail, viewerEmail);
-      const isPublished = Boolean(targetUserConfig.isPublished);
-
-      if (!isSystemAdmin && !isOwnBoard && !isPublished) {
-        return {
-          success: false,
-          error: 'このボードは未公開です',
-          data: [],
-          sheetName: '',
-          header: '未公開'
-        };
-      }
+      const { targetUser, config: targetUserConfig, isOwnBoard } = access;
 
       const options = {
         classFilter: classFilter !== 'すべて' ? classFilter : undefined,
@@ -1571,39 +1572,45 @@ function getNotificationUpdate(targetUserId, options = {}) {
       return { success: false, message: 'Invalid request' };
     }
 
-    const targetUser = findPublishedBoardOwner(targetUserId, email);
-    if (!targetUser) {
-      return { success: false, message: 'User not found' };
-    }
-
-    const targetConfig = getConfigOrDefault(targetUser.userId, targetUser);
-    const isOwnBoard = sameEmail_(targetUser.userEmail, email);
+    // getPublishedSheetData と同じ認可プリアンブルを共有 (DRY / 分岐差の防止)。
     const isAdmin = isAdministrator(email);
-
-    if (!isAdmin && !isOwnBoard && !targetConfig.isPublished) {
-      return { success: false, message: 'Access denied' };
+    const access = resolveViewerBoardAccess_(targetUserId, email, isAdmin);
+    if (!access.ok) {
+      return { success: false, message: access.reason === 'not_found' ? 'User not found' : 'Access denied' };
     }
+    const { targetUser, config: targetConfig, isOwnBoard } = access;
 
     // Why: 'すべて' はサーバーにとっては null と同義。生のまま渡すとクラス名として
       //      フィルタされて全件 0 にマッチしなくなる（getPublishedSheetData と同じ正規化）。
     const classFilter = options.classFilter && options.classFilter !== 'すべて'
       ? options.classFilter
       : undefined;
-
-    const userData = getUserSheetData(targetUserId, {
+    const dataOptions = {
       includeTimestamp: true,
       classFilter,
       sortBy: options.sortOrder || 'newest',
+      adminMode: isAdmin || isOwnBoard,
       requestingUser: email,
-      targetUserEmail: targetUser.userEmail
-    }, targetUser, targetConfig);
+      targetUserEmail: targetUser.userEmail,
+      preloadedAuth: { email, isAdmin }
+    };
 
-    if (!userData.success) {
+    // Why (v2865): viewer は getPublishedSheetData と同一 cache entry
+    //   (key = userId:version:classFilter:sortBy) を共有する。 旧実装は毎 poll 無キャッシュで
+    //   ボード全体を再読し、 getPublishedSheetData の board-data cache を相殺して 700 viewer 環境
+    //   で 429 storm の主因になっていた。 owner/admin は編集中の即時反映が要るため非キャッシュ。
+    const isViewerOnly = !isAdmin && !isOwnBoard;
+    const userData = isViewerOnly
+      ? withBoardDataCache_(targetUser.userId, dataOptions, () =>
+          getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig))
+      : getUserSheetData(targetUser.userId, dataOptions, targetUser, targetConfig);
+
+    if (!userData || !userData.success) {
       return { success: false, message: 'Data access failed' };
     }
 
     const lastUpdate = new Date(options.lastUpdateTime || 0);
-    const newItems = userData.data.filter(item => {
+    const newItems = (userData.data || []).filter(item => {
       const itemTime = new Date(item.timestamp || 0);
       return itemTime > lastUpdate;
     });

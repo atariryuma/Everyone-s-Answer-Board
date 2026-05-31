@@ -152,6 +152,33 @@ test('processReactionDirect: removes LIKE when user toggles same reaction', () =
   assert.equal(result.reactions.LIKE.reacted, false);
 });
 
+test('processReactionDirect: case-insensitive toggle removes own mixed-case reaction (M1)', () => {
+  // Why (M1): stored cell が別 case (Actor@Example.com) でも、 actor@example.com の toggle で
+  //   自分の reaction を認識して外せる。 旧実装 (完全一致) では外せず二重カウントしていた。
+  const ctx = loadReactionContext();
+  const sheet = createMockSheet({
+    headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'],
+    rows: [['answer-a', '', 'Actor@Example.com', '']]
+  });
+
+  const result = ctx.processReactionDirect(sheet, 2, 'LIKE', 'actor@example.com');
+
+  assert.equal(result.action, 'removed', 'mixed-case stored email must be recognized as own reaction');
+  assert.equal(result.reactions.LIKE.count, 0);
+  assert.equal(result.reactions.LIKE.reacted, false);
+  assert.equal(sheet._data[1][2], '', 'own reaction (any case) is removed');
+});
+
+test('processReactionDirect: stores canonical (lowercased) email on add (M1)', () => {
+  const ctx = loadReactionContext();
+  const sheet = createMockSheet({
+    headers: ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'],
+    rows: [['answer-a', '', '', '']]
+  });
+  ctx.processReactionDirect(sheet, 2, 'LIKE', 'Actor@Example.com');
+  assert.equal(sheet._data[1][2], 'actor@example.com', 'added email is normalized to lowercase');
+});
+
 test('processReactionDirect: switches reaction from LIKE to CURIOUS', () => {
   const ctx = loadReactionContext();
   const sheet = createMockSheet({
@@ -359,6 +386,51 @@ test('extractReactions: reacted=false when userEmail is null', () => {
   const r = ctx.extractReactions(['a', 'x@x.com', '', ''], ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS']);
   assert.equal(r.UNDERSTAND.reacted, false);
   assert.equal(r.UNDERSTAND.count, 1);
+});
+
+test('extractReactions: reacted is case-insensitive (M1)', () => {
+  // Why (M1): identity は case-insensitive。stored cell が別 case でも自分の reaction を認識する。
+  const ctx = loadReactionContext();
+  const headers = ['Q1', 'UNDERSTAND', 'LIKE', 'CURIOUS'];
+  const row = ['answer', 'Alice@Example.com', '', ''];
+  const r = ctx.extractReactions(row, headers, 'alice@example.com');
+  assert.equal(r.UNDERSTAND.reacted, true, 'mixed-case stored email must match normalized viewer');
+});
+
+test('extractReactions: uses precomputed indices when provided (M2)', () => {
+  // Why (M2): batch hot path は列 index を 1 度だけ解決して渡す。precomputed を尊重すること。
+  const ctx = loadReactionContext();
+  // headers をわざと UNDERSTAND を含まない形にし、precomputed の方を使うことを示す。
+  const headers = ['Q1', 'colA', 'colB', 'colC'];
+  const row = ['answer', 'a@x.com|b@x.com', 'c@x.com', ''];
+  const precomputed = { UNDERSTAND: 1, LIKE: 2, CURIOUS: 3 };
+  const r = ctx.extractReactions(row, headers, 'c@x.com', precomputed);
+  assert.equal(r.UNDERSTAND.count, 2);
+  assert.equal(r.LIKE.count, 1);
+  assert.equal(r.LIKE.reacted, true);
+});
+
+test('resolveReactionColumns_: resolves all 4 columns in one pass (M2)', () => {
+  const ctx = loadReactionContext();
+  const map = ctx.resolveReactionColumns_(['ts', 'UNDERSTAND', 'q', 'like', 'CURIOUS', 'Highlight']);
+  assert.equal(map.UNDERSTAND, 1);
+  assert.equal(map.LIKE, 3);      // case-insensitive
+  assert.equal(map.CURIOUS, 4);
+  assert.equal(map.HIGHLIGHT, 5); // case-insensitive
+});
+
+test('resolveReactionColumns_: missing columns are -1', () => {
+  const ctx = loadReactionContext();
+  const map = ctx.resolveReactionColumns_(['ts', 'answer']);
+  assert.equal(map.UNDERSTAND, -1);
+  assert.equal(map.HIGHLIGHT, -1);
+});
+
+test('extractHighlight: uses precomputed index when provided (M2)', () => {
+  const ctx = loadReactionContext();
+  // headers に HIGHLIGHT 名が無くても precomputed index で解決。
+  assert.equal(ctx.extractHighlight(['a', 'TRUE'], ['Q1', 'colX'], 1), true);
+  assert.equal(ctx.extractHighlight(['a', ''], ['Q1', 'colX'], 1), false);
 });
 
 // =====================================================================
