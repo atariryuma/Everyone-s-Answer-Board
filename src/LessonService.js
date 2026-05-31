@@ -171,17 +171,11 @@ function __createLessonRow_(record) {
   return { ...record, sizeBytes: serialized.sizeBytes, etag: serialized.etag, schemaVersion: LESSON_SCHEMA_VERSION };
 }
 
-// 既存 row を patch。patch は {state?, name?, startedAt?, endedAt?, lessonJson?}。
-//   batch write: 1 setValues 呼び出しで完結 (CLAUDE.md batch ルール)。
-//   lessonJson 含む patch なら etag / sizeBytes も更新、そうでないなら lessonJson 列は触らず etag のみ。
-//
-//   Why LockService: 旧コードは read-modify-write を unlocked で行っていたため、
-//   advanceLessonPhase / endLesson / updateLessonDraft の同時クリックで write が lost
-//   する data-loss race があった。LockService.getDocumentLock() で lessons sheet 全体を
-//   serialize する (細粒度 lock は LessonId 単位の lock service が無いため避ける)。
-function __updateLessonRow_(lessonId, patch, expectedEtag) {
-  // ScriptLock (script-wide) for serializing all lesson sheet writes.
-  // GAS LockService doesn't support per-key locking, so script-wide is the only option.
+// 全 lesson sheet write を serialize する ScriptLock wrapper。
+//   GAS LockService は per-key lock 非対応なので script-wide が唯一の選択。
+//   acquire / 5s timeout / finally-release の boilerplate を 1 箇所に集約し、
+//   __updateLessonRow_ / __deleteLessonRow_ は body だけ lambda で渡す。
+function __withLessonLock_(fn) {
   const lock = LockService.getScriptLock();
   let locked = false;
   try {
@@ -189,7 +183,23 @@ function __updateLessonRow_(lessonId, patch, expectedEtag) {
     if (!locked) {
       return { success: false, error: 'LOCK_TIMEOUT', message: '別の処理が実行中です。少し待ってから再試行してください。' };
     }
+    return fn();
+  } finally {
+    if (locked) {
+      try { lock.releaseLock(); } catch (e) { console.warn('__withLessonLock_ releaseLock failed:', e.message); }
+    }
+  }
+}
 
+// 既存 row を patch。patch は {state?, name?, startedAt?, endedAt?, lessonJson?}。
+//   batch write: 1 setValues 呼び出しで完結 (CLAUDE.md batch ルール)。
+//   lessonJson 含む patch なら etag / sizeBytes も更新、そうでないなら lessonJson 列は触らず etag のみ。
+//
+//   Why LockService: 旧コードは read-modify-write を unlocked で行っていたため、
+//   advanceLessonPhase / endLesson / updateLessonDraft の同時クリックで write が lost
+//   する data-loss race があった。__withLessonLock_ で lessons sheet 全体を serialize する。
+function __updateLessonRow_(lessonId, patch, expectedEtag) {
+  return __withLessonLock_(() => {
     const found = __findLessonById_(lessonId);
     if (!found) return { success: false, error: 'LESSON_NOT_FOUND', message: 'lesson not found' };
     if (expectedEtag && found.lesson.etag && found.lesson.etag !== expectedEtag) {
@@ -223,11 +233,7 @@ function __updateLessonRow_(lessonId, patch, expectedEtag) {
       success: true,
       lesson: { ...found.lesson, ...patch, lessonJson, sizeBytes: serialized.sizeBytes, etag: serialized.etag }
     };
-  } finally {
-    if (locked) {
-      try { lock.releaseLock(); } catch (e) { console.warn('__updateLessonRow_ releaseLock failed:', e.message); }
-    }
-  }
+  });
 }
 
 function __listLessonsForUser_(userId, options = {}) {
@@ -275,35 +281,26 @@ function __listLessonsForUser_(userId, options = {}) {
 function __deleteLessonRow_(lessonId) {
   // Why ScriptLock: deleteRow は行 index を shift する。同時に動いている __updateLessonRow_
   //   は事前に findLessonById_ で取得した rowIndex を保持しているので、その index に対する
-  //   setValues が「別の lesson 行」を書き換える data-loss を起こす。__updateLessonRow_ と
-  //   同じ getScriptLock() で serialize する。
-  const lock = LockService.getScriptLock();
-  let locked = false;
-  try {
-    locked = lock.tryLock(5000);
-    if (!locked) {
-      return { success: false, error: 'LOCK_TIMEOUT', message: '別の処理が実行中です。少し待ってから再試行してください。' };
+  //   setValues が「別の lesson 行」を書き換える data-loss を起こす。__withLessonLock_ で
+  //   __updateLessonRow_ と同じ ScriptLock を共有し serialize する。
+  return __withLessonLock_(() => {
+    try {
+      const found = __findLessonById_(lessonId);
+      if (!found) return { success: false, error: 'LESSON_NOT_FOUND' };
+      // Why: SA proxy は deleteRow を持たない。admin は DB シートの editor 共有を受けているので
+      //   SpreadsheetApp 経由で直接削除する。
+      const dbId = typeof getCachedProperty === 'function' ? getCachedProperty('DATABASE_SPREADSHEET_ID') : null;
+      if (!dbId) return { success: false, error: 'DATABASE_NOT_CONFIGURED' };
+      const ss = SpreadsheetApp.openById(dbId);
+      const sheet = ss.getSheetByName('lessons');
+      if (!sheet) return { success: false, error: 'LESSONS_SHEET_NOT_FOUND' };
+      sheet.deleteRow(found.rowIndex);
+      return { success: true };
+    } catch (error) {
+      logError_('__deleteLessonRow_', error);
+      return { success: false, error: 'DELETE_FAILED', message: error && error.message };
     }
-
-    const found = __findLessonById_(lessonId);
-    if (!found) return { success: false, error: 'LESSON_NOT_FOUND' };
-    // Why: SA proxy は deleteRow を持たない。admin は DB シートの editor 共有を受けているので
-    //   SpreadsheetApp 経由で直接削除する。
-    const dbId = typeof getCachedProperty === 'function' ? getCachedProperty('DATABASE_SPREADSHEET_ID') : null;
-    if (!dbId) return { success: false, error: 'DATABASE_NOT_CONFIGURED' };
-    const ss = SpreadsheetApp.openById(dbId);
-    const sheet = ss.getSheetByName('lessons');
-    if (!sheet) return { success: false, error: 'LESSONS_SHEET_NOT_FOUND' };
-    sheet.deleteRow(found.rowIndex);
-    return { success: true };
-  } catch (error) {
-    logError_('__deleteLessonRow_', error);
-    return { success: false, error: 'DELETE_FAILED', message: error && error.message };
-  } finally {
-    if (locked) {
-      try { lock.releaseLock(); } catch (e) { console.warn('__deleteLessonRow_ releaseLock failed:', e.message); }
-    }
-  }
+  });
 }
 
 // ----- Authorization: owner OR admin (write) / owner OR admin OR collaborator (read) -----
@@ -333,7 +330,8 @@ function __requireLessonOwner_(userId, lessonId, options) {
       }
     }
     if (!isCollaborator) {
-      return { error: createErrorResponse('他ユーザーの lesson にはアクセスできません') };
+      const resourceLabel = (options && options.resourceLabel) || 'lesson';
+      return { error: createErrorResponse(`他ユーザーの ${resourceLabel} にはアクセスできません`) };
     }
   }
 
@@ -517,15 +515,8 @@ function updateLessonDraft(userId, lessonId, fieldPath, value, expectedEtag) {
 
 function listLessons(userId) {
   try {
-    const email = getCurrentEmail();
-    if (!email) return createAuthError();
-    const callerUser = findUserByEmail(email, { requestingUser: email });
-    if (!callerUser) return createUserNotFoundError();
-
-    const isAdmin = isAdministrator(email);
-    if (!isAdmin && callerUser.userId !== userId) {
-      return createErrorResponse('他ユーザーの lesson 一覧にはアクセスできません');
-    }
+    const access = __requireLessonOwner_(userId, null, { resourceLabel: 'lesson 一覧' });
+    if (access.error) return access.error;
 
     const lessons = __listLessonsForUser_(userId);
     // 軽量化: 一覧では heavy な snapshots / profileTransitions は除外。
@@ -554,15 +545,8 @@ function listLessons(userId) {
  */
 function getKnownClassesForUser(userId) {
   try {
-    const email = getCurrentEmail();
-    if (!email) return createAuthError();
-    const callerUser = findUserByEmail(email, { requestingUser: email });
-    if (!callerUser) return createUserNotFoundError();
-
-    const isAdmin = isAdministrator(email);
-    if (!isAdmin && callerUser.userId !== userId) {
-      return createErrorResponse('他ユーザーの class 一覧にはアクセスできません');
-    }
+    const access = __requireLessonOwner_(userId, null, { resourceLabel: 'class 一覧' });
+    if (access.error) return access.error;
 
     const lessons = __listLessonsForUser_(userId); // createdAt 降順済
     const seen = new Set();

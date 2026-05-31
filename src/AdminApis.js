@@ -52,6 +52,18 @@ function assertManagedSpreadsheet_(spreadsheetId) {
 }
 
 
+// admin API の対象ユーザー解決: params.userId 指定があればそのユーザー、無ければ
+//   呼び出し元 (gcloud user) の userId に自動解決。見つからなければ null。
+//   connectForm / createForm など「対象ユーザー特定」を 1 箇所に統一。
+function resolveTargetUser_(params) {
+  const targetUserId = (typeof params.userId === 'string' && params.userId) ? params.userId : null;
+  if (targetUserId) {
+    return findUserById(targetUserId, { requestingUser: getCurrentEmail() });
+  }
+  const email = getCurrentEmail();
+  return email ? findUserByEmail(email, { requestingUser: email }) : null;
+}
+
 function getAdminUsers() {
   try {
     const auth = requireAdmin();
@@ -139,14 +151,11 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
   }
   // v2855+: collaborator (ボード SS の editor) は unpublish (緊急停止) のみ許可。
   //   publish 再開や toggle は owner / admin のみ — 「閉じる方向」 だけ collaborator OK。
-  let isCollaborator = false;
   if (!isAdmin && !isOwnBoard) {
     const isUnpublishingOnly = (newState === false)
       && typeof isBoardCollaborator === 'function'
       && isBoardCollaborator(targetUser, email);
-    if (isUnpublishingOnly) {
-      isCollaborator = true;
-    } else {
+    if (!isUnpublishingOnly) {
       return createErrorResponse('ボードの公開状態を変更する権限がありません');
     }
   }
@@ -1019,14 +1028,7 @@ function dispatchAdminOperation(operation, params) {
       // と同じパイプライン（spreadsheet 自動作成・回答シート検出も含む）。
       // userId 省略時は requester (gcloud user) の userId に自動解決。
       { const e = reqStr('formUrl'); if (e) return e; }
-      const targetUserId = (typeof params.userId === 'string' && params.userId) ? params.userId : null;
-      let user = null;
-      if (targetUserId) {
-        user = findUserById(targetUserId, { requestingUser: getCurrentEmail() });
-      } else {
-        const email = getCurrentEmail();
-        user = email ? findUserByEmail(email, { requestingUser: email }) : null;
-      }
+      const user = resolveTargetUser_(params);
       if (!user) return createErrorResponse('User not found');
 
       const procResult = processFormUrlInput(params.formUrl);
@@ -1085,14 +1087,7 @@ function dispatchAdminOperation(operation, params) {
       // templateType: 'board' | 'numberline' | 'matrix' | 'pie' (default: 'board')
       const templateType = ['board', 'numberline', 'matrix', 'pie'].includes(params.templateType)
         ? params.templateType : 'board';
-      const targetUserId = (typeof params.userId === 'string' && params.userId) ? params.userId : null;
-      let user = null;
-      if (targetUserId) {
-        user = findUserById(targetUserId, { requestingUser: getCurrentEmail() });
-      } else {
-        const email = getCurrentEmail();
-        user = email ? findUserByEmail(email, { requestingUser: email }) : null;
-      }
+      const user = resolveTargetUser_(params);
       if (!user) return createErrorResponse('User not found');
 
       const createResult = createTemplateForm(templateType, params.templateOptions || {});

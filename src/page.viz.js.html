@@ -172,6 +172,78 @@
   }
 
   // ---------------------------------------------------------------------
+  // dot 共通装飾 (matrix / numberline single source)
+  //
+  // Why 集約: リアクションリング (stroke の色/太さ/不透明/破線) と数バッジは
+  //   かつて両レンダラに同一コードがコピペされており、片方だけ編集すると
+  //   v2861 の CVD 冗長符号化が drift する保守ハザードがあった。1 箇所に集約。
+  // ---------------------------------------------------------------------
+
+  // リアクションリング (stroke 装飾) を d3 selection に適用し、chain 継続のため
+  //   selection を返す。 .on() ハンドラはレンダラ毎に異なる (selfL / self + sameCoordOf)
+  //   ため呼び出し側に残す。
+  //   priority: HIGHLIGHT (教師注目, 金縁・実線・太め) > REACTION (児童間人気, 種別色 + 破線)。
+  //   細く・淡く (2.0px / opacity 0.85): 主役は「位置 = 立場」、リング (人気) は脇役。
+  //     太い枠線は「多数派 = 正解」の暗黙シグナル化リスク (道徳教育 / DCE レビュー 2026-05-14)。
+  //   注: SVG presentation attribute (attr) は外部 CSS (.viz-dot{stroke}) に specificity で
+  //     負けるため、必ずインライン style で適用する。
+  function applyReactionRingStyles(selection) {
+    return selection
+      .style('stroke', (d) => {
+        if (d.data && d.data.highlight) return '#fbbf24'; // amber-400 (gold)
+        const t = topReactionType(d.data);
+        return t ? REACTION_COLORS[t] : null;
+      })
+      .style('stroke-width', (d) => {
+        if (d.data && d.data.highlight) return 3.0;
+        return topReactionType(d.data) ? 2.0 : null;
+      })
+      .style('stroke-opacity', (d) => {
+        if (d.data && d.data.highlight) return 1.0;
+        return topReactionType(d.data) ? 0.85 : null;
+      })
+      // CVD 冗長符号化: 種別ごとに破線パターンを変える（色 + 形）。 highlight は実線。
+      .style('stroke-dasharray', (d) => {
+        if (d.data && d.data.highlight) return null;
+        return reactionDash(topReactionType(d.data));
+      });
+  }
+
+  // dot 中央のリアクション数バッジ。 AdminPanel 設定「リアクション数を表示」
+  //   (state.showCounts) を尊重。 非表示でも stroke リングは残るので「人気の有無」は分かる。
+  function renderDotLabels(g, nodes, state) {
+    const showCounts = !!(state && state.showCounts);
+    const reactedNodes = showCounts ? nodes.filter((n) => totalReactions(n.data) > 0) : [];
+    const labelJoin = g.selectAll('.viz-dot-label').data(reactedNodes, (d) => 'l_' + d.data.rowIndex);
+    labelJoin.exit().remove();
+    labelJoin.enter().append('text')
+      .attr('class', 'viz-dot-label')
+      .attr('text-anchor', 'middle')
+      .attr('pointer-events', 'none')
+      .merge(labelJoin)
+      .attr('x', (d) => d.x)
+      .attr('y', (d) => d.y + 3.5)
+      .text((d) => totalReactions(d.data));
+  }
+
+  // 行を snapshot (before/after 比較・timeline 再生) 用の正規化 shape に変換。
+  //   vizCaptureBefore と snapshots map で同一コピペだったのを single source 化。
+  //   snapshot に field を足すとき片側を直し忘れる drift を防ぐ。
+  function snapshotRowShape(r) {
+    return {
+      rowIndex: r.rowIndex,
+      emailHash: r.emailHash || null,
+      class: r.class || '',
+      name: r.name || '',
+      answer: r.answer || '',
+      reason: r.reason || '',
+      numericX: typeof r.numericX === 'number' ? r.numericX : null,
+      numericY: typeof r.numericY === 'number' ? r.numericY : null,
+      timestamp: r.timestamp || null
+    };
+  }
+
+  // ---------------------------------------------------------------------
   // 行リストポップアップ (pie のカテゴリ / wordcloud の単語 → 該当行群へリアクション)
   //
   // Why: pie のスライスや wordcloud のバーは「集計表現」なので、その背後にある
@@ -855,41 +927,15 @@
       const dotEnter = dotJoin.enter().append('circle')
         .attr('class', 'viz-dot current enter');
       const selfL = this;
-      dotEnter.merge(dotJoin)
-        .attr('cx', (d) => d.x)
-        .attr('cy', (d) => d.y)
-        .attr('r', (d) => radiusFor(d))
-        .classed('swing-high', (d) => radiusFor(d) > BASE_R + 3)
-        .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
-        // SVG presentation attribute (attr) は外部 CSS より specificity が低いため、
-        //   .viz-dot { stroke: #0f172a } に上書きされて画面には出ない。
-        //   インライン style (style) なら specificity 1000 相当で確実に勝てる。
-        //
-        //   priority: HIGHLIGHT (教師注目) > REACTION (児童間人気) > none
-        //   教師が意図的に「みんな見て」した意見は金縁でリアクションリングより目立たせる。
-        //   DCE: 教師の促しは同調圧力ではなく多面的視点の提示なので、強調 OK。
-        .style('stroke', (d) => {
-          if (d.data && d.data.highlight) return '#fbbf24'; // tailwind amber-400 (gold)
-          const t = topReactionType(d.data);
-          return t ? REACTION_COLORS[t] : null;
-        })
-        // 細く・淡く: 位置情報 (=立場) を主役のままに、リング (=人気) を脇役にする
-        //   2026-05-14 道徳教育 / DCE 観点でレビュー: 太い枠線は「多数派 = 正解」の
-        //   暗黙シグナル化リスクがある。細く淡くすれば視認可能性は保ちつつ威圧感を下げる。
-        //   ただし HIGHLIGHT (教師注目) は意図的に目立たせる: width 3 + opacity 1.0。
-        .style('stroke-width', (d) => {
-          if (d.data && d.data.highlight) return 3.0;
-          return topReactionType(d.data) ? 2.0 : null;
-        })
-        .style('stroke-opacity', (d) => {
-          if (d.data && d.data.highlight) return 1.0;
-          return topReactionType(d.data) ? 0.85 : null;
-        })
-        // CVD 冗長符号化: 種別ごとに破線パターンを変える（色 + 形）。 highlight は実線。
-        .style('stroke-dasharray', (d) => {
-          if (d.data && d.data.highlight) return null;
-          return reactionDash(topReactionType(d.data));
-        })
+      // リアクションリング (stroke 装飾) は applyReactionRingStyles に集約 (matrix と共通)。
+      applyReactionRingStyles(
+        dotEnter.merge(dotJoin)
+          .attr('cx', (d) => d.x)
+          .attr('cy', (d) => d.y)
+          .attr('r', (d) => radiusFor(d))
+          .classed('swing-high', (d) => radiusFor(d) > BASE_R + 3)
+          .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
+      )
         .on('mouseenter', (event, d) => showTooltip(event, d.data, selfL))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, selfL))
         .on('mouseleave', () => hideTooltip())
@@ -902,21 +948,8 @@
           }
         });
 
-      // dot 中央のリアクション数バッジ (v2782 で showCounts ガードを追加して matrix と挙動を統一)。
-      //   AdminPanel 設定「リアクション数を表示」(state.showCounts) を尊重する。
-      //   非表示設定でも stroke 色 (リング) は残るので「人気の有無」は分かる。
-      const showCounts = !!(this.state && this.state.showCounts);
-      const reactedNodes = showCounts ? nodes.filter((n) => totalReactions(n.data) > 0) : [];
-      const labelJoin = g.selectAll('.viz-dot-label').data(reactedNodes, (d) => 'l_' + d.data.rowIndex);
-      labelJoin.exit().remove();
-      labelJoin.enter().append('text')
-        .attr('class', 'viz-dot-label')
-        .attr('text-anchor', 'middle')
-        .attr('pointer-events', 'none')
-        .merge(labelJoin)
-        .attr('x', (d) => d.x)
-        .attr('y', (d) => d.y + 3.5)
-        .text((d) => totalReactions(d.data));
+      // dot 中央のリアクション数バッジ (matrix と共通の renderDotLabels に集約)。
+      renderDotLabels(g, nodes, this.state);
 
       // 統計 + 教師パネル
       updateStatsPills(this, current.length);
@@ -1274,42 +1307,17 @@
       const dotEnter = dotJoin.enter().append('circle')
         .attr('class', 'viz-dot current enter');
       const self = this;
-      dotEnter.merge(dotJoin)
-        .attr('cx', (d) => d.x)
-        .attr('cy', (d) => d.y)
-        .attr('r', (d) => radiusForMatrix(d))
-        .classed('swing-high', (d) => radiusForMatrix(d) > BASE_R_M + 3)
-        .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
-        .classed('lone-voice', (d) => isLoneVoice(d))
-        // リアクション可視化: 最頻 type の色で stroke を上書き (反応 0 なら CSS 既定)
-        //   細く・淡く (2.0px / opacity 0.85): 散布図の主役は「位置 = 立場」。
-        //   リング (人気) はあくまで補助情報なので、教師がチラ見できる強度に抑える。
-        //   道徳教育 / DCE レビュー (2026-05-14) で「多数派 = 正解」シグナルの過剰化を避ける調整。
-        //
-        //   priority: HIGHLIGHT (教師注目) > REACTION (児童間人気) > LONE-VOICE (少数派) > none
-        //   教師の意図的な「注目」は同調圧力ではないので 3.0px / 不透明で強調 OK。
-        //   lone-voice は CSS で drop-shadow を付け、stroke は触らない（reaction ring と共存）
-        //
-        //   重要: SVG の `.attr()` は presentation attribute (specificity 0) で
-        //   外部 CSS (.viz-dot { stroke: #0f172a }) に負ける。インライン style なら勝てる。
-        .style('stroke', (d) => {
-          if (d.data && d.data.highlight) return '#fbbf24'; // amber-400 (gold)
-          const t = topReactionType(d.data);
-          return t ? REACTION_COLORS[t] : null;
-        })
-        .style('stroke-width', (d) => {
-          if (d.data && d.data.highlight) return 3.0;
-          return topReactionType(d.data) ? 2.0 : null;
-        })
-        .style('stroke-opacity', (d) => {
-          if (d.data && d.data.highlight) return 1.0;
-          return topReactionType(d.data) ? 0.85 : null;
-        })
-        // CVD 冗長符号化: 種別ごとに破線パターンを変える（色 + 形）。 highlight は実線。
-        .style('stroke-dasharray', (d) => {
-          if (d.data && d.data.highlight) return null;
-          return reactionDash(topReactionType(d.data));
-        })
+      // リアクションリング (stroke 装飾) は applyReactionRingStyles に集約 (numberline と共通)。
+      //   lone-voice (少数派) は CSS の drop-shadow で表現し stroke は触らない (reaction ring と共存)。
+      applyReactionRingStyles(
+        dotEnter.merge(dotJoin)
+          .attr('cx', (d) => d.x)
+          .attr('cy', (d) => d.y)
+          .attr('r', (d) => radiusForMatrix(d))
+          .classed('swing-high', (d) => radiusForMatrix(d) > BASE_R_M + 3)
+          .classed('highlight', (d) => Boolean(d.data && d.data.highlight))
+          .classed('lone-voice', (d) => isLoneVoice(d))
+      )
         .on('mouseenter', (event, d) => showTooltip(event, d.data, self, sameCoordOf(d.data)))
         .on('mousemove',  (event, d) => showTooltip(event, d.data, self, sameCoordOf(d.data)))
         .on('mouseleave', () => hideTooltip())
@@ -1373,21 +1381,8 @@
         }
       }
 
-      // dot 中央のリアクション数バッジ。
-      //   AdminPanel 設定「リアクション数を表示」(state.showCounts) を尊重。
-      //   非表示設定でも stroke 色 (リング) は出るので「人気の有無」は分かる。
-      const showCounts = !!(this.state && this.state.showCounts);
-      const reactedNodes = showCounts ? nodes.filter((n) => totalReactions(n.data) > 0) : [];
-      const labelJoin = g.selectAll('.viz-dot-label').data(reactedNodes, (d) => 'l_' + d.data.rowIndex);
-      labelJoin.exit().remove();
-      labelJoin.enter().append('text')
-        .attr('class', 'viz-dot-label')
-        .attr('text-anchor', 'middle')
-        .attr('pointer-events', 'none')
-        .merge(labelJoin)
-        .attr('x', (d) => d.x)
-        .attr('y', (d) => d.y + 3.5)
-        .text((d) => totalReactions(d.data));
+      // dot 中央のリアクション数バッジ (numberline と共通の renderDotLabels に集約)。
+      renderDotLabels(g, nodes, this.state);
 
       updateStatsPills(this, current.length);
       maybeRenderTeacherPanel(this, swings, rows, 'matrix');
@@ -2405,17 +2400,7 @@
         latestTimestamp: d.ms,
         boardMode: boardMode || 'board',
         axisConfig: axisConfig || null,
-        addedRow: {
-          rowIndex: r.rowIndex,
-          emailHash: r.emailHash || null,
-          class: r.class || '',
-          name: r.name || '',
-          answer: r.answer || '',
-          reason: r.reason || '',
-          numericX: typeof r.numericX === 'number' ? r.numericX : null,
-          numericY: typeof r.numericY === 'number' ? r.numericY : null,
-          timestamp: r.timestamp || null
-        }
+        addedRow: snapshotRowShape(r)
       };
     });
 
@@ -2567,17 +2552,7 @@
    * 議論前は「現在の全体状態」を anchor として残す full snapshot (delta ではない)。
    */
   StudyQuestApp.prototype.vizCaptureBefore = function () {
-    const rows = (this.state.currentAnswers || []).map(r => ({
-      rowIndex: r.rowIndex,
-      emailHash: r.emailHash || null,
-      class: r.class || '',
-      name: r.name || '',
-      answer: r.answer || '',
-      reason: r.reason || '',
-      numericX: typeof r.numericX === 'number' ? r.numericX : null,
-      numericY: typeof r.numericY === 'number' ? r.numericY : null,
-      timestamp: r.timestamp || null
-    }));
+    const rows = (this.state.currentAnswers || []).map(r => snapshotRowShape(r));
     const snap = {
       capturedAt: Date.now(),
       boardMode: this.state.boardMode || 'board',

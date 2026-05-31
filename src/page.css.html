@@ -253,24 +253,7 @@ body:not(.admin-mode) .admin-mode-only {
  * Page-specific Component Styles
  * ============================================================================= */
 
-/* Game button overrides - enhanced tactile feedback */
-.game-btn {
-  border-bottom-width: 4px;
-  text-shadow: 1px 1px 2px rgba(0,0,0,0.4);
-}
-.game-btn:not(:disabled):hover {
-  transform: translate3d(0, -2px, 0); 
-  box-shadow: 0 8px 16px rgba(0,0,0,0.3);
-}
-.game-btn:active:not(:disabled) { 
-  transform: translate3d(0, 2px, 0); 
-  border-bottom-width: 2px; 
-}
-.game-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-#classFilter, #sortOrder { 
+#classFilter, #sortOrder {
   background-color: var(--status-info); 
   border: var(--border-primary); 
   color: var(--theme-text-primary); 
@@ -457,7 +440,6 @@ html, body {
 .admin-toggle:hover {
   background-color: color-mix(in srgb, var(--brand-accent-light) 10%, transparent);
 }
-/* Spinner definition moved to UnifiedStyles.css.html - use .spinner-medium for 40px spinner */
 
 /* Notification Banner Base and Animation Classes */
 .notification-banner-base {
@@ -497,11 +479,6 @@ html, body {
 
   .answer-card {
     margin-bottom: 1rem;
-  }
-
-  .game-btn {
-    padding: 0.75rem 1rem;
-    font-size: 0.875rem;
   }
 
   header {

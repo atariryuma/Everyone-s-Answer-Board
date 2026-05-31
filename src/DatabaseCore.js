@@ -1148,6 +1148,22 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
     }
   }
 
+  // setValue(s) 共通の RAW PUT。 resource (range or sheetName) / values / label のみ可変。
+  //   getRange().setValue/setValues と getDataRange().setValues の 3 箇所で共有。
+  const putValuesViaApi = (resource, values, label) => {
+    const auth = resolveAuth();
+    return fetchSheetsAPIWithRetry(
+      `${baseUrl}/values/${resource}?valueInputOption=RAW`,
+      {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
+        payload: JSON.stringify({ values })
+      },
+      label,
+      auth.saEmail, resolveAuth
+    );
+  };
+
   return {
     getName: () => sheetName,
     getSheetId: () => additionalInfo.sheetId || 0,
@@ -1183,18 +1199,7 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
         },
         setValue: (value) => {
           try {
-            const auth = resolveAuth();
-            const payload = { values: [[value]] };
-            return fetchSheetsAPIWithRetry(
-              `${baseUrl}/values/${range}?valueInputOption=RAW`,
-              {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
-                payload: JSON.stringify(payload)
-              },
-              `setValue(${range})`,
-              auth.saEmail, resolveAuth
-            );
+            return putValuesViaApi(range, [[value]], `setValue(${range})`);
           } catch (error) {
             console.warn('setValue via API failed after retries:', error.message);
             throw error;
@@ -1202,18 +1207,7 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
         },
         setValues: (values) => {
           try {
-            const auth = resolveAuth();
-            const payload = { values };
-            return fetchSheetsAPIWithRetry(
-              `${baseUrl}/values/${range}?valueInputOption=RAW`,
-              {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
-                payload: JSON.stringify(payload)
-              },
-              `setValues(${range})`,
-              auth.saEmail, resolveAuth
-            );
+            return putValuesViaApi(range, values, `setValues(${range})`);
           } catch (error) {
             console.warn('setValues via API failed after retries:', error.message);
             throw error;
@@ -1241,18 +1235,7 @@ function createServiceAccountSheetProxy(sheetId, sheetName, accessToken, additio
         },
         setValues: (values) => {
           try {
-            const auth = resolveAuth();
-            const payload = { values };
-            return fetchSheetsAPIWithRetry(
-              `${baseUrl}/values/${sheetName}?valueInputOption=RAW`,
-              {
-                method: 'PUT',
-                headers: { 'Authorization': `Bearer ${auth.token}`, 'Content-Type': 'application/json' },
-                payload: JSON.stringify(payload)
-              },
-              `getDataRange.setValues(${sheetName})`,
-              auth.saEmail, resolveAuth
-            );
+            return putValuesViaApi(sheetName, values, `getDataRange.setValues(${sheetName})`);
           } catch (error) {
             console.warn('getDataRange setValues via API failed after retries:', error.message);
             throw error;

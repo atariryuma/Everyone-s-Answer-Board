@@ -317,8 +317,7 @@
     if (!hasSeenWelcome && window.sharedModals) {
       window.sharedModals.showWelcome({
         onStart: () => {
-          // モーダルを閉じて通常フローへ
-          console.log('Welcome modal: user started');
+          // モーダルを閉じて通常フローへ (sharedModals 側で自動クローズ)
         },
         onManual: () => {
           // マニュアルを開く
@@ -2751,23 +2750,7 @@
 
       if (!silent) window.setLoading(true, '設定を保存中...');
 
-      if (!config.formUrl && config.spreadsheetId && config.sheetName) {
-        runServer('getFormInfo', config.spreadsheetId, config.sheetName).then((formResult) => {
-          if (formResult && formResult.success && formResult.formData && formResult.formData.formUrl) {
-            config.formUrl = formResult.formData.formUrl;
-            config.formTitle = formResult.formData.formTitle;
-            systemState.config = { ...systemState.config, ...config };
-            updateResourceButtons(systemState.config);
-            try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
-          }
-          executeDraftSave(config);
-        }, (error) => {
-          console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
-          executeDraftSave(config);
-        });
-      } else {
-        executeDraftSave(config);
-      }
+      resolveFormUrlThen(config, executeDraftSave);
 
     } catch (error) {
       console.error('下書き保存準備エラー:', error);
@@ -2798,6 +2781,29 @@
     }
   }
 
+  // formUrl 未設定だが spreadsheetId/sheetName がある場合、 getFormInfo で formUrl/formTitle を
+  //   自動解決してから next(config) を実行。 解決不要 / 失敗時もそのまま next に進む (best-effort)。
+  //   saveDraft (下書き保存) と publishApp (公開) で共通の前処理だったのを集約。
+  function resolveFormUrlThen(config, next) {
+    if (!config.formUrl && config.spreadsheetId && config.sheetName) {
+      runServer('getFormInfo', config.spreadsheetId, config.sheetName).then((formResult) => {
+        if (formResult && formResult.success && formResult.formData && formResult.formData.formUrl) {
+          config.formUrl = formResult.formData.formUrl;
+          config.formTitle = formResult.formData.formTitle;
+          systemState.config = { ...systemState.config, ...config };
+          updateResourceButtons(systemState.config);
+          try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
+        }
+        next(config);
+      }, (error) => {
+        console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
+        next(config);
+      });
+    } else {
+      next(config);
+    }
+  }
+
   function publishApp() {
     if (!ClientMutex.acquire('publishApp')) {
       showInfo('公開処理を実行中です…');
@@ -2824,23 +2830,7 @@
 
       window.setLoading(true, '回答ボードを公開中...');
 
-      if (!config.formUrl && config.spreadsheetId && config.sheetName) {
-        runServer('getFormInfo', config.spreadsheetId, config.sheetName).then((formResult) => {
-          if (formResult && formResult.success && formResult.formData && formResult.formData.formUrl) {
-            config.formUrl = formResult.formData.formUrl;
-            config.formTitle = formResult.formData.formTitle;
-            systemState.config = { ...systemState.config, ...config };
-            updateResourceButtons(systemState.config);
-            try { autofillAxisLabelsFromFormInfo(formResult.formData); } catch (_) {}
-          }
-          executePublish(config);
-        }, (error) => {
-          console.warn('⚠️ フォーム自動検出エラー（安全に継続）:', error.message);
-          executePublish(config);
-        });
-      } else {
-        executePublish(config);
-      }
+      resolveFormUrlThen(config, executePublish);
 
     } catch (error) {
       console.error('公開準備エラー:', error);
@@ -3579,22 +3569,6 @@
     }
   }
 
-  function formatDate(dateString) {
-    if (!dateString) return '--';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-    } catch (e) {
-      return '--';
-    }
-  }
-
   function copyViewUrl(url) {
     if (!url) {
       showError('コピーするURLがありません');
@@ -3857,7 +3831,10 @@
       });
     }
 
-    function openLessonWizard(lessonId, preloaded) {
+    // lesson を読込 (preloaded があればそれ、無ければ gasRun('lesson.review'))、 成功時に
+    //   onLoaded(lesson) を実行。 setLoading / 成功チェック / etag セット / load 失敗の
+    //   error handling を集約。 openLessonWizard (CREATE) / openLessonRunner (RUN) で共通。
+    function loadLessonThen(lessonId, preloaded, onLoaded) {
       currentLessonId = lessonId;
       if (!preloaded) window.setLoading(true, 'レッスンを読込中...');
       const loader = preloaded
@@ -3870,11 +3847,20 @@
           return;
         }
         currentLessonEtag = res.data.lesson.etag;
+        onLoaded(res.data.lesson);
+      }).catch((err) => {
+        if (!preloaded) window.setLoading(false);
+        window.showError((err && err.message) || 'レッスン読み込み失敗');
+      });
+    }
+
+    function openLessonWizard(lessonId, preloaded) {
+      loadLessonThen(lessonId, preloaded, (lesson) => {
         document.body.classList.add('mode-create-lesson');
         document.body.classList.remove('mode-run-lesson');
         history.pushState({ lesson: lessonId, mode: 'create' }, '', '#lesson/' + lessonId);
         renderWizardStep(1);
-        hydrateWizardFromLesson(res.data.lesson);
+        hydrateWizardFromLesson(lesson);
       });
     }
 
@@ -4910,25 +4896,11 @@
 
     // ---------- Runner (実行中) ----------
     function openLessonRunner(lessonId, preloaded) {
-      currentLessonId = lessonId;
-      if (!preloaded) window.setLoading(true, 'レッスンを読込中...');
-      const loader = preloaded
-        ? Promise.resolve({ success: true, data: { lesson: preloaded } })
-        : gasRun('lesson.review', { userId, lessonId });
-      loader.then((res) => {
-        if (!preloaded) window.setLoading(false);
-        if (!res || !res.success) {
-          window.showError((res && res.message) || 'レッスン読み込み失敗');
-          return;
-        }
-        currentLessonEtag = res.data.lesson.etag;
+      loadLessonThen(lessonId, preloaded, (lesson) => {
         document.body.classList.remove('mode-create-lesson');
         document.body.classList.add('mode-run-lesson');
         history.pushState({ lesson: lessonId, mode: 'run' }, '', '#lesson/' + lessonId);
-        renderRunner(res.data.lesson);
-      }).catch((err) => {
-        if (!preloaded) window.setLoading(false);
-        window.showError((err && err.message) || 'レッスン読み込み失敗');
+        renderRunner(lesson);
       });
     }
 

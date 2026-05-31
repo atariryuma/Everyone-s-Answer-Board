@@ -1040,6 +1040,18 @@ function renameMyProfile(oldName, newName) {
  * server so the wire never sees the identity when identity is not permitted.
  * Admins and board owners always see everything (they can see raw sheet anyway).
  */
+// getUserSheetData 失敗時に viewer へ返す標準 empty-board response。
+//   getPublishedSheetData / *ForProfile の 3 箇所で同一だったのを集約。
+function buildSheetDataErrorResult_(result) {
+  return {
+    success: false,
+    error: result?.message || 'データ取得エラー',
+    data: [],
+    sheetName: result?.sheetName || '',
+    header: result?.header || '問題'
+  };
+}
+
 function buildSafePublishedDataResult(result, config, viewerContext = {}) {
   const displaySettings = (config && config.displaySettings) || DEFAULT_DISPLAY_SETTINGS;
   const includeIdentity = Boolean(
@@ -1331,15 +1343,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 
       const result = cacheableResult;
 
-      if (!result || !result.success) {
-        return {
-          success: false,
-          error: result?.message || 'データ取得エラー',
-          data: [],
-          sheetName: result?.sheetName || '',
-          header: result?.header || '問題'
-        };
-      }
+      if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
       return buildSafePublishedDataResult(result, targetUserConfig, {
         isAdmin: isSystemAdmin,
@@ -1378,15 +1382,7 @@ function getPublishedSheetData(classFilter, sortOrder, adminMode, targetUserId) 
 
     const result = getUserSheetData(user.userId, options, user, userConfig);
 
-    if (!result || !result.success) {
-      return {
-        success: false,
-        error: result?.message || 'データ取得エラー',
-        data: [],
-        sheetName: result?.sheetName || '',
-        header: result?.header || '問題',
-      };
-    }
+    if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
     return buildSafePublishedDataResult(result, userConfig, {
       isAdmin: isSystemAdmin,
@@ -1508,15 +1504,7 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
     };
 
     const result = getUserSheetData(targetUserId, options, targetUser, synthesized);
-    if (!result || !result.success) {
-      return {
-        success: false,
-        error: result?.message || 'データ取得エラー',
-        data: [],
-        sheetName: result?.sheetName || '',
-        header: result?.header || '問題'
-      };
-    }
+    if (!result || !result.success) return buildSheetDataErrorResult_(result);
 
     return buildSafePublishedDataResult(result, synthesized, {
       isAdmin: isSystemAdmin,
@@ -1897,16 +1885,20 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
     const currentHeadersNormalized = currentHeaders.map(h => String(h || '').toUpperCase().trim());
     const columnsToAdd = requiredColumns.filter(c => !currentHeadersNormalized.includes(c));
 
+    // 「追加不要 (全列存在)」の標準レスポンス。 pre-open short-circuit と lock 後 fresh recheck の
+    //   2 箇所で同一なので集約。
+    const alreadyCompleteResult = {
+      success: true,
+      columnsAdded: [],
+      totalColumns: requiredColumns.length,
+      alreadyExists: requiredColumns.length
+    };
+
     // Why short-circuit before open: getColumnAnalysis 開示時はすでに spreadsheet を 1 回開いている。
     //   columnsToAdd=0 (リアクション列が全て存在する典型ケース) なら、2 回目の open は無駄。
     //   429 リスクと ~200-500ms の往復を回避する。
     if (columnsToAdd.length === 0) {
-      return {
-        success: true,
-        columnsAdded: [],
-        totalColumns: requiredColumns.length,
-        alreadyExists: requiredColumns.length
-      };
+      return alreadyCompleteResult;
     }
 
     // Why ScriptLock: 2 つの concurrent getColumnAnalysis 呼び出しが同じ「missing」を見て
@@ -1947,12 +1939,7 @@ function setupReactionAndHighlightColumns(spreadsheetId, sheetName, currentHeade
     const freshNormalized = freshHeaders.map(h => String(h || '').toUpperCase().trim());
     const reallyMissing = columnsToAdd.filter(c => !freshNormalized.includes(c));
     if (reallyMissing.length === 0) {
-      return {
-        success: true,
-        columnsAdded: [],
-        totalColumns: requiredColumns.length,
-        alreadyExists: requiredColumns.length
-      };
+      return alreadyCompleteResult;
     }
 
     const columnsAdded = [];

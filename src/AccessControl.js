@@ -31,7 +31,7 @@
  *   - owner / admin 判定は呼び出し側で先に行うこと (Drive API 呼び出し回避)
  */
 
-/* global UrlFetchApp, CacheService, pickServiceAccount_, getServiceAccountAccessToken_, getUserConfig, logError_ */
+/* global pickServiceAccount_, getServiceAccountAccessToken_, getUserConfig, logError_ */
 
 const COLLABORATOR_CACHE_TTL_OK_SEC = 120;
 const COLLABORATOR_CACHE_TTL_NO_SEC = 600;

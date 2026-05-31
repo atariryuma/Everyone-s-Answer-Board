@@ -327,7 +327,7 @@
     /* =============================================================================
      * Animation & Transform System - Standardized Values
      * ============================================================================= */
-    --transition-fast: 0.1s;                       /* instant tactile (game-btn active 等) */
+    --transition-fast: 0.1s;                       /* instant tactile (button active 等) */
     --transition-quick: var(--animation-fast);     /* 0.15s — animation-fast と統一 (hover/micro) */
     --transition-normal: 0.2s;                     /* 標準 (button hover, card lift) */
     --transition-slow: 0.3s;                       /* modal / page transition */
@@ -696,28 +696,6 @@
     padding: var(--btn-padding);
     min-height: var(--btn-min-height);
     min-width: var(--btn-min-width);
-  }
-
-  /* Game-Style Buttons (from Page.html) */
-  .game-btn {
-    background: var(--brand-primary);
-    color: white;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    box-shadow: 0 4px 0 var(--theme-overlay-black-20);
-    transition: all var(--transition-fast) ease;
-    border: 2px solid transparent;
-  }
-
-  .game-btn:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 5px 0 var(--theme-overlay-black-20);
-  }
-
-  .game-btn:active {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 var(--theme-overlay-black-20);
   }
 
   /* CTA Button with Shimmer Effect */

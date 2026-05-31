@@ -207,18 +207,7 @@
       this.state.currentAnswers = [];
       this.dismissNewContentBanner();
 
-      const container = this.elements.answersContainer;
-      if (container) {
-        const existingCards = container.querySelectorAll('.answer-card');
-        if (existingCards.length > 0) {
-          existingCards.forEach(card => {
-            if (this.visibilityObserver) {
-              this.visibilityObserver.unobserve(card);
-            }
-          });
-          container.innerHTML = '';
-        }
-      }
+      this._clearAnswerCards();
     }
 
     async executeWithRetry(operation, options = {}) {
@@ -1757,25 +1746,28 @@
       this.manageEmptyState('show');
     }
 
-    async clearAllCardsForEmptyData() {
-      const isFirstTime = this.isFirstTimeBoardAccess();
+    // answersContainer の全 .answer-card を visibilityObserver から解除して DOM から除去。
+    //   board reset と空データ clear の共通処理。 除去した cards があれば true。
+    _clearAnswerCards() {
+      const container = this.elements.answersContainer;
+      if (!container) return false;
+      const existingCards = container.querySelectorAll('.answer-card');
+      if (existingCards.length === 0) return false;
+      existingCards.forEach(card => {
+        if (this.visibilityObserver) {
+          this.visibilityObserver.unobserve(card);
+        }
+      });
+      container.innerHTML = '';
+      return true;
+    }
 
+    async clearAllCardsForEmptyData() {
       this.state.currentAnswers = [];
 
-      const container = this.elements.answersContainer;
-      if (container) {
-        const existingCards = container.querySelectorAll('.answer-card');
-
-        if (existingCards.length > 0) {
-
-          existingCards.forEach(card => {
-            if (this.visibilityObserver) {
-              this.visibilityObserver.unobserve(card);
-            }
-          });
-          container.innerHTML = '';
-          await new Promise(resolve => requestAnimationFrame(resolve));
-        }
+      if (this._clearAnswerCards()) {
+        // 空データ描画前に 1 frame 待って DOM クリアを確実に反映。
+        await new Promise(resolve => requestAnimationFrame(resolve));
       }
     }
 
@@ -3575,23 +3567,7 @@
 
       if (immediate) {
         try {
-          const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
-          if (card && card instanceof HTMLElement) {
-            this.updateCardReactions(card, item);
-            this.applyReactionStyles(card, item);
-          } else {
-          }
-
-          if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-            // updateModalReactionButtons 内で rowIndex 一致チェックするので不一致なら no-op。
-            const modalRowIndex = this.elements.modalReactionContainer
-              .querySelector('[data-row-index]')?.dataset.rowIndex;
-            if (modalRowIndex == item.rowIndex) {
-              this.updateModalReactionButtons(item);
-              this.applyReactionStyles(this.elements.answerModalCard, item);
-            }
-          }
-
+          this._applyReactionUIUpdate(item);
         } catch (error) {
           console.error('❌ UI即座更新エラー:', error);
         }
@@ -3601,22 +3577,7 @@
       return new Promise(resolve => {
         requestAnimationFrame(() => {
           try {
-            const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
-            if (card && card instanceof HTMLElement) {
-              this.updateCardReactions(card, item);
-              this.applyReactionStyles(card, item);
-            } else {
-            }
-
-            if (!this.elements.answerModalContainer.classList.contains('hidden')) {
-              const modalRowIndex = this.elements.modalReactionContainer
-                .querySelector('[data-row-index]')?.dataset.rowIndex;
-              if (modalRowIndex == item.rowIndex) {
-                this.updateModalReactionButtons(item);
-                this.applyReactionStyles(this.elements.answerModalCard, item);
-              }
-            }
-
+            this._applyReactionUIUpdate(item);
             resolve();
           } catch (error) {
             console.error('UI更新エラー:', error);
@@ -3624,6 +3585,25 @@
           }
         });
       });
+    }
+
+    // card + (開いていれば) modal のリアクション表示を item で更新。
+    //   immediate path と requestAnimationFrame path で同一だったロジックを集約。
+    _applyReactionUIUpdate(item) {
+      const card = document.querySelector(`[data-row-index="${item.rowIndex}"]`);
+      if (card && card instanceof HTMLElement) {
+        this.updateCardReactions(card, item);
+        this.applyReactionStyles(card, item);
+      }
+      if (!this.elements.answerModalContainer.classList.contains('hidden')) {
+        // updateModalReactionButtons 内で rowIndex 一致チェックするので不一致なら no-op。
+        const modalRowIndex = this.elements.modalReactionContainer
+          .querySelector('[data-row-index]')?.dataset.rowIndex;
+        if (modalRowIndex == item.rowIndex) {
+          this.updateModalReactionButtons(item);
+          this.applyReactionStyles(this.elements.answerModalCard, item);
+        }
+      }
     }
 
     getScopedKey(base) {
@@ -4833,8 +4813,7 @@
         body.low-performance .answer-card.new-card {
           animation: none;
         }
-        body.low-performance .reaction-btn:hover,
-        body.low-performance .game-btn:hover {
+        body.low-performance .reaction-btn:hover {
           transform: none;
         }
         body.low-performance * {

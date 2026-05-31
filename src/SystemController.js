@@ -1305,6 +1305,19 @@ function __buildFormInfoResult_(access, spreadsheetId, sheetName) {
 // ─── Performance metrics ─────────────────────────────────────────
 // API 実行時間 / キャッシュ効率 / エラー率 / バッチ処理 / メモリの軽量モニタ。
 
+// perf API (getPerformanceMetrics / diagnosePerformance) 用の admin 権限ゲート。
+//   権限が無ければ timestamp 付き error response を返す (caller は早期 return)、 あれば null。
+function __requirePerfAdmin_() {
+  // admin 判定は canonical な requireAdmin() を再利用。 失敗時のみ perf API 用の
+  //   timestamp 付き error response を返す (createAdminRequiredError とは別 shape)。
+  if (requireAdmin()) return null;
+  return {
+    success: false,
+    error: 'Administrator権限が必要です',
+    timestamp: new Date().toISOString()
+  };
+}
+
 /**
  * パフォーマンスメトリクスを収集・分析する
  * @param {string} category - メトリクスカテゴリ ('api', 'cache', 'batch', 'error')
@@ -1314,15 +1327,8 @@ function __buildFormInfoResult_(access, spreadsheetId, sheetName) {
 function getPerformanceMetrics(category = 'all', options = {}) {
   try {
     const startTime = Date.now();
-    const currentEmail = getCurrentEmail();
-
-    if (!currentEmail || !isAdministrator(currentEmail)) {
-      return {
-        success: false,
-        error: 'Administrator権限が必要です',
-        timestamp: new Date().toISOString()
-      };
-    }
+    const authError = __requirePerfAdmin_();
+    if (authError) return authError;
 
     const metrics = {
       timestamp: new Date().toISOString(),
@@ -1599,15 +1605,8 @@ function collectErrorMetrics(options = {}) {
  */
 function diagnosePerformance(options = {}) {
   try {
-    const currentEmail = getCurrentEmail();
-
-    if (!currentEmail || !isAdministrator(currentEmail)) {
-      return {
-        success: false,
-        error: 'Administrator権限が必要です',
-        timestamp: new Date().toISOString()
-      };
-    }
+    const authError = __requirePerfAdmin_();
+    if (authError) return authError;
 
     const metricsResult = getPerformanceMetrics('all', options);
     if (!metricsResult.success) {
