@@ -1235,6 +1235,36 @@ function bumpBoardDataVersion_(userId) {
   } catch (_) { /* ignore */ }
 }
 
+/**
+ * publish 状態遷移時の board 関連 cache を一括無効化する (v2865 DRY)。
+ *   publishApp と __applyPublishStateChange の 2 経路が共有する mechanism。
+ *   「いつ呼ぶか」(状態変化時のみ / publish 時のみ 等) は呼び出し側の policy で、 ここは
+ *   「何を無効化するか」だけを持つ:
+ *     - primary spreadsheetId + 各 profile.spreadsheetId の sa_validation cache
+ *     - userId 単位の board data version (全 filter/sort/profile を一度に stale 化)
+ *   typeof guard は GAS multi-file 環境で別ファイルの helper が test 単独 load 時に未定義でも
+ *   落ちないため (既存 bumpBoardDataVersion_ 呼び出しと同じ方針)。
+ * @param {Object} config - 対象ボードの config (spreadsheetId / profiles を参照)
+ * @param {string} userId
+ */
+function invalidateBoardCaches_(config, userId) {
+  if (config && typeof invalidateSaValidationCache_ === 'function') {
+    if (config.spreadsheetId) {
+      try { invalidateSaValidationCache_(config.spreadsheetId); } catch (_) { /* ignore */ }
+    }
+    if (Array.isArray(config.profiles)) {
+      for (const p of config.profiles) {
+        if (p && p.spreadsheetId) {
+          try { invalidateSaValidationCache_(p.spreadsheetId); } catch (_) { /* ignore */ }
+        }
+      }
+    }
+  }
+  if (userId && typeof bumpBoardDataVersion_ === 'function') {
+    try { bumpBoardDataVersion_(userId); } catch (_) { /* ignore */ }
+  }
+}
+
 function boardDataCacheKey_(userId, options) {
   const ver = getBoardDataVersion_(userId);
   const filter = options.classFilter || '_';
@@ -1437,20 +1467,16 @@ function getPublishedSheetDataForProfile(targetUserId, profileName, classFilter,
     }
     const { email: viewerEmail, isAdmin: isSystemAdmin } = adminAuth;
 
-    const targetUser = findPublishedBoardOwner(targetUserId, viewerEmail, {
-      preloadedAuth: { email: viewerEmail, isAdmin: isSystemAdmin }
-    });
-    if (!targetUser) {
-      return { success: false, error: 'Target user not found', data: [] };
+    // getPublishedSheetData / getNotificationUpdate と同じ認可プリアンブルを共有 (DRY)。
+    const access = resolveViewerBoardAccess_(targetUserId, viewerEmail, isSystemAdmin);
+    if (!access.ok) {
+      return {
+        success: false,
+        error: access.reason === 'not_found' ? 'Target user not found' : 'このボードは未公開です',
+        data: []
+      };
     }
-
-    const targetConfig = getConfigOrDefault(targetUserId, targetUser);
-    const isOwnBoard = sameEmail_(targetUser.userEmail, viewerEmail);
-    const isPublished = Boolean(targetConfig.isPublished);
-
-    if (!isSystemAdmin && !isOwnBoard && !isPublished) {
-      return { success: false, error: 'このボードは未公開です', data: [] };
-    }
+    const { targetUser, config: targetConfig, isOwnBoard } = access;
 
     // history gate: students (非 owner / 非 admin) は profileHistory にある名前のみ閲覧可。
     //   owner/admin は profiles[] にあれば全部読めるようにする（preview 用途）。

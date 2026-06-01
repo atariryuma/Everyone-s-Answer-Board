@@ -230,25 +230,11 @@ function __applyPublishStateChange(targetUserId, newState, options = {}) {
     return createErrorResponse(`ボード状態の更新に失敗しました: ${saveResult.message || '詳細不明'}`);
   }
 
-  // 2 階層の cache を即時 stale 化:
-  //   1. sa_validation cache (60s TTL): 未公開ボードへの SA pool access を即 block
-  //   2. board data cache (12s TTL): viewer の polling が見ている stale data を即更新
-  // 状態が実際に変わったときのみ bump (toggle no-op で 100+ viewer の cache を捨てないため)。
-  if (wasPublished !== targetIsPublished) {
-    if (currentConfig.spreadsheetId) {
-      invalidateSaValidationCache_(currentConfig.spreadsheetId);
-    }
-    if (Array.isArray(currentConfig.profiles)) {
-      for (const p of currentConfig.profiles) {
-        if (p && p.spreadsheetId) invalidateSaValidationCache_(p.spreadsheetId);
-      }
-    }
-    // board data cache は userId 単位 (= ボード単位)。 全 profile / 全 filter / 全 sort が
-    // 1 度の bump で stale 化される。 typeof check は GAS multi-file env で同名関数が別ファイル
-    // (DataApis.js) にあり、 test 単独 load 時に未定義の場合を吸収する。
-    if (typeof bumpBoardDataVersion_ === 'function') {
-      try { bumpBoardDataVersion_(targetUser.userId); } catch (_) { /* ignore */ }
-    }
+  // 2 階層の cache を即時 stale 化 (sa_validation 60s + board data 12s)。 状態が実際に変わった
+  //   ときのみ (toggle no-op で 100+ viewer の cache を捨てないため)。 mechanism は publishApp と
+  //   共有の invalidateBoardCaches_ (DataApis.js)。 typeof guard は test 単独 load 吸収用。
+  if (wasPublished !== targetIsPublished && typeof invalidateBoardCaches_ === 'function') {
+    invalidateBoardCaches_(currentConfig, targetUser.userId);
   }
 
   const redirectUrl = getWebAppUrl() + '?mode=view&userId=' + targetUser.userId;

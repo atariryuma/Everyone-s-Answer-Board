@@ -745,44 +745,45 @@ function saveUserConfig(userId, config, options = {}) {
       };
     }
 
+    // user.configJson を 1 度だけ parse し、 etag 検証 + 後段の publish-state guard で共有する
+    //   (旧実装は同じ文字列を最大 2 回 parse していた)。 parse 失敗時は null = 検証スキップ。
+    let persistedConfig = null;
+    if (user.configJson) {
+      try {
+        persistedConfig = JSON.parse(user.configJson);
+      } catch (parseError) {
+        console.warn('saveUserConfig: persisted config parse failed:', parseError.message);
+      }
+    }
+
     if (config.etag) {
-      if (user.configJson) {
-        try {
-          const currentConfig = JSON.parse(user.configJson);
-          const currentETag = currentConfig.etag || user.lastModified;
+      if (persistedConfig) {
+        const currentETag = persistedConfig.etag || user.lastModified;
 
-          if (currentETag && config.etag !== currentETag) {
-            console.warn('saveUserConfig: ETag mismatch detected', {
-              userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
-              requestETag: config.etag,
-              currentETag
-            });
+        if (currentETag && config.etag !== currentETag) {
+          console.warn('saveUserConfig: ETag mismatch detected', {
+            userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
+            requestETag: config.etag,
+            currentETag
+          });
 
-            return {
-              success: false,
-              error: 'etag_mismatch',
-              message: 'Configuration has been modified by another user',
-              currentConfig
-            };
-          }
-        } catch (parseError) {
-          console.warn('saveUserConfig: Current config parse error for ETag validation:', parseError.message);
+          return {
+            success: false,
+            error: 'etag_mismatch',
+            message: 'Configuration has been modified by another user',
+            currentConfig: persistedConfig
+          };
         }
       }
-    } else if (user.configJson) {
+    } else if (persistedConfig && persistedConfig.etag) {
       // etag を渡さない save は楽観ロックをスキップする (last-write-wins)。 既存 config が
       // etag を持つのに etag 無しで上書きする = 別タブ/別 request の編集を黙って飲み込む
       // 可能性がある。 silent lost-update を観測可能にするため WARN を残す
       // (hard reject はしない: profile/lesson 等 etag を渡さない正当な内部 caller が多数あるため)。
-      try {
-        const currentConfig = JSON.parse(user.configJson);
-        if (currentConfig && currentConfig.etag) {
-          console.warn('saveUserConfig: etag-less overwrite of an etag-bearing config (optimistic lock skipped)', {
-            userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
-            currentETag: currentConfig.etag
-          });
-        }
-      } catch (_) { /* parse 失敗は etag 検証外の通常 save で扱う */ }
+      console.warn('saveUserConfig: etag-less overwrite of an etag-bearing config (optimistic lock skipped)', {
+        userId: userId && typeof userId === 'string' ? `${userId.substring(0, 8)}***` : 'N/A',
+        currentETag: persistedConfig.etag
+      });
     }
 
     const validation = options.isPublish
@@ -806,15 +807,9 @@ function saveUserConfig(userId, config, options = {}) {
     //   isUserBoardPublished が false 化して意図せぬ非公開バグになるため (data-loss 回避)。
     //   公開状態を変える正規経路は必ず options.__allowPublishStateWrite を付けて呼ぶ。
     if (!options.__allowPublishStateWrite) {
-      let persistedPublished;
-      let persistedPublishedAt;
-      if (user.configJson) {
-        try {
-          const persisted = JSON.parse(user.configJson);
-          persistedPublished = persisted.isPublished;
-          persistedPublishedAt = persisted.publishedAt;
-        } catch (_) { /* parse 失敗時は下の default (未公開) に委ねる */ }
-      }
+      // 冒頭で parse 済の persistedConfig を再利用 (parse 失敗 = null なら未公開既定)。
+      const persistedPublished = persistedConfig ? persistedConfig.isPublished : undefined;
+      const persistedPublishedAt = persistedConfig ? persistedConfig.publishedAt : undefined;
       cleanedConfig.isPublished = persistedPublished === true;
       cleanedConfig.publishedAt = (persistedPublished === true) ? (persistedPublishedAt || null) : null;
     }

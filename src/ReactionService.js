@@ -13,6 +13,13 @@
 const ROW_LOCK_TTL_SECONDS = 35;
 const ROW_LOCK_ACQUIRE_TIMEOUT_MS = 800;  // ScriptLock critical section の最大待機時間
 
+// email identity の正規化 (case-insensitive, trim)。 reaction の membership/removal/add/reacted
+//   判定と canonical 保存はすべてこの 1 関数を通すことで「同一投票者」の定義を一致させる
+//   (sameEmail_ と同じ規約 / M1)。 別 case の綴りが混入しても二重カウントしない。
+function normalizeReactionEmail_(email) {
+  return String(email == null ? '' : email).trim().toLowerCase();
+}
+
 /**
  * row 単位の lock を ScriptCache + 短い ScriptLock critical section で acquire する。
  *
@@ -220,11 +227,11 @@ function processReactionDirect(sheet, rowNumber, reactionType, actorEmail, prelo
   const maxCol = Math.max(...columnIndexes);
   const [rowData = []] = sheet.getRange(rowNumber, minCol, 1, maxCol - minCol + 1).getValues();
 
-  // Why (v2865 / M1): email identity は case-insensitive (sameEmail_ と同じ規約)。 旧実装は
-  //   完全一致 (includes/===) だったため、 stored cell に別 case の綴りが混入すると同一ユーザーを
-  //   別人扱いし、 (a) count 二重化 (b) 自分の reaction を外せない、 という vote 破損を起こした。
-  //   membership/removal/add/reacted を正規化比較に統一し、 保存も canonical (小文字) に揃える。
-  const normEmail_ = (e) => String(e == null ? '' : e).trim().toLowerCase();
+  // Why (v2865 / M1): email identity は case-insensitive。 旧実装は完全一致 (includes/===) で、
+  //   stored cell に別 case の綴りが混入すると同一ユーザーを別人扱いし、 (a) count 二重化
+  //   (b) 自分の reaction を外せない、 という vote 破損を起こした。 membership/removal/add/reacted
+  //   を normalizeReactionEmail_ 経由の比較に統一し、 保存も canonical (小文字) に揃える。
+  const normEmail_ = normalizeReactionEmail_;
   const actorNorm = normEmail_(actorEmail);
 
   const currentReactions = {};
@@ -391,8 +398,8 @@ function extractReactions(row, headers, userEmail = null, precomputedIndices = n
     };
 
     const reactionTypes = ['UNDERSTAND', 'LIKE', 'CURIOUS'];
-    // email identity は case-insensitive (sameEmail_ と同じ規約 / M1)。
-    const viewerNorm = userEmail ? String(userEmail).trim().toLowerCase() : null;
+    // email identity は case-insensitive (normalizeReactionEmail_ = sameEmail_ と同じ規約 / M1)。
+    const viewerNorm = userEmail ? normalizeReactionEmail_(userEmail) : null;
 
     reactionTypes.forEach(reactionType => {
       const columnIndex = (precomputedIndices && typeof precomputedIndices[reactionType] === 'number')
@@ -407,7 +414,7 @@ function extractReactions(row, headers, userEmail = null, precomputedIndices = n
 
         reactions[reactionType] = {
           count: reactionUsers.length,
-          reacted: viewerNorm ? reactionUsers.some(u => String(u).trim().toLowerCase() === viewerNorm) : false
+          reacted: viewerNorm ? reactionUsers.some(u => normalizeReactionEmail_(u) === viewerNorm) : false
         };
       }
     });
