@@ -7,9 +7,10 @@
 //   - __hasEditorPermissionViaDrive_(fileId, emailNorm) … Drive permissions.list + cache (security 中核)
 //   - __emailHash_(email) … SHA-256 cache key (衝突で他人の editor 判定を継承しないため)
 //
-// 既知バグ (このテストで固定・別途レポート): isBoardCollaborator は getUserConfig() の
-//   envelope {success, config:{spreadsheetId}} を unwrap せず envelope.spreadsheetId を読むため、
-//   ssId が常に undefined になり editor でも false を返す (fail-closed = 権限過剰でなく不足)。
+// 修正済みバグ (v2855 collaborator 認可): isBoardCollaborator は getUserConfig() の
+//   envelope {success, config:{spreadsheetId}} を .config で unwrap する。以前は envelope 直読みで
+//   ssId が常に undefined になり editor でも false を返していた (fail-closed = 権限過剰でなく不足)。
+//   corrupted config では fail-closed (認可を開かない)。
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -202,18 +203,44 @@ test('isBoardCollaborator: config に spreadsheetId が無ければ false', () =
   assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'o@x.jp' }, 'editor@x.jp'), false);
 });
 
-// KNOWN BUG を固定するテスト (別途レポート): getUserConfig は envelope {success, config:{spreadsheetId}}
-// を返すが AccessControl は envelope.spreadsheetId を読むため、実際に editor でも現状 false になる。
-// fail-closed (認可不足) 方向なので security hole ではないが、v2855 collaborator 機能は無効化状態。
-// 修正されたら本テストは false→true に変える必要がある (レポート参照)。
-test('isBoardCollaborator: [KNOWN BUG] envelope 未 unwrap により editor でも現状 false を返す', () => {
+// happy-path (v2855 collaborator 認可): getUserConfig は envelope {success, config:{spreadsheetId}}
+// を返す。AccessControl は .config で unwrap し、ボード SS に Drive editor (writer/owner) 権限を
+// 持つメールを collaborator として認可する。以前は envelope 直読みで ssId が undefined になり
+// editor でも false だった (修正済み)。
+test('isBoardCollaborator: envelope を unwrap し Drive editor を collaborator として true', () => {
   const ctx = loadCtx({
     // 本物の getUserConfig と同じ envelope 形状
     getUserConfig: () => ({ success: true, config: { spreadsheetId: 'SS1' } }),
     // editor として Drive 上は writer 権限を持つ
     fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'editor@x.jp', role: 'writer' }]))
   });
-  const actual = ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp');
-  // 現状の実挙動を固定。envelope.config.spreadsheetId を読むよう修正されれば true になるべき。
-  assert.equal(actual, false);
+  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), true);
+});
+
+test('isBoardCollaborator: SS に editor 権限が無い viewer は false (unwrap 後も権限判定は Drive 依存)', () => {
+  const ctx = loadCtx({
+    getUserConfig: () => ({ success: true, config: { spreadsheetId: 'SS1' } }),
+    // editor@x.jp のみ writer。viewer@x.jp は permission list に不在
+    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'editor@x.jp', role: 'writer' }]))
+  });
+  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'viewer@x.jp'), false);
+});
+
+test('isBoardCollaborator: getUserConfig が success:false なら false (config 取得失敗)', () => {
+  const ctx = loadCtx({
+    getUserConfig: () => ({ success: false, config: { spreadsheetId: 'SS1' }, message: 'User not found' }),
+    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'editor@x.jp', role: 'writer' }]))
+  });
+  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), false);
+});
+
+// corrupted config (JSON parse 失敗で default に fallback) は認可判定では fail-closed。
+// stale な spreadsheetId が残っていても collaborator を認可しない (破損 config を信頼しない)。
+// AdminApis の publish 状態変更が corrupted を拒否するのと同じ扱い。
+test('isBoardCollaborator: corrupted config は spreadsheetId が残っていても fail-closed で false', () => {
+  const ctx = loadCtx({
+    getUserConfig: () => ({ success: true, corrupted: true, config: { spreadsheetId: 'SS1' } }),
+    fetch: () => mockResponse(200, drivePermissionsBody([{ email: 'editor@x.jp', role: 'writer' }]))
+  });
+  assert.equal(ctx.isBoardCollaborator({ userId: 'u1', userEmail: 'owner@x.jp' }, 'editor@x.jp'), false);
 });
