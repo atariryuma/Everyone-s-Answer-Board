@@ -50,14 +50,21 @@ function isBoardCollaborator(targetUser, viewerEmail) {
   // owner 自身は collaborator ではなく owner 扱い (呼び出し側で別 path)
   if (norm === String(targetUser.userEmail || '').toLowerCase().trim()) return false;
 
-  let config;
+  let res;
   try {
-    config = (typeof getUserConfig === 'function') ? getUserConfig(targetUser.userId) : null;
+    res = (typeof getUserConfig === 'function') ? getUserConfig(targetUser.userId) : null;
   } catch (e) {
     if (typeof logError_ === 'function') logError_('isBoardCollaborator/config', e);
     return false;
   }
-  const ssId = config && config.spreadsheetId;
+  // getUserConfig は envelope {success, config, corrupted, ...} を返す。spreadsheetId は
+  //   res.config.spreadsheetId にある (envelope 直読みは常に undefined で、v2855 collaborator
+  //   認可が実質無効化されていた)。他の呼び出し側 (AdminApis) と同じく .config で unwrap する。
+  // 認可判定なので corrupted config では fail-closed: 破損 config の default には spreadsheetId
+  //   が無く、あっても信頼できないため collaborator を認可しない (AdminApis の publish 状態変更と
+  //   同じ扱い)。
+  const cfg = (res && res.success && !res.corrupted) ? res.config : null;
+  const ssId = cfg && cfg.spreadsheetId;
   if (!ssId) return false;
 
   return __hasEditorPermissionViaDrive_(ssId, norm);
