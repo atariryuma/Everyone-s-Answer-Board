@@ -18,6 +18,27 @@ const { parseEnvFromArgs, requestJSON, loadScriptContext } = require('./lib/gas-
 const { env, remainingArgs } = parseEnvFromArgs(process.argv.slice(2));
 const force = remainingArgs.includes('--force');
 
+// デプロイ成功後に HEAD コミットの vNNNN で git tag を打つ (best-effort)。
+// Why: GAS の versionNumber (2870 等) と git コミットの vNNNN (2868 等) は別カウンタで、
+//   2 テナント (naha/open) は同一コミットを別 GAS version として deploy する。tag は
+//   「どのコミットが本番に出たか」を git 側で辿るためのものなので、GAS version ではなく
+//   HEAD コミットの vNNNN を採用する。両テナントが同じコミットを打っても idempotent。
+// 失敗してもデプロイ自体は成功済みなので、ここでは warn だけして exit code を変えない。
+function tagDeployedVersionBestEffort() {
+  try {
+    const subject = execFileSync('git', ['log', '-1', '--format=%s'], { encoding: 'utf8' }).trim();
+    const m = subject.match(/\(v(\d+)\)\s*$/);
+    if (!m) return;
+    const tag = `v${m[1]}`;
+    const existing = execFileSync('git', ['tag', '-l', tag], { encoding: 'utf8' }).trim();
+    if (existing) return; // 既存 tag は触らない
+    execFileSync('git', ['tag', tag], { encoding: 'utf8' });
+    console.log(`Tagged HEAD as ${tag} (push with: git push origin ${tag})`);
+  } catch (e) {
+    console.warn(`(tag skipped: ${e.message})`);
+  }
+}
+
 function preflightGitClean() {
   let status;
   try {
@@ -76,6 +97,9 @@ try {
 
   console.log(`\nDeploy complete! v${version}`);
   console.log(`URL: ${config.prodUrl}`);
+
+  // 本番反映に成功したので、HEAD コミットの vNNNN を git tag で辿れるようにする (best-effort)。
+  tagDeployedVersionBestEffort();
 } catch (error) {
   console.error('Deploy failed:', error.message);
   process.exit(1);
