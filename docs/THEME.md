@@ -156,17 +156,24 @@ npm run theme:verify      # 統合ゲート: 12 軸 / 120 点満点 / CI 用
 - contrast: 12 種類の text/accent/status × 3 種類の bg = 72 pair を alpha-blend 後計算
 - hardcoded スキャン: brand-identity (cyan/amber/purple/etc.) と `theme:exempt` コメントは exempt
 
-### 移行専用ツールの状況 (2026-07-05 時点)
+### 移行ツールの状況 (2026-07-05 時点)
 
-`theme:tokenize` / `theme:pair` / `theme-normalize-typography.js` は一度きりの移行を回す
-ためのツール。migration が完了すれば削除候補になる。現状:
+移行の apply モードは概ね完了しているが、**多くは dry-run が regression gate の現役依存**なので
+安易に削除しないこと。`theme:perfect` は内部で `theme-matrix.js --uncovered` (axis 1) /
+`theme-pair-tailwind.js --dry-run` (axis 2) / `theme-contrast.js` (axis 6) / `theme-verify.js`
+(axis 7) を spawn する ([scripts/theme-perfect.js](../scripts/theme-perfect.js))。
 
-- **`theme:pair`** (theme-pair-tailwind.js): `--dry-run` で **残 0 件**。`dark:` prefix 廃止は完了済 → **削除候補**。
-- **`theme:tokenize`** (theme-tokenize.js): `--dry-run` で残 1 件 (page.viz.css.html の `rgba(148,163,184,0.5)` → `--theme-border-strong`)。適用しきれば削除候補。
-- **`theme:uncovered`**: 43 件残るが **actionable な theme-bleed は 0 件** (残りは brand-identity 色/shadow で exempt)。light/dark 移行は機能的に完了。
+- **`theme:pair`** (theme-pair-tailwind.js): apply 移行は完了 (残 0 件) **だが `--dry-run` は
+  `theme:perfect` axis 2「Tailwind unpaired = 0」の regression gate が実行する現役依存**。削除不可。
+- **`theme:tokenize`** (theme-tokenize.js): 残 1 件 (page.viz.css.html の `rgba(148,163,184,0.5)`
+  → `--theme-border-strong`)。gate 非依存だが、将来の hardcoded→token 移行に再利用できるので残置。
+- **`theme-normalize-typography.js`**: npm script も gate 依存も無い純粋な一度きりツール。
+  唯一の削除候補だが、削除前に移行残がゼロか確認すること。
+- **`theme:uncovered`**: 43 件残るが **actionable な theme-bleed は 0 件** (残りは brand-identity
+  色/shadow で exempt)。light/dark 移行は機能的に完了。
 
-削除するかどうかはユーザー判断。共通ロジック (色パース / token 抽出 / contrast 計算) を
-`scripts/lib/theme-core.js` へ抽出する重複排除は未実施 (出力完全一致の検証コストが高いため別タスク)。
+共通ロジック (色パース / token 抽出 / contrast 計算) を `scripts/lib/theme-core.js` へ抽出する
+重複排除は未実施 (出力完全一致の検証コストが高いため別タスク)。
 
 ---
 
