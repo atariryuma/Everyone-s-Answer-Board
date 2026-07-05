@@ -16,6 +16,8 @@ npm run logs:cloud -- --user naha-okinawa      # メアド断片でフィルタ
 npm run logs:cloud -- --function doPost        # 関数名でフィルタ
 npm run logs:cloud -- --all-deployments        # 共有 GCP project の全アプリログ
 npm run logs:cloud -- --deployment <id>        # 特定 deployment にフィルタ
+npm run logs:cloud -- --json                   # JSON 形式で出力
+npm run logs:cloud -- --brief                  # 1 行/エントリ簡潔モード
 npm run logs:summary                           # シグネチャ別集計
 npm run logs:errors                            # 直近 24h ERROR 集計
 npm run logs:tail                              # 直近 10 分 ERROR
@@ -44,10 +46,14 @@ npm run logs:open                              # open 環境用
 npm run api -- systemDiagnosis        # Core props / DB / Deploy の健康診断
 npm run api -- getUsers               # 全ユーザー一覧
 npm run api -- getAppStatus           # アプリ有効/無効状態
+npm run api -- enableApp              # アプリを有効化
+npm run api -- disableApp             # 緊急停止（アプリ無効化）
 npm run api -- getLogs --limit 20     # セキュリティログ
 npm run api -- perfMetrics            # パフォーマンス指標
 npm run api -- perfDiagnosis          # パフォーマンス診断 + 推奨事項
 npm run api -- listProperties         # Script Properties（認証情報マスク済み）
+npm run api -- getProperty --k NAME           # 個別 property 取得
+npm run api -- setProperty --k NAME --v VALUE # property 更新
 npm run api -- cacheReset             # 全キャッシュクリア
 npm run api -- autoRepair             # 自動修復
 ```
@@ -75,6 +81,10 @@ npm run api -- bulkSetUserConfig \
 
 npm run api -- bulkSetUserConfig --filter '{"emailContains":"naha"}' --patch '...'
 
+# アクティブ / 公開状態の切替
+npm run api -- toggleUserActive --userId <uuid>            # アクティブ状態切替
+npm run api -- toggleUserBoard --userId <uuid>             # ボード公開状態切替
+
 # 分析・プレビュー
 npm run api -- runColumnAnalysis --userId <uuid>           # 列マッピング自動検出
 npm run api -- previewBoard --userId <uuid>                # viewer 視点のサンプル
@@ -99,6 +109,28 @@ npm run api -- createForm --userId <uuid> --templateType board|numberline|matrix
 
 **保護されているフィールド**（patch から自動除外）：
 `userId`, `userEmail`, `googleId`, `createdAt`, `etag`
+
+### 1-3. SA pool 管理
+
+700 人スケールの同時アクセスを service account pool で捌く。設計詳細は [ARCHITECTURE.md](ARCHITECTURE.md)。
+
+```bash
+npm run api -- listServiceAccountPool         # pool 一覧 (slot/email/projectId)
+npm run api -- getServiceAccountUsage         # SA 別 5分窓使用回数 + cooling 状態
+npm run api -- addServiceAccountToPool --json '<SA JSON>'     # 1 個追加 (DB editor + verify 自動)
+npm run api -- addServiceAccountsToPoolBatch --inputs '<...>' # 複数一括 (改行 or `}\n{` 区切り)
+npm run api -- reverifyServiceAccountInPool --slot SERVICE_ACCOUNT_CREDS_2  # 共有反映後の再検証
+npm run api -- removeServiceAccountFromPool --slot SERVICE_ACCOUNT_CREDS_2  # secondary 削除
+npm run api -- repairSpreadsheetSharing --spreadsheetId <ID>  # 1 SS に SA pool 全員 editor 追加
+npm run api -- migrateBoardSharing --dryRun true   # 既存ボード一括 cleanup の dry run
+npm run api -- migrateBoardSharing                 # 全ボードに SA pool editor 追加 + domain 共有 revoke
+```
+
+**負荷検証**（CI 対象外、手動）:
+
+```bash
+node scripts/load-test-concurrent.js --n 30 --op previewBoard  # N 並列 API call で SA pool / 429 を検証
+```
 
 ---
 
