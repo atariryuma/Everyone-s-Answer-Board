@@ -16,6 +16,7 @@
     "deploy:list": "node scripts/deploy-list.js",
     "push:open": "node scripts/env-switch.js open npx clasp push --force",
     "deploy:open": "node scripts/env-switch.js open node scripts/deploy-prod.js --env open",
+    "deploy:all": "npm run deploy:prod && npm run deploy:open",
     "api": "node scripts/admin-api.js",
     "api:open": "node scripts/admin-api.js --env open",
     "logs:cloud": "node scripts/logs.js",

@@ -35,7 +35,7 @@ node --test tests/main.doPost.test.cjs   # Run a single test file
 
 **CI** (.github/workflows/ci.yml): Syntax check + `npm run lint:errors` + `npm test`（品質ゲートのみ。デプロイはローカルの `deploy:prod` で行う）
 
-**2 テナント構成**: 本番は GAS 2 つ（那覇市 = default / 沖縄県 = open）。`deploy:prod` は那覇市のみ、沖縄県は `npm run deploy:open` を別途実行する（`push:open` / `api:open` / `logs:open` も同様）。
+**2 テナント構成**: 本番は GAS 2 つ（那覇市 = default / 沖縄県 = open）。`deploy:prod` は那覇市のみ、沖縄県は `npm run deploy:open` を別途実行する（`push:open` / `api:open` / `logs:open` も同様）。両方まとめて出すなら `npm run deploy:all`（`deploy:prod && deploy:open` を直列実行。那覇が失敗したら沖縄はスキップ。並列実行は env-switch がトークンを swap するため不可）。
 
 ---
 
