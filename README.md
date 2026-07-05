@@ -161,9 +161,10 @@ npm run deploy            # 新しいURLでデプロイ（テスト用）
 npm run pull              # GASからコードを取得
 npm run logs              # GAS実行ログを確認
 
-# 2 テナント運用（沖縄県 = open 環境）
+# 2 テナント運用（那覇市 = default / 沖縄県 = open 環境）
+npm run deploy:all        # 那覇 → 沖縄 を順に本番デプロイ（推奨・ドリフト防止）
 npm run push:open         # open 環境へプッシュ
-npm run deploy:open       # open 環境へ本番デプロイ（URL維持）
+npm run deploy:open       # open 環境のみ本番デプロイ（URL維持）
 npm run api:open -- systemDiagnosis   # open 環境の状態確認
 npm run logs:open         # open 環境のログ確認
 
@@ -191,8 +192,9 @@ npm run logs:cloud -- --severity ERROR --hours 24  # エラーのみ
 - **テスト**: pre-commit フックで自動実行（`npm install` 時に自動有効化。テスト失敗時はコミットをブロック）
 
 > **2 テナント構成の注意**: 本番は GAS プロジェクトが 2 つ（那覇市 = default / 沖縄県 = open）。
-> `npm run deploy:prod` は那覇市版のみを更新する。沖縄県版は `npm run deploy:open` を
-> **別途実行**しないと旧コードのまま残る。環境切替は `scripts/env-switch.js` が担う。
+> `npm run deploy:prod` は那覇市版のみを更新するため、沖縄県版が旧コードのまま残るドリフトが起きやすい。
+> src 変更時は `npm run deploy:all`（那覇→沖縄を順にデプロイ）で両方まとめて反映するのが安全。
+> 環境切替は `scripts/env-switch.js` が担う。
 
 ### GAS保守ルール
 
