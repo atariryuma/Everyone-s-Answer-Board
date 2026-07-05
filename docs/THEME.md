@@ -156,6 +156,18 @@ npm run theme:verify      # 統合ゲート: 12 軸 / 120 点満点 / CI 用
 - contrast: 12 種類の text/accent/status × 3 種類の bg = 72 pair を alpha-blend 後計算
 - hardcoded スキャン: brand-identity (cyan/amber/purple/etc.) と `theme:exempt` コメントは exempt
 
+### 移行専用ツールの状況 (2026-07-05 時点)
+
+`theme:tokenize` / `theme:pair` / `theme-normalize-typography.js` は一度きりの移行を回す
+ためのツール。migration が完了すれば削除候補になる。現状:
+
+- **`theme:pair`** (theme-pair-tailwind.js): `--dry-run` で **残 0 件**。`dark:` prefix 廃止は完了済 → **削除候補**。
+- **`theme:tokenize`** (theme-tokenize.js): `--dry-run` で残 1 件 (page.viz.css.html の `rgba(148,163,184,0.5)` → `--theme-border-strong`)。適用しきれば削除候補。
+- **`theme:uncovered`**: 43 件残るが **actionable な theme-bleed は 0 件** (残りは brand-identity 色/shadow で exempt)。light/dark 移行は機能的に完了。
+
+削除するかどうかはユーザー判断。共通ロジック (色パース / token 抽出 / contrast 計算) を
+`scripts/lib/theme-core.js` へ抽出する重複排除は未実施 (出力完全一致の検証コストが高いため別タスク)。
+
 ---
 
 ## 色を追加 / 変更したいとき
