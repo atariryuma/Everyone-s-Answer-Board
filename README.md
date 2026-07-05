@@ -154,12 +154,18 @@ Everyone-s-Answer-Board/
 
 ```bash
 # 開発
-npm test                  # テスト実行（604件、node:test）
+npm test                  # テスト実行（node:test）
 npm run push              # GASにコードをプッシュ
 npm run deploy:prod       # 本番デプロイ（URL維持、pushも含む）
 npm run deploy            # 新しいURLでデプロイ（テスト用）
 npm run pull              # GASからコードを取得
 npm run logs              # GAS実行ログを確認
+
+# 2 テナント運用（沖縄県 = open 環境）
+npm run push:open         # open 環境へプッシュ
+npm run deploy:open       # open 環境へ本番デプロイ（URL維持）
+npm run api:open -- systemDiagnosis   # open 環境の状態確認
+npm run logs:open         # open 環境のログ確認
 
 # 本番運用
 npm run api -- systemDiagnosis     # システム診断
@@ -180,9 +186,13 @@ npm run logs:cloud -- --severity ERROR --hours 24  # エラーのみ
                                                     GitHub CI（構文チェック+テスト）
 ```
 
-- **CI**: 構文チェック + テストのみ（品質ゲート）
+- **CI**: 構文チェック + lint（error）+ テスト（品質ゲート）
 - **デプロイ**: ローカルの `deploy:prod` で実行（CLIから本番URLを維持して更新）
-- **テスト**: pre-pushフックで自動実行（テスト失敗時はpushブロック）
+- **テスト**: pre-commit フックで自動実行（`npm install` 時に自動有効化。テスト失敗時はコミットをブロック）
+
+> **2 テナント構成の注意**: 本番は GAS プロジェクトが 2 つ（那覇市 = default / 沖縄県 = open）。
+> `npm run deploy:prod` は那覇市版のみを更新する。沖縄県版は `npm run deploy:open` を
+> **別途実行**しないと旧コードのまま残る。環境切替は `scripts/env-switch.js` が担う。
 
 ### GAS保守ルール
 
