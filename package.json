@@ -6,6 +6,7 @@
     "node": ">=20"
   },
   "scripts": {
+    "postinstall": "git config core.hooksPath .githooks || true",
     "pull": "clasp pull",
     "push": "clasp push",
     "open": "clasp open",

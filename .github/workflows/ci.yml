@@ -44,5 +44,10 @@ jobs:
             exit 1
           fi
 
+      - name: Lint (CLAUDE.md rules, error severity)
+        # Why: pre-commit hook を bypass (--no-verify) したコミットや hook 未設定環境からの
+        #   push でも CLAUDE.md ルール違反 (setTimeout / getEffectiveUser 等) を CI で捕捉する。
+        run: npm run lint:errors
+
       - name: Run unit tests
         run: npm test
