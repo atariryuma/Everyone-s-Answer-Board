@@ -16,66 +16,17 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseColor, blendOnBg, relativeLuminance, extractBlockBody, extractTokensFromBody } = require('./lib/theme-core');
 
 const SRC_DIR = path.resolve(__dirname, '../src');
 const ARGS = process.argv.slice(2);
 const FLAG_JSON = ARGS.includes('--json');
 
 // =====================================================================
-// hex / rgba → RGB
-// =====================================================================
-
-function parseColor(value, fallbackBg) {
-  value = String(value).trim();
-  if (value.startsWith('#')) {
-    const hex = value.slice(1);
-    const expanded = hex.length === 3
-      ? hex.split('').map(c => c + c).join('')
-      : hex.length === 6 ? hex : hex.slice(0, 6);
-    return {
-      r: parseInt(expanded.slice(0, 2), 16),
-      g: parseInt(expanded.slice(2, 4), 16),
-      b: parseInt(expanded.slice(4, 6), 16),
-      a: 1,
-    };
-  }
-  if (value.startsWith('rgba(') || value.startsWith('rgb(')) {
-    const m = value.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/);
-    if (!m) return null;
-    return {
-      r: Number(m[1]),
-      g: Number(m[2]),
-      b: Number(m[3]),
-      a: m[4] !== undefined ? Number(m[4]) : 1,
-    };
-  }
-  return null;
-}
-
-// alpha 合成: foreground (with alpha) を background に重ねた最終色を計算
-function blendOnBg(fg, bg) {
-  if (!fg || !bg) return fg;
-  if (fg.a >= 1) return fg;
-  const a = fg.a;
-  return {
-    r: Math.round(fg.r * a + bg.r * (1 - a)),
-    g: Math.round(fg.g * a + bg.g * (1 - a)),
-    b: Math.round(fg.b * a + bg.b * (1 - a)),
-    a: 1,
-  };
-}
-
-// =====================================================================
 // WCAG 2.1 contrast ratio
+//   parseColor / blendOnBg / relativeLuminance は scripts/lib/theme-core.js に
+//   共通化。contrastRatio は theme-contrast 固有の「丸めない生 ratio」なので残す。
 // =====================================================================
-
-function relativeLuminance({ r, g, b }) {
-  const toLinear = (c) => {
-    const v = c / 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * toLinear(r) + 0.7152 * toLinear(g) + 0.0722 * toLinear(b);
-}
 
 function contrastRatio(fg, bg) {
   const l1 = relativeLuminance(fg);
@@ -86,33 +37,12 @@ function contrastRatio(fg, bg) {
 }
 
 // =====================================================================
-// Token 抽出
+// Token 抽出 (extractBlockBody / token 抽出ロジックは
+//   scripts/lib/theme-core.js に共通化)
 // =====================================================================
 
-function extractBlockBody(css, startRegex) {
-  const startMatch = css.match(startRegex);
-  if (!startMatch) return '';
-  const startIdx = startMatch.index + startMatch[0].lastIndexOf('{');
-  let depth = 1;
-  let i = startIdx + 1;
-  while (i < css.length && depth > 0) {
-    if (css[i] === '{') depth++;
-    else if (css[i] === '}') depth--;
-    i++;
-  }
-  return css.slice(startIdx + 1, i - 1);
-}
-
 function extractTokens(css, startRegex) {
-  const body = extractBlockBody(css, startRegex);
-  if (!body) return {};
-  const tokens = {};
-  const re = /--([a-z0-9-]+)\s*:\s*([^;]+);/gi;
-  let m;
-  while ((m = re.exec(body)) !== null) {
-    tokens[`--${m[1]}`] = m[2].trim();
-  }
-  return tokens;
+  return extractTokensFromBody(extractBlockBody(css, startRegex));
 }
 
 function resolveToken(tokens, name) {

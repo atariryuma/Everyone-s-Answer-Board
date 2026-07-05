@@ -179,8 +179,11 @@ apply モードの移行が完了していても削除してはいけない。
 **参考: `theme:uncovered`** は 43 件残るが actionable な theme-bleed は 0 件 (brand-identity 色/shadow は
 exempt)。light/dark 移行は機能的に完了している。
 
-共通ロジック (色パース / token 抽出 / contrast 計算) を `scripts/lib/theme-core.js` へ抽出する
-重複排除は未実施 (出力完全一致の検証コストが高いため別タスク)。
+色パース (`parseColor`) / alpha 合成 (`blendOnBg`) / 相対輝度 (`relativeLuminance`) / CSS ブロック・token
+抽出 (`extractBlockBody` / `extractTokensFromBody`) は [scripts/lib/theme-core.js](../scripts/lib/theme-core.js)
+に共通化済 (theme-contrast.js / theme-matrix.js が require)。ツール固有の実装 (theme-contrast の
+丸めない生 `contrastRatio`、theme-matrix の丸め込み `contrast`、部分一致 `resolveToken` と完全一致
+`resolveVar`) は挙動が異なるため各ツールに残している。theme-core は `tests/lib.theme-core.test.cjs` で検証。
 
 ---
 

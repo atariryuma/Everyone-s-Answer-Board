@@ -21,6 +21,7 @@
 
 const fs = require('node:fs');
 const path = require('node:path');
+const { parseColor, blendOnBg, relativeLuminance, extractBlockBody, extractTokensFromBody } = require('./lib/theme-core');
 
 const SRC_DIR = path.resolve(__dirname, '../src');
 const ARGS = process.argv.slice(2);
@@ -28,57 +29,10 @@ const FLAG_JSON = ARGS.includes('--json');
 const FLAG_UNCOVERED = ARGS.includes('--uncovered');
 
 // ─────────────────────────────────────────────────────────────
-//  カラー処理 (parse / blend / contrast — theme-contrast.js と同じ)
+//  カラー処理 (parseColor / blendOnBg / relativeLuminance は
+//   scripts/lib/theme-core.js に共通化。contrast は matrix 固有の
+//   丸め込み + defaultBg blend なのでここに残す)
 // ─────────────────────────────────────────────────────────────
-
-function parseColor(value) {
-  if (!value) return null;
-  value = String(value).trim();
-  if (value.startsWith('#')) {
-    const hex = value.slice(1);
-    const expanded = hex.length === 3
-      ? hex.split('').map(c => c + c).join('')
-      : hex.length === 6 ? hex : hex.slice(0, 6);
-    if (!/^[0-9a-fA-F]{6}$/.test(expanded)) return null;
-    return {
-      r: parseInt(expanded.slice(0, 2), 16),
-      g: parseInt(expanded.slice(2, 4), 16),
-      b: parseInt(expanded.slice(4, 6), 16),
-      a: 1,
-    };
-  }
-  if (value.startsWith('rgba(') || value.startsWith('rgb(')) {
-    const m = value.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+)\s*)?\)/);
-    if (!m) return null;
-    return {
-      r: Number(m[1]),
-      g: Number(m[2]),
-      b: Number(m[3]),
-      a: m[4] !== undefined ? Number(m[4]) : 1,
-    };
-  }
-  return null;
-}
-
-function blendOnBg(fg, bg) {
-  if (!fg || !bg) return fg;
-  if (fg.a >= 1) return fg;
-  const a = fg.a;
-  return {
-    r: Math.round(fg.r * a + bg.r * (1 - a)),
-    g: Math.round(fg.g * a + bg.g * (1 - a)),
-    b: Math.round(fg.b * a + bg.b * (1 - a)),
-    a: 1,
-  };
-}
-
-function relLum({ r, g, b }) {
-  const lin = (c) => {
-    const v = c / 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  };
-  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
-}
 
 function contrast(fgVal, bgVal, defaultBg = null) {
   let fg = parseColor(fgVal);
@@ -87,37 +41,16 @@ function contrast(fgVal, bgVal, defaultBg = null) {
   if (bg.a < 1 && defaultBg) bg = blendOnBg(bg, parseColor(defaultBg));
   if (bg.a < 1) bg = blendOnBg(bg, { r: 255, g: 255, b: 255, a: 1 });
   if (fg.a < 1) fg = blendOnBg(fg, bg);
-  const l1 = relLum(fg);
-  const l2 = relLum(bg);
+  const l1 = relativeLuminance(fg);
+  const l2 = relativeLuminance(bg);
   return Math.round(((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05)) * 100) / 100;
 }
 
 // ─────────────────────────────────────────────────────────────
-//  Token 抽出
+//  Token 抽出 (extractBlockBody / extractTokensFromBody は
+//   scripts/lib/theme-core.js に共通化。resolveVar は matrix 固有の
+//   完全一致 regex + depth ガードなのでここに残す)
 // ─────────────────────────────────────────────────────────────
-
-function extractBlock(css, startRegex) {
-  const m = css.match(startRegex);
-  if (!m) return '';
-  const startIdx = m.index + m[0].lastIndexOf('{');
-  let depth = 1, i = startIdx + 1;
-  while (i < css.length && depth > 0) {
-    if (css[i] === '{') depth++;
-    else if (css[i] === '}') depth--;
-    i++;
-  }
-  return css.slice(startIdx + 1, i - 1);
-}
-
-function extractTokens(body) {
-  const tokens = {};
-  const re = /--([a-z0-9-]+)\s*:\s*([^;]+);/gi;
-  let m;
-  while ((m = re.exec(body)) !== null) {
-    tokens[`--${m[1]}`] = m[2].trim();
-  }
-  return tokens;
-}
 
 function resolveVar(tokens, name, depth = 0) {
   if (depth > 8) return tokens[name] || null;
@@ -321,10 +254,10 @@ function main() {
   const unifiedPath = path.join(SRC_DIR, 'UnifiedStyles.css.html');
   const unifiedCss = fs.readFileSync(unifiedPath, 'utf8');
 
-  const rootBody = extractBlock(unifiedCss, /:root\s*\{/);
-  const lightBody = extractBlock(unifiedCss, /body\.theme-light[^{]*\{/);
-  const darkTokens = extractTokens(rootBody);
-  const lightOverrides = extractTokens(lightBody);
+  const rootBody = extractBlockBody(unifiedCss, /:root\s*\{/);
+  const lightBody = extractBlockBody(unifiedCss, /body\.theme-light[^{]*\{/);
+  const darkTokens = extractTokensFromBody(rootBody);
+  const lightOverrides = extractTokensFromBody(lightBody);
   const lightTokens = { ...darkTokens, ...lightOverrides };
 
   // ─── 1. Token 一覧 ───
