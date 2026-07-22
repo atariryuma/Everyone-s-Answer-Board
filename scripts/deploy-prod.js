@@ -69,8 +69,12 @@ try {
   const { config, scriptId, token } = loadScriptContext(env);
 
   // 1. Push latest code
-  console.log('Pushing code to GAS...');
-  execSync('npx clasp push --force', { stdio: 'inherit' });
+  // clasp はグローバル default ユーザーで push するため、別テナントの作業で default が
+  // 切り替わると 403 (The caller does not have permission) になる。REST 呼び出しと同じ
+  // tokenName の named credential (~/.clasprc.json tokens.<name>) を明示して環境非依存にする。
+  const claspUser = config.claspUser || config.tokenName || 'default';
+  console.log(`Pushing code to GAS (clasp user: ${claspUser})...`);
+  execSync(`npx clasp --user ${claspUser} push --force`, { stdio: 'inherit' });
 
   // 2. Create new version
   console.log('Creating new version...');
