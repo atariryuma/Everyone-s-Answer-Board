@@ -28,6 +28,8 @@
     "smoke": "node scripts/smoke-prod.js",
     "smoke:open": "node scripts/smoke-prod.js --env open",
     "smoke:all": "npm run smoke && npm run smoke:open",
+    "loadtest": "node scripts/load-test-concurrent.js",
+    "loadtest:open": "node scripts/load-test-concurrent.js --env open",
     "test": "node --test tests/*.test.cjs",
     "test:coverage": "node scripts/test-coverage.js",
     "lint": "node scripts/lint.js",

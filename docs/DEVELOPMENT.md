@@ -206,6 +206,28 @@ node scripts/smoke-prod.js --verbose  # previewBoard の中身も表示
 **いつ使うか**: `npm run deploy:all` の直後（デプロイゲート）。失敗すると exit 1。
 CI には入れない（認証情報と本番疎通が必要、GAS quota を消費するため）。
 
+### 2-6. 負荷検証（同時接続シミュレーション）
+
+```bash
+npm run loadtest                      # 那覇 / N=30 / previewBoard
+npm run loadtest:open                 # 沖縄
+npm run loadtest -- --n 50 --max-p90 15000   # 並列数としきい値を指定
+node scripts/load-test-concurrent.js --no-warmup   # コールドスタート自体を測る
+```
+
+700 人規模を想定した設計（SA pool round-robin + 30s cooldown / board data cache 10s /
+per-row CAS lock）が実際に効いているかを本番で実測する。**並列時に崩れる挙動は
+ユニットテストでも smoke テストでも検出できない**ため、これが唯一の検証手段。
+
+- `--userId` 省略時は `getUsers` から接続済みユーザーを自動選択（テナント非依存）
+- **ウォームアップ 1 回を計測から除外**する。GAS はアイドル後の初回に spin-up が入り
+  （実測 22s、ウォーム時 4.6s）、そのまま測ると初回が必ず false FAIL になるため
+- 判定: 全件成功 **かつ** p90 ≤ `--max-p90`（既定 20000ms）で exit 0。
+  成功率だけ見ると「全部返ったが 1 件 60 秒」を見逃す
+
+> ⚠️ **本番に実負荷をかける**。read-only だが N に比例して GAS / Sheets API quota を消費する。
+> **授業中には実行しない**。実測の目安（N=3, ウォーム時）: 那覇 p90 6.7s / 沖縄 p90 4.8s。
+
 ---
 
 ## 3. デプロイと環境
