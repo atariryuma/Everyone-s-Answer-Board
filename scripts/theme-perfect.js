@@ -132,9 +132,15 @@ check('7. theme:verify 120/120', perfect120,
   perfect120 ? verifyScoreText : `${verifyScoreText} — 失敗軸: ${verifyFailedAxes || '(取得不可)'}`);
 
 // 8. Unit tests 957 PASS
-const tests = spawnSync('npm', ['test'], { cwd: ROOT, encoding: 'utf8' });
-const failMatch = tests.stdout.match(/fail\s+(\d+)/);
-const passMatch = tests.stdout.match(/pass\s+(\d+)/);
+// npm を経由せず reporter を固定して叩く。既定レポーターは非 TTY だと Node 20=tap /
+//   Node 22+=spec と変わり、出力形式 (`# pass N` / `ℹ pass N`) に依存した解析は
+//   Node バージョンで壊れる (theme-verify axis 10 が CI で実際に false FAIL した)。
+const testFileList = fs.readdirSync(path.join(ROOT, 'tests'))
+  .filter((f) => f.endsWith('.test.cjs'))
+  .map((f) => path.join('tests', f));
+const tests = spawnSync('node', ['--test', '--test-reporter=tap', ...testFileList], { cwd: ROOT, encoding: 'utf8' });
+const failMatch = (tests.stdout || '').match(/^#\s*fail\s+(\d+)/m);
+const passMatch = (tests.stdout || '').match(/^#\s*pass\s+(\d+)/m);
 const testsPass = failMatch && failMatch[1] === '0' && passMatch && parseInt(passMatch[1]) > 900;
 check('8. Unit tests 957+ PASS', testsPass, `pass=${passMatch?passMatch[1]:'?'}, fail=${failMatch?failMatch[1]:'?'}`);
 

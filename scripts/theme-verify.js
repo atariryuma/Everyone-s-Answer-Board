@@ -281,22 +281,24 @@ record(
 // 10. Unit tests
 // =====================================================================
 function runTests() {
-  // npm を経由せず node --test を直接叩く。
-  //   `npm test --silent` は npm のバージョンによって script の stdout まで抑制され、
-  //   pass 行を取りこぼして本軸が false FAIL する (CI の npm 10 系で実際に発生し、
-  //   ローカル npm 11 では再現しなかった)。npm 層を外せばバージョン非依存になる。
+  // npm を経由せず node --test を直接叩き、**レポーターも明示指定**する。
+  //   node:test の既定レポーターは非 TTY だと Node 20 で tap (`# pass N`)、
+  //   Node 22+ で spec (`ℹ pass N`) と変わる。`ℹ` 固定の regex だったため
+  //   CI (Node 20) だけ pass 行を取りこぼし本軸が false FAIL していた
+  //   (ローカル Node 24 では spec が出るので再現しなかった)。
+  //   reporter を固定すれば Node バージョンに依存しない。
   //   glob はシェル無しでは展開されないので明示的にファイル列挙する。
   const testDir = path.join(ROOT, 'tests');
   const testFiles = fs.readdirSync(testDir)
     .filter((f) => f.endsWith('.test.cjs'))
     .map((f) => path.join('tests', f));
-  const result = spawnSync('node', ['--test', ...testFiles], {
+  const result = spawnSync('node', ['--test', '--test-reporter=tap', ...testFiles], {
     cwd: ROOT, encoding: 'utf8'
   });
-  // node:test 出力から pass/fail を抽出
+  // tap レポーターの summary (`# pass N` / `# fail N`) から抽出
   const output = (result.stdout || '') + (result.stderr || '');
-  const passMatch = output.match(/ℹ pass (\d+)/);
-  const failMatch = output.match(/ℹ fail (\d+)/);
+  const passMatch = output.match(/^#\s*pass\s+(\d+)/m);
+  const failMatch = output.match(/^#\s*fail\s+(\d+)/m);
   const pass = passMatch ? Number(passMatch[1]) : 0;
   const fail = failMatch ? Number(failMatch[1]) : -1;
   return { pass, fail, ok: fail === 0 && pass > 0 };
