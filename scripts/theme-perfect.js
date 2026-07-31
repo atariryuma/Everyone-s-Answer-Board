@@ -213,10 +213,18 @@ const vizCss = readSrc('page.viz.css.html');
 const lightOverrideCount = (vizCss.match(/body\.theme-light\s+\./g) || []).length;
 check('19. page.viz light override ≥ 9 件', lightOverrideCount >= 9, `${lightOverrideCount} 件`);
 
-// 20. CLAUDE.md にメンテナンスフローが記載
+// 20. メンテナンスフローが記載 (CLAUDE.md または docs/THEME.md)
+//   2026-07 の docs 再編で theme の詳細 (保守 CLI フロー含む) を CLAUDE.md から
+//   docs/THEME.md へ移譲し、CLAUDE.md からはリンクで辿る構成にした。本 axis の意図は
+//   「フローが文書化され追跡可能なこと」なので、移譲先の docs/THEME.md も判定対象に含める。
+const hasMaintenanceFlow = (text) =>
+  /theme:matrix.*theme:uncovered.*theme:tokenize/s.test(text) ||
+  /theme-card-1.*theme-card-2.*theme-card-3/s.test(text);
 const claudemd = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8');
-const hasFlow = /theme:matrix.*theme:uncovered.*theme:tokenize/s.test(claudemd) || /theme-card-1.*theme-card-2.*theme-card-3/s.test(claudemd);
-check('20. CLAUDE.md にメンテナンスフロー記載', hasFlow, hasFlow ? '✓' : '✗');
+const themeDocPath = path.join(ROOT, 'docs', 'THEME.md');
+const themeDoc = fs.existsSync(themeDocPath) ? fs.readFileSync(themeDocPath, 'utf8') : '';
+const hasFlow = hasMaintenanceFlow(claudemd) || hasMaintenanceFlow(themeDoc);
+check('20. メンテナンスフロー記載 (CLAUDE.md / docs/THEME.md)', hasFlow, hasFlow ? '✓' : '✗');
 
 // 21. color-scheme CSS property (両モード定義済)
 const hasCsRoot = /:root\s*\{[\s\S]*?color-scheme:\s*dark/.test(us);
