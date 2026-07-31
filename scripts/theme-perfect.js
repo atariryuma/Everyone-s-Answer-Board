@@ -123,7 +123,13 @@ check('6. WCAG AA 全 pair pass (dark + light)', allPass, allPass ? '72/72' : 'f
 const verify = spawnSync('node', ['scripts/theme-verify.js'], { cwd: ROOT, encoding: 'utf8' });
 const scoreMatch = verify.stdout.match(/Score:\s*(\d+)\s*\/\s*(\d+)/);
 const perfect120 = scoreMatch && scoreMatch[1] === scoreMatch[2];
-check('7. theme:verify 120/120', perfect120, scoreMatch ? `${scoreMatch[1]}/${scoreMatch[2]}` : 'unknown');
+// 子プロセスの score だけ拾うと「どの軸が落ちたか」が親のログに残らず、CI でしか
+//   再現しない失敗 (npm バージョン差など) の診断ができない。失敗時のみ theme-verify の
+//   ❌ 行を親のログへ転記する。
+const verifyScoreText = scoreMatch ? `${scoreMatch[1]}/${scoreMatch[2]}` : 'unknown';
+const verifyFailedAxes = (verify.stdout || '').split('\n').filter((l) => l.includes('❌')).join(' / ');
+check('7. theme:verify 120/120', perfect120,
+  perfect120 ? verifyScoreText : `${verifyScoreText} — 失敗軸: ${verifyFailedAxes || '(取得不可)'}`);
 
 // 8. Unit tests 957 PASS
 const tests = spawnSync('npm', ['test'], { cwd: ROOT, encoding: 'utf8' });

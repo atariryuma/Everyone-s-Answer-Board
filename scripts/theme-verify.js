@@ -281,7 +281,16 @@ record(
 // 10. Unit tests
 // =====================================================================
 function runTests() {
-  const result = spawnSync('npm', ['test', '--silent'], {
+  // npm を経由せず node --test を直接叩く。
+  //   `npm test --silent` は npm のバージョンによって script の stdout まで抑制され、
+  //   pass 行を取りこぼして本軸が false FAIL する (CI の npm 10 系で実際に発生し、
+  //   ローカル npm 11 では再現しなかった)。npm 層を外せばバージョン非依存になる。
+  //   glob はシェル無しでは展開されないので明示的にファイル列挙する。
+  const testDir = path.join(ROOT, 'tests');
+  const testFiles = fs.readdirSync(testDir)
+    .filter((f) => f.endsWith('.test.cjs'))
+    .map((f) => path.join('tests', f));
+  const result = spawnSync('node', ['--test', ...testFiles], {
     cwd: ROOT, encoding: 'utf8'
   });
   // node:test 出力から pass/fail を抽出
