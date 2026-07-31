@@ -3,10 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
-    paths: ['src/**', 'tests/**', 'package.json', '.github/workflows/ci.yml']
+    # scripts/** と docs/** も対象: theme:perfect が scripts/theme-*.js を spawn し、
+    #   axis 20 は docs/THEME.md の保守フロー記載を判定するため (docs 再編でゲートが壊れた実績あり)。
+    paths: ['src/**', 'tests/**', 'scripts/**', 'docs/**', 'CLAUDE.md', 'package.json', '.github/workflows/ci.yml']
   pull_request:
     branches: [main]
-    paths: ['src/**', 'tests/**', 'package.json', '.github/workflows/ci.yml']
+    paths: ['src/**', 'tests/**', 'scripts/**', 'docs/**', 'CLAUDE.md', 'package.json', '.github/workflows/ci.yml']
 
 jobs:
   test:
@@ -51,3 +53,9 @@ jobs:
 
       - name: Run unit tests
         run: npm test
+
+      - name: Theme quality gate (theme:perfect 全軸)
+        # Why: theme:perfect は 32 軸の統合ゲート (theme-bleed / dark: prefix / token 完備 /
+        #   ドキュメント整合 等) だが CI にも pre-commit にも入っておらず、2026-07 の docs 再編で
+        #   axis 20 がサイレントに壊れ 2 日以上検出されなかった。実行 ~2 秒と安価なので常時回す。
+        run: npm run theme:perfect

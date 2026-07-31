@@ -488,7 +488,7 @@ check('31. Status + Accent rgba hardcoded = 0 (color-mix 統一)',
 
 // 出力
 console.log('\n══════════════════════════════════════════════════════════════════');
-console.log('  Theme Perfect — 20 軸 完璧度ゲート');
+console.log(`  Theme Perfect — ${checks.length} 軸 完璧度ゲート`);
 console.log('══════════════════════════════════════════════════════════════════\n');
 let pass = 0;
 for (const c of checks) {
