@@ -180,6 +180,32 @@ node scripts/lint.js src/main.js      # 特定ファイル
 npm run check                         # test + systemDiagnosis（本番疎通含む）
 ```
 
+### 2-5. 本番スモークテスト（read-only 統合テスト）
+
+```bash
+npm run smoke                         # 那覇 (default)
+npm run smoke:open                    # 沖縄 (open)
+npm run smoke:all                     # 両テナント
+node scripts/smoke-prod.js --verbose  # previewBoard の中身も表示
+```
+
+**なぜ必要か**: `tests/*.test.cjs` は `vm.createContext` で GAS API を stub したユニットテストなので、
+**「stub と実 GAS の挙動が違う」バグを一切検出できない**。スモークテストは実 GAS / 実 Sheets /
+実 SA pool を通して、デプロイ後の本番が本当に生きているかを検証する。
+
+検証項目（7 つ・すべて read-only。本番状態を変えない）:
+
+1. アプリが有効（緊急停止されていない）
+2. `systemDiagnosis` 全項目 PASS
+3. users DB が実 Sheets から読め、レコード形状が正しい
+4. 全 `configJson` が JSON として parse 可能（破損 config は viewer 事故の原因）
+5. 必須 Script Properties が揃っている
+6. **`previewBoard` が実データを返す** — SA pool → 実 Spreadsheet → 列マッピングを丸ごと通す中核チェック
+7. Cache / 外部サービスが available
+
+**いつ使うか**: `npm run deploy:all` の直後（デプロイゲート）。失敗すると exit 1。
+CI には入れない（認証情報と本番疎通が必要、GAS quota を消費するため）。
+
 ---
 
 ## 3. デプロイと環境
