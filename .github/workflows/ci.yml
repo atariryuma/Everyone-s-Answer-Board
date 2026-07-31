@@ -14,10 +14,13 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        # node-version は engines の下限 (>=20) に合わせて 20 に固定する。
+        #   ローカル開発は Node 24 なので、CI が下限を踏むことで版差バグを検出できる
+        #   (実際 node:test の既定レポーター差 tap/spec による誤判定を CI が捕捉した)。
+        uses: actions/setup-node@v7
         with:
           node-version: 20
           cache: npm
