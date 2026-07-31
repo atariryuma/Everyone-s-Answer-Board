@@ -24,6 +24,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { checkBrandAliasResidue } = require('./lib/brand-alias-check');
+const { extractBlockBody } = require('./lib/theme-core');
 
 const ROOT = path.resolve(__dirname, '..');
 const SRC = path.join(ROOT, 'src');
@@ -172,8 +173,14 @@ check('14. brand alias 不在 (--theme-* 直参照に統一)',
   aliasRes.aliasFree ? '✓ 0 件' : `def=${aliasRes.hasDef}, usage=${aliasRes.usageFiles.join(',')}`);
 
 // 15. card tier tokens 完備 (--theme-card-1/2/3 が dark + light 両方に)
-const darkCardDef = /:root\s*\{[\s\S]*?--theme-card-1:[\s\S]*?--theme-card-2:[\s\S]*?--theme-card-3:[\s\S]*?\}/m.test(us);
-const lightCardDef = /body\.theme-light[\s\S]{0,3000}?--theme-card-1:[\s\S]*?--theme-card-2:[\s\S]*?--theme-card-3/.test(us);
+//   旧実装は body.theme-light から 3000 文字の固定窓で検索していたが、light ブロックが
+//   6000 文字超に育ち card token (実距離 3202 文字) を取りこぼして false FAIL していた。
+//   窓を広げるのではなくブロック本体を正しく切り出して判定する (誤検知でゲートの信頼を落とさない)。
+const CARD_TIER_TOKENS = ['--theme-card-1:', '--theme-card-2:', '--theme-card-3:'];
+const darkTokenBlock = extractBlockBody(us, /:root\s*\{/);
+const lightTokenBlock = extractBlockBody(us, /body\.theme-light[^{]*\{/);
+const darkCardDef = CARD_TIER_TOKENS.every((t) => darkTokenBlock.includes(t));
+const lightCardDef = CARD_TIER_TOKENS.every((t) => lightTokenBlock.includes(t));
 check('15. --theme-card-1/2/3 dark+light 両定義', darkCardDef && lightCardDef, `dark=${darkCardDef}, light=${lightCardDef}`);
 
 // 16. high contrast media query dark+light両方
