@@ -1,0 +1,160 @@
+<!-- =====================================================================
+  SharedIcons — UI アイコンの単一ソース (v2888)
+
+  Why: 従来 UI は絵文字 (🎒 📋 ✨ 🔧 …) をアイコン代わりに使っていた。
+    絵文字は (1) OS/ブラウザでレンダリングが変わる (2) 電子黒板の投影で
+    潰れて判別できない (3) 色が固定でテーマに追従しない (4) 意味の統一が
+    効かない、という 4 点で教室利用に耐えない。
+    ここで stroke ベースの line icon 1 セットに統一する。
+
+  使い方:
+    HTML      : <svg class="icon" aria-hidden="true"><use href="#i-play"/></svg>
+    JS 文字列 : ${icon('play')}  /  icon('play', 'icon-lg')
+    サイズは font-size 追従 (1.25em)。色は currentColor 追従。
+
+  追加するとき:
+    - 24x24 viewBox / stroke ベース / fill なし で描く (塗りが要る場合のみ
+      個別に fill="currentColor" を付ける)
+    - 名前は「見た目」でなく「意味」で付ける (pie-chart は OK、orange-circle は NG)
+    - 絵文字を新規に UI へ書かない。lint (npm run lint) が検出する。
+===================================================================== -->
+<style>
+  .icon {
+    width: 1.25em;
+    height: 1.25em;
+    flex: none;
+    display: inline-block;
+    vertical-align: -0.22em;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    /* 投影時に細線が飛ばないよう、拡大時は線幅を維持する */
+    vector-effect: non-scaling-stroke;
+  }
+  .icon-sm { width: 1em; height: 1em; }
+  .icon-lg { width: 1.5em; height: 1.5em; }
+  .icon-xl { width: 2rem; height: 2rem; stroke-width: 1.5; }
+
+  /* spin: 読み込み中の loader 用。prefers-reduced-motion では停止。 */
+  .icon-spin { animation: icon-spin 900ms linear infinite; }
+  @keyframes icon-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) {
+    .icon-spin { animation: none; }
+  }
+</style>
+
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true" focusable="false">
+  <!-- ── 基本操作 ───────────────────────────────────────────── -->
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+  <symbol id="i-chevron-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></symbol>
+  <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-rotate-ccw" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect width="14" height="14" x="8" y="8" rx="2"/><path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M15.2 3a2 2 0 0 1 1.4.6l3.8 3.8a2 2 0 0 1 .6 1.4V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M17 21v-7a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v7"/><path d="M7 3v4a1 1 0 0 0 1 1h7"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M21.2 6.2a3 3 0 0 0-4.24-4.24L3 15.92V21h5.08z"/><path d="m15 5 4 4"/></symbol>
+
+  <!-- ── 状態 / フィードバック ───────────────────────────────── -->
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></symbol>
+  <symbol id="i-alert-triangle" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+  <symbol id="i-alert-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></symbol>
+  <symbol id="i-check-circle" viewBox="0 0 24 24"><path d="M21.8 10A10 10 0 1 1 17 3.34"/><path d="m9 11 3 3L22 4"/></symbol>
+  <symbol id="i-lightbulb" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5A5.8 5.8 0 0 0 18 8a6 6 0 0 0-12 0c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></symbol>
+  <symbol id="i-circle-dot" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></symbol>
+  <symbol id="i-loader" viewBox="0 0 24 24"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+
+  <!-- ── 公開 / 権限 ─────────────────────────────────────────── -->
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></symbol>
+  <symbol id="i-unlock" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></symbol>
+  <symbol id="i-megaphone" viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 14z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M2.06 12.35a1 1 0 0 1 0-.7 10.75 10.75 0 0 1 19.88 0 1 1 0 0 1 0 .7 10.75 10.75 0 0 1-19.88 0"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M10.7 5.1A11 11 0 0 1 12 5c5 0 9 4 10 7a12.5 12.5 0 0 1-2.4 3.5"/><path d="M6.6 6.6C4.3 8.1 2.7 10.2 2 12c1 3 5 7 10 7a11 11 0 0 0 4.4-.9"/><path d="m2 2 20 20"/></symbol>
+  <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="m16 17 5-5-5-5"/><path d="M21 12H9"/></symbol>
+
+  <!-- ── 授業の進行 ──────────────────────────────────────────── -->
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 3.5v17a.5.5 0 0 0 .77.42l13-8.5a.5.5 0 0 0 0-.84l-13-8.5A.5.5 0 0 0 6 3.5"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect width="14" height="14" x="5" y="5" rx="2"/></symbol>
+  <symbol id="i-skip-back" viewBox="0 0 24 24"><path d="M18 19V5l-11 7z"/><path d="M5 5v14"/></symbol>
+  <symbol id="i-skip-forward" viewBox="0 0 24 24"><path d="M6 5v14l11-7z"/><path d="M19 5v14"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z"/><path d="m6.08 11-3.5 1.6a1 1 0 0 0 0 1.81l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9a1 1 0 0 0 0-1.83L17.9 11"/></symbol>
+
+  <!-- ── 可視化モード ────────────────────────────────────────── -->
+  <symbol id="i-pie-chart" viewBox="0 0 24 24"><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/><path d="M22 12A10 10 0 0 0 12 2v10z"/></symbol>
+  <symbol id="i-scatter-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><circle cx="9" cy="15" r="1.6"/><circle cx="14" cy="9" r="1.6"/><circle cx="18.5" cy="13.5" r="1.6"/></symbol>
+  <symbol id="i-number-line" viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M6 9.5v5"/><path d="M12 9.5v5"/><path d="M18 9.5v5"/><circle cx="15" cy="12" r="2.5"/></symbol>
+  <symbol id="i-message-square" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-word-cloud" viewBox="0 0 24 24"><path d="M4 7V5h16v2"/><path d="M9 19h6"/><path d="M12 5v14"/></symbol>
+  <symbol id="i-bar-chart" viewBox="0 0 24 24"><path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M8 17V9"/><path d="M13 17V5"/><path d="M18 17v-5"/></symbol>
+
+  <!-- ── Google リソース ─────────────────────────────────────── -->
+  <symbol id="i-form" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M9 13h6"/><path d="M9 17h6"/></symbol>
+  <symbol id="i-table" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M12 3v18"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"/></symbol>
+  <symbol id="i-graduation-cap" viewBox="0 0 24 24"><path d="M21.42 10.92a1 1 0 0 0-.02-1.84L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.83l8.57 3.91a2 2 0 0 0 1.66 0z"/><path d="M22 10.5V16"/><path d="M6 12.5V16c0 1.66 2.7 3 6 3s6-1.34 6-3v-3.5"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.8 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-external-link" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
+
+  <!-- ── 設定 / 人 ───────────────────────────────────────────── -->
+  <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></symbol>
+  <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.93 0 1.65-.75 1.65-1.69 0-.44-.18-.83-.44-1.12a1.66 1.66 0 0 1 1.23-2.79h2c3.05 0 5.56-2.5 5.56-5.56C22 6 17.46 2 12 2"/><circle cx="6.5" cy="12.5" r=".8" fill="currentColor" stroke="none"/><circle cx="8.5" cy="7.5" r=".8" fill="currentColor" stroke="none"/><circle cx="13.5" cy="6.5" r=".8" fill="currentColor" stroke="none"/><circle cx="17.5" cy="10.5" r=".8" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-book-open" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+  <symbol id="i-sparkles" viewBox="0 0 24 24"><path d="M9.94 14.32a2 2 0 0 0-1.26-1.26L3 11l5.68-2.06a2 2 0 0 0 1.26-1.26L12 2l2.06 5.68a2 2 0 0 0 1.26 1.26L21 11l-5.68 2.06a2 2 0 0 0-1.26 1.26L12 20z"/><path d="M20 3v4"/><path d="M22 5h-4"/></symbol>
+  <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2"/><path d="M14 10V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v2"/><path d="M10 10.5V6a2 2 0 0 0-2-2a2 2 0 0 0-2 2v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M11.53 2.3a.53.53 0 0 1 .94 0l2.6 5.27 5.82.85a.53.53 0 0 1 .29.9l-4.21 4.1 1 5.8a.53.53 0 0 1-.77.55L12 17.02l-5.2 2.74a.53.53 0 0 1-.77-.55l1-5.8-4.21-4.1a.53.53 0 0 1 .29-.9l5.81-.85z"/></symbol>
+  <symbol id="i-thumbs-up" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.34 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+  <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 0 1-9 9 9 9 0 0 1-6.7-3L3 16"/><path d="M3 12a9 9 0 0 1 9-9 9 9 0 0 1 6.7 3L21 8"/><path d="M21 3v5h-5"/><path d="M3 21v-5h5"/></symbol>
+</svg>
+
+<script>
+  (function () {
+    'use strict';
+
+    // 存在する symbol の許可リスト。typo を silent fail にせず開発時に検出する。
+    var KNOWN = null;
+    function knownIds() {
+      if (KNOWN) return KNOWN;
+      KNOWN = {};
+      try {
+        var nodes = document.querySelectorAll('symbol[id^="i-"]');
+        for (var i = 0; i < nodes.length; i++) KNOWN[nodes[i].id.slice(2)] = true;
+      } catch (_) { /* 取得できなくても描画は継続する */ }
+      return KNOWN;
+    }
+
+    /**
+     * アイコン 1 個分の SVG 文字列を返す。
+     * @param {string} name - symbol 名 (先頭の 'i-' は不要)。例: 'play'
+     * @param {string} [extraClass] - 追加クラス。例: 'icon-lg'
+     * @returns {string} <svg> 文字列。未知の name なら空文字。
+     */
+    function icon(name, extraClass) {
+      if (typeof name !== 'string' || !name) return '';
+      var safe = name.replace(/[^a-z0-9-]/g, '');
+      if (!safe) return '';
+      var ids = knownIds();
+      if (Object.keys(ids).length && !ids[safe]) {
+        if (window.console && console.warn) console.warn('[icon] unknown icon:', name);
+        return '';
+      }
+      var cls = 'icon' + (extraClass ? ' ' + String(extraClass).replace(/[^a-z0-9 _-]/gi, '') : '');
+      return '<svg class="' + cls + '" aria-hidden="true" focusable="false"><use href="#i-' + safe + '"></use></svg>';
+    }
+
+    window.icon = icon;
+  })();
+</script>

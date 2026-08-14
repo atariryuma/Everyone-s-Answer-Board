@@ -79,6 +79,43 @@ const RULES = [
       && !filepath.endsWith('/helpers.js'),
   },
   {
+    id: 'no-emoji-as-ui-icon',
+    severity: 'warn',
+    message: '絵文字を UI アイコンに使わない。OS でレンダリングが変わり投影で潰れ、テーマ色に追従しない。SharedIcons の <use href="#i-*"> / icon(\'name\') を使用。',
+    // 絵文字本体（Misc Symbols and Pictographs 以降 + Dingbats + Misc Symbols）を検出。
+    // 「—」「①」「★」等の記号や日本語は対象外。variation selector 単体も無視。
+    patterns: [
+      /[\u{1F300}-\u{1FAFF}]/gu,
+      /[\u{2600}-\u{27BF}]\u{FE0F}/gu,
+    ],
+    // UI を出す HTML のみ。SharedIcons 自身（説明コメントで絵文字に言及）は除外。
+    filter: (filepath) => /\.html$/.test(filepath)
+      && !filepath.includes('/tests/')
+      && !filepath.endsWith('/SharedIcons.html'),
+  },
+  {
+    id: 'no-gradient-background',
+    severity: 'warn',
+    message: 'グラデーション背景は使わない（旧世代 UI の主因）。単色 surface + border + shadow で階層を表現する。',
+    patterns: [
+      /\bbg-gradient-to-[a-z]+\b/g,
+      /background(-image)?\s*:\s*linear-gradient\(/g,
+    ],
+    filter: (filepath) => /\.html$/.test(filepath)
+      && !filepath.includes('/tests/')
+      // UnifiedStyles / login 背景は意匠として意図的に残す領域があるため対象外。
+      && !filepath.endsWith('/UnifiedStyles.css.html')
+      && !filepath.endsWith('/LoginPage.html'),
+  },
+  {
+    id: 'no-long-inline-class-chain',
+    severity: 'warn',
+    message: 'Tailwind utility の長い連結は primitive (.btn / .card / .field 等) に切り出す。CLAUDE.md「新規 UI は semantic primitives を使う」。',
+    // class="..." が 100 文字を超えるもの
+    patterns: [/class="[^"]{100,}"/g],
+    filter: (filepath) => /\.html$/.test(filepath) && !filepath.includes('/tests/'),
+  },
+  {
     id: 'top-level-side-effects',
     severity: 'warn',
     message: 'HTML テンプレート JS の top-level に google.script.run / DOM 操作 / setInterval があると ReferenceError や race condition の原因。init() 内へ。',

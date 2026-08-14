@@ -156,6 +156,8 @@
     </style>
   </head>
   <body class="login-background">
+  <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
+  <?!= include('SharedIcons'); ?>
     <div class="min-h-screen flex items-center justify-center p-4">
       <div class="login-container glass-panel rounded-2xl p-8">
         <!-- ヘッダー -->

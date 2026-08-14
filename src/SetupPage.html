@@ -18,6 +18,8 @@
 </head>
 
 <body style="background: var(--theme-bg-base); color: var(--theme-text-primary);">
+  <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
+  <?!= include('SharedIcons'); ?>
   <div class="max-w-2xl mx-auto">
     <!-- ヘッダー -->
     <div class="text-center mb-6">

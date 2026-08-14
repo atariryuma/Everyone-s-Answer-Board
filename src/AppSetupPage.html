@@ -31,6 +31,8 @@
     </script>
   </head>
   <body style="background: var(--theme-bg-base); color: var(--theme-text-primary);">
+  <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
+  <?!= include('SharedIcons'); ?>
     <div
       id="loading-overlay"
       class="fixed inset-0 bg-theme-base bg-opacity-75 flex items-center justify-center z-[9999] hidden"

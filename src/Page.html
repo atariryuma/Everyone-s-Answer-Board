@@ -159,6 +159,8 @@
 
 </head>
 <body style="background: var(--theme-bg-base); color: var(--theme-text-primary);">
+  <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
+  <?!= include('SharedIcons'); ?>
   <!-- Loading Overlay for UnifiedLoadingManager -->
   <div id="loading-overlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001]" style="display: none;">
     <div class="bg-theme-base border border-theme-normal rounded-lg p-6 text-center shadow-xl">

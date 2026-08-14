@@ -213,6 +213,8 @@
 </head>
 
 <body style="background: var(--theme-bg-base); color: var(--theme-text-primary);">
+  <!-- アイコン sprite: <use href="#i-*"> の解決に必要なので body 先頭で読む。 -->
+  <?!= include('SharedIcons'); ?>
   <div id="loading-overlay" class="fixed inset-0 bg-opacity-75 flex items-center justify-center z-[9999] hidden"
     style="background-color: var(--theme-bg-overlay);">
     <div class="flex flex-col items-center gap-4">
