@@ -26,6 +26,12 @@
     return;
   }
 
+  // SharedIcons の icon() への薄いラッパ。SharedIcons が未 include のページ
+  // (テスト / 旧テンプレート) でも文字列連結が壊れないよう空文字を返す。
+  function iconSvg(name, extraClass) {
+    return (typeof window.icon === 'function') ? window.icon(name, extraClass) : '';
+  }
+
   /**
    * Viz レンダラの成功テレメトリ。各モードを初回描画したとき 1 回だけ Cloud Logging に
    * 送る。CLI から `npm run logs:cloud --severity INFO` で全機能が動いていることを確認可能。
@@ -2650,31 +2656,40 @@
       toolsBar.className = 'viz-toolbar viz-controls';
       toolsBar.setAttribute('role', 'toolbar');
       toolsBar.setAttribute('aria-label', '議論支援ツール');
+      // Progressive disclosure (v2889):
+      //   旧構成は「議論前 / 比較 / 動き / 軌跡スライダー / 現在に戻る」の 5 コントロールを
+      //   常時並べており、初見の教師には何を先に押すのか判別できなかった。
+      //   さらに「比較」「動き」は 議論前 anchor 未保存だと alert で弾かれるため、
+      //   「押せるのに押すと怒られるボタン」が 2 つ常設されている状態だった。
+      //   新構成: 常時見えるのは「くらべる」1 つだけ。ON にしたときだけ副操作が現れる。
+      //   anchor 未保存でも compareRender 側が「最初の投稿」へ自動フォールバックするので、
+      //   事前に何かを押させる必要はない (旧 alert ガードは撤去)。
       toolsBar.innerHTML = [
-        '<span class="viz-toolbar-section-label">議論支援</span>',
         '<div class="viz-toolbar-center" id="vizControls">',
-        '  <button type="button" id="vizCaptureBeforeBtn" class="viz-btn" ' +
-        '          title="議論前として現在の分布を保存" aria-label="議論前として現在の分布を保存">',
-        '    📌 議論前',
+        '  <button type="button" id="vizCompareToggleBtn" class="viz-btn viz-btn-primary" ' +
+        '          title="はじめの分布と今の分布を並べて見る" ' +
+        '          aria-label="はじめと今をくらべる" aria-pressed="false">',
+        '    ' + iconSvg('rotate-ccw') + '<span>くらべる</span>',
         '  </button>',
-        '  <button type="button" id="vizCompareToggleBtn" class="viz-btn" ' +
-        '          title="議論前と現在を2画面で対比" aria-label="議論前と現在を2画面で対比" ' +
-        '          aria-pressed="false">',
-        '    ⇄ 比較',
-        '  </button>',
-        '  <button type="button" id="vizDeltaToggleBtn" class="viz-btn" ' +
-        '          title="議論前→現在の動きを軌跡で表示 (matrix のみ / クリックで再生 / Shift+クリックでOFF)" ' +
-        '          aria-label="議論前から現在への意見の動きを軌跡で表示" ' +
-        '          aria-pressed="false">',
-        '    → 動き',
-        '  </button>',
-        '  <div class="viz-timeline">',
-        '    <label for="vizTimelineSlider" class="viz-timeline-label">軌跡</label>',
-        '    <input type="range" id="vizTimelineSlider" min="0" max="0" value="0" step="1" ' +
-        '           aria-label="軌跡タイムライン: 過去の分布を再生" />',
-        '    <span id="vizTimelineLabel" class="viz-timeline-time" aria-live="polite">現在</span>',
-        '    <button type="button" id="vizTimelineNowBtn" class="viz-btn-small" ' +
-        '            title="現在に戻る" aria-label="タイムラインを現在に戻す">↺</button>',
+        '  <div id="vizCompareTools" class="viz-compare-tools" hidden>',
+        '    <button type="button" id="vizCaptureBeforeBtn" class="viz-btn-small" ' +
+        '            title="今の分布を「はじめ」の基準として保存し直す" ' +
+        '            aria-label="今の分布を基準にする">',
+        '      ' + iconSvg('circle-dot') + '<span>今を基準に</span>',
+        '    </button>',
+        '    <button type="button" id="vizDeltaToggleBtn" class="viz-btn-small" ' +
+        '            title="意見がどう動いたかを軌跡で重ねる（散布図のみ）" ' +
+        '            aria-label="意見の動きを軌跡で表示" aria-pressed="false" hidden>',
+        '      ' + iconSvg('arrow-right') + '<span>動き</span>',
+        '    </button>',
+        '    <div class="viz-timeline">',
+        '      <label for="vizTimelineSlider" class="viz-timeline-label">時点</label>',
+        '      <input type="range" id="vizTimelineSlider" min="0" max="0" value="0" step="1" ' +
+        '             aria-label="左側に表示する時点を選ぶ" />',
+        '      <span id="vizTimelineLabel" class="viz-timeline-time" aria-live="polite">現在</span>',
+        '      <button type="button" id="vizTimelineNowBtn" class="viz-btn-small" ' +
+        '              title="現在に戻す" aria-label="時点を現在に戻す">' + iconSvg('refresh') + '</button>',
+        '    </div>',
         '  </div>',
         '</div>'
       ].join('');
@@ -2747,7 +2762,23 @@
   // CSS .saved アニメーション持続時間と一致させる (短いと残光が消える、長いと連打しづらい)。
   const CAPTURE_FLASH_MS = 1500;
 
+  // 比較モードの副操作 (今を基準に / 動き / 時点スライダー) の出し入れ。
+  //   - 比較 OFF: 副操作はまとめて hidden。常時見えるのは「くらべる」だけ。
+  //   - 比較 ON : 副操作を表示。「動き」は matrix のときだけ意味を持つので個別に出し入れする。
+  function syncCompareToolsVisibility(toolsBar, app) {
+    if (!toolsBar) return;
+    const on = !!(app.state && app.state.vizCompareMode);
+    const tools = toolsBar.querySelector('#vizCompareTools');
+    if (tools) tools.hidden = !on;
+    const deltaBtn = toolsBar.querySelector('#vizDeltaToggleBtn');
+    if (deltaBtn) {
+      deltaBtn.hidden = !(on && app.state && app.state.boardMode === 'matrix');
+    }
+  }
+
   function bindDiscussionToolsEvents(toolsBar, app) {
+    // 初期状態を DOM に反映 (比較 OFF なので副操作は畳まれる)。
+    syncCompareToolsVisibility(toolsBar, app);
     const captureBtn = toolsBar.querySelector('#vizCaptureBeforeBtn');
     if (captureBtn) {
       captureBtn.addEventListener('click', () => {
@@ -2759,16 +2790,14 @@
     const compareBtn = toolsBar.querySelector('#vizCompareToggleBtn');
     if (compareBtn) {
       compareBtn.addEventListener('click', () => {
-        // 議論前スナップ未保存で比較 ON にしようとしても compareRender は普通の描画に
-        // フォールバックする (loadBeforeSnapshot null) ので、UI 上「active なのに見た目が
-        // 変わらない」状態になり教師が混乱する。事前ガードして警告。
-        if (!app.state.vizCompareMode && !app.vizGetBefore()) {
-          try { window.alert('「📌 議論前」を先に押して、議論開始時点の分布を保存してください。'); } catch (_) {}
-          return;
-        }
+        // v2889: 「議論前を先に押せ」という事前ガードは撤去した。
+        //   compareRender は before anchor が無ければ「最初の投稿」へ自動フォールバックし、
+        //   snapshot が 0 件のときだけ自力で OFF に戻して toast を出す。つまり押す前に
+        //   別のボタンを押させる必要はどこにも無く、ガードは離脱を生むだけだった。
         app.state.vizCompareMode = !app.state.vizCompareMode;
         compareBtn.classList.toggle('active', !!app.state.vizCompareMode);
         compareBtn.setAttribute('aria-pressed', String(!!app.state.vizCompareMode));
+        syncCompareToolsVisibility(toolsBar, app);
         // モーダルが開いていれば閉じる: stale な右カード残置 / 切替遅延を避ける。
         if (typeof app.hideAnswerModal === 'function') app.hideAnswerModal();
         // 比較モード中: timeline スライダーが「左ペインの時刻」を制御する設計。
@@ -2792,21 +2821,26 @@
     const deltaBtn = toolsBar.querySelector('#vizDeltaToggleBtn');
     if (deltaBtn) {
       deltaBtn.addEventListener('click', (event) => {
+        // ガード失敗は toast で伝える。native alert は投影中に画面を占有し、
+        // 教師が教室の前でダイアログを閉じる操作を強いられるため使わない。
+        const notify = (msg) => {
+          if (typeof app.showToast === 'function') app.showToast(msg);
+          else if (window.notifications && typeof window.notifications.info === 'function') {
+            window.notifications.info(msg);
+          }
+        };
         if (!app.state.vizShowDeltas) {
           const before = app.vizGetBefore();
           if (!before) {
-            try { window.alert('「📌 議論前」を先に押して、議論開始時点の分布を保存してください。'); } catch (_) {}
+            notify('「今を基準に」を押すと、そこからの動きを追えます');
             return;
           }
           if (app.state.boardMode !== 'matrix') {
-            try { window.alert('意見の動きは matrix モード（散布図）でのみ表示できます。'); } catch (_) {}
+            notify('意見の動きは散布図でのみ表示できます');
             return;
           }
           if (!arePhasesAxisCompatible(before.axisConfig, app.state.axisConfig)) {
-            try {
-              window.alert('議論前スナップと現在で軸が異なるため、動きを描けません。\n' +
-                '同じ問い（同じ X/Y 軸ラベル）の間でのみ動きを可視化できます。');
-            } catch (_) {}
+            notify('基準と今で軸が違うため、動きを描けません（同じ問いの間でのみ可能）');
             return;
           }
           app.state.vizShowDeltas = true;
@@ -3284,19 +3318,21 @@
       else label.textContent = '現在';
     }
 
-    // 議論前ボタンの状態
+    // 「今を基準に」ボタン: anchor 保存済みかを示すだけ (押下の前提条件ではない)。
     const beforeBtn = document.getElementById('vizCaptureBeforeBtn');
-    if (beforeBtn) {
-      const has = !!app.vizGetBefore();
-      beforeBtn.classList.toggle('has-before', has);
-      // 議論前未保存 → compare ボタンに視覚的ヒント (compare-disabled クラスで CSS 制御)
-      const compareBtn = document.getElementById('vizCompareToggleBtn');
-      if (compareBtn) {
-        compareBtn.classList.toggle('compare-disabled', !has && !app.state.vizCompareMode);
-        // aria-pressed は state と毎回同期（クリックハンドラだけだと render 経由の変更を反映しそこねる）
-        compareBtn.setAttribute('aria-pressed', String(!!app.state.vizCompareMode));
-      }
+    if (beforeBtn) beforeBtn.classList.toggle('has-before', !!app.vizGetBefore());
+
+    // v2889: anchor 未保存でも「くらべる」は押せる (自動フォールバックがある) ので、
+    //   旧 compare-disabled による「押せなさそうな見た目」は付けない。
+    const compareBtn = document.getElementById('vizCompareToggleBtn');
+    if (compareBtn) {
+      compareBtn.classList.remove('compare-disabled');
+      // aria-pressed は state と毎回同期（クリックハンドラだけだと render 経由の変更を反映しそこねる）
+      compareBtn.setAttribute('aria-pressed', String(!!app.state.vizCompareMode));
+      compareBtn.classList.toggle('active', !!app.state.vizCompareMode);
     }
+    // render 経由で compareMode / boardMode が変わった場合も副操作の出し入れを追従させる。
+    syncCompareToolsVisibility(document.getElementById('vizToolbar'), app);
   }
 
   // expose snapshot helpers for tests
@@ -3401,18 +3437,18 @@
         rows: accumulateRowsUpTo(snaps, idx),
         axisConfig: snaps[idx].axisConfig
       };
-      leftLabel = '⏱ ' + fmtHhMm(snaps[idx].latestTimestamp);
+      leftLabel = fmtHhMm(snaps[idx].latestTimestamp) + ' の分布';
     } else if (before) {
       // 議論前 anchor (full snapshot): rows / capturedAt をそのまま読める
       leftSource = before;
-      leftLabel = '📌 議論前 (' + fmtHhMm(before.capturedAt) + ')';
+      leftLabel = 'はじめ（' + fmtHhMm(before.capturedAt) + '）';
     } else if (snaps.length > 0) {
       // fallback: 「議論前」未保存 → 最初の投稿だけを左に出す
       leftSource = {
         rows: accumulateRowsUpTo(snaps, 0),
         axisConfig: snaps[0].axisConfig
       };
-      leftLabel = '📍 最初の投稿 (' + fmtHhMm(snaps[0].latestTimestamp) + ')';
+      leftLabel = 'はじめ（' + fmtHhMm(snaps[0].latestTimestamp) + '）';
     } else {
       // snapshot 0 件 + 議論前未保存 → 比較不能。compareMode を OFF にしてユーザーに通知。
       this.state.vizCompareMode = false;
@@ -3424,7 +3460,7 @@
         compareBtn.setAttribute('aria-pressed', 'false');
       }
       if (typeof this.showToast === 'function') {
-        this.showToast('比較するには「📌 議論前」を先に押すか、投稿が蓄積するまで待ってください');
+        this.showToast('回答がもう少し集まると、はじめと今をくらべられます');
       }
       return await renderOne();
     }
@@ -3434,7 +3470,7 @@
     answers.innerHTML = '';
     const wrap = document.createElement('div');
     wrap.className = 'viz-compare-wrap';
-    const rightLabel = '📊 現在';
+    const rightLabel = 'いま';
     const beforePane = document.createElement('div');
     beforePane.className = 'viz-compare-pane';
     beforePane.innerHTML = `<h4>${leftLabel}</h4>`;

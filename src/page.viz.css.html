@@ -107,11 +107,9 @@
     stroke: rgba(255, 255, 255, 0.9);  /* theme:exempt - colored dot 上の白ハロー (badge separator) */
     stroke-width: 2.5;
   }
-  /* 比較モード ON 中で議論前未保存のとき、compare ボタンに「使えない」ヒント */
-  .viz-btn.compare-disabled {
-    opacity: 0.55;
-    cursor: help;
-  }
+  /* v2889: compare-disabled は廃止 (anchor 未保存でも「くらべる」は押せる)。
+     旧マークアップが残った場合でも見た目が壊れないよう no-op として残す。 */
+  .viz-btn.compare-disabled { opacity: 1; cursor: pointer; }
 
   /* 行リストポップアップ (pie のカテゴリ / wordcloud の単語クリック時) */
   .viz-rows-popup {
@@ -780,10 +778,46 @@
        押したとき文字が背景に同化して消える。 theme-text-primary 継承で両モード可読に。 */
     color: var(--theme-text-primary);
   }
-  .viz-btn.has-before::before {
-    content: '✓ ';
-    color: var(--theme-text-confirm);  /* green: light では darker green に切替 */
+  /* 基準保存済みマーカー。旧実装は ::before で '✓ ' を差し込んでいたが、
+     フォント依存の記号なのでアイコン系と揃わない。左端のドットで表す。 */
+  .viz-btn.has-before {
+    border-color: color-mix(in srgb, var(--status-success) 55%, transparent);
   }
+  .viz-btn.has-before::before {
+    content: '';
+    width: 0.4rem;
+    height: 0.4rem;
+    margin-right: 0.35rem;
+    border-radius: var(--radius-full);
+    background: var(--theme-text-confirm);
+    flex: none;
+  }
+
+  /* 「くらべる」= この bar の主操作。他より一段強く見せる。 */
+  .viz-btn-primary {
+    font-weight: 600;
+    border-color: color-mix(in srgb, var(--theme-accent-cyan) 45%, transparent);
+  }
+
+  /* 比較 ON のときだけ現れる副操作群。OFF 時は [hidden] で完全に畳む。 */
+  .viz-compare-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    padding-left: 0.6rem;
+    border-left: 1px solid var(--theme-border-subtle);
+  }
+  .viz-compare-tools[hidden] { display: none; }
+
+  /* icon + ラベルを縦中央で揃える (SharedIcons の .icon は inline-block) */
+  .viz-btn, .viz-btn-small {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .viz-btn[hidden], .viz-btn-small[hidden] { display: none; }
   .viz-btn.saved {
     background: color-mix(in srgb, var(--status-success) 30%, transparent);
     border-color: var(--theme-text-confirm);

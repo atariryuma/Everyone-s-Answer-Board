@@ -1248,7 +1248,9 @@ test('__vizRenderCompare: snapshot 0 件 + before 未保存 → toast + button O
   app.showToast = (m) => { toastMsg = m; };
   await StudyQuestApp.prototype.__vizRenderCompare.call(app, async () => {}, 'matrix');
   assert.equal(app.state.vizCompareMode, false, 'compareMode は OFF に降格');
-  assert.match(toastMsg || '', /議論前|投稿/, 'toast でユーザーに理由を伝える');
+  // 文言そのものではなく「比較できない理由が伝わっているか」を検査する。
+  // v2889 で「議論前を先に押せ」→「回答が集まれば比較できる」に変更済み。
+  assert.match(toastMsg || '', /くらべ|比較|回答/, 'toast でユーザーに理由を伝える');
 });
 
 // =====================================================================
