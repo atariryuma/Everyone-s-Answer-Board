@@ -475,6 +475,42 @@
     --theme-accent-indigo: #4338ca;                    /* indigo-700 — light 上 7.4:1 */
   }
 
+  /* =============================================================================
+     縦リズム (vertical rhythm) — セクション間隔の唯一の既定 (v2915)
+
+     Why: Tailwind CDN 廃止 (v2901) で preflight が失われ、h1-h6 / p / ul の
+       ブラウザ既定マージン (h1 = 0.67em, p = 1em … フォントサイズ依存で可変) が
+       復活していた。これが mb-* / space-y-* と衝突し、同じ「セクション区切り」でも
+       実測 12 / 16 / 20 / 24px とバラバラになっていた (Unpublished 画面で計測)。
+
+     方針: 既定マージンを 0 にするだけでは、余白クラスを持たない要素
+       (見出し 48/62・段落 71/103) が全部くっついてしまう。そこで UA 既定を
+       「設計スケール由来の既定値」へ置き換える。これでマークアップを一切触らずに
+       全ページの間隔が揃い、個別調整が要らなくなる。
+
+     優先順位: ここは要素セレクタ (詳細度 0,0,1) なので、既存の mb-* / mt-* /
+       space-y-* (0,1,0 以上) が従来どおり勝つ。意図的に調整した箇所は壊れない。
+
+     font-size と list-style はリセットしない: 見出しの 48/62 が明示サイズを持たず
+       .admin-title 等のカスタムクラスや既定サイズに依存しており、リセットすると
+       文字が縮む。list-style も箇条書き 5 箇所が既定の bullet を前提にしている。
+     ============================================================================= */
+  h1, h2, h3, h4, h5, h6,
+  p, ul, ol, dl, blockquote, figure, pre, table {
+    margin-block: 0 var(--space-3);   /* 段落内の区切り = 12px */
+  }
+  /* 直前に何かある見出しは「新しいまとまりの開始」なので上を広く取る */
+  * + h1, * + h2, * + h3 { margin-block-start: var(--space-6); }  /* 24px */
+  * + h4, * + h5, * + h6 { margin-block-start: var(--space-5); }  /* 20px */
+  /* まとまりの最後の要素が余分な下余白でカードの底を押し広げないようにする */
+  h1:last-child, h2:last-child, h3:last-child, h4:last-child, h5:last-child, h6:last-child,
+  p:last-child, ul:last-child, ol:last-child, dl:last-child,
+  blockquote:last-child, figure:last-child, pre:last-child, table:last-child {
+    margin-block-end: 0;
+  }
+  /* dd はブラウザ既定の左インデント (40px) が効くと箇条書きがずれる */
+  dd { margin-inline-start: 0; }
+
   /* Base Styles - Unified body element */
   body {
     margin: 0;
