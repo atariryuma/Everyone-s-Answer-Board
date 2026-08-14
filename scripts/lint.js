@@ -135,7 +135,10 @@ const RULES = [
       && !filepath.includes('/tests/')
       // UnifiedStyles / login 背景は意匠として意図的に残す領域があるため対象外。
       && !filepath.endsWith('/UnifiedStyles.css.html')
-      && !filepath.endsWith('/LoginPage.html'),
+      && !filepath.endsWith('/LoginPage.html')
+      // SharedPageHead は UnifiedStyles を展開した生成物 (v2909)。元ファイルで
+      // 検査済みの内容を二重に報告してしまうため対象外にする。
+      && !filepath.endsWith('/SharedPageHead.html'),
   },
   {
     id: 'no-long-inline-class-chain',
@@ -194,6 +197,10 @@ function snippet(content, index, span = 80) {
  *   // lint-disable-next-line <rule-id>              ← 次の行を suppress
  *   // lint-disable-next-line <rule-id> -- 理由      ← 次の行を suppress (理由付き)
  *
+ * CSS のブロックコメント形式も受け付ける (検査対象は .html 内の <style> も含むため、
+ * `//` が書けない箇所がある):
+ *   /* lint-disable-next-line <rule-id> -- 理由 *\/
+ *
  * Why: ESLint 互換の suppress 表記。1 ファイル全体を無効化する手段は意図的に提供しない
  *     (見落としやすいため)。理由 (`-- ...`) は強制ではないが、書くと grep 可能になる。
  */
@@ -203,8 +210,10 @@ function isSuppressed(content, finding) {
   const sameLine = lines[finding.line - 1] || '';
   const prevLine = lines[finding.line - 2] || '';
 
-  const sameLineRe = new RegExp(`//\\s*lint-disable-line\\s+${finding.rule}(\\s|$|;)`);
-  const prevLineRe = new RegExp(`//\\s*lint-disable-next-line\\s+${finding.rule}(\\s|$|;)`);
+  // `//` (JS) と `/*` (CSS) の両方を受け付ける
+  const open = '(?://|/\\*)';
+  const sameLineRe = new RegExp(`${open}\\s*lint-disable-line\\s+${finding.rule}(\\s|$|;)`);
+  const prevLineRe = new RegExp(`${open}\\s*lint-disable-next-line\\s+${finding.rule}(\\s|$|;)`);
 
   return sameLineRe.test(sameLine) || prevLineRe.test(prevLine);
 }

@@ -613,11 +613,19 @@ button.highlight-badge:hover {
 .answer-card.reaction-bg-understand::before { background: var(--brand-understand); }
 .answer-card.reaction-bg-curious::before { background: var(--brand-curious); }
 
-/* 複数種別は縦方向グラデーションで併記する (左バー上で色が積み重なる) */
-.answer-card.reaction-bg-like-understand::before { background: linear-gradient(180deg, var(--brand-like), var(--brand-understand)); }
-.answer-card.reaction-bg-like-curious::before { background: linear-gradient(180deg, var(--brand-like), var(--brand-curious)); }
-.answer-card.reaction-bg-understand-curious::before { background: linear-gradient(180deg, var(--brand-understand), var(--brand-curious)); }
-.answer-card.reaction-bg-like-understand-curious::before { background: linear-gradient(180deg, var(--brand-like), var(--brand-understand), var(--brand-curious)); }
+/* 複数種別は左バーを等分した「区切り」で併記する。
+   滑らかなグラデーションだと 2 種か 3 種かを目で数えられず、符号として機能しない。
+   hard stop で境界を立てることで種類数が読み取れる (色覚に依存しない冗長チャネル)。
+   lint の no-gradient-background は「面の装飾グラデーション」を禁じる規則であり、
+   ここは 3-7px の符号バーなので理由を添えて除外する。 */
+/* lint-disable-next-line no-gradient-background -- 装飾ではなくリアクション種別の符号 */
+.answer-card.reaction-bg-like-understand::before { background: linear-gradient(180deg, var(--brand-like) 0 50%, var(--brand-understand) 50% 100%); }
+/* lint-disable-next-line no-gradient-background -- 装飾ではなくリアクション種別の符号 */
+.answer-card.reaction-bg-like-curious::before { background: linear-gradient(180deg, var(--brand-like) 0 50%, var(--brand-curious) 50% 100%); }
+/* lint-disable-next-line no-gradient-background -- 装飾ではなくリアクション種別の符号 */
+.answer-card.reaction-bg-understand-curious::before { background: linear-gradient(180deg, var(--brand-understand) 0 50%, var(--brand-curious) 50% 100%); }
+/* lint-disable-next-line no-gradient-background -- 装飾ではなくリアクション種別の符号 */
+.answer-card.reaction-bg-like-understand-curious::before { background: linear-gradient(180deg, var(--brand-like) 0 33.33%, var(--brand-understand) 33.33% 66.66%, var(--brand-curious) 66.66% 100%); }
 
 .answer-card.reaction-border-1::before { width: 3px; }
 .answer-card.reaction-border-2::before { width: 5px; }

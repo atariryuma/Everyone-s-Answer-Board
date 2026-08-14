@@ -868,8 +868,13 @@
           saPool_setStatus('エラー: ' + (err && err.message), true);
         });
       }
-      function saPool_migrate() {
-        if (!confirm('既存ボード全件に SA pool 全員を editor 追加し、 旧ドメイン共有を revoke します。\n冪等のため何度実行しても安全。\n\n実行しますか?')) return;
+      async function saPool_migrate() {
+        const ok = await modals.confirm(
+          '既存ボード全件に SA pool 全員を editor 追加し、旧ドメイン共有を revoke します。\n'
+          + '冪等のため何度実行しても安全です。',
+          { title: '共有設定を移行する', okLabel: '実行する' }
+        );
+        if (!ok) return;
         saPool_setStatus('migration 実行中... (ボード数 × 数秒)');
         saPool_callAdmin('migrateBoardSharing', {}).then(function(result) {
           if (!result || !result.success) {
@@ -892,8 +897,12 @@
           saPool_setStatus('エラー: ' + (err && err.message), true);
         });
       }
-      function saPool_remove(slot) {
-        if (!confirm(slot + 'を pool から削除しますか? (GCP 側の SA key は別途 revoke が必要)')) return;
+      async function saPool_remove(slot) {
+        const ok = await modals.confirm(
+          slot + ' を pool から削除します。\nGCP 側の SA key は別途 revoke が必要です。',
+          { title: 'サービスアカウントを削除する', okLabel: '削除する', variant: 'danger' }
+        );
+        if (!ok) return;
         saPool_setStatus(slot + 'を削除中...');
         saPool_callAdmin('removeServiceAccountFromPool', { slot: slot }).then(function(result) {
           if (result && result.success) {
