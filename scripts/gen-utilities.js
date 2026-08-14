@@ -45,6 +45,23 @@ for (const f of htmlFiles) {
   }
 }
 
+// ── 1b. 動的に組み立てられたクラスの検出 ──────────────────────────
+//   `'lg:grid-cols-' + value` のような文字列連結は、静的走査では実際の
+//   クラス名が分からない。Tailwind CDN の JIT は実行時にコンパイルしていたので
+//   動いていたが、静的 CSS では「生成されないので効かない」無言の不具合になる
+//   (実例: 列数スライダーが 5・6 で効かなかった)。ここで検出して警告する。
+const dynamicSuspects = [];
+for (const f of htmlFiles) {
+  const s = fs.readFileSync(path.join(SRC, f), 'utf8');
+  // 'xxx-' + var  /  `xxx-${...}`  の形で、xxx が Tailwind っぽい接頭辞のもの
+  const re = /['"`]([a-z]+(?::[a-z-]+)?-)['"`]?\s*(?:\+|\$\{)/g;
+  for (const m of s.matchAll(re)) {
+    const prefix = m[1];
+    if (!/(grid-cols|col-span|gap|p|px|py|m|mx|my|w|h|text|bg|border|rounded|z|opacity|translate|scale)-$/.test(prefix)) continue;
+    dynamicSuspects.push(`${f}:${(s.slice(0, m.index).match(/\n/g) || []).length + 1} '${prefix}' + …`);
+  }
+}
+
 // ── 2. 自前 CSS に既にある名前は除外 ────────────────────────────────
 //   注意: 「コメント内でクラス名に言及しているだけ」を実定義と誤認しないこと。
 //   CSS コメントを除去し、宣言ブロック `{...}` の外 (= セレクタ部) だけを走査する。
@@ -440,6 +457,11 @@ if (CHECK) {
   fs.writeFileSync(OUT, out);
   console.log(`✓ ${path.relative(process.cwd(), OUT)} を生成`);
   console.log(`  base ${base.length} / state ${states.length} / media ${Object.values(media).flat().length} ルール`);
+  if (dynamicSuspects.length) {
+    console.log(`\n  ⚠ 動的に組み立てられている疑いのあるクラス ${dynamicSuspects.length} 件:`);
+    for (const d of dynamicSuspects) console.log(`      ${d}`);
+    console.log('      静的 CSS では実行時に作られるクラスは効きません。CSS 変数などに置き換えてください。');
+  }
   if (skipped.length) {
     console.log(`\n  未対応 (Tailwind でも無効か、自前 CSS 側の名前) ${skipped.length} 件:`);
     console.log('   ', skipped.join(' '));

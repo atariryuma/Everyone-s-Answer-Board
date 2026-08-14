@@ -389,253 +389,30 @@
         return;
       }
 
-      const safeMessage = escapeHtml(message || 'ログインが完了しました');
-      const safeAdminUrl = escapeHtml(adminUrl);
+      const safeMessageRaw = message || 'ログインが完了しました';
 
       setLoginButtonState(false);
 
-      // theme:exempt-block-start — Login 成功時の transient popup ウィンドウ全体。
-      //   親 theme 非継承。 常時 dark brand gradient で一貫した login 体験を維持。
-      const successHtml = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>${safeMessage}</title>
-          <meta charset="utf-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1">
-          <style> body { 
-              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-              background: #1a1b26;
-              min-height: 100vh;
-              margin: 0;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              padding: 20px;
-              position: relative;
-              transition: background 2s ease-out;
-            }
-            body.success-transition {
-              background: linear-gradient(135deg, #1a1b26 0%, #2a3d4a 30%, #1e3a3f 60%, #1a1b26 100%);
-            }
-            body::before {
-              content: '';
-              position: absolute;
-              top: 0; left: 0; right: 0; bottom: 0;
-              /* theme:exempt - standalone popup, theme system 非統合 */
-              background-image: radial-gradient(circle at 20% 30%, rgba(59, 130, 246, 0.1) 0%, transparent 50%),
-                                radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 50%),
-                                radial-gradient(circle at 40% 80%, rgba(6, 182, 212, 0.1) 0%, transparent 50%);
-              pointer-events: none;
-              transition: background-image 2s ease-out, opacity 2s ease-out;
-            }
-            body.success-transition::before {
-              /* theme:exempt - standalone popup, theme system 非統合 */
-              background-image: radial-gradient(circle at 25% 25%, rgba(16, 185, 129, 0.15) 0%, transparent 60%),
-                                radial-gradient(circle at 75% 75%, rgba(59, 130, 246, 0.15) 0%, transparent 60%),
-                                radial-gradient(circle at 50% 50%, rgba(139, 233, 253, 0.1) 0%, transparent 70%);
-              opacity: 0.8;
-            }
-            .container {
-              background: rgba(26,27,38,0.7);
-              backdrop-filter: blur(12px);
-              border: 1px solid rgba(255,255,255,0.1);
-              border-radius: 16px;
-              padding: 2rem;
-              max-width: 420px;
-              width: 90%;
-              min-height: 580px;
-              max-height: 90vh;
-              overflow-y: auto;
-              text-align: center;
-              box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-              position: relative;
-              z-index: 1;
-              animation: slideUp 0.6s ease-out;
-            }
-            /* Responsive design matching login panel breakpoints */
-            @media (max-width: 640px) {
-              .container {
-                width: 95%;
-                max-width: 380px;
-                min-height: 520px;
-                padding: 1.5rem;
-              }
-              .main-button {
-                min-height: 48px;
-                padding: 1rem 1.5rem;
-                font-size: 16px;
-              }
-            }
-            @media (max-width: 768px) {
-              .container {
-                padding: 1rem;
-              }
-            }
-            @media (max-height: 700px) {
-              .container {
-                min-height: auto;
-                max-height: 85vh;
-              }
-            }
-            @media (min-width: 768px) {
-              .container {
-                padding: 2rem;
-              }
-            }
-            @media (min-width: 1024px) {
-              .container {
-                max-width: 450px;
-                padding: 2.5rem;
-              }
-            }
-            @keyframes slideUp {
-              0% { opacity: 0; transform: translateY(20px); }
-              100% { opacity: 1; transform: translateY(0); }
-            }
-            @keyframes spin {
-              0% { transform: rotate(0deg); }
-              100% { transform: rotate(360deg); }
-            }
-            .icon { font-size: 64px; margin-bottom: 20px; }
-            .title { 
-              color: #10b981; 
-              font-size: 24px; 
-              font-weight: bold; 
-              margin-bottom: 16px; 
-            }
-            .subtitle { 
-              color: #d1d5db; 
-              margin-bottom: 32px; 
-              line-height: 1.5;
-            }
-            .main-button {
-              display: inline-block;
-              background: linear-gradient(135deg, #10b981 0%, #3b82f6 100%);
-              color: white;
-              font-weight: bold;
-              padding: 16px 32px;
-              border-radius: 0.75rem;
-              text-decoration: none;
-              font-size: 18px;
-              transition: all var(--transition-slow) ease;
-              margin-bottom: 24px;
-              box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
-              width: 100%;
-              box-sizing: border-box;
-            }
-            .main-button:hover {
-              transform: translateY(-2px);
-              box-shadow: 0 8px 25px rgba(16, 185, 129, 0.6);
-            }
-            .url-info {
-              background: rgba(17, 24, 39, 0.8);
-              border-radius: 0.5rem;
-              padding: 16px;
-              margin: 20px 0;
-              border: 1px solid rgba(75, 85, 99, 0.5);
-            }
-            .url-label {
-              color: #9ca3af;
-              font-size: 12px;
-              font-weight: 600;
-              margin-bottom: 8px;
-            }
-            .url-text {
-              color: #60a5fa;
-              font-family: 'Courier New', monospace;
-              font-size: 12px;
-              word-break: break-all;
-              line-height: 1.4;
-              background: rgba(17, 24, 39, 0.8);
-              padding: 8px;
-              border-radius: 0.25rem;
-            }
-            .copy-btn {
-              margin-top: 8px;
-              color: #3b82f6;
-              background: none;
-              border: none;
-              font-size: 12px;
-              text-decoration: underline;
-              cursor: pointer;
-            }
-            .copy-btn:hover { color: #60a5fa; }
-            .note {
-              color: #9ca3af;
-              font-size: 13px;
-              margin-top: 20px;
-              line-height: 1.5;
-              text-align: left;
-            }
-            .note div {
-              margin-bottom: 4px;
-              word-break: keep-all;
-              overflow-wrap: break-word;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="icon"></div>
-            <h1 class="title">${safeMessage}</h1>
-            <p class="subtitle">管理パネルにアクセスしてください</p>
-
-            <a href="${safeAdminUrl}" class="main-button" id="admin-panel-btn" onclick="handleSingleClick(this)">
-              <span id="admin-panel-btn-text"> 管理パネルを開く</span>
-            </a>
-
-            <div class="url-info">
-              <div class="url-label"> 管理パネルURL:</div>
-              <div class="url-text">${safeAdminUrl}</div>
-              <button data-copy-url class="copy-btn"> URLをコピー
-              </button>
-            </div>
-            
-            <div class="note">
-              <div class="mb-1"> このリンクは安全です</div>
-              <div class="mb-1"> Google Apps Script公式のセキュリティガイドラインに準拠</div>
-              <div class="mb-1"> ボタンをクリックして管理パネルに移動してください</div>
-              <div class="mb-1"> このURLをブックマークすると、次回から直接アクセスできます</div>
-              <div> セキュリティのため、URLは他人と共有しないでください</div>
-            </div>
-          </div>
-        </body>
-        </html> `;
-      // theme:exempt-block-end
-
-      document.body.innerHTML = successHtml; // lint-disable-line no-inner-html-assignment-with-variable -- safeMessage と safeAdminUrl は escapeHtml 済 + adminUrl は /^https:\/\//i.test() でガード
-
-      // Bind the copy button after injection. adminUrl is held in the
-      // closure (already validated as https above) rather than
-      // interpolated into markup, so no risk of breaking out of a JS
-      // string literal with quotes or script tags.
-      const copyBtn = document.querySelector('[data-copy-url]');
-      if (copyBtn) {
-        copyBtn.addEventListener('click', () => window.copyUrlToClipboard(adminUrl, copyBtn));
-      }
-
-
-      window.handleSingleClick = function(buttonElement) {
-        if (buttonElement.dataset.clicked === 'true') {
-          return false;
-        }
-
-        buttonElement.dataset.clicked = 'true';
-
-        const btnText = buttonElement.querySelector('#admin-panel-btn-text');
-        if (btnText) {
-          btnText.textContent = '管理パネルに移動中...';
-        }
-        buttonElement.style.opacity = '0.7';
-        buttonElement.style.pointerEvents = 'none';
-
-        return true; // リンクの通常動作を継続
+      // v2905: 以前はここでログイン成功画面を 205 行のインライン HTML + CSS として
+      //   組み立て、document.body.innerHTML に丸ごと差し込んでいた。アプリの
+      //   primitive を一切使わず、グラデーション背景・backdrop-filter・
+      //   ハードコード色を自前で書き直した「2 つ目の UI」になっていた。
+      //   同じ用途の showRedirectModal が SharedUtilities にあるので、それに寄せる。
+      const openAdmin = () => {
+        try { window.top.location.href = adminUrl; }
+        catch (_) { window.location.href = adminUrl; }
       };
-
-      requestIdleCallback(() => {
-        document.body.classList.add('success-transition');
-      }, { timeout: 300 });
+      if (typeof window.showRedirectModal === 'function') {
+        window.showRedirectModal({
+          title: safeMessageRaw,
+          message: 'このURLをブックマークしておくと、次回から直接開けます。他の人とは共有しないでください。',
+          redirectUrl: adminUrl,
+          buttonLabel: '管理パネルを開く',
+          variant: 'green'
+        });
+      } else {
+        openAdmin();
+      }
 
     } catch (error) {
       console.error('成功画面表示エラー:', error);
@@ -656,54 +433,5 @@
     }
   }
 
-  /**
-   * URLをクリップボードにコピー (成功画面用)
-   * @param {string} url - コピーするURL
-   * @param {HTMLElement} buttonElement - クリックされたボタン要素
-   */
-  window.copyUrlToClipboard = function (url, buttonElement) {
-    try {
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard
-          .writeText(url)
-          .then(() => {
-            const originalText = buttonElement.textContent;
-            buttonElement.textContent = 'コピー完了!';
-            buttonElement.disabled = true;
-  
-
-            createPromiseDelay(2000).then(() => {
-              buttonElement.textContent = originalText;
-              buttonElement.disabled = false;
-            });
-          })
-          .catch((error) => {
-            console.error('Clipboard API failed:', error);
-            const messageElement = document.createElement('span');
-            messageElement.textContent = '(手動でコピーしてください)';
-            messageElement.style.color = 'var(--status-warning)';
-            buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-  
-
-            createPromiseDelay(5000).then(() => messageElement.remove());
-          });
-      } else {
-        console.warn('Clipboard API not supported. Manual copy required.');
-        const messageElement = document.createElement('span');
-        messageElement.textContent =
-          '(ブラウザがコピーをサポートしていません。手動でコピーしてください)';
-        messageElement.style.color = 'var(--status-warning)';
-        buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-        createPromiseDelay(5000).then(() => messageElement.remove());
-      }
-    } catch (error) {
-      console.error('copyUrlToClipboard error:', error);
-      const messageElement = document.createElement('span');
-      messageElement.textContent = '(コピー中にエラーが発生しました)';
-      messageElement.style.color = 'var(--status-error)';
-      buttonElement.parentNode.insertBefore(messageElement, buttonElement.nextSibling);
-      createPromiseDelay(5000).then(() => messageElement.remove());
-    }
-  };
 
 </script>

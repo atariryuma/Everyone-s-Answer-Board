@@ -84,6 +84,20 @@
   <symbol id="i-graduation-cap" viewBox="0 0 24 24"><path d="M21.42 10.92a1 1 0 0 0-.02-1.84L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.83l8.57 3.91a2 2 0 0 0 1.66 0z"/><path d="M22 10.5V16"/><path d="M6 12.5V16c0 1.66 2.7 3 6 3s6-1.34 6-3v-3.5"/></symbol>
   <symbol id="i-external-link" viewBox="0 0 24 24"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></symbol>
 
+  <!-- ── リアクション (児童が押すボタン) ──────────────────────
+       outline = 未押下 / solid = 押下済み。solid 側は paths に
+       fill="currentColor" stroke="none" を直接指定して .icon の
+       fill:none / stroke:currentColor を上書きする。 -->
+  <symbol id="i-hand-thumb-up-outline" viewBox="0 0 24 24"><path d="M7 10v12"/><path d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.34 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88"/></symbol>
+  <symbol id="i-hand-thumb-up-solid" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M15 5.88 14 10h5.83a2 2 0 0 1 1.92 2.56l-2.34 8A2 2 0 0 1 17.5 22H4a2 2 0 0 1-2-2v-8a2 2 0 0 1 2-2h2.76a2 2 0 0 0 1.79-1.11L12 2a3.13 3.13 0 0 1 3 3.88"/><path fill="currentColor" stroke="none" d="M6.4 10h1.2v12H6.4z"/></symbol>
+  <symbol id="i-lightbulb-outline" viewBox="0 0 24 24"><path d="M15 14c.2-1 .7-1.7 1.5-2.5A5.8 5.8 0 0 0 18 8a6 6 0 0 0-12 0c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></symbol>
+  <symbol id="i-lightbulb-solid" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M12 2a6 6 0 0 0-6 6c0 1.3.5 2.6 1.5 3.5.8.8 1.3 1.5 1.5 2.5h6c.2-1 .7-1.7 1.5-2.5A5.8 5.8 0 0 0 18 8a6 6 0 0 0-6-6"/><path d="M9 18h6"/><path d="M10 22h4"/></symbol>
+  <symbol id="i-magnifying-glass-plus-outline" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6"/><path d="M8 11h6"/></symbol>
+  <symbol id="i-magnifying-glass-plus-solid" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="currentColor" stroke="none"/><path d="m21 21-4.3-4.3"/><path d="M11 8v6" stroke="var(--theme-bg-base)"/><path d="M8 11h6" stroke="var(--theme-bg-base)"/></symbol>
+  <symbol id="i-star-outline" viewBox="0 0 24 24"><path d="M11.53 2.3a.53.53 0 0 1 .94 0l2.6 5.27 5.82.85a.53.53 0 0 1 .29.9l-4.21 4.1 1 5.8a.53.53 0 0 1-.77.55L12 17.02l-5.2 2.74a.53.53 0 0 1-.77-.55l1-5.8-4.21-4.1a.53.53 0 0 1 .29-.9l5.81-.85z"/></symbol>
+  <symbol id="i-star-solid" viewBox="0 0 24 24"><path fill="currentColor" stroke="none" d="M11.53 2.3a.53.53 0 0 1 .94 0l2.6 5.27 5.82.85a.53.53 0 0 1 .29.9l-4.21 4.1 1 5.8a.53.53 0 0 1-.77.55L12 17.02l-5.2 2.74a.53.53 0 0 1-.77-.55l1-5.8-4.21-4.1a.53.53 0 0 1 .29-.9l5.81-.85z"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+
   <!-- ── 設定 / 人 ───────────────────────────────────────────── -->
   <symbol id="i-settings" viewBox="0 0 24 24"><path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2"/><circle cx="12" cy="12" r="3"/></symbol>
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7"/><path d="M4 10V3"/><path d="M12 21v-9"/><path d="M12 8V3"/><path d="M20 21v-5"/><path d="M20 12V3"/><path d="M1 14h6"/><path d="M9 8h6"/><path d="M17 16h6"/></symbol>

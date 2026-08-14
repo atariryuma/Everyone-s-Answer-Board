@@ -222,19 +222,29 @@ for (const f of HTML_FILES) {
 }
 check('17. <meta theme-color> 全部 exempt 明示', untaggedMeta === 0, `${untaggedMeta} 件 untagged`);
 
-// 18. document.write popup に exempt-block マーカー
-let unmarkedPopups = 0;
+// 18. アプリの外に「2 つ目の UI」を作っていないか
+//   v2905: 以前は別ウィンドウ / body 差し替えで完結した HTML を組み立てる箇所が
+//   2 つあり (フォーム作成の進捗 popup 60 行 / ログイン成功画面 205 行)、どちらも
+//   アプリの primitive を使わず色を literal で書き直していた。テーマ変更が届かず、
+//   案内文が本体と乖離して古くなる (削除済みボタンを押すよう書かれていた実例あり)。
+//   両方 modals / showRedirectModal へ寄せたので、再発しないよう検出を残す。
+let standaloneUis = 0;
+const standaloneWhere = [];
 for (const f of HTML_FILES) {
+  if (!f.endsWith('.html') || f === 'd3.min.html') continue;
   const text = readSrc(f);
-  const writes = text.match(/(?:document\.write\(|=\s*`[\s\S]{0,500}?<!DOCTYPE html>)/g) || [];
-  // 各 popup の周辺 500 chars に exempt-block-start があるか
-  for (const m of writes) {
-    const idx = text.indexOf(m);
-    const before = text.slice(Math.max(0, idx - 500), idx);
-    if (!/theme:exempt/i.test(before)) unmarkedPopups++;
-  }
+  // ページ本体の DOCTYPE (1 行目) は当然あるので、JS 文字列の中のものだけ数える。
+  //   コメント内で「以前 document.write していた」と説明している箇所を
+  //   検出しないよう、走査前にコメントを落とす。
+  const inScript = (text.match(/<script[\s\S]*?<\/script>/g) || []).join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, ' ')
+    .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
+  const hits = (inScript.match(/<!DOCTYPE html>/gi) || []).length
+    + (inScript.match(/document\.write\s*\(/g) || []).length;
+  if (hits > 0) { standaloneUis += hits; standaloneWhere.push(f); }
 }
-check('18. document.write popup 全部 exempt-block 化', unmarkedPopups === 0, `${unmarkedPopups} 件 unmarked`);
+check('18. アプリ外に 2 つ目の UI を組み立てていない', standaloneUis === 0,
+  standaloneUis === 0 ? '0 件' : `${standaloneUis} 件 (${standaloneWhere.join(', ')})`);
 
 // 19. viz CSS body.theme-light override 数 ≥ 9 (quadrant-label/keyword/contrast/axis/4*quadrants 等)
 const vizCss = readSrc('page.viz.css.html');

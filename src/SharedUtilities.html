@@ -229,210 +229,8 @@
       return this.cache.size;
     }
 
-    getStats() {
-      this.cleanup();
-      return {
-        size: this.cache.size,
-        maxSize: this.maxSize,
-        defaultTTL: this.defaultTTL,
-      };
-    }
   }
 
-
-  /**
-   * 統一データローディングAPI - GAS 2025ベストプラクティス準拠
-   * 非同期データローディング、キャッシング、エラーハンドリングを統合
-   */
-  class UnifiedDataLoader {
-    constructor() {
-      this.loadingStates = new Map();
-      this.cache = new Map();
-      this.abortControllers = new Map();
-      this.retryAttempts = new Map();
-      this.maxRetries = 3;
-      this.defaultTimeout = 30000;
-      // Long-running sessions (admin panel) accumulate distinct cache keys per
-      //   JSON.stringify(args) suffix. Cap to bound memory; LRU via insertion order.
-      this.cacheMaxSize = 50;
-    }
-
-    /**
-     * データ読み込みの統一エントリーポイント
-     * @param {string} functionName - GAS関数名
-     * @param {Object} options - 読み込みオプション
-     * @param {...any} args - GAS関数への引数
-     * @returns {Promise} データ読み込み結果
-     */
-    async loadData(functionName, options = {}, ...args) {
-      const {
-        cache = true,
-        cacheKey = null,
-        cacheTTL = 300000, // 5分
-        showLoading = true,
-        loadingMessage = 'データを読み込み中...',
-        retryOnError = true,
-        timeout = this.defaultTimeout
-      } = options;
-
-      const funcName = functionName || 'unknown';
-      const finalCacheKey = cacheKey || `${funcName}_${JSON.stringify(args || []).substring(0, 50)}`;
-      const requestId = `${funcName}_${Date.now()}`;
-
-      try {
-        if (cache && this.cache.has(finalCacheKey)) {
-          const cached = this.cache.get(finalCacheKey);
-          if (Date.now() - cached.timestamp < cacheTTL) {
-            return cached.data;
-          }
-          this.cache.delete(finalCacheKey);
-        }
-
-        if (showLoading) {
-          this.setLoadingState(requestId, true, loadingMessage);
-        }
-
-        const result = await this.executeGASCall(functionName, timeout, ...args);
-
-        if (cache && result) {
-          if (this.cache.size >= this.cacheMaxSize) {
-            const oldestKey = this.cache.keys().next().value;
-            if (oldestKey !== undefined) this.cache.delete(oldestKey);
-          }
-          this.cache.set(finalCacheKey, {
-            data: result,
-            timestamp: Date.now()
-          });
-        }
-
-        return result;
-
-      } catch (error) {
-        console.error(` [UnifiedDataLoader] ${funcName} エラー:`, error);
-
-        if (retryOnError && this.shouldRetry(requestId)) {
-          return this.loadData(functionName, { ...options, retryOnError: false }, ...args);
-        }
-
-        throw error;
-      } finally {
-        if (showLoading) {
-          this.setLoadingState(requestId, false);
-        }
-        this.cleanup(requestId);
-      }
-    }
-
-    /**
-     * GAS関数の実際の実行
-     * @param {string} functionName - 関数名
-     * @param {number} timeout - タイムアウト時間
-     * @param {...any} args - 引数
-     * @returns {Promise} 実行結果
-     */
-    executeGASCall(functionName, timeout, ...args) {
-      return new Promise((resolve, reject) => {
-        if (typeof google === 'undefined' || !google.script?.run) {
-          reject(new Error('Google Apps Script環境が利用できません'));
-          return;
-        }
-
-        // setTimeout instead of microtask-recursion: avoid 100% CPU during
-        // the wait. See matching fix in verifyAuthentication() above.
-        let completed = false;
-        const timeoutId = setTimeout(() => {
-          if (!completed) {
-            completed = true;
-            reject(new Error(`タイムアウト: ${functionName || 'unknown'} (${timeout || 0}ms)`));
-          }
-        }, timeout);
-
-        google.script.run
-          .withSuccessHandler((result) => {
-            if (!completed) {
-              completed = true;
-              clearTimeout(timeoutId);
-              resolve(result);
-            }
-          })
-          .withFailureHandler((error) => {
-            if (!completed) {
-              completed = true;
-              clearTimeout(timeoutId);
-              console.error(` [UnifiedDataLoader] ${functionName || 'unknown'} GAS実行エラー:`, error);
-              reject(new Error(error.message || error.toString()));
-            }
-          })
-        [functionName](...args);
-      });
-    }
-
-    /**
-     * ローディング状態管理
-     */
-    setLoadingState(requestId, isLoading, message = '') {
-      if (isLoading) {
-        this.loadingStates.set(requestId, { message, startTime: Date.now() });
-        if (window.unifiedLoading) {
-          window.unifiedLoading.show(message);
-        }
-      } else {
-        this.loadingStates.delete(requestId);
-        if (window.unifiedLoading && this.loadingStates.size === 0) {
-          window.unifiedLoading.hide();
-        }
-      }
-    }
-
-    /**
-     * リトライ判定
-     */
-    shouldRetry(requestId) {
-      const attempts = this.retryAttempts.get(requestId) || 0;
-      if (attempts >= this.maxRetries) {
-        return false;
-      }
-      this.retryAttempts.set(requestId, attempts + 1);
-      return true;
-    }
-
-    /**
-     * リクエスト後処理
-     */
-    cleanup(requestId) {
-      this.loadingStates.delete(requestId);
-      this.retryAttempts.delete(requestId);
-      this.abortControllers.delete(requestId);
-    }
-
-    /**
-     * キャッシュ管理
-     */
-    clearCache(pattern = null) {
-      if (pattern) {
-        for (const key of this.cache.keys()) {
-          if (key.includes(pattern)) {
-            this.cache.delete(key);
-          }
-        }
-      } else {
-        this.cache.clear();
-      }
-    }
-
-    /**
-     * 統計情報取得
-     */
-    getStats() {
-      return {
-        cacheSize: this.cache.size,
-        activeRequests: this.loadingStates.size,
-        totalRetries: Array.from(this.retryAttempts.values()).reduce((a, b) => a + b, 0)
-      };
-    }
-  }
-
-  window.unifiedDataLoader = new UnifiedDataLoader();
 
   class ErrorHandler {
     constructor() {
@@ -495,11 +293,6 @@
     isLoading(key) {
       const state = this.loadingStates.get(key);
       return state ? state.isLoading : false;
-    }
-
-    clearLoading(key) {
-      this.loadingStates.delete(key);
-      this.setLoading(key, false);
     }
 
   }
@@ -587,7 +380,6 @@
   }
 
   /** Promise-based delay utility */
-  window.createPromiseDelay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
   /**
    * リダイレクト用モーダルを表示（GAS iFrame 対応）
@@ -1407,33 +1199,6 @@
     }
   };
 
-  window.setPartialLoading = function (loading, message) {
-    if (loading) {
-      const safeInfoMessage = message || '処理中...';
-      window.showInfo(safeInfoMessage);
-
-      const activeElements = document.querySelectorAll('.partial-loading-target');
-      activeElements.forEach((el) => {
-        el.classList.add('partial-loading');
-        if (!el.dataset.originalText) {
-          el.dataset.originalText = el.textContent;
-        }
-        el.textContent = '読み込み中...';
-        el.disabled = true;
-      });
-    } else {
-      const activeElements = document.querySelectorAll('.partial-loading');
-      activeElements.forEach((el) => {
-        el.classList.remove('partial-loading');
-        if (el.dataset.originalText) {
-          el.textContent = el.dataset.originalText;
-          delete el.dataset.originalText;
-        }
-        el.disabled = false;
-      });
-    }
-  };
-
   // WARNING SUPPRESSION は先頭のIIFE内で定義済みのため、ここでは不要
 
 
@@ -1566,9 +1331,7 @@
   window.showMessage = (message, type, opts) => window.notifications.showMessage(message, type, opts);
   window.showSuccess = (message, opts) => window.notifications.success(message, opts);
   window.showError   = (message, opts) => window.notifications.error(message, opts);
-  window.showWarning = (message, opts) => window.notifications.warning(message, opts);
   window.showInfo    = (message, opts) => window.notifications.info(message, opts);
-  window.showBanner  = (message, opts) => window.notifications.banner(message, opts);
 
 
 

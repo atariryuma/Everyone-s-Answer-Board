@@ -914,7 +914,7 @@
 
   // ハイドレーション専用の軽量列復元: loading overlay / toast / autosave をスキップして
   //   headers fetch + 保存済 mapping の dropdown 復元だけを実行する。
-  //   connectToDataSource は user-triggered な「検証して接続」用 (重い + autosave 発火) なので分離。
+  //   connectToDataSource は user 起点の明示接続用 (重い + autosave 発火) なので分離。
   //   成功は silent (autosave-status は他用途で使うので noisy にしない)、失敗時のみフィードバック。
   async function silentlyRestoreColumnMapping(spreadsheetId, sheetName, savedMapping) {
     const setStatus = (typeof setAutoSaveStatus === 'function') ? setAutoSaveStatus : () => {};
@@ -934,7 +934,7 @@
       if (ys) ys.value = (savedMapping && typeof savedMapping.numericY === 'number') ? String(savedMapping.numericY) : '';
     } catch (e) {
       console.warn('silentlyRestoreColumnMapping failed:', e && e.message);
-      setStatus('自動接続に失敗。「検証して接続」を押すか URL を貼り直してください', 'warning');
+      setStatus('自動接続に失敗しました。URL を貼り直してください', 'warning');
     }
   }
 
@@ -1278,129 +1278,60 @@
    * Why: 可視化モードに合った Forms 構造（線形尺度フィールド）をテンプレート時点で
    *      用意することで、教師が手動で項目を追加する手間を省く。
    */
+  /**
+   * テンプレートから Google フォーム + 回答先スプレッドシートを生成する。
+   *
+   * v2904: 以前はここで別ウィンドウに document.write() で 60 行の HTML を書き込み、
+   *   その中に手順を表示していた。問題が 3 つあった:
+   *     1. 手順が古く、v2757 で削除済みの「検証して接続」ボタンと、v2891 で
+   *        「公開する」に変わった「今すぐ公開」を押すよう案内していた。
+   *        つまり教師に存在しないボタンを探させていた。
+   *     2. TEMPLATE_VIEW に pie が無く、円グラフを選ぶと掲示板の手順が出ていた。
+   *     3. アプリの CSS が届かない別ウィンドウなので、色をすべて literal で
+   *        書き直す必要があり、テーマ変更が反映されない領域になっていた。
+   *   手順の表示はアプリ側のモーダル (modals.alert) に移し、別ウィンドウは
+   *   「ポップアップブロッカー回避のために先に開いておく器」だけに徹する。
+   *
+   * @param {string} [requestedType] - BOARD_MODES の templateable な key
+   */
   function createTemplateForm(requestedType) {
-    // busy 表示は dropdown の summary ボタンに出す (旧 hidden ボタンは撤去済)。
     const btn = document.querySelector('.template-form-picker > summary');
     const templateType = requestedType || 'board';
-    // テンプレート種別ごとの表示テキスト集約。ローディング画面の文言が散らからないよう
-    // 1 か所にまとめる。backend の TEMPLATE_LABELS とは別 runtime なので意図的に重複。
-    const TEMPLATE_VIEW = {
-      board: {
-        label: '掲示板',
-        editLi: '<li><strong>回答の選択肢</strong> → 質問に合った選択肢に変更</li>',
-        extraUsableLi: '',
-        editStepTarget: '回答の選択肢'
-      },
-      numberline: {
-        label: '数直線',
-        editLi: '<li><strong>立場の質問文・両端ラベル</strong> → 授業のテーマに合わせて変更</li>',
-        extraUsableLi: '<li>立場（1〜5の線形尺度）</li>',
-        editStepTarget: '軸ラベル'
-      },
-      matrix: {
-        label: 'マトリクス',
-        editLi: '<li><strong>X軸/Y軸の質問文・両端ラベル</strong> → 授業のテーマに合わせて変更</li>',
-        extraUsableLi: '<li>X軸・Y軸（1〜5の線形尺度）</li>',
-        editStepTarget: '軸ラベル'
-      }
+
+    // 種別ごとに「作成後に編集が必要な項目」が違う。手順文の唯一の定義。
+    const TEMPLATE_GUIDE = {
+      board:      { label: '掲示板',       edit: '回答の選択肢' },
+      numberline: { label: '数直線',       edit: '立場の質問文と両端のラベル' },
+      matrix:     { label: 'マトリクス',   edit: 'X軸・Y軸の質問文と両端のラベル' },
+      pie:        { label: '円グラフ',     edit: '回答の選択肢' }
     };
-    const view = TEMPLATE_VIEW[templateType] || TEMPLATE_VIEW.board;
-    const typeLabel = view.label;
+    const guide = TEMPLATE_GUIDE[templateType] || TEMPLATE_GUIDE.board;
 
     if (btn) {
-      btn.classList.add('btn-busy');  // 統一: スピナー表示で「処理中」明示
+      btn.classList.add('btn-busy');
       btn.dataset.prevHtml = btn.innerHTML;
       btn.textContent = '作成中...';
     }
+    const restoreBtn = () => {
+      if (!btn) return;
+      btn.classList.remove('btn-busy');
+      if (btn.dataset.prevHtml) { btn.innerHTML = btn.dataset.prevHtml; delete btn.dataset.prevHtml; }
+    };
 
-    // ポップアップブロッカー対策: ユーザークリック直後にウィンドウを開く
-    // 非同期コールバック内ではwindow.openがブロックされるため
-    // 参考: https://www.abeautifulsite.net/posts/opening-a-new-window-after-an-async-operation/
+    // ポップアップブロッカー対策: window.open はユーザー操作と同じ tick で呼ぶ必要がある。
+    //   非同期コールバック内から開くとブロックされるため、先に空のタブを確保しておく。
     const newWindow = window.open('about:blank', '_blank');
-    if (newWindow) {
-      // theme:exempt-block-start — 別ウィンドウの transient loading screen。 親 theme 非継承、 常時 dark brand 一貫。
-      newWindow.document.write(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>フォーム作成中...</title>
-          <style>
-            @keyframes spin { to { transform: rotate(360deg); } }
-            .spinner { animation: spin 1s linear infinite; display: inline-block; }
-            .btn-primary {
-              background: #6366f1;
-              color: white;
-              border: none;
-              padding: 16px 32px;
-              font-size: 16px;
-              font-weight: bold;
-              border-radius: 0.75rem;
-              cursor: pointer;
-              transition: all 0.2s;
-              display: none;
-            }
-            .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(99,102,241,0.4); } /* theme:exempt: 独立 popup window — 親の CSS 変数が届かないので literal 値が正 */
-          </style>
-        </head>
-        <body style="background:#16213e;color:white;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-          <div style="text-align:center;max-width:500px;padding:24px;">
-            <div id="status-icon" style="font-size:48px;margin-bottom:16px;" class="spinner"></div>
-            <p id="status-text" style="font-size:20px;font-weight:bold;margin-bottom:24px;">テンプレート（${typeLabel}）を作成中...</p>
-
-            <div style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);border-radius: 0.75rem;padding:20px;text-align:left;margin-bottom:16px;"><!-- theme:exempt: 独立 popup window — 親の CSS 変数が届かないので literal 値が正 -->
-              <p style="font-size:14px;color:#fbbf24;margin:0 0 12px 0;font-weight:bold;"> 編集が必要な項目</p>
-              <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
-                <li><strong>クラス</strong> → 実際のクラス名に変更</li>
-                ${view.editLi}
-              </ul>
-            </div>
-
-            <div style="background:rgba(255,255,255,0.1);border-radius: 0.75rem;padding:20px;text-align:left;margin-bottom:16px;">
-              <p style="font-size:14px;color:#a0aec0;margin:0 0 12px 0;"> そのまま使える項目</p>
-              <ul style="margin:0;padding-left:20px;font-size:13px;line-height:1.8;color:#e2e8f0;">
-                <li>名前（テキスト入力）</li>
-                <li>理由（長文入力）</li>
-                ${view.extraUsableLi}
-              </ul>
-            </div>
-
-            <div style="background:rgba(134,239,172,0.12);border:1px solid rgba(134,239,172,0.3);border-radius: 0.75rem;padding:20px;text-align:left;">
-              <p style="font-size:14px;color:#86efac;margin:0 0 12px 0;font-weight:bold;"> 次のステップ</p>
-              <ol style="margin:0;padding-left:20px;font-size:13px;line-height:1.9;color:#e2e8f0;">
-                <li>下のボタンでフォーム編集画面を開く</li>
-                <li>クラス名と${view.editStepTarget}を編集</li>
-                <li>管理パネルに戻り「<strong> 検証して接続</strong>」をクリック</li>
-                <li>「<strong>今すぐ公開</strong>」で完了！</li>
-              </ol>
-            </div>
-
-            <button id="open-form-btn" class="btn-primary" style="margin-top:24px;">
-               フォームを編集する
-            </button>
-          </div>
-        </body>
-        </html>
-      `);
-      // theme:exempt-block-end
-    }
 
     runServer('createTemplateForm', templateType).then((result) => {
-      if (btn) {
-        btn.classList.remove('btn-busy');
-        if (btn.dataset.prevHtml) { btn.innerHTML = btn.dataset.prevHtml; delete btn.dataset.prevHtml; }
-      }
+      restoreBtn();
 
       if (!(result && result.success)) {
-        // エラー時はローディング画面を閉じる
         if (newWindow && !newWindow.closed) newWindow.close();
         showError((result && result.error) || 'フォーム作成に失敗しました');
         return;
       }
 
-      showSuccess(result.message || 'テンプレートフォームを作成しました');
-
-      // URL入力欄にフォームURLと接続情報をセット
-      // ユーザーが「 検証して接続」をクリックした際に使用される
+      // 生成結果を UI に反映 (URL 欄 / 検出情報 / 表示モード)。
       const formUrlInput = document.getElementById('form-url-input');
       if (formUrlInput) {
         formUrlInput.value = result.editUrl;
@@ -1409,25 +1340,11 @@
         formUrlInput.dataset.formTitle = result.formTitle;
         formUrlInput.dataset.formUrl = result.formUrl;
       }
-
-      // フォーム選択データも保持（後方互換性）
-      const formSelect = document.getElementById('form-select');
-      if (formSelect) {
-        formSelect.dataset.spreadsheetId = result.spreadsheetId;
-        formSelect.dataset.sheetName = result.sheetName;
-        formSelect.dataset.formTitle = result.formTitle;
-        formSelect.dataset.formUrl = result.formUrl;
-      }
-
-      // Why: 数直線(M1)/マトリクス(M2) テンプレートを作ったら、公開設定の
-      //      boardMode セレクトをその種別に合わせて先回りで設定する。
       const boardModeSelect = document.getElementById('board-mode-select');
-      if (boardModeSelect && (result.templateType === 'numberline'|| result.templateType === 'matrix'|| result.templateType === 'pie')) {
+      if (boardModeSelect && result.templateType && result.templateType !== 'board') {
         boardModeSelect.value = result.templateType;
-        try { boardModeSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+        try { boardModeSelect.dispatchEvent(new Event('change', { bubbles: true })); } catch (_) {}
       }
-
-      // 検出情報を表示（リンク付き）
       const detectionInfo = document.getElementById('form-detection-info');
       const detectedFormLink = document.getElementById('detected-form-link');
       const detectedSpreadsheetLink = document.getElementById('detected-spreadsheet-link');
@@ -1441,36 +1358,26 @@
         detectedSpreadsheetLink.href = safeHttpsHref_(result.spreadsheetUrl);
       }
 
-      // 作成完了後、ボタンを表示してユーザーのクリックで遷移
+      // 確保しておいたタブをフォーム編集画面へ送る。
       if (result.editUrl && newWindow && !newWindow.closed) {
-        try {
-          const doc = newWindow.document;
-          const statusIcon = doc.getElementById('status-icon');
-          const statusText = doc.getElementById('status-text');
-          const openFormBtn = doc.getElementById('open-form-btn');
-          if (statusIcon) { statusIcon.textContent = ''; statusIcon.classList.remove('spinner'); }
-          if (statusText) statusText.textContent = 'フォームの作成が完了しました！';
-          if (openFormBtn) {
-            openFormBtn.style.display = 'inline-block';
-            openFormBtn.onclick = () => { newWindow.location.href = safeHttpsHref_(result.editUrl); };
-          }
-        } catch (e) {
-          newWindow.location.href = safeHttpsHref_(result.editUrl);
-        }
+        newWindow.location.href = safeHttpsHref_(result.editUrl);
       }
 
-      // フォーム編集後に手動で接続してもらうため、自動接続は行わない
-      // 理由: ユーザーがフォームの質問を編集すると列構造が変わるため、
-      // 編集完了後に接続（自動推定）を行う必要がある
-      showInfo('フォーム編集後、「 検証して接続」ボタンをクリックしてください', 5000);
-    }, (error) => {
-      // エラー時はローディング画面を閉じる
-      if (newWindow && !newWindow.closed) newWindow.close();
-      if (btn) {
-        btn.disabled = false;
-        btn.classList.remove('btn-busy');
-        btn.textContent = 'テンプレート作成';
+      // 手順はアプリ側で出す。列の自動推定はフォーム編集後に走らせたいので、
+      //   ここでは自動接続しない (質問を編集すると列構成が変わるため)。
+      showSuccess(result.message || `${guide.label}のフォームを作成しました`);
+      if (window.modals && typeof window.modals.alert === 'function') {
+        window.modals.alert(
+          `別のタブでフォームが開きます。\n\n`
+          + `1. クラス名と${guide.edit}を、授業に合わせて編集\n`
+          + `2. この画面に戻る (編集内容は自動で読み取られます)\n`
+          + `3. 「公開する」で児童に配布`,
+          { title: `${guide.label}のフォームを作成しました` }
+        );
       }
+    }, (error) => {
+      if (newWindow && !newWindow.closed) newWindow.close();
+      restoreBtn();
       showError(error.message || 'フォーム作成中にエラーが発生しました');
     });
   }

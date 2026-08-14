@@ -2038,7 +2038,7 @@
           frag.appendChild(this.createSkeletonCard());
         }
         const container = this.elements.answersContainer;
-        container.className = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
+        this.applyAnswersColumns();
         container.innerHTML = '';
         container.appendChild(frag);
       }
@@ -2252,6 +2252,28 @@
       this.updateLayoutControls(newRows);
     }
 
+    /**
+     * 回答グリッドの列数を反映する。
+     *
+     * v2905: 以前は `'... lg:grid-cols-' + slider.value` で Tailwind クラスを
+     *   文字列連結して className ごと差し替えていた。Tailwind CDN の JIT は
+     *   実行時に生成されるクラスもその場でコンパイルしていたので動いていたが、
+     *   静的 CSS へ移行するとビルド時に存在しないクラスは効かない
+     *   (実際 lg:grid-cols-5 / 6 は生成されず、スライダーを 5・6 にしても
+     *    4 列のままになる状態だった)。
+     *   クラス名を組み立てるのをやめ、CSS 変数 1 つで列数を渡す形にする。
+     *   これなら値が何であっても常に効き、生成側の走査にも依存しない。
+     */
+    applyAnswersColumns() {
+      const container = this.elements.answersContainer;
+      if (!container) return;
+      if (!container.classList.contains('answers-grid')) {
+        container.className = 'answers-grid';
+      }
+      const cols = parseInt((this.elements.sizeSlider && this.elements.sizeSlider.value) || '4', 10);
+      container.style.setProperty('--answers-cols', String(Number.isFinite(cols) ? cols : 4));
+    }
+
     updateLayoutControls(newRows) {
       const updates = [];
       if (this.elements.sliderValue && this.elements.sizeSlider &&
@@ -2259,10 +2281,7 @@
         updates.push(() => this.elements.sliderValue.textContent = this.elements.sizeSlider.value);
       }
       if (this.elements.sizeSlider) {
-        const className = 'grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-' + this.elements.sizeSlider.value;
-        if (this.elements.answersContainer.className !== className) {
-          updates.push(() => this.elements.answersContainer.className = className);
-        }
+        updates.push(() => this.applyAnswersColumns());
       }
       if (this.elements.answerCount) {
         const countHtml = this.getIcon('users', 'w-4 h-4 inline-block -mt-1') + '<span>'+ newRows.length + '件</span>';
@@ -4320,20 +4339,23 @@
         this.state.lastFocusedElement.focus();
       }
     }
+    /**
+     * SharedIcons の sprite からアイコン 1 個分の SVG を返す。
+     *
+     * v2904: 以前は Page.html に window.ICONS として 10 個のインライン SVG を
+     *   別途持っており、SharedIcons とアイコンセットが 2 つ並存していた。
+     *   リアクションの outline/solid 対も含めて sprite 側へ移し、定義を 1 つにした。
+     *
+     * @param {string} name - 'hand-thumb-up' 等。outline/solid 対を持つものは
+     *   solid フラグで切り替わる。対を持たないものはそのまま参照する。
+     * @param {string} [classes] - svg に付ける追加クラス
+     * @param {boolean} [solid] - 押下済み表現にするか
+     */
     getIcon(name, classes = '', solid = false) {
-      if (!window.ICONS) {
-        return '<svg class="'+ classes + '" aria-hidden="true">⭐</svg>';
-      }
-
-      const key = solid ? name + '-solid': name + '-outline';
-      const icon = window.ICONS[key] || window.ICONS[name];
-
-      if (!icon) {
-        return '<svg class="'+ classes + '" aria-hidden="true">⭐</svg>';
-      }
-
-      const result = icon.replace('<svg', `<svg class="${classes}" aria-hidden="true"`);
-      return result;
+      const PAIRED = new Set(['hand-thumb-up', 'lightbulb', 'magnifying-glass-plus', 'star']);
+      const id = PAIRED.has(name) ? `${name}-${solid ? 'solid' : 'outline'}` : name;
+      const cls = ('icon ' + (classes || '')).trim();
+      return `<svg class="${cls}" aria-hidden="true"><use href="#i-${id}"></use></svg>`;
     }
 
     renderIcons() {
