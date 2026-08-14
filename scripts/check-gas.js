@@ -16,6 +16,7 @@
  *   5. doPost の action allowlist と dispatch テーブルが一致しているか
  *   6. HTML の要素 ID を JS が参照しているとき、その ID が存在するか
  *   7. appsscript.json が JSON として妥当か
+ *   8. *.css.html の中身が <style> の外にはみ出していないか
  *
  * 使い方:
  *   npm run check:gas          # 全項目
@@ -200,6 +201,36 @@ for (const s of jsSrc.values()) {
     }
   }
   check('7. appsscript.json が妥当', ok, detail);
+}
+
+// ── 8. *.css.html が <style> の外にはみ出していないか ──────────────
+// Why: これらは <head> 内に include される CSS 断片。ファイル途中で </style> が
+//   閉じると、それ以降の CSS は「ただのテキスト」になる。ブラウザは <head> 内の
+//   非空白テキストを見た時点で head を打ち切って body に送るため、
+//     (a) その CSS 規則がすべて無効になる
+//     (b) CSS のソースが画面上部に生テキストで表示される
+//     (c) 後続の include (page.viz.css 等) まで body へ押し出される
+//   という三重の事故になる。しかも lint も test も theme ゲートも
+//   「ファイル内にその規則が書かれている」ことしか見ないので全部 pass する。
+//   実際 v2905/v2906 で追加した .answers-grid 等 80 行がこの状態だった。
+{
+  const cssFiles = htmlFiles.filter((f) => f.endsWith('.css.html'));
+  const bad = [];
+  for (const f of cssFiles) {
+    const src = htmlSrc.get(f);
+    // <style> ブロックと HTML コメント (ファイル冒頭の説明) は正当。それ以外が
+    // 残れば、CSS がテキストとして <head> に流れ出している。
+    // 位置を報告するため、除去部分は同じ長さの空白に置換して行番号を保つ。
+    const blank = (m) => m.replace(/[^\n]/g, ' ');
+    const outside = src
+      .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, blank)
+      .replace(/<!--[\s\S]*?-->/g, blank);
+    if (outside.trim()) {
+      const strayLines = outside.split('\n').filter((l) => l.trim()).length;
+      bad.push(`${f}: ${strayLines} 行が <style> の外 (${lineOf(src, outside.search(/\S/))} 行目付近)`);
+    }
+  }
+  check('8. *.css.html が <style> の中に収まっている', bad.length === 0, bad.join(', '));
 }
 
 // ── 出力 ──────────────────────────────────────────────────────────
