@@ -1,28 +1,19 @@
 <!-- =====================================================================
-  SharedPageHead — 全ページ共通の <head> 定型 (v2899)
+  SharedPageHead — 全ページ共通の <head> 定型
 
-  Why: 従来は 9 つの HTML テンプレートが同じ meta / base / viewport と
-    4 つの include を各自で書いており、しかも順序がページごとに揺れていた。
-    CLAUDE.md は「include order は固定。変更には独立コミットが必要」と
-    規定しているが、その順序が 9 箇所に散っていては規約を守りようがない。
-    順序をこのファイル 1 つに閉じ込め、規約を構造で強制する。
+  【自動生成】このファイルは scripts/gen-pagehead.js が生成する。直接編集しない。
+     中身を変えたいときは元ファイル (下記) を編集して `npm run gen:pagehead` を実行する。
 
-  読み込み順序 (この順序に意味がある。動かすときは独立コミットで):
-    1. SharedSecurityHeaders — CSP。他の何よりも先に効かせる
-    2. SharedThemeBoot       — paint 前に <html> へ theme class を付け FOUC を防ぐ
-    3. UnifiedStyles.css     — semantic token とプリミティブの本体
-    4. UtilityStyles.css     — Tailwind 互換の静的 utility (自動生成)。
-                               primitive を上書きできるよう必ず最後に読む
+  Why: 9 つのページテンプレートが同じ meta / base / viewport と 4 つの CSS/JS を各自で
+    書いており、順序もページごとに揺れていた。順序の定義を 1 箇所に閉じ込め、規約を
+    構造で強制する。さらに include を展開済みにすることで、この <head> 全体が
+    テンプレート評価を必要としなくなり、include() が単なるファイル連結で済むようになる。
 
-  使い方 (各ページの <head> 内):
-    <title>ページ固有のタイトル</title>
-    include('SharedPageHead') をスクリプトレットで囲んで書く
-    <style> /* ページ固有のスタイルだけをここに */ </style>
-
-  注意: この用例をスクリプトレット記法そのままで書いてはいけない。 include() は
-    createTemplateFromFile().evaluate() (main.js) なので、 HTML コメント内であっても
-    スクリプトレットは評価される。 ここに書くと自分自身を無限 include して全ページが落ちる。
-    SharedThemeBoot も同じ理由で用例から記法を外している。
+  読み込み順序 (scripts/gen-pagehead.js の ORDER が唯一の定義):
+    1. SharedSecurityHeaders  — CSP。他の何よりも先に効かせる
+    2. SharedThemeBoot        — paint 前に <html> へ theme class を付け FOUC を防ぐ
+    3. UnifiedStyles.css      — semantic token とプリミティブの本体
+    4. UtilityStyles.css      — Tailwind 互換の静的 utility (自動生成)。primitive を上書きできるよう必ず最後
 
   含めないもの:
     - <title> : ページごとに異なるため各ページで書く
@@ -31,7 +22,3082 @@
 <meta charset="UTF-8" />
 <base target="_top" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<?!= include('SharedSecurityHeaders'); ?>
-<?!= include('SharedThemeBoot'); ?>
-<?!= include('UnifiedStyles.css'); ?>
-<?!= include('UtilityStyles.css'); ?>
+<!-- ── SharedSecurityHeaders ── -->
+<!-- Shared Security Headers -->
+<!-- 
+  セキュリティヘッダー強化版（2025年対応）
+  
+  Content Security Policy (CSP):
+  - script-src: 自身のドメイン + Google Apps Script API + CDNJS（GSAP用）
+  - style-src: 自身のドメイン + Google Fonts + インラインスタイル（必要最小限）
+  - img-src: データURL禁止、HTTPSのみ
+  - connect-src: Apps Script API接続のみ
+  - object-src: 完全禁止（Flash等の古い技術防止）
+  - base-uri: 自身のドメインのみ（Base Tag攻撃防止）
+  
+  Permissions Policy設定：
+  現行ブラウザで認識される機能のみに最適化済み（2025年対応）。
+  プライバシー保護強化のため機能アクセスを明示的に制御。
+-->
+
+<!-- Content Security Policy - XSS攻撃完全防御 -->
+<meta
+  http-equiv="Content-Security-Policy"
+  content="default-src 'self';
+           script-src 'self' 'unsafe-inline' https://script.google.com;
+           style-src 'self' 'unsafe-inline';
+           font-src 'self';
+           img-src 'self' https:; 
+           connect-src 'self' https://script.google.com; 
+           object-src 'none'; 
+           base-uri 'self'; 
+           form-action 'self';"
+/>
+
+<!-- 追加セキュリティヘッダー -->
+<meta http-equiv="Cache-Control" content="no-cache" />
+<meta http-equiv="X-Content-Type-Options" content="nosniff" />
+<!-- Note: X-Frame-Options is controlled by server via HtmlService.setXFrameOptionsMode. -->
+<meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
+
+<!-- 権限ポリシー - プライバシー保護強化（2025年対応：認識される機能のみ） -->
+<meta
+  http-equiv="Permissions-Policy"
+  content="camera=(), microphone=(), geolocation=(), payment=(), usb=(), bluetooth=(), accelerometer=(), gyroscope=(), magnetometer=()"
+/>
+<!-- ── SharedThemeBoot ── -->
+<script>
+  // SharedThemeBoot — FOUC (Flash of Unstyled Content) 防止 + color-scheme 設定。
+  //
+  // Why: themeManager (SharedUtilities) は body 末尾で読まれることが多いので、
+  //   head パース時に theme class を <html> に当てないと、 light モード保存ユーザに
+  //   一瞬 dark 背景がフラッシュして見える。 paint 前に同期で実行する必要がある。
+  //
+  // 使い方: 各ページ <head> 内 SharedTailwindConfig include の直後に
+  //   include('SharedThemeBoot') する。 GAS template engine 競合回避のため
+  //   サンプル include タグは ここに書かない (コメント内でも engine が parse する)。
+  //
+  // 仕様:
+  //   - localStorage 'app-theme' を読む (dark / light / auto)。 invalid なら auto。
+  //   - auto は (prefers-color-scheme: dark) で resolve。
+  //   - <html> に theme-dark/theme-light + dark/light クラス、 data-theme 属性、
+  //     color-scheme CSS プロパティ を即時付与。
+  //   - body はまだ存在しないので、 themeManager.init() (後で実行される) が
+  //     body にも同 class を貼る。 paint で見えるのは <html> 側だけなので OK。
+  //
+  // ベストプラクティス参考:
+  //   - https://github.com/AVGVSTVS96/astro-fouc-killer
+  //   - https://notanumber.in/blog/fixing-react-dark-mode-flickering
+  //   - https://natebal.com/best-practices-for-dark-mode/
+
+  (function () {
+    try {
+      var saved = null;
+      try { saved = localStorage.getItem('app-theme'); } catch (_) {}
+      var VALID = ['dark', 'light', 'auto'];
+      var theme = (saved && VALID.indexOf(saved) >= 0) ? saved : 'auto';
+      var resolved = theme;
+      if (theme === 'auto') {
+        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+        resolved = prefersDark ? 'dark' : 'light';
+      }
+      var html = document.documentElement;
+      html.classList.remove('dark', 'light', 'theme-dark', 'theme-light');
+      html.classList.add(resolved, 'theme-' + resolved);
+      html.setAttribute('data-theme', resolved);
+      // color-scheme: ネイティブ scrollbar / form control / canvas を theme 追従させる
+      html.style.colorScheme = resolved;
+
+      // mobile browser chrome 色を theme 連動 (OS 自動切替に依存しない)
+      //   theme-color meta を JS で動的更新。 ブラウザは meta の color を mobile chrome
+      //   (上部 address bar 等) に反映する。 element 自体は paint より先に存在する必要なし。
+      try {
+        var THEME_BAR_COLORS = { dark: '#1a1b26', light: '#f1f5f9' };  // theme:exempt - mobile chrome bar 用
+        var metaTC = document.querySelector('meta[name="theme-color"]');
+        if (!metaTC) {
+          metaTC = document.createElement('meta');
+          metaTC.setAttribute('name', 'theme-color');
+          document.head && document.head.appendChild(metaTC);
+        }
+        metaTC.setAttribute('content', THEME_BAR_COLORS[resolved]);
+      } catch (_) {}
+    } catch (e) { /* never break page load */ }
+  })();
+</script>
+<!-- ── UnifiedStyles.css ── -->
+<style> /* =============================================================================
+   みんなの回答ボード - Unified CSS Styles
+   Based on AdminPanel.html with additional styles from all HTML files
+   ============================================================================= */
+
+  /* =============================================================================
+   * Button "busy" 共通スタイル — ButtonBusyManager.withBusy が toggle する class
+   * pointer-events: none で連打を物理的に止め、疑似要素でスピナーを右端に出す。
+   * ============================================================================= */
+  .btn-busy {
+    opacity: 0.7;
+    cursor: progress;
+    position: relative;
+    pointer-events: none;
+    padding-right: calc(1.5em + 0.5rem); /* スピナー分の右余白を確保 */
+  }
+  .btn-busy::after {
+    content: "";
+    position: absolute;
+    right: 0.6rem;
+    top: 50%;
+    width: 0.95em;
+    height: 0.95em;
+    margin-top: -0.5em;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    border-radius: 50%;
+    animation: btn-busy-spin 0.6s linear infinite;
+  }
+  @keyframes btn-busy-spin {
+    to { transform: rotate(360deg); }
+  }
+
+  /* CSS Variables - Comprehensive Color and Design System */
+  :root {
+    /* =============================================================================
+     * Brand identity colors — theme 不変 (dark/light 両方で同じ色相)
+     * 文脈依存の背景・前景・境界は --theme-* を直接使う ( alias 廃止 v2849)
+     * ============================================================================= */
+    --brand-primary: #3b82f6;
+    --brand-primary-secondary: #1d4ed8;
+    --brand-accent: #fbbf24;
+    --brand-accent-light: #8be9fd;
+
+    /* =============================================================================
+     * Semantic Theme Tokens (DARK = default, theme で書き換える対象)
+     *
+     * 命名規約:
+     *   --theme-bg-*       背景色 (base, surface, elevated, overlay)
+     *   --theme-text-*     テキスト色 (primary, secondary, muted, inverse)
+     *   --theme-border-*   境界線色 (subtle, normal, strong)
+     *   --theme-overlay-*  半透明オーバーレイ (white-XX, black-XX, surface-glass)
+     *   --theme-spinner    スピナー色 (loading インジケーター)
+     *
+     * 注意: brand identity ( --brand-primary 等) は不変。 status / reaction も不変。
+     *   テーマ切替で書き換わるのは「文脈依存の色」 (背景・テキスト・境界線・装飾) のみ。
+     * ============================================================================= */
+    /* color-scheme: ネイティブ scrollbar / form 部品 / canvas を OS dark テーマに追従させる。
+       ベストプラクティス (2026 業界標準): https://natebal.com/best-practices-for-dark-mode/ */
+    color-scheme: dark;
+
+    /* 背景レイヤー (奥 → 手前)
+     * 設計思想 (v2816+): Tokyo Night の atmospheric 感 + GitHub 風 solid elevation の hybrid
+     *   - bg-base    = #1a1b26 Tokyo Night ベース (純 slate より暖かい blue-purple tint)
+     *   - bg-surface = bg-base から 1 段明るく solid (alpha 廃止、 明確な elevation)
+     *   - bg-elevated = modal/popover 用さらに elevated solid
+     *
+     * 例 (dark):  base #1a1b26  →  surface #252738  →  elevated #2e3046
+     * 例 (light): base #f1f5f9  →  surface #ffffff   →  elevated #ffffff + shadow */
+    --theme-bg-base: #1a1b26;                          /* Tokyo Night base — atmospheric warm dark */
+    --theme-bg-surface: #252738;                       /* 1 step lighter solid (v2815 #1e293b より Tokyo Night 寄り) */
+    --theme-bg-elevated: #2e3046;                      /* 2 step lighter (modal/popup) */
+    --theme-bg-elevated-hover: #3a3d52;                /* elevated の hover state (v2837+) */
+    --theme-bg-overlay: rgba(0, 0, 0, 0.75);           /* modal backdrop */
+
+    /* テキスト階層 (v2816: c0caf5 と #f1f5f9 の中間 #e2e8f0 でバランス)
+     * Tokyo Night の冷たさを避けつつ slate-100 より柔らかく、 読書性も確保。 */
+    --theme-text-primary: #e2e8f0;                     /* slate-200 — 本文 (12:1 AAA on #1a1b26) */
+    --theme-text-secondary: #cbd5e1;                   /* slate-300 — やや弱 */
+    --theme-text-muted: #94a3b8;                       /* slate-400 — キャプション・補助 (AAA 6.6:1) */
+    --theme-text-inverse: #1a1b26;                     /* light area 上の暗色テキスト */
+    --theme-text-emphasis: #fde047;                    /* yellow-300 — 値/時刻/見出しの強調 (dark で映える) */
+    --theme-text-confirm: #4ade80;                     /* green-400 — 保存済/確認マーク */
+
+    /* 境界線 — v2854: alpha を 0.15→0.10 に薄め、 status box の色付き border (vibrant strong) と
+       「白枠 = 装飾、 色枠 = 意味あり」 の視覚階層を明確化。 */
+    --theme-border-subtle: rgba(255, 255, 255, 0.10);   /* 一般 card / panel の subtle 装飾枠 */
+    --theme-border-normal: rgba(255, 255, 255, 0.18);   /* glass-panel:hover 等で多用 */
+    --theme-border-strong: rgba(255, 255, 255, 0.28);   /* spinner border, high-contrast */
+
+    /* 半透明オーバーレイ (dark 前提の rgba(255,255,255,*) / rgba(0,0,0,*) を集約) */
+    --theme-overlay-white-10: rgba(255, 255, 255, 0.1);   /* shimmer 等 */
+    --theme-overlay-white-20: rgba(255, 255, 255, 0.2);   /* hover 境界線 */
+    --theme-overlay-white-30: rgba(255, 255, 255, 0.3);   /* spinner border */
+    --theme-overlay-black-20: rgba(0, 0, 0, 0.2);         /* card shadow base */
+    --theme-overlay-black-60: rgba(0, 0, 0, 0.6);         /* heavy shadow */
+    --theme-overlay-black-90: rgba(0, 0, 0, 0.9);         /* modal backdrop strong */
+    --theme-overlay-surface-glass: rgba(16, 17, 28, 0.95); /* loading-content 不透明背景 */
+
+    /* viz / インジケーター */
+    --theme-spinner: #67e8f9;                          /* bright cyan, loading spinner */
+    --theme-accent-cyan: #38bdf8;                      /* notification banner / アクセント境界線 */
+    --theme-accent-cyan-soft: rgba(56, 189, 248, 0.18); /* banner 背景の薄い cyan */
+    --theme-overlay-white-05: rgba(255, 255, 255, 0.05); /* input 背景の極薄 */
+
+    /* Status text colors (両モード対応 contrast 確保)
+     * 旧 text-theme-status-error 等の Tailwind pair を 1 token に統一。
+     * HTML class は `text-theme-status-error` 等で両モード対応 */
+    --theme-status-error-text: #f87171;                /* red-400 — dark 5:1 / light 4.4:1 */
+    --theme-status-success-text: #4ade80;              /* green-400 — dark 7:1 / light 2.6:1 (要 light override) */
+    --theme-status-warning-text: #fbbf24;              /* yellow-400 — dark 11:1 / light 1.8:1 (要 light override) */
+    --theme-status-info-text: #60a5fa;                 /* blue-400 — dark 6:1 / light 3:1 (要 light override) */
+
+    /* Card / Panel tier (v2828: 親 card 内の inner box step elevation 明示)
+     *   bg-surface (card 外側) = #252738 (1 step up from base)
+     *   --theme-card-1 (inner box step UP from surface) = #2e3046 (2 step up)
+     *   --theme-card-2 (deeper nested) = #38394e (3 step up)
+     *   --theme-card-3 (highest, popup) = #42445b (4 step up)
+     * v2827 までは card-1 = bg-surface で同色 → 親 card 内の inner row が見えない bug。 */
+    --theme-card-1: #424766;                           /* +5% lum from surface — perceptually clearly visible step */
+    --theme-card-2: #454860;                           /* +6% lum — deeper nest */
+    --theme-card-3: #50546c;                           /* +8% lum — popup over modal */
+
+    /* Status feedback box bg / border (v2848+ — vibrant pale shades で 「色のあるラベル」
+     * 効果を出す。 dark page bg 上で明るく浮かぶことで visual punch を確保。
+     * 旧 v2847 の rgba 低 alpha 版だと色が消えて視認性が弱かった (user 報告)。 */
+    --theme-status-success-soft: #dcfce7;    /* green-100 */
+    --theme-status-success-strong: #86efac;  /* green-300 — border */
+    --theme-status-error-soft: #fee2e2;      /* red-100 */
+    --theme-status-error-strong: #fca5a5;    /* red-300 */
+    --theme-status-warning-soft: #fef9c3;    /* yellow-100 */
+    --theme-status-warning-strong: #fde047;  /* yellow-300 */
+    --theme-status-info-soft: #dbeafe;       /* blue-100 */
+    --theme-status-info-strong: #93c5fd;     /* blue-300 */
+    --theme-status-accent-soft: #cffafe;     /* cyan-100 opaque — 他 status-X-soft と統一 (v2854) */
+    --theme-status-accent-strong: #22d3ee;   /* cyan-400 — visible accent border */
+    --theme-status-detection-soft: #ede9fe;  /* violet-100 — form detection */
+    --theme-status-detection-strong: #c4b5fd;/* violet-300 */
+    --theme-status-detection-text: #4c1d95;  /* violet-900 — text on vibrant violet-soft bg */
+    --theme-status-highlight-soft: #f3e8ff;  /* purple-100 — teacher highlight */
+    --theme-status-highlight-strong: #d8b4fe;/* purple-300 */
+    --theme-status-highlight-text: #c084fc;  /* purple-400 — vibrant label/icon on dark page bg */
+
+    /* Text on vibrant -soft bg (dark text for AA contrast on pale bg, 両モード共通) */
+    --theme-status-success-text-on-soft: #14532d;  /* green-900 */
+    --theme-status-error-text-on-soft: #7f1d1d;    /* red-900 */
+    --theme-status-warning-text-on-soft: #713f12;  /* yellow-900 */
+    --theme-status-info-text-on-soft: #1e3a8a;     /* blue-900 */
+    --theme-status-accent-text-on-soft: #164e63;   /* cyan-900 */
+    --theme-status-highlight-text-on-soft: #581c87; /* purple-900 — confidence-badge.manual 用 (v2858) */
+
+    /* Pink accent (お題見出し用 — brand cyan とは別系統の強調色) */
+    --theme-accent-pink: #f472b6;            /* pink-400 — vibrant on dark bg */
+
+    /* Scrollbar (Page.html answer modal で使う) */
+    --theme-scrollbar-thumb: rgba(255, 255, 255, 0.20);
+    --theme-scrollbar-track: rgba(255, 255, 255, 0.05);
+
+    /* Link hover (cyan accent の hover 状態) */
+    --theme-accent-cyan-hover: #67e8f9;                /* cyan-300 (brighter than --theme-accent-cyan) */
+
+    /* Cyan accent — 役割別の追加段 (v2849+)
+     * sky-400 (--theme-accent-cyan) より強い tonal punch を必要とする箇所 (lesson card,
+     * viz dot, btn-active) と、 hero gradient の deeper cyan を意味別に分離。
+     * 旧来 rgba(34,211,238) / rgba(8,145,178) 等の hardcoded を color-mix 経由に統一。 */
+    --theme-accent-cyan-strong: #22d3ee;               /* cyan-400 — 強調 (lesson card, viz, button active) */
+    --theme-accent-cyan-deep: #0891b2;                 /* cyan-600 — gradient base, compare pane */
+
+    /* Brand primary の brighter variant (v2849+) — class chip / template item border 等で
+     * primary より明るい blue が必要な箇所。 brand identity なので両モード不変。 */
+    --brand-primary-light: #60a5fa;                    /* blue-400 — brighter primary */
+
+    /* Destructive accent (v2851+) — 「公開を終了」 等の 「取り消し / 強い注意」 action 用。
+     * status-error より 「不可逆な操作」 を示唆する orange (red より柔らかく warning より強い)。 */
+    --theme-accent-destructive: #ea580c;               /* orange-600 — 公開終了 / destructive primary */
+
+    /* Indigo accent (v2851+) — viz 対立軸 chip / quadrant keyword 専用。
+     * brand cyan とは別 hue で「議論の対立構造」 を示す視覚言語。 */
+    --theme-accent-indigo: #6366f1;                    /* indigo-500 */
+
+    /* =============================================================================
+     * Status Colors - System Feedback
+     * ============================================================================= */
+    --status-success: #10b981;
+    --status-error: #ef4444;
+    --status-warning: #f59e0b;
+    --status-info: #3b82f6;
+
+    /* =============================================================================
+     * UI Interaction Colors - User Actions
+     * ============================================================================= */
+    --brand-like: #f43f5e;           /* rose-500: status-error と区別しつつ elevated 上でも AA (3.51) */
+    --brand-understand: #fbbf24;      /* Keeping understand amber */
+    --brand-curious: #059669;         /* Distinct from status-success */
+    --brand-highlight: #a855f7;       /* purple-500: elevated 上でも AA (3.26)。旧 #9333ea は 2.40 で不足 */
+    --brand-highlight-alt: #c084fc;   /* Light purple - highlighted card border gradient */
+
+    /* =============================================================================
+     * Google Workspace Integration
+     * ============================================================================= */
+    --google-blue: #4285f4;
+    --google-green: #34a853;
+    --google-yellow: #fbbc05;
+    --google-red: #ea4335;
+
+    /* =============================================================================
+     * Z-Index Hierarchy System - Logical Layering
+     * ============================================================================= */
+    --z-base: 0;           /* Base content layer */
+    --z-content: 10;       /* Regular content */
+    --z-elevated: 50;      /* Elevated UI elements */
+    --z-overlay: 100;      /* Page overlays */
+    --z-dropdown: 500;     /* Dropdowns & menus */
+    --z-modal: 1000;       /* Modal dialogs */
+    --z-notification: 8000; /* Notifications */
+    --z-tooltip: 9000;     /* Tooltips */
+    --z-loading-overlay: 9500;  /* Loading overlays (critical but below tooltips) */
+    --z-loading-quickstart: 9600; /* QuickStart loading (higher than standard loading) */
+    --z-critical: 9999;    /* Critical system overlays */
+
+    /* =============================================================================
+     * Typography System - Tailwind compliant scale (v2812+)
+     *
+     * 用途: CSS で font-size / font-weight / line-height を書くとき必ずこれを使う。
+     *   Tailwind utility (text-xs/sm/base/lg/xl/2xl/3xl/4xl) と完全に同じ値なので
+     *   HTML class と CSS rule で同じ scale を共有でき、 視覚的統一性が保たれる。
+     *
+     * 既存の中途半端な値 (0.78rem 0.85rem 0.92rem 等) は段階的に最近接 token へ移行する。
+     * ============================================================================= */
+    --font-size-xs: 0.75rem;     /* 12px — caption, micro label */
+    --font-size-sm: 0.875rem;    /* 14px — body small, secondary text */
+    --font-size-base: 1rem;      /* 16px — default body */
+    --font-size-lg: 1.125rem;    /* 18px — emphasized body */
+    --font-size-xl: 1.25rem;     /* 20px — sub-heading */
+    --font-size-2xl: 1.5rem;     /* 24px — section heading */
+    --font-size-3xl: 1.875rem;   /* 30px — page heading */
+    --font-size-4xl: 2.25rem;    /* 36px — hero heading */
+
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+
+    --leading-tight: 1.25;       /* ヘッダー */
+    --leading-snug: 1.375;
+    --leading-normal: 1.5;       /* 本文標準 */
+    --leading-relaxed: 1.625;    /* 読みやすさ優先 */
+    --leading-loose: 1.75;       /* 長文 / ガイド文 */
+
+    /* =============================================================================
+     * Responsive Breakpoint System - Tailwind Compliant
+     * ============================================================================= */
+    --breakpoint-sm: 640px;   /* Small screens */
+    --breakpoint-md: 768px;   /* Medium screens */
+    --breakpoint-lg: 1024px;  /* Large screens */
+    --breakpoint-xl: 1280px;  /* Extra large screens */
+    --breakpoint-2xl: 1536px; /* 2X Extra large screens */
+
+    /* =============================================================================
+     * Alpha Values & Opacity System - Comprehensive
+     * ============================================================================= */
+    --alpha-invisible: 0;
+    --alpha-subtle: 0.1;     /* Light backgrounds, gentle effects */
+    --alpha-light: 0.2;      /* Secondary elements */
+    --alpha-medium: 0.3;     /* Standard overlays */
+    --alpha-visible: 0.5;    /* Balanced transparency */
+    --alpha-strong: 0.6;     /* Prominent elements */
+    --alpha-heavy: 0.8;      /* Modal overlays */
+    --alpha-opaque: 0.95;    /* Near-solid */
+    --alpha-solid: 1;
+
+    /* =============================================================================
+     * Spacing System - Systematic Sizing
+     * ============================================================================= */
+    --space-0: 0;
+    --space-1: 0.25rem;  /* 4px */
+    --space-2: 0.5rem;   /* 8px */
+    --space-3: 0.75rem;  /* 12px */
+    --space-4: 1rem;     /* 16px */
+    --space-5: 1.25rem;  /* 20px */
+    --space-6: 1.5rem;   /* 24px */
+    --space-8: 2rem;     /* 32px */
+    --space-10: 2.5rem;  /* 40px */
+    --space-12: 3rem;    /* 48px */
+    --space-16: 4rem;    /* 64px */
+    --space-20: 5rem;    /* 80px */
+
+    /* =============================================================================
+     * Border System - Unified Definitions
+     * ============================================================================= */
+    --border-width-thin: 1px;
+    --border-width-normal: 2px;
+    --border-width-thick: 3px;
+    --border-width-heavy: 4px;
+
+    --border-style: solid;
+    --border-primary: var(--border-width-thin) var(--border-style) var(--theme-border-subtle);
+    --border-accent: var(--border-width-normal) var(--border-style) var(--brand-primary);
+    --border-status-error: var(--border-width-thin) var(--border-style) var(--status-error);
+    --border-status-success: var(--border-width-thin) var(--border-style) var(--status-success);
+
+    /* Border Radius System */
+    --radius-none: 0;
+    --radius-sm: 0.25rem;   /* 4px */
+    --radius-md: 0.5rem;    /* 8px */
+    --radius-lg: 0.75rem;   /* 12px */
+    --radius-xl: 1rem;      /* 16px */
+    --radius-full: 9999px;
+
+    /* =============================================================================
+     * Shadow System - Optimized Calculations
+     * ============================================================================= */
+    --shadow-color-base: rgba(0, 0, 0, var(--alpha-subtle));
+    --shadow-color-medium: rgba(0, 0, 0, 0.15);
+    --shadow-sm: 0 var(--space-1) var(--space-2) var(--shadow-color-base);
+    --shadow-md: 0 var(--space-4) var(--space-6) var(--shadow-color-medium);
+    --shadow-lg: 0 var(--space-8) var(--space-20) var(--shadow-color-medium);
+
+    /* =============================================================================
+     * Performance Optimized Computed Values
+     * ============================================================================= */
+    --glass-backdrop: blur(var(--backdrop-blur));
+    --transition-standard: all var(--transition-normal) var(--transition-easing);
+    --transition-transform: transform var(--transition-normal) var(--transition-easing);
+
+    /* =============================================================================
+     * Animation & Transform System - Standardized Values
+     * ============================================================================= */
+    --transition-fast: 0.1s;                       /* instant tactile (button active 等) */
+    --transition-quick: var(--animation-fast);     /* 0.15s — animation-fast と統一 (hover/micro) */
+    --transition-normal: 0.2s;                     /* 標準 (button hover, card lift) */
+    --transition-slow: 0.3s;                       /* modal / page transition */
+    --transition-easing: ease-out;
+
+    --animation-fast: 0.15s;                       /* fade-in / entry — transition-quick の base */
+    --animation-normal: 0.3s;
+    --animation-slow: 0.5s;
+
+    --transform-subtle: translateY(-1px);
+    --transform-normal: translateY(-2px);
+    --transform-strong: translateY(-4px);
+    --transform-float: translateY(-8px);
+
+    --scale-subtle: 1.02;
+    --scale-normal: 1.05;
+    --scale-strong: 1.1;
+
+    --backdrop-blur: 12px;
+  }
+
+  /* =============================================================================
+   * Light Theme Override (v2800+) - 適用方法:
+   *   1. body に `theme-light` クラス付与 (themeManager.set('light'))
+   *   2. または html に [data-theme="light"] 属性
+   *   3. または (将来) `@media (prefers-color-scheme: light)` 自動適用
+   *
+   * Why class-based (not media-query default): 教師がプロジェクター投影時など
+   *   明示的に切替えたい運用がある。 OS 設定追従は opt-in (themeManager の auto モード)。
+   *
+   * Light theme の値は **placeholder**。 実際の light mode 実装時に色を調整する。
+   * ============================================================================= */
+  body.theme-light,
+  :root[data-theme="light"],
+  html.theme-light {
+    /* light mode native UI (scrollbar / form 部品) も追従 */
+    color-scheme: light;
+
+    /* ライトモード配色 (v2801 確定値)
+     * 根拠: Tailwind slate (cool, projector-friendly) + shadcn de facto baseline +
+     *       WCAG 2.1 AA + 子供向け readability 配慮 (muted を slate-500 → slate-600 に昇格)。
+     * 検証: theme-contrast script で全 contrast pass を確認済。
+     */
+
+    /* 背景レイヤー (v2815+: 業界定番 「カード on off-white bg」パターン)
+     * 旧: bg-base #f8fafc (slate-50) + bg-surface rgba(255,255,255,0.92) → 両方 near-white で
+     *     カードとページ bg が同化して "全部白" な印象。 user 指摘 「しろすぎない?」 の原因。
+     * 新: bg-base #f1f5f9 (slate-100) → bg-surface #ffffff (純白カード)
+     *     GitHub / Linear / Stripe / shadcn-default と同じ 「ページbg < カード」階層を確立。 */
+    --theme-bg-base: #f1f5f9;                          /* slate-100 — page bg (旧 slate-50 から trim) */
+    --theme-bg-surface: #ffffff;                       /* 純白カード — ページ bg より明確に浮く */
+    --theme-bg-elevated: #ffffff;                      /* modal も純白 + shadow */
+    --theme-bg-elevated-hover: #f1f5f9;                /* slate-100 — hover */
+    --theme-bg-overlay: rgba(15, 23, 42, 0.4);         /* modal backdrop = slate-900 半透明 */
+
+    /* テキスト階層 — children-friendly に muted を slate-600 まで昇格 */
+    --theme-text-primary: #0f172a;                     /* slate-900: 16:1 (より crisp に) */
+    --theme-text-secondary: #334155;                   /* slate-700: 10.8:1 */
+    --theme-text-muted: #475569;                       /* slate-600: 7.6:1 (slate-500 4.5:1 は子供には弱い) */
+    --theme-text-inverse: #f1f5f9;                     /* 反転背景上のテキスト */
+    --theme-text-emphasis: #b45309;                    /* amber-700: 白系 bg で AA (yellow-300 は light で消える) */
+    --theme-text-confirm: #15803d;                     /* green-700: 白系 bg で AA */
+
+    /* 境界線 — solid color に変更 (rgba から) */
+    --theme-border-subtle: #e2e8f0;                    /* slate-200 (shadcn 標準) */
+    --theme-border-normal: #cbd5e1;                    /* slate-300 (form input 境界) */
+    --theme-border-strong: #94a3b8;                    /* slate-400 (focus / active) */
+
+    /* 半透明オーバーレイ (反転: white → slate-900 alpha) */
+    --theme-overlay-white-05: rgba(15, 23, 42, 0.03);
+    --theme-overlay-white-10: rgba(15, 23, 42, 0.05);
+    --theme-overlay-white-20: rgba(15, 23, 42, 0.08);
+    --theme-overlay-white-30: rgba(15, 23, 42, 0.12);
+    --theme-overlay-black-20: rgba(15, 23, 42, 0.08);  /* shadow は light でも slate */
+    --theme-overlay-black-60: rgba(15, 23, 42, 0.2);
+    --theme-overlay-black-90: rgba(15, 23, 42, 0.4);
+    --theme-overlay-surface-glass: rgba(255, 255, 255, 0.95);
+
+    /* インジケーター / アクセント (light 上で WCAG AA 確保: cyan は 3 段下げ) */
+    --theme-spinner: #0891b2;                          /* cyan-600 (dark の cyan-300 から 3 段下) */
+    --theme-accent-cyan: #0e7490;                      /* cyan-700: 5.4:1 on slate-50  AA */
+    --theme-accent-cyan-soft: rgba(14, 116, 144, 0.1); /* cyan-700 系の薄背景 */
+
+    /* Card tier (light v2828): 白カード内の inner box が見える step elevation
+       - card-1: slate-50 #f8fafc (白カードよりわずかに濃く inner box 明示)
+       - card-2: slate-100 #f1f5f9 (より深い nest)
+       - card-3: slate-200 #e2e8f0 (popup over modal 等の最深 nest) */
+    --theme-card-1: #f8fafc;                           /* slate-50 solid — 白カード内 1 step */
+    --theme-card-2: #f1f5f9;                           /* slate-100 — 2 step */
+    --theme-card-3: #e2e8f0;                           /* slate-200 — 3 step (popup) */
+
+    /* Status text — light mode 上で AA 確保のため濃い shade に override */
+    --theme-status-error-text: #b91c1c;                /* red-700: 6.6:1 on white */
+    --theme-status-success-text: #15803d;              /* green-700: 5.7:1 */
+    --theme-status-warning-text: #b45309;              /* amber-700: 6.6:1 */
+    --theme-status-info-text: #1d4ed8;                 /* blue-700: 7.8:1 */
+
+    /* Brand / Status colors の light 上 contrast 確保 (light 専用上書き) */
+    --brand-understand: #b45309;                       /* amber-700: 6.0:1 (dark の amber-400 は light で 1.6:1 fail) */
+    --status-success: #15803d;                         /* emerald-700: 5.6:1 (dark の emerald-500 は light で 2.4 fail) */
+    --status-warning: #a16207;                         /* amber-700: 5.6:1 (dark の amber-500 は light for 2.1 fail) */
+
+    /* Status feedback box - light mode は dark と同じ vibrant pale shade で OK
+     * (white bg 上で pale tint として visible)。 値を redeclare してtheme audit を通す。 */
+    --theme-status-success-soft: #dcfce7;
+    --theme-status-success-strong: #86efac;
+    --theme-status-error-soft: #fee2e2;
+    --theme-status-error-strong: #fca5a5;
+    --theme-status-warning-soft: #fef9c3;
+    --theme-status-warning-strong: #fde047;
+    --theme-status-info-soft: #dbeafe;
+    --theme-status-info-strong: #93c5fd;
+    --theme-status-detection-soft: #ede9fe;
+    --theme-status-detection-strong: #c4b5fd;
+    --theme-status-detection-text: #4c1d95;
+    --theme-status-highlight-soft: #f3e8ff;
+    --theme-status-highlight-strong: #d8b4fe;
+
+    /* -text-on-soft 系は両モード dark text 共通 */
+    --theme-status-success-text-on-soft: #14532d;
+    --theme-status-error-text-on-soft: #7f1d1d;
+    --theme-status-warning-text-on-soft: #713f12;
+    --theme-status-info-text-on-soft: #1e3a8a;
+    --theme-status-highlight-text-on-soft: #581c87;
+    --theme-status-accent-text-on-soft: #164e63;
+
+    /* pink / highlight-text / accent / cyan-hover は light で contrast 確保のため override */
+    --theme-accent-pink: #be185d;            /* pink-700 — light 7.5:1 */
+    --theme-status-highlight-text: #7e22ce;  /* purple-700 — light 5.4:1 */
+    --theme-status-accent-soft: #cffafe;     /* cyan-100 opaque — 他 status-X-soft と統一 (v2854) */
+    --theme-status-accent-strong: #0e7490;
+
+    /* Scrollbar (light) */
+    --theme-scrollbar-thumb: rgba(15, 23, 42, 0.25);
+    --theme-scrollbar-track: rgba(15, 23, 42, 0.05);
+
+    /* Link hover (cyan accent の hover 状態) - light mode は さらに濃く */
+    --theme-accent-cyan-hover: #155e75;                /* cyan-800 */
+
+    /* Cyan accent 役割別 (v2849+) — light 上 contrast 確保のため 1-2 段濃い */
+    --theme-accent-cyan-strong: #0891b2;               /* cyan-600 — light 上の強調 */
+    --theme-accent-cyan-deep: #0e7490;                 /* cyan-700 — light 上の最深 */
+
+    /* destructive / indigo — light 上 contrast 確保のため 1 段濃い (v2851+) */
+    --theme-accent-destructive: #c2410c;               /* orange-700 — light 上 4.4:1 */
+    --theme-accent-indigo: #4338ca;                    /* indigo-700 — light 上 7.4:1 */
+  }
+
+  /* Base Styles - Unified body element */
+  body {
+    margin: 0;
+    padding: 0;
+    color: var(--theme-text-primary);
+    background: var(--theme-bg-base);
+    /* Stack 設計 (v2846):
+     *   1-6: 欧文 - macOS (-apple-system) / Windows (Segoe UI) / Android (Roboto) / brand fallback
+     *   7-10: 和文 - macOS (Hiragino Sans) / Win10+ (Yu Gothic) / Win7+ (Meiryo)
+     *   11: 最終 fallback (browser configured sans-serif)
+     * 欧文・和文を OS 標準で固定することで、 ユーザの browser font 設定 (chrome://settings/fonts)
+     * の影響を実質排除。 web font 不要なので network request / FOUC 無し。 */
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Google Sans', 'Inter',
+                 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.6;
+    overflow-x: hidden;
+    /* Theme 切替時にスムーズに色変化させる (200ms ease)。 業界標準パターン。
+       transition は元々あった他要素 (button hover, glass-panel 等) を上書きしないよう
+       background-color / color / border-color のみに限定 */
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  /* v2842: form elements (button/input/select/textarea) は browser UA stylesheet で
+     system font になり body font を継承しない quirk があるため、 global に inherit を
+     強制する。 Tailwind preflight 相当 (modern-normalize と同等)。 これが無いと
+     ブラウザ font 設定が button text に反映される (user 報告 v2841)。
+     font-size/line-height も併せて inherit させ、 body の `line-height: 1.6` を form
+     全体に伝播。 */
+  button, input, select, textarea {
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
+  }
+
+  /* Theme-aware 主要 surface 要素も滑らかに切替 — visual jank を最小化 */
+  .glass-panel,
+  .answer-card,
+  .modern-select,
+  .modern-input,
+  .viz-container,
+  .eab-header,
+  .eab-count-pill,
+  .eab-select {
+    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  }
+  /* 高速 hover / interactive 系には transition を 200ms 適用するとモタつくので除外
+     (元々の hover transition が短い 150ms を保持) */
+  @media (prefers-reduced-motion: reduce) {
+    body, .glass-panel, .answer-card, .modern-select, .modern-input,
+    .viz-container, .eab-header, .eab-count-pill, .eab-select {
+      transition: none;
+    }
+  }
+
+  /* Theme toggle button (sun/moon) — themeManager.mountToggle 経由でマウント */
+  .theme-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    background: transparent;
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: 0.5rem;
+    color: var(--theme-text-secondary);
+    cursor: pointer;
+    transition: background var(--transition-quick) ease, color var(--transition-quick) ease, border-color var(--transition-quick) ease;
+  }
+  .theme-toggle-btn:hover {
+    background: var(--theme-overlay-white-10);
+    border-color: var(--theme-border-normal);
+    color: var(--theme-text-primary);
+  }
+  .theme-toggle-btn:focus-visible {
+    outline: 2px solid var(--theme-accent-cyan);
+    outline-offset: 2px;
+  }
+
+  /* Glass Panel Effects (v2815+: card elevation を border + shadow で明示)
+   * dark: bg-surface slate-800 で page bg slate-900 から浮く
+   * light: 純白カード on slate-100 page bg、 さらに shadow で elevation 確立 */
+  .glass-panel {
+    background: var(--theme-bg-surface);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    -webkit-backdrop-filter: var(--glass-backdrop);
+    backdrop-filter: var(--glass-backdrop);
+    border: var(--border-primary);
+    transition: all var(--transition-normal) var(--transition-easing);
+    border-radius: 1rem;
+  }
+
+  .glass-panel:hover {
+    border-color: var(--theme-border-normal);
+    will-change: border-color;
+  }
+
+  .glass-panel:not(:hover) {
+    will-change: auto;
+  }
+
+  /* Comprehensive Button System */
+  .btn {
+    /* Button-specific CSS variables for better maintainability */
+    --btn-padding: 0.75rem 1.5rem;
+    --btn-border-radius: 0.75rem;
+    --btn-min-height: 44px;
+    --btn-min-width: 44px;
+    --btn-font-size: var(--font-size-sm);  /* 14px — token に統一 */
+    --btn-hover-transform: translate3d(0, -2px, 0);
+
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--btn-padding);
+    border-radius: var(--btn-border-radius);
+    font-weight: 600;
+    transition: all var(--transition-normal) var(--transition-easing);
+    cursor: pointer;
+    border: none;
+    text-decoration: none;
+    min-height: var(--btn-min-height);
+    min-width: var(--btn-min-width);
+    position: relative;
+    overflow: hidden;
+    font-size: var(--btn-font-size);
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: var(--theme-overlay-white-30);  /* btn:active ripple */
+    transition: all var(--animation-normal) var(--transition-easing);
+    transform: translate(-50%, -50%);
+    z-index: 0;
+  }
+
+  .btn:not(:disabled):active::before {
+    width: 100%;
+    height: 100%;
+  }
+
+  .btn > * {
+    position: relative;
+    z-index: 1;
+  }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  .btn:not(:disabled):hover {
+    transform: var(--btn-hover-transform);
+    will-change: transform;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .btn:not(:disabled):active {
+    transform: translate3d(0, 0, 0);
+    will-change: auto;
+  }
+
+  /* Button Variants */
+  .btn-primary {
+    background: var(--brand-primary);
+    color: white;
+    font-weight: 700;
+  }
+
+  .btn-secondary {
+    background: var(--theme-overlay-white-10);
+    color: var(--theme-text-primary);
+    border: 1px solid var(--theme-border-normal);
+  }
+
+  .btn-danger {
+    background: var(--status-error);
+    color: white;
+  }
+
+
+  /* btn-success / btn-warning: 緑/黄 brand bg は本質的に light なので、 white 文字では
+     AA contrast fail (white on emerald-500 = 2.5:1, on amber-500 = 2.15:1)。
+     dark text (slate-900) を使うことで両モードで 5:1 以上確保 (5.0/9.7:1)。 */
+  .btn-success {
+    background: var(--status-success);
+    color: #0f172a;  /* theme:exempt - 緑 bg 上は必ず暗色テキスト (WCAG AA 確保) */
+  }
+
+  /* .btn-link — 行内の補助アクション (「再推定」「自動推定に戻す」)。
+     Why: <button> だが視覚的にはリンク。 .btn の padding / min-height / ripple は
+          行内テキストの流れを壊すので継承させず、単独クラスとして定義する。 */
+  .btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: var(--font-size-xs);
+    line-height: inherit;
+    color: var(--theme-accent-cyan);
+    cursor: pointer;
+    flex-shrink: 0;
+    text-underline-offset: 2px;
+    transition: color var(--transition-quick) var(--transition-easing);
+  }
+
+  .btn-link:not(:disabled):hover {
+    color: var(--theme-accent-cyan-hover);
+    text-decoration: underline;
+  }
+
+  .btn-link:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    text-decoration: none;
+  }
+
+  .btn-link-info {
+    color: var(--theme-status-info-text);
+  }
+
+  .btn-link-info:not(:disabled):hover {
+    color: var(--theme-status-info-text);
+  }
+
+
+  /* Button Size Variants */
+
+  /* CTA Button with Shimmer Effect */
+
+  /* Status Indicators */
+
+  .status-error {
+    background-color: var(--status-error);
+  }
+
+  /* Answer Card System (from Page.html) */
+  .answer-card {
+    /* Card-specific CSS variables for better encapsulation */
+    --card-hover-transform: translateY(-2px);
+    --card-border-radius: 1rem;
+    --card-padding: 1.5rem;
+    --card-transition: all var(--transition-normal) var(--transition-easing);
+
+    background: var(--theme-bg-surface);
+    border: var(--border-primary);
+    border-radius: var(--card-border-radius);
+    padding: var(--card-padding);
+    transition: var(--card-transition);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .answer-card:hover {
+    transform: var(--card-hover-transform);
+    box-shadow: var(--shadow-lg);
+    border-color: var(--theme-border-normal);
+    will-change: transform;
+  }
+
+  .answer-card:not(:hover) {
+    will-change: auto;
+  }
+
+
+  .answer-card.loading {
+    opacity: 0.7;
+    pointer-events: none;
+  }
+
+  /* Reaction System styles are in page.css.html for Page-specific functionality */
+
+  /* Admin Toggle - Subtle button for administrators only */
+  .admin-toggle {
+    font-size: 0.75rem;
+    transition: all var(--transition-normal) ease;
+  }
+
+  .admin-toggle:hover {
+    transform: translateY(-1px);
+    will-change: transform;
+  }
+
+  .admin-toggle:not(:hover) {
+    will-change: auto;
+  }
+
+  /* Loading skeleton (used by Page.html skeleton-card) */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--theme-overlay-white-10) 25%,
+      var(--theme-overlay-white-20) 50%,
+      var(--theme-overlay-white-10) 75%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.5s infinite;
+    border-radius: 0.5rem;
+  }
+
+  /* =============================================================================
+   UNIFIED LOADING OVERLAY SYSTEM
+   ============================================================================= */
+
+  /* Base loading overlay - Optimized specificity without excessive !important */
+  .loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition:
+      opacity 0.3s ease,
+      background-color 0.3s ease;
+    z-index: var(--z-loading-overlay);
+    background-color: rgba(0, 0, 0, 0);
+    visibility: visible;
+    opacity: 1;
+    margin: 0;
+    padding: 0;
+    transform: none;
+    /* Force isolation from any parent stacking contexts */
+    isolation: isolate;
+    /* Ensure the overlay is always positioned relative to viewport */
+    contain: layout;
+    /* Override any parent transforms that might affect positioning */
+    will-change: auto;
+  }
+
+  /* High specificity override for framework conflicts (only when necessary) */
+  body .loading-overlay:not(.hidden) {
+    display: flex !important;
+    position: fixed !important;
+    z-index: var(--z-loading-overlay) !important;
+  }
+
+  /* Variant: Transparent overlay - completely invisible interaction blocker */
+  .loading-overlay.transparent {
+    background-color: rgba(0, 0, 0, 0); /* Completely transparent */
+    backdrop-filter: none; /* No visual effects */
+    -webkit-backdrop-filter: none;
+  }
+
+  /* Content container for all loading elements */
+  .loading-content {
+    color: var(--theme-text-primary);
+    text-align: center;
+    padding: 2rem;
+    max-width: 400px;
+    background: var(--theme-overlay-surface-glass);
+    border-radius: 1rem;
+    border: 1px solid var(--theme-accent-cyan-soft);  /* brand-accent-light の薄め (loading 専用) */
+    box-shadow: 0 12px 40px var(--theme-overlay-black-60);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+  }
+
+  .loading-message {
+    font-size: 1.125rem;
+    margin-top: 1rem;
+    font-weight: 600;
+    opacity: 0.95;
+    animation: fadeInOut 1.5s ease-in-out infinite;
+    text-align: center;
+  }
+
+  /* Improved loading message animation */
+  @keyframes fadeInOut {
+    0%,
+    100% {
+      opacity: 0.95;
+    }
+    50% {
+      opacity: 0.75;
+    }
+  }
+
+  /* Spinner for global loading */
+  .global-spinner {
+    width: 60px;
+    height: 60px;
+    border: 6px solid var(--theme-border-strong);
+    border-top: 6px solid var(--theme-spinner);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 1.5rem;
+  }
+
+
+  /* Ensure QuickStart progress bar is visible */
+  #quickstart-progress {
+    position: relative;
+    z-index: var(--z-tooltip) !important;
+  }
+  /* Variant: Modal, for critical blocking actions */
+  .loading-overlay.modal {
+    background-color: var(--theme-overlay-black-90);
+    z-index: var(--z-notification);
+  }
+
+  /* Spinner Variants */
+  .spinner {
+    width: 24px;
+    height: 24px;
+    border: 3px solid var(--theme-border-strong);
+    border-top: 3px solid var(--theme-spinner);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .spinner-small {
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--theme-border-strong);
+    border-top: 2px solid var(--theme-spinner);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+
+  .loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 4px solid var(--theme-border-strong);  /* spinner-accent: brand-accent-light alpha */
+    border-top: 4px solid var(--theme-spinner);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    flex-shrink: 0;
+  }
+
+  .spinner-xs {
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--theme-border-strong);  /* spinner-accent: brand-accent-light alpha */
+    border-top: 2px solid var(--theme-spinner);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    display: inline-block;
+  }
+
+  /* Tooltip System */
+  .tooltip {
+    position: relative;
+  }
+
+  .tooltip::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--theme-overlay-black-90);
+    color: white;
+    padding: 6px 10px;
+    border-radius: 0.5rem;
+    font-size: var(--font-size-xs);  /* 12px — token に統一 */
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-normal);
+    z-index: var(--z-modal);
+    margin-bottom: 5px;
+  }
+
+  .tooltip:hover::after {
+    opacity: 1;
+  }
+
+  /* ============================================================
+   * Card Primitives (v2836+)
+   * 旧パターン: <section class="card glass-panel rounded-xl p-6"> — 3 重 alias
+   *   .card は margin-bottom のみ、 glass-panel が bg/border/radius/shadow、
+   *   rounded-xl は glass-panel.border-radius:1rem と重複、 p-6 は padding hardcode。
+   * 新パターン: <section class="card"> または <section class="card card-compact">。
+   *   .card 単体で bg + border + radius + shadow + padding + margin を提供。
+   *   なぜ .glass-panel と分けるか: glass-panel は modal/header/hero 等 padding が
+   *   文脈依存のところでも使うので、 「コンテンツカード」 とは semantic を分離する。
+   *   .card は 「上下に積まれるコンテンツの 1 単位」 を表す。
+   * 既存の .glass-panel 単体使用 (modal 等) は影響を受けない。 */
+  .card {
+    background: var(--theme-bg-surface);
+    border: var(--border-primary);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    margin-bottom: var(--space-4);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    transition: all var(--transition-normal) var(--transition-easing);
+  }
+
+  /* compact: padding を縮めた card (情報密度の高い設定パネル等)。 旧 .info-card 相当。 */
+  .card-compact {
+    padding: var(--space-4);
+    margin-bottom: var(--space-3);
+  }
+
+  /* ============================================================
+   * Modal Primitives (v2839+)
+   * 旧パターン: <div class="glass-panel rounded-xl p-6 max-w-md w-full mx-4"> *   = 6 utility 重複 (modal 9 箇所で repeat)。
+   * 新パターン: <div class="modal-card"> または <div class="modal-card modal-card-lg">。
+   *   .modal-card 単体で modal の全レイアウト (bg/border/radius/padding/max-width/margin) を提供。
+   * 用途別: modal-card-sm (確認 dialog) / modal-card-md (form modal) / modal-card-lg (content modal)。
+   * .modal-card-prominent: 答え modal 等の primary content modal 用 cyan accent。 */
+  /* modal-overlay: モーダルの背面。旧実装は fixed inset-0 bg-black/80 backdrop-blur-sm
+     … の utility 連結を 5 箇所で重複させていた。1 クラスに集約する。 */
+  /* ============================================================
+   * Admin UI primitives (v2902)
+   *
+   * Why: 管理画面 (アプリ設定 / 初期設定 / 詳細設定) は児童が見る画面と同じ
+   *   装飾レベルで作られていた。カード枠・色付きボックス・バッジ・大きな見出しが
+   *   並び、どこが操作対象かを読み取るのに時間がかかる。管理画面に必要なのは
+   *   「装飾」ではなく「一覧性と密度」なので、業界標準の設定画面 (GitHub Settings /
+   *   Vercel / Stripe Dashboard 等) と同じ構成要素に置き換える。
+   *
+   * 構成:
+   *   .admin-page      全体の幅と余白
+   *   .admin-section   区切り線で仕切るセクション (カード枠を使わない)
+   *   .admin-title     セクション見出し (小さめ・色を持たない)
+   *   .admin-row       ラベル / 説明 / 操作 の 3 要素を 1 行に置く設定行
+   *   .admin-actions   行末のボタン群
+   *   .admin-hint      補足文 (muted 一色。色付きボックスにしない)
+   *   .admin-table     一覧表
+   *   .admin-kv        key-value の読み取り専用表示
+   *   .admin-stat      数値サマリ
+   * ============================================================ */
+  .admin-page {
+    max-width: 56rem;
+    margin: 0 auto;
+    padding: var(--space-6) var(--space-4) var(--space-16);
+  }
+
+  .admin-page-header {
+    padding-bottom: var(--space-4);
+    margin-bottom: var(--space-2);
+    border-bottom: var(--border-primary);
+  }
+  .admin-page-header h1 {
+    font-size: var(--font-size-xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--theme-text-primary);
+    margin: 0;
+  }
+  .admin-page-header p {
+    font-size: var(--font-size-sm);
+    color: var(--theme-text-muted);
+    margin: var(--space-1) 0 0;
+  }
+
+  .admin-section {
+    padding: var(--space-5) 0;
+    border-bottom: 1px solid var(--theme-border-subtle);
+  }
+  .admin-section:last-child { border-bottom: none; }
+
+  .admin-title {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    color: var(--theme-text-primary);
+    letter-spacing: 0.02em;
+    margin: 0 0 var(--space-1);
+  }
+  .admin-title .icon { color: var(--theme-text-muted); }
+
+  .admin-section > .admin-hint:first-of-type { margin-top: 0; }
+
+  .admin-hint {
+    font-size: var(--font-size-xs);
+    line-height: var(--leading-relaxed);
+    color: var(--theme-text-muted);
+    margin: var(--space-1) 0 var(--space-3);
+  }
+
+  /* 設定行: 左にラベル+説明、右に操作。狭い画面では縦積み。 */
+  .admin-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-4);
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--theme-border-subtle);
+  }
+  .admin-row:first-of-type { border-top: none; }
+  .admin-row-label {
+    font-size: var(--font-size-sm);
+    color: var(--theme-text-primary);
+    min-width: 0;
+  }
+  .admin-row-label small {
+    display: block;
+    font-size: var(--font-size-xs);
+    color: var(--theme-text-muted);
+    margin-top: 0.15rem;
+  }
+  .admin-actions {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: none;
+    flex-wrap: wrap;
+  }
+  @media (max-width: 640px) {
+    .admin-row { flex-direction: column; align-items: stretch; }
+    .admin-actions { justify-content: flex-start; }
+  }
+
+  /* key-value の読み取り専用表示 */
+  .admin-kv {
+    display: grid;
+    grid-template-columns: minmax(6rem, 12rem) 1fr;
+    gap: var(--space-2) var(--space-4);
+    font-size: var(--font-size-sm);
+  }
+  .admin-kv dt { color: var(--theme-text-muted); }
+  .admin-kv dd { color: var(--theme-text-primary); margin: 0; word-break: break-all; }
+
+  /* 数値サマリ。装飾を持たず数字と見出しだけ。 */
+  .admin-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+    gap: var(--space-4);
+  }
+  .admin-stat-value {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-weight-semibold);
+    color: var(--theme-text-primary);
+    line-height: 1.2;
+    font-variant-numeric: tabular-nums;
+  }
+  .admin-stat-label {
+    font-size: var(--font-size-xs);
+    color: var(--theme-text-muted);
+    margin-top: 0.15rem;
+  }
+
+  /* 一覧表 */
+  .admin-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+  }
+  .admin-table th {
+    text-align: left;
+    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-xs);
+    color: var(--theme-text-muted);
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--theme-border-subtle);
+    white-space: nowrap;
+  }
+  .admin-table td {
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--theme-border-subtle);
+    color: var(--theme-text-primary);
+    vertical-align: middle;
+  }
+  .admin-table tbody tr:last-child td { border-bottom: none; }
+  .admin-table tbody tr:hover { background: var(--theme-card-1); }
+
+  /* 出力欄 (診断結果 / ログ) */
+  .admin-output {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: var(--font-size-xs);
+    line-height: var(--leading-relaxed);
+    white-space: pre-wrap;
+    word-break: break-word;
+    background: var(--theme-card-1);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: var(--radius-md);
+    padding: var(--space-3);
+    max-height: 24rem;
+    overflow: auto;
+    color: var(--theme-text-secondary);
+    margin: 0;
+  }
+
+  /* 状態ドット。色数を絞り、意味のあるものだけに使う。 */
+  .admin-dot {
+    display: inline-block;
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-full);
+    background: var(--theme-text-muted);
+    flex: none;
+  }
+  .admin-dot-ok { background: var(--status-success); }
+  .admin-dot-error { background: var(--status-error); }
+
+  /* 状態バッジ (admin 一覧表内)。色は 2 値だけに絞り、面ではなく文字色で表す。 */
+  .admin-badge {
+    display: inline-block;
+    padding: 0.1rem 0.45rem;
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-medium);
+    border: 1px solid var(--theme-border-subtle);
+    color: var(--theme-text-muted);
+    white-space: nowrap;
+  }
+  .admin-badge-on {
+    color: var(--theme-text-confirm);
+    border-color: color-mix(in srgb, var(--status-success) 45%, transparent);
+  }
+  .admin-badge-off {
+    color: var(--theme-text-muted);
+  }
+
+  /* app-body: 全ページ共通の body 基本色。
+     旧実装は 8 ページが同じ inline style="background: var(--theme-bg-base); …" を
+     書いており、テーマ変更のたびに 8 箇所を直す必要があった。1 クラスに集約する。 */
+  .app-body {
+    background: var(--theme-bg-base);
+    color: var(--theme-text-primary);
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-modal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--space-4);
+    background: var(--theme-bg-overlay);
+    -webkit-backdrop-filter: blur(4px);
+    backdrop-filter: blur(4px);
+  }
+
+  /* icon-btn: アイコンだけの円形ボタン (閉じる / 小さな操作)。
+     旧実装は bg-white/20 hover:bg-white/30 … とハードコード色を並べており、
+     ライトテーマで見えなくなっていた。theme token に統一する。 */
+  .icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: var(--radius-full);
+    border: var(--border-primary);
+    background: var(--theme-bg-surface);
+    color: var(--theme-text-secondary);
+    cursor: pointer;
+    transition: background var(--transition-quick), color var(--transition-quick);
+  }
+  .icon-btn:hover { background: var(--theme-bg-elevated); color: var(--theme-text-primary); }
+  .icon-btn:focus-visible { outline: 2px solid var(--theme-accent-cyan); outline-offset: 2px; }
+
+  /* 回答モーダルの本文領域 */
+  .modal-answer-body {
+    flex-grow: 1;
+    min-height: 200px;
+    margin-bottom: var(--space-4);
+    overflow-y: auto;
+    padding-right: var(--space-4);
+  }
+
+  /* is-disabled: 「まだ押せない」ボタン (読み込み中 / 前提未達)。
+     disabled 属性が付けられない <a> でも同じ見た目にするため class で表現する。 */
+  .is-disabled {
+    opacity: 0.55;
+    pointer-events: none;
+    cursor: not-allowed;
+  }
+
+  .modal-card {
+    background: var(--theme-bg-surface);
+    border: var(--border-primary);
+    border-radius: var(--radius-xl);
+    padding: var(--space-6);
+    width: 100%;
+    max-width: 28rem;  /* デフォルト = max-w-md (確認 dialog 想定) */
+    margin: 0 var(--space-4);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.03);
+    -webkit-backdrop-filter: var(--glass-backdrop);
+    backdrop-filter: var(--glass-backdrop);
+  }
+  .modal-card-md { max-width: 42rem; }   /* max-w-2xl */
+  .modal-card-lg { max-width: 64rem; }   /* max-w-5xl */
+  .modal-card-prominent {
+    border: 2px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  }
+
+  /* Message System */
+  .message {
+    padding: 1rem;
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
+    transform: translateY(20px);
+    opacity: 0;
+    transition: all var(--animation-normal) var(--transition-easing);
+  }
+
+  .message.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  /* Modal System */
+  /* Why: background/color は呼び出し側（.icon-btn 等の併用クラス）に委ねる。
+     ここで色を持つと併用クラスを上書きして「×ボタンが透明」になる不具合が
+     出ていた。位置・形状のみ定義する。 */
+  .modal-close-btn {
+    border: none;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all var(--transition-normal) var(--transition-easing);
+  }
+
+  /* Performance Optimizations */
+  .render-optimized {
+    will-change: transform, opacity;
+    transform: translate3d(0, 0, 0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+  }
+
+  /* Reset optimization when interaction ends */
+
+  /* Disable render optimization when global loading is active to prevent stacking context issues */
+  body.gas-loading .render-optimized,
+  .loading-active .render-optimized {
+    transform: none;
+    will-change: auto;
+  }
+
+  /* Alternative loading-safe optimization for when we need performance but loading is active */
+  .render-optimized.loading-safe {
+    /* Use containment instead of transform for performance without stacking context issues */
+    contain: style layout;
+    transform: none;
+    will-change: auto;
+  }
+
+  /* Accessibility */
+  :focus-visible {
+    outline: 3px solid var(--brand-primary);
+    outline-offset: 2px;
+    border-radius: 0.25rem;
+  }
+
+  /* Animation Classes (only used ones) */
+  .fade-in {
+    animation: fadeIn var(--animation-normal) ease-out;
+  }
+
+  /* Keyframe Animations */
+  @keyframes fadeIn {
+    0% {
+      opacity: 0;
+      transform: translateY(10px);
+      will-change: opacity, transform;
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+      will-change: auto;
+    }
+  }
+
+  /* 通知バナー専用: 上から下にドロップダウン */
+  @keyframes fadeInFromTop {
+    0% {
+      opacity: 0;
+      transform: translate(-50%, -20px);
+      will-change: opacity, transform;
+    }
+    100% {
+      opacity: 1;
+      transform: translate(-50%, 0);
+      will-change: auto;
+    }
+  }
+
+  /* 通知トースト専用: 右から左にスライドイン */
+  @keyframes fadeInFromRight {
+    0% {
+      opacity: 0;
+      transform: translateX(100px);
+      will-change: opacity, transform;
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+      will-change: auto;
+    }
+  }
+
+  /* 中央上の通知バナー (NotificationSystem.banner)。 全ページで使えるよう UnifiedStyles に集約。
+     旧 page.viz.css.html の .board-switched-toast を踏襲。 */
+  .board-switched-toast {
+    position: fixed;
+    top: 1.5rem;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    z-index: var(--z-notification);
+    padding: 0.75rem 1.25rem;
+    background: var(--theme-accent-cyan-soft);
+    border: 1px solid var(--theme-accent-cyan);
+    border-radius: 0.75rem;
+    color: var(--theme-text-primary);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--transition-slow) ease, transform var(--transition-slow) ease;
+    max-width: 90vw;
+    text-align: center;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  .board-switched-toast strong { color: var(--theme-accent-cyan); }
+  .board-switched-toast span { color: var(--theme-text-secondary); font-size: 0.875rem; }
+  .board-switched-toast.visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  @keyframes skeleton-loading {
+    0% {
+      background-position: 200% 0;
+      will-change: background-position;
+    }
+    100% {
+      background-position: -200% 0;
+      will-change: auto;
+    }
+  }
+
+  @keyframes spin {
+    0% {
+      transform: rotate(0deg);
+      will-change: transform;
+    }
+    100% {
+      transform: rotate(360deg);
+      will-change: auto;
+    }
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      will-change: transform;
+    }
+    50% {
+      transform: scale(1.05);
+    }
+  }
+
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translate3d(0, 0, 0);
+      will-change: transform;
+    }
+    25% {
+      transform: translate3d(-5px, 0, 0);
+    }
+    75% {
+      transform: translate3d(5px, 0, 0);
+    }
+  }
+
+  @keyframes bounce {
+    0%,
+    100% {
+      transform: translateY(0);
+      will-change: transform;
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes modalFade {
+    0% {
+      opacity: 0;
+      will-change: opacity;
+    }
+    100% {
+      opacity: 1;
+      will-change: auto;
+    }
+  }
+
+  @keyframes modalScale {
+    0% {
+      transform: scale(0.9);
+      will-change: transform;
+    }
+    100% {
+      transform: scale(1);
+      will-change: auto;
+    }
+  }
+
+  @keyframes slideIn {
+    0% {
+      opacity: 0;
+      transform: translateX(-20px);
+      will-change: opacity, transform;
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+      will-change: auto;
+    }
+  }
+
+
+  @keyframes slideInFromBottom {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+      will-change: opacity, transform;
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+      will-change: auto;
+    }
+  }
+
+
+  /* Font Styles */
+
+  /* Text Utilities */
+
+  /* Loading Overlay Hidden State Override */
+  .loading-overlay.hidden {
+    display: none;
+    visibility: hidden;
+    opacity: 0;
+  }
+
+  /* Media Queries */
+
+  /* Performance optimizations for low-end devices - integrated into main mobile query */
+
+  /* Reduced motion support */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  /* High contrast mode support — テーマに応じて border/text を強化 */
+  @media (prefers-contrast: high) {
+    :root {
+      --theme-border-subtle: rgba(255, 255, 255, 0.3);
+      --theme-text-primary: #ffffff;
+    }
+    body.theme-light,
+    :root[data-theme="light"] {
+      --theme-border-subtle: #475569;  /* slate-600 で境界線をはっきり */
+      --theme-text-primary: #000000;
+    }
+  }
+
+  /* Mobile-first responsive design with performance optimizations */
+  @media (max-width: 768px) /* md breakpoint */ {
+    .btn {
+      min-height: 48px;
+      padding: 1rem 1.5rem;
+      font-size: 16px;
+    }
+
+
+    .glass-panel {
+      margin: 0.5rem;
+      padding: 1rem;
+      /* Performance optimization for low-end devices */
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+      background: var(--theme-bg-elevated);
+    }
+
+    .answer-card {
+      padding: 1rem;
+    }
+
+    .reaction-btn {
+      padding: 0.5rem 0.75rem;
+      font-size: 0.875rem;
+    }
+  }
+
+  /* High refresh rate display optimizations */
+  @media (min-resolution: 120dpi) {
+    .btn,
+    .answer-card {
+      will-change: transform;
+    }
+  }
+
+
+
+
+  /* Accessibility support - prefers-reduced-motion (btn:disabled only) */
+  @media (prefers-reduced-motion: reduce) {
+    .btn:disabled {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      transform: none !important;
+    }
+  }
+
+  /* =============================================================================
+   * AdminPanel Common Components
+   * ============================================================================= */
+
+  /* Form Groups */
+  .form-group {
+    margin-bottom: 1rem;
+  }
+
+  /* Modern Select Styling — admin form 共通の select 要素
+     CRITICAL: appearance: none を必ず付ける。 これが無いとブラウザの native widget が
+     OS dark mode を強制継承し、 light mode でも濃紺 bg + 白文字で rendered される
+     (2026-05-19 user screenshot で確認済みのバグ)。 chevron は custom SVG で描画。 */
+  .modern-select {
+    width: 100%;
+    padding: 0.75rem 2.25rem 0.75rem 0.875rem;  /* 右に chevron 分の余白 */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background: var(--theme-bg-elevated);
+    /* chevron: theme-aware SVG (currentColor 風)、 light/dark で自動切替 */
+    background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg'width='12'height='12'viewBox='0 0 12 12'fill='none'stroke='%2394a3b8'stroke-width='2'stroke-linecap='round'stroke-linejoin='round'%3E%3Cpolyline points='3 4.5 6 7.5 9 4.5'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 12px 12px;
+    border: 1px solid var(--theme-border-normal);
+    border-radius: 0.5rem;
+    color: var(--theme-text-primary);
+    font-size: 0.875rem;
+    transition: all var(--transition-normal);
+    cursor: pointer;
+  }
+
+  .modern-select:focus {
+    outline: none;
+    border-color: color-mix(in srgb, var(--brand-primary) 80%, transparent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  }
+
+  .modern-select.has-ai-selection {
+    border-color: color-mix(in srgb, var(--brand-primary) 60%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  }
+
+  .modern-select.has-manual-selection {
+    border-color: color-mix(in srgb, var(--brand-highlight) 60%, transparent);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand-highlight) 20%, transparent);
+  }
+
+  /* .modern-select-sm / -md は v2840 で削除 — 実 migration 無く YAGNI 違反だった。
+     必要時に .eab-select の rule を直接整理する方が筋。 */
+
+  /* Modern Input Styling - modern-selectと統一デザイン */
+  .modern-input {
+    width: 100%;
+    padding: 0.875rem 1rem;
+    background: var(--theme-overlay-white-05);
+    border: var(--border-primary);
+    border-radius: 0.75rem;
+    color: var(--theme-text-primary);
+    transition: all var(--transition-normal) var(--transition-easing);
+    /* 16px は意図的（token 化しない）: iOS Safari は font-size < 16px の input に
+       focus すると自動ズームするため、 入力欄は必ず 16px 固定にする。 */
+    font-size: 16px;
+    min-height: 44px;
+  }
+
+  .modern-input:focus {
+    outline: none;
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 10%, transparent);  /* primary halo (brand identity) */
+    background: var(--theme-overlay-white-10);
+  }
+
+  .modern-input:hover {
+    border-color: var(--theme-border-strong);
+  }
+
+  .modern-input::placeholder {
+    color: var(--theme-text-muted);
+  }
+
+  /* Toggle Switches */
+  .toggle-group {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .toggle-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+    color: var(--theme-text-secondary);
+  }
+
+  .toggle-switch input {
+    display: none;
+  }
+
+  .slider {
+    width: 44px;
+    height: 24px;
+    background: var(--theme-border-strong);
+    border-radius: 0.75rem;
+    position: relative;
+    transition: all var(--transition-slow);
+  }
+
+  .slider:before {
+    content: '';
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    /* iOS 風 toggle knob: 両モードで白 (track 上の浮き感を shadow で表現) */
+    background: #ffffff;  /* theme:exempt — iOS-style toggle knob */
+    top: 2px;
+    left: 2px;
+    transition: all var(--transition-slow);
+    box-shadow: 0 1px 3px var(--theme-overlay-black-20);
+  }
+
+  .toggle-switch input:checked + .slider {
+    background: color-mix(in srgb, var(--brand-primary) 80%, transparent);
+  }
+
+  .toggle-switch input:checked + .slider:before {
+    transform: translateX(20px);
+  }
+
+  /* Status Badges */
+  .status-badge {
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+
+  /* v2858: bg と text を同 token で書くと light mode で contrast 不足 (= 「非公開」 等の
+     文字が見えない bug)。 vibrant pale opaque + dark text-on-soft + vibrant strong border の
+     v2848+ pattern に統一して両モード AA 確保。 */
+  .status-badge.unpublished {
+    background: var(--theme-status-warning-soft);
+    color: var(--theme-status-warning-text-on-soft);
+    border: 1px solid var(--theme-status-warning-strong);
+  }
+
+  .status-badge.published {
+    background: var(--theme-status-success-soft);
+    color: var(--theme-status-success-text-on-soft);
+    border: 1px solid var(--theme-status-success-strong);
+  }
+
+  .status-badge.error {
+    background: var(--theme-status-error-soft);
+    color: var(--theme-status-error-text-on-soft);
+    border: 1px solid var(--theme-status-error-strong);
+  }
+
+  /* Confidence Badges */
+  .confidence-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+    gap: 0.25rem;
+  }
+
+  .confidence-badge.high {
+    background: var(--theme-status-success-soft);
+    color: var(--theme-status-success-text-on-soft);
+    border: 1px solid var(--theme-status-success-strong);
+  }
+
+  .confidence-badge.medium {
+    background: var(--theme-status-warning-soft);
+    color: var(--theme-status-warning-text-on-soft);
+    border: 1px solid var(--theme-status-warning-strong);
+  }
+
+  .confidence-badge.low {
+    background: var(--theme-status-error-soft);
+    color: var(--theme-status-error-text-on-soft);
+    border: 1px solid var(--theme-status-error-strong);
+  }
+
+  .confidence-badge.manual {
+    background: var(--theme-status-highlight-soft);
+    color: var(--theme-status-highlight-text-on-soft);
+    border: 1px solid var(--theme-status-highlight-strong);
+  }
+
+  /* Action Button Groups */
+
+  /* Link Buttons — brand primary blue (両モード視認確保) */
+  .link-btn {
+    background: color-mix(in srgb, var(--brand-primary) 20%, transparent);
+    color: var(--brand-primary);
+    padding: 0.5rem 1rem;
+    border-radius: 0.5rem;
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: all var(--transition-normal);
+    display: inline-block;
+    text-align: center;
+  }
+
+  .link-btn:hover {
+    background: color-mix(in srgb, var(--brand-primary) 30%, transparent);
+  }
+
+  /* Config Item Styling — admin panel の設定 1 行表示 */
+  /* ╔══════════════════════════════════════════════════════════════════════╗
+     ║ INNER BOX — 親 card 内の "step elevation" box (single source of truth) ║
+     ║ 使い方: <div class="box">...</div> で 親 card より明確に浮く inner box  ║
+     ║ 色変更時: --theme-card-1 token を 1 行変えれば全 .box に反映              ║
+     ╚══════════════════════════════════════════════════════════════════════╝ */
+  .box {
+    background: var(--theme-card-1);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+  /* .box-row: flex 横並び の inner box (label + value) */
+  .box-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  /* .box-active / .config-item は v2840 で削除 — .box .box-row primitive へ統合済 */
+
+  /* box-success: 成功・完了を表す box。status token で light/dark 両対応。 */
+  .box-success {
+    background: color-mix(in srgb, var(--status-success) 12%, transparent);
+    border: var(--border-status-success);
+  }
+
+  /* box-warning / box-info: 注意喚起・補足情報。box-success と同じ組み立て。 */
+  .box-warning {
+    background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-warning) 45%, transparent);
+  }
+  .box-error {
+    background: color-mix(in srgb, var(--status-error) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-error) 45%, transparent);
+  }
+
+  .config-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .label {
+    font-weight: 500;
+    color: var(--theme-text-muted);
+    font-size: 0.875rem;
+  }
+
+  /* `<details>` summary の default triangle を消し、回転式の小さな三角で代替する。 */
+  .admin-collapsible > summary {
+    list-style: none;
+    outline: none;
+    transition: color var(--transition-quick) ease;
+  }
+  .admin-collapsible > summary::-webkit-details-marker { display: none; }
+  .admin-collapsible > summary::before {
+    content: "▸ ";
+    display: inline-block;
+    transition: transform var(--transition-quick) ease;
+    margin-right: 0.25em;
+    color: inherit;
+  }
+  .admin-collapsible[open] > summary::before {
+    transform: rotate(90deg);
+  }
+
+  /* Lesson Workspace: inline takeover mode で main workspace を hide。
+     既定で wizard / Runner は非表示、body class が付いた時だけ表示する。
+     HTML の hidden 属性は使わない (CSS 上書き不可で blank screen の原因になる)。
+     admin-container 外に出しているので margin を独自に持たせて status-header と整列。 */
+  #lesson-workspace,
+  #lesson-runner {
+    display: none;
+    margin: var(--space-4);
+  }
+  body.mode-create-lesson #lesson-workspace { display: block; }
+  body.mode-run-lesson #lesson-runner { display: block; }
+  body.mode-create-lesson [data-normal-mode],
+  body.mode-run-lesson [data-normal-mode] { display: none; }
+
+  /* ----- Class chip picker (wizard step 1) ----- */
+  .class-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+  .class-chip-row-inline { margin-bottom: 0; }
+  .class-chip-row-selected {
+    min-height: 2.5rem;
+    padding: 0.5rem;
+    background: var(--theme-overlay-white-05);
+    border: 1px dashed var(--theme-border-normal);
+    border-radius: 0.5rem;
+  }
+  .class-chip-row-known {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .class-chip-empty {
+    color: var(--theme-text-muted);
+    font-size: 0.875rem;
+    font-style: italic;
+  }
+  .class-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.3rem 0.7rem;
+    border-radius: 9999px;
+    background: color-mix(in srgb, var(--brand-primary) 18%, transparent);  /* brand-primary 薄背景 */
+    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
+    color: var(--theme-text-primary);
+    font-size: 0.875rem;
+    cursor: default;
+  }
+  .class-chip-known {
+    background: var(--theme-overlay-white-10);
+    border-color: var(--theme-border-normal);
+    cursor: pointer;
+    transition: all var(--transition-quick) ease;
+  }
+  .class-chip-known:hover {
+    background: color-mix(in srgb, var(--brand-primary) 18%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
+    color: var(--theme-text-primary);
+  }
+  .class-chip-remove {
+    background: none;
+    border: none;
+    color: var(--theme-text-muted);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    padding: 0 0.15rem;
+  }
+  .class-chip-remove:hover { color: var(--status-error); }
+  .class-preset-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+  }
+  .class-preset-label {
+    font-size: 0.875rem;
+    color: var(--theme-text-muted);
+  }
+  .btn-class-preset {
+    padding: 0.25rem 0.65rem;
+    border-radius: 0.5rem;
+    background: var(--theme-card-1);
+    border: 1px solid var(--theme-border-normal);
+    color: var(--theme-text-secondary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-quick) ease;
+  }
+  .btn-class-preset:hover {
+    background: color-mix(in srgb, var(--brand-primary) 20%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
+    color: var(--theme-text-primary);
+  }
+  .btn-class-preset.active {
+    background: color-mix(in srgb, var(--brand-primary) 30%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 70%, transparent);
+    color: var(--theme-text-primary);
+  }
+  .class-custom-add summary {
+    cursor: pointer;
+    color: var(--theme-text-muted);
+    font-size: 0.875rem;
+    padding: 0.3rem 0;
+  }
+  .class-custom-add[open] summary { color: var(--theme-text-secondary); }
+
+  /* Wizard progress dots (Stripe 風) */
+  .lesson-step-dot {
+    display: inline-block;
+    width: 1.5rem; height: 1.5rem;
+    text-align: center; line-height: 1.5rem;
+    border-radius: 9999px;
+    color: var(--theme-border-strong);
+    font-size: 0.875rem;
+  }
+  .lesson-step-dot.active {
+    color: color-mix(in srgb, var(--theme-accent-cyan-strong) 95%, transparent);
+    font-weight: bold;
+  }
+  .lesson-step[hidden] { display: none; }
+
+  /* Phase card (Wizard Step 2 / Runner) */
+  .lesson-phase-card {
+    background: var(--theme-card-1);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: 0.75rem;
+    padding: 0.85rem 1rem;
+    min-width: 180px;
+    transition: border-color var(--transition-quick) ease, background var(--transition-quick) ease;
+  }
+  .lesson-phase-card.active {
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 70%, transparent);
+    background: color-mix(in srgb, var(--theme-accent-cyan-deep) 18%, transparent);
+  }
+  .lesson-phase-card.completed {
+    opacity: 0.7;
+    border-color: color-mix(in srgb, var(--status-success) 45%, transparent);
+  }
+  .lesson-phase-card .phase-number {
+    font-size: 0.75rem; color: var(--theme-text-muted); font-weight: bold;
+  }
+  .lesson-phase-card .phase-name { font-size: 1rem; color: var(--theme-text-primary); margin: 0.2rem 0; }
+  .lesson-phase-card .phase-meta { font-size: 0.75rem; color: var(--theme-text-muted); }
+
+  /* Phase card 編集モード (Wizard Step 2) */
+  .phase-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+  }
+  .phase-delete-btn {
+    background: none;
+    border: none;
+    color: var(--theme-text-muted);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 0.3rem;
+    border-radius: 0.5rem;
+    transition: color var(--transition-quick) ease, background var(--transition-quick) ease;
+  }
+  .phase-delete-btn:hover {
+    color: var(--status-error);
+    background: color-mix(in srgb, var(--status-error) 10%, transparent);
+  }
+  .phase-field {
+    margin-bottom: 0.6rem;
+  }
+  .phase-field:last-child { margin-bottom: 0; }
+  .phase-label {
+    display: block;
+    font-size: 0.75rem;
+    color: var(--theme-text-muted);
+    margin-bottom: 0.2rem;
+  }
+  .phase-add-wrap {
+    grid-column: 1 / -1;
+    text-align: center;
+    margin-top: 0.5rem;
+  }
+  .phase-add-btn {
+    padding: 0.6rem 1.4rem;
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 12%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--theme-accent-cyan-strong) 50%, transparent);
+    border-radius: 0.5rem;
+    color: var(--theme-accent-cyan);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-quick) ease;
+  }
+  .phase-add-btn:hover {
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 20%, transparent);
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent);
+    /* color は base の var(--theme-accent-cyan) を継承。 旧 color:#fff は light mode の
+       淡いシアン地で白文字が消えていた (theme bug)。 */
+  }
+
+  /* Phase preview & detail UI (Wizard Step 2) */
+  .phase-preview {
+    margin-bottom: 0.6rem;
+    padding: 0.5rem 0.6rem;
+    background: color-mix(in srgb, var(--theme-accent-cyan-deep) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 25%, transparent);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    color: var(--theme-text-primary);
+  }
+  .phase-preview-numberline {
+    display: flex; align-items: center; gap: 0.4rem; justify-content: space-between;
+  }
+  .phase-preview-track {
+    flex: 1; text-align: center; color: color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent); letter-spacing: -2px;
+  }
+  .phase-preview-end {
+    color: var(--theme-accent-cyan);
+    max-width: 38%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .phase-preview-matrix {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 0.2rem 0.4rem;
+    align-items: center;
+    font-size: 0.75rem;
+  }
+  .matrix-y-high { grid-column: 2; color: var(--theme-accent-cyan); }
+  .matrix-grid {
+    grid-column: 2;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: 1fr 1fr;
+    width: 100%; aspect-ratio: 1;
+    max-height: 50px;
+    background: var(--theme-card-2);
+    border-radius: 0.25rem;
+    overflow: hidden;
+  }
+  .matrix-quad {
+    border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 18%, transparent);
+  }
+  .matrix-x-axis { grid-column: 2; color: var(--theme-accent-cyan); }
+  .matrix-y-low { grid-column: 2; color: var(--theme-accent-cyan); }
+  .phase-preview-pie,
+  .phase-preview-board {
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+
+  .phase-detail {
+    margin-top: 0.5rem;
+    background: var(--theme-card-2);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: 0.5rem;
+    padding: 0.4rem 0.6rem;
+  }
+  .phase-detail summary {
+    cursor: pointer;
+    color: var(--theme-accent-cyan);
+    font-size: 0.75rem;
+    padding: 0.15rem 0;
+    list-style: none;
+  }
+  .phase-detail summary::before { content: '▸ '; color: var(--theme-text-muted); }
+  .phase-detail[open] summary::before { content: '▾ '; color: color-mix(in srgb, var(--theme-accent-cyan-strong) 80%, transparent); }
+  .phase-detail-row {
+    display: flex; gap: 0.4rem; align-items: center; margin-top: 0.4rem;
+  }
+  .phase-detail-tag {
+    font-size: 0.75rem; color: var(--theme-text-muted);
+    min-width: 1.5rem;
+  }
+  .phase-detail-sep {
+    color: var(--theme-text-muted); font-size: 0.875rem;
+  }
+  .phase-detail-row input {
+    flex: 1; min-width: 0; padding: 0.3rem 0.5rem; font-size: 0.875rem;
+  }
+  .phase-choice-list {
+    margin-top: 0.4rem;
+    display: flex; flex-direction: column; gap: 0.3rem;
+  }
+  .phase-choice-row {
+    display: flex; gap: 0.3rem; align-items: center;
+  }
+  .phase-choice-row input {
+    flex: 1; padding: 0.3rem 0.5rem; font-size: 0.875rem;
+  }
+  .phase-choice-del {
+    background: none; border: none;
+    color: var(--theme-text-muted);
+    font-size: 1rem; cursor: pointer; padding: 0 0.3rem;
+  }
+  .phase-choice-del:hover { color: var(--status-error); }
+  .phase-choice-add {
+    align-self: flex-start;
+    padding: 0.25rem 0.7rem;
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 10%, transparent);
+    border: 1px dashed color-mix(in srgb, var(--theme-accent-cyan-strong) 40%, transparent);
+    border-radius: 0.5rem;
+    color: var(--theme-accent-cyan);
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .phase-choice-add:hover {
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 20%, transparent);
+  }
+
+  /* Phase scale picker (3 / 5 / 7 段階の radio 群) */
+  .phase-scale-grid {
+    display: flex; gap: 0.6rem; align-items: center; margin-top: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .phase-scale-opt {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+    padding: 0.25rem 0.55rem;
+    background: var(--theme-card-2);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--theme-text-primary);
+    cursor: pointer;
+  }
+  .phase-scale-opt:hover {
+    border-color: color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
+  }
+  .phase-scale-opt input[type="radio"] { margin: 0; cursor: pointer; }
+  .phase-scale-hint {
+    font-size: 0.75rem;
+    color: var(--theme-text-muted);
+  }
+
+  /* Phase image zone: drag&drop + click + paste */
+  .phase-image-zone {
+    position: relative;
+    margin-top: 0.4rem;
+    padding: 0.7rem;
+    background: var(--theme-card-2);
+    border: 1.5px dashed color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: all var(--transition-quick) ease;
+    min-height: 80px;
+    outline: none;
+  }
+  .phase-image-zone:hover,
+  .phase-image-zone:focus,
+  .phase-image-zone.drag-hover {
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 8%, transparent);
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 70%, transparent);
+  }
+  .phase-image-zone .phase-image-file {
+    display: none;
+  }
+  .phase-image-hint {
+    display: flex; align-items: center; gap: 0.5rem; justify-content: center;
+    color: var(--theme-accent-cyan);
+    font-size: 0.875rem;
+    text-align: center;
+    padding: 0.4rem;
+  }
+  .phase-image-hint-icon { font-size: 1.25rem; }
+  .phase-image-preview {
+    display: flex; flex-direction: column; align-items: center; gap: 0.4rem;
+  }
+  .phase-image-preview img {
+    max-width: 100%; max-height: 160px;
+    border-radius: 0.5rem;
+    border: 1px solid var(--theme-border-subtle);
+    background: var(--theme-bg-base);  /* 画像背景 (透過 PNG 用) */
+  }
+  .phase-image-clear {
+    background: color-mix(in srgb, var(--status-error) 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-error) 45%, transparent);
+    color: var(--theme-status-error-text);
+    border-radius: 0.5rem;
+    padding: 0.2rem 0.6rem;
+    font-size: 0.75rem;
+    cursor: pointer;
+  }
+  .phase-image-clear:hover {
+    background: color-mix(in srgb, var(--status-error) 30%, transparent);
+    color: var(--theme-text-primary);
+  }
+  .phase-image-note {
+    text-align: center;
+  }
+
+  /* 「+ もっと細かく」 で集約する任意拡張ブロック */
+  .phase-extra-details > summary {
+    color: var(--theme-accent-cyan);
+    font-size: 0.75rem;
+  }
+  .phase-extra-badges {
+    margin-left: 0.4rem;
+    font-size: 0.75rem;
+    color: color-mix(in srgb, var(--theme-accent-cyan-strong) 90%, transparent);
+    padding: 0.05rem 0.4rem;
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 12%, transparent);
+    border-radius: 0.5rem;
+  }
+  .phase-extra-list {
+    display: flex; flex-direction: column; gap: 0.7rem; margin-top: 0.5rem;
+  }
+  .phase-extra-section {
+    background: var(--theme-card-2);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.6rem;
+  }
+  .phase-extra-label {
+    font-size: 0.75rem;
+    color: var(--theme-accent-cyan);
+    margin-bottom: 0.35rem;
+  }
+
+  /* プレビュー上のラベル「 生徒に見える形:」: 「ここが結果」を明示 */
+  .phase-preview-label {
+    font-size: 0.75rem;
+    color: var(--theme-accent-cyan);
+    font-weight: 600;
+    margin: 0.85rem 0 0.35rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--theme-border-subtle);
+  }
+
+  /* 「その他」 toggle */
+  .phase-choice-other {
+    display: flex; align-items: center; gap: 0.4rem;
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--theme-text-primary);
+    cursor: pointer;
+  }
+  .phase-choice-other input[type="checkbox"] { cursor: pointer; }
+
+  /* board preview: サンプルカード */
+  .phase-preview-sample-card {
+    background: var(--theme-card-1);
+    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 35%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.45rem 0.55rem;
+    font-size: 0.75rem;
+  }
+  .sample-card-name {
+    font-size: 0.65rem;
+    color: var(--theme-text-muted);
+    margin-bottom: 0.15rem;
+  }
+  .sample-card-answer {
+    color: var(--theme-accent-cyan);
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+  }
+  .sample-card-reason {
+    color: var(--theme-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1.3;
+  }
+  .phase-preview-board-hint {
+    margin-top: 0.3rem;
+    font-size: 0.65rem;
+    color: var(--theme-text-muted);
+    text-align: center;
+  }
+
+  /* pie preview: SVG 円グラフ + 凡例 */
+  .phase-preview-pie {
+    display: flex !important; align-items: center; gap: 0.6rem;
+  }
+  .phase-preview-pie-svg {
+    width: 36px; height: 36px; flex-shrink: 0;
+  }
+  .phase-preview-pie-list {
+    display: flex; flex-direction: column; gap: 0.15rem;
+    font-size: 0.75rem;
+    color: var(--theme-text-primary);
+  }
+  .phase-preview-pie-item {
+    display: inline-flex; align-items: center; gap: 0.3rem;
+  }
+  .phase-preview-pie-dot {
+    width: 0.55rem; height: 0.55rem; border-radius: 50%;
+    display: inline-block;
+  }
+  .phase-preview-pie-dot-0 { background: #60a5fa; }
+  .phase-preview-pie-dot-1 { background: #34d399; }
+  .phase-preview-pie-dot-2 { background: #fbbf24; }
+  .phase-preview-pie-dot-3 { background: #f87171; }
+
+  /* matrix preview: サンプル点 (児童 A, B) */
+  .matrix-quad { position: relative; }
+  .matrix-sample-dot {
+    position: absolute;
+    width: 1.1rem; height: 1.1rem;
+    background: color-mix(in srgb, var(--brand-primary-light) 85%, transparent);
+    border-radius: 50%;
+    color: var(--theme-text-primary);
+    font-size: 0.55rem; line-height: 1.1rem;
+    text-align: center; font-weight: 700;
+    box-shadow: 0 0 0 1px var(--theme-card-2);
+  }
+
+  /* Lesson template picker (dropdown menu on  新しい授業を作る ▾) */
+  .lesson-template-picker {
+    position: relative;
+  }
+  .lesson-template-picker > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .lesson-template-picker > summary::-webkit-details-marker { display: none; }
+  .lesson-template-menu {
+    position: absolute;
+    right: 0; top: 100%;
+    margin-top: 0.4rem;
+    width: 280px;
+    background: var(--theme-card-3);
+    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.4rem;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+    z-index: 100;
+  }
+  .lesson-template-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    text-align: left;
+    padding: 0.55rem 0.7rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    color: var(--theme-text-primary);
+    cursor: pointer;
+    margin-bottom: 0.25rem;
+    transition: all var(--transition-quick) ease;
+  }
+  .lesson-template-item:hover {
+    background: color-mix(in srgb, var(--brand-primary) 15%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
+  }
+  .lesson-template-label {
+    font-size: 0.875rem; font-weight: 600;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .lesson-template-desc {
+    font-size: 0.75rem;
+    color: var(--theme-text-muted);
+    margin-top: 0.15rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .lesson-template-phase-count {
+    color: var(--theme-accent-cyan);
+    margin-left: 0.3rem;
+  }
+  .lesson-template-loading {
+    padding: 0.4rem 0.7rem;
+    font-size: 0.875rem;
+    color: var(--theme-text-muted);
+    font-style: italic;
+  }
+
+  /* ===== Phase 追加 dropdown (Wizard Step 2) ===== */
+  .phase-add-picker {
+    position: relative;
+    display: inline-block;
+  }
+  .phase-add-picker > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .phase-add-picker > summary::-webkit-details-marker { display: none; }
+  .phase-add-menu {
+    position: absolute;
+    left: 50%; top: 100%;
+    transform: translateX(-50%);
+    margin-top: 0.4rem;
+    min-width: 220px;
+    background: var(--theme-card-3);
+    border: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 50%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.35rem;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.5);
+    z-index: 50;
+  }
+  .phase-add-menu-item {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 0.5rem 0.7rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    color: var(--theme-text-primary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all var(--transition-fast) ease;
+  }
+  .phase-add-menu-item:hover {
+    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 15%, transparent);
+    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 40%, transparent);
+  }
+
+  /* ===== テンプレフォーム作成 dropdown ===== */
+  .template-form-picker {
+    position: relative;
+    display: inline-block;
+  }
+  .template-form-picker > summary {
+    list-style: none;
+    cursor: pointer;
+  }
+  .template-form-picker > summary::-webkit-details-marker { display: none; }
+  .template-form-menu {
+    position: absolute;
+    left: 0; top: 100%;
+    margin-top: 0.4rem;
+    min-width: 280px;
+    background: var(--theme-card-3);
+    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 50%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.4rem;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6);
+    z-index: 50;
+  }
+  .template-form-item {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    text-align: left;
+    padding: 0.5rem 0.7rem;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 0.5rem;
+    color: var(--theme-text-primary);
+    cursor: pointer;
+    margin-bottom: 0.2rem;
+    transition: all var(--transition-fast) ease;
+  }
+  .template-form-item:hover {
+    background: color-mix(in srgb, var(--brand-primary) 15%, transparent);
+    border-color: color-mix(in srgb, var(--brand-primary-light) 45%, transparent);
+  }
+  .template-form-label { font-size: 0.875rem; font-weight: 600; }
+  .template-form-desc {
+    font-size: 0.75rem;
+    color: var(--theme-text-muted);
+    margin-top: 0.1rem;
+  }
+
+  /* Step 3 confirm: phase 詳細リスト */
+  .confirm-phase-list {
+    margin: 0;
+    padding-left: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+  .confirm-phase-row {
+    display: flex;
+    gap: 0.7rem;
+    align-items: flex-start;
+    padding: 0.5rem 0.7rem;
+    background: var(--theme-card-1);
+    border: 1px solid var(--theme-border-subtle);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+  }
+  .confirm-phase-idx {
+    color: var(--theme-accent-cyan);
+    font-weight: 600;
+    min-width: 5.5rem;
+    font-size: 0.75rem;
+  }
+  .confirm-phase-body {
+    flex: 1;
+    color: var(--theme-text-primary);
+    line-height: 1.5;
+  }
+  .confirm-phase-q { color: var(--theme-text-muted); font-size: 0.875rem; }
+  .confirm-phase-detail { color: var(--theme-accent-cyan); font-size: 0.75rem; }
+
+  .confirm-warnings-wrap { margin-top: 0.7rem; }
+  .confirm-warnings {
+    margin: 0; padding-left: 0; list-style: none;
+    background: color-mix(in srgb, var(--status-warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-warning) 40%, transparent);
+    border-radius: 0.5rem;
+    padding: 0.5rem 0.7rem;
+    font-size: 0.875rem;
+    color: var(--theme-status-warning-text);
+  }
+  .confirm-warnings li { margin: 0.15rem 0; }
+  .confirm-ok {
+    margin: 0;
+    padding: 0.5rem 0.7rem;
+    background: color-mix(in srgb, var(--status-success) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-success) 30%, transparent);
+    border-radius: 0.5rem;
+    color: var(--theme-status-success-text);
+    font-size: 0.875rem;
+  }
+
+  /* lesson.start エラー時の retry box */
+  .lesson-start-error-box {
+    margin-top: 0.7rem;
+    padding: 0.7rem 1rem;
+    background: color-mix(in srgb, var(--status-error) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--status-error) 45%, transparent);
+    border-radius: 0.5rem;
+  }
+  .lesson-start-error-title {
+    font-weight: 600; color: var(--theme-status-error-text);
+    font-size: 0.875rem;
+  }
+  .lesson-start-error-detail {
+    font-size: 0.875rem;
+    color: var(--theme-status-error-text);
+    margin-top: 0.25rem;
+  }
+  .lesson-start-error-progress {
+    font-size: 0.875rem;
+    color: var(--theme-status-success-text);
+    margin-top: 0.35rem;
+  }
+
+  /* .lesson-hero-card は .card-hero に統合 (v2836)。 旧名は AdminPanel.html migration 済。 */
+
+  /* 個別ボードモードへの divider (二者択一を明示) */
+  .section-group-divider::before,
+
+  /* Step number badge: 個別ボード authoring の ① ② ③ を視覚的に番号化。
+     セットアップ順序が教師に伝わるようにする (Hick's Law: 選択肢を減らし順番で誘導)。 */
+  .step-number {
+    display: inline-block;
+    min-width: 1.5rem; height: 1.5rem;
+    line-height: 1.5rem; text-align: center;
+    background: var(--theme-overlay-white-10);
+    border-radius: 50%;
+    font-size: 0.875rem;
+    margin-right: 0.4rem;
+    color: var(--theme-accent-cyan);
+  }
+
+  /* フォーム連携の代替経路ブロック (details 内、2 つを区切る薄い背景) */
+  .form-alternative-block {
+    padding: 0.75rem;
+    background: var(--theme-card-2);
+    border-radius: 0.5rem;
+  }
+
+  /* Lesson review banner (Phase 2): Page.html 上部に固定表示 */
+  #lesson-review-banner.hidden { display: none; }
+  #lesson-review-banner {
+    position: sticky; top: 0; z-index: 9999;
+    background: color-mix(in srgb, var(--theme-accent-cyan-deep) 90%, transparent);
+    color: var(--theme-text-primary); padding: 0.5rem 1rem;
+    border-bottom: 1px solid color-mix(in srgb, var(--theme-accent-cyan-strong) 60%, transparent);
+    font-size: 0.875rem;
+  }
+  #lesson-review-banner .lesson-review-banner-inner {
+    max-width: 1200px; margin: 0 auto;
+    display: flex; align-items: center; gap: 0.5rem;
+  }
+  #lesson-review-banner .lesson-review-readonly {
+    margin-left: auto;
+    font-size: 0.75rem;
+    background: var(--theme-overlay-white-20);
+    padding: 0.15rem 0.6rem; border-radius: 9999px;
+  }
+
+  /* Lesson list (過去レッスン一覧) */
+  #lesson-list li {
+    padding: 0.6rem 0.8rem;
+    background: var(--theme-card-2);
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    transition: background var(--transition-fast) ease;
+  }
+  #lesson-list li:hover { background: var(--theme-card-3); }
+  #lesson-list .lesson-state-badge {
+    font-size: 0.75rem; padding: 0.1rem 0.5rem; border-radius: 9999px;
+    background: var(--theme-border-subtle); color: var(--theme-bg-elevated);
+  }
+  #lesson-list .lesson-state-badge.state-active {
+    background: var(--theme-status-accent-soft); color: var(--theme-status-accent-text-on-soft);
+  }
+  #lesson-list .lesson-state-badge.state-completed {
+    background: var(--theme-status-success-soft); color: var(--theme-status-success-text-on-soft);
+  }
+  /* state-active は cyan accent-soft (opaque vibrant pale) + cyan-900 text で両モード AA。
+     state-completed は status-success-soft で自動切替されるので light override 不要。 */
+
+  /* =============================================================================
+   * Status feedback utility — defensive CSS rules (v2853+)
+   *
+   * Why: Tailwind CDN JIT が nested theme key (`theme.status-X-{soft,strong,text-on-soft}`)
+   *   から utility class を生成し損ねるケースが production で観測された (心理的安全性 box
+   *   が dark のまま表示される drift)。 Tailwind 経由と CSS rule を冗長化することで、
+   *   utility が失敗しても確実に色が出る defensive layer。
+   *
+   * HTML 側は `class="bg-theme-status-warning-soft border border-theme-status-warning-strong"`
+   *   のような Tailwind class をそのまま使い続ける (semantic で読みやすい)。
+   *   token を変更したいときは `--theme-status-*` の値を 1 箇所変えるだけで全箇所に反映。
+   * ============================================================================= */
+  .bg-theme-status-error-soft       { background: var(--theme-status-error-soft); }
+  .bg-theme-status-warning-soft     { background: var(--theme-status-warning-soft); }
+
+  .border-theme-status-error-strong     { border-color: var(--theme-status-error-strong); }
+  .border-theme-status-warning-strong   { border-color: var(--theme-status-warning-strong); }
+
+  .text-theme-status-error-text-on-soft   { color: var(--theme-status-error-text-on-soft); }
+  .text-theme-status-warning-text-on-soft { color: var(--theme-status-warning-text-on-soft); }
+  .text-theme-status-info-text-on-soft    { color: var(--theme-status-info-text-on-soft); }
+
+  .text-theme-status-success     { color: var(--theme-status-success-text); }
+  .text-theme-status-error       { color: var(--theme-status-error-text); }
+  .text-theme-status-warning     { color: var(--theme-status-warning-text); }
+  .text-theme-status-info        { color: var(--theme-status-info-text); }
+  .text-theme-status-detection   { color: var(--theme-status-detection-text); }
+  .text-theme-status-highlight   { color: var(--theme-status-highlight-text); }
+
+  /* お題見出し用 pink accent も同様に defensive fallback */
+  .text-theme-accent-pink        { color: var(--theme-accent-pink); }
+</style>
+<!-- ── UtilityStyles.css ── -->
+<!-- =====================================================================
+  UtilityStyles — Tailwind 互換の静的 utility CSS (自動生成)
+
+  【自動生成】このファイルは scripts/gen-utilities.js が生成する。直接編集しない。
+     クラスを増やしたいときは HTML 側で使ってから `npm run gen:utilities` を実行する。
+
+  Why: 以前は cdn.tailwindcss.com (Tailwind Play CDN) をブラウザで読み込み、
+    JIT コンパイルしていた。Tailwind 公式が本番非推奨としているビルドであり、
+    学校ネットワークが CDN を遮断すると全画面が崩壊する構造だった。
+    実測では JIT 固有機能をほぼ使っていなかったため、使用クラスだけを
+    静的 CSS として同梱し、外部ネットワーク依存をゼロにする。
+
+  読み込み順序: UnifiedStyles.css の後 (Tailwind と同じく utility が primitive を
+    上書きする順序を保つ)。SharedPageHead が管理する。
+===================================================================== -->
+<style>
+  /* ── keyframes (animate-spin / animate-pulse) ── */
+  @keyframes tw-spin { to { transform: rotate(360deg); } }
+  @keyframes tw-pulse { 50% { opacity: 0.5; } }
+
+  /* ── base utilities ── */
+  .absolute { position: absolute; }
+  .animate-pulse { animation: tw-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+  .animate-spin { animation: tw-spin 1s linear infinite; }
+  .basis-full { flex-basis: 100%; }
+  .bg-black { background-color: rgb(0 0 0 / var(--tw-bg-opacity, 1)); }
+  .bg-blue-600 { background-color: rgb(37 99 235 / var(--tw-bg-opacity, 1)); }
+  .bg-cyan-600 { background-color: rgb(8 145 178 / var(--tw-bg-opacity, 1)); }
+  .bg-opacity-50 { --tw-bg-opacity: 0.5; }
+  .bg-opacity-70 { --tw-bg-opacity: 0.7; }
+  .bg-opacity-75 { --tw-bg-opacity: 0.75; }
+  .bg-theme-base { background-color: var(--theme-bg-base); }
+  .bg-theme-card-1 { background-color: var(--theme-card-1); }
+  .bg-theme-card-2 { background-color: var(--theme-card-2); }
+  .bg-theme-card-3 { background-color: var(--theme-card-3); }
+  .bg-theme-elevated { background-color: var(--theme-bg-elevated); }
+  .bg-theme-surface { background-color: var(--theme-bg-surface); }
+  .block { display: block; }
+  .border { border-width: 1px; border-style: solid; }
+  .border-2 { border-width: 2px; border-style: solid; }
+  .border-cyan-400 { border-color: #22d3ee; }
+  .border-cyan-400\/80 { border-color: color-mix(in srgb, #22d3ee 80%, transparent); }
+  .border-l-2 { border-left-width: 2px; border-style: solid; }
+  .border-t { border-top-width: 1px; border-style: solid; }
+  .border-theme-normal { border-color: var(--theme-border-normal); }
+  .border-theme-subtle { border-color: var(--theme-border-subtle); }
+  .bottom-0 { bottom: 0px; }
+  .break-all { word-break: break-all; }
+  .break-words { overflow-wrap: break-word; }
+  .col-span-full { grid-column: 1 / -1; }
+  .cursor-pointer { cursor: pointer; }
+  .duration-200 { transition-duration: 200ms; }
+  .fixed { position: fixed; }
+  .flex-col { flex-direction: column; }
+  .flex-grow { flex-grow: 1; }
+  .flex-wrap { flex-wrap: wrap; }
+  .font-bold { font-weight: 700; }
+  .font-medium { font-weight: 500; }
+  .font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+  .font-normal { font-weight: 400; }
+  .font-semibold { font-weight: 600; }
+  .gap-1 { gap: 0.25rem; }
+  .gap-1\.5 { gap: 0.375rem; }
+  .gap-3 { gap: 0.75rem; }
+  .gap-4 { gap: 1rem; }
+  .gap-6 { gap: 1.5rem; }
+  .gap-x-2 { column-gap: 0.5rem; }
+  .gap-y-1 { row-gap: 0.25rem; }
+  .grid { display: grid; }
+  .grid-cols-1 { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+  .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .h-10 { height: 2.5rem; }
+  .h-12 { height: 3rem; }
+  .h-16 { height: 4rem; }
+  .h-20 { height: 5rem; }
+  .h-3 { height: 0.75rem; }
+  .h-3\.5 { height: 0.875rem; }
+  .h-4 { height: 1rem; }
+  .h-5 { height: 1.25rem; }
+  .h-6 { height: 1.5rem; }
+  .h-8 { height: 2rem; }
+  .inline-block { display: inline-block; }
+  .inline-flex { display: inline-flex; }
+  .inset-0 { top: 0px; right: 0px; bottom: 0px; left: 0px; }
+  .italic { font-style: italic; }
+  .items-start { align-items: flex-start; }
+  .justify-between { justify-content: space-between; }
+  .justify-center { justify-content: center; }
+  .justify-end { justify-content: flex-end; }
+  .leading-relaxed { line-height: 1.625; }
+  .leading-tight { line-height: 1.25; }
+  .left-0 { left: 0px; }
+  .list-decimal { list-style-type: decimal; }
+  .list-disc { list-style-type: disc; }
+  .list-inside { list-style-position: inside; }
+  .max-w-2xl { max-width: 42rem; }
+  .max-w-5xl { max-width: 64rem; }
+  .max-w-lg { max-width: 32rem; }
+  .max-w-md { max-width: 28rem; }
+  .mb-1 { margin-bottom: 0.25rem; }
+  .mb-2 { margin-bottom: 0.5rem; }
+  .mb-3 { margin-bottom: 0.75rem; }
+  .mb-4 { margin-bottom: 1rem; }
+  .mb-5 { margin-bottom: 1.25rem; }
+  .mb-6 { margin-bottom: 1.5rem; }
+  .mb-8 { margin-bottom: 2rem; }
+  .min-h-\[1\.5rem\] { min-height: 1.5rem; }
+  .min-h-screen { min-height: 100vh; }
+  .min-w-\[1rem\] { min-width: 1rem; }
+  .min-w-\[640px\] { min-width: 640px; }
+  .ml-1 { margin-left: 0.25rem; }
+  .ml-12 { margin-left: 3rem; }
+  .ml-2 { margin-left: 0.5rem; }
+  .ml-4 { margin-left: 1rem; }
+  .ml-auto { margin-left: auto; }
+  .mr-1 { margin-right: 0.25rem; }
+  .mr-2 { margin-right: 0.5rem; }
+  .mt-0\.5 { margin-top: 0.125rem; }
+  .mt-1 { margin-top: 0.25rem; }
+  .mt-2 { margin-top: 0.5rem; }
+  .mt-3 { margin-top: 0.75rem; }
+  .mt-4 { margin-top: 1rem; }
+  .mt-5 { margin-top: 1.25rem; }
+  .mt-6 { margin-top: 1.5rem; }
+  .mx-4 { margin-left: 1rem; margin-right: 1rem; }
+  .mx-auto { margin-left: auto; margin-right: auto; }
+  .opacity-50 { opacity: 0.5; }
+  .opacity-90 { opacity: 0.9; }
+  .overflow-auto { overflow: auto; }
+  .overflow-x-auto { overflow-x: auto; }
+  .p-2 { padding: 0.5rem; }
+  .p-3 { padding: 0.75rem; }
+  .p-4 { padding: 1rem; }
+  .p-6 { padding: 1.5rem; }
+  .p-8 { padding: 2rem; }
+  .pb-4 { padding-bottom: 1rem; }
+  .pl-4 { padding-left: 1rem; }
+  .pointer-events-none { pointer-events: none; }
+  .pt-4 { padding-top: 1rem; }
+  .pt-6 { padding-top: 1.5rem; }
+  .px-2 { padding-left: 0.5rem; padding-right: 0.5rem; }
+  .px-3 { padding-left: 0.75rem; padding-right: 0.75rem; }
+  .px-4 { padding-left: 1rem; padding-right: 1rem; }
+  .px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+  .py-1 { padding-top: 0.25rem; padding-bottom: 0.25rem; }
+  .py-16 { padding-top: 4rem; padding-bottom: 4rem; }
+  .py-2 { padding-top: 0.5rem; padding-bottom: 0.5rem; }
+  .py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+  .py-8 { padding-top: 2rem; padding-bottom: 2rem; }
+  .relative { position: relative; }
+  .resize-none { resize: none; }
+  .right-0 { right: 0px; }
+  .right-2 { right: 0.5rem; }
+  .ring-2 { box-shadow: 0 0 0 2px var(--tw-ring-color, rgb(59 130 246 / 0.5)); }
+  .ring-cyan-400\/50 { --tw-ring-color: color-mix(in srgb, #22d3ee 50%, transparent); }
+  .rounded { border-radius: 0.25rem; }
+  .rounded-2xl { border-radius: 1rem; }
+  .rounded-full { border-radius: 9999px; }
+  .rounded-lg { border-radius: 0.5rem; }
+  .rounded-xl { border-radius: 0.75rem; }
+  .select-none { user-select: none; }
+  .shadow-lg { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1); }
+  .shadow-xl { box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1); }
+  .space-x-3 > * + * { margin-left: 0.75rem; }
+  .space-y-1 > * + * { margin-top: 0.25rem; }
+  .space-y-2 > * + * { margin-top: 0.5rem; }
+  .space-y-3 > * + * { margin-top: 0.75rem; }
+  .space-y-4 > * + * { margin-top: 1rem; }
+  .space-y-5 > * + * { margin-top: 1.25rem; }
+  .space-y-6 > * + * { margin-top: 1.5rem; }
+  .text-2xl { font-size: 1.5rem; line-height: 2rem; }
+  .text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+  .text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
+  .text-base { font-size: 1rem; line-height: 1.5rem; }
+  .text-blue-400 { color: #60a5fa; }
+  .text-center { text-align: center; }
+  .text-cyan-200 { color: #a5f3fc; }
+  .text-green-400 { color: #4ade80; }
+  .text-lg { font-size: 1.125rem; line-height: 1.75rem; }
+  .text-red-400 { color: #f87171; }
+  .text-right { text-align: right; }
+  .text-sm { font-size: 0.875rem; line-height: 1.25rem; }
+  .text-theme { color: var(--theme-text-primary); }
+  .text-theme-accent-cyan { color: var(--theme-accent-cyan); }
+  .text-theme-muted { color: var(--theme-text-muted); }
+  .text-theme-secondary { color: var(--theme-text-secondary); }
+  .text-white { color: #ffffff; }
+  .text-xl { font-size: 1.25rem; line-height: 1.75rem; }
+  .text-xs { font-size: 0.75rem; line-height: 1rem; }
+  .text-yellow-400 { color: #facc15; }
+  .top-2 { top: 0.5rem; }
+  .transition-all { transition-property: all; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+  .transition-colors { transition-property: color, background-color, border-color, fill, stroke; transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1); transition-duration: 150ms; }
+  .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .w-10 { width: 2.5rem; }
+  .w-12 { width: 3rem; }
+  .w-16 { width: 4rem; }
+  .w-20 { width: 5rem; }
+  .w-3 { width: 0.75rem; }
+  .w-3\.5 { width: 0.875rem; }
+  .w-3\/4 { width: 75%; }
+  .w-4 { width: 1rem; }
+  .w-5 { width: 1.25rem; }
+  .w-6 { width: 1.5rem; }
+  .w-8 { width: 2rem; }
+  .w-full { width: 100%; }
+  .whitespace-nowrap { white-space: nowrap; }
+  .whitespace-pre-wrap { white-space: pre-wrap; }
+  .z-10 { z-index: 10; }
+  .z-30 { z-index: 30; }
+  .z-40 { z-index: 40; }
+  .z-50 { z-index: 50; }
+  .z-\[10001\] { z-index: 10001; }
+  .z-\[10002\] { z-index: 10002; }
+  .z-\[9999\] { z-index: 9999; }
+
+  /* ── state variants (hover / focus / disabled) ── */
+  .hover\:bg-cyan-700:hover { background-color: rgb(14 116 144 / var(--tw-bg-opacity, 1)); }
+  .hover\:bg-theme-elevated-hover:hover { background-color: var(--theme-bg-elevated-hover); }
+  .hover\:bg-theme-status-error-soft:hover { background-color: var(--theme-status-error-soft); }
+  .hover\:text-theme:hover { color: var(--theme-text-primary); }
+  .hover\:text-theme-accent-cyan-hover:hover { color: var(--theme-accent-cyan-hover); }
+  .hover\:text-white:hover { color: #ffffff; }
+  .hover\:underline:hover { text-decoration-line: underline; }
+
+  /* ── sm (>= 640px) ── */
+  @media (min-width: 640px) {
+    .sm\:basis-auto { flex-basis: auto; }
+    .sm\:flex-row { flex-direction: row; }
+    .sm\:inline { display: inline; }
+  }
+
+  /* ── md (>= 768px) ── */
+  @media (min-width: 768px) {
+    .md\:flex-row { flex-direction: row; }
+    .md\:flex-shrink-0 { flex-shrink: 0; }
+    .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .md\:pb-6 { padding-bottom: 1.5rem; }
+    .md\:pt-6 { padding-top: 1.5rem; }
+    .md\:px-6 { padding-left: 1.5rem; padding-right: 1.5rem; }
+    .md\:text-2xl { font-size: 1.5rem; line-height: 2rem; }
+    .md\:text-3xl { font-size: 1.875rem; line-height: 2.25rem; }
+    .md\:text-4xl { font-size: 2.25rem; line-height: 2.5rem; }
+    .md\:w-56 { width: 14rem; }
+  }
+</style>

@@ -60,6 +60,12 @@ jobs:
         #   本番に出る。生成物と入力のズレを CI で止める。
         run: npm run check:utilities
 
+      - name: 共通 head が最新か (include 平坦化の生成物)
+        # Why: SharedPageHead.html は gen-pagehead.js が 4 ファイルを展開した生成物。
+        #   元ファイル (UnifiedStyles.css 等) を編集して再生成を忘れると、その変更だけ
+        #   本番に出ないまま古い head が配信され続ける。生成物と入力のズレを CI で止める。
+        run: npm run check:pagehead
+
       - name: GAS 参照整合性チェック
         # Why: GAS は単一グローバルスコープでモジュール解決が無いため、関数や要素 ID を
         #   1 つ消すと呼び出し側は無言で本番落ちする。node --test は各ファイルを個別に

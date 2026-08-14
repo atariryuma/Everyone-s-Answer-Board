@@ -27,11 +27,20 @@ function getCurrentEmail() {
 
 /**
  * Include HTML template
+ *
+ * include 対象 (13 ファイル / 計 963KB) は scriptlet を一切持たないため、テンプレート評価は不要。
+ * 単なるファイル連結にすることで、ページ描画のたびに 963KB をテンプレートコンパイラへ通すのを
+ * やめ、同時に二つの事故を構造的に潰す:
+ *   - 循環 include (v2908 で全ページ停止を起こしかけた) が原理的に起きなくなる
+ *   - vendor ライブラリ (d3.min / tinySegmenter) が "<?" を含んでも誤解析されない
+ * 不変条件「include 対象は scriptlet を持たない」は check-gas.js の項目 11 が守る。
+ * 唯一入れ子を持っていた SharedPageHead は scripts/gen-pagehead.js が展開済みにしている。
+ *
  * @param {string} filename - Template filename to include
  * @returns {string} HTML content of the template
  */
 function include(filename) {
-  return HtmlService.createTemplateFromFile(filename).evaluate().getContent();
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
 /**

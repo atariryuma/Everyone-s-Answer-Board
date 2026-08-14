@@ -35,6 +35,8 @@
     "check:gas": "node scripts/check-gas.js",
     "gen:utilities": "node scripts/gen-utilities.js",
     "check:utilities": "node scripts/gen-utilities.js --check",
+    "gen:pagehead": "node scripts/gen-pagehead.js",
+    "check:pagehead": "node scripts/gen-pagehead.js --check",
     "lint": "node scripts/lint.js",
     "lint:errors": "node scripts/lint.js --severity error",
     "lint:eslint": "eslint src/*.js",

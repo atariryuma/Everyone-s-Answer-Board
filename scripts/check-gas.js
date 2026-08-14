@@ -285,6 +285,29 @@ for (const s of jsSrc.values()) {
   check('10. include() が循環していない', cycles.length === 0, cycles.join(', '));
 }
 
+// ── 11. include 対象が scriptlet を持たないか ───────────────────────
+// Why: include() は createHtmlOutputFromFile().getContent() (main.js) で、テンプレート評価を
+//   しない。これは include 対象 13 ファイル (計 963KB) が scriptlet を 1 つも持たないことを
+//   前提にした最適化で、この前提が崩れると scriptlet が生テキストとして画面に出る。
+//   9/10 が「評価される側」の事故を防ぐのに対し、これは「評価されない側」の前提を守る。
+//   入れ子 include もここで弾かれるため、循環は構造的に発生しない。
+{
+  const targets = new Set();
+  for (const [, src] of [...jsSrc, ...htmlSrc]) {
+    const code = src.replace(/<!--[\s\S]*?-->/g, (m) => m.replace(/[^\n]/g, ' '));
+    for (const m of code.matchAll(/<\?[^?]*?include\(\s*'([^']+)'/g)) targets.add(m[1]);
+  }
+  const bad = [];
+  for (const name of targets) {
+    const f = htmlFiles.includes(name) ? name : `${name}.html`;
+    const src = htmlSrc.get(f);
+    if (src === undefined) continue; // 1 が実在チェックを担当
+    const s = src.match(/<\?/);
+    if (s) bad.push(`${f}:${lineOf(src, s.index)} include 対象に scriptlet がある`);
+  }
+  check('11. include 対象が scriptlet を持たない', bad.length === 0, bad.join(', '));
+}
+
 // ── 出力 ──────────────────────────────────────────────────────────
 console.log('\nGAS 参照整合性チェック\n');
 for (const r of results) {
