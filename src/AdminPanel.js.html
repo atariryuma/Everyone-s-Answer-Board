@@ -1307,15 +1307,19 @@
     };
     const guide = TEMPLATE_GUIDE[templateType] || TEMPLATE_GUIDE.board;
 
-    if (btn) {
-      btn.classList.add('btn-busy');
-      btn.dataset.prevHtml = btn.innerHTML;
-      btn.textContent = '作成中...';
+    // アイコンを含む summary の中身は触らず、ラベル span の textContent だけ差し替える。
+    const btnLabel = btn ? btn.querySelector('.template-form-summary-label') : null;
+    if (btn) btn.classList.add('btn-busy');
+    if (btnLabel) {
+      btnLabel.dataset.prevText = btnLabel.textContent;
+      btnLabel.textContent = '作成中...';
     }
     const restoreBtn = () => {
-      if (!btn) return;
-      btn.classList.remove('btn-busy');
-      if (btn.dataset.prevHtml) { btn.innerHTML = btn.dataset.prevHtml; delete btn.dataset.prevHtml; }
+      if (btn) btn.classList.remove('btn-busy');
+      if (btnLabel && btnLabel.dataset.prevText) {
+        btnLabel.textContent = btnLabel.dataset.prevText;
+        delete btnLabel.dataset.prevText;
+      }
     };
 
     // ポップアップブロッカー対策: window.open はユーザー操作と同じ tick で呼ぶ必要がある。

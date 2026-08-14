@@ -674,6 +674,41 @@
     color: #0f172a;  /* theme:exempt - 緑 bg 上は必ず暗色テキスト (WCAG AA 確保) */
   }
 
+  /* .btn-link — 行内の補助アクション (「再推定」「自動推定に戻す」)。
+     Why: <button> だが視覚的にはリンク。 .btn の padding / min-height / ripple は
+          行内テキストの流れを壊すので継承させず、単独クラスとして定義する。 */
+  .btn-link {
+    background: none;
+    border: none;
+    padding: 0;
+    font-size: var(--font-size-xs);
+    line-height: inherit;
+    color: var(--theme-accent-cyan);
+    cursor: pointer;
+    flex-shrink: 0;
+    text-underline-offset: 2px;
+    transition: color var(--transition-quick) var(--transition-easing);
+  }
+
+  .btn-link:not(:disabled):hover {
+    color: var(--theme-accent-cyan-hover);
+    text-decoration: underline;
+  }
+
+  .btn-link:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    text-decoration: none;
+  }
+
+  .btn-link-info {
+    color: var(--theme-status-info-text);
+  }
+
+  .btn-link-info:not(:disabled):hover {
+    color: var(--theme-status-info-text);
+  }
+
 
   /* Button Size Variants */
 
@@ -1259,10 +1294,9 @@
   }
 
   /* Modal System */
-  /* Why: background/color は呼び出し側の Tailwind クラス（bg-red-600 text-white 等）
-     を尊重するため設定しない。以前は UnifiedStyles が後読みされ Tailwind の
-     bg-red-600 / text-white を上書きしてボタンが半透明白背景+薄い前景色になり
-     「×ボタンが透明」と報告されていた。位置・形状のみ定義する。 */
+  /* Why: background/color は呼び出し側（.icon-btn 等の併用クラス）に委ねる。
+     ここで色を持つと併用クラスを上書きして「×ボタンが透明」になる不具合が
+     出ていた。位置・形状のみ定義する。 */
   .modal-close-btn {
     border: none;
     border-radius: 50%;

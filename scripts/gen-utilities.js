@@ -418,7 +418,7 @@ for (const cls of [...used].sort()) {
 const header = `<!-- =====================================================================
   UtilityStyles — Tailwind 互換の静的 utility CSS (自動生成)
 
-  ⚠️ このファイルは scripts/gen-utilities.js が生成する。直接編集しない。
+  【自動生成】このファイルは scripts/gen-utilities.js が生成する。直接編集しない。
      クラスを増やしたいときは HTML 側で使ってから \`npm run gen:utilities\` を実行する。
 
   Why: 以前は cdn.tailwindcss.com (Tailwind Play CDN) をブラウザで読み込み、
