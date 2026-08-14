@@ -2081,7 +2081,7 @@
       while (labelEl.firstChild) labelEl.removeChild(labelEl.firstChild);
       labelEl.appendChild(document.createTextNode(def.label + ': '));
       const hintSpan = document.createElement('span');
-      hintSpan.className = 'text-xs ml-2 '+ (def.required ? 'text-red-300': 'text-theme-muted');
+      hintSpan.className = 'text-xs ml-2 '+ (def.required ? 'text-theme-status-error': 'text-theme-muted');
       hintSpan.textContent = (def.required ? '【必須】 ': '(任意) ') + def.hint;
       labelEl.appendChild(hintSpan);
     });
@@ -3024,13 +3024,13 @@
     const showNamesEl = document.getElementById('current-show-names');
     if (showNamesEl) {
       showNamesEl.textContent = ds.showNames ? '実名表示': '匿名';
-      showNamesEl.className = 'text-sm '+ (ds.showNames ? 'text-cyan-300': 'text-theme-secondary');
+      showNamesEl.className = 'text-sm '+ (ds.showNames ? 'text-theme-accent-cyan': 'text-theme-secondary');
     }
 
     const showReactionsEl = document.getElementById('current-show-reactions');
     if (showReactionsEl) {
       showReactionsEl.textContent = ds.showReactions ? '表示': '非表示';
-      showReactionsEl.className = 'text-sm '+ (ds.showReactions ? 'text-cyan-300': 'text-theme-secondary');
+      showReactionsEl.className = 'text-sm '+ (ds.showReactions ? 'text-theme-accent-cyan': 'text-theme-secondary');
     }
 
   }

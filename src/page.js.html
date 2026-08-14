@@ -2748,7 +2748,9 @@
       }
 
       const opinionTitle = document.createElement('h3');
-      opinionTitle.className = 'opinion-text text-cyan-200 whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
+      // text-cyan-200 は light mode の白背景で 1.25:1 しか出ず、ボードの主役である
+      //   意見テキストがほぼ読めなかった。theme token 経由にして両モードで AA を満たす。
+      opinionTitle.className = 'opinion-text text-theme-accent-cyan whitespace-pre-wrap break-words text-xl md:text-2xl font-semibold leading-tight';
       opinionTitle.textContent = safeData.opinion || '（回答内容が取得できませんでした）';
 
       contentDiv.appendChild(opinionTitle);

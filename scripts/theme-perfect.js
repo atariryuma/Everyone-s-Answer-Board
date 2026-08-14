@@ -569,6 +569,31 @@ function checkThemeBarSync() {
 const barSync = checkThemeBarSync();
 check('32. mobile chrome bar 色 = --theme-bg-base', barSync.ok, barSync.detail);
 
+// 33. light mode で読めなくなる生 Tailwind 文字色が残っていないか
+// Why: text-<color>-100..300 は dark 前提の淡い色で、light mode の白背景に載ると
+//   コントラストが 1.2:1 程度まで落ちて実質読めない。実際 page.js の意見カード見出しが
+//   text-cyan-200 のまま残り、ボードの主役テキストが light mode で 1.25:1 だった。
+//   既存の hardcoded 検査は hex/rgba を見るため、utility クラス名では素通りする。
+//   WCAG 軸も token ペアだけを見るので、生クラスは誰も検査していなかった。
+{
+  const PALETTE = 'slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|'
+    + 'teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose';
+  const re = new RegExp(`\\btext-(?:${PALETTE})-(?:100|200|300)\\b`, 'g');
+  const bad = [];
+  for (const f of HTML_FILES) {
+    const src = readSrc(f);
+    src.split('\n').forEach((line, i) => {
+      // コメント行は説明目的なので除外 (JS 行コメント / CSS ブロックコメント)
+      const t = line.trim();
+      if (t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) return;
+      for (const m of line.match(re) || []) bad.push(`${f}:${i + 1} ${m}`);
+    });
+  }
+  check('33. light mode で読めない生 Tailwind 文字色 = 0',
+    bad.length === 0,
+    bad.length === 0 ? '✓ 0 件 (theme token 経由に統一)' : `${bad.length} 件: ${bad.slice(0, 4).join(', ')}`);
+}
+
 // 出力
 console.log('\n══════════════════════════════════════════════════════════════════');
 console.log(`  Theme Perfect — ${checks.length} 軸 完璧度ゲート`);

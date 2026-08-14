@@ -436,6 +436,15 @@ const header = `<!-- ===========================================================
     上書きする順序を保つ)。SharedPageHead が管理する。
 ===================================================================== -->
 <style>
+  /* ── preflight: box-sizing ──
+     Why: Tailwind の preflight が全要素に border-box を当てていたが、CDN 廃止時に
+       utility クラスだけを移植して preflight を落としてしまった。既定の content-box では
+       w-full (width:100%) と px-* を併用した要素が padding 分だけ親からはみ出す。
+       実際 #main-container (w-full + md:px-6) が desktop で 48px、mobile で 32px
+       溢れ、ボードの右端カードが切れて横スクロールが出ていた。
+       他の utility と違い「使われているクラス」から検出できない類なので、常に出力する。 */
+  *, ::before, ::after { box-sizing: border-box; }
+
   /* ── keyframes (animate-spin / animate-pulse) ── */
   @keyframes tw-spin { to { transform: rotate(360deg); } }
   @keyframes tw-pulse { 50% { opacity: 0.5; } }
