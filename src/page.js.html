@@ -3623,9 +3623,9 @@
     showDeleteConfirmationModal(answerData) {
       return new Promise((resolve) => {
         const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001] animate-fade-in';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[10001]';
         modal.innerHTML = `
-        <div class="modal-card animate-scale-up">
+        <div class="modal-card">
           <div class="flex items-center gap-3 mb-4">
             <div class="text-theme-status-error">
               <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">

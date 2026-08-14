@@ -79,15 +79,25 @@ const RULES = [
       && !filepath.endsWith('/helpers.js'),
   },
   {
+    id: 'no-external-resource',
+    severity: 'error',
+    message: '外部ホストから script/link/font を読み込まない。学校ネットワークが遮断すると画面が崩壊する。必要なものは src/ に同梱する。',
+    // script.google.com (GAS 自身) 以外へ向いた <script src> / <link href> を検出。
+    patterns: [
+      /<(?:script|link)[^>]+(?:src|href)="https?:\/\/(?!script\.google\.com)[^"]+"/g,
+    ],
+    filter: (filepath) => /\.html$/.test(filepath) && !filepath.includes('/tests/'),
+  },
+  {
     id: 'page-head-must-use-shared',
     severity: 'error',
     message: 'ページの <head> は include(\'SharedPageHead\') 経由で組み立てる。個別 include は読み込み順序が崩れ、CSP や FOUC の不具合を生む。',
     // SharedPageHead が束ねている 4 つを直接 include しているページを検出。
     patterns: [
       /<\?!=\s*include\('SharedSecurityHeaders'\)/g,
-      /<\?!=\s*include\('SharedTailwindConfig'\)/g,
       /<\?!=\s*include\('SharedThemeBoot'\)/g,
       /<\?!=\s*include\('UnifiedStyles\.css'\)/g,
+      /<\?!=\s*include\('UtilityStyles\.css'\)/g,
     ],
     // SharedPageHead 自身だけが直接 include してよい。
     filter: (filepath) => /\.html$/.test(filepath)

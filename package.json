@@ -33,6 +33,8 @@
     "test": "node --test tests/*.test.cjs",
     "test:coverage": "node scripts/test-coverage.js",
     "check:gas": "node scripts/check-gas.js",
+    "gen:utilities": "node scripts/gen-utilities.js",
+    "check:utilities": "node scripts/gen-utilities.js --check",
     "lint": "node scripts/lint.js",
     "lint:errors": "node scripts/lint.js --severity error",
     "lint:eslint": "eslint src/*.js",

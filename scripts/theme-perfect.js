@@ -162,11 +162,20 @@ check('10. themeManager 全 API 実装', missing.length === 0, missing.length ? 
 const hasPersist = /['"]app-theme['"]/.test(su);
 check('11. localStorage \'app-theme\' 永続化', hasPersist, hasPersist ? '✓' : '✗');
 
-// 12. Tailwind darkMode:'class' + theme.extend.colors
-const tw = readSrc('SharedTailwindConfig.html');
-const hasDarkMode = /darkMode:\s*['"]class['"]/.test(tw);
-const hasThemeColors = /theme-bg-base|theme-text-primary/.test(tw);
-check('12. Tailwind darkMode + theme tokens 公開', hasDarkMode && hasThemeColors, `darkMode=${hasDarkMode}, tokens=${hasThemeColors}`);
+// 12. theme token が utility class として公開されているか
+//   v2901: Tailwind CDN を廃止し、使用クラスだけを静的生成する方式へ移行した。
+//   検査対象を Tailwind config → 生成済み UtilityStyles.css.html に切り替える。
+//   light/dark の切替は --theme-* token と body.theme-light が担うので darkMode 設定は不要。
+const tw = readSrc('UtilityStyles.css.html');
+const hasThemeColors = /var\(--theme-bg-base\)|var\(--theme-text-primary\)/.test(tw);
+// CDN 由来の <script src> / <link href> が 1 つも無いこと (コメント内の言及は対象外)。
+let cdnTags = 0;
+for (const f of HTML_FILES) {
+  if (!f.endsWith('.html')) continue;
+  const t = readSrc(f);
+  cdnTags += (t.match(/<(?:script|link)[^>]+(?:src|href)="https?:\/\/(?!script\.google\.com)[^"]+"/g) || []).length;
+}
+check('12. theme token が utility class として公開 (CDN 非依存)', hasThemeColors && cdnTags === 0, `tokens=${hasThemeColors}, 外部読込タグ=${cdnTags}`);
 
 // 13. apply() で .dark + .light + theme-{dark,light} を html/body に
 // v2810+: 統一形 classList.add(resolved, 'theme-' + resolved) を採用
@@ -335,7 +344,7 @@ check('27. Orphan dark: utility = 0 (paired のみ受容)', orphans === 0, `${or
 function countAnyDarkPrefix() {
   let n = 0;
   for (const f of HTML_FILES) {
-    if (f === 'SharedThemeBoot.html' || f === 'SharedTailwindConfig.html') continue;
+    if (f === 'SharedThemeBoot.html') continue;
     const text = readSrc(f);
     // dark: の使用 (class="..." 内 or classList.add 内のみ)
     const matches = text.match(/\bdark:[a-z]+[-:][a-zA-Z0-9/_-]+/g) || [];
@@ -362,29 +371,26 @@ check('28. gray/slate ファミリー混在 = 0', grayMix === 0, `${grayMix} 件
 // 30. Tailwind utility ↔ config 整合性 (no-op class 検出)
 //   HTML で使われている theme- utility が Tailwind config (nested colors) に存在するか
 function checkUtilityConfigConsistency() {
-  const tw = readSrc('SharedTailwindConfig.html');
-  // nested theme: { DEFAULT, primary, ... } から key を抽出
-  const themeMatch = tw.match(/theme:\s*\{([\s\S]*?)\n\s*\},\s*\n\s*\/\//);
-  const themeKeys = new Set(['theme']);  // text-theme = DEFAULT
-  if (themeMatch) {
-    const keyRe = /^\s*['"]?([a-zA-Z][\w-]*)['"]?\s*:/gm;
+  // v2901: Tailwind config を廃止したので、実際に CSS で定義されたルールを正とする。
+  //   theme utility は 2 箇所に分かれる:
+  //     - UnifiedStyles.css.html : 以前から手書きしていた status/soft 系
+  //     - UtilityStyles.css.html : gen-utilities.js が生成する分
+  const tw = readSrc('UtilityStyles.css.html') + '\n' + readSrc('UnifiedStyles.css.html');
+  const themeKeys = new Set(['theme']);
+  {
+    // `.text-theme-x` だけでなく `.hover\:text-theme-x:hover` のような
+    //   variant 付きセレクタも拾えるよう、直前が `.` または `\:` を許す。
+    const keyRe = /[.:](?:text|bg|border|ring|divide)-(theme[\w-]*?)(?:\\\/\d+)?(?=[\s{:,])/g;
     let m;
-    while ((m = keyRe.exec(themeMatch[1])) !== null) {
-      const k = m[1];
-      if (k === 'DEFAULT') themeKeys.add('theme');
-      else themeKeys.add(`theme-${k}`);
+    while ((m = keyRe.exec(tw)) !== null) {
+      themeKeys.add(m[1]);
     }
   }
-  // brand / status keys
-  const brandMatch = tw.match(/brand:\s*\{([\s\S]*?)\}/);
-  if (brandMatch) {
-    let m, re = /^\s*['"]?([a-zA-Z][\w-]*)['"]?\s*:/gm;
-    while ((m = re.exec(brandMatch[1])) !== null) themeKeys.add(`brand-${m[1]}`);
-  }
-  const statusMatch = tw.match(/status:\s*\{([\s\S]*?)\}/);
-  if (statusMatch) {
-    let m, re = /^\s*['"]?([a-zA-Z][\w-]*)['"]?\s*:/gm;
-    while ((m = re.exec(statusMatch[1])) !== null) themeKeys.add(`status-${m[1]}`);
+  // brand- / status- も同様に生成済みルールから拾う
+  {
+    const keyRe = /[.:](?:text|bg|border|ring|divide)-((?:brand|status)[\w-]*?)(?:\\\/\d+)?(?=[\s{:,])/g;
+    let m;
+    while ((m = keyRe.exec(tw)) !== null) themeKeys.add(m[1]);
   }
 
   // HTML で使われている theme-/brand-/status- utility が config key にあるか
@@ -392,12 +398,14 @@ function checkUtilityConfigConsistency() {
   const noopExamples = [];
   for (const f of HTML_FILES) {
     const text = readSrc(f);
-    const utilRe = /\b(?:text|bg|border|ring|from|to|via|divide|placeholder|outline|fill|stroke)-(theme(?:-[a-z][\w-]*)?|brand-[a-z][\w-]*|status-[a-z][\w-]*)\b/g;
+    // `--border-status-success` のような CSS カスタムプロパティ名は utility class ではない。
+    //   直前が `-` (= `--` の一部) の場合は除外する。
+    const utilRe = /(^|[^-\w])(?:text|bg|border|ring|from|to|via|divide|placeholder|outline|fill|stroke)-(theme(?:-[a-z][\w-]*)?|brand-[a-z][\w-]*|status-[a-z][\w-]*)\b/g;
     let m;
     while ((m = utilRe.exec(text)) !== null) {
-      if (!themeKeys.has(m[1])) {
+      if (!themeKeys.has(m[2])) {
         noop++;
-        if (noopExamples.length < 3) noopExamples.push(`${f}: ${m[0]}`);
+        if (noopExamples.length < 3) noopExamples.push(`${f}: ${m[0].trim()}`);
       }
     }
   }

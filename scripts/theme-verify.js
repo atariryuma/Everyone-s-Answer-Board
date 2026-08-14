@@ -128,24 +128,35 @@ if (contrast.error) {
 }
 
 // =====================================================================
-// 7. Tailwind darkMode 設定
+// 7. utility CSS が静的同梱されているか (CDN 非依存)
+//    v2901: cdn.tailwindcss.com を廃止し、使用クラスだけを
+//    UtilityStyles.css.html に静的生成する方式へ移行。
+//    light/dark は --theme-* token + body.theme-light で表現するため
+//    Tailwind の darkMode 設定は不要になった。
 // =====================================================================
-function checkTailwindConfig() {
-  const cfg = fs.readFileSync(path.join(SRC_DIR, 'SharedTailwindConfig.html'), 'utf8');
-  const hasDarkMode = /darkMode\s*:\s*['"]class['"]/.test(cfg);
-  // theme.extend.colors に CSS 変数 mapping があるかチェック (key 名は何でもよく、 value が var(--theme-*))
+function checkUtilityCss() {
+  const cssPath = path.join(SRC_DIR, 'UtilityStyles.css.html');
+  if (!fs.existsSync(cssPath)) return { hasCss: false, hasThemeColors: false, cdnFree: false, ok: false };
+  const cfg = fs.readFileSync(cssPath, 'utf8');
   const hasThemeColors = /var\(--theme-bg-base\)/.test(cfg) && /var\(--theme-text-primary\)/.test(cfg);
-  return { hasDarkMode, hasThemeColors, ok: hasDarkMode && hasThemeColors };
+  // どのページも外部ホストから script/link を読んでいないこと
+  let cdnFree = true;
+  for (const f of fs.readdirSync(SRC_DIR)) {
+    if (!f.endsWith('.html')) continue;
+    const t = fs.readFileSync(path.join(SRC_DIR, f), 'utf8');
+    if (/<(?:script|link)[^>]+(?:src|href)="https?:\/\/(?!script\.google\.com)[^"]+"/.test(t)) cdnFree = false;
+  }
+  return { hasCss: true, hasThemeColors, cdnFree, ok: hasThemeColors && cdnFree };
 }
 
-const twConfig = checkTailwindConfig();
+const twConfig = checkUtilityCss();
 record(
-  '7. Tailwind darkMode 設定',
+  '7. utility CSS 静的同梱 (CDN 非依存)',
   10,
   twConfig.ok,
   twConfig.ok
-    ? "darkMode:'class' + extend.colors(theme-bg-base 等) 完備"
-    : `darkMode:${twConfig.hasDarkMode ? '✓' : '✗'} colors:${twConfig.hasThemeColors ? '✓' : '✗'}`
+    ? 'UtilityStyles.css.html に theme token utility を同梱 / 外部読込 0'
+    : `themeColors:${twConfig.hasThemeColors ? '✓' : '✗'} cdnFree:${twConfig.cdnFree ? '✓' : '✗'}`
 );
 
 // =====================================================================
@@ -176,7 +187,9 @@ function checkThemeManager() {
 // =====================================================================
 function checkClassSyncWithTailwind() {
   const su = fs.readFileSync(path.join(SRC_DIR, 'SharedUtilities.html'), 'utf8');
-  const tw = fs.readFileSync(path.join(SRC_DIR, 'SharedTailwindConfig.html'), 'utf8');
+  // v2901: Tailwind config は廃止。dark/light の判定は themeManager が付ける
+  //   class と UnifiedStyles の body.theme-light セレクタの整合で見る。
+  const tw = fs.readFileSync(path.join(SRC_DIR, 'UnifiedStyles.css.html'), 'utf8');
 
   // themeManager.apply が html/body に追加する class 名を抽出
   // v2810+ 統一: classList.add(resolved, 'theme-' + resolved) — resolved は 'dark'/'light' 変数
@@ -187,13 +200,8 @@ function checkClassSyncWithTailwind() {
   const themeMgrAddsThemeDark = /classList\.add\(['"]theme-['"]\s*\+\s*resolved\)|classList\.add\(['"]theme-dark['"]|classList\.add\(resolved,\s*['"]theme-['"]\s*\+\s*resolved\)/.test(su);
 
   // Tailwind darkMode 設定: 'class' (= .dark), ['class', '.X'], 'selector'
-  const tailwindMode = (() => {
-    const m1 = tw.match(/darkMode\s*:\s*['"]class['"]/);
-    if (m1) return 'class-default';  // looks for .dark
-    const m2 = tw.match(/darkMode\s*:\s*\[\s*['"]class['"]\s*,\s*['"]([^'"]+)['"]\s*\]/);
-    if (m2) return `class-custom:${m2[1]}`;
-    return 'none';
-  })();
+  // CSS 側が light を body.theme-light で表現しているなら 'class-custom:theme-light' 相当。
+  const tailwindMode = /body\.theme-light/.test(tw) ? 'class-custom:theme-light' : 'none';
 
   // 整合性判定
   let ok = false;
@@ -206,8 +214,11 @@ function checkClassSyncWithTailwind() {
       : "Tailwind darkMode:'class' は .dark を探すが themeManager が .dark を付与していない (dark: variant 発動せず)";
   } else if (tailwindMode.startsWith('class-custom:')) {
     const selector = tailwindMode.slice('class-custom:'.length).replace(/^\./, '');
-    const re = new RegExp(`classList\\.add\\(['"]${selector}['"]`);
-    ok = re.test(su);
+    // themeManager は `classList.add('theme-' + resolved)` の動的形で付与するため、
+    //   リテラル一致だけでなく動的合成形も許容する (v2810+ の統一形)。
+    const literal = new RegExp(`classList\\.add\\((?:[^)]*,\\s*)?['"]${selector}['"]`);
+    const dynamic = /classList\.add\((?:[^)]*,\s*)?['"]theme-['"]\s*\+\s*resolved/;
+    ok = literal.test(su) || dynamic.test(su);
     reason = ok
       ? `Tailwind darkMode:[class, .${selector}] + themeManager 同期 ✓`
       : `Tailwind は .${selector} を探すが themeManager が付与していない`;

@@ -54,6 +54,12 @@ jobs:
         #   push でも CLAUDE.md ルール違反 (setTimeout / getEffectiveUser 等) を CI で捕捉する。
         run: npm run lint:errors
 
+      - name: utility CSS が最新か (Tailwind CDN 廃止後の生成物)
+        # Why: UtilityStyles.css.html は gen-utilities.js の生成物。HTML に新しい
+        #   Tailwind クラスを書いたのに再生成を忘れると、そのクラスだけ無スタイルで
+        #   本番に出る。生成物と入力のズレを CI で止める。
+        run: npm run check:utilities
+
       - name: GAS 参照整合性チェック
         # Why: GAS は単一グローバルスコープでモジュール解決が無いため、関数や要素 ID を
         #   1 つ消すと呼び出し側は無言で本番落ちする。node --test は各ファイルを個別に
