@@ -438,7 +438,13 @@ function sanitizeProfileHistory(input, sanitizedProfiles) {
 }
 
 /**
- * profiles 配列のサニタイズ。
+ * profiles 配列のサニタイズ（レガシー移行専用）。
+ *
+ * v2894 で「保存済みボード (profiles)」の UI と API は撤去した。この関数が残っているのは、
+ * 既存ユーザーの config に入ったままの profiles を、管理画面初回ロード時の
+ * migrateLegacyProfilesToLesson_ が授業へ移すまで消さずに保つため。
+ * 全ユーザーの移行が完了したら sanitizeProfileHistory ともども削除してよい。
+ *
  *
  * Why: multi-board のために 1 user の config 内に複数の「表示設定スナップショット」を
  *      保持する。各 profile は active config と同じ形（formUrl/spreadsheetId/sheetName/

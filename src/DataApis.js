@@ -1,6 +1,6 @@
 /**
  * @fileoverview DataApis - データ操作 API（公開ボードのデータ取得、列分析、
- *   profile 切替、フォルダ作成、リアクションのバッチ取得など）。クロスファイルの
+ *   フォルダ作成、リアクションのバッチ取得など）。クロスファイルの
  *   依存関係は下の global 宣言を参照。
  */
 
@@ -857,177 +857,15 @@ function validateHeaderIntegrity(targetUserId) {
   }
 }
 
-/**
- * View 画面から profile を切替えるためのエンドポイント。
- *
- * Why: 教師がビュー画面の profile セレクタを操作 → google.script.run.loadProfileForView →
- *      該当ユーザーの config の profile を active に適用 → 200 OK で再ロードを促す。
- *      adminApi 経路の loadProfile と異なり、こちらは Session ベースの認証で動く。
- *      profile を切替えられるのは「自分のボード」または「管理者」のみ。
- *
- * @param {string} profileName
- * @param {string} [targetUserId] - 省略時は requester 自身
- * @returns {Object} { success, message, activeProfile }
- */
-function loadProfileForView(profileName, targetUserId) {
-  try {
-    if (!profileName || typeof profileName !== 'string') {
-      return createErrorResponse('profileName is required');
-    }
-    const email = getCurrentEmail();
-    if (!email) return createAuthError();
-
-    // 対象 user 判定
-    let user;
-    if (targetUserId && typeof targetUserId === 'string') {
-      user = findUserById(targetUserId, { requestingUser: email });
-    } else {
-      user = findUserByEmail(email, { requestingUser: email });
-    }
-    if (!user) return createUserNotFoundError();
-
-    // 認可: 自分のボードか、管理者か
-    const isOwn = sameEmail_(user.userEmail, email);
-    const isAdmin = isAdministrator(email);
-    if (!isOwn && !isAdmin) {
-      return createErrorResponse('権限がありません: 自分以外のボードのプロファイル切替は管理者のみ可能です');
-    }
-
-    const cfgRes = getUserConfig(user.userId, user);
-    if (!cfgRes.success) return createErrorResponse(cfgRes.message || 'config load failed');
-    const cur = cfgRes.config || {};
-    const profiles = Array.isArray(cur.profiles) ? cur.profiles : [];
-    const p = profiles.find(x => x && x.name === profileName);
-    if (!p) return createErrorResponse(`Profile "${profileName}" not found`);
-
-    // Why (完全置換): matrix → wordcloud に切替えた時に旧 columnMapping.numericX/Y が
-    //   居残るのを防ぐため、profile に無いキーは __applyProfileToConfig_ で明示上書き。
-    const merged = {
-      ...__applyProfileToConfig_(cur, p),
-      activeProfile: p.name,
-      userId: user.userId,
-      profileHistory: __appendProfileHistory_(cur.profileHistory, p.name)
-    };
-
-    const saveRes = saveUserConfig(user.userId, merged, { isMainConfig: true });
-    if (!saveRes.success) return saveRes;
-    // profile 切替で board の spreadsheetId / columnMapping が変わるので、 viewer 向け
-    // board data cache を即時 stale 化する。 これを忘れると最大 TTL 分 viewer が
-    // 旧プロファイルのデータを読み続ける (cache key に activeProfile が含まれないため)。
-    if (typeof bumpBoardDataVersion_ === 'function') {
-      try { bumpBoardDataVersion_(user.userId); } catch (_) { /* ignore */ }
-    }
-    return createSuccessResponse('Profile loaded', { activeProfile: p.name });
-  } catch (error) {
-    logError_('loadProfileForView', error);
-    return createExceptionResponse(error);
-  }
-}
 
 // =====================================================================
-// Profile management for AdminPanel (owner-facing).
-// Why: 既存の listProfiles/saveProfile/deleteProfile は admin API 経由のみで、
-//   AdminPanel の owner が直接 google.script.run できなかった。Session 認証で
-//   「自分のボード」に限り profile CRUD できる薄いラッパーを用意する。
-//   実装は AdminApis.js の __listProfilesCore / __saveProfileCore /
-//   __deleteProfileCore に集約済み。ここでは認可（自分のボード限定）のみ担当。
+// 呼び出し元 (Session 認証済みユーザー) 自身の userId を解決するヘルパー。
 // =====================================================================
 
-function __resolveOwnUserId_() {
-  const email = getCurrentEmail();
-  if (!email) return { error: createAuthError() };
-  const user = findUserByEmail(email, { requestingUser: email });
-  if (!user) return { error: createUserNotFoundError() };
-  return { userId: user.userId };
-}
 
-function listMyProfiles() {
-  try {
-    const resolved = __resolveOwnUserId_();
-    if (resolved.error) return resolved.error;
-    return __listProfilesCore(resolved.userId);
-  } catch (error) {
-    logError_('listMyProfiles', error);
-    return createExceptionResponse(error);
-  }
-}
 
-function saveCurrentAsProfile(name) {
-  try {
-    const resolved = __resolveOwnUserId_();
-    if (resolved.error) return resolved.error;
-    return __saveProfileCore(resolved.userId, name, { autoActivate: true });
-  } catch (error) {
-    logError_('saveCurrentAsProfile', error);
-    return createExceptionResponse(error);
-  }
-}
 
-function deleteMyProfile(name) {
-  try {
-    const resolved = __resolveOwnUserId_();
-    if (resolved.error) return resolved.error;
-    return __deleteProfileCore(resolved.userId, name);
-  } catch (error) {
-    logError_('deleteMyProfile', error);
-    return createExceptionResponse(error);
-  }
-}
 
-/**
- * プロファイル名を変更する (UI: 名前 double-click → 編集 → Enter)。
- *   - profile entry の name フィールドを置換
- *   - config.activeProfile が一致すれば追従
- *   - config.profileHistory の oldName entries を newName に migrate
- *   - 同名 (newName) が既に存在すれば reject (collision)
- *
- * @param {string} oldName
- * @param {string} newName
- * @returns {Object} { success, message, newName }
- */
-function renameMyProfile(oldName, newName) {
-  try {
-    if (!oldName || typeof oldName !== 'string') {
-      return createErrorResponse('oldName is required');
-    }
-    if (!newName || typeof newName !== 'string') {
-      return createErrorResponse('newName is required');
-    }
-    const cleanNew = newName.trim().slice(0, 50);
-    if (!cleanNew) return createErrorResponse('新しい名前を入力してください');
-    if (cleanNew === oldName) {
-      return createSuccessResponse('変更なし', { newName: cleanNew });
-    }
-    const resolved = __resolveOwnUserId_();
-    if (resolved.error) return resolved.error;
-
-    const cfgRes = getUserConfig(resolved.userId);
-    if (!cfgRes.success) return createErrorResponse(cfgRes.message || 'getUserConfig failed');
-    const cur = cfgRes.config || {};
-    const profiles = Array.isArray(cur.profiles) ? cur.profiles.slice() : [];
-    const idx = profiles.findIndex(p => p && p.name === oldName);
-    if (idx < 0) return createErrorResponse(`プロファイル「${oldName}」が見つかりません`);
-    if (profiles.some(p => p && p.name === cleanNew)) {
-      return createErrorResponse(`プロファイル「${cleanNew}」は既に存在します`);
-    }
-    profiles[idx] = Object.assign({}, profiles[idx], { name: cleanNew });
-
-    const patch = { profiles };
-    if (cur.activeProfile === oldName) patch.activeProfile = cleanNew;
-    if (Array.isArray(cur.profileHistory)) {
-      patch.profileHistory = cur.profileHistory.map(entry => {
-        if (entry && entry.name === oldName) return Object.assign({}, entry, { name: cleanNew });
-        return entry;
-      });
-    }
-    const saveRes = applyConfigPatch_(resolved.userId, patch, { publish: false });
-    if (!saveRes.success) return saveRes;
-    return createSuccessResponse(`プロファイル名を「${cleanNew}」に変更しました`, { newName: cleanNew });
-  } catch (error) {
-    logError_('renameMyProfile', error);
-    return createExceptionResponse(error);
-  }
-}
 
 /**
  * Shape the sheet-data result into the JSON-safe envelope the frontend expects.
@@ -1041,7 +879,7 @@ function renameMyProfile(oldName, newName) {
  * Admins and board owners always see everything (they can see raw sheet anyway).
  */
 // getUserSheetData 失敗時に viewer へ返す標準 empty-board response。
-//   getPublishedSheetData / *ForProfile の 3 箇所で同一だったのを集約。
+//   複数の read 経路で同一だったのを集約。
 function buildSheetDataErrorResult_(result) {
   return {
     success: false,
@@ -1106,62 +944,15 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     defaultMax: 5
   };
 
-  // Why: multi-board の profile セレクタは「所有者または管理者のみ」が操作可能。
-  //      students の wire には乗せない（混乱回避 + 内部設定の漏洩防止）。
-  //      また、これを client の isTeacher 判定の根拠にも使う（profiles 配列が wire に
-  //      含まれていれば、その閲覧者は teacher 権限）。
-  //
-  // v2773: read-time にも cross-ref filter を適用 (defense in depth)。
-  //   sanitizeProfileHistory は save-time にしか走らない (lazy) ため、storage に既存の
-  //   orphan history が残っていると次回保存まで client に流れていた。
-  //   sanitizeProfileHistory(history, profiles) で常に正規化してから wire に乗せる。
-  //   これで「保存されるまで orphan pill が消えない」問題が構造的に解消する。
-  let profileSummary = null;
+  // 閲覧者が所有者/管理者かどうか。client の UI 表示判定に使う。
   const isPrivilegedViewer = Boolean(viewerContext.isAdmin || viewerContext.isOwnBoard);
-  const cleanHistory = (typeof sanitizeProfileHistory === 'function' && config)
-    ? sanitizeProfileHistory(config.profileHistory, config.profiles)
-    : [];
-  if (isPrivilegedViewer && config && Array.isArray(config.profiles) && config.profiles.length > 0) {
-    profileSummary = {
-      active: config.activeProfile || null,
-      list: config.profiles.map(p => ({
-        name: p.name,
-        formTitle: p.formTitle || '',
-        boardMode: (p.displaySettings && p.displaySettings.boardMode) || 'auto'
-      })),
-      history: cleanHistory.map(h => ({ name: h.name, activatedAt: h.activatedAt || '' }))
-    };
-  }
-
-  // Option B: 生徒は過去フェーズだけは閲覧できるよう、profileHistory と current のみ
-  //   サブセット情報を wire に乗せる。未来 profile (history 未登録) は漏らさない。
-  //   teacher 用の full profileSummary は上記 isPrivilegedViewer 経路で送る。
-  //   cleanHistory (sanitizeProfileHistory 通過後) を使うので orphan は届かない。
-  let studentProfileNav = null;
-  if (!isPrivilegedViewer && cleanHistory.length > 0 && config && Array.isArray(config.profiles)) {
-    const profileByName = {};
-    for (const p of config.profiles) {
-      if (p && p.name) profileByName[p.name] = p;
-    }
-    studentProfileNav = {
-      active: config.activeProfile || null,
-      history: cleanHistory.map(h => {
-        const meta = profileByName[h.name] || {};
-        return {
-          name: h.name,
-          activatedAt: h.activatedAt || '',
-          formTitle: meta.formTitle || ''
-        };
-      })
-    };
-  }
 
   // viewer がティーチャー権限を持つかの最終フラグ。client 側で UI 表示判定に使う。
   // server 側で判定する方が改ざんに強い（client の window.isEditor は信用しない）。
   const viewerIsTeacher = isPrivilegedViewer;
 
-  // Why: 生徒の「📝 回答フォーム」ボタンを polling のたびに最新値に更新するため、
-  //      formUrl と formTitle を wire に載せる。profile 切替で active config の
+  // Why: 生徒の「回答フォーム」ボタンを polling のたびに最新値に更新するため、
+  //      formUrl と formTitle を wire に載せる。授業のフェーズが進んで config の
   //      formUrl が変わったとき、5 秒以内に生徒のボタンも切替わる（教師との同期）。
   //      formUrl は config に元から保存されている情報なので追加のセキュリティリスクなし。
   const formMeta = {
@@ -1176,14 +967,8 @@ function buildSafePublishedDataResult(result, config, viewerContext = {}) {
     sheetName: String(result.sheetName || 'Sheet1'),
     displaySettings: { ...displaySettings, boardMode: effectiveMode },
     axisConfig,
-    profiles: profileSummary,
-    studentProfileNav,
     formMeta,
-    viewerIsTeacher,
-    // viewingPastProfile: 過去フェーズ閲覧時のみ profile 名を入れる（caller が override）。
-    //   主経路 (getPublishedSheetData) では undefined のまま。
-    //   getPublishedSheetDataForProfile が結果を post-process して値を入れる。
-    viewingPastProfile: viewerContext.viewingPastProfile || null
+    viewerIsTeacher
   };
 }
 
@@ -1240,11 +1025,11 @@ function bumpBoardDataVersion_(userId) {
  *   publishApp と __applyPublishStateChange の 2 経路が共有する mechanism。
  *   「いつ呼ぶか」(状態変化時のみ / publish 時のみ 等) は呼び出し側の policy で、 ここは
  *   「何を無効化するか」だけを持つ:
- *     - primary spreadsheetId + 各 profile.spreadsheetId の sa_validation cache
- *     - userId 単位の board data version (全 filter/sort/profile を一度に stale 化)
+ *     - primary spreadsheetId + 旧 profiles の spreadsheetId の sa_validation cache
+ *     - userId 単位の board data version (全 filter/sort を一度に stale 化)
  *   typeof guard は GAS multi-file 環境で別ファイルの helper が test 単独 load 時に未定義でも
  *   落ちないため (既存 bumpBoardDataVersion_ 呼び出しと同じ方針)。
- * @param {Object} config - 対象ボードの config (spreadsheetId / profiles を参照)
+ * @param {Object} config - 対象ボードの config (spreadsheetId / 旧 profiles を参照)
  * @param {string} userId
  */
 function invalidateBoardCaches_(config, userId) {

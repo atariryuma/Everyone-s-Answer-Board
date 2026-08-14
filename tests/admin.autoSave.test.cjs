@@ -97,54 +97,6 @@ test('AdminPanel: #autosave-status が存在する (自動保存の視覚 feedba
   assert.match(match[0], /aria-live/, '#autosave-status に aria-live が無い');
 });
 
-test('AdminPanel: プロファイル保存ボタンは「新規保存」(別名で新規作成) ラベルで、別動線として残る', () => {
-  // 旧「複製」表記から「新規保存」に変更。意味は「現在の状態を別名で新しい profile として保存」。
-  // 同名 profile への上書きは active-profile-edit-bar の「このプロファイルを更新」ボタンで行う。
-  const saveBtnSection = ADMIN_HTML.match(
-    /<button[^>]*id="save-current-as-profile-btn"[\s\S]*?<\/button>/
-  );
-  assert.ok(saveBtnSection, 'プロファイル新規保存ボタンが見当たらない');
-  assert.match(
-    saveBtnSection[0],
-    /新規保存|保存/,
-    'プロファイル保存ボタンが「新規保存」用途のラベルになっていない'
-  );
-});
-
-test('AdminPanel.html: 左パネル末尾に「💾 プロファイル『〇』に保存」ボタン (save-to-profile-btn) がある', () => {
-  // 「編集 → 保存」フローを自然にするため active row inline ではなく左パネル末尾に集約。
-  // 表示は hidden 既定で、applyConfig が activeProfile を見て表示/dataset を更新する (drift-proof)。
-  assert.match(
-    ADMIN_HTML,
-    /id="save-to-profile-btn"/,
-    'save-to-profile-btn が左パネルに存在しない'
-  );
-  assert.match(
-    ADMIN_HTML,
-    /id="save-to-profile-name"/,
-    'save-to-profile-name span (動的ラベル用) が無い'
-  );
-});
-
-test('AdminPanel.js.html: applyConfig が save-to-profile-btn の dataset と label を毎回再生成する (drift 防止)', () => {
-  // editBar 時代の textContent 読み出しで起きた「別 profile を誤上書き」を再発させない。
-  assert.match(
-    ADMIN_JS,
-    /save-to-profile-btn[\s\S]{0,400}config\.activeProfile/,
-    'applyConfig 内で save-to-profile-btn を activeProfile に同期していない'
-  );
-  assert.match(
-    ADMIN_JS,
-    /btn\.dataset\.profileName\s*=\s*active/,
-    'save-to-profile-btn の dataset.profileName が active から動的セットされていない'
-  );
-});
-
-test('AdminPanel.js.html: handleActiveProfileUpdate は呼び出し側からの name 引数で動く', () => {
-  const fn = ADMIN_JS.match(/function handleActiveProfileUpdate\s*\(([^)]*)\)/);
-  assert.ok(fn, 'handleActiveProfileUpdate 関数が見つからない');
-  assert.match(fn[1], /\bname\b/, 'handleActiveProfileUpdate は name 引数を受け取る必要がある');
-});
 
 // ─────────────────────────────────────────────────────────────────────────
 // JS 側: ハンドラと behavior の不変条件

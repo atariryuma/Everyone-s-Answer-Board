@@ -538,26 +538,6 @@ test('generateRequestId: structure is req_<timestamp36>_<random9>', () => {
   assert.match(id, /^req_[0-9a-z]+_[0-9a-z]{1,9}$/);
 });
 
-// =====================================================================
-// Option B: loadSheetData gate during past-phase view
-// Why: 過去フェーズ閲覧中に classFilter/sortOrder 変更 / refreshContent ボタンが押されると
-//   従来は loadSheetData 経由で「現在フェーズ」に戻ってしまっていた。viewingPastProfile が
-//   立っている間は __vizLoadPastProfile に分岐して同じフェーズで再フェッチさせるガードを追加。
-//   (page.js の loadSheetData 入口)
-// =====================================================================
-
-test('loadSheetData: routes to __vizLoadPastProfile when viewing past phase', async () => {
-  const { instance } = makeInstance();
-  let pastReloadName = null;
-  instance.state = { userId: 'u1', viewingPastProfile: '導入アンケート', isLoading: false };
-  instance.__vizLoadPastProfile = (name) => { pastReloadName = name; };
-
-  await instance.loadSheetData({ bypassCache: true, isInitialLoad: false });
-
-  assert.equal(pastReloadName, '導入アンケート');
-  // viewingPastProfile は __vizLoadPastProfile 内で再 set されるべきだが、ガード解除直後は null
-  assert.equal(instance.state.viewingPastProfile, null);
-});
 
 test('loadSheetData: bypasses gate when isInitialLoad=true (初回起動経路は素通り)', async () => {
   const { instance } = makeInstance();
@@ -581,26 +561,6 @@ test('loadSheetData: bypasses gate when isInitialLoad=true (初回起動経路�
   assert.equal(initialLoadStarted, true, '通常経路に進む');
 });
 
-test('loadSheetData: bypasses gate when viewingPastProfile not set', async () => {
-  const { instance } = makeInstance();
-  let pastReloadCalled = false;
-  let loadStarted = false;
-  instance.state = {
-    userId: 'u1', viewingPastProfile: null, isLoading: false,
-    currentAnswers: []
-  };
-  instance.__vizLoadPastProfile = () => { pastReloadCalled = true; };
-  instance.performDataLoad = async () => { loadStarted = true; };
-  instance.showLoadingOverlay = () => {};
-  instance.hideLoadingOverlay = () => {};
-  instance.clearCache = () => {};
-  instance.shouldClearCache = () => false;
-  instance.handleError = () => {};
-
-  await instance.loadSheetData({ bypassCache: true, isInitialLoad: false });
-  assert.equal(pastReloadCalled, false);
-  assert.equal(loadStarted, true);
-});
 
 // =====================================================================
 // populateClassFilter: シンプル化版 (Option B 周辺の cleanup)
@@ -644,21 +604,6 @@ test('populateClassFilter: falls back to すべて when selection missing + sync
   assert.equal(persisted, 'すべて', 'sessionStorage も同期されて次回 fetch も整合');
 });
 
-// Note: __vizLoadPastProfile の classFilter 引数渡しは page.viz.js.html 側で定義されており、
-//   テスト fixture (page.js.html のみロード) では prototype 上に存在しない。
-//   ソース文字列に対する static check で regression 防止する。
-test('__vizLoadPastProfile: source passes classFilter from getCurrentFilterState (static guard)', () => {
-  const src = fs.readFileSync(path.resolve(__dirname, '../src/page.viz.js.html'), 'utf8');
-  // hard-code null bug の回帰防止: getPublishedSheetDataForProfile 呼び出し直前で classFilter を変数渡しすること。
-  // v2796: google.script.run 直呼び出しから runServer wrapper に migrate。 形式:
-  //   runServer('getPublishedSheetDataForProfile', userId, name, classFilter, sortOrder)
-  const callMatch = src.match(/runServer\('getPublishedSheetDataForProfile'[^)]+\)/);
-  assert.ok(callMatch, 'runServer("getPublishedSheetDataForProfile", ...) 呼び出しが存在する');
-  // 引数のうち 4 番目 (classFilter 位置) が `null` の literal でないこと
-  // 形式: runServer('getPublishedSheetDataForProfile', userId, name, classFilter, sortOrder)
-  const args = callMatch[0].slice("runServer('getPublishedSheetDataForProfile',".length, -1).split(',').map(s => s.trim());
-  assert.notEqual(args[2], 'null', 'classFilter 引数を null hard-code してはいけない');
-});
 
 // =====================================================================
 // updateDisplaySettingsFromAPI: profile 切替時の UNIFIED_CONFIG 同期

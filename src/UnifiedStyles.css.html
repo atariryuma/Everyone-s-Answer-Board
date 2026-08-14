@@ -99,7 +99,7 @@
 
     /* viz / インジケーター */
     --theme-spinner: #67e8f9;                          /* bright cyan, loading spinner */
-    --theme-accent-cyan: #38bdf8;                      /* notification banner / viz-profile-pill 境界線 */
+    --theme-accent-cyan: #38bdf8;                      /* notification banner / アクセント境界線 */
     --theme-accent-cyan-soft: rgba(56, 189, 248, 0.18); /* banner 背景の薄い cyan */
     --theme-overlay-white-05: rgba(255, 255, 255, 0.05); /* input 背景の極薄 */
 
@@ -1368,7 +1368,7 @@
   }
 
   /* .modern-select-sm / -md は v2840 で削除 — 実 migration 無く YAGNI 違反だった。
-     必要時に .eab-select / .viz-profile-select の rule を直接整理する方が筋。 */
+     必要時に .eab-select の rule を直接整理する方が筋。 */
 
   /* Modern Input Styling - modern-selectと統一デザイン */
   .modern-input {
@@ -2155,81 +2155,6 @@
     font-size: 0.875rem;
     color: var(--theme-text-muted);
     font-style: italic;
-  }
-
-  /* ===== Profile row: アイコンボタン + 状態バッジ + 編集中バー ===== */
-  .profile-badge {
-    padding: 0.15rem 0.45rem;
-    /* 「 公開中」等の機能的な状態テキスト。 旧 0.65rem(10.4px) は design system 下限
-       (--font-size-xs 12px) を割っていたため、 教師が公開状態を読み取る文字として小さすぎた。 */
-    font-size: var(--font-size-xs);
-    border-radius: 0.25rem;
-    flex-shrink: 0;
-    line-height: 1.2;
-  }
-  .profile-badge-active {
-    background: color-mix(in srgb, var(--theme-accent-cyan-deep) 40%, transparent);
-    color: var(--theme-accent-cyan);
-  }
-  .profile-badge-published {
-    background: rgb(5, 150, 105);
-    color: #fff;
-  }
-  .profile-icon-btn {
-    background: transparent;
-    border: 1px solid transparent;
-    border-radius: 0.5rem;
-    color: var(--theme-text-secondary);
-    padding: 0.15rem 0.4rem;
-    font-size: 0.875rem;
-    cursor: pointer;
-    transition: all var(--transition-fast) ease;
-    flex-shrink: 0;
-  }
-  .profile-icon-delete {
-    color: color-mix(in srgb, var(--status-error) 85%, transparent);
-  }
-  .profile-icon-delete:hover {
-    background: color-mix(in srgb, var(--status-error) 20%, transparent);
-    border-color: color-mix(in srgb, var(--status-error) 45%, transparent);
-    /* color:#fff 廃止 (light mode で淡赤地に白文字が消える)。 base の status-error を継承。 */
-  }
-  /* ロード中の行を highlight */
-  .profile-row.profile-row-loading {
-    background: color-mix(in srgb, var(--brand-primary) 15%, transparent) !important;
-    border-color: color-mix(in srgb, var(--brand-primary-light) 60%, transparent) !important;
-    opacity: 0.7;
-    pointer-events: none;
-  }
-  /* 名前 (dblclick で rename 可能) */
-  .profile-name {
-    cursor: text;
-  }
-  .profile-name:hover {
-    text-decoration: underline dotted var(--theme-border-normal);
-    text-underline-offset: 3px;
-  }
-  .profile-rename-input {
-    width: 100%;
-    background: var(--theme-card-3);
-    border: 1px solid color-mix(in srgb, var(--brand-primary-light) 60%, transparent);
-    border-radius: 0.25rem;
-    color: var(--theme-text-primary);
-    font-size: 0.75rem;
-    padding: 0.1rem 0.3rem;
-    outline: none;
-  }
-
-  /*  更新ボタン (active row のみ表示) */
-  .profile-icon-update {
-    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 18%, transparent);
-    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 45%, transparent);
-    color: var(--theme-accent-cyan);
-  }
-  .profile-icon-update:hover {
-    background: color-mix(in srgb, var(--theme-accent-cyan-strong) 40%, transparent);
-    border-color: color-mix(in srgb, var(--theme-accent-cyan-strong) 70%, transparent);
-    /* color:#fff 廃止 (light mode で淡シアン地に白文字が消える)。 base の accent-cyan を継承。 */
   }
 
   /* ===== Phase 追加 dropdown (Wizard Step 2) ===== */

@@ -1550,3 +1550,54 @@ function installLessonTriggers() {
     logError_('installLessonTriggers', error);
   }
 }
+
+/**
+ * 旧「保存済みボード (config.profiles)」を授業レコードへ吸収して config から削除する。
+ *
+ * Why: profiles と lesson は「1 授業分の設定 + データ + 履歴」という同じものを指す
+ *   2 つの実装だった。教師から見ると「新しく授業をやるとき、どちらを作ればいいのか」が
+ *   判断できず、これが初見の迷いの最大の原因になっていた。授業に一本化するにあたり、
+ *   既存ユーザーの profiles を捨てずに授業履歴として引き取る一方向移行を行う。
+ *
+ * 実行タイミング: 本人が管理画面を開いたとき (getBatchedAdminData) に 1 回だけ。
+ *   移行後は config.profiles / activeProfile / profileHistory を削除するので、
+ *   2 回目以降は profiles.length === 0 で即座に抜ける。
+ *
+ * 冪等性: 移行が失敗したら config はそのまま残るので、次回ロードで再試行される。
+ *   逆に lesson 書き込み成功後に config 削除が失敗した場合は、次回ロードで
+ *   同じ profiles がもう一度取り込まれ lesson が重複する。授業履歴の重複は
+ *   実害が小さく (教師が消せる)、profiles の消失より安全なのでこの順序を選ぶ。
+ *
+ * @param {string} userId
+ * @returns {{migrated: boolean, lessonId?: string, reason?: string}}
+ */
+function migrateLegacyProfilesToLesson_(userId) {
+  try {
+    if (!userId) return { migrated: false, reason: 'no-user' };
+    const config = getConfigOrDefault(userId);
+    const profiles = (config && Array.isArray(config.profiles)) ? config.profiles : [];
+    if (profiles.length === 0) return { migrated: false, reason: 'nothing-to-migrate' };
+
+    const res = importLessonFromProfiles(userId, { includeSnapshots: true });
+    if (!res || res.success !== true) {
+      logError_('migrateLegacyProfilesToLesson_', new Error(
+        '取り込み失敗: ' + ((res && res.message) || '不明')));
+      return { migrated: false, reason: 'import-failed' };
+    }
+
+    // 取り込み済みなので config 側の profile 情報を消す。
+    //   applyConfigPatch_ は deepMerge なので「キーを消す」には null を明示する必要がある。
+    //   ConfigService.validateAndSanitizeConfig が空/未設定を delete するため、
+    //   profiles: [] / activeProfile: '' を渡せば結果的にキーごと落ちる。
+    applyConfigPatch_(userId, {
+      profiles: [],
+      activeProfile: '',
+      profileHistory: []
+    }, { publish: false });
+
+    return { migrated: true, lessonId: res.data && res.data.lesson && res.data.lesson.lessonId };
+  } catch (error) {
+    logError_('migrateLegacyProfilesToLesson_', error);
+    return { migrated: false, reason: 'exception' };
+  }
+}

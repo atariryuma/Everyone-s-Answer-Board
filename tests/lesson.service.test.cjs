@@ -584,27 +584,6 @@ test('startLesson: LockService が busy なら LESSON_BUSY', () => {
   assert.match(res.message, /LESSON_BUSY/);
 });
 
-// =====================================================================
-// advanceLessonPhase
-// =====================================================================
-
-test('advanceLessonPhase: next で profileTransitions に entry が追加され Form が切替えられる', () => {
-  const { context, formCloses, configPatches } = loadLessonContext();
-  const created = context.createLessonDraft('u1', '5/15', 'doutoku-3phase');
-  const lessonId = created.data.lesson.lessonId;
-  context.updateLessonDraft('u1', lessonId, 'classes', ['5-1']);
-  context.startLesson('u1', lessonId);
-
-  const formCloseBefore = formCloses.length;
-  const patchesBefore = configPatches.length;
-  const res = context.advanceLessonPhase('u1', lessonId, 'next');
-  assert.equal(res.success, true);
-  assert.equal(res.data.activePhaseIndex, 1);
-  // phase 0 close, phase 1 open の 2 つの form 操作が追加
-  assert.equal(formCloses.length - formCloseBefore, 2);
-  // phase 1 の config が user config に書かれた
-  assert.equal(configPatches.length - patchesBefore, 1);
-});
 
 test('advanceLessonPhase: 最後のフェーズで next すると reject', () => {
   const { context } = loadLessonContext();

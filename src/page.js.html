@@ -1177,8 +1177,8 @@
 
           // Option B: 過去フェーズ閲覧中は polling 経由のデータ更新を止める。
           //   生徒が過去フェーズを開いている間に teacher が新着で auto-reload すると、
-          //   学習の振り返りが強制中断される。formMeta による profile 切替検知も同様に skip。
-          const viewingPast = !!(this.state && this.state.viewingPastProfile);
+          //   学習の振り返りが強制中断される。formMeta によるフェーズ切替検知も同様に skip。
+          const viewingPast = !!(this.state && this.state.isReviewMode);
 
           if (response.hasNewContent && !viewingPast) {
             // Why: モード別の更新戦略。
@@ -1197,16 +1197,16 @@
             }
           }
 
-          // Why: 教師が profile 切替したとき、生徒の 5 秒 polling で即時に検知する。
-          //   getNotificationUpdate に formMeta/activeProfile を載せたので、ここで前回値と
+          // Why: 授業のフェーズが進んだとき、生徒の 5 秒 polling で即時に検知する。
+          //   getNotificationUpdate に formMeta を載せたので、ここで前回値と
           //   比較して URL 変更があれば「新しいボードに切り替わりました」トースト + 自動再読込。
-          //   これがないと polling は新着投稿しか拾えず、profile 切替は気付かれない。
+          //   これがないと polling は新着投稿しか拾えず、フェーズ切替は気付かれない。
           if (response.formMeta && !viewingPast) {
             const newUrl = response.formMeta.formUrl || '';
             const prevUrl = this.state.lastSeenFormUrl || '';
             if (prevUrl && newUrl && prevUrl !== newUrl) {
               this.__showBoardSwitchedToast(response.formMeta.formTitle || '新しいボード');
-              // 自動でデータ再読込し、ボード本体も新 profile の中身に切替える
+              // 自動でデータ再読込し、ボード本体も新フェーズの中身に切替える
               if (typeof this.loadSheetData === 'function') {
                 this.loadSheetData({ bypassCache: true, isInitialLoad: false });
               }
@@ -1273,7 +1273,7 @@
 
       const timeSinceActivity = Date.now() - this.lastActivityTime;
 
-      // Why (授業テンポ優先): 道徳の 45 分授業で教師が profile 切替したとき、
+      // Why (授業テンポ優先): 道徳の 45 分授業で教師がフェーズを進めたとき、
       //   生徒側で 15 秒以上待つと授業がもたつく。直近アクティブ (1 分以内) のときは
       //   5 秒間隔で getNotificationUpdate を呼ぶ。アイドル時はバックオフ。
       //   GAS quota は 1 ユーザー 90 sec/min なので、5 sec interval = 12 calls/min で余裕。
@@ -1405,8 +1405,8 @@
     /**
      * #form-link-btn を新しい formMeta で更新。各 loadSheetData の戻り値から呼ばれる。
      *
-     * Why: 教師が profile 切替や formUrl 変更したときに、5秒のポーリング cycle で
-     *      生徒側のボタンも追従する。これがないと profile 切替で生徒は古い Forms を
+     * Why: 教師がフェーズを進めたり formUrl を変更したときに、5秒のポーリング cycle で
+     *      生徒側のボタンも追従する。これがないとフェーズ切替で生徒は古い Forms を
      *      指したまま「先生さっき言ったボードはどこ？」と混乱する。
      *
      *      セキュリティ: formUrl は config 由来でユーザー入力。javascript: スキーム
@@ -1435,7 +1435,7 @@
 
     /**
      * 「新しいボードに切替わりました」中央上バナー。
-     * 教師が profile 切替したとき、生徒の小さい端末でも気付けるよう表示。
+     * 教師がフェーズを進めたとき、生徒の小さい端末でも気付けるよう表示。
      */
     __showBoardSwitchedToast(title) {
       const safeTitle = (window.sharedUtilities && window.sharedUtilities.security && window.sharedUtilities.security.escapeHtml)
@@ -2029,18 +2029,6 @@
         config.bypassCache = true;
       }
 
-      // Option B: 過去フェーズ閲覧中は、classFilter / sortOrder / refreshContent 等から
-      //   loadSheetData が呼ばれても「現在フェーズに戻る」のではなく「同じ過去フェーズで再フェッチ」
-      //   が UX 上正しい。viewingPastProfile を解除してから __vizLoadPastProfile に分岐し、新しい
-      //   filter / sort をサーバへ渡す。isInitialLoad は初回起動のときだけ通常経路へ。
-      if (!config.isInitialLoad && this.state && this.state.viewingPastProfile &&
-          typeof this.__vizLoadPastProfile === 'function') {
-        const name = this.state.viewingPastProfile;
-        this.state.viewingPastProfile = null;  // ガード解除 (同名 no-op をスキップして再フェッチ)
-        this.__vizLoadPastProfile(name);
-        return Promise.resolve();
-      }
-
       if (this.state.isLoading && config.showLoading) {
         return Promise.resolve(); // Return resolved Promise to prevent hanging .then() chains
       }
@@ -2108,7 +2096,7 @@
           ? result.displaySettings.boardMode
           : 'board';
 
-        // boardMode は profile (= server) が決める。teacher の手動 override 機構は撤去済。
+        // boardMode は server が決める。teacher の手動 override 機構は撤去済。
         //   ?boardMode=X URL パラメータだけは検証 / プレビュー用途で残す。
         let overrideMode = null;
         try {
@@ -2127,7 +2115,6 @@
               chosen: this.state.boardMode,
               server: serverMode,
               override: overrideMode,
-              activeProfile: serverActiveProfile,
               viewerIsTeacher: result.viewerIsTeacher
             });
             this._modeLogged = this.state.boardMode;
@@ -2140,43 +2127,11 @@
         if (result.viewerIsTeacher === true) {
           this.state.isEditor = true;
         }
-        // multi-board: profile セレクタが使うメタ情報
-        if (result.profiles && result.profiles.list) {
-          this.state.profiles = result.profiles.list;
-          this.state.activeProfile = result.profiles.active || null;
-          // teacher pill の「 過去 active 経験あり」表示に使う。server profileSummary に同梱。
-          this.state.profileHistory = Array.isArray(result.profiles.history) ? result.profiles.history : [];
-        } else {
-          this.state.profiles = [];
-          this.state.activeProfile = null;
-          this.state.profileHistory = [];
-        }
-
-        // Option B: 生徒は studentProfileNav 経由で過去フェーズへ navigate できる。
-        //   teacher は state.profiles + state.activeProfile を見るのでこれは不要。
-        //   getPublishedSheetData が studentProfileNav を返したときだけ student として扱う。
-        if (result.studentProfileNav && Array.isArray(result.studentProfileNav.history)) {
-          this.state.studentProfileNav = result.studentProfileNav;
-          // student の active も同期しておく（pills の current 判定用）
-          if (!this.state.activeProfile && result.studentProfileNav.active) {
-            this.state.activeProfile = result.studentProfileNav.active;
-          }
-        } else if (!result.studentProfileNav) {
-          // 教師経路など studentProfileNav が来ない場合は state からも消す（一貫性）
-          this.state.studentProfileNav = null;
-        }
-        // 過去フェーズを閲覧中かのフラグ。getPublishedSheetData 経由なら null （= 現在）。
-        //   getPublishedSheetDataForProfile 経由でロードしたときだけ profile 名が入る。
-        if (typeof result.viewingPastProfile !== 'undefined') {
-          this.state.viewingPastProfile = result.viewingPastProfile || null;
-        }
-
-        // Why: profile 切替 / 教師が formUrl 変更 → 生徒のボタンも即時更新（次の poll で）。
-        //      従来は init で 1 回だけ getActiveFormInfo を呼んでいたが、それでは
-        //      授業中に profile 切替されても生徒は古い Forms を指したまま。
-        //      polling のたびに wire の formMeta を反映することで同期される。
+        // Why: 授業のフェーズが進む / 教師が formUrl を変えると、生徒のボタンも
+        //      次の poll で追従させる必要がある。従来は init で 1 回だけ
+        //      getActiveFormInfo を呼んでいたため、授業中の切替に追従できなかった。
         if (result.formMeta) {
-          // profile 切替検知: 生徒に「新しいボードに切替わりました」通知（5秒で自動消滅）。
+          // フェーズ切替検知: 生徒に「新しいボードに切替わりました」通知（5秒で自動消滅）。
           // Why: 教師が黒板で切替えても、生徒の小さい端末では変化に気づきにくい。
           //      短いトーストで「新フォームに切替わった」ことを明示する。
           // ただし viewer 自身が pill click で switch した直後は、 すでに右上トースト
@@ -2371,16 +2326,14 @@
       try {
         const result = await renderOne();
 
-        // toolbar (profile pills) は冪等に再注入。inject → refresh の順で OK。
-        if (typeof this.__vizInjectModeBar === 'function') this.__vizInjectModeBar();
+        // mode 連動 UI (controlsFooter の出し入れ) を再同期。
         if (typeof this.__vizRefreshModeBar === 'function') this.__vizRefreshModeBar();
-        if (typeof this.__vizInjectProfileSelector === 'function') this.__vizInjectProfileSelector();
 
-        // Why: 初回描画成功を Cloud Logging に通知（mode/profile ごと 1 回のみ）。
+        // Why: 初回描画成功を Cloud Logging に通知（mode ごと 1 回のみ）。
         //      CLI から「全機能が動いた」を確認するための telemetry。
         try {
           if (!this._renderedHeartbeats) this._renderedHeartbeats = new Set();
-          const beaconKey = (this.state.activeProfile || 'noprofile') + ':' + mode;
+          const beaconKey = mode;
           if (!this._renderedHeartbeats.has(beaconKey) &&
               window.ClientErrorReporter && typeof window.ClientErrorReporter.report === 'function') {
             this._renderedHeartbeats.add(beaconKey);
@@ -2389,7 +2342,6 @@
               message: '[viz/dispatched] '+ mode + ' rendered',
               context: 'dispatcher',
               source: JSON.stringify({
-                profile: this.state.activeProfile || null,
                 rowCount: (this.state.currentAnswers || []).length,
                 viewerIsTeacher: this.state.isEditor === true
               }).substring(0, 200)
@@ -3166,7 +3118,7 @@
     async addReaction(rowIndex, reaction) {
       // Option B / Phase 2 lesson review: 過去状態を閲覧中は read-only。
       //   サーバ側でも判別できないので client が gate するのが必須。
-      if (this.state && (this.state.viewingPastProfile || this.state.isReviewMode)) {
+      if (this.state && this.state.isReviewMode) {
         if (typeof this.showToast === 'function') {
           this.showToast(this.state.isReviewMode ? '振り返り中はリアクションできません': '過去のフェーズを閲覧中はリアクションできません');
         }
@@ -3687,7 +3639,7 @@
 
     async handleHighlight(rowIndex) {
       // Option B / Phase 2 lesson review: 過去状態閲覧中は read-only。
-      if (this.state && (this.state.viewingPastProfile || this.state.isReviewMode)) {
+      if (this.state && this.state.isReviewMode) {
         if (typeof this.showToast === 'function') {
           this.showToast(this.state.isReviewMode ? '振り返り中は操作できません': '過去のフェーズを閲覧中は操作できません');
         }
@@ -5029,10 +4981,10 @@
     /**
      *  API応答からdisplaySettingsを動的更新
      *
-     * Why (profile 跨ぎ整合性): 管理モード OFF パスと loadFormLink 等が
-     *   `UNIFIED_CONFIG.displaySettings` を「現在 active profile の値」として参照する。
+     * Why: 管理モード OFF パスと loadFormLink 等が
+     *   `UNIFIED_CONFIG.displaySettings` を「現在の設定」として参照する。
      *   admin mode ON 中も含めて毎回 server 値で同期しておかないと、bootstrap 時の値が
-     *   stale なまま残り、profile 切替後の管理モード OFF で「最初の profile の設定」に
+     *   stale なまま残り、フェーズ切替後の管理モード OFF で「最初のフェーズの設定」に
      *   戻ってしまう。表示用 globals (showCounts / displayMode) は admin mode 中は
      *   forced 値で固定するため、return ガードはその更新だけに適用。
      *
@@ -5043,7 +4995,7 @@
         return;
       }
 
-      // UNIFIED_CONFIG は admin mode 中でも常に最新の profile 設定で同期する。
+      // UNIFIED_CONFIG は admin mode 中でも常に最新の設定で同期する。
       if (window.UNIFIED_CONFIG) {
         window.UNIFIED_CONFIG.displaySettings = newDisplaySettings;
       }
@@ -5126,9 +5078,9 @@
   // Why: ES6 の class 宣言は <script> トップレベルでも window に自動公開されない。
   //      page.viz.js は window.StudyQuestApp.prototype に method を追加する設計なので、
   //      ここで明示的に公開する。これがないと viz レンダラー（renderNumberLine 等）と
-  //      モード切替バー / profile セレクタが全て無効化される silent bug になる。
+  //      mode 連動 UI が全て無効化される silent bug になる。
   window.StudyQuestApp = StudyQuestApp;
-  // page.viz.js から profile 切替後に form ボタンを強制リフレッシュするため公開。
+  // page.viz.js からフェーズ切替後に form ボタンを強制リフレッシュするため公開。
   // 通常は loadSheetData の formMeta 経由で更新されるが、ある種のキャッシュ
   // パスで取りこぼすので、明示的に getActiveFormInfo を再呼出して同期する。
   window.loadFormLink = loadFormLink;
